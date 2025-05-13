@@ -48,7 +48,10 @@ class GameScene extends Phaser.Scene {
         const playerBodyHeight = 50;
         const sledHeight = 15;
         const riderHeight = playerBodyHeight - sledHeight;
-
+        
+        // Calculate circular hitbox properties
+        const circleRadius = Math.max(playerBodyWidth, sledHeight) / 1.5;
+        
         this.player = this.add.container(200, 100);
         this.player.setSize(playerBodyWidth, playerBodyHeight);
 
@@ -62,7 +65,6 @@ class GameScene extends Phaser.Scene {
             playerBodyWidth / 2, riderHeight / 2,
             this.neonYellow
         );
-        // rider.setOrigin(0.5,0.5); // Default for triangle
 
         const sledX = 0;
         const sledY = (playerBodyHeight / 2) - (sledHeight / 2);
@@ -71,17 +73,34 @@ class GameScene extends Phaser.Scene {
             playerBodyWidth+10, sledHeight,
             this.neonRed
         );
-        // sled.setOrigin(0.5,0.5); // Default for rectangle
-
+        
+        // Add a faint circular outline to visualize the physics body (for debugging)
+        const physicsCircle = this.add.circle(0, sledY - 5, circleRadius);
+        physicsCircle.setStrokeStyle(1, 0x00ff00, 0.3);
+        
         const riderOriginMarker = this.add.circle(riderX, riderY, 5, this.debugGreen, 0.8).setDepth(20);
         const sledOriginMarker = this.add.circle(sledX, sledY, 5, this.debugOrange, 0.8).setDepth(20);
 
-        this.player.add([sled, rider, riderOriginMarker, sledOriginMarker]);
+        this.player.add([sled, rider, physicsCircle, riderOriginMarker, sledOriginMarker]);
 
+        // Add physics to the player container
         this.physics.add.existing(this.player);
+        
+        // Set a circular physics body
+        this.player.body.setCircle(circleRadius);
+        
+        // Adjust the offset to position the circle at the bottom of the sled
+        // This is important so the circle contacts the terrain properly
+        this.player.body.setOffset(
+            -circleRadius + (playerBodyWidth / 2), // center horizontally 
+            -circleRadius + playerBodyHeight - (sledHeight / 2) // align with bottom of sled
+        );
+        
+        // Physics properties
         this.player.body.setGravityY(800);
         this.player.body.setCollideWorldBounds(false);
         this.player.body.setBounce(0.1);
+        this.player.body.setFriction(0.1, 0.1); // Lower friction helps with smoother sliding
 
         console.log(`Player created. Container X: ${this.player.x}, Y: ${this.player.y}`);
         console.log(`Rider local X: ${rider.x}, Y: ${rider.y}`);
@@ -322,41 +341,86 @@ class GameScene extends Phaser.Scene {
 
         const onGround = this.player.body.blocked.down || this.player.body.touching.down;
         const speed = 300;
+        const airControl = 0.5; // Multiplier for air control (0-1)
         const leanForce = 600;
+        const airLeanForce = leanForce * airControl;
         const jumpPower = 450;
-
+        
+        // Air rotation speeds - faster than on ground for better tricks
+        const groundRotationSpeed = 250;
+        const airRotationSpeed = 400; // Faster rotation in air for tricks
+        
+        // Track if the player is doing a trick
+        const doingTrick = !onGround && (this.player.body.angularVelocity !== 0);
+        
+        // Left/Right controls - always allow rotation, but adjust force based on ground contact
         if (this.cursors.left.isDown) {
-            this.player.body.setAngularVelocity(-250);
-            if (onGround) this.player.body.setAccelerationX(-leanForce);
-        } else if (this.cursors.right.isDown) {
-            this.player.body.setAngularVelocity(250);
-            if (onGround) this.player.body.setAccelerationX(leanForce);
-        } else {
-            this.player.body.setAngularVelocity(0);
+            // Always allow rotation, on ground or in air
+            this.player.body.setAngularVelocity(onGround ? -groundRotationSpeed : -airRotationSpeed);
+            
+            // Apply acceleration with reduced effect in air
+            const force = onGround ? -leanForce : -airLeanForce;
+            this.player.body.setAccelerationX(force);
+        } 
+        else if (this.cursors.right.isDown) {
+            // Always allow rotation, on ground or in air
+            this.player.body.setAngularVelocity(onGround ? groundRotationSpeed : airRotationSpeed);
+            
+            // Apply acceleration with reduced effect in air
+            const force = onGround ? leanForce : airLeanForce;
+            this.player.body.setAccelerationX(force);
+        } 
+        else {
+            // When no input, stop rotation if on ground, but keep it in air for tricks
+            if (onGround) {
+                this.player.body.setAngularVelocity(0);
+                
+                // Gradually level out when on ground
+                if (this.player.angle !== 0) {
+                    this.player.setAngle(Phaser.Math.Linear(this.player.angle, 0, 0.2));
+                }
+            } 
+            else {
+                // In air with no input - maintain some rotation but slow it down
+                this.player.body.angularVelocity *= 0.98;
+            }
         }
-
+        
+        // Ground movement - slide based on angle
         if (onGround) {
             const angleRad = Phaser.Math.DegToRad(this.player.angle);
             const gravitySlideForce = 400;
             this.player.body.acceleration.x += Math.sin(angleRad) * gravitySlideForce;
             this.player.body.setFrictionX(0.05);
-        } else {
+            
+            // Reset trick tracking when landing
+            if (this.wasTricking && Math.abs(this.player.body.velocity.y) < 10) {
+                // Could add trick scoring logic here
+                this.wasTricking = false;
+            }
+        } 
+        else {
+            // Reduced air friction for smoother flight
             this.player.body.setFrictionX(0.01);
-            if (!this.cursors.left.isDown && !this.cursors.right.isDown) {
-                if (this.player.angle > 1) this.player.body.setAngularVelocity(-150);
-                else if (this.player.angle < -1) this.player.body.setAngularVelocity(150);
-                else {
-                    this.player.body.setAngularVelocity(0);
-                    this.player.setAngle(Phaser.Math.Linear(this.player.angle, 0, 0.1));
-                }
+            
+            // Track that we're doing a trick if we're rotating significantly
+            if (Math.abs(this.player.body.angularVelocity) > 50) {
+                this.wasTricking = true;
             }
         }
 
+        // Speed limits to prevent going too fast
         if (this.player.body.velocity.x > speed) this.player.body.setVelocityX(speed);
         if (this.player.body.velocity.x < -speed) this.player.body.setVelocityX(-speed);
 
+        // Jump only when on ground
         if ((this.cursors.up.isDown || this.cursors.space.isDown) && onGround) {
             this.player.body.setVelocityY(-jumpPower);
+            
+            // Add a slight rotational impulse on jump for style
+            const jumpRotation = (this.player.body.velocity.x > 10) ? 50 : 
+                               (this.player.body.velocity.x < -10) ? -50 : 0;
+            this.player.body.angularVelocity += jumpRotation;
         }
 
         this.manageTerrain();
