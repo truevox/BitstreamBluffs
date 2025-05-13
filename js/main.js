@@ -10,7 +10,7 @@ window.onload = function() {
             default: 'arcade',
             arcade: {
                 gravity: { y: 0 }, // Global gravity (player has its own)
-                debug: true // Set to true for physics body outlines, false for production
+                debug: true // ENSURE THIS IS TRUE to show physics body outlines
             }
         },
         scene: [BootScene, PreloadScene, GameScene]
