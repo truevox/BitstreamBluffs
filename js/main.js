@@ -1,20 +1,25 @@
 // js/main.js
-window.onload = function() {
+window.onload = () => {
     const config = {
-        type: Phaser.AUTO, // Automatically try WebGL, then Canvas
-        width: 1000, // Game width
-        height: 700, // Game height
-        parent: 'game-container', // ID of the div to contain the game
-        backgroundColor: '#000000', // Black background for Phaser canvas
+        type: Phaser.AUTO,          // WebGL if available, otherwise Canvas
+        width: 1000,
+        height: 700,
+        parent: 'game-container',
+        backgroundColor: '#000000',
+
+        // ───────────────────────────────────────────
+        //  PHYSICS: switch from Arcade → Matter
+        // ───────────────────────────────────────────
         physics: {
-            default: 'arcade',
-            arcade: {
-                gravity: { y: 0 }, // Global gravity (player has its own)
-                debug: true // ENSURE THIS IS TRUE to show physics body outlines
+            default: 'matter',
+            matter: {
+                gravity: { y: 1 },  // ≈ 1000 px/s²; tweak to taste
+                debug: true         // green wireframes; set false for production
             }
         },
-        scene: [BootScene, PreloadScene, GameScene]
+
+        scene: [ BootScene, PreloadScene, GameScene ]
     };
 
-    const game = new Phaser.Game(config);
+    new Phaser.Game(config);
 };

@@ -1,447 +1,359 @@
 // js/GameScene.js
+// Uses Phaser 3 with the built‑in Matter physics plugin.
+// ------------------------------------------------------
+
 class GameScene extends Phaser.Scene {
     constructor() {
-        super('GameScene');
-        this.player = null;
-        this.cursors = null;
-        this.terrainGraphics = null;
-        this.terrainSegments = [];
-        // this.terrainSegmentsPhysicsGroup = null; // Will be a regular group
+        super({ 
+            key: 'GameScene',
+            physics: {
+                matter: {
+                    gravity: { y: 1 },
+                    debug: true
+                }
+            }
+        });
 
-        this.segmentWidth = 100;
-        this.terrainStartX = -200;
-        this.lastTerrainY = 500;
+        // --- unchanged state -------------------------------------------------
+        this.player           = null;
+        this.cursors          = null;
+        this.terrainGraphics  = null;
+        this.terrainSegments  = [];
 
+        this.segmentWidth       = 100;
+        this.terrainStartX      = -200;
+        this.lastTerrainY       = 500;
         this.worldBoundsPadding = 2000;
 
-        this.neonYellow = 0xffff00;
-        this.neonBlue = 0x00ffff;
-        this.neonPink = 0xff00ff;
-        this.neonRed = 0xff0000;
-        this.debugGreen = 0x00ff00;
+        this.neonYellow  = 0xffff00;
+        this.neonBlue    = 0x00ffff;
+        this.neonPink    = 0xff00ff;
+        this.neonRed     = 0xff0000;
+        this.debugGreen  = 0x00ff00;
         this.debugOrange = 0xffa500;
 
-
-        this.debugTextStyle = { font: '16px Monospace', fill: '#00ff00', stroke: '#000000', strokeThickness: 2 };
+        this.debugTextStyle = {
+            font: '16px Monospace',
+            fill: '#00ff00',
+            stroke: '#000000',
+            strokeThickness: 2
+        };
         this.debugText = null;
+
+        // --- helpers for Matter ---------------------------------------------
+        this.onGround           = false;   // updated from collision events
+        this.currentSlopeAngle  = 0;       // rad
     }
 
     preload() {
-        // console.log("GameScene: preload");
+        /* nothing to load right now */
     }
 
     create() {
-        // console.log("GameScene: create");
-
+        // --------------------------------------------------------------------
+        // world + input setup (unchanged)
+        // --------------------------------------------------------------------
         this.cameras.main.setBackgroundColor('#000000');
-        this.manette = new Manette(this);
+        this.manette = new Manette(this);                 // ⬅ still works
         this.cursors = this.input.keyboard.createCursorKeys();
 
-        this.terrainGraphics = this.add.graphics();
-        // terrainSegmentsPhysicsGroup will now be a regular group to hold terrain GameObjects
-        // The physics bodies will be managed directly.
-        this.terrainSegmentsPhysicsGroup = this.add.group();
+        // switch to Matter bounds
+        this.matter.world.setBounds(
+            -this.worldBoundsPadding,
+            -this.worldBoundsPadding,
+            this.cameras.main.width  + this.worldBoundsPadding * 2,
+            this.cameras.main.height + this.worldBoundsPadding * 2
+        );
 
-
-        // --- Player Creation ---
-        const playerBodyWidth = 30;
+        // --------------------------------------------------------------------
+        // PHYSICS ‑‑ PLAYER  (now Matter)
+        // --------------------------------------------------------------------
+        const playerBodyWidth  = 30;
         const playerBodyHeight = 50;
-        const sledHeight = 15;
-        const riderHeight = playerBodyHeight - sledHeight;
-        
-        // Calculate circular hitbox properties
-        const circleRadius = Math.max(playerBodyWidth, sledHeight) / 1.5;
-        
-        this.player = this.add.container(200, 100);
-        this.player.setSize(playerBodyWidth, playerBodyHeight);
+        const sledHeight       = 15;
+        const riderHeight      = playerBodyHeight - sledHeight;
+        const circleRadius     = Math.max(playerBodyWidth, sledHeight) / 1.5;
 
-        const riderX = 12; //DO NOT TOUCH
-        // Fix rider positioning to be exactly centered over the sled
-        const riderY = -sledHeight - (riderHeight-120 / 2); //DO NOT TOUCH
-        const rider = this.add.triangle(
+        // build visuals first (unchanged)
+        const riderX = 12; // DO NOT TOUCH
+        const riderY = -sledHeight - (riderHeight - 120 / 2); // DO NOT TOUCH
+        const rider  = this.add.triangle(
             riderX, riderY,
             0, -riderHeight / 2,
             -playerBodyWidth / 2, riderHeight / 2,
-            playerBodyWidth / 2, riderHeight / 2,
+            playerBodyWidth / 2,  riderHeight / 2,
             this.neonYellow
         );
 
         const sledX = 0;
         const sledY = (playerBodyHeight / 2) - (sledHeight / 2);
-        const sled = this.add.rectangle(
+        const sled  = this.add.rectangle(
             sledX, sledY,
-            playerBodyWidth+10, sledHeight,
+            playerBodyWidth + 10,
+            sledHeight,
             this.neonRed
         );
-        
-        // Add a faint circular outline to visualize the physics body (for debugging)
-        const physicsCircle = this.add.circle(0, sledY - 5, circleRadius);
-        physicsCircle.setStrokeStyle(1, 0x00ff00, 0.3);
-        
-        const riderOriginMarker = this.add.circle(riderX, riderY, 5, this.debugGreen, 0.8).setDepth(20);
-        const sledOriginMarker = this.add.circle(sledX, sledY, 5, this.debugOrange, 0.8).setDepth(20);
 
-        this.player.add([sled, rider, physicsCircle, riderOriginMarker, sledOriginMarker]);
+        const physicsCircle = this.add.circle(0, sledY - 5, circleRadius)
+                                      .setStrokeStyle(1, 0x00ff00, 0.3);
 
-        // Add physics to the player container
-        this.physics.add.existing(this.player);
-        
-        // Set a circular physics body
-        this.player.body.setCircle(circleRadius);
-        
-        // Adjust the offset to position the circle at the bottom of the sled
-        // This is important so the circle contacts the terrain properly
-        this.player.body.setOffset(
-            -circleRadius + (playerBodyWidth / 2), // center horizontally 
-            -circleRadius + playerBodyHeight - (sledHeight / 2) // align with bottom of sled
-        );
-        
-        // Physics properties
-        this.player.body.setGravityY(800);
-        this.player.body.setCollideWorldBounds(false);
-        this.player.body.setBounce(0.1);
-        this.player.body.setFriction(0.1, 0.1); // Lower friction helps with smoother sliding
+        const riderOriginMarker = this.add.circle(riderX, riderY, 5,
+                                                  this.debugGreen, 0.8).setDepth(20);
+        const sledOriginMarker  = this.add.circle(sledX,  sledY,  5,
+                                                  this.debugOrange, 0.8).setDepth(20);
 
-        console.log(`Player created. Container X: ${this.player.x}, Y: ${this.player.y}`);
-        console.log(`Rider local X: ${rider.x}, Y: ${rider.y}`);
-        console.log(`Sled local X: ${sled.x}, Y: ${sled.y}`);
+        // create container and convert it to Matter
+        this.player = this.add.container(200, 100,
+            [sled, rider, physicsCircle, riderOriginMarker, sledOriginMarker]);
 
+        // add a circular Matter body to the container
+        const Bodies = Phaser.Physics.Matter.Matter.Bodies;
+        const playerBody = Bodies.circle(0, 0, circleRadius, {
+            restitution: 0.1,
+            friction: 0.03,  // Reduced friction for better sliding
+            density: 0.002
+        });
+
+        this.matter.add.gameObject(this.player);
+        this.player.setExistingBody(playerBody)
+                   .setFixedRotation(false)      // allow spins for tricks
+                   .setPosition(200, 100);       // re‑centre after body attach
+
+        // camera follow stays the same
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
         this.cameras.main.setFollowOffset(0, 100);
 
-        this.physics.world.setBounds(
-            -this.worldBoundsPadding, -this.worldBoundsPadding,
-            this.cameras.main.width + this.worldBoundsPadding * 2,
-            this.cameras.main.height + this.worldBoundsPadding * 2
-        );
-
+        // --------------------------------------------------------------------
+        // TERRAIN  (now Matter static rectangles)
+        // --------------------------------------------------------------------
+        this.terrainGraphics = this.add.graphics();
         console.log(`Initial terrain generation. First segment from Y: ${this.lastTerrainY}`);
+
         for (let i = 0; i < 25; i++) {
             this.generateNextTerrainSegment(i === 0);
         }
         this.drawTerrain();
         console.log(`${this.terrainSegments.length} terrain segments generated.`);
 
-        // Collider will check player against all children of terrainSegmentsPhysicsGroup
-        this.physics.add.collider(this.player, this.terrainSegmentsPhysicsGroup.getChildren(), this.playerHitTerrain, null, this);
+        // --------------------------------------------------------------------
+        // COLLISION EVENTS for slope angle + ground detection
+        // --------------------------------------------------------------------
+        this.matter.world.on('collisionstart', (event) => {
+            for (const pair of event.pairs) {
+                const { bodyA, bodyB } = pair;
 
-        this.debugText = this.add.text(10, 10, '', this.debugTextStyle).setScrollFactor(0).setDepth(100);
-        console.log("GameScene setup complete.");
+                if (bodyA === this.player.body || bodyB === this.player.body) {
+                    const other = (bodyA === this.player.body) ? bodyB : bodyA;
+
+                    if (other.terrainAngle !== undefined) {
+                        this.onGround          = true;
+                        this.currentSlopeAngle = other.terrainAngle;
+                    }
+                }
+            }
+        });
+
+        this.matter.world.on('collisionend', (event) => {
+            for (const pair of event.pairs) {
+                if (pair.bodyA === this.player.body || pair.bodyB === this.player.body) {
+                    this.onGround = false;
+                }
+            }
+        });
+
+        // --------------------------------------------------------------------
+        // DEBUG TEXT
+        // --------------------------------------------------------------------
+        this.debugText = this.add.text(10, 10, '',
+            this.debugTextStyle).setScrollFactor(0).setDepth(100);
+
+        console.log("GameScene setup complete (Matter edition).");
     }
 
-    playerHitTerrain(player, segmentGameObject) {
-        // When player hits terrain, adjust player's rotation to better match the terrain angle
-        // This helps with the physics feel of sliding along the terrain
-        
-        if (segmentGameObject && segmentGameObject.terrainAngle !== undefined) {
-            // Get the terrain angle in degrees
-            const terrainAngleDeg = Phaser.Math.RadToDeg(segmentGameObject.terrainAngle);
-            
-            // Optional: gradually adjust player's angle towards the terrain angle
-            // for smoother transition when moving from segment to segment
-            const playerAngleDeg = player.angle;
-            const angleDiff = terrainAngleDeg - playerAngleDeg;
-            
-            // Apply a small impulse based on the slope angle to help with downhill momentum
-            if (Math.abs(angleDiff) > 5 && player.body.velocity.y < 5) {
-                const slopeImpulse = Math.sin(segmentGameObject.terrainAngle) * 50;
-                player.body.velocity.x += slopeImpulse;
-            }
-            
-            // Debug info
-            if (this.debugText) {
-                this.debugText.setText([
-                    ...this.debugText.text.split('\n').slice(0, 5),
-                    `Terrain Angle: ${terrainAngleDeg.toFixed(1)}°`
-                ]);
-            }
+    // ------------------------------------------------------------------------
+    // PLAYER‑TERRAIN angle helper (called from collision handler if wanted)
+    // ------------------------------------------------------------------------
+    playerHitTerrain(terrainAngleRad) {
+        // rotate player gently toward terrain angle on touchdown
+        const targetDeg  = Phaser.Math.RadToDeg(terrainAngleRad);
+        const currentDeg = this.player.angle;
+        const diff       = targetDeg - currentDeg;
+
+        if (Math.abs(diff) > 2) {
+            this.player.setAngle(currentDeg + diff * 0.2);
         }
     }
 
+    // ------------------------------------------------------------------------
+    // TERRAIN GENERATION  (Matter static bodies replacing Arcade group)
+    // ------------------------------------------------------------------------
     generateNextTerrainSegment(isFirstSegment = false) {
         const prevX = this.terrainStartX + (this.terrainSegments.length * this.segmentWidth);
         const prevY = this.lastTerrainY;
-        let newY = prevY;
-        let segmentAngleRad;
 
-        if (isFirstSegment) { newY += Phaser.Math.Between(20, 40); }
-        else {
-            const randomFactor = Math.random();
-            if (randomFactor < 0.55) { newY += Phaser.Math.Between(10, 40); }
-            else if (randomFactor < 0.75) { newY += Phaser.Math.Between(40, 80); }
-            else if (randomFactor < 0.9) { newY += Phaser.Math.Between(-20, 10); }
-            else { newY -= Phaser.Math.Between(30, 80); }
+        // pick a new Y using the same rules
+        let newY = prevY;
+        if (isFirstSegment) {
+            newY += Phaser.Math.Between(20, 40);
+        } else {
+            const r = Math.random();
+            if      (r < 0.55) newY += Phaser.Math.Between(10,  40);
+            else if (r < 0.75) newY += Phaser.Math.Between(40,  80);
+            else if (r < 0.90) newY += Phaser.Math.Between(-20, 10);
+            else               newY -= Phaser.Math.Between(30,  80);
         }
         newY = Phaser.Math.Clamp(newY, prevY - 80, prevY + 100);
-        segmentAngleRad = Math.atan2(newY - prevY, this.segmentWidth);
+        const segmentAngleRad = Math.atan2(newY - prevY, this.segmentWidth);
 
         const segment = {
-            x1: prevX, y1: prevY, x2: prevX + this.segmentWidth, y2: newY,
+            x1: prevX, y1: prevY,
+            x2: prevX + this.segmentWidth, y2: newY,
             color: Math.random() < 0.5 ? this.neonBlue : this.neonPink,
             angle: segmentAngleRad
         };
         this.terrainSegments.push(segment);
         this.lastTerrainY = newY;
 
-        // Instead of using one big rectangle, we'll use multiple small ones to approximate the slope
-        // This ensures a smooth slope rather than steps
-        const subSegmentCount = 5; // Number of sub-segments to create for smooth slope
-        const physicsSubSegments = [];
-        
+        // break the slope into sub‑rectangles for smooth collision (unchanged count)
+        const subSegmentCount = 5;
         for (let i = 0; i < subSegmentCount; i++) {
-            // Calculate positions for this sub-segment
             const t1 = i / subSegmentCount;
             const t2 = (i + 1) / subSegmentCount;
-            
-            // Linear interpolation to find points along the line
+
             const x1 = Phaser.Math.Linear(segment.x1, segment.x2, t1);
             const y1 = Phaser.Math.Linear(segment.y1, segment.y2, t1);
             const x2 = Phaser.Math.Linear(segment.x1, segment.x2, t2);
             const y2 = Phaser.Math.Linear(segment.y1, segment.y2, t2);
-            
-            // Calculate center point and length for this sub-segment
-            const centerX = (x1 + x2) / 2;
-            const centerY = (y1 + y2) / 2;
-            const length = Phaser.Math.Distance.Between(x1, y1, x2, y2);
-            const thickness = 4; // Thinner bodies for more precise collisions
-            
-            // Create a physics body for this sub-segment
-            const subRect = this.add.rectangle(centerX, centerY, length, thickness);
-            subRect.setOrigin(0.5, 0.5);
-            
-            // Enable static physics
-            this.physics.world.enable(subRect, Phaser.Physics.Arcade.STATIC_BODY);
-            
-            // Set rotation to match this segment's slope
-            const subAngleRad = Math.atan2(y2 - y1, x2 - x1);
-            subRect.setRotation(subAngleRad);
-            
-            // Update physics body
-            subRect.body.updateFromGameObject();
-            
-            // Store properties for collision handling
-            subRect.terrainAngle = subAngleRad;
-            subRect.parentSegment = segment;
-            
-            // Add to the physics group for collision detection
-            this.terrainSegmentsPhysicsGroup.add(subRect);
-            
-            // Keep track of all sub-segments for this terrain piece
-            physicsSubSegments.push(subRect);
+
+            const centerX   = (x1 + x2) / 2;
+            const centerY   = (y1 + y2) / 2;
+            const length    = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+            const thickness = 5;
+
+            // create a static Matter rectangle (invisible, purely for collision)
+            const body = this.matter.add.rectangle(
+                centerX, centerY, length, thickness, {
+                    isStatic: true,
+                    angle   : Math.atan2(y2 - y1, x2 - x1),
+                    friction: 0.01,
+                    label   : 'terrain'
+                }
+            );
+
+            body.terrainAngle = body.angle; // store for collision callback
         }
-        
-        // Store all sub-segments with the main segment for cleanup later
-        segment.physicsSubSegments = physicsSubSegments;
     }
 
+    // ------------------------------------------------------------------------
+    // draw neon rails (visual only – unchanged)
+    // ------------------------------------------------------------------------
     drawTerrain() {
         this.terrainGraphics.clear();
-        
-        // Draw the terrain lines
-        for (const segment of this.terrainSegments) {
-            // Draw the main neon line
-            this.terrainGraphics.lineStyle(5, segment.color, 1);
-            this.terrainGraphics.beginPath();
-            this.terrainGraphics.moveTo(segment.x1, segment.y1);
-            this.terrainGraphics.lineTo(segment.x2, segment.y2);
-            this.terrainGraphics.strokePath();
-            
-            // Optional: Draw a subtle glow effect to make the lines pop
-            this.terrainGraphics.lineStyle(8, segment.color, 0.3);
-            this.terrainGraphics.beginPath();
-            this.terrainGraphics.moveTo(segment.x1, segment.y1);
-            this.terrainGraphics.lineTo(segment.x2, segment.y2);
-            this.terrainGraphics.strokePath();
-            
-            // Optional debugging - visualize the collision bodies
-            // if (segment.physicsBody && segment.physicsBody.body) {
-            //     const body = segment.physicsBody.body;
-            //     this.terrainGraphics.lineStyle(1, 0x0000ff, 0.5);
-            //     this.terrainGraphics.strokeRect(
-            //         body.x, body.y, body.width, body.height
-            //     );
-            // }
+
+        for (const seg of this.terrainSegments) {
+            this.terrainGraphics.lineStyle(5, seg.color, 1).beginPath();
+            this.terrainGraphics.moveTo(seg.x1, seg.y1);
+            this.terrainGraphics.lineTo(seg.x2, seg.y2).strokePath();
+
+            this.terrainGraphics.lineStyle(8, seg.color, 0.3).beginPath();
+            this.terrainGraphics.moveTo(seg.x1, seg.y1);
+            this.terrainGraphics.lineTo(seg.x2, seg.y2).strokePath();
         }
     }
 
+    // ------------------------------------------------------------------------
+    // manageTerrain (only the physics‑cleanup bits needed tweaking)
+    // ------------------------------------------------------------------------
     manageTerrain() {
-        const camera = this.cameras.main;
-        const lookAheadTriggerX = this.player.x + camera.width * 1.5;
-        const lastSegment = this.terrainSegments[this.terrainSegments.length - 1];
-        const lastGeneratedSegmentX = lastSegment ? lastSegment.x2 : this.terrainStartX;
+        const cam              = this.cameras.main;
+        const lookAheadTrigger = this.player.x + cam.width * 1.5;
 
-        if (lastGeneratedSegmentX < lookAheadTriggerX) {
+        const lastSeg   = this.terrainSegments[this.terrainSegments.length - 1];
+        const lastX     = lastSeg ? lastSeg.x2 : this.terrainStartX;
+        if (lastX < lookAheadTrigger) {
             this.generateNextTerrainSegment();
             this.drawTerrain();
         }
 
-        const removeThresholdX = this.player.x - camera.width * 1.5;
-        let removedAny = false;
-        
-        // Find segments that are completely off-screen (all subsegments are past threshold)
-        const segmentsToRemove = [];
-        
-        // First identify complete segments to remove
-        for (let i = 0; i < this.terrainSegments.length; i++) {
-            const segment = this.terrainSegments[i];
-            if (segment.x2 < removeThresholdX) {
-                segmentsToRemove.push(segment);
-            } else {
-                // Once we find a segment that's still on screen, we can stop checking
-                // (segments are ordered by x-position)
-                break;
-            }
-        }
-        
-        // Now clean up the identified segments
-        if (segmentsToRemove.length > 0) {
-            removedAny = true;
-            
-            // Remove each segment and its associated physics bodies
-            segmentsToRemove.forEach(segment => {
-                // Clean up all subsegments for this terrain piece
-                if (segment.physicsSubSegments) {
-                    segment.physicsSubSegments.forEach(subRect => {
-                        // Remove from physics group and destroy
-                        this.terrainSegmentsPhysicsGroup.remove(subRect, true, true);
-                    });
-                }
-                
-                // Remove the segment from our tracking array
-                const index = this.terrainSegments.indexOf(segment);
-                if (index !== -1) {
-                    this.terrainSegments.splice(index, 1);
-                }
-            });
-            
-            console.log(`Removed ${segmentsToRemove.length} terrain segments`);
-        }
-
-        if (removedAny) {
-            this.drawTerrain(); // Redraw terrain after removing segments
-            
-            if (this.terrainSegments.length === 0) {
-                console.warn("All terrain segments removed. Regenerating from player position.");
-                this.terrainStartX = this.player.x - this.segmentWidth * 10;
-                this.lastTerrainY = this.player.y + 200;
-                for (let i = 0; i < 20; i++) {
-                    this.generateNextTerrainSegment(i === 0);
-                }
-                this.drawTerrain();
-            }
+        // remove segments far behind
+        const removeThresholdX = this.player.x - cam.width * 1.5;
+        while (this.terrainSegments.length &&
+               this.terrainSegments[0].x2 < removeThresholdX) {
+            this.terrainSegments.shift();
         }
     }
 
+    // ------------------------------------------------------------------------
+    // UPDATE  (Arcade‑style controls translated to Matter)
+    // ------------------------------------------------------------------------
     update(time, delta) {
-        if(this.player && this.player.body){
-            this.player.body.setAccelerationX(0);
-        } else {
-            return; // Player not ready
-        }
+        const Body = Phaser.Physics.Matter.Matter.Body;
 
-        const onGround = this.player.body.blocked.down || this.player.body.touching.down;
-        const speed = 300;
-        const airControl = 0.5; // Multiplier for air control (0-1)
-        const leanForce = 600;
-        const airLeanForce = leanForce * airControl;
-        const jumpPower = 450;
-        
-        // Air rotation speeds - faster than on ground for better tricks
-        const groundRotationSpeed = 250;
-        const airRotationSpeed = 400; // Faster rotation in air for tricks
-        
-        // Track if the player is doing a trick
-        const doingTrick = !onGround && (this.player.body.angularVelocity !== 0);
-        
-        // Left/Right controls - always allow rotation, but adjust force based on ground contact
+        // --------------------------------------------------------------------
+        // INPUT – spin + push left/right
+        // --------------------------------------------------------------------
+        const groundRotVel = 0.05;  // ~deg/s in rad Units
+        const airRotVel    = 0.10;
+        const pushForce    = 0.002; // tune to taste
+
         if (this.cursors.left.isDown) {
-            // Always allow rotation, on ground or in air
-            this.player.body.setAngularVelocity(onGround ? -groundRotationSpeed : -airRotationSpeed);
-            
-            // Apply acceleration with reduced effect in air
-            const force = onGround ? -leanForce : -airLeanForce;
-            this.player.body.setAccelerationX(force);
-        } 
+            Body.setAngularVelocity(this.player.body,
+                this.onGround ? -groundRotVel : -airRotVel);
+
+            Body.applyForce(this.player.body,
+                this.player.body.position,
+                { x: this.onGround ? -pushForce : -pushForce * 0.5, y: 0 });
+        }
         else if (this.cursors.right.isDown) {
-            // Always allow rotation, on ground or in air
-            this.player.body.setAngularVelocity(onGround ? groundRotationSpeed : airRotationSpeed);
-            
-            // Apply acceleration with reduced effect in air
-            const force = onGround ? leanForce : airLeanForce;
-            this.player.body.setAccelerationX(force);
-        } 
-        else {
-            // When no input, stop rotation if on ground, but keep it in air for tricks
-            if (onGround) {
-                this.player.body.setAngularVelocity(0);
-                
-                // Gradually level out when on ground
-                if (this.player.angle !== 0) {
-                    this.player.setAngle(Phaser.Math.Linear(this.player.angle, 0, 0.2));
-                }
-            } 
-            else {
-                // In air with no input - maintain some rotation but slow it down
-                this.player.body.angularVelocity *= 0.98;
-            }
+            Body.setAngularVelocity(this.player.body,
+                this.onGround ? groundRotVel : airRotVel);
+
+            Body.applyForce(this.player.body,
+                this.player.body.position,
+                { x: this.onGround ?  pushForce :  pushForce * 0.5, y: 0 });
         }
-        
-        // Ground movement - slide based on angle
-        if (onGround) {
-            const angleRad = Phaser.Math.DegToRad(this.player.angle);
-            const gravitySlideForce = 400;
-            this.player.body.acceleration.x += Math.sin(angleRad) * gravitySlideForce;
-            this.player.body.setFrictionX(0.05);
-            
-            // Reset trick tracking when landing
-            if (this.wasTricking && Math.abs(this.player.body.velocity.y) < 10) {
-                // Could add trick scoring logic here
-                this.wasTricking = false;
-            }
-        } 
-        else {
-            // Reduced air friction for smoother flight
-            this.player.body.setFrictionX(0.01);
-            
-            // Track that we're doing a trick if we're rotating significantly
-            if (Math.abs(this.player.body.angularVelocity) > 50) {
-                this.wasTricking = true;
-            }
+        else if (this.onGround) {
+            Body.setAngularVelocity(this.player.body, 0);
+            // gently align to slope
+            this.playerHitTerrain(this.currentSlopeAngle);
         }
 
-        // Speed limits to prevent going too fast
-        if (this.player.body.velocity.x > speed) this.player.body.setVelocityX(speed);
-        if (this.player.body.velocity.x < -speed) this.player.body.setVelocityX(-speed);
-
-        // Jump only when on ground
-        if ((this.cursors.up.isDown || this.cursors.space.isDown) && onGround) {
-            this.player.body.setVelocityY(-jumpPower);
-            
-            // Add a slight rotational impulse on jump for style
-            const jumpRotation = (this.player.body.velocity.x > 10) ? 50 : 
-                               (this.player.body.velocity.x < -10) ? -50 : 0;
-            this.player.body.angularVelocity += jumpRotation;
+        // --------------------------------------------------------------------
+        // JUMP
+        // --------------------------------------------------------------------
+        if ((this.cursors.up.isDown || this.cursors.space.isDown) && this.onGround) {
+            Body.setVelocity(this.player.body,
+                { x: this.player.body.velocity.x, y: -10 });
+            this.onGround = false;
         }
 
+        // --------------------------------------------------------------------
+        // camera, terrain churn, fail states (unchanged)
+        // --------------------------------------------------------------------
         this.manageTerrain();
 
-        if (this.player.y > this.cameras.main.worldView.bottom + this.player.height + 300) {
+        if (this.player.y > this.cameras.main.worldView.bottom + 800) {
             console.log("Player fell too far. Restarting.");
             this.scene.restart();
         }
-        if (this.player.x < this.cameras.main.worldView.left - this.player.width - 200) {
+        if (this.player.x < this.cameras.main.worldView.left - 400) {
             console.log("Player went too far left. Restarting.");
             this.scene.restart();
         }
 
-        if (this.debugText && this.player && this.player.body) {
+        // --------------------------------------------------------------------
+        // DEBUG HUD
+        // --------------------------------------------------------------------
+        if (this.debugText) {
             this.debugText.setText([
-                `Player X: ${this.player.x.toFixed(0)}, Y: ${this.player.y.toFixed(0)}`,
-                `Vel X: ${this.player.body.velocity.x.toFixed(0)}, Y: ${this.player.body.velocity.y.toFixed(0)}`,
-                `Accel X: ${this.player.body.acceleration.x.toFixed(0)}, Accel Y: ${this.player.body.acceleration.y.toFixed(0)}`,
-                `Angle: ${this.player.angle.toFixed(1)}`,
-                `OnGround: ${onGround}`
+                `X: ${this.player.x.toFixed(0)},  Y: ${this.player.y.toFixed(0)}`,
+                `Vx: ${this.player.body.velocity.x.toFixed(2)}  ` +
+                `Vy: ${this.player.body.velocity.y.toFixed(2)}`,
+                `Angle: ${Phaser.Math.RadToDeg(this.player.body.angle).toFixed(1)}`,
+                `OnGround: ${this.onGround}`
             ]);
         }
     }
 }
+
+// export default GameScene;
