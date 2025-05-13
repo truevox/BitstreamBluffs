@@ -9,7 +9,7 @@ class GameScene extends Phaser.Scene {
             physics: {
                 matter: {
                     gravity: { y: 1 },
-                    debug: true
+                    debug: configLoader.isDebuggingEnabled()
                 }
             }
         });

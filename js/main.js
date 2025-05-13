@@ -13,8 +13,8 @@ window.onload = () => {
         physics: {
             default: 'matter',
             matter: {
-                gravity: { y: 1 },  // ≈ 1000 px/s²; tweak to taste
-                debug: true         // green wireframes; set false for production
+                gravity: { y: 1 },  // ≈ 1000 px/s²; tweak to taste
+                debug: configLoader.isDebuggingEnabled()  // Use config setting
             }
         },
 
