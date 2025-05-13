@@ -184,7 +184,9 @@ class GameScene extends Phaser.Scene {
     // TERRAIN GENERATION  (Matter static bodies replacing Arcade group)
     // ------------------------------------------------------------------------
     generateNextTerrainSegment(isFirstSegment = false) {
-        const prevX = this.terrainStartX + (this.terrainSegments.length * this.segmentWidth);
+        // Get previous endpoint from last segment instead of calculating based on array length
+        const prevSegment = this.terrainSegments[this.terrainSegments.length - 1];
+        const prevX = prevSegment ? prevSegment.x2 : this.terrainStartX;
         const prevY = this.lastTerrainY;
 
         // pick a new Y using the same rules
@@ -205,7 +207,8 @@ class GameScene extends Phaser.Scene {
             x1: prevX, y1: prevY,
             x2: prevX + this.segmentWidth, y2: newY,
             color: Math.random() < 0.5 ? this.neonBlue : this.neonPink,
-            angle: segmentAngleRad
+            angle: segmentAngleRad,
+            bodies: [] // Track associated physics bodies for later cleanup
         };
         this.terrainSegments.push(segment);
         this.lastTerrainY = newY;
@@ -232,11 +235,13 @@ class GameScene extends Phaser.Scene {
                     isStatic: true,
                     angle   : Math.atan2(y2 - y1, x2 - x1),
                     friction: 0.01,
-                    label   : 'terrain'
+                    label   : 'terrain',
+                    segmentId: this.terrainSegments.length - 1 // Associate with segment for cleanup
                 }
             );
 
             body.terrainAngle = body.angle; // store for collision callback
+            segment.bodies.push(body); // Store reference to body for cleanup
         }
     }
 
@@ -258,7 +263,7 @@ class GameScene extends Phaser.Scene {
     }
 
     // ------------------------------------------------------------------------
-    // manageTerrain (only the physics‑cleanup bits needed tweaking)
+    // manageTerrain (with proper physics body cleanup)
     // ------------------------------------------------------------------------
     manageTerrain() {
         const cam              = this.cameras.main;
@@ -273,9 +278,31 @@ class GameScene extends Phaser.Scene {
 
         // remove segments far behind
         const removeThresholdX = this.player.x - cam.width * 1.5;
-        while (this.terrainSegments.length &&
-               this.terrainSegments[0].x2 < removeThresholdX) {
-            this.terrainSegments.shift();
+        
+        // Track segments to be removed
+        const segmentsToRemove = [];
+        
+        // Identify segments to remove
+        let i = 0;
+        while (i < this.terrainSegments.length && 
+               this.terrainSegments[i].x2 < removeThresholdX) {
+            segmentsToRemove.push(this.terrainSegments[i]);
+            i++;
+        }
+        
+        // Remove the identified segments
+        if (segmentsToRemove.length > 0) {
+            // Remove physics bodies for each segment
+            segmentsToRemove.forEach(segment => {
+                if (segment.bodies) {
+                    segment.bodies.forEach(body => {
+                        this.matter.world.remove(body);
+                    });
+                }
+            });
+            
+            // Remove visual segments
+            this.terrainSegments.splice(0, segmentsToRemove.length);
         }
     }
 
