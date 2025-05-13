@@ -6,7 +6,7 @@ class GameScene extends Phaser.Scene {
         this.cursors = null;
         this.terrainGraphics = null;
         this.terrainSegments = [];
-        this.terrainSegmentsPhysicsGroup = null;
+        // this.terrainSegmentsPhysicsGroup = null; // Will be a regular group
 
         this.segmentWidth = 100;
         this.terrainStartX = -200;
@@ -18,6 +18,9 @@ class GameScene extends Phaser.Scene {
         this.neonBlue = 0x00ffff;
         this.neonPink = 0xff00ff;
         this.neonRed = 0xff0000;
+        this.debugGreen = 0x00ff00;
+        this.debugOrange = 0xffa500;
+
 
         this.debugTextStyle = { font: '16px Monospace', fill: '#00ff00', stroke: '#000000', strokeThickness: 2 };
         this.debugText = null;
@@ -35,57 +38,57 @@ class GameScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
 
         this.terrainGraphics = this.add.graphics();
-        this.terrainSegmentsPhysicsGroup = this.physics.add.staticGroup();
+        // terrainSegmentsPhysicsGroup will now be a regular group to hold terrain GameObjects
+        // The physics bodies will be managed directly.
+        this.terrainSegmentsPhysicsGroup = this.add.group();
+
 
         // --- Player Creation ---
-        const playerWidth = 30;
-        const playerHeight = 50; // Total height of the container for physics
-        const sledHeight = 15;   // Height of the sled part
-        const riderHeight = playerHeight - sledHeight; // Height allocated for the rider
+        const playerBodyWidth = 30;
+        const playerBodyHeight = 50;
+        const sledHeight = 15;
+        const riderHeight = playerBodyHeight - sledHeight;
 
-        // Player container - its origin becomes (0.5, 0.5) after setSize
         this.player = this.add.container(200, 100);
-        this.player.setSize(playerWidth, playerHeight); // Physics body size for the container
+        this.player.setSize(playerBodyWidth, playerBodyHeight);
 
-        // Rider: Neon Yellow equilateral triangle
-        // Rider's origin is (0.5, 0.5) by default.
-        // Position its center (0,0 locally) relative to the container's center.
+        const riderX = 12;
+        // Fix rider positioning to be exactly centered over the sled
+        const riderY = -sledHeight - (riderHeight-120 / 2);
         const rider = this.add.triangle(
-            0, // Local x within container (0 means centered horizontally)
-            -(sledHeight / 2), // Position rider's center slightly above the container's vertical center, effectively on top of the sled.
-            0, -riderHeight / 2,                      // Top point (relative to triangle's own origin)
-            -playerWidth / 2, riderHeight / 2,       // Bottom-left point
-            playerWidth / 2, riderHeight / 2,        // Bottom-right point
+            riderX, riderY,
+            0, -riderHeight / 2,
+            -playerBodyWidth / 2, riderHeight / 2,
+            playerBodyWidth / 2, riderHeight / 2,
             this.neonYellow
         );
-        // rider.setOrigin(0.5, 0.5); // Default, can be explicit
+        // rider.setOrigin(0.5,0.5); // Default for triangle
 
-        // Sled: Neon Red rectangle
-        // Sled's origin is (0.5, 0.5) by default.
-        // Position its center (0,0 locally) relative to the container's center.
+        const sledX = 0;
+        const sledY = (playerBodyHeight / 2) - (sledHeight / 2);
         const sled = this.add.rectangle(
-            0, // Local x within container (0 means centered horizontally)
-            (riderHeight / 2),  // Position sled's center slightly below the container's vertical center.
-            playerWidth,    // width of the rectangle
-            sledHeight,     // height of the rectangle
-            this.neonRed    // fill color
+            sledX, sledY,
+            playerBodyWidth, sledHeight,
+            this.neonRed
         );
-        // sled.setOrigin(0.5, 0.5); // Default, can be explicit
+        // sled.setOrigin(0.5,0.5); // Default for rectangle
 
-        this.player.add([sled, rider]); // Sled drawn first, then rider on top
+        const riderOriginMarker = this.add.circle(riderX, riderY, 5, this.debugGreen, 0.8).setDepth(20);
+        const sledOriginMarker = this.add.circle(sledX, sledY, 5, this.debugOrange, 0.8).setDepth(20);
+
+        this.player.add([sled, rider, riderOriginMarker, sledOriginMarker]);
 
         this.physics.add.existing(this.player);
         this.player.body.setGravityY(800);
         this.player.body.setCollideWorldBounds(false);
         this.player.body.setBounce(0.1);
-        this.player.body.setFrictionX(0.02);
-        this.player.body.setDamping(false);
 
-        console.log(`Player created at X: ${this.player.x}, Y: ${this.player.y}`);
+        console.log(`Player created. Container X: ${this.player.x}, Y: ${this.player.y}`);
+        console.log(`Rider local X: ${rider.x}, Y: ${rider.y}`);
+        console.log(`Sled local X: ${sled.x}, Y: ${sled.y}`);
 
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
         this.cameras.main.setFollowOffset(0, 100);
-        this.cameras.main.setZoom(1);
 
         this.physics.world.setBounds(
             -this.worldBoundsPadding, -this.worldBoundsPadding,
@@ -93,30 +96,31 @@ class GameScene extends Phaser.Scene {
             this.cameras.main.height + this.worldBoundsPadding * 2
         );
 
-        console.log(`Initial terrain generation starting. First segment from Y: ${this.lastTerrainY}`);
+        console.log(`Initial terrain generation. First segment from Y: ${this.lastTerrainY}`);
         for (let i = 0; i < 25; i++) {
             this.generateNextTerrainSegment(i === 0);
         }
-        this.drawTerrain(); // Draws the visual neon lines
+        this.drawTerrain();
         console.log(`${this.terrainSegments.length} terrain segments generated.`);
 
-        this.physics.add.collider(this.player, this.terrainSegmentsPhysicsGroup, this.playerHitTerrain, null, this);
+        // Collider will check player against all children of terrainSegmentsPhysicsGroup
+        this.physics.add.collider(this.player, this.terrainSegmentsPhysicsGroup.getChildren(), this.playerHitTerrain, null, this);
 
         this.debugText = this.add.text(10, 10, '', this.debugTextStyle).setScrollFactor(0).setDepth(100);
-
-        console.log("GameScene setup complete. Physics debug outlines should be visible and ROTATED for terrain.");
+        console.log("GameScene setup complete.");
     }
 
     playerHitTerrain(player, segmentGameObject) {
-        console.log(`Player hit terrain. Segment Angle (deg): ${Phaser.Math.RadToDeg(segmentGameObject.terrainAngle).toFixed(1)}`);
+        // segmentGameObject is the Phaser.GameObjects.Rectangle used for physics
+        // Log the GameObject's rotation (which we set)
+        console.log(`Player hit terrain. Segment GO Rotation (deg): ${Phaser.Math.RadToDeg(segmentGameObject.rotation).toFixed(1)}`);
     }
 
     generateNextTerrainSegment(isFirstSegment = false) {
         const prevX = this.terrainStartX + (this.terrainSegments.length * this.segmentWidth);
         const prevY = this.lastTerrainY;
-
         let newY = prevY;
-        let segmentAngleRad; // Angle in radians
+        let segmentAngleRad;
 
         if (isFirstSegment) { newY += Phaser.Math.Between(20, 40); }
         else {
@@ -132,7 +136,7 @@ class GameScene extends Phaser.Scene {
         const segment = {
             x1: prevX, y1: prevY, x2: prevX + this.segmentWidth, y2: newY,
             color: Math.random() < 0.5 ? this.neonBlue : this.neonPink,
-            angle: segmentAngleRad // Store angle in radians
+            angle: segmentAngleRad
         };
         this.terrainSegments.push(segment);
         this.lastTerrainY = newY;
@@ -142,28 +146,30 @@ class GameScene extends Phaser.Scene {
         const length = Phaser.Math.Distance.Between(segment.x1, segment.y1, segment.x2, segment.y2);
         const thickness = 10;
 
+        // 1. Create the Rectangle GameObject
         const terrainRect = this.add.rectangle(centerX, centerY, length, thickness);
-        terrainRect.setVisible(false); // Keep invisible, debug outlines should still show.
+        terrainRect.setOrigin(0.5, 0.5);
+        terrainRect.setVisible(false); // Debug outlines should still show if global debug is true
 
-        this.physics.add.existing(terrainRect, true); // true for static body
+        // 2. Enable static physics body directly on the GameObject
+        this.physics.world.enableBody(terrainRect, Phaser.Physics.Arcade.STATIC_BODY);
+        // Note: enableBody sets properties like immovable=true, allowGravity=false for static bodies.
 
-        // Set the GameObject's rotation (in radians) - this also orients the debug draw if visible
+        // 3. Set GameObject's rotation (in radians)
         terrainRect.setRotation(segmentAngleRad);
 
-        // CRITICAL FIX: Set the Arcade Physics Body's angle property directly (in degrees).
-        if (terrainRect.body instanceof Phaser.Physics.Arcade.StaticBody || terrainRect.body instanceof Phaser.Physics.Arcade.Body) {
-            terrainRect.body.angle = Phaser.Math.RadToDeg(segmentAngleRad);
+        // 4. CRITICAL: Update the body from the GameObject's transform
+        if (terrainRect.body) {
+            terrainRect.body.updateFromGameObject();
+        } else {
+            console.error(`Terrain segment at (${centerX}, ${centerY}) created WITHOUT a physics body!`);
         }
 
-        // Refresh the physics body to reflect changes.
-        // This ensures the collision bounds are updated after rotation.
-        if (terrainRect.body.world) {
-            terrainRect.body.updateFromGameObject();
-        }
+        // 5. Add to a regular group for tracking/management (and for the collider)
+        this.terrainSegmentsPhysicsGroup.add(terrainRect);
 
         terrainRect.terrainAngle = segmentAngleRad; // Custom property
-        this.terrainSegmentsPhysicsGroup.add(terrainRect); // Add to group for collision
-        segment.physicsBody = terrainRect;
+        segment.physicsBody = terrainRect; // Reference to the GameObject
     }
 
     drawTerrain() {
@@ -189,22 +195,30 @@ class GameScene extends Phaser.Scene {
         }
 
         const removeThresholdX = this.player.x - camera.width * 1.5;
-        let segmentsRemovedCount = 0;
-        this.terrainSegments = this.terrainSegments.filter(segment => {
-            if (segment.x2 < removeThresholdX) {
-                if (segment.physicsBody && segment.physicsBody.active) {
-                    this.terrainSegmentsPhysicsGroup.remove(segment.physicsBody, true, true);
-                }
-                segmentsRemovedCount++;
-                return false;
+        let removedAny = false;
+        // Iterate over a copy of the group's children if modifying the group directly
+        const childrenToRemove = [];
+        this.terrainSegmentsPhysicsGroup.getChildren().forEach(terrainRect => {
+            if (terrainRect.x + (terrainRect.width / 2) < removeThresholdX) { // Check right edge of body
+                 childrenToRemove.push(terrainRect);
             }
-            return true;
         });
 
-        if (segmentsRemovedCount > 0) {
-            this.drawTerrain();
+        childrenToRemove.forEach(terrainRect => {
+            // Remove from our tracking array first
+            this.terrainSegments = this.terrainSegments.filter(s => s.physicsBody !== terrainRect);
+            // Then destroy the GameObject (which also removes its body and from the group)
+            terrainRect.destroy();
+            removedAny = true;
+        });
+
+
+        if (removedAny) {
+            this.drawTerrain(); // Redraw if any visual segments might have changed (though physics is main concern)
             if (this.terrainSegments.length > 0) {
-                this.terrainStartX = this.terrainSegments[0].x1;
+                 // This might need adjustment if terrainStartX isn't purely based on array index anymore
+                // For now, let's assume it's okay, or we might need a different way to track the leading edge.
+                // this.terrainStartX = this.terrainSegments[0].x1;
             } else {
                 console.warn("All terrain segments removed. Regenerating from player position.");
                 this.terrainStartX = this.player.x - this.segmentWidth * 10;
@@ -216,6 +230,12 @@ class GameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
+        if(this.player && this.player.body){
+            this.player.body.setAccelerationX(0);
+        } else {
+            return; // Player not ready
+        }
+
         const onGround = this.player.body.blocked.down || this.player.body.touching.down;
         const speed = 300;
         const leanForce = 600;
@@ -229,7 +249,6 @@ class GameScene extends Phaser.Scene {
             if (onGround) this.player.body.setAccelerationX(leanForce);
         } else {
             this.player.body.setAngularVelocity(0);
-            this.player.body.setAccelerationX(0);
         }
 
         if (onGround) {
@@ -270,7 +289,8 @@ class GameScene extends Phaser.Scene {
         if (this.debugText && this.player && this.player.body) {
             this.debugText.setText([
                 `Player X: ${this.player.x.toFixed(0)}, Y: ${this.player.y.toFixed(0)}`,
-                `Velocity X: ${this.player.body.velocity.x.toFixed(0)}, Y: ${this.player.body.velocity.y.toFixed(0)}`,
+                `Vel X: ${this.player.body.velocity.x.toFixed(0)}, Y: ${this.player.body.velocity.y.toFixed(0)}`,
+                `Accel X: ${this.player.body.acceleration.x.toFixed(0)}, Accel Y: ${this.player.body.acceleration.y.toFixed(0)}`,
                 `Angle: ${this.player.angle.toFixed(1)}`,
                 `OnGround: ${onGround}`
             ]);
