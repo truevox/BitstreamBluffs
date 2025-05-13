@@ -1,0 +1,16 @@
+# Dependencies
+/node_modules
+
+# Parcel cache and build artifacts
+/.parcel-cache
+/dist
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db

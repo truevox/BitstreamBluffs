@@ -1,163 +1,214 @@
-Bitstream Bluffs: Cold Booting Debumont – A SledHEAD Simulation
-Complete Design Document (v0.2 – revised for longer loop & four defined tricks)
+# **Bitstream Bluffs**
 
-🚀 Game Pillars (Immutable)
-#	Pillar	Explanation
-1	Carve or Crash	Downhill‑only, momentum‑driven sledding. No uphill, no brakes—master the slope or eat snow‑static.
-2	Every Run a Story	A seed starts it; a Pascal’s Ledger hash ends it. Each session is a tiny legend you can share verbatim.
-3	Glitch Is Gospel	Visual, audio, and even physics corruption are celebrated, not hidden. Bit‑rot is part of the aesthetic.
-4	Portable Core	All game logic is engine‑agnostic so it can be transplanted to Unity, Cocos, or anything else later.
-5	Fail Fast, Then Flow	Boot‑in → sled as long as you can (1–5 min target) → spectacular crash → instant restart. Total downtime between crash and new ride ≤ 10 seconds.
+*A downhill‑only, neon‑soaked, trick‑and‑race slice of* ***SledHEAD***
 
-Clarification: “Boot‑sledge‑explode loop ≤ 10 s” refers only to restart friction—the time between death and new sled on slope. The playable run itself is intended to last 1‑3 minutes on average, up to 5 minutes for talented riders.
+---
 
-🧠 Core Gameplay
-1. Physics‑Driven Sledding (2D Side‑Scrolling)
-Gravity, slope angle, drag, and air‑resistance all simulated in SledPhysicsEngine.js.
+## 1. Game Pillars
 
-Collision with terrain edges and hazards.
+| #                               | Immutable Principle                                                                                                                                                             | Why It Exists |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **1. Flow State First**         | Every action (tilt, trick, bounce) pushes players toward an unbroken *flow* of carve ➜ air ➜ land. If a feature kills momentum, it’s out.                                       |               |
+| **2. Readable Chaos**           | Levels look wild—glitches, laser‑edges, data vents—but silhouettes & hit‑boxes stay crystal‑clear so players always know why they crashed or scored big. Simple retro graphics. |               |
+| **3. One‑More‑Run Loop ≤ 10 s** | Boot, sledge, explode, restart in under 10 seconds. Instant retry keeps the “just one more” addiction alive.                                                                    |               |
+| **4. Tricks Reward Risk**       | Style counts: harder air‑control & combo timing = exponentially higher score multipliers. If you play safe you finish farther, but leaderboard kings live on the edge.          |               |
+| **5. Seeded But Surprising**    | Procedural seeds guarantee shareable runs; layered glitches & optional daily patch rules keep even identical seeds feeling slightly “alive.”                                    |               |
 
-Camera auto‑scrolls; player can’t stall the screen.
+---
 
-2. Defined Trick Set
-Trick	Input Pattern	Effect	Scoring Note
-Helicopter (CW)	Hold Right while airborne; complete ≥ 360° clockwise spin	Pure style (no physics change)	Base score + rotation multiplier
-Helicopter (CCW)	Hold Left while airborne; ≥ 360° counter‑clockwise spin	Pure style	Same scoring rules; separate trick ID
-Air Brake	Hold Down mid‑air	Sled swings behind rider, sharply increases drag (slowdown)	Opens tactical short‑landing routes
-Parachute	Press Jump/Tuck once in air, then hold Up	Deploys glitch‑parachute sprite, slightly increases hang‑time	Enables longer combo chains
+## 2. Visual & Tech Spec
 
-Trick detection lives in TrickDetector.js. Combos multiply score if performed in one airtime window.
+| Aspect                  | Detail                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Art Style**           | 1‑bit–outline *Tron*‑wireframe plus neon fill ( cyan,  magenta,  lime,  amber). 16×16→128×128 pixel tiles; upscale w/ **xBRZ** or **EPX** to preserve crispness is a sprite-based stretch goal. For this prototype, use artistically arranged basic shapes instead of sprites to begin with - I'll replace them with sprites during a final art pass, if it's needed. |
+| **Glitch VFX**          | Every 3–6s trigger a **visual glitch event** (shader‑based RGB split + scanline wobble is one example) & **audio drop‑out or static** (50–200 ms). Seeds decide pattern so runs are deterministic.                                                                                                                                                                        |
+| **Asset Pipeline**      | Stretch goal is Aseprite → 8‑frame PNG strips → TexturePacker → **Phaser 3.80 Spine** runtime (skeletal for rider) + spritesheets for terrain/hazards. All exported under `/assets/…`. This prototype should use artistically arranged shapes rather than sprites.                                                                                                        |
+| **Audio**               | 48 kHz **.ogg**; FM‑chip synth base, side‑chain ducked to SFX. Separate *“glitch bus”* applies bit‑crush & stutter during VFX events. For this prototype, just make the sounds programmatically.                                                                                                                                                                          |
+| **Resolution & Camera** | Virtual canvas 480 × 270 (16 × 9). Pixel‑perfect camera scaled to device.                                                                                                                                                                                                                                                                                                 |
 
-3. Procedural Terrain & Hazards
-Terrain slice built deterministically from seed:
+---
 
-Hazard	Behavior
-Firewall Gate	1‑tile barrier; pass when color matches flicker or fry instantly
-Glitch Node	Inverts gravity or flips terrain normals for N seconds
-Bitstream Rail	Magnetizes sled forward; speed boost, can chain tricks
-Data Chasm	Gap between slices; requires jump, rail, or parachute
+## 3. Target Platforms & Performance
 
-🎨 Art & Aesthetic
-Palette: 1‑bit base (black/white) with neon accents (#39FF14 green, #FF003C red, #A03CFF purple).
+| Platform                   | Goal FPS                                                                                                               | Notes |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----- |
+| **PC (Win/Linux/macOS)**   | 60 FPS target & hard‑cap  (V‑sync off) to avoid logic runaway.                                                         |       |
+| **Steam Deck**             | 40 FPS battery mode / 60 FPS plugged. Verified Deck Input glyphs.                                                      |       |
+| **Mobile (iOS & Android)** | 30 FPS floor on mid‑range 2020 phones. **Gamepad first** (Bluetooth), fallback: on‑screen overlay mirrors WASD/Arrows. |       |
 
-Tiles: 16×16 px; sled 32×16 px with eight animation frames.
+Performance Guard‑Rails
 
-Shaders:
+* Dynamic timestep capped at 8 ms.
+* Terrain chunk pool (object‑recycle).
+* WebGL 2 mandatory; canvas fallback omitted.
 
-ramSmear.frag – horizontal pixel bleed during high speed
+---
 
-bitrotNoise.frag – random bit‑flip speckles on crashes
+## 4. Core Mechanics
 
-Background: Three parallax layers populated by “memory fragments” (low‑poly cubes, scroll @ 1×/0.5×/0.25×).
+### 4.1 Input Map
 
-🔧 Architecture & Portability
-Copy
-Edit
-bitstream-bluffs/
-├─ core/
-│  ├─ SledPhysicsEngine.js
-│  ├─ ProceduralTerrainGenerator.js
-│  ├─ TrickDetector.js
-│  ├─ RunLogger.js
-│  └─ SeedManager.js
-├─ phaser/
-│  ├─ Renderer.js
-│  ├─ InputManager.js
-│  └─ SoundManager.js
-├─ assets/ (sprites, palettes, shaders)
-├─ tests/ (Jest)
-└─ build/ (Webpack)
-Core modules return plain objects—no Phaser types.
+```
+W – Push Forward (only when velocity < 10 px/s & slope ≥ –5°)
+A / D – Tilt Back / Forward (air & ground lean)
+S – Brake (ground friction++ or aerial angular‑damp)
+A+D – Tuck (reduces drag, −15% gravity scale)
+Space – Hop / Bump Jump
+Shift – Emergency Reset (respawn on last safe ground, –1 combo)
+←/→ – Helicopter CCW/CW (style)
+↑ – Air Brake (throw sled → decel 25%, reduces descent)
+↓ – Parachute Stall (gravity half for 0.8 s, steer locked)
+Esc/Pause – Pascal’s Ledger menu
+```
 
-Phaser layer only renders, plays audio, collects input.
+### 4.2 Physics Tuning
 
-CI: GitHub Actions → lint, test, bundle (<2 MB gzipped).
+| Parameter          | Value                                                 | Rationale                                              |
+| ------------------ | ----------------------------------------------------- | ------------------------------------------------------ |
+| Gravity            | 900 px/s²                                             | Heavier than Alto; snappy airtime.                     |
+| Max Tilt Torque    | 420 deg/s²                                            | Lets players spin 540° within average airtime.         |
+| Drag (untucked)    | 0.015                                                 | Allows speed retention on gentle slopes but not flats. |
+| Air Control Factor | 0.7                                                   | Air tilt less effective than ground lean.              |
+| Collision          | SAT on convex hull; sled & rider share compound body. |                                                        |
 
-Unity bridge later via WebGL or JS‑to‑C# wrappers.
+---
 
-🧪 Tech Stack
-Purpose	Tool
-Engine	Phaser 3 (ES6 modules)
-Build	Babel, Webpack
-Code Quality	ESLint, Prettier
-Testing	Jest (≥ 90 % coverage on /core)
-Versioning	Semantic commits (feat:, fix:)
-Hosting	GitHub Pages (auto‑deploy)
+## 5. Procedural Track Generation
 
-🥅 MVP Feature Checklist
- Seed input & validation at boot
+| Method                                                   | Pros                                | Cons                                                                         | Verdict                                   |
+| -------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------- |
+|                                                          |                                     |                                                                              |                                           |
+| **Spline‑Driven** (Bezier curves w/ control‐point noise) | Smooth flow, tunable slopes/airtime | Requires post‑process mesh; potential impossible landings if slope too steep | Best for *medium‑length* runs—core loop   |
+| **Pure Noise** (Perlin 1‑D heightmap)                    | Infinite variety, zero art cost     | Chaotic readability; hard to guarantee landable bumps                        | Use *sparingly* for end‑game glitch zones |
 
- Deterministic terrain gen from seed
+**Hybrid Recipe** (recommended)
 
- Full sled physics & collision
+1. **Seed** → deterministic PRNG
+2. **Spline Segment Pack** x N (length escalates; each seeded for angle/height variance)
+3. **Noise Zone** (difficulty spike)
+4. Loop steps 2–3 until player wipe‑out.
 
- Four tricks with scoring & combo logic
+Terrain exported as **polyline JSON** → triangulated in‑engine for ground mesh & collision.
 
- Crash detection → Pascal’s Ledger hash logger
+---
 
- HUD: speed, score, current seed, trick alerts
+## 6. Systems Design
 
- Neon pixel‑glitch visuals + parallax layers
+### 6.1 Scoring
 
- Sound stubs (sled scrape, glitch pop, crash zap)
+* **Distance**: +1 pt per meter.
+* **Trick Value**: base × rotation × airtime modifier.
+* **Combo Multiplier**: begins ×1; +0.25 per unique trick before landing; resets on landing.
+* **Style Bonus**: Perfect Landing (+20).
+* **Ledger Entries**: On death, the score stored in local IndexedDB.
 
- ≤ 10 s crash‑to‑restart turnaround
+### 6.2 Leaderboard
 
-When all above are solid, tag v0.1 “First Freeze” and publish.
+* **Initials (3 chars, though we may make it more later, so make either work)** input on Top‑10.
+* Stored per‑device; optional “export sharecode” (JSON).
+* **Daily Patch Rule (stretch goal)**: at 00:00 UTC, one movement rule toggles (e.g., *Tuck grants +50% speed, but steering −50%*). Applies to all runs; leaderboard flag shows rule id.
 
-🌱 Stretch Features
-Feature	Notes
-Ghost Replay	Record input stream + RNG offset; playback overlay.
-Daily Seed Challenge	Seed = CRC32(YYYY‑MM‑DD); post on site.
-Cloud Leaderboard	Hash + score to Cloudflare Worker (cheap).
-AI Commentary Logs	Lightweight Markov text triggered by velocity & airtime.
-Unlockable Visual Filters	Style milestones grant extra shader layers.
+### 6.3 Stretch-goal optional Roguelite Meta
 
-⏰ Suggested 5‑Sprint Roadmap
-Sprint	Focus	Key Deliverables
-0	Setup	Repo scaffold, seed UI, placeholder art
-1	Terrain & Physics	Generator v1, basic sled movement
-2	Tricks & Collisions	Implement 4 tricks, combo scoring
-3	Crash Flow & Hash	Ledger integration, restart loop
-4	Juice & Polish	Shaders, audio, README, web deploy
+* Unlock **Cosmetic Glows** & **Start‑Speed Boosts** with “Data Shards” collected after crashes. No meta power that trivializes core skill curve.
 
-(Assumes ~10 hrs/week solo dev; scale as needed.)
+---
 
-🔌 Build / Run Commands
-bash
-Copy
-Edit
-# Install
-npm install
+## 7. Content Spec
 
-# Dev server with hot reload
-npm run dev
+| Category            | Examples                                                                                                      | Behavior                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Hazards**         | *Glitch Chasm*, *Overflow Firewall*, *Packet Spike*, *Garbage‑Data Vent*                                      | Instant crash, OR speed cut, OR physics scramble for 2 s |
+| **Terrain Mods**    | High Bandwith Zones (low friction), Compression Zones (higher gravity), Wireless Bridges (gap w/ bounce pads) | Affect physics; telegraph via color coding               |
+| **Power‑Ups**       | **Clock Pulse** (+1 s slo‑mo), **Packet Burst** (+30% speed 3 s), **Hashed Backup** (negate 1 crash)          | Spawn probability scales inverse to current distance     |
+| **Difficulty Ramp** | Slope variance ↑, hazard density ↑, glitch VFX frequency ↑ for seeds > 1000 m distance                        |                                                          |
 
-# Lint + tests
-npm run test
+---
 
-# Production bundle (build/)
-npm run build
-Deploy build/ to any static host—tested on GitHub Pages and Netlify.
+## 8. Technical Architecture
 
-📜 README Outline (to include)
-Overview & Pillars
+```
+src/
+ ├─ main.ts            ← boot, config
+ ├─ scenes/
+ │   ├─ PreloadScene
+ │   ├─ RunScene
+ │   ├─ PauseScene
+ │   └─ UIScene
+ ├─ systems/
+ │   ├─ InputRouter.ts       ← gamepad / KB&M / touch
+ │   ├─ TerrainGenerator.ts  ← hybrid generator
+ │   ├─ PhysicsTuner.ts      ← exposes tweaked constants
+ │   └─ ScoreManager.ts
+ ├─ data/
+ │   ├─ chunks/*.json        ← chunk polyline & metadata
+ │   ├─ hazards/*.json       ← ScriptableObject‑style defs
+ │   └─ palettes.json
+ └─ shaders/
+     └─ glitch.frag
+```
 
-Getting Started (Node >= 18, npm >= 9)
+* **Scene Streaming**: TerrainGenerator keeps a 3‑screen buffer ahead; destroys 2‑screens behind.
+* **ScriptableObjects**: Plain JSON; each hazard defines sprite key, collision size, onHit effect, weight.
+* **Input Abstraction**: Digital & analog unified to `VirtualPad` object → emits `move`, `tilt`, `trick` events.
+* **Data‑Driven Seeds**: `seed` param hashed via xxHash → PRNG state for terrain & glitch event schedule.
+* **Save**: LocalStorage `settings`, IndexedDB `runs`, no cloud.
 
-Script Commands
+---
 
-Seed Format & Examples
+## 9. UX & Juice
 
-Contributing Guidelines (commit style, branch flow)
+| Feature             | Implementation                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Camera**          | Lerp follow X + anticipation look‑ahead; Y drifts to keep ⅓ screen above rider.                        |
+| **Screen Shake**    | Per‑pixel RNG jitter on hard land or crash.                                                            |
+| **Global Glitch**   | Full‑screen shader + audio bus stutter - every 5-15 seconds.                                           |
+| **Particle Trails** | Neon ribbon behind sled; hue shifts with speed.                                                        |
+| **UI**              | Score top‑left, combo top‑right; subtle scanline background; Ledger hash & share‑seed on death screen. |
 
-Porting Notes (Unity embed hints)
+Accessibility: color‑blind palette swap, screen‑shake toggle, 90 ° tilt‑controls for mobile.
 
-License (MIT suggested)
+---
 
-🍁 Final Notes
-Run Length Reality Check: Average ride time now explicitly 1–3 minutes, skill ceiling up to 5 minutes.
+## 10. Production Roadmap
 
-Restart Speed: Keep death‑to‑sled ≤ 10 s to preserve flow.
+| Phase                        | Duration | Exit Criteria                                                  |
+| ---------------------------- | -------- | -------------------------------------------------------------- |
+| **Prototype**                | 4 wks    | Gravity sled, tilt, single procedural hill, restart loop ≤10 s |
+| **Vertical Slice**           | 8 wks    | Core VFX, 4 hazards, chunk+noise hybrid, local leaderboard     |
+| **Alpha**                    | 6 wks    | All hazards + power‑ups, full art set, Deck verification       |
+| **Beta**                     | 4 wks    | Performance pass, accessibility, mobile overlay                |
+| **Release (Steam + Mobile)** | 2 wks    | Leaderboards stable, marketing assets, Steam achievements      |
+| **Post‑Launch**              | ongoing  | Daily patch rules, cosmetic DLC, mod‑support docs              |
 
-Trick Spec: Helicopter CW, Helicopter CCW, Air Brake, Parachute—each with distinct inputs, effects, and scoring hooks.
+---
+
+## 11. Future‑Proofing Notes
+
+* **Mod‑Ready Folders**: `/mods/terrain`, `/mods/hazards`, `/mods/shaders` hot‑loaded in dev builds.
+* **Data‑Driven Everything**: No hazard or chunk hard‑coded; new JSON → pick‑up on boot.
+* **Save Migration**: Use versioned JSON; unknown keys ignored, enabling forward compatibility.
+
+---
+
+## 12. Default Keyboard Mapping (Ship‑Ready)
+
+| Key       | Action            | Notes                                               |
+| --------- | ----------------- | --------------------------------------------------- |
+| **W**     | Propel / Push     | Flat/upslope kick; disabled in air and on downslope |
+| **A**     | Tilt Back         | CCW rotation                                        |
+| **D**     | Tilt Forward      | CW rotation                                         |
+| **S**     | Tuck              | Aerodynamic form                                    |
+| **←**     | Helicopter CCW    | Style                                               |
+| **→**     | Helicopter CW     | Style                                               |
+| **↑**     | Air Brake         | Horizontal Decelerate                               |
+| **↓**     | Parachute Stall   | Float                                               |
+| **Space** | Hop               | Terrain bump jump                                   |
+| **Shift** | Emergency Recover | Respawn, –score                                     |
+| **Esc**   | Pause / Ledger    | Menu                                                |
+
+Gamepad mirrored (Left Stick = tilt, Right Trigger = push, Face Buttons = tricks). Touch overlay maps to same virtual buttons.
+
+---
+
+### **Go code the carve.** 🛷⚡
