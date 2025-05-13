@@ -106,8 +106,8 @@ class GameScene extends Phaser.Scene {
         const Bodies = Phaser.Physics.Matter.Matter.Bodies;
         const playerBody = Bodies.circle(0, 0, circleRadius, {
             restitution: 0.1,
-            friction: 0.0003,  // Reduced friction for better sliding
-            density: 0.002
+            friction: 0.000003,  // Reduced friction for better sliding
+            density: 0.2
         });
 
         this.matter.add.gameObject(this.player);
