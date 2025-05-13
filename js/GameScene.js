@@ -90,13 +90,21 @@ class GameScene extends Phaser.Scene {
             this.neonRed
         );
 
+        // Physics circle visualization - only visible in debug mode
         const physicsCircle = this.add.circle(0, sledY - 5, circleRadius)
                                       .setStrokeStyle(1, 0x00ff00, 0.3);
 
+        // Debug markers - only visible when debug mode is enabled
         const riderOriginMarker = this.add.circle(riderX, riderY, 5,
                                                   this.debugGreen, 0.8).setDepth(20);
         const sledOriginMarker  = this.add.circle(sledX,  sledY,  5,
                                                   this.debugOrange, 0.8).setDepth(20);
+        
+        // Set visibility of debug markers based on debug mode
+        const debugEnabled = configLoader.isDebuggingEnabled();
+        riderOriginMarker.visible = debugEnabled;
+        sledOriginMarker.visible = debugEnabled;
+        physicsCircle.visible = debugEnabled;
 
         // create container and convert it to Matter
         this.player = this.add.container(200, 100,
