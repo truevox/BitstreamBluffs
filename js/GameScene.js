@@ -52,9 +52,9 @@ class GameScene extends Phaser.Scene {
         this.player = this.add.container(200, 100);
         this.player.setSize(playerBodyWidth, playerBodyHeight);
 
-        const riderX = 12;
+        const riderX = 12; //DO NOT TOUCH
         // Fix rider positioning to be exactly centered over the sled
-        const riderY = -sledHeight - (riderHeight-120 / 2);
+        const riderY = -sledHeight - (riderHeight-120 / 2); //DO NOT TOUCH
         const rider = this.add.triangle(
             riderX, riderY,
             0, -riderHeight / 2,
@@ -68,7 +68,7 @@ class GameScene extends Phaser.Scene {
         const sledY = (playerBodyHeight / 2) - (sledHeight / 2);
         const sled = this.add.rectangle(
             sledX, sledY,
-            playerBodyWidth, sledHeight,
+            playerBodyWidth+10, sledHeight,
             this.neonRed
         );
         // sled.setOrigin(0.5,0.5); // Default for rectangle
