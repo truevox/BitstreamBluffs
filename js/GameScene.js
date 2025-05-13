@@ -189,18 +189,19 @@ class GameScene extends Phaser.Scene {
         const prevX = prevSegment ? prevSegment.x2 : this.terrainStartX;
         const prevY = this.lastTerrainY;
 
-        // pick a new Y using the same rules
+        // pick a new Y using steeper slope values
         let newY = prevY;
         if (isFirstSegment) {
-            newY += Phaser.Math.Between(20, 40);
+            newY += Phaser.Math.Between(40, 70); // Steeper initial descent
         } else {
             const r = Math.random();
-            if      (r < 0.55) newY += Phaser.Math.Between(10,  40);
-            else if (r < 0.75) newY += Phaser.Math.Between(40,  80);
-            else if (r < 0.90) newY += Phaser.Math.Between(-20, 10);
-            else               newY -= Phaser.Math.Between(30,  80);
+            // Increased probability and magnitude of downward slopes
+            if      (r < 0.60) newY += Phaser.Math.Between(35,  70);  // Moderate downslope (more common)
+            else if (r < 0.85) newY += Phaser.Math.Between(70, 120);  // Steep downslope (more common)
+            else if (r < 0.95) newY += Phaser.Math.Between(-15, 25);  // Mild variation for interest
+            else               newY -= Phaser.Math.Between(10,  40);  // Occasional small upslope (less common/less steep)
         }
-        newY = Phaser.Math.Clamp(newY, prevY - 80, prevY + 100);
+        newY = Phaser.Math.Clamp(newY, prevY - 60, prevY + 150); // Allow steeper descents
         const segmentAngleRad = Math.atan2(newY - prevY, this.segmentWidth);
 
         const segment = {
