@@ -320,30 +320,55 @@ class GameScene extends Phaser.Scene {
     // ------------------------------------------------------------------------
     update(time, delta) {
         const Body = Phaser.Physics.Matter.Matter.Body;
+        
+        // Update our Manette input controller
+        this.manette.update();
 
         // --------------------------------------------------------------------
-        // INPUT – spin + push left/right
+        // INPUT – rotation control using Manette
         // --------------------------------------------------------------------
         const groundRotVel = 0.05;  // ~deg/s in rad Units
         const airRotVel    = 0.10;
         const pushForce    = 0.002; // tune to taste
 
+        // Original left/right controls for pushing and rotating on ground
         if (this.cursors.left.isDown) {
-            Body.setAngularVelocity(this.player.body,
-                this.onGround ? -groundRotVel : -airRotVel);
+            // Only apply rotation on ground (not in air)
+            if (this.onGround) {
+                Body.setAngularVelocity(this.player.body, -groundRotVel);
+            }
 
             Body.applyForce(this.player.body,
                 this.player.body.position,
                 { x: this.onGround ? -pushForce : -pushForce * 0.5, y: 0 });
         }
         else if (this.cursors.right.isDown) {
-            Body.setAngularVelocity(this.player.body,
-                this.onGround ? groundRotVel : airRotVel);
+            // Only apply rotation on ground (not in air)
+            if (this.onGround) {
+                Body.setAngularVelocity(this.player.body, groundRotVel);
+            }
 
             Body.applyForce(this.player.body,
                 this.player.body.position,
                 { x: this.onGround ?  pushForce :  pushForce * 0.5, y: 0 });
         }
+        
+        // For air rotation, check input state and apply or reset rotation accordingly
+        if (!this.onGround) {
+            // W key/left-stick up for counter-clockwise rotation in air
+            if (this.manette.isActionActive('rotateCounterClockwise')) {
+                Body.setAngularVelocity(this.player.body, -airRotVel);
+            }
+            // S key/left-stick down for clockwise rotation in air
+            else if (this.manette.isActionActive('rotateClockwise')) {
+                Body.setAngularVelocity(this.player.body, airRotVel);
+            }
+            // If neither rotation key is pressed, stop rotation immediately
+            else {
+                Body.setAngularVelocity(this.player.body, 0);
+            }
+        }
+        // When on ground, reset angular velocity and align to slope
         else if (this.onGround) {
             Body.setAngularVelocity(this.player.body, 0);
             // gently align to slope
@@ -351,9 +376,9 @@ class GameScene extends Phaser.Scene {
         }
 
         // --------------------------------------------------------------------
-        // JUMP
+        // JUMP - using space bar only via Manette
         // --------------------------------------------------------------------
-        if ((this.cursors.up.isDown || this.cursors.space.isDown) && this.onGround) {
+        if (this.manette.isActionActive('jump') && this.onGround) {
             Body.setVelocity(this.player.body,
                 { x: this.player.body.velocity.x, y: -10 });
             this.onGround = false;
