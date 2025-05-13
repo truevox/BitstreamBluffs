@@ -57,13 +57,9 @@ class GameScene extends Phaser.Scene {
         this.manette = new Manette(this);                 // ⬅ still works
         this.cursors = this.input.keyboard.createCursorKeys();
 
-        // switch to Matter bounds
-        this.matter.world.setBounds(
-            -this.worldBoundsPadding,
-            -this.worldBoundsPadding,
-            this.cameras.main.width  + this.worldBoundsPadding * 2,
-            this.cameras.main.height + this.worldBoundsPadding * 2
-        );
+        // No world boundaries - allowing free movement
+        // We removed the setBounds call to eliminate the walls
+        // that were blocking player movement
 
         // --------------------------------------------------------------------
         // PHYSICS ‑‑ PLAYER  (now Matter)
@@ -110,7 +106,7 @@ class GameScene extends Phaser.Scene {
         const Bodies = Phaser.Physics.Matter.Matter.Bodies;
         const playerBody = Bodies.circle(0, 0, circleRadius, {
             restitution: 0.1,
-            friction: 0.03,  // Reduced friction for better sliding
+            friction: 0.0003,  // Reduced friction for better sliding
             density: 0.002
         });
 
