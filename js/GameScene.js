@@ -111,9 +111,32 @@ class GameScene extends Phaser.Scene {
     }
 
     playerHitTerrain(player, segmentGameObject) {
-        // segmentGameObject is the Phaser.GameObjects.Rectangle used for physics
-        // Log the GameObject's rotation (which we set)
-        console.log(`Player hit terrain. Segment GO Rotation (deg): ${Phaser.Math.RadToDeg(segmentGameObject.rotation).toFixed(1)}`);
+        // When player hits terrain, adjust player's rotation to better match the terrain angle
+        // This helps with the physics feel of sliding along the terrain
+        
+        if (segmentGameObject && segmentGameObject.terrainAngle !== undefined) {
+            // Get the terrain angle in degrees
+            const terrainAngleDeg = Phaser.Math.RadToDeg(segmentGameObject.terrainAngle);
+            
+            // Optional: gradually adjust player's angle towards the terrain angle
+            // for smoother transition when moving from segment to segment
+            const playerAngleDeg = player.angle;
+            const angleDiff = terrainAngleDeg - playerAngleDeg;
+            
+            // Apply a small impulse based on the slope angle to help with downhill momentum
+            if (Math.abs(angleDiff) > 5 && player.body.velocity.y < 5) {
+                const slopeImpulse = Math.sin(segmentGameObject.terrainAngle) * 50;
+                player.body.velocity.x += slopeImpulse;
+            }
+            
+            // Debug info
+            if (this.debugText) {
+                this.debugText.setText([
+                    ...this.debugText.text.split('\n').slice(0, 5),
+                    `Terrain Angle: ${terrainAngleDeg.toFixed(1)}°`
+                ]);
+            }
+        }
     }
 
     generateNextTerrainSegment(isFirstSegment = false) {
@@ -141,45 +164,84 @@ class GameScene extends Phaser.Scene {
         this.terrainSegments.push(segment);
         this.lastTerrainY = newY;
 
-        const centerX = (segment.x1 + segment.x2) / 2;
-        const centerY = (segment.y1 + segment.y2) / 2;
-        const length = Phaser.Math.Distance.Between(segment.x1, segment.y1, segment.x2, segment.y2);
-        const thickness = 10;
-
-        // 1. Create the Rectangle GameObject
-        const terrainRect = this.add.rectangle(centerX, centerY, length, thickness);
-        terrainRect.setOrigin(0.5, 0.5);
-        terrainRect.setVisible(false); // Debug outlines should still show if global debug is true
-
-        // 2. Enable static physics body directly on the GameObject
-        this.physics.world.enableBody(terrainRect, Phaser.Physics.Arcade.STATIC_BODY);
-        // Note: enableBody sets properties like immovable=true, allowGravity=false for static bodies.
-
-        // 3. Set GameObject's rotation (in radians)
-        terrainRect.setRotation(segmentAngleRad);
-
-        // 4. CRITICAL: Update the body from the GameObject's transform
-        if (terrainRect.body) {
-            terrainRect.body.updateFromGameObject();
-        } else {
-            console.error(`Terrain segment at (${centerX}, ${centerY}) created WITHOUT a physics body!`);
+        // Instead of using one big rectangle, we'll use multiple small ones to approximate the slope
+        // This ensures a smooth slope rather than steps
+        const subSegmentCount = 5; // Number of sub-segments to create for smooth slope
+        const physicsSubSegments = [];
+        
+        for (let i = 0; i < subSegmentCount; i++) {
+            // Calculate positions for this sub-segment
+            const t1 = i / subSegmentCount;
+            const t2 = (i + 1) / subSegmentCount;
+            
+            // Linear interpolation to find points along the line
+            const x1 = Phaser.Math.Linear(segment.x1, segment.x2, t1);
+            const y1 = Phaser.Math.Linear(segment.y1, segment.y2, t1);
+            const x2 = Phaser.Math.Linear(segment.x1, segment.x2, t2);
+            const y2 = Phaser.Math.Linear(segment.y1, segment.y2, t2);
+            
+            // Calculate center point and length for this sub-segment
+            const centerX = (x1 + x2) / 2;
+            const centerY = (y1 + y2) / 2;
+            const length = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+            const thickness = 4; // Thinner bodies for more precise collisions
+            
+            // Create a physics body for this sub-segment
+            const subRect = this.add.rectangle(centerX, centerY, length, thickness);
+            subRect.setOrigin(0.5, 0.5);
+            
+            // Enable static physics
+            this.physics.world.enable(subRect, Phaser.Physics.Arcade.STATIC_BODY);
+            
+            // Set rotation to match this segment's slope
+            const subAngleRad = Math.atan2(y2 - y1, x2 - x1);
+            subRect.setRotation(subAngleRad);
+            
+            // Update physics body
+            subRect.body.updateFromGameObject();
+            
+            // Store properties for collision handling
+            subRect.terrainAngle = subAngleRad;
+            subRect.parentSegment = segment;
+            
+            // Add to the physics group for collision detection
+            this.terrainSegmentsPhysicsGroup.add(subRect);
+            
+            // Keep track of all sub-segments for this terrain piece
+            physicsSubSegments.push(subRect);
         }
-
-        // 5. Add to a regular group for tracking/management (and for the collider)
-        this.terrainSegmentsPhysicsGroup.add(terrainRect);
-
-        terrainRect.terrainAngle = segmentAngleRad; // Custom property
-        segment.physicsBody = terrainRect; // Reference to the GameObject
+        
+        // Store all sub-segments with the main segment for cleanup later
+        segment.physicsSubSegments = physicsSubSegments;
     }
 
     drawTerrain() {
         this.terrainGraphics.clear();
+        
+        // Draw the terrain lines
         for (const segment of this.terrainSegments) {
+            // Draw the main neon line
             this.terrainGraphics.lineStyle(5, segment.color, 1);
             this.terrainGraphics.beginPath();
             this.terrainGraphics.moveTo(segment.x1, segment.y1);
             this.terrainGraphics.lineTo(segment.x2, segment.y2);
             this.terrainGraphics.strokePath();
+            
+            // Optional: Draw a subtle glow effect to make the lines pop
+            this.terrainGraphics.lineStyle(8, segment.color, 0.3);
+            this.terrainGraphics.beginPath();
+            this.terrainGraphics.moveTo(segment.x1, segment.y1);
+            this.terrainGraphics.lineTo(segment.x2, segment.y2);
+            this.terrainGraphics.strokePath();
+            
+            // Optional debugging - visualize the collision bodies
+            // if (segment.physicsBody && segment.physicsBody.body) {
+            //     const body = segment.physicsBody.body;
+            //     this.terrainGraphics.lineStyle(1, 0x0000ff, 0.5);
+            //     this.terrainGraphics.strokeRect(
+            //         body.x, body.y, body.width, body.height
+            //     );
+            // }
         }
     }
 
@@ -196,34 +258,56 @@ class GameScene extends Phaser.Scene {
 
         const removeThresholdX = this.player.x - camera.width * 1.5;
         let removedAny = false;
-        // Iterate over a copy of the group's children if modifying the group directly
-        const childrenToRemove = [];
-        this.terrainSegmentsPhysicsGroup.getChildren().forEach(terrainRect => {
-            if (terrainRect.x + (terrainRect.width / 2) < removeThresholdX) { // Check right edge of body
-                 childrenToRemove.push(terrainRect);
+        
+        // Find segments that are completely off-screen (all subsegments are past threshold)
+        const segmentsToRemove = [];
+        
+        // First identify complete segments to remove
+        for (let i = 0; i < this.terrainSegments.length; i++) {
+            const segment = this.terrainSegments[i];
+            if (segment.x2 < removeThresholdX) {
+                segmentsToRemove.push(segment);
+            } else {
+                // Once we find a segment that's still on screen, we can stop checking
+                // (segments are ordered by x-position)
+                break;
             }
-        });
-
-        childrenToRemove.forEach(terrainRect => {
-            // Remove from our tracking array first
-            this.terrainSegments = this.terrainSegments.filter(s => s.physicsBody !== terrainRect);
-            // Then destroy the GameObject (which also removes its body and from the group)
-            terrainRect.destroy();
+        }
+        
+        // Now clean up the identified segments
+        if (segmentsToRemove.length > 0) {
             removedAny = true;
-        });
-
+            
+            // Remove each segment and its associated physics bodies
+            segmentsToRemove.forEach(segment => {
+                // Clean up all subsegments for this terrain piece
+                if (segment.physicsSubSegments) {
+                    segment.physicsSubSegments.forEach(subRect => {
+                        // Remove from physics group and destroy
+                        this.terrainSegmentsPhysicsGroup.remove(subRect, true, true);
+                    });
+                }
+                
+                // Remove the segment from our tracking array
+                const index = this.terrainSegments.indexOf(segment);
+                if (index !== -1) {
+                    this.terrainSegments.splice(index, 1);
+                }
+            });
+            
+            console.log(`Removed ${segmentsToRemove.length} terrain segments`);
+        }
 
         if (removedAny) {
-            this.drawTerrain(); // Redraw if any visual segments might have changed (though physics is main concern)
-            if (this.terrainSegments.length > 0) {
-                 // This might need adjustment if terrainStartX isn't purely based on array index anymore
-                // For now, let's assume it's okay, or we might need a different way to track the leading edge.
-                // this.terrainStartX = this.terrainSegments[0].x1;
-            } else {
+            this.drawTerrain(); // Redraw terrain after removing segments
+            
+            if (this.terrainSegments.length === 0) {
                 console.warn("All terrain segments removed. Regenerating from player position.");
                 this.terrainStartX = this.player.x - this.segmentWidth * 10;
                 this.lastTerrainY = this.player.y + 200;
-                for (let i = 0; i < 20; i++) this.generateNextTerrainSegment(i === 0);
+                for (let i = 0; i < 20; i++) {
+                    this.generateNextTerrainSegment(i === 0);
+                }
                 this.drawTerrain();
             }
         }
