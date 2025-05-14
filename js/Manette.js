@@ -9,6 +9,7 @@ class Manette {
             rotateCounterClockwise: false,
             rotateClockwise: false,
             trickAction: false,
+            brakeAction: false,
             // Future actions can be added here
         };
 
@@ -49,6 +50,9 @@ class Manette {
                 // Right on left stick (positive X value) for trick action (tuck/parachute)
                 const leftStickX = this.gamepad.leftStick.x;
                 this.actions.trickAction = this.actions.trickAction || (leftStickX > 0.2);
+                
+                // Left on left stick (negative X value) for brake action (drag/airbrake)
+                this.actions.brakeAction = this.actions.brakeAction || (leftStickX < -0.2);
                 
                 // Jump with bottom face button (typically A on Xbox, X on PlayStation)
                 this.actions.jump = this.actions.jump || this.gamepad.buttons[0].pressed;
@@ -99,6 +103,14 @@ class Manette {
         });
         keyboard.on('keyup-D', () => {
             this.actions.trickAction = false;
+        });
+        
+        // Map A key to perform brake action (drag on ground / airbrake in air)
+        keyboard.on('keydown-A', () => {
+            this.actions.brakeAction = true;
+        });
+        keyboard.on('keyup-A', () => {
+            this.actions.brakeAction = false;
         });
         
         // Map SPACE key to jump

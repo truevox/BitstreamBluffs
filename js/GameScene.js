@@ -47,8 +47,11 @@ class GameScene extends Phaser.Scene {
         // --- trick state ----------------------------------------------------
         this.isTucking          = false;   // for ground speed boost
         this.isParachuting      = false;   // for air trick
+        this.isDragging         = false;   // for ground drag
+        this.isAirBraking       = false;   // for air brake trick
         this.prevGroundState    = false;   // to detect ground/air transitions
         this.sledOriginalY      = 0;       // to track original sled position
+        this.sledOriginalX      = 0;       // to track original sled X position
     }
 
     preload() {
@@ -96,8 +99,9 @@ class GameScene extends Phaser.Scene {
             this.neonRed
         );
         
-        // Store the original sled Y position for the parachute trick
+        // Store the original sled position for the tricks
         this.sledOriginalY = sledY;
+        this.sledOriginalX = sledX;
 
         // Physics circle visualization - only visible in debug mode
         const physicsCircle = this.add.circle(0, sledY - 5, circleRadius)
@@ -337,15 +341,18 @@ class GameScene extends Phaser.Scene {
         const groundStateChanged = this.prevGroundState !== this.onGround;
         if (groundStateChanged) {
             // Cancel any active tricks when transitioning between ground/air
-            if (this.isTucking || this.isParachuting) {
+            if (this.isTucking || this.isParachuting || this.isDragging || this.isAirBraking) {
                 this.isTucking = false;
                 this.isParachuting = false;
+                this.isDragging = false;
+                this.isAirBraking = false;
                 
-                // Reset sled position if we were parachuting
+                // Reset sled position if we were doing a trick that moved it
                 if (this.player && this.player.getChildren) {
                     const sled = this.player.getChildren()[1]; // The sled is the second child
                     if (sled) {
                         sled.y = this.sledOriginalY;
+                        sled.x = this.sledOriginalX;
                     }
                 }
             }
@@ -442,6 +449,73 @@ class GameScene extends Phaser.Scene {
             }
         }
         
+        // --------------------------------------------------------------------
+        // BRAKE ACTION - A key/left on left stick
+        // --------------------------------------------------------------------
+        // Handle drag or airbrake based on ground state
+        if (this.manette.isActionActive('brakeAction')) {
+            if (this.onGround) {
+                // DRAGGING - on ground for slight speed reduction
+                this.isDragging = true;
+                
+                // Apply backward force to slow down
+                const dragForce = 0.1; // Slows speed slightly - tune to taste
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: -dragForce, y: 0 });
+            } else {
+                // AIRBRAKE TRICK - in air for dramatic speed reduction
+                this.isAirBraking = true;
+                
+                // Move the sled behind the player for airbrake visual
+                if (this.player && this.player.getChildren) {
+                    const playerWidth = 30; // Use same value as in create()
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        // Move sled backwards behind the player
+                        sled.x = -playerWidth; // Move sled behind player
+                    }
+                }
+                
+                // Dramatically reduce horizontal velocity while airbraking (80% reduction per second)
+                // Calculate the delta reduction based on frame rate
+                const currentVelocity = this.player.body.velocity;
+                const reductionRate = 1.2; // 80% reduction per second
+                const frameReduction = reductionRate / 60; // Assuming 60fps, adjust per frame
+                
+                // Calculate new velocity with reduction, but keep a minimum speed
+                const minSpeed = 0.1; // Minimum speed to maintain
+                let newXVel = currentVelocity.x * (1 - frameReduction);
+                
+                // Ensure we don't drop below minimum speed in either direction
+                if (Math.abs(newXVel) < minSpeed) {
+                    newXVel = minSpeed * Math.sign(currentVelocity.x);
+                }
+                
+                Body.setVelocity(this.player.body, {
+                    x: newXVel,
+                    y: currentVelocity.y
+                });
+            }
+        } else {
+            // Reset brake states when button released
+            if (this.isDragging) {
+                this.isDragging = false;
+            }
+            
+            if (this.isAirBraking) {
+                this.isAirBraking = false;
+                
+                // Reset sled position
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        sled.x = this.sledOriginalX; // Reset sled horizontal position
+                    }
+                }
+            }
+        }
+        
         // For air rotation, check input state and apply or reset rotation accordingly
         if (!this.onGround) {
             // W key/left-stick up for counter-clockwise rotation in air
@@ -498,7 +572,8 @@ class GameScene extends Phaser.Scene {
                 `Speed: ${Math.abs(this.player.body.velocity.x).toFixed(2)}`,
                 `Angle: ${Phaser.Math.RadToDeg(this.player.body.angle).toFixed(1)}`,
                 `OnGround: ${this.onGround}`,
-                `Tucking: ${this.isTucking}, Parachuting: ${this.isParachuting}`
+                `Tucking: ${this.isTucking}, Parachuting: ${this.isParachuting}`,
+                `Dragging: ${this.isDragging}, AirBraking: ${this.isAirBraking}`
             ]);
         }
     }
