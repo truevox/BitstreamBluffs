@@ -54,8 +54,10 @@ class Manette {
                 // Left on left stick (negative X value) for brake action (drag/airbrake)
                 this.actions.brakeAction = this.actions.brakeAction || (leftStickX < -0.2);
                 
-                // Jump with bottom face button (typically A on Xbox, X on PlayStation)
-                this.actions.jump = this.actions.jump || this.gamepad.buttons[0].pressed;
+                // Jump with bottom face button (A on Xbox, X on PlayStation) OR right trigger (R2)
+                this.actions.jump = this.actions.jump || 
+                                   this.gamepad.buttons[0].pressed || // Bottom face button
+                                   this.gamepad.buttons[7].pressed;   // Right trigger (R2)
             }
         }
         
