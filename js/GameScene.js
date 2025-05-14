@@ -495,6 +495,7 @@ class GameScene extends Phaser.Scene {
                 `X: ${this.player.x.toFixed(0)},  Y: ${this.player.y.toFixed(0)}`,
                 `Vx: ${this.player.body.velocity.x.toFixed(2)}  ` +
                 `Vy: ${this.player.body.velocity.y.toFixed(2)}`,
+                `Speed: ${Math.abs(this.player.body.velocity.x).toFixed(2)}`,
                 `Angle: ${Phaser.Math.RadToDeg(this.player.body.angle).toFixed(1)}`,
                 `OnGround: ${this.onGround}`,
                 `Tucking: ${this.isTucking}, Parachuting: ${this.isParachuting}`
