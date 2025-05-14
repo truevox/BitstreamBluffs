@@ -43,6 +43,20 @@ class GameScene extends Phaser.Scene {
         // --- helpers for Matter ---------------------------------------------
         this.onGround           = false;   // updated from collision events
         this.currentSlopeAngle  = 0;       // rad
+        
+        // --- trick state ----------------------------------------------------
+        this.isTucking          = false;   // for ground speed boost
+        this.isParachuting      = false;   // for air trick
+        this.isDragging         = false;   // for ground drag
+        this.isAirBraking       = false;   // for air brake trick
+        this.prevGroundState    = false;   // to detect ground/air transitions
+        this.sledOriginalY      = 0;       // to track original sled position
+        this.sledOriginalX      = 0;       // to track original sled X position
+        
+        // --- walking mode state -----------------------------------------------
+        this.sledDistance       = 40;      // distance between player and sled when walking
+        // HUD text for player mode (WALKING/SLEDDING)
+        this.hudText = null;
     }
 
     preload() {
@@ -50,6 +64,7 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
+        // No local walk mode state; always use this.manette.walkMode
         // --------------------------------------------------------------------
         // world + input setup (unchanged)
         // --------------------------------------------------------------------
@@ -89,6 +104,10 @@ class GameScene extends Phaser.Scene {
             sledHeight,
             this.neonRed
         );
+        
+        // Store the original sled position for the tricks
+        this.sledOriginalY = sledY;
+        this.sledOriginalX = sledX;
 
         // Physics circle visualization - only visible in debug mode
         const physicsCircle = this.add.circle(0, sledY - 5, circleRadius)
@@ -164,6 +183,21 @@ class GameScene extends Phaser.Scene {
                 }
             }
         });
+
+        // --------------------------------------------------------------------
+        // HUD TEXT (always visible, top left)
+        // --------------------------------------------------------------------
+        this.hudText = this.add.text(10, 70, '', {
+            font: '24px monospace',
+            fill: '#ffff00',
+            stroke: '#000000',
+            strokeThickness: 5,
+            padding: { left: 10, right: 10, top: 5, bottom: 5 },
+            backgroundColor: 'rgba(0,0,0,0.75)'
+        }).setScrollFactor(0).setDepth(101);
+        
+        // Set initial HUD text
+        this.updateHudText();
 
         // --------------------------------------------------------------------
         // DEBUG TEXT
@@ -320,30 +354,293 @@ class GameScene extends Phaser.Scene {
     // ------------------------------------------------------------------------
     update(time, delta) {
         const Body = Phaser.Physics.Matter.Matter.Body;
+        
+        // Update our Manette input controller
+        this.manette.update();
+
+        // Handle walk mode transitions (use only this.manette.walkMode)
+        if (this.manette.isActionActive('toggleWalkMode')) {
+            if (this.manette.walkMode) {
+                // Just switched to walk mode
+                console.log('Entered walk mode');
+                this.isTucking = false;
+                this.isParachuting = false;
+                this.isDragging = false;
+                this.isAirBraking = false;
+                // Reset sled position for walk mode
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1];
+                    if (sled) {
+                        sled.y = this.sledOriginalY;
+                        sled.x = -this.sledDistance; // Position sled behind player
+                    }
+                }
+                // Force immediate HUD update
+                this.updateHudText();
+            } else {
+                // Just switched back to sled mode
+                console.log('Entered sled mode');
+                // Reset sled position for sled mode
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1];
+                    if (sled) {
+                        sled.y = this.sledOriginalY;
+                        sled.x = this.sledOriginalX;
+                    }
+                }
+                // Force immediate HUD update
+                this.updateHudText();
+            }
+        }
+
+        // Detect transitions between ground and air states
+        const groundStateChanged = this.prevGroundState !== this.onGround;
+        if (groundStateChanged) {
+            // Cancel any active tricks when transitioning between ground/air
+            if (this.isTucking || this.isParachuting || this.isDragging || this.isAirBraking) {
+                this.isTucking = false;
+                this.isParachuting = false;
+                this.isDragging = false;
+                this.isAirBraking = false;
+                
+                // Reset sled position if we were doing a trick that moved it
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        sled.y = this.sledOriginalY;
+                        sled.x = this.sledOriginalX;
+                    }
+                }
+            }
+            // Update previous state for next frame
+            this.prevGroundState = this.onGround;
+        }
 
         // --------------------------------------------------------------------
-        // INPUT – spin + push left/right
+        // INPUT – rotation control using Manette
         // --------------------------------------------------------------------
         const groundRotVel = 0.05;  // ~deg/s in rad Units
         const airRotVel    = 0.10;
         const pushForce    = 0.002; // tune to taste
 
+        // Original left/right controls for pushing and rotating on ground
         if (this.cursors.left.isDown) {
-            Body.setAngularVelocity(this.player.body,
-                this.onGround ? -groundRotVel : -airRotVel);
+            // Only apply rotation on ground (not in air)
+            if (this.onGround) {
+                Body.setAngularVelocity(this.player.body, -groundRotVel);
+            }
 
             Body.applyForce(this.player.body,
                 this.player.body.position,
                 { x: this.onGround ? -pushForce : -pushForce * 0.5, y: 0 });
         }
         else if (this.cursors.right.isDown) {
-            Body.setAngularVelocity(this.player.body,
-                this.onGround ? groundRotVel : airRotVel);
+            // Only apply rotation on ground (not in air)
+            if (this.onGround) {
+                Body.setAngularVelocity(this.player.body, groundRotVel);
+            }
 
             Body.applyForce(this.player.body,
                 this.player.body.position,
                 { x: this.onGround ?  pushForce :  pushForce * 0.5, y: 0 });
         }
+        
+        // --------------------------------------------------------------------
+        // WALKING MODE - Tab or L1 toggles between walking and sledding
+        // --------------------------------------------------------------------
+        if (this.manette.isWalkMode()) {
+            // We're in walking mode
+            const walkSpeed = 1.5; // Constant walking speed
+            
+            // Reset velocities for more precise control
+            Body.setVelocity(this.player.body, {
+                x: 0,
+                y: this.player.body.velocity.y // Keep vertical velocity for gravity
+            });
+            
+            // Move left with A key or left stick
+            if (this.manette.isActionActive('walkLeft')) {
+                Body.translate(this.player.body, { x: -walkSpeed, y: 0 });
+            }
+            
+            // Move right with D key or right stick
+            if (this.manette.isActionActive('walkRight')) {
+                Body.translate(this.player.body, { x: walkSpeed, y: 0 });
+            }
+            
+            // Tiny jump in walk mode
+            if (this.manette.isActionActive('jump') && this.onGround) {
+                Body.setVelocity(this.player.body,
+                    { x: this.player.body.velocity.x, y: -3 }); // Smaller jump
+                this.onGround = false;
+            }
+            
+            // Make the player upright when walking
+            const targetAngle = 0; // Upright
+            Body.setAngle(this.player.body, targetAngle);
+            Body.setAngularVelocity(this.player.body, 0);
+            
+            // Make the sled follow the player on an invisible string
+            if (this.player && this.player.getChildren) {
+                const sled = this.player.getChildren()[1]; // The sled is the second child
+                if (sled) {
+                    // Position the sled behind the player with a slight lag effect
+                    sled.x = -this.sledDistance;
+                    
+                    // If on ground, make sled stay on ground, otherwise let it follow player's Y
+                    if (this.onGround) {
+                        sled.y = this.sledOriginalY;
+                    }
+                }
+            }
+            
+            // Skip other control handlers when in walk mode
+            return;
+        }
+        
+        // --------------------------------------------------------------------
+        // TRICK ACTION - D key/right on left stick (normal sled mode)
+        // --------------------------------------------------------------------
+        // Handle tuck or parachute trick based on ground state
+        if (this.manette.isActionActive('trickAction')) {
+            if (this.onGround) {
+                // TUCKING - on ground for speed boost
+                this.isTucking = true;
+                
+                // Apply additional forward force while tucking
+                const tuckBoostForce = 0.003; // Adjust to taste
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: tuckBoostForce, y: 0 });
+            } else {
+                // PARACHUTE TRICK - in air
+                this.isParachuting = true;
+                
+                // Move the sled up for parachute trick visual
+                if (this.player && this.player.getChildren) {
+                    const playerHeight = 50; // Use same value as in create()
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        // Move sled 1.25 player-heights up
+                        sled.y = this.sledOriginalY - (playerHeight * 1.25);
+                    }
+                }
+                
+                // Reduce gravity effect while parachuting
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: 0, y: -0.1 }); // Small upward force to simulate floating
+                
+                // Preserve horizontal velocity
+                const currentVelocity = this.player.body.velocity;
+                const horizontalPreservation = 1.01; // Almost no horizontal drag
+                Body.setVelocity(this.player.body, {
+                    x: currentVelocity.x * horizontalPreservation,
+                    y: currentVelocity.y
+                });
+            }
+        } else {
+            // Reset trick states when button released
+            if (this.isTucking) {
+                this.isTucking = false;
+            }
+            
+            if (this.isParachuting) {
+                this.isParachuting = false;
+                
+                // Reset sled position
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        sled.y = this.sledOriginalY;
+                    }
+                }
+            }
+        }
+        
+        // --------------------------------------------------------------------
+        // BRAKE ACTION - A key/left on left stick
+        // --------------------------------------------------------------------
+        // Handle drag or airbrake based on ground state
+        if (this.manette.isActionActive('brakeAction')) {
+            if (this.onGround) {
+                // DRAGGING - on ground for slight speed reduction
+                this.isDragging = true;
+                
+                // Apply backward force to slow down
+                const dragForce = 0.1; // Slows speed slightly - tune to taste
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: -dragForce, y: 0 });
+            } else {
+                // AIRBRAKE TRICK - in air for dramatic speed reduction
+                this.isAirBraking = true;
+                
+                // Move the sled behind the player for airbrake visual
+                if (this.player && this.player.getChildren) {
+                    const playerWidth = 30; // Use same value as in create()
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        // Move sled backwards behind the player
+                        sled.x = -playerWidth; // Move sled behind player
+                    }
+                }
+                
+                // Dramatically reduce horizontal velocity while airbraking (80% reduction per second)
+                // Calculate the delta reduction based on frame rate
+                const currentVelocity = this.player.body.velocity;
+                const reductionRate = 1.2; // 80% reduction per second
+                const frameReduction = reductionRate / 60; // Assuming 60fps, adjust per frame
+                
+                // Calculate new velocity with reduction, but keep a minimum speed
+                const minSpeed = 0.1; // Minimum speed to maintain
+                let newXVel = currentVelocity.x * (1 - frameReduction);
+                
+                // Ensure we don't drop below minimum speed in either direction
+                if (Math.abs(newXVel) < minSpeed) {
+                    newXVel = minSpeed * Math.sign(currentVelocity.x);
+                }
+                
+                Body.setVelocity(this.player.body, {
+                    x: newXVel,
+                    y: currentVelocity.y
+                });
+            }
+        } else {
+            // Reset brake states when button released
+            if (this.isDragging) {
+                this.isDragging = false;
+            }
+            
+            if (this.isAirBraking) {
+                this.isAirBraking = false;
+                
+                // Reset sled position
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        sled.x = this.sledOriginalX; // Reset sled horizontal position
+                    }
+                }
+            }
+        }
+        
+        // For air rotation, check input state and apply or reset rotation accordingly
+        if (!this.onGround) {
+            // W key/left-stick up for counter-clockwise rotation in air
+            if (this.manette.isActionActive('rotateCounterClockwise')) {
+                Body.setAngularVelocity(this.player.body, -airRotVel);
+            }
+            // S key/left-stick down for clockwise rotation in air
+            else if (this.manette.isActionActive('rotateClockwise')) {
+                Body.setAngularVelocity(this.player.body, airRotVel);
+            }
+            // If neither rotation key is pressed, stop rotation immediately
+            else {
+                Body.setAngularVelocity(this.player.body, 0);
+            }
+        }
+        // When on ground, reset angular velocity and align to slope
         else if (this.onGround) {
             Body.setAngularVelocity(this.player.body, 0);
             // gently align to slope
@@ -351,9 +648,9 @@ class GameScene extends Phaser.Scene {
         }
 
         // --------------------------------------------------------------------
-        // JUMP
+        // JUMP - using space bar only via Manette
         // --------------------------------------------------------------------
-        if ((this.cursors.up.isDown || this.cursors.space.isDown) && this.onGround) {
+        if (this.manette.isActionActive('jump') && this.onGround) {
             Body.setVelocity(this.player.body,
                 { x: this.player.body.velocity.x, y: -10 });
             this.onGround = false;
@@ -374,6 +671,11 @@ class GameScene extends Phaser.Scene {
         }
 
         // --------------------------------------------------------------------
+        // Update HUD every frame
+        // --------------------------------------------------------------------
+        this.updateHudText();
+
+        // --------------------------------------------------------------------
         // DEBUG HUD
         // --------------------------------------------------------------------
         if (this.debugText) {
@@ -381,9 +683,21 @@ class GameScene extends Phaser.Scene {
                 `X: ${this.player.x.toFixed(0)},  Y: ${this.player.y.toFixed(0)}`,
                 `Vx: ${this.player.body.velocity.x.toFixed(2)}  ` +
                 `Vy: ${this.player.body.velocity.y.toFixed(2)}`,
+                `Speed: ${Math.abs(this.player.body.velocity.x).toFixed(2)}`,
                 `Angle: ${Phaser.Math.RadToDeg(this.player.body.angle).toFixed(1)}`,
-                `OnGround: ${this.onGround}`
+                `OnGround: ${this.onGround}`,
+                `Mode: ${this.manette.walkMode ? 'WALKING' : 'SLEDDING'}`,
+                `Tucking: ${this.isTucking}, Parachuting: ${this.isParachuting}`,
+                `Dragging: ${this.isDragging}, AirBraking: ${this.isAirBraking}`
             ]);
+        }
+    }
+    
+    // Helper method to update the HUD text
+    updateHudText() {
+        if (this.hudText) {
+            const mode = this.manette ? (this.manette.walkMode ? 'WALKING' : 'SLEDDING') : 'UNKNOWN';
+            this.hudText.setText(`MODE: ${mode}`);
         }
     }
 }
