@@ -8,6 +8,7 @@ class Manette {
             jump: false,
             rotateCounterClockwise: false,
             rotateClockwise: false,
+            trickAction: false,
             // Future actions can be added here
         };
 
@@ -44,6 +45,10 @@ class Manette {
                 
                 // Down on left stick (positive Y value)
                 this.actions.rotateClockwise = this.actions.rotateClockwise || (leftStickY > 0.2);
+                
+                // Right on left stick (positive X value) for trick action (tuck/parachute)
+                const leftStickX = this.gamepad.leftStick.x;
+                this.actions.trickAction = this.actions.trickAction || (leftStickX > 0.2);
                 
                 // Jump with bottom face button (typically A on Xbox, X on PlayStation)
                 this.actions.jump = this.actions.jump || this.gamepad.buttons[0].pressed;
@@ -86,6 +91,14 @@ class Manette {
         });
         keyboard.on('keyup-S', () => {
             this.actions.rotateClockwise = false;
+        });
+        
+        // Map D key to perform trick action (tuck on ground / parachute in air)
+        keyboard.on('keydown-D', () => {
+            this.actions.trickAction = true;
+        });
+        keyboard.on('keyup-D', () => {
+            this.actions.trickAction = false;
         });
         
         // Map SPACE key to jump

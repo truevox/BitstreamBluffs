@@ -43,6 +43,12 @@ class GameScene extends Phaser.Scene {
         // --- helpers for Matter ---------------------------------------------
         this.onGround           = false;   // updated from collision events
         this.currentSlopeAngle  = 0;       // rad
+        
+        // --- trick state ----------------------------------------------------
+        this.isTucking          = false;   // for ground speed boost
+        this.isParachuting      = false;   // for air trick
+        this.prevGroundState    = false;   // to detect ground/air transitions
+        this.sledOriginalY      = 0;       // to track original sled position
     }
 
     preload() {
@@ -89,6 +95,9 @@ class GameScene extends Phaser.Scene {
             sledHeight,
             this.neonRed
         );
+        
+        // Store the original sled Y position for the parachute trick
+        this.sledOriginalY = sledY;
 
         // Physics circle visualization - only visible in debug mode
         const physicsCircle = this.add.circle(0, sledY - 5, circleRadius)
@@ -323,6 +332,26 @@ class GameScene extends Phaser.Scene {
         
         // Update our Manette input controller
         this.manette.update();
+        
+        // Detect transitions between ground and air states
+        const groundStateChanged = this.prevGroundState !== this.onGround;
+        if (groundStateChanged) {
+            // Cancel any active tricks when transitioning between ground/air
+            if (this.isTucking || this.isParachuting) {
+                this.isTucking = false;
+                this.isParachuting = false;
+                
+                // Reset sled position if we were parachuting
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        sled.y = this.sledOriginalY;
+                    }
+                }
+            }
+            // Update previous state for next frame
+            this.prevGroundState = this.onGround;
+        }
 
         // --------------------------------------------------------------------
         // INPUT – rotation control using Manette
@@ -351,6 +380,66 @@ class GameScene extends Phaser.Scene {
             Body.applyForce(this.player.body,
                 this.player.body.position,
                 { x: this.onGround ?  pushForce :  pushForce * 0.5, y: 0 });
+        }
+        
+        // --------------------------------------------------------------------
+        // TRICK ACTION - D key/right on left stick
+        // --------------------------------------------------------------------
+        // Handle tuck or parachute trick based on ground state
+        if (this.manette.isActionActive('trickAction')) {
+            if (this.onGround) {
+                // TUCKING - on ground for speed boost
+                this.isTucking = true;
+                
+                // Apply additional forward force while tucking
+                const tuckBoostForce = 0.003; // Adjust to taste
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: tuckBoostForce, y: 0 });
+            } else {
+                // PARACHUTE TRICK - in air
+                this.isParachuting = true;
+                
+                // Move the sled up for parachute trick visual
+                if (this.player && this.player.getChildren) {
+                    const playerHeight = 50; // Use same value as in create()
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        // Move sled 1.25 player-heights up
+                        sled.y = this.sledOriginalY - (playerHeight * 1.25);
+                    }
+                }
+                
+                // Reduce gravity effect while parachuting
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: 0, y: -0.2 }); // Small upward force to simulate floating
+                
+                // Preserve horizontal velocity
+                const currentVelocity = this.player.body.velocity;
+                const horizontalPreservation = 1.005; // Almost no horizontal drag
+                Body.setVelocity(this.player.body, {
+                    x: currentVelocity.x * horizontalPreservation,
+                    y: currentVelocity.y
+                });
+            }
+        } else {
+            // Reset trick states when button released
+            if (this.isTucking) {
+                this.isTucking = false;
+            }
+            
+            if (this.isParachuting) {
+                this.isParachuting = false;
+                
+                // Reset sled position
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                    if (sled) {
+                        sled.y = this.sledOriginalY;
+                    }
+                }
+            }
         }
         
         // For air rotation, check input state and apply or reset rotation accordingly
@@ -407,7 +496,8 @@ class GameScene extends Phaser.Scene {
                 `Vx: ${this.player.body.velocity.x.toFixed(2)}  ` +
                 `Vy: ${this.player.body.velocity.y.toFixed(2)}`,
                 `Angle: ${Phaser.Math.RadToDeg(this.player.body.angle).toFixed(1)}`,
-                `OnGround: ${this.onGround}`
+                `OnGround: ${this.onGround}`,
+                `Tucking: ${this.isTucking}, Parachuting: ${this.isParachuting}`
             ]);
         }
     }
