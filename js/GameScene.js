@@ -52,6 +52,11 @@ class GameScene extends Phaser.Scene {
         this.prevGroundState    = false;   // to detect ground/air transitions
         this.sledOriginalY      = 0;       // to track original sled position
         this.sledOriginalX      = 0;       // to track original sled X position
+        
+        // --- walking mode state -----------------------------------------------
+        this.sledDistance       = 40;      // distance between player and sled when walking
+        // HUD text for player mode (WALKING/SLEDDING)
+        this.hudText = null;
     }
 
     preload() {
@@ -59,6 +64,7 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
+        // No local walk mode state; always use this.manette.walkMode
         // --------------------------------------------------------------------
         // world + input setup (unchanged)
         // --------------------------------------------------------------------
@@ -177,6 +183,21 @@ class GameScene extends Phaser.Scene {
                 }
             }
         });
+
+        // --------------------------------------------------------------------
+        // HUD TEXT (always visible, top left)
+        // --------------------------------------------------------------------
+        this.hudText = this.add.text(10, 70, '', {
+            font: '24px monospace',
+            fill: '#ffff00',
+            stroke: '#000000',
+            strokeThickness: 5,
+            padding: { left: 10, right: 10, top: 5, bottom: 5 },
+            backgroundColor: 'rgba(0,0,0,0.75)'
+        }).setScrollFactor(0).setDepth(101);
+        
+        // Set initial HUD text
+        this.updateHudText();
 
         // --------------------------------------------------------------------
         // DEBUG TEXT
@@ -336,7 +357,42 @@ class GameScene extends Phaser.Scene {
         
         // Update our Manette input controller
         this.manette.update();
-        
+
+        // Handle walk mode transitions (use only this.manette.walkMode)
+        if (this.manette.isActionActive('toggleWalkMode')) {
+            if (this.manette.walkMode) {
+                // Just switched to walk mode
+                console.log('Entered walk mode');
+                this.isTucking = false;
+                this.isParachuting = false;
+                this.isDragging = false;
+                this.isAirBraking = false;
+                // Reset sled position for walk mode
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1];
+                    if (sled) {
+                        sled.y = this.sledOriginalY;
+                        sled.x = -this.sledDistance; // Position sled behind player
+                    }
+                }
+                // Force immediate HUD update
+                this.updateHudText();
+            } else {
+                // Just switched back to sled mode
+                console.log('Entered sled mode');
+                // Reset sled position for sled mode
+                if (this.player && this.player.getChildren) {
+                    const sled = this.player.getChildren()[1];
+                    if (sled) {
+                        sled.y = this.sledOriginalY;
+                        sled.x = this.sledOriginalX;
+                    }
+                }
+                // Force immediate HUD update
+                this.updateHudText();
+            }
+        }
+
         // Detect transitions between ground and air states
         const groundStateChanged = this.prevGroundState !== this.onGround;
         if (groundStateChanged) {
@@ -390,7 +446,60 @@ class GameScene extends Phaser.Scene {
         }
         
         // --------------------------------------------------------------------
-        // TRICK ACTION - D key/right on left stick
+        // WALKING MODE - Tab or L1 toggles between walking and sledding
+        // --------------------------------------------------------------------
+        if (this.manette.isWalkMode()) {
+            // We're in walking mode
+            const walkSpeed = 1.5; // Constant walking speed
+            
+            // Reset velocities for more precise control
+            Body.setVelocity(this.player.body, {
+                x: 0,
+                y: this.player.body.velocity.y // Keep vertical velocity for gravity
+            });
+            
+            // Move left with A key or left stick
+            if (this.manette.isActionActive('walkLeft')) {
+                Body.translate(this.player.body, { x: -walkSpeed, y: 0 });
+            }
+            
+            // Move right with D key or right stick
+            if (this.manette.isActionActive('walkRight')) {
+                Body.translate(this.player.body, { x: walkSpeed, y: 0 });
+            }
+            
+            // Tiny jump in walk mode
+            if (this.manette.isActionActive('jump') && this.onGround) {
+                Body.setVelocity(this.player.body,
+                    { x: this.player.body.velocity.x, y: -3 }); // Smaller jump
+                this.onGround = false;
+            }
+            
+            // Make the player upright when walking
+            const targetAngle = 0; // Upright
+            Body.setAngle(this.player.body, targetAngle);
+            Body.setAngularVelocity(this.player.body, 0);
+            
+            // Make the sled follow the player on an invisible string
+            if (this.player && this.player.getChildren) {
+                const sled = this.player.getChildren()[1]; // The sled is the second child
+                if (sled) {
+                    // Position the sled behind the player with a slight lag effect
+                    sled.x = -this.sledDistance;
+                    
+                    // If on ground, make sled stay on ground, otherwise let it follow player's Y
+                    if (this.onGround) {
+                        sled.y = this.sledOriginalY;
+                    }
+                }
+            }
+            
+            // Skip other control handlers when in walk mode
+            return;
+        }
+        
+        // --------------------------------------------------------------------
+        // TRICK ACTION - D key/right on left stick (normal sled mode)
         // --------------------------------------------------------------------
         // Handle tuck or parachute trick based on ground state
         if (this.manette.isActionActive('trickAction')) {
@@ -562,6 +671,11 @@ class GameScene extends Phaser.Scene {
         }
 
         // --------------------------------------------------------------------
+        // Update HUD every frame
+        // --------------------------------------------------------------------
+        this.updateHudText();
+
+        // --------------------------------------------------------------------
         // DEBUG HUD
         // --------------------------------------------------------------------
         if (this.debugText) {
@@ -572,9 +686,18 @@ class GameScene extends Phaser.Scene {
                 `Speed: ${Math.abs(this.player.body.velocity.x).toFixed(2)}`,
                 `Angle: ${Phaser.Math.RadToDeg(this.player.body.angle).toFixed(1)}`,
                 `OnGround: ${this.onGround}`,
+                `Mode: ${this.manette.walkMode ? 'WALKING' : 'SLEDDING'}`,
                 `Tucking: ${this.isTucking}, Parachuting: ${this.isParachuting}`,
                 `Dragging: ${this.isDragging}, AirBraking: ${this.isAirBraking}`
             ]);
+        }
+    }
+    
+    // Helper method to update the HUD text
+    updateHudText() {
+        if (this.hudText) {
+            const mode = this.manette ? (this.manette.walkMode ? 'WALKING' : 'SLEDDING') : 'UNKNOWN';
+            this.hudText.setText(`MODE: ${mode}`);
         }
     }
 }

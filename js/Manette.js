@@ -10,8 +10,14 @@ class Manette {
             rotateClockwise: false,
             trickAction: false,
             brakeAction: false,
+            toggleWalkMode: false,
+            walkLeft: false,
+            walkRight: false,
             // Future actions can be added here
         };
+        
+        // Track if we're in walk mode
+        this.walkMode = false;
 
         // Track gamepad state
         this.gamepad = null;
@@ -32,6 +38,16 @@ class Manette {
     }
 
     update() {
+        // Reset edge-triggered actions
+        this.actions.toggleWalkMode = false;
+        
+        // Tab key is now handled via the window event listener
+        // toggle action is reset each frame unless toggled this frame
+        if (!this.tabToggled) {
+            this.actions.toggleWalkMode = false;
+        }
+        this.tabToggled = false;
+        
         // Check for gamepad connections/disconnections (if gamepad API is available)
         if (this.scene.input.gamepad) {
             this.updateGamepadConnection();
@@ -51,13 +67,45 @@ class Manette {
                 const leftStickX = this.gamepad.leftStick.x;
                 this.actions.trickAction = this.actions.trickAction || (leftStickX > 0.2);
                 
-                // Left on left stick (negative X value) for brake action (drag/airbrake)
-                this.actions.brakeAction = this.actions.brakeAction || (leftStickX < -0.2);
+                // Left on left stick (negative X value) for brake action (drag/airbrake) or walking left
+                if (this.walkMode) {
+                    this.actions.walkLeft = leftStickX < -0.2;
+                } else {
+                    this.actions.brakeAction = this.actions.brakeAction || (leftStickX < -0.2);
+                }
+                
+                // Right on left stick (positive X value) for trick action or walking right
+                if (this.walkMode) {
+                    this.actions.walkRight = leftStickX > 0.2;
+                } else {
+                    this.actions.trickAction = this.actions.trickAction || (leftStickX > 0.2);
+                }
                 
                 // Jump with bottom face button (A on Xbox, X on PlayStation) OR right trigger (R2)
                 this.actions.jump = this.actions.jump || 
                                    this.gamepad.buttons[0].pressed || // Bottom face button
                                    this.gamepad.buttons[7].pressed;   // Right trigger (R2)
+                                   
+                // Toggle walk mode with L1/LB button
+                if (!this.prevL1Pressed && this.gamepad.buttons[4].pressed) {
+                    this.walkMode = !this.walkMode;
+                    this.actions.toggleWalkMode = true;
+                    this.tabToggled = true; // Mark that we toggled this frame
+                    console.log(`Walk mode ${this.walkMode ? 'enabled' : 'disabled'}`);
+                    
+                    // Immediately update the HUD in the GameScene
+                    if (this.scene && this.scene.updateHudText) {
+                        this.scene.updateHudText();
+                    }
+                } else {
+                    // Only reset if we didn't toggle this frame
+                    if (!this.tabToggled) {
+                        this.actions.toggleWalkMode = false;
+                    }
+                }
+                
+                // Track previous L1 state to detect edges
+                this.prevL1Pressed = this.gamepad.buttons[4].pressed;
             }
         }
         
@@ -67,6 +115,23 @@ class Manette {
     // Helper to get action states
     isActionActive(actionName) {
         return this.actions[actionName] || false;
+    }
+    
+    // Helper to check if we're in walking mode
+    isWalkMode() {
+        return this.walkMode;
+    }
+    
+    // Helper to toggle walk mode programmatically
+    toggleWalkMode() {
+        this.walkMode = !this.walkMode;
+        
+        // If we're attached to a GameScene, notify it to update the HUD
+        if (this.scene && this.scene.updateHudText) {
+            this.scene.updateHudText();
+        }
+        
+        return this.walkMode;
     }
 
     // Helper to consume an action (e.g., for single presses like jump)
@@ -107,13 +172,64 @@ class Manette {
             this.actions.trickAction = false;
         });
         
-        // Map A key to perform brake action (drag on ground / airbrake in air)
+        // Map A key based on current mode
         keyboard.on('keydown-A', () => {
-            this.actions.brakeAction = true;
+            if (this.walkMode) {
+                this.actions.walkLeft = true;
+            } else {
+                this.actions.brakeAction = true;
+            }
         });
         keyboard.on('keyup-A', () => {
+            this.actions.walkLeft = false;
             this.actions.brakeAction = false;
         });
+        
+        // Map D key based on current mode
+        keyboard.on('keydown-D', () => {
+            if (this.walkMode) {
+                this.actions.walkRight = true;
+            } else {
+                this.actions.trickAction = true;
+            }
+        });
+        keyboard.on('keyup-D', () => {
+            this.actions.walkRight = false;
+            this.actions.trickAction = false;
+        });
+        
+        // Prevent Tab key from changing focus and directly handle it here
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Tab') {
+                // Prevent default tab behavior
+                event.preventDefault();
+                
+                // Only toggle if we haven't already toggled recently (debounce)
+                if (!this.tabDebounce) {
+                    // Toggle walk mode
+                    this.walkMode = !this.walkMode;
+                    this.actions.toggleWalkMode = true;
+                    this.tabToggled = true; // Mark that we toggled this frame
+                    console.log(`[DEBUG] Tab pressed. walkMode is now:`, this.walkMode);
+                    
+                    // Immediately update the HUD in the GameScene
+                    if (this.scene && this.scene.updateHudText) {
+                        this.scene.updateHudText();
+                    }
+                    
+                    // Set debounce for 200ms to prevent accidental double toggles
+                    this.tabDebounce = true;
+                    setTimeout(() => {
+                        this.tabDebounce = false;
+                    }, 200);
+                } else {
+                    console.log('[DEBUG] Tab debounce active, toggle ignored.');
+                }
+            }
+        });
+        
+        // Initialize debounce flag
+        this.tabDebounce = false;
         
         // Map SPACE key to jump
         keyboard.on('keydown-SPACE', () => {
