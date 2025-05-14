@@ -413,11 +413,11 @@ class GameScene extends Phaser.Scene {
                 // Reduce gravity effect while parachuting
                 Body.applyForce(this.player.body,
                     this.player.body.position,
-                    { x: 0, y: -0.2 }); // Small upward force to simulate floating
+                    { x: 0, y: -0.1 }); // Small upward force to simulate floating
                 
                 // Preserve horizontal velocity
                 const currentVelocity = this.player.body.velocity;
-                const horizontalPreservation = 1.005; // Almost no horizontal drag
+                const horizontalPreservation = 1.01; // Almost no horizontal drag
                 Body.setVelocity(this.player.body, {
                     x: currentVelocity.x * horizontalPreservation,
                     y: currentVelocity.y
