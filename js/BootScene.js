@@ -1,5 +1,8 @@
 // js/BootScene.js
-class BootScene extends Phaser.Scene {
+// Boot scene for initial game loading
+// ------------------------------------------------------
+
+export default class BootScene extends Phaser.Scene {
     constructor() {
         super('BootScene');
     }
@@ -15,4 +18,3 @@ class BootScene extends Phaser.Scene {
         this.scene.start('PreloadScene');
     }
 }
-

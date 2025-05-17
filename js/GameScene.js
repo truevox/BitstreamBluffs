@@ -2,7 +2,13 @@
 // Uses Phaser 3 with the built‑in Matter physics plugin.
 // ------------------------------------------------------
 
-class GameScene extends Phaser.Scene {
+// Import physics configuration
+import PhysicsConfig from './config/physics-config.js';
+import Manette from './Manette.js';
+import RotationSystem from './utils/RotationSystem.js';
+import configLoader from './config/config-loader.js';
+
+export default class GameScene extends Phaser.Scene {
     constructor() {
         super({ 
             key: 'GameScene',
@@ -68,8 +74,8 @@ class GameScene extends Phaser.Scene {
         this.hudText = null;
         
         // --- extra lives system -----------------------------------------------
-        this.lives              = 1;       // start with one extra life
-        this.maxLives           = 3;       // maximum number of lives
+        this.lives              = PhysicsConfig.extraLives.initialLives;  // start with configured initial lives
+        this.maxLives           = PhysicsConfig.extraLives.maxLives;      // maximum number of lives
         this.lastLifeCollectTime = 0;     // to track time between life pickups
         this.nextLifeAvailableTime = 0;   // earliest time next life can appear
         this.lifeCollectibles  = [];      // array to store life collectible objects
@@ -180,10 +186,10 @@ class GameScene extends Phaser.Scene {
         // add a circular Matter body to the container
         const Bodies = Phaser.Physics.Matter.Matter.Bodies;
         const playerBody = Bodies.circle(0, 0, circleRadius, {
-            restitution: 0.1,
-            friction: 0.000001,  // Even lower friction for smoother sliding
-            frictionAir: 0.001,  // Very low air friction
-            density: 0.18        // Slightly lower density for less "heaviness"
+            restitution: PhysicsConfig.player.restitution,
+            friction: PhysicsConfig.player.friction,       // Friction from config
+            frictionAir: PhysicsConfig.player.frictionAir, // Air friction from config
+            density: PhysicsConfig.player.density          // Density from config
         });
 
         this.matter.add.gameObject(this.player);
@@ -326,10 +332,10 @@ class GameScene extends Phaser.Scene {
                 const Body = Phaser.Physics.Matter.Matter.Body;
                 const currentVel = this.player.body.velocity;
                 Body.setVelocity(this.player.body, {
-                    x: currentVel.x * 0.7, 
+                    x: currentVel.x * PhysicsConfig.tricks.wobbleLandingSpeedFactor, 
                     y: currentVel.y 
                 });
-                this.currentSpeedMultiplier = 0.8;
+                this.currentSpeedMultiplier = 1.0;
             },
             onFlipComplete: (fullFlips, partialFlip) => {
                 console.log(`Flip complete! ${fullFlips} + ${partialFlip.toFixed(2)}`);
@@ -364,7 +370,7 @@ class GameScene extends Phaser.Scene {
         const diff       = targetDeg - currentDeg;
 
         if (Math.abs(diff) > 2) {
-            this.player.setAngle(currentDeg + diff * 0.2);
+            this.player.setAngle(currentDeg + diff * PhysicsConfig.rotation.slopeAlignmentFactor);
         }
     }
 
@@ -529,7 +535,7 @@ class GameScene extends Phaser.Scene {
             // Determine direction from player angle
             const playerAngleRad = this.player.rotation;
             // Apply a small force in the downhill direction
-            const downhillForce = 0.0005;
+            const downhillForce = PhysicsConfig.movement.downhillBiasForce;
             Body.applyForce(this.player.body,
                 this.player.body.position,
                 { 
@@ -602,9 +608,9 @@ class GameScene extends Phaser.Scene {
         // --------------------------------------------------------------------
         // INPUT – rotation control using Manette
         // --------------------------------------------------------------------
-        const groundRotVel = 0.05;  // ~deg/s in rad Units
-        const airRotVel    = 0.10;
-        const pushForce    = 0.0035; // Increased from 0.002 for more responsive movement
+        const groundRotVel = PhysicsConfig.rotation.groundRotationVel; // Ground rotation velocity
+        const airRotVel    = PhysicsConfig.rotation.airRotationVel;    // Air rotation velocity
+        const pushForce    = PhysicsConfig.movement.pushForce;         // Push force for movement
 
         // Original left/right controls for pushing and rotating on ground
         if (this.cursors.left.isDown) {
@@ -616,7 +622,7 @@ class GameScene extends Phaser.Scene {
             // Apply force with speed multiplier when on ground
             const leftForce = this.onGround ? 
                 -pushForce * this.currentSpeedMultiplier : // Apply multiplier on ground
-                -pushForce * 0.5;                        // Reduced in air (no multiplier)
+                -pushForce * PhysicsConfig.movement.airPushMultiplier; // Reduced in air by configured multiplier
                 
             Body.applyForce(this.player.body,
                 this.player.body.position,
@@ -631,7 +637,7 @@ class GameScene extends Phaser.Scene {
             // Apply force with speed multiplier when on ground
             const rightForce = this.onGround ? 
                 pushForce * this.currentSpeedMultiplier : // Apply multiplier on ground
-                pushForce * 0.5;                        // Reduced in air (no multiplier)
+                pushForce * PhysicsConfig.movement.airPushMultiplier; // Reduced in air by configured multiplier
                 
             Body.applyForce(this.player.body,
                 this.player.body.position,
@@ -664,7 +670,7 @@ class GameScene extends Phaser.Scene {
             // Tiny jump in walk mode
             if (this.manette.isActionActive('jump') && this.onGround) {
                 Body.setVelocity(this.player.body,
-                    { x: this.player.body.velocity.x, y: -3 }); // Smaller jump
+                    { x: this.player.body.velocity.x, y: PhysicsConfig.jump.walkJumpVelocity }); // Walk mode jump
                 this.onGround = false;
             }
             
@@ -866,7 +872,7 @@ class GameScene extends Phaser.Scene {
         // --------------------------------------------------------------------
         if (this.manette.isActionActive('jump') && this.onGround) {
             Body.setVelocity(this.player.body,
-                { x: this.player.body.velocity.x, y: -10 });
+                { x: this.player.body.velocity.x, y: PhysicsConfig.jump.jumpVelocity });
             this.onGround = false;
             
             // Reset speed multiplier on jump
@@ -1025,8 +1031,11 @@ class GameScene extends Phaser.Scene {
                 
                 // Update timing variables
                 this.lastLifeCollectTime = this.time.now;
-                // Next life available between 30 seconds and 2 minutes
-                const nextDelay = Phaser.Math.Between(30000, 120000);
+                // Next life available between min and max time from config
+                const nextDelay = Phaser.Math.Between(
+                    PhysicsConfig.extraLives.minTimeToNextLife, 
+                    PhysicsConfig.extraLives.maxTimeToNextLife
+                );
                 this.nextLifeAvailableTime = this.time.now + nextDelay;
                 
                 // Safe cleanup of the physics body
@@ -1087,7 +1096,7 @@ class GameScene extends Phaser.Scene {
             const canSpawn = currentTime > this.nextLifeAvailableTime && 
                            Array.isArray(this.lifeCollectibles) && 
                            this.lifeCollectibles.length < 2 && 
-                           this.lives < this.maxLives;
+                           this.lives < PhysicsConfig.extraLives.maxLives;
                            
             if (canSpawn) {
                 // Only spawn with a 20% chance each cycle - prevents too many spawns
@@ -1095,7 +1104,10 @@ class GameScene extends Phaser.Scene {
                     console.log('Spawning new extra life collectible');
                     this.spawnExtraLife();
                     // Update next available time regardless of successful spawn
-                    this.nextLifeAvailableTime = currentTime + Phaser.Math.Between(30000, 120000);
+                    this.nextLifeAvailableTime = currentTime + Phaser.Math.Between(
+                        PhysicsConfig.extraLives.minTimeToNextLife, 
+                        PhysicsConfig.extraLives.maxTimeToNextLife
+                    );
                 }
             }
         } catch (error) {
@@ -1217,7 +1229,7 @@ class GameScene extends Phaser.Scene {
             
             // Calculate a safe position in front of the player
             // Use a simple offset rather than calculating exact positions
-            const spawnX = playerPos.x + 600; // Always 600px ahead
+            const spawnX = playerPos.x + PhysicsConfig.extraLives.spawnDistance; // Distance from config
             const spawnY = playerPos.y;       // Same level as player
             
             // Create our fallback texture if needed
@@ -1235,7 +1247,7 @@ class GameScene extends Phaser.Scene {
             lifeCollectible.setDepth(10);
             
             // Add simple circular collision area
-            const collider = this.matter.add.circle(spawnX, spawnY, 20, {
+            const collider = this.matter.add.circle(spawnX, spawnY, PhysicsConfig.extraLives.collectibleRadius, {
                 isSensor: true,
                 isExtraLife: true,
                 label: 'extraLife'
@@ -1310,7 +1322,7 @@ GameScene.prototype.applyPassiveSpeedBoost = function() {
         const velocity = this.player.body.velocity;
         
         // Apply a small minimum boost regardless of speed
-        const minBoost = 0.00015;
+        const minBoost = PhysicsConfig.movement.minBoostStrength;
         const direction = Math.sign(velocity.x) || 1; // Default to right if no movement
         
         // Add the minimum boost to keep things moving
@@ -1319,8 +1331,8 @@ GameScene.prototype.applyPassiveSpeedBoost = function() {
             { x: direction * minBoost, y: 0 });
         
         // Additional boost based on multiplier if moving fast enough
-        if (Math.abs(velocity.x) > 0.3 && this.currentSpeedMultiplier > 1.0) {
-            const boostStrength = 0.0003 * (this.currentSpeedMultiplier - 1.0) * Math.abs(velocity.x);
+        if (Math.abs(velocity.x) > PhysicsConfig.movement.speedBoostThreshold && this.currentSpeedMultiplier > 1.0) {
+            const boostStrength = PhysicsConfig.movement.speedBoostFactor * (this.currentSpeedMultiplier - 1.0) * Math.abs(velocity.x);
             
             // Apply a larger force when we have a speed multiplier
             Body.applyForce(this.player.body,
@@ -1364,4 +1376,4 @@ GameScene.prototype.applyPassiveSpeedBoost = function() {
     }
 };
 
-// Class is globally available through script tag loading
+// GameScene is now properly exported as ES module

@@ -1,7 +1,8 @@
 // js/Manette.js
 // Input mapping system (Keyboard + Gamepad -> Actions)
+// ------------------------------------------------------
 
-class Manette {
+export default class Manette {
     constructor(scene) {
         this.scene = scene;
         this.actions = {
@@ -276,4 +277,4 @@ class Manette {
     }
 }
 
-// Instantiated by GameScene
+// Now properly exported as ES module

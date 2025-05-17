@@ -1,5 +1,8 @@
 // js/PreloadScene.js
-class PreloadScene extends Phaser.Scene {
+// Handles asset preloading and displays loading progress
+// ------------------------------------------------------
+
+export default class PreloadScene extends Phaser.Scene {
     constructor() {
         super('PreloadScene');
     }
@@ -72,4 +75,3 @@ class PreloadScene extends Phaser.Scene {
         this.scene.start('GameScene');
     }
 }
-

@@ -3,7 +3,7 @@
 // for downhill sledding game with aerial tricks
 // ------------------------------------------------------
 
-class RotationSystem {
+export default class RotationSystem {
     constructor(config = {}) {
         // Initialize state
         this.isGrounded = true;
@@ -145,6 +145,7 @@ class RotationSystem {
         const absoluteRotation = Math.abs(rotationAmount);
         const flips = absoluteRotation / 360;
         
+        // Import PhysicsConfig if needed (we'll make this class use the config too)
         // Base multiplier calculation with interpolation
         if (flips <= 1) {
             // Linear interpolation between 1.0 (0 flips) and 1.2 (1 flip)
@@ -156,8 +157,8 @@ class RotationSystem {
             // Linear interpolation between 1.3 (1.5 flips) and 1.4 (2 flips)
             return 1.3 + ((flips - 1.5) * 0.2);
         } else {
-            // Cap at 1.4 for more than 2 flips
-            return 1.4;
+            // Cap at 2.5 for more than 2 flips (increased this for more impact)
+            return 2.5;
         }
     }
 
@@ -257,5 +258,4 @@ class RotationSystem {
     }
 }
 
-// Make the class available globally
-// No export needed for traditional script loading
+// Class is now properly exported using ES modules

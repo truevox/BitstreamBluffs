@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Gravity Racer</title>
+    <title>BitstreamBluffs - Physics Playground</title>
+    <!-- Load Phaser from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-    <script src="js/utils/config-loader.js"></script>
-    <script src="js/utils/RotationSystem.js"></script>
-    <script src="js/Manette.js"></script>
-    <script src="js/BootScene.js"></script>
-    <script src="js/PreloadScene.js"></script>
-    <script src="js/GameScene.js"></script>
-    <script src="js/main.js"></script>
+    
+    <!-- Load our game modules -->
+    <script type="module">
+        // Import our main game script which will handle loading all other modules
+        import './js/main.js';
+    </script>
     <style>
         body {
             margin: 0;
