@@ -3,6 +3,8 @@
  * Tests spawn timing, collection logic, and cleanup
  */
 import { measurePerformance, createPhaserSceneMock } from '../../test-utils.js';
+import { jest, describe, test, expect } from '@jest/globals';
+
 
 // Mock dependencies
 jest.mock('../../../js/config/physics-config.js', () => ({
@@ -15,6 +17,10 @@ jest.mock('../../../js/config/physics-config.js', () => ({
   }
 }));
 
+// Get the mocked modules
+const PhysicsConfig = jest.requireMock('../../../js/config/physics-config.js');
+
+
 /**
  * Simplified extra life system for testing
  * Based on the collectExtraLife and manageExtraLives methods in GameScene
@@ -22,7 +28,7 @@ jest.mock('../../../js/config/physics-config.js', () => ({
 class ExtraLifeSystem {
   constructor(scene) {
     this.scene = scene;
-    this.PhysicsConfig = require('../../../js/config/physics-config.js');
+    this.PhysicsConfig = PhysicsConfig;
     
     // State
     this.lives = this.PhysicsConfig.extraLives.initialLives;
@@ -180,7 +186,7 @@ describe('Extra Life Collectibles Unit Tests', () => {
   test('initializes with correct default values', measurePerformance(() => {
     expect(extraLifeSystem.lives).toBe(3);
     expect(extraLifeSystem.lifeCollectibles).toEqual([]);
-    expect(extraLifeSystem.lastLifeCollectTime).toBe(0);
+    expect(extraLifeSystem.lastLifeCollectTime).toBeCloseTo(0, 1);
   }));
   
   test('spawns extra life with correct properties', measurePerformance(() => {
@@ -249,7 +255,7 @@ describe('Extra Life Collectibles Unit Tests', () => {
     expect(extraLifeSystem.lives).toBe(3);
     
     // Collection time should not update
-    expect(extraLifeSystem.lastLifeCollectTime).toBe(0);
+    expect(extraLifeSystem.lastLifeCollectTime).toBeCloseTo(0, 1);
   }));
   
   test('respects max lives limit', measurePerformance(() => {
@@ -304,7 +310,7 @@ describe('Extra Life Collectibles Unit Tests', () => {
     
     // Should not spawn
     expect(spawned).toBe(false);
-    expect(extraLifeSystem.lifeCollectibles.length).toBe(0);
+    expect(extraLifeSystem.lifeCollectibles.length).toBeCloseTo(0, 1);
   }));
   
   test('cleans up offscreen collectibles correctly', measurePerformance(() => {

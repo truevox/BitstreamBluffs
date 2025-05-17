@@ -1,0 +1,378 @@
+/**
+ * Integration tests for input controller with game systems
+ * Tests how input system interacts with physics, trick systems and stamina
+ */
+import { measurePerformance, createPhaserSceneMock, mockMathRandom } from '../../test-utils.js';
+import { jest, describe, test, expect } from '@jest/globals';
+
+
+// Mock dependencies
+jest.mock('../../../js/config/physics-config.js', ()
+
+// Get the mocked modules
+const PhysicsConfig = jest.requireMock('../../../js/config/physics-config.js');
+ => ({
+  controls: {
+    walkModeToggleDelay: 500,
+    doubleTapThreshold: 300
+  },
+  player: {
+    jumpForce: 8,
+    walkSpeed: 3,
+    brakeStrength: 0.4
+  },
+  movement: {
+    maxSpeed: 15,
+    acceleration: 0.2,
+    brakeStrength: 0.4,
+    airBrakeStrength: 0.15,
+    tuckSpeedBoost: 1.01
+  },
+  trick: {
+    flipRate: 5,
+    scoreBase: 100
+  },
+  stamina: {
+    tuckDrainMultiplier: 1.2
+  }
+}));
+
+/**
+ * Simplified game controller for testing integration between
+ * input and game systems
+ */
+class GameController {
+  constructor() {
+    this.PhysicsConfig = PhysicsConfig;
+    
+    // Subsystems
+    this.input = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      jump: false,
+      trick: false,
+      walkToggle: false
+    };
+    
+    // Player state
+    this.player = {
+      position: { x: 0, y: 500 },
+      velocity: { x: 3, y: 0 },
+      onGround: true,
+      walkMode: false,
+      trickInProgress: false,
+      rotation: 0,
+      flips: 0,
+      stamina: 100,
+      crashed: false
+    };
+    
+    // Game state history
+    this.stateHistory = [];
+  }
+  
+  // Process player inputs and update game state
+  update(deltaTime) {
+    if (this.player.crashed) return;
+    
+    // Handle movement based on input and current mode
+    if (this.player.walkMode) {
+      this.updateWalkingMovement(deltaTime);
+    } else {
+      this.updateSleddingMovement(deltaTime);
+    }
+    
+    // Handle jumps/tricks
+    if (this.input.jump && this.player.onGround) {
+      this.player.velocity.y = -this.PhysicsConfig.player.jumpForce;
+      this.player.onGround = false;
+    }
+    
+    // Handle trick rotation in air
+    if (this.input.trick && !this.player.onGround) {
+      this.player.trickInProgress = true;
+      
+      // Apply rotation based on direction and speed
+      const rotationSpeed = this.PhysicsConfig.trick.flipRate * deltaTime;
+      const direction = Math.sign(this.player.velocity.x) || 1;
+      
+      this.player.rotation += rotationSpeed * direction;
+      
+      // Track full flips
+      const fullRotation = Math.PI * 2;
+      const prevFlips = this.player.flips;
+      this.player.flips = Math.floor(Math.abs(this.player.rotation) / fullRotation);
+      
+      // Update score when completing a flip
+      if (this.player.flips > prevFlips) {
+        // Would trigger score update in real game
+      }
+    }
+    
+    // Handle stamina drain for tucking
+    if (this.input.down && this.player.onGround) {
+      // Tucking drains more stamina
+      this.player.stamina -= 0.2 * this.PhysicsConfig.stamina.tuckDrainMultiplier * deltaTime;
+    } else {
+      // Normal stamina drain
+      this.player.stamina -= 0.1 * deltaTime;
+    }
+    
+    // Clamp stamina
+    this.player.stamina = Math.max(0, Math.min(100, this.player.stamina));
+    
+    // Record state for analysis
+    this.stateHistory.push({
+      time: Date.now(),
+      position: { ...this.player.position },
+      velocity: { ...this.player.velocity },
+      onGround: this.player.onGround,
+      walkMode: this.player.walkMode,
+      trickInProgress: this.player.trickInProgress,
+      rotation: this.player.rotation,
+      flips: this.player.flips,
+      stamina: this.player.stamina,
+      input: { ...this.input }
+    });
+  }
+  
+  updateWalkingMovement(deltaTime) {
+    // Movement in walking mode
+    if (this.input.left && !this.input.right) {
+      this.player.velocity.x = -this.PhysicsConfig.player.walkSpeed;
+    } else if (this.input.right && !this.input.left) {
+      this.player.velocity.x = this.PhysicsConfig.player.walkSpeed;
+    } else {
+      // Friction to stop
+      this.player.velocity.x *= 0.8;
+    }
+    
+    // Apply velocity
+    this.player.position.x += this.player.velocity.x * deltaTime;
+    this.player.position.y += this.player.velocity.y * deltaTime;
+  }
+  
+  updateSleddingMovement(deltaTime) {
+    // Handle braking
+    if (this.input.left && this.input.right) {
+      // Hard brake with both left+right
+      this.player.velocity.x *= (1 - this.PhysicsConfig.movement.brakeStrength * 2 * deltaTime);
+    } else if ((this.input.left && this.player.velocity.x > 0) || 
+              (this.input.right && this.player.velocity.x < 0)) {
+      // Brake when input is opposite to direction
+      this.player.velocity.x *= (1 - this.PhysicsConfig.movement.brakeStrength * deltaTime);
+    }
+    
+    // Handle acceleration
+    if (this.input.right && this.player.velocity.x >= 0) {
+      this.player.velocity.x += this.PhysicsConfig.movement.acceleration * deltaTime;
+    } else if (this.input.left && this.player.velocity.x <= 0) {
+      this.player.velocity.x -= this.PhysicsConfig.movement.acceleration * deltaTime;
+    }
+    
+    // Handle tucking for speed boost
+    if (this.input.down && this.player.onGround) {
+      this.player.velocity.x *= this.PhysicsConfig.movement.tuckSpeedBoost;
+    }
+    
+    // Apply velocity
+    this.player.position.x += this.player.velocity.x * deltaTime;
+    this.player.position.y += this.player.velocity.y * deltaTime;
+    
+    // Apply gravity if in air
+    if (!this.player.onGround) {
+      this.player.velocity.y += 9.8 * deltaTime; // Simplified gravity
+    }
+    
+    // Ground collision check (very simple for testing)
+    if (this.player.position.y >= 500 && this.player.velocity.y > 0) {
+      this.player.position.y = 500;
+      this.player.onGround = true;
+      this.player.velocity.y = 0;
+      
+      // Landing ends trick mode
+      if (this.player.trickInProgress) {
+        this.player.trickInProgress = false;
+        
+        // Reset rotation on landing
+        this.player.rotation = 0;
+      }
+    }
+  }
+  
+  // Simulate player inputs
+  setInputState(newInputs) {
+    this.input = { ...this.input, ...newInputs };
+  }
+  
+  // Run simulation with an input sequence
+  simulateWithInputs(inputSequence, durationSec) {
+    const deltaTime = 1/60; // 60fps simulation
+    let elapsed = 0;
+    let sequenceIndex = 0;
+    
+    // Reset state
+    this.stateHistory = [];
+    
+    // Run simulation
+    while (elapsed < durationSec) {
+      // Apply next input when it's time
+      if (sequenceIndex < inputSequence.length && 
+          elapsed >= inputSequence[sequenceIndex].time) {
+        this.setInputState(inputSequence[sequenceIndex].input);
+        sequenceIndex++;
+      }
+      
+      // Update game state
+      this.update(deltaTime);
+      
+      elapsed += deltaTime;
+    }
+    
+    return this.stateHistory;
+  }
+}
+
+describe('Input System Integration Tests', () => {
+  let gameController;
+  
+  beforeEach(() => {
+    gameController = new GameController();
+  });
+  
+  test('player braking reduces speed as expected', measurePerformance(() => {
+    // Start with some speed
+    gameController.player.velocity.x = 10;
+    
+    // Create input sequence for braking test
+    const brakingInputs = [
+      { time: 0, input: { left: true, right: false } }, // Brake by turning left
+      { time: 1, input: { left: true, right: true } },  // Hard brake at 1 second
+      { time: 2, input: { left: false, right: false } } // Release at 2 seconds
+    ];
+    
+    // Run simulation
+    const states = gameController.simulateWithInputs(brakingInputs, 3);
+    
+    // Check results
+    const initialVelocity = states[0].velocity.x;
+    const afterLeftBrake = states[60].velocity.x; // ~1 second mark
+    const afterHardBrake = states[120].velocity.x; // ~2 second mark
+    const finalVelocity = states[states.length - 1].velocity.x;
+    
+    // Left braking should reduce speed
+    expect(afterLeftBrake).toBeLessThan(initialVelocity);
+    
+    // Hard braking should reduce speed more dramatically
+    expect(afterHardBrake).toBeLessThan(afterLeftBrake);
+    
+    // After releasing, should settle to a very low speed
+    expect(finalVelocity).toBeLessThan(afterHardBrake);
+  }));
+  
+  test('tucking increases speed and drains more stamina', measurePerformance(() => {
+    // Create input sequence for tucking test
+    const tuckingInputs = [
+      { time: 0, input: { right: true, down: false } }, // Just move right
+      { time: 1, input: { right: true, down: true } },  // Start tucking
+      { time: 2, input: { right: true, down: false } }  // Stop tucking
+    ];
+    
+    // Run simulation
+    const states = gameController.simulateWithInputs(tuckingInputs, 3);
+    
+    // Find key points (before tuck, during tuck, after tuck)
+    const beforeTuck = states[59]; // Just before 1 second
+    const duringTuck = states[90]; // During tucking
+    const afterTuck = states[120]; // Just after 2 seconds
+    
+    // Speed should increase during tucking
+    expect(duringTuck.velocity.x).toBeGreaterThan(beforeTuck.velocity.x);
+    
+    // Stamina drain should be higher during tucking
+    const normalDrainRate = beforeTuck.stamina - states[0].stamina;
+    const tuckingDrainRate = beforeTuck.stamina - duringTuck.stamina;
+    
+    // Tucking should drain more over similar time
+    const normalDrainPerFrame = normalDrainRate / 59;
+    const tuckingDrainPerFrame = tuckingDrainRate / (90 - 59);
+    expect(tuckingDrainPerFrame).toBeGreaterThan(normalDrainPerFrame);
+  }));
+  
+  test('trick inputs cause rotation and track flips in air', measurePerformance(() => {
+    // Create input sequence for trick test
+    const trickInputs = [
+      { time: 0, input: { right: true } },            // Move right first
+      { time: 0.5, input: { right: true, jump: true } }, // Jump at 0.5s
+      { time: 0.6, input: { right: true, trick: true } }, // Start trick
+      { time: 1.5, input: { right: true } }              // End trick
+    ];
+    
+    // Run simulation
+    const states = gameController.simulateWithInputs(trickInputs, 3);
+    
+    // Find when player is in air
+    const inAirStates = states.filter(s => !s.onGround);
+    expect(inAirStates.length).toBeGreaterThan(0);
+    
+    // Should have some rotation during trick
+    const maxRotation = Math.max(...inAirStates.map(s => Math.abs(s.rotation)));
+    expect(maxRotation).toBeGreaterThan(0);
+    
+    // Check that rotation is tracked
+    const trickStates = inAirStates.filter(s => s.trickInProgress);
+    expect(trickStates.length).toBeGreaterThan(0);
+    
+    // Eventually should land and reset rotation
+    const finalState = states[states.length - 1];
+    expect(finalState.onGround).toBe(true);
+    expect(finalState.trickInProgress).toBe(false);
+  }));
+  
+  test('walking mode changes movement behavior', measurePerformance(() => {
+    // Setup walk mode
+    gameController.player.walkMode = true;
+    
+    // Create input sequence for walking test
+    const walkingInputs = [
+      { time: 0, input: { right: true } },  // Walk right
+      { time: 1, input: { left: true, right: false } },  // Walk left
+      { time: 2, input: { left: false, right: false } }  // Stop
+    ];
+    
+    // Run simulation
+    const states = gameController.simulateWithInputs(walkingInputs, 3);
+    
+    // Get key states
+    const walkingRight = states[30]; // ~0.5s
+    const walkingLeft = states[90];  // ~1.5s
+    const stopped = states[150];     // ~2.5s
+    
+    // Should walk right at walking speed
+    expect(walkingRight.velocity.x).toBeCloseTo(gameController.PhysicsConfig.player.walkSpeed);
+    
+    // Should walk left at walking speed (negative)
+    expect(walkingLeft.velocity.x).toBeCloseTo(-gameController.PhysicsConfig.player.walkSpeed);
+    
+    // Should stop when no input (near zero with friction)
+    expect(Math.abs(stopped.velocity.x)).toBeLessThan(0.5);
+    
+    // Compare to sledding mode
+    gameController.player.walkMode = false;
+    gameController.player.velocity.x = 3; // Reset speed
+    
+    // Same inputs in sled mode
+    const sleddingStates = gameController.simulateWithInputs(walkingInputs, 3);
+    
+    // Speed in sled mode should be different (usually faster)
+    const sleddingRight = sleddingStates[30];
+    expect(sleddingRight.velocity.x).not.toBeCloseTo(walkingRight.velocity.x);
+    
+    // Braking behavior is different from walking
+    const sleddingLeft = sleddingStates[90];
+    // In sled mode, going left is braking when already moving right
+    expect(Math.abs(sleddingLeft.velocity.x)).toBeLessThan(Math.abs(walkingLeft.velocity.x));
+  }));
+});

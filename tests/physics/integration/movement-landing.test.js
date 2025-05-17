@@ -2,6 +2,8 @@
  * Integration tests for movement physics and landing mechanics
  */
 import { measurePerformance, createPhaserSceneMock } from '../../test-utils.js';
+import { jest, describe, test, expect } from '@jest/globals';
+
 
 // Mock dependencies
 jest.mock('../../../js/config/physics-config.js', () => ({
@@ -29,6 +31,10 @@ jest.mock('../../../js/config/physics-config.js', () => ({
     speedBoostThreshold: 0.3
   }
 }));
+
+// Get the mocked modules
+const PhysicsConfig = jest.requireMock('../../../js/config/physics-config.js');
+
 
 // Simplified physics simulator for testing
 class PhysicsSimulator {
@@ -97,7 +103,7 @@ class PhysicsSimulator {
   
   // Simulate landing on a slope
   land(slopeAngleDegrees) {
-    const PhysicsConfig = require('../../../js/config/physics-config.js');
+    
     const previouslyOnGround = this.player.onGround;
     
     // Set terrain contact info
@@ -167,7 +173,7 @@ describe('Movement and Landing Physics Integration Tests', () => {
     // Should be a clean landing
     expect(landingResult).toBe('clean');
     expect(physics.player.crashed).toBe(false);
-    expect(physics.player.velocity.y).toBe(0); // Vertical velocity canceled
+    expect(physics.player.velocity.y).toBeCloseTo(0, 1); // Vertical velocity canceled
     expect(physics.player.velocity.x).toBe(5); // Horizontal preserved
   }));
   

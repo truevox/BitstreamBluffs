@@ -1,0 +1,336 @@
+/**
+ * Unit tests for extra life collectible system
+ * Tests spawn timing, collection logic, and cleanup
+ */
+import { measurePerformance, createPhaserSceneMock } from '../../test-utils.js';
+import { jest, describe, test, expect } from '@jest/globals';
+
+
+// Mock dependencies
+jest.mock('../../../js/config/physics-config.js', () => ({ ({
+  extraLives: {
+    initialLives: 3,
+    maxLives: 5,
+    minSpawnInterval: 15000, // 15 seconds minimum between spawns
+    spawnChance: 0.3, // 30% chance to spawn when eligible
+    collectRadius: 40 // Collection radius in pixels
+  }
+}));
+
+// Get the mocked modules
+const PhysicsConfig = jest.requireMock('../../../js/config/physics-config.js');
+
+
+/**
+ * Simplified extra life system for testing
+ * Based on the collectExtraLife and manageExtraLives methods in GameScene
+ */
+class ExtraLifeSystem {
+  constructor(scene) {
+    this.scene = scene;
+    this.PhysicsConfig = PhysicsConfig;
+    
+    // State
+    this.lives = this.PhysicsConfig.extraLives.initialLives;
+    this.lifeCollectibles = [];
+    this.lastLifeCollectTime = 0;
+    this.nextLifeAvailableTime = 0;
+  }
+  
+  /**
+   * Manages extra life collectibles
+   * @param {number} currentTime - Current game time
+   * @returns {boolean} - True if a new collectible was spawned
+   */
+  manageExtraLives(currentTime) {
+    // Check if we're eligible to spawn a new life
+    if (this.lives < this.PhysicsConfig.extraLives.maxLives && 
+        currentTime >= this.nextLifeAvailableTime) {
+      
+      // Random chance to spawn based on config
+      if (Math.random() < this.PhysicsConfig.extraLives.spawnChance) {
+        this.spawnExtraLife();
+        this.nextLifeAvailableTime = currentTime + this.PhysicsConfig.extraLives.minSpawnInterval;
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Spawns an extra life collectible
+   * @returns {Object} - The spawned collectible
+   */
+  spawnExtraLife() {
+    // Create a new life collectible
+    const randomX = 500 + Math.random() * 1000;
+    const randomY = 300 + Math.random() * 300;
+    
+    const collectible = {
+      id: `life_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      position: { x: randomX, y: randomY },
+      collected: false,
+      alive: true,
+      timestamp: Date.now()
+    };
+    
+    // Add to collectibles array
+    this.lifeCollectibles.push(collectible);
+    
+    // In a real game, would create the sprite here
+    // this.scene.add.image(randomX, randomY, 'extraLife')
+    
+    return collectible;
+  }
+  
+  /**
+   * Collects an extra life if the player is close enough
+   * @param {Object} playerPosition - Player's position {x, y}
+   * @returns {Object|null} - The collected life or null
+   */
+  collectExtraLife(playerPosition) {
+    for (const life of this.lifeCollectibles) {
+      if (life.alive && !life.collected) {
+        // Calculate distance to player
+        const dx = playerPosition.x - life.position.x;
+        const dy = playerPosition.y - life.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // If player is close enough, collect the life
+        if (distance <= this.PhysicsConfig.extraLives.collectRadius) {
+          // Mark as collected
+          life.collected = true;
+          
+          // Increase lives count if below max
+          if (this.lives < this.PhysicsConfig.extraLives.maxLives) {
+            this.lives++;
+          }
+          
+          // Track collection time
+          this.lastLifeCollectTime = Date.now();
+          
+          // Schedule removal of the collectible
+          setTimeout(() => {
+            this.removeCollectible(life.id);
+          }, 1000); // Remove after animation would play
+          
+          return life;
+        }
+      }
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Removes a collectible by ID
+   * @param {string} id - ID of the collectible to remove
+   */
+  removeCollectible(id) {
+    const index = this.lifeCollectibles.findIndex(life => life.id === id);
+    if (index !== -1) {
+      this.lifeCollectibles[index].alive = false;
+    }
+  }
+  
+  /**
+   * Cleans up offscreen collectibles
+   * @param {number} leftBound - Left edge of visible area
+   * @returns {number} - Number of collectibles cleaned up
+   */
+  cleanupOffscreenCollectibles(leftBound) {
+    if (!this.lifeCollectibles.length) return 0;
+    
+    let cleanedCount = 0;
+    
+    // Flag offscreen collectibles
+    for (const life of this.lifeCollectibles) {
+      if (life.alive && life.position.x < leftBound) {
+        life.alive = false;
+        cleanedCount++;
+      }
+    }
+    
+    // Filter out dead collectibles after a certain threshold
+    // (in the real game, this would be done periodically to avoid array growing too large)
+    if (this.lifeCollectibles.length > 20) {
+      this.lifeCollectibles = this.lifeCollectibles.filter(life => life.alive);
+    }
+    
+    return cleanedCount;
+  }
+}
+
+describe('Extra Life Collectibles Unit Tests', () => {
+  let extraLifeSystem;
+  let mockScene;
+  let originalDateNow;
+  let mockedTime;
+  
+  beforeEach(() => {
+    mockScene = createPhaserSceneMock();
+    extraLifeSystem = new ExtraLifeSystem(mockScene);
+    
+    // Mock Date.now for consistent testing
+    originalDateNow = Date.now;
+    mockedTime = 1000;
+    Date.now = jest.fn(() => mockedTime);
+  });
+  
+  afterEach(() => {
+    // Restore Date.now
+    Date.now = originalDateNow;
+  });
+  
+  test('initializes with correct default values', measurePerformance(() => {
+    expect(extraLifeSystem.lives).toBe(3);
+    expect(extraLifeSystem.lifeCollectibles).toEqual([]);
+    expect(extraLifeSystem.lastLifeCollectTime).toBe(0);
+  }));
+  
+  test('spawns extra life with correct properties', measurePerformance(() => {
+    const collectible = extraLifeSystem.spawnExtraLife();
+    
+    expect(collectible).toBeDefined();
+    expect(collectible.id).toContain('life_');
+    expect(collectible.position.x).toBeGreaterThanOrEqual(500);
+    expect(collectible.position.y).toBeGreaterThanOrEqual(300);
+    expect(collectible.collected).toBe(false);
+    expect(collectible.alive).toBe(true);
+    
+    // Should be added to the system's array
+    expect(extraLifeSystem.lifeCollectibles.length).toBe(1);
+    expect(extraLifeSystem.lifeCollectibles[0]).toBe(collectible);
+  }));
+  
+  test('collects extra life when player is close enough', measurePerformance(() => {
+    // Spawn a life
+    const collectible = extraLifeSystem.spawnExtraLife();
+    const position = collectible.position;
+    
+    // Player position just within collection radius
+    const playerPosition = {
+      x: position.x + 35, // Within the 40px radius
+      y: position.y
+    };
+    
+    // Collect the life
+    const collected = extraLifeSystem.collectExtraLife(playerPosition);
+    
+    // Should return the collected life
+    expect(collected).toBe(collectible);
+    
+    // Should mark as collected
+    expect(collectible.collected).toBe(true);
+    
+    // Should increase lives count
+    expect(extraLifeSystem.lives).toBe(4);
+    
+    // Should update collection time
+    expect(extraLifeSystem.lastLifeCollectTime).toBe(mockedTime);
+  }));
+  
+  test('does not collect life when player is too far', measurePerformance(() => {
+    // Spawn a life
+    const collectible = extraLifeSystem.spawnExtraLife();
+    const position = collectible.position;
+    
+    // Player position outside collection radius
+    const playerPosition = {
+      x: position.x + 50, // Beyond the 40px radius
+      y: position.y
+    };
+    
+    // Try to collect the life
+    const collected = extraLifeSystem.collectExtraLife(playerPosition);
+    
+    // Should not collect
+    expect(collected).toBeNull();
+    
+    // Collectible should still be available
+    expect(collectible.collected).toBe(false);
+    
+    // Lives count should not change
+    expect(extraLifeSystem.lives).toBe(3);
+    
+    // Collection time should not update
+    expect(extraLifeSystem.lastLifeCollectTime).toBe(0);
+  }));
+  
+  test('respects max lives limit', measurePerformance(() => {
+    // Set lives to max
+    extraLifeSystem.lives = 5;
+    
+    // Spawn a life
+    const collectible = extraLifeSystem.spawnExtraLife();
+    
+    // Collect the life
+    const playerPosition = {
+      x: collectible.position.x,
+      y: collectible.position.y
+    };
+    extraLifeSystem.collectExtraLife(playerPosition);
+    
+    // Lives should not exceed max
+    expect(extraLifeSystem.lives).toBe(5);
+  }));
+  
+  test('manages spawning based on time and probability', measurePerformance(() => {
+    // Mock random to ensure spawn
+    const originalRandom = Math.random;
+    Math.random = jest.fn().mockReturnValue(0.1); // Below 0.3 threshold
+    
+    // Set current time to allow spawn
+    const currentTime = 20000;
+    
+    // Should spawn a life
+    const spawned = extraLifeSystem.manageExtraLives(currentTime);
+    expect(spawned).toBe(true);
+    expect(extraLifeSystem.lifeCollectibles.length).toBe(1);
+    
+    // Next spawn time should be set
+    expect(extraLifeSystem.nextLifeAvailableTime).toBe(currentTime + 15000);
+    
+    // Trying again immediately should not spawn
+    const spawned2 = extraLifeSystem.manageExtraLives(currentTime);
+    expect(spawned2).toBe(false);
+    expect(extraLifeSystem.lifeCollectibles.length).toBe(1);
+    
+    // Restore Math.random
+    Math.random = originalRandom;
+  }));
+  
+  test('does not spawn if at max lives', measurePerformance(() => {
+    // Set lives to max
+    extraLifeSystem.lives = 5;
+    
+    // Try to spawn
+    const spawned = extraLifeSystem.manageExtraLives(10000);
+    
+    // Should not spawn
+    expect(spawned).toBe(false);
+    expect(extraLifeSystem.lifeCollectibles.length).toBe(0);
+  }));
+  
+  test('cleans up offscreen collectibles correctly', measurePerformance(() => {
+    // Spawn multiple collectibles
+    const life1 = extraLifeSystem.spawnExtraLife();
+    const life2 = extraLifeSystem.spawnExtraLife();
+    const life3 = extraLifeSystem.spawnExtraLife();
+    
+    // Position them at different x coordinates
+    life1.position.x = 100; // Offscreen
+    life2.position.x = 300; // Offscreen
+    life3.position.x = 700; // Onscreen
+    
+    // Clean up with boundary at x=500
+    const cleanedCount = extraLifeSystem.cleanupOffscreenCollectibles(500);
+    
+    // Should clean up the first two
+    expect(cleanedCount).toBe(2);
+    expect(life1.alive).toBe(false);
+    expect(life2.alive).toBe(false);
+    expect(life3.alive).toBe(true);
+  }));
+});

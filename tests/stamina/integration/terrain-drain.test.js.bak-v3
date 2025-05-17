@@ -1,0 +1,349 @@
+/**
+ * Integration tests for stamina system drain over terrain
+ */
+import { measurePerformance, mockMathRandom } from '../../test-utils.js';
+import { jest, describe, test, expect } from '@jest/globals';
+
+
+// Mock dependencies
+jest.mock('../../../js/config/physics-config.js', () => ({ ({
+  stamina: {
+    max: 100,
+    min: 0,
+    surfaces: {
+      snow: { drainRate: 0.2 },
+      ice: { drainRate: 0.1 },
+      powder: { drainRate: 0.4 }
+    },
+    items: {
+      smallEnergy: { regenAmount: 15 },
+      mediumEnergy: { regenAmount: 30 },
+      largeEnergy: { regenAmount: 50 }
+    },
+    baseRegenRate: 0.05,
+    speedDrainMultiplier: 0.02,
+    criticalThreshold: 20
+  },
+  terrain: {
+    minSlopeAngle: 10,
+    maxSlopeAngle: 45,
+    smoothingFactor: 0.85,
+    variationFrequency: 0.2
+  },
+  player: {
+    landingSafetyAngle: 30,
+    safeLandingSpeedThreshold: 10
+  }
+}));
+
+// Get the mocked modules
+const PhysicsConfig = jest.requireMock('../../../js/config/physics-config.js');
+
+
+/**
+ * Simulate a player moving through terrain with stamina system
+ */
+class StaminaSimulator {
+  constructor(seed = 42) {
+    this.seed = seed;
+    this.resetRandom = mockMathRandom(seed);
+    
+    // Time
+    this.totalTime = 0;
+    this.frameTime = 16.67; // ~60fps
+    
+    // Player state
+    this.player = {
+      position: { x: 0, y: 500 },
+      velocity: { x: 3, y: 0 }, // Start with some speed
+      onGround: true,
+      stamina: 100
+    };
+    
+    // Generate terrain with surface types
+    this.terrain = this.generateTerrain(50);
+    
+    // History for analysis
+    this.staminaHistory = [];
+  }
+  
+  generateTerrain(segmentCount) {
+    const segments = [];
+    let lastY = 500;
+    const segmentWidth = 100;
+    
+    for (let i = 0; i < segmentCount; i++) {
+      // Generate variation using randomness
+      const variation = (Math.random() * 2 - 1) * 0.2;
+      const smoothingFactor = 0.85;
+      
+      // Calculate next Y with smoothing
+      let nextY = lastY + (variation * 150);
+      nextY = lastY + ((nextY - lastY) * smoothingFactor);
+      
+      // Ensure within bounds
+      nextY = Math.max(300, Math.min(700, nextY));
+      
+      // Determine surface type based on terrain properties
+      let surfaceType = 'snow'; // Default
+      
+      // Different surfaces based on segment position or angle
+      if (i % 5 === 0) {
+        surfaceType = 'ice'; // Every 5th segment is ice
+      } else if (i % 7 === 0) {
+        surfaceType = 'powder'; // Every 7th segment is powder
+      }
+      
+      segments.push({
+        startX: i * segmentWidth,
+        startY: lastY,
+        endX: (i + 1) * segmentWidth,
+        endY: nextY,
+        surfaceType
+      });
+      
+      lastY = nextY;
+    }
+    
+    return segments;
+  }
+  
+  getTerrainSegmentAtPosition(x) {
+    for (const segment of this.terrain) {
+      if (x >= segment.startX && x < segment.endX) {
+        return segment;
+      }
+    }
+    return null;
+  }
+  
+  updateStamina(deltaTime) {
+    
+    const segment = this.getTerrainSegmentAtPosition(this.player.position.x);
+    
+    if (segment && this.player.onGround) {
+      // Get surface drain rate
+      const drainRate = PhysicsConfig.stamina.surfaces[segment.surfaceType]?.drainRate || 
+                        PhysicsConfig.stamina.surfaces.snow.drainRate;
+      
+      // Speed-based additional drain
+      const speedDrain = Math.abs(this.player.velocity.x) * PhysicsConfig.stamina.speedDrainMultiplier;
+      
+      // Total drain for this frame
+      const totalDrain = (drainRate + speedDrain) * deltaTime;
+      
+      // Update stamina
+      this.player.stamina = Math.max(PhysicsConfig.stamina.min, this.player.stamina - totalDrain);
+    } else if (!this.player.onGround) {
+      // In air, use a different calculation or no drain
+      // For this test, we'll use a minimal air drain
+      const airDrain = 0.05 * deltaTime;
+      this.player.stamina = Math.max(PhysicsConfig.stamina.min, this.player.stamina - airDrain);
+    }
+    
+    // Record stamina state
+    this.staminaHistory.push({
+      time: this.totalTime,
+      stamina: this.player.stamina,
+      position: { ...this.player.position },
+      velocity: { ...this.player.velocity },
+      surfaceType: segment ? segment.surfaceType : 'air'
+    });
+  }
+  
+  updatePosition(deltaTime) {
+    // Simple physics update
+    this.player.position.x += this.player.velocity.x * deltaTime;
+    
+    // Get current terrain segment
+    const segment = this.getTerrainSegmentAtPosition(this.player.position.x);
+    if (segment) {
+      // Calculate terrain height at position
+      const segmentProgress = (this.player.position.x - segment.startX) / (segment.endX - segment.startX);
+      const terrainY = segment.startY + (segment.endY - segment.startY) * segmentProgress;
+      
+      // Snap to terrain
+      this.player.position.y = terrainY;
+    }
+  }
+  
+  update() {
+    // Convert frame time to seconds
+    const deltaTime = this.frameTime / 1000;
+    
+    // Update position
+    this.updatePosition(deltaTime);
+    
+    // Update stamina
+    this.updateStamina(deltaTime);
+    
+    // Update time
+    this.totalTime += this.frameTime;
+  }
+  
+  simulateRun(duration) {
+    let elapsed = 0;
+    
+    while (elapsed < duration) {
+      this.update();
+      elapsed += this.frameTime;
+      
+      // Stop if out of stamina
+      if (this.player.stamina <= 0) {
+        break;
+      }
+    }
+    
+    return this.staminaHistory;
+  }
+  
+  // Add energy item
+  addEnergyItem(type) {
+    
+    const regenAmount = PhysicsConfig.stamina.items[type]?.regenAmount || 0;
+    
+    if (regenAmount > 0) {
+      this.player.stamina = Math.min(
+        PhysicsConfig.stamina.max,
+        this.player.stamina + regenAmount
+      );
+    }
+  }
+  
+  cleanup() {
+    this.resetRandom();
+  }
+}
+
+describe('Stamina Integration Tests - Terrain Drain', () => {
+  let staminaSimulator;
+  
+  beforeEach(() => {
+    staminaSimulator = new StaminaSimulator(42);
+  });
+  
+  afterEach(() => {
+    staminaSimulator.cleanup();
+  });
+  
+  test('stamina drains consistently over standard terrain loop', measurePerformance(() => {
+    // Simulate 20 seconds of movement (low speed to not drain too quickly)
+    staminaSimulator.player.velocity.x = 3;
+    const history = staminaSimulator.simulateRun(20000);
+    
+    // Should have significant entries
+    expect(history.length).toBeGreaterThan(1000); // ~1200 frames at 60fps for 20 seconds
+    
+    // Stamina should decrease over time
+    expect(history[history.length - 1].stamina).toBeLessThan(100);
+    
+    // Check for consistent drain (should not jump suddenly)
+    for (let i = 1; i < history.length; i++) {
+      const previousStamina = history[i - 1].stamina;
+      const currentStamina = history[i].stamina;
+      
+      // Stamina should not increase (no items used in this test)
+      expect(currentStamina).toBeLessThanOrEqual(previousStamina);
+      
+      // Change between frames should be small and consistent
+      // Largest possible drop would be on powder at high speed
+      const maxExpectedDrop = (0.4 + (10 * 0.02)) * (16.67 / 1000);
+      expect(previousStamina - currentStamina).toBeLessThanOrEqual(maxExpectedDrop);
+    }
+  }), 1000);
+  
+  test('different surfaces affect stamina drain rates', measurePerformance(() => {
+    // Run simulation and collect surface-specific data
+    staminaSimulator.player.velocity.x = 5; // Consistent speed
+    const history = staminaSimulator.simulateRun(15000);
+    
+    // Group drain rates by surface type
+    const surfaceDrains = {
+      snow: [],
+      ice: [],
+      powder: []
+    };
+    
+    // Calculate frame-by-frame drain for each surface type
+    for (let i = 1; i < history.length; i++) {
+      const surfaceType = history[i - 1].surfaceType;
+      if (surfaceType !== 'air' && surfaceDrains.hasOwnProperty(surfaceType)) {
+        const drain = history[i - 1].stamina - history[i].stamina;
+        surfaceDrains[surfaceType].push(drain);
+      }
+    }
+    
+    // Calculate average drain for each surface
+    const avgDrains = {};
+    for (const [surface, drains] of Object.entries(surfaceDrains)) {
+      if (drains.length > 0) {
+        avgDrains[surface] = drains.reduce((sum, drain) => sum + drain, 0) / drains.length;
+      }
+    }
+    
+    // Ice should drain less than snow
+    expect(avgDrains.ice).toBeLessThan(avgDrains.snow);
+    
+    // Powder should drain more than snow
+    expect(avgDrains.powder).toBeGreaterThan(avgDrains.snow);
+  }), 1000);
+  
+  test('energy item restores appropriate stamina amount', measurePerformance(() => {
+    // Drain some stamina first
+    staminaSimulator.player.velocity.x = 8; // Faster to drain more
+    staminaSimulator.simulateRun(5000);
+    
+    // Record stamina before item
+    const staminaBefore = staminaSimulator.player.stamina;
+    
+    // Use medium energy item
+    staminaSimulator.addEnergyItem('mediumEnergy');
+    
+    // Should have increased by the correct amount (but not exceed max)
+    expect(staminaSimulator.player.stamina).toBe(
+      Math.min(100, staminaBefore + 30)
+    );
+    
+    // Continue simulation
+    const history = staminaSimulator.simulateRun(2000);
+    
+    // Stamina should continue to drain after item use
+    expect(history[history.length - 1].stamina).toBeLessThan(staminaSimulator.player.stamina);
+  }), 1000);
+  
+  test('speed affects drain rate proportionally', measurePerformance(() => {
+    // Run at different speeds and record drain
+    const speedRuns = {};
+    const testSpeeds = [2, 5, 10];
+    
+    for (const speed of testSpeeds) {
+      // Reset simulator for each test
+      const simulator = new StaminaSimulator(42);
+      simulator.player.velocity.x = speed;
+      
+      // Run for 10 seconds
+      const history = simulator.simulateRun(10000);
+      
+      // Calculate total drain
+      const totalDrain = 100 - history[history.length - 1].stamina;
+      speedRuns[speed] = totalDrain;
+      
+      simulator.cleanup();
+    }
+    
+    // Higher speeds should drain more
+    expect(speedRuns[2]).toBeLessThan(speedRuns[5]);
+    expect(speedRuns[5]).toBeLessThan(speedRuns[10]);
+    
+    // Drain should scale roughly proportionally to speed difference
+    // The difference between 5 and 2 should be about 3 * speedDrainMultiplier
+    // The difference between 10 and 5 should be about 5 * speedDrainMultiplier
+    const diff_5_2 = speedRuns[5] - speedRuns[2];
+    const diff_10_5 = speedRuns[10] - speedRuns[5];
+    
+    // The ratio should be roughly 5/3 = 1.67 (allowing some variation due to terrain differences)
+    const ratio = diff_10_5 / diff_5_2;
+    expect(ratio).toBeGreaterThan(1.4);
+    expect(ratio).toBeLessThan(2.0);
+  }), 1000);
+});

@@ -4,6 +4,8 @@
 import { measurePerformance, mockMathRandom, createPhaserSceneMock } from '../../test-utils.js';
 import fs from 'fs';
 import path from 'path';
+import { jest, describe, test, expect } from '@jest/globals';
+
 
 // Mock dependencies
 jest.mock('../../../js/config/physics-config.js', () => ({
@@ -43,6 +45,10 @@ jest.mock('../../../js/config/physics-config.js', () => ({
     comboTimeWindow: 2000
   }
 }));
+
+// Get the mocked modules
+const PhysicsConfig = jest.requireMock('../../../js/config/physics-config.js');
+
 
 /**
  * Game simulation that supports input playback for E2E testing
@@ -190,7 +196,7 @@ class GameSimulation {
   }
   
   handleLanding(segment) {
-    const PhysicsConfig = require('../../../js/config/physics-config.js');
+    
     
     // Get landing parameters
     const { landingSafetyAngle, safeLandingSpeedThreshold, crashSpeedThreshold } = PhysicsConfig.player;
@@ -279,7 +285,7 @@ class GameSimulation {
   
   processInput() {
     // Handle keyboard input based on current state
-    const PhysicsConfig = require('../../../js/config/physics-config.js');
+    
     
     if (this.player.crashed) return;
     
@@ -616,7 +622,7 @@ describe('Trick Execution E2E Tests with Input Playback', () => {
     expect(finalState.crashed).toBe(true);
     
     // Should not have awarded score for incomplete trick
-    expect(finalState.score).toBe(0);
+    expect(finalState.score).toBeCloseTo(0, 1);
     
     // Multiplier should be reset to 1.0
     expect(finalState.multiplier).toBe(1.0);

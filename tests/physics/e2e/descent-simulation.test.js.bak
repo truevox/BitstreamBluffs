@@ -1,0 +1,415 @@
+/**
+ * E2E tests for sled physics simulating descent over varied terrain
+ */
+import { measurePerformance, mockMathRandom } from '../../test-utils.js';
+import { jest, describe, test, expect } from '@jest/globals';
+
+
+// Mock dependencies
+jest.mock('../../../js/config/physics-config.js', ()
+
+// Get the mocked modules
+const PhysicsConfig = jest.requireMock('../../../js/config/physics-config.js');
+ => ({
+  player: {
+    landingSafetyAngle: 30,
+    safeLandingSpeedThreshold: 10,
+    crashSpeedThreshold: 18
+  },
+  gravity: {
+    default: 1,
+    airControl: 0.3,
+  },
+  surfaces: {
+    snow: { friction: 0.05 },
+    ice: { friction: 0.01 },
+    powder: { friction: 0.08 }
+  },
+  movement: {
+    maxSpeed: 15,
+    acceleration: 0.2,
+    brakeStrength: 0.4,
+    airBrakeStrength: 0.15,
+    minBoostStrength: 0.00015,
+    speedBoostFactor: 0.00025,
+    speedBoostThreshold: 0.3
+  },
+  terrain: {
+    minSlopeAngle: 10,
+    maxSlopeAngle: 45
+  }
+}));
+
+/**
+ * Comprehensive sled physics simulation for E2E testing
+ */
+class DescentSimulator {
+  constructor(seed = 42) {
+    this.seed = seed;
+    this.resetRandom = mockMathRandom(seed);
+    
+    // Time tracking
+    this.totalTime = 0;
+    this.frameTime = 16.67; // ~60fps
+    
+    // Player state
+    this.player = {
+      position: { x: 0, y: 500 },
+      velocity: { x: 0, y: 0 },
+      onGround: true,
+      crashed: false,
+      wobbling: false,
+      currentSpeedMultiplier: 1.0,
+      tricks: {
+        flips: 0,
+        partialFlip: 0,
+        trickScore: 0
+      }
+    };
+    
+    // Generate terrain
+    this.terrain = this.generateTerrain(50); // 50 segments
+    
+    // Game state history for analysis
+    this.stateHistory = [];
+  }
+  
+  generateTerrain(segmentCount) {
+    const segments = [];
+    let lastY = 500;
+    const segmentWidth = 100;
+    
+    for (let i = 0; i < segmentCount; i++) {
+      // Generate variation using randomness
+      const variation = (Math.random() * 2 - 1) * 0.2;
+      const smoothingFactor = 0.85;
+      
+      // Calculate next Y with smoothing
+      let nextY = lastY + (variation * 150);
+      nextY = lastY + ((nextY - lastY) * smoothingFactor);
+      
+      // Ensure within bounds
+      nextY = Math.max(300, Math.min(700, nextY));
+      
+      // Calculate angle in degrees
+      const deltaY = nextY - lastY;
+      const angleRad = Math.atan2(deltaY, segmentWidth);
+      const angleDeg = angleRad * (180 / Math.PI);
+      
+      // Add some features like jumps and flat sections for testing
+      let type = 'normal';
+      let surfaceType = 'snow';
+      
+      // Every 10th segment is a jump
+      if (i % 10 === 9) {
+        type = 'jump';
+        nextY -= 50; // Make a gap
+      }
+      
+      // Every 15th segment is icy
+      if (i % 15 === 5) {
+        surfaceType = 'ice';
+      }
+      
+      segments.push({
+        startX: i * segmentWidth,
+        startY: lastY,
+        endX: (i + 1) * segmentWidth,
+        endY: nextY,
+        angle: angleDeg,
+        type,
+        surfaceType
+      });
+      
+      lastY = nextY;
+    }
+    
+    return segments;
+  }
+  
+  getTerrainSegmentAtPosition(x) {
+    for (const segment of this.terrain) {
+      if (x >= segment.startX && x < segment.endX) {
+        return segment;
+      }
+    }
+    return null;
+  }
+  
+  checkTerrainCollision() {
+    const segment = this.getTerrainSegmentAtPosition(this.player.position.x);
+    if (!segment) return false;
+    
+    // Calculate terrain height at player x position
+    const segmentProgress = (this.player.position.x - segment.startX) / (segment.endX - segment.startX);
+    const terrainY = segment.startY + (segment.endY - segment.startY) * segmentProgress;
+    
+    // Check if player is below (or at) terrain height
+    if (this.player.position.y >= terrainY) {
+      if (!this.player.onGround) {
+        this.handleLanding(segment);
+      }
+      
+      // Snap to terrain
+      this.player.position.y = terrainY;
+      this.player.onGround = true;
+      return true;
+    } else {
+      // Above terrain
+      if (this.player.onGround) {
+        this.handleTakeoff();
+      }
+      return false;
+    }
+  }
+  
+  handleLanding(segment) {
+    const PhysicsConfig = PhysicsConfig;
+    
+    // Get landing parameters
+    const { landingSafetyAngle, safeLandingSpeedThreshold, crashSpeedThreshold } = PhysicsConfig.player;
+    
+    // Calculate landing metrics
+    const landingSpeed = Math.abs(this.player.velocity.y);
+    const landingAngle = Math.abs(segment.angle);
+    const isAngleSafe = landingAngle <= landingSafetyAngle;
+    const isSpeedSafe = landingSpeed <= safeLandingSpeedThreshold;
+    const isCrashing = landingSpeed > crashSpeedThreshold || !isAngleSafe;
+    
+    // Record any tricks completed
+    if (this.player.tricks.flips > 0 || this.player.tricks.partialFlip > 0.25) {
+      this.player.tricks.trickScore += (this.player.tricks.flips * 100) + 
+        (Math.floor(this.player.tricks.partialFlip * 4) * 25);
+      
+      // Award speed multiplier for successful tricks
+      if (!isCrashing) {
+        this.player.currentSpeedMultiplier = Math.min(3.0, 
+          this.player.currentSpeedMultiplier + (this.player.tricks.flips * 0.2));
+      }
+    }
+    
+    // Reset trick counters
+    this.player.tricks.flips = 0;
+    this.player.tricks.partialFlip = 0;
+    
+    // Handle landing outcome
+    if (isCrashing) {
+      this.player.crashed = true;
+      this.player.velocity.x *= 0.2; // Slow down significantly on crash
+      this.player.currentSpeedMultiplier = 1.0; // Reset multiplier
+    } else if (!isSpeedSafe && isAngleSafe) {
+      this.player.wobbling = true;
+      this.player.velocity.x *= 0.7; // Slow down a bit
+      setTimeout(() => { this.player.wobbling = false; }, 500);
+    }
+    
+    // Cancel vertical velocity on landing
+    this.player.velocity.y = 0;
+  }
+  
+  handleTakeoff() {
+    this.player.onGround = false;
+  }
+  
+  updatePhysics() {
+    // Skip if crashed
+    if (this.player.crashed) return;
+    
+    // Convert frameTime to seconds
+    const dtSec = this.frameTime / 1000;
+    
+    // Apply gravity if in air
+    if (!this.player.onGround) {
+      this.player.velocity.y += (PhysicsConfig.gravity.default * 15) * dtSec;
+      
+      // Update trick rotation in air
+      if (Math.abs(this.player.velocity.x) > 5) {
+        const rotationSpeed = this.player.velocity.x * 0.005;
+        this.player.tricks.partialFlip += rotationSpeed * dtSec;
+        
+        // Count complete flips
+        if (this.player.tricks.partialFlip >= 1.0) {
+          this.player.tricks.flips += 1;
+          this.player.tricks.partialFlip -= 1.0;
+        } else if (this.player.tricks.partialFlip <= -1.0) {
+          this.player.tricks.flips -= 1;
+          this.player.tricks.partialFlip += 1.0;
+        }
+      }
+    }
+    
+    // Apply slope force if on ground
+    if (this.player.onGround) {
+      const segment = this.getTerrainSegmentAtPosition(this.player.position.x);
+      if (segment) {
+        const slopeAngleRad = segment.angle * (Math.PI / 180);
+        const slopeForce = Math.sin(slopeAngleRad) * 10;
+        this.player.velocity.x += slopeForce * dtSec;
+        
+        // Apply appropriate friction based on surface type
+        const friction = PhysicsConfig.surfaces[segment.surfaceType]?.friction || 
+                        PhysicsConfig.surfaces.snow.friction;
+        const frictionForce = friction * Math.abs(this.player.velocity.x);
+        const direction = Math.sign(this.player.velocity.x);
+        
+        if (Math.abs(this.player.velocity.x) > frictionForce) {
+          this.player.velocity.x -= direction * frictionForce;
+        } else {
+          this.player.velocity.x = 0;
+        }
+      }
+    }
+    
+    // Apply boost from speed multiplier
+    if (this.player.onGround && this.player.currentSpeedMultiplier > 1.0) {
+      const direction = Math.sign(this.player.velocity.x) || 1;
+      const boostStrength = PhysicsConfig.movement.minBoostStrength + 
+        (PhysicsConfig.movement.speedBoostFactor * (this.player.currentSpeedMultiplier - 1.0) * 
+        Math.abs(this.player.velocity.x));
+      
+      this.player.velocity.x += direction * boostStrength * 100; // Scaled for simulation
+    }
+    
+    // Apply speed cap
+    if (Math.abs(this.player.velocity.x) > PhysicsConfig.movement.maxSpeed) {
+      this.player.velocity.x = Math.sign(this.player.velocity.x) * PhysicsConfig.movement.maxSpeed;
+    }
+    
+    // Update position
+    this.player.position.x += this.player.velocity.x * dtSec;
+    this.player.position.y += this.player.velocity.y * dtSec;
+    
+    // Check collision with terrain
+    this.checkTerrainCollision();
+  }
+  
+  simulate(durationMs) {
+    // Reset state history
+    this.stateHistory = [];
+    
+    // Run simulation for the specified duration
+    let elapsed = 0;
+    while (elapsed < durationMs) {
+      // Record the state
+      this.stateHistory.push({
+        time: this.totalTime,
+        position: { ...this.player.position },
+        velocity: { ...this.player.velocity },
+        onGround: this.player.onGround,
+        crashed: this.player.crashed,
+        wobbling: this.player.wobbling,
+        speedMultiplier: this.player.currentSpeedMultiplier,
+        trickScore: this.player.tricks.trickScore,
+        currentFlips: this.player.tricks.flips,
+        partialFlip: this.player.tricks.partialFlip
+      });
+      
+      // Update physics
+      this.updatePhysics();
+      
+      // Update time
+      elapsed += this.frameTime;
+      this.totalTime += this.frameTime;
+      
+      // End early if crashed
+      if (this.player.crashed) {
+        break;
+      }
+    }
+    
+    return this.stateHistory;
+  }
+  
+  cleanup() {
+    this.resetRandom();
+  }
+}
+
+describe('Sled Physics E2E Descent Simulation', () => {
+  let simulator;
+  jest.setTimeout(5000); // Increase timeout for this computationally intensive E2E test
+  
+  beforeEach(() => {
+    simulator = new DescentSimulator(42);
+  });
+  
+  afterEach(() => {
+    simulator.cleanup();
+  });
+  
+  test('simulates consistent descent over varied terrain', measurePerformance(() => {
+    // Simulate 10 seconds of gameplay
+    const stateHistory = simulator.simulate(10000);
+    
+    // Ensure we have enough states recorded
+    expect(stateHistory.length).toBeGreaterThan(500); // Roughly 10sec at 60fps
+    
+    // Verify player moves consistently forward
+    let lastX = -Infinity;
+    for (const state of stateHistory) {
+      expect(state.position.x).toBeGreaterThan(lastX);
+      lastX = state.position.x;
+    }
+    
+    // Check that player position stayed within terrain bounds
+    for (const state of stateHistory) {
+      expect(state.position.y).toBeGreaterThanOrEqual(250);
+      expect(state.position.y).toBeLessThanOrEqual(750);
+    }
+    
+    // Verify maximum speed is respected
+    for (const state of stateHistory) {
+      const speed = Math.sqrt(
+        state.velocity.x * state.velocity.x + 
+        state.velocity.y * state.velocity.y
+      );
+      expect(speed).toBeLessThanOrEqual(20); // Give a little buffer
+    }
+  }), 1000); // Extra time allowance
+  
+  test('detects and handles jumps correctly', measurePerformance(() => {
+    // Simulate 15 seconds to ensure hitting jumps
+    const stateHistory = simulator.simulate(15000);
+    
+    // Count air time segments (consecutive frames where onGround is false)
+    let inAir = false;
+    let airTimeSegments = 0;
+    let airFrames = 0;
+    let longestAirTime = 0;
+    
+    for (const state of stateHistory) {
+      if (!state.onGround) {
+        airFrames++;
+        if (!inAir) {
+          inAir = true;
+          airTimeSegments++;
+        }
+      } else {
+        if (inAir) {
+          inAir = false;
+          longestAirTime = Math.max(longestAirTime, airFrames);
+          airFrames = 0;
+        }
+      }
+    }
+    
+    // We should have at least one jump with significant air time
+    expect(airTimeSegments).toBeGreaterThan(0);
+    expect(longestAirTime).toBeGreaterThan(10); // At least 10 frames of air time
+  }));
+  
+  test('trick system awards points correctly', measurePerformance(() => {
+    // Set high initial velocity to enable tricks
+    simulator.player.velocity.x = 12;
+    
+    // Simulate 20 seconds to ensure hitting jumps and performing tricks
+    const stateHistory = simulator.simulate(20000);
+    
+    // Should accumulate trick score
+    expect(stateHistory[stateHistory.length - 1].trickScore).toBeGreaterThan(0);
+    
+    // Speed multiplier should increase after successful tricks
+    const multiplierIncreased = stateHistory.some(state => state.speedMultiplier > 1.0);
+    expect(multiplierIncreased).toBe(true);
+  }));
+});

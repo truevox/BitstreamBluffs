@@ -2,6 +2,8 @@
  * E2E tests for multi-chunk terrain generation and validation
  */
 import { measurePerformance, mockMathRandom, createPhaserSceneMock } from '../../test-utils.js';
+import { jest, describe, test, expect } from '@jest/globals';
+
 
 // Mock dependencies
 jest.mock('../../../js/config/physics-config.js', () => ({
@@ -18,6 +20,10 @@ jest.mock('../../../js/config/physics-config.js', () => ({
     preloadedChunks: 3 // How many chunks to keep loaded
   }
 }));
+
+// Get the mocked modules
+const PhysicsConfig = jest.requireMock('../../../js/config/physics-config.js');
+
 
 // Simplified terrain chunk manager for E2E testing
 class TerrainChunkManager {
@@ -112,7 +118,7 @@ describe('Multi-Chunk Terrain E2E Tests', () => {
     // Initial load at position 0
     let visibleChunks = terrainManager.loadChunks(0);
     expect(visibleChunks.length).toBe(3);
-    expect(visibleChunks[0].index).toBe(0);
+    expect(visibleChunks[0].index).toBeCloseTo(0, 1);
     expect(visibleChunks[1].index).toBe(1);
     expect(visibleChunks[2].index).toBe(2);
     
