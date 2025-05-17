@@ -8,6 +8,7 @@ class ConfigLoader {
         this.config = {
             debuggingOn: 0 // Default to debugging off
         };
+        this.configLoaded = false;
         this.loadConfig();
     }
 
@@ -16,16 +17,14 @@ class ConfigLoader {
      * File format expected to be simple key=value pairs, one per line
      * e.g., debuggingOn=1
      */
-    loadConfig() {
+    async loadConfig() {
         try {
-            // Create an XMLHttpRequest to load the config file
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', 'config.txt', false); // Synchronous request
-            xhr.send();
+            // Using fetch API which works better with modules
+            const response = await fetch('config.txt');
             
-            if (xhr.status === 200) {
+            if (response.ok) {
                 // Parse the config file
-                const configText = xhr.responseText;
+                const configText = await response.text();
                 const lines = configText.split('\n');
                 
                 for (const line of lines) {
@@ -35,6 +34,7 @@ class ConfigLoader {
                     }
                 }
                 
+                this.configLoaded = true;
                 console.log('Config loaded successfully:', this.config);
             } else {
                 console.log('Config file not found, using default settings');
@@ -49,6 +49,7 @@ class ConfigLoader {
      * @returns {boolean} True if debugging is enabled, false otherwise
      */
     isDebuggingEnabled() {
+        // Safely return the debug setting, defaulting to false if not loaded
         return this.config.debuggingOn === 1;
     }
 }

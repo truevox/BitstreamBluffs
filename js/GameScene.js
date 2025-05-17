@@ -1,5 +1,5 @@
 // js/GameScene.js
-// Uses Phaser 3 with the built‑in Matter physics plugin.
+// Uses Phaser 3 with the built‑in Matter physics plugin.
 // ------------------------------------------------------
 
 class GameScene extends Phaser.Scene {
@@ -52,6 +52,10 @@ class GameScene extends Phaser.Scene {
         this.prevGroundState    = false;   // to detect ground/air transitions
         this.sledOriginalY      = 0;       // to track original sled position
         this.sledOriginalX      = 0;       // to track original sled X position
+        
+        // --- rotation and flip tracking system --------------------------------
+        this.rotationSystem     = null;     // will be initialized in create()
+        this.currentSpeedMultiplier = 1.0;  // default speed multiplier
         
         // --- walking mode state -----------------------------------------------
         this.sledDistance       = 40;      // distance between player and sled when walking
@@ -198,12 +202,55 @@ class GameScene extends Phaser.Scene {
         
         // Set initial HUD text
         this.updateHudText();
+        
+        // --------------------------------------------------------------------
+        // ROTATION SYSTEM - For flip tracking and landing evaluation
+        // --------------------------------------------------------------------
+        this.rotationSystem = new RotationSystem({
+            onCleanLanding: (speedMultiplier) => {
+                this.currentSpeedMultiplier = speedMultiplier;
+                console.log(`Clean landing! Speed multiplier: ${speedMultiplier.toFixed(2)}x`);
+            },
+            onCrash: () => {
+                console.log('Crashed!');
+                // Reset player velocity on crash
+                const Body = Phaser.Physics.Matter.Matter.Body;
+                Body.setVelocity(this.player.body, { x: 0, y: 0 });
+                // Restart the scene after a short delay
+                this.time.delayedCall(500, () => {
+                    this.scene.restart();
+                });
+            },
+            onWobble: () => {
+                console.log('Wobble landing!');
+                // Reduce speed on wobble
+                const Body = Phaser.Physics.Matter.Matter.Body;
+                const currentVel = this.player.body.velocity;
+                Body.setVelocity(this.player.body, { 
+                    x: currentVel.x * 0.7, 
+                    y: currentVel.y 
+                });
+                this.currentSpeedMultiplier = 0.8;
+            },
+            onFlipComplete: (fullFlips, partialFlip) => {
+                console.log(`Flip complete! ${fullFlips} + ${partialFlip.toFixed(2)}`);
+                // Could trigger visual effects here
+            }
+        });
 
         // --------------------------------------------------------------------
         // DEBUG TEXT
         // --------------------------------------------------------------------
         this.debugText = this.add.text(10, 10, '',
             this.debugTextStyle).setScrollFactor(0).setDepth(100);
+        
+        // Apply a passive boost to maintain momentum when a speed multiplier is active
+        this.time.addEvent({
+            delay: 100, // execute 10 times per second
+            callback: this.applyPassiveSpeedBoost,
+            callbackScope: this,
+            loop: true
+        });
 
         console.log("GameScene setup complete (Matter edition).");
     }
@@ -430,9 +477,14 @@ class GameScene extends Phaser.Scene {
                 Body.setAngularVelocity(this.player.body, -groundRotVel);
             }
 
+            // Apply force with speed multiplier when on ground
+            const leftForce = this.onGround ? 
+                -pushForce * this.currentSpeedMultiplier : // Apply multiplier on ground
+                -pushForce * 0.5;                        // Reduced in air (no multiplier)
+                
             Body.applyForce(this.player.body,
                 this.player.body.position,
-                { x: this.onGround ? -pushForce : -pushForce * 0.5, y: 0 });
+                { x: leftForce, y: 0 });
         }
         else if (this.cursors.right.isDown) {
             // Only apply rotation on ground (not in air)
@@ -440,9 +492,14 @@ class GameScene extends Phaser.Scene {
                 Body.setAngularVelocity(this.player.body, groundRotVel);
             }
 
+            // Apply force with speed multiplier when on ground
+            const rightForce = this.onGround ? 
+                pushForce * this.currentSpeedMultiplier : // Apply multiplier on ground
+                pushForce * 0.5;                        // Reduced in air (no multiplier)
+                
             Body.applyForce(this.player.body,
                 this.player.body.position,
-                { x: this.onGround ?  pushForce :  pushForce * 0.5, y: 0 });
+                { x: rightForce, y: 0 });
         }
         
         // --------------------------------------------------------------------
@@ -508,7 +565,8 @@ class GameScene extends Phaser.Scene {
                 this.isTucking = true;
                 
                 // Apply additional forward force while tucking
-                const tuckBoostForce = 0.003; // Adjust to taste
+                // Use the current speed multiplier for added boost when landing tricks
+                const tuckBoostForce = 0.003 * this.currentSpeedMultiplier; 
                 Body.applyForce(this.player.body,
                     this.player.body.position,
                     { x: tuckBoostForce, y: 0 });
@@ -627,24 +685,44 @@ class GameScene extends Phaser.Scene {
         
         // For air rotation, check input state and apply or reset rotation accordingly
         if (!this.onGround) {
+            let deltaRotation = 0;
+            
             // W key/left-stick up for counter-clockwise rotation in air
             if (this.manette.isActionActive('rotateCounterClockwise')) {
                 Body.setAngularVelocity(this.player.body, -airRotVel);
+                deltaRotation = -Phaser.Math.RadToDeg(airRotVel);
             }
             // S key/left-stick down for clockwise rotation in air
             else if (this.manette.isActionActive('rotateClockwise')) {
                 Body.setAngularVelocity(this.player.body, airRotVel);
+                deltaRotation = Phaser.Math.RadToDeg(airRotVel);
             }
             // If neither rotation key is pressed, stop rotation immediately
             else {
                 Body.setAngularVelocity(this.player.body, 0);
             }
+            
+            // Update rotation system with current state
+            const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
+            this.rotationSystem.update({
+                grounded: this.onGround,
+                currentAngle: currentAngleDeg,
+                deltaRotation: deltaRotation
+            });
         }
         // When on ground, reset angular velocity and align to slope
         else if (this.onGround) {
             Body.setAngularVelocity(this.player.body, 0);
             // gently align to slope
             this.playerHitTerrain(this.currentSlopeAngle);
+            
+            // Update rotation system with current ground state
+            const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
+            this.rotationSystem.update({
+                grounded: this.onGround,
+                currentAngle: currentAngleDeg,
+                deltaRotation: 0
+            });
         }
 
         // --------------------------------------------------------------------
@@ -654,6 +732,9 @@ class GameScene extends Phaser.Scene {
             Body.setVelocity(this.player.body,
                 { x: this.player.body.velocity.x, y: -10 });
             this.onGround = false;
+            
+            // Reset speed multiplier on jump
+            this.currentSpeedMultiplier = 1.0;
         }
 
         // --------------------------------------------------------------------
@@ -683,7 +764,7 @@ class GameScene extends Phaser.Scene {
                 `X: ${this.player.x.toFixed(0)},  Y: ${this.player.y.toFixed(0)}`,
                 `Vx: ${this.player.body.velocity.x.toFixed(2)}  ` +
                 `Vy: ${this.player.body.velocity.y.toFixed(2)}`,
-                `Speed: ${Math.abs(this.player.body.velocity.x).toFixed(2)}`,
+                `Speed: ${Math.abs(this.player.body.velocity.x).toFixed(2)} (${this.currentSpeedMultiplier.toFixed(2)}x)`,
                 `Angle: ${Phaser.Math.RadToDeg(this.player.body.angle).toFixed(1)}`,
                 `OnGround: ${this.onGround}`,
                 `Mode: ${this.manette.walkMode ? 'WALKING' : 'SLEDDING'}`,
@@ -697,9 +778,71 @@ class GameScene extends Phaser.Scene {
     updateHudText() {
         if (this.hudText) {
             const mode = this.manette ? (this.manette.walkMode ? 'WALKING' : 'SLEDDING') : 'UNKNOWN';
-            this.hudText.setText(`MODE: ${mode}`);
+            
+            // Add flip stats to HUD when in the air
+            let hudContent = `MODE: ${mode}`;
+            
+            // Always show the speed multiplier in sledding mode, for better feedback
+            if (!this.manette.walkMode) {
+                hudContent += `\nSPEED MULT: ${this.currentSpeedMultiplier.toFixed(2)}x`;
+                
+                // Add flip stats only when in the air
+                if (!this.onGround && this.rotationSystem) {
+                    const flipStats = this.rotationSystem.getFlipStats();
+                    hudContent += `\nFLIPS: ${flipStats.fullFlips} + ${flipStats.partialFlip.toFixed(2)}`;
+                }
+            }
+            
+            this.hudText.setText(hudContent);
         }
     }
 }
 
-// export default GameScene;
+/**
+ * Helper method to apply a passive speed boost based on the current multiplier.
+ * This makes the speed boost from landing tricks feel more impactful.
+ */
+GameScene.prototype.applyPassiveSpeedBoost = function() {
+    // Only apply when on ground, not in walking mode, and player is moving
+    if (this.onGround && !this.manette.walkMode && this.player && this.player.body) {
+        const Body = Phaser.Physics.Matter.Matter.Body;
+        const velocity = this.player.body.velocity;
+        
+        // Only apply boost when moving at a decent speed and multiplier is above base
+        if (Math.abs(velocity.x) > 0.5 && this.currentSpeedMultiplier > 1.0) {
+            const direction = Math.sign(velocity.x); // -1 for left, 1 for right
+            const boostStrength = 0.0003 * (this.currentSpeedMultiplier - 1.0) * Math.abs(velocity.x);
+            
+            // Apply a small force in the direction of movement
+            Body.applyForce(this.player.body,
+                this.player.body.position,
+                { x: direction * boostStrength, y: 0 });
+        }
+    }
+};
+
+/**
+ * Helper method to apply a passive speed boost based on the current multiplier.
+ * This makes the speed boost from landing tricks feel more impactful.
+ */
+GameScene.prototype.applyPassiveSpeedBoost = function() {
+    // Only apply when on ground, not in walking mode, and player is moving
+    if (this.onGround && !this.manette.walkMode && this.player && this.player.body) {
+        const Body = Phaser.Physics.Matter.Matter.Body;
+        const velocity = this.player.body.velocity;
+        
+        // Only apply boost when moving at a decent speed and multiplier is above base
+        if (Math.abs(velocity.x) > 0.5 && this.currentSpeedMultiplier > 1.0) {
+            const direction = Math.sign(velocity.x); // -1 for left, 1 for right
+            // Scale boost by current speed and multiplier value
+            const boostStrength = 0.0002 * (this.currentSpeedMultiplier - 1.0) * Math.abs(velocity.x);
+            
+            // We debounce here to prevent event flooding during trick chaining
+            Body.applyForce(this.player.body,
+                this.player.body.position,
+                { x: direction * boostStrength, y: 0 });
+        }
+    }
+};
+
+// Class is globally available through script tag loading

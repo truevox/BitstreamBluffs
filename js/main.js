@@ -21,5 +21,6 @@ window.onload = () => {
         scene: [ BootScene, PreloadScene, GameScene ]
     };
 
+    console.log('Starting Phaser game with config:', config);
     new Phaser.Game(config);
 };
