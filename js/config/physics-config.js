@@ -47,8 +47,8 @@ const PhysicsConfig = {
     
     // Extra lives system
     extraLives: {
-        initialLives: 1,               // Starting number of lives
-        maxLives: 3,                   // Maximum number of lives
+        initialLives: 2,               // Starting number of lives
+        maxLives: 5,                   // Maximum number of lives
         minTimeToNextLife: 30000,      // Minimum ms between life spawns (30 sec)
         maxTimeToNextLife: 120000,     // Maximum ms between life spawns (2 min)
         spawnDistance: 600,            // How far ahead lives spawn

@@ -20,6 +20,9 @@ export default class GameScene extends Phaser.Scene {
             }
         });
         
+        // Game state flags
+        this.gameOverShown = false; // Track if game over has been shown during this run
+        
         // Bind methods to ensure 'this' context is preserved
         this.safePreUpdate = this.safePreUpdate.bind(this);
         this.manageExtraLives = this.manageExtraLives.bind(this);
@@ -116,6 +119,13 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create() {
+        console.log('Scene create method started - initializing game');
+        // Reset core game variables to prevent issues on restart
+        this.lives = PhysicsConfig.extraLives.initialLives;
+        this.lastTerrainY = 500; // Reset terrain starting point
+        this.terrainSegments = [];
+        this.gameOverShown = false; // Reset game over flag on scene create
+        
         // No local walk mode state; always use this.manette.walkMode
         // --------------------------------------------------------------------
         // world + input setup (unchanged)
@@ -224,11 +234,23 @@ export default class GameScene extends Phaser.Scene {
         this.terrainGraphics = this.add.graphics();
         console.log(`Initial terrain generation. First segment from Y: ${this.lastTerrainY}`);
 
+        // Generate initial terrain - ensure we have a solid platform to start on
         for (let i = 0; i < 25; i++) {
             this.generateNextTerrainSegment(i === 0);
         }
         this.drawTerrain();
         console.log(`${this.terrainSegments.length} terrain segments generated.`);
+        
+        // Verify player position is above terrain
+        if (this.terrainSegments.length > 0) {
+            const firstSegment = this.terrainSegments[0];
+            // Ensure player is positioned correctly above the first terrain segment
+            const playerY = firstSegment.y1 - 50; // Position above the terrain with padding
+            console.log(`Positioning player at Y: ${playerY}, terrain at Y: ${firstSegment.y1}`);
+            this.player.setPosition(200, playerY);
+        } else {
+            console.warn('No terrain segments available for initial player positioning');
+        }
 
         // --------------------------------------------------------------------
         // COLLISION EVENTS for slope angle + ground detection
@@ -320,9 +342,43 @@ export default class GameScene extends Phaser.Scene {
                         // Just reset position slightly and continue
                         Body.setVelocity(this.player.body, { x: 2, y: -1 }); // Small kick to get moving again
                     });
-                } else {
-                    // No lives left, restart the scene after a short delay
-                    this.time.delayedCall(500, () => {
+                } else if (!this.gameOverShown) {
+                    // No lives left and game over hasn't been shown yet
+                    console.log('No lives left, preparing to restart scene...');
+                    this.gameOverShown = true; // Mark as shown to prevent multiple displays
+                    
+                    // Show game over feedback before restarting, centered on player
+                    const gameOverText = this.add.text(
+                        this.player.x,
+                        this.player.y - 100, // Position above player
+                        'GAME OVER', 
+                        {
+                            font: '32px Arial',
+                            fill: '#ff0000',
+                            stroke: '#000000',
+                            strokeThickness: 6
+                        }
+                    ).setDepth(100).setOrigin(0.5);
+                    
+                    // Add flash effect centered on player
+                    const flashRect = this.add.rectangle(
+                        this.player.x,
+                        this.player.y,
+                        this.cameras.main.width,
+                        this.cameras.main.height,
+                        0xff0000, 0.4
+                    ).setDepth(90);
+                    
+                    // Make effects follow the player
+                    this.tweens.add({
+                        targets: [gameOverText, flashRect],
+                        alpha: { from: 1, to: 0.7, yoyo: true, repeat: 3 },
+                        duration: 300
+                    });
+                    
+                    this.time.delayedCall(1500, () => {
+                        // Proper cleanup before scene restart
+                        this.cleanupBeforeRestart();
                         this.scene.restart();
                     });
                 }
@@ -1421,6 +1477,57 @@ GameScene.prototype.handleResize = function({ width, height }) {
     
     // Redraw terrain if needed
     this.drawTerrain();
+};
+
+// Helper to properly clean up before scene restart
+GameScene.prototype.cleanupBeforeRestart = function() {
+    console.log('Cleaning up before scene restart...');
+    
+    // Clear any existing timers and tweens
+    this.time.removeAllEvents();
+    this.tweens.killAll();
+    
+    // Properly destroy terrain physics bodies to prevent memory leaks
+    if (this.terrainSegments) {
+        this.terrainSegments.forEach(segment => {
+            if (segment.bodies) {
+                segment.bodies.forEach(body => {
+                    if (body && body.gameObject) {
+                        body.gameObject.destroy();
+                    } else if (body) {
+                        // If there's no gameObject, manually remove the body
+                        this.matter.world.remove(body);
+                    }
+                });
+            }
+        });
+        
+        // Clear the array
+        this.terrainSegments = [];
+    }
+    
+    // Clean up any collectibles
+    if (this.lifeCollectibles) {
+        this.lifeCollectibles.forEach(collectible => {
+            if (collectible && collectible.destroy) {
+                collectible.destroy();
+            }
+        });
+        this.lifeCollectibles = [];
+    }
+    
+    // Clean up any other physics bodies
+    if (this.player && this.player.body) {
+        // Make sure the player body is properly removed
+        this.matter.world.remove(this.player.body);
+    }
+    
+    // Clean up graphics
+    if (this.terrainGraphics) {
+        this.terrainGraphics.clear();
+    }
+    
+    console.log('Cleanup complete');
 };
 
 // GameScene is now properly exported as ES module
