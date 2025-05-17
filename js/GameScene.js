@@ -181,8 +181,9 @@ class GameScene extends Phaser.Scene {
         const Bodies = Phaser.Physics.Matter.Matter.Bodies;
         const playerBody = Bodies.circle(0, 0, circleRadius, {
             restitution: 0.1,
-            friction: 0.000003,  // Reduced friction for better sliding
-            density: 0.2
+            friction: 0.000001,  // Even lower friction for smoother sliding
+            frictionAir: 0.001,  // Very low air friction
+            density: 0.18        // Slightly lower density for less "heaviness"
         });
 
         this.matter.add.gameObject(this.player);
@@ -324,7 +325,7 @@ class GameScene extends Phaser.Scene {
                 // Reduce speed on wobble
                 const Body = Phaser.Physics.Matter.Matter.Body;
                 const currentVel = this.player.body.velocity;
-                Body.setVelocity(this.player.body, { 
+                Body.setVelocity(this.player.body, {
                     x: currentVel.x * 0.7, 
                     y: currentVel.y 
                 });
@@ -523,6 +524,20 @@ class GameScene extends Phaser.Scene {
         
         const Body = Phaser.Physics.Matter.Matter.Body;
         
+        // Apply a gentle downhill bias force when on ground to prevent sticking
+        if (this.onGround && !this.manette.walkMode && this.player.body) {
+            // Determine direction from player angle
+            const playerAngleRad = this.player.rotation;
+            // Apply a small force in the downhill direction
+            const downhillForce = 0.0005;
+            Body.applyForce(this.player.body,
+                this.player.body.position,
+                { 
+                    x: Math.sin(playerAngleRad) * downhillForce,
+                    y: Math.cos(playerAngleRad) * downhillForce 
+                });
+        }
+        
         // Update our Manette input controller
         this.manette.update();
 
@@ -589,7 +604,7 @@ class GameScene extends Phaser.Scene {
         // --------------------------------------------------------------------
         const groundRotVel = 0.05;  // ~deg/s in rad Units
         const airRotVel    = 0.10;
-        const pushForce    = 0.002; // tune to taste
+        const pushForce    = 0.0035; // Increased from 0.002 for more responsive movement
 
         // Original left/right controls for pushing and rotating on ground
         if (this.cursors.left.isDown) {
@@ -917,6 +932,7 @@ class GameScene extends Phaser.Scene {
             // Always show the speed multiplier in sledding mode, for better feedback
             if (!this.manette.walkMode) {
                 hudContent += `\nSPEED MULT: ${this.currentSpeedMultiplier.toFixed(2)}x`;
+                hudContent += `\nLIVES: ${this.lives}`;
                 
                 // Add flip stats only when in the air
                 if (!this.onGround && this.rotationSystem) {
@@ -1293,12 +1309,20 @@ GameScene.prototype.applyPassiveSpeedBoost = function() {
         const Body = Phaser.Physics.Matter.Matter.Body;
         const velocity = this.player.body.velocity;
         
-        // Only apply boost when moving at a decent speed and multiplier is above base
-        if (Math.abs(velocity.x) > 0.5 && this.currentSpeedMultiplier > 1.0) {
-            const direction = Math.sign(velocity.x); // -1 for left, 1 for right
+        // Apply a small minimum boost regardless of speed
+        const minBoost = 0.00015;
+        const direction = Math.sign(velocity.x) || 1; // Default to right if no movement
+        
+        // Add the minimum boost to keep things moving
+        Body.applyForce(this.player.body,
+            this.player.body.position,
+            { x: direction * minBoost, y: 0 });
+        
+        // Additional boost based on multiplier if moving fast enough
+        if (Math.abs(velocity.x) > 0.3 && this.currentSpeedMultiplier > 1.0) {
             const boostStrength = 0.0003 * (this.currentSpeedMultiplier - 1.0) * Math.abs(velocity.x);
             
-            // Apply a small force in the direction of movement
+            // Apply a larger force when we have a speed multiplier
             Body.applyForce(this.player.body,
                 this.player.body.position,
                 { x: direction * boostStrength, y: 0 });
@@ -1316,16 +1340,26 @@ GameScene.prototype.applyPassiveSpeedBoost = function() {
         const Body = Phaser.Physics.Matter.Matter.Body;
         const velocity = this.player.body.velocity;
         
-        // Only apply boost when moving at a decent speed and multiplier is above base
-        if (Math.abs(velocity.x) > 0.5 && this.currentSpeedMultiplier > 1.0) {
-            const direction = Math.sign(velocity.x); // -1 for left, 1 for right
+        // Apply a minimum boost to keep the player moving even at base speed
+        const minBoostStrength = 0.00015; // Small minimum boost
+        
+        // Direction of movement
+        const direction = Math.sign(velocity.x); // -1 for left, 1 for right
+        
+        // If we have a speed multiplier, apply a stronger boost
+        if (Math.abs(velocity.x) > 0.3 && this.currentSpeedMultiplier > 1.0) {
             // Scale boost by current speed and multiplier value
-            const boostStrength = 0.0002 * (this.currentSpeedMultiplier - 1.0) * Math.abs(velocity.x);
+            const multiplierBoost = 0.00025 * (this.currentSpeedMultiplier - 1.0) * Math.abs(velocity.x);
             
-            // We debounce here to prevent event flooding during trick chaining
+            // Apply the boost
             Body.applyForce(this.player.body,
                 this.player.body.position,
-                { x: direction * boostStrength, y: 0 });
+                { x: direction * (minBoostStrength + multiplierBoost), y: 0 });
+        } else if (Math.abs(velocity.x) > 0.1) {
+            // Even without a multiplier, apply the minimum boost
+            Body.applyForce(this.player.body,
+                this.player.body.position,
+                { x: direction * minBoostStrength, y: 0 });
         }
     }
 };
