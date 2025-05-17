@@ -7,6 +7,7 @@ import PhysicsConfig from './config/physics-config.js';
 import Manette from './Manette.js';
 import RotationSystem from './utils/RotationSystem.js';
 import configLoader from './config/config-loader.js';
+import { initializeRandomWithSeed } from './utils/seed-generator.js';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -120,6 +121,17 @@ export default class GameScene extends Phaser.Scene {
 
     create() {
         console.log('Scene create method started - initializing game');
+        
+        // Initialize with the seed from StartScene if available
+        if (window.gameSeed) {
+            console.log('Using game seed:', window.gameSeed);
+            // Create a seeded random function
+            this.seededRandom = initializeRandomWithSeed(window.gameSeed);
+        } else {
+            console.warn('No game seed found, using default Math.random');
+            // Fallback to standard Math.random
+            this.seededRandom = Math.random;
+        }
         // Reset core game variables to prevent issues on restart
         this.lives = PhysicsConfig.extraLives.initialLives;
         this.lastTerrainY = 500; // Reset terrain starting point
@@ -377,9 +389,10 @@ export default class GameScene extends Phaser.Scene {
                     });
                     
                     this.time.delayedCall(1500, () => {
-                        // Proper cleanup before scene restart
+                        // Proper cleanup before returning to start screen
                         this.cleanupBeforeRestart();
-                        this.scene.restart();
+                        // Go back to StartScene instead of restarting
+                        this.scene.start('StartScene');
                     });
                 }
             },
@@ -448,7 +461,8 @@ export default class GameScene extends Phaser.Scene {
         if (isFirstSegment) {
             newY += Phaser.Math.Between(40, 70); // Steeper initial descent
         } else {
-            const r = Math.random();
+            // Use seeded random if available, otherwise fallback to Math.random
+            const r = this.seededRandom ? this.seededRandom() : Math.random();
             // Increased probability and magnitude of downward slopes
             if      (r < 0.60) newY += Phaser.Math.Between(35,  70);  // Moderate downslope (more common)
             else if (r < 0.85) newY += Phaser.Math.Between(70, 120);  // Steep downslope (more common)
@@ -461,7 +475,8 @@ export default class GameScene extends Phaser.Scene {
         const segment = {
             x1: prevX, y1: prevY,
             x2: prevX + this.segmentWidth, y2: newY,
-            color: Math.random() < 0.5 ? this.neonBlue : this.neonPink,
+            // Use seeded random for color selection
+            color: (this.seededRandom ? this.seededRandom() : Math.random()) < 0.5 ? this.neonBlue : this.neonPink,
             angle: segmentAngleRad,
             bodies: [] // Track associated physics bodies for later cleanup
         };

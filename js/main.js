@@ -8,6 +8,7 @@ import PhysicsConfig from './config/physics-config.js';
 // Import game scenes
 import BootScene from './BootScene.js';
 import PreloadScene from './PreloadScene.js';
+import StartScene from './StartScene.js';
 import GameScene from './GameScene.js';
 
 // Import utility classes
@@ -74,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
 
-        scene: [ GameScene ]  // Start directly with GameScene for now
+        scene: [ StartScene, GameScene ]  // Start with StartScene, then transition to GameScene
     };
 
     console.log('Starting Phaser game with config:', config);
