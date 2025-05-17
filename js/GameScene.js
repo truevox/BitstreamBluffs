@@ -1275,6 +1275,28 @@ export default class GameScene extends Phaser.Scene {
         }
     }
     
+    // Helper to find terrain height at a given X position
+    findTerrainHeightAt(xPos) {
+        if (!this.terrainSegments || this.terrainSegments.length === 0) {
+            return 500; // Default height if no terrain
+        }
+        
+        // Find the terrain segment that contains this X position
+        for (let i = 0; i < this.terrainSegments.length; i++) {
+            const segment = this.terrainSegments[i];
+            if (xPos >= segment.x1 && xPos <= segment.x2) {
+                // Found the segment, now interpolate Y based on X position
+                const ratio = (xPos - segment.x1) / (segment.x2 - segment.x1);
+                const terrainHeight = Phaser.Math.Linear(segment.y1, segment.y2, ratio);
+                return terrainHeight;
+            }
+        }
+        
+        // If we're beyond the last segment, use the last segment's end point
+        const lastSegment = this.terrainSegments[this.terrainSegments.length - 1];
+        return lastSegment.y2;
+    }
+    
     // Helper to spawn an extra life collectible - COMPLETELY REWRITTEN
     spawnExtraLife() {
         // Make sure player exists and has a valid position
@@ -1288,9 +1310,21 @@ export default class GameScene extends Phaser.Scene {
             const playerPos = this.player.body.position;
             
             // Calculate a safe position in front of the player
-            // Use a simple offset rather than calculating exact positions
             const spawnX = playerPos.x + PhysicsConfig.extraLives.spawnDistance; // Distance from config
-            const spawnY = playerPos.y;       // Same level as player
+            
+            // Find the terrain height directly below the spawn point
+            const terrainHeight = this.findTerrainHeightAt(spawnX);
+            
+            // Calculate player sprite height (approximated from player body + sled height)
+            const playerSpriteHeight = 50; // Player body height from create() method
+            
+            // Position powerup above terrain but not too high (less than 7 player sprite heights)
+            const maxHeightAboveTerrain = playerSpriteHeight * 6; // Less than 7 sprite heights
+            const minHeightAboveTerrain = playerSpriteHeight * 2; // At least 2 sprite heights for safety
+            
+            // Random height between min and max, but ensure it's at a reasonable height
+            const heightAboveTerrain = Phaser.Math.Between(minHeightAboveTerrain, maxHeightAboveTerrain);
+            const spawnY = terrainHeight - heightAboveTerrain; // Subtract because Y increases downward
             
             // Create our fallback texture if needed
             if (!this.textures.exists('extraLife')) {
@@ -1306,18 +1340,22 @@ export default class GameScene extends Phaser.Scene {
             // Set depth to ensure it appears above terrain
             lifeCollectible.setDepth(10);
             
-            // Add simple circular collision area
+            // Create a STATIC circular collision area that won't be affected by gravity
             const collider = this.matter.add.circle(spawnX, spawnY, PhysicsConfig.extraLives.collectibleRadius, {
                 isSensor: true,
                 isExtraLife: true,
-                label: 'extraLife'
+                label: 'extraLife',
+                isStatic: true, // Make it static so it doesn't fall
             });
             
             // Store references to link the sprite and physics body
             lifeCollectible.collider = collider;
             collider.gameObject = lifeCollectible;
             
-            // No tweens! Just set basic properties
+            // Store original Y position for hover animation
+            lifeCollectible.originalY = spawnY;
+            
+            // Set basic properties
             lifeCollectible.isExtraLife = true;
             
             // Add to our tracking array
@@ -1326,20 +1364,46 @@ export default class GameScene extends Phaser.Scene {
             }
             this.lifeCollectibles.push(lifeCollectible);
             
-            // Add an update listener to this specific collectible
-            this.events.on('update', () => {
-                // If the sprite still exists, update its position to match the collider
-                if (lifeCollectible && !lifeCollectible.destroyed && collider && collider.position) {
-                    try {
+            // Calculate hover distance (approximately 3 sprite widths)
+            const spriteWidth = PhysicsConfig.extraLives.collectibleRadius * 2;
+            const hoverDistance = spriteWidth * 3; // 3 sprite widths as requested
+            
+            // Instead of tweening the physics body directly (which can cause issues),
+            // We'll use a tween on a dummy object and update manually
+            const hoverController = { y: 0 };
+            
+            // Add hover animation with tweens
+            this.tweens.add({
+                targets: hoverController,
+                y: 1,                      // Normalize from 0 to 1 for easier math
+                duration: 2000,            // 2 seconds for one direction
+                ease: 'Sine.easeInOut',    // Smooth sine wave motion
+                yoyo: true,                // Makes it go back down
+                repeat: -1,                // Repeat indefinitely
+                onUpdate: () => {
+                    if (collider && !collider.isStatic) {
+                        // If somehow the body became non-static, make it static again
+                        this.matter.body.setStatic(collider, true);
+                    }
+                    
+                    if (collider && collider.position && !lifeCollectible.destroyed) {
+                        // Calculate Y position based on sine wave (0-1 normalized value)
+                        const offset = Math.sin(hoverController.y * Math.PI) * hoverDistance;
+                        
+                        // Update the static body position directly
+                        this.matter.body.setPosition(collider, {
+                            x: collider.position.x,
+                            y: spawnY - offset
+                        });
+                        
+                        // Update sprite to match collider
                         lifeCollectible.x = collider.position.x;
                         lifeCollectible.y = collider.position.y;
-                    } catch (e) {
-                        // If there's an error, we'll handle cleanup in the next cycle
                     }
                 }
             });
             
-            console.log('Successfully spawned extra life collectible');
+            console.log(`Spawned powerup at X: ${spawnX}, Y: ${spawnY} (${heightAboveTerrain}px above terrain)`);
             return lifeCollectible;
         } catch (error) {
             console.error('Error spawning extra life:', error);
