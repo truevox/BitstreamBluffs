@@ -13,6 +13,11 @@ class GameScene extends Phaser.Scene {
                 }
             }
         });
+        
+        // Bind methods to ensure 'this' context is preserved
+        this.safePreUpdate = this.safePreUpdate.bind(this);
+        this.manageExtraLives = this.manageExtraLives.bind(this);
+        this.cleanupOffscreenCollectibles = this.cleanupOffscreenCollectibles.bind(this);
 
         // --- unchanged state -------------------------------------------------
         this.player           = null;
@@ -61,10 +66,46 @@ class GameScene extends Phaser.Scene {
         this.sledDistance       = 40;      // distance between player and sled when walking
         // HUD text for player mode (WALKING/SLEDDING)
         this.hudText = null;
+        
+        // --- extra lives system -----------------------------------------------
+        this.lives              = 1;       // start with one extra life
+        this.maxLives           = 3;       // maximum number of lives
+        this.lastLifeCollectTime = 0;     // to track time between life pickups
+        this.nextLifeAvailableTime = 0;   // earliest time next life can appear
+        this.lifeCollectibles  = [];      // array to store life collectible objects
+        this.livesText          = null;    // text object for displaying lives
     }
 
     preload() {
-        /* nothing to load right now */
+        // Try to load life collectible image
+        this.load.image('extraLife', 'assets/extraLife.png');
+        
+        // Handle missing image error
+        this.load.on('filecomplete', (key) => {
+            if (key === 'extraLife') {
+                console.log('Extra life image loaded successfully');
+            }
+        });
+        
+        this.load.on('loaderror', (file) => {
+            if (file.key === 'extraLife') {
+                console.warn('Failed to load extraLife image, creating a fallback');
+                // Create a fallback texture
+                const graphics = this.make.graphics({x: 0, y: 0, add: false});
+                graphics.fillStyle(0xff00ff, 1); // Neon pink
+                graphics.lineStyle(4, 0xffffff, 1); // White border
+                graphics.fillCircle(32, 32, 25);
+                graphics.strokeCircle(32, 32, 25);
+                // Add a heart shape
+                graphics.fillStyle(0xffffff, 1);
+                graphics.fillCircle(24, 24, 8);
+                graphics.fillCircle(40, 24, 8);
+                graphics.fillTriangle(16, 30, 48, 30, 32, 45);
+                
+                // Generate a texture from the graphics object
+                graphics.generateTexture('extraLife', 64, 64);
+            }
+        });
     }
 
     create() {
@@ -75,6 +116,9 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor('#000000');
         this.manette = new Manette(this);                 // ⬅ still works
         this.cursors = this.input.keyboard.createCursorKeys();
+        
+        // Add an update listener that runs before the main update to clean up any dead objects
+        this.events.on('preupdate', this.safePreUpdate, this);
 
         // No world boundaries - allowing free movement
         // We removed the setBounds call to eliminate the walls
@@ -149,6 +193,22 @@ class GameScene extends Phaser.Scene {
         // camera follow stays the same
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
         this.cameras.main.setFollowOffset(0, 100);
+        
+        // Initialize the lives display (top right corner)
+        this.livesText = this.add.text(
+            this.cameras.main.width - 120, 10, 
+            `LIVES: ${this.lives}`, 
+            {
+                font: '18px Arial',
+                fill: '#ff00ff',  // Use neon pink to match game style
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setScrollFactor(0).setDepth(100);
+
+        // Initialize time-based variables for extra life spawning
+        this.lastLifeCollectTime = this.time.now;
+        this.nextLifeAvailableTime = this.time.now + Phaser.Math.Between(2000, 5000); // Initial spawn between 2-5 seconds
 
         // --------------------------------------------------------------------
         // TERRAIN  (now Matter static rectangles)
@@ -175,6 +235,12 @@ class GameScene extends Phaser.Scene {
                     if (other.terrainAngle !== undefined) {
                         this.onGround          = true;
                         this.currentSlopeAngle = other.terrainAngle;
+                    }
+                    
+                    // Check if player collided with an extra life collectible
+                    if (other.isExtraLife) {
+                        // Pass the physics body directly, not the gameObject
+                        this.collectExtraLife(other);
                     }
                 }
             }
@@ -216,10 +282,42 @@ class GameScene extends Phaser.Scene {
                 // Reset player velocity on crash
                 const Body = Phaser.Physics.Matter.Matter.Body;
                 Body.setVelocity(this.player.body, { x: 0, y: 0 });
-                // Restart the scene after a short delay
-                this.time.delayedCall(500, () => {
-                    this.scene.restart();
-                });
+                
+                // Use a life if available, otherwise restart
+                if (this.lives > 0) {
+                    this.lives--;
+                    this.updateLivesDisplay();
+                    
+                    // Flash the screen red to indicate a life lost
+                    const flashRect = this.add.rectangle(
+                        this.cameras.main.worldView.centerX,
+                        this.cameras.main.worldView.centerY,
+                        this.cameras.main.width,
+                        this.cameras.main.height,
+                        0xff0000, 0.4
+                    ).setScrollFactor(0).setDepth(90);
+                    
+                    // Fade out and remove the flash
+                    this.tweens.add({
+                        targets: flashRect,
+                        alpha: 0,
+                        duration: 300,
+                        onComplete: () => {
+                            flashRect.destroy();
+                        }
+                    });
+                    
+                    // Provide temporary invincibility
+                    this.time.delayedCall(500, () => {
+                        // Just reset position slightly and continue
+                        Body.setVelocity(this.player.body, { x: 2, y: -1 }); // Small kick to get moving again
+                    });
+                } else {
+                    // No lives left, restart the scene after a short delay
+                    this.time.delayedCall(500, () => {
+                        this.scene.restart();
+                    });
+                }
             },
             onWobble: () => {
                 console.log('Wobble landing!');
@@ -396,10 +494,33 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    // Safe pre-update that runs before the main update cycle
+    // This will clean up any objects that need to be removed
+    safePreUpdate() {
+        try {
+            // Make sure our collectibles array is valid
+            if (!this.lifeCollectibles) {
+                this.lifeCollectibles = [];
+            }
+            
+            // Filter out any invalid collectibles
+            this.lifeCollectibles = this.lifeCollectibles.filter(item => {
+                return item && !item.destroyed && !item.isBeingDestroyed;
+            });
+        } catch (error) {
+            console.error('Error in safePreUpdate:', error);
+        }
+    }
+    
     // ------------------------------------------------------------------------
     // UPDATE  (Arcade‑style controls translated to Matter)
     // ------------------------------------------------------------------------
     update(time, delta) {
+        // Safety check - if we're missing critical objects, don't proceed with update
+        if (!this.scene || !this.scene.isActive || !this.player || !this.player.body) {
+            return;
+        }
+        
         const Body = Phaser.Physics.Matter.Matter.Body;
         
         // Update our Manette input controller
@@ -755,7 +876,18 @@ class GameScene extends Phaser.Scene {
         // Update HUD every frame
         // --------------------------------------------------------------------
         this.updateHudText();
-
+        
+        // --------------------------------------------------------------------
+        // Extra life spawning logic - only if we have a valid player
+        // --------------------------------------------------------------------
+        try {
+            if (this.player && this.player.body && this.player.body.position) {
+                this.manageExtraLives(time);
+            }
+        } catch (error) {
+            console.error('Error managing extra lives:', error);
+        }
+        
         // --------------------------------------------------------------------
         // DEBUG HUD
         // --------------------------------------------------------------------
@@ -794,6 +926,359 @@ class GameScene extends Phaser.Scene {
             }
             
             this.hudText.setText(hudContent);
+        }
+    }
+    
+    // Helper method to update the lives display
+    updateLivesDisplay() {
+        if (this.livesText) {
+            this.livesText.setText(`LIVES: ${this.lives}`);
+        }
+    }
+    
+    // Helper to collect an extra life - COMPLETELY REWRITTEN
+    collectExtraLife(collider) {
+        // Check if the collider is valid
+        if (!collider) {
+            console.warn('Attempted to collect invalid life object');
+            return;
+        }
+        
+        // Find the sprite object associated with this collider
+        let sprite = null;
+        let collectibleIndex = -1;
+        
+        // First safely find the sprite and index in our array
+        try {
+            if (collider.gameObject) {
+                sprite = collider.gameObject;
+            } else {
+                // If there's no direct reference, try to find it in our array
+                for (let i = 0; i < this.lifeCollectibles.length; i++) {
+                    const item = this.lifeCollectibles[i];
+                    if (item && item.collider === collider) {
+                        sprite = item;
+                        collectibleIndex = i;
+                        break;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error finding sprite for collectible:', error);
+        }
+        
+        // Only collect if we're not at max lives
+        if (this.lives < this.maxLives) {
+            // Increase lives count
+            this.lives++;
+            this.updateLivesDisplay();
+            
+            try {
+                // Get position for effect
+                let effectX = this.player.x;
+                let effectY = this.player.y;
+                
+                // Use sprite position if available
+                if (sprite && typeof sprite.x !== 'undefined') {
+                    effectX = sprite.x;
+                    effectY = sprite.y;
+                } 
+                // Or use collider position if available
+                else if (collider.position) {
+                    effectX = collider.position.x;
+                    effectY = collider.position.y;
+                }
+                
+                // Visual feedback for collecting a life
+                const collectEffect = this.add.circle(
+                    effectX, effectY, 30, 0xffff00, 0.7
+                );
+                
+                // Simple animation for collection effect
+                this.tweens.add({
+                    targets: collectEffect,
+                    scale: 2,
+                    alpha: 0,
+                    duration: 300,
+                    onComplete: () => {
+                        if (collectEffect && !collectEffect.destroyed) {
+                            collectEffect.destroy();
+                        }
+                    }
+                });
+                
+                // Update timing variables
+                this.lastLifeCollectTime = this.time.now;
+                // Next life available between 30 seconds and 2 minutes
+                const nextDelay = Phaser.Math.Between(30000, 120000);
+                this.nextLifeAvailableTime = this.time.now + nextDelay;
+                
+                // Safe cleanup of the physics body
+                if (this.matter && this.matter.world && collider) {
+                    try {
+                        this.matter.world.remove(collider);
+                    } catch (e) {
+                        console.warn('Error removing collider:', e);
+                    }
+                }
+                
+                // Safe removal from our array
+                if (collectibleIndex >= 0) {
+                    this.lifeCollectibles.splice(collectibleIndex, 1);
+                } else {
+                    this.lifeCollectibles = this.lifeCollectibles.filter(item => {
+                        return item !== sprite && item.collider !== collider;
+                    });
+                }
+                
+                // Finally destroy the sprite object if it exists
+                if (sprite && !sprite.destroyed) {
+                    try {
+                        sprite.destroy();
+                    } catch (e) {
+                        console.warn('Error destroying sprite:', e);
+                    }
+                }
+                
+                console.log('Successfully collected extra life. Lives:', this.lives);
+            } catch (error) {
+                console.error('Error in collectExtraLife:', error);
+            }
+        }
+    }
+    
+    // Helper to manage extra life collectibles - SIMPLIFIED
+    manageExtraLives(currentTime) {
+        // Multiple safety checks to avoid crashing
+        if (!this.scene || !this.scene.isActive || !this.scene.isActive()) {
+            return; // Exit if the scene isn't active
+        }
+        
+        if (!this.player || !this.player.body || !this.player.body.position) {
+            return; // Exit early if player doesn't exist or isn't initialized
+        }
+        
+        try {
+            // Initialize the collectibles array if needed
+            if (!this.lifeCollectibles) {
+                this.lifeCollectibles = [];
+            }
+            
+            // Clean up off-screen collectibles (safely)
+            this.cleanupOffscreenCollectibles();
+            
+            // Only spawn if conditions are all met
+            const canSpawn = currentTime > this.nextLifeAvailableTime && 
+                           Array.isArray(this.lifeCollectibles) && 
+                           this.lifeCollectibles.length < 2 && 
+                           this.lives < this.maxLives;
+                           
+            if (canSpawn) {
+                // Only spawn with a 20% chance each cycle - prevents too many spawns
+                if (Math.random() < 0.2) {
+                    console.log('Spawning new extra life collectible');
+                    this.spawnExtraLife();
+                    // Update next available time regardless of successful spawn
+                    this.nextLifeAvailableTime = currentTime + Phaser.Math.Between(30000, 120000);
+                }
+            }
+        } catch (error) {
+            console.error('Error in manageExtraLives:', error);
+            // Reset collectibles array if there was an error
+            this.lifeCollectibles = [];
+        }
+    }
+    
+    // Helper to clean up off-screen collectibles - COMPLETELY REWRITTEN FOR SAFETY
+    cleanupOffscreenCollectibles() {
+        if (!this.cameras || !this.cameras.main || !this.player) {
+            return; // Exit if cameras or player aren't initialized
+        }
+        
+        // Reset the array if it's not valid
+        if (!this.lifeCollectibles || !Array.isArray(this.lifeCollectibles)) {
+            this.lifeCollectibles = []; 
+            return;
+        }
+        
+        try {
+            // Instead of checking positions which might cause errors,
+            // we'll simply remove collectibles that have been around too long
+            const maxDistance = 3000; // Maximum distance from player in any direction
+            const playerPos = this.player.body ? this.player.body.position : { x: 0, y: 0 };
+            
+            // Create a new filtered array instead of modifying the existing one
+            const newCollectibles = [];
+            
+            // Process each collectible safely
+            for (let i = 0; i < this.lifeCollectibles.length; i++) {
+                const collectible = this.lifeCollectibles[i];
+                
+                // Skip invalid collectibles
+                if (!collectible || collectible.destroyed || collectible.isBeingDestroyed) {
+                    continue;
+                }
+                
+                // Safe distance check - if we can't get position, remove it
+                let keepCollectible = true;
+                try {
+                    // Only attempt to check position if the object exists and has these properties
+                    if (collectible.body && collectible.body.position) {
+                        const dx = collectible.body.position.x - playerPos.x;
+                        const dy = collectible.body.position.y - playerPos.y;
+                        const distanceSquared = dx * dx + dy * dy;
+                        
+                        // Remove if too far from player
+                        if (distanceSquared > maxDistance * maxDistance) {
+                            keepCollectible = false;
+                        }
+                    } else if (collectible.x !== undefined && collectible.y !== undefined) {
+                        // Fallback to direct x/y if they exist
+                        const dx = collectible.x - playerPos.x;
+                        const dy = collectible.y - playerPos.y;
+                        const distanceSquared = dx * dx + dy * dy;
+                        
+                        // Remove if too far from player
+                        if (distanceSquared > maxDistance * maxDistance) {
+                            keepCollectible = false;
+                        }
+                    } else {
+                        // No valid position properties, remove it
+                        keepCollectible = false;
+                    }
+                } catch (e) {
+                    // If any error occurs while checking position, remove the collectible
+                    keepCollectible = false;
+                }
+                
+                // Process the collectible
+                if (keepCollectible) {
+                    newCollectibles.push(collectible);
+                } else {
+                    // Safely remove the collectible
+                    try {
+                        // Remove physics body if it exists
+                        if (collectible.body && this.matter && this.matter.world) {
+                            this.matter.world.remove(collectible.body);
+                        }
+                        
+                        // Mark as being destroyed to prevent other code from using it
+                        collectible.isBeingDestroyed = true;
+                        
+                        // Kill any tweens associated with this object
+                        if (this.tweens) {
+                            this.tweens.killTweensOf(collectible);
+                        }
+                        
+                        // Finally destroy the object
+                        collectible.destroy();
+                    } catch (destroyError) {
+                        console.warn('Error safely destroying collectible:', destroyError);
+                    }
+                }
+            }
+            
+            // Replace the old array with our new filtered array
+            this.lifeCollectibles = newCollectibles;
+        } catch (error) {
+            console.error('Error in cleanupOffscreenCollectibles:', error);
+            // Reset the array to be safe
+            this.lifeCollectibles = [];
+        }
+    }
+    
+    // Helper to spawn an extra life collectible - COMPLETELY REWRITTEN
+    spawnExtraLife() {
+        // Make sure player exists and has a valid position
+        if (!this.player || !this.player.body || !this.player.body.position) {
+            console.warn('Cannot spawn extra life: player position is invalid');
+            return null;
+        }
+        
+        try {
+            // Get player position safely
+            const playerPos = this.player.body.position;
+            
+            // Calculate a safe position in front of the player
+            // Use a simple offset rather than calculating exact positions
+            const spawnX = playerPos.x + 600; // Always 600px ahead
+            const spawnY = playerPos.y;       // Same level as player
+            
+            // Create our fallback texture if needed
+            if (!this.textures.exists('extraLife')) {
+                this.createExtraLifeTexture();
+            }
+            
+            // Create static sprite instead of physics object - MUCH SAFER
+            const lifeCollectible = this.add.sprite(spawnX, spawnY, 'extraLife');
+            
+            // Scale to appropriate size
+            lifeCollectible.setScale(0.5);
+            
+            // Set depth to ensure it appears above terrain
+            lifeCollectible.setDepth(10);
+            
+            // Add simple circular collision area
+            const collider = this.matter.add.circle(spawnX, spawnY, 20, {
+                isSensor: true,
+                isExtraLife: true,
+                label: 'extraLife'
+            });
+            
+            // Store references to link the sprite and physics body
+            lifeCollectible.collider = collider;
+            collider.gameObject = lifeCollectible;
+            
+            // No tweens! Just set basic properties
+            lifeCollectible.isExtraLife = true;
+            
+            // Add to our tracking array
+            if (!this.lifeCollectibles) {
+                this.lifeCollectibles = [];
+            }
+            this.lifeCollectibles.push(lifeCollectible);
+            
+            // Add an update listener to this specific collectible
+            this.events.on('update', () => {
+                // If the sprite still exists, update its position to match the collider
+                if (lifeCollectible && !lifeCollectible.destroyed && collider && collider.position) {
+                    try {
+                        lifeCollectible.x = collider.position.x;
+                        lifeCollectible.y = collider.position.y;
+                    } catch (e) {
+                        // If there's an error, we'll handle cleanup in the next cycle
+                    }
+                }
+            });
+            
+            console.log('Successfully spawned extra life collectible');
+            return lifeCollectible;
+        } catch (error) {
+            console.error('Error spawning extra life:', error);
+            return null;
+        }
+    }
+    
+    // Helper to create the extraLife texture
+    createExtraLifeTexture() {
+        try {
+            // Create a fallback texture
+            const graphics = this.make.graphics({x: 0, y: 0, add: false});
+            graphics.fillStyle(0xff00ff, 1); // Neon pink
+            graphics.lineStyle(4, 0xffffff, 1); // White border
+            graphics.fillCircle(32, 32, 25);
+            graphics.strokeCircle(32, 32, 25);
+            // Add a heart shape
+            graphics.fillStyle(0xffffff, 1);
+            graphics.fillCircle(24, 24, 8);
+            graphics.fillCircle(40, 24, 8);
+            graphics.fillTriangle(16, 30, 48, 30, 32, 45);
+            
+            // Generate a texture from the graphics object
+            graphics.generateTexture('extraLife', 64, 64);
+            console.log('Created fallback extraLife texture');
+        } catch (error) {
+            console.error('Error creating extraLife texture:', error);
         }
     }
 }
