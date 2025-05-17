@@ -24,6 +24,7 @@ export default class GameScene extends Phaser.Scene {
         this.safePreUpdate = this.safePreUpdate.bind(this);
         this.manageExtraLives = this.manageExtraLives.bind(this);
         this.cleanupOffscreenCollectibles = this.cleanupOffscreenCollectibles.bind(this);
+        this.handleResize = this.handleResize.bind(this);
 
         // --- unchanged state -------------------------------------------------
         this.player           = null;
@@ -358,6 +359,9 @@ export default class GameScene extends Phaser.Scene {
         });
 
         console.log("GameScene setup complete (Matter edition).");
+
+        // Set up the resize handler
+        this.game.events.on('resize', this.handleResize, this);
     }
 
     // ------------------------------------------------------------------------
@@ -1374,6 +1378,49 @@ GameScene.prototype.applyPassiveSpeedBoost = function() {
                 { x: direction * minBoostStrength, y: 0 });
         }
     }
+};
+
+// Handle window resizing
+GameScene.prototype.handleResize = function({ width, height }) {
+    // Skip if cameras aren't initialized yet
+    if (!this.cameras || !this.cameras.main) return;
+    
+    console.log(`Handling resize: ${width}x${height}`);
+    
+    // Adjust camera bounds
+    this.cameras.main.setSize(width, height);
+    
+    // Adjust camera bounds to follow player with appropriate padding
+    const worldBounds = this.physics.world.bounds;
+    if (this.player && this.player.body) {
+        // Ensure camera follows the player properly with the new dimensions
+        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        
+        // Set appropriate deadzone based on screen size
+        const horizontalDeadzone = width * 0.3;
+        const verticalDeadzone = height * 0.3;
+        this.cameras.main.setDeadzone(horizontalDeadzone, verticalDeadzone);
+    }
+    
+    // Reposition HUD elements if they exist
+    if (this.hudText) {
+        // Position the HUD text at the top left of the screen with padding
+        this.hudText.setPosition(10, 10);
+    }
+    
+    if (this.livesText) {
+        // Position the lives text at the top right of the screen with padding
+        this.livesText.setPosition(width - 10, 10);
+        this.livesText.setOrigin(1, 0); // Align to top right
+    }
+    
+    if (this.debugText) {
+        // Position debug text at bottom left
+        this.debugText.setPosition(10, height - 60);
+    }
+    
+    // Redraw terrain if needed
+    this.drawTerrain();
 };
 
 // GameScene is now properly exported as ES module

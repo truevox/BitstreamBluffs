@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BitstreamBluffs - Physics Playground</title>
     <!-- Load Phaser from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
@@ -13,17 +13,36 @@
         import './js/main.js';
     </script>
     <style>
-        body {
+        html, body {
             margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
             background-color: #000000; /* Black background for the page */
+            overflow: hidden; /* Prevent scrollbars on the page itself */
+            touch-action: none; /* Prevent default touch behaviors like pinch zoom */
+        }
+        
+        #game-container {
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            overflow: hidden; /* Prevent scrollbars on the page itself */
         }
+        
         canvas {
-            border: 1px solid #333; /* Optional: a subtle border for the canvas */
+            display: block; /* Removes default inline spacing */
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Maintains aspect ratio */
+        }
+        
+        /* Hide address bar on mobile devices when possible */
+        @media screen and (max-width: 768px) {
+            html {
+                height: calc(100% + 60px);
+            }
         }
     </style>
 </head>
