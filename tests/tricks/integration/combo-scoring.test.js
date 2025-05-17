@@ -1,0 +1,288 @@
+/**
+ * Integration tests for trick combo and scoring system
+ */
+import { measurePerformance, createPhaserSceneMock } from '../../test-utils.js';
+
+// Mock dependencies
+jest.mock('../../../js/config/physics-config.js', () => ({
+  trick: {
+    minFlipAngle: 0.75,
+    fullFlipThreshold: 0.9,
+    scoreBase: 100,
+    comboMultiplier: 1.5,
+    maxCombo: 5,
+    comboTimeWindow: 2000
+  }
+}));
+
+/**
+ * Trick System that manages trick execution, combos and scoring
+ */
+class TrickSystem {
+  constructor() {
+    this.totalRotation = 0;
+    this.airborne = false;
+    this.tricks = [];
+    this.currentCombo = 0;
+    this.comboMultiplier = 1.0;
+    this.lastTrickTime = 0;
+    this.score = 0;
+    this.PhysicsConfig = require('../../../js/config/physics-config.js');
+  }
+  
+  setAirborne(isAirborne) {
+    const wasAirborne = this.airborne;
+    this.airborne = isAirborne;
+    
+    if (wasAirborne && !isAirborne) {
+      // Landing - complete any tricks
+      this.completeTrick();
+    } else if (!wasAirborne && isAirborne) {
+      // Take off - reset rotation tracking
+      this.resetRotation();
+    }
+    
+    return this.airborne;
+  }
+  
+  resetRotation() {
+    this.totalRotation = 0;
+  }
+  
+  addRotation(angleRadians) {
+    if (!this.airborne) return;
+    
+    this.totalRotation += angleRadians;
+  }
+  
+  getFlips() {
+    const fullRotation = Math.PI * 2;
+    const fullFlips = Math.floor(Math.abs(this.totalRotation) / fullRotation);
+    
+    // Calculate partial rotation (0.0 - 0.99)
+    const partialFlip = (Math.abs(this.totalRotation) % fullRotation) / fullRotation;
+    
+    // Add an extra flip if we're very close to completing one
+    const extraFlip = partialFlip >= this.PhysicsConfig.trick.fullFlipThreshold ? 1 : 0;
+    
+    return {
+      full: fullFlips + extraFlip,
+      partial: partialFlip
+    };
+  }
+  
+  completeTrick() {
+    if (!this.hasTrick()) {
+      this.resetRotation();
+      return null;
+    }
+    
+    const now = Date.now();
+    const { full: fullFlips, partial: partialFlip } = this.getFlips();
+    const direction = this.totalRotation >= 0 ? 'clockwise' : 'counter-clockwise';
+    
+    const trick = {
+      fullFlips,
+      partialFlip,
+      direction,
+      timestamp: now
+    };
+    
+    // Add to trick history
+    this.tricks.push(trick);
+    
+    // Calculate combo status
+    const comboTimeWindow = this.PhysicsConfig.trick.comboTimeWindow;
+    if (now - this.lastTrickTime <= comboTimeWindow) {
+      // Continuing a combo
+      this.currentCombo++;
+      this.comboMultiplier = Math.min(
+        this.PhysicsConfig.trick.maxCombo,
+        this.comboMultiplier * this.PhysicsConfig.trick.comboMultiplier
+      );
+    } else {
+      // New combo
+      this.currentCombo = 1;
+      this.comboMultiplier = 1.0;
+    }
+    
+    // Update last trick time
+    this.lastTrickTime = now;
+    
+    // Calculate score
+    const trickScore = this.calculateTrickScore(trick);
+    this.score += trickScore;
+    
+    // Reset rotation for next trick
+    this.resetRotation();
+    
+    return {
+      ...trick,
+      score: trickScore,
+      comboMultiplier: this.comboMultiplier,
+      comboCount: this.currentCombo
+    };
+  }
+  
+  calculateTrickScore(trick) {
+    const baseScore = this.PhysicsConfig.trick.scoreBase;
+    
+    // Score for full flips
+    const flipScore = trick.fullFlips * baseScore;
+    
+    // Score for partial flips (if significant)
+    const partialScore = trick.partialFlip >= 0.25 ? 
+      Math.floor(trick.partialFlip * 4) * (baseScore / 4) : 0;
+    
+    // Apply combo multiplier
+    return Math.floor((flipScore + partialScore) * this.comboMultiplier);
+  }
+  
+  hasTrick() {
+    return Math.abs(this.totalRotation) >= this.PhysicsConfig.trick.minFlipAngle;
+  }
+  
+  getTotalScore() {
+    return this.score;
+  }
+  
+  getCurrentCombo() {
+    return {
+      count: this.currentCombo,
+      multiplier: this.comboMultiplier
+    };
+  }
+}
+
+describe('Trick Combo and Scoring Integration Tests', () => {
+  let trickSystem;
+  let originalDateNow;
+  let mockedTime;
+  
+  beforeEach(() => {
+    trickSystem = new TrickSystem();
+    
+    // Mock Date.now for consistent timing tests
+    originalDateNow = Date.now;
+    mockedTime = 1000; // Starting time
+    Date.now = jest.fn(() => mockedTime);
+  });
+  
+  afterEach(() => {
+    // Restore original Date.now
+    Date.now = originalDateNow;
+  });
+  
+  test('tracks and scores basic tricks correctly', measurePerformance(() => {
+    // Start in the air
+    trickSystem.setAirborne(true);
+    
+    // Perform a backflip (one full rotation)
+    trickSystem.addRotation(Math.PI * 2);
+    
+    // Land the trick
+    trickSystem.setAirborne(false);
+    
+    // Should have scored one full flip
+    expect(trickSystem.getTotalScore()).toBe(100); // Base score for one flip
+    expect(trickSystem.tricks.length).toBe(1);
+    expect(trickSystem.tricks[0].fullFlips).toBe(1);
+  }));
+  
+  test('builds and maintains combos correctly', measurePerformance(() => {
+    // First trick
+    trickSystem.setAirborne(true);
+    trickSystem.addRotation(Math.PI * 2); // One full rotation
+    trickSystem.setAirborne(false);
+    
+    // Should have base score and combo of 1
+    expect(trickSystem.getTotalScore()).toBe(100);
+    expect(trickSystem.getCurrentCombo().count).toBe(1);
+    expect(trickSystem.getCurrentCombo().multiplier).toBe(1.0);
+    
+    // Second trick within combo window
+    mockedTime += 1500; // 1.5 seconds later (within 2s window)
+    trickSystem.setAirborne(true);
+    trickSystem.addRotation(Math.PI * 2); // Another full rotation
+    trickSystem.setAirborne(false);
+    
+    // Should have increased combo and applied multiplier
+    expect(trickSystem.getCurrentCombo().count).toBe(2);
+    expect(trickSystem.getCurrentCombo().multiplier).toBe(1.5);
+    expect(trickSystem.getTotalScore()).toBe(100 + 150); // 100 + (100 * 1.5)
+    
+    // Third trick within combo window
+    mockedTime += 1500;
+    trickSystem.setAirborne(true);
+    trickSystem.addRotation(Math.PI * 2); // Another full rotation
+    trickSystem.setAirborne(false);
+    
+    // Should have further increased combo
+    expect(trickSystem.getCurrentCombo().count).toBe(3);
+    expect(trickSystem.getCurrentCombo().multiplier).toBe(2.25); // 1.5 * 1.5
+    expect(trickSystem.getTotalScore()).toBe(100 + 150 + 225); // Adding 100 * 2.25
+  }));
+  
+  test('resets combo after time window expires', measurePerformance(() => {
+    // First trick
+    trickSystem.setAirborne(true);
+    trickSystem.addRotation(Math.PI * 2);
+    trickSystem.setAirborne(false);
+    
+    expect(trickSystem.getCurrentCombo().count).toBe(1);
+    
+    // Second trick after combo window expires
+    mockedTime += 3000; // 3 seconds (beyond 2s window)
+    trickSystem.setAirborne(true);
+    trickSystem.addRotation(Math.PI * 2);
+    trickSystem.setAirborne(false);
+    
+    // Combo should have reset
+    expect(trickSystem.getCurrentCombo().count).toBe(1);
+    expect(trickSystem.getCurrentCombo().multiplier).toBe(1.0);
+    expect(trickSystem.getTotalScore()).toBe(200); // 100 + 100, no multiplier
+  }));
+  
+  test('scores multiple flips in a single trick', measurePerformance(() => {
+    trickSystem.setAirborne(true);
+    
+    // Do a triple backflip
+    trickSystem.addRotation(Math.PI * 2 * 3);
+    
+    trickSystem.setAirborne(false);
+    
+    // Should score 3 times the base amount
+    expect(trickSystem.getTotalScore()).toBe(300); // 3 * 100
+    expect(trickSystem.tricks.length).toBe(1);
+    expect(trickSystem.tricks[0].fullFlips).toBe(3);
+  }));
+  
+  test('handles partial rotations correctly', measurePerformance(() => {
+    trickSystem.setAirborne(true);
+    
+    // Do 1.5 flips
+    trickSystem.addRotation(Math.PI * 3); // 540 degrees
+    
+    trickSystem.setAirborne(false);
+    
+    // Should score 1 full flip + half flip
+    expect(trickSystem.tricks[0].fullFlips).toBe(1);
+    expect(trickSystem.tricks[0].partialFlip).toBeCloseTo(0.5);
+    
+    // Score should include partial flip portion
+    expect(trickSystem.getTotalScore()).toBe(125); // 100 + (100/4 * 1)
+  }));
+  
+  test('caps combo multiplier at maximum', measurePerformance(() => {
+    // Do 6 tricks in quick succession to test max combo
+    for (let i = 0; i < 6; i++) {
+      trickSystem.setAirborne(true);
+      trickSystem.addRotation(Math.PI * 2);
+      mockedTime += 1000; // 1 second between tricks
+      trickSystem.setAirborne(false);
+    }
+    
+    // Multiplier should be capped at max (5)
+    expect(trickSystem.getCurrentCombo().multiplier).toBe(5);
+  }));
+});

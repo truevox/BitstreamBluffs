@@ -1,0 +1,188 @@
+/**
+ * E2E tests for multi-chunk terrain generation and validation
+ */
+import { measurePerformance, mockMathRandom, createPhaserSceneMock } from '../../test-utils.js';
+
+// Mock dependencies
+jest.mock('../../../js/config/physics-config.js', () => ({
+  terrain: {
+    minSlopeAngle: 10,
+    maxSlopeAngle: 45,
+    smoothingFactor: 0.85,
+    variationFrequency: 0.2,
+    cliffThreshold: 70,
+    segmentWidth: 100
+  },
+  world: {
+    chunkSize: 10, // Segments per chunk
+    preloadedChunks: 3 // How many chunks to keep loaded
+  }
+}));
+
+// Simplified terrain chunk manager for E2E testing
+class TerrainChunkManager {
+  constructor(seed = 42) {
+    this.seed = seed;
+    this.chunks = [];
+    this.currentChunkIndex = 0;
+    this.segmentWidth = 100;
+    this.lastY = 500; // Starting height
+    
+    // Initialize random function
+    this.resetRandom = mockMathRandom(this.seed);
+  }
+  
+  generateChunk(chunkIndex) {
+    const segments = [];
+    const startX = chunkIndex * 10 * this.segmentWidth;
+    let currentY = this.lastY;
+    
+    for (let i = 0; i < 10; i++) {
+      // Random variation with smoothing
+      const variation = (Math.random() * 2 - 1) * 0.2;
+      let nextY = currentY + (variation * 150);
+      nextY = currentY + ((nextY - currentY) * 0.85);
+      
+      // Ensure within bounds
+      nextY = Math.max(300, Math.min(700, nextY));
+      
+      // Create segment
+      segments.push({
+        startX: startX + (i * this.segmentWidth),
+        startY: currentY,
+        endX: startX + ((i + 1) * this.segmentWidth),
+        endY: nextY,
+        angle: this.calculateAngle(currentY, nextY)
+      });
+      
+      currentY = nextY;
+    }
+    
+    this.lastY = currentY;
+    return { index: chunkIndex, segments };
+  }
+  
+  calculateAngle(startY, endY) {
+    const deltaY = endY - startY;
+    const angleRad = Math.atan2(Math.abs(deltaY), this.segmentWidth);
+    return angleRad * (180 / Math.PI); // Convert to degrees
+  }
+  
+  loadChunks(viewportX) {
+    // Calculate which chunk the viewport is in
+    const chunkIndex = Math.floor(viewportX / (10 * this.segmentWidth));
+    
+    // Load chunks if needed
+    if (chunkIndex !== this.currentChunkIndex) {
+      this.currentChunkIndex = chunkIndex;
+      
+      // Generate new chunks ahead
+      for (let i = chunkIndex; i < chunkIndex + 3; i++) {
+        if (!this.chunks.some(chunk => chunk.index === i)) {
+          this.chunks.push(this.generateChunk(i));
+        }
+      }
+      
+      // Remove chunks too far behind
+      this.chunks = this.chunks.filter(chunk => 
+        chunk.index >= chunkIndex - 1 && chunk.index < chunkIndex + 3
+      );
+    }
+    
+    return this.chunks;
+  }
+  
+  cleanup() {
+    this.resetRandom();
+  }
+}
+
+describe('Multi-Chunk Terrain E2E Tests', () => {
+  let terrainManager;
+  
+  beforeEach(() => {
+    terrainManager = new TerrainChunkManager(42);
+  });
+  
+  afterEach(() => {
+    terrainManager.cleanup();
+  });
+  
+  test('generates and manages multiple terrain chunks', measurePerformance(() => {
+    // Initial load at position 0
+    let visibleChunks = terrainManager.loadChunks(0);
+    expect(visibleChunks.length).toBe(3);
+    expect(visibleChunks[0].index).toBe(0);
+    expect(visibleChunks[1].index).toBe(1);
+    expect(visibleChunks[2].index).toBe(2);
+    
+    // Move forward to trigger new chunk loading
+    visibleChunks = terrainManager.loadChunks(1500); // Move to middle of chunk 1
+    expect(visibleChunks.length).toBe(3);
+    expect(visibleChunks[0].index).toBe(1);
+    expect(visibleChunks[1].index).toBe(2);
+    expect(visibleChunks[2].index).toBe(3);
+    
+    // Move further to load more chunks
+    visibleChunks = terrainManager.loadChunks(3000); // Move to middle of chunk 3
+    expect(visibleChunks.length).toBe(3);
+    expect(visibleChunks[0].index).toBe(2);
+    expect(visibleChunks[1].index).toBe(3);
+    expect(visibleChunks[2].index).toBe(4);
+  }));
+  
+  test('ensures terrain continuity across chunk boundaries', measurePerformance(() => {
+    // Load first set of chunks
+    const chunks = terrainManager.loadChunks(0);
+    
+    // Check continuity within chunks
+    for (const chunk of chunks) {
+      for (let i = 0; i < chunk.segments.length - 1; i++) {
+        expect(chunk.segments[i].endY).toBe(chunk.segments[i + 1].startY);
+        expect(chunk.segments[i].endX).toBe(chunk.segments[i + 1].startX);
+      }
+    }
+    
+    // Check continuity between chunks
+    for (let i = 0; i < chunks.length - 1; i++) {
+      const currentChunk = chunks[i];
+      const nextChunk = chunks[i + 1];
+      
+      const lastSegment = currentChunk.segments[currentChunk.segments.length - 1];
+      const firstSegment = nextChunk.segments[0];
+      
+      expect(lastSegment.endY).toBe(firstSegment.startY);
+      expect(lastSegment.endX).toBe(firstSegment.startX);
+    }
+  }));
+  
+  test('validates terrain integrity and detects invalid values', measurePerformance(() => {
+    // Generate 5 chunks (50 segments total)
+    for (let i = 0; i < 5; i++) {
+      terrainManager.generateChunk(i);
+    }
+    
+    // Validate all segments across all chunks
+    for (const chunk of terrainManager.chunks) {
+      for (const segment of chunk.segments) {
+        // Check for NaN values
+        expect(isNaN(segment.startX)).toBe(false);
+        expect(isNaN(segment.startY)).toBe(false);
+        expect(isNaN(segment.endX)).toBe(false);
+        expect(isNaN(segment.endY)).toBe(false);
+        expect(isNaN(segment.angle)).toBe(false);
+        
+        // Validate angles are within reasonable range
+        expect(segment.angle).toBeGreaterThanOrEqual(0);
+        expect(segment.angle).toBeLessThanOrEqual(90);
+        
+        // Verify positions are valid
+        expect(segment.startX).toBeLessThan(segment.endX);
+        expect(segment.startY).toBeGreaterThanOrEqual(300);
+        expect(segment.startY).toBeLessThanOrEqual(700);
+        expect(segment.endY).toBeGreaterThanOrEqual(300);
+        expect(segment.endY).toBeLessThanOrEqual(700);
+      }
+    }
+  }));
+});

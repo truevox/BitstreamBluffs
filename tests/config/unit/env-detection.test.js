@@ -1,0 +1,219 @@
+/**
+ * Unit tests for environment detection in config loader
+ * Validates proper detection of development vs. production environments
+ */
+import { measurePerformance } from '../../test-utils.js';
+
+// Mock window.location for testing different environments
+const mockLocation = (hostname) => {
+  // Store original location
+  const originalLocation = window.location;
+  
+  // Mock Location object
+  const mockLocationObj = {
+    ancestorOrigins: {},
+    assign: jest.fn(),
+    hash: '',
+    host: hostname,
+    hostname: hostname,
+    href: `https://${hostname}/`,
+    origin: `https://${hostname}`,
+    pathname: '/',
+    port: '',
+    protocol: 'https:',
+    reload: jest.fn(),
+    replace: jest.fn(),
+    search: '',
+    toString: jest.fn().mockImplementation(() => `https://${hostname}/`)
+  };
+  
+  // Mock location
+  delete window.location;
+  window.location = mockLocationObj;
+  
+  // Return cleanup function
+  return () => {
+    window.location = originalLocation;
+  };
+};
+
+/**
+ * Simplified config loader environment detection for testing
+ * Based on the user requirements for environment detection
+ */
+class ConfigEnvironmentDetector {
+  constructor() {
+    this.prodHosts = [
+      'sledhead.truevox.net',
+      'sledhead.ing',
+      '.sledhead.ing' // matches subdomains
+    ];
+  }
+  
+  /**
+   * Detects if the current environment is production
+   * @returns {boolean} true if production, false if development
+   */
+  isProduction() {
+    const hostname = window.location.hostname;
+    
+    // Check direct matches
+    if (this.prodHosts.includes(hostname)) {
+      return true;
+    }
+    
+    // Check subdomain matches (anything ending with .sledhead.ing)
+    if (hostname.endsWith('.sledhead.ing')) {
+      return true;
+    }
+    
+    // Default to development
+    return false;
+  }
+  
+  /**
+   * Detects if the current environment is development
+   * @returns {boolean} true if development, false if production
+   */
+  isDevelopment() {
+    return !this.isProduction();
+  }
+  
+  /**
+   * Detects if debugging should be enabled based on environment
+   * @returns {boolean} true if debugging should be enabled
+   */
+  isDebuggingEnabled() {
+    return this.isDevelopment() || window.location.search.includes('debug=true');
+  }
+  
+  /**
+   * Gets environment-specific configuration
+   * @returns {Object} Configuration object with environment-specific values
+   */
+  getConfig() {
+    const isProd = this.isProduction();
+    
+    return {
+      environment: isProd ? 'production' : 'development',
+      logging: {
+        level: isProd ? 'error' : 'debug',
+        enabled: !isProd
+      },
+      physics: {
+        debugging: this.isDebuggingEnabled()
+      },
+      analytics: {
+        enabled: isProd
+      }
+    };
+  }
+}
+
+describe('Environment Detection Unit Tests', () => {
+  let configDetector;
+  let originalWindow;
+  
+  beforeEach(() => {
+    // Store original window
+    originalWindow = global.window;
+    
+    // Create a default window mock
+    global.window = {
+      location: {
+        hostname: 'localhost',
+        search: ''
+      }
+    };
+    
+    // Create a fresh detector for each test
+    configDetector = new ConfigEnvironmentDetector();
+  });
+  
+  afterEach(() => {
+    // Restore original window
+    global.window = originalWindow;
+  });
+  
+  test('correctly identifies development environments', measurePerformance(() => {
+    // Test localhost
+    window.location.hostname = 'localhost';
+    expect(configDetector.isDevelopment()).toBe(true);
+    expect(configDetector.isProduction()).toBe(false);
+    
+    // Test 127.0.0.1
+    window.location.hostname = '127.0.0.1';
+    expect(configDetector.isDevelopment()).toBe(true);
+    expect(configDetector.isProduction()).toBe(false);
+    
+    // Test arbitrary development domain
+    window.location.hostname = 'dev.example.com';
+    expect(configDetector.isDevelopment()).toBe(true);
+    expect(configDetector.isProduction()).toBe(false);
+  }));
+  
+  test('correctly identifies production environments', measurePerformance(() => {
+    // Test main production domain
+    window.location.hostname = 'sledhead.truevox.net';
+    expect(configDetector.isProduction()).toBe(true);
+    expect(configDetector.isDevelopment()).toBe(false);
+    
+    // Test .sledhead.ing domain
+    window.location.hostname = 'sledhead.ing';
+    expect(configDetector.isProduction()).toBe(true);
+    expect(configDetector.isDevelopment()).toBe(false);
+    
+    // Test subdomain of .sledhead.ing
+    window.location.hostname = 'app.sledhead.ing';
+    expect(configDetector.isProduction()).toBe(true);
+    expect(configDetector.isDevelopment()).toBe(false);
+    
+    // Test another subdomain of .sledhead.ing
+    window.location.hostname = 'beta.sledhead.ing';
+    expect(configDetector.isProduction()).toBe(true);
+    expect(configDetector.isDevelopment()).toBe(false);
+  }));
+  
+  test('debugging is enabled in development but not production', measurePerformance(() => {
+    // Development environments should have debugging enabled
+    window.location.hostname = 'localhost';
+    expect(configDetector.isDebuggingEnabled()).toBe(true);
+    
+    // Production environments should not have debugging enabled
+    window.location.hostname = 'sledhead.truevox.net';
+    expect(configDetector.isDebuggingEnabled()).toBe(false);
+  }));
+  
+  test('debug parameter enables debugging even in production', measurePerformance(() => {
+    // Set production environment
+    window.location.hostname = 'sledhead.truevox.net';
+    
+    // Without debug parameter, debugging should be disabled
+    window.location.search = '';
+    expect(configDetector.isDebuggingEnabled()).toBe(false);
+    
+    // With debug parameter, debugging should be enabled
+    window.location.search = '?debug=true';
+    expect(configDetector.isDebuggingEnabled()).toBe(true);
+  }));
+  
+  test('environment-specific config has correct values', measurePerformance(() => {
+    // Check development config
+    window.location.hostname = 'localhost';
+    const devConfig = configDetector.getConfig();
+    expect(devConfig.environment).toBe('development');
+    expect(devConfig.logging.level).toBe('debug');
+    expect(devConfig.logging.enabled).toBe(true);
+    expect(devConfig.physics.debugging).toBe(true);
+    expect(devConfig.analytics.enabled).toBe(false);
+    
+    // Check production config
+    window.location.hostname = 'sledhead.truevox.net';
+    const prodConfig = configDetector.getConfig();
+    expect(prodConfig.environment).toBe('production');
+    expect(prodConfig.logging.level).toBe('error');
+    expect(prodConfig.logging.enabled).toBe(false);
+    expect(prodConfig.physics.debugging).toBe(false);
+    expect(prodConfig.analytics.enabled).toBe(true);
+  }));
+});

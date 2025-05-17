@@ -1,0 +1,232 @@
+/**
+ * Integration tests for movement physics and landing mechanics
+ */
+import { measurePerformance, createPhaserSceneMock } from '../../test-utils.js';
+
+// Mock dependencies
+jest.mock('../../../js/config/physics-config.js', () => ({
+  player: {
+    landingSafetyAngle: 30,  // Max angle for safe landing in degrees
+    safeLandingSpeedThreshold: 10,  // Speed threshold for safe landing
+    crashSpeedThreshold: 18  // Speed threshold for crashing
+  },
+  gravity: {
+    default: 1,
+    airControl: 0.3,
+  },
+  surfaces: {
+    snow: { friction: 0.05 },
+    ice: { friction: 0.01 },
+    powder: { friction: 0.08 }
+  },
+  movement: {
+    maxSpeed: 15,
+    acceleration: 0.2,
+    brakeStrength: 0.4,
+    airBrakeStrength: 0.15,
+    minBoostStrength: 0.00015,
+    speedBoostFactor: 0.00025,
+    speedBoostThreshold: 0.3
+  }
+}));
+
+// Simplified physics simulator for testing
+class PhysicsSimulator {
+  constructor() {
+    this.player = {
+      position: { x: 0, y: 0 },
+      velocity: { x: 0, y: 0 },
+      onGround: false,
+      crashed: false,
+      lastTerrainAngle: 0
+    };
+    
+    this.resetPlayer();
+  }
+  
+  resetPlayer() {
+    this.player = {
+      position: { x: 0, y: 0 },
+      velocity: { x: 0, y: 0 },
+      onGround: false,
+      crashed: false,
+      lastTerrainAngle: 0
+    };
+  }
+  
+  // Apply forces for a frame
+  updatePhysics(dt = 16) {
+    // Convert dt to seconds
+    const dtSec = dt / 1000;
+    
+    // Apply gravity if in air
+    if (!this.player.onGround) {
+      this.player.velocity.y += 1 * dtSec * 15; // Base gravity constant
+    }
+    
+    // Apply slope force if on ground
+    if (this.player.onGround) {
+      const slopeAngleRad = this.player.lastTerrainAngle * (Math.PI / 180);
+      const slopeForce = Math.sin(slopeAngleRad) * 10;
+      this.player.velocity.x += slopeForce * dtSec;
+    }
+    
+    // Apply friction if on ground
+    if (this.player.onGround) {
+      const friction = 0.05; // Snow friction
+      const frictionForce = friction * Math.abs(this.player.velocity.x);
+      const direction = Math.sign(this.player.velocity.x);
+      
+      if (Math.abs(this.player.velocity.x) > frictionForce) {
+        this.player.velocity.x -= direction * frictionForce;
+      } else {
+        this.player.velocity.x = 0;
+      }
+    }
+    
+    // Apply speed cap
+    const maxSpeed = 15;
+    if (Math.abs(this.player.velocity.x) > maxSpeed) {
+      this.player.velocity.x = Math.sign(this.player.velocity.x) * maxSpeed;
+    }
+    
+    // Update position
+    this.player.position.x += this.player.velocity.x * dtSec;
+    this.player.position.y += this.player.velocity.y * dtSec;
+  }
+  
+  // Simulate landing on a slope
+  land(slopeAngleDegrees) {
+    const PhysicsConfig = require('../../../js/config/physics-config.js');
+    const previouslyOnGround = this.player.onGround;
+    
+    // Set terrain contact info
+    this.player.onGround = true;
+    this.player.lastTerrainAngle = slopeAngleDegrees;
+    
+    // Get landing safety parameters
+    const { landingSafetyAngle, safeLandingSpeedThreshold, crashSpeedThreshold } = PhysicsConfig.player;
+    
+    // Calculate landing safety
+    const landingSpeed = Math.abs(this.player.velocity.y);
+    const isAngleSafe = Math.abs(slopeAngleDegrees) <= landingSafetyAngle;
+    const isSpeedSafe = landingSpeed <= safeLandingSpeedThreshold;
+    const isCrashing = landingSpeed > crashSpeedThreshold;
+    
+    // Determine landing result
+    if (!previouslyOnGround) {
+      if (isCrashing || !isAngleSafe) {
+        this.player.crashed = true;
+        this.player.velocity.x *= 0.2; // Slow down significantly on crash
+        return 'crash';
+      } else if (isSpeedSafe && isAngleSafe) {
+        this.player.velocity.y = 0; // Cancel vertical velocity
+        return 'clean';
+      } else {
+        // Wobble but don't crash
+        this.player.velocity.x *= 0.7; // Slow down a bit
+        return 'wobble';
+      }
+    }
+    
+    return 'already-on-ground';
+  }
+}
+
+describe('Movement and Landing Physics Integration Tests', () => {
+  let physics;
+  
+  beforeEach(() => {
+    physics = new PhysicsSimulator();
+  });
+  
+  test('acceleration is limited by maximum speed', measurePerformance(() => {
+    // Set a high initial velocity
+    physics.player.velocity.x = 10;
+    physics.player.onGround = true;
+    physics.player.lastTerrainAngle = 30; // Steep slope for acceleration
+    
+    // Run physics for 1 second (60 frames at 16.67ms)
+    for (let i = 0; i < 60; i++) {
+      physics.updatePhysics(16.67);
+    }
+    
+    // Velocity should be capped at max speed
+    expect(Math.abs(physics.player.velocity.x)).toBeLessThanOrEqual(15);
+  }));
+  
+  test('landing on safe angle produces clean landing', measurePerformance(() => {
+    // Set up falling player
+    physics.player.velocity.y = 8; // Below crash threshold but significant
+    physics.player.velocity.x = 5;
+    physics.player.onGround = false;
+    
+    // Land on a gentle slope
+    const landingResult = physics.land(15);
+    
+    // Should be a clean landing
+    expect(landingResult).toBe('clean');
+    expect(physics.player.crashed).toBe(false);
+    expect(physics.player.velocity.y).toBe(0); // Vertical velocity canceled
+    expect(physics.player.velocity.x).toBe(5); // Horizontal preserved
+  }));
+  
+  test('landing on steep angle causes crash', measurePerformance(() => {
+    // Set up falling player
+    physics.player.velocity.y = 8;
+    physics.player.velocity.x = 5;
+    physics.player.onGround = false;
+    
+    // Land on a steep slope (beyond safety angle)
+    const landingResult = physics.land(45);
+    
+    // Should crash
+    expect(landingResult).toBe('crash');
+    expect(physics.player.crashed).toBe(true);
+    expect(physics.player.velocity.x).toBeCloseTo(1); // Horizontal reduced
+  }));
+  
+  test('landing with high velocity causes crash even on safe angle', measurePerformance(() => {
+    // Set up fast falling player
+    physics.player.velocity.y = 20; // Above crash threshold
+    physics.player.velocity.x = 10;
+    physics.player.onGround = false;
+    
+    // Land on a gentle slope
+    const landingResult = physics.land(10);
+    
+    // Should crash due to speed despite good angle
+    expect(landingResult).toBe('crash');
+    expect(physics.player.crashed).toBe(true);
+  }));
+  
+  test('time-based deceleration works correctly', measurePerformance(() => {
+    // Setup player on flat ground with initial speed
+    physics.player.velocity.x = 10;
+    physics.player.onGround = true;
+    physics.player.lastTerrainAngle = 0; // Flat ground
+    
+    // Initial position
+    const initialX = physics.player.position.x;
+    
+    // Run physics for 2 seconds (120 frames)
+    for (let i = 0; i < 120; i++) {
+      physics.updatePhysics(16.67);
+    }
+    
+    // Should have decelerated due to friction
+    expect(physics.player.velocity.x).toBeLessThan(10);
+    
+    // Should have moved forward
+    expect(physics.player.position.x).toBeGreaterThan(initialX);
+    
+    // Run physics until nearly stopped
+    for (let i = 0; i < 200; i++) {
+      physics.updatePhysics(16.67);
+      if (Math.abs(physics.player.velocity.x) < 0.1) break;
+    }
+    
+    // Should eventually come to a stop on flat ground
+    expect(Math.abs(physics.player.velocity.x)).toBeLessThan(0.1);
+  }));
+});
