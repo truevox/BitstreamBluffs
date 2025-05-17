@@ -117,5 +117,7 @@ function fnv1aHash(input) {
     }
     
     // Format like SHA-256 for consistency (pad to 64 chars)
-    return (hash >>> 0).toString(16).padStart(64, '0');
+    // Put zeros AFTER the hash value as requested
+    const hashHex = (hash >>> 0).toString(16);
+    return hashHex + '0'.repeat(64 - hashHex.length);
 }
