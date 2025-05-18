@@ -378,6 +378,9 @@ export default class GameScene extends Phaser.Scene {
                     console.log('No lives left, preparing to restart scene...');
                     this.gameOverShown = true; // Mark as shown to prevent multiple displays
                     
+                    // Create explosion effect for the player and sled
+                    this.createPlayerExplosionEffect();
+                    
                     // Show game over feedback before restarting, centered on player
                     const gameOverText = this.add.text(
                         this.player.x,
@@ -1712,6 +1715,168 @@ GameScene.prototype.initToastSystem = function() {
     
     // Position the toast container
     this.positionToastContainer();
+};
+
+// Create explosion effect for player and sled when game over occurs
+GameScene.prototype.createPlayerExplosionEffect = function() {
+    if (!this.player || !this.player.getAll) {
+        console.warn('Cannot create explosion effect - player not available');
+        return;
+    }
+    
+    try {
+        // Get the player's current position
+        const playerX = this.player.x;
+        const playerY = this.player.y;
+        
+        // Get the children components (sled and rider)
+        const children = this.player.getAll();
+        if (!children || children.length < 2) {
+            console.warn('Cannot create explosion effect - player components not available');
+            return;
+        }
+        
+        // Get the sled (first child) and rider (second child)
+        const sled = children[0];
+        const rider = children[1];
+        
+        // Hide the original container but NOT the components
+        this.player.visible = false;
+        
+        // Create clones of the original rider and sled at the correct world positions
+        // We need to create new objects because the originals are tied to the container
+        const riderWorldPos = this.player.getLocalPoint(rider.x, rider.y);
+        const sledWorldPos = this.player.getLocalPoint(sled.x, sled.y);
+        
+        // Create new triangle for the rider that matches the original
+        const riderClone = this.add.triangle(
+            playerX + rider.x, 
+            playerY + rider.y,
+            0, -rider.height/2,
+            -rider.width/2, rider.height/2,
+            rider.width/2, rider.height/2,
+            0xffff00 // Neon yellow
+        );
+        riderClone.setRotation(this.player.rotation);
+        riderClone.setDepth(60);
+        
+        // Create new rectangle for the sled that matches the original
+        const sledClone = this.add.rectangle(
+            playerX + sled.x,
+            playerY + sled.y,
+            sled.width,
+            sled.height,
+            0xff0000 // Neon red
+        );
+        sledClone.setRotation(this.player.rotation);
+        sledClone.setDepth(60);
+        
+        // Add smaller particle effects for added drama
+        this.createExplosionParticles(playerX, playerY, 0xff0000, { width: 20, height: 10 });
+        this.createExplosionParticles(playerX, playerY - 20, 0xffff00, { width: 15, height: 15 });
+        
+        // Make the rider blast upward and spin
+        this.tweens.add({
+            targets: riderClone,
+            x: playerX + (Math.random() > 0.5 ? 150 : -150),
+            y: playerY - 200 - Math.random() * 100,
+            rotation: riderClone.rotation + (Math.random() > 0.5 ? 8 : -8),
+            alpha: 0,
+            scaleX: 0.5,
+            scaleY: 0.5,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => {
+                riderClone.destroy();
+            }
+        });
+        
+        // Make the sled blast in a different direction and spin
+        this.tweens.add({
+            targets: sledClone,
+            x: playerX + (Math.random() > 0.5 ? -120 : 120),
+            y: playerY + 100 + Math.random() * 80,
+            rotation: sledClone.rotation + (Math.random() > 0.5 ? 6 : -6),
+            alpha: 0,
+            scaleX: 0.7,
+            scaleY: 0.7,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => {
+                sledClone.destroy();
+            }
+        });
+        
+        // Add a shockwave effect
+        const shockwave = this.add.circle(playerX, playerY, 10, 0xffffff, 0.4);
+        shockwave.setDepth(50);
+        
+        this.tweens.add({
+            targets: shockwave,
+            radius: 250,
+            alpha: 0,
+            duration: 800,
+            ease: 'Power2',
+            onComplete: () => {
+                shockwave.destroy();
+            }
+        });
+    } catch (error) {
+        console.error('Error creating explosion effect:', error);
+    }
+};
+
+// Helper to create particle explosion effect
+GameScene.prototype.createExplosionParticles = function(x, y, color, size) {
+    const particleCount = 20;
+    const particles = [];
+    
+    for (let i = 0; i < particleCount; i++) {
+        // Create particle shapes - mix of triangles and rectangles
+        let particle;
+        
+        if (Math.random() > 0.5) {
+            // Triangle particles
+            particle = this.add.triangle(
+                x, y,
+                0, -5,
+                -5, 5,
+                5, 5,
+                color
+            );
+        } else {
+            // Rectangle particles
+            const width = Math.random() * (size.width / 2) + 3;
+            const height = Math.random() * (size.height / 2) + 3;
+            particle = this.add.rectangle(x, y, width, height, color);
+        }
+        
+        // Random rotation
+        particle.rotation = Math.random() * Math.PI * 2;
+        particle.setDepth(60);
+        particles.push(particle);
+        
+        // Calculate random velocity
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 4;
+        const velocityX = Math.cos(angle) * speed;
+        const velocityY = Math.sin(angle) * speed;
+        
+        // Animate the particle
+        this.tweens.add({
+            targets: particle,
+            x: x + velocityX * 100,
+            y: y + velocityY * 100,
+            scaleX: 0,
+            scaleY: 0,
+            rotation: particle.rotation + (Math.random() > 0.5 ? 5 : -5),
+            alpha: 0,
+            duration: 800 + Math.random() * 400,
+            onComplete: () => {
+                particle.destroy();
+            }
+        });
+    }
 };
 
 // Helper to position the toast container at the bottom center of the screen
