@@ -15,8 +15,9 @@ import GameScene from './GameScene.js';
 import './utils/RotationSystem.js';
 import './Manette.js';
 
-// Initialize the game when document is loaded
-document.addEventListener('DOMContentLoaded', () => {
+// Function to initialize the game
+function initializeGame() {
+    console.log('Initializing game after fonts are loaded...');
     // Calculate game dimensions based on the window size
     const calculateGameDimensions = () => {
         // Base design aspect ratio (original game dimensions)
@@ -98,4 +99,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Make physics config available globally for easy tweaking in console
     window.PhysicsConfig = PhysicsConfig;
     window.game = game;
+}
+
+// Initialize the game when document is loaded and fonts are ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if fonts are already loaded
+    if (window.fontsLoaded) {
+        initializeGame();
+    } else {
+        console.log('Waiting for fonts to load before starting game...');
+        // Set up an interval to check font loading status
+        const fontCheckInterval = setInterval(() => {
+            if (window.fontsLoaded) {
+                clearInterval(fontCheckInterval);
+                initializeGame();
+            }
+        }, 100);
+        
+        // Fallback - start the game after 3 seconds even if fonts aren't detected as loaded
+        setTimeout(() => {
+            if (!window.game) {
+                clearInterval(fontCheckInterval);
+                console.warn('Font loading timed out, starting game anyway');
+                initializeGame();
+            }
+        }, 3000);
+    }
 });

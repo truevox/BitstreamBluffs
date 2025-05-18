@@ -9,7 +9,13 @@
  * @returns {string} A hash string to use as the game seed
  */
 export function generateGameSeed() {
-    // Combine current timestamp and random value for uniqueness
+    // If we have an early generated seed, use it
+    if (earlyGenerationComplete && earlyGeneratedSeed) {
+        console.log('Using pre-computed seed:', earlyGeneratedSeed);
+        return earlyGeneratedSeed;
+    }
+    
+    // Otherwise generate a new seed
     const timestamp = new Date().toISOString();
     const randomValue = Math.random().toString(36).substring(2);
     const seedSource = `${timestamp}-${randomValue}`;
@@ -64,6 +70,49 @@ let sha256Available = false;
 // Cached seed value - updated when SHA-256 is computed
 let cachedSeed = null;
 let initialSeedSource = null;
+
+// Early-generated seed for faster startup
+let earlyGeneratedSeed = null;
+let earlyGenerationComplete = false;
+
+// Start early generation if the flag is set
+if (typeof window !== 'undefined' && window.earlySeedGeneration) {
+    console.log('Starting early seed generation...');
+    // Start computing a seed immediately
+    const timestamp = new Date().toISOString();
+    const randomValue = Math.random().toString(36).substring(2);
+    const seedSource = `${timestamp}-${randomValue}`;
+    
+    // Start SHA-256 calculation in the background
+    if (window.crypto && window.crypto.subtle && window.isSecureContext) {
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(seedSource);
+            
+            window.crypto.subtle.digest('SHA-256', data)
+                .then(hashBuffer => {
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    console.log('Early SHA-256 seed generated:', hashHex);
+                    
+                    // Store the early generated seed
+                    earlyGeneratedSeed = hashHex;
+                    initialSeedSource = seedSource; // Store the source for consistency
+                    earlyGenerationComplete = true;
+                    sha256Available = true;
+                })
+                .catch(error => {
+                    console.error('Early SHA-256 generation failed:', error);
+                    // Fall back to FNV-1a
+                    earlyGeneratedSeed = fnv1aHash(seedSource);
+                    initialSeedSource = seedSource;
+                    earlyGenerationComplete = true;
+                });
+        } catch (err) {
+            console.warn('Early seed generation error:', err);
+        }
+    }
+}
 
 /**
  * Hash using SHA-256 when available, with fallback to FNV-1a

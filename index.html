@@ -12,6 +12,62 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
     
+    <!-- Font preloader script to ensure fonts are loaded before game starts -->
+    <script>
+        // Store a reference to when fonts are ready
+        window.fontsLoaded = false;
+        
+        // Function to check if fonts are loaded
+        function checkFontsLoaded() {
+            if (document.fonts && document.fonts.check) {
+                // Modern browsers - use Font Loading API
+                const isPressStartLoaded = document.fonts.check('1em "Press Start 2P"');
+                const isVT323Loaded = document.fonts.check('1em "VT323"');
+                
+                window.fontsLoaded = isPressStartLoaded && isVT323Loaded;
+                
+                if (!window.fontsLoaded) {
+                    // Try again in 100ms
+                    setTimeout(checkFontsLoaded, 100);
+                }
+            } else {
+                // Fallback for browsers without Font Loading API
+                // Set a timeout to allow fonts to load
+                setTimeout(function() {
+                    window.fontsLoaded = true;
+                }, 1000); // Give fonts 1 second to load
+            }
+        }
+        
+        // Start checking fonts
+        checkFontsLoaded();
+        
+        // Start computing the game seed early
+        // This will trigger the SHA-256 computation in the background
+        window.earlySeedGeneration = true;
+        
+        // Preload fonts with invisible elements
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create and add elements with our custom fonts
+            const pressStartPreloader = document.createElement('div');
+            pressStartPreloader.style.fontFamily = '"Press Start 2P"';
+            pressStartPreloader.style.position = 'absolute';
+            pressStartPreloader.style.visibility = 'hidden';
+            pressStartPreloader.textContent = 'BITSTREAM BLUFFS';
+            document.body.appendChild(pressStartPreloader);
+            
+            const vt323Preloader = document.createElement('div');
+            vt323Preloader.style.fontFamily = 'VT323';
+            vt323Preloader.style.position = 'absolute';
+            vt323Preloader.style.visibility = 'hidden';
+            vt323Preloader.textContent = 'SEED';
+            document.body.appendChild(vt323Preloader);
+            
+            // Additionally trigger a check after DOM is loaded
+            checkFontsLoaded();
+        });
+    </script>
+    
     <!-- Load our game modules -->
     <script type="module">
         // Import our main game script which will handle loading all other modules
