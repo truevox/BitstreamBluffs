@@ -143,18 +143,21 @@
         
         <h2>CONTROLS</h2>
         <div class="box">
-            <h3>Keyboard</h3>
-            <p><span class="key">↑</span> or <span class="key">W</span> - Lean back / Slow down</p>
-            <p><span class="key">↓</span> or <span class="key">S</span> - Lean forward / Speed up</p>
-            <p><span class="key">←</span> or <span class="key">A</span> - Turn left</p>
-            <p><span class="key">→</span> or <span class="key">D</span> - Turn right</p>
+            <h3>Modes</h3>
+            <p><span class="key">TAB</span> - Toggle between Sled mode and Walking mode</p>
+            
+            <h3>Sled Mode</h3>
+            <p><span class="key">W</span> - Rotate counterclockwise (gain trick points when completed)</p>
+            <p><span class="key">S</span> - Rotate clockwise (gain trick points when completed)</p>
+            <p><span class="key">A</span> - On ground: Slow down by dragging legs | In air: Air Brake trick (slows you down with vertical boost)</p>
+            <p><span class="key">D</span> - On ground: Tuck to go faster | In air: Parachute trick (slower falling, float further)</p>
             <p><span class="key">SPACE</span> - Jump (when on ground)</p>
             
-            <h3>Gamepad</h3>
-            <p>Left Stick - Movement</p>
-            <p>A Button - Jump</p>
-            <p>Right Trigger - Speed up</p>
-            <p>Left Trigger - Slow down</p>
+            <h3>Walking Mode</h3>
+            <p><span class="key">W</span> / <span class="key">S</span> - No effect</p>
+            <p><span class="key">A</span> - Move slowly left</p>
+            <p><span class="key">D</span> - Move slowly right</p>
+            <p><span class="key">SPACE</span> - Jump (smaller than sled jump)</p>
         </div>
         
         <h2>TRICKS</h2>
@@ -162,24 +165,26 @@
         
         <div class="tricks">
             <div class="trick-card">
-                <h3>180° SPIN</h3>
-                <p>Press <span class="key">←</span> or <span class="key">→</span> while in air</p>
-                <p>Points: 100</p>
+                <h3>ROTATION</h3>
+                <p>Press <span class="key">W</span> (counterclockwise) or <span class="key">S</span> (clockwise) while in air</p>
+                <p>Points: 100-300 based on rotation amount</p>
             </div>
             <div class="trick-card">
-                <h3>360° SPIN</h3>
-                <p>Complete a full rotation in air</p>
-                <p>Points: 250</p>
+                <h3>AIR BRAKE</h3>
+                <p>Press <span class="key">A</span> while in air</p>
+                <p>Slows horizontal movement with vertical boost</p>
+                <p>Points: 150</p>
             </div>
             <div class="trick-card">
-                <h3>BACKFLIP</h3>
-                <p>Press <span class="key">↑</span> during jump</p>
-                <p>Points: 300</p>
+                <h3>PARACHUTE</h3>
+                <p>Press <span class="key">D</span> while in air</p>
+                <p>Slower falling, float further</p>
+                <p>Points: 200</p>
             </div>
             <div class="trick-card">
-                <h3>FRONTFLIP</h3>
-                <p>Press <span class="key">↓</span> during jump</p>
-                <p>Points: 300</p>
+                <h3>COMBO BONUS</h3>
+                <p>Chain multiple tricks in a single jump</p>
+                <p>Points: Multiplier increases with each trick</p>
             </div>
         </div>
         
