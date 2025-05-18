@@ -15,6 +15,40 @@
             margin: 0;
             padding: 0;
             text-align: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        .star {
+            position: fixed;
+            border-radius: 50%;
+            opacity: 0.8;
+            animation: twinkle 3s infinite alternate;
+            z-index: -1;
+        }
+        
+        @keyframes twinkle {
+            0% { opacity: 0.4; }
+            100% { opacity: 0.8; }
+        }
+        
+        /* Retro scan lines */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.05),
+                rgba(0, 0, 0, 0.05) 1px,
+                transparent 1px,
+                transparent 4px
+            );
+            pointer-events: none; /* Allow clicking through the scan lines */
         }
         
         .container {
@@ -214,6 +248,38 @@
         // Preload fonts to avoid FOUC (Flash of Unstyled Content)
         document.fonts.ready.then(() => {
             document.body.style.opacity = 1;
+        });
+        
+        // Create starfield background with actual stars
+        document.addEventListener('DOMContentLoaded', () => {
+            const colors = ['#ff00ff', '#00ffff', '#ffff00']; // Magenta, Cyan, Yellow
+            const starCount = 70; // Create 70 stars (a bit more muted than the start screen's 100)
+            
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.classList.add('star');
+                
+                // Random position
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                star.style.left = `${x}%`;
+                star.style.top = `${y}%`;
+                
+                // Random size (smaller than start screen for muted effect)
+                const size = 1 + Math.random() * 2;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                
+                // Random color
+                const colorIndex = Math.floor(Math.random() * colors.length);
+                star.style.backgroundColor = colors[colorIndex];
+                
+                // Random animation delay for twinkling effect
+                star.style.animationDelay = `${Math.random() * 3}s`;
+                
+                // Add to document
+                document.body.appendChild(star);
+            }
         });
     </script>
 </body>

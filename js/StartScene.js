@@ -771,10 +771,22 @@ export default class StartScene extends Phaser.Scene {
      * @param {string} tooltip - Tooltip text to show on hover
      */
     addIconInteractivity(icon, url, tooltip) {
+        // Determine tooltip position based on the icon - special case for the Snow Bee icon
+        let tooltipX = icon.x - icon.width/2;
+        let tooltipY = icon.y - icon.height - 10;
+        let tooltipOrigin = { x: 0.5, y: 1 };
+        
+        // Special case for the Snow Bee icon - position tooltip directly above it
+        if (url === 'https://sledhead.ing') {
+            tooltipX = icon.x;
+            tooltipY = icon.y - 45; // Moved higher so bottom is where top used to be
+            tooltipOrigin = { x: 0.5, y: 1 };
+        }
+        
         // Create tooltip (initially hidden)
         const tooltipText = this.add.text(
-            icon.x - icon.width/2,
-            icon.y - icon.height - 10,
+            tooltipX,
+            tooltipY,
             tooltip,
             {
                 fontFamily: 'VT323',
@@ -783,7 +795,7 @@ export default class StartScene extends Phaser.Scene {
                 backgroundColor: '#000000',
                 padding: { x: 5, y: 3 }
             }
-        ).setOrigin(0.5, 1).setAlpha(0);
+        ).setOrigin(tooltipOrigin.x, tooltipOrigin.y).setAlpha(0);
         
         // If icon is in a container, add tooltip to the same container
         if (icon.parentContainer) {
