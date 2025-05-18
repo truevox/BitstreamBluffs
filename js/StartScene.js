@@ -187,17 +187,7 @@ export default class StartScene extends Phaser.Scene {
         
         startButton.on('pointerdown', this.startGame);
         
-        // Show seed info
-        const seedLabel = this.add.text(
-            width / 2,
-            height * 0.65,
-            'GAME SEED:',
-            {
-                fontFamily: 'monospace',
-                fontSize: '16px',
-                color: '#ffffff'
-            }
-        ).setOrigin(0.5);
+        // Game preview and terrain display section
         
         // Create a screen that shows the game terrain line like in the image
         const gamePreview = this.add.graphics();

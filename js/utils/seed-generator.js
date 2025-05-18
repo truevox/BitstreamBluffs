@@ -144,7 +144,6 @@ function updateDisplayedSeed(newSeed) {
         }
     }
 }
-}
 
 /**
  * Simple FNV-1a hash implementation
