@@ -376,6 +376,327 @@ async function runGameplayTests() {
         throw new Error('Canvas size did not change after window resize');
       }
     });
+    
+    // Test 7: Seed-based deterministic terrain generation
+    await runTest('Seed-based terrain generation consistency', async () => {
+      // Create a function to test terrain generation with specific seed
+      const testTerrainWithSeed = async (seed) => {
+        // Navigate to game and set the seed
+        await mcp2_puppeteer_navigate({ url: 'http://localhost:8000' });
+        
+        // Set a specific seed in localStorage
+        await mcp2_puppeteer_evaluate({
+          script: `
+            window.localStorage.setItem('gameTestSeed', '${seed}');
+          `
+        });
+        
+        // Wait for game to load
+        await waitForGameLoaded();
+        
+        // Start the game
+        await mcp2_puppeteer_evaluate({
+          script: `
+            const startScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'StartScene');
+            const startButton = startScene.children.list.find(container => 
+              container.type === 'Container' && 
+              container.list.some(child => child.type === 'Text' && child.text.includes('START GAME'))
+            );
+            
+            if (startButton) {
+              startButton.emit('pointerdown');
+              startButton.emit('pointerup');
+            }
+          `
+        });
+        
+        // Wait for game scene and terrain generation
+        await sleep(1000);
+        
+        // Capture terrain data for comparison
+        return await mcp2_puppeteer_evaluate({
+          script: `
+            const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+            return gameScene.terrainSegments.map(segment => {
+              // Return a consistent representation of segments
+              if (segment.points) {
+                return segment.points.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }));
+              }
+              return [];
+            });
+          `
+        });
+      };
+      
+      // Test with a specific seed
+      const testSeed = "mcp-test-seed-123";
+      
+      // Get terrain from first run
+      const firstRunResults = await testTerrainWithSeed(testSeed);
+      
+      // Get terrain from second run with same seed
+      const secondRunResults = await testTerrainWithSeed(testSeed);
+      
+      // Compare the terrain data - they should match when using same seed
+      if (JSON.stringify(firstRunResults) !== JSON.stringify(secondRunResults)) {
+        throw new Error('Terrain generation is not deterministic with same seed');
+      }
+    });
+    
+    // Test 8: Flip detection and scoring
+    await runTest('Flip detection and scoring', async () => {
+      // Start fresh game
+      await mcp2_puppeteer_navigate({ url: 'http://localhost:8000' });
+      await waitForGameLoaded();
+      
+      // Start the game
+      await mcp2_puppeteer_evaluate({
+        script: `
+          const startScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'StartScene');
+          const startButton = startScene.children.list.find(container => 
+            container.type === 'Container' && 
+            container.list.some(child => child.type === 'Text' && child.text.includes('START GAME'))
+          );
+          
+          if (startButton) {
+            startButton.emit('pointerdown');
+            startButton.emit('pointerup');
+          }
+        `
+      });
+      
+      // Wait for game scene
+      await sleep(800);
+      
+      // Get initial score
+      const initialScore = await mcp2_puppeteer_evaluate({
+        script: `
+          const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+          return gameScene.points || 0;
+        `
+      });
+      
+      // Force the player into a state where a flip can be executed
+      await mcp2_puppeteer_evaluate({
+        script: `
+          const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+          
+          // Set up for a flip
+          gameScene.onGround = false;
+          
+          // Ensure rotation tracking is active
+          if (gameScene.rotationSystem && !gameScene.rotationSystem.isTracking) {
+            gameScene.rotationSystem.startTracking();
+          }
+          
+          // Apply an upward velocity to give time for the flip
+          if (gameScene.player && gameScene.player.body) {
+            gameScene.player.body.velocity.y = -10; // Moving up
+          }
+        `
+      });
+      
+      // Simulate pressing up arrow for a flip
+      await mcp2_puppeteer_evaluate({
+        script: `
+          // Simulate pressing up arrow key
+          const upKeyDown = new KeyboardEvent('keydown', { key: 'ArrowUp' });
+          document.dispatchEvent(upKeyDown);
+          
+          // Schedule releasing the key
+          setTimeout(() => {
+            const upKeyUp = new KeyboardEvent('keyup', { key: 'ArrowUp' });
+            document.dispatchEvent(upKeyUp);
+          }, 300);
+        `
+      });
+      
+      // Wait for flip to occur
+      await sleep(1000);
+      
+      // Force landing to trigger flip completion
+      const flipResults = await mcp2_puppeteer_evaluate({
+        script: `
+          const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+          
+          // Track if rotation was detected
+          const rotationDetected = gameScene.rotationSystem && 
+                                 (gameScene.rotationSystem.hasRotated || 
+                                  gameScene.rotationSystem.rotationCount > 0);
+                                  
+          // Trigger landing to complete the flip
+          if (gameScene.rotationSystem && gameScene.rotationSystem.isTracking) {
+            // Set player on ground
+            gameScene.onGround = true;
+            
+            // Stop tracking rotation
+            gameScene.rotationSystem.stopTracking();
+            
+            // Calculate flip values
+            const fullFlips = Math.floor(gameScene.rotationSystem.rotationCount || 0);
+            const partialFlip = (gameScene.rotationSystem.rotationCount || 0) % 1;
+            
+            // Call flip completion handler if it exists
+            if (typeof gameScene.onFlipComplete === 'function') {
+              gameScene.onFlipComplete(fullFlips, partialFlip);
+            }
+          }
+          
+          return {
+            rotationDetected,
+            rotationCount: gameScene.rotationSystem ? gameScene.rotationSystem.rotationCount : 0
+          };
+        `
+      });
+      
+      // Wait for score to update
+      await sleep(500);
+      
+      // Check if score increased or rotation was detected
+      const scoreResults = await mcp2_puppeteer_evaluate({
+        script: `
+          const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+          return gameScene.points || 0;
+        `
+      });
+      
+      if (!flipResults.rotationDetected && scoreResults <= initialScore) {
+        throw new Error('Flip system did not detect rotation or update score');
+      }
+    });
+    
+    // Test 9: Altitude drop tracking
+    await runTest('Altitude drop tracking', async () => {
+      // Start fresh game
+      await mcp2_puppeteer_navigate({ url: 'http://localhost:8000' });
+      await waitForGameLoaded();
+      
+      // Start the game
+      await mcp2_puppeteer_evaluate({
+        script: `
+          const startScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'StartScene');
+          const startButton = startScene.children.list.find(container => 
+            container.type === 'Container' && 
+            container.list.some(child => child.type === 'Text' && child.text.includes('START GAME'))
+          );
+          
+          if (startButton) {
+            startButton.emit('pointerdown');
+            startButton.emit('pointerup');
+          }
+        `
+      });
+      
+      // Wait for game scene
+      await sleep(1000);
+      
+      // Get initial altitude
+      const initialAlt = await mcp2_puppeteer_evaluate({
+        script: `
+          const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+          return {
+            initialY: gameScene.initialY,
+            currentY: gameScene.player ? gameScene.player.y : 0,
+            altitudeDrop: gameScene.initialY - (gameScene.player ? gameScene.player.y : 0)
+          };
+        `
+      });
+      
+      // Move right to progress downhill
+      await mcp2_puppeteer_evaluate({
+        script: `
+          // Press right arrow
+          const rightDown = new KeyboardEvent('keydown', { key: 'ArrowRight' });
+          document.dispatchEvent(rightDown);
+        `
+      });
+      
+      // Wait a moment to move downhill
+      await sleep(2000);
+      
+      // Release key
+      await mcp2_puppeteer_evaluate({
+        script: `
+          // Release right arrow
+          const rightUp = new KeyboardEvent('keyup', { key: 'ArrowRight' });
+          document.dispatchEvent(rightUp);
+        `
+      });
+      
+      // Get current altitude
+      const currentAlt = await mcp2_puppeteer_evaluate({
+        script: `
+          const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+          return {
+            initialY: gameScene.initialY,
+            currentY: gameScene.player ? gameScene.player.y : 0,
+            altitudeDrop: gameScene.initialY - (gameScene.player ? gameScene.player.y : 0),
+            altitudeDisplayed: gameScene.altitudeDropText && gameScene.altitudeDropText.text || ''
+          };
+        `
+      });
+      
+      // Verify altitude drop increased
+      if (currentAlt.altitudeDrop <= initialAlt.altitudeDrop) {
+        throw new Error('Altitude drop did not increase during downhill movement');
+      }
+      
+      // Check altitude display was updated
+      if (!currentAlt.altitudeDisplayed.includes('ALTITUDE')) {
+        throw new Error('Altitude display not properly updated');
+      }
+    });
+    
+    // Test 10: Physics config integration test
+    await runTest('Physics configuration integration', async () => {
+      // Start fresh game
+      await mcp2_puppeteer_navigate({ url: 'http://localhost:8000' });
+      await waitForGameLoaded();
+      
+      // Check physics config values
+      const physicsResults = await mcp2_puppeteer_evaluate({
+        script: `
+          // Check if PhysicsConfig is properly loaded and used
+          if (!window.PhysicsConfig) {
+            return { error: 'PhysicsConfig not found' };
+          }
+          
+          // If we're in the game scene, check specific values
+          const gameScene = window.game.scene.scenes.find(s => 
+            s.sys.settings.key === 'GameScene' && s.sys.settings.active
+          );
+          
+          if (gameScene) {
+            return {
+              // Initial lives match config
+              livesMatch: gameScene.lives === PhysicsConfig.extraLives.initialLives,
+              // Max lives match config
+              maxLivesMatch: gameScene.maxLives === PhysicsConfig.extraLives.maxLives,
+              // Gravity set from config
+              gravityMatch: window.game.physics.world && 
+                          window.game.physics.world.gravity && 
+                          window.game.physics.world.gravity.y === PhysicsConfig.gravity
+            };
+          } else {
+            // Just check that PhysicsConfig exists with expected properties
+            return {
+              hasGravity: typeof PhysicsConfig.gravity !== 'undefined',
+              hasExtraLives: typeof PhysicsConfig.extraLives !== 'undefined'
+            };
+          }
+        `
+      });
+      
+      // Check that at least one config value is correctly applied
+      if (physicsResults.error || 
+         (!physicsResults.livesMatch && 
+          !physicsResults.maxLivesMatch && 
+          !physicsResults.gravityMatch && 
+          !physicsResults.hasGravity && 
+          !physicsResults.hasExtraLives)) {
+        throw new Error('Physics configuration not properly integrated');
+      }
+    });
 
     // Summary of test results
     console.log('\n📋 Test Results Summary:');

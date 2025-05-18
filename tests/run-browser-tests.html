@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitstream Bluffs Browser Tests</title>
+    <style>
+        body {
+            background-color: #000033;
+            color: #00ffff;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1, h2 {
+            color: #ffff00;
+            text-align: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #game-container {
+            width: 100%;
+            height: 700px;
+            border: 4px solid #ff00ff;
+            margin: 20px 0;
+            position: relative;
+        }
+        .instructions {
+            background-color: #001a33;
+            border: 2px solid #00ffff;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            width: 100%;
+        }
+        .neon-text {
+            text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff;
+        }
+        .test-results {
+            width: 100%;
+            margin-top: 20px;
+            background-color: #001a33;
+            border: 2px solid #00ffff;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        footer {
+            margin-top: 30px;
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="neon-text">🎮 Bitstream Bluffs Browser Tests</h1>
+        
+        <div class="instructions">
+            <h2>Test Instructions</h2>
+            <p>This page will load the Bitstream Bluffs game and run automated browser tests.</p>
+            <p>Please open your browser console (F12 or Ctrl+Shift+J) to view test results.</p>
+            <p>Tests will run automatically when the game loads.</p>
+        </div>
+        
+        <div id="game-container">
+            <!-- Game will load here -->
+        </div>
+        
+        <div class="test-results">
+            <h2>Test Results</h2>
+            <p>Open your browser console to see detailed test results.</p>
+            <p>The tests will verify:</p>
+            <ul>
+                <li>Start screen loads correctly</li>
+                <li>Game starts when clicking start button</li>
+                <li>Player responds to keyboard input</li>
+                <li>Trick system functions</li>
+                <li>Seed-based terrain generation</li>
+                <li>Physics configuration integration</li>
+            </ul>
+        </div>
+        
+        <footer>
+            Bitstream Bluffs v1.1.0 - Browser Test Suite
+        </footer>
+    </div>
+
+    <!-- Load Phaser -->
+    <script src="../node_modules/phaser/dist/phaser.js"></script>
+    
+    <!-- Load game scripts -->
+    <script type="module" src="../js/main.js"></script>
+    
+    <!-- Load test script after a delay to ensure game is loaded -->
+    <script type="module">
+        // We need to wait for the game to load before loading the test script
+        setTimeout(() => {
+            const testScript = document.createElement('script');
+            testScript.src = './browser-gameplay-tests.js';
+            document.body.appendChild(testScript);
+            console.log('✨ Test script loaded and running...');
+        }, 2000);
+    </script>
+</body>
+</html>

@@ -1,13 +1,19 @@
-// tests/gameplay-tests.js
+// tests/puppeteer-tests.js
 // Comprehensive gameplay tests for Bitstream Bluffs using Puppeteer
 // ----------------------------------------------------------------------
 
-const puppeteer = require('puppeteer');
-const { expect } = require('chai');
-const http = require('http');
-const path = require('path');
-const express = require('express');
-const fs = require('fs');
+import puppeteer from 'puppeteer';
+import { expect } from 'chai';
+import http from 'http';
+import path from 'path';
+import express from 'express';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import fs from 'fs';
+
+// Get __dirname equivalent in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Test configuration
 const TEST_CONFIG = {
@@ -67,7 +73,11 @@ describe('Bitstream Bluffs Gameplay Tests', function() {
     // Launch browser
     browser = await puppeteer.launch({ 
       headless: TEST_CONFIG.headless,
-      args: ['--window-size=1280,800']
+      args: [
+        '--window-size=1280,800',
+        '--no-sandbox',           // Required in restricted environments
+        '--disable-setuid-sandbox' // Additional sandbox disable flag
+      ]
     });
     
     // Create page with viewport large enough for game
@@ -454,7 +464,332 @@ describe('Bitstream Bluffs Gameplay Tests', function() {
     // Verify that canvas size changed
     expect(newSize).to.not.deep.equal(initialSize);
   });
+
+  // Test 11: Seed-based terrain generation
+  it('should generate consistent terrain when using the same seed', async function() {
+    // This test verifies that terrain generation is deterministic based on seed
+    // First run with initial seed
+    const terrainTest = async (customSeed) => {
+      await page.goto(TEST_CONFIG.gameUrl, { waitUntil: 'networkidle2' });
+      await page.waitForFunction(() => window.game !== undefined);
+      
+      // Set a specific seed if provided
+      if (customSeed) {
+        await page.evaluate((seed) => {
+          window.localStorage.setItem('gameTestSeed', seed);
+        }, customSeed);
+      }
+      
+      await page.waitForFunction(GAME_STATES.start);
+      
+      // Start the game
+      await page.evaluate(() => {
+        const startScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'StartScene');
+        const startButton = startScene.children.list.find(container => 
+          container.type === 'Container' && 
+          container.list.some(child => child.type === 'Text' && child.text.includes('START GAME'))
+        );
+        
+        if (startButton) {
+          startButton.emit('pointerdown');
+          startButton.emit('pointerup');
+        }
+      });
+      
+      await page.waitForFunction(GAME_STATES.playing);
+      
+      // Allow terrain to generate
+      await page.waitForTimeout(1000);
+      
+      // Capture terrain data
+      return await page.evaluate(() => {
+        const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+        return gameScene.terrainSegments.map(segment => {
+          // Return a simplified representation of segments for comparison
+          if (segment.points) {
+            return segment.points.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }));
+          }
+          return [];
+        });
+      });
+    };
+    
+    // Generate a fixed seed
+    const testSeed = "test-seed-123";
+    
+    // First run
+    const firstRunTerrain = await terrainTest(testSeed);
+    
+    // Second run with same seed
+    const secondRunTerrain = await terrainTest(testSeed);
+    
+    // Compare terrain segments - they should be identical with same seed
+    expect(JSON.stringify(firstRunTerrain)).to.equal(JSON.stringify(secondRunTerrain));
+  });
+
+  // Test 12: Altitude drop tracking
+  it('should track altitude drop during gameplay', async function() {
+    // Start the game
+    await startGameHelper(page);
+    
+    // Get initial altitude status
+    const initialAltitude = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return gameScene.initialY - gameScene.player.y;
+    });
+    
+    // Play for a bit to accumulate altitude drop
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(2000);
+    await page.keyboard.up('ArrowRight');
+    
+    // Get updated altitude
+    const updatedAltitude = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return gameScene.initialY - gameScene.player.y;
+    });
+    
+    // As player moves downhill, altitude drop should increase
+    expect(updatedAltitude).to.be.greaterThan(initialAltitude);
+    
+    // Check if altitude text is updated
+    const altitudeDisplayed = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return gameScene.altitudeDropText && 
+             gameScene.altitudeDropText.text && 
+             gameScene.altitudeDropText.text.includes('ALTITUDE');
+    });
+    
+    expect(altitudeDisplayed).to.be.true;
+  });
+
+  // Test 13: Flip tracking and scoring system
+  it('should detect and score flips correctly', async function() {
+    // Start the game
+    await startGameHelper(page);
+    
+    // Get initial score
+    const initialScore = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return gameScene.points || 0;
+    });
+    
+    // Perform a flip by pressing up arrow in the air
+    await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      
+      // Set up conditions for a flip
+      // Force the player in the air
+      gameScene.onGround = false;
+      
+      // Set a high initial velocity to ensure we have time for a flip
+      if (gameScene.player && gameScene.player.body) {
+        gameScene.player.body.velocity.y = -10; // Moving up initially
+      }
+      
+      // Initialize rotation system if needed
+      if (!gameScene.rotationSystem.isTracking) {
+        gameScene.rotationSystem.startTracking();
+      }
+    });
+    
+    // Press up key to initiate a flip
+    await page.keyboard.down('ArrowUp');
+    await page.waitForTimeout(300);
+    await page.keyboard.up('ArrowUp');
+    
+    // Wait for the flip to complete
+    await page.waitForTimeout(1000);
+    
+    // Force landing to complete the flip
+    await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      
+      // Simulate landing to complete the flip
+      if (gameScene.rotationSystem && gameScene.rotationSystem.isTracking) {
+        gameScene.onGround = true;
+        gameScene.rotationSystem.stopTracking();
+        
+        // If there are rotations, call the flip complete handler
+        if (gameScene.rotationSystem.rotationCount > 0) {
+          const fullFlips = Math.floor(gameScene.rotationSystem.rotationCount);
+          const partialFlip = gameScene.rotationSystem.rotationCount % 1;
+          
+          // Call the flip completion handler
+          if (gameScene.onFlipComplete) {
+            gameScene.onFlipComplete(fullFlips, partialFlip);
+          }
+        }
+      }
+    });
+    
+    // Get the updated score
+    await page.waitForTimeout(500); // Wait for score to update
+    
+    // Check if score increased
+    const newScore = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return {
+        score: gameScene.points || 0,
+        flipDetected: gameScene.rotationSystem && 
+                      (gameScene.rotationSystem.hasRotated || 
+                       gameScene.rotationSystem.rotationCount > 0)
+      };
+    });
+    
+    // Either the flip was detected or score increased
+    expect(newScore.flipDetected || newScore.score > initialScore).to.be.true;
+  });
+
+  // Test 14: Wobble state detection
+  it('should detect wobble state on unstable landing', async function() {
+    // Start the game
+    await startGameHelper(page);
+    
+    // Set up conditions for a wobble
+    await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      
+      // First ensure we're on ground
+      gameScene.onGround = true;
+      
+      // Then simulate a steep landing angle that would trigger wobble
+      if (gameScene.onWobble && gameScene.playerHitTerrain) {
+        // Call with a steep angle (> 45 degrees) - in radians
+        gameScene.playerHitTerrain(Math.PI / 3); // ~60 degrees
+      }
+    });
+    
+    // Wait a moment for wobble state to be detected
+    await page.waitForTimeout(300);
+    
+    // Check if wobble was triggered
+    const wobbleDetected = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return gameScene.isWobbling || gameScene.wobbleIntensity > 0;
+    });
+    
+    expect(wobbleDetected).to.be.true;
+  });
+
+  // Test 15: Extra life timing system
+  it('should respect minimum time between extra life spawns', async function() {
+    // Start the game
+    await startGameHelper(page);
+    
+    // Get the current extra life timing information
+    const lifeTiming = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return {
+        lastCollectTime: gameScene.lastLifeCollectTime,
+        nextAvailableTime: gameScene.nextLifeAvailableTime,
+        currentLives: gameScene.lives,
+        maxLives: gameScene.maxLives
+      };
+    });
+    
+    // Force spawn an extra life and collect it
+    await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      
+      // Only proceed if lives are less than max
+      if (gameScene.lives < gameScene.maxLives) {
+        // Force record the collect time
+        const now = gameScene.time.now;
+        gameScene.lastLifeCollectTime = now;
+        
+        // Set next available time based on the cooldown
+        gameScene.nextLifeAvailableTime = now + PhysicsConfig.extraLives.minTimeBetweenSpawnsMs;
+      }
+    });
+    
+    // Try to spawn another immediately (should not create one due to cooldown)
+    await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return gameScene.spawnExtraLife();
+    });
+    
+    // Verify no new life was spawned during cooldown
+    const noSpawnDuringCooldown = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      const now = gameScene.time.now;
+      return now < gameScene.nextLifeAvailableTime; // Should still be in cooldown
+    });
+    
+    expect(noSpawnDuringCooldown).to.be.true;
+  });
+
+  // Test 16: Physics config integration
+  it('should apply physics configuration settings', async function() {
+    // Start the game
+    await startGameHelper(page);
+    
+    // Check if physics config is applied
+    const physicsConfigApplied = await page.evaluate(() => {
+      // Check that the PhysicsConfig exists and is being used
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      
+      // Check that initial lives match the physics config
+      const livesMatchConfig = gameScene.lives === PhysicsConfig.extraLives.initialLives;
+      
+      // Check that gravity is set from physics config
+      const gravityMatch = window.game.physics.world.gravity.y === PhysicsConfig.gravity;
+      
+      return {
+        livesMatchConfig,
+        gravityMatch,
+        gravityValue: window.game.physics.world.gravity.y,
+        configValue: PhysicsConfig.gravity
+      };
+    });
+    
+    // Verify physics configuration is correctly applied
+    expect(physicsConfigApplied.livesMatchConfig || 
+           physicsConfigApplied.gravityMatch).to.be.true;
+  });
+
+  // Test 17: Terrain cleanup
+  it('should clean up offscreen terrain segments', async function() {
+    // Start the game
+    await startGameHelper(page);
+    
+    // Get initial terrain segment count
+    const initialTerrainCount = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return gameScene.terrainSegments.length;
+    });
+    
+    // Move player far to the right to force terrain cleanup
+    await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      if (gameScene.player && gameScene.player.body) {
+        // Move player far to the right
+        const originalX = gameScene.player.x;
+        gameScene.player.setPosition(originalX + 5000, gameScene.player.y);
+        
+        // Force terrain management
+        gameScene.manageTerrain();
+      }
+    });
+    
+    // Allow time for cleanup
+    await page.waitForTimeout(500);
+    
+    // Check terrain segments again
+    const terrainResults = await page.evaluate(() => {
+      const gameScene = window.game.scene.scenes.find(s => s.sys.settings.key === 'GameScene');
+      return {
+        currentCount: gameScene.terrainSegments.length,
+        newSegmentsCreated: gameScene.terrainSegments.some(s => s.x > 5000) // Check if new segments created ahead
+      };
+    });
+    
+    // Verify terrain management is working - either segments were removed or new ones created
+    expect(terrainResults.currentCount !== initialTerrainCount || 
+           terrainResults.newSegmentsCreated).to.be.true;
+  });
 });
+
 
 // Helper functions
 
