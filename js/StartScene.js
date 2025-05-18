@@ -420,25 +420,110 @@ export default class StartScene extends Phaser.Scene {
             }
         ).setOrigin(0.5);
         
-        // Create Copy Seed button
-        const copyButton = this.createRetroButton(
-            width / 2 - 90, 
-            seedSectionY + 50, 
-            170, 
-            40, 
-            'COPY SEED', 
-            '#00ffaa'
+        // Create Copy Seed button with identical logic as Start Game
+        const copyButtonWidth = 170;
+        const copyButtonHeight = 40;
+        
+        // Glow for Copy button
+        const copyButtonGlow = this.add.graphics();
+        copyButtonGlow.fillStyle(0x00ffaa, 0.2);
+        copyButtonGlow.fillRoundedRect(
+            width / 2 - 90 - copyButtonWidth/2 - 5, 
+            seedSectionY + 50 - copyButtonHeight/2 - 5, 
+            copyButtonWidth + 10, 
+            copyButtonHeight + 10, 
+            10
         );
         
-        // Create Paste Seed button
-        const pasteButton = this.createRetroButton(
-            width / 2 + 90, 
-            seedSectionY + 50, 
-            170, 
-            40, 
-            'PASTE SEED', 
-            '#ffaa00'
+        // Copy button background
+        const copyButton = this.add.rectangle(
+            width / 2 - 90,
+            seedSectionY + 50,
+            copyButtonWidth,
+            copyButtonHeight,
+            0x000022
+        ).setStrokeStyle(4, 0x00ffaa, 1).setInteractive();
+        
+        // Copy button text
+        const copyText = this.add.text(
+            width / 2 - 90,
+            seedSectionY + 50,
+            'COPY SEED',
+            {
+                fontFamily: '"Press Start 2P"',
+                fontSize: '16px',
+                color: '#00ffaa',
+                padding: { x: 4, y: 8 }
+            }
+        ).setOrigin(0.5);
+        
+        // Copy button hover and click effects - exactly like Start Game
+        copyButton.on('pointerover', () => {
+            copyButton.setStrokeStyle(4, 0xffff00, 1);
+            copyText.setColor('#ffff00');
+        });
+        
+        copyButton.on('pointerout', () => {
+            copyButton.setStrokeStyle(4, 0x00ffaa, 1);
+            copyText.setColor('#00ffaa');
+        });
+        
+        // Create Paste Seed button with identical logic as Start Game
+        const pasteButtonWidth = 170;
+        const pasteButtonHeight = 40;
+        
+        // Glow for Paste button
+        const pasteButtonGlow = this.add.graphics();
+        pasteButtonGlow.fillStyle(0xffaa00, 0.2);
+        pasteButtonGlow.fillRoundedRect(
+            width / 2 + 90 - pasteButtonWidth/2 - 5, 
+            seedSectionY + 50 - pasteButtonHeight/2 - 5, 
+            pasteButtonWidth + 10, 
+            pasteButtonHeight + 10, 
+            10
         );
+        
+        // Paste button background
+        const pasteButton = this.add.rectangle(
+            width / 2 + 90,
+            seedSectionY + 50,
+            pasteButtonWidth,
+            pasteButtonHeight,
+            0x000022
+        ).setStrokeStyle(4, 0xffaa00, 1).setInteractive();
+        
+        // Paste button text
+        const pasteText = this.add.text(
+            width / 2 + 90,
+            seedSectionY + 50,
+            'PASTE SEED',
+            {
+                fontFamily: '"Press Start 2P"',
+                fontSize: '16px',
+                color: '#ffaa00',
+                padding: { x: 4, y: 8 }
+            }
+        ).setOrigin(0.5);
+        
+        // Paste button hover and click effects - exactly like Start Game
+        pasteButton.on('pointerover', () => {
+            pasteButton.setStrokeStyle(4, 0xffff00, 1);
+            pasteText.setColor('#ffff00');
+        });
+        
+        pasteButton.on('pointerout', () => {
+            pasteButton.setStrokeStyle(4, 0xffaa00, 1);
+            pasteText.setColor('#ffaa00');
+        });
+        
+        // Add glow animation like Start Game
+        this.tweens.add({
+            targets: [copyButtonGlow, pasteButtonGlow],
+            alpha: { from: 0.6, to: 0.2 },
+            duration: 1000,
+            yoyo: true, 
+            repeat: -1
+        });
         
         // Add button functionality
         copyButton.on('pointerdown', () => {
@@ -470,51 +555,27 @@ export default class StartScene extends Phaser.Scene {
                 seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
             });
             
-            // Visual feedback for the button
-            copyButton.buttonText.setColor('#ffffff');
-            copyButton.buttonBackground.clear();
-            copyButton.buttonBackground.fillStyle(0x00aa66, 1);
-            copyButton.buttonBackground.fillRoundedRect(
-                -copyButton.width/2, -copyButton.height/2, 
-                copyButton.width, copyButton.height, 10
-            );
-            copyButton.buttonBackground.lineStyle(2, 0x00ffaa, 1);
-            copyButton.buttonBackground.strokeRoundedRect(
-                -copyButton.width/2, -copyButton.height/2, 
-                copyButton.width, copyButton.height, 10
-            );
+            // Visual feedback for button click (temporary color change)
+            const originalStrokeColor = 0x00ffaa;
+            const originalTextColor = '#00ffaa';
+            const clickStrokeColor = 0xffffff;
+            const clickTextColor = '#ffffff';
             
-            // Reset visual after a delay
+            // Change to click state
+            copyButton.setFillStyle(0x003322);
+            copyText.setColor(clickTextColor);
+            
+            // Reset after a short delay
             this.time.delayedCall(300, () => {
-                copyButton.buttonText.setColor('#00ffaa');
-                copyButton.buttonBackground.clear();
-                copyButton.buttonBackground.fillStyle(0x001a33, 1);
-                copyButton.buttonBackground.fillRoundedRect(
-                    -copyButton.width/2, -copyButton.height/2, 
-                    copyButton.width, copyButton.height, 10
-                );
-                copyButton.buttonBackground.lineStyle(2, 0x00ffaa, 1);
-                copyButton.buttonBackground.strokeRoundedRect(
-                    -copyButton.width/2, -copyButton.height/2, 
-                    copyButton.width, copyButton.height, 10
-                );
+                copyButton.setFillStyle(0x000022);
+                copyText.setColor(originalTextColor);
             });
         });
         
         pasteButton.on('pointerdown', () => {
-            // Visual feedback first
-            pasteButton.buttonText.setColor('#ffffff');
-            pasteButton.buttonBackground.clear();
-            pasteButton.buttonBackground.fillStyle(0xaa6600, 1);
-            pasteButton.buttonBackground.fillRoundedRect(
-                -pasteButton.width/2, -pasteButton.height/2, 
-                pasteButton.width, pasteButton.height, 10
-            );
-            pasteButton.buttonBackground.lineStyle(2, 0xffaa00, 1);
-            pasteButton.buttonBackground.strokeRoundedRect(
-                -pasteButton.width/2, -pasteButton.height/2, 
-                pasteButton.width, pasteButton.height, 10
-            );
+            // Visual feedback for button click (temporary color change)
+            pasteButton.setFillStyle(0x332200);
+            pasteText.setColor('#ffffff');
             
             // Try to get text from clipboard
             if (navigator.clipboard && window.isSecureContext) {
@@ -564,18 +625,8 @@ export default class StartScene extends Phaser.Scene {
             
             // Reset visual after a delay
             this.time.delayedCall(300, () => {
-                pasteButton.buttonText.setColor('#ffaa00');
-                pasteButton.buttonBackground.clear();
-                pasteButton.buttonBackground.fillStyle(0x331a00, 1);
-                pasteButton.buttonBackground.fillRoundedRect(
-                    -pasteButton.width/2, -pasteButton.height/2, 
-                    pasteButton.width, pasteButton.height, 10
-                );
-                pasteButton.buttonBackground.lineStyle(2, 0xffaa00, 1);
-                pasteButton.buttonBackground.strokeRoundedRect(
-                    -pasteButton.width/2, -pasteButton.height/2, 
-                    pasteButton.width, pasteButton.height, 10
-                );
+                pasteButton.setFillStyle(0x000022);
+                pasteText.setColor('#ffaa00');
             });
         });
         
