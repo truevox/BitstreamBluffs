@@ -275,63 +275,133 @@ export default class StartScene extends Phaser.Scene {
         // Create interactive seed management section with input field and buttons
         const seedSectionY = height * 0.8;
         
-        // First, add a text display of the seed that's clearly visible
+        // Create a styled visual background for the seed display
+        const seedBackground = this.add.graphics();
+        seedBackground.fillStyle(0x000033, 1);
+        seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+        seedBackground.lineStyle(2, 0x00ffff, 1);
+        seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+        
+        // Create the seed text display
         const seedText = this.add.text(
             width / 2,
             seedSectionY,
             this.seed,
             {
                 fontFamily: 'VT323',
-                fontSize: '20px',
+                fontSize: '24px',
                 color: '#00ffff',
-                align: 'center',
-                backgroundColor: '#000033',
-                padding: { x: 10, y: 8 }
+                align: 'center'
             }
-        ).setOrigin(0.5).setDepth(10);
+        ).setOrigin(0.5);
         
-        // Add a styled background for the seed text
-        const seedBackground = this.add.graphics();
-        seedBackground.fillStyle(0x000033, 1);
-        seedBackground.fillRoundedRect(
-            width / 2 - 260/2, 
-            seedSectionY - 20, 
-            260, 
-            40, 
-            5
-        );
-        seedBackground.lineStyle(2, 0x00ffff, 1);
-        seedBackground.strokeRoundedRect(
-            width / 2 - 260/2, 
-            seedSectionY - 20, 
-            260, 
-            40, 
-            5
-        );
-        seedBackground.setDepth(9);
+        // Flag to indicate if we're in seed editing mode
+        this.isEditingSeed = false;
         
-        // Create DOM element for text input (positioned offscreen but accessible)
-        const seedInput = this.add.dom(width / 2, seedSectionY + 1000).createFromHTML(`
-            <input type="text" id="seedInput" value="${this.seed}" 
-                   style="width: 250px; height: 30px; background-color: #000033; 
-                          color: #00ffff; border: 2px solid #00ffff; 
-                          border-radius: 5px; text-align: center; 
-                          font-family: 'VT323', monospace; font-size: 18px; 
-                          padding: 5px;">
-        `);
+        // Make the seed text interactive to allow editing
+        seedText.setInteractive({ useHandCursor: true });
         
-        // Make the visual seed text act as a button to focus on the input
-        seedText.setInteractive();
-        seedText.on('pointerdown', () => {
-            // When clicked, bring the input on screen temporarily and focus it
-            seedInput.y = seedSectionY;
-            const inputElement = seedInput.getChildByID('seedInput');
-            inputElement.focus();
-            inputElement.select();
+        // Add a custom pulse effect to the border to indicate it's editable
+        this.tweens.add({
+            targets: seedBackground,
+            alpha: { from: 1, to: 0.7 },
+            duration: 1500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
         });
         
-        // Get the actual input element for later reference
-        const inputElement = seedInput.getChildByID('seedInput');
+        // Create a cursor graphic to indicate text editing
+        const cursor = this.add.text(0, seedSectionY, '|', {
+            fontFamily: 'VT323',
+            fontSize: '24px',
+            color: '#00ffff'
+        }).setOrigin(0, 0.5).setVisible(false);
+        
+        // Set up blinking cursor animation
+        this.blinkCursorInterval = null;
+        
+        // Handle clicking on the seed to start editing mode
+        seedText.on('pointerdown', () => {
+            // Start editing mode
+            this.isEditingSeed = true;
+            // Position cursor at end of text
+            const textWidth = seedText.width;
+            cursor.setPosition(width / 2 + textWidth / 2 + 2, seedSectionY);
+            cursor.setVisible(true);
+            
+            // Create blinking cursor effect
+            if (this.blinkCursorInterval) clearInterval(this.blinkCursorInterval);
+            this.blinkCursorInterval = setInterval(() => {
+                cursor.setVisible(!cursor.visible);
+            }, 500);
+            
+            // Change border to indicate edit mode
+            seedBackground.clear();
+            seedBackground.fillStyle(0x001a33, 1); // Slightly lighter background
+            seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+            seedBackground.lineStyle(2, 0xffff00, 1); // Yellow border while editing
+            seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+        });
+        
+        // Enable keyboard input for editing the seed
+        this.input.keyboard.on('keydown', (event) => {
+            if (!this.isEditingSeed) return;
+            
+            const key = event.key;
+            
+            // Handle different key inputs
+            if (key === 'Escape' || key === 'Enter') {
+                // Exit editing mode
+                this.isEditingSeed = false;
+                cursor.setVisible(false);
+                if (this.blinkCursorInterval) clearInterval(this.blinkCursorInterval);
+                
+                // Reset border to normal
+                seedBackground.clear();
+                seedBackground.fillStyle(0x000033, 1);
+                seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.lineStyle(2, 0x00ffff, 1);
+                seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                
+            } else if (key === 'Backspace') {
+                // Handle backspace key
+                if (this.seed.length > 0) {
+                    this.seed = this.seed.slice(0, -1);
+                    seedText.setText(this.seed);
+                    window.gameSeed = this.seed;
+                    
+                    // Update cursor position
+                    const textWidth = seedText.width;
+                    cursor.setPosition(width / 2 + textWidth / 2 + 2, seedSectionY);
+                }
+            } else if (key.length === 1) {
+                // Add character to seed
+                this.seed += key;
+                seedText.setText(this.seed);
+                window.gameSeed = this.seed;
+                
+                // Update cursor position
+                const textWidth = seedText.width;
+                cursor.setPosition(width / 2 + textWidth / 2 + 2, seedSectionY);
+            }
+        });
+        
+        // Exit edit mode when clicking elsewhere
+        this.input.on('pointerdown', (pointer, gameObjects) => {
+            if (this.isEditingSeed && !gameObjects.includes(seedText)) {
+                this.isEditingSeed = false;
+                cursor.setVisible(false);
+                if (this.blinkCursorInterval) clearInterval(this.blinkCursorInterval);
+                
+                // Reset border to normal
+                seedBackground.clear();
+                seedBackground.fillStyle(0x000033, 1);
+                seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.lineStyle(2, 0x00ffff, 1);
+                seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+            }
+        });
         
         // Add input label above
         const inputLabel = this.add.text(
@@ -369,9 +439,8 @@ export default class StartScene extends Phaser.Scene {
         
         // Add button functionality
         copyButton.on('pointerdown', () => {
-            // Copy the current visible seed
-            const currentSeed = this.seed;
-            this.copyTextToClipboard(currentSeed);
+            // Copy the current seed
+            this.copyTextToClipboard(this.seed);
             
             // Flash the seed text for visual feedback
             this.tweens.add({
@@ -380,6 +449,22 @@ export default class StartScene extends Phaser.Scene {
                 yoyo: true,
                 duration: 150,
                 repeat: 1
+            });
+            
+            // Flash the background for extra feedback
+            seedBackground.clear();
+            seedBackground.fillStyle(0x00aa66, 1); // Success green
+            seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+            seedBackground.lineStyle(2, 0x00ffff, 1);
+            seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+            
+            // Reset background after short delay
+            this.time.delayedCall(300, () => {
+                seedBackground.clear();
+                seedBackground.fillStyle(0x000033, 1);
+                seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.lineStyle(2, 0x00ffff, 1);
+                seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
             });
             
             // Visual feedback for the button
@@ -432,20 +517,34 @@ export default class StartScene extends Phaser.Scene {
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.readText()
                     .then(text => {
-                        // Update both the input value and visible seed text
-                        inputElement.value = text;
+                        // Update the seed text display
                         seedText.setText(text);
                         
                         // Update the game seed
                         this.seed = text;
                         window.gameSeed = text;
                         
-                        // Flash the seed text for visual feedback
+                        // Visual feedback animation
                         this.tweens.add({
                             targets: seedText,
                             alpha: { from: 0.2, to: 1 },
-                            yoyo: false,
                             duration: 300
+                        });
+                        
+                        // Flash the background for extra feedback
+                        seedBackground.clear();
+                        seedBackground.fillStyle(0xaa6600, 1); // Orange for paste
+                        seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                        seedBackground.lineStyle(2, 0xffaa00, 1);
+                        seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                        
+                        // Reset background after short delay
+                        this.time.delayedCall(300, () => {
+                            seedBackground.clear();
+                            seedBackground.fillStyle(0x000033, 1);
+                            seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                            seedBackground.lineStyle(2, 0x00ffff, 1);
+                            seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
                         });
                     })
                     .catch(err => {
@@ -474,30 +573,8 @@ export default class StartScene extends Phaser.Scene {
             });
         });
         
-        // Add event listener to update the game seed when input changes
-        inputElement.addEventListener('change', () => {
-            this.seed = inputElement.value;
-            window.gameSeed = inputElement.value;
-            
-            // Update the visible seed text
-            seedText.setText(inputElement.value);
-            
-            // Move input back offscreen
-            seedInput.y = seedSectionY + 1000;
-            
-            console.log('Seed updated to:', this.seed);
-        });
-        
-        // Add event listener to select all text when input is clicked
-        inputElement.addEventListener('click', () => {
-            inputElement.select();
-        });
-        
-        // Add event listener to handle input blur (losing focus)
-        inputElement.addEventListener('blur', () => {
-            // Move input back offscreen
-            seedInput.y = seedSectionY + 1000;
-        });
+        // Seed is now updated in the key event handlers
+        // No need for additional event listeners
         
         // Instructions text with VT323 font
         this.add.text(
