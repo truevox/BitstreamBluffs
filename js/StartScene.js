@@ -106,12 +106,23 @@ export default class StartScene extends Phaser.Scene {
         
         // Add title with retro glow effect (like the image shows)
         // Add a glow background for the title
+        const titleBox = {
+            x: width / 2 - 280,
+            y: height * 0.15 - 20,
+            width: 560,
+            height: 150,
+            borderRadius: 15
+        };
+        
         const titleGlow = this.add.graphics();
         titleGlow.fillStyle(0xff00ff, 0.2);
-        titleGlow.fillRoundedRect(width / 2 - 280, height * 0.15 - 20, 560, 150, 15);
+        titleGlow.fillRoundedRect(titleBox.x, titleBox.y, titleBox.width, titleBox.height, titleBox.borderRadius);
+        
+        // Create title as a container for bouncing animation
+        const titleContainer = this.add.container(width / 2, height * 0.2);
         
         // Create title text with Press Start 2P font
-        const titleText = this.add.text(width / 2, height * 0.2, 'BITSTREAM\nBLUFFS', {
+        const titleText = this.add.text(0, 0, 'BITSTREAM\nBLUFFS', {
             fontFamily: '"Press Start 2P"',
             fontSize: '42px',
             color: '#ff00ff',
@@ -122,7 +133,56 @@ export default class StartScene extends Phaser.Scene {
             lineSpacing: 20
         }).setOrigin(0.5);
         
-        // Add glow effect
+        // Add text to container
+        titleContainer.add(titleText);
+        
+        // Calculate bounds for bouncing
+        const textWidth = titleText.width;
+        const textHeight = titleText.height;
+        
+        // Calculate bounce boundaries to keep title inside the glow box
+        const boundsLeft = titleBox.x + textWidth/2;
+        const boundsRight = titleBox.x + titleBox.width - textWidth/2;
+        const boundsTop = titleBox.y + textHeight/2;
+        const boundsBottom = titleBox.y + titleBox.height - textHeight/2;
+        
+        // Initial velocity (pixels per second)
+        const velocity = {
+            x: Phaser.Math.Between(50, 100) * (Math.random() > 0.5 ? 1 : -1),
+            y: Phaser.Math.Between(30, 60) * (Math.random() > 0.5 ? 1 : -1)
+        };
+        
+        // Update function for bouncing
+        this.bounceUpdate = (time, delta) => {
+            // Convert delta to seconds
+            const deltaSeconds = delta / 1000;
+            
+            // Update position based on velocity
+            titleContainer.x += velocity.x * deltaSeconds;
+            titleContainer.y += velocity.y * deltaSeconds;
+            
+            // Check for collision with boundaries
+            if (titleContainer.x <= boundsLeft) {
+                titleContainer.x = boundsLeft;
+                velocity.x *= -1; // Reverse x direction
+            } else if (titleContainer.x >= boundsRight) {
+                titleContainer.x = boundsRight;
+                velocity.x *= -1; // Reverse x direction
+            }
+            
+            if (titleContainer.y <= boundsTop) {
+                titleContainer.y = boundsTop;
+                velocity.y *= -1; // Reverse y direction
+            } else if (titleContainer.y >= boundsBottom) {
+                titleContainer.y = boundsBottom;
+                velocity.y *= -1; // Reverse y direction
+            }
+        };
+        
+        // Add the update function to the scene
+        this.events.on('update', this.bounceUpdate);
+        
+        // Add glow effect to text
         this.tweens.add({
             targets: titleText,
             alpha: { from: 0.8, to: 1 },
@@ -301,6 +361,17 @@ export default class StartScene extends Phaser.Scene {
     
     update() {
         // Additional gamepad polling if needed
+    }
+    
+    /**
+     * Called when scene is shutdown (e.g., when transitioning to another scene)
+     */
+    shutdown() {
+        // Remove the bounce update event listener to prevent memory leaks
+        if (this.bounceUpdate) {
+            this.events.off('update', this.bounceUpdate);
+            this.bounceUpdate = null;
+        }
     }
     
     startGame() {
