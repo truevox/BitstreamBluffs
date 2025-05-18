@@ -275,12 +275,13 @@ export default class StartScene extends Phaser.Scene {
         // Create interactive seed management section with input field and buttons
         const seedSectionY = height * 0.8;
         
+        // SHA-256 hash is 64 characters in hex format, need a wider rectangle with some extra padding
         // Create a styled visual background for the seed display
         const seedBackground = this.add.graphics();
         seedBackground.fillStyle(0x000033, 1);
-        seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+        seedBackground.fillRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
         seedBackground.lineStyle(2, 0x00ffff, 1);
-        seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+        seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
         
         // Create the seed text display
         const seedText = this.add.text(
@@ -339,9 +340,9 @@ export default class StartScene extends Phaser.Scene {
             // Change border to indicate edit mode
             seedBackground.clear();
             seedBackground.fillStyle(0x001a33, 1); // Slightly lighter background
-            seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+            seedBackground.fillRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
             seedBackground.lineStyle(2, 0xffff00, 1); // Yellow border while editing
-            seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+            seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
         });
         
         // Enable keyboard input for editing the seed
@@ -360,9 +361,9 @@ export default class StartScene extends Phaser.Scene {
                 // Reset border to normal
                 seedBackground.clear();
                 seedBackground.fillStyle(0x000033, 1);
-                seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.fillRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
                 seedBackground.lineStyle(2, 0x00ffff, 1);
-                seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
                 
             } else if (key === 'Backspace') {
                 // Handle backspace key
@@ -376,14 +377,16 @@ export default class StartScene extends Phaser.Scene {
                     cursor.setPosition(width / 2 + textWidth / 2 + 2, seedSectionY);
                 }
             } else if (key.length === 1) {
-                // Add character to seed
-                this.seed += key;
-                seedText.setText(this.seed);
-                window.gameSeed = this.seed;
-                
-                // Update cursor position
-                const textWidth = seedText.width;
-                cursor.setPosition(width / 2 + textWidth / 2 + 2, seedSectionY);
+                // Add character to seed only if we haven't reached the SHA-256 hash length limit (64 chars)
+                if (this.seed.length < 64) {
+                    this.seed += key;
+                    seedText.setText(this.seed);
+                    window.gameSeed = this.seed;
+                    
+                    // Update cursor position
+                    const textWidth = seedText.width;
+                    cursor.setPosition(width / 2 + textWidth / 2 + 2, seedSectionY);
+                }
             }
         });
         
@@ -397,9 +400,9 @@ export default class StartScene extends Phaser.Scene {
                 // Reset border to normal
                 seedBackground.clear();
                 seedBackground.fillStyle(0x000033, 1);
-                seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.fillRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
                 seedBackground.lineStyle(2, 0x00ffff, 1);
-                seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
             }
         });
         
@@ -454,17 +457,17 @@ export default class StartScene extends Phaser.Scene {
             // Flash the background for extra feedback
             seedBackground.clear();
             seedBackground.fillStyle(0x00aa66, 1); // Success green
-            seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+            seedBackground.fillRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
             seedBackground.lineStyle(2, 0x00ffff, 1);
-            seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+            seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
             
             // Reset background after short delay
             this.time.delayedCall(300, () => {
                 seedBackground.clear();
                 seedBackground.fillStyle(0x000033, 1);
-                seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.fillRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
                 seedBackground.lineStyle(2, 0x00ffff, 1);
-                seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
             });
             
             // Visual feedback for the button
@@ -517,12 +520,15 @@ export default class StartScene extends Phaser.Scene {
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.readText()
                     .then(text => {
+                        // Limit pasted text to SHA-256 hash length (64 characters)
+                        const limitedText = text.substring(0, 64);
+                        
                         // Update the seed text display
-                        seedText.setText(text);
+                        seedText.setText(limitedText);
                         
                         // Update the game seed
-                        this.seed = text;
-                        window.gameSeed = text;
+                        this.seed = limitedText;
+                        window.gameSeed = limitedText;
                         
                         // Visual feedback animation
                         this.tweens.add({
@@ -534,17 +540,17 @@ export default class StartScene extends Phaser.Scene {
                         // Flash the background for extra feedback
                         seedBackground.clear();
                         seedBackground.fillStyle(0xaa6600, 1); // Orange for paste
-                        seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                        seedBackground.fillRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
                         seedBackground.lineStyle(2, 0xffaa00, 1);
-                        seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                        seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
                         
                         // Reset background after short delay
                         this.time.delayedCall(300, () => {
                             seedBackground.clear();
                             seedBackground.fillStyle(0x000033, 1);
-                            seedBackground.fillRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                            seedBackground.fillRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
                             seedBackground.lineStyle(2, 0x00ffff, 1);
-                            seedBackground.strokeRoundedRect(width / 2 - 150, seedSectionY - 20, 300, 40, 10);
+                            seedBackground.strokeRoundedRect(width / 2 - 315, seedSectionY - 20, 630, 40, 10);
                         });
                     })
                     .catch(err => {
