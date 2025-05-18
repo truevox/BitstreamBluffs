@@ -342,6 +342,13 @@ export default class GameScene extends Phaser.Scene {
                     this.lives--;
                     this.updateLivesDisplay();
                     
+                    // Force player into walking mode when they lose a life
+                    if (!this.manette.walkMode) {
+                        this.manette.walkMode = true;
+                        this.showToast('Walking Mode Activated', 2000);
+                        console.log('Forced into walking mode after losing a life');
+                    }
+                    
                     // Flash the screen red to indicate a life lost
                     const flashRect = this.add.rectangle(
                         this.cameras.main.worldView.centerX,
