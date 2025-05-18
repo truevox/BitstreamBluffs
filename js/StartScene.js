@@ -647,6 +647,9 @@ export default class StartScene extends Phaser.Scene {
             }
         ).setOrigin(0.5);
         
+        // Add GitHub link, instruction manual, and sledhead.ing links in the bottom right corner
+        this.createBottomRightLinks(width, height);
+        
         // Setup keyboard controls
         this.input.keyboard.on('keydown-SPACE', this.startGame, this);
         this.input.keyboard.on('keydown-ENTER', this.startGame, this);
@@ -691,6 +694,140 @@ export default class StartScene extends Phaser.Scene {
             this.events.off('update', this.bounceUpdate);
             this.bounceUpdate = null;
         }
+    }
+    
+    /**
+     * Creates links to GitHub, Instruction Manual, and Sledhead.ing in the bottom right corner
+     * @param {number} width - Screen width
+     * @param {number} height - Screen height
+     */
+    createBottomRightLinks(width, height) {
+        // Container for the links
+        const linksContainer = this.add.container(width - 20, height - 20);
+        linksContainer.setDepth(100); // Keep on top of everything
+        
+        // Load GitHub mark images (SVG and PNG fallback)
+        this.load.svg('githubMark', 'assets/icons/github-mark.svg');
+        this.load.image('githubMarkPng', 'assets/icons/github-mark.png');
+        
+        // After loading is complete create the GitHub icon
+        const createGithubIcon = () => {
+            // Try to use SVG first, fall back to PNG if SVG load failed
+            const textureKey = this.textures.exists('githubMark') ? 'githubMark' : 'githubMarkPng';
+            
+            // Create the GitHub icon
+            const githubIcon = this.add.image(0, 0, textureKey)
+                .setOrigin(1, 1)
+                .setScale(0.3) // 10% smaller than previous size (0.33)
+                .setInteractive();
+            
+            // Set a white tint since the GitHub mark is typically dark
+            githubIcon.setTint(0xFFFFFF);
+            
+            // Add to container
+            linksContainer.add(githubIcon);
+            
+            // Add hover effect and click handler
+            this.addIconInteractivity(githubIcon, 'https://github.com/truevox/BitstreamBluffs', 'GitHub Repository');
+        };
+        
+        // Instruction manual icon (position adjusted to account for GitHub icon width)
+        const instructionsIcon = this.add.text(-50, 0, '📖', {
+            fontFamily: 'Arial',
+            fontSize: '28px'
+        }).setOrigin(1, 1).setInteractive();
+        
+        // Load the Snow Bee icon for Sledhead.ing link
+        this.load.image('snowBee', 'assets/AltLogo_Bee (Snow Bee).png');
+        this.load.once('complete', () => {
+            // Create GitHub icon now that assets are loaded
+            createGithubIcon();
+            
+            // Create Snow Bee icon
+            const snowBeeIcon = this.add.image(-100, -5, 'snowBee')
+                .setOrigin(1, 1)
+                .setScale(0.06) // Scaled down to 60% of original size
+                .setInteractive();
+            
+            // Add to container
+            linksContainer.add(snowBeeIcon);
+            
+            // Add hover effect and click handler
+            this.addIconInteractivity(snowBeeIcon, 'https://sledhead.ing', 'Visit SledHEAD');
+        });
+        this.load.start();
+        
+        // Add instruction icon to container
+        linksContainer.add(instructionsIcon);
+        
+        // Add hover effects and click handler for instructions
+        this.addIconInteractivity(instructionsIcon, 'docs/instructions.html', 'Game Instructions');
+    }
+    
+    /**
+     * Adds hover effects and click handler to an icon
+     * @param {Phaser.GameObjects.GameObject} icon - The icon to add interactivity to
+     * @param {string} url - The URL to open on click
+     * @param {string} tooltip - Tooltip text to show on hover
+     */
+    addIconInteractivity(icon, url, tooltip) {
+        // Create tooltip (initially hidden)
+        const tooltipText = this.add.text(
+            icon.x - icon.width/2,
+            icon.y - icon.height - 10,
+            tooltip,
+            {
+                fontFamily: 'VT323',
+                fontSize: '16px',
+                color: '#ffffff',
+                backgroundColor: '#000000',
+                padding: { x: 5, y: 3 }
+            }
+        ).setOrigin(0.5, 1).setAlpha(0);
+        
+        // If icon is in a container, add tooltip to the same container
+        if (icon.parentContainer) {
+            icon.parentContainer.add(tooltipText);
+        }
+        
+        // Hover effects
+        icon.on('pointerover', () => {
+            // Scale up icon
+            this.tweens.add({
+                targets: icon,
+                scale: icon.scale * 1.2,
+                duration: 200
+            });
+            
+            // Show tooltip
+            this.tweens.add({
+                targets: tooltipText,
+                alpha: 1,
+                duration: 200
+            });
+        });
+        
+        icon.on('pointerout', () => {
+            // Scale down icon
+            this.tweens.add({
+                targets: icon,
+                scale: icon.scale / 1.2,
+                duration: 200
+            });
+            
+            // Hide tooltip
+            this.tweens.add({
+                targets: tooltipText,
+                alpha: 0,
+                duration: 200
+            });
+        });
+        
+        // Click handler
+        icon.on('pointerdown', () => {
+            // Open URL in new tab
+            window.open(url, '_blank');
+        });
     }
     
     /**

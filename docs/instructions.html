@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitstream Bluffs - Instructions</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #000022;
+            color: #00ffff;
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1, h2, h3 {
+            font-family: 'Press Start 2P', cursive;
+            color: #ff00ff;
+            text-shadow: 2px 2px 0px #000;
+            margin-top: 40px;
+        }
+        
+        h1 {
+            font-size: 32px;
+        }
+        
+        h2 {
+            font-size: 24px;
+        }
+        
+        h3 {
+            font-size: 20px;
+        }
+        
+        p {
+            margin: 20px 0;
+            font-size: 20px;
+        }
+        
+        .key {
+            display: inline-block;
+            background-color: #333355;
+            border: 2px solid #00ffff;
+            border-radius: 5px;
+            padding: 2px 8px;
+            margin: 0 5px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #ffffff;
+        }
+        
+        .box {
+            background-color: #000033;
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        
+        .glow {
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0ff, 0 0 20px #0ff;
+            }
+            to {
+                text-shadow: 0 0 10px #fff, 0 0 15px #0ff, 0 0 20px #0ff, 0 0 25px #0ff;
+            }
+        }
+        
+        .button {
+            display: inline-block;
+            background-color: #000022;
+            border: 3px solid #00ffff;
+            border-radius: 8px;
+            padding: 10px 20px;
+            margin: 20px 0;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            color: #00ffff;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .button:hover {
+            background-color: #00ffff;
+            color: #000022;
+            transform: scale(1.05);
+        }
+        
+        .tricks {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin: 30px 0;
+        }
+        
+        .trick-card {
+            width: 45%;
+            background-color: #000033;
+            border: 2px solid #ff00ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .back-link {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #00ffff;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            color: #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="glow">BITSTREAM BLUFFS</h1>
+        <p>Welcome to the digital slopes! Navigate the procedurally generated terrain, perform tricks, and challenge your friends with the same seed.</p>
+        
+        <div class="box">
+            <h2>OBJECTIVE</h2>
+            <p>Ride down the procedurally generated mountain while performing tricks to score points. Avoid obstacles and find the optimal path to maximize your score!</p>
+        </div>
+        
+        <h2>CONTROLS</h2>
+        <div class="box">
+            <h3>Keyboard</h3>
+            <p><span class="key">↑</span> or <span class="key">W</span> - Lean back / Slow down</p>
+            <p><span class="key">↓</span> or <span class="key">S</span> - Lean forward / Speed up</p>
+            <p><span class="key">←</span> or <span class="key">A</span> - Turn left</p>
+            <p><span class="key">→</span> or <span class="key">D</span> - Turn right</p>
+            <p><span class="key">SPACE</span> - Jump (when on ground)</p>
+            
+            <h3>Gamepad</h3>
+            <p>Left Stick - Movement</p>
+            <p>A Button - Jump</p>
+            <p>Right Trigger - Speed up</p>
+            <p>Left Trigger - Slow down</p>
+        </div>
+        
+        <h2>TRICKS</h2>
+        <p>Perform tricks while in the air to earn points!</p>
+        
+        <div class="tricks">
+            <div class="trick-card">
+                <h3>180° SPIN</h3>
+                <p>Press <span class="key">←</span> or <span class="key">→</span> while in air</p>
+                <p>Points: 100</p>
+            </div>
+            <div class="trick-card">
+                <h3>360° SPIN</h3>
+                <p>Complete a full rotation in air</p>
+                <p>Points: 250</p>
+            </div>
+            <div class="trick-card">
+                <h3>BACKFLIP</h3>
+                <p>Press <span class="key">↑</span> during jump</p>
+                <p>Points: 300</p>
+            </div>
+            <div class="trick-card">
+                <h3>FRONTFLIP</h3>
+                <p>Press <span class="key">↓</span> during jump</p>
+                <p>Points: 300</p>
+            </div>
+        </div>
+        
+        <h2>SEEDS</h2>
+        <div class="box">
+            <p>Each game is generated using a unique seed. Share your seed with friends to challenge them on the exact same terrain!</p>
+            <p>You can copy, paste, or manually edit the seed on the start screen.</p>
+        </div>
+        
+        <h2>TIPS</h2>
+        <div class="box">
+            <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <li>Build momentum before attempting jumps</li>
+                <li>Land on downward slopes to maintain speed</li>
+                <li>Chain tricks together for combo multipliers</li>
+                <li>Use the seed system to practice difficult sections</li>
+                <li>Try to find secret paths and shortcuts in the terrain</li>
+            </ul>
+        </div>
+        
+        <a href="../index.html" class="button">RETURN TO GAME</a>
+    </div>
+    
+    <a href="../index.html" class="back-link">← BACK TO GAME</a>
+    
+    <script>
+        // Preload fonts to avoid FOUC (Flash of Unstyled Content)
+        document.fonts.ready.then(() => {
+            document.body.style.opacity = 1;
+        });
+    </script>
+</body>
+</html>
