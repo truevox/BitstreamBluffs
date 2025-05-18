@@ -272,46 +272,231 @@ export default class StartScene extends Phaser.Scene {
         const playerDot = this.add.circle(width/2 - 70, height * 0.65 + 34, 8, 0xffff00, 1);
         playerDot.setStrokeStyle(2, 0xff00ff);
         
-        // The seed value (clickable to copy) with VT323 font
-        const seedDisplay = this.add.text(
+        // Create interactive seed management section with input field and buttons
+        const seedSectionY = height * 0.8;
+        
+        // First, add a text display of the seed that's clearly visible
+        const seedText = this.add.text(
             width / 2,
-            height * 0.8,
-            'SEED: ' + this.seed,
+            seedSectionY,
+            this.seed,
+            {
+                fontFamily: 'VT323',
+                fontSize: '20px',
+                color: '#00ffff',
+                align: 'center',
+                backgroundColor: '#000033',
+                padding: { x: 10, y: 8 }
+            }
+        ).setOrigin(0.5).setDepth(10);
+        
+        // Add a styled background for the seed text
+        const seedBackground = this.add.graphics();
+        seedBackground.fillStyle(0x000033, 1);
+        seedBackground.fillRoundedRect(
+            width / 2 - 260/2, 
+            seedSectionY - 20, 
+            260, 
+            40, 
+            5
+        );
+        seedBackground.lineStyle(2, 0x00ffff, 1);
+        seedBackground.strokeRoundedRect(
+            width / 2 - 260/2, 
+            seedSectionY - 20, 
+            260, 
+            40, 
+            5
+        );
+        seedBackground.setDepth(9);
+        
+        // Create DOM element for text input (positioned offscreen but accessible)
+        const seedInput = this.add.dom(width / 2, seedSectionY + 1000).createFromHTML(`
+            <input type="text" id="seedInput" value="${this.seed}" 
+                   style="width: 250px; height: 30px; background-color: #000033; 
+                          color: #00ffff; border: 2px solid #00ffff; 
+                          border-radius: 5px; text-align: center; 
+                          font-family: 'VT323', monospace; font-size: 18px; 
+                          padding: 5px;">
+        `);
+        
+        // Make the visual seed text act as a button to focus on the input
+        seedText.setInteractive();
+        seedText.on('pointerdown', () => {
+            // When clicked, bring the input on screen temporarily and focus it
+            seedInput.y = seedSectionY;
+            const inputElement = seedInput.getChildByID('seedInput');
+            inputElement.focus();
+            inputElement.select();
+        });
+        
+        // Get the actual input element for later reference
+        const inputElement = seedInput.getChildByID('seedInput');
+        
+        // Add input label above
+        const inputLabel = this.add.text(
+            width / 2,
+            seedSectionY - 30,
+            'GAME SEED:',
             {
                 fontFamily: 'VT323',
                 fontSize: '22px',
-                color: '#ffff00',
-                backgroundColor: '#222244',
-                padding: { left: 10, right: 10, top: 5, bottom: 5 }
-            }
-        ).setOrigin(0.5).setInteractive();
-        
-        // Tooltip text with VT323 font
-        const tooltipText = this.add.text(
-            width / 2,
-            height * 0.8 + 30,
-            '(Click to copy)',
-            {
-                fontFamily: 'VT323',
-                fontSize: '18px',
-                color: '#aaaaaa'
+                color: '#ffffff',
+                stroke: '#000000',
+                strokeThickness: 2
             }
         ).setOrigin(0.5);
         
-        // Copy seed on click
-        seedDisplay.on('pointerdown', () => {
-            // Create a temporary text area to copy the seed
-            this.copyTextToClipboard(this.seed);
+        // Create Copy Seed button
+        const copyButton = this.createRetroButton(
+            width / 2 - 90, 
+            seedSectionY + 50, 
+            170, 
+            40, 
+            'COPY SEED', 
+            '#00ffaa'
+        );
+        
+        // Create Paste Seed button
+        const pasteButton = this.createRetroButton(
+            width / 2 + 90, 
+            seedSectionY + 50, 
+            170, 
+            40, 
+            'PASTE SEED', 
+            '#ffaa00'
+        );
+        
+        // Add button functionality
+        copyButton.on('pointerdown', () => {
+            // Copy the current visible seed
+            const currentSeed = this.seed;
+            this.copyTextToClipboard(currentSeed);
             
-            // Visual feedback for copy
-            tooltipText.setText('Copied!');
-            tooltipText.setColor('#00ff00');
-            
-            // Reset tooltip after a delay
-            this.time.delayedCall(1500, () => {
-                tooltipText.setText('(Click to copy)');
-                tooltipText.setColor('#aaaaaa');
+            // Flash the seed text for visual feedback
+            this.tweens.add({
+                targets: seedText,
+                alpha: { from: 1, to: 0.2 },
+                yoyo: true,
+                duration: 150,
+                repeat: 1
             });
+            
+            // Visual feedback for the button
+            copyButton.buttonText.setColor('#ffffff');
+            copyButton.buttonBackground.clear();
+            copyButton.buttonBackground.fillStyle(0x00aa66, 1);
+            copyButton.buttonBackground.fillRoundedRect(
+                -copyButton.width/2, -copyButton.height/2, 
+                copyButton.width, copyButton.height, 10
+            );
+            copyButton.buttonBackground.lineStyle(2, 0x00ffaa, 1);
+            copyButton.buttonBackground.strokeRoundedRect(
+                -copyButton.width/2, -copyButton.height/2, 
+                copyButton.width, copyButton.height, 10
+            );
+            
+            // Reset visual after a delay
+            this.time.delayedCall(300, () => {
+                copyButton.buttonText.setColor('#00ffaa');
+                copyButton.buttonBackground.clear();
+                copyButton.buttonBackground.fillStyle(0x001a33, 1);
+                copyButton.buttonBackground.fillRoundedRect(
+                    -copyButton.width/2, -copyButton.height/2, 
+                    copyButton.width, copyButton.height, 10
+                );
+                copyButton.buttonBackground.lineStyle(2, 0x00ffaa, 1);
+                copyButton.buttonBackground.strokeRoundedRect(
+                    -copyButton.width/2, -copyButton.height/2, 
+                    copyButton.width, copyButton.height, 10
+                );
+            });
+        });
+        
+        pasteButton.on('pointerdown', () => {
+            // Visual feedback first
+            pasteButton.buttonText.setColor('#ffffff');
+            pasteButton.buttonBackground.clear();
+            pasteButton.buttonBackground.fillStyle(0xaa6600, 1);
+            pasteButton.buttonBackground.fillRoundedRect(
+                -pasteButton.width/2, -pasteButton.height/2, 
+                pasteButton.width, pasteButton.height, 10
+            );
+            pasteButton.buttonBackground.lineStyle(2, 0xffaa00, 1);
+            pasteButton.buttonBackground.strokeRoundedRect(
+                -pasteButton.width/2, -pasteButton.height/2, 
+                pasteButton.width, pasteButton.height, 10
+            );
+            
+            // Try to get text from clipboard
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.readText()
+                    .then(text => {
+                        // Update both the input value and visible seed text
+                        inputElement.value = text;
+                        seedText.setText(text);
+                        
+                        // Update the game seed
+                        this.seed = text;
+                        window.gameSeed = text;
+                        
+                        // Flash the seed text for visual feedback
+                        this.tweens.add({
+                            targets: seedText,
+                            alpha: { from: 0.2, to: 1 },
+                            yoyo: false,
+                            duration: 300
+                        });
+                    })
+                    .catch(err => {
+                        console.error('Failed to read clipboard: ', err);
+                    });
+            } else {
+                // Alert if clipboard API is not available
+                console.error('Clipboard API not available');
+                alert('Clipboard paste not available in this browser or context.');
+            }
+            
+            // Reset visual after a delay
+            this.time.delayedCall(300, () => {
+                pasteButton.buttonText.setColor('#ffaa00');
+                pasteButton.buttonBackground.clear();
+                pasteButton.buttonBackground.fillStyle(0x331a00, 1);
+                pasteButton.buttonBackground.fillRoundedRect(
+                    -pasteButton.width/2, -pasteButton.height/2, 
+                    pasteButton.width, pasteButton.height, 10
+                );
+                pasteButton.buttonBackground.lineStyle(2, 0xffaa00, 1);
+                pasteButton.buttonBackground.strokeRoundedRect(
+                    -pasteButton.width/2, -pasteButton.height/2, 
+                    pasteButton.width, pasteButton.height, 10
+                );
+            });
+        });
+        
+        // Add event listener to update the game seed when input changes
+        inputElement.addEventListener('change', () => {
+            this.seed = inputElement.value;
+            window.gameSeed = inputElement.value;
+            
+            // Update the visible seed text
+            seedText.setText(inputElement.value);
+            
+            // Move input back offscreen
+            seedInput.y = seedSectionY + 1000;
+            
+            console.log('Seed updated to:', this.seed);
+        });
+        
+        // Add event listener to select all text when input is clicked
+        inputElement.addEventListener('click', () => {
+            inputElement.select();
+        });
+        
+        // Add event listener to handle input blur (losing focus)
+        inputElement.addEventListener('blur', () => {
+            // Move input back offscreen
+            seedInput.y = seedSectionY + 1000;
         });
         
         // Instructions text with VT323 font
@@ -372,6 +557,73 @@ export default class StartScene extends Phaser.Scene {
             this.events.off('update', this.bounceUpdate);
             this.bounceUpdate = null;
         }
+    }
+    
+    /**
+     * Creates a styled retro button with hover effects
+     * @param {number} x - X position of button
+     * @param {number} y - Y position of button
+     * @param {number} width - Width of button
+     * @param {number} height - Height of button
+     * @param {string} text - Button text
+     * @param {string} color - Text color (hex)
+     * @returns {Phaser.GameObjects.Container} - Button container
+     */
+    createRetroButton(x, y, width, height, text, color = '#00ffff') {
+        // Create container for the button
+        const buttonContainer = this.add.container(x, y);
+        
+        // Add button background
+        const buttonBackground = this.add.graphics();
+        buttonBackground.fillStyle(0x001a33, 1);
+        buttonBackground.fillRoundedRect(-width/2, -height/2, width, height, 10);
+        buttonBackground.lineStyle(2, color.replace('#', '0x'), 1);
+        buttonBackground.strokeRoundedRect(-width/2, -height/2, width, height, 10);
+        
+        // Add button text
+        const buttonText = this.add.text(
+            0,
+            0,
+            text,
+            {
+                fontFamily: '"Press Start 2P"',
+                fontSize: '16px',
+                color: color,
+                align: 'center'
+            }
+        ).setOrigin(0.5);
+        
+        // Add components to container
+        buttonContainer.add(buttonBackground);
+        buttonContainer.add(buttonText);
+        
+        // Make button interactive
+        buttonContainer.setInteractive(new Phaser.Geom.Rectangle(-width/2, -height/2, width, height), Phaser.Geom.Rectangle.Contains);
+        
+        // Add hover effects
+        buttonContainer.on('pointerover', () => {
+            buttonBackground.clear();
+            buttonBackground.fillStyle(0x003366, 1);
+            buttonBackground.fillRoundedRect(-width/2, -height/2, width, height, 10);
+            buttonBackground.lineStyle(2, color.replace('#', '0x'), 1);
+            buttonBackground.strokeRoundedRect(-width/2, -height/2, width, height, 10);
+        });
+        
+        buttonContainer.on('pointerout', () => {
+            buttonBackground.clear();
+            buttonBackground.fillStyle(0x001a33, 1);
+            buttonBackground.fillRoundedRect(-width/2, -height/2, width, height, 10);
+            buttonBackground.lineStyle(2, color.replace('#', '0x'), 1);
+            buttonBackground.strokeRoundedRect(-width/2, -height/2, width, height, 10);
+        });
+        
+        // Store width and height for later use
+        buttonContainer.width = width;
+        buttonContainer.height = height;
+        buttonContainer.buttonBackground = buttonBackground;
+        buttonContainer.buttonText = buttonText;
+        
+        return buttonContainer;
     }
     
     startGame() {
