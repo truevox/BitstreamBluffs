@@ -58,6 +58,13 @@ function stringToNumericSeed(str) {
     return hash >>> 0;
 }
 
+// Flag to indicate whether SHA-256 is available
+let sha256Available = false;
+
+// Cached seed value - updated when SHA-256 is computed
+let cachedSeed = null;
+let initialSeedSource = null;
+
 /**
  * Hash using SHA-256 when available, with fallback to FNV-1a
  *
@@ -65,39 +72,78 @@ function stringToNumericSeed(str) {
  * @returns {string} Hexadecimal hash string
  */
 function sha256WithFallback(input) {
+    // Store the initial seed source for potential later use
+    initialSeedSource = input;
+    
     // Check if we can use the Web Crypto API
     if (window.crypto && window.crypto.subtle && window.isSecureContext) {
         try {
-            // Create a synchronous wrapper around the async SHA-256
-            // This is a bit of a hack but lets us maintain the interface
-            let hashResult = null;
+            // Since we have Web Crypto API, attempt to use it for SHA-256
             const encoder = new TextEncoder();
             const data = encoder.encode(input);
             
-            // Start the async operation
-            window.crypto.subtle.digest('SHA-256', data)
+            // Create and return a promise that resolves to the SHA-256 hash
+            const promise = window.crypto.subtle.digest('SHA-256', data)
                 .then(hashBuffer => {
                     const hashArray = Array.from(new Uint8Array(hashBuffer));
                     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
                     console.log('Generated SHA-256 seed:', hashHex);
-                    // Store the result globally if needed later
-                    window.lastSha256Seed = hashHex;
+                    
+                    // Update the cached seed and indicate SHA-256 is available
+                    cachedSeed = hashHex;
+                    sha256Available = true;
+                    
+                    // Update the displayed seed if possible
+                    updateDisplayedSeed(hashHex);
+                    
+                    return hashHex;
                 })
                 .catch(error => {
                     console.error('SHA-256 failed, using FNV-1a fallback:', error);
+                    return fnv1aHash(input);
                 });
-                
-            // Return a synchronous FNV-1a hash but store the real SHA-256 for later
-            return fnv1aHash(input);
+            
+            // For now, return the FNV-1a hash, but the real SHA-256 will replace it soon
+            // This is necessary because Web Crypto API is asynchronous
+            cachedSeed = fnv1aHash(input);
+            return cachedSeed;
         } catch (err) {
             console.warn('Web Crypto API error, using FNV-1a:', err);
-            return fnv1aHash(input);
+            cachedSeed = fnv1aHash(input);
+            return cachedSeed;
         }
     } else {
         // Fallback to FNV-1a if Web Crypto isn't available
         console.log('Web Crypto not available, using FNV-1a');
-        return fnv1aHash(input);
+        cachedSeed = fnv1aHash(input);
+        return cachedSeed;
     }
+}
+
+/**
+ * Updates the displayed seed in the UI if the game has started
+ * This is called when SHA-256 calculation completes
+ */
+function updateDisplayedSeed(newSeed) {
+    // Store the seed in the global space
+    window.gameSeed = newSeed;
+    
+    // Find any active Phaser scene that might be displaying the seed
+    if (window.game && window.game.scene) {
+        const startScene = window.game.scene.getScene('StartScene');
+        if (startScene && startScene.seed) {
+            // Update the seed in the StartScene
+            startScene.seed = newSeed;
+            
+            // Try to find and update the seed display text
+            startScene.children?.list?.forEach(child => {
+                if (child.text && child.text.includes('SEED:')) {
+                    child.setText('SEED: ' + newSeed);
+                }
+            });
+        }
+    }
+}
 }
 
 /**

@@ -365,10 +365,11 @@ export default class GameScene extends Phaser.Scene {
                         this.player.y - 100, // Position above player
                         'GAME OVER', 
                         {
-                            font: '32px Arial',
+                            fontFamily: '"Press Start 2P"',
+                            fontSize: '28px',
                             fill: '#ff0000',
                             stroke: '#000000',
-                            strokeThickness: 6
+                            strokeThickness: 4
                         }
                     ).setDepth(100).setOrigin(0.5);
                     

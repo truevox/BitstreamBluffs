@@ -110,16 +110,16 @@ export default class StartScene extends Phaser.Scene {
         titleGlow.fillStyle(0xff00ff, 0.2);
         titleGlow.fillRoundedRect(width / 2 - 280, height * 0.15 - 20, 560, 150, 15);
         
-        // Create title text with arcade-style font
+        // Create title text with Press Start 2P font
         const titleText = this.add.text(width / 2, height * 0.2, 'BITSTREAM\nBLUFFS', {
-            fontFamily: 'Arial',
-            fontSize: '68px',
-            fontStyle: 'bold',
+            fontFamily: '"Press Start 2P"',
+            fontSize: '42px',
             color: '#ff00ff',
             align: 'center',
             stroke: '#ffffff',
-            strokeThickness: 4,
-            padding: { x: 20, y: 10 }
+            strokeThickness: 3,
+            padding: { x: 20, y: 10 },
+            lineSpacing: 20
         }).setOrigin(0.5);
         
         // Add glow effect
@@ -152,17 +152,16 @@ export default class StartScene extends Phaser.Scene {
             0x000022
         ).setStrokeStyle(4, 0x00ffff, 1).setInteractive();
         
-        // Button text with pixel-like font
+        // Button text with Press Start 2P font
         const startText = this.add.text(
             width / 2,
             height * 0.5,
             'START GAME',
             {
-                fontFamily: 'monospace',
-                fontSize: '24px',
-                fontStyle: 'bold',
+                fontFamily: '"Press Start 2P"',
+                fontSize: '18px',
                 color: '#00ffff',
-                padding: { x: 4, y: 4 }
+                padding: { x: 4, y: 8 }
             }
         ).setOrigin(0.5);
         
@@ -223,28 +222,28 @@ export default class StartScene extends Phaser.Scene {
         const playerDot = this.add.circle(width/2 - 70, height * 0.65 + 34, 8, 0xffff00, 1);
         playerDot.setStrokeStyle(2, 0xff00ff);
         
-        // The seed value (clickable to copy)
+        // The seed value (clickable to copy) with VT323 font
         const seedDisplay = this.add.text(
             width / 2,
             height * 0.8,
             'SEED: ' + this.seed,
             {
-                fontFamily: 'monospace',
-                fontSize: '16px',
+                fontFamily: 'VT323',
+                fontSize: '22px',
                 color: '#ffff00',
                 backgroundColor: '#222244',
                 padding: { left: 10, right: 10, top: 5, bottom: 5 }
             }
         ).setOrigin(0.5).setInteractive();
         
-        // Tooltip text
+        // Tooltip text with VT323 font
         const tooltipText = this.add.text(
             width / 2,
-            height * 0.8 + 25,
+            height * 0.8 + 30,
             '(Click to copy)',
             {
-                fontFamily: 'Arial',
-                fontSize: '14px',
+                fontFamily: 'VT323',
+                fontSize: '18px',
                 color: '#aaaaaa'
             }
         ).setOrigin(0.5);
@@ -265,17 +264,17 @@ export default class StartScene extends Phaser.Scene {
             });
         });
         
-        // Instructions text
+        // Instructions text with VT323 font
         this.add.text(
             width / 2,
             height * 0.9,
             'PRESS SPACE, ENTER, A OR START BUTTON TO PLAY',
             {
-                fontFamily: 'Arial',
-                fontSize: '16px',
+                fontFamily: 'VT323',
+                fontSize: '22px',
                 color: '#ffffff',
                 stroke: '#000000',
-                strokeThickness: 3
+                strokeThickness: 2
             }
         ).setOrigin(0.5);
         
