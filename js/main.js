@@ -72,7 +72,7 @@ function initializeGame() {
             default: 'matter',
             matter: {
                 gravity: { y: 1 },  // ≈ 1000 px/s²; configurable via PhysicsConfig
-                debug: configLoader.isDebuggingEnabled()  // Use config setting
+                debug: false  // Always disable debug visualization
             }
         },
 

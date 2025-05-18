@@ -16,7 +16,7 @@ export default class GameScene extends Phaser.Scene {
             physics: {
                 matter: {
                     gravity: { y: 1 },
-                    debug: configLoader.isDebuggingEnabled()
+                    debug: false // Always disable debug visualization 
                 }
             }
         });
@@ -48,13 +48,7 @@ export default class GameScene extends Phaser.Scene {
         this.debugGreen  = 0x00ff00;
         this.debugOrange = 0xffa500;
 
-        this.debugTextStyle = {
-            font: '16px Monospace',
-            fill: '#00ff00',
-            stroke: '#000000',
-            strokeThickness: 2
-        };
-        this.debugText = null;
+        // Only UI elements specifically requested are initialized
 
         // --- helpers for Matter ---------------------------------------------
         this.onGround           = false;   // updated from collision events
@@ -75,8 +69,13 @@ export default class GameScene extends Phaser.Scene {
         
         // --- walking mode state -----------------------------------------------
         this.sledDistance       = 40;      // distance between player and sled when walking
-        // HUD text for player mode (WALKING/SLEDDING)
-        this.hudText = null;
+        // UI elements
+        this.speedText = null;        // Top left - Speed display
+        this.altitudeDropText = null; // Top left - Altitude drop display
+        this.pointsText = null;       // Top middle - Points display
+        this.livesDisplay = null;     // Top right - Lives triangles container
+        this.toastContainer = null;   // Bottom - Toast messages for tricks
+        this.lastY = 0;              // Track last Y position to calculate altitude drop
         
         // --- extra lives system -----------------------------------------------
         this.lives              = PhysicsConfig.extraLives.initialLives;  // start with configured initial lives
@@ -186,25 +185,11 @@ export default class GameScene extends Phaser.Scene {
         this.sledOriginalY = sledY;
         this.sledOriginalX = sledX;
 
-        // Physics circle visualization - only visible in debug mode
-        const physicsCircle = this.add.circle(0, sledY - 5, circleRadius)
-                                      .setStrokeStyle(1, 0x00ff00, 0.3);
-
-        // Debug markers - only visible when debug mode is enabled
-        const riderOriginMarker = this.add.circle(riderX, riderY, 5,
-                                                  this.debugGreen, 0.8).setDepth(20);
-        const sledOriginMarker  = this.add.circle(sledX,  sledY,  5,
-                                                  this.debugOrange, 0.8).setDepth(20);
-        
-        // Set visibility of debug markers based on debug mode
-        const debugEnabled = configLoader.isDebuggingEnabled();
-        riderOriginMarker.visible = debugEnabled;
-        sledOriginMarker.visible = debugEnabled;
-        physicsCircle.visible = debugEnabled;
+        // No debug visualization as per UI requirements
 
         // create container and convert it to Matter
         this.player = this.add.container(200, 100,
-            [sled, rider, physicsCircle, riderOriginMarker, sledOriginMarker]);
+            [sled, rider]);
 
         // add a circular Matter body to the container
         const Bodies = Phaser.Physics.Matter.Matter.Bodies;
@@ -224,17 +209,52 @@ export default class GameScene extends Phaser.Scene {
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
         this.cameras.main.setFollowOffset(0, 100);
         
-        // Initialize the lives display (top right corner)
-        this.livesText = this.add.text(
-            this.cameras.main.width - 120, 10, 
-            `LIVES: ${this.lives}`, 
+        // Initialize UI elements
+        
+        // Top left - Speed display
+        this.speedText = this.add.text(
+            10, 10, 
+            'Speed: 0.00', 
             {
                 font: '18px Arial',
-                fill: '#ff00ff',  // Use neon pink to match game style
+                fill: '#00ffff',  // Neon blue
                 stroke: '#000000',
                 strokeThickness: 4
             }
         ).setScrollFactor(0).setDepth(100);
+        
+        // Top left - Altitude drop display (below speed)
+        this.altitudeDropText = this.add.text(
+            10, 40, 
+            'Altitude Drop: 0.00', 
+            {
+                font: '18px Arial',
+                fill: '#00ffff',  // Neon blue
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setScrollFactor(0).setDepth(100);
+        
+        // Top middle - Points display
+        this.pointsText = this.add.text(
+            this.cameras.main.width / 2, 10, 
+            'Points: 0', 
+            {
+                font: '20px Arial',
+                fill: '#ff00ff',  // Neon pink
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setScrollFactor(0).setDepth(100).setOrigin(0.5, 0); // Center horizontally
+        
+        // Top right - Lives as yellow triangles
+        this.livesDisplay = this.add.graphics().setScrollFactor(0).setDepth(100);
+        // Position in the top-right corner with some padding
+        this.livesDisplay.x = this.cameras.main.width - 100;
+        this.livesDisplay.y = 20;
+        
+        // Bottom - Toast container for trick announcements
+        this.toastContainer = this.add.container(0, 0).setScrollFactor(0).setDepth(100);
 
         // Initialize time-based variables for extra life spawning
         this.lastLifeCollectTime = this.time.now;
@@ -299,16 +319,8 @@ export default class GameScene extends Phaser.Scene {
         // --------------------------------------------------------------------
         // HUD TEXT (always visible, top left)
         // --------------------------------------------------------------------
-        this.hudText = this.add.text(10, 70, '', {
-            font: '24px monospace',
-            fill: '#ffff00',
-            stroke: '#000000',
-            strokeThickness: 5,
-            padding: { left: 10, right: 10, top: 5, bottom: 5 },
-            backgroundColor: 'rgba(0,0,0,0.75)'
-        }).setScrollFactor(0).setDepth(101);
-        
-        // Set initial HUD text
+        // Initialize our toast system for trick announcements
+        this.initToastSystem();
         this.updateHudText();
         
         // --------------------------------------------------------------------
@@ -410,15 +422,32 @@ export default class GameScene extends Phaser.Scene {
             },
             onFlipComplete: (fullFlips, partialFlip) => {
                 console.log(`Flip complete! ${fullFlips} + ${partialFlip.toFixed(2)}`);
-                // Could trigger visual effects here
+                
+                // Show a toast notification for completed flips
+                if (fullFlips > 0 || partialFlip > 0.25) {
+                    let message = '';
+                    
+                    if (fullFlips > 0) {
+                        // Full flip message
+                        message = `${fullFlips}x Flip`;
+                        if (fullFlips > 1) message += 's';
+                        
+                        // Add partial if significant
+                        if (partialFlip > 0.25) {
+                            message += ` + ${(partialFlip * 360).toFixed(0)}°`;
+                        }
+                    } else if (partialFlip > 0.25) {
+                        // Only partial rotation
+                        message = `${(partialFlip * 360).toFixed(0)}° Rotation`;
+                    }
+                    
+                    // Show the toast
+                    this.showToast(message);
+                }
             }
         });
 
-        // --------------------------------------------------------------------
-        // DEBUG TEXT
-        // --------------------------------------------------------------------
-        this.debugText = this.add.text(10, 10, '',
-            this.debugTextStyle).setScrollFactor(0).setDepth(100);
+        // No debug HUD as per UI requirements
         
         // Apply a passive boost to maintain momentum when a speed multiplier is active
         this.time.addEvent({
@@ -780,7 +809,10 @@ export default class GameScene extends Phaser.Scene {
         if (this.manette.isActionActive('trickAction')) {
             if (this.onGround) {
                 // TUCKING - on ground for speed boost
-                this.isTucking = true;
+                if (!this.isTucking) {
+                    this.isTucking = true;
+                    this.showToast('Speed Boost!', 1500);
+                }
                 
                 // Apply additional forward force while tucking
                 // Use the current speed multiplier for added boost when landing tricks
@@ -790,7 +822,10 @@ export default class GameScene extends Phaser.Scene {
                     { x: tuckBoostForce, y: 0 });
             } else {
                 // PARACHUTE TRICK - in air
-                this.isParachuting = true;
+                if (!this.isParachuting) {
+                    this.isParachuting = true;
+                    this.showToast('Parachute!', 1500);
+                }
                 
                 // Move the sled up for parachute trick visual
                 if (this.player && this.player.getChildren) {
@@ -841,7 +876,10 @@ export default class GameScene extends Phaser.Scene {
         if (this.manette.isActionActive('brakeAction')) {
             if (this.onGround) {
                 // DRAGGING - on ground for slight speed reduction
-                this.isDragging = true;
+                if (!this.isDragging) {
+                    this.isDragging = true;
+                    this.showToast('Dragging!', 1500);
+                }
                 
                 // Apply backward force to slow down
                 const dragForce = 0.1; // Slows speed slightly - tune to taste
@@ -850,7 +888,10 @@ export default class GameScene extends Phaser.Scene {
                     { x: -dragForce, y: 0 });
             } else {
                 // AIRBRAKE TRICK - in air for dramatic speed reduction
-                this.isAirBraking = true;
+                if (!this.isAirBraking) {
+                    this.isAirBraking = true;
+                    this.showToast('Air Brake!', 1500);
+                }
                 
                 // Move the sled behind the player for airbrake visual
                 if (this.player && this.player.getChildren) {
@@ -985,52 +1026,84 @@ export default class GameScene extends Phaser.Scene {
             console.error('Error managing extra lives:', error);
         }
         
-        // --------------------------------------------------------------------
-        // DEBUG HUD
-        // --------------------------------------------------------------------
-        if (this.debugText) {
-            this.debugText.setText([
-                `X: ${this.player.x.toFixed(0)},  Y: ${this.player.y.toFixed(0)}`,
-                `Vx: ${this.player.body.velocity.x.toFixed(2)}  ` +
-                `Vy: ${this.player.body.velocity.y.toFixed(2)}`,
-                `Speed: ${Math.abs(this.player.body.velocity.x).toFixed(2)} (${this.currentSpeedMultiplier.toFixed(2)}x)`,
-                `Angle: ${Phaser.Math.RadToDeg(this.player.body.angle).toFixed(1)}`,
-                `OnGround: ${this.onGround}`,
-                `Mode: ${this.manette.walkMode ? 'WALKING' : 'SLEDDING'}`,
-                `Tucking: ${this.isTucking}, Parachuting: ${this.isParachuting}`,
-                `Dragging: ${this.isDragging}, AirBraking: ${this.isAirBraking}`
-            ]);
-        }
+        // HUD is now managed by updateHudText method
+        // No debug HUD is displayed
     }
     
     // Helper method to update the HUD text
     updateHudText() {
-        if (this.hudText) {
-            const mode = this.manette ? (this.manette.walkMode ? 'WALKING' : 'SLEDDING') : 'UNKNOWN';
-            
-            // Add flip stats to HUD when in the air
-            let hudContent = `MODE: ${mode}`;
-            
-            // Always show the speed multiplier in sledding mode, for better feedback
-            if (!this.manette.walkMode) {
-                hudContent += `\nSPEED MULT: ${this.currentSpeedMultiplier.toFixed(2)}x`;
-                hudContent += `\nLIVES: ${this.lives}`;
-                
-                // Add flip stats only when in the air
-                if (!this.onGround && this.rotationSystem) {
-                    const flipStats = this.rotationSystem.getFlipStats();
-                    hudContent += `\nFLIPS: ${flipStats.fullFlips} + ${flipStats.partialFlip.toFixed(2)}`;
-                }
-            }
-            
-            this.hudText.setText(hudContent);
+        if (!this.player || !this.player.body) return;
+        
+        // Get player speed (absolute value of x velocity)
+        const speed = Math.abs(this.player.body.velocity.x).toFixed(2);
+        
+        // Calculate altitude drop (difference in y position since last frame)
+        const currentY = this.player.y;
+        const altitudeDrop = this.lastY !== 0 ? (currentY - this.lastY).toFixed(2) : '0.00';
+        this.lastY = currentY;
+        
+        // Update speed text
+        if (this.speedText) {
+            this.speedText.setText(`Speed: ${speed}`);
         }
+        
+        // Update altitude drop text
+        if (this.altitudeDropText) {
+            this.altitudeDropText.setText(`Altitude Drop: ${altitudeDrop}`);
+        }
+        
+        // Update points (placeholder for now)
+        if (this.pointsText) {
+            this.pointsText.setText('Points: 0');
+        }
+        
+        // Update lives display
+        this.updateLivesDisplay();
     }
     
-    // Helper method to update the lives display
+    // Helper method to update the lives display with yellow triangles
     updateLivesDisplay() {
-        if (this.livesText) {
-            this.livesText.setText(`LIVES: ${this.lives}`);
+        if (!this.livesDisplay) return;
+        
+        // Clear previous lives display
+        this.livesDisplay.clear();
+        
+        // Get player's current rotation
+        const playerRotation = this.player ? this.player.rotation : 0;
+        
+        // Draw one triangle per life
+        const triangleSize = 15;
+        const spacing = triangleSize * 2;
+        
+        for (let i = 0; i < this.lives; i++) {
+            // Position each triangle with proper spacing
+            const x = i * spacing;
+            const y = 0;
+            
+            // Draw a yellow triangle that mimics the player's rotation
+            this.livesDisplay.fillStyle(this.neonYellow, 1);
+            this.livesDisplay.beginPath();
+            
+            // Create triangle points (pointing right by default)
+            const points = [
+                { x: 0, y: -triangleSize/2 },    // Top point
+                { x: triangleSize, y: 0 },        // Right point
+                { x: 0, y: triangleSize/2 }       // Bottom point
+            ];
+            
+            // Apply rotation that matches the player
+            const rotatedPoints = points.map(point => {
+                const rotX = point.x * Math.cos(playerRotation) - point.y * Math.sin(playerRotation);
+                const rotY = point.x * Math.sin(playerRotation) + point.y * Math.cos(playerRotation);
+                return { x: rotX + x, y: rotY + y };
+            });
+            
+            // Draw the triangle
+            this.livesDisplay.moveTo(rotatedPoints[0].x, rotatedPoints[0].y);
+            this.livesDisplay.lineTo(rotatedPoints[1].x, rotatedPoints[1].y);
+            this.livesDisplay.lineTo(rotatedPoints[2].x, rotatedPoints[2].y);
+            this.livesDisplay.closePath();
+            this.livesDisplay.fillPath();
         }
     }
     
@@ -1538,22 +1611,31 @@ GameScene.prototype.handleResize = function({ width, height }) {
         this.cameras.main.setDeadzone(horizontalDeadzone, verticalDeadzone);
     }
     
-    // Reposition HUD elements if they exist
-    if (this.hudText) {
-        // Position the HUD text at the top left of the screen with padding
-        this.hudText.setPosition(10, 10);
+    // Reposition UI elements if they exist
+    if (this.speedText) {
+        this.speedText.setPosition(10, 10);
     }
     
-    if (this.livesText) {
-        // Position the lives text at the top right of the screen with padding
-        this.livesText.setPosition(width - 10, 10);
-        this.livesText.setOrigin(1, 0); // Align to top right
+    if (this.altitudeDropText) {
+        this.altitudeDropText.setPosition(10, 40);
     }
     
-    if (this.debugText) {
-        // Position debug text at bottom left
-        this.debugText.setPosition(10, height - 60);
+    if (this.pointsText) {
+        this.pointsText.setPosition(width / 2, 10);
+        this.pointsText.setOrigin(0.5, 0); // Center horizontally
     }
+    
+    if (this.livesDisplay) {
+        this.livesDisplay.x = width - 100;
+        this.livesDisplay.y = 20;
+    }
+    
+    if (this.toastContainer) {
+        // Reposition toast container at bottom center
+        this.positionToastContainer();
+    }
+    
+    // No debug text to position
     
     // Redraw terrain if needed
     this.drawTerrain();
@@ -1608,6 +1690,75 @@ GameScene.prototype.cleanupBeforeRestart = function() {
     }
     
     console.log('Cleanup complete');
+};
+
+// Initialize the toast system for trick announcements
+GameScene.prototype.initToastSystem = function() {
+    // Create a container for toast messages at the bottom of the screen
+    if (!this.toastContainer) {
+        this.toastContainer = this.add.container(0, 0).setScrollFactor(0).setDepth(100);
+    }
+    
+    // Position the toast container
+    this.positionToastContainer();
+};
+
+// Helper to position the toast container at the bottom center of the screen
+GameScene.prototype.positionToastContainer = function() {
+    if (!this.toastContainer) return;
+    
+    // Position at bottom center
+    this.toastContainer.x = this.cameras.main.width / 2;
+    this.toastContainer.y = this.cameras.main.height - 100;
+};
+
+// Show a toast message for tricks and rotations
+GameScene.prototype.showToast = function(message, duration = 2000) {
+    if (!this.toastContainer) return;
+    
+    // Create toast text
+    const toast = this.add.text(0, 0, message, {
+        font: '24px Arial',
+        fill: '#ffff00', // Neon yellow for visibility
+        stroke: '#000000',
+        strokeThickness: 4,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        padding: { x: 15, y: 10 }
+    }).setOrigin(0.5, 0);
+    
+    // Add to container
+    this.toastContainer.add(toast);
+    
+    // Shift existing toasts upward
+    const toasts = this.toastContainer.getAll();
+    for (let i = 0; i < toasts.length - 1; i++) {
+        toasts[i].y -= toast.height + 10;
+    }
+    
+    // Fade in and out animation
+    this.tweens.add({
+        targets: toast,
+        alpha: { from: 0, to: 1 },
+        duration: 300,
+        ease: 'Power2',
+        onComplete: () => {
+            // Start fading out after a delay
+            this.time.delayedCall(duration, () => {
+                this.tweens.add({
+                    targets: toast,
+                    alpha: 0,
+                    y: toast.y - 30,
+                    duration: 500,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        // Remove from container when done
+                        this.toastContainer.remove(toast, true);
+                        toast.destroy();
+                    }
+                });
+            });
+        }
+    });
 };
 
 // GameScene is now properly exported as ES module
