@@ -75,7 +75,7 @@ export default class GameScene extends Phaser.Scene {
         this.pointsText = null;       // Top middle - Points display
         this.livesDisplay = null;     // Top right - Lives triangles container
         this.toastContainer = null;   // Bottom - Toast messages for tricks
-        this.lastY = 0;              // Track last Y position to calculate altitude drop
+        this.initialY = 0;           // Track initial Y position at start of run for altitude drop
         
         // --- extra lives system -----------------------------------------------
         this.lives              = PhysicsConfig.extraLives.initialLives;  // start with configured initial lives
@@ -1037,10 +1037,14 @@ export default class GameScene extends Phaser.Scene {
         // Get player speed (absolute value of x velocity)
         const speed = Math.abs(this.player.body.velocity.x).toFixed(2);
         
-        // Calculate altitude drop (difference in y position since last frame)
+        // Set initial Y position if not set yet
+        if (this.initialY === 0) {
+            this.initialY = this.player.y;
+        }
+        
+        // Calculate total altitude drop from start of run
         const currentY = this.player.y;
-        const altitudeDrop = this.lastY !== 0 ? (currentY - this.lastY).toFixed(2) : '0.00';
-        this.lastY = currentY;
+        const totalAltitudeDrop = Math.max(0, (currentY - this.initialY)).toFixed(2);
         
         // Update speed text
         if (this.speedText) {
@@ -1049,7 +1053,7 @@ export default class GameScene extends Phaser.Scene {
         
         // Update altitude drop text
         if (this.altitudeDropText) {
-            this.altitudeDropText.setText(`Altitude Drop: ${altitudeDrop}`);
+            this.altitudeDropText.setText(`Altitude Drop: ${totalAltitudeDrop}`);
         }
         
         // Update points (placeholder for now)
