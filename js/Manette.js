@@ -2,6 +2,9 @@
 // Input mapping system (Keyboard + Gamepad -> Actions)
 // ------------------------------------------------------
 
+// Import physics configuration
+import PhysicsConfig from './config/physics-config.js';
+
 export default class Manette {
     constructor(scene) {
         this.scene = scene;
@@ -225,6 +228,17 @@ export default class Manette {
                             // Restore original position in sledding mode
                             this.scene.sled.x = this.scene.sledOriginalX;
                             this.scene.sled.y = this.scene.sledOriginalY;
+                        }
+                    }
+                    
+                    // Adjust rider position based on mode
+                    if (this.scene && this.scene.rider && this.scene.riderOriginalY !== undefined) {
+                        if (this.walkMode) {
+                            // Move rider down by the configured amount in walking mode
+                            this.scene.rider.y = this.scene.riderOriginalY + PhysicsConfig.walkMode.riderYOffset;
+                        } else {
+                            // Move rider back to original position in sledding mode
+                            this.scene.rider.y = this.scene.riderOriginalY;
                         }
                     }
                     

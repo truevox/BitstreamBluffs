@@ -39,6 +39,11 @@ const PhysicsConfig = {
         walkJumpVelocity: -3,      // Jump velocity in walk mode
     },
     
+    // Walking mode parameters
+    walkMode: {
+        riderYOffset: 10,          // How many pixels to move the rider down in walking mode
+    },
+    
     // Speed adjustments for trick landings
     tricks: {
         wobbleLandingSpeedFactor: 0.7, // Speed retention on wobble landing (0-1)

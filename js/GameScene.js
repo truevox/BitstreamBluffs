@@ -69,6 +69,7 @@ export default class GameScene extends Phaser.Scene {
         
         // --- walking mode state -----------------------------------------------
         this.sledDistance       = 40;      // distance between player and sled when walking
+        this.riderOriginalY    = 0;       // to track original rider position
         // UI elements
         this.speedText = null;        // Top left - Speed display
         this.altitudeDropText = null; // Top left - Altitude drop display
@@ -171,6 +172,9 @@ export default class GameScene extends Phaser.Scene {
             playerBodyWidth / 2,  riderHeight / 2,
             this.neonYellow
         );
+        
+        // Store the original rider position for mode transitions
+        this.riderOriginalY = riderY;
 
         const sledX = 0;
         const sledY = (playerBodyHeight / 2) - (sledHeight / 2);
@@ -185,8 +189,9 @@ export default class GameScene extends Phaser.Scene {
         this.sledOriginalY = sledY;
         this.sledOriginalX = sledX;
         
-        // Store a reference to the sled for easier access
+        // Store a reference to the sled and rider for easier access
         this.sled = sled;
+        this.rider = rider;
 
         // No debug visualization as per UI requirements
 
@@ -687,6 +692,11 @@ export default class GameScene extends Phaser.Scene {
                     this.sled.visible = false; // Hide the sled in walking mode
                     this.sled.x = -this.sledDistance; // Position behind player
                 }
+                
+                // Move the rider down in walking mode based on config
+                if (this.rider) {
+                    this.rider.y = this.riderOriginalY + PhysicsConfig.walkMode.riderYOffset; // Move down by configured amount
+                }
             } else {
                 // Just switched back to sled mode
                 console.log('Entered sled mode');
@@ -695,6 +705,11 @@ export default class GameScene extends Phaser.Scene {
                     this.sled.visible = true; // Show the sled in sledding mode
                     this.sled.x = this.sledOriginalX; // Restore original position
                     this.sled.y = this.sledOriginalY; // Ensure correct Y position
+                }
+                
+                // Move the rider back to original position in sledding mode
+                if (this.rider) {
+                    this.rider.y = this.riderOriginalY; // Reset to original Y position
                 }
             }
             // Force immediate HUD update
