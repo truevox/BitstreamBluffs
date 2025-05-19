@@ -213,6 +213,21 @@ export default class Manette {
                     this.tabToggled = true; // Mark that we toggled this frame
                     console.log(`[DEBUG] Tab pressed. walkMode is now:`, this.walkMode);
                     
+                    // Directly update sled visibility when walk mode is toggled
+                    if (this.scene && this.scene.sled) {
+                        this.scene.sled.visible = !this.walkMode; // Show only in sledding mode
+                        
+                        // Adjust sled position based on mode
+                        if (this.walkMode) {
+                            // Hide behind player in walking mode
+                            this.scene.sled.x = -this.scene.sledDistance; 
+                        } else {
+                            // Restore original position in sledding mode
+                            this.scene.sled.x = this.scene.sledOriginalX;
+                            this.scene.sled.y = this.scene.sledOriginalY;
+                        }
+                    }
+                    
                     // Immediately update the HUD in the GameScene
                     if (this.scene && this.scene.updateHudText) {
                         this.scene.updateHudText();

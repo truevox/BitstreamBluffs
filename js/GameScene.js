@@ -184,12 +184,20 @@ export default class GameScene extends Phaser.Scene {
         // Store the original sled position for the tricks
         this.sledOriginalY = sledY;
         this.sledOriginalX = sledX;
+        
+        // Store a reference to the sled for easier access
+        this.sled = sled;
 
         // No debug visualization as per UI requirements
 
         // create container and convert it to Matter
         this.player = this.add.container(200, 100,
             [sled, rider]);
+
+        // Set initial sled visibility based on walk mode
+        if (this.manette && this.manette.walkMode) {
+            sled.visible = false; // Hide sled initially if in walking mode
+        }
 
         // add a circular Matter body to the container
         const Bodies = Phaser.Physics.Matter.Matter.Bodies;
@@ -345,6 +353,10 @@ export default class GameScene extends Phaser.Scene {
                     // Force player into walking mode when they lose a life
                     if (!this.manette.walkMode) {
                         this.manette.walkMode = true;
+                        // Hide the sled when entering walk mode
+                        if (this.sled) {
+                            this.sled.visible = false;
+                        }
                         this.showToast('Walking Mode Activated', 2000);
                         console.log('Forced into walking mode after losing a life');
                     }
@@ -658,7 +670,6 @@ export default class GameScene extends Phaser.Scene {
                     y: Math.cos(playerAngleRad) * downhillForce 
                 });
         }
-        
         // Update our Manette input controller
         this.manette.update();
 
@@ -671,35 +682,29 @@ export default class GameScene extends Phaser.Scene {
                 this.isParachuting = false;
                 this.isDragging = false;
                 this.isAirBraking = false;
-                // Reset sled position for walk mode
-                if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1];
-                    if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = -this.sledDistance; // Position sled behind player
-                    }
+                // Reset sled position for walk mode and hide it
+                if (this.player && this.sled) {
+                    this.sled.visible = false; // Hide the sled in walking mode
+                    this.sled.x = -this.sledDistance; // Position behind player
                 }
-                // Force immediate HUD update
-                this.updateHudText();
             } else {
                 // Just switched back to sled mode
                 console.log('Entered sled mode');
-                // Reset sled position for sled mode
-                if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1];
-                    if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = this.sledOriginalX;
-                    }
+                // Reset sled position for sled mode and show it
+                if (this.player && this.sled) {
+                    this.sled.visible = true; // Show the sled in sledding mode
+                    this.sled.x = this.sledOriginalX; // Restore original position
+                    this.sled.y = this.sledOriginalY; // Ensure correct Y position
                 }
-                // Force immediate HUD update
-                this.updateHudText();
             }
+            // Force immediate HUD update
+            this.updateHudText();
         }
 
         // Detect transitions between ground and air states
         const groundStateChanged = this.prevGroundState !== this.onGround;
         if (groundStateChanged) {
+            // ...
             // Cancel any active tricks when transitioning between ground/air
             if (this.isTucking || this.isParachuting || this.isDragging || this.isAirBraking) {
                 this.isTucking = false;
@@ -709,10 +714,11 @@ export default class GameScene extends Phaser.Scene {
                 
                 // Reset sled position if we were doing a trick that moved it
                 if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1]; // The sled is the second child
-                    if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = this.sledOriginalX;
+                    // Use our direct sled reference
+                    if (this.sled) {
+                        this.sled.y = this.sledOriginalY;
+                        this.sled.x = this.sledOriginalX;
+                        this.sled.visible = !this.manette.walkMode; // Show sled only in sledding mode
                     }
                 }
             }
@@ -1514,29 +1520,30 @@ export default class GameScene extends Phaser.Scene {
         }
     }
     
-    // Helper to create the extraLife texture
-    createExtraLifeTexture() {
-        try {
-            // Create a fallback texture
-            const graphics = this.make.graphics({x: 0, y: 0, add: false});
-            graphics.fillStyle(0xff00ff, 1); // Neon pink
-            graphics.lineStyle(4, 0xffffff, 1); // White border
-            graphics.fillCircle(32, 32, 25);
-            graphics.strokeCircle(32, 32, 25);
-            // Add a heart shape
-            graphics.fillStyle(0xffffff, 1);
-            graphics.fillCircle(24, 24, 8);
-            graphics.fillCircle(40, 24, 8);
-            graphics.fillTriangle(16, 30, 48, 30, 32, 45);
-            
-            // Generate a texture from the graphics object
-            graphics.generateTexture('extraLife', 64, 64);
-            console.log('Created fallback extraLife texture');
-        } catch (error) {
-            console.error('Error creating extraLife texture:', error);
-        }
-    }
 }
+
+// Helper to create the extraLife texture
+GameScene.prototype.createExtraLifeTexture = function() {
+    try {
+        // Create a fallback texture
+        const graphics = this.make.graphics({x: 0, y: 0, add: false});
+        graphics.fillStyle(0xff00ff, 1); // Neon pink
+        graphics.lineStyle(4, 0xffffff, 1); // White border
+        graphics.fillCircle(32, 32, 25);
+        graphics.strokeCircle(32, 32, 25);
+        // Add a heart shape
+        graphics.fillStyle(0xffffff, 1);
+        graphics.fillCircle(24, 24, 8);
+        graphics.fillCircle(40, 24, 8);
+        graphics.fillTriangle(16, 30, 48, 30, 32, 45);
+                            
+        // Generate a texture from the graphics object
+        graphics.generateTexture('extraLife', 64, 64);
+        console.log('Created fallback extraLife texture');
+    } catch (error) {
+        console.error('Error creating extraLife texture:', error);
+    }
+};
 
 /**
  * Helper method to apply a passive speed boost based on the current multiplier.
