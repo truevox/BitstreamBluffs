@@ -110,7 +110,24 @@ export default class ModularGameScene extends Phaser.Scene {
         // This matches the original GameScene which removed setBounds call
         // to eliminate the walls that were blocking player movement
         this.matter.world.setGravity(0, PhysicsConfig.physics.gravityY);
-        this.rotationSystem = new RotationSystem(this.matter.world.localWorld);
+        
+        // Initialize rotation system with proper callbacks for landing evaluations
+        this.rotationSystem = new RotationSystem({
+            onCleanLanding: (speedMultiplier) => {
+                this.currentSpeedMultiplier = speedMultiplier;
+                console.log(`Clean landing! Speed multiplier: ${speedMultiplier.toFixed(2)}x`);
+                this.hud.showToast(`Clean landing! x${speedMultiplier.toFixed(1)}`, 1500);
+            },
+            onCrash: () => {
+                console.log('Crashed!');
+                // Handle the crash - implementation below
+                this.handleCrash();
+            },
+            onWobble: () => {
+                console.log('Wobble landing!');
+                this.hud.showToast('Wobble!', 1000);
+            }
+        });
         
         // Set up collision detection
         this.setupCollisionHandlers();
@@ -272,8 +289,10 @@ export default class ModularGameScene extends Phaser.Scene {
      * Matches the physics implementation of the original GameScene
      */
     update(time, delta) {
-        // Safety check - if we're missing critical objects, don't proceed with update
-        if (!this.scene || !this.scene.isActive || !this.player || !this.player.body) {
+        // Comprehensive safety check - if we're missing any critical objects, don't proceed with update
+        // This is important for clean scene transitions, especially during game over
+        if (!this.scene || !this.scene.isActive || !this.player || !this.player.body || 
+            !this.inputController || this.gameOverShown) {
             return;
         }
         
@@ -282,7 +301,8 @@ export default class ModularGameScene extends Phaser.Scene {
         
         // Apply a gentle downhill bias force when on ground to prevent sticking
         // Only apply when in sledding mode, matching original GameScene
-        if (this.onGround && !this.inputController.isWalkMode() && this.player.body) {
+        // Add safety check to prevent errors during scene transitions (like game over)
+        if (this.onGround && this.inputController && this.player && this.player.body && !this.inputController.isWalkMode()) {
             // Determine direction from player angle
             const playerAngleRad = this.player.rotation;
             // Apply a small force in the downhill direction
@@ -813,6 +833,101 @@ export default class ModularGameScene extends Phaser.Scene {
         if (Math.abs(diff) > 2) {
             // Use slopeAlignmentFactor to make the rotation smooth
             this.player.setAngle(currentDeg + diff * PhysicsConfig.rotation.slopeAlignmentFactor);
+        }
+    }
+    
+    /**
+     * Handle player crashes due to bad landings
+     * Matches the original GameScene implementation
+     */
+    handleCrash() {
+        // Reset player velocity on crash
+        const Body = Phaser.Physics.Matter.Matter.Body;
+        Body.setVelocity(this.player.body, { x: 0, y: 0 });
+        
+        // Use a life if available, otherwise trigger game over
+        if (this.lives > 0) {
+            this.lives--;
+            
+            // Force player into walking mode when they lose a life
+            if (!this.inputController.isWalkMode()) {
+                // Call isWalkMode on the inputController instead of accessing manette directly
+                this.inputController.setWalkMode(true);
+                
+                // Hide the sled when entering walk mode
+                if (this.sled) {
+                    this.sled.visible = false;
+                }
+                
+                this.hud.showToast('Walking Mode Activated', 2000);
+                console.log('Forced into walking mode after losing a life');
+            }
+            
+            // Flash the screen red to indicate a life lost
+            const flashRect = this.add.rectangle(
+                this.cameras.main.worldView.centerX,
+                this.cameras.main.worldView.centerY,
+                this.cameras.main.width,
+                this.cameras.main.height,
+                0xff0000, 0.4
+            ).setScrollFactor(0).setDepth(90);
+            
+            // Fade out and remove the flash
+            this.tweens.add({
+                targets: flashRect,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                    flashRect.destroy();
+                }
+            });
+            
+            // Provide temporary invincibility and a small kick to get moving again
+            this.time.delayedCall(500, () => {
+                Body.setVelocity(this.player.body, { x: 2, y: -1 }); 
+            });
+        } else if (!this.gameOverShown) {
+            // No lives left and game over hasn't been shown yet
+            console.log('No lives left, game over...');
+            this.gameOverShown = true; // Mark as shown to prevent multiple displays
+            
+            // Show game over feedback before restarting
+            const gameOverText = this.add.text(
+                this.player.x,
+                this.player.y - 100, // Position above player
+                'GAME OVER', 
+                {
+                    fontFamily: '"Press Start 2P"',
+                    fontSize: '28px',
+                    fill: '#ff0000',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }
+            ).setDepth(100).setOrigin(0.5);
+            
+            // Add flash effect centered on player
+            const flashRect = this.add.rectangle(
+                this.player.x,
+                this.player.y,
+                this.cameras.main.width,
+                this.cameras.main.height,
+                0xff0000, 0.4
+            ).setDepth(99);
+            
+            // Make effects follow the player with a pulsing animation
+            this.tweens.add({
+                targets: [gameOverText, flashRect],
+                alpha: { from: 1, to: 0.7, yoyo: true, repeat: 3 },
+                duration: 300
+            });
+            
+            // Return to StartScene after a delay
+            this.time.delayedCall(1500, () => {
+                // Proper cleanup before returning to start screen
+                this.cleanupBeforeRestart();
+                // Go back to StartScene instead of restarting
+                this.scene.start('StartScene');
+            });
         }
     }
     

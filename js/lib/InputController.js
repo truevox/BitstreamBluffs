@@ -146,6 +146,23 @@ export default class InputController {
     }
     
     /**
+     * Sets the walk mode state programmatically
+     * Used for forcing the player into walking mode when they crash
+     * @param {boolean} isWalking - Whether to enable walk mode
+     */
+    setWalkMode(isWalking) {
+        if (this.manette.walkMode !== isWalking) {
+            this.manette.walkMode = isWalking;
+            this.manette.actions.toggleWalkMode = true; // Trigger the toggle action
+            
+            // Handle visibility of sled in the scene if available
+            if (this.scene && this.scene.sled) {
+                this.scene.sled.visible = !isWalking;
+            }
+        }
+    }
+    
+    /**
      * Checks if an action was just initiated this frame
      * @param {string} action - The action to check
      * @returns {boolean} True if the action was just pressed
@@ -256,8 +273,12 @@ export default class InputController {
      * Called when the controller is no longer needed
      */
     destroy() {
+        // The Manette class doesn't have a destroy method
+        // Just nullify the reference to allow garbage collection
         if (this.manette) {
-            this.manette.destroy();
+            // Clean up any references to avoid memory leaks
+            this.manette.scene = null;
+            this.manette.gamepad = null;
             this.manette = null;
         }
         
