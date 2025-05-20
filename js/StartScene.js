@@ -962,8 +962,9 @@ export default class StartScene extends Phaser.Scene {
         this.cameras.main.fadeOut(500, 0, 0, 0);
         
         this.cameras.main.once('camerafadeoutcomplete', () => {
-            // Start the appropriate game scene based on the parameter
-            this.scene.start('GameScene');
+            // Start the appropriate game scene based on the useModular flag
+            const sceneToStart = useModular ? 'ModularGameScene' : 'GameScene';
+            this.scene.start(sceneToStart);
             console.log(`Starting game with ${useModular ? 'modular' : 'original'} architecture`);
         });
     }
