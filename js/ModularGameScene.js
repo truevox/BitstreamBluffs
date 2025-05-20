@@ -67,6 +67,7 @@ export default class ModularGameScene extends Phaser.Scene {
         this.sledDistance = 40;      // distance between player and sled when walking
         this.sledOriginalY = 0;      // to track original sled position
         this.riderOriginalY = 0;     // to track original rider position
+        this.sledOriginalX = 0;      // to track original sled X position
         
         // Bind methods to ensure 'this' context is preserved
         this.handleResize = this.handleResize.bind(this);
@@ -266,6 +267,10 @@ export default class ModularGameScene extends Phaser.Scene {
         this.collectibles.init(PhysicsConfig);
     }
     
+    /**
+     * Main update loop - runs player physics and game logic
+     * Matches the physics implementation of the original GameScene
+     */
     update(time, delta) {
         // Safety check - if we're missing critical objects, don't proceed with update
         if (!this.scene || !this.scene.isActive || !this.player || !this.player.body) {
@@ -273,21 +278,11 @@ export default class ModularGameScene extends Phaser.Scene {
         }
         
         const Body = Phaser.Physics.Matter.Matter.Body;
-        
-        // Calculate rotation delta for flip tracking
-        const prevAngle = this.player.body.angle;
-        const currentAngleDeg = Phaser.Math.RadToDeg(prevAngle);
-        const deltaRotation = delta * 0.01; // Calculate rotation change for this frame
-        
-        // Always update rotation system with current state
-        this.rotationSystem.update({
-            grounded: this.onGround,
-            currentAngle: currentAngleDeg,
-            deltaRotation: this.onGround ? 0 : deltaRotation // Only track rotation in air
-        });
+        let deltaRotation = 0;
         
         // Apply a gentle downhill bias force when on ground to prevent sticking
-        if (this.onGround && this.player.body) {
+        // Only apply when in sledding mode, matching original GameScene
+        if (this.onGround && !this.inputController.isWalkMode() && this.player.body) {
             // Determine direction from player angle
             const playerAngleRad = this.player.rotation;
             // Apply a small force in the downhill direction
@@ -298,6 +293,9 @@ export default class ModularGameScene extends Phaser.Scene {
                     x: Math.sin(playerAngleRad) * downhillForce,
                     y: Math.cos(playerAngleRad) * downhillForce 
                 });
+            
+            // Apply passive speed boost when on ground (same as original GameScene)
+            this.applyPassiveSpeedBoost();
         }
         
         // Update input controller
@@ -326,7 +324,7 @@ export default class ModularGameScene extends Phaser.Scene {
                 if (flipData.fullFlips > 0 || flipData.partialFlip > 0.5) {
                     this.onFlipComplete(flipData.fullFlips, flipData.partialFlip);
                 }
-                // Reset rotation tracking - no need to call reset() as the RotationSystem handles this in handleLanding()
+                // Reset rotation tracking - no need to call reset() as the RotationSystem handles this internally
             }
             
             // Update previous state for next frame
@@ -411,6 +409,39 @@ export default class ModularGameScene extends Phaser.Scene {
         }
     }
     
+    /**
+     * Applies a passive speed boost based on current speed
+     * Matches the physics from the original GameScene
+     */
+    applyPassiveSpeedBoost() {
+        const Body = Phaser.Physics.Matter.Matter.Body;
+        const currentVelocity = this.player.body.velocity;
+        const currentSpeed = Math.abs(currentVelocity.x);
+        
+        // Apply a minimum constant boost when on ground
+        const minBoostForce = PhysicsConfig.movement.minBoostStrength;
+        
+        // Apply additional boost that scales with current speed
+        let speedScaledBoost = 0;
+        if (currentSpeed > PhysicsConfig.movement.speedBoostThreshold) {
+            // Speed-based multiplier that scales with current speed
+            speedScaledBoost = PhysicsConfig.movement.speedBoostFactor * currentSpeed;
+            
+            // Update speed multiplier (for other force calculations)
+            this.currentSpeedMultiplier = 1.0 + (0.1 * (currentSpeed / 2));
+            this.currentSpeedMultiplier = Math.min(this.currentSpeedMultiplier, 2.0); // Cap at 2x
+        }
+        
+        // Apply combined boost force
+        const totalBoostForce = minBoostForce + speedScaledBoost;
+        
+        // The force is applied in the direction of current movement
+        const forceDirection = currentVelocity.x >= 0 ? 1 : -1;
+        Body.applyForce(this.player.body,
+            this.player.body.position,
+            { x: forceDirection * totalBoostForce, y: 0 });
+    }
+
     handleSleddingControls(input) {
         const Body = Phaser.Physics.Matter.Matter.Body;
         const groundRotVel = PhysicsConfig.rotation.groundRotationVel;
@@ -449,6 +480,9 @@ export default class ModularGameScene extends Phaser.Scene {
         else {
             Body.setAngularVelocity(this.player.body, 0);
             
+            // Rotate player to match terrain angle - critical for hugging the terrain
+            this.playerHitTerrain(this.currentSlopeAngle);
+            
             // Update rotation system with current ground state
             const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
             this.rotationSystem.update({
@@ -459,88 +493,155 @@ export default class ModularGameScene extends Phaser.Scene {
         }
         
         // -----------------------------------------------------------------
-        // A KEY - BRAKE/DRAG
+        // A KEY - BRAKE/DRAG (exact match to GameScene implementation)
         // -----------------------------------------------------------------
         if (input.brakeAction) {
             if (this.onGround) {
-                // On ground: drag legs to slow down
-                const brakeForce = -this.player.body.velocity.x * 0.03;
-                Body.applyForce(this.player.body, 
-                    this.player.body.position, 
-                    { x: brakeForce, y: 0 });
-                    
-                if (Math.abs(this.player.body.velocity.x) > 1) {
-                    this.hud.showToast('Braking!', 500);
+                // DRAGGING - on ground for slight speed reduction
+                if (!this.isDragging) {
+                    this.isDragging = true;
+                    this.hud.showToast('Dragging!', 1500);
                 }
-            } 
-            else {
-                // In air: air brake (slow horizontal, small vertical boost)
-                const airBrakeForceX = -this.player.body.velocity.x * 0.02;
-                const airBrakeForceY = -0.001; // Small upward force
                 
+                // Apply backward force to slow down
+                const dragForce = 0.1; // Slows speed slightly - matching GameScene
                 Body.applyForce(this.player.body,
                     this.player.body.position,
-                    { x: airBrakeForceX, y: airBrakeForceY });
-                    
-                this.hud.showToast('Air Brake!', 500);
+                    { x: -dragForce, y: 0 });
+            } 
+            else {
+                // AIRBRAKE TRICK - in air for dramatic speed reduction
+                if (!this.isAirBraking) {
+                    this.isAirBraking = true;
+                    this.hud.showToast('Air Brake!', 1500);
+                }
+                
+                // Move the sled behind the player for airbrake visual
+                if (this.sled) {
+                    // Move sled backwards behind the player
+                    this.sled.x = -30; // Move sled behind player (matching GameScene)
+                }
+                
+                // Dramatically reduce horizontal velocity while airbraking (80% reduction per second)
+                // Calculate the delta reduction based on frame rate
+                const currentVelocity = this.player.body.velocity;
+                const reductionRate = 1.2; // 80% reduction per second (matching GameScene)
+                const frameReduction = reductionRate / 60; // Assuming 60fps, adjust per frame
+                
+                // Apply reduction as new velocity, not a force
+                const newXVel = currentVelocity.x * (1 - frameReduction);
+                
+                Body.setVelocity(this.player.body, {
+                    x: newXVel,
+                    y: currentVelocity.y
+                });
+            }
+        } else {
+            // Reset brake states when button released
+            if (this.isDragging) {
+                this.isDragging = false;
+            }
+            
+            if (this.isAirBraking) {
+                this.isAirBraking = false;
+                
+                // Reset sled position
+                if (this.sled) {
+                    this.sled.x = this.sledOriginalX; // Reset sled horizontal position
+                }
             }
         }
         
         // -----------------------------------------------------------------
-        // D KEY - TUCK/PARACHUTE
+        // D KEY - TUCK/PARACHUTE (exact match to GameScene implementation)
         // -----------------------------------------------------------------
         if (input.trickAction) {
             if (this.onGround) {
-                // On ground: tuck for speed boost
+                // TUCKING - on ground for speed boost
                 if (!this.isTucking) {
                     this.isTucking = true;
-                    this.hud.showToast('Speed Boost!', 1000);
+                    this.hud.showToast('Speed Boost!', 1500);
                 }
                 
-                // Apply boost force
-                const tuckBoostForce = 0.003 * this.currentSpeedMultiplier;
+                // Apply significant forward force for speed boost
+                const tuckBoostFactor = 0.004; // Slightly stronger than default (matching GameScene)
+                const tuckBoostForce = tuckBoostFactor * this.currentSpeedMultiplier;
+                
                 Body.applyForce(this.player.body,
                     this.player.body.position,
                     { x: tuckBoostForce, y: 0 });
                     
-                // Apply visual offset if tucking
+                // Apply visual change for tucking
                 if (this.rider) {
-                    this.rider.y = this.riderOriginalY + 5;
+                    this.rider.y = this.riderOriginalY + 5; // move rider down slightly
                 }
             }
             else {
-                // In air: parachute effect (slower falling, float further)
-                const parachuteForceY = this.player.body.velocity.y * 0.01; // Counter current fall
-                const parachuteForceX = 0.001; // Small forward push
+                // PARACHUTE TRICK - in air for slowed falling
+                if (!this.isParachuting) {
+                    this.isParachuting = true;
+                    this.hud.showToast('Parachute!', 1500);
+                }
                 
+                // Move the sled down for parachute visual
+                if (this.sled) {
+                    this.sled.y = this.sledOriginalY + 15; // Move sled down slightly
+                }
+                
+                // Counter current velocity for slower falling
+                const currentVelocity = this.player.body.velocity;
+                const parachuteFactor = 0.8; // 20% reduction in falling speed (matching GameScene)
+                
+                // Only reduce downward velocity
+                if (currentVelocity.y > 0) {
+                    Body.setVelocity(this.player.body, {
+                        x: currentVelocity.x,
+                        y: currentVelocity.y * parachuteFactor
+                    });
+                }
+                
+                // Add slight forward drift
+                const driftForce = 0.0005;
                 Body.applyForce(this.player.body,
                     this.player.body.position,
-                    { x: parachuteForceX, y: parachuteForceY });
-                    
-                this.hud.showToast('Parachute!', 500);
+                    { x: driftForce, y: 0 });
             }
         }
-        else if (this.isTucking && this.onGround) {
-            // Reset tuck state when not pressing D
-            this.isTucking = false;
-            if (this.rider) {
-                this.rider.y = this.riderOriginalY;
+        else {
+            // Reset trick states when button released
+            if (this.isTucking) {
+                this.isTucking = false;
+                
+                // Reset rider position
+                if (this.rider) {
+                    this.rider.y = this.riderOriginalY;
+                }
+            }
+            
+            if (this.isParachuting) {
+                this.isParachuting = false;
+                
+                // Reset sled position
+                if (this.sled) {
+                    this.sled.y = this.sledOriginalY;
+                }
             }
         }
         
         // -----------------------------------------------------------------
-        // SPACE - JUMP
+        // SPACE - JUMP (matches original GameScene implementation)
         // -----------------------------------------------------------------
         if (input.jump && this.onGround) {
-            const jumpVelocity = PhysicsConfig.jump.jumpVelocity;
+            // Use the correct constant from PhysicsConfig
+            // Note: Original uses negative value, so we maintain that convention
             Body.setVelocity(this.player.body, {
                 x: this.player.body.velocity.x,
-                y: jumpVelocity
+                y: PhysicsConfig.jump.jumpVelocity // This matches GameScene
             });
             this.onGround = false;
             this.hud.showToast('Jump!', 1000);
             
-            // Reset speed multiplier on jump
+            // Reset speed multiplier on jump - important physics detail from GameScene
             this.currentSpeedMultiplier = 1.0;
         }
         
@@ -695,6 +796,24 @@ export default class ModularGameScene extends Phaser.Scene {
         });
         
         return success;
+    }
+    
+    /**
+     * Rotates the player to align with the terrain angle
+     * This is crucial for making the player "hug" the terrain
+     * @param {number} terrainAngleRad - The angle of the terrain in radians
+     */
+    playerHitTerrain(terrainAngleRad) {
+        // Rotate player gently toward terrain angle on touchdown
+        const targetDeg = Phaser.Math.RadToDeg(terrainAngleRad);
+        const currentDeg = this.player.angle;
+        const diff = targetDeg - currentDeg;
+
+        // Only adjust if difference is significant
+        if (Math.abs(diff) > 2) {
+            // Use slopeAlignmentFactor to make the rotation smooth
+            this.player.setAngle(currentDeg + diff * PhysicsConfig.rotation.slopeAlignmentFactor);
+        }
     }
     
     updateHud() {
