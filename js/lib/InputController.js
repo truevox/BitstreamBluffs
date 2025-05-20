@@ -84,29 +84,36 @@ export default class InputController {
         this.prevState.jump = this.jump;
         this.prevState.walkMode = this.isWalkMode();
         
-        // Update input state - mapping from Manette's action names to our interface
-        // Using direct keyboard checks as fallbacks since Manette doesn't have all the same action names
-        this.left = this.manette.isActionActive('brakeAction') || this.cursors.left.isDown;
-        this.right = this.manette.isActionActive('trickAction') || this.cursors.right.isDown;
-        this.up = this.manette.isActionActive('rotateCounterClockwise') || this.cursors.up.isDown;
-        this.down = this.manette.isActionActive('rotateClockwise') || this.cursors.down.isDown;
-        this.jump = this.cursors.space.isDown;  // Manette doesn't directly expose 'jump'
+        // Update input state - directly mapping inputs to match GameScene.js
+        // In walk mode, W/S don't do anything, A/D move left/right
+        if (this.manette.isWalkMode()) {
+            // Walking mode controls
+            this.left = this.manette.isActionActive('walkLeft') || this.cursors.left.isDown;
+            this.right = this.manette.isActionActive('walkRight') || this.cursors.right.isDown;
+            
+            // W/S do nothing in walking mode
+            this.rotateCounterClockwise = false;
+            this.rotateClockwise = false;
+        } else {
+            // Sledding mode controls - mimic GameScene exactly
+            
+            // A key for brake/drag
+            this.brakeAction = this.manette.isActionActive('brakeAction') || this.cursors.left.isDown;
+            
+            // D key for tuck/trick
+            this.trickAction = this.manette.isActionActive('trickAction') || this.cursors.right.isDown;
+            
+            // W key for counter-clockwise rotation
+            this.rotateCounterClockwise = this.manette.isActionActive('rotateCounterClockwise') || this.cursors.up.isDown;
+            
+            // S key for clockwise rotation
+            this.rotateClockwise = this.manette.isActionActive('rotateClockwise') || this.cursors.down.isDown;
+        }
         
-        // Check keyboard for tuck (Shift/Ctrl/T)
-        this.tuck = this.scene.input.keyboard.checkDown(this.scene.input.keyboard.addKey('SHIFT')) || 
-                   this.scene.input.keyboard.checkDown(this.scene.input.keyboard.addKey('CTRL')) ||
-                   this.scene.input.keyboard.checkDown(this.scene.input.keyboard.addKey('T'));
-                   
-        // Drag is down key in non-walk mode
-        this.drag = !this.manette.isWalkMode() && this.down;
+        // Space for jump in both modes
+        this.jump = this.manette.isActionActive('jump') || this.cursors.space.isDown;
         
-        // Air brake is down key in air
-        this.airBrake = this.down;
-        
-        // Parachute is P key
-        this.parachute = this.scene.input.keyboard.checkDown(this.scene.input.keyboard.addKey('P'));
-        
-        // Toggle walk mode - Manette tracks this internally, we just need to capture the event
+        // Toggle walk mode
         this.toggleWalkMode = this.manette.actions.toggleWalkMode;
         
         // Return current input state object - useful for debugging and testing
@@ -121,6 +128,10 @@ export default class InputController {
             airBrake: this.airBrake,
             parachute: this.parachute,
             toggleWalkMode: this.toggleWalkMode,
+            rotateCounterClockwise: this.rotateCounterClockwise,
+            rotateClockwise: this.rotateClockwise,
+            brakeAction: this.brakeAction,
+            trickAction: this.trickAction,
             justPressedJump: this.isJumpJustPressed(),
             walkMode: this.manette.isWalkMode()
         };

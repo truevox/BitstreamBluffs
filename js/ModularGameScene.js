@@ -370,13 +370,15 @@ export default class ModularGameScene extends Phaser.Scene {
             y: this.player.body.velocity.y // Keep vertical velocity for gravity
         });
         
-        // Move left/right
+        // Move left/right with A/D keys
         if (input.left) {
             Body.translate(this.player.body, { x: -walkSpeed, y: 0 });
         }
         if (input.right) {
             Body.translate(this.player.body, { x: walkSpeed, y: 0 });
         }
+        
+        // W/S don't do anything in walking mode (handled by InputController)
         
         // Walking jump (small)
         if (input.jump && this.onGround) {
@@ -385,6 +387,7 @@ export default class ModularGameScene extends Phaser.Scene {
                 y: PhysicsConfig.jump.walkJumpVelocity 
             });
             this.onGround = false;
+            this.hud.showToast('Small Jump', 500);
         }
         
         // Make the player upright when walking
@@ -393,10 +396,16 @@ export default class ModularGameScene extends Phaser.Scene {
         
         // Position sled behind player if available
         if (this.sled) {
-            this.sled.x = -this.sledDistance;
+            this.sled.visible = false;
+            this.sled.x = this.player.x - this.sledDistance;
             if (this.onGround) {
                 this.sled.y = this.sledOriginalY;
             }
+        }
+        
+        // Make rider visible in walking mode
+        if (this.rider) {
+            this.rider.visible = true;
         }
     }
     
@@ -405,42 +414,123 @@ export default class ModularGameScene extends Phaser.Scene {
         const groundRotVel = PhysicsConfig.rotation.groundRotationVel;
         const airRotVel = PhysicsConfig.rotation.airRotationVel;
         const pushForce = PhysicsConfig.movement.pushForce;
+        let deltaRotation = 0;
         
-        // Left/right controls
-        if (input.left) {
-            // Only apply rotation on ground
-            if (this.onGround) {
-                Body.setAngularVelocity(this.player.body, -groundRotVel);
+        // -----------------------------------------------------------------
+        // W/S KEYS - ROTATION CONTROLS
+        // -----------------------------------------------------------------
+        if (!this.onGround) {
+            // W key for counter-clockwise rotation in air
+            if (input.rotateCounterClockwise) {
+                Body.setAngularVelocity(this.player.body, -airRotVel);
+                deltaRotation = -Phaser.Math.RadToDeg(airRotVel);
+            }
+            // S key for clockwise rotation in air
+            else if (input.rotateClockwise) {
+                Body.setAngularVelocity(this.player.body, airRotVel);
+                deltaRotation = Phaser.Math.RadToDeg(airRotVel);
+            }
+            // If neither rotation key is pressed, stop rotation immediately
+            else {
+                Body.setAngularVelocity(this.player.body, 0);
             }
             
-            // Apply force with speed multiplier
-            const leftForce = this.onGround ? 
-                -pushForce * this.currentSpeedMultiplier : 
-                -pushForce * PhysicsConfig.movement.airPushMultiplier;
-            
-            Body.applyForce(this.player.body,
-                this.player.body.position,
-                { x: leftForce, y: 0 });
+            // Update rotation system with current state
+            const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
+            this.rotationSystem.update({
+                grounded: this.onGround,
+                currentAngle: currentAngleDeg,
+                deltaRotation: deltaRotation
+            });
         }
-        else if (input.right) {
-            // Only apply rotation on ground
-            if (this.onGround) {
-                Body.setAngularVelocity(this.player.body, groundRotVel);
-            }
+        // When on ground, reset angular velocity and align to slope
+        else {
+            Body.setAngularVelocity(this.player.body, 0);
             
-            // Apply force with speed multiplier
-            const rightForce = this.onGround ? 
-                pushForce * this.currentSpeedMultiplier : 
-                pushForce * PhysicsConfig.movement.airPushMultiplier;
-            
-            Body.applyForce(this.player.body,
-                this.player.body.position,
-                { x: rightForce, y: 0 });
+            // Update rotation system with current ground state
+            const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
+            this.rotationSystem.update({
+                grounded: this.onGround,
+                currentAngle: currentAngleDeg,
+                deltaRotation: 0
+            });
         }
         
-        // Jump control
+        // -----------------------------------------------------------------
+        // A KEY - BRAKE/DRAG
+        // -----------------------------------------------------------------
+        if (input.brakeAction) {
+            if (this.onGround) {
+                // On ground: drag legs to slow down
+                const brakeForce = -this.player.body.velocity.x * 0.03;
+                Body.applyForce(this.player.body, 
+                    this.player.body.position, 
+                    { x: brakeForce, y: 0 });
+                    
+                if (Math.abs(this.player.body.velocity.x) > 1) {
+                    this.hud.showToast('Braking!', 500);
+                }
+            } 
+            else {
+                // In air: air brake (slow horizontal, small vertical boost)
+                const airBrakeForceX = -this.player.body.velocity.x * 0.02;
+                const airBrakeForceY = -0.001; // Small upward force
+                
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: airBrakeForceX, y: airBrakeForceY });
+                    
+                this.hud.showToast('Air Brake!', 500);
+            }
+        }
+        
+        // -----------------------------------------------------------------
+        // D KEY - TUCK/PARACHUTE
+        // -----------------------------------------------------------------
+        if (input.trickAction) {
+            if (this.onGround) {
+                // On ground: tuck for speed boost
+                if (!this.isTucking) {
+                    this.isTucking = true;
+                    this.hud.showToast('Speed Boost!', 1000);
+                }
+                
+                // Apply boost force
+                const tuckBoostForce = 0.003 * this.currentSpeedMultiplier;
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: tuckBoostForce, y: 0 });
+                    
+                // Apply visual offset if tucking
+                if (this.rider) {
+                    this.rider.y = this.riderOriginalY + 5;
+                }
+            }
+            else {
+                // In air: parachute effect (slower falling, float further)
+                const parachuteForceY = this.player.body.velocity.y * 0.01; // Counter current fall
+                const parachuteForceX = 0.001; // Small forward push
+                
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { x: parachuteForceX, y: parachuteForceY });
+                    
+                this.hud.showToast('Parachute!', 500);
+            }
+        }
+        else if (this.isTucking && this.onGround) {
+            // Reset tuck state when not pressing D
+            this.isTucking = false;
+            if (this.rider) {
+                this.rider.y = this.riderOriginalY;
+            }
+        }
+        
+        // -----------------------------------------------------------------
+        // SPACE - JUMP
+        // -----------------------------------------------------------------
         if (input.jump && this.onGround) {
-            const jumpVelocity = -PhysicsConfig.jump.velocity;
+            const jumpVelocity = PhysicsConfig.jump.jumpVelocity;
             Body.setVelocity(this.player.body, {
                 x: this.player.body.velocity.x,
                 y: jumpVelocity
