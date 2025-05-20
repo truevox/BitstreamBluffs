@@ -105,7 +105,9 @@ export default class ModularGameScene extends Phaser.Scene {
         this.inputController = new InputController(this);
         
         // Configure physics
-        this.matter.world.setBounds(-50, 0, this.scale.width + 100, this.scale.height * 2);
+        // No world boundaries - allowing free movement
+        // This matches the original GameScene which removed setBounds call
+        // to eliminate the walls that were blocking player movement
         this.matter.world.setGravity(0, PhysicsConfig.physics.gravityY);
         this.rotationSystem = new RotationSystem(this.matter.world.localWorld);
         
