@@ -32,6 +32,7 @@ export default class TerrainManager {
         // Colors
         this.neonYellow = 0xffff00;
         this.neonBlue = 0x00ffff;
+        this.neonPink = 0xff00ff;
         
         // Seeded random function - initialized by scene
         this.seededRandom = null;
@@ -70,80 +71,128 @@ export default class TerrainManager {
      * @returns {Object} The generated terrain segment
      */
     generateNextTerrainSegment(isFirstSegment = false) {
-        const lastSegment = this.terrainSegments[this.terrainSegments.length - 1];
-        let startX = isFirstSegment ? this.terrainStartX : lastSegment ? lastSegment.x + this.segmentWidth : this.terrainStartX;
+        // Get previous endpoint from last segment
+        const prevSegment = this.terrainSegments[this.terrainSegments.length - 1];
+        const prevX = prevSegment ? prevSegment.endX : this.terrainStartX;
+        const prevY = this.lastTerrainY;
         
-        // Use fixed starting height for first segment, or last terrain Y for subsequent segments
-        let startY = isFirstSegment ? this.lastTerrainY : this.lastTerrainY;
+        // Pick a new Y using the same probability distribution as GameScene
+        let newY = prevY;
         
-        // For first segment, create a flat platform
-        let endY = startY;
-        
-        if (!isFirstSegment) {
-            // Calculate slope with some random variation for subsequent segments
-            // Random variation between -50 and +30
-            const variation = this.seededRandom() * 80 - 50;
-            endY = Math.max(100, Math.min(800, startY + variation));
+        if (isFirstSegment) {
+            // Steeper initial descent, matching GameScene
+            newY += Phaser.Math.Between(40, 70);
+        } else {
+            // Use seeded random with same probability distribution as GameScene
+            const r = this.seededRandom();
+            
+            // Match GameScene probability distribution exactly
+            if (r < 0.60) {
+                // 60% chance: Moderate downslope (more common)
+                newY += Phaser.Math.Between(35, 70);
+            } else if (r < 0.85) {
+                // 25% chance: Steep downslope (more common)
+                newY += Phaser.Math.Between(70, 120);
+            } else if (r < 0.95) {
+                // 10% chance: Mild variation for interest
+                newY += Phaser.Math.Between(-15, 25);
+            } else {
+                // 5% chance: Occasional small upslope (less common/less steep)
+                newY -= Phaser.Math.Between(10, 40);
+            }
         }
         
-        // Create terrain segment object with vertices for drawing and collision
+        // Apply same clamping as GameScene to allow steeper descents
+        newY = Phaser.Math.Clamp(newY, prevY - 60, prevY + 150);
+        
+        // Calculate segment angle for physics
+        const segmentAngleRad = Math.atan2(newY - prevY, this.segmentWidth);
+        
+        // Create segment with same properties as GameScene
         const segment = {
-            x: startX,
-            y: startY,
-            endX: startX + this.segmentWidth,
-            endY: endY,
-            isRamp: !isFirstSegment && Math.abs(endY - startY) > 10,
-            vertices: [
-                { x: startX, y: startY },
-                { x: startX + this.segmentWidth, y: endY },
-                { x: startX + this.segmentWidth, y: endY + 500 }, // Extended bottom point
-                { x: startX, y: startY + 500 } // Extended bottom point
-            ]
+            x: prevX,
+            y: prevY,
+            endX: prevX + this.segmentWidth,
+            endY: newY,
+            // Use same color selection logic as GameScene
+            color: this.seededRandom() < 0.5 ? this.neonBlue : this.neonPink,
+            angle: segmentAngleRad,
+            bodies: [] // Track associated physics bodies for cleanup
         };
         
-        // Create Matter physics body for this segment
-        const terrainBody = this.scene.matter.add.fromVertices(
-            (startX + startX + this.segmentWidth) / 2, // x center
-            (startY + endY + 500) / 2, // y center (include the extended bottom)
-            [segment.vertices],
-            { isStatic: true, label: 'terrain' }
-        );
-        
-        // Store reference to physics body for later cleanup
-        segment.body = terrainBody;
-        
-        // Add segment to array
+        // Add to terrain segments array
         this.terrainSegments.push(segment);
         
         // Update last terrain Y for next segment
-        this.lastTerrainY = endY;
+        this.lastTerrainY = newY;
         
-        // Redraw terrain after adding new segment
-        this.drawTerrain();
+        // Create sub-segments for collision like in GameScene
+        this.createSubSegments(segment);
         
-        // Return the created segment for reference if needed
+        // Return the created segment
         return segment;
     }
     
     /**
+     * Creates sub-segments for smoother collision detection
+     * @param {Object} segment - The main segment to divide into sub-segments
+     */
+    createSubSegments(segment) {
+        // Break the slope into sub-rectangles for smooth collision, just like GameScene
+        const subSegmentCount = 5; // Same as GameScene
+        
+        for (let i = 0; i < subSegmentCount; i++) {
+            const t1 = i / subSegmentCount;
+            const t2 = (i + 1) / subSegmentCount;
+            
+            const x1 = Phaser.Math.Linear(segment.x, segment.endX, t1);
+            const y1 = Phaser.Math.Linear(segment.y, segment.endY, t1);
+            const x2 = Phaser.Math.Linear(segment.x, segment.endX, t2);
+            const y2 = Phaser.Math.Linear(segment.y, segment.endY, t2);
+            
+            const centerX = (x1 + x2) / 2;
+            const centerY = (y1 + y2) / 2;
+            const length = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+            const thickness = 5; // Same as GameScene
+            
+            // Create a static Matter rectangle (invisible, purely for collision)
+            const body = this.scene.matter.add.rectangle(
+                centerX, centerY, length, thickness, {
+                    isStatic: true,
+                    angle: Math.atan2(y2 - y1, x2 - x1),
+                    friction: 0.01,
+                    label: 'terrain',
+                    segmentId: this.terrainSegments.length - 1 // Associate with segment for cleanup
+                }
+            );
+            
+            // Store terrain angle for collision callback, same as GameScene
+            body.terrainAngle = body.angle;
+            segment.bodies.push(body); // Store reference to body for cleanup
+        }
+    }
+    
+    /**
      * Draws all terrain segments with neon lines
-     * Renders the visible terrain surface
+     * Renders the visible terrain surface with same style as GameScene
      */
     drawTerrain() {
         if (!this.terrainGraphics) return;
         
         this.terrainGraphics.clear();
         
-        // Set line style for terrain top surface
-        this.terrainGraphics.lineStyle(2, this.neonBlue, 1);
-        
-        // Draw each segment's top line
-        this.terrainSegments.forEach(segment => {
-            this.terrainGraphics.beginPath();
-            this.terrainGraphics.moveTo(segment.x, segment.y);
-            this.terrainGraphics.lineTo(segment.endX, segment.endY);
-            this.terrainGraphics.strokePath();
-        });
+        // Draw each segment using the same visual style as GameScene
+        for (const seg of this.terrainSegments) {
+            // Primary neon line (thinner, full brightness)
+            this.terrainGraphics.lineStyle(5, seg.color, 1).beginPath();
+            this.terrainGraphics.moveTo(seg.x, seg.y);
+            this.terrainGraphics.lineTo(seg.endX, seg.endY).strokePath();
+            
+            // Secondary glow line (thicker, lower opacity)
+            this.terrainGraphics.lineStyle(8, seg.color, 0.3).beginPath();
+            this.terrainGraphics.moveTo(seg.x, seg.y);
+            this.terrainGraphics.lineTo(seg.endX, seg.endY).strokePath();
+        }
     }
     
     /**
@@ -190,18 +239,53 @@ export default class TerrainManager {
     
     /**
      * Updates terrain based on player position
-     * Generates new segments ahead and removes old ones behind
-     * @param {number} playerX - Current player X position
+     * Manages terrain generation and cleanup using same approach as GameScene
+     * @param {number} playerX - Current player X position for terrain management
      */
     update(playerX) {
-        // Generate new terrain segments as the player moves right
-        const lastSegment = this.terrainSegments[this.terrainSegments.length - 1];
-        if (lastSegment && playerX > lastSegment.x - this.worldBoundsPadding) {
+        // Get camera for reference (same as GameScene)
+        const cam = this.scene.cameras.main;
+        
+        // Generate new terrain ahead with same lookahead distance as GameScene
+        const lookAheadTrigger = playerX + cam.width * 1.5;
+        
+        // Get position of last segment
+        const lastSeg = this.terrainSegments[this.terrainSegments.length - 1];
+        const lastX = lastSeg ? lastSeg.endX : this.terrainStartX;
+        
+        // Generate more terrain if needed
+        if (lastX < lookAheadTrigger) {
             this.generateNextTerrainSegment();
+            this.drawTerrain();
         }
         
-        // Clean up off-screen terrain
-        this.cleanupTerrain(playerX);
+        // Remove segments that are far behind, using same threshold as GameScene
+        const removeThresholdX = playerX - cam.width * 1.5;
+        
+        // Identify segments to remove
+        const segmentsToRemove = [];
+        let i = 0;
+        
+        while (i < this.terrainSegments.length && 
+               this.terrainSegments[i].endX < removeThresholdX) {
+            segmentsToRemove.push(this.terrainSegments[i]);
+            i++;
+        }
+        
+        // Remove the identified segments and their physics bodies
+        if (segmentsToRemove.length > 0) {
+            // Remove physics bodies for each segment
+            segmentsToRemove.forEach(segment => {
+                if (segment.bodies) {
+                    segment.bodies.forEach(body => {
+                        this.scene.matter.world.remove(body);
+                    });
+                }
+            });
+            
+            // Remove visual segments
+            this.terrainSegments.splice(0, segmentsToRemove.length);
+        }
     }
     
     /**

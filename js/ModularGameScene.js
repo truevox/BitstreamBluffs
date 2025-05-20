@@ -157,32 +157,18 @@ export default class ModularGameScene extends Phaser.Scene {
             }
         });
         
-        // Handle end of collision
+        // Handle end of collision - using a simpler approach similar to GameScene
         this.matter.world.on('collisionend', (event) => {
             const pairs = event.pairs;
             
             for (let i = 0; i < pairs.length; i++) {
-                const bodyA = pairs[i].bodyA;
-                const bodyB = pairs[i].bodyB;
+                const pair = pairs[i];
                 
                 // Check if player left the ground
-                if ((bodyA === this.player.body && bodyB.label === 'terrain') ||
-                    (bodyB === this.player.body && bodyA.label === 'terrain')) {
-                    // Only set onGround = false if there are no other contacts
-                    let stillOnGround = false;
-                    
-                    // Check current collisions to see if player is still on ground
-                    const allCollisions = this.matter.world.getAllCollisions();
-                    for (let j = 0; j < allCollisions.length; j++) {
-                        const contact = allCollisions[j];
-                        if ((contact.bodyA === this.player.body && contact.bodyB.label === 'terrain') ||
-                            (contact.bodyB === this.player.body && contact.bodyA.label === 'terrain')) {
-                            stillOnGround = true;
-                            break;
-                        }
-                    }
-                    
-                    this.onGround = stillOnGround;
+                if (pair.bodyA === this.player.body || pair.bodyB === this.player.body) {
+                    // Simply set onGround to false when any collision with the player ends
+                    // This is a simplification that works well enough for gameplay
+                    this.onGround = false;
                 }
             }
         });
