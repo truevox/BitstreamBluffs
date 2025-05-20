@@ -2,7 +2,22 @@
 // Handles all HUD and UI elements display
 // ------------------------------------------------------
 
+/**
+ * @fileoverview HudDisplay module manages all UI elements, including speed indicators,
+ * score displays, lives indicators, and toast notifications. It handles updating these
+ * elements based on game state and provides methods for game events like explosions.
+ * 
+ * @module HudDisplay
+ */
+
+/**
+ * Manages all heads-up display (HUD) elements and visual effects in the game
+ */
 export default class HudDisplay {
+    /**
+     * Creates a new HudDisplay instance
+     * @param {Phaser.Scene} scene - The scene this display manager is attached to
+     */
     constructor(scene) {
         this.scene = scene;
         
@@ -23,6 +38,10 @@ export default class HudDisplay {
         this.initialY = 0;
     }
     
+    /**
+     * Initializes all HUD elements
+     * Creates speed, altitude, score, and lives displays
+     */
     init() {
         // Create HUD text elements
         this.speedText = this.scene.add.text(
@@ -71,7 +90,10 @@ export default class HudDisplay {
         this.scene.scale.on('resize', this.handleResize, this);
     }
     
-    // Initialize the toast system for trick announcements
+    /**
+     * Initializes the toast notification system
+     * Used for displaying temporary messages like trick completions and point awards
+     */
     initToastSystem() {
         // Create container for toast messages at bottom center
         this.toastContainer = this.scene.add.container(
@@ -80,12 +102,22 @@ export default class HudDisplay {
         ).setScrollFactor(0).setDepth(100);
     }
     
-    // Set initial Y position for altitude drop calculation
+    /**
+     * Sets the initial Y position for altitude drop calculation
+     * @param {number} y - The initial Y position of the player
+     */
     setInitialY(y) {
         this.initialY = y;
     }
     
-    // Update all HUD elements with current game state
+    /**
+     * Updates all HUD elements with current game state
+     * @param {Phaser.Physics.Matter.Sprite} player - The player object
+     * @param {number} score - Current game score
+     * @param {number} speed - Current player speed
+     * @param {number} lives - Current lives remaining
+     * @param {number} maxLives - Maximum possible lives
+     */
     update(player, score, speed, lives, maxLives) {
         if (!player) return;
         
@@ -102,14 +134,20 @@ export default class HudDisplay {
         this.updateLivesDisplay(lives, maxLives);
     }
     
-    // Update the speed display
+    /**
+     * Updates the speed display
+     * @param {number} speed - Current player speed
+     */
     updateSpeed(speed) {
         if (this.speedText) {
             this.speedText.setText(`Speed: ${speed}`);
         }
     }
     
-    // Update the altitude drop display
+    /**
+     * Updates the altitude drop display
+     * @param {number} playerY - Current player Y position
+     */
     updateAltitudeDrop(playerY) {
         if (this.altitudeDropText && this.initialY !== undefined) {
             const altitudeDrop = Math.max(0, Math.round(playerY - this.initialY));
@@ -117,14 +155,21 @@ export default class HudDisplay {
         }
     }
     
-    // Update the score display
+    /**
+     * Updates the score display
+     * @param {number} score - Current game score
+     */
     updateScore(score) {
         if (this.pointsText) {
             this.pointsText.setText(`Points: ${score}`);
         }
     }
     
-    // Update the lives display with yellow triangles
+    /**
+     * Updates the lives display with visual indicators
+     * @param {number} lives - Current lives remaining
+     * @param {number} maxLives - Maximum possible lives
+     */
     updateLivesDisplay(lives, maxLives) {
         if (!this.livesDisplay) return;
         
@@ -150,7 +195,11 @@ export default class HudDisplay {
         }
     }
     
-    // Show a toast message for tricks and rotations
+    /**
+     * Shows a toast notification message
+     * @param {string} message - Message to display
+     * @param {number} [duration=2000] - Duration to show the message in milliseconds
+     */
     showToast(message, duration = 2000) {
         if (!this.toastContainer) return;
         
@@ -199,7 +248,10 @@ export default class HudDisplay {
         });
     }
     
-    // Helper to position the toast container at the bottom center of the screen
+    /**
+     * Positions the toast container at the bottom center of the screen
+     * @private
+     */
     positionToastContainer() {
         if (!this.toastContainer) return;
         
@@ -208,7 +260,12 @@ export default class HudDisplay {
         this.toastContainer.y = this.scene.cameras.main.height - 100;
     }
     
-    // Handle window resizing
+    /**
+     * Handles window resizing events to reposition UI elements
+     * @param {object} gameSize - Object containing the new width and height
+     * @param {number} gameSize.width - New game width
+     * @param {number} gameSize.height - New game height
+     */
     handleResize(gameSize) {
         const { width, height } = gameSize;
         
@@ -225,7 +282,15 @@ export default class HudDisplay {
         this.positionToastContainer();
     }
     
-    // Create explosion effect for player
+    /**
+     * Creates explosion particle effects
+     * @param {number} x - X position of the explosion
+     * @param {number} y - Y position of the explosion
+     * @param {number} color - Color of the particles in hex format
+     * @param {object} size - Size dimensions for the particles
+     * @param {number} size.width - Width of the particles
+     * @param {number} size.height - Height of the particles
+     */
     createExplosionParticles(x, y, color, size) {
         const particleCount = 20;
         const particles = [];
@@ -278,7 +343,14 @@ export default class HudDisplay {
         }
     }
     
-    // Create full player explosion effect for game over
+    /**
+     * Creates full player explosion effect for game over
+     * Combines multiple particle effects and shockwave
+     * @param {number} playerX - Player X position
+     * @param {number} playerY - Player Y position
+     * @param {number} sledX - Sled X position
+     * @param {number} sledY - Sled Y position
+     */
     createPlayerExplosionEffect(playerX, playerY, sledX, sledY) {
         try {
             // Create a shockwave effect
@@ -316,7 +388,10 @@ export default class HudDisplay {
         }
     }
     
-    // Clean up resources
+    /**
+     * Cleans up all resources used by the HUD display
+     * Should be called when the scene is shutdown or destroyed
+     */
     destroy() {
         // Remove resize event listener
         this.scene.scale.off('resize', this.handleResize, this);

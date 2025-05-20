@@ -2,7 +2,22 @@
 // Handles all terrain generation and management
 // ------------------------------------------------------
 
+/**
+ * @fileoverview TerrainManager module handles procedural terrain generation and physics.
+ * It creates, renders, and manages terrain segments as the player traverses the game world,
+ * providing proper collision detection and dynamically generating new terrain ahead of the player.
+ * 
+ * @module TerrainManager
+ */
+
+/**
+ * Manages the procedural terrain generation, physics, and rendering
+ */
 export default class TerrainManager {
+    /**
+     * Creates a new TerrainManager instance
+     * @param {Phaser.Scene} scene - The scene this manager is attached to
+     */
     constructor(scene) {
         this.scene = scene;
         this.terrainGraphics = null;
@@ -22,6 +37,9 @@ export default class TerrainManager {
         this.seededRandom = null;
     }
     
+    /**
+     * Initializes the terrain system
+     */
     init() {
         // Get seeded random function from scene if available
         this.seededRandom = this.scene.seededRandom || Math.random;
@@ -33,7 +51,10 @@ export default class TerrainManager {
         this.initTerrain();
     }
     
-    // Initialize the first terrain platform
+    /**
+     * Initializes the first terrain platform/segment
+     * Creates a flat starting area for the player
+     */
     initTerrain() {
         // Reset terrain state
         this.terrainSegments = [];
@@ -43,7 +64,11 @@ export default class TerrainManager {
         this.generateNextTerrainSegment(true); 
     }
     
-    // Generate the next terrain segment
+    /**
+     * Generates the next terrain segment procedurally
+     * @param {boolean} isFirstSegment - Whether this is the first segment (flat platform)
+     * @returns {Object} The generated terrain segment
+     */
     generateNextTerrainSegment(isFirstSegment = false) {
         const lastSegment = this.terrainSegments[this.terrainSegments.length - 1];
         let startX = isFirstSegment ? this.terrainStartX : lastSegment ? lastSegment.x + this.segmentWidth : this.terrainStartX;
@@ -100,7 +125,10 @@ export default class TerrainManager {
         return segment;
     }
     
-    // Draw terrain neon lines
+    /**
+     * Draws all terrain segments with neon lines
+     * Renders the visible terrain surface
+     */
     drawTerrain() {
         if (!this.terrainGraphics) return;
         
@@ -118,7 +146,12 @@ export default class TerrainManager {
         });
     }
     
-    // Find the terrain height at a specific X position
+    /**
+     * Finds the terrain height at a specific X position
+     * Uses linear interpolation to determine the exact height
+     * @param {number} xPos - The x position to check
+     * @returns {number} The terrain height at the specified position
+     */
     findTerrainHeightAt(xPos) {
         for (let i = 0; i < this.terrainSegments.length; i++) {
             const segment = this.terrainSegments[i];
@@ -134,7 +167,12 @@ export default class TerrainManager {
         return 500;
     }
     
-    // Get the slope angle (in radians) at a specific X position
+    /**
+     * Gets the slope angle (in radians) at a specific X position
+     * Used for physics calculations and player orientation
+     * @param {number} xPos - The x position to check
+     * @returns {number} The slope angle in radians
+     */
     getSlopeAngleAt(xPos) {
         for (let i = 0; i < this.terrainSegments.length; i++) {
             const segment = this.terrainSegments[i];
@@ -150,7 +188,11 @@ export default class TerrainManager {
         return 0;
     }
     
-    // Update terrain based on player position
+    /**
+     * Updates terrain based on player position
+     * Generates new segments ahead and removes old ones behind
+     * @param {number} playerX - Current player X position
+     */
     update(playerX) {
         // Generate new terrain segments as the player moves right
         const lastSegment = this.terrainSegments[this.terrainSegments.length - 1];
@@ -162,7 +204,11 @@ export default class TerrainManager {
         this.cleanupTerrain(playerX);
     }
     
-    // Clean up terrain segments that are off-screen
+    /**
+     * Cleans up terrain segments that are off-screen
+     * Removes segments that are far behind the player to optimize performance
+     * @param {number} playerX - Current player X position
+     */
     cleanupTerrain(playerX) {
         // Remove terrain segments that are far behind the player
         const viewportLeft = playerX - this.worldBoundsPadding * 2;
@@ -186,17 +232,28 @@ export default class TerrainManager {
         }
     }
     
-    // Get all terrain segments (useful for collision checks)
+    /**
+     * Gets all terrain segments
+     * Useful for collision checks and terrain queries
+     * @returns {Array<Object>} All current terrain segments
+     */
     getTerrainSegments() {
         return this.terrainSegments;
     }
     
-    // Set the seed random function (from the scene)
+    /**
+     * Sets the seeded random function
+     * Ensures consistent terrain generation for the same seed
+     * @param {Function} seededRandomFn - The seeded random function to use
+     */
     setSeededRandom(seededRandomFn) {
         this.seededRandom = seededRandomFn || Math.random;
     }
     
-    // Reset the terrain system (for scene restart)
+    /**
+     * Resets the terrain system
+     * Used when restarting the scene or resetting the game
+     */
     reset() {
         // Clean up all terrain bodies
         this.terrainSegments.forEach(segment => {
@@ -213,7 +270,10 @@ export default class TerrainManager {
         this.initTerrain();
     }
     
-    // Clean up resources
+    /**
+     * Cleans up all resources used by the terrain manager
+     * Should be called when the scene is shutdown or destroyed
+     */
     destroy() {
         // Clean up all terrain bodies from Matter world
         this.terrainSegments.forEach(segment => {

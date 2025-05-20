@@ -2,9 +2,26 @@
 // Handles all game input (keyboard and gamepad)
 // ------------------------------------------------------
 
+/**
+ * @fileoverview InputController module manages all player input from keyboard and gamepad.
+ * It provides a unified interface for checking input state regardless of input method (keyboard,
+ * gamepad, etc.). This module simplifies the main game logic by abstracting away input handling.
+ * 
+ * @module InputController
+ * @requires Manette
+ */
+
 import Manette from '../Manette.js';
 
+/**
+ * Handles all input processing for the game, providing a unified interface for
+ * detecting player actions from both keyboard and gamepad.
+ */
 export default class InputController {
+    /**
+     * Creates a new InputController instance
+     * @param {Phaser.Scene} scene - The scene this controller is attached to
+     */
     constructor(scene) {
         this.scene = scene;
         this.cursors = null;
@@ -32,6 +49,10 @@ export default class InputController {
         this.init();
     }
     
+    /**
+     * Initializes input handlers including keyboard and gamepad via Manette
+     * @private
+     */
     init() {
         // Initialize cursor keys
         this.cursors = this.scene.input.keyboard.createCursorKeys();
@@ -54,6 +75,10 @@ export default class InputController {
         this.manette.mapAction('toggleWalkMode', ['TAB']); 
     }
     
+    /**
+     * Updates all input states for this frame
+     * @returns {Object} Current input state for all actions
+     */
     update() {
         // First, update Manette controller
         this.manette.update();
@@ -93,63 +118,116 @@ export default class InputController {
         };
     }
     
-    // Check if walk mode is active (delegate to Manette for compatibility)
+    /**
+     * Checks if walk mode is currently active
+     * @returns {boolean} True if walk mode is active
+     */
     isWalkMode() {
         return this.manette.walkMode;
     }
     
-    // Check if an action was just initiated this frame
+    /**
+     * Checks if an action was just initiated this frame
+     * @param {string} action - The action to check
+     * @returns {boolean} True if the action was just pressed
+     */
     isActionJustPressed(action) {
         return this.manette.isActionJustPressed(action);
     }
     
-    // Utility methods to check specific inputs
+    /**
+     * Checks if left movement is being pressed
+     * @returns {boolean} True if left is pressed
+     */
     isLeftPressed() {
         return this.left;
     }
     
+    /**
+     * Checks if right movement is being pressed
+     * @returns {boolean} True if right is pressed
+     */
     isRightPressed() {
         return this.right;
     }
     
+    /**
+     * Checks if up movement is being pressed
+     * @returns {boolean} True if up is pressed
+     */
     isUpPressed() {
         return this.up;
     }
     
+    /**
+     * Checks if down movement is being pressed
+     * @returns {boolean} True if down is pressed
+     */
     isDownPressed() {
         return this.down;
     }
     
+    /**
+     * Checks if jump is being pressed
+     * @returns {boolean} True if jump is pressed
+     */
     isJumpPressed() {
         return this.jump;
     }
     
+    /**
+     * Checks if jump was just pressed this frame
+     * @returns {boolean} True if jump was just pressed
+     */
     isJumpJustPressed() {
         // Check if jump was just pressed this frame
         return this.jump && !this.prevState.jump;
     }
     
+    /**
+     * Checks if tuck (speed boost) is being pressed
+     * @returns {boolean} True if tuck is pressed
+     */
     isTuckPressed() {
         return this.tuck;
     }
     
+    /**
+     * Checks if drag (slow down) is being pressed
+     * @returns {boolean} True if drag is pressed
+     */
     isDragPressed() {
         return this.drag;
     }
     
+    /**
+     * Checks if air brake is being pressed
+     * @returns {boolean} True if air brake is pressed
+     */
     isAirBrakePressed() {
         return this.airBrake;
     }
     
+    /**
+     * Checks if parachute action is being pressed
+     * @returns {boolean} True if parachute is pressed
+     */
     isParachutePressed() {
         return this.parachute;
     }
     
+    /**
+     * Checks if walk mode was toggled this frame
+     * @returns {boolean} True if walk mode was toggled
+     */
     isWalkModeToggled() {
         return this.toggleWalkMode;
     }
     
-    // Clean up event listeners and resources
+    /**
+     * Cleans up event listeners and resources
+     * Called when the controller is no longer needed
+     */
     destroy() {
         if (this.manette) {
             this.manette.destroy();

@@ -2,7 +2,23 @@
 // Handles all collectible items like extra lives
 // ------------------------------------------------------
 
+/**
+ * @fileoverview CollectibleManager module handles spawning, updating, and collecting 
+ * of in-game pickups such as extra lives. It manages their lifecycle including positioning,
+ * physics integration, collection effects, and cleanup.
+ * 
+ * @module CollectibleManager
+ */
+
+/**
+ * Manages all collectible items like extra lives throughout the game
+ */
 export default class CollectibleManager {
+    /**
+     * Creates a new CollectibleManager instance
+     * @param {Phaser.Scene} scene - The scene this manager is attached to
+     * @param {TerrainManager} terrainManager - Reference to the terrain manager for placement
+     */
     constructor(scene, terrainManager) {
         this.scene = scene;
         this.terrainManager = terrainManager;
@@ -15,6 +31,10 @@ export default class CollectibleManager {
         this.physicsConfig = null;
     }
     
+    /**
+     * Initializes the collectibles system
+     * @param {Object} physicsConfig - Physics configuration settings
+     */
     init(physicsConfig) {
         // Store physics config for use in this manager
         this.physicsConfig = physicsConfig;
@@ -23,7 +43,11 @@ export default class CollectibleManager {
         this.createExtraLifeTexture();
     }
     
-    // Update collectibles system
+    /**
+     * Updates the collectibles system based on current game state
+     * @param {number} currentTime - Current game time
+     * @param {number} playerX - Current player X position
+     */
     update(currentTime, playerX) {
         if (!this.physicsConfig) return;
         
@@ -34,7 +58,12 @@ export default class CollectibleManager {
         this.cleanupOffscreenCollectibles(playerX);
     }
     
-    // Helper to manage extra life collectibles
+    /**
+     * Manages the spawning cycle of extra life collectibles
+     * Based on elapsed time and randomization
+     * @param {number} currentTime - Current game time
+     * @private
+     */
     manageExtraLives(currentTime) {
         if (!this.physicsConfig) return;
         
@@ -56,7 +85,12 @@ export default class CollectibleManager {
         }
     }
     
-    // Helper to clean up off-screen collectibles
+    /**
+     * Cleans up collectibles that are off-screen
+     * Optimizes performance by removing objects far behind the player
+     * @param {number} playerX - Current player X position
+     * @private
+     */
     cleanupOffscreenCollectibles(playerX) {
         // Calculate viewport boundaries (with buffer)
         const viewportLeft = playerX - 2000;
@@ -91,7 +125,12 @@ export default class CollectibleManager {
         }
     }
     
-    // Helper to spawn an extra life collectible
+    /**
+     * Spawns an extra life collectible in the game world
+     * Places it on terrain ahead of the player with proper physics
+     * @returns {Object|undefined} The created extra life object or undefined on failure
+     * @private
+     */
     spawnExtraLife() {
         if (!this.physicsConfig) return;
         
@@ -178,7 +217,13 @@ export default class CollectibleManager {
         }
     }
     
-    // Helper to handle extra life collection
+    /**
+     * Handles the collection of an extra life by the player
+     * Includes visual effects and physics cleanup
+     * @param {MatterJS.Body} collider - The body that collided with the extra life
+     * @param {Function} callback - Callback to execute after collection (e.g., increase lives)
+     * @returns {boolean} Whether the collection was successful
+     */
     collectExtraLife(collider, callback) {
         try {
             // Find the matching extra life in our array
@@ -265,7 +310,11 @@ export default class CollectibleManager {
         }
     }
     
-    // Helper to create the extraLife texture
+    /**
+     * Creates the texture for extra life collectibles
+     * Generates a yellow triangle pointing upward
+     * @private
+     */
     createExtraLifeTexture() {
         try {
             // Skip if texture already exists
@@ -295,12 +344,20 @@ export default class CollectibleManager {
         }
     }
     
-    // Get all collectibles (useful for collision checks)
+    /**
+     * Gets all active collectibles
+     * Useful for external collision checks and queries
+     * @returns {Array<Object>} Array of all active collectible objects
+     */
     getCollectibles() {
         return this.extraLives;
     }
     
-    // Reset the collectible system (for scene restart)
+    /**
+     * Resets the collectible system
+     * Cleans up all existing collectibles and resets timers
+     * Used when restarting the scene or level
+     */
     reset() {
         // Clean up all existing collectibles
         this.extraLives.forEach(life => {
@@ -317,7 +374,10 @@ export default class CollectibleManager {
         this.lastLifeCollectTime = 0;
     }
     
-    // Clean up resources
+    /**
+     * Cleans up all resources used by the collectible manager
+     * Should be called when the scene is shutdown or destroyed
+     */
     destroy() {
         this.reset();
         this.terrainManager = null;
