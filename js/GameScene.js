@@ -8,6 +8,7 @@ import Manette from './Manette.js';
 import RotationSystem from './utils/RotationSystem.js';
 import configLoader from './config/config-loader.js';
 import { initializeRandomWithSeed } from './utils/seed-generator.js';
+import Player from './Player.js';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -90,8 +91,9 @@ export default class GameScene extends Phaser.Scene {
         // Try to load life collectible image
         this.load.image('extraLife', 'assets/extraLife.png');
         
-        // Load particle image for explosion effects
-        this.load.image('particle', 'assets/particle.png');
+        // Instead of loading an external particle image, we'll create it programmatically
+        // This eliminates the 404 error for missing particle.png
+        this.createParticleTexture();
         
         // Handle missing image error
         this.load.on('filecomplete', (key) => {
@@ -118,14 +120,8 @@ export default class GameScene extends Phaser.Scene {
                 // Generate a texture from the graphics object
                 graphics.generateTexture('extraLife', 64, 64);
             } else if (file.key === 'particle') {
-                console.warn('Failed to load particle image, creating a fallback');
-                // Create a fallback texture for particles
-                const graphics = this.make.graphics({x: 0, y: 0, add: false});
-                graphics.fillStyle(0xffffff, 1); // White
-                graphics.fillCircle(8, 8, 8); // Simple circle particle
-                
-                // Generate a texture from the graphics object
-                graphics.generateTexture('particle', 16, 16);
+                // Particle texture is now created programmatically in createParticleTexture() method
+                // This conditional branch should no longer be reached
             }
         });
     }
@@ -165,61 +161,17 @@ export default class GameScene extends Phaser.Scene {
         // that were blocking player movement
 
         // --------------------------------------------------------------------
-        // PHYSICS ‑‑ PLAYER  (now Matter)
+        // PHYSICS ‑‑ PLAYER  (using Player class)
         // --------------------------------------------------------------------
-        const playerBodyWidth  = 30;
-        const playerBodyHeight = 50;
-        const sledHeight       = 15;
-        const riderHeight      = playerBodyHeight - sledHeight;
-        const circleRadius     = Math.max(playerBodyWidth, sledHeight) / 1.5;
+        // Initialize the player using the Player class
+        this.player = new Player(this, 200, 100); // scene, x, y
 
-        // build visuals first (unchanged)
-        const riderX = 12; // DO NOT TOUCH
-        const riderY = -sledHeight - (riderHeight - 120 / 2); // DO NOT TOUCH
-        const rider  = this.add.triangle(
-            riderX, riderY,
-            0, -riderHeight / 2,
-            -playerBodyWidth / 2, riderHeight / 2,
-            playerBodyWidth / 2,  riderHeight / 2,
-            this.neonYellow
-        );
-
-        const sledX = 0;
-        const sledY = (playerBodyHeight / 2) - (sledHeight / 2);
-        const sled  = this.add.rectangle(
-            sledX, sledY,
-            playerBodyWidth + 10,
-            sledHeight,
-            this.neonRed
-        );
-        
-        // Store direct references to the rider and sled objects
-        this.rider = rider;
-        this.sled = sled;
-        
-        // Store the original sled position for the tricks
-        this.sledOriginalY = sledY;
-        this.sledOriginalX = sledX;
-
-        // No debug visualization as per UI requirements
-
-        // create container and convert it to Matter
-        this.player = this.add.container(200, 100,
-            [sled, rider]);
-
-        // add a circular Matter body to the container
-        const Bodies = Phaser.Physics.Matter.Matter.Bodies;
-        const playerBody = Bodies.circle(0, 0, circleRadius, {
-            restitution: PhysicsConfig.player.restitution,
-            friction: PhysicsConfig.player.friction,       // Friction from config
-            frictionAir: PhysicsConfig.player.frictionAir, // Air friction from config
-            density: PhysicsConfig.player.density          // Density from config
-        });
-
-        this.matter.add.gameObject(this.player);
-        this.player.setExistingBody(playerBody)
-                   .setFixedRotation(false)      // allow spins for tricks
-                   .setPosition(200, 100);       // re‑centre after body attach
+        // Store direct references to rider and sled for backward compatibility
+        this.rider = this.player.getRider();
+        this.sled = this.player.getSled();
+        this.sledOriginalX = this.player.getOriginalSledX();
+        this.sledOriginalY = this.player.getOriginalSledY();
+        this.sledDistance = this.player.getSledDistance();
 
         // camera follow stays the same
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
@@ -659,6 +611,9 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         
+        // Update the player's visuals to match the physics body
+        this.player.updateVisuals();
+        
         const Body = Phaser.Physics.Matter.Matter.Body;
         
         // Apply a gentle downhill bias force when on ground to prevent sticking
@@ -688,11 +643,11 @@ export default class GameScene extends Phaser.Scene {
                 this.isDragging = false;
                 this.isAirBraking = false;
                 // Reset sled position for walk mode
-                if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1];
+                if (this.player && this.player.getSled()) {
+                    const sled = this.player.getSled();
                     if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = -this.sledDistance; // Position sled behind player
+                        sled.y = this.player.getOriginalSledY();
+                        sled.x = -this.player.getSledDistance(); // Position sled behind player
                     }
                 }
                 // Force immediate HUD update
@@ -701,11 +656,11 @@ export default class GameScene extends Phaser.Scene {
                 // Just switched back to sled mode
                 console.log('Entered sled mode');
                 // Reset sled position for sled mode
-                if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1];
+                if (this.player && this.player.getSled()) {
+                    const sled = this.player.getSled();
                     if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = this.sledOriginalX;
+                        sled.y = this.player.getOriginalSledY();
+                        sled.x = this.player.getOriginalSledX();
                     }
                 }
                 // Force immediate HUD update
@@ -724,11 +679,11 @@ export default class GameScene extends Phaser.Scene {
                 this.isAirBraking = false;
                 
                 // Reset sled position if we were doing a trick that moved it
-                if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1]; // The sled is the second child
+                if (this.player && this.player.getSled()) {
+                    const sled = this.player.getSled();
                     if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = this.sledOriginalX;
+                        sled.y = this.player.getOriginalSledY();
+                        sled.x = this.player.getOriginalSledX();
                     }
                 }
             }
@@ -853,15 +808,15 @@ export default class GameScene extends Phaser.Scene {
             Body.setAngularVelocity(this.player.body, 0);
             
             // Make the sled follow the player on an invisible string
-            if (this.player && this.player.getChildren) {
-                const sled = this.player.getChildren()[1]; // The sled is the second child
+            if (this.player && this.player.getSled()) {
+                const sled = this.player.getSled();
                 if (sled) {
                     // Position the sled behind the player with a slight lag effect
-                    sled.x = -this.sledDistance;
+                    sled.x = -this.player.getSledDistance();
                     
                     // If on ground, make sled stay on ground, otherwise let it follow player's Y
                     if (this.onGround) {
-                        sled.y = this.sledOriginalY;
+                        sled.y = this.player.getOriginalSledY();
                     }
                 }
             }
@@ -896,10 +851,11 @@ export default class GameScene extends Phaser.Scene {
                 }
                 
                 // Move the sled up for parachute trick visual
-                if (this.player && this.sled) {
+                if (this.player && this.player.getSled()) {
+                    const sled = this.player.getSled();
                     const playerHeight = 50; // Use same value as in create()
                     // Apply the visual effect directly to our sled reference
-                    this.sled.y = this.sledOriginalY - (playerHeight * 1.25);
+                    sled.y = this.player.getOriginalSledY() - (playerHeight * 1.25);
                 }
                 
                 // Reduce gravity effect while parachuting
@@ -925,8 +881,9 @@ export default class GameScene extends Phaser.Scene {
                 this.isParachuting = false;
                 
                 // Reset sled position using direct reference
-                if (this.player && this.sled) {
-                    this.sled.y = this.sledOriginalY;
+                if (this.player && this.player.getSled()) {
+                    const sled = this.player.getSled();
+                    sled.y = this.player.getOriginalSledY();
                 }
             }
         }
@@ -956,10 +913,11 @@ export default class GameScene extends Phaser.Scene {
                 }
                 
                 // Move the sled behind the player for airbrake visual
-                if (this.player && this.sled) {
+                if (this.player && this.player.getSled()) {
+                    const sled = this.player.getSled();
                     const playerWidth = 30; // Use same value as in create()
                     // Apply the visual effect directly to our sled reference
-                    this.sled.x = -playerWidth; // Move sled behind player
+                    sled.x = -playerWidth; // Move sled behind player
                 }
                 
                 // Dramatically reduce horizontal velocity while airbraking (80% reduction per second)
@@ -992,8 +950,9 @@ export default class GameScene extends Phaser.Scene {
                 this.isAirBraking = false;
                 
                 // Reset sled position using direct reference
-                if (this.player && this.sled) {
-                    this.sled.x = this.sledOriginalX; // Reset sled horizontal position
+                if (this.player && this.player.getSled()) {
+                    const sled = this.player.getSled();
+                    sled.x = this.player.getOriginalSledX(); // Reset sled horizontal position
                 }
             }
         }
@@ -1877,6 +1836,34 @@ GameScene.prototype.showToast = function(message, duration = 2000) {
             });
         }
     });
+};
+
+// Create particle texture programmatically
+GameScene.prototype.createParticleTexture = function() {
+    // Create a graphics object for generating the particle texture
+    const graphics = this.make.graphics({x: 0, y: 0, add: false});
+    
+    // Create a glowing particle effect
+    const centerColor = 0xffffff; // White center
+    const edgeColor = 0xff8800;   // Orange-yellow glow
+    
+    // Draw outer glow
+    graphics.fillStyle(edgeColor, 0.5);
+    graphics.fillCircle(8, 8, 8);
+    
+    // Draw inner glow
+    graphics.fillStyle(edgeColor, 0.8);
+    graphics.fillCircle(8, 8, 6);
+    
+    // Draw core
+    graphics.fillStyle(centerColor, 1);
+    graphics.fillCircle(8, 8, 4);
+    
+    // Generate the texture
+    graphics.generateTexture('particle', 16, 16);
+    graphics.destroy();
+    
+    console.log('Particle texture created programmatically');
 };
 
 // GameScene is now properly exported as ES module
