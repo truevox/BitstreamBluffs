@@ -25,10 +25,9 @@ export default class GameScene extends Phaser.Scene {
         this.gameOverShown = false; // Track if game over has been shown during this run
         
         // Bind methods to ensure 'this' context is preserved
+        // Only bind methods that are defined inside the class
         this.safePreUpdate = this.safePreUpdate.bind(this);
-        this.manageExtraLives = this.manageExtraLives.bind(this);
-        this.cleanupOffscreenCollectibles = this.cleanupOffscreenCollectibles.bind(this);
-        this.handleResize = this.handleResize.bind(this);
+        // Don't try to bind prototype methods as they're handled differently
 
         // --- unchanged state -------------------------------------------------
         this.player           = null;
@@ -69,6 +68,9 @@ export default class GameScene extends Phaser.Scene {
         
         // --- walking mode state -----------------------------------------------
         this.sledDistance       = 40;      // distance between player and sled when walking
+        this.riderOriginalY    = 0;       // to track original rider position
+        this.walkAnimTime      = 0;       // time accumulator for walking animation
+        this.playerOriginalRotation = 0;  // store original player rotation
         // UI elements
         this.speedText = null;        // Top left - Speed display
         this.altitudeDropText = null; // Top left - Altitude drop display
@@ -87,45 +89,25 @@ export default class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        // Try to load life collectible image
+        console.log('GameScene preload method running');
+        
+        // Load all the game assets
+        this.load.image('ground', 'assets/platform.png');
+        this.load.image('player', 'assets/player.png'); // Fallback if graphics fail
         this.load.image('extraLife', 'assets/extraLife.png');
         
-        // Load particle image for explosion effects
-        this.load.image('particle', 'assets/particle.png');
-        
-        // Handle missing image error
+        // Add custom event listeners for errors
         this.load.on('filecomplete', (key) => {
             if (key === 'extraLife') {
-                console.log('Extra life image loaded successfully');
+                console.log('extraLife image loaded successfully');
             }
         });
         
         this.load.on('loaderror', (file) => {
             if (file.key === 'extraLife') {
-                console.warn('Failed to load extraLife image, creating a fallback');
-                // Create a fallback texture
-                const graphics = this.make.graphics({x: 0, y: 0, add: false});
-                graphics.fillStyle(0xff00ff, 1); // Neon pink
-                graphics.lineStyle(4, 0xffffff, 1); // White border
-                graphics.fillCircle(32, 32, 25);
-                graphics.strokeCircle(32, 32, 25);
-                // Add a heart shape
-                graphics.fillStyle(0xffffff, 1);
-                graphics.fillCircle(24, 24, 8);
-                graphics.fillCircle(40, 24, 8);
-                graphics.fillTriangle(16, 30, 48, 30, 32, 45);
-                
-                // Generate a texture from the graphics object
-                graphics.generateTexture('extraLife', 64, 64);
-            } else if (file.key === 'particle') {
-                console.warn('Failed to load particle image, creating a fallback');
-                // Create a fallback texture for particles
-                const graphics = this.make.graphics({x: 0, y: 0, add: false});
-                graphics.fillStyle(0xffffff, 1); // White
-                graphics.fillCircle(8, 8, 8); // Simple circle particle
-                
-                // Generate a texture from the graphics object
-                graphics.generateTexture('particle', 16, 16);
+                console.warn('Failed to load extraLife image, will create a fallback in create()');
+                // We'll create the fallback texture in create() method instead of here
+                // because the graphics context is more reliable there
             }
         });
     }
@@ -183,6 +165,10 @@ export default class GameScene extends Phaser.Scene {
             playerBodyWidth / 2,  riderHeight / 2,
             this.neonYellow
         );
+        
+        // Store the original rider position for mode transitions
+        this.riderOriginalY = riderY;
+        this.playerOriginalRotation = 0;  // Will be updated during play
 
         const sledX = 0;
         const sledY = (playerBodyHeight / 2) - (sledHeight / 2);
@@ -193,19 +179,24 @@ export default class GameScene extends Phaser.Scene {
             this.neonRed
         );
         
-        // Store direct references to the rider and sled objects
-        this.rider = rider;
-        this.sled = sled;
-        
         // Store the original sled position for the tricks
         this.sledOriginalY = sledY;
         this.sledOriginalX = sledX;
+        
+        // Store a reference to the sled and rider for easier access
+        this.sled = sled;
+        this.rider = rider;
 
         // No debug visualization as per UI requirements
 
         // create container and convert it to Matter
         this.player = this.add.container(200, 100,
             [sled, rider]);
+
+        // Set initial sled visibility based on walk mode
+        if (this.manette && this.manette.walkMode) {
+            sled.visible = false; // Hide sled initially if in walking mode
+        }
 
         // add a circular Matter body to the container
         const Bodies = Phaser.Physics.Matter.Matter.Bodies;
@@ -353,9 +344,6 @@ export default class GameScene extends Phaser.Scene {
                 const Body = Phaser.Physics.Matter.Matter.Body;
                 Body.setVelocity(this.player.body, { x: 0, y: 0 });
                 
-                // Create explosion particle effect
-                this.createExplosionEffect(this.player.x, this.player.y);
-                
                 // Use a life if available, otherwise restart
                 if (this.lives > 0) {
                     this.lives--;
@@ -364,6 +352,10 @@ export default class GameScene extends Phaser.Scene {
                     // Force player into walking mode when they lose a life
                     if (!this.manette.walkMode) {
                         this.manette.walkMode = true;
+                        // Hide the sled when entering walk mode
+                        if (this.sled) {
+                            this.sled.visible = false;
+                        }
                         this.showToast('Walking Mode Activated', 2000);
                         console.log('Forced into walking mode after losing a life');
                     }
@@ -396,6 +388,9 @@ export default class GameScene extends Phaser.Scene {
                     // No lives left and game over hasn't been shown yet
                     console.log('No lives left, preparing to restart scene...');
                     this.gameOverShown = true; // Mark as shown to prevent multiple displays
+                    
+                    // Create explosion effect for the player and sled
+                    this.createPlayerExplosionEffect();
                     
                     // Show game over feedback before restarting, centered on player
                     const gameOverText = this.add.text(
@@ -483,21 +478,24 @@ export default class GameScene extends Phaser.Scene {
             loop: true
         });
 
+        // Create the extraLife texture using our helper method
+        this.createExtraLifeTexture();
+        
         console.log("GameScene setup complete (Matter edition).");
 
         // Set up the resize handler
         this.game.events.on('resize', this.handleResize, this);
     }
-
+    
     // ------------------------------------------------------------------------
     // PLAYER‑TERRAIN angle helper (called from collision handler if wanted)
     // ------------------------------------------------------------------------
     playerHitTerrain(terrainAngleRad) {
         // rotate player gently toward terrain angle on touchdown
-        const targetDeg  = Phaser.Math.RadToDeg(terrainAngleRad);
+        const targetDeg = Phaser.Math.RadToDeg(terrainAngleRad);
         const currentDeg = this.player.angle;
-        const diff       = targetDeg - currentDeg;
-
+        const diff = targetDeg - currentDeg;
+        
         if (Math.abs(diff) > 2) {
             this.player.setAngle(currentDeg + diff * PhysicsConfig.rotation.slopeAlignmentFactor);
         }
@@ -661,6 +659,35 @@ export default class GameScene extends Phaser.Scene {
         
         const Body = Phaser.Physics.Matter.Matter.Body;
         
+        // Update walking animation when in walk mode and A or D is pressed
+        if (this.manette && this.manette.walkMode && this.player) {
+            // Store original rotation when first entering walk mode if not set
+            if (this.playerOriginalRotation === undefined) {
+                this.playerOriginalRotation = this.player.rotation;
+                this.walkAnimTime = 0;
+                console.log('Initializing walk animation, storing original rotation:', this.playerOriginalRotation);
+            }
+            
+            if (this.manette.actions.walkLeft || this.manette.actions.walkRight) {
+                // Update animation timer
+                this.walkAnimTime += delta / 1000; // Convert ms to seconds
+                
+                // Calculate oscillating rotation using sine wave
+                const walkConfig = PhysicsConfig.walkMode;
+                const angleInRadians = Math.sin(this.walkAnimTime * Math.PI * walkConfig.walkAnimSpeed) 
+                                    * (walkConfig.walkAnimRotation * Math.PI / 180);
+                
+                // Apply rotation to player (oscillate around original rotation)
+                this.player.rotation = this.playerOriginalRotation + angleInRadians;
+                
+                // Debug info
+                if (this.scene.game && this.scene.game.config && 
+                    this.scene.game.config.physics && this.scene.game.config.physics.debug) {
+                    console.log(`Walk animation: time=${this.walkAnimTime.toFixed(2)}, angle=${(angleInRadians * 180 / Math.PI).toFixed(2)}°`);
+                }
+            }
+        }
+        
         // Apply a gentle downhill bias force when on ground to prevent sticking
         if (this.onGround && !this.manette.walkMode && this.player.body) {
             // Determine direction from player angle
@@ -679,7 +706,7 @@ export default class GameScene extends Phaser.Scene {
         this.manette.update();
 
         // Handle walk mode transitions (use only this.manette.walkMode)
-        if (this.manette.isActionActive('toggleWalkMode')) {
+        if (this.manette.actions.toggleWalkMode) {
             if (this.manette.walkMode) {
                 // Just switched to walk mode
                 console.log('Entered walk mode');
@@ -687,30 +714,43 @@ export default class GameScene extends Phaser.Scene {
                 this.isParachuting = false;
                 this.isDragging = false;
                 this.isAirBraking = false;
-                // Reset sled position for walk mode
-                if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1];
-                    if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = -this.sledDistance; // Position sled behind player
-                    }
+                
+                // Store current rotation as reference for walking animation
+                this.playerOriginalRotation = this.player.rotation;
+                
+                // Reset sled position for walk mode and hide it
+                if (this.player && this.sled) {
+                    this.sled.visible = false; // Hide the sled in walking mode
+                    this.sled.x = -this.sledDistance; // Position behind player
                 }
-                // Force immediate HUD update
-                this.updateHudText();
+                
+                // Move the rider down in walking mode based on config
+                if (this.rider) {
+                    this.rider.y = this.riderOriginalY + PhysicsConfig.walkMode.riderYOffset; // Move down by configured amount
+                }
             } else {
                 // Just switched back to sled mode
                 console.log('Entered sled mode');
-                // Reset sled position for sled mode
-                if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1];
-                    if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = this.sledOriginalX;
-                    }
+                // Reset sled position for sled mode and show it
+                if (this.player && this.sled) {
+                    this.sled.visible = true; // Show the sled in sledding mode
+                    this.sled.x = this.sledOriginalX; // Restore original position
+                    this.sled.y = this.sledOriginalY; // Ensure correct Y position
                 }
-                // Force immediate HUD update
-                this.updateHudText();
+                
+                // Move the rider back to original position in sledding mode
+                if (this.rider) {
+                    this.rider.y = this.riderOriginalY; // Reset to original Y position
+                }
+                
+                // Reset player rotation to original when exiting walk mode
+                if (this.player) {
+                    this.player.rotation = this.playerOriginalRotation;
+                    this.walkAnimTime = 0; // Reset animation timer
+                }
             }
+            // Force immediate HUD update
+            this.updateHudText();
         }
 
         // Detect transitions between ground and air states
@@ -724,12 +764,10 @@ export default class GameScene extends Phaser.Scene {
                 this.isAirBraking = false;
                 
                 // Reset sled position if we were doing a trick that moved it
-                if (this.player && this.player.getChildren) {
-                    const sled = this.player.getChildren()[1]; // The sled is the second child
-                    if (sled) {
-                        sled.y = this.sledOriginalY;
-                        sled.x = this.sledOriginalX;
-                    }
+                if (this.player && this.sled) {
+                    this.sled.y = this.sledOriginalY;
+                    this.sled.x = this.sledOriginalX;
+                    this.sled.visible = !this.manette.walkMode; // Show sled only in sledding mode
                 }
             }
             // Update previous state for next frame
@@ -778,16 +816,9 @@ export default class GameScene extends Phaser.Scene {
         // --------------------------------------------------------------------
         // WALKING MODE - Tab or L1 toggles between walking and sledding
         // --------------------------------------------------------------------
-        if (this.manette.isWalkMode()) {
+        if (this.manette.walkMode) {
             // We're in walking mode
             const walkSpeed = 1.5; // Constant walking speed
-            
-            // Initialize walk animation state if not already set
-            if (this.walkAnimTime === undefined) {
-                this.walkAnimTime = 0;
-                this.playerOriginalRotation = this.player.rotation;
-                console.log('Initializing walk animation, storing original rotation:', this.playerOriginalRotation);
-            }
             
             // Reset velocities for more precise control
             Body.setVelocity(this.player.body, {
@@ -795,53 +826,18 @@ export default class GameScene extends Phaser.Scene {
                 y: this.player.body.velocity.y // Keep vertical velocity for gravity
             });
             
-            // Check if we're walking in either direction
-            const isWalking = this.manette.isActionActive('walkLeft') || 
-                              this.manette.isActionActive('walkRight') || 
-                              this.cursors.left.isDown || 
-                              this.cursors.right.isDown;
-            
-            // Move left with A key or left stick or cursor left
-            if (this.manette.isActionActive('walkLeft') || this.cursors.left.isDown) {
+            // Move left with A key or left stick
+            if (this.manette.actions.walkLeft) {
                 Body.translate(this.player.body, { x: -walkSpeed, y: 0 });
             }
             
-            // Move right with D key or right stick or cursor right
-            if (this.manette.isActionActive('walkRight') || this.cursors.right.isDown) {
+            // Move right with D key or right stick
+            if (this.manette.actions.walkRight) {
                 Body.translate(this.player.body, { x: walkSpeed, y: 0 });
             }
             
-            // Apply oscillating walking animation when moving
-            if (isWalking) {
-                // Update animation timer
-                this.walkAnimTime += 0.1; // Increment animation time
-                
-                // Calculate oscillating rotation using sine wave
-                // Hardcode some reasonable values if PhysicsConfig.walkMode is undefined
-                const walkAnimSpeed = 10; // Animation frequency - lower is faster
-                const walkAnimRotation = 15; // Max tilt angle in degrees
-                
-                const angleInRadians = Math.sin(this.walkAnimTime * Math.PI / walkAnimSpeed) 
-                                    * (walkAnimRotation * Math.PI / 180);
-                
-                // Apply rotation to player sprite and its physics body
-                this.player.rotation = (this.playerOriginalRotation || 0) + angleInRadians;
-                Body.setAngle(this.player.body, this.player.rotation);
-                
-                console.log(`Walk animation: angle=${(angleInRadians * 180 / Math.PI).toFixed(2)}°`);
-            }
-            
-            // Make the player upright when not walking
-            if (!isWalking) {
-                // Reset to original rotation
-                if (this.playerOriginalRotation !== undefined) {
-                    this.player.rotation = this.playerOriginalRotation;
-                    Body.setAngle(this.player.body, this.player.rotation);
-                }
-            }
-            
             // Tiny jump in walk mode
-            if (this.manette.isActionActive('jump') && this.onGround) {
+            if (this.manette.actions.jump && this.onGround) {
                 Body.setVelocity(this.player.body,
                     { x: this.player.body.velocity.x, y: PhysicsConfig.jump.walkJumpVelocity }); // Walk mode jump
                 this.onGround = false;
@@ -851,214 +847,192 @@ export default class GameScene extends Phaser.Scene {
             const targetAngle = 0; // Upright
             Body.setAngle(this.player.body, targetAngle);
             Body.setAngularVelocity(this.player.body, 0);
-            
-            // Make the sled follow the player on an invisible string
-            if (this.player && this.player.getChildren) {
-                const sled = this.player.getChildren()[1]; // The sled is the second child
-                if (sled) {
-                    // Position the sled behind the player with a slight lag effect
-                    sled.x = -this.sledDistance;
+        }
+        // If not in walk mode, handle other trick actions
+        else {
+            // --------------------------------------------------------------------
+            // TRICK ACTION - D key/right on left stick (normal sled mode)
+            // --------------------------------------------------------------------
+            // Handle tuck or parachute trick based on ground state
+            if (this.manette.actions.trickAction) {
+                if (this.onGround) {
+                    // TUCKING - on ground for speed boost
+                    if (!this.isTucking) {
+                        this.isTucking = true;
+                        this.showToast('Speed Boost!', 1500);
+                    }
                     
-                    // If on ground, make sled stay on ground, otherwise let it follow player's Y
-                    if (this.onGround) {
-                        sled.y = this.sledOriginalY;
+                    // Apply additional forward force while tucking
+                    // Use the current speed multiplier for added boost when landing tricks
+                    const tuckBoostForce = 0.003 * this.currentSpeedMultiplier; 
+                    Body.applyForce(this.player.body,
+                        this.player.body.position,
+                        { x: tuckBoostForce, y: 0 });
+                } else {
+                    // PARACHUTE TRICK - in air
+                    if (!this.isParachuting) {
+                        this.isParachuting = true;
+                        this.showToast('Parachute!', 1500);
+                    }
+                    
+                    // Move the sled up for parachute trick visual
+                    if (this.sled) {
+                        const playerHeight = 50; // Use same value as in create()
+                        this.sled.y = this.sledOriginalY - (playerHeight * 1.25);
+                    }
+                    
+                    // Reduce gravity effect while parachuting
+                    Body.applyForce(this.player.body,
+                        this.player.body.position,
+                        { x: 0, y: -0.1 }); // Small upward force to simulate floating
+                    
+                    // Preserve horizontal velocity
+                    const currentVelocity = this.player.body.velocity;
+                    const horizontalPreservation = 1.01; // Almost no horizontal drag
+                    Body.setVelocity(this.player.body, {
+                        x: currentVelocity.x * horizontalPreservation,
+                        y: currentVelocity.y
+                    });
+                }
+            } else {
+                // Reset trick states when button released
+                if (this.isTucking) {
+                    this.isTucking = false;
+                }
+                
+                if (this.isParachuting) {
+                    this.isParachuting = false;
+                    
+                    // Reset sled position
+                    if (this.sled) {
+                        this.sled.y = this.sledOriginalY;
                     }
                 }
             }
             
-            // Skip other control handlers when in walk mode
-            return;
-        }
-        
-        // --------------------------------------------------------------------
-        // TRICK ACTION - D key/right on left stick (normal sled mode)
-        // --------------------------------------------------------------------
-        // Handle tuck or parachute trick based on ground state
-        if (this.manette.isActionActive('trickAction')) {
-            if (this.onGround) {
-                // TUCKING - on ground for speed boost
-                if (!this.isTucking) {
-                    this.isTucking = true;
-                    this.showToast('Speed Boost!', 1500);
+            // --------------------------------------------------------------------
+            // BRAKE ACTION - A key/left on left stick
+            // --------------------------------------------------------------------
+            // Handle drag or airbrake based on ground state
+            if (this.manette.actions.brakeAction) {
+                if (this.onGround) {
+                    // DRAGGING - on ground for slight speed reduction
+                    if (!this.isDragging) {
+                        this.isDragging = true;
+                        this.showToast('Dragging!', 1500);
+                    }
+                    
+                    // Apply backward force to slow down
+                    const dragForce = 0.1; // Slows speed slightly - tune to taste
+                    Body.applyForce(this.player.body,
+                        this.player.body.position,
+                        { x: -dragForce, y: 0 });
+                } else {
+                    // AIRBRAKE TRICK - in air for dramatic speed reduction
+                    if (!this.isAirBraking) {
+                        this.isAirBraking = true;
+                        this.showToast('Air Brake!', 1500);
+                    }
+                    
+                    // Move the sled behind the player for airbrake visual
+                    if (this.sled) {
+                        const playerWidth = 30; // Use same value as in create()
+                        this.sled.x = -playerWidth; // Move sled behind player
+                    }
+                    
+                    // Dramatically reduce horizontal velocity while airbraking (80% reduction per second)
+                    // Calculate the delta reduction based on frame rate
+                    const currentVelocity = this.player.body.velocity;
+                    const reductionRate = 1.2; // 80% reduction per second
+                    const frameReduction = reductionRate / 60; // Assuming 60fps, adjust per frame
+                    
+                    // Calculate new velocity with reduction, but keep a minimum speed
+                    const minSpeed = 0.1; // Minimum speed to maintain
+                    let newXVel = currentVelocity.x * (1 - frameReduction);
+                    
+                    // Ensure we don't drop below minimum speed in either direction
+                    if (Math.abs(newXVel) < minSpeed) {
+                        newXVel = minSpeed * Math.sign(currentVelocity.x);
+                    }
+                    
+                    Body.setVelocity(this.player.body, {
+                        x: newXVel,
+                        y: currentVelocity.y
+                    });
                 }
-                
-                // Apply additional forward force while tucking
-                // Use the current speed multiplier for added boost when landing tricks
-                const tuckBoostForce = 0.003 * this.currentSpeedMultiplier; 
-                Body.applyForce(this.player.body,
-                    this.player.body.position,
-                    { x: tuckBoostForce, y: 0 });
             } else {
-                // PARACHUTE TRICK - in air
-                if (!this.isParachuting) {
-                    this.isParachuting = true;
-                    this.showToast('Parachute!', 1500);
+                // Reset brake states when button released
+                if (this.isDragging) {
+                    this.isDragging = false;
                 }
                 
-                // Move the sled up for parachute trick visual
-                if (this.player && this.sled) {
-                    const playerHeight = 50; // Use same value as in create()
-                    // Apply the visual effect directly to our sled reference
-                    this.sled.y = this.sledOriginalY - (playerHeight * 1.25);
+                if (this.isAirBraking) {
+                    this.isAirBraking = false;
+                    
+                    // Reset sled position
+                    if (this.sled) {
+                        this.sled.x = this.sledOriginalX; // Reset sled horizontal position
+                    }
+                }
+            }
+            
+            // For air rotation, check input state and apply or reset rotation accordingly
+            if (!this.onGround) {
+                let deltaRotation = 0;
+                
+                // W key/left-stick up for counter-clockwise rotation in air
+                if (this.manette.actions.rotateCounterClockwise) {
+                    Body.setAngularVelocity(this.player.body, -airRotVel);
+                    deltaRotation = -Phaser.Math.RadToDeg(airRotVel);
+                }
+                // S key/left-stick down for clockwise rotation in air
+                else if (this.manette.actions.rotateClockwise) {
+                    Body.setAngularVelocity(this.player.body, airRotVel);
+                    deltaRotation = Phaser.Math.RadToDeg(airRotVel);
+                }
+                // If neither rotation key is pressed, stop rotation immediately
+                else {
+                    Body.setAngularVelocity(this.player.body, 0);
                 }
                 
-                // Reduce gravity effect while parachuting
-                Body.applyForce(this.player.body,
-                    this.player.body.position,
-                    { x: 0, y: -0.1 }); // Small upward force to simulate floating
-                
-                // Preserve horizontal velocity
-                const currentVelocity = this.player.body.velocity;
-                const horizontalPreservation = 1.01; // Almost no horizontal drag
-                Body.setVelocity(this.player.body, {
-                    x: currentVelocity.x * horizontalPreservation,
-                    y: currentVelocity.y
+                // Update rotation system with current state
+                const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
+                this.rotationSystem.update({
+                    grounded: this.onGround,
+                    currentAngle: currentAngleDeg,
+                    deltaRotation: deltaRotation
                 });
             }
-        } else {
-            // Reset trick states when button released
-            if (this.isTucking) {
-                this.isTucking = false;
-            }
-            
-            if (this.isParachuting) {
-                this.isParachuting = false;
+            // When on ground, reset angular velocity and align to slope
+            else if (this.onGround) {
+                Body.setAngularVelocity(this.player.body, 0);
+                // gently align to slope
+                this.playerHitTerrain(this.currentSlopeAngle);
                 
-                // Reset sled position using direct reference
-                if (this.player && this.sled) {
-                    this.sled.y = this.sledOriginalY;
-                }
-            }
-        }
-        
-        // --------------------------------------------------------------------
-        // BRAKE ACTION - A key/left on left stick
-        // --------------------------------------------------------------------
-        // Handle drag or airbrake based on ground state
-        if (this.manette.isActionActive('brakeAction')) {
-            if (this.onGround) {
-                // DRAGGING - on ground for slight speed reduction
-                if (!this.isDragging) {
-                    this.isDragging = true;
-                    this.showToast('Dragging!', 1500);
-                }
-                
-                // Apply backward force to slow down
-                const dragForce = 0.1; // Slows speed slightly - tune to taste
-                Body.applyForce(this.player.body,
-                    this.player.body.position,
-                    { x: -dragForce, y: 0 });
-            } else {
-                // AIRBRAKE TRICK - in air for dramatic speed reduction
-                if (!this.isAirBraking) {
-                    this.isAirBraking = true;
-                    this.showToast('Air Brake!', 1500);
-                }
-                
-                // Move the sled behind the player for airbrake visual
-                if (this.player && this.sled) {
-                    const playerWidth = 30; // Use same value as in create()
-                    // Apply the visual effect directly to our sled reference
-                    this.sled.x = -playerWidth; // Move sled behind player
-                }
-                
-                // Dramatically reduce horizontal velocity while airbraking (80% reduction per second)
-                // Calculate the delta reduction based on frame rate
-                const currentVelocity = this.player.body.velocity;
-                const reductionRate = 1.2; // 80% reduction per second
-                const frameReduction = reductionRate / 60; // Assuming 60fps, adjust per frame
-                
-                // Calculate new velocity with reduction, but keep a minimum speed
-                const minSpeed = 0.1; // Minimum speed to maintain
-                let newXVel = currentVelocity.x * (1 - frameReduction);
-                
-                // Ensure we don't drop below minimum speed in either direction
-                if (Math.abs(newXVel) < minSpeed) {
-                    newXVel = minSpeed * Math.sign(currentVelocity.x);
-                }
-                
-                Body.setVelocity(this.player.body, {
-                    x: newXVel,
-                    y: currentVelocity.y
+                // Update rotation system with current ground state
+                const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
+                this.rotationSystem.update({
+                    grounded: this.onGround,
+                    currentAngle: currentAngleDeg,
+                    deltaRotation: 0
                 });
             }
-        } else {
-            // Reset brake states when button released
-            if (this.isDragging) {
-                this.isDragging = false;
-            }
-            
-            if (this.isAirBraking) {
-                this.isAirBraking = false;
+
+            // --------------------------------------------------------------------
+            // JUMP - using space bar only via Manette
+            // --------------------------------------------------------------------
+            if (this.manette.actions.jump && this.onGround) {
+                Body.setVelocity(this.player.body,
+                    { x: this.player.body.velocity.x, y: PhysicsConfig.jump.jumpVelocity });
+                this.onGround = false;
                 
-                // Reset sled position using direct reference
-                if (this.player && this.sled) {
-                    this.sled.x = this.sledOriginalX; // Reset sled horizontal position
-                }
+                // Reset speed multiplier on jump
+                this.currentSpeedMultiplier = 1.0;
             }
-        }
-        
-        // For air rotation, check input state and apply or reset rotation accordingly
-        if (!this.onGround) {
-            let deltaRotation = 0;
-            
-            // Use a lower air rotation velocity to prevent physics issues
-            const safeAirRotVel = Math.min(airRotVel, 0.05); // Cap rotation speed to prevent physics glitches
-            
-            // W key/left-stick up for counter-clockwise rotation in air
-            if (this.manette.isActionActive('rotateCounterClockwise')) {
-                // Apply the rotation directly rather than through angular velocity
-                // This is more stable for physics simulations
-                this.player.rotation -= safeAirRotVel;
-                Body.setAngle(this.player.body, this.player.rotation);
-                deltaRotation = -Phaser.Math.RadToDeg(safeAirRotVel);
-            }
-            // S key/left-stick down for clockwise rotation in air
-            else if (this.manette.isActionActive('rotateClockwise')) {
-                // Apply the rotation directly rather than through angular velocity
-                this.player.rotation += safeAirRotVel;
-                Body.setAngle(this.player.body, this.player.rotation);
-                deltaRotation = Phaser.Math.RadToDeg(safeAirRotVel);
-            }
-            // No need for an else case - we'll preserve current rotation
-            
-            // Update rotation system with current state
-            const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
-            this.rotationSystem.update({
-                grounded: this.onGround,
-                currentAngle: currentAngleDeg,
-                deltaRotation: deltaRotation
-            });
-        }
-        // When on ground, reset angular velocity and align to slope
-        else if (this.onGround) {
-            Body.setAngularVelocity(this.player.body, 0);
-            // gently align to slope
-            this.playerHitTerrain(this.currentSlopeAngle);
-            
-            // Update rotation system with current ground state
-            const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
-            this.rotationSystem.update({
-                grounded: this.onGround,
-                currentAngle: currentAngleDeg,
-                deltaRotation: 0
-            });
         }
 
         // --------------------------------------------------------------------
-        // JUMP - using space bar only via Manette
-        // --------------------------------------------------------------------
-        if (this.manette.isActionActive('jump') && this.onGround) {
-            Body.setVelocity(this.player.body,
-                { x: this.player.body.velocity.x, y: PhysicsConfig.jump.jumpVelocity });
-            this.onGround = false;
-            
-            // Reset speed multiplier on jump
-            this.currentSpeedMultiplier = 1.0;
-        }
-
-        // --------------------------------------------------------------------
-        // camera, terrain churn, fail states (unchanged)
+        // camera, terrain churn, fail states
         // --------------------------------------------------------------------
         this.manageTerrain();
 
@@ -1077,517 +1051,403 @@ export default class GameScene extends Phaser.Scene {
         this.updateHudText();
         
         // --------------------------------------------------------------------
+    
+        // Update the HUD text every frame
+        this.updateHudText();
+        
         // Extra life spawning logic - only if we have a valid player
-        // --------------------------------------------------------------------
         try {
             if (this.player && this.player.body && this.player.body.position) {
+                // Manage extra lives spawning and collection
                 this.manageExtraLives(time);
             }
         } catch (error) {
             console.error('Error managing extra lives:', error);
         }
+    } // End of update method
+
+// Helper method to update the HUD text
+updateHudText() {
+        // DRAGGING - on ground for slight speed reduction
+        if (!this.isDragging) {
+            this.isDragging = true;
+            this.showToast('Dragging!', 1500);
+        }
         
-        // HUD is now managed by updateHudText method
-        // No debug HUD is displayed
+        // Apply backward force to slow down
+        const dragForce = 0.1; // Slows speed slightly - tune to taste
+        Body.applyForce(this.player.body,
+            this.player.body.position,
+            { x: -dragForce, y: 0 });
+    } else {
+        // AIRBRAKE TRICK - in air for dramatic speed reduction
+        if (!this.isAirBraking) {
+            this.isAirBraking = true;
+            this.showToast('Air Brake!', 1500);
+        }
+        
+        // Move the sled behind the player for airbrake visual
+        if (this.sled) {
+            const playerWidth = 30; // Use same value as in create()
+            this.sled.x = -playerWidth; // Move sled behind player
+        }
+        
+        // Dramatically reduce horizontal velocity while airbraking (80% reduction per second)
+        // Calculate the delta reduction based on frame rate
+        const currentVelocity = this.player.body.velocity;
+        const reductionRate = 1.2; // 80% reduction per second
+        const frameReduction = reductionRate / 60; // Assuming 60fps, adjust per frame
+        
+        // Calculate new velocity with reduction, but keep a minimum speed
+        const minSpeed = 0.1; // Minimum speed to maintain
+        let newXVel = currentVelocity.x * (1 - frameReduction);
+        
+        // Ensure we don't drop below minimum speed in either direction
+        if (Math.abs(newXVel) < minSpeed) {
+            newXVel = minSpeed * Math.sign(currentVelocity.x);
+        }
+        
+        Body.setVelocity(this.player.body, {
+            x: newXVel,
+            y: currentVelocity.y
+        });
+    }
+} else {
+    // Reset brake states when button released
+    if (this.isDragging) {
+        this.isDragging = false;
     }
     
-    // Helper method to update the HUD text
-    updateHudText() {
-        if (!this.player || !this.player.body) return;
+    if (this.isAirBraking) {
+        this.isAirBraking = false;
         
-        // Get player speed (absolute value of x velocity)
-        const speed = Math.abs(this.player.body.velocity.x).toFixed(2);
-        
-        // Set initial Y position if not set yet
-        if (this.initialY === 0) {
-            this.initialY = this.player.y;
-        }
-        
-        // Calculate total altitude drop from start of run
-        const currentY = this.player.y;
-        const totalAltitudeDrop = Math.max(0, (currentY - this.initialY)).toFixed(2);
-        
-        // Update speed text
-        if (this.speedText) {
-            this.speedText.setText(`Speed: ${speed}`);
-        }
-        
-        // Update altitude drop text
-        if (this.altitudeDropText) {
-            this.altitudeDropText.setText(`Altitude Drop: ${totalAltitudeDrop}`);
-        }
-        
-        // Update points (placeholder for now)
-        if (this.pointsText) {
-            this.pointsText.setText('Points: 0');
-        }
-        
-        // Update lives display
-        this.updateLivesDisplay();
-    }
-    
-    // Helper method to update the lives display with yellow triangles
-    updateLivesDisplay() {
-        if (!this.livesDisplay) return;
-        
-        // Clear previous lives display
-        this.livesDisplay.clear();
-        
-        // Get player's current rotation
-        const playerRotation = this.player ? this.player.rotation : 0;
-        
-        // Draw one triangle per life
-        const triangleSize = 15;
-        const spacing = triangleSize * 2;
-        
-        for (let i = 0; i < this.lives; i++) {
-            // Position each triangle with proper spacing
-            const x = i * spacing;
-            const y = 0;
-            
-            // Draw a yellow triangle that mimics the player's rotation
-            this.livesDisplay.fillStyle(this.neonYellow, 1);
-            this.livesDisplay.beginPath();
-            
-            // Create triangle points (pointing right by default)
-            const points = [
-                { x: 0, y: -triangleSize/2 },    // Top point
-                { x: triangleSize, y: 0 },        // Right point
-                { x: 0, y: triangleSize/2 }       // Bottom point
-            ];
-            
-            // Apply rotation that matches the player
-            const rotatedPoints = points.map(point => {
-                const rotX = point.x * Math.cos(playerRotation) - point.y * Math.sin(playerRotation);
-                const rotY = point.x * Math.sin(playerRotation) + point.y * Math.cos(playerRotation);
-                return { x: rotX + x, y: rotY + y };
-            });
-            
-            // Draw the triangle
-            this.livesDisplay.moveTo(rotatedPoints[0].x, rotatedPoints[0].y);
-            this.livesDisplay.lineTo(rotatedPoints[1].x, rotatedPoints[1].y);
-            this.livesDisplay.lineTo(rotatedPoints[2].x, rotatedPoints[2].y);
-            this.livesDisplay.closePath();
-            this.livesDisplay.fillPath();
-        }
-    }
-    
-    // Helper to collect an extra life - COMPLETELY REWRITTEN
-    collectExtraLife(collider) {
-        // Check if the collider is valid
-        if (!collider) {
-            console.warn('Attempted to collect invalid life object');
-            return;
-        }
-        
-        // Find the sprite object associated with this collider
-        let sprite = null;
-        let collectibleIndex = -1;
-        
-        // First safely find the sprite and index in our array
-        try {
-            if (collider.gameObject) {
-                sprite = collider.gameObject;
-            } else {
-                // If there's no direct reference, try to find it in our array
-                for (let i = 0; i < this.lifeCollectibles.length; i++) {
-                    const item = this.lifeCollectibles[i];
-                    if (item && item.collider === collider) {
-                        sprite = item;
-                        collectibleIndex = i;
-                        break;
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error finding sprite for collectible:', error);
-        }
-        
-        // Only collect if we're not at max lives
-        if (this.lives < this.maxLives) {
-            // Increase lives count
-            this.lives++;
-            this.updateLivesDisplay();
-            
-            try {
-                // Get position for effect
-                let effectX = this.player.x;
-                let effectY = this.player.y;
-                
-                // Use sprite position if available
-                if (sprite && typeof sprite.x !== 'undefined') {
-                    effectX = sprite.x;
-                    effectY = sprite.y;
-                } 
-                // Or use collider position if available
-                else if (collider.position) {
-                    effectX = collider.position.x;
-                    effectY = collider.position.y;
-                }
-                
-                // Visual feedback for collecting a life
-                const collectEffect = this.add.circle(
-                    effectX, effectY, 30, 0xffff00, 0.7
-                );
-                
-                // Simple animation for collection effect
-                this.tweens.add({
-                    targets: collectEffect,
-                    scale: 2,
-                    alpha: 0,
-                    duration: 300,
-                    onComplete: () => {
-                        if (collectEffect && !collectEffect.destroyed) {
-                            collectEffect.destroy();
-                        }
-                    }
-                });
-                
-                // Update timing variables
-                this.lastLifeCollectTime = this.time.now;
-                // Next life available between min and max time from config
-                const nextDelay = Phaser.Math.Between(
-                    PhysicsConfig.extraLives.minTimeToNextLife, 
-                    PhysicsConfig.extraLives.maxTimeToNextLife
-                );
-                this.nextLifeAvailableTime = this.time.now + nextDelay;
-                
-                // Safe cleanup of the physics body
-                if (this.matter && this.matter.world && collider) {
-                    try {
-                        this.matter.world.remove(collider);
-                    } catch (e) {
-                        console.warn('Error removing collider:', e);
-                    }
-                }
-                
-                // Safe removal from our array
-                if (collectibleIndex >= 0) {
-                    this.lifeCollectibles.splice(collectibleIndex, 1);
-                } else {
-                    this.lifeCollectibles = this.lifeCollectibles.filter(item => {
-                        return item !== sprite && item.collider !== collider;
-                    });
-                }
-                
-                // Finally destroy the sprite object if it exists
-                if (sprite && !sprite.destroyed) {
-                    try {
-                        sprite.destroy();
-                    } catch (e) {
-                        console.warn('Error destroying sprite:', e);
-                    }
-                }
-                
-                console.log('Successfully collected extra life. Lives:', this.lives);
-            } catch (error) {
-                console.error('Error in collectExtraLife:', error);
-            }
-        }
-    }
-    
-    // Helper to manage extra life collectibles - SIMPLIFIED
-    manageExtraLives(currentTime) {
-        // Multiple safety checks to avoid crashing
-        if (!this.scene || !this.scene.isActive || !this.scene.isActive()) {
-            return; // Exit if the scene isn't active
-        }
-        
-        if (!this.player || !this.player.body || !this.player.body.position) {
-            return; // Exit early if player doesn't exist or isn't initialized
-        }
-        
-        try {
-            // Initialize the collectibles array if needed
-            if (!this.lifeCollectibles) {
-                this.lifeCollectibles = [];
-            }
-            
-            // Clean up off-screen collectibles (safely)
-            this.cleanupOffscreenCollectibles();
-            
-            // Only spawn if conditions are all met
-            const canSpawn = currentTime > this.nextLifeAvailableTime && 
-                           Array.isArray(this.lifeCollectibles) && 
-                           this.lifeCollectibles.length < 2 && 
-                           this.lives < PhysicsConfig.extraLives.maxLives;
-                           
-            if (canSpawn) {
-                // Only spawn with a 20% chance each cycle - prevents too many spawns
-                if (Math.random() < 0.2) {
-                    console.log('Spawning new extra life collectible');
-                    this.spawnExtraLife();
-                    // Update next available time regardless of successful spawn
-                    this.nextLifeAvailableTime = currentTime + Phaser.Math.Between(
-                        PhysicsConfig.extraLives.minTimeToNextLife, 
-                        PhysicsConfig.extraLives.maxTimeToNextLife
-                    );
-                }
-            }
-        } catch (error) {
-            console.error('Error in manageExtraLives:', error);
-            // Reset collectibles array if there was an error
-            this.lifeCollectibles = [];
-        }
-    }
-    
-    // Helper to clean up off-screen collectibles - COMPLETELY REWRITTEN FOR SAFETY
-    cleanupOffscreenCollectibles() {
-        if (!this.cameras || !this.cameras.main || !this.player) {
-            return; // Exit if cameras or player aren't initialized
-        }
-        
-        // Reset the array if it's not valid
-        if (!this.lifeCollectibles || !Array.isArray(this.lifeCollectibles)) {
-            this.lifeCollectibles = []; 
-            return;
-        }
-        
-        try {
-            // Instead of checking positions which might cause errors,
-            // we'll simply remove collectibles that have been around too long
-            const maxDistance = 3000; // Maximum distance from player in any direction
-            const playerPos = this.player.body ? this.player.body.position : { x: 0, y: 0 };
-            
-            // Create a new filtered array instead of modifying the existing one
-            const newCollectibles = [];
-            
-            // Process each collectible safely
-            for (let i = 0; i < this.lifeCollectibles.length; i++) {
-                const collectible = this.lifeCollectibles[i];
-                
-                // Skip invalid collectibles
-                if (!collectible || collectible.destroyed || collectible.isBeingDestroyed) {
-                    continue;
-                }
-                
-                // Safe distance check - if we can't get position, remove it
-                let keepCollectible = true;
-                try {
-                    // Only attempt to check position if the object exists and has these properties
-                    if (collectible.body && collectible.body.position) {
-                        const dx = collectible.body.position.x - playerPos.x;
-                        const dy = collectible.body.position.y - playerPos.y;
-                        const distanceSquared = dx * dx + dy * dy;
-                        
-                        // Remove if too far from player
-                        if (distanceSquared > maxDistance * maxDistance) {
-                            keepCollectible = false;
-                        }
-                    } else if (collectible.x !== undefined && collectible.y !== undefined) {
-                        // Fallback to direct x/y if they exist
-                        const dx = collectible.x - playerPos.x;
-                        const dy = collectible.y - playerPos.y;
-                        const distanceSquared = dx * dx + dy * dy;
-                        
-                        // Remove if too far from player
-                        if (distanceSquared > maxDistance * maxDistance) {
-                            keepCollectible = false;
-                        }
-                    } else {
-                        // No valid position properties, remove it
-                        keepCollectible = false;
-                    }
-                } catch (e) {
-                    // If any error occurs while checking position, remove the collectible
-                    keepCollectible = false;
-                }
-                
-                // Process the collectible
-                if (keepCollectible) {
-                    newCollectibles.push(collectible);
-                } else {
-                    // Safely remove the collectible
-                    try {
-                        // Remove physics body if it exists
-                        if (collectible.body && this.matter && this.matter.world) {
-                            this.matter.world.remove(collectible.body);
-                        }
-                        
-                        // Mark as being destroyed to prevent other code from using it
-                        collectible.isBeingDestroyed = true;
-                        
-                        // Kill any tweens associated with this object
-                        if (this.tweens) {
-                            this.tweens.killTweensOf(collectible);
-                        }
-                        
-                        // Finally destroy the object
-                        collectible.destroy();
-                    } catch (destroyError) {
-                        console.warn('Error safely destroying collectible:', destroyError);
-                    }
-                }
-            }
-            
-            // Replace the old array with our new filtered array
-            this.lifeCollectibles = newCollectibles;
-        } catch (error) {
-            console.error('Error in cleanupOffscreenCollectibles:', error);
-            // Reset the array to be safe
-            this.lifeCollectibles = [];
-        }
-    }
-    
-    // Helper to find terrain height at a given X position
-    findTerrainHeightAt(xPos) {
-        if (!this.terrainSegments || this.terrainSegments.length === 0) {
-            return 500; // Default height if no terrain
-        }
-        
-        // Find the terrain segment that contains this X position
-        for (let i = 0; i < this.terrainSegments.length; i++) {
-            const segment = this.terrainSegments[i];
-            if (xPos >= segment.x1 && xPos <= segment.x2) {
-                // Found the segment, now interpolate Y based on X position
-                const ratio = (xPos - segment.x1) / (segment.x2 - segment.x1);
-                const terrainHeight = Phaser.Math.Linear(segment.y1, segment.y2, ratio);
-                return terrainHeight;
-            }
-        }
-        
-        // If we're beyond the last segment, use the last segment's end point
-        const lastSegment = this.terrainSegments[this.terrainSegments.length - 1];
-        return lastSegment.y2;
-    }
-    
-    // Helper to spawn an extra life collectible - COMPLETELY REWRITTEN
-    spawnExtraLife() {
-        // Make sure player exists and has a valid position
-        if (!this.player || !this.player.body || !this.player.body.position) {
-            console.warn('Cannot spawn extra life: player position is invalid');
-            return null;
-        }
-        
-        try {
-            // Get player position safely
-            const playerPos = this.player.body.position;
-            
-            // Calculate a safe position in front of the player
-            const spawnX = playerPos.x + PhysicsConfig.extraLives.spawnDistance; // Distance from config
-            
-            // Find the terrain height directly below the spawn point
-            const terrainHeight = this.findTerrainHeightAt(spawnX);
-            
-            // Calculate player sprite height (approximated from player body + sled height)
-            const playerSpriteHeight = 50; // Player body height from create() method
-            
-            // Position powerup above terrain but not too high (less than 7 player sprite heights)
-            const maxHeightAboveTerrain = playerSpriteHeight * 6; // Less than 7 sprite heights
-            const minHeightAboveTerrain = playerSpriteHeight * 2; // At least 2 sprite heights for safety
-            
-            // Random height between min and max, but ensure it's at a reasonable height
-            const heightAboveTerrain = Phaser.Math.Between(minHeightAboveTerrain, maxHeightAboveTerrain);
-            const spawnY = terrainHeight - heightAboveTerrain; // Subtract because Y increases downward
-            
-            // Create our fallback texture if needed
-            if (!this.textures.exists('extraLife')) {
-                this.createExtraLifeTexture();
-            }
-            
-            // Create static sprite instead of physics object - MUCH SAFER
-            const lifeCollectible = this.add.sprite(spawnX, spawnY, 'extraLife');
-            
-            // Scale to appropriate size
-            lifeCollectible.setScale(0.5);
-            
-            // Set depth to ensure it appears above terrain
-            lifeCollectible.setDepth(10);
-            
-            // Create a STATIC circular collision area that won't be affected by gravity
-            const collider = this.matter.add.circle(spawnX, spawnY, PhysicsConfig.extraLives.collectibleRadius, {
-                isSensor: true,
-                isExtraLife: true,
-                label: 'extraLife',
-                isStatic: true, // Make it static so it doesn't fall
-            });
-            
-            // Store references to link the sprite and physics body
-            lifeCollectible.collider = collider;
-            collider.gameObject = lifeCollectible;
-            
-            // Store original Y position for hover animation
-            lifeCollectible.originalY = spawnY;
-            
-            // Set basic properties
-            lifeCollectible.isExtraLife = true;
-            
-            // Add to our tracking array
-            if (!this.lifeCollectibles) {
-                this.lifeCollectibles = [];
-            }
-            this.lifeCollectibles.push(lifeCollectible);
-            
-            // Calculate hover distance (approximately 3 sprite widths)
-            const spriteWidth = PhysicsConfig.extraLives.collectibleRadius * 2;
-            const hoverDistance = spriteWidth * 3; // 3 sprite widths as requested
-            
-            // Instead of tweening the physics body directly (which can cause issues),
-            // We'll use a tween on a dummy object and update manually
-            const hoverController = { y: 0 };
-            
-            // Add hover animation with tweens
-            this.tweens.add({
-                targets: hoverController,
-                y: 1,                      // Normalize from 0 to 1 for easier math
-                duration: 2000,            // 2 seconds for one direction
-                ease: 'Sine.easeInOut',    // Smooth sine wave motion
-                yoyo: true,                // Makes it go back down
-                repeat: -1,                // Repeat indefinitely
-                onUpdate: () => {
-                    if (collider && !collider.isStatic) {
-                        // If somehow the body became non-static, make it static again
-                        this.matter.body.setStatic(collider, true);
-                    }
-                    
-                    if (collider && collider.position && !lifeCollectible.destroyed) {
-                        // Calculate Y position based on sine wave (0-1 normalized value)
-                        const offset = Math.sin(hoverController.y * Math.PI) * hoverDistance;
-                        
-                        // Update the static body position directly
-                        this.matter.body.setPosition(collider, {
-                            x: collider.position.x,
-                            y: spawnY - offset
-                        });
-                        
-                        // Update sprite to match collider
-                        lifeCollectible.x = collider.position.x;
-                        lifeCollectible.y = collider.position.y;
-                    }
-                }
-            });
-            
-            console.log(`Spawned powerup at X: ${spawnX}, Y: ${spawnY} (${heightAboveTerrain}px above terrain)`);
-            return lifeCollectible;
-        } catch (error) {
-            console.error('Error spawning extra life:', error);
-            return null;
-        }
-    }
-    
-    // Helper to create the extraLife texture
-    createExtraLifeTexture() {
-        try {
-            // Create a fallback texture
-            const graphics = this.make.graphics({x: 0, y: 0, add: false});
-            graphics.fillStyle(0xff00ff, 1); // Neon pink
-            graphics.lineStyle(4, 0xffffff, 1); // White border
-            graphics.fillCircle(32, 32, 25);
-            graphics.strokeCircle(32, 32, 25);
-            // Add a heart shape
-            graphics.fillStyle(0xffffff, 1);
-            graphics.fillCircle(24, 24, 8);
-            graphics.fillCircle(40, 24, 8);
-            graphics.fillTriangle(16, 30, 48, 30, 32, 45);
-            
-            // Generate a texture from the graphics object
-            graphics.generateTexture('extraLife', 64, 64);
-            console.log('Created fallback extraLife texture');
-        } catch (error) {
-            console.error('Error creating extraLife texture:', error);
+        // Reset sled position
+        if (this.sled) {
+            this.sled.x = this.sledOriginalX; // Reset sled horizontal position
         }
     }
 }
+
+// For air rotation, check input state and apply or reset rotation accordingly
+if (!this.onGround) {
+    let deltaRotation = 0;
+    
+    // W key/left-stick up for counter-clockwise rotation in air
+    if (this.manette.actions.rotateCounterClockwise) {
+        Body.setAngularVelocity(this.player.body, -airRotVel);
+        deltaRotation = -Phaser.Math.RadToDeg(airRotVel);
+    }
+    // S key/left-stick down for clockwise rotation in air
+    else if (this.manette.actions.rotateClockwise) {
+        Body.setAngularVelocity(this.player.body, airRotVel);
+        deltaRotation = Phaser.Math.RadToDeg(airRotVel);
+    }
+    // If neither rotation key is pressed, stop rotation immediately
+    else {
+        Body.setAngularVelocity(this.player.body, 0);
+    }
+    
+    // Update rotation system with current state
+    const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
+    this.rotationSystem.update({
+        grounded: this.onGround,
+        currentAngle: currentAngleDeg,
+        deltaRotation: deltaRotation
+    });
+}
+// When on ground, reset angular velocity and align to slope
+else if (this.onGround) {
+    Body.setAngularVelocity(this.player.body, 0);
+    // gently align to slope
+    this.playerHitTerrain(this.currentSlopeAngle);
+    
+    // Update rotation system with current ground state
+    const currentAngleDeg = Phaser.Math.RadToDeg(this.player.body.angle);
+    this.rotationSystem.update({
+        grounded: this.onGround,
+        currentAngle: currentAngleDeg,
+        deltaRotation: 0
+    });
+}
+
+// --------------------------------------------------------------------
+// JUMP - using space bar only via Manette
+// --------------------------------------------------------------------
+if (this.manette.actions.jump && this.onGround) {
+    Body.setVelocity(this.player.body,
+        { x: this.player.body.velocity.x, y: PhysicsConfig.jump.jumpVelocity });
+    this.onGround = false;
+    
+    // Reset speed multiplier on jump
+    this.currentSpeedMultiplier = 1.0;
+}
+
+// --------------------------------------------------------------------
+// camera, terrain churn, fail states
+// --------------------------------------------------------------------
+this.manageTerrain();
+
+if (this.player.y > this.cameras.main.worldView.bottom + 800) {
+    console.log("Player fell too far. Restarting.");
+    this.scene.restart();
+}
+if (this.player.x < this.cameras.main.worldView.left - 400) {
+    console.log("Player went too far left. Restarting.");
+    this.scene.restart();
+}
+
+// Helper method to update the HUD text
+updateHudText() {
+    if (!this.player || !this.player.body) return;
+    
+    // Get player speed (absolute value of x velocity)
+    const speed = Math.abs(this.player.body.velocity.x).toFixed(2);
+    
+    // Set initial Y position if not set yet
+    if (this.initialY === 0) {
+        this.initialY = this.player.y;
+    }
+    
+    // Calculate total altitude drop from start of run
+    const currentY = this.player.y;
+    const totalAltitudeDrop = Math.max(0, (currentY - this.initialY)).toFixed(2);
+    
+    // Update speed text
+    if (this.speedText) {
+        this.speedText.setText(`Speed: ${speed}`);
+    }
+    
+    // Update altitude drop text
+    if (this.altitudeDropText) {
+        this.altitudeDropText.setText(`Altitude Drop: ${totalAltitudeDrop}`);
+    }
+    
+    // Update points (placeholder for now)
+    if (this.pointsText) {
+        this.pointsText.setText('Points: 0');
+    }
+    
+    // Update lives display
+    this.updateLivesDisplay();
+}
+
+// Helper method to update the lives display with yellow triangles
+updateLivesDisplay() {
+    if (!this.livesDisplay) return;
+    
+    // Clear previous lives display
+    this.livesDisplay.clear();
+    
+    // Get player's current rotation
+    const playerRotation = this.player ? this.player.rotation : 0;
+    
+    // Draw one triangle per life
+    const triangleSize = 15;
+    const spacing = triangleSize * 2;
+    
+    for (let i = 0; i < this.lives; i++) {
+        // Position each triangle with proper spacing
+        const x = i * spacing;
+        const y = 0;
+        
+        // Draw a yellow triangle that mimics the player's rotation
+        this.livesDisplay.fillStyle(this.neonYellow, 1);
+        this.livesDisplay.beginPath();
+        
+        // Create triangle points (pointing right by default)
+        const points = [
+            { x: 0, y: -triangleSize/2 },    // Top point
+            { x: triangleSize, y: 0 },        // Right point
+            { x: 0, y: triangleSize/2 }       // Bottom point
+        ];
+        
+        // Apply rotation that matches the player
+        const rotatedPoints = points.map(point => {
+            const rotX = point.x * Math.cos(playerRotation) - point.y * Math.sin(playerRotation);
+            const rotY = point.x * Math.sin(playerRotation) + point.y * Math.cos(playerRotation);
+            return { x: rotX + x, y: rotY + y };
+        });
+        
+        // Draw the triangle
+        this.livesDisplay.moveTo(rotatedPoints[0].x, rotatedPoints[0].y);
+        this.livesDisplay.lineTo(rotatedPoints[1].x, rotatedPoints[1].y);
+        this.livesDisplay.lineTo(rotatedPoints[2].x, rotatedPoints[2].y);
+        this.livesDisplay.closePath();
+        this.livesDisplay.fillPath();
+    }
+}
+
+// Helper to create the extraLife texture
+GameScene.prototype.createExtraLifeTexture = function() {
+    try {
+        // Check if the texture already exists in the cache
+        if (this.textures.exists('extraLife')) {
+            console.log('extraLife texture already exists, using existing one');
+            return;
+        }
+
+        // Create a fallback texture using same yellow triangle as player
+        const graphics = this.make.graphics({x: 0, y: 0, add: false});
+        
+        // Use the exact same neon yellow as the player
+        const neonYellow = 0xffff00;
+        graphics.fillStyle(neonYellow, 1);
+        
+        // Draw triangle matching the player triangle
+        // Using symmetric triangle pointing upward
+        const triangleSize = 20;
+        const centerX = 32;
+        const centerY = 32;
+        
+        // Draw the triangle - sharp point at the top
+        graphics.beginPath();
+        graphics.moveTo(centerX, centerY - triangleSize);      // Top point
+        graphics.lineTo(centerX + triangleSize, centerY + triangleSize); // Bottom right
+        graphics.lineTo(centerX - triangleSize, centerY + triangleSize); // Bottom left
+        graphics.closePath();
+        graphics.fillPath();
+        
+        // Optional: Add a white outline for better visibility
+        graphics.lineStyle(2, 0xffffff);
+        graphics.strokePath();
+        
+        // Generate the texture
+        graphics.generateTexture('extraLife', 64, 64);
+        console.log('Created extraLife texture as yellow triangle');
+    } catch (error) {
+        console.error('Error creating extraLife texture:', error);
+        
+        // Last resort fallback - create a simple shape if everything else fails
+        try {
+            const graphics = this.make.graphics({x: 0, y: 0, add: false});
+            graphics.fillStyle(0xffff00, 1);
+            graphics.fillTriangle(32, 16, 16, 48, 48, 48); // Simple triangle
+            graphics.generateTexture('extraLife', 64, 64);
+            console.log('Created emergency fallback extraLife texture');
+        } catch (e) {
+            console.error('Critical failure creating extraLife texture:', e);
+        }
+    }
+};
+
+// Function to manage the spawning of extra lives
+GameScene.prototype.manageExtraLives = function(time) {
+    // Initialize if not already done
+    if (!this.extraLivesGroup) {
+        this.extraLivesGroup = this.add.group();
+        this.lastExtraLifeTime = time;
+        this.nextExtraLifeTime = time + Phaser.Math.Between(
+            PhysicsConfig.extraLives.minTimeToNextLife,
+            PhysicsConfig.extraLives.maxTimeToNextLife
+        );
+        console.log(`Next extra life will spawn in ${((this.nextExtraLifeTime - time)/1000).toFixed(1)} seconds`);
+    }
+    
+    // Check if it's time to spawn a new extra life
+    if (time > this.nextExtraLifeTime && this.lives < PhysicsConfig.extraLives.maxLives) {
+        // Spawn an extra life ahead of the player
+        this.spawnExtraLife();
+        
+        // Set the next spawn time
+        this.lastExtraLifeTime = time;
+        this.nextExtraLifeTime = time + Phaser.Math.Between(
+            PhysicsConfig.extraLives.minTimeToNextLife,
+            PhysicsConfig.extraLives.maxTimeToNextLife
+        );
+        console.log(`Next extra life will spawn in ${((this.nextExtraLifeTime - time)/1000).toFixed(1)} seconds`);
+    }
+    
+    // Check for collisions with extra lives
+    if (this.extraLivesGroup && this.extraLivesGroup.getChildren().length > 0) {
+        const extraLives = this.extraLivesGroup.getChildren();
+        for (let i = 0; i < extraLives.length; i++) {
+            const extraLife = extraLives[i];
+            
+            // Check distance to player for collection
+            const distance = Phaser.Math.Distance.Between(
+                this.player.x, this.player.y,
+                extraLife.x, extraLife.y
+            );
+            
+            if (distance < PhysicsConfig.extraLives.collectibleRadius) {
+                // Player collected the extra life
+                this.collectExtraLife(extraLife);
+            }
+            
+            // Remove if too far behind player
+            if (extraLife.x < this.player.x - 800) {
+                extraLife.destroy();
+            }
+        }
+    }
+};
+
+// Function to spawn an extra life ahead of the player
+GameScene.prototype.spawnExtraLife = function() {
+    // Calculate spawn position ahead of player
+    const spawnX = this.player.x + PhysicsConfig.extraLives.spawnDistance;
+    
+    // Get a Y position near the terrain height at that X
+    let spawnY = this.getTerrainHeightAtX(spawnX) - 100; // Spawn above terrain
+    
+    // Create the extra life sprite
+    const extraLife = this.add.sprite(spawnX, spawnY, 'extraLife');
+    extraLife.setScale(0.8);
+    
+    // Add to group for easy management
+    this.extraLivesGroup.add(extraLife);
+    
+    // Visual effects for the new extra life
+    this.tweens.add({
+        targets: extraLife,
+        y: spawnY - 20,
+        duration: 1000,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+    });
+    
+    console.log(`Spawned extra life at (${spawnX}, ${spawnY})`);
+};
+
+// Function to collect an extra life
+GameScene.prototype.collectExtraLife = function(extraLife) {
+    // Add life if below max
+    if (this.lives < PhysicsConfig.extraLives.maxLives) {
+        this.lives++;
+        this.updateLivesDisplay();
+        
+        // Visual and audio feedback
+        this.cameras.main.flash(500, 255, 255, 0);
+        
+        console.log(`Collected extra life! Lives: ${this.lives}`);
+    }
+    
+    // Create a collection animation
+    this.tweens.add({
+        targets: extraLife,
+        scale: 1.5,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => extraLife.destroy()
+    });
+};
+
+// Helper function to estimate terrain height at a given X position
+GameScene.prototype.getTerrainHeightAtX = function(x) {
+    // Find the terrain segment containing x
+    for (let i = 0; i < this.terrainSegments.length; i++) {
+        const segment = this.terrainSegments[i];
+        if (x >= segment.x1 && x <= segment.x2) {
+            // Interpolate height within this segment
+            const t = (x - segment.x1) / (segment.x2 - segment.x1);
+            return segment.y1 + t * (segment.y2 - segment.y1);
+        }
+    }
+    
+    // If we can't find a specific segment, return a reasonable fallback
+    return this.lastTerrainY || 500;
+};
 
 /**
  * Helper method to apply a passive speed boost based on the current multiplier.
@@ -1665,7 +1525,11 @@ GameScene.prototype.handleResize = function({ width, height }) {
     this.cameras.main.setSize(width, height);
     
     // Adjust camera bounds to follow player with appropriate padding
-    const worldBounds = this.physics.world.bounds;
+    // Add safety check for physics world
+    if (this.physics && this.physics.world) {
+        const worldBounds = this.physics.world.bounds;
+    }
+    
     if (this.player && this.player.body) {
         // Ensure camera follows the player properly with the new dimensions
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -1704,59 +1568,6 @@ GameScene.prototype.handleResize = function({ width, height }) {
     
     // Redraw terrain if needed
     this.drawTerrain();
-};
-
-// Add explosion effect on crash using modern Phaser 3.60+ particle system
-GameScene.prototype.createExplosionEffect = function(x, y) {
-    try {
-        // Create a simple visual explosion with circles instead of particles
-        const explosionGroup = this.add.group();
-        const colors = [0xffff00, 0xff0000, 0xff5500, 0xffffff]; // Yellow, red, orange, white
-        
-        // Create 15 particles manually
-        for (let i = 0; i < 15; i++) {
-            const size = Phaser.Math.Between(5, 15);
-            const color = Phaser.Utils.Array.GetRandom(colors);
-            
-            // Create a circle particle
-            const particle = this.add.circle(
-                x, 
-                y, 
-                size, 
-                color,
-                0.8 // Alpha
-            );
-            
-            // Add to group for easy management
-            explosionGroup.add(particle);
-            
-            // Set random velocity
-            const angle = Math.random() * Math.PI * 2;
-            const speed = Phaser.Math.Between(50, 200);
-            const vx = Math.cos(angle) * speed;
-            const vy = Math.sin(angle) * speed;
-            
-            // Animate the particle
-            this.tweens.add({
-                targets: particle,
-                x: particle.x + vx,
-                y: particle.y + vy,
-                alpha: 0,
-                scale: 0.1,
-                duration: Phaser.Math.Between(500, 1000),
-                onComplete: () => {
-                    particle.destroy();
-                }
-            });
-        }
-        
-        // Auto-destroy the group after it's done
-        this.time.delayedCall(1100, () => {
-            explosionGroup.destroy(true);
-        });
-    } catch (e) {
-        console.warn('Error creating explosion effect:', e);
-    }
 };
 
 // Helper to properly clean up before scene restart
@@ -1819,6 +1630,168 @@ GameScene.prototype.initToastSystem = function() {
     
     // Position the toast container
     this.positionToastContainer();
+};
+
+// Create explosion effect for player and sled when game over occurs
+GameScene.prototype.createPlayerExplosionEffect = function() {
+    if (!this.player || !this.player.getAll) {
+        console.warn('Cannot create explosion effect - player not available');
+        return;
+    }
+    
+    try {
+        // Get the player's current position
+        const playerX = this.player.x;
+        const playerY = this.player.y;
+        
+        // Get the children components (sled and rider)
+        const children = this.player.getAll();
+        if (!children || children.length < 2) {
+            console.warn('Cannot create explosion effect - player components not available');
+            return;
+        }
+        
+        // Get the sled (first child) and rider (second child)
+        const sled = children[0];
+        const rider = children[1];
+        
+        // Hide the original container but NOT the components
+        this.player.visible = false;
+        
+        // Create clones of the original rider and sled at the correct world positions
+        // We need to create new objects because the originals are tied to the container
+        const riderWorldPos = this.player.getLocalPoint(rider.x, rider.y);
+        const sledWorldPos = this.player.getLocalPoint(sled.x, sled.y);
+        
+        // Create new triangle for the rider that matches the original
+        const riderClone = this.add.triangle(
+            playerX + rider.x, 
+            playerY + rider.y,
+            0, -rider.height/2,
+            -rider.width/2, rider.height/2,
+            rider.width/2, rider.height/2,
+            0xffff00 // Neon yellow
+        );
+        riderClone.setRotation(this.player.rotation);
+        riderClone.setDepth(60);
+        
+        // Create new rectangle for the sled that matches the original
+        const sledClone = this.add.rectangle(
+            playerX + sled.x,
+            playerY + sled.y,
+            sled.width,
+            sled.height,
+            0xff0000 // Neon red
+        );
+        sledClone.setRotation(this.player.rotation);
+        sledClone.setDepth(60);
+        
+        // Add smaller particle effects for added drama
+        this.createExplosionParticles(playerX, playerY, 0xff0000, { width: 20, height: 10 });
+        this.createExplosionParticles(playerX, playerY - 20, 0xffff00, { width: 15, height: 15 });
+        
+        // Make the rider blast upward and spin
+        this.tweens.add({
+            targets: riderClone,
+            x: playerX + (Math.random() > 0.5 ? 150 : -150),
+            y: playerY - 200 - Math.random() * 100,
+            rotation: riderClone.rotation + (Math.random() > 0.5 ? 8 : -8),
+            alpha: 0,
+            scaleX: 0.5,
+            scaleY: 0.5,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => {
+                riderClone.destroy();
+            }
+        });
+        
+        // Make the sled blast in a different direction and spin
+        this.tweens.add({
+            targets: sledClone,
+            x: playerX + (Math.random() > 0.5 ? -120 : 120),
+            y: playerY + 100 + Math.random() * 80,
+            rotation: sledClone.rotation + (Math.random() > 0.5 ? 6 : -6),
+            alpha: 0,
+            scaleX: 0.7,
+            scaleY: 0.7,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => {
+                sledClone.destroy();
+            }
+        });
+        
+        // Add a shockwave effect
+        const shockwave = this.add.circle(playerX, playerY, 10, 0xffffff, 0.4);
+        shockwave.setDepth(50);
+        
+        this.tweens.add({
+            targets: shockwave,
+            radius: 250,
+            alpha: 0,
+            duration: 800,
+            ease: 'Power2',
+            onComplete: () => {
+                shockwave.destroy();
+            }
+        });
+    } catch (error) {
+        console.error('Error creating explosion effect:', error);
+    }
+};
+
+// Helper to create particle explosion effect
+GameScene.prototype.createExplosionParticles = function(x, y, color, size) {
+    const particleCount = 20;
+    const particles = [];
+    
+    for (let i = 0; i < particleCount; i++) {
+        // Create particle shapes - mix of triangles and rectangles
+        let particle;
+        
+        if (Math.random() > 0.5) {
+            // Triangle particles
+            particle = this.add.triangle(
+                x, y,
+                0, -5,
+                -5, 5,
+                5, 5,
+                color
+            );
+        } else {
+            // Rectangle particles
+            const width = Math.random() * (size.width / 2) + 3;
+            const height = Math.random() * (size.height / 2) + 3;
+            particle = this.add.rectangle(x, y, width, height, color);
+        }
+        
+        // Random rotation
+        particle.rotation = Math.random() * Math.PI * 2;
+        particle.setDepth(60);
+        particles.push(particle);
+        
+        // Calculate random velocity
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 4;
+        const velocityX = Math.cos(angle) * speed;
+        const velocityY = Math.sin(angle) * speed;
+        
+        // Animate the particle
+        this.tweens.add({
+            targets: particle,
+            x: x + velocityX * 100,
+            y: y + velocityY * 100,
+            scaleX: 0,
+            scaleY: 0,
+            rotation: particle.rotation + (Math.random() > 0.5 ? 5 : -5),
+            alpha: 0,
+            duration: 800 + Math.random() * 400,
+            onComplete: () => {
+                particle.destroy();
+            }
+        });
+    }
 };
 
 // Helper to position the toast container at the bottom center of the screen
