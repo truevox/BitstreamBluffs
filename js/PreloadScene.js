@@ -71,7 +71,7 @@ export default class PreloadScene extends Phaser.Scene {
 
     create() {
         // console.log("PreloadScene: create");
-        // Assets are loaded, start the main game scene
-        this.scene.start('GameScene');
+        // Assets are loaded, start the start screen
+        this.scene.start('StartScene');
     }
 }

@@ -83,8 +83,9 @@ function initializeGame() {
             }
         },
 
-        // Choose between original and modular architecture based on URL parameter
-        scene: [ StartScene, useModular ? ModularGameScene : GameScene ]  // Start with StartScene, then transition to selected game scene
+        // Important: Start with BootScene which should transition to PreloadScene, then StartScene
+        // The order matters - first scene in the array is the one that starts first
+        scene: [ BootScene, PreloadScene, StartScene, GameScene, ModularGameScene ]
     };
 
     console.log('Starting Phaser game with config:', config);

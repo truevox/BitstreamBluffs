@@ -286,6 +286,18 @@ export default class ModularGameScene extends Phaser.Scene {
         
         const Body = Phaser.Physics.Matter.Matter.Body;
         
+        // Calculate rotation delta for flip tracking
+        const prevAngle = this.player.body.angle;
+        const currentAngleDeg = Phaser.Math.RadToDeg(prevAngle);
+        const deltaRotation = delta * 0.01; // Calculate rotation change for this frame
+        
+        // Always update rotation system with current state
+        this.rotationSystem.update({
+            grounded: this.onGround,
+            currentAngle: currentAngleDeg,
+            deltaRotation: this.onGround ? 0 : deltaRotation // Only track rotation in air
+        });
+        
         // Apply a gentle downhill bias force when on ground to prevent sticking
         if (this.onGround && this.player.body) {
             // Determine direction from player angle
@@ -322,11 +334,11 @@ export default class ModularGameScene extends Phaser.Scene {
             
             // Land flips/tricks when transitioning from air to ground
             if (this.onGround && !this.prevGroundState) {
-                const flipData = this.rotationSystem.getFlipData();
+                const flipData = this.rotationSystem.getFlipStats();
                 if (flipData.fullFlips > 0 || flipData.partialFlip > 0.5) {
                     this.onFlipComplete(flipData.fullFlips, flipData.partialFlip);
                 }
-                this.rotationSystem.reset();
+                // Reset rotation tracking - no need to call reset() as the RotationSystem handles this in handleLanding()
             }
             
             // Update previous state for next frame

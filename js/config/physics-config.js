@@ -3,6 +3,11 @@
 // Adjust these values to fine-tune the game feel
 
 const PhysicsConfig = {
+    // Core physics system properties
+    physics: {
+        gravityY: 1.0,       // Default gravity (Matter.js uses 1 by default)
+    },
+    
     // Player physics body properties
     player: {
         restitution: 0.1,     // Bounciness (0 = no bounce, 1 = full bounce)
