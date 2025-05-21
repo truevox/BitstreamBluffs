@@ -4,6 +4,7 @@
 
 // Import crypto library for SHA-256 hashing
 import { generateGameSeed } from './utils/seed-generator.js';
+import StarfieldParallax from './background/StarfieldParallax.js';
 
 export default class StartScene extends Phaser.Scene {
     constructor() {
@@ -23,16 +24,28 @@ export default class StartScene extends Phaser.Scene {
         // Generate a seed for this game session
         this.seed = generateGameSeed();
         
-        // Add background
+        // Add player-following parallax starfield background (always behind everything else)
         const { width, height } = this.cameras.main;
-        
-        // Create a dark background with arcade cabinet feel
+        this.starfield = new StarfieldParallax(this, { 
+            width, 
+            height, 
+            depth: -100,            // Ensure it's behind everything
+            density: 1.5,          // Density of stars
+            cellSize: 800,         // Size of each cell in pixels
+            sizes: [3, 5, 7],      // Larger stars for better visibility
+            visibleBuffer: 2,      // Extra cells beyond visible area
+            speeds: [0.05, 0.1, 0.25] // Slower parallax factors for more distant feeling
+        });
+
+        // Create a dark background with arcade cabinet feel (drawn above stars but still behind gameplay)
         const backgroundGraphics = this.add.graphics();
+        backgroundGraphics.setDepth(-90); // Still behind UI/gameplay, but above stars
         backgroundGraphics.fillStyle(0x000022, 1);
         backgroundGraphics.fillRect(0, 0, width, height);
         
         // Add retro scan lines for arcade feel
         const scanLines = this.add.graphics();
+        scanLines.setDepth(-80);
         for (let y = 0; y < height; y += 4) {
             scanLines.lineStyle(1, 0x000000, 0.1);
             scanLines.lineBetween(0, y, width, y);
@@ -685,6 +698,11 @@ export default class StartScene extends Phaser.Scene {
     }
     
     update() {
+        // Update the starfield (use camera center as 'player' position in start screen)
+        if (this.starfield && this.cameras && this.cameras.main) {
+            // No player object in start screen, so the camera center will be used as player position
+            this.starfield.update(this.cameras.main);
+        }
         // Additional gamepad polling if needed
     }
     

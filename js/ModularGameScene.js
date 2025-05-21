@@ -13,6 +13,7 @@ import InputController from './lib/InputController.js';
 import TerrainManager from './lib/TerrainManager.js';
 import CollectibleManager from './lib/CollectibleManager.js';
 import ExplosionEffects from './utils/ExplosionEffects.js';
+import StarfieldParallax from './background/StarfieldParallax.js';
 
 export default class ModularGameScene extends Phaser.Scene {
     constructor() {
@@ -98,6 +99,20 @@ export default class ModularGameScene extends Phaser.Scene {
         this.gameOverShown = false;
         this.score = 0;
         
+        // Add player-following parallax starfield background (always behind everything else)
+        const { width, height } = this.cameras.main;
+        console.log(`Creating player-following starfield with dimensions ${width}x${height}`);
+        this.starfield = new StarfieldParallax(this, { 
+            width, 
+            height, 
+            depth: -100,            // Ensure it's behind everything
+            density: 2.0,          // Higher density for more stars
+            cellSize: 800,         // Size of each cell in pixels
+            sizes: [3, 5, 7],      // Larger stars for better visibility
+            visibleBuffer: 3,      // Extra cells beyond visible area to prevent pop-in
+            speeds: [0.05, 0.1, 0.25] // Slower parallax factors for more distant feeling
+        });
+
         // Setup world
         this.cameras.main.setBackgroundColor('#000000');
         
@@ -294,6 +309,10 @@ export default class ModularGameScene extends Phaser.Scene {
      * Matches the physics implementation of the original GameScene
      */
     update(time, delta) {
+        // Update the parallax starfield to follow player position
+        if (this.starfield && this.cameras && this.cameras.main && this.player) {
+            this.starfield.update(this.cameras.main, this.player);
+        }
         // Comprehensive safety check - if we're missing any critical objects, don't proceed with update
         // This is important for clean scene transitions, especially during game over
         if (!this.scene || !this.scene.isActive || !this.player || !this.player.body || 
