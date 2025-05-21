@@ -61,27 +61,50 @@ export default class CollectibleManager {
     /**
      * Manages the spawning cycle of extra life collectibles
      * Based on elapsed time and randomization
+     * Matches the original GameScene implementation
      * @param {number} currentTime - Current game time
      * @private
      */
     manageExtraLives(currentTime) {
         if (!this.physicsConfig) return;
         
-        // Check if it's time to spawn a new extra life
-        const timeSinceLastLife = currentTime - this.lastLifeCollectTime;
-        const minSpawnDelay = this.physicsConfig.extraLives.minSpawnDelay;
+        // Multiple safety checks to avoid crashing
+        if (!this.scene || !this.scene.scene || !this.scene.scene.isActive) {
+            return; // Exit if the scene isn't active
+        }
         
-        if (timeSinceLastLife >= minSpawnDelay) {
-            // Random chance to spawn based on elapsed time
-            const chanceToSpawn = Math.min(
-                0.005, // Base chance
-                0.005 * (timeSinceLastLife / minSpawnDelay) // Increasing chance over time
-            );
+        if (!this.scene.player || !this.scene.player.body || !this.scene.player.body.position) {
+            return; // Exit early if player doesn't exist or isn't initialized
+        }
+        
+        try {
+            // Clean up off-screen collectibles (safely)
+            this.cleanupOffscreenCollectibles(this.scene.player.x);
             
-            if (Math.random() < chanceToSpawn) {
-                this.spawnExtraLife();
-                this.lastLifeCollectTime = currentTime; // Reset timer
+            // Only spawn if conditions are all met
+            const nextLifeAvailableTime = this.nextLifeAvailableTime || 0;
+            
+            const canSpawn = currentTime > nextLifeAvailableTime && 
+                          Array.isArray(this.extraLives) && 
+                          this.extraLives.length < 2 && 
+                          this.scene.lives < this.physicsConfig.extraLives.maxLives;
+                          
+            if (canSpawn) {
+                // Only spawn with a 20% chance each cycle - prevents too many spawns
+                if (Math.random() < 0.2) {
+                    console.log('Spawning new extra life collectible');
+                    this.spawnExtraLife();
+                    // Update next available time regardless of successful spawn
+                    this.nextLifeAvailableTime = currentTime + Phaser.Math.Between(
+                        this.physicsConfig.extraLives.minTimeToNextLife, 
+                        this.physicsConfig.extraLives.maxTimeToNextLife
+                    );
+                }
             }
+        } catch (error) {
+            console.error('Error in manageExtraLives:', error);
+            // Reset collectibles array if there was an error
+            this.extraLives = [];
         }
     }
     
@@ -128,6 +151,7 @@ export default class CollectibleManager {
     /**
      * Spawns an extra life collectible in the game world
      * Places it on terrain ahead of the player with proper physics
+     * Matches the original GameScene implementation
      * @returns {Object|undefined} The created extra life object or undefined on failure
      * @private
      */
@@ -141,47 +165,67 @@ export default class CollectibleManager {
                 return;
             }
             
+            // Get player position safely
+            const player = this.scene.player;
+            if (!player || !player.body || !player.body.position) {
+                console.warn('Cannot spawn extra life: player not available');
+                return;
+            }
+
+            const playerPos = player.body.position;
+            
             // Ensure texture exists
             if (!this.scene.textures.exists('extraLife')) {
                 this.createExtraLifeTexture();
             }
             
-            // Calculate spawn position
-            const segments = this.terrainManager.getTerrainSegments();
-            if (segments.length < 3) return; // Need some terrain first
+            // Calculate a safe position in front of the player
+            const spawnX = playerPos.x + this.physicsConfig.extraLives.spawnDistance;
             
-            // Spawn ahead of player, around 2000px forward
-            const cameraX = this.scene.cameras.main.scrollX;
-            const spawnX = cameraX + 2000 + Math.random() * 1000;
+            // Find the terrain height directly below the spawn point
+            const terrainHeight = this.terrainManager.findTerrainHeightAt(spawnX);
+            if (!terrainHeight) {
+                console.warn('Cannot spawn extra life: no terrain at spawn point');
+                return;
+            }
             
-            // Find terrain height at spawn X
-            const terrainY = this.terrainManager.findTerrainHeightAt(spawnX);
-            if (!terrainY) return; // No valid terrain found
+            // Calculate player sprite height (approximated from player body + sled height)
+            const playerSpriteHeight = 50; // Player body height from create() method
             
-            // Spawn above terrain at a random height
-            const spawnY = terrainY - 100 - Math.random() * 300;
+            // Position powerup above terrain but not too high (less than 7 player sprite heights)
+            const maxHeightAboveTerrain = playerSpriteHeight * 6;
+            const minHeightAboveTerrain = playerSpriteHeight * 2; // At least 2 sprite heights for safety
             
-            // Create a new sprite using our texture
+            // Random height between min and max, but ensure it's at a reasonable height
+            const heightAboveTerrain = Phaser.Math.Between(minHeightAboveTerrain, maxHeightAboveTerrain);
+            const spawnY = terrainHeight - heightAboveTerrain; // Subtract because Y increases downward
+            
+            // Create static sprite for the collectible
             const lifeSprite = this.scene.add.sprite(spawnX, spawnY, 'extraLife');
-            lifeSprite.setDepth(10);
+            lifeSprite.setScale(0.5); // Scale to appropriate size
+            lifeSprite.setDepth(10);  // Set depth to ensure it appears above terrain
             
-            // Add a Matter physics body (sensor)
+            // Create a STATIC circular collision area that won't be affected by gravity
             const lifeBody = this.scene.matter.add.circle(
-                spawnX,
-                spawnY,
-                20,
+                spawnX, 
+                spawnY, 
+                this.physicsConfig.extraLives.collectibleRadius,
                 {
                     isSensor: true,
+                    isExtraLife: true,
                     label: 'extraLife',
-                    plugin: {
-                        attractors: [
-                            // No attractors for now
-                        ]
-                    }
+                    isStatic: true, // Make it static so it doesn't fall
                 }
             );
             
-            // Store references together
+            // Store references to link the sprite and physics body
+            lifeSprite.collider = lifeBody;
+            lifeBody.gameObject = lifeSprite;
+            
+            // Store original Y position for hover animation
+            lifeSprite.originalY = spawnY;
+            
+            // Store in our tracking object
             const extraLife = {
                 sprite: lifeSprite,
                 body: lifeBody,
@@ -191,27 +235,63 @@ export default class CollectibleManager {
             // Add to our tracking array
             this.extraLives.push(extraLife);
             
-            // Set the sprite to match physics body position
-            lifeSprite.setOrigin(0.5, 0.5);
+            // Calculate hover distance (approximately 3 sprite widths) - matching original
+            const spriteWidth = this.physicsConfig.extraLives.collectibleRadius * 2;
+            const hoverDistance = spriteWidth * 3;
             
-            // Add animation effects
+            // Instead of tweening the physics body directly, use a dummy object
+            const hoverController = { y: 0 };
+            
+            // Add hover animation with tweens
             this.scene.tweens.add({
-                targets: lifeSprite,
-                y: spawnY + 20,
-                duration: 1000,
-                yoyo: true,
-                repeat: -1,
-                ease: 'Sine.easeInOut'
+                targets: hoverController,
+                y: 1,                      // Normalize from 0 to 1 for easier math
+                duration: 2000,            // 2 seconds for one direction
+                ease: 'Sine.easeInOut',    // Smooth sine wave motion
+                yoyo: true,                // Makes it go back down
+                repeat: -1,                // Repeat indefinitely
+                onUpdate: () => {
+                    // Safety checks for scene transition/destruction
+                    if (!this.scene || !this.scene.scene || !this.scene.scene.isActive) {
+                        return; // Skip update if scene is gone or not active
+                    }
+                    
+                    // Safety check for Matter physics engine
+                    if (!this.scene.matter || !this.scene.matter.body || !this.scene.matter.world) {
+                        return; // Matter physics has been destroyed
+                    }
+                    
+                    // Check if objects still exist and are valid
+                    if (!lifeBody || !lifeBody.position || !lifeSprite || lifeSprite.destroyed) {
+                        return; // Objects no longer exist
+                    }
+                    
+                    try {
+                        // If somehow the body became non-static, make it static again
+                        if (!lifeBody.isStatic) {
+                            this.scene.matter.body.setStatic(lifeBody, true);
+                        }
+                        
+                        // Calculate Y position based on sine wave (0-1 normalized value)
+                        const offset = Math.sin(hoverController.y * Math.PI) * hoverDistance;
+                        
+                        // Update the static body position directly
+                        this.scene.matter.body.setPosition(lifeBody, {
+                            x: lifeBody.position.x,
+                            y: spawnY - offset
+                        });
+                        
+                        // Update sprite to match collider
+                        lifeSprite.x = lifeBody.position.x;
+                        lifeSprite.y = lifeBody.position.y;
+                    } catch (error) {
+                        // Silently fail if any operation fails
+                        // This can happen during scene transitions
+                    }
+                }
             });
             
-            // Add rotation animation
-            this.scene.tweens.add({
-                targets: lifeSprite,
-                angle: 360,
-                duration: 3000,
-                repeat: -1,
-                ease: 'Linear'
-            });
+            console.log(`Spawned extra life at X: ${spawnX}, Y: ${spawnY} (${heightAboveTerrain}px above terrain)`);
         } catch (error) {
             console.error('Error spawning extra life:', error);
         }
