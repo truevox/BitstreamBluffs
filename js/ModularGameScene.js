@@ -375,6 +375,23 @@ export default class ModularGameScene extends Phaser.Scene {
         
         // Update collectibles
         this.collectibles.update(time, this.player.x);
+
+        // --- Failsafe: Prevent player from falling through terrain ---
+        // If the player sprite is ever below the terrain at the same x,
+        // teleport the player directly above the terrain. This prevents rare physics bugs
+        // where the player can tunnel through the ground due to high velocity or collision errors.
+        if (this.terrain && this.player && this.player.body) {
+            const terrainY = this.terrain.findTerrainHeightAt(this.player.x);
+            if (this.player.y > terrainY + 5) { // Allow a small epsilon for collision tolerance
+                // Move player just above the terrain
+                this.player.y = terrainY - 1;
+                // Also move the physics body directly
+                this.player.body.position.y = terrainY - 1;
+                // Zero vertical velocity to prevent instant re-falling
+                this.player.body.velocity.y = 0;
+                // Optionally, you could also reset forces here if needed
+            }
+        }
         
         // Game over conditions
         if (this.player.y > this.cameras.main.worldView.bottom + 800) {
