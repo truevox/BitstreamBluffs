@@ -112,9 +112,11 @@ export default class ModularGameScene extends Phaser.Scene {
         
         // Initialize rotation system with proper callbacks for landing evaluations
         this.rotationSystem = new RotationSystem({
-            onCleanLanding: (speedMultiplier) => {
-                this.currentSpeedMultiplier = speedMultiplier;
-                console.log(`Clean landing! Speed multiplier: ${speedMultiplier.toFixed(2)}x`); // No toast for clean landings
+            onCleanLanding: (_speedMultiplier) => {
+                // Clean landings no longer boost speed; multiplier always 1.0
+                this.currentSpeedMultiplier = 1.0;
+                // We log for analytics/debug but do not apply a multiplier
+                console.log('Clean landing! No speed boost applied.');
             },
             onCrash: () => {
                 console.log('Crashed!');
@@ -333,14 +335,20 @@ export default class ModularGameScene extends Phaser.Scene {
                 this.isParachuting = false;
                 this.isDragging = false;
                 this.isAirBraking = false;
-                
                 // Reset sled position if we were doing a trick that moved it
                 if (this.sled) {
                     this.sled.y = this.sledOriginalY;
                     this.sled.x = this.sledOriginalX;
                 }
             }
-            
+            // Cancel all movement/rotation actions (WASD) on any ground/air transition
+            if (this.inputController && this.inputController.manette) {
+                const actions = this.inputController.manette.actions;
+                actions.rotateCounterClockwise = false;
+                actions.rotateClockwise = false;
+                actions.trickAction = false;
+                actions.brakeAction = false;
+            }
             // Land flips/tricks when transitioning from air to ground
             if (this.onGround && !this.prevGroundState) {
                 const flipData = this.rotationSystem.getFlipStats();
@@ -349,7 +357,6 @@ export default class ModularGameScene extends Phaser.Scene {
                 }
                 // Reset rotation tracking - no need to call reset() as the RotationSystem handles this internally
             }
-            
             // Update previous state for next frame
             this.prevGroundState = this.onGround;
         }
@@ -459,31 +466,19 @@ export default class ModularGameScene extends Phaser.Scene {
     applyPassiveSpeedBoost() {
         const Body = Phaser.Physics.Matter.Matter.Body;
         const currentVelocity = this.player.body.velocity;
-        const currentSpeed = Math.abs(currentVelocity.x);
-        
-        // Apply a minimum constant boost when on ground
+        // Always use a speed multiplier of 1.0; clean landings do not affect speed
+        this.currentSpeedMultiplier = 1.0;
+        // Only apply the minimum constant boost when on ground
         const minBoostForce = PhysicsConfig.movement.minBoostStrength;
-        
-        // Apply additional boost that scales with current speed
-        let speedScaledBoost = 0;
-        if (currentSpeed > PhysicsConfig.movement.speedBoostThreshold) {
-            // Speed-based multiplier that scales with current speed
-            speedScaledBoost = PhysicsConfig.movement.speedBoostFactor * currentSpeed;
-            
-            // Update speed multiplier (for other force calculations)
-            this.currentSpeedMultiplier = 1.0 + (0.1 * (currentSpeed / 2));
-            this.currentSpeedMultiplier = Math.min(this.currentSpeedMultiplier, 2.0); // Cap at 2x
-        }
-        
-        // Apply combined boost force
-        const totalBoostForce = minBoostForce + speedScaledBoost;
-        
+        // No additional speed boost from landing multipliers
+        const totalBoostForce = minBoostForce;
         // The force is applied in the direction of current movement
         const forceDirection = currentVelocity.x >= 0 ? 1 : -1;
         Body.applyForce(this.player.body,
             this.player.body.position,
             { x: forceDirection * totalBoostForce, y: 0 });
-    }
+    } // Clean landings no longer boost speed; see llm-notes.md for rationale.
+
 
     handleSleddingControls(input) {
         const Body = Phaser.Physics.Matter.Matter.Body;
@@ -543,7 +538,7 @@ export default class ModularGameScene extends Phaser.Scene {
                 // DRAGGING - on ground for slight speed reduction
                 if (!this.isDragging) {
                     this.isDragging = true;
-                    this.hud.showToast('Dragging!', 1500);
+                    // No toast for dragging
                 }
                 
                 // Apply backward force to slow down
@@ -556,7 +551,7 @@ export default class ModularGameScene extends Phaser.Scene {
                 // AIRBRAKE TRICK - in air for dramatic speed reduction
                 if (!this.isAirBraking) {
                     this.isAirBraking = true;
-                    this.hud.showToast('Air Brake!', 1500);
+                    // No toast for air brake
                 }
                 
                 // Move the sled behind the player for airbrake visual
@@ -603,7 +598,7 @@ export default class ModularGameScene extends Phaser.Scene {
                 // TUCKING - on ground for speed boost
                 if (!this.isTucking) {
                     this.isTucking = true;
-                    this.hud.showToast('Speed Boost!', 1500);
+                    // No toast for tucking
                 }
                 
                 // Apply significant forward force for speed boost
@@ -623,7 +618,7 @@ export default class ModularGameScene extends Phaser.Scene {
                 // PARACHUTE TRICK - in air for slowed falling
                 if (!this.isParachuting) {
                     this.isParachuting = true;
-                    this.hud.showToast('Parachute!', 1500);
+                    // No toast for parachute
                 }
                 
                 // Move the sled down for parachute visual
@@ -683,7 +678,8 @@ export default class ModularGameScene extends Phaser.Scene {
             });
             this.onGround = false;
             this.hud.showToast('Jump!', 1000);
-            
+
+
             // Reset speed multiplier on jump - important physics detail from GameScene
             this.currentSpeedMultiplier = 1.0;
         }

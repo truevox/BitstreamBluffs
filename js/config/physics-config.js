@@ -10,10 +10,10 @@ const PhysicsConfig = {
     
     // Player physics body properties
     player: {
-        restitution: 0.001,     // Bounciness (0 = no bounce, 1 = full bounce)
-        friction: 0.0005,   // Surface friction (lower = more sliding)
-        frictionAir: 0.01,   // Air resistance (lower = less slowdown in air)
-        density: 0.38,        // Mass density (lower = lighter)
+        restitution: 0,     // Bounciness (0 = no bounce, 1 = full bounce)
+        friction: 0.00005,   // Surface friction (lower = more sliding)
+        frictionAir: 0.001,   // Air resistance (lower = less slowdown in air)
+        density: 0.98,        // Mass density (lower = lighter)
     },
     
     // Movement forces and velocities
