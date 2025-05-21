@@ -110,7 +110,7 @@ export default class ModularGameScene extends Phaser.Scene {
             cellSize: 800,         // Size of each cell in pixels
             sizes: [3, 5, 7],      // Larger stars for better visibility
             visibleBuffer: 3,      // Extra cells beyond visible area to prevent pop-in
-            speeds: [0.05, 0.1, 0.25] // Slower parallax factors for more distant feeling
+            speeds: [-0.1, -0.2, -0.3] // Much slower parallax for true cosmic background feeling
         });
 
         // Setup world
