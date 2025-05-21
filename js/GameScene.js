@@ -1,5 +1,6 @@
 // js/GameScene.js
-// Uses Phaser 3 with the built‑in Matter physics plugin.
+// README
+// THIS IS A LEGACY FILE - DO NOT UPDATE - IT WILL EVENTUALLY BE REMOVED
 // ------------------------------------------------------
 
 // Import physics configuration
