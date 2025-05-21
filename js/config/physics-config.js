@@ -10,10 +10,10 @@ const PhysicsConfig = {
     
     // Player physics body properties
     player: {
-        restitution: 0.1,     // Bounciness (0 = no bounce, 1 = full bounce)
-        friction: 0.000001,   // Surface friction (lower = more sliding)
-        frictionAir: 0.001,   // Air resistance (lower = less slowdown in air)
-        density: 0.18,        // Mass density (lower = lighter)
+        restitution: 0.001,     // Bounciness (0 = no bounce, 1 = full bounce)
+        friction: 0.0005,   // Surface friction (lower = more sliding)
+        frictionAir: 0.01,   // Air resistance (lower = less slowdown in air)
+        density: 0.38,        // Mass density (lower = lighter)
     },
     
     // Movement forces and velocities
@@ -23,12 +23,12 @@ const PhysicsConfig = {
         airPushMultiplier: 0.5,   // Multiplier for push force when in air
         
         // Constant bias to help with hill movement
-        downhillBiasForce: 0.0005, // Subtle force applied downhill
+        downhillBiasForce: .5, // Subtle force applied downhill
         
         // Passive speed boost parameters
-        minBoostStrength: 0.00015, // Minimum boost always applied when on ground
-        speedBoostThreshold: 0.3,  // Minimum speed needed for multiplier boost
-        speedBoostFactor: 0.0003,  // How much speed boost scales with multiplier
+        minBoostStrength: 0.0000075, // less natural speed gain
+        speedBoostThreshold: 0.3,  // Minimum speed needed for multiplier boost (unchanged)
+        speedBoostFactor: 0.000015,  // less trick boost strength
     },
     
     // Rotation velocities

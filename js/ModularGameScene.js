@@ -114,8 +114,7 @@ export default class ModularGameScene extends Phaser.Scene {
         this.rotationSystem = new RotationSystem({
             onCleanLanding: (speedMultiplier) => {
                 this.currentSpeedMultiplier = speedMultiplier;
-                console.log(`Clean landing! Speed multiplier: ${speedMultiplier.toFixed(2)}x`);
-                this.hud.showToast(`Clean landing! x${speedMultiplier.toFixed(1)}`, 1500);
+                console.log(`Clean landing! Speed multiplier: ${speedMultiplier.toFixed(2)}x`); // No toast for clean landings
             },
             onCrash: () => {
                 console.log('Crashed!');
@@ -123,8 +122,7 @@ export default class ModularGameScene extends Phaser.Scene {
                 this.handleCrash();
             },
             onWobble: () => {
-                console.log('Wobble landing!');
-                this.hud.showToast('Wobble!', 1000);
+                console.log('Wobble landing!'); // No toast for wobbles
             }
         });
         
