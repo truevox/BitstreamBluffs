@@ -8,12 +8,11 @@ import PhysicsConfig from './config/physics-config.js';
 import RotationSystem from './utils/RotationSystem.js';
 import configLoader from './config/config-loader.js';
 import { initializeRandomWithSeed } from './utils/seed-generator.js';
-
-// Import modular subsystems
+import HudDisplay from './lib/HudDisplay.js';
 import InputController from './lib/InputController.js';
 import TerrainManager from './lib/TerrainManager.js';
-import HudDisplay from './lib/HudDisplay.js';
 import CollectibleManager from './lib/CollectibleManager.js';
+import ExplosionEffects from './utils/ExplosionEffects.js';
 
 export default class ModularGameScene extends Phaser.Scene {
     constructor() {
@@ -139,6 +138,7 @@ export default class ModularGameScene extends Phaser.Scene {
         this.initializeTerrainManager();
         this.initializeHudDisplay();
         this.initializeCollectibleManager();
+        this.initializeExplosionEffects();
         
         // Set up the resize handler
         this.scale.on('resize', this.handleResize, this);
@@ -282,6 +282,11 @@ export default class ModularGameScene extends Phaser.Scene {
         // Create and initialize collectible manager
         this.collectibles = new CollectibleManager(this, this.terrain);
         this.collectibles.init(PhysicsConfig);
+    }
+    
+    initializeExplosionEffects() {
+        // Create and initialize explosion effects manager
+        this.explosionEffects = new ExplosionEffects(this);
     }
     
     /**
@@ -891,6 +896,11 @@ export default class ModularGameScene extends Phaser.Scene {
             console.log('No lives left, game over...');
             this.gameOverShown = true; // Mark as shown to prevent multiple displays
             
+            // Create explosion effect for the player and sled using our effects module
+            if (this.explosionEffects) {
+                this.explosionEffects.createPlayerExplosion(this.player);
+            }
+            
             // Show game over feedback before restarting
             const gameOverText = this.add.text(
                 this.player.x,
@@ -941,6 +951,8 @@ export default class ModularGameScene extends Phaser.Scene {
         // Update HUD elements
         this.hud.update(this.player, this.score, speed, this.lives, PhysicsConfig.extraLives.maxLives);
     }
+    
+
     
     handleResize(gameSize) {
         const { width, height } = gameSize;
