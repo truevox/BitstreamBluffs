@@ -381,6 +381,26 @@ export default class ModularGameScene extends Phaser.Scene {
             this.scene.restart();
         }
         
+        // --- Camera follow clamp logic ---
+        // Never let the camera center fall more than 400px in X or 200px in Y from the player
+        const cam = this.cameras.main;
+        const cameraCenterX = cam.scrollX + cam.width / 2;
+        const cameraCenterY = cam.scrollY + cam.height / 2;
+        const maxLagX = 400;
+        const maxLagY = 200;
+        if (this.player.x - cameraCenterX > maxLagX) {
+            cam.scrollX = this.player.x - maxLagX - cam.width / 2;
+        }
+        if (this.player.x - cameraCenterX < -maxLagX) {
+            cam.scrollX = this.player.x + maxLagX - cam.width / 2;
+        }
+        if (this.player.y - cameraCenterY > maxLagY) {
+            cam.scrollY = this.player.y - maxLagY - cam.height / 2;
+        }
+        if (this.player.y - cameraCenterY < -maxLagY) {
+            cam.scrollY = this.player.y + maxLagY - cam.height / 2;
+        }
+
         // Update HUD
         this.updateHud();
     }
