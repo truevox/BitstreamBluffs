@@ -633,50 +633,8 @@ export default class StartScene extends Phaser.Scene {
         // Seed is now updated in the key event handlers
         // No need for additional event listeners
         
-        // Add architecture selection buttons
-        const architectureButtonY = height * 0.78;
-        
-        // Create container for selection buttons
-        const buttonContainer = this.add.container(width / 2, architectureButtonY);
-        
-        // Mode selection title
-        const modeTitle = this.add.text(
-            0,
-            -60,
-            'SELECT GAME MODE',
-            {
-                fontFamily: '"Press Start 2P"',
-                fontSize: '16px',
-                color: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 2
-            }
-        ).setOrigin(0.5);
-        buttonContainer.add(modeTitle);
-        
-        // Create original architecture button
-        const originalButton = this.createRetroButton(
-            -120, 
-            0, 
-            200, 
-            50, 
-            'CLASSIC', 
-            '#ffff00'
-        );
-        originalButton.on('pointerdown', () => this.startGame(false));
-        buttonContainer.add(originalButton);
-        
-        // Create modular architecture button
-        const modularButton = this.createRetroButton(
-            120, 
-            0, 
-            200, 
-            50, 
-            'MODULAR', 
-            '#00ffff'
-        );
-        modularButton.on('pointerdown', () => this.startGame(true));
-        buttonContainer.add(modularButton);
+        // Seed is now updated in the key event handlers
+        // No need for additional event listeners
         
         // Instructions text with VT323 font
         this.add.text(
@@ -954,18 +912,17 @@ export default class StartScene extends Phaser.Scene {
         return buttonContainer;
     }
     
-    startGame(useModular = false) {
-        // Set URL parameter for module selection
-        window.useModularArchitecture = useModular;
+    startGame() {
+        // Always use the modular architecture
+        window.useModularArchitecture = true;
         
         // Transition effect
         this.cameras.main.fadeOut(500, 0, 0, 0);
         
         this.cameras.main.once('camerafadeoutcomplete', () => {
-            // Start the appropriate game scene based on the useModular flag
-            const sceneToStart = useModular ? 'ModularGameScene' : 'GameScene';
-            this.scene.start(sceneToStart);
-            console.log(`Starting game with ${useModular ? 'modular' : 'original'} architecture`);
+            // Always start the ModularGameScene
+            this.scene.start('ModularGameScene');
+            console.log('Starting game with modular architecture');
         });
     }
     

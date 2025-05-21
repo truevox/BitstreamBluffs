@@ -54,11 +54,9 @@ function initializeGame() {
     // Get initial dimensions
     const { width, height } = calculateGameDimensions();
     
-    // Check if we should use the modular architecture
-    // First check URL parameters, then fall back to window property set by StartScene
-    const urlParams = new URLSearchParams(window.location.search);
-    const useModular = urlParams.has('modular') || window.useModularArchitecture === true;
-    console.log(`Using ${useModular ? 'modular' : 'original'} game architecture`);
+    // Always use the modular architecture
+    const useModular = true;
+    console.log('Using modular game architecture');
     
     // Game configuration
     const config = {
