@@ -8,6 +8,19 @@
 
 ---
 
+## Jest Test Environment: jsdom (Default)
+- **Why:** Most tests (especially Phaser/game/DOM-related) require browser globals (`window`, `document`).
+- **How:** Jest config in package.json sets `"testEnvironment": "jsdom"` by default.
+- **Override for Node-only tests:**
+  - Add to the top of a test file:
+    ```js
+    /**
+     * @jest-environment node
+     */
+    ```
+- **Reference:** This fixes CI errors like `window is not defined`, `Phaser is not defined`, and Web Crypto API issues in tests.
+- See also: common-issues.md for troubleshooting.
+
 ## Common API Misuse: RotationSystem.update
 
 ### Issue
