@@ -13,6 +13,9 @@
 /**
  * Manages all collectible items like extra lives throughout the game
  */
+/**
+ * Manages all collectible items like extra lives throughout the game.
+ */
 export default class CollectibleManager {
     /**
      * Creates a new CollectibleManager instance

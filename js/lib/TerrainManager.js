@@ -13,6 +13,9 @@
 /**
  * Manages the procedural terrain generation, physics, and rendering
  */
+/**
+ * Manages the procedural terrain generation, physics, and rendering.
+ */
 export default class TerrainManager {
     /**
      * Creates a new TerrainManager instance

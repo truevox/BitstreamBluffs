@@ -3,7 +3,14 @@
  * Loads and parses the external config.txt file
  * Used to control debugging settings without modifying source code
  */
+/**
+ * Loads and parses the external config.txt file.
+ * Used to control debugging settings without modifying source code.
+ */
 class ConfigLoader {
+    /**
+     * Creates a new ConfigLoader instance and loads config.txt.
+     */
     constructor() {
         this.config = {
             debuggingOn: 0 // Default to debugging off
@@ -15,6 +22,11 @@ class ConfigLoader {
     /**
      * Loads the config.txt file and parses it for configuration settings
      * File format expected to be simple key=value pairs, one per line
+     * e.g., debuggingOn=1
+     */
+    /**
+     * Loads the config.txt file and parses it for configuration settings.
+     * File format expected to be simple key=value pairs, one per line.
      * e.g., debuggingOn=1
      */
     async loadConfig() {
@@ -47,6 +59,10 @@ class ConfigLoader {
     /**
      * Gets the debug flag based on the loaded configuration
      * @returns {boolean} True if debugging is enabled, false otherwise
+     */
+    /**
+     * Gets the debug flag based on the loaded configuration.
+     * @returns {boolean} True if debugging is enabled, false otherwise.
      */
     isDebuggingEnabled() {
         // Safely return the debug setting, defaulting to false if not loaded

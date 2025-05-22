@@ -2,6 +2,11 @@
 // Configuration parameters for the game physics and player movement
 // Adjust these values to fine-tune the game feel
 
+/**
+ * Configuration parameters for the game physics and player movement.
+ * Adjust these values to fine-tune the game feel.
+ * @namespace PhysicsConfig
+ */
 const PhysicsConfig = {
     // Core physics system properties
     physics: {
@@ -66,5 +71,8 @@ const PhysicsConfig = {
     }
 };
 
-// Export the config
+/**
+ * Exported physics configuration object for use throughout the game.
+ * @type {PhysicsConfig}
+ */
 export default PhysicsConfig;

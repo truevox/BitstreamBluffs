@@ -13,6 +13,9 @@
 // Removed HudDisplay import (js/systems removed)
 // Removed CollectibleManager import (js/systems removed)
 
+/**
+ * Simple test suite for verifying module integrity and basic functionality.
+ */
 class ModuleTestSuite {
     constructor() {
         this.tests = [];
@@ -28,12 +31,20 @@ class ModuleTestSuite {
      * @param {string} name - Test name
      * @param {Function} testFn - Test function
      */
+    /**
+     * Adds a test to the suite.
+     * @param {string} name - Test name.
+     * @param {Function} testFn - Test function.
+     */
     addTest(name, testFn) {
         this.tests.push({ name, testFn });
     }
 
     /**
      * Run all tests in the suite
+     */
+    /**
+     * Runs all tests in the suite and prints results to the console.
      */
     async runTests() {
         console.log('🧪 Starting module tests...');
@@ -56,6 +67,9 @@ class ModuleTestSuite {
     /**
      * Print test results summary
      */
+    /**
+     * Prints a summary of test results to the console.
+     */
     printSummary() {
         console.log('\n--- Test Results Summary ---');
         console.log(`Total tests: ${this.results.total}`);
@@ -72,6 +86,9 @@ class ModuleTestSuite {
 
 /**
  * Mock scene for testing
+ */
+/**
+ * Mock scene for testing Phaser modules and UI logic.
  */
 class MockScene {
     constructor() {

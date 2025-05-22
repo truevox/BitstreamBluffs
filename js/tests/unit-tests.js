@@ -18,7 +18,13 @@ import PhysicsConfig from '../config/physics-config.js';
 /**
  * Unit test framework for Bitstream Bluffs modules
  */
+/**
+ * Unit test framework for Bitstream Bluffs modules.
+ */
 class UnitTestFramework {
+    /**
+     * Creates a new UnitTestFramework instance.
+     */
     constructor() {
         this.tests = [];
         this.results = {
@@ -35,12 +41,21 @@ class UnitTestFramework {
      * @param {string} name - Test name
      * @param {Function} testFn - Test function
      */
+    /**
+     * Adds a test to the framework.
+     * @param {string} module - Module being tested.
+     * @param {string} name - Test name.
+     * @param {Function} testFn - Test function.
+     */
     addTest(module, name, testFn) {
         this.tests.push({ module, name, testFn });
     }
     
     /**
      * Run all tests in the framework
+     */
+    /**
+     * Runs all tests in the framework and prints results to the console.
      */
     async runTests() {
         console.log('🧪 Starting unit tests...');
@@ -76,6 +91,9 @@ this.results.moduleResults[test.module].failed++;
     /**
      * Print test results summary
      */
+    /**
+     * Prints a summary of test results by module to the console.
+     */
     printSummary() {
         console.log('\n=== Test Results Summary ===');
         console.log(`Total tests: ${this.results.total}`);
@@ -101,6 +119,10 @@ this.results.moduleResults[test.module].failed++;
 /**
  * Creates a mock Phaser scene for testing
  * @returns {Object} A mock scene object
+ */
+/**
+ * Creates a mock Phaser scene for testing purposes.
+ * @returns {Object} A mock scene object with stubbed methods.
  */
 function createMockScene() {
     return {

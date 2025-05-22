@@ -8,6 +8,11 @@
  * 
  * @returns {string} A hash string to use as the game seed
  */
+/**
+ * Generates a deterministic game seed using the current time and Math.random.
+ * Uses SHA-256 when available, with fallback to FNV-1a.
+ * @returns {string} A hash string to use as the game seed.
+ */
 export function generateGameSeed() {
     // If we have an early generated seed, use it
     if (earlyGenerationComplete && earlyGeneratedSeed) {
@@ -31,6 +36,12 @@ export function generateGameSeed() {
  * @param {string} seedString - The seed string to initialize the RNG with
  * @returns {function} A seeded random function that returns values between 0-1
  */
+/**
+ * Initializes the random number generator with a specific seed string.
+ * Makes terrain generation and other random elements deterministic.
+ * @param {string} seedString - The seed string to initialize the RNG with.
+ * @returns {function} A seeded random function that returns values between 0-1.
+ */
 export function initializeRandomWithSeed(seedString) {
     // Convert seed string to numeric value for the algorithm
     let numericSeed = stringToNumericSeed(seedString);
@@ -51,6 +62,11 @@ export function initializeRandomWithSeed(seedString) {
  * 
  * @param {string} str - Input string to convert to numeric seed
  * @returns {number} Numeric seed value suitable for PRNG initialization
+ */
+/**
+ * Converts a string to a numeric seed value for PRNG initialization.
+ * @param {string} str - Input string to convert to numeric seed.
+ * @returns {number} Numeric seed value suitable for PRNG initialization.
  */
 function stringToNumericSeed(str) {
     let hash = 1779033703 ^ str.length;  // Use a prime number for better distribution
@@ -120,6 +136,11 @@ if (typeof window !== 'undefined' && window.earlySeedGeneration) {
  * @param {string} input - Input string to hash
  * @returns {string} Hexadecimal hash string
  */
+/**
+ * Hashes the input using SHA-256 when available, with fallback to FNV-1a.
+ * @param {string} input - Input string to hash.
+ * @returns {string} Hexadecimal hash string.
+ */
 function sha256WithFallback(input) {
     // Store the initial seed source for potential later use
     initialSeedSource = input;
@@ -173,6 +194,11 @@ function sha256WithFallback(input) {
  * Updates the displayed seed in the UI if the game has started
  * This is called when SHA-256 calculation completes
  */
+/**
+ * Updates the displayed seed in the UI if the game has started.
+ * Called when SHA-256 calculation completes.
+ * @param {string} newSeed - The new seed string to display.
+ */
 function updateDisplayedSeed(newSeed) {
     // Store the seed in the global space
     window.gameSeed = newSeed;
@@ -200,6 +226,11 @@ function updateDisplayedSeed(newSeed) {
  * 
  * @param {string} input - Input string to hash
  * @returns {string} Hexadecimal hash string
+ */
+/**
+ * Simple FNV-1a hash implementation for game seeds when SHA-256 isn't available.
+ * @param {string} input - Input string to hash.
+ * @returns {string} Hexadecimal hash string.
  */
 function fnv1aHash(input) {
     // Use the FNV-1a algorithm for simplicity and speed

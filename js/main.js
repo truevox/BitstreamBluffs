@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Entry point for Bitstream Bluffs using ES modules.
+ * Sets up Phaser game configuration, handles font loading, and initializes the modular game architecture.
+ * All scene and utility imports are managed here.
+ */
 // js/main.js - Entry point for the game using ES modules
 // ---------------------------------------------------------------------
 
@@ -17,9 +22,19 @@ import './utils/RotationSystem.js';
 import './Manette.js';
 
 // Function to initialize the game
+/**
+ * Initializes the Phaser game instance after fonts are loaded and sets up resize handling.
+ * Calculates optimal game dimensions and attaches the game to the DOM.
+ *
+ * @function
+ */
 function initializeGame() {
     console.log('Initializing game after fonts are loaded...');
     // Calculate game dimensions based on the window size
+    /**
+     * Calculates game dimensions based on the current window size, preserving aspect ratio.
+     * @returns {{width: number, height: number}} The calculated width and height for the game canvas.
+     */
     const calculateGameDimensions = () => {
         // Base design aspect ratio (original game dimensions)
         const baseWidth = 1000;

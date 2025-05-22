@@ -5,7 +5,16 @@
 // Import physics configuration
 import PhysicsConfig from './config/physics-config.js';
 
+/**
+ * Input mapping system for Bitstream Bluffs.
+ * Maps keyboard and gamepad inputs to game actions and manages walk/sled mode.
+ */
 export default class Manette {
+    /**
+     * Constructs the Manette input manager.
+     *
+     * @param {Phaser.Scene} scene - The Phaser scene using this input manager.
+     */
     constructor(scene) {
         this.scene = scene;
         this.actions = {
@@ -41,6 +50,12 @@ export default class Manette {
         console.log("Manette input manager initialized");
     }
 
+    /**
+     * Updates the action states based on current keyboard and gamepad input.
+     * Should be called once per frame.
+     *
+     * @returns {Object} The updated actions object.
+     */
     update() {
         // Reset edge-triggered actions
         this.actions.toggleWalkMode = false;
@@ -116,17 +131,28 @@ export default class Manette {
         // Note: Keyboard inputs are handled by event listeners, not in the update loop
     }
 
-    // Helper to get action states
+    /**
+     * Returns whether a given action is currently active.
+     *
+     * @param {string} actionName - The action name to check.
+     * @returns {boolean} True if the action is active.
+     */
     isActionActive(actionName) {
         return this.actions[actionName] || false;
     }
     
-    // Helper to check if we're in walking mode
+    /**
+     * Returns whether the player is currently in walking mode.
+     *
+     * @returns {boolean} True if in walking mode.
+     */
     isWalkMode() {
         return this.walkMode;
     }
     
-    // Helper to toggle walk mode programmatically
+    /**
+     * Programmatically toggles walking mode on or off.
+     */
     toggleWalkMode() {
         this.walkMode = !this.walkMode;
         
@@ -138,7 +164,11 @@ export default class Manette {
         return this.walkMode;
     }
 
-    // Helper to consume an action (e.g., for single presses like jump)
+    /**
+     * Consumes an action (sets it to false) for one-time actions like jump.
+     *
+     * @param {string} actionName - The action to consume.
+     */
     consumeAction(actionName) {
         const isActive = this.actions[actionName];
         if (isActive) {
@@ -147,7 +177,9 @@ export default class Manette {
         return isActive;
     }
 
-    // Helper to set up keyboard controls
+    /**
+     * Sets up keyboard controls and listeners for all mapped actions.
+     */
     setupKeyboardControls() {
         // Get keyboard manager
         const keyboard = this.scene.input.keyboard;
@@ -270,7 +302,9 @@ export default class Manette {
         });
     }
     
-    // Helper to set up gamepad controls
+    /**
+     * Sets up gamepad controls and listeners for all mapped actions.
+     */
     setupGamepadControls() {
         if (!this.scene.input.gamepad) {
             return; // Exit if gamepad API not available
@@ -291,7 +325,10 @@ export default class Manette {
         });
     }
     
-    // Check and update gamepad connection status
+    /**
+     * Checks and updates the gamepad connection status.
+     * Connects to the first available gamepad if not already connected.
+     */
     updateGamepadConnection() {
         // Skip if gamepad API not available
         if (!this.scene.input.gamepad) {

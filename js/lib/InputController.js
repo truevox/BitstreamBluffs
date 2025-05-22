@@ -17,6 +17,10 @@ import Manette from '../Manette.js';
  * Handles all input processing for the game, providing a unified interface for
  * detecting player actions from both keyboard and gamepad.
  */
+/**
+ * Handles all input processing for the game, providing a unified interface for
+ * detecting player actions from both keyboard and gamepad.
+ */
 export default class InputController {
     /**
      * Creates a new InputController instance

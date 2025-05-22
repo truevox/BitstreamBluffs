@@ -2,11 +2,24 @@
 // Handles asset preloading and displays loading progress
 // ------------------------------------------------------
 
+/**
+ * Scene responsible for preloading all game assets and displaying loading progress.
+ * Shows loading and percent text, and transitions to StartScene when done.
+ *
+ * @extends Phaser.Scene
+ */
 export default class PreloadScene extends Phaser.Scene {
+    /**
+     * Constructs the PreloadScene and sets the scene key.
+     */
     constructor() {
         super('PreloadScene');
     }
 
+    /**
+     * Preloads all assets and displays loading progress.
+     * Attaches listeners for progress, file progress, and completion.
+     */
     preload() {
         // console.log("PreloadScene: preload");
 
@@ -69,6 +82,9 @@ export default class PreloadScene extends Phaser.Scene {
         // We'll generate graphics procedurally or use Phaser's built-in shapes.
     }
 
+    /**
+     * Called after all assets are loaded. Starts the StartScene.
+     */
     create() {
         // console.log("PreloadScene: create");
         // Assets are loaded, start the start screen
