@@ -7,7 +7,7 @@
 ### 🚀 Feature: Netlify Build Performance & Caching
 - Added and committed `package-lock.json` for deterministic npm installs and improved Netlify dependency caching.
 - Created `netlify.toml` with:
-  - Custom build command: `npm install && npm run test:all`
+  - Custom build command: `npm install && npm run test`
   - Publish directory: `dist`
   - Environment: `NODE_VERSION=22`, `PUPPETEER_SKIP_DOWNLOAD=1` (skips Chromium download in Netlify production builds; Puppeteer is still used internally for CI and local testing)
 - Installed and configured `netlify-plugin-cache` to cache `node_modules` and `package-lock.json` between builds, significantly reducing install times.
