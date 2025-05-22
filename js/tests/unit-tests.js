@@ -239,46 +239,6 @@ function createMockScene() {
 // Create test framework
 const unitTests = new UnitTestFramework();
 
-
-unitTests.addTest('TerrainManager', 'should find terrain height at position', () => {
-    const mockScene = createMockScene();
-    // [REMOVED] TerrainManager instantiation (js/systems removed)
-    // [REMOVED] TerrainManager init (js/systems removed)
-    
-    // Test height finding
-    const height = terrainManager.findTerrainHeightAt(0);
-    
-    // Just verify it returns a number
-    if (typeof height !== 'number') throw new Error('findTerrainHeightAt should return a number');
-});
-
-unitTests.addTest('TerrainManager', 'should clean up resources on destroy', () => {
-    const mockScene = createMockScene();
-    // [REMOVED] TerrainManager instantiation (js/systems removed)
-    // [REMOVED] TerrainManager init (js/systems removed)
-    
-    terrainManager.destroy();
-    
-    // Verify proper cleanup
-    if (terrainManager.terrainGraphics) throw new Error('TerrainGraphics not cleaned up');
-    if (terrainManager.scene) throw new Error('Scene reference not cleaned up');
-});
-
-
-unitTests.addTest('HudDisplay', 'should initialize UI elements', () => {
-    const mockScene = createMockScene();
-    // [REMOVED] HudDisplay instantiation (js/systems removed)
-    hudDisplay.init();
-    
-    // Verify HUD initialization
-    if (!hudDisplay.speedText) throw new Error('Speed text not initialized');
-    
-    // Verify proper cleanup
-    if (collectibleManager.scene) throw new Error('Scene reference not cleaned up');
-    if (collectibleManager.terrainManager) throw new Error('TerrainManager reference not cleaned up');
-    if (collectibleManager.physicsConfig) throw new Error('PhysicsConfig reference not cleaned up');
-});
-
 // Run all unit tests
 console.log('Bitstream Bluffs Module Unit Tests');
 console.log('--------------------------------');
