@@ -43,7 +43,7 @@ The game now supports both implementations without requiring code changes:
 
 - **Runtime Selection**: Players can choose between implementations via the start screen
 - **URL Parameter**: Add `?modular=true` to use the modular architecture
-- **Default Behavior**: Without parameters, the original implementation is used
+- **Default Behavior**: Without parameters, the modular architecture is used
 
 ### Step 2: Making Changes to Existing Modules
 
