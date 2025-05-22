@@ -1,5 +1,21 @@
 # Changelog
 
+## [v1.3.0] - 2025-05-21
+
+### :bug: Bugfixes
+- Remove invalid `RotationSystem.update(this.player.rotation)` call; now always pass full state object per API
+
+**What:**
+- Deleted an incorrect call to `RotationSystem.update` that passed only the player rotation value instead of the required state object.
+
+**Why:**
+- Duplicate and invalid API usage could break core game logic, especially flip tracking and landing detection.
+- The correct update calls were already handled in the same function, so the extra/bad call was unnecessary and harmful.
+
+**How:**
+- Removed the invalid call and verified all remaining usages pass the full required object (`{ grounded, currentAngle, deltaRotation }`).
+- Added a note to `llm-notes.md` to prevent similar mistakes in the future.
+
 All notable changes to Bitstream Bluffs will be documented in this file.
 
 ## [v1.2.0] - 2025-05-20

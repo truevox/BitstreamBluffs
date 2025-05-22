@@ -1,5 +1,37 @@
 # LLM Notes:
 
+---
+
+## Common API Misuse: RotationSystem.update
+
+### Issue
+- The `RotationSystem.update` method must always be called with an object containing `{ grounded, currentAngle, deltaRotation }`.
+- Passing a single value (e.g., `this.player.rotation`) is incorrect and will break flip/rotation tracking.
+
+### Why this matters
+- The system relies on full state for tracking flips, landings, and points.
+- Incorrect calls can cause subtle bugs in gameplay logic.
+
+### Example of correct usage
+```js
+this.rotationSystem.update({
+  grounded: this.onGround,
+  currentAngle: Phaser.Math.RadToDeg(this.player.body.angle),
+  deltaRotation: deltaRotation
+});
+```
+
+### Example of incorrect usage
+```js
+// ❌ Do not do this:
+this.rotationSystem.update(this.player.rotation);
+```
+
+### Resolution
+- All calls in ModularGameScene.js now use the correct state object.
+- See commit :bug: Remove invalid RotationSystem.update(this.player.rotation) call; now always pass full state object per API
+
+
 ## Parallax Starfield Background:
 
 ### Why this approach?

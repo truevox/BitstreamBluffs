@@ -723,9 +723,8 @@ export default class ModularGameScene extends Phaser.Scene {
 
         
         // Track rotations for flips
-        if (!this.onGround) {
-            this.rotationSystem.update(this.player.rotation);
-        }
+        // (Removed invalid update call; all valid updates above use full state object)
+
     }
     
     onFlipComplete(fullFlips, partialFlip) {
