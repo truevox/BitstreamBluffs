@@ -646,8 +646,6 @@ export default class StartScene extends Phaser.Scene {
         // Seed is now updated in the key event handlers
         // No need for additional event listeners
         
-        // Seed is now updated in the key event handlers
-        // No need for additional event listeners
         
         // Instructions text with VT323 font
         this.add.text(
