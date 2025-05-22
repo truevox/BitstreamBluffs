@@ -1,5 +1,5 @@
 [build]
-  command = "npm install && npm run test"
+  command = "npm install && npm run build && npm run test"
   publish = "dist"
 
 [build.environment]
