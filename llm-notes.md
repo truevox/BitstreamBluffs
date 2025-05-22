@@ -1,4 +1,10 @@
-# LLM Notes:
+# LLM Notes
+
+## Puppeteer Use in CI/CD
+- Puppeteer is still required for internal and CI test runs (see test:puppeteer and test:all npm scripts).
+- In Netlify production builds, Chromium download is skipped (`PUPPETEER_SKIP_DOWNLOAD=1` in netlify.toml) to speed up deploys and avoid unnecessary binary downloads.
+- **Do not remove Puppeteer from devDependencies or test scripts.**
+- If you re-enable browser-based end-to-end tests in production builds, remove or adjust the env var in netlify.toml.
 
 ---
 

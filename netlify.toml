@@ -1,0 +1,13 @@
+[build]
+  command = "npm install && npm run test:all"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PUPPETEER_SKIP_DOWNLOAD = "1"
+
+[[plugins]]
+  package = "netlify-plugin-cache"
+
+  [plugins.inputs]
+  paths = ["node_modules", "package-lock.json"]

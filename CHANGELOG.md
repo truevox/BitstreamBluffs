@@ -2,6 +2,28 @@
 
 ## [v1.5.0] - 2025-05-21
 
+## [v1.4.0] - 2025-05-21
+
+### 🚀 Feature: Netlify Build Performance & Caching
+- Added and committed `package-lock.json` for deterministic npm installs and improved Netlify dependency caching.
+- Created `netlify.toml` with:
+  - Custom build command: `npm install && npm run test:all`
+  - Publish directory: `dist`
+  - Environment: `NODE_VERSION=22`, `PUPPETEER_SKIP_DOWNLOAD=1` (skips Chromium download in Netlify production builds; Puppeteer is still used internally for CI and local testing)
+- Installed and configured `netlify-plugin-cache` to cache `node_modules` and `package-lock.json` between builds, significantly reducing install times.
+
+**What:**
+- Implements best practices for Netlify CI/CD with npm, including lockfile, environment config, and persistent dependency caching.
+
+**Why:**
+- Dramatically speeds up Netlify builds by leveraging deterministic installs and caching, reducing CI time and bandwidth usage.
+
+**How:**
+- Committed `package-lock.json`.
+- Added `netlify.toml` with build and plugin configuration.
+- Installed and configured `netlify-plugin-cache` as a dev dependency.
+- Bumped version to v1.4.0.
+
 ### :bug: Bugfixes
 - Remove invalid `RotationSystem.update(this.player.rotation)` call; now always pass full state object per API
 
