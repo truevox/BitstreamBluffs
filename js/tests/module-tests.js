@@ -8,10 +8,10 @@
  */
 
 // Import the modules to test
-import InputController from '../lib/InputController.js';
-import TerrainManager from '../lib/TerrainManager.js';
-import HudDisplay from '../lib/HudDisplay.js';
-import CollectibleManager from '../lib/CollectibleManager.js';
+// Removed InputController import (js/systems removed)
+// Removed TerrainManager import (js/systems removed)
+// Removed HudDisplay import (js/systems removed)
+// Removed CollectibleManager import (js/systems removed)
 
 class ModuleTestSuite {
     constructor() {
@@ -110,34 +110,6 @@ class MockScene {
 // Create the test suite
 const testSuite = new ModuleTestSuite();
 
-// Test InputController module
-testSuite.addTest('InputController module can be instantiated', () => {
-    const mockScene = new MockScene();
-    const inputController = new InputController(mockScene);
-    if (!inputController) throw new Error('Failed to instantiate InputController');
-});
-
-// Test TerrainManager module
-testSuite.addTest('TerrainManager module can be instantiated', () => {
-    const mockScene = new MockScene();
-    const terrainManager = new TerrainManager(mockScene);
-    if (!terrainManager) throw new Error('Failed to instantiate TerrainManager');
-});
-
-// Test HudDisplay module
-testSuite.addTest('HudDisplay module can be instantiated', () => {
-    const mockScene = new MockScene();
-    const hudDisplay = new HudDisplay(mockScene);
-    if (!hudDisplay) throw new Error('Failed to instantiate HudDisplay');
-});
-
-// Test CollectibleManager module
-testSuite.addTest('CollectibleManager module can be instantiated', () => {
-    const mockScene = new MockScene();
-    const terrainManager = new TerrainManager(mockScene);
-    const collectibleManager = new CollectibleManager(mockScene, terrainManager);
-    if (!collectibleManager) throw new Error('Failed to instantiate CollectibleManager');
-});
 
 // Run the tests
 console.log('Module Tests for Bitstream Bluffs');
