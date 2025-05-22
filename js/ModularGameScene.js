@@ -328,16 +328,16 @@ export default class ModularGameScene extends Phaser.Scene {
         // Only apply when in sledding mode, matching original GameScene
         // Add safety check to prevent errors during scene transitions (like game over)
         if (this.onGround && this.inputController && this.player && this.player.body && !this.inputController.isWalkMode()) {
-            // Determine direction from player angle
-            const playerAngleRad = this.player.rotation;
-            // Apply a small force in the downhill direction
-            const downhillForce = PhysicsConfig.movement.downhillBiasForce;
-            Body.applyForce(this.player.body,
-                this.player.body.position,
-                { 
-                    x: Math.sin(playerAngleRad) * downhillForce,
-                    y: Math.cos(playerAngleRad) * downhillForce 
-                });
+            // Apply a small force in the downhill direction based on the terrain slope, not player orientation
+                const slopeAngleRad = this.currentSlopeAngle;
+                const downhillForce = PhysicsConfig.movement.downhillBiasForce;
+                // Always push down the hill: x = cos, y = sin (flip sign if needed)
+                Body.applyForce(this.player.body,
+                    this.player.body.position,
+                    { 
+                        x: Math.cos(slopeAngleRad) * downhillForce,
+                        y: Math.sin(slopeAngleRad) * downhillForce
+                    }); // Downhill bias uses terrain, not player rotation
             
             // Apply passive speed boost when on ground (same as original GameScene)
             this.applyPassiveSpeedBoost();
