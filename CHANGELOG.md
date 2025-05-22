@@ -1,6 +1,6 @@
 # Changelog
 
-## [v1.3.0] - 2025-05-21
+## [v1.5.0] - 2025-05-21
 
 ### :bug: Bugfixes
 - Remove invalid `RotationSystem.update(this.player.rotation)` call; now always pass full state object per API

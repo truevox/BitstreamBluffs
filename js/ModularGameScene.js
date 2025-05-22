@@ -14,6 +14,7 @@ import TerrainManager from './lib/TerrainManager.js';
 import CollectibleManager from './lib/CollectibleManager.js';
 import ExplosionEffects from './utils/ExplosionEffects.js';
 import StarfieldParallax from './background/StarfieldParallax.js';
+import applyFlipImpulse from './flip-impulse.js';
 
 export default class ModularGameScene extends Phaser.Scene {
     constructor() {
@@ -728,6 +729,9 @@ export default class ModularGameScene extends Phaser.Scene {
     }
     
     onFlipComplete(fullFlips, partialFlip) {
+    // Flip landing: reward with a single, instantaneous velocity impulse (see flip-impulse.js)
+    // No lingering multipliers or sticky buffs—boost is one-and-done.
+    
         if (fullFlips === 0 && partialFlip < 0.5) {
             return; // No significant rotation
         }
@@ -747,9 +751,10 @@ export default class ModularGameScene extends Phaser.Scene {
             message = `Half Flip! +${points}`;
         }
         
-        // Apply speed boost based on trick complexity
-        const speedMultiplier = 1 + (fullFlips * 0.2) + (partialFlip * 0.1);
-        this.currentSpeedMultiplier = Math.min(2.0, speedMultiplier);
+        // Apply a one-time spring-like impulse for flip landing (see flip-impulse.js)
+        // This is a single, non-sticky reward: no lingering speed multiplier.
+        applyFlipImpulse(this.player, fullFlips, partialFlip);
+        this.currentSpeedMultiplier = 1.0; // Always reset after landing reward!
         
         // Update score and show toast
         this.score += points;
