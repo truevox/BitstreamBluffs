@@ -1,6 +1,31 @@
-# LLM Notes:
+# LLM Notes
+
+## Puppeteer Use in CI/CD
+- Puppeteer is still required for internal and CI test runs (see test:puppeteer and test:all npm scripts).
+- In Netlify production builds, Chromium download is skipped (`PUPPETEER_SKIP_DOWNLOAD=1` in netlify.toml) to speed up deploys and avoid unnecessary binary downloads.
+- **Do not remove Puppeteer from devDependencies or test scripts.**
+- If you re-enable browser-based end-to-end tests in production builds, remove or adjust the env var in netlify.toml.
 
 ---
+
+## Netlify Build Test Strategy
+- **Netlify runs only unit/integration tests** (`npm run test`) for fast deploy feedback.
+- **Full E2E (Puppeteer) tests** (`npm run test:all`) are not run on every Netlify build, as they are slower and more expensive.
+- To run all tests (including E2E), use a separate CI workflow (e.g., GitHub Actions nightly or on main branch merges).
+- This strategy keeps deploys fast while maintaining robust test coverage in CI.
+
+## Jest Test Environment: jsdom (Default)
+- **Why:** Most tests (especially Phaser/game/DOM-related) require browser globals (`window`, `document`).
+- **How:** Jest config in package.json sets `"testEnvironment": "jsdom"` by default.
+- **Override for Node-only tests:**
+  - Add to the top of a test file:
+    ```js
+    /**
+     * @jest-environment node
+     */
+    ```
+- **Reference:** This fixes CI errors like `window is not defined`, `Phaser is not defined`, and Web Crypto API issues in tests.
+- See also: common-issues.md for troubleshooting.
 
 ## Common API Misuse: RotationSystem.update
 

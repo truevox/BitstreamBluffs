@@ -49,6 +49,25 @@ this.events.on('update', () => {
 });
 ```
 
+## Jest Environment Issues (window/Phaser/crypto)
+
+### 🐞 Issue: "window is not defined", "Phaser is not defined", or Web Crypto API errors in Jest
+
+**Description:**
+- Tests that use Phaser, DOM APIs, or browser globals fail in Node environment.
+- Typical errors: `window is not defined`, `Phaser is not defined`, `ReferenceError: window.crypto`.
+
+**Solution:**
+- Jest config now defaults to `testEnvironment: jsdom` (see package.json and llm-notes.md).
+- For Node-only tests, add this at the top of the test file:
+  ```js
+  /**
+   * @jest-environment node
+   */
+  ```
+
+---
+
 ## Asset Loading Issues
 
 ### 🐞 Issue: "Failed to process file: image [filename]"
