@@ -10,6 +10,7 @@ import BootScene from './BootScene.js';
 import PreloadScene from './PreloadScene.js';
 import StartScene from './StartScene.js';
 import GameScene from './GameScene.js';
+import ModularGameScene from './ModularGameScene.js'; // New modular architecture
 
 // Import utility classes
 import './utils/RotationSystem.js';
@@ -53,6 +54,10 @@ function initializeGame() {
     // Get initial dimensions
     const { width, height } = calculateGameDimensions();
     
+    // Always use the modular architecture
+    const useModular = true;
+    console.log('Using modular game architecture');
+    
     // Game configuration
     const config = {
         type: Phaser.AUTO,          // WebGL if available, otherwise Canvas
@@ -76,7 +81,9 @@ function initializeGame() {
             }
         },
 
-        scene: [ StartScene, GameScene ]  // Start with StartScene, then transition to GameScene
+        // Important: Start with BootScene which should transition to PreloadScene, then StartScene
+        // The order matters - first scene in the array is the one that starts first
+        scene: [ BootScene, PreloadScene, StartScene, GameScene, ModularGameScene ]
     };
 
     console.log('Starting Phaser game with config:', config);
