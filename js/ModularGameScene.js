@@ -111,8 +111,32 @@ export default class ModularGameScene extends Phaser.Scene {
             cellSize: 800,         // Size of each cell in pixels
             sizes: [3, 5, 7],      // Larger stars for better visibility
             visibleBuffer: 3,      // Extra cells beyond visible area to prevent pop-in
-            speeds: [-0.1, -0.2, -0.3] // Much slower parallax for true cosmic background feeling
+            speeds: [-0.1, -0.2, -0.3], // Much slower parallax for true cosmic background feeling
+            colors: [ // Vibrant palette for each layer, matching StartScene
+                ['#ffe066', '#fffbe6', '#ffff00'], // yellow/white
+                ['#00eaff', '#82f7ff', '#00ffff'], // cyan/blue
+                ['#d500f9', '#ff57e6', '#ff00ff']  // magenta/pink
+            ]
         });
+
+        // Add a few static colored twinkling stars for extra vibrancy (like StartScene)
+        const staticStarColors = [0xff00ff, 0x00ffff, 0xffff00];
+        for (let i = 0; i < 40; i++) {
+            const x = Phaser.Math.Between(0, width);
+            const y = Phaser.Math.Between(0, height);
+            const size = Phaser.Math.Between(1, 3);
+            const color = Phaser.Math.RND.pick(staticStarColors);
+            const star = this.add.circle(x, y, size, color, 0.8).setDepth(-99);
+            if (Math.random() > 0.6) {
+                this.tweens.add({
+                    targets: star,
+                    alpha: 0.3,
+                    duration: Phaser.Math.Between(1000, 3000),
+                    yoyo: true,
+                    repeat: -1
+                });
+            }
+        }
 
         // Setup world
         this.cameras.main.setBackgroundColor('#000000');
