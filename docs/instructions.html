@@ -31,6 +31,13 @@
             0% { opacity: 0.4; }
             100% { opacity: 0.8; }
         }
+
+        /* Ensure fade-out always wins */
+        .back-to-game.fade-out {
+            opacity: 0 !important;
+            pointer-events: none;
+            transition: opacity 0.6s !important;
+        }
         
         /* Retro scan lines */
         body::after {
@@ -282,5 +289,72 @@
             }
         });
     </script>
+<script>
+  console.log('Instructions script loaded');
+  
+  // Find the BACK TO GAME element by its text content
+  function findBackToGameElement() {
+    // Method 1: Try to find by text content
+    const allElements = document.querySelectorAll('*');
+    for (const el of allElements) {
+      if (el.textContent && el.textContent.trim() === 'BACK TO GAME' || 
+          el.textContent && el.textContent.trim() === '← BACK TO GAME') {
+        console.log('Found BACK TO GAME by text!', el);
+        return el;
+      }
+    }
+    console.log('Could not find BACK TO GAME element');
+    return null;
+  }
+  
+  function atPageBottom() {
+    const scrollY = window.scrollY || window.pageYOffset;
+    const viewportHeight = window.innerHeight;
+    const pageHeight = document.documentElement.scrollHeight;
+    const buffer = 50; // Larger buffer for earlier fade
+    const atBottom = (scrollY + viewportHeight) >= (pageHeight - buffer);
+    return atBottom;
+  }
+  
+  function updateBackButtonVisibility() {
+    const backButton = findBackToGameElement();
+    
+    if (!backButton) {
+      console.log('Back button not found, cannot update visibility');
+      return;
+    }
+    
+    if (atPageBottom()) {
+      // Apply fade styles directly
+      backButton.style.opacity = '0';
+      backButton.style.pointerEvents = 'none';
+      console.log('Fade-out applied to:', backButton);
+    } else {
+      backButton.style.opacity = '1';
+      backButton.style.pointerEvents = 'auto';
+      console.log('Fade-in applied to:', backButton);
+    }
+  }
+  
+  // Run when page is loaded
+  window.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded - searching for BACK TO GAME element');
+    
+    const backButton = findBackToGameElement();
+    if (backButton) {
+      // Add transition for smooth fade
+      backButton.style.transition = 'opacity 0.6s ease';
+      console.log('Added transition to back button');
+    }
+    
+    // Initial check
+    updateBackButtonVisibility();
+    
+    // Event listeners
+    window.addEventListener('scroll', updateBackButtonVisibility);
+    window.addEventListener('resize', updateBackButtonVisibility);
+  });
+</script>
+
 </body>
 </html>
