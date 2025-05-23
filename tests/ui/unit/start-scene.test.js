@@ -83,16 +83,64 @@ const seedGeneratorModule = jest.requireMock('../../../js/utils/seed-generator.j
 import StartScene from '../../../js/StartScene.js';
 
 // Patch: Mock canvas context for Phaser in headless (jsdom) environments
+// Hardened canvas mocking for Phaser in jsdom/CI
+const ensureCanvasContextStub = el => {
+  el.getContext = () => ({
+    fillStyle: '',
+    fillRect: () => {},
+    getImageData: () => ({ data: [] }),
+    putImageData: () => {},
+    getContextAttributes: () => ({}),
+    clearRect: () => {},
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    closePath: () => {},
+    stroke: () => {},
+    fill: () => {},
+    arc: () => {},
+    lineWidth: 1,
+    strokeStyle: '',
+    fillStyle: '',
+    setLineDash: () => {},
+    drawImage: () => {},
+    measureText: () => ({ width: 100 }),
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createPattern: () => ({}),
+    createRadialGradient: () => ({ addColorStop: () => {} })
+  });
+  return el;
+};
+
+let origCreateElement;
 beforeAll(() => {
-  const origCreateElement = global.document.createElement;
+  origCreateElement = global.document.createElement;
   global.document.createElement = function (tag, ...args) {
     const el = origCreateElement.call(this, tag, ...args);
     if (tag === 'canvas') {
-      el.getContext = () => ({ fillStyle: '' });
+      return ensureCanvasContextStub(el);
     }
     return el;
   };
 });
+
+beforeEach(() => {
+  // Re-apply the patch in case document is reset by other test code
+  global.document.createElement = function (tag, ...args) {
+    const el = origCreateElement.call(this, tag, ...args);
+    if (tag === 'canvas') {
+      return ensureCanvasContextStub(el);
+    }
+    return el;
+  };
+});
+
+// Defensive: If getContext is called and returns null, throw a clear error
+HTMLCanvasElement.prototype.getContext = HTMLCanvasElement.prototype.getContext || function () {
+  throw new Error('Canvas getContext returned null! Harden the canvas mock in tests/ui/unit/start-scene.test.js');
+};
 
 describe('StartScene', () => {
   let startScene;
