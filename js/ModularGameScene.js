@@ -16,7 +16,18 @@ import ExplosionEffects from './utils/ExplosionEffects.js';
 import StarfieldParallax from './background/StarfieldParallax.js';
 import applyFlipImpulse from './flip-impulse.js';
 
+/**
+ * Main modular game scene for Bitstream Bluffs.
+ * Uses Phaser 3 with Matter physics and a modular architecture for maintainability.
+ * Handles player, terrain, collectibles, HUD, and all core gameplay logic.
+ *
+ * @extends Phaser.Scene
+ */
 export default class ModularGameScene extends Phaser.Scene {
+    /**
+     * Constructs the ModularGameScene.
+     * Initializes all core state, colors, and binds resize handler.
+     */
     constructor() {
         super({ 
             key: 'ModularGameScene',
@@ -74,6 +85,10 @@ export default class ModularGameScene extends Phaser.Scene {
         this.handleResize = this.handleResize.bind(this);
     }
     
+    /**
+     * Preloads assets for the scene.
+     * All assets should be loaded in PreloadScene; this is a stub for Phaser lifecycle.
+     */
     preload() {
         console.log('ModularGameScene preload method started');
         
@@ -81,6 +96,11 @@ export default class ModularGameScene extends Phaser.Scene {
         // All assets should be loaded in PreloadScene
     }
     
+    /**
+     * Creates and initializes the game scene, modules, and player.
+     * Sets up starfield, input, physics, collision handlers, player, terrain, HUD, collectibles, and effects.
+     * Binds resize event and prepares scene for gameplay.
+     */
     create() {
         console.log('ModularGameScene create method started - initializing game');
         
@@ -111,8 +131,32 @@ export default class ModularGameScene extends Phaser.Scene {
             cellSize: 800,         // Size of each cell in pixels
             sizes: [3, 5, 7],      // Larger stars for better visibility
             visibleBuffer: 3,      // Extra cells beyond visible area to prevent pop-in
-            speeds: [-0.1, -0.2, -0.3] // Much slower parallax for true cosmic background feeling
+            speeds: [-0.1, -0.2, -0.3], // Much slower parallax for true cosmic background feeling
+            colors: [ // Vibrant palette for each layer, matching StartScene
+                ['#ffe066', '#fffbe6', '#ffff00'], // yellow/white
+                ['#00eaff', '#82f7ff', '#00ffff'], // cyan/blue
+                ['#d500f9', '#ff57e6', '#ff00ff']  // magenta/pink
+            ]
         });
+
+        // Add a few static colored twinkling stars for extra vibrancy (like StartScene)
+        const staticStarColors = [0xff00ff, 0x00ffff, 0xffff00];
+        for (let i = 0; i < 40; i++) {
+            const x = Phaser.Math.Between(0, width);
+            const y = Phaser.Math.Between(0, height);
+            const size = Phaser.Math.Between(1, 3);
+            const color = Phaser.Math.RND.pick(staticStarColors);
+            const star = this.add.circle(x, y, size, color, 0.8).setDepth(-99);
+            if (Math.random() > 0.6) {
+                this.tweens.add({
+                    targets: star,
+                    alpha: 0.3,
+                    duration: Phaser.Math.Between(1000, 3000),
+                    yoyo: true,
+                    repeat: -1
+                });
+            }
+        }
 
         // Setup world
         this.cameras.main.setBackgroundColor('#000000');
@@ -160,6 +204,10 @@ export default class ModularGameScene extends Phaser.Scene {
         this.scale.on('resize', this.handleResize, this);
     }
     
+    /**
+     * Sets up collision event handlers for player, terrain, and collectibles.
+     * Handles collision start/end for ground detection and extra life collection.
+     */
     setupCollisionHandlers() {
         // Set up collision event handling for player
         this.matter.world.on('collisionstart', (event) => {
@@ -210,6 +258,10 @@ export default class ModularGameScene extends Phaser.Scene {
         });
     }
     
+    /**
+     * Creates the player character, sled, and rider.
+     * Adds physics body, sets up camera follow, and stores references for tricks and walking mode.
+     */
     createPlayer() {
         // Player character dimensions
         const playerBodyWidth = 30;
@@ -272,6 +324,10 @@ export default class ModularGameScene extends Phaser.Scene {
         this.cameras.main.setFollowOffset(0, 100);
     }
     
+    /**
+     * Initializes the terrain manager, sets seeded random, and generates initial terrain.
+     * Draws terrain for the start of the game.
+     */
     initializeTerrainManager() {
         // Create and initialize terrain manager
         this.terrain = new TerrainManager(this);
@@ -287,6 +343,9 @@ export default class ModularGameScene extends Phaser.Scene {
         this.terrain.drawTerrain();
     }
     
+    /**
+     * Initializes the HUD display system and sets the initial Y position.
+     */
     initializeHudDisplay() {
         // Create and initialize HUD system
         this.hud = new HudDisplay(this);
@@ -294,12 +353,18 @@ export default class ModularGameScene extends Phaser.Scene {
         this.hud.setInitialY(this.player.y);
     }
     
+    /**
+     * Initializes the collectible manager and sets up collectibles for the scene.
+     */
     initializeCollectibleManager() {
         // Create and initialize collectible manager
         this.collectibles = new CollectibleManager(this, this.terrain);
         this.collectibles.init(PhysicsConfig);
     }
     
+    /**
+     * Initializes the explosion effects manager for player and sled explosions.
+     */
     initializeExplosionEffects() {
         // Create and initialize explosion effects manager
         this.explosionEffects = new ExplosionEffects(this);
@@ -308,6 +373,12 @@ export default class ModularGameScene extends Phaser.Scene {
     /**
      * Main update loop - runs player physics and game logic
      * Matches the physics implementation of the original GameScene
+     */
+    /**
+     * Main update loop for the scene. Handles player physics, controls, terrain, collectibles, camera, and HUD.
+     *
+     * @param {number} time - Current time in ms since game start.
+     * @param {number} delta - Time elapsed since last frame in ms.
      */
     update(time, delta) {
         // Update the parallax starfield to follow player position
@@ -400,17 +471,58 @@ export default class ModularGameScene extends Phaser.Scene {
         // If the player sprite is ever below the terrain at the same x,
         // teleport the player directly above the terrain. This prevents rare physics bugs
         // where the player can tunnel through the ground due to high velocity or collision errors.
-        if (this.terrain && this.player && this.player.body) {
-            const terrainY = this.terrain.findTerrainHeightAt(this.player.x);
-            if (this.player.y > terrainY + 5) { // Allow a small epsilon for collision tolerance
-                // Move player just above the terrain
-                this.player.y = terrainY - 1;
-                // Also move the physics body directly
-                this.player.body.position.y = terrainY - 1;
-                // Zero vertical velocity to prevent instant re-falling
-                this.player.body.velocity.y = 0;
-                // Optionally, you could also reset forces here if needed
-            }
+
+        // Confirm update loop is running
+        if (this.player && this.player.body) {
+            console.debug('[Update] Frame', performance.now(), 'Player y:', this.player.y, 'x:', this.player.x);
+        }
+
+        if (!this.terrain || !this.player || !this.player.body) {
+            // Log which object is missing for debug purposes
+            console.warn('[Failsafe] Skipped: terrain, player, or body missing.', {
+                terrain: !!this.terrain,
+                player: !!this.player,
+                body: this.player ? !!this.player.body : 'n/a'
+            });
+            return;
+        }
+
+        // Optionally check terrain bounds if TerrainManager supports it
+        const terrainMinX = this.terrain.getMinX?.();
+        const terrainMaxX = this.terrain.getMaxX?.();
+        if (terrainMinX !== undefined && terrainMaxX !== undefined &&
+            (this.player.x < terrainMinX || this.player.x > terrainMaxX)) {
+            console.warn('[Failsafe] Player x out of terrain bounds:', this.player.x, terrainMinX, terrainMaxX);
+            // Optionally clamp or respawn, but for now just log
+        }
+
+        const terrainY = this.terrain.findTerrainHeightAt(this.player.x);
+        if (typeof terrainY !== 'number' || isNaN(terrainY)) {
+            console.warn('[Failsafe] No valid terrain at x:', this.player.x, 'Player y:', this.player.y);
+            // Optionally: teleport to a safe spawn, or freeze player
+            // this.respawnPlayer();
+            return;
+        }
+
+        // Use a dynamic epsilon based on vertical speed
+        const epsilon = Math.max(5, Math.abs(this.player.body.velocity.y) * 0.5); // Scales with speed
+        if (this.player.y > terrainY + epsilon) {
+            console.warn('[Failsafe] Large fall detected. Correcting position.', {
+                playerY: this.player.y,
+                terrainY,
+                velocityY: this.player.body.velocity.y,
+                epsilon
+            });
+            // Move player just above the terrain
+            this.player.y = terrainY - 1;
+            // Also move the physics body directly
+            this.player.body.position.y = terrainY - 1;
+            // Zero vertical velocity to prevent instant re-falling
+            this.player.body.velocity.y = 0;
+            // Clear any residual force
+            this.player.body.force.y = 0;
+            // Mark this frame as a teleport to avoid repeated physics issues
+            this.player.justTeleported = true;
         }
         
         // Game over conditions
@@ -447,6 +559,11 @@ export default class ModularGameScene extends Phaser.Scene {
         this.updateHud();
     }
     
+    /**
+     * Handles player controls and physics in walking mode.
+     *
+     * @param {Object} input - Current input state from InputController.
+     */
     handleWalkingMode(input) {
         const Body = Phaser.Physics.Matter.Matter.Body;
         const walkSpeed = 1.5; // Constant walking speed
@@ -500,6 +617,11 @@ export default class ModularGameScene extends Phaser.Scene {
      * Applies a passive speed boost based on current speed
      * Matches the physics from the original GameScene
      */
+    /**
+     * Applies a passive speed boost based on current speed.
+     * Matches the physics from the original GameScene.
+     * No longer affected by landing multipliers.
+     */
     applyPassiveSpeedBoost() {
         const Body = Phaser.Physics.Matter.Matter.Body;
         const currentVelocity = this.player.body.velocity;
@@ -517,6 +639,12 @@ export default class ModularGameScene extends Phaser.Scene {
     } // Clean landings no longer boost speed; see llm-notes.md for rationale.
 
 
+    /**
+     * Handles player controls and physics in sledding mode.
+     * Processes rotation, tricks, braking, tucking, parachuting, and jumping.
+     *
+     * @param {Object} input - Current input state from InputController.
+     */
     handleSleddingControls(input) {
         const Body = Phaser.Physics.Matter.Matter.Body;
         const groundRotVel = PhysicsConfig.rotation.groundRotationVel;
@@ -709,9 +837,23 @@ export default class ModularGameScene extends Phaser.Scene {
         if (input.jump && this.onGround) {
             // Use the correct constant from PhysicsConfig
             // Note: Original uses negative value, so we maintain that convention
+            // Scale jump height with speed: at or above minSpeedForMaxJump, use full jump; below, interpolate to minJumpVelocity
+            const vx = this.player.body.velocity.x;
+            const absSpeed = Math.abs(vx);
+            const maxSpeed = PhysicsConfig.jump.minSpeedForMaxJump;
+            const maxJump = PhysicsConfig.jump.jumpVelocity;
+            const minJump = PhysicsConfig.jump.minJumpVelocity;
+            // Linear interpolation for jump velocity based on current speed
+            let jumpVel = maxJump;
+            if (absSpeed < maxSpeed) {
+                // Lerp from minJump to maxJump as speed increases
+                const t = absSpeed / maxSpeed;
+                jumpVel = minJump + (maxJump - minJump) * t;
+            }
+            // We scale jump height to reward speed: slow = lower jump, fast = full jump
             Body.setVelocity(this.player.body, {
-                x: this.player.body.velocity.x,
-                y: PhysicsConfig.jump.jumpVelocity // This matches GameScene
+                x: vx,
+                y: jumpVel
             });
             this.onGround = false;
             this.hud.showToast('Jump!', 1000);
@@ -728,6 +870,13 @@ export default class ModularGameScene extends Phaser.Scene {
 
     }
     
+    /**
+     * Called when a flip or partial flip landing is detected.
+     * Applies a one-time velocity impulse and awards points.
+     *
+     * @param {number} fullFlips - Number of full flips completed.
+     * @param {number} partialFlip - Fractional part of a flip (0.0–1.0).
+     */
     onFlipComplete(fullFlips, partialFlip) {
     // Flip landing: reward with a single, instantaneous velocity impulse (see flip-impulse.js)
     // No lingering multipliers or sticky buffs—boost is one-and-done.
@@ -763,6 +912,13 @@ export default class ModularGameScene extends Phaser.Scene {
         }
     }
     
+    /**
+     * Handles collection of an extra life collectible.
+     * Increments lives or awards points if at max lives.
+     *
+     * @param {MatterJS.BodyType} colliderBody - The body of the collected extra life.
+     * @returns {boolean} True if collected, false otherwise.
+     */
     collectExtraLife(colliderBody) {
         // Delegate to collectible manager
         const success = this.collectibles.collectExtraLife(colliderBody, () => {
@@ -787,6 +943,12 @@ export default class ModularGameScene extends Phaser.Scene {
      * This is crucial for making the player "hug" the terrain
      * @param {number} terrainAngleRad - The angle of the terrain in radians
      */
+    /**
+     * Rotates the player to align with the terrain angle.
+     * This is crucial for making the player "hug" the terrain.
+     *
+     * @param {number} terrainAngleRad - The angle of the terrain in radians.
+     */
     playerHitTerrain(terrainAngleRad) {
         // Rotate player gently toward terrain angle on touchdown
         const targetDeg = Phaser.Math.RadToDeg(terrainAngleRad);
@@ -803,6 +965,11 @@ export default class ModularGameScene extends Phaser.Scene {
     /**
      * Handle player crashes due to bad landings
      * Matches the original GameScene implementation
+     */
+    /**
+     * Handles player crashes due to bad landings.
+     * Uses a life if available, otherwise triggers game over.
+     * Matches the original GameScene implementation.
      */
     handleCrash() {
         // Reset player velocity on crash
@@ -900,6 +1067,9 @@ export default class ModularGameScene extends Phaser.Scene {
         }
     }
     
+    /**
+     * Updates the HUD display with player stats, score, and lives.
+     */
     updateHud() {
         if (!this.player || !this.hud) return;
         
@@ -913,6 +1083,11 @@ export default class ModularGameScene extends Phaser.Scene {
     
 
     
+    /**
+     * Handles resizing of the game window and updates HUD layout.
+     *
+     * @param {Phaser.Structs.Size} gameSize - The new game size.
+     */
     handleResize(gameSize) {
         const { width, height } = gameSize;
         
@@ -922,11 +1097,17 @@ export default class ModularGameScene extends Phaser.Scene {
         }
     }
     
+    /**
+     * Cleans up resources when the scene is shutdown.
+     */
     shutdown() {
         // Clean up resources when scene is shutdown
         this.cleanupBeforeRestart();
     }
     
+    /**
+     * Cleans up all modules, listeners, and state before restarting or exiting the scene.
+     */
     cleanupBeforeRestart() {
         // Remove resize event listener
         this.scale.off('resize', this.handleResize, this);

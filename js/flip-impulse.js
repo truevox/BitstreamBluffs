@@ -13,6 +13,15 @@
  * @param {number} partialFlip - Fractional flip (0.0-1.0) completed.
  * @param {object} [options] - Optional tuning overrides.
  */
+/**
+ * Applies a one-time velocity impulse to the player body based on trick complexity.
+ * Keeps ModularGameScene.js lean and encapsulates all boost logic here.
+ *
+ * @param {Phaser.Physics.Matter.Sprite} player - The player game object with a Matter body.
+ * @param {number} fullFlips - Number of full flips completed.
+ * @param {number} partialFlip - Fractional flip (0.0-1.0) completed.
+ * @param {object} [options] - Optional tuning overrides.
+ */
 export default function applyFlipImpulse(player, fullFlips, partialFlip, options = {}) {
   // Numbers tuned for "feels good" zone; tweak as needed
   const baseImpulse = options.baseImpulse ?? 2.0;

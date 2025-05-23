@@ -2,6 +2,11 @@
 // Configuration parameters for the game physics and player movement
 // Adjust these values to fine-tune the game feel
 
+/**
+ * Configuration parameters for the game physics and player movement.
+ * Adjust these values to fine-tune the game feel.
+ * @namespace PhysicsConfig
+ */
 const PhysicsConfig = {
     // Core physics system properties
     physics: {
@@ -40,8 +45,11 @@ const PhysicsConfig = {
     
     // Jump parameters
     jump: {
-        jumpVelocity: -10,         // Initial upward velocity on jump
+        jumpVelocity: -10,         // Initial upward velocity on jump (maximum, at top speed)
         walkJumpVelocity: -3,      // Jump velocity in walk mode
+        minSpeedForMaxJump: 40,    // Speed (pixels/frame) at which jump is full height
+        minJumpVelocity: -4,       // Minimum jump velocity at zero speed
+        // Above minSpeedForMaxJump, jump is always max; below, it lerps to minJumpVelocity
     },
     
     // Walking mode parameters
@@ -66,5 +74,8 @@ const PhysicsConfig = {
     }
 };
 
-// Export the config
+/**
+ * Exported physics configuration object for use throughout the game.
+ * @type {PhysicsConfig}
+ */
 export default PhysicsConfig;

@@ -14,7 +14,25 @@
  * Player-following starfield background for Phaser scenes.
  * Stars are always generated around player position, ensuring consistent density.
  */
+/**
+ * Player-following starfield background for Phaser scenes.
+ * Stars are always generated around player position, ensuring consistent density.
+ */
 export default class StarfieldParallax {
+  /**
+   * @param {Phaser.Scene} scene - The parent scene
+   * @param {object} [opts]
+   * @param {number} [opts.width=scene.scale.width]
+   * @param {number} [opts.height=scene.scale.height]
+   * @param {number} [opts.density=1.5] - Stars per 1000×1000 pixel area (higher = more stars)
+   * @param {number} [opts.layers=3] - Number of parallax layers
+   * @param {number[]} [opts.sizes=[3,5,7]] - Star sizes per layer
+   * @param {string[][]} [opts.colors] - Array of hex color strings per layer
+   * @param {number[]} [opts.speeds=[0.05,0.1,0.25]] - Parallax speed factors (0=static, 1=full scroll)
+   * @param {number} [opts.depth=-100] - Phaser depth (z-order)
+   * @param {number} [opts.cellSize=500] - Size of each cell in the grid
+   * @param {number} [opts.visibleBuffer=2] - Number of cells beyond visible area to fill with stars
+   */
   /**
    * @param {Phaser.Scene} scene - The parent scene
    * @param {object} [opts]
@@ -68,6 +86,12 @@ export default class StarfieldParallax {
   
   /**
    * Create stars for a specific cell
+   * @param {number} cellX - Cell X coordinate
+   * @param {number} cellY - Cell Y coordinate
+   * @private
+   */
+  /**
+   * Create stars for a specific cell.
    * @param {number} cellX - Cell X coordinate
    * @param {number} cellY - Cell Y coordinate
    * @private
@@ -130,6 +154,10 @@ export default class StarfieldParallax {
    * Create circle textures for different star sizes
    * @returns {Object} Map of star sizes to texture keys
    */
+  /**
+   * Create circle textures for different star sizes.
+   * @returns {Object} Map of star sizes to texture keys
+   */
   createStarTextures() {
     const textures = {};
     
@@ -166,6 +194,11 @@ export default class StarfieldParallax {
    * Update which cells are visible based on player position
    * @param {number} playerX - Player's world X position
    * @param {number} playerY - Player's world Y position 
+   */
+  /**
+   * Update which cells are visible based on player position.
+   * @param {number} playerX - Player's world X position
+   * @param {number} playerY - Player's world Y position
    */
   updateVisibleCells(playerX, playerY) {
     // Get current cell coordinates
@@ -234,6 +267,11 @@ export default class StarfieldParallax {
    * @param {number} camX - Camera X position
    * @param {number} camY - Camera Y position
    */
+  /**
+   * Position all stars with parallax effect.
+   * @param {number} camX - Camera X position
+   * @param {number} camY - Camera Y position
+   */
   updateStarPositions(camX, camY) {
     let visibleStars = 0;
     const viewWidth = this.width;
@@ -267,6 +305,11 @@ export default class StarfieldParallax {
 
   /**
    * Call this in your scene's update(), passing the camera and player position
+   * @param {Phaser.Cameras.Scene2D.Camera} [camera]
+   * @param {Phaser.GameObjects.GameObject} [player] - The player object (used for position)
+   */
+  /**
+   * Call this in your scene's update(), passing the camera and player position.
    * @param {Phaser.Cameras.Scene2D.Camera} [camera]
    * @param {Phaser.GameObjects.GameObject} [player] - The player object (used for position)
    */
@@ -305,6 +348,11 @@ export default class StarfieldParallax {
    * Set depth (z-index) for all stars
    * @param {number} depth - Depth value
    */
+  /**
+   * Set depth (z-index) for all stars.
+   * @param {number} depth - Depth value
+   * @returns {StarfieldParallax} This instance for chaining
+   */
   setDepth(depth) {
     this.depthValue = depth;
     
@@ -320,6 +368,9 @@ export default class StarfieldParallax {
   
   /**
    * Clean up all stars when no longer needed
+   */
+  /**
+   * Clean up all stars when no longer needed.
    */
   destroy() {
     // Destroy all stars in all cells

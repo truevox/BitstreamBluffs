@@ -13,6 +13,9 @@
 /**
  * Manages all heads-up display (HUD) elements and visual effects in the game
  */
+/**
+ * Manages all heads-up display (HUD) elements and visual effects in the game.
+ */
 export default class HudDisplay {
     /**
      * Creates a new HudDisplay instance

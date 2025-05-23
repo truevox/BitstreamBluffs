@@ -5,10 +5,17 @@
 /**
  * ExplosionEffects - Utility class for creating visual explosion effects
  */
+/**
+ * Utility class for creating visual explosion effects in the game.
+ */
 export default class ExplosionEffects {
     /**
      * Create a new ExplosionEffects instance
      * @param {Phaser.Scene} scene - The scene to add effects to
+     */
+    /**
+     * Creates a new ExplosionEffects instance.
+     * @param {Phaser.Scene} scene - The scene to add effects to.
      */
     constructor(scene) {
         this.scene = scene;
@@ -17,6 +24,10 @@ export default class ExplosionEffects {
     /**
      * Create an explosion effect for player and sled
      * @param {Object} playerContainer - The player container with sled and rider
+     */
+    /**
+     * Creates an explosion effect for the player and sled.
+     * @param {Object} playerContainer - The player container with sled and rider.
      */
     createPlayerExplosion(playerContainer) {
         if (!playerContainer || !playerContainer.getAll) {
@@ -132,6 +143,13 @@ export default class ExplosionEffects {
      * @param {number} y - Y position
      * @param {number} color - Color in hex format
      * @param {Object} size - Width and height object
+     */
+    /**
+     * Creates a particle explosion effect at the specified position.
+     * @param {number} x - X position.
+     * @param {number} y - Y position.
+     * @param {number} color - Color in hex format.
+     * @param {Object} size - Width and height object.
      */
     createParticles(x, y, color, size) {
         const particleCount = 20;

@@ -10,6 +10,12 @@ import RotationSystem from './utils/RotationSystem.js';
 import configLoader from './config/config-loader.js';
 import { initializeRandomWithSeed } from './utils/seed-generator.js';
 
+/**
+ * @deprecated LEGACY: Original Bitstream Bluffs game scene. DO NOT UPDATE. Will be removed.
+ * Uses Phaser 3 with Matter physics. Replaced by ModularGameScene.
+ *
+ * @extends Phaser.Scene
+ */
 export default class GameScene extends Phaser.Scene {
     constructor() {
         super({ 

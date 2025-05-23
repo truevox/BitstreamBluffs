@@ -3,7 +3,14 @@
 // for downhill sledding game with aerial tricks
 // ------------------------------------------------------
 
+/**
+ * Handles rotation physics, flip tracking, and landing evaluation for aerial tricks.
+ */
 export default class RotationSystem {
+    /**
+     * Creates a new RotationSystem instance.
+     * @param {Object} [config] - Optional configuration and callbacks.
+     */
     constructor(config = {}) {
         // Initialize state
         this.isGrounded = true;

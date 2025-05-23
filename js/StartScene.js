@@ -6,7 +6,16 @@
 import { generateGameSeed } from './utils/seed-generator.js';
 import StarfieldParallax from './background/StarfieldParallax.js';
 
+/**
+ * Start screen scene for Bitstream Bluffs.
+ * Handles the main menu UI, starfield, and game seed generation.
+ *
+ * @extends Phaser.Scene
+ */
 export default class StartScene extends Phaser.Scene {
+    /**
+     * Constructs the StartScene and binds context for callbacks.
+     */
     constructor() {
         super({ key: 'StartScene' });
         this.seed = '';
@@ -15,11 +24,17 @@ export default class StartScene extends Phaser.Scene {
         this.startGame = this.startGame.bind(this);
     }
 
+    /**
+     * Loads any assets needed for the start screen. Most elements are created programmatically.
+     */
     preload() {
         // Load any assets needed for the start screen
         // For now, we'll create everything programmatically
     }
 
+    /**
+     * Sets up the start screen, generates a game seed, and displays the UI and background.
+     */
     create() {
         // Generate a seed for this game session
         this.seed = generateGameSeed();
@@ -695,6 +710,9 @@ export default class StartScene extends Phaser.Scene {
         console.log('Game initialized with seed:', this.seed);
     }
     
+    /**
+     * Updates the scene, including any animated UI or background elements.
+     */
     update() {
         // Update the starfield (use camera center as 'player' position in start screen)
         if (this.starfield && this.cameras && this.cameras.main) {
@@ -706,6 +724,9 @@ export default class StartScene extends Phaser.Scene {
     
     /**
      * Called when scene is shutdown (e.g., when transitioning to another scene)
+     */
+    /**
+     * Called when the scene is shutdown (e.g., when transitioning to another scene).
      */
     shutdown() {
         // Remove the bounce update event listener to prevent memory leaks
@@ -719,6 +740,12 @@ export default class StartScene extends Phaser.Scene {
      * Creates links to GitHub, Instruction Manual, and Sledhead.ing in the bottom right corner
      * @param {number} width - Screen width
      * @param {number} height - Screen height
+     */
+    /**
+     * Creates links to GitHub, Instruction Manual, and Sledhead.ing in the bottom right corner.
+     *
+     * @param {number} width - Screen width.
+     * @param {number} height - Screen height.
      */
     createBottomRightLinks(width, height) {
         // Container for the links
@@ -788,6 +815,13 @@ export default class StartScene extends Phaser.Scene {
      * @param {Phaser.GameObjects.GameObject} icon - The icon to add interactivity to
      * @param {string} url - The URL to open on click
      * @param {string} tooltip - Tooltip text to show on hover
+     */
+    /**
+     * Adds hover effects and click handler to an icon.
+     *
+     * @param {Phaser.GameObjects.GameObject} icon - The icon to add interactivity to.
+     * @param {string} url - The URL to open on click.
+     * @param {string} tooltip - Tooltip text to show on hover.
      */
     addIconInteractivity(icon, url, tooltip) {
         // Determine tooltip position based on the icon - special case for the Snow Bee icon
@@ -871,6 +905,17 @@ export default class StartScene extends Phaser.Scene {
      * @param {string} color - Text color (hex)
      * @returns {Phaser.GameObjects.Container} - Button container
      */
+    /**
+     * Creates a styled retro button with hover effects.
+     *
+     * @param {number} x - X position of button.
+     * @param {number} y - Y position of button.
+     * @param {number} width - Width of button.
+     * @param {number} height - Height of button.
+     * @param {string} text - Button text.
+     * @param {string} [color='#00ffff'] - Text color (hex).
+     * @returns {Phaser.GameObjects.Container} Button container.
+     */
     createRetroButton(x, y, width, height, text, color = '#00ffff') {
         // Create container for the button
         const buttonContainer = this.add.container(x, y);
@@ -928,6 +973,9 @@ export default class StartScene extends Phaser.Scene {
         return buttonContainer;
     }
     
+    /**
+     * Starts the ModularGameScene with a transition effect.
+     */
     startGame() {
         // Always use the modular architecture
         window.useModularArchitecture = true;
@@ -942,6 +990,11 @@ export default class StartScene extends Phaser.Scene {
         });
     }
     
+    /**
+     * Copies the provided text to the clipboard using the best available method.
+     *
+     * @param {string} text - The text to copy.
+     */
     copyTextToClipboard(text) {
         // This function uses the Navigator clipboard API when available
         // or falls back to document.execCommand for older browsers
