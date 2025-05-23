@@ -1,6 +1,6 @@
 {
   "name": "bitstream-bluffs",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "type": "module",
   "description": "2D side-scrolling infinite sledder game",
   "scripts": {
@@ -37,6 +37,8 @@
     "jest-environment-jsdom": "^29.7.0",
     "mocha": "^10.8.2",
     "netlify-plugin-cache": "^1.0.3",
-    "puppeteer": "^21.11.0"
+    "phaser": "^3.70.0",
+    "puppeteer": "^21.11.0",
+    "phaser": "3.70.0"
   }
 }

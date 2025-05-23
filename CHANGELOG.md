@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.4.2
+
+### 🛠 Fix: Add Phaser as devDependency for CI
+- What: Added `phaser@3.70.0` as a devDependency in package.json to fix test runner errors in Netlify CI/CD.
+- Why: Netlify and Jest require Phaser to be installed for import in StartScene.js and other test files.
+- How: Installed Phaser with `npm install --save-dev phaser@3.70.0`.
+
 ## v1.4.1
 
 ### 🛠 Fix: Add build script for Netlify CI

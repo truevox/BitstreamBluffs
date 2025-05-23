@@ -41,6 +41,7 @@
 - **Reference:** This fixes CI errors like `window is not defined`, `Phaser is not defined`, and Web Crypto API issues in tests.
 - See also: common-issues.md for troubleshooting.
 - Netlify requires a `build` script in `package.json`, even for static JS/HTML projects. Use a no-op if not needed, or CI will fail before running tests.
+- Phaser must be present in `devDependencies` for Netlify CI/CD and Jest to work with any file that imports Phaser (e.g., StartScene.js). If you see 'Cannot find module phaser', check your package.json.
 
 ## Common API Misuse: RotationSystem.update
 
