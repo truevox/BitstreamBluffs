@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.4.1
+
+### 🛠 Fix: Add build script for Netlify CI
+- What: Added a no-op `build` script to `package.json` so Netlify build/test pipeline will not fail.
+- Why: Netlify requires a `build` script even for static JS/HTML projects; without it, CI/CD fails before tests run.
+- How: Inserted `"build": "echo 'No build step'"` to the scripts section of `package.json`.
+
 ## [v1.5.1] - 2025-05-22
 
 ### 🛡️ Failsafe: Enhance player-terrain fallback logic

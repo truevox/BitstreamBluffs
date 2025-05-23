@@ -40,6 +40,7 @@
     ```
 - **Reference:** This fixes CI errors like `window is not defined`, `Phaser is not defined`, and Web Crypto API issues in tests.
 - See also: common-issues.md for troubleshooting.
+- Netlify requires a `build` script in `package.json`, even for static JS/HTML projects. Use a no-op if not needed, or CI will fail before running tests.
 
 ## Common API Misuse: RotationSystem.update
 
