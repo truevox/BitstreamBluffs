@@ -618,6 +618,7 @@ describe('Trick Execution E2E Tests with Input Playback', () => {
     // Find the final state
     const finalState = result[result.length - 1];
     
+    console.log('finalState:', finalState);
     // Should have crashed
     expect(finalState.crashed).toBe(true);
     
@@ -654,6 +655,8 @@ describe('Trick Execution E2E Tests with Input Playback', () => {
     expect(keyMetrics).toMatchObject(expectedMetrics);
     
     // Specific assertions for stable metrics
+    console.log('keyMetrics:', keyMetrics);
+    expect(typeof keyMetrics.distanceTraveled).toBe('number');
     expect(keyMetrics.distanceTraveled).toBeGreaterThan(1000); // Should move significantly
     expect(keyMetrics.maxSpeed).toBeLessThanOrEqual(15); // Shouldn't exceed max speed
   }), 1000);

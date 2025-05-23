@@ -73,7 +73,11 @@ describe('Seed Generator Module', () => {
     
     test('should try to use SHA-256 in secure contexts', () => {
       global.isSecureContext = true;
-      generateGameSeed();
+      console.log('isSecureContext:', global.isSecureContext, 'mockDigest calls:', mockDigest.mock.calls.length);
+      generateGameSeed();           
+      if (mockDigest.mock.calls.length === 0) {
+        console.error('mockDigest was not called!');
+      }
       expect(mockDigest).toHaveBeenCalled();
       expect(mockDigest.mock.calls[0][0]).toBe('SHA-256');
     });

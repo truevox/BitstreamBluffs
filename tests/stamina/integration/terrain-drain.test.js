@@ -281,9 +281,13 @@ describe('Stamina Integration Tests - Terrain Drain', () => {
       }
     }
     
+    // Debug output for drain rates
+    console.log('avgDrains:', avgDrains);
+    expect(typeof avgDrains.ice).toBe('number');
+    expect(typeof avgDrains.snow).toBe('number');
+    expect(typeof avgDrains.powder).toBe('number');
     // Ice should drain less than snow
     expect(avgDrains.ice).toBeLessThan(avgDrains.snow);
-    
     // Powder should drain more than snow
     expect(avgDrains.powder).toBeGreaterThan(avgDrains.snow);
   }), 1000);

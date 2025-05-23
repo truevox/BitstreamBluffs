@@ -495,6 +495,8 @@ describe('Memory Usage and Performance E2E Tests', () => {
     
     // FPS should be near target
     const avgFPS = results.performanceAssessment.avgFPS;
+    console.log('avgFPS:', avgFPS);
+    expect(typeof avgFPS).toBe('number');
     expect(avgFPS).toBeGreaterThanOrEqual(30);
   }));
   
@@ -518,6 +520,8 @@ describe('Memory Usage and Performance E2E Tests', () => {
     // Memory should stabilize - late memory shouldn't be dramatically higher than mid memory
     // Allow some growth but not unbounded
     const growthRate = (lateMemory - midMemory) / midMemory;
+    console.log('lateMemory:', lateMemory, 'midMemory:', midMemory, 'growthRate:', growthRate);
+    expect(typeof growthRate).toBe('number');
     expect(growthRate).toBeLessThan(0.5); // Less than 50% growth in second half
   }));
   
@@ -559,7 +563,11 @@ describe('Memory Usage and Performance E2E Tests', () => {
       const currSegment = sortedSegments[i];
       
       // Each segment should connect to the next
-      expect(prevSegment.position.x + prevSegment.width).toBeCloseTo(currSegment.position.x, 0);
+      console.log('prevSegment:', prevSegment, 'currSegment:', currSegment);
+    expect(typeof prevSegment.position.x).toBe('number');
+    expect(typeof prevSegment.width).toBe('number');
+    expect(typeof currSegment.position.x).toBe('number');
+    expect(prevSegment.position.x + prevSegment.width).toBeCloseTo(currSegment.position.x, 0);
     }
     
     // Clean up off-screen objects
