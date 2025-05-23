@@ -471,17 +471,58 @@ export default class ModularGameScene extends Phaser.Scene {
         // If the player sprite is ever below the terrain at the same x,
         // teleport the player directly above the terrain. This prevents rare physics bugs
         // where the player can tunnel through the ground due to high velocity or collision errors.
-        if (this.terrain && this.player && this.player.body) {
-            const terrainY = this.terrain.findTerrainHeightAt(this.player.x);
-            if (this.player.y > terrainY + 5) { // Allow a small epsilon for collision tolerance
-                // Move player just above the terrain
-                this.player.y = terrainY - 1;
-                // Also move the physics body directly
-                this.player.body.position.y = terrainY - 1;
-                // Zero vertical velocity to prevent instant re-falling
-                this.player.body.velocity.y = 0;
-                // Optionally, you could also reset forces here if needed
-            }
+
+        // Confirm update loop is running
+        if (this.player && this.player.body) {
+            console.debug('[Update] Frame', performance.now(), 'Player y:', this.player.y, 'x:', this.player.x);
+        }
+
+        if (!this.terrain || !this.player || !this.player.body) {
+            // Log which object is missing for debug purposes
+            console.warn('[Failsafe] Skipped: terrain, player, or body missing.', {
+                terrain: !!this.terrain,
+                player: !!this.player,
+                body: this.player ? !!this.player.body : 'n/a'
+            });
+            return;
+        }
+
+        // Optionally check terrain bounds if TerrainManager supports it
+        const terrainMinX = this.terrain.getMinX?.();
+        const terrainMaxX = this.terrain.getMaxX?.();
+        if (terrainMinX !== undefined && terrainMaxX !== undefined &&
+            (this.player.x < terrainMinX || this.player.x > terrainMaxX)) {
+            console.warn('[Failsafe] Player x out of terrain bounds:', this.player.x, terrainMinX, terrainMaxX);
+            // Optionally clamp or respawn, but for now just log
+        }
+
+        const terrainY = this.terrain.findTerrainHeightAt(this.player.x);
+        if (typeof terrainY !== 'number' || isNaN(terrainY)) {
+            console.warn('[Failsafe] No valid terrain at x:', this.player.x, 'Player y:', this.player.y);
+            // Optionally: teleport to a safe spawn, or freeze player
+            // this.respawnPlayer();
+            return;
+        }
+
+        // Use a dynamic epsilon based on vertical speed
+        const epsilon = Math.max(5, Math.abs(this.player.body.velocity.y) * 0.5); // Scales with speed
+        if (this.player.y > terrainY + epsilon) {
+            console.warn('[Failsafe] Large fall detected. Correcting position.', {
+                playerY: this.player.y,
+                terrainY,
+                velocityY: this.player.body.velocity.y,
+                epsilon
+            });
+            // Move player just above the terrain
+            this.player.y = terrainY - 1;
+            // Also move the physics body directly
+            this.player.body.position.y = terrainY - 1;
+            // Zero vertical velocity to prevent instant re-falling
+            this.player.body.velocity.y = 0;
+            // Clear any residual force
+            this.player.body.force.y = 0;
+            // Mark this frame as a teleport to avoid repeated physics issues
+            this.player.justTeleported = true;
         }
         
         // Game over conditions

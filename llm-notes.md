@@ -1,5 +1,19 @@
 # LLM Notes
 
+## 2025-05-22: Terrain Failsafe Diagnostics Improved
+- The player-terrain failsafe in `ModularGameScene.js` now includes:
+  - Diagnostic logging for missing terrain/player/body
+  - Out-of-bounds and invalid terrainY warnings
+  - Epsilon for correction scales with vertical velocity
+  - Teleport correction now zeroes velocity and force, and sets a 'justTeleported' flag
+- All changes are commented for maintainability and debugging.
+- If players still fall through terrain, consider implementing:
+  - Multi-frame recovery (keep above terrain for several frames)
+  - Hard teleport to last valid position or safe spawn if far below terrain
+  - Cooldown after teleport to disable gravity/collision
+  - Auto-respawn if terrain is missing for multiple frames
+  - Tracking last safe position
+
 ## Puppeteer Use in CI/CD
 - Puppeteer is still required for internal and CI test runs (see test:puppeteer and test:all npm scripts).
 - In Netlify production builds, Chromium download is skipped (`PUPPETEER_SKIP_DOWNLOAD=1` in netlify.toml) to speed up deploys and avoid unnecessary binary downloads.
