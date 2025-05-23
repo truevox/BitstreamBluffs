@@ -1,5 +1,14 @@
 # LLM Notes
 
+## Phaser + jsdom Canvas API CI Issue (2025-05-23)
+- **Problem:** Phaser expects a real browser Canvas API, but jsdom (used by Jest in CI/Netlify) does not implement the full Canvas 2D context. This causes errors like:
+
+      TypeError: Cannot set properties of null (setting 'fillStyle')
+
+  when Phaser tries to use `getContext('2d')` on a canvas element.
+- **Solution:** A Jest setup file (`jest.setup.js`) mocks the Canvas 2D context so Phaser does not crash in jsdom-based CI environments. Jest config (`setupFiles`) must include this file.
+- See also `common-issues.md` for further details.
+
 ## 2025-05-22: Terrain Failsafe Diagnostics Improved
 - The player-terrain failsafe in `ModularGameScene.js` now includes:
   - Diagnostic logging for missing terrain/player/body

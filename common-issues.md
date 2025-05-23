@@ -1,5 +1,21 @@
 # Common Issues and Solutions
 
+## Phaser + jsdom Canvas API incompatibility in CI
+
+**Problem:**
+Phaser expects a real browser Canvas API, but jsdom (used by Jest in CI/Netlify) does not implement the full Canvas 2D context. This causes errors like:
+
+    TypeError: Cannot set properties of null (setting 'fillStyle')
+
+when Phaser tries to use `getContext('2d')` on a canvas element.
+
+**Solution:**
+A Jest setup file (`jest.setup.js`) mocks the Canvas 2D context so Phaser does not crash in jsdom-based CI environments. See that file for the mock implementation.
+
+- Make sure `setupFiles` in Jest config includes `jest.setup.js`.
+- See also llm-notes.md for further context.
+
+
 ## Game Physics Issues
 
 ### 🐞 Issue: "Cannot read properties of undefined (reading 'position')"
