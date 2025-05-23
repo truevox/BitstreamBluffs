@@ -21,6 +21,7 @@ import ModularGameScene from './ModularGameScene.js'; // New modular architectur
 import './utils/RotationSystem.js';
 import './Manette.js';
 
+import Phaser from 'phaser';
 // Function to initialize the game
 /**
  * Initializes the Phaser game instance after fonts are loaded and sets up resize handling.

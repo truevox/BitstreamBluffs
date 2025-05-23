@@ -29,8 +29,13 @@ export default class StartScene extends Phaser.Scene {
      * Loads any assets needed for the start screen. Most elements are created programmatically.
      */
     preload() {
-        // Load any assets needed for the start screen
-        // For now, we'll create everything programmatically
+        // Load GitHub SVG and PNG icons
+        this.load.svg('githubMark', '/assets/icons/github-mark.svg');
+        this.load.image('githubMarkPng', '/assets/icons/github-mark.png');
+        // Load snowBee icon
+        this.load.image('snowBee', '/assets/snowBee.png');
+        // Load extraLife icon
+        this.load.image('extraLife', '/assets/extraLife.png');
     }
 
     /**
@@ -667,7 +672,7 @@ export default class StartScene extends Phaser.Scene {
         this.add.text(
             width / 2,
             height * 0.9,
-            'OR PRESS SPACE/ENTER FOR CLASSIC MODE',
+            'CLICK START GAME ABOVE OR PRESS SPACE/ENTER TO START',
             {
                 fontFamily: 'VT323',
                 fontSize: '22px',
