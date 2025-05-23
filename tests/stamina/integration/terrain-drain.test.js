@@ -300,6 +300,8 @@ describe('Stamina Integration Tests - Terrain Drain', () => {
     staminaSimulator.addEnergyItem('mediumEnergy');
     
     // Should have increased by the correct amount (but not exceed max)
+    // Ensure value is a number before matcher
+    expect(typeof staminaSimulator.player.stamina).toBe('number');
     expect(staminaSimulator.player.stamina).toBe(
       Math.min(100, staminaBefore + 30)
     );

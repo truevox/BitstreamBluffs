@@ -3,6 +3,8 @@
  */
 import { jest, describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 
+global.Phaser = { GameObjects: { Text: jest.fn() } };
+
 // Mock Phaser
 const mockScene = {
   add: {
