@@ -82,6 +82,18 @@ const seedGeneratorModule = jest.requireMock('../../../js/utils/seed-generator.j
 // Import the StartScene after mocking dependencies
 import StartScene from '../../../js/StartScene.js';
 
+// Patch: Mock canvas context for Phaser in headless (jsdom) environments
+beforeAll(() => {
+  const origCreateElement = global.document.createElement;
+  global.document.createElement = function (tag, ...args) {
+    const el = origCreateElement.call(this, tag, ...args);
+    if (tag === 'canvas') {
+      el.getContext = () => ({ fillStyle: '' });
+    }
+    return el;
+  };
+});
+
 describe('StartScene', () => {
   let startScene;
   
