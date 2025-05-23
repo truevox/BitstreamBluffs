@@ -796,9 +796,23 @@ export default class ModularGameScene extends Phaser.Scene {
         if (input.jump && this.onGround) {
             // Use the correct constant from PhysicsConfig
             // Note: Original uses negative value, so we maintain that convention
+            // Scale jump height with speed: at or above minSpeedForMaxJump, use full jump; below, interpolate to minJumpVelocity
+            const vx = this.player.body.velocity.x;
+            const absSpeed = Math.abs(vx);
+            const maxSpeed = PhysicsConfig.jump.minSpeedForMaxJump;
+            const maxJump = PhysicsConfig.jump.jumpVelocity;
+            const minJump = PhysicsConfig.jump.minJumpVelocity;
+            // Linear interpolation for jump velocity based on current speed
+            let jumpVel = maxJump;
+            if (absSpeed < maxSpeed) {
+                // Lerp from minJump to maxJump as speed increases
+                const t = absSpeed / maxSpeed;
+                jumpVel = minJump + (maxJump - minJump) * t;
+            }
+            // We scale jump height to reward speed: slow = lower jump, fast = full jump
             Body.setVelocity(this.player.body, {
-                x: this.player.body.velocity.x,
-                y: PhysicsConfig.jump.jumpVelocity // This matches GameScene
+                x: vx,
+                y: jumpVel
             });
             this.onGround = false;
             this.hud.showToast('Jump!', 1000);
