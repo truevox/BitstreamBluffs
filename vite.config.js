@@ -6,6 +6,7 @@ export default defineConfig({
   root: '.',
   publicDir: 'public', // Use 'public' for static assets
   build: {
+    chunkSizeWarningLimit: 2000,
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
