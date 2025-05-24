@@ -71,17 +71,18 @@ class ConfigEnvironmentDetector {
    */
   isProduction() {
     const hostname = window.location.hostname;
-    
+    if (!hostname || typeof hostname !== 'string') return false; // Defensive: treat undefined/empty/non-string as not production
+
     // Check direct matches
     if (this.prodHosts.includes(hostname)) {
       return true;
     }
-    
+
     // Check subdomain matches (anything ending with .sledhead.ing)
     if (hostname.endsWith('.sledhead.ing')) {
       return true;
     }
-    
+
     // Default to development
     return false;
   }
