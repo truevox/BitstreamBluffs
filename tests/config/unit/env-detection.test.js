@@ -152,61 +152,61 @@ describe('Environment Detection Unit Tests', () => {
   
   test('correctly identifies development environments', measurePerformance(() => {
     // Test localhost
-    window.location.hostname = 'localhost';
+    mockLocation('localhost');
     expect(configDetector.isDevelopment()).toBe(true);
     expect(configDetector.isProduction()).toBe(false);
-    
+
     // Test 127.0.0.1
-    window.location.hostname = '127.0.0.1';
+    mockLocation('127.0.0.1');
     expect(configDetector.isDevelopment()).toBe(true);
     expect(configDetector.isProduction()).toBe(false);
-    
+
     // Test arbitrary development domain
-    window.location.hostname = 'dev.example.com';
+    mockLocation('dev.example.com');
     expect(configDetector.isDevelopment()).toBe(true);
     expect(configDetector.isProduction()).toBe(false);
   }));
   
   test('correctly identifies production environments', measurePerformance(() => {
     // Test main production domain
-    window.location.hostname = 'sledhead.truevox.net';
+    mockLocation('sledhead.truevox.net');
     expect(configDetector.isProduction()).toBe(true);
     expect(configDetector.isDevelopment()).toBe(false);
-    
+
     // Test .sledhead.ing domain
-    window.location.hostname = 'sledhead.ing';
+    mockLocation('sledhead.ing');
     expect(configDetector.isProduction()).toBe(true);
     expect(configDetector.isDevelopment()).toBe(false);
-    
+
     // Test subdomain of .sledhead.ing
-    window.location.hostname = 'app.sledhead.ing';
+    mockLocation('app.sledhead.ing');
     expect(configDetector.isProduction()).toBe(true);
     expect(configDetector.isDevelopment()).toBe(false);
-    
+
     // Test another subdomain of .sledhead.ing
-    window.location.hostname = 'beta.sledhead.ing';
+    mockLocation('beta.sledhead.ing');
     expect(configDetector.isProduction()).toBe(true);
     expect(configDetector.isDevelopment()).toBe(false);
   }));
   
   test('debugging is enabled in development but not production', measurePerformance(() => {
     // Development environments should have debugging enabled
-    window.location.hostname = 'localhost';
+    mockLocation('localhost');
     expect(configDetector.isDebuggingEnabled()).toBe(true);
-    
+
     // Production environments should not have debugging enabled
-    window.location.hostname = 'sledhead.truevox.net';
+    mockLocation('sledhead.truevox.net');
     expect(configDetector.isDebuggingEnabled()).toBe(false);
   }));
   
   test('debug parameter enables debugging even in production', measurePerformance(() => {
     // Set production environment
-    window.location.hostname = 'sledhead.truevox.net';
-    
+    mockLocation('sledhead.truevox.net');
+
     // Without debug parameter, debugging should be disabled
     window.location.search = '';
     expect(configDetector.isDebuggingEnabled()).toBe(false);
-    
+
     // With debug parameter, debugging should be enabled
     window.location.search = '?debug=true';
     expect(configDetector.isDebuggingEnabled()).toBe(true);
