@@ -51,6 +51,12 @@
 
 ---
 
+## 2025-05-23: Netlify Deprecation Warnings (npm)
+- mocha upgraded to 11.2.2 to remove deprecated glob/inflight from its dependency tree.
+- jest and jest-environment-jsdom are already at latest (29.7.0), but still depend on deprecated packages (glob, inflight, domexception, abab) via their upstream dependencies.
+- No further action is possible until jest/jsdom ecosystem updates upstream dependencies.
+- These warnings do not affect production or test correctness, but are tracked for future maintenance.
+
 ## Netlify Build Test Strategy
 - **Netlify runs only unit/integration tests** (`npm run test`) for fast deploy feedback.
 - **Full E2E (Puppeteer) tests** (`npm run test:all`) are not run on every Netlify build, as they are slower and more expensive.
