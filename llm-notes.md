@@ -1,4 +1,17 @@
-# LLM Notes
+# LL
+
+## v1.7.0: Dependency Upgrade (2025-05-23)
+
+- **Root Cause:**
+  - Netlify/CI flagged deprecated transitive dependencies (`inflight`, `glob`, `domexception`, `abab`) via Jest and jsdom.
+- **Actions Taken:**
+  - Upgraded all direct dependencies to latest compatible versions (`chai`, `express`, `jest`, `jest-environment-jsdom`, `mocha`, `phaser`, `puppeteer`).
+  - Clean install required: delete `node_modules` and `package-lock.json`, then run `npm install`.
+- **Future Guidance:**
+  - Periodically run `npm outdated` and upgrade direct dependencies to minimize risk of deprecated transitive packages.
+  - If warnings persist, check Jest ecosystem for major version compatibility before bumping beyond 29.x.
+  - See CHANGELOG.md for summary.
+M Notes
 
 ## 2025-05-23: CI Hardening for Netlify Build
 - **Input Playback Crash Test:**

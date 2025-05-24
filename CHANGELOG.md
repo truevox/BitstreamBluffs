@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.0
+
+###  Dependency Upgrades
+- Upgraded all direct dependencies (chai, express, jest, jest-environment-jsdom, mocha, phaser, puppeteer) to their latest compatible versions.
+- This resolves Netlify and CI warnings about deprecated transitive packages (`inflight`, `glob`, `domexception`, `abab`).
+- Clean install required: delete `node_modules` and `package-lock.json`, then run `npm install`.
+- See `llm-notes.md` for additional automation context.
+
+
 ## v1.5.3
 
 ### 🧪 Test Robustness: Relax trick scoring assertions
