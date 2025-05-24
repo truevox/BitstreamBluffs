@@ -214,28 +214,25 @@ describe('Environment Detection Unit Tests', () => {
   
   test('environment-specific config has correct values', measurePerformance(() => {
     // Check development config
-    window.location.hostname = 'localhost';
+    Object.defineProperty(window, 'location', {
+      value: new URL('https://localhost/'),
+      writable: true,
+      configurable: true,
+    });
     const devConfig = configDetector.getConfig();
     expect(devConfig.environment).toBe('development');
     expect(devConfig.logging.level).toBe('debug');
     expect(devConfig.logging.enabled).toBe(true);
     expect(devConfig.physics.debugging).toBe(true);
     expect(devConfig.analytics.enabled).toBe(false);
-    
+
     // Check production config
-    // Patch: Attempt to override window.location.hostname for jsdom/CI; skip if not possible
-    try {
-      Object.defineProperty(window.location, 'hostname', { value: 'sledhead.truevox.net', configurable: true });
-    } catch (e) {
-      console.warn('[CI PATCH] Unable to override window.location.hostname in jsdom; skipping production config test.');
-      return;
-    }
+    Object.defineProperty(window, 'location', {
+      value: new URL('https://sledhead.truevox.net/'),
+      writable: true,
+      configurable: true,
+    });
     const prodConfig = configDetector.getConfig();
-    if (prodConfig.environment !== 'production') {
-      console.warn('[CI PATCH] Expected production environment, but got', prodConfig.environment, '— this may be a CI/jsdom limitation. Skipping assertion.');
-      // TODO: Improve environment mocking for robust CI test
-      return;
-    }
     expect(prodConfig.environment).toBe('production');
     expect(prodConfig.logging.level).toBe('error');
     expect(prodConfig.logging.enabled).toBe(false);
