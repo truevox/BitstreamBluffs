@@ -284,8 +284,9 @@ export default class StarfieldParallax {
         const parallaxFactor = this.speeds[star.layer % this.speeds.length];
         
         // Set new position relative to camera with parallax
-        star.x = star.worldX - camX * parallaxFactor;
-        star.y = star.worldY - camY * parallaxFactor;
+        star.x = (star.worldX - camX) + camX; // Readd parallax someday when I can get it working right
+        star.y = (star.worldY - camY) + camY; // Readd parallax someday when I can get it working right
+
         
         // Count stars in visible area
         if (star.x >= 0 && star.x <= viewWidth && 
@@ -337,8 +338,10 @@ export default class StarfieldParallax {
       playerY = camY + this.height / 2;
     }
     
-    // Update which cells are visible based on player position
-    this.updateVisibleCells(playerX, playerY);
+    // Update which cells are visible based on camera center (not player), so stars always fill the visible screen
+    const camCenterX = camX + this.width / 2;
+    const camCenterY = camY + this.height / 2;
+    this.updateVisibleCells(camCenterX, camCenterY);
     
     // Update star positions based on camera
     this.updateStarPositions(camX, camY);
