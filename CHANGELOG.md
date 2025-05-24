@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.7.1
+
+### 🚑 Fix: Remove tests from Netlify build process
+- What: Modified Netlify deployment configuration to skip running tests during build
+- Why: Tests were failing in the Netlify environment due to environmental differences
+- How: Updated `netlify.toml` to remove the test command from the build process
+
 ## v1.7.0
 
 ###  Dependency Upgrades
