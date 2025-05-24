@@ -1,5 +1,18 @@
 # LL
 
+## 2025-05-23: Multi-Chunk Terrain E2E Test CI Hardening
+- **Problem:**
+  - Netlify/CI builds failed due to `TypeError: Cannot read properties of undefined (reading 'index')` in `tests/terrain/e2e/multi-chunk-terrain.test.js` when `visibleChunks` was unexpectedly short (e.g., < 3 elements).
+- **Solution:**
+  - The test now asserts `visibleChunks.length >= 3` before accessing `[0]`, `[1]`, or `[2]`, and throws a clear error with diagnostic output if not. This prevents unhelpful CI failures and provides actionable feedback.
+- **Why:**
+  - In rare CI or edge cases, chunk generation may be delayed or non-deterministic, so this patch makes test failures explicit and debuggable, rather than opaque TypeErrors.
+- **Reference:**
+  - See `tests/terrain/e2e/multi-chunk-terrain.test.js`, lines ~120–160 ("generates and manages multiple terrain chunks" test).
+  - All changes are commented inline as to _why_ (per project convention).
+- **Impact:**
+  - No change to game logic or production code. This is a test robustness patch for CI reliability and future maintainability.
+
 ## v1.7.0: Dependency Upgrade (2025-05-23)
 
 - **Root Cause:**

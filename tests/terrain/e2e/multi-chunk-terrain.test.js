@@ -117,20 +117,19 @@ describe('Multi-Chunk Terrain E2E Tests', () => {
   test('generates and manages multiple terrain chunks', measurePerformance(() => {
     // Initial load at position 0
     let visibleChunks = terrainManager.loadChunks(0);
+    // Defensive: Ensure we have enough chunks before accessing by index
+    if (visibleChunks.length < 3) {
+      // This prevents CI TypeErrors and gives actionable output
+      console.error('[E2E TEST ERROR] visibleChunks.length < 3:', visibleChunks);
+      throw new Error(`Expected at least 3 visibleChunks, got ${visibleChunks.length}. Value: ${JSON.stringify(visibleChunks)}`);
+    }
     if (process.env.CI) {
       // CI tolerance patch: relax chunk count assertion in CI // <-- DO NOT ERASE!
       if (visibleChunks.length !== 3) {
         console.warn('[CI PATCH] visibleChunks.length !== 3 in CI:', visibleChunks.length);
       }
     } else {
-      if (process.env.CI) {
-        // CI tolerance patch: relax chunk count assertion in CI // <-- DO NOT ERASE!
-        if (visibleChunks.length !== 3) {
-          console.warn('[CI PATCH] visibleChunks.length !== 3 in CI:', visibleChunks.length);
-        }
-      } else {
-        expect(visibleChunks.length).toBe(3);
-      }
+      expect(visibleChunks.length).toBe(3);
     }
     if (process.env.CI) {
       // CI tolerance patch: relax chunk index assertion in CI // <-- DO NOT ERASE!
@@ -145,6 +144,10 @@ describe('Multi-Chunk Terrain E2E Tests', () => {
     
     // Move forward to trigger new chunk loading
     visibleChunks = terrainManager.loadChunks(1500); // Move to middle of chunk 1
+    if (visibleChunks.length < 3) {
+      console.error('[E2E TEST ERROR] visibleChunks.length < 3 after move to 1500:', visibleChunks);
+      throw new Error(`Expected at least 3 visibleChunks after move to 1500, got ${visibleChunks.length}. Value: ${JSON.stringify(visibleChunks)}`);
+    }
     expect(visibleChunks.length).toBe(3);
     expect(visibleChunks[0].index).toBe(1);
     expect(visibleChunks[1].index).toBe(2);
@@ -152,6 +155,10 @@ describe('Multi-Chunk Terrain E2E Tests', () => {
     
     // Move further to load more chunks
     visibleChunks = terrainManager.loadChunks(3000); // Move to middle of chunk 3
+    if (visibleChunks.length < 3) {
+      console.error('[E2E TEST ERROR] visibleChunks.length < 3 after move to 3000:', visibleChunks);
+      throw new Error(`Expected at least 3 visibleChunks after move to 3000, got ${visibleChunks.length}. Value: ${JSON.stringify(visibleChunks)}`);
+    }
     expect(visibleChunks.length).toBe(3);
     expect(visibleChunks[0].index).toBe(2);
     expect(visibleChunks[1].index).toBe(3);
