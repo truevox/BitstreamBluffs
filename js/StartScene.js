@@ -19,6 +19,8 @@ export default class StartScene extends Phaser.Scene {
      */
     constructor() {
         super({ key: 'StartScene' });
+        // Explicitly set key for test compliance and Phaser.Scene contract
+        this.key = 'StartScene'; // Required for tests and scene management
         this.seed = '';
         
         // Bind methods to preserve 'this' context
