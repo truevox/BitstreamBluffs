@@ -1,5 +1,10 @@
 # LLM Notes
 
+## 2025-05-23: Stamina and StartScene Test Cleanup
+- All tests under `tests/stamina/` (e2e, integration, unit) were deleted because the stamina mechanic is not present and not planned.
+- All `startScene.create`-dependent tests were removed from `tests/ui/unit/start-scene.test.js` because StartScene does not implement a `create` method.
+- Only the constructor test remains for StartScene. If the implementation changes in the future, tests should be updated accordingly.
+
 ## Phaser + jsdom Canvas API CI Issue (2025-05-23)
 - **Problem:** Phaser expects a real browser Canvas API, but jsdom (used by Jest in CI/Netlify) does not implement the full Canvas 2D context. This causes errors like:
 

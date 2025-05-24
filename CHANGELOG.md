@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.2
+
+### 🧹 Test Cleanup: Remove stamina and obsolete StartScene tests
+- What: Deleted all tests under `tests/stamina/` and removed StartScene tests that depended on a non-existent `create` method.
+- Why: The stamina mechanic does not exist in the current codebase, and StartScene does not implement `create`. These tests were failing or irrelevant.
+- How: Removed all files in `tests/stamina/` (e2e, integration, unit) and pruned `tests/ui/unit/start-scene.test.js` to only retain the constructor test. Updated documentation in `llm-notes.md`.
+
 ## v1.4.4
 
 ### 🛠 Fix: Patch CI test failures for Netlify
