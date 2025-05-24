@@ -246,10 +246,10 @@
             </ul>
         </div>
         
-        <a href="../index.html" class="button">RETURN TO GAME</a>
+        <a href="../index.html" class="button" onclick="returnToGame(event)">RETURN TO GAME</a>
     </div>
     
-    <a href="../index.html" class="back-link">← BACK TO GAME</a>
+    <a href="../index.html" class="back-link" onclick="returnToGame(event)">← BACK TO GAME</a>
     
     <script>
         // Preload fonts to avoid FOUC (Flash of Unstyled Content)
@@ -290,6 +290,15 @@
         });
     </script>
 <script>
+  // Allows both RETURN TO GAME and ← BACK TO GAME to close the window if possible, or fallback to redirect
+  function returnToGame(e) {
+    if (e) e.preventDefault();
+    // Try to close the window (works if opened via script)
+    window.close();
+    // If window.close() fails (not opened by script), fallback to redirect
+    window.location.href = '/index.html';
+  }
+
   console.log('Instructions script loaded');
   
   // Find the BACK TO GAME element by its text content

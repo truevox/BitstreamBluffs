@@ -10,7 +10,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: './public/index.html', // Main HTML moved to public/
+      input: './index.html', // Main HTML moved to public/
     },
   },
   server: {
