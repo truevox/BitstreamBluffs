@@ -16,19 +16,19 @@ const PhysicsConfig = {
     // Player physics body properties
     player: {
         restitution: 0,     // Bounciness (0 = no bounce, 1 = full bounce)
-        friction: 0.00005,   // Surface friction (lower = more sliding)
-        frictionAir: 0.001,   // Air resistance (lower = less slowdown in air)
+        friction: 0.04,   // Surface friction (lower = more sliding)
+        frictionAir: 0.002,   // Air resistance (lower = less slowdown in air)
         density: 0.98,        // Mass density (lower = lighter)
     },
     
     // Movement forces and velocities
     movement: {
         // Force applied when pressing left/right
-        pushForce: 0.0035,        // Base push force for left/right movement
-        airPushMultiplier: 0.5,   // Multiplier for push force when in air
+        pushForce: 0,        // Base push force for left/right movement
+        airPushMultiplier: 0,   // Multiplier for push force when in air
         
         // Constant bias to help with hill movement
-        downhillBiasForce: .5, // Subtle force applied downhill
+        downhillBiasForce: 0.5, // Subtle force applied downhill
         
         // Passive speed boost parameters
         minBoostStrength: 0.0000075, // less natural speed gain
