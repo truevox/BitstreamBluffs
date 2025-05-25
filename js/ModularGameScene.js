@@ -794,16 +794,21 @@ export default class ModularGameScene extends Phaser.Scene {
                 // PARACHUTE TRICK - in air for slowed falling
                 if (!this.isParachuting) {
                     this.isParachuting = true;
-                    this.parachuteEffectiveness = 1.0; // Reset effectiveness when first activating
-                    // No toast for parachute
-                } else {
-                    // Gradually decrease parachute effectiveness over time
-                    // Delta is in ms, so convert to seconds and apply reduction rate
-                    const reductionRate = 0.5; // 50% reduction per second - adjust to taste
+                    // Don't reset effectiveness when re-activating during the same jump
+                    // Effectiveness only resets on landing
+                    
+                    // Debug log to check effectiveness when activating
+                    console.log(`Parachute activated with effectiveness: ${this.parachuteEffectiveness.toFixed(2)}`);
+                } 
+                
+                // Always decrease effectiveness while parachuting, regardless of how many times activated
+                if (this.parachuteEffectiveness > 0) {
+                    // Transition from 100% to 0% over exactly 2 seconds
+                    const reductionRate = 0.5; // 50% reduction per second = 100% over 2 seconds
                     this.parachuteEffectiveness -= (delta / 1000) * reductionRate;
                     
-                    // Clamp effectiveness between 0.2 (20%) and 1.0 (100%)
-                    this.parachuteEffectiveness = Phaser.Math.Clamp(this.parachuteEffectiveness, 0, 1.0);
+                    // Clamp to minimum of 0 (no effect after 2 seconds)
+                    this.parachuteEffectiveness = Math.max(0, this.parachuteEffectiveness);
                     
                     // Debug log to check if effectiveness is changing
                     console.log(`Parachute effectiveness: ${this.parachuteEffectiveness.toFixed(2)}`);
@@ -818,8 +823,9 @@ export default class ModularGameScene extends Phaser.Scene {
                 
                 // Counter current velocity for slower falling - scaled by effectiveness
                 const currentVelocity = this.player.body.velocity;
-                // Calculate factor based on effectiveness (0.8 at full effectiveness, 0.95 at min effectiveness)
-                const effectiveFactor = Phaser.Math.Linear(0.95, 0.8, this.parachuteEffectiveness);
+                // Calculate factor based on effectiveness (0.8 at full effectiveness, 1.0 at 0% effectiveness)
+                // At 0% effectiveness, there should be no parachute effect (factor of 1.0)
+                const effectiveFactor = Phaser.Math.Linear(1.0, 0.8, this.parachuteEffectiveness);
                 
                 // Only reduce downward velocity
                 if (currentVelocity.y > 0) {
@@ -829,12 +835,15 @@ export default class ModularGameScene extends Phaser.Scene {
                     });
                 }
                 
-                // Add slight forward drift - scaled by effectiveness
-                const baseDriftForce = 0.0005;
-                const effectiveDriftForce = baseDriftForce * this.parachuteEffectiveness;
-                Body.applyForce(this.player.body,
-                    this.player.body.position,
-                    { x: effectiveDriftForce, y: 0 });
+                // Only apply forward drift if there's effectiveness left
+                if (this.parachuteEffectiveness > 0) {
+                    // Add slight forward drift - scaled by effectiveness
+                    const baseDriftForce = 0.0005;
+                    const effectiveDriftForce = baseDriftForce * this.parachuteEffectiveness;
+                    Body.applyForce(this.player.body,
+                        this.player.body.position,
+                        { x: effectiveDriftForce, y: 0 });
+                }
             }
         }
         else {

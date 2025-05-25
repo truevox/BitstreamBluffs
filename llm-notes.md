@@ -24,7 +24,21 @@
   - Periodically run `npm outdated` and upgrade direct dependencies to minimize risk of deprecated transitive packages.
   - If warnings persist, check Jest ecosystem for major version compatibility before bumping beyond 29.x.
   - See CHANGELOG.md for summary.
-M Notes
+
+## LLM Automation Notes
+
+## Parachute Effectiveness Overhaul (v1.6.0, 2025-05-25)
+- Parachute effectiveness now depletes from 100% to 0% over 2 seconds of use per jump, regardless of toggling.
+- Effectiveness only resets on landing. No 'refresh' by toggling in-air.
+- At 0% effectiveness, parachute gives no benefit.
+- Visual and physics effects scale with effectiveness.
+
+## Legacy Code
+- `js/GameScene.js` is a legacy scene and is due for removal. Do not modify or call—refer to `ModularGameScene.js` or other more appropriate files for all new gameplay work.
+
+## Extra Life Pickup Icon
+- The extra life pickup icon should be the same as the player's yellow triangle. It is likely a primal shape, rather than a rasterized .png or .jpg
+- It should follow the player's transformations and rotations for visual consistency.
 
 ## 2025-05-23: CI Hardening for Netlify Build
 - **Input Playback Crash Test:**
