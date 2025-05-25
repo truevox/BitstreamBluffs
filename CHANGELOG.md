@@ -3,7 +3,7 @@
 ## v1.6.0 - 2025-05-25
 
 ### ✨ Feature: Parachute is now a per-jump, limited resource
-- What: Parachute effectiveness depletes from 100% to 0% over 2 seconds of use per jump (not per activation).
+- What: Parachute effectiveness now depletes from 100% to 0% over 1 second of use per jump (not per activation).
 - Why: Prevents toggling to refresh effectiveness, making parachute a strategic, limited tool per jump.
 - How: Effectiveness only resets on landing; physics and visuals scale with effectiveness. At 0%, parachute provides no benefit.
 

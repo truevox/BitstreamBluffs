@@ -803,8 +803,8 @@ export default class ModularGameScene extends Phaser.Scene {
                 
                 // Always decrease effectiveness while parachuting, regardless of how many times activated
                 if (this.parachuteEffectiveness > 0) {
-                    // Transition from 100% to 0% over exactly 2 seconds
-                    const reductionRate = 0.5; // 50% reduction per second = 100% over 2 seconds
+                    // Transition from 100% to 0% over exactly 1 second
+                    const reductionRate = 1.0; // 100% reduction per second = 100% over 1 second
                     this.parachuteEffectiveness -= (delta / 1000) * reductionRate;
                     
                     // Clamp to minimum of 0 (no effect after 2 seconds)
