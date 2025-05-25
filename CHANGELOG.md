@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.7.2
+
+### 🎮 Feature: Diminishing parachute effectiveness
+- What: Parachute effectiveness now gradually decreases the longer it's used in a single jump.
+- Why: This creates more strategic gameplay by encouraging players to use the parachute in short bursts rather than continuously.
+- How: Added effectiveness tracking (1.0 to 0.2 scale) that diminishes over time and resets upon landing. Visual effects and physics forces scale with current effectiveness.
+
 ## v1.7.1
 
 ### 🚑 Fix: Remove tests from Netlify build process

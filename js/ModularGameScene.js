@@ -70,6 +70,7 @@ export default class ModularGameScene extends Phaser.Scene {
         this.isParachuting = false;  // for air trick
         this.isDragging = false;     // for ground drag
         this.isAirBraking = false;   // for air brake trick
+        this.parachuteEffectiveness = 1.0; // Full effectiveness (100%) at start
         
         // Rotation tracking system (for flips and tricks)
         this.rotationSystem = null;     // will be initialized in create()
@@ -220,6 +221,9 @@ export default class ModularGameScene extends Phaser.Scene {
                 // Check if player collided with terrain
                 if ((bodyA === this.player.body && bodyB.label === 'terrain') ||
                     (bodyB === this.player.body && bodyA.label === 'terrain')) {
+                    // Check if we're transitioning from air to ground
+                    const wasInAir = !this.onGround;
+                    
                     this.onGround = true;
                     
                     // Calculate terrain angle for smooth movement
@@ -229,6 +233,12 @@ export default class ModularGameScene extends Phaser.Scene {
                         const v1 = terrainBody.vertices[0];
                         const v2 = terrainBody.vertices[1];
                         this.currentSlopeAngle = Math.atan2(v2.y - v1.y, v2.x - v1.x);
+                    }
+                    
+                    // Reset parachute effectiveness when landing
+                    if (wasInAir) {
+                        this.parachuteEffectiveness = 1.0;
+                        console.log('Landing detected - parachute effectiveness reset to 1.0');
                     }
                 }
                 
@@ -459,7 +469,7 @@ export default class ModularGameScene extends Phaser.Scene {
         }
         
         // Handle standard sledding controls
-        this.handleSleddingControls(input);
+        this.handleSleddingControls(input, delta);
         
         // Update terrain
         this.terrain.update(this.player.x);
@@ -644,8 +654,9 @@ export default class ModularGameScene extends Phaser.Scene {
      * Processes rotation, tricks, braking, tucking, parachuting, and jumping.
      *
      * @param {Object} input - Current input state from InputController.
+     * @param {number} delta - Time elapsed since last frame in ms.
      */
-    handleSleddingControls(input) {
+    handleSleddingControls(input, delta) {
         const Body = Phaser.Physics.Matter.Matter.Body;
         const groundRotVel = PhysicsConfig.rotation.groundRotationVel;
         const airRotVel = PhysicsConfig.rotation.airRotationVel;
@@ -783,31 +794,47 @@ export default class ModularGameScene extends Phaser.Scene {
                 // PARACHUTE TRICK - in air for slowed falling
                 if (!this.isParachuting) {
                     this.isParachuting = true;
+                    this.parachuteEffectiveness = 1.0; // Reset effectiveness when first activating
                     // No toast for parachute
+                } else {
+                    // Gradually decrease parachute effectiveness over time
+                    // Delta is in ms, so convert to seconds and apply reduction rate
+                    const reductionRate = 0.5; // 50% reduction per second - adjust to taste
+                    this.parachuteEffectiveness -= (delta / 1000) * reductionRate;
+                    
+                    // Clamp effectiveness between 0.2 (20%) and 1.0 (100%)
+                    this.parachuteEffectiveness = Phaser.Math.Clamp(this.parachuteEffectiveness, 0, 1.0);
+                    
+                    // Debug log to check if effectiveness is changing
+                    console.log(`Parachute effectiveness: ${this.parachuteEffectiveness.toFixed(2)}`);
                 }
                 
-                // Move the sled down for parachute visual
+                // Move the sled down for parachute visual - height based on effectiveness
                 if (this.sled) {
-                    this.sled.y = this.sledOriginalY + 15; // Move sled down slightly
+                    // Scale visual effect with effectiveness
+                    const offsetY = 15 * this.parachuteEffectiveness; 
+                    this.sled.y = this.sledOriginalY + offsetY;
                 }
                 
-                // Counter current velocity for slower falling
+                // Counter current velocity for slower falling - scaled by effectiveness
                 const currentVelocity = this.player.body.velocity;
-                const parachuteFactor = 0.8; // 20% reduction in falling speed (matching GameScene)
+                // Calculate factor based on effectiveness (0.8 at full effectiveness, 0.95 at min effectiveness)
+                const effectiveFactor = Phaser.Math.Linear(0.95, 0.8, this.parachuteEffectiveness);
                 
                 // Only reduce downward velocity
                 if (currentVelocity.y > 0) {
                     Body.setVelocity(this.player.body, {
                         x: currentVelocity.x,
-                        y: currentVelocity.y * parachuteFactor
+                        y: currentVelocity.y * effectiveFactor
                     });
                 }
                 
-                // Add slight forward drift
-                const driftForce = 0.0005;
+                // Add slight forward drift - scaled by effectiveness
+                const baseDriftForce = 0.0005;
+                const effectiveDriftForce = baseDriftForce * this.parachuteEffectiveness;
                 Body.applyForce(this.player.body,
                     this.player.body.position,
-                    { x: driftForce, y: 0 });
+                    { x: effectiveDriftForce, y: 0 });
             }
         }
         else {
