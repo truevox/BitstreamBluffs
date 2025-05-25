@@ -24,6 +24,7 @@ export default class TerrainManager {
     constructor(scene) {
         this.scene = scene;
         this.terrainGraphics = null;
+        this.debugGraphics = null; // For visualizing physics bodies
         this.terrainSegments = [];
         
         // Terrain configuration
@@ -32,10 +33,17 @@ export default class TerrainManager {
         this.lastTerrainY = 500;
         this.worldBoundsPadding = 2000;
         
+        // Anti-tunneling configuration
+        this.floorDepth = 2000; // How far down the floor extends below terrain
+        this.floorBodies = []; // Store floor bodies for cleanup
+        this.showDebugBodies = false; // Set to false to hide debug visualization
+        this.floorOffset = 100; // Pixels below terrain to start the floor body - increased for safety
+        
         // Colors
         this.neonYellow = 0xffff00;
         this.neonBlue = 0x00ffff;
         this.neonPink = 0xff00ff;
+        this.debugColor = 0xff3333; // Red color for debug visualization
         
         // Seeded random function - initialized by scene
         this.seededRandom = null;
@@ -50,6 +58,9 @@ export default class TerrainManager {
         
         // Create graphics object for terrain rendering
         this.terrainGraphics = this.scene.add.graphics({ lineStyle: { width: 2, color: this.neonBlue } });
+        
+        // Create debug graphics for visualizing physics bodies
+        this.debugGraphics = this.scene.add.graphics({ fillStyle: { color: this.debugColor, alpha: 0.3 } });
         
         // Initialize the first terrain segment
         this.initTerrain();
@@ -173,7 +184,38 @@ export default class TerrainManager {
             body.terrainAngle = body.angle;
             segment.bodies.push(body); // Store reference to body for cleanup
         }
+        
+        // Create a single large safe floor block that starts 50px below the lowest point of the segment
+        // This is much simpler and more reliable than trying to follow the terrain contour exactly
+        const lowestY = Math.max(segment.y, segment.endY); // Find the lowest (higher Y value) point of the segment
+        const safeFloorY = lowestY + 50; // Position floor 50 pixels below the lowest point
+        
+        // Create a rectangle that covers the entire segment width and extends down
+        const floorWidth = segment.endX - segment.x;
+        const floorHeight = this.floorDepth; // How far down the floor extends
+        
+        // Create the floor body - positioned safely below terrain
+        const safeFloorBody = this.scene.matter.add.rectangle(
+            segment.x + (floorWidth / 2), // Center X of segment
+            safeFloorY + (floorHeight / 2), // Center Y starting 50px below terrain and extending down
+            floorWidth, // Cover the entire segment width
+            floorHeight, // Extend down by floorDepth
+            {
+                isStatic: true,
+                friction: 0, // No friction to avoid affecting player physics when not needed
+                label: 'terrain_floor',
+                collisionFilter: {
+                    category: 0x0002, // Floor category
+                    mask: 0x0001     // Player category
+                }
+            }
+        );
+        
+        // Store the floor body for cleanup
+        segment.floorBody = safeFloorBody;
+        this.floorBodies.push(safeFloorBody);
     }
+
     
     /**
      * Draws all terrain segments with neon lines
@@ -183,6 +225,11 @@ export default class TerrainManager {
         if (!this.terrainGraphics) return;
         
         this.terrainGraphics.clear();
+        
+        // Also clear debug graphics if it exists
+        if (this.debugGraphics) {
+            this.debugGraphics.clear();
+        }
         
         // Draw each segment using the same visual style as GameScene
         for (const seg of this.terrainSegments) {
@@ -195,6 +242,48 @@ export default class TerrainManager {
             this.terrainGraphics.lineStyle(8, seg.color, 0.3).beginPath();
             this.terrainGraphics.moveTo(seg.x, seg.y);
             this.terrainGraphics.lineTo(seg.endX, seg.endY).strokePath();
+            
+            // Draw debug visualization for floor bodies if enabled
+            if (this.showDebugBodies && this.debugGraphics) {
+                // Draw the main floor body as a polygon
+                if (seg.floorBody && seg.floorBody.parts && seg.floorBody.parts.length > 0) {
+                    // For composite bodies, we need to draw each part
+                    for (const part of seg.floorBody.parts) {
+                        if (part.vertices && part.vertices.length > 0) {
+                            this.debugGraphics.fillStyle(this.debugColor, 0.3);
+                            this.debugGraphics.beginPath();
+                            
+                            // Draw the vertices as a filled polygon
+                            this.debugGraphics.moveTo(part.vertices[0].x, part.vertices[0].y);
+                            for (let i = 1; i < part.vertices.length; i++) {
+                                this.debugGraphics.lineTo(part.vertices[i].x, part.vertices[i].y);
+                            }
+                            this.debugGraphics.closePath();
+                            this.debugGraphics.fillPath();
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Draw all floor bodies for debugging
+        if (this.showDebugBodies && this.debugGraphics) {
+            for (const body of this.floorBodies) {
+                if (body && body.parts && body.parts.length > 0) {
+                    for (const part of body.parts) {
+                        if (part.vertices && part.vertices.length > 0) {
+                            this.debugGraphics.fillStyle(0xff0000, 0.2);
+                            this.debugGraphics.beginPath();
+                            this.debugGraphics.moveTo(part.vertices[0].x, part.vertices[0].y);
+                            for (let i = 1; i < part.vertices.length; i++) {
+                                this.debugGraphics.lineTo(part.vertices[i].x, part.vertices[i].y);
+                            }
+                            this.debugGraphics.closePath();
+                            this.debugGraphics.fillPath();
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -279,6 +368,22 @@ export default class TerrainManager {
         if (segmentsToRemove.length > 0) {
             // Remove physics bodies for each segment
             segmentsToRemove.forEach(segment => {
+                // Remove main terrain body
+                if (segment.body) {
+                    this.scene.matter.world.remove(segment.body);
+                }
+                
+                // Remove floor body if it exists
+                if (segment.floorBody) {
+                    this.scene.matter.world.remove(segment.floorBody);
+                    // Also remove from our tracking array
+                    const idx = this.floorBodies.indexOf(segment.floorBody);
+                    if (idx !== -1) {
+                        this.floorBodies.splice(idx, 1);
+                    }
+                }
+                
+                // Remove any sub-segment bodies
                 if (segment.bodies) {
                     segment.bodies.forEach(body => {
                         this.scene.matter.world.remove(body);
@@ -309,6 +414,16 @@ export default class TerrainManager {
                 // Remove this segment's physics body safely
                 if (segment.body && segment.body.id) {
                     this.scene.matter.world.remove(segment.body);
+                }
+                
+                // Remove floor body if it exists
+                if (segment.floorBody && segment.floorBody.id) {
+                    this.scene.matter.world.remove(segment.floorBody);
+                    // Also remove from our tracking array
+                    const idx = this.floorBodies.indexOf(segment.floorBody);
+                    if (idx !== -1) {
+                        this.floorBodies.splice(idx, 1);
+                    }
                 }
                 
                 // Remove from our array
@@ -347,7 +462,21 @@ export default class TerrainManager {
             if (segment.body && segment.body.id) {
                 this.scene.matter.world.remove(segment.body);
             }
+            
+            if (segment.floorBody && segment.floorBody.id) {
+                this.scene.matter.world.remove(segment.floorBody);
+            }
         });
+        
+        // Clean up all floor bodies
+        this.floorBodies.forEach(body => {
+            if (body && body.id) {
+                this.scene.matter.world.remove(body);
+            }
+        });
+        
+        // Reset floor bodies array
+        this.floorBodies = [];
         
         // Reset arrays and properties
         this.terrainSegments = [];
@@ -367,7 +496,21 @@ export default class TerrainManager {
             if (segment.body && segment.body.id) {
                 this.scene.matter.world.remove(segment.body);
             }
+            
+            if (segment.floorBody && segment.floorBody.id) {
+                this.scene.matter.world.remove(segment.floorBody);
+            }
         });
+        
+        // Clean up all floor bodies
+        this.floorBodies.forEach(body => {
+            if (body && body.id) {
+                this.scene.matter.world.remove(body);
+            }
+        });
+        
+        // Reset floor bodies array
+        this.floorBodies = [];
         
         // Clear arrays and graphics
         this.terrainSegments = [];
