@@ -43,6 +43,7 @@ export default class TerrainManager {
         this.neonYellow = 0xffff00;
         this.neonBlue = 0x00ffff;
         this.neonPink = 0xff00ff;
+        this.neonGreen = 0x00ff88; // Added for green terrain type (bright neon green)
         this.debugColor = 0xff3333; // Red color for debug visualization
         
         // Seeded random function - initialized by scene
@@ -129,7 +130,14 @@ export default class TerrainManager {
             endX: prevX + this.segmentWidth,
             endY: newY,
             // Use same color selection logic as GameScene
-            color: this.seededRandom() < 0.5 ? this.neonBlue : this.neonPink,
+            // Pick color randomly between blue, pink, and green for terrain variety
+            // We want roughly equal distribution for visual diversity
+            color: (() => {
+                const r = this.seededRandom();
+                if (r < 1/3) return this.neonBlue;
+                if (r < 2/3) return this.neonPink;
+                return this.neonGreen;
+            })(),
             angle: segmentAngleRad,
             bodies: [] // Track associated physics bodies for cleanup
         };
