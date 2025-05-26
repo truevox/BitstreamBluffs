@@ -1,5 +1,9 @@
 # LL
 
+## v1.5.0 (2025-05-25)
+- All references to `js/GameScene.js` have been removed (see CHANGELOG). `ModularGameScene.js` is now the canonical gameplay scene. Do not add or reference `GameScene.js` in future changes; target `ModularGameScene.js` for all gameplay logic and architecture.
+
+
 ## 2025-05-23: Multi-Chunk Terrain E2E Test CI Hardening
 - **Problem:**
   - Netlify/CI builds failed due to `TypeError: Cannot read properties of undefined (reading 'index')` in `tests/terrain/e2e/multi-chunk-terrain.test.js` when `visibleChunks` was unexpectedly short (e.g., < 3 elements).
@@ -33,8 +37,6 @@
 - At 0% effectiveness, parachute gives no benefit.
 - Visual and physics effects scale with effectiveness.
 
-## Legacy Code
-- `js/GameScene.js` is a legacy scene and is due for removal. Do not modify or call—refer to `ModularGameScene.js` or other more appropriate files for all new gameplay work.
 
 ## Extra Life Pickup Icon
 - The extra life pickup icon should be the same as the player's yellow triangle. It is likely a primal shape, rather than a rasterized .png or .jpg

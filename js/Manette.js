@@ -112,7 +112,7 @@ export default class Manette {
                     this.tabToggled = true; // Mark that we toggled this frame
                     console.log(`Walk mode ${this.walkMode ? 'enabled' : 'disabled'}`);
                     
-                    // Immediately update the HUD in the GameScene
+                    // Immediately update the HUD in the active game scene (was GameScene, now ModularGameScene)
                     if (this.scene && this.scene.updateHudText) {
                         this.scene.updateHudText();
                     }
@@ -156,7 +156,7 @@ export default class Manette {
     toggleWalkMode() {
         this.walkMode = !this.walkMode;
         
-        // If we're attached to a GameScene, notify it to update the HUD
+        // If we're attached to a ModularGameScene, notify it to update the HUD
         if (this.scene && this.scene.updateHudText) {
             this.scene.updateHudText();
         }
@@ -274,7 +274,7 @@ export default class Manette {
                         }
                     }
                     
-                    // Immediately update the HUD in the GameScene
+                    // Immediately update the HUD in the active game scene (was GameScene, now ModularGameScene)
                     if (this.scene && this.scene.updateHudText) {
                         this.scene.updateHudText();
                     }

@@ -14,7 +14,6 @@ import PhysicsConfig from './config/physics-config.js';
 import BootScene from './BootScene.js';
 import PreloadScene from './PreloadScene.js';
 import StartScene from './StartScene.js';
-import GameScene from './GameScene.js';
 import ModularGameScene from './ModularGameScene.js'; // New modular architecture
 
 // Import utility classes
@@ -99,7 +98,7 @@ function initializeGame() {
 
         // Important: Start with BootScene which should transition to PreloadScene, then StartScene
         // The order matters - first scene in the array is the one that starts first
-        scene: [ BootScene, PreloadScene, StartScene, GameScene, ModularGameScene ]
+        scene: [ BootScene, PreloadScene, StartScene, ModularGameScene ]
     };
 
     console.log('Starting Phaser game with config:', config);

@@ -39,6 +39,14 @@
 
 ## v1.5.2
 
+## v1.5.0 - 2025-05-25
+
+### 🗑️ Removal: Eliminate legacy GameScene.js
+- **What:** Removed all code references to `js/GameScene.js` and deleted the file.
+- **Why:** The modular architecture (`ModularGameScene.js`) is now the canonical gameplay scene. Keeping both caused confusion and maintenance overhead.
+- **How:** Removed all imports and scene references to `GameScene` in `main.js`, updated documentation/comments elsewhere, and deleted the file itself. Only `ModularGameScene` is now loaded and referenced in the game lifecycle.
+
+
 ### 🧹 Test Cleanup: Remove stamina and obsolete StartScene tests
 - What: Deleted all tests under `tests/stamina/` and removed StartScene tests that depended on a non-existent `create` method.
 - Why: The stamina mechanic does not exist in the current codebase, and StartScene does not implement `create`. These tests were failing or irrelevant.
@@ -73,18 +81,6 @@
 - How: Inserted `"build": "echo 'No build step'"` to the scripts section of `package.json`.
 
 ## [v1.5.1] - 2025-05-22
-
-### 🛡️ Failsafe: Enhance player-terrain fallback logic
-- Improved the terrain failsafe in `ModularGameScene.js`:
-  - Added robust diagnostics and warnings if terrain/player/body are missing.
-  - Logs when player x is out of bounds or terrainY is invalid.
-  - Epsilon for correction now scales with vertical speed, catching high-speed falls.
-  - After teleport, both velocity and force are zeroed, and a flag is set to prevent repeated physics issues.
-  - All changes are commented for maintainability and debugging.
-- These changes help prevent and diagnose rare 'fall through world' events, but further multi-frame or respawn logic may be needed for full robustness.
-
-## [v1.5.0] - 2025-05-21
-
 ## [v1.4.0] - 2025-05-21
 
 ### 🚀 Feature: Netlify Build Performance & Caching
