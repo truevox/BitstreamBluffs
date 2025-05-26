@@ -29,7 +29,14 @@
   - If warnings persist, check Jest ecosystem for major version compatibility before bumping beyond 29.x.
   - See CHANGELOG.md for summary.
 
-## LLM Automation Notes
+## LLM Notes
+
+## Buffered ground detection (implemented v1.5.0, current logic)
+- The player is considered "on ground" until their Y position is more than 10px above the terrain at their X.
+- Prevents the player from being treated as airborne due to minor bounces or physics jitter.
+- The collisionend handler does not set `onGround = false` immediately; instead, this is checked in the update loop after retrieving terrain height.
+- See `ModularGameScene.js` (update loop, groundBuffer logic) for implementation.
+- Motivation: Smoother and more forgiving ground/air transitions, especially on uneven or noisy terrain.
 
 ## Parachute Effectiveness Overhaul (v1.6.0, 2025-05-25)
 - Parachute effectiveness now depletes from 100% to 0% over a short period of use per jump, regardless of toggling.

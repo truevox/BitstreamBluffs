@@ -1,13 +1,17 @@
 # Changelog
 
-## v1.6.0 - 2025-05-25
+## v1.7.2 - 2025-05-25
 
 ### ✨ Feature: Parachute is now a per-jump, limited resource
 - What: Parachute effectiveness now depletes from 100% to 0% over 1 second of use per jump (not per activation).
 - Why: Prevents toggling to refresh effectiveness, making parachute a strategic, limited tool per jump.
 - How: Effectiveness only resets on landing; physics and visuals scale with effectiveness. At 0%, parachute provides no benefit.
-
 ## v1.7.2
+
+### ✨ Feature: Buffered ground detection (10px buffer, implemented v1.5.0)
+- What: Player remains "on ground" until more than 10px above terrain, not just on collision end.
+- Why: Prevents minor bounces or jitter from causing unwanted airborne state, for smoother gameplay.
+- How: Collision end no longer sets `onGround = false` immediately; now checked in the update loop after retrieving terrain height. See llm-notes.md for rationale and implementation notes.
 
 ### 🎮 Feature: Diminishing parachute effectiveness
 - What: Parachute effectiveness now gradually decreases the longer it's used in a single jump.
@@ -39,7 +43,6 @@
 
 ## v1.5.2
 
-## v1.5.0 - 2025-05-25
 
 ### 🗑️ Removal: Eliminate legacy GameScene.js
 - **What:** Removed all code references to `js/GameScene.js` and deleted the file.

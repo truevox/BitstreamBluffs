@@ -254,16 +254,10 @@ export default class ModularGameScene extends Phaser.Scene {
         // Handle end of collision - using a simpler approach similar to GameScene
         this.matter.world.on('collisionend', (event) => {
             const pairs = event.pairs;
-            
             for (let i = 0; i < pairs.length; i++) {
                 const pair = pairs[i];
-                
-                // Check if player left the ground
-                if (pair.bodyA === this.player.body || pair.bodyB === this.player.body) {
-                    // Simply set onGround to false when any collision with the player ends
-                    // This is a simplification that works well enough for gameplay
-                    this.onGround = false;
-                }
+                // Do not immediately set onGround = false here.
+                // We'll handle buffered ground detection in the update() loop for smoother gameplay.
             }
         });
     }
@@ -533,6 +527,18 @@ export default class ModularGameScene extends Phaser.Scene {
             this.player.body.force.y = 0;
             // Mark this frame as a teleport to avoid repeated physics issues
             this.player.justTeleported = true;
+        }
+
+        // --- Buffered ground detection logic ---
+        // We want the player to remain "on ground" until they are more than 10px above the terrain.
+        // This prevents minor bounces and physics jitter from causing unwanted airborne state.
+        const groundBuffer = 10;
+        if (this.player.y < terrainY - groundBuffer) {
+            // Player is clearly airborne
+            this.onGround = false;
+        } else {
+            // Player is within 10px above terrain, still considered on ground
+            this.onGround = true;
         }
         
         // Game over conditions
