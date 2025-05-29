@@ -34,7 +34,7 @@ class ConfigLoader {
         }
         
         // Default to off in production, on in development
-        const host = window.location.hostname;
+        const host = (typeof window !== 'undefined' && window.location) ? window.location.hostname : 'localhost';
         return host === 'localhost' || host === '127.0.0.1';
     }
 }

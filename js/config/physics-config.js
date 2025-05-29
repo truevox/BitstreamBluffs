@@ -8,9 +8,9 @@
  * @namespace PhysicsConfig
  */
 const PhysicsConfig = {
-    bluePoints: 1, // Points per tick on blue terrain
-    blueSpeedThreshold: 3, // Minimum speed offset for blue points
-    groundBufferHeight: 10, // Max px above terrain to still count as "on ground" (buffered detection)
+    bluePoints: 2, // Points per unit of speed above threshold on blue terrain
+    blueSpeedThreshold: 3, // Lowered: Minimum speed to earn blue points
+    groundBufferHeight: 10, // Pixels above terrain for buffered ground detection
 
     // Core physics system properties
     physics: {

@@ -2,6 +2,12 @@
 // Uses Phaser 3 with the built‑in Matter physics plugin.
 // Implements a modular architecture for better maintainability.
 // ------------------------------------------------------
+// Allow logic-only tests to run in Node by providing a minimal Phaser mock if not present
+if (typeof globalThis.Phaser === 'undefined') {
+  globalThis.Phaser = { Scene: class {} };
+}
+// Always use globalThis.Phaser for physics calls (robust ESM/test compatibility)
+const getPhaser = () => globalThis.Phaser;
 
 // Import physics configuration
 import PhysicsConfig from './config/physics-config.js';
@@ -38,51 +44,50 @@ export default class ModularGameScene extends Phaser.Scene {
                 }
             }
         });
-        
         // Game state flags
-        this.gameOverShown = false; // Track if game over has been shown during this run
-        
+        this.gameOverShown = false;
         // Subsystem modules
-        this.inputController = null; // Handles all input processing
-        this.terrain = null;         // Manages terrain generation and physics
-        this.hud = null;             // Handles UI elements and display
-        this.collectibles = null;    // Manages collectible items like extra lives
-        
+        this.inputController = null;
+        this.terrain = null;
+        this.hud = null;
+        this.collectibles = null;
         // Player state
         this.player = null;
-        this.onGround = false;   // updated from collision events
-        this.currentSlopeAngle = 0; // rad
-        this.prevGroundState = false; // to detect ground/air transitions
-        
+        this.onGround = false;
+        this.currentSlopeAngle = 0;
+        this.prevGroundState = false;
         // Game state
         this.score = 0;
         this.lives = PhysicsConfig.extraLives.initialLives;
-        this.initialY = 0; // Track initial Y position at start of run for altitude drop
-        
+        this.initialY = 0;
         // Colors
         this.neonYellow = 0xffff00;
         this.neonBlue = 0x00ffff;
         this.neonPink = 0xff00ff;
+        this.neonGreen = 0x00ff88;
         this.neonRed = 0xff0000;
-        
+        // Terrain interaction state
+        this.lastTerrainType = null; // Track which terrain type we're on
+        this.terrainTypeTimer = 0; // For blue point accrual
+        // Particle emitters
+        this.greenStreakEmitter = null;
+        this.blueBlingEmitter = null;
+        this.magentaFlickerEmitter = null;
         // Trick state
-        this.isTucking = false;      // for ground speed boost
-        this.isParachuting = false;  // for air trick
-        this.isDragging = false;     // for ground drag
-        this.isAirBraking = false;   // for air brake trick
-        this.parachuteEffectiveness = 1.0; // Full effectiveness (100%) at start
-        
-        // Rotation tracking system (for flips and tricks)
-        this.rotationSystem = null;     // will be initialized in create()
-        this.currentSpeedMultiplier = 1.0; // default speed multiplier
-        
+        this.isTucking = false;
+        this.isParachuting = false;
+        this.isDragging = false;
+        this.isAirBraking = false;
+        this.parachuteEffectiveness = 1.0;
+        // Rotation tracking system
+        this.rotationSystem = null;
+        this.currentSpeedMultiplier = 1.0;
         // Walking mode state
-        this.sledDistance = 40;      // distance between player and sled when walking
-        this.sledOriginalY = 0;      // to track original sled position
-        this.riderOriginalY = 0;     // to track original rider position
-        this.sledOriginalX = 0;      // to track original sled X position
-        
-        // Bind methods to ensure 'this' context is preserved
+        this.sledDistance = 40;
+        this.sledOriginalY = 0;
+        this.riderOriginalY = 0;
+        this.sledOriginalX = 0;
+        // Bind methods
         this.handleResize = this.handleResize.bind(this);
     }
     
@@ -92,10 +97,17 @@ export default class ModularGameScene extends Phaser.Scene {
      */
     preload() {
         console.log('ModularGameScene preload method started');
+        this.load.image('extraLife', 'assets/pickups/extra-life.png');
         
-        // No additional assets needed for this scene specifically
-        // All assets should be loaded in PreloadScene
+        // Create a default particle texture
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        graphics.fillStyle(0xffffff);
+        graphics.fillCircle(8, 8, 8);
+        graphics.generateTexture('particle', 16, 16);
     }
+
+
+    
     
     /**
      * Creates and initializes the game scene, modules, and player.
@@ -103,6 +115,7 @@ export default class ModularGameScene extends Phaser.Scene {
      * Binds resize event and prepares scene for gameplay.
      */
     create() {
+        // Particle texture debug dot removed; confirmed working
         console.log('ModularGameScene create method started - initializing game');
         
         // Initialize with the seed from StartScene if available
@@ -200,7 +213,81 @@ export default class ModularGameScene extends Phaser.Scene {
         this.initializeHudDisplay();
         this.initializeCollectibleManager();
         this.initializeExplosionEffects();
+
+        // --- Terrain Particle Emitters Setup ---
+        // Create independent particle emitters for each effect
         
+        // Green: "Streak Jets" (lime-yellow, angled, fast, short-lived)
+        // Phaser 3.90+ particle system: configure emitters directly with this.add.particles({ ... })
+        // Each call creates an independent emitter with its own config and texture.
+        // See: https://newdocs.phaser.io/docs/3.90.0/Phaser.GameObjects.Particles.ParticleSystem
+
+        // --- DEBUG: Forced always-on test emitter at center ---
+        this.testEmitter = this.add.particles({
+            textureKey: 'particle',
+            x: this.cameras.main.centerX,
+            y: this.cameras.main.centerY,
+            tint: [0xffffff],
+            speed: 60,
+            angle: { min: 0, max: 360 },
+            lifespan: 900,
+            alpha: { start: 1, end: 0 },
+            scale: { start: 1.2, end: 0.1 },
+            quantity: 2,
+            frequency: 90,
+            maxParticles: 30,
+        });
+        console.log('[DEBUG] Forced test emitter created at center:', this.testEmitter);
+
+        this.greenStreakEmitter = this.add.particles({
+            textureKey: 'particle',
+            tint: [0x00ff88, 0xffff00],
+            speed: { min: 180, max: 320 },
+            angle: { min: -10, max: 10 },
+            lifespan: 180,
+            alpha: { start: 0.7, end: 0 },
+            scale: { start: 0.55, end: 0.1 },
+            quantity: 1,
+            frequency: 18,
+            maxParticles: 40,
+        });
+        this.greenStreakEmitter.setVisible(false);
+        this.greenStreakEmitter.active = false;
+
+        this.blueBlingEmitter = this.add.particles({
+            textureKey: 'particle',
+            tint: [0x00ffff, 0xffffff],
+            speedY: { min: -120, max: -60 },
+            speedX: { min: -30, max: 30 },
+            gravityY: 60,
+            lifespan: { min: 200, max: 420 },
+            alpha: { start: 1, end: 0 },
+            scale: { start: 0.5, end: 0.1 },
+            rotate: { min: 0, max: 360 },
+            quantity: 2,
+            frequency: 60,
+            maxParticles: 30,
+        });
+        this.blueBlingEmitter.setVisible(false);
+        this.blueBlingEmitter.active = false;
+
+        this.magentaFlickerEmitter = this.add.particles({
+            textureKey: 'particle',
+            tint: [0xff00ff, 0x660066],
+            speed: { min: 40, max: 120 },
+            angle: { min: -40, max: 40 },
+            lifespan: 80,
+            alpha: { start: 1, end: 0 },
+            scale: { start: 0.4, end: 0.01 },
+            quantity: 2,
+            frequency: 25,
+            maxParticles: 30,
+        });
+        this.magentaFlickerEmitter.setVisible(false);
+        this.magentaFlickerEmitter.active = false;
+        // All emitters are now direct ParticleSystem objects, not managers or legacy emitters.
+        // Control visibility via .setVisible()/.active as of Phaser 3.90+.
+
         // Set up the resize handler
         this.scale.on('resize', this.handleResize, this);
     }
@@ -385,6 +472,7 @@ export default class ModularGameScene extends Phaser.Scene {
      * @param {number} delta - Time elapsed since last frame in ms.
      */
     update(time, delta) {
+    console.log('[UPDATE ENTRY]', { time, delta, onGround: this.onGround, position: this.player?.body?.position, terrain: this.terrain?.getTerrainSegments?.() });
         // Update the parallax starfield to follow player position
         if (this.starfield && this.cameras && this.cameras.main && this.player) {
             this.starfield.update(this.cameras.main, this.player);
@@ -395,8 +483,37 @@ export default class ModularGameScene extends Phaser.Scene {
             !this.inputController || this.gameOverShown) {
             return;
         }
+
+        // --- Buffered ground detection ---
+        // --- Improved buffered ground detection with stickiness ---
+        if (!this.onGround && this.terrain && this.player && this.player.body) {
+            const cfg = PhysicsConfig;
+            const px = this.player.x;
+            const py = this.player.y;
+            const segments = this.terrain.getTerrainSegments?.();
+            if (segments && segments.length) {
+                for (let i = 0; i < segments.length; i++) {
+                    const seg = segments[i];
+                    if (px >= seg.x && px <= seg.endX) {
+                        // Linear interpolate terrain Y at px
+                        const t = (px - seg.x) / (seg.endX - seg.x);
+                        const terrainY = seg.y + t * (seg.endY - seg.y);
+                        // Make buffer more forgiving (now 30px above, 40px below)
+                        if (py >= terrainY - 30 && py <= terrainY + 40) {
+                            this.onGround = true;
+                            this.groundStickyFrames = 6; // Stay on ground for 6 frames after leaving
+                            break;
+                        }
+                    }
+                }
+            }
+        } else if (!this.onGround && this.groundStickyFrames > 0) {
+            // Sticky ground: remain on ground for a few frames after leaving
+            this.onGround = true;
+            this.groundStickyFrames--;
+        }
         
-        const Body = Phaser.Physics.Matter.Matter.Body;
+        const Body = getPhaser().Physics.Matter.Matter.Body;
         let deltaRotation = 0;
         
         // Apply a gentle downhill bias force when on ground to prevent sticking
@@ -418,6 +535,132 @@ export default class ModularGameScene extends Phaser.Scene {
             this.applyPassiveSpeedBoost();
         }
         
+        // --- TERRAIN INTERACTION & PARTICLE EFFECTS ---
+        // Find the current terrain segment under the player
+        let currentTerrainType = null;
+        let currentTerrainAngle = 0;
+        let segmentColor = null;
+        const segments = this.terrain.getTerrainSegments();
+        let currentSegment = null;
+        for (let i = 0; i < segments.length; i++) {
+            const seg = segments[i];
+            if (this.player.x >= seg.x && this.player.x <= seg.endX) {
+                segmentColor = seg.color;
+                currentTerrainAngle = seg.angle;
+                currentSegment = seg;
+                if (segmentColor === this.neonGreen) currentTerrainType = 'green';
+                else if (segmentColor === this.neonBlue) currentTerrainType = 'blue';
+                else if (segmentColor === this.neonPink) currentTerrainType = 'magenta';
+                break;
+            }
+        }
+        // --- DEBUG: Terrain detection ---
+        console.log('[TERRAIN DETECTION]', {
+            playerX: this.player.x,
+            playerY: this.player.y,
+            currentTerrainType,
+            currentSegment
+        });
+        if (currentTerrainType === 'blue') {
+            console.log('[TERRAIN SEGMENT - BLUE]', currentSegment);
+        }
+        // --- PHYSICS/POINTS EFFECTS ---
+        // Only apply when on ground and not walking
+        console.log('[FRICTION CHECK]', { onGround: this.onGround, walkMode: this.inputController.isWalkMode(), currentTerrainType });
+        if (this.onGround && !this.inputController.isWalkMode() && currentTerrainType) {
+            const Body = getPhaser().Physics.Matter.Matter.Body;
+            if (currentTerrainType === 'green') {
+                // Speed boost: reduce friction
+                console.log('[GAMELOGIC] Setting friction to', 0.01);
+                Body.set(this.player.body, 'friction', 0.01);
+                console.log('[GAMELOGIC] Setting frictionStatic to', 0.01);
+                Body.set(this.player.body, 'frictionStatic', 0.01);
+                // No points
+            } else if (currentTerrainType === 'blue') {
+                // Normal friction
+                console.log('[GAMELOGIC] Setting friction to', 0.08);
+                Body.set(this.player.body, 'friction', 0.08);
+                console.log('[GAMELOGIC] Setting frictionStatic to', 0.08);
+                Body.set(this.player.body, 'frictionStatic', 0.08);
+                // Award points every 100ms based on speed
+                if (!this.terrainTypeTimer) this.terrainTypeTimer = 0;
+                this.terrainTypeTimer += delta;
+                const velocity = this.player.body.velocity;
+                const playerSpeed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+                const base = playerSpeed - PhysicsConfig.blueSpeedThreshold;
+                const gain = PhysicsConfig.bluePoints * Math.max(0, base);
+                console.log('[BLUE POINTS CHECK]', {onGround: this.onGround, playerSpeed, blueSpeedThreshold: PhysicsConfig.blueSpeedThreshold, gain, delta, timer: this.terrainTypeTimer});
+                if (this.terrainTypeTimer >= 100) {
+                    if (gain > 0) {
+                        this.score += gain;
+                        console.log('[BLUE POINTS AWARDED]', {score: this.score, gain});
+                    }
+                    this.terrainTypeTimer -= 100;
+                }
+            } else if (currentTerrainType === 'magenta') {
+                // Slowdown: increase friction
+                console.log('[GAMELOGIC] Setting friction to', 0.28);
+Body.set(this.player.body, 'friction', 0.28);
+                console.log('[GAMELOGIC] Setting frictionStatic to', 0.28);
+Body.set(this.player.body, 'frictionStatic', 0.28);
+                // No points
+            }
+        } else {
+            // Reset to default friction if not on terrain
+            const Body = getPhaser().Physics.Matter.Matter.Body;
+            console.log('[GAMELOGIC] Setting friction to', PhysicsConfig.player.friction);
+Body.set(this.player.body, 'friction', PhysicsConfig.player.friction);
+            console.log('[GAMELOGIC] Setting frictionStatic to', PhysicsConfig.player.friction);
+Body.set(this.player.body, 'frictionStatic', PhysicsConfig.player.friction);
+            this.terrainTypeTimer = 0;
+        }
+
+        // --- PARTICLE EMITTER ACTIVATION ---
+        // Only one emitter should be visible/active at a time; follow player
+        if (currentTerrainType === 'green' && this.onGround) {
+            this.greenStreakEmitter.setPosition(this.player.x, this.player.y + 18);
+            this.greenStreakEmitter.setAngle({ min: Phaser.Math.RadToDeg(currentTerrainAngle) - 10, max: Phaser.Math.RadToDeg(currentTerrainAngle) + 10 });
+            this.greenStreakEmitter.setVisible(true);
+            this.greenStreakEmitter.active = true;
+            this.blueBlingEmitter.setVisible(false);
+            this.blueBlingEmitter.active = false;
+            this.magentaFlickerEmitter.setVisible(false);
+            this.magentaFlickerEmitter.active = false;
+        } else if (currentTerrainType === 'blue' && this.onGround) {
+            this.blueBlingEmitter.setPosition(this.player.x, this.player.y + 10);
+            this.blueBlingEmitter.setVisible(true);
+            this.blueBlingEmitter.active = true;
+            this.greenStreakEmitter.setVisible(false);
+            this.greenStreakEmitter.active = false;
+            this.magentaFlickerEmitter.setVisible(false);
+            this.magentaFlickerEmitter.active = false;
+        } else if (currentTerrainType === 'magenta' && this.onGround) {
+            this.magentaFlickerEmitter.setPosition(this.player.x, this.player.y + 16);
+            this.magentaFlickerEmitter.setVisible(true);
+            this.magentaFlickerEmitter.active = true;
+            this.greenStreakEmitter.setVisible(false);
+            this.greenStreakEmitter.active = false;
+            this.blueBlingEmitter.setVisible(false);
+            this.blueBlingEmitter.active = false;
+        } else {
+            this.greenStreakEmitter.setVisible(false);
+            this.greenStreakEmitter.active = false;
+            this.blueBlingEmitter.setVisible(false);
+            this.blueBlingEmitter.active = false;
+            this.magentaFlickerEmitter.setVisible(false);
+            this.magentaFlickerEmitter.active = false;
+        }
+        // Debug log for emitter visibility
+        if (this.greenStreakEmitter.visible || this.blueBlingEmitter.visible || this.magentaFlickerEmitter.visible) {
+            console.log('[DEBUG] Particle emitter active:', {
+                green: this.greenStreakEmitter.visible,
+                blue: this.blueBlingEmitter.visible,
+                magenta: this.magentaFlickerEmitter.visible
+            });
+        }
+
+        this.lastTerrainType = currentTerrainType;
+
         // Update input controller
         const input = this.inputController.update();
         
@@ -574,6 +817,7 @@ export default class ModularGameScene extends Phaser.Scene {
         // Update HUD
         this.updateHud();
     }
+
     
     /**
      * Handles player controls and physics in walking mode.
@@ -581,7 +825,7 @@ export default class ModularGameScene extends Phaser.Scene {
      * @param {Object} input - Current input state from InputController.
      */
     handleWalkingMode(input) {
-        const Body = Phaser.Physics.Matter.Matter.Body;
+        const Body = getPhaser().Physics.Matter.Matter.Body;
         const walkSpeed = 1.5; // Constant walking speed
         
         // Reset velocities for more precise control
@@ -639,7 +883,7 @@ export default class ModularGameScene extends Phaser.Scene {
      * No longer affected by landing multipliers.
      */
     applyPassiveSpeedBoost() {
-        const Body = Phaser.Physics.Matter.Matter.Body;
+        const Body = getPhaser().Physics.Matter.Matter.Body;
         const currentVelocity = this.player.body.velocity;
         // Always use a speed multiplier of 1.0; clean landings do not affect speed
         this.currentSpeedMultiplier = 1.0;
@@ -663,7 +907,7 @@ export default class ModularGameScene extends Phaser.Scene {
      * @param {number} delta - Time elapsed since last frame in ms.
      */
     handleSleddingControls(input, delta) {
-        const Body = Phaser.Physics.Matter.Matter.Body;
+        const Body = getPhaser().Physics.Matter.Matter.Body;
         const groundRotVel = PhysicsConfig.rotation.groundRotationVel;
         const airRotVel = PhysicsConfig.rotation.airRotationVel;
         const pushForce = PhysicsConfig.movement.pushForce;
@@ -1015,7 +1259,7 @@ export default class ModularGameScene extends Phaser.Scene {
      */
     handleCrash() {
         // Reset player velocity on crash
-        const Body = Phaser.Physics.Matter.Matter.Body;
+        const Body = getPhaser().Physics.Matter.Matter.Body;
         Body.setVelocity(this.player.body, { x: 0, y: 0 });
         
         // Use a life if available, otherwise trigger game over
@@ -1119,8 +1363,8 @@ export default class ModularGameScene extends Phaser.Scene {
         const velocity = this.player.body.velocity;
         const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
         
-        // Update HUD elements
-        this.hud.update(this.player, this.score, speed, this.lives, PhysicsConfig.extraLives.maxLives);
+        // Update HUD elements (show integer score only)
+        this.hud.update(this.player, Math.floor(this.score), speed, this.lives, PhysicsConfig.extraLives.maxLives);
     }
     
 
