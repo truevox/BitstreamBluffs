@@ -1,0 +1,8 @@
+1. Add a powerup that halves the propability of a magenta segment 
+2. ? Add powerdowns that halve the chances of getting a blue or green segment
+3. Add a powerup that increases the propability of a blue segment
+4. Add a powerup that increases the propability of a green segment
+5. Add a powerup and powerdown to adjust player speed (temporary)
+6. Add a powerup and powerdown to adjust player jump height (temporary)
+7. Add a powerup and powerdown to adjust player rotation speed (temporary)
+8. Add the data avalanch

@@ -31,6 +31,13 @@
 
 ## LLM Notes
 
+## Blue Terrain Scoring (v1.5.0)
+- Points accrue every 100ms on blue terrain: `bluePoints * max(0, playerSpeed - blueSpeedThreshold)`.
+- `bluePoints` and `blueSpeedThreshold` are set in `js/config/physics-config.js`.
+- Score only increases (never decreases) and is based on actual player speed.
+- Tests simulate realistic frame-by-frame accrual and require playerSpeed >= 6 for points.
+- See CHANGELOG for version and rationale.
+
 ## Buffered ground detection (implemented v1.5.0, current logic)
 - The player is considered "on ground" until their Y position is more than 10px above the terrain at their X.
 - Prevents the player from being treated as airborne due to minor bounces or physics jitter.
