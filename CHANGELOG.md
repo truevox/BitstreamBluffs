@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.8.0 - 2025-05-28
+
+### 🟦✨ Feature: Add Terrain Colors section to Instructions
+- What it does:
+  Adds a new "Terrain Colors" section to the Bitstream Bluffs instructions page, explaining the effects of blue (extra points), green (less friction, speed boost), and magenta (more friction, slows you down) terrain.
+- Why it was added:
+  To inform players about the gameplay effects of different colored terrains, improving clarity and strategy for new and returning players.
+- How it works:
+  Inserts a clearly commented, styled section after the Avalanche Warning and before TIPS in `public/docs/instructions.html`, matching the existing visual theme and using the same classes for consistency.
+
 ## v1.7.2 - 2025-05-25
 
 ### ✨ Feature: Parachute is now a per-jump, limited resource

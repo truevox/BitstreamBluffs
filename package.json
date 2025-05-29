@@ -1,6 +1,6 @@
 {
   "name": "bitstream-bluffs",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "type": "module",
   "description": "2D side-scrolling infinite sledder game",
   "scripts": {

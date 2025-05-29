@@ -8,6 +8,10 @@
  * @namespace PhysicsConfig
  */
 const PhysicsConfig = {
+    bluePoints: 1, // Points per tick on blue terrain
+    blueSpeedThreshold: 3, // Minimum speed offset for blue points
+    groundBufferHeight: 10, // Max px above terrain to still count as "on ground" (buffered detection)
+
     // Core physics system properties
     physics: {
         gravityY: 1.0,       // Default gravity (Matter.js uses 1 by default)
