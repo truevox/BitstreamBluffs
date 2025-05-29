@@ -223,21 +223,21 @@ export default class ModularGameScene extends Phaser.Scene {
         // See: https://newdocs.phaser.io/docs/3.90.0/Phaser.GameObjects.Particles.ParticleSystem
 
         // --- DEBUG: Forced always-on test emitter at center ---
-        this.testEmitter = this.add.particles({
-            textureKey: 'particle',
-            x: this.cameras.main.centerX,
-            y: this.cameras.main.centerY,
-            tint: [0xffffff],
-            speed: 60,
-            angle: { min: 0, max: 360 },
-            lifespan: 900,
-            alpha: { start: 1, end: 0 },
-            scale: { start: 1.2, end: 0.1 },
-            quantity: 2,
-            frequency: 90,
-            maxParticles: 30,
-        });
-        console.log('[DEBUG] Forced test emitter created at center:', this.testEmitter);
+        // this.testEmitter = this.add.particles({
+        //     textureKey: 'particle',
+        //     x: this.cameras.main.centerX,
+        //     y: this.cameras.main.centerY,
+        //     tint: [0xffffff],
+        //     speed: 60,
+        //     angle: { min: 0, max: 360 },
+        //     lifespan: 900,
+        //     alpha: { start: 1, end: 0 },
+        //     scale: { start: 1.2, end: 0.1 },
+        //     quantity: 2,
+        //     frequency: 90,
+        //     maxParticles: 30,
+        // });
+        // console.log('[DEBUG] Forced test emitter created at center:', this.testEmitter);
 
         this.greenStreakEmitter = this.add.particles({
             textureKey: 'particle',
@@ -617,38 +617,31 @@ Body.set(this.player.body, 'frictionStatic', PhysicsConfig.player.friction);
 
         // --- PARTICLE EMITTER ACTIVATION ---
         // Only one emitter should be visible/active at a time; follow player
-        if (currentTerrainType === 'green' && this.onGround) {
-            this.greenStreakEmitter.setPosition(this.player.x, this.player.y + 18);
-            this.greenStreakEmitter.setAngle({ min: Phaser.Math.RadToDeg(currentTerrainAngle) - 10, max: Phaser.Math.RadToDeg(currentTerrainAngle) + 10 });
-            this.greenStreakEmitter.setVisible(true);
-            this.greenStreakEmitter.active = true;
-            this.blueBlingEmitter.setVisible(false);
-            this.blueBlingEmitter.active = false;
-            this.magentaFlickerEmitter.setVisible(false);
-            this.magentaFlickerEmitter.active = false;
-        } else if (currentTerrainType === 'blue' && this.onGround) {
-            this.blueBlingEmitter.setPosition(this.player.x, this.player.y + 10);
-            this.blueBlingEmitter.setVisible(true);
-            this.blueBlingEmitter.active = true;
-            this.greenStreakEmitter.setVisible(false);
-            this.greenStreakEmitter.active = false;
-            this.magentaFlickerEmitter.setVisible(false);
-            this.magentaFlickerEmitter.active = false;
-        } else if (currentTerrainType === 'magenta' && this.onGround) {
-            this.magentaFlickerEmitter.setPosition(this.player.x, this.player.y + 16);
-            this.magentaFlickerEmitter.setVisible(true);
-            this.magentaFlickerEmitter.active = true;
-            this.greenStreakEmitter.setVisible(false);
-            this.greenStreakEmitter.active = false;
-            this.blueBlingEmitter.setVisible(false);
-            this.blueBlingEmitter.active = false;
-        } else {
-            this.greenStreakEmitter.setVisible(false);
-            this.greenStreakEmitter.active = false;
-            this.blueBlingEmitter.setVisible(false);
-            this.blueBlingEmitter.active = false;
-            this.magentaFlickerEmitter.setVisible(false);
-            this.magentaFlickerEmitter.active = false;
+        const playerOnGround = this.onGround; // Cache for clarity
+
+        // Default all emitters to off
+        this.greenStreakEmitter.setVisible(false);
+        this.greenStreakEmitter.active = false;
+        this.blueBlingEmitter.setVisible(false);
+        this.blueBlingEmitter.active = false;
+        this.magentaFlickerEmitter.setVisible(false);
+        this.magentaFlickerEmitter.active = false;
+
+        if (playerOnGround) {
+            if (currentTerrainType === 'green') {
+                this.greenStreakEmitter.setPosition(this.player.x, this.player.y + 10); // Adjusted offset
+                this.greenStreakEmitter.setAngle({ min: Phaser.Math.RadToDeg(currentTerrainAngle) - 10, max: Phaser.Math.RadToDeg(currentTerrainAngle) + 10 });
+                this.greenStreakEmitter.setVisible(true);
+                this.greenStreakEmitter.active = true;
+            } else if (currentTerrainType === 'blue') {
+                this.blueBlingEmitter.setPosition(this.player.x, this.player.y + 10); // Adjusted offset
+                this.blueBlingEmitter.setVisible(true);
+                this.blueBlingEmitter.active = true;
+            } else if (currentTerrainType === 'magenta') {
+                this.magentaFlickerEmitter.setPosition(this.player.x, this.player.y + 10); // Adjusted offset
+                this.magentaFlickerEmitter.setVisible(true);
+                this.magentaFlickerEmitter.active = true;
+            }
         }
         // Debug log for emitter visibility
         if (this.greenStreakEmitter.visible || this.blueBlingEmitter.visible || this.magentaFlickerEmitter.visible) {
