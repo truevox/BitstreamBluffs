@@ -19,8 +19,8 @@ import InputController from './lib/InputController.js';
 import TerrainManager from './lib/TerrainManager.js';
 import CollectibleManager from './lib/CollectibleManager.js';
 import ExplosionEffects from './utils/ExplosionEffects.js';
-import StarfieldParallax from './background/StarfieldParallax.js';
 import applyFlipImpulse from './flip-impulse.js';
+import StarfieldParallax from './background/StarfieldParallax.js';
 
 /**
  * Main modular game scene for Bitstream Bluffs.
@@ -214,33 +214,36 @@ export default class ModularGameScene extends Phaser.Scene {
         this.initializeCollectibleManager();
         this.initializeExplosionEffects();
 
-        // --- Terrain Particle Emitters Setup ---
-        // Create independent particle emitters for each effect
-        
-        // Green: "Streak Jets" (lime-yellow, angled, fast, short-lived)
-        // Phaser 3.90+ particle system: configure emitters directly with this.add.particles({ ... })
-        // Each call creates an independent emitter with its own config and texture.
-        // See: https://newdocs.phaser.io/docs/3.90.0/Phaser.GameObjects.Particles.ParticleSystem
+        // --- Terrain Particle Emitters Setup (FIXED) ---
+        // Create independent particle emitters for each effect using correct Phaser 3.90+ syntax
+        // Verify particle texture exists before creating emitters
+        console.log('Particle texture exists:', this.textures.exists('particle'));
+        if (this.textures.exists('particle')) {
+            const texture = this.textures.get('particle');
+            console.log('Particle texture dimensions:', texture.source[0].width, 'x', texture.source[0].height);
+        }
 
         // --- DEBUG: Forced always-on test emitter at center ---
-        this.testEmitter = this.add.particles({
-            textureKey: 'particle',
-            x: this.cameras.main.centerX,
-            y: this.cameras.main.centerY,
+        this.testEmitter = this.add.particles(this.cameras.main.centerX, this.cameras.main.centerY, 'particle', {
             tint: [0xffffff],
-            speed: 60,
+            speed: { min: 100, max: 250 }, // Increased speed range for better dispersion
             angle: { min: 0, max: 360 },
-            lifespan: 900,
-            alpha: { start: 1, end: 0 },
-            scale: { start: 1.2, end: 0.1 },
-            quantity: 2,
-            frequency: 90,
-            maxParticles: 30,
+            lifespan: 1200, // Longer lifespan to see spread better
+            alpha: { start: 0.8, end: 0 },
+            scale: { start: 0.8, end: 0.1 },
+            quantity: 3, // More particles per emission
+            frequency: 120, // Slightly less frequent to avoid overcrowding
+            maxParticles: 50, // Allow more total particles
+            emitZone: { // Add emission area for additional spread
+                type: 'random',
+                source: new Phaser.Geom.Circle(0, 0, 15) // 15px radius emission area
+            },
+            on: true // Start active for testing
         });
         console.log('[DEBUG] Forced test emitter created at center:', this.testEmitter);
 
-        this.greenStreakEmitter = this.add.particles({
-            textureKey: 'particle',
+        // Green: "Streak Jets" (lime-yellow, angled, fast, short-lived)
+        this.greenStreakEmitter = this.add.particles(0, 0, 'particle', {
             tint: [0x00ff88, 0xffff00],
             speed: { min: 180, max: 320 },
             angle: { min: -10, max: 10 },
@@ -250,12 +253,11 @@ export default class ModularGameScene extends Phaser.Scene {
             quantity: 1,
             frequency: 18,
             maxParticles: 40,
+            on: false // Start inactive
         });
-        this.greenStreakEmitter.setVisible(false);
-        this.greenStreakEmitter.active = false;
 
-        this.blueBlingEmitter = this.add.particles({
-            textureKey: 'particle',
+        // Blue: "Bling Sparks" (cyan-white, upward arcs, gravity-affected)
+        this.blueBlingEmitter = this.add.particles(0, 0, 'particle', {
             tint: [0x00ffff, 0xffffff],
             speedY: { min: -120, max: -60 },
             speedX: { min: -30, max: 30 },
@@ -267,12 +269,11 @@ export default class ModularGameScene extends Phaser.Scene {
             quantity: 2,
             frequency: 60,
             maxParticles: 30,
+            on: false // Start inactive
         });
-        this.blueBlingEmitter.setVisible(false);
-        this.blueBlingEmitter.active = false;
 
-        this.magentaFlickerEmitter = this.add.particles({
-            textureKey: 'particle',
+        // Magenta: "Danger Flicker" (magenta-purple, chaotic, very short-lived)
+        this.magentaFlickerEmitter = this.add.particles(0, 0, 'particle', {
             tint: [0xff00ff, 0x660066],
             speed: { min: 40, max: 120 },
             angle: { min: -40, max: 40 },
@@ -282,11 +283,15 @@ export default class ModularGameScene extends Phaser.Scene {
             quantity: 2,
             frequency: 25,
             maxParticles: 30,
+            on: false // Start inactive
         });
-        this.magentaFlickerEmitter.setVisible(false);
-        this.magentaFlickerEmitter.active = false;
-        // All emitters are now direct ParticleSystem objects, not managers or legacy emitters.
-        // Control visibility via .setVisible()/.active as of Phaser 3.90+.
+
+        console.log('[DEBUG] All particle emitters created:', {
+            green: this.greenStreakEmitter,
+            blue: this.blueBlingEmitter,
+            magenta: this.magentaFlickerEmitter,
+            test: this.testEmitter
+        });
 
         // Set up the resize handler
         this.scale.on('resize', this.handleResize, this);
@@ -425,9 +430,9 @@ export default class ModularGameScene extends Phaser.Scene {
         this.terrain.setSeededRandom(this.seededRandom);
         this.terrain.init();
         
-        // Generate initial terrain segments
-        for (let i = 0; i < 15; i++) {
-            this.terrain.generateNextTerrainSegment(i === 0);
+        // Generate initial terrain segments (init() already created the first one)
+        for (let i = 0; i < 14; i++) {
+            this.terrain.generateNextTerrainSegment(false); // All additional segments are NOT first
         }
         
         // Draw terrain
@@ -548,6 +553,19 @@ export default class ModularGameScene extends Phaser.Scene {
                 segmentColor = seg.color;
                 currentTerrainAngle = seg.angle;
                 currentSegment = seg;
+                
+                // Debug: Show color comparison in detail
+                console.log('[DEBUG] Found matching segment:', {
+                    segColor: seg.color,
+                    segColorHex: seg.color.toString(16),
+                    neonGreen: this.neonGreen,
+                    neonGreenHex: this.neonGreen.toString(16),
+                    neonBlue: this.neonBlue,
+                    neonBlueHex: this.neonBlue.toString(16), 
+                    neonPink: this.neonPink,
+                    neonPinkHex: this.neonPink.toString(16)
+                });
+                
                 if (segmentColor === this.neonGreen) currentTerrainType = 'green';
                 else if (segmentColor === this.neonBlue) currentTerrainType = 'blue';
                 else if (segmentColor === this.neonPink) currentTerrainType = 'magenta';
@@ -559,6 +577,8 @@ export default class ModularGameScene extends Phaser.Scene {
             playerX: this.player.x,
             playerY: this.player.y,
             currentTerrainType,
+            onGround: this.onGround,
+            segmentColor: segmentColor,
             currentSegment
         });
         if (currentTerrainType === 'blue') {
@@ -600,63 +620,89 @@ export default class ModularGameScene extends Phaser.Scene {
             } else if (currentTerrainType === 'magenta') {
                 // Slowdown: increase friction
                 console.log('[GAMELOGIC] Setting friction to', 0.28);
-Body.set(this.player.body, 'friction', 0.28);
+                Body.set(this.player.body, 'friction', 0.28);
                 console.log('[GAMELOGIC] Setting frictionStatic to', 0.28);
-Body.set(this.player.body, 'frictionStatic', 0.28);
+                Body.set(this.player.body, 'frictionStatic', 0.28);
                 // No points
             }
         } else {
             // Reset to default friction if not on terrain
             const Body = getPhaser().Physics.Matter.Matter.Body;
             console.log('[GAMELOGIC] Setting friction to', PhysicsConfig.player.friction);
-Body.set(this.player.body, 'friction', PhysicsConfig.player.friction);
+            Body.set(this.player.body, 'friction', PhysicsConfig.player.friction);
             console.log('[GAMELOGIC] Setting frictionStatic to', PhysicsConfig.player.friction);
-Body.set(this.player.body, 'frictionStatic', PhysicsConfig.player.friction);
+            Body.set(this.player.body, 'frictionStatic', PhysicsConfig.player.friction);
             this.terrainTypeTimer = 0;
         }
 
-        // --- PARTICLE EMITTER ACTIVATION ---
-        // Only one emitter should be visible/active at a time; follow player
+        // --- PARTICLE EMITTER ACTIVATION (FIXED) ---
+        // Turn off all emitters first
+        this.greenStreakEmitter.stop();
+        this.blueBlingEmitter.stop();
+        this.magentaFlickerEmitter.stop();
+
+        // CRITICAL DEBUG: Show exact state every few frames
+        if (this.time.now % 1000 < 50) { // Log every second approximately
+            console.log('[CRITICAL DEBUG]', {
+                onGround: this.onGround,
+                currentTerrainType: currentTerrainType,
+                segmentColor: segmentColor,
+                neonGreen: this.neonGreen,
+                neonBlue: this.neonBlue,
+                neonPink: this.neonPink,
+                segmentCount: segments.length,
+                playerX: this.player.x,
+                playerY: this.player.y
+            });
+            
+            // Also show on screen for easy debugging
+            if (!this.debugText) {
+                this.debugText = this.add.text(10, 10, '', { 
+                    fontSize: '16px', 
+                    fill: '#ffffff',
+                    backgroundColor: '#000000aa'
+                }).setScrollFactor(0);
+            }
+            this.debugText.setText([
+                `onGround: ${this.onGround}`,
+                `terrainType: ${currentTerrainType}`,
+                `segmentColor: ${segmentColor ? segmentColor.toString(16) : 'null'}`,
+                `segments: ${segments.length}`,
+                `playerY: ${Math.round(this.player.y)}`
+            ].join('\n'));
+        }
+
+        // Activate the appropriate emitter based on terrain type
         if (currentTerrainType === 'green' && this.onGround) {
             this.greenStreakEmitter.setPosition(this.player.x, this.player.y + 18);
-            this.greenStreakEmitter.setAngle({ min: Phaser.Math.RadToDeg(currentTerrainAngle) - 10, max: Phaser.Math.RadToDeg(currentTerrainAngle) + 10 });
-            this.greenStreakEmitter.setVisible(true);
-            this.greenStreakEmitter.active = true;
-            this.blueBlingEmitter.setVisible(false);
-            this.blueBlingEmitter.active = false;
-            this.magentaFlickerEmitter.setVisible(false);
-            this.magentaFlickerEmitter.active = false;
+            // Update angle based on terrain slope
+            this.greenStreakEmitter.setConfig({
+                angle: { 
+                    min: Phaser.Math.RadToDeg(currentTerrainAngle) - 10, 
+                    max: Phaser.Math.RadToDeg(currentTerrainAngle) + 10 
+                }
+            });
+            this.greenStreakEmitter.start();
+            console.log('[DEBUG] Green emitter started at:', this.player.x, this.player.y + 18, 'onGround:', this.onGround);
         } else if (currentTerrainType === 'blue' && this.onGround) {
             this.blueBlingEmitter.setPosition(this.player.x, this.player.y + 10);
-            this.blueBlingEmitter.setVisible(true);
-            this.blueBlingEmitter.active = true;
-            this.greenStreakEmitter.setVisible(false);
-            this.greenStreakEmitter.active = false;
-            this.magentaFlickerEmitter.setVisible(false);
-            this.magentaFlickerEmitter.active = false;
+            this.blueBlingEmitter.start();
+            console.log('[DEBUG] Blue emitter started at:', this.player.x, this.player.y + 10, 'onGround:', this.onGround);
         } else if (currentTerrainType === 'magenta' && this.onGround) {
-            this.magentaFlickerEmitter.setPosition(this.player.x, this.player.y + 16);
-            this.magentaFlickerEmitter.setVisible(true);
-            this.magentaFlickerEmitter.active = true;
-            this.greenStreakEmitter.setVisible(false);
-            this.greenStreakEmitter.active = false;
-            this.blueBlingEmitter.setVisible(false);
-            this.blueBlingEmitter.active = false;
+            this.magentaFlickerEmitter.setPosition(this.player.x, this.player.y + 15);
+            this.magentaFlickerEmitter.start();
+            console.log('[DEBUG] Magenta emitter started at:', this.player.x, this.player.y + 15, 'onGround:', this.onGround);
         } else {
-            this.greenStreakEmitter.setVisible(false);
-            this.greenStreakEmitter.active = false;
-            this.blueBlingEmitter.setVisible(false);
-            this.blueBlingEmitter.active = false;
-            this.magentaFlickerEmitter.setVisible(false);
-            this.magentaFlickerEmitter.active = false;
+            console.log('[DEBUG] No emitter activated - TerrainType:', currentTerrainType, 'onGround:', this.onGround);
         }
-        // Debug log for emitter visibility
-        if (this.greenStreakEmitter.visible || this.blueBlingEmitter.visible || this.magentaFlickerEmitter.visible) {
-            console.log('[DEBUG] Particle emitter active:', {
-                green: this.greenStreakEmitter.visible,
-                blue: this.blueBlingEmitter.visible,
-                magenta: this.magentaFlickerEmitter.visible
-            });
+        
+        // Debug log for emitter activity
+        const activeEmitters = [];
+        if (this.greenStreakEmitter.on) activeEmitters.push('green');
+        if (this.blueBlingEmitter.on) activeEmitters.push('blue');
+        if (this.magentaFlickerEmitter.on) activeEmitters.push('magenta');
+        if (activeEmitters.length > 0) {
+            console.log('[DEBUG] Active particle emitters:', activeEmitters);
         }
 
         this.lastTerrainType = currentTerrainType;

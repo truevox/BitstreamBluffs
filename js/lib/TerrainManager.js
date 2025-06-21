@@ -77,7 +77,7 @@ export default class TerrainManager {
         this.lastTerrainY = 500; // Reset terrain starting point
         
         // Generate initial flat segment
-        this.generateNextTerrainSegment(true); 
+        this.generateNextTerrainSegment(true);
     }
     
     /**

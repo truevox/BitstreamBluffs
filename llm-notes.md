@@ -198,3 +198,19 @@ this.starfield.update(this.cameras.main);
 ### Notes
 - See StarfieldParallax.js for full API and documentation.
 - This approach avoids z-order bugs and keeps backgrounds performant.
+
+## Particle System Fix (2025-06-08)
+
+- **Problem:** Particles weren't working due to incorrect Phaser 3.90+ syntax and control methods.
+- **Issues Fixed:**
+  1. **Incorrect Creation Syntax:** Was using `this.add.particles({ textureKey: 'particle', ... })` instead of `this.add.particles(x, y, 'particle', { config })`
+  2. **Wrong Control Methods:** Was using `setVisible(false)` and `active = false` instead of proper `start()` and `stop()` methods
+  3. **Configuration Updates:** Dynamic angle updates now use `setConfig()` method
+  4. **Missing Imports:** Added missing imports for `applyFlipImpulse` and `StarfieldParallax`
+- **Solution:**
+  - Updated particle emitter creation to use correct Phaser 3.90+ syntax
+  - Replaced visibility/active properties with `start()`/`stop()` methods
+  - Added proper debugging and texture validation
+  - Particles now activate based on terrain type (green=speed boost, blue=points, magenta=danger)
+- **Files Changed:** `js/ModularGameScene.js` (create method and update loop)
+- **Testing:** Debug emitter at screen center should be visible immediately; terrain-based emitters activate when player is on colored terrain

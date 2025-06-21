@@ -16,3 +16,6 @@
 Thumbs.db
 config.txt
 .config/config.txt
+
+# Unrelated files
+/public/docs/Slides/

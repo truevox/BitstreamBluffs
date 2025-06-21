@@ -2,7 +2,7 @@
 // Start screen scene for Bitstream Bluffs
 // ------------------------------------------------------
 
-import Phaser from 'phaser';
+// Phaser is loaded globally via CDN in index.html - no import needed
 // Import crypto library for SHA-256 hashing
 import { generateGameSeed } from './utils/seed-generator.js';
 import StarfieldParallax from './background/StarfieldParallax.js';
