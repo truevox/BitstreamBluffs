@@ -287,20 +287,21 @@ export default class Player {
             Math.pow(this.sprite.body.velocity.y, 2)
         );
 
+        // Control particle emission (Phaser 3.60+ uses emitting property)
         if (speed > 5 && !this.isWalkingMode) {
-            this.trail.start();
-            this.trail.setFrequency(Math.max(20, 100 - speed));
+            this.trail.emitting = true;
+            this.trail.frequency = Math.max(20, 100 - speed);
         } else {
-            this.trail.stop();
+            this.trail.emitting = false;
         }
 
-        // Change trail color based on tricks
+        // Change trail color based on tricks (Phaser 3.60+ uses setParticleTint)
         if (this.isAirBraking) {
-            this.trail.setTint(0xff00ff); // Magenta
+            this.trail.setParticleTint(0xff00ff); // Magenta
         } else if (this.isParachuting) {
-            this.trail.setTint(0xffaa00); // Amber
+            this.trail.setParticleTint(0xffaa00); // Amber
         } else {
-            this.trail.setTint(0x00ffff); // Cyan
+            this.trail.setParticleTint(0x00ffff); // Cyan
         }
     }
 
