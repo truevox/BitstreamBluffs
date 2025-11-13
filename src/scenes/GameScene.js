@@ -58,9 +58,9 @@ export default class GameScene extends Phaser.Scene {
         // Create HUD
         this.createHUD();
 
-        // Camera follows player
-        this.cameras.main.startFollow(this.player.sprite, false, 0.1, 0.3);
-        this.cameras.main.setFollowOffset(0, -50);
+        // Camera follows player in both X and Y
+        this.cameras.main.startFollow(this.player.sprite, false, 0.08, 0.2);
+        this.cameras.main.setFollowOffset(0, -60); // Keep player slightly above center
 
         // Initialize The Bit Stream (chasing element)
         this.bitStream = {
