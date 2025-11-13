@@ -65,18 +65,17 @@ export default class Player {
     }
 
     createTrailEffect() {
-        // Create a simple particle trail
-        const particles = this.scene.add.particles('particle-cyan');
-        this.trail = particles.createEmitter({
+        // Create a simple particle trail using Phaser 3.60+ API
+        this.trail = this.scene.add.particles(0, 0, 'particle-cyan', {
             follow: this.sprite,
             speed: { min: 10, max: 30 },
             scale: { start: 1, end: 0 },
             alpha: { start: 0.8, end: 0 },
             lifespan: 300,
             frequency: 50,
-            tint: 0x00ffff
+            tint: 0x00ffff,
+            emitting: false  // Start stopped
         });
-        this.trail.stop();
     }
 
     update(keys, delta) {

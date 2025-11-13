@@ -212,10 +212,9 @@ export default class GameScene extends Phaser.Scene {
         this.bitStreamGraphics = this.add.graphics();
         this.bitStreamGraphics.setDepth(100);
 
-        // Create particles for the bit stream effect
-        const particles = this.add.particles('particle-magenta');
-        this.bitStreamParticles = particles.createEmitter({
-            x: { min: 0, max: 480 },
+        // Create particles for the bit stream effect using Phaser 3.60+ API
+        this.bitStreamParticles = this.add.particles(240, 0, 'particle-magenta', {
+            x: { min: -240, max: 240 },
             y: 0,
             speedY: { min: 20, max: 50 },
             speedX: { min: -20, max: 20 },
