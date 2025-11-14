@@ -44,13 +44,14 @@ export default class TerrainGenerator {
     }
 
     generateInitialTerrain() {
-        // Start with a wide flat starting platform centered on player spawn
-        // Player spawns at (240, 100), so create platform from x=40 to x=440
-        this.createSlopeSegment(40, 100, 400, 0, 'normal', 20);
+        // Start with a wide flat starting platform
+        // Player spawns at (240, 100), platform top should be at y=110 so player sits on it
+        // Create platform from x=40 to x=440
+        this.createSlopeSegment(40, 110, 400, 0, 'normal', 20);
 
         // Generate initial downhill segments starting from end of platform
         let currentX = 440;
-        let currentY = 100;
+        let currentY = 110;
 
         for (let i = 0; i < 15; i++) {
             const angle = this.minSlope + this.random() * (this.maxSlope - this.minSlope);
