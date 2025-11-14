@@ -36,8 +36,10 @@ export default class GameScene extends Phaser.Scene {
             pink: 0xff00aa       // Magenta terrain
         };
 
-        // Set up camera
-        this.cameras.main.setBounds(0, 0, 480, 100000);
+        // Set up camera with wide horizontal bounds to allow left/right following
+        // X bounds: -2000 to +2000 (4000 total width for horizontal movement)
+        // Y bounds: 0 to 100000 (vertical downhill progression)
+        this.cameras.main.setBounds(-2000, 0, 4000, 100000);
         this.cameras.main.setBackgroundColor(0x000000);
 
         // Create starfield background
