@@ -36,10 +36,10 @@ export default class GameScene extends Phaser.Scene {
             pink: 0xff00aa       // Magenta terrain
         };
 
-        // Set up camera with wide horizontal bounds to allow left/right following
-        // X bounds: -2000 to +2000 (4000 total width for horizontal movement)
+        // Set up camera with very wide horizontal bounds to allow left/right following
+        // X bounds: -10000 to +10000 (20000 total width for horizontal movement)
         // Y bounds: 0 to 100000 (vertical downhill progression)
-        this.cameras.main.setBounds(-2000, 0, 4000, 100000);
+        this.cameras.main.setBounds(-10000, 0, 20000, 100000);
         this.cameras.main.setBackgroundColor(0x000000);
 
         // Create starfield background
@@ -173,26 +173,29 @@ export default class GameScene extends Phaser.Scene {
         if (this.bitStream.active) {
             this.bitStream.y += this.bitStream.speed;
 
-            // Update visual
+            // Update visual (spans across camera view, not fixed coordinates)
+            const camX = this.cameras.main.scrollX;
+            const camWidth = this.cameras.main.width;
+
             this.bitStreamGraphics.clear();
             this.bitStreamGraphics.fillStyle(0xff0000, 0.3);
-            this.bitStreamGraphics.fillRect(0, this.bitStream.y - 50, 480, 100);
+            this.bitStreamGraphics.fillRect(camX, this.bitStream.y - 50, camWidth, 100);
 
-            // Draw glitchy lines
+            // Draw glitchy lines across camera width
             this.bitStreamGraphics.lineStyle(2, 0xff00ff, 1);
             for (let i = 0; i < 10; i++) {
                 const lineY = this.bitStream.y - 50 + (Math.random() * 100);
                 const glitchOffset = (Math.random() - 0.5) * 20;
                 this.bitStreamGraphics.lineBetween(
-                    0 + glitchOffset,
+                    camX + glitchOffset,
                     lineY,
-                    480 + glitchOffset,
+                    camX + camWidth + glitchOffset,
                     lineY
                 );
             }
 
-            // Position particle emitter
-            this.bitStreamParticles.setPosition(240, this.bitStream.y);
+            // Position particle emitter at center of camera
+            this.bitStreamParticles.setPosition(camX + camWidth / 2, this.bitStream.y);
 
             // Game over if The Bit Stream catches the player
             if (this.bitStream.y > this.player.sprite.y - 100) {
@@ -250,12 +253,14 @@ export default class GameScene extends Phaser.Scene {
         const speedRatio = Math.min(speed / maxSpeed, 1.0);
 
         // Calculate target lead (direction matters)
+        // NOTE: Camera offset is INVERTED - negative offset shows what's ahead
+        // If moving right (+X), we want negative offset to look ahead right
         const velocityAngle = Math.atan2(velocity.y, velocity.x);
-        const targetLeadX = Math.cos(velocityAngle) * maxLead * speedRatio;
-        const targetLeadY = Math.sin(velocityAngle) * maxLead * speedRatio * 0.3; // Less vertical leading
+        const targetLeadX = -Math.cos(velocityAngle) * maxLead * speedRatio; // NEGATIVE to look ahead
+        const targetLeadY = -Math.sin(velocityAngle) * maxLead * speedRatio * 0.5; // NEGATIVE, more vertical lead
 
         // Smooth interpolation to target lead
-        const lerpFactor = 0.05;
+        const lerpFactor = 0.08;
         this.cameraLeadX += (targetLeadX - this.cameraLeadX) * lerpFactor;
         const cameraLeadY = this.cameraOffsetY + targetLeadY;
 
