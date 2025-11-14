@@ -58,9 +58,12 @@ export default class GameScene extends Phaser.Scene {
         // Create HUD
         this.createHUD();
 
-        // Camera follows player in both X and Y
+        // Camera follows player in both X and Y with dynamic leading
         this.cameras.main.startFollow(this.player.sprite, false, 0.08, 0.2);
-        this.cameras.main.setFollowOffset(0, -60); // Keep player slightly above center
+
+        // Camera leading state
+        this.cameraLeadX = 0;
+        this.cameraOffsetY = -60; // Keep player slightly above center
 
         // Initialize The Bit Stream (chasing element)
         this.bitStream = {
@@ -144,6 +147,9 @@ export default class GameScene extends Phaser.Scene {
         // Update player
         this.player.update(this.keys, delta);
 
+        // Update camera leading based on player velocity
+        this.updateCameraLeading(delta);
+
         // Update terrain
         this.terrain.update(this.player.sprite.y);
 
@@ -225,6 +231,34 @@ export default class GameScene extends Phaser.Scene {
             tint: [0xff0000, 0xff00ff, 0x8800ff]
         });
         this.bitStreamParticles.setDepth(99);
+    }
+
+    updateCameraLeading(delta) {
+        // Calculate camera lead based on player velocity
+        // Player sprite is ~24 units wide, so 4 widths = ~96 units
+        const playerWidth = 24;
+        const maxLead = playerWidth * 4; // 96 units ahead at max speed
+
+        // Get player velocity
+        const velocity = this.player.sprite.body.velocity;
+        const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+
+        // Good clip speed is around 10-15 units/frame
+        const maxSpeed = 15;
+        const speedRatio = Math.min(speed / maxSpeed, 1.0);
+
+        // Calculate target lead (direction matters)
+        const velocityAngle = Math.atan2(velocity.y, velocity.x);
+        const targetLeadX = Math.cos(velocityAngle) * maxLead * speedRatio;
+        const targetLeadY = Math.sin(velocityAngle) * maxLead * speedRatio * 0.3; // Less vertical leading
+
+        // Smooth interpolation to target lead
+        const lerpFactor = 0.05;
+        this.cameraLeadX += (targetLeadX - this.cameraLeadX) * lerpFactor;
+        const cameraLeadY = this.cameraOffsetY + targetLeadY;
+
+        // Update camera offset
+        this.cameras.main.setFollowOffset(this.cameraLeadX, cameraLeadY);
     }
 
     updateHUD() {
