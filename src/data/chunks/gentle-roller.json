@@ -1,0 +1,15 @@
+{
+  "id": "gentle-roller",
+  "kind": "spline",
+  "weight": 3,
+  "minDistanceM": 0,
+  "lengthPx": 1200,
+  "controlPoints": [
+    { "x": 0.0, "y": 0 },
+    { "x": 0.3, "y": 90 },
+    { "x": 0.6, "y": 70 },
+    { "x": 1.0, "y": 240 }
+  ],
+  "tags": ["intro", "jump-lip"],
+  "modIds": ["highBandwidth", "compression"]
+}

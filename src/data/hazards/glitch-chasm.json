@@ -1,0 +1,2 @@
+{ "id": "glitchChasm", "shapeKey": "chasm", "size": { "w": 64, "h": 40 },
+  "onHit": { "effect": "crash" }, "weight": 2, "minDistanceM": 150, "placement": "ground", "colorKey": "magenta" }

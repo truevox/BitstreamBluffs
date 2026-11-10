@@ -1,0 +1,2 @@
+{ "id": "overflowFirewall", "shapeKey": "firewall", "size": { "w": 16, "h": 48 },
+  "onHit": { "effect": "slow", "durationMs": 1500, "speedFactor": 0.5 }, "weight": 3, "minDistanceM": 50, "placement": "ground", "colorKey": "amber" }
