@@ -4,7 +4,19 @@
  *
  * VirtualPad = the single normalized input state. Keyboard, gamepad and touch overlay all write into it
  * (via InputRouter); everything else only READS it through InputRouter.poll().
+ * Pure DOM/logic: no Phaser import (Jest-testable under jsdom).
  */
+import { TouchOverlay } from './TouchOverlay.js';
+
+/** Analog dead-zone (stick / device tilt). */
+export const ANALOG_DEADZONE = 0.15;
+
+const EDGE_NAMES = ['hop', 'reset', 'pause', 'airBrake', 'parachute', 'confirm'];
+const HELD_NAMES = [
+  'push', 'tuck', 'brake', 'hop', 'reset', 'airBrake', 'parachute', 'pause', 'confirm',
+  'tiltBack', 'tiltForward', 'heliLeft', 'heliRight',
+];
+
 
 /**
  * Normalized control state (design doc 4.1; where 4.1 and 12 disagree 4.1 wins: S = brake, A+D together = tuck).
@@ -39,42 +51,126 @@ export class VirtualPad {
   constructor() {
     /** @type {VirtualPadState} */
     this.state = emptyPadState();
+    /** name -> set of sources currently holding it (so keyboard release never cancels a touch hold). */
+    this.held = {};
+    for (const n of HELD_NAMES) this.held[n] = new Set();
+    /** analog source -> raw value. @type {Object<string,number>} */
+    this.analog = {};
+    /** @type {TouchOverlay|null} */
+    this.overlay = null;
   }
 
   /**
    * Set a digital button. Names are the boolean fields of VirtualPadState plus 'tiltBack'/'tiltForward'/
-   * 'heliLeft'/'heliRight' raw keys (the pad derives tilt/tuck/heli from them).
+   * 'heliLeft'/'heliRight' raw keys (the pad derives tilt/tuck/heli from them) and 'confirm' (edge only).
+   * Unknown names are ignored. Each source is tracked separately.
    * @param {string} name
    * @param {boolean} down
    * @param {'keyboard'|'gamepad'|'touch'} source
    * @returns {void}
    */
-  setButton(name, down, source) {}
+  setButton(name, down, source) {
+    const set = this.held[name];
+    if (!set) return;
+    const src = source || 'keyboard';
+    const was = set.size > 0;
+    if (down) set.add(src);
+    else set.delete(src);
+    const now = set.size > 0;
+    if (down) this.state.lastSource = src;
+    if (now && !was && EDGE_NAMES.includes(name)) this.state.pressed[name] = true;
+    this._recompute();
+  }
 
   /**
-   * Set analog tilt (gamepad stick). Overrides keyboard tilt while |value| > deadzone 0.15.
+   * Set analog tilt (gamepad stick, device tilt). Overrides digital tilt while |value| > deadzone 0.15.
+   * Several analog sources may coexist; the one with the largest magnitude wins.
    * @param {number} value -1..1
+   * @param {string} [source='gamepad'] analog source key ('gamepad' | 'device').
    * @returns {void}
    */
-  setTilt(value) {}
+  setTilt(value, source = 'gamepad') {
+    const v = Math.max(-1, Math.min(1, Number(value) || 0));
+    if (this.analog[source] === v) return;
+    this.analog[source] = v;
+    if (Math.abs(v) > ANALOG_DEADZONE) this.state.lastSource = source === 'device' ? 'touch' : 'gamepad';
+    this._recompute();
+  }
+
+  /** @private */
+  _recompute() {
+    const s = this.state;
+    const h = (n) => this.held[n].size > 0;
+    s.push = h('push');
+    s.brake = h('brake');
+    s.hop = h('hop');
+    s.reset = h('reset');
+    s.airBrake = h('airBrake');
+    s.parachute = h('parachute');
+    s.pause = h('pause');
+    const back = h('tiltBack');
+    const fwd = h('tiltForward');
+    s.tuck = h('tuck') || (back && fwd);
+    const digital = back && fwd ? 0 : fwd ? 1 : back ? -1 : 0;
+    let analog = 0;
+    for (const k of Object.keys(this.analog)) {
+      const v = this.analog[k];
+      if (Math.abs(v) > ANALOG_DEADZONE && Math.abs(v) > Math.abs(analog)) {
+        // rescale so the output starts at 0 just outside the dead-zone
+        analog = Math.sign(v) * Math.min(1, (Math.abs(v) - ANALOG_DEADZONE) / (1 - ANALOG_DEADZONE));
+      }
+    }
+    s.tilt = analog !== 0 ? analog : digital;
+    s.heli = /** @type {-1|0|1} */ ((h('heliRight') ? 1 : 0) - (h('heliLeft') ? 1 : 0));
+  }
+
+  /**
+   * Release everything held by one source (window blur, gamepad disconnect, overlay hidden).
+   * @param {'keyboard'|'gamepad'|'touch'} source
+   * @returns {void}
+   */
+  releaseSource(source) {
+    for (const n of HELD_NAMES) this.held[n].delete(source);
+    if (source === 'gamepad') delete this.analog.gamepad;
+    if (source === 'touch') delete this.analog.device;
+    this._recompute();
+  }
 
   /**
    * Snapshot current state and CLEAR the one-shot `pressed` edges.
    * @returns {VirtualPadState} a copy (safe to keep).
    */
   poll() {
-    return { ...this.state, pressed: { ...this.state.pressed } };
+    const out = { ...this.state, pressed: { ...this.state.pressed } };
+    for (const n of EDGE_NAMES) this.state.pressed[n] = false;
+    return out;
   }
 
   /**
    * Create/show the DOM touch overlay (buttons mirroring WASD/arrows) inside `parent`. No-op on non-touch
-   * devices when settings.touchOverlay === 'auto'.
+   * devices when settings.touchOverlay === 'auto'. Safe to call again (e.g. after settings change).
+   * The overlay is only visible while setOverlayContext(true) was called (InputRouter does it on RUN_START).
    * @param {HTMLElement} parent usually game.canvas.parentElement.
    * @param {Pick<import('./SaveStore.js').Settings,'touchOverlay'|'touchRotate90'>} options
    * @returns {void}
    */
-  mountTouchOverlay(parent, options) {}
+  mountTouchOverlay(parent, options) {
+    if (typeof document === 'undefined') return;
+    if (!this.overlay) this.overlay = new TouchOverlay(this);
+    this.overlay.mount(parent, (options && options.touchOverlay) || 'auto');
+  }
+
+  /** @param {boolean} visible show/hide the overlay for the current context. @returns {void} */
+  setOverlayContext(visible) {
+    if (this.overlay) this.overlay.setContextVisible(visible);
+  }
 
   /** Remove overlay and listeners. @returns {void} */
-  destroy() {}
+  destroy() {
+    if (this.overlay) this.overlay.destroy();
+    this.overlay = null;
+    for (const n of HELD_NAMES) this.held[n].clear();
+    this.analog = {};
+    this.state = emptyPadState();
+  }
 }
