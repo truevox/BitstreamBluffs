@@ -5,11 +5,30 @@
   "minDistanceM": 0,
   "lengthPx": 1200,
   "controlPoints": [
-    { "x": 0.0, "y": 0 },
-    { "x": 0.3, "y": 90 },
-    { "x": 0.6, "y": 70 },
-    { "x": 1.0, "y": 240 }
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.3,
+      "y": 56
+    },
+    {
+      "x": 0.6,
+      "y": 43
+    },
+    {
+      "x": 1,
+      "y": 149
+    }
   ],
-  "tags": ["intro", "jump-lip"],
-  "modIds": ["highBandwidth", "compression"]
+  "tags": [
+    "intro",
+    "roller",
+    "jump-lip"
+  ],
+  "modIds": [
+    "highBandwidth",
+    "compression"
+  ]
 }

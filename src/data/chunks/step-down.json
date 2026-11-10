@@ -1,0 +1,44 @@
+{
+  "id": "step-down",
+  "kind": "spline",
+  "weight": 2,
+  "minDistanceM": 60,
+  "lengthPx": 1300,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.2,
+      "y": 6
+    },
+    {
+      "x": 0.32,
+      "y": 74
+    },
+    {
+      "x": 0.48,
+      "y": 81
+    },
+    {
+      "x": 0.62,
+      "y": 155
+    },
+    {
+      "x": 0.78,
+      "y": 161
+    },
+    {
+      "x": 1,
+      "y": 217
+    }
+  ],
+  "tags": [
+    "steps"
+  ],
+  "modIds": [
+    "highBandwidth",
+    "compression"
+  ]
+}

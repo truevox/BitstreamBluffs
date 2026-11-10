@@ -1,0 +1,40 @@
+{
+  "id": "ski-jump",
+  "kind": "spline",
+  "weight": 1.5,
+  "minDistanceM": 200,
+  "lengthPx": 1200,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.3,
+      "y": 105
+    },
+    {
+      "x": 0.55,
+      "y": 155
+    },
+    {
+      "x": 0.7,
+      "y": 149
+    },
+    {
+      "x": 0.8,
+      "y": 93
+    },
+    {
+      "x": 1,
+      "y": 180
+    }
+  ],
+  "tags": [
+    "big-air",
+    "jump-lip"
+  ],
+  "modIds": [
+    "compression"
+  ]
+}

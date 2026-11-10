@@ -4,7 +4,16 @@
   "weight": 1,
   "minDistanceM": 300,
   "lengthPx": 900,
-  "noise": { "amplitudePx": 38, "frequency": 0.018, "octaves": 3, "meanSlopeDeg": 14 },
-  "tags": ["difficulty-spike"],
-  "modIds": ["compression"]
+  "noise": {
+    "amplitudePx": 26,
+    "frequency": 0.006,
+    "octaves": 3,
+    "meanSlopeDeg": 14
+  },
+  "tags": [
+    "difficulty-spike"
+  ],
+  "modIds": [
+    "compression"
+  ]
 }

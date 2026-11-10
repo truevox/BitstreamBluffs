@@ -1,0 +1,20 @@
+{
+  "id": "noise-static-storm",
+  "kind": "noise",
+  "weight": 1,
+  "minDistanceM": 700,
+  "lengthPx": 1300,
+  "noise": {
+    "amplitudePx": 34,
+    "frequency": 0.0075,
+    "octaves": 4,
+    "meanSlopeDeg": 16
+  },
+  "tags": [
+    "difficulty-spike"
+  ],
+  "modIds": [
+    "compression",
+    "highBandwidth"
+  ]
+}
