@@ -1,11 +1,88 @@
 /**
- * OWNER: gameplay engineer. May be Phaser-free (keep it so: it is unit-testable).
+ * OWNER: gameplay engineer. Phaser-free (keep it so: it is unit-testable).
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * Single source of the EFFECTIVE physics constants for a frame: base PHYSICS (doc 4.2) x tuck x terrain-mod zones
- * x daily rule x timed effects. Also holds the doc-units -> Matter-units conversion helpers (ARCHITECTURE.md section 7).
+ * x daily rule x timed effects. Also holds the doc-units -> Matter-units conversion helpers (ARCHITECTURE.md section 7)
+ * and every gameplay "feel" tunable (TUNING) so nothing else hard-codes numbers.
+ *
+ * MATTER 0.20 NOTE (bundled with Phaser 3.90): Body.setVelocity / getVelocity and angular velocity are NORMALISED to
+ * a 1000/60 ms base step, not to the actual sub-step. So "px/s -> Matter" is `pxPerSecToStep(v, BASE_STEP_MS)`. The
+ * helpers still accept a delta so they stay correct if that ever changes.
  */
-import { PHYSICS } from '../constants.js';
+import { PHYSICS, MAX_PHYSICS_STEP_MS } from '../constants.js';
+
+/** Matter's internal base delta in ms (Body._baseDelta). */
+export const BASE_STEP_MS = 1000 / 60;
+
+/**
+ * Gameplay feel tunables that the design doc does not pin down. Everything is in doc units (px, s, deg).
+ * Tweak here only.
+ */
+export const TUNING = Object.freeze({
+  /**
+   * Matter sliding friction of the sled. MUST stay 0: Matter 0.20's friction solver jams a body on slopes below ~15 deg
+   * for ANY friction >= 0.0005 (verified). All runner drag is applied manually via groundResist / brakeResist instead.
+   */
+  groundFriction: 0,
+  /** Matter static friction of the sled (0 for the same reason). */
+  groundFrictionStatic: 0,
+  /** Extra manual runner resistance on the ground, 1/s (exponential speed decay). Scaled by frictionMul. */
+  groundResist: 0.12,
+  /**
+   * Multiplier on the doc drag (PHYSICS.dragUntucked 0.015) when written to Matter frictionAir. Matter 0.20 applies
+   * frictionAir per 16.7 ms base step (= 0.9/s), which caps a 8 degree slope at ~120 px/s, far from the ~400-800 px/s
+   * the architecture expects. 0.3 keeps the doc ratios (tuck halves drag, boosts divide it) with a livelier terminal
+   * speed. Set to 1 for the literal doc value.
+   */
+  dragFeelMul: 0.3,
+  /**
+   * Multiplier on air tilt authority (on top of PHYSICS.airControlFactor 0.7). With the literal 420 deg/s^2 x 0.7 a held
+   * flip needs ~2.1 s of airtime for 540 degrees; 1.6 brings that to ~1.6 s so a 540 fits an average big jump (doc 4.2).
+   */
+  airTiltFeelMul: 1.6,
+  /** Ground friction multiplier and extra manual decay while braking (S). */
+  brakeFrictionMul: 1,
+  brakeResist: 2.2,
+  /** Aerial angular damping while braking (S in air), 1/s. */
+  airBrakeAngularDamp: 5,
+  /** Quadratic drag (1/px) giving a soft terminal velocity on very steep slopes; ~0 below 600 px/s. */
+  quadDrag: 0.00009,
+  /** Ground lean torque multiplier (relative to maxTiltTorque). */
+  groundTiltMul: 0.5,
+  /** Angular velocity cap, deg/s. */
+  maxAngularVelDegS: 560,
+  /** Push kick: surface speed set by W when stalled (px/s), and re-trigger delay. */
+  pushKickPxS: 70,
+  pushCooldownMs: 280,
+  /** Hop: speed along the surface normal (px/s) and coyote/buffer windows. */
+  hopPxS: 300,
+  hopCoyoteMs: 90,
+  hopBufferMs: 110,
+  /** Ground contact hysteresis (ms) before the sled counts as airborne. */
+  groundedGraceMs: 45,
+  /** Air brake (Up): horizontal speed removed over airBrakeSpanMs at 100 % hold, descent damping, gravity mul. */
+  airBrakeSpanMs: 800,
+  airBrakeDescentDamp: 2.4,
+  airBrakeGravityMul: 0.8,
+  /** Seconds-based helicopter spin rate of the visual (deg/s). */
+  heliSpinDegS: 760,
+  /** Hazard / power-up defaults. */
+  scrambleGravityWobble: 0.45,
+  scrambleTorqueJitterDegS2: 380,
+  /** Invulnerability after Hashed Backup saves you or after a respawn (ms). */
+  invulnerableMs: 900,
+  /** A body falling this far below the interpolated ground line has fallen into a gap/void: crash. */
+  voidDepthPx: 320,
+  /** Camera. */
+  cameraLerpX: 5.5,
+  cameraLerpY: 3.2,
+  lookAheadSec: 0.35,
+  lookAheadMaxPx: 120,
+  /** Screen shake amplitudes (px). */
+  shakeHardLanding: 3,
+  shakeCrash: 7,
+});
 
 /**
  * @typedef {Object} TunerContext
@@ -15,6 +92,12 @@ import { PHYSICS } from '../constants.js';
  * @property {boolean} [scrambled]  garbage-data vent active (controls/gravity perturbed).
  * @property {boolean} [slowed]     overflow firewall active.
  * @property {number} [speedBoost]  packet burst multiplier (1 = none).
+ * @property {number} [slowFactor]  overflow firewall speed multiplier while slowed (default PHYSICS.slowFactor).
+ * @property {number} [timeMs]      run time, used for the scramble wobble.
+ * @property {boolean} [parachute]  parachute stall active (gravity x0.5, steering locked).
+ * @property {boolean} [airBrake]   air brake held while airborne.
+ * @property {boolean} [airborne]
+ * @property {boolean} [braking]    S held.
  */
 
 /**
@@ -25,7 +108,14 @@ import { PHYSICS } from '../constants.js';
  * @property {number} tiltTorqueDegS2    deg/s^2 at full input on ground.
  * @property {number} airControl         multiplier on tilt torque while airborne.
  * @property {number} bounceMul
- * @property {number} speedMul           overall speed multiplier for boosts/slows (applied as velocity scaling).
+ * @property {number} speedMul           overall speed multiplier for boosts/slows (applied as drag scaling).
+ * @property {number} [steerMul]         0 = steering locked (parachute), 1 normal, tucked daily rule may reduce.
+ * @property {number} [tiltSign]         -1 when scrambled (inverted controls).
+ * @property {number} [groundResist]     manual runner resistance 1/s.
+ * @property {number} [quadDrag]
+ * @property {number} [pushForceMul]
+ * @property {number} [scrambleJitterDegS2] random torque amplitude while scrambled.
+ * @property {number} [restitution]
  */
 
 /** px/s -> Matter per-step velocity for a step of deltaMs. @param {number} pxPerS @param {number} deltaMs @returns {number} */
@@ -53,6 +143,7 @@ export class PhysicsTuner {
   /** @param {Partial<typeof PHYSICS>} [overrides] dev-time overrides of base values. */
   constructor(overrides = {}) {
     this.base = { ...PHYSICS, ...overrides };
+    this.tuning = TUNING;
   }
 
   /**
@@ -60,14 +151,66 @@ export class PhysicsTuner {
    * @returns {EffectivePhysics}
    */
   getEffective(ctx) {
+    const b = this.base;
+    const t = this.tuning;
+    const daily = ctx.daily || {};
+    const zones = ctx.zones || [];
+
+    let gravityMul = daily.gravityMul || 1;
+    let frictionMul = daily.frictionMul || 1;
+    let bounceMul = 1;
+    for (const z of zones) {
+      const p = (z && z.physics) || {};
+      if (p.gravityMul) gravityMul *= p.gravityMul;
+      if (p.frictionMul) frictionMul *= p.frictionMul;
+      if (p.bounceMul) bounceMul *= p.bounceMul;
+    }
+
+    let speedMul = ctx.speedBoost || 1;
+    if (ctx.slowed) speedMul *= ctx.slowFactor || b.slowFactor;
+    let dragMul = 1;
+    let steerMul = 1;
+    if (ctx.tucked) {
+      gravityMul *= b.tuckGravityMul;
+      dragMul *= b.tuckDragMul;
+      speedMul *= daily.tuckSpeedMul || 1;
+      steerMul *= daily.tuckSteerMul == null ? 1 : daily.tuckSteerMul;
+    }
+    if (ctx.parachute) {
+      gravityMul *= b.parachuteGravityMul;
+      steerMul = 0;
+    } else if (ctx.airBrake) {
+      gravityMul *= t.airBrakeGravityMul;
+    }
+
+    let tiltSign = 1;
+    let jitter = 0;
+    if (ctx.scrambled) {
+      tiltSign = -1;
+      jitter = t.scrambleTorqueJitterDegS2;
+      const tm = (ctx.timeMs || 0) / 1000;
+      gravityMul *= 1 + t.scrambleGravityWobble * Math.sin(tm * 11) * Math.cos(tm * 4.3);
+    }
+
+    const resistBase = t.groundResist * frictionMul + (ctx.braking && !ctx.airborne ? t.brakeResist : 0);
+    const frictionBrake = ctx.braking && !ctx.airborne ? t.brakeFrictionMul : 1;
+
     return {
-      gravityPxS2: this.base.gravityPxS2 * (ctx.tucked ? this.base.tuckGravityMul : 1),
-      frictionAir: this.base.dragUntucked * (ctx.tucked ? this.base.tuckDragMul : 1),
-      groundFriction: 0.05,
-      tiltTorqueDegS2: this.base.maxTiltTorqueDegS2,
-      airControl: this.base.airControlFactor,
-      bounceMul: 1,
-      speedMul: ctx.speedBoost || 1,
+      gravityPxS2: b.gravityPxS2 * gravityMul,
+      // Linear drag falls as speedMul rises, so terminal speed scales ~ speedMul (packet burst +30 %, firewall -50 %).
+      frictionAir: (b.dragUntucked * t.dragFeelMul * dragMul) / Math.max(0.2, speedMul),
+      groundFriction: t.groundFriction * frictionMul * frictionBrake,
+      tiltTorqueDegS2: b.maxTiltTorqueDegS2,
+      airControl: b.airControlFactor * t.airTiltFeelMul * (daily.airControlMul || 1),
+      bounceMul,
+      speedMul,
+      steerMul,
+      tiltSign,
+      groundResist: resistBase,
+      quadDrag: t.quadDrag,
+      pushForceMul: daily.pushForceMul || 1,
+      scrambleJitterDegS2: jitter,
+      restitution: Math.min(0.9, 0.02 * bounceMul * bounceMul),
     };
   }
 }
@@ -78,14 +221,17 @@ export class PhysicsTuner {
  * @param {Phaser.Physics.Matter.World} matterWorld
  * @param {number} deltaMs frame delta (clamp upstream to <= 50).
  * @param {(stepMs:number)=>void} [beforeStep] hook to apply forces/torques for each sub-step.
+ * @param {(stepMs:number)=>void} [afterStep] optional hook after each sub-step (collision events have fired).
  * @returns {number} number of sub-steps run.
  */
-export function stepWorld(matterWorld, deltaMs, beforeStep) {
-  const n = Math.max(1, Math.ceil(deltaMs / 8));
+export function stepWorld(matterWorld, deltaMs, beforeStep, afterStep) {
+  if (!(deltaMs > 0)) return 0;
+  const n = Math.max(1, Math.ceil(deltaMs / MAX_PHYSICS_STEP_MS));
   const step = deltaMs / n;
   for (let i = 0; i < n; i++) {
     if (beforeStep) beforeStep(step);
     matterWorld.step(step);
+    if (afterStep) afterStep(step);
   }
   return n;
 }

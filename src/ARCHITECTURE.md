@@ -211,3 +211,117 @@ delta in ms. Conversions (helpers in `PhysicsTuner.js`, gameplay may fix them bu
   `PostFXPipeline` + `camera.setPostPipeline`.
 * A block comment cannot contain `*/` - writing `FOO_*/BAR` in JSDoc breaks the Vite build.
 * Dev: `npm run dev` (vite, port 5173); headless boot check exposes `window.__bbGame`.
+
+## Input/Audio/Glitch addenda
+
+All additive; no existing signature or payload changed.
+
+* **VirtualPad**: `setTilt(value, source = 'gamepad')` has an optional 2nd arg (analog sources `'gamepad'` / `'device'`;
+  largest magnitude wins; output is rescaled outside the 0.15 dead-zone). New: `releaseSource(source)`,
+  `setOverlayContext(visible)`. New helper file `systems/TouchOverlay.js` (DOM only). The touch overlay is shown only
+  while a run is active (InputRouter listens to `RUN_START` / `RUN_END` / `RUN_ABORT` / `GAME_PAUSE` / `GAME_RESUME`), in
+  mode `touchOverlay: 'on'`, or `'auto'` on touch devices. `touchRotate90` = device roll (steering-wheel style, screen-orientation
+  aware, +-30 degrees = full tilt) feeds the analog tilt; on iOS the permission prompt is requested on the first touch.
+* **InputRouter INPUT_ACTION mapping**: Esc and gamepad Start emit `'pause'` only (menus treat it as back); `'cancel'` =
+  Backspace / gamepad B. Space and gamepad A emit `'hop'` + `'confirm'`; Enter `'confirm'`; W/A/S/D and arrows also emit
+  `'up'/'left'/'down'/'right'` (direction actions auto-repeat); Up/Down arrows additionally `'airBrake'`/`'parachute'`.
+  `'anyKey'` fires on every first press of any key / gamepad button / touch pointer (touch taps do NOT emit `'confirm'`:
+  scenes needing tap-to-confirm should use Phaser pointer events or `'anyKey'` with `source === 'touch'`).
+  Keys typed into `input`/`textarea` are ignored; Ctrl/Meta/Alt combos are ignored.
+* **Gamepad** (standard mapping, Steam Deck): left stick X analog tilt, RT push, LT tuck, A hop(+confirm), B brake(+cancel),
+  X air brake, Y parachute, LB/RB (or right stick X) helicopter CCW/CW, Back reset, Start pause, d-pad = menu + digital tilt.
+* **AudioSynth** additive methods: `setSpeed(pxPerSec)` (wind whoosh + music intensity; RunScene should call it every frame),
+  `setIntensity(0..1)`. Music intensity also follows `DISTANCE_CHANGED`. There is **no event for push or hop**, so RunScene
+  must call `audio.playSfx('push')` / `playSfx('hop')` itself. Everything else is event driven (also `COMBO_CHANGED`
+  reason `'trick'` -> `combo` SFX, `ZONE_ENTER` -> soft blip). It never throws without WebAudio.
+* **GlitchDirector**: event ids are `g<n>-<4 hex>`; the hex tag is the seed-derived pattern that `GlitchPipeline` uses
+  (RunScene just forwards `id/kind/durationMs/intensity`). Extra exports: `glitchRamp`, `glitchGapRange`, `preview(count)`.
+  The gap blend runs from 0.5 x to 1.0 x `TERRAIN.difficultyRampStartM` (early 5-15 s below 500 m, 3-6 s from 1000 m).
+* **GlitchPipeline**: also self-expires an event `durationMs + 60 ms` after start (pause-safe), runs in "safe" mode
+  (weaker, no inversion flicker) when `settings.screenShake === false`, and composites transparent camera pixels over the
+  game's clear colour. Extra uniforms: `uKind`, `uSeed`, `uSafe`, `uCrt`, `uBg`. The always-on CRT layer exists only on
+  cameras where `install()` was called (RunScene).
+
+## Core-logic addenda
+
+All additive; no public signature changed.
+
+* **Geometry conventions** (TerrainGenerator): `hazards[].x` and `bouncePads[].x` are the **centre** of the object
+  (pads are `width` wide around it, always on solid ground ending before the gap). Points are evenly spaced at 16 px
+  (`SPACING_PX`); a bridge chunk's polyline also has interior points inside the gap, which gameplay must skip (no
+  collider/mesh between `gaps[i].x0` and `.x1`; falling into the gap is a miss, handle as a fall/crash). Hazards never
+  appear on bridge chunks, inside gaps, on steep ground, within 700 px of the start, or closer than 480 px to each other
+  (also across chunk borders). Power-ups are never within 90 px of a hazard.
+* **Chunk lifetime**: `update()` returns `removed` indices; the chunk *objects* are recycled one `update()` later, so
+  do not keep references to removed chunks past the frame you receive them (key your meshes/entities by `chunk.index`).
+  Do not mutate chunk objects. `getChunk(i)` returns the live object when active, otherwise a fresh copy.
+* **Extra TerrainGenerator members** (optional): `getChunkAt(x)`, `stats`, `difficultyAt()` extended values. `heightAt`,
+  `slopeDegAt`, `getZonesAt` work for any x >= 0 (slightly ahead of the window they extend it and the new chunks are
+  reported in the next `update().added`; far outside the window they rebuild a temporary chunk, which is slower, so
+  call them with positions near the sled).
+* **Difficulty**: flat until 1000 m; then `slopeVariance` 1->2, `hazardDensity` 0.8->2.1 per 1000 px, `glitchFrequency`
+  1->1.9, `noiseWeightMul` 1->4 over the following ~3000-6000 m. Chunk template `jitterPx` is an optional extra field.
+* **TrickTracker**: `TrickEvent.count` is the **cumulative** rotation count in the current air phase (a double flip
+  emits count 1 then count 2). `ScoreManager.addTrick` pays only the increase, so call it for every event. `LandingResult`
+  gains optional `rotationDeg`. On `state.crashed` while airborne the tracker returns a landing with `quality:'crash'`
+  (so `scoreManager.onLanding(landing)` forfeits the combo) and resets itself; call `tracker.reset()` after Shift reset /
+  respawn. Thresholds are exported constants (`PERFECT_ANGLE_DEG` 12, `GOOD_ANGLE_DEG` 28, `SLOPPY_ANGLE_DEG` 55,
+  `HARD_IMPACT_PX_S` 520, `CRASH_IMPACT_PX_S` 1500, flip tolerance 20 deg, air brake 250 ms, parachute 300 ms).
+  Trick value = base x (2^count - 1) x (1 + min(airtime,2500)/2500).
+* **ScoreManager**: snapshot gains `penaltyPoints`; reset penalty is tracked separately so `trickPoints` stays >= 0.
+  A `crash` landing quality banks nothing (no separate `onCrash` call needed, though it is harmless).
+* **SaveStore**: `init()` never rejects (memory fallback, `store.backend` is `'idb'` or `'memory'`). Records are
+  sanitised on save/load/import (unknown keys dropped). Sharecode = `BB1:` + base64(UTF-8 JSON `{app,v,runs}`), importer
+  also accepts bare base64 / raw JSON, skips runs whose `ledgerHash` does not match their contents, and never throws.
+  `setInitials` throws `RangeError` for < 3 chars (after trim) and clamps to 12; unknown run ids are ignored.
+* **DailyPatch**: 8 rules; index = whole UTC days since epoch modulo `RULES.length`. Added `msUntilNextRule(date)`.
+* **Rng**: `fork(label)` derives from the *initial* seed (independent of how much the parent has been consumed). New
+  export `hashInts(a, b)`. Real xxHash32 (reference vectors tested).
+
+## UI addenda (UI engineer; all additive, nothing in sections 1-9 changed)
+
+1. **Optional HUD speed event** `'bb:hudSpeed'` (exported as `HUD_SPEED_EVENT` from `scenes/UIScene.js`, payload `{speedPxS:number}`).
+   The contract has no speed event, so UIScene derives km/h from `DISTANCE_CHANGED` timing. If RunScene emits `bb:hudSpeed`
+   (about 10 Hz) the HUD uses the exact value instead. Not required.
+2. **Optional PauseScene launch data** `runId` (`scene.launch(PAUSE, {runTimeMs, runId})`), used for the `RUN_ABORT` payload.
+   If absent PauseScene reads `UIScene.runId` (set from `RUN_START`), else sends `''`.
+3. **Pause / restart / quit semantics** (PauseScene): Restart emits `RUN_ABORT`, stops RUN + UI and starts RUN again (same seed).
+   Quit emits `RUN_ABORT`, stops RUN + UI, starts TITLE. Resume follows section 2 exactly, then polls `INPUT` a few times to
+   consume the stale `pressed.pause` edge of the key that resumed. RunScene should additionally call `inputRouter.poll()` once on
+   `GAME_RESUME` so that edge can never re-pause the run.
+4. **UIScene may miss `RUN_START`** (launched in the same frame it is emitted); it initialises seed/daily rule from `REG.SEED` and
+   `DailyPatch.getDailyInfo()` and resets on any later `RUN_START`. It listens to everything in the events table and removes
+   every listener on shutdown.
+5. **GameOverScene** shows the initials entry only when `qualifiesForTop10(score)` is true AND `score > 0` AND `cause !== 'quit'`.
+   Initials length is `INITIALS_LENGTH` in `ui/Format.js` (default 3; the widget supports any length, SaveStore allows 3..12).
+   Space/Enter/A/tap retry immediately with `registry REG.SEED` reset to `record.seed`; a pending, unsaved entry is saved
+   fire-and-forget (prefilled from `settings.lastInitials`, default `AAA`) so a retry never loses a top-10 score.
+6. **Menu input**: UI scenes accept `EVT.INPUT_ACTION` (`up/down/left/right/confirm/cancel/hop/pause`) AND fall back to Phaser
+   keyboard + `navigator.getGamepads()`; duplicates from different sources within 60 ms are merged (`ui/MenuInput.js`). While typing
+   initials, keyboard-sourced `INPUT_ACTION`s are ignored (typing "A" must not move a cursor).
+7. **DOM text boxes** (seed entry, sharecode export/import) are real `<input>`/`<textarea>` elements stopped from propagating
+   key events (`ui/DomTextBox.js`), so InputRouter's window listeners never see typed keys. InputRouter must not use
+   capture-phase listeners that `preventDefault` Space/arrows, or those keys cannot be typed in the box.
+
+## Gameplay addenda (gameplay engineer; all additive)
+
+* **Matter 0.20 units**: `Body.setVelocity/getVelocity/AngularVelocity` are normalised to a 1000/60 ms base step, NOT the
+  sub-step (section 7's `v * stepMs / 1000` is only right for stepMs = 16.67). Gameplay uses `BASE_STEP_MS` (PhysicsTuner).
+  `world.step(delta)` handles variable deltas itself (`Body._timeCorrection`).
+* **Matter friction must be 0 on the sled**: any `friction >= 0.0005` jams the sled on slopes below ~15 deg (verified in node and
+  in-game). Runner drag, braking and High Bandwidth zones are applied manually (`TUNING.groundResist`, `brakeResist`,
+  `frictionMul`). Terrain bodies get `frictionStatic = 0` (Matter combines static friction with max()).
+* **Feel tunables beyond the doc** (all in `PhysicsTuner.TUNING`, doc values in `constants.PHYSICS` untouched):
+  `dragFeelMul` 0.3 (written frictionAir = 0.015 x 0.3 = 0.0045; literal 0.015 caps an 8 deg slope at ~120 px/s) and
+  `airTiltFeelMul` 1.6 (air tilt = 420 x 0.7 x 1.6; literal needs ~2.1 s for 540 deg, now ~1.6 s). Set both to 1 for the literal doc.
+  `EffectivePhysics` gained optional fields `steerMul`, `tiltSign`, `groundResist`, `quadDrag`, `pushForceMul`,
+  `scrambleJitterDegS2`, `restitution`; `TunerContext` gained `slowFactor`, `timeMs`, `parachute`, `airBrake`, `airborne`,
+  `braking`. `stepWorld()` has an optional 4th arg `afterStep`.
+* **Spawn**: the sled spawns `SPAWN_RUNIN_PX` (44) px past `getStartPosition().x` so the rear runner has ground; distance is
+  measured from the spawn x. Camera X is clamped to >= -30 so the world edge is never shown.
+* **Crash rules**: head/torso touching terrain, `LandingResult.quality === 'crash'`, crash hazards, or falling
+  `TUNING.voidDepthPx` (320) below the interpolated ground line (gaps) all crash. Hashed Backup negates any of them
+  (`CRASH negated:true`); for non-hazard causes the sled is also respawned (`RESPAWN reason 'backup'`, pending combo dropped).
+  Manual Shift reset: `RESPAWN reason 'manual'`, ends timed power-ups with `POWERUP_EXPIRED reason 'respawn'`.
+* **Extra emissions**: `HUD_SPEED_EVENT` ~10 Hz; `audio.playSfx('hop'|'push')` and `audio.setSpeed()` from RunScene.
+* **Entity files added**: `entities/Background.js` (parallax), `entities/Fx.js` (pooled shards/sparks/rings).
