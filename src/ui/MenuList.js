@@ -1,0 +1,224 @@
+/**
+ * OWNER: UI engineer.
+ * Vertical menu list usable with keyboard, gamepad (via MenuInput actions), mouse and touch.
+ * Item kinds:
+ *   action : { label, onSelect }
+ *   choice : { label, options:[{value,label}], get(), set(v) }   left/right cycles, click cycles forward
+ *   slider : { label, get() -> 0..1, set(v), step? }              left/right adjusts, click/drag on the bar sets
+ * Optional per item: sub (dim secondary text), color (palette key), disabled.
+ */
+import Phaser from 'phaser';
+import { NeonText } from './Neon.js';
+import { uiSfx } from './Sound.js';
+
+const SLIDER_W = 70;
+
+export class MenuList extends Phaser.GameObjects.Container {
+  /**
+   * @param {Phaser.Scene} scene
+   * @param {import('./Theme.js').Theme} theme
+   * @param {{x:number,y:number,w:number,rowH?:number,items:object[],color?:string,align?:'left'|'center',scale?:number,
+   *          parent?:Phaser.GameObjects.Container, onBack?:function():void}} o
+   */
+  constructor(scene, theme, o) {
+    super(scene, o.x, o.y);
+    this.theme = theme;
+    this.w = o.w;
+    this.rowH = o.rowH || 16;
+    this.items = o.items;
+    this.colorKey = o.color || 'cyan';
+    this.align = o.align || 'left';
+    this.scale1 = o.scale || 1;
+    this.selected = this.items.findIndex((i) => !i.disabled);
+    if (this.selected < 0) this.selected = 0;
+    this.dragging = -1;
+    this.g = new Phaser.GameObjects.Graphics(scene);
+    this.add(this.g);
+    this.rows = this.items.map((item, i) => this._buildRow(scene, item, i));
+    scene.add.existing(this);
+    if (o.parent) o.parent.add(this);
+    this._unbind = theme.bind(() => this.refresh());
+  }
+
+  _buildRow(scene, item, i) {
+    const y = i * this.rowH;
+    const cy = y + this.rowH / 2;
+    const center = this.align === 'center';
+    const label = new NeonText(scene, this.theme, center ? this.w / 2 : 14, cy, item.label, {
+      color: item.color || 'text', scale: this.scale1, anchor: center ? 'center' : 'left', vAnchor: 0.5,
+    });
+    this.add(label);
+    const row = { label, value: null, sub: null, zone: null };
+    if (item.kind === 'choice' || item.kind === 'slider') {
+      row.value = new NeonText(scene, this.theme, this.w - 8, cy, '', { color: this.colorKey, anchor: 'right', vAnchor: 0.5 });
+      this.add(row.value);
+    }
+    if (item.sub) {
+      row.sub = new NeonText(scene, this.theme, this.w - 8, cy, item.sub, {
+        color: 'text', anchor: 'right', vAnchor: 0.5, outline: 'none',
+      });
+      row.sub.setAlpha(0.6);
+      this.add(row.sub);
+    }
+    const zone = new Phaser.GameObjects.Zone(scene, 0, y, this.w, this.rowH).setOrigin(0, 0);
+    zone.setInteractive({ useHandCursor: !item.disabled });
+    this.add(zone);
+    zone.on('pointerover', () => {
+      if (!item.disabled) this.setSelected(i, true);
+    });
+    zone.on('pointerdown', (p, lx) => this._onPointerDown(i, lx));
+    zone.on('pointermove', (p, lx) => {
+      if (this.dragging === i && p.isDown) this._setSliderFromX(i, lx);
+    });
+    zone.on('pointerup', () => { this.dragging = -1; });
+    zone.on('pointerupoutside', () => { this.dragging = -1; });
+    row.zone = zone;
+    return row;
+  }
+
+  _sliderRange() {
+    return { x0: this.w - 8 - SLIDER_W - 26, x1: this.w - 8 - 26 };
+  }
+
+  _onPointerDown(i, lx) {
+    const item = this.items[i];
+    if (item.disabled) return;
+    this.setSelected(i, true);
+    if (item.kind === 'slider') {
+      this.dragging = i;
+      this._setSliderFromX(i, lx);
+    } else if (item.kind === 'choice') {
+      this._adjust(i, lx < this.w * 0.6 && lx < this.w - 90 ? -1 : 1);
+    } else {
+      this.activate(i);
+    }
+  }
+
+  _setSliderFromX(i, lx) {
+    const { x0, x1 } = this._sliderRange();
+    const v = Math.min(1, Math.max(0, (lx - x0) / (x1 - x0)));
+    const item = this.items[i];
+    const step = item.step || 0.1;
+    const snapped = Math.round(v / step) * step;
+    if (Math.abs(snapped - item.get()) > 1e-6) {
+      item.set(Math.min(1, Math.max(0, snapped)));
+      uiSfx(this.scene, 'uiMove');
+      this.refresh();
+    }
+  }
+
+  /** @param {number} i @param {boolean} [silent] @returns {void} */
+  setSelected(i, silent) {
+    if (i === this.selected) return;
+    this.selected = i;
+    if (!silent) uiSfx(this.scene, 'uiMove');
+    else uiSfx(this.scene, 'uiMove', { volume: 0.5 });
+    this.refresh();
+  }
+
+  _move(dir) {
+    const n = this.items.length;
+    let i = this.selected;
+    for (let k = 0; k < n; k++) {
+      i = (i + dir + n) % n;
+      if (!this.items[i].disabled) break;
+    }
+    this.setSelected(i);
+  }
+
+  _adjust(i, dir) {
+    const item = this.items[i];
+    if (item.kind === 'choice') {
+      const cur = item.options.findIndex((o) => o.value === item.get());
+      const next = item.options[(cur + dir + item.options.length) % item.options.length];
+      item.set(next.value);
+      uiSfx(this.scene, 'uiSelect');
+    } else if (item.kind === 'slider') {
+      const step = item.step || 0.1;
+      const v = Math.min(1, Math.max(0, Math.round((item.get() + dir * step) / step) * step));
+      item.set(v);
+      uiSfx(this.scene, 'uiMove', { pitch: 0.8 + v * 0.6 });
+    }
+    this.refresh();
+  }
+
+  /** @param {number} [i] @returns {void} */
+  activate(i = this.selected) {
+    const item = this.items[i];
+    if (!item || item.disabled) return;
+    if (item.kind === 'choice') this._adjust(i, 1);
+    else if (item.kind === 'slider') this._adjust(i, 1);
+    else if (item.onSelect) {
+      uiSfx(this.scene, 'uiSelect');
+      item.onSelect();
+    }
+  }
+
+  /**
+   * @param {string} action MenuInput action
+   * @returns {boolean} true if consumed
+   */
+  handleAction(action) {
+    switch (action) {
+      case 'up': this._move(-1); return true;
+      case 'down': this._move(1); return true;
+      case 'left':
+      case 'right': {
+        const k = this.items[this.selected].kind;
+        if (k !== 'choice' && k !== 'slider') return false;
+        this._adjust(this.selected, action === 'left' ? -1 : 1);
+        return true;
+      }
+      case 'confirm': this.activate(); return true;
+      default: return false;
+    }
+  }
+
+  /** Repaint highlight + values. @returns {void} */
+  refresh() {
+    const pal = this.theme.pal;
+    const g = this.g;
+    g.clear();
+    this.items.forEach((item, i) => {
+      const row = this.rows[i];
+      const sel = i === this.selected && !item.disabled;
+      const c = pal[item.color || this.colorKey];
+      const y = i * this.rowH;
+      if (sel) {
+        g.fillStyle(c, 0.16);
+        g.fillRect(0, y, this.w, this.rowH - 1);
+        g.fillStyle(c, 1);
+        g.fillRect(0, y, 2, this.rowH - 1);
+      }
+      row.label.setColorKey(item.disabled ? 'text' : sel ? (item.color || 'text') : 'text');
+      row.label.setAlpha(item.disabled ? 0.35 : sel ? 1 : 0.85);
+      if (item.kind === 'choice') {
+        const opt = item.options.find((o) => o.value === item.get()) || item.options[0];
+        row.value.setText(sel ? `← ${opt.label} →` : opt.label);
+        row.value.setColorKey(item.color || this.colorKey);
+      } else if (item.kind === 'slider') {
+        const v = item.get();
+        const { x0, x1 } = this._sliderRange();
+        const cy = y + this.rowH / 2;
+        g.fillStyle(pal.bgAlt, 1);
+        g.fillRect(x0, cy - 2, x1 - x0, 5);
+        g.fillStyle(c, sel ? 0.5 : 0.3);
+        g.fillRect(x0, cy - 2, x1 - x0, 1);
+        g.fillRect(x0, cy + 2, x1 - x0, 1);
+        g.fillStyle(c, 1);
+        g.fillRect(x0, cy - 1, Math.round((x1 - x0) * v), 3);
+        g.fillStyle(pal.text, 1);
+        g.fillRect(x0 + Math.round((x1 - x0) * v) - 1, cy - 4, 2, 9);
+        row.value.setText(`${Math.round(v * 100)}%`);
+        row.value.setColorKey(item.color || this.colorKey);
+      }
+      if (row.sub) row.sub.setColorKey('text');
+    });
+  }
+
+  destroy(fromScene) {
+    if (this._unbind) this._unbind();
+    this._unbind = null;
+    super.destroy(fromScene);
+  }
+}
