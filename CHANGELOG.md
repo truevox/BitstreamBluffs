@@ -1,5 +1,87 @@
 # Changelog
 
+## v2.0.0 - 2026-11-10
+
+### 🏗️ Rebuild: Ground-up rewrite in `src/` (Phaser 3.90 + Matter)
+- What it does:
+  Replaces the previous implementation with a new game built from `docs/DESIGN-DOC.md`. The code lives in `src/` and uses Phaser 3.90, Matter physics, Vite and plain JavaScript ES modules. Root `index.html` now loads `src/main.js`. There are no image or audio assets: shapes are drawn procedurally and sound is synthesised with WebAudio.
+- Why it was added:
+  To implement the design doc as a fresh, data-driven codebase with an explicit contract between its modules, documented in `src/ARCHITECTURE.md`.
+- How it works:
+  Core logic (RNG, terrain generation, scoring, tricks, saves, daily rule) has no Phaser imports and is unit-tested under `tests/src/`. Scenes, entities and UI sit on top of it. Content (chunks, hazards, power-ups, terrain mods, palettes) is plain JSON under `src/data/`.
+
+### ✨ Feature: Seeded hybrid spline and noise terrain
+- What it does:
+  Generates an endless downhill track from spline chunk packs with noise zones as difficulty spikes. Runs are seeded, so the same seed gives identical terrain, spawns and glitch schedule.
+- Why it was added:
+  Matches the design doc's hybrid recipe and its "seeded but surprising" pillar, so runs can be shared.
+- How it works:
+  `TerrainGenerator` uses a xxHash32-seeded `Rng` with forked streams per subsystem. Difficulty stays flat until 1000 m, then slope variance, hazard density and glitch frequency ramp up.
+
+### ✨ Feature: Compound-body sled physics and the design-doc control scheme
+- What it does:
+  The sled and rider are one compound Matter body that rides thick static terrain segments. Controls follow design doc section 4.1: W push, A/D tilt, S brake, A+D tuck, Space hop, Shift emergency reset, ←/→ helicopter, ↑ air brake, ↓ parachute stall, Esc pause.
+- Why it was added:
+  Gives the downhill feel the design doc asks for, with tuning values kept in one place.
+- How it works:
+  `PhysicsTuner` converts doc units (px/s, degrees) to Matter units and combines base physics, tuck, terrain zones and the daily rule into one effective-physics value per step. Physics advances in sub-steps of at most 8 ms.
+
+### ✨ Feature: Tricks, combos and scoring
+- What it does:
+  Tracks backflips, frontflips, helicopter spins, air brakes and parachutes. Landings are rated perfect, good, sloppy or crash. Distance pays +1 per metre, combos build with each unique trick, and a perfect landing pays a bonus.
+- Why it was added:
+  Rewards risk, as in design doc pillar 4 and section 6.1.
+- How it works:
+  `TrickTracker` emits trick events and a landing result. `ScoreManager` keeps tricks provisional until landing and discards them on crash.
+
+### ✨ Feature: Hazards, terrain mods and power-ups
+- What it does:
+  Adds four hazards (Glitch Chasm, Overflow Firewall, Packet Spike, Garbage-Data Vent), three terrain mods (High Bandwidth, Compression, Wireless Bridge) and three power-ups (Clock Pulse, Packet Burst, Hashed Backup).
+- Why it was added:
+  Covers the content spec in design doc section 7.
+- How it works:
+  Each is defined by a JSON file in `src/data/hazards/`, `src/data/terrainMods/` or `src/data/powerups/`. Hazards and power-ups are physics sensors. Hashed Backup negates one crash.
+
+### ✨ Feature: Glitch shader and procedural audio
+- What it does:
+  Triggers screen glitch events (RGB split and scanline wobble) with matching audio drop-outs and static. Events last 50-200 ms and come every 5-15 s early in a run, easing to 3-6 s by 1000 m.
+- Why it was added:
+  Delivers the "readable chaos" look and the glitch VFX spec in design doc section 2, with seeded timing.
+- How it works:
+  `GlitchDirector` produces a deterministic schedule. `GlitchPipeline` applies the shader, and `AudioSynth` drives the music, SFX and a glitch bus.
+
+### ✨ Feature: Keyboard, gamepad and touch input
+- What it does:
+  Supports keyboard, a standard gamepad mapping (left stick tilt, right trigger push, face buttons for tricks) and a touch overlay that mirrors the virtual buttons during runs. Touch can also use device roll for steering.
+- Why it was added:
+  Design doc section 3 asks for gamepad-first input and an on-screen fallback on mobile.
+- How it works:
+  `InputRouter` and `VirtualPad` map every source to one pad state. `TouchOverlay` is DOM-only and is shown only while a run is active.
+
+### ✨ Feature: Title, HUD, "Pascal's Ledger" pause menu and game over
+- What it does:
+  Title screen with seed entry. HUD for score and combo. Esc opens the "Pascal's Ledger" pause menu with resume, restart and quit. Game over offers an instant retry on the same seed. Top-10 scores take 3-character initials and are kept in a per-device leaderboard that can be exported and imported as a sharecode.
+- Why it was added:
+  Completes the run loop: crash, see the result, and restart in well under 10 seconds (design doc pillar 3).
+- How it works:
+  Runs are stored in IndexedDB with a memory fallback. Settings are kept in localStorage. Sharecodes are `BB1:` plus base64 JSON. Imports dedupe by run id and skip runs whose ledger hash does not match.
+
+### ✨ Feature: Daily patch rule
+- What it does:
+  One movement rule applies to every run each UTC day. Rules include things like tuck boosts and steering cuts. The rule's id is stored in each run record.
+- Why it was added:
+  Design doc section 6.2 stretch goal, to keep identical seeds feeling "alive".
+- How it works:
+  `DailyPatch` picks one of 8 rules from the whole number of UTC days since the epoch, modulo the rule count.
+
+### 🗂️ Legacy: `js/` implementation retained, no longer loaded
+- What it does:
+  The previous implementation stays in `js/`, untouched, with its legacy tests in `tests/`. `index.html` no longer loads it, and new code does not import from it.
+- Why it was kept:
+  For reference during the rebuild. Several legacy tests were already failing before the rebuild.
+- How it works:
+  Nothing in `src/` depends on `js/`. Run the new suite with `npm test -- tests/src`.
+
 ## v1.8.0 - 2025-05-28
 
 ### 🟦✨ Feature: Add Terrain Colors section to Instructions
