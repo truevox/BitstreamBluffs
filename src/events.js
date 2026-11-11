@@ -66,7 +66,62 @@ export const EVT = Object.freeze({
    * Payload: InputActionPayload. Continuous control is read by polling InputRouter.poll() instead.
    */
   INPUT_ACTION: 'bb:inputAction',
+  /** Emitter: RunScene (fun-pass). Payload: LandingBoostPayload. */
+  LANDING_BOOST: 'bb:landingBoost',
+  /** Emitter: RunScene (fun-pass). Payload: NearMissPayload. */
+  NEAR_MISS: 'bb:nearMiss',
+  /** Emitter: RunScene (fun-pass). Payload: ShardCollectedPayload. */
+  SHARD_COLLECTED: 'bb:shardCollected',
+  /** Emitter: RunScene (fun-pass). Payload: MilestonePayload. */
+  MILESTONE: 'bb:milestone',
+  /** Emitter: RunScene (fun-pass), once per run. Payload: NewBestPayload. */
+  NEW_BEST: 'bb:newBest',
+  /** Emitter: RunScene (fun-pass). Payload: TutorialHintPayload. */
+  TUTORIAL_HINT: 'bb:tutorialHint',
 });
+
+/**
+ * @typedef {Object} LandingBoostPayload
+ * @property {number} amountPxS  speed added, px/s.
+ * @property {'perfect'|'good'} quality
+ * @property {number} comboMult
+ * @property {string[]} tricks
+ */
+
+/**
+ * @typedef {Object} NearMissPayload
+ * @property {string} hazardType
+ * @property {number} points
+ * @property {number} x  world px.
+ * @property {number} y  world px.
+ */
+
+/**
+ * @typedef {Object} ShardCollectedPayload
+ * @property {number} chain   current chain length.
+ * @property {number} points
+ * @property {number} total   shards collected this run.
+ * @property {number} x  world px.
+ * @property {number} y  world px.
+ */
+
+/**
+ * @typedef {Object} MilestonePayload
+ * @property {number} sector
+ * @property {number} distanceM
+ */
+
+/**
+ * @typedef {Object} NewBestPayload
+ * @property {number} distanceM
+ * @property {number} previousBestM
+ */
+
+/**
+ * @typedef {Object} TutorialHintPayload
+ * @property {'push'|'hop'|'flip'|'land'|'tuck'|'boost'} id
+ * @property {boolean} show
+ */
 
 /**
  * @typedef {Object} RunStartPayload

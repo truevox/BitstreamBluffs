@@ -16,7 +16,7 @@ import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { LeaderboardView, SettingsView, SeedView } from '../ui/Views.js';
-import { randomSeed, idToLabel } from '../ui/Format.js';
+import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 
 const CONTROLS_A = [['W', 'PUSH'], ['A/D', 'TILT'], ['A+D', 'TUCK'], ['S', 'BRAKE'], ['SPACE', 'HOP']];
@@ -42,6 +42,8 @@ export class TitleScene extends Phaser.Scene {
     this._buildMenu();
     this._buildControls();
     this._buildDailyStrip();
+    this.bestText = new NeonText(this, theme, GAME_WIDTH / 2, 239, '', { color: 'lime', anchor: 'center', vAnchor: 0.5, outline: 'none' });
+    this._loadBest();
     this.hint = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 12, '↑↓ SELECT   ENTER/SPACE/A CONFIRM   TAP ANY ITEM', {
       color: 'text', anchor: 'center', vAnchor: 0.5,
     });
@@ -98,6 +100,18 @@ export class TitleScene extends Phaser.Scene {
     p.add(new NeonText(this, theme, 8, 79, 'PAD  STICK=TILT  RT=PUSH', { color: 'cyan', outline: 'none' }).setAlpha(0.85));
     p.add(new NeonText(this, theme, 8, 90, 'FACE BTNS=TRICKS  TOUCH=ON-SCREEN', { color: 'cyan', outline: 'none' }).setAlpha(0.85));
     this.controlsPanel = p;
+  }
+
+  _loadBest() {
+    try {
+      const store = this.registry.get(REG.SAVE_STORE);
+      Promise.resolve(store.getRecentRuns(1000)).then((runs) => {
+        if (!Array.isArray(runs) || !runs.length || !this.bestText.scene) return;
+        const m = Math.max(...runs.map((r) => r.distanceM || 0));
+        const sc = Math.max(...runs.map((r) => r.score || 0));
+        if (m > 0) this.bestText.setText(`BEST ${fmtInt(m)} M   ${fmtInt(sc)} PTS`);
+      }).catch(() => {});
+    } catch (e) { /* cosmetic */ }
   }
 
   _buildDailyStrip() {

@@ -109,19 +109,24 @@ export class GameOverScene extends Phaser.Scene {
       ['BEST AIR', `${fmtSec(rec.maxAirtimeMs)} S`, ''],
       ['RUN TIME', fmtClock(rec.durationMs), ''],
     ];
+    const shards = Number(rec.shards) || 0;
+    const near = Number(rec.nearMisses) || 0;
+    const bonus = Number(rec.bonusPoints) || 0;
+    if (shards > 0) rows.push(['SHARDS', fmtInt(shards), bonus > 0 && !near ? `+${fmtInt(bonus)}` : '']);
+    if (near > 0) rows.push(['NEAR MISSES', fmtInt(near), bonus > 0 ? `+${fmtInt(bonus)}` : '']);
     rows.forEach(([k, v, pts], i) => {
-      const y = 58 + i * 11;
+      const y = 56 + i * 10;
       p.add(new NeonText(this, theme, 8, y, k, { color: 'text', outline: 'none' }).setAlpha(0.7));
       p.add(new NeonText(this, theme, 106, y, v, { color: 'cyan', outline: 'none' }));
       if (pts) p.add(new NeonText(this, theme, 218, y, pts, { color: 'lime', anchor: 'right', outline: 'none' }));
     });
-    p.add(new NeonText(this, theme, 8, 118, 'LEDGER HASH', { color: 'text', outline: 'none' }).setAlpha(0.7));
-    p.add(new NeonText(this, theme, 106, 118, String(rec.ledgerHash || '--------').toUpperCase(), { color: 'magenta', outline: 'none' }));
-    p.add(new NeonText(this, theme, 8, 132, 'SHARE SEED', { color: 'text', outline: 'none' }).setAlpha(0.7));
-    this.seedText = new NeonText(this, theme, 106, 132, ellipsize(String(rec.seed || '-').toUpperCase(), 70), { color: 'lime', outline: 'none' });
+    p.add(new NeonText(this, theme, 8, 128, 'LEDGER HASH', { color: 'text', outline: 'none' }).setAlpha(0.7));
+    p.add(new NeonText(this, theme, 106, 128, String(rec.ledgerHash || '--------').toUpperCase(), { color: 'magenta', outline: 'none' }));
+    p.add(new NeonText(this, theme, 8, 141, 'SHARE SEED', { color: 'text', outline: 'none' }).setAlpha(0.7));
+    this.seedText = new NeonText(this, theme, 106, 141, ellipsize(String(rec.seed || '-').toUpperCase(), 70), { color: 'lime', outline: 'none' });
     p.add(this.seedText);
     this.copyBtn = new Button(this, theme, {
-      x: 182, y: 128, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
+      x: 182, y: 137, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
     });
     p.add(this.copyBtn);
     this.tweens.addCounter({
@@ -159,6 +164,7 @@ export class GameOverScene extends Phaser.Scene {
         return Promise.resolve(fallback);
       }
     };
+    this._loadBest(store, rec, safe);
     Promise.all([
       safe(() => store.qualifiesForTop10(rec.score), false),
       safe(() => store.getLeaderboard(10), []),
@@ -166,8 +172,41 @@ export class GameOverScene extends Phaser.Scene {
       if (!this.alive || this.leaving) return;
       this.rows = Array.isArray(rows) ? rows : [];
       const already = this.rows.some((r) => r.id === rec.id);
-      if (qualifies && !already && (rec.score || 0) > 0 && rec.cause !== 'quit') this._showEntry();
+      const worthy = this.rows.length >= 3 || (rec.score || 0) >= 200;
+      if (qualifies && worthy && !already && (rec.score || 0) > 0 && rec.cause !== 'quit') this._showEntry();
       else this._showBoard(already ? rec.id : undefined);
+    });
+  }
+
+  /** Compare this run with the device best (all stored runs except this one). Cosmetic, async, never blocks. */
+  _loadBest(store, rec, safe) {
+    safe(() => store.getRecentRuns(1000), []).then((runs) => {
+      if (!this.alive || !Array.isArray(runs) || rec.cause === 'quit' && !(rec.score > 0)) return;
+      const others = runs.filter((r) => r && r.id !== rec.id);
+      if (!others.length) return;
+      const bestM = Math.max(...others.map((r) => r.distanceM || 0));
+      const bestS = Math.max(...others.map((r) => r.score || 0));
+      const m = rec.distanceM || 0;
+      let l1;
+      let l2;
+      let key;
+      if (m > bestM || (rec.score || 0) > bestS) {
+        l1 = 'NEW BEST!';
+        l2 = m > bestM ? `PREV ${fmtInt(bestM)} M` : `PREV ${fmtInt(bestS)} PTS`;
+        key = 'lime';
+      } else {
+        l1 = `${fmtInt(bestM - m)} M SHORT`;
+        l2 = 'OF YOUR BEST';
+        key = 'amber';
+      }
+      const a = new NeonText(this, this.theme, 218, 32, l1, { color: key, anchor: 'right', outline: 'none' });
+      const b = new NeonText(this, this.theme, 218, 42, l2, { color: 'text', anchor: 'right', outline: 'none' });
+      b.setAlpha(0.7);
+      this.left.add([a, b]);
+      if (key === 'lime') {
+        this.tweens.add({ targets: a, alpha: { from: 1, to: 0.4 }, duration: 260, yoyo: true, repeat: -1 });
+        uiSfx(this, 'newBest');
+      }
     });
   }
 
@@ -192,6 +231,7 @@ export class GameOverScene extends Phaser.Scene {
     this.entryGroup = [t1, hint, hint2];
     this.input_.rawKeyHandler = (e) => this._rawKey(e);
     this.footer.setText('TYPE INITIALS - ENTER SAVE - SPACE SAVE + RETRY');
+    this._retryHint('SPACE = SAVE + RETRY');
     uiSfx(this, 'combo');
   }
 
@@ -224,6 +264,12 @@ export class GameOverScene extends Phaser.Scene {
     this.entryGroup = [];
     this.input_.rawKeyHandler = null;
     this.footer.setText('SPACE / ENTER / A / TAP = RETRY SAME SEED');
+    this._retryHint('SPACE / ENTER / A');
+  }
+
+  _retryHint(text) {
+    const b = this.buttons && this.buttons[0];
+    if (b && b.hintText) b.hintText.setText(text);
   }
 
   skipEntry() {

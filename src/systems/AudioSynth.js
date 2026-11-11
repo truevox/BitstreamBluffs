@@ -29,6 +29,7 @@ import { Rng } from './Rng.js';
 export const SFX = Object.freeze([
   'push', 'hop', 'land', 'landPerfect', 'landHard', 'trick', 'combo', 'crash', 'respawn',
   'powerup', 'powerupEnd', 'hazardSlow', 'hazardScramble', 'uiMove', 'uiSelect', 'uiBack', 'glitch',
+  'boost', 'nearMiss', 'shard', 'milestone', 'newBest',
 ]);
 
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
@@ -360,7 +361,8 @@ export class AudioSynth {
   /**
    * Play a one-shot sound.
    * @param {typeof SFX[number]} name
-   * @param {{pitch?:number, volume?:number}} [opts] pitch multiplier (1 = normal), volume 0..1 relative.
+   * @param {{pitch?:number, volume?:number, intensity?:number, step?:number}} [opts] pitch multiplier (1 = normal), volume 0..1
+   *   relative; intensity (0..1, 'boost' only: 1 = perfect); step (0-based chain index, 'shard' only: pitch ladder, capped at 9).
    * @returns {void}
    */
   playSfx(name, opts) {
@@ -372,12 +374,12 @@ export class AudioSynth {
       this._lastSfx[name] = t;
       const p = (opts && opts.pitch) || 1;
       const v = opts && opts.volume != null ? opts.volume : 1;
-      this._sfx(name, t + 0.002, p, v);
+      this._sfx(name, t + 0.002, p, v, opts || {});
     } catch (e) { /* never throw */ }
   }
 
   /** @private */
-  _sfx(name, t, p, v) {
+  _sfx(name, t, p, v, opts = {}) {
     const d = this.nodes.sfxBus;
     const o = (type, f0, f1, dur, vol, at = 0, extra) =>
       this._osc(type, f0 * p, f1 * p, t + at, dur, vol * v, d, extra);
@@ -454,6 +456,34 @@ export class AudioSynth {
       case 'glitch':
         nz(0.12, 0.25, 'highpass', 2500, 2500);
         o('square', 60, 50, 0.08, 0.2);
+        break;
+      case 'boost': {
+        const k = clamp01(opts.intensity != null ? opts.intensity : 0.4);
+        nz(0.28 + 0.2 * k, 0.28 + 0.2 * k, 'bandpass', 500, 4000 + 2000 * k);
+        o('sawtooth', 120, 360 + 360 * k, 0.26 + 0.14 * k, 0.2 + 0.1 * k);
+        o('square', midi(67), midi(79), 0.12, 0.1, 0.04);
+        if (k > 0.6) [79, 84, 88].forEach((n, i) => o('triangle', midi(n), midi(n), 0.16, 0.18, 0.1 + 0.05 * i));
+        break;
+      }
+      case 'nearMiss':
+        nz(0.1, 0.22, 'bandpass', 3500, 1200);
+        o('square', 900, 1800, 0.08, 0.1);
+        break;
+      case 'shard': {
+        const n = 84 + Math.min(9, Math.max(0, Math.floor(opts.step || 0))) * 2;
+        o('triangle', midi(n), midi(n), 0.12, 0.2);
+        o('square', midi(n + 12), midi(n + 12), 0.06, 0.06, 0.03);
+        break;
+      }
+      case 'milestone':
+        [67, 72, 76, 79].forEach((n, i) => o('square', midi(n), midi(n), 0.12, 0.13, 0.07 * i));
+        o('triangle', midi(55), midi(55), 0.4, 0.25);
+        break;
+      case 'newBest':
+        [72, 76, 79, 84, 79, 84, 88].forEach((n, i) => {
+          o('triangle', midi(n), midi(n), 0.16, 0.22, 0.07 * i);
+          o('square', midi(n), midi(n), 0.08, 0.07, 0.07 * i);
+        });
         break;
       default:
         break;

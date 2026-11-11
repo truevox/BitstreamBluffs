@@ -21,6 +21,7 @@ import { NeonText, strokeRectPx } from '../ui/Neon.js';
 import { measureText } from '../ui/PixelFont.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { fmtInt, fmtMult, fmtSec, idToLabel } from '../ui/Format.js';
+import { uiSfx } from '../ui/Sound.js';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -44,7 +45,15 @@ const EFFECT_INFO = {
   slow: { label: 'SPEED CUT', color: 'amber' },
 };
 
-const POPUP_Y = 64;
+const HINT_TEXT = {
+  keyboard: { push: 'W  PUSH', hop: 'SPACE  HOP', flip: 'HOLD A / D  FLIP', land: 'LEVEL OUT TO LAND', tuck: 'A+D  TUCK', boost: 'LAND TRICKS = SPEED' },
+  touch: { push: 'TAP PUSH', hop: 'TAP HOP', flip: 'HOLD TILT = FLIP', land: 'LEVEL OUT TO LAND', tuck: 'HOLD TUCK', boost: 'LAND TRICKS = SPEED' },
+  gamepad: { push: 'PUSH  TAP FORWARD', hop: 'A  HOP', flip: 'HOLD STICK L / R  FLIP', land: 'LEVEL OUT TO LAND', tuck: 'TUCK BUTTON', boost: 'LAND TRICKS = SPEED' },
+};
+const CHAIN_LIFE_MS = 2500;
+const HINT_MAX_MS = 4000;
+
+const POPUP_Y = 80;
 const POPUP_STEP = 10;
 const MAX_POPUPS = 3;
 
@@ -76,6 +85,16 @@ export class UIScene extends Phaser.Scene {
     this.nowMs = 0;
     this.runId = '';
     this.dailyRuleId = '';
+    this.shards = 0;
+    this.chain = 0;
+    this.chainUntil = 0;
+    this.pending = 0;
+    this.pendingRaw = 0;
+    this.hintId = null;
+    this.hintUntil = 0;
+    this.stripQueue = [];
+    this.stripBusy = false;
+    this.bestShown = false;
 
     this._buildStats();
     this._buildCenter();
@@ -107,6 +126,12 @@ export class UIScene extends Phaser.Scene {
     on(EVT.GAME_PAUSE, this.onPause);
     on(EVT.GAME_RESUME, this.onResume);
     on(EVT.RUN_END, this.onRunEnd);
+    on(EVT.LANDING_BOOST, this.onBoost);
+    on(EVT.NEAR_MISS, this.onNearMiss);
+    on(EVT.SHARD_COLLECTED, this.onShard);
+    on(EVT.MILESTONE, this.onMilestone);
+    on(EVT.NEW_BEST, this.onNewBest);
+    on(EVT.TUTORIAL_HINT, this.onHint);
 
     const cleanup = () => {
       for (const [evt, fn] of this.listeners) this.game.events.off(evt, fn, this);
@@ -134,6 +159,13 @@ export class UIScene extends Phaser.Scene {
     this.comboLabel.setAlpha(0.8);
     this.comboText = this._t(GAME_WIDTH - 8, 13, 'x1.00', { color: 'lime', scale: 2, anchor: 'right' });
     this.comboInfo = this._t(GAME_WIDTH - 8, 31, '', { color: 'amber', anchor: 'right' });
+    // pending (at stake) trick points, pulses while the multiplier is above x1
+    this.pendingText = this._t(GAME_WIDTH - 8, 41, '', { color: 'amber', scale: 2, anchor: 'right', outline: 'glow' });
+    this.shardText = this._t(8, 51, '', { color: 'cyan' });
+    this.chainText = this._t(8, 51, '', { color: 'amber' });
+    this.shardLabel = '';
+    this.shardText.setVisible(false);
+    this.chainText.setVisible(false);
   }
 
   _buildCenter() {
@@ -151,6 +183,24 @@ export class UIScene extends Phaser.Scene {
     this.flash.setAlpha(0);
     this.banner = this._t(cx, 100, '', { color: 'danger', scale: 3, anchor: 'center', vAnchor: 0.5 });
     this.banner.setAlpha(0);
+    this.boostText = this._t(cx, 24, '', { color: 'lime', scale: 2, anchor: 'center', outline: 'glow' });
+    this.boostText.setAlpha(0);
+    // slide-in strip (milestones / new best) just above the rider band
+    this.stripC = this.add.container(0, 0);
+    this.hud.add(this.stripC);
+    this.stripG = new Phaser.GameObjects.Graphics(this);
+    this.stripT = new NeonText(this, this.theme, cx, 61, '', { color: 'cyan', scale: 2, anchor: 'center', outline: 'glow' });
+    this.stripC.add([this.stripG, this.stripT]);
+    this.stripC.setVisible(false);
+    this.theme.bind(() => this._paintStrip());
+    // tutorial chip
+    this.hintG = new Phaser.GameObjects.Graphics(this);
+    this.hintT = new NeonText(this, this.theme, cx, GAME_HEIGHT - 19, '', { color: 'text', anchor: 'center', outline: 'none' });
+    this.hud.add([this.hintG, this.hintT]);
+    this.hintChip = { w: 0, key: 'cyan' };
+    this.theme.bind(() => this._paintHint());
+    this.hintG.setVisible(false);
+    this.hintT.setVisible(false);
   }
 
   _buildFooter() {
@@ -195,6 +245,30 @@ export class UIScene extends Phaser.Scene {
     g.fillStyle(c, 1);
     g.fillRect(x - 3, 3, 2, 13);
     g.fillRect(x + w + 1, 3, 2, 13);
+  }
+
+  _paintStrip() {
+    const g = this.stripG;
+    g.clear();
+    const pal = this.theme.pal;
+    g.fillStyle(pal.bg, 0.6);
+    g.fillRect(0, 59, GAME_WIDTH, 17);
+    g.fillStyle(pal[this.stripKey || 'cyan'], 0.9);
+    g.fillRect(0, 59, GAME_WIDTH, 1);
+    g.fillRect(0, 75, GAME_WIDTH, 1);
+  }
+
+  _paintHint() {
+    const g = this.hintG;
+    g.clear();
+    if (!this.hintChip.w) return;
+    const pal = this.theme.pal;
+    const w = this.hintChip.w;
+    const x = Math.round(GAME_WIDTH / 2 - w / 2);
+    const y = GAME_HEIGHT - 23;
+    g.fillStyle(pal.bg, 0.78);
+    g.fillRect(x, y, w, 13);
+    strokeRectPx(g, x, y, w, 13, pal[this.hintChip.key], 0.9);
   }
 
   _paintPowerups() {
@@ -264,6 +338,13 @@ export class UIScene extends Phaser.Scene {
     this.speedText.setText('0 KM/H');
     this.comboText.setText(fmtMult(1)).setColorKey('lime');
     this.comboInfo.setText('');
+    this._setPending(0);
+    this.shards = 0;
+    this.chain = 0;
+    this.shardText.setVisible(false);
+    this.chainText.setVisible(false);
+    this.bestShown = false;
+    this._hideHint();
     for (const id of [...this.powerups.keys()]) this._removePowerup(id);
     for (const k of [...this.effects.keys()]) this._removeEffect(k);
     this.zones = [];
@@ -278,6 +359,7 @@ export class UIScene extends Phaser.Scene {
 
   onRunEnd() {
     this.comboInfo.setText('');
+    this._setPending(0);
   }
 
   onScore(p) {
@@ -294,8 +376,127 @@ export class UIScene extends Phaser.Scene {
     this.comboText.setText(fmtMult(m));
     this.comboText.setColorKey(m >= 2.5 ? 'magenta' : m >= 1.5 ? 'amber' : 'lime');
     const n = (p.tricks && p.tricks.length) || 0;
-    this.comboInfo.setText(n > 0 ? `${n} TRICK${n > 1 ? 'S' : ''} +${fmtInt(p.pendingPoints)}` : '');
+    this.comboInfo.setText(n > 0 ? `${n} TRICK${n > 1 ? 'S' : ''} PENDING` : '');
     if (grew) this._pop(this.comboText, 2, 3);
+    this._setPending(n > 0 ? p.pendingPoints || 0 : 0);
+  }
+
+  _setPending(raw) {
+    const prev = this.pending;
+    this.pendingRaw = raw;
+    this.pending = Math.round(raw * (this.multiplier || 1));
+    if (this.pending <= 0) {
+      this.pendingText.setText('');
+      return;
+    }
+    this.pendingText.setText(`+${fmtInt(this.pending)}`);
+    if (this.pending > prev) this._pop(this.pendingText, 2, 2.8);
+  }
+
+  onBoost(p) {
+    if (!p) return;
+    const perfect = p.quality === 'perfect';
+    const t = this.boostText;
+    this.tweens.killTweensOf(t);
+    t.setText(`BOOST +${fmtInt(Math.round(p.amountPxS || 0))}`).setColorKey(perfect ? 'amber' : 'lime');
+    const base = perfect ? 3 : 2;
+    t.setAlpha(1).setScale(base * 1.5);
+    this.tweens.add({ targets: t, scaleX: base, scaleY: base, duration: 150, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: t, alpha: 0, delay: perfect ? 900 : 600, duration: 300 });
+    // speed readout flash
+    this.speedText.setColorKey('amber');
+    this._pop(this.speedText, 1, perfect ? 2 : 1.5);
+    this.time.delayedCall(450, () => { if (this.speedText.scene) this.speedText.setColorKey('cyan'); });
+    uiSfx(this, 'boost', { intensity: perfect ? 1 : 0.35 });
+  }
+
+  onNearMiss(p) {
+    this._popup(`NEAR MISS +${fmtInt((p && p.points) || 25)}`, 'magenta');
+    uiSfx(this, 'nearMiss');
+  }
+
+  onShard(p) {
+    if (!p) return;
+    this.shards = p.total || this.shards + 1;
+    this.chain = p.chain || 0;
+    this.chainUntil = this.nowMs + CHAIN_LIFE_MS;
+    this.shardLabel = `SHARDS ${fmtInt(this.shards)}`;
+    this.shardText.setText(this.shardLabel).setVisible(true);
+    this._pop(this.shardText, 1, 1.7);
+    const show = this.chain > 1;
+    this.chainText.setVisible(show);
+    if (show) {
+      this.chainText.setText(`x${this.chain}`).setX(8 + measureText(this.shardLabel) + 6);
+      this._pop(this.chainText, 1, 1.8);
+    }
+    uiSfx(this, 'shard', { step: Math.max(0, this.chain - 1) });
+  }
+
+  onMilestone(p) {
+    this._strip(`SECTOR ${(p && p.sector) || ''}`, 'cyan');
+    uiSfx(this, 'milestone');
+  }
+
+  onNewBest() {
+    if (this.bestShown) return;
+    this.bestShown = true;
+    this._strip('NEW BEST DISTANCE', 'amber');
+    uiSfx(this, 'newBest');
+  }
+
+  onHint(p) {
+    if (!p) return;
+    if (!p.show) {
+      if (this.hintId === p.id) this._hideHint();
+      return;
+    }
+    const router = this.registry.get(REG.INPUT);
+    const ov = router && router.pad && router.pad.overlay;
+    const src = router && router.pad && router.pad.state && router.pad.state.lastSource;
+    const mode = (ov && ov.isVisible && ov.isVisible()) || src === 'touch' ? 'touch' : src === 'gamepad' ? 'gamepad' : 'keyboard';
+    const label = HINT_TEXT[mode][p.id] || '';
+    if (!label) return;
+    this.hintId = p.id;
+    this.hintT.setText(label).setVisible(true);
+    this.hintChip = { w: measureText(label) + 14, key: 'cyan' };
+    this.hintG.setVisible(true);
+    this._paintHint();
+    this.hintUntil = this.nowMs + HINT_MAX_MS;
+  }
+
+  _hideHint() {
+    this.hintId = null;
+    this.hintUntil = 0;
+    this.hintChip.w = 0;
+    this.hintG.setVisible(false);
+    this.hintT.setVisible(false);
+    this._paintHint();
+  }
+
+  _strip(text, key) {
+    this.stripQueue.push({ text, key });
+    if (!this.stripBusy) this._nextStrip();
+  }
+
+  _nextStrip() {
+    const job = this.stripQueue.shift();
+    if (!job) {
+      this.stripBusy = false;
+      return;
+    }
+    this.stripBusy = true;
+    this.stripKey = job.key;
+    this._paintStrip();
+    this.stripT.setText(job.text).setColorKey(job.key);
+    const c = this.stripC;
+    this.tweens.killTweensOf(c);
+    c.setVisible(true).setX(-GAME_WIDTH);
+    // slide in 220 ms, hold 500 ms, slide out 220 ms (< 1 s total)
+    this.tweens.add({ targets: c, x: 0, duration: 220, ease: 'Cubic.easeOut' });
+    this.tweens.add({
+      targets: c, x: GAME_WIDTH, delay: 720, duration: 220, ease: 'Cubic.easeIn',
+      onComplete: () => { c.setVisible(false); this._nextStrip(); },
+    });
   }
 
   onDistance(p) {
@@ -577,5 +778,21 @@ export class UIScene extends Phaser.Scene {
     }
     // zone chip pulse
     if (this.zoneText.visible) this.zoneG.setAlpha(0.75 + 0.25 * Math.sin(this.nowMs * 0.008));
+    // tutorial chip fallback timeout, shard chain expiry
+    if (this.hintId && this.nowMs > this.hintUntil) this._hideHint();
+    if (this.chain > 0 && this.nowMs > this.chainUntil) {
+      this.chain = 0;
+      this.chainText.setVisible(false);
+    }
+    // combo urgency: pending points pulse while the multiplier is above x1
+    if (this.pending > 0) {
+      if (this.multiplier > 1.01) {
+        const k = Math.sin(this.nowMs * (0.012 + (this.multiplier - 1) * 0.004));
+        this.pendingText.setAlpha(0.7 + 0.3 * k);
+        this.pendingText.setColorKey(k > 0.3 ? 'text' : this.multiplier >= 2.5 ? 'magenta' : 'amber');
+      } else {
+        this.pendingText.setAlpha(1).setColorKey('amber');
+      }
+    }
   }
 }
