@@ -362,3 +362,52 @@ All additive; no public signature changed.
   order when several arrived in one frame. On the Game Over initials panel: Enter saves, Space saves with the current letters and
   retries instantly, Esc skips (nothing saved). With no panel up Space / Enter / pad A / tap retry at once.
 * **UIScene** hides the seed / daily-rule lines while the touch overlay is visible (they sat under the HOP / PUSH buttons).
+
+### Fun-pass: feedback (UI / audio)
+* New events (`events.js`): `LANDING_BOOST`, `NEAR_MISS`, `SHARD_COLLECTED`, `MILESTONE`, `NEW_BEST`, `TUTORIAL_HINT` (emitted by RunScene).
+  UIScene listens (all removed on shutdown) and also triggers the matching sfx itself (RunScene must not).
+* HUD: BOOST callout (top-centre, perfect = bigger), NEAR MISS popup, SHARDS counter + chain chip under the speed readout (chain chip
+  expires 2.5 s after the last shard), pending trick points (x multiplier) pulse under the combo, SECTOR / NEW BEST strip (y 59-76, popups now start at y 80,
+  < 1 s, queued), tutorial chip bottom-centre (wording by touch overlay / `pad.state.lastSource`; auto-hides after 4 s).
+* AudioSynth `playSfx` opts gained `intensity` (`'boost'`, 0..1, 1 = perfect) and `step` (`'shard'`, chain index, ladder capped at 9).
+  New names: `boost`, `nearMiss`, `shard`, `milestone`, `newBest`.
+* GameOver: best comparison from `getRecentRuns(1000)` (excludes this run), shards / near misses rows from optional
+  `rec.shards` / `rec.nearMisses` / `rec.bonusPoints`; initials panel only if the board has >= 3 entries or score >= 200;
+  RETRY hint follows the panel state. Title shows the device best distance / score.
+
+## Fun-pass: terrain (level-design engineer; additive)
+
+* **New chunk fields** (always present, reset on recycle): `shards: {id,x,y}[]` (sorted by x, ids `s<chunkIndex>-<n>`, world px, >= 12 px above the
+  surface, clear of every hazard hit box by >= 22 px), `launches: {x,y,angleDeg,airS,landX|null}[]` (ballistic lips at the expected speed),
+  `sector` (1-based, `floor(startX / 20 / 500) + 1`), `breather` (bool). `ScoreManager.addBonus(points, kind)` (`'shard'|'nearMiss'|'milestone'`) adds
+  immediately (separate `bonusPoints`, not combo, never multiplied, survives crash/reset); snapshot gains `bonusPoints`, `shards`, `nearMisses`,
+  `milestones`, `bonusByKind`.
+* **Opening**: chunk 0 is the generated `gen-jump` chunk (no template): ~720 px of 14 deg descent, then an easy lip at ~x 830 (~41 m, ~0.55 s of air at
+  the expected speed) onto a 36 deg landing ramp and a hazard-free runout. No hazards before 80 m, no crash hazards before 150 m
+  (`HAZARD_SOFT_PX` 1600, `HAZARD_SAFE_PX` 3000); hazard density ramps in from 35 % at 75 m to full at 600 m.
+* **Launches**: `gen-jump` chunks (defId `gen-jump`, not in the JSON templates) are chosen when `sinceLaunch` grows (never twice in a row, never in
+  breathers); mean launch spacing ~2700 px (~5 s at cruise). Lip up-angle 12 deg, landing slope 36 -> 42 deg by 1500 m, landing ramp sized for 1.2 x
+  `expectedSpeedPxS(distM)` (340 + 0.18 m, cap 620) so airtime grows ~0.6 s -> ~1.2+ s. The whole jump chunk plus every detected lip's landing zone
+  (and the next chunk's start via `bounds[].noHazX`) is hazard free.
+* **Crests**: slope may increase (convex) by at most `CREST_TURN_DEG` 3.5 deg per 16 px segment on ordinary spline chunks (`NOISE_CREST_TURN_DEG` 6 in
+  noise zones); templates tagged `SHARP_TAGS` (kicker, jump-lip, launch, big-air, drop, steps) and generated jumps keep the 10 / 16 deg lips.
+* **Sectors**: `difficultyAt` is stepped per 500 m (ramp = sector/7, same ceilings as before, reached ~3500 m) and also returns `sector`, `speedBudget`.
+  The first chunk starting in a new sector is a calm "breather" (roller/cruise/intro template, no noise/bridge/jump, first 1100 px hazard free).
+* **Anti-stall**: `bounds[].speed` carries a 1-D roll model (0.65 g sin, 0.2 v + 0.0003 v^2 drag); `_finishSafe` adds descent to any non-bridge chunk
+  until the model stays above 55 px/s. 0 stalls in 60 seeds x 10 000 m.
+* **Shards**: one group per chunk at most, ~59 % of chunks: arcs off every launch lip / bounce pad (always), else (`SHARD_PLAIN_CHANCE` 17 % of the remaining chunks)
+  a ground line 14 px above a 8-38 deg stretch or a high risk hump over a hazard / gap; risk share = 12 % + dist/5500 (max 65 %).
+
+## Fun-pass: feel (game-feel engineer)
+
+* **Trick -> speed loop** (`TUNING.boost*`, `sloppySpeedKeep`): good/perfect landing after >= 1 trick adds `60 x comboMult x (1 + 0.2 x (tricks-1))` px/s
+  along the travel direction (perfect x1.5, cap 260) and runs drag x0.3 for 1.2 s (`Sled.boostMs`); perfect with no tricks +30; sloppy keeps 92 % speed
+  and damps spin. Emits `LANDING_BOOST`. Measured: perfect single backflip +113 px/s (+~125 px/s within 150 ms).
+* **Ground snap** (`TUNING.snap*`, `Sled.applyControls`, `RunScene.dropAhead`): grounded >= 100 ms, no hop/launch for 350 ms, left ground < 160 ms ago,
+  normal speed < 130 px/s and ground ahead falls away < 11 deg -> normal velocity is clamped to 0. Kickers/drops/hops are untouched.
+* **Forgiveness**: tracker 'crash' landings with |angle| <= 78 deg and impact < 1700 px/s become 'sloppy' (RunScene); crash hazard hit-boxes are 72 % x 80 % of the drawn box.
+* **Speed feel**: camera zoom 1.0 -> 0.82 (150..600 px/s, stepped 0.005; `applyZoomCompensation` counter-scales the scroll-factor-0 background and flash
+  rect), look-ahead 170 px, streaks > 420 px/s, hit-stop 45/70 ms, landing squash, impact-scaled sparks.
+* **Near miss / shards / milestones / best gate / hints**: `RunScene.updateFun`; `entities/Shard.js` (ShardField), `entities/BestMarker.js`.
+  `SHARD_COLLECTED.total` = shard points this run. Tutorial completion persists in localStorage `bb.tutorialDone` (SaveStore drops unknown settings keys).
+  RunRecord gets `shards`, `nearMisses`, `bonusPoints` (SaveStore.sanitizeRun may strip them).

@@ -79,8 +79,56 @@ export const TUNING = Object.freeze({
   /** Camera. */
   cameraLerpX: 5.5,
   cameraLerpY: 3.2,
-  lookAheadSec: 0.35,
-  lookAheadMaxPx: 120,
+  lookAheadSec: 0.4,
+  lookAheadMaxPx: 170,
+  /** Speed-zoom: 1.0 below zoomSpeedLo px/s, zoomMin at zoomSpeedHi px/s and above; zoomLerp = 1/s smoothing. */
+  zoomMin: 0.82,
+  zoomSpeedLo: 150,
+  zoomSpeedHi: 600,
+  zoomLerp: 2.2,
+  /** Speed streaks start at streakSpeedLo px/s and reach full strength at streakSpeedHi. */
+  streakSpeedLo: 420,
+  streakSpeedHi: 700,
+  /** Hit-stop (ms of frozen physics) on perfect/hard landings and on a crash. */
+  hitStopLandingMs: 45,
+  hitStopCrashMs: 70,
+  /** Trick -> speed loop. Boost = base x comboMult x (1 + trickCountBonus x (tricks-1)); perfect x perfectMul; capped. */
+  boostBasePxS: 60,
+  boostTrickCountBonus: 0.2,
+  boostPerfectMul: 1.5,
+  boostCapPxS: 260,
+  boostPerfectNoTrickPxS: 30,
+  /** After a boost the drag (air, ground resist, quadratic) is multiplied by boostDragMul for boostDragMs. */
+  boostDragMs: 1200,
+  boostDragMul: 0.3,
+  /** A sloppy landing keeps this fraction of the speed. */
+  sloppySpeedKeep: 0.92,
+  /** Forgiveness: TrickTracker 'crash' landings up to this angle (deg) / impact (px/s) become a sloppy wobble instead. */
+  forgiveAngleDeg: 78,
+  forgiveImpactPxS: 1700,
+  /**
+   * Ground snap (crest smoothing): a sled that was grounded >= snapMinGroundMs, did not hop/launch in the last snapQuietMs,
+   * left the ground < snapWindowMs ago, rises from the surface slower than snapMaxVnPxS and has ground that falls away by
+   * less than snapMaxDropDeg (over the look-ahead) gets its surface-normal speed clamped to snapKeepVnPxS plus snapDownPxS/s
+   * of downforce. Real kickers (drop > snapMaxDropDeg, or vn above the cap) are untouched.
+   */
+  snapMinGroundMs: 100,
+  snapQuietMs: 350,
+  snapWindowMs: 160,
+  snapMaxVnPxS: 130,
+  snapKeepVnPxS: 0,
+  snapMaxDropDeg: 11,
+  snapMinSpeedPxS: 250,
+  /** Near miss: crash hazard passed within this many px above / below its centre line (plus half its height). */
+  nearMissAbovePx: 80,
+  nearMissBelowPx: 30,
+  nearMissPoints: 25,
+  nearMissSlowMs: 80,
+  shardRadiusPx: 18,
+  shardChainMs: 1500,
+  shardPointsPerChain: 5,
+  shardPointsCap: 50,
+  milestoneEveryM: 500,
   /** Screen shake amplitudes (px). */
   shakeHardLanding: 3,
   shakeCrash: 7,

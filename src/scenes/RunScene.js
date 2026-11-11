@@ -40,6 +40,8 @@ import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
 import { Fx } from '../entities/Fx.js';
+import { ShardField } from '../entities/Shard.js';
+import { BestMarker } from '../entities/BestMarker.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -50,6 +52,20 @@ const SAFE_HISTORY_MS = 3000;
 const SLOWMO_CAP_MS = 3000;
 /** Spawn this far past terrain x=0 so the rear runner has ground under it. */
 const SPAWN_RUNIN_PX = 44;
+const TUTORIAL_KEY = 'bb.tutorialDone';
+const smooth01 = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
+
+/** Tutorial hints already completed on this device. SaveStore.sanitizeSettings drops unknown keys, so use our own key. */
+function loadTutorialDone() {
+  try {
+    const raw = globalThis.localStorage && globalThis.localStorage.getItem(TUTORIAL_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) { return new Set(); }
+}
+function saveTutorialDone(set) {
+  try { if (globalThis.localStorage) globalThis.localStorage.setItem(TUTORIAL_KEY, JSON.stringify([...set])); } catch (e) { /* ignore */ }
+}
 
 export class RunScene extends Phaser.Scene {
   constructor() {
@@ -123,6 +139,21 @@ export class RunScene extends Phaser.Scene {
     this._contactQueue = [];
     this._landingShake = 0;
     this._frameDt = 16.7;
+    this.hitStopMs = 0;
+    this.blinkMs = 0;
+    this._zoom = 1;
+    this._zoomKick = 0;
+    this._airTricks = 0;
+    this.shardChain = 0;
+    this.shardChainAt = -1e9;
+    this.shardTotal = 0;
+    this.shardCount = 0;
+    this.nearMissCount = 0;
+    this.lastMilestone = 0;
+    this.newBestDone = false;
+    this.tutDone = loadTutorialDone();
+    this.tutShown = new Set();
+    this.tutTimers = { stall: 0, boostHint: 0 };
 
     // physics world: manual stepping only
     const world = this.matter.world;
@@ -137,6 +168,8 @@ export class RunScene extends Phaser.Scene {
     this.mesh = new TerrainMesh(this, this.palette, this.content.terrainMods);
     this.fx = new Fx(this, this.palette);
     this.trail = new TrailParticles(this, this.palette);
+    this.shardField = new ShardField(this, this.palette);
+    this.streaks = this.add.graphics().setDepth(12).setBlendMode(Phaser.BlendModes.ADD);
     this.flashRect = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0)
       .setOrigin(0).setScrollFactor(0).setDepth(100);
 
@@ -153,6 +186,14 @@ export class RunScene extends Phaser.Scene {
     this.startGate = this.add.graphics().setDepth(6);
     this.drawStartGate(this.startGate, start.x + 14, this.terrain.heightAt(start.x + 14));
     this.snapCamera();
+    // best-distance gate (device best from the save store's in-memory run list; skipped when there is none)
+    this.bestM = 0;
+    try {
+      const runs = this.saveStore && this.saveStore.runs;
+      if (Array.isArray(runs)) for (const r of runs) if (r && r.distanceM > this.bestM) this.bestM = Math.floor(r.distanceM);
+    } catch (e) { this.bestM = 0; }
+    this.bestMarker = this.bestM >= 20
+      ? new BestMarker(this, this.palette, this.startX + this.bestM * PIXELS_PER_METER, this.bestM) : null;
 
     // events
     this._onCollide = (event) => {
@@ -203,6 +244,10 @@ export class RunScene extends Phaser.Scene {
     safe(this.trail);
     safe(this.fx);
     safe(this.bg);
+    safe(this.shardField);
+    safe(this.bestMarker);
+    safe(this.streaks);
+    this.shardField = this.bestMarker = this.streaks = null;
     this.sled = this.mesh = this.trail = this.fx = this.bg = null;
     this.terrain = null;
     this.tricks = null;
@@ -246,10 +291,12 @@ export class RunScene extends Phaser.Scene {
       pu.push(p);
     });
     if (pu.length) this.powerups.set(chunk.index, pu);
+    if (this.shardField) this.shardField.addChunk(chunk);
   }
 
   dropChunk(idx) {
     this.mesh.removeChunk(idx);
+    if (this.shardField) this.shardField.removeChunk(idx);
     const hz = this.hazards.get(idx);
     if (hz) hz.forEach((h) => h.destroy());
     this.hazards.delete(idx);
@@ -284,6 +331,19 @@ export class RunScene extends Phaser.Scene {
   slopeAt(x) {
     const s = this.terrain.slopeDegAt(x);
     return Number.isFinite(s) ? s : 0;
+  }
+
+  /** Emit an event only if its constant exists (UI engineer adds the fun-pass names to events.js). */
+  emitIf(name, payload) {
+    if (name) this.game.events.emit(name, payload);
+  }
+
+  /** Award a bonus through ScoreManager.addBonus when present, then publish the score. @returns {boolean} */
+  bonus(points, kind) {
+    if (!this.score || typeof this.score.addBonus !== 'function') return false;
+    this.score.addBonus(points, kind);
+    this.emitScore();
+    return true;
   }
 
   // ------------------------------------------------------------------ collisions
@@ -471,7 +531,10 @@ export class RunScene extends Phaser.Scene {
     this.currentPhys = phys;
 
     // sub-stepped physics; slow-mo scales the delta, never the 8 ms limit
-    const simDt = dt * (this.slowmoMs > 0 ? this.slowmoScale : 1);
+    sled.dropAheadDeg = this.dropAhead(sled);
+    let simDt = dt * (this.slowmoMs > 0 ? this.slowmoScale : 1);
+    if (this.blinkMs > 0) { this.blinkMs -= dt; simDt *= 0.35; }
+    if (this.hitStopMs > 0) { this.hitStopMs -= dt; simDt = 0; }
     stepWorld(
       this.matter.world,
       simDt,
@@ -492,6 +555,8 @@ export class RunScene extends Phaser.Scene {
         if (audio.setSpeed) audio.setSpeed(sled.speed);
       } catch (e) { /* audio must never break the loop */ }
     }
+    this._hopped = !!sled.hopPulse;
+    this._pushed = !!sled.pushPulse;
     sled.hopPulse = 0;
     sled.pushPulse = 0;
 
@@ -523,6 +588,7 @@ export class RunScene extends Phaser.Scene {
     if (this.pendingCrash) this.resolveCrash(fs);
 
     if (!this.crashed) {
+      this.updateFun(dt, pad, Math.max(0, (sled.x - this.startX) / PIXELS_PER_METER));
       // distance
       const metres = Math.max(0, (sled.x - this.startX) / PIXELS_PER_METER);
       if (this.score.setDistance(metres)) {
@@ -558,17 +624,55 @@ export class RunScene extends Phaser.Scene {
       const s = Math.sin(a);
       this.trail.update(sled.x + c * -16 - s * 6, sled.y + s * -16 + c * 6, sled.speed);
     }
+    const fxDt = this.hitStopMs > 0 || (this.crashed && this.crashTimerMs < TUNING.hitStopCrashMs) ? dt * 0.08 : dt;
     this.updateCamera(dt);
     const cam = this.cameras.main;
-    const left = cam.scrollX;
-    const right = cam.scrollX + GAME_WIDTH;
+    const halfW = GAME_WIDTH / (2 * cam.zoom);
+    const left = cam.scrollX + GAME_WIDTH / 2 - halfW;
+    const right = cam.scrollX + GAME_WIDTH / 2 + halfW;
+    this._view = { left, right, top: cam.scrollY + GAME_HEIGHT / 2 - GAME_HEIGHT / (2 * cam.zoom), bottom: cam.scrollY + GAME_HEIGHT / 2 + GAME_HEIGHT / (2 * cam.zoom) };
     this.mesh.cull(left - 40, right + 40);
     const t = this.runTimeMs;
     for (const list of this.hazards.values()) for (const h of list) h.update(t, left, right);
     for (const list of this.powerups.values()) for (const p of list) p.update(t, left, right);
-    this.fx.update(dt, (x) => this.terrain.heightAt(x));
+    this.fx.update(fxDt, (x) => this.terrain.heightAt(x));
+    if (this.shardField) this.shardField.update(t, left, right);
+    if (this.bestMarker) this.bestMarker.update(t, sled.x, (x) => this.terrain.heightAt(x));
+    this.drawStreaks(t);
     this.bg.update(cam.scrollX, t, sled.speed);
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
+  }
+
+  /** How many degrees steeper (downhill) the ground gets a short way ahead; large for kickers / drops. */
+  dropAhead(sled) {
+    const ahead = clamp(Math.abs(sled.vx) * 0.1, 24, 90);
+    const here = this.slopeAt(sled.x);
+    return this.slopeAt(sled.x + ahead) - here;
+  }
+
+  /** Subtle speed streaks (world space, additive), only at high speed. */
+  drawStreaks(t) {
+    const g = this.streaks;
+    if (!g) return;
+    g.clear();
+    const sled = this.sled;
+    const k = smooth01((sled.speed - TUNING.streakSpeedLo) / (TUNING.streakSpeedHi - TUNING.streakSpeedLo));
+    if (k <= 0.02 || !this._view || this.crashed) return;
+    const v = this._view;
+    const w = v.right - v.left;
+    const h = v.bottom - v.top;
+    const sp = sled.speed || 1;
+    const dx = sled.vx / sp;
+    const dy = sled.vy / sp;
+    const len = 26 + 60 * k;
+    g.lineStyle(1, this.palette.text, 0.22 * k);
+    for (let i = 0; i < 16; i++) {
+      const fx = (((i * 0.6180339 + 0.13) % 1) * w * 1.0 - sled.x * (0.35 + (i % 4) * 0.12) + w * 8) % w;
+      const fy = ((i * 0.3819660 + 0.07) % 1) * h * 0.85 + ((t * 0.02 * (1 + i % 3)) % 6);
+      const x = v.left + (fx + w) % w;
+      const y = v.top + fy;
+      g.lineBetween(x, y, x - dx * len, y - dy * len);
+    }
   }
 
   tickEffects(dt) {
@@ -646,12 +750,22 @@ export class RunScene extends Phaser.Scene {
       this.game.events.emit(EVT.TRICK, {
         type: t.type, count: n, value: r.value, isNew: r.isNew, airtimeMs: t.airtimeMs != null ? t.airtimeMs : upd.airtimeMs || 0,
       });
+      this._airTricks += n;
+      if (/flip$/i.test(t.type)) this.tutDoneId('flip');
       this.emitCombo('trick');
       this.fx.sparks(fs.x, fs.y - 14, r.isNew ? this.palette.amber : this.palette.cyan, 8, 150, 60);
     }
-    const l = upd.landing;
+    let l = upd.landing;
     if (!l) return;
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, l.airtimeMs || 0);
+    const airTricks = this._airTricks;
+    this._airTricks = 0;
+    this.tutHint('flip', false);
+    // forgiveness: clearly-bad-but-not-head-first landings become a recoverable wobble instead of a crash
+    if (l.quality === 'crash' && Math.abs(l.angleDeg || 0) <= TUNING.forgiveAngleDeg
+      && (l.impactSpeedPxS || 0) < TUNING.forgiveImpactPxS) {
+      l = { ...l, quality: 'sloppy' };
+    }
     if (l.quality === 'crash') {
       this.game.events.emit(EVT.LANDING, {
         quality: 'crash', angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
@@ -660,6 +774,9 @@ export class RunScene extends Phaser.Scene {
       this.pendingCrash = { cause: 'badLanding' };
       return;
     }
+    const pre = this.score.getSnapshot();
+    const mult = pre.multiplier || 1;
+    const nTricks = Math.max(airTricks, (pre.comboTricks || []).length);
     const r = this.score.onLanding(l);
     this.game.events.emit(EVT.LANDING, {
       quality: l.quality, angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
@@ -668,9 +785,152 @@ export class RunScene extends Phaser.Scene {
     this.emitCombo('landing');
     this.emitScore();
     const col = l.quality === 'perfect' ? this.palette.lime : l.quality === 'sloppy' ? this.palette.amber : this.palette.cyan;
-    this.fx.sparks(fs.x, fs.y + 8, col, l.hard ? 18 : 8, l.hard ? 240 : 140, 90);
+    const imp = l.impactSpeedPxS || 0;
+    this.fx.sparks(fs.x, fs.y + 8, col, Math.round(clamp(6 + imp / 45, 6, 28)), clamp(110 + imp * 0.25, 110, 280), 90);
     if (l.quality === 'perfect') this.fx.ring(fs.x, fs.y + 10, this.palette.lime, 30, 360);
     if (l.hard) this.shake(TUNING.shakeHardLanding);
+    if (l.quality === 'perfect' || l.hard) {
+      this.hitStopMs = Math.max(this.hitStopMs, TUNING.hitStopLandingMs);
+      this.sled.squash = l.hard ? 1 : 0.6;
+    } else if (imp > 250) this.sled.squash = 0.35;
+    if (l.quality === 'good' || l.quality === 'perfect') this.tutDoneId('land');
+    this.tutHint('land', false);
+    this.applyLandingBoost(l, mult, nTricks, fs);
+  }
+
+  /** Trick -> speed loop (TUNING.boost*): a clean landing after tricks gives a forward burst and a stretch of low drag. */
+  applyLandingBoost(l, mult, nTricks, fs) {
+    const sled = this.sled;
+    if (l.quality === 'sloppy') {
+      sled.wobble(TUNING.sloppySpeedKeep);
+      return;
+    }
+    let amt = 0;
+    if (nTricks > 0) {
+      amt = TUNING.boostBasePxS * mult * (1 + TUNING.boostTrickCountBonus * (nTricks - 1));
+      if (l.quality === 'perfect') amt *= TUNING.boostPerfectMul;
+      amt = Math.min(TUNING.boostCapPxS, amt);
+    } else if (l.quality === 'perfect') {
+      amt = TUNING.boostPerfectNoTrickPxS;
+    }
+    if (amt <= 0) return;
+    sled.addForwardSpeed(amt);
+    sled.boostMs = TUNING.boostDragMs;
+    this.lastBoost = { amountPxS: Math.round(amt), t: this.runTimeMs };
+    this.emitIf(EVT.LANDING_BOOST, { amountPxS: Math.round(amt), quality: l.quality, comboMult: mult, tricks: nTricks });
+    const k = amt / TUNING.boostCapPxS;
+    const sp = sled.speed || 1;
+    const bx = fs.x - (sled.vx / sp) * 18;
+    const by = fs.y - (sled.vy / sp) * 18 + 6;
+    this.fx.ring(fs.x, fs.y + 6, this.palette.amber, 38 + 30 * k, 420);
+    this.fx.sparks(bx, by, this.palette.lime, 10 + Math.round(14 * k), 260 + 160 * k, 20);
+    this.fx.sparks(bx, by, this.palette.amber, 6, 200, 10);
+    this._zoomKick = Math.max(this._zoomKick, 0.025 + 0.04 * k);
+    this.shake(1 + 1.5 * k);
+    if (!this.tutDone.has('boost')) {
+      this.tutHint('boost', true);
+      this.tutTimers.boostHint = 2400;
+    }
+  }
+
+  // ------------------------------------------------------------------ fun-pass systems
+
+  tutHint(id, show) {
+    if (this.tutDone.has(id)) return;
+    const on = this.tutShown.has(id);
+    if (show === on) return;
+    if (show) this.tutShown.add(id); else this.tutShown.delete(id);
+    this.emitIf(EVT.TUTORIAL_HINT, { id, show });
+  }
+
+  tutDoneId(id) {
+    if (this.tutDone.has(id)) return;
+    this.tutHint(id, false);
+    this.tutDone.add(id);
+    saveTutorialDone(this.tutDone);
+  }
+
+  /** Per-frame: shards, near misses, milestones / best marker, first-run hints. */
+  updateFun(dt, pad, metres) {
+    const sled = this.sled;
+    const now = this.runTimeMs;
+
+    // shards
+    if (this.shardField) {
+      const got = this.shardField.collect(sled.x, sled.y - 6, TUNING.shardRadiusPx);
+      for (const sh of got) {
+        if (now - this.shardChainAt > TUNING.shardChainMs) this.shardChain = 0;
+        this.shardChain += 1;
+        this.shardChainAt = now;
+        const points = Math.min(TUNING.shardPointsCap, TUNING.shardPointsPerChain * this.shardChain);
+        this.bonus(points, 'shard');
+        this.shardTotal += points;
+        this.shardCount = (this.shardCount || 0) + 1;
+        this.emitIf(EVT.SHARD_COLLECTED, { chain: this.shardChain, points, total: this.shardTotal, x: sh.x, y: sh.y });
+        this.fx.ring(sh.x, sh.y, this.palette.lime, 16 + Math.min(14, this.shardChain * 2), 260);
+        this.fx.sparks(sh.x, sh.y, this.palette.lime, 6 + Math.min(8, this.shardChain), 150);
+      }
+    }
+
+    // near misses + first-hazard hint
+    let hazardAhead = false;
+    for (const list of this.hazards.values()) {
+      for (const h of list) {
+        if (h.hit || (h.def.onHit && h.def.onHit.effect !== 'crash')) continue;
+        const dxh = h.cx - sled.x;
+        if (dxh > 0 && dxh < 460) hazardAhead = true;
+        const side = sled.x >= h.cx ? 1 : -1;
+        if (h._side === -1 && side === 1 && !h.nearMissed) {
+          const dy = sled.y - h.cy;
+          if (dy > -(h.h / 2 + TUNING.nearMissAbovePx) && dy < h.h / 2 + TUNING.nearMissBelowPx) {
+            h.nearMissed = true;
+            this.nearMissCount = (this.nearMissCount || 0) + 1;
+            this.bonus(TUNING.nearMissPoints, 'nearMiss');
+            this.emitIf(EVT.NEAR_MISS, { hazardType: h.def.id, points: TUNING.nearMissPoints, x: h.cx, y: h.cy });
+            this.blinkMs = TUNING.nearMissSlowMs;
+            this.fx.sparks(h.cx, h.cy - h.h / 2, this.palette.amber, 12, 220, 60);
+            this.fx.ring(h.cx, h.cy - h.h / 2, this.palette.amber, 26, 300);
+          }
+        }
+        h._side = side;
+      }
+    }
+
+    // milestones + best marker
+    const sector = Math.floor(metres / TUNING.milestoneEveryM);
+    while (this.lastMilestone < sector) {
+      this.lastMilestone += 1;
+      this.emitIf(EVT.MILESTONE, { sector: this.lastMilestone + 1, distanceM: this.lastMilestone * TUNING.milestoneEveryM });
+      this.flashRect.setFillStyle(this.palette.cyan, 1).setAlpha(0.2);
+      this.fx.ring(sled.x, sled.y, this.palette.cyan, 70, 600);
+      this.fx.sparks(sled.x, sled.y - 6, this.palette.cyan, 14, 240, 40);
+    }
+    if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
+      this.newBestDone = true;
+      this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });
+      if (this.bestMarker) this.bestMarker.markPassed();
+      this.flashRect.setFillStyle(this.palette.amber, 1).setAlpha(0.28);
+      this.fx.ring(sled.x, sled.y, this.palette.amber, 80, 700);
+      this.fx.sparks(sled.x, sled.y - 6, this.palette.amber, 20, 280, 60);
+    }
+
+    // first-run hints
+    if (this._pushed) this.tutDoneId('push');
+    this.tutTimers.stall = sled.grounded && sled.speed < 20 && now > 800 ? this.tutTimers.stall + dt : 0;
+    this.tutHint('push', this.tutTimers.stall > 700);
+    if (this._hopped && this.tutShown.has('hop')) this.tutDoneId('hop');
+    this.tutHint('hop', hazardAhead);
+    if (!sled.grounded && sled.airtimeMs > 450 && this._airTricks === 0 && !this.tutDone.has('flip')) this.tutHint('flip', true);
+    if (!sled.grounded && sled.airtimeMs > 300 && sled.vy > 0 && !this.tutDone.has('land')) {
+      const gap = this.terrain.heightAt(sled.x) - sled.y;
+      const rel = Math.abs(((sled.angleDeg - sled.groundAngleDeg + 540) % 360 + 360) % 360 - 180);
+      this.tutHint('land', gap < 110 && rel > 25);
+    }
+    if (this.tutTimers.boostHint > 0) {
+      this.tutTimers.boostHint -= dt;
+      if (this.tutTimers.boostHint <= 0) this.tutDoneId('boost');
+    }
+    void pad;
   }
 
   // ------------------------------------------------------------------ zones
@@ -747,6 +1007,7 @@ export class RunScene extends Phaser.Scene {
     const along = Math.max(60, sp * keep);
     s.setPose(x, y - 4, ang, dirx * along, diry * along);
     s.invulnerableMs = TUNING.invulnerableMs;
+    this._airTricks = 0;
     this.tricks.reset();
     this.trail.reset();
     this.safeSamples.length = 0;
@@ -834,6 +1095,9 @@ export class RunScene extends Phaser.Scene {
       bestCombo: Math.max(this.bestCombo, snap.bestCombo || 1),
       maxAirtimeMs: Math.round(this.maxAirtimeMs),
       cause: 'crash',
+      shards: this.shardCount || 0,
+      nearMisses: this.nearMissCount || 0,
+      bonusPoints: Math.round(snap.bonusPoints || 0),
       ledgerHash: '',
     };
     record.ledgerHash = SaveStore.computeLedgerHash(record);
@@ -902,8 +1166,20 @@ export class RunScene extends Phaser.Scene {
     const s = this.sled;
     this._camX = s.x - GAME_WIDTH * 0.38;
     this._camY = s.y - GAME_HEIGHT / 3;
+    this._zoom = 1;
+    cam.setZoom(1);
+    this.applyZoomCompensation(1);
     cam.scrollX = Math.round(this._camX);
     cam.scrollY = Math.round(this._camY);
+  }
+
+  /** Screen-space layers (background, flash) live at scroll factor 0; counter-scale them so camera zoom does not shrink them. */
+  applyZoomCompensation(z) {
+    const k = 1 / z;
+    const px = (GAME_WIDTH * (z - 1)) / (2 * z);
+    const py = (GAME_HEIGHT * (z - 1)) / (2 * z);
+    if (this.bg && this.bg.gfx) this.bg.gfx.setScale(k).setPosition(px, py);
+    if (this.flashRect) this.flashRect.setScale(k).setPosition(px, py);
   }
 
   updateCamera(dt) {
@@ -934,7 +1210,25 @@ export class RunScene extends Phaser.Scene {
     }
     // never show far past the start edge of the world
     if (this._camX < -30) this._camX = -30;
-    cam.scrollX = Math.round(this._camX) + ox;
-    cam.scrollY = Math.round(this._camY) + oy;
+
+    // speed zoom: 1.0 at rest -> zoomMin at zoomSpeedHi, smoothed, with a brief extra pull-out on boosts. Stepped to 0.005
+    // so the vector terrain does not shimmer from continuous sub-pixel scale changes.
+    const zt = 1 - (1 - TUNING.zoomMin) * smooth01((s.speed - TUNING.zoomSpeedLo) / (TUNING.zoomSpeedHi - TUNING.zoomSpeedLo));
+    this._zoom += (zt - this._zoom) * (1 - Math.exp((-TUNING.zoomLerp * dt) / 1000));
+    this._zoomKick = Math.max(0, this._zoomKick - dt / 260 * 0.05);
+    const z = Math.round(clamp(this._zoom - this._zoomKick, 0.6, 1.2) * 200) / 200;
+    if (z !== cam.zoom) {
+      cam.setZoom(z);
+      this.applyZoomCompensation(z);
+    }
+    // keep the rider at the same screen position whatever the zoom (zoom pivots on the screen centre)
+    const px0 = s.x - this._camX;
+    const py0 = s.y - this._camY;
+    let sx = s.x - GAME_WIDTH / 2 - (px0 - GAME_WIDTH / 2) / z;
+    const sy = s.y - GAME_HEIGHT / 2 - (py0 - GAME_HEIGHT / 2) / z;
+    const visLeft = sx + GAME_WIDTH / 2 - GAME_WIDTH / (2 * z);
+    if (visLeft < -30) sx += -30 - visLeft;
+    cam.scrollX = Math.round(sx) + ox;
+    cam.scrollY = Math.round(sy) + oy;
   }
 }

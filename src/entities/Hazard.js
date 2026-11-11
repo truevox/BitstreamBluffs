@@ -46,7 +46,13 @@ export class Hazard {
     const cy = air ? spawn.y : spawn.y - Math.cos(rot) * (h / 2);
     this.cx = cx;
     this.cy = cy;
-    this.body = Bodies.rectangle(cx, cy, w, h, {
+    // crash hit-boxes are a little smaller than the drawn brackets (forgiving: a normal hop clears a spike)
+    const crashy = !def.onHit || def.onHit.effect === 'crash';
+    const bw = crashy ? w * 0.72 : w;
+    const bh = crashy ? h * 0.8 : h;
+    const bcy = crashy && !air ? cy + (h - bh) / 2 * Math.cos(rot) : cy;
+    const bcx = crashy && !air ? cx - (h - bh) / 2 * Math.sin(rot) : cx;
+    this.body = Bodies.rectangle(bcx, bcy, bw, bh, {
       isStatic: true,
       isSensor: true,
       angle: rot,
@@ -89,7 +95,7 @@ export class Hazard {
     const h = this.h;
     const frame = Math.floor(t / 66);
 
-    // hit-box corner brackets (always the exact collision box)
+    // hit-box corner brackets (the drawn box; crash hit-boxes are ~25% smaller)
     g.lineStyle(1, col, 0.5);
     const hw = w / 2;
     const b = 4;

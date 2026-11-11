@@ -67,6 +67,11 @@ export class Sled {
     this._time = 0;
     this._lastTilt = 0;
     this.pose = { phi: 10, chute: 0, brake: 0, tuck: 0 };
+    this.boostMs = 0; // reduced drag after a landing boost
+    this.squash = 0; // 0..1 landing squash (visual)
+    this.dropAheadDeg = 90; // how much steeper the ground gets just ahead (set by RunScene); large = kicker/drop
+    this._groundRunMs = 0;
+    this._sinceLaunchMs = 999;
 
     this._buildBody(x, y);
     this.gfx = scene.add.graphics().setDepth(20);
@@ -146,6 +151,7 @@ export class Sled {
       this.msSinceContact += stepMs;
     }
     this._contactFlag = false;
+    this._groundRunMs = this.msSinceContact < 1 ? this._groundRunMs + stepMs : (this.msSinceContact > TUNING.snapWindowMs ? 0 : this._groundRunMs);
     this.airtimeMs = this.grounded ? 0 : this.airtimeMs + stepMs;
     this._sync();
   }
@@ -187,7 +193,10 @@ export class Sled {
 
     // ---- world / body tunables ----
     this.world.engine.gravity.y = phys.gravityPxS2 / 1000;
-    b.frictionAir = phys.frictionAir;
+    this._sinceLaunchMs += stepMs;
+    const boostK = this.boostMs > 0 ? TUNING.boostDragMul : 1;
+    if (this.boostMs > 0) this.boostMs = Math.max(0, this.boostMs - stepMs);
+    b.frictionAir = phys.frictionAir * boostK;
     b.friction = phys.groundFriction;
     b.restitution = phys.restitution == null ? 0.02 : phys.restitution;
 
@@ -203,13 +212,13 @@ export class Sled {
 
     // soft terminal velocity
     if (phys.quadDrag && speed > 1) {
-      const f = Math.max(0, 1 - phys.quadDrag * speed * dt);
+      const f = Math.max(0, 1 - phys.quadDrag * boostK * speed * dt);
       vx *= f;
       vy *= f;
     }
     // runner resistance on the ground (lower inside High Bandwidth zones, much higher while braking)
     if (grounded && phys.groundResist) {
-      const f = Math.exp(-phys.groundResist * dt);
+      const f = Math.exp(-phys.groundResist * boostK * dt);
       vx *= f;
       vy *= f;
     }
@@ -243,6 +252,20 @@ export class Sled {
       this.hopBufferMs = 0;
       this.msSinceContact = TUNING.groundedGraceMs + 1; // leave the ground immediately
       this.hopPulse = 1;
+      this._sinceLaunchMs = 0;
+    }
+
+    // ground snap / crest smoothing: kill the small upward drift off convex crests (see TUNING.snap*)
+    if (this._sinceLaunchMs > TUNING.snapQuietMs && this._groundRunMs >= TUNING.snapMinGroundMs
+      && this.msSinceContact < TUNING.snapWindowMs && this.dropAheadDeg < TUNING.snapMaxDropDeg
+      && Math.hypot(vx, vy) > TUNING.snapMinSpeedPxS && !chute && !this.airBrakeActive) {
+      const vn2 = vx * nx + vy * ny;
+      if (vn2 > TUNING.snapKeepVnPxS && vn2 < TUNING.snapMaxVnPxS) {
+        const cut = vn2 - TUNING.snapKeepVnPxS;
+        vx -= nx * cut;
+        vy -= ny * cut;
+        this.snapSteps = (this.snapSteps || 0) + 1;
+      }
     }
 
     Body.setVelocity(b, { x: fromPxS(vx), y: fromPxS(vy) });
@@ -285,8 +308,36 @@ export class Sled {
     const v = Body.getVelocity(this.body);
     Body.setVelocity(this.body, { x: v.x, y: Math.min(v.y, -fromPxS(upPxS)) });
     this.msSinceContact = TUNING.groundedGraceMs + 1;
+    this._sinceLaunchMs = 0;
     this.chuteUsed = false;
     this._sync();
+  }
+
+  /**
+   * Landing boost: add forward speed along the current travel direction (slope tangent when nearly stopped).
+   * @param {number} pxS
+   * @returns {void}
+   */
+  addForwardSpeed(pxS) {
+    if (!this.inWorld) return;
+    const v = Body.getVelocity(this.body);
+    let vx = toPxS(v.x);
+    let vy = toPxS(v.y);
+    const sp = Math.hypot(vx, vy);
+    let dx;
+    let dy;
+    if (sp > 30) { dx = vx / sp; dy = vy / sp; } else { dx = Math.cos(this.groundAngleDeg * DEG); dy = Math.sin(this.groundAngleDeg * DEG); }
+    vx += dx * pxS;
+    vy += dy * pxS;
+    Body.setVelocity(this.body, { x: fromPxS(vx), y: fromPxS(vy) });
+    this._sync();
+  }
+
+  /** Sloppy landing: shave speed and damp the spin so the wobble recovers. @param {number} keep @returns {void} */
+  wobble(keep) {
+    if (!this.inWorld) return;
+    this.scaleVelocity(keep);
+    Body.setAngularVelocity(this.body, Body.getAngularVelocity(this.body) * 0.3);
   }
 
   /**
@@ -313,6 +364,9 @@ export class Sled {
     Body.setVelocity(b, { x: fromPxS(vxPxS), y: fromPxS(vyPxS) });
     this.msSinceContact = 999;
     this._contactFlag = false;
+    this.boostMs = 0;
+    this._groundRunMs = 0;
+    this._sinceLaunchMs = 0;
     this.parachuteMs = 0;
     this.chuteUsed = false;
     this.airtimeMs = 0;
@@ -366,6 +420,7 @@ export class Sled {
   render(dtMs = 16.7) {
     if (this.destroyed || this.hidden || !this.gfx) return;
     const k = 1 - Math.exp(-dtMs / 70);
+    this.squash = Math.max(0, (this.squash || 0) - dtMs / 160);
     const pose = this.pose;
     const tiltN = this._lastTilt || 0;
     const airbrake = this.airBrakeActive ? 1 : 0;
@@ -411,7 +466,13 @@ export class Sled {
     const flip = sx < 0;
     const jx = this.scrambled ? (Math.random() - 0.5) * 3 : 0;
     const jy = this.scrambled ? (Math.random() - 0.5) * 3 : 0;
-    const P = (lx, ly) => ({ x: ox + c * lx * sx - s * ly + jx, y: oy + s * lx * sx + c * ly + jy });
+    const sq = this.squash || 0;
+    const wx = 1 + 0.12 * sq;
+    const P = (lx0, ly0) => {
+      const ly = 11 + (ly0 - 11) * (1 - 0.22 * sq);
+      const lx = lx0 * wx;
+      return { x: ox + c * lx * sx - s * ly + jx, y: oy + s * lx * sx + c * ly + jy };
+    };
     const poly = (pts, fill, fa, stroke, w) => {
       const m = pts.map((p) => P(p[0], p[1]));
       if (fill != null) {
