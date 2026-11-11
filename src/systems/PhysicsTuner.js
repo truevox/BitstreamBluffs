@@ -28,35 +28,37 @@ export const TUNING = Object.freeze({
   /** Matter static friction of the sled (0 for the same reason). */
   groundFrictionStatic: 0,
   /** Extra manual runner resistance on the ground, 1/s (exponential speed decay). Scaled by frictionMul. */
-  groundResist: 0.12,
+  groundResist: 0.04,
   /**
    * Multiplier on the doc drag (PHYSICS.dragUntucked 0.015) when written to Matter frictionAir. Matter 0.20 applies
-   * frictionAir per 16.7 ms base step (= 0.9/s), which caps a 8 degree slope at ~120 px/s, far from the ~400-800 px/s
-   * the architecture expects. 0.3 keeps the doc ratios (tuck halves drag, boosts divide it) with a livelier terminal
-   * speed. Set to 1 for the literal doc value.
+   * frictionAir per 16.7 ms base step (= 0.9/s for the literal 0.015), which capped speed at ~120-250 px/s and stalled
+   * the sled in every dip (QA: hands-off run covered ~110 m in 20 s). 0.15 (= 0.14/s) keeps the doc ratios (tuck halves
+   * drag, boosts divide it) and, with groundResist 0.04 and quadDrag below, gives a 350-500 px/s cruise on ordinary
+   * 8-12 degree terrain and ~600+ on steep drops (was 0.3). Set to 1 for the literal doc value.
    */
-  dragFeelMul: 0.3,
+  dragFeelMul: 0.15,
   /**
-   * Multiplier on air tilt authority (on top of PHYSICS.airControlFactor 0.7). With the literal 420 deg/s^2 x 0.7 a held
-   * flip needs ~2.1 s of airtime for 540 degrees; 1.6 brings that to ~1.6 s so a 540 fits an average big jump (doc 4.2).
+   * Multiplier on air tilt authority (on top of PHYSICS.airControlFactor 0.7). The doc's 420 deg/s^2 x 0.7 needs ~1.9 s
+   * of airtime for 540 degrees, but hops / kickers last 0.8-1.4 s. 3.6 (= 1060 deg/s^2 in the air) gives a held flip
+   * ~540 degrees in ~1.0 s, i.e. an ordinary kicker or a hop off a slope (was 1.6).
    */
-  airTiltFeelMul: 1.6,
+  airTiltFeelMul: 3.6,
   /** Ground friction multiplier and extra manual decay while braking (S). */
   brakeFrictionMul: 1,
   brakeResist: 2.2,
   /** Aerial angular damping while braking (S in air), 1/s. */
   airBrakeAngularDamp: 5,
-  /** Quadratic drag (1/px) giving a soft terminal velocity on very steep slopes; ~0 below 600 px/s. */
-  quadDrag: 0.00009,
+  /** Quadratic drag (1/px) giving a soft terminal velocity on very steep slopes (about +0.15/s at 500 px/s; was 0.00009). */
+  quadDrag: 0.0003,
   /** Ground lean torque multiplier (relative to maxTiltTorque). */
   groundTiltMul: 0.5,
-  /** Angular velocity cap, deg/s. */
-  maxAngularVelDegS: 560,
+  /** Angular velocity cap, deg/s (raised from 560 so a held flip is not clipped by the air tilt multiplier). */
+  maxAngularVelDegS: 1100,
   /** Push kick: surface speed set by W when stalled (px/s), and re-trigger delay. */
-  pushKickPxS: 70,
+  pushKickPxS: 90,
   pushCooldownMs: 280,
-  /** Hop: speed along the surface normal (px/s) and coyote/buffer windows. */
-  hopPxS: 300,
+  /** Hop: speed along the surface normal (px/s; was 300, raised so an average hop is ~0.8 s of air) and coyote/buffer windows. */
+  hopPxS: 360,
   hopCoyoteMs: 90,
   hopBufferMs: 110,
   /** Ground contact hysteresis (ms) before the sled counts as airborne. */

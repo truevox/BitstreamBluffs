@@ -65,7 +65,27 @@ export class MenuInput {
       if (e.repeat && !DIRS.has(a)) return;
       this._fire(a, 'keyboard', true);
     };
-    if (scene.input.keyboard) scene.input.keyboard.on('keydown', this._onKey);
+    // Phaser's keyboard plugin is used for plain menu keys only. In raw text-entry mode (initials) native window events
+    // are used instead: InputRouter preventDefaults Space / arrows and Phaser drops default-prevented events (Space
+    // would never reach the entry), and Phaser's per-frame key queue was seen re-delivering keys out of order when
+    // several arrive in one frame (fast typing 'zqx' gave 'ZZX').
+    // Events already consumed natively are remembered so that Phaser's (later, per-frame) copy of the same key press
+    // cannot act again once raw mode has ended, e.g. the Enter that saved the initials must not also retry.
+    this._native = new WeakSet();
+    this._onPhaserKey = (ev) => {
+      const e = ev.originalEvent || ev;
+      if (this.rawKeyHandler || (e && this._native.has(e))) return;
+      this._onKey(ev);
+    };
+    if (scene.input.keyboard) scene.input.keyboard.on('keydown', this._onPhaserKey);
+    this._onWinKey = (e) => {
+      if (!this.rawKeyHandler || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable === true)) return;
+      this._native.add(e);
+      this._onKey(e);
+    };
+    if (typeof window !== 'undefined') window.addEventListener('keydown', this._onWinKey);
 
     this._onPointer = () => this._unlock();
     scene.input.on('pointerdown', this._onPointer);
@@ -156,7 +176,8 @@ export class MenuInput {
     if (!this.game) return;
     this.game.events.off(EVT.INPUT_ACTION, this._onAction);
     const s = this.scene;
-    if (s.input && s.input.keyboard) s.input.keyboard.off('keydown', this._onKey);
+    if (s.input && s.input.keyboard) s.input.keyboard.off('keydown', this._onPhaserKey);
+    if (typeof window !== 'undefined') window.removeEventListener('keydown', this._onWinKey);
     if (s.input) s.input.off('pointerdown', this._onPointer);
     s.events.off(Phaser.Scenes.Events.UPDATE, this._onUpdate);
     s.events.off('shutdown', this._cleanup);

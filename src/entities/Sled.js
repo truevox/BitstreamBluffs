@@ -79,8 +79,8 @@ export class Sled {
       return shape(o);
     };
     const parts = [
-      mk((o) => Bodies.circle(x - 15, y + 7, 4, o), 'skid'),
-      mk((o) => Bodies.circle(x + 15, y + 7, 4, o), 'skid'),
+      mk((o) => Bodies.polygon(x - 15, y + 7, 24, 4, o), 'skid'),
+      mk((o) => Bodies.polygon(x + 15, y + 7, 24, 4, o), 'skid'),
       mk((o) => Bodies.rectangle(x, y + 3, 40, 6, { ...o, chamfer: { radius: 2 } }), 'deck'),
       mk((o) => Bodies.rectangle(x - 5, y - 8, 9, 15, { ...o, chamfer: { radius: 3 } }), 'torso', { density: 0.0012 }),
       mk((o) => Bodies.circle(x - 2, y - 21, 5, o), 'head', { density: 0.0008 }),
@@ -345,6 +345,7 @@ export class Sled {
       vx: this.vx,
       vy: this.vy,
       angleDeg: this.angleDeg,
+      heliDeg: this.heliPhase,
       angularVelDegS: ((Body.getAngularVelocity(this.body) * 1000) / BASE_STEP_MS) / DEG,
       grounded: this.grounded,
       groundAngleDeg: this.groundAngleDeg,
@@ -386,7 +387,7 @@ export class Sled {
       const target = Math.round(this.heliPhase / 360) * 360;
       this.heliPhase = lerp(this.heliPhase, target, 1 - Math.exp(-dtMs / 50));
     }
-    if (Math.abs(this.heliPhase) > 36000) this.heliPhase %= 360;
+    if (Math.abs(this.heliPhase) > 36000) this.heliPhase %= 360; // TrickTracker ignores the resulting jump (> 720 deg)
 
     this._draw();
   }

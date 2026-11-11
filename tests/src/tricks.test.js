@@ -373,3 +373,51 @@ describe('integration with ScoreManager rules', () => {
     expect(res.banked).toBeGreaterThan(0);
   });
 });
+
+describe('helicopter spins from the sled drawing phase (SledFrameState.heliDeg)', () => {
+  // Regression: the helicopter spin is a visual rotation, the physics body does not turn, so arrow-key spins used to
+  // score nothing. When heliDeg is provided the heli bucket is fed from it and body rotation always counts as flips.
+  const spin = ({ turns, dir = 1, bodyPerFrame = 0, frames = 60 }) => {
+    const r = rig();
+    let heli = 12345; // arbitrary start phase
+    r.run(3, { grounded: true, state: { heliDeg: heli } });
+    const out = [];
+    for (let i = 0; i < frames; i++) {
+      heli += (dir * 360 * turns) / frames;
+      out.push(r.frame({ dAngle: bodyPerFrame, input: { heli: dir }, state: { heliDeg: heli } }));
+    }
+    out.push(r.frame({ grounded: true, state: { heliDeg: heli } }));
+    return allTricks(out);
+  };
+
+  test('a held arrow spin with a motionless body scores helicopterCW / CCW', () => {
+    expect(spin({ turns: 1, dir: 1 }).map((t) => [t.type, t.count])).toEqual([['helicopterCW', 1]]);
+    expect(spin({ turns: 1, dir: -1 }).map((t) => [t.type, t.count])).toEqual([['helicopterCCW', 1]]);
+  });
+
+  test('two turns count 1 then 2; less than a turn scores nothing', () => {
+    expect(spin({ turns: 2 }).map((t) => t.count)).toEqual([1, 2]);
+    expect(spin({ turns: 0.6 })).toHaveLength(0);
+  });
+
+  test('body rotation during a heli spin is a flip, not a helicopter', () => {
+    const types = spin({ turns: 1, bodyPerFrame: -6 }).map((t) => t.type).sort();
+    expect(types).toEqual(['backflip', 'helicopterCW']);
+  });
+
+  test('a re-based drawing phase (huge jump) is ignored', () => {
+    const r = rig();
+    r.run(3, { grounded: true, state: { heliDeg: 36001 } });
+    const out = r.run(30, { input: { heli: 1 }, state: { heliDeg: 40 } });
+    out.push(r.frame({ grounded: true, state: { heliDeg: 40 } }));
+    expect(allTricks(out)).toHaveLength(0);
+  });
+
+  test('without heliDeg the legacy body-rotation rule still applies', () => {
+    const r = rig();
+    r.run(3, { grounded: true });
+    const out = r.run(60, { dAngle: 6, input: { heli: 1 } });
+    out.push(r.frame({ grounded: true }));
+    expect(allTricks(out).map((t) => t.type)).toEqual(['helicopterCW']);
+  });
+});

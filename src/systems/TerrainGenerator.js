@@ -33,18 +33,26 @@ import { TERRAIN } from '../constants.js';
 export const SPACING_PX = 16;
 /** Steepest descent / ascent the generator will emit (degrees). Always below TERRAIN.maxSlopeDeg. */
 export const MAX_DOWN_DEG = 42;
-export const MAX_UP_DEG = 28;
+export const MAX_UP_DEG = 12;
 export const MAX_NOISE_DOWN_DEG = 38;
 export const MAX_NOISE_UP_DEG = 26;
 /** Max change of slope angle between neighbouring segments (degrees). */
 export const MAX_TURN_DEG = 10;
 export const MAX_NOISE_TURN_DEG = 17;
 /** Every chunk descends at least this much overall (tan of angle). */
-const MIN_NET_TAN = Math.tan((7 * Math.PI) / 180);
+const MIN_NET_TAN = Math.tan((9 * Math.PI) / 180);
 /** Hazard fairness: hazards keep this far from chunk ends / each other / the start of the run. */
 export const HAZARD_END_MARGIN_PX = 240;
 export const HAZARD_MIN_SPACING_PX = 480;
 export const HAZARD_MIN_X_PX = 700;
+/**
+ * Anti-stall ("flow") rule: a hill may never rise above the descending RISE_LINE_DEG line drawn from the previous
+ * peak (a sled resting on that peak can always roll over the next one), nor more than RISE_MAX_PX above the valley
+ * floor it climbs out of. Keeps ordinary terrain rollable without pushing.
+ */
+export const RISE_LINE_DEG = 7;
+export const RISE_MAX_PX = 30;
+const RISE_LINE_TAN = Math.tan((RISE_LINE_DEG * Math.PI) / 180);
 const RAD = Math.PI / 180;
 const DEG = 180 / Math.PI;
 
@@ -120,6 +128,7 @@ export class TerrainGenerator {
     this.stats = { created: 1, reused: 0, built: 0 };
     this.bounds = [{
       startX: 0, startY: 0, startAngDeg: 6, packNo: 0, pos: 0, packSize: this._packSize(0), prevKind: '',
+      peakDx: 0, peakDy: 0, valDy: 0,
     }];
     this._cap = 0;
     this._raw = null;
@@ -433,9 +442,11 @@ export class TerrainGenerator {
     let endAng;
     if (kind === 'noise') {
       this._noiseProfile(def, shape, n, L, variance);
+      this._limitRise(raw, n, b);
       endAng = this._finish(raw, 0, n, b.startY, b.startAngDeg, limits, ys);
     } else {
       this._bezierProfile(def, shape, n, L, variance, index === 0 ? 0.6 : L / def.lengthPx);
+      if (kind !== 'bridge') this._limitRise(raw, n, b);
       if (kind === 'bridge') {
         const br = def.bridge || { gapPx: 176, bounceBoost: 420 };
         let gapSegs = Math.round(clamp(br.gapPx * (1 + 0.08 * Math.min(1, Math.max(0, (distM - 200) / 2000))), 64, 224) / SPACING_PX);
@@ -499,7 +510,11 @@ export class TerrainGenerator {
         pos = 0;
         packSize = this._packSize(packNo);
       }
-      this.bounds.push({ startX: target.endX, startY: ys[n], startAngDeg: endAng, packNo, pos, packSize, prevKind: kind });
+      const rs = this._riseState(ys, n, b);
+      this.bounds.push({
+        startX: target.endX, startY: ys[n], startAngDeg: endAng, packNo, pos, packSize, prevKind: kind,
+        peakDx: rs.peakDx, peakDy: rs.peakDy, valDy: rs.valDy,
+      });
     }
     return target;
   }
@@ -580,6 +595,54 @@ export class TerrainGenerator {
     for (let i = 0; i <= n; i++) raw[i] -= base;
   }
 
+  /**
+   * Flow rule (see RISE_LINE_DEG): raise (lower on screen) any raw height that would climb above the allowed line.
+   * Works on heights relative to the chunk start (raw[0] = 0); peak/valley state comes from the incoming bound.
+   */
+  _limitRise(raw, n, b) {
+    let peakX = -b.peakDx;
+    let peakY = b.peakDy;
+    let valY = b.valDy;
+    let dir = 1;
+    let prev = raw[0];
+    for (let i = 1; i <= n; i++) {
+      const x = i * SPACING_PX;
+      let y = raw[i];
+      const floor = Math.max(peakY + RISE_LINE_TAN * (x - peakX), valY - RISE_MAX_PX);
+      if (y < floor) y = floor;
+      raw[i] = y;
+      if (y < prev) dir = -1;
+      else if (y > prev) {
+        if (dir < 0) { peakX = (i - 1) * SPACING_PX; peakY = prev; valY = prev; }
+        dir = 1;
+        if (y > valY) valY = y;
+      }
+      prev = y;
+    }
+  }
+
+  /** Peak / valley state at the end of a built chunk (final heights), relative to its end point, for the next chunk. */
+  _riseState(ys, n, b) {
+    let peakX = -b.peakDx;
+    let peakY = b.peakDy;
+    let valY = b.valDy;
+    let dir = 1;
+    const y0 = ys[0];
+    let prev = 0;
+    for (let i = 1; i <= n; i++) {
+      const y = ys[i] - y0;
+      if (y < prev) dir = -1;
+      else if (y > prev) {
+        if (dir < 0) { peakX = (i - 1) * SPACING_PX; peakY = prev; valY = prev; }
+        dir = 1;
+        if (y > valY) valY = y;
+      }
+      prev = y;
+    }
+    const yEnd = ys[n] - y0;
+    return { peakDx: n * SPACING_PX - peakX, peakDy: peakY - yEnd, valDy: valY - yEnd };
+  }
+
   /** Fill this._raw[0..n] with a noise-zone profile: mean slope + fbm value noise, faded in/out at the ends. */
   _noiseProfile(def, shape, n, L, variance) {
     const nz = def.noise || { amplitudePx: 24, frequency: 0.006, octaves: 3, meanSlopeDeg: 14 };
@@ -638,8 +701,10 @@ export class TerrainGenerator {
       lastRel = rel;
       if (ang > hi) ang = hi;
       else if (ang < lo) ang = lo;
-      if (ang > prev + limits.turn) ang = prev + limits.turn;
-      else if (ang < prev - limits.turn) ang = prev - limits.turn;
+      // the first segment of a chunk never turns by more than MAX_TURN_DEG (noise chunks used to allow 17 at the seam)
+      const turn = i === i0 + 1 ? Math.min(limits.turn, MAX_TURN_DEG) : limits.turn;
+      if (ang > prev + turn) ang = prev + turn;
+      else if (ang < prev - turn) ang = prev - turn;
       y += Math.tan(ang * RAD) * SPACING_PX;
       out[i] = y;
       prev = ang;

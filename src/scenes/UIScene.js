@@ -560,6 +560,14 @@ export class UIScene extends Phaser.Scene {
       this.speedMs = 0;
       this.speedText.setText('0 KM/H');
     }
+    // the on-screen touch controls own the bottom-right corner: hide the seed / daily rule lines while they are shown
+    const router = this.registry.get(REG.INPUT);
+    const ov = router && router.pad && router.pad.overlay;
+    const covered = !!(ov && ov.isVisible && ov.isVisible());
+    if (this.seedText && this.seedText.visible === covered) {
+      this.seedText.setVisible(!covered);
+      this.ruleText.setVisible(!covered);
+    }
     // glitch jitter of the HUD (subtle)
     if (this.nowMs < this.glitchUntil) {
       this.hud.setPosition(Phaser.Math.Between(-this.glitchPower, this.glitchPower), 0);

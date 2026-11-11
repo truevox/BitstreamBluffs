@@ -325,3 +325,40 @@ All additive; no public signature changed.
   Manual Shift reset: `RESPAWN reason 'manual'`, ends timed power-ups with `POWERUP_EXPIRED reason 'respawn'`.
 * **Extra emissions**: `HUD_SPEED_EVENT` ~10 Hz; `audio.playSfx('hop'|'push')` and `audio.setSpeed()` from RunScene.
 * **Entity files added**: `entities/Background.js` (parallax), `entities/Fx.js` (pooled shards/sparks/rings).
+
+## Integration / QA addenda (QA engineer; additive, nothing in sections 1-9 changed)
+
+* **Flow tuning (Pillar 1)**. QA found a hands-off sled stalled (< 10 px/s) in the first dip and covered ~110 m in 20 s
+  (peak ~320 px/s). Doc 4.2 values in `constants.PHYSICS` are untouched; the feel multipliers in `PhysicsTuner.TUNING` changed:
+
+  | Tunable | Before | After | Effect |
+  |---|---|---|---|
+  | `dragFeelMul` (x doc drag 0.015) | 0.3 | 0.15 | linear air drag 0.27/s -> 0.14/s |
+  | `groundResist` (1/s) | 0.12 | 0.04 | runner resistance |
+  | `quadDrag` (1/px) | 0.00009 | 0.0003 | soft terminal speed (~600 px/s on steep drops) |
+  | `airTiltFeelMul` (x doc 420 x 0.7) | 1.6 | 3.6 | air tilt 470 -> 1060 deg/s^2: a held flip is ~270 deg in a 0.8 s hop, ~540 deg in ~1.0-1.1 s |
+  | `maxAngularVelDegS` | 560 | 1100 | do not clip a held flip |
+  | `hopPxS` | 300 | 360 | an average hop is ~0.8 s of air (was ~0.6) |
+  | `pushKickPxS` | 70 | 90 | W from a standstill still useful |
+
+  Measured with the real game (12 seeds, hazards ignored, hands-off, today's daily rule): mean speed 78 -> ~350 px/s, distance
+  in 20 s ~85 m -> ~250-320 m, stalls (> 2 s below 10 px/s) in 40 s: 12 of 12 seeds -> 0 of 12 (also 0 with the heaviest,
+  lightest and stickiest daily rules). Matter 0.20 loses ~35 % of `g sin(slope)` on the polyline colliders (QA measured
+  accel 61 vs 91 px/s^2 at 5 deg) which is why the drag had to drop so far.
+* **TerrainGenerator flow rules** (`RISE_LINE_DEG`, `RISE_MAX_PX`, `MAX_UP_DEG`): spline slopes climb at most `MAX_UP_DEG` = 12
+  (was 28 - the old kicker ramps were walls that trapped sleds in bowls W cannot escape, push needs slope >= -5 deg); a hill never
+  rises above the descending 7 deg line drawn from the previous peak nor more than 30 px above the valley floor it climbs out of
+  (state carried in `bounds[].peakDx/peakDy/valDy`, so chunks stay pure functions of seed and index); every chunk still
+  descends >= 9 deg overall (`MIN_NET_TAN`, was 7); the first segment of a chunk turns at most `MAX_TURN_DEG` (noise seams used
+  to allow 17). Templates `kicker-lip`, `valley-launch`, `ski-jump` had their uphill rises cut to ~35-45 px. Terrain unit tests were
+  not loosened; flow rules have their own tests (`tests/src/terrain.test.js`, "flow rules").
+* **Helicopter spin scoring**: the spin is a drawing-only rotation, so `TrickTracker` (which counted body rotation while an arrow was
+  held) never scored it. `SledFrameState` has an optional `heliDeg` (continuous drawing phase, `Sled.heliPhase`); when present the heli
+  bucket is fed from it and body rotation always counts as flips. Without it the legacy rule applies.
+* **Sled skids** are 24-gon polygons instead of Matter's 10-sided circles (polygon edge normals caused ~10 % extra seam drag).
+* **Camera** keeps the rider inside a 34 px band and follows faster with vertical speed (bounce pads launched the sled off screen).
+* **Menu text entry**: `ui/MenuInput` uses native window keydown events (not Phaser's keyboard plugin) while `rawKeyHandler` is set,
+  because InputRouter preventDefaults Space / arrows (Phaser drops those) and Phaser's per-frame key queue re-delivered keys out of
+  order when several arrived in one frame. On the Game Over initials panel: Enter saves, Space saves with the current letters and
+  retries instantly, Esc skips (nothing saved). With no panel up Space / Enter / pad A / tap retry at once.
+* **UIScene** hides the seed / daily-rule lines while the touch overlay is visible (they sat under the HOP / PUSH buttons).

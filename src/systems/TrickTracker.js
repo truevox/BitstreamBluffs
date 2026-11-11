@@ -44,6 +44,11 @@ export const DEFAULT_MIN_AIRTIME_MS = 120;
  * @property {number} groundAngleDeg  slope of terrain under/near sled in degrees (clockwise positive = descending right);
  *                                  used for landing alignment. Use last known value while airborne.
  * @property {{heli:-1|0|1, airBrake:boolean, parachute:boolean}} input  heli: -1 = CCW (left arrow), +1 = CW (right arrow).
+ * @property {number} [heliDeg]     OPTIONAL continuous (unwrapped) helicopter spin phase of the sled drawing, clockwise positive.
+ *                                  The helicopter spin is a visual rotation about the sled's vertical axis (the physics body does
+ *                                  not rotate), so when this is provided helicopter turns are counted from it, whatever the
+ *                                  arrow-key state, and body rotation always counts as flips. When absent the legacy rule applies
+ *                                  (body rotation while input.heli != 0 counts as helicopter).
  * @property {boolean} crashed      true on the frame a crash is detected (tracker discards airborne tricks).
  */
 
@@ -123,6 +128,7 @@ export class TrickTracker {
     const dt = state.dtMs > 0 ? state.dtMs : 0;
     const angle = Number.isFinite(state.angleDeg) ? state.angleDeg : this._prevAngle || 0;
     const input = state.input || NO_INPUT;
+    const heli = Number.isFinite(state.heliDeg) ? state.heliDeg : null;
     const tricks = [];
 
     if (state.crashed) {
@@ -132,6 +138,7 @@ export class TrickTracker {
       }
       this.reset();
       this._prevAngle = angle;
+      this._prevHeli = heli;
       this._havePrev = true;
       return { tricks, landing, airborne: false, airtimeMs: 0, rotationDeg: 0 };
     }
@@ -151,9 +158,7 @@ export class TrickTracker {
         if (!this._havePrev) this._prevAngle = angle;
       }
       const airtime = t - this._airStart;
-      const delta = angle - this._prevAngle;
-      if (input.heli) this._heliNet += delta;
-      else this._tiltNet += delta;
+      this._accumulate(angle, heli, input);
 
       this._emitRotations(tricks, this._tiltNet, '_tiltDone', 'backflip', 'frontflip', airtime);
       this._emitRotations(tricks, this._heliNet, '_heliDone', 'helicopterCCW', 'helicopterCW', airtime);
@@ -169,6 +174,7 @@ export class TrickTracker {
         tricks.push({ type: 'parachute', count: 1, rotationDeg: 0, airtimeMs: airtime });
       }
       this._prevAngle = angle;
+      this._prevHeli = heli;
       this._havePrev = true;
       return { tricks, landing: null, airborne: true, airtimeMs: airtime, rotationDeg: this._tiltNet + this._heliNet };
     }
@@ -178,9 +184,7 @@ export class TrickTracker {
     let rot = 0;
     if (this._air) {
       const airtime = t - this._airStart;
-      const delta = angle - this._prevAngle;
-      if (input.heli) this._heliNet += delta;
-      else this._tiltNet += delta;
+      this._accumulate(angle, heli, input);
       rot = this._tiltNet + this._heliNet;
       if (airtime >= this.minAirtimeMs) {
         // a rotation completed on the touchdown frame still counts
@@ -194,6 +198,7 @@ export class TrickTracker {
       this._air = false;
     }
     this._prevAngle = angle;
+    this._prevHeli = heli;
     this._havePrev = true;
     return { tricks, landing, airborne: false, airtimeMs: 0, rotationDeg: rot };
   }
@@ -211,7 +216,20 @@ export class TrickTracker {
     this._brakeDone = false;
     this._chuteDone = false;
     this._prevAngle = 0;
+    this._prevHeli = null;
     this._havePrev = false;
+  }
+
+  /** Add this frame's rotation to the flip / helicopter buckets (see SledFrameState.heliDeg). */
+  _accumulate(angle, heli, input) {
+    const delta = angle - this._prevAngle;
+    if (heli != null) {
+      this._tiltNet += delta;
+      let hd = this._prevHeli != null ? heli - this._prevHeli : 0;
+      if (Math.abs(hd) > 720) hd = 0; // the drawing's phase was re-based
+      this._heliNet += hd;
+    } else if (input.heli) this._heliNet += delta;
+    else this._tiltNet += delta;
   }
 
   _emitRotations(out, net, doneKey, ccwType, cwType, airtime) {

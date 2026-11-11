@@ -561,3 +561,74 @@ describe('TerrainGenerator streaming and pooling', () => {
     expect(snap(added[0])).toEqual(snap(ref.getChunk(added[0].index)));
   });
 });
+
+describe('TerrainGenerator flow rules (QA: hands-off sleds used to stall in dips)', () => {
+  const MAX_UP = 12;
+
+  /** Points of the first `n` chunks, bridges excluded (their gap is a deliberate jump). */
+  const solid = (g, n) => {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const c = g.getChunk(i);
+      if (c.kind === 'bridge') continue;
+      for (let k = 0; k < c.points.length; k++) out.push({ ...c.points[k], first: k === 0, chunk: c });
+    }
+    return out;
+  };
+
+  test('spline chunks never climb steeper than MAX_UP_DEG and no hill rises far above its valley', () => {
+    let worstUp = 0;
+    let worstRise = 0;
+    for (let s = 0; s < 20; s++) {
+      const g = makeGen('flow-' + s);
+      for (let i = 0; i < 120; i++) {
+        const c = g.getChunk(i);
+        if (c.kind !== 'spline') continue;
+        let valleyY = c.points[0].y;
+        for (let k = 0; k < c.points.length - 1; k++) {
+          worstUp = Math.max(worstUp, -segAngle(c.points, k));
+          const y = c.points[k + 1].y;
+          if (y > c.points[k].y) valleyY = Math.max(valleyY, y);
+          else if (y < c.points[k].y) worstRise = Math.max(worstRise, valleyY - y);
+        }
+      }
+    }
+    expect(worstUp).toBeLessThanOrEqual(MAX_UP + 1e-6);
+    // RISE_MAX_PX is 30 on the raw profile; the start-tangent blend and slope limiter reshape it a little
+    expect(worstRise).toBeLessThanOrEqual(70);
+  });
+
+  test('a rolling point mass with typical drag never stalls on the first 1.5 km of 40 seeds', () => {
+    // 1-D roll along the polyline: 65% of g*sin(slope) (Matter seam losses seen in QA), linear + quadratic drag.
+    for (let s = 0; s < 40; s++) {
+      const g = makeGen('roll-' + s);
+      const pts = solid(g, 40).filter((p, i, a) => i === 0 || p.x > a[i - 1].x);
+      let v = 90;
+      let i = 0;
+      let pos = pts[0].x;
+      let below = 0;
+      for (let t = 0; t < 120 && i < pts.length - 2 && pos < 1500 * PIXELS_PER_METER; t += 0.01) {
+        const a = Math.atan2(pts[i + 1].y - pts[i].y, pts[i + 1].x - pts[i].x);
+        v = Math.max(0, v + (900 * Math.sin(a) * 0.65 - 0.2 * v - 0.0003 * v * v) * 0.01);
+        pos += v * Math.cos(a) * 0.01;
+        while (i < pts.length - 2 && pos >= pts[i + 1].x) i++;
+        below = v < 10 ? below + 0.01 : 0;
+        if (below > 1) throw new Error(`seed ${s}: stalled at ${Math.round(pos / 20)} m`);
+      }
+    }
+  });
+
+  test('the first segment of every chunk turns by at most 12 degrees from the previous one (noise seams too)', () => {
+    for (let s = 0; s < 10; s++) {
+      const g = makeGen('seam-' + s);
+      let prev = g.getChunk(0);
+      for (let i = 1; i < 300; i++) {
+        const c = g.getChunk(i);
+        if (c.kind !== 'bridge' && prev.kind !== 'bridge') {
+          expect(Math.abs(segAngle(prev.points, prev.points.length - 2) - segAngle(c.points, 0))).toBeLessThanOrEqual(12);
+        }
+        prev = c;
+      }
+    }
+  });
+});

@@ -64,6 +64,9 @@ export class RunScene extends Phaser.Scene {
     this.inputRouter = reg.get(REG.INPUT) || null;
     this.saveStore = reg.get(REG.SAVE_STORE) || null;
     this.settings = reg.get(REG.SETTINGS) || {};
+    // One-shot edges (Esc that closed a menu view, Space that retried, ...) pile up while no scene polls the router; a
+    // stale `pressed.pause` paused the run on its first frame. Drop them before the run starts.
+    try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
     this.palette = getPalette(this.game);
     this.seed = String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
     this.startedAt = Date.now();
@@ -911,9 +914,14 @@ export class RunScene extends Phaser.Scene {
     const tx = s.x + look - GAME_WIDTH * 0.38;
     const ty = s.y - GAME_HEIGHT / 3 - clamp(s.vy * 0.05, -26, 34);
     const kx = 1 - Math.exp((-TUNING.cameraLerpX * dt) / 1000);
-    const ky = 1 - Math.exp((-TUNING.cameraLerpY * dt) / 1000);
+    // follow faster the quicker the sled moves vertically (bounce pads / big drops must never push it off screen)
+    const ky = 1 - Math.exp((-(TUNING.cameraLerpY + clamp(Math.abs(s.vy) / 90, 0, 7)) * dt) / 1000);
     this._camX += (tx - this._camX) * kx;
     this._camY += (ty - this._camY) * ky;
+    // hard guarantee: keep the rider inside the visible band
+    const margin = 34;
+    if (s.y - this._camY < margin) this._camY = s.y - margin;
+    else if (s.y - this._camY > GAME_HEIGHT - margin) this._camY = s.y - (GAME_HEIGHT - margin);
     let ox = 0;
     let oy = 0;
     if (this.shakeAmp > 0.15) {
