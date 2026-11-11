@@ -1,0 +1,31 @@
+{
+  "id": "wireless-bridge",
+  "kind": "bridge",
+  "weight": 1,
+  "minDistanceM": 200,
+  "lengthPx": 700,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.5,
+      "y": 25
+    },
+    {
+      "x": 1,
+      "y": 60
+    }
+  ],
+  "bridge": {
+    "gapPx": 176,
+    "bounceBoost": 420
+  },
+  "tags": [
+    "gap"
+  ],
+  "modIds": [
+    "wirelessBridge"
+  ]
+}

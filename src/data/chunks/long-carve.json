@@ -1,0 +1,36 @@
+{
+  "id": "long-carve",
+  "kind": "spline",
+  "weight": 2,
+  "minDistanceM": 80,
+  "lengthPx": 2200,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.25,
+      "y": 56
+    },
+    {
+      "x": 0.5,
+      "y": 130
+    },
+    {
+      "x": 0.75,
+      "y": 155
+    },
+    {
+      "x": 1,
+      "y": 273
+    }
+  ],
+  "tags": [
+    "carve",
+    "long"
+  ],
+  "modIds": [
+    "highBandwidth"
+  ]
+}

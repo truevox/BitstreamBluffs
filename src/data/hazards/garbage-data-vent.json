@@ -1,0 +1,2 @@
+{ "id": "garbageDataVent", "shapeKey": "vent", "size": { "w": 28, "h": 30 },
+  "onHit": { "effect": "scramble", "durationMs": 2000 }, "weight": 2, "minDistanceM": 120, "placement": "ground", "colorKey": "lime" }

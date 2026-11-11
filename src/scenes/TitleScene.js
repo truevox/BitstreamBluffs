@@ -1,0 +1,184 @@
+/**
+ * OWNER: UI engineer.
+ * Title / main menu. Menu: Start Run (random seed), Daily Run (UTC-date seed + today's Daily Patch rule),
+ * Enter Seed, Leaderboard, Settings. Operable by keyboard, gamepad and touch/mouse. Writes the chosen seed to
+ * registry REG.SEED, unlocks audio on first input (MenuInput does this) and starts SCENES.RUN.
+ */
+import Phaser from 'phaser';
+import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
+import { DailyPatch } from '../systems/DailyPatch.js';
+import { Theme } from '../ui/Theme.js';
+import { NeonText } from '../ui/Neon.js';
+import { measureText, ellipsize } from '../ui/PixelFont.js';
+import { Panel } from '../ui/Panel.js';
+import { MenuList } from '../ui/MenuList.js';
+import { MenuInput } from '../ui/MenuInput.js';
+import { Backdrop } from '../ui/Backdrop.js';
+import { addScanlines } from '../ui/Scanlines.js';
+import { LeaderboardView, SettingsView, SeedView } from '../ui/Views.js';
+import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
+import { uiSfx } from '../ui/Sound.js';
+
+const CONTROLS_A = [['W', 'PUSH'], ['A/D', 'TILT'], ['A+D', 'TUCK'], ['S', 'BRAKE'], ['SPACE', 'HOP']];
+const CONTROLS_B = [['SHIFT', 'RESET'], ['← →', 'HELI SPIN'], ['↑', 'AIR BRAKE'], ['↓', 'CHUTE'], ['ESC', 'PAUSE']];
+
+export class TitleScene extends Phaser.Scene {
+  constructor() {
+    super(SCENES.TITLE);
+  }
+
+  create() {
+    this.starting = false;
+    this.view = null;
+    this.dim = null;
+    this.glitchUntil = 0;
+    this.nextGlitch = 2500;
+    const theme = (this.theme = new Theme(this));
+    theme.bind((pal) => this.cameras.main.setBackgroundColor(pal.bg));
+    this.backdrop = new Backdrop(this, theme, { horizon: 228, alpha: 0.9 });
+    this.daily = DailyPatch.getDailyInfo();
+
+    this._buildLogo();
+    this._buildMenu();
+    this._buildControls();
+    this._buildDailyStrip();
+    this.bestText = new NeonText(this, theme, GAME_WIDTH / 2, 239, '', { color: 'lime', anchor: 'center', vAnchor: 0.5, outline: 'none' });
+    this._loadBest();
+    this.hint = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 12, '↑↓ SELECT   ENTER/SPACE/A CONFIRM   TAP ANY ITEM', {
+      color: 'text', anchor: 'center', vAnchor: 0.5,
+    });
+    this.hint.setAlpha(0.7);
+    addScanlines(this);
+
+    this.input_ = new MenuInput(this, (a) => this._onAction(a));
+    this.events.once('shutdown', () => this._closeView());
+    this.cameras.main.fadeIn(180, 5, 6, 15);
+  }
+
+  _buildLogo() {
+    const theme = this.theme;
+    this.logo = [];
+    const lines = [
+      { text: 'BITSTREAM', y: 8, scale: 4, color: 'cyan' },
+      { text: 'BLUFFS', y: 40, scale: 4, color: 'magenta' },
+    ];
+    for (const ln of lines) {
+      const total = measureText(ln.text) * ln.scale;
+      let x = Math.round(GAME_WIDTH / 2 - total / 2);
+      [...ln.text].forEach((ch, i) => {
+        const t = new NeonText(this, theme, x, ln.y, ch, { color: ln.color, scale: ln.scale, outline: 'dark' });
+        this.logo.push({ t, baseY: ln.y, baseX: x, i, base: ln.color, line: ln.text });
+        x += (measureText(ch) + 1) * ln.scale;
+      });
+    }
+    this.sub = new NeonText(this, theme, GAME_WIDTH / 2, 76, 'A DOWNHILL NEON TRICK RACE', { color: 'amber', anchor: 'center', outline: 'none' });
+    this.sub.setAlpha(0.9);
+  }
+
+  _buildMenu() {
+    const theme = this.theme;
+    this.menuPanel = new Panel(this, theme, { x: 24, y: 92, w: 216, h: 104, color: 'cyan', fillAlpha: 0.88 });
+    const items = [
+      { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
+      { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this.startRun(this.daily.seed) },
+      { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
+      { kind: 'action', label: 'LEADERBOARD', color: 'amber', onSelect: () => this._openView(new LeaderboardView(this, theme, { onClose: () => this._closeView() })) },
+      { kind: 'action', label: 'SETTINGS', color: 'cyan', onSelect: () => this._openView(new SettingsView(this, theme, { onClose: () => this._closeView() })) },
+    ];
+    this.menu = new MenuList(this, theme, { x: 4, y: 4, w: 208, rowH: 19, items, scale: 2, parent: this.menuPanel });
+  }
+
+  _buildControls() {
+    const theme = this.theme;
+    const p = new Panel(this, theme, { x: 252, y: 92, w: 204, h: 104, color: 'magenta', title: 'CONTROLS', fillAlpha: 0.88 });
+    const col = (rows, x) => rows.forEach(([k, a], i) => {
+      p.add(new NeonText(this, theme, x, 22 + i * 11, k, { color: 'amber', outline: 'none' }));
+      p.add(new NeonText(this, theme, x + 34, 22 + i * 11, a, { color: 'text', outline: 'none' }));
+    });
+    col(CONTROLS_A, 8);
+    col(CONTROLS_B, 106);
+    p.add(new NeonText(this, theme, 8, 79, 'PAD  STICK=TILT  RT=PUSH', { color: 'cyan', outline: 'none' }).setAlpha(0.85));
+    p.add(new NeonText(this, theme, 8, 90, 'FACE BTNS=TRICKS  TOUCH=ON-SCREEN', { color: 'cyan', outline: 'none' }).setAlpha(0.85));
+    this.controlsPanel = p;
+  }
+
+  _loadBest() {
+    try {
+      const store = this.registry.get(REG.SAVE_STORE);
+      Promise.resolve(store.getRecentRuns(1000)).then((runs) => {
+        if (!Array.isArray(runs) || !runs.length || !this.bestText.scene) return;
+        const m = Math.max(...runs.map((r) => r.distanceM || 0));
+        const sc = Math.max(...runs.map((r) => r.score || 0));
+        if (m > 0) this.bestText.setText(`BEST ${fmtInt(m)} M   ${fmtInt(sc)} PTS`);
+      }).catch(() => {});
+    } catch (e) { /* cosmetic */ }
+  }
+
+  _buildDailyStrip() {
+    const theme = this.theme;
+    const rule = this.daily.rule || { name: '-', description: '', id: '' };
+    const p = new Panel(this, theme, { x: 24, y: 202, w: 432, h: 26, color: 'amber', fillAlpha: 0.88 });
+    p.add(new NeonText(this, theme, 8, 4, `DAILY PATCH ${this.daily.dateKey} UTC: ${rule.name.toUpperCase()}`, { color: 'amber', outline: 'none' }));
+    p.add(new NeonText(this, theme, 8, 15, ellipsize(rule.description || idToLabel(rule.id), 414), { color: 'text', outline: 'none' }).setAlpha(0.85));
+    this.dailyPanel = p;
+  }
+
+  _openSeed() {
+    this._openView(new SeedView(this, this.theme, {
+      onClose: () => this._closeView(),
+      onSubmit: (seed) => this.startRun(seed || randomSeed()),
+    }));
+  }
+
+  _openView(view) {
+    this._closeView();
+    this.dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8).setOrigin(0, 0).setDepth(400).setInteractive();
+    this.view = view;
+  }
+
+  _closeView() {
+    if (this.view) this.view.destroy();
+    this.view = null;
+    if (this.dim) this.dim.destroy();
+    this.dim = null;
+  }
+
+  _onAction(action) {
+    if (this.starting) return;
+    if (this.view) {
+      this.view.handleAction(action);
+      return;
+    }
+    this.menu.handleAction(action);
+  }
+
+  /** @param {string} seed @returns {void} */
+  startRun(seed) {
+    if (this.starting) return;
+    this.starting = true;
+    this.registry.set(REG.SEED, seed);
+    uiSfx(this, 'uiSelect', { pitch: 1.3 });
+    this._closeView();
+    this.scene.start(SCENES.RUN);
+  }
+
+  update(time) {
+    this.backdrop.update(time);
+    const t = time;
+    const glitching = t < this.glitchUntil;
+    if (!glitching && t > this.nextGlitch) {
+      this.glitchUntil = t + 130;
+      this.nextGlitch = t + 2500 + Math.random() * 3500;
+      this.glitchPick = new Set([Math.floor(Math.random() * this.logo.length), Math.floor(Math.random() * this.logo.length)]);
+    }
+    for (const L of this.logo) {
+      const wave = Math.round(Math.sin(t * 0.004 + L.i * 0.55 + (L.line === 'BLUFFS' ? 1.5 : 0)) * 2);
+      let dx = 0;
+      if (glitching && this.glitchPick && this.glitchPick.has(this.logo.indexOf(L))) dx = (Math.random() < 0.5 ? -3 : 3);
+      L.t.setPosition(L.baseX + dx, L.baseY + wave);
+      const sweep = (Math.floor(t / 90) + L.i) % 16 === 0 || (Math.floor(t / 90) + L.i + 5) % 16 === 0 ? 'text' : L.base;
+      L.t.setColorKey(sweep);
+    }
+    this.sub.setAlpha(0.75 + 0.2 * Math.sin(t * 0.004));
+  }
+}

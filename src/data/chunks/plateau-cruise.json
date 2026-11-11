@@ -1,0 +1,28 @@
+{
+  "id": "plateau-cruise",
+  "kind": "spline",
+  "weight": 2,
+  "minDistanceM": 30,
+  "lengthPx": 1000,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.5,
+      "y": 25
+    },
+    {
+      "x": 1,
+      "y": 68
+    }
+  ],
+  "tags": [
+    "recover",
+    "cruise"
+  ],
+  "modIds": [
+    "highBandwidth"
+  ]
+}

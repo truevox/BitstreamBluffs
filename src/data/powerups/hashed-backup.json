@@ -1,0 +1,3 @@
+{ "id": "hashedBackup", "shapeKey": "shield", "radius": 10,
+  "effect": { "kind": "shield", "charges": 1 },
+  "spawn": { "baseChance": 0.15, "distanceDecayM": 1200 }, "colorKey": "amber" }

@@ -1,0 +1,1 @@
+{ "id": "compression", "colorKey": "magenta", "physics": { "gravityMul": 1.4 }, "weight": 2, "minDistanceM": 150, "lengthPx": [400, 800] }

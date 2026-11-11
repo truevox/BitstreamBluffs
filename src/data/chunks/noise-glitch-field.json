@@ -1,0 +1,19 @@
+{
+  "id": "noise-glitch-field",
+  "kind": "noise",
+  "weight": 1,
+  "minDistanceM": 300,
+  "lengthPx": 900,
+  "noise": {
+    "amplitudePx": 26,
+    "frequency": 0.006,
+    "octaves": 3,
+    "meanSlopeDeg": 14
+  },
+  "tags": [
+    "difficulty-spike"
+  ],
+  "modIds": [
+    "compression"
+  ]
+}

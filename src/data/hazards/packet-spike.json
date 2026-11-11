@@ -1,0 +1,2 @@
+{ "id": "packetSpike", "shapeKey": "spike", "size": { "w": 20, "h": 20 },
+  "onHit": { "effect": "crash" }, "weight": 3, "minDistanceM": 80, "placement": "ground", "colorKey": "danger" }
