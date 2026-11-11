@@ -2,6 +2,7 @@ import {
   TerrainGenerator, SPACING_PX, HAZARD_MIN_SPACING_PX, HAZARD_MIN_X_PX, CREST_TURN_DEG, NOISE_CREST_TURN_DEG, SHARP_TAGS, SECTOR_M,
   HAZARD_SOFT_PX, HAZARD_SAFE_PX, expectedSpeedPxS,
 } from '../../src/systems/TerrainGenerator.js';
+import { SLOW_HAZARD_MIN_DEG, SLOW_HAZARD_CLEAR_PX, RUNOUT_TURN_DEG } from '../../src/systems/TerrainGenerator.js';
 import { TERRAIN, PIXELS_PER_METER } from '../../src/constants.js';
 import { makeGen, loadContent, segAngle, inGap, rollSim, findLaunches } from './_helpers.js';
 
@@ -951,5 +952,45 @@ describe('TerrainGenerator fun pass: anti-stall at any distance', () => {
   test('expected speed budget rises with distance and is capped', () => {
     expect(expectedSpeedPxS(0)).toBeLessThan(expectedSpeedPxS(1000));
     expect(expectedSpeedPxS(1e6)).toBeLessThanOrEqual(620);
+  });
+});
+
+describe('TerrainGenerator fun pass 2: air, runout, slow hazards', () => {
+  test('slow-type hazards always have a steady >= 9 deg descent for 600 px behind them', () => {
+    let slow = 0;
+    for (let sd = 0; sd < 6; sd++) {
+      const g = makeGen('slow-' + sd);
+      for (let i = 0; i < 100; i++) {
+        const c = g.getChunk(i);
+        for (const h of c.hazards) {
+          if (h.defId !== 'overflowFirewall') continue;
+          slow++;
+          const k0 = Math.floor((h.x - c.startX) / 16);
+          for (let k = k0; k <= Math.min(c.points.length - 2, k0 + 37); k++) {
+            expect(segAngle(c.points, k)).toBeGreaterThanOrEqual(SLOW_HAZARD_MIN_DEG - 0.01);
+          }
+          expect(h.x + SLOW_HAZARD_CLEAR_PX).toBeLessThanOrEqual(c.endX);
+        }
+      }
+    }
+    expect(slow).toBeGreaterThan(0);
+  });
+
+  test('landing-ramp runouts bend by at most RUNOUT_TURN_DEG per segment', () => {
+    for (let sd = 0; sd < 6; sd++) {
+      const g = makeGen('run-' + sd);
+      for (let i = 0; i < 60; i++) {
+        const c = g.getChunk(i);
+        if (c.defId !== 'gen-jump') continue;
+        let steep = false;
+        for (let k = 1; k < c.points.length - 1; k++) {
+          const a = segAngle(c.points, k);
+          if (a > 30) steep = true;
+          else if (steep) {
+            expect(segAngle(c.points, k - 1) - a).toBeLessThanOrEqual(RUNOUT_TURN_DEG + 0.01);
+          }
+        }
+      }
+    }
   });
 });

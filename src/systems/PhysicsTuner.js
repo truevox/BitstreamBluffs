@@ -56,6 +56,12 @@ export const TUNING = Object.freeze({
   maxAngularVelDegS: 1100,
   /** Push kick: surface speed set by W when stalled (px/s), and re-trigger delay. */
   pushKickPxS: 90,
+  /** Stall safety net (Sled.applyControls): below stallNudgeBelowPxS for stallNudgeAfterMs on slopes < stallNudgeMaxSlopeDeg, auto-push to stallNudgeToPxS. */
+  stallNudgeBelowPxS: 40,
+  stallNudgeAfterMs: 600,
+  stallNudgeMaxSlopeDeg: 16,
+  stallNudgeToPxS: 120,
+  stallNudgeAccelPxS2: 160,
   pushCooldownMs: 280,
   /** Hop: speed along the surface normal (px/s; was 300, raised so an average hop is ~0.8 s of air) and coyote/buffer windows. */
   hopPxS: 360,

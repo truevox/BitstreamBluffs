@@ -241,6 +241,19 @@ export class Sled {
       this.pushPulse = 1;
     }
 
+    // stall safety net: crawling < stallNudgeBelowPxS for > stallNudgeAfterMs on non-steep ground with no brake -> gentle auto-push up to stallNudgeToPxS
+    speed = Math.hypot(vx, vy);
+    const crawl = grounded && speed < TUNING.stallNudgeBelowPxS && Math.abs(this.groundAngleDeg) < TUNING.stallNudgeMaxSlopeDeg && !(pad && (pad.brake || pad.airBrake));
+    this._crawlMs = crawl || (this._nudging && grounded) ? this._crawlMs + stepMs : 0;
+    if (this._crawlMs > TUNING.stallNudgeAfterMs && grounded && !(pad && (pad.brake || pad.airBrake)) && Math.abs(this.groundAngleDeg) < TUNING.stallNudgeMaxSlopeDeg) {
+      this._nudging = true;
+      if (speed < TUNING.stallNudgeToPxS) {
+        const add = Math.min(TUNING.stallNudgeAccelPxS2 * dt, TUNING.stallNudgeToPxS - speed);
+        vx += tx * add;
+        vy += ty * add;
+      }
+    } else this._nudging = false;
+
     // hop / bump jump (Space) with coyote time and input buffer
     if (this.hopBufferMs > 0 && this.msSinceContact < TUNING.hopCoyoteMs) {
       const vn = vx * nx + vy * ny;

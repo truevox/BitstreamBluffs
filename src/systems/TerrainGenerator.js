@@ -69,10 +69,23 @@ export const HAZARD_SAFE_PX = 3000;
 /** The first part of a sector's breather chunk is hazard free. */
 export const BREATHER_CALM_PX = 1100;
 /** Jump chunks, landing zones and breathers are hazard free, so ordinary chunks carry proportionally more. */
-export const HAZARD_DENSITY_MUL = 2.4;
+export const HAZARD_DENSITY_MUL = 3.4;
 /** Generated launch chunk ("gen-jump"): see _jumpAngles. */
 export const JUMP_APPROACH_FIRST_PX = 900;
 export const JUMP_RUNOUT_PX = 240;
+/** Measured (real game): launch speed after a JUMP_APPROACH_DEG x JUMP_APPROACH_PX approach, regardless of the entry speed. */
+export const JUMP_LAUNCH_SPEED_PX_S = 480;
+/** Up-angle of the lip of later generated jumps (the first, easy one keeps MAX_UP_DEG). */
+export const JUMP_LIP_UP_DEG = 15;
+export const JUMP_APPROACH_DEG = 24;
+export const JUMP_APPROACH_PX = 900;
+/** The runout after a landing ramp bends (concave) by at most this per 16 px segment, so a 700 px/s sled keeps its head off the ground. */
+export const RUNOUT_TURN_DEG = 0.9;
+/** Slow-type hazards need this much clear descent behind them (px) or they are not placed (anti-stall). */
+export const SLOW_HAZARD_CLEAR_PX = 600;
+export const SLOW_HAZARD_MIN_DEG = 9;
+/** Real launch speed of a sharp-lip template is this share of the expected speed (measured 160-300 px/s of 340-440). */
+export const TEMPLATE_LIP_SPEED_MUL = 0.8;
 /** Anti-stall: the roll model must stay above this speed (px/s) inside every chunk. */
 export const STALL_SPEED_PX_S = 80;
 export const LIP_MIN_AIR_S = 0.45;
@@ -571,7 +584,7 @@ export class TerrainGenerator {
       this._placeZones(target, def, crng.fork('zone'), distM, L);
     }
     const vExp = expectedSpeedPxS(distM);
-    const lips = kind === 'bridge' ? this._padLips(target, vExp) : this._findLips(target.points, vExp, target.endX);
+    const lips = kind === 'bridge' ? this._padLips(target, vExp) : this._findLips(target.points, isJump ? Math.min(vExp, JUMP_LAUNCH_SPEED_PX_S) : vExp * TEMPLATE_LIP_SPEED_MUL, target.endX);
     let landEnd = 0;
     for (const l of lips) {
       if (!l.pad) {
@@ -626,7 +639,7 @@ export class TerrainGenerator {
     const vExp = expectedSpeedPxS(distM);
     const alpha = MAX_UP_DEG;
     const beta = first ? 36 : 36 + 6 * Math.min(1, distM / 1500);
-    const approach = first ? 24 : 11 + shape.range(-1.5, 2);
+    const approach = first ? 24 : JUMP_APPROACH_DEG + shape.range(-1, 1);
     const angs = [];
     let cur = b.startAngDeg;
     const move = (target, up, down) => {
@@ -641,18 +654,18 @@ export class TerrainGenerator {
       for (let i = 0; i < k; i++) angs.push(cur);
     };
     move(approach, CREST_TURN_DEG, MAX_TURN_DEG);
-    const approachPx = first ? JUMP_APPROACH_FIRST_PX : 240 + shape.range(0, 140);
+    const approachPx = first ? JUMP_APPROACH_FIRST_PX : JUMP_APPROACH_PX + shape.range(0, 100);
     hold(Math.max(0, approachPx - angs.length * SPACING_PX));
-    move(-alpha, 0, first ? 10 : 6); // compression ramp
-    hold((first ? 4 : 3) * SPACING_PX); // lip (the first one is long: the mesh rounds the crest, so a short lip launches flat)
+    move(-alpha, 0, 10); // compression ramp
+    hold(4 * SPACING_PX); // lip (the first one is long: the mesh rounds the crest, so a short lip launches flat)
     move(beta, LIP_TURN_DEG, LIP_TURN_DEG); // sharp fall-away: ground drops clear of the trajectory at once
     // landing ramp long enough for the fastest plausible launch (1.2 x expected) to touch down on it
-    const vmax = first ? 470 : vExp * 1.2;
+    const vmax = first ? 470 : Math.max(JUMP_LAUNCH_SPEED_PX_S * 1.25, vExp * 1.1);
     const ca = Math.cos(alpha * RAD);
     const k = GRAV / (2 * vmax * vmax * ca * ca);
     const xHit = (Math.tan(beta * RAD) + Math.tan(alpha * RAD)) / k;
     hold(Math.min(first ? 560 : 1100, xHit * 0.9 + 64));
-    move(9, 0, 3.5); // smooth concave runout
+    move(9, 0, RUNOUT_TURN_DEG); // long smooth concave runout
     hold(JUMP_RUNOUT_PX);
     return angs;
   }
@@ -874,7 +887,7 @@ export class TerrainGenerator {
       const len = Math.hypot(SPACING_PX, dy);
       const sin = dy / len;
       const dt = len / Math.max(v, 25);
-      v += (585 * sin - 0.2 * v - 0.0003 * v * v) * dt;
+      v += (585 * sin - 0.3 * v - 0.0004 * v * v) * dt;
       if (v < 0) v = 0;
       if (v > 900) v = 900;
       if (v < min) min = v;
@@ -978,7 +991,8 @@ export class TerrainGenerator {
           const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
           const w = (def.size && def.size.w) || 24;
           const flatEnough = slope > -12 && slope < 28 && this._flatAround(pts, i);
-          if (flatEnough && x - w > chunk.startX) {
+          const slowOk = !def.onHit || def.onHit.effect !== 'slow' || this._descentAhead(pts, i, chunk.endX);
+          if (flatEnough && slowOk && x - w > chunk.startX) {
             const hx = Math.round(x);
             chunk.hazards.push({ defId: def.id, x: hx, y: this._yAtLocal(pts, hx), rotationDeg: slope });
           }
@@ -1101,6 +1115,16 @@ export class TerrainGenerator {
   }
 
   /** True if the 5 segments around i do not turn sharply (hazards sit on readable ground). */
+  /** True when the next SLOW_HAZARD_CLEAR_PX of this chunk (must fit inside it) is a steady descent of >= SLOW_HAZARD_MIN_DEG. */
+  _descentAhead(pts, i, endX) {
+    if (pts[i].x + SLOW_HAZARD_CLEAR_PX > endX) return false;
+    const k1 = Math.min(pts.length - 2, i + Math.ceil(SLOW_HAZARD_CLEAR_PX / SPACING_PX));
+    for (let k = i; k <= k1; k++) {
+      if (Math.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG < SLOW_HAZARD_MIN_DEG) return false;
+    }
+    return true;
+  }
+
   _flatAround(pts, i) {
     const a0 = Math.max(0, i - 2);
     const a1 = Math.min(pts.length - 2, i + 2);

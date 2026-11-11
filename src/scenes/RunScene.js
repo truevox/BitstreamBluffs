@@ -348,6 +348,14 @@ export class RunScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ collisions
 
+  /** A head/torso brush on a concave transition is forgiven while the sled is grounded and roughly aligned with the slope. */
+  headForgiven() {
+    const sled = this.sled;
+    if (sled.msSinceContact > 150) return false;
+    const rel = Math.abs(((sled.angleDeg - sled.groundAngleDeg + 540) % 360 + 360) % 360 - 180);
+    return rel <= 70;
+  }
+
   handlePair(pair) {
     if (this.crashed || !this.sled || !this.sled.body) return;
     const a = pair.bodyA;
@@ -360,6 +368,7 @@ export class RunScene extends Phaser.Scene {
     switch (other.label) {
       case 'terrain':
         if (part.label === 'skid' || part.label === 'deck') this.sled.noteGroundContact();
+        else if (this.headForgiven()) this.sled.noteGroundContact();
         else if (!this.pendingCrash) this.pendingCrash = { cause: 'terrain' };
         break;
       case 'hazard':
@@ -829,7 +838,7 @@ export class RunScene extends Phaser.Scene {
     this.shake(1 + 1.5 * k);
     if (!this.tutDone.has('boost')) {
       this.tutHint('boost', true);
-      this.tutTimers.boostHint = 2400;
+      this.tutTimers.boostHint = 3000;
     }
   }
 
