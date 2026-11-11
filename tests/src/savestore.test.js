@@ -283,6 +283,12 @@ describe('sanitizers and base64', () => {
     expect(sanitizeRun({ id: 'y', initials: ' abcd ' }).initials).toBe('ABCD');
   });
 
+  test('sanitizeRun keeps fun-pass counters', () => {
+    const r = sanitizeRun({ id: 'z', shards: 7, nearMisses: 2, bonusPoints: 140, hack: 1 });
+    expect(r).toMatchObject({ shards: 7, nearMisses: 2, bonusPoints: 140 });
+    expect(sanitizeRun({ id: 'q', shards: -1 })).not.toHaveProperty('shards');
+  });
+
   test('normalizeInitials', () => {
     expect(normalizeInitials(' a\u0000bc ')).toBe('ABC');
     expect(normalizeInitials(5)).toBe('');

@@ -279,6 +279,13 @@ export class Sled {
     const torqueDeg = phys.tiltTorqueDegS2 * (g ? TUNING.groundTiltMul : phys.airControl) * tilt;
     w += torqueDeg * DEG * dt;
     if (phys.scrambleJitterDegS2) w += (Math.random() * 2 - 1) * phys.scrambleJitterDegS2 * DEG * dt;
+    if (!g && tilt === 0) {
+      // hands off: spin bleeds off and the nose eases toward the travel direction, so a pitch-over at a lip does not tumble the sled
+      let err = Math.atan2(vy, vx) - b.angle;
+      err = Math.atan2(Math.sin(err), Math.cos(err));
+      w += clamp(err, -1.2, 1.2) * TUNING.airIdleLevelK * dt;
+      w *= Math.exp(-TUNING.airIdleSpinDamp * dt);
+    }
     if (pad && pad.brake && !g) w *= Math.exp(-TUNING.airBrakeAngularDamp * dt);
     if (chute) w *= Math.exp(-2.5 * dt);
     const wMax = TUNING.maxAngularVelDegS * DEG;

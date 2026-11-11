@@ -112,6 +112,10 @@ export const TUNING = Object.freeze({
    * less than snapMaxDropDeg (over the look-ahead) gets its surface-normal speed clamped to snapKeepVnPxS plus snapDownPxS/s
    * of downforce. Real kickers (drop > snapMaxDropDeg, or vn above the cap) are untouched.
    */
+  /** Per-second exponential damping of angular velocity while airborne with no tilt input. */
+  airIdleSpinDamp: 3,
+  /** Spring (1/s^2) easing the nose toward the velocity heading while airborne with no tilt input. */
+  airIdleLevelK: 8,
   snapMinGroundMs: 100,
   snapQuietMs: 350,
   snapWindowMs: 160,

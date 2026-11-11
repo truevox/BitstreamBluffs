@@ -133,6 +133,9 @@ export function sanitizeRun(raw) {
     cause: raw.cause === 'quit' ? 'quit' : 'crash',
     ledgerHash: str(raw.ledgerHash),
   };
+  for (const k of ['shards', 'nearMisses', 'bonusPoints']) {
+    if (typeof raw[k] === 'number' && Number.isFinite(raw[k]) && raw[k] >= 0) r[k] = raw[k];
+  }
   const ini = normalizeInitials(raw.initials);
   if (ini.length >= INITIALS_MIN) r.initials = ini;
   return r;

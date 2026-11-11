@@ -71,10 +71,10 @@ export const BREATHER_CALM_PX = 1100;
 /** Jump chunks, landing zones and breathers are hazard free, so ordinary chunks carry proportionally more. */
 export const HAZARD_DENSITY_MUL = 2.4;
 /** Generated launch chunk ("gen-jump"): see _jumpAngles. */
-export const JUMP_APPROACH_FIRST_PX = 720;
+export const JUMP_APPROACH_FIRST_PX = 900;
 export const JUMP_RUNOUT_PX = 240;
 /** Anti-stall: the roll model must stay above this speed (px/s) inside every chunk. */
-export const STALL_SPEED_PX_S = 55;
+export const STALL_SPEED_PX_S = 80;
 export const LIP_MIN_AIR_S = 0.45;
 /** Deliberate lips of generated jumps turn this much per segment (still below the 17 deg kink limit). */
 export const LIP_TURN_DEG = 16;
@@ -598,7 +598,7 @@ export class TerrainGenerator {
         peakDx: rs.peakDx, peakDy: rs.peakDy, valDy: rs.valDy,
         sinceLaunch: lips.length ? Math.max(0, target.endX - lips[lips.length - 1].x) : b.sinceLaunch + L,
         prevJump: isJump,
-        speed: this._roll(ys, n, b.speed).end,
+        speed: Math.min(150, this._roll(ys, n, b.speed).end), // capped: slow hazards / crashes can bleed speed the roll model never saw
         noHazX: Math.max(landEnd > target.endX ? landEnd : 0, b.noHazX > target.endX ? b.noHazX : 0),
       });
     }
@@ -624,9 +624,9 @@ export class TerrainGenerator {
   _jumpAngles(index, b, distM, shape) {
     const first = index === 0;
     const vExp = expectedSpeedPxS(distM);
-    const alpha = first ? 10 : MAX_UP_DEG;
+    const alpha = MAX_UP_DEG;
     const beta = first ? 36 : 36 + 6 * Math.min(1, distM / 1500);
-    const approach = first ? 14 : 11 + shape.range(-1.5, 2);
+    const approach = first ? 24 : 11 + shape.range(-1.5, 2);
     const angs = [];
     let cur = b.startAngDeg;
     const move = (target, up, down) => {
@@ -643,11 +643,11 @@ export class TerrainGenerator {
     move(approach, CREST_TURN_DEG, MAX_TURN_DEG);
     const approachPx = first ? JUMP_APPROACH_FIRST_PX : 240 + shape.range(0, 140);
     hold(Math.max(0, approachPx - angs.length * SPACING_PX));
-    move(-alpha, 0, 6); // compression ramp
-    hold(3 * SPACING_PX); // lip
+    move(-alpha, 0, first ? 10 : 6); // compression ramp
+    hold((first ? 4 : 3) * SPACING_PX); // lip (the first one is long: the mesh rounds the crest, so a short lip launches flat)
     move(beta, LIP_TURN_DEG, LIP_TURN_DEG); // sharp fall-away: ground drops clear of the trajectory at once
     // landing ramp long enough for the fastest plausible launch (1.2 x expected) to touch down on it
-    const vmax = vExp * 1.2;
+    const vmax = first ? 470 : vExp * 1.2;
     const ca = Math.cos(alpha * RAD);
     const k = GRAV / (2 * vmax * vmax * ca * ca);
     const xHit = (Math.tan(beta * RAD) + Math.tan(alpha * RAD)) / k;
