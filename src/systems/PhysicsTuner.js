@@ -80,6 +80,9 @@ export const TUNING = Object.freeze({
   scrambleTorqueJitterDegS2: 380,
   /** Invulnerability after Hashed Backup saves you or after a respawn (ms). */
   invulnerableMs: 900,
+  /** Opening grace: non-hazard crashes before this distance (m) become recovers, at most openingGraceMax per run. */
+  openingGraceM: 150,
+  openingGraceMax: 3,
   /** A body falling this far below the interpolated ground line has fallen into a gap/void: crash. */
   voidDepthPx: 320,
   /** Camera. */

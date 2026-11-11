@@ -128,6 +128,7 @@ export class RunScene extends Phaser.Scene {
     this.slowmoMs = 0;
     this.slowmoScale = 0.5;
     this.shieldCharges = 0;
+    this.openingGraces = 0;
     this.activeZones = new Map();
     this.hazards = new Map();
     this.powerups = new Map();
@@ -996,7 +997,7 @@ export class RunScene extends Phaser.Scene {
     return this.safeSamples[0] || null;
   }
 
-  respawnAt(sample, reason, speedKeep) {
+  respawnAt(sample, reason, speedKeep, minAlong = 60) {
     const s = this.sled;
     let x;
     let y;
@@ -1013,7 +1014,7 @@ export class RunScene extends Phaser.Scene {
     const keep = sp > 1 ? Math.min(1, 380 / sp) * speedKeep : 0;
     const dirx = Math.cos(ang * DEG);
     const diry = Math.sin(ang * DEG);
-    const along = Math.max(60, sp * keep);
+    const along = Math.max(minAlong, sp * keep);
     s.setPose(x, y - 4, ang, dirx * along, diry * along);
     s.invulnerableMs = TUNING.invulnerableMs;
     this._airTricks = 0;
@@ -1047,6 +1048,22 @@ export class RunScene extends Phaser.Scene {
     this.pendingCrash = null;
     const speed = Math.hypot(fs.vx, fs.vy);
     if (this.sled.invulnerableMs > 0 && c.cause !== 'chasm') return; // brief grace after a respawn / backup
+    const distM = (fs.x - this.startX) / PIXELS_PER_METER;
+    if (c.cause !== 'hazard' && c.cause !== 'chasm' && distM < TUNING.openingGraceM && this.openingGraces < TUNING.openingGraceMax) {
+      // opening grace: recover instead of ending the run (no Hashed Backup charge used)
+      this.openingGraces += 1;
+      this.sled.invulnerableMs = Math.max(this.sled.invulnerableMs, 1200);
+      this.fx.ring(fs.x, fs.y, this.palette.amber, 46, 450);
+      this.fx.sparks(fs.x, fs.y, this.palette.amber, 12, 220);
+      this.shake(1.5);
+      this.flashRect.setFillStyle(this.palette.amber, 1).setAlpha(0.2);
+      const dropped = this.score.getSnapshot().comboTricks.length;
+      this.score.onCrash();
+      const pos = this.respawnAt(this.pickSafe(800), 'backup', 0.9, 250);
+      this.game.events.emit(EVT.RESPAWN, { reason: 'backup', x: pos.x, y: pos.y, comboPenalty: dropped });
+      this.emitCombo('crash');
+      return;
+    }
     if (this.shieldCharges > 0) {
       this.shieldCharges -= 1;
       this.game.events.emit(EVT.CRASH, {
