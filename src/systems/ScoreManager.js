@@ -47,6 +47,11 @@ export function airtimeFactor(airtimeMs) {
  * @property {number} pendingPoints  unbanked trick points (before multiplier).
  * @property {number} bestCombo      highest multiplier reached this run.
  * @property {number} [penaltyPoints] total deducted by emergency resets (additive field).
+ * @property {number} [bonusPoints]   immediate bonus points (shards, near misses, milestones); included in `total`.
+ * @property {number} [shards]        shard bonuses collected.
+ * @property {number} [nearMisses]    near-miss bonuses awarded.
+ * @property {number} [milestones]    milestone bonuses awarded.
+ * @property {{shard:number,nearMiss:number,milestone:number}} [bonusByKind] points per bonus kind.
  */
 
 export class ScoreManager {
@@ -63,6 +68,9 @@ export class ScoreManager {
     this.distanceM = 0;
     this.trickPoints = 0;
     this.penaltyPoints = 0;
+    this.bonusPoints = 0;
+    this.bonusCounts = { shard: 0, nearMiss: 0, milestone: 0 };
+    this.bonusByKind = { shard: 0, nearMiss: 0, milestone: 0 };
     this.pending = 0;
     this.comboTricks = [];
     this.paid = {};
@@ -136,6 +144,22 @@ export class ScoreManager {
     return { comboPenalty, pointsLost };
   }
 
+  /**
+   * Immediate bonus (not part of the pending combo, not multiplied, survives crashes and resets).
+   * @param {number} points non-negative; rounded, NaN / negatives count as 0.
+   * @param {'shard'|'nearMiss'|'milestone'} kind unknown kinds add points but are not counted per kind.
+   * @returns {ScoreSnapshot}
+   */
+  addBonus(points, kind) {
+    const pts = Math.max(0, Math.round(Number(points) || 0));
+    this.bonusPoints += pts;
+    if (kind in this.bonusCounts) {
+      this.bonusCounts[kind]++;
+      this.bonusByKind[kind] += pts;
+    }
+    return this.getSnapshot();
+  }
+
   /** @returns {number} current multiplier = 1 + 0.25 * uniqueTricks. */
   getMultiplier() {
     return SCORING.comboStart + SCORING.comboStep * this.comboTricks.length;
@@ -145,7 +169,7 @@ export class ScoreManager {
   getSnapshot() {
     const distancePoints = Math.floor(this.distanceM) * SCORING.pointsPerMeter;
     return {
-      total: Math.max(0, Math.round(distancePoints + this.trickPoints - this.penaltyPoints)),
+      total: Math.max(0, Math.round(distancePoints + this.trickPoints + this.bonusPoints - this.penaltyPoints)),
       distancePoints,
       trickPoints: this.trickPoints,
       distanceM: this.distanceM,
@@ -154,6 +178,11 @@ export class ScoreManager {
       pendingPoints: this.pending,
       bestCombo: this.bestCombo,
       penaltyPoints: this.penaltyPoints,
+      bonusPoints: this.bonusPoints,
+      shards: this.bonusCounts.shard,
+      nearMisses: this.bonusCounts.nearMiss,
+      milestones: this.bonusCounts.milestone,
+      bonusByKind: { ...this.bonusByKind },
     };
   }
 

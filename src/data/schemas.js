@@ -36,7 +36,14 @@
  * @property {BouncePad[]} bouncePads
  * @property {HazardSpawn[]} hazards
  * @property {PowerUpSpawn[]} powerups
+ * @property {ShardSpawn[]} shards      fun pass: collectibles, sorted by x, ids `s<chunkIndex>-<n>` unique and stable per seed (may be empty).
+ * @property {LaunchInfo[]} launches    fun pass: ballistic launch points at the expected speed (may be empty).
+ * @property {number} sector            fun pass: 1-based 500 m sector of startX.
+ * @property {boolean} breather         fun pass: first (calm, partly hazard-free) chunk of a sector.
  */
+
+/** @typedef {{id:string, x:number, y:number}} ShardSpawn  world px, centre; always above the surface and clear of hazards. */
+/** @typedef {{x:number, y:number, angleDeg:number, airS:number, landX:number|null}} LaunchInfo  landX null = lands beyond the chunk. */
 
 /** @typedef {{modId:'highBandwidth'|'compression'|'wirelessBridge', x0:number, x1:number}} TerrainZone  world px, x0<x1. */
 /** @typedef {{x0:number, x1:number}} GapSpan  both x values coincide with polyline points; no collider/mesh between them. */

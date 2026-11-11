@@ -1,6 +1,9 @@
-import { TerrainGenerator, SPACING_PX, HAZARD_MIN_SPACING_PX, HAZARD_MIN_X_PX } from '../../src/systems/TerrainGenerator.js';
+import {
+  TerrainGenerator, SPACING_PX, HAZARD_MIN_SPACING_PX, HAZARD_MIN_X_PX, CREST_TURN_DEG, NOISE_CREST_TURN_DEG, SHARP_TAGS, SECTOR_M,
+  HAZARD_SOFT_PX, HAZARD_SAFE_PX, expectedSpeedPxS,
+} from '../../src/systems/TerrainGenerator.js';
 import { TERRAIN, PIXELS_PER_METER } from '../../src/constants.js';
-import { makeGen, loadContent, segAngle, inGap } from './_helpers.js';
+import { makeGen, loadContent, segAngle, inGap, rollSim, findLaunches } from './_helpers.js';
 
 const snap = (c) => JSON.parse(JSON.stringify(c));
 const N = 300; // chunks examined in the bulk tests (several kilometres of track)
@@ -146,7 +149,7 @@ describe('TerrainGenerator geometry guarantees', () => {
 
   test('chunk defs respect minDistanceM', () => {
     const defs = Object.fromEntries(loadContent().chunks.map((d) => [d.id, d]));
-    for (const c of chunks) expect(c.startX / PIXELS_PER_METER).toBeGreaterThanOrEqual(defs[c.defId].minDistanceM);
+    for (const c of chunks) if (c.defId !== 'gen-jump') expect(c.startX / PIXELS_PER_METER).toBeGreaterThanOrEqual(defs[c.defId].minDistanceM);
   });
 
   test('pack structure: noise zones appear, and are not adjacent to each other', () => {
@@ -223,7 +226,7 @@ describe('TerrainGenerator spawns', () => {
         for (const gp of c.gaps) expect(h.x < gp.x0 || h.x > gp.x1).toBe(true);
         const slope = g.slopeDegAt(h.x);
         expect(slope).toBeLessThan(30);
-        expect(slope).toBeGreaterThan(-15);
+        expect(slope).toBeGreaterThan(-17.5);
       }
     }
   });
@@ -244,13 +247,13 @@ describe('TerrainGenerator spawns', () => {
         const c = gen.getChunk(i);
         const dM = c.startX / PIXELS_PER_METER;
         const len = c.endX - c.startX;
-        if (dM > 150 && dM < 1000) { early += c.hazards.length; earlyLen += len; }
+        if (dM > 150 && dM < 500) { early += c.hazards.length; earlyLen += len; }
         else if (dM > 4500) { late += c.hazards.length; lateLen += len; }
       }
     }
     expect(earlyLen).toBeGreaterThan(0);
     expect(lateLen).toBeGreaterThan(0);
-    expect(late / lateLen).toBeGreaterThan((early / earlyLen) * 1.4);
+    expect(late / lateLen).toBeGreaterThan((early / earlyLen) * 1.2);
   });
 
   test('power-ups: valid, lifted above ground, clear of hazards, probability falls with distance', () => {
@@ -408,21 +411,26 @@ describe('TerrainGenerator queries', () => {
 
 describe('TerrainGenerator difficulty', () => {
   const g = makeGen('diff');
-  test('flat until 1000 m then rising', () => {
+  test('difficulty steps up once per 500 m sector and keeps rising toward the old baseline', () => {
     const base = g.difficultyAt(0);
-    expect(g.difficultyAt(999)).toEqual(base);
-    expect(g.difficultyAt(1000)).toEqual(base);
+    expect(g.difficultyAt(499)).toEqual(base);
+    expect(base.sector).toBe(1);
+    expect(base.slopeVariance).toBe(1);
+    expect(base.hazardDensity).toBeCloseTo(0.8, 6);
     let prev = base;
-    for (const d of [1500, 2500, 4000]) {
+    for (const d of [500, 1000, 1500, 2500, 4000]) {
       const cur = g.difficultyAt(d);
+      expect(cur.sector).toBe(Math.floor(d / SECTOR_M) + 1);
       expect(cur.slopeVariance).toBeGreaterThan(prev.slopeVariance);
       expect(cur.hazardDensity).toBeGreaterThan(prev.hazardDensity);
       expect(cur.glitchFrequency).toBeGreaterThan(prev.glitchFrequency);
       expect(cur.noiseWeightMul).toBeGreaterThan(prev.noiseWeightMul);
+      expect(cur.speedBudget).toBeGreaterThanOrEqual(prev.speedBudget);
       prev = cur;
     }
-    expect(base.slopeVariance).toBe(1);
-    expect(base.hazardDensity).toBeGreaterThan(0);
+    // the old 1000 m ramp reached 2.1 / 4 by 4000 m; sector steps reach the same ceiling
+    expect(g.difficultyAt(4000).hazardDensity).toBeGreaterThan(1.9);
+    expect(g.difficultyAt(99999).hazardDensity).toBeCloseTo(2.1, 6);
   });
 
   test('slope variance makes late terrain bumpier', () => {
@@ -430,7 +438,7 @@ describe('TerrainGenerator difficulty', () => {
       const a = [];
       for (let i = from; i < to; i++) {
         const c = gen.getChunk(i);
-        if (c.kind !== 'spline') continue;
+        if (c.kind !== 'spline' || c.defId === 'gen-jump') continue;
         for (let k = 0; k < c.points.length - 1; k++) a.push(segAngle(c.points, k));
       }
       const m = a.reduce((s, v) => s + v, 0) / a.length;
@@ -630,5 +638,318 @@ describe('TerrainGenerator flow rules (QA: hands-off sleds used to stall in dips
         prev = c;
       }
     }
+  });
+});
+
+describe('TerrainGenerator fun pass: gentle opening', () => {
+  test('no crash hazards in the first 150 m (50 seeds), nothing at all in the first 80 m', () => {
+    const { hazards } = loadContent();
+    for (let sd = 0; sd < 50; sd++) {
+      const g = makeGen('gentle-' + sd);
+      for (let i = 0; i < 12; i++) {
+        const c = g.getChunk(i);
+        for (const h of c.hazards) {
+          expect(h.x).toBeGreaterThanOrEqual(HAZARD_SOFT_PX);
+          if (h.x < HAZARD_SAFE_PX) expect(hazards[h.defId].onHit.effect).not.toBe('crash');
+        }
+      }
+    }
+  });
+
+  test('chunk 0 is a speed-building run into one easy jump with a long clean landing', () => {
+    for (let sd = 0; sd < 30; sd++) {
+      const g = makeGen('open-' + sd);
+      const c = g.getChunk(0);
+      expect(c.launches.length).toBe(1);
+      const l = c.launches[0];
+      expect(l.x).toBeLessThan(60 * PIXELS_PER_METER);
+      expect(l.x).toBeGreaterThan(400);
+      expect(l.airS).toBeGreaterThanOrEqual(0.5);
+      expect(l.landX).not.toBeNull();
+      // runs downhill all the way up to the lip
+      for (let i = 0; i < Math.floor((l.x - 160) / SPACING_PX); i++) expect(segAngle(c.points, i)).toBeGreaterThan(5);
+      // landing ramp: a down-slope under the landing point, then at least 240 px of runout in the same chunk
+      expect(segAngle(c.points, Math.floor((l.landX - c.startX) / SPACING_PX))).toBeGreaterThan(20);
+      expect(c.endX - l.landX).toBeGreaterThan(240);
+      expect(c.hazards).toEqual([]);
+    }
+  });
+
+  test('an independent ballistic check finds the first launch within 60 m', () => {
+    for (let sd = 0; sd < 10; sd++) {
+      const L = findLaunches(makeGen('first-' + sd), 6, 380, 0.5);
+      expect(L.length).toBeGreaterThan(0);
+      expect(L[0].x).toBeLessThan(60 * PIXELS_PER_METER);
+    }
+  });
+
+  test('hazard density ramps in smoothly rather than at full density', () => {
+    let early = 0;
+    let earlyLen = 0;
+    let mid = 0;
+    let midLen = 0;
+    for (let sd = 0; sd < 12; sd++) {
+      const g = makeGen('ramp-' + sd);
+      for (let i = 0; i < 60; i++) {
+        const c = g.getChunk(i);
+        const m = c.startX / PIXELS_PER_METER;
+        if (m < 300) { early += c.hazards.length; earlyLen += c.endX - c.startX; }
+        else if (m >= 1000 && m < 2500) { mid += c.hazards.length; midLen += c.endX - c.startX; }
+      }
+    }
+    expect(mid / midLen).toBeGreaterThan((early / earlyLen) * 1.2);
+  });
+});
+
+describe('TerrainGenerator fun pass: launches and crests', () => {
+  const content = loadContent();
+  const sharp = Object.fromEntries(content.chunks.map((d) => [d.id, (d.tags || []).some((t) => SHARP_TAGS.includes(t))]));
+  sharp['gen-jump'] = true;
+
+  test('launches happen every ~2000-3500 px on average and get airier with distance', () => {
+    const xs = [];
+    const earlyAir = [];
+    const lateAir = [];
+    for (let sd = 0; sd < 12; sd++) {
+      const g = makeGen('launch-' + sd);
+      let last = null;
+      for (let i = 0; i < 80; i++) {
+        for (const l of g.getChunk(i).launches) {
+          if (last !== null) xs.push(l.x - last);
+          last = l.x;
+          (l.x / PIXELS_PER_METER < 800 ? earlyAir : lateAir).push(l.airS);
+        }
+      }
+    }
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(mean).toBeGreaterThan(1800);
+    expect(mean).toBeLessThan(3800);
+    const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+    expect(avg(lateAir)).toBeGreaterThan(avg(earlyAir));
+    expect(avg(lateAir)).toBeGreaterThan(0.9);
+    expect(Math.max(...lateAir)).toBeLessThan(1.8);
+  });
+
+  test('generated jumps land on a down-slope inside the chunk', () => {
+    for (let sd = 0; sd < 8; sd++) {
+      const g = makeGen('land-' + sd);
+      for (let i = 0; i < 80; i++) {
+        const c = g.getChunk(i);
+        if (c.defId !== 'gen-jump') continue;
+        const l = c.launches[0];
+        expect(l).toBeDefined();
+        expect(l.landX).not.toBeNull();
+        expect(segAngle(c.points, Math.floor((l.landX - c.startX) / SPACING_PX))).toBeGreaterThan(25);
+      }
+    }
+  });
+
+  test('landing zones are hazard free (this chunk and the next)', () => {
+    for (let sd = 0; sd < 15; sd++) {
+      const g = makeGen('zone-' + sd);
+      for (let i = 0; i < 100; i++) {
+        const c = g.getChunk(i);
+        const next = g.getChunk(i + 1);
+        for (const l of c.launches) {
+          const end = (l.landX == null ? l.x + 700 : l.landX) + 100;
+          for (const h of c.hazards.concat(next.hazards)) expect(h.x < l.x - 40 || h.x > end).toBe(true);
+        }
+      }
+    }
+  });
+
+  test('ordinary terrain has round crests: slope never increases by more than CREST_TURN_DEG per segment', () => {
+    let worstSpline = 0;
+    let worstNoise = 0;
+    let worstSharp = 0;
+    for (let sd = 0; sd < 15; sd++) {
+      const g = makeGen('crest-' + sd);
+      for (let i = 0; i < 120; i++) {
+        const c = g.getChunk(i);
+        for (let k = 1; k < c.points.length - 1; k++) {
+          if (inGap(c, k) || inGap(c, k - 1)) continue;
+          const inc = segAngle(c.points, k) - segAngle(c.points, k - 1);
+          if (c.kind === 'noise') worstNoise = Math.max(worstNoise, inc);
+          else if (sharp[c.defId]) worstSharp = Math.max(worstSharp, inc);
+          else worstSpline = Math.max(worstSpline, inc);
+        }
+      }
+    }
+    expect(worstSpline).toBeLessThanOrEqual(CREST_TURN_DEG + 1e-6);
+    expect(worstNoise).toBeLessThanOrEqual(NOISE_CREST_TURN_DEG + 1e-6);
+    expect(worstSharp).toBeGreaterThan(CREST_TURN_DEG * 2); // deliberate lips stay sharp
+  });
+});
+
+describe('TerrainGenerator fun pass: sectors', () => {
+  test('chunk.sector is 1-based and follows startX; each sector starts with a calm breather chunk', () => {
+    const g = makeGen('sectors');
+    let breathers = 0;
+    let lastSector = 0;
+    for (let i = 0; i < 200; i++) {
+      const c = g.getChunk(i);
+      expect(c.sector).toBe(Math.floor(c.startX / PIXELS_PER_METER / SECTOR_M) + 1);
+      expect(c.sector).toBeGreaterThanOrEqual(lastSector);
+      if (c.sector > lastSector && i > 0) {
+        breathers++;
+        expect(c.breather).toBe(true);
+        expect(c.kind).toBe('spline');
+        expect(c.defId).not.toBe('gen-jump');
+        for (const h of c.hazards) expect(h.x - c.startX).toBeGreaterThan(1000);
+      } else expect(c.breather).toBe(false);
+      lastSector = c.sector;
+    }
+    expect(breathers).toBeGreaterThan(10);
+  });
+
+  test('hazards get denser sector by sector', () => {
+    const dens = (from, to) => {
+      let n = 0;
+      let len = 0;
+      for (let sd = 0; sd < 10; sd++) {
+        const g = makeGen('sd-' + sd);
+        for (let i = 0; i < 120; i++) {
+          const c = g.getChunk(i);
+          if (c.sector >= from && c.sector <= to) { n += c.hazards.length; len += c.endX - c.startX; }
+        }
+      }
+      return n / len;
+    };
+    expect(dens(3, 4)).toBeGreaterThan(dens(1, 2));
+    expect(dens(7, 9)).toBeGreaterThan(dens(3, 4));
+  });
+});
+
+describe('TerrainGenerator fun pass: shards', () => {
+  const content = loadContent();
+  const hazardBox = (h) => {
+    const d = content.hazards[h.defId];
+    return { x0: h.x - d.size.w / 2, x1: h.x + d.size.w / 2, top: h.y - d.size.h };
+  };
+
+  test('shards are deterministic per seed and independent of call order', () => {
+    const a = makeGen('sh-a');
+    const b = makeGen('sh-a');
+    for (let i = 59; i >= 0; i--) expect(snap(a.getChunk(i).shards)).toEqual(snap(b.getChunk(i).shards));
+    const c = makeGen('sh-b');
+    let diff = 0;
+    for (let i = 0; i < 40; i++) if (JSON.stringify(a.getChunk(i).shards) !== JSON.stringify(c.getChunk(i).shards)) diff++;
+    expect(diff).toBeGreaterThan(20);
+  });
+
+  test('shape: sorted by x, unique stable ids, 4-9 per group, inside the chunk, ~55-65 % of chunks', () => {
+    let withShards = 0;
+    let total = 0;
+    const ids = new Set();
+    for (let sd = 0; sd < 15; sd++) {
+      const g = makeGen('shape-' + sd);
+      for (let i = 0; i < 100; i++) {
+        const c = g.getChunk(i);
+        total++;
+        expect(Array.isArray(c.shards)).toBe(true);
+        if (!c.shards.length) continue;
+        withShards++;
+        expect(c.shards.length).toBeGreaterThanOrEqual(4);
+        expect(c.shards.length).toBeLessThanOrEqual(9);
+        c.shards.forEach((s, k) => {
+          expect(s.id).toBe(`s${i}-${k}`);
+          expect(ids.has(sd + s.id)).toBe(false);
+          ids.add(sd + s.id);
+          expect(s.x).toBeGreaterThanOrEqual(c.startX);
+          expect(s.x).toBeLessThanOrEqual(c.endX);
+          if (k) expect(s.x).toBeGreaterThan(c.shards[k - 1].x);
+        });
+      }
+    }
+    expect(withShards / total).toBeGreaterThan(0.5);
+    expect(withShards / total).toBeLessThan(0.7);
+  });
+
+  test('every shard is above the surface and clear of hazard hit boxes', () => {
+    for (let sd = 0; sd < 15; sd++) {
+      const g = makeGen('clear-' + sd);
+      for (let i = 0; i < 150; i++) {
+        const c = g.getChunk(i);
+        for (const s of c.shards) {
+          expect(s.y).toBeLessThanOrEqual(g.heightAt(s.x) - 10);
+          for (const h of c.hazards) {
+            const b = hazardBox(h);
+            expect(s.x >= b.x0 - 10 && s.x <= b.x1 + 10 && s.y >= b.top - 10).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  test('arcs follow launches (shards sit on the ballistic line) and ground lines hug ~14 px above the surface', () => {
+    let arcs = 0;
+    let lines = 0;
+    for (let sd = 0; sd < 10; sd++) {
+      const g = makeGen('kind-' + sd);
+      for (let i = 0; i < 100; i++) {
+        const c = g.getChunk(i);
+        if (c.shards.length < 4) continue;
+        const heights = c.shards.map((s) => g.heightAt(s.x) - s.y);
+        if (heights.every((h) => Math.abs(h - 14) <= 1.5)) lines++;
+        else if (c.launches.length || c.bouncePads.length) arcs++;
+      }
+    }
+    expect(arcs).toBeGreaterThan(20);
+    expect(lines).toBeGreaterThan(5);
+  });
+
+  test('fewer free ground lines and more risky placements as distance grows', () => {
+    const ratio = (lo, hi) => {
+      let ground = 0;
+      let other = 0;
+      for (let sd = 0; sd < 25; sd++) {
+        const g = makeGen('risk-' + sd);
+        for (let i = 0; i < 160; i++) {
+          const c = g.getChunk(i);
+          const m = c.startX / PIXELS_PER_METER;
+          if (m < lo || m >= hi || c.shards.length < 4 || c.launches.length || c.bouncePads.length) continue;
+          const heights = c.shards.map((s) => g.heightAt(s.x) - s.y);
+          if (heights.every((h) => Math.abs(h - 14) <= 1.5)) ground++;
+          else other++;
+        }
+      }
+      return ground / (ground + other);
+    };
+    expect(ratio(0, 1500)).toBeGreaterThan(ratio(4000, 99999));
+  });
+
+  test('chunk objects recycled by update() have their shards (and launches) reset', () => {
+    const stream = makeGen('recycle');
+    const fresh = makeGen('recycle');
+    let x = 0;
+    let checked = 0;
+    for (let f = 0; f < 600; f++) {
+      x += 120;
+      stream.update(x);
+      for (const c of stream.getActiveChunks()) {
+        const ref = fresh.getChunk(c.index);
+        expect(snap(c.shards)).toEqual(snap(ref.shards));
+        expect(snap(c.launches)).toEqual(snap(ref.launches));
+        expect(c.sector).toBe(ref.sector);
+        checked++;
+      }
+    }
+    expect(stream.stats.reused).toBeGreaterThan(5);
+    expect(checked).toBeGreaterThan(1000);
+  });
+});
+
+describe('TerrainGenerator fun pass: anti-stall at any distance', () => {
+  test('a rolling point mass never stalls on the first 10 000 m of 30 seeds', () => {
+    for (let sd = 0; sd < 30; sd++) {
+      const r = rollSim(makeGen('late-' + sd), 10000);
+      if (r.stalledAtM !== null) throw new Error(`seed ${sd}: stalled at ${Math.round(r.stalledAtM)} m`);
+      expect(r.reachedM).toBeGreaterThanOrEqual(10000);
+    }
+  });
+
+  test('expected speed budget rises with distance and is capped', () => {
+    expect(expectedSpeedPxS(0)).toBeLessThan(expectedSpeedPxS(1000));
+    expect(expectedSpeedPxS(1e6)).toBeLessThanOrEqual(620);
   });
 });

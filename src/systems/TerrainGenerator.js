@@ -53,6 +53,44 @@ export const HAZARD_MIN_X_PX = 700;
 export const RISE_LINE_DEG = 7;
 export const RISE_MAX_PX = 30;
 const RISE_LINE_TAN = Math.tan((RISE_LINE_DEG * Math.PI) / 180);
+/**
+ * Crest rounding (fun pass): the slope angle may INCREASE (convex crest = ground falling away) by at most this per 16 px
+ * segment on ordinary terrain, so a sled above ~450 px/s no longer micro-hops. Deliberate launch templates (SHARP_TAGS)
+ * keep the full MAX_TURN_DEG. Concave (bowl) transitions are unrestricted up to the turn limit.
+ */
+export const CREST_TURN_DEG = 3.5;
+export const NOISE_CREST_TURN_DEG = 6;
+export const SHARP_TAGS = ['kicker', 'jump-lip', 'launch', 'big-air', 'drop', 'steps', 'jump-gen'];
+/** Sectors: every SECTOR_M metres difficulty steps up and a calm breather chunk starts the sector. */
+export const SECTOR_M = 500;
+/** Hazard gentleness: no hazards before HAZARD_SOFT_PX (80 m); only non-crash hazards before HAZARD_SAFE_PX (150 m). */
+export const HAZARD_SOFT_PX = 1600;
+export const HAZARD_SAFE_PX = 3000;
+/** The first part of a sector's breather chunk is hazard free. */
+export const BREATHER_CALM_PX = 1100;
+/** Jump chunks, landing zones and breathers are hazard free, so ordinary chunks carry proportionally more. */
+export const HAZARD_DENSITY_MUL = 2.4;
+/** Generated launch chunk ("gen-jump"): see _jumpAngles. */
+export const JUMP_APPROACH_FIRST_PX = 720;
+export const JUMP_RUNOUT_PX = 240;
+/** Anti-stall: the roll model must stay above this speed (px/s) inside every chunk. */
+export const STALL_SPEED_PX_S = 55;
+export const LIP_MIN_AIR_S = 0.45;
+/** Deliberate lips of generated jumps turn this much per segment (still below the 17 deg kink limit). */
+export const LIP_TURN_DEG = 16;
+/** Shards: spacing, group size and share of chunks that carry a group. */
+export const SHARD_SPACING_PX = [28, 40];
+export const SHARD_GROUP = [4, 9];
+export const SHARD_PLAIN_CHANCE = 0.17;
+const GRAV = 900;
+const JUMP_DEF = Object.freeze({
+  id: 'gen-jump', kind: 'spline', weight: 1, minDistanceM: 0, lengthPx: 1, tags: Object.freeze(['jump', 'launch', 'jump-gen']),
+});
+
+/** Typical sled speed (px/s) at a distance: the "speed budget" that jump geometry and shard arcs are sized for. */
+export function expectedSpeedPxS(distM) {
+  return Math.min(620, 340 + 0.18 * Math.max(0, distM));
+}
 const RAD = Math.PI / 180;
 const DEG = 180 / Math.PI;
 
@@ -128,7 +166,7 @@ export class TerrainGenerator {
     this.stats = { created: 1, reused: 0, built: 0 };
     this.bounds = [{
       startX: 0, startY: 0, startAngDeg: 6, packNo: 0, pos: 0, packSize: this._packSize(0), prevKind: '',
-      peakDx: 0, peakDy: 0, valDy: 0,
+      peakDx: 0, peakDy: 0, valDy: 0, sinceLaunch: 0, prevJump: false, noHazX: 0, speed: 90,
     }];
     this._cap = 0;
     this._raw = null;
@@ -262,12 +300,16 @@ export class TerrainGenerator {
    * @returns {DifficultyParams}
    */
   difficultyAt(distanceM) {
-    const ramp = Math.max(0, (distanceM - TERRAIN.difficultyRampStartM) / 3000);
+    // stepped per sector (SECTOR_M); the old single ramp from 1000 m is the baseline this builds toward (ramp 1 ~ 3500 m)
+    const sector = Math.floor(Math.max(0, distanceM) / SECTOR_M);
+    const ramp = sector / 7;
     return {
       slopeVariance: 1 + 0.5 * Math.min(ramp, 2),
       hazardDensity: 0.8 + 1.3 * Math.min(ramp, 1),
       glitchFrequency: 1 + 0.6 * Math.min(ramp, 1.5),
       noiseWeightMul: 1 + 1.5 * Math.min(ramp, 2),
+      sector: sector + 1,
+      speedBudget: expectedSpeedPxS(sector * SECTOR_M),
     };
   }
 
@@ -276,7 +318,7 @@ export class TerrainGenerator {
   _newChunk() {
     return {
       index: -1, defId: '', kind: 'spline', startX: 0, endX: 0, points: [],
-      zones: [], gaps: [], bouncePads: [], hazards: [], powerups: [],
+      zones: [], gaps: [], bouncePads: [], hazards: [], powerups: [], shards: [], launches: [], sector: 1, breather: false,
     };
   }
 
@@ -389,19 +431,32 @@ export class TerrainGenerator {
     return out;
   }
 
+  _sectorOf(startX) {
+    return Math.floor(startX / this.ppm / SECTOR_M) + 1;
+  }
+
+  /** The first chunk that starts inside a new sector is a calm "breather". */
+  _isBreather(index, b) {
+    return index > 0 && this._sectorOf(b.startX) > this._sectorOf(this.bounds[index - 1].startX);
+  }
+
   _pickDef(index, b, distM, diff, plan) {
-    if (index === 0) {
-      const intro = this.splineDefs.filter((d) => d.tags && d.tags.includes('intro'));
-      const pool = intro.length ? intro : this.splineDefs.slice().sort((a, c) => (a.minDistanceM || 0) - (c.minDistanceM || 0)).slice(0, 2);
-      return plan.weighted(pool, (d) => d.weight || 1) || this.splineDefs[0];
-    }
-    if (b.pos >= b.packSize) {
+    if (index === 0) return JUMP_DEF; // gentle opening: speed-building run into one easy jump
+    const breather = this._isBreather(index, b);
+    if (!breather && b.pos >= b.packSize) {
       const noise = this._eligible(this.noiseDefs, distM);
       const pick = plan.weighted(noise, (d) => (d.weight || 1) * diff.noiseWeightMul);
       if (pick) return pick;
     }
     let cand = this._eligible(this.splineDefs, distM);
-    if (index >= 2 && b.prevKind !== 'bridge') cand = cand.concat(this._eligible(this.bridgeDefs, distM));
+    if (breather) {
+      const calm = cand.filter((d) => d.tags && d.tags.some((t) => t === 'recover' || t === 'cruise' || t === 'roller' || t === 'intro'));
+      if (calm.length) cand = calm;
+    } else {
+      const p = clamp((b.sinceLaunch - 300) / 500, 0, 1);
+      if (!b.prevJump && b.prevKind !== 'bridge' && plan.chance(p)) return JUMP_DEF;
+      if (index >= 2 && b.prevKind !== 'bridge') cand = cand.concat(this._eligible(this.bridgeDefs, distM));
+    }
     const pick = plan.weighted(cand, (d) => d.weight || 1);
     if (pick) return pick;
     const fallback = this.splineDefs.slice().sort((a, c) => (a.minDistanceM || 0) - (c.minDistanceM || 0));
@@ -422,6 +477,9 @@ export class TerrainGenerator {
     const shape = crng.fork('shape');
     const def = this._pickDef(index, b, distM, diff, plan);
     const kind = def.kind === 'noise' || def.kind === 'bridge' ? def.kind : 'spline';
+    const isJump = def === JUMP_DEF;
+    const breather = this._isBreather(index, b);
+    const sharp = isJump || (def.tags && def.tags.some((t) => SHARP_TAGS.includes(t)));
 
     let scale = 1;
     if (kind === 'spline') scale = Math.min(1.6, 1 + 0.08 * b.packNo);
@@ -429,21 +487,31 @@ export class TerrainGenerator {
     let n = Math.max(10, Math.round((def.lengthPx * scale * jitterLen) / SPACING_PX));
     if (kind === 'bridge') n = Math.max(30, Math.round(def.lengthPx / SPACING_PX));
     this._ensureScratch(n + 2);
-    const L = n * SPACING_PX;
+    let L = n * SPACING_PX;
     const raw = this._raw;
-    const ys = this._ys;
+    let ys = this._ys;
     const limits = kind === 'noise'
-      ? { down: MAX_NOISE_DOWN_DEG, up: MAX_NOISE_UP_DEG, turn: MAX_NOISE_TURN_DEG }
-      : { down: MAX_DOWN_DEG, up: MAX_UP_DEG, turn: MAX_TURN_DEG };
+      ? { down: MAX_NOISE_DOWN_DEG, up: MAX_NOISE_UP_DEG, turn: MAX_NOISE_TURN_DEG, crest: NOISE_CREST_TURN_DEG }
+      : { down: MAX_DOWN_DEG, up: MAX_UP_DEG, turn: MAX_TURN_DEG, crest: sharp ? MAX_TURN_DEG : CREST_TURN_DEG };
 
     const variance = index === 0 ? 0.6 : diff.slopeVariance;
     let gi0 = -1;
     let gi1 = -1;
     let endAng;
-    if (kind === 'noise') {
+    if (isJump) {
+      const ja = this._jumpAngles(index, b, distM, shape);
+      n = ja.length;
+      L = n * SPACING_PX;
+      this._ensureScratch(n + 2);
+      const jy = this._ys;
+      jy[0] = b.startY;
+      for (let i = 0; i < n; i++) jy[i + 1] = jy[i] + Math.tan(ja[i] * RAD) * SPACING_PX;
+      endAng = ja[n - 1];
+      ys = jy;
+    } else if (kind === 'noise') {
       this._noiseProfile(def, shape, n, L, variance);
       this._limitRise(raw, n, b);
-      endAng = this._finish(raw, 0, n, b.startY, b.startAngDeg, limits, ys);
+      endAng = this._finishSafe(raw, n, b, limits, ys);
     } else {
       this._bezierProfile(def, shape, n, L, variance, index === 0 ? 0.6 : L / def.lengthPx);
       if (kind !== 'bridge') this._limitRise(raw, n, b);
@@ -461,7 +529,7 @@ export class TerrainGenerator {
         ys[gi1] = yEnd;
         endAng = this._finish(raw, gi1, n, yEnd, Math.min(a1, 14), limits, ys);
       } else {
-        endAng = this._finish(raw, 0, n, b.startY, b.startAngDeg, limits, ys);
+        endAng = this._finishSafe(raw, n, b, limits, ys);
       }
     }
 
@@ -483,6 +551,10 @@ export class TerrainGenerator {
     target.bouncePads.length = 0;
     target.hazards.length = 0;
     target.powerups.length = 0;
+    target.shards.length = 0;
+    target.launches.length = 0;
+    target.sector = this._sectorOf(startX);
+    target.breather = breather;
 
     if (kind === 'bridge') {
       const br = def.bridge || { gapPx: 176, bounceBoost: 420 };
@@ -498,8 +570,18 @@ export class TerrainGenerator {
     } else {
       this._placeZones(target, def, crng.fork('zone'), distM, L);
     }
-    this._placeHazards(target, crng.fork('haz'), distM, diff, kind);
+    const vExp = expectedSpeedPxS(distM);
+    const lips = kind === 'bridge' ? this._padLips(target, vExp) : this._findLips(target.points, vExp, target.endX);
+    let landEnd = 0;
+    for (const l of lips) {
+      if (!l.pad) {
+        target.launches.push({ x: l.x, y: l.y, angleDeg: -Math.atan2(l.vy, l.vx) * DEG, airS: l.airS, landX: l.landX });
+      }
+      landEnd = Math.max(landEnd, l.zoneEnd);
+    }
+    this._placeHazards(target, crng.fork('haz'), distM, diff, kind, b, isJump, breather, lips);
     this._placePowerups(target, crng.fork('pu'), distM);
+    this._placeShards(target, crng.fork('shard'), distM, lips);
 
     if (this.bounds.length === index + 1) {
       let pos = b.pos + 1;
@@ -514,6 +596,10 @@ export class TerrainGenerator {
       this.bounds.push({
         startX: target.endX, startY: ys[n], startAngDeg: endAng, packNo, pos, packSize, prevKind: kind,
         peakDx: rs.peakDx, peakDy: rs.peakDy, valDy: rs.valDy,
+        sinceLaunch: lips.length ? Math.max(0, target.endX - lips[lips.length - 1].x) : b.sinceLaunch + L,
+        prevJump: isJump,
+        speed: this._roll(ys, n, b.speed).end,
+        noHazX: Math.max(landEnd > target.endX ? landEnd : 0, b.noHazX > target.endX ? b.noHazX : 0),
       });
     }
     return target;
@@ -526,6 +612,99 @@ export class TerrainGenerator {
     const a = pts[i];
     const c = pts[i + 1];
     return a.y + ((c.y - a.y) * (x - a.x)) / (c.x - a.x);
+  }
+
+  // ------------------------------------------------------------------------------------------ jumps and lips
+
+  /**
+   * Per-segment slope angles (deg, + = descending) of a generated launch chunk: speed-building approach, compression
+   * ramp, three-segment lip, sharp fall-away onto a long down-slope landing ramp (length sized for the expected speed
+   * so the trajectory lands ON it, 1.0-1.6 s of air at cruise), then a smooth runout. The whole chunk is hazard free.
+   */
+  _jumpAngles(index, b, distM, shape) {
+    const first = index === 0;
+    const vExp = expectedSpeedPxS(distM);
+    const alpha = first ? 10 : MAX_UP_DEG;
+    const beta = first ? 36 : 36 + 6 * Math.min(1, distM / 1500);
+    const approach = first ? 14 : 11 + shape.range(-1.5, 2);
+    const angs = [];
+    let cur = b.startAngDeg;
+    const move = (target, up, down) => {
+      let guard = 80;
+      while (Math.abs(target - cur) > 1e-6 && guard-- > 0) {
+        cur += clamp(target - cur, -down, up);
+        angs.push(cur);
+      }
+    };
+    const hold = (px) => {
+      const k = Math.ceil(px / SPACING_PX);
+      for (let i = 0; i < k; i++) angs.push(cur);
+    };
+    move(approach, CREST_TURN_DEG, MAX_TURN_DEG);
+    const approachPx = first ? JUMP_APPROACH_FIRST_PX : 240 + shape.range(0, 140);
+    hold(Math.max(0, approachPx - angs.length * SPACING_PX));
+    move(-alpha, 0, 6); // compression ramp
+    hold(3 * SPACING_PX); // lip
+    move(beta, LIP_TURN_DEG, LIP_TURN_DEG); // sharp fall-away: ground drops clear of the trajectory at once
+    // landing ramp long enough for the fastest plausible launch (1.2 x expected) to touch down on it
+    const vmax = vExp * 1.2;
+    const ca = Math.cos(alpha * RAD);
+    const k = GRAV / (2 * vmax * vmax * ca * ca);
+    const xHit = (Math.tan(beta * RAD) + Math.tan(alpha * RAD)) / k;
+    hold(Math.min(first ? 560 : 1100, xHit * 0.9 + 64));
+    move(9, 0, 3.5); // smooth concave runout
+    hold(JUMP_RUNOUT_PX);
+    return angs;
+  }
+
+  /** Ballistic flight from (x0,y0) over this chunk's polyline. @returns {{t:number, x:number}|null} null = leaves the chunk. */
+  _flight(pts, x0, y0, vx, vy) {
+    const xEnd = pts[pts.length - 1].x;
+    for (let t = 0.03; t < 2.4; t += 0.03) {
+      const x = x0 + vx * t;
+      if (x >= xEnd) return null;
+      const y = y0 + vy * t + 0.5 * GRAV * t * t;
+      if (t > 0.09 && y >= this._yAtLocal(pts, x) - 1.5) return { t, x };
+    }
+    return { t: 2.4, x: x0 + vx * 2.4 };
+  }
+
+  /**
+   * Launch points of a (non-bridge) chunk: convex slope breaks from which a sled at the expected speed stays airborne
+   * >= LIP_MIN_AIR_S. Each lip carries its launch velocity, airtime, landing x (null = beyond the chunk) and the end of
+   * its hazard-free landing zone.
+   */
+  _findLips(pts, vExp, endX) {
+    const lips = [];
+    const n = pts.length;
+    const ang = (k) => Math.atan2(pts[k + 1].y - pts[k].y, pts[k + 1].x - pts[k].x) * DEG;
+    let skipTo = -Infinity;
+    for (let i = 3; i < n - 2; i++) {
+      if (pts[i].x <= skipTo) continue;
+      const a0 = (ang(i - 3) + ang(i - 2) + ang(i - 1)) / 3;
+      const a1 = (ang(i) + ang(i + 1)) / 2;
+      if (a1 - a0 < 7) continue;
+      const inc = ang(i - 1);
+      const vx = vExp * Math.cos(inc * RAD);
+      const vy = vExp * Math.sin(inc * RAD);
+      const f = this._flight(pts, pts[i].x, pts[i].y, vx, vy);
+      const air = f ? f.t : 1.6;
+      if (air < LIP_MIN_AIR_S) continue;
+      const landX = f ? f.x : null;
+      lips.push({ x: pts[i].x, y: pts[i].y, vx, vy, airS: air, landX, zoneEnd: landX == null ? pts[i].x + Math.max(vx * 1.8 + 160, 800) : landX + 160 });
+      skipTo = landX == null ? Infinity : landX;
+    }
+    return lips;
+  }
+
+  /** Bounce-pad launch of a bridge chunk (shard arcs only; not reported in chunk.launches). */
+  _padLips(chunk, vExp) {
+    const out = [];
+    for (const p of chunk.bouncePads) {
+      const g = chunk.gaps[0];
+      out.push({ x: p.x, y: p.y, vx: vExp * 0.75, vy: -p.boost, airS: 1, landX: g ? g.x1 : null, zoneEnd: g ? g.x1 + 160 : p.x, pad: true });
+    }
+    return out;
   }
 
   // ----------------------------------------------------------------------------------------------- profiles
@@ -672,10 +851,42 @@ export class TerrainGenerator {
   }
 
   /**
+   * Anti-stall at any distance: run the 1-D roll model (65 % of g sin(slope), linear + quadratic drag, entry speed carried
+   * in bounds[].speed) over the finished chunk and, while it would crawl below STALL_SPEED_PX_S, add extra uniform descent.
+   */
+  _finishSafe(raw, n, b, limits, ys) {
+    let extra = 0;
+    let endAng = 0;
+    for (let iter = 0; iter < 7; iter++) {
+      endAng = this._finish(raw, 0, n, b.startY, b.startAngDeg, limits, ys, extra);
+      if (this._roll(ys, n, b.speed).min >= STALL_SPEED_PX_S) break;
+      extra += 28 + 8 * iter;
+    }
+    return endAng;
+  }
+
+  /** 1-D roll along ys[0..n]. @returns {{min:number, end:number}} slowest and final speed (px/s). */
+  _roll(ys, n, v0) {
+    let v = v0;
+    let min = v0;
+    for (let i = 0; i < n; i++) {
+      const dy = ys[i + 1] - ys[i];
+      const len = Math.hypot(SPACING_PX, dy);
+      const sin = dy / len;
+      const dt = len / Math.max(v, 25);
+      v += (585 * sin - 0.2 * v - 0.0003 * v * v) * dt;
+      if (v < 0) v = 0;
+      if (v > 900) v = 900;
+      if (v < min) min = v;
+    }
+    return { min, end: v };
+  }
+
+  /**
    * Shared post-processing for points i0..i1 (indices into raw/out). Writes out[i0..i1], out[i0] = startY.
    * @returns {number} slope angle (deg) of the last segment.
    */
-  _finish(raw, i0, i1, startY, prevAngDeg, limits, out) {
+  _finish(raw, i0, i1, startY, prevAngDeg, limits, out, extraLift = 0) {
     const segs = i1 - i0;
     const Lseg = segs * SPACING_PX;
     out[i0] = startY;
@@ -688,26 +899,36 @@ export class TerrainGenerator {
     // blended heights relative to start
     const corr = (x) => (x >= B ? 0 : delta * x * (1 - x / B) * (1 - x / B));
     const endCorr = corr(Lseg);
-    const lift = net + endCorr < need ? need - (net + endCorr) : 0;
-    let prev = prevAngDeg;
-    let y = startY;
-    let lastRel = 0;
+    let lift = (net + endCorr < need ? need - (net + endCorr) : 0) + extraLift;
     const lo = -limits.up;
     const hi = limits.down;
-    for (let i = i0 + 1; i <= i1; i++) {
-      const x = (i - i0) * SPACING_PX;
-      const rel = raw[i] - raw[i0] + corr(x) + (lift * x) / Lseg;
-      let ang = Math.atan2(rel - lastRel, SPACING_PX) * DEG;
-      lastRel = rel;
-      if (ang > hi) ang = hi;
-      else if (ang < lo) ang = lo;
-      // the first segment of a chunk never turns by more than MAX_TURN_DEG (noise chunks used to allow 17 at the seam)
-      const turn = i === i0 + 1 ? Math.min(limits.turn, MAX_TURN_DEG) : limits.turn;
-      if (ang > prev + turn) ang = prev + turn;
-      else if (ang < prev - turn) ang = prev - turn;
-      y += Math.tan(ang * RAD) * SPACING_PX;
-      out[i] = y;
-      prev = ang;
+    const crest = limits.crest || limits.turn;
+    let prev = prevAngDeg;
+    // the crest limiter lags convex transitions (terrain stays higher), so re-run with more lift until the net descent holds
+    for (let iter = 0; iter < 6; iter++) {
+      prev = prevAngDeg;
+      let y = startY;
+      let lastRel = 0;
+      for (let i = i0 + 1; i <= i1; i++) {
+        const x = (i - i0) * SPACING_PX;
+        const rel = raw[i] - raw[i0] + corr(x) + (lift * x) / Lseg;
+        let ang = Math.atan2(rel - lastRel, SPACING_PX) * DEG;
+        lastRel = rel;
+        if (ang > hi) ang = hi;
+        else if (ang < lo) ang = lo;
+        // the first segment of a chunk never turns by more than MAX_TURN_DEG (noise chunks used to allow 17 at the seam)
+        const first = i === i0 + 1;
+        const up = first ? Math.min(crest, MAX_TURN_DEG) : crest;
+        const down = first ? Math.min(limits.turn, MAX_TURN_DEG) : limits.turn;
+        if (ang > prev + up) ang = prev + up;
+        else if (ang < prev - down) ang = prev - down;
+        y += Math.tan(ang * RAD) * SPACING_PX;
+        out[i] = y;
+        prev = ang;
+      }
+      const short = need - (out[i1] - startY);
+      if (short <= 0.5) break;
+      lift += short;
     }
     return prev;
   }
@@ -733,9 +954,11 @@ export class TerrainGenerator {
     chunk.zones.push({ modId: m.id, x0, x1: x0 + len });
   }
 
-  _placeHazards(chunk, rng, distM, diff, kind) {
-    if (!this.hazardList.length || kind === 'bridge') return;
-    const density = diff.hazardDensity * (kind === 'noise' ? 0.5 : 1);
+  _placeHazards(chunk, rng, distM, diff, kind, b, noHazards, breather, lips) {
+    if (!this.hazardList.length || kind === 'bridge' || noHazards) return;
+    // smooth ramp-in: 35 % of the nominal density at 75 m, full density from 600 m
+    const rampIn = clamp(0.35 + (0.65 * (distM - 75)) / 525, 0.35, 1);
+    const density = diff.hazardDensity * (kind === 'noise' ? 0.5 : 1) * rampIn * HAZARD_DENSITY_MUL;
     if (!(density > 0)) return;
     const mean = 1000 / density;
     const pts = chunk.points;
@@ -743,9 +966,13 @@ export class TerrainGenerator {
     const xEnd = chunk.endX - HAZARD_END_MARGIN_PX;
     while (x <= xEnd) {
       const gapX = Math.max(HAZARD_MIN_SPACING_PX, rng.range(0.6, 1.4) * mean);
-      if (x >= HAZARD_MIN_X_PX) {
+      x = Math.round(x);
+      let free = x >= HAZARD_MIN_X_PX && x >= HAZARD_SOFT_PX && x >= b.noHazX && !(breather && x < chunk.startX + BREATHER_CALM_PX);
+      if (free) for (const l of lips) if (x >= l.x - 40 && x <= l.zoneEnd) free = false;
+      if (free) {
         const dM = x / this.ppm;
-        const def = rng.weighted(this.hazardList, (h) => ((h.minDistanceM || 0) <= dM ? h.weight || 1 : 0));
+        const crashOk = x >= HAZARD_SAFE_PX;
+        const def = rng.weighted(this.hazardList, (h) => ((h.minDistanceM || 0) <= dM && (crashOk || !h.onHit || h.onHit.effect !== 'crash') ? h.weight || 1 : 0));
         if (def) {
           const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
           const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
@@ -758,6 +985,118 @@ export class TerrainGenerator {
         }
       }
       x += gapX;
+    }
+  }
+
+  // ------------------------------------------------------------------------------------------------- shards
+
+  /**
+   * Collectible shard group (one per chunk at most): a ballistic arc off a launch lip / bounce pad (always when the chunk
+   * has one), else a ground-hugging line on a fast smooth stretch, else a high "risk" hump over a hazard or gap. The
+   * share of risky groups grows with distance. Every shard is clear of terrain and of hazard hitboxes.
+   */
+  _placeShards(chunk, rng, distM, lips) {
+    const pts = chunk.points;
+    const spacing = () => rng.range(SHARD_SPACING_PX[0], SHARD_SPACING_PX[1]);
+    const hz = chunk.hazards.map((h) => {
+      const d = this.options.hazardDefs && (Array.isArray(this.options.hazardDefs) ? this.options.hazardDefs.find((q) => q.id === h.defId) : this.options.hazardDefs[h.defId]);
+      const w = (d && d.size && d.size.w) || 24;
+      const ht = (d && d.size && d.size.h) || 24;
+      return { x0: h.x - w / 2 - 22, x1: h.x + w / 2 + 22, top: h.y - ht - 22 };
+    });
+    const ok = (x, y) => {
+      if (x < chunk.startX + 8 || x > chunk.endX - 8) return false;
+      if (y > this._yAtLocal(pts, x) - 12) return false;
+      for (const h of hz) if (x >= h.x0 && x <= h.x1 && y >= h.top) return false;
+      return true;
+    };
+    const out = [];
+    const arcFrom = (l) => {
+      const list = [];
+      let acc = 0;
+      let next = 36;
+      let px = l.x;
+      let py = l.y;
+      for (let t = 0.01; t < 2.4 && list.length < SHARD_GROUP[1]; t += 0.01) {
+        const x = l.x + l.vx * t;
+        const y = l.y + l.vy * t + 0.5 * GRAV * t * t;
+        acc += Math.hypot(x - px, y - py);
+        px = x;
+        py = y;
+        if (x >= chunk.endX - 8) break;
+        if (acc >= next) {
+          if (!ok(x, y)) {
+            if (list.length) break;
+            continue;
+          }
+          list.push({ x: Math.round(x), y: Math.round(y) });
+          next += spacing();
+        }
+      }
+      return list;
+    };
+    let group = null;
+    // (a) arcs off lips / pads
+    for (const l of lips) {
+      const g = arcFrom(l);
+      if (g.length >= SHARD_GROUP[0]) { group = g; break; }
+    }
+    if (!group) {
+      if (!rng.chance(SHARD_PLAIN_CHANCE)) return;
+      const riskP = clamp(0.12 + distM / 5500, 0.12, 0.65);
+      const wantRisk = rng.chance(riskP);
+      const cnt = rng.int ? rng.int(SHARD_GROUP[0], SHARD_GROUP[1]) : Math.round(rng.range(SHARD_GROUP[0], SHARD_GROUP[1]));
+      if ((wantRisk && chunk.hazards.length) || chunk.kind === 'bridge') {
+        // (c) risk hump centred over a hazard, or over the gap of a bridge chunk
+        let cx;
+        let base;
+        if (chunk.kind === 'bridge' && chunk.gaps.length) {
+          cx = (chunk.gaps[0].x0 + chunk.gaps[0].x1) / 2;
+          base = 70;
+        } else {
+          const h = chunk.hazards[Math.floor(rng.range(0, chunk.hazards.length)) % chunk.hazards.length];
+          cx = h.x;
+          base = 62;
+        }
+        const sp = 32;
+        const g = [];
+        for (let k = 0; k < cnt; k++) {
+          const u = cnt === 1 ? 0 : (k / (cnt - 1)) * 2 - 1;
+          const x = Math.round(cx + u * ((cnt - 1) / 2) * sp);
+          g.push({ x, y: Math.round(this._yAtLocal(pts, x) - base - 26 * (1 - u * u)) });
+        }
+        group = g;
+      } else {
+        // (b) ground-hugging line on a smooth, fast section
+        const sp = spacing();
+        const len = (cnt - 1) * sp;
+        const tries = 8;
+        for (let tr = 0; tr < tries && !group; tr++) {
+          const x0 = Math.round(rng.range(chunk.startX + 40, Math.max(chunk.startX + 41, chunk.endX - 40 - len)));
+          const g = [];
+          let good = true;
+          for (let k = 0; k < cnt && good; k++) {
+            const x = Math.round(x0 + k * sp);
+            const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
+            const a = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
+            const y = Math.round(this._yAtLocal(pts, x) - 14);
+            if (a < 8 || a > 38 || chunk.gaps.some((q) => x > q.x0 - 20 && x < q.x1 + 20) || !ok(x, y)) good = false;
+            g.push({ x, y });
+          }
+          if (good) group = g;
+        }
+      }
+    }
+    if (!group) return;
+    for (const p of group) if (ok(p.x, p.y)) out.push(p);
+    if (out.length < SHARD_GROUP[0]) return;
+    out.sort((p, q) => p.x - q.x);
+    const seen = new Set();
+    let nid = 0;
+    for (const p of out) {
+      if (seen.has(p.x)) continue; // never two shards at the same x
+      seen.add(p.x);
+      chunk.shards.push({ id: `s${chunk.index}-${nid++}`, x: p.x, y: p.y });
     }
   }
 

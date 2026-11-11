@@ -203,7 +203,8 @@ describe('ScoreManager reset penalty and reset()', () => {
     s.reset();
     expect(s.getSnapshot()).toEqual({
       total: 0, distancePoints: 0, trickPoints: 0, distanceM: 0, multiplier: 1, comboTricks: [], pendingPoints: 0,
-      bestCombo: 1, penaltyPoints: 0,
+      bestCombo: 1, penaltyPoints: 0, bonusPoints: 0, shards: 0, nearMisses: 0, milestones: 0,
+      bonusByKind: { shard: 0, nearMiss: 0, milestone: 0 },
     });
   });
 
@@ -212,5 +213,66 @@ describe('ScoreManager reset penalty and reset()', () => {
     s.addTrick(trick('backflip'));
     s.getSnapshot().comboTricks.push('x');
     expect(s.getSnapshot().comboTricks).toEqual(['backflip']);
+  });
+});
+
+describe('ScoreManager bonuses (shards / near misses / milestones)', () => {
+  test('addBonus adds immediately to the total and tracks per-kind counts and points', () => {
+    const s = new ScoreManager();
+    s.setDistance(10);
+    let snap = s.addBonus(25, 'shard');
+    expect(snap.total).toBe(35);
+    expect(snap.bonusPoints).toBe(25);
+    expect(snap.shards).toBe(1);
+    expect(snap.trickPoints).toBe(0);
+    s.addBonus(25, 'shard');
+    s.addBonus(100, 'nearMiss');
+    snap = s.addBonus(500, 'milestone');
+    expect(snap.shards).toBe(2);
+    expect(snap.nearMisses).toBe(1);
+    expect(snap.milestones).toBe(1);
+    expect(snap.bonusPoints).toBe(650);
+    expect(snap.bonusByKind).toEqual({ shard: 50, nearMiss: 100, milestone: 500 });
+    expect(snap.total).toBe(10 + 650);
+  });
+
+  test('bonuses are not part of the pending combo, are not multiplied, and survive crash / reset penalties', () => {
+    const s = new ScoreManager();
+    s.addTrick(trick('backflip'));
+    s.addTrick(trick('frontflip'));
+    s.addBonus(40, 'shard');
+    expect(s.getSnapshot().pendingPoints).toBe(s.pending);
+    const before = s.getSnapshot().pendingPoints;
+    s.onLanding({ quality: 'crash' });
+    expect(s.getSnapshot().bonusPoints).toBe(40);
+    expect(s.getSnapshot().total).toBe(40);
+    s.addTrick(trick('backflip'));
+    s.onLanding({ quality: 'good' });
+    const t = s.getSnapshot().total;
+    expect(t).toBeGreaterThan(40);
+    expect(before).toBeGreaterThan(0);
+    s.penalizeReset();
+    expect(s.getSnapshot().bonusPoints).toBe(40);
+  });
+
+  test('bad input is sanitised: rounded, negatives / NaN count as 0, unknown kinds add points but no counts', () => {
+    const s = new ScoreManager();
+    expect(s.addBonus(10.6, 'shard').bonusPoints).toBe(11);
+    expect(s.addBonus(-5, 'shard').bonusPoints).toBe(11);
+    expect(s.addBonus(NaN, 'nearMiss').bonusPoints).toBe(11);
+    const snap = s.addBonus(7, 'weird');
+    expect(snap.bonusPoints).toBe(18);
+    expect(snap.shards).toBe(2);
+    expect(snap.nearMisses).toBe(1);
+  });
+
+  test('reset clears bonuses', () => {
+    const s = new ScoreManager();
+    s.addBonus(50, 'milestone');
+    s.reset();
+    const snap = s.getSnapshot();
+    expect(snap.bonusPoints).toBe(0);
+    expect(snap.milestones).toBe(0);
+    expect(snap.total).toBe(0);
   });
 });
