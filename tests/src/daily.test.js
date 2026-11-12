@@ -93,3 +93,30 @@ describe('DailyPatch.getDailyInfo', () => {
     expect(DailyPatch.msUntilNextRule(new Date('2025-03-10T23:59:59.000Z'))).toBe(1000);
   });
 });
+
+describe('DailyPatch countdown helpers', () => {
+  test('msUntilNextRule is exact at boundaries and mid-day', () => {
+    expect(DailyPatch.msUntilNextRule(new Date('2025-03-10T20:48:00.000Z'))).toBe(3 * 3600000 + 12 * 60000);
+    expect(DailyPatch.msUntilNextRule(new Date('2025-03-10T23:59:59.999Z'))).toBe(1);
+  });
+
+  test('formatCountdown', () => {
+    expect(DailyPatch.formatCountdown(3 * 3600000 + 12 * 60000)).toBe('3H 12M');
+    expect(DailyPatch.formatCountdown(3 * 3600000 + 11 * 60000 + 1)).toBe('3H 12M');
+    expect(DailyPatch.formatCountdown(3600000)).toBe('1H 0M');
+    expect(DailyPatch.formatCountdown(86400000)).toBe('24H 0M');
+    expect(DailyPatch.formatCountdown(12 * 60000)).toBe('12M');
+    expect(DailyPatch.formatCountdown(30000)).toBe('<1M');
+    expect(DailyPatch.formatCountdown(0)).toBe('0M');
+    expect(DailyPatch.formatCountdown(-5)).toBe('0M');
+    expect(DailyPatch.formatCountdown(NaN)).toBe('0M');
+  });
+
+  test('dateKeyFromSeed round-trips getDailyInfo seeds and rejects others', () => {
+    const info = DailyPatch.getDailyInfo(new Date('2025-03-10T05:00:00Z'));
+    expect(DailyPatch.dateKeyFromSeed(info.seed)).toBe('2025-03-10');
+    expect(DailyPatch.dateKeyFromSeed('daily-2025-02-30')).toBeNull();
+    expect(DailyPatch.dateKeyFromSeed('seed-1')).toBeNull();
+    expect(DailyPatch.dateKeyFromSeed(null)).toBeNull();
+  });
+});

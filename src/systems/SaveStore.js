@@ -13,6 +13,7 @@
  */
 import { STORAGE } from '../constants.js';
 import { xxHash32 } from './Rng.js';
+import { DailyPatch } from './DailyPatch.js';
 
 /**
  * @typedef {Object} Settings
@@ -245,6 +246,12 @@ const txDone = (tx) =>
     tx.onabort = () => reject(tx.error || new Error('idb tx aborted'));
   });
 
+/** @param {Date|number} v @returns {Date} valid Date (invalid input falls back to now). */
+function toDate(v) {
+  const d = v instanceof Date ? v : new Date(typeof v === 'number' ? v : NaN);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
 export class SaveStore {
   constructor() {
     /** @type {RunRecord[]} in-memory mirror / fallback, insertion order. */
@@ -454,6 +461,76 @@ export class SaveStore {
     }
     skipped += Math.max(0, list.length - MAX_IMPORT);
     return { imported, skipped };
+  }
+
+  // ---- read-only chase queries (sync, in-memory mirror; no I/O, safe to call from create()) ------------------------
+
+  /**
+   * Best score / best distance / attempt count among stored runs on `seed`. Synchronous O(n) scan of the in-memory
+   * mirror (a few thousand runs is well under a millisecond). Counts every stored run, crash or quit.
+   * Pass `excludeRunId` (the run that just finished) to compare against the PREVIOUS best:
+   * NEW SEED BEST when `!prev || run.score > prev.bestScore`. Best score and best distance are independent maxima.
+   * @param {string} seed
+   * @param {{excludeRunId?: string}} [opts]
+   * @returns {{seed:string, attempts:number, bestScore:number, bestDistanceM:number}|null} null when no runs match.
+   */
+  getSeedStats(seed, opts = {}) {
+    if (typeof seed !== 'string' || !seed) return null;
+    const ex = opts && typeof opts.excludeRunId === 'string' ? opts.excludeRunId : null;
+    let attempts = 0;
+    let bestScore = 0;
+    let bestDistanceM = 0;
+    for (const r of this.runs) {
+      if (r.seed !== seed || (ex !== null && r.id === ex)) continue;
+      attempts++;
+      if (r.score > bestScore) bestScore = r.score;
+      if (r.distanceM > bestDistanceM) bestDistanceM = r.distanceM;
+    }
+    return attempts ? { seed, attempts, bestScore, bestDistanceM } : null;
+  }
+
+  /**
+   * Stats for the daily seed of a UTC day (seed built by DailyPatch.getDailyInfo, `daily-YYYY-MM-DD`).
+   * Same semantics and `excludeRunId` option as getSeedStats.
+   * @param {Date|number} [when=new Date()] instant inside the UTC day (Date or epoch ms).
+   * @param {{excludeRunId?: string}} [opts]
+   * @returns {{seed:string, dateKey:string, attempts:number, bestScore:number, bestDistanceM:number}|null}
+   */
+  getDailyStats(when = new Date(), opts = {}) {
+    const info = DailyPatch.getDailyInfo(toDate(when));
+    const s = this.getSeedStats(info.seed, opts);
+    return s ? { ...s, dateKey: info.dateKey } : null;
+  }
+
+  /**
+   * Daily streak: consecutive UTC days with at least one stored run on that day's daily seed, ending today or
+   * yesterday (ending yesterday = still live, today's run would extend it; an older last day = 0).
+   * Day membership comes from the date inside each run's SEED (`daily-YYYY-MM-DD`), not from timestamps: it is
+   * immune to clock skew, zero/missing timestamps, and midnight-straddling runs, and it is exactly the day whose
+   * rule/seed the player chose. Future-dated seeds are ignored. Counts crash and quit runs.
+   * @param {Date|number} [now=new Date()] "now" (Date or epoch ms).
+   * @returns {{streak:number, playedToday:boolean, todayKey:string, lastPlayedKey:string|null}}
+   *   lastPlayedKey = most recent daily date key played that is not in the future (null if none).
+   */
+  getDailyStreak(now = new Date()) {
+    const nowD = toDate(now);
+    const todayKey = nowD.toISOString().slice(0, 10);
+    const days = new Set();
+    for (const r of this.runs) {
+      const k = DailyPatch.dateKeyFromSeed(r.seed);
+      if (k && k <= todayKey) days.add(k);
+    }
+    const playedToday = days.has(todayKey);
+    const DAY = 86400000;
+    const keyAt = (offset) => new Date(Date.parse(`${todayKey}T00:00:00.000Z`) - offset * DAY).toISOString().slice(0, 10);
+    let start = playedToday ? 0 : days.has(keyAt(1)) ? 1 : -1;
+    let streak = 0;
+    if (start >= 0) {
+      while (days.has(keyAt(start + streak))) streak++;
+    }
+    let lastPlayedKey = null;
+    for (const k of days) if (lastPlayedKey === null || k > lastPlayedKey) lastPlayedKey = k;
+    return { streak, playedToday, todayKey, lastPlayedKey };
   }
 
   // ---- internals ----------------------------------------------------------------------------------------------

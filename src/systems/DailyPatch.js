@@ -118,4 +118,32 @@ export class DailyPatch {
     const t = date instanceof Date && !Number.isNaN(date.getTime()) ? date.getTime() : Date.now();
     return DAY_MS - (((t % DAY_MS) + DAY_MS) % DAY_MS);
   }
+
+  /**
+   * Additive helper: parse the UTC date key out of a daily seed.
+   * @param {string} seed
+   * @returns {string|null} 'YYYY-MM-DD' for a seed of the form `daily-YYYY-MM-DD`, else null.
+   */
+  static dateKeyFromSeed(seed) {
+    const m = typeof seed === 'string' ? /^daily-(\d{4}-\d{2}-\d{2})$/.exec(seed) : null;
+    if (!m) return null;
+    const t = Date.parse(`${m[1]}T00:00:00.000Z`);
+    return Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== m[1] ? null : m[1];
+  }
+
+  /**
+   * Additive helper: format a millisecond duration for the "NEXT PATCH IN" countdown, e.g. '3H 12M'.
+   * Under one hour it reads '12M'; under one minute '<1M'. Rounds minutes up so the display never shows 0 early.
+   * Non-finite or non-positive input gives '0M'.
+   * @param {number} ms
+   * @returns {string}
+   */
+  static formatCountdown(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return '0M';
+    const totalMin = Math.ceil(ms / 60000);
+    if (ms < 60000) return '<1M';
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `${h}H ${m}M` : `${m}M`;
+  }
 }

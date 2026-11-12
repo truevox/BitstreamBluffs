@@ -1,5 +1,43 @@
 # Changelog
 
+## v2.1.0 - 2026-11-12
+
+### ✅ Added
+- Flow streak: a run-level flow multiplier (up to x3) that survives landings and is shown as a HUD flow meter.
+- Named combos with combo display names, SPIN CUT notes and true shard counts.
+- Paid 500 m milestone bonus per sector, capped at sector 10.
+- Rogue Packet air hazard in jump arcs past 1500 m, with its own drone look, warning blip and a STAY LOW lip marker.
+- Seed best, today's best, daily streak and a next-patch countdown on the Title screen and Game Over.
+- Tuck hint that now actually shows.
+- Game Over report whose rows sum to the score.
+- Collectible shards, near-miss bonuses, sector milestones and first-run hints.
+- Speed burst after a clean trick landing, with speed-based camera zoom, hit-stop and landing effects.
+- Opening grace: recovery from non-hazard crashes in the first 150 m, plus a guaranteed gentle opening jump.
+- Audio and HUD feedback for boosts, near misses, shards and sectors.
+
+### 🔧 Changed
+- Terrain pacing reworked: rounder crests, regular launches with hazard-free landings, breathers every 500 m, and stall prevention at any distance.
+- Generated jumps have real airtime, crests no longer cause micro-hops, and ground snap keeps the sled on the terrain.
+- Combos are flip-first: air brake and parachute no longer step the combo multiplier, and a combo lasts across jumps.
+- Mid-spin landings take a penalty; coast and nudges are ignored.
+- Sloppy landings are more forgiving and runouts are softer.
+- Power-up spawn chance stays at or above 40% of base.
+- Difficulty ramp extended with a gentler capped tail, so the game keeps changing past 3 km.
+- Tuned drag, air tilt and terrain climbs so hands-off runs keep rolling.
+- Seeds are unchanged before about 1.5 km and differ after it compared with 2.0.0.
+
+### 🐛 Fixed
+- Space retry and garbled typing on the initials panel.
+- Stale input carried across scenes.
+- Helicopter spins now score.
+- Camera no longer loses the sled on bounce pads.
+- HUD no longer overlaps the touch buttons.
+- Opening jump geometry and air self-levelling.
+- Stalls after slow hazards.
+- Shield saves keep the combo without re-paying it.
+- Air-brake-only jumps no longer earn flow.
+- Bonus fields are saved correctly in run records.
+
 ## v2.0.0 - 2026-11-10
 
 ### 🏗️ Rebuild: Ground-up rewrite in `src/` (Phaser 3.90 + Matter)

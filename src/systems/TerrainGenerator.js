@@ -18,6 +18,7 @@
  *    slope-change limiter (no impossible walls, readable curvature).
  *  - Spawns (zones, hazards, power-ups, bounce pads) come from independent forked RNG streams per chunk, so tweaking
  *    hazard content never changes the terrain shape.
+ *  - Air hazards (placement 'air') are placed last, per jump, from their own fork ('air'); see _placeAirHazard.
  *  - Streaming: update(playerX) keeps TERRAIN.bufferAheadScreens screens generated ahead and drops chunks wholly
  *    TERRAIN.keepBehindScreens screens behind. Dropped chunk objects are pooled and reused one update later (so
  *    consumers that still hold a reference during the frame they receive `removed` are safe).
@@ -95,6 +96,48 @@ export const LIP_TURN_DEG = 16;
 export const SHARD_SPACING_PX = [28, 40];
 export const SHARD_GROUP = [4, 9];
 export const SHARD_PLAIN_CHANCE = 0.17;
+/**
+ * Air hazards (placement 'air', e.g. roguePacket): at most one per generated jump, never on chunk 0, never in breathers,
+ * never before AIR_HAZARD_MIN_M (the def's own minDistanceM may only raise this). Chance per eligible jump rises from
+ * AIR_CHANCE_START to AIR_CHANCE_END between AIR_HAZARD_MIN_M and AIR_CHANCE_FULL_M. Drawn from the forked rng 'air'.
+ */
+export const AIR_HAZARD_MIN_M = 1500;
+export const AIR_CHANCE_START = 0.25;
+export const AIR_CHANCE_END = 0.55;
+export const AIR_CHANCE_FULL_M = 10000;
+/**
+ * Fairness: the hit box of an air hazard sits ABOVE every no-hop arc, with at least AIR_CLEARANCE_PX of vertical clearance,
+ * for launch speeds from AIR_SPEED_LO_MUL x to max(AIR_SPEED_HI_MUL x, expected speed) of the nominal launch speed (arcs are
+ * monotone in speed, so the fastest one bounds the family; 1.6x covers a sled boosted by landing speed-ups). So a normal
+ * flight always passes under it and only a hop at the lip or a wildly over-fast arc reaches it. (A "low" placement near the
+ * lip-to-landing chord was rejected: a slow launch drops onto the landing ramp and no box could keep 70 px clear of it.)
+ */
+export const AIR_CLEARANCE_PX = 70;
+export const AIR_SPEED_LO_MUL = 0.75;
+export const AIR_SPEED_HI_MUL = 1.6;
+/**
+ * Position along the flight: the box sits LATE in the arc, at least AIR_MIN_DX_PX past the lip and between AIR_U_MIN and
+ * AIR_U_MAX of the lip-to-landing span, so a reflex hop at the lip is already committed when the box is reached and the
+ * warning telegraph has time to be read. A jump whose span cannot fit this (0.8 x span < 400 px) gets no air hazard.
+ */
+export const AIR_MIN_DX_PX = 400;
+export const AIR_U_MIN = 0.55;
+export const AIR_U_MAX = 0.8;
+/**
+ * Near-miss window for flying UNDER an air hazard: a sled that crosses the box x while airborne and at most this far below
+ * the box bottom paid a near miss. It spans the whole no-hop family: the box bottom is >= AIR_CLEARANCE_PX above the 1.6x
+ * arc and the nominal (1.0x) arc passes ~280 px below it at the placement distances above (tested), so one normal flight
+ * pays exactly once.
+ */
+export const AIR_NEAR_MISS_BELOW_PX = 360;
+/** Power-up spawn chance never decays below this share of the def's baseChance. */
+export const POWERUP_FLOOR_FRACTION = 0.4;
+/** Difficulty tail: past the old caps the ramp keeps creeping up (gently) to a hard ceiling. */
+export const HAZARD_DENSITY_CAP_M = 3500;
+export const HAZARD_DENSITY_TAIL_END_M = 10000;
+export const HAZARD_DENSITY_TAIL = 0.7; // 2.1 -> 2.8
+export const SPEED_TAIL_END_M = 6000;
+export const SPEED_TAIL = 80; // 620 -> 700
 const GRAV = 900;
 const JUMP_DEF = Object.freeze({
   id: 'gen-jump', kind: 'spline', weight: 1, minDistanceM: 0, lengthPx: 1, tags: Object.freeze(['jump', 'launch', 'jump-gen']),
@@ -102,7 +145,10 @@ const JUMP_DEF = Object.freeze({
 
 /** Typical sled speed (px/s) at a distance: the "speed budget" that jump geometry and shard arcs are sized for. */
 export function expectedSpeedPxS(distM) {
-  return Math.min(620, 340 + 0.18 * Math.max(0, distM));
+  const d = Math.max(0, distM);
+  const capM = (620 - 340) / 0.18; // ~1556 m: where the original ramp reached its 620 px/s cap
+  const tail = SPEED_TAIL * clamp((d - capM) / (SPEED_TAIL_END_M - capM), 0, 1);
+  return Math.min(620, 340 + 0.18 * d) + tail; // continuous at the cap, hard ceiling 620 + SPEED_TAIL
 }
 const RAD = Math.PI / 180;
 const DEG = 180 / Math.PI;
@@ -160,7 +206,10 @@ export class TerrainGenerator {
     this.noiseDefs = defs.filter((d) => d.kind === 'noise');
     this.bridgeDefs = defs.filter((d) => d.kind === 'bridge');
     if (this.splineDefs.length === 0) this.splineDefs = [BUILTIN_DEF];
-    this.hazardList = toList(options.hazardDefs).sort(byId);
+    // ground hazards feed the original placement loop untouched; air hazards are placed per jump from their own list
+    const allHazards = toList(options.hazardDefs).sort(byId);
+    this.hazardList = allHazards.filter((h) => h.placement !== 'air');
+    this.airHazardList = allHazards.filter((h) => h.placement === 'air');
     this.powerupList = toList(options.powerupDefs).sort(byId);
     this.modMap = {};
     for (const m of toList(options.modDefs)) this.modMap[m.id] = m;
@@ -316,9 +365,11 @@ export class TerrainGenerator {
     // stepped per sector (SECTOR_M); the old single ramp from 1000 m is the baseline this builds toward (ramp 1 ~ 3500 m)
     const sector = Math.floor(Math.max(0, distanceM) / SECTOR_M);
     const ramp = sector / 7;
+    // past the old 3500 m cap the density keeps creeping up: 2.1 -> 2.1 + HAZARD_DENSITY_TAIL by 10 km, then flat
+    const tail = HAZARD_DENSITY_TAIL * clamp((sector * SECTOR_M - HAZARD_DENSITY_CAP_M) / (HAZARD_DENSITY_TAIL_END_M - HAZARD_DENSITY_CAP_M), 0, 1);
     return {
       slopeVariance: 1 + 0.5 * Math.min(ramp, 2),
-      hazardDensity: 0.8 + 1.3 * Math.min(ramp, 1),
+      hazardDensity: 0.8 + 1.3 * Math.min(ramp, 1) + tail,
       glitchFrequency: 1 + 0.6 * Math.min(ramp, 1.5),
       noiseWeightMul: 1 + 1.5 * Math.min(ramp, 2),
       sector: sector + 1,
@@ -595,6 +646,7 @@ export class TerrainGenerator {
     this._placeHazards(target, crng.fork('haz'), distM, diff, kind, b, isJump, breather, lips);
     this._placePowerups(target, crng.fork('pu'), distM);
     this._placeShards(target, crng.fork('shard'), distM, lips);
+    this._placeAirHazard(target, crng.fork('air'), distM, isJump, breather, lips);
 
     if (this.bounds.length === index + 1) {
       let pos = b.pos + 1;
@@ -664,7 +716,7 @@ export class TerrainGenerator {
     const ca = Math.cos(alpha * RAD);
     const k = GRAV / (2 * vmax * vmax * ca * ca);
     const xHit = (Math.tan(beta * RAD) + Math.tan(alpha * RAD)) / k;
-    hold(Math.min(first ? 560 : 1100, xHit * 0.9 + 64));
+    hold(Math.min(first ? 560 : 1300, xHit * 0.9 + 64));
     move(9, 0, RUNOUT_TURN_DEG); // long smooth concave runout
     hold(JUMP_RUNOUT_PX);
     return angs;
@@ -1002,6 +1054,89 @@ export class TerrainGenerator {
     }
   }
 
+  // ------------------------------------------------------------------------------------------------- air hazards
+
+  /**
+   * Ballistic y of the nominal flight scaled to `mul` x the launch speed, `dx` px after the lip (g = 900, y down).
+   * @param {{y:number, vx:number, vy:number}} lip
+   */
+  _arcY(lip, mul, dx) {
+    return lip.y + (lip.vy / lip.vx) * dx + (GRAV * dx * dx) / (2 * mul * mul * lip.vx * lip.vx);
+  }
+
+  /**
+   * At most one air hazard per generated jump, in the flight arc. Placed LAST (after powerups and shards) from its own fork,
+   * so ground terrain, ground hazards, power-ups and shards of a seed are not affected by its random draws.
+   * Spawn contract for placement 'air': `y` is the CENTRE of the hazard (Hazard.js), rotationDeg 0. The hit box bottom is
+   * >= AIR_CLEARANCE_PX above the highest no-hop arc (see AIR_CLEARANCE_PX), late in the flight (see AIR_MIN_DX_PX).
+   */
+  _placeAirHazard(chunk, rng, distM, isJump, breather, lips) {
+    // fixed number of draws so the stream is independent of the early returns below
+    const rChance = rng.next();
+    const rU = rng.next();
+    const rExtra = rng.next();
+    const rDef = rng.next();
+    if (!this.airHazardList.length || !isJump || breather || chunk.index === 0) return;
+    let lip = null;
+    for (const l of lips) if (!l.pad && l.landX != null && (!lip || l.airS > lip.airS)) lip = l;
+    if (!lip || !(lip.vx > 0)) return;
+    const span = lip.landX - lip.x;
+    const lo = Math.max(AIR_MIN_DX_PX, AIR_U_MIN * span);
+    const hi = AIR_U_MAX * span;
+    if (hi < lo) return; // the span cannot hold a box >= AIR_MIN_DX_PX past the lip
+    const lipM = lip.x / this.ppm;
+    const p = AIR_CHANCE_START + (AIR_CHANCE_END - AIR_CHANCE_START) * clamp((lipM - AIR_HAZARD_MIN_M) / (AIR_CHANCE_FULL_M - AIR_HAZARD_MIN_M), 0, 1);
+    if (lipM < AIR_HAZARD_MIN_M || rChance >= p) return;
+    const hiMul = Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(distM) / Math.hypot(lip.vx, lip.vy));
+    // two candidate positions (the second only when the first collides with a power-up / shard)
+    for (const dxPick of [lo + (hi - lo) * rU, lo + (hi - lo) * ((rU + 0.5) % 1)]) {
+      const x = Math.round(lip.x + dxPick);
+      const def = this._pickAirDef(rDef, x / this.ppm);
+      if (!def) return;
+      const w = (def.size && def.size.w) || 24;
+      const h = (def.size && def.size.h) || 24;
+      const crashy = !def.onHit || def.onHit.effect === 'crash';
+      const bw = crashy ? w * 0.72 : w;
+      const bh = crashy ? h * 0.8 : h;
+      const dx = x - lip.x;
+      // the arc bends a little across the box width: use its highest edge sample
+      const highest = Math.min(this._arcY(lip, hiMul, dx - bw / 2), this._arcY(lip, hiMul, dx), this._arcY(lip, hiMul, dx + bw / 2));
+      const cy = highest - AIR_CLEARANCE_PX - 6 - 18 * rExtra - bh / 2;
+      if (this._airBlocked(chunk, x, cy, bw, bh)) continue;
+      chunk.hazards.push({ defId: def.id, x, y: Math.round(cy * 100) / 100, rotationDeg: 0 });
+      chunk.hazards.sort((a, b) => a.x - b.x);
+      return;
+    }
+  }
+
+  /** Weighted pick (one pre-drawn random number) among air defs allowed at distance dM. */
+  _pickAirDef(r, dM) {
+    let total = 0;
+    const ok = [];
+    for (const d of this.airHazardList) {
+      if (dM >= Math.max(AIR_HAZARD_MIN_M, d.minDistanceM || 0) && (d.maxDistanceM == null || dM <= d.maxDistanceM)) {
+        ok.push(d);
+        total += Math.max(0, d.weight == null ? 1 : d.weight);
+      }
+    }
+    if (!ok.length || !(total > 0)) return null;
+    let t = r * total;
+    for (const d of ok) {
+      t -= Math.max(0, d.weight == null ? 1 : d.weight);
+      if (t < 0) return d;
+    }
+    return ok[ok.length - 1];
+  }
+
+  /** True when a hit box would sit on a power-up, shard, gap or too close to another hazard. */
+  _airBlocked(chunk, x, cy, bw, bh) {
+    for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return true;
+    for (const s of chunk.shards) if (Math.abs(s.x - x) < bw / 2 + 24 && Math.abs(s.y - cy) < bh / 2 + 24) return true;
+    for (const g of chunk.gaps) if (x > g.x0 - 80 && x < g.x1 + 80) return true;
+    for (const h of chunk.hazards) if (Math.abs(h.x - x) < HAZARD_MIN_SPACING_PX) return true;
+    return false;
+  }
+
   // ------------------------------------------------------------------------------------------------- shards
 
   /**
@@ -1147,7 +1282,7 @@ export class TerrainGenerator {
       const dM = x / this.ppm;
       const def = rng.pick(this.powerupList);
       const sp = def.spawn || { baseChance: 0.2, distanceDecayM: 1500 };
-      const chance = sp.baseChance / (1 + dM / sp.distanceDecayM);
+      const chance = Math.max(sp.baseChance * POWERUP_FLOOR_FRACTION, sp.baseChance / (1 + dM / sp.distanceDecayM));
       const lift = (def.radius || 10) + rng.range(26, 58);
       if (rng.chance(chance) && x > 480) {
         let clear = true;

@@ -101,10 +101,30 @@ describe('terrain mods', () => {
     expect(byId.wirelessBridge.physics.bounceMul).toBeGreaterThan(1);
   });
 
+  test('hazard defs follow the schema; the air hazard is a crash hazard from >= 1500 m', () => {
+    const hazards = readDir('hazards');
+    const ids = hazards.map((h) => h.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const h of hazards) {
+      expect(typeof h.shapeKey).toBe('string');
+      expect(h.size.w).toBeGreaterThan(0);
+      expect(h.size.h).toBeGreaterThan(0);
+      expect(['crash', 'slow', 'scramble']).toContain(h.onHit.effect);
+      expect(h.weight).toBeGreaterThan(0);
+      expect(h.minDistanceM).toBeGreaterThanOrEqual(0);
+      expect(['ground', 'air']).toContain(h.placement);
+      expect(PALETTE_KEYS).toContain(h.colorKey);
+    }
+    const air = hazards.filter((h) => h.placement === 'air');
+    expect(air.map((h) => h.id)).toEqual(['roguePacket']);
+    expect(air[0].onHit.effect).toBe('crash');
+    expect(air[0].minDistanceM).toBeGreaterThanOrEqual(1500);
+  });
+
   test('loadContent exposes every group', () => {
     const c = loadContent();
     expect(c.chunks.length).toBe(chunks.length);
-    expect(Object.keys(c.hazards).sort()).toEqual(['garbageDataVent', 'glitchChasm', 'overflowFirewall', 'packetSpike']);
+    expect(Object.keys(c.hazards).sort()).toEqual(['garbageDataVent', 'glitchChasm', 'overflowFirewall', 'packetSpike', 'roguePacket']);
     expect(Object.keys(c.powerups).sort()).toEqual(['clockPulse', 'hashedBackup', 'packetBurst']);
   });
 });

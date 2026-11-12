@@ -13,7 +13,7 @@
  * timers bottom-left, seed / daily rule bottom-right. The middle band where the rider lives stays clear.
  */
 import Phaser from 'phaser';
-import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER } from '../constants.js';
+import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, SCORING } from '../constants.js';
 import { EVT } from '../events.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
@@ -53,8 +53,19 @@ const HINT_TEXT = {
 const CHAIN_LIFE_MS = 2500;
 const HINT_MAX_MS = 4000;
 
-const POPUP_Y = 80;
-const POPUP_STEP = 10;
+/** Flow meter: compact readout under the pending-points line (top-right), bar width in px. */
+const FLOW_Y = 62;
+const FLOW_BAR_W = 64;
+/** Widest a popup line may be (screen is 480 px). */
+const POPUP_MAX_W = 440;
+const flowColor = (f) => (f >= 2.5 ? 'magenta' : f >= 2 ? 'amber' : f >= 1.5 ? 'lime' : 'cyan');
+/** 1.5 -> '1.5', 1.25 -> '1.25', 2 -> '2'. */
+const fmtShort = (n) => String(Math.round(n * 100) / 100);
+
+/** The named-combo bank line (the payoff) is its own big line; the small popups stack under it. */
+const BANK_Y = 80;
+const POPUP_Y = 100;
+const POPUP_STEP = 11;
 const MAX_POPUPS = 3;
 
 export class UIScene extends Phaser.Scene {
@@ -95,6 +106,9 @@ export class UIScene extends Phaser.Scene {
     this.stripQueue = [];
     this.stripBusy = false;
     this.bestShown = false;
+    this.flow = 1;
+    this.flowFrac = 0;
+    this.flowStep = 0;
 
     this._buildStats();
     this._buildCenter();
@@ -132,6 +146,8 @@ export class UIScene extends Phaser.Scene {
     on(EVT.MILESTONE, this.onMilestone);
     on(EVT.NEW_BEST, this.onNewBest);
     on(EVT.TUTORIAL_HINT, this.onHint);
+    on(EVT.FLOW_CHANGED, this.onFlowChanged);
+    on(EVT.FLOW_LOST, this.onFlowLost);
 
     const cleanup = () => {
       for (const [evt, fn] of this.listeners) this.game.events.off(evt, fn, this);
@@ -160,12 +176,20 @@ export class UIScene extends Phaser.Scene {
     this.comboText = this._t(GAME_WIDTH - 8, 13, 'x1.00', { color: 'lime', scale: 2, anchor: 'right' });
     this.comboInfo = this._t(GAME_WIDTH - 8, 31, '', { color: 'amber', anchor: 'right' });
     // pending (at stake) trick points, pulses while the multiplier is above x1
-    this.pendingText = this._t(GAME_WIDTH - 8, 41, '', { color: 'amber', scale: 2, anchor: 'right', outline: 'glow' });
+    this.pendingText = this._t(GAME_WIDTH - 8, 43, '', { color: 'amber', scale: 2, anchor: 'right', outline: 'glow' });
     this.shardText = this._t(8, 51, '', { color: 'cyan' });
     this.chainText = this._t(8, 51, '', { color: 'amber' });
     this.shardLabel = '';
     this.shardText.setVisible(false);
     this.chainText.setVisible(false);
+    // flow streak: label + draining timeout bar, only visible while flow > 1
+    this.flowText = this._t(GAME_WIDTH - 8, FLOW_Y, 'FLOW x1.1', { color: 'cyan', anchor: 'right', outline: 'glow' });
+    this.flowG = new Phaser.GameObjects.Graphics(this);
+    this.hud.add(this.flowG);
+    this.flowLostText = this._t(GAME_WIDTH - 8, FLOW_Y, 'FLOW LOST', { color: 'danger', anchor: 'right', outline: 'glow' });
+    this.flowText.setVisible(false);
+    this.flowG.setVisible(false);
+    this.flowLostText.setAlpha(0);
   }
 
   _buildCenter() {
@@ -185,6 +209,9 @@ export class UIScene extends Phaser.Scene {
     this.banner.setAlpha(0);
     this.boostText = this._t(cx, 24, '', { color: 'lime', scale: 2, anchor: 'center', outline: 'glow' });
     this.boostText.setAlpha(0);
+    // payoff line of a landing: "DOUBLE BACKFLIP + HELI x1.5 +450" (big, glowing, fades after ~1.1 s)
+    this.bankLine = this._t(cx, BANK_Y, '', { color: 'amber', scale: 2, anchor: 'center', outline: 'glow' });
+    this.bankLine.setAlpha(0);
     // slide-in strip (milestones / new best) just above the rider band
     this.stripC = this.add.container(0, 0);
     this.hud.add(this.stripC);
@@ -343,6 +370,11 @@ export class UIScene extends Phaser.Scene {
     this.chain = 0;
     this.shardText.setVisible(false);
     this.chainText.setVisible(false);
+    this._setFlow(1, 0);
+    this.tweens.killTweensOf(this.flowLostText);
+    this.flowLostText.setAlpha(0);
+    this.tweens.killTweensOf(this.bankLine);
+    this.bankLine.setAlpha(0);
     this.bestShown = false;
     this._hideHint();
     for (const id of [...this.powerups.keys()]) this._removePowerup(id);
@@ -377,20 +409,21 @@ export class UIScene extends Phaser.Scene {
     this.comboText.setColorKey(m >= 2.5 ? 'magenta' : m >= 1.5 ? 'amber' : 'lime');
     const n = (p.tricks && p.tricks.length) || 0;
     this.comboInfo.setText(n > 0 ? `${n} TRICK${n > 1 ? 'S' : ''} PENDING` : '');
-    if (grew) this._pop(this.comboText, 2, 3);
+    if (grew) this._pop(this.comboText, 2, 2.5);
     this._setPending(n > 0 ? p.pendingPoints || 0 : 0);
   }
 
-  _setPending(raw) {
+  _setPending(raw, quiet) {
     const prev = this.pending;
     this.pendingRaw = raw;
-    this.pending = Math.round(raw * (this.multiplier || 1));
+    // what a clean landing would bank: pending x combo x the flow carried in
+    this.pending = Math.round(raw * (this.multiplier || 1) * (this.flow || 1));
     if (this.pending <= 0) {
       this.pendingText.setText('');
       return;
     }
     this.pendingText.setText(`+${fmtInt(this.pending)}`);
-    if (this.pending > prev) this._pop(this.pendingText, 2, 2.8);
+    if (this.pending > prev && !quiet) this._pop(this.pendingText, 2, 2.3);
   }
 
   onBoost(p) {
@@ -417,7 +450,7 @@ export class UIScene extends Phaser.Scene {
 
   onShard(p) {
     if (!p) return;
-    this.shards = p.total || this.shards + 1;
+    this.shards = p.count != null ? p.count : this.shards + 1;
     this.chain = p.chain || 0;
     this.chainUntil = this.nowMs + CHAIN_LIFE_MS;
     this.shardLabel = `SHARDS ${fmtInt(this.shards)}`;
@@ -433,7 +466,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   onMilestone(p) {
-    this._strip(`SECTOR ${(p && p.sector) || ''}`, 'cyan');
+    const pts = p && p.points > 0 ? `  +${fmtInt(p.points)}` : '';
+    this._strip(`SECTOR ${(p && p.sector) || ''}${pts}`, 'cyan');
     uiSfx(this, 'milestone');
   }
 
@@ -518,6 +552,14 @@ export class UIScene extends Phaser.Scene {
     this.exactSpeedUntil = this.nowMs + 600;
     this.speedMs = (p.speedPxS || 0) / PIXELS_PER_METER;
     this.speedText.setText(`${fmtInt(this.speedMs * 3.6)} KM/H`);
+    // flow resync (also covers a missed FLOW_* event and a timeout refresh at the x3.0 cap)
+    if (p.flow != null) {
+      if (p.flow > 1.001 && (Math.abs(p.flow - this.flow) > 1e-6 || Math.abs((p.flowFrac || 0) - this.flowFrac) > 0.02)) {
+        this._setFlow(p.flow, p.flowFrac || 0);
+      } else if (p.flow <= 1.001 && this.flow > 1.001) {
+        this._setFlow(1, 0);
+      }
+    }
   }
 
   onTrick(p) {
@@ -528,15 +570,113 @@ export class UIScene extends Phaser.Scene {
 
   onLanding(p) {
     const banked = p.bankedPoints || 0;
+    if (p.midSpin) this._popup('SPIN CUT  GRADE DOWN', 'magenta');
     if (p.quality === 'perfect') {
       const bonus = p.bonusPoints || 20;
       this._flash(`PERFECT LANDING +${bonus}`);
-      if (banked > 0) this._popup(`BANKED +${fmtInt(banked)}`, 'amber');
+      if (banked > 0) this._bank(this._bankText(p, banked, ''), 'amber');
     } else if (p.quality === 'good') {
-      if (banked > 0) this._popup(`BANKED +${fmtInt(banked)}`, 'text');
+      if (banked > 0) this._bank(this._bankText(p, banked, ''), 'text');
     } else if (p.quality === 'sloppy') {
-      this._popup(banked > 0 ? `SLOPPY +${fmtInt(banked)}` : 'SLOPPY LANDING', 'amber');
+      this._bank(banked > 0 ? this._bankText(p, banked, 'SLOPPY ') : 'SLOPPY LANDING', 'amber');
     }
+  }
+
+  /** Show the landing payoff line (scale 2, glow), replacing the previous one. */
+  _bank(text, color) {
+    const t = this.bankLine;
+    this.tweens.killTweensOf(t);
+    t.setText(text).setColorKey(color).setAlpha(1).setScale(2.7);
+    this.tweens.add({ targets: t, scaleX: 2, scaleY: 2, duration: 160, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: t, alpha: 0, delay: 1100, duration: 350 });
+  }
+
+  /**
+   * "DOUBLE BACKFLIP + HELI x1.5 +450": named combo, combo multiplier when above x1, banked points. Always fits 480 px
+   * at the bank line's scale 2 (shortened step by step: drop prefix, mult, name).
+   */
+  _bankText(p, banked, prefix) {
+    const name = p.comboName || '';
+    const mult = p.comboMult > 1.001 ? ` x${fmtShort(p.comboMult)}` : '';
+    const pts = ` +${fmtInt(banked)}`;
+    const tries = [
+      `${prefix}${name || 'BANKED'}${mult}${pts}`,
+      `${name || 'BANKED'}${mult}${pts}`,
+      `${name || 'BANKED'}${pts}`,
+      `BANKED${pts}`,
+    ];
+    return tries.find((t) => measureText(t) * 2 <= POPUP_MAX_W) || tries[tries.length - 1];
+  }
+
+  // ---------------------------------------------------------------- flow
+
+  /** Apply flow state to the meter: visibility, text, colour. frac = remaining timeout 0..1. */
+  _setFlow(flow, frac) {
+    this.flow = flow;
+    this.flowFrac = Math.max(0, Math.min(1, frac));
+    const on = flow > 1.001;
+    this.flowText.setVisible(on);
+    this.flowG.setVisible(on);
+    if (on) {
+      this.flowText.setText(`FLOW x${flow.toFixed(2)}`).setColorKey(flowColor(flow));
+      this._paintFlow();
+    }
+    this._setPending(this.pendingRaw, true);
+  }
+
+  _paintFlow() {
+    const g = this.flowG;
+    g.clear();
+    if (this.flow <= 1.001) return;
+    const pal = this.theme.pal;
+    const x = GAME_WIDTH - 8 - FLOW_BAR_W;
+    const y = FLOW_Y + 10;
+    const low = this.flowFrac < 0.25 && Math.floor(this.nowMs / 110) % 2 === 0;
+    const c = pal[low ? 'danger' : flowColor(this.flow)];
+    g.fillStyle(pal.bg, 0.75);
+    g.fillRect(x - 1, y - 1, FLOW_BAR_W + 2, 5);
+    g.fillStyle(pal.bgAlt, 1);
+    g.fillRect(x, y, FLOW_BAR_W, 3);
+    g.fillStyle(c, 1);
+    g.fillRect(x, y, Math.round(FLOW_BAR_W * this.flowFrac), 3);
+  }
+
+  onFlowChanged(p) {
+    if (!p) return;
+    const flow = p.flow || 1;
+    const rose = flow > this.flow + 1e-6;
+    const step = Math.floor(flow * 2); // colour steps at 1.5 / 2 / 2.5
+    this._setFlow(flow, p.timeoutFrac != null ? p.timeoutFrac : 1);
+    if (flow > 1.001) {
+      this.tweens.killTweensOf(this.flowText);
+      this.flowText.setAlpha(1);
+      if (rose) {
+        this._pop(this.flowText, 1, step > this.flowStep ? 2.6 : 1.8);
+        uiSfx(this, 'flowUp', { flow });
+      } else {
+        // sloppy landing, shield hit or timeout halving: partly lost (the bar was refilled by the event's timeoutFrac)
+        this._pop(this.flowText, 1, 1.4);
+        uiSfx(this, 'uiBack', { pitch: 0.8, volume: 0.6 });
+        if (p.reason === 'timeout') {
+          this.flowText.setColorKey('danger');
+          this.time.delayedCall(350, () => {
+            if (this.flowText.scene && this.flow > 1.001) this.flowText.setColorKey(flowColor(this.flow));
+          });
+        }
+      }
+    }
+    this.flowStep = step;
+  }
+
+  onFlowLost() {
+    this._setFlow(1, 0);
+    this.flowStep = 0;
+    const t = this.flowLostText;
+    this.tweens.killTweensOf(t);
+    t.setY(FLOW_Y).setAlpha(1).setScale(1.6);
+    this.tweens.add({ targets: t, scaleX: 1, scaleY: 1, duration: 150, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: t, alpha: 0, y: FLOW_Y + 6, delay: 800, duration: 300 });
+    uiSfx(this, 'flowLost');
   }
 
   onPowerCollected(p) {
@@ -775,6 +915,11 @@ export class UIScene extends Phaser.Scene {
       this.hud.setAlpha(Math.random() < 0.3 ? 0.6 : 1);
     } else if (this.hud.x !== 0 || this.hud.alpha !== 1) {
       this.hud.setPosition(0, 0).setAlpha(1);
+    }
+    // flow timeout drains in run time (resynced ~10 Hz by HUD_SPEED_EVENT)
+    if (this.flow > 1.001) {
+      this.flowFrac = Math.max(0, this.flowFrac - delta / SCORING.flowTimeoutMs);
+      this._paintFlow();
     }
     // zone chip pulse
     if (this.zoneText.visible) this.zoneG.setAlpha(0.75 + 0.25 * Math.sin(this.nowMs * 0.008));

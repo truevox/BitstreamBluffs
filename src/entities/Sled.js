@@ -420,6 +420,8 @@ export class Sled {
       vy: this.vy,
       angleDeg: this.angleDeg,
       heliDeg: this.heliPhase,
+      // the helicopter DRAWING's spin angle: TrickTracker drops the landing grade when it is not near a whole turn
+      midSpin: this.heliPhase,
       angularVelDegS: ((Body.getAngularVelocity(this.body) * 1000) / BASE_STEP_MS) / DEG,
       grounded: this.grounded,
       groundAngleDeg: this.groundAngleDeg,

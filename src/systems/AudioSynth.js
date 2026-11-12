@@ -29,7 +29,7 @@ import { Rng } from './Rng.js';
 export const SFX = Object.freeze([
   'push', 'hop', 'land', 'landPerfect', 'landHard', 'trick', 'combo', 'crash', 'respawn',
   'powerup', 'powerupEnd', 'hazardSlow', 'hazardScramble', 'uiMove', 'uiSelect', 'uiBack', 'glitch',
-  'boost', 'nearMiss', 'shard', 'milestone', 'newBest',
+  'boost', 'nearMiss', 'shard', 'milestone', 'newBest', 'flowUp', 'flowLost', 'airWarn',
 ]);
 
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
@@ -362,7 +362,8 @@ export class AudioSynth {
    * Play a one-shot sound.
    * @param {typeof SFX[number]} name
    * @param {{pitch?:number, volume?:number, intensity?:number, step?:number}} [opts] pitch multiplier (1 = normal), volume 0..1
-   *   relative; intensity (0..1, 'boost' only: 1 = perfect); step (0-based chain index, 'shard' only: pitch ladder, capped at 9).
+   *   relative; intensity (0..1, 'boost' only: 1 = perfect); step (0-based chain index, 'shard' only: pitch ladder, capped at 9);
+   *   flow (1..3, 'flowUp' only: pitch climbs with the flow multiplier).
    * @returns {void}
    */
   playSfx(name, opts) {
@@ -475,6 +476,22 @@ export class AudioSynth {
         o('square', midi(n + 12), midi(n + 12), 0.06, 0.06, 0.03);
         break;
       }
+      case 'flowUp': {
+        // ascending tick: pitch climbs two semitones per 0.2 of flow, capped one octave and a half above the base
+        const f = Math.max(1, Math.min(3, Number(opts.flow) || 1.1));
+        const n = 76 + Math.min(18, Math.round((f - 1) * 10));
+        o('triangle', midi(n), midi(n), 0.09, 0.2);
+        o('square', midi(n + 7), midi(n + 7), 0.07, 0.07, 0.045);
+        break;
+      }
+      case 'flowLost':
+        o('triangle', 620, 110, 0.26, 0.24);
+        o('square', 310, 70, 0.2, 0.08, 0.02);
+        break;
+      case 'airWarn':
+        o('square', 1180, 1180, 0.045, 0.1);
+        o('square', 1180, 1180, 0.045, 0.1, 0.09);
+        break;
       case 'milestone':
         [67, 72, 76, 79].forEach((n, i) => o('square', midi(n), midi(n), 0.12, 0.13, 0.07 * i));
         o('triangle', midi(55), midi(55), 0.4, 0.25);
