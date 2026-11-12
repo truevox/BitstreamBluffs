@@ -423,15 +423,16 @@ describe('helicopter spins from the sled drawing phase (SledFrameState.heliDeg)'
 });
 
 describe('incomplete helicopter landing penalty', () => {
-  test('isMidSpin accepts booleans and helicopter phases (35 deg tolerance)', () => {
+  test('isMidSpin accepts booleans and helicopter phases (60 deg tolerance)', () => {
     expect(isMidSpin(true)).toBe(true);
     expect(isMidSpin(false)).toBe(false);
     expect(isMidSpin(undefined)).toBe(false);
     expect(isMidSpin(0)).toBe(false);
-    expect(isMidSpin(35)).toBe(false);
-    expect(isMidSpin(36)).toBe(true);
+    expect(isMidSpin(40)).toBe(false); // the visual coast after releasing the key
+    expect(isMidSpin(60)).toBe(false);
+    expect(isMidSpin(61)).toBe(true);
     expect(isMidSpin(180)).toBe(true);
-    expect(isMidSpin(360 - 35)).toBe(false);
+    expect(isMidSpin(360 - 60)).toBe(false);
     expect(isMidSpin(-720 - 20)).toBe(false);
     expect(isMidSpin(-90)).toBe(true);
   });
@@ -444,6 +445,7 @@ describe('incomplete helicopter landing penalty', () => {
     expect(classifyLanding(0, CRASH_IMPACT_PX_S, true).quality).toBe('crash');
     expect(classifyLanding(0, 100, 10).quality).toBe('perfect'); // within tolerance of a whole turn
     expect(classifyLanding(0, 100, 90).quality).toBe('good');
+    expect(classifyLanding(0, 100, 40).quality).toBe('perfect'); // coast
     expect(classifyLanding(0, 100).quality).toBe('perfect'); // legacy callers unchanged
   });
 
@@ -459,5 +461,59 @@ describe('incomplete helicopter landing penalty', () => {
     expect(penalised.quality).toBe('good');
     expect(penalised.midSpin).toBe(true);
     expect(land(360).quality).toBe('perfect');
+  });
+
+  describe('mid-spin only when the phase is genuinely unfinished', () => {
+    /** Air phase with a helicopter key held for `heldFrames` (drawing phase advancing `perFrame` deg), then landing. */
+    const spinLanding = ({ heldFrames, perFrame, releaseFrames = 0, coastDeg = 0, landPhase }) => {
+      const r = rig();
+      r.run(2, { grounded: true });
+      let phase = 0;
+      for (let i = 0; i < heldFrames; i++) {
+        phase += perFrame;
+        r.frame({ input: { heli: 1 }, state: { heliDeg: phase, midSpin: phase } });
+      }
+      for (let i = 0; i < releaseFrames; i++) {
+        phase += coastDeg / Math.max(1, releaseFrames);
+        r.frame({ state: { heliDeg: phase, midSpin: phase } });
+      }
+      const p = landPhase != null ? landPhase : phase;
+      return r.frame({ grounded: true, state: { vx: 100, vy: 50, heliDeg: p, midSpin: p } }).landing;
+    };
+
+    test('residual coast after a finished turn (+40 deg, key released) is not a penalty', () => {
+      const l = spinLanding({ heldFrames: 40, perFrame: 9, releaseFrames: 10, coastDeg: 40 }); // 360 + 40
+      expect(l.midSpin).toBe(false);
+      expect(l.quality).toBe('perfect');
+    });
+
+    test('a brief key nudge (< a quarter turn) with the key released is not a penalty', () => {
+      const l = spinLanding({ heldFrames: 4, perFrame: 8, releaseFrames: 8, coastDeg: 30 }); // 32 + 30 = 62 deg drawn
+      expect(l.midSpin).toBe(false);
+      expect(l.quality).toBe('perfect');
+    });
+
+    test('a real half-turn that was released is still mid-spin and drops a grade', () => {
+      const l = spinLanding({ heldFrames: 20, perFrame: 9, releaseFrames: 4, coastDeg: 5 }); // ~185 deg
+      expect(l.midSpin).toBe(true);
+      expect(l.quality).toBe('good');
+    });
+
+    test('key still held at touchdown with a short spin is mid-spin (the spin is unfinished)', () => {
+      const r = rig();
+      r.run(2, { grounded: true });
+      r.run(10, { input: { heli: 1 }, state: { heliDeg: 30, midSpin: 30 } });
+      r.frame({ input: { heli: 1 }, state: { heliDeg: 80, midSpin: 80 } });
+      const l = r.frame({ grounded: true, state: { vx: 100, vy: 50, heliDeg: 90, midSpin: 90 } }).landing;
+      expect(l.midSpin).toBe(true);
+      expect(l.quality).toBe('good');
+    });
+
+    test('an explicit midSpin: true is always honoured', () => {
+      const r = rig();
+      r.run(2, { grounded: true });
+      r.run(10, {});
+      expect(r.frame({ grounded: true, state: { vx: 100, vy: 50, midSpin: true } }).landing.midSpin).toBe(true);
+    });
   });
 });

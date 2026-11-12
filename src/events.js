@@ -121,7 +121,8 @@ export const EVT = Object.freeze({
  * @typedef {Object} FlowChangedPayload
  * @property {number} flow          current flow multiplier (1..SCORING.flowMax).
  * @property {number} previous      flow before this change.
- * @property {'gain'|'halved'} reason  gain = clean trick landing; halved = sloppy landing.
+ * @property {'gain'|'halved'|'timeout'} reason  gain = clean landing after a flip / helicopter; halved = sloppy landing or a
+ *   shield-absorbed hit; timeout = the flow timer expired and the bonus was halved (flow is still above 1; the timer restarted).
  * @property {number} timeoutFrac   remaining timeout 0..1 (1 right after a gain).
  * @property {number} best          best flow this run.
  */
@@ -129,7 +130,8 @@ export const EVT = Object.freeze({
 /**
  * @typedef {Object} FlowLostPayload
  * @property {number} previous      flow that was lost (> 1).
- * @property {'crash'|'reset'|'timeout'} reason  crash covers a shield-absorbed crash and a real crash.
+ * @property {'crash'|'reset'|'timeout'} reason  crash = a real crash; reset = Shift; timeout = repeated timeouts halved the bonus
+ *   below SCORING.flowClearBelow and flow returned to 1.
  */
 
 /**
@@ -191,6 +193,10 @@ export const EVT = Object.freeze({
  * @property {boolean} hard         true if impact was hard enough to trigger screen shake / big thud.
  * @property {number} x
  * @property {number} y
+ * @property {string} [comboName]   additive: display name of the tricks just banked ('' when none).
+ * @property {number} [comboMult]   additive: combo multiplier applied to the bank.
+ * @property {number} [flowUsed]    additive: flow multiplier applied to the bank (after this landing's gain).
+ * @property {boolean} [midSpin]    additive: true when an unfinished helicopter spin cost the landing a grade.
  */
 
 /**

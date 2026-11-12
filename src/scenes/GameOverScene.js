@@ -30,7 +30,7 @@ import { uiSfx } from '../ui/Sound.js';
 
 const PANEL_Y = 54;
 const PANEL_H = 160;
-/** RUN REPORT rows start at panel y 56 and must end above the ledger-hash line (y 128). */
+/** RUN REPORT rows start at panel y 56 and must end above the ledger-hash line (y 132: 8 rows end at y 126). */
 const ROW_H = 9;
 const MAX_ROWS = 8;
 
@@ -109,37 +109,42 @@ export class GameOverScene extends Phaser.Scene {
     const shards = Number(rec.shards) || 0;
     const near = Number(rec.nearMisses) || 0;
     const bonus = Number(rec.bonusPoints) || 0;
+    // Shift resets are not stored in the record: whatever is left between the score and its parts is the reset penalty,
+    // so the listed point rows always add up to the score (DISTANCE + TRICKS + BONUSES - RESET PENALTY).
+    const penalty = Math.max(0, distPts + (Number(rec.trickPoints) || 0) + bonus - (Number(rec.score) || 0));
     const chase = this._chase(rec);
     this.chase = chase;
     // Report rows in display order with a priority (lower = kept first). At most MAX_ROWS fit above the ledger hash line,
-    // so the lowest priorities are dropped rather than overlapping anything.
+    // so the lowest priorities are dropped rather than overlapping anything. Point rows (right column) come first.
     const cand = [
       { pri: 0, row: ['DISTANCE', `${fmtInt(rec.distanceM)} M`, `+${fmtInt(distPts)}`] },
       { pri: 1, row: ['TRICKS', `${fmtInt(trickCount)} DONE`, `+${fmtInt(rec.trickPoints)}`] },
-      { pri: 2, row: ['BEST COMBO', fmtMult(rec.bestCombo || 1), ''] },
-      { pri: 3, row: ['BEST FLOW', fmtMult(Math.max(1, Number(rec.bestFlow) || 1)).replace(/(\.\d)0$/, '$1'), ''] },
-      shards > 0 && { pri: 4, row: ['SHARDS', fmtInt(shards), bonus > 0 && !near ? `+${fmtInt(bonus)}` : ''] },
-      near > 0 && { pri: 5, row: ['NEAR MISSES', fmtInt(near), bonus > 0 ? `+${fmtInt(bonus)}` : ''] },
-      chase.streak > 0 && { pri: 6, row: ['DAILY STREAK', `${chase.streak} ${chase.streak === 1 ? 'DAY' : 'DAYS'}`, ''] },
-      { pri: 7, row: ['BEST AIR', `${fmtSec(rec.maxAirtimeMs)} S`, ''] },
-      { pri: 8, row: ['RUN TIME', fmtClock(rec.durationMs), ''] },
+      bonus > 0 && { pri: 2, row: ['BONUSES', '', `+${fmtInt(bonus)}`] },
+      penalty > 0 && { pri: 3, row: ['RESET PENALTY', '', `-${fmtInt(penalty)}`], negative: true },
+      { pri: 4, row: ['BEST COMBO', fmtMult(rec.bestCombo || 1), ''] },
+      { pri: 5, row: ['BEST FLOW', fmtMult(Math.max(1, Number(rec.bestFlow) || 1)).replace(/(\.\d)0$/, '$1'), ''] },
+      shards > 0 && { pri: 6, row: ['SHARDS', fmtInt(shards), ''] },
+      near > 0 && { pri: 7, row: ['NEAR MISSES', fmtInt(near), ''] },
+      chase.streak > 0 && { pri: 8, row: ['DAILY STREAK', `${chase.streak} ${chase.streak === 1 ? 'DAY' : 'DAYS'}`, ''] },
+      { pri: 9, row: ['BEST AIR', `${fmtSec(rec.maxAirtimeMs)} S`, ''] },
+      { pri: 10, row: ['RUN TIME', fmtClock(rec.durationMs), ''] },
     ].filter(Boolean);
     const keep = new Set(cand.slice().sort((a, b) => a.pri - b.pri).slice(0, MAX_ROWS));
-    const rows = cand.filter((c) => keep.has(c)).map((c) => c.row);
-    rows.forEach(([k, v, pts], i) => {
+    const rows = cand.filter((c) => keep.has(c));
+    rows.forEach(({ row: [k, v, pts], negative }, i) => {
       const y = 56 + i * ROW_H;
       p.add(new NeonText(this, theme, 8, y, k, { color: 'text', outline: 'none' }).setAlpha(0.7));
-      p.add(new NeonText(this, theme, 106, y, v, { color: 'cyan', outline: 'none' }));
-      if (pts) p.add(new NeonText(this, theme, 218, y, pts, { color: 'lime', anchor: 'right', outline: 'none' }));
+      if (v) p.add(new NeonText(this, theme, 106, y, v, { color: 'cyan', outline: 'none' }));
+      if (pts) p.add(new NeonText(this, theme, 218, y, pts, { color: negative ? 'danger' : 'lime', anchor: 'right', outline: 'none' }));
     });
     this._buildChaseLines(p, chase);
-    p.add(new NeonText(this, theme, 8, 128, 'LEDGER HASH', { color: 'text', outline: 'none' }).setAlpha(0.7));
-    p.add(new NeonText(this, theme, 106, 128, String(rec.ledgerHash || '--------').toUpperCase(), { color: 'magenta', outline: 'none' }));
-    p.add(new NeonText(this, theme, 8, 141, 'SHARE SEED', { color: 'text', outline: 'none' }).setAlpha(0.7));
-    this.seedText = new NeonText(this, theme, 106, 141, ellipsize(String(rec.seed || '-').toUpperCase(), 70), { color: 'lime', outline: 'none' });
+    p.add(new NeonText(this, theme, 8, 132, 'LEDGER HASH', { color: 'text', outline: 'none' }).setAlpha(0.7));
+    p.add(new NeonText(this, theme, 106, 132, String(rec.ledgerHash || '--------').toUpperCase(), { color: 'magenta', outline: 'none' }));
+    p.add(new NeonText(this, theme, 8, 144, 'SHARE SEED', { color: 'text', outline: 'none' }).setAlpha(0.7));
+    this.seedText = new NeonText(this, theme, 106, 144, ellipsize(String(rec.seed || '-').toUpperCase(), 70), { color: 'lime', outline: 'none' });
     p.add(this.seedText);
     this.copyBtn = new Button(this, theme, {
-      x: 182, y: 137, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
+      x: 182, y: 140, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
     });
     p.add(this.copyBtn);
     this.tweens.addCounter({
@@ -245,12 +250,15 @@ export class GameOverScene extends Phaser.Scene {
       let l2;
       let key;
       if (m > bestM || (rec.score || 0) > bestS) {
-        l1 = 'NEW BEST!';
+        // the chase line above already says NEW SEED / TODAY'S BEST (a score best): a second "score best" line is noise
+        if (m <= bestM && this.chase && this.chase.seedKey === 'lime') return;
+        // name the metric: the chase line above (seed / today's best) is a SCORE best, this one compares with the device
+        l1 = m > bestM ? 'DISTANCE BEST!' : 'SCORE BEST!';
         l2 = m > bestM ? `PREV ${fmtInt(bestM)} M` : `PREV ${fmtInt(bestS)} PTS`;
         key = 'lime';
       } else {
-        l1 = `${fmtInt(bestM - m)} M SHORT`;
-        l2 = 'OF YOUR BEST';
+        l1 = `${fmtInt(bestM - m)} M SHORT OF`;
+        l2 = 'DISTANCE BEST';
         key = 'amber';
       }
       const a = new NeonText(this, this.theme, 218, 32, l1, { color: key, anchor: 'right', outline: 'none' });

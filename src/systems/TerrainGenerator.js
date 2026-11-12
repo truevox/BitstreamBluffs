@@ -108,13 +108,28 @@ export const AIR_CHANCE_FULL_M = 10000;
 /**
  * Fairness: the hit box of an air hazard sits ABOVE every no-hop arc, with at least AIR_CLEARANCE_PX of vertical clearance,
  * for launch speeds from AIR_SPEED_LO_MUL x to max(AIR_SPEED_HI_MUL x, expected speed) of the nominal launch speed (arcs are
- * monotone in speed, so the fastest one bounds the family). So a normal flight always passes under it and only a hop at the
- * lip or a boosted arc reaches it. (A "low" placement near the lip-to-landing chord was rejected: a slow launch drops onto
- * the landing ramp and no box could keep 70 px clear of that arc.)
+ * monotone in speed, so the fastest one bounds the family; 1.6x covers a sled boosted by landing speed-ups). So a normal
+ * flight always passes under it and only a hop at the lip or a wildly over-fast arc reaches it. (A "low" placement near the
+ * lip-to-landing chord was rejected: a slow launch drops onto the landing ramp and no box could keep 70 px clear of it.)
  */
 export const AIR_CLEARANCE_PX = 70;
 export const AIR_SPEED_LO_MUL = 0.75;
-export const AIR_SPEED_HI_MUL = 1.25;
+export const AIR_SPEED_HI_MUL = 1.6;
+/**
+ * Position along the flight: the box sits LATE in the arc, at least AIR_MIN_DX_PX past the lip and between AIR_U_MIN and
+ * AIR_U_MAX of the lip-to-landing span, so a reflex hop at the lip is already committed when the box is reached and the
+ * warning telegraph has time to be read. A jump whose span cannot fit this (0.8 x span < 400 px) gets no air hazard.
+ */
+export const AIR_MIN_DX_PX = 400;
+export const AIR_U_MIN = 0.55;
+export const AIR_U_MAX = 0.8;
+/**
+ * Near-miss window for flying UNDER an air hazard: a sled that crosses the box x while airborne and at most this far below
+ * the box bottom paid a near miss. It spans the whole no-hop family: the box bottom is >= AIR_CLEARANCE_PX above the 1.6x
+ * arc and the nominal (1.0x) arc passes ~280 px below it at the placement distances above (tested), so one normal flight
+ * pays exactly once.
+ */
+export const AIR_NEAR_MISS_BELOW_PX = 360;
 /** Power-up spawn chance never decays below this share of the def's baseChance. */
 export const POWERUP_FLOOR_FRACTION = 0.4;
 /** Difficulty tail: past the old caps the ramp keeps creeping up (gently) to a hard ceiling. */
@@ -1053,7 +1068,7 @@ export class TerrainGenerator {
    * At most one air hazard per generated jump, in the flight arc. Placed LAST (after powerups and shards) from its own fork,
    * so ground terrain, ground hazards, power-ups and shards of a seed are not affected by its random draws.
    * Spawn contract for placement 'air': `y` is the CENTRE of the hazard (Hazard.js), rotationDeg 0. The hit box bottom is
-   * >= AIR_CLEARANCE_PX above the highest no-hop arc (see AIR_CLEARANCE_PX), roughly at mid flight.
+   * >= AIR_CLEARANCE_PX above the highest no-hop arc (see AIR_CLEARANCE_PX), late in the flight (see AIR_MIN_DX_PX).
    */
   _placeAirHazard(chunk, rng, distM, isJump, breather, lips) {
     // fixed number of draws so the stream is independent of the early returns below
@@ -1066,14 +1081,16 @@ export class TerrainGenerator {
     for (const l of lips) if (!l.pad && l.landX != null && (!lip || l.airS > lip.airS)) lip = l;
     if (!lip || !(lip.vx > 0)) return;
     const span = lip.landX - lip.x;
-    if (span < 240) return;
+    const lo = Math.max(AIR_MIN_DX_PX, AIR_U_MIN * span);
+    const hi = AIR_U_MAX * span;
+    if (hi < lo) return; // the span cannot hold a box >= AIR_MIN_DX_PX past the lip
     const lipM = lip.x / this.ppm;
     const p = AIR_CHANCE_START + (AIR_CHANCE_END - AIR_CHANCE_START) * clamp((lipM - AIR_HAZARD_MIN_M) / (AIR_CHANCE_FULL_M - AIR_HAZARD_MIN_M), 0, 1);
     if (lipM < AIR_HAZARD_MIN_M || rChance >= p) return;
     const hiMul = Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(distM) / Math.hypot(lip.vx, lip.vy));
     // two candidate positions (the second only when the first collides with a power-up / shard)
-    for (const u of [0.3 + 0.3 * rU, 0.3 + 0.3 * ((rU + 0.5) % 1)]) {
-      const x = Math.round(lip.x + u * span);
+    for (const dxPick of [lo + (hi - lo) * rU, lo + (hi - lo) * ((rU + 0.5) % 1)]) {
+      const x = Math.round(lip.x + dxPick);
       const def = this._pickAirDef(rDef, x / this.ppm);
       if (!def) return;
       const w = (def.size && def.size.w) || 24;

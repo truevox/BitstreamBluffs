@@ -435,17 +435,25 @@ whether or not the run is saved yet, because of `excludeRunId`. For the streak, 
 
 Owner: core-logic engineer. All additive except the two rule changes marked RULE. Numbers live in `SCORING` (constants.js).
 
-* **Flow streak** (`ScoreManager`): run-level multiplier `flow` x1.0..`flowMax` x3.0. A perfect (+`flowPerfectStep` 0.2) or good
-  (+`flowGoodStep` 0.1) landing that banked >= 1 trick raises it and refreshes the timeout. Sloppy with >= 1 trick keeps `flowSloppyKeep` (0.5) of the
-  bonus above 1.0 and does NOT refresh the timeout. Crash landing, `onCrash()` (call it for a shield-absorbed crash too), `penalizeReset()`
-  and `flowTimeoutMs` (6000) of ticked time clear it. `banked = round(pending x combo x flowUsed)`, where `flowUsed` is the flow
-  carried INTO the landing. Distance and flat bonuses are never multiplied.
+* **Flow streak** (`ScoreManager`; RULE changed in the fix round): run-level multiplier `flow` x1.0..`flowMax` x3.0. A perfect (+`flowPerfectStep`
+  0.25) or good (+`flowGoodStep` 0.15) landing after >= 1 COMBO-STEP trick (`SCORING.comboStepTypes`: flips and helicopters; air brake /
+  parachute alone gain nothing) raises it. ANY perfect / good landing, tricks or not, refreshes the timeout (`flowTimeoutMs` 9000 of ticked
+  run time). Sloppy with >= 1 trick keeps `flowSloppyKeep` (0.5) of the bonus above 1.0 (applied AFTER that landing banks, paid at the carried-in
+  flow) and does NOT refresh the timeout. Crash landing, `onCrash()` and `penalizeReset()` clear it. The timeout does not clear: each expiry
+  halves the bonus above 1.0 and restarts the timer (`FlowChange {reason:'timeout', lost:false}`); once the halved bonus would be below
+  `SCORING.flowClearBelow` (0.05) it clears to 1.0 (`lost:true`). `banked = round(pending x combo x flowUsed)`, where `flowUsed` is the flow
+  AFTER this landing's gain (so the first clean trick landing already pays; a landing that gains nothing pays at the carried-in flow).
+  Distance and flat bonuses are never multiplied. **Shield save**: `onShieldHit(dropCombo = false)` halves the bonus (reason `'halved'`) and,
+  unless `dropCombo`, leaves the pending combo, its paid baseline and the tracker counts untouched (RunScene passes `false` for a hazard hit
+  absorbed by Hashed Backup, e.g. mid-air, and `true` when it respawns the sled). Do NOT call `onCrash()` for a shield hit: it wipes `paid`
+  while TrickTracker keeps its counts, so later flips would be re-paid at full cumulative value.
 * **Calls RunScene must make**: `score.tick(dtMs)` once per frame with the run-clock delta (excludes pause; never wall clock);
   `onLanding(landing)`, `onCrash()`, `penalizeReset()` as before. Each returns a `FlowChange`
   `{changed, lost, previous, flow, reason:'gain'|'halved'|'crash'|'reset'|'timeout'|'none', timeoutFrac, best}`
   (`onLanding().flowChange`, `penalizeReset().flowChange`, `onCrash()` and `tick()` directly). ScoreManager never emits: the scene emits
-  `EVT.FLOW_CHANGED` (`FlowChangedPayload {flow, previous, reason:'gain'|'halved', timeoutFrac, best}`) when `changed && !lost`, and
-  `EVT.FLOW_LOST` (`FlowLostPayload {previous, reason:'crash'|'reset'|'timeout'}`) when `lost`.
+  `EVT.FLOW_CHANGED` (`FlowChangedPayload {flow, previous, reason:'gain'|'halved'|'timeout', timeoutFrac, best}`) when `changed && !lost`, and
+  `EVT.FLOW_LOST` (`FlowLostPayload {previous, reason:'crash'|'reset'|'timeout'}`) when `lost`. FLOW_CHANGED reasons: `'gain'`, `'halved'` (sloppy /
+  shield hit), `'timeout'` (timer expiry halving; flow still above 1, timer restarted, `timeoutFrac` 1); FLOW_LOST `'timeout'` = the bonus decayed away.
   HUD getters: `getFlow()`, `getFlowTimeoutFraction()` (0 when flow is 1), snapshot fields `flow`, `flowTimeoutFrac`, `bestFlow`,
   `comboCounts`. `onLanding` additionally returns `flowUsed` and `comboName`.
 * **bestFlow in the record**: the scene may add an optional `bestFlow` (from `snapshot.bestFlow`) to the RunRecord. It is NOT covered by
@@ -454,16 +462,18 @@ Owner: core-logic engineer. All additive except the two rule changes marked RULE
 * **RULE: combo step**: only `SCORING.comboStepTypes` (backflip, frontflip, helicopterCCW, helicopterCW) add `comboStep`. Air brake and
   parachute keep base points and still appear in `comboTricks`, but `addTrick().isNew` and `TrickPayload.isNew` are false for them.
 * **Incomplete helicopter**: `classifyLanding(angleDiffDeg, impactSpeedPxS, midSpin?)`; `midSpin` is `true` or a helicopter phase in
-  degrees (e.g. `heliDeg`, any sign/wrap). `isMidSpin(spin)` is true when the phase is further than `SCORING.midSpinToleranceDeg` (35)
-  from a whole turn. The grade drops one level (perfect->good, good->sloppy, sloppy stays); never creates or rescues a crash.
+  degrees (e.g. `heliDeg`, any sign/wrap). `isMidSpin(spin)` is true when the phase is further than `SCORING.midSpinToleranceDeg` (60, was 35:
+  the drawing coasts ~40 deg after the key is released) from a whole turn. TrickTracker additionally ignores a NUMERIC phase (no penalty) when the
+  helicopter key was released before touchdown and less than `MID_SPIN_MIN_DEG` (90, a quarter turn) of helicopter spin was made in the air
+  phase (a nudge or pure coast); a key still held at touchdown or `midSpin: true` always counts. The grade drops one level (perfect->good, good->sloppy, sloppy stays); never creates or rescues a crash.
   `SledFrameState.midSpin` (same type, optional) is forwarded by `TrickTracker`; `LandingResult.midSpin` reports that the penalty applied.
   RunScene should pass its drawing's heli phase (or `true` while a spin is unfinished) in `midSpin` on the landing frame.
 * **Combo names**: `comboName(tricks, maxChars = 28)` (ScoreManager.js) takes type strings or `{type,count}`; e.g. `DOUBLE BACKFLIP + HELI`,
   `TRIPLE FRONTFLIP`, `BACKFLIP + AIR BRAKE`; degrades to BRAKE/CHUTE, then `N-TRICK COMBO`. `getComboName()` names the pending combo;
   `onLanding().comboName` names the jump just landed (capture it for the HUD popup).
-* **Milestones**: `milestoneBonus(sector) = 100 x sector`; `score.checkMilestones(distanceM)` pays (via `addBonus(..., 'milestone')`)
+* **Milestones**: `milestoneBonus(sector) = 100 x min(sector, SCORING.milestoneMaxSector 10)` (linear, flat 1000 from 5 km on; was 100 x sector); `score.checkMilestones(distanceM)` pays (via `addBonus(..., 'milestone')`)
   every newly completed 500 m sector exactly once and returns `[{sector, points, distanceM}]`; the scene emits `EVT.MILESTONE` for each
-  (payload gained optional `points`). Call it when distance advances. Reaching 500 m pays sector 1 (100), 1000 m pays sector 2 (200).
+  (payload gained optional `points`). Call it when distance advances. Reaching 500 m pays sector 1 (100), 1000 m pays sector 2 (200), 5 km sector 10 (1000).
   If RunScene keeps its own milestone trigger, drop the old `addBonus(..., 'milestone')` call to avoid double payment.
 * **Event payload doc fixes**: `LandingBoostPayload.tricks` is a number (count banked). `ShardCollectedPayload.total` is cumulative shard
   POINTS; new optional `count` is the true shard count.
@@ -477,11 +487,18 @@ Owner: core-logic engineer. All additive except the two rule changes marked RULE
   sit on the ground, so code that assumed `hazard.y == heightAt(hazard.x)` must check `defs[h.defId].placement` first.
 * **Placement rules**: only in generated jump chunks (`gen-jump`), never chunk 0, never breathers, never before `AIR_HAZARD_MIN_M` (1500 m; a def's own
   `minDistanceM` can only raise it), at most one per jump. Chance per eligible jump: 25 % at 1500 m rising linearly to 55 % at 10 km (`AIR_CHANCE_*`).
-  Position: 30-60 % of the way from the lip to the nominal landing, blocked (then retried once at another x, else skipped) by a power-up within 90 px,
+  Position (fix round: LATE in the arc): `AIR_U_MIN` 0.55 .. `AIR_U_MAX` 0.8 of the lip-to-landing span AND at least `AIR_MIN_DX_PX` (400 px) past the
+  lip; a jump whose span cannot fit that (0.8 x span < 400) gets no air hazard. Blocked (then retried once at another x, else skipped) by a power-up within 90 px,
   a shard, a gap or another hazard within 480 px. The def is picked by `weight` among air defs eligible at that distance (data driven).
 * **Fairness guarantee (tested)**: the hit box sits ABOVE every no-hop flight with >= `AIR_CLEARANCE_PX` (70 px) of vertical clearance, for launch
-  speeds from 0.75 x to max(1.25 x, expected speed) of the nominal launch speed (arcs rise monotonically with speed, so the fastest bounds the family).
-  A normal flight always passes under it; only a full hop at the lip (+360 px/s) or a boosted arc reaches it (~70 % of hops at the lip do). A "low" box near the
+  speeds from 0.75 x to max(`AIR_SPEED_HI_MUL` 1.6 x, expected speed) of the nominal launch speed (arcs rise monotonically with speed, so the fastest bounds
+  the family; 1.6 x covers landing-boosted sleds). A normal flight always passes under it (nominal arc ~280-300 px below the box bottom, 1.25 x ~170 px);
+  only a full hop at the lip (+360 px/s) reaches it.
+  **Near miss**: flying under pays once: `RunScene.updateFun` pays an air-hazard near miss for an AIRBORNE sled crossing the box x with `0 < sled.y - box
+  bottom < TUNING.airNearMissBelowPx` (= `AIR_NEAR_MISS_BELOW_PX` 360, which covers every still-airborne no-hop arc; tested). **Telegraph**:
+  `TUNING.airWarnAheadPx` is 900 (box ahead of the sled): the hazard goes `alert`, `airWarn` plays, and `entities/AirTelegraph.js` draws a blinking STAY LOW
+  marker with cascading chevrons and a dotted guide over the launch lip it belongs to (`Hazard.lip` = nearest `chunk.launches` entry before the box,
+  set in `RunScene.takeChunk`), so the no-hop decision can be made before the lip. The hop tutorial hint still ignores air hazards. A "low" box near the
   lip-to-landing chord was rejected: a slow launch drops onto the landing ramp and no box can keep 70 px from that arc.
 * **Determinism**: air placement is the last step of `_build`, draws only from `crng.fork('air')` (a fixed 4 draws per chunk) and reads, never changes,
   the shards / power-ups already placed. Air defs are kept out of the ground hazard list, so ground hazards, terrain, shards, zones and launches are
@@ -498,24 +515,31 @@ Owner: core-logic engineer. All additive except the two rule changes marked RULE
 
 * **Flow wiring** (`RunScene`): `score.tick(simDt)` every frame right after `stepWorld`, with `simDt` = the scaled sim delta (slow-mo stretches the
   timeout, pause and hit-stop freeze it; never wall clock). `RunScene.emitFlow(fc)` turns any FlowChange (tick, `onLanding`, `onCrash`,
-  `penalizeReset`) into `FLOW_LOST` (lost) or `FLOW_CHANGED` (changed). `onCrash()` is also called on a shield-absorbed crash (any cause), so that
-  also drops the pending combo (`COMBO_CHANGED reason 'crash'`). `HUD_SPEED_EVENT` (~10 Hz) now also carries `flow` and `flowFrac` so the HUD meter resyncs
+  `penalizeReset`) into `FLOW_LOST` (lost) or `FLOW_CHANGED` (changed). A shield-absorbed HAZARD hit calls `onShieldHit(false)` (flow halved, pending combo kept, no COMBO_CHANGED); a shield-absorbed body / landing / void crash
+  respawns the sled and calls `onShieldHit(true)` (combo dropped, `COMBO_CHANGED reason 'crash'`). `HUD_SPEED_EVENT` (~10 Hz) now also carries `flow` and `flowFrac` so the HUD meter resyncs
   (covers the timeout refresh at the x3.0 cap, which is not a FLOW_CHANGED). UIScene: `FLOW xN.N` + draining bar under the pending-points line
   (top-right, visible only while flow > 1), colour steps at 1.5 / 2 / 2.5, pop per gain, `FLOW LOST` callout; pending points now include flow.
   SFX: `flowUp` (`opts.flow` raises pitch), `flowLost` (down-sweep), `airWarn`. RunRecord gets `bestFlow` (unhashed; the sanitiser drops it, so GameOver
   reads it from `REG.LAST_RECORD`). Rule change in ScoreManager: a sloppy landing that banked zero tricks no longer halves flow.
-* **LandingPayload additive fields**: `comboName` (name of the jump just banked), `comboMult`, `flowUsed`, `midSpin` (grade dropped for an unfinished spin).
-  `Sled.getFrameState()` now passes `midSpin: heliPhase` (the drawn helicopter angle); TrickTracker applies the 35 deg tolerance. HUD shows
-  `SPIN CUT  GRADE DOWN` under the bank popup. Bank popup = `[SLOPPY ]NAME xMULT +POINTS`, shortened (drop prefix, mult, name) until it fits 440 px.
+* **LandingPayload additive fields** (now in the `events.js` typedef): `comboName` (name of the jump just banked), `comboMult`, `flowUsed`, `midSpin` (grade dropped
+  for an unfinished spin). `Sled.getFrameState()` passes `midSpin: heliPhase` (the drawn helicopter angle); TrickTracker applies the 60 deg tolerance and the
+  coast / nudge exemption. HUD: the bank line `[SLOPPY ]NAME xMULT +POINTS` is its own big glowing line (scale 2, y 80, ~1.4 s; shortened until it fits 440 px at
+  that scale) and the small popups (incl. `SPIN CUT  GRADE DOWN`) stack under it from y 100 at an 11 px pitch, so they never overlap. Top-right stack: COMBO y4,
+  value y13, info y31, pending y43, FLOW y62 + bar y72 (pop peaks 2.5 / 2.3 keep them apart).
 * **Milestones**: `RunScene.updateFun` uses `score.checkMilestones(metres)` only (no second `addBonus`). `MilestonePayload.sector` is now the sector
   just completed (500 m -> 1; it used to send `n + 1`), `points` is the paid bonus, shown in the SECTOR strip. **Shards**: `SHARD_COLLECTED.count` is sent
   and `SHARDS N` shows the count.
-* **Tuck hint**: shown once when grounded, not tucking, slope >= `TUNING.tuckHintSlopeDeg` and speed > 150 for `TUNING.tuckHintMs`; done (persisted) when the
-  player tucks on the ground or the steep stretch ends.
+* **Tuck hint** (fix round): due after `TUNING.tuckHintMs` (800) of grounded, not tucking, slope >= `tuckHintSlopeDeg` (12) and speed > 150. It waits for any
+  other hint to clear (dropped after `tuckHintWaitMs` 8000), stays up at least `tuckHintShowMs` (2500; hides when the steep stretch ends, forced at +1300)
+  and is only retired (persisted `bb.tutorialDone`) when the player tucks on the ground or it has been shown `tuckHintMaxShows` (2) times (count in
+  localStorage `bb.tuckShows`). At most one show per run.
 * **Rogue Packet** (`Hazard.shapeKey 'drone'`): halo + rotor bars + hull + white-hot core, visual-only bob, faster pulse / tighter ring once `hazard.alert`.
   RunScene sets `alert` and plays `airWarn` once when an air hazard is within `TUNING.airWarnAheadPx` ahead. Air hazards are excluded from the "hop" tutorial hint
-  (hopping is the wrong answer), and their near miss uses `TUNING.airNearMissBelowPx` below the box centre line; `h.cy` is always the box centre.
+  (hopping is the wrong answer), and their near miss is the airborne pass-under window described in the air-hazard section above; `h.cy` is always the box centre.
 * **Chase UI**: GameOver shows `NEW SEED BEST` / `SEED BEST n` (top right of RUN REPORT; on a daily seed it reads `NEW TODAY'S BEST` / `TODAY'S BEST n`
-  from `getDailyStats`) and a `DAILY STREAK n DAYS` row for daily runs. The report keeps at most 8 rows by priority (DISTANCE, TRICKS, BEST COMBO, BEST FLOW,
-  SHARDS, NEAR MISSES, DAILY STREAK, BEST AIR, RUN TIME), dropping the lowest first. Title daily strip: `NEXT PATCH IN 3H 12M` plus `STREAK n   TODAY'S BEST n` or
+  from `getDailyStats`) and a `DAILY STREAK n DAYS` row for daily runs. The report keeps at most 8 rows by priority (DISTANCE, TRICKS, BONUSES, RESET PENALTY, BEST COMBO, BEST FLOW,
+  SHARDS, NEAR MISSES, DAILY STREAK, BEST AIR, RUN TIME), dropping the lowest first. The right-column point rows add up to the score: DISTANCE + TRICKS +
+  BONUSES (`rec.bonusPoints`: shards, near misses and milestones together) - RESET PENALTY (derived: parts minus score, only shown when > 0); SHARDS / NEAR MISSES
+  are plain counts. The device-best lines under the chase line read `DISTANCE BEST!` / `SCORE BEST!` (+ `PREV n`) or `n M SHORT OF` / `DISTANCE BEST`, so they can never be
+  confused with the seed / today's SCORE best line above them. Row pitch 9, ledger hash y 132, share seed y 144. Title daily strip: `NEXT PATCH IN 3H 12M` plus `STREAK n   TODAY'S BEST n` or
   `NOT PLAYED TODAY`, refreshed every 15 s by a scene timer.

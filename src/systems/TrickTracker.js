@@ -27,6 +27,11 @@ export const SLOPPY_ANGLE_DEG = 55;
 export const HARD_IMPACT_PX_S = 520;
 export const PERFECT_MAX_IMPACT_PX_S = 900;
 export const CRASH_IMPACT_PX_S = 1500;
+/**
+ * A helicopter spin phase counts as unfinished only when the air phase made at least this much spin (a quarter turn)
+ * or the spin key was still held at touchdown. Less than that with the key released is coast / a nudge, not a trick.
+ */
+export const MID_SPIN_MIN_DEG = 90;
 /** Default minimum airtime for an air phase to count as a jump. */
 export const DEFAULT_MIN_AIRTIME_MS = 120;
 
@@ -53,8 +58,10 @@ export const DEFAULT_MIN_AIRTIME_MS = 120;
  *                                  (body rotation while input.heli != 0 counts as helicopter).
  * @property {boolean|number} [midSpin] OPTIONAL helicopter state at touchdown, used to grade the landing (see isMidSpin).
  *                                  true = rider was mid-spin; a number = helicopter phase in degrees (any unwrapped value,
- *                                  e.g. heliDeg), mid-spin when further than SCORING.midSpinToleranceDeg from a whole turn.
- *                                  Absent/false = no penalty (legacy behaviour).
+ *                                  e.g. heliDeg), mid-spin when further than SCORING.midSpinToleranceDeg (60) from a whole turn.
+ *                                  A numeric phase is ignored (no penalty) when the spin key was released before touchdown and
+ *                                  less than MID_SPIN_MIN_DEG of helicopter spin was made in this air phase (visual coast / a
+ *                                  nudge). `true` is always honoured. Absent/false = no penalty (legacy behaviour).
  * @property {boolean} crashed      true on the frame a crash is detected (tracker discards airborne tricks).
  */
 
@@ -102,7 +109,7 @@ export function wrapAngle(a) {
 /**
  * Is the helicopter spin incomplete at touchdown? Pure helper.
  * @param {boolean|number|undefined|null} spin true/false, or a helicopter phase in degrees (unwrapped, any sign):
- *   incomplete when its distance to the nearest whole turn exceeds SCORING.midSpinToleranceDeg (35 deg).
+ *   incomplete when its distance to the nearest whole turn exceeds SCORING.midSpinToleranceDeg (60 deg).
  * @returns {boolean}
  */
 export function isMidSpin(spin) {
@@ -181,10 +188,14 @@ export class TrickTracker {
         this._chuteMs = 0;
         this._brakeDone = false;
         this._chuteDone = false;
+        this._heliMax = 0;
+        this._heliHeld = false;
         if (!this._havePrev) this._prevAngle = angle;
       }
       const airtime = t - this._airStart;
       this._accumulate(angle, heli, input);
+      this._heliMax = Math.max(this._heliMax, Math.abs(this._heliNet));
+      this._heliHeld = !!input.heli;
 
       this._emitRotations(tricks, this._tiltNet, '_tiltDone', 'backflip', 'frontflip', airtime);
       this._emitRotations(tricks, this._heliNet, '_heliDone', 'helicopterCCW', 'helicopterCW', airtime);
@@ -241,6 +252,8 @@ export class TrickTracker {
     this._chuteMs = 0;
     this._brakeDone = false;
     this._chuteDone = false;
+    this._heliMax = 0;
+    this._heliHeld = false;
     this._prevAngle = 0;
     this._prevHeli = null;
     this._havePrev = false;
@@ -277,7 +290,9 @@ export class TrickTracker {
     const vx = state.vx || 0;
     const vy = state.vy || 0;
     const impact = Math.max(0, -vx * Math.sin(th) + vy * Math.cos(th));
-    const midSpin = isMidSpin(state.midSpin);
+    // residual visual coast / a key nudge is not an unfinished spin: needs a real spin attempt or the key still down
+    const coast = typeof state.midSpin === 'number' && !this._heliHeld && this._heliMax < MID_SPIN_MIN_DEG;
+    const midSpin = !coast && isMidSpin(state.midSpin);
     let { quality, hard } = classifyLanding(diff, impact, midSpin);
     if (crashFrame) {
       quality = 'crash';

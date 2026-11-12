@@ -2,6 +2,7 @@ import {
   TerrainGenerator, SPACING_PX, HAZARD_MIN_SPACING_PX, HAZARD_MIN_X_PX, CREST_TURN_DEG, NOISE_CREST_TURN_DEG, SHARP_TAGS, SECTOR_M,
   HAZARD_SOFT_PX, HAZARD_SAFE_PX, expectedSpeedPxS, POWERUP_FLOOR_FRACTION,
   AIR_HAZARD_MIN_M, AIR_CLEARANCE_PX, AIR_SPEED_LO_MUL, AIR_SPEED_HI_MUL, JUMP_LAUNCH_SPEED_PX_S,
+  AIR_MIN_DX_PX, AIR_U_MIN, AIR_U_MAX, AIR_NEAR_MISS_BELOW_PX,
 } from '../../src/systems/TerrainGenerator.js';
 import { SLOW_HAZARD_MIN_DEG, SLOW_HAZARD_CLEAR_PX, RUNOUT_TURN_DEG } from '../../src/systems/TerrainGenerator.js';
 import { TERRAIN, PIXELS_PER_METER } from '../../src/constants.js';
@@ -1097,7 +1098,7 @@ describe('air hazards (roguePacket in jump arcs)', () => {
     for (const { c } of chunksBefore1500) expect(airOf(c)).toEqual([]);
   });
 
-  test('FAIRNESS: every air hazard keeps >= 70 px clear of every no-hop arc (0.75x .. 1.25x / expected speed), above them', () => {
+  test('FAIRNESS: every air hazard keeps >= 70 px clear of every no-hop arc (0.75x .. 1.6x / expected speed), above them', () => {
     let checked = 0;
     let minClear = Infinity;
     for (const { g, c } of all) {
@@ -1113,7 +1114,11 @@ describe('air hazards (roguePacket in jump arcs)', () => {
       const top = a.y - bh / 2;
       const bottom = a.y + bh / 2;
       const hiMul = Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(c.startX / PIXELS_PER_METER) / vN);
-      for (let m = AIR_SPEED_LO_MUL; m <= hiMul + 1e-9; m += 0.01) {
+      expect(hiMul).toBeGreaterThanOrEqual(1.6);
+      const muls = [];
+      for (let m = AIR_SPEED_LO_MUL; m < hiMul; m += 0.05) muls.push(m);
+      muls.push(hiMul);
+      for (const m of muls) {
         const v = vN * m;
         for (const k of [-1, -0.5, 0, 0.5, 1]) {
           const x = a.x + (k * bw) / 2;
@@ -1133,6 +1138,48 @@ describe('air hazards (roguePacket in jump arcs)', () => {
     }
     expect(checked).toBeGreaterThan(100);
     expect(minClear).toBeGreaterThanOrEqual(AIR_CLEARANCE_PX - 0.5);
+  });
+
+  test('LATE placement: box is >= 400 px past the lip, at 0.55-0.8 of the lip-to-landing span, never closer than the span allows', () => {
+    expect(AIR_MIN_DX_PX).toBe(400);
+    expect(AIR_SPEED_HI_MUL).toBe(1.6);
+    let n = 0;
+    for (const { c } of all) {
+      const a = airOf(c)[0];
+      if (!a) continue;
+      const l = c.launches[0];
+      const span = l.landX - l.x;
+      const dx = a.x - l.x;
+      expect(dx).toBeGreaterThanOrEqual(AIR_MIN_DX_PX - 1);
+      expect(dx / span).toBeGreaterThanOrEqual(AIR_U_MIN - 0.01);
+      expect(dx / span).toBeLessThanOrEqual(AIR_U_MAX + 0.01);
+      n++;
+    }
+    expect(n).toBeGreaterThan(100);
+  });
+
+  test('NEAR MISS WINDOW: the nominal (1.0x) and every no-hop arc crosses the box x inside the window under the box', () => {
+    let n = 0;
+    for (const { g, c } of all) {
+      const a = airOf(c)[0];
+      if (!a) continue;
+      const l = c.launches[0];
+      const th = (l.angleDeg * Math.PI) / 180;
+      const vN = Math.min(expectedSpeedPxS(c.startX / PIXELS_PER_METER), JUMP_LAUNCH_SPEED_PX_S);
+      const bh = airDef.size.h * 0.8;
+      const dx = a.x - l.x;
+      for (const m of [0.9, 1, 1.25, 1.6]) {
+        const arcY = l.y - Math.tan(th) * dx + (900 * dx * dx) / (2 * (vN * m) ** 2 * Math.cos(th) ** 2);
+        const below = arcY - (a.y + bh / 2); // how far under the box bottom the flight passes
+        const airborne = arcY < g.heightAt(a.x) - 10; // a slower arc has already landed before the box x and never crosses it
+        expect(below).toBeGreaterThan(0);
+        if (m >= 1) expect(airborne).toBe(true);
+        // RunScene pays a near miss for an airborne pass inside this window
+        if (airborne) expect(below).toBeLessThan(AIR_NEAR_MISS_BELOW_PX);
+      }
+      n++;
+    }
+    expect(n).toBeGreaterThan(100);
   });
 
   test('a hop at the lip can reach the box (the hazard is reachable only by an over-ambitious arc, not decoration)', () => {

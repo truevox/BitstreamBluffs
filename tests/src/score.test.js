@@ -92,7 +92,9 @@ describe('ScoreManager tricks and combo', () => {
     const pending = s.getSnapshot().pendingPoints;
     const r = s.onLanding({ quality: 'good' });
     expect(r.multiplierUsed).toBe(1.25);
-    expect(r.banked).toBe(Math.round(pending * 1.25));
+    // the first clean trick landing already pays its own flow gain (good = +0.15)
+    expect(r.flowUsed).toBe(1.15);
+    expect(r.banked).toBe(Math.round(pending * 1.25 * 1.15));
     expect(r.bonus).toBe(0);
     const snap = s.getSnapshot();
     expect(snap.trickPoints).toBe(r.banked);
@@ -287,62 +289,102 @@ function jump(s, quality, types = ['backflip']) {
 }
 
 describe('flow streak', () => {
-  test('starts at x1.0 and gains +0.2 perfect / +0.1 good, capped at x3.0', () => {
+  test('starts at x1.0 and gains +0.25 perfect / +0.15 good, capped at x3.0', () => {
     const s = new ScoreManager();
     expect(s.getFlow()).toBe(1);
-    expect(jump(s, 'perfect').flowChange).toMatchObject({ changed: true, previous: 1, flow: 1.2, reason: 'gain' });
+    expect(SCORING.flowPerfectStep).toBe(0.25);
+    expect(SCORING.flowGoodStep).toBe(0.15);
+    expect(SCORING.flowTimeoutMs).toBe(9000);
+    expect(jump(s, 'perfect').flowChange).toMatchObject({ changed: true, previous: 1, flow: 1.25, reason: 'gain' });
     jump(s, 'good');
-    expect(s.getFlow()).toBe(1.3);
+    expect(s.getFlow()).toBe(1.4);
     for (let i = 0; i < 30; i++) jump(s, 'perfect');
     expect(s.getFlow()).toBe(SCORING.flowMax);
+    expect(s.getFlow()).toBe(3);
     expect(s.getSnapshot().bestFlow).toBe(SCORING.flowMax);
   });
 
-  test('landings without a banked trick, or crash-free but trickless, do not build flow', () => {
+  test('x2 is reachable: four perfect flip landings', () => {
     const s = new ScoreManager();
-    const r = s.onLanding({ quality: 'perfect' });
-    expect(r.flowChange.changed).toBe(false);
-    expect(s.getFlow()).toBe(1);
+    for (let i = 0; i < 4; i++) jump(s, 'perfect');
+    expect(s.getFlow()).toBe(2);
   });
 
-  test('flow multiplies banked trick points (value carried in) but not the perfect bonus', () => {
+  test('landings without a combo-step trick do not build flow (none, air brake or parachute alone)', () => {
+    for (const types of [[], ['airBrake'], ['parachute'], ['airBrake', 'parachute']]) {
+      const s = new ScoreManager();
+      const r = jump(s, 'perfect', types);
+      expect(r.flowChange.changed).toBe(false);
+      expect(s.getFlow()).toBe(1);
+    }
+    // a helicopter or a frontflip does
+    expect(jump(new ScoreManager(), 'good', ['helicopterCW']).flowChange.reason).toBe('gain');
+    expect(jump(new ScoreManager(), 'good', ['frontflip', 'airBrake']).flowChange.reason).toBe('gain');
+  });
+
+  test('ANY good or perfect landing refreshes the timeout, tricks or not; sloppy does not', () => {
     const s = new ScoreManager();
-    jump(s, 'perfect'); // flow 1.2
+    jump(s, 'good');
+    s.tick(SCORING.flowTimeoutMs - 1000);
+    expect(s.getFlowTimeoutFraction()).toBeCloseTo(1000 / SCORING.flowTimeoutMs, 5);
+    s.onLanding({ quality: 'good' }); // no tricks at all
+    expect(s.getFlowTimeoutFraction()).toBe(1);
+    s.tick(5000);
+    jump(s, 'perfect', ['airBrake']); // air brake only: no gain, but the clean landing keeps the streak alive
+    expect(s.getFlow()).toBe(1.15);
+    expect(s.getFlowTimeoutFraction()).toBe(1);
+    s.tick(5000);
+    s.onLanding({ quality: 'sloppy' });
+    expect(s.getFlowTimeoutFraction()).toBeCloseTo(4000 / SCORING.flowTimeoutMs, 5);
+  });
+
+  test('the landing that gains flow pays at the NEW flow (first clean trick landing already pays)', () => {
+    const s = new ScoreManager();
     s.addTrick(trick('backflip'));
     const pending = s.getSnapshot().pendingPoints;
     const r = s.onLanding({ quality: 'perfect' });
-    expect(r.flowUsed).toBe(1.2);
-    expect(r.banked).toBe(Math.round(pending * 1.25 * 1.2));
-    expect(r.bonus).toBe(SCORING.perfectLandingBonus);
+    expect(r.flowUsed).toBe(1.25);
+    expect(r.banked).toBe(Math.round(pending * 1.25 * 1.25));
+    expect(r.bonus).toBe(SCORING.perfectLandingBonus); // flat, never multiplied
+    // a landing that gains nothing pays at the carried-in flow
+    s.addTrick(trick('airBrake'));
+    const p2 = s.getSnapshot().pendingPoints;
+    const r2 = s.onLanding({ quality: 'good' });
+    expect(r2.flowUsed).toBe(1.25);
+    expect(r2.banked).toBe(Math.round(p2 * 1.25));
   });
 
-  test('sloppy landing halves the bonus above 1.0 and does not refresh the timeout', () => {
+  test('sloppy landing halves the bonus above 1.0 (paid at the carried-in flow) and does not refresh the timeout', () => {
     const s = new ScoreManager();
-    for (let i = 0; i < 5; i++) jump(s, 'perfect'); // 2.0
+    for (let i = 0; i < 4; i++) jump(s, 'perfect'); // 2.0
     s.tick(3000);
-    const r = jump(s, 'sloppy');
+    s.addTrick(trick('backflip'));
+    const pending = s.getSnapshot().pendingPoints;
+    const r = s.onLanding({ quality: 'sloppy' });
     expect(r.flowChange).toMatchObject({ reason: 'halved', previous: 2, flow: 1.5, lost: false });
-    expect(s.getFlowTimeoutFraction()).toBeCloseTo(0.5, 5);
+    expect(r.flowUsed).toBe(2);
+    expect(r.banked).toBe(Math.round(pending * 1.25 * 2));
+    expect(s.getFlowTimeoutFraction()).toBeCloseTo(6000 / SCORING.flowTimeoutMs, 5);
     const none = new ScoreManager();
     expect(jump(none, 'sloppy').flowChange.changed).toBe(false);
   });
 
   test('a sloppy landing with zero tricks does not halve flow', () => {
     const s = new ScoreManager();
-    for (let i = 0; i < 5; i++) jump(s, 'perfect'); // 2.0
+    for (let i = 0; i < 4; i++) jump(s, 'perfect'); // 2.0
     const r = jump(s, 'sloppy', []);
     expect(r.flowChange.changed).toBe(false);
     expect(s.getFlow()).toBe(2);
   });
 
-  test('crash, crash landing, shield save and Shift reset clear flow', () => {
+  test('crash, crash landing and Shift reset clear flow', () => {
     const build = () => {
       const s = new ScoreManager();
       for (let i = 0; i < 3; i++) jump(s, 'perfect');
       return s;
     };
     let s = build();
-    expect(s.onCrash()).toMatchObject({ lost: true, reason: 'crash', previous: 1.6, flow: 1 });
+    expect(s.onCrash()).toMatchObject({ lost: true, reason: 'crash', previous: 1.75, flow: 1 });
     s = build();
     expect(s.onLanding({ quality: 'crash' }).flowChange).toMatchObject({ lost: true, reason: 'crash' });
     s = build();
@@ -351,18 +393,62 @@ describe('flow streak', () => {
     expect(s.onCrash().lost).toBe(false); // nothing left to lose
   });
 
-  test('times out after flowTimeoutMs of ticked time; clean trick landing refreshes it', () => {
+  test('timeout halves the bonus above 1.0 and restarts the timer; clears (lost) when the bonus falls below 0.05', () => {
     const s = new ScoreManager();
-    jump(s, 'good');
-    expect(s.getFlowTimeoutFraction()).toBe(1);
-    expect(s.tick(SCORING.flowTimeoutMs - 1000).lost).toBe(false);
-    expect(s.getFlowTimeoutFraction()).toBeCloseTo(1000 / SCORING.flowTimeoutMs, 5);
-    jump(s, 'good'); // refresh
-    expect(s.getFlowTimeoutFraction()).toBe(1);
-    expect(s.tick(SCORING.flowTimeoutMs - 1)).toMatchObject({ lost: false });
-    expect(s.tick(1)).toMatchObject({ lost: true, reason: 'timeout', previous: 1.2, flow: 1 });
+    for (let i = 0; i < 4; i++) jump(s, 'perfect'); // 2.0
+    expect(s.tick(SCORING.flowTimeoutMs - 1)).toMatchObject({ changed: false, lost: false });
+    const h1 = s.tick(1);
+    expect(h1).toMatchObject({ changed: true, lost: false, reason: 'timeout', previous: 2, flow: 1.5, timeoutFrac: 1 });
+    expect(s.getFlowTimeoutFraction()).toBe(1); // timer restarted
+    expect(s.tick(SCORING.flowTimeoutMs)).toMatchObject({ lost: false, reason: 'timeout', previous: 1.5, flow: 1.25 });
+    expect(s.tick(SCORING.flowTimeoutMs)).toMatchObject({ lost: false, reason: 'timeout', flow: 1.13 });
+    expect(s.tick(SCORING.flowTimeoutMs)).toMatchObject({ lost: false, reason: 'timeout', flow: 1.07 });
+    const gone = s.tick(SCORING.flowTimeoutMs);
+    expect(gone).toMatchObject({ lost: true, reason: 'timeout', previous: 1.07, flow: 1 });
     expect(s.getFlowTimeoutFraction()).toBe(0);
-    expect(s.tick(99999).lost).toBe(false);
+    expect(s.tick(99999)).toMatchObject({ lost: false, changed: false });
+  });
+
+  test('a clean landing after a timeout halving rebuilds from the halved value', () => {
+    const s = new ScoreManager();
+    for (let i = 0; i < 4; i++) jump(s, 'perfect');
+    s.tick(SCORING.flowTimeoutMs); // 1.5
+    jump(s, 'perfect');
+    expect(s.getFlow()).toBe(1.75);
+    expect(s.getFlowTimeoutFraction()).toBe(1);
+  });
+
+  test('onShieldHit halves the flow bonus and keeps the pending combo (or drops it on request)', () => {
+    const s = new ScoreManager();
+    for (let i = 0; i < 4; i++) jump(s, 'perfect'); // 2.0
+    s.addTrick(trick('backflip', 1, 500));
+    const pending = s.getSnapshot().pendingPoints;
+    expect(s.onShieldHit()).toMatchObject({ changed: true, lost: false, reason: 'halved', previous: 2, flow: 1.5 });
+    expect(s.getSnapshot()).toMatchObject({ pendingPoints: pending, comboTricks: ['backflip'], flow: 1.5 });
+    expect(s.onShieldHit(true).flow).toBe(1.25);
+    expect(s.getSnapshot()).toMatchObject({ pendingPoints: 0, comboTricks: [] });
+    expect(new ScoreManager().onShieldHit()).toMatchObject({ changed: false, lost: false, reason: 'none' });
+  });
+
+  test('shield-absorbed mid-air hit: later flips are paid once, never re-paid at full cumulative value', () => {
+    const s = new ScoreManager();
+    // jump: a backflip is finished, then a hazard hit is absorbed by the shield, then the SECOND turn completes
+    const a = s.addTrick(trick('backflip', 1, 600));
+    s.onShieldHit();
+    const b = s.addTrick(trick('backflip', 2, 900));
+    const worth = SCORING.trickBase.backflip * rotationFactor(2) * airtimeFactor(900);
+    expect(a.value + b.value).toBeCloseTo(worth, 0);
+    expect(s.getSnapshot().pendingPoints).toBe(a.value + b.value);
+    expect(s.getSnapshot().comboTricks).toEqual(['backflip']);
+    const r = s.onLanding({ quality: 'good' });
+    expect(r.banked).toBe(Math.round((a.value + b.value) * 1.25 * r.flowUsed));
+    // the old behaviour (onCrash on a shield hit) wiped `paid`, so the second event re-paid the whole worth
+    const bad = new ScoreManager();
+    bad.addTrick(trick('backflip', 1, 600));
+    bad.onCrash();
+    const re = bad.addTrick(trick('backflip', 2, 900));
+    expect(re.value).toBeCloseTo(worth, 0);
+    expect(b.value).toBeLessThan(re.value);
   });
 
   test('best flow survives loss, reset() clears everything, snapshot exposes flow fields', () => {
@@ -370,9 +456,9 @@ describe('flow streak', () => {
     jump(s, 'perfect');
     jump(s, 'perfect');
     const snap = s.getSnapshot();
-    expect(snap).toMatchObject({ flow: 1.4, bestFlow: 1.4, flowTimeoutFrac: 1 });
+    expect(snap).toMatchObject({ flow: 1.5, bestFlow: 1.5, flowTimeoutFrac: 1 });
     s.onCrash();
-    expect(s.getSnapshot()).toMatchObject({ flow: 1, bestFlow: 1.4 });
+    expect(s.getSnapshot()).toMatchObject({ flow: 1, bestFlow: 1.5 });
     s.reset();
     expect(s.getSnapshot()).toMatchObject({ flow: 1, bestFlow: 1 });
   });
@@ -385,6 +471,18 @@ describe('flow streak', () => {
     const snap = s.getSnapshot();
     expect(snap.distancePoints).toBe(10);
     expect(snap.bonusPoints).toBe(25);
+  });
+
+  test('flow share: a run of clean trick landings pays clearly more with flow than without', () => {
+    const s = new ScoreManager();
+    let withoutFlow = 0;
+    for (let i = 0; i < 8; i++) {
+      s.addTrick(trick('backflip', 1, 800));
+      const pending = s.getSnapshot().pendingPoints;
+      const r = s.onLanding({ quality: i % 2 ? 'good' : 'perfect' });
+      withoutFlow += Math.round(pending * 1.25) + r.bonus;
+    }
+    expect(s.getSnapshot().trickPoints).toBeGreaterThan(withoutFlow * 1.4);
   });
 });
 
@@ -443,9 +541,12 @@ describe('comboName', () => {
 });
 
 describe('milestone bonus', () => {
-  test('milestoneBonus = 100 x sector', () => {
+  test('milestoneBonus = 100 x min(sector, 10): linear, capped at 1000', () => {
     expect(milestoneBonus(1)).toBe(100);
     expect(milestoneBonus(4)).toBe(400);
+    expect(milestoneBonus(10)).toBe(1000);
+    expect(milestoneBonus(11)).toBe(1000);
+    expect(milestoneBonus(40)).toBe(1000);
     expect(milestoneBonus(0)).toBe(0);
     expect(milestoneBonus(NaN)).toBe(0);
   });
@@ -463,5 +564,13 @@ describe('milestone bonus', () => {
     expect(snap.bonusByKind.milestone).toBe(600);
     s.reset();
     expect(s.checkMilestones(500)).toHaveLength(1);
+  });
+
+  test('milestone pay-out is linear then flat: 5 km pays 5500 in total, 10 km 15500 (the old 100 x sector would pay 21000)', () => {
+    const s = new ScoreManager();
+    s.checkMilestones(5000); // sectors 1..10
+    expect(s.getSnapshot().bonusByKind.milestone).toBe(5500);
+    s.checkMilestones(10000); // sectors 11..20 at 1000 each
+    expect(s.getSnapshot().bonusByKind.milestone).toBe(15500);
   });
 });

@@ -14,11 +14,13 @@
  *   combo        x1, +0.25 per UNIQUE flip / helicopter type (SCORING.comboStepTypes; air brake and parachute keep
  *                their points but do not step) before landing; applies to all pending trick points when the landing
  *                banks them; resets on landing.
- *   flow         run-level multiplier x1.0..x3.0 that survives landings. A perfect (+0.2) / good (+0.1) landing that
- *                banks >= 1 trick raises it; sloppy halves the bonus above 1.0; crash / shield save / Shift reset /
- *                SCORING.flowTimeoutMs of run time (fed through tick()) without such a landing clears it. It multiplies
- *                banked trick points (on top of combo) using the value carried INTO the landing. Distance and flat
- *                bonuses are never multiplied.
+ *   flow         run-level multiplier x1.0..x3.0 that survives landings. A perfect (+0.25) / good (+0.15) landing after
+ *                >= 1 combo-step trick (flip / helicopter; air brake or parachute alone do not count) raises it. ANY
+ *                perfect / good landing refreshes the timeout (SCORING.flowTimeoutMs, 9 s of run time fed through
+ *                tick()). Sloppy after tricks halves the bonus above 1.0; a shield-absorbed hit halves it
+ *                (onShieldHit); the timeout halves it and restarts the timer (cleared, i.e. lost, once the bonus is
+ *                below SCORING.flowClearBelow); crash / Shift reset clear it. It multiplies banked trick points (on top
+ *                of combo) using the value AFTER this landing's gain. Distance and flat bonuses are never multiplied.
  *   landing      perfect = +20 flat (not multiplied); sloppy/good just bank; crash forfeits the whole pending combo.
  *   reset        Shift: pending combo dropped, SCORING.resetPenaltyPoints deducted (total floored at 0).
  */
@@ -68,10 +70,10 @@ export function airtimeFactor(airtimeMs) {
  * What a flow-affecting call did. RunScene emits EVT.FLOW_CHANGED when `changed && !lost`, EVT.FLOW_LOST when `lost`.
  * @typedef {Object} FlowChange
  * @property {boolean} changed  flow value differs from before.
- * @property {boolean} lost     flow was cleared from a value above 1.
+ * @property {boolean} lost     flow was cleared from a value above 1 (a 'timeout' halving that leaves flow above 1 is NOT lost).
  * @property {number} previous  flow before the call.
  * @property {number} flow      flow after the call.
- * @property {'gain'|'halved'|'crash'|'reset'|'timeout'|'none'} reason
+ * @property {'gain'|'halved'|'crash'|'reset'|'timeout'|'none'} reason  'timeout' with lost=false is a timeout halving.
  * @property {number} timeoutFrac remaining timeout 0..1 after the call.
  * @property {number} best      best flow this run.
  */
@@ -79,13 +81,14 @@ export function airtimeFactor(airtimeMs) {
 const round2 = (v) => Math.round(v * 100) / 100;
 
 /**
- * Bonus for finishing a 500 m sector: milestoneBasePoints x sector (sector 1 = first 500 m).
+ * Bonus for finishing a 500 m sector: milestoneBasePoints x min(sector, milestoneMaxSector) (sector 1 = first 500 m),
+ * so it is linear and capped at 1000 points from sector 10 on.
  * @param {number} sector 1-based
  * @returns {number} 0 for sector < 1
  */
 export function milestoneBonus(sector) {
   const n = Math.floor(Number(sector) || 0);
-  return n >= 1 ? SCORING.milestoneBasePoints * n : 0;
+  return n >= 1 ? SCORING.milestoneBasePoints * Math.min(n, SCORING.milestoneMaxSector) : 0;
 }
 
 const NAME_PARTS = {
@@ -196,57 +199,90 @@ export class ScoreManager {
   }
 
   /**
-   * Landing: bank pending tricks x multiplier, add perfect bonus, reset combo. A crash landing forfeits everything.
+   * Landing: bank pending tricks x multiplier x flow, add perfect bonus, reset combo. A crash landing forfeits everything.
    * @param {{quality:'perfect'|'good'|'sloppy'|'crash'}} landing LandingResult from TrickTracker.
    *   Pass the already graded quality (classifyLanding with the mid-spin penalty applied).
    * @returns {{banked:number, bonus:number, multiplierUsed:number, flowUsed:number, flowChange:FlowChange,
-   *   comboName:string}} banked = pending x combo x flowUsed (flow carried INTO this landing); comboName = display
-   *   name of the jump's tricks ('' if none), captured before the combo clears.
+   *   comboName:string}} banked = pending x combo x flowUsed; flowUsed is the flow AFTER this landing's gain (so the first
+   *   clean trick landing already pays), or the flow carried in when nothing was gained; comboName = display name of
+   *   the jump's tricks ('' if none), captured before the combo clears.
    */
   onLanding(landing) {
     const multiplierUsed = this.getMultiplier();
-    const flowUsed = this.flow;
     const name = comboName(this.comboTricks.map((type) => ({ type, count: this.counts[type] })));
     if (landing && landing.quality === 'crash') {
+      const flowUsed = this.flow;
       this._clearCombo();
       return { banked: 0, bonus: 0, multiplierUsed, flowUsed, flowChange: this._clearFlow('crash'), comboName: name };
     }
     const hadTricks = this.comboTricks.length > 0;
-    const banked = Math.round(this.pending * multiplierUsed * flowUsed);
-    const bonus = landing && landing.quality === 'perfect' ? SCORING.perfectLandingBonus : 0;
-    this.trickPoints += banked + bonus;
-    this._clearCombo();
+    const hadStep = this.comboTricks.some((t) => SCORING.comboStepTypes.includes(t));
     const q = landing && landing.quality;
+    const clean = q === 'perfect' || q === 'good';
     let flowChange;
-    if (hadTricks && (q === 'perfect' || q === 'good')) {
+    if (clean && hadStep) {
       const step = q === 'perfect' ? SCORING.flowPerfectStep : SCORING.flowGoodStep;
       flowChange = this._setFlow(Math.min(SCORING.flowMax, this.flow + step), 'gain');
-      this.flowRemainingMs = SCORING.flowTimeoutMs;
-      flowChange.timeoutFrac = 1;
     } else if (q === 'sloppy' && hadTricks && this.flow > SCORING.flowStart) {
-      const kept = SCORING.flowStart + (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
-      flowChange = this._setFlow(kept, 'halved');
+      // the halving applies after this landing banks (the sloppy jump is still paid at the flow it was flown with)
+      flowChange = null;
     } else {
       flowChange = this._flowChange(this.flow, 'none');
+    }
+    const flowUsed = this.flow;
+    const banked = Math.round(this.pending * multiplierUsed * flowUsed);
+    const bonus = q === 'perfect' ? SCORING.perfectLandingBonus : 0;
+    this.trickPoints += banked + bonus;
+    this._clearCombo();
+    if (!flowChange) {
+      const kept = SCORING.flowStart + (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
+      flowChange = this._setFlow(kept, 'halved');
+    }
+    if (clean && this.flow > SCORING.flowStart) {
+      this.flowRemainingMs = SCORING.flowTimeoutMs;
+      flowChange.timeoutFrac = 1;
     }
     return { banked, bonus, multiplierUsed, flowUsed, flowChange, comboName: name };
   }
 
   /**
    * Advance the flow timeout. Call every frame with the frame delta (run clock, excludes pause); never wall clock.
+   * Each expiry halves the bonus above 1.0 and restarts the timer; when the bonus falls below
+   * SCORING.flowClearBelow flow is cleared instead.
    * @param {number} dtMs
-   * @returns {FlowChange} `lost` is true on the frame the timeout clears flow.
+   * @returns {FlowChange} reason 'timeout': `lost` false = halved (emit FLOW_CHANGED), `lost` true = cleared (FLOW_LOST).
    */
   tick(dtMs) {
     if (this.flow > SCORING.flowStart) {
       this.flowRemainingMs -= Math.max(0, Number(dtMs) || 0);
-      if (this.flowRemainingMs <= 0) return this._clearFlow('timeout');
+      if (this.flowRemainingMs <= 0) {
+        const bonus = (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
+        if (bonus < SCORING.flowClearBelow) return this._clearFlow('timeout');
+        const change = this._setFlow(SCORING.flowStart + bonus, 'timeout');
+        this.flowRemainingMs = SCORING.flowTimeoutMs;
+        change.timeoutFrac = 1;
+        return change;
+      }
     }
     return this._flowChange(this.flow, 'none');
   }
 
   /**
-   * Crash (real or shield-absorbed): discard pending tricks and combo and clear flow.
+   * A hit absorbed by Hashed Backup: halve the flow bonus (like a sloppy landing) and keep everything else. The pending
+   * combo, its paid baseline and the tracker's counts stay consistent, so tricks finished after a mid-air hazard hit are
+   * paid exactly once.
+   * @param {boolean} [dropCombo] also discard the pending combo (use when the sled is respawned and the tracker reset).
+   * @returns {FlowChange} reason 'halved' (changed false when flow was already 1).
+   */
+  onShieldHit(dropCombo = false) {
+    if (dropCombo) this._clearCombo();
+    if (this.flow <= SCORING.flowStart) return this._flowChange(this.flow, 'none');
+    const kept = SCORING.flowStart + (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
+    return this._setFlow(kept, 'halved');
+  }
+
+  /**
+   * Crash (real or negated by a respawn): discard pending tricks and combo and clear flow.
    * @returns {FlowChange}
    */
   onCrash() {

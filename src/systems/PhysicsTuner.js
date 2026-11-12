@@ -11,6 +11,7 @@
  * helpers still accept a delta so they stay correct if that ever changes.
  */
 import { PHYSICS, MAX_PHYSICS_STEP_MS } from '../constants.js';
+import { AIR_NEAR_MISS_BELOW_PX } from './TerrainGenerator.js';
 
 /** Matter's internal base delta in ms (Body._baseDelta). */
 export const BASE_STEP_MS = 1000 / 60;
@@ -135,10 +136,15 @@ export const TUNING = Object.freeze({
   /** Near miss: crash hazard passed within this many px above / below its centre line (plus half its height). */
   nearMissAbovePx: 80,
   nearMissBelowPx: 30,
-  airNearMissBelowPx: 64, // air hazards are passed underneath: sled centre within this far below the box bottom pays
-  airWarnAheadPx: 560, // air hazard early-warning blip when it is this close ahead (about the right screen edge at speed)
-  tuckHintSlopeDeg: 12, // first long steep grounded descent shows the tuck hint
-  tuckHintMs: 2200,
+  /** Air hazards are passed underneath: an airborne sled crossing the box x within this far below its bottom pays (generator constant). */
+  airNearMissBelowPx: AIR_NEAR_MISS_BELOW_PX,
+  /** Air hazard warning (alert pulse, sound and the STAY LOW marker over the lip) once the box is this close ahead; the lip is ~400 px before it. */
+  airWarnAheadPx: 900,
+  tuckHintSlopeDeg: 12, // a steep grounded descent shows the tuck hint ...
+  tuckHintMs: 800, // ... after this long on it
+  tuckHintShowMs: 2500, // minimum time on screen once shown (then it hides when the steep stretch ends)
+  tuckHintWaitMs: 8000, // a hint waiting for another hint to clear is dropped after this long
+  tuckHintMaxShows: 2, // shown this many times (across runs) without the player tucking -> done for good
   nearMissPoints: 25,
   nearMissSlowMs: 80,
   shardRadiusPx: 18,

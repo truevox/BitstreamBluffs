@@ -97,16 +97,18 @@ export const SCORING = Object.freeze({
    * multiplier; distance and flat bonuses are never multiplied).
    */
   flowStart: 1,
-  flowPerfectStep: 0.2, // perfect landing that banks >= 1 trick
-  flowGoodStep: 0.1, // good landing that banks >= 1 trick
+  flowPerfectStep: 0.25, // perfect landing after >= 1 combo-step trick (flip / helicopter)
+  flowGoodStep: 0.15, // good landing after >= 1 combo-step trick
   flowMax: 3,
   flowSloppyKeep: 0.5, // sloppy landing keeps this fraction of the bonus above flowStart
-  flowTimeoutMs: 6000, // run-clock ms without a trick-banking clean (perfect/good) landing clears flow
+  flowTimeoutMs: 9000, // run-clock ms without a clean (perfect/good) landing; each expiry halves the bonus above 1.0
+  flowClearBelow: 0.05, // a halving that leaves less than this bonus above flowStart clears flow to 1.0 (flow lost)
   /** Helicopter spin phase further than this from a whole turn at touchdown counts as an incomplete spin. */
-  midSpinToleranceDeg: 35,
-  /** Milestone bonus: every milestoneEveryM metres, pay milestoneBasePoints x sector (sector 1 = first 500 m). */
+  midSpinToleranceDeg: 60,
+  /** Milestone bonus: every milestoneEveryM metres, pay milestoneBasePoints x min(sector, milestoneMaxSector). */
   milestoneEveryM: 500,
   milestoneBasePoints: 100,
+  milestoneMaxSector: 10,
   /** Max characters of a combo display name (480 px pixel HUD). */
   comboNameMaxChars: 28,
   /** Base trick values; final = base * rotationFactor * airtimeFactor (core engineer defines the factors). */
