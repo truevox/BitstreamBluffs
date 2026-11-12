@@ -623,11 +623,13 @@ export class RunScene extends Phaser.Scene {
 
     // trick tracking (always fed; flagged crashed on the frame a crash is detected)
     const fs = sled.getFrameState(this.runTimeMs, dt);
-    fs.crashed = !!this.pendingCrash;
+    // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
+    const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);
+    fs.crashed = !!this.pendingCrash && !absorbed;
     const upd = this.tricks.update(fs) || {};
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, upd.airtimeMs || 0, sled.airtimeMs);
 
-    if (!this.pendingCrash) this.handleTricksAndLanding(upd, fs);
+    if (!this.pendingCrash || absorbed) this.handleTricksAndLanding(upd, fs);
     else if (upd.landing && upd.landing.quality === 'crash') { /* already crashing */ }
 
     // zones, safe-ground samples
@@ -958,7 +960,9 @@ export class RunScene extends Phaser.Scene {
           const dy = sled.y - h.cy;
           const below = air ? TUNING.airNearMissBelowPx : TUNING.nearMissBelowPx;
           // air hazards: flying UNDER it (airborne at the box x) is the normal line and pays; the window covers the whole no-hop family
-          if ((!air || !sled.grounded) && dy > -(h.h / 2 + TUNING.nearMissAbovePx) && dy < h.h / 2 + below) {
+          if (air && (sled.invulnerableMs > 0 || dy <= h.h / 2)) {
+            // no payout while passing through the box under grace, and only a sled BELOW the box bottom counts
+          } else if ((!air || !sled.grounded) && dy > -(h.h / 2 + TUNING.nearMissAbovePx) && dy < h.h / 2 + below) {
             h.nearMissed = true;
             this.nearMissCount = (this.nearMissCount || 0) + 1;
             this.bonus(TUNING.nearMissPoints, 'nearMiss');
@@ -1015,7 +1019,7 @@ export class RunScene extends Phaser.Scene {
         const steep = sled.grounded && !pad.tuck && sled.groundAngleDeg >= TUNING.tuckHintSlopeDeg && sled.speed > 150;
         this._steepMs = steep ? this._steepMs + dt : 0;
         const shown = this.tutShown.has('tuck');
-        if (!shown && !this._tuckShownRun && this._tuckWantAt == null && this._steepMs > TUNING.tuckHintMs) this._tuckWantAt = now;
+        if (!shown && !this._tuckShownRun && this.tuckShows < TUNING.tuckHintMaxShows && this._tuckWantAt == null && this._steepMs > TUNING.tuckHintMs) this._tuckWantAt = now;
         if (this._tuckWantAt != null && !shown) {
           if (now - this._tuckWantAt > TUNING.tuckHintWaitMs) this._tuckWantAt = null;
           else if (this.tutShown.size === 0) {

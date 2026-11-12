@@ -111,7 +111,7 @@ export class GameOverScene extends Phaser.Scene {
     const bonus = Number(rec.bonusPoints) || 0;
     // Shift resets are not stored in the record: whatever is left between the score and its parts is the reset penalty,
     // so the listed point rows always add up to the score (DISTANCE + TRICKS + BONUSES - RESET PENALTY).
-    const penalty = Math.max(0, distPts + (Number(rec.trickPoints) || 0) + bonus - (Number(rec.score) || 0));
+    const penalty = Math.max(0, Math.round(distPts + (Number(rec.trickPoints) || 0) + bonus - (Number(rec.score) || 0)));
     const chase = this._chase(rec);
     this.chase = chase;
     // Report rows in display order with a priority (lower = kept first). At most MAX_ROWS fit above the ledger hash line,
@@ -123,9 +123,9 @@ export class GameOverScene extends Phaser.Scene {
       penalty > 0 && { pri: 3, row: ['RESET PENALTY', '', `-${fmtInt(penalty)}`], negative: true },
       { pri: 4, row: ['BEST COMBO', fmtMult(rec.bestCombo || 1), ''] },
       { pri: 5, row: ['BEST FLOW', fmtMult(Math.max(1, Number(rec.bestFlow) || 1)).replace(/(\.\d)0$/, '$1'), ''] },
-      shards > 0 && { pri: 6, row: ['SHARDS', fmtInt(shards), ''] },
-      near > 0 && { pri: 7, row: ['NEAR MISSES', fmtInt(near), ''] },
-      chase.streak > 0 && { pri: 8, row: ['DAILY STREAK', `${chase.streak} ${chase.streak === 1 ? 'DAY' : 'DAYS'}`, ''] },
+      chase.streak > 0 && { pri: 6, row: ['DAILY STREAK', `${chase.streak} ${chase.streak === 1 ? 'DAY' : 'DAYS'}`, ''] },
+      shards > 0 && { pri: 7, row: ['SHARDS', fmtInt(shards), ''] },
+      near > 0 && { pri: 8, row: ['NEAR MISSES', fmtInt(near), ''] },
       { pri: 9, row: ['BEST AIR', `${fmtSec(rec.maxAirtimeMs)} S`, ''] },
       { pri: 10, row: ['RUN TIME', fmtClock(rec.durationMs), ''] },
     ].filter(Boolean);

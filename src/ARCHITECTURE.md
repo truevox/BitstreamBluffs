@@ -439,13 +439,15 @@ Owner: core-logic engineer. All additive except the two rule changes marked RULE
   0.25) or good (+`flowGoodStep` 0.15) landing after >= 1 COMBO-STEP trick (`SCORING.comboStepTypes`: flips and helicopters; air brake /
   parachute alone gain nothing) raises it. ANY perfect / good landing, tricks or not, refreshes the timeout (`flowTimeoutMs` 9000 of ticked
   run time). Sloppy with >= 1 trick keeps `flowSloppyKeep` (0.5) of the bonus above 1.0 (applied AFTER that landing banks, paid at the carried-in
-  flow) and does NOT refresh the timeout. Crash landing, `onCrash()` and `penalizeReset()` clear it. The timeout does not clear: each expiry
+  flow) and does NOT refresh the timeout; every halving (sloppy, timeout, `onShieldHit`) clears to 1.0 with `lost:true` when the kept bonus is
+  below `flowClearBelow`, and flow reaching exactly 1.0 by any path is reported `lost`, never `changed`, with the timer zeroed. Crash landing, `onCrash()` and `penalizeReset()` clear it. The timeout does not clear: each expiry
   halves the bonus above 1.0 and restarts the timer (`FlowChange {reason:'timeout', lost:false}`); once the halved bonus would be below
   `SCORING.flowClearBelow` (0.05) it clears to 1.0 (`lost:true`). `banked = round(pending x combo x flowUsed)`, where `flowUsed` is the flow
   AFTER this landing's gain (so the first clean trick landing already pays; a landing that gains nothing pays at the carried-in flow).
   Distance and flat bonuses are never multiplied. **Shield save**: `onShieldHit(dropCombo = false)` halves the bonus (reason `'halved'`) and,
   unless `dropCombo`, leaves the pending combo, its paid baseline and the tracker counts untouched (RunScene passes `false` for a hazard hit
-  absorbed by Hashed Backup, e.g. mid-air, and `true` when it respawns the sled). Do NOT call `onCrash()` for a shield hit: it wipes `paid`
+  absorbed by Hashed Backup, e.g. mid-air, and `true` when it respawns the sled). RunScene does NOT flag the tracker `crashed` for a hazard hit
+  that a shield charge (or post-respawn grace) absorbs, so the air phase and counts continue and the landing banks the combo once. Do NOT call `onCrash()` for a shield hit: it wipes `paid`
   while TrickTracker keeps its counts, so later flips would be re-paid at full cumulative value.
 * **Calls RunScene must make**: `score.tick(dtMs)` once per frame with the run-clock delta (excludes pause; never wall clock);
   `onLanding(landing)`, `onCrash()`, `penalizeReset()` as before. Each returns a `FlowChange`

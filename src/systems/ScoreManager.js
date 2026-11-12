@@ -235,8 +235,7 @@ export class ScoreManager {
     this.trickPoints += banked + bonus;
     this._clearCombo();
     if (!flowChange) {
-      const kept = SCORING.flowStart + (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
-      flowChange = this._setFlow(kept, 'halved');
+      flowChange = this._halveFlow('halved');
     }
     if (clean && this.flow > SCORING.flowStart) {
       this.flowRemainingMs = SCORING.flowTimeoutMs;
@@ -256,11 +255,11 @@ export class ScoreManager {
     if (this.flow > SCORING.flowStart) {
       this.flowRemainingMs -= Math.max(0, Number(dtMs) || 0);
       if (this.flowRemainingMs <= 0) {
-        const bonus = (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
-        if (bonus < SCORING.flowClearBelow) return this._clearFlow('timeout');
-        const change = this._setFlow(SCORING.flowStart + bonus, 'timeout');
-        this.flowRemainingMs = SCORING.flowTimeoutMs;
-        change.timeoutFrac = 1;
+        const change = this._halveFlow('timeout');
+        if (!change.lost) {
+          this.flowRemainingMs = SCORING.flowTimeoutMs;
+          change.timeoutFrac = 1;
+        }
         return change;
       }
     }
@@ -277,8 +276,7 @@ export class ScoreManager {
   onShieldHit(dropCombo = false) {
     if (dropCombo) this._clearCombo();
     if (this.flow <= SCORING.flowStart) return this._flowChange(this.flow, 'none');
-    const kept = SCORING.flowStart + (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
-    return this._setFlow(kept, 'halved');
+    return this._halveFlow('halved');
   }
 
   /**
@@ -410,7 +408,21 @@ export class ScoreManager {
     const previous = this.flow;
     this.flow = round2(value);
     if (this.flow > this.bestFlow) this.bestFlow = this.flow;
-    return this._flowChange(previous, reason);
+    const change = this._flowChange(previous, reason);
+    if (this.flow <= SCORING.flowStart && previous > SCORING.flowStart) {
+      // reaching exactly 1.0 by any path is a loss, not a change
+      this.flowRemainingMs = 0;
+      change.lost = true;
+      change.timeoutFrac = 0;
+    }
+    return change;
+  }
+
+  /** Halve the bonus above 1.0; a bonus left below SCORING.flowClearBelow clears flow to 1.0 (lost) instead. */
+  _halveFlow(reason) {
+    const bonus = (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
+    if (bonus < SCORING.flowClearBelow) return this._clearFlow(reason);
+    return this._setFlow(SCORING.flowStart + bonus, reason);
   }
 
   _clearFlow(reason) {

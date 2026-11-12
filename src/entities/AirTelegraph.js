@@ -19,6 +19,7 @@ export class AirTelegraph {
     this.label = scene.add.text(0, 0, 'STAY LOW', {
       fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: hex(palette.danger), stroke: '#000000', strokeThickness: 4,
     }).setOrigin(0.5, 1).setDepth(9).setVisible(false);
+    this._labelCol = palette.danger;
   }
 
   /**
@@ -60,7 +61,11 @@ export class AirTelegraph {
       for (let d = 30; d < len - 24; d += 22) g.fillRect(Math.round(x + (gx * d) / len), Math.round(y - 70 + (gy * d) / len), 3, 3);
       if (!shown) {
         shown = true;
-        this.label.setPosition(x, y - 92).setAlpha(fade).setColor(hex(col)).setVisible(true);
+        this.label.setPosition(x, y - 92).setAlpha(fade).setVisible(true);
+        if (col !== this._labelCol) {
+          this._labelCol = col;
+          this.label.setColor(hex(col));
+        }
       }
     }
     if (!shown) this.label.setVisible(false);

@@ -1,4 +1,5 @@
 import { ScoreManager, rotationFactor, airtimeFactor, comboName, milestoneBonus } from '../../src/systems/ScoreManager.js';
+import { TrickTracker } from '../../src/systems/TrickTracker.js';
 import { SCORING } from '../../src/constants.js';
 
 const trick = (type, count = 1, airtimeMs = 0) => ({ type, count, rotationDeg: count * 360, airtimeMs });
@@ -369,6 +370,30 @@ describe('flow streak', () => {
     expect(jump(none, 'sloppy').flowChange.changed).toBe(false);
   });
 
+  test('halving that leaves a bonus below flowClearBelow clears flow (sloppy landing and shield hit); exact 1.0 is lost', () => {
+    const a = new ScoreManager();
+    a.flow = 1.08; // bonus 0.08 -> halves to 0.04 < flowClearBelow
+    a.flowRemainingMs = 5000;
+    a.addTrick(trick('backflip'));
+    const r = a.onLanding({ quality: 'sloppy' });
+    expect(r.flowChange).toMatchObject({ lost: true, reason: 'halved', previous: 1.08, flow: 1 });
+    expect(a.getFlow()).toBe(1);
+    expect(a.getFlowTimeoutFraction()).toBe(0);
+    const b = new ScoreManager();
+    b.flow = 1.04;
+    b.flowRemainingMs = 5000;
+    expect(b.onShieldHit()).toMatchObject({ lost: true, reason: 'halved', flow: 1 });
+    expect(b.flowRemainingMs).toBe(0);
+    const c = new ScoreManager();
+    c.flow = 1.1;
+    expect(c.onShieldHit()).toMatchObject({ lost: false, flow: 1.05 });
+    const d = new ScoreManager();
+    d.flow = 1.2;
+    const ch = d._setFlow(1, 'x');
+    expect(ch).toMatchObject({ lost: true, flow: 1 });
+    expect(d.flowRemainingMs).toBe(0);
+  });
+
   test('a sloppy landing with zero tricks does not halve flow', () => {
     const s = new ScoreManager();
     for (let i = 0; i < 4; i++) jump(s, 'perfect'); // 2.0
@@ -449,6 +474,42 @@ describe('flow streak', () => {
     const re = bad.addTrick(trick('backflip', 2, 900));
     expect(re.value).toBeCloseTo(worth, 0);
     expect(b.value).toBeLessThan(re.value);
+  });
+
+  test('REAL tracker + score: backflip, shield-absorbed hit mid-air (tracker not flagged crashed), second backflip, clean landing', () => {
+    const s = new ScoreManager();
+    const tracker = new TrickTracker();
+    let t = 0;
+    let angle = 0;
+    const events = [];
+    const feed = (o) => {
+      t += 16;
+      angle += o.dAngle || 0;
+      const upd = tracker.update({
+        timeMs: t, dtMs: 16, x: 0, y: 0, vx: 400, vy: 0, angularVelDegS: 0, groundAngleDeg: 0, crashed: false,
+        grounded: !!o.grounded, angleDeg: angle, input: { heli: 0, airBrake: false, parachute: false },
+      });
+      for (const tr of upd.tricks) events.push({ kind: 'trick', value: s.addTrick(tr).value, count: tr.count, air: tr.airtimeMs });
+      if (upd.landing) events.push({ kind: 'landing', ...s.onLanding({ ...upd.landing, quality: 'good' }) });
+    };
+    feed({ grounded: true });
+    for (let i = 0; i < 70; i++) feed({ dAngle: i < 60 ? -6 : 0 }); // first backflip
+    s.onShieldHit(); // the hit is absorbed: scene feeds the tracker an UNFLAGGED frame, sled keeps flying
+    for (let i = 0; i < 70; i++) feed({ dAngle: i < 60 ? -6 : 0 }); // second backflip
+    expect(events.filter((e) => e.kind === 'landing')).toHaveLength(0);
+    for (let i = 0; i < 5; i++) feed({ grounded: true });
+    const tricks = events.filter((e) => e.kind === 'trick');
+    const landings = events.filter((e) => e.kind === 'landing');
+    expect(tricks.map((e) => e.count)).toEqual([1, 2]); // never counted from 1 again
+    expect(landings).toHaveLength(1);
+    const paid = tricks[0].value + tricks[1].value;
+    const worthAt = (air) => SCORING.trickBase.backflip * rotationFactor(2) * airtimeFactor(air);
+    // two flips are paid once in total: about one double-flip's worth, not a double flip plus a re-paid single
+    expect(paid).toBeGreaterThanOrEqual(worthAt(tricks[0].air) - 1);
+    expect(paid).toBeLessThanOrEqual(worthAt(tricks[1].air) + 1);
+    expect(landings[0].banked).toBe(Math.round(paid * 1.25 * landings[0].flowUsed));
+    expect(s.getSnapshot()).toMatchObject({ pendingPoints: 0, comboTricks: [] });
+    expect(s.getSnapshot().trickPoints).toBe(landings[0].banked);
   });
 
   test('best flow survives loss, reset() clears everything, snapshot exposes flow fields', () => {
