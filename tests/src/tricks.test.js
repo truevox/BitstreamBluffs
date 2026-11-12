@@ -1,6 +1,6 @@
 import {
   TrickTracker, wrapAngle, classifyLanding, FLIP_TOLERANCE_DEG, AIR_BRAKE_MIN_MS, PARACHUTE_MIN_MS,
-  PERFECT_ANGLE_DEG, GOOD_ANGLE_DEG, SLOPPY_ANGLE_DEG, HARD_IMPACT_PX_S, CRASH_IMPACT_PX_S,
+  PERFECT_ANGLE_DEG, GOOD_ANGLE_DEG, SLOPPY_ANGLE_DEG, HARD_IMPACT_PX_S, CRASH_IMPACT_PX_S, isMidSpin,
 } from '../../src/systems/TrickTracker.js';
 
 const DT = 16;
@@ -355,7 +355,7 @@ describe('crash and reset', () => {
 });
 
 describe('integration with ScoreManager rules', () => {
-  test('double backflip + air brake then perfect landing yields a x1.5 combo', async () => {
+  test('double backflip + air brake then perfect landing yields a x1.25 combo (air brake no longer steps)', async () => {
     const { ScoreManager } = await import('../../src/systems/ScoreManager.js');
     const r = rig();
     const sm = new ScoreManager();
@@ -368,7 +368,7 @@ describe('integration with ScoreManager rules', () => {
     // angle may be anywhere; force a perfect landing result for the score integration
     const res = sm.onLanding({ quality: 'perfect' });
     expect(land.landing).not.toBeNull();
-    expect(res.multiplierUsed).toBe(1.5);
+    expect(res.multiplierUsed).toBe(1.25);
     expect(res.bonus).toBe(20);
     expect(res.banked).toBeGreaterThan(0);
   });
@@ -419,5 +419,45 @@ describe('helicopter spins from the sled drawing phase (SledFrameState.heliDeg)'
     const out = r.run(60, { dAngle: 6, input: { heli: 1 } });
     out.push(r.frame({ grounded: true }));
     expect(allTricks(out).map((t) => t.type)).toEqual(['helicopterCW']);
+  });
+});
+
+describe('incomplete helicopter landing penalty', () => {
+  test('isMidSpin accepts booleans and helicopter phases (35 deg tolerance)', () => {
+    expect(isMidSpin(true)).toBe(true);
+    expect(isMidSpin(false)).toBe(false);
+    expect(isMidSpin(undefined)).toBe(false);
+    expect(isMidSpin(0)).toBe(false);
+    expect(isMidSpin(35)).toBe(false);
+    expect(isMidSpin(36)).toBe(true);
+    expect(isMidSpin(180)).toBe(true);
+    expect(isMidSpin(360 - 35)).toBe(false);
+    expect(isMidSpin(-720 - 20)).toBe(false);
+    expect(isMidSpin(-90)).toBe(true);
+  });
+
+  test('classifyLanding drops one level, never forces or rescues a crash', () => {
+    expect(classifyLanding(0, 100, true).quality).toBe('good');
+    expect(classifyLanding(GOOD_ANGLE_DEG, 100, true).quality).toBe('sloppy');
+    expect(classifyLanding(GOOD_ANGLE_DEG + 1, 100, true).quality).toBe('sloppy');
+    expect(classifyLanding(SLOPPY_ANGLE_DEG + 1, 100, true).quality).toBe('crash');
+    expect(classifyLanding(0, CRASH_IMPACT_PX_S, true).quality).toBe('crash');
+    expect(classifyLanding(0, 100, 10).quality).toBe('perfect'); // within tolerance of a whole turn
+    expect(classifyLanding(0, 100, 90).quality).toBe('good');
+    expect(classifyLanding(0, 100).quality).toBe('perfect'); // legacy callers unchanged
+  });
+
+  test('tracker grades the landing from state.midSpin', () => {
+    const land = (midSpin) => {
+      const r = rig();
+      r.run(2, { grounded: true });
+      r.run(12, { grounded: false });
+      return r.frame({ grounded: true, state: { vx: 100, vy: 50, midSpin } }).landing;
+    };
+    expect(land(undefined).quality).toBe('perfect');
+    const penalised = land(true);
+    expect(penalised.quality).toBe('good');
+    expect(penalised.midSpin).toBe(true);
+    expect(land(360).quality).toBe('perfect');
   });
 });

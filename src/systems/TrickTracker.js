@@ -12,6 +12,8 @@
  * Air phases shorter than minAirtimeMs are bumps: no landing is reported.
  */
 
+import { SCORING } from '../constants.js';
+
 /** Rotation counts as a full turn at 360 - tolerance degrees. */
 export const FLIP_TOLERANCE_DEG = 20;
 /** Air brake / parachute must be held this long in the air to register as a trick. */
@@ -49,6 +51,10 @@ export const DEFAULT_MIN_AIRTIME_MS = 120;
  *                                  not rotate), so when this is provided helicopter turns are counted from it, whatever the
  *                                  arrow-key state, and body rotation always counts as flips. When absent the legacy rule applies
  *                                  (body rotation while input.heli != 0 counts as helicopter).
+ * @property {boolean|number} [midSpin] OPTIONAL helicopter state at touchdown, used to grade the landing (see isMidSpin).
+ *                                  true = rider was mid-spin; a number = helicopter phase in degrees (any unwrapped value,
+ *                                  e.g. heliDeg), mid-spin when further than SCORING.midSpinToleranceDeg from a whole turn.
+ *                                  Absent/false = no penalty (legacy behaviour).
  * @property {boolean} crashed      true on the frame a crash is detected (tracker discards airborne tricks).
  */
 
@@ -70,6 +76,7 @@ export const DEFAULT_MIN_AIRTIME_MS = 120;
  * @property {number} airtimeMs
  * @property {boolean} hard           hard impact (screen shake worthy).
  * @property {number} [rotationDeg]   net rotation over the whole air phase (additive field).
+ * @property {boolean} [midSpin]      additive: true when the grade was dropped one level for an incomplete helicopter.
  */
 
 /**
@@ -93,12 +100,27 @@ export function wrapAngle(a) {
 }
 
 /**
+ * Is the helicopter spin incomplete at touchdown? Pure helper.
+ * @param {boolean|number|undefined|null} spin true/false, or a helicopter phase in degrees (unwrapped, any sign):
+ *   incomplete when its distance to the nearest whole turn exceeds SCORING.midSpinToleranceDeg (35 deg).
+ * @returns {boolean}
+ */
+export function isMidSpin(spin) {
+  if (spin === true) return true;
+  if (typeof spin !== 'number' || !Number.isFinite(spin)) return false;
+  const r = Math.abs(spin) % 360;
+  return Math.min(r, 360 - r) > SCORING.midSpinToleranceDeg;
+}
+
+/**
  * Classify a touchdown. Pure helper (exported for tests / UI).
  * @param {number} angleDiffDeg sled angle minus ground slope, wrapped.
  * @param {number} impactSpeedPxS
+ * @param {boolean|number} [midSpin] additive: incomplete helicopter (see isMidSpin). Drops the grade one level
+ *   (perfect->good, good->sloppy, sloppy stays sloppy); never turns a landing into a crash and never rescues one.
  * @returns {{quality:'perfect'|'good'|'sloppy'|'crash', hard:boolean}}
  */
-export function classifyLanding(angleDiffDeg, impactSpeedPxS) {
+export function classifyLanding(angleDiffDeg, impactSpeedPxS, midSpin) {
   const a = Math.abs(angleDiffDeg);
   const hard = impactSpeedPxS >= HARD_IMPACT_PX_S;
   let quality;
@@ -106,6 +128,10 @@ export function classifyLanding(angleDiffDeg, impactSpeedPxS) {
   else if (a <= PERFECT_ANGLE_DEG && impactSpeedPxS <= PERFECT_MAX_IMPACT_PX_S) quality = 'perfect';
   else if (a <= GOOD_ANGLE_DEG) quality = 'good';
   else quality = 'sloppy';
+  if (isMidSpin(midSpin)) {
+    if (quality === 'perfect') quality = 'good';
+    else if (quality === 'good') quality = 'sloppy';
+  }
   return { quality, hard };
 }
 
@@ -251,7 +277,8 @@ export class TrickTracker {
     const vx = state.vx || 0;
     const vy = state.vy || 0;
     const impact = Math.max(0, -vx * Math.sin(th) + vy * Math.cos(th));
-    let { quality, hard } = classifyLanding(diff, impact);
+    const midSpin = isMidSpin(state.midSpin);
+    let { quality, hard } = classifyLanding(diff, impact, midSpin);
     if (crashFrame) {
       quality = 'crash';
       hard = true;
@@ -263,6 +290,7 @@ export class TrickTracker {
       airtimeMs: t - this._airStart,
       hard,
       rotationDeg: this._tiltNet + this._heliNet,
+      midSpin: midSpin && !crashFrame,
     };
   }
 }

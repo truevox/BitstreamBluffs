@@ -87,6 +87,28 @@ export const SCORING = Object.freeze({
   comboStep: 0.25, // per unique trick type before landing
   perfectLandingBonus: 20,
   resetPenaltyPoints: 50, // Shift emergency reset: pending combo dropped + this many points (floored at 0)
+  /**
+   * Only these trick types add a comboStep when first performed in a jump. Air brake / parachute keep their base
+   * points but do not step the multiplier, so flips and helicopter spins are the stars.
+   */
+  comboStepTypes: Object.freeze(['backflip', 'frontflip', 'helicopterCCW', 'helicopterCW']),
+  /**
+   * Flow streak: run-level multiplier that survives landings (applied to banked trick points on top of the combo
+   * multiplier; distance and flat bonuses are never multiplied).
+   */
+  flowStart: 1,
+  flowPerfectStep: 0.2, // perfect landing that banks >= 1 trick
+  flowGoodStep: 0.1, // good landing that banks >= 1 trick
+  flowMax: 3,
+  flowSloppyKeep: 0.5, // sloppy landing keeps this fraction of the bonus above flowStart
+  flowTimeoutMs: 6000, // run-clock ms without a trick-banking clean (perfect/good) landing clears flow
+  /** Helicopter spin phase further than this from a whole turn at touchdown counts as an incomplete spin. */
+  midSpinToleranceDeg: 35,
+  /** Milestone bonus: every milestoneEveryM metres, pay milestoneBasePoints x sector (sector 1 = first 500 m). */
+  milestoneEveryM: 500,
+  milestoneBasePoints: 100,
+  /** Max characters of a combo display name (480 px pixel HUD). */
+  comboNameMaxChars: 28,
   /** Base trick values; final = base * rotationFactor * airtimeFactor (core engineer defines the factors). */
   trickBase: Object.freeze({
     backflip: 100,

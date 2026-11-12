@@ -78,6 +78,10 @@ export const EVT = Object.freeze({
   NEW_BEST: 'bb:newBest',
   /** Emitter: RunScene (fun-pass). Payload: TutorialHintPayload. */
   TUTORIAL_HINT: 'bb:tutorialHint',
+  /** Emitter: RunScene (from a ScoreManager FlowChange with changed && !lost). Payload: FlowChangedPayload. */
+  FLOW_CHANGED: 'bb:flowChanged',
+  /** Emitter: RunScene (from a ScoreManager FlowChange with lost). Payload: FlowLostPayload. */
+  FLOW_LOST: 'bb:flowLost',
 });
 
 /**
@@ -85,7 +89,7 @@ export const EVT = Object.freeze({
  * @property {number} amountPxS  speed added, px/s.
  * @property {'perfect'|'good'} quality
  * @property {number} comboMult
- * @property {string[]} tricks
+ * @property {number} tricks  NUMBER of tricks banked by the landing (RunScene sends a count, not names).
  */
 
 /**
@@ -99,8 +103,9 @@ export const EVT = Object.freeze({
 /**
  * @typedef {Object} ShardCollectedPayload
  * @property {number} chain   current chain length.
- * @property {number} points
- * @property {number} total   shards collected this run.
+ * @property {number} points  points awarded for this shard.
+ * @property {number} total   cumulative shard POINTS this run (not a count; RunScene sends points).
+ * @property {number} [count] additive: true number of shards collected this run (including this one).
  * @property {number} x  world px.
  * @property {number} y  world px.
  */
@@ -109,6 +114,22 @@ export const EVT = Object.freeze({
  * @typedef {Object} MilestonePayload
  * @property {number} sector
  * @property {number} distanceM
+ * @property {number} [points]  additive: bonus paid (ScoreManager.checkMilestones / milestoneBonus).
+ */
+
+/**
+ * @typedef {Object} FlowChangedPayload
+ * @property {number} flow          current flow multiplier (1..SCORING.flowMax).
+ * @property {number} previous      flow before this change.
+ * @property {'gain'|'halved'} reason  gain = clean trick landing; halved = sloppy landing.
+ * @property {number} timeoutFrac   remaining timeout 0..1 (1 right after a gain).
+ * @property {number} best          best flow this run.
+ */
+
+/**
+ * @typedef {Object} FlowLostPayload
+ * @property {number} previous      flow that was lost (> 1).
+ * @property {'crash'|'reset'|'timeout'} reason  crash covers a shield-absorbed crash and a real crash.
  */
 
 /**
@@ -166,7 +187,7 @@ export const EVT = Object.freeze({
  * @property {number} impactSpeedPxS  vertical-ish impact speed in px/s (speed component along ground normal).
  * @property {number} airtimeMs
  * @property {number} bonusPoints   perfect-landing bonus actually awarded (0 if not perfect).
- * @property {number} bankedPoints  trick points banked by this landing (after combo multiplier).
+ * @property {number} bankedPoints  trick points banked by this landing (after combo multiplier AND flow).
  * @property {boolean} hard         true if impact was hard enough to trigger screen shake / big thud.
  * @property {number} x
  * @property {number} y
