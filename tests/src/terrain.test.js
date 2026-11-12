@@ -1,8 +1,9 @@
+import crypto from 'crypto';
 import {
   TerrainGenerator, SPACING_PX, HAZARD_MIN_SPACING_PX, HAZARD_MIN_X_PX, CREST_TURN_DEG, NOISE_CREST_TURN_DEG, SHARP_TAGS, SECTOR_M,
   HAZARD_SOFT_PX, HAZARD_SAFE_PX, expectedSpeedPxS, POWERUP_FLOOR_FRACTION,
   AIR_HAZARD_MIN_M, AIR_CLEARANCE_PX, AIR_SPEED_LO_MUL, AIR_SPEED_HI_MUL, JUMP_LAUNCH_SPEED_PX_S,
-  AIR_MIN_DX_PX, AIR_U_MIN, AIR_U_MAX, AIR_NEAR_MISS_BELOW_PX,
+  AIR_MIN_DX_PX, AIR_U_MIN, AIR_U_MAX, AIR_NEAR_MISS_BELOW_PX, HAZARD_RETRY_FROM_M,
 } from '../../src/systems/TerrainGenerator.js';
 import { SLOW_HAZARD_MIN_DEG, SLOW_HAZARD_CLEAR_PX, RUNOUT_TURN_DEG } from '../../src/systems/TerrainGenerator.js';
 import { TERRAIN, PIXELS_PER_METER } from '../../src/constants.js';
@@ -1334,5 +1335,52 @@ describe('longer difficulty ramp (tail past the old caps)', () => {
     }
     expect(jumps).toBeGreaterThan(80);
     expect(lateJumps).toBeGreaterThan(20);
+  });
+});
+
+describe('late-game hazard fill (retry of rejected slots past HAZARD_RETRY_FROM_M)', () => {
+  // md5 of every chunk starting before 2000 m, taken from the generator BEFORE the late-game fill was added
+  const GOLDEN_BEFORE_2000M = {
+    alpha: '6e5c7443c540:20', beta: 'e4ed7b8fa11b:21', gamma: 'bed9bc0df84a:20',
+    'sim-01': '9212e9ac3899:22', 'sim-17': 'a1c2e22cb540:20', 'daily-2026-11-12': 'e833c066662d:20',
+  };
+
+  test('chunks starting before HAZARD_RETRY_FROM_M (so the whole opening and early game) are bit-identical to before', () => {
+    expect(HAZARD_RETRY_FROM_M).toBeGreaterThanOrEqual(1500);
+    for (const [seed, want] of Object.entries(GOLDEN_BEFORE_2000M)) {
+      const g = makeGen(seed);
+      const h = crypto.createHash('md5');
+      let n = 0;
+      for (let i = 0; ; i++) {
+        const c = g.getChunk(i);
+        if (c.startX / PIXELS_PER_METER >= HAZARD_RETRY_FROM_M) break;
+        h.update(JSON.stringify(c));
+        n++;
+      }
+      expect(h.digest('hex').slice(0, 12) + ':' + n).toBe(want);
+    }
+  });
+
+  test('past 2500 m a 500 m band carries about 5-7 hazards on average (ground + air); spacing rules still hold', () => {
+    const content = loadContent();
+    let n = 0;
+    const seeds = 16;
+    for (let s = 1; s <= seeds; s++) {
+      const gen = makeGen('sim-' + String(s).padStart(2, '0'));
+      let prevGroundX = null;
+      for (let i = 0; ; i++) {
+        const c = gen.getChunk(i);
+        const m = c.startX / PIXELS_PER_METER;
+        if (m > 6000) break;
+        const ground = groundHazards(content.hazards, c);
+        for (let k = 1; k < ground.length; k++) expect(ground[k].x - ground[k - 1].x).toBeGreaterThanOrEqual(HAZARD_MIN_SPACING_PX);
+        if (prevGroundX != null && ground.length) expect(ground[0].x - prevGroundX).toBeGreaterThanOrEqual(HAZARD_MIN_SPACING_PX);
+        if (ground.length) prevGroundX = ground[ground.length - 1].x;
+        if (m >= 2500) n += c.hazards.length;
+      }
+    }
+    const perBand = n / seeds / ((6000 - 2500) / 500);
+    expect(perBand).toBeGreaterThan(5);
+    expect(perBand).toBeLessThan(7.5);
   });
 });

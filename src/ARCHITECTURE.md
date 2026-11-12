@@ -506,6 +506,14 @@ Owner: core-logic engineer. All additive except the two rule changes marked RULE
   the shards / power-ups already placed. Air defs are kept out of the ground hazard list, so ground hazards, terrain, shards, zones and launches are
   bit-identical with and without the def (tested). Power-ups: the `rng.chance` draw is unchanged; only the threshold changed.
 * **Power-up floor**: spawn chance = `max(POWERUP_FLOOR_FRACTION (0.4) x baseChance, baseChance / (1 + d / decay))`.
+* **Hazard fill past 2000 m** (measured, 48 seeds `sim-01..48`): after `HAZARD_DENSITY_MUL` 3.4 the requested gap (1000 / density px) is below
+  `HAZARD_MIN_SPACING_PX` 480 from ~600 m on, so slots sit exactly 480 px apart and `hazardDensity` / `HAZARD_DENSITY_TAIL` no longer change the ground
+  count (only the share of eligible ground does). Only ~25-30 % of the ground is eligible (jump chunks, landing zones, breathers and margins are hazard
+  free) versus ~73 % before the pacing rework, and a rejected slot (flat / slow-hazard / lip-zone rule) used to waste 480 px. From `HAZARD_RETRY_FROM_M`
+  2000 a rejected slot is retried `HAZARD_RETRY_STEP_PX` 120 px further; placed hazards still advance by the full gap, so spacing and the hazard-free
+  rules are unchanged and chunks starting before 2000 m are bit-identical. Result per 500 m band past 2500 m: ~3.8 ground + ~0.5 air crash hazards
+  (was ~2.9 + ~0.5), ~6 hazards in total (was ~4.7); the pre-rework game had ~7 crash / ~14 total. The rest of the gap is the spacing ceiling
+  (~2.08 hazards per 1000 px of eligible ground; the fill now reaches ~1.9), not a tunable constant.
 * **Longer ramp**: `expectedSpeedPxS` = old curve (340 + 0.18 m, 620 at ~1556 m) + a tail of 80 px/s reached linearly at 6000 m (700 max). `hazardDensity`
   = old stepped curve (2.1 at 3500 m) + a tail of 0.7 reached at 10 km (2.8 max); other difficulty fields are unchanged. Later generated jumps may have
   a landing ramp up to 1300 px (was 1100) so a launch at 1.1 x the expected speed still lands on it. Terrain, shards and ground hazards of an existing

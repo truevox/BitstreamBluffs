@@ -71,6 +71,14 @@ export const HAZARD_SAFE_PX = 3000;
 export const BREATHER_CALM_PX = 1100;
 /** Jump chunks, landing zones and breathers are hazard free, so ordinary chunks carry proportionally more. */
 export const HAZARD_DENSITY_MUL = 3.4;
+/**
+ * Late-game fill: past 500 m the density formula asks for a gap well below HAZARD_MIN_SPACING_PX, so every slot sits exactly
+ * one min spacing apart and a slot rejected (flat / slow-hazard / lip-zone rules) wastes a whole 480 px. From
+ * HAZARD_RETRY_FROM_M on, a rejected slot is retried HAZARD_RETRY_STEP_PX further instead; a placed hazard still advances
+ * by the full gap, so the spacing rules are untouched (only the fill of the eligible ground rises).
+ */
+export const HAZARD_RETRY_FROM_M = 2000;
+export const HAZARD_RETRY_STEP_PX = 120;
 /** Generated launch chunk ("gen-jump"): see _jumpAngles. */
 export const JUMP_APPROACH_FIRST_PX = 900;
 export const JUMP_RUNOUT_PX = 240;
@@ -1029,7 +1037,9 @@ export class TerrainGenerator {
     const pts = chunk.points;
     let x = chunk.startX + HAZARD_END_MARGIN_PX + rng.range(0, mean * 0.5);
     const xEnd = chunk.endX - HAZARD_END_MARGIN_PX;
+    const retry = distM >= HAZARD_RETRY_FROM_M;
     while (x <= xEnd) {
+      let placed = false;
       const gapX = Math.max(HAZARD_MIN_SPACING_PX, rng.range(0.6, 1.4) * mean);
       x = Math.round(x);
       let free = x >= HAZARD_MIN_X_PX && x >= HAZARD_SOFT_PX && x >= b.noHazX && !(breather && x < chunk.startX + BREATHER_CALM_PX);
@@ -1047,10 +1057,11 @@ export class TerrainGenerator {
           if (flatEnough && slowOk && x - w > chunk.startX) {
             const hx = Math.round(x);
             chunk.hazards.push({ defId: def.id, x: hx, y: this._yAtLocal(pts, hx), rotationDeg: slope });
+            placed = true;
           }
         }
       }
-      x += gapX;
+      x += retry && !placed ? HAZARD_RETRY_STEP_PX : gapX;
     }
   }
 
