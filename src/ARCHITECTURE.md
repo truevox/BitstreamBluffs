@@ -411,3 +411,85 @@ All additive; no public signature changed.
 * **Near miss / shards / milestones / best gate / hints**: `RunScene.updateFun`; `entities/Shard.js` (ShardField), `entities/BestMarker.js`.
   `SHARD_COLLECTED.total` = shard points this run. Tutorial completion persists in localStorage `bb.tutorialDone` (SaveStore drops unknown settings keys).
   RunRecord gets `shards`, `nearMisses`, `bonusPoints` (SaveStore.sanitizeRun may strip them).
+
+## Addendum: chase queries and daily countdown (meta/persistence engineer)
+
+Additive, read-only helpers. No change to RunRecord, `computeLedgerHash`, the `BB1:` sharecode, the IndexedDB layout or the memory fallback.
+All SaveStore helpers below are **synchronous** scans of the in-memory `this.runs` mirror (filled once by `init()`), so they never touch I/O and
+are safe to call in `RunScene.create()`, `GameOverScene.create()` and `TitleScene.create()` without blocking retry. O(n) per call, fine for thousands of runs.
+Every stored run counts (crash and quit); runs imported via sharecode count too (they carry initials).
+
+* `store.getSeedStats(seed, {excludeRunId}?)` -> `{seed, attempts, bestScore, bestDistanceM} | null`. Best score and best distance are independent maxima.
+* `store.getDailyStats(when = now, {excludeRunId}?)` -> same plus `dateKey`, for `DailyPatch.getDailyInfo(when).seed` (`when` is a Date or epoch ms).
+* `store.getDailyStreak(now = new Date())` -> `{streak, playedToday, todayKey, lastPlayedKey}`. Day membership is the date inside the run's seed
+  (`daily-YYYY-MM-DD`), not its timestamps (robust to clock skew and midnight-straddling runs). Streak ends today or yesterday, else 0; future-dated seeds ignored.
+* `DailyPatch.dateKeyFromSeed(seed)` -> `'YYYY-MM-DD' | null`; `DailyPatch.formatCountdown(ms)` -> `'3H 12M'` / `'12M'` / `'<1M'` / `'0M'` (minutes rounded up).
+
+**GameOver usage.** `saveRun` is async and pushes to `this.runs` synchronously before its first await, so the finished run is already in the mirror when the
+scene asks. Call `const prev = store.getSeedStats(run.seed, {excludeRunId: run.id})` (and `getDailyStats(new Date(run.startedAt), {excludeRunId: run.id})` when the
+seed is a daily seed) to get the PREVIOUS best; "NEW SEED BEST" when `!prev || run.score > prev.bestScore`, else "SEED BEST ${prev.bestScore}". The same call is correct
+whether or not the run is saved yet, because of `excludeRunId`. For the streak, call `getDailyStreak(Date.now())` after saving: a first daily run today shows playedToday true.
+**Title usage.** `store.getDailyStreak(Date.now())`, `store.getDailyStats(Date.now())`, and `DailyPatch.formatCountdown(DailyPatch.msUntilNextRule())` (refresh on a slow timer).
+
+## Addendum: scoring fun-pass (flow, flips, combo names, milestones)
+
+Owner: core-logic engineer. All additive except the two rule changes marked RULE. Numbers live in `SCORING` (constants.js).
+
+* **Flow streak** (`ScoreManager`): run-level multiplier `flow` x1.0..`flowMax` x3.0. A perfect (+`flowPerfectStep` 0.2) or good
+  (+`flowGoodStep` 0.1) landing that banked >= 1 trick raises it and refreshes the timeout. Sloppy keeps `flowSloppyKeep` (0.5) of the
+  bonus above 1.0 and does NOT refresh the timeout. Crash landing, `onCrash()` (call it for a shield-absorbed crash too), `penalizeReset()`
+  and `flowTimeoutMs` (6000) of ticked time clear it. `banked = round(pending x combo x flowUsed)`, where `flowUsed` is the flow
+  carried INTO the landing. Distance and flat bonuses are never multiplied.
+* **Calls RunScene must make**: `score.tick(dtMs)` once per frame with the run-clock delta (excludes pause; never wall clock);
+  `onLanding(landing)`, `onCrash()`, `penalizeReset()` as before. Each returns a `FlowChange`
+  `{changed, lost, previous, flow, reason:'gain'|'halved'|'crash'|'reset'|'timeout'|'none', timeoutFrac, best}`
+  (`onLanding().flowChange`, `penalizeReset().flowChange`, `onCrash()` and `tick()` directly). ScoreManager never emits: the scene emits
+  `EVT.FLOW_CHANGED` (`FlowChangedPayload {flow, previous, reason:'gain'|'halved', timeoutFrac, best}`) when `changed && !lost`, and
+  `EVT.FLOW_LOST` (`FlowLostPayload {previous, reason:'crash'|'reset'|'timeout'}`) when `lost`.
+  HUD getters: `getFlow()`, `getFlowTimeoutFraction()` (0 when flow is 1), snapshot fields `flow`, `flowTimeoutFrac`, `bestFlow`,
+  `comboCounts`. `onLanding` additionally returns `flowUsed` and `comboName`.
+* **bestFlow in the record**: the scene may add an optional `bestFlow` (from `snapshot.bestFlow`) to the RunRecord. It is NOT covered by
+  `computeLedgerHash` (which hashes a fixed field list), so old saved runs stay valid; SaveStore's record sanitiser must default it
+  (`>= 1`) when absent. Until SaveStore carries it, read it from the snapshot only.
+* **RULE: combo step**: only `SCORING.comboStepTypes` (backflip, frontflip, helicopterCCW, helicopterCW) add `comboStep`. Air brake and
+  parachute keep base points and still appear in `comboTricks`, but `addTrick().isNew` and `TrickPayload.isNew` are false for them.
+* **Incomplete helicopter**: `classifyLanding(angleDiffDeg, impactSpeedPxS, midSpin?)`; `midSpin` is `true` or a helicopter phase in
+  degrees (e.g. `heliDeg`, any sign/wrap). `isMidSpin(spin)` is true when the phase is further than `SCORING.midSpinToleranceDeg` (35)
+  from a whole turn. The grade drops one level (perfect->good, good->sloppy, sloppy stays); never creates or rescues a crash.
+  `SledFrameState.midSpin` (same type, optional) is forwarded by `TrickTracker`; `LandingResult.midSpin` reports that the penalty applied.
+  RunScene should pass its drawing's heli phase (or `true` while a spin is unfinished) in `midSpin` on the landing frame.
+* **Combo names**: `comboName(tricks, maxChars = 28)` (ScoreManager.js) takes type strings or `{type,count}`; e.g. `DOUBLE BACKFLIP + HELI`,
+  `TRIPLE FRONTFLIP`, `BACKFLIP + AIR BRAKE`; degrades to BRAKE/CHUTE, then `N-TRICK COMBO`. `getComboName()` names the pending combo;
+  `onLanding().comboName` names the jump just landed (capture it for the HUD popup).
+* **Milestones**: `milestoneBonus(sector) = 100 x sector`; `score.checkMilestones(distanceM)` pays (via `addBonus(..., 'milestone')`)
+  every newly completed 500 m sector exactly once and returns `[{sector, points, distanceM}]`; the scene emits `EVT.MILESTONE` for each
+  (payload gained optional `points`). Call it when distance advances. Reaching 500 m pays sector 1 (100), 1000 m pays sector 2 (200).
+  If RunScene keeps its own milestone trigger, drop the old `addBonus(..., 'milestone')` call to avoid double payment.
+* **Event payload doc fixes**: `LandingBoostPayload.tricks` is a number (count banked). `ShardCollectedPayload.total` is cumulative shard
+  POINTS; new optional `count` is the true shard count.
+
+## Late-game freshness: air hazard, power-up floor, longer ramp (terrain engineer; additive)
+
+* **Air hazards** (`HazardDef.placement: 'air'`, first def `roguePacket`: `data/hazards/rogue-packet.json`, 52x30 box, hit box 72 % x 80 %, crash,
+  `shapeKey 'chasm'`, `colorKey 'danger'`, `minDistanceM` 1500). They are listed in `chunk.hazards` like any other hazard, so `RunScene.takeChunk`
+  and `entities/Hazard.js` already spawn, draw and collide them with no scene change. **Air spawn contract**: `y` is the CENTRE of the box
+  (Hazard.js already treats `placement 'air'` that way; no fix was needed), `rotationDeg` is 0, and `hazards` stays sorted by `x`. They never
+  sit on the ground, so code that assumed `hazard.y == heightAt(hazard.x)` must check `defs[h.defId].placement` first.
+* **Placement rules**: only in generated jump chunks (`gen-jump`), never chunk 0, never breathers, never before `AIR_HAZARD_MIN_M` (1500 m; a def's own
+  `minDistanceM` can only raise it), at most one per jump. Chance per eligible jump: 25 % at 1500 m rising linearly to 55 % at 10 km (`AIR_CHANCE_*`).
+  Position: 30-60 % of the way from the lip to the nominal landing, blocked (then retried once at another x, else skipped) by a power-up within 90 px,
+  a shard, a gap or another hazard within 480 px. The def is picked by `weight` among air defs eligible at that distance (data driven).
+* **Fairness guarantee (tested)**: the hit box sits ABOVE every no-hop flight with >= `AIR_CLEARANCE_PX` (70 px) of vertical clearance, for launch
+  speeds from 0.75 x to max(1.25 x, expected speed) of the nominal launch speed (arcs rise monotonically with speed, so the fastest bounds the family).
+  A normal flight always passes under it; only a full hop at the lip (+360 px/s) or a boosted arc reaches it (~70 % of hops at the lip do). A "low" box near the
+  lip-to-landing chord was rejected: a slow launch drops onto the landing ramp and no box can keep 70 px from that arc.
+* **Determinism**: air placement is the last step of `_build`, draws only from `crng.fork('air')` (a fixed 4 draws per chunk) and reads, never changes,
+  the shards / power-ups already placed. Air defs are kept out of the ground hazard list, so ground hazards, terrain, shards, zones and launches are
+  bit-identical with and without the def (tested). Power-ups: the `rng.chance` draw is unchanged; only the threshold changed.
+* **Power-up floor**: spawn chance = `max(POWERUP_FLOOR_FRACTION (0.4) x baseChance, baseChance / (1 + d / decay))`.
+* **Longer ramp**: `expectedSpeedPxS` = old curve (340 + 0.18 m, 620 at ~1556 m) + a tail of 80 px/s reached linearly at 6000 m (700 max). `hazardDensity`
+  = old stepped curve (2.1 at 3500 m) + a tail of 0.7 reached at 10 km (2.8 max); other difficulty fields are unchanged. Later generated jumps may have
+  a landing ramp up to 1300 px (was 1100) so a launch at 1.1 x the expected speed still lands on it. Terrain, shards and ground hazards of an existing
+  seed are unchanged until the first jump / lip beyond ~1556 m; from there chunk lengths differ slightly and everything downstream is a different
+  (equally valid) track. Power-ups differ from ~1800-2250 m on (floor).
+

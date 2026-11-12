@@ -48,7 +48,7 @@
 /** @typedef {{modId:'highBandwidth'|'compression'|'wirelessBridge', x0:number, x1:number}} TerrainZone  world px, x0<x1. */
 /** @typedef {{x0:number, x1:number}} GapSpan  both x values coincide with polyline points; no collider/mesh between them. */
 /** @typedef {{x:number, y:number, width:number, boost:number}} BouncePad  y = ground surface at x; boost = upward speed px/s. */
-/** @typedef {{defId:string, x:number, y:number, rotationDeg:number}} HazardSpawn  y = ground surface height at x (sit on it). */
+/** @typedef {{defId:string, x:number, y:number, rotationDeg:number}} HazardSpawn  ground hazards: y = ground surface height at x (sit on it). Air hazards (def.placement 'air'): y = CENTRE of the box, floating in a jump arc, rotationDeg 0. */
 /** @typedef {{defId:string, x:number, y:number}} PowerUpSpawn  y = centre, already lifted above ground by the generator. */
 
 /**
@@ -60,7 +60,7 @@
  * @property {{effect:'crash'|'slow'|'scramble', durationMs?:number, speedFactor?:number}} onHit
  * @property {number} weight          relative spawn weight.
  * @property {number} minDistanceM
- * @property {'ground'|'air'} placement
+ * @property {'ground'|'air'} placement   'air' = floats at spawn.y (centre) inside the flight arc of a generated jump, at most one per jump, see ARCHITECTURE.md "Air hazards".
  * @property {string} colorKey        palette key (PALETTE_KEYS).
  */
 
@@ -71,7 +71,7 @@
  * @property {string} shapeKey
  * @property {number} radius          pickup radius px.
  * @property {{kind:'slowmo'|'speedBoost'|'shield', durationMs?:number, timeScale?:number, speedFactor?:number, charges?:number}} effect
- * @property {{baseChance:number, distanceDecayM:number}} spawn  chance per candidate slot = baseChance / (1 + distanceM / distanceDecayM).
+ * @property {{baseChance:number, distanceDecayM:number}} spawn  chance per candidate slot = max(0.4 x baseChance, baseChance / (1 + distanceM / distanceDecayM)).
  * @property {string} colorKey
  */
 
