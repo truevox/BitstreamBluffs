@@ -3,7 +3,7 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * One hazard instance built from a HazardDef + HazardSpawn. Sensor body; draws shape from def.shapeKey
- * ('chasm' | 'firewall' | 'spike' | 'vent'). Silhouettes fill their hit-box so the danger is always legible
+ * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'). Silhouettes fill their hit-box so the danger is always legible
  * (design doc pillar 2); faint corner brackets mark the exact hit-box.
  */
 import Phaser from 'phaser';
@@ -64,6 +64,8 @@ export class Hazard {
     this.gfx = scene.add.graphics({ x: air ? spawn.x : spawn.x, y: air ? spawn.y + h / 2 : spawn.y }).setDepth(8);
     this.gfx.setRotation(rot);
     this.seed = spawn.x * 0.013 + spawn.y * 0.007;
+    /** Set by RunScene when an air hazard is about to enter view: faster pulse + a wider warning glow. */
+    this.alert = false;
     this._lastDraw = -1e9;
     this.draw(0);
   }
@@ -94,6 +96,11 @@ export class Hazard {
     const w = this.w;
     const h = this.h;
     const frame = Math.floor(t / 66);
+
+    if (this.def.shapeKey === 'drone') {
+      this._drone(g, t, frame, col, pal);
+      return;
+    }
 
     // hit-box corner brackets (the drawn box; crash hit-boxes are ~25% smaller)
     g.lineStyle(1, col, 0.5);
@@ -196,6 +203,54 @@ export class Hazard {
     // base plate
     g.lineStyle(2, col, 1);
     g.lineBetween(-w / 2 - 3, 0, w / 2 + 3, 0);
+  }
+
+  // Rogue Packet: a hovering hostile data drone. Hull is a bright-cored diamond with pulsing rings and two flickering
+  // rotor bars so it reads against the sky at speed; the drawing bobs (visual only, the hit-box stays put).
+  _drone(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const bob = Math.sin(t / 260 + this.seed) * 2.5;
+    const pulse = 0.5 + 0.5 * Math.sin(t / (this.alert ? 90 : 190) + this.seed);
+    const cy = -h / 2 + bob;
+    // soft halo (additive-looking stacked discs) plus an alert ring that tightens
+    g.fillStyle(col, 0.1 + 0.1 * pulse);
+    g.fillEllipse(0, cy, w + 22 + 8 * pulse, h + 18 + 6 * pulse);
+    g.fillStyle(col, 0.12 + 0.1 * pulse);
+    g.fillEllipse(0, cy, w + 8, h + 6);
+    if (this.alert) {
+      g.lineStyle(1, pal.text, 0.35 + 0.4 * pulse);
+      g.strokeEllipse(0, cy, w + 30 - 10 * pulse, h + 24 - 8 * pulse);
+    }
+    // rotor bars (flicker between two lengths)
+    const rl = frame % 2 === 0 ? w * 0.62 : w * 0.46;
+    g.lineStyle(2, col, 0.95);
+    g.lineBetween(-rl, cy - h * 0.38, rl, cy - h * 0.38);
+    g.lineBetween(-rl * 0.8, cy + h * 0.38, rl * 0.8, cy + h * 0.38);
+    // hull: diamond with notched sides
+    const hull = [
+      { x: -w / 2, y: cy }, { x: -w * 0.22, y: cy - h * 0.42 }, { x: w * 0.22, y: cy - h * 0.42 },
+      { x: w / 2, y: cy }, { x: w * 0.22, y: cy + h * 0.42 }, { x: -w * 0.22, y: cy + h * 0.42 },
+    ];
+    g.fillStyle(pal.bg, 0.95);
+    g.fillPoints(hull, true);
+    g.fillStyle(col, 0.3);
+    g.fillPoints(hull, true);
+    g.lineStyle(2, col, 1);
+    g.strokePoints(hull, true, true);
+    // packet "header" stripes
+    g.lineStyle(1, col, 0.8);
+    g.lineBetween(-w * 0.3, cy - 3, w * 0.3, cy - 3);
+    g.lineBetween(-w * 0.3, cy + 4, w * 0.3, cy + 4);
+    // hostile eye: white-hot core
+    g.fillStyle(pal.text, 0.95);
+    g.fillCircle(0, cy, 3.5 + 1.5 * pulse);
+    g.fillStyle(col, 1);
+    g.fillCircle(0, cy, 1.8);
+    // side spikes pointing outward
+    g.fillStyle(col, 1);
+    g.fillTriangle(-w / 2 - 6, cy, -w / 2 + 1, cy - 4, -w / 2 + 1, cy + 4);
+    g.fillTriangle(w / 2 + 6, cy, w / 2 - 1, cy - 4, w / 2 - 1, cy + 4);
   }
 
   // Garbage-Data Vent: grate + rising junk glyphs

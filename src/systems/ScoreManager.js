@@ -223,7 +223,7 @@ export class ScoreManager {
       flowChange = this._setFlow(Math.min(SCORING.flowMax, this.flow + step), 'gain');
       this.flowRemainingMs = SCORING.flowTimeoutMs;
       flowChange.timeoutFrac = 1;
-    } else if (q === 'sloppy' && this.flow > SCORING.flowStart) {
+    } else if (q === 'sloppy' && hadTricks && this.flow > SCORING.flowStart) {
       const kept = SCORING.flowStart + (this.flow - SCORING.flowStart) * SCORING.flowSloppyKeep;
       flowChange = this._setFlow(kept, 'halved');
     } else {

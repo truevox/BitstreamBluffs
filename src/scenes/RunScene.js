@@ -150,7 +150,7 @@ export class RunScene extends Phaser.Scene {
     this.shardTotal = 0;
     this.shardCount = 0;
     this.nearMissCount = 0;
-    this.lastMilestone = 0;
+    this._steepMs = 0;
     this.newBestDone = false;
     this.tutDone = loadTutorialDone();
     this.tutShown = new Set();
@@ -339,6 +339,14 @@ export class RunScene extends Phaser.Scene {
     if (name) this.game.events.emit(name, payload);
   }
 
+  /** One-shot SFX through the registry audio (never throws). */
+  playSfx(name, opts) {
+    try {
+      const audio = this.registry.get(REG.AUDIO);
+      if (audio) audio.playSfx(name, opts);
+    } catch (e) { /* audio must never break the loop */ }
+  }
+
   /** Award a bonus through ScoreManager.addBonus when present, then publish the score. @returns {boolean} */
   bonus(points, kind) {
     if (!this.score || typeof this.score.addBonus !== 'function') return false;
@@ -510,7 +518,10 @@ export class RunScene extends Phaser.Scene {
     this._hudMs = (this._hudMs || 0) + dt;
     if (this._hudMs >= 100) {
       this._hudMs = 0;
-      this.game.events.emit(HUD_SPEED_EVENT, { speedPxS: this.sled.speed });
+      // flow fields resync the HUD meter (timeout drains in run-clock time, which slow-mo stretches)
+      this.game.events.emit(HUD_SPEED_EVENT, {
+        speedPxS: this.sled.speed, flow: this.score.getFlow(), flowFrac: this.score.getFlowTimeoutFraction(),
+      });
     }
 
     // timers (real time)
@@ -555,6 +566,8 @@ export class RunScene extends Phaser.Scene {
       },
     );
     this.flushDespawn();
+    // flow timeout runs on the same scaled run clock as physics (slow-mo stretches it, pause / hit-stop freeze it)
+    this.emitFlow(this.score.tick(simDt));
 
     // SFX with no event: push / hop (+ wind speed every frame)
     const audio = this.registry.get(REG.AUDIO);
@@ -752,6 +765,18 @@ export class RunScene extends Phaser.Scene {
     });
   }
 
+  /** Publish a ScoreManager FlowChange: FLOW_LOST when cleared, else FLOW_CHANGED when the value moved. */
+  emitFlow(fc) {
+    if (!fc) return;
+    if (fc.lost) {
+      this.game.events.emit(EVT.FLOW_LOST, { previous: fc.previous, reason: fc.reason });
+    } else if (fc.changed) {
+      this.game.events.emit(EVT.FLOW_CHANGED, {
+        flow: fc.flow, previous: fc.previous, reason: fc.reason, timeoutFrac: fc.timeoutFrac, best: fc.best,
+      });
+    }
+  }
+
   handleTricksAndLanding(upd, fs) {
     for (const t of upd.tricks || []) {
       const r = this.score.addTrick(t);
@@ -791,7 +816,10 @@ export class RunScene extends Phaser.Scene {
     this.game.events.emit(EVT.LANDING, {
       quality: l.quality, angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
       bonusPoints: r.bonus, bankedPoints: r.banked, hard: !!l.hard, x: fs.x, y: fs.y,
+      // additive (HUD): named combo, the multipliers applied, and whether an unfinished helicopter spin cost a grade
+      comboName: r.comboName || '', comboMult: r.multiplierUsed, flowUsed: r.flowUsed, midSpin: !!l.midSpin,
     });
+    this.emitFlow(r.flowChange);
     this.emitCombo('landing');
     this.emitScore();
     const col = l.quality === 'perfect' ? this.palette.lime : l.quality === 'sloppy' ? this.palette.amber : this.palette.cyan;
@@ -876,7 +904,7 @@ export class RunScene extends Phaser.Scene {
         this.bonus(points, 'shard');
         this.shardTotal += points;
         this.shardCount = (this.shardCount || 0) + 1;
-        this.emitIf(EVT.SHARD_COLLECTED, { chain: this.shardChain, points, total: this.shardTotal, x: sh.x, y: sh.y });
+        this.emitIf(EVT.SHARD_COLLECTED, { chain: this.shardChain, points, total: this.shardTotal, count: this.shardCount, x: sh.x, y: sh.y });
         this.fx.ring(sh.x, sh.y, this.palette.lime, 16 + Math.min(14, this.shardChain * 2), 260);
         this.fx.sparks(sh.x, sh.y, this.palette.lime, 6 + Math.min(8, this.shardChain), 150);
       }
@@ -887,19 +915,28 @@ export class RunScene extends Phaser.Scene {
     for (const list of this.hazards.values()) {
       for (const h of list) {
         if (h.hit || (h.def.onHit && h.def.onHit.effect !== 'crash')) continue;
+        // air hazards (roguePacket) float: hy is the box CENTRE, not a ground contact, and hopping is the wrong answer
+        const air = h.def.placement === 'air';
         const dxh = h.cx - sled.x;
-        if (dxh > 0 && dxh < 460) hazardAhead = true;
+        if (!air && dxh > 0 && dxh < 460) hazardAhead = true;
+        if (air && !h.warned && !h.hit && dxh > 0 && dxh < TUNING.airWarnAheadPx) {
+          h.warned = true;
+          h.alert = true;
+          this.playSfx('airWarn');
+        }
         const side = sled.x >= h.cx ? 1 : -1;
         if (h._side === -1 && side === 1 && !h.nearMissed) {
           const dy = sled.y - h.cy;
-          if (dy > -(h.h / 2 + TUNING.nearMissAbovePx) && dy < h.h / 2 + TUNING.nearMissBelowPx) {
+          const below = air ? TUNING.airNearMissBelowPx : TUNING.nearMissBelowPx;
+          if (dy > -(h.h / 2 + TUNING.nearMissAbovePx) && dy < h.h / 2 + below) {
             h.nearMissed = true;
             this.nearMissCount = (this.nearMissCount || 0) + 1;
             this.bonus(TUNING.nearMissPoints, 'nearMiss');
             this.emitIf(EVT.NEAR_MISS, { hazardType: h.def.id, points: TUNING.nearMissPoints, x: h.cx, y: h.cy });
             this.blinkMs = TUNING.nearMissSlowMs;
-            this.fx.sparks(h.cx, h.cy - h.h / 2, this.palette.amber, 12, 220, 60);
-            this.fx.ring(h.cx, h.cy - h.h / 2, this.palette.amber, 26, 300);
+            const fy = air ? h.cy : h.cy - h.h / 2;
+            this.fx.sparks(h.cx, fy, this.palette.amber, 12, 220, 60);
+            this.fx.ring(h.cx, fy, this.palette.amber, 26, 300);
           }
         }
         h._side = side;
@@ -907,10 +944,10 @@ export class RunScene extends Phaser.Scene {
     }
 
     // milestones + best marker
-    const sector = Math.floor(metres / TUNING.milestoneEveryM);
-    while (this.lastMilestone < sector) {
-      this.lastMilestone += 1;
-      this.emitIf(EVT.MILESTONE, { sector: this.lastMilestone + 1, distanceM: this.lastMilestone * TUNING.milestoneEveryM });
+    // ScoreManager pays each completed sector exactly once (addBonus 'milestone'); the scene only announces it
+    for (const m of this.score.checkMilestones(metres)) {
+      this.emitScore();
+      this.emitIf(EVT.MILESTONE, { sector: m.sector, distanceM: m.distanceM, points: m.points });
       this.flashRect.setFillStyle(this.palette.cyan, 1).setAlpha(0.2);
       this.fx.ring(sled.x, sled.y, this.palette.cyan, 70, 600);
       this.fx.sparks(sled.x, sled.y - 6, this.palette.cyan, 14, 240, 40);
@@ -936,11 +973,18 @@ export class RunScene extends Phaser.Scene {
       const rel = Math.abs(((sled.angleDeg - sled.groundAngleDeg + 540) % 360 + 360) % 360 - 180);
       this.tutHint('land', gap < 110 && rel > 25);
     }
+    // tuck hint: first long steep descent while grounded and not tucking, once per device
+    if (!this.tutDone.has('tuck')) {
+      if (pad.tuck && sled.grounded) this.tutDoneId('tuck');
+      const steep = sled.grounded && !pad.tuck && sled.groundAngleDeg >= TUNING.tuckHintSlopeDeg && sled.speed > 150;
+      this._steepMs = steep ? this._steepMs + dt : 0;
+      if (this._steepMs > TUNING.tuckHintMs && this.tutShown.size === 0) this.tutHint('tuck', true);
+      else if (this.tutShown.has('tuck') && !steep) this.tutDoneId('tuck'); // shown once, then never again
+    }
     if (this.tutTimers.boostHint > 0) {
       this.tutTimers.boostHint -= dt;
       if (this.tutTimers.boostHint <= 0) this.tutDoneId('boost');
     }
-    void pad;
   }
 
   // ------------------------------------------------------------------ zones
@@ -1029,6 +1073,7 @@ export class RunScene extends Phaser.Scene {
   manualReset() {
     const sample = this.pickSafe(250);
     const r = this.score.penalizeReset() || { comboPenalty: 0, pointsLost: 0 };
+    this.emitFlow(r.flowChange);
     const pos = this.respawnAt(sample, 'manual', 0.6);
     this.resetCooldownMs = 600;
     // timed pickups / hazard effects end with the respawn
@@ -1058,7 +1103,7 @@ export class RunScene extends Phaser.Scene {
       this.shake(1.5);
       this.flashRect.setFillStyle(this.palette.amber, 1).setAlpha(0.2);
       const dropped = this.score.getSnapshot().comboTricks.length;
-      this.score.onCrash();
+      this.emitFlow(this.score.onCrash());
       const pos = this.respawnAt(this.pickSafe(800), 'backup', 0.9, 250);
       this.game.events.emit(EVT.RESPAWN, { reason: 'backup', x: pos.x, y: pos.y, comboPenalty: dropped });
       this.emitCombo('crash');
@@ -1075,14 +1120,15 @@ export class RunScene extends Phaser.Scene {
       this.fx.sparks(fs.x, fs.y, this.palette.amber, 20, 260);
       this.shake(2.5);
       this.flashRect.setFillStyle(this.palette.amber, 1).setAlpha(0.25);
+      // a shield-absorbed crash still breaks the flow streak (and drops the pending combo, per ScoreManager.onCrash)
+      const dropped = this.score.getSnapshot().comboTricks.length;
+      this.emitFlow(this.score.onCrash());
       if (c.cause !== 'hazard') {
         // body/landing/void crash: the sled is wrecked, put it back on safe ground
-        const dropped = this.score.getSnapshot().comboTricks.length;
-        this.score.onCrash();
         const pos = this.respawnAt(this.pickSafe(800), 'backup', 0.8);
         this.game.events.emit(EVT.RESPAWN, { reason: 'backup', x: pos.x, y: pos.y, comboPenalty: dropped });
-        this.emitCombo('crash');
       }
+      this.emitCombo('crash');
       return;
     }
     this.doCrash(c, fs, speed);
@@ -1091,7 +1137,7 @@ export class RunScene extends Phaser.Scene {
   doCrash(c, fs, speed) {
     this.crashed = true;
     this.crashTimerMs = 0;
-    this.score.onCrash();
+    this.emitFlow(this.score.onCrash());
     this.emitCombo('crash');
     this.game.events.emit(EVT.CRASH, {
       cause: c.cause, x: fs.x, y: fs.y, speedPxS: speed, hazardId: c.hazardId, negated: false,
@@ -1119,6 +1165,7 @@ export class RunScene extends Phaser.Scene {
       trickPoints: Math.round(snap.trickPoints),
       tricks: { ...this.trickCounts },
       bestCombo: Math.max(this.bestCombo, snap.bestCombo || 1),
+      bestFlow: Math.max(1, snap.bestFlow || 1), // not hashed; SaveStore's sanitiser may drop it, GameOver reads it from here
       maxAirtimeMs: Math.round(this.maxAirtimeMs),
       cause: 'crash',
       shards: this.shardCount || 0,

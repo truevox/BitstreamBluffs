@@ -135,6 +135,10 @@ export const TUNING = Object.freeze({
   /** Near miss: crash hazard passed within this many px above / below its centre line (plus half its height). */
   nearMissAbovePx: 80,
   nearMissBelowPx: 30,
+  airNearMissBelowPx: 64, // air hazards are passed underneath: sled centre within this far below the box bottom pays
+  airWarnAheadPx: 560, // air hazard early-warning blip when it is this close ahead (about the right screen edge at speed)
+  tuckHintSlopeDeg: 12, // first long steep grounded descent shows the tuck hint
+  tuckHintMs: 2200,
   nearMissPoints: 25,
   nearMissSlowMs: 80,
   shardRadiusPx: 18,

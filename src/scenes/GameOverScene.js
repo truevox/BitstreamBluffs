@@ -13,6 +13,7 @@
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, SCORING } from '../constants.js';
 import { updateSetting } from '../services.js';
+import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
 import { ellipsize } from '../ui/PixelFont.js';
@@ -29,6 +30,9 @@ import { uiSfx } from '../ui/Sound.js';
 
 const PANEL_Y = 54;
 const PANEL_H = 160;
+/** RUN REPORT rows start at panel y 56 and must end above the ledger-hash line (y 128). */
+const ROW_H = 9;
+const MAX_ROWS = 8;
 
 export class GameOverScene extends Phaser.Scene {
   constructor() {
@@ -102,24 +106,33 @@ export class GameOverScene extends Phaser.Scene {
     p.add(this.scoreText);
     const distPts = Math.floor(rec.distanceM || 0) * SCORING.pointsPerMeter;
     const trickCount = Object.values(rec.tricks || {}).reduce((a, b) => a + (Number(b) || 0), 0);
-    const rows = [
-      ['DISTANCE', `${fmtInt(rec.distanceM)} M`, `+${fmtInt(distPts)}`],
-      ['TRICKS', `${fmtInt(trickCount)} DONE`, `+${fmtInt(rec.trickPoints)}`],
-      ['BEST COMBO', fmtMult(rec.bestCombo || 1), ''],
-      ['BEST AIR', `${fmtSec(rec.maxAirtimeMs)} S`, ''],
-      ['RUN TIME', fmtClock(rec.durationMs), ''],
-    ];
     const shards = Number(rec.shards) || 0;
     const near = Number(rec.nearMisses) || 0;
     const bonus = Number(rec.bonusPoints) || 0;
-    if (shards > 0) rows.push(['SHARDS', fmtInt(shards), bonus > 0 && !near ? `+${fmtInt(bonus)}` : '']);
-    if (near > 0) rows.push(['NEAR MISSES', fmtInt(near), bonus > 0 ? `+${fmtInt(bonus)}` : '']);
+    const chase = this._chase(rec);
+    this.chase = chase;
+    // Report rows in display order with a priority (lower = kept first). At most MAX_ROWS fit above the ledger hash line,
+    // so the lowest priorities are dropped rather than overlapping anything.
+    const cand = [
+      { pri: 0, row: ['DISTANCE', `${fmtInt(rec.distanceM)} M`, `+${fmtInt(distPts)}`] },
+      { pri: 1, row: ['TRICKS', `${fmtInt(trickCount)} DONE`, `+${fmtInt(rec.trickPoints)}`] },
+      { pri: 2, row: ['BEST COMBO', fmtMult(rec.bestCombo || 1), ''] },
+      { pri: 3, row: ['BEST FLOW', fmtMult(Math.max(1, Number(rec.bestFlow) || 1)).replace(/(\.\d)0$/, '$1'), ''] },
+      shards > 0 && { pri: 4, row: ['SHARDS', fmtInt(shards), bonus > 0 && !near ? `+${fmtInt(bonus)}` : ''] },
+      near > 0 && { pri: 5, row: ['NEAR MISSES', fmtInt(near), bonus > 0 ? `+${fmtInt(bonus)}` : ''] },
+      chase.streak > 0 && { pri: 6, row: ['DAILY STREAK', `${chase.streak} ${chase.streak === 1 ? 'DAY' : 'DAYS'}`, ''] },
+      { pri: 7, row: ['BEST AIR', `${fmtSec(rec.maxAirtimeMs)} S`, ''] },
+      { pri: 8, row: ['RUN TIME', fmtClock(rec.durationMs), ''] },
+    ].filter(Boolean);
+    const keep = new Set(cand.slice().sort((a, b) => a.pri - b.pri).slice(0, MAX_ROWS));
+    const rows = cand.filter((c) => keep.has(c)).map((c) => c.row);
     rows.forEach(([k, v, pts], i) => {
-      const y = 56 + i * 10;
+      const y = 56 + i * ROW_H;
       p.add(new NeonText(this, theme, 8, y, k, { color: 'text', outline: 'none' }).setAlpha(0.7));
       p.add(new NeonText(this, theme, 106, y, v, { color: 'cyan', outline: 'none' }));
       if (pts) p.add(new NeonText(this, theme, 218, y, pts, { color: 'lime', anchor: 'right', outline: 'none' }));
     });
+    this._buildChaseLines(p, chase);
     p.add(new NeonText(this, theme, 8, 128, 'LEDGER HASH', { color: 'text', outline: 'none' }).setAlpha(0.7));
     p.add(new NeonText(this, theme, 106, 128, String(rec.ledgerHash || '--------').toUpperCase(), { color: 'magenta', outline: 'none' }));
     p.add(new NeonText(this, theme, 8, 141, 'SHARE SEED', { color: 'text', outline: 'none' }).setAlpha(0.7));
@@ -134,6 +147,47 @@ export class GameOverScene extends Phaser.Scene {
       onUpdate: (t) => this.scoreText.setText(fmtInt(t.getValue())),
       onComplete: () => this.scoreText.setText(fmtInt(rec.score)),
     });
+  }
+
+  /**
+   * Chase stats for the finished run (all synchronous SaveStore scans, `excludeRunId` makes it correct whether or not the
+   * run is already saved). Never throws.
+   * @returns {{seedLine:string, seedKey:string, streak:number}}
+   */
+  _chase(rec) {
+    const out = { seedLine: '', seedKey: 'amber', streak: 0 };
+    const store = this.registry.get(REG.SAVE_STORE);
+    if (!store || !rec || !rec.id || rec.id === 'none' || !rec.seed) return out;
+    const score = Number(rec.score) || 0;
+    const line = (label, prev) => {
+      if (!prev || score > prev.bestScore) return { text: `NEW ${label} BEST`, key: 'lime' };
+      return { text: `${label} BEST ${fmtInt(prev.bestScore)}`, key: 'amber' };
+    };
+    try {
+      const prev = store.getSeedStats(rec.seed, { excludeRunId: rec.id });
+      const l = line('SEED', prev);
+      out.seedLine = l.text;
+      out.seedKey = l.key;
+    } catch (e) { /* cosmetic */ }
+    try {
+      const daily = DailyPatch.getDailyInfo(new Date(rec.startedAt || Date.now()));
+      if (daily.seed === rec.seed) {
+        // a daily seed: today's best is the seed's best, so it replaces the generic seed line
+        const l = line("TODAY'S", store.getDailyStats(new Date(rec.startedAt || Date.now()), { excludeRunId: rec.id }));
+        out.seedLine = l.text;
+        out.seedKey = l.key;
+        const st = store.getDailyStreak(Date.now());
+        out.streak = (st && st.streak) || 0;
+      }
+    } catch (e) { /* cosmetic */ }
+    return out;
+  }
+
+  _buildChaseLines(panel, chase) {
+    if (!chase.seedLine) return;
+    const t = new NeonText(this, this.theme, 218, 22, chase.seedLine, { color: chase.seedKey, anchor: 'right', outline: 'none' });
+    panel.add(t);
+    if (chase.seedKey === 'lime') this.tweens.add({ targets: t, alpha: { from: 1, to: 0.5 }, duration: 320, yoyo: true, repeat: -1 });
   }
 
   _buildButtons() {

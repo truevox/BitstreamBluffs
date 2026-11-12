@@ -119,8 +119,44 @@ export class TitleScene extends Phaser.Scene {
     const rule = this.daily.rule || { name: '-', description: '', id: '' };
     const p = new Panel(this, theme, { x: 24, y: 202, w: 432, h: 26, color: 'amber', fillAlpha: 0.88 });
     p.add(new NeonText(this, theme, 8, 4, `DAILY PATCH ${this.daily.dateKey} UTC: ${rule.name.toUpperCase()}`, { color: 'amber', outline: 'none' }));
-    p.add(new NeonText(this, theme, 8, 15, ellipsize(rule.description || idToLabel(rule.id), 414), { color: 'text', outline: 'none' }).setAlpha(0.85));
+    this.dailyDesc = rule.description || idToLabel(rule.id);
+    this.dailyDescText = new NeonText(this, theme, 8, 15, '', { color: 'text', outline: 'none' });
+    this.dailyDescText.setAlpha(0.85);
+    // right-aligned chase info: countdown on the first line, streak + today's best on the second
+    this.nextPatchText = new NeonText(this, theme, 424, 4, '', { color: 'cyan', anchor: 'right', outline: 'none' });
+    this.chaseText = new NeonText(this, theme, 424, 15, '', { color: 'lime', anchor: 'right', outline: 'none' });
+    p.add([this.dailyDescText, this.nextPatchText, this.chaseText]);
     this.dailyPanel = p;
+    this._refreshDaily();
+    // slow refresh (countdown minutes, midnight rollover); the scene clock stops with the scene
+    this.time.addEvent({ delay: 15000, loop: true, callback: () => this._refreshDaily() });
+  }
+
+  /** Streak, today's best (or NOT PLAYED TODAY) and the NEXT PATCH IN countdown. All synchronous reads, never throws. */
+  _refreshDaily() {
+    if (!this.nextPatchText || !this.nextPatchText.scene) return;
+    const now = new Date();
+    this.nextPatchText.setText(`NEXT PATCH IN ${DailyPatch.formatCountdown(DailyPatch.msUntilNextRule(now))}`);
+    let chase = 'NOT PLAYED TODAY';
+    let key = 'amber';
+    try {
+      const store = this.registry.get(REG.SAVE_STORE);
+      const st = store.getDailyStreak(now.getTime());
+      const today = store.getDailyStats(now.getTime());
+      const parts = [];
+      if (st && st.streak > 0) parts.push(`STREAK ${st.streak}`);
+      if (today && today.attempts > 0) {
+        parts.push(`TODAY'S BEST ${fmtInt(today.bestScore)}`);
+        key = 'lime';
+      } else {
+        parts.push('NOT PLAYED TODAY');
+      }
+      chase = parts.join('   ');
+    } catch (e) { /* cosmetic: leave the default */ }
+    this.chaseText.setText(chase).setColorKey(key);
+    // the description gets whatever width the right-hand line leaves
+    const room = 416 - measureText(chase) - 12;
+    this.dailyDescText.setText(ellipsize(this.dailyDesc, Math.max(60, room)));
   }
 
   _openSeed() {

@@ -436,7 +436,7 @@ whether or not the run is saved yet, because of `excludeRunId`. For the streak, 
 Owner: core-logic engineer. All additive except the two rule changes marked RULE. Numbers live in `SCORING` (constants.js).
 
 * **Flow streak** (`ScoreManager`): run-level multiplier `flow` x1.0..`flowMax` x3.0. A perfect (+`flowPerfectStep` 0.2) or good
-  (+`flowGoodStep` 0.1) landing that banked >= 1 trick raises it and refreshes the timeout. Sloppy keeps `flowSloppyKeep` (0.5) of the
+  (+`flowGoodStep` 0.1) landing that banked >= 1 trick raises it and refreshes the timeout. Sloppy with >= 1 trick keeps `flowSloppyKeep` (0.5) of the
   bonus above 1.0 and does NOT refresh the timeout. Crash landing, `onCrash()` (call it for a shield-absorbed crash too), `penalizeReset()`
   and `flowTimeoutMs` (6000) of ticked time clear it. `banked = round(pending x combo x flowUsed)`, where `flowUsed` is the flow
   carried INTO the landing. Distance and flat bonuses are never multiplied.
@@ -493,3 +493,29 @@ Owner: core-logic engineer. All additive except the two rule changes marked RULE
   seed are unchanged until the first jump / lip beyond ~1556 m; from there chunk lengths differ slightly and everything downstream is a different
   (equally valid) track. Power-ups differ from ~1800-2250 m on (floor).
 
+
+## Integration: flow, spin cut, named combos, air drone, chase UI (integration engineer; additive)
+
+* **Flow wiring** (`RunScene`): `score.tick(simDt)` every frame right after `stepWorld`, with `simDt` = the scaled sim delta (slow-mo stretches the
+  timeout, pause and hit-stop freeze it; never wall clock). `RunScene.emitFlow(fc)` turns any FlowChange (tick, `onLanding`, `onCrash`,
+  `penalizeReset`) into `FLOW_LOST` (lost) or `FLOW_CHANGED` (changed). `onCrash()` is also called on a shield-absorbed crash (any cause), so that
+  also drops the pending combo (`COMBO_CHANGED reason 'crash'`). `HUD_SPEED_EVENT` (~10 Hz) now also carries `flow` and `flowFrac` so the HUD meter resyncs
+  (covers the timeout refresh at the x3.0 cap, which is not a FLOW_CHANGED). UIScene: `FLOW xN.N` + draining bar under the pending-points line
+  (top-right, visible only while flow > 1), colour steps at 1.5 / 2 / 2.5, pop per gain, `FLOW LOST` callout; pending points now include flow.
+  SFX: `flowUp` (`opts.flow` raises pitch), `flowLost` (down-sweep), `airWarn`. RunRecord gets `bestFlow` (unhashed; the sanitiser drops it, so GameOver
+  reads it from `REG.LAST_RECORD`). Rule change in ScoreManager: a sloppy landing that banked zero tricks no longer halves flow.
+* **LandingPayload additive fields**: `comboName` (name of the jump just banked), `comboMult`, `flowUsed`, `midSpin` (grade dropped for an unfinished spin).
+  `Sled.getFrameState()` now passes `midSpin: heliPhase` (the drawn helicopter angle); TrickTracker applies the 35 deg tolerance. HUD shows
+  `SPIN CUT  GRADE DOWN` under the bank popup. Bank popup = `[SLOPPY ]NAME xMULT +POINTS`, shortened (drop prefix, mult, name) until it fits 440 px.
+* **Milestones**: `RunScene.updateFun` uses `score.checkMilestones(metres)` only (no second `addBonus`). `MilestonePayload.sector` is now the sector
+  just completed (500 m -> 1; it used to send `n + 1`), `points` is the paid bonus, shown in the SECTOR strip. **Shards**: `SHARD_COLLECTED.count` is sent
+  and `SHARDS N` shows the count.
+* **Tuck hint**: shown once when grounded, not tucking, slope >= `TUNING.tuckHintSlopeDeg` and speed > 150 for `TUNING.tuckHintMs`; done (persisted) when the
+  player tucks on the ground or the steep stretch ends.
+* **Rogue Packet** (`Hazard.shapeKey 'drone'`): halo + rotor bars + hull + white-hot core, visual-only bob, faster pulse / tighter ring once `hazard.alert`.
+  RunScene sets `alert` and plays `airWarn` once when an air hazard is within `TUNING.airWarnAheadPx` ahead. Air hazards are excluded from the "hop" tutorial hint
+  (hopping is the wrong answer), and their near miss uses `TUNING.airNearMissBelowPx` below the box centre line; `h.cy` is always the box centre.
+* **Chase UI**: GameOver shows `NEW SEED BEST` / `SEED BEST n` (top right of RUN REPORT; on a daily seed it reads `NEW TODAY'S BEST` / `TODAY'S BEST n`
+  from `getDailyStats`) and a `DAILY STREAK n DAYS` row for daily runs. The report keeps at most 8 rows by priority (DISTANCE, TRICKS, BEST COMBO, BEST FLOW,
+  SHARDS, NEAR MISSES, DAILY STREAK, BEST AIR, RUN TIME), dropping the lowest first. Title daily strip: `NEXT PATCH IN 3H 12M` plus `STREAK n   TODAY'S BEST n` or
+  `NOT PLAYED TODAY`, refreshed every 15 s by a scene timer.

@@ -327,6 +327,14 @@ describe('flow streak', () => {
     expect(jump(none, 'sloppy').flowChange.changed).toBe(false);
   });
 
+  test('a sloppy landing with zero tricks does not halve flow', () => {
+    const s = new ScoreManager();
+    for (let i = 0; i < 5; i++) jump(s, 'perfect'); // 2.0
+    const r = jump(s, 'sloppy', []);
+    expect(r.flowChange.changed).toBe(false);
+    expect(s.getFlow()).toBe(2);
+  });
+
   test('crash, crash landing, shield save and Shift reset clear flow', () => {
     const build = () => {
       const s = new ScoreManager();

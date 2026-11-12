@@ -1,2 +1,2 @@
-{ "id": "roguePacket", "shapeKey": "chasm", "size": { "w": 52, "h": 30 },
+{ "id": "roguePacket", "shapeKey": "drone", "size": { "w": 52, "h": 30 },
   "onHit": { "effect": "crash" }, "weight": 3, "minDistanceM": 1500, "placement": "air", "colorKey": "danger" }
