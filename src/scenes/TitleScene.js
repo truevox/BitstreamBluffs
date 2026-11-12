@@ -116,10 +116,9 @@ export class TitleScene extends Phaser.Scene {
 
   _buildDailyStrip() {
     const theme = this.theme;
-    const rule = this.daily.rule || { name: '-', description: '', id: '' };
     const p = new Panel(this, theme, { x: 24, y: 202, w: 432, h: 26, color: 'amber', fillAlpha: 0.88 });
-    p.add(new NeonText(this, theme, 8, 4, `DAILY PATCH ${this.daily.dateKey} UTC: ${rule.name.toUpperCase()}`, { color: 'amber', outline: 'none' }));
-    this.dailyDesc = rule.description || idToLabel(rule.id);
+    this.dailyHeadText = new NeonText(this, theme, 8, 4, '', { color: 'amber', outline: 'none' });
+    p.add(this.dailyHeadText);
     this.dailyDescText = new NeonText(this, theme, 8, 15, '', { color: 'text', outline: 'none' });
     this.dailyDescText.setAlpha(0.85);
     // right-aligned chase info: countdown on the first line, streak + today's best on the second
@@ -127,15 +126,31 @@ export class TitleScene extends Phaser.Scene {
     this.chaseText = new NeonText(this, theme, 424, 15, '', { color: 'lime', anchor: 'right', outline: 'none' });
     p.add([this.dailyDescText, this.nextPatchText, this.chaseText]);
     this.dailyPanel = p;
+    this._applyDaily();
     this._refreshDaily();
     // slow refresh (countdown minutes, midnight rollover); the scene clock stops with the scene
     this.time.addEvent({ delay: 15000, loop: true, callback: () => this._refreshDaily() });
+  }
+
+  /** Rebuild everything that shows this.daily: strip header, description and the DAILY RUN menu sub label (its seed is read lazily). */
+  _applyDaily() {
+    const rule = this.daily.rule || { name: '-', description: '', id: '' };
+    this.dailyHeadText.setText(`DAILY PATCH ${this.daily.dateKey} UTC: ${rule.name.toUpperCase()}`);
+    this.dailyDesc = rule.description || idToLabel(rule.id);
+    const row = this.menu && this.menu.rows[1];
+    if (row && row.sub) row.sub.setText(ellipsize(rule.name.toUpperCase(), 80));
   }
 
   /** Streak, today's best (or NOT PLAYED TODAY) and the NEXT PATCH IN countdown. All synchronous reads, never throws. */
   _refreshDaily() {
     if (!this.nextPatchText || !this.nextPatchText.scene) return;
     const now = new Date();
+    // midnight UTC rollover: re-read the daily info so the rule, the DAILY RUN seed and the stats below all agree
+    const fresh = DailyPatch.getDailyInfo(now);
+    if (fresh.dateKey !== this.daily.dateKey) {
+      this.daily = fresh;
+      this._applyDaily();
+    }
     this.nextPatchText.setText(`NEXT PATCH IN ${DailyPatch.formatCountdown(DailyPatch.msUntilNextRule(now))}`);
     let chase = 'NOT PLAYED TODAY';
     let key = 'amber';

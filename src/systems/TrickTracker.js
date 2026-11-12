@@ -291,9 +291,14 @@ export class TrickTracker {
     const vy = state.vy || 0;
     const impact = Math.max(0, -vx * Math.sin(th) + vy * Math.cos(th));
     // residual visual coast / a key nudge is not an unfinished spin: needs a real spin attempt or the key still down
-    const coast = typeof state.midSpin === 'number' && !this._heliHeld && this._heliMax < MID_SPIN_MIN_DEG;
+    // _heliMax is only updated in the airborne branch, so fold in the touchdown frame's own spin
+    const spunDeg = Math.max(this._heliMax, Math.abs(this._heliNet));
+    const coast = typeof state.midSpin === 'number' && !this._heliHeld && spunDeg < MID_SPIN_MIN_DEG;
     const midSpin = !coast && isMidSpin(state.midSpin);
     let { quality, hard } = classifyLanding(diff, impact, midSpin);
+    // report the penalty only when it actually lowered a clean grade (a sloppy or crash grade has nothing to lose)
+    const base = classifyLanding(diff, impact, false).quality;
+    const penalised = midSpin && (base === 'perfect' || base === 'good') && quality !== base;
     if (crashFrame) {
       quality = 'crash';
       hard = true;
@@ -305,7 +310,7 @@ export class TrickTracker {
       airtimeMs: t - this._airStart,
       hard,
       rotationDeg: this._tiltNet + this._heliNet,
-      midSpin: midSpin && !crashFrame,
+      midSpin: penalised && !crashFrame,
     };
   }
 }

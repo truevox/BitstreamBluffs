@@ -509,6 +509,29 @@ describe('incomplete helicopter landing penalty', () => {
       expect(l.quality).toBe('good');
     });
 
+    test('a spin that crosses the quarter-turn minimum on the touchdown frame is still penalised', () => {
+      const r = rig();
+      r.run(2, { grounded: true });
+      for (let i = 1; i <= 17; i++) r.frame({ input: { heli: 1 }, state: { heliDeg: i * 5, midSpin: i * 5 } }); // 85 deg, key held
+      r.frame({ state: { heliDeg: 85, midSpin: 85 } }); // key released, still airborne: max spin so far 85 < 90
+      const l = r.frame({ grounded: true, state: { vx: 100, vy: 50, heliDeg: 95, midSpin: 95 } }).landing; // 95 on touchdown
+      expect(l.midSpin).toBe(true);
+      expect(l.quality).toBe('good');
+    });
+
+    test('a landing that is already sloppy does not report a spin cut', () => {
+      const land = (groundAngleDeg) => {
+        const r = rig();
+        r.run(2, { grounded: true });
+        r.run(12, { grounded: false });
+        return r.frame({ grounded: true, state: { vx: 100, vy: 50, midSpin: true, groundAngleDeg } }).landing;
+      };
+      const sloppy = land(-(GOOD_ANGLE_DEG + 1));
+      expect(sloppy.quality).toBe('sloppy');
+      expect(sloppy.midSpin).toBe(false);
+      expect(land(0).midSpin).toBe(true); // a perfect landing really was cut to good
+    });
+
     test('an explicit midSpin: true is always honoured', () => {
       const r = rig();
       r.run(2, { grounded: true });
