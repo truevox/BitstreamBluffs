@@ -274,6 +274,7 @@
       scene.inputRouter = stub;
       scene.dailyMods = {};
       scene.dailyRuleId = 'none';
+      if (o.sub) installSubTrace(scene, o.sub);
       if (!keepUi) game.scene.stop('UIScene');
     });
 
@@ -298,6 +299,52 @@
     const chunkRecs = new Map();
     let crashEvent = null;
     const lead = [];
+    const sb = {};
+    let subBuf = null;
+    function installSubTrace(sc, n) {
+      // optional physics-sub-step recorder (--sub N): last N sub-steps as
+      // [t ms, x, y, angle deg, angVel deg/s, vx, vy, msSinceContact, 'parts touching terrain this step' (e.g. "skid:0.8@-12,head")]
+      subBuf = { n, rows: [], touch: [], ghost: { n: 0, g: 0, ln: 0, lg: 0 } };
+      const hp = sc.handlePair.bind(sc);
+      sc.handlePair = (pair) => {
+        const a = pair.bodyA; const b = pair.bodyB; const sb = sc.sled && sc.sled.body;
+        if (sb && pair.collision) {
+          const part = a && a.parent === sb ? a : (b && b.parent === sb ? b : null);
+          if (part) {
+            const c = pair.collision;
+            const oth = part === a ? b : a;
+            const ov = oth && oth.vertices ? oth.vertices : null;
+            let seg = '';
+            if (ov) { const xs = ov.map((v) => v.x); const ys = ov.map((v) => v.y); seg = `[x${Math.round(Math.min(...xs))}-${Math.round(Math.max(...xs))} y${Math.round(Math.min(...ys))}..${Math.round(Math.max(...ys))}]`; }
+            let dev = 0;
+            if (ov && oth.label === 'terrain') {
+              // deviation (deg) of the contact normal from the quad's top-face normal (sign-agnostic)
+              const tv = [...ov].sort((p1, p2) => p1.y - p2.y).slice(0, 2).sort((p1, p2) => p1.x - p2.x);
+              const ex = tv[1].x - tv[0].x; const ey = tv[1].y - tv[0].y; const el = Math.hypot(ex, ey) || 1;
+              const tn = { x: ey / el, y: -ex / el };
+              const dot = Math.abs(tn.x * c.normal.x + tn.y * c.normal.y);
+              dev = Math.acos(Math.min(1, dot)) / DEG;
+              if (part.label === 'skid') {
+                const air = sc.sled.msSinceContact >= TUNING.groundedGraceMs;
+                subBuf.ghost.n++; if (dev > 20) subBuf.ghost.g++;
+                if (air) { subBuf.ghost.ln++; if (dev > 20) subBuf.ghost.lg++; }
+              }
+            }
+            subBuf.touch.push(`${part.label}:${r1(c.depth)}@${Math.round(Math.atan2(c.normal.y, c.normal.x) / DEG)}d${Math.round(dev)}${seg}`);
+          }
+        }
+        return hp(pair);
+      };
+      const es = sc.sled.endStep.bind(sc.sled);
+      sc.sled.endStep = (ms) => {
+        es(ms);
+        const s2 = sc.sled;
+        subBuf.rows.push([Math.round(sc.runTimeMs * 10) / 10, r1(s2.x), r1(s2.y), r1(s2.angleDeg), Math.round((s2.body.angularVelocity * 60) / DEG),
+          Math.round(s2.vx), Math.round(s2.vy), Math.round(s2.msSinceContact), subBuf.touch.join(',')]);
+        subBuf.touch = [];
+        if (subBuf.rows.length > subBuf.n) subBuf.rows.shift();
+      };
+    }
     const distOf = (x) => (x - scene.startX) / PPM;
 
     const on = (name, fn) => { game.events.on(name, fn); return () => game.events.off(name, fn); };
@@ -439,6 +486,11 @@
         lead.push([Math.round(tMs), r1(distM), r1(s.angleDeg - s.groundAngleDeg), Math.round((s.body.angularVelocity * 60) / DEG), g ? 1 : 0, Math.round(s.speed), r1(s.groundAngleDeg), np.tilt, np.pressed.hop ? 1 : 0]);
         if (lead.length > 40) lead.shift();
       }
+      if (g) { // grounded speed by 4-degree slope bin (cruise-speed evidence): sb[bin] = [frames, sum speed px/s]
+        const bin = Math.round(s.groundAngleDeg / 4) * 4;
+        const e = sb[bin] || (sb[bin] = [0, 0]);
+        e[0]++; e[1] += s.speed;
+      }
       if (traceEvery && frame % traceEvery === 0) R.trace.push([s.x, s.y, s.angleDeg, rngCalls]);
 
       if (scene.crashed || crashEvent) {
@@ -458,6 +510,7 @@
           grounded: !!g, angleDeg: r1(s.angleDeg), invulnerableMs: Math.round(s.invulnerableMs || 0),
         };
         if (R.crash.lastLanding) delete R.crash.lastLanding.tMs;
+        if (subBuf) R.crash.sub = subBuf.rows;
         R.crash.lead = lead.map((l) => [Math.round(l[0] - tMs), ...l.slice(1)]);
         closeAir(true);
         endReason = 'crash:' + (e.cause || 'unknown');
@@ -481,6 +534,8 @@
     R.simSec = r2(tMs / 1000);
     R.frames = frame;
     R.openingGraces = scene.openingGraces;
+    R.speedBySlope = sb;
+    if (subBuf) { R.ghost = subBuf.ghost; if (!R.crash) R.tail = subBuf.rows; }
     R.maxSpeed = Math.round(R.maxSpeed);
     R.minZoom = r2(R.minZoom);
     R.zoomAtMaxSpeed = r2(R.zoomAtMaxSpeed);

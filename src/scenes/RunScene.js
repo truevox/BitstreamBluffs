@@ -43,6 +43,7 @@ import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
 import { BestMarker } from '../entities/BestMarker.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
+import { installTerrainContactFix } from '../systems/TerrainContact.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -179,6 +180,7 @@ export class RunScene extends Phaser.Scene {
     world.engine.positionIterations = 8;
     world.engine.velocityIterations = 6;
     world.engine.gravity.y = PHYSICS.gravityPxS2 / 1000;
+    installTerrainContactFix(Phaser.Physics.Matter.Matter);
 
     // visuals / entities
     this.cameras.main.setBackgroundColor(this.palette.bg);

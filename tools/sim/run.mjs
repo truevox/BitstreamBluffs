@@ -22,6 +22,8 @@
  *   --flipTargetDeg N     flip: ideal release when rotation + w/spinDamp >= N deg (default 340)
  *   --flipMinAirMs N      flip: only attempt a flip when ballistic ETA >= N ms (default 700)
  *   --hopLeadMs N         hop: hop when the next ground crash hazard is N ms away (default 380)
+ *   --seedPrefix P        with --seeds N: names become P-01..P-NN instead of sim-01.. (a second, independent seed set)
+ *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
  *   --workers N           parallel pages (default 4)           --out FILE   write JSON
  *   --verify              determinism check (traces every 60 frames compared exactly, twice per seed, fresh pages)
  *   --keepUi              leave UIScene running (slower)       --quiet      no per-run lines
@@ -52,7 +54,7 @@ function parseArgs(argv) {
     if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop'].includes(name)) { a[name] = true; continue; }
     a[name] = argv[++i];
   }
-  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'hopLeadMs', 'traceEvery']) if (a[n] != null) a[n] = Number(a[n]);
+  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'hopLeadMs', 'traceEvery', 'sub']) if (a[n] != null) a[n] = Number(a[n]);
   return a;
 }
 const args = parseArgs(process.argv.slice(2));
@@ -65,6 +67,7 @@ function expandSeeds(s) {
   return s.split(',').map((x) => x.trim()).filter(Boolean);
 }
 const seeds = expandSeeds(String(args.seeds));
+if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
 const params = {};
 for (const n of ['releaseLateMs', 'flipCleanDeg', 'hopLeadMs']) if (args[n] != null) params[n] = args[n];
 if (args.noHop) params.noHop = true;
@@ -178,7 +181,7 @@ async function main() {
     const runJob = async (page, job) => {
       const opts = {
         seed: job.seed, policy: args.policy, maxM: args.maxM, maxSec: args.maxSec, params, keepUi: !!args.keepUi,
-        traceEvery: args.traceEvery || (args.verify ? 60 : 0),
+        traceEvery: args.traceEvery || (args.verify ? 60 : 0), sub: args.sub || 0,
       };
       if (args.policy === 'terrain') return page.evaluate((o) => window.__sim.genTerrain(o), opts);
       return page.evaluate((o) => window.__sim.run(o), opts);

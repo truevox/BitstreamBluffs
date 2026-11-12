@@ -44,6 +44,9 @@ export const DEFAULT_MIN_AIRTIME_MS = 120;
  * @property {number} y             world px.
  * @property {number} vx            px/s.
  * @property {number} vy            px/s (down positive).
+ * @property {number} [impactVx]    OPTIONAL velocity (px/s) the sled had going INTO the touchdown. Physics engines resolve the contact
+ * @property {number} [impactVy]    before the frame is observed, so vx/vy on the landing frame have lost their ground-normal part and
+ *                                  would grade every landing as soft; when both are finite they are used for the impact speed.
  * @property {number} angleDeg      CONTINUOUS (unwrapped, may exceed +-360) sled rotation, clockwise positive.
  *                                  Must be unwrapped by the caller so flips can be counted (e.g. accumulate shortest delta).
  * @property {number} angularVelDegS deg/s, clockwise positive.
@@ -287,8 +290,10 @@ export class TrickTracker {
     const ground = Number.isFinite(state.groundAngleDeg) ? state.groundAngleDeg : 0;
     const diff = wrapAngle(angle - ground);
     const th = (ground * Math.PI) / 180;
-    const vx = state.vx || 0;
-    const vy = state.vy || 0;
+    // a crash frame is not a touchdown (the sled may be mid-air, e.g. a hazard hit): use its live velocity
+    const pre = !crashFrame && Number.isFinite(state.impactVx) && Number.isFinite(state.impactVy);
+    const vx = (pre ? state.impactVx : state.vx) || 0;
+    const vy = (pre ? state.impactVy : state.vy) || 0;
     const impact = Math.max(0, -vx * Math.sin(th) + vy * Math.cos(th));
     // residual visual coast / a key nudge is not an unfinished spin: needs a real spin attempt or the key still down
     // _heliMax is only updated in the airborne branch, so fold in the touchdown frame's own spin

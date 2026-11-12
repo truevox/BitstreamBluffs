@@ -302,6 +302,29 @@ describe('landing quality', () => {
     expect(land(0, 45, { vx: 500, vy: 0 }).impactSpeedPxS).toBe(0);
   });
 
+  test('pre-touchdown velocity (impactVx/Vy) grades the impact when the solver has already removed the normal part', () => {
+    // the physics engine resolves the contact before the frame is observed: vx/vy on the landing frame are ~parallel to the ground
+    const post = { vx: 600, vy: 0, impactVx: 600, impactVy: 650 };
+    const l = land(0, 0, post);
+    expect(l.impactSpeedPxS).toBeCloseTo(650, 5);
+    expect(l.hard).toBe(true);
+    // without the fields the legacy behaviour (post-solve velocity) is unchanged
+    expect(land(0, 0, { vx: 600, vy: 0 }).impactSpeedPxS).toBe(0);
+    // a violent pre-impact speed is no longer 'perfect'
+    expect(land(0, 0, { vx: 600, vy: 0, impactVx: 600, impactVy: 1000 }).quality).toBe('good');
+    // only one of the two finite -> ignored
+    expect(land(0, 0, { vx: 600, vy: 100, impactVy: 900 }).impactSpeedPxS).toBeCloseTo(100, 5);
+  });
+
+  test('a crash frame ignores stale touchdown velocity (the sled may be airborne)', () => {
+    const r = rig();
+    r.run(2, { grounded: true });
+    r.run(25, {});
+    const u = r.frame({ crashed: true, state: { vx: 300, vy: 100, impactVx: 900, impactVy: 900 } });
+    expect(u.landing.quality).toBe('crash');
+    expect(u.landing.impactSpeedPxS).toBeCloseTo(100, 5);
+  });
+
   test('very hard impacts are flagged hard, and crash above the limit', () => {
     expect(land(0, 0, { vx: 100, vy: HARD_IMPACT_PX_S + 50 }).hard).toBe(true);
     expect(land(0, 0, { vx: 100, vy: 100 }).hard).toBe(false);

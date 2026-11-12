@@ -28,8 +28,15 @@ export const TUNING = Object.freeze({
   groundFriction: 0,
   /** Matter static friction of the sled (0 for the same reason). */
   groundFrictionStatic: 0,
-  /** Extra manual runner resistance on the ground, 1/s (exponential speed decay). Scaled by frictionMul. */
-  groundResist: 0.04,
+  /**
+   * Extra manual runner resistance on the ground, 1/s (exponential speed decay). Scaled by frictionMul.
+   * Was 0.04. The seam "ghost" contacts (terrainSnapNormals) used to bleed ~30 % of the cruise speed (grounded speed was a flat
+   * ~480 px/s on 0-24 degree slopes); with them gone the sled ran ~31 % faster (average 465 -> 607 px/s) and every jump launched
+   * ~25 % faster. 0.10 gives back some of that (average ~581 px/s, +25 % vs the old game) while keeping the jump airtimes at or above
+   * the old ones (chunk-0 jump 706 ms vs 689, later jumps ~1000 ms vs 840). 0.17 = +17 % pace but a 600 ms first jump; 0.25 = +9 % pace
+   * but jumps 17 % shorter than before and 6 % under 400 ms.
+   */
+  groundResist: 0.10,
   /**
    * Multiplier on the doc drag (PHYSICS.dragUntucked 0.015) when written to Matter frictionAir. Matter 0.20 applies
    * frictionAir per 16.7 ms base step (= 0.9/s for the literal 0.015), which capped speed at ~120-250 px/s and stalled
@@ -51,6 +58,23 @@ export const TUNING = Object.freeze({
   airBrakeAngularDamp: 5,
   /** Quadratic drag (1/px) giving a soft terminal velocity on very steep slopes (about +0.15/s at 500 px/s; was 0.00009). */
   quadDrag: 0.0003,
+  /**
+   * Runner contact normals (TerrainContact.js). Matter's SAT picks the minimum-overlap axis, which at the 16 px quad seams is
+   * often a wall axis or one of the 24-gon runner's own 15 degree face axes instead of the ground's normal ("ghost" normals).
+   * With this on, every runner/terrain contact uses the quad's top-face normal. This was the root cause of the post-landing
+   * spin / terrain crashes after good landings (and a hidden speed-dependent drag of ~30 % on cruise speed).
+   * Contacts where the runner is deeper than terrainSnapMaxDepthPx below the quad's top plane (real walls: gap edges) are left alone.
+   */
+  terrainSnapNormals: true,
+  terrainSnapMaxDepthPx: 10,
+  /**
+   * Landing settle: for landSettleMs after a touchdown (contact after >= groundedGraceMs of air) the post-solve angular velocity is
+   * capped at landSpinMaxDegS. A rigid sled that lands on one runner first gets +/-400..700 deg/s from the contact solver and rocks
+   * onto the other runner; with 8 ms sub-steps and zero friction nothing damps that, so a good landing bounced into a flip.
+   * 0 disables. Ground lean (A/D) accelerates only ~210 deg/s^2, so normal riding never reaches the cap.
+   */
+  landSpinMaxDegS: 200,
+  landSettleMs: 150,
   /** Ground lean torque multiplier (relative to maxTiltTorque). */
   groundTiltMul: 0.5,
   /** Angular velocity cap, deg/s (raised from 560 so a held flip is not clipped by the air tilt multiplier). */

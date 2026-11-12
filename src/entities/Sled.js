@@ -24,6 +24,7 @@ export const CAT = Object.freeze({ TERRAIN: 0x0001, SLED: 0x0002, SENSOR: 0x0004
 const toPxS = (v) => (v * 1000) / BASE_STEP_MS;
 const fromPxS = (v) => (v * BASE_STEP_MS) / 1000;
 
+const fromRadS = (w) => (w * BASE_STEP_MS) / 1000;
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -72,6 +73,7 @@ export class Sled {
     this.dropAheadDeg = 90; // how much steeper the ground gets just ahead (set by RunScene); large = kicker/drop
     this._groundRunMs = 0;
     this._sinceLaunchMs = 999;
+    this._landSettleMs = 0;
 
     this._buildBody(x, y);
     this.gfx = scene.add.graphics().setDepth(20);
@@ -145,7 +147,12 @@ export class Sled {
    */
   endStep(stepMs) {
     if (this._contactFlag) {
-      if (this.msSinceContact >= TUNING.groundedGraceMs) this.chuteUsed = false; // freshly landed
+      if (this.msSinceContact >= TUNING.groundedGraceMs) {
+        this.chuteUsed = false; // freshly landed
+        this._landSettleMs = TUNING.landSettleMs;
+        this.touchdownVx = this._preVx;
+        this.touchdownVy = this._preVy;
+      }
       this.msSinceContact = 0;
     } else {
       this.msSinceContact += stepMs;
@@ -153,6 +160,12 @@ export class Sled {
     this._contactFlag = false;
     this._groundRunMs = this.msSinceContact < 1 ? this._groundRunMs + stepMs : (this.msSinceContact > TUNING.snapWindowMs ? 0 : this._groundRunMs);
     this.airtimeMs = this.grounded ? 0 : this.airtimeMs + stepMs;
+    if (this._landSettleMs > 0 && TUNING.landSpinMaxDegS > 0) {
+      this._landSettleMs = Math.max(0, this._landSettleMs - stepMs);
+      const wMax = fromRadS(TUNING.landSpinMaxDegS * DEG);
+      const w = Body.getAngularVelocity(this.body);
+      if (Math.abs(w) > wMax) Body.setAngularVelocity(this.body, Math.sign(w) * wMax);
+    }
     this._sync();
   }
 
@@ -282,6 +295,10 @@ export class Sled {
     }
 
     Body.setVelocity(b, { x: fromPxS(vx), y: fromPxS(vy) });
+    // velocity going INTO this step's collision solve: Matter has already removed the normal component when
+    // endStep() runs, so this is the only honest source for the touchdown impact speed
+    this._preVx = vx;
+    this._preVy = vy;
 
     // ---- rotation (rad/s) ----
     let w = (Body.getAngularVelocity(b) * 1000) / BASE_STEP_MS;
@@ -384,6 +401,9 @@ export class Sled {
     Body.setVelocity(b, { x: fromPxS(vxPxS), y: fromPxS(vyPxS) });
     this.msSinceContact = 999;
     this._contactFlag = false;
+    this.touchdownVx = undefined;
+    this.touchdownVy = undefined;
+    this._landSettleMs = 0;
     this.boostMs = 0;
     this._groundRunMs = 0;
     this._sinceLaunchMs = 0;
@@ -418,6 +438,8 @@ export class Sled {
       y: this.y,
       vx: this.vx,
       vy: this.vy,
+      impactVx: this.touchdownVx,
+      impactVy: this.touchdownVy,
       angleDeg: this.angleDeg,
       heliDeg: this.heliPhase,
       // the helicopter DRAWING's spin angle: TrickTracker drops the landing grade when it is not near a whole turn
