@@ -474,3 +474,87 @@ describe('IndexedDB persistence (fake indexedDB)', () => {
     expect(s.runs).toHaveLength(1);
   });
 });
+
+describe('chase queries (seed best, daily best, daily streak)', () => {
+  const NOW = Date.parse('2025-03-10T15:00:00Z');
+  const dseed = (k) => `daily-${k}`;
+
+  test('getSeedStats: null when none, maxima and attempts, excludeRunId', async () => {
+    const s = await fresh();
+    expect(s.getSeedStats('abc')).toBeNull();
+    await s.saveRun(makeRun({ id: 'a', seed: 'abc', score: 500, distanceM: 100 }));
+    await s.saveRun(makeRun({ id: 'b', seed: 'abc', score: 300, distanceM: 900 }));
+    await s.saveRun(makeRun({ id: 'c', seed: 'other', score: 9999 }));
+    expect(s.getSeedStats('abc')).toEqual({ seed: 'abc', attempts: 2, bestScore: 500, bestDistanceM: 900 });
+    expect(s.getSeedStats('abc', { excludeRunId: 'a' })).toEqual({ seed: 'abc', attempts: 1, bestScore: 300, bestDistanceM: 900 });
+    expect(s.getSeedStats('other', { excludeRunId: 'c' })).toBeNull();
+    expect(s.getSeedStats('')).toBeNull();
+  });
+
+  test('getDailyStats uses the UTC day seed', async () => {
+    const s = await fresh();
+    await s.saveRun(makeRun({ id: 'd1', seed: dseed('2025-03-10'), score: 70, distanceM: 5 }));
+    await s.saveRun(makeRun({ id: 'd2', seed: dseed('2025-03-10'), score: 40, distanceM: 50 }));
+    await s.saveRun(makeRun({ id: 'd3', seed: dseed('2025-03-09'), score: 999 }));
+    expect(s.getDailyStats(new Date('2025-03-10T23:59:59Z'))).toEqual({
+      seed: dseed('2025-03-10'), dateKey: '2025-03-10', attempts: 2, bestScore: 70, bestDistanceM: 50,
+    });
+    expect(s.getDailyStats(Date.parse('2025-03-11T00:00:00Z'))).toBeNull();
+    expect(s.getDailyStats(NOW, { excludeRunId: 'd1' }).bestScore).toBe(40);
+  });
+
+  async function storeWith(keys) {
+    const s = await fresh();
+    let i = 0;
+    for (const k of keys) await s.saveRun(makeRun({ id: `x${i++}`, seed: dseed(k), startedAt: 0, endedAt: 0 }));
+    return s;
+  }
+
+  test('streak: empty store', async () => {
+    const s = await fresh();
+    expect(s.getDailyStreak(NOW)).toEqual({ streak: 0, playedToday: false, todayKey: '2025-03-10', lastPlayedKey: null });
+  });
+
+  test('streak: today counts, consecutive days across month boundary', async () => {
+    const s = await storeWith(['2025-03-10', '2025-03-09', '2025-03-08', '2025-02-28', '2025-03-01']);
+    const r = s.getDailyStreak(NOW);
+    expect(r.playedToday).toBe(true);
+    expect(r.streak).toBe(3);
+    const s2 = await storeWith(['2025-03-01', '2025-02-28', '2025-02-27', '2025-03-02']);
+    expect(s2.getDailyStreak(Date.parse('2025-03-02T01:00:00Z')).streak).toBe(4);
+  });
+
+  test('streak: ending yesterday is live, gap resets', async () => {
+    const s = await storeWith(['2025-03-09', '2025-03-08']);
+    expect(s.getDailyStreak(NOW)).toEqual({ streak: 2, playedToday: false, todayKey: '2025-03-10', lastPlayedKey: '2025-03-09' });
+    const g = await storeWith(['2025-03-08', '2025-03-07']);
+    expect(g.getDailyStreak(NOW).streak).toBe(0);
+    expect(g.getDailyStreak(NOW).lastPlayedKey).toBe('2025-03-08');
+    const hole = await storeWith(['2025-03-10', '2025-03-08']);
+    expect(hole.getDailyStreak(NOW).streak).toBe(1);
+  });
+
+  test('streak: ignores non-daily and future seeds, accepts Date, duplicates count once', async () => {
+    const s = await storeWith(['2025-03-10', '2025-03-10', '2025-03-11']);
+    await s.saveRun(makeRun({ id: 'n', seed: 'daily-garbage' }));
+    const r = s.getDailyStreak(new Date(NOW));
+    expect(r.streak).toBe(1);
+    expect(r.lastPlayedKey).toBe('2025-03-10');
+  });
+
+  test('queries do not alter stored runs or ledger hashes', async () => {
+    const s = await fresh();
+    const run = makeRun({ id: 'h', seed: dseed('2025-03-10') });
+    await s.saveRun(run);
+    s.getSeedStats(run.seed); s.getDailyStats(NOW); s.getDailyStreak(NOW);
+    expect(s.runs[0].ledgerHash).toBe(SaveStore.computeLedgerHash(s.runs[0]));
+  });
+
+  test('few thousand runs stay fast', async () => {
+    const s = await fresh();
+    for (let i = 0; i < 5000; i++) s.runs.push(sanitizeRun(makeRun({ id: `p${i}`, seed: dseed(new Date(NOW - (i % 400) * 86400000).toISOString().slice(0, 10)) })));
+    const t = Date.now();
+    s.getDailyStreak(NOW); s.getSeedStats(dseed('2025-03-10')); s.getDailyStats(NOW);
+    expect(Date.now() - t).toBeLessThan(200);
+  });
+});
