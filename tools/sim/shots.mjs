@@ -3,6 +3,7 @@
  * Screenshot driver for the real game (vite + headless Chromium, deviceScaleFactor 2, HUD scene running).
  *   node tools/sim/shots.mjs hints  <outDir>     tutorial hints: keyboard (natural run), push (stall), touch / gamepad labels
  *   node tools/sim/shots.mjs zoom   <outDir>     speed-zoom views and warning-time table (scenario in shots-zoom.js)
+ *   node tools/sim/shots.mjs hud   <outDir>     HUD layout stress: banners, fixed rows, hint chip, touch controls (scenarios in shots-hud.js)
  * Scenarios live page-side in shots-page.js; they await window.__shot(name, meta) which saves <outDir>/<name>.png.
  */
 import { spawn } from 'node:child_process';
@@ -33,6 +34,7 @@ try {
   await page.addInitScript({ path: path.join(here, 'browser.js') });
   await page.addInitScript({ path: path.join(here, 'shots-page.js') });
   await page.addInitScript({ path: path.join(here, 'shots-zoom.js') });
+  await page.addInitScript({ path: path.join(here, 'shots-hud.js') });
   const shots = [];
   await page.exposeFunction('__shot', async (name, meta) => {
     const file = path.join(outDir, `${name}.png`);
@@ -58,7 +60,9 @@ try {
     result.trace = await run('stallTrace', opts);
   } else if (mode === 'zoom') {
     result.zoom = await page.evaluate((o) => window.__shotsZoom.run(o), opts);
-  } else throw new Error('mode: hints | zoom');
+  } else if (mode === 'hud') {
+    result.hud = await page.evaluate((o) => window.__shotsHud.run(o), opts);
+  } else throw new Error('mode: hints | zoom | hud');
   writeFileSync(path.join(outDir, `${mode}.json`), JSON.stringify(result, null, 1));
   console.log('done', shots.length, 'shots');
 } finally {
