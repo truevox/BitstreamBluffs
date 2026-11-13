@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.3 - unreleased (W1 reward-line fit)
+
+### 🐛 Fixed
+- Keep long multi-reward Game Over text within its 280px lane, and use supported ASCII separators.
+
 ## v2.2.2 - unreleased (W1 Game Over spacing)
 
 ### 🐛 Fixed

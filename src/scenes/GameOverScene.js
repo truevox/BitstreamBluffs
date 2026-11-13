@@ -259,14 +259,14 @@ export class GameOverScene extends Phaser.Scene {
         if (reward.boost) bits.push(String(reward.boost).toUpperCase());
         if (reward.biome) bits.push('SIGNATURE LOCKED - COMING ONLINE');
       }
-      if (bits.length) return ellipsize(bits.join('  ·  '), 58);
+      if (bits.length) return ellipsize(bits.join(' / '), 280);
     }
     if (awards.leveledTo && awards.rewards) {
       const bits = [];
       if (awards.rewards.title) bits.push(String(awards.rewards.title).toUpperCase());
       if (awards.rewards.cosmetic) bits.push(String(awards.rewards.cosmetic).toUpperCase());
       if (awards.rewards.biome) bits.push('SIGNATURE LOCKED - COMING ONLINE');
-      if (bits.length) return bits.join('  ·  ');
+      if (bits.length) return ellipsize(bits.join(' / '), 280);
     }
     const toNext = awards.progress ? awards.progress.xpToNext : 0;
     if (toNext > 0) return `${fmtInt(toNext)} XP TO NEXT`;
