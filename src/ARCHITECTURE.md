@@ -565,8 +565,19 @@ Runs used to end in a `terrain` crash (head or torso on the ground) a moment aft
 `minMs` (1.5 s; tuck 2.5 s) unless the player does the action (`tutDoneId`, persisted in `bb.tutorialDone` as before), and at most `maxMs` (a timed-out hint must
 see its trigger drop before it can return, so nothing sticks); 0.6 s gap after any hide; nothing before 2.5 s of run time except push; a higher-priority want
 replaces the current hint once it has had its minimum; while a ground hazard is within ~3.4 s of travel and hop is not yet done, only push / hop may start. Triggers:
-hop = next ground crash hazard within 1.5 s of travel (350..1300 px); flip = a launch lip within 1.3 s of travel (grounded) or airborne > 250 ms with no trick
+hop = next ground crash hazard within 1.2 s of travel (350..1300 px; the hazard itself only enters the view ~0.5-0.65 s before the sled reaches it); flip = a launch lip within 1.3 s of travel (grounded) or airborne > 250 ms with no trick
 (max 3 shows per run, text says "IN AIR ..."); boost = 2.2 s after a landing boost (explains what just happened, then done); tuck = steep grounded descent, only after the
 first landing and 12 s of run time, once per run, retired after `tuckHintMaxShows`. The "land" hint (dead: needed > 25 deg off the slope < 110 px above ground) is removed.
 Tunables are a constants block at the top of RunScene.js (`HOP_*`, `FLIP_*`, `BOOST_HINT_MS`, `TUCK_HINT_MIN_RUN_MS`); `TUNING.tuckHintWaitMs` is now unused. `UIScene`'s
 8 s `HINT_MAX_MS` is only a backstop. Measured with `tools/sim/hints.mjs` (stats from a `run.mjs --out` file) and `tools/sim/shots.mjs hints` (real screenshots).
+
+## Addendum: camera at speed (second zoom stage)
+
+Runs now cruise at ~650 px/s and peak at 1050-1200 px/s (up to ~1700), past the 340-700 px/s the camera was tuned for. `RunScene.updateCamera` keeps the old curve
+(zoom 1 -> `TUNING.zoomMin` 0.82 between 150 and `zoomSpeedHi` 600 px/s) and adds a second stage: zoom keeps easing out to `ZOOM_FAR_MIN` 0.62 at `ZOOM_FAR_SPEED_HI`
+1200 px/s, and the look-ahead grows by `LOOK_FAR_EXTRA_PX` 90 between 600 and 1000 px/s (the x follow lag eats most of the base look-ahead at speed). The rider is kept at
+least `RIDER_MIN_SCREEN_X` 36 screen px from the left edge (the zoom code pins the rider's screen x to `sled.x - _camX`, so the bound is in screen px). These constants sit at
+the top of RunScene.js, not in PhysicsTuner. Camera only: no physics input reads it (`run.mjs --policy hop` is identical with and without it). Nothing else needed to change for the wider
+view: background and flash layers are counter-scaled by `applyZoomCompensation` (checked down to 0.62), terrain is generated `TERRAIN.bufferAheadScreens` (3) screens ahead (the view
+is < 1.7 screens wide), and the cull margins use the zoomed `_view`. Measured with `tools/sim/shots.mjs zoom <dir> '{"trace":true}'` (hop-policy runs, real screenshots at scale 2;
+`shots-zoom.js`): warning time = (view right edge - sled x) / speed.

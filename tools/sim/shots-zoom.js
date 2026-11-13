@@ -18,6 +18,7 @@
     const rows = BINS.map(() => ({ ground: [], air: [], zoom: [], sx: [] }));
     const hazRows = []; // {bin, speed, toReachS, zoom}
     const lipRows = [];
+    const trace = []; // o.trace: {seed, t (s), speed, zoom} every 3rd frame, for the zoom-over-time check
     const shots = []; let minTerrainMargin = 1e9; let maxSpeed = 0;
     for (const seed of seeds) {
       const env = await S.boot(seed);
@@ -32,6 +33,7 @@
         const speed = s.speed; maxSpeed = Math.max(maxSpeed, speed);
         const ahead = v.right - s.x; const warn = ahead / Math.max(speed, 1);
         const zoom = sc.cameras.main.zoom;
+        if (o.trace && f % 3 === 0) trace.push({ seed, t: r2(f / 60), speed: Math.round(speed), zoom, g: s.grounded ? 1 : 0, sx: r2((s.x - v.left) / (v.right - v.left)) });
         const sxFrac = (s.x - v.left) / (v.right - v.left);
         const b = binOf(speed);
         if (b >= 0 && speed > 300) { rows[b][s.grounded ? 'ground' : 'air'].push(warn); rows[b].zoom.push(zoom); rows[b].sx.push(sxFrac); }
@@ -84,7 +86,7 @@
       zoomMedian: q(rows[i].zoom, 0.5), sledScreenXFracMedian: rows[i].sx.length ? r2(q(rows[i].sx, 0.5)) : null,
     }));
     const byBin = (arr) => BINS.map(([a, b], i) => { const t = arr.filter((r) => r.bin === i).map((r) => r.toReachS); return { band: `${a}-${b}`, n: t.length, min: t.length ? Math.min(...t) : null, median: q(t, 0.5) }; });
-    return { table, hazardEntersView: byBin(hazRows), lipEntersView: byBin(lipRows), hazRows, lipRows, minTerrainMarginPx: Math.round(minTerrainMargin), maxSpeed: Math.round(maxSpeed) };
+    return { trace, table, hazardEntersView: byBin(hazRows), lipEntersView: byBin(lipRows), hazRows, lipRows, minTerrainMarginPx: Math.round(minTerrainMargin), maxSpeed: Math.round(maxSpeed) };
   }
   window.__shotsZoom = { run };
 })();

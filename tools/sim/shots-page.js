@@ -13,6 +13,9 @@
     mods = { EVT: ev.EVT, REG: con.REG, PPM: con.PIXELS_PER_METER, TUNING: tun.TUNING, W: con.GAME_WIDTH, H: con.GAME_HEIGHT };
     return mods;
   }
+  // Phaser's TweenManager measures time with Date.now(), which browser.js pins: advance it one frame per step so UI tweens (popups) animate
+  let clockMs = Date.UTC(2026, 0, 5, 12, 0, 0);
+  Date.now = () => clockMs;
   const newPad = () => ({
     push: false, tilt: 0, tuck: false, brake: false, hop: false, reset: false, heli: 0, airBrake: false, parachute: false, pause: false,
     lastSource: 'keyboard', pressed: { hop: false, reset: false, pause: false, airBrake: false, parachute: false, confirm: false },
@@ -49,6 +52,7 @@
   /** advance one frame; render=true uses the full Phaser step so the canvas shows the new frame */
   function frame(env, render) {
     env.t += DT;
+    clockMs += DT;
     if (render) env.game.step(env.t, DT); else env.game.headlessStep(env.t, DT);
     env.pad.hop = false; env.pad.pressed.hop = false; env.pad.push = false;
   }
@@ -154,5 +158,22 @@
     return { rows, hints: env.hints };
   }
 
-  window.__shots = { stallTrace, hintsNatural, hintPush, hintsModes, boot, frame, hopPolicy, hintUi, loadMods };
+  /** Debug: do landing / boost banners clear after a few seconds? Lists visible UI texts at intervals after the first boost. */
+  async function bannerTrace(o) {
+    const env = await boot(o.seed || 'sim-01'); const st = { lastHop: -1e9 };
+    const ui = env.game.scene.getScene('UIScene'); const rows = []; let boostT = null;
+    const texts = () => ui.children.list.concat(...ui.children.list.filter((c) => c.list).map((c) => c.list)).filter((c) => c.text && c.visible && c.alpha > 0.05).map((c) => c.text);
+    for (let f = 0; f < 60 * 60; f++) {
+      S_hop(env, st); frame(env, false);
+      if (boostT == null && env.scene.lastBoost) boostT = env.t;
+      if (boostT != null && (env.t - boostT) % 1000 < 17) rows.push([Math.round((env.t - boostT) / 1000), texts().filter((t) => /BOOST|LANDING|MISS|BURST/.test(t))]);
+      if (boostT != null && env.t - boostT > 1000 && !rows.shot1) { rows.shot1 = 1; frame(env, true); await window.__shot('banner-1s', {}); }
+      if (boostT != null && env.t - boostT > 6000 && !rows.shot2) { rows.shot2 = 1; frame(env, true); await window.__shot('banner-6s', {}); }
+      if (boostT != null && env.t - boostT > 8000) break;
+    }
+    return rows;
+  }
+  const S_hop = (env, st) => hopPolicy(env, st);
+
+  window.__shots = { bannerTrace, stallTrace, hintsNatural, hintPush, hintsModes, boot, frame, hopPolicy, hintUi, loadMods };
 })();

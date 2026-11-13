@@ -62,7 +62,7 @@ const TUCK_SHOWS_KEY = 'bb.tuckShows';
  * hop: show when the next ground hazard is within HOP_HINT_LEAD_S of travel (but at least HOP_HINT_MIN_PX); other hints are
  * held back while it is within HOP_DANGER_S so they cannot eat the warning window. flip: show on the approach to a launch lip.
  */
-const HOP_HINT_LEAD_S = 1.5;
+const HOP_HINT_LEAD_S = 1.2;
 const HOP_HINT_MIN_PX = 350;
 const HOP_HINT_MAX_PX = 1300;
 const HOP_DANGER_S = 3.4;
@@ -72,6 +72,17 @@ const FLIP_AIR_MS = 250;
 const BOOST_HINT_MS = 2200;
 /** The tuck hint (an advanced technique) waits for this much run time and for the first landing. */
 const TUCK_HINT_MIN_RUN_MS = 12000;
+/**
+ * Second zoom stage: TUNING.zoomMin is reached at TUNING.zoomSpeedHi (600 px/s); past that the camera keeps pulling out to
+ * ZOOM_FAR_MIN at ZOOM_FAR_SPEED_HI. Measured (tools/sim/shots.mjs zoom): at 850+ px/s only 0.33-0.45 s of terrain was visible ahead
+ * of the sled, too little to see a ground hazard coming; the clamp in updateCamera already allows 0.6.
+ */
+const ZOOM_FAR_MIN = 0.62;
+const ZOOM_FAR_SPEED_HI = 1200;
+/** Extra look-ahead (px, on top of TUNING.lookAheadMaxPx) that ramps in between 600 and 1000 px/s; the follow lag eats the base look-ahead at speed. */
+const LOOK_FAR_EXTRA_PX = 90;
+/** The rider is never allowed closer than this many screen px to the left edge. */
+const RIDER_MIN_SCREEN_X = 36;
 const smooth01 = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
 
 /** Tutorial hints already completed on this device. SaveStore.sanitizeSettings drops unknown keys, so use our own key. */
@@ -1324,7 +1335,8 @@ export class RunScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const s = this.sled;
     // Look ahead in the direction of travel; Y keeps ~1/3 of the screen above the rider and peeks lower when falling.
-    const look = clamp(s.vx * TUNING.lookAheadSec, -TUNING.lookAheadMaxPx * 0.5, TUNING.lookAheadMaxPx);
+    const look = clamp(s.vx * TUNING.lookAheadSec, -TUNING.lookAheadMaxPx * 0.5, TUNING.lookAheadMaxPx)
+      + LOOK_FAR_EXTRA_PX * smooth01((s.vx - 600) / 400);
     const tx = s.x + look - GAME_WIDTH * 0.38;
     const ty = s.y - GAME_HEIGHT / 3 - clamp(s.vy * 0.05, -26, 34);
     const kx = 1 - Math.exp((-TUNING.cameraLerpX * dt) / 1000);
@@ -1346,12 +1358,16 @@ export class RunScene extends Phaser.Scene {
     } else {
       this.shakeAmp = 0;
     }
+    // ... and horizontally: the extra look-ahead must not push the rider off the left edge (the zoom below keeps the rider at
+    // screen x = s.x - _camX whatever the zoom, so this is a plain screen-px bound)
+    if (s.x - this._camX < RIDER_MIN_SCREEN_X) this._camX = s.x - RIDER_MIN_SCREEN_X;
     // never show far past the start edge of the world
     if (this._camX < -30) this._camX = -30;
 
     // speed zoom: 1.0 at rest -> zoomMin at zoomSpeedHi, smoothed, with a brief extra pull-out on boosts. Stepped to 0.005
     // so the vector terrain does not shimmer from continuous sub-pixel scale changes.
-    const zt = 1 - (1 - TUNING.zoomMin) * smooth01((s.speed - TUNING.zoomSpeedLo) / (TUNING.zoomSpeedHi - TUNING.zoomSpeedLo));
+    const zNear = 1 - (1 - TUNING.zoomMin) * smooth01((s.speed - TUNING.zoomSpeedLo) / (TUNING.zoomSpeedHi - TUNING.zoomSpeedLo));
+    const zt = zNear - (TUNING.zoomMin - ZOOM_FAR_MIN) * smooth01((s.speed - TUNING.zoomSpeedHi) / (ZOOM_FAR_SPEED_HI - TUNING.zoomSpeedHi));
     this._zoom += (zt - this._zoom) * (1 - Math.exp((-TUNING.zoomLerp * dt) / 1000));
     this._zoomKick = Math.max(0, this._zoomKick - dt / 260 * 0.05);
     const z = Math.round(clamp(this._zoom - this._zoomKick, 0.6, 1.2) * 200) / 200;

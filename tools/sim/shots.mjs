@@ -52,6 +52,8 @@ try {
     result.modes = await run('hintsModes', opts);
   } else if (mode === 'pushRelease') {
     result.push = await run('hintPush', { ...opts, release: true });
+  } else if (mode === 'bannerTrace') {
+    result.rows = await run('bannerTrace', opts);
   } else if (mode === 'stallTrace') {
     result.trace = await run('stallTrace', opts);
   } else if (mode === 'zoom') {
