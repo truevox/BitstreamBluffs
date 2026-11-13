@@ -188,8 +188,14 @@
           if (!st.hold) return null;
           if (st.releaseAt == null) {
             const eta = etaToGround(scene);
-            if (ok(predict(c, 0, eta, st.ang0))) { st.releaseAt = c.tMs + late; st.idealFound = true; }
-            else if (eta < 150) st.releaseAt = c.tMs;
+            if (ok(predict(c, 0, eta, st.ang0))) { st.releaseAt = c.tMs + Math.max(0, late); st.idealFound = true; }
+            else if (late < 0) {
+              // EARLY release (negative --releaseLateMs): let go when the ideal frame is at most -late ms away (25 ms grid)
+              for (let hm = 25; hm <= -late; hm += 25) {
+                if (ok(predict(c, hm, eta, st.ang0))) { st.releaseAt = c.tMs; st.idealFound = true; break; }
+              }
+              if (st.releaseAt == null && eta < 150) st.releaseAt = c.tMs;
+            } else if (eta < 150) st.releaseAt = c.tMs;
             if (st.releaseAt != null) st.idealRot = st.ang0 - sled.angleDeg;
           }
           const released = st.releaseAt != null && c.tMs >= st.releaseAt;
@@ -198,27 +204,52 @@
         };
       },
 
-      /** Brake to a dead stop on gentle ground, release, watch the stall nudge. Records into c.probe. */
+      /**
+       * Brake to a dead stop on gentle ground, release, watch the stall nudge. Records into c.probe.
+       * --probeKind picks WHERE the stop happens: the brake is held to a dead stop only while the ground slope (deg, + = downhill) is inside the
+       * band; elsewhere the sled just creeps (brakes above 90 px/s) so it stops in the first band stretch it reaches.
+       *   first (default) any |slope| < the nudge limit (16)      flat    |slope| < 2.5
+       *   down            gentle downhill 4..10                    upGentle uphill 4..9
+       *   upSteep         uphill 11..15.5 (generated terrain has nothing steeper than the 12 deg start ramp, so this is the same spot as `first`)
+       * --probeMinM N only starts braking after N metres. Besides the nudge timings the probe records, for the first 4 s after the
+       * release, a trace [t since release (s), speed along the slope (px/s, + = forward), speed, nudging, crawl ms] every 100 ms,
+       * and `maxBackPx`: how far (px) the sled got back down the slope from where it stopped.
+       */
       stallProbe(p) {
-        const stopBelow = p.stopBelowPxS != null ? p.stopBelowPxS : 3;
-        const st = { phase: 'brake', tStop: null, tSlow: null, tNudge: null, tRecover: null, minSpeedAfter: 1e9, slopeAtStop: null, x: null, maxBrakeMs: 25000 };
+        // a brake cannot hold a sled on a downhill (no static friction: it creeps at ~g*sin/brakeResist), so on 'down' count a 30 px/s crawl as stopped
+        const stopBelow = p.stopBelowPxS != null ? p.stopBelowPxS : (p.probeKind === 'down' ? 30 : 3);
+        const lim = TUNING.stallNudgeMaxSlopeDeg;
+        const bands = { first: [-lim + 0.01, lim - 0.01], flat: [-2.5, 2.5], down: [4, 10], upGentle: [-9, -4], upSteep: [-15.5, -11] };
+        const kind = p.probeKind || 'first';
+        const band = bands[kind];
+        if (!band) throw new Error('unknown probeKind ' + kind);
+        const minM = p.probeMinM != null ? p.probeMinM : 0;
+        const creep = p.creepPxS != null ? p.creepPxS : 90;
+        const st = { kind, phase: 'brake', tStop: null, tSlow: null, tNudge: null, tRecover: null, minSpeedAfter: 1e9, slopeAtStop: null, x: null, maxBrakeMs: 60000, trace: [], x0: 0, maxBackPx: 0 };
         return (c) => {
           const { sled } = c;
           c.probe = st;
+          const dM = (sled.x - c.scene.startX) / PPM;
+          const vt = sled.vx * Math.cos(sled.groundAngleDeg * DEG) + sled.vy * Math.sin(sled.groundAngleDeg * DEG);
           if (st.phase === 'brake') {
-            if (sled.grounded && sled.speed < stopBelow && Math.abs(sled.groundAngleDeg) < TUNING.stallNudgeMaxSlopeDeg) {
-              st.phase = 'released'; st.tStop = c.tMs; st.slopeAtStop = r1(sled.groundAngleDeg); st.x = r1((sled.x - c.scene.startX) / PPM);
+            const inBand = sled.groundAngleDeg >= band[0] && sled.groundAngleDeg <= band[1];
+            if (sled.grounded && sled.speed < stopBelow && inBand && dM >= minM) {
+              st.phase = 'released'; st.tStop = c.tMs; st.slopeAtStop = r1(sled.groundAngleDeg); st.x = r1(dM); st.x0 = sled.x;
               return null;
             }
             if (c.tMs > st.maxBrakeMs) { st.phase = 'neverStopped'; return null; }
-            return { brake: true };
+            // outside the band (or before minM) just creep: brake whenever faster than creepPxS so the stop happens in the band, not past it
+            return (kind === 'first' || (inBand && dM >= minM - 40) || sled.speed > creep) ? { brake: true } : null;
           }
           if (st.phase === 'released') {
+            const since = c.tMs - st.tStop;
             st.minSpeedAfter = Math.min(st.minSpeedAfter, Math.round(sled.speed));
+            st.maxBackPx = Math.max(st.maxBackPx, st.x0 - sled.x);
+            if (since < 4000 && Math.round(since) % 100 < 17) st.trace.push([r2(since / 1000), Math.round(vt), Math.round(sled.speed), sled._nudging ? 1 : 0, Math.round(sled._crawlMs || 0)]);
             if (st.tSlow == null && sled.grounded && sled.speed < TUNING.stallNudgeBelowPxS) st.tSlow = c.tMs;
             if (st.tNudge == null && sled._nudging) st.tNudge = c.tMs;
-            if (st.tRecover == null && sled.speed > 120) { st.tRecover = c.tMs; st.phase = 'done'; }
-            if (c.tMs - st.tStop > 20000) st.phase = 'timeout';
+            if (st.tRecover == null && sled.speed > 120 && vt > 0) { st.tRecover = c.tMs; st.phase = 'done'; }
+            if (since > 20000) st.phase = 'timeout';
           }
           return null;
         };

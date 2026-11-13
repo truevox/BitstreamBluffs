@@ -10,7 +10,7 @@
  */
 import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
-import { TUNING, BASE_STEP_MS } from '../systems/PhysicsTuner.js';
+import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin } from '../systems/PhysicsTuner.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -254,18 +254,14 @@ export class Sled {
       this.pushPulse = 1;
     }
 
-    // stall safety net: crawling < stallNudgeBelowPxS for > stallNudgeAfterMs on non-steep ground with no brake -> gentle auto-push up to stallNudgeToPxS
-    speed = Math.hypot(vx, vy);
-    const crawl = grounded && speed < TUNING.stallNudgeBelowPxS && Math.abs(this.groundAngleDeg) < TUNING.stallNudgeMaxSlopeDeg && !(pad && (pad.brake || pad.airBrake));
-    this._crawlMs = crawl || (this._nudging && grounded) ? this._crawlMs + stepMs : 0;
-    if (this._crawlMs > TUNING.stallNudgeAfterMs && grounded && !(pad && (pad.brake || pad.airBrake)) && Math.abs(this.groundAngleDeg) < TUNING.stallNudgeMaxSlopeDeg) {
-      this._nudging = true;
-      if (speed < TUNING.stallNudgeToPxS) {
-        const add = Math.min(TUNING.stallNudgeAccelPxS2 * dt, TUNING.stallNudgeToPxS - speed);
-        vx += tx * add;
-        vy += ty * add;
-      }
-    } else this._nudging = false;
+    // stall safety net (see stallNudgeStep): stopped or rolling backwards on non-steep ground with no brake -> gentle auto-push forward
+    const nudge = stallNudgeStep({ crawlMs: this._crawlMs || 0, nudging: !!this._nudging }, {
+      grounded, braking: !!(pad && (pad.brake || pad.airBrake)), slopeDeg: this.groundAngleDeg, vx, vy, stepMs, gravityPxS2: phys.gravityPxS2,
+    });
+    this._crawlMs = nudge.crawlMs;
+    this._nudging = nudge.nudging;
+    vx += nudge.dvx;
+    vy += nudge.dvy;
 
     // hop / bump jump (Space) with coyote time and input buffer
     if (this.hopBufferMs > 0 && this.msSinceContact < TUNING.hopCoyoteMs) {
@@ -311,10 +307,7 @@ export class Sled {
     if (phys.scrambleJitterDegS2) w += (Math.random() * 2 - 1) * phys.scrambleJitterDegS2 * DEG * dt;
     if (!g && tilt === 0) {
       // hands off: spin bleeds off and the nose eases toward the travel direction, so a pitch-over at a lip does not tumble the sled
-      let err = Math.atan2(vy, vx) - b.angle;
-      err = Math.atan2(Math.sin(err), Math.cos(err));
-      w += clamp(err, -1.2, 1.2) * TUNING.airIdleLevelK * dt;
-      w *= Math.exp(-TUNING.airIdleSpinDamp * dt);
+      w = airIdleSpin(w, b.angle, vx, vy, dt);
     }
     if (pad && pad.brake && !g) w *= Math.exp(-TUNING.airBrakeAngularDamp * dt);
     if (chute) w *= Math.exp(-2.5 * dt);

@@ -31,7 +31,9 @@
  * Policies (details in browser.js): flip's "ideal" release = first frame where rotationSoFar + w/airIdleSpinDamp >= 340 deg,
  * i.e. the sled will have covered ~one turn once the hands-off spin-down has finished; releaseLateMs delays that.
  * hop hops so the apex is over the next ground crash hazard and vetoes hops near a lip that has an air hazard after it.
- * stallProbe brakes to a dead stop on gentle ground, releases, and records when sled._nudging fires and the time to >120 px/s.
+ * stallProbe brakes to a dead stop on gentle ground, releases, and records when sled._nudging fires and the time to >120 px/s;
+ * --probeKind first|flat|down|upGentle|upSteep picks the kind of slope it stops on (--probeMinM N: not before N metres); see browser.js.
+ * --releaseLateMs may be NEGATIVE for flip: release that many ms BEFORE the ideal frame.
  */
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -54,7 +56,7 @@ function parseArgs(argv) {
     if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop'].includes(name)) { a[name] = true; continue; }
     a[name] = argv[++i];
   }
-  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'hopLeadMs', 'traceEvery', 'sub']) if (a[n] != null) a[n] = Number(a[n]);
+  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM']) if (a[n] != null) a[n] = Number(a[n]);
   return a;
 }
 const args = parseArgs(process.argv.slice(2));
@@ -69,7 +71,8 @@ function expandSeeds(s) {
 const seeds = expandSeeds(String(args.seeds));
 if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
 const params = {};
-for (const n of ['releaseLateMs', 'flipCleanDeg', 'hopLeadMs']) if (args[n] != null) params[n] = args[n];
+for (const n of ['releaseLateMs', 'flipCleanDeg', 'hopLeadMs', 'probeMinM']) if (args[n] != null) params[n] = args[n];
+if (args.probeKind) params.probeKind = String(args.probeKind);
 if (args.noHop) params.noHop = true;
 
 // ------------------------------------------------------------------ vite + browser

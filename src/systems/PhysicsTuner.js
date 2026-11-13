@@ -46,11 +46,13 @@ export const TUNING = Object.freeze({
    */
   dragFeelMul: 0.15,
   /**
-   * Multiplier on air tilt authority (on top of PHYSICS.airControlFactor 0.7). The doc's 420 deg/s^2 x 0.7 needs ~1.9 s
-   * of airtime for 540 degrees, but hops / kickers last 0.8-1.4 s. 3.6 (= 1060 deg/s^2 in the air) gives a held flip
-   * ~540 degrees in ~1.0 s, i.e. an ordinary kicker or a hop off a slope (was 1.6).
+   * Multiplier on air tilt authority (on top of PHYSICS.airControlFactor 0.7 and the doc's 420 deg/s^2): 5 = 1470 deg/s^2 in the air.
+   * Was 3.6 (1060). A flip must be HELD for ~0.65 s before the sled has turned far enough to be finished by the levelling spring
+   * (airIdleLevelK), and generated jumps give ~1.0 s of air, so the slack between the earliest good release and touchdown (which is the
+   * whole release window, see airIdleLevelK) was only ~250 ms; 5 buys back ~100 ms of it. With maxAngularVelDegS 900 the rotation
+   * of a held flip is about the same as before: ~580 deg in 1.0 s, ~960 deg in 1.4 s.
    */
-  airTiltFeelMul: 3.6,
+  airTiltFeelMul: 5,
   /** Ground friction multiplier and extra manual decay while braking (S). */
   brakeFrictionMul: 1,
   brakeResist: 2.2,
@@ -77,16 +79,25 @@ export const TUNING = Object.freeze({
   landSettleMs: 150,
   /** Ground lean torque multiplier (relative to maxTiltTorque). */
   groundTiltMul: 0.5,
-  /** Angular velocity cap, deg/s (raised from 560 so a held flip is not clipped by the air tilt multiplier). */
-  maxAngularVelDegS: 1100,
+  /**
+   * Angular velocity cap, deg/s (1100 before). Reached after ~0.6 s of held tilt. With the old weak levelling every 100 ms of late
+   * release added ~100 deg of spin the player could not time; 900 keeps a double flip possible in ~1.4 s of air (see airTiltFeelMul).
+   */
+  maxAngularVelDegS: 900,
   /** Push kick: surface speed set by W when stalled (px/s), and re-trigger delay. */
   pushKickPxS: 90,
-  /** Stall safety net (Sled.applyControls): below stallNudgeBelowPxS for stallNudgeAfterMs on slopes < stallNudgeMaxSlopeDeg, auto-push to stallNudgeToPxS. */
+  /**
+   * Stall safety net (stallNudgeStep, called from Sled.applyControls): forward speed ALONG THE SLOPE below stallNudgeBelowPxS (so
+   * stopped or rolling backwards) for stallNudgeAfterMs on slopes < stallNudgeMaxSlopeDeg with no brake -> auto-push forward at
+   * stallNudgeAccelPxS2 (net of gravity on an up-slope) until the speed passes stallNudgeToPxS (a little above the 120 px/s "moving
+   * again" mark so the sled does not hover just under it). 240 (was 160) turns a sled that rolled back at 50 px/s on a 12 deg ramp
+   * round and up to 120 within ~1.5 s of letting go of the brake.
+   */
   stallNudgeBelowPxS: 40,
   stallNudgeAfterMs: 600,
   stallNudgeMaxSlopeDeg: 16,
-  stallNudgeToPxS: 120,
-  stallNudgeAccelPxS2: 160,
+  stallNudgeToPxS: 130,
+  stallNudgeAccelPxS2: 240,
   pushCooldownMs: 280,
   /** Hop: speed along the surface normal (px/s; was 300, raised so an average hop is ~0.8 s of air) and coyote/buffer windows. */
   hopPxS: 360,
@@ -146,10 +157,18 @@ export const TUNING = Object.freeze({
    * less than snapMaxDropDeg (over the look-ahead) gets its surface-normal speed clamped to snapKeepVnPxS plus snapDownPxS/s
    * of downforce. Real kickers (drop > snapMaxDropDeg, or vn above the cap) are untouched.
    */
-  /** Per-second exponential damping of angular velocity while airborne with no tilt input. */
-  airIdleSpinDamp: 3,
-  /** Spring (1/s^2) easing the nose toward the velocity heading while airborne with no tilt input. */
-  airIdleLevelK: 8,
+  /**
+   * Hands-off air rotation (no tilt held), see airIdleSpin(): `airIdleLevelK` (1/s^2) springs the nose toward the velocity heading by
+   * the SHORTEST way (error clamped to +-1.2 rad), `airIdleSpinDamp` (1/s) damps the spin. They were 8 and 3, which left a released flip
+   * spinning at 600-1000 deg/s for ~1 s (coast ~ w / damp = 280 deg) with a spring far too weak to stop it: every 100 ms of late (or
+   * early) release moved the landing angle by ~120 deg, so the clean window was < 100 ms wide (measured 32 % clean at +100 ms, 12 % at
+   * -100 ms). At 80 and 12 the spin is gone and the nose is level within ~0.2 s from any starting angle, so a release anywhere between
+   * about half a turn and a turn and a half finishes the flip by itself (earlier: it unwinds to a plain landing), and the only thing
+   * that still crashes is letting go less than ~150 ms before touchdown (or never letting go). Holding tilt is untouched (the spring
+   * only acts with no input) and still crashes. Stronger values (120 / 18) measured no better and look like a snap.
+   */
+  airIdleSpinDamp: 12,
+  airIdleLevelK: 80,
   snapMinGroundMs: 100,
   snapQuietMs: 350,
   snapWindowMs: 160,
@@ -234,6 +253,56 @@ export function gravityToMatter(g) {
 export function angAccelToStep(degS2, deltaMs) {
   const dt = deltaMs / 1000;
   return (degS2 * Math.PI) / 180 * dt * dt;
+}
+
+/**
+ * Hands-off air rotation, one step (pure; Sled.applyControls uses it when airborne with no tilt input): a spring toward the
+ * velocity heading by the SHORTEST way (error clamped to +-1.2 rad) plus exponential spin damping. See TUNING.airIdleLevelK / airIdleSpinDamp.
+ * @param {number} w angular velocity, rad/s (clockwise positive, like the body angle).
+ * @param {number} angle body angle, rad (any multiple of a turn).
+ * @param {number} vx velocity px/s.
+ * @param {number} vy velocity px/s (down positive).
+ * @param {number} dt seconds.
+ * @param {typeof TUNING} [t]
+ * @returns {number} new angular velocity, rad/s.
+ */
+export function airIdleSpin(w, angle, vx, vy, dt, t = TUNING) {
+  let err = Math.atan2(vy, vx) - angle;
+  err = Math.atan2(Math.sin(err), Math.cos(err));
+  const spring = Math.max(-1.2, Math.min(1.2, err)) * t.airIdleLevelK * dt;
+  return (w + spring) * Math.exp(-t.airIdleSpinDamp * dt);
+}
+
+/**
+ * Stall safety net, one physics step (pure; Sled.applyControls feeds it and applies the result).
+ * A sled that is stopped or rolling BACKWARDS (speed along the slope tangent below `stallNudgeBelowPxS`) on non-steep ground with no
+ * brake for `stallNudgeAfterMs` gets a gentle push along the tangent up to `stallNudgeToPxS`. The test is the signed tangential speed,
+ * not the speed magnitude: a sled sliding backwards down a gentle up-slope at 50 px/s has |v| > 40 but is exactly the case the net is for.
+ * On an up-slope the push also cancels the gravity component along the slope, so it is a net 160 px/s^2 on any slope (on a 12 deg
+ * up-slope gravity alone is ~190 px/s^2, more than the raw push). Once started it continues until the target speed is reached.
+ * Never acts while braking, airborne, on steep ground, or while the sled is moving forward at or above the threshold.
+ * @param {{crawlMs:number, nudging:boolean}} st state from the previous step.
+ * @param {{grounded:boolean, braking:boolean, slopeDeg:number, vx:number, vy:number, stepMs:number, gravityPxS2:number}} i velocity px/s, slope deg (+ = downhill).
+ * @param {typeof TUNING} [t]
+ * @returns {{crawlMs:number, nudging:boolean, dvx:number, dvy:number}} velocity change (px/s) to add this step.
+ */
+export function stallNudgeStep(st, i, t = TUNING) {
+  const rad = (i.slopeDeg * Math.PI) / 180;
+  const tx = Math.cos(rad);
+  const ty = Math.sin(rad);
+  const vt = i.vx * tx + i.vy * ty; // signed speed along the slope (+ = downhill / forward)
+  const eligible = i.grounded && !i.braking && Math.abs(i.slopeDeg) < t.stallNudgeMaxSlopeDeg;
+  const crawl = eligible && vt < (st.nudging ? t.stallNudgeToPxS : t.stallNudgeBelowPxS);
+  const crawlMs = crawl ? st.crawlMs + i.stepMs : 0;
+  const nudging = crawl && crawlMs > t.stallNudgeAfterMs;
+  let dv = 0;
+  if (nudging) {
+    const dt = i.stepMs / 1000;
+    dv = Math.min(t.stallNudgeAccelPxS2 * dt, t.stallNudgeToPxS - vt);
+    // cancel the pull of gravity along an up-slope (ty < 0) so the push is a net acceleration
+    dv += Math.max(0, -ty) * i.gravityPxS2 * dt;
+  }
+  return { crawlMs, nudging, dvx: tx * dv, dvy: ty * dv };
 }
 
 export class PhysicsTuner {
