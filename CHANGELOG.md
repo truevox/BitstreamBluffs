@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.4 - unreleased (W1 footer bounds)
+
+### 🐛 Fixed
+- Keep the Game Over retry footer's measured text bounds inside the 270px virtual screen.
+
 ## v2.2.3 - unreleased (W1 reward-line fit)
 
 ### 🐛 Fixed

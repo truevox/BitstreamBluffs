@@ -58,7 +58,7 @@ export class GameOverScene extends Phaser.Scene {
     this.board = new LeaderboardTable(this, theme, { x: 8, y: 22, w: 200, entries: null, parent: this.right });
     this._buildButtons();
     this._buildProgression();
-    this.footer = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 4, 'SPACE / ENTER / A / TAP = RETRY SAME SEED', {
+    this.footer = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 5, 'SPACE / ENTER / A / TAP = RETRY SAME SEED', {
       color: 'text', anchor: 'center', vAnchor: 0.5,
     });
     this.footer.setAlpha(0.7);
