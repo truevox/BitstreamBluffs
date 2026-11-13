@@ -102,7 +102,21 @@ export class TitleScene extends Phaser.Scene {
       { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
       { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this.startRun(this.daily.seed, DailyPatch.biomeMaskForDate()) },
       { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
-      { kind: 'action', label: 'PROFILE', color: 'lime', onSelect: () => this._openView(new ProfileView(this, theme, { onClose: () => this._closeView(), onShop: () => this._openView(new ShopView(this, theme, { onClose: () => this._closeView() })) })) },
+      {
+        kind: 'action',
+        label: 'PROFILE',
+        color: 'lime',
+        onSelect: () => {
+          // The shop is opened FROM the profile and returns TO it. Closing the shop straight to Title
+          // would make Escape a two-screen jump — the player pressed back once and lost their place,
+          // and a keys-only player had no way to tell what had happened.
+          const openProfile = () => this._openView(new ProfileView(this, theme, {
+            onClose: () => this._closeView(),
+            onShop: () => this._openView(new ShopView(this, theme, { onClose: () => { openProfile(); } })),
+          }));
+          openProfile();
+        },
+      },
       { kind: 'action', label: 'LEADERBOARD', color: 'amber', onSelect: () => this._openView(new LeaderboardView(this, theme, { onClose: () => this._closeView() })) },
       { kind: 'action', label: 'SETTINGS', color: 'cyan', onSelect: () => this._openView(new SettingsView(this, theme, { onClose: () => this._closeView() })) },
     ];

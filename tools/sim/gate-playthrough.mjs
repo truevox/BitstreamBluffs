@@ -349,7 +349,7 @@ async function main() {
       } finally { await page.close(); }
     }
 
-    // ---- 6b. a boosted run's Game Over must not claim a clean-board honour (W4 defect 4)
+    // ---- 6b. a boosted run's Game Over must not claim a clean-board honour, and every glyph must be legible (W4 defect 4)
     if (WITH_BOOSTS) {
       const { page, errors, out } = await playToGameOver(browser, port, 0, {
         boosts: { errorCorrection: true, headStart: false }, absorbFirst: true,
@@ -358,39 +358,112 @@ async function main() {
         if (out.fatal) fail('modded Game Over is honest', out.fatal);
         else if (errors.length) fail('modded Game Over: no page errors', errors.join(' | '));
         else {
-          // Read the SCREEN, not the record: the defect was a headline, not a flag. Every string the
-          // player can see, plus the ledger title.
+          // Read the SCREEN, not the record: the defect was a headline, not a flag. Every string and
+          // every drawn glyph rect, plus the qualifying initials-entry -> saved-board flow.
           const seen = await page.evaluate(async () => {
             const g = window.__bbGame;
-            const over = g.scene.getScene('GameOverScene');
-            if (!over) return { fatal: 'no GameOverScene' };
-            const texts = [];
-            const walk = (l) => {
-              for (const o of l || []) {
-                if (o && typeof o.text === 'string' && o.text) texts.push(o.text);
-                if (o && o.list) walk(o.list);
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const inspectScene = (over) => {
+              const glyphs = [];
+              const seenObjs = new Set();
+              // ghostA/ghostB are decorative chromatic-aberration shadows of the big CRASHED header.
+              const skip = new Set([over.ghostA, over.ghostB].filter(Boolean));
+              const walk = (l, hidden = false) => {
+                for (const o of l || []) {
+                  if (!o || seenObjs.has(o) || skip.has(o)) continue;
+                  seenObjs.add(o);
+                  const vis = !hidden && o.visible !== false && (o.alpha === undefined || o.alpha > 0);
+                  const kids = Array.isArray(o.list) ? o.list : [];
+                  if (!kids.length && vis && typeof o.text === 'string' && o.text && o.width !== undefined) {
+                    const b = o.getBounds ? o.getBounds() : null;
+                    if (b) {
+                      glyphs.push({
+                        text: o.text, x: b.x, y: b.y, w: b.width, h: b.height, inkH: b.height * (8 / 9),
+                      });
+                    }
+                  }
+                  if (kids.length) walk(kids, !vis);
+                }
+              };
+              walk(over.children && over.children.list);
+              const byPos = new Map();
+              for (const r of glyphs) {
+                const k = `${r.text}@${Math.round(r.x)},${Math.round(r.y)}`;
+                if (!byPos.has(k)) byPos.set(k, r);
               }
+              const rects = [...byPos.values()];
+              const bad = [];
+              for (let i = 0; i < rects.length; i++) {
+                for (let j = i + 1; j < rects.length; j++) {
+                  const a = rects[i]; const b = rects[j];
+                  if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.inkH && b.y < a.y + a.inkH) {
+                    bad.push(`${a.text} <-> ${b.text}`);
+                  }
+                }
+              }
+              const clipped = rects.filter((r) => r.inkH < 7.9 || r.x < 0 || r.y < 0 || r.x + r.w > 480 || r.y + r.inkH > 270);
+              const tt = over.right && over.right.titleText;
+              const title = tt && tt.main && tt.main.text ? String(tt.main.text) : '';
+              return {
+                texts: rects.map((r) => r.text),
+                title,
+                count: rects.length,
+                bad,
+                clipped: clipped.map((r) => `${r.text}(${r.x.toFixed(1)},${r.y.toFixed(1)},${r.w.toFixed(1)}x${r.inkH.toFixed(1)})`),
+                minInkH: rects.length ? Math.min(...rects.map((r) => r.inkH)) : 0,
+              };
             };
-            walk(over.children && over.children.list);
-            // Panel keeps its title in titleText (a NeonText), not in `.title`. Reading the wrong field
-            // returned '' and let this check pass on visible strings alone — a blind spot, not a pass.
-            // NeonText is a container wrapping a BitmapText in `.main`; the string is main.text. The first
-            // version read `.text` on the container, got undefined, and the check passed on the other
-            // strings alone — exactly the "looks green, proves nothing" shape this gate exists to avoid.
-            const tt = over.right && over.right.titleText;
-            const title = tt && tt.main && tt.main.text ? String(tt.main.text) : '';
-            return { texts, title };
+
+            const over1 = g.scene.getScene('GameOverScene');
+            if (!over1) return { fatal: 'no GameOverScene' };
+            const boardOnly = inspectScene(over1);
+
+            // Also exercise a qualifying modded run (score >= 200) -> NEW MODDED TOP 10! -> saveEntry('MRV') -> MODDED // YOU ARE ON THE BOARD.
+            const store = g.registry.get('saveStore');
+            const qualRec = {
+              id: 'gate-mod-qual', seed: 'gate-seed', biomeMask: 0, score: 1500, distanceM: 320,
+              trickPoints: 400, tricks: { backflip: 2 }, bestCombo: 2, bestFlow: 1.5,
+              maxAirtimeMs: 900, durationMs: 12000, ledgerHash: 'ABCD1234', dailyRuleId: 'none',
+              cause: 'crash', shards: 9, nearMisses: 1, bonusPoints: 100, modded: true,
+              startedAt: Date.now() - 12000, endedAt: Date.now(),
+            };
+            await store.saveRun(qualRec);
+            g.registry.set('lastRecord', qualRec);
+            g.scene.start('GameOverScene');
+            await wait(900);
+            const over2 = g.scene.getScene('GameOverScene');
+            if (!over2) return { fatal: 'no qualifying GameOverScene' };
+            const entryState = inspectScene(over2);
+            const hadEntry = Boolean(over2.entry);
+            if (over2.entry) {
+              await over2.saveEntry('MRV');
+              await wait(500);
+            }
+            const afterSave = inspectScene(over2);
+            return { boardOnly, entryState, hadEntry, afterSave };
           }).catch((e) => ({ fatal: String(e) }));
           if (seen.fatal) fail('modded Game Over is honest', seen.fatal);
           else {
-            const all = seen.texts.join(' | ') + ' | ' + seen.title;
-            const claimsClean = /NEW TOP 10/.test(all) || /NEW SEED BEST/.test(all) || /TODAY'S BEST/.test(all);
-            const saysModded = /MODDED/i.test(all);
-            if (claimsClean) fail('modded Game Over claims no clean-board honour', `screen says: ${all.slice(0, 160)}`);
-            else if (!seen.title) fail('modded Game Over has a ledger title', 'could not read the panel title');
-            else if (!saysModded) fail('modded Game Over says the run is modded/unranked', `title="${seen.title}" screen says: ${all.slice(0, 160)}`);
-            else if (!/MODDED/i.test(seen.title)) fail('modded Game Over titles the MODDED board', `title="${seen.title}"`);
-            else pass('modded Game Over labels the run modded and offers no clean-board honour', `title="${seen.title}"`);
+            const checkState = (label, st) => {
+              const all = st.texts.join(' | ') + ' | ' + st.title;
+              const claimsClean = /\bNEW TOP 10\b/.test(all) || /NEW SEED BEST/.test(all) || /TODAY'S BEST/.test(all);
+              if (claimsClean) return `claims clean-board honour: ${all.slice(0, 160)}`;
+              if (!st.title) return 'missing ledger title';
+              if (!/MODDED/i.test(st.title)) return `title missing MODDED: "${st.title}"`;
+              if (!/MODDED/i.test(all)) return `screen missing MODDED: ${all.slice(0, 160)}`;
+              if (st.count < 25) return `too few glyphs (${st.count})`;
+              if (st.minInkH < 7.9) return `clipped glyph height minInkH=${st.minInkH}`;
+              if (st.clipped.length) return `out-of-bounds/clipped: ${st.clipped.slice(0, 3).join(' | ')}`;
+              if (st.bad.length) return `overlapping glyphs: ${st.bad.slice(0, 4).join(' | ')}`;
+              return null;
+            };
+            const err1 = checkState('boardOnly', seen.boardOnly);
+            const err2 = !seen.hadEntry ? 'qualifying modded run did not open initials entry' : checkState('entryState', seen.entryState);
+            const err3 = checkState('afterSave', seen.afterSave);
+            if (err1) fail('modded Game Over (board) is honest and non-overlapping', err1);
+            else if (err2) fail('modded Game Over (initials entry) is honest and non-overlapping', err2);
+            else if (err3) fail('modded Game Over (after saveEntry) stays MODDED and non-overlapping', err3);
+            else pass('modded Game Over labels the run modded, keeps MODDED across saveEntry, and has zero glyph overlaps', `board="${seen.boardOnly.title}", saved="${seen.afterSave.title}", glyphs=${seen.entryState.count}`);
           }
         }
       } finally { await page.close(); }
@@ -664,6 +737,172 @@ async function main() {
         else if (!out.boost.found) fail('shop: the boost row is readable', 'row not found in the rendered list');
         else if (!out.boost.on) fail('shop: the boost row shows ON after being set ON', `row drew "${out.boost.texts}"`);
         else pass('shop: opens from PROFILE, no glyphs overlap, bank refreshes, buying debits/owns/equips, boost row reflects the toggle', `${out.beforeGlyphs} glyphs, bank ${out.beforeBank} -> ${out.afterBank}`);
+      } finally { await page.close(); }
+    }
+
+    // ---- 6c. TITLE MENU: no two rows may overlap, and the panel must clear the DAILY PATCH strip.
+    //
+    // CC Friday's defect 3 was SETTINGS overflowing the panel into the Daily box. The unit test covers
+    // the layout ARITHMETIC; this reads the drawn rects on the shipped bundle, which is the thing she
+    // actually saw. The first version of this check walked for `o.main` and found ZERO glyphs, then
+    // passed — a probe that measured nothing is worse than no probe, so it now asserts a glyph count
+    // and reads leaf BitmapTexts the same way the shop step does.
+    {
+      const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+      try {
+        const out = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.scene.start('TitleScene');
+          await wait(1100);
+          const t = g.scene.getScene('TitleScene');
+          if (!t || !t.menu) return { fatal: 'no Title menu' };
+          const glyphs = [];
+          const seen = new Set();
+          // The 4x BITSTREAM/BLUFFS wordmark is letter-by-letter art: its two lines are kerned 32px of
+          // ink into a 32px advance, so their boxes touch, and every letter waves +-2px on the sine. That
+          // is the logo moving, not a layout overflow, so the logo letters are excluded by identity.
+          const skip = new Set(((t.logo || []).map((L) => L.t)).filter(Boolean));
+          // Read NeonText CONTAINERS once each: each one draws the same string twice (glow outline +
+          // main), and the two have slightly different font metrics, so walking to leaves reported every
+          // label as overlapping itself. `continue` after a container also keeps the pair out of the pool.
+          const walk = (l, hidden = false) => {
+            for (const o of l || []) {
+              if (!o || seen.has(o) || skip.has(o)) continue;
+              seen.add(o);
+              const vis = !hidden && o.visible !== false && (o.alpha === undefined || o.alpha > 0);
+              if (vis && o.main && typeof o.main.text === 'string' && o.main.text) {
+                const b = o.getBounds ? o.getBounds() : null;
+                if (b) glyphs.push({ text: o.main.text, x: b.x, y: b.y, w: b.width, h: b.height, inkH: b.height * (8 / 9) });
+                continue;
+              }
+              const kids = Array.isArray(o.list) ? o.list : [];
+              if (kids.length) walk(kids, !vis);
+            }
+          };
+          walk(t.children && t.children.list);
+          const byPos = new Map();
+          for (const r of glyphs) {
+            const k = `${r.text}@${Math.round(r.x)},${Math.round(r.y)}`;
+            if (!byPos.has(k)) byPos.set(k, r);
+          }
+          const rects = [...byPos.values()];
+          const bad = [];
+          for (let i = 0; i < rects.length; i++) {
+            for (let j = i + 1; j < rects.length; j++) {
+              const a = rects[i]; const b = rects[j];
+              if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.inkH && b.y < a.y + a.inkH) {
+                bad.push(`${a.text} <-> ${b.text}`);
+              }
+            }
+          }
+          // Menu rows by identity (their drawn label is scaled 2x, so measure their own bounds).
+          const rows = (t.menu.rows || []).map((r, i) => {
+            const b = r.label && r.label.getBounds ? r.label.getBounds() : null;
+            return { i, label: r.label && r.label.main ? r.label.main.text : '', b };
+          }).filter((r) => r.b);
+          const panel = t.menuPanel;
+          const panelBottom = panel ? panel.y + panel.h : null;
+          const daily = t.dailyPanel ? { y: t.dailyPanel.y } : null;
+          const lastRow = rows[rows.length - 1] || null;
+          return {
+            count: rects.length,
+            menuRows: rows.length,
+            labels: rows.map((r) => r.label),
+            bad,
+            panelBottom,
+            dailyTop: daily ? daily.y : null,
+            lastRowBottom: lastRow ? lastRow.b.y + lastRow.b.height * (8 / 9) : null,
+            minInkH: rects.length ? Math.min(...rects.map((r) => r.inkH)) : 0,
+          };
+        }).catch((e) => ({ fatal: String(e) }));
+
+        if (out.fatal) fail('title: menu renders', out.fatal);
+        else if (errors.length) fail('title: no page errors', errors.join(' | '));
+        else if (out.count < 30) fail('title: the probe actually measured the screen', `only ${out.count} glyphs read`);
+        else if (out.menuRows !== 6) fail('title: the menu has six rows', `${out.menuRows}: ${JSON.stringify(out.labels)}`);
+        else if (out.bad.length) fail('title: no two glyphs overlap', out.bad.slice(0, 4).join(' | '));
+        else if (out.minInkH < 7.9) fail('title: every glyph keeps a full ink height', `minInkH=${out.minInkH}`);
+        else if (out.dailyTop !== null && out.lastRowBottom !== null && out.lastRowBottom > out.dailyTop) {
+          fail('title: the last menu row clears the DAILY PATCH strip', `row bottom ${out.lastRowBottom.toFixed(1)} > strip top ${out.dailyTop}`);
+        } else if (out.dailyTop !== null && out.panelBottom !== null && out.panelBottom > out.dailyTop) {
+          fail('title: the menu panel clears the DAILY PATCH strip', `panel bottom ${out.panelBottom} > strip top ${out.dailyTop}`);
+        } else pass('title: six rows, no overlapping glyphs, and the menu clears the DAILY PATCH strip', `${out.count} glyphs, last row bottom ${out.lastRowBottom && out.lastRowBottom.toFixed(1)} vs strip ${out.dailyTop}`);
+      } finally { await page.close(); }
+    }
+
+    // ---- 7b. SHARD SHOP is reachable with KEYS ONLY (CC Friday's blocker).
+    //
+    // ProfileView used to forward every action to the signature menu, which wraps inside its own rows,
+    // so keyboard and gamepad players could never reach the shop — and since the shop moved off Title,
+    // that button was the only way in. This step sends real key events and never clicks anything.
+    if (WITH_BOOSTS) {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+      try {
+        // Open PROFILE the way a player does: from the Title menu.
+        const opened = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const t = g.scene.getScene('TitleScene');
+          const item = (t.menu.items || []).find((i) => /PROFILE/i.test(String(i.label || '')));
+          if (!item) return { fatal: 'no PROFILE entry on the Title menu' };
+          item.onSelect();
+          await new Promise((r) => setTimeout(r, 700));
+          const v = t.view;
+          if (!v) return { fatal: 'PROFILE view did not open' };
+          return { ok: true, rows: v.sigMenu ? v.sigMenu.items.length : 0, hasShop: Boolean(v.shopButton) };
+        });
+        if (opened.fatal) { fail('keys: PROFILE opens from Title', opened.fatal); }
+        else if (!opened.hasShop) { fail('keys: PROFILE has a SHARD SHOP button', 'no shopButton'); }
+        else {
+          // Walk DOWN past the last toggle row onto the SHARD SHOP button, then press Enter.
+          // Down-presses are spaced past MenuInput's 100ms repeat so each one registers as one step.
+          const steps = opened.rows + 1;
+          for (let i = 0; i < steps; i += 1) { await page.keyboard.press('ArrowDown'); await sleep(140); }
+          const focused = await page.evaluate(() => {
+            const t = window.__bbGame.scene.getScene('TitleScene');
+            const v = t.view;
+            return { focus: v && v.focusIdx, kind: (v && v._focusTargets()[v.focusIdx] || {}).kind };
+          });
+          await page.keyboard.press('Enter');
+          await sleep(800);
+          const after = await page.evaluate(() => {
+            const t = window.__bbGame.scene.getScene('TitleScene');
+            const v = t.view;
+            const title = v && v.panel && v.panel.titleText && v.panel.titleText.main.text;
+            return { title: String(title || ''), isShop: Boolean(v && v.menu && v.menu.items && v.menu.items.some((i) => /BOOST|COSMETIC/i.test(String(i.label || '')))) };
+          });
+          if (focused.kind !== 'buy') fail('keys: DOWN reaches the SHARD SHOP button', `focus was on ${focused.kind} at index ${focused.focus}`);
+          else if (!after.isShop) fail('keys: ENTER opens the shop', `still on "${after.title}"`);
+          else pass('keys: PROFILE -> SHARD SHOP opens with arrow keys and Enter only', `title="${after.title}"`);
+
+          // BACK must stay reachable by keys too: Escape closes the shop, then down-to-BACK and Enter.
+          await page.keyboard.press('Escape');
+          await sleep(600);
+          const backOk = await page.evaluate(async () => {
+            const t = window.__bbGame.scene.getScene('TitleScene');
+            // Escape should have returned us to PROFILE (the shop's onClose).
+            const v = t.view;
+            if (!v) return { inProfile: false };
+            const n = v.sigMenu ? v.sigMenu.items.length : 0;
+            for (let i = 0; i < n + 2; i += 1) v.handleAction('down');
+            const kind = (v._focusTargets()[v.focusIdx] || {}).kind;
+            return { inProfile: true, kind };
+          });
+          if (!backOk.inProfile) fail('keys: Escape returns to PROFILE', 'no view open');
+          else if (backOk.kind !== 'back') fail('keys: DOWN reaches BACK', `focus was on ${backOk.kind}`);
+          else {
+            await page.keyboard.press('Enter');
+            await sleep(600);
+            const gone = await page.evaluate(() => {
+              const t = window.__bbGame.scene.getScene('TitleScene');
+              return !t.view;
+            });
+            if (!gone) fail('keys: ENTER on BACK closes PROFILE', 'view still open');
+            else pass('keys: BACK stays reachable by keys and closes the view', 'ArrowDown -> Enter');
+          }
+        }
+        if (errors.length) fail('keys: no page errors', errors.join(' | '));
       } finally { await page.close(); }
     }
 
