@@ -361,9 +361,15 @@ export class ProfileView extends View {
       const sb = layout.shopButton;
       this.shopButton = new Button(scene, theme, {
         x: sb.x, y: sb.y, w: sb.w, h: sb.h, label: 'SHARD SHOP', color: 'amber',
-        onClick: () => { this.close(); o.onShop && o.onShop(); },
+        onClick: () => this._openShop(),
       });
       this.panel.add(this.shopButton);
+      // The button is pointer-only by design (Button's own doc says keyboard users reach the action
+      // through scene-level keys). That was fine while the shop also had a Title row; it is now the ONLY
+      // way in, so Profile has to provide the key path itself.
+      this._onShop = o.onShop;
+      this.shopFocus = new Phaser.GameObjects.Graphics(scene);
+      this.panel.add(this.shopFocus);
     }
 
     this.biomeDefs = biomeDefs;
@@ -449,16 +455,111 @@ export class ProfileView extends View {
     } catch (e) { /* a denied storage write must not break the menu */ }
   }
 
+  /**
+   * Open the shop from this screen.
+   *
+   * Kept as one method so the pointer button and the key path cannot diverge: the keyboard used to be
+   * unable to reach the shop at all, which is only possible if the two entry points are separate code.
+   */
+  _openShop() {
+    const go = this._onShop;
+    this.close();
+    if (go) go();
+  }
+
+  /**
+   * Focus targets in visual order: the signature rows, then SHARD SHOP, then BACK.
+   *
+   * ProfileView used to forward every action straight to `sigMenu`, which wraps inside its own five
+   * rows — so keyboard and gamepad could never leave the toggles, and SHARD SHOP (the only route to the
+   * shop) was unreachable without a mouse. A single ordered list is what makes it reachable: up/down walk
+   * it, and confirm activates whichever entry holds focus.
+   *
+   * @returns {Array<{kind:'row'|'buy'|'back', index?:number}>}
+   */
+  _focusTargets() {
+    const out = [];
+    const rows = this.sigMenu ? this.sigMenu.items.length : 0;
+    for (let i = 0; i < rows; i += 1) out.push({ kind: 'row', index: i });
+    if (this.shopButton) out.push({ kind: 'buy' });
+    out.push({ kind: 'back' });
+    return out;
+  }
+
+  /** Paint the focus ring on whichever target holds focus (rows are highlighted by MenuList itself). */
+  _paintFocus() {
+    if (!this.shopFocus) return;
+    const g = this.shopFocus;
+    const pal = this.theme.pal;
+    g.clear();
+    const t = this._focusTargets()[this.focusIdx];
+    if (!t) return;
+    let r = null;
+    if (t.kind === 'buy' && this.shopButton) r = { x: this.shopButton.x, y: this.shopButton.y, w: this.shopButton.w, h: this.shopButton.h };
+    if (t.kind === 'back' && this.back) r = { x: this.back.x, y: this.back.y, w: this.back.w, h: this.back.h };
+    if (!r) return;
+    g.lineStyle(1, pal[t.kind === 'buy' ? 'amber' : 'magenta'], 1);
+    g.strokeRect(r.x - 1.5, r.y - 1.5, r.w + 3, r.h + 3);
+  }
+
   handleAction(action) {
-    // Focus the signature menu on confirm when it exists, so it is reachable with the same keys as
-    // every other menu; back still closes the view.
     if (action === 'cancel') {
       this.close();
       return true;
     }
-    if (this.sigMenu) return this.sigMenu.handleAction(action);
-    if (action === 'confirm') this.close();
+
+    const targets = this._focusTargets();
+    // Focus lives here, not in MenuList: the menu's own selection wraps inside its rows, which is exactly
+    // why the shop was unreachable. One ordered list means one place that decides where focus is, and the
+    // menu's highlight is a mirror of it rather than a second, competing cursor.
+    if (this.focusIdx === undefined || this.focusIdx === null || this.focusIdx >= targets.length) {
+      // Land on the first row if there is one; otherwise on the first button. Never on BACK, so the
+      // first press moves into the screen rather than leaving it.
+      this.focusIdx = this.sigMenu ? 0 : Math.max(0, targets.length - 2);
+      this._syncMenu();
+      this._paintFocus();
+      if (action !== 'confirm') return true;
+    }
+
+    const cur = targets[this.focusIdx];
+    if (!cur) return true;
+
+    if (action === 'up' || action === 'down') {
+      const next = this.focusIdx + (action === 'up' ? -1 : 1);
+      if (next < 0 || next >= targets.length) return true; // clamp: no wrap onto BACK by accident
+      this.focusIdx = next;
+      this._syncMenu();
+      this._paintFocus();
+      uiSfx(this.scene, 'uiMove');
+      return true;
+    }
+
+    if (action === 'left' || action === 'right') {
+      // Only a toggle row is horizontally adjustable; on the buttons this is a no-op, not an exit.
+      if (cur.kind !== 'row' || !this.sigMenu) return true;
+      this.sigMenu._adjust(cur.index, action === 'left' ? -1 : 1);
+      return true;
+    }
+
+    if (action === 'confirm') {
+      if (cur.kind === 'row' && this.sigMenu) {
+        this.sigMenu.activate();
+      } else if (cur.kind === 'buy') {
+        uiSfx(this.scene, 'uiSelect');
+        this._openShop();
+      } else {
+        this.close();
+      }
+      return true;
+    }
     return true;
+  }
+
+  /** Mirror this view's focus onto the menu's highlight. */
+  _syncMenu() {
+    if (!this.sigMenu) return;
+    const t = this._focusTargets()[this.focusIdx];
+    if (t && t.kind === 'row') this.sigMenu.setSelected(t.index, true);
   }
 
   destroy() {

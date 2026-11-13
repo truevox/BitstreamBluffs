@@ -576,7 +576,7 @@ export class GameOverScene extends Phaser.Scene {
   skipEntry() {
     if (!this.entry) return;
     this._leaveEntry();
-    this._showBoard();
+    this._showBoard(undefined, boardsModded(this.rec));
   }
 
   /**
@@ -601,14 +601,16 @@ export class GameOverScene extends Phaser.Scene {
 
   async saveEntry(initials) {
     if (!this.entry || this.leaving) return;
+    const modded = boardsModded(this.rec);
     this._leaveEntry();
-    this.right.setColorKey('cyan').setTitle('LEDGER');
+    this.right.setColorKey('cyan').setTitle(modded ? 'MODDED' : 'LEDGER');
     const ok = await this._persist(initials);
     if (!this.alive || this.leaving) return;
     let rows = this.rows;
     if (ok) {
       try {
-        rows = (await this.registry.get(REG.SAVE_STORE).getLeaderboard(10)) || [];
+        const store = this.registry.get(REG.SAVE_STORE);
+        rows = (await (modded ? store.getModdedLeaderboard(10) : store.getLeaderboard(10))) || [];
       } catch (e) {
         rows = this.rows;
       }
@@ -621,7 +623,7 @@ export class GameOverScene extends Phaser.Scene {
     }
     if (!this.alive || this.leaving) return;
     this.rows = rows;
-    this._showBoard(ok ? this.rec.id : undefined);
+    this._showBoard(ok ? this.rec.id : undefined, modded);
   }
 
   /**
