@@ -46,12 +46,13 @@ const EFFECT_INFO = {
 };
 
 const HINT_TEXT = {
-  keyboard: { push: 'W  PUSH', hop: 'SPACE  HOP', flip: 'HOLD A / D  FLIP', land: 'LEVEL OUT TO LAND', tuck: 'A+D  TUCK', boost: 'LAND TRICKS = SPEED' },
-  touch: { push: 'TAP PUSH', hop: 'TAP HOP', flip: 'HOLD TILT = FLIP', land: 'LEVEL OUT TO LAND', tuck: 'HOLD TUCK', boost: 'LAND TRICKS = SPEED' },
-  gamepad: { push: 'PUSH  TAP FORWARD', hop: 'A  HOP', flip: 'HOLD STICK L / R  FLIP', land: 'LEVEL OUT TO LAND', tuck: 'TUCK BUTTON', boost: 'LAND TRICKS = SPEED' },
+  keyboard: { push: 'W  PUSH', hop: 'SPACE  HOP', flip: 'IN AIR  HOLD A / D  FLIP', tuck: 'A+D  TUCK', boost: 'CLEAN LANDING = SPEED BOOST' },
+  touch: { push: 'TAP PUSH', hop: 'TAP HOP', flip: 'IN AIR  HOLD TILT  FLIP', tuck: 'HOLD TUCK', boost: 'CLEAN LANDING = SPEED BOOST' },
+  gamepad: { push: 'PUSH  TAP FORWARD', hop: 'A  HOP', flip: 'IN AIR  HOLD STICK L / R  FLIP', tuck: 'TUCK BUTTON', boost: 'CLEAN LANDING = SPEED BOOST' },
 };
 const CHAIN_LIFE_MS = 2500;
-const HINT_MAX_MS = 4000;
+/** Backstop only: RunScene's HintScheduler (systems/HintScheduler.js) owns hint timing and always sends the hide. */
+const HINT_MAX_MS = 8000;
 
 /** Flow meter: compact readout under the pending-points line (top-right), bar width in px. */
 const FLOW_Y = 62;

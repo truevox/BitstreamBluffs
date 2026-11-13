@@ -44,6 +44,7 @@ import { ShardField } from '../entities/Shard.js';
 import { BestMarker } from '../entities/BestMarker.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
+import { HintScheduler } from '../systems/HintScheduler.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -56,6 +57,21 @@ const SLOWMO_CAP_MS = 3000;
 const SPAWN_RUNIN_PX = 44;
 const TUTORIAL_KEY = 'bb.tutorialDone';
 const TUCK_SHOWS_KEY = 'bb.tuckShows';
+/**
+ * First-run hint triggers (the scheduling rules live in systems/HintScheduler.js). Kept here, not in PhysicsTuner.
+ * hop: show when the next ground hazard is within HOP_HINT_LEAD_S of travel (but at least HOP_HINT_MIN_PX); other hints are
+ * held back while it is within HOP_DANGER_S so they cannot eat the warning window. flip: show on the approach to a launch lip.
+ */
+const HOP_HINT_LEAD_S = 1.5;
+const HOP_HINT_MIN_PX = 350;
+const HOP_HINT_MAX_PX = 1300;
+const HOP_DANGER_S = 3.4;
+const FLIP_APPROACH_S = 1.3;
+const FLIP_APPROACH_MIN_PX = 160;
+const FLIP_AIR_MS = 250;
+const BOOST_HINT_MS = 2200;
+/** The tuck hint (an advanced technique) waits for this much run time and for the first landing. */
+const TUCK_HINT_MIN_RUN_MS = 12000;
 const smooth01 = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
 
 /** Tutorial hints already completed on this device. SaveStore.sanitizeSettings drops unknown keys, so use our own key. */
@@ -165,14 +181,13 @@ export class RunScene extends Phaser.Scene {
     this.shardCount = 0;
     this.nearMissCount = 0;
     this._steepMs = 0;
-    this._tuckWantAt = null; // run time the tuck hint became due (it waits for other hints to clear)
-    this._tuckShownAt = null;
-    this._tuckShownRun = false;
+    this._landings = 0; // landings survived this run (the tuck hint waits for the first one)
     this.tuckShows = loadTuckShows();
     this.newBestDone = false;
     this.tutDone = loadTutorialDone();
     this.tutShown = new Set();
-    this.tutTimers = { stall: 0, boostHint: 0 };
+    this.tutTimers = { stall: 0 };
+    this.hints = new HintScheduler({ done: this.tutDone });
 
     // physics world: manual stepping only
     const world = this.matter.world;
@@ -826,7 +841,6 @@ export class RunScene extends Phaser.Scene {
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, l.airtimeMs || 0);
     const airTricks = this._airTricks;
     this._airTricks = 0;
-    this.tutHint('flip', false);
     // forgiveness: clearly-bad-but-not-head-first landings become a recoverable wobble instead of a crash
     if (l.quality === 'crash' && Math.abs(l.angleDeg || 0) <= TUNING.forgiveAngleDeg
       && (l.impactSpeedPxS || 0) < TUNING.forgiveImpactPxS) {
@@ -862,8 +876,7 @@ export class RunScene extends Phaser.Scene {
       this.hitStopMs = Math.max(this.hitStopMs, TUNING.hitStopLandingMs);
       this.sled.squash = l.hard ? 1 : 0.6;
     } else if (imp > 250) this.sled.squash = 0.35;
-    if (l.quality === 'good' || l.quality === 'perfect') this.tutDoneId('land');
-    this.tutHint('land', false);
+    this._landings += 1;
     this.applyLandingBoost(l, mult, nTricks, fs);
   }
 
@@ -896,27 +909,30 @@ export class RunScene extends Phaser.Scene {
     this.fx.sparks(bx, by, this.palette.amber, 6, 200, 10);
     this._zoomKick = Math.max(this._zoomKick, 0.025 + 0.04 * k);
     this.shake(1 + 1.5 * k);
-    if (!this.tutDone.has('boost')) {
-      this.tutHint('boost', true);
-      this.tutTimers.boostHint = 3000;
-    }
   }
 
   // ------------------------------------------------------------------ fun-pass systems
 
-  tutHint(id, show) {
-    if (this.tutDone.has(id)) return;
-    const on = this.tutShown.has(id);
-    if (show === on) return;
-    if (show) this.tutShown.add(id); else this.tutShown.delete(id);
-    this.emitIf(EVT.TUTORIAL_HINT, { id, show });
+  /** Emit scheduler transitions (UIScene draws one hint at a time) and persist what they imply. */
+  applyHintEvents(events) {
+    for (const e of events) {
+      if (e.show) this.tutShown.add(e.id); else this.tutShown.delete(e.id);
+      this.emitIf(EVT.TUTORIAL_HINT, e);
+      if (e.id === 'tuck' && e.show) {
+        this.tuckShows += 1;
+        saveTuckShows(this.tuckShows);
+      } else if (!e.show && ((e.id === 'boost') || (e.id === 'tuck' && this.tuckShows >= TUNING.tuckHintMaxShows))) {
+        this.tutDoneId(e.id); // explained once / shown often enough
+      }
+    }
   }
 
+  /** The player did what the hint asks: hide it and never show it again (persisted). */
   tutDoneId(id) {
     if (this.tutDone.has(id)) return;
-    this.tutHint(id, false);
-    this.tutDone.add(id);
+    const ev = this.hints.complete(id, this.runTimeMs);
     saveTutorialDone(this.tutDone);
+    this.applyHintEvents(ev);
   }
 
   /** Per-frame: shards, near misses, milestones / best marker, first-run hints. */
@@ -942,7 +958,7 @@ export class RunScene extends Phaser.Scene {
     }
 
     // near misses + first-hazard hint
-    let hazardAhead = false;
+    let hazardDx = Infinity;
     const marks = [];
     for (const list of this.hazards.values()) {
       for (const h of list) {
@@ -950,7 +966,7 @@ export class RunScene extends Phaser.Scene {
         // air hazards (roguePacket) float: hy is the box CENTRE, not a ground contact, and hopping is the wrong answer
         const air = h.def.placement === 'air';
         const dxh = h.cx - sled.x;
-        if (!air && dxh > 0 && dxh < 460) hazardAhead = true;
+        if (!air && dxh > 0 && dxh < hazardDx) hazardDx = dxh;
         if (air && !h.warned && !h.hit && dxh > 0 && dxh < TUNING.airWarnAheadPx) {
           h.warned = true;
           h.alert = true;
@@ -999,52 +1015,37 @@ export class RunScene extends Phaser.Scene {
       this.fx.sparks(sled.x, sled.y - 6, this.palette.amber, 20, 280, 60);
     }
 
-    // first-run hints
+    // first-run hints: triggers only; HintScheduler decides what is on screen (one at a time, readable, prioritised)
     if (this._pushed) this.tutDoneId('push');
-    this.tutTimers.stall = sled.grounded && sled.speed < 20 && now > 800 ? this.tutTimers.stall + dt : 0;
-    this.tutHint('push', this.tutTimers.stall > 700);
     if (this._hopped && this.tutShown.has('hop')) this.tutDoneId('hop');
-    this.tutHint('hop', hazardAhead);
-    if (!sled.grounded && sled.airtimeMs > 450 && this._airTricks === 0 && !this.tutDone.has('flip')) this.tutHint('flip', true);
-    if (!sled.grounded && sled.airtimeMs > 300 && sled.vy > 0 && !this.tutDone.has('land')) {
-      const gap = this.terrain.heightAt(sled.x) - sled.y;
-      const rel = Math.abs(((sled.angleDeg - sled.groundAngleDeg + 540) % 360 + 360) % 360 - 180);
-      this.tutHint('land', gap < 110 && rel > 25);
+    if (pad.tuck && sled.grounded) this.tutDoneId('tuck');
+    this.tutTimers.stall = sled.grounded && sled.speed < 20 && now > 800 ? this.tutTimers.stall + dt : 0;
+    const wants = {};
+    wants.push = this.tutTimers.stall > 700;
+    // hop: HOP_HINT_LEAD_S of travel before the hazard (it enters the screen about a second before the sled gets there)
+    const hopLead = clamp(sled.speed * HOP_HINT_LEAD_S, HOP_HINT_MIN_PX, HOP_HINT_MAX_PX);
+    wants.hop = hazardDx < hopLead;
+    const danger = !this.tutDone.has('hop') && hazardDx < sled.speed * HOP_DANGER_S + HOP_HINT_MIN_PX;
+    // flip: on the approach to a launch lip (learn it before the jump), and in the air until a trick starts
+    const lipAhead = !this.tutDone.has('flip') && sled.grounded && this.launchAheadPx(sled.x) < Math.max(FLIP_APPROACH_MIN_PX, sled.speed * FLIP_APPROACH_S);
+    wants.flip = lipAhead || (!sled.grounded && sled.airtimeMs > FLIP_AIR_MS && this._airTricks === 0);
+    wants.boost = this.lastBoost != null && now - this.lastBoost.t < BOOST_HINT_MS;
+    // tuck: a steep grounded descent, only once the first jump and landing are behind the player
+    const steep = sled.grounded && !pad.tuck && sled.groundAngleDeg >= TUNING.tuckHintSlopeDeg && sled.speed > 150;
+    this._steepMs = steep ? this._steepMs + dt : 0;
+    wants.tuck = this._landings > 0 && now > TUCK_HINT_MIN_RUN_MS && this.tuckShows < TUNING.tuckHintMaxShows && (this._steepMs > TUNING.tuckHintMs || this.tutShown.has('tuck') && steep);
+    this.applyHintEvents(this.hints.update(now, wants, danger));
+  }
+
+  /** Distance (px) from x to the next generated launch lip ahead, or Infinity. */
+  launchAheadPx(x) {
+    let best = Infinity;
+    for (const ch of this.terrain.activeList) {
+      if (ch.endX < x) continue;
+      for (const l of ch.launches || []) if (l.x > x && l.x - x < best) best = l.x - x;
+      if (best < Infinity) break;
     }
-    // tuck hint: a steep grounded descent without tucking. Due after tuckHintMs on it, waits for any other hint to clear
-    // (up to tuckHintWaitMs), stays up at least tuckHintShowMs (until the steep stretch ends), and is only retired when the
-    // player actually tucks or it has been shown tuckHintMaxShows times across runs.
-    if (!this.tutDone.has('tuck')) {
-      if (pad.tuck && sled.grounded) {
-        this.tutDoneId('tuck');
-      } else {
-        const steep = sled.grounded && !pad.tuck && sled.groundAngleDeg >= TUNING.tuckHintSlopeDeg && sled.speed > 150;
-        this._steepMs = steep ? this._steepMs + dt : 0;
-        const shown = this.tutShown.has('tuck');
-        if (!shown && !this._tuckShownRun && this.tuckShows < TUNING.tuckHintMaxShows && this._tuckWantAt == null && this._steepMs > TUNING.tuckHintMs) this._tuckWantAt = now;
-        if (this._tuckWantAt != null && !shown) {
-          if (now - this._tuckWantAt > TUNING.tuckHintWaitMs) this._tuckWantAt = null;
-          else if (this.tutShown.size === 0) {
-            this._tuckWantAt = null;
-            this._tuckShownRun = true;
-            this._tuckShownAt = now;
-            this.tuckShows += 1;
-            saveTuckShows(this.tuckShows);
-            this.tutHint('tuck', true);
-          }
-        } else if (shown) {
-          const up = now - this._tuckShownAt;
-          if (up > TUNING.tuckHintShowMs && (!steep || up > TUNING.tuckHintShowMs + 1300)) {
-            if (this.tuckShows >= TUNING.tuckHintMaxShows) this.tutDoneId('tuck');
-            else this.tutHint('tuck', false);
-          }
-        }
-      }
-    }
-    if (this.tutTimers.boostHint > 0) {
-      this.tutTimers.boostHint -= dt;
-      if (this.tutTimers.boostHint <= 0) this.tutDoneId('boost');
-    }
+    return best;
   }
 
   // ------------------------------------------------------------------ zones
