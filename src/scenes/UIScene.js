@@ -48,7 +48,7 @@ const EFFECT_INFO = {
 const HINT_TEXT = {
   keyboard: { push: 'W  PUSH', hop: 'SPACE  HOP', flip: 'IN AIR  HOLD A / D  FLIP', tuck: 'A+D  TUCK', boost: 'CLEAN LANDING = SPEED BOOST' },
   touch: { push: 'TAP PUSH', hop: 'TAP HOP', flip: 'IN AIR  HOLD TILT  FLIP', tuck: 'HOLD TUCK', boost: 'CLEAN LANDING = SPEED BOOST' },
-  gamepad: { push: 'PUSH  TAP FORWARD', hop: 'A  HOP', flip: 'IN AIR  HOLD STICK L / R  FLIP', tuck: 'TUCK BUTTON', boost: 'CLEAN LANDING = SPEED BOOST' },
+  gamepad: { push: 'RT  PUSH', hop: 'A  HOP', flip: 'IN AIR  HOLD STICK L / R  FLIP', tuck: 'LT  TUCK', boost: 'CLEAN LANDING = SPEED BOOST' },
 };
 const CHAIN_LIFE_MS = 2500;
 /** Backstop only: RunScene's HintScheduler (systems/HintScheduler.js) owns hint timing and always sends the hide. */
