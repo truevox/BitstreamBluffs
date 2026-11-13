@@ -355,7 +355,66 @@ async function main() {
         else pass('clean run is not marked modded', 'modded absent/false');
       } finally { await page.close(); }
     }
-    // ---- 7/8. W4 cosmetics reach the sled, and colourblind refuses them
+    // ---- 7. the Title menu exposes the shop, the shop opens, and buying works end to end
+    if (WITH_BOOSTS) {
+      const buyProfile = JSON.parse(JSON.stringify(PROFILE));
+      buyProfile.bank = 275;
+      buyProfile.xp = 48400;
+      buyProfile.unlocked.cosmetics = [];
+      buyProfile.equipped = { trail: 'default', glow: 'default', rider: 'default', theme: 'default', title: 'default' };
+      const { page, errors } = await bootWithProfile(browser, port, buyProfile);
+      try {
+        const out = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.scene.start('TitleScene');
+          await wait(1100);
+          const t = g.scene.getScene('TitleScene');
+          const items = (t.menu && t.menu.items) || [];
+          const titles = items.map((i) => String(i.label || ''));
+          const shopItem = items.find((i) => /SHOP/i.test(String(i.label || '')));
+          if (!shopItem) return { fatal: `no shop entry in menu: ${JSON.stringify(titles)}` };
+          shopItem.onSelect();
+          await wait(1000);
+          const view = t.view;
+          if (!view) return { fatal: 'shop view did not open' };
+          const text = [];
+          const seen = new Set();
+          const walk = (l) => {
+            for (const o of l || []) {
+              if (typeof o.text === 'string' && o.text && !seen.has(o.text)) { seen.add(o.text); text.push(o.text); }
+              if (o.list) walk(o.list);
+            }
+          };
+          if (view.panel) walk(view.panel.list);
+          // Buy the cheapest unowned rider hue through the view's own handler.
+          const before = g.registry.get('profile');
+          const beforeBank = before.bank;
+          view._choose('rider-hue-mint');
+          await wait(500);
+          const after = g.registry.get('profile');
+          return {
+            titles,
+            opened: true,
+            showsBank: text.some((x) => /BANK 275/.test(x)),
+            showsState: text.some((x) => x === 'EQUIP') || text.some((x) => /^\d+$/.test(x)),
+            beforeBank,
+            afterBank: after.bank,
+            owned: (after.unlocked.cosmetics || []).includes('rider-hue-mint'),
+            equipped: after.equipped.rider,
+          };
+        }).catch((e) => ({ fatal: String(e) }));
+        if (out.fatal) fail('shop: opens from the Title menu', out.fatal);
+        else if (errors.length) fail('shop: no page errors', errors.join(' | '));
+        else if (!out.showsBank) fail('shop: shows the bank', 'no BANK line rendered');
+        else if (out.afterBank !== out.beforeBank - 100) fail('shop: buying debits the price', `${out.beforeBank} -> ${out.afterBank}`);
+        else if (!out.owned) fail('shop: buying records ownership', 'not in unlocked.cosmetics');
+        else if (out.equipped !== 'mint') fail('shop: buying equips in the same action', `equipped ${out.equipped}`);
+        else pass('shop: opens from Title, shows the bank, buying debits, owns and equips atomically', `bank ${out.beforeBank} -> ${out.afterBank}`);
+      } finally { await page.close(); }
+    }
+
+    // ---- 8/9. W4 cosmetics reach the sled, and colourblind refuses them
     if (WITH_BOOSTS) {
       const baseProfile = JSON.parse(JSON.stringify(PROFILE));
 

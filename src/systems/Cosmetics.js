@@ -55,11 +55,25 @@ const CATALOGUE = Object.freeze({
 });
 
 /**
- * @param {string} id @returns {{kind:string,slot:string,value:string}|null}
+ * Resolve a catalogue entry by ID **or by equipped value**.
+ *
+ * Both are needed because `ProfileStore.equip()` stores the item's `value` ('mint'), not its id
+ * ('rider-hue-mint'), so an item equipped through the shop arrives here as 'mint' while one written by
+ * hand or by a test arrives as the id. Accepting only the id meant a shop-equipped cosmetic silently
+ * refused to render — exactly the "tests green, feature invisible" failure this module exists to prevent.
+ * @param {string} idOrValue @returns {{kind:string,slot:string,value:string,id?:string}|null}
  */
-export function cosmeticFor(id) {
-  if (typeof id !== 'string' || !id) return null;
-  return CATALOGUE[id] || null;
+export function cosmeticFor(idOrValue) {
+  if (typeof idOrValue !== 'string' || !idOrValue) return null;
+  const direct = CATALOGUE[idOrValue];
+  if (direct) return { ...direct, id: idOrValue };
+  for (const [id, entry] of Object.entries(CATALOGUE)) {
+    // `value` is only unique within a slot, so this can only be used when the caller knows the slot.
+    // Returning the first match is safe for the single-owner slots the game ships (rider/glow/trail/theme
+    // never share a value across kinds); a future clash would be caught by the uniqueness test.
+    if (entry.value === idOrValue) return { ...entry, id };
+  }
+  return null;
 }
 
 /**
@@ -99,8 +113,12 @@ export function resolveCosmetics(profile, palette, paletteHex, o = {}) {
   const lookup = (slot) => {
     const id = equipped[slot];
     if (!id || id === 'default') return null;
-    const entry = cosmeticFor(id);
-    if (!entry) { if (id) missing.push(id); return null; }
+    // Match within the slot's own kind: `equip()` writes a bare value ('mint'), so a value that exists in
+    // two kinds must resolve to the one this slot draws.
+    const entry = cosmeticFor(id) || Object.entries(CATALOGUE)
+      .filter(([, e]) => e.slot === slot && e.value === id)
+      .map(([cid, e]) => ({ ...e, id: cid }))[0] || null;
+    if (!entry || entry.slot !== slot) { if (id) missing.push(id); return null; }
     const hue = COSMETIC_HUES[entry.kind] && COSMETIC_HUES[entry.kind][entry.value];
     if (!hue) { missing.push(id); return null; }
     return { entry, hue };

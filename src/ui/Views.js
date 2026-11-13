@@ -17,7 +17,8 @@ import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
 import { ellipsize } from './PixelFont.js';
 import { profileLayout } from './ProfileLayout.js';
-import { toggleBiome, biomeToggleRows } from '../systems/ProfileStore.js';
+import { shopLayout, shopMenuItems } from './ShopLayout.js';
+import { toggleBiome, biomeToggleRows, purchase, equip, isOwned } from '../systems/ProfileStore.js';
 
 /** Base: centred panel with a BACK button. */
 class View {
@@ -388,5 +389,124 @@ export class ProfileView extends View {
     if (this.unbindBar) this.unbindBar();
     this.unbindBar = null;
     super.destroy();
+  }
+}
+
+/**
+ * W4: SHARD SHOP — buy cosmetics and equip them, and set the pre-run boost loadout.
+ *
+ * One action per row ("get me this") rather than a BUY then EQUIP dance: if the player owns it, selecting
+ * equips it; if they can afford it, selecting buys and equips in one atomic save. Both paths go through
+ * ProfileStore's pure functions, so the cannot-go-negative / cannot-double-buy rules are enforced in the
+ * tested layer and this view only chooses which rule to invoke.
+ *
+ * Boosts live here too because they are the same shape of decision (a spend, then a persistent choice) and
+ * because the spec makes them "chosen on a pre-run loadout" — this is that loadout screen.
+ */
+export class ShopView extends View {
+  /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
+  constructor(scene, theme, o) {
+    const layout = shopLayout({ profile: scene.registry.get(REG.PROFILE) });
+    super(scene, theme, {
+      w: layout.w, h: layout.h, title: 'SHARD SHOP', color: 'amber', onClose: o.onClose, y: 22, backLabel: 'BACK',
+    });
+
+    this.service = scene.registry.get(REG.PROGRESSION);
+    this.store = (this.service && this.service.store) || null;
+
+    for (const it of layout.items) {
+      this.panel.add(new NeonText(scene, theme, it.x, it.y, it.text, { color: it.color }));
+    }
+
+    const band = layout.band;
+    this.menu = new MenuList(scene, theme, {
+      x: band.x, y: band.y, w: band.w, rowH: band.rowH,
+      items: this._menuItems(), color: 'lime', parent: this.panel,
+    });
+
+    this.boostMenu = new MenuList(scene, theme, {
+      x: band.x, y: band.y + band.rowH * (layout.rows.length + 4), w: band.w, rowH: band.rowH,
+      items: this._boostItems(), color: 'magenta', parent: this.panel,
+    });
+  }
+
+  _profile() {
+    return this.scene.registry.get(REG.PROFILE) || {};
+  }
+
+  _menuItems() {
+    return shopMenuItems(shopLayout({ profile: this._profile() })).map((m) => ({
+      kind: 'action',
+      label: m.label,
+      disabled: m.disabled,
+      sub: m.state,
+      onSelect: () => this._choose(m.id),
+    }));
+  }
+
+  _boostItems() {
+    const prof = this._profile();
+    const boosts = (prof.boosts && typeof prof.boosts === 'object') ? prof.boosts : {};
+    return [
+      { id: 'errorCorrection', label: 'ERROR CORRECTION' },
+      { id: 'headStart', label: 'HEAD START' },
+    ].map((b) => ({
+      kind: 'choice',
+      label: b.label,
+      options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+      get: () => boosts[b.id] === true,
+      set: (v) => this._setBoost(b.id, Boolean(v)),
+    }));
+  }
+
+  /**
+   * Buy-or-equip, atomically. A refused purchase leaves the profile untouched: `purchase` returns the same
+   * object by identity when it declines, which is how that is detected without duplicating its rules here.
+   */
+  _choose(id) {
+    const prof = this._profile();
+    let next = prof;
+    try {
+      if (!isOwned(prof, id)) {
+        const bought = purchase(prof, id);
+        if (bought === prof) { uiSfx(this.scene, 'uiBack'); return; }
+        next = bought;
+        uiSfx(this.scene, 'uiSelect', { pitch: 1.4 });
+      } else {
+        uiSfx(this.scene, 'uiSelect');
+      }
+      next = equip(next, id);
+      this.scene.registry.set(REG.PROFILE, this.store ? this.store.save(next) : next);
+    } catch (e) {
+      // A denied storage write must not break the shop; the in-memory choice still shows this session.
+      this.scene.registry.set(REG.PROFILE, next);
+    }
+    this._refresh();
+  }
+
+  _setBoost(id, on) {
+    const prof = this._profile();
+    const next = { ...prof, boosts: { ...(prof.boosts || {}), [id]: on } };
+    try {
+      this.scene.registry.set(REG.PROFILE, this.store ? this.store.save(next) : next);
+    } catch (e) {
+      this.scene.registry.set(REG.PROFILE, next);
+    }
+  }
+
+  /** Rebuild row states after a purchase, so EQUIP -> EQUIPPED shows immediately. */
+  _refresh() {
+    const items = this._menuItems();
+    this.menu.items = items;
+    this.menu.rows.forEach((row, i) => {
+      if (!items[i]) return;
+      row.label.setText(items[i].label);
+      if (row.sub) row.sub.setText(items[i].sub || '');
+    });
+  }
+
+  handleAction(action) {
+    if (action === 'cancel') { this.close(); return true; }
+    return this.menu.handleAction(action);
   }
 }

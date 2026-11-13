@@ -11,6 +11,10 @@
 import {
   COSMETIC_HUES, resolveCosmetics, cosmeticFor,
 } from '../../src/systems/Cosmetics.js';
+import { equip, purchase } from '../../src/systems/ProfileStore.js';
+import { defaultProfile } from '../../src/systems/Progression.js';
+
+const DEFAULT_PROFILE = defaultProfile();
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -127,6 +131,31 @@ describe('resolveCosmetics', () => {
     expect(on.theme).toBe('sunset');
     const cb = resolveCosmetics(profileWith({ theme: 'theme-sunset' }), PALETTE, PALETTE_HEX, { colorblind: true });
     expect(cb.theme).toBe('default');
+  });
+});
+
+describe('the two ways an item can be equipped', () => {
+  // ProfileStore.equip() writes the item's VALUE ('mint'); a hand-written save or an older test may write
+  // the ID ('rider-hue-mint'). Both must render, or an item bought in the shop is invisible.
+  test('an equipped VALUE renders (this is what equip() actually stores)', () => {
+    const out = resolveCosmetics(profileWith({ rider: 'mint' }), PALETTE, PALETTE_HEX, {});
+    expect(out.rider).toBe(COSMETIC_HUES.rider.mint.color);
+  });
+
+  test('an equipped ID renders too', () => {
+    const out = resolveCosmetics(profileWith({ rider: 'rider-hue-mint' }), PALETTE, PALETTE_HEX, {});
+    expect(out.rider).toBe(COSMETIC_HUES.rider.mint.color);
+  });
+
+  test('shop equip() output round-trips through the resolver', () => {
+    // The integration seam: take the profile the shop produces and resolve it, rather than asserting the
+    // shape of equip()'s output and hoping the renderer agrees.
+    // Buy then equip, the same two calls the shop makes: equip() correctly refuses an unowned item, so
+    // skipping the purchase would test a refused equip and call it a render failure.
+    const bought = equip(purchase({ ...DEFAULT_PROFILE, bank: 500 }, 'rider-hue-mint'), 'rider-hue-mint');
+    const out = resolveCosmetics(bought, PALETTE, PALETTE_HEX, {});
+    expect(out.rider).toBe(COSMETIC_HUES.rider.mint.color);
+    expect(out.missing).toEqual([]);
   });
 });
 
