@@ -24,6 +24,7 @@
  *   --hopLeadMs N         hop: hop when the next ground crash hazard is N ms away (default 380)
  *   --seedPrefix P        with --seeds N: names become P-01..P-NN instead of sim-01.. (a second, independent seed set)
  *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
+ *   --rule ID             run under that DailyPatch rule's real modifiers (default: none/neutralised)
  *   --workers N           parallel pages (default 4)           --out FILE   write JSON
  *   --verify              determinism check (traces every 60 frames compared exactly, twice per seed, fresh pages)
  *   --keepUi              leave UIScene running (slower)       --quiet      no per-run lines
@@ -186,6 +187,8 @@ async function main() {
       const opts = {
         seed: job.seed, policy: args.policy, maxM: args.maxM, maxSec: args.maxSec, params, keepUi: !!args.keepUi,
         traceEvery: args.traceEvery || (args.verify ? 60 : 0), sub: args.sub || 0,
+        // Daily rule to measure under; 'none' (the default) neutralises modifiers for pacing runs.
+        rule: args.rule ? String(args.rule) : 'none',
       };
       if (args.policy === 'terrain') return page.evaluate((o) => window.__sim.genTerrain(o), opts);
       return page.evaluate((o) => window.__sim.run(o), opts);

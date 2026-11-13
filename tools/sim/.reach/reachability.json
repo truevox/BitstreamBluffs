@@ -1,0 +1,332 @@
+{
+ "args": {
+  "seeds": "10",
+  "maxM": "20000",
+  "maxSec": 300,
+  "policies": "hop,flip"
+ },
+ "policies": [
+  "hop",
+  "flip"
+ ],
+ "perRule": {
+  "none": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 7769.5,
+   "score": 21514,
+   "shards": 86,
+   "nearMisses": 58,
+   "tricks": 17,
+   "maxAirtimeMs": 1817,
+   "bestCombo": 1.25
+  },
+  "tuckBoost": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 7769.5,
+   "score": 21514,
+   "shards": 86,
+   "nearMisses": 58,
+   "tricks": 17,
+   "maxAirtimeMs": 1817,
+   "bestCombo": 1.25
+  },
+  "heavyPackets": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 8615.2,
+   "score": 23409,
+   "shards": 44,
+   "nearMisses": 60,
+   "tricks": 6,
+   "maxAirtimeMs": 1450,
+   "bestCombo": 1.25
+  },
+  "featherweight": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 6802.3,
+   "score": 17896,
+   "shards": 119,
+   "nearMisses": 48,
+   "tricks": 28,
+   "maxAirtimeMs": 2300,
+   "bestCombo": 1.25
+  },
+  "slickLines": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 8176.6,
+   "score": 22911,
+   "shards": 90,
+   "nearMisses": 60,
+   "tricks": 25,
+   "maxAirtimeMs": 1883,
+   "bestCombo": 1.25
+  },
+  "stickyBits": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 7221.7,
+   "score": 20176,
+   "shards": 129,
+   "nearMisses": 52,
+   "tricks": 15,
+   "maxAirtimeMs": 1733,
+   "bestCombo": 1.25
+  },
+  "airDancer": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 7769.5,
+   "score": 21514,
+   "shards": 86,
+   "nearMisses": 58,
+   "tricks": 27,
+   "maxAirtimeMs": 2133,
+   "bestCombo": 1.25
+  },
+  "stiffNeck": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 7905,
+   "score": 22558,
+   "shards": 86,
+   "nearMisses": 58,
+   "tricks": 8,
+   "maxAirtimeMs": 1700,
+   "bestCombo": 1.25
+  },
+  "turboTuck": {
+   "runs": 20,
+   "policies": [
+    "hop",
+    "flip"
+   ],
+   "distanceM": 8521.1,
+   "score": 24616,
+   "shards": 107,
+   "nearMisses": 63,
+   "tricks": 9,
+   "maxAirtimeMs": 1717,
+   "bestCombo": 1.25
+  }
+ },
+ "failures": [],
+ "advisory": [
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "none",
+   "seen": 1.25
+  },
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "tuckBoost",
+   "seen": 1.25
+  },
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "heavyPackets",
+   "seen": 1.25
+  },
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "featherweight",
+   "seen": 1.25
+  },
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "slickLines",
+   "seen": 1.25
+  },
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "stickyBits",
+   "seen": 1.25
+  },
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "airDancer",
+   "seen": 1.25
+  },
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "stiffNeck",
+   "seen": 1.25
+  },
+  {
+   "id": "t2-combo-5",
+   "metric": "bestCombo",
+   "target": 1.5,
+   "rule": "turboTuck",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "none",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "tuckBoost",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "heavyPackets",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "featherweight",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "slickLines",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "stickyBits",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "airDancer",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "stiffNeck",
+   "seen": 1.25
+  },
+  {
+   "id": "t3-combo-10",
+   "metric": "bestCombo",
+   "target": 1.75,
+   "rule": "turboTuck",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "none",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "tuckBoost",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "heavyPackets",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "featherweight",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "slickLines",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "stickyBits",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "airDancer",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "stiffNeck",
+   "seen": 1.25
+  },
+  {
+   "id": "t4-combo-15",
+   "metric": "bestCombo",
+   "target": 2,
+   "rule": "turboTuck",
+   "seen": 1.25
+  }
+ ]
+}

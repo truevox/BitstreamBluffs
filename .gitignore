@@ -11,6 +11,10 @@
 *.swp
 *.swo
 
+# Sim sweep raw output (per-rule run dumps); the summary is committed as evidence
+/tools/sim/.reach/*.json
+!/tools/sim/.reach/reachability.json
+
 # OS generated files
 .DS_Store
 Thumbs.db

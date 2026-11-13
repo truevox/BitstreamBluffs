@@ -48,7 +48,11 @@
     const [ev, con, tun] = await Promise.all([
       import('/src/events.js'), import('/src/constants.js'), import('/src/systems/PhysicsTuner.js'),
     ]);
-    mods = { EVT: ev.EVT, REG: con.REG, PPM: con.PIXELS_PER_METER, TUNING: tun.TUNING, airIdleSpin: tun.airIdleSpin };
+    const dyn = await import('/src/systems/DailyPatch.js');
+    mods = {
+      EVT: ev.EVT, REG: con.REG, PPM: con.PIXELS_PER_METER, TUNING: tun.TUNING, airIdleSpin: tun.airIdleSpin,
+      DAILY_RULES: dyn.DailyPatch.RULES,
+    };
     return mods;
   }
 
@@ -269,6 +273,7 @@
   // ---------------------------------------------------------------- one run
   async function run(o) {
     const M = await loadMods();
+    const pendingRules = M.DAILY_RULES || [];
     const { EVT, REG, PPM, TUNING } = M;
     const game = window.__bbGame;
     const params = o.params || {};
@@ -310,8 +315,11 @@
     game.events.once(EVT.RUN_START, () => {
       scene = game.scene.getScene('RunScene');
       scene.inputRouter = stub;
-      scene.dailyMods = {};
-      scene.dailyRuleId = 'none';
+      // A --rule run keeps that rule's real modifiers so mission targets can be measured under the
+      // rule they ship with; the default stays neutralised for the pacing curve.
+      const rule = o.rule && o.rule !== 'none' ? (pendingRules.find((r) => r.id === o.rule) || null) : null;
+      scene.dailyMods = rule ? { ...rule.modifiers } : {};
+      scene.dailyRuleId = rule ? rule.id : 'none';
       if (o.sub) installSubTrace(scene, o.sub);
       if (!keepUi) game.scene.stop('UIScene');
     });
@@ -323,6 +331,7 @@
       crash: null, negatedCrashes: [], airPhases: [], landings: [], respawns: [], nudges: [], hints: [], hazardHits: [],
       maxSpeed: 0, maxSpeedAtM: 0, minZoom: 99, minZoomAtM: 0, zoomAtMaxSpeed: 0,
       bands: {}, generatedToM: 0, openingGraces: 0, trace: [],
+      shards: 0, nearMisses: 0, score: 0, scoreAt: 0, tricks: {}, maxAirtimeMs: 0, bestCombo: 1,
     };
     let tMs = 0; // run clock as the harness sees it (frames * DT)
     let lastLanding = null;
@@ -406,6 +415,25 @@
     }));
     offs.push(on(EVT.HAZARD_HIT, (e) => {
       R.hazardHits.push({ id: e.hazardId, effect: e.effect, distM: r1(distOf(e.x)) });
+    }));
+    // W2 reachability evidence: missions are scored from these same events, so the harness has to
+    // count them or "is this target reachable?" can only be answered by guesswork.
+    offs.push(on(EVT.SHARD_COLLECTED, (e) => {
+      R.shards += 1;
+      R.scoreAt = Math.max(R.scoreAt, (e && e.total) || 0);
+    }));
+    offs.push(on(EVT.NEAR_MISS, () => { R.nearMisses += 1; }));
+    // bestCombo means the same thing the game means by it: the best COMBO MULTIPLIER reached
+    // (MissionsService reads payload.multiplier). Recording trick count instead would silently grade
+    // combo targets against a different unit than the one they are checked in.
+    offs.push(on(EVT.COMBO_CHANGED, (e) => {
+      const m = (e && e.multiplier) || 1;
+      if (m > R.bestCombo) R.bestCombo = m;
+    }));
+    offs.push(on(EVT.SCORE_CHANGED, (e) => { if (e && isFinite(e.total)) R.score = e.total; }));
+    offs.push(on(EVT.TRICK, (e) => {
+      if (!e || typeof e.type !== 'string') return;
+      R.tricks[e.type] = (R.tricks[e.type] || 0) + (e.count || 1);
     }));
 
     function classifyStart(x0) {
@@ -570,6 +598,10 @@
     closeAir(false);
     R.endReason = endReason;
     R.distM = r1(distOf(scene.sled.x));
+    // The run's own score is authoritative; the shard-chain bonus is the only thing ScoreManager adds
+    // that no score event carries, so fall back to it when no SCORE_CHANGED arrived.
+    R.score = Math.round(R.score || R.scoreAt || 0);
+    R.maxAirtimeMs = R.landings.reduce((a, l) => Math.max(a, l.airtimeMs || 0), 0);
     R.simSec = r2(tMs / 1000);
     R.frames = frame;
     R.openingGraces = scene.openingGraces;

@@ -7,6 +7,7 @@
  */
 import { Rng } from '../../src/systems/Rng.js';
 import { DailyPatch } from '../../src/systems/DailyPatch.js';
+import { SCORING } from '../../src/constants.js';
 import missionsData from '../../src/data/missions/missions.json';
 import {
   missionState, satisfies, progressFor, drawMissions, rollSet, missionProgressText,
@@ -409,6 +410,29 @@ describe('daily-rule compatibility (spec gate)', () => {
         });
         expect(t.target).toBeLessThanOrEqual(cap);
       }
+    }
+  });
+
+  test("no combo target exceeds the game's own maximum combo multiplier", () => {
+    // A bestCombo target is compared directly against ScoreManager.bestCombo, which is
+    // comboStart + comboStep * (unique combo-step trick types) — capped by the number of such types
+    // that exist. Deriving the ceiling from SCORING instead of typing a number is the point: the
+    // first draft of the template table asked for x3 / x5 / x10 / x15, all impossible because the
+    // multiplier tops out at x2 (a real defect the simulator caught, not a hypothetical).
+    const maxMultiplier = SCORING.comboStart + SCORING.comboStep * SCORING.comboStepTypes.length;
+    expect(maxMultiplier).toBe(2);
+    for (const t of TEMPLATES) {
+      if (t.metric !== 'bestCombo') continue;
+      if (t.type === 'cumulative') continue;
+      expect({ id: t.id, target: t.target, cap: maxMultiplier }).toMatchObject({ target: expect.any(Number) });
+      expect(t.target).toBeLessThanOrEqual(maxMultiplier);
+    }
+  });
+
+  test('every single-run combo target is attainable at all (not below 1)', () => {
+    for (const t of TEMPLATES) {
+      if (t.metric !== 'bestCombo' || t.type !== 'singleRun') continue;
+      expect(t.target).toBeGreaterThanOrEqual(SCORING.comboStart);
     }
   });
 
