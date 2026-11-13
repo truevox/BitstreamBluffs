@@ -5,6 +5,7 @@
  *   action : { label, onSelect }
  *   choice : { label, options:[{value,label}], get(), set(v) }   left/right cycles, click cycles forward
  *   slider : { label, get() -> 0..1, set(v), step? }              left/right adjusts, click/drag on the bar sets
+ *   static : { label }                                            drawn but never focusable or clickable
  * Optional per item: sub (dim secondary text), color (palette key), disabled.
  */
 import Phaser from 'phaser';
@@ -78,7 +79,16 @@ export class MenuList extends Phaser.GameObjects.Container {
       row.sub.setAlpha(0.6);
       this.add(row.sub);
     }
+    // W6's column geometry AND W5's static rows: the zone is sized to the COLUMN, and a static row gets no
+    // zone at all. Both matter — a full-width zone under a two-column list would let a click in the left
+    // column select a row in the right one.
     const zone = new Phaser.GameObjects.Zone(scene, x0, y, this.colW, this.rowH).setOrigin(0, 0);
+    // 'static' rows are headings and summary lines: they are drawn by the same list so they share its
+    // geometry, but they must never take focus or swallow a click meant for the row beneath.
+    if (item.kind === 'static') {
+      row.zone = null;
+      return row;
+    }
     zone.setInteractive({ useHandCursor: !item.disabled });
     this.add(zone);
     zone.on('pointerover', () => {

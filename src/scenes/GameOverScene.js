@@ -21,6 +21,9 @@ import {
   GAMEOVER_MISSIONS_RULE_Y, entryLayout,
 } from '../ui/MissionsLayout.js';
 import { ellipsize } from '../ui/PixelFont.js';
+// Whether a boosted run may rank is Ranking.js's decision alone (W4's single-helper rule), so this scene
+// asks it instead of testing rec.modded itself.
+import { boardsModded } from '../systems/Ranking.js';
 import { Panel } from '../ui/Panel.js';
 import { Button } from '../ui/Button.js';
 import { MenuInput } from '../ui/MenuInput.js';
@@ -262,6 +265,9 @@ export class GameOverScene extends Phaser.Scene {
     const out = { seedLine: '', seedKey: 'amber', streak: 0 };
     const store = this.registry.get(REG.SAVE_STORE);
     if (!store || !rec || !rec.id || rec.id === 'none' || !rec.seed) return out;
+    // An unranked boosted run has no seed best, no daily best and no streak to announce: none of those
+    // tables will contain it. Saying nothing is the honest answer; the panel says MODDED - UNRANKED.
+    if (boardsModded(rec)) { out.unranked = true; return out; }
     const score = Number(rec.score) || 0;
     const line = (label, prev) => {
       if (!prev || score > prev.bestScore) return { text: `NEW ${label} BEST`, key: 'lime' };
@@ -290,6 +296,13 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   _buildChaseLines(panel, chase) {
+    if (chase.unranked) {
+      // Occupy the same slot the seed-best line would, so the player is told why there is no best here
+      // rather than being left to infer it from a missing line.
+      const u = new NeonText(this, this.theme, 218, 22, 'MODDED - UNRANKED', { color: 'amber', anchor: 'right', outline: 'none' });
+      panel.add(u);
+      return;
+    }
     if (!chase.seedLine) return;
     const t = new NeonText(this, this.theme, 218, 22, chase.seedLine, { color: chase.seedKey, anchor: 'right', outline: 'none' });
     panel.add(t);
@@ -430,23 +443,38 @@ export class GameOverScene extends Phaser.Scene {
       }
     };
     this._loadBest(store, rec, safe);
+    // A boosted run is NOT rankable while MODDED_RUNS_RANKED is false, so it must be judged against the
+    // MODDED board and must never be offered clean-board initials or a seed best (CC Friday's W4 defect 4:
+    // a boosted run was shown NEW TOP 10! and NEW SEED BEST, neither of which the clean board would keep).
+    // The decision comes from Ranking.js, not from a flag test here.
+    const modded = boardsModded(rec);
     Promise.all([
-      safe(() => store.qualifiesForTop10(rec.score), false),
-      safe(() => store.getLeaderboard(10), []),
+      // A boosted run is judged against the board it can actually enter. Asking the clean board would
+      // offer clean-board initials for a run the clean board will never hold.
+      safe(() => (modded ? store.qualifiesForModdedTop10(rec.score) : store.qualifiesForTop10(rec.score)), false),
+      safe(() => (modded ? store.getModdedLeaderboard(10) : store.getLeaderboard(10)), []),
     ]).then(([qualifies, rows]) => {
       if (!this.alive || this.leaving) return;
       this.rows = Array.isArray(rows) ? rows : [];
       const already = this.rows.some((r) => r.id === rec.id);
       const worthy = this.rows.length >= 3 || (rec.score || 0) >= 200;
       if (qualifies && worthy && !already && (rec.score || 0) > 0 && rec.cause !== 'quit') this._showEntry();
-      else this._showBoard(already ? rec.id : undefined);
+      else this._showBoard(already ? rec.id : undefined, modded);
     });
   }
 
-  /** Compare this run with the device best (all stored runs except this one). Cosmetic, async, never blocks. */
+  /**
+   * Compare this run with the device best (all stored runs except this one). Cosmetic, async, never blocks.
+   *
+   * A boosted run is compared against the MODDED board's histories, not against clean runs: telling a
+   * boosted player they set a "DISTANCE BEST" the clean board will never show them is exactly the false
+   * promise CC Friday caught.
+   */
   _loadBest(store, rec, safe) {
-    safe(() => store.getRecentRuns(1000), []).then((runs) => {
+    safe(() => (boardsModded(rec) ? store.getModdedLeaderboard(1000) : store.getRecentRuns(1000)), []).then((runs) => {
       if (!this.alive || !Array.isArray(runs) || rec.cause === 'quit' && !(rec.score > 0)) return;
+      // The modded board only holds runs WITH initials, so the player's own just-finished run may not be in
+      // it yet. Comparing against that board is still right: it is the list this run will actually appear on.
       const others = runs.filter((r) => r && r.id !== rec.id);
       if (!others.length) return;
       const bestM = Math.max(...others.map((r) => r.distanceM || 0));
@@ -595,10 +623,20 @@ export class GameOverScene extends Phaser.Scene {
     this._showBoard(ok ? this.rec.id : undefined);
   }
 
-  _showBoard(highlightId) {
+  /**
+   * @param {string} [highlightId] this run's record id, if it is on the board being shown
+   * @param {boolean} [modded] the run is boosted and therefore unranked on the clean board
+   */
+  _showBoard(highlightId, modded) {
     this.board.setVisible(true);
     this.board.setEntries(this.rows, highlightId);
-    this.right.setTitle(highlightId ? 'LEDGER // YOU ARE ON THE BOARD' : 'LEDGER // TOP 10');
+    // Label the board the rows actually came from. A boosted run reading "TOP 10" over the MODDED board
+    // would be a lie about which list the player is looking at.
+    const title = modded
+      ? (highlightId ? 'MODDED // YOU ARE ON THE BOARD' : 'MODDED // TOP 10')
+      : (highlightId ? 'LEDGER // YOU ARE ON THE BOARD' : 'LEDGER // TOP 10');
+    this.right.setTitle(title);
+    this.modded = modded === true;
   }
 
   // ------------------------------------------------------------ actions

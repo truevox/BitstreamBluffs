@@ -430,6 +430,24 @@ export class SaveStore {
   }
 
   /**
+   * Whether `score` would place on the MODDED top 10.
+   *
+   * Separate from qualifiesForTop10 because that method's `opts` doubles as BOTH the candidate's ranking
+   * permission and the board filter; a boosted candidate cannot be expressed there without also making the
+   * boosted runs already on the board rankable. The modded board is defined by isModdedOnly, so this asks
+   * that same helper rather than testing the flag.
+   *
+   * @param {number} score
+   * @returns {Promise<boolean>}
+   */
+  async qualifiesForModdedTop10(score) {
+    const board = this.runs.filter((r) => r.initials && isModdedOnly(r))
+      .sort((a, b) => b.score - a.score || a.endedAt - b.endedAt);
+    if (board.length < 10) return true;
+    return score > board[9].score;
+  }
+
+  /**
    * @param {number} score
    * @returns {Promise<boolean>} true if `score` would place in the top 10 (board not full, or beats 10th).
    */
