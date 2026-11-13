@@ -485,7 +485,54 @@ async function main() {
       } finally { await page.close(); }
     }
 
-    // ---- 10/11. W4 cosmetics reach the sled, and colourblind refuses them
+    // ---- 10. a boosted run still earns Resonance and shards, even though it cannot rank
+    if (WITH_BOOSTS) {
+      const earnProfile = JSON.parse(JSON.stringify(PROFILE));
+      // Head Start only. With Error Correction the shield ABSORBS the crash that ends this run, so the
+      // run would keep going and never credit - correct behaviour, useless as a test of crediting.
+      earnProfile.boosts = { errorCorrection: false, headStart: true };
+      earnProfile.bank = 0;
+      earnProfile.xp = 0;
+      const { page, errors } = await bootWithProfile(browser, port, earnProfile);
+      try {
+        const out = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.scene.start('TitleScene');
+          await wait(1000);
+          const t = g.scene.getScene('TitleScene');
+          t.starting = false;
+          t.startRun('earn-gate', 0);
+          await wait(1600);
+          const run = g.scene.getScene('RunScene');
+          if (!run) return { fatal: 'run did not start' };
+          run.runTimeMs = 6000;
+          run.shardCount = 12;
+          run.pendingCrash = { cause: 'chasm' };
+          // The credit lands asynchronously on RUN_END (the service banks synchronously, but the profile
+          // object is replaced, so polling the registry is the honest wait rather than a fixed sleep).
+          let prof = g.registry.get('profile');
+          for (let i = 0; i < 30 && !((prof.xp || 0) > 0); i++) {
+            await wait(200);
+            prof = g.registry.get('profile');
+          }
+          prof = g.registry.get('profile');
+          return {
+            xp: prof.xp || 0,
+            bank: prof.bank || 0,
+            lifetimeShards: (prof.lifetime && prof.lifetime.shards) || 0,
+            runs: (prof.lifetime && prof.lifetime.runs) || 0,
+          };
+        }).catch((e) => ({ fatal: String(e) }));
+        if (out.fatal) fail('boosted run: starts and ends', out.fatal);
+        else if (errors.length) fail('boosted run: no page errors', errors.join(' | '));
+        else if (!(out.xp > 0)) fail('boosted run still earns Resonance', `xp ${out.xp}`);
+        else if (!(out.bank > 0)) fail('boosted run still earns shards', `bank ${out.bank}`);
+        else pass('boosted run still earns Resonance and shards despite not ranking', `xp ${out.xp}, bank ${out.bank}`);
+      } finally { await page.close(); }
+    }
+
+    // ---- 11/12. W4 cosmetics reach the sled, and colourblind refuses them
     if (WITH_BOOSTS) {
       const baseProfile = JSON.parse(JSON.stringify(PROFILE));
 
