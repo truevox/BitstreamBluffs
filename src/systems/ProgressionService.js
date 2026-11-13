@@ -125,6 +125,10 @@ export class ProgressionService {
       record: record ? { id: record.id, seed: record.seed } : null,
       earnedCosmetics: awards && awards.rewards && awards.rewards.cosmetic ? [awards.rewards.cosmetic] : [],
       pendingBiomes: awards && awards.rewards && awards.rewards.biome ? [awards.rewards.biome] : [],
+      // W5: achievements unlocked BY THIS RUN, so Game Over can announce them. Forwarded from the credit
+      // result rather than re-read from the profile, which would include unlocks from earlier sessions and
+      // re-announce them on every run.
+      achievements: awards && Array.isArray(awards.achievements) ? awards.achievements : [],
       // W2: what the mission set paid this run, for the Game Over list and the completion toast.
       missions: missionRoll ? {
         completed: missionRoll.completed || [],
