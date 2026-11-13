@@ -16,6 +16,7 @@ import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { LeaderboardView, SettingsView, SeedView, ProfileView } from '../ui/Views.js';
+import { titleBadgeLayout } from '../ui/ProfileLayout.js';
 import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 
@@ -90,16 +91,23 @@ export class TitleScene extends Phaser.Scene {
     this.menu = new MenuList(this, theme, { x: 4, y: 4, w: 208, rowH: 16, items, scale: 2, parent: this.menuPanel });
   }
 
+  /**
+   * The level badge lives in the top-left corner, left of the 4x logo: the centred slot under the
+   * logo is already taken by the subtitle (y 76-83), so a centred badge collided with it and with the
+   * menu panel at y 92. Geometry comes from ProfileLayout so it is overlap-tested in Jest.
+   */
   _buildLevelBadge() {
     const theme = this.theme;
-    const profile = this.registry.get(REG.PROFILE) || null;
-    if (!profile) return;
-    const lvl = profile.level || 1;
-    const levels = (this.registry.get(REG.CONTENT) || {}).progression || { levels: [] };
-    const entry = (levels.levels || []).find((e) => e.level === lvl) || { title: '' };
-    const y = 74;
-    this.levelBadge = new NeonText(this, theme, GAME_WIDTH / 2, y, `SYNC LEVEL ${lvl}`, { color: 'lime', anchor: 'center', vAnchor: 0.5, outline: 'none' });
-    this.levelTitle = new NeonText(this, theme, GAME_WIDTH / 2, y + 11, String(entry.title || '').toUpperCase(), { color: 'text', anchor: 'center', vAnchor: 0.5, outline: 'none', alpha: 0.75 });
+    const layout = titleBadgeLayout({
+      profile: this.registry.get(REG.PROFILE),
+      levels: (this.registry.get(REG.CONTENT) || {}).progression,
+    });
+    if (!layout) return;
+    this.levelBadge = [];
+    for (const it of layout.items) {
+      const t = new NeonText(this, theme, it.x, it.y, it.text, { color: it.color, outline: it.outline, alpha: it.alpha });
+      this.levelBadge.push(t);
+    }
   }
 
   _buildControls() {

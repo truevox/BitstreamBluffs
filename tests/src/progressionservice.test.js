@@ -4,6 +4,7 @@ import { ProgressionService } from '../../src/systems/ProgressionService.js';
 import { ProfileStore, PROFILE_KEY } from '../../src/systems/ProfileStore.js';
 import { REG } from '../../src/constants.js';
 import { EVT } from '../../src/events.js';
+import { levelForXp } from '../../src/systems/Progression.js';
 
 const LEVELS = JSON.parse(fs.readFileSync('src/data/progression/levels.json', 'utf8'));
 
@@ -63,8 +64,11 @@ describe('ProgressionService', () => {
     expect(awards.credited).toBe(true);
     expect(awards.xp.total).toBeGreaterThan(0);
     expect(svc.profile.xp).toBe(awards.xp.total);
-    expect(awards.progress.level).toBe(1);
-    expect(awards.progress.ratio).toBeGreaterThan(0);
+    // The run's XP decides the level; assert it against the shipped table rather than a hardcoded 1.
+    expect(awards.progress.level).toBe(awards.levelAfter);
+    expect(levelForXp(svc.profile.xp, LEVELS)).toBe(awards.progress.level);
+    expect(awards.progress.ratio).toBeGreaterThanOrEqual(0);
+    expect(awards.progress.ratio).toBeLessThanOrEqual(1);
   });
 
   test('a duplicate RUN_END for the same run awards nothing more', async () => {
@@ -135,8 +139,11 @@ describe('ProgressionService', () => {
 
   test('publishes an empty rewardsEarned list for a run that does not level up', async () => {
     const { game } = await make();
-    game.events.emit(EVT.RUN_END, { record: rec() });
-    expect(game.registry.get(REG.LAST_AWARDS).rewardsEarned).toEqual([]);
+    // Deliberately tiny: stays below level 2 whatever the shipped curve is.
+    game.events.emit(EVT.RUN_END, { record: rec({ id: 'tiny', ledgerHash: 'htiny', distanceM: 5, score: 5, tricks: {}, shards: 0, nearMisses: 0, maxAirtimeMs: 0, durationMs: 1000 }) });
+    const awards = game.registry.get(REG.LAST_AWARDS);
+    expect(awards.leveledTo).toBe(0);
+    expect(awards.rewardsEarned).toEqual([]);
   });
 
   test('a missing saveStore does not break boot', async () => {

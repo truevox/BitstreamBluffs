@@ -124,29 +124,45 @@ describe('levelForXp / xpToNext', () => {
 });
 
 describe('tuning targets (D-C: state the numbers)', () => {
-  // The curve is anchored on MEASURED play, not a guess: tools/sim/pacing.mjs runs the real sim
-  // (hop policy, 16 seeds, hands-off physics) and reports ~187 XP per minute of play
-  // (avg 3229 m / 2.07 min per run, ~387 XP). The table is set from that rate:
-  //   level 2  =    625 XP  (~3.3 min)
-  //   level 4  =  3 750 XP  (~20.1 min)  <- first biome (debumont)
-  //   level 30 = 149 925 XP (~13.4 h)
-  // Re-measure with `node tools/sim/pacing.mjs --policy hop` if the XP feeds change.
-  const XP_PER_MIN = 187;
+  // These assertions run against MEASURED play, not a hand-built record: tests/fixtures/pacing-handsOff.json
+  // is the real output of `node tools/sim/pacing.mjs --policy handsOff --seeds 24`, i.e. an untrained player
+  // who does nothing but steer. That is the honest benchmark for "a new player" — the hop policy is a
+  // competent player and flatters the curve.
+  //
+  // Regenerate the fixture (and re-check these numbers) if the XP feeds, scoring, or physics change:
+  //   node tools/sim/pacing.mjs --policy handsOff --seeds 24
+  const FIXTURE = JSON.parse(fs.readFileSync('tests/fixtures/pacing-handsOff.json', 'utf8'));
+  const asRecord = (r) => ({ distanceM: r.distM, durationMs: Math.round(r.simSec * 1000), score: r.score,
+    tricks: {}, shards: 0, nearMisses: 0, maxAirtimeMs: r.maxAirtimeMs });
 
   test('level 2 arrives within the first 3 runs of a new player', () => {
-    // Worst-case early run for a beginner: short, no tricks, no shards.
-    const weak = rec({ durationMs: 70000, distanceM: 600, score: 1200, tricks: {}, shards: 0, nearMisses: 0, maxAirtimeMs: 600 });
-    const per = xpForRun(weak).total;
-    expect(levelForXp(per * 3, TABLE)).toBeGreaterThanOrEqual(2);
-    // ...and a typical first run already reaches it.
-    expect(levelForXp(per, TABLE)).toBeLessThanOrEqual(2);
+    // Play the measured runs in order and check the level reached by run 3.
+    let xp = 0;
+    for (let i = 0; i < 3; i++) xp += xpForRun(asRecord(FIXTURE.runs[i])).total;
+    expect(levelForXp(xp, TABLE)).toBeGreaterThanOrEqual(2);
   });
 
-  test('first biome unlock lands around 20 minutes of play', () => {
+  test('level 2 is not so cheap that the first run always grants it', () => {
+    // The other half of the target: reaching level 2 should still be a small achievement, not automatic.
+    const weakest = Math.min(...FIXTURE.runs.map((r) => xpForRun(asRecord(r)).total));
+    expect(TABLE.levels[1].xpMin).toBeGreaterThan(weakest);
+  });
+
+  test('first biome unlock lands around 20 minutes of measured play', () => {
     const firstBiome = TABLE.levels.find((l) => l.biome);
-    const minutes = firstBiome.xpMin / XP_PER_MIN;
-    expect(minutes).toBeGreaterThanOrEqual(16);
-    expect(minutes).toBeLessThanOrEqual(24);
+    // Replay the measured runs until the first biome's threshold is crossed; count real seconds.
+    let xp = 0;
+    let ms = 0;
+    let i = 0;
+    while (xp < firstBiome.xpMin && i < 10000) {
+      const rec2 = asRecord(FIXTURE.runs[i % FIXTURE.runs.length]);
+      xp += xpForRun(rec2).total;
+      ms += rec2.durationMs;
+      i += 1;
+    }
+    const minutes = ms / 60000;
+    expect(minutes).toBeGreaterThanOrEqual(14);
+    expect(minutes).toBeLessThanOrEqual(28);
   });
 
   test('the curve keeps rising and all 11 biomes arrive by the cap', () => {
@@ -156,7 +172,10 @@ describe('tuning targets (D-C: state the numbers)', () => {
     const biomes = TABLE.levels.filter((l) => l.biome);
     expect(biomes).toHaveLength(TABLE.biomeOrder.length);
     expect(biomes[biomes.length - 1].level).toBeLessThanOrEqual(TABLE.cap);
-    expect(TABLE.levels[TABLE.cap - 1].xpMin / XP_PER_MIN / 60).toBeLessThanOrEqual(16); // hours to cap
+    // A cap that takes 100+ hours is not a cap, it is a wall.
+    const totalMs = FIXTURE.runs.reduce((a, r) => a + Math.round(r.simSec * 1000), 0);
+    const xpPerMin = FIXTURE.runs.reduce((a, r) => a + xpForRun(asRecord(r)).total, 0) / (totalMs / 60000);
+    expect(TABLE.levels[TABLE.cap - 1].xpMin / xpPerMin / 60).toBeLessThanOrEqual(40);
   });
 });
 

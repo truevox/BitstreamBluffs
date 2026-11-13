@@ -1,0 +1,151 @@
+{
+ "_doc": "Measured hands-off runs (tools/sim/pacing.mjs --policy handsOff --seeds 24). Used by tests/src/progression.test.js so the pacing targets are asserted against real play, not a constructed record. Regenerate with: node tools/sim/pacing.mjs --policy handsOff --seeds 24 --fixture tests/fixtures/pacing-handsOff.json",
+ "_policy": "handsOff",
+ "_seeds": 24,
+ "runs": [
+  {
+   "distM": 312.4,
+   "simSec": 11.52,
+   "score": 312,
+   "maxAirtimeMs": 900
+  },
+  {
+   "distM": 398.5,
+   "simSec": 17.15,
+   "score": 399,
+   "maxAirtimeMs": 867
+  },
+  {
+   "distM": 311.5,
+   "simSec": 11.62,
+   "score": 312,
+   "maxAirtimeMs": 1183
+  },
+  {
+   "distM": 328.7,
+   "simSec": 12.75,
+   "score": 329,
+   "maxAirtimeMs": 983
+  },
+  {
+   "distM": 167,
+   "simSec": 7.13,
+   "score": 167,
+   "maxAirtimeMs": 800
+  },
+  {
+   "distM": 322.3,
+   "simSec": 11.78,
+   "score": 322,
+   "maxAirtimeMs": 917
+  },
+  {
+   "distM": 186.3,
+   "simSec": 7.93,
+   "score": 186,
+   "maxAirtimeMs": 800
+  },
+  {
+   "distM": 319.7,
+   "simSec": 12.85,
+   "score": 320,
+   "maxAirtimeMs": 917
+  },
+  {
+   "distM": 159.3,
+   "simSec": 6.7,
+   "score": 159,
+   "maxAirtimeMs": 1017
+  },
+  {
+   "distM": 315.1,
+   "simSec": 12.42,
+   "score": 315,
+   "maxAirtimeMs": 950
+  },
+  {
+   "distM": 514.8,
+   "simSec": 18.57,
+   "score": 515,
+   "maxAirtimeMs": 917
+  },
+  {
+   "distM": 310.6,
+   "simSec": 12.65,
+   "score": 311,
+   "maxAirtimeMs": 883
+  },
+  {
+   "distM": 358.7,
+   "simSec": 12.95,
+   "score": 359,
+   "maxAirtimeMs": 933
+  },
+  {
+   "distM": 364.9,
+   "simSec": 15.15,
+   "score": 365,
+   "maxAirtimeMs": 1100
+  },
+  {
+   "distM": 459.7,
+   "simSec": 18.6,
+   "score": 460,
+   "maxAirtimeMs": 883
+  },
+  {
+   "distM": 1917.6,
+   "simSec": 70.92,
+   "score": 1918,
+   "maxAirtimeMs": 1217
+  },
+  {
+   "distM": 308.5,
+   "simSec": 11.8,
+   "score": 309,
+   "maxAirtimeMs": 900
+  },
+  {
+   "distM": 509.6,
+   "simSec": 18.85,
+   "score": 510,
+   "maxAirtimeMs": 933
+  },
+  {
+   "distM": 513.9,
+   "simSec": 18.98,
+   "score": 514,
+   "maxAirtimeMs": 1000
+  },
+  {
+   "distM": 962.7,
+   "simSec": 33.8,
+   "score": 963,
+   "maxAirtimeMs": 1033
+  },
+  {
+   "distM": 319.2,
+   "simSec": 12.78,
+   "score": 319,
+   "maxAirtimeMs": 867
+  },
+  {
+   "distM": 324,
+   "simSec": 12.72,
+   "score": 324,
+   "maxAirtimeMs": 950
+  },
+  {
+   "distM": 755.8,
+   "simSec": 27.27,
+   "score": 756,
+   "maxAirtimeMs": 1233
+  },
+  {
+   "distM": 686.7,
+   "simSec": 27.38,
+   "score": 687,
+   "maxAirtimeMs": 1217
+  }
+ ]
+}

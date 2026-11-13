@@ -12,7 +12,7 @@
     },
     {
       "level": 2,
-      "xpMin": 150,
+      "xpMin": 100,
       "title": "Bit Runner",
       "biome": null,
       "cosmetic": "trail-cyan",
