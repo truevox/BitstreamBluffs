@@ -38,6 +38,7 @@ try {
   await page.addInitScript({ path: path.join(here, 'shots-progression.js') });
   await page.addInitScript({ path: path.join(here, 'shots-missions.js') });
   await page.addInitScript({ path: path.join(here, 'shots-probe-profile.js') });
+  await page.addInitScript({ path: path.join(here, 'shots-biomes.js') });
   const shots = [];
   await page.exposeFunction('__shot', async (name, meta) => {
     const file = path.join(outDir, `${name}.png`);
@@ -71,6 +72,8 @@ try {
     result.probe = await page.evaluate((o) => window.__shotsProbe.runProfile(o), opts);
   } else if (mode === 'progression') {
     result.progression = await page.evaluate((o) => window.__shotsProgression.run(o), opts);
+  } else if (mode === 'biomes') {
+    result.biomes = await page.evaluate((o) => window.__shotsBiomes.run(o), opts);
   } else if (mode === 'missions') {
     result.missions = await page.evaluate((o) => window.__shotsMissions.run(o), opts);
   } else throw new Error('mode: hints | zoom | hud | progression | missions');
