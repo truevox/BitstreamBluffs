@@ -471,8 +471,6 @@ export class ShopView extends View {
 
   /** The panel's single source of truth: layout rows + menu items, rebuilt together every time. */
   _menuItems(layout) {
-    const prof = this._profile();
-    const boosts = (prof.boosts && typeof prof.boosts === 'object') ? prof.boosts : {};
     return shopMenuItems(layout).map((m) => {
       if (m.rowKind === 'item') {
         return { kind: 'action', label: m.label, sub: m.sub, disabled: m.disabled, onSelect: () => this._choose(m.id) };
@@ -482,7 +480,8 @@ export class ShopView extends View {
           kind: 'choice',
           label: m.label,
           options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
-          get: () => boosts[m.boostId] === true,
+          // Read the live profile: a `boosts` snapshot captured here goes stale the moment the toggle is set.
+          get: () => (this._profile().boosts || {})[m.boostId] === true,
           set: (v) => this._setBoost(m.boostId, Boolean(v)),
         };
       }
