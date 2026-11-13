@@ -260,15 +260,45 @@ export function isOfferable(t, profile, ruleId) {
  * @param {{ruleId?:string|null, exclude?:string[]}} [o]
  * @returns {Array} chosen templates (fewer than `count` only if the pool is smaller)
  */
+/** Default tier thresholds, mirroring `missions.json: tierUnlock`. Kept here only as a fallback for
+ * callers that pass a bare template array (tests, tools); the app always passes the data value. */
+export const DEFAULT_TIER_UNLOCK = Object.freeze({ 1: 1, 2: 3, 3: 6, 4: 10 });
+
+/**
+ * The highest mission tier a given Sync Level may draw (D7).
+ * @param {number} level Sync Level, 1-based
+ * @param {Object} [unlock] tier -> min level map, from `missions.json`
+ * @returns {number} 1..4
+ */
+export function maxTierForLevel(level, unlock = DEFAULT_TIER_UNLOCK) {
+  const lv = Number.isFinite(level) ? level : 1;
+  let best = 1;
+  for (const [tier, min] of Object.entries(unlock || {})) {
+    const t = Number(tier); const m = Number(min);
+    if (Number.isFinite(t) && Number.isFinite(m) && lv >= m && t > best) best = t;
+  }
+  return best;
+}
+
 export function drawMissions(profile, templates, count = SLOTS, o = {}) {
   const all = Array.isArray(templates) ? templates.filter((t) => t && typeof t === 'object') : [];
   const ruleId = o.ruleId !== undefined ? o.ruleId : (profile && profile.missions && profile.missions.ruleId) || null;
   const exclude = new Set([...(o.exclude || []), ...((profile && profile.missions && profile.missions.active) || [])]);
-  const pool = all
+  const unlock = o.tierUnlock || (profile && profile.missions && profile.missions.tierUnlock) || DEFAULT_TIER_UNLOCK;
+  const level = (profile && Number.isFinite(profile.level)) ? profile.level : 1;
+  const maxTier = maxTierForLevel(level, unlock);
+  const eligible = all
     .filter((t) => isOfferable(t, profile, ruleId))
-    .filter((t) => !exclude.has(t.id))
-    .slice()
-    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    .filter((t) => !exclude.has(t.id));
+  // D7: low levels draw only low tiers. Filtering (rather than weighting) keeps the seed stream
+  // identical for a given counter, so a saved profile's next draw is still reproducible.
+  let pool = eligible.filter((t) => !Number.isFinite(t.tier) || t.tier <= maxTier);
+  // Never leave a slot empty: if the unlocked tiers cannot fill the set, fall back to everything
+  // eligible (biome/rule/exclude gating still applies) rather than returning a short set.
+  if (pool.length < Math.max(1, Math.round(count)) && eligible.length > pool.length) {
+    pool = eligible;
+  }
+  pool = pool.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
   if (!pool.length) return [];
   const want = Math.min(Math.max(1, Math.round(count)), pool.length);
   const rng = new Rng(missionSeed(profile && profile.missions && profile.missions.counter, 'draw'));
@@ -376,7 +406,7 @@ export function rollSet(profile, activeTemplates, record, allTemplates, o = {}) 
     counter += 1;
     const drawnProfile = { ...p, missions: { ...prevMissions, counter, active, progress } };
     const drawn = drawMissions(drawnProfile, all, targetSlots - active.length, {
-      ruleId, exclude: [...active, ...completedIds],
+      ruleId, exclude: [...active, ...completedIds], tierUnlock: o.tierUnlock,
     });
     if (!drawn.length) break;
     for (const d of drawn) {

@@ -18,7 +18,7 @@ import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
 import {
   columnRows, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, GAMEOVER_BOARD_ROW_H,
-  GAMEOVER_MISSIONS_RULE_Y,
+  GAMEOVER_MISSIONS_RULE_Y, entryLayout,
 } from '../ui/MissionsLayout.js';
 import { ellipsize } from '../ui/PixelFont.js';
 import { Panel } from '../ui/Panel.js';
@@ -425,19 +425,20 @@ export class GameOverScene extends Phaser.Scene {
     this.board.setVisible(false);
     this.right.setColorKey('lime').setTitle('NEW TOP 10!');
     const last = (this.registry.get(REG.SETTINGS) || {}).lastInitials || '';
-    const y0 = 22;
+    // Every y here comes from MissionsLayout.entryLayout(), where SAVE and the hint rects are asserted
+    // disjoint. Hand-tuning these numbers is what put the SAVE button on top of both hint lines: the
+    // entry widget draws its own SAVE at local 88..104, so hints at 84/96 were underneath it.
+    const EL = entryLayout();
+    const cx = Math.round(EL.title.x + EL.title.w / 2);
     this.entryGroup = [];
-    const t1 = new NeonText(this, theme, 108, y0, 'ENTER YOUR INITIALS', { color: 'lime', anchor: 'center', outline: 'none' });
+    const t1 = new NeonText(this, theme, cx, EL.title.y, 'ENTER YOUR INITIALS', { color: 'lime', anchor: 'center', outline: 'none' });
     this.right.add(t1);
     this.entry = new InitialsEntry(this, theme, {
-      x: 0, y: y0 + 6, w: 216, length: INITIALS_LENGTH, initial: last, color: 'lime', onSubmit: (v) => this.saveEntry(v),
+      x: 0, y: EL.entryY, w: EL.panelW, length: INITIALS_LENGTH, initial: last, color: 'lime', onSubmit: (v) => this.saveEntry(v),
     });
     this.right.add(this.entry);
-    // 84 and 96, not 106 and 118: at 118 the second hint's glyphs ran to local 126 and the mission
-    // separator rule sits at 127, so the block read as one run-on paragraph glued to the hint
-    // (CC Friday's initials-entry finding). Both lines now end above local 105, leaving a real gap.
-    const hint = new NeonText(this, theme, 108, 84, 'TYPE / ARROWS / TAP  -  ENTER SAVES', { color: 'text', anchor: 'center', outline: 'none' });
-    const hint2 = new NeonText(this, theme, 108, 96, 'SPACE = SAVE + RETRY   ESC = SKIP', { color: 'text', anchor: 'center', outline: 'none' });
+    const hint = new NeonText(this, theme, cx, EL.hints[0].y, 'TYPE / ARROWS / TAP  -  ENTER SAVES', { color: 'text', anchor: 'center', outline: 'none' });
+    const hint2 = new NeonText(this, theme, cx, EL.hints[1].y, 'SPACE = SAVE + RETRY   ESC = SKIP', { color: 'text', anchor: 'center', outline: 'none' });
     hint.setAlpha(0.6);
     hint2.setAlpha(0.6);
     this.right.add([hint, hint2]);

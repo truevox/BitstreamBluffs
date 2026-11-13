@@ -9,9 +9,10 @@ import { Rng } from '../../src/systems/Rng.js';
 import { DailyPatch } from '../../src/systems/DailyPatch.js';
 import { SCORING } from '../../src/constants.js';
 import missionsData from '../../src/data/missions/missions.json';
+import levelsData from '../../src/data/progression/levels.json';
 import reachabilityData from '../../tools/sim/.reach/reachability.json';
 import {
-  missionState, satisfies, progressFor, drawMissions, rollSet, missionProgressText,
+  missionState, satisfies, progressFor, drawMissions, rollSet, missionProgressText, activeTemplates,
   xpForTemplate, SET_BONUS, MISSION_REWARD,
 } from '../../src/systems/Missions.js';
 import { defaultProfile } from '../../src/systems/Progression.js';
@@ -30,6 +31,12 @@ const prof = (o = {}) => {
   const p = defaultProfile();
   return { ...p, ...o, missions: { ...p.missions, ...(o.missions || {}) } };
 };
+
+/** Resolve a profile's active mission ids to templates the way the app does. */
+const activeTemplatesOf = (p) => activeTemplates(p, TEMPLATES);
+
+/** XP floor of a level, read from the level table. */
+const levelXp = (level) => (levelsData.levels.find((l) => l.level === level) || {}).xpMin || 0;
 
 describe('missions data', () => {
   test('ships about 45 templates in tiers', () => {
@@ -166,6 +173,138 @@ describe('deterministic selection', () => {
     for (let c = 0; c < 30; c++) {
       const drawn = drawMissions(prof({ missions: { counter: c } }), TEMPLATES, 3);
       expect(new Set(drawn.map((m) => m.id)).size).toBe(drawn.length);
+    }
+  });
+});
+
+describe('D7 tier gating by Sync Level', () => {
+  // Marvin's D7 (2026-11-13): low levels draw only low tiers; higher tiers open as the player levels.
+  // Thresholds live in missions.json (`tierUnlock`), not in code, and these tests read them from the
+  // data so changing a threshold is a data change, not a test rewrite.
+
+  test('the levels in the progression table are the ones the thresholds name', () => {
+    // A threshold pointing at level 0 or 99 would silently disable or permanently lock a tier.
+    const levels = levelsData.levels.map((l) => l.level);
+    const unlock = missionsData.tierUnlock;
+    expect(Object.keys(unlock).sort()).toEqual(['1', '2', '3', '4']);
+    expect(unlock['1']).toBe(1);
+    for (const lv of Object.values(unlock)) {
+      expect(levels).toContain(lv);
+    }
+    // Monotonic: a higher tier can never unlock earlier than a lower one.
+    const seq = [1, 2, 3, 4].map((t) => unlock[String(t)]);
+    expect(seq).toEqual([...seq].sort((a, b) => a - b));
+  });
+
+  test('a fresh Sync Level 1 profile draws only tier 1', () => {
+    for (let c = 0; c < 40; c++) {
+      const p = prof({ level: 1, xp: 0, missions: { counter: c, active: [], progress: {} } });
+      const drawn = drawMissions(p, TEMPLATES, 3);
+      expect(drawn).toHaveLength(3);
+      expect(drawn.map((m) => m.tier)).toEqual([1, 1, 1]);
+    }
+  });
+
+  test('each tier opens exactly at its threshold, not before', () => {
+    const unlock = missionsData.tierUnlock;
+    for (const tier of [2, 3, 4]) {
+      const at = unlock[String(tier)];
+      // One level below the threshold: this tier must not be offered.
+      for (let c = 0; c < 30; c++) {
+        const below = prof({ level: at - 1, missions: { counter: c, active: [], progress: {} } });
+        expect(drawMissions(below, TEMPLATES, 3).some((m) => m.tier === tier)).toBe(false);
+      }
+      // At the threshold it becomes eligible: across enough counters it must actually appear,
+      // otherwise the tier is unlocked on paper and unreachable in practice.
+      let seen = 0;
+      for (let c = 0; c < 120; c++) {
+        const p = prof({ level: at, xp: levelXp(at), missions: { counter: c, active: [], progress: {} } });
+        seen += drawMissions(p, TEMPLATES, 3).filter((m) => m.tier === tier).length;
+      }
+      expect({ tier, seen: seen > 0 }).toMatchObject({ tier, seen: true });
+    }
+  });
+
+  test('a max-level profile can still draw every tier, so gating never starves the pool', () => {
+    const top = levelsData.levels[levelsData.levels.length - 1].level;
+    const tiers = new Set();
+    for (let c = 0; c < 200; c++) {
+      const p = prof({ level: top, missions: { counter: c, active: [], progress: {} } });
+      for (const m of drawMissions(p, TEMPLATES, 3)) tiers.add(m.tier);
+    }
+    expect([...tiers].sort()).toEqual([1, 2, 3, 4]);
+  });
+
+  test('three slots are always fillable at every level', () => {
+    // D7's hard requirement: fall back to the highest unlocked tier rather than leaving a slot empty.
+    for (const { level } of levelsData.levels) {
+      for (let c = 0; c < 12; c++) {
+        const p = prof({ level, missions: { counter: c, active: [], progress: {} } });
+        const drawn = drawMissions(p, TEMPLATES, 3);
+        expect({ level, n: drawn.length }).toMatchObject({ level, n: 3 });
+        expect(new Set(drawn.map((m) => m.id)).size).toBe(3);
+      }
+    }
+  });
+
+  test('gating does not break determinism or the existing seeds', () => {
+    for (let c = 0; c < 25; c++) {
+      const p = prof({ level: 4, missions: { counter: c, active: [], progress: {} } });
+      const a = drawMissions(p, TEMPLATES, 3).map((m) => m.id);
+      const b = drawMissions(p, TEMPLATES, 3).map((m) => m.id);
+      expect(a).toEqual(b);
+    }
+  });
+
+  test('raising the level never removes missions from a pool, only adds', () => {
+    // Sanity on the filter's direction: the eligible set at level N is a superset of level N-1.
+    const tiersAt = (level) => {
+      const ids = new Set();
+      for (let c = 0; c < 30; c++) {
+        const p = prof({ level, missions: { counter: c, active: [], progress: {} } });
+        for (const m of drawMissions(p, TEMPLATES, 3)) ids.add(m.tier);
+      }
+      return ids;
+    };
+    let prev = new Set();
+    for (const { level } of levelsData.levels.slice(0, 12)) {
+      const cur = tiersAt(level);
+      for (const t of prev) expect(cur.has(t)).toBe(true);
+      prev = cur;
+    }
+  });
+});
+
+describe('D7 — saved profiles keep the missions they drew', () => {
+  // CC Friday's stated reason for gating BEFORE W2 lands on main: "a saved profile keeps whatever
+  // missions it drew". Gating must therefore never re-roll or drop a mission already in a slot, even
+  // if it is a tier the profile's level would no longer be allowed to draw.
+
+  test('an active high-tier cumulative mission survives a roll at level 1 with its progress', () => {
+    // Cumulative, not single-run: a single-run mission's progress is per-run by design, so only a
+    // cumulative one can demonstrate carried history surviving the level gate.
+    const high = TEMPLATES.find((t) => t.tier === 4 && t.type === 'cumulative');
+    expect(high).toBeDefined();
+    const active = [high.id];
+    const p = prof({
+      level: 1,
+      lifetime: { ...defaultProfile().lifetime, shards: 7 },
+      missions: { counter: 5, active, progress: { [high.id]: 7 } },
+    });
+    const out = rollSet(p, activeTemplatesOf(p), rec({ shards: 0, score: 10 }), TEMPLATES);
+    expect(out.active).toContain(high.id);
+    expect(out.progress[high.id]).toBeGreaterThanOrEqual(7);
+  });
+
+  test('refills at level 1 are tier 1 even when a high-tier mission is still active', () => {
+    const high = TEMPLATES.find((t) => t.tier === 4);
+    const active = [high.id];
+    const p = prof({ level: 1, missions: { counter: 3, active, progress: {} } });
+    const out = rollSet(p, [high], rec({ score: 10 }), TEMPLATES);
+    const added = out.active.filter((id) => id !== high.id);
+    expect(added).toHaveLength(2);
+    for (const id of added) {
+      expect(TEMPLATES.find((t) => t.id === id).tier).toBe(1);
     }
   });
 });

@@ -1,0 +1,20 @@
+{
+ "missions": {
+  "title": {
+   "active": 3
+  },
+  "gameover": {
+   "completed": 2,
+   "xp": 744
+  },
+  "gameoverInitials": {
+   "entryOpen": true
+  },
+  "pause": {
+   "active": 3
+  },
+  "toast": {
+   "ok": true
+  }
+ }
+}

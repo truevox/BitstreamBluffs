@@ -1,404 +1,410 @@
 {
- "_doc": "W2 mission templates. Tiers 1-4 escalate by target size, not by type. `metric` names a RunRecord field for singleRun/cumulative; `require` lists trick types for combo. `excludedRuleIds` names DailyPatch.RULES entries this template must not be offered under (see tests/src/missions.test.js for the compatibility assertion). Keep `title` <= 34 chars so it fits the MILESTONE strip. Airtime targets are per-jump maxAirtimeMs, measured achievable from real runs (tools/sim: single-jump airMs max 1772, median 796) \u2014 not total airtime.",
- "templates": [
-  {
-   "id": "t1-distance-500",
-   "type": "singleRun",
-   "tier": 1,
-   "title": "Reach 500 m in one run",
-   "metric": "distanceM",
-   "target": 500
+  "_doc": "W2 mission templates. Tiers 1-4 escalate by target size, not by type. `metric` names a RunRecord field for singleRun/cumulative; `require` lists trick types for combo. `excludedRuleIds` names DailyPatch.RULES entries this template must not be offered under (see tests/src/missions.test.js for the compatibility assertion). Keep `title` <= 34 chars so it fits the MILESTONE strip. Airtime targets are per-jump maxAirtimeMs, measured achievable from real runs (tools/sim: single-jump airMs max 1772, median 796) \u2014 not total airtime. D7 (Marvin 2026-11-13): `tierUnlock` maps a mission tier to the Sync Level at which it becomes drawable. Low levels draw only low tiers; thresholds are data so tuning them needs no code change. Tier 1 is always open. Selection never leaves a slot empty \u2014 `drawMissions` falls back to the highest unlocked tier.",
+  "tierUnlock": {
+    "1": 1,
+    "2": 3,
+    "3": 6,
+    "4": 10
   },
-  {
-   "id": "t1-distance-1000",
-   "type": "singleRun",
-   "tier": 1,
-   "title": "Reach 1000 m in one run",
-   "metric": "distanceM",
-   "target": 1000
-  },
-  {
-   "id": "t1-score-2000",
-   "type": "singleRun",
-   "tier": 1,
-   "title": "Score 2000 in one run",
-   "metric": "score",
-   "target": 2000
-  },
-  {
-   "id": "t1-shards-15",
-   "type": "singleRun",
-   "tier": 1,
-   "title": "Grab 15 shards in a run",
-   "metric": "shards",
-   "target": 15
-  },
-  {
-   "id": "t1-nearmiss-10",
-   "type": "singleRun",
-   "tier": 1,
-   "title": "10 near misses in a run",
-   "metric": "nearMisses",
-   "target": 10
-  },
-  {
-   "id": "t1-airtime-900",
-   "type": "singleRun",
-   "tier": 1,
-   "title": "0.9 s of air in one jump",
-   "metric": "maxAirtimeMs",
-   "target": 900
-  },
-  {
-   "id": "t1-combo-3",
-   "type": "singleRun",
-   "tier": 1,
-   "title": "Hold a x1.25 combo",
-   "metric": "bestCombo",
-   "target": 1.25
-  },
-  {
-   "id": "t1-trick-backflip",
-   "type": "combo",
-   "tier": 1,
-   "title": "Land a backflip",
-   "require": [
-    "backflip"
-   ]
-  },
-  {
-   "id": "t1-trick-frontflip",
-   "type": "combo",
-   "tier": 1,
-   "title": "Land a frontflip",
-   "require": [
-    "frontflip"
-   ]
-  },
-  {
-   "id": "t1-trick-heli",
-   "type": "combo",
-   "tier": 1,
-   "title": "Land a full heli",
-   "require": [
-    "helicopter"
-   ]
-  },
-  {
-   "id": "t1-cum-shards-50",
-   "type": "cumulative",
-   "tier": 1,
-   "title": "Collect 50 shards total",
-   "metric": "shards",
-   "target": 50
-  },
-  {
-   "id": "t2-distance-1500",
-   "type": "singleRun",
-   "tier": 2,
-   "title": "Reach 1500 m in one run",
-   "metric": "distanceM",
-   "target": 1500
-  },
-  {
-   "id": "t2-distance-2500",
-   "type": "singleRun",
-   "tier": 2,
-   "title": "Reach 2500 m in one run",
-   "metric": "distanceM",
-   "target": 2500
-  },
-  {
-   "id": "t2-score-8000",
-   "type": "singleRun",
-   "tier": 2,
-   "title": "Score 8000 in one run",
-   "metric": "score",
-   "target": 8000
-  },
-  {
-   "id": "t2-shards-30",
-   "type": "singleRun",
-   "tier": 2,
-   "title": "Grab 30 shards in a run",
-   "metric": "shards",
-   "target": 30
-  },
-  {
-   "id": "t2-nearmiss-25",
-   "type": "singleRun",
-   "tier": 2,
-   "title": "25 near misses in a run",
-   "metric": "nearMisses",
-   "target": 25
-  },
-  {
-   "id": "t2-airtime-1100",
-   "type": "singleRun",
-   "tier": 2,
-   "title": "1.1 s of air in one jump",
-   "metric": "maxAirtimeMs",
-   "target": 1100
-  },
-  {
-   "id": "t2-combo-5",
-   "type": "singleRun",
-   "tier": 2,
-   "title": "Hold a x1.5 combo",
-   "metric": "bestCombo",
-   "target": 1.5
-  },
-  {
-   "id": "t2-combo-flipheli",
-   "type": "combo",
-   "tier": 2,
-   "title": "Backflip + heli, one run",
-   "require": [
-    "backflip",
-    "helicopter"
-   ]
-  },
-  {
-   "id": "t2-combo-twoflips",
-   "type": "combo",
-   "tier": 2,
-   "title": "Back and front, one run",
-   "require": [
-    "backflip",
-    "frontflip"
-   ]
-  },
-  {
-   "id": "t2-combo-brakeflip",
-   "type": "combo",
-   "tier": 2,
-   "title": "Air brake, then flip",
-   "require": [
-    "airBrake",
-    "backflip"
-   ]
-  },
-  {
-   "id": "t2-combo-chute",
-   "type": "combo",
-   "tier": 2,
-   "title": "Flip, then parachute",
-   "require": [
-    "backflip",
-    "parachute"
-   ]
-  },
-  {
-   "id": "t2-cum-shards-200",
-   "type": "cumulative",
-   "tier": 2,
-   "title": "Collect 200 shards total",
-   "metric": "shards",
-   "target": 200
-  },
-  {
-   "id": "t2-cum-dist-10k",
-   "type": "cumulative",
-   "tier": 2,
-   "title": "Ride 10 km total",
-   "metric": "distanceM",
-   "target": 10000
-  },
-  {
-   "id": "t2-cum-nearmiss-100",
-   "type": "cumulative",
-   "tier": 2,
-   "title": "100 near misses total",
-   "metric": "nearMisses",
-   "target": 100
-  },
-  {
-   "id": "t3-distance-4000",
-   "type": "singleRun",
-   "tier": 3,
-   "title": "Reach 4000 m in one run",
-   "metric": "distanceM",
-   "target": 4000
-  },
-  {
-   "id": "t3-score-14000",
-   "type": "singleRun",
-   "tier": 3,
-   "title": "Score 14000 in one run",
-   "metric": "score",
-   "target": 14000
-  },
-  {
-   "id": "t3-shards-40",
-   "type": "singleRun",
-   "tier": 3,
-   "title": "Grab 40 shards in a run",
-   "metric": "shards",
-   "target": 40
-  },
-  {
-   "id": "t3-nearmiss-40",
-   "type": "singleRun",
-   "tier": 3,
-   "title": "40 near misses in a run",
-   "metric": "nearMisses",
-   "target": 40
-  },
-  {
-   "id": "t3-airtime-1300",
-   "type": "singleRun",
-   "tier": 3,
-   "title": "1.3 s of air in one jump",
-   "metric": "maxAirtimeMs",
-   "target": 1300
-  },
-  {
-   "id": "t3-combo-10",
-   "type": "singleRun",
-   "tier": 3,
-   "title": "Hold a x1.75 combo",
-   "metric": "bestCombo",
-   "target": 1.75
-  },
-  {
-   "id": "t3-combo-triple",
-   "type": "combo",
-   "tier": 3,
-   "title": "Backflip, front, heli",
-   "require": [
-    "backflip",
-    "frontflip",
-    "helicopter"
-   ]
-  },
-  {
-   "id": "t3-combo-chuteflip",
-   "type": "combo",
-   "tier": 3,
-   "title": "Parachute + 2 flip types",
-   "require": [
-    "parachute",
-    "backflip",
-    "frontflip"
-   ]
-  },
-  {
-   "id": "t3-cum-shards-500",
-   "type": "cumulative",
-   "tier": 3,
-   "title": "Collect 500 shards total",
-   "metric": "shards",
-   "target": 500
-  },
-  {
-   "id": "t3-cum-dist-50k",
-   "type": "cumulative",
-   "tier": 3,
-   "title": "Ride 50 km total",
-   "metric": "distanceM",
-   "target": 50000
-  },
-  {
-   "id": "t3-cum-score-100k",
-   "type": "cumulative",
-   "tier": 3,
-   "title": "Score 100k total",
-   "metric": "score",
-   "target": 100000
-  },
-  {
-   "id": "t3-cum-runs-25",
-   "type": "cumulative",
-   "tier": 3,
-   "title": "Finish 25 runs",
-   "metric": "runs",
-   "target": 25
-  },
-  {
-   "id": "t4-distance-6000",
-   "type": "singleRun",
-   "tier": 4,
-   "title": "Reach 6000 m in one run",
-   "metric": "distanceM",
-   "target": 6000
-  },
-  {
-   "id": "t4-score-17500",
-   "type": "singleRun",
-   "tier": 4,
-   "title": "Score 17500 in one run",
-   "metric": "score",
-   "target": 17500
-  },
-  {
-   "id": "t4-airtime-1400",
-   "type": "singleRun",
-   "tier": 4,
-   "title": "1.4 s of air in one jump",
-   "metric": "maxAirtimeMs",
-   "target": 1400
-  },
-  {
-   "id": "t4-combo-15",
-   "type": "singleRun",
-   "tier": 4,
-   "title": "Hold a x2 combo",
-   "metric": "bestCombo",
-   "target": 2
-  },
-  {
-   "id": "t4-combo-all",
-   "type": "combo",
-   "tier": 4,
-   "title": "Every trick, one run",
-   "require": [
-    "backflip",
-    "frontflip",
-    "helicopter",
-    "parachute"
-   ]
-  },
-  {
-   "id": "t4-cum-shards-1k",
-   "type": "cumulative",
-   "tier": 4,
-   "title": "Collect 1000 shards total",
-   "metric": "shards",
-   "target": 1000
-  },
-  {
-   "id": "t4-cum-dist-200k",
-   "type": "cumulative",
-   "tier": 4,
-   "title": "Ride 200 km total",
-   "metric": "distanceM",
-   "target": 200000
-  },
-  {
-   "id": "t4-cum-runs-100",
-   "type": "cumulative",
-   "tier": 4,
-   "title": "Finish 100 runs",
-   "metric": "runs",
-   "target": 100
-  },
-  {
-   "id": "t4-biome-debumont",
-   "type": "singleRun",
-   "tier": 4,
-   "title": "1500 m in Debumont",
-   "metric": "distanceM",
-   "target": 1500,
-   "biome": "debumont"
-  },
-  {
-   "id": "t4-biome-glacier",
-   "type": "singleRun",
-   "tier": 4,
-   "title": "2000 m in the Glacier",
-   "metric": "distanceM",
-   "target": 2000,
-   "biome": "garbage-dump-glacier"
-  }
- ]
+  "templates": [
+    {
+      "id": "t1-distance-500",
+      "type": "singleRun",
+      "tier": 1,
+      "title": "Reach 500 m in one run",
+      "metric": "distanceM",
+      "target": 500
+    },
+    {
+      "id": "t1-distance-1000",
+      "type": "singleRun",
+      "tier": 1,
+      "title": "Reach 1000 m in one run",
+      "metric": "distanceM",
+      "target": 1000
+    },
+    {
+      "id": "t1-score-2000",
+      "type": "singleRun",
+      "tier": 1,
+      "title": "Score 2000 in one run",
+      "metric": "score",
+      "target": 2000
+    },
+    {
+      "id": "t1-shards-15",
+      "type": "singleRun",
+      "tier": 1,
+      "title": "Grab 15 shards in a run",
+      "metric": "shards",
+      "target": 15
+    },
+    {
+      "id": "t1-nearmiss-10",
+      "type": "singleRun",
+      "tier": 1,
+      "title": "10 near misses in a run",
+      "metric": "nearMisses",
+      "target": 10
+    },
+    {
+      "id": "t1-airtime-900",
+      "type": "singleRun",
+      "tier": 1,
+      "title": "0.9 s of air in one jump",
+      "metric": "maxAirtimeMs",
+      "target": 900
+    },
+    {
+      "id": "t1-combo-3",
+      "type": "singleRun",
+      "tier": 1,
+      "title": "Hold a x1.25 combo",
+      "metric": "bestCombo",
+      "target": 1.25
+    },
+    {
+      "id": "t1-trick-backflip",
+      "type": "combo",
+      "tier": 1,
+      "title": "Land a backflip",
+      "require": [
+        "backflip"
+      ]
+    },
+    {
+      "id": "t1-trick-frontflip",
+      "type": "combo",
+      "tier": 1,
+      "title": "Land a frontflip",
+      "require": [
+        "frontflip"
+      ]
+    },
+    {
+      "id": "t1-trick-heli",
+      "type": "combo",
+      "tier": 1,
+      "title": "Land a full heli",
+      "require": [
+        "helicopter"
+      ]
+    },
+    {
+      "id": "t1-cum-shards-50",
+      "type": "cumulative",
+      "tier": 1,
+      "title": "Collect 50 shards total",
+      "metric": "shards",
+      "target": 50
+    },
+    {
+      "id": "t2-distance-1500",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "Reach 1500 m in one run",
+      "metric": "distanceM",
+      "target": 1500
+    },
+    {
+      "id": "t2-distance-2500",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "Reach 2500 m in one run",
+      "metric": "distanceM",
+      "target": 2500
+    },
+    {
+      "id": "t2-score-8000",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "Score 8000 in one run",
+      "metric": "score",
+      "target": 8000
+    },
+    {
+      "id": "t2-shards-30",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "Grab 30 shards in a run",
+      "metric": "shards",
+      "target": 30
+    },
+    {
+      "id": "t2-nearmiss-25",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "25 near misses in a run",
+      "metric": "nearMisses",
+      "target": 25
+    },
+    {
+      "id": "t2-airtime-1100",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "1.1 s of air in one jump",
+      "metric": "maxAirtimeMs",
+      "target": 1100
+    },
+    {
+      "id": "t2-combo-5",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "Hold a x1.5 combo",
+      "metric": "bestCombo",
+      "target": 1.5
+    },
+    {
+      "id": "t2-combo-flipheli",
+      "type": "combo",
+      "tier": 2,
+      "title": "Backflip + heli, one run",
+      "require": [
+        "backflip",
+        "helicopter"
+      ]
+    },
+    {
+      "id": "t2-combo-twoflips",
+      "type": "combo",
+      "tier": 2,
+      "title": "Back and front, one run",
+      "require": [
+        "backflip",
+        "frontflip"
+      ]
+    },
+    {
+      "id": "t2-combo-brakeflip",
+      "type": "combo",
+      "tier": 2,
+      "title": "Air brake, then flip",
+      "require": [
+        "airBrake",
+        "backflip"
+      ]
+    },
+    {
+      "id": "t2-combo-chute",
+      "type": "combo",
+      "tier": 2,
+      "title": "Flip, then parachute",
+      "require": [
+        "backflip",
+        "parachute"
+      ]
+    },
+    {
+      "id": "t2-cum-shards-200",
+      "type": "cumulative",
+      "tier": 2,
+      "title": "Collect 200 shards total",
+      "metric": "shards",
+      "target": 200
+    },
+    {
+      "id": "t2-cum-dist-10k",
+      "type": "cumulative",
+      "tier": 2,
+      "title": "Ride 10 km total",
+      "metric": "distanceM",
+      "target": 10000
+    },
+    {
+      "id": "t2-cum-nearmiss-100",
+      "type": "cumulative",
+      "tier": 2,
+      "title": "100 near misses total",
+      "metric": "nearMisses",
+      "target": 100
+    },
+    {
+      "id": "t3-distance-4000",
+      "type": "singleRun",
+      "tier": 3,
+      "title": "Reach 4000 m in one run",
+      "metric": "distanceM",
+      "target": 4000
+    },
+    {
+      "id": "t3-score-14000",
+      "type": "singleRun",
+      "tier": 3,
+      "title": "Score 14000 in one run",
+      "metric": "score",
+      "target": 14000
+    },
+    {
+      "id": "t3-shards-40",
+      "type": "singleRun",
+      "tier": 3,
+      "title": "Grab 40 shards in a run",
+      "metric": "shards",
+      "target": 40
+    },
+    {
+      "id": "t3-nearmiss-40",
+      "type": "singleRun",
+      "tier": 3,
+      "title": "40 near misses in a run",
+      "metric": "nearMisses",
+      "target": 40
+    },
+    {
+      "id": "t3-airtime-1300",
+      "type": "singleRun",
+      "tier": 3,
+      "title": "1.3 s of air in one jump",
+      "metric": "maxAirtimeMs",
+      "target": 1300
+    },
+    {
+      "id": "t3-combo-10",
+      "type": "singleRun",
+      "tier": 3,
+      "title": "Hold a x1.75 combo",
+      "metric": "bestCombo",
+      "target": 1.75
+    },
+    {
+      "id": "t3-combo-triple",
+      "type": "combo",
+      "tier": 3,
+      "title": "Backflip, front, heli",
+      "require": [
+        "backflip",
+        "frontflip",
+        "helicopter"
+      ]
+    },
+    {
+      "id": "t3-combo-chuteflip",
+      "type": "combo",
+      "tier": 3,
+      "title": "Parachute + 2 flip types",
+      "require": [
+        "parachute",
+        "backflip",
+        "frontflip"
+      ]
+    },
+    {
+      "id": "t3-cum-shards-500",
+      "type": "cumulative",
+      "tier": 3,
+      "title": "Collect 500 shards total",
+      "metric": "shards",
+      "target": 500
+    },
+    {
+      "id": "t3-cum-dist-50k",
+      "type": "cumulative",
+      "tier": 3,
+      "title": "Ride 50 km total",
+      "metric": "distanceM",
+      "target": 50000
+    },
+    {
+      "id": "t3-cum-score-100k",
+      "type": "cumulative",
+      "tier": 3,
+      "title": "Score 100k total",
+      "metric": "score",
+      "target": 100000
+    },
+    {
+      "id": "t3-cum-runs-25",
+      "type": "cumulative",
+      "tier": 3,
+      "title": "Finish 25 runs",
+      "metric": "runs",
+      "target": 25
+    },
+    {
+      "id": "t4-distance-6000",
+      "type": "singleRun",
+      "tier": 4,
+      "title": "Reach 6000 m in one run",
+      "metric": "distanceM",
+      "target": 6000
+    },
+    {
+      "id": "t4-score-17500",
+      "type": "singleRun",
+      "tier": 4,
+      "title": "Score 17500 in one run",
+      "metric": "score",
+      "target": 17500
+    },
+    {
+      "id": "t4-airtime-1400",
+      "type": "singleRun",
+      "tier": 4,
+      "title": "1.4 s of air in one jump",
+      "metric": "maxAirtimeMs",
+      "target": 1400
+    },
+    {
+      "id": "t4-combo-15",
+      "type": "singleRun",
+      "tier": 4,
+      "title": "Hold a x2 combo",
+      "metric": "bestCombo",
+      "target": 2
+    },
+    {
+      "id": "t4-combo-all",
+      "type": "combo",
+      "tier": 4,
+      "title": "Every trick, one run",
+      "require": [
+        "backflip",
+        "frontflip",
+        "helicopter",
+        "parachute"
+      ]
+    },
+    {
+      "id": "t4-cum-shards-1k",
+      "type": "cumulative",
+      "tier": 4,
+      "title": "Collect 1000 shards total",
+      "metric": "shards",
+      "target": 1000
+    },
+    {
+      "id": "t4-cum-dist-200k",
+      "type": "cumulative",
+      "tier": 4,
+      "title": "Ride 200 km total",
+      "metric": "distanceM",
+      "target": 200000
+    },
+    {
+      "id": "t4-cum-runs-100",
+      "type": "cumulative",
+      "tier": 4,
+      "title": "Finish 100 runs",
+      "metric": "runs",
+      "target": 100
+    },
+    {
+      "id": "t4-biome-debumont",
+      "type": "singleRun",
+      "tier": 4,
+      "title": "1500 m in Debumont",
+      "metric": "distanceM",
+      "target": 1500,
+      "biome": "debumont"
+    },
+    {
+      "id": "t4-biome-glacier",
+      "type": "singleRun",
+      "tier": 4,
+      "title": "2000 m in the Glacier",
+      "metric": "distanceM",
+      "target": 2000,
+      "biome": "garbage-dump-glacier"
+    }
+  ]
 }

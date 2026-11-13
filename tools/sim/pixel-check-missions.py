@@ -72,9 +72,14 @@ def report(name, ok, detail):
 # A glyph is 8 font rows tall (FONT_LINE_H 9 = 8 + gap). Ink runs measured off a real capture were
 # 7 virtual px per line, so a legible row must show at least this many consecutive ink rows.
 GLYPH_INK_H = 6
-# Vertical gap required between one row's ink and the next: a bar drawn immediately under a label
-# leaves 0-1 px and reads as a single slab over the text.
-MIN_ROW_GAP = 2
+# Vertical gap required between one row's ink and the next. Pitch is FONT_LINE_H (9): 7 glyph rows,
+# 1 descender row, 1 gap. A line whose text has a descender ("Merge lanes", "0.9 s of air") inks 8
+# rows and legitimately leaves only the 1 gap row, so the floor is 1 virtual px, not 2. The clamp that
+# actually catches a bar drawn over a label is MAX_ROW_INK_H below: overlapping rows merge into one
+# run roughly twice as tall, and no single text line can exceed the font's 8 ink rows.
+MIN_ROW_GAP = 1
+# Tallest legitimate single-row ink run: 7 glyph rows + 1 descender row.
+MAX_ROW_INK_H = 9
 
 
 def ink_runs(buf, w, x0, x1, y0, y1, thresh=110, min_px=3):
@@ -122,6 +127,12 @@ def check_legible(name, buf, w, x0, x1, y0, y1, want_rows, thresh=110):
         tightest = min(gaps)
         ok &= report(f"{name}: lines never merge into each other", tightest >= MIN_ROW_GAP,
                      f"gaps={gaps} tightest={tightest} px (need >= {MIN_ROW_GAP})")
+    # No single line may be taller than the font's ink: a run twice that height means two lines (or a
+    # line and a bar) are overlapping and read as one slab.
+    if heights:
+        tallest = max(heights)
+        ok &= report(f"{name}: no line overlaps another", tallest <= MAX_ROW_INK_H,
+                     f"tallest={tallest} px (need <= {MAX_ROW_INK_H})")
     return ok
 
 
@@ -182,6 +193,46 @@ def check_gameover(path, label="gameover"):
     return ok
 
 
+def check_entry_stack(path, label="gameover-initials"):
+    """The initials-entry stack must be ordered and disjoint: letters, SAVE button, then hints.
+
+    CC Friday's blocking regression at 7617a80: the legibility fix moved the hint lines up to clear the
+    mission separator, and the SAVE button (drawn by the entry widget) ended up ON TOP of both hint
+    lines, covering their middle. Glyph-height checks cannot see this — each hint line is still full
+    height, it is simply drawn under a box. Only an overlap assertion between the SAVE rect and the
+    hint rects catches it, so that is what this measures: the SAVE band must END before the first hint
+    band STARTS, with a real gap.
+
+    Panel-local reference (screen = local + panel origin 250,54):
+      88..104   SAVE button        -> screen 142..158
+     106..114   hint 1             -> screen 160..168
+     116..124   hint 2             -> screen 170..178
+    """
+    w, h, buf = raw_rgb(path)
+    ok = True
+    PX0, PX1 = 300, 420          # inside the LEDGER panel's text column
+    save_y0, save_y1 = 142, 158  # local 88..104
+    hint_y0, hint_y1 = 158, 180  # local 104..126, where both hints must live
+    save_ink = band_ink(buf, w, PX0, save_y0, PX1, save_y1, thresh=110)
+    ok &= report(f"{label}: SAVE button band has content", save_ink > 200, f"ink={save_ink} px")
+    hints = ink_runs(buf, w, PX0, PX1, hint_y0, hint_y1, thresh=110)
+    ok &= report(f"{label}: both hint lines present below SAVE", len(hints) >= 2,
+                 f"lines={len(hints)} runs={[(round(a,2), round(b,2)) for a, b in hints]}")
+    if hints:
+        first_hint_top = min(a for a, _ in hints)
+        # The assertion the old probe lacked. A hint line starting inside the SAVE band means the
+        # button box is drawn over it.
+        ok &= report(f"{label}: SAVE ends before the first hint starts",
+                     first_hint_top >= save_y1, f"first hint top={round(first_hint_top,2)} save bottom={save_y1}")
+        gap = round(first_hint_top - save_y1, 2)
+        ok &= report(f"{label}: SAVE and hints leave a real gap", gap >= 1.5, f"gap={gap} px")
+        # And each hint must be a full glyph row, not a sliver peeking out from under the button.
+        heights = [round(b - a + 0.25, 2) for a, b in hints[:2]]
+        ok &= report(f"{label}: hint lines are full glyph height",
+                     min(heights) >= GLYPH_INK_H, f"heights={heights} (need >= {GLYPH_INK_H})")
+    return ok
+
+
 def check_toast(path):
     """The completion toast: bright strip ink in the MILESTONE band (screen y ~52..72)."""
     w, h, buf = raw_rgb(path)
@@ -200,6 +251,9 @@ def main():
     # The initials-entry state is the one CC Friday found unreadable and the one the probe never
     # captured. Same legibility assertions, different screen.
     ok &= check_gameover(f"{d}/w2-gameover-initials-default.png", label="gameover-initials")
+    # The initials stack's own ordering assertion — SAVE must not be drawn over the hint lines.
+    ok &= check_entry_stack(f"{d}/w2-gameover-initials-default.png")
+    ok &= check_entry_stack(f"{d}/w2-gameover-initials-colorblind.png", label="gameover-initials-colorblind")
     ok &= check_pause(f"{d}/w2-pause-missions-default.png")
     ok &= check_toast(f"{d}/w2-toast-mission-default.png")
     # Colorblind pass: the same checks on the alternate palette, since ink contrast differs.

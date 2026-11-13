@@ -6,7 +6,7 @@ import {
   SCREEN, MISSION_PANEL, MISSION_LIST_TITLE, TITLE_BANDS, TITLE_BEST_X, TITLE_BEST_Y,
   rect, overlaps, insideScreen, missionPanelLayout, missionListLayout, toastSlot,
   charsThatFit, ellipsize, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, columnRows,
-  GAMEOVER_BOARD_ROW_H, GAMEOVER_MISSIONS_RULE_Y, LABEL_H, GLYPH_H,
+  GAMEOVER_BOARD_ROW_H, GAMEOVER_MISSIONS_RULE_Y, LABEL_H, GLYPH_H, entryLayout,
 } from '../../src/ui/MissionsLayout.js';
 // The font's own line height, read from the font module rather than from the layout that consumes it.
 // This is what stops the "label is one glyph tall" assertion from being a tautology about a local
@@ -288,6 +288,61 @@ describe('Game Over mission block', () => {
     expect(GAMEOVER_BOARD_ROWS).toBe(10);
     expect(GAMEOVER_BOARD_ROW_H).toBeLessThan(11);
     expect(boardEnd()).toBeLessThanOrEqual(GAMEOVER_MISSIONS_RULE_Y); // board ends above the rule
+  });
+});
+
+describe('Game Over initials-entry stack', () => {
+  // CC Friday's blocking regression at 7617a80: the legibility fix moved the two hint lines to local
+  // 84/96 to clear the mission separator, but InitialsEntry draws its own SAVE button at local
+  // 88..104, so the button box covered the middle of both hint lines. The old probe only measured
+  // mission-row glyph heights, so nothing could see this. These assertions exist so it cannot recur.
+
+  test('the SAVE button never overlaps either hint line', () => {
+    const L = entryLayout();
+    for (const [i, h] of L.hints.entries()) {
+      expect({ hint: i, overlap: overlaps(L.save, h) }).toMatchObject({ overlap: false });
+      // Disjoint is the floor; a real gap is what reads as separate controls.
+      const clear = h.y >= L.save.y + L.save.h || L.save.y >= h.y + h.h;
+      expect(clear).toBe(true);
+    }
+  });
+
+  test('the SAVE button owns the band the entry widget draws it in', () => {
+    // Mirrors InitialsEntry's constructor: slotY 14, slotH 28, SAVE at slotY + slotH + 18 with h 16,
+    // offset by the widget's own y. If the widget moves, this fails instead of drifting silently.
+    const L = entryLayout();
+    const widgetSaveY = L.entryY + L.entrySlotY + L.entrySlotH + 18;
+    expect(L.save.y).toBe(widgetSaveY);
+    expect(L.save.h).toBe(16);
+  });
+
+  test('nothing in the entry stack runs into the mission block below it', () => {
+    const L = entryLayout();
+    expect(L.contentBottom).toBeLessThan(GAMEOVER_MISSIONS_RULE_Y);
+    // And a real gap, not a one-pixel join: the rule at 127 plus mission rows from 128.
+    expect(GAMEOVER_MISSIONS_RULE_Y - L.contentBottom).toBeGreaterThanOrEqual(2);
+    for (const h of L.hints) expect(h.y + h.h).toBeLessThanOrEqual(L.contentBottom);
+  });
+
+  test('each hint line gets a full glyph height', () => {
+    const L = entryLayout();
+    for (const h of L.hints) {
+      expect(h.h).toBeGreaterThanOrEqual(FONT_LINE_H - 1);
+      // Consecutive hint lines must not merge either.
+      expect(h.h).toBeGreaterThanOrEqual(GLYPH_H);
+    }
+    expect(L.hints[1].y).toBeGreaterThanOrEqual(L.hints[0].y + GLYPH_H);
+  });
+
+  test('the stack stays inside the panel and below the title', () => {
+    const L = entryLayout();
+    expect(L.title.y + L.title.h).toBeLessThanOrEqual(L.entryY + L.entrySlotY);
+    for (const r of [L.title, L.slots, L.save, ...L.hints]) {
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.w).toBeLessThanOrEqual(L.panelW);
+      expect(r.y).toBeGreaterThanOrEqual(0);
+      expect(r.y + r.h).toBeLessThanOrEqual(GAMEOVER_MISSIONS_RULE_Y);
+    }
   });
 });
 

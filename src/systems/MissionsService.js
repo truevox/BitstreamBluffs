@@ -22,6 +22,8 @@ export class MissionsService {
   constructor(game, o) {
     this.game = game;
     this.templates = Array.isArray(o && o.templates) ? o.templates : [];
+    /** D7 tier thresholds (tier -> min Sync Level); injected from missions.json at boot. */
+    this.tierUnlock = (o && o.tierUnlock) || null;
     this.store = o && o.store;
     this.now = (o && o.now) || (() => Date.now());
     this.alive = true;
@@ -127,6 +129,7 @@ export class MissionsService {
     // Reuse the roll path with a synthetic empty record: no mission completes, it only refills.
     const out = rollSet(p, [], { ledgerHash: '', distanceM: 0 }, this.templates, {
       ruleId: p.missions && p.missions.ruleId ? p.missions.ruleId : null,
+      tierUnlock: this.tierUnlock || undefined,
     });
     this.store.applyMissions(out);
     return out;
@@ -146,6 +149,7 @@ export class MissionsService {
     const active = activeTemplates(p, this.templates);
     const out = rollSet(p, active, record || {}, this.templates, {
       ruleId: p.missions && p.missions.ruleId ? p.missions.ruleId : null,
+      tierUnlock: this.tierUnlock || undefined,
       completedComboIds: this._completedThisRun,
     });
     this.store.applyMissions(out);

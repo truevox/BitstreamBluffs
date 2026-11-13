@@ -110,6 +110,66 @@ export const GLYPH_H = FONT_LINE_H - 1;
 /** Height of one pixel-font line at scale 1; the bar must start at or below this. */
 export const LABEL_H = GLYPH_H;
 
+/**
+ * Game Over initials-entry geometry, in LEDGER-panel-local coordinates.
+ *
+ * This exists because moving the two hint lines to 84/96 to clear the mission separator put them
+ * straight THROUGH the SAVE button (local 88..104, drawn by `InitialsEntry`), so the button box
+ * covered the middle of both hint lines — a regression from the legibility fix, caught by CC Friday at
+ * native resolution. The stack is fixed and order-sensitive, so it is encoded here and asserted:
+ *
+ *   22..30   ENTER YOUR INITIALS
+ *   28..84   entry widget: up-arrow zone, 28 px letter slots, down-arrow zone
+ *   88..104  SAVE button
+ *  106..124  the two hint lines
+ *  127      mission separator rule (the mission rows start at 128)
+ *
+ * The hints cannot go below ~124 because the rule is at 127 and three mission rows need 128..158.
+ */
+export const ENTRY_LAYOUT = Object.freeze({
+  panelW: 216,
+  titleY: 22,
+  entryY: 28,
+  /** Entry-widget internals, mirrored from InitialsEntry's constructor (slotY 14, slotH 28). */
+  entrySlotY: 14,
+  entrySlotH: 28,
+  saveY: 88,
+  saveH: 16,
+  saveW: 84,
+  hint1Y: 106,
+  hint2Y: 116,
+});
+
+/**
+ * Rects for the initials-entry stack, in panel-local coordinates. The SAVE rect and the hint rects are
+ * returned separately so a test can assert they are disjoint — the assertion whose absence let the
+ * button be drawn over the hints.
+ * @returns {{title:Object, slots:Object, save:Object, hints:Object[], contentBottom:number}}
+ */
+export function entryLayout(o = {}) {
+  const L = { ...ENTRY_LAYOUT, ...o };
+  const slotsTop = L.entryY + L.entrySlotY;
+  return {
+    title: rect(8, L.titleY, L.panelW - 16, GLYPH_H),
+    // The entry WIDGET spans the full panel width (it centres its slots inside that), so this rect is
+    // 0-based: it is the widget's box, not a slot. Anchoring it at entryY offset it 28 px right and off
+    // the panel — the panel-bounds assertion below is what caught that.
+    slots: rect(0, slotsTop, L.panelW, L.entrySlotH),
+    save: rect(Math.round((L.panelW - L.saveW) / 2), L.saveY, L.saveW, L.saveH),
+    hints: [
+      rect(0, L.hint1Y, L.panelW, GLYPH_H),
+      rect(0, L.hint2Y, L.panelW, GLYPH_H),
+    ],
+    contentBottom: L.hint2Y + GLYPH_H,
+    // The constants used, echoed so a test can re-derive the SAVE offset from the widget's own layout
+    // instead of taking the resulting rect on faith.
+    entryY: L.entryY,
+    entrySlotY: L.entrySlotY,
+    entrySlotH: L.entrySlotH,
+    panelW: L.panelW,
+  };
+}
+
 /** The Title screen's existing occupied bands, for overlap assertions. */
 export const TITLE_BANDS = Object.freeze({
   menu: Object.freeze({ x: 24, y: 92, w: 432, h: 104 }),

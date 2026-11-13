@@ -278,15 +278,20 @@ describe('combo missions (same-combo requirement)', () => {
   test('a combo mission is met only when the tricks land in ONE combo', async () => {
     const game = fakeGame([]);
     const t = { id: 'zzz-combo', type: 'combo', tier: 1, title: 'Backflip + heli, one combo', require: ['backflip', 'helicopter'] };
+    // Inert filler: the other two slots must hold missions this run cannot satisfy, or the assertion
+    // below is really about whatever the draw happened to return. They were auto-drawn fillers before
+    // D7 changed which tiers a level-1 profile draws, and then trick missions appeared here and
+    // completed legitimately, failing a test about combo membership.
+    const filler = (id) => ({ id, type: 'singleRun', tier: 1, title: 'Unreachable filler', metric: 'score', target: 9_999_999 });
     const store = new ProfileStore({ levels, storage: memStorage() });
     store.load();
     const progression = new ProgressionService(game, { levels, store });
     await progression.init();
-    const missions = new MissionsService(game, { templates: [...TEMPLATES, t], store });
+    const missions = new MissionsService(game, { templates: [...TEMPLATES, t, filler('zzz-fill-a'), filler('zzz-fill-b')], store });
     await missions.init();
     progression.missions = missions;
     const m = store.profile.missions;
-    store.profile = { ...store.profile, missions: { ...m, active: ['zzz-combo', m.active[0], m.active[1]] } };
+    store.profile = { ...store.profile, missions: { ...m, active: ['zzz-combo', 'zzz-fill-a', 'zzz-fill-b'] } };
 
     const seen = [];
     game.events.on(EVT.MISSION_COMPLETED, (p) => seen.push(p.id));
