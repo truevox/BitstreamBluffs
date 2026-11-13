@@ -50,9 +50,13 @@ describe('the single-helper rule', () => {
         const rel = path.relative(root, p);
         if (rel === path.join('systems', 'Ranking.js')) continue;
         if (rel === 'constants.js') continue; // where the constant is declared
-        const src = fs.readFileSync(p, 'utf8');
-        // Reading the constant anywhere but Ranking.js means a second decision point.
-        if (/MODDED_RUNS_RANKED/.test(src)) offenders.push(rel);
+        // Reading the constant anywhere but Ranking.js means a second decision point. Prose is not a
+        // decision, and a comment that NAMES the constant (explaining why a boost path is not ranked) is
+        // documentation, not a second implementation.
+        const code = fs.readFileSync(p, 'utf8').split('\n')
+          .filter((l) => { const t = l.trim(); return !(t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')); })
+          .join('\n');
+        if (/MODDED_RUNS_RANKED/.test(code)) offenders.push(rel);
       }
     };
     walk(root);
@@ -81,7 +85,12 @@ describe('the single-helper rule', () => {
           if (!/\.modded\b/.test(t)) continue;
           // Assignment or whitelisting is not a decision: `r.modded = true`, `modded: true`, `raw.modded === true`
           // inside sanitizeRun's copy is storage. A conditional/comparison use is a decision.
-          const isWrite = /^\.?[\w.[\]]*\.modded\s*=[^=]/.test(t) || /^modded:/.test(t) || /\bif \(raw\.modded === true\)/.test(t);
+          // A conditional SPREAD that writes the field into a record (`...(this.modded ? { modded: true } : {})`)
+          // is still a write: it decides what gets stored, not which record may rank.
+          const isWrite = /^\.?[\w.[\]]*\.modded\s*=[^=]/.test(t)
+            || /^modded:/.test(t)
+            || /\.\.\.\(.*\.modded.*\{.*modded:/.test(t)
+            || /\bif \(raw\.modded === true\)/.test(t);
           if (isWrite) continue;
           offenders.push(`${rel}: ${t}`);
         }

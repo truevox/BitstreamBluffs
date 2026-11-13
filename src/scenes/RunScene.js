@@ -29,6 +29,7 @@ import { ScoreManager } from '../systems/ScoreManager.js';
 import { TrickTracker } from '../systems/TrickTracker.js';
 import { GlitchDirector } from '../systems/GlitchDirector.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
+import { boostEffects } from '../systems/Boosts.js';
 import { PhysicsTuner, stepWorld, TUNING } from '../systems/PhysicsTuner.js';
 import { GlitchPipeline } from '../shaders/GlitchPipeline.js';
 import { getPalette } from '../ui/Palette.js';
@@ -136,6 +137,10 @@ export class RunScene extends Phaser.Scene {
     // daily rule (read ONCE per run)
     const daily = DailyPatch.getDailyInfo();
     this.dailyRuleId = (daily && daily.rule && daily.rule.id) || 'none';
+    // W4 loadout: the boosts the player switched on, read from the profile. Absent profile or absent
+    // boosts means a clean run, which is the default-off rule.
+    const prof = this.registry.get(REG.PROFILE) || {};
+    this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
     this.dailyMods = (daily && daily.rule && daily.rule.modifiers) || {};
 
     // pure systems
@@ -237,6 +242,20 @@ export class RunScene extends Phaser.Scene {
     this.startX = spawnX;
     this.sled = new Sled(this, spawnX, spawnY - 14, this.palette);
     this.sled.setPose(spawnX, spawnY - 15, spawnAng, 50 * Math.cos(spawnAng * DEG), 50 * Math.sin(spawnAng * DEG));
+    // W4 boosts. Applied at spawn from the loadout chosen before the run: the shield reuses the Hashed
+    // Backup charge counter the pickup already feeds, and Head Start scales the launch velocity through
+    // the same method the speed-boost pickup uses. No physics constant is touched.
+    // `dailyRuleId` is set to TODAY's rule on every run (it dresses the daily's rule), so it cannot mean
+    // "this is the daily". A run is the daily iff its seed is a daily seed — the same date-in-seed test
+    // the streak uses, which is immune to clock skew.
+    const isDaily = DailyPatch.dateKeyFromSeed(this.seed) !== null;
+    this.boostFx = boostEffects(this.loadout, { daily: isDaily });
+    this.modded = this.boostFx.modded;
+    if (this.boostFx.shieldCharges > 0) {
+      this.shieldCharges = (this.shieldCharges || 0) + this.boostFx.shieldCharges;
+      this.sled.shield = true;
+    }
+    if (this.boostFx.speedFactor !== 1) this.sled.scaleVelocity(this.boostFx.speedFactor);
     this.startGate = this.add.graphics().setDepth(6);
     this.drawStartGate(this.startGate, start.x + 14, this.terrain.heightAt(start.x + 14));
     this.snapCamera();
@@ -1306,6 +1325,10 @@ export class RunScene extends Phaser.Scene {
       bestFlow: Math.max(1, snap.bestFlow || 1), // not hashed; SaveStore's sanitiser may drop it, GameOver reads it from here
       maxAirtimeMs: Math.round(this.maxAirtimeMs),
       cause: 'crash',
+      // W4: set only when a boost was actually active, so a clean run writes exactly the record it wrote
+      // before W4 (same keys, same ledger-hash input). Ranking keeps it off clean boards; the hash is
+      // unchanged and does not include it.
+      ...(this.modded ? { modded: true } : {}),
       shards: this.shardCount || 0,
       nearMisses: this.nearMissCount || 0,
       bonusPoints: Math.round(snap.bonusPoints || 0),

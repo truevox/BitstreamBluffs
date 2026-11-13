@@ -174,6 +174,10 @@ export function defaultProfile() {
     unlocked: { biomes: [], cosmetics: [], boosts: {} },
     equipped: { trail: 'default', glow: 'default', rider: 'default', theme: 'default', title: 'default' },
     biomeMask: 0,
+    // W4 loadout: which boosts are switched ON for the next run. Separate from `unlocked.boosts`, which
+    // records what the player owns. Additive, default-off, and safe on an old save by omission - which is
+    // why it needs no saveVersion bump.
+    boosts: { errorCorrection: false, headStart: false },
     missions: { counter: 0, active: [], progress: {} },
     achievements: {},
     credited: [],

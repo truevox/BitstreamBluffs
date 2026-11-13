@@ -108,12 +108,12 @@ async function bootWithProfile(browser, port, profile) {
 }
 
 /** Boot, start a run at `mask`, end it through the production crash path, read back Game Over. */
-async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate-seed' } = {}) {
+async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate-seed', drainShield = false, absorbFirst = false } = {}) {
   const profile = JSON.parse(JSON.stringify(PROFILE));
   if (boosts) profile.boosts = boosts;
   const { page, errors, consoleErrors } = await bootWithProfile(browser, port, profile);
 
-  const out = await page.evaluate(async ({ profile, mask, seed }) => {
+  const out = await page.evaluate(async ({ profile, mask, seed, drainShield, absorbFirst }) => {
     const g = window.__bbGame;
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     // The profile is already loaded from storage by the real load path; only the run's mask is forced,
@@ -130,6 +130,19 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
     const startedMask = g.registry.get('biomeMask');
     const shieldAtStart = run.shieldCharges || 0;
     run.runTimeMs = 5000;
+    let absorbedCrash = null;
+    if (absorbFirst) {
+      // A shield charge ABSORBS the next crash and respawns, so a shielded run cannot reach Game Over in
+      // one hit. Prove the absorb, then spend the charge so the run can genuinely end.
+      run.pendingCrash = { cause: 'hazard', hazardId: 'hazard' };
+      await wait(1200);
+      absorbedCrash = { crashed: run.crashed === true, chargesLeft: run.shieldCharges, runEnded: run.crashed === true };
+      run.shieldCharges = 0;
+      run.crashed = false;
+      run.runTimeMs = 5000;
+    } else if (drainShield) {
+      run.shieldCharges = 0;
+    }
     // End the run the way a chasm does: queue a pending crash and let the real update loop resolve it, so
     // doCrash, the record build, saveRun, RUN_END and the scene hand-off all run as production code.
     // `chasm` and not `terrain`: an opening-grace terrain crash is deliberately forgiven and respawns,
@@ -150,7 +163,7 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
     };
     if (over) { walk(over.children && over.children.list); if (over.panel) walk(over.panel.list); }
     return {
-      active, startedMask, shieldAtStart, texts,
+      active, startedMask, shieldAtStart, absorbedCrash, texts,
       maskAfter: g.registry.get('biomeMask'),
       recordMask: rec ? (Number.isFinite(rec.biomeMask) ? rec.biomeMask : 0) : null,
       recordModded: rec ? rec.modded === true : null,
@@ -158,7 +171,7 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
       hasRetry: texts.some((t) => /RETRY/i.test(t)),
       hasCopy: texts.some((t) => /COPY|OK!/i.test(t)),
     };
-  }, { profile, mask, seed }).catch((e) => ({ fatal: String(e) }));
+  }, { profile, mask, seed, drainShield, absorbFirst }).catch((e) => ({ fatal: String(e) }));
 
   return { page, errors, consoleErrors, out };
 }
@@ -263,13 +276,18 @@ async function main() {
 
     // ---- 5/6. W4 boosts. Skipped here because this tree predates them; W4's copy of this gate runs them.
     if (WITH_BOOSTS) {
-      const { page, errors, out } = await playToGameOver(browser, port, 0, { boosts: { errorCorrection: true, headStart: false } });
+      const { page, errors, out } = await playToGameOver(browser, port, 0, {
+        boosts: { errorCorrection: true, headStart: false }, absorbFirst: true,
+      });
       try {
         if (out.fatal) fail('boosted run reaches Game Over', out.fatal);
         else if (errors.length) fail('boosted run: no page errors', errors.join(' | '));
         else if (!(out.shieldAtStart >= 1)) fail('Error Correction Engine grants a shield charge', `saw ${out.shieldAtStart}`);
+        // The boost must change the RUN, not just sit on the profile: a shielded crash is absorbed rather
+        // than ending the run.
+        else if (!out.absorbedCrash || out.absorbedCrash.crashed) fail('shield absorbs a crash', JSON.stringify(out.absorbedCrash));
         else if (out.recordModded !== true) fail('boosted run is marked modded', `saw ${out.recordModded}`);
-        else pass('boosted run: shield charge applied and record marked modded', `shieldCharges=${out.shieldAtStart}`);
+        else pass('Error Correction Engine grants a shield, absorbs a crash, and the run is marked modded', `charges=${out.shieldAtStart}`);
       } finally { await page.close(); }
     }
 
