@@ -47,6 +47,21 @@ export const MISSION_LIST_TITLE = Object.freeze({
   padTop: 0,
 });
 
+/**
+ * Game Over mission block. It goes in the LEDGER panel (right), because the left RUN REPORT panel has
+ * no room at all: its 8 report rows reach local 128, then the ledger hash 132, seed 144, COPY button
+ * to 154, against a floor at 160.
+ *
+ * Neither panel had a free band, so this needed a decision rather than a nudge: the board's 10 rows
+ * reached local 146 and left 14 px. The Game Over board is trimmed to 8 rows (GAMEOVER_BOARD_ROWS),
+ * ending at local 124, which frees 124..160. The heading sits at 126 and three 8 px rows run 136..159,
+ * leaving a 1 px margin above the panel floor.
+ */
+export const GAMEOVER_BOARD_ROWS = 8;
+export const GAMEOVER_MISSIONS_Y = 136;
+/** Row pitch for the Game Over block: tighter than the in-run panel to fit the 36 px band. */
+export const GAMEOVER_ROW_H = 8;
+
 /** The Title screen's existing occupied bands, for overlap assertions. */
 export const TITLE_BANDS = Object.freeze({
   menu: Object.freeze({ x: 24, y: 92, w: 432, h: 104 }),

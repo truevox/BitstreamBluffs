@@ -5,7 +5,7 @@
 import {
   SCREEN, MISSION_PANEL, MISSION_LIST_TITLE, TITLE_BANDS, TITLE_BEST_X, TITLE_BEST_Y,
   rect, overlaps, insideScreen, missionPanelLayout, missionListLayout, toastSlot,
-  charsThatFit, ellipsize,
+  charsThatFit, ellipsize, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, columnRows,
 } from '../../src/ui/MissionsLayout.js';
 
 describe('overlaps / insideScreen', () => {
@@ -144,6 +144,50 @@ describe('missionListLayout', () => {
 
   test('the in-run panel and the Title list do not overlap', () => {
     expect(overlaps(missionPanelLayout(3).panel, missionListLayout(3).panel)).toBe(false);
+  });
+});
+
+describe('Game Over mission block', () => {
+  // Real GameOverScene geometry, transcribed here so the assertion is against the scene, not against
+  // the mission module's own opinion of itself. Panel: y=PANEL_Y 54, h=PANEL_H 160 -> floor 214. The
+  // LEDGER board ends at local 103; buttons occupy screen y 220..244; the XP row is at 246.
+  const LEDGER = { x: 250, y: 54, w: 216, h: 160 };
+  const BOARD_END_LOCAL = 22 + 14 + GAMEOVER_BOARD_ROWS * 11; // table y 22 + rows start 14, ROW_H 11
+  const BUTTONS = { x: 0, y: 220, w: 480, h: 24 };
+  const block = () => {
+    const geom = columnRows({ x: 8, y: GAMEOVER_MISSIONS_Y, w: 200, count: 3, rowH: GAMEOVER_ROW_H, barH: 2 });
+    return { geom, heading: { x: 8, y: GAMEOVER_MISSIONS_Y - 10, w: 60, h: 7 } };
+  };
+
+  test('the block sits inside the LEDGER panel, in screen coordinates', () => {
+    const { geom, heading } = block();
+    for (const r of [...geom.rows, ...geom.bars]) {
+      const screen = rect(LEDGER.x + r.x, LEDGER.y + r.y, r.w, r.h);
+      expect({ r: screen, ok: insideScreen(screen) }).toMatchObject({ ok: true });
+      expect(screen.x).toBeGreaterThanOrEqual(LEDGER.x);
+      expect(screen.x + screen.w).toBeLessThanOrEqual(LEDGER.x + LEDGER.w);
+      expect(screen.y).toBeGreaterThanOrEqual(LEDGER.y);
+      expect(screen.y + screen.h).toBeLessThanOrEqual(LEDGER.y + LEDGER.h);
+    }
+    expect(heading.y).toBeGreaterThanOrEqual(BOARD_END_LOCAL);
+  });
+
+  test('the block clears the leaderboard rows above it', () => {
+    const { heading } = block();
+    // Measured against the board's real last row at its configured row count, not a guess: 8 rows
+    // end at local 124 and the heading must start below that.
+    expect(heading.y).toBeGreaterThanOrEqual(BOARD_END_LOCAL);
+    expect(GAMEOVER_BOARD_ROWS).toBeLessThan(10); // trimming the board is what made the band exist
+  });
+
+  test('the block does not run through the retry buttons or the XP row', () => {
+    const { geom } = block();
+    const last = geom.rows[geom.rows.length - 1];
+    const lastScreen = rect(LEDGER.x + last.x, LEDGER.y + last.y, last.w, last.h);
+    // Luna's round-2 finding: the first attempt ended near screen y 251, through the buttons at
+    // 220..244 and the XP line at 246.
+    expect(overlaps(lastScreen, BUTTONS)).toBe(false);
+    expect(lastScreen.y + lastScreen.h).toBeLessThanOrEqual(BUTTONS.y);
   });
 });
 

@@ -103,14 +103,19 @@ def check_pause(path):
 def check_gameover(path):
     w, h, buf = raw_rgb(path)
     ok = True
-    # RUN REPORT panel: x 14..240, y 54..214. Mission rows were placed at y 172..197.
-    ink = band_ink(buf, w, 24, 170, 232, 200)
+    # The mission block lives in the LEDGER panel (x 250..466, y 54..214): local 136..159 -> screen
+    # 190..213. Luna's round-2 finding was the first attempt hanging past the panel and through the
+    # retry buttons, so this checks for content here AND emptiness in the button band.
+    ink = band_ink(buf, w, 258, 190, 460, 212)
     ok &= report("gameover: mission rows have content", ink > 300, f"ink={ink} px")
-    # Panel bottom edge is y 214. Below it is the button row (RETRY at y 220), so the assertion is
-    # that the mission block stays ABOVE 214 — checked by requiring the band just under the last
-    # mission row (y 200..212) to hold nothing but the panel border, not mission text.
-    gap = band_ink(buf, w, 24, 209, 232, 213, thresh=110)
-    ok &= report("gameover: mission block stays inside panel", gap < 400, f"ink={gap} px")
+    # The button band legitimately holds the RETRY / NEW SEED / TITLE labels, so "no ink there" is
+    # wrong — that assertion failed on the buttons themselves, not on missions. What must be true is
+    # that the mission block ends above the band: its lowest ink row has to be inside the panel.
+    rows = [vy for vy in range(190, 216) if band_ink(buf, w, 258, vy, 460, vy + 1) > 0]
+    last = max(rows) if rows else 0
+    ok &= report("gameover: mission block ends above the button band", 0 < last < 214, f"last mission row y={last}")
+    below = band_ink(buf, w, 250, 214, 470, 219)
+    ok &= report("gameover: mission block stays inside the ledger panel", below == 0, f"ink={below} px")
     return ok
 
 

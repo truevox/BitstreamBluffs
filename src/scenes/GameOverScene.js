@@ -16,7 +16,7 @@ import { updateSetting } from '../services.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
-import { columnRows } from '../ui/MissionsLayout.js';
+import { columnRows, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS } from '../ui/MissionsLayout.js';
 import { ellipsize } from '../ui/PixelFont.js';
 import { Panel } from '../ui/Panel.js';
 import { Button } from '../ui/Button.js';
@@ -56,7 +56,10 @@ export class GameOverScene extends Phaser.Scene {
     this._buildHeader();
     this._buildStats();
     this.right = new Panel(this, theme, { x: 250, y: PANEL_Y, w: 216, h: PANEL_H, color: 'cyan', title: 'LEDGER', fillAlpha: 0.9 });
-    this.board = new LeaderboardTable(this, theme, { x: 8, y: 22, w: 200, entries: null, parent: this.right });
+    this.board = new LeaderboardTable(this, theme, { x: 8, y: 22, w: 200, entries: null, rows: GAMEOVER_BOARD_ROWS, parent: this.right });
+    // Must come after this.right exists: the mission block lives in the LEDGER panel, and calling it
+    // from _buildStats() drew nothing at all because the panel was not constructed yet.
+    this._buildMissions();
     this._buildButtons();
     this._buildProgression();
     this.footer = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 5, 'SPACE / ENTER / A / TAP = RETRY SAME SEED', {
@@ -152,7 +155,6 @@ export class GameOverScene extends Phaser.Scene {
       x: 182, y: 140, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
     });
     p.add(this.copyBtn);
-    this._buildMissions(p);
     this.tweens.addCounter({
       from: 0, to: rec.score || 0, duration: Math.min(700, 200 + (rec.score || 0) * 0.2),
       onUpdate: (t) => this.scoreText.setText(fmtInt(t.getValue())),
@@ -161,22 +163,32 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   /**
-   * W2: the three missions with their standing progress, in the free band at the bottom of RUN
-   * REPORT (the report rows end ~124 and the seed row at 158; the panel runs to PANEL_H=160 → y 214).
-   * Rows and bars come from columnRows() so the fit is unit-tested, not eyeballed.
+   * W2: the three missions with their standing progress.
+   *
+   * They live in the LEDGER panel's unused bottom band (local y 104..160), NOT in RUN REPORT: that
+   * panel is full to its floor (8 report rows to local 128, then the ledger hash at 132, seed at 144
+   * and the COPY button ending at 154, with the panel floor at 160). Luna's round-2 audit caught the
+   * first attempt doing exactly that — it hung the rows past the panel, through the retry buttons at
+   * screen y 220..244 and the XP line at 246. The board ends at local 103, so this band is the only
+   * one on the screen that is genuinely empty; the geometry is asserted in
+   * tests/src/missionslayout.test.js against the real panel and button bands.
    */
-  _buildMissions(p) {
+  _buildMissions() {
     try {
       const view = this.registry.get(REG.MISSIONS);
       const rows = (view && view.active) || [];
       if (!rows.length) return;
-      const geom = columnRows({ x: 8, y: 172, w: 210, count: Math.min(3, rows.length), rowH: 9, barH: 2 });
-      p.add(new NeonText(this, this.theme, 8, 162, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
+      // No soft `if (!p) return` here: that is what let the block silently draw nothing when it ran
+      // before the LEDGER panel existed. A missing panel is a construction-order bug and must be loud.
+      const p = this.right;
+      if (!p) throw new Error('GameOverScene._buildMissions: LEDGER panel missing — call after this.right exists');
+      const geom = columnRows({ x: 8, y: GAMEOVER_MISSIONS_Y, w: 200, count: Math.min(3, rows.length), rowH: GAMEOVER_ROW_H, barH: 2 });
+      p.add(new NeonText(this, this.theme, 8, GAMEOVER_MISSIONS_Y - 10, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
       rows.slice(0, 3).forEach((row, i) => {
         const r = geom.rows[i];
         const b = geom.bars[i];
         if (!r || !b) return;
-        const label = new NeonText(this, this.theme, r.x, r.y, ellipsize(row.title, 150), {
+        const label = new NeonText(this, this.theme, r.x, r.y, ellipsize(row.title, 122), {
           color: row.done ? 'lime' : 'text', outline: 'none',
         });
         label.setAlpha(0.9);
@@ -190,7 +202,7 @@ export class GameOverScene extends Phaser.Scene {
           g.fillRect(b.x, b.y, Math.max(1, Math.round(b.w * frac)), b.h);
         }
         p.add(g);
-        const pct = new NeonText(this, this.theme, 218, r.y, `${Math.round(frac * 100)}%`, {
+        const pct = new NeonText(this, this.theme, 204, r.y, `${Math.round(frac * 100)}%`, {
           color: row.done ? 'lime' : 'text', anchor: 'right', outline: 'none',
         });
         pct.setAlpha(0.7);
