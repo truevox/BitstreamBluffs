@@ -334,7 +334,11 @@ export class ProfileView extends View {
         },
         set: (v) => this._setBiome(r.id, Boolean(v)),
       }));
-      this.sigMenu = new MenuList(scene, theme, { x: 10, y: 150, w: 180, rowH: 11, items, color: 'magenta', parent: this.panel });
+      // Geometry from the layout, so the menu can never be drawn on top of the biome names again.
+      const band = layout.toggleMenu;
+      this.sigMenu = new MenuList(scene, theme, {
+        x: band.x, y: band.y, w: band.w, rowH: band.rowH, items, color: 'magenta', parent: this.panel,
+      });
     }
   }
 

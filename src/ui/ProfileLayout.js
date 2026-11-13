@@ -142,15 +142,45 @@ export function profileLayout(o = {}) {
     ? 'SIGNATURE LOCKED - COMING ONLINE'
     : `${sigCount} SIGNATURE${sigCount === 1 ? '' : 'S'} ONLINE`;
   items.push(box('sig-note', note, RIGHT, 132, 'text', { align: 'right', alpha: 0.7 }));
-  order.forEach((id, i) => {
+  // Signature names sit ABOVE the toggle menu, not behind it. Luna's round-2 finding: the menu was
+  // drawn at y=150 in Views.js while the names ran from y=146, so the ON/OFF rows covered the names.
+  // The geometry lives here now so overlap stays unit-tested instead of depending on two files agreeing.
+  // Name pitch is 10, not 11: the shipped table has ELEVEN biomes (4 rows) and the toggle menu has to
+  // fit under them inside a 224px panel. At pitch 11 with an 11px menu the deepest row ran to y=242.
+    // NAME_TOP must clear the header row (y=132 + GLYPH_H 8) — starting at 138 overlapped it. Pitch 9 is
+  // the tightest that satisfies the GLYPH_H+1 rule in MissionsLayout, and it is what lets four name rows
+  // plus five toggle rows fit in a 224px panel.
+  const NAME_TOP = 141;
+  const NAME_PITCH = 9;
+  // Only the NOT-YET-PLAYABLE signatures get a plain name row. An unlocked biome already appears in the
+  // toggle menu below, labelled with its unlock level, so listing it twice was pure duplication - and it
+  // was the duplication that pushed the menu off the bottom of the panel.
+  const namedOnly = order.filter((id) => !sigIds.has(id));
+  namedOnly.forEach((id, i) => {
     const col = i % 3;
-    const y = 146 + Math.floor(i / 3) * 13;
+    const y = NAME_TOP + Math.floor(i / 3) * NAME_PITCH;
     const has = reached.has(id);
     // 0.55 alpha keeps even the unreached names above the 4.5:1 contrast floor in both palettes.
     items.push(box(`sig-${id}`, label(id), PAD + col * 134, y, has ? 'amber' : 'text', { alpha: has ? 1 : 0.55 }));
   });
 
-  return { w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar };
+  // The toggle menu's band: below the last name row, sized so the deepest row still clears the panel
+  // floor. Five signatures is the worst case; a sixth would push past h, which is why the height is
+  // computed from `order` rather than hardcoded.
+  const nameRows = Math.max(1, Math.ceil(namedOnly.length / 3));
+  const lastNameBottom = namedOnly.length
+    ? NAME_TOP + (nameRows - 1) * NAME_PITCH + GLYPH_H
+    : NAME_TOP - NAME_PITCH + GLYPH_H; // no plain rows: sit directly under the header
+  const toggleMenu = {
+    x: PAD + 2,
+    y: lastNameBottom + 2,
+    w: PROFILE_PANEL.w - (PAD * 2) - 4,
+    // 9 not 11: five ON/OFF rows must clear the panel floor beneath four name rows. GLYPH_H is 8, so
+    // 9 still leaves a clear row gap.
+    rowH: 9,
+  };
+
+  return { w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu, toggleRowCount: sigCount };
 }
 
 /**

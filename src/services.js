@@ -40,6 +40,7 @@ export async function createServices(game) {
     templates: game.registry.get(REG.CONTENT).missions.templates,
     // D7 tier thresholds come from the data, not from a constant in the service.
     tierUnlock: game.registry.get(REG.CONTENT).missions.tierUnlock,
+    biomeDefs: Object.values(game.registry.get(REG.CONTENT).biomes || {}),
     store: progression.store,
   });
   game.registry.set(REG.MISSIONS_SERVICE, missions);

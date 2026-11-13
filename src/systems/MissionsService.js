@@ -24,6 +24,8 @@ export class MissionsService {
     this.templates = Array.isArray(o && o.templates) ? o.templates : [];
     /** D7 tier thresholds (tier -> min Sync Level); injected from missions.json at boot. */
     this.tierUnlock = (o && o.tierUnlock) || null;
+    /** W3 biome table, so a mission for a switched-off signature is never offered. */
+    this.biomeDefs = (o && Array.isArray(o.biomeDefs)) ? o.biomeDefs : [];
     this.store = o && o.store;
     this.now = (o && o.now) || (() => Date.now());
     this.alive = true;
@@ -130,6 +132,7 @@ export class MissionsService {
     const out = rollSet(p, [], { ledgerHash: '', distanceM: 0 }, this.templates, {
       ruleId: p.missions && p.missions.ruleId ? p.missions.ruleId : null,
       tierUnlock: this.tierUnlock || undefined,
+      biomeDefs: this.biomeDefs,
     });
     this.store.applyMissions(out);
     return out;
@@ -150,6 +153,7 @@ export class MissionsService {
     const out = rollSet(p, active, record || {}, this.templates, {
       ruleId: p.missions && p.missions.ruleId ? p.missions.ruleId : null,
       tierUnlock: this.tierUnlock || undefined,
+      biomeDefs: this.biomeDefs,
       completedComboIds: this._completedThisRun,
     });
     this.store.applyMissions(out);

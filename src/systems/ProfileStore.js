@@ -152,6 +152,27 @@ export function unlockedBiomeIds(profile) {
 }
 
 /**
+ * Biomes a profile has EARNED, resolved against the shipped biome table. Pure.
+ *
+ * `unlockedBiomeIds` answers from the profile alone, which is why mission gating against
+ * `profile.unlocked.biomes` was dead code: nothing ever populated it. This resolves the derived
+ * `pendingBiomes` list against the real defs, so the answer is bounded by both what the profile
+ * reached and what actually ships. A biome id the profile mentions but the table does not have is
+ * dropped rather than trusted.
+ * @param {Object} profile
+ * @param {Array<{id:string,bit:number,unlockLevel:number}>} biomeDefs
+ * @returns {string[]}
+ */
+export function earnedBiomeIds(profile, biomeDefs) {
+  const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
+  const earned = unlockedBiomeIds(profile);
+  return defs
+    .filter((d) => d && typeof d.id === 'string' && earned.includes(d.id))
+    .sort((a, b) => (a.unlockLevel || 0) - (b.unlockLevel || 0) || a.id.localeCompare(b.id))
+    .map((d) => d.id);
+}
+
+/**
  * Toggle one unlocked biome signature on or off in a profile's mask (W3). Pure: returns a new profile,
  * never mutates the input, so a caller can decide whether to save.
  *

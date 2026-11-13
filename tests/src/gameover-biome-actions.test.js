@@ -14,6 +14,7 @@
  * These pin the actions themselves, called on the prototype, not a re-implementation.
  */
 import { jest } from '@jest/globals';
+import { shareableSeed } from '../../src/ui/Format.js';
 jest.unstable_mockModule('phaser', () => ({ default: { Scene: class {}, GameObjects: new Proxy({}, { get: () => class {} }) } }));
 jest.unstable_mockModule('../../src/data/index.js', () => ({ content: {}, loadContent: () => ({}) }));
 const { GameOverScene } = await import('../../src/scenes/GameOverScene.js');
@@ -104,5 +105,23 @@ describe('NEW SEED drops the previous run mask', () => {
     const { ctx, values } = scene({ mask: 8, profile: capped({ biomeMask: 7, pendingBiomes: ['debumont'] }) });
     GameOverScene.prototype.newSeed.call(ctx);
     expect(values.get(REG.BIOME_MASK)).toBe(1);
+  });
+});
+
+describe('share seed: the panel and the clipboard cannot disagree', () => {
+  // Luna's round-2 finding: the panel rendered `seed@mask` while COPY put the bare seed on the
+  // clipboard, so copying a share seed silently dropped the player into a different world.
+  test('a mask-31 run shares its mask', () => {
+    expect(shareableSeed({ seed: 'alpha', biomeMask: 31 })).toBe('alpha@31');
+  });
+
+  test('a mask-0 run shares a bare seed, exactly as before W3', () => {
+    expect(shareableSeed({ seed: 'alpha', biomeMask: 0 })).toBe('alpha');
+    expect(shareableSeed({ seed: 'alpha' })).toBe('alpha');
+  });
+
+  test('an empty or missing seed shares nothing rather than "@0"', () => {
+    expect(shareableSeed({ seed: '', biomeMask: 5 })).toBe('');
+    expect(shareableSeed(null)).toBe('');
   });
 });

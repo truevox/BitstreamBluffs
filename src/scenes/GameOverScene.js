@@ -159,8 +159,7 @@ export class GameOverScene extends Phaser.Scene {
     // The mask is part of the run's identity: replaying a mask-31 run on the bare seed would drop the
     // player into a different world, so the shareable seed carries the same @mask suffix the entry
     // field accepts (W3 spec). Mask 0 stays suffix-free so every existing seed string is unchanged.
-    const maskVal = Number(rec.biomeMask) || 0;
-    const seedShown = maskVal ? `${rec.seed}@${maskVal}` : String(rec.seed || '-');
+    const seedShown = shareableSeed(rec);
     this.seedText = new NeonText(this, theme, 106, 144, ellipsize(seedShown.toUpperCase(), 70), { color: 'lime', outline: 'none' });
     p.add(this.seedText);
     this.copyBtn = new Button(this, theme, {
@@ -641,7 +640,9 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   async _copySeed() {
-    const ok = await copyText(String(this.rec.seed || ''));
+    // Luna's round-2 finding: COPY handed over the bare seed while the panel showed seed@mask, so the
+    // copy button pasted the player into a different world. Both now come from shareableSeed().
+    const ok = await copyText(String(shareableSeed(this.rec) || ''));
     if (!this.alive) return;
     this.copyBtn.setLabel(ok ? 'OK!' : 'NO');
     this.seedText.setColorKey(ok ? 'amber' : 'danger');
@@ -650,7 +651,7 @@ export class GameOverScene extends Phaser.Scene {
       this.copyBtn.setLabel('COPY');
       this.seedText.setColorKey('lime');
     });
-    if (!ok) this.footer.setText(`CLIPBOARD BLOCKED - SEED: ${String(this.rec.seed).toUpperCase()}`);
+    if (!ok) this.footer.setText(`CLIPBOARD BLOCKED - SEED: ${String(shareableSeed(this.rec) || '').toUpperCase()}`);
   }
 
   update(time, delta) {

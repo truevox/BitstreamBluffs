@@ -42,3 +42,19 @@ export function idToLabel(id) {
 
 /** Maximum length of leaderboard initials (design doc 6.2: 3 by default, configurable). */
 export const INITIALS_LENGTH = 3;
+
+/**
+ * The seed a finished run should share: `seed@mask` when the run used biomes, bare seed at mask 0.
+ *
+ * One function because the panel display and the COPY button had drifted apart — the panel showed the
+ * suffix and the clipboard did not, so copying a share seed silently changed the world. Mask 0 stays
+ * suffix-free so every seed string that existed before W3 still means what it did.
+ * @param {{seed:*, biomeMask:*}} rec
+ * @returns {string}
+ */
+export function shareableSeed(rec) {
+  const seed = rec && rec.seed != null ? String(rec.seed) : '';
+  if (!seed) return '';
+  const mask = rec && Number(rec.biomeMask) || 0;
+  return mask ? `${seed}@${mask}` : seed;
+}

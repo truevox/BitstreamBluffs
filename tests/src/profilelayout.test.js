@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { profileLayout, titleBadgeLayout, overlappingPairs, statRows, fmtPlaytime, PROFILE_PANEL, TITLE_BADGE } from '../../src/ui/ProfileLayout.js';
@@ -302,5 +303,57 @@ describe('ProfileLayout — signature status reflects what W3 actually ships', (
       expect(overlappingPairs(layout.items)).toEqual([]);
       for (const it of layout.items) expect(it.x + it.w).toBeLessThanOrEqual(PROFILE_PANEL.w);
     }
+  });
+});
+
+describe('the signature toggle menu cannot cover the biome names', () => {
+  // Luna's round-2 finding #4: MenuList was created at y=150 in Views.js while the name rows started
+  // at y=146, so the ON/OFF rows drew over the names they belonged to. The band is layout data now.
+  // The real view passes content.progression, which is where biomeOrder lives; without it the layout
+  // has no names to place and this whole check would pass vacuously.
+  // The SHIPPED table, not a two-line stub: loadLevelTable falls back to a biomeOrder-less default for
+  // a table under two levels, which would make every assertion here vacuous.
+  const levels = JSON.parse(fs.readFileSync(new URL('../../src/data/progression/levels.json', import.meta.url), 'utf8'));
+  const withBiomes = (level) => ({
+    v: 1, xp: 0, level, bank: 0, biomeMask: 31,
+    pendingBiomes: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'].slice(0, level >= 12 ? 5 : 3),
+    unlocked: { biomes: [], cosmetics: [], boosts: {} },
+    missions: { counter: 0, active: [], progress: {} }, achievements: {}, credited: [],
+  });
+
+  test('the menu starts below every name row', () => {
+    const layout = profileLayout({ profile: withBiomes(12), levels });
+    const names = layout.items.filter((it) => it.key.startsWith('sig-') && it.key !== 'sig-head' && it.key !== 'sig-note');
+    expect(names.length).toBeGreaterThan(0);
+    const lowest = Math.max(...names.map((it) => it.y));
+    expect(layout.toggleMenu.y).toBeGreaterThan(lowest);
+  });
+
+  test('the menu starts below the last name row in the SHIPPED table', () => {
+    // The table lists 11 biomes, so the names occupy four rows. This is the case that actually broke.
+    const layout = profileLayout({ profile: withBiomes(12), levels });
+    const names = layout.items.filter((it) => /^sig-/.test(it.key) && it.key !== 'sig-head' && it.key !== 'sig-note');
+    const lowest = Math.max(...names.map((it) => it.y + it.h));
+    expect(layout.toggleMenu.y).toBeGreaterThanOrEqual(lowest);
+  });
+
+  test('every toggle row fits inside the panel', () => {
+    // Measured against the real shipped table: five unlocked signatures, 11 biomes in the order. The
+    // first version passed this with a stub table and still overflowed the panel by 4px in the game,
+    // because the names were listed twice - once as plain rows and again as toggle labels.
+    const layout = profileLayout({ profile: withBiomes(12), levels });
+    const bottom = layout.toggleMenu.y + 5 * layout.toggleMenu.rowH;
+    expect(bottom).toBeLessThanOrEqual(PROFILE_PANEL.h);
+  });
+
+  test('a signature is listed exactly once: either as a pending name or as a toggle', () => {
+    const layout = profileLayout({ profile: withBiomes(12), levels, playableBiomeIds: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'] });
+    const plain = layout.items.filter((it) => /^sig-/.test(it.key) && it.key !== 'sig-head' && it.key !== 'sig-note').map((it) => it.text);
+    // Playable biomes belong in the toggle menu, so none of them should also have a plain name row.
+    for (const t of ['DEBUMONT', 'GARBAGE DUMP GLACIER', 'PYRAMID PEAK']) {
+      expect({ t, listed: plain.includes(t) }).toMatchObject({ t, listed: false });
+    }
+    // Still-pending ones keep their name so the player can see what is coming.
+    expect(plain.length).toBeGreaterThan(0);
   });
 });

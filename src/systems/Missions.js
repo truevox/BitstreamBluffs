@@ -16,6 +16,7 @@
  *   combo       the same run must contain every trick in `require`
  */
 import { Rng } from './Rng.js';
+import { earnedBiomeIds, unlockedBiomeIds } from './ProfileStore.js';
 
 /** How many missions are active at once (spec §5 W2). */
 export const SLOTS = 3;
@@ -229,19 +230,29 @@ export function missionSeed(counter, extra) {
  * @param {Object} profile
  * @param {string|null} ruleId
  */
-export function isOfferable(t, profile, ruleId) {
+export function isOfferable(t, profile, ruleId, biomeDefs) {
   if (!t || typeof t !== 'object') return false;
+  const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   if (Array.isArray(t.excludedRuleIds) && ruleId && t.excludedRuleIds.includes(ruleId)) return false;
   if (t.biome) {
-    const unlocked = (profile && profile.unlocked && Array.isArray(profile.unlocked.biomes))
-      ? profile.unlocked.biomes : [];
+    // Earned, not merely listed: `profile.unlocked.biomes` is part of the profile shape but nothing
+    // populates it, so reading it alone made every biome mission unofferable to a real profile.
+    // With no table (a legacy caller) fall back to the profile's own view, which is the pre-W3
+    // behaviour; the run-start and draw paths always pass the table.
+    const unlocked = defs.length ? earnedBiomeIds(profile, defs) : unlockedBiomeIds(profile);
     if (!unlocked.includes(t.biome)) return false;
-    // biomeMask is a bitfield over the biome order; a disabled signature must not spawn missions.
+    // A disabled signature must not spawn missions for terrain the player will never see. The bit comes
+    // from the biome table, because `profile.biomeOrder` is never set - gating on it meant the mask was
+    // never consulted at all.
     const mask = profile && isNum(profile.biomeMask) ? profile.biomeMask : 0;
-    const order = (profile && Array.isArray(profile.biomeOrder)) ? profile.biomeOrder : null;
-    if (order) {
-      const idx = order.indexOf(t.biome);
-      if (idx >= 0 && (mask & (1 << idx)) === 0) return false;
+    const def = defs.find((d) => d && d.id === t.biome);
+    const bit = def && isNum(def.bit) ? def.bit : null;
+    if (bit === null) {
+      // No table to resolve against (a legacy two-argument caller): fail closed on the mask only if the
+      // profile has switched everything off, which is the one case we can decide without the table.
+      if (!mask) return false;
+    } else if ((mask & bit) === 0) {
+      return false;
     }
   }
   return true;
@@ -285,10 +296,11 @@ export function drawMissions(profile, templates, count = SLOTS, o = {}) {
   const ruleId = o.ruleId !== undefined ? o.ruleId : (profile && profile.missions && profile.missions.ruleId) || null;
   const exclude = new Set([...(o.exclude || []), ...((profile && profile.missions && profile.missions.active) || [])]);
   const unlock = o.tierUnlock || (profile && profile.missions && profile.missions.tierUnlock) || DEFAULT_TIER_UNLOCK;
+  const biomeDefs = Array.isArray(o.biomeDefs) ? o.biomeDefs : [];
   const level = (profile && Number.isFinite(profile.level)) ? profile.level : 1;
   const maxTier = maxTierForLevel(level, unlock);
   const eligible = all
-    .filter((t) => isOfferable(t, profile, ruleId))
+    .filter((t) => isOfferable(t, profile, ruleId, biomeDefs))
     .filter((t) => !exclude.has(t.id));
   // D7: low levels draw only low tiers. Filtering (rather than weighting) keeps the seed stream
   // identical for a given counter, so a saved profile's next draw is still reproducible.
@@ -419,6 +431,7 @@ export function rollSet(profile, activeTemplates, record, allTemplates, o = {}) 
     const drawnProfile = { ...p, missions: { ...prevMissions, counter, active, progress } };
     const drawn = drawMissions(drawnProfile, all, targetSlots - active.length, {
       ruleId, exclude: [...active, ...completedIds], tierUnlock: o.tierUnlock,
+      biomeDefs: o.biomeDefs,
     });
     if (!drawn.length) break;
     for (const d of drawn) {
