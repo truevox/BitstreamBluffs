@@ -196,7 +196,7 @@
                 if (ok(predict(c, hm, eta, st.ang0))) { st.releaseAt = c.tMs; st.idealFound = true; st.idealEtaMs = eta - hm; break; }
               }
               if (st.releaseAt == null && eta < 150) st.releaseAt = c.tMs;
-            } else if (eta < 150) st.releaseAt = c.tMs;
+            } else if (eta < 150 && late < 3000) st.releaseAt = c.tMs; // (--releaseLateMs >= 3000 = hold tilt into the ground: no emergency release either)
             if (st.releaseAt != null) st.idealRot = st.ang0 - sled.angleDeg;
           }
           const released = st.releaseAt != null && c.tMs >= st.releaseAt;
