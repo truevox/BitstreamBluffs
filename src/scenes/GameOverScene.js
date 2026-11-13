@@ -182,13 +182,39 @@ export class GameOverScene extends Phaser.Scene {
   _buildMissions() {
     try {
       const view = this.registry.get(REG.MISSIONS);
+      // What this run actually earned, not what was handed out for the next one. The panel previously
+      // drew only the freshly dealt actives, so a run that completed a mission and paid 60 XP showed
+      // the player three missions they had never seen and no word about the one they had just cleared
+      // (CC Friday, W2). Completed comes from the same roll the awards were credited from.
+      const completed = (view && Array.isArray(view.completed)) ? view.completed : [];
       const rows = (view && view.active) || [];
-      if (!rows.length) return;
+      if (!rows.length && !completed.length) return;
       // No soft `if (!p) return` here: that is what let the block silently draw nothing when it ran
       // before the LEDGER panel existed. A missing panel is a construction-order bug and must be loud.
       const p = this.right;
       if (!p) throw new Error('GameOverScene._buildMissions: LEDGER panel missing — call after this.right exists');
-      const geom = columnRows({ x: 8, y: GAMEOVER_MISSIONS_Y, w: 200, count: Math.min(3, rows.length), rowH: GAMEOVER_ROW_H, barH: 2 });
+      // The band fits exactly three rows and there is no spare pixel, so the rows are repurposed
+      // rather than a line being appended: completed missions first (with their payout), then the
+      // fresh actives for context. A mission cannot be both, so the two lists never double up.
+      // Payout FIRST, title after: the row is 166 px of glyphs and "Grab 15 shards in a run  +60 XP +4"
+      // measures 172, so ellipsizing from the end silently ate the shard reward - the exact number the
+      // block exists to show. Leading with the payout means a long title is what gets clipped.
+      const doneRows = completed.slice(0, 3).map((c) => ({
+        label: `${c.xp ? `+${c.xp} XP ` : ''}${c.shards ? `+${c.shards} ` : ''}${c.title}`,
+        color: 'lime',
+        done: true,
+        // A completed mission has nothing left to progress toward; the bar would be a lie at 0 or a
+        // tautology at 100, so it is omitted entirely.
+        fraction: null,
+      }));
+      const activeRows = rows.slice(0, Math.max(0, 3 - doneRows.length)).map((row) => ({
+        label: ellipsize(row.title, 200 - 30 - 4),
+        color: row.done ? 'lime' : 'text',
+        done: Boolean(row.done),
+        fraction: Math.max(0, Math.min(1, row.fraction || 0)),
+      }));
+      const listed = doneRows.concat(activeRows);
+      const geom = columnRows({ x: 8, y: GAMEOVER_MISSIONS_Y, w: 200, count: listed.length, rowH: GAMEOVER_ROW_H, barH: 2 });
       // A separator rule instead of a "MISSIONS" heading: with ten truthful leaderboard rows there is
       // no vertical room for a heading line, and a rule marks the group without claiming a row of its
       // own. The progress bars under each label carry the rest of the grouping.
@@ -196,15 +222,16 @@ export class GameOverScene extends Phaser.Scene {
       rule.fillStyle(this.theme.color('cyan'), 0.35);
       rule.fillRect(8, GAMEOVER_MISSIONS_RULE_Y, 200, 1);
       p.add(rule);
-      rows.slice(0, 3).forEach((row, i) => {
+      listed.forEach((row, i) => {
         const r = geom.rows[i];
         const b = geom.bars[i];
         if (!r || !b) return;
-        const label = new NeonText(this, this.theme, r.x, r.y, ellipsize(row.title, geom.textW), {
-          color: row.done ? 'lime' : 'text', outline: 'none',
+        const label = new NeonText(this, this.theme, r.x, r.y, ellipsize(row.label, geom.textW), {
+          color: row.color, outline: 'none',
         });
         label.setAlpha(0.9);
         p.add(label);
+        if (row.fraction === null) return; // completed: no bar (see doneRows)
         const g = this.add.graphics();
         g.fillStyle(0x1a2b3a, 1);
         g.fillRect(b.x, b.y, b.w, b.h);

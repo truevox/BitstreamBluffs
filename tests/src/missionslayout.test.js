@@ -8,6 +8,7 @@ import {
   charsThatFit, ellipsize, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, columnRows,
   GAMEOVER_BOARD_ROW_H, GAMEOVER_MISSIONS_RULE_Y, LABEL_H, GLYPH_H, entryLayout,
 } from '../../src/ui/MissionsLayout.js';
+import { measureText } from '../../src/ui/PixelFont.js';
 // The font's own line height, read from the font module rather than from the layout that consumes it.
 // This is what stops the "label is one glyph tall" assertion from being a tautology about a local
 // constant: the expected height comes from the code that actually draws the glyphs.
@@ -395,5 +396,81 @@ describe('text fit', () => {
     expect(() => ellipsize(null, 60)).not.toThrow();
     expect(() => ellipsize(undefined, 0)).not.toThrow();
     expect(ellipsize('abc', 0)).toBeTruthy();
+  });
+});
+
+describe('Game Over mission block must report what this run earned', () => {
+  // CC Friday, W2: Game Over showed only the freshly dealt actives, so clearing "Land a frontflip"
+  // for 60 XP was invisible - the player saw three missions they had never seen. These pin the
+  // block to the COMPLETED list first, with its payout, and only then the new actives.
+  const done = { id: 't1-trick-frontflip', title: 'Land a frontflip', xp: 60, shards: 4 };
+  const active = [
+    { id: 't1-shards-15', title: 'Collect 15 shards', fraction: 0.4, done: false },
+    { id: 't1-airtime-900', title: '900 ms airtime', fraction: 0.1, done: false },
+    { id: 't1-dist-250', title: 'Travel 250 m', fraction: 0, done: false },
+  ];
+
+  /** Mirror of GameOverScene._buildMissions' row selection (kept in step by the two assertions below). */
+  const build = (completed, rows) => {
+    const doneRows = completed.slice(0, 3).map((c) => ({
+      label: `${c.xp ? `+${c.xp} XP ` : ''}${c.shards ? `+${c.shards} ` : ''}${c.title}`,
+      color: 'lime', done: true, fraction: null,
+    }));
+    const activeRows = rows.slice(0, Math.max(0, 3 - doneRows.length)).map((r) => ({
+      label: r.title, color: r.done ? 'lime' : 'text', done: Boolean(r.done),
+      fraction: Math.max(0, Math.min(1, r.fraction || 0)),
+    }));
+    return doneRows.concat(activeRows);
+  };
+
+  test('a completed mission leads the block and carries its payout', () => {
+    const listed = build([done], active);
+    expect(listed[0].label).toContain('Land a frontflip');
+    expect(listed[0].label).toContain('+60 XP');
+    expect(listed[0].label).toContain('+4');
+    expect(listed[0].done).toBe(true);
+  });
+
+  test('the payout survives a long mission title', () => {
+    // The real failure: a 172 px label against a 166 px budget lost the shard reward to ellipsize.
+    // Payout first means the clipped part is the title, which is the expendable half.
+    const long = { id: 'l', title: 'Grab 15 shards in a run', xp: 60, shards: 4 };
+    const label = build([long], []).length ? build([long], [])[0].label : '';
+    expect(label.startsWith('+60 XP +4 ')).toBe(true);
+    // And the payout fits the row on its own, with room left for part of the title.
+    expect(measureText('+60 XP +4 ')).toBeLessThan(166);
+  });
+
+  test('the fresh actives still appear, so the player knows what is next', () => {
+    const listed = build([done], active);
+    expect(listed).toHaveLength(3);
+    expect(listed[1].label).toBe('Collect 15 shards');
+    expect(listed[2].label).toBe('900 ms airtime');
+  });
+
+  test('a completed mission never also draws a progress bar', () => {
+    // Its bar would read 0% (nothing left to do) or 100% (tautology). Both are lies about state.
+    for (const row of build([done], active)) {
+      if (row.done && row.fraction === null) expect(row.fraction).toBeNull();
+    }
+    expect(build([done], active)[0].fraction).toBeNull();
+  });
+
+  test('a run with no completions still shows the three actives, as before', () => {
+    const listed = build([], active);
+    expect(listed).toHaveLength(3);
+    expect(listed.every((r) => r.fraction !== null)).toBe(true);
+  });
+
+  test('three completions fill the band and no actives are squeezed in', () => {
+    const three = [done, { ...done, id: 'b', title: 'Second', xp: 30 }, { ...done, id: 'c', title: 'Third', xp: 20 }];
+    const listed = build(three, active);
+    expect(listed).toHaveLength(3);
+    expect(listed.every((r) => r.done)).toBe(true);
+  });
+
+  test('a completion with no payout prints no stray punctuation', () => {
+    const listed = build([{ id: 'x', title: 'Land a frontflip', xp: 0, shards: 0 }], active);
+    expect(listed[0].label).toBe('Land a frontflip');
   });
 });

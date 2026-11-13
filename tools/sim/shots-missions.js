@@ -125,9 +125,23 @@
     game.scene.start('GameOverScene');
     step(env, 40);
     await palette(env, c, 'default');
+    // Read back the ACTUAL text objects the scene drew into the LEDGER panel, so this proves the
+    // block reports the payout rather than merely that a PNG exists.
+    const go = game.scene.getScene('GameOverScene');
+    const drawn = [];
+    try {
+      const walk = (o) => {
+        if (!o) return;
+        if (o.main && typeof o.main.text === 'string' && o.main.text) drawn.push(o.main.text);
+        if (o.list) o.list.forEach(walk);
+      };
+      walk(go.right);
+    } catch (e) { /* cosmetic */ }
     const meta = {
       completed: awards && awards.missions ? awards.missions.completed.length : 0,
       xp: awards && awards.xp ? awards.xp.total : 0,
+      payoutLabels: drawn.filter((t) => /\+\d+\s*XP/.test(t)),
+      missionLabels: drawn.slice(-6),
     };
     await window.__shot('w2-gameover-missions-default', meta);
     await palette(env, c, 'colorblind');
