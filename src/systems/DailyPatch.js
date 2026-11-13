@@ -102,6 +102,26 @@ export class DailyPatch {
   }
 
   /**
+   * The daily run's biome mask (W3, D6). Derived from the UTC date key ALONE, by a pure function, so every
+   * player runs the same mask on the same day regardless of what they have unlocked - that is the point
+   * of D6: a locked biome may appear as a preview. Widening it with unlocks would make the daily
+   * leaderboard compare different terrain for different players.
+   *
+   * Cycle is 9 days: 4 clear days (mask 0, the terrain everyone knows) followed by one day for each of the
+   * batch-1 signature biomes, so a daily is usually the classic run with a preview featured regularly.
+   * @param {Date|number} [when=new Date()]
+   * @returns {number} biome mask.
+   */
+  static biomeMaskForDate(when = new Date()) {
+    const d = when instanceof Date ? when : new Date(typeof when === 'number' ? when : Date.now());
+    const t = Number.isNaN(d.getTime()) ? Date.now() : d.getTime();
+    const dayNumber = Math.floor(t / DAY_MS);
+    // 4 clear days + one day per batch-1 biome (bits 1,2,4,8,16). W6 extends this with the other six.
+    const CYCLE = [0, 0, 0, 0, 1, 2, 4, 8, 16];
+    return CYCLE[((dayNumber % CYCLE.length) + CYCLE.length) % CYCLE.length];
+  }
+
+  /**
    * @param {string} id
    * @returns {DailyRule|null}
    */

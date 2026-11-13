@@ -136,6 +136,72 @@ function grantLevelRewards(profile, levelBefore, table) {
  * @param {*} levels
  * @returns {{profile:Object, awards:Object}|null} null when already credited or the record is unusable.
  */
+/**
+ * Biomes a profile has actually unlocked. `pendingBiomes` is derived from the level table on every
+ * sanitize, so it is the one field that is always in step with XP; `unlocked.biomes` is part of the
+ * profile shape but nothing populates it yet, so reading it alone would report every biome locked.
+ * Pure.
+ * @param {Object} profile
+ * @returns {string[]}
+ */
+export function unlockedBiomeIds(profile) {
+  if (!profile || typeof profile !== 'object') return [];
+  const pending = Array.isArray(profile.pendingBiomes) ? profile.pendingBiomes : [];
+  const listed = (profile.unlocked && Array.isArray(profile.unlocked.biomes)) ? profile.unlocked.biomes : [];
+  return [...new Set([...pending, ...listed])];
+}
+
+/**
+ * Toggle one unlocked biome signature on or off in a profile's mask (W3). Pure: returns a new profile,
+ * never mutates the input, so a caller can decide whether to save.
+ *
+ * Refuses a biome the player has not unlocked: a toggle that honoured a locked bit would let a profile
+ * see terrain it never earned. An unknown id is likewise a no-op rather than an error, because this is
+ * driven by UI ids and must never throw.
+ *
+ * @param {Object} profile
+ * @param {string} biomeId
+ * @param {Array<{id:string,bit:number}>} biomeDefs
+ * @returns {Object} the same profile object when nothing changed, else a shallow copy.
+ */
+export function toggleBiome(profile, biomeId, biomeDefs) {
+  if (!profile || typeof profile !== 'object') return profile;
+  const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
+  const def = defs.find((d) => d && d.id === biomeId);
+  if (!def || !Number.isFinite(def.bit)) return profile;
+  const unlocked = unlockedBiomeIds(profile);
+  if (!unlocked.includes(biomeId)) return profile;
+  const mask = (profile.biomeMask >>> 0) || 0;
+  const next = (mask & def.bit) ? (mask & ~def.bit) >>> 0 : (mask | def.bit) >>> 0;
+  if (next === mask) return profile;
+  return { ...profile, biomeMask: next };
+}
+
+/**
+ * The biome toggle rows a Profile view should show: every biome in unlock order, with the player's
+ * current state. Pure, so the view stays a renderer and this stays testable.
+ * @param {Object} profile
+ * @param {Array<{id:string,bit:number,name:string,unlockLevel:number}>} biomeDefs
+ * @returns {Array<{id:string,name:string,bit:number,unlockLevel:number,unlocked:boolean,enabled:boolean}>}
+ */
+export function biomeToggleRows(profile, biomeDefs) {
+  const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
+  const unlocked = unlockedBiomeIds(profile);
+  const mask = (profile && profile.biomeMask) >>> 0 || 0;
+  return defs
+    .filter((d) => d && d.id && Number.isFinite(d.bit))
+    .slice()
+    .sort((a, b) => (a.unlockLevel || 0) - (b.unlockLevel || 0) || a.id.localeCompare(b.id))
+    .map((d) => ({
+      id: d.id,
+      name: d.name || d.id,
+      bit: d.bit,
+      unlockLevel: d.unlockLevel || 1,
+      unlocked: unlocked.includes(d.id),
+      enabled: unlocked.includes(d.id) && (mask & d.bit) !== 0,
+    }));
+}
+
 export function creditRun(profile, record, levels) {
   const table = loadLevelTable(levels);
   const base = sanitizeProfile(profile, table);

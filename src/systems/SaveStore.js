@@ -96,6 +96,34 @@ export function sanitizeSettings(raw) {
  * @param {any} v
  * @returns {string} '' if not a string.
  */
+/**
+ * Parse a seed that may carry a biome-mask suffix, `seed@mask` (W3). Pure.
+ *
+ * The suffix form exists so a player can replay a specific biome layout from the seed field; a bare
+ * seed is mask 0 and behaves exactly as before, so every existing seed string keeps its meaning. A
+ * malformed suffix is not an error: the whole string is treated as a seed, because a seed is arbitrary
+ * user text and rejecting it would lose the run the player asked for.
+ *
+ * @param {string} raw
+ * @param {Array<{bit:number}>} [biomeDefs] content, to bound the mask to biomes that exist.
+ * @returns {{seed:string, biomeMask:number, hadSuffix:boolean}}
+ */
+export function parseSeedMask(raw, biomeDefs) {
+  const str0 = typeof raw === 'string' ? raw.trim() : '';
+  const m = /^(.*?)@(\d{1,10})$/.exec(str0);
+  if (!m || !m[1]) return { seed: str0, biomeMask: 0, hadSuffix: false };
+  let mask = Number(m[2]) >>> 0;
+  const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
+  if (defs.length) {
+    // Only keep bits that correspond to a real biome: a mask naming a non-existent biome would produce
+    // sectors with no palette and no chunks.
+    let known = 0;
+    for (const d of defs) if (d && Number.isFinite(d.bit)) known |= d.bit;
+    mask &= known;
+  }
+  return { seed: m[1], biomeMask: mask, hadSuffix: true };
+}
+
 export function normalizeInitials(v) {
   if (typeof v !== 'string') return '';
   // eslint-disable-next-line no-control-regex
@@ -136,6 +164,12 @@ export function sanitizeRun(raw) {
   };
   for (const k of ['shards', 'nearMisses', 'bonusPoints']) {
     if (typeof raw[k] === 'number' && Number.isFinite(raw[k]) && raw[k] >= 0) r[k] = raw[k];
+  }
+  // W3 (mask-scoped stats): the biome mask the run was played on. Whitelisted ONLY - deliberately not
+  // part of the ledger hash (computeLedgerHash is unchanged) and not accompanied by a saveVersion bump,
+  // so every existing record keeps its identity and old records without the field count as mask 0.
+  if (typeof raw.biomeMask === 'number' && Number.isFinite(raw.biomeMask) && raw.biomeMask >= 0) {
+    r.biomeMask = Math.floor(raw.biomeMask) >>> 0;
   }
   const ini = normalizeInitials(raw.initials);
   if (ini.length >= INITIALS_MIN) r.initials = ini;
@@ -477,11 +511,17 @@ export class SaveStore {
   getSeedStats(seed, opts = {}) {
     if (typeof seed !== 'string' || !seed) return null;
     const ex = opts && typeof opts.excludeRunId === 'string' ? opts.excludeRunId : null;
+    // D6: seed-best compares only within the same biome mask, because two masks are different terrain.
+    // `biomeMask` is opt-in: when the caller does not pass it, every run on the seed is compared, which
+    // is the pre-W3 behaviour this method had and what the legacy tests and leaderboard still expect.
+    const wantMask = opts && Number.isFinite(opts.biomeMask) ? opts.biomeMask >>> 0 : null;
     let attempts = 0;
     let bestScore = 0;
     let bestDistanceM = 0;
     for (const r of this.runs) {
       if (r.seed !== seed || (ex !== null && r.id === ex)) continue;
+      // Old records predate the field and are mask 0 by definition (they were played before biomes).
+      if (wantMask !== null && ((r.biomeMask >>> 0) || 0) !== wantMask) continue;
       attempts++;
       if (r.score > bestScore) bestScore = r.score;
       if (r.distanceM > bestDistanceM) bestDistanceM = r.distanceM;
@@ -498,6 +538,12 @@ export class SaveStore {
    */
   getDailyStats(when = new Date(), opts = {}) {
     const info = DailyPatch.getDailyInfo(toDate(when));
+    // D6's "daily-best compares only within the same biome mask" needs no filter here, and adding one
+    // would be wrong: the daily mask is derived from the DATE (DailyPatch.biomeMaskForDate), so every
+    // run on a given daily seed was played at that same mask by definition. Filtering on the stored
+    // field would additionally hide every run recorded before W3 - those have no `biomeMask`, count as
+    // mask 0, and would silently vanish from the daily leaderboard on any day whose derived mask is
+    // non-zero. The seed already scopes the mask; that is the invariant.
     const s = this.getSeedStats(info.seed, opts);
     return s ? { ...s, dateKey: info.dateKey } : null;
   }
