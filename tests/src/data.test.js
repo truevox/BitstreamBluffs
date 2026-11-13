@@ -83,14 +83,21 @@ describe('chunk templates', () => {
 
 describe('terrain mods', () => {
   test('the three documented mods exist with schema fields and valid palette keys', () => {
-    expect(mods.map((m) => m.id).sort()).toEqual(['compression', 'highBandwidth', 'wirelessBridge']);
+    // The three base mods are pinned by name: they back existing chunk templates, so removing or
+    // renaming one is a content break. Biome mods (W3) are additive, so this asserts containment
+    // rather than an exact list - W3 adds five, W6 will add six more.
+    expect(mods.map((m) => m.id)).toEqual(expect.arrayContaining(['compression', 'highBandwidth', 'wirelessBridge']));
     for (const m of mods) {
       expect(PALETTE_KEYS).toContain(m.colorKey);
       expect(m.weight).toBeGreaterThan(0);
       expect(m.minDistanceM).toBeGreaterThanOrEqual(0);
       expect(m.lengthPx).toHaveLength(2);
       expect(m.lengthPx[0]).toBeLessThanOrEqual(m.lengthPx[1]);
-      expect(Object.keys(m.physics).length).toBeGreaterThan(0);
+      // A mod must do SOMETHING: either physics (the original contract) or a scoring multiplier
+      // (W3's Crystal Cavern echo). A mod with neither would be a zone the player cannot feel.
+      const physical = Object.keys(m.physics || {}).length > 0;
+      const scoring = Number.isFinite(m.scoreMul) && m.scoreMul > 1;
+      expect({ id: m.id, acts: physical || scoring }).toMatchObject({ id: m.id, acts: true });
     }
   });
 

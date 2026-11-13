@@ -31,6 +31,11 @@ export const SCENES = Object.freeze({
 export const REG = Object.freeze({
   /** @type {string} current run seed string (set by TitleScene, read by RunScene). */
   SEED: 'seed',
+  /**
+   * @type {number} biome mask for the next run (W3; set by TitleScene, read by RunScene). 0 = base terrain.
+   * Additive: absent means 0, so every existing path that never sets it behaves exactly as before.
+   */
+  BIOME_MASK: 'biomeMask',
   /** @type {import('./systems/SaveStore.js').Settings} live settings object. Mutate only via updateSetting(). */
   SETTINGS: 'settings',
   /** @type {import('./systems/SaveStore.js').SaveStore} */

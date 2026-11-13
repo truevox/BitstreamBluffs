@@ -64,6 +64,15 @@ export const NOISE_CREST_TURN_DEG = 6;
 export const SHARP_TAGS = ['kicker', 'jump-lip', 'launch', 'big-air', 'drop', 'steps', 'jump-gen'];
 /** Sectors: every SECTOR_M metres difficulty steps up and a calm breather chunk starts the sector. */
 export const SECTOR_M = 500;
+
+/**
+ * Sectors whose content is always base Bitstream, whatever the mask (spec W3: "Sectors 0 and 1 are always
+ * base Bitstream. From sector 2, each sector is base or one enabled biome."). Sector numbers here are
+ * 0-based (sector n starts at n * SECTOR_M); TerrainChunk.sector is the same value 1-based for display.
+ */
+export const BASE_SECTORS = 2;
+/** Weight of a base-Bitstream sector against the enabled biomes, once biomes can appear. */
+export const BIOME_BASE_WEIGHT = 2.2;
 /** Hazard gentleness: no hazards before HAZARD_SOFT_PX (80 m); only non-crash hazards before HAZARD_SAFE_PX (150 m). */
 export const HAZARD_SOFT_PX = 1600;
 export const HAZARD_SAFE_PX = 3000;
@@ -200,12 +209,45 @@ function vnoise(x, seed) {
  * @property {number} [pxPerMeter=20]
  */
 
+/**
+ * Which biome a sector is drawn as. Pure and seed-deterministic: the answer depends only on
+ * (seed, sector, mask), never on call order or on how much terrain has been generated, so a chunk built
+ * late by streaming is identical to one built early.
+ *
+ * Draws from `Rng.fork('biome')`, an independent stream, so asking this question never advances the
+ * terrain, hazard or shard streams. That is what lets `biomeMask = 0` stay byte-identical to the
+ * pre-W3 generator (pinned by tests/src/terrain-golden-mask0.test.js).
+ *
+ * @param {string|number} seed run seed.
+ * @param {number} sector 0-based sector index.
+ * @param {number} biomeMask bitfield of enabled biome bits.
+ * @param {Array<{id:string,bit:number,weight?:number}>} [biomeDefs] content; defaults to none.
+ * @returns {string|null} biome id, or null for base Bitstream.
+ */
+export function biomeForSector(seed, sector, biomeMask, biomeDefs) {
+  if (!(sector >= BASE_SECTORS)) return null;
+  const mask = biomeMask >>> 0;
+  if (!mask) return null;
+  const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
+  // Eligible = the biome is in the mask AND we actually have its definition (a mask bit with no content
+  // would otherwise be a sector with no palette and no chunks).
+  const eligible = defs.filter((d) => d && d.bit && (mask & d.bit) !== 0);
+  if (!eligible.length) return null;
+  const rng = new Rng(xxHash32(`biome:${sector}`, new Rng(seed).baseSeed));
+  const pick = rng.weighted(
+    eligible.concat([{ id: null, weight: BIOME_BASE_WEIGHT }]),
+    (d) => d.weight || 1,
+  );
+  return pick && pick.id ? pick.id : null;
+}
+
 export class TerrainGenerator {
   /** @param {TerrainGeneratorOptions} options */
   constructor(options) {
     this.options = options;
     this.screenW = options.screenWidthPx || 480;
     this.ppm = options.pxPerMeter || 20;
+    this.seed = String(options.seed);
     this.rng = new Rng(options.seed).fork('terrain');
     this.seedState = this.rng.baseSeed;
 
@@ -221,6 +263,9 @@ export class TerrainGenerator {
     this.powerupList = toList(options.powerupDefs).sort(byId);
     this.modMap = {};
     for (const m of toList(options.modDefs)) this.modMap[m.id] = m;
+    /** Biome defs (W3, additive): drives sector assignment, palettes and biome chunk preference. */
+    this.biomeDefs = toList(options.biomeDefs).sort(byId);
+    this.biomeMask = Number.isFinite(options.biomeMask) ? options.biomeMask >>> 0 : 0;
 
     /** @type {Map<number, import('../data/schemas.js').TerrainChunk>} */
     this.active = new Map();
@@ -507,12 +552,24 @@ export class TerrainGenerator {
     return Math.floor(startX / this.ppm / SECTOR_M) + 1;
   }
 
+  /**
+   * Biome of the 0-based sector a chunk starts in, or null. Chunks are shorter than a sector, so a
+   * chunk that starts in a biome sector belongs to it; a chunk straddling a boundary is assigned by
+   * its START, which keeps the assignment a pure function of the chunk's own start position.
+   * @param {{startX:number}} b
+   * @returns {string|null}
+   */
+  _biomeForChunk(b) {
+    if (!this.biomeMask || !this.biomeDefs.length) return null;
+    return biomeForSector(this.seed, this._sectorOf(b.startX) - 1, this.biomeMask, this.biomeDefs);
+  }
+
   /** The first chunk that starts inside a new sector is a calm "breather". */
   _isBreather(index, b) {
     return index > 0 && this._sectorOf(b.startX) > this._sectorOf(this.bounds[index - 1].startX);
   }
 
-  _pickDef(index, b, distM, diff, plan) {
+  _pickDef(index, b, distM, diff, plan, biomeDef) {
     if (index === 0) return JUMP_DEF; // gentle opening: speed-building run into one easy jump
     const breather = this._isBreather(index, b);
     if (!breather && b.pos >= b.packSize) {
@@ -521,6 +578,14 @@ export class TerrainGenerator {
       if (pick) return pick;
     }
     let cand = this._eligible(this.splineDefs, distM);
+    // Biome flavour: inside a biome sector prefer that biome's chunk templates. This is a PREFERENCE,
+    // not a filter - if the templates are not eligible at this distance (or absent) the sector still
+    // gets ordinary terrain, so a biome can never create a hole in the ramp.
+    if (biomeDef && !breather) {
+      const ids = biomeDef.chunks || [];
+      const flavoured = cand.filter((d) => ids.includes(d.id));
+      if (flavoured.length) cand = flavoured;
+    }
     if (breather) {
       const calm = cand.filter((d) => d.tags && d.tags.some((t) => t === 'recover' || t === 'cruise' || t === 'roller' || t === 'intro'));
       if (calm.length) cand = calm;
@@ -547,7 +612,9 @@ export class TerrainGenerator {
     const crng = new Rng(hashInts(this.seedState, index + 1));
     const plan = crng.fork('plan');
     const shape = crng.fork('shape');
-    const def = this._pickDef(index, b, distM, diff, plan);
+    const biome = this._biomeForChunk(b);
+    const biomeDef = biome ? this.biomeDefs.find((d) => d.id === biome) : null;
+    const def = this._pickDef(index, b, distM, diff, plan, biomeDef);
     const kind = def.kind === 'noise' || def.kind === 'bridge' ? def.kind : 'spline';
     const isJump = def === JUMP_DEF;
     const breather = this._isBreather(index, b);
@@ -627,6 +694,13 @@ export class TerrainGenerator {
     target.launches.length = 0;
     target.sector = this._sectorOf(startX);
     target.breather = breather;
+    // Present only when the chunk is inside a biome. Keeping the field absent (rather than null) for
+    // base terrain is deliberate: it makes mask-0 chunks byte-identical under JSON.stringify, which is
+    // what the pre-existing hazard-fill digest test compares - an additive `biome: null` would have
+    // tripped a regression guard that has nothing to do with biomes. Chunk objects are pooled, so a
+    // recycled chunk MUST have the field cleared or it would keep the previous sector's biome.
+    if (biome) target.biome = biome;
+    else if (target.biome !== undefined) delete target.biome;
 
     if (kind === 'bridge') {
       const br = def.bridge || { gapPx: 176, bounceBoost: 420 };
@@ -641,6 +715,7 @@ export class TerrainGenerator {
       }
     } else {
       this._placeZones(target, def, crng.fork('zone'), distM, L);
+      if (biomeDef) this._placeBiomeZone(target, biomeDef, crng.fork('biomeZone'), distM);
     }
     const vExp = expectedSpeedPxS(distM);
     const lips = kind === 'bridge' ? this._padLips(target, vExp) : this._findLips(target.points, isJump ? Math.min(vExp, JUMP_LAUNCH_SPEED_PX_S) : vExp * TEMPLATE_LIP_SPEED_MUL, target.endX);
@@ -1007,6 +1082,28 @@ export class TerrainGenerator {
   }
 
   // ------------------------------------------------------------------------------------------------- spawns
+
+  /**
+   * The biome's signature mechanic, as a zone inside a biome sector. Bounded length, never the whole
+   * chunk, and never overlapping an existing zone of the same mod. Uses its own forked stream so it
+   * cannot shift hazards, shards or power-ups.
+   * @param {import('../data/schemas.js').TerrainChunk} chunk
+   * @param {{id:string, mod:string}} biomeDef
+   * @param {import('./Rng.js').Rng} rng
+   * @param {number} distM
+   */
+  _placeBiomeZone(chunk, biomeDef, rng, distM) {
+    const m = this.modMap[biomeDef.mod];
+    if (!m) return;
+    if ((m.minDistanceM || 0) > distM) return;
+    const range = m.lengthPx || [400, 800];
+    const maxLen = chunk.endX - chunk.startX - 2 * 96;
+    if (maxLen < 160) return;
+    if (!rng.chance(0.75)) return;
+    const len = Math.min(maxLen, Math.round(rng.range(range[0], range[1])));
+    const x0 = Math.round(chunk.startX + rng.range(96, chunk.endX - chunk.startX - len - 96));
+    chunk.zones.push({ modId: m.id, x0, x1: x0 + len });
+  }
 
   _placeZones(chunk, def, rng, distM, L) {
     const ids = def.modIds || [];

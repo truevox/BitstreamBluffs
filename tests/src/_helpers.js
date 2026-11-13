@@ -22,6 +22,7 @@ export function loadContent() {
     hazards: byId(readDir('hazards')),
     powerups: byId(readDir('powerups')),
     terrainMods: byId(readDir('terrainMods')),
+    biomes: byId(readDir('biomes')),
   };
 }
 
@@ -33,6 +34,7 @@ export function makeGen(seed = 'test-seed', overrides = {}) {
     hazardDefs: c.hazards,
     powerupDefs: c.powerups,
     modDefs: c.terrainMods,
+    biomeDefs: Object.values(c.biomes),
     ...overrides,
   });
 }
