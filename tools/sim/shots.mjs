@@ -35,6 +35,7 @@ try {
   await page.addInitScript({ path: path.join(here, 'shots-page.js') });
   await page.addInitScript({ path: path.join(here, 'shots-zoom.js') });
   await page.addInitScript({ path: path.join(here, 'shots-hud.js') });
+  await page.addInitScript({ path: path.join(here, 'shots-progression.js') });
   const shots = [];
   await page.exposeFunction('__shot', async (name, meta) => {
     const file = path.join(outDir, `${name}.png`);
@@ -62,7 +63,9 @@ try {
     result.zoom = await page.evaluate((o) => window.__shotsZoom.run(o), opts);
   } else if (mode === 'hud') {
     result.hud = await page.evaluate((o) => window.__shotsHud.run(o), opts);
-  } else throw new Error('mode: hints | zoom | hud');
+  } else if (mode === 'progression') {
+    result.progression = await page.evaluate((o) => window.__shotsProgression.run(o), opts);
+  } else throw new Error('mode: hints | zoom | hud | progression');
   writeFileSync(path.join(outDir, `${mode}.json`), JSON.stringify(result, null, 1));
   console.log('done', shots.length, 'shots');
 } finally {

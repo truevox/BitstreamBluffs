@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.2.0 - unreleased (W1: pilot profile, Resonance, Sync Levels)
+
+### ✅ Added
+- **Pilot profile** (`src/systems/ProfileStore.js`, with the pure logic in `src/systems/Progression.js`) stored under its own `localStorage` key `bb.profile` with its own `v` field, so `sanitizeSettings` (which drops unknown keys) never touches it and `STORAGE.saveVersion` does not change. Missing or throwing storage degrades to an in-memory profile. A corrupt or future-version profile loads as a clean default and never throws.
+- **XP and Sync Levels** (`src/systems/Progression.js`, `src/data/progression/levels.json`): `xpForRun`, `levelForXp`, `xpToNext`, `rewardsForLevel`. 30 levels, thresholds and rewards live in data, not code. XP parts: 1 per 10 m, 1 per 50 score, 12 per trick, 5 per shard, 2 per near miss, 1 per 2 s of airtime.
+- **Progression service** (`src/systems/ProgressionService.js`) created in `createServices` under the new `REG.PROGRESSION` key. It listens to `EVT.RUN_END`, credits the run synchronously, saves the profile, and publishes an awards object under `REG.LAST_AWARDS`. Crediting is idempotent on `record.ledgerHash`, so a replayed `RUN_END` cannot double-award. On a device that already has runs, lifetime totals and XP are backfilled once. `RunScene` is not edited.
+- **Game Over Resonance row**: XP earned, current Sync Level, a Resonance bar for progress inside the level, and on a level-up a `SYNC LEVEL n` line with what unlocked. Cosmetic only: Retry still works on frame one and cancels the pulse.
+- **Title screen**: `SYNC LEVEL n` badge with the level title, and a `PROFILE` menu item opening a read-only profile view (lifetime stats, Resonance progress, biome signatures).
+- Tests: `tests/src/progression.test.js` (19), `tests/src/profilestore.test.js` (18), `tests/src/progressionservice.test.js` (9).
+- Screenshot gate: `tools/sim/shots.mjs progression <dir>` captures Game Over (with and without a level-up), Title badge and Profile view in both the default and colour-blind palettes.
+
+### 🔧 Changed
+- `src/constants.js` gains three additive `REG` keys (`PROFILE`, `LAST_AWARDS`, `PROGRESSION`); `src/data/index.js` exposes `content.progression`; `src/services.js` creates the progression service. Signatures unchanged.
+- Title menu row height 19 → 16 px to fit the extra `PROFILE` item in the existing panel.
+- Game Over footer moved from `y-8` to `y-4` to make room for the Resonance row.
+
+### 📌 Notes
+- Biome signatures are listed in `levels.json` and shown as `SIGNATURE LOCKED - COMING ONLINE` until W3/W6 ship the biomes themselves. Nothing biome-related is playable in this release.
+- The profile is **not** part of the `BB1:` share code yet; adding it is a follow-up.
+- `playwright` (`^1.65.0`) is a `devDependency` (Marvin approved 2026-11-13) because the screenshot and sim harnesses need it.
+
 ## v2.1.1 - 2026-11-13
 
 ### ✅ Added

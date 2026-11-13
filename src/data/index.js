@@ -5,6 +5,7 @@
  * New JSON dropped into a data folder is picked up automatically at boot (design doc section 11).
  */
 import palettes from './palettes.json';
+import levels from './progression/levels.json';
 
 const chunkFiles = import.meta.glob('./chunks/*.json', { eager: true, import: 'default' });
 const hazardFiles = import.meta.glob('./hazards/*.json', { eager: true, import: 'default' });
@@ -18,6 +19,7 @@ const modFiles = import.meta.glob('./terrainMods/*.json', { eager: true, import:
  * @property {Object<string, import('./schemas.js').PowerUpDef>} powerups by def id.
  * @property {Object<string, import('./schemas.js').TerrainModDef>} terrainMods by mod id.
  * @property {Object<string, Object<string,string>>} palettes      palette name -> { key: '#rrggbb' }.
+ * @property {Object} progression   Sync Level table (levels.json): {cap, levels[], biomeOrder[]}. Additive.
  */
 
 const byId = (files) =>
@@ -34,5 +36,6 @@ export function loadContent() {
     powerups: byId(powerupFiles),
     terrainMods: byId(modFiles),
     palettes,
+    progression: levels,
   };
 }

@@ -16,6 +16,7 @@ import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
 import { ellipsize } from './PixelFont.js';
+import { fmtInt, fmtSec, idToLabel } from './Format.js';
 
 /** Base: centred panel with a BACK button. */
 class View {
@@ -265,6 +266,81 @@ export class SharecodeView extends View {
   destroy() {
     if (this.box) this.box.destroy();
     this.box = null;
+    super.destroy();
+  }
+}
+
+/**
+ * W1: PROFILE view — lifetime stats, Sync Level, Resonance progress, and the list of biome
+ * signatures the player has reached (locked ones read "SIGNATURE LOCKED — COMING ONLINE" until
+ * W3/W6 ship the biomes themselves). Read-only; nothing here writes the profile.
+ */
+export class ProfileView extends View {
+  /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
+  constructor(scene, theme, o) {
+    super(scene, theme, { w: 400, h: 200, title: 'PILOT PROFILE', color: 'lime', onClose: o.onClose, y: 34, backLabel: 'BACK' });
+    const p = scene.registry.get(REG.PROFILE) || {};
+    const life = p.lifetime || {};
+    const levels = (scene.registry.get(REG.CONTENT) || {}).progression || { levels: [], cap: 1 };
+    const lvl = p.level || 1;
+    const entry = (levels.levels || []).find((e) => e.level === lvl) || { title: '', xpMin: 0 };
+    const nextEntry = (levels.levels || []).find((e) => e.level === lvl + 1);
+    const xp = p.xp || 0;
+    const span = nextEntry ? nextEntry.xpMin - entry.xpMin : 0;
+    const ratio = nextEntry && span > 0 ? Math.min(1, Math.max(0, (xp - entry.xpMin) / span)) : 1;
+    const add = (x, y, t, color, opts) => this.panel.add(new NeonText(scene, theme, x, y, t, { color, outline: 'none', ...(opts || {}) }));
+
+    // Sync Level block.
+    add(12, 22, `SYNC LEVEL ${lvl}`, 'lime');
+    add(136, 22, String(entry.title || '').toUpperCase(), 'text');
+    add(12, 34, `XP ${fmtInt(xp)}`, 'amber');
+    if (nextEntry) add(300, 34, `${fmtInt(Math.max(0, nextEntry.xpMin - xp))} TO L${lvl + 1}`, 'text');
+
+    // Resonance bar (same geometry as Game Over).
+    const barX = 100, barY = 32, barW = 190, barH = 8;
+    const bar = scene.add.graphics();
+    this.panel.add(bar);
+    const paintBar = (pal) => {
+      bar.clear();
+      bar.fillStyle(pal.bg, 1);
+      bar.fillRect(barX, barY, barW, barH);
+      bar.fillStyle(pal.lime, 1);
+      bar.fillRect(barX + 1, barY + 1, Math.round((barW - 2) * ratio), barH - 2);
+      bar.lineStyle(1, pal[ratio >= 1 ? 'lime' : 'cyan'], 0.8);
+      bar.strokeRect(barX, barY, barW, barH);
+    };
+    paintBar(theme.pal);
+    const unbindBar = theme.bind(paintBar);
+    this.unbindBar = unbindBar;
+
+    // Lifetime stats, two columns.
+    const rows = [
+      ['RUNS', fmtInt(life.runs)], ['TOTAL DISTANCE', `${fmtInt(life.distanceM)} M`],
+      ['BEST SCORE', fmtInt(life.bestScore)], ['BEST DISTANCE', `${fmtInt(life.bestDistanceM)} M`],
+      ['BEST COMBO', `x${(life.bestCombo || 0).toFixed(2)}`], ['BEST AIR', `${fmtSec(life.maxAirtimeMs)} S`],
+      ['DATA SHARDS', fmtInt(life.shards)], ['NEAR MISSES', fmtInt(life.nearMisses)],
+    ];
+    rows.forEach(([k, v], i) => {
+      const col = i < 4 ? 0 : 1;
+      const x = col === 0 ? 12 : 206;
+      const y = 52 + (i % 4) * 12;
+      add(x, y, k, 'text', { alpha: 0.7 });
+      add(x + 92, y, v, 'cyan');
+    });
+
+    // Signature list: reached ones are named, the rest read as locked.
+    add(12, 106, 'SIGNATURES', 'magenta');
+    const unlocked = new Set(p.pendingBiomes || []);
+    (levels.biomeOrder || []).slice(0, 6).forEach((id, i) => {
+      const y = 120 + i * 11;
+      const has = unlocked.has(id);
+      add(12, y, idToLabel(id), has ? 'amber' : 'text', { alpha: has ? 1 : 0.45 });
+      add(196, y, has ? 'SIGNATURE LOCKED - COMING ONLINE' : '', 'text', { alpha: 0.5 });
+    });
+  }
+
+  destroy() {
+    if (this.unbindBar) this.unbindBar();
     super.destroy();
   }
 }

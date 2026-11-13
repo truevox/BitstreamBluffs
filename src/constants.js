@@ -43,6 +43,12 @@ export const REG = Object.freeze({
   CONTENT: 'content',
   /** @type {import('./systems/SaveStore.js').RunRecord|null} record of the run that just ended (for GameOverScene). */
   LAST_RECORD: 'lastRecord',
+  /** @type {Object|null} live player profile (W1 progression, owned by ProgressionService). Additive. */
+  PROFILE: 'profile',
+  /** @type {Object|null} awards object of the last run: XP parts, level-up, Resonance progress. Additive. */
+  LAST_AWARDS: 'lastAwards',
+  /** @type {import('./systems/ProgressionService.js').ProgressionService|null} Additive. */
+  PROGRESSION: 'progression',
 });
 
 /** Palette keys. Each palette in src/data/palettes.json must define every key (as "#rrggbb"). */

@@ -19,3 +19,6 @@ config.txt
 
 # Unrelated files
 /public/docs/Slides/
+# Coverage output and sim scratch
+/coverage
+/tools/sim/.pacing

@@ -57,7 +57,8 @@ export class GameOverScene extends Phaser.Scene {
     this.right = new Panel(this, theme, { x: 250, y: PANEL_Y, w: 216, h: PANEL_H, color: 'cyan', title: 'LEDGER', fillAlpha: 0.9 });
     this.board = new LeaderboardTable(this, theme, { x: 8, y: 22, w: 200, entries: null, parent: this.right });
     this._buildButtons();
-    this.footer = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 8, 'SPACE / ENTER / A / TAP = RETRY SAME SEED', {
+    this._buildProgression();
+    this.footer = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 4, 'SPACE / ENTER / A / TAP = RETRY SAME SEED', {
       color: 'text', anchor: 'center', vAnchor: 0.5,
     });
     this.footer.setAlpha(0.7);
@@ -72,6 +73,9 @@ export class GameOverScene extends Phaser.Scene {
     this.events.once('shutdown', () => {
       this.alive = false;
       this.input.off('pointerdown', this._onPointer);
+      if (this.unbindBar) { this.unbindBar(); this.unbindBar = null; }
+      if (this.pulse) { this.pulse.remove(); this.pulse = null; }
+      this.resonance = null;
     });
 
     this._loadBoard();
@@ -193,6 +197,70 @@ export class GameOverScene extends Phaser.Scene {
     const t = new NeonText(this, this.theme, 218, 22, chase.seedLine, { color: chase.seedKey, anchor: 'right', outline: 'none' });
     panel.add(t);
     if (chase.seedKey === 'lime') this.tweens.add({ targets: t, alpha: { from: 1, to: 0.5 }, duration: 320, yoyo: true, repeat: -1 });
+  }
+
+  // ------------------------------------------------------------ progression (W1)
+
+  /**
+   * One Resonance row under the buttons: XP earned in this run, the level bar, and on a level-up the
+   * "SYNC LEVEL n" line plus what unlocked. Cosmetic only — Retry remains frame-one responsive and
+   * cancels the count-up tween. Never throws, and renders nothing when no awards were published.
+   */
+  _buildProgression() {
+    const theme = this.theme;
+    const awards = this.registry.get(REG.LAST_AWARDS) || null;
+    if (!awards || !awards.xp || !awards.xp.total) return;
+    const y = 250;
+    const xp = awards.xp;
+    const prog = awards.progress || { level: 1, ratio: 0, xpToNext: 0 };
+    const label = awards.leveledTo ? `SYNC LEVEL ${awards.leveledTo}` : `SYNC LEVEL ${prog.level}`;
+    this.xpText = new NeonText(this, theme, 14, y, `+${fmtInt(xp.total)} XP`, { color: 'amber', outline: 'none' });
+    this.levelText = new NeonText(this, theme, 96, y, label, { color: awards.leveledTo ? 'lime' : 'cyan', outline: 'none' });
+    this.rewardsText = new NeonText(this, theme, GAME_WIDTH - 14, y, this._rewardsLine(awards), {
+      color: awards.leveledTo ? 'lime' : 'text', anchor: 'right', outline: 'none',
+    });
+    if (!awards.leveledTo) this.rewardsText.setAlpha(0.7);
+
+    // Resonance bar between the XP figure and the rewards line; fills with the level ratio.
+    const barX = 96, barY = y + 10, barW = 150, barH = 4;
+    this.resonance = this.add.graphics();
+    const paint = (pal) => {
+      if (!this.resonance) return;
+      this.resonance.clear();
+      this.resonance.fillStyle(pal.bg, 1);
+      this.resonance.fillRect(barX, barY, barW, barH);
+      const w = Math.max(0, Math.min(1, prog.ratio || 0));
+      this.resonance.fillStyle(awards.leveledTo ? pal.amber : pal.lime, 1);
+      this.resonance.fillRect(barX, barY, Math.round(barW * w), barH);
+      this.resonance.lineStyle(1, pal[awards.leveledTo ? 'amber' : 'cyan'], 0.6);
+      this.resonance.strokeRect(barX - 0.5, barY - 0.5, barW + 1, barH + 1);
+    };
+    paint(theme.pal);
+    this.unbindBar = theme.bind(paint);
+
+    // Crisp bar start: brief pulse on a level-up, but nothing blocks input and Retry cancels it.
+    if (awards.leveledTo) {
+      this.pulse = this.tweens.addCounter({
+        from: 0, to: 1, duration: 420, yoyo: false,
+        onUpdate: (t) => {
+          if (this.rewardsText) this.rewardsText.setAlpha(0.55 + 0.45 * Math.abs(1 - 2 * t.getValue()));
+        },
+      });
+    }
+  }
+
+  /** @returns {string} short "what unlocked" line, or the "next level" hint. */
+  _rewardsLine(awards) {
+    if (awards.leveledTo && awards.rewards) {
+      const bits = [];
+      if (awards.rewards.title) bits.push(String(awards.rewards.title).toUpperCase());
+      if (awards.rewards.cosmetic) bits.push(String(awards.rewards.cosmetic).toUpperCase());
+      if (awards.rewards.biome) bits.push('SIGNATURE LOCKED - COMING ONLINE');
+      if (bits.length) return bits.join('  ·  ');
+    }
+    const toNext = awards.progress ? awards.progress.xpToNext : 0;
+    if (toNext > 0) return `${fmtInt(toNext)} XP TO NEXT`;
+    return 'MAX SYNC';
   }
 
   _buildButtons() {
@@ -415,6 +483,9 @@ export class GameOverScene extends Phaser.Scene {
   retry() {
     if (this.leaving) return;
     this.leaving = true;
+    // W1: the XP award is already committed (the service credits synchronously on RUN_END), so this
+    // run cannot be banked twice by retrying. Cancel the cosmetic pulse so retry stays frame-one crisp.
+    if (this.pulse) { this.pulse.remove(); this.pulse = null; }
     this._commitPending();
     if (this.rec.seed) this.registry.set(REG.SEED, this.rec.seed);
     uiSfx(this, 'uiSelect', { pitch: 1.3 });

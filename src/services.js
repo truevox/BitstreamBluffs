@@ -8,6 +8,7 @@ import { loadContent } from './data/index.js';
 import { SaveStore } from './systems/SaveStore.js';
 import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
+import { createProgressionService } from './systems/ProgressionService.js';
 
 /**
  * Instantiate SaveStore, load settings, create InputRouter + AudioSynth, load content, set a default seed.
@@ -28,6 +29,9 @@ export async function createServices(game) {
   if (!game.registry.get(REG.SEED)) game.registry.set(REG.SEED, String(Date.now()));
   game.registry.get(REG.INPUT).applySettings(settings);
   game.registry.get(REG.AUDIO).applySettings(settings);
+  // W1: progression service (profile load + one-time backfill + RUN_END listener). Additive.
+  const progression = await createProgressionService(game, { levels: game.registry.get(REG.CONTENT).progression });
+  game.registry.set(REG.PROGRESSION, progression);
 }
 
 /**

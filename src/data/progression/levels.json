@@ -1,0 +1,259 @@
+{
+  "_doc": "Sync Level thresholds and rewards. Data-driven (W1). xpMin is the cumulative XP needed to REACH that level. Cap is the last entry. Biomes unlock in this order; W1 only lists them (W3/W6 make them playable).",
+  "cap": 30,
+  "levels": [
+    {
+      "level": 1,
+      "xpMin": 0,
+      "title": "Signal Virgin",
+      "biome": null,
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 2,
+      "xpMin": 150,
+      "title": "Bit Runner",
+      "biome": null,
+      "cosmetic": "trail-cyan",
+      "boost": null
+    },
+    {
+      "level": 3,
+      "xpMin": 1200,
+      "title": "Packet Jockey",
+      "biome": null,
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 4,
+      "xpMin": 3750,
+      "title": "Frame Pusher",
+      "biome": "debumont",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 5,
+      "xpMin": 5650,
+      "title": "Cache Rider",
+      "biome": null,
+      "cosmetic": "glow-lime",
+      "boost": null
+    },
+    {
+      "level": 6,
+      "xpMin": 7925,
+      "title": "Latency Ghost",
+      "biome": null,
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 7,
+      "xpMin": 10525,
+      "title": "Buffer Bandit",
+      "biome": "garbage-dump-glacier",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 8,
+      "xpMin": 13475,
+      "title": "Parity Pilot",
+      "biome": null,
+      "cosmetic": null,
+      "boost": "headStart"
+    },
+    {
+      "level": 9,
+      "xpMin": 16750,
+      "title": "Checksum Kid",
+      "biome": null,
+      "cosmetic": "rider-amber",
+      "boost": null
+    },
+    {
+      "level": 10,
+      "xpMin": 20325,
+      "title": "Sync Surfer",
+      "biome": "pyramid-peak",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 11,
+      "xpMin": 24250,
+      "title": "Handshake Hero",
+      "biome": null,
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 12,
+      "xpMin": 28475,
+      "title": "Uplink Runner",
+      "biome": null,
+      "cosmetic": "theme-magenta",
+      "boost": null
+    },
+    {
+      "level": 13,
+      "xpMin": 33000,
+      "title": "Downlink Diver",
+      "biome": "underwater-mountain",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 14,
+      "xpMin": 37825,
+      "title": "Bitstream Baron",
+      "biome": null,
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 15,
+      "xpMin": 42975,
+      "title": "Packet Storm",
+      "biome": null,
+      "cosmetic": "trail-magenta",
+      "boost": "errorCorrection"
+    },
+    {
+      "level": 16,
+      "xpMin": 48400,
+      "title": "Wireless Wraith",
+      "biome": "crystal-cavern",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 17,
+      "xpMin": 54125,
+      "title": "Compression King",
+      "biome": null,
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 18,
+      "xpMin": 60150,
+      "title": "Bandwidth Banshee",
+      "biome": null,
+      "cosmetic": "glow-cyan",
+      "boost": null
+    },
+    {
+      "level": 19,
+      "xpMin": 66450,
+      "title": "Terabit Titan",
+      "biome": "space-mountain",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 20,
+      "xpMin": 73050,
+      "title": "Resonance Rider",
+      "biome": null,
+      "cosmetic": "rider-lime",
+      "boost": null
+    },
+    {
+      "level": 21,
+      "xpMin": 79925,
+      "title": "Nightshade Node",
+      "biome": null,
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 22,
+      "xpMin": 87100,
+      "title": "Quantum Quill",
+      "biome": "candy-cane-canyon",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 23,
+      "xpMin": 94550,
+      "title": "Overclock Oracle",
+      "biome": null,
+      "cosmetic": "theme-amber",
+      "boost": null
+    },
+    {
+      "level": 24,
+      "xpMin": 102275,
+      "title": "Teraflop Trickster",
+      "biome": null,
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 25,
+      "xpMin": 110275,
+      "title": "Jellyfish Signal",
+      "biome": "sky-jellyfish-mountain",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 26,
+      "xpMin": 118550,
+      "title": "Steam Circuit",
+      "biome": "steampunk-slopes",
+      "cosmetic": "trail-amber",
+      "boost": null
+    },
+    {
+      "level": 27,
+      "xpMin": 127075,
+      "title": "Micronaut",
+      "biome": "micro-mountain",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 28,
+      "xpMin": 135900,
+      "title": "Vent Diver",
+      "biome": "vertigo-vents",
+      "cosmetic": null,
+      "boost": null
+    },
+    {
+      "level": 29,
+      "xpMin": 145000,
+      "title": "Full Duplex",
+      "biome": null,
+      "cosmetic": "glow-magenta",
+      "boost": null
+    },
+    {
+      "level": 30,
+      "xpMin": 154350,
+      "title": "BITSTREAM LEGEND",
+      "biome": null,
+      "cosmetic": "theme-legend",
+      "boost": null
+    }
+  ],
+  "biomeOrder": [
+    "debumont",
+    "garbage-dump-glacier",
+    "pyramid-peak",
+    "underwater-mountain",
+    "crystal-cavern",
+    "space-mountain",
+    "candy-cane-canyon",
+    "sky-jellyfish-mountain",
+    "steampunk-slopes",
+    "micro-mountain",
+    "vertigo-vents"
+  ]
+}

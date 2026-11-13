@@ -15,7 +15,7 @@ import { MenuList } from '../ui/MenuList.js';
 import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
 import { addScanlines } from '../ui/Scanlines.js';
-import { LeaderboardView, SettingsView, SeedView } from '../ui/Views.js';
+import { LeaderboardView, SettingsView, SeedView, ProfileView } from '../ui/Views.js';
 import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 
@@ -40,6 +40,7 @@ export class TitleScene extends Phaser.Scene {
 
     this._buildLogo();
     this._buildMenu();
+    this._buildLevelBadge();
     this._buildControls();
     this._buildDailyStrip();
     this.bestText = new NeonText(this, theme, GAME_WIDTH / 2, 239, '', { color: 'lime', anchor: 'center', vAnchor: 0.5, outline: 'none' });
@@ -82,10 +83,23 @@ export class TitleScene extends Phaser.Scene {
       { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
       { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this.startRun(this.daily.seed) },
       { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
+      { kind: 'action', label: 'PROFILE', color: 'lime', onSelect: () => this._openView(new ProfileView(this, theme, { onClose: () => this._closeView() })) },
       { kind: 'action', label: 'LEADERBOARD', color: 'amber', onSelect: () => this._openView(new LeaderboardView(this, theme, { onClose: () => this._closeView() })) },
       { kind: 'action', label: 'SETTINGS', color: 'cyan', onSelect: () => this._openView(new SettingsView(this, theme, { onClose: () => this._closeView() })) },
     ];
-    this.menu = new MenuList(this, theme, { x: 4, y: 4, w: 208, rowH: 19, items, scale: 2, parent: this.menuPanel });
+    this.menu = new MenuList(this, theme, { x: 4, y: 4, w: 208, rowH: 16, items, scale: 2, parent: this.menuPanel });
+  }
+
+  _buildLevelBadge() {
+    const theme = this.theme;
+    const profile = this.registry.get(REG.PROFILE) || null;
+    if (!profile) return;
+    const lvl = profile.level || 1;
+    const levels = (this.registry.get(REG.CONTENT) || {}).progression || { levels: [] };
+    const entry = (levels.levels || []).find((e) => e.level === lvl) || { title: '' };
+    const y = 74;
+    this.levelBadge = new NeonText(this, theme, GAME_WIDTH / 2, y, `SYNC LEVEL ${lvl}`, { color: 'lime', anchor: 'center', vAnchor: 0.5, outline: 'none' });
+    this.levelTitle = new NeonText(this, theme, GAME_WIDTH / 2, y + 11, String(entry.title || '').toUpperCase(), { color: 'text', anchor: 'center', vAnchor: 0.5, outline: 'none', alpha: 0.75 });
   }
 
   _buildControls() {
