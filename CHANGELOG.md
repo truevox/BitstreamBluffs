@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.5 - unreleased (W1 multi-level rewards)
+
+### 🐛 Fixed
+- Game Over now shows every reward earned in a run that crosses several Sync Levels, not just the
+  last one. A run jumping L1 -> L3 banks the L2 cosmetic but the awards view dropped
+  `rewardsEarned`, so the prize was invisible.
+
 ## v2.2.4 - unreleased (W1 footer bounds)
 
 ### 🐛 Fixed

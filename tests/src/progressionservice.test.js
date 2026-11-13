@@ -117,6 +117,28 @@ describe('ProgressionService', () => {
     expect(game.events.listenerCount(EVT.RUN_END)).toBe(0);
   });
 
+  test('publishes every reward crossed in one run, not just the last level', async () => {
+    // Regression: ProfileStore computes awards.rewardsEarned for ALL levels a run crosses, but the
+    // service used to drop the field when building its view, so Game Over's reward list read
+    // undefined and the player was never shown the prize they had just earned (e.g. a big run
+    // jumping L1 -> L3 silently hid the L2 'trail-cyan' cosmetic).
+    const { game, svc } = await make();
+    game.events.emit(EVT.RUN_END, { record: rec({ distanceM: 20000, score: 60000, tricks: { a: 10 }, shards: 50, nearMisses: 10, durationMs: 200000, maxAirtimeMs: 4000 }) });
+    const awards = game.registry.get(REG.LAST_AWARDS);
+    expect(awards.levelBefore).toBe(1);
+    expect(awards.levelAfter).toBe(3);
+    expect(awards.rewardsEarned.map((r) => r.level)).toEqual([2, 3]);
+    expect(awards.rewardsEarned.map((r) => r.cosmetic)).toContain('trail-cyan');
+    // The cosmetic really is banked on the profile, so the view must not pretend otherwise.
+    expect(svc.profile.unlocked.cosmetics).toContain('trail-cyan');
+  });
+
+  test('publishes an empty rewardsEarned list for a run that does not level up', async () => {
+    const { game } = await make();
+    game.events.emit(EVT.RUN_END, { record: rec() });
+    expect(game.registry.get(REG.LAST_AWARDS).rewardsEarned).toEqual([]);
+  });
+
   test('a missing saveStore does not break boot', async () => {
     localStorage.clear();
     const game = fakeGame();

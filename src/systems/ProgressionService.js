@@ -91,6 +91,10 @@ export class ProgressionService {
       levelAfter: awards ? awards.levelAfter : level,
       leveledTo: awards ? awards.leveledTo : 0,
       rewards: awards ? awards.rewards : null,
+      // Every level crossed by THIS run, not just the last one: a big run can jump L1 -> L3 and the
+      // L2 reward (e.g. trail-cyan) is still earned. Forwarded so Game Over can list all of them;
+      // without this the rewards loop there reads undefined and silently drops prizes.
+      rewardsEarned: awards && Array.isArray(awards.rewardsEarned) ? awards.rewardsEarned : [],
       title: awards ? awards.title : rw.title,
       credited: Boolean(awards),
       // Resonance bar: XP progress inside the current level.
