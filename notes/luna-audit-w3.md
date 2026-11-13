@@ -271,9 +271,10 @@ as physics-only and lose the spec's stated mechanic.
 
 ## Files I changed
 
-Commit **`340b345`** on `feature/progression-w3-biomes` (rebased onto Home's `03f81d1`, which already
-contains the `shareableSeed` import — so this commit does **not** re-apply it). Portable patch:
-`notes/w3-luna-round3-repairs.patch`.
+Commit **`c310254`** on `feature/progression-w3-biomes`, applied on top of Home's `03f81d1` (which
+already contained the `shareableSeed` import, so this commit does not re-apply it). The repairs are
+committed to the branch itself rather than left in a detached worktree — that was the round-2 failure
+mode. A portable copy of the code changes is at `notes/w3-luna-round3-repairs.patch`.
 
 | File | Change |
 |---|---|
