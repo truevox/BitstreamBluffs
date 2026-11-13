@@ -1,5 +1,32 @@
 # Changelog
 
+## v2.2.6 - unreleased (W1 Title badge + PROFILE view)
+
+### ✨ Added
+- Title screen shows a `SYNC LEVEL n` badge with the level title, top-left of the animated logo. The
+  badge derives its level from XP, so a stale `level` field can never disagree with the XP figure.
+- `PROFILE` menu item opens a read-only lifetime profile: level and title, XP with a Resonance bar
+  and XP to the next level, ten lifetime statistics (runs, distance, play time, best score, best
+  distance, best combo, best airtime, shards, near misses, tricks) and all 11 biome rewards. Locked
+  biome mechanics read `SIGNATURE LOCKED - COMING ONLINE` until W3/W6 ship them.
+- `src/ui/ProfileLayout.js`: Phaser-free layout for both surfaces, so positions, text extents,
+  overlap and palette contrast are unit-tested without booting Phaser.
+
+### 🐛 Fixed
+- Right-aligned text in the profile view was shifted a second time by `NeonText`'s own origin, which
+  pushed the signature note outside the panel. Layout boxes are top-left by contract, so the view now
+  draws left-anchored at the box origin.
+- The spec's `SIGNATURE LOCKED — COMING ONLINE` uses an em dash the 5x7 font does not have and
+  rendered as `?`; the note now uses a hyphen, and a test asserts every drawn string has glyphs.
+
+### 🧪 Tests
+- `tests/src/profilelayout.test.js` (30 tests): overlap/edge overflow across fresh, mid, maxed and
+  cap-reached profiles, XP-derived level over a lying level field, 4.5:1 contrast in both palettes,
+  glyph coverage, biome reward counts, and playtime formatting.
+- `tools/sim/verify-profile-ui.mjs`: headed verification of the real scenes (18 checks) - opens the
+  view from the actual PROFILE menu row, asserts no overlap or panel spill, and confirms palette
+  swaps repaint without moving a single box.
+
 ## v2.2.5 - unreleased (W1 multi-level rewards)
 
 ### 🐛 Fixed
