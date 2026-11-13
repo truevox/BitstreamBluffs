@@ -107,6 +107,63 @@ async function bootWithProfile(browser, port, profile) {
   return { page, errors, consoleErrors };
 }
 
+/**
+ * Boot, start a run and read back what the sled and trail are actually drawing with.
+ * @param {Object} browser @param {number} port @param {Object} profile
+ */
+async function probeLook(browser, port, profile) {
+  const { page, errors } = await bootWithProfile(browser, port, profile);
+  try {
+    const out = await page.evaluate(async () => {
+      const g = window.__bbGame;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      g.registry.set('biomeMask', 0);
+      g.scene.start('TitleScene');
+      await wait(800);
+      const t = g.scene.getScene('TitleScene');
+      t.starting = false;
+      t.startRun('look-gate', 0);
+      await wait(1600);
+      const run = g.scene.getScene('RunScene');
+      if (!run) return { fatal: 'RunScene did not start' };
+      // Read the values the DRAW call will use, resolved through the entity's own helper.
+      const pal = run.palette;
+      return {
+        look: run.look ? { rider: run.look.rider, glow: run.look.glow, trail: run.look.trail, theme: run.look.theme, overridden: run.look.overridden } : null,
+        drawnRider: run.sled._cosmetic('rider', pal.magenta),
+        drawnGlow: run.sled._cosmetic('glow', pal.cyan),
+        drawnTrail: Array.isArray(run.trail.stops) ? run.trail.stops : null,
+        paletteMagenta: pal.magenta, paletteCyan: pal.cyan,
+      };
+    }).catch((e) => ({ fatal: String(e) }));
+    return { page, errors, out };
+  } catch (e) {
+    return { page: null, errors: [], out: { fatal: String(e) } };
+  }
+}
+
+/** Boot with a colourblind palette forced into localStorage settings. */
+async function bootWithProfileCb(browser, port, profile) {
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.addInitScript((p) => {
+    try {
+      window.localStorage.setItem('bb.profile', JSON.stringify(p));
+      // Settings are their own key; only `palette` matters here.
+      const s = window.localStorage.getItem('bb.settings');
+      const parsed = s ? JSON.parse(s) : {};
+      parsed.palette = 'colorblind';
+      window.localStorage.setItem('bb.settings', JSON.stringify(parsed));
+    } catch (e) { /* first load */ }
+  }, profile);
+  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.waitForFunction(() => window.__bbGame, null, { timeout: 25000 });
+  await page.waitForTimeout(700);
+  return { page, errors };
+}
+
 /** Boot, start a run at `mask`, end it through the production crash path, read back Game Over. */
 async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate-seed', drainShield = false, absorbFirst = false } = {}) {
   const profile = JSON.parse(JSON.stringify(PROFILE));
@@ -297,6 +354,60 @@ async function main() {
         if (out.recordModded !== false) fail('clean run is not marked modded', `saw ${out.recordModded}`);
         else pass('clean run is not marked modded', 'modded absent/false');
       } finally { await page.close(); }
+    }
+    // ---- 7/8. W4 cosmetics reach the sled, and colourblind refuses them
+    if (WITH_BOOSTS) {
+      const baseProfile = JSON.parse(JSON.stringify(PROFILE));
+
+      // A bought-and-equipped hue must change what is DRAWN, not just what is stored.
+      const equipped = JSON.parse(JSON.stringify(baseProfile));
+      equipped.bank = 1000;
+      equipped.unlocked.cosmetics = ['rider-hue-mint', 'sled-glow-warm', 'trail-hue-ember'];
+      equipped.equipped = { trail: 'trail-hue-ember', glow: 'sled-glow-warm', rider: 'rider-hue-mint', theme: 'default', title: 'default' };
+      const a = await probeLook(browser, port, equipped);
+      try {
+        if (a.out.fatal) fail('cosmetics: run starts', a.out.fatal);
+        else if (a.errors.length) fail('cosmetics: no page errors', a.errors.join(' | '));
+        else if (!a.out.look) fail('cosmetics: look resolved for the run', 'run.look missing');
+        else if (a.out.drawnRider === a.out.paletteMagenta) fail('equipped rider hue is drawn', 'still the palette magenta');
+        else if (a.out.drawnGlow === a.out.paletteCyan) fail('equipped sled glow is drawn', 'still the palette cyan');
+        else if (!a.out.drawnTrail) fail('equipped trail hue is drawn', 'trail stops not applied');
+        else pass('equipped cosmetics reach the drawn sled, glow and trail', `rider=${a.out.drawnRider.toString(16)} glow=${a.out.drawnGlow.toString(16)}`);
+      } finally { if (a.page) await a.page.close(); }
+
+      // Colourblind must refuse the same loadout: the safety clause in the spec.
+      const cbProfile = JSON.parse(JSON.stringify(equipped));
+      const b = await (async () => {
+        const { page, errors } = await bootWithProfileCb(browser, port, cbProfile);
+        try {
+          const out = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.registry.set('biomeMask', 0);
+            g.scene.start('TitleScene');
+            await wait(800);
+            const t = g.scene.getScene('TitleScene');
+            t.starting = false;
+            t.startRun('look-cb', 0);
+            await wait(1600);
+            const run = g.scene.getScene('RunScene');
+            if (!run) return { fatal: 'RunScene did not start' };
+            const pal = run.palette;
+            return {
+              overridden: !!(run.look && run.look.overridden),
+              drawnRider: run.sled._cosmetic('rider', pal.magenta),
+              paletteMagenta: pal.magenta,
+            };
+          }).catch((e) => ({ fatal: String(e) }));
+          return { errors, out };
+        } finally { await page.close(); }
+      })();
+      try {
+        if (b.out.fatal) fail('colourblind: run starts', b.out.fatal);
+        else if (!b.out.overridden) fail('colourblind refuses cosmetics', 'look.overridden was false');
+        else if (b.out.drawnRider !== b.out.paletteMagenta) fail('colourblind rider falls back to the palette', `drew ${b.out.drawnRider.toString(16)}`);
+        else pass('colourblind mode refuses the equipped cosmetics', 'rider fell back to the palette');
+      } finally { /* page closed above */ }
     }
   } finally {
     await browser.close();
