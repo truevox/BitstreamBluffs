@@ -172,7 +172,7 @@ export class InitialsEntry extends Phaser.GameObjects.Container {
       this.letters[i].setColorKey(sel ? 'text' : this.colorKey);
     }
     const sx = this.x0 + this.cursor * (this.slotW + this.gap) + this.slotW / 2;
-    this.arrowUp.setPosition(Math.round(sx), 6);
+    this.arrowUp.setPosition(Math.round(sx), 8);
     this.arrowDown.setPosition(Math.round(sx), this.slotY + this.slotH + 8);
   }
 
