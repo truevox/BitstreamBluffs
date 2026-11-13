@@ -615,7 +615,55 @@ The stall safety net is `stallNudgeStep()`: it tests the signed speed along the 
 
 UI is additive and cosmetic. `GameOverScene._buildProgression` draws one row in the band under the buttons (`y` 250): `+XP`, the Sync Level line, a Resonance bar for progress inside the level, and on a level-up the unlock line. It is driven off `REG.LAST_AWARDS` and renders nothing when no awards were published. Retry is still frame-one: the XP is already committed before Game Over ever runs, and `retry()` cancels the pulse tween. `TitleScene` gains a `SYNC LEVEL n` badge (level + title) and a `PROFILE` item opening `ProfileView` in `src/ui/Views.js` (`View` is not exported, so the view lives in that file rather than in a new module). All new graphics register a `Theme.bind` callback and are unbound on scene shutdown, so the colour-blind palette swap repaints them live.
 
-Biome rewards are listed in the level table but not yet playable: they surface as `SIGNATURE LOCKED - COMING ONLINE` until W3/W6 ship the biomes. The profile is not in the `BB1:` share code; that is a follow-up.
+Biome rewards are playable from W3 for the batch-1 biomes (see the W3 addendum below); the profile now reports how many are shipped rather than a `SIGNATURE LOCKED - COMING ONLINE` note that stopped being true. The profile is not in the `BB1:` share code; that is a follow-up.
+
+## Addendum: biomes (W3, terrain + meta; additive)
+
+Five batch-1 biomes, each a sector of ordinary terrain with one signature mechanic:
+Debumont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal Cavern.
+
+**Selection is pure and cheap.** `biomeForSector(seed, sector, mask, defs)` answers from
+`(seed, sector, mask)` alone - never from how much terrain has been generated or in what order -
+so a chunk built late by streaming is identical to one built early. It draws from
+`Rng.fork('biome')`, an independent stream, so *asking* the question never advances the terrain,
+hazard or shard streams. Sectors 0-1 are always base Bitstream so every run opens the same way;
+from sector 2 a sector is base or one enabled biome, weighted 2.2:1 toward base.
+
+**A biome's chunk templates are a preference, not a filter.** If its templates are not eligible
+at that distance the sector still gets ordinary terrain, so a biome can never leave a hole in
+the ramp.
+
+**The `biome` field is written only inside a biome, and cleared when a pooled chunk returns to
+base terrain.** Absent rather than `null`, deliberately: `JSON.stringify` of a mask-0 chunk stays
+byte-identical, which is what the pre-existing hazard-fill digest guard compares.
+
+**Mechanics.** Four are physics multipliers on the existing `terrainMods` schema (powder drag,
+sticky ground, thermal loft, slow-motion). Crystal Cavern's is scoring: "tricks landed inside
+score a combo bonus" cannot be written as a physics multiplier, so its mod carries an additive
+`scoreMul` applied to banked trick points only - never the flat perfect-landing bonus, never
+distance points, clamped to `>= 1`. This is an intentional extension of `TerrainModDef`.
+
+**Persistence.** `biomeMask` is in `sanitizeRun`'s whitelist and is *not* part of
+`computeLedgerHash` (which hashes a fixed field list); there is no `saveVersion` bump. Records
+written before W3 have no field and count as mask 0. `getSeedStats` takes an opt-in `biomeMask`
+scope so seed-best compares within one mask; omitting it keeps pre-W3 behaviour.
+
+**Daily.** The Daily Run's mask is derived from the UTC date key alone - identical for every
+player, independent of unlocks (a locked biome may appear as a preview, per D6). 9-day cycle:
+4 clear days plus one day per batch-1 biome. `getDailyStats` does *not* filter on the stored
+mask: every run on `daily-YYYY-MM-DD` was played at that day's mask by definition, so the seed
+already scopes it, and filtering as well would hide every pre-W3 daily run.
+
+**UI.** Biome entry raises a banner through the same serialised strip queue as the mission
+toast, so the two cannot overlap. Seed entry accepts `seed@mask`; a bare seed parses to mask 0
+and is used verbatim, and a malformed suffix is treated as a seed rather than rejected.
+
+**Gates.** Golden mask-0 terrain test pins 300 chunks x 5 seeds before any generator change.
+Per-biome screenshots in both palettes come from `node tools/sim/shots.mjs biomes <dir>`, each
+reporting the biome its generator claims, so a shot that fell back to base terrain fails loudly.
+Per-biome simulation uses `--biomeMask`, and the mask must ride on the run *options* (the page
+reads `o.biomeMask`), not only on `params` - having it only in `params` silently played every
+mask as 0.
 
 Gate harness: `node tools/sim/shots.mjs progression <dir>` (`tools/sim/shots-progression.js`) drives the **real** services and scenes — a real `RUN_END`, real `GameOverScene`/`TitleScene` — and shoots Game Over (normal and level-up), the Title badge and the Profile view in both palettes. The XP awards in those shots come from the real credit path, not from faking the registry.
 
