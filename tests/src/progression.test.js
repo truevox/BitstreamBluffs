@@ -58,6 +58,20 @@ describe('loadLevelTable', () => {
     expect(t.levels.length).toBeGreaterThan(1);
     expect(t.cap).toBe(t.levels[t.levels.length - 1].level);
   });
+
+  test('the fallback table agrees with the shipped table on every level it covers', () => {
+    // The fallback is only used if levels.json is missing or unusable, so it is easy to forget when
+    // retuning — and a stale fallback would silently ship a different early curve in exactly the
+    // broken-deploy case where nobody is watching. Assert it cannot drift.
+    const fb = loadLevelTable(null);
+    for (const l of fb.levels) {
+      const shipped = TABLE.levels.find((s) => s.level === l.level);
+      expect(shipped).toBeDefined();
+      expect(l.xpMin).toBe(shipped.xpMin);
+      expect(l.title).toBe(shipped.title);
+      expect(l.cosmetic ?? null).toBe(shipped.cosmetic ?? null);
+    }
+  });
 });
 
 describe('xpForRun', () => {
