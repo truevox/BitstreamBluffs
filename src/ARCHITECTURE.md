@@ -618,3 +618,7 @@ UI is additive and cosmetic. `GameOverScene._buildProgression` draws one row in 
 Biome rewards are listed in the level table but not yet playable: they surface as `SIGNATURE LOCKED - COMING ONLINE` until W3/W6 ship the biomes. The profile is not in the `BB1:` share code; that is a follow-up.
 
 Gate harness: `node tools/sim/shots.mjs progression <dir>` (`tools/sim/shots-progression.js`) drives the **real** services and scenes — a real `RUN_END`, real `GameOverScene`/`TitleScene` — and shoots Game Over (normal and level-up), the Title badge and the Profile view in both palettes. The XP awards in those shots come from the real credit path, not from faking the registry.
+
+## Missions
+
+`Missions.js` implements deterministic mission selection and evaluation. It seeds draws from the profile mission counter, sorts eligible templates by ID, and filters biome- and rule-ineligible templates. Tier determines the reward multiplier; selection does not gate tiers by Sync Level. `MissionsService` publishes active mission progress through `REG.MISSIONS` and sends live completion notifications; `ProgressionService` invokes its payout path only after a run has been credited, so replaying a credited run cannot pay a mission twice. Mission state and rewards persist in `bb.profile`. Title, Pause and Game Over render the published view; HUD notifications share the milestone strip.

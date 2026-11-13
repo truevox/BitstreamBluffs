@@ -136,6 +136,50 @@
     return meta;
   }
 
+  /**
+   * Game Over with the initials entry OPEN. This is the state CC Friday found unreadable at native
+   * resolution ("MISSIONS header flush under the SPACE = SAVE + RETRY hint", mission rows sliced), and
+   * it is the state the old probe never captured: the entry needs a real top-10 qualification, so this
+   * seeds a leaderboard and a score that qualifies. Without this shot the probe can pass while the
+   * panel is unreadable in the one state a new player actually sees on their first good run.
+   */
+  async function gameoverInitials(opts = {}) {
+    const c = await ctx();
+    const { game, REG, EVT } = c;
+    game.loop.stop();
+    const rec = record({ tag: 'ini', score: 90000, distanceM: 4200, ...(opts.record || {}) });
+    game.registry.set(REG.SEED, rec.seed);
+    game.registry.set(REG.LAST_RECORD, rec);
+    const store = game.registry.get(REG.SAVE_STORE);
+    if (store && typeof store.getLeaderboard === 'function') {
+      store.getLeaderboard = async () => [
+        { id: 'x1', initials: 'AAA', score: 1000, distanceM: 100, seed: 's1', dailyRuleId: 'none' },
+        { id: 'x2', initials: 'BBB', score: 900, distanceM: 90, seed: 's2', dailyRuleId: 'none' },
+        { id: 'x3', initials: 'CCC', score: 800, distanceM: 80, seed: 's3', dailyRuleId: 'none' },
+      ];
+      store.qualifiesForTop10 = async () => true;
+    }
+    game.events.emit(EVT.RUN_END, { record: rec });
+    const awards = game.registry.get(REG.LAST_AWARDS) || null;
+    for (const k of ['RunScene', 'UIScene', 'PauseScene', 'GameOverScene', 'TitleScene']) { try { game.scene.stop(k); } catch (e) { /* ignore */ } }
+    muteAudio(game, REG);
+    const env = mkEnv(game);
+    game.scene.start('GameOverScene');
+    step(env, 30);
+    // The leaderboard promise resolves on a microtask; give it a real frame to open the entry.
+    await new Promise((r) => setTimeout(r, 200));
+    step(env, 20);
+    const scene = game.scene.getScene('GameOverScene');
+    const open = !!(scene && scene.entry);
+    const meta = { entryOpen: open, footer: scene && scene.footer && scene.footer.text };
+    await palette(env, c, 'default');
+    await window.__shot('w2-gameover-initials-default', meta);
+    await palette(env, c, 'colorblind');
+    await window.__shot('w2-gameover-initials-colorblind', meta);
+    await palette(env, c, 'default');
+    return meta;
+  }
+
   /** The mid-run completion toast on the real HUD (uses the MILESTONE strip). */
   async function toast() {
     const c = await ctx();
@@ -168,10 +212,11 @@
     const out = {};
     out.title = await title(o);
     out.gameover = await gameover(o);
+    out.gameoverInitials = await gameoverInitials(o);
     out.pause = await pause(o);
     out.toast = await toast(o);
     return out;
   }
 
-  window.__shotsMissions = { run, title, pause, gameover, toast };
+  window.__shotsMissions = { run, title, pause, gameover, gameoverInitials, toast };
 })();

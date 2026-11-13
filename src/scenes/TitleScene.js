@@ -51,7 +51,10 @@ export class TitleScene extends Phaser.Scene {
     // BEST line ran straight through it (Luna's W2 finding 3). Geometry lives in MissionsLayout.
     this.bestText = new NeonText(this, theme, TITLE_BEST_X, TITLE_BEST_Y, '', { color: 'lime', anchor: 'right', vAnchor: 0.5, outline: 'none' });
     this._loadBest();
-    this.hint = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 12, '↑↓ SELECT   ENTER/SPACE/A CONFIRM   TAP ANY ITEM', {
+    // GAME_HEIGHT - 8, i.e. glyphs 258..266: the mission list needed 228..257 to give each of its three
+    // rows a full 8 px glyph box at a 9 px pitch (a bar drawn under a label at an 8 px pitch is what
+    // sliced the text in half), so the hint moved down 4 px rather than the list clipping its glyphs.
+    this.hint = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 8, '↑↓ SELECT   ENTER/SPACE/A CONFIRM   TAP ANY ITEM', {
       color: 'text', anchor: 'center', vAnchor: 0.5,
     });
     this.hint.setAlpha(0.7);

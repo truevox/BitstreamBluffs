@@ -34,16 +34,26 @@ export const MISSION_LIST_TITLE = Object.freeze({
   x: 24,
   y: 228,
   // The only free band on Title is y 228..270 (menu+CONTROLS end at 196, DAILY PATCH at 228), and it
-  // also has to hold BEST and the control hint. Two things follow, and both are asserted in
+  // also has to hold BEST and the control hint. Three things follow, all asserted in
   // tests/src/missionslayout.test.js rather than eyeballed:
   //   * the list is a LEFT COLUMN (x 24..240), because BEST needs the right half;
-  //   * it carries no "MISSIONS" header, because 26 px of vertical space only fits three rows.
-  // A full-width, headed list is what collided with BEST and the hint (Luna's W2 finding 3).
+  //   * it carries no "MISSIONS" header, because 26 px of vertical space only fits three rows;
+  //   * the progress bar sits BESIDE its label, not under it. A glyph is 8 rows tall (FONT_LINE_H 9),
+  //     so label + bar stacked needs 10 px and three rows would need 30 of the 26 px available. At an
+  //     8 px pitch the bar landed 5 px down, straight through the label's lower glyph rows — the
+  //     "text sliced in half" CC Friday saw at native resolution on a real Chrome pane. Beside the
+  //     text the bar cannot cover a single glyph row, and a 9 px pitch (8 px glyph + 1 px gap) fits
+  //     three fully legible rows in 27 px.
   w: 216,
   rows: 3,
-  rowH: 8,
-  labelH: 5,
+  /** 8 px glyph + 1 px gap: the minimum pitch that never clips a descender. */
+  rowH: 9,
+  /** Full glyph box. Must equal the font's 8 rows or descenders are cut. */
+  labelH: 8,
   barH: 2,
+  /** Width of the inline progress bar at the right end of each row. */
+  barW: 40,
+  padX: 4,
   padTop: 0,
 });
 
@@ -52,15 +62,45 @@ export const MISSION_LIST_TITLE = Object.freeze({
  * no room at all: its 8 report rows reach local 128, then the ledger hash 132, seed 144, COPY button
  * to 154, against a floor at 160.
  *
- * Neither panel had a free band, so this needed a decision rather than a nudge: the board's 10 rows
- * reached local 146 and left 14 px. The Game Over board is trimmed to 8 rows (GAMEOVER_BOARD_ROWS),
- * ending at local 124, which frees 124..160. The heading sits at 126 and three 8 px rows run 136..159,
- * leaving a 1 px margin above the panel floor.
+ * The panel interior is local 0..160. Two earlier layouts were wrong and both were caught in audit:
+ *
+ *  1. Keeping the board at its 11 px pitch and trimming it to 8 rows bought the band, but it silently
+ *     broke the "top 10" contract the panel title advertises (Luna, round 3).
+ *  2. Packing three mission rows at an 8 px pitch put each progress bar 2 px up into its own label,
+ *     because an 8 px label plus a 2 px bar needs 10 px, not 8 (Luna, round 3).
+ *
+ * What actually fits was solved numerically, not by eye: the board keeps ALL TEN rows at a 9 px pitch
+ * (8 px glyph + 1 px gap), ending at local 125; a 1 px separator rule sits at 126; three mission rows
+ * at a 10 px pitch (8 px label with its 2 px bar flush underneath) run 127..157, leaving 3 px above
+ * the panel floor at 160. Ten truthful entries beat a heading that would have to lie about the count.
  */
-export const GAMEOVER_BOARD_ROWS = 8;
-export const GAMEOVER_MISSIONS_Y = 136;
-/** Row pitch for the Game Over block: tighter than the in-run panel to fit the 36 px band. */
-export const GAMEOVER_ROW_H = 8;
+export const GAMEOVER_BOARD_ROWS = 10;
+/** Board pitch on Game Over only: 9 px fits ten rows in the space where 11 px fits eight. */
+export const GAMEOVER_BOARD_ROW_H = 9;
+/** Mission rows start here. Budget derived numerically, not by eye (see the solver in the tests). */
+export const GAMEOVER_MISSIONS_Y = 128;
+/**
+ * Mission row pitch. A glyph box is 8 rows (GLYPH_H) and font row 7 is a descender, so a pitch of 10
+ * leaves a 2 px nominal gap that measures 1.25 px once the descender is drawn — the rows visually
+ * merge, which is half of what CC Friday read as "text sliced in half". 11 gives a real 3 px gap.
+ * The block still fits: 128 + 2*11 + 8 = 158 against a panel floor at 160.
+ */
+export const GAMEOVER_ROW_H = 11;
+/**
+ * Separator rule above the mission block. This replaces the separate "MISSIONS" heading: with ten
+ * truthful leaderboard rows the panel has no vertical room for a heading line, and dropping the
+ * heading beats either lying about the board size or covering a mission label. The rule plus the
+ * progress bars identify the group.
+ */
+export const GAMEOVER_MISSIONS_RULE_Y = 127;
+/** Height of one pixel-font line at scale 1; the bar must start at or below this. */
+export const LABEL_H = 8;
+/**
+ * Rows a glyph can occupy, from the font itself: `buildTexture` writes font rows 0..7 (a 5x7 face
+ * plus one descender row), so a text box shorter than this clips real ink. Any row pitch below
+ * GLYPH_H + 1 makes consecutive rows touch.
+ */
+export const GLYPH_H = 8;
 
 /** The Title screen's existing occupied bands, for overlap assertions. */
 export const TITLE_BANDS = Object.freeze({
@@ -68,8 +108,10 @@ export const TITLE_BANDS = Object.freeze({
   daily: Object.freeze({ x: 24, y: 202, w: 432, h: 26 }),
   // Where TitleScene draws BEST: the right column, sharing the band with the list.
   best: Object.freeze({ x: 248, y: 234, w: 208, h: 14 }),
-  // The control hint, at its original baseline (GAME_HEIGHT - 12), below the list.
-  hint: Object.freeze({ x: 0, y: 254, w: 480, h: 9 }),
+  // The control hint, now at GAME_HEIGHT - 8 (glyphs 258..266). It sat at 254..262 and the mission
+  // list needed 228..255 to give each of three rows its full 8 px glyph box at a 9 px pitch, so the
+  // hint moved down 4 px to buy a real gap instead of a zero-margin join.
+  hint: Object.freeze({ x: 0, y: 258, w: 480, h: 9 }),
 });
 
 /** Centre x for the Title BEST line: right column, clear of the mission list. */
@@ -128,16 +170,21 @@ export function missionPanelLayout(count, o = {}) {
 export function missionListLayout(count, o = {}) {
   const L = { ...MISSION_LIST_TITLE, ...o };
   const n = Math.max(0, Math.min(L.rows, Math.round(count || 0)));
-  const panel = rect(L.x, L.y, L.w, L.padTop + n * L.rowH + 2);
+  const panel = rect(L.x, L.y, L.w, L.padTop + n * L.rowH + 1);
   const rows = [];
   const bars = [];
   const top = L.y + L.padTop;
+  // The bar is inline: same 8 px line as the label, at the right end, so the label keeps its full
+  // glyph height. The text box is narrowed by the bar's width plus a gap, which is what makes the two
+  // rects disjoint rather than merely on the same row.
+  const barX = L.x + L.w - L.padX - L.barW;
+  const textW = Math.max(24, barX - 4 - (L.x + L.padX));
   for (let i = 0; i < n; i++) {
     const y = top + i * L.rowH;
-    // Label on the row's first line, its bar directly under it — both inside rowH, so a row can never
-    // bleed into the next one (the old +8 bar offset overran a 9 px row).
-    rows.push(rect(L.x + 4, y, L.w - 8, L.labelH));
-    bars.push(rect(L.x + 4, y + L.labelH, L.w - 8, L.barH));
+    rows.push(rect(L.x + L.padX, y, textW, L.labelH));
+    // Vertically centred in the glyph box, where a 2 px bar reads as a progress line and covers
+    // nothing: the text is to its left, never underneath it.
+    bars.push(rect(barX, y + Math.floor((L.labelH - L.barH) / 2), L.barW, L.barH));
   }
   return { panel, header: null, rows, bars };
 }
@@ -195,15 +242,24 @@ export function ellipsize(text, rowW, advance = 6) {
  * @returns {{rows:Array<{x:number,y:number,w:number}>, bars:Array<{x:number,y:number,w:number,h:number}>, h:number}}
  */
 export function columnRows(o) {
-  const count = Math.max(0, Math.min(3, o.count || 0));
-  const rowH = o.rowH || 9;
+  const x = o.x;
+  const y = o.y;
+  const w = o.w;
+  const count = Math.max(0, Math.round(o.count || 0));
+  const rowH = o.rowH || 10;
   const barH = o.barH || 2;
+  const barW = o.barW || 30;
   const rows = [];
   const bars = [];
+  // The bar is INLINE — at the right end of the row's own line — rather than underneath the label.
+  // Stacking them needs labelH + barH = 10 px per row and leaves a zero-pixel gap between one row's
+  // bar and the next row's glyphs, which reads as a slab of ink pasted over the text. A glyph is 8
+  // rows tall (GLYPH_H), so the label box keeps that full height and the bar sits beside it.
+  const textW = Math.max(24, w - barW - 4);
   for (let i = 0; i < count; i += 1) {
-    const y = o.y + i * rowH;
-    rows.push(rect(o.x, y, o.w, rowH - 1));
-    bars.push(rect(o.x, y + rowH - barH - 1, o.w, barH));
+    const ry = y + i * rowH;
+    rows.push(rect(x, ry, textW, GLYPH_H));
+    bars.push(rect(x + w - barW, ry + Math.floor((GLYPH_H - barH) / 2), barW, barH));
   }
-  return { rows, bars, h: count * rowH };
+  return { rows, bars, h: count * rowH, textW };
 }

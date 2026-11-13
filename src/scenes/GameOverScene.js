@@ -16,7 +16,10 @@ import { updateSetting } from '../services.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
-import { columnRows, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS } from '../ui/MissionsLayout.js';
+import {
+  columnRows, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, GAMEOVER_BOARD_ROW_H,
+  GAMEOVER_MISSIONS_RULE_Y,
+} from '../ui/MissionsLayout.js';
 import { ellipsize } from '../ui/PixelFont.js';
 import { Panel } from '../ui/Panel.js';
 import { Button } from '../ui/Button.js';
@@ -56,7 +59,10 @@ export class GameOverScene extends Phaser.Scene {
     this._buildHeader();
     this._buildStats();
     this.right = new Panel(this, theme, { x: 250, y: PANEL_Y, w: 216, h: PANEL_H, color: 'cyan', title: 'LEDGER', fillAlpha: 0.9 });
-    this.board = new LeaderboardTable(this, theme, { x: 8, y: 22, w: 200, entries: null, rows: GAMEOVER_BOARD_ROWS, parent: this.right });
+    this.board = new LeaderboardTable(this, theme, {
+      x: 8, y: 22, w: 200, entries: null, rows: GAMEOVER_BOARD_ROWS,
+      rowH: GAMEOVER_BOARD_ROW_H, parent: this.right,
+    });
     // Must come after this.right exists: the mission block lives in the LEDGER panel, and calling it
     // from _buildStats() drew nothing at all because the panel was not constructed yet.
     this._buildMissions();
@@ -183,12 +189,18 @@ export class GameOverScene extends Phaser.Scene {
       const p = this.right;
       if (!p) throw new Error('GameOverScene._buildMissions: LEDGER panel missing — call after this.right exists');
       const geom = columnRows({ x: 8, y: GAMEOVER_MISSIONS_Y, w: 200, count: Math.min(3, rows.length), rowH: GAMEOVER_ROW_H, barH: 2 });
-      p.add(new NeonText(this, this.theme, 8, GAMEOVER_MISSIONS_Y - 10, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
+      // A separator rule instead of a "MISSIONS" heading: with ten truthful leaderboard rows there is
+      // no vertical room for a heading line, and a rule marks the group without claiming a row of its
+      // own. The progress bars under each label carry the rest of the grouping.
+      const rule = this.add.graphics();
+      rule.fillStyle(this.theme.color('cyan'), 0.35);
+      rule.fillRect(8, GAMEOVER_MISSIONS_RULE_Y, 200, 1);
+      p.add(rule);
       rows.slice(0, 3).forEach((row, i) => {
         const r = geom.rows[i];
         const b = geom.bars[i];
         if (!r || !b) return;
-        const label = new NeonText(this, this.theme, r.x, r.y, ellipsize(row.title, 122), {
+        const label = new NeonText(this, this.theme, r.x, r.y, ellipsize(row.title, geom.textW), {
           color: row.done ? 'lime' : 'text', outline: 'none',
         });
         label.setAlpha(0.9);
@@ -202,11 +214,6 @@ export class GameOverScene extends Phaser.Scene {
           g.fillRect(b.x, b.y, Math.max(1, Math.round(b.w * frac)), b.h);
         }
         p.add(g);
-        const pct = new NeonText(this, this.theme, 204, r.y, `${Math.round(frac * 100)}%`, {
-          color: row.done ? 'lime' : 'text', anchor: 'right', outline: 'none',
-        });
-        pct.setAlpha(0.7);
-        p.add(pct);
       });
     } catch (e) { /* cosmetic */ }
   }
@@ -426,8 +433,11 @@ export class GameOverScene extends Phaser.Scene {
       x: 0, y: y0 + 6, w: 216, length: INITIALS_LENGTH, initial: last, color: 'lime', onSubmit: (v) => this.saveEntry(v),
     });
     this.right.add(this.entry);
-    const hint = new NeonText(this, theme, 108, 106, 'TYPE / ARROWS / TAP  -  ENTER SAVES', { color: 'text', anchor: 'center', outline: 'none' });
-    const hint2 = new NeonText(this, theme, 108, 118, 'SPACE = SAVE + RETRY   ESC = SKIP', { color: 'text', anchor: 'center', outline: 'none' });
+    // 84 and 96, not 106 and 118: at 118 the second hint's glyphs ran to local 126 and the mission
+    // separator rule sits at 127, so the block read as one run-on paragraph glued to the hint
+    // (CC Friday's initials-entry finding). Both lines now end above local 105, leaving a real gap.
+    const hint = new NeonText(this, theme, 108, 84, 'TYPE / ARROWS / TAP  -  ENTER SAVES', { color: 'text', anchor: 'center', outline: 'none' });
+    const hint2 = new NeonText(this, theme, 108, 96, 'SPACE = SAVE + RETRY   ESC = SKIP', { color: 'text', anchor: 'center', outline: 'none' });
     hint.setAlpha(0.6);
     hint2.setAlpha(0.6);
     this.right.add([hint, hint2]);

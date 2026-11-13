@@ -6,6 +6,7 @@ import {
   SCREEN, MISSION_PANEL, MISSION_LIST_TITLE, TITLE_BANDS, TITLE_BEST_X, TITLE_BEST_Y,
   rect, overlaps, insideScreen, missionPanelLayout, missionListLayout, toastSlot,
   charsThatFit, ellipsize, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, columnRows,
+  GAMEOVER_BOARD_ROW_H, GAMEOVER_MISSIONS_RULE_Y, LABEL_H, GLYPH_H,
 } from '../../src/ui/MissionsLayout.js';
 
 describe('overlaps / insideScreen', () => {
@@ -142,6 +143,41 @@ describe('missionListLayout', () => {
     }
   });
 
+  test('every row shows a full glyph height — the text can never be sliced', () => {
+    // CC Friday's finding, reproduced from the source rather than from a screenshot: a glyph is
+    // FONT_LINE_H - 1 = 8 rows tall, and the old list drew a 5 px "label" with the bar at y+5, so the
+    // bar covered the lower two glyph rows of every mission title ("Finish 25 runs" cut in half at
+    // native resolution). Two independent conditions have to hold, and the pixel probe could see
+    // neither because it only asked whether ink existed:
+    //   1. the label rect is at least one full glyph box tall;
+    //   2. the bar's rect does not intersect the label's rect at all.
+    const L = missionListLayout(3);
+    for (let i = 0; i < L.rows.length; i++) {
+      expect(L.rows[i].h).toBeGreaterThanOrEqual(GLYPH_H);
+      expect(overlaps(L.rows[i], L.bars[i])).toBe(false);
+      // Row pitch must admit a full glyph plus a gap, or consecutive rows clip each other.
+      expect(MISSION_LIST_TITLE.rowH).toBeGreaterThanOrEqual(GLYPH_H + 1);
+    }
+  });
+
+  test('consecutive Title rows never overlap', () => {
+    const L = missionListLayout(3);
+    for (let i = 1; i < L.rows.length; i += 1) {
+      expect(overlaps(L.rows[i - 1], L.rows[i])).toBe(false);
+      expect(overlaps(L.bars[i - 1], L.bars[i])).toBe(false);
+      expect(overlaps(L.rows[i - 1], L.bars[i])).toBe(false);
+    }
+  });
+
+  test('the mission title fits its text box at the real maximum title length', () => {
+    // 47 templates, longest title 25 chars. Nothing may be silently ellipsized away at scale 1: the
+    // row has to be wide enough for the longest real title, and the bar gets the rest.
+    const L = missionListLayout(3);
+    const longest = 25;
+    expect(charsThatFit(L.rows[0].w)).toBeGreaterThanOrEqual(longest);
+    expect(ellipsize('X'.repeat(longest), L.rows[0].w)).toHaveLength(longest);
+  });
+
   test('the in-run panel and the Title list do not overlap', () => {
     expect(overlaps(missionPanelLayout(3).panel, missionListLayout(3).panel)).toBe(false);
   });
@@ -149,18 +185,56 @@ describe('missionListLayout', () => {
 
 describe('Game Over mission block', () => {
   // Real GameOverScene geometry, transcribed here so the assertion is against the scene, not against
-  // the mission module's own opinion of itself. Panel: y=PANEL_Y 54, h=PANEL_H 160 -> floor 214. The
-  // LEDGER board ends at local 103; buttons occupy screen y 220..244; the XP row is at 246.
+  // the mission module's own opinion of itself. LEDGER panel: y=54, h=160 -> interior local 0..160.
+  // Board container sits at local y 22; its rows start 14 below that at GAMEOVER_BOARD_ROW_H pitch.
   const LEDGER = { x: 250, y: 54, w: 216, h: 160 };
-  const BOARD_END_LOCAL = 22 + 14 + GAMEOVER_BOARD_ROWS * 11; // table y 22 + rows start 14, ROW_H 11
+  const PANEL_FLOOR = LEDGER.h; // local 160
+  const BOARD_Y = 22;
+  const ROWS_OFFSET = 14;
   const BUTTONS = { x: 0, y: 220, w: 480, h: 24 };
-  const block = () => {
-    const geom = columnRows({ x: 8, y: GAMEOVER_MISSIONS_Y, w: 200, count: 3, rowH: GAMEOVER_ROW_H, barH: 2 });
-    return { geom, heading: { x: 8, y: GAMEOVER_MISSIONS_Y - 10, w: 60, h: 7 } };
-  };
+  /** Local y where the last leaderboard row's text ends. */
+  const boardEnd = () => BOARD_Y + ROWS_OFFSET + (GAMEOVER_BOARD_ROWS - 1) * GAMEOVER_BOARD_ROW_H + LABEL_H;
+  const block = () => columnRows({ x: 8, y: GAMEOVER_MISSIONS_Y, w: 200, count: 3, rowH: GAMEOVER_ROW_H, barH: 2 });
+
+  test('each progress bar never covers its own label', () => {
+    // Two rounds of audits found this defect in different forms: first a bar 2 px INTO an 8 px label
+    // (pitch 8), then a bar flush under a label with a zero-pixel gap to the next row (pitch 10), which
+    // reads as a slab of ink across the text. The invariant that fixes both is geometric rather than
+    // aesthetic: the label and the bar must not intersect, in any row, and the label must keep a full
+    // glyph box. A bar placed under the label only satisfies this at a pitch that leaves no gap, so
+    // the layout puts it inline instead.
+    const geom = block();
+    geom.rows.forEach((r, i) => {
+      const b = geom.bars[i];
+      expect(overlaps(r, b)).toBe(false);
+      expect(r.h).toBeGreaterThanOrEqual(GLYPH_H);
+      // Inline, or below with a real gap — never inside.
+      const inline = b.x >= r.x + r.w;
+      const below = b.y >= r.y + r.h + 1;
+      expect(inline || below).toBe(true);
+    });
+  });
+
+  test('consecutive mission rows do not collide', () => {
+    const geom = block();
+    for (let i = 1; i < geom.rows.length; i += 1) {
+      expect(overlaps(geom.rows[i - 1], geom.rows[i])).toBe(false);
+      expect(overlaps(geom.bars[i - 1], geom.rows[i])).toBe(false);
+      expect(overlaps(geom.rows[i - 1], geom.bars[i])).toBe(false);
+      // A full glyph box plus a visible gap: rows that merely touch read as one paragraph.
+      expect(geom.rows[i].y).toBeGreaterThanOrEqual(geom.rows[i - 1].y + GLYPH_H);
+    }
+  });
+
+  test('the mission title fits its text box at the longest real title', () => {
+    // The longest template is 132 px wide at scale 1 ("Collect 1000 shards total"). A text box that
+    // cannot hold it silently ellipsizes a mission's target away, which is worse than a tight fit.
+    const geom = block();
+    expect(geom.textW).toBeGreaterThanOrEqual(132);
+  });
 
   test('the block sits inside the LEDGER panel, in screen coordinates', () => {
-    const { geom, heading } = block();
+    const geom = block();
     for (const r of [...geom.rows, ...geom.bars]) {
       const screen = rect(LEDGER.x + r.x, LEDGER.y + r.y, r.w, r.h);
       expect({ r: screen, ok: insideScreen(screen) }).toMatchObject({ ok: true });
@@ -169,25 +243,39 @@ describe('Game Over mission block', () => {
       expect(screen.y).toBeGreaterThanOrEqual(LEDGER.y);
       expect(screen.y + screen.h).toBeLessThanOrEqual(LEDGER.y + LEDGER.h);
     }
-    expect(heading.y).toBeGreaterThanOrEqual(BOARD_END_LOCAL);
+    expect(GAMEOVER_MISSIONS_RULE_Y).toBeGreaterThan(boardEnd());
+    expect(GAMEOVER_MISSIONS_Y).toBeGreaterThan(GAMEOVER_MISSIONS_RULE_Y);
+  });
+
+  test('the whole block fits above the panel floor', () => {
+    const geom = block();
+    const last = geom.bars[geom.bars.length - 1];
+    expect(last.y + last.h).toBeLessThanOrEqual(PANEL_FLOOR);
+    // Not merely "fits": a zero-margin layout is what made the first attempt look acceptable.
+    expect(PANEL_FLOOR - (last.y + last.h)).toBeGreaterThanOrEqual(2);
   });
 
   test('the block clears the leaderboard rows above it', () => {
-    const { heading } = block();
-    // Measured against the board's real last row at its configured row count, not a guess: 8 rows
-    // end at local 124 and the heading must start below that.
-    expect(heading.y).toBeGreaterThanOrEqual(BOARD_END_LOCAL);
-    expect(GAMEOVER_BOARD_ROWS).toBeLessThan(10); // trimming the board is what made the band exist
+    expect(GAMEOVER_MISSIONS_RULE_Y).toBeGreaterThan(boardEnd());
+    expect(GAMEOVER_MISSIONS_Y).toBeGreaterThan(boardEnd());
   });
 
   test('the block does not run through the retry buttons or the XP row', () => {
-    const { geom } = block();
-    const last = geom.rows[geom.rows.length - 1];
+    const geom = block();
+    const last = geom.bars[geom.bars.length - 1];
     const lastScreen = rect(LEDGER.x + last.x, LEDGER.y + last.y, last.w, last.h);
     // Luna's round-2 finding: the first attempt ended near screen y 251, through the buttons at
     // 220..244 and the XP line at 246.
     expect(overlaps(lastScreen, BUTTONS)).toBe(false);
     expect(lastScreen.y + lastScreen.h).toBeLessThanOrEqual(BUTTONS.y);
+  });
+
+  test('the panel still shows all ten entries its title advertises', () => {
+    // Luna's round-3 finding: the block was bought by trimming the board to 8 rows while the panel
+    // title still read "TOP 10". The pitch is tightened instead; the COUNT is the user-visible contract.
+    expect(GAMEOVER_BOARD_ROWS).toBe(10);
+    expect(GAMEOVER_BOARD_ROW_H).toBeLessThan(11);
+    expect(boardEnd()).toBeLessThanOrEqual(GAMEOVER_MISSIONS_RULE_Y); // board ends above the rule
   });
 });
 

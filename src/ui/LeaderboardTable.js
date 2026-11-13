@@ -23,13 +23,18 @@ export class LeaderboardTable extends Phaser.GameObjects.Container {
    * @param {Phaser.Scene} scene
    * @param {import('./Theme.js').Theme} theme
    * @param {{x:number,y:number,w:number,entries:object[]|null,highlightId?:string,rows?:number,wide?:boolean,
-   *          parent?:Phaser.GameObjects.Container}} o entries === null shows a loading message
+   *          rowH?:number,parent?:Phaser.GameObjects.Container}} o entries === null shows a loading message
+   *   `rowH` lets a caller tighten the pitch to fit the same row count in less space (Game Over uses 9
+   *   to keep all ten entries visible alongside the mission block). Defaults to ROW_H.
    */
   constructor(scene, theme, o) {
     super(scene, o.x, o.y);
     this.theme = theme;
     this.w = o.w;
     this.rows = o.rows || 10;
+    // Per-caller pitch. The pitch is a rendering detail; the row COUNT is the contract the panel title
+    // advertises, so tightening the pitch must never be used to show fewer entries than promised.
+    this.rowH = o.rowH || ROW_H;
     this.wide = o.wide !== undefined ? o.wide : o.w >= 330;
     this.g = new Phaser.GameObjects.Graphics(scene);
     this.add(this.g);
@@ -79,7 +84,7 @@ export class LeaderboardTable extends Phaser.GameObjects.Container {
       this._cell(w / 2, 66, 'FINISH A TOP-10 RUN TO CLAIM A SPOT', 'text', 'center').setAlpha(0.6);
     }
     list.forEach((e, i) => {
-      const y = 14 + i * ROW_H;
+      const y = 14 + i * this.rowH;
       const hi = this.highlightId && e.id === this.highlightId;
       if (hi) this.highlightRow = i;
       const color = hi ? 'lime' : i === 0 ? 'amber' : 'text';
@@ -104,11 +109,11 @@ export class LeaderboardTable extends Phaser.GameObjects.Container {
     g.fillStyle(pal.cyan, 0.3);
     g.fillRect(0, 10, this.w, 1);
     if (this.highlightRow >= 0) {
-      const y = 14 + this.highlightRow * ROW_H - 2;
+      const y = 14 + this.highlightRow * this.rowH - 2;
       g.fillStyle(pal.lime, 0.12 + 0.1 * Math.sin(this.pulse));
-      g.fillRect(0, y, this.w, ROW_H);
+      g.fillRect(0, y, this.w, this.rowH);
       g.fillStyle(pal.lime, 1);
-      g.fillRect(0, y, 2, ROW_H);
+      g.fillRect(0, y, 2, this.rowH);
     }
   }
 

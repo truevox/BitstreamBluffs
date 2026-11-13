@@ -34,6 +34,8 @@ export function buildTitleMissionList(scene, theme, rows) {
     // Local coordinates inside the panel; ellipsized to the measured row width so a long title can
     // never run past its own bar (the defect Luna caught in W1's reward line).
     const local = { x: r.x - L.panel.x, y: r.y - L.panel.y, w: r.w };
+    // The bar is INLINE (to the right of the text), so the label keeps its full 8 px glyph box. Only
+    // a bar drawn underneath a label at a sub-10 px pitch can slice it — see MISSION_LIST_TITLE.
     const label = new NeonText(scene, theme, local.x, local.y, ellipsize(row.title, local.w), {
       color: row.done ? 'lime' : 'text', outline: 'none',
     });

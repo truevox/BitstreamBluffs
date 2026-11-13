@@ -70,13 +70,16 @@ export class PauseScene extends Phaser.Scene {
     const mview = this.registry.get(REG.MISSIONS);
     const mrows = (mview && mview.active) || [];
     if (mrows.length) {
-      const geom = columnRows({ x: 236, y: 138, w: 172, count: Math.min(3, mrows.length), rowH: 10, barH: 2 });
+      const geom = columnRows({ x: 236, y: 138, w: 172, count: Math.min(3, mrows.length), rowH: 11, barH: 2 });
       panel.add(new NeonText(this, theme, 236, 128, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
       mrows.slice(0, 3).forEach((row, i) => {
         const r = geom.rows[i];
         const b = geom.bars[i];
         if (!r || !b) return;
-        const label = new NeonText(this, theme, r.x, r.y, ellipsize(row.title, 150), {
+        // Ellipsized to the row's own text box (which already excludes the inline bar), not to the
+        // whole panel width: a title that ran under its bar would be the same class of defect as a bar
+        // drawn over a title.
+        const label = new NeonText(this, theme, r.x, r.y, ellipsize(row.title, geom.textW), {
           color: row.done ? 'lime' : 'text', outline: 'none',
         });
         label.setAlpha(0.9);

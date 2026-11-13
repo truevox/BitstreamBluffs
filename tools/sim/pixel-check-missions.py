@@ -69,6 +69,62 @@ def report(name, ok, detail):
     return ok
 
 
+# A glyph is 8 font rows tall (FONT_LINE_H 9 = 8 + gap). Ink runs measured off a real capture were
+# 7 virtual px per line, so a legible row must show at least this many consecutive ink rows.
+GLYPH_INK_H = 6
+# Vertical gap required between one row's ink and the next: a bar drawn immediately under a label
+# leaves 0-1 px and reads as a single slab over the text.
+MIN_ROW_GAP = 2
+
+
+def ink_runs(buf, w, x0, x1, y0, y1, thresh=110, min_px=3):
+    """Contiguous virtual-y runs that contain ink inside a virtual-x band.
+
+    Returns [(startY, endY)] in virtual pixels. This is what turns "is there ink?" into "is each line
+    of text its full height, with a real gap to the next line?" — the question the old probe never
+    asked, which is why it passed while every mission row was sliced in half.
+    """
+    runs = []
+    cur = None
+    last = None
+    for Y in range(vy(y0), vy(y1)):
+        row = Y * w
+        n = 0
+        for x in range(vx(x0), vx(x1)):
+            i = (row + x) * 3
+            if luma((buf[i], buf[i + 1], buf[i + 2])) > thresh:
+                n += 1
+        ink = n >= min_px
+        y = Y / SCALE
+        if cur is None or cur[0] != ink:
+            if cur and cur[0]:
+                runs.append((cur[1], last))
+            cur = [ink, y]
+        last = y
+    if cur and cur[0]:
+        runs.append((cur[1], last))
+    return runs
+
+
+def check_legible(name, buf, w, x0, x1, y0, y1, want_rows, thresh=110):
+    """Every text row in a band must be full glyph height with a real gap to the next."""
+    ok = True
+    runs = ink_runs(buf, w, x0, x1, y0, y1, thresh=thresh)
+    heights = [round(b - a + 0.25, 2) for a, b in runs]
+    ok &= report(f"{name}: {want_rows} readable text rows", len(runs) >= want_rows,
+                 f"lines={len(runs)} heights={heights}")
+    if runs:
+        shortest = min(heights)
+        ok &= report(f"{name}: every line is full glyph height", shortest >= GLYPH_INK_H,
+                     f"shortest={shortest} px (need >= {GLYPH_INK_H})")
+    if len(runs) >= 2:
+        gaps = [round(runs[i][0] - runs[i - 1][1], 2) for i in range(1, len(runs))]
+        tightest = min(gaps)
+        ok &= report(f"{name}: lines never merge into each other", tightest >= MIN_ROW_GAP,
+                     f"gaps={gaps} tightest={tightest} px (need >= {MIN_ROW_GAP})")
+    return ok
+
+
 def check_title(path):
     w, h, buf = raw_rgb(path)
     ok = True
@@ -78,13 +134,17 @@ def check_title(path):
     # Right column belongs to BEST. Mission ink out there means the list went full-width again.
     right = band_ink(buf, w, 300, 230, 470, 252)
     ok &= report("title: list stays out of the BEST column", right == 0, f"ink={right} px")
-    # The hint's own glyphs start at y 254 and run across the screen centre, so "is the hint band
-    # empty?" is the wrong question — it never is. The collision test is the GAP: y 249..253 inside the
-    # list's column must be blank, which can only be true if the list ends above the hint.
-    gap = band_ink(buf, w, 26, 249, 238, 253, thresh=140)
-    ok &= report("title: list clears the hint line", gap == 0, f"ink={gap} px")
-    # The DAILY PATCH strip's second row is at y ~215-220; mission text must not appear inside it
-    # beyond what the strip already draws. Compare against the strip's own rows.
+    # CC Friday's finding at native resolution: each mission row's text was cut roughly in half
+    # vertically by the next row's bar. Ink existing proves nothing about that, so measure the actual
+    # line heights and the gaps between them in the list's own column.
+    ok &= check_legible("title: mission rows", buf, w, 26, 200, 228, 258, want_rows=3)
+    # The control hint must still sit below the list with a real gap, not glued to the last row.
+    # x 244..470 excludes the list panel's own bottom border (x 24..240, y 255) so this measures the
+    # hint text, not the frame around the list.
+    tail = ink_runs(buf, w, 244, 470, 252, 268)
+    if tail:
+        ok &= report("title: hint line stays below the list", tail[0][0] >= 256,
+                     f"first hint ink y={tail[0][0]}")
     return ok
 
 
@@ -100,22 +160,25 @@ def check_pause(path):
     return ok
 
 
-def check_gameover(path):
+def check_gameover(path, label="gameover"):
     w, h, buf = raw_rgb(path)
     ok = True
-    # The mission block lives in the LEDGER panel (x 250..466, y 54..214): local 136..159 -> screen
-    # 190..213. Luna's round-2 finding was the first attempt hanging past the panel and through the
+    # The mission block lives in the LEDGER panel (x 250..466, y 54..214): local 128..157 -> screen
+    # 182..211. Luna's round-2 finding was the first attempt hanging past the panel and through the
     # retry buttons, so this checks for content here AND emptiness in the button band.
-    ink = band_ink(buf, w, 258, 190, 460, 212)
-    ok &= report("gameover: mission rows have content", ink > 300, f"ink={ink} px")
+    ink = band_ink(buf, w, 258, 182, 460, 212)
+    ok &= report(f"{label}: mission rows have content", ink > 300, f"ink={ink} px")
+    # CC Friday read these rows as sliced at native resolution; measuring line heights is the only
+    # check that can tell a legible row from a half-covered one.
+    ok &= check_legible(f"{label}: mission rows", buf, w, 258, 420, 180, 214, want_rows=3)
     # The button band legitimately holds the RETRY / NEW SEED / TITLE labels, so "no ink there" is
     # wrong — that assertion failed on the buttons themselves, not on missions. What must be true is
     # that the mission block ends above the band: its lowest ink row has to be inside the panel.
-    rows = [vy for vy in range(190, 216) if band_ink(buf, w, 258, vy, 460, vy + 1) > 0]
+    rows = [vy for vy in range(182, 216) if band_ink(buf, w, 258, vy, 460, vy + 1) > 0]
     last = max(rows) if rows else 0
-    ok &= report("gameover: mission block ends above the button band", 0 < last < 214, f"last mission row y={last}")
+    ok &= report(f"{label}: mission block ends above the button band", 0 < last < 214, f"last mission row y={last}")
     below = band_ink(buf, w, 250, 214, 470, 219)
-    ok &= report("gameover: mission block stays inside the ledger panel", below == 0, f"ink={below} px")
+    ok &= report(f"{label}: mission block stays inside the ledger panel", below == 0, f"ink={below} px")
     return ok
 
 
@@ -134,6 +197,9 @@ def main():
     ok = True
     ok &= check_title(f"{d}/w2-title-missions-default.png")
     ok &= check_gameover(f"{d}/w2-gameover-missions-default.png")
+    # The initials-entry state is the one CC Friday found unreadable and the one the probe never
+    # captured. Same legibility assertions, different screen.
+    ok &= check_gameover(f"{d}/w2-gameover-initials-default.png", label="gameover-initials")
     ok &= check_pause(f"{d}/w2-pause-missions-default.png")
     ok &= check_toast(f"{d}/w2-toast-mission-default.png")
     # Colorblind pass: the same checks on the alternate palette, since ink contrast differs.
