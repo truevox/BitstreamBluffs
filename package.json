@@ -12,7 +12,8 @@
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "test:puppeteer": "node ./node_modules/mocha/bin/mocha.js tests/puppeteer-tests.js --timeout 30000",
-    "test:all": "npm run test && npm run test:puppeteer"
+    "test:all": "npm run test && npm run test:puppeteer",
+    "gate:playthrough": "npm run build && node tools/sim/gate-playthrough.mjs"
   },
   "jest": {
     "testEnvironment": "jsdom",

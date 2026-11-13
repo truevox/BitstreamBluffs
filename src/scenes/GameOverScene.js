@@ -29,7 +29,7 @@ import { addScanlines } from '../ui/Scanlines.js';
 import { InitialsEntry } from '../ui/InitialsEntry.js';
 import { LeaderboardTable, ruleLabel } from '../ui/LeaderboardTable.js';
 import { copyText } from '../ui/Clipboard.js';
-import { fmtInt, fmtClock, fmtMult, fmtSec, randomSeed, INITIALS_LENGTH } from '../ui/Format.js';
+import { fmtInt, fmtClock, fmtMult, fmtSec, randomSeed, INITIALS_LENGTH, shareableSeed } from '../ui/Format.js';
 import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { uiSfx } from '../ui/Sound.js';
 
