@@ -302,6 +302,14 @@ All additive; no public signature changed.
 7. **DOM text boxes** (seed entry, sharecode export/import) are real `<input>`/`<textarea>` elements stopped from propagating
    key events (`ui/DomTextBox.js`), so InputRouter's window listeners never see typed keys. InputRouter must not use
    capture-phase listeners that `preventDefault` Space/arrows, or those keys cannot be typed in the box.
+8. **HUD slots** (`UIScene._layout`, `ui/HudLayout.js`): the centre banners (effect warnings, BOOST, PERFECT LANDING, sector strip, bank line,
+   CRASH banner, trick popups) are stacked top to bottom from their classic y (`SLOT`), so simultaneous ones take separate rows instead of
+   overlapping, and are pushed under any fixed HUD row, the zone chip or touch button they would touch (rows are measured live; wide values
+   such as a 7-digit score, shards in the thousands or a long combo name cannot collide). Pop animations are capped (about 25 %) so they
+   stay inside the 3 px gap; the speed pop stays above the shard row (y 53); the shard chain chip follows the popping counter. The bottom
+   row (power-ups, tutorial chip) is placed with `placeX`: power-ups move right of the touch buttons, the chip moves above the power-up row
+   when it would touch them, the seed lines or the buttons. Touch boxes come from the overlay's `.bb-cl` clusters mapped through the canvas
+   rectangle. Screenshots: `node tools/sim/shots.mjs hud <outDir>` (scenarios in `tools/sim/shots-hud.js`, with an overlap probe).
 
 ## Gameplay addenda (gameplay engineer; all additive)
 

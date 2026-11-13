@@ -11,6 +11,9 @@
  *
  * Layout (480x270): score top-left, combo top-right, zone chip + warnings top-centre, trick popups below them, power-up
  * timers bottom-left, seed / daily rule bottom-right. The middle band where the rider lives stays clear.
+ * Centre banners (warnings, BOOST, PERFECT LANDING, sector strip, bank line, crash banner, popups) never share a slot:
+ * `_layout()` stacks the visible ones top to bottom (ui/HudLayout.js `stackY`) from their classic y, pushing them under the fixed
+ * HUD rows, the zone chip and the touch buttons they would touch. The bottom row (power-ups, tutorial chip) does the same with `placeX`.
  */
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, SCORING } from '../constants.js';
@@ -22,6 +25,7 @@ import { measureText } from '../ui/PixelFont.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { fmtInt, fmtMult, fmtSec, idToLabel } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
+import { stackY, placeX } from '../ui/HudLayout.js';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -68,6 +72,13 @@ const BANK_Y = 80;
 const POPUP_Y = 100;
 const POPUP_STEP = 11;
 const MAX_POPUPS = 3;
+/** Row of the shard counter (the speed row above it is 10 px high; its pop stays under that). */
+const SHARD_Y = 53;
+/** Classic top y of each centre slot (used when nothing above it is showing). */
+const SLOT = { warn: 22, boost: 24, flash: 46, strip: 59, bank: BANK_Y, banner: 86, popup: POPUP_Y };
+const POWER_Y = GAME_HEIGHT - 28;
+const POWER_PITCH = 62;
+const HINT_ROWS = [GAME_HEIGHT - 23, GAME_HEIGHT - 44];
 
 export class UIScene extends Phaser.Scene {
   constructor() {
@@ -110,6 +121,14 @@ export class UIScene extends Phaser.Scene {
     this.flow = 1;
     this.flowFrac = 0;
     this.flowStep = 0;
+    this.zoneY = 3;
+    this.powerX = 8;
+    this.hintX = 0;
+    this.hintY = HINT_ROWS[0];
+    this.touchRects = [];
+    this.touchAt = -1e9;
+    this.bannerScale = 3;
+    this.boostScale = 2;
 
     this._buildStats();
     this._buildCenter();
@@ -178,8 +197,8 @@ export class UIScene extends Phaser.Scene {
     this.comboInfo = this._t(GAME_WIDTH - 8, 31, '', { color: 'amber', anchor: 'right' });
     // pending (at stake) trick points, pulses while the multiplier is above x1
     this.pendingText = this._t(GAME_WIDTH - 8, 43, '', { color: 'amber', scale: 2, anchor: 'right', outline: 'glow' });
-    this.shardText = this._t(8, 51, '', { color: 'cyan' });
-    this.chainText = this._t(8, 51, '', { color: 'amber' });
+    this.shardText = this._t(8, SHARD_Y, '', { color: 'cyan' });
+    this.chainText = this._t(8, SHARD_Y, '', { color: 'amber' });
     this.shardLabel = '';
     this.shardText.setVisible(false);
     this.chainText.setVisible(false);
@@ -204,14 +223,14 @@ export class UIScene extends Phaser.Scene {
     this.zoneG.setVisible(false);
     this.zoneText.setVisible(false);
     this.warnY = 22;
-    this.flash = this._t(cx, 46, '', { color: 'amber', scale: 2, anchor: 'center', outline: 'glow' });
+    this.flash = this._t(cx, 46, '', { color: 'amber', scale: 2, anchor: 'center', vAnchor: 0.5, outline: 'glow' });
     this.flash.setAlpha(0);
     this.banner = this._t(cx, 100, '', { color: 'danger', scale: 3, anchor: 'center', vAnchor: 0.5 });
     this.banner.setAlpha(0);
-    this.boostText = this._t(cx, 24, '', { color: 'lime', scale: 2, anchor: 'center', outline: 'glow' });
+    this.boostText = this._t(cx, 24, '', { color: 'lime', scale: 2, anchor: 'center', vAnchor: 0.5, outline: 'glow' });
     this.boostText.setAlpha(0);
     // payoff line of a landing: "DOUBLE BACKFLIP + HELI x1.5 +450" (big, glowing, fades after ~1.1 s)
-    this.bankLine = this._t(cx, BANK_Y, '', { color: 'amber', scale: 2, anchor: 'center', outline: 'glow' });
+    this.bankLine = this._t(cx, BANK_Y, '', { color: 'amber', scale: 2, anchor: 'center', vAnchor: 0.5, outline: 'glow' });
     this.bankLine.setAlpha(0);
     // slide-in strip (milestones / new best) just above the rider band
     this.stripC = this.add.container(0, 0);
@@ -220,6 +239,7 @@ export class UIScene extends Phaser.Scene {
     this.stripT = new NeonText(this, this.theme, cx, 61, '', { color: 'cyan', scale: 2, anchor: 'center', outline: 'glow' });
     this.stripC.add([this.stripG, this.stripT]);
     this.stripC.setVisible(false);
+    this.hud.sendToBack(this.stripC); // the band sits behind the HUD rows it crosses (score / shards / flow stay readable)
     this.theme.bind(() => this._paintStrip());
     // tutorial chip
     this.hintG = new Phaser.GameObjects.Graphics(this);
@@ -268,11 +288,12 @@ export class UIScene extends Phaser.Scene {
     const w = this.zoneChip.w;
     const x = Math.round(GAME_WIDTH / 2 - w / 2);
     g.fillStyle(pal.bg, 0.72);
-    g.fillRect(x, 3, w, 13);
-    strokeRectPx(g, x, 3, w, 13, c, 0.9);
+    const y = this.zoneY;
+    g.fillRect(x, y, w, 13);
+    strokeRectPx(g, x, y, w, 13, c, 0.9);
     g.fillStyle(c, 1);
-    g.fillRect(x - 3, 3, 2, 13);
-    g.fillRect(x + w + 1, 3, 2, 13);
+    g.fillRect(x - 3, y, 2, 13);
+    g.fillRect(x + w + 1, y, 2, 13);
   }
 
   _paintStrip() {
@@ -292,8 +313,8 @@ export class UIScene extends Phaser.Scene {
     if (!this.hintChip.w) return;
     const pal = this.theme.pal;
     const w = this.hintChip.w;
-    const x = Math.round(GAME_WIDTH / 2 - w / 2);
-    const y = GAME_HEIGHT - 23;
+    const x = this.hintX || Math.round(GAME_WIDTH / 2 - w / 2);
+    const y = this.hintY;
     g.fillStyle(pal.bg, 0.78);
     g.fillRect(x, y, w, 13);
     strokeRectPx(g, x, y, w, 13, pal[this.hintChip.key], 0.9);
@@ -308,8 +329,8 @@ export class UIScene extends Phaser.Scene {
       const info = POWERUP_INFO[id] || { color: 'cyan' };
       const key = (this.content.powerups && this.content.powerups[id] && this.content.powerups[id].colorKey) || info.color;
       const c = pal[key];
-      const x = 8 + i * 62;
-      const y = GAME_HEIGHT - 28;
+      const x = this.powerX + i * POWER_PITCH;
+      const y = POWER_Y;
       const blink = p.total > 0 && p.remaining < 1000 && Math.floor(this.nowMs / 120) % 2 === 0;
       g.fillStyle(pal.bg, 0.75);
       g.fillRect(x, y, 20, 20);
@@ -434,12 +455,15 @@ export class UIScene extends Phaser.Scene {
     this.tweens.killTweensOf(t);
     t.setText(`BOOST +${fmtInt(Math.round(p.amountPxS || 0))}`).setColorKey(perfect ? 'amber' : 'lime');
     const base = perfect ? 3 : 2;
-    t.setAlpha(1).setScale(base * 1.5);
+    this.boostScale = base;
+    t.__snap = true;
+    // pops about its centre by 25 %: stays inside the gap to the next slot
+    t.setAlpha(1).setScale(base * 1.25);
     this.tweens.add({ targets: t, scaleX: base, scaleY: base, duration: 150, ease: 'Back.easeOut' });
     this.tweens.add({ targets: t, alpha: 0, delay: perfect ? 900 : 600, duration: 300 });
     // speed readout flash
     this.speedText.setColorKey('amber');
-    this._pop(this.speedText, 1, perfect ? 2 : 1.5);
+    this._pop(this.speedText, 1, perfect ? 1.4 : 1.3); // the shard row is 12 px below: a bigger pop would run into it
     this.time.delayedCall(450, () => { if (this.speedText.scene) this.speedText.setColorKey('cyan'); });
     uiSfx(this, 'boost', { intensity: perfect ? 1 : 0.35 });
   }
@@ -456,12 +480,12 @@ export class UIScene extends Phaser.Scene {
     this.chainUntil = this.nowMs + CHAIN_LIFE_MS;
     this.shardLabel = `SHARDS ${fmtInt(this.shards)}`;
     this.shardText.setText(this.shardLabel).setVisible(true);
-    this._pop(this.shardText, 1, 1.7);
+    this._pop(this.shardText, 1, 1.4);
     const show = this.chain > 1;
     this.chainText.setVisible(show);
     if (show) {
-      this.chainText.setText(`x${this.chain}`).setX(8 + measureText(this.shardLabel) + 6);
-      this._pop(this.chainText, 1, 1.8);
+      this.chainText.setText(`x${this.chain}`);
+      this._pop(this.chainText, 1, 1.5);
     }
     uiSfx(this, 'shard', { step: Math.max(0, this.chain - 1) });
   }
@@ -492,6 +516,8 @@ export class UIScene extends Phaser.Scene {
     const label = HINT_TEXT[mode][p.id] || '';
     if (!label) return;
     this.hintId = p.id;
+    this.hintX = 0; // _layout picks the free spot on the next frame
+    this.hintY = HINT_ROWS[0];
     this.hintT.setText(label).setVisible(true);
     this.hintChip = { w: measureText(label) + 14, key: 'cyan' };
     this.hintG.setVisible(true);
@@ -525,6 +551,7 @@ export class UIScene extends Phaser.Scene {
     this.stripT.setText(job.text).setColorKey(job.key);
     const c = this.stripC;
     this.tweens.killTweensOf(c);
+    c.__snap = true;
     c.setVisible(true).setX(-GAME_WIDTH);
     // slide in 220 ms, hold 500 ms, slide out 220 ms (< 1 s total)
     this.tweens.add({ targets: c, x: 0, duration: 220, ease: 'Cubic.easeOut' });
@@ -587,7 +614,8 @@ export class UIScene extends Phaser.Scene {
   _bank(text, color) {
     const t = this.bankLine;
     this.tweens.killTweensOf(t);
-    t.setText(text).setColorKey(color).setAlpha(1).setScale(2.7);
+    t.__snap = true;
+    t.setText(text).setColorKey(color).setAlpha(1).setScale(2.5);
     this.tweens.add({ targets: t, scaleX: 2, scaleY: 2, duration: 160, ease: 'Back.easeOut' });
     this.tweens.add({ targets: t, alpha: 0, delay: 1100, duration: 350 });
   }
@@ -713,7 +741,7 @@ export class UIScene extends Phaser.Scene {
   _layoutPowerups() {
     let i = 0;
     for (const [, p] of this.powerups) {
-      p.text.setPosition(8 + i * 62 + 24, GAME_HEIGHT - 24);
+      p.text.setPosition(this.powerX + i * POWER_PITCH + 24, GAME_HEIGHT - 24);
       i++;
     }
   }
@@ -726,6 +754,7 @@ export class UIScene extends Phaser.Scene {
     let e = this.effects.get(p.effect);
     if (!e) {
       const t = this._t(GAME_WIDTH / 2, this.warnY + this.effects.size * 11, '', { color: info.color, anchor: 'center', outline: 'dark' });
+      t.__snap = true;
       e = { text: t, remaining: 0, total: 0 };
       this.effects.set(p.effect, e);
     }
@@ -746,9 +775,7 @@ export class UIScene extends Phaser.Scene {
   _removeEffect(key) {
     const e = this.effects.get(key);
     if (e) e.text.destroy();
-    this.effects.delete(key);
-    let i = 0;
-    for (const [, v] of this.effects) v.text.setY(this.warnY + i++ * 11);
+    this.effects.delete(key); // the rest glide up in _layout
   }
 
   onZoneEnter(p) {
@@ -828,7 +855,8 @@ export class UIScene extends Phaser.Scene {
   _flash(text) {
     const f = this.flash;
     this.tweens.killTweensOf(f);
-    f.setText(text).setAlpha(1).setScale(2.6);
+    f.__snap = true;
+    f.setText(text).setAlpha(1).setScale(2.5);
     this.tweens.add({ targets: f, scaleX: 2, scaleY: 2, duration: 160, ease: 'Back.easeOut' });
     this.tweens.add({ targets: f, alpha: 0, delay: 750, duration: 300 });
   }
@@ -836,18 +864,19 @@ export class UIScene extends Phaser.Scene {
   _banner(text, color, scale) {
     const b = this.banner;
     this.tweens.killTweensOf(b);
-    b.setText(text).setColorKey(color).setScale(scale * 1.4).setAlpha(1);
+    this.bannerScale = scale;
+    b.__snap = true;
+    b.setText(text).setColorKey(color).setScale(scale * 1.25).setAlpha(1);
     this.tweens.add({ targets: b, scaleX: scale, scaleY: scale, duration: 140, ease: 'Back.easeOut' });
     this.tweens.add({ targets: b, alpha: 0, delay: 900, duration: 250 });
   }
 
   _popup(text, color) {
-    for (const p of this.popups) {
-      this.tweens.killTweensOf(p);
-      p.y += POPUP_STEP;
-    }
+    // older popups drop one slot (positions come from _layout, which glides them down)
+    for (const p of this.popups) this.tweens.killTweensOf(p);
     const t = this._t(GAME_WIDTH / 2, POPUP_Y, text, { color, anchor: 'center', outline: 'dark' });
-    t.setScale(1.35);
+    t.__snap = true;
+    t.setScale(1.25);
     this.popups.unshift(t);
     this.tweens.add({ targets: t, scaleX: 1, scaleY: 1, duration: 140, ease: 'Back.easeOut' });
     this.tweens.add({
@@ -868,6 +897,140 @@ export class UIScene extends Phaser.Scene {
     if (i >= 0) this.popups.splice(i, 1);
     this.tweens.killTweensOf(t);
     if (t.scene) t.destroy();
+  }
+
+  // ---------------------------------------------------------------- layout
+
+  /** Screen box of a NeonText (game px), from its current scale and anchor. */
+  _trect(nt) {
+    const s = nt.scaleX;
+    const w = measureText(nt.main.text) * s;
+    const h = 8 * s;
+    return { x: nt.x - w * nt.main.originX, y: nt.y - h * nt.main.originY, w, h };
+  }
+
+  _shown(nt) {
+    return nt.visible && nt.alpha > 0.03 && !!nt.main.text;
+  }
+
+  /** Boxes of the fixed HUD rows that are showing (what the centre banners must not touch). */
+  _fixedRects() {
+    const out = [];
+    for (const nt of [this.scoreLabel, this.scoreText, this.distText, this.speedText, this.shardText, this.chainText,
+      this.comboLabel, this.comboText, this.comboInfo, this.pendingText, this.flowText, this.flowLostText]) {
+      if (this._shown(nt)) out.push(this._trect(nt));
+    }
+    if (this.flowG.visible) out.push({ x: GAME_WIDTH - 8 - FLOW_BAR_W - 1, y: FLOW_Y + 9, w: FLOW_BAR_W + 2, h: 5 });
+    return out;
+  }
+
+  /** Boxes (game px) of the on-screen touch buttons, read from the DOM overlay and mapped through the canvas rectangle. */
+  _refreshTouchRects() {
+    this.touchAt = this.nowMs;
+    const router = this.registry.get(REG.INPUT);
+    const ov = router && router.pad && router.pad.overlay;
+    const root = ov && ov.isVisible && ov.isVisible() && ov.root;
+    const canvas = this.game.canvas;
+    const out = [];
+    if (root && root.querySelectorAll && canvas && canvas.getBoundingClientRect) {
+      const cr = canvas.getBoundingClientRect();
+      if (cr.width > 0 && cr.height > 0) {
+        const sx = GAME_WIDTH / cr.width;
+        const sy = GAME_HEIGHT / cr.height;
+        for (const el of root.querySelectorAll('.bb-cl')) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) out.push({ x: (r.left - cr.left) * sx, y: (r.top - cr.top) * sy, w: r.width * sx, h: r.height * sy });
+        }
+      }
+    }
+    this.touchRects = out;
+  }
+
+  _glide(obj, ty, dt) {
+    if (obj.__snap || obj.__laid === undefined) {
+      obj.__snap = false;
+      obj.__laid = true;
+      obj.y = ty;
+      return;
+    }
+    const d = ty - obj.y;
+    obj.y = Math.abs(d) < 1 ? ty : Math.round(obj.y + d * Math.min(1, dt / 70));
+  }
+
+  /** Stack the centre slots and place the bottom row. Called every frame; cheap (a dozen rectangles). */
+  _layout(dt) {
+    if (this.nowMs - this.touchAt > 500) this._refreshTouchRects();
+    const cx = GAME_WIDTH / 2;
+    const touch = this.touchRects;
+    const keep = this._fixedRects().concat(touch);
+
+    // zone chip: top centre, below the touch pause / reset buttons when those are up
+    let chipBox = null;
+    if (this.zoneChip.w) {
+      const w = this.zoneChip.w + 8;
+      const y = stackY([{ w, h: 13, pref: 3 }], { cx, gap: 3, keepOuts: touch })[0];
+      if (y !== this.zoneY) {
+        this.zoneY = y;
+        this._paintZone();
+      }
+      this.zoneText.setY(y + 3);
+      chipBox = { x: cx - w / 2, y, w, h: 13 };
+    } else this.zoneY = 3;
+    if (chipBox) keep.push(chipBox);
+
+    // centre stack, in priority order; each entry is {obj, w, h, pref, kind}
+    const slots = [];
+    const add = (obj, w, h, pref, kind) => slots.push({ obj, w, h, pref, kind });
+    for (const e of this.effects.values()) add(e.text, measureText(e.text.main.text), 8, SLOT.warn, 'top');
+    if (this._shown(this.boostText)) add(this.boostText, measureText(this.boostText.main.text) * this.boostScale, 8 * this.boostScale, SLOT.boost, 'mid');
+    if (this._shown(this.flash)) add(this.flash, measureText(this.flash.main.text) * 2, 16, SLOT.flash, 'mid');
+    if (this.stripC.visible && this.stripT.main.text) add(this.stripC, measureText(this.stripT.main.text) * 2, 17, SLOT.strip, 'strip');
+    if (this._shown(this.bankLine)) add(this.bankLine, measureText(this.bankLine.main.text) * 2, 16, SLOT.bank, 'mid');
+    if (this._shown(this.banner)) add(this.banner, measureText(this.banner.main.text) * this.bannerScale, 8 * this.bannerScale, SLOT.banner, 'mid');
+    for (const p of this.popups) add(p, measureText(p.main.text), 8, SLOT.popup, 'top');
+    const ys = stackY(slots, { cx, startY: 0, gap: 3, keepOuts: keep });
+    slots.forEach((sl, i) => {
+      if (sl.kind === 'strip') {
+        const ty = ys[i] - 59;
+        if (sl.obj.__snap) { sl.obj.__snap = false; sl.obj.y = ty; } else sl.obj.y += (ty - sl.obj.y) * Math.min(1, dt / 70);
+      } else this._glide(sl.obj, sl.kind === 'mid' ? ys[i] + sl.h / 2 : ys[i], dt);
+    });
+
+    // bottom row: power-up timers (clear of the touch buttons), then the tutorial chip (clear of both and of the seed lines)
+    const n = this.powerups.size;
+    const rowW = n ? (n - 1) * POWER_PITCH + 56 : 0;
+    let px = 8;
+    if (n) {
+      const free = placeX(rowW, POWER_Y, 26, 8, touch, { min: 8, max: GAME_WIDTH - 8 });
+      px = free === null ? 8 : free;
+    }
+    if (px !== this.powerX) {
+      this.powerX = px;
+      this._paintPowerups();
+      this._layoutPowerups();
+    }
+    const bottom = touch.slice();
+    if (n) bottom.push({ x: px, y: POWER_Y, w: rowW, h: 26 });
+    if (this.seedText && this.seedText.visible) bottom.push(this._trect(this.seedText), this._trect(this.ruleText));
+    if (this.hintChip.w) {
+      const w = this.hintChip.w;
+      let hx = null;
+      let hy = HINT_ROWS[0];
+      for (const row of HINT_ROWS) {
+        hy = row;
+        hx = placeX(w, row, 13, Math.round(cx - w / 2), bottom, { min: 4, max: GAME_WIDTH - 4 });
+        if (hx !== null) break;
+      }
+      if (hx === null) hx = Math.round(cx - w / 2);
+      if (hx !== this.hintX || hy !== this.hintY) {
+        this.hintX = hx;
+        this.hintY = hy;
+        this._paintHint();
+      }
+      this.hintT.setPosition(hx + w / 2, hy + 4);
+    }
+    // the shard chain chip follows the (popping) shard counter
+    if (this.chainText.visible) this.chainText.setX(8 + measureText(this.shardLabel) * this.shardText.scaleX + 6);
   }
 
   // ---------------------------------------------------------------- frame
@@ -922,6 +1085,7 @@ export class UIScene extends Phaser.Scene {
       this.flowFrac = Math.max(0, this.flowFrac - delta / SCORING.flowTimeoutMs);
       this._paintFlow();
     }
+    this._layout(delta);
     // zone chip pulse
     if (this.zoneText.visible) this.zoneG.setAlpha(0.75 + 0.25 * Math.sin(this.nowMs * 0.008));
     // tutorial chip fallback timeout, shard chain expiry

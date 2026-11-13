@@ -77,7 +77,8 @@
       reset(); base({});
       emit('LANDING', { quality: 'perfect', angleDeg: 2, impactSpeedPxS: 300, airtimeMs: 900, bonusPoints: 20, bankedPoints: 0, hard: false, x: 0, y: 0, comboName: '', comboMult: 1, flowUsed: 1 });
       emit('LANDING_BOOST', { amountPxS: 28, quality: 'perfect', comboMult: 1, tricks: 0 });
-      step(10); await shot('landing-boost');
+      step(2); await shot('landing-boost-pop');
+      step(8); await shot('landing-boost');
       step(30); await shot('landing-boost-later');
     }
     // 2. landing + long combo name + flow change + tricks + near miss
@@ -105,6 +106,13 @@
       emit('FLOW_CHANGED', { flow: 1.5, previous: 1, reason: 'gain', timeoutFrac: 1, best: 1.5 });
       step(14); await shot('milestone-best-miss');
       step(52); await shot('milestone-best-miss-2');
+    }
+    // 3b. the reported speed / shards collision: a boost pops the speed readout while the shard counter is showing
+    if (want('speed-shards-pop')) {
+      reset(); base({ score: 5273, meters: 2988, speed: 830 });
+      emit('SHARD_COLLECTED', { chain: 3, points: 10, total: 130, count: 13, x: 0, y: 0 });
+      emit('LANDING_BOOST', { amountPxS: 28, quality: 'perfect', comboMult: 1, tricks: 0 });
+      step(2); await shot('speed-shards-pop');
     }
     // 4. widest fixed rows
     if (want('max-width')) {
