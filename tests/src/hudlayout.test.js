@@ -1,4 +1,4 @@
-import { rectsHit, stackY, placeX } from '../../src/ui/HudLayout.js';
+import { rectsHit, stackY, placeX, bandHits, placeBand } from '../../src/ui/HudLayout.js';
 import { measureText } from '../../src/ui/PixelFont.js';
 import { fmtInt } from '../../src/ui/Format.js';
 
@@ -47,5 +47,46 @@ describe('HudLayout.placeX', () => {
   });
   test('returns null when the row is blocked', () => {
     expect(placeX(100, 240, 20, 8, [{ x: 0, y: 230, w: 480, h: 40 }], { min: 0, max: 480 })).toBeNull();
+  });
+});
+
+describe('HudLayout.placeBand — a full-width band must not paint through the HUD rows', () => {
+  // The W2 defect: the mission toast strip is a full-width band, so its measured text missing the
+  // fixed rows is not enough - its background fill crossed them and drew over "FLOW x1.25".
+  const FLOW = { x: 380, y: 62, w: 92, h: 8 }; // flowText at FLOW_Y = 62, right-anchored
+  const SCORE = { x: 4, y: 4, w: 120, h: 8 };
+
+  test('a band that clears every row stays at its preferred y', () => {
+    expect(placeBand(17, 100, [FLOW, SCORE])).toBe(100);
+  });
+
+  test('a band crossing a fixed row is pushed below it', () => {
+    // 59 is the classic strip position and it crosses FLOW (62..70).
+    const y = placeBand(17, 59, [FLOW]);
+    expect(y).toBeGreaterThanOrEqual(FLOW.y + FLOW.h);
+    expect(bandHits({ y, h: 17 }, [FLOW])).toBe(false);
+  });
+
+  test('bandHits is true for a band overlapping a row even if its own text would fit', () => {
+    // The whole point: a narrow measured text does not save a full-width band.
+    expect(bandHits({ y: 59, h: 17 }, [FLOW])).toBe(true);
+    expect(bandHits({ y: 40, h: 17 }, [FLOW])).toBe(false);
+  });
+
+  test('it stacks below several rows in turn, not just the first', () => {
+    const rows = [{ x: 0, y: 50, w: 480, h: 10 }, { x: 0, y: 63, w: 480, h: 10 }];
+    const y = placeBand(16, 40, rows);
+    expect(bandHits({ y, h: 16 }, rows)).toBe(false);
+    expect(y).toBeGreaterThanOrEqual(73);
+  });
+
+  test('it never runs off the bottom of the screen', () => {
+    // A pathological keep-out must clamp rather than place the band at y=400 on a 270 px screen.
+    const tall = { x: 0, y: 0, w: 480, h: 260 };
+    expect(placeBand(17, 59, [tall], { maxY: 270 })).toBeLessThanOrEqual(270);
+  });
+
+  test('no keep-outs means no movement', () => {
+    expect(placeBand(17, 59, [])).toBe(59);
   });
 });

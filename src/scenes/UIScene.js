@@ -26,7 +26,7 @@ import { measureText } from '../ui/PixelFont.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { fmtInt, fmtMult, fmtSec, idToLabel } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
-import { stackY, placeX } from '../ui/HudLayout.js';
+import { stackY, placeX, placeBand } from '../ui/HudLayout.js';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -1030,17 +1030,26 @@ export class UIScene extends Phaser.Scene {
     for (const e of this.effects.values()) add(e.text, measureText(e.text.main.text), 8, SLOT.warn, 'top');
     if (this._shown(this.boostText)) add(this.boostText, measureText(this.boostText.main.text) * this.boostScale, 8 * this.boostScale, SLOT.boost, 'mid');
     if (this._shown(this.flash)) add(this.flash, measureText(this.flash.main.text) * 2, 16, SLOT.flash, 'mid');
-    if (this.stripC.visible && this.stripT.main.text) add(this.stripC, measureText(this.stripT.main.text) * 2, 17, SLOT.strip, 'strip');
+    // The strip is a FULL-WIDTH band, not a text box: it is placed by placeBand against the fixed rows
+    // instead of joining the text stack. Its background fill crosses the whole row, so measuring only
+    // its text (the old behaviour) let it paint over "FLOW x1.25" and the trick popups - the W2 defect.
+    const stripUp = this.stripC.visible && Boolean(this.stripT.main.text);
     if (this._shown(this.bankLine)) add(this.bankLine, measureText(this.bankLine.main.text) * 2, 16, SLOT.bank, 'mid');
     if (this._shown(this.banner)) add(this.banner, measureText(this.banner.main.text) * this.bannerScale, 8 * this.bannerScale, SLOT.banner, 'mid');
     for (const p of this.popups) add(p, measureText(p.main.text), 8, SLOT.popup, 'top');
     const ys = stackY(slots, { cx, startY: 0, gap: 3, keepOuts: keep });
     slots.forEach((sl, i) => {
-      if (sl.kind === 'strip') {
-        const ty = ys[i] - 59;
-        if (sl.obj.__snap) { sl.obj.__snap = false; sl.obj.y = ty; } else sl.obj.y += (ty - sl.obj.y) * Math.min(1, dt / 70);
-      } else this._glide(sl.obj, sl.kind === 'mid' ? ys[i] + sl.h / 2 : ys[i], dt);
+      this._glide(sl.obj, sl.kind === 'mid' ? ys[i] + sl.h / 2 : ys[i], dt);
     });
+
+    // strip band: own slot, clear of every fixed row across its full width
+    if (stripUp) {
+      const bandTop = placeBand(17, SLOT.strip, keep, { gap: 3 });
+      // the container's band is drawn at local y 59..76, and its text at local y 61: shift so the
+      // BAND top lands on bandTop.
+      const ty = bandTop - 59;
+      if (this.stripC.__snap) { this.stripC.__snap = false; this.stripC.y = ty; } else this.stripC.y += (ty - this.stripC.y) * Math.min(1, dt / 70);
+    }
 
     // bottom row: power-up timers (clear of the touch buttons), then the tutorial chip (clear of both and of the seed lines)
     const n = this.powerups.size;

@@ -208,8 +208,77 @@
     return { ok: true };
   }
 
+  /**
+   * CC Friday's reported defect: a mission-complete toast arriving while the trick popup stack AND the
+   * FLOW indicator are on screen. The plain `toast` scenario cannot see it - it has no flow and no
+   * popups, so the strip's full-width band lands in an empty neighbourhood and looks fine.
+   */
+  async function toastCollision() {
+    const c = await ctx();
+    const { game, REG, EVT } = c;
+    game.loop.stop();
+    for (const k of ['RunScene', 'UIScene', 'PauseScene', 'GameOverScene', 'TitleScene']) { try { game.scene.stop(k); } catch (e) { /* ignore */ } }
+    muteAudio(game, REG);
+    const env = mkEnv(game);
+    game.registry.set(REG.SEED, 'sim-shots');
+    game.registry.set(REG.LAST_RECORD, null);
+    game.scene.start('RunScene', { seed: 'sim-shots', dailyRuleId: 'none' });
+    step(env, 10);
+    game.events.emit(EVT.RUN_START, { seed: 'sim-shots' });
+
+    // FLOW up (this is the row at FLOW_Y = 62 the strip used to paint over)
+    // RunScene pushes its own hudSpeed at ~10 Hz with flow=1, so a single injected value is
+    // overwritten before the frame is drawn. Re-assert it every frame so FLOW is genuinely on.
+    const holdFlow = (n) => { for (let i = 0; i < n; i++) { game.events.emit('bb:hudSpeed', { speedPxS: 900, flow: 1.25, flowFrac: 0.7 }); step(env, 1); } };
+    holdFlow(6);
+    // a trick popup stack on screen at the same time
+    game.events.emit(EVT.TRICK, { type: 'frontflip', count: 1, points: 250 });
+    game.events.emit(EVT.LANDING, { kind: 'perfect', points: 50 });
+    holdFlow(3);
+    // and the mission toast lands right in the middle of all of it
+    game.events.emit(EVT.MISSION_COMPLETED, { id: 't1-trick-frontflip', title: 'Land a frontflip', xp: 60, shards: 4 });
+    holdFlow(12);
+
+    await palette(env, c, 'default');
+    step(env, 4);
+    // RunScene emits hudSpeed(flow=1) on every frame, so FLOW must be re-asserted with no frame in
+    // between it and the screenshot - otherwise the indicator is legitimately off and the probe would
+    // "prove" a clean layout by never showing the thing it is supposed to collide with.
+    game.events.emit('bb:hudSpeed', { speedPxS: 900, flow: 1.25, flowFrac: 0.7 });
+    const ui = game.scene.getScene('UIScene');
+    // One layout pass AFTER the flow is on, so the strip is placed against the row it must avoid.
+    // (Measuring before this would read a layout computed when FLOW was still hidden - the exact
+    // stale-order mistake that makes a collision test pass for the wrong reason.)
+    // Several passes: the strip glides toward its target rather than snapping, so a single pass
+    // leaves it mid-flight and the probe would read a position it never rests at on screen.
+    for (let i = 0; i < 40; i++) ui._layout(16);
+    // Report the ACTUAL rectangles so the collision is proven by geometry, not by squinting at a PNG.
+    const rect = (o) => (o ? { x: Math.round(o.x), y: Math.round(o.y), w: Math.round(o.displayWidth), h: Math.round(o.displayHeight) } : null);
+    const stripBand = ui.stripC && ui.stripC.visible ? { x: 0, y: Math.round(ui.stripC.y + 59), w: 480, h: 17 } : null;
+    // Use the HUD's own measurement helpers so the probe sees exactly what the layout sees.
+    const measured = (nt) => (ui._shown(nt) ? ui._trect(nt) : null);
+    const popups = (ui.popups || []).filter((p) => p.visible && p.alpha > 0.05).map(measured).filter(Boolean);
+    const flow = measured(ui.flowText);
+    const flowRaw = { flowVal: ui.flow, visible: ui.flowText ? ui.flowText.visible : null, text: ui.flowText && ui.flowText.main ? String(ui.flowText.main.text) : null };
+    const hit = (a, b) => Boolean(a && b && a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h);
+    await window.__shot('w3-toast-collision-default', {
+      stripBand, flow, popups,
+      stripVsFlow: hit(stripBand, flow),
+      stripVsPopups: popups.map((pp) => hit(stripBand, pp)),
+      stripText: ui.stripT && ui.stripT.main ? String(ui.stripT.main.text) : null,
+      flowRaw,
+    });
+    await palette(env, c, 'colorblind');
+    step(env, 4);
+    await window.__shot('w3-toast-collision-colorblind', {});
+    await palette(env, c, 'default');
+    for (const k of ['RunScene', 'UIScene']) { try { game.scene.stop(k); } catch (e) { /* ignore */ } }
+    return { ok: true };
+  }
+
   async function run(o) {
     const out = {};
+    out.toastCollision = await toastCollision();
     out.title = await title(o);
     out.gameover = await gameover(o);
     out.gameoverInitials = await gameoverInitials(o);

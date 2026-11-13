@@ -36,6 +36,47 @@ export function stackY(items, { cx, startY = 0, gap = 3, keepOuts = [] }) {
 }
 
 /**
+ * True when a full-width band at [y, y+h) would paint through any keep-out rectangle.
+ *
+ * A band is a different shape from a text box: the strip and the biome banner span the whole 480 px
+ * row, so it is not enough for their own measured text to miss the fixed HUD rows - the background
+ * fill crosses the row and draws over whatever sits there. That is the W2 defect (a mission toast
+ * painted through "FLOW x1.25" and the trick popups) and the same bug shape the biome banner would
+ * have inherited.
+ * @param {{y:number,h:number}} band
+ * @param {{x:number,y:number,w:number,h:number}[]} keepOuts
+ * @param {number} [width=480] band width (the whole row by default).
+ * @param {number} [gap=0] clear gap required.
+ * @returns {boolean}
+ */
+export function bandHits(band, keepOuts, width = 480, gap = 0) {
+  const box = { x: 0, y: band.y, w: width, h: band.h };
+  return (keepOuts || []).some((k) => rectsHit(box, k, gap));
+}
+
+/**
+ * Top y for a full-width band of height `h`, at or below `pref`, that clears every keep-out row.
+ * Stays at `pref` when it is already clear, so the strip keeps its classic position on a quiet HUD.
+ * @param {number} h band height
+ * @param {number} pref preferred top y
+ * @param {{x:number,y:number,w:number,h:number}[]} keepOuts
+ * @param {{gap?:number, maxY?:number, width?:number}} [o]
+ * @returns {number}
+ */
+export function placeBand(h, pref, keepOuts, o = {}) {
+  const gap = o.gap === undefined ? 3 : o.gap;
+  const width = o.width === undefined ? 480 : o.width;
+  const maxY = o.maxY === undefined ? 270 : o.maxY;
+  let y = pref;
+  for (let guard = 0; guard < 64; guard++) {
+    const hit = (keepOuts || []).find((k) => rectsHit({ x: 0, y, w: width, h }, k, gap - 1));
+    if (!hit) break;
+    y = hit.y + hit.h + gap;
+  }
+  return Math.min(y, Math.max(pref, maxY - h));
+}
+
+/**
  * Left edge for a w x h box at row `y` that touches none of `keepOuts`, closest to `prefLeft`, within [min, max] (right limit of
  * the box). Null when no free spot exists on that row.
  * @returns {number|null}
