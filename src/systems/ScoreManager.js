@@ -360,12 +360,21 @@ export class ScoreManager {
     return SCORING.comboStart + SCORING.comboStep * steps;
   }
 
+  /** @returns {number} points from whole metres; allocation-free (per-frame callers). */
+  getDistancePoints() {
+    return Math.floor(this.distanceM) * SCORING.pointsPerMeter;
+  }
+
+  /** @returns {number} running total (same value as getSnapshot().total); allocation-free. */
+  getTotal() {
+    return Math.max(0, Math.round(this.getDistancePoints() + this.trickPoints + this.bonusPoints - this.penaltyPoints));
+  }
+
   /** @returns {ScoreSnapshot} */
   getSnapshot() {
-    const distancePoints = Math.floor(this.distanceM) * SCORING.pointsPerMeter;
     return {
-      total: Math.max(0, Math.round(distancePoints + this.trickPoints + this.bonusPoints - this.penaltyPoints)),
-      distancePoints,
+      total: this.getTotal(),
+      distancePoints: this.getDistancePoints(),
       trickPoints: this.trickPoints,
       distanceM: this.distanceM,
       multiplier: this.getMultiplier(),

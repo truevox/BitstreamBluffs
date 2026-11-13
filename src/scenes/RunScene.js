@@ -142,6 +142,7 @@ export class RunScene extends Phaser.Scene {
       powerupDefs: this.content.powerups,
       modDefs: this.content.terrainMods,
     });
+    this.heightFn = (x) => this.terrain.heightAt(x); // allocated once; reads this.terrain at call time
     this.score = new ScoreManager({ pxPerMeter: PIXELS_PER_METER });
     this.score.reset();
     this.tricks = new TrickTracker();
@@ -673,8 +674,7 @@ export class RunScene extends Phaser.Scene {
       // distance
       const metres = Math.max(0, (sled.x - this.startX) / PIXELS_PER_METER);
       if (this.score.setDistance(metres)) {
-        const snap = this.score.getSnapshot();
-        this.game.events.emit(EVT.DISTANCE_CHANGED, { meters: Math.floor(snap.distanceM) });
+        this.game.events.emit(EVT.DISTANCE_CHANGED, { meters: Math.floor(this.score.distanceM) });
         this.emitScore();
       }
 
@@ -682,7 +682,7 @@ export class RunScene extends Phaser.Scene {
       this.streamTerrain(sled.x);
 
       // glitch schedule
-      const gr = this.glitch.update(this.runTimeMs, this.score.getSnapshot().distanceM) || {};
+      const gr = this.glitch.update(this.runTimeMs, this.score.distanceM) || {};
       for (const e of gr.ended || []) this.game.events.emit(EVT.GLITCH_END, { id: e.id });
       for (const e of gr.started || []) {
         this.game.events.emit(EVT.GLITCH_START, { id: e.id, kind: e.kind, durationMs: e.durationMs, intensity: e.intensity });
@@ -716,9 +716,9 @@ export class RunScene extends Phaser.Scene {
     const t = this.runTimeMs;
     for (const list of this.hazards.values()) for (const h of list) h.update(t, left, right);
     for (const list of this.powerups.values()) for (const p of list) p.update(t, left, right);
-    this.fx.update(fxDt, (x) => this.terrain.heightAt(x));
+    this.fx.update(fxDt, this.heightFn);
     if (this.shardField) this.shardField.update(t, left, right);
-    if (this.bestMarker) this.bestMarker.update(t, sled.x, (x) => this.terrain.heightAt(x));
+    if (this.bestMarker) this.bestMarker.update(t, sled.x, this.heightFn);
     this.drawStreaks(t);
     this.bg.update(cam.scrollX, t, sled.speed);
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
@@ -820,11 +820,11 @@ export class RunScene extends Phaser.Scene {
   // ------------------------------------------------------------------ tricks / landings / score
 
   emitScore() {
-    const snap = this.score.getSnapshot();
-    const delta = snap.total - this.lastTotal;
-    this.lastTotal = snap.total;
+    const total = this.score.getTotal();
+    const delta = total - this.lastTotal;
+    this.lastTotal = total;
     this.game.events.emit(EVT.SCORE_CHANGED, {
-      total: snap.total, distancePoints: snap.distancePoints, trickPoints: snap.trickPoints, delta,
+      total, distancePoints: this.score.getDistancePoints(), trickPoints: this.score.trickPoints, delta,
     });
   }
 

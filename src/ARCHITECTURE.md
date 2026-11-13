@@ -268,6 +268,7 @@ All additive; no public signature changed.
   respawn. Thresholds are exported constants (`PERFECT_ANGLE_DEG` 12, `GOOD_ANGLE_DEG` 28, `SLOPPY_ANGLE_DEG` 55,
   `HARD_IMPACT_PX_S` 520, `CRASH_IMPACT_PX_S` 1500, flip tolerance 20 deg, air brake 250 ms, parachute 300 ms).
   Trick value = base x (2^count - 1) x (1 + min(airtime,2500)/2500).
+* **ScoreManager** also exposes allocation-free `getTotal()` / `getDistancePoints()` (what `getSnapshot()` uses) for per-frame callers.
 * **ScoreManager**: snapshot gains `penaltyPoints`; reset penalty is tracked separately so `trickPoints` stays >= 0.
   A `crash` landing quality banks nothing (no separate `onCrash` call needed, though it is harmless).
 * **SaveStore**: `init()` never rejects (memory fallback, `store.backend` is `'idb'` or `'memory'`). Records are
