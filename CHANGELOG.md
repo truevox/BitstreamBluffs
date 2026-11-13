@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.3.2 - unreleased (Luna W2 audit repairs)
+
+### 🐛 Fixed
+- Remove the overlapping Title-screen MISSIONS heading from the first mission row.
+- Exclude a mission completed in the current roll from its immediate replacement draw.
+
 ## v2.3.1 - unreleased (W2 audit repairs)
 
 ### 🐛 Fixed

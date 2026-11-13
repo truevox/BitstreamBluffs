@@ -9,6 +9,7 @@ import { Rng } from '../../src/systems/Rng.js';
 import { DailyPatch } from '../../src/systems/DailyPatch.js';
 import { SCORING } from '../../src/constants.js';
 import missionsData from '../../src/data/missions/missions.json';
+import reachabilityData from '../../tools/sim/.reach/reachability.json';
 import {
   missionState, satisfies, progressFor, drawMissions, rollSet, missionProgressText,
   xpForTemplate, SET_BONUS, MISSION_REWARD,
@@ -240,6 +241,18 @@ describe('rollSet — completion, payment and replacement', () => {
     expect(out.active).not.toContain('a');
   });
 
+  test('a just-completed mission is not immediately drawn as its own replacement', () => {
+    const completed = TEMPLATES.find((t) => t.type === 'singleRun' && t.metric === 'distanceM');
+    const out = rollSet(
+      prof({ missions: { active: [completed.id], counter: 0 } }),
+      [completed],
+      rec({ distanceM: completed.target }),
+      TEMPLATES,
+    );
+    expect(out.completed.map((c) => c.id)).toContain(completed.id);
+    expect(out.active).not.toContain(completed.id);
+  });
+
   test('the same run cannot pay twice — the applied-hash ring is honoured', () => {
     // Missions.js is pure, so it does not own the dedupe ring: the caller passes the ledgerHashes
     // already applied (ProfileStore's `credited` ring, the same one that makes XP idempotent). This
@@ -369,17 +382,6 @@ function isReachableUnder(t, rule) {
 describe('daily-rule compatibility (spec gate)', () => {
   const rules = DailyPatch.RULES;
 
-  // Measured from real runs (tools/sim, hop + handsOff policies): single-jump airtime peaks at
-  // ~1772 ms and the best per-run max has median ~1490 ms. Gravity multipliers scale ballistic
-  // hang time roughly by 1/sqrt(g), so those are the ceilings we hold templates to.
-  const BASELINE_MAX_AIR_MS = 1772;
-  const ceilings = (rule) => {
-    const g = (rule.modifiers && rule.modifiers.gravityMul) || 1;
-    return {
-      maxAirtimeMs: Math.floor(BASELINE_MAX_AIR_MS / Math.sqrt(g)),
-    };
-  };
-
   test('there are exactly 8 daily rules', () => {
     expect(rules).toHaveLength(8);
   });
@@ -398,10 +400,11 @@ describe('daily-rule compatibility (spec gate)', () => {
     }
   });
 
-  test('no airtime target exceeds what the day\'s gravity allows', () => {
-    // The one metric a physics rule can genuinely make impossible.
+  test('no airtime target exceeds a measured real-game run under any daily rule', () => {
+    // Use the sweep's actual maxima, not a ballistic estimate scaled from one hand-picked baseline.
+    // The earlier 1772/sqrt(gravity) ceiling did not correspond to the checked-in pacing run data.
     for (const rule of rules) {
-      const cap = ceilings(rule).maxAirtimeMs;
+      const cap = reachabilityData.perRule[rule.id].maxAirtimeMs;
       for (const t of TEMPLATES) {
         if (t.metric !== 'maxAirtimeMs') continue;
         if (t.type === 'cumulative') continue; // accumulates across runs, never gated by one day

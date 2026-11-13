@@ -367,12 +367,17 @@ export function rollSet(profile, activeTemplates, record, allTemplates, o = {}) 
   let counter = isNum(prevMissions.counter) ? prevMissions.counter : 0;
   const targetSlots = Math.max(SLOTS, slots.length || 0);
   let active = keep.slice();
+  // A just-completed mission is not a replacement: immediately drawing it again makes the player
+  // repeat the same goal instead of seeing a new objective.
+  const completedIds = completed.map((c) => c.id);
   let guard = 0;
   while (active.length < targetSlots && guard < 32) {
     guard += 1;
     counter += 1;
     const drawnProfile = { ...p, missions: { ...prevMissions, counter, active, progress } };
-    const drawn = drawMissions(drawnProfile, all, targetSlots - active.length, { ruleId, exclude: active });
+    const drawn = drawMissions(drawnProfile, all, targetSlots - active.length, {
+      ruleId, exclude: [...active, ...completedIds],
+    });
     if (!drawn.length) break;
     for (const d of drawn) {
       if (active.length >= targetSlots) break;

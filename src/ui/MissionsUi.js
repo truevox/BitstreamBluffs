@@ -27,9 +27,6 @@ export function buildTitleMissionList(scene, theme, rows) {
     x: L.panel.x, y: L.panel.y, w: L.panel.w, h: L.panel.h,
     color: 'magenta', fillAlpha: 0.82,
   });
-  const head = new NeonText(scene, theme, 4, 2, 'MISSIONS', { color: 'magenta', outline: 'none' });
-  head.setAlpha(0.9);
-  panel.add(head);
   list.forEach((row, i) => {
     const r = L.rows[i];
     const bar = L.bars[i];
