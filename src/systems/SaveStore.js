@@ -14,6 +14,7 @@
 import { STORAGE } from '../constants.js';
 import { xxHash32 } from './Rng.js';
 import { DailyPatch } from './DailyPatch.js';
+import { isRankable } from './Ranking.js';
 
 /**
  * @typedef {Object} Settings
@@ -171,6 +172,11 @@ export function sanitizeRun(raw) {
   if (typeof raw.biomeMask === 'number' && Number.isFinite(raw.biomeMask) && raw.biomeMask >= 0) {
     r.biomeMask = Math.floor(raw.biomeMask) >>> 0;
   }
+  // W4 (modded runs): true when the run used a boost. Whitelisted ONLY - like `biomeMask`, it is
+  // deliberately absent from computeLedgerHash and needs no saveVersion bump, so an existing record
+  // keeps its identity and every pre-W4 run stays clean by omission rather than being retroactively
+  // disqualified. The decision to exclude it from a board lives in systems/Ranking.js, not here.
+  if (raw.modded === true) r.modded = true;
   const ini = normalizeInitials(raw.initials);
   if (ini.length >= INITIALS_MIN) r.initials = ini;
   return r;
@@ -406,16 +412,20 @@ export class SaveStore {
    * @param {number} [limit=10]
    * @returns {Promise<RunRecord[]>}
    */
-  async getLeaderboard(limit = 10) {
-    return this._board().slice(0, Math.max(0, limit)).map((r) => ({ ...r, tricks: { ...r.tricks } }));
+  async getLeaderboard(limit = 10, opts = {}) {
+    return this._board(opts).slice(0, Math.max(0, limit)).map((r) => ({ ...r, tricks: { ...r.tricks } }));
   }
 
   /**
    * @param {number} score
    * @returns {Promise<boolean>} true if `score` would place in the top 10 (board not full, or beats 10th).
    */
-  async qualifiesForTop10(score) {
-    const board = this._board();
+  async qualifiesForTop10(score, opts = {}) {
+    // `opts` carries the candidate's `modded` flag, so it IS the record to rank: the helper decides, and
+    // this method never looks at the flag itself. Whether a boosted run may rank is the constant's
+    // business; duplicating that test here is precisely the scatter the gate forbids.
+    if (!isRankable(opts, opts)) return false;
+    const board = this._board(opts);
     if (board.length < 10) return true;
     return score > board[9].score;
   }
@@ -454,7 +464,7 @@ export class SaveStore {
    * @returns {Promise<string>}
    */
   async exportSharecode() {
-    const runs = this._board();
+    const runs = this._board({ ranked: true });
     return SHARECODE_PREFIX + base64Encode(JSON.stringify({ app: 'bitstream-bluffs', v: STORAGE.saveVersion, runs }));
   }
 
@@ -520,6 +530,7 @@ export class SaveStore {
     let bestDistanceM = 0;
     for (const r of this.runs) {
       if (r.seed !== seed || (ex !== null && r.id === ex)) continue;
+      if (!isRankable(r, opts)) continue;
       // Old records predate the field and are mask 0 by definition (they were played before biomes).
       if (wantMask !== null && ((r.biomeMask >>> 0) || 0) !== wantMask) continue;
       attempts++;
@@ -558,11 +569,15 @@ export class SaveStore {
    * @returns {{streak:number, playedToday:boolean, todayKey:string, lastPlayedKey:string|null}}
    *   lastPlayedKey = most recent daily date key played that is not in the future (null if none).
    */
-  getDailyStreak(now = new Date()) {
+  getDailyStreak(now = new Date(), opts = {}) {
     const nowD = toDate(now);
     const todayKey = nowD.toISOString().slice(0, 10);
     const days = new Set();
     for (const r of this.runs) {
+      // W4: a boosted run does not hold a daily streak. Scanned here rather than through _board()
+      // because the streak is about DAYS played, not placed runs, so it has its own loop - which is
+      // exactly why this surface needed its own route through the one helper.
+      if (!isRankable(r, opts)) continue;
       const k = DailyPatch.dateKeyFromSeed(r.seed);
       if (k && k <= todayKey) days.add(k);
     }
@@ -582,8 +597,9 @@ export class SaveStore {
   // ---- internals ----------------------------------------------------------------------------------------------
 
   /** @returns {RunRecord[]} sorted initialed runs (live objects; callers copy). */
-  _board() {
-    const idx = this.runs.map((r, i) => [r, i]).filter(([r]) => r.initials);
+  _board(opts) {
+    const idx = this.runs.map((r, i) => [r, i])
+      .filter(([r]) => r.initials && isRankable(r, opts));
     idx.sort((a, b) => b[0].score - a[0].score || a[0].endedAt - b[0].endedAt || a[1] - b[1]);
     return idx.map(([r]) => r);
   }
