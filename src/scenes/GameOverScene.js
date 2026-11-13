@@ -16,6 +16,7 @@ import { updateSetting } from '../services.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
+import { columnRows } from '../ui/MissionsLayout.js';
 import { ellipsize } from '../ui/PixelFont.js';
 import { Panel } from '../ui/Panel.js';
 import { Button } from '../ui/Button.js';
@@ -151,11 +152,51 @@ export class GameOverScene extends Phaser.Scene {
       x: 182, y: 140, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
     });
     p.add(this.copyBtn);
+    this._buildMissions(p);
     this.tweens.addCounter({
       from: 0, to: rec.score || 0, duration: Math.min(700, 200 + (rec.score || 0) * 0.2),
       onUpdate: (t) => this.scoreText.setText(fmtInt(t.getValue())),
       onComplete: () => this.scoreText.setText(fmtInt(rec.score)),
     });
+  }
+
+  /**
+   * W2: the three missions with their standing progress, in the free band at the bottom of RUN
+   * REPORT (the report rows end ~124 and the seed row at 158; the panel runs to PANEL_H=160 → y 214).
+   * Rows and bars come from columnRows() so the fit is unit-tested, not eyeballed.
+   */
+  _buildMissions(p) {
+    try {
+      const view = this.registry.get(REG.MISSIONS);
+      const rows = (view && view.active) || [];
+      if (!rows.length) return;
+      const geom = columnRows({ x: 8, y: 172, w: 210, count: Math.min(3, rows.length), rowH: 9, barH: 2 });
+      p.add(new NeonText(this, this.theme, 8, 162, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
+      rows.slice(0, 3).forEach((row, i) => {
+        const r = geom.rows[i];
+        const b = geom.bars[i];
+        if (!r || !b) return;
+        const label = new NeonText(this, this.theme, r.x, r.y, ellipsize(row.title, 150), {
+          color: row.done ? 'lime' : 'text', outline: 'none',
+        });
+        label.setAlpha(0.9);
+        p.add(label);
+        const g = this.add.graphics();
+        g.fillStyle(0x1a2b3a, 1);
+        g.fillRect(b.x, b.y, b.w, b.h);
+        const frac = Math.max(0, Math.min(1, row.fraction || 0));
+        if (frac > 0) {
+          g.fillStyle(row.done ? 0x9cff57 : this.theme.color('cyan'), 1);
+          g.fillRect(b.x, b.y, Math.max(1, Math.round(b.w * frac)), b.h);
+        }
+        p.add(g);
+        const pct = new NeonText(this, this.theme, 218, r.y, `${Math.round(frac * 100)}%`, {
+          color: row.done ? 'lime' : 'text', anchor: 'right', outline: 'none',
+        });
+        pct.setAlpha(0.7);
+        p.add(pct);
+      });
+    } catch (e) { /* cosmetic */ }
   }
 
   /**

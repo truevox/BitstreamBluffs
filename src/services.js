@@ -9,6 +9,7 @@ import { SaveStore } from './systems/SaveStore.js';
 import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
 import { createProgressionService } from './systems/ProgressionService.js';
+import { createMissionsService } from './systems/MissionsService.js';
 
 /**
  * Instantiate SaveStore, load settings, create InputRouter + AudioSynth, load content, set a default seed.
@@ -32,6 +33,15 @@ export async function createServices(game) {
   // W1: progression service (profile load + one-time backfill + RUN_END listener). Additive.
   const progression = await createProgressionService(game, { levels: game.registry.get(REG.CONTENT).progression });
   game.registry.set(REG.PROGRESSION, progression);
+  // W2: missions. The service is created after progression so it can borrow the already-loaded
+  // profile store, and it is attached to progression BEFORE RUN_END can fire (both happen during
+  // preload, before TitleScene exists). Additive.
+  const missions = await createMissionsService(game, {
+    templates: game.registry.get(REG.CONTENT).missions.templates,
+    store: progression.store,
+  });
+  game.registry.set(REG.MISSIONS_SERVICE, missions);
+  progression.missions = missions;
 }
 
 /**

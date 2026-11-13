@@ -264,6 +264,38 @@ export class ProfileStore {
   }
 
   /**
+   * Merge a W2 mission roll into the profile and persist.
+   *
+   * Missions are applied separately from `credit()` on purpose: credit() is what makes a run
+   * idempotent (it returns null on a replayed hash), and missions must follow that decision rather
+   * than make their own. Keeping this as a distinct step means a tombstoned run can never advance
+   * mission progress while paying no XP, or the reverse.
+   *
+   * @param {{active:string[],counter:number,progress:Object,completed:Array,xp:number,shards:number,setCleared:boolean}} roll
+   * @returns {Object} the new profile (also assigned to this.profile)
+   */
+  applyMissions(roll) {
+    if (!roll || typeof roll !== 'object') return this.profile;
+    const p = this.profile;
+    const missions = {
+      counter: nonNeg(roll.counter),
+      active: Array.isArray(roll.active) ? roll.active.filter((x) => typeof x === 'string').slice(0, 3) : [],
+      progress: roll.progress && typeof roll.progress === 'object' ? { ...roll.progress } : {},
+      // The daily rule the set was drawn under, so a save/load mid-day cannot re-filter differently.
+      ruleId: typeof roll.ruleId === 'string' ? roll.ruleId : (p.missions && p.missions.ruleId) || null,
+    };
+    const next = {
+      ...p,
+      xp: p.xp + nonNeg(roll.xp),
+      bank: p.bank + nonNeg(roll.shards),
+      missions,
+    };
+    this.profile = sanitizeProfile(next, this.levels);
+    this.save();
+    return this.profile;
+  }
+
+  /**
    * One-time backfill from stored runs (see backfillFromRuns). Saves only if something changed.
    * @param {Array<Object>} runs
    * @returns {boolean} true when the profile changed

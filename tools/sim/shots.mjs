@@ -36,6 +36,7 @@ try {
   await page.addInitScript({ path: path.join(here, 'shots-zoom.js') });
   await page.addInitScript({ path: path.join(here, 'shots-hud.js') });
   await page.addInitScript({ path: path.join(here, 'shots-progression.js') });
+  await page.addInitScript({ path: path.join(here, 'shots-missions.js') });
   await page.addInitScript({ path: path.join(here, 'shots-probe-profile.js') });
   const shots = [];
   await page.exposeFunction('__shot', async (name, meta) => {
@@ -70,7 +71,9 @@ try {
     result.probe = await page.evaluate((o) => window.__shotsProbe.runProfile(o), opts);
   } else if (mode === 'progression') {
     result.progression = await page.evaluate((o) => window.__shotsProgression.run(o), opts);
-  } else throw new Error('mode: hints | zoom | hud | progression');
+  } else if (mode === 'missions') {
+    result.missions = await page.evaluate((o) => window.__shotsMissions.run(o), opts);
+  } else throw new Error('mode: hints | zoom | hud | progression | missions');
   writeFileSync(path.join(outDir, `${mode}.json`), JSON.stringify(result, null, 1));
   console.log('done', shots.length, 'shots');
 } finally {

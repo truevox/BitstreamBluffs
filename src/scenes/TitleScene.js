@@ -14,6 +14,7 @@ import { Panel } from '../ui/Panel.js';
 import { MenuList } from '../ui/MenuList.js';
 import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
+import { buildTitleMissionList } from '../ui/MissionsUi.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { LeaderboardView, SettingsView, SeedView, ProfileView } from '../ui/Views.js';
 import { titleBadgeLayout } from '../ui/ProfileLayout.js';
@@ -44,6 +45,7 @@ export class TitleScene extends Phaser.Scene {
     this._buildLevelBadge();
     this._buildControls();
     this._buildDailyStrip();
+    this._buildMissions();
     this.bestText = new NeonText(this, theme, GAME_WIDTH / 2, 239, '', { color: 'lime', anchor: 'center', vAnchor: 0.5, outline: 'none' });
     this._loadBest();
     this.hint = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 12, '↑↓ SELECT   ENTER/SPACE/A CONFIRM   TAP ANY ITEM', {
@@ -134,6 +136,19 @@ export class TitleScene extends Phaser.Scene {
         if (m > 0) this.bestText.setText(`BEST ${fmtInt(m)} M   ${fmtInt(sc)} PTS`);
       }).catch(() => {});
     } catch (e) { /* cosmetic */ }
+  }
+
+  /**
+   * W2: the three active missions, in the only free band on this screen (below the DAILY PATCH
+   * strip). Geometry and overlap are unit-tested in MissionsLayout; this only supplies data.
+   */
+  _buildMissions() {
+    try {
+      const view = this.registry.get(REG.MISSIONS);
+      const rows = (view && view.active) || [];
+      if (!rows.length) return;
+      this.missionsPanel = buildTitleMissionList(this, this.theme, rows);
+    } catch (e) { /* cosmetic: a missing mission service must never block the Title screen */ }
   }
 
   _buildDailyStrip() {

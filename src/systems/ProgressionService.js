@@ -28,11 +28,14 @@ export async function createProgressionService(game, o) {
 export class ProgressionService {
   /**
    * @param {Phaser.Game} game
-   * @param {{levels:*, saveStore?:*, now?:function():number, store?:ProfileStore}} o
+   * @param {{levels:*, saveStore?:*, now?:function():number, store?:ProfileStore, missions?:*}} o
    */
   constructor(game, o) {
     this.game = game;
     this.levels = loadLevelTable(o.levels);
+    // W2 missions attach here (set by createServices) so RUN_END has exactly one listener that
+    // decides whether a run counts at all.
+    this.missions = o.missions || null;
     this.store = o.store || new ProfileStore({ levels: this.levels });
     this.now = o.now || (() => Date.now());
     this.alive = true;
@@ -71,14 +74,27 @@ export class ProgressionService {
     if (!this.alive) return;
     const record = payload && payload.record ? payload.record : null;
     const awards = record ? this.store.credit(record) : null;
-    const view = this._awardsView(awards, record);
+    // Missions ride on the crediting decision, not on RUN_END itself: `credit()` returns null for a
+    // run whose hash is already in the ring, so a replayed event pays missions nothing. Missions then
+    // fold their own XP/shards into the same profile before the awards view is built, so Game Over
+    // shows one consistent total.
+    let missionRoll = null;
+    if (awards && record && this.missions) {
+      try {
+        missionRoll = this.missions.onRunCredited(record);
+      } catch (e) {
+        // Missions must never break the boot or the run's XP: log-free degrade, carry on.
+        missionRoll = null;
+      }
+    }
+    const view = this._awardsView(awards, record, missionRoll);
     this.lastAwards = view;
     this.game.registry.set(REG.LAST_AWARDS, view);
     this.publish(view);
   }
 
   /** @returns {{xp:{total:number,parts:Array},levelBefore:number,levelAfter:number,leveledTo:number,rewards:Object|null,title:string|null,credited:boolean,progress:{level:number,xp:number,levelXp:number,nextXp:number,xpToNext:number}}} */
-  _awardsView(awards, record) {
+  _awardsView(awards, record, missionRoll) {
     const p = this.store.profile;
     const table = this.levels;
     const level = levelForXp(p.xp, table);
@@ -109,6 +125,13 @@ export class ProgressionService {
       record: record ? { id: record.id, seed: record.seed } : null,
       earnedCosmetics: awards && awards.rewards && awards.rewards.cosmetic ? [awards.rewards.cosmetic] : [],
       pendingBiomes: awards && awards.rewards && awards.rewards.biome ? [awards.rewards.biome] : [],
+      // W2: what the mission set paid this run, for the Game Over list and the completion toast.
+      missions: missionRoll ? {
+        completed: missionRoll.completed || [],
+        setCleared: Boolean(missionRoll.setCleared),
+        xp: missionRoll.xp || 0,
+        shards: missionRoll.shards || 0,
+      } : null,
     };
   }
 

@@ -82,6 +82,9 @@ export const EVT = Object.freeze({
   FLOW_CHANGED: 'bb:flowChanged',
   /** Emitter: RunScene (from a ScoreManager FlowChange with lost). Payload: FlowLostPayload. */
   FLOW_LOST: 'bb:flowLost',
+
+  /** W2: a mission's target was met mid-run (payload {id,title,xp,shards}). Additive. */
+  MISSION_COMPLETED: 'bb:missionCompleted',
 });
 
 /**

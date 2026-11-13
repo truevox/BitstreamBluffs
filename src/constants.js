@@ -49,6 +49,10 @@ export const REG = Object.freeze({
   LAST_AWARDS: 'lastAwards',
   /** @type {import('./systems/ProgressionService.js').ProgressionService|null} Additive. */
   PROGRESSION: 'progression',
+  /** W2: published mission view (the three actives with progress). Additive. */
+  MISSIONS: 'missions',
+  /** W2: the MissionsService instance (registry view is REG.MISSIONS). Additive. */
+  MISSIONS_SERVICE: 'missionsService',
 });
 
 /** Palette keys. Each palette in src/data/palettes.json must define every key (as "#rrggbb"). */

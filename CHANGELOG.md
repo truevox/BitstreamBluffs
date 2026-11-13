@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.3.0 - unreleased (W2 Missions)
+
+### ✨ Added
+- **Missions.** Three active missions, drawn deterministically from `profile.missions.counter` via
+  `Rng` — no `Math.random`, no `Date.now`, so the same profile always sees the same set. Three types:
+  single-run thresholds, cumulative goals across runs, and named-combination ("land a backflip and a
+  heli in one combo"). Clearing all three pays a set bonus and draws a fresh set.
+- `src/data/missions/missions.json`: 47 templates across four tiers, validated for unique ids and
+  reachable targets.
+- `src/systems/Missions.js` (pure) and `src/systems/MissionsService.js` (event glue). The service
+  hangs its payout off `ProgressionService`'s crediting decision rather than subscribing to RUN_END
+  itself: a replayed ledger hash pays missions nothing, exactly as it pays no XP.
+- Mid-run completion toasts: `TRICK`, `LANDING`, `SHARD_COLLECTED`, `NEAR_MISS` and `COMBO_CHANGED`
+  feed live counters, so a mission announced the moment its target is met. The live path never pays —
+  the RUN_END roll remains the only source of payout.
+- Missions shown on Title, in Pause, and on Game Over with progress bars, from one published view.
+- `src/ui/MissionsLayout.js`: Phaser-free geometry with unit tests for overlap against the real
+  Title-screen bands (menu, CONTROLS, DAILY PATCH) and the screen edges.
+
+### 🐛 Fixed
+- Four airtime missions asked for 3–9 seconds of air *in one jump*; measured runs peak near 1.8 s, so
+  they were impossible. Retargeted to 0.9/1.1/1.3/1.5 s and renamed to match, with a test that holds
+  every airtime target to the ceiling each daily rule's gravity allows.
+
+### ✅ Tests
+- 23 suites / 498 tests. New: `missions` (41), `missionslayout` (20), `missionsservice` (12),
+  including determinism, daily-rule compatibility across all 8 rules, no-double-payout, and live-toast
+  idempotency.
+
 ## v2.2.6 - unreleased (W1 Title badge + PROFILE view)
 
 ### ✨ Added

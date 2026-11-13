@@ -13,6 +13,7 @@ import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
 import { ellipsize, wrapText } from '../ui/PixelFont.js';
+import { columnRows } from '../ui/MissionsLayout.js';
 import { Panel } from '../ui/Panel.js';
 import { MenuList } from '../ui/MenuList.js';
 import { MenuInput } from '../ui/MenuInput.js';
@@ -64,7 +65,34 @@ export class PauseScene extends Phaser.Scene {
     col(54, 'SEED', ellipsize(seed, 172), 'cyan');
     col(80, 'DAILY RULE', ellipsize(rule.name.toUpperCase(), 172), 'amber');
     panel.add(new NeonText(this, theme, 236, 102, wrapText(rule.description || '', 176, 3), { color: 'text', outline: 'none' }).setAlpha(0.7));
-    panel.add(new NeonText(this, theme, 236, 148, 'THE LEDGER NEVER FORGETS.', { color: 'magenta', outline: 'none' }).setAlpha(0.6));
+    // W2: the three active missions. Right column is free from y=116 (rule description wraps to 3
+    // lines from 102) down to 168; the panel ends at y 208. Geometry from columnRows(), unit-tested.
+    const mview = this.registry.get(REG.MISSIONS);
+    const mrows = (mview && mview.active) || [];
+    if (mrows.length) {
+      const geom = columnRows({ x: 236, y: 120, w: 172, count: Math.min(3, mrows.length), rowH: 10, barH: 2 });
+      panel.add(new NeonText(this, theme, 236, 110, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
+      mrows.slice(0, 3).forEach((row, i) => {
+        const r = geom.rows[i];
+        const b = geom.bars[i];
+        if (!r || !b) return;
+        const label = new NeonText(this, theme, r.x, r.y, ellipsize(row.title, 150), {
+          color: row.done ? 'lime' : 'text', outline: 'none',
+        });
+        label.setAlpha(0.9);
+        panel.add(label);
+        const g = this.add.graphics();
+        g.fillStyle(0x1a2b3a, 1);
+        g.fillRect(b.x, b.y, b.w, b.h);
+        const frac = Math.max(0, Math.min(1, row.fraction || 0));
+        if (frac > 0) {
+          g.fillStyle(row.done ? 0x9cff57 : theme.color('cyan'), 1);
+          g.fillRect(b.x, b.y, Math.max(1, Math.round(b.w * frac)), b.h);
+        }
+        panel.add(g);
+      });
+    }
+    panel.add(new NeonText(this, theme, 236, 158, 'THE LEDGER NEVER FORGETS.', { color: 'magenta', outline: 'none' }).setAlpha(0.6));
 
     this.hint = new NeonText(this, theme, GAME_WIDTH / 2, py + 172 + 12, 'ESC RESUME    ↑↓ SELECT    ENTER/SPACE/A CONFIRM', {
       color: 'text', anchor: 'center', vAnchor: 0.5,

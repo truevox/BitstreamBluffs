@@ -18,6 +18,7 @@
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, SCORING } from '../constants.js';
 import { EVT } from '../events.js';
+import { missionToastText } from '../ui/MissionsUi.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText, strokeRectPx } from '../ui/Neon.js';
@@ -168,6 +169,8 @@ export class UIScene extends Phaser.Scene {
     on(EVT.TUTORIAL_HINT, this.onHint);
     on(EVT.FLOW_CHANGED, this.onFlowChanged);
     on(EVT.FLOW_LOST, this.onFlowLost);
+    // W2: toast the moment a mission is met, not just at run end.
+    on(EVT.MISSION_COMPLETED, this.onMissionCompleted);
 
     const cleanup = () => {
       for (const [evt, fn] of this.listeners) this.game.events.off(evt, fn, this);
@@ -414,6 +417,33 @@ export class UIScene extends Phaser.Scene {
   onRunEnd() {
     this.comboInfo.setText('');
     this._setPending(0);
+    this._toastMissions();
+  }
+
+  /**
+   * W2: toast each mission this run completed. Reuses the existing strip queue instead of a new HUD
+   * band, so stacking is unchanged and overlapping toasts serialise exactly as milestones do.
+   * ProgressionService has already published the awards by the time RUN_END reaches this scene
+   * (it is registered first in createServices), so reading the registry here is safe; if it somehow
+   * is not, nothing is toasted rather than throwing at run end.
+   */
+  /**
+   * W2: a mission was completed mid-run. Shares the milestone strip queue so HUD stacking is
+   * unchanged and the toast cannot collide with a MILESTONE or NEW BEST slide.
+   * @param {{id:string,title?:string,xp?:number,shards?:number}} p
+   */
+  onMissionCompleted(p) {
+    if (!p) return;
+    this._strip(missionToastText(p, p.title), 'lime');
+  }
+
+  _toastMissions() {
+    try {
+      const awards = this.registry.get(REG.LAST_AWARDS);
+      const done = awards && awards.missions && Array.isArray(awards.missions.completed)
+        ? awards.missions.completed : [];
+      for (const c of done) this._strip(missionToastText(c, c.title), 'lime');
+    } catch (e) { /* cosmetic */ }
   }
 
   onScore(p) {
