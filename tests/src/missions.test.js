@@ -13,6 +13,7 @@ import levelsData from '../../src/data/progression/levels.json';
 import reachabilityData from '../../tools/sim/.reach/reachability.json';
 import {
   missionState, satisfies, progressFor, drawMissions, rollSet, missionProgressText, activeTemplates,
+  isOfferable, maxTierForLevel,
   xpForTemplate, SET_BONUS, MISSION_REWARD,
 } from '../../src/systems/Missions.js';
 import { defaultProfile } from '../../src/systems/Progression.js';
@@ -305,6 +306,47 @@ describe('D7 — saved profiles keep the missions they drew', () => {
     expect(added).toHaveLength(2);
     for (const id of added) {
       expect(TEMPLATES.find((t) => t.id === id).tier).toBe(1);
+    }
+  });
+});
+
+describe('D7 — the fill guarantee cannot leak a high tier', () => {
+  // `drawMissions` falls back to the FULL eligible pool when the unlocked tiers cannot fill three
+  // slots, so that a slot is never empty. That fallback is a deliberate exception to D7 and would be a
+  // hole in it: a level-1 profile drawing a tier-4 mission. It is safe today because the smallest
+  // unlocked pool (level 1, no biomes, any daily rule) is 11 templates against 3 slots — measured
+  // across every level x biomeMask x rule combination in `notes/check-d7-fallback.mjs`. This test is
+  // that measurement made permanent: if templates are removed or the thresholds change so the
+  // unlocked pool can no longer fill the slots, this fails instead of quietly handing a new player a
+  // tier-4 mission.
+
+  test('the unlocked pool fills three slots at every level, biome state and daily rule', () => {
+    const unlock = missionsData.tierUnlock;
+    const tiers = [1, 2, 3, 6, 10, 20, levelsData.levels[levelsData.levels.length - 1].level];
+    const masks = [0, 1, 3, 7, 15, 31];
+    for (const level of [...new Set(tiers)]) {
+      const maxTier = maxTierForLevel(level, unlock);
+      for (const biomeMask of masks) {
+        for (const rule of DailyPatch.RULES) {
+          const p = prof({ level, biomeMask, unlocked: { biomes: [], cosmetics: [], boosts: {} } });
+          const eligible = TEMPLATES.filter((t) => isOfferable(t, p, rule.id));
+          const inTier = eligible.filter((t) => !Number.isFinite(t.tier) || t.tier <= maxTier);
+          expect({ level, biomeMask, rule: rule.id, enough: inTier.length >= 3 })
+            .toMatchObject({ level, biomeMask, rule: rule.id, enough: true });
+        }
+      }
+    }
+  });
+
+  test('a level-1 profile draws only tier 1 under every daily rule', () => {
+    // The direct restatement of D7's first requirement, per rule rather than only under the default.
+    for (const rule of DailyPatch.RULES) {
+      for (let c = 0; c < 15; c++) {
+        const p = prof({ level: 1, missions: { counter: c, active: [], progress: {} } });
+        const drawn = drawMissions(p, TEMPLATES, 3, { ruleId: rule.id });
+        expect({ rule: rule.id, tiers: drawn.map((m) => m.tier) })
+          .toMatchObject({ rule: rule.id, tiers: [1, 1, 1] });
+      }
     }
   });
 });
