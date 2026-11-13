@@ -178,6 +178,32 @@ export function toggleBiome(profile, biomeId, biomeDefs) {
 }
 
 /**
+ * The mask a normal run should start with: the profile's enabled bits, restricted to biomes the player
+ * has actually unlocked. Pure.
+ *
+ * The restriction is the point. A profile can carry a bit for a biome it has not reached (an older
+ * save, a hand-edited blob, a level table that moved), and honouring it would hand a low-level player
+ * terrain they never earned. `toggleBiome` refuses the same thing on the toggle path; this is the same
+ * rule at the run-start path, so the two cannot drift.
+ *
+ * @param {Object} profile
+ * @param {Array<{id:string,bit:number}>} biomeDefs
+ * @returns {number} a non-negative integer mask
+ */
+export function enabledBiomeMask(profile, biomeDefs) {
+  const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
+  if (!profile || typeof profile !== 'object') return 0;
+  const mask = (profile.biomeMask >>> 0) || 0;
+  if (!mask) return 0;
+  const unlocked = unlockedBiomeIds(profile);
+  let allowed = 0;
+  for (const def of defs) {
+    if (def && Number.isFinite(def.bit) && unlocked.includes(def.id)) allowed |= def.bit;
+  }
+  return (mask & allowed) >>> 0;
+}
+
+/**
  * The biome toggle rows a Profile view should show: every biome in unlock order, with the player's
  * current state. Pure, so the view stays a renderer and this stays testable.
  * @param {Object} profile

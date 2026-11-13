@@ -1350,7 +1350,11 @@ export class RunScene extends Phaser.Scene {
   refreshPalette() {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
-    this.palette = getPalette(this.game, this._biomeDefForSector(this._biomeSector));
+    const biomeDef = this._biomeDefForSector(this._biomeSector);
+    this.palette = getPalette(this.game, biomeDef);
+    // W3: the biome's `background` motif, and back to the base backdrop when the sector has no biome.
+    // setMotif(null) is the exit case: a motif must not outlive the sector that owns it.
+    if (this.bg) this.bg.setMotif(biomeDef && biomeDef.background ? biomeDef.background : null);
     this.cameras.main.setBackgroundColor(this.palette.bg);
     this.sled.palette = this.palette;
     this.trail.setPalette(this.palette);

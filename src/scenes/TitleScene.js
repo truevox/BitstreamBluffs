@@ -8,6 +8,7 @@ import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { parseSeedMask } from '../systems/SaveStore.js';
+import { unlockedBiomeIds, enabledBiomeMask } from '../systems/ProfileStore.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
 import { measureText, ellipsize } from '../ui/PixelFont.js';
@@ -255,12 +256,19 @@ export class TitleScene extends Phaser.Scene {
   startRun(seed, maskOverride) {
     if (this.starting) return;
     this.starting = true;
-    // W3: a seed may name a biome layout with a `seed@mask` suffix. A bare seed parses to mask 0 and is
-    // used verbatim, so every existing seed string behaves exactly as before.
     const biomeDefs = Object.values((this.registry.get(REG.CONTENT) || {}).biomes || {});
     const parsed = parseSeedMask(seed, biomeDefs);
     this.registry.set(REG.SEED, parsed.seed || seed);
-    const mask = Number.isFinite(maskOverride) ? maskOverride >>> 0 : parsed.biomeMask;
+    // W3 mask precedence, highest first:
+    //   1. an explicit maskOverride (the Daily: date-derived, identical for every player)
+    //   2. a `seed@mask` suffix (a shared seed must reproduce the sender's world)
+    //   3. the profile's own enabled-and-unlocked signatures (an ordinary run)
+    // Falling back to 0 at step 3 is what CC Friday caught: START RUN ignored the profile entirely.
+    const mask = Number.isFinite(maskOverride)
+      ? maskOverride >>> 0
+      : parsed.hadSuffix
+        ? parsed.biomeMask
+        : enabledBiomeMask(this.registry.get(REG.PROFILE), biomeDefs);
     this.registry.set(REG.BIOME_MASK, mask);
     uiSfx(this, 'uiSelect', { pitch: 1.3 });
     this._closeView();

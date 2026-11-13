@@ -30,6 +30,7 @@ import { InitialsEntry } from '../ui/InitialsEntry.js';
 import { LeaderboardTable, ruleLabel } from '../ui/LeaderboardTable.js';
 import { copyText } from '../ui/Clipboard.js';
 import { fmtInt, fmtClock, fmtMult, fmtSec, randomSeed, INITIALS_LENGTH } from '../ui/Format.js';
+import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { uiSfx } from '../ui/Sound.js';
 
 const PANEL_Y = 54;
@@ -606,6 +607,9 @@ export class GameOverScene extends Phaser.Scene {
     if (this.pulse) { this.pulse.remove(); this.pulse = null; }
     this._commitPending();
     if (this.rec.seed) this.registry.set(REG.SEED, this.rec.seed);
+    // CC Friday: retry keeps the mask of the run being retried. Set it explicitly rather than letting the
+    // previous value survive in the registry, which was correct only by accident.
+    this.registry.set(REG.BIOME_MASK, Number(this.rec.biomeMask) || 0);
     uiSfx(this, 'uiSelect', { pitch: 1.3 });
     this.scene.start(SCENES.RUN);
   }
@@ -616,6 +620,12 @@ export class GameOverScene extends Phaser.Scene {
     this.leaving = true;
     this._commitPending();
     this.registry.set(REG.SEED, randomSeed());
+    // A fresh seed is an ordinary run, so it uses the profile mask. Leaving the previous value behind
+    // meant NEW SEED after a Daily run inherited that day's date-derived mask.
+    this.registry.set(REG.BIOME_MASK, enabledBiomeMask(
+      this.registry.get(REG.PROFILE),
+      Object.values((this.registry.get(REG.CONTENT) || {}).biomes || {}),
+    ));
     uiSfx(this, 'uiSelect');
     this.scene.start(SCENES.RUN);
   }
