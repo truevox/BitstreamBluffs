@@ -563,6 +563,81 @@ async function main() {
       } finally { await page.close(); }
     }
 
+    // ---- 7b. SHARD SHOP is reachable with KEYS ONLY (CC Friday's blocker).
+    //
+    // ProfileView used to forward every action to the signature menu, which wraps inside its own rows,
+    // so keyboard and gamepad players could never reach the shop — and since the shop moved off Title,
+    // that button was the only way in. This step sends real key events and never clicks anything.
+    if (WITH_BOOSTS) {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+      try {
+        // Open PROFILE the way a player does: from the Title menu.
+        const opened = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const t = g.scene.getScene('TitleScene');
+          const item = (t.menu.items || []).find((i) => /PROFILE/i.test(String(i.label || '')));
+          if (!item) return { fatal: 'no PROFILE entry on the Title menu' };
+          item.onSelect();
+          await new Promise((r) => setTimeout(r, 700));
+          const v = t.view;
+          if (!v) return { fatal: 'PROFILE view did not open' };
+          return { ok: true, rows: v.sigMenu ? v.sigMenu.items.length : 0, hasShop: Boolean(v.shopButton) };
+        });
+        if (opened.fatal) { fail('keys: PROFILE opens from Title', opened.fatal); }
+        else if (!opened.hasShop) { fail('keys: PROFILE has a SHARD SHOP button', 'no shopButton'); }
+        else {
+          // Walk DOWN past the last toggle row onto the SHARD SHOP button, then press Enter.
+          // Down-presses are spaced past MenuInput's 100ms repeat so each one registers as one step.
+          const steps = opened.rows + 1;
+          for (let i = 0; i < steps; i += 1) { await page.keyboard.press('ArrowDown'); await sleep(140); }
+          const focused = await page.evaluate(() => {
+            const t = window.__bbGame.scene.getScene('TitleScene');
+            const v = t.view;
+            return { focus: v && v.focusIdx, kind: (v && v._focusTargets()[v.focusIdx] || {}).kind };
+          });
+          await page.keyboard.press('Enter');
+          await sleep(800);
+          const after = await page.evaluate(() => {
+            const t = window.__bbGame.scene.getScene('TitleScene');
+            const v = t.view;
+            const title = v && v.panel && v.panel.titleText && v.panel.titleText.main.text;
+            return { title: String(title || ''), isShop: Boolean(v && v.menu && v.menu.items && v.menu.items.some((i) => /BOOST|COSMETIC/i.test(String(i.label || '')))) };
+          });
+          if (focused.kind !== 'buy') fail('keys: DOWN reaches the SHARD SHOP button', `focus was on ${focused.kind} at index ${focused.focus}`);
+          else if (!after.isShop) fail('keys: ENTER opens the shop', `still on "${after.title}"`);
+          else pass('keys: PROFILE -> SHARD SHOP opens with arrow keys and Enter only', `title="${after.title}"`);
+
+          // BACK must stay reachable by keys too: Escape closes the shop, then down-to-BACK and Enter.
+          await page.keyboard.press('Escape');
+          await sleep(600);
+          const backOk = await page.evaluate(async () => {
+            const t = window.__bbGame.scene.getScene('TitleScene');
+            // Escape should have returned us to PROFILE (the shop's onClose).
+            const v = t.view;
+            if (!v) return { inProfile: false };
+            const n = v.sigMenu ? v.sigMenu.items.length : 0;
+            for (let i = 0; i < n + 2; i += 1) v.handleAction('down');
+            const kind = (v._focusTargets()[v.focusIdx] || {}).kind;
+            return { inProfile: true, kind };
+          });
+          if (!backOk.inProfile) fail('keys: Escape returns to PROFILE', 'no view open');
+          else if (backOk.kind !== 'back') fail('keys: DOWN reaches BACK', `focus was on ${backOk.kind}`);
+          else {
+            await page.keyboard.press('Enter');
+            await sleep(600);
+            const gone = await page.evaluate(() => {
+              const t = window.__bbGame.scene.getScene('TitleScene');
+              return !t.view;
+            });
+            if (!gone) fail('keys: ENTER on BACK closes PROFILE', 'view still open');
+            else pass('keys: BACK stays reachable by keys and closes the view', 'ArrowDown -> Enter');
+          }
+        }
+        if (errors.length) fail('keys: no page errors', errors.join(' | '));
+      } finally { await page.close(); }
+    }
+
     // ---- 8. the leaderboard has a modded tab, and it opens
     if (WITH_BOOSTS) {
       const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
