@@ -1,5 +1,43 @@
 # Changelog
 
+## v2.4.0 - unreleased (W3 Biomes batch 1)
+
+### ✨ Added
+- **Biomes (batch 1).** Debumont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal
+  Cavern. A biome is a masked sector of ordinary terrain rather than a separate generator:
+  `biomeForSector(seed, sector, biomeMask)` forks `Rng` under `biome`, so no existing random stream is
+  disturbed and sectors 0-1 stay base Bitstream. Each biome carries one signature mechanic expressed as
+  a bounded terrain mod (D2), a partial palette tint per palette, and a background motif.
+- **Biome mask.** `RunRecord.biomeMask` is whitelisted in `sanitizeRun` and deliberately kept OUT of the
+  ledger hash, so a record's identity does not change with the terrain it was played on. Records written
+  before this release have no field and count as mask 0 everywhere.
+- **Seed entry** accepts an optional `seed@mask` suffix; mask 0 stays suffix-free so every seed string
+  that predates this release means exactly what it did.
+- **Profile view** can toggle each unlocked signature on or off; a normal run uses the enabled set, a
+  Daily run uses the date-derived mask, and an explicit `@mask` or Daily mask takes precedence over the
+  profile.
+- **HUD** shows a banner on entering a biome sector. **Sim** gained a `--biomeMask` option and a
+  per-biome survival/speed table against the W0 baseline.
+
+### 🐛 Fixed
+- Game Over threw `ReferenceError: shareableSeed is not defined` on the first frame of every finished
+  run: the W3 COPY fix called the helper but never imported it, and 678 green tests missed it because
+  they exercised `shareableSeed()` directly and never ran the scene's build path. Bound the import and
+  added a test that drives `_buildStats()` so a missing binding fails loudly instead of shipping.
+- A normal START RUN ignored the persisted profile mask, so enabling a signature in Profile had no
+  effect on a random run. Mask precedence is now explicit mask → `@mask` suffix → profile.
+- COPY handed over the bare seed while the panel displayed `seed@mask`, pasting the player into a
+  different world than the one shown.
+- The Profile signature toggle menu covered the biome names it belonged to, and with all five
+  signatures unlocked its last row drew underneath the BACK button.
+- Biome-tied missions were never offered to a real profile: the gate read `profile.unlocked.biomes`,
+  which nothing populates, and `profile.biomeOrder`, which nothing sets.
+
+### ⚠️ Known disagreement
+- `getDailyStats` does not filter by the date-derived mask, on the ruling that the daily seed already
+  scopes the mask. It does not: the seed field accepts a `@mask` suffix, so one daily seed text can be
+  played at three different masks. Recorded rather than changed; see `notes/luna-audit-w3.md`.
+
 ## v2.3.2 - unreleased (Luna W2 audit repairs)
 
 ### 🐛 Fixed

@@ -76,13 +76,47 @@
  */
 
 /**
- * Terrain mod def (src/data/terrainMods/*.json). All multipliers default 1.
+ * Terrain mod def (src/data/terrainMods/*.json). All physics multipliers default 1.
+ *
+ * `physics` may be empty. W3's Crystal Cavern needs an echo zone whose mechanic is "tricks landed
+ * inside score a combo bonus", which is not expressible as any of the three physics multipliers, so the
+ * mod carries `scoreMul` instead. A mod must declare at least one of `physics` or `scoreMul`, or it is
+ * a zone the player cannot feel; `data.test.js` enforces that.
+ *
  * @typedef {Object} TerrainModDef
- * @property {'highBandwidth'|'compression'|'wirelessBridge'} id
+ * @property {string} id              camelCase, e.g. 'highBandwidth', 'stickyPatch', 'echoZone'.
  * @property {string} colorKey         telegraph colour (palette key).
- * @property {{frictionMul?:number, gravityMul?:number, bounceMul?:number}} physics
+ * @property {{frictionMul?:number, gravityMul?:number, bounceMul?:number}} [physics]
+ * @property {number} [scoreMul]      W3: multiplier on banked trick points inside the zone, >= 1.
+ *                                    Never applies to the flat perfect-landing bonus or to distance.
  * @property {number} weight
  * @property {number} minDistanceM
- * @property {[number,number]} lengthPx  min,max zone length.
+ * @property {[number,number]} [lengthPx]  min,max zone length.
+ */
+
+/**
+ * Biome def (src/data/biomes/*.json). W3 batch 1; additive to the content set.
+ *
+ * A biome is a masked sector of ordinary terrain with one signature mechanic, a palette tint and a
+ * background motif. It is not a separate generator: `biomeForSector` decides which biome (if any) owns a
+ * sector, and the sector is then built from the normal chunk templates plus this biome's mod zone.
+ *
+ * @typedef {Object} BiomeDef
+ * @property {string} id            kebab-case, e.g. 'garbage-dump-glacier'.
+ * @property {number} bit           power-of-two mask bit. This is the vocabulary of `profile.biomeMask`
+ *                                  and of the date-derived Daily mask, so it is assigned by CONTENT and
+ *                                  must never be inferred from a position in `levels.json: biomeOrder`.
+ * @property {string} name          player-facing name.
+ * @property {number} unlockLevel   Sync Level that grants it; must agree with `levels.json`.
+ * @property {string} lore          one-line flavour text.
+ * @property {string} background    background motif id (see `Background.js`).
+ * @property {string} mod           `.id` of exactly ONE `TerrainModDef` - D2 allows one signature
+ *                                  mechanic per biome. Note this is a camelCase terrainMod id
+ *                                  ('echoZone'), not a kebab-case file name.
+ * @property {string[]} chunks      2-3 chunk template ids this sector PREFERS. A preference, not a
+ *                                  filter: an ineligible template falls back to ordinary terrain.
+ * @property {Object<string, Object<string,string>>} palettes  palette name -> partial overrides,
+ *                                  merged over the ACTIVE palette. Partial so colour-blind keys the
+ *                                  biome does not name survive. `danger` is never overridable.
  */
 export {};

@@ -314,9 +314,15 @@ describe('the signature toggle menu cannot cover the biome names', () => {
   // The SHIPPED table, not a two-line stub: loadLevelTable falls back to a biomeOrder-less default for
   // a table under two levels, which would make every assertion here vacuous.
   const levels = JSON.parse(fs.readFileSync(new URL('../../src/data/progression/levels.json', import.meta.url), 'utf8'));
+  // Real defs, so the fixture's unlocks track each biome's actual unlockLevel (crystal-cavern is 16,
+  // not 12). A hardcoded slice would make the worst case - all five toggle rows - unreachable.
+  const BIOME_DEFS = readdirSync(path.resolve('src/data/biomes')).filter((f) => f.endsWith('.json'))
+    .map((f) => JSON.parse(readFileSync(path.resolve('src/data/biomes', f), 'utf8')))
+    .sort((a, b) => a.bit - b.bit);
+  const playable = BIOME_DEFS.map((b) => b.id);
   const withBiomes = (level) => ({
     v: 1, xp: 0, level, bank: 0, biomeMask: 31,
-    pendingBiomes: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'].slice(0, level >= 12 ? 5 : 3),
+    pendingBiomes: BIOME_DEFS.filter((d) => d.unlockLevel <= level).map((d) => d.id),
     unlocked: { biomes: [], cosmetics: [], boosts: {} },
     missions: { counter: 0, active: [], progress: {} }, achievements: {}, credited: [],
   });
@@ -344,6 +350,23 @@ describe('the signature toggle menu cannot cover the biome names', () => {
     const layout = profileLayout({ profile: withBiomes(12), levels });
     const bottom = layout.toggleMenu.y + 5 * layout.toggleMenu.rowH;
     expect(bottom).toBeLessThanOrEqual(PROFILE_PANEL.h);
+  });
+
+  test('the last toggle row clears the BACK button', () => {
+    // The round-2 fix sized the menu against the PANEL FLOOR, but the panel's bottom strip is occupied
+    // by the BACK button (`y: h - 22, h: 16` in the View base class), and `toggleMenu` is returned
+    // separately from `items`, so `overlappingPairs(items)` never saw it. With all five signatures
+    // unlocked and h=224 the fifth row overlapped the button by 62x3px. This pins the real constraint.
+    const VIEW_BACK = { y: PROFILE_PANEL.h - 22, h: 16 };
+    for (const level of [1, 4, 7, 10, 13, 16, 29]) {
+      const layout = profileLayout({ profile: withBiomes(level), levels, playableBiomeIds: playable });
+      const band = layout.toggleMenu;
+      const rows = layout.toggleRowCount || 0;
+      if (!rows) continue;
+      const menuBottom = band.y + rows * band.rowH;
+      expect({ level, clear: menuBottom <= VIEW_BACK.y })
+        .toEqual({ level, clear: true });
+    }
   });
 
   test('a signature is listed exactly once: either as a pending name or as a toggle', () => {

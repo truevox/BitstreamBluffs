@@ -12,8 +12,16 @@ import { measureText } from './PixelFont.js';
 import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 import { fmtInt, fmtSec, fmtClock, idToLabel } from './Format.js';
 
-/** PROFILE view panel size. Taller than the leaderboard because it carries 10 stats and 11 signatures. */
-export const PROFILE_PANEL = Object.freeze({ w: 416, h: 224 });
+/**
+ * PROFILE view panel size. Taller than the leaderboard because it carries 10 stats and 11 signatures.
+ *
+ * 240, not 224: with all five W3 signatures unlocked the toggle menu runs to local y 205, and the BACK
+ * button sits at `h - 22`. At h=224 that is y 202, so the fifth ON/OFF row drew underneath the button.
+ * 240 puts the button at 218 and leaves the menu clear by 13px. It still fits the 270px canvas at y=22
+ * (bottom 262). The panel's own `items` were always well clear; it was the toggle band, which is
+ * returned separately and so is not covered by `overlappingPairs(items)`, that overflowed.
+ */
+export const PROFILE_PANEL = Object.freeze({ w: 416, h: 240 });
 
 /** Screen x of the Title badge: left of the 4x logo (BITSTREAM starts at 138), so the two never touch. */
 export const TITLE_BADGE = Object.freeze({ x: 8, y: 6, lineH: 10 });
