@@ -292,19 +292,31 @@ export function drawMissions(profile, templates, count = SLOTS, o = {}) {
     .filter((t) => !exclude.has(t.id));
   // D7: low levels draw only low tiers. Filtering (rather than weighting) keeps the seed stream
   // identical for a given counter, so a saved profile's next draw is still reproducible.
-  let pool = eligible.filter((t) => !Number.isFinite(t.tier) || t.tier <= maxTier);
-  // Never leave a slot empty: if the unlocked tiers cannot fill the set, fall back to everything
-  // eligible (biome/rule/exclude gating still applies) rather than returning a short set.
-  if (pool.length < Math.max(1, Math.round(count)) && eligible.length > pool.length) {
-    pool = eligible;
+  const belowCeiling = (t) => !Number.isFinite(t.tier) || t.tier <= maxTier;
+  let pool = eligible.filter(belowCeiling);
+  // D7's fill guarantee: "fall back to the highest unlocked tier, never an empty slot". Home's first
+  // version read this as licence to widen to EVERY eligible tier, which would hand a level-1 profile a
+  // tier-4 mission in a squeeze — it cannot happen against the shipped data, but the code must not
+  // depend on that. Widen only to the highest tier at or below the ceiling, never above it, and only
+  // as far as needed; if even that cannot fill the set, return a shorter set rather than leak a tier.
+  const want = Math.max(1, Math.round(count));
+  if (pool.length && pool.length < want) {
+    for (let tier = maxTier; tier >= 1 && pool.length < want; tier--) {
+      const extra = eligible.filter((t) => t.tier === tier);
+      if (extra.length) pool = pool.concat(extra);
+    }
   }
-  pool = pool.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  // Dedupe: the widened loop may re-add templates already in the pool.
+  const seen = new Set();
+  pool = pool
+    .filter((t) => (seen.has(t.id) ? false : seen.add(t.id)))
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
   if (!pool.length) return [];
-  const want = Math.min(Math.max(1, Math.round(count)), pool.length);
+  const n = Math.min(want, pool.length);
   const rng = new Rng(missionSeed(profile && profile.missions && profile.missions.counter, 'draw'));
   const picked = [];
   const left = pool.slice();
-  for (let i = 0; i < want; i++) {
+  for (let i = 0; i < n; i++) {
     const idx = rng.int(0, left.length - 1);
     picked.push(left[idx]);
     left.splice(idx, 1);

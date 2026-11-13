@@ -338,6 +338,25 @@ describe('D7 — the fill guarantee cannot leak a high tier', () => {
     }
   });
 
+  test('the fallback never exceeds the unlocked tier, even under a thin pool', () => {
+    // Marvin's D7 wording: "fall back to the highest unlocked tier, never an empty slot". Home's first
+    // implementation read the fill guarantee as licence to widen to EVERY eligible tier, which would
+    // hand a level-1 profile a tier-4 mission in a squeeze. It cannot fire against the shipped data
+    // (the smallest unlocked pool is 11 vs 3 slots), but the code must not depend on that: this test
+    // forces the thin-pool case directly and asserts the tier ceiling holds there too.
+    const tier1 = TEMPLATES.filter((t) => t.tier === 1).slice(0, 1); // one tier-1 template only
+    const high = TEMPLATES.filter((t) => t.tier === 4);
+    expect(tier1).toHaveLength(1);
+    expect(high.length).toBeGreaterThan(0);
+    for (let c = 0; c < 20; c++) {
+      const p = prof({ level: 1, missions: { counter: c, active: [], progress: {} } });
+      const drawn = drawMissions(p, [...tier1, ...high], 3);
+      for (const m of drawn) {
+        expect({ id: m.id, tier: m.tier, ok: m.tier <= 1 }).toMatchObject({ id: m.id, tier: m.tier, ok: true });
+      }
+    }
+  });
+
   test('a level-1 profile draws only tier 1 under every daily rule', () => {
     // The direct restatement of D7's first requirement, per rule rather than only under the default.
     for (const rule of DailyPatch.RULES) {
