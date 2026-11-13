@@ -98,6 +98,13 @@ export function sanitizeProfile(raw, levels) {
     p.equipped[k] = typeof e[k] === 'string' && e[k] ? e[k] : 'default';
   }
   p.biomeMask = nonNeg(raw.biomeMask);
+  // W4 loadout. Anything that is not an explicit `true` is off: a hand-edited save, a string "true", or a
+  // boost id that no longer ships must never silently start a run modded.
+  const b = raw.boosts && typeof raw.boosts === 'object' ? raw.boosts : {};
+  p.boosts = {
+    errorCorrection: b.errorCorrection === true,
+    headStart: b.headStart === true,
+  };
   const m = raw.missions && typeof raw.missions === 'object' ? raw.missions : {};
   p.missions = {
     counter: nonNeg(m.counter),
@@ -277,6 +284,11 @@ export function creditRun(profile, record, levels) {
     lifetime: { ...base.lifetime },
     unlocked: { ...base.unlocked, biomes: [...base.unlocked.biomes], cosmetics: [...base.unlocked.cosmetics], boosts: { ...base.unlocked.boosts } },
   };
+  // W4: the run's Data Shards land in the spendable bank as well as the lifetime total. Two numbers on
+  // purpose - `lifetime.shards` is what the player has EARNED and never goes down when they spend, and
+  // `bank` is the balance. This is the one place a run pays, so a replay that returns null above pays
+  // neither, and missions fold their shards in through applyMissions below.
+  next.bank = base.bank + nonNeg(record.shards);
   const L = next.lifetime;
   L.runs += 1;
   L.distanceM += nonNeg(record.distanceM);
@@ -535,4 +547,94 @@ export class ProfileStore {
     this.save();
     return true;
   }
+}
+
+// ---- W4 economy: the shop -------------------------------------------------------------------------
+
+/**
+ * The cosmetic catalogue. Loaded from data/cosmetics/cosmetics.json where a bundler is available, with
+ * the shipped fallback below so a pure test or a headless caller never depends on the glob.
+ *
+ * `slot` matches a key in `profile.equipped` (trail/glow/rider/theme/title), so equipping is a direct
+ * assignment rather than a second mapping table that could drift from the profile shape.
+ */
+export const SHOP_ITEMS = Object.freeze([
+  { id: 'trail-hue-aurora', kind: 'trail', slot: 'trail', name: 'Aurora Trail', price: 0, unlockLevel: 3, value: 'aurora' },
+  { id: 'trail-hue-ember', kind: 'trail', slot: 'trail', name: 'Ember Trail', price: 120, unlockLevel: 1, value: 'ember' },
+  { id: 'trail-hue-tidal', kind: 'trail', slot: 'trail', name: 'Tidal Trail', price: 200, unlockLevel: 5, value: 'tidal' },
+  { id: 'sled-glow-warm', kind: 'glow', slot: 'glow', name: 'Warm Glow', price: 90, unlockLevel: 1, value: 'warm' },
+  { id: 'sled-glow-cold', kind: 'glow', slot: 'glow', name: 'Cold Glow', price: 150, unlockLevel: 4, value: 'cold' },
+  { id: 'rider-hue-mint', kind: 'rider', slot: 'rider', name: 'Mint Rider', price: 100, unlockLevel: 1, value: 'mint' },
+  { id: 'rider-hue-plum', kind: 'rider', slot: 'rider', name: 'Plum Rider', price: 180, unlockLevel: 6, value: 'plum' },
+  { id: 'theme-mono', kind: 'theme', slot: 'theme', name: 'Mono Theme', price: 250, unlockLevel: 1, value: 'mono' },
+  { id: 'theme-sunset', kind: 'theme', slot: 'theme', name: 'Sunset Theme', price: 300, unlockLevel: 8, value: 'sunset' },
+  { id: 'title-rookie', kind: 'title', slot: 'title', name: 'Rookie', price: 0, unlockLevel: 1, value: 'ROOKIE' },
+  { id: 'title-static', kind: 'title', slot: 'title', name: 'Static Rider', price: 220, unlockLevel: 1, value: 'STATIC RIDER' },
+]);
+
+/** @param {string} id @returns {Object|null} */
+export function shopItem(id) {
+  return SHOP_ITEMS.find((i) => i && i.id === id) || null;
+}
+
+/**
+ * Whether the profile owns an item. Level-reward items (price 0) are owned once the player reaches their
+ * unlockLevel, which is how W1's level rewards already work; paid items are owned by purchase.
+ * @param {Object} profile @param {string} id @returns {boolean}
+ */
+export function isOwned(profile, id) {
+  const item = shopItem(id);
+  if (!item || !profile || typeof profile !== 'object') return false;
+  const owned = profile.unlocked && Array.isArray(profile.unlocked.cosmetics) ? profile.unlocked.cosmetics : [];
+  if (owned.includes(id)) return true;
+  const lvl = Number(profile.level) || 1;
+  return item.price === 0 && Number(item.unlockLevel) <= lvl;
+}
+
+/**
+ * Buy one item. PURE, and atomic: on ANY refusal it returns the profile object it was given, untouched,
+ * so a caller that saves unconditionally still cannot persist a partial purchase.
+ *
+ * Refusals, in order: unknown id, already owned, level too low, not enough shards. The affordability
+ * check is a single comparison against `price` rather than a subtraction followed by a clamp, because a
+ * clamp would silently let a player buy with shards they do not have.
+ * @param {Object} profile @param {string} id @returns {Object}
+ */
+export function purchase(profile, id) {
+  const item = shopItem(id);
+  if (!item || !profile || typeof profile !== 'object') return profile;
+  if (isOwned(profile, id)) return profile;
+  if ((Number(profile.level) || 1) < (Number(item.unlockLevel) || 1)) return profile;
+  const bank = nonNeg(profile.bank);
+  if (bank < item.price) return profile;
+  return {
+    ...profile,
+    bank: bank - item.price,
+    unlocked: {
+      ...profile.unlocked,
+      cosmetics: [...(Array.isArray(profile.unlocked && profile.unlocked.cosmetics) ? profile.unlocked.cosmetics : []), id],
+    },
+  };
+}
+
+/**
+ * Equip an owned item into its slot. PURE. Idempotent: equipping what is already equipped returns the
+ * same object unchanged, so a save is a no-op rather than a rewrite.
+ * @param {Object} profile @param {string} id @returns {Object}
+ */
+export function equip(profile, id) {
+  const item = shopItem(id);
+  if (!item || !profile || typeof profile !== 'object') return profile;
+  if (!isOwned(profile, id)) return profile;
+  const equipped = profile.equipped && typeof profile.equipped === 'object' ? profile.equipped : {};
+  if (equipped[item.slot] === item.value) return profile;
+  return { ...profile, equipped: { ...equipped, [item.slot]: item.value } };
+}
+
+/** Unequip a slot back to 'default'. PURE. @param {Object} profile @param {string} slot @returns {Object} */
+export function unequip(profile, slot) {
+  if (!profile || typeof profile !== 'object') return profile;
+  const equipped = profile.equipped && typeof profile.equipped === 'object' ? profile.equipped : {};
+  if (equipped[slot] === 'default' || equipped[slot] === undefined) return profile;
+  return { ...profile, equipped: { ...equipped, [slot]: 'default' } };
 }

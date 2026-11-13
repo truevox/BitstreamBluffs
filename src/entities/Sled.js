@@ -35,10 +35,14 @@ export class Sled {
    * @param {number} y world px spawn.
    * @param {Object<string,number>} palette colour ints from ui/Palette.getPalette().
    */
-  constructor(scene, x, y, palette) {
+  constructor(scene, x, y, palette, look) {
     this.scene = scene;
     this.world = scene.matter.world;
     this.palette = palette;
+    // W4 cosmetics. `look` is pre-resolved by Cosmetics.resolveCosmetics, so this entity never reads the
+    // profile or the catalogue. Absent `look` (every pre-W4 caller and every test) falls straight through
+    // to the palette keys below, so the default sled renders exactly as it did before W4.
+    this.look = look || null;
     this.x = x;
     this.y = y;
     this.vx = 0;
@@ -486,6 +490,17 @@ export class Sled {
     this._draw();
   }
 
+  /**
+   * A cosmetic colour as an int, or the palette fallback. Cosmetics resolve to hex strings; Phaser's
+   * Graphics wants an int, and converting here keeps it out of the draw loop's hot path.
+   * @param {'rider'|'glow'} key @param {number} fallback @returns {number}
+   */
+  _cosmetic(key, fallback) {
+    const v = this.look && this.look[key];
+    if (typeof v !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(v)) return fallback;
+    return parseInt(v.slice(1), 16);
+  }
+
   _draw() {
     const g = this.gfx;
     const pal = this.palette;
@@ -534,8 +549,10 @@ export class Sled {
 
     const flicker = this.invulnerableMs > 0 && Math.floor(this._time / 70) % 2 === 0;
     const aMul = flicker ? 0.35 : 1;
-    const sledCol = this.scrambled ? pal.magenta : pal.cyan;
-    const riderCol = this.scrambled ? pal.lime : pal.magenta;
+    // A scramble deliberately overrides cosmetics: the effect's whole point is that the player loses
+    // control of their look for a moment, so it must not be cancelled by a paid hue.
+    const sledCol = this.scrambled ? pal.magenta : this._cosmetic('glow', pal.cyan);
+    const riderCol = this.scrambled ? pal.lime : this._cosmetic('rider', pal.magenta);
 
     // parachute canopy (world-up, drawn first so the rider overlaps the shrouds)
     if (this.pose.chute > 0.02) this._drawChute(g, ox, oy, this.pose.chute, c, s);

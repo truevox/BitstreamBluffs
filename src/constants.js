@@ -183,6 +183,13 @@ export const TIMING = Object.freeze({
   maxBootToPlayMs: 3000,
 });
 
+/**
+ * Whether a run carrying a boost may rank (W4). Spec W4 ships this false: a boosted run is a different
+ * game, so it stays off the clean top-10, seed best, daily best and streak, and gets its own board.
+ * Every decision routes through src/systems/Ranking.js — do not test this constant anywhere else.
+ */
+export const MODDED_RUNS_RANKED = false;
+
 /** Persistence names. */
 export const STORAGE = Object.freeze({
   settingsKey: 'bb.settings',

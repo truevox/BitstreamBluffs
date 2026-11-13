@@ -1,0 +1,105 @@
+{
+  "v": 1,
+  "note": "W4 cosmetic catalogue. `kind` routes the item to what it changes; `slot` is the profile.cosmetics key it equips into. Some items are level rewards (price 0, unlockLevel set) and some are bought. Prices are in Data Shards.",
+  "items": [
+    {
+      "id": "trail-hue-aurora",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Aurora Trail",
+      "price": 0,
+      "unlockLevel": 3,
+      "value": "aurora"
+    },
+    {
+      "id": "trail-hue-ember",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Ember Trail",
+      "price": 120,
+      "unlockLevel": 1,
+      "value": "ember"
+    },
+    {
+      "id": "trail-hue-tidal",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Tidal Trail",
+      "price": 200,
+      "unlockLevel": 5,
+      "value": "tidal"
+    },
+    {
+      "id": "sled-glow-warm",
+      "kind": "sledGlow",
+      "slot": "glow",
+      "name": "Warm Glow",
+      "price": 90,
+      "unlockLevel": 1,
+      "value": "warm"
+    },
+    {
+      "id": "sled-glow-cold",
+      "kind": "sledGlow",
+      "slot": "glow",
+      "name": "Cold Glow",
+      "price": 150,
+      "unlockLevel": 4,
+      "value": "cold"
+    },
+    {
+      "id": "rider-hue-mint",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Mint Rider",
+      "price": 100,
+      "unlockLevel": 1,
+      "value": "mint"
+    },
+    {
+      "id": "rider-hue-plum",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Plum Rider",
+      "price": 180,
+      "unlockLevel": 6,
+      "value": "plum"
+    },
+    {
+      "id": "theme-mono",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Mono Theme",
+      "price": 250,
+      "unlockLevel": 1,
+      "value": "mono"
+    },
+    {
+      "id": "theme-sunset",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Sunset Theme",
+      "price": 300,
+      "unlockLevel": 8,
+      "value": "sunset"
+    },
+    {
+      "id": "title-rookie",
+      "kind": "title",
+      "slot": "title",
+      "name": "Rookie",
+      "price": 0,
+      "unlockLevel": 1,
+      "value": "ROOKIE"
+    },
+    {
+      "id": "title-static",
+      "kind": "title",
+      "slot": "title",
+      "name": "Static Rider",
+      "price": 220,
+      "unlockLevel": 1,
+      "value": "STATIC RIDER"
+    }
+  ]
+}

@@ -188,18 +188,24 @@ export function profileLayout(o = {}) {
     rowH: 9,
   };
 
-  // W5: the achievements entry point lives IN the profile view, as the spec asks, rather than as a
-  // seventh Title menu row. The panel has no free vertical band left (the toggle menu ends at ~205 and
-  // BACK starts at h-22 = 218), so the summary sits at 205 and the button goes BESIDE BACK, bottom-left,
-  // where the width is free because BACK is right-aligned.
+  // Two buttons now want the strip beside BACK, and both belong on this screen:
+  //   * W5's ACHIEVEMENTS entry — the spec puts the grid in Profile, and Title has no seventh row;
+  //   * W4's SHARD SHOP — Title's band fits six 2x rows (y92..196, daily strip at 202) and the shop was
+  //     the seventh, which is the overflow CC Friday caught with SETTINGS.
+  // BACK is right-aligned at x w-76, so both fit left of it: 96 + 8 + 96 = 200px, well inside 416.
   const achUnlocked = Object.keys(p.achievements && typeof p.achievements === 'object' ? p.achievements : {}).length;
   const achTotal = Number(o.achievementTotal) > 0 ? Number(o.achievementTotal) : 0;
   items.push(box('ach-summary',
     achTotal ? `ACHIEVEMENTS ${achUnlocked}/${achTotal}` : `ACHIEVEMENTS ${achUnlocked}`,
     PAD, PROFILE_PANEL.h - 34, 'amber', { alpha: 0.9 }));
-  const achButton = { x: PAD, y: PROFILE_PANEL.h - 22, w: 92, h: 16 };
+  const BTN_Y = PROFILE_PANEL.h - 22;
+  const achButton = { x: PAD, y: BTN_Y, w: 96, h: 16 };
+  const shopButton = { x: PAD + 96 + 8, y: BTN_Y, w: 96, h: 16 };
 
-  return { w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu, toggleRowCount: sigCount, achButton, achUnlocked, achTotal };
+  return {
+    w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu,
+    toggleRowCount: sigCount, achButton, achUnlocked, achTotal, shopButton,
+  };
 }
 
 /**

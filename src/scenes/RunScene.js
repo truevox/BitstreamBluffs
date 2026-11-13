@@ -29,9 +29,11 @@ import { ScoreManager } from '../systems/ScoreManager.js';
 import { TrickTracker } from '../systems/TrickTracker.js';
 import { GlitchDirector } from '../systems/GlitchDirector.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
+import { boostEffects } from '../systems/Boosts.js';
+import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING } from '../systems/PhysicsTuner.js';
 import { GlitchPipeline } from '../shaders/GlitchPipeline.js';
-import { getPalette } from '../ui/Palette.js';
+import { getPalette, getPaletteCss } from '../ui/Palette.js';
 import { HUD_SPEED_EVENT } from './UIScene.js';
 import { Sled } from '../entities/Sled.js';
 import { TerrainMesh } from '../entities/TerrainMesh.js';
@@ -125,6 +127,9 @@ export class RunScene extends Phaser.Scene {
     // stale `pressed.pause` paused the run on its first frame. Drop them before the run starts.
     try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
     this.palette = getPalette(this.game);
+    // W4 cosmetics: resolved ONCE per run, from the profile, for the same reason the biome mask is: the
+    // sled, the trail and the drawn colours must not disagree with each other mid-run.
+    this.look = this._resolveLook();
     this.seed = String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
     // W3: resolved ONCE per run, from the registry (a daily run sets the date-derived mask). Never
     // re-read mid-run, so the terrain, the stats scope and the saved record cannot disagree.
@@ -136,6 +141,10 @@ export class RunScene extends Phaser.Scene {
     // daily rule (read ONCE per run)
     const daily = DailyPatch.getDailyInfo();
     this.dailyRuleId = (daily && daily.rule && daily.rule.id) || 'none';
+    // W4 loadout: the boosts the player switched on, read from the profile. Absent profile or absent
+    // boosts means a clean run, which is the default-off rule.
+    const prof = this.registry.get(REG.PROFILE) || {};
+    this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
     this.dailyMods = (daily && daily.rule && daily.rule.modifiers) || {};
 
     // pure systems
@@ -220,7 +229,7 @@ export class RunScene extends Phaser.Scene {
     this.bg = new Background(this, this.palette);
     this.mesh = new TerrainMesh(this, this.palette, this.content.terrainMods);
     this.fx = new Fx(this, this.palette);
-    this.trail = new TrailParticles(this, this.palette);
+    this.trail = new TrailParticles(this, this.palette, this.look && this.look.trail);
     this.shardField = new ShardField(this, this.palette);
     this.airTelegraph = new AirTelegraph(this, this.palette);
     this.streaks = this.add.graphics().setDepth(12).setBlendMode(Phaser.BlendModes.ADD);
@@ -235,8 +244,22 @@ export class RunScene extends Phaser.Scene {
     const spawnY = this.terrain.heightAt(spawnX);
     const spawnAng = this.slopeAt(spawnX);
     this.startX = spawnX;
-    this.sled = new Sled(this, spawnX, spawnY - 14, this.palette);
+    this.sled = new Sled(this, spawnX, spawnY - 14, this.palette, this.look);
     this.sled.setPose(spawnX, spawnY - 15, spawnAng, 50 * Math.cos(spawnAng * DEG), 50 * Math.sin(spawnAng * DEG));
+    // W4 boosts. Applied at spawn from the loadout chosen before the run: the shield reuses the Hashed
+    // Backup charge counter the pickup already feeds, and Head Start scales the launch velocity through
+    // the same method the speed-boost pickup uses. No physics constant is touched.
+    // `dailyRuleId` is set to TODAY's rule on every run (it dresses the daily's rule), so it cannot mean
+    // "this is the daily". A run is the daily iff its seed is a daily seed — the same date-in-seed test
+    // the streak uses, which is immune to clock skew.
+    const isDaily = DailyPatch.dateKeyFromSeed(this.seed) !== null;
+    this.boostFx = boostEffects(this.loadout, { daily: isDaily });
+    this.modded = this.boostFx.modded;
+    if (this.boostFx.shieldCharges > 0) {
+      this.shieldCharges = (this.shieldCharges || 0) + this.boostFx.shieldCharges;
+      this.sled.shield = true;
+    }
+    if (this.boostFx.speedFactor !== 1) this.sled.scaleVelocity(this.boostFx.speedFactor);
     this.startGate = this.add.graphics().setDepth(6);
     this.drawStartGate(this.startGate, start.x + 14, this.terrain.heightAt(start.x + 14));
     this.snapCamera();
@@ -1306,6 +1329,10 @@ export class RunScene extends Phaser.Scene {
       bestFlow: Math.max(1, snap.bestFlow || 1), // not hashed; SaveStore's sanitiser may drop it, GameOver reads it from here
       maxAirtimeMs: Math.round(this.maxAirtimeMs),
       cause: 'crash',
+      // W4: set only when a boost was actually active, so a clean run writes exactly the record it wrote
+      // before W4 (same keys, same ledger-hash input). Ranking keeps it off clean boards; the hash is
+      // unchanged and does not include it.
+      ...(this.modded ? { modded: true } : {}),
       shards: this.shardCount || 0,
       nearMisses: this.nearMissCount || 0,
       bonusPoints: Math.round(snap.bonusPoints || 0),
@@ -1347,6 +1374,21 @@ export class RunScene extends Phaser.Scene {
     if (payload && payload.key === 'palette' && this.sled) this.refreshPalette();
   }
 
+  /**
+   * Resolve the equipped cosmetics into colours. Reads the profile, then hands off to the pure resolver so
+   * the colourblind safety rule lives in one tested place rather than in the draw loop.
+   * @returns {{rider:string, glow:string, trail:string[], theme:string}|null}
+   */
+  _resolveLook() {
+    const reg = this.registry;
+    const profile = reg.get(REG.PROFILE) || null;
+    const settings = reg.get(REG.SETTINGS) || {};
+    const hex = getPaletteCss(this.game, this._biomeDefForSector(this._biomeSector));
+    return resolveCosmetics(profile, this.palette, hex, {
+      colorblind: settings.palette === 'colorblind',
+    });
+  }
+
   refreshPalette() {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
@@ -1357,7 +1399,11 @@ export class RunScene extends Phaser.Scene {
     if (this.bg) this.bg.setMotif(biomeDef && biomeDef.background ? biomeDef.background : null);
     this.cameras.main.setBackgroundColor(this.palette.bg);
     this.sled.palette = this.palette;
-    this.trail.setPalette(this.palette);
+    // A palette toggle can turn colourblind ON, which refuses every cosmetic: the sled and trail have to
+    // be re-resolved, not just repainted, or a paid hue would survive the accessibility switch.
+    this.look = this._resolveLook();
+    if (this.sled) this.sled.look = this.look;
+    if (this.trail) { this.trail.setPalette(this.palette); this.trail.setStops(this.look && this.look.trail); }
     this.bg.setPalette(this.palette);
     this.fx.palette = this.palette;
     if (this.airTelegraph) this.airTelegraph.setPalette(this.palette);

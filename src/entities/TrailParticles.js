@@ -25,9 +25,16 @@ export class TrailParticles {
    * @param {Phaser.Scene} scene
    * @param {Object<string,number>} palette
    */
-  constructor(scene, palette) {
+  constructor(scene, palette, trailStops) {
     this.scene = scene;
     this.palette = palette;
+    // W4 trail hue. A cosmetic trail replaces all four speed stops, because the trail already colours by
+    // speed and swapping one stop would fight that gradient. Absent (every pre-W4 caller), the palette
+    // stops are used unchanged.
+    this.stops = Array.isArray(trailStops) && trailStops.length === 4
+      ? trailStops.map((h) => (/^#[0-9a-fA-F]{6}$/.test(h) ? parseInt(h.slice(1), 16) : null))
+      : null;
+    if (this.stops && this.stops.some((v) => v === null)) this.stops = null;
     this.points = [];
     this.destroyed = false;
     this.speedRef = 900;
@@ -53,6 +60,18 @@ export class TrailParticles {
   }
 
   /** @param {Object<string,number>} palette @returns {void} */
+  /**
+   * Swap the trail hue mid-run (a palette toggle, or a colourblind switch refusing cosmetics).
+   * @param {string[]|null} trailStops four hex strings, or null for the palette gradient
+   * @returns {void}
+   */
+  setStops(trailStops) {
+    this.stops = Array.isArray(trailStops) && trailStops.length === 4
+      ? trailStops.map((h) => (/^#[0-9a-fA-F]{6}$/.test(h) ? parseInt(h.slice(1), 16) : null))
+      : null;
+    if (this.stops && this.stops.some((v) => v === null)) this.stops = null;
+  }
+
   setPalette(palette) {
     this.palette = palette;
   }
@@ -64,7 +83,7 @@ export class TrailParticles {
    */
   colorForSpeed(speedPxS) {
     const p = this.palette;
-    const stops = [p.cyan, p.lime, p.amber, p.magenta];
+    const stops = this.stops || [p.cyan, p.lime, p.amber, p.magenta];
     const t = Math.min(0.9999, Math.max(0, speedPxS / this.speedRef)) * (stops.length - 1);
     const i = Math.floor(t);
     return lerpColor(stops[i], stops[i + 1], t - i);
