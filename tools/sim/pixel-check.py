@@ -58,6 +58,69 @@ def rows_with_ink(buf, w, x0, y0, x1, y1, bg, margin=40):
         yield y, c
 
 
+def check_footer_band(path):
+    """Game Over: the Resonance bar must not touch the footer hint line.
+
+    CC Friday's PR #17 verification found them overlapping, worst in the initials-entry state, and
+    noted the probe never covered that state - which is exactly why it had passed.
+
+    Finding the bar by an x-band does not work: the footer's centred text crosses the same columns,
+    and the SYNC LEVEL label sits inside them too. So the bar is identified by SHAPE - a stroked
+    rectangle has ink at both its left edge (x~96) and its right edge (x~246) on the same row, while
+    text lines are narrower and start further right. The footer is then the first row with ink
+    reaching past x 300, since it is centred and much wider than the bar.
+    """
+    MIN_GAP = 2
+    w, h, buf = raw_rgb(path)
+    s = w / 480.0
+
+    def ink_x(y):
+        row = [x for x in range(0, w) if luma(px(buf, w, x, y)) > 70]
+        return (min(row) / s, max(row) / s) if row else None
+
+    def ink_x_at(vy):
+        return ink_x(int(vy * s))
+
+    bar_rows, footer_top, seen_bar = [], None, False
+    for vy in range(248, 270):
+        y = int(vy * s)
+        ext = ink_x(y)
+        if not ext:
+            continue
+        lo, hi = ext
+        # The bar: spans its whole stroke width, left edge near 96 and right edge near 246.
+        if lo <= 104 and 240 <= hi <= 250:
+            bar_rows.append(vy)
+            seen_bar = True
+            continue
+        # The footer: wide centred text, well past the bar's right edge.
+        if seen_bar and hi > 300:
+            footer_top = vy
+            break
+
+    name = path.rsplit('/', 1)[-1]
+    if not bar_rows:
+        print(f"  FAIL: no Resonance bar ink found in {name} (bar missing, or shape test is wrong)")
+        return False
+    if footer_top is None:
+        print(f"  FAIL: no footer hint ink below the bar in {name}")
+        return False
+    bar_bottom = max(bar_rows)
+    gap = footer_top - bar_bottom
+    # The band above matters too: moving the bar down to fix the footer put it flush against the XP
+    # text row (measured at y 252), so a fix on one side must not create a collision on the other.
+    xp_bottom = max((vy for vy in range(240, bar_rows[0]) if ink_x_at(vy)), default=bar_rows[0])
+    up_gap = bar_rows[0] - xp_bottom
+    good = gap >= MIN_GAP and up_gap >= MIN_GAP
+    print(f"gameover {name}: xp ends y{xp_bottom} bar y{bar_rows[0]}..{bar_bottom} footer y{footer_top} "
+          f"gaps {up_gap}px above / {gap}px below {'OK' if good else 'COLLISION'}")
+    if gap < MIN_GAP:
+        print(f"  FAIL: footer hint is {gap}px from the bar (need {MIN_GAP}); they touch or overlap")
+    if up_gap < MIN_GAP:
+        print(f"  FAIL: the XP row is {up_gap}px from the bar (need {MIN_GAP}); they touch or overlap")
+    return good
+
+
 def main():
     shots = sys.argv[1].rstrip("/")
     ok = True
@@ -100,6 +163,14 @@ def main():
             ok = False
             print(f"  FAIL: {n} ink px outside the panel on the {side} side (text spill)")
     print(f"profile: ink outside panel {spill}")
+
+    # ---- Game Over: Resonance bar vs footer hint, plain AND initials-entry states. ----
+    for shot in ('w1-gameover-resonance-default', 'w1-gameover-levelup-default', 'w1-gameover-initials-default'):
+        try:
+            ok &= check_footer_band(f"{shots}/{shot}.png")
+        except FileNotFoundError:
+            ok = False
+            print(f"  FAIL: missing shot {shot}.png - the layout probe cannot pass without it")
 
     bands, cur = [], None
     for y, c in rows_with_ink(buf, w, px0 * SCALE + 4, py0 * SCALE, px1 * SCALE - 4, py1 * SCALE, bg, margin=38):

@@ -20,6 +20,15 @@ export const CREDITED_MAX = 500;
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const int = (v, d = 0) => (isNum(v) ? Math.round(v) : d);
 const nonNeg = (v) => Math.max(0, int(v, 0));
+/**
+ * Non-negative FLOAT: a counter that legitimately has a fractional part.
+ *
+ * RunRecord.bestCombo is a combo MULTIPLIER (SaveStore: "highest multiplier"), so x1.25 and x2.5 are
+ * real values. Rounding it with nonNeg stored 1 and 3 — a silent corruption that missions and
+ * achievements would read back. Counters that are genuinely integral (runs, metres, score, shards)
+ * keep using nonNeg; this is only for fields whose unit is fractional.
+ */
+const nonNegFloat = (v, d = 0) => (isNum(v) ? Math.max(0, v) : d);
 const str = (v) => (typeof v === 'string' ? v : '');
 const strArr = (v) => (Array.isArray(v) ? Array.from(new Set(v.filter((s) => typeof s === 'string' && s))) : []);
 
@@ -42,7 +51,7 @@ function sanitizeLifetime(raw) {
     nearMisses: nonNeg(o.nearMisses),
     bestScore: nonNeg(o.bestScore),
     bestDistanceM: nonNeg(o.bestDistanceM),
-    bestCombo: nonNeg(o.bestCombo),
+    bestCombo: nonNegFloat(o.bestCombo),
     maxAirtimeMs: nonNeg(o.maxAirtimeMs),
   };
 }
@@ -153,7 +162,7 @@ export function creditRun(profile, record, levels) {
   L.nearMisses += nonNeg(record.nearMisses);
   L.bestScore = Math.max(L.bestScore, nonNeg(record.score));
   L.bestDistanceM = Math.max(L.bestDistanceM, nonNeg(record.distanceM));
-  L.bestCombo = Math.max(L.bestCombo, nonNeg(record.bestCombo));
+  L.bestCombo = Math.max(L.bestCombo, nonNegFloat(record.bestCombo));
   L.maxAirtimeMs = Math.max(L.maxAirtimeMs, nonNeg(record.maxAirtimeMs));
   if (record.tricks && typeof record.tricks === 'object') {
     for (const [k, v] of Object.entries(record.tricks)) {
