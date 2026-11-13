@@ -363,7 +363,10 @@ describe('the signature toggle menu cannot cover the biome names', () => {
       const band = layout.toggleMenu;
       const rows = layout.toggleRowCount || 0;
       if (!rows) continue;
-      const menuBottom = band.y + rows * band.rowH;
+      // W6: measured on PHYSICAL rows. With two columns the menu is as tall as its taller column, not as
+      // tall as the row count, and measuring the count would fail a layout that is actually correct.
+      const physical = layout.togglePhysicalRows !== undefined ? layout.togglePhysicalRows : rows;
+      const menuBottom = band.y + physical * band.rowH;
       expect({ level, clear: menuBottom <= VIEW_BACK.y })
         .toEqual({ level, clear: true });
     }

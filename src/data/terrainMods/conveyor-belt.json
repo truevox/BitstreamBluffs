@@ -1,0 +1,9 @@
+{
+  "id": "conveyorBelt",
+  "colorKey": "amber",
+  "physics": { "pushForceMul": 2.0 },
+  "direction": 1,
+  "weight": 3,
+  "minDistanceM": 160,
+  "lengthPx": [400, 860]
+}

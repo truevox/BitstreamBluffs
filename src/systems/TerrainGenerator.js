@@ -382,7 +382,36 @@ export class TerrainGenerator {
     const i = this._segIndex(c, x);
     const a = p[i];
     const b = p[i + 1];
-    return a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x);
+    const y = a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x);
+    // W6: a swelled zone lifts and drops the SURFACE, so the hills the sled rides are the hills it sees.
+    // Applied here rather than by rewriting generator points, because heightAt is the one place the
+    // surface is read: contact, slope, drawing and the golden terrain test all go through it, so a swell
+    // cannot be visible in one and absent in another.
+    return y + this._swellAt(x);
+  }
+
+  /**
+   * Surface offset from any rolling-dew swell covering x.
+   *
+   * Sine, bounded by amplitudePx, so the surface can never invert or swallow the sled. Zones are read
+   * from the same chunks heightAt already resolved, so this costs one extra zone scan only when a swell
+   * exists at all; the common path (no swell) returns 0 before any maths.
+   * @param {number} x world px
+   * @returns {number} px offset, down positive
+   */
+  _swellAt(x) {
+    const zones = this._chunkAt(x).zones;
+    let sum = 0;
+    for (let i = 0; i < zones.length; i++) {
+      const z = zones[i];
+      if (x < z.x0 || x > z.x1) continue;
+      // Zones carry a modId, not the def: resolve through modMap, the same table _placeBiomeZone uses.
+      const mod = this.modMap && this.modMap[z.modId];
+      const sw = mod && mod.terrainSwell;
+      if (!sw || !Number.isFinite(sw.amplitudePx) || !Number.isFinite(sw.periodPx) || sw.periodPx <= 0) continue;
+      sum += Math.sin(((x - z.x0) / sw.periodPx) * Math.PI * 2) * sw.amplitudePx;
+    }
+    return sum;
   }
 
   /**

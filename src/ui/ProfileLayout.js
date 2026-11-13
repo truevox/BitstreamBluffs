@@ -179,13 +179,21 @@ export function profileLayout(o = {}) {
   const lastNameBottom = namedOnly.length
     ? NAME_TOP + (nameRows - 1) * NAME_PITCH + GLYPH_H
     : NAME_TOP - NAME_PITCH + GLYPH_H; // no plain rows: sit directly under the header
+  // W6: eleven signatures cannot stack in one column. At 9px pitch, 11 rows from y 142 reach 241 while
+  // BACK starts at 218, so the last three would be covered by a button the player cannot see through —
+  // the exact defect W3's audit already caught once. Split into two columns instead of shrinking the pitch:
+  // 6 rows per column at 9px is 54px, clearing BACK by 22px, and the font stays legible.
+  const TOGGLE_ROWS_PER_COL = 6;
+  const TOGGLE_COLS = order.length > TOGGLE_ROWS_PER_COL ? 2 : 1;
   const toggleMenu = {
     x: PAD + 2,
     y: lastNameBottom + 2,
     w: PROFILE_PANEL.w - (PAD * 2) - 4,
-    // 9 not 11: five ON/OFF rows must clear the panel floor beneath four name rows. GLYPH_H is 8, so
+    // 9 not 11: the rows must clear the panel floor beneath the signature names. GLYPH_H is 8, so
     // 9 still leaves a clear row gap.
     rowH: 9,
+    columns: TOGGLE_COLS,
+    rowsPerColumn: TOGGLE_ROWS_PER_COL,
   };
 
   // W5: the achievements entry point lives IN the profile view, as the spec asks, rather than as a
@@ -199,7 +207,13 @@ export function profileLayout(o = {}) {
     PAD, PROFILE_PANEL.h - 34, 'amber', { alpha: 0.9 }));
   const achButton = { x: PAD, y: PROFILE_PANEL.h - 22, w: 92, h: 16 };
 
-  return { w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu, toggleRowCount: sigCount, achButton, achUnlocked, achTotal };
+  // Physical rows the menu occupies: with two columns that is the taller column, not the row count, which
+  // is what the overlap test has to measure.
+  const togglePhysicalRows = Math.min(sigCount, TOGGLE_ROWS_PER_COL) || 0;
+  return {
+    w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu,
+    toggleRowCount: sigCount, togglePhysicalRows, achButton, achUnlocked, achTotal,
+  };
 }
 
 /**

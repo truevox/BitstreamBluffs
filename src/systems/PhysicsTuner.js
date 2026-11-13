@@ -351,14 +351,23 @@ export class PhysicsTuner {
     let gravityMul = daily.gravityMul || 1;
     let frictionMul = daily.frictionMul || 1;
     let bounceMul = 1;
+    // W6: the surface-feel multipliers a zone can carry. Kept separate from the three base ones so the
+    // existing mods read exactly as before; each defaults to 1 and multiplies, so two overlapping zones
+    // compound rather than one silently winning.
+    let zoneSpeedMul = 1;
+    let zoneSteerMul = 1;
+    let zonePushMul = 1;
     for (const z of zones) {
       const p = (z && z.physics) || {};
       if (p.gravityMul) gravityMul *= p.gravityMul;
       if (p.frictionMul) frictionMul *= p.frictionMul;
       if (p.bounceMul) bounceMul *= p.bounceMul;
+      if (p.speedMul) zoneSpeedMul *= p.speedMul;
+      if (p.steerMul) zoneSteerMul *= p.steerMul;
+      if (p.pushForceMul) zonePushMul *= p.pushForceMul;
     }
 
-    let speedMul = ctx.speedBoost || 1;
+    let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul;
     if (ctx.slowed) speedMul *= ctx.slowFactor || b.slowFactor;
     let dragMul = 1;
     let steerMul = 1;
@@ -393,14 +402,14 @@ export class PhysicsTuner {
       frictionAir: (b.dragUntucked * t.dragFeelMul * dragMul) / Math.max(0.2, speedMul),
       groundFriction: t.groundFriction * frictionMul * frictionBrake,
       tiltTorqueDegS2: b.maxTiltTorqueDegS2,
-      airControl: b.airControlFactor * t.airTiltFeelMul * (daily.airControlMul || 1),
+      airControl: b.airControlFactor * t.airTiltFeelMul * (daily.airControlMul || 1) * zoneSteerMul,
       bounceMul,
       speedMul,
       steerMul,
       tiltSign,
       groundResist: resistBase,
       quadDrag: t.quadDrag,
-      pushForceMul: daily.pushForceMul || 1,
+      pushForceMul: (daily.pushForceMul || 1) * zonePushMul,
       scrambleJitterDegS2: jitter,
       restitution: Math.min(0.9, 0.02 * bounceMul * bounceMul),
     };

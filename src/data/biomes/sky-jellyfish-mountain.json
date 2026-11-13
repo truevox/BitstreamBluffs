@@ -1,0 +1,14 @@
+{
+  "id": "sky-jellyfish-mountain",
+  "bit": 128,
+  "name": "Sky Jellyfish Mountain",
+  "unlockLevel": 25,
+  "lore": "Everything here gives a little before it holds. Including the ground.",
+  "background": "jellyfish",
+  "mod": "bouncySpring",
+  "chunks": ["whoops", "rolling-hills", "kicker-lip"],
+  "palettes": {
+    "default": { "bg": "#04121a", "bgAlt": "#0a2436", "cyan": "#7cf0e0", "magenta": "#c08fff", "lime": "#a8ffc4", "amber": "#ffe0a0", "text": "#eafcff" },
+    "colorblind": { "bg": "#04121a", "bgAlt": "#0a2436", "cyan": "#8ad0cc", "magenta": "#a8a0d0", "lime": "#9cdcb0", "amber": "#dccca0", "text": "#eef8fa" }
+  }
+}

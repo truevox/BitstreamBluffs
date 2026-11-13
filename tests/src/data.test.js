@@ -93,11 +93,15 @@ describe('terrain mods', () => {
       expect(m.minDistanceM).toBeGreaterThanOrEqual(0);
       expect(m.lengthPx).toHaveLength(2);
       expect(m.lengthPx[0]).toBeLessThanOrEqual(m.lengthPx[1]);
-      // A mod must do SOMETHING: either physics (the original contract) or a scoring multiplier
-      // (W3's Crystal Cavern echo). A mod with neither would be a zone the player cannot feel.
+      // A mod must do SOMETHING the player can feel: physics (the original contract), a scoring
+      // multiplier (W3's echo zone), a terrain swell (W6's dew bumps) or a launch (W6's geysers).
+      // The two W6 shapes are their own categories rather than being smuggled into `physics`, because
+      // they act on the SURFACE and on CONTACT, not on the effective constants each frame.
       const physical = Object.keys(m.physics || {}).length > 0;
       const scoring = Number.isFinite(m.scoreMul) && m.scoreMul > 1;
-      expect({ id: m.id, acts: physical || scoring }).toMatchObject({ id: m.id, acts: true });
+      const swell = Boolean(m.terrainSwell && Number.isFinite(m.terrainSwell.amplitudePx));
+      const launch = Boolean(m.launch && Number.isFinite(m.launch.velocityPxS));
+      expect({ id: m.id, acts: physical || scoring || swell || launch }).toMatchObject({ id: m.id, acts: true });
     }
   });
 

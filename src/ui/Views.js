@@ -374,6 +374,7 @@ export class ProfileView extends View {
       const band = layout.toggleMenu;
       this.sigMenu = new MenuList(scene, theme, {
         x: band.x, y: band.y, w: band.w, rowH: band.rowH, items, color: 'magenta', parent: this.panel,
+        columns: band.columns, rowsPerColumn: band.rowsPerColumn,
       });
     }
 

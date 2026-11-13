@@ -1,0 +1,9 @@
+{
+  "id": "geyserVent",
+  "colorKey": "magenta",
+  "physics": {},
+  "launch": { "velocityPxS": 620, "cooldownMs": 900 },
+  "weight": 3,
+  "minDistanceM": 170,
+  "lengthPx": [380, 800]
+}
