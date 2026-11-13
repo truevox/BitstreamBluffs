@@ -316,6 +316,17 @@ export class RunScene extends Phaser.Scene {
   // ------------------------------------------------------------------ terrain streaming
 
   /** Ask the generator to stream around x and mirror its adds/removals into mesh, hazards and power-ups. */
+  /**
+   * The biome definition owning a sector, or null for base terrain / no mask. Pure w.r.t. game state.
+   * @param {number} sectorNow 1-based sector index as the HUD uses it
+   * @returns {Object|null}
+   */
+  _biomeDefForSector(sectorNow) {
+    if (!this.biomeMask) return null;
+    const id = biomeForSector(this.seed, sectorNow - 1, this.biomeMask, Object.values(this.content.biomes || {}));
+    return id ? (this.content.biomes || {})[id] || null : null;
+  }
+
   streamTerrain(x) {
     const res = this.terrain.update(x) || {};
     const removed = res.removed || [];
@@ -1046,6 +1057,9 @@ export class RunScene extends Phaser.Scene {
       const def = biomeId ? (this.content.biomes || {})[biomeId] : null;
       if (def) this.emitIf(EVT.BIOME_ENTER, { id: def.id, name: def.name, sector: sectorNow, entering: true });
       else if (this._lastBiome) this.emitIf(EVT.BIOME_ENTER, { id: null, name: 'Bitstream', sector: sectorNow, entering: false });
+      // The biome's palette only takes effect if something applies it. Repaint on entry AND on exit
+      // back to base terrain, or the tint would persist past the biome that owns it.
+      this.refreshPalette();
       this._lastBiome = Boolean(def);
     }
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
@@ -1334,7 +1348,9 @@ export class RunScene extends Phaser.Scene {
   }
 
   refreshPalette() {
-    this.palette = getPalette(this.game);
+    // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
+    // pure function of current state, so a palette toggle mid-biome repaints to the right place.
+    this.palette = getPalette(this.game, this._biomeDefForSector(this._biomeSector));
     this.cameras.main.setBackgroundColor(this.palette.bg);
     this.sled.palette = this.palette;
     this.trail.setPalette(this.palette);
