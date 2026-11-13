@@ -21,8 +21,9 @@ export const config = {
   backgroundColor: '#05060f',
   pixelArt: true,
   roundPixels: true,
+  powerPreference: 'high-performance',
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  fps: { target: TARGET_FPS, limit: TARGET_FPS, forceSetTimeOut: false },
+  fps: { target: TARGET_FPS, forceSetTimeOut: false }, // no fps.limit: Phaser's limiter drops early rAF frames and stutters
   input: { gamepad: true },
   physics: {
     default: 'matter',
