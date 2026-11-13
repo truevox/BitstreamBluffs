@@ -8,6 +8,9 @@
  * Virtual screen is 480x270 (see UIScene / the sim harness).
  */
 
+// PixelFont has no Phaser import, so this stays a pure module dependency (the file's stated rule).
+import { FONT_LINE_H } from './PixelFont.js';
+
 export const SCREEN = Object.freeze({ w: 480, h: 270 });
 
 /** One panel's fixed geometry, in virtual pixels. */
@@ -93,14 +96,19 @@ export const GAMEOVER_ROW_H = 11;
  * progress bars identify the group.
  */
 export const GAMEOVER_MISSIONS_RULE_Y = 127;
-/** Height of one pixel-font line at scale 1; the bar must start at or below this. */
-export const LABEL_H = 8;
 /**
- * Rows a glyph can occupy, from the font itself: `buildTexture` writes font rows 0..7 (a 5x7 face
- * plus one descender row), so a text box shorter than this clips real ink. Any row pitch below
- * GLYPH_H + 1 makes consecutive rows touch.
+ * Rows a glyph can occupy, taken from the font rather than declared here: `buildTexture` writes font
+ * rows 0..7 (a 5x7 face plus one descender row) into a cell of FONT_LINE_H = 9, so real ink spans
+ * GLYPH_H = 8 rows. A text box shorter than this clips ink; a row pitch below GLYPH_H + 1 makes
+ * consecutive rows touch — the descender row alone is what turned a nominal 2 px gap into 1.25 px.
+ *
+ * This is deliberately derived, not restated: a layout that asserts "this label is one glyph tall"
+ * against its own local constant proves only that the constant equals itself, so the test could never
+ * catch a wrong constant. Importing the font's own line height makes the assertion bite.
  */
-export const GLYPH_H = 8;
+export const GLYPH_H = FONT_LINE_H - 1;
+/** Height of one pixel-font line at scale 1; the bar must start at or below this. */
+export const LABEL_H = GLYPH_H;
 
 /** The Title screen's existing occupied bands, for overlap assertions. */
 export const TITLE_BANDS = Object.freeze({

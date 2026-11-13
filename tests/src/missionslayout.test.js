@@ -8,6 +8,10 @@ import {
   charsThatFit, ellipsize, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, columnRows,
   GAMEOVER_BOARD_ROW_H, GAMEOVER_MISSIONS_RULE_Y, LABEL_H, GLYPH_H,
 } from '../../src/ui/MissionsLayout.js';
+// The font's own line height, read from the font module rather than from the layout that consumes it.
+// This is what stops the "label is one glyph tall" assertion from being a tautology about a local
+// constant: the expected height comes from the code that actually draws the glyphs.
+import { FONT_LINE_H } from '../../src/ui/PixelFont.js';
 
 describe('overlaps / insideScreen', () => {
   test('detects overlap and respects a required gap', () => {
@@ -143,6 +147,14 @@ describe('missionListLayout', () => {
     }
   });
 
+  test('the glyph constant matches the font it claims to describe', () => {
+    // If these ever diverge, every other legibility assertion here silently becomes decorative: the
+    // layout would be measuring itself. FONT_LINE_H 9 is 8 ink rows + 1 gap (see PixelFont.buildTexture,
+    // which writes font rows 0..7).
+    expect(FONT_LINE_H).toBe(9);
+    expect(GLYPH_H).toBe(FONT_LINE_H - 1);
+  });
+
   test('every row shows a full glyph height — the text can never be sliced', () => {
     // CC Friday's finding, reproduced from the source rather than from a screenshot: a glyph is
     // FONT_LINE_H - 1 = 8 rows tall, and the old list drew a 5 px "label" with the bar at y+5, so the
@@ -153,10 +165,10 @@ describe('missionListLayout', () => {
     //   2. the bar's rect does not intersect the label's rect at all.
     const L = missionListLayout(3);
     for (let i = 0; i < L.rows.length; i++) {
-      expect(L.rows[i].h).toBeGreaterThanOrEqual(GLYPH_H);
+      expect(L.rows[i].h).toBeGreaterThanOrEqual(FONT_LINE_H - 1);
       expect(overlaps(L.rows[i], L.bars[i])).toBe(false);
       // Row pitch must admit a full glyph plus a gap, or consecutive rows clip each other.
-      expect(MISSION_LIST_TITLE.rowH).toBeGreaterThanOrEqual(GLYPH_H + 1);
+      expect(MISSION_LIST_TITLE.rowH).toBeGreaterThanOrEqual(FONT_LINE_H);
     }
   });
 
@@ -207,7 +219,7 @@ describe('Game Over mission block', () => {
     geom.rows.forEach((r, i) => {
       const b = geom.bars[i];
       expect(overlaps(r, b)).toBe(false);
-      expect(r.h).toBeGreaterThanOrEqual(GLYPH_H);
+      expect(r.h).toBeGreaterThanOrEqual(FONT_LINE_H - 1);
       // Inline, or below with a real gap — never inside.
       const inline = b.x >= r.x + r.w;
       const below = b.y >= r.y + r.h + 1;
@@ -222,7 +234,7 @@ describe('Game Over mission block', () => {
       expect(overlaps(geom.bars[i - 1], geom.rows[i])).toBe(false);
       expect(overlaps(geom.rows[i - 1], geom.bars[i])).toBe(false);
       // A full glyph box plus a visible gap: rows that merely touch read as one paragraph.
-      expect(geom.rows[i].y).toBeGreaterThanOrEqual(geom.rows[i - 1].y + GLYPH_H);
+      expect(geom.rows[i].y).toBeGreaterThanOrEqual(geom.rows[i - 1].y + FONT_LINE_H - 1);
     }
   });
 
