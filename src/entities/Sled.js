@@ -70,6 +70,8 @@ export class Sled {
     this.pose = { phi: 10, chute: 0, brake: 0, tuck: 0 };
     this.boostMs = 0; // reduced drag after a landing boost
     this.squash = 0; // 0..1 landing squash (visual)
+    this.airEtaMs = Infinity; // ballistic ms to touchdown while airborne (set by RunScene.airForecast); Infinity = unknown
+    this.airSlopeDeg = null; // ground slope at that touchdown point (deg), null = unknown
     this.dropAheadDeg = 90; // how much steeper the ground gets just ahead (set by RunScene); large = kicker/drop
     this._groundRunMs = 0;
     this._sinceLaunchMs = 999;
@@ -307,7 +309,7 @@ export class Sled {
     if (phys.scrambleJitterDegS2) w += (Math.random() * 2 - 1) * phys.scrambleJitterDegS2 * DEG * dt;
     if (!g && tilt === 0) {
       // hands off: spin bleeds off and the nose eases toward the travel direction, so a pitch-over at a lip does not tumble the sled
-      w = airIdleSpin(w, b.angle, vx, vy, dt);
+      w = airIdleSpin(w, b.angle, vx, vy, dt, TUNING, { etaMs: this.airEtaMs, slopeDeg: this.airSlopeDeg });
     }
     if (pad && pad.brake && !g) w *= Math.exp(-TUNING.airBrakeAngularDamp * dt);
     if (chute) w *= Math.exp(-2.5 * dt);

@@ -48,7 +48,7 @@
     const [ev, con, tun] = await Promise.all([
       import('/src/events.js'), import('/src/constants.js'), import('/src/systems/PhysicsTuner.js'),
     ]);
-    mods = { EVT: ev.EVT, REG: con.REG, PPM: con.PIXELS_PER_METER, TUNING: tun.TUNING };
+    mods = { EVT: ev.EVT, REG: con.REG, PPM: con.PIXELS_PER_METER, TUNING: tun.TUNING, airIdleSpin: tun.airIdleSpin };
     return mods;
   }
 
@@ -75,7 +75,7 @@
   }
 
   function makePolicies(M) {
-    const { TUNING, PPM } = M;
+    const { TUNING, PPM, airIdleSpin } = M;
     let policies_hop = null;
     const policies = {
       /** No input at all. */
@@ -128,18 +128,18 @@
        * Feasible = a forward model of the sled's own air-rotation rules (Sled.applyControls: air torque while held, then
        * spin-down + auto-level toward the travel direction once released) says that holding for SOME duration and then
        * letting go gives, at the ballistic touchdown, >= 340 deg of net ccw rotation and a landing angle within
-       * flipCleanDeg (default 12 = the 'perfect' threshold) of the ground slope there.
+       * flipCleanDeg (default 28 = TrickTracker's 'good' threshold, i.e. a clean landing; 12 = 'perfect' is a knife edge because a hands-off sled
+       * settles ~15 deg nose-down of the slope, so only a sled still swinging through the slope angle scores it) of the ground slope there.
+       * The model calls the game's own pure airIdleSpin with the same landing forecast RunScene gives Sled, so it cannot drift from the game.
        * IDEAL release = the earliest frame at which that is true for "let go right now". --releaseLateMs N keeps
        * holding N ms beyond that frame (the later, the more it overshoots). Phases that are not feasible get no input.
        * If the ETA drops below 150 ms before the ideal frame was found, the policy lets go anyway.
-       * Air-phase records carry flip:{hold, etaMs, holdMs, idealRot, idealFound} plus the landing quality/angle.
+       * Air-phase records carry flip:{hold, etaMs, holdMs, idealRot, idealFound, idealEtaMs (ms of air left at the ideal frame: >= 300 = the flip 'had room'), relEtaMs/relAirLeftMs/predRot/predErr/relRot/relW (state and model prediction at the real release)} plus the landing quality/angle.
        */
       flip(p) {
         const late = p.releaseLateMs || 0;
-        const clean = p.flipCleanDeg != null ? p.flipCleanDeg : 12;
+        const clean = p.flipCleanDeg != null ? p.flipCleanDeg : 28;
         const hopLayer = p.noHop ? null : policies_hop(p);
-        const K = TUNING.airIdleLevelK;
-        const damp = TUNING.airIdleSpinDamp;
         const wMax = TUNING.maxAngularVelDegS * DEG;
         const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
         // forward model: hold tilt -1 for holdMs, then hands-off, until etaMs. Returns net ccw rotation (deg) since launch
@@ -153,6 +153,7 @@
           let w = sled.body.angularVelocity * 60; // rad/s, clockwise positive
           let vy = sled.vy;
           const vx = sled.vx;
+          const slopeL = c.scene.terrain.slopeDegAt(sled.x + (vx * etaMs) / 1000);
           const h = 1 / 120;
           const n = Math.max(1, Math.round(etaMs / 1000 / h));
           const nh = Math.round(holdMs / 1000 / h);
@@ -161,15 +162,14 @@
             if (i < nh) {
               w -= torque * h; // tilt -1
             } else {
-              const err = wrap(Math.atan2(vy, vx) - ang);
-              w += Math.max(-1.2, Math.min(1.2, err)) * K * h;
-              w *= Math.exp(-damp * h);
+              // the game's own pure hands-off rule (never a copy: the policy's notion of "ideal" must not drift from Sled)
+              w = airIdleSpin(w, ang, vx, vy, h, undefined, { etaMs: etaMs - i * h * 1000, slopeDeg: slopeL });
             }
             w = Math.max(-wMax, Math.min(wMax, w));
             ang += w * h;
           }
           const finalDeg = ang / DEG;
-          const slope = c.scene.terrain.slopeDegAt(sled.x + (vx * etaMs) / 1000);
+          const slope = slopeL;
           return { rotCcw: ang0Launch - finalDeg, errDeg: wrap((finalDeg - slope) * DEG) / DEG };
         };
         const target = p.flipTargetDeg != null ? p.flipTargetDeg : 340; // 340 = one counted flip (TrickTracker: 360 - 20); 700 = a double
@@ -189,17 +189,23 @@
           if (!st.hold) return null;
           if (st.releaseAt == null) {
             const eta = etaToGround(scene);
-            if (ok(predict(c, 0, eta, st.ang0))) { st.releaseAt = c.tMs + Math.max(0, late); st.idealFound = true; }
+            if (ok(predict(c, 0, eta, st.ang0))) { st.releaseAt = c.tMs + Math.max(0, late); st.idealFound = true; st.idealEtaMs = eta; }
             else if (late < 0) {
               // EARLY release (negative --releaseLateMs): let go when the ideal frame is at most -late ms away (25 ms grid)
               for (let hm = 25; hm <= -late; hm += 25) {
-                if (ok(predict(c, hm, eta, st.ang0))) { st.releaseAt = c.tMs; st.idealFound = true; break; }
+                if (ok(predict(c, hm, eta, st.ang0))) { st.releaseAt = c.tMs; st.idealFound = true; st.idealEtaMs = eta - hm; break; }
               }
               if (st.releaseAt == null && eta < 150) st.releaseAt = c.tMs;
             } else if (eta < 150) st.releaseAt = c.tMs;
             if (st.releaseAt != null) st.idealRot = st.ang0 - sled.angleDeg;
           }
           const released = st.releaseAt != null && c.tMs >= st.releaseAt;
+          if (released && st.relT == null) {
+            // diagnostics at the real release frame: what the forward model says a release NOW gives, and how much air the model sees left
+            const eta = etaToGround(scene);
+            const pr = predict(c, 0, eta, st.ang0);
+            st.relT = c.tMs; st.relEtaMs = eta; st.predRot = pr.rotCcw; st.predErr = pr.errDeg; st.relAng = sled.angleDeg; st.relRot = st.ang0 - sled.angleDeg; st.relW = sled.body.angularVelocity * 60 / DEG;
+          }
           if (!released) st.holdMs += DT;
           return released ? null : { tilt: -1 };
         };
@@ -435,7 +441,8 @@
           hop: air.hop, ...air.cls, rotDeg: Math.round(air.ang0 - air.lastAng), endedByCrash: !!endedByCrash,
           landing: pendingLand ? pendingLand.quality : null, landAngleDeg: pendingLand ? pendingLand.angleDeg : null,
           landImpactPxS: pendingLand ? pendingLand.impactSpeedPxS : null,
-          flip: ctx.flip ? { hold: ctx.flip.hold, etaMs: ctx.flip.etaMs, holdMs: Math.round(ctx.flip.holdMs), idealRot: ctx.flip.idealRot == null ? null : Math.round(ctx.flip.idealRot), idealFound: ctx.flip.idealFound } : null,
+          flip: ctx.flip ? { hold: ctx.flip.hold, etaMs: ctx.flip.etaMs, holdMs: Math.round(ctx.flip.holdMs), idealRot: ctx.flip.idealRot == null ? null : Math.round(ctx.flip.idealRot), idealFound: ctx.flip.idealFound, idealEtaMs: ctx.flip.idealEtaMs == null ? null : ctx.flip.idealEtaMs,
+            relEtaMs: ctx.flip.relEtaMs, predRot: ctx.flip.predRot == null ? null : Math.round(ctx.flip.predRot), predErr: ctx.flip.predErr == null ? null : r1(ctx.flip.predErr), relRot: ctx.flip.relRot == null ? null : Math.round(ctx.flip.relRot), relW: ctx.flip.relW == null ? null : Math.round(ctx.flip.relW), relAirLeftMs: ctx.flip.relT == null ? null : Math.round(tMs - ctx.flip.relT) } : null,
         });
       }
       lastAir = { airMs: air.airMs, endT: tMs };

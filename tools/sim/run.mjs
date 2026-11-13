@@ -19,6 +19,7 @@
  *   --policy NAME         handsOff | flip | hop | stallProbe | terrain          (default handsOff)
  *   --maxM N              stop at N metres (default 3000)      --maxSec N   sim-time limit (default 240)
  *   --releaseLateMs N     flip: release N ms later than the ideal frame (default 0)
+ *   --flipCleanDeg N      flip: landing tolerance of the ideal frame (default 28 = clean landing; 12 = perfect only, the earlier default)
  *   --flipTargetDeg N     flip: the ideal release is the first frame from which a release gives >= N deg of net rotation and a clean landing (default 340; 700 = double flip)
  *   --hopLeadMs N         hop: hop when the next ground crash hazard is N ms away (default 380)
  *   --seedPrefix P        with --seeds N: names become P-01..P-NN instead of sim-01.. (a second, independent seed set)
@@ -28,7 +29,7 @@
  *   --keepUi              leave UIScene running (slower)       --quiet      no per-run lines
  *
  * Policies (details in browser.js): flip's "ideal" release = the first frame from which a release (a forward model of Sled's own air rules) gives
- * >= 340 deg of net rotation and a landing within 12 deg of the slope; releaseLateMs delays it (negative = earlier). Attempts for which the model
+ * >= 340 deg of net rotation and a landing within --flipCleanDeg (default 28, the 'good' band) of the slope; releaseLateMs delays it (negative = earlier). Attempts for which the model
  * never finds the ideal frame (a marginal flip) are marked flip.idealFound=false: those release at the last moment and are not a timing test.
  * hop hops so the apex is over the next ground crash hazard and vetoes hops near a lip that has an air hazard after it.
  * stallProbe brakes to a dead stop on gentle ground, releases, and records when sled._nudging fires and the time to >120 px/s;

@@ -65,6 +65,69 @@ describe('airIdleSpin (hands-off air rotation)', () => {
   });
 });
 
+/** Same as coast() but with the landing forecast RunScene feeds Sled: ground slope at touchdown and ms left in the air. */
+function levelWith(angleDeg, wDegS, airMs, slopeDeg, vx = 600, vy = 300) {
+  const h = 1 / 125;
+  let a = angleDeg * DEG;
+  let w = wDegS * DEG;
+  for (let t = 0; t < airMs / 1000 - 1e-9; t += h) {
+    w = airIdleSpin(w, a, vx, vy, h, TUNING, { etaMs: airMs - t * 1000, slopeDeg });
+    w = Math.max(-TUNING.maxAngularVelDegS * DEG, Math.min(TUNING.maxAngularVelDegS * DEG, w));
+    a += w * h;
+  }
+  return { angleDeg: a / DEG, errDeg: wrap(a - slopeDeg * DEG) / DEG };
+}
+
+describe('airIdleSpin with a landing forecast (late / early flip release)', () => {
+  const slope = 12;
+  const rest = slope + TUNING.airIdleLandOffsetDeg; // where a hands-off sled settles: slightly nose-down of the slope, a "good" landing
+
+  test('without a forecast nothing changed: it still aims at the velocity heading', () => {
+    expect(airIdleSpin(0, 0.3, 500, 0, 0.008)).toBeLessThan(0);
+    expect(airIdleSpin(0, -0.3, 500, 0, 0.008, TUNING, null)).toBeGreaterThan(0);
+  });
+
+  test('with a forecast it settles at the slope plus the landing offset, not at the heading', () => {
+    const r = levelWith(rest + 30, 0, 800, slope);
+    expect(Math.abs(wrap((r.angleDeg - rest) * DEG) / DEG)).toBeLessThan(3);
+    expect(Math.abs(r.errDeg)).toBeGreaterThan(8); // not a free perfect landing
+    expect(Math.abs(r.errDeg)).toBeLessThan(20); // but safely inside the "good" band (28)
+  });
+
+  test('levelling gets stronger as the ground gets closer', () => {
+    const far = Math.abs(airIdleSpin(0, 1, 600, 300, 0.008, TUNING, { etaMs: 1000, slopeDeg: slope }));
+    const near = Math.abs(airIdleSpin(0, 1, 600, 300, 0.008, TUNING, { etaMs: 150, slopeDeg: slope }));
+    const nearer = Math.abs(airIdleSpin(0, 1, 600, 300, 0.008, TUNING, { etaMs: 80, slopeDeg: slope }));
+    expect(near).toBeGreaterThan(far * 2);
+    expect(nearer).toBeLessThanOrEqual(near * (TUNING.airIdleUrgencyMax / 2) ** 2 + 1e-9); // capped
+    expect(airIdleSpin(0, 1, 600, 300, 0.008, TUNING, { etaMs: 1, slopeDeg: slope })).toBeCloseTo(airIdleSpin(0, 1, 600, 300, 0.008, TUNING, { etaMs: 10, slopeDeg: slope }), 6);
+  });
+
+  test('a flip let go anywhere in 0.4-0.85 s of held tilt lands level with >= 270 ms of air left, however late', () => {
+    const torque = 420 * 0.7 * TUNING.airTiltFeelMul;
+    for (const holdMs of [450, 550, 650, 750, 850]) {
+      let w = 0;
+      let rot = 0;
+      for (let t = 0; t < holdMs / 1000; t += 0.002) { w = Math.min(TUNING.maxAngularVelDegS, w + torque * 0.002); rot += w * 0.002; }
+      const r = levelWith(-rot, -w, 270, slope);
+      expect(Math.abs(r.errDeg)).toBeLessThan(28);
+    }
+  });
+
+  test('a release at the half-turn tipping point (140 deg round, 270 ms left) still comes down level either way', () => {
+    expect(Math.abs(levelWith(-140, -630, 270, slope).errDeg)).toBeLessThan(28);
+    expect(Math.abs(levelWith(-170, -700, 270, slope).errDeg)).toBeLessThan(28);
+  });
+
+  test('but a sled released inverted with almost no air left still crashes', () => {
+    for (const ms of [30, 50, 70]) expect(Math.abs(levelWith(-180, -600, ms, slope).errDeg)).toBeGreaterThan(55);
+  });
+
+  test('a sled released inverted with 100 ms left does not get a free landing either', () => {
+    expect(Math.abs(levelWith(-170, -800, 100, slope).errDeg)).toBeGreaterThan(28);
+  });
+});
+
 describe('stallNudgeStep (stall safety net)', () => {
   const base = { grounded: true, braking: false, slopeDeg: 0, vx: 0, vy: 0, stepMs: 8, gravityPxS2: 900 };
   /** Run the net for `ms` with the sled held at the given velocity; returns the final state. */

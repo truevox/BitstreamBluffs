@@ -50,7 +50,7 @@ export const TUNING = Object.freeze({
    * Was 3.6 (1060). A flip must be HELD for ~0.65 s before the sled has turned far enough to be finished by the levelling spring
    * (airIdleLevelK), and generated jumps give ~1.0 s of air, so the slack between the earliest good release and touchdown (which is the
    * whole release window, see airIdleLevelK) was only ~250 ms; 5 buys back ~100 ms of it. With maxAngularVelDegS 900 the rotation
-   * of a held flip is about the same as before: ~580 deg in 1.0 s, ~960 deg in 1.4 s.
+   * of a held flip is about the same as before: ~600 deg in 1.0 s, ~960 deg in 1.4 s (measured in the sim: 627 deg at 1054 ms, 944 at 1394 ms).
    */
   airTiltFeelMul: 5,
   /** Ground friction multiplier and extra manual decay while braking (S). */
@@ -158,17 +158,37 @@ export const TUNING = Object.freeze({
    * of downforce. Real kickers (drop > snapMaxDropDeg, or vn above the cap) are untouched.
    */
   /**
-   * Hands-off air rotation (no tilt held), see airIdleSpin(): `airIdleLevelK` (1/s^2) springs the nose toward the velocity heading by
+   * Hands-off air rotation (no tilt held), see airIdleSpin(): `airIdleLevelK` (1/s^2) springs the nose toward the landing attitude by
    * the SHORTEST way (error clamped to +-1.2 rad), `airIdleSpinDamp` (1/s) damps the spin. They were 8 and 3, which left a released flip
-   * spinning at 600-1000 deg/s for ~1 s (coast ~ w / damp = 280 deg) with a spring far too weak to stop it: every 100 ms of late (or
-   * early) release moved the landing angle by ~120 deg, so the clean window was < 100 ms wide (measured 32 % clean at +100 ms, 12 % at
-   * -100 ms). At 80 and 12 the spin is gone and the nose is level within ~0.2 s from any starting angle, so a release anywhere between
-   * about half a turn and a turn and a half finishes the flip by itself (earlier: it unwinds to a plain landing), and the only thing
-   * that still crashes is letting go less than ~150 ms before touchdown (or never letting go). Holding tilt is untouched (the spring
-   * only acts with no input) and still crashes. Stronger values (120 / 18) measured no better and look like a snap.
+   * spinning at 600-1000 deg/s for ~1 s with a spring far too weak to stop it; at 80 and 12 the spin is gone within ~0.3 s and an
+   * UNHURRIED release (>= ~450 ms of air left) lands level from any attitude. Holding tilt is untouched (the spring only acts with no
+   * input) and still crashes. Stronger constant values (120 / 18) look like a snap and measured no better; what the window still lacked
+   * was authority when little air is left, see airIdleUrgencyRefMs.
+   *
+   * What the window really is: a flip let go after about 0.42 s of held tilt (about a third of a turn, plus ~50 deg of coast) is carried round
+   * to one full turn, and one let go before that unwinds to a plain landing; the tipping point between the two is 180 deg from level,
+   * where the spring flips direction. A release up to ~0.85 s of hold (about 470 deg of rotation) still finishes ONE flip, later ones go on
+   * to a second turn (a double on long air). Before the urgency scaling the sled needed ~0.45 s to come back from the tipping point, so
+   * anything released with less than that left (about 100 ms either side of the tipping point, and every release 200 ms or more after
+   * the earliest good one) landed on its side. With it, a release at any rotation lands on the runners if >= ~250 ms of air is left.
    */
   airIdleSpinDamp: 12,
   airIdleLevelK: 80,
+  /**
+   * Where the hands-off sled settles: this many degrees nose-down of the ground slope at the predicted touchdown (Sled.airSlopeDeg, from
+   * RunScene.airForecast). 15 is what the old "aim at the velocity heading" rule produced on generated landings (median 16, p10-p90
+   * 12-19 deg), so an unattended landing stays a "good" one (PERFECT_ANGLE_DEG 12 .. GOOD 28) and a PERFECT one still has to be earned
+   * with tilt: aiming at the slope itself made ~100 % of hands-off landings perfect, +25 % speed and a failing hop policy (measured).
+   */
+  airIdleLandOffsetDeg: 15,
+  /**
+   * Levelling urgency: with `eta` ms of air left (Sled.airEtaMs) the spring is multiplied by u^2 and the spin damping by u, where
+   * u = clamp(airIdleUrgencyRefMs / eta, 1, airIdleUrgencyMax) (the same damping ratio, a faster settle). 400 ms and 3 => unchanged above 400 ms
+   * of air, 4x spring at 200 ms, 9x (the cap) from 133 ms. That is enough to turn a release from the tipping point with 250 ms left into a
+   * landing, and still not enough (wMax limits the turn to ~45 deg per 50 ms) to rescue one let go inverted with <~100 ms left.
+   */
+  airIdleUrgencyRefMs: 400,
+  airIdleUrgencyMax: 3,
   snapMinGroundMs: 100,
   snapQuietMs: 350,
   snapWindowMs: 160,
@@ -257,20 +277,26 @@ export function angAccelToStep(degS2, deltaMs) {
 
 /**
  * Hands-off air rotation, one step (pure; Sled.applyControls uses it when airborne with no tilt input): a spring toward the
- * velocity heading by the SHORTEST way (error clamped to +-1.2 rad) plus exponential spin damping. See TUNING.airIdleLevelK / airIdleSpinDamp.
+ * landing attitude by the SHORTEST way (error clamped to +-1.2 rad) plus exponential spin damping. See TUNING.airIdleLevelK / airIdleSpinDamp.
+ * With `ctx` (what RunScene.airForecast gives Sled: ballistic ms to touchdown and ground slope there) the attitude is slope + airIdleLandOffsetDeg
+ * and the spring/damping scale with urgency (TUNING.airIdleUrgencyRefMs); without it the target is the velocity heading and nothing is scaled.
  * @param {number} w angular velocity, rad/s (clockwise positive, like the body angle).
  * @param {number} angle body angle, rad (any multiple of a turn).
  * @param {number} vx velocity px/s.
  * @param {number} vy velocity px/s (down positive).
  * @param {number} dt seconds.
  * @param {typeof TUNING} [t]
+ * @param {{etaMs?:number, slopeDeg?:number|null}|null} [ctx] landing forecast (etaMs Infinity / slopeDeg null = unknown).
  * @returns {number} new angular velocity, rad/s.
  */
-export function airIdleSpin(w, angle, vx, vy, dt, t = TUNING) {
-  let err = Math.atan2(vy, vx) - angle;
+export function airIdleSpin(w, angle, vx, vy, dt, t = TUNING, ctx = null) {
+  const target = ctx && ctx.slopeDeg != null ? (ctx.slopeDeg + t.airIdleLandOffsetDeg) * Math.PI / 180 : Math.atan2(vy, vx);
+  let err = target - angle;
   err = Math.atan2(Math.sin(err), Math.cos(err));
-  const spring = Math.max(-1.2, Math.min(1.2, err)) * t.airIdleLevelK * dt;
-  return (w + spring) * Math.exp(-t.airIdleSpinDamp * dt);
+  const eta = ctx && ctx.etaMs != null ? ctx.etaMs : Infinity;
+  const u = Math.min(t.airIdleUrgencyMax, Math.max(1, t.airIdleUrgencyRefMs / Math.max(eta, 1)));
+  const spring = Math.max(-1.2, Math.min(1.2, err)) * t.airIdleLevelK * u * u * dt;
+  return (w + spring) * Math.exp(-t.airIdleSpinDamp * u * dt);
 }
 
 /**

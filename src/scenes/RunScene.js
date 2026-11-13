@@ -608,6 +608,7 @@ export class RunScene extends Phaser.Scene {
 
     // sub-stepped physics; slow-mo scales the delta, never the 8 ms limit
     sled.dropAheadDeg = this.dropAhead(sled);
+    this.airForecast(sled);
     let simDt = dt * (this.slowmoMs > 0 ? this.slowmoScale : 1);
     if (this.blinkMs > 0) { this.blinkMs -= dt; simDt *= 0.35; }
     if (this.hitStopMs > 0) { this.hitStopMs -= dt; simDt = 0; }
@@ -721,6 +722,19 @@ export class RunScene extends Phaser.Scene {
     this.drawStreaks(t);
     this.bg.update(cam.scrollX, t, sled.speed);
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
+  }
+
+  /** Airborne only: ballistic ms to touchdown and the ground slope there (sled.airEtaMs / airSlopeDeg), for Sled's hands-off levelling. */
+  airForecast(sled) {
+    if (sled.grounded) { sled.airEtaMs = Infinity; sled.airSlopeDeg = null; return; }
+    const g = (this.currentPhys && this.currentPhys.gravityPxS2) || 900;
+    for (let ms = 20; ms <= 2500; ms += 20) {
+      const ts = ms / 1000;
+      const x = sled.x + sled.vx * ts;
+      if (sled.y + sled.vy * ts + 0.5 * g * ts * ts + 14 >= this.terrain.heightAt(x)) { sled.airEtaMs = ms; sled.airSlopeDeg = this.slopeAt(x); return; }
+    }
+    sled.airEtaMs = Infinity;
+    sled.airSlopeDeg = null;
   }
 
   /** How many degrees steeper (downhill) the ground gets a short way ahead; large for kickers / drops. */
