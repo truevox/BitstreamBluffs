@@ -141,17 +141,25 @@ export function creditRun(profile, record, levels) {
   const leveledTo = next.level > levelBefore ? next.level : 0;
   const rewards = leveledTo ? rewardsForLevel(leveledTo, table) : null;
   if (leveledTo) {
+    // A long run can cross several thresholds; grant every intervening non-biome reward.
+    for (let level = levelBefore + 1; level <= next.level; level++) {
+      const crossed = rewardsForLevel(level, table);
+      if (crossed.cosmetic && !next.unlocked.cosmetics.includes(crossed.cosmetic)) next.unlocked.cosmetics.push(crossed.cosmetic);
+      if (crossed.boost) next.unlocked.boosts[crossed.boost] = next.unlocked.boosts[crossed.boost] || 1;
+    }
     // W1: biome rewards are LISTED but not unlockable until W3/W6 ship the biomes themselves.
-    if (rewards.cosmetic && !next.unlocked.cosmetics.includes(rewards.cosmetic)) next.unlocked.cosmetics.push(rewards.cosmetic);
-    if (rewards.boost) next.unlocked.boosts[rewards.boost] = next.unlocked.boosts[rewards.boost] || 1;
     next.pendingBiomes = table.levels.filter((l) => l.biome && l.level <= next.level).map((l) => l.biome);
   }
+  const rewardsEarned = leveledTo
+    ? table.levels.filter((entry) => entry.level > levelBefore && entry.level <= next.level).map((entry) => rewardsForLevel(entry.level, table))
+    : [];
   const awards = {
     xp,
     levelBefore,
     levelAfter: next.level,
     leveledTo,
     rewards,
+    rewardsEarned,
     title: rewards ? rewards.title : null,
   };
   return { profile: next, awards };
@@ -186,7 +194,16 @@ export class ProfileStore {
    * @param {{storage?: Storage, levels?: *}} [o]
    */
   constructor(o = {}) {
-    this.storage = o.storage !== undefined ? o.storage : (typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined);
+    if (o.storage !== undefined) {
+      this.storage = o.storage;
+    } else {
+      try {
+        this.storage = typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined;
+      } catch (e) {
+        // Accessing localStorage itself can throw in opaque origins/private contexts, before any method runs.
+        this.storage = undefined;
+      }
+    }
     this.levels = loadLevelTable(o.levels);
     /** @type {Object} */
     this.profile = defaultProfile();

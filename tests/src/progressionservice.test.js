@@ -98,6 +98,12 @@ describe('ProgressionService', () => {
     expect(svc2.profile.lifetime.runs).toBe(2);
   });
 
+  test('backfills beyond the recent-run window instead of truncating lifetime history', async () => {
+    const runs = Array.from({ length: 1001 }, (_, i) => rec({ id: `old-${i}`, ledgerHash: `hash-${i}` }));
+    const { svc } = await make(runs);
+    expect(svc.profile.lifetime.runs).toBe(runs.length);
+  });
+
   test('does not backfill a brand-new device with no runs', async () => {
     const { svc } = await make([]);
     expect(svc.profile.lifetime.runs).toBe(0);

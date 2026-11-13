@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.1 - unreleased (W1 audit fixes)
+
+### 🐛 Fixed
+- Profile startup now falls back to memory when reading the `localStorage` property itself throws.
+- Existing-device backfill now includes all stored runs, not only the most recent 1,000.
+- A run that crosses multiple Sync Level thresholds grants and reports every crossed cosmetic/boost reward.
+
 ## v2.2.0 - unreleased (W1: pilot profile, Resonance, Sync Levels)
 
 ### ✅ Added

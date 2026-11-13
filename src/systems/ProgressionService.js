@@ -46,7 +46,9 @@ export class ProgressionService {
     const saveStore = this.game.registry.get(REG.SAVE_STORE);
     if (saveStore && this.store.profile.lifetime.runs === 0) {
       try {
-        const runs = await saveStore.getRecentRuns(1000);
+        // Backfill the complete local history; truncating here permanently loses lifetime stats on
+        // devices with more runs than the UI's usual recent-history window.
+        const runs = await saveStore.getRecentRuns(Number.MAX_SAFE_INTEGER);
         if (Array.isArray(runs) && runs.length) this.store.backfill(runs);
       } catch (e) { /* backfill is a nicety; never block boot on it */ }
     }

@@ -115,6 +115,19 @@ describe('load tolerance', () => {
     expect(() => s.save(s.profile)).not.toThrow();
     expect(s.profile.level).toBe(1);
   });
+
+  test('does not throw when reading the global localStorage getter throws', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, get: () => { throw new Error('denied'); } });
+    try {
+      const s = new ProfileStore({ levels: levels() });
+      expect(() => s.load()).not.toThrow();
+      expect(s.profile.level).toBe(1);
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+      else delete globalThis.localStorage;
+    }
+  });
 });
 
 describe('sanitizeProfile', () => {
@@ -213,6 +226,10 @@ describe('creditRun idempotency', () => {
     const awards = s.credit(rec({ distanceM: 8000, score: 20000, tricks: { a: 20 }, shards: 40 }));
     expect(awards.leveledTo).toBeGreaterThan(1);
     expect(awards.rewards.title).toBeTruthy();
+    expect(awards.rewardsEarned.map((reward) => reward.level)).toEqual(
+      Array.from({ length: awards.leveledTo }, (_, i) => i + 1).slice(1),
+    );
+    expect(s.profile.unlocked.cosmetics).toContain('trail-cyan');
     expect(s.profile.level).toBe(awards.leveledTo);
   });
 });

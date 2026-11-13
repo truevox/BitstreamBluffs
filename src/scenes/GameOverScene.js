@@ -251,6 +251,15 @@ export class GameOverScene extends Phaser.Scene {
 
   /** @returns {string} short "what unlocked" line, or the "next level" hint. */
   _rewardsLine(awards) {
+    if (awards.leveledTo && Array.isArray(awards.rewardsEarned)) {
+      const bits = [];
+      for (const reward of awards.rewardsEarned) {
+        if (reward.cosmetic) bits.push(String(reward.cosmetic).toUpperCase());
+        if (reward.boost) bits.push(String(reward.boost).toUpperCase());
+        if (reward.biome) bits.push('SIGNATURE LOCKED - COMING ONLINE');
+      }
+      if (bits.length) return ellipsize(bits.join('  ·  '), 58);
+    }
     if (awards.leveledTo && awards.rewards) {
       const bits = [];
       if (awards.rewards.title) bits.push(String(awards.rewards.title).toUpperCase());
