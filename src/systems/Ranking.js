@@ -18,6 +18,23 @@
 import { MODDED_RUNS_RANKED } from '../constants.js';
 
 /**
+ * Whether this record plays on the MODDED board rather than the clean one.
+ *
+ * This exists so a view can label the board it is showing without testing the field itself. Game Over needs
+ * the answer twice — which board to load, and whether to say MODDED - UNRANKED instead of announcing a seed
+ * best — and both are ranking decisions, so both belong here rather than in the scene.
+ *
+ * @param {{modded?:boolean}} record
+ * @param {{ranked?:boolean}} [o] test override
+ * @returns {boolean}
+ */
+export function boardsModded(record, o) {
+  if (!record || typeof record !== 'object') return false;
+  if (record.modded !== true) return false;
+  return !ranksModded(o);
+}
+
+/**
  * Whether modded runs are allowed to rank right now.
  * @param {{ranked?:boolean}} [o] test override; production callers pass nothing and read the constant.
  * @returns {boolean}

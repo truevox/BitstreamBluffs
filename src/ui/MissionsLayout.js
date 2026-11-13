@@ -182,6 +182,34 @@ export const TITLE_BANDS = Object.freeze({
   hint: Object.freeze({ x: 0, y: 258, w: 480, h: 9 }),
 });
 
+/**
+ * Title menu geometry, computed from the row count so a seventh entry cannot be added silently.
+ *
+ * This exists because W4 added SHARD SHOP as a seventh row and the SETTINGS row ended up drawn over the
+ * DAILY PATCH strip (CC Friday's W4 defect 3). The scene's panel height had multiplied the row pitch by the
+ * text scale, so it reported a 228px panel for 112px of rows and nothing noticed it was lying.
+ *
+ * The menu is drawn at 2x, so a row is ROW_H * SCALE = 32px tall inside a band that only allows 104px
+ * (y 92..196, with the daily strip at 202). That is 3 rows of 32, or 6 rows at the 16px pitch MenuList
+ * actually uses — the pre-W4 screen. Six is the ceiling: 92 + 6*16 = 188, and a seventh lands at 204.
+ *
+ * @param {number} count number of menu rows
+ * @returns {{x:number,y:number,w:number,h:number,rowH:number,scale:number,rows:number,lastRowBottom:number,fits:boolean}}
+ */
+export function titleMenuLayout(count) {
+  const ROW_H = 16;
+  const SCALE = 2;
+  const rows = Math.max(0, Math.floor(count) || 0);
+  // Panel height is rows * pitch plus a 4px frame inset. NOT multiplied by scale: MenuList treats rowH as
+  // the pitch and scales only the glyphs, so scaling here double-counted it.
+  const h = 4 + rows * ROW_H;
+  const lastRowBottom = 92 + rows * ROW_H;
+  return {
+    x: 24, y: 92, w: 216, h, rowH: ROW_H, scale: SCALE, rows, lastRowBottom,
+    fits: lastRowBottom <= TITLE_BANDS.menu.y + TITLE_BANDS.menu.h && h <= TITLE_BANDS.menu.h,
+  };
+}
+
 /** Centre x for the Title BEST line: right column, clear of the mission list. */
 export const TITLE_BEST_X = 440;
 /** Baseline y for the Title BEST line. */

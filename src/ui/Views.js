@@ -351,6 +351,18 @@ export class ProfileView extends View {
     // W3: signature toggles. Only unlocked biomes get a row, and toggling one persists the profile so a
     // player's choice survives a reload. Toggling is cosmetic-adjacent but real: it changes which biome
     // sectors their next run can contain, which is why mask-scoped stats exist.
+    // SHARD SHOP moved here from the Title menu: Title's band physically fits six 2x rows and the shop
+    // was the seventh (it overran the DAILY PATCH strip). It sits on this screen because Profile is where
+    // you already look at what you own and what it looks like.
+    if (layout.shopButton) {
+      const sb = layout.shopButton;
+      this.shopButton = new Button(scene, theme, {
+        x: sb.x, y: sb.y, w: sb.w, h: sb.h, label: 'SHARD SHOP', color: 'amber',
+        onClick: () => { this.close(); o.onShop && o.onShop(); },
+      });
+      this.panel.add(this.shopButton);
+    }
+
     this.biomeDefs = biomeDefs;
     const service = scene.registry.get(REG.PROGRESSION);
     this.profileStore = (service && service.store) || null;
@@ -446,49 +458,62 @@ export class ShopView extends View {
     this.service = scene.registry.get(REG.PROGRESSION);
     this.store = (this.service && this.service.store) || null;
 
-    for (const it of layout.items) {
-      this.panel.add(new NeonText(scene, theme, it.x, it.y, it.text, { color: it.color }));
-    }
-
-    const band = layout.band;
-    this.menu = new MenuList(scene, theme, {
-      x: band.x, y: band.y, w: band.w, rowH: band.rowH,
-      items: this._menuItems(), color: 'lime', parent: this.panel,
-    });
-
-    this.boostMenu = new MenuList(scene, theme, {
-      x: band.x, y: band.y + band.rowH * (layout.rows.length + 4), w: band.w, rowH: band.rowH,
-      items: this._boostItems(), color: 'magenta', parent: this.panel,
-    });
+    // ONE MenuList for the whole panel: headers, item rows, boosts and the loadout line are items in the
+    // same list, so they all share one row pitch and cannot be drawn over each other. Nothing else is
+    // drawn into this panel except the frame and BACK.
+    this.menu = null;
+    this._build();
   }
 
   _profile() {
     return this.scene.registry.get(REG.PROFILE) || {};
   }
 
-  _menuItems() {
-    return shopMenuItems(shopLayout({ profile: this._profile() })).map((m) => ({
-      kind: 'action',
-      label: m.label,
-      disabled: m.disabled,
-      sub: m.state,
-      onSelect: () => this._choose(m.id),
-    }));
-  }
-
-  _boostItems() {
+  /** The panel's single source of truth: layout rows + menu items, rebuilt together every time. */
+  _menuItems(layout) {
     const prof = this._profile();
     const boosts = (prof.boosts && typeof prof.boosts === 'object') ? prof.boosts : {};
-    return [
-      { id: 'errorCorrection', label: 'ERROR CORRECTION' },
-      { id: 'headStart', label: 'HEAD START' },
-    ].map((b) => ({
-      kind: 'choice',
-      label: b.label,
-      options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
-      get: () => boosts[b.id] === true,
-      set: (v) => this._setBoost(b.id, Boolean(v)),
-    }));
+    return shopMenuItems(layout).map((m) => {
+      if (m.rowKind === 'item') {
+        return { kind: 'action', label: m.label, sub: m.sub, disabled: m.disabled, onSelect: () => this._choose(m.id) };
+      }
+      if (m.rowKind === 'boost') {
+        return {
+          kind: 'choice',
+          label: m.label,
+          options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+          get: () => boosts[m.boostId] === true,
+          set: (v) => this._setBoost(m.boostId, Boolean(v)),
+        };
+      }
+      // Headings and the BANK/loadout lines: real rows in the list for geometry, never selectable.
+      return { kind: 'static', label: m.label, disabled: true };
+    });
+  }
+
+  _build() {
+    const layout = shopLayout({ profile: this._profile() });
+    if (this.menu) { this.menu.destroy(); this.menu = null; }
+    // The bank value is drawn outside the list (the list right-aligns only row state), so it has to be
+    // torn down with it or every rebuild would stack another "BANK n" on the same pixel.
+    for (const t of (this.bankTexts || [])) t.destroy();
+    this.bankTexts = [];
+    const band = layout.band;
+    this.menu = new MenuList(this.scene, this.theme, {
+      x: band.x, y: band.y, w: band.w, rowH: layout.rowH,
+      items: this._menuItems(layout), color: 'lime', parent: this.panel,
+    });
+    // The BANK line is a right-aligned value in the list, not a separate static string, so it refreshes
+    // with everything else. MenuList would draw it as a label, so it is rendered beside the list at the
+    // head row's own y.
+    const head = layout.rows.find((r) => r.kind === 'head');
+    if (head && head.texts) {
+      for (const t of head.texts) {
+        const txt = new NeonText(this.scene, this.theme, t.x, t.y, t.text, { color: t.color });
+        this.panel.add(txt);
+        this.bankTexts.push(txt);
+      }
+    }
   }
 
   /**
@@ -526,15 +551,17 @@ export class ShopView extends View {
     }
   }
 
-  /** Rebuild row states after a purchase, so EQUIP -> EQUIPPED shows immediately. */
+  /**
+   * Rebuild the whole list after a purchase or a boost toggle.
+   *
+   * This used to patch only the menu's rows, which is why the bank line, the owned/equipped states and the
+   * loadout summary went stale (CC Friday's defect 2). Rebuilding from the layout means every visible
+   * string comes from the same profile read, so nothing can lag behind.
+   */
   _refresh() {
-    const items = this._menuItems();
-    this.menu.items = items;
-    this.menu.rows.forEach((row, i) => {
-      if (!items[i]) return;
-      row.label.setText(items[i].label);
-      if (row.sub) row.sub.setText(items[i].sub || '');
-    });
+    const keep = this.menu ? this.menu.selected : 0;
+    this._build();
+    if (this.menu) this.menu.setSelected(Math.min(keep, this.menu.items.length - 1), true);
   }
 
   handleAction(action) {
@@ -542,3 +569,4 @@ export class ShopView extends View {
     return this.menu.handleAction(action);
   }
 }
+

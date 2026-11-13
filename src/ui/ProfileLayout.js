@@ -188,7 +188,13 @@ export function profileLayout(o = {}) {
     rowH: 9,
   };
 
-  return { w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu, toggleRowCount: sigCount };
+  // SHARD SHOP lives here rather than on the Title menu. Title's menu band is y 92..196 (the DAILY PATCH
+  // strip starts at 202) and the menu is drawn at 2x, so a row is a full 16px tall: six rows occupy
+  // 92..188 and a seventh would reach 204, on top of the daily strip. That is exactly the overflow CC
+  // Friday caught with SETTINGS. Seven rows do not fit at any pitch that keeps the glyphs legible, so the
+  // seventh entry moves to the screen that already shows what you own and what it looks like.
+  const shopButton = { x: PAD, y: PROFILE_PANEL.h - 22, w: 96, h: 16 };
+  return { w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu, toggleRowCount: sigCount, shopButton };
 }
 
 /**

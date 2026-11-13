@@ -348,6 +348,53 @@ async function main() {
       } finally { await page.close(); }
     }
 
+    // ---- 6b. a boosted run's Game Over must not claim a clean-board honour (W4 defect 4)
+    if (WITH_BOOSTS) {
+      const { page, errors, out } = await playToGameOver(browser, port, 0, {
+        boosts: { errorCorrection: true, headStart: false }, absorbFirst: true,
+      });
+      try {
+        if (out.fatal) fail('modded Game Over is honest', out.fatal);
+        else if (errors.length) fail('modded Game Over: no page errors', errors.join(' | '));
+        else {
+          // Read the SCREEN, not the record: the defect was a headline, not a flag. Every string the
+          // player can see, plus the ledger title.
+          const seen = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const over = g.scene.getScene('GameOverScene');
+            if (!over) return { fatal: 'no GameOverScene' };
+            const texts = [];
+            const walk = (l) => {
+              for (const o of l || []) {
+                if (o && typeof o.text === 'string' && o.text) texts.push(o.text);
+                if (o && o.list) walk(o.list);
+              }
+            };
+            walk(over.children && over.children.list);
+            // Panel keeps its title in titleText (a NeonText), not in `.title`. Reading the wrong field
+            // returned '' and let this check pass on visible strings alone — a blind spot, not a pass.
+            // NeonText is a container wrapping a BitmapText in `.main`; the string is main.text. The first
+            // version read `.text` on the container, got undefined, and the check passed on the other
+            // strings alone — exactly the "looks green, proves nothing" shape this gate exists to avoid.
+            const tt = over.right && over.right.titleText;
+            const title = tt && tt.main && tt.main.text ? String(tt.main.text) : '';
+            return { texts, title };
+          }).catch((e) => ({ fatal: String(e) }));
+          if (seen.fatal) fail('modded Game Over is honest', seen.fatal);
+          else {
+            const all = seen.texts.join(' | ') + ' | ' + seen.title;
+            const claimsClean = /NEW TOP 10/.test(all) || /NEW SEED BEST/.test(all) || /TODAY'S BEST/.test(all);
+            const saysModded = /MODDED/i.test(all);
+            if (claimsClean) fail('modded Game Over claims no clean-board honour', `screen says: ${all.slice(0, 160)}`);
+            else if (!seen.title) fail('modded Game Over has a ledger title', 'could not read the panel title');
+            else if (!saysModded) fail('modded Game Over says the run is modded/unranked', `title="${seen.title}" screen says: ${all.slice(0, 160)}`);
+            else if (!/MODDED/i.test(seen.title)) fail('modded Game Over titles the MODDED board', `title="${seen.title}"`);
+            else pass('modded Game Over labels the run modded and offers no clean-board honour', `title="${seen.title}"`);
+          }
+        }
+      } finally { await page.close(); }
+    }
+
     if (WITH_BOOSTS) {
       const { page, out } = await playToGameOver(browser, port, 0);
       try {
@@ -370,47 +417,108 @@ async function main() {
           g.scene.start('TitleScene');
           await wait(1100);
           const t = g.scene.getScene('TitleScene');
-          const items = (t.menu && t.menu.items) || [];
-          const titles = items.map((i) => String(i.label || ''));
-          const shopItem = items.find((i) => /SHOP/i.test(String(i.label || '')));
-          if (!shopItem) return { fatal: `no shop entry in menu: ${JSON.stringify(titles)}` };
-          shopItem.onSelect();
-          await wait(1000);
-          const view = t.view;
-          if (!view) return { fatal: 'shop view did not open' };
-          const text = [];
-          const seen = new Set();
-          const walk = (l) => {
-            for (const o of l || []) {
-              if (typeof o.text === 'string' && o.text && !seen.has(o.text)) { seen.add(o.text); text.push(o.text); }
-              if (o.list) walk(o.list);
+
+          // Every glyph actually on the shop panel, as screen rects: (text, world x, world y, w, h).
+          // This reads the OBJECTS, not the layout module, so a second overlapping layer drawn by the view
+          // is visible here even though the layout itself is correct.
+          const glyphsOn = (view) => {
+            const out = [];
+            const seenObjs = new Set();
+            const walk = (l) => {
+              for (const o of l || []) {
+                if (!o || seenObjs.has(o)) continue; // a container can be reachable twice; count it once
+                seenObjs.add(o);
+                // Only LEAF text: a container that holds children is not itself a drawn string, and
+                // counting both a NeonText and the glyphs inside it would double-report every line.
+                const hasChildren = Array.isArray(o.list) && o.list.length > 0;
+                if (!hasChildren && typeof o.text === 'string' && o.text && o.width !== undefined) {
+                  const b = o.getBounds ? o.getBounds() : null;
+                  if (b) out.push({ text: o.text, x: b.x, y: b.y, w: b.width, h: b.height });
+                }
+                if (hasChildren) walk(o.list);
+              }
+            };
+            if (view && view.panel) walk(view.panel.list);
+            // NeonText draws a shadow pass and a fill pass at the SAME rect; that is one readable string,
+            // not two overlapping ones. Collapse identical text at identical geometry before testing.
+            const byPos = new Map();
+            for (const r of out) {
+              const k = `${r.text}@${Math.round(r.x)},${Math.round(r.y)}`;
+              if (!byPos.has(k)) byPos.set(k, r);
             }
+            return [...byPos.values()];
           };
-          if (view.panel) walk(view.panel.list);
-          // Buy the cheapest unowned rider hue through the view's own handler.
+          const overlapPairs = (rects) => {
+            const bad = [];
+            for (let i = 0; i < rects.length; i++) {
+              for (let j = i + 1; j < rects.length; j++) {
+                const a = rects[i];
+                const b = rects[j];
+                const hit = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+                if (hit) bad.push(`${a.text} <-> ${b.text}`);
+              }
+            }
+            return bad;
+          };
+
+          // SHARD SHOP now lives in PROFILE, because six 2x rows is all the Title band holds.
+          const titles = ((t.menu && t.menu.items) || []).map((i) => String(i.label || ''));
+          if (titles.some((x) => /SHOP/i.test(x))) return { fatal: `shop still on Title menu: ${JSON.stringify(titles)}` };
+          const profileItem = (t.menu.items || []).find((i) => /PROFILE/i.test(String(i.label || '')));
+          if (!profileItem) return { fatal: `no PROFILE entry: ${JSON.stringify(titles)}` };
+          profileItem.onSelect();
+          await wait(900);
+          const pView = t.view;
+          if (!pView || !pView.shopButton) return { fatal: 'PROFILE has no SHARD SHOP button' };
+          // Press the button the player presses.
+          pView.shopButton.zone ? pView.shopButton.zone.emit('pointerdown') : pView.shopButton.emit('pointerdown');
+          await wait(900);
+          const view = t.view;
+          if (!view || !view.menu) return { fatal: 'shop view did not open from PROFILE' };
+
           const before = g.registry.get('profile');
           const beforeBank = before.bank;
+          const beforeGlyphs = glyphsOn(view);
+          const beforeBad = overlapPairs(beforeGlyphs);
+          const beforeBankText = beforeGlyphs.filter((x) => /BANK/.test(x.text)).map((x) => x.text);
+
+          // Buy the cheapest unowned rider hue through the view's own handler.
           view._choose('rider-hue-mint');
           await wait(500);
           const after = g.registry.get('profile');
+          const afterGlyphs = glyphsOn(view);
+          const afterBad = overlapPairs(afterGlyphs);
+          const afterBankText = afterGlyphs.filter((x) => /BANK/.test(x.text)).map((x) => x.text);
+
           return {
             titles,
             opened: true,
-            showsBank: text.some((x) => /BANK 275/.test(x)),
-            showsState: text.some((x) => x === 'EQUIP') || text.some((x) => /^\d+$/.test(x)),
+            beforeGlyphs: beforeGlyphs.length,
+            afterGlyphs: afterGlyphs.length,
+            beforeBad,
+            afterBad,
+            beforeBankText,
+            afterBankText,
             beforeBank,
             afterBank: after.bank,
             owned: (after.unlocked.cosmetics || []).includes('rider-hue-mint'),
             equipped: after.equipped.rider,
           };
         }).catch((e) => ({ fatal: String(e) }));
-        if (out.fatal) fail('shop: opens from the Title menu', out.fatal);
+        // Readability is now a GATE, not a screenshot someone has to eyeball. CC Friday's rejection was
+        // "the logic passes but the screen is unreadable", so the gate asserts the drawn rects themselves.
+        if (out.fatal) fail('shop: opens from PROFILE', out.fatal);
         else if (errors.length) fail('shop: no page errors', errors.join(' | '));
-        else if (!out.showsBank) fail('shop: shows the bank', 'no BANK line rendered');
+        else if (!out.beforeBankText.length) fail('shop: shows the bank', 'no BANK line rendered');
+        else if (out.beforeBad.length) fail('shop: no two glyphs overlap on open', out.beforeBad.slice(0, 4).join(' | '));
+        else if (out.afterBad.length) fail('shop: no two glyphs overlap after a purchase', out.afterBad.slice(0, 4).join(' | '));
+        // The stale-text defect: the bank line and the row states must be rebuilt, not just the menu rows.
+        else if (out.afterBankText.join() === out.beforeBankText.join()) fail('shop: the bank line refreshes after a purchase', `still ${out.beforeBankText.join()}`);
+        else if (!/BANK 175/.test(out.afterBankText.join())) fail('shop: bank line shows the new balance', out.afterBankText.join());
         else if (out.afterBank !== out.beforeBank - 100) fail('shop: buying debits the price', `${out.beforeBank} -> ${out.afterBank}`);
         else if (!out.owned) fail('shop: buying records ownership', 'not in unlocked.cosmetics');
         else if (out.equipped !== 'mint') fail('shop: buying equips in the same action', `equipped ${out.equipped}`);
-        else pass('shop: opens from Title, shows the bank, buying debits, owns and equips atomically', `bank ${out.beforeBank} -> ${out.afterBank}`);
+        else pass('shop: opens from PROFILE, no glyphs overlap, bank refreshes, buying debits/owns/equips', `${out.beforeGlyphs} glyphs, bank ${out.beforeBank} -> ${out.afterBank}`);
       } finally { await page.close(); }
     }
 

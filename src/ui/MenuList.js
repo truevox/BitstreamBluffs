@@ -5,6 +5,7 @@
  *   action : { label, onSelect }
  *   choice : { label, options:[{value,label}], get(), set(v) }   left/right cycles, click cycles forward
  *   slider : { label, get() -> 0..1, set(v), step? }              left/right adjusts, click/drag on the bar sets
+ *   static : { label }                                            drawn but never focusable or clickable
  * Optional per item: sub (dim secondary text), color (palette key), disabled.
  */
 import Phaser from 'phaser';
@@ -61,6 +62,12 @@ export class MenuList extends Phaser.GameObjects.Container {
       this.add(row.sub);
     }
     const zone = new Phaser.GameObjects.Zone(scene, 0, y, this.w, this.rowH).setOrigin(0, 0);
+    // 'static' rows are headings and summary lines: they are drawn by the same list so they share its
+    // geometry, but they must never take focus or swallow a click meant for the row beneath.
+    if (item.kind === 'static') {
+      row.zone = null;
+      return row;
+    }
     zone.setInteractive({ useHandCursor: !item.disabled });
     this.add(zone);
     zone.on('pointerover', () => {

@@ -17,7 +17,7 @@ import { MenuList } from '../ui/MenuList.js';
 import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
 import { buildTitleMissionList } from '../ui/MissionsUi.js';
-import { TITLE_BEST_X, TITLE_BEST_Y } from '../ui/MissionsLayout.js';
+import { TITLE_BEST_X, TITLE_BEST_Y, TITLE_BANDS, titleMenuLayout } from '../ui/MissionsLayout.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { LeaderboardView, SettingsView, SeedView, ProfileView, ShopView } from '../ui/Views.js';
 import { titleBadgeLayout } from '../ui/ProfileLayout.js';
@@ -89,26 +89,34 @@ export class TitleScene extends Phaser.Scene {
 
   _buildMenu() {
     const theme = this.theme;
-    // Panel height is DERIVED from the row count, not hard-coded. W4 added SHARD SHOP as a seventh row;
-    // a fixed 104px panel silently clipped it, which is the same class of bug as the W3 toggle menu that
-    // covered the biome names. Row pitch is rowH * scale because the menu is drawn at 2x.
-    const MENU_ROW_H = 16;
-    const MENU_SCALE = 2;
+    // Panel height is DERIVED from the row count, not hard-coded, so a future row cannot be silently
+    // clipped. It is NOT derived times `scale`: MenuList already treats rowH as the pitch and only the
+    // glyphs are scaled 2x, so multiplying by scale again reported a 228px panel for 112px of rows — which
+    // is how the panel came to be drawn over the DAILY PATCH strip.
+    //
+    // Six rows at a 16px pitch occupy 92..188 inside a band that ends at 196. Seven would reach 204 and
+    // overrun the strip at 202, so the seventh entry (SHARD SHOP) lives in PROFILE instead of here.
     const items = [
       { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
       { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this.startRun(this.daily.seed, DailyPatch.biomeMaskForDate()) },
       { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
-      { kind: 'action', label: 'PROFILE', color: 'lime', onSelect: () => this._openView(new ProfileView(this, theme, { onClose: () => this._closeView() })) },
-      { kind: 'action', label: 'SHARD SHOP', color: 'amber', onSelect: () => this._openView(new ShopView(this, theme, { onClose: () => this._closeView() })) },
+      { kind: 'action', label: 'PROFILE', color: 'lime', onSelect: () => this._openView(new ProfileView(this, theme, { onClose: () => this._closeView(), onShop: () => this._openView(new ShopView(this, theme, { onClose: () => this._closeView() })) })) },
       { kind: 'action', label: 'LEADERBOARD', color: 'amber', onSelect: () => this._openView(new LeaderboardView(this, theme, { onClose: () => this._closeView() })) },
       { kind: 'action', label: 'SETTINGS', color: 'cyan', onSelect: () => this._openView(new SettingsView(this, theme, { onClose: () => this._closeView() })) },
     ];
     // Declared AFTER `items`: reading it first was a temporal-dead-zone ReferenceError that blanked the
     // whole Title screen at boot.
+    // Geometry comes from MissionsLayout.titleMenuLayout() so the row count, the panel height and the
+    // DAILY PATCH strip are one tested relationship instead of three numbers in a scene nobody can test.
+    const geo = titleMenuLayout(items.length);
+    if (!geo.fits) {
+      // Fail visibly in development rather than shipping a row under the daily strip: the menu is full.
+      console.warn(`Title menu does not fit: ${items.length} rows reach y${geo.lastRowBottom}, band ends at ${TITLE_BANDS.menu.y + TITLE_BANDS.menu.h}`);
+    }
     this.menuPanel = new Panel(this, theme, {
-      x: 24, y: 92, w: 216, h: 4 + items.length * MENU_ROW_H * MENU_SCALE, color: 'cyan', fillAlpha: 0.88,
+      x: geo.x, y: geo.y, w: geo.w, h: geo.h, color: 'cyan', fillAlpha: 0.88,
     });
-    this.menu = new MenuList(this, theme, { x: 4, y: 4, w: 208, rowH: MENU_ROW_H, items, scale: MENU_SCALE, parent: this.menuPanel });
+    this.menu = new MenuList(this, theme, { x: 4, y: 4, w: 208, rowH: geo.rowH, items, scale: geo.scale, parent: this.menuPanel });
   }
 
   /**

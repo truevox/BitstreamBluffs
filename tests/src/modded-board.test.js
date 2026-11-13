@@ -7,6 +7,7 @@
  * player who paid for a boost and scored their best run has nowhere to see it.
  */
 import { isModdedOnly, isRankable, rankableOnly } from '../../src/systems/Ranking.js';
+import { SaveStore } from '../../src/systems/SaveStore.js';
 
 const rec = (o) => ({
   version: 1, id: o.id || 'r1', score: 1000, distanceM: 500, initials: 'AAA',
@@ -63,5 +64,45 @@ describe('the two boards are exactly complementary', () => {
     expect(rankableOnly(rows).map((r) => r.id)).toEqual(['c']);
     expect(rankableOnly(rows, { ranked: true }).map((r) => r.id)).toEqual(['c', 'm']);
     expect(rows.filter((r) => isModdedOnly(r, { ranked: true }))).toEqual([]);
+  });
+});
+
+/** A store with no IndexedDB: the in-memory mirror is what reads are served from. */
+function makeStore(runs) {
+  const s = new SaveStore();
+  s.runs = runs;
+  return s;
+}
+
+describe('qualifiesForModdedTop10 — the board a boosted run can actually enter', () => {
+  test('a boosted score qualifies on the MODDED board, and never on the clean one', async () => {
+    // The defect this closes: Game Over asked qualifiesForTop10 for a boosted run, which either offered
+    // clean-board initials for a run the clean board will never hold, or (with fudged opts) made every
+    // clean run on the board unrankable. A boosted run has its own board, so it gets its own question.
+    const store = makeStore([]);
+    expect(await store.qualifiesForModdedTop10(500)).toBe(true);
+    // qualifiesForTop10's `opts` is the candidate record itself, so the boosted candidate is passed as the
+    // record: that is what makes the helper (not the caller) decide it cannot rank.
+    expect(await store.qualifiesForTop10(500, { modded: true })).toBe(false);
+    // A clean candidate still qualifies: the boost exclusion must not have broken the normal path.
+    expect(await store.qualifiesForTop10(500, { modded: false })).toBe(true);
+  });
+
+  test('a full modded board only admits a score that beats its last entry', async () => {
+    const runs = [];
+    for (let i = 0; i < 10; i++) {
+      runs.push(rec({ id: `mod-${i}`, score: 1000 + i * 100, endedAt: i + 1, modded: true }));
+    }
+    const store = makeStore(runs);
+    expect(await store.qualifiesForModdedTop10(500)).toBe(false);
+    expect(await store.qualifiesForModdedTop10(5000)).toBe(true);
+  });
+
+  test('ten CLEAN runs do not fill the modded board', async () => {
+    // If they did, a boosted player would be denied their own top 10 by runs that are not on it.
+    const runs = [];
+    for (let i = 0; i < 10; i++) runs.push(rec({ id: `clean-${i}`, score: 9000, endedAt: i + 1 }));
+    const store = makeStore(runs);
+    expect(await store.qualifiesForModdedTop10(10)).toBe(true);
   });
 });
