@@ -172,7 +172,8 @@
           const slope = c.scene.terrain.slopeDegAt(sled.x + (vx * etaMs) / 1000);
           return { rotCcw: ang0Launch - finalDeg, errDeg: wrap((finalDeg - slope) * DEG) / DEG };
         };
-        const ok = (pr) => pr.rotCcw >= 340 && Math.abs(pr.errDeg) <= clean;
+        const target = p.flipTargetDeg != null ? p.flipTargetDeg : 340; // 340 = one counted flip (TrickTracker: 360 - 20); 700 = a double
+        const ok = (pr) => pr.rotCcw >= target && Math.abs(pr.errDeg) <= clean;
         let st = null;
         return (c) => {
           const { scene, sled } = c;

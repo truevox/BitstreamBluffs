@@ -19,8 +19,7 @@
  *   --policy NAME         handsOff | flip | hop | stallProbe | terrain          (default handsOff)
  *   --maxM N              stop at N metres (default 3000)      --maxSec N   sim-time limit (default 240)
  *   --releaseLateMs N     flip: release N ms later than the ideal frame (default 0)
- *   --flipTargetDeg N     flip: ideal release when rotation + w/spinDamp >= N deg (default 340)
- *   --flipMinAirMs N      flip: only attempt a flip when ballistic ETA >= N ms (default 700)
+ *   --flipTargetDeg N     flip: the ideal release is the first frame from which a release gives >= N deg of net rotation and a clean landing (default 340; 700 = double flip)
  *   --hopLeadMs N         hop: hop when the next ground crash hazard is N ms away (default 380)
  *   --seedPrefix P        with --seeds N: names become P-01..P-NN instead of sim-01.. (a second, independent seed set)
  *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
@@ -28,8 +27,9 @@
  *   --verify              determinism check (traces every 60 frames compared exactly, twice per seed, fresh pages)
  *   --keepUi              leave UIScene running (slower)       --quiet      no per-run lines
  *
- * Policies (details in browser.js): flip's "ideal" release = first frame where rotationSoFar + w/airIdleSpinDamp >= 340 deg,
- * i.e. the sled will have covered ~one turn once the hands-off spin-down has finished; releaseLateMs delays that.
+ * Policies (details in browser.js): flip's "ideal" release = the first frame from which a release (a forward model of Sled's own air rules) gives
+ * >= 340 deg of net rotation and a landing within 12 deg of the slope; releaseLateMs delays it (negative = earlier). Attempts for which the model
+ * never finds the ideal frame (a marginal flip) are marked flip.idealFound=false: those release at the last moment and are not a timing test.
  * hop hops so the apex is over the next ground crash hazard and vetoes hops near a lip that has an air hazard after it.
  * stallProbe brakes to a dead stop on gentle ground, releases, and records when sled._nudging fires and the time to >120 px/s;
  * --probeKind first|flat|down|upGentle|upSteep picks the kind of slope it stops on (--probeMinM N: not before N metres); see browser.js.
@@ -56,7 +56,7 @@ function parseArgs(argv) {
     if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop'].includes(name)) { a[name] = true; continue; }
     a[name] = argv[++i];
   }
-  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM']) if (a[n] != null) a[n] = Number(a[n]);
+  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM']) if (a[n] != null) a[n] = Number(a[n]);
   return a;
 }
 const args = parseArgs(process.argv.slice(2));
@@ -71,7 +71,7 @@ function expandSeeds(s) {
 const seeds = expandSeeds(String(args.seeds));
 if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
 const params = {};
-for (const n of ['releaseLateMs', 'flipCleanDeg', 'hopLeadMs', 'probeMinM']) if (args[n] != null) params[n] = args[n];
+for (const n of ['releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'probeMinM']) if (args[n] != null) params[n] = args[n];
 if (args.probeKind) params.probeKind = String(args.probeKind);
 if (args.noHop) params.noHop = true;
 
