@@ -40,7 +40,7 @@ export class PauseScene extends Phaser.Scene {
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72).setOrigin(0, 0).setInteractive();
     const px = 30;
     const py = 36;
-    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 172, color: 'magenta', title: "PASCAL'S LEDGER // PAUSED", fillAlpha: 0.96 }));
+    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: "PASCAL'S LEDGER // PAUSED", fillAlpha: 0.96 }));
 
     const items = [
       { kind: 'action', label: 'RESUME', color: 'lime', onSelect: () => this.resume() },
@@ -65,13 +65,13 @@ export class PauseScene extends Phaser.Scene {
     col(54, 'SEED', ellipsize(seed, 172), 'cyan');
     col(80, 'DAILY RULE', ellipsize(rule.name.toUpperCase(), 172), 'amber');
     panel.add(new NeonText(this, theme, 236, 102, wrapText(rule.description || '', 176, 3), { color: 'text', outline: 'none' }).setAlpha(0.7));
-    // W2: the three active missions. Right column is free from y=116 (rule description wraps to 3
-    // lines from 102) down to 168; the panel ends at y 208. Geometry from columnRows(), unit-tested.
+    // W2: the three active missions. Keep the full three-line rule description clear; the panel is
+    // extended so the mission bars and ledger line fit without colliding with the hint below.
     const mview = this.registry.get(REG.MISSIONS);
     const mrows = (mview && mview.active) || [];
     if (mrows.length) {
-      const geom = columnRows({ x: 236, y: 120, w: 172, count: Math.min(3, mrows.length), rowH: 10, barH: 2 });
-      panel.add(new NeonText(this, theme, 236, 110, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
+      const geom = columnRows({ x: 236, y: 138, w: 172, count: Math.min(3, mrows.length), rowH: 10, barH: 2 });
+      panel.add(new NeonText(this, theme, 236, 128, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
       mrows.slice(0, 3).forEach((row, i) => {
         const r = geom.rows[i];
         const b = geom.bars[i];
@@ -92,7 +92,7 @@ export class PauseScene extends Phaser.Scene {
         panel.add(g);
       });
     }
-    panel.add(new NeonText(this, theme, 236, 158, 'THE LEDGER NEVER FORGETS.', { color: 'magenta', outline: 'none' }).setAlpha(0.6));
+    panel.add(new NeonText(this, theme, 236, 174, 'THE LEDGER NEVER FORGETS.', { color: 'magenta', outline: 'none' }).setAlpha(0.6));
 
     this.hint = new NeonText(this, theme, GAME_WIDTH / 2, py + 172 + 12, 'ESC RESUME    ↑↓ SELECT    ENTER/SPACE/A CONFIRM', {
       color: 'text', anchor: 'center', vAnchor: 0.5,

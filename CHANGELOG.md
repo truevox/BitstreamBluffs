@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.3.1 - unreleased (W2 audit repairs)
+
+### 🐛 Fixed
+- Avoid showing the same mission completion twice when the live HUD toast is followed by the RUN_END payout toast.
+- Move the Pause mission list below the full daily-rule description and extend its panel so the ledger line sits below all progress rows.
+
 ## v2.3.0 - unreleased (W2 Missions)
 
 ### ✨ Added

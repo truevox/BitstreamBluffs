@@ -118,6 +118,7 @@ export class UIScene extends Phaser.Scene {
     this.hintUntil = 0;
     this.stripQueue = [];
     this.stripBusy = false;
+    this.missionToastsThisRun = new Set();
     this.bestShown = false;
     this.flow = 1;
     this.flowFrac = 0;
@@ -379,6 +380,7 @@ export class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------- events
 
   onRunStart(p) {
+    this.missionToastsThisRun.clear();
     this.runId = (p && p.runId) || '';
     this.score = 0;
     this.meters = 0;
@@ -434,6 +436,7 @@ export class UIScene extends Phaser.Scene {
    */
   onMissionCompleted(p) {
     if (!p) return;
+    if (p.id) this.missionToastsThisRun.add(p.id);
     this._strip(missionToastText(p, p.title), 'lime');
   }
 
@@ -442,7 +445,11 @@ export class UIScene extends Phaser.Scene {
       const awards = this.registry.get(REG.LAST_AWARDS);
       const done = awards && awards.missions && Array.isArray(awards.missions.completed)
         ? awards.missions.completed : [];
-      for (const c of done) this._strip(missionToastText(c, c.title), 'lime');
+      for (const c of done) {
+        if (c.id && this.missionToastsThisRun.has(c.id)) continue;
+        if (c.id) this.missionToastsThisRun.add(c.id);
+        this._strip(missionToastText(c, c.title), 'lime');
+      }
     } catch (e) { /* cosmetic */ }
   }
 

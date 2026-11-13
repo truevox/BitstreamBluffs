@@ -89,8 +89,8 @@ def check_pause(path):
     # Mission column: x 266..430 (panel x30 + 236), y 130..165.
     ink = band_ink(buf, w, 266, 128, 430, 150)
     ok &= report("pause: mission column has content", ink > 300, f"ink={ink} px")
-    # Footer line "THE LEDGER NEVER FORGETS." sits at panel-local y 158 => screen y 194.
-    footer = band_ink(buf, w, 266, 190, 430, 200, thresh=70)
+    # Footer line "THE LEDGER NEVER FORGETS." sits at panel-local y 174 => screen y 210.
+    footer = band_ink(buf, w, 266, 206, 430, 216, thresh=70)
     ok &= report("pause: footer line not overrun", footer < 3000, f"ink={footer} px")
     return ok
 
