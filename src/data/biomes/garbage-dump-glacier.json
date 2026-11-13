@@ -1,0 +1,14 @@
+{
+  "id": "garbage-dump-glacier",
+  "bit": 2,
+  "name": "Garbage Dump Glacier",
+  "unlockLevel": 7,
+  "lore": "A century of discarded packets, compressed into ice that grabs your skis and keeps them.",
+  "background": "drift",
+  "mod": "stickyPatch",
+  "chunks": ["whoops", "step-down", "rolling-hills"],
+  "palettes": {
+    "default": { "bg": "#04100c", "bgAlt": "#0a1e18", "cyan": "#5fe8c0", "magenta": "#b6ff7a", "lime": "#8dff9e", "amber": "#d9ff9a", "text": "#dffbea" },
+    "colorblind": { "bg": "#04100c", "bgAlt": "#0a1e18", "cyan": "#7fd0b0", "magenta": "#cfd07a", "lime": "#d6e08a", "amber": "#e6d070", "text": "#f0f6f0" }
+  }
+}

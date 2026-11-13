@@ -1,0 +1,14 @@
+{
+  "id": "underwater-mountain",
+  "bit": 8,
+  "name": "Underwater Mountain",
+  "unlockLevel": 13,
+  "lore": "The mountain kept its original latency. Everything here arrives a little later than you sent it.",
+  "background": "currents",
+  "mod": "slowMotion",
+  "chunks": ["plateau-cruise", "speed-chute", "noise-static-storm"],
+  "palettes": {
+    "default": { "bg": "#020a16", "bgAlt": "#06203a", "cyan": "#3ad0ff", "magenta": "#4d8cff", "lime": "#5fffe0", "amber": "#7ad0ff", "text": "#cfeeff" },
+    "colorblind": { "bg": "#020a16", "bgAlt": "#06203a", "cyan": "#6fb8e0", "magenta": "#8f9fd8", "lime": "#a0e8d8", "amber": "#9cc8e0", "text": "#eaf6ff" }
+  }
+}

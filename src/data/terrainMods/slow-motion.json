@@ -1,0 +1,1 @@
+{ "id": "slowMotion", "colorKey": "cyan", "physics": { "gravityMul": 0.88, "frictionMul": 1.2 }, "weight": 3, "minDistanceM": 140, "lengthPx": [450, 950] }

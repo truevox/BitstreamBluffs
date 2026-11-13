@@ -1,0 +1,14 @@
+{
+  "id": "crystal-cavern",
+  "bit": 16,
+  "name": "Crystal Cavern",
+  "unlockLevel": 16,
+  "lore": "Every landing rings twice. The second ring is where the score lives.",
+  "background": "facets",
+  "mod": "echoZone",
+  "chunks": ["noise-glitch-field", "wireless-bridge-wide", "whoops"],
+  "palettes": {
+    "default": { "bg": "#0c0416", "bgAlt": "#1c0a2e", "cyan": "#c08fff", "magenta": "#ff5fe0", "lime": "#9ffff0", "amber": "#d8a0ff", "text": "#f0e0ff" },
+    "colorblind": { "bg": "#0c0416", "bgAlt": "#1c0a2e", "cyan": "#b09fd8", "magenta": "#d890c8", "lime": "#a8e8e0", "amber": "#c8b0e0", "text": "#f4ecfa" }
+  }
+}

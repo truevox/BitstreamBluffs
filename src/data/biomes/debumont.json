@@ -1,0 +1,14 @@
+{
+  "id": "debumont",
+  "bit": 1,
+  "name": "Debumont",
+  "unlockLevel": 4,
+  "lore": "The original slope, before the protocol got ambitious. Powder that remembers being analogue.",
+  "background": "ridges",
+  "mod": "powderFlurry",
+  "chunks": ["gentle-roller", "long-carve", "valley-launch"],
+  "palettes": {
+    "default": { "bg": "#070a18", "bgAlt": "#101733", "cyan": "#8fd8ff", "magenta": "#e6d9ff", "lime": "#cfe8ff", "amber": "#ffe6b8", "text": "#eaf4ff" },
+    "colorblind": { "bg": "#070a18", "bgAlt": "#101733", "cyan": "#9ccbe8", "magenta": "#c9b8d8", "lime": "#e8e0b0", "amber": "#f0d090", "text": "#f4f4f4" }
+  }
+}

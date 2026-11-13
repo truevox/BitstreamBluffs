@@ -1,0 +1,14 @@
+{
+  "id": "pyramid-peak",
+  "bit": 4,
+  "name": "Pyramid Peak",
+  "unlockLevel": 10,
+  "lore": "Thermals climb the terraces faster than you can fall. Ride them and the air holds you up.",
+  "background": "terraces",
+  "mod": "thermalUpdraft",
+  "chunks": ["ski-jump", "big-air-drop", "kicker-lip"],
+  "palettes": {
+    "default": { "bg": "#140a04", "bgAlt": "#2a1608", "cyan": "#ffd27a", "magenta": "#ff8f4d", "lime": "#ffe08a", "amber": "#ffc24d", "text": "#fff2d8" },
+    "colorblind": { "bg": "#140a04", "bgAlt": "#2a1608", "cyan": "#e8c070", "magenta": "#e0a050", "lime": "#efe0a0", "amber": "#eec060", "text": "#faf2e0" }
+  }
+}
