@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.1.1 - 2026-11-13
+
+### ✅ Added
+- Deterministic headless simulation harness in `tools/sim/`. It runs the real game in headless Chromium with a fixed 1000/60 ms step and seeded randomness. Run it with `npm run sim -- --seeds 100 --policy handsOff --out result.json`. Policies are `handsOff`, `hop`, `flip`, `stallProbe` and `terrain`, and `--verify` checks that repeated runs produce identical traces.
+- `TerrainContact` snaps runner and terrain contact normals to the surface (`src/systems/TerrainContact.js`).
+- `HintScheduler` shows one tutorial hint at a time, by priority (`src/systems/HintScheduler.js`).
+- `HudLayout` stacks banners and pop-ups in separate slots so they no longer overlap (`src/ui/HudLayout.js`).
+- Second camera zoom-out stage at high speed (down to 0.62 zoom) for more warning of what is ahead.
+- New unit suites under `tests/src/` for terrain contact, air and stall, HUD layout and the hint scheduler, plus additions to the terrain and trick tests.
+
+### 🔧 Changed
+- Ground resistance retuned (`groundResist` 0.04 to 0.10). Later jumps now have about 1.0 s median air time (was 0.84 s), with almost none under 0.4 s. As a side effect the sled is somewhat faster.
+- Late-game hazard fill: from 2000 m on, rejected hazard slots are retried (`HAZARD_RETRY_FROM_M`), which raises crash-hazard density there by roughly 30%. Terrain for a given seed is unchanged before 2000 m and different after it compared with v2.1.0, so daily seeds and shared replays will play differently past 2 km.
+- Flip levelling: after releasing tilt, air levelling aims at the upcoming landing slope and strengthens as the ground nears (`airIdleSpin` with a landing forecast, `airForecast` in RunScene). Releasing anywhere from 0.3 s early to 0.3 s late now crashes about 6-11% of the time in simulation (was 8-51%). Holding the flip into the ground still crashes.
+- Stall nudge starts sooner and pushes harder, and now also triggers when the sled slides backwards. Recovery on a 12 degree uphill takes about 1.25 s (was 3.3 s).
+- Tutorial hints: the hop hint appears about 1.2 s before the hazard, the flip hint stays on screen for about 1.5 s, and the "land" hint has been removed.
+- Post-touchdown spin is capped, and landings are graded from pre-impact velocity.
+
+### 🐛 Fixed
+- A good landing no longer spins the sled into a crash. The cause was false contact normals at the seams between 16 px terrain segments. Over 100 seeded hands-off runs, terrain and bad-landing crashes went from 32 to 0, and none crash before 150 m.
+- HUD banners and pop-ups no longer overlap each other.
+- Gamepad hint labels name the real buttons (RT PUSH, LT TUCK).
+
+### ⚠️ Known issues
+- Audio has not been checked by ear.
+- The HUD has not been checked on real touch devices.
+- On small touch layouts, a full banner stack can cover the rider.
+- Warning time is still short above about 850 px/s.
+
 ## v2.1.0 - 2026-11-12
 
 ### ✅ Added
