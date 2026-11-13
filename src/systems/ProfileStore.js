@@ -97,6 +97,29 @@ export function sanitizeProfile(raw, levels) {
 }
 
 /**
+ * Grant every non-biome level reward crossed on the way from `levelBefore` to the profile's current
+ * level. Mutates `profile` in place. Shared by creditRun (run XP) and applyMissions (mission XP) so a
+ * threshold crossed by either path pays exactly the same rewards — mission XP used to bump the level
+ * without ever granting its cosmetic/boost, stranding that reward forever.
+ * @param {Object} profile
+ * @param {number} levelBefore
+ * @param {*} table
+ */
+function grantLevelRewards(profile, levelBefore, table) {
+  const before = isNum(levelBefore) ? levelBefore : 1;
+  const level = isNum(profile.level) ? profile.level : before;
+  if (level <= before) return;
+  // A long run can cross several thresholds; grant every intervening non-biome reward.
+  for (let l = before + 1; l <= level; l++) {
+    const crossed = rewardsForLevel(l, table);
+    if (crossed.cosmetic && !profile.unlocked.cosmetics.includes(crossed.cosmetic)) profile.unlocked.cosmetics.push(crossed.cosmetic);
+    if (crossed.boost) profile.unlocked.boosts[crossed.boost] = profile.unlocked.boosts[crossed.boost] || 1;
+  }
+  // W1: biome rewards are LISTED but not unlockable until W3/W6 ship the biomes themselves.
+  profile.pendingBiomes = table.levels.filter((l) => l.biome && l.level <= level).map((l) => l.biome);
+}
+
+/**
  * Apply one finished run to a profile. PURE — returns a NEW profile (or null when the run was
  * already credited). Callers persist the result.
  * @param {Object} profile
@@ -140,16 +163,7 @@ export function creditRun(profile, record, levels) {
   next.level = levelForXp(next.xp, table);
   const leveledTo = next.level > levelBefore ? next.level : 0;
   const rewards = leveledTo ? rewardsForLevel(leveledTo, table) : null;
-  if (leveledTo) {
-    // A long run can cross several thresholds; grant every intervening non-biome reward.
-    for (let level = levelBefore + 1; level <= next.level; level++) {
-      const crossed = rewardsForLevel(level, table);
-      if (crossed.cosmetic && !next.unlocked.cosmetics.includes(crossed.cosmetic)) next.unlocked.cosmetics.push(crossed.cosmetic);
-      if (crossed.boost) next.unlocked.boosts[crossed.boost] = next.unlocked.boosts[crossed.boost] || 1;
-    }
-    // W1: biome rewards are LISTED but not unlockable until W3/W6 ship the biomes themselves.
-    next.pendingBiomes = table.levels.filter((l) => l.biome && l.level <= next.level).map((l) => l.biome);
-  }
+  if (leveledTo) grantLevelRewards(next, levelBefore, table);
   const rewardsEarned = leveledTo
     ? table.levels.filter((entry) => entry.level > levelBefore && entry.level <= next.level).map((entry) => rewardsForLevel(entry.level, table))
     : [];
@@ -290,6 +304,20 @@ export class ProfileStore {
       bank: p.bank + nonNeg(roll.shards),
       missions,
     };
+    // Mission XP can cross a level threshold, and it must pay that level's reward exactly like run XP
+    // does. Without this the level number rose while the cosmetic/boost was silently lost.
+    const table = loadLevelTable(this.levels);
+    const levelBefore = levelForXp(next.xp - nonNeg(roll.xp), table);
+    next.level = levelForXp(next.xp, table);
+    if (next.level > levelBefore) {
+      next.unlocked = {
+        ...p.unlocked,
+        biomes: [...p.unlocked.biomes],
+        cosmetics: [...p.unlocked.cosmetics],
+        boosts: { ...p.unlocked.boosts },
+      };
+      grantLevelRewards(next, levelBefore, table);
+    }
     this.profile = sanitizeProfile(next, this.levels);
     this.save();
     return this.profile;

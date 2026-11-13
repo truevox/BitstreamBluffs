@@ -15,6 +15,7 @@ import { MenuList } from '../ui/MenuList.js';
 import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
 import { buildTitleMissionList } from '../ui/MissionsUi.js';
+import { TITLE_BEST_X, TITLE_BEST_Y } from '../ui/MissionsLayout.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { LeaderboardView, SettingsView, SeedView, ProfileView } from '../ui/Views.js';
 import { titleBadgeLayout } from '../ui/ProfileLayout.js';
@@ -46,7 +47,9 @@ export class TitleScene extends Phaser.Scene {
     this._buildControls();
     this._buildDailyStrip();
     this._buildMissions();
-    this.bestText = new NeonText(this, theme, GAME_WIDTH / 2, 239, '', { color: 'lime', anchor: 'center', vAnchor: 0.5, outline: 'none' });
+    // BEST moved off centre: the W2 mission list occupies the left column of this band, so a centred
+    // BEST line ran straight through it (Luna's W2 finding 3). Geometry lives in MissionsLayout.
+    this.bestText = new NeonText(this, theme, TITLE_BEST_X, TITLE_BEST_Y, '', { color: 'lime', anchor: 'right', vAnchor: 0.5, outline: 'none' });
     this._loadBest();
     this.hint = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 12, '↑↓ SELECT   ENTER/SPACE/A CONFIRM   TAP ANY ITEM', {
       color: 'text', anchor: 'center', vAnchor: 0.5,

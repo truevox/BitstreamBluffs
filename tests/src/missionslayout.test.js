@@ -3,7 +3,7 @@
  * a pixel probe missed — every rectangle is checked for overlap, containment and text fit here.
  */
 import {
-  SCREEN, MISSION_PANEL, MISSION_LIST_TITLE, TITLE_BANDS,
+  SCREEN, MISSION_PANEL, MISSION_LIST_TITLE, TITLE_BANDS, TITLE_BEST_X, TITLE_BEST_Y,
   rect, overlaps, insideScreen, missionPanelLayout, missionListLayout, toastSlot,
   charsThatFit, ellipsize,
 } from '../../src/ui/MissionsLayout.js';
@@ -107,6 +107,39 @@ describe('missionListLayout', () => {
     // 1 px from the edge (bottom 269), which reads as clipped — require a real margin.
     expect(insideScreen(L.panel)).toBe(true);
     expect(SCREEN.h - (L.panel.y + L.panel.h)).toBeGreaterThanOrEqual(4);
+  });
+
+  test('the list does not collide with the BEST line or the control hint', () => {
+    // Luna's W2 finding 3: the full-width list was drawn across y 229..264, over BEST (y 239) and the
+    // hint (y 258). The pixel probe passed because it only asked "is there ink?", never "does this
+    // rect land on that text?". These are the assertions that were missing.
+    const L = missionListLayout(3);
+    expect(overlaps(L.panel, TITLE_BANDS.best)).toBe(false);
+    expect(overlaps(L.panel, TITLE_BANDS.hint)).toBe(false);
+    for (const r of [...L.rows, ...L.bars]) {
+      expect(overlaps(r, TITLE_BANDS.best)).toBe(false);
+      expect(overlaps(r, TITLE_BANDS.hint)).toBe(false);
+    }
+  });
+
+  test('BEST sits to the right of the list and the hint sits below both', () => {
+    const L = missionListLayout(3);
+    expect(TITLE_BANDS.best.x).toBeGreaterThanOrEqual(L.panel.x + L.panel.w);
+    expect(TITLE_BANDS.hint.y).toBeGreaterThanOrEqual(L.panel.y + L.panel.h);
+    // BEST shares the band with the list, so only its horizontal clearance is required; the hint must
+    // sit fully below the list, which is what makes the band arithmetic work.
+    expect(TITLE_BEST_X).toBeGreaterThanOrEqual(L.panel.x + L.panel.w);
+    expect(TITLE_BEST_Y).toBeGreaterThanOrEqual(L.panel.y);
+    expect(TITLE_BANDS.hint.y).toBeGreaterThanOrEqual(L.panel.y + L.panel.h);
+  });
+
+  test('rows stay inside their own row height', () => {
+    // The previous geometry put each bar 8 px below a 9 px row, so bars bled into the next row.
+    const L = missionListLayout(3);
+    for (let i = 0; i < L.rows.length; i++) {
+      expect(overlaps(L.rows[i], L.bars[i])).toBe(false);
+      expect(L.bars[i].y + L.bars[i].h).toBeLessThanOrEqual(L.panel.y + L.panel.h);
+    }
   });
 
   test('the in-run panel and the Title list do not overlap', () => {

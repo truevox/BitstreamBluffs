@@ -105,9 +105,9 @@ describe('combo missions', () => {
     id: 'cb', type: 'combo', tier: 2, title: 'Backflip + heli', require: ['backflip', 'helicopter'],
   };
 
-  test('needs every required trick in the same run', () => {
-    const both = rec({ tricks: { backflip: 1, helicopterCCW: 1 } });
-    expect(satisfies(t, { record: both })).toBe(true);
+  test('needs every required trick in the same combo', () => {
+    expect(satisfies(t, { combo: ['backflip', 'helicopterCCW'] })).toBe(true);
+    expect(satisfies(t, { record: rec({ tricks: { backflip: 1, helicopterCCW: 1 } }) })).toBe(false);
   });
 
   test('one of the two is not enough', () => {
@@ -117,13 +117,15 @@ describe('combo missions', () => {
   test('either helicopter direction counts as a helicopter', () => {
     // TrickTracker emits helicopterCCW / helicopterCW. A mission asking for a "heli" must accept both,
     // otherwise half the players can never complete it.
-    const cw = rec({ tricks: { backflip: 1, helicopterCW: 1 } });
-    expect(satisfies(t, { record: cw })).toBe(true);
+    expect(satisfies(t, { combo: ['backflip', 'helicopterCW'] })).toBe(true);
   });
 
   test('progress is the fraction of the requirement met', () => {
-    expect(progressFor(t, { record: rec({ tricks: { backflip: 1 } }) })).toBe(1);
-    expect(progressFor(t, { record: rec({ tricks: {} }) })).toBe(0);
+    expect(progressFor(t, { combo: ['backflip'] })).toBe(1);
+    expect(progressFor(t, { record: rec({ tricks: { backflip: 1, helicopterCW: 1 } }) })).toBe(0);
+    expect(progressFor(t, { combo: [] })).toBe(0);
+    expect(missionState(t, { combo: ['backflip'] }).have).toBe(1);
+    expect(missionState(t, { record: rec({ tricks: { backflip: 1, helicopterCW: 1 } }) }).have).toBe(0);
   });
 });
 

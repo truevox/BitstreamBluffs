@@ -70,11 +70,17 @@ export class MissionsService {
     on(EVT.SCORE_CHANGED, (p) => { this.live.score = (p && p.total) || 0; this._checkLive(); });
     on(EVT.SHARD_COLLECTED, () => { this.live.shards += 1; this._checkLive(); });
     on(EVT.NEAR_MISS, () => { this.live.nearMisses += 1; this._checkLive(); });
-    on(EVT.COMBO_CHANGED, (p) => { this.live.bestCombo = Math.max(this.live.bestCombo, (p && p.multiplier) || 1); this._checkLive(); });
+    on(EVT.COMBO_CHANGED, (p) => {
+      this.live.bestCombo = Math.max(this.live.bestCombo, (p && p.multiplier) || 1);
+      // Real combo membership (RunScene publishes snap.comboTricks), so a combo mission is judged on
+      // one combo rather than on the run's aggregate trick tally.
+      if (p && Array.isArray(p.tricks)) this.live.combo = p.tricks.map((t) => (typeof t === 'string' ? t : t && (t.type || t.trick))).filter(Boolean);
+      this._checkLive();
+    });
     on(EVT.LANDING, (p) => {
       const ms = (p && (p.airMs || p.airtimeMs)) || 0;
       if (ms > this.live.maxAirtimeMs) this.live.maxAirtimeMs = ms;
-      this._checkLive();
+      this._checkLive(Boolean(p && p.quality && p.quality !== 'crash'));
     });
     on(EVT.TRICK, (p) => {
       const t = p && (p.type || p.trick);
@@ -85,7 +91,7 @@ export class MissionsService {
 
   /** Zero the live counters for a fresh run. */
   resetLive() {
-    this.live = { distanceM: 0, score: 0, shards: 0, nearMisses: 0, bestCombo: 1, maxAirtimeMs: 0, tricks: {} };
+    this.live = { distanceM: 0, score: 0, shards: 0, nearMisses: 0, bestCombo: 1, maxAirtimeMs: 0, tricks: {}, combo: [] };
     if (!this._completedThisRun) this._completedThisRun = new Set();
   }
 
@@ -94,13 +100,14 @@ export class MissionsService {
    * paid here — `onRunCredited` at RUN_END remains the only place that pays, so the live path cannot
    * double-award even if a metric oscillates.
    */
-  _checkLive() {
+  _checkLive(landed = false) {
     if (!this.alive || !this.store) return;
     const p = this.profile;
     if (!p) return;
     const ctx = { live: this.live, record: this.live, profile: p };
     for (const t of activeTemplates(p, this.templates)) {
       if (!t || this._completedThisRun.has(t.id)) continue;
+      if (t.type === 'combo' && !landed) continue;
       let met = false;
       try { met = satisfies(t, ctx); } catch (e) { met = false; }
       if (!met) continue;
@@ -139,6 +146,7 @@ export class MissionsService {
     const active = activeTemplates(p, this.templates);
     const out = rollSet(p, active, record || {}, this.templates, {
       ruleId: p.missions && p.missions.ruleId ? p.missions.ruleId : null,
+      completedComboIds: this._completedThisRun,
     });
     this.store.applyMissions(out);
     this.lastRoll = out;

@@ -27,23 +27,40 @@ export const MISSION_PANEL = Object.freeze({
 
 /**
  * Title-screen mission list. The Title screen is already full: menu + CONTROLS panels occupy
- * y 92..196 and the DAILY PATCH strip y 202..228, so the only free band is y 228..270. This is
- * deliberately compact (10 px rows) — asserted against the real bands in tests, not assumed.
+ * y 92..196 and the DAILY PATCH strip y 202..228, so the only free band is y 228..254. The list is
+ * deliberately compact and headerless — justified by the band arithmetic, not by eye.
  */
 export const MISSION_LIST_TITLE = Object.freeze({
   x: 24,
-  y: 229,
-  w: 432,
+  y: 228,
+  // The only free band on Title is y 228..270 (menu+CONTROLS end at 196, DAILY PATCH at 228), and it
+  // also has to hold BEST and the control hint. Two things follow, and both are asserted in
+  // tests/src/missionslayout.test.js rather than eyeballed:
+  //   * the list is a LEFT COLUMN (x 24..240), because BEST needs the right half;
+  //   * it carries no "MISSIONS" header, because 26 px of vertical space only fits three rows.
+  // A full-width, headed list is what collided with BEST and the hint (Luna's W2 finding 3).
+  w: 216,
   rows: 3,
-  rowH: 9,
-  padTop: 6,
+  rowH: 8,
+  labelH: 5,
+  barH: 2,
+  padTop: 0,
 });
 
 /** The Title screen's existing occupied bands, for overlap assertions. */
 export const TITLE_BANDS = Object.freeze({
   menu: Object.freeze({ x: 24, y: 92, w: 432, h: 104 }),
   daily: Object.freeze({ x: 24, y: 202, w: 432, h: 26 }),
+  // Where TitleScene draws BEST: the right column, sharing the band with the list.
+  best: Object.freeze({ x: 248, y: 234, w: 208, h: 14 }),
+  // The control hint, at its original baseline (GAME_HEIGHT - 12), below the list.
+  hint: Object.freeze({ x: 0, y: 254, w: 480, h: 9 }),
 });
+
+/** Centre x for the Title BEST line: right column, clear of the mission list. */
+export const TITLE_BEST_X = 440;
+/** Baseline y for the Title BEST line. */
+export const TITLE_BEST_Y = 240;
 
 /**
  * A rect as {x, y, w, h} — the one shape every consumer (Jest tests, Phaser Graphics) understands.
@@ -102,8 +119,10 @@ export function missionListLayout(count, o = {}) {
   const top = L.y + L.padTop;
   for (let i = 0; i < n; i++) {
     const y = top + i * L.rowH;
-    rows.push(rect(L.x + 4, y, L.w - 8, 7));
-    bars.push(rect(L.x + 4, y + 8, L.w - 8, 2));
+    // Label on the row's first line, its bar directly under it — both inside rowH, so a row can never
+    // bleed into the next one (the old +8 bar offset overran a 9 px row).
+    rows.push(rect(L.x + 4, y, L.w - 8, L.labelH));
+    bars.push(rect(L.x + 4, y + L.labelH, L.w - 8, L.barH));
   }
   return { panel, header: null, rows, bars };
 }

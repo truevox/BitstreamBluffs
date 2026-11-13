@@ -8,6 +8,7 @@ import { ProgressionService } from '../../src/systems/ProgressionService.js';
 import { ProfileStore, PROFILE_KEY } from '../../src/systems/ProfileStore.js';
 import { REG } from '../../src/constants.js';
 import { EVT } from '../../src/events.js';
+import { satisfies } from '../../src/systems/Missions.js';
 import missionsData from '../../src/data/missions/missions.json';
 import levels from '../../src/data/progression/levels.json';
 
@@ -247,5 +248,127 @@ describe('mid-run live evaluation (spec W2)', () => {
     game.events.on(EVT.MISSION_COMPLETED, (p) => seen.push(p));
     game.events.emit(EVT.SHARD_COLLECTED, {});
     expect(seen).toHaveLength(0);
+  });
+});
+
+describe('mission XP crossing a level threshold', () => {
+  test('awards the level reward, not just the new level number', async () => {
+    // Luna W2 finding 4: applyMissions used to raise `xp` and let sanitizeProfile derive `level`, so
+    // a mission payout that crossed a threshold showed the new level while permanently losing its
+    // reward — the next run then started from the higher level and never went back for it.
+    const game = fakeGame([]);
+    const easy = { id: 'zzz-level', type: 'singleRun', tier: 1, title: 'Reach 10 m', metric: 'distanceM', target: 10 };
+    const store = new ProfileStore({ levels, storage: memStorage() });
+    store.load();
+    store.profile = { ...store.profile, xp: 90 }; // level 2 threshold is 100 XP
+    const missions = new MissionsService(game, { templates: [...TEMPLATES, easy], store });
+    await missions.init();
+    store.profile.missions.active = [easy.id];
+
+    expect(store.profile.level).toBe(1);
+    missions.onRunCredited(rec({ ledgerHash: 'level-1', distanceM: 500 }));
+
+    expect(store.profile.xp).toBeGreaterThanOrEqual(100);
+    expect(store.profile.level).toBe(2);
+    expect(store.profile.unlocked.cosmetics).toContain('trail-cyan');
+  });
+});
+
+describe('combo missions (same-combo requirement)', () => {
+  test('a combo mission is met only when the tricks land in ONE combo', async () => {
+    const game = fakeGame([]);
+    const t = { id: 'zzz-combo', type: 'combo', tier: 1, title: 'Backflip + heli, one combo', require: ['backflip', 'helicopter'] };
+    const store = new ProfileStore({ levels, storage: memStorage() });
+    store.load();
+    const progression = new ProgressionService(game, { levels, store });
+    await progression.init();
+    const missions = new MissionsService(game, { templates: [...TEMPLATES, t], store });
+    await missions.init();
+    progression.missions = missions;
+    const m = store.profile.missions;
+    store.profile = { ...store.profile, missions: { ...m, active: ['zzz-combo', m.active[0], m.active[1]] } };
+
+    const seen = [];
+    game.events.on(EVT.MISSION_COMPLETED, (p) => seen.push(p.id));
+    game.events.emit(EVT.RUN_START, {});
+    // Backflip lands, combo resets, then a heli: both tricks happened, but not together.
+    game.events.emit(EVT.COMBO_CHANGED, { multiplier: 2, tricks: ['backflip'] });
+    game.events.emit(EVT.COMBO_CHANGED, { multiplier: 1, tricks: ['helicopterCCW'] });
+    expect(seen).toEqual([]);
+
+    // Now both in the same combo.
+    game.events.emit(EVT.COMBO_CHANGED, { multiplier: 3, tricks: ['backflip', 'helicopterCW'] });
+    expect(seen).toEqual([]);
+    game.events.emit(EVT.LANDING, { quality: 'clean' });
+    expect(seen).toEqual(['zzz-combo']);
+  });
+
+  test('a completed live combo is paid after the combo resets and the run is credited', async () => {
+    const game = fakeGame([]);
+    const t = { id: 'zzz-combo', type: 'combo', tier: 1, title: 'Backflip + heli', require: ['backflip', 'helicopter'] };
+    const store = new ProfileStore({ levels, storage: memStorage() });
+    store.load();
+    const missions = new MissionsService(game, { templates: [...TEMPLATES, t], store });
+    await missions.init();
+    store.profile.missions.active = [t.id];
+    game.events.emit(EVT.RUN_START, {});
+    game.events.emit(EVT.COMBO_CHANGED, { multiplier: 3, tricks: ['backflip', 'helicopterCW'] });
+    game.events.emit(EVT.LANDING, { quality: 'clean' });
+    game.events.emit(EVT.COMBO_CHANGED, { multiplier: 1, tricks: [] });
+    const result = missions.onRunCredited(rec());
+    expect(result.completed.map((item) => typeof item === 'string' ? item : item.id)).toContain(t.id);
+  });
+
+  test('landed combo rewards persist once when the credited run is replayed', async () => {
+    const game = fakeGame([]);
+    const t = { id: 'zzz-combo', type: 'combo', tier: 1, title: 'Backflip + heli', require: ['backflip', 'helicopter'] };
+    const storage = memStorage();
+    const store = new ProfileStore({ levels, storage });
+    store.load();
+    const progression = new ProgressionService(game, { levels, store });
+    await progression.init();
+    const missions = new MissionsService(game, { templates: [...TEMPLATES, t], store });
+    await missions.init();
+    progression.missions = missions;
+    store.profile.missions.active = [t.id];
+    game.events.emit(EVT.RUN_START, {});
+    game.events.emit(EVT.COMBO_CHANGED, { reason: 'trick', tricks: ['backflip', 'helicopterCW'] });
+    game.events.emit(EVT.LANDING, { quality: 'clean' });
+    game.events.emit(EVT.COMBO_CHANGED, { reason: 'landing', tricks: [] });
+    const record = rec({ ledgerHash: 'combo-payout' });
+    game.events.emit(EVT.RUN_END, { record });
+    const awards = game.registry.get(REG.LAST_AWARDS);
+    expect(awards.missions.completed.map((item) => item.id)).toContain(t.id);
+    expect(awards.missions.xp).toBeGreaterThan(0);
+    expect(awards.missions.shards).toBeGreaterThan(0);
+    const xp = store.profile.xp;
+    const bank = store.profile.bank;
+    const reloaded = new ProfileStore({ levels, storage });
+    reloaded.load();
+    expect(reloaded.profile.xp).toBe(xp);
+    expect(reloaded.profile.bank).toBe(bank);
+    game.events.emit(EVT.RUN_END, { record });
+    expect(store.profile.xp).toBe(xp);
+    expect(store.profile.bank).toBe(bank);
+  });
+
+  test('a crashed landing does not complete a pending combo mission', async () => {
+    const game = fakeGame([]);
+    const t = { id: 'zzz-combo', type: 'combo', tier: 1, title: 'Backflip + heli', require: ['backflip', 'helicopter'] };
+    const store = new ProfileStore({ levels, storage: memStorage() });
+    store.load();
+    const missions = new MissionsService(game, { templates: [...TEMPLATES, t], store });
+    await missions.init();
+    store.profile.missions.active = [t.id];
+    game.events.emit(EVT.RUN_START, {});
+    game.events.emit(EVT.COMBO_CHANGED, { reason: 'trick', tricks: ['backflip', 'helicopterCW'] });
+    game.events.emit(EVT.LANDING, { quality: 'crash' });
+    expect(missions.onRunCredited(rec()).completed.map((item) => item.id)).not.toContain(t.id);
+  });
+
+  test('a run record alone cannot satisfy a combo mission', () => {
+    // Under-award rather than pay for tricks that merely coexisted in a run.
+    const rec = { tricks: { backflip: 2, helicopterCCW: 1 } };
+    expect(satisfies({ type: 'combo', require: ['backflip', 'helicopter'] }, { record: rec })).toBe(false);
   });
 });

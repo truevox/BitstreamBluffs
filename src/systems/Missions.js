@@ -100,9 +100,8 @@ export function progressFor(t, ctx) {
   if (t.type === 'combo') {
     const req = comboRequirement(t);
     if (!req.length) return 0;
-    const tricks = (ctx && ctx.record && ctx.record.tricks) || {};
-    const met = req.filter((r) => hasTrick(tricks, r)).length;
-    return met;
+    const have = new Set(comboTricksFrom(ctx).map(familyOf));
+    return req.filter((r) => have.has(familyOf(r))).length;
   }
   const target = isNum(t.target) ? t.target : 0;
   if (!(target > 0)) return 0;
@@ -116,22 +115,56 @@ export function progressFor(t, ctx) {
 }
 
 /** The `require` list of a combo template, normalised to a string array. */
+/** Canonical family name for a trick type, so 'helicopter' and 'helicopterCCW' compare equal. */
+function familyOf(name) {
+  const n = String(name || '');
+  for (const [fam, members] of Object.entries(TRICK_FAMILIES)) {
+    if (fam === n || members.includes(n)) return fam;
+  }
+  return n;
+}
+
+/** Trick-type names from the current combo, in the shapes contexts provide them. */
+function comboTricksFrom(ctx) {
+  const c = ctx && (ctx.combo || (ctx.live && ctx.live.combo) || (ctx.record && ctx.record.combo));
+  if (!Array.isArray(c)) return [];
+  return c.map((x) => (typeof x === 'string' ? x : (x && (x.type || x.trick)) || '')).filter(Boolean);
+}
+
 function comboRequirement(t) {
   return Array.isArray(t.require) ? t.require.filter((r) => typeof r === 'string') : [];
 }
 
 /**
  * Is the template satisfied by this context?
+ *
+ * Combo templates must be met *within a single combo*, not merely somewhere in the run. That is what
+ * the mission title says ("land a backflip and a heli in one combo"), so an aggregate trick tally
+ * would pay for behaviour the player was never asked to perform. The live side supplies real combo
+ * membership: RunScene's COMBO_CHANGED carries `tricks: snap.comboTricks`. When a context has no combo
+ * membership at all (a bare RunRecord, which does not group tricks by combo), a combo mission is NOT
+ * satisfied — we under-award rather than pay for the wrong thing.
+ *
  * @param {Object} t
- * @param {{record?:*, profile?:*, live?:*}} ctx
+ * @param {{record?:*, profile?:*, live?:*, combo?:string[]}} ctx
  */
 export function satisfies(t, ctx) {
   if (!t || typeof t !== 'object') return false;
   if (t.type === 'combo') {
     const req = comboRequirement(t);
     if (!req.length) return false;
-    const tricks = (ctx && ctx.record && ctx.record.tricks) || {};
-    return req.every((r) => hasTrick(tricks, r));
+    const combo = comboTricksFrom(ctx);
+    if (combo.length) {
+      const have = new Set(combo.map((n) => familyOf(n)));
+      return req.every((r) => have.has(familyOf(r)));
+    }
+    // No combo membership available: fall back to the aggregate only when the template explicitly
+    // opts in. Default is strict.
+    if (t.allowAnyCombo === true) {
+      const tricks = (ctx && ctx.record && ctx.record.tricks) || {};
+      return req.every((r) => hasTrick(tricks, r));
+    }
+    return false;
   }
   const target = isNum(t.target) ? t.target : 0;
   if (!(target > 0)) return false;
@@ -154,8 +187,7 @@ export function missionState(t, ctx) {
   let text = '';
   if (safe.type === 'combo') {
     const req = comboRequirement(safe);
-    const tricks = (ctx && ctx.record && ctx.record.tricks) || {};
-    have = req.filter((r) => hasTrick(tricks, r)).length;
+    have = progressFor(safe, ctx);
     fraction = req.length ? have / req.length : 0;
     text = `${have}/${req.length} tricks`;
   } else {
@@ -308,7 +340,7 @@ export function rollSet(profile, activeTemplates, record, allTemplates, o = {}) 
 
   for (const t of slots) {
     const ctx = { record: record || {}, profile: { ...p, missions: { ...prevMissions, progress: prevProgress } }, live: o.live };
-    const done = satisfies(t, ctx);
+    const done = (t.type === 'combo' && o.completedComboIds instanceof Set && o.completedComboIds.has(t.id)) || satisfies(t, ctx);
     if (done) {
       const gainXp = xpForTemplate(t);
       const gainShards = shardsForTemplate(t);

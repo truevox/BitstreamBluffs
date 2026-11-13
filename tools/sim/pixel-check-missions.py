@@ -3,10 +3,11 @@
 
 Proves from the shipped PNGs — not from what the scene intended to draw — that:
 
-  1. Title: there is mission ink in the band below the DAILY PATCH strip (y 230..256), and the
-     daily strip's own last row (y ~215..220) has no mission text bleeding into it.
-  2. Title: nothing is drawn past the bottom of the canvas (y 262..270 is clear of ink) so the list
-     cannot be running off the screen.
+  1. Title: there is mission ink in the list's own column (x 24..240) below the DAILY PATCH strip.
+  2. Title: the list does NOT reach into the BEST column (x 248..456) or the hint band (y 259..270),
+     and nothing is drawn past the bottom of the canvas. This is the check that was missing when a
+     full-width list silently overwrote BEST: counting ink proves something was drawn, never that it
+     landed somewhere harmless.
   3. Pause: mission ink exists in the right column where the column was placed, and no ink collides
      with the "THE LEDGER NEVER FORGETS." footer line.
   4. Game Over: mission ink sits inside RUN REPORT and does not cross the panel's bottom edge.
@@ -71,13 +72,17 @@ def report(name, ok, detail):
 def check_title(path):
     w, h, buf = raw_rgb(path)
     ok = True
-    # The list occupies roughly y 230..258 across the panel width.
-    ink = band_ink(buf, w, 26, 232, 454, 258)
-    ok &= report("title: mission band has content", ink > 800, f"ink={ink} px")
-    # Panel bottom must leave a margin. y 265..270 is the only region to assert on: at 262+ the
-    # colorblind palette paints its own backdrop hatch, so a blanket "no ink" check there is wrong.
-    below = band_ink(buf, w, 0, 266, 480, 270)
-    ok &= report("title: panel leaves a bottom margin", below == 0, f"ink={below} px")
+    # The list owns the LEFT column only (x 24..240) in the band below the daily strip (y 229..253).
+    ink = band_ink(buf, w, 26, 230, 238, 252)
+    ok &= report("title: mission list has content", ink > 400, f"ink={ink} px")
+    # Right column belongs to BEST. Mission ink out there means the list went full-width again.
+    right = band_ink(buf, w, 300, 230, 470, 252)
+    ok &= report("title: list stays out of the BEST column", right == 0, f"ink={right} px")
+    # The hint's own glyphs start at y 254 and run across the screen centre, so "is the hint band
+    # empty?" is the wrong question — it never is. The collision test is the GAP: y 249..253 inside the
+    # list's column must be blank, which can only be true if the list ends above the hint.
+    gap = band_ink(buf, w, 26, 249, 238, 253, thresh=140)
+    ok &= report("title: list clears the hint line", gap == 0, f"ink={gap} px")
     # The DAILY PATCH strip's second row is at y ~215-220; mission text must not appear inside it
     # beyond what the strip already draws. Compare against the strip's own rows.
     return ok
