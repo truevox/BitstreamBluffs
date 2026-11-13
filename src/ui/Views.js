@@ -70,12 +70,44 @@ export class LeaderboardView extends View {
     this.panel.add(new NeonText(scene, theme, 12, this.h - 18, 'ONE LEDGER PER DEVICE. MAGENTA RULE FLAG = DAILY PATCH ACTIVE.', {
       color: 'text', outline: 'none',
     }).setAlpha(0.55));
-    const store = scene.registry.get(REG.SAVE_STORE);
-    Promise.resolve(store.getLeaderboard(10)).then((rows) => {
-      if (this.alive) this.table.setEntries(rows || []);
+    // W4: two boards. The clean board is what the game has always shown; the modded board is where a
+    // boosted run goes instead of vanishing. Both come from SaveStore, both decide through Ranking.js, so
+    // this view never tests `modded` itself.
+    this.store = scene.registry.get(REG.SAVE_STORE);
+    this.showingModded = false;
+    this.emptyText = null;
+    this.tabBtn = new Button(scene, theme, {
+      x: this.w - 148, y: this.h - 24, w: 68, h: 16, label: 'MODDED', color: 'amber',
+      onClick: () => this._toggleBoard(),
+    });
+    this.panel.add(this.tabBtn);
+    this._loadBoard();
+  }
+
+  _loadBoard() {
+    const store = this.store;
+    if (!store) { this.table.setEntries([]); return; }
+    const p = this.showingModded
+      ? Promise.resolve(store.getModdedLeaderboard(10))
+      : Promise.resolve(store.getLeaderboard(10));
+    p.then((rows) => {
+      if (!this.alive) return;
+      this.table.setEntries(rows || []);
+      // An empty modded board must say WHY it is empty, or it reads as a bug rather than as "no boosted
+      // runs yet".
+      if (!rows || rows.length === 0) {
+        this.emptyText = `NO ${this.showingModded ? 'MODDED' : 'CLEAN'} RUNS RECORDED YET`;
+      }
     }).catch(() => {
       if (this.alive) this.table.setEntries([]);
     });
+    this.tabBtn.setLabel(this.showingModded ? 'CLEAN' : 'MODDED');
+  }
+
+  _toggleBoard() {
+    this.showingModded = !this.showingModded;
+    uiSfx(this.scene, 'uiSelect');
+    this._loadBoard();
   }
 }
 

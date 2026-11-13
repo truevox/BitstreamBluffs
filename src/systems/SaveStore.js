@@ -14,7 +14,7 @@
 import { STORAGE } from '../constants.js';
 import { xxHash32 } from './Rng.js';
 import { DailyPatch } from './DailyPatch.js';
-import { isRankable } from './Ranking.js';
+import { isRankable, isModdedOnly } from './Ranking.js';
 
 /**
  * @typedef {Object} Settings
@@ -414,6 +414,19 @@ export class SaveStore {
    */
   async getLeaderboard(limit = 10, opts = {}) {
     return this._board(opts).slice(0, Math.max(0, limit)).map((r) => ({ ...r, tricks: { ...r.tricks } }));
+  }
+
+  /**
+   * The MODDED board: boosted runs only. Spec W4 gives them "their own leaderboard tab" rather than
+   * simply hiding them, so a boosted run's score is still visible to the player who earned it.
+   * @param {number} [limit=10]
+   * @returns {Promise<RunRecord[]>}
+   */
+  async getModdedLeaderboard(limit = 10, opts = {}) {
+    const idx = this.runs.map((r, i) => [r, i])
+      .filter(([r]) => r.initials && isModdedOnly(r, opts));
+    idx.sort((a, b) => b[0].score - a[0].score || a[0].endedAt - b[0].endedAt || a[1] - b[1]);
+    return idx.slice(0, Math.max(0, limit)).map(([r]) => ({ ...r, tricks: { ...r.tricks } }));
   }
 
   /**

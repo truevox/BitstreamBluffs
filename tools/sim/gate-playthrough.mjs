@@ -414,7 +414,78 @@ async function main() {
       } finally { await page.close(); }
     }
 
-    // ---- 8/9. W4 cosmetics reach the sled, and colourblind refuses them
+    // ---- 8. the leaderboard has a modded tab, and it opens
+    if (WITH_BOOSTS) {
+      const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+      try {
+        const out = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.scene.start('TitleScene');
+          await wait(1100);
+          const t = g.scene.getScene('TitleScene');
+          const item = (t.menu.items || []).find((i) => /LEADERBOARD/i.test(String(i.label || '')));
+          if (!item) return { fatal: 'no leaderboard entry' };
+          item.onSelect();
+          await wait(900);
+          const view = t.view;
+          if (!view) return { fatal: 'leaderboard view did not open' };
+          const read = () => (view.tabBtn && view.tabBtn.label && view.tabBtn.label.main)
+            ? view.tabBtn.label.main.text : null;
+          const cleanLabel = read();
+          if (!view.tabBtn) return { fatal: 'no board tab button' };
+          view._toggleBoard();
+          await wait(600);
+          const moddedLabel = read();
+          return { cleanLabel, moddedLabel, toggled: view.showingModded };
+        }).catch((e) => ({ fatal: String(e) }));
+        if (out.fatal) fail('leaderboard: opens with a board tab', out.fatal);
+        else if (errors.length) fail('leaderboard: no page errors', errors.join(' | '));
+        else if (out.cleanLabel !== 'MODDED') fail('leaderboard: clean board offers the modded tab', `tab read ${out.cleanLabel}`);
+        else if (!out.toggled) fail('leaderboard: tab switches to the modded board', 'showingModded stayed false');
+        else if (out.moddedLabel !== 'CLEAN') fail('leaderboard: modded board offers the way back', `tab read ${out.moddedLabel}`);
+        else pass('leaderboard: clean/modded tab both ways', 'MODDED -> CLEAN');
+      } finally { await page.close(); }
+    }
+
+    // ---- 9. a boosted loadout is REFUSED on the daily run (spec W4)
+    if (WITH_BOOSTS) {
+      const dailyProfile = JSON.parse(JSON.stringify(PROFILE));
+      dailyProfile.boosts = { errorCorrection: true, headStart: true };
+      const { page, errors } = await bootWithProfile(browser, port, dailyProfile);
+      try {
+        const out = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.scene.start('TitleScene');
+          await wait(1000);
+          const t = g.scene.getScene('TitleScene');
+          const daily = (t.daily && t.daily.seed) || null;
+          if (!daily) return { fatal: 'no daily seed available' };
+          t.starting = false;
+          // Start the daily through the same call the DAILY RUN menu item makes.
+          t.startRun(daily, null);
+          await wait(1600);
+          const run = g.scene.getScene('RunScene');
+          if (!run) return { fatal: 'daily run did not start' };
+          return {
+            seed: run.seed,
+            shield: run.shieldCharges || 0,
+            modded: run.modded === true,
+            factor: run.boostFx ? run.boostFx.speedFactor : null,
+          };
+        }).catch((e) => ({ fatal: String(e) }));
+        if (out.fatal) fail('daily: run starts', out.fatal);
+        else if (errors.length) fail('daily: no page errors', errors.join(' | '));
+        else if (!/^daily-/.test(String(out.seed))) fail('daily: run really is the daily', `seed ${out.seed}`);
+        else if (out.shield !== 0) fail('daily refuses the shield boost', `shieldCharges ${out.shield}`);
+        else if (out.modded) fail('daily run is not marked modded', 'modded true');
+        else if (out.factor !== 1) fail('daily refuses Head Start', `speedFactor ${out.factor}`);
+        else pass('daily run refuses both boosts while the profile has them ON', 'shield 0, factor 1, not modded');
+      } finally { await page.close(); }
+    }
+
+    // ---- 10/11. W4 cosmetics reach the sled, and colourblind refuses them
     if (WITH_BOOSTS) {
       const baseProfile = JSON.parse(JSON.stringify(PROFILE));
 

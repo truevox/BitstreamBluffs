@@ -45,6 +45,24 @@ export function isRankable(record, o) {
 }
 
 /**
+ * Whether this record belongs on the MODDED board.
+ *
+ * The complement of `isRankable`, and deliberately defined here rather than at the view: a modded tab that
+ * filtered on `r.modded === true` itself would be the sixth scattered decision this module exists to
+ * prevent, and would ignore the constant when it flips.
+ * @param {Object} record
+ * @param {{ranked?:boolean}} [o]
+ * @returns {boolean}
+ */
+export function isModdedOnly(record, o) {
+  if (!record || typeof record !== 'object') return false;
+  if (record.modded !== true) return false;
+  // When the constant is on, a modded run ranks on the CLEAN board too, so it does not also need a
+  // separate listing to be discoverable.
+  return !ranksModded(o);
+}
+
+/**
  * Filter a list of records down to the ones allowed on a clean surface. Callers use this instead of
  * hand-rolling the predicate, so the rule stays in one place even as surfaces are added.
  * @param {Array<Object>} records
