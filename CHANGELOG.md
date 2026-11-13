@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.2 - unreleased (W1 Game Over spacing)
+
+### 🐛 Fixed
+- Moved the Resonance row up four pixels so its bar clears the Game Over footer at 480×270.
+
 ## v2.2.1 - unreleased (W1 audit fixes)
 
 ### 🐛 Fixed

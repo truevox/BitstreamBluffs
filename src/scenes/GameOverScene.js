@@ -210,7 +210,8 @@ export class GameOverScene extends Phaser.Scene {
     const theme = this.theme;
     const awards = this.registry.get(REG.LAST_AWARDS) || null;
     if (!awards || !awards.xp || !awards.xp.total) return;
-    const y = 250;
+    // Keep the 4px bar above the footer's measured ink bounds at the 480x270 virtual size.
+    const y = 246;
     const xp = awards.xp;
     const prog = awards.progress || { level: 1, ratio: 0, xpToNext: 0 };
     const label = awards.leveledTo ? `SYNC LEVEL ${awards.leveledTo}` : `SYNC LEVEL ${prog.level}`;
