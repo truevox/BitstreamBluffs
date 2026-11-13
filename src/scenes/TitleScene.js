@@ -89,13 +89,17 @@ export class TitleScene extends Phaser.Scene {
 
   _buildMenu() {
     const theme = this.theme;
-    this.menuPanel = new Panel(this, theme, { x: 24, y: 92, w: 216, h: 104, color: 'cyan', fillAlpha: 0.88 });
+    // Height is derived from the row count, not hardcoded: adding ACHIEVEMENTS made a 7th row and a fixed
+    // 104px panel would have drawn it over the panel's bottom edge.
+    const MENU_ROW_H = 16;
+    const MENU_ROWS = 6;
+    this.menuPanel = new Panel(this, theme, { x: 24, y: 92, w: 216, h: MENU_ROW_H * MENU_ROWS, color: 'cyan', fillAlpha: 0.88 });
     const items = [
       { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
       { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this.startRun(this.daily.seed, DailyPatch.biomeMaskForDate()) },
       { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
       { kind: 'action', label: 'PROFILE', color: 'lime', onSelect: () => this._openView(new ProfileView(this, theme, { onClose: () => this._closeView() })) },
-      { kind: 'action', label: 'LEADERBOARD', color: 'amber', onSelect: () => this._openView(new LeaderboardView(this, theme, { onClose: () => this._closeView() })) },
+      { kind: 'action', label: 'LEADERBOARD', color: 'lime', onSelect: () => this._openView(new LeaderboardView(this, theme, { onClose: () => this._closeView() })) },
       { kind: 'action', label: 'SETTINGS', color: 'cyan', onSelect: () => this._openView(new SettingsView(this, theme, { onClose: () => this._closeView() })) },
     ];
     this.menu = new MenuList(this, theme, { x: 4, y: 4, w: 208, rowH: 16, items, scale: 2, parent: this.menuPanel });

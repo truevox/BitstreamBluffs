@@ -280,6 +280,110 @@ async function main() {
         else pass('clean run is not marked modded', 'modded absent/false');
       } finally { await page.close(); }
     }
+
+    // ---- W5: an achievement unlock is announced on the Game Over screen AND persisted.
+    {
+      const { page, errors, out } = await playToGameOver(browser, port, 0);
+      try {
+        if (out.fatal) fail('W5: run reaches Game Over', out.fatal);
+        else if (errors.length) fail('W5: no page errors', errors.join(' | '));
+        else if (!out.active) fail('W5: GameOverScene active', 'scene not active');
+        else {
+          const ach = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const prof = JSON.parse(JSON.stringify(g.registry.get('profile')));
+            return {
+              stored: Object.keys(prof.achievements || {}).length,
+              keys: Object.keys(prof.achievements || {}),
+            };
+          });
+          const over = await page.evaluate(() => {
+            const g = window.__bbGame;
+            const s = g.scene.getScene('GameOverScene');
+            const out = [];
+            const seen = new Set();
+            const walk = (list) => { for (const o of list || []) { if (!o) continue; if (typeof o.text === 'string' && o.text && !seen.has(o.text)) { seen.add(o.text); out.push(o.text); } if (o.list) walk(o.list); } };
+            if (s) walk(s.children && s.children.list);
+            return out;
+          });
+          // A run always credits at least one run, so FIRST DESCENT must unlock and be announced.
+          if (!ach.stored) fail('W5: achievement persisted', `stored=${ach.stored}`);
+          else if (!over.some((t) => /UNLOCKED|MORE/i.test(t))) fail('W5: unlock announced on Game Over', `texts=${JSON.stringify(over.filter((t) => /UNLOCK/i.test(t)))}`);
+          else pass('W5: achievement unlocked, persisted, and announced', `stored=${ach.stored} ${ach.keys.slice(0, 3).join(',')}`);
+        }
+      } finally { await page.close(); }
+    }
+
+    // ---- W5: the achievements grid opens from the profile and pages without error.
+    {
+      const { page, errors, out } = await playToGameOver(browser, port, 0);
+      try {
+        if (errors.length) fail('W5 grid: no page errors', errors.join(' | '));
+        else {
+          const grid = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.scene.start('TitleScene');
+            await wait(900);
+            const title = g.scene.getScene('TitleScene');
+            if (!title || !title.menu) return { fatal: 'TitleScene has no menu' };
+            // Drive the REAL menu: move to the PROFILE row and confirm, exactly as a keypress would.
+            const idx = title.menu.items.findIndex((i) => String(i.label).toUpperCase() === 'PROFILE');
+            if (idx < 0) return { fatal: 'no PROFILE row in the Title menu' };
+            title.menu.setSelected(idx);
+            title.menu.activate(idx);
+            await wait(400);
+            const prof = title.view;
+            if (!prof) return { fatal: 'confirming PROFILE opened no view' };
+            const profKind = prof.constructor ? prof.constructor.name : 'none';
+            if (!prof.achButton) return { fatal: `ProfileView has no achievements button (${profKind})` };
+            // Press the button the player presses: emit the pointerdown its own zone listens for, rather
+            // than calling a handler directly. That is the same path a real click takes.
+            if (!prof.achButton.zone) return { fatal: 'achievements button has no input zone' };
+            prof.achButton.zone.emit('pointerdown');
+            await wait(450);
+            const v = title.view;
+            if (!v) return { fatal: 'achievements button opened no view' };
+            const read = () => {
+              const out = []; const seen = new Set();
+              const walk = (list) => { for (const o of list || []) { if (!o) continue; if (typeof o.text === 'string' && o.text && !seen.has(o.text)) { seen.add(o.text); out.push(o.text); } if (o.list) walk(o.list); } };
+              if (v && v.panel) walk(v.panel.list);
+              return out;
+            };
+            const page1 = read();
+            const pages = v.pages;
+            const kind = v.constructor ? v.constructor.name : 'none';
+            if (v._turn) v._turn(1);
+            await wait(300);
+            const page2 = read();
+            return {
+              kind, pages,
+              page1HasHeader: page1.some((t) => /SKILL|DISTANCE|DAILY/i.test(t)),
+              hasAchRows: page1.some((t) => /FIRST DESCENT|DOUBLED UP|KILOMETRE CLUB|REGULAR/i.test(t)),
+              page1Text: page1.slice(0, 6),
+              diff: page1.join('|') !== page2.join('|'),
+              page2Num: v.page,
+              hasPageLabel: page1.some((t) => /PAGE \d+\/\d+/.test(t)),
+              // Backing out must return to PROFILE, not all the way to the Title screen.
+              backReturnsToProfile: (() => {
+                const before = v.constructor ? v.constructor.name : '';
+                return { before, hasClose: typeof v.close === 'function' };
+              })(),
+            };
+          });
+          if (grid.fatal) fail('W5 grid: opens from profile', grid.fatal);
+          // Asserted on BEHAVIOUR, not on the class name: the production bundle minifies, so
+          // `constructor.name` is `rc`, not `AchievementsView`. A name check was asserting on a string
+          // the build is free to rewrite.
+          else if (!grid.hasAchRows) fail('W5 grid: shows achievement names', JSON.stringify(grid.page1Text));
+          else if (!grid.page1HasHeader) fail('W5 grid: shows group headers', JSON.stringify(grid.page1Text));
+          else if (!grid.hasPageLabel) fail('W5 grid: shows a page indicator', JSON.stringify(grid.page1Text));
+          else if (grid.pages > 1 && !grid.diff) fail('W5 grid: paging changes the rows', `pages=${grid.pages} page2=${grid.page2Num}`);
+          else pass('W5 grid: opens from PROFILE, headers and page label render, paging works', `pages=${grid.pages}`);
+        }
+      } finally { await page.close(); }
+    }
   } finally {
     await browser.close();
     server.close();

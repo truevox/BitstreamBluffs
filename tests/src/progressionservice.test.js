@@ -162,3 +162,37 @@ describe('ProgressionService', () => {
     await expect(svc.init()).resolves.toBeTruthy();
   });
 });
+
+// W5: the awards view is the ONLY channel between crediting and Game Over. The toast read
+// `awards.achievements` and drew nothing for a whole gate run because this field was never forwarded —
+// the unlock was correct, persisted and invisible. Pinned here so the seam cannot silently drop again.
+describe('W5: achievements reach the Game Over screen', () => {
+  test('a run that unlocks an achievement forwards exactly those unlocks', async () => {
+    const { game, svc } = await make();
+    game.events.emit(EVT.RUN_END, { record: rec({ ledgerHash: 'h-ach' }) });
+    const view = game.registry.get(REG.LAST_AWARDS);
+    expect(Array.isArray(view.achievements)).toBe(true);
+    expect(view.achievements.map((a) => a.id)).toContain('first-descent');
+  });
+
+  test('the forwarded list is only THIS run’s unlocks, not the profile’s whole history', async () => {
+    const { game, svc } = await make();
+    game.events.emit(EVT.RUN_END, { record: rec({ ledgerHash: 'h-a' }) });
+    const first = game.registry.get(REG.LAST_AWARDS).achievements.map((a) => a.id);
+    expect(first.length).toBeGreaterThan(0);
+
+    // A second run re-announcing the first run's unlock is the bug this guards: the player would see
+    // FIRST DESCENT announced again on every subsequent run.
+    game.events.emit(EVT.RUN_END, { record: rec({ ledgerHash: 'h-b', distanceM: 200 }) });
+    const second = game.registry.get(REG.LAST_AWARDS).achievements.map((a) => a.id);
+    expect(second).not.toContain('first-descent');
+  });
+
+  test('a run that unlocks nothing forwards an empty list, not undefined', async () => {
+    const { game } = await make();
+    game.events.emit(EVT.RUN_END, { record: rec({ ledgerHash: 'h-x' }) });
+    game.events.emit(EVT.RUN_END, { record: rec({ ledgerHash: 'h-y' }) });
+    const view = game.registry.get(REG.LAST_AWARDS);
+    expect(view.achievements).toEqual([]);
+  });
+});

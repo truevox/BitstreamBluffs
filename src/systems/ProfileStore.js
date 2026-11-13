@@ -10,6 +10,7 @@
  * most once, so a replayed RUN_END or a double-scene start cannot double-award.
  */
 import { defaultProfile, loadLevelTable, levelForXp, rewardsForLevel, xpForRun, PROFILE_VERSION } from './Progression.js';
+import { metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -87,6 +88,9 @@ export function sanitizeProfile(raw, levels) {
   p.unlocked = {
     biomes: strArr(u.biomes),
     cosmetics: strArr(u.cosmetics),
+    // W5: achievement title rewards land here. Without this line the sanitizer would drop them on the
+    // very next load, so a player would win OMNISCIENT and lose it at the next boot.
+    titles: strArr(u.titles),
     boosts: u.boosts && typeof u.boosts === 'object' ? Object.fromEntries(Object.entries(u.boosts).filter(([k, v]) => typeof k === 'string' && k && isNum(v))) : {},
   };
   const e = raw.equipped && typeof raw.equipped === 'object' ? raw.equipped : {};
@@ -100,7 +104,14 @@ export function sanitizeProfile(raw, levels) {
     active: Array.isArray(m.active) ? m.active.filter((x) => typeof x === 'string').slice(0, 3) : [],
     progress: m.progress && typeof m.progress === 'object' ? { ...m.progress } : {},
   };
-  p.achievements = raw.achievements && typeof raw.achievements === 'object' ? { ...raw.achievements } : {};
+  // W5: {id: unlockMs}. Only finite timestamps survive: a NaN or a string would sort unpredictably in the
+  // Profile grid, and a junk key would render as a nameless row.
+  p.achievements = {};
+  if (raw.achievements && typeof raw.achievements === 'object' && !Array.isArray(raw.achievements)) {
+    for (const [k, v] of Object.entries(raw.achievements)) {
+      if (typeof k === 'string' && k && Number.isFinite(v)) p.achievements[k] = v;
+    }
+  }
   p.credited = strArr(raw.credited).slice(-CREDITED_MAX);
   return finishShape(p, table);
 }
@@ -289,6 +300,10 @@ export function creditRun(profile, record, levels) {
   const rewardsEarned = leveledTo
     ? table.levels.filter((entry) => entry.level > levelBefore && entry.level <= next.level).map((entry) => rewardsForLevel(entry.level, table))
     : [];
+  // W5: evaluate achievements as part of the same credit, so a run that crosses a threshold unlocks it
+  // on the Game Over screen rather than on some later unrelated save. `now` comes from the record's
+  // end time, not from inside the pure evaluator.
+  const unlockedNow = unlockAchievementsFor(next, record, { at: nonNeg(record.endedAt) });
   const awards = {
     xp,
     levelBefore,
@@ -297,8 +312,70 @@ export function creditRun(profile, record, levels) {
     rewards,
     rewardsEarned,
     title: rewards ? rewards.title : null,
+    achievements: unlockedNow.added,
   };
-  return { profile: next, awards };
+  return { profile: unlockedNow.profile, awards };
+}
+
+/**
+ * Evaluate W5 achievements against a profile and stamp the newly unlocked ones.
+ *
+ * Pure apart from nothing at all: `opts.at` is supplied by the caller (spec W5), so this is deterministic.
+ * Returns a NEW profile even when nothing unlocked, which keeps callers from having to check.
+ *
+ * @param {Object} profile
+ * @param {Object|null} [run] the record that just finished, if any
+ * @param {{at?:number, biomeCount?:number, streak?:number, dailyRuns?:number}} [opts]
+ * @returns {{profile:Object, added:Array<Object>}}
+ */
+export function unlockAchievementsFor(profile, run, opts = {}) {
+  const p = (profile && typeof profile === 'object') ? profile : {};
+  const metrics = metricsFrom(p, run, opts);
+  const newly = newlyUnlocked(metrics, p.achievements);
+  const { store, added } = stampNew(p.achievements, newly, opts && opts.at);
+  if (!added.length) return { profile: p, added: [] };
+  // `unlocked` must be cloned before any reward touches it: the spread above is SHALLOW, so writing
+  // through a shared nested object would mutate the caller's profile even though the top level is a copy.
+  const u = p.unlocked && typeof p.unlocked === 'object' ? p.unlocked : {};
+  const next = {
+    ...p,
+    achievements: store,
+    unlocked: {
+      ...u,
+      biomes: Array.isArray(u.biomes) ? [...u.biomes] : [],
+      cosmetics: Array.isArray(u.cosmetics) ? [...u.cosmetics] : [],
+      titles: Array.isArray(u.titles) ? [...u.titles] : [],
+      boosts: u.boosts && typeof u.boosts === 'object' ? { ...u.boosts } : {},
+    },
+  };
+  // W5: a reward is granted exactly when the achievement is stamped, in the same save, so the two can
+  // never disagree about whether the player owns it.
+  for (const a of added) grantAchievementReward(next, a);
+  return { profile: next, added };
+}
+
+/**
+ * Grant an achievement's cosmetic or title reward. Unknown reward types are ignored rather than thrown:
+ * a future reward kind shipping ahead of its grant path must not break a run's credit.
+ * @param {Object} profile mutated in place (already a fresh copy)
+ * @param {Object} def
+ * @returns {void}
+ */
+export function grantAchievementReward(profile, def) {
+  const r = def && def.reward;
+  if (!r || typeof r !== 'object') return;
+  if (typeof r.cosmetic === 'string' && r.cosmetic) {
+    const u = profile.unlocked && typeof profile.unlocked === 'object' ? profile.unlocked : { biomes: [], cosmetics: [], boosts: {} };
+    const list = Array.isArray(u.cosmetics) ? u.cosmetics : [];
+    if (!list.includes(r.cosmetic)) u.cosmetics = [...list, r.cosmetic];
+    profile.unlocked = u;
+  }
+  if (typeof r.title === 'string' && r.title) {
+    const u = profile.unlocked && typeof profile.unlocked === 'object' ? profile.unlocked : { biomes: [], cosmetics: [], boosts: {} };
+    const list = Array.isArray(u.titles) ? u.titles : [];
+    if (!list.includes(r.title)) u.titles = [...list, r.title];
+    profile.unlocked = u;
+  }
 }
 
 /**

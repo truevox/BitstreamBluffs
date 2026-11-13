@@ -30,6 +30,7 @@ import { InitialsEntry } from '../ui/InitialsEntry.js';
 import { LeaderboardTable, ruleLabel } from '../ui/LeaderboardTable.js';
 import { copyText } from '../ui/Clipboard.js';
 import { fmtInt, fmtClock, fmtMult, fmtSec, randomSeed, INITIALS_LENGTH, shareableSeed } from '../ui/Format.js';
+import { toastLayout } from '../ui/AchievementsLayout.js';
 import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { uiSfx } from '../ui/Sound.js';
 
@@ -69,6 +70,7 @@ export class GameOverScene extends Phaser.Scene {
     this._buildMissions();
     this._buildButtons();
     this._buildProgression();
+    this._buildAchievementToast();
     this.footer = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 5, 'SPACE / ENTER / A / TAP = RETRY SAME SEED', {
       color: 'text', anchor: 'center', vAnchor: 0.5,
     });
@@ -86,6 +88,7 @@ export class GameOverScene extends Phaser.Scene {
       this.input.off('pointerdown', this._onPointer);
       if (this.unbindBar) { this.unbindBar(); this.unbindBar = null; }
       if (this.pulse) { this.pulse.remove(); this.pulse = null; }
+      if (this.toastFade) { this.toastFade.remove(); this.toastFade = null; }
       this.resonance = null;
     });
 
@@ -350,6 +353,27 @@ export class GameOverScene extends Phaser.Scene {
         },
       });
     }
+  }
+
+  /**
+   * W5: announce achievements unlocked by this run, in the top-left band the header leaves free.
+   *
+   * Fades out rather than lingering, so it does not sit under the leaderboard while the player reads the
+   * panel. The tween is removed on shutdown like the resonance pulse, and nothing here blocks input.
+   */
+  _buildAchievementToast() {
+    const awards = this.registry.get(REG.LAST_AWARDS) || null;
+    const layout = toastLayout(awards ? awards.achievements : null, { ellipsize });
+    if (!layout) return;
+    this.toast = layout.lines.map((it) => {
+      return new NeonText(this, this.theme, it.x, it.y, it.text, { color: it.color, outline: 'dark', alpha: it.alpha });
+    });
+    // 6.5 s: long enough to read a name and its description on the screen a player stares at after a
+    // crash, short enough that it is gone before they pick a button.
+    this.toastFade = this.tweens.add({
+      targets: this.toast, alpha: 0, delay: 6500, duration: 700,
+      onComplete: () => { for (const t of this.toast) t.destroy(); this.toast = []; },
+    });
   }
 
   /** @returns {string} short "what unlocked" line, or the "next level" hint. */

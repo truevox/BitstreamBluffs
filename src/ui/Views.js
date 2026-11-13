@@ -17,6 +17,8 @@ import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
 import { ellipsize } from './PixelFont.js';
 import { profileLayout } from './ProfileLayout.js';
+import { achievementsLayout, clampPage } from './AchievementsLayout.js';
+import { ACHIEVEMENTS } from '../systems/Achievements.js';
 import { toggleBiome, biomeToggleRows } from '../systems/ProfileStore.js';
 
 /** Base: centred panel with a BACK button. */
@@ -288,6 +290,7 @@ export class ProfileView extends View {
       profile: scene.registry.get(REG.PROFILE),
       levels: content.progression,
       playableBiomeIds: biomeDefs.map((d) => d.id),
+      achievementTotal: ACHIEVEMENTS.length,
     });
     super(scene, theme, { w: layout.w, h: layout.h, title: 'PILOT PROFILE', color: 'lime', onClose: o.onClose, y: 22, backLabel: 'BACK' });
 
@@ -340,6 +343,35 @@ export class ProfileView extends View {
         x: band.x, y: band.y, w: band.w, rowH: band.rowH, items, color: 'magenta', parent: this.panel,
       });
     }
+
+    // W5: the achievements grid opens from here, as the spec places it in the Profile view. The button
+    // sits bottom-left because BACK owns bottom-right; the layout module owns both boxes so the two can
+    // never be drawn on top of each other.
+    if (layout.achButton) {
+      const bb = layout.achButton;
+      this.achButton = new Button(scene, theme, {
+        x: bb.x, y: bb.y, w: bb.w, h: bb.h, label: 'ACHIEVEMENTS', color: 'amber',
+        onClick: () => this._openAchievements(),
+      });
+      this.panel.add(this.achButton);
+    }
+  }
+
+  /** Open the achievements grid from inside the profile, replacing this view. */
+  _openAchievements() {
+    uiSfx(this.scene, 'uiSelect');
+    const next = new AchievementsView(this.scene, this.theme, {
+      onClose: () => {
+        // Backing out of the grid returns to the PROFILE view the player came from, not to the Title
+        // screen: ejecting them a screen further than they went in is a navigation bug the player feels.
+        const back = new ProfileView(this.scene, this.theme, { onClose: this.onClose });
+        this.destroy();
+        this.scene.view = back;
+      },
+      biomeDefs: this.biomeDefs,
+    });
+    this.destroy();
+    this.scene.view = next;
   }
 
   /** Unlocked biomes as toggle rows (empty before any unlock). */
@@ -388,5 +420,81 @@ export class ProfileView extends View {
     if (this.unbindBar) this.unbindBar();
     this.unbindBar = null;
     super.destroy();
+  }
+}
+
+/**
+ * W5: ACHIEVEMENTS grid. Read-only; nothing here writes the profile.
+ *
+ * Paged because 29 rows will not fit above a BACK button, and paging is done by swapping this view's own
+ * text objects rather than rebuilding the panel: rebuilding would re-run the constructor and lose the
+ * player's page when the palette changes.
+ *
+ * LEFT/RIGHT (or 'prev'/'next') page; cancel closes, which the base class already does.
+ */
+export class AchievementsView extends View {
+  /**
+   * @param {Phaser.Scene} scene
+   * @param {import('./Theme.js').Theme} theme
+   * @param {{onClose:function():void, page?:number, biomeCount?:number, biomeDefs?:Object[]}} o
+   */
+  constructor(scene, theme, o) {
+    const profile = scene.registry.get(REG.PROFILE);
+    const biomeDefs = o.biomeDefs || Object.values((scene.registry.get(REG.CONTENT) || {}).biomes || {});
+    const layout = achievementsLayout({
+      profile,
+      page: o.page || 0,
+      biomeCount: o.biomeCount !== undefined ? o.biomeCount : biomeDefs.length,
+    });
+    super(scene, theme, { w: layout.w, h: layout.h, title: 'ACHIEVEMENTS', color: 'amber', onClose: o.onClose, y: 13, backLabel: 'BACK' });
+    this.profile = profile;
+    this.biomeDefs = biomeDefs;
+    this.page = layout.page;
+    this.rows = [];
+    this._paint();
+  }
+
+  /** Draw the current page, replacing whatever was drawn for the previous one. */
+  _paint() {
+    for (const t of this.rows) t.destroy();
+    this.rows = [];
+    const layout = achievementsLayout({
+      profile: this.scene.registry.get(REG.PROFILE) || this.profile,
+      page: this.page,
+      biomeCount: this.biomeDefs.length,
+    });
+    this.page = layout.page;
+    this.pages = layout.pages;
+    for (const it of layout.items) {
+      // Same rule as ProfileView: layout boxes are top-left, so never re-apply an origin.
+      const t = new NeonText(this.scene, this.theme, it.x, it.y, it.text, {
+        color: it.color, outline: it.outline, alpha: it.alpha,
+      });
+      this.panel.add(t);
+      this.rows.push(t);
+    }
+  }
+
+  /** Move by `delta` pages, clamped, and repaint only when the page actually changes. */
+  _turn(delta) {
+    const next = clampPage(this.page + delta);
+    if (next === this.page) return false;
+    this.page = next;
+    this._paint();
+    uiSfx(this.scene, 'uiMove');
+    return true;
+  }
+
+  handleAction(action) {
+    if (action === 'cancel') {
+      this.close();
+      return true;
+    }
+    if (action === 'left') return this._turn(-1);
+    if (action === 'right') return this._turn(1);
+    // Confirm is a no-op on a read-only grid rather than closing it: a player paging with confirm would
+    // otherwise be ejected from the screen they were reading.
+    if (action === 'confirm') return true;
+    return true;
   }
 }
