@@ -509,7 +509,8 @@ export class GameOverScene extends Phaser.Scene {
   _showEntry() {
     const theme = this.theme;
     this.board.setVisible(false);
-    this.right.setColorKey('lime').setTitle('NEW TOP 10!');
+    // A boosted run only ever qualifies for the MODDED board (see _resolveBoard), so say so.
+    this.right.setColorKey('lime').setTitle(boardsModded(this.rec) ? 'NEW MODDED TOP 10!' : 'NEW TOP 10!');
     const last = (this.registry.get(REG.SETTINGS) || {}).lastInitials || '';
     // Every y here comes from MissionsLayout.entryLayout(), where SAVE and the hint rects are asserted
     // disjoint. Hand-tuning these numbers is what put the SAVE button on top of both hint lines: the

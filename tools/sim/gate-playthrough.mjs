@@ -233,6 +233,7 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
   return { page, errors, consoleErrors, out };
 }
 
+
 async function main() {
   const { server, port } = await serve();
   const browser = await chromium.launch();
@@ -525,6 +526,25 @@ async function main() {
           // Every glyph actually on the shop panel, as screen rects: (text, world x, world y, w, h).
           // This reads the OBJECTS, not the layout module, so a second overlapping layer drawn by the view
           // is visible here even though the layout itself is correct.
+          // Read a boost row's rendered state from the glyphs actually on screen. CC Friday's defect was
+          // that the profile saved errorCorrection:true while the row still drew OFF, so the gate reads
+          // the row itself — reading the profile would have passed on the broken build.
+          // A row's drawn strings are NeonText wrappers whose actual string lives on `.main.text`
+          // (Neon.js keeps a BitmapText inside the wrapper for the fill/shadow passes). Reading `.text`
+          // on the wrapper returns undefined, which is how an earlier version of this check reported an
+          // empty row and looked like a rendering bug rather than a probe bug.
+          const textOf = (o) => (o && o.main && typeof o.main.text === 'string' ? o.main.text : '');
+          const readBoostRow = (view, boostId) => {
+            const menu = (view && view.menu) || {};
+            const items = menu.items || [];
+            const idx = items.findIndex((it) => it && it.boostId === boostId);
+            if (idx < 0) return { found: false };
+            const row = (menu.rows || [])[idx];
+            if (!row) return { found: false };
+            const joined = [textOf(row.label), textOf(row.value), textOf(row.sub)].filter(Boolean).join(' ');
+            return { found: true, texts: joined, on: /\bON\b/.test(joined) && !/\bOFF\b/.test(joined) };
+          };
+
           const glyphsOn = (view) => {
             const out = [];
             const seenObjs = new Set();
@@ -586,6 +606,19 @@ async function main() {
           const beforeBad = overlapPairs(beforeGlyphs);
           const beforeBankText = beforeGlyphs.filter((x) => /BANK/.test(x.text)).map((x) => x.text);
 
+          // Toggle a boost ON the way the row does, then read the ROW back. CC Friday's defect was that
+          // the profile said errorCorrection:true while the row still drew OFF, so both have to be read.
+          const boostItems = (view.menu && view.menu.items) || [];
+          const boostIdx = boostItems.findIndex((it) => it && it.boostId === 'errorCorrection');
+          if (boostIdx < 0) return { fatal: 'no boost item: ' + JSON.stringify(boostItems.map((i) => Object.keys(i || {})).slice(0, 4)) };
+          // Exercise the player's choice-row pointer handler, including its redraw.
+          view.menu._onPointerDown(boostIdx, view.menu.w - 1);
+          await wait(350);
+          // Read the currently displayed menu after the interaction.
+          const liveView = t.view;
+          const boostAfterSet = readBoostRow(liveView, 'errorCorrection');
+          const boostSaved = Boolean((g.registry.get('profile').boosts || {}).errorCorrection);
+
           // Buy the cheapest unowned rider hue through the view's own handler.
           view._choose('rider-hue-mint');
           await wait(500);
@@ -607,6 +640,11 @@ async function main() {
             afterBank: after.bank,
             owned: (after.unlocked.cosmetics || []).includes('rider-hue-mint'),
             equipped: after.equipped.rider,
+            // CC Friday found, playing the built game, that toggling a boost saved the profile but left
+            // the row reading OFF. The row's options come from a `get` closure, so the gate has to read
+            // the row BACK after setting it — reading the profile would have passed on the broken build.
+            boost: boostAfterSet,
+            boostSaved,
           };
         }).catch((e) => ({ fatal: String(e) }));
         // Readability is now a GATE, not a screenshot someone has to eyeball. CC Friday's rejection was
@@ -622,7 +660,10 @@ async function main() {
         else if (out.afterBank !== out.beforeBank - 100) fail('shop: buying debits the price', `${out.beforeBank} -> ${out.afterBank}`);
         else if (!out.owned) fail('shop: buying records ownership', 'not in unlocked.cosmetics');
         else if (out.equipped !== 'mint') fail('shop: buying equips in the same action', `equipped ${out.equipped}`);
-        else pass('shop: opens from PROFILE, no glyphs overlap, bank refreshes, buying debits/owns/equips', `${out.beforeGlyphs} glyphs, bank ${out.beforeBank} -> ${out.afterBank}`);
+        else if (!out.boostSaved) fail('shop: toggling a boost saves it', 'profile.boosts.errorCorrection not set');
+        else if (!out.boost.found) fail('shop: the boost row is readable', 'row not found in the rendered list');
+        else if (!out.boost.on) fail('shop: the boost row shows ON after being set ON', `row drew "${out.boost.texts}"`);
+        else pass('shop: opens from PROFILE, no glyphs overlap, bank refreshes, buying debits/owns/equips, boost row reflects the toggle', `${out.beforeGlyphs} glyphs, bank ${out.beforeBank} -> ${out.afterBank}`);
       } finally { await page.close(); }
     }
 
