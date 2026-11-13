@@ -5,6 +5,7 @@
  *   profile    — the PROFILE view (lifetime stats), default and colorblind
  *   gameover   — GameOverScene after a credited run: Resonance bar, no level-up, default and colorblind
  *   levelup    — GameOverScene after a run that levels up: SYNC LEVEL n + what unlocked, default and colorblind
+ *   initials   — GameOverScene with the initials entry OPEN (footer hint at its longest), both palettes
  * Every shot is driven by real RUN_END → ProgressionService, not by faking the registry.
  */
 (() => {
@@ -93,6 +94,9 @@
     const { game } = c;
     const out = {};
     const env = mkEnv(game);
+    // Stop every other scene first: the initials scenario leaves GameOverScene running, and a live
+    // scene above TitleScene means the ProfileView is drawn underneath it and never appears in the shot.
+    for (const k of ['RunScene', 'UIScene', 'PauseScene', 'GameOverScene', 'TitleScene']) { try { game.scene.stop(k); } catch (e) { /* ignore */ } }
     game.scene.start('TitleScene');
     step(env, 40);
     const ts = game.scene.getScene('TitleScene');
@@ -106,7 +110,8 @@
     await palette(env, c, 'colorblind');
     await window.__shot('w1-profile-view-colorblind', {});
     await palette(env, c, 'default');
-    out.profile = { open: Boolean(ts.view) };
+    const active = game.scene.scenes.filter((sc) => sc.scene.isActive() || sc.scene.isVisible()).map((sc) => sc.scene.key);
+    out.profile = { open: Boolean(ts.view), active };
     return out;
   }
 
@@ -131,6 +136,47 @@
     return { xp: awards && awards.xp.total, leveledTo: awards && awards.leveledTo, progress: awards && awards.progress };
   }
 
+  /**
+   * Game Over with the initials entry open. CC Friday's PR #17 verification found the footer hint
+   * ("TYPE INITIALS - ENTER SAVE - SPACE SAVE + RETRY") drawn across the Resonance bar, and noted the
+   * shots never covered this state — which is why the layout probe passed. This scenario is the
+   * missing coverage: the entry needs a real top-10 qualification, so it seeds a leaderboard first.
+   */
+  async function initials(o) {
+    const c = await ctx();
+    const { game, M, REG } = c;
+    const rec = record({ tag: 'ini', score: 90000, distanceM: 4200 });
+    game.registry.set(REG.SEED, rec.seed);
+    game.registry.set(REG.LAST_RECORD, rec);
+    // Three existing entries make `worthy` true, and a high score makes qualifiesForTop10 true.
+    const store = game.registry.get(REG.SAVE_STORE);
+    if (store && typeof store.getLeaderboard === 'function') {
+      store.getLeaderboard = async () => [
+        { id: 'x1', initials: 'AAA', score: 1000, distanceM: 100, seed: 's1', dailyRuleId: 'none' },
+        { id: 'x2', initials: 'BBB', score: 900, distanceM: 90, seed: 's2', dailyRuleId: 'none' },
+        { id: 'x3', initials: 'CCC', score: 800, distanceM: 80, seed: 's3', dailyRuleId: 'none' },
+      ];
+      store.qualifiesForTop10 = async () => true;
+    }
+    game.events.emit(M.EVT.RUN_END, { record: rec });
+    const awards = game.registry.get(REG.LAST_AWARDS) || null;
+    for (const k of ['RunScene', 'UIScene', 'PauseScene', 'GameOverScene', 'TitleScene']) { try { game.scene.stop(k); } catch (e) { /* ignore */ } }
+    const env = mkEnv(game);
+    game.scene.start('GameOverScene');
+    step(env, 30);
+    // The async leaderboard promise resolves on a microtask; give it a real frame to open the entry.
+    await new Promise((r) => setTimeout(r, 200));
+    step(env, 20);
+    const scene = game.scene.getScene('GameOverScene');
+    const open = !!(scene && scene.entry);
+    await palette(env, c, 'default');
+    await window.__shot('w1-gameover-initials-default', { entryOpen: open, xp: awards && awards.xp.total });
+    await palette(env, c, 'colorblind');
+    await window.__shot('w1-gameover-initials-colorblind', { entryOpen: open, xp: awards && awards.xp.total });
+    await palette(env, c, 'default');
+    return { entryOpen: open, footer: scene && scene.footer && scene.footer.text };
+  }
+
   // A normal credited run, then a run big enough to level up from a fresh profile.
   async function run(o) {
     const out = {};
@@ -141,8 +187,9 @@
       record: { distanceM: 9500, score: 32000, trickPoints: 4200, tricks: { backflip: 14, spin360: 9 }, shards: 70, nearMisses: 22, durationMs: 240000 },
     });
     out.title = (await title(o)).title;
+    out.initials = await initials(o);
     out.profile = (await profile(o)).profile;
     return out;
   }
-  window.__shotsProgression = { run, title, profile, gameover };
+  window.__shotsProgression = { run, title, profile, gameover, initials };
 })();

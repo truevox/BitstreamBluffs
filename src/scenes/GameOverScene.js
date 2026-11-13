@@ -223,7 +223,15 @@ export class GameOverScene extends Phaser.Scene {
     if (!awards.leveledTo) this.rewardsText.setAlpha(0.7);
 
     // Resonance bar between the XP figure and the rewards line; fills with the level ratio.
-    const barX = 96, barY = y + 10, barW = 150, barH = 4;
+    //
+    // Measured from the shipped PNGs, not from the nominal values: the XP text row inks y 246..252 and
+    // the footer hint inks from y 261, so the whole free band is 253..260. The bar was at 256..260 —
+    // flush against the footer, which is CC Friday's PR #17 finding (worst in the initials-entry state,
+    // whose footer string is longer and reaches further left). A 2 px bar at 255..256 leaves 2 clear rows
+    // above and 4 below in the worst (level-up / initials) state. A 3 px bar could not: the band only
+    // admits 2+3+2, so the extra pixel has to come out of the bar, not out of the clearance.
+    // Verified in all three Game Over shots by pixel-check.py, both gaps.
+    const barX = 96, barY = y + 10, barW = 150, barH = 2;
     this.resonance = this.add.graphics();
     const paint = (pal) => {
       if (!this.resonance) return;
@@ -255,7 +263,9 @@ export class GameOverScene extends Phaser.Scene {
     if (awards.leveledTo && Array.isArray(awards.rewardsEarned)) {
       const bits = [];
       for (const reward of awards.rewardsEarned) {
-        if (reward.cosmetic) bits.push(String(reward.cosmetic).toUpperCase());
+        // Label the cosmetic as an unlock: a bare "TRAIL-CYAN" reads like a leftover id, not something
+        // the player just earned (CC Friday's PR #17 note). Boosts stay bare-but-dashed for width.
+        if (reward.cosmetic) bits.push(`UNLOCKED ${String(reward.cosmetic).toUpperCase().replace(/-/g, ' ')}`);
         if (reward.boost) bits.push(String(reward.boost).toUpperCase());
         if (reward.biome) bits.push('SIGNATURE LOCKED - COMING ONLINE');
       }

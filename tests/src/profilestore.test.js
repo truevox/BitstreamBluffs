@@ -23,6 +23,52 @@ function rec(over = {}) {
   };
 }
 
+// CC Friday's independent verification of PR #17 (2026-11-13) found that lifetime.bestCombo was being
+// rounded to an integer by the sanitizer, while RunRecord.bestCombo is a COMBO MULTIPLIER (SaveStore:
+// "highest multiplier", e.g. x1.25). A run showing BEST COMBO x1.25 stored 1, and x2.5 would store 3.
+// Missions and achievements read this field, so the loss is not cosmetic.
+describe('lifetime floats (CC Friday verification, 2026-11-13)', () => {
+  test('bestCombo keeps its fractional multiplier', () => {
+    const s = new ProfileStore({ levels: levels() });
+    s.credit(rec({ id: 'f1', ledgerHash: 'fh1', bestCombo: 1.25 }));
+    expect(s.load().lifetime.bestCombo).toBe(1.25);
+    s.credit(rec({ id: 'f2', ledgerHash: 'fh2', bestCombo: 2.5 }));
+    expect(s.load().lifetime.bestCombo).toBe(2.5);
+    // and it must survive a reload through the sanitizer, which is where the rounding happened
+    expect(s.load().lifetime.bestCombo).toBe(2.5);
+  });
+
+  test('a fractional bestCombo is not rounded up either (x2.5 is not x3)', () => {
+    const s = new ProfileStore({ levels: levels() });
+    s.credit(rec({ id: 'f3', ledgerHash: 'fh3', bestCombo: 2.5 }));
+    expect(s.load().lifetime.bestCombo).not.toBe(3);
+    expect(s.load().lifetime.bestCombo).toBe(2.5);
+  });
+
+  test('counters still round: runs, metres, shards and XP stay integers', () => {
+    const s = new ProfileStore({ levels: levels() });
+    s.credit(rec({ id: 'f4', ledgerHash: 'fh4', distanceM: 500.6, score: 1000.4, shards: 4.5 }));
+    const p = s.load();
+    expect(Number.isInteger(p.lifetime.runs)).toBe(true);
+    expect(Number.isInteger(p.lifetime.distanceM)).toBe(true);
+    expect(Number.isInteger(p.lifetime.score)).toBe(true);
+    expect(Number.isInteger(p.lifetime.shards)).toBe(true);
+    expect(Number.isInteger(p.xp)).toBe(true);
+  });
+
+  test('sanitizeProfile rejects junk in float fields without throwing', () => {
+    for (const bad of [NaN, Infinity, -5, null, undefined, '1.25', {}, []]) {
+      const p = sanitizeProfile({ lifetime: { bestCombo: bad, maxAirtimeMs: bad } });
+      expect({ bad: String(bad), bestCombo: p.lifetime.bestCombo }).toMatchObject({
+        bestCombo: expect.any(Number),
+      });
+      expect(p.lifetime.bestCombo).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(p.lifetime.bestCombo)).toBe(true);
+      expect(Number.isFinite(p.lifetime.maxAirtimeMs)).toBe(true);
+    }
+  });
+});
+
 beforeEach(() => localStorage.clear());
 
 describe('own storage key and version', () => {
