@@ -332,3 +332,56 @@ describe('biome mechanics actually reach the physics', () => {
     }
   });
 });
+
+describe('terrain determinism with a biome mask (W3 gate: same seed + mask -> same terrain, twice)', () => {
+  // The spec asks for this at the TERRAIN level, not just the sector function. A generator that
+  // consulted mutable state (or reused a stream across builds) could agree on which biome owns a
+  // sector and still emit different chunks for it.
+  const build = (seed, mask, n) => {
+    const gen = new TerrainGenerator({
+      seed,
+      chunkDefs: readDir('chunks'), hazardDefs: byId(readDir('hazards')), powerupDefs: byId(readDir('powerups')),
+      modDefs: byId(readDir('terrainMods')), biomeDefs: BIOMES, biomeMask: mask,
+    });
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(JSON.stringify(gen.getChunk(i)));
+    return out;
+  };
+
+  test('the same seed and mask produce byte-identical chunks on two separate builds', () => {
+    for (const mask of [0, 1, 16, ALL_MASK]) {
+      const a = build('det-seed', mask, 120);
+      const b = build('det-seed', mask, 120);
+      expect({ mask, same: JSON.stringify(a) === JSON.stringify(b) }).toMatchObject({ mask, same: true });
+    }
+  });
+
+  test('a masked build differs from mask 0, so the mask is not silently ignored', () => {
+    // Guards the failure that made the first sim comparison meaningless: a mask that never reaches
+    // the generator looks deterministic and identical, and proves nothing.
+    const zero = build('det-seed', 0, 120);
+    const masked = build('det-seed', ALL_MASK, 120);
+    expect(JSON.stringify(zero)).not.toBe(JSON.stringify(masked));
+  });
+
+  test('generation order does not change the terrain', () => {
+    // A player streams chunks left to right; a pooled-chunk bug would make the same chunk differ
+    // depending on what was generated before it.
+    const gen = new TerrainGenerator({
+      seed: 'order-terrain',
+      chunkDefs: readDir('chunks'), hazardDefs: byId(readDir('hazards')), powerupDefs: byId(readDir('powerups')),
+      modDefs: byId(readDir('terrainMods')), biomeDefs: BIOMES, biomeMask: ALL_MASK,
+    });
+    const forward = [];
+    for (let i = 0; i < 60; i++) forward.push(JSON.stringify(gen.getChunk(i)));
+    // Re-read the same chunks in a different order on a fresh generator.
+    const gen2 = new TerrainGenerator({
+      seed: 'order-terrain',
+      chunkDefs: readDir('chunks'), hazardDefs: byId(readDir('hazards')), powerupDefs: byId(readDir('powerups')),
+      modDefs: byId(readDir('terrainMods')), biomeDefs: BIOMES, biomeMask: ALL_MASK,
+    });
+    for (const i of [59, 12, 0, 33, 7, 45]) {
+      expect({ i, chunk: JSON.stringify(gen2.getChunk(i)) }).toMatchObject({ i, chunk: forward[i] });
+    }
+  });
+});

@@ -155,7 +155,12 @@ export class GameOverScene extends Phaser.Scene {
     p.add(new NeonText(this, theme, 8, 132, 'LEDGER HASH', { color: 'text', outline: 'none' }).setAlpha(0.7));
     p.add(new NeonText(this, theme, 106, 132, String(rec.ledgerHash || '--------').toUpperCase(), { color: 'magenta', outline: 'none' }));
     p.add(new NeonText(this, theme, 8, 144, 'SHARE SEED', { color: 'text', outline: 'none' }).setAlpha(0.7));
-    this.seedText = new NeonText(this, theme, 106, 144, ellipsize(String(rec.seed || '-').toUpperCase(), 70), { color: 'lime', outline: 'none' });
+    // The mask is part of the run's identity: replaying a mask-31 run on the bare seed would drop the
+    // player into a different world, so the shareable seed carries the same @mask suffix the entry
+    // field accepts (W3 spec). Mask 0 stays suffix-free so every existing seed string is unchanged.
+    const maskVal = Number(rec.biomeMask) || 0;
+    const seedShown = maskVal ? `${rec.seed}@${maskVal}` : String(rec.seed || '-');
+    this.seedText = new NeonText(this, theme, 106, 144, ellipsize(seedShown.toUpperCase(), 70), { color: 'lime', outline: 'none' });
     p.add(this.seedText);
     this.copyBtn = new Button(this, theme, {
       x: 182, y: 140, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
@@ -260,7 +265,9 @@ export class GameOverScene extends Phaser.Scene {
       return { text: `${label} BEST ${fmtInt(prev.bestScore)}`, key: 'amber' };
     };
     try {
-      const prev = store.getSeedStats(rec.seed, { excludeRunId: rec.id });
+      // D6: seed-best compares only within the same biome mask. Without the scope, a mask-31 run
+      // would be judged against mask-0 runs and report a "NEW SEED BEST" it never set.
+      const prev = store.getSeedStats(rec.seed, { excludeRunId: rec.id, biomeMask: Number(rec.biomeMask) || 0 });
       const l = line('SEED', prev);
       out.seedLine = l.text;
       out.seedKey = l.key;

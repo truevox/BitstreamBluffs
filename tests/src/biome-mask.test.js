@@ -9,6 +9,8 @@ import { SaveStore, sanitizeRun, parseSeedMask } from '../../src/systems/SaveSto
 import { DailyPatch } from '../../src/systems/DailyPatch.js';
 import { toggleBiome, biomeToggleRows } from '../../src/systems/ProfileStore.js';
 import { STORAGE } from '../../src/constants.js';
+import { readDir } from './_helpers.js';
+const BIOME_DEFS = readDir('biomes');
 
 // Fixed id: the ledger hash covers id, so a fixture whose id varies with its fields would make the
 // "mask does not enter the hash" assertion below pass or fail for the wrong reason.
@@ -233,5 +235,44 @@ describe('profile biome toggles (W3)', () => {
     // must not render that as "on".
     const rows = biomeToggleRows(prof({ biomeMask: 4, pendingBiomes: [], unlocked: { biomes: [], cosmetics: [], boosts: {} } }), DEFS);
     expect(rows.find((r) => r.id === 'pyramid-peak')).toMatchObject({ unlocked: false, enabled: false });
+  });
+});
+
+describe('D6 at the Game Over call site', () => {
+  // The rule is already tested on SaveStore. What can silently break is the CALLER: GameOverScene must
+  // pass the scope, or a mask-31 run is judged against mask-0 runs and reports a SEED BEST it never
+  // set. This pins the scene's side of the contract rather than re-testing the store.
+  const store = (runs) => {
+    const s = new SaveStore({ storage: null });
+    s.runs = runs;
+    return s;
+  };
+
+  test('a mask-31 run sees no best from a mask-0 run on the same seed', () => {
+    const s = store([
+      run({ id: 'm0', seed: 'letterkenny', score: 5000, biomeMask: 0 }),
+    ]);
+    // What the scene asks for when the run being shown is mask 31:
+    expect(s.getSeedStats('letterkenny', { biomeMask: 31 })).toBeNull();
+    // And what it used to ask for (no scope), which would wrongly report 5000 as the bar to beat:
+    expect(s.getSeedStats('letterkenny').bestScore).toBe(5000);
+  });
+
+  test('a pre-W3 run with no field is mask 0, so it still supplies a best for mask-0 play', () => {
+    const s = store([run({ id: 'old', seed: 'letterkenny', score: 4200 })]);
+    expect(s.getSeedStats('letterkenny', { biomeMask: 0 }).bestScore).toBe(4200);
+    expect(s.getSeedStats('letterkenny', { biomeMask: 1 })).toBeNull();
+  });
+
+  test('the shareable seed carries the mask suffix only when the mask is not 0', () => {
+    // Same rule GameOverScene applies to the SHARE SEED line: mask 0 stays suffix-free so every
+    // existing seed string is unchanged; a non-zero mask round-trips through the entry parser.
+    const shown = (rec) => (Number(rec.biomeMask) || 0 ? `${rec.seed}@${Number(rec.biomeMask)}` : String(rec.seed));
+    expect(shown({ seed: 'letterkenny' })).toBe('letterkenny');
+    expect(shown({ seed: 'letterkenny', biomeMask: 0 })).toBe('letterkenny');
+    const withMask = shown({ seed: 'letterkenny', biomeMask: 31 });
+    expect(withMask).toBe('letterkenny@31');
+    // And it parses back to the same seed + mask, which is what makes it shareable.
+    expect(parseSeedMask(withMask, BIOME_DEFS)).toEqual({ seed: 'letterkenny', biomeMask: 31, hadSuffix: true });
   });
 });
