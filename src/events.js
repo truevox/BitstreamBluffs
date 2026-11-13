@@ -76,6 +76,8 @@ export const EVT = Object.freeze({
   MILESTONE: 'bb:milestone',
   /** Emitter: RunScene (fun-pass), once per run. Payload: NewBestPayload. */
   NEW_BEST: 'bb:newBest',
+  /** Emitter: RunScene (W3), on entering a biome sector. Payload: { id, name, sector, entering:boolean }. */
+  BIOME_ENTER: 'bb:biomeEnter',
   /** Emitter: RunScene (fun-pass). Payload: TutorialHintPayload. */
   TUTORIAL_HINT: 'bb:tutorialHint',
   /** Emitter: RunScene (from a ScoreManager FlowChange with changed && !lost). Payload: FlowChangedPayload. */

@@ -128,14 +128,20 @@ export function profileLayout(o = {}) {
     items.push(box(`stat-v${i}`, v, valueRight, y, 'cyan', { align: 'right' }));
   });
 
-  // Biomes: reached ones are unlocked as biomes, but W1 does not ship their mechanics yet, so the
-  // signature status is a single uniform note (SPEC: "SIGNATURE LOCKED — COMING ONLINE" until W3/W6).
-  // Hyphen, not the spec's em dash: the 5x7 font has no U+2014 and would draw '?'.
+  // Biomes: W3 ships the first five signatures, so the W1 "SIGNATURE LOCKED - COMING ONLINE" note is
+  // no longer true for them. It now states how many reached biomes have a playable signature vs how
+  // many are still pending W6, which stays honest as W6 adds the rest.
+  // Hyphen, not an em dash: the 5x7 font has no U+2014 and would draw '?'. 
   const order = Array.isArray(table.biomeOrder) ? table.biomeOrder : [];
   const reached = new Set(Array.isArray(p.pendingBiomes) ? p.pendingBiomes : []);
   const reachedCount = order.filter((id) => reached.has(id)).length;
+  const sigIds = new Set(Array.isArray(o.playableBiomeIds) ? o.playableBiomeIds : []);
+  const sigCount = order.filter((id) => reached.has(id) && sigIds.has(id)).length;
   items.push(box('sig-head', `BIOMES REACHED ${reachedCount}/${order.length}`, PAD, 132, 'magenta'));
-  items.push(box('sig-note', 'SIGNATURE LOCKED - COMING ONLINE', RIGHT, 132, 'text', { align: 'right', alpha: 0.7 }));
+  const note = sigIds.size === 0
+    ? 'SIGNATURE LOCKED - COMING ONLINE'
+    : `${sigCount} SIGNATURE${sigCount === 1 ? '' : 'S'} ONLINE`;
+  items.push(box('sig-note', note, RIGHT, 132, 'text', { align: 'right', alpha: 0.7 }));
   order.forEach((id, i) => {
     const col = i % 3;
     const y = 146 + Math.floor(i / 3) * 13;

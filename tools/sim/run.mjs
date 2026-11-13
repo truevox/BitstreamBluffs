@@ -23,6 +23,8 @@
  *   --flipTargetDeg N     flip: the ideal release is the first frame from which a release gives >= N deg of net rotation and a clean landing (default 340; 700 = double flip)
  *   --hopLeadMs N         hop: hop when the next ground crash hazard is N ms away (default 380)
  *   --seedPrefix P        with --seeds N: names become P-01..P-NN instead of sim-01.. (a second, independent seed set)
+ *   --biomeMask M         W3: biome bitmask for the run (1 Debumont, 2 Garbage Dump Glacier, 4 Pyramid Peak,
+ *                         8 Underwater Mountain, 16 Crystal Cavern; combined by OR). Default 0 = base terrain.
  *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
  *   --rule ID             run under that DailyPatch rule's real modifiers (default: none/neutralised)
  *   --workers N           parallel pages (default 4)           --out FILE   write JSON
@@ -73,7 +75,7 @@ function expandSeeds(s) {
 const seeds = expandSeeds(String(args.seeds));
 if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
 const params = {};
-for (const n of ['releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'probeMinM']) if (args[n] != null) params[n] = args[n];
+for (const n of ['releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'probeMinM', 'biomeMask']) if (args[n] != null) params[n] = args[n];
 if (args.probeKind) params.probeKind = String(args.probeKind);
 if (args.noHop) params.noHop = true;
 
@@ -186,6 +188,9 @@ async function main() {
     const runJob = async (page, job) => {
       const opts = {
         seed: job.seed, policy: args.policy, maxM: args.maxM, maxSec: args.maxSec, params, keepUi: !!args.keepUi,
+        // W3: the biome mask must ride on the options, not only in `params` - the page reads o.biomeMask to
+        // set REG.BIOME_MASK before RunScene builds its generator.
+        biomeMask: args.biomeMask != null ? Number(args.biomeMask) >>> 0 : 0,
         traceEvery: args.traceEvery || (args.verify ? 60 : 0), sub: args.sub || 0,
         // Daily rule to measure under; 'none' (the default) neutralises modifiers for pacing runs.
         rule: args.rule ? String(args.rule) : 'none',

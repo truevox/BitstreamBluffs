@@ -306,6 +306,9 @@
     const store = game.registry.get(REG.SAVE_STORE);
     if (store && Array.isArray(store.runs)) store.runs.length = 0;
     game.registry.set(REG.SEED, o.seed);
+    // W3: the mask the sim plays at. Set alongside the seed so the run, the record and the stats scope
+    // all agree; 0 is base terrain and is what every pre-W3 sim call gets.
+    game.registry.set(REG.BIOME_MASK, o.biomeMask >>> 0);
 
     const pad = newPad();
     let curPad = pad;
@@ -496,6 +499,7 @@
 
     // ---- start: first headlessStep processes the queue, creates RunScene (RUN_START hook installs the stub)
     game.registry.set(REG.SEED, o.seed);
+    game.registry.set(REG.BIOME_MASK, o.biomeMask >>> 0);
     game.scene.start('RunScene');
     const wall0 = performance.now();
     let guard = 0;
@@ -657,6 +661,7 @@
     const TG = (await import('/src/systems/TerrainGenerator.js')).TerrainGenerator;
     const tg = new TG({
       seed: String(o.seed), chunkDefs: content.chunks, hazardDefs: content.hazards, powerupDefs: content.powerups, modDefs: content.terrainMods,
+      biomeDefs: Object.values(content.biomes || {}), biomeMask: o.biomeMask >>> 0,
     });
     const chunkRecs = new Map();
     for (let i = 0; ; i++) {

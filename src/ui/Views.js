@@ -17,6 +17,7 @@ import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
 import { ellipsize } from './PixelFont.js';
 import { profileLayout } from './ProfileLayout.js';
+import { toggleBiome, biomeToggleRows } from '../systems/ProfileStore.js';
 
 /** Base: centred panel with a BACK button. */
 class View {
@@ -281,9 +282,12 @@ export class SharecodeView extends View {
 export class ProfileView extends View {
   /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
   constructor(scene, theme, o) {
+    const content = scene.registry.get(REG.CONTENT) || {};
+    const biomeDefs = Object.values(content.biomes || {});
     const layout = profileLayout({
       profile: scene.registry.get(REG.PROFILE),
-      levels: (scene.registry.get(REG.CONTENT) || {}).progression,
+      levels: content.progression,
+      playableBiomeIds: biomeDefs.map((d) => d.id),
     });
     super(scene, theme, { w: layout.w, h: layout.h, title: 'PILOT PROFILE', color: 'lime', onClose: o.onClose, y: 22, backLabel: 'BACK' });
 
@@ -310,10 +314,69 @@ export class ProfileView extends View {
       bar.lineStyle(1, pal[b.color], 0.9);
       bar.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
     });
+
+    // W3: signature toggles. Only unlocked biomes get a row, and toggling one persists the profile so a
+    // player's choice survives a reload. Toggling is cosmetic-adjacent but real: it changes which biome
+    // sectors their next run can contain, which is why mask-scoped stats exist.
+    this.biomeDefs = biomeDefs;
+    const service = scene.registry.get(REG.PROGRESSION);
+    this.profileStore = (service && service.store) || null;
+    this.toggleRows = this._toggleRows();
+    if (this.toggleRows.length) {
+      const items = this.toggleRows.map((r) => ({
+        kind: 'choice',
+        label: `${r.name.toUpperCase()} ${r.unlockLevel}`,
+        options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+        get: () => {
+          const p = scene.registry.get(REG.PROFILE) || {};
+          const row = biomeToggleRows(p, this.biomeDefs).find((x) => x.id === r.id);
+          return Boolean(row && row.enabled);
+        },
+        set: (v) => this._setBiome(r.id, Boolean(v)),
+      }));
+      this.sigMenu = new MenuList(scene, theme, { x: 10, y: 150, w: 180, rowH: 11, items, color: 'magenta', parent: this.panel });
+    }
+  }
+
+  /** Unlocked biomes as toggle rows (empty before any unlock). */
+  _toggleRows() {
+    try {
+      return biomeToggleRows(this.scene.registry.get(REG.PROFILE) || {}, this.biomeDefs).filter((r) => r.unlocked);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Apply one toggle and persist it. `toggleBiome` flips, so it is called only when the desired state
+   * differs from the current one - calling it unconditionally would invert an already-correct row.
+   */
+  _setBiome(id, on) {
+    const prof = this.scene.registry.get(REG.PROFILE);
+    if (!prof) return;
+    const row = biomeToggleRows(prof, this.biomeDefs).find((x) => x.id === id);
+    if (!row || row.enabled === on) return;
+    const next = toggleBiome(prof, id, this.biomeDefs);
+    const service = this.scene.registry.get(REG.PROGRESSION);
+    const store = this.profileStore || (service && service.store) || null;
+    try {
+      if (store) {
+        this.scene.registry.set(REG.PROFILE, store.save(next));
+      } else {
+        this.scene.registry.set(REG.PROFILE, next);
+      }
+    } catch (e) { /* a denied storage write must not break the menu */ }
   }
 
   handleAction(action) {
-    if (action === 'cancel' || action === 'confirm') this.close();
+    // Focus the signature menu on confirm when it exists, so it is reachable with the same keys as
+    // every other menu; back still closes the view.
+    if (action === 'cancel') {
+      this.close();
+      return true;
+    }
+    if (this.sigMenu) return this.sigMenu.handleAction(action);
+    if (action === 'confirm') this.close();
     return true;
   }
 

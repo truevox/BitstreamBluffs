@@ -635,3 +635,58 @@ describe('milestone bonus', () => {
     expect(s.getSnapshot().bonusByKind.milestone).toBe(15500);
   });
 });
+
+describe('ScoreManager echo zone (W3)', () => {
+  // Crystal Cavern's signature mechanic: tricks landed inside an echo zone score a combo bonus. It is
+  // the one batch-1 mechanic that is scoring rather than physics, so it gets its own tests here.
+  const landed = (zoneScoreMul) => {
+    const s = new ScoreManager();
+    s.addTrick(trick('backflip', 1, 0));
+    return { s, r: s.onLanding({ quality: 'good' }, { zoneScoreMul }) };
+  };
+
+  test('multiplies banked trick points', () => {
+    const plain = landed(1).r;
+    const echo = landed(1.3).r;
+    expect(echo.banked).toBe(Math.round(plain.banked * 1.3));
+    expect(echo.zoneMul).toBe(1.3);
+    expect(plain.zoneMul).toBe(1);
+  });
+
+  test('leaves the perfect-landing flat bonus alone', () => {
+    // The flat bonus is deliberately identical everywhere; letting a zone inflate it would make the
+    // "perfect landing" reward meaningless inside one biome.
+    const s1 = new ScoreManager();
+    s1.addTrick(trick('backflip', 1, 0));
+    const plain = s1.onLanding({ quality: 'perfect' });
+    const s2 = new ScoreManager();
+    s2.addTrick(trick('backflip', 1, 0));
+    const echo = s2.onLanding({ quality: 'perfect' }, { zoneScoreMul: 1.3 });
+    expect(echo.bonus).toBe(plain.bonus);
+    expect(echo.banked).toBeGreaterThan(plain.banked);
+  });
+
+  test('never reduces a payout, and ignores a nonsensical multiplier', () => {
+    // A mod must not be able to take points away, and a corrupt/absent value must be harmless.
+    const base = landed(1).r.banked;
+    for (const bad of [0.5, 0, -3, NaN, undefined, null, '1.3']) {
+      expect({ bad, banked: landed(bad).r.banked }).toMatchObject({ bad, banked: base });
+    }
+  });
+
+  test('has no effect on a crash', () => {
+    const s = new ScoreManager();
+    s.addTrick(trick('backflip', 1, 0));
+    const r = s.onLanding({ quality: 'crash' }, { zoneScoreMul: 1.3 });
+    expect(r.banked).toBe(0);
+  });
+
+  test('does not apply to distance points', () => {
+    const s = new ScoreManager();
+    s.setDistance(100);
+    s.addTrick(trick('backflip', 1, 0));
+    const before = s.getSnapshot().distancePoints;
+    s.onLanding({ quality: 'good' }, { zoneScoreMul: 1.3 });
+    expect(s.getSnapshot().distancePoints).toBe(before);
+  });
+});

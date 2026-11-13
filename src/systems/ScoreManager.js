@@ -202,12 +202,17 @@ export class ScoreManager {
    * Landing: bank pending tricks x multiplier x flow, add perfect bonus, reset combo. A crash landing forfeits everything.
    * @param {{quality:'perfect'|'good'|'sloppy'|'crash'}} landing LandingResult from TrickTracker.
    *   Pass the already graded quality (classifyLanding with the mid-spin penalty applied).
+   * @param {{zoneScoreMul?:number}} [opts] additive (W3): bonus multiplier from terrain-mod zones the sled
+   *   is standing in at the landing (Crystal Cavern's echo zone). Bounded by the caller; clamped to
+   *   >= 1 here so a mod can never reduce a payout, only add to it. Multiplies the banked trick points
+   *   only - never the perfect-landing flat bonus or distance points, so the echo cannot inflate the
+   *   parts of a score that are meant to be identical everywhere.
    * @returns {{banked:number, bonus:number, multiplierUsed:number, flowUsed:number, flowChange:FlowChange,
    *   comboName:string}} banked = pending x combo x flowUsed; flowUsed is the flow AFTER this landing's gain (so the first
    *   clean trick landing already pays), or the flow carried in when nothing was gained; comboName = display name of
    *   the jump's tricks ('' if none), captured before the combo clears.
    */
-  onLanding(landing) {
+  onLanding(landing, opts) {
     const multiplierUsed = this.getMultiplier();
     const name = comboName(this.comboTricks.map((type) => ({ type, count: this.counts[type] })));
     if (landing && landing.quality === 'crash') {
@@ -230,7 +235,8 @@ export class ScoreManager {
       flowChange = this._flowChange(this.flow, 'none');
     }
     const flowUsed = this.flow;
-    const banked = Math.round(this.pending * multiplierUsed * flowUsed);
+    const zoneMul = Math.max(1, (opts && Number.isFinite(opts.zoneScoreMul) ? opts.zoneScoreMul : 1));
+    const banked = Math.round(this.pending * multiplierUsed * flowUsed * zoneMul);
     const bonus = q === 'perfect' ? SCORING.perfectLandingBonus : 0;
     this.trickPoints += banked + bonus;
     this._clearCombo();
@@ -241,7 +247,7 @@ export class ScoreManager {
       this.flowRemainingMs = SCORING.flowTimeoutMs;
       flowChange.timeoutFrac = 1;
     }
-    return { banked, bonus, multiplierUsed, flowUsed, flowChange, comboName: name };
+    return { banked, bonus, multiplierUsed, flowUsed, flowChange, comboName: name, zoneMul };
   }
 
   /**

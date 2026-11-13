@@ -167,6 +167,9 @@ export class UIScene extends Phaser.Scene {
     on(EVT.SHARD_COLLECTED, this.onShard);
     on(EVT.MILESTONE, this.onMilestone);
     on(EVT.NEW_BEST, this.onNewBest);
+    // W3: biome banner. Uses the same serialised strip queue as milestones and missions, so it can
+    // never overlap the trick popup or the FLOW indicator (the W2 defect carried into W3).
+    on(EVT.BIOME_ENTER, this.onBiomeEnter);
     on(EVT.TUTORIAL_HINT, this.onHint);
     on(EVT.FLOW_CHANGED, this.onFlowChanged);
     on(EVT.FLOW_LOST, this.onFlowLost);
@@ -531,6 +534,12 @@ export class UIScene extends Phaser.Scene {
     const pts = p && p.points > 0 ? `  +${fmtInt(p.points)}` : '';
     this._strip(`SECTOR ${(p && p.sector) || ''}${pts}`, 'cyan');
     uiSfx(this, 'milestone');
+  }
+
+  onBiomeEnter(p) {
+    if (!p || !p.name) return;
+    if (p.entering) this._strip(p.name.toUpperCase(), 'magenta');
+    else this._strip('BITSTREAM', 'cyan');
   }
 
   onNewBest() {

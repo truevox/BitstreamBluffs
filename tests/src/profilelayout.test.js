@@ -4,6 +4,7 @@ import { profileLayout, titleBadgeLayout, overlappingPairs, statRows, fmtPlaytim
 import { defaultProfile, levelForXp } from '../../src/systems/Progression.js';
 import { PALETTE_KEYS } from '../../src/constants.js';
 import { measureText, hasGlyph } from '../../src/ui/PixelFont.js';
+import { readdirSync } from 'fs';
 
 const levels = JSON.parse(readFileSync(path.resolve('src/data/progression/levels.json'), 'utf8'));
 const palettes = JSON.parse(readFileSync(path.resolve('src/data/palettes.json'), 'utf8'));
@@ -260,5 +261,46 @@ describe('fmtPlaytime', () => {
 
   test('junk input is 0:00, not NaN', () => {
     for (const v of [undefined, null, 'x', NaN, -5]) expect(fmtPlaytime(v)).toBe('0:00');
+  });
+});
+
+describe('ProfileLayout — signature status reflects what W3 actually ships', () => {
+  const BIOMES = readdirSync(path.resolve('src/data/biomes')).filter((f) => f.endsWith('.json'))
+    .map((f) => JSON.parse(readFileSync(path.resolve('src/data/biomes', f), 'utf8')));
+  const playable = BIOMES.map((b) => b.id);
+
+  test('the W1 "COMING ONLINE" note is gone once signatures exist', () => {
+    // Leaving it would tell players their unlocked biomes do nothing, which stopped being true in W3.
+    const layout = profileLayout({ profile: maxedProfile(), levels, playableBiomeIds: playable });
+    const note = layout.items.find((i) => i.key === 'sig-note');
+    expect(note.text).not.toContain('COMING ONLINE');
+    expect(note.text).not.toContain('LOCKED');
+  });
+
+  test('it counts signatures that are both reached and shipped', () => {
+    const layout = profileLayout({ profile: maxedProfile(), levels, playableBiomeIds: playable });
+    const note = layout.items.find((i) => i.key === 'sig-note');
+    // Maxed profile has reached all 11; W3 ships 5.
+    expect(note.text).toBe(`${playable.length} SIGNATURES ONLINE`);
+  });
+
+  test('a profile that has reached nothing still says nothing is online', () => {
+    const layout = profileLayout({ profile: defaultProfile(), levels, playableBiomeIds: playable });
+    const note = layout.items.find((i) => i.key === 'sig-note');
+    expect(note.text).toBe('0 SIGNATURES ONLINE');
+  });
+
+  test('with no shipped biome content at all, it keeps the original wording', () => {
+    // W6-era safety: if content were ever missing, the note must not claim signatures exist.
+    const layout = profileLayout({ profile: maxedProfile(), levels, playableBiomeIds: [] });
+    expect(layout.items.find((i) => i.key === 'sig-note').text).toBe('SIGNATURE LOCKED - COMING ONLINE');
+  });
+
+  test('the note never overlaps the other profile rows in either palette', () => {
+    for (const playableIds of [[], playable]) {
+      const layout = profileLayout({ profile: maxedProfile(), levels, playableBiomeIds: playableIds });
+      expect(overlappingPairs(layout.items)).toEqual([]);
+      for (const it of layout.items) expect(it.x + it.w).toBeLessThanOrEqual(PROFILE_PANEL.w);
+    }
   });
 });

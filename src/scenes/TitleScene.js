@@ -7,6 +7,7 @@
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
+import { parseSeedMask } from '../systems/SaveStore.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
 import { measureText, ellipsize } from '../ui/PixelFont.js';
@@ -90,7 +91,7 @@ export class TitleScene extends Phaser.Scene {
     this.menuPanel = new Panel(this, theme, { x: 24, y: 92, w: 216, h: 104, color: 'cyan', fillAlpha: 0.88 });
     const items = [
       { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
-      { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this.startRun(this.daily.seed) },
+      { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this.startRun(this.daily.seed, DailyPatch.biomeMaskForDate()) },
       { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
       { kind: 'action', label: 'PROFILE', color: 'lime', onSelect: () => this._openView(new ProfileView(this, theme, { onClose: () => this._closeView() })) },
       { kind: 'action', label: 'LEADERBOARD', color: 'amber', onSelect: () => this._openView(new LeaderboardView(this, theme, { onClose: () => this._closeView() })) },
@@ -246,11 +247,21 @@ export class TitleScene extends Phaser.Scene {
     this.menu.handleAction(action);
   }
 
-  /** @param {string} seed @returns {void} */
-  startRun(seed) {
+  /**
+   * @param {string} seed seed text, optionally with a `seed@mask` suffix (W3).
+   * @param {number} [maskOverride] explicit mask (daily run); wins over any suffix.
+   * @returns {void}
+   */
+  startRun(seed, maskOverride) {
     if (this.starting) return;
     this.starting = true;
-    this.registry.set(REG.SEED, seed);
+    // W3: a seed may name a biome layout with a `seed@mask` suffix. A bare seed parses to mask 0 and is
+    // used verbatim, so every existing seed string behaves exactly as before.
+    const biomeDefs = Object.values((this.registry.get(REG.CONTENT) || {}).biomes || {});
+    const parsed = parseSeedMask(seed, biomeDefs);
+    this.registry.set(REG.SEED, parsed.seed || seed);
+    const mask = Number.isFinite(maskOverride) ? maskOverride >>> 0 : parsed.biomeMask;
+    this.registry.set(REG.BIOME_MASK, mask);
     uiSfx(this, 'uiSelect', { pitch: 1.3 });
     this._closeView();
     this.scene.start(SCENES.RUN);

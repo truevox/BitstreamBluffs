@@ -24,7 +24,7 @@ import {
 } from '../constants.js';
 import { EVT } from '../events.js';
 import { SaveStore } from '../systems/SaveStore.js';
-import { TerrainGenerator } from '../systems/TerrainGenerator.js';
+import { TerrainGenerator, biomeForSector } from '../systems/TerrainGenerator.js';
 import { ScoreManager } from '../systems/ScoreManager.js';
 import { TrickTracker } from '../systems/TrickTracker.js';
 import { GlitchDirector } from '../systems/GlitchDirector.js';
@@ -126,6 +126,10 @@ export class RunScene extends Phaser.Scene {
     try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
     this.palette = getPalette(this.game);
     this.seed = String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
+    // W3: resolved ONCE per run, from the registry (a daily run sets the date-derived mask). Never
+    // re-read mid-run, so the terrain, the stats scope and the saved record cannot disagree.
+    const maskReg = reg.get(REG.BIOME_MASK);
+    this.biomeMask = Number.isFinite(maskReg) ? maskReg >>> 0 : 0;
     this.startedAt = Date.now();
     this.runId = `${this.startedAt}-${this.seed}`;
 
@@ -141,6 +145,8 @@ export class RunScene extends Phaser.Scene {
       hazardDefs: this.content.hazards,
       powerupDefs: this.content.powerups,
       modDefs: this.content.terrainMods,
+      biomeDefs: Object.values(this.content.biomes || {}),
+      biomeMask: this.biomeMask,
     });
     this.heightFn = (x) => this.terrain.heightAt(x); // allocated once; reads this.terrain at call time
     this.score = new ScoreManager({ pxPerMeter: PIXELS_PER_METER });
@@ -882,7 +888,7 @@ export class RunScene extends Phaser.Scene {
     const pre = this.score.getSnapshot();
     const mult = pre.multiplier || 1;
     const nTricks = Math.max(airTricks, (pre.comboTricks || []).length);
-    const r = this.score.onLanding(l);
+    const r = this.score.onLanding(l, { zoneScoreMul: this._zoneScoreMulAt(fs.x) });
     this.game.events.emit(EVT.LANDING, {
       quality: l.quality, angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
       bonusPoints: r.bonus, bankedPoints: r.banked, hard: !!l.hard, x: fs.x, y: fs.y,
@@ -1031,6 +1037,17 @@ export class RunScene extends Phaser.Scene {
       this.fx.ring(sled.x, sled.y, this.palette.cyan, 70, 600);
       this.fx.sparks(sled.x, sled.y - 6, this.palette.cyan, 14, 240, 40);
     }
+    // W3: announce the biome we are in, when it changes. Driven by the sled's current position rather
+    // than by chunk callbacks so it cannot fire out of order or twice for one crossing.
+    const sectorNow = this.terrain._sectorOf(sled.x);
+    if (this._biomeSector !== sectorNow) {
+      this._biomeSector = sectorNow;
+      const biomeId = this.biomeMask ? biomeForSector(this.seed, sectorNow - 1, this.biomeMask, Object.values(this.content.biomes || {})) : null;
+      const def = biomeId ? (this.content.biomes || {})[biomeId] : null;
+      if (def) this.emitIf(EVT.BIOME_ENTER, { id: def.id, name: def.name, sector: sectorNow, entering: true });
+      else if (this._lastBiome) this.emitIf(EVT.BIOME_ENTER, { id: null, name: 'Bitstream', sector: sectorNow, entering: false });
+      this._lastBiome = Boolean(def);
+    }
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;
       this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });
@@ -1084,6 +1101,21 @@ export class RunScene extends Phaser.Scene {
       if (def) out.push(def);
     }
     return out;
+  }
+
+  /**
+   * Product of the scoring multipliers of the mod zones at x (W3). Only mods that define `scoreMul`
+   * contribute, so physics-only zones leave scoring untouched. Bounded by the data, and multiplied
+   * rather than summed so two overlapping echo zones cannot compound into a runaway payout.
+   * @param {number} x world px
+   * @returns {number} >= 1
+   */
+  _zoneScoreMulAt(x) {
+    let mul = 1;
+    for (const def of this.getZoneDefs(x)) {
+      if (def && Number.isFinite(def.scoreMul) && def.scoreMul > 1) mul *= def.scoreMul;
+    }
+    return mul;
   }
 
   updateZones(x) {
@@ -1246,6 +1278,9 @@ export class RunScene extends Phaser.Scene {
       id: this.runId,
       seed: this.seed,
       dailyRuleId: this.dailyRuleId,
+      // W3: only recorded when non-zero, so a mask-0 run writes exactly the record it wrote before W3
+      // (same keys, same ledger hash input) and old and new mask-0 runs stay comparable.
+      ...(this.biomeMask ? { biomeMask: this.biomeMask } : {}),
       startedAt: this.startedAt,
       endedAt: Date.now(),
       durationMs: Math.round(this.runTimeMs),
