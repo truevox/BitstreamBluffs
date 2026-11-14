@@ -266,10 +266,10 @@ async function main() {
     // before/after bank arithmetic and the popup decision agree with the bank the shop then shows.
     {
       const SHOP_RICH = { ...JSON.parse(JSON.stringify(PROFILE)), bank: 400 };
-      const probeShop = async (profile, { pressRetry = false, shards = 95 } = {}) => {
+      const probeShop = async (profile, { pressRetry = false, shards = 95, freshBoard = false } = {}) => {
         const { page, errors } = await bootWithProfile(browser, port, profile);
         try {
-          return await page.evaluate(async ({ pressRetry, shards }) => {
+          return await page.evaluate(async ({ pressRetry, shards, freshBoard }) => {
             const g = window.__bbGame;
             const wait = (ms) => new Promise((r) => setTimeout(r, ms));
             g.registry.set('biomeMask', 0);
@@ -286,6 +286,7 @@ async function main() {
             // pickup; setting it here is the same value the collect loop would have produced.
             run.runTimeMs = 5000;
             run.shardCount = shards;
+            if (freshBoard) run.score.addBonus(1000, 'gate');
             run.pendingCrash = { cause: 'chasm' };
             // Wait for Game Over to build, then for the autoprompt delay to elapse.
             for (let i = 0; i < 60 && !(g.scene.getScene('GameOverScene') && g.scene.getScene('GameOverScene').scene.isActive()); i += 1) await wait(250);
@@ -319,6 +320,14 @@ async function main() {
               };
             }
             await wait(1800); // > SHOP_PROMPT_MS
+            if (freshBoard) {
+              const hadEntry = Boolean(over.entry);
+              const pending = Boolean(over.shopPending);
+              const prematurelyOpen = Boolean(over.shopOpen);
+              if (hadEntry) over.skipEntry();
+              await wait(900);
+              return { bankAtOver, flag, hadEntry, pending, prematurelyOpen, opened: Boolean(over.shopOpen), entryClosed: !over.entry };
+            }
             const openAfterDelay = Boolean(over.shopOpen);
             const hasShopTitle = texts().some((t) => /SHARD SHOP/i.test(t));
             // Retry while the shop is open must close it and start a run.
@@ -326,7 +335,7 @@ async function main() {
             await wait(900);
             const retried = Boolean(g.scene.getScene('RunScene') && g.scene.getScene('RunScene').scene.isActive());
             return { bankAtOver, flag, hintBefore, openAfterDelay, hasShopTitle, retried };
-          }, { pressRetry, shards }).catch((e) => ({ fatal: String(e) }));
+          }, { pressRetry, shards, freshBoard }).catch((e) => ({ fatal: String(e) }));
         } finally { await page.close(); }
       };
 
@@ -358,6 +367,12 @@ async function main() {
       else if (!crosser.hasShopTitle) fail('the opened panel is the Shard Shop', 'no SHARD SHOP title on screen');
       else if (!crosser.retried) fail('retry from inside the opened shop', 'RunScene did not start');
       else pass('crossing a price pops the shop once, and retry from it starts the run', `bank=${crosser.bankAtOver}`);
+
+      // A separate browser page has an empty leaderboard; demand actual initials entry before skipping it.
+      const fresh = await probeShop({ ...JSON.parse(JSON.stringify(PROFILE)), xp: 0, level: 1, bank: 85 }, { shards: 10, freshBoard: true });
+      if (fresh.fatal || !fresh.flag || !fresh.hadEntry || !fresh.pending || fresh.prematurelyOpen || !fresh.entryClosed || !fresh.opened)
+        fail('fresh board: newly affordable shop opens after skipping initials', JSON.stringify(fresh));
+      else pass('fresh board: newly affordable shop opens after skipping initials', JSON.stringify(fresh));
 
       const early = await probeShop(SHOP_RICH, { pressRetry: true });
       if (early.fatal) fail('shop autoprompt: early-retry probe', early.fatal);
