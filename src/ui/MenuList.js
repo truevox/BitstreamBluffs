@@ -211,12 +211,16 @@ export class MenuList extends Phaser.GameObjects.Container {
       const row = this.rows[i];
       const sel = i === this.selected && !item.disabled;
       const c = pal[item.color || this.colorKey];
-      const y = i * this.rowH;
+      // Same cell as the row's own label and zone: in a multi-column list item i is NOT at i * rowH, and
+      // painting it there put the highlight below the list, in the wrong column.
+      const { col, rowInCol } = this._cell(i);
+      const x0 = col * this.colW;
+      const y = rowInCol * this.rowH;
       if (sel) {
         g.fillStyle(c, 0.16);
-        g.fillRect(0, y, this.w, this.rowH - 1);
+        g.fillRect(x0, y, this.colW, this.rowH - 1);
         g.fillStyle(c, 1);
-        g.fillRect(0, y, 2, this.rowH - 1);
+        g.fillRect(x0, y, 2, this.rowH - 1);
       }
       row.label.setColorKey(item.disabled ? 'text' : sel ? (item.color || 'text') : 'text');
       row.label.setAlpha(item.disabled ? 0.35 : sel ? 1 : 0.85);

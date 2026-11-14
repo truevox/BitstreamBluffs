@@ -252,3 +252,35 @@ describe('Clipboard.copyText', () => {
     }
   });
 });
+
+// ================================================================== UI-2: MenuList columns
+
+describe('UI-2: MenuList highlights the selected row in its own column', () => {
+  test('UI-2: with columns:2 the highlight for item 7 is drawn at column 2, row 1', () => {
+    const s = makeScene(null);
+    const theme = new Theme(s);
+    const items = Array.from({ length: 11 }, (_, i) => ({
+      kind: 'choice', label: `B${i}`, options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }], get: () => false, set: () => {},
+    }));
+    const m = new MenuList(s, theme, { x: 0, y: 0, w: 388, rowH: 9, items, columns: 2, rowsPerColumn: 6 });
+    m.setSelected(7, true);
+    // The first fillRect after the highlight colour is the 16% wash over the selected row.
+    const rects = m.g.ops.filter((o) => o[0] === 'fillRect');
+    const wash = rects[0];
+    expect(wash).toBeTruthy();
+    const [, x, y, w] = wash;
+    expect({ x, y, w }).toEqual({ x: 194, y: 9, w: 194 });
+  });
+});
+
+describe('MenuList single column stays pixel-identical', () => {
+  test('UI-2 control: a one-column list highlights row i at y = i * rowH across the full width', () => {
+    const s = makeScene(null);
+    const theme = new Theme(s);
+    const items = Array.from({ length: 4 }, (_, i) => ({ kind: 'action', label: `A${i}`, onSelect: () => {} }));
+    const m = new MenuList(s, theme, { x: 0, y: 0, w: 200, rowH: 16, items });
+    m.setSelected(3, true);
+    const [, x, y, w] = m.g.ops.filter((o) => o[0] === 'fillRect')[0];
+    expect({ x, y, w }).toEqual({ x: 0, y: 48, w: 200 });
+  });
+});
