@@ -11,6 +11,7 @@
  */
 import { defaultProfile, loadLevelTable, levelForXp, rewardsForLevel, xpForRun, PROFILE_VERSION } from './Progression.js';
 import { metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
+import { DailyPatch } from './DailyPatch.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -54,6 +55,8 @@ function sanitizeLifetime(raw) {
     bestDistanceM: nonNeg(o.bestDistanceM),
     bestCombo: nonNegFloat(o.bestCombo),
     maxAirtimeMs: nonNeg(o.maxAirtimeMs),
+    dailyRuns: nonNeg(o.dailyRuns),
+    bestStreak: nonNeg(o.bestStreak),
   };
 }
 
@@ -154,6 +157,8 @@ function grantLevelRewards(profile, levelBefore, table) {
  * @param {Object} profile
  * @param {Object} record
  * @param {*} levels
+ * @param {{streak?:number}} [extra] caller-owned facts: `streak` is the current Daily streak
+ *        (SaveStore.getDailyStreak), kept as lifetime.bestStreak.
  * @returns {{profile:Object, awards:Object}|null} null when already credited or the record is unusable.
  */
 /**
@@ -269,7 +274,7 @@ export function biomeToggleRows(profile, biomeDefs) {
     }));
 }
 
-export function creditRun(profile, record, levels) {
+export function creditRun(profile, record, levels, extra = {}) {
   const table = loadLevelTable(levels);
   const base = sanitizeProfile(profile, table);
   if (!record || typeof record !== 'object') return null;
@@ -302,6 +307,12 @@ export function creditRun(profile, record, levels) {
   L.bestDistanceM = Math.max(L.bestDistanceM, nonNeg(record.distanceM));
   L.bestCombo = Math.max(L.bestCombo, nonNegFloat(record.bestCombo));
   L.maxAirtimeMs = Math.max(L.maxAirtimeMs, nonNeg(record.maxAirtimeMs));
+  // ACH-3: a run on a `daily-YYYY-MM-DD` seed is a Daily run (the same seed rule SaveStore's streak uses).
+  // The streak itself is the caller's fact: it needs every stored run, which this pure function does not
+  // see, so ProgressionService passes SaveStore.getDailyStreak's value in and the best one is kept.
+  if (DailyPatch.dateKeyFromSeed(record.seed)) L.dailyRuns += 1;
+  const ex = extra && typeof extra === 'object' ? extra : {};
+  L.bestStreak = Math.max(L.bestStreak, nonNeg(ex.streak));
   if (record.tricks && typeof record.tricks === 'object') {
     for (const [k, v] of Object.entries(record.tricks)) {
       if (typeof k === 'string' && k && isNum(v) && v > 0) L.tricks[k] = (L.tricks[k] || 0) + Math.round(v);
@@ -317,7 +328,11 @@ export function creditRun(profile, record, levels) {
   // W5: evaluate achievements as part of the same credit, so a run that crosses a threshold unlocks it
   // on the Game Over screen rather than on some later unrelated save. `now` comes from the record's
   // end time, not from inside the pure evaluator.
-  const unlockedNow = unlockAchievementsFor(next, record, { at: nonNeg(record.endedAt) });
+  // Only the daily facts are forwarded. `biomesDiscovered` waits on the definition of "discovered", and
+  // spreading `extra` wholesale would let a caller's biomeCount unlock the biome achievements early.
+  const unlockedNow = unlockAchievementsFor(next, record, {
+    at: nonNeg(record.endedAt), dailyRuns: L.dailyRuns, streak: L.bestStreak,
+  });
   const awards = {
     xp,
     levelBefore,
@@ -485,10 +500,11 @@ export class ProfileStore {
   /**
    * Credit a finished run and persist. Idempotent on ledgerHash.
    * @param {Object} record
+   * @param {{streak?:number}} [extra] caller-owned facts, forwarded to creditRun
    * @returns {Object|null} awards, or null when the run was already credited / unusable.
    */
-  credit(record) {
-    const res = creditRun(this.profile, record, this.levels);
+  credit(record, extra = {}) {
+    const res = creditRun(this.profile, record, this.levels, extra);
     if (!res) return null;
     this.profile = res.profile;
     this.save();

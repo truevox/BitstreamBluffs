@@ -170,6 +170,10 @@ export function defaultProfile() {
       bestDistanceM: 0,
       bestCombo: 0,
       maxAirtimeMs: 0,
+      // W5 daily achievements (ACH-3): daily-seed runs credited, and the longest Daily streak seen at a
+      // credit. Kept here so the achievements grid reads the same numbers the unlock did.
+      dailyRuns: 0,
+      bestStreak: 0,
     },
     // W5: `titles` holds achievement title rewards. It is present from the start so a fresh profile and a
     // reloaded one have the identical shape — a missing key would make the two disagree on first save.

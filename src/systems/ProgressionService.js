@@ -78,7 +78,7 @@ export class ProgressionService {
     // whether THIS run newly made something affordable. Taken from the live profile rather than derived
     // from the credit afterwards, because both `credit()` and `applyMissions()` move the bank.
     const before = shopState(this.store.profile);
-    const awards = record ? this.store.credit(record) : null;
+    const awards = record ? this.store.credit(record, this._dailyFacts()) : null;
     // Missions ride on the crediting decision, not on RUN_END itself: `credit()` returns null for a
     // run whose hash is already in the ring, so a replayed event pays missions nothing. Missions then
     // fold their own XP/shards into the same profile before the awards view is built, so Game Over
@@ -101,6 +101,24 @@ export class ProgressionService {
     this.lastAwards = view;
     this.game.registry.set(REG.LAST_AWARDS, view);
     this.publish(view);
+  }
+
+  /**
+   * ACH-3: the caller-owned daily facts the achievement evaluator needs. The streak comes from SaveStore,
+   * which RunScene has already handed this run (saveRun pushes it synchronously before RUN_END), so the
+   * run that makes a 3-day streak unlocks "Three in a Row" on its own Game Over. Guarded: a missing or
+   * throwing SaveStore means streak 0, never a lost credit.
+   * @returns {{streak:number}}
+   */
+  _dailyFacts() {
+    try {
+      const saveStore = this.game.registry.get(REG.SAVE_STORE);
+      if (!saveStore || typeof saveStore.getDailyStreak !== 'function') return { streak: 0 };
+      const st = saveStore.getDailyStreak(this.now());
+      return { streak: st && Number.isFinite(st.streak) ? st.streak : 0 };
+    } catch (e) {
+      return { streak: 0 };
+    }
   }
 
   /**

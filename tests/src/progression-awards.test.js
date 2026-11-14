@@ -144,3 +144,34 @@ describe('LVL-1: a level crossed by mission XP is announced like one crossed by 
     expect({ leveledTo: view.leveledTo, rewards: view.rewards, earned: view.rewardsEarned }).toEqual({ leveledTo: 0, rewards: null, earned: [] });
   });
 });
+
+describe('ACH-3 (daily and streak half): ProgressionService passes the SaveStore streak to the credit', () => {
+  async function runWith(saveStore, record) {
+    const game = fakeGame();
+    game.registry.set(REG.SAVE_STORE, saveStore);
+    const store = new ProfileStore({ levels: LEVELS, storage: memStorage() });
+    // lifetime.runs > 0 so init skips the backfill and the fake needs no getRecentRuns.
+    store.save(v1({ lifetime: { runs: 1 } }));
+    const svc = new ProgressionService(game, { levels: LEVELS, store, now: () => Date.parse('2026-11-13T12:00:00Z') });
+    await svc.init();
+    game.events.emit(EVT.RUN_END, { record });
+    return { view: game.registry.get(REG.LAST_AWARDS), store };
+  }
+
+  test('a 3-day streak in SaveStore unlocks Three in a Row on the run that makes it', async () => {
+    const asked = [];
+    const saveStore = { getDailyStreak: (now) => { asked.push(now); return { streak: 3, playedToday: true }; } };
+    const { view, store } = await runWith(saveStore, rec({ seed: 'daily-2026-11-13' }));
+    expect(view.achievements.map((a) => a.id)).toEqual(expect.arrayContaining(['daily-1', 'streak-3']));
+    expect(store.profile.lifetime.bestStreak).toBe(3);
+    expect(asked).toEqual([Date.parse('2026-11-13T12:00:00Z')]);
+  });
+
+  test('a SaveStore that throws or lacks getDailyStreak never blocks the credit', async () => {
+    for (const saveStore of [{ getDailyStreak: () => { throw new Error('x'); } }, {}]) {
+      const { view } = await runWith(saveStore, rec({ seed: 'daily-2026-11-13' }));
+      expect(view.credited).toBe(true);
+      expect(view.achievements.map((a) => a.id)).toContain('daily-1');
+    }
+  });
+});

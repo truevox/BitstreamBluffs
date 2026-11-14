@@ -108,8 +108,10 @@ export function metricsFrom(profile, run, extra = {}) {
     tricksLanded,
     trickKinds: trickKinds.size,
     nearMisses: Math.max(n(L.nearMisses), 0),
-    dailyRuns: Math.max(n(extra.dailyRuns), 0),
-    bestStreak: Math.max(n(extra.streak), 0),
+    // The caller's figure, or the profile's own stored count (creditRun keeps both in lifetime), so the
+    // grid, which passes neither, shows the same numbers the unlock used.
+    dailyRuns: Math.max(n(extra.dailyRuns), n(L.dailyRuns), 0),
+    bestStreak: Math.max(n(extra.streak), n(L.bestStreak), 0),
     shards: Math.max(n(L.shards), 0),
     level: Math.max(n(p.level), 1),
     biomesDiscovered: Math.max(n(extra.biomeCount), 0),

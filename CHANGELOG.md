@@ -39,6 +39,7 @@
 - **F9:** removed the dead `missions.ruleId` plumbing (the `applyMissions` writer and the two `MissionsService` readers). Nothing produced a rule id, the sanitizer dropped it, and no template uses `excludedRuleIds`; the pure `excludedRuleIds` filter in `Missions.js` stays for a future caller.
 - **BOOT-1:** `MissionsService.init` republishes `REG.PROFILE` after it fills the mission slots, so a boost toggle before the first run no longer saves the pre-draw profile and wipes the missions.
 - **LVL-1:** the Game Over awards view measures the level-up from before the run to after mission XP, so a level crossed by mission XP gets the same level-up line, `leveledTo` and `rewardsEarned` entry as one crossed by run XP.
+- **ACH-3 (daily/streak only):** `creditRun` now feeds the achievement evaluator `dailyRuns` and `streak`, so Daily Habit, Three in a Row and Week of Pain can unlock. A run on a `daily-YYYY-MM-DD` seed counts into a new `lifetime.dailyRuns`; `ProgressionService` passes `SaveStore.getDailyStreak(now).streak` in and the best is kept as `lifetime.bestStreak`, which the achievements grid also reads. The biome achievements are unchanged and still wait on the definition of "discovered".
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 

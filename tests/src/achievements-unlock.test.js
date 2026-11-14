@@ -49,3 +49,43 @@ describe('ACH-5: combo progress starts from nothing', () => {
 });
 
 function achShown(a, m) { return progressFor(a, m).value; }
+
+describe('ACH-3 (daily and streak half): creditRun feeds the evaluator dailyRuns and streak', () => {
+  test('a run on a daily seed unlocks Daily Habit', () => {
+    const res = creditRun(v1(), rec({ seed: 'daily-2026-11-13' }), LEVELS);
+    expect(res.awards.achievements.map((a) => a.id)).toContain('daily-1');
+    expect(res.profile.lifetime.dailyRuns).toBe(1);
+  });
+
+  test('an ordinary seed does not count as a daily run', () => {
+    for (const seed of ['s', 'daily-2026-13-40', 'xdaily-2026-11-13', 'daily-2026-11-13@3']) {
+      const res = creditRun(v1(), rec({ seed }), LEVELS);
+      expect({ seed, daily: res.profile.achievements['daily-1'] }).toEqual({ seed, daily: undefined });
+      expect(res.profile.lifetime.dailyRuns).toBe(0);
+    }
+  });
+
+  test('a caller-supplied streak unlocks the streak achievements and is kept as the best streak', () => {
+    const three = creditRun(v1(), rec({ seed: 'daily-2026-11-13' }), LEVELS, { streak: 3 });
+    expect(three.awards.achievements.map((a) => a.id)).toEqual(expect.arrayContaining(['daily-1', 'streak-3']));
+    expect(three.profile.achievements['streak-7']).toBeUndefined();
+    expect(three.profile.lifetime.bestStreak).toBe(3);
+    const seven = creditRun(three.profile, rec({ id: 'r2', ledgerHash: 'h2', seed: 'daily-2026-11-17' }), LEVELS, { streak: 7 });
+    expect(seven.awards.achievements.map((a) => a.id)).toEqual(['streak-7']);
+    // A broken streak later never lowers the best.
+    const later = creditRun(seven.profile, rec({ id: 'r3', ledgerHash: 'h3', seed: 'daily-2026-11-30' }), LEVELS, { streak: 1 });
+    expect(later.profile.lifetime.bestStreak).toBe(7);
+  });
+
+  test('the caller cannot feed biomesDiscovered through the same door', () => {
+    const p = v1({ xp: 1e9 });
+    const res = creditRun(p, rec(), LEVELS, { streak: 0, biomeCount: 11 });
+    expect(['biomes-2', 'biomes-5', 'biomes-11'].filter((id) => res.profile.achievements[id] !== undefined)).toEqual([]);
+  });
+
+  test('the grid reads the stored counts, so an unlocked daily row is not shown at 0', () => {
+    const res = creditRun(v1(), rec({ seed: 'daily-2026-11-13' }), LEVELS, { streak: 3 });
+    const m = metricsFrom(res.profile, null, {});
+    expect({ dailyRuns: m.dailyRuns, bestStreak: m.bestStreak }).toEqual({ dailyRuns: 1, bestStreak: 3 });
+  });
+});
