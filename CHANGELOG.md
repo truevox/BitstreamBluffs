@@ -37,6 +37,7 @@
 - **MS-2:** a biome mission ("1500 m in Debumont") completes, and toasts live, only on a run whose `biomeMask` includes that biome's bit. The draw gate and the completion gate share one mask check.
 - **SHOP-1:** the shop autoprompt and the `SHOP: B` hint ignore title items (`slot === 'title'`), which the Shard Shop hides until a title UI exists, so they no longer fire over a 220-shard title the player cannot see.
 - **F9:** removed the dead `missions.ruleId` plumbing (the `applyMissions` writer and the two `MissionsService` readers). Nothing produced a rule id, the sanitizer dropped it, and no template uses `excludedRuleIds`; the pure `excludedRuleIds` filter in `Missions.js` stays for a future caller.
+- **BOOT-1:** `MissionsService.init` republishes `REG.PROFILE` after it fills the mission slots, so a boost toggle before the first run no longer saves the pre-draw profile and wipes the missions.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 

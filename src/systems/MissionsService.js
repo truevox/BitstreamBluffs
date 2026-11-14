@@ -64,6 +64,10 @@ export class MissionsService {
   async init() {
     this.alive = true;
     this.ensureSlots();
+    // ensureSlots() replaces store.profile (applyMissions builds a new object), but ProgressionService
+    // published REG.PROFILE before missions existed. Views derive their saves from REG.PROFILE, so a boost
+    // toggle before the first run saved the pre-draw profile and wiped the mission set. Republish here.
+    if (this.store && this.store.profile && this.game.registry) this.game.registry.set(REG.PROFILE, this.store.profile);
     this.publish();
     this._subscribe();
     this.game.events.once('destroy', () => this.destroy());

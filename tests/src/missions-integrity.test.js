@@ -176,3 +176,21 @@ describe('F9: missions carry no daily-rule id', () => {
     expect(Object.keys(store.profile.missions).sort()).toEqual(['active', 'counter', 'progress']);
   });
 });
+
+describe('BOOT-1: the published profile after boot is the store profile', () => {
+  test('REG.PROFILE carries the boot mission draw', async () => {
+    const { game, store } = await boot(memStorage());
+    expect(store.profile.missions.active.length).toBe(3);
+    // Views save a profile derived from REG.PROFILE; a stale one wipes the boot mission draw.
+    expect(game.registry.get(REG.PROFILE)).toBe(store.profile);
+  });
+
+  test('a boost toggle saved from REG.PROFILE before the first run keeps the missions', async () => {
+    const storage = memStorage();
+    const { game, store } = await boot(storage);
+    const drawn = store.profile.missions.active.slice();
+    const published = game.registry.get(REG.PROFILE);
+    store.save({ ...published, boosts: { ...published.boosts, headStart: true } });
+    expect(store.profile.missions.active).toEqual(drawn);
+  });
+});
