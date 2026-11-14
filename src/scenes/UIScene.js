@@ -13,7 +13,8 @@
  * timers bottom-left, seed / daily rule bottom-right. The middle band where the rider lives stays clear.
  * Centre banners (warnings, BOOST, PERFECT LANDING, sector strip, bank line, crash banner, popups) never share a slot:
  * `_layout()` stacks the visible ones top to bottom (ui/HudLayout.js `stackY`) from their classic y, pushing them under the fixed
- * HUD rows, the zone chip and the touch buttons they would touch. The bottom row (power-ups, tutorial chip) does the same with `placeX`.
+ * HUD rows, the zone chip and the touch buttons they would touch. The sector / mission strip is a full-width band and takes its
+ * slot in that same stack (a `full` item), so it cannot overlap the banners above or below it. The bottom row (power-ups, tutorial chip) does the same with `placeX`.
  */
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, SCORING } from '../constants.js';
@@ -26,7 +27,7 @@ import { measureText } from '../ui/PixelFont.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { fmtInt, fmtMult, fmtSec, idToLabel } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
-import { stackY, placeX, placeBand, STRIP_BAND } from '../ui/HudLayout.js';
+import { stackY, placeX, STRIP_BAND } from '../ui/HudLayout.js';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -167,8 +168,9 @@ export class UIScene extends Phaser.Scene {
     on(EVT.SHARD_COLLECTED, this.onShard);
     on(EVT.MILESTONE, this.onMilestone);
     on(EVT.NEW_BEST, this.onNewBest);
-    // W3: biome banner. Uses the same serialised strip queue as milestones and missions, so it can
-    // never overlap the trick popup or the FLOW indicator (the W2 defect carried into W3).
+    // W3: biome banner. Uses the same serialised strip queue as milestones and missions, so two strips
+    // never show at once. Overlap with the FLOW indicator, the trick popups and the other centre banners
+    // is prevented by _layout, which stacks the strip band with them as one full-width slot.
     on(EVT.BIOME_ENTER, this.onBiomeEnter);
     on(EVT.TUTORIAL_HINT, this.onHint);
     on(EVT.FLOW_CHANGED, this.onFlowChanged);
@@ -1030,26 +1032,28 @@ export class UIScene extends Phaser.Scene {
     for (const e of this.effects.values()) add(e.text, measureText(e.text.main.text), 8, SLOT.warn, 'top');
     if (this._shown(this.boostText)) add(this.boostText, measureText(this.boostText.main.text) * this.boostScale, 8 * this.boostScale, SLOT.boost, 'mid');
     if (this._shown(this.flash)) add(this.flash, measureText(this.flash.main.text) * 2, 16, SLOT.flash, 'mid');
-    // The strip is a FULL-WIDTH band, not a text box: it is placed by placeBand against the fixed rows
-    // instead of joining the text stack. Its background fill crosses the whole row, so measuring only
-    // its text (the old behaviour) let it paint over "FLOW x1.25" and the trick popups - the W2 defect.
+    // The strip is a FULL-WIDTH band, not a text box: its background fill crosses the whole row, so measuring
+    // only its text (the W2 defect) let it paint over "FLOW x1.25" and the trick popups. It takes its slot in
+    // this same stack (between the flash and the bank line, in SLOT order) as a `full` item, tested across
+    // the whole row. It used to be placed separately with placeBand, which ignored the stack, so it sat on
+    // the PERFECT flash, the bank line and the CRASH banner (audit U5a/b/c).
     const stripUp = this.stripC.visible && Boolean(this.stripT.main.text);
+    if (stripUp) slots.push({ obj: this.stripC, w: GAME_WIDTH, h: STRIP_BAND.h, pref: SLOT.strip, kind: 'band', full: true });
     if (this._shown(this.bankLine)) add(this.bankLine, measureText(this.bankLine.main.text) * 2, 16, SLOT.bank, 'mid');
     if (this._shown(this.banner)) add(this.banner, measureText(this.banner.main.text) * this.bannerScale, 8 * this.bannerScale, SLOT.banner, 'mid');
     for (const p of this.popups) add(p, measureText(p.main.text), 8, SLOT.popup, 'top');
-    const ys = stackY(slots, { cx, startY: 0, gap: 3, keepOuts: keep });
+    const ys = stackY(slots, { cx, startY: 0, gap: 3, width: GAME_WIDTH, keepOuts: keep });
     slots.forEach((sl, i) => {
+      if (sl.kind === 'band') {
+        // The container's band is drawn at local y 59..76 and its text at local y 61: shift so the BAND
+        // top lands on its stacked y. Never lower than the screen allows.
+        const bandTop = Math.min(ys[i], Math.max(SLOT.strip, GAME_HEIGHT - sl.h));
+        const ty = bandTop - SLOT.strip;
+        if (this.stripC.__snap) { this.stripC.__snap = false; this.stripC.y = ty; } else this.stripC.y += (ty - this.stripC.y) * Math.min(1, dt / 70);
+        return;
+      }
       this._glide(sl.obj, sl.kind === 'mid' ? ys[i] + sl.h / 2 : ys[i], dt);
     });
-
-    // strip band: own slot, clear of every fixed row across its full width
-    if (stripUp) {
-      const bandTop = placeBand(17, SLOT.strip, keep, { gap: 3 });
-      // the container's band is drawn at local y 59..76, and its text at local y 61: shift so the
-      // BAND top lands on bandTop.
-      const ty = bandTop - 59;
-      if (this.stripC.__snap) { this.stripC.__snap = false; this.stripC.y = ty; } else this.stripC.y += (ty - this.stripC.y) * Math.min(1, dt / 70);
-    }
 
     // bottom row: power-up timers (clear of the touch buttons), then the tutorial chip (clear of both and of the seed lines)
     const n = this.powerups.size;

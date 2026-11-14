@@ -1,7 +1,7 @@
 /**
  * OWNER: UI engineer.
  * Phaser-free HUD layout helpers (rectangles are {x, y, w, h} in game pixels, 480x270).
- * UIScene uses them to stack the centre banners (landing, boost, strip, popups) in separate slots that also dodge the fixed
+ * UIScene uses them to stack the centre banners (landing, boost, strip band, bank line, crash banner, popups) in separate slots that also dodge the fixed
  * HUD rows and the on-screen touch buttons, and to find a free spot for the bottom row (power-ups, tutorial chip).
  */
 
@@ -27,21 +27,26 @@ export function rectsHit(a, b, pad = 0) {
 }
 
 /**
- * Stack centred items top to bottom. Each item is {w, h, pref?, cx?}: it takes `max(cursor, pref)` as its top, is pushed below any
- * keep-out rectangle it would touch, and the next item starts `gap` under it. Items that do not collide stay at `pref`
+ * Stack centred items top to bottom. Each item is {w, h, pref?, cx?, full?}: it takes `max(cursor, pref)` as its top, is pushed
+ * below any keep-out rectangle it would touch, and the next item starts `gap` under it. Items that do not collide stay at `pref`
  * (their classic position). Returns the top y of every item, in order.
- * @param {{w:number,h:number,pref?:number,cx?:number}[]} items
- * @param {{cx:number, startY?:number, gap?:number, keepOuts?:{x:number,y:number,w:number,h:number}[]}} opts
+ *
+ * `full: true` marks a full-width band (the HUD strip): it is tested across the whole `width`, not just its own `w`, because its
+ * background fill crosses the row. Putting the band IN the stack, rather than placing it separately, is what keeps it off the
+ * centre banners above and below it: the cursor only moves down, so no two stacked items can overlap (audit U5a/b/c).
+ * @param {{w:number,h:number,pref?:number,cx?:number,full?:boolean}[]} items
+ * @param {{cx:number, startY?:number, gap?:number, width?:number, keepOuts?:{x:number,y:number,w:number,h:number}[]}} opts
  * @returns {number[]}
  */
-export function stackY(items, { cx, startY = 0, gap = 3, keepOuts = [] }) {
+export function stackY(items, { cx, startY = 0, gap = 3, width = 480, keepOuts = [] }) {
   const out = [];
   let cursor = startY;
   for (const it of items) {
     let y = Math.max(cursor, it.pref || 0);
-    const x = (it.cx === undefined ? cx : it.cx) - it.w / 2;
+    const w = it.full ? width : it.w;
+    const x = it.full ? 0 : (it.cx === undefined ? cx : it.cx) - it.w / 2;
     for (let guard = 0; guard < 64; guard++) {
-      const hit = keepOuts.find((k) => rectsHit({ x, y, w: it.w, h: it.h }, k, gap - 1));
+      const hit = keepOuts.find((k) => rectsHit({ x, y, w, h: it.h }, k, gap - 1));
       if (!hit) break;
       y = hit.y + hit.h + gap;
     }

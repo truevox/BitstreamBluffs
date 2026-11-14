@@ -457,3 +457,87 @@ describe('U4b: clicks inside the open Game Over shop never reach the buttons und
     expect(g.shopOpen).toBe(false);
   });
 });
+
+// ================================================================== U5: HUD strip band vs centre stack
+
+
+// ================================================================== U5: HUD strip vs centre stack
+
+/** A NeonText-shaped stub that UIScene._layout reads. */
+const nt = (text, scale = 1, vAnchor = 0.5) => ({ visible: true, alpha: 1, scaleX: scale, x: 240, y: 0, __snap: true, main: { text, originX: 0.5, originY: vAnchor } });
+
+function hud({ keep = [], flash, bank, banner }) {
+  const s = Object.create(UIScene.prototype);
+  Object.assign(s, {
+    nowMs: 0, touchAt: 0, touchRects: [], zoneChip: { w: 0 }, zoneY: 3, effects: new Map(),
+    boostText: { ...nt(''), visible: false }, boostScale: 2,
+    flash: flash ? nt(flash) : { ...nt(''), visible: false },
+    bankLine: bank ? nt(bank) : { ...nt(''), visible: false },
+    banner: banner ? nt(banner, 3) : { ...nt(''), visible: false }, bannerScale: 3,
+    stripC: { visible: true, y: 0, __snap: true }, stripT: { main: { text: 'MISSION DONE +60 XP' } },
+    popups: [], powerups: new Map(), powerX: 8, chainText: { visible: false }, hintChip: { w: 0 }, seedText: null,
+    _fixedRects: () => keep.slice(),
+  });
+  s._layout(16);
+  const band = { x: 0, y: s.stripC.y + 59, w: 480, h: 17 };
+  const box = (o, h) => ({ x: 240 - (measureText(o.main.text) * o.scaleX) / 2, y: o.y - h / 2, w: measureText(o.main.text) * o.scaleX, h });
+  const items = [];
+  if (flash) items.push(['PERFECT LANDING flash', box(s.flash, 16)]);
+  if (bank) items.push(['bank line', box(s.bankLine, 16)]);
+  if (banner) items.push(['CRASH banner', box(s.banner, 24)]);
+  return { band, items };
+}
+const overlapsY = (a, b) => a.y < b.y + b.h && b.y < a.y + a.h;
+const hits = ({ band, items }) => items.filter(([, r]) => overlapsY(band, r)).map(([n, r]) => `${n} y${r.y}..${r.y + r.h} vs strip y${band.y}..${band.y + band.h}`);
+
+describe('U5: the full-width strip band and the centre stack are one layout', () => {
+  // FLOW readout (right-anchored text at FLOW_Y 62) and its bar (y 71..76), as _fixedRects reports them.
+  const FLOW = [{ x: 472 - measureText('FLOW x1.50'), y: 62, w: measureText('FLOW x1.50'), h: 8 }, { x: 407, y: 71, w: 66, h: 5 }];
+
+  test('U5a: a mission/sector strip never overlaps the PERFECT LANDING flash (quiet HUD)', () => {
+    const LEFT = [{ x: 8, y: 13, w: measureText('9,999,999') * 2, h: 16 }, { x: 8, y: 31, w: measureText('99,999 M'), h: 8 }, { x: 8, y: 41, w: measureText('432 KM/H'), h: 8 }];
+    expect(hits(hud({ keep: LEFT, flash: 'PERFECT LANDING +20' }))).toEqual([]);
+  });
+
+  test('U5b: with FLOW showing, the pushed-down strip never overlaps the bank line', () => {
+    expect(hits(hud({ keep: FLOW, bank: 'KICKFLIP COMBO x2 +500' }))).toEqual([]);
+  });
+
+  test('U5c: the run-end mission toast never overlaps the CRASH banner', () => {
+    expect(hits(hud({ keep: FLOW, banner: 'CRASH' }))).toEqual([]);
+  });
+});
+
+// ================================================================== mission toasts at run end
+
+describe('U5: the band still keeps its classic place and clears the fixed rows', () => {
+  test('on a quiet HUD with nothing else up, the band stays at y 59', () => {
+    const { band } = hud({ keep: [] });
+    expect(band.y).toBe(59);
+  });
+
+  test('with FLOW showing, the band is pushed clear of the FLOW text and bar', () => {
+    const FLOW = [{ x: 472 - measureText('FLOW x1.50'), y: 62, w: measureText('FLOW x1.50'), h: 8 }, { x: 407, y: 71, w: 66, h: 5 }];
+    const { band } = hud({ keep: FLOW });
+    for (const k of FLOW) expect(overlapsY(band, k)).toBe(false);
+  });
+
+  test('the flash, the band, the bank line and the banner all stack without touching', () => {
+    const FLOW = [{ x: 472 - measureText('FLOW x1.50'), y: 62, w: measureText('FLOW x1.50'), h: 8 }, { x: 407, y: 71, w: 66, h: 5 }];
+    const r = hud({ keep: FLOW, flash: 'PERFECT LANDING +20', bank: 'KICKFLIP COMBO x2 +500', banner: 'CRASH' });
+    const all = [['strip', r.band], ...r.items];
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) expect([all[i][0], all[j][0], overlapsY(all[i][1], all[j][1])]).toEqual([all[i][0], all[j][0], false]);
+    }
+    expect(r.items[r.items.length - 1][1].y + 24).toBeLessThanOrEqual(GAME_HEIGHT);
+  });
+});
+
+describe('U5: HudLayout.stackY full-width items', () => {
+  test('a full item is tested across the whole row; the same item without `full` slips past an edge row', async () => {
+    const { stackY } = await import('../../src/ui/HudLayout.js');
+    const edge = [{ x: 400, y: 60, w: 72, h: 10 }]; // a right-anchored row, nowhere near the centred text
+    expect(stackY([{ w: 200, h: 17, pref: 59 }], { cx: 240, keepOuts: edge })).toEqual([59]);
+    expect(stackY([{ w: 200, h: 17, pref: 59, full: true }], { cx: 240, keepOuts: edge })).toEqual([73]);
+  });
+});
