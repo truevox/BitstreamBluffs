@@ -24,7 +24,7 @@ import {
 import { ellipsize } from '../ui/PixelFont.js';
 // Whether a boosted run may rank is Ranking.js's decision alone (W4's single-helper rule), so this scene
 // asks it instead of testing rec.modded itself.
-import { boardsModded } from '../systems/Ranking.js';
+import { boardsModded, rankableOnly } from '../systems/Ranking.js';
 import { Panel } from '../ui/Panel.js';
 import { Button } from '../ui/Button.js';
 import { MenuInput } from '../ui/MenuInput.js';
@@ -517,9 +517,15 @@ export class GameOverScene extends Phaser.Scene {
    * A boosted run is compared against the MODDED board's histories, not against clean runs: telling a
    * boosted player they set a "DISTANCE BEST" the clean board will never show them is exactly the false
    * promise CC Friday caught.
+   *
+   * The reverse holds too: a clean run is compared only with runs a clean board may hold (Ranking.js
+   * `rankableOnly`). Comparing it with every stored run told a clean player they were "8,400 M SHORT OF"
+   * a Head Start run's distance (audit F-LEAD-2).
    */
   _loadBest(store, rec, safe) {
-    safe(() => (boardsModded(rec) ? store.getModdedLeaderboard(1000) : store.getRecentRuns(1000)), []).then((runs) => {
+    const modded = boardsModded(rec);
+    safe(() => (modded ? store.getModdedLeaderboard(1000) : store.getRecentRuns(1000)), []).then((all) => {
+      const runs = modded || !Array.isArray(all) ? all : rankableOnly(all);
       if (!this.alive || !Array.isArray(runs) || rec.cause === 'quit' && !(rec.score > 0)) return;
       // The modded board only holds runs WITH initials, so the player's own just-finished run may not be in
       // it yet. Comparing against that board is still right: it is the list this run will actually appear on.
