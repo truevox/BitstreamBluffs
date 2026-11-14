@@ -128,8 +128,11 @@ The repair is proven in both directions, not just "tests are green now":
 
 | Tree | Built-game bought-out probe | Gate |
 |---|---|---|
-| `e0ae90f` (current `main`, unpatched) | **FAIL** — flag true, hint shown, popup over 0 purchasable rows | **FAIL** (12 passed, 1 failed) |
+| `e0ae90f` (current `main`, unpatched) | **FAIL** — flag true, hint shown, popup over 0 purchasable rows | **FAIL** (14 passed, 1 failed) |
 | `luna/w41-shop-affordability-agrees` | **PASS** — no hint, no popup, B inert | **PASS** (15/15) |
+
+Counts differ per base because W6 added two gate cases of its own between `83b0a4b` (12) and `e0ae90f`
+(14); the failing case is the same one in both.
 
 The new tests fail against the old helper (verified by stashing only `ShopPrompt.js`) and pass with it.
 
