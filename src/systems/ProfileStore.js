@@ -300,6 +300,10 @@ export function creditRun(profile, record, levels) {
   L.bestDistanceM = Math.max(L.bestDistanceM, nonNeg(record.distanceM));
   L.bestCombo = Math.max(L.bestCombo, nonNegFloat(record.bestCombo));
   L.maxAirtimeMs = Math.max(L.maxAirtimeMs, nonNeg(record.maxAirtimeMs));
+  // Snapshot the lifetime tricks BEFORE this run is folded in: `next.lifetime` is a shallow copy of
+  // `base.lifetime`, so `L.tricks` and `base.lifetime.tricks` are the SAME object and a snapshot taken
+  // afterwards would already contain the run. Taken here, it is the profile as it stood before the run.
+  const tricksBeforeRun = (base.lifetime && base.lifetime.tricks) ? { ...base.lifetime.tricks } : {};
   if (record.tricks && typeof record.tricks === 'object') {
     for (const [k, v] of Object.entries(record.tricks)) {
       if (typeof k === 'string' && k && isNum(v) && v > 0) L.tricks[k] = (L.tricks[k] || 0) + Math.round(v);
@@ -315,7 +319,23 @@ export function creditRun(profile, record, levels) {
   // W5: evaluate achievements as part of the same credit, so a run that crosses a threshold unlocks it
   // on the Game Over screen rather than on some later unrelated save. `now` comes from the record's
   // end time, not from inside the pure evaluator.
-  const unlockedNow = unlockAchievementsFor(next, record, { at: nonNeg(record.endedAt) });
+  //
+  // The record's tricks are folded into `L.tricks` above, and `metricsFrom` ALSO adds `run.tricks` to the
+  // lifetime total, so passing `next` here counted a run's tricks twice: five lands unlocked `tricks-10`,
+  // nine unlocked it too. Evaluate against the profile as it stands BEFORE this run's tricks are folded in,
+  // and let metricsFrom's `run.tricks` term be the one that counts them. Everything else the credit changed
+  // (xp, level, bank, shards, distance, combo, airtime) is already on `next`, so level-gated and distance
+  // achievements still see this run's outcome. The kinds metric is unaffected either way: it is a Set union.
+  const beforeTricks = record.tricks && typeof record.tricks === 'object'
+    ? { ...next, lifetime: { ...next.lifetime, tricks: tricksBeforeRun } }
+    : next;
+  const unlockedNow = unlockAchievementsFor(beforeTricks, record, { at: nonNeg(record.endedAt) });
+  // `unlockedNow.profile` was derived from `beforeTricks`, so it does not carry this run's folded lifetime
+  // totals. Keep the credited `next` and take only the achievement stamping and its rewards from the
+  // evaluation — otherwise the run's tricks, distance and score vanish from the returned profile.
+  const credited = unlockedNow.added.length
+    ? { ...next, achievements: unlockedNow.profile.achievements, unlocked: unlockedNow.profile.unlocked }
+    : next;
   const awards = {
     xp,
     levelBefore,
@@ -326,7 +346,7 @@ export function creditRun(profile, record, levels) {
     title: rewards ? rewards.title : null,
     achievements: unlockedNow.added,
   };
-  return { profile: unlockedNow.profile, awards };
+  return { profile: credited, awards };
 }
 
 /**

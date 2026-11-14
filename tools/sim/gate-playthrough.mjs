@@ -205,9 +205,18 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
     // `chasm` and not `terrain`: an opening-grace terrain crash is deliberately forgiven and respawns,
     // which is correct behaviour and would leave the gate waiting for a Game Over that never comes.
     run.pendingCrash = { cause: 'chasm' };
-    await wait(3000);
+    // Poll for the scene to actually become ACTIVE rather than sleeping a fixed 3s (the flake diagnosed on
+    // W5/W6: under load the run has not handed off and the probe reads a pre-handoff scene).
+    const deadline = Date.now() + 15000;
+    let active = false;
+    while (Date.now() < deadline) {
+      const s = g.scene.getScene('GameOverScene');
+      active = Boolean(s && s.scene && s.scene.isActive && s.scene.isActive());
+      if (active) break;
+      await wait(100);
+    }
+    if (active) await wait(350);
     const over = g.scene.getScene('GameOverScene');
-    const active = Boolean(over && over.scene && over.scene.isActive && over.scene.isActive());
     const rec = g.registry.get('lastRecord') || g.registry.get('record') || null;
     const texts = [];
     const seen = new Set();
