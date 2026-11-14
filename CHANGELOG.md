@@ -29,6 +29,7 @@
 - UI-2: a multi-column MenuList (Profile signature toggles) draws its highlight on the selected row's own
   column and row, not below the list.
 - U7a: the clipboard fallback removes its hidden textarea even when `execCommand` throws.
+- **MS-3:** the profile sanitizer (and `applyMissions`) now dedupes active mission ids before the three-slot cap, so a hand-edited save cannot pay one mission three times.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 

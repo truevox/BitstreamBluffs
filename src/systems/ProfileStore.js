@@ -108,7 +108,9 @@ export function sanitizeProfile(raw, levels) {
   const m = raw.missions && typeof raw.missions === 'object' ? raw.missions : {};
   p.missions = {
     counter: nonNeg(m.counter),
-    active: Array.isArray(m.active) ? m.active.filter((x) => typeof x === 'string').slice(0, 3) : [],
+    // Deduped before the cap: a hand-edited ['a','a','a'] would otherwise fill all three slots with one
+    // mission and pay it three times on a single run.
+    active: strArr(m.active).slice(0, 3),
     progress: m.progress && typeof m.progress === 'object' ? { ...m.progress } : {},
   };
   // W5: {id: unlockMs}. Only finite timestamps survive: a NaN or a string would sort unpredictably in the
@@ -504,7 +506,7 @@ export class ProfileStore {
     const p = this.profile;
     const missions = {
       counter: nonNeg(roll.counter),
-      active: Array.isArray(roll.active) ? roll.active.filter((x) => typeof x === 'string').slice(0, 3) : [],
+      active: strArr(roll.active).slice(0, 3),
       progress: roll.progress && typeof roll.progress === 'object' ? { ...roll.progress } : {},
       // The daily rule the set was drawn under, so a save/load mid-day cannot re-filter differently.
       ruleId: typeof roll.ruleId === 'string' ? roll.ruleId : (p.missions && p.missions.ruleId) || null,
