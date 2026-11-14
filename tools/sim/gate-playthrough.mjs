@@ -1671,10 +1671,12 @@ async function main() {
               const crashedByHit = !!run.pendingCrash;
               keepAlive();
               step(12);
-              const mid = run.blindRect ? run.blindRect.alpha : null;
+              // what reaches the screen: a Rectangle draws fillAlpha x alpha, so the object alpha alone can lie
+              const opacity = () => (run.blindRect && run.blindRect.visible ? run.blindRect.fillAlpha * run.blindRect.alpha : null);
+              const mid = opacity();
               const visible = run.blindRect ? run.blindRect.visible : null;
               step(80);
-              const end = run.blindRect ? run.blindRect.alpha : null;
+              const end = opacity();
               res.blind = { crashedByHit, mid, end, visible, crashed: run.crashed, inWorld: run.sled.inWorld };
             } catch (e) { res.blind = { fatal: String(e) }; }
 
@@ -1736,9 +1738,9 @@ async function main() {
         const b = o.blind;
         if (b.fatal) fail(name.blind, b.fatal);
         else if (b.crashedByHit || b.crashed || !b.inWorld) fail(name.blind, `blind crashed the run (hit ${b.crashedByHit}, crashed ${b.crashed}, inWorld ${b.inWorld})`);
-        else if (!(b.mid > 0.3) || !(b.mid <= 0.65 + 1e-9)) fail(name.blind, `overlay alpha mid-effect ${b.mid} (want (0.3, 0.65])`);
+        else if (!(b.mid > 0.3) || !(b.mid <= 0.65 + 1e-9)) fail(name.blind, `overlay opacity (fillAlpha x alpha) mid-effect ${b.mid} (want (0.3, 0.65])`);
         else if (b.end !== 0) fail(name.blind, `overlay did not clear: alpha ${b.end}`);
-        else pass(name.blind, `overlay alpha ${b.mid.toFixed(3)} mid-effect (visibility floor 0.35 -> max 0.65), 0 after; no crash`);
+        else pass(name.blind, `overlay opacity ${b.mid.toFixed(3)} mid-effect (visibility floor 0.35 -> max 0.65), 0 after; no crash`);
 
         const st = o.stabilize;
         if (st.fatal) fail(name.stabilize, st.fatal);

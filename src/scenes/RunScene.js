@@ -247,8 +247,9 @@ export class RunScene extends Phaser.Scene {
     this.flashRect = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0)
       .setOrigin(0).setScrollFactor(0).setDepth(100);
     // B0 `blind`: a dimming layer under the flash (the HUD is a separate scene above it, so it stays readable).
-    this.blindRect = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, this.palette.bg, 0)
-      .setOrigin(0).setScrollFactor(0).setDepth(99);
+    // Fill alpha 1 and object alpha 0: a Rectangle draws fillAlpha x alpha, so updateBlindOverlay's alpha is the opacity.
+    this.blindRect = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, this.palette.bg, 1)
+      .setOrigin(0).setScrollFactor(0).setDepth(99).setAlpha(0);
 
     // initial terrain buffer, then the sled on the surface
     this.streamTerrain(0);
@@ -1530,6 +1531,7 @@ export class RunScene extends Phaser.Scene {
     // setMotif(null) is the exit case: a motif must not outlive the sector that owns it.
     if (this.bg) this.bg.setMotif(biomeDef && biomeDef.background ? biomeDef.background : null);
     this.cameras.main.setBackgroundColor(this.palette.bg);
+    if (this.blindRect) this.blindRect.setFillStyle(this.palette.bg, 1); // B0 blind overlay follows the palette
     this.sled.palette = this.palette;
     // A palette toggle can turn colourblind ON, which refuses every cosmetic: the sled and trail have to
     // be re-resolved, not just repainted, or a paid hue would survive the accessibility switch.
