@@ -8,7 +8,7 @@ export const FX_GROUND_HAZARD = Object.freeze({
   biome: 'garbage-dump-glacier',
   shapeKey: 'fxUnknownShape',
   size: { w: 26, h: 22 },
-  onHit: { effect: 'slow', durationMs: 900, speedFactor: 0.7 },
+  onHit: { effect: 'blind', durationMs: 1200, visibility: 0.4 },
   spawn: { baseChance: 0.5 },
   weight: 1,
   minDistanceM: 0,

@@ -149,6 +149,21 @@ export const AIR_U_MAX = 0.8;
 export const AIR_NEAR_MISS_BELOW_PX = 360;
 /** Power-up spawn chance never decays below this share of the def's baseChance. */
 export const POWERUP_FLOOR_FRACTION = 0.4;
+/**
+ * B0 biome spawns (spec §4 bounds). One hazard slot and one power-up slot per biome chunk, each spawning with the def's
+ * own `spawn.baseChance`, capped here. The power-up chance has no distance decay (spec: "a fixed spawn chance").
+ */
+export const BIOME_SPAWN_MAX_CHANCE = 0.5;
+/** Chance used when a biome def carries no `spawn.baseChance` (mirrors the base power-up default). */
+export const BIOME_SPAWN_DEFAULT_CHANCE = 0.2;
+/**
+ * Clearance from the chunk edges for biome spawns. Spec §4 asks for >= 96 px; 240 (the base hazard margin) is used because a
+ * per-chunk pass cannot see the neighbour chunk, and two 240 px margins are what keep hazards >= HAZARD_MIN_SPACING_PX apart
+ * across a chunk border.
+ */
+export const BIOME_EDGE_MARGIN_PX = HAZARD_END_MARGIN_PX;
+/** Random numbers each biome slot draws, whatever its outcome, so one def's tuning never shifts another stream. */
+export const BIOME_SLOT_DRAWS = 5;
 /** Difficulty tail: past the old caps the ramp keeps creeping up (gently) to a hard ceiling. */
 export const HAZARD_DENSITY_CAP_M = 3500;
 export const HAZARD_DENSITY_TAIL_END_M = 10000;
@@ -185,6 +200,10 @@ const groupByBiome = (sorted) => {
 };
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smooth = (t) => t * t * (3 - 2 * t);
+/** Spawn chance of one biome slot: the def's `spawn.baseChance`, capped at BIOME_SPAWN_MAX_CHANCE (spec §4). */
+const biomeChance = (d) => clamp(
+  d.spawn && Number.isFinite(d.spawn.baseChance) ? d.spawn.baseChance : BIOME_SPAWN_DEFAULT_CHANCE, 0, BIOME_SPAWN_MAX_CHANCE,
+);
 
 /** 1-D smooth value noise in [-1,1]. */
 function vnoise(x, seed) {
@@ -773,6 +792,9 @@ export class TerrainGenerator {
     this._placePowerups(target, crng.fork('pu'), distM);
     this._placeShards(target, crng.fork('shard'), distM, lips);
     this._placeAirHazard(target, crng.fork('air'), distM, isJump, breather, lips);
+    // B0: biome hazards / power-ups, LAST and only inside a biome chunk, from their own forks (spec §5). A fork derives
+    // from crng's initial state, so creating these never moves any stream above; base chunks never reach this line.
+    if (biome) this._placeBiomeSpawns(target, biome, crng.fork('biomeHaz'), crng.fork('biomePu'), distM, kind, b, isJump, breather, lips);
 
     if (this.bounds.length === index + 1) {
       let pos = b.pos + 1;
@@ -1228,36 +1250,173 @@ export class TerrainGenerator {
     const rExtra = rng.next();
     const rDef = rng.next();
     if (!this.airHazardList.length || !isJump || breather || chunk.index === 0) return;
-    let lip = null;
-    for (const l of lips) if (!l.pad && l.landX != null && (!lip || l.airS > lip.airS)) lip = l;
-    if (!lip || !(lip.vx > 0)) return;
-    const span = lip.landX - lip.x;
-    const lo = Math.max(AIR_MIN_DX_PX, AIR_U_MIN * span);
-    const hi = AIR_U_MAX * span;
-    if (hi < lo) return; // the span cannot hold a box >= AIR_MIN_DX_PX past the lip
+    const s = this._airSpan(lips);
+    if (!s) return;
+    const { lip, lo, hi } = s;
     const lipM = lip.x / this.ppm;
     const p = AIR_CHANCE_START + (AIR_CHANCE_END - AIR_CHANCE_START) * clamp((lipM - AIR_HAZARD_MIN_M) / (AIR_CHANCE_FULL_M - AIR_HAZARD_MIN_M), 0, 1);
     if (lipM < AIR_HAZARD_MIN_M || rChance >= p) return;
-    const hiMul = Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(distM) / Math.hypot(lip.vx, lip.vy));
+    const hiMul = this._airHiMul(lip, distM);
     // two candidate positions (the second only when the first collides with a power-up / shard)
     for (const dxPick of [lo + (hi - lo) * rU, lo + (hi - lo) * ((rU + 0.5) % 1)]) {
       const x = Math.round(lip.x + dxPick);
       const def = this._pickAirDef(rDef, x / this.ppm);
       if (!def) return;
-      const w = (def.size && def.size.w) || 24;
-      const h = (def.size && def.size.h) || 24;
-      const crashy = !def.onHit || def.onHit.effect === 'crash';
-      const bw = crashy ? w * 0.72 : w;
-      const bh = crashy ? h * 0.8 : h;
-      const dx = x - lip.x;
-      // the arc bends a little across the box width: use its highest edge sample
-      const highest = Math.min(this._arcY(lip, hiMul, dx - bw / 2), this._arcY(lip, hiMul, dx), this._arcY(lip, hiMul, dx + bw / 2));
-      const cy = highest - AIR_CLEARANCE_PX - 6 - 18 * rExtra - bh / 2;
-      if (this._airBlocked(chunk, x, cy, bw, bh)) continue;
-      chunk.hazards.push({ defId: def.id, x, y: Math.round(cy * 100) / 100, rotationDeg: 0 });
-      chunk.hazards.sort((a, b) => a.x - b.x);
-      return;
+      if (this._tryAirBox(chunk, def, lip, hiMul, x, rExtra)) return;
     }
+  }
+
+  /**
+   * The jump of a chunk that can hold an air hazard: its longest non-pad lip with a known landing, and the band of x offsets
+   * past the lip where the box may go. Null when there is no such lip or the span cannot hold a box >= AIR_MIN_DX_PX past it.
+   */
+  _airSpan(lips) {
+    let lip = null;
+    for (const l of lips) if (!l.pad && l.landX != null && (!lip || l.airS > lip.airS)) lip = l;
+    if (!lip || !(lip.vx > 0)) return null;
+    const span = lip.landX - lip.x;
+    const lo = Math.max(AIR_MIN_DX_PX, AIR_U_MIN * span);
+    const hi = AIR_U_MAX * span;
+    if (hi < lo) return null;
+    return { lip, lo, hi };
+  }
+
+  /** Launch-speed multiple whose arc bounds every no-hop flight (see AIR_SPEED_HI_MUL). */
+  _airHiMul(lip, distM) {
+    return Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(distM) / Math.hypot(lip.vx, lip.vy));
+  }
+
+  /**
+   * Place `def` as an air box at x above the flight arc of `lip` (AIR_CLEARANCE_PX over the fastest no-hop arc) unless it is
+   * blocked (_airBlocked). Keeps `chunk.hazards` sorted by x. @returns {boolean} true when placed.
+   */
+  _tryAirBox(chunk, def, lip, hiMul, x, rExtra) {
+    const w = (def.size && def.size.w) || 24;
+    const h = (def.size && def.size.h) || 24;
+    const crashy = !def.onHit || def.onHit.effect === 'crash';
+    const bw = crashy ? w * 0.72 : w;
+    const bh = crashy ? h * 0.8 : h;
+    const dx = x - lip.x;
+    // the arc bends a little across the box width: use its highest edge sample
+    const highest = Math.min(this._arcY(lip, hiMul, dx - bw / 2), this._arcY(lip, hiMul, dx), this._arcY(lip, hiMul, dx + bw / 2));
+    const cy = highest - AIR_CLEARANCE_PX - 6 - 18 * rExtra - bh / 2;
+    if (this._airBlocked(chunk, x, cy, bw, bh)) return false;
+    chunk.hazards.push({ defId: def.id, x, y: Math.round(cy * 100) / 100, rotationDeg: 0 });
+    chunk.hazards.sort((a, b) => a.x - b.x);
+    return true;
+  }
+
+  // ------------------------------------------------------------------------------------------------- biome spawns (B0)
+
+  /**
+   * One biome hazard slot and one biome power-up slot (spec §4/§5). Runs only for a chunk whose `biome` is set, AFTER every
+   * base pass, from forks 'biomeHaz' / 'biomePu'. Each slot draws exactly BIOME_SLOT_DRAWS numbers up front, whatever
+   * happens next, so a def's chance or a blocked position never shifts the other slot or a later chunk. With no biome defs in
+   * content the pass places nothing.
+   * Ground hazards keep the base clearances (no bridge or jump chunk, BIOME_EDGE_MARGIN_PX from the chunk edges, the
+   * breather calm stretch, lip windows, b.noHazX, gaps, HAZARD_MIN_SPACING_PX from any hazard, 90 px from any power-up,
+   * readable slope, slow hazards only before a descent, no shard over the box). Air hazards use the base jump-arc box.
+   * @param {import('../data/schemas.js').TerrainChunk} chunk
+   * @param {string} biome
+   * @param {import('./Rng.js').Rng} hRng fork 'biomeHaz'
+   * @param {import('./Rng.js').Rng} pRng fork 'biomePu'
+   */
+  _placeBiomeSpawns(chunk, biome, hRng, pRng, distM, kind, b, isJump, breather, lips) {
+    const h0 = hRng.next(); const h1 = hRng.next(); const h2 = hRng.next(); const h3 = hRng.next(); hRng.next();
+    const p0 = pRng.next(); const p1 = pRng.next(); const p2 = pRng.next(); const p3 = pRng.next(); pRng.next();
+    const hDefs = this.biomeHazards[biome];
+    if (hDefs && chunk.index > 0) {
+      const def = this._pickBiomeDef(hDefs, h1, distM);
+      if (def && h0 < biomeChance(def)) {
+        if (def.placement === 'air') {
+          const s = !isJump || breather ? null : this._airSpan(lips);
+          if (s) {
+            const hiMul = this._airHiMul(s.lip, distM);
+            for (const u of [h2, (h2 + 0.5) % 1]) {
+              if (this._tryAirBox(chunk, def, s.lip, hiMul, Math.round(s.lip.x + s.lo + (s.hi - s.lo) * u), h3)) break;
+            }
+          }
+        } else if (kind !== 'bridge' && !isJump) {
+          const span = chunk.endX - chunk.startX - 2 * BIOME_EDGE_MARGIN_PX;
+          const steps = span > 0 ? Math.floor(span / HAZARD_RETRY_STEP_PX) + 1 : 0;
+          for (let k = 0; k < steps; k++) if (this._tryBiomeGround(chunk, def, (h2 + (k * HAZARD_RETRY_STEP_PX) / span) % 1, b, breather, lips)) break;
+        }
+      }
+    }
+    const pDefs = this.biomePowerups[biome];
+    if (pDefs && chunk.index > 0) {
+      const def = this._pickBiomeDef(pDefs, p1, distM);
+      if (def && p0 < biomeChance(def)) {
+        for (const u of [p2, (p2 + 0.5) % 1]) if (this._tryBiomePowerup(chunk, def, u, p3)) break;
+      }
+    }
+  }
+
+  /** Weighted pick from one pre-drawn number among defs allowed at distM. `weight: 0` disables a def. */
+  _pickBiomeDef(defs, r, distM) {
+    let total = 0;
+    for (const d of defs) if (this._biomeDefOk(d, distM)) total += Math.max(0, d.weight == null ? 1 : d.weight);
+    if (!(total > 0)) return null;
+    let t = r * total;
+    let last = null;
+    for (const d of defs) {
+      if (!this._biomeDefOk(d, distM)) continue;
+      const w = Math.max(0, d.weight == null ? 1 : d.weight);
+      if (!(w > 0)) continue;
+      last = d;
+      t -= w;
+      if (t < 0) return d;
+    }
+    return last;
+  }
+
+  _biomeDefOk(d, distM) {
+    return (d.minDistanceM || 0) <= distM && (d.maxDistanceM == null || distM <= d.maxDistanceM);
+  }
+
+  /** Ground biome hazard at fraction u of the chunk's inner span, if every base clearance holds. @returns {boolean} placed */
+  _tryBiomeGround(chunk, def, u, b, breather, lips) {
+    const lo = chunk.startX + BIOME_EDGE_MARGIN_PX;
+    const hi = chunk.endX - BIOME_EDGE_MARGIN_PX;
+    if (hi < lo) return false;
+    const x = Math.round(lo + (hi - lo) * u);
+    const crash = !def.onHit || def.onHit.effect === 'crash';
+    if (x < HAZARD_MIN_X_PX || x < HAZARD_SOFT_PX || x < b.noHazX || (crash && x < HAZARD_SAFE_PX)) return false;
+    if (breather && x < chunk.startX + BREATHER_CALM_PX) return false;
+    for (const l of lips) if (x >= l.x - 40 && x <= l.zoneEnd) return false;
+    for (const g of chunk.gaps) if (x >= g.x0 - 96 && x <= g.x1 + 96) return false;
+    for (const q of chunk.hazards) if (Math.abs(q.x - x) < HAZARD_MIN_SPACING_PX) return false;
+    for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return false;
+    const pts = chunk.points;
+    const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
+    const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
+    if (!(slope > -12 && slope < 28) || !this._flatAround(pts, i)) return false;
+    if (def.onHit && def.onHit.effect === 'slow' && !this._descentAhead(pts, i, chunk.endX)) return false;
+    const w = (def.size && def.size.w) || 24;
+    const ht = (def.size && def.size.h) || 24;
+    const y = this._yAtLocal(pts, x);
+    for (const s of chunk.shards) if (s.x >= x - w / 2 - 22 && s.x <= x + w / 2 + 22 && s.y >= y - ht - 22) return false;
+    chunk.hazards.push({ defId: def.id, x, y, rotationDeg: slope });
+    chunk.hazards.sort((p, q) => p.x - q.x);
+    return true;
+  }
+
+  /** Biome power-up at fraction u of the chunk's inner span, lifted like a base pickup. @returns {boolean} placed */
+  _tryBiomePowerup(chunk, def, u, rLift) {
+    const lo = chunk.startX + BIOME_EDGE_MARGIN_PX;
+    const hi = chunk.endX - BIOME_EDGE_MARGIN_PX;
+    if (hi < lo) return false;
+    const x = Math.round(lo + (hi - lo) * u);
+    if (x <= 480) return false;
+    for (const q of chunk.hazards) if (Math.abs(q.x - x) < 90) return false;
+    for (const g of chunk.gaps) if (x > g.x0 - 80 && x < g.x1 + 40) return false;
+    for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return false;
+    const r = def.radius || 10;
+    const y = this._yAtLocal(chunk.points, x) - (r + 26 + 32 * rLift);
+    for (const s of chunk.shards) if (Math.abs(s.x - x) < r + 24 && Math.abs(s.y - y) < r + 24) return false;
+    chunk.powerups.push({ defId: def.id, x, y });
+    chunk.powerups.sort((p, q) => p.x - q.x);
+    return true;
   }
 
   /** Weighted pick (one pre-drawn random number) among air defs allowed at distance dM. */
