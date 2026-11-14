@@ -270,3 +270,25 @@ describe('the Title BEST line shows clean runs only', () => {
     expect(await bestLine([rec({ distanceM: 9000, score: 9000, modded: true })])).toBe('untouched');
   });
 });
+
+// ================================================================ FAIRNESS-3: DAILY RUN seed and mask from one day
+
+describe('DAILY RUN takes its seed and its mask from the same UTC day', () => {
+  test('DAILY RUN sets the date seed and the date mask (override), not the profile mask', () => {
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, { ...BOOSTED_PROFILE, biomeMask: 1, pendingBiomes: ['debumont'] }]]);
+    pressTitle(values, 'DAILY RUN');
+    expect(values.get(REG.SEED)).toBe(TODAY_SEED);
+    expect(DailyPatch.biomeMaskForDate()).toBe(8);
+    expect(values.get(REG.BIOME_MASK)).toBe(8);
+  });
+
+  test('pressed just after 00:00 UTC, before the 15 s refresh, the seed and the mask agree on the day', () => {
+    // The scene still holds yesterday's info (refreshed every 15 s); the clock is already on the new day.
+    const yesterdayInfo = DailyPatch.getDailyInfo(new Date('2026-11-12T23:59:59Z'));
+    jest.setSystemTime(Date.parse('2026-11-13T00:00:05Z'));
+    const values = new Map([[REG.CONTENT, CONTENT]]);
+    pressTitle(values, 'DAILY RUN', { daily: yesterdayInfo });
+    const seedDay = DailyPatch.dateKeyFromSeed(values.get(REG.SEED));
+    expect(values.get(REG.BIOME_MASK)).toBe(DailyPatch.biomeMaskForDate(new Date(`${seedDay}T12:00:00Z`)));
+  });
+});

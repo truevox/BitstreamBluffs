@@ -101,7 +101,7 @@ export class TitleScene extends Phaser.Scene {
     // shows what you own and what it looks like).
     const items = [
       { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
-      { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this.startRun(this.daily.seed, DailyPatch.biomeMaskForDate()) },
+      { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this._startDaily() },
       { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
       {
         kind: 'action',
@@ -284,6 +284,18 @@ export class TitleScene extends Phaser.Scene {
       return;
     }
     this.menu.handleAction(action);
+  }
+
+  /**
+   * DAILY RUN. The seed and the mask are both derived at press time from ONE clock read. `this.daily` is
+   * refreshed only every 15 s, so reading the seed from it and the mask from "now" could pair yesterday's
+   * seed with today's mask for a press just after 00:00 UTC. RunScene reads the daily rule at create(), so
+   * deriving all three from the current day keeps seed, mask and rule on the same date.
+   * @returns {void}
+   */
+  _startDaily() {
+    const now = new Date();
+    this.startRun(DailyPatch.getDailyInfo(now).seed, DailyPatch.biomeMaskForDate(now));
   }
 
   /**

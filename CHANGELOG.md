@@ -6,6 +6,7 @@
 - **Golden mask-0 test now hashes every chunk field** (T6). The hand-written `full` projection missed power-ups, launches and the zone `modId` (it hashed `z.id`, which does not exist). A new `complete` digest per seed, recorded identically at `06e79f5` and `e0ae90f`, closes the gap. Proven by mutation: changing a zone modId past 2 km now fails 5 golden tests (before: none).
 - **F-LEAD-1.** A clean run's in-world BEST marker and its NEW BEST now chase the best clean (rankable) run only; a boosted run chases the modded runs. The split is `Ranking.sameBoardAs`, the same board choice Game Over makes.
 - **FAIRNESS-1.** The Title "BEST n M   n PTS" line now reads clean (rankable) runs only, so a boosted run no longer sets it.
+- **FAIRNESS-3.** DAILY RUN derives its seed and its biome mask from one clock read at press time, so a press just after 00:00 UTC (before the Title's 15 s refresh) can no longer pair yesterday's seed with today's mask.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 
