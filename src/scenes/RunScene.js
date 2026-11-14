@@ -30,6 +30,7 @@ import { TrickTracker } from '../systems/TrickTracker.js';
 import { GlitchDirector } from '../systems/GlitchDirector.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { boostEffects } from '../systems/Boosts.js';
+import { sameBoardAs } from '../systems/Ranking.js';
 import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING } from '../systems/PhysicsTuner.js';
 import { GlitchPipeline } from '../shaders/GlitchPipeline.js';
@@ -263,11 +264,14 @@ export class RunScene extends Phaser.Scene {
     this.startGate = this.add.graphics().setDepth(6);
     this.drawStartGate(this.startGate, start.x + 14, this.terrain.heightAt(start.x + 14));
     this.snapCamera();
-    // best-distance gate (device best from the save store's in-memory run list; skipped when there is none)
+    // best-distance gate (device best from the save store's in-memory run list; skipped when there is none).
+    // Only runs on the board THIS run lands on count (Ranking.sameBoardAs): a clean run must not chase, or
+    // be told it fell short of, a Head Start run's distance. boostFx carries this run's `modded`.
     this.bestM = 0;
     try {
       const runs = this.saveStore && this.saveStore.runs;
-      if (Array.isArray(runs)) for (const r of runs) if (r && r.distanceM > this.bestM) this.bestM = Math.floor(r.distanceM);
+      const onBoard = sameBoardAs(this.boostFx);
+      if (Array.isArray(runs)) for (const r of runs) if (r && onBoard(r) && r.distanceM > this.bestM) this.bestM = Math.floor(r.distanceM);
     } catch (e) { this.bestM = 0; }
     this.bestMarker = this.bestM >= 20
       ? new BestMarker(this, this.palette, this.startX + this.bestM * PIXELS_PER_METER, this.bestM) : null;

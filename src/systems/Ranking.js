@@ -89,3 +89,18 @@ export function isModdedOnly(record, o) {
 export function rankableOnly(records, o) {
   return (Array.isArray(records) ? records : []).filter((r) => isRankable(r, o));
 }
+
+/**
+ * A predicate for "on the same board as this record": the modded board when `record` boards modded,
+ * otherwise the clean board. A run's in-world BEST marker and its NEW BEST chase the best on the board the
+ * run itself will land on, the same split Game Over makes when it picks which list to compare against.
+ *
+ * While MODDED_RUNS_RANKED is false a clean run never chases a boosted distance and a boosted run chases
+ * the modded runs. When the constant is on, every run is on the one clean board.
+ * @param {{modded?:boolean}} record the run being played (any object carrying the loadout's `modded`)
+ * @param {{ranked?:boolean}} [o]
+ * @returns {(r:Object) => boolean}
+ */
+export function sameBoardAs(record, o) {
+  return boardsModded(record, o) ? (r) => isModdedOnly(r, o) : (r) => isRankable(r, o);
+}
