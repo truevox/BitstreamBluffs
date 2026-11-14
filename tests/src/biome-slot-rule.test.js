@@ -167,6 +167,25 @@ describe('slot rule: replacing one base ground hazard', () => {
     expect(has / eligible).toBeLessThanOrEqual(0.6);
   });
 
+  test('the pick among candidates comes from the slot\'s draw, not always the first candidate', () => {
+    // A replaced hazard that has an EARLIER base hazard in its chunk which the fixture would also fit: with the draw, this
+    // happens often; a "first candidate" pick would only allow it when every earlier fitting one failed a ground rule.
+    let later = 0;
+    let replaced = 0;
+    for (const { fx, base } of runs) {
+      for (let i = 0; i < N; i++) {
+        const h = fx[i].hazards.find(isFx);
+        const k = h ? base[i].hazards.findIndex((q) => q.x === h.x) : -1;
+        if (k < 0) continue;
+        replaced++;
+        const fits = (q) => { const d = content.hazards[q.defId]; return d.placement !== 'air' && FX_GROUND_HAZARD.size.w <= d.size.w + 8 && FX_GROUND_HAZARD.size.h <= d.size.h + 8; };
+        if (base[i].hazards.slice(0, k).some(fits)) later++;
+      }
+    }
+    console.log(`slot-rule pick: ${later}/${replaced} replacements took a later candidate`);
+    expect(later / replaced).toBeGreaterThan(0.25);
+  });
+
   test('determinism: same (seed, mask, content) twice and in reverse call order is deep-equal', () => {
     const a = gen('slot-det');
     const b = gen('slot-det');

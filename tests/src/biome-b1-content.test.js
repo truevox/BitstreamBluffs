@@ -184,3 +184,20 @@ describe('B1 content: measured presence in biome chunks (slot rule, spec §4 ame
     expect(p / all).toBeLessThanOrEqual(0.45);
   });
 });
+
+describe('B1 invariant: same seed + mask gives identical terrain twice (shipped content)', () => {
+  test.each([1, 2, 8, 64])('mask %p: two generators, forward and reverse call order, deep-equal over 150 chunks', (mask) => {
+    const snap = (ch) => JSON.parse(JSON.stringify(ch));
+    const a = makeGen('b1-det', { biomeMask: mask });
+    const b = makeGen('b1-det', { biomeMask: mask });
+    const rev = [];
+    for (let i = 149; i >= 0; i--) rev[i] = snap(b.getChunk(i));
+    let biomeSpawns = 0;
+    for (let i = 0; i < 150; i++) {
+      const ch = snap(a.getChunk(i));
+      expect(ch).toEqual(rev[i]);
+      biomeSpawns += [...ch.hazards, ...ch.powerups].filter((s) => (c.hazards[s.defId] || c.powerups[s.defId]).biome).length;
+    }
+    expect(biomeSpawns).toBeGreaterThan(0); // the stream really contains biome spawns
+  });
+});

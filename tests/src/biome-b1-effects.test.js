@@ -187,6 +187,8 @@ describe('B1 HUD entries (UIScene)', () => {
   test('each B1 pickup has its own HUD name (not an id-derived label)', () => {
     const u = ui();
     expect(IDS.map((id) => u._powerInfo(id).name)).toEqual(['MAPLE WAX', 'SLICK WAX', 'AQUA-LUNG', 'SWEET-TOOTH']);
+    // the rows' own colours (the id-derived fallback is cyan for a speedBoost pickup, so Maple's amber needs its row)
+    expect(IDS.map((id) => u._powerInfo(id).color)).toEqual(['amber', 'cyan', 'cyan', 'magenta']);
   });
 
   test('each B1 pickup chip draws its own icon: not the unknown square, not the generic ward icon, all different', () => {
@@ -247,8 +249,10 @@ describe('B1 drawing: every new shapeKey has its own routine', () => {
       const h = new Hazard(scene(), def, { x: 100, y: 50, rotationDeg: 0 }, PAL);
       expect(h.drawKind).toBe(def.shapeKey);
       out[id] = shape(h.gfx);
-      // the generic box is one fillRect + one strokeRect of the full hit box; none of these is that
-      expect(out[id]).not.toBe(JSON.stringify(['fillRect', 'strokeRect']));
+      // the same def with an unknown shapeKey draws the generic box: the real drawing must differ from it
+      const generic = new Hazard(scene(), { ...def, shapeKey: 'zzUnknownShape' }, { x: 100, y: 50, rotationDeg: 0 }, PAL);
+      expect(generic.drawKind).toBe('generic');
+      expect(out[id]).not.toBe(shape(generic.gfx));
       if (id === 'seagullDive') expect(h.color).toBe(PAL.danger);
     }
     expect(new Set(Object.values(out)).size).toBe(4);
@@ -261,6 +265,9 @@ describe('B1 drawing: every new shapeKey has its own routine', () => {
       const p = new PowerUp(scene(), def, { x: 100, y: 50 }, PAL);
       expect(p.drawKind).toBe(def.shapeKey);
       out[id] = shape(p.gfx);
+      const generic = new PowerUp(scene(), { ...def, shapeKey: 'zzUnknownGlyph' }, { x: 100, y: 50 }, PAL);
+      expect(generic.drawKind).toBe('generic');
+      expect(out[id]).not.toBe(shape(generic.gfx));
     }
     expect(new Set(Object.values(out)).size).toBe(4);
   });
