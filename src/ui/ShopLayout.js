@@ -43,12 +43,15 @@ const upper = (s) => String(s === undefined || s === null ? '' : s).toUpperCase(
  * Row shapes:
  *   { kind:'header', key, label }                    — section heading, never selectable
  *   { kind:'item',   key, id, label, state, disabled, owned, equipped, locked, price }
- *   { kind:'boost',  key, id, label, on }            — a toggle row
+ *   { kind:'boost',  key, id, label, on, locked, unlockLevel, state, disabled }
+ *                                                    — a toggle row; locked (not in unlocked.boosts) = disabled
  *   { kind:'static', key, label, color }             — the loadout line, never selectable
  * Every row owns its measured text box in `texts`; that array is what the overlap test intersects.
  *
  * @param {Object} o
  * @param {Object|null} o.profile
+ * @param {Object} [o.levels] parsed levels.json (content.progression); only used to name the level that
+ *   unlocks a locked boost. Without it a locked boost reads "LOCKED".
  * @returns {{w:number,h:number,rows:Array,texts:Array<{key:string,text:string,x:number,y:number,w:number,h:number,color:string}>,
  *            rowH:number, band:{x:number,y:number,w:number}, bankText:string, loadoutText:string, firstSelectable:number}}
  */
@@ -58,6 +61,9 @@ export function shopLayout(o = {}) {
   const boosts = (profile.boosts && typeof profile.boosts === 'object') ? profile.boosts : {};
   const bank = Number.isFinite(profile.bank) ? profile.bank : 0;
   const level = Number.isFinite(profile.level) ? profile.level : 1;
+  const grants = (profile.unlocked && typeof profile.unlocked === 'object' && profile.unlocked.boosts
+    && typeof profile.unlocked.boosts === 'object') ? profile.unlocked.boosts : {};
+  const levelRows = (o.levels && Array.isArray(o.levels.levels)) ? o.levels.levels : [];
 
   const rows = [];
   const texts = [];
@@ -106,8 +112,17 @@ export function shopLayout(o = {}) {
   // Boosts are part of the same list because they are part of the same panel. The old view positioned
   // them from an estimate of the catalogue's height, which is exactly how they landed on the TRAIL rows.
   rows.push({ kind: 'header', key: 'hdr-boosts', label: 'BOOSTS' });
+  // F3: a boost is offered only once the profile owns it. Ownership is the grant record ProfileStore
+  // writes when a level-up crosses the boost's level (`unlocked.boosts[id]`, levels 8 and 15 today); the
+  // shop shows that record, it does not re-derive it from the level. A locked boost stays visible, says
+  // the level that unlocks it, and cannot be selected.
   for (const b of BOOSTS) {
-    rows.push({ kind: 'boost', key: `boost-${b.id}`, id: b.id, label: b.label, on: boosts[b.id] === true });
+    const locked = !grants[b.id];
+    const entry = levelRows.find((l) => l && l.boost === b.id);
+    const unlockLevel = entry && Number.isFinite(entry.level) ? entry.level : null;
+    const on = boosts[b.id] === true;
+    const state = locked ? (unlockLevel ? `LVL ${unlockLevel}` : 'LOCKED') : (on ? 'ON' : 'OFF');
+    rows.push({ kind: 'boost', key: `boost-${b.id}`, id: b.id, label: b.label, on, locked, unlockLevel, state, disabled: locked });
   }
 
   // Loadout: what the next run will actually look like.
@@ -143,11 +158,11 @@ export function shopLayout(o = {}) {
       ];
     } else if (r.kind === 'boost') {
       if (firstSelectable < 0) firstSelectable = i;
-      const stateText = r.on ? 'ON' : 'OFF';
+      const stateText = r.state;
       const rw = measureText(stateText);
       r.texts = [
         { key: `${r.key}-label`, text: r.label, x: PAD + 6, y, w: measureText(r.label), h: GLYPH_H, color: 'text' },
-        { key: `${r.key}-right`, text: stateText, x: SHOP_PANEL.w - PAD - 6 - rw, y, w: rw, h: GLYPH_H, color: r.on ? 'lime' : 'text' },
+        { key: `${r.key}-right`, text: stateText, x: SHOP_PANEL.w - PAD - 6 - rw, y, w: rw, h: GLYPH_H, color: (!r.locked && r.on) ? 'lime' : 'text' },
       ];
     } else {
       r.texts = [{ key: `${r.key}-label`, text: r.label, x: PAD, y, w: measureText(r.label), h: GLYPH_H, color: r.kind === 'header' ? 'magenta' : (r.color || 'text') }];
@@ -187,8 +202,12 @@ export function shopMenuItems(layout) {
       return { kind: 'action', id: r.id, label: r.label, sub: r.state, rowKind: 'item', disabled: r.disabled, onSelect: null };
     }
     if (r.kind === 'boost') {
+      // A locked boost is a disabled row that shows its unlock level instead of an ON/OFF value.
+      if (r.locked) {
+        return { kind: 'action', id: r.id, label: r.label, rowKind: 'boost', boostId: r.id, sub: r.state, disabled: true, onSelect: null };
+      }
       return {
-        kind: 'choice', id: r.id, label: r.label, rowKind: 'boost', boostId: r.id,
+        kind: 'choice', id: r.id, label: r.label, rowKind: 'boost', boostId: r.id, disabled: false,
         options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
         get: () => r.on, set: null,
       };

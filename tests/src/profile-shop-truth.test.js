@@ -110,3 +110,45 @@ describe('F11: Profile labels say what they count', () => {
     expect(head(v1({ xp: MAX_XP }))).toBe('SIGNATURES UNLOCKED 11/11');
   });
 });
+
+describe('F3: the shop only offers boosts the profile has unlocked', () => {
+  const boostRow = (p, id) => shopLayout({ profile: p, levels: LEVELS }).rows.find((r) => r.kind === 'boost' && r.id === id);
+  const boostMenu = (p, id) => shopMenuItems(shopLayout({ profile: p, levels: LEVELS })).find((m) => m.rowKind === 'boost' && m.boostId === id);
+
+  test('F3: a level-1 profile cannot select the Head Start toggle in the shop', () => {
+    const p = v1();
+    expect(p.level).toBe(1);
+    const row = shopMenuItems(shopLayout({ profile: p })).find((m) => m.rowKind === 'boost' && m.boostId === 'headStart');
+    // Correct: either absent or disabled until Sync Level 8 grants it.
+    expect(row === undefined || row.disabled === true).toBe(true);
+  });
+
+  test('F3: a locked boost stays visible and says the level that unlocks it', () => {
+    const p = v1();
+    expect(boostRow(p, 'headStart')).toMatchObject({ locked: true, disabled: true, state: 'LVL 8' });
+    expect(boostRow(p, 'errorCorrection')).toMatchObject({ locked: true, disabled: true, state: 'LVL 15' });
+    const texts = shopLayout({ profile: p, levels: LEVELS }).texts.map((t) => t.text);
+    expect(texts).toEqual(expect.arrayContaining(['HEAD START', 'LVL 8', 'ERROR CORRECTION', 'LVL 15']));
+    expect(boostMenu(p, 'headStart')).toMatchObject({ disabled: true, sub: 'LVL 8' });
+  });
+
+  test('F3: a boost the profile was granted (unlocked.boosts) is a normal ON/OFF toggle', () => {
+    const p = v1({ xp: LEVELS.levels.find((l) => l.level === 8).xpMin, unlocked: { boosts: { headStart: 1 } }, boosts: { headStart: true } });
+    expect(boostRow(p, 'headStart')).toMatchObject({ locked: false, disabled: false, on: true, state: 'ON' });
+    expect(boostMenu(p, 'headStart').disabled).toBe(false);
+    expect(boostRow(p, 'errorCorrection')).toMatchObject({ locked: true, state: 'LVL 15' });
+  });
+
+  test('F3: the gate is the grant record (unlocked.boosts), the same one ProfileStore writes on a level-up', () => {
+    // A level-20 profile whose save never recorded the grant stays locked: the shop shows what the profile
+    // owns, it does not re-derive ownership from the level.
+    const p = v1({ xp: LEVELS.levels.find((l) => l.level === 20).xpMin });
+    expect(boostRow(p, 'headStart').locked).toBe(true);
+  });
+
+  test('F3: without a level table the locked boost still reads locked, not ON/OFF', () => {
+    expect(boostRow(v1(), 'headStart')).toBeTruthy();
+    const row = shopLayout({ profile: v1() }).rows.find((r) => r.kind === 'boost' && r.id === 'headStart');
+    expect(row).toMatchObject({ locked: true, disabled: true, state: 'LOCKED' });
+  });
+});

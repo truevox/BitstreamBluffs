@@ -9,6 +9,9 @@
 - **FAIRNESS-3.** DAILY RUN derives its seed and its biome mask from one clock read at press time, so a press just after 00:00 UTC (before the Title's 15 s refresh) can no longer pair yesterday's seed with today's mask.
 - **F3 (run side).** A run applies only the boosts the profile has unlocked (`unlocked.boosts`: Head Start at Sync Level 8, Error Correction Engine at 15) as well as switched on. A toggled-but-locked boost does nothing and does not mark the run modded. The rule lives in `Boosts.js` (`boostEffects` / `isModdedRun` / `loadoutForRun` take `o.unlocked`; an omitted set owns nothing). The shop-side gate is a separate fix.
 - **TERRAIN-2.** At biome mask 0, RunScene no longer calls `refreshPalette()` (which rebuilds every collider) on the first frame and at every 500 m sector crossing; a mask-0 run repaints only on a palette setting change, as before W3.
+- F3 (shop): the Shard Shop no longer offers a boost toggle the profile has not unlocked. A locked boost stays
+  listed with the level that unlocks it ("HEAD START ... LVL 8") and cannot be selected; it becomes an ON/OFF
+  toggle once the level-up grant (`unlocked.boosts`) is on the profile.
 - F11: Profile lists LOCKED biomes too, each with its unlock level ("LVL 7"), not only the unlocked toggles.
   The biome header reads "SIGNATURES UNLOCKED n/11" (it counts unlocks, not visits), the spendable "BANK n" is
   shown on the LIFETIME row, and the lifetime stat once called "DATA SHARDS" is now "RUN SHARDS".

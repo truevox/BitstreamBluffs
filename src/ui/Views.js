@@ -746,7 +746,7 @@ export class AchievementsView extends View {
 export class ShopView extends View {
   /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
   constructor(scene, theme, o) {
-    const layout = shopLayout({ profile: scene.registry.get(REG.PROFILE) });
+    const layout = shopLayout({ profile: scene.registry.get(REG.PROFILE), levels: (scene.registry.get(REG.CONTENT) || {}).progression });
     super(scene, theme, {
       w: layout.w, h: layout.h, title: 'SHARD SHOP', color: 'amber', onClose: o.onClose, y: 22, backLabel: 'BACK',
     });
@@ -771,6 +771,10 @@ export class ShopView extends View {
       if (m.rowKind === 'item') {
         return { kind: 'action', id: m.id, label: m.label, sub: m.sub, disabled: m.disabled, onSelect: () => this._choose(m.id) };
       }
+      if (m.rowKind === 'boost' && m.disabled) {
+        // F3: not unlocked yet. Drawn with its unlock level, never focusable, never toggled.
+        return { kind: 'action', label: m.label, boostId: m.boostId, sub: m.sub, disabled: true };
+      }
       if (m.rowKind === 'boost') {
         return {
           kind: 'choice',
@@ -789,8 +793,12 @@ export class ShopView extends View {
     });
   }
 
+  _levels() {
+    return (this.scene.registry.get(REG.CONTENT) || {}).progression;
+  }
+
   _build() {
-    const layout = shopLayout({ profile: this._profile() });
+    const layout = shopLayout({ profile: this._profile(), levels: this._levels() });
     if (this.menu) { this.menu.destroy(); this.menu = null; }
     // The bank value is drawn outside the list (the list right-aligns only row state), so it has to be
     // torn down with it or every rebuild would stack another "BANK n" on the same pixel.

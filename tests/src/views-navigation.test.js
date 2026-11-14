@@ -585,3 +585,42 @@ describe('F11: the Profile view draws locked biomes and keeps the toggles on the
     }
   });
 });
+
+// ================================================================== F3: shop boost gate (view half)
+
+describe('F3: ShopView does not let a locked boost be switched on', () => {
+  test('F3: on a level-1 profile no key or pointer path turns Head Start or Error Correction on', () => {
+    const { s, view } = shopHost({ ...defaultProfile(), bank: 0 });
+    const boostIdx = view.menu.items.map((it, i) => (it.boostId ? i : -1)).filter((i) => i >= 0);
+    expect(boostIdx.length).toBe(2);
+    for (const i of boostIdx) {
+      expect(view.menu.items[i].disabled).toBe(true);
+      expect(view.menu.items[i].sub).toMatch(/^LVL \d+$/);
+    }
+    // Keys: walk the whole list with every action at every stop.
+    for (let n = 0; n < view.menu.items.length + 2; n++) {
+      expect(boostIdx).not.toContain(view.menu.selected);
+      for (const a of ['left', 'right', 'confirm']) {
+        const cur = view.menu.items[view.menu.selected];
+        if (cur && cur.boostId) view.handleAction(a);
+      }
+      view.handleAction('down');
+    }
+    // Pointer: click each boost row's zone.
+    for (const i of boostIdx) {
+      const z = view.menu.rows[i].zone;
+      if (z) { z.emit('pointerover'); z.emit('pointerdown', {}, 10); z.emit('pointerdown', {}, 380); }
+    }
+    const b = s.registry.get(REG.PROFILE).boosts;
+    expect(b.headStart).toBe(false);
+    expect(b.errorCorrection).toBe(false);
+  });
+
+  test('F3 control: once unlocked.boosts.headStart is granted the toggle works', () => {
+    const p = { ...defaultProfile(), xp: LEVELS.levels.find((l) => l.level === 8).xpMin, level: 8, unlocked: { ...defaultProfile().unlocked, boosts: { headStart: 1 } } };
+    const { s, view } = shopHost(p);
+    focusItem(view, (it) => it.boostId === 'headStart');
+    view.handleAction('right');
+    expect(s.registry.get(REG.PROFILE).boosts.headStart).toBe(true);
+  });
+});
