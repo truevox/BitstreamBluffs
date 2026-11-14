@@ -250,3 +250,23 @@ describe('Ranking.sameBoardAs', () => {
     expect([clean, boosted].map(sameBoardAs(boosted, { ranked: true }))).toEqual([true, true]);
   });
 });
+
+// ================================================================ FAIRNESS-1: the Title BEST line
+
+describe('the Title BEST line shows clean runs only', () => {
+  const bestLine = async (runs) => {
+    const bestText = { scene: true, text: 'untouched', setText(t) { this.text = t; return this; } };
+    const t = titleCtx(new Map([[REG.SAVE_STORE, memStore(runs)]]), { bestText });
+    TitleScene.prototype._loadBest.call(t);
+    await flush();
+    return bestText.text;
+  };
+
+  test('a boosted run\'s distance and score do not become the Title BEST', async () => {
+    expect(await bestLine(MIXED_RUNS())).toBe('BEST 500 M   500 PTS');
+  });
+
+  test('with only boosted runs saved, the BEST line is left alone', async () => {
+    expect(await bestLine([rec({ distanceM: 9000, score: 9000, modded: true })])).toBe('untouched');
+  });
+});

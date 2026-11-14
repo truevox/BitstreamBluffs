@@ -8,6 +8,7 @@ import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { parseSeedMask } from '../systems/SaveStore.js';
+import { rankableOnly } from '../systems/Ranking.js';
 import { unlockedBiomeIds, enabledBiomeMask } from '../systems/ProfileStore.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText } from '../ui/Neon.js';
@@ -171,8 +172,11 @@ export class TitleScene extends Phaser.Scene {
   _loadBest() {
     try {
       const store = this.registry.get(REG.SAVE_STORE);
-      Promise.resolve(store.getRecentRuns(1000)).then((runs) => {
-        if (!Array.isArray(runs) || !runs.length || !this.bestText.scene) return;
+      Promise.resolve(store.getRecentRuns(1000)).then((all) => {
+        // Clean runs only (Ranking.rankableOnly): a Head Start run is a different game and must not set
+        // the device BEST shown on the Title, any more than it can set a clean leaderboard entry.
+        const runs = rankableOnly(all);
+        if (!runs.length || !this.bestText.scene) return;
         const m = Math.max(...runs.map((r) => r.distanceM || 0));
         const sc = Math.max(...runs.map((r) => r.score || 0));
         if (m > 0) this.bestText.setText(`BEST ${fmtInt(m)} M   ${fmtInt(sc)} PTS`);
