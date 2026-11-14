@@ -20,8 +20,11 @@
  * `isOwned` and `purchase` look their item up in the module-level SHOP_ITEMS, so they cannot be pointed at
  * another catalogue. Rather than fake a catalogue and have the popup silently disagree with the panel it
  * opens, the rules are restated here over an explicit item, and `shop-prompt.test.js` proves equivalence
- * against the real `purchase()` across a grid of banks, levels and owned-sets on the SHIPPED catalogue.
- * If the shop's refusals ever change order or meaning, that test fails.
+ * across a grid of banks, levels and owned-sets on the SHIPPED catalogue — against `soldInShop()`, which
+ * is the same predicate the panel filters with, not against `purchase()` alone. `purchase()` is the wrong
+ * oracle on its own: it accepts `title-static`, which the panel never draws, so an oracle built only on
+ * `purchase()` agreed with the old helper and both were wrong together (Luna W4.1).
+ * If the shop's refusals ever change order or meaning, those tests fail.
  */
 import { SHOP_ITEMS, soldInShop } from './ProfileStore.js';
 
