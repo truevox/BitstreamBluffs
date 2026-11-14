@@ -71,7 +71,13 @@ export class LeaderboardView extends View {
     // tenth table row (panel y ~146) and the button strip. At y 40 the panel still ends at 228 of 270.
     super(scene, theme, { w: 440, h: 188, title: 'LEDGER // TOP 10 ON THIS DEVICE', color: 'cyan', onClose: o.onClose, y: 40 });
     this.table = new LeaderboardTable(scene, theme, { x: 12, y: 24, w: 416, entries: null, parent: this.panel });
-    this.panel.add(new NeonText(scene, theme, 12, this.h - 18, 'ONE LEDGER PER DEVICE. MAGENTA RULE FLAG = DAILY PATCH ACTIVE.', {
+    // The footer used to be one 329px line on the button row, so it ran under MODDED and BACK. It is split:
+    // the short half stays on the button row (it ends at x 129, MODDED starts at 292) and the rule-flag
+    // note moves to the free line above, left of the key hint.
+    this.panel.add(new NeonText(scene, theme, 12, this.h - 18, 'ONE LEDGER PER DEVICE.', {
+      color: 'text', outline: 'none',
+    }).setAlpha(0.55));
+    this.panel.add(new NeonText(scene, theme, 12, this.h - 38, 'MAGENTA RULE FLAG = DAILY PATCH ACTIVE.', {
       color: 'text', outline: 'none',
     }).setAlpha(0.55));
     // W4: two boards. The clean board is what the game has always shown; the modded board is where a

@@ -468,3 +468,52 @@ describe('U3: leaderboard tabs and empty state', () => {
     expect(all).not.toContain('CLN');
   });
 });
+
+describe('UI-1: the leaderboard footer fits at 480x270', () => {
+  const store = () => ({ getLeaderboard: async () => [], getModdedLeaderboard: async () => [] });
+  const full = () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      id: `r${i}`, initials: 'WWW', score: 9999999 - i, distanceM: 99999, seed: 'WWWWWWWWWWWWWWWW', dailyRuleId: 'none',
+    }));
+    return { getLeaderboard: async () => rows, getModdedLeaderboard: async () => rows };
+  };
+  const panelTexts = (view) => view.panel.list.filter((o) => o.main && typeof o.main.text === 'string' && o.main.text)
+    .map((o) => ({ text: o.main.text, x: o.x, y: o.y, w: measureText(o.main.text), h: 8 }));
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  test('UI-1: the leaderboard footer line is not drawn under the MODDED button at 480x270', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    const footer = view.panel.list.find((o) => o.main && /ONE LEDGER PER DEVICE/.test(o.main.text));
+    expect(footer).toBeTruthy();
+    const right = footer.x + measureText(footer.main.text);
+    // The tab button and BACK share the footer's row (button y h-24..h-8, text y h-18..h-10).
+    expect(right).toBeLessThanOrEqual(view.tabBtn.x - 2);
+  });
+
+  test('UI-1: with a full ten-row board no footer text touches a button, another footer text or the table', async () => {
+    const t = titleHost({ [REG.SAVE_STORE]: full() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    await flush();
+    // Footer texts only: everything drawn into the panel below the table's top (the frame title sits above).
+    const boxes = panelTexts(view).filter((b) => b.y > view.table.y);
+    // The rule-flag explanation survives the split; it is still on screen somewhere.
+    expect(boxes.some((b) => /MAGENTA RULE FLAG = DAILY PATCH ACTIVE/.test(b.text))).toBe(true);
+    const tableBottom = view.table.y + 14 + 9 * view.table.rowH + 8;
+    for (const b of boxes) {
+      expect({ text: b.text, inside: b.x >= 4 && b.x + b.w <= view.w - 4 }).toEqual({ text: b.text, inside: true });
+      expect({ text: b.text, belowTable: b.y >= tableBottom + 1 }).toEqual({ text: b.text, belowTable: true });
+      for (const btn of [view.tabBtn, view.back]) {
+        expect({ text: b.text, hitsButton: hit(b, btn) }).toEqual({ text: b.text, hitsButton: false });
+      }
+    }
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        expect({ pair: [boxes[i].text, boxes[j].text], overlap: hit(boxes[i], boxes[j]) })
+          .toEqual({ pair: [boxes[i].text, boxes[j].text], overlap: false });
+      }
+    }
+  });
+});
