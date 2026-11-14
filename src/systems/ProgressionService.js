@@ -10,6 +10,7 @@ import { EVT } from '../events.js';
 import { REG } from '../constants.js';
 import { ProfileStore } from './ProfileStore.js';
 import { levelForXp, xpToNext, rewardsForLevel, loadLevelTable } from './Progression.js';
+import { newlyAffordable, shopState } from './ShopPrompt.js';
 
 /**
  * Create the progression service, load the profile (and backfill it once from stored runs if this
@@ -73,6 +74,10 @@ export class ProgressionService {
   onRunEnd(payload) {
     if (!this.alive) return;
     const record = payload && payload.record ? payload.record : null;
+    // W4.1: snapshot the spendable state BEFORE the run is credited, so the shop autoprompt can tell
+    // whether THIS run newly made something affordable. Taken from the live profile rather than derived
+    // from the credit afterwards, because both `credit()` and `applyMissions()` move the bank.
+    const before = shopState(this.store.profile);
     const awards = record ? this.store.credit(record) : null;
     // Missions ride on the crediting decision, not on RUN_END itself: `credit()` returns null for a
     // run whose hash is already in the ring, so a replayed event pays missions nothing. Missions then
@@ -88,9 +93,31 @@ export class ProgressionService {
       }
     }
     const view = this._awardsView(awards, record, missionRoll);
+    // W4.1: decide the shop autoprompt here, where both the before- and after-credit state are known, and
+    // publish it as a plain boolean. Game Over only renders it; it does not re-derive economy rules.
+    // Not published for a replayed run (awards === null): that run paid nothing, so it changed nothing.
+    const showShop = Boolean(awards) && this._shopAutoprompt(before);
+    view.shopAutoprompt = showShop;
     this.lastAwards = view;
     this.game.registry.set(REG.LAST_AWARDS, view);
     this.publish(view);
+  }
+
+  /**
+   * Did this run newly make a shop item affordable?
+   *
+   * Kept behind a guard because a broken economy must never stop a run from being credited: if anything
+   * here throws, the answer is "no popup" and the run stands.
+   * @param {{bank:number, level:number, owned:Array<string>}} before
+   * @returns {boolean}
+   */
+  _shopAutoprompt(before) {
+    try {
+      const after = shopState(this.store.profile);
+      return newlyAffordable(before, after);
+    } catch (e) {
+      return false;
+    }
   }
 
   /** @returns {{xp:{total:number,parts:Array},levelBefore:number,levelAfter:number,leveledTo:number,rewards:Object|null,title:string|null,credited:boolean,progress:{level:number,xp:number,levelXp:number,nextXp:number,xpToNext:number}}} */

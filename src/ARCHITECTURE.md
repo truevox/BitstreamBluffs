@@ -670,3 +670,41 @@ Gate harness: `node tools/sim/shots.mjs progression <dir>` (`tools/sim/shots-pro
 ## Missions
 
 `Missions.js` implements deterministic mission selection and evaluation. It seeds draws from the profile mission counter, sorts eligible templates by ID, and filters biome- and rule-ineligible templates. Tier determines the reward multiplier AND gates offerability by Sync Level (D7): `missions.json` carries a `tierUnlock` map of tier → minimum Sync Level (tier 1 at level 1, tier 2 at 3, tier 3 at 6, tier 4 at 10), and `drawMissions` drops templates above the profile's unlocked tier before the seeded pick. Thresholds live in data so they can be tuned without a code change; tier 1 is always open. If the unlocked tiers cannot fill three slots, the draw widens only up to the highest tier at or below the profile's ceiling, never above it — D7's wording is "fall back to the highest unlocked tier, never an empty slot", so a thin pool may return fewer than three missions rather than leak a tier the player has not unlocked. Gating never re-rolls or drops a mission already in a slot: a profile that drew a tier-3 mission before this rule existed keeps it and keeps its progress, and only its refills are gated. `MissionsService` publishes active mission progress through `REG.MISSIONS` and sends live completion notifications; `ProgressionService` invokes its payout path only after a run has been credited, so replaying a credited run cannot pay a mission twice. Mission state and rewards persist in `bb.profile`. Title, Pause and Game Over render the published view; HUD notifications share the milestone strip.
+
+## Addendum: shop autoprompt (W4.1, additive)
+
+Marvin's request was that a player who can afford something be taken to the Shard Shop instead of having to
+remember it lives behind PROFILE. The shop is **not** added to the Title menu (that stays as it was); Game Over
+gains a popup and a hint.
+
+**The decision is made once, at credit time, by `ProgressionService`.** It is the only place that sees the
+profile both before and after the run, so it is the only place the question "did this run *newly* make
+something affordable" can be answered exactly. `credit()` and `applyMissions()` both move the bank, so
+re-deriving a "before" afterwards from the credit would be arithmetic guessing; instead the service snapshots
+`shopState(profile)` (bank, level, owned cosmetics) before crediting, and `newlyAffordable(before, after)`
+compares the two. The answer is published as `shopAutoprompt` on the awards view in `REG.LAST_AWARDS`; Game
+Over renders it and never re-derives economy rules. Nothing is stored, so there is no new profile field, no
+`saveVersion` bump and no ledger-hash change.
+
+**`ShopPrompt.js` restates the shop's refusals rather than calling them.** `isOwned`/`purchase` resolve their
+item from the module-level `SHOP_ITEMS`, so they cannot be pointed at another catalogue, and a helper that
+quietly judged a different list than the panel it opens would be worse than useless.
+`tests/src/shop-prompt.test.js` instead proves equivalence with the real `purchase()` across a grid of banks,
+levels and owned-sets on the shipped catalogue, in both directions: anything the helper calls affordable is
+actually buyable, and when every purchase is refused the helper says so. Repricing the catalogue therefore
+breaks the tests rather than the popup.
+
+**Frequency.** The popup fires only when this run crossed something; the footer hint `SHOP: B` (pad LB) shows
+whenever anything is affordable, popup or not, so a stockpile player is told about the shop without being
+interrupted every round. `B`/`b` is a `MenuInput` action (`shop`) rather than a scene-local key listener, so it
+gets the same debouncing and a gamepad equivalent, and the footer cannot advertise a key that does not exist.
+
+**Retry always wins.** Input is live from the first frame; any action or tap before the timer fires cancels the
+popup; while the shop is open, `confirm` closes it and retries, `cancel` closes it back to Game Over, `alt`
+closes it and starts a new seed, and only cursor/toggle actions reach the shop. The pending timer and the open
+view are both torn down on shutdown, so nothing fires into a scene that is gone.
+
+**Known gap.** `notes/cc-friday-shop-popup-2.txt` mentions "boosts not yet owned" as part of purchasability.
+Boosts have no price in this economy — they are level rewards toggled in the shop, not bought — so there is
+nothing for that clause to match. Inventing a price would be a new economy decision, which is Marvin's, not
+this workstream's.
