@@ -748,10 +748,13 @@ async function main() {
             if (!prof) return { fatal: 'confirming PROFILE opened no view' };
             const profKind = prof.constructor ? prof.constructor.name : 'none';
             if (!prof.achButton) return { fatal: `ProfileView has no achievements button (${profKind})` };
-            // Press the button the player presses: emit the pointerdown its own zone listens for, rather
-            // than calling a handler directly. That is the same path a real click takes.
-            if (!prof.achButton.zone) return { fatal: 'achievements button has no input zone' };
-            prof.achButton.zone.emit('pointerdown');
+            // Reach ACHIEVEMENTS the way a keyboard/pad player does: move focus with the routed 'down'
+            // action until it sits on the ACHIEVEMENTS target, then confirm. This used to emit the
+            // button's pointerdown, which passed while the button was unreachable by keys (audit U2).
+            let hops = 0;
+            while ((prof._focusTargets()[prof.focusIdx] || {}).kind !== 'ach' && hops < 30) { prof.handleAction('down'); hops += 1; }
+            if ((prof._focusTargets()[prof.focusIdx] || {}).kind !== 'ach') return { fatal: 'ACHIEVEMENTS is not reachable by keys' };
+            prof.handleAction('confirm');
             await wait(450);
             const v = title.view;
             if (!v) return { fatal: 'achievements button opened no view' };
@@ -1138,8 +1141,13 @@ async function main() {
         else {
           // Walk DOWN past the last toggle row onto the SHARD SHOP button, then press Enter.
           // Down-presses are spaced past MenuInput's 100ms repeat so each one registers as one step.
-          const steps = opened.rows + 1;
-          for (let i = 0; i < steps; i += 1) { await page.keyboard.press('ArrowDown'); await sleep(140); }
+          // Press real ArrowDown keys until focus reaches the SHARD SHOP button (ACHIEVEMENTS now sits
+          // between the toggle rows and SHOP, so a fixed count would rot every time the order changes).
+          const focusKind = () => page.evaluate(() => {
+            const v = window.__bbGame.scene.getScene('TitleScene').view;
+            return v ? (v._focusTargets()[v.focusIdx] || {}).kind : null;
+          });
+          for (let i = 0; i < opened.rows + 6 && (await focusKind()) !== 'buy'; i += 1) { await page.keyboard.press('ArrowDown'); await sleep(140); }
           const focused = await page.evaluate(() => {
             const t = window.__bbGame.scene.getScene('TitleScene');
             const v = t.view;
@@ -1166,7 +1174,7 @@ async function main() {
             const v = t.view;
             if (!v) return { inProfile: false };
             const n = v.sigMenu ? v.sigMenu.items.length : 0;
-            for (let i = 0; i < n + 2; i += 1) v.handleAction('down');
+            for (let i = 0; i < n + 6 && (v._focusTargets()[v.focusIdx] || {}).kind !== 'back'; i += 1) v.handleAction('down');
             const kind = (v._focusTargets()[v.focusIdx] || {}).kind;
             return { inProfile: true, kind };
           });
@@ -1203,21 +1211,31 @@ async function main() {
           await wait(900);
           const view = t.view;
           if (!view) return { fatal: 'leaderboard view did not open' };
-          const read = () => (view.tabBtn && view.tabBtn.label && view.tabBtn.label.main)
-            ? view.tabBtn.label.main.text : null;
-          const cleanLabel = read();
           if (!view.tabBtn) return { fatal: 'no board tab button' };
-          view._toggleBoard();
-          await wait(600);
-          const moddedLabel = read();
-          return { cleanLabel, moddedLabel, toggled: view.showingModded };
+          return { ok: true };
         }).catch((e) => ({ fatal: String(e) }));
+        // Switch boards with REAL keys (audit U3: this used to call view._toggleBoard(), which passed
+        // while no key could switch the board). Right shows MODDED, Left shows CLEAN.
+        const readTab = () => page.evaluate(() => {
+          const view = window.__bbGame.scene.getScene('TitleScene').view;
+          const lbl = view && view.tabBtn && view.tabBtn.label && view.tabBtn.label.main ? view.tabBtn.label.main.text : null;
+          return { label: lbl, modded: Boolean(view && view.showingModded) };
+        });
+        if (!out.fatal) {
+          const before = await readTab();
+          await page.keyboard.press('ArrowRight'); await new Promise((r) => setTimeout(r, 700));
+          const right = await readTab();
+          await page.keyboard.press('ArrowLeft'); await new Promise((r) => setTimeout(r, 700));
+          const left = await readTab();
+          out.cleanLabel = before.label; out.moddedLabel = right.label; out.toggled = right.modded; out.back = !left.modded;
+        }
         if (out.fatal) fail('leaderboard: opens with a board tab', out.fatal);
         else if (errors.length) fail('leaderboard: no page errors', errors.join(' | '));
         else if (out.cleanLabel !== 'MODDED') fail('leaderboard: clean board offers the modded tab', `tab read ${out.cleanLabel}`);
         else if (!out.toggled) fail('leaderboard: tab switches to the modded board', 'showingModded stayed false');
         else if (out.moddedLabel !== 'CLEAN') fail('leaderboard: modded board offers the way back', `tab read ${out.moddedLabel}`);
-        else pass('leaderboard: clean/modded tab both ways', 'MODDED -> CLEAN');
+        else if (!out.back) fail('leaderboard: ArrowLeft returns to the clean board', 'still modded');
+        else pass('leaderboard: clean/modded tab both ways by keyboard', 'ArrowRight -> MODDED, ArrowLeft -> CLEAN');
       } finally { await page.close(); }
     }
 
