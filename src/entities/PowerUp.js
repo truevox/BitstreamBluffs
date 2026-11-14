@@ -7,6 +7,7 @@
  */
 import Phaser from 'phaser';
 import { CAT } from './Sled.js';
+import { powerupDrawKind } from '../systems/BiomeEffects.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies } = Matter;
@@ -29,6 +30,8 @@ export class PowerUp {
     this.color = palette[def.colorKey] != null ? palette[def.colorKey] : palette.cyan;
     const r = def.radius || 10;
     this.radius = r;
+    /** Glyph: the def's shapeKey when known, else 'generic' (a biome pickup with a new shapeKey still shows a glyph). */
+    this.drawKind = powerupDrawKind(def);
     this.body = Bodies.circle(spawn.x, spawn.y, r + 3, {
       isStatic: true,
       isSensor: true,
@@ -82,7 +85,7 @@ export class PowerUp {
     g.lineStyle(1.5, col, 1);
     g.strokeCircle(0, 0, r - 3);
 
-    switch (this.def.shapeKey) {
+    switch (this.drawKind) {
       case 'clock': {
         g.lineStyle(1.5, pal.text, 1);
         g.lineBetween(0, 0, 0, -r * 0.55);
@@ -104,9 +107,14 @@ export class PowerUp {
         g.fillCircle(0, -0.5, 1.8);
         break;
       }
-      default:
+      default: {
+        // generic glyph: a filled diamond in the pickup colour with a light core, readable at any size
+        const d = r * 0.5;
         g.fillStyle(col, 1);
-        g.fillCircle(0, 0, 3);
+        g.fillPoints([{ x: 0, y: -d }, { x: d, y: 0 }, { x: 0, y: d }, { x: -d, y: 0 }], true);
+        g.fillStyle(pal.text, 1);
+        g.fillCircle(0, 0, 1.4);
+      }
     }
   }
 

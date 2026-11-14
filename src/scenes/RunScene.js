@@ -32,7 +32,12 @@ import { DailyPatch } from '../systems/DailyPatch.js';
 import { boostEffects } from '../systems/Boosts.js';
 import { sameBoardAs } from '../systems/Ranking.js';
 import { resolveCosmetics } from '../systems/Cosmetics.js';
-import { PhysicsTuner, stepWorld, TUNING } from '../systems/PhysicsTuner.js';
+import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
+import { emptyWards, addWard, tickWards, isWarded, wardMsLeft } from '../systems/Wards.js';
+import {
+  gustImpulse, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
+  resolveLanding, hazardEffectDurationMs, timedPowerupMs,
+} from '../systems/BiomeEffects.js';
 import { GlitchPipeline } from '../shaders/GlitchPipeline.js';
 import { getPalette, getPaletteCss } from '../ui/Palette.js';
 import { HUD_SPEED_EVENT } from './UIScene.js';
@@ -190,6 +195,7 @@ export class RunScene extends Phaser.Scene {
     this.slowmoMs = 0;
     this.slowmoScale = 0.5;
     this.shieldCharges = 0;
+    this._resetBiomeEffects();
     this.openingGraces = 0;
     this.activeZones = new Map();
     this.hazards = new Map();
@@ -240,6 +246,9 @@ export class RunScene extends Phaser.Scene {
     this.streaks = this.add.graphics().setDepth(12).setBlendMode(Phaser.BlendModes.ADD);
     this.flashRect = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0)
       .setOrigin(0).setScrollFactor(0).setDepth(100);
+    // B0 `blind`: a dimming layer under the flash (the HUD is a separate scene above it, so it stays readable).
+    this.blindRect = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, this.palette.bg, 0)
+      .setOrigin(0).setScrollFactor(0).setDepth(99);
 
     // initial terrain buffer, then the sled on the surface
     this.streamTerrain(0);
@@ -530,7 +539,13 @@ export class RunScene extends Phaser.Scene {
     const def = h.def;
     const eff = def.onHit || { effect: 'crash' };
     const kind = eff.effect;
-    const dur = kind === 'crash' ? 0 : (eff.durationMs != null ? eff.durationMs : (kind === 'scramble' ? PHYSICS.scrambleDurationMs : 1500));
+    // B0 ward: a warded hazard (by id) or effect does nothing at all and reports no hit (Wards.js)
+    if (isWarded(this.wards, { hazardId: def.id }) || isWarded(this.wards, { effect: kind })) {
+      this.fx.ring(h.cx, h.cy, this.palette.cyan, 22, 260);
+      if (h.gfx) h.gfx.setAlpha(0.4);
+      return;
+    }
+    const dur = hazardEffectDurationMs(eff);
     this.game.events.emit(EVT.HAZARD_HIT, { hazardId: def.id, effect: kind, durationMs: dur, x: h.cx, y: h.cy });
     if (kind === 'crash') {
       if (!this.pendingCrash) this.pendingCrash = { cause: 'hazard', hazardId: def.id };
@@ -544,8 +559,32 @@ export class RunScene extends Phaser.Scene {
       this.scrambleMs = dur;
       this.fx.sparks(h.cx, h.cy, h.color, 16, 160, 80);
       this.shake(1.5);
+    } else if (kind === 'blind') {
+      // B0: a flash, then a dimming overlay (BiomeEffects.blindOverlayAlpha; never below 35 % visibility, no crash)
+      this.blindMs = dur;
+      this.blindTotalMs = dur;
+      this.blindVis = blindVisibility(eff.visibility);
+      this.flashRect.setFillStyle(0xffffff, 1).setAlpha(0.45);
+      this.fx.sparks(h.cx, h.cy, h.color, 12, 160, 60);
+    } else if (kind === 'gust') {
+      // B0: one bounded velocity kick (BiomeEffects.gustImpulse, <= 180 px/s)
+      const g = gustImpulse(eff.impulsePxS);
+      this._addSledVelocity(g.dvx, g.dvy);
+      this.fx.sparks(h.cx, h.cy, h.color, 10, 220, 40);
+      this.shake(1);
     }
     if (h.gfx) h.gfx.setAlpha(0.4);
+  }
+
+  /** Add a velocity (px/s) to the sled body (B0 gust). Sled caches px/s from the body; keep the cache in step. */
+  _addSledVelocity(dvx, dvy) {
+    const s = this.sled;
+    if (!s || !s.inWorld || !s.body || (!dvx && !dvy)) return;
+    const Body = Phaser.Physics.Matter.Matter.Body;
+    const v = Body.getVelocity(s.body);
+    Body.setVelocity(s.body, { x: v.x + pxPerSecToStep(dvx, BASE_STEP_MS), y: v.y + pxPerSecToStep(dvy, BASE_STEP_MS) });
+    s.vx += dvx;
+    s.vy += dvy;
   }
 
   onPowerUp(p) {
@@ -569,6 +608,25 @@ export class RunScene extends Phaser.Scene {
       this.shieldCharges += eff.charges || 1;
       charges = this.shieldCharges;
       this.sled.shield = true;
+    } else if (eff.kind === 'ward') {
+      // B0: switches off its listed mods / hazards / effects for 4-6 s (Wards.js; PhysicsTuner and onHazard consult it)
+      this.wards = addWard(this.wards, def.id, eff);
+      durationMs = wardMsLeft(this.wards, def.id);
+    } else if (eff.kind === 'glide') {
+      // B0: lower ground friction (PhysicsTuner glideFrictionMul)
+      durationMs = timedPowerupMs(eff);
+      if (this.glideMs > 0 && this.glideId !== def.id) this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.glideId, reason: 'replaced' });
+      this.glideMs = durationMs;
+      this.glideMul = glideFrictionMul(eff.frictionMul);
+      this.glideId = def.id;
+    } else if (eff.kind === 'stabilize') {
+      // B0: wider landing tolerance (BiomeEffects.resolveLanding) and optional bounce damping
+      durationMs = timedPowerupMs(eff);
+      if (this.stabilizeMs > 0 && this.stabilizeId !== def.id) this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.stabilizeId, reason: 'replaced' });
+      this.stabilizeMs = durationMs;
+      this.stabilizeDeg = stabilizeToleranceDeg(eff.landingToleranceDeg);
+      this.stabilizeBounce = stabilizeBounceMul(eff.bounceMul);
+      this.stabilizeId = def.id;
     }
     this.fx.ring(p.spawn.x, p.spawn.y, p.color, 34, 420);
     this.fx.sparks(p.spawn.x, p.spawn.y, p.color, 12, 180);
@@ -637,22 +695,8 @@ export class RunScene extends Phaser.Scene {
     const zoneDefs = this.getZoneDefs(this.sled.x);
     const sled = this.sled;
     sled.groundAngleDeg = this.slopeAt(sled.x);
-    sled.scrambled = this.scrambleMs > 0;
-    const ctx = {
-      tucked: pad.tuck,
-      zones: zoneDefs,
-      daily: this.dailyMods,
-      scrambled: this.scrambleMs > 0,
-      slowed: this.slowMs > 0,
-      slowFactor: this.slowFactor,
-      speedBoost: this.boostMs > 0 ? this.boostFactor : 1,
-      timeMs: this.runTimeMs,
-      parachute: sled.parachuteMs > 0,
-      airBrake: sled.airBrakeActive,
-      airborne: !sled.grounded,
-      braking: pad.brake,
-    };
-    const phys = this.tuner.getEffective(ctx);
+    sled.scrambled = this.scrambleMs > 0 && !isWarded(this.wards, { effect: 'scramble' });
+    const phys = this.tuner.getEffective(this.physicsContext(pad, zoneDefs));
     this.currentPhys = phys;
 
     // sub-stepped physics; slow-mo scales the delta, never the 8 ms limit
@@ -770,6 +814,84 @@ export class RunScene extends Phaser.Scene {
     this.drawStreaks(t);
     this.bg.update(cam.scrollX, t, sled.speed);
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
+    this.updateBlindOverlay();
+  }
+
+  /**
+   * The PhysicsTuner context for this frame: zones, daily rule, timed hazard effects and power-ups (B0: wards, glide,
+   * stabilize). A warded slow / scramble stops acting while the ward lasts.
+   * @param {Object} pad normalized pad.
+   * @param {Object[]} [zoneDefs] mod defs under the sled (default: looked up at the sled x).
+   */
+  physicsContext(pad, zoneDefs) {
+    const sled = this.sled;
+    return {
+      tucked: !!pad.tuck,
+      zones: zoneDefs || this.getZoneDefs(sled.x),
+      daily: this.dailyMods,
+      scrambled: this.scrambleMs > 0 && !isWarded(this.wards, { effect: 'scramble' }),
+      slowed: this.slowMs > 0 && !isWarded(this.wards, { effect: 'slow' }),
+      slowFactor: this.slowFactor,
+      speedBoost: this.boostMs > 0 ? this.boostFactor : 1,
+      timeMs: this.runTimeMs,
+      parachute: sled.parachuteMs > 0,
+      airBrake: sled.airBrakeActive,
+      airborne: !sled.grounded,
+      braking: !!pad.brake,
+      wards: this.wards,
+      glideFrictionMul: this.glideMs > 0 ? this.glideMul : 1,
+      stabilizeBounceMul: this.stabilizeMs > 0 ? this.stabilizeBounce : 1,
+    };
+  }
+
+  /** B0 biome effect state (wards, glide, stabilize, blind), cleared at run start. */
+  _resetBiomeEffects() {
+    this.wards = emptyWards();
+    this.glideMs = 0;
+    this.glideMul = 1;
+    this.glideId = null;
+    this.stabilizeMs = 0;
+    this.stabilizeDeg = 0;
+    this.stabilizeBounce = 1;
+    this.stabilizeId = null;
+    this.blindMs = 0;
+    this.blindTotalMs = 0;
+    this.blindVis = 1;
+  }
+
+  /** B0: end every biome effect now (manual reset), reporting each the way its HUD chip expects. */
+  _endBiomeEffects(reason) {
+    for (const w of this.wards.wards) this.game.events.emit(EVT.POWERUP_EXPIRED, { id: w.id, reason });
+    if (this.glideMs > 0) this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.glideId, reason });
+    if (this.stabilizeMs > 0) this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.stabilizeId, reason });
+    if (this.blindMs > 0) this.game.events.emit(EVT.EFFECT_END, { effect: 'blind' });
+    this._resetBiomeEffects();
+    this.updateBlindOverlay();
+  }
+
+  /** B0 timers (real time, like the other effects). */
+  tickBiomeEffects(dt) {
+    const r = tickWards(this.wards, dt);
+    for (const id of r.expired) this.game.events.emit(EVT.POWERUP_EXPIRED, { id, reason: 'timeout' });
+    if (this.glideMs > 0) {
+      this.glideMs -= dt;
+      if (this.glideMs <= 0) { this.glideMs = 0; this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.glideId, reason: 'timeout' }); }
+    }
+    if (this.stabilizeMs > 0) {
+      this.stabilizeMs -= dt;
+      if (this.stabilizeMs <= 0) { this.stabilizeMs = 0; this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.stabilizeId, reason: 'timeout' }); }
+    }
+    if (this.blindMs > 0) {
+      this.blindMs -= dt;
+      if (this.blindMs <= 0) { this.blindMs = 0; this.game.events.emit(EVT.EFFECT_END, { effect: 'blind' }); }
+    }
+  }
+
+  /** B0: alpha of the blind overlay for this frame (0 when not blinded or when blind is warded). */
+  updateBlindOverlay() {
+    if (!this.blindRect) return;
+    const a = this.blindMs > 0 && !isWarded(this.wards, { effect: 'blind' }) ? blindOverlayAlpha(this.blindMs, this.blindTotalMs, this.blindVis) : 0;
+    if (this.blindRect.alpha !== a) this.blindRect.setAlpha(a);
   }
 
   /** Airborne only: ballistic ms to touchdown and the ground slope there (sled.airEtaMs / airSlopeDeg), for Sled's hands-off levelling. */
@@ -818,6 +940,7 @@ export class RunScene extends Phaser.Scene {
   }
 
   tickEffects(dt) {
+    this.tickBiomeEffects(dt);
     if (this.slowMs > 0) {
       this.slowMs -= dt;
       if (this.slowMs <= 0) {
@@ -914,11 +1037,9 @@ export class RunScene extends Phaser.Scene {
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, l.airtimeMs || 0);
     const airTricks = this._airTricks;
     this._airTricks = 0;
-    // forgiveness: clearly-bad-but-not-head-first landings become a recoverable wobble instead of a crash
-    if (l.quality === 'crash' && Math.abs(l.angleDeg || 0) <= TUNING.forgiveAngleDeg
-      && (l.impactSpeedPxS || 0) < TUNING.forgiveImpactPxS) {
-      l = { ...l, quality: 'sloppy' };
-    }
+    // forgiveness: clearly-bad-but-not-head-first landings become a recoverable wobble instead of a crash; a B0
+    // stabilize power-up widens the tolerance by its landingToleranceDeg (BiomeEffects.resolveLanding)
+    l = resolveLanding(l, this.stabilizeMs > 0 ? this.stabilizeDeg : 0, TUNING);
     if (l.quality === 'crash') {
       this.game.events.emit(EVT.LANDING, {
         quality: 'crash', angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
@@ -1246,6 +1367,7 @@ export class RunScene extends Phaser.Scene {
     if (this.slowmoMs > 0) { this.slowmoMs = 0; this.game.events.emit(EVT.POWERUP_EXPIRED, { id: 'clockPulse', reason: 'respawn' }); }
     if (this.slowMs > 0) { this.slowMs = 0; this.game.events.emit(EVT.EFFECT_END, { effect: 'slow' }); }
     if (this.scrambleMs > 0) { this.scrambleMs = 0; this.sled.scrambled = false; this.game.events.emit(EVT.EFFECT_END, { effect: 'scramble' }); }
+    this._endBiomeEffects('respawn');
     this.game.events.emit(EVT.RESPAWN, { reason: 'manual', x: pos.x, y: pos.y, comboPenalty: r.comboPenalty || 0 });
     this.emitCombo('reset');
     this.emitScore();
@@ -1454,6 +1576,7 @@ export class RunScene extends Phaser.Scene {
     const py = (GAME_HEIGHT * (z - 1)) / (2 * z);
     if (this.bg && this.bg.gfx) this.bg.gfx.setScale(k).setPosition(px, py);
     if (this.flashRect) this.flashRect.setScale(k).setPosition(px, py);
+    if (this.blindRect) this.blindRect.setScale(k).setPosition(px, py);
   }
 
   updateCamera(dt) {

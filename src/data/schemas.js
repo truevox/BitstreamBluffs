@@ -57,11 +57,19 @@
  * @property {string} id
  * @property {string} shapeKey        key of the Graphics draw routine (gameplay entity switch), e.g. 'chasm'.
  * @property {{w:number,h:number}} size   collision box in px.
- * @property {{effect:'crash'|'slow'|'scramble', durationMs?:number, speedFactor?:number}} onHit
- * @property {number} weight          relative spawn weight.
+ * @property {{effect:'crash'|'slow'|'scramble'|'blind'|'gust', durationMs?:number, speedFactor?:number,
+ *             visibility?:number, impulsePxS?:[number,number]}} onHit
+ *                                    B0 (additive): 'blind' {durationMs?, visibility?} dims the screen (never below 35 %
+ *                                    visibility, no crash); 'gust' {impulsePxS:[x,y]} is one velocity kick, at most 180 px/s.
+ *                                    Math in systems/BiomeEffects.js.
+ * @property {number} weight          relative spawn weight (biome defs: 0 disables the def).
  * @property {number} minDistanceM
  * @property {'ground'|'air'} placement   'air' = floats at spawn.y (centre) inside the flight arc of a generated jump, at most one per jump, see ARCHITECTURE.md "Air hazards".
- * @property {string} colorKey        palette key (PALETTE_KEYS).
+ * @property {string} colorKey        palette key (PALETTE_KEYS). A BIOME crash hazard is always drawn in `danger`.
+ * @property {string} [biome]         B0 (additive): biome id. A def with this field never enters the base hazard lists;
+ *                                    it spawns only in that biome's chunks (TerrainGenerator._placeBiomeSpawns).
+ * @property {{baseChance:number}} [spawn]  B0, biome defs only: chance of the chunk's biome hazard slot, capped at 0.5.
+ * @property {number} [maxDistanceM]  optional upper distance bound.
  */
 
 /**
@@ -70,9 +78,18 @@
  * @property {string} id
  * @property {string} shapeKey
  * @property {number} radius          pickup radius px.
- * @property {{kind:'slowmo'|'speedBoost'|'shield', durationMs?:number, timeScale?:number, speedFactor?:number, charges?:number}} effect
+ * @property {{kind:'slowmo'|'speedBoost'|'shield'|'ward'|'glide'|'stabilize', durationMs?:number, timeScale?:number,
+ *             speedFactor?:number, charges?:number, mods?:string[], hazards?:string[], effects?:string[],
+ *             frictionMul?:number, landingToleranceDeg?:number, bounceMul?:number}} effect
+ *                                    B0 kinds (additive): 'ward' {durationMs (4-6 s), mods[], hazards[], effects[]} switches
+ *                                    off those terrain-mod ids, hazard ids and hazard effects (systems/Wards.js); 'glide'
+ *                                    {frictionMul, durationMs} multiplies ground friction; 'stabilize' {landingToleranceDeg,
+ *                                    bounceMul?, durationMs} widens landing tolerance (systems/BiomeEffects.js).
  * @property {{baseChance:number, distanceDecayM:number}} spawn  chance per candidate slot = max(0.4 x baseChance, baseChance / (1 + distanceM / distanceDecayM)).
+ *                                    Biome defs: baseChance alone, capped at 0.5 (no distance decay).
  * @property {string} colorKey
+ * @property {string} [biome]         B0 (additive): biome id. A def with this field never enters the base power-up list; it
+ *                                    spawns only in that biome's chunks, one slot per chunk. Ranked; never sets `modded`.
  */
 
 /**

@@ -12,6 +12,7 @@
  */
 import { PHYSICS, MAX_PHYSICS_STEP_MS } from '../constants.js';
 import { AIR_NEAR_MISS_BELOW_PX } from './TerrainGenerator.js';
+import { isWarded } from './Wards.js';
 
 /** Matter's internal base delta in ms (Body._baseDelta). */
 export const BASE_STEP_MS = 1000 / 60;
@@ -234,6 +235,9 @@ export const TUNING = Object.freeze({
  * @property {boolean} [airBrake]   air brake held while airborne.
  * @property {boolean} [airborne]
  * @property {boolean} [braking]    S held.
+ * @property {import('./Wards.js').WardState} [wards]  B0: active wards; a zone whose mod id is warded is skipped.
+ * @property {number} [glideFrictionMul]   B0 `glide` power-up: multiplier on ground friction (groundResist), 1 = none.
+ * @property {number} [stabilizeBounceMul] B0 `stabilize` power-up: multiplier on bounce, 1 = none.
  */
 
 /**
@@ -412,6 +416,8 @@ export class PhysicsTuner {
     // `launch` lives on the MOD DEF (geyser-vent.json), not on zone.physics, so it is read from the def.
     let geyserLaunch = null;
     for (const z of zones) {
+      // B0 ward: a warded mod is skipped entirely, as if the sled were not in that zone (Wards.js).
+      if (ctx.wards && z && isWarded(ctx.wards, { modId: z.id })) continue;
       const p = (z && z.physics) || {};
       if (p.gravityMul) gravityMul *= p.gravityMul;
       if (p.frictionMul) frictionMul *= p.frictionMul;
@@ -427,6 +433,10 @@ export class PhysicsTuner {
       }
       if (z && z.launch && typeof z.launch === 'object') geyserLaunch = z.launch;
     }
+
+    // B0 glide / stabilize power-ups (values already clamped by BiomeEffects at pickup).
+    if (ctx.glideFrictionMul > 0) frictionMul *= ctx.glideFrictionMul;
+    if (ctx.stabilizeBounceMul > 0) bounceMul *= ctx.stabilizeBounceMul;
 
     let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul;
     if (ctx.slowed) speedMul *= ctx.slowFactor || b.slowFactor;

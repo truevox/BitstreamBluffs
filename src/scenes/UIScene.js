@@ -46,9 +46,21 @@ const POWERUP_INFO = {
   packetBurst: { name: 'PACKET BURST', color: 'lime' },
   hashedBackup: { name: 'HASHED BACKUP', color: 'amber' },
 };
+/**
+ * Power-up KINDS (B0, biome full treatment). Biome pickups are keyed by id like the base ones once their content lands;
+ * until a pickup id has its own POWERUP_INFO row, its chip, popup colour and icon come from its effect kind here.
+ */
+const POWERUP_KIND_INFO = {
+  ward: { color: 'cyan' },
+  glide: { color: 'lime' },
+  stabilize: { color: 'amber' },
+};
+/** Hazard effects on screen. `showMs`: minimum time the warning stays up (a gust is instant, so it reports 0 ms). */
 const EFFECT_INFO = {
   scramble: { label: 'PHYSICS SCRAMBLE', color: 'danger' },
   slow: { label: 'SPEED CUT', color: 'amber' },
+  blind: { label: 'BLINDED', color: 'amber' },
+  gust: { label: 'GUST', color: 'cyan', showMs: 700 },
 };
 
 const HINT_TEXT = {
@@ -343,8 +355,7 @@ export class UIScene extends Phaser.Scene {
     g.clear();
     let i = 0;
     for (const [id, p] of this.powerups) {
-      const info = POWERUP_INFO[id] || { color: 'cyan' };
-      const key = (this.content.powerups && this.content.powerups[id] && this.content.powerups[id].colorKey) || info.color;
+      const key = this._powerColor(id);
       const c = pal[key];
       const x = this.powerX + i * POWER_PITCH;
       const y = POWER_Y;
@@ -365,10 +376,37 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
+  /** Effect kind of a power-up id from content ('' when unknown). */
+  _powerKind(id) {
+    const d = this.content && this.content.powerups && this.content.powerups[id];
+    return (d && d.effect && d.effect.kind) || '';
+  }
+
+  /** HUD info for a power-up id: its own POWERUP_INFO row, else its kind's (B0), else a cyan chip named after the id. */
+  _powerInfo(id) {
+    if (POWERUP_INFO[id]) return POWERUP_INFO[id];
+    const k = POWERUP_KIND_INFO[this._powerKind(id)];
+    return { name: idToLabel(id), color: k ? k.color : 'cyan' };
+  }
+
   _drawIcon(g, id, cx, cy, c) {
     g.lineStyle(1, c, 1);
     g.fillStyle(c, 1);
-    if (id === 'clockPulse') {
+    const kind = POWERUP_INFO[id] ? '' : this._powerKind(id);
+    if (kind === 'ward') {
+      // ward: a ring with a bar through it ("this mechanic is off")
+      g.strokeCircle(cx, cy, 6);
+      g.lineBetween(cx - 4, cy + 4, cx + 4, cy - 4);
+    } else if (kind === 'glide') {
+      // glide: two runner lines with a speed tick
+      g.lineBetween(cx - 6, cy + 2, cx + 5, cy + 2);
+      g.lineBetween(cx - 4, cy + 5, cx + 6, cy + 5);
+      g.fillTriangle(cx - 2, cy - 6, cx - 2, cy - 1, cx + 4, cy - 3.5);
+    } else if (kind === 'stabilize') {
+      // stabilize: a level bar on a pivot
+      g.lineBetween(cx - 6, cy - 1, cx + 6, cy - 1);
+      g.fillTriangle(cx, cy, cx - 4, cy + 6, cx + 4, cy + 6);
+    } else if (id === 'clockPulse') {
       g.strokeCircle(cx, cy, 6);
       g.lineBetween(cx, cy, cx, cy - 4);
       g.lineBetween(cx, cy, cx + 3, cy + 1);
@@ -791,7 +829,7 @@ export class UIScene extends Phaser.Scene {
     const total = p.durationMs || 0;
     const old = this.powerups.get(id);
     if (old) old.text.destroy();
-    const info = POWERUP_INFO[id] || { name: idToLabel(id), color: 'cyan' };
+    const info = this._powerInfo(id);
     const t = this._t(0, GAME_HEIGHT - 26, '', { color: 'text', outline: 'dark' });
     this.powerups.set(id, { total, remaining: total, charges: p.charges || 0, text: t });
     this._paintPowerups();
@@ -800,7 +838,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   _powerColor(id) {
-    const info = POWERUP_INFO[id] || { color: 'cyan' };
+    const info = this._powerInfo(id);
     return (this.content.powerups && this.content.powerups[id] && this.content.powerups[id].colorKey) || info.color;
   }
 
@@ -828,7 +866,7 @@ export class UIScene extends Phaser.Scene {
     if (p.effect === 'crash') return;
     const info = EFFECT_INFO[p.effect];
     if (!info) return;
-    const dur = p.durationMs || 0;
+    const dur = Math.max(p.durationMs || 0, info.showMs || 0);
     let e = this.effects.get(p.effect);
     if (!e) {
       const t = this._t(GAME_WIDTH / 2, this.warnY + this.effects.size * 11, '', { color: info.color, anchor: 'center', outline: 'dark' });

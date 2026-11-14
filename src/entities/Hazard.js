@@ -3,11 +3,12 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * One hazard instance built from a HazardDef + HazardSpawn. Sensor body; draws shape from def.shapeKey
- * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'). Silhouettes fill their hit-box so the danger is always legible
+ * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
  * (design doc pillar 2); faint corner brackets mark the exact hit-box.
  */
 import Phaser from 'phaser';
 import { CAT } from './Sled.js';
+import { hazardColorKey, hazardDrawKind } from '../systems/BiomeEffects.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies } = Matter;
@@ -34,7 +35,11 @@ export class Hazard {
     this.palette = palette;
     this.hit = false;
     this.destroyed = false;
-    this.color = palette[def.colorKey] != null ? palette[def.colorKey] : palette.danger;
+    // BiomeEffects.hazardColorKey: a biome crash hazard is always `danger` (spec §4); base defs keep their colorKey
+    const ck = hazardColorKey(def);
+    this.color = palette[ck] != null ? palette[ck] : palette.danger;
+    /** Drawing routine: the def's shapeKey when known, else 'generic' (a biome def with a new shapeKey still draws). */
+    this.drawKind = hazardDrawKind(def);
     const w = (def.size && def.size.w) || 24;
     const h = (def.size && def.size.h) || 24;
     this.w = w;
@@ -97,7 +102,7 @@ export class Hazard {
     const h = this.h;
     const frame = Math.floor(t / 66);
 
-    if (this.def.shapeKey === 'drone') {
+    if (this.drawKind === 'drone') {
       this._drone(g, t, frame, col, pal);
       return;
     }
@@ -115,7 +120,7 @@ export class Hazard {
       }
     }
 
-    switch (this.def.shapeKey) {
+    switch (this.drawKind) {
       case 'chasm': this._chasm(g, t, frame, col, pal); break;
       case 'firewall': this._firewall(g, t, frame, col, pal); break;
       case 'spike': this._spike(g, t, frame, col, pal); break;
