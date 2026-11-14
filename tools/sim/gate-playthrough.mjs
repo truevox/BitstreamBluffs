@@ -1327,6 +1327,80 @@ async function main() {
       } else pass('W6: a conveyor belt drives the real sled with no player input', `dvx=${c.out.withBelt.toFixed(2)} vs no-belt ${c.out.withoutBelt.toFixed(2)}`);
     }
 
+    // ---- W6: a geyser vent LAUNCHES the real sled. Same shape as the conveyor check, and for the same
+    // reason: geyser-vent.json carried `launch` from the start while nothing read it, so a schema unit test
+    // could pass forever with the mechanic absent. This drives Sled.applyControls with the vent's real
+    // physics and requires an upward velocity kick plus a cooldown that stops an immediate re-fire.
+    {
+      const c = await (async () => {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        try {
+          const out = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.registry.set('biomeMask', 0);
+            g.scene.start('TitleScene');
+            const t0 = Date.now();
+            let run = null;
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              if (!started && tt && !tt.starting) { started = true; tt.startRun('geyser-probe', 0); }
+              const rr = g.scene.getScene('RunScene');
+              if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'RunScene never produced a live sled' };
+            await wait(200);
+            if (run.sled.destroyed || !run.sled.inWorld) return { fatal: 'sled died before the probe' };
+
+            // The vent as the generator would place it: a zone whose MOD DEF carries the launch data.
+            const vent = run.content.terrainMods.geyserVent;
+            const x = run.sled.x;
+            const chunk = run.terrain._chunkAt(x);
+            const zones = chunk.zones;
+            const existing = zones.length;
+            zones.push({ modId: 'geyserVent', x0: x - 400, x1: x + 400 });
+
+            const phys = run.tuner.getEffective({ zones: [vent] });
+            const emptyPad = { push: false, brake: false, tuck: false, left: false, right: false, hop: false, heli: 0, pressed: {}, airBrake: false };
+
+            run.sled.grounded = true;
+            run.sled.groundAngleDeg = 0;
+            run.sled.geyserCooldownMs = 0;
+            const vyBefore = run.sled.body.velocity.y;
+            run.sled.applyControls(emptyPad, phys, 16);
+            const vyAfter = run.sled.body.velocity.y;
+
+            // Immediately again, with the cooldown now set: must NOT fire a second time.
+            run.sled.grounded = true;
+            const vyBefore2 = run.sled.body.velocity.y;
+            run.sled.applyControls(emptyPad, phys, 16);
+            const vyAfter2 = run.sled.body.velocity.y;
+
+            zones.length = existing;
+            // Matter carries velocity in engine units per step; convert to px/s the way Sled does so the
+            // number in the gate output is the same quantity the vent's data is expressed in.
+            const PX = (v) => (v * 1000) / 16.666666666666668;
+            return {
+              hasLaunchData: Boolean(phys.geyserLaunch && phys.geyserLaunch.velocityPxS > 0),
+              launchVelocity: phys.geyserLaunch ? phys.geyserLaunch.velocityPxS : null,
+              dvy: PX(vyAfter) - PX(vyBefore),
+              dvySecond: PX(vyAfter2) - PX(vyBefore2),
+              cooldownAfter: run.sled.geyserCooldownMs,
+            };
+          }).catch((e) => ({ fatal: String(e) }));
+          return { errors, out };
+        } finally { await page.close(); }
+      })();
+      if (c.out.fatal) fail('W6: geyser vent launches the sled', c.out.fatal);
+      else if (c.errors.length) fail('W6: geyser vent — no page errors', c.errors.join(' | '));
+      else if (!c.out.hasLaunchData) fail('W6: the vent\'s launch data reaches the tuner', JSON.stringify(c.out));
+      else if (!(c.out.dvy < -100)) fail('W6: a geyser throws the sled upward with real force', `dvy=${c.out.dvy} px/s (need a real upward kick, not a rounding error)`);
+      else if (!(c.out.dvySecond > -1)) fail('W6: the vent does not re-fire while on cooldown', `second dvy=${c.out.dvySecond}`);
+      else pass('W6: a geyser vent launches the real sled, once per cooldown', `dvy=${c.out.dvy.toFixed(1)} of ${c.out.launchVelocity} px/s, then ${c.out.dvySecond.toFixed(1)}`);
+    }
+
   } finally {
     await browser.close();
     server.close();

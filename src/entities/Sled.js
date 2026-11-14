@@ -10,7 +10,7 @@
  */
 import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
-import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep } from '../systems/PhysicsTuner.js';
+import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyserStep } from '../systems/PhysicsTuner.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -203,6 +203,7 @@ export class Sled {
     }
     this.hopBufferMs = Math.max(0, this.hopBufferMs - stepMs);
     this.pushCooldownMs = Math.max(0, this.pushCooldownMs - stepMs);
+    this.geyserCooldownMs = Math.max(0, (this.geyserCooldownMs || 0) - stepMs);
     this.invulnerableMs = Math.max(0, this.invulnerableMs - stepMs);
     if (this.parachuteMs > 0) this.parachuteMs = Math.max(0, this.parachuteMs - stepMs);
     if (grounded) this.parachuteMs = 0;
@@ -306,6 +307,18 @@ export class Sled {
       });
       vx += belt.dvx;
       vy += belt.dvy;
+    }
+
+    // geyser vent (W6, Vertigo Vents): a grounded sled over a vent is thrown upward, on a cooldown so the
+    // vent cannot re-fire every step and pin the sled in the air. The data carried this since the biome
+    // shipped but nothing read it, so the mechanic did not exist; this is its consumer.
+    if (phys.geyserLaunch) {
+      const vent = geyserStep({ grounded, launch: phys.geyserLaunch, cooldownLeftMs: this.geyserCooldownMs || 0 });
+      if (vent.fire) {
+        vy = Math.min(vy, 0) + vent.dvy;
+        this.geyserCooldownMs = vent.cooldownMs;
+        this._sinceLaunchMs = 0;
+      }
     }
 
     Body.setVelocity(b, { x: fromPxS(vx), y: fromPxS(vy) });

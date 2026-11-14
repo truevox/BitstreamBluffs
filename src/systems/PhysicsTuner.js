@@ -318,6 +318,33 @@ export function conveyorStep(i) {
 }
 
 /**
+ * Geyser vent, one physics step (W6, Vertigo Vents; pure — Sled.applyControls supplies it and applies the result).
+ *
+ * The spec's W6 table says "Geysers that launch you", and `geyser-vent.json` has carried
+ * `launch: { velocityPxS, cooldownMs }` since the biome shipped — but nothing ever read the field, so the
+ * mechanic did not exist while its data and schema looked present. This is the same failure shape as the
+ * conveyor belt's unused `direction`; both are why "the data is there" is never evidence that a mechanic works.
+ *
+ * A vent fires only from the ground, and only when its cooldown has expired — without that, a vent under the
+ * sled would kick on every physics step and hold the sled in the air forever.
+ *
+ * @param {{grounded:boolean, launch?:{velocityPxS?:number, cooldownMs?:number}, cooldownLeftMs?:number}} i
+ * @param {number} [defaultCooldownMs] used when the vent's data omits a usable cooldown.
+ * @returns {{fire:boolean, dvy:number, cooldownMs:number}} upward velocity change (px/s, negative = up).
+ */
+export function geyserStep(i, defaultCooldownMs = 900) {
+  const inert = { fire: false, dvy: 0, cooldownMs: 0 };
+  if (!i || !i.grounded) return inert;
+  const l = i.launch;
+  if (!l || typeof l !== 'object') return inert;
+  const v = l.velocityPxS;
+  if (!Number.isFinite(v) || v <= 0) return inert;
+  if ((i.cooldownLeftMs || 0) > 0) return inert;
+  const cd = Number.isFinite(l.cooldownMs) && l.cooldownMs > 0 ? l.cooldownMs : defaultCooldownMs;
+  return { fire: true, dvy: -v, cooldownMs: cd };
+}
+
+/**
  * Stall safety net, one physics step (pure; Sled.applyControls feeds it and applies the result).
  * A sled that is stopped or rolling BACKWARDS (speed along the slope tangent below `stallNudgeBelowPxS`) on non-steep ground with no
  * brake for `stallNudgeAfterMs` gets a gentle push along the tangent up to `stallNudgeToPxS`. The test is the signed tangential speed,
@@ -381,6 +408,9 @@ export class PhysicsTuner {
     // beltDirection, so a consumer cannot add a negative magnitude by mistake.
     let beltDrive = 0;
     let beltDirection = 1;
+    // W6 geysers: the vent's launch data, resolved here so the consumer does not walk the zone list again.
+    // `launch` lives on the MOD DEF (geyser-vent.json), not on zone.physics, so it is read from the def.
+    let geyserLaunch = null;
     for (const z of zones) {
       const p = (z && z.physics) || {};
       if (p.gravityMul) gravityMul *= p.gravityMul;
@@ -395,6 +425,7 @@ export class PhysicsTuner {
         // does not produce; picking the nearer (last) zone keeps the behaviour deterministic.
         beltDirection = (z && z.direction) === -1 || (z && z.physics && z.physics.direction) === -1 ? -1 : 1;
       }
+      if (z && z.launch && typeof z.launch === 'object') geyserLaunch = z.launch;
     }
 
     let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul;
@@ -442,6 +473,7 @@ export class PhysicsTuner {
       pushForceMul: (daily.pushForceMul || 1) * zonePushMul,
       beltDrivePxS2: beltDrive,
       beltDirection,
+      geyserLaunch,
       scrambleJitterDegS2: jitter,
       restitution: Math.min(0.9, 0.02 * bounceMul * bounceMul),
     };
