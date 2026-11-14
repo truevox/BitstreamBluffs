@@ -268,7 +268,17 @@ describe('_placeBiomeSpawns: placement of biome hazards and power-ups', () => {
       expect(withFx[i].points).toEqual(noFx[i].points);
       expect(withFx[i].zones).toEqual(noFx[i].zones);
       expect(withFx[i].shards).toEqual(noFx[i].shards);
-      expect(withFx[i].hazards.filter((h) => !isFx(h))).toEqual(noFx[i].hazards);
+      // B1 slot rule (spec §4, amended 2026-11-14): when the free scan finds no slot, ONE base ground hazard may be swapped
+      // IN PLACE (same x, y, rotation) for the chunk's biome hazard. Every other base hazard is untouched.
+      const own = withFx[i].hazards.filter((h) => !isFx(h));
+      const lost = noFx[i].hazards.filter((h) => !own.some((q) => q.x === h.x && q.defId === h.defId));
+      expect(lost.length).toBeLessThanOrEqual(1);
+      for (const h of own) expect(noFx[i].hazards).toContainEqual(h);
+      if (lost.length) {
+        const swap = withFx[i].hazards.find(isFx);
+        expect(swap && { x: swap.x, y: swap.y, rotationDeg: swap.rotationDeg }).toEqual({ x: lost[0].x, y: lost[0].y, rotationDeg: lost[0].rotationDeg });
+        expect(fxDefs[swap.defId].biome).toBe(withFx[i].biome);
+      }
       expect(withFx[i].powerups.filter((p) => !isFx(p))).toEqual(noFx[i].powerups);
     }
   });

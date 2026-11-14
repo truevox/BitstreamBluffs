@@ -164,6 +164,12 @@ export const BIOME_SPAWN_DEFAULT_CHANCE = 0.2;
 export const BIOME_EDGE_MARGIN_PX = HAZARD_END_MARGIN_PX;
 /** Random numbers each biome slot draws, whatever its outcome, so one def's tuning never shifts another stream. */
 export const BIOME_SLOT_DRAWS = 5;
+/**
+ * B1 slot rule (spec §4, amended 2026-11-14): when the free scan finds no ground slot, the biome hazard may replace ONE base
+ * ground hazard of its chunk, but only when its box fits within the replaced box plus this slack (w and h each), so the
+ * shard and power-up clearances computed around the base hazard still hold.
+ */
+export const BIOME_REPLACE_SLACK_PX = 8;
 /** Difficulty tail: past the old caps the ramp keeps creeping up (gently) to a hard ceiling. */
 export const HAZARD_DENSITY_CAP_M = 3500;
 export const HAZARD_DENSITY_TAIL_END_M = 10000;
@@ -1328,7 +1334,7 @@ export class TerrainGenerator {
    * @param {import('./Rng.js').Rng} pRng fork 'biomePu'
    */
   _placeBiomeSpawns(chunk, biome, hRng, pRng, distM, kind, b, isJump, breather, lips) {
-    const h0 = hRng.next(); const h1 = hRng.next(); const h2 = hRng.next(); const h3 = hRng.next(); hRng.next();
+    const h0 = hRng.next(); const h1 = hRng.next(); const h2 = hRng.next(); const h3 = hRng.next(); const h4 = hRng.next();
     const p0 = pRng.next(); const p1 = pRng.next(); const p2 = pRng.next(); const p3 = pRng.next(); pRng.next();
     const hDefs = this.biomeHazards[biome];
     if (hDefs && chunk.index > 0) {
@@ -1345,7 +1351,10 @@ export class TerrainGenerator {
         } else if (kind !== 'bridge' && !isJump) {
           const span = chunk.endX - chunk.startX - 2 * BIOME_EDGE_MARGIN_PX;
           const steps = span > 0 ? Math.floor(span / HAZARD_RETRY_STEP_PX) + 1 : 0;
-          for (let k = 0; k < steps; k++) if (this._tryBiomeGround(chunk, def, (h2 + (k * HAZARD_RETRY_STEP_PX) / span) % 1, b, breather, lips)) break;
+          let placed = false;
+          for (let k = 0; k < steps && !placed; k++) placed = this._tryBiomeGround(chunk, def, (h2 + (k * HAZARD_RETRY_STEP_PX) / span) % 1, b, breather, lips);
+          // B1 slot rule (spec §4 amendment): no free slot -> replace one base ground hazard, picked with the 5th draw
+          if (!placed) this._replaceBiomeGround(chunk, def, h4, b, breather, lips);
         }
       }
     }
@@ -1386,24 +1395,64 @@ export class TerrainGenerator {
     const hi = chunk.endX - BIOME_EDGE_MARGIN_PX;
     if (hi < lo) return false;
     const x = Math.round(lo + (hi - lo) * u);
+    const at = this._biomeGroundAt(chunk, def, x, b, breather, lips, null);
+    if (!at) return false;
+    chunk.hazards.push({ defId: def.id, x, y: at.y, rotationDeg: at.slope });
+    chunk.hazards.sort((p, q) => p.x - q.x);
+    return true;
+  }
+
+  /**
+   * Every biome ground rule at world x (edges, breather, lips, gaps, spacing, power-ups, slope, `slow` before a descent,
+   * shards against THIS def's box). `skip` is a hazard spawn left out of the spacing check (the one a replacement swaps).
+   * @returns {{y:number, slope:number}|null} the ground y and slope at x, or null when a rule fails.
+   */
+  _biomeGroundAt(chunk, def, x, b, breather, lips, skip) {
+    if (x < chunk.startX + BIOME_EDGE_MARGIN_PX || x > chunk.endX - BIOME_EDGE_MARGIN_PX) return null;
     const crash = !def.onHit || def.onHit.effect === 'crash';
-    if (x < HAZARD_MIN_X_PX || x < HAZARD_SOFT_PX || x < b.noHazX || (crash && x < HAZARD_SAFE_PX)) return false;
-    if (breather && x < chunk.startX + BREATHER_CALM_PX) return false;
-    for (const l of lips) if (x >= l.x - 40 && x <= l.zoneEnd) return false;
-    for (const g of chunk.gaps) if (x >= g.x0 - 96 && x <= g.x1 + 96) return false;
-    for (const q of chunk.hazards) if (Math.abs(q.x - x) < HAZARD_MIN_SPACING_PX) return false;
-    for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return false;
+    if (x < HAZARD_MIN_X_PX || x < HAZARD_SOFT_PX || x < b.noHazX || (crash && x < HAZARD_SAFE_PX)) return null;
+    if (breather && x < chunk.startX + BREATHER_CALM_PX) return null;
+    for (const l of lips) if (x >= l.x - 40 && x <= l.zoneEnd) return null;
+    for (const g of chunk.gaps) if (x >= g.x0 - 96 && x <= g.x1 + 96) return null;
+    for (const q of chunk.hazards) if (q !== skip && Math.abs(q.x - x) < HAZARD_MIN_SPACING_PX) return null;
+    for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return null;
     const pts = chunk.points;
     const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
     const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
-    if (!(slope > -12 && slope < 28) || !this._flatAround(pts, i)) return false;
-    if (def.onHit && def.onHit.effect === 'slow' && !this._descentAhead(pts, i, chunk.endX)) return false;
+    if (!(slope > -12 && slope < 28) || !this._flatAround(pts, i)) return null;
+    if (def.onHit && def.onHit.effect === 'slow' && !this._descentAhead(pts, i, chunk.endX)) return null;
     const w = (def.size && def.size.w) || 24;
     const ht = (def.size && def.size.h) || 24;
     const y = this._yAtLocal(pts, x);
-    for (const s of chunk.shards) if (s.x >= x - w / 2 - 22 && s.x <= x + w / 2 + 22 && s.y >= y - ht - 22) return false;
-    chunk.hazards.push({ defId: def.id, x, y, rotationDeg: slope });
-    chunk.hazards.sort((p, q) => p.x - q.x);
+    for (const s of chunk.shards) if (s.x >= x - w / 2 - 22 && s.x <= x + w / 2 + 22 && s.y >= y - ht - 22) return null;
+    return { y, slope };
+  }
+
+  /**
+   * B1 slot rule (spec §4, amended 2026-11-14). The free scan found no slot: swap ONE base ground hazard of this chunk for
+   * the biome def, in place (same x, y, rotation). A candidate must be a base (non-biome) ground def whose box, grown by
+   * BIOME_REPLACE_SLACK_PX in w and h, holds the biome box, and its spot must pass every biome ground rule with the biome
+   * def (spacing ignores the candidate itself). `r` is the slot's pre-drawn 5th number: the draw count never changes, so
+   * base streams and the power-up slot are untouched. @returns {boolean} replaced
+   */
+  _replaceBiomeGround(chunk, def, r, b, breather, lips) {
+    const w = (def.size && def.size.w) || 24;
+    const ht = (def.size && def.size.h) || 24;
+    const cands = [];
+    for (let k = 0; k < chunk.hazards.length; k++) {
+      const q = chunk.hazards[k];
+      const qd = this.hazardList.find((d) => d.id === q.defId); // base ground defs only (no biome, no air def)
+      if (!qd) continue;
+      const qw = (qd.size && qd.size.w) || 24;
+      const qh = (qd.size && qd.size.h) || 24;
+      if (w > qw + BIOME_REPLACE_SLACK_PX || ht > qh + BIOME_REPLACE_SLACK_PX) continue;
+      if (!this._biomeGroundAt(chunk, def, q.x, b, breather, lips, q)) continue;
+      cands.push(k);
+    }
+    if (!cands.length) return false;
+    const k = cands[Math.min(cands.length - 1, Math.floor(r * cands.length))];
+    const q = chunk.hazards[k];
+    chunk.hazards[k] = { defId: def.id, x: q.x, y: q.y, rotationDeg: q.rotationDeg };
     return true;
   }
 
