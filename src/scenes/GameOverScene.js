@@ -58,6 +58,25 @@ const SHOP_AFTER_ENTRY_MS = 500;
 /** The key the footer hint advertises. Must match MenuInput's `shop` action. */
 const SHOP_KEY = 'B';
 
+/**
+ * "SIGNATURE ONLINE: <BIOME>" for a level that unlocked a biome. All 11 biomes ship, so the old
+ * "SIGNATURE LOCKED - COMING ONLINE" was false (audit GO-1 / U6a). The display name comes from the loaded
+ * content when a registry is given; the id is the fallback, so this never throws on a partial scene.
+ * @param {string} id biome id
+ * @param {{get:function(string):*}} [registry]
+ * @returns {string}
+ */
+function biomeOnlineLine(id, registry) {
+  let name = '';
+  try {
+    const biomes = (registry && typeof registry.get === 'function' && (registry.get(REG.CONTENT) || {}).biomes) || {};
+    const def = biomes[id] || Object.values(biomes).find((b) => b && b.id === id);
+    name = def && def.name ? String(def.name) : '';
+  } catch (e) { /* fall back to the id */ }
+  if (!name) name = String(id || '').replace(/[-_]/g, ' ');
+  return `SIGNATURE ONLINE: ${name.toUpperCase()}`;
+}
+
 export class GameOverScene extends Phaser.Scene {
   constructor() {
     super(SCENES.GAME_OVER);
@@ -427,7 +446,7 @@ export class GameOverScene extends Phaser.Scene {
         // the player just earned (CC Friday's PR #17 note). Boosts stay bare-but-dashed for width.
         if (reward.cosmetic) bits.push(`UNLOCKED ${String(reward.cosmetic).toUpperCase().replace(/-/g, ' ')}`);
         if (reward.boost) bits.push(String(reward.boost).toUpperCase());
-        if (reward.biome) bits.push('SIGNATURE LOCKED - COMING ONLINE');
+        if (reward.biome) bits.push(biomeOnlineLine(reward.biome, this && this.registry));
       }
       if (bits.length) return ellipsize(bits.join(' / '), 280);
     }
@@ -435,7 +454,7 @@ export class GameOverScene extends Phaser.Scene {
       const bits = [];
       if (awards.rewards.title) bits.push(String(awards.rewards.title).toUpperCase());
       if (awards.rewards.cosmetic) bits.push(String(awards.rewards.cosmetic).toUpperCase());
-      if (awards.rewards.biome) bits.push('SIGNATURE LOCKED - COMING ONLINE');
+      if (awards.rewards.biome) bits.push(biomeOnlineLine(awards.rewards.biome, this && this.registry));
       if (bits.length) return ellipsize(bits.join(' / '), 280);
     }
     const toNext = awards.progress ? awards.progress.xpToNext : 0;
