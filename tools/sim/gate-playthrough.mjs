@@ -205,7 +205,21 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
     // `chasm` and not `terrain`: an opening-grace terrain crash is deliberately forgiven and respawns,
     // which is correct behaviour and would leave the gate waiting for a Game Over that never comes.
     run.pendingCrash = { cause: 'chasm' };
-    await wait(3000);
+    // Wait for the CONDITION, not a fixed sleep. This was `await wait(3000)` and it flaked: under load the
+    // crash resolve + record build + saveRun + scene hand-off can take longer than 3s, and the step then
+    // reported "Game Over never built: scene inactive" — a false failure that says nothing about the game.
+    // Bounded (8s) so a genuinely broken screen still fails instead of hanging.
+    const byDeadline = async (ms) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        const s = g.scene.getScene('GameOverScene');
+        if (s && s.scene && s.scene.isActive && s.scene.isActive() && s.rec) return true;
+        await wait(100);
+      }
+      return false;
+    };
+    const built = await byDeadline(8000);
+    if (!built) await wait(200); // one settle frame before reading text off a scene that just appeared
     const over = g.scene.getScene('GameOverScene');
     const active = Boolean(over && over.scene && over.scene.isActive && over.scene.isActive());
     const rec = g.registry.get('lastRecord') || g.registry.get('record') || null;
@@ -802,7 +816,9 @@ async function main() {
       } finally { await page.close(); }
     }
 
-    // ---- 8. the leaderboard has a modded tab, and it opens
+    // ---- 8. the leaderboard has a modded tab, it opens, and NEITHER board draws two glyphs on top of
+    //         each other (W4 put a tab button on the footer line, which is exactly the kind of collision
+    //         the Title/shop steps were added for; this view had no such step, so the overlap shipped).
     if (WITH_BOOSTS) {
       const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
       try {
@@ -820,19 +836,63 @@ async function main() {
           if (!view) return { fatal: 'leaderboard view did not open' };
           const read = () => (view.tabBtn && view.tabBtn.label && view.tabBtn.label.main)
             ? view.tabBtn.label.main.text : null;
+          // Read the DRAWN rects of the panel: every NeonText container once (glow + main are two
+          // BitmapTexts per label, so walking to leaves reports every label overlapping itself), plus the
+          // tab button's own label, which lives on a Button rather than a bare NeonText.
+          const scan = () => {
+            const rects = [];
+            const seen = new Set();
+            const walk = (l, hidden = false) => {
+              for (const o of l || []) {
+                if (!o || seen.has(o)) continue;
+                seen.add(o);
+                const vis = !hidden && o.visible !== false && (o.alpha === undefined || o.alpha > 0);
+                if (vis && o.main && typeof o.main.text === 'string' && o.main.text) {
+                  const b = o.getBounds ? o.getBounds() : null;
+                  if (b) rects.push({ text: o.main.text, x: b.x, y: b.y, w: b.width, h: b.height, inkH: b.height * (8 / 9) });
+                  continue;
+                }
+                const kids = Array.isArray(o.list) ? o.list : [];
+                if (kids.length) walk(kids, !vis);
+              }
+            };
+            walk(view.panel.list);
+            const bad = [];
+            for (let i = 0; i < rects.length; i += 1) {
+              for (let j = i + 1; j < rects.length; j += 1) {
+                const a = rects[i]; const b = rects[j];
+                if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.inkH && b.y < a.y + a.inkH) {
+                  bad.push(`${a.text} <-> ${b.text}`);
+                }
+              }
+            }
+            const texts = rects.map((r) => r.text);
+            return { count: rects.length, bad, texts };
+          };
           const cleanLabel = read();
           if (!view.tabBtn) return { fatal: 'no board tab button' };
+          const clean = scan();
           view._toggleBoard();
           await wait(600);
           const moddedLabel = read();
-          return { cleanLabel, moddedLabel, toggled: view.showingModded };
+          const modded = scan();
+          return {
+            cleanLabel, moddedLabel, toggled: view.showingModded, clean, modded,
+          };
         }).catch((e) => ({ fatal: String(e) }));
         if (out.fatal) fail('leaderboard: opens with a board tab', out.fatal);
         else if (errors.length) fail('leaderboard: no page errors', errors.join(' | '));
         else if (out.cleanLabel !== 'MODDED') fail('leaderboard: clean board offers the modded tab', `tab read ${out.cleanLabel}`);
         else if (!out.toggled) fail('leaderboard: tab switches to the modded board', 'showingModded stayed false');
         else if (out.moddedLabel !== 'CLEAN') fail('leaderboard: modded board offers the way back', `tab read ${out.moddedLabel}`);
-        else pass('leaderboard: clean/modded tab both ways', 'MODDED -> CLEAN');
+        else if (out.clean.count < 8) fail('leaderboard: the probe actually measured the clean board', `only ${out.clean.count} glyphs read`);
+        else if (out.modded.count < 8) fail('leaderboard: the probe actually measured the modded board', `only ${out.modded.count} glyphs read`);
+        else if (out.clean.bad.length) fail('leaderboard: no two glyphs overlap on the clean board', out.clean.bad.slice(0, 4).join(' | '));
+        else if (out.modded.bad.length) fail('leaderboard: no two glyphs overlap on the modded board', out.modded.bad.slice(0, 4).join(' | '));
+        // An empty board has to name WHICH board is empty; "NO ENTRIES YET" on both reads as a bug.
+        else if (!out.clean.texts.some((s) => /NO CLEAN RUNS/.test(s))) fail('leaderboard: the empty clean board says so', JSON.stringify(out.clean.texts));
+        else if (!out.modded.texts.some((s) => /NO MODDED RUNS/.test(s))) fail('leaderboard: the empty modded board says so', JSON.stringify(out.modded.texts));
+        else pass('leaderboard: clean/modded tab both ways, no glyph overlaps, each empty board names itself', `MODDED -> CLEAN, ${out.clean.count}/${out.modded.count} glyphs`);
       } finally { await page.close(); }
     }
 
