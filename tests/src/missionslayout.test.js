@@ -8,7 +8,7 @@ import {
   charsThatFit, ellipsize, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, columnRows,
   GAMEOVER_BOARD_ROW_H, GAMEOVER_MISSIONS_RULE_Y, LABEL_H, GLYPH_H, entryLayout,
 } from '../../src/ui/MissionsLayout.js';
-import { measureText } from '../../src/ui/PixelFont.js';
+import { measureText, hasGlyph } from '../../src/ui/PixelFont.js';
 // The font's own line height, read from the font module rather than from the layout that consumes it.
 // This is what stops the "label is one glyph tall" assertion from being a tautology about a local
 // constant: the expected height comes from the code that actually draws the glyphs.
@@ -380,8 +380,10 @@ describe('text fit', () => {
     const long = 'x'.repeat(200);
     const cut = ellipsize(long, 60);
     expect(cut.length).toBeLessThanOrEqual(charsThatFit(60));
-    expect(cut.endsWith('…')).toBe(true);
-    expect(cut.split('…')).toHaveLength(2);
+    // The pixel font has no '…' glyph (it would draw '?'), so the cut uses the font's own '..' mark,
+    // like PixelFont.ellipsize does, and every character of the result must be drawable.
+    expect(cut.endsWith('..')).toBe(true);
+    expect([...cut].every((ch) => hasGlyph(ch))).toBe(true);
   });
 
   test('ellipsize never exceeds the row for any real title', () => {

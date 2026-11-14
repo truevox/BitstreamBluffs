@@ -325,8 +325,10 @@ export function ellipsize(text, rowW, advance = 6) {
   const s = typeof text === 'string' ? text : '';
   const max = charsThatFit(rowW, advance);
   if (s.length <= max) return s;
-  if (max <= 1) return s.slice(0, max);
-  return `${s.slice(0, max - 1)}…`;
+  // '..' rather than '…': the pixel font has no ellipsis glyph and would draw '?' (PixelFont.ellipsize
+  // uses the same mark).
+  if (max <= 2) return s.slice(0, max);
+  return `${s.slice(0, max - 2)}..`;
 }
 
 /**
