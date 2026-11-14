@@ -54,8 +54,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 30;
-const EXPECTED_WITHOUT_BOOSTS = 19;
+const EXPECTED_WITH_BOOSTS = 38; // B1: +8 (hazard and power-up per Wards biome)
+const EXPECTED_WITHOUT_BOOSTS = 27; // B1: +8
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -73,6 +73,12 @@ const PROFILE = {
   lifetime: { runs: 0, distanceM: 0, playMs: 0, score: 0, tricks: {}, shards: 0, nearMisses: 0,
     bestScore: 0, bestDistanceM: 0, bestCombo: 1, maxAirtimeMs: 0 },
 };
+
+// B1: the shipped biome defs, read from src/data so gate expectations follow the JSON (dist is built from it)
+const readJson = (rel) => JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+const defsIn = (dir) => Object.fromEntries(fs.readdirSync(path.join(ROOT, dir)).filter((f) => f.endsWith('.json')).map((f) => { const d = readJson(path.join(dir, f)); return [d.id, d]; }));
+const HAZ_DEFS = defsIn('src/data/hazards');
+const PU_DEFS = defsIn('src/data/powerups');
 
 const results = [];
 const fail = (name, detail) => { results.push({ name, ok: false, detail }); };
@@ -1747,6 +1753,234 @@ async function main() {
         else if (st.without !== 'badLanding') fail(name.stabilize, `control: an 86 deg landing should crash without stabilize, got ${st.without}`);
         else if (st.withStab !== null) fail(name.stabilize, `with stabilize the 86 deg landing still crashed (${st.withStab})`);
         else pass(name.stabilize, 'an 86 deg landing: crash without, wobble with a +12 deg stabilize');
+      }
+    }
+
+    // ---- B1 (biome full treatment, "Wards"): per biome, a real seed@<bit> run of the built game. The biome hazard and
+    // power-up are looked up in THAT run's terrain (run.terrain.getChunk), built by the shipped RunScene.takeChunk into real
+    // Hazard / PowerUp entities from the shipped JSON, and driven through the shipped onHazard / onPowerUp dispatch. The
+    // effect is read from the real sled body and from the live frame loop (run.update -> physicsContext -> PhysicsTuner ->
+    // run.currentPhys). Removing a hazard's or power-up's effect path fails its line below (negative controls in the B1
+    // report). Seeds and distances double as the lead's hand-play list.
+    {
+      const B1 = [
+        { biome: 'debumont', name: 'Debumont', seed: 'b1debumont35', mask: 1, hazard: 'groomerCat', powerup: 'mapleWax' },
+        { biome: 'garbage-dump-glacier', name: 'Garbage Dump Glacier', seed: 'b1garbage13', mask: 2, hazard: 'seagullDive', powerup: 'slickWaxSpray' },
+        { biome: 'underwater-mountain', name: 'Underwater Mountain', seed: 'b1underwater15', mask: 8, hazard: 'seaweedTangle', powerup: 'aquaLungBubble' },
+        { biome: 'candy-cane-canyon', name: 'Candy Cane Canyon', seed: 'b1candy11', mask: 64, hazard: 'chocolateRiver', powerup: 'sweetToothCoating' },
+      ];
+      for (const B of B1) {
+        const hzName = `B1 ${B.name}: ${B.hazard} spawns on ${B.seed}@${B.mask} and acts on the real sled`;
+        const puName = `B1 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and its effect acts on the real run`;
+        const c = await (async () => {
+          const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+          try {
+            const out = await page.evaluate(async (B) => {
+              const g = window.__bbGame;
+              const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+              g.scene.start('TitleScene');
+              const t0 = Date.now();
+              let run = null;
+              let started = false;
+              while (Date.now() - t0 < 15000) {
+                const tt = g.scene.getScene('TitleScene');
+                if (!started && tt && !tt.starting) { started = true; tt.startRun(`${B.seed}@${B.mask}`); }
+                const rr = g.scene.getScene('RunScene');
+                if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+                await wait(100);
+              }
+              if (!run) return { fatal: 'RunScene never produced a live sled' };
+              await wait(300);
+              if (run.sled.destroyed || !run.sled.inWorld || run.crashed) return { fatal: 'sled died before the probe' };
+              run.scene.pause();
+              const res = { seed: run.seed, mask: run.biomeMask };
+              const PX = (v) => (v * 1000) / (1000 / 60);
+              const speed = () => Math.hypot(PX(run.sled.body.velocity.x), PX(run.sled.body.velocity.y));
+              let clock = run.runTimeMs;
+              const step = (n) => { for (let i = 0; i < n; i++) { clock += 16; run.update(clock, 16); } };
+              const keepAlive = () => { run.sled.invulnerableMs = 1e9; run.pendingCrash = null; };
+              const live = () => { run.sled.invulnerableMs = 0; run.pendingCrash = null; };
+              const hits = [];
+              const onHit = (p) => hits.push(p);
+              g.events.on('bb:hazardHit', onHit);
+              const ui = g.scene.getScene('UIScene');
+              // find the first chunk of THIS run carrying a def, build its real entity through RunScene.takeChunk
+              const find = (id, list) => {
+                for (let i = 0; i < 200; i++) {
+                  const ch = run.terrain.getChunk(i);
+                  const sp = ch[list].find((s) => s.defId === id);
+                  if (sp) return { ch, sp };
+                }
+                return null;
+              };
+              const taken = [];
+              const entity = (f, map) => {
+                if (!run.mesh.chunks.has(f.ch.index)) { run.takeChunk(f.ch); taken.push(f.ch.index); }
+                return (run[map].get(f.ch.index) || []).find((e) => e.def.id === f.sp.defId && e.spawn.x === f.sp.x) || null;
+              };
+              const zonesAt = (x) => run.terrain._chunkAt(x).zones;
+              const withZone = (modId, fn) => {
+                const x = run.sled.x;
+                const touched = [...new Set([zonesAt(x), zonesAt(x + 400)])];
+                const lens = touched.map((z) => z.length);
+                for (const z of touched) z.push({ modId, x0: x - 3000, x1: x + 3000 });
+                try { return fn(); } finally { touched.forEach((z, i) => { z.length = lens[i]; }); }
+              };
+              try {
+                keepAlive();
+                run._resetBiomeEffects();
+                step(2);
+                // ---- hazard
+                const fh = find(B.hazard, 'hazards');
+                const h = fh && entity(fh, 'hazards');
+                if (!h) res.hz = { fatal: `no ${B.hazard} in the first 200 chunks of ${B.seed}@${B.mask}` };
+                else {
+                  const def = h.def;
+                  res.hz = { m: Math.round(fh.sp.x / 20), chunkBiome: fh.ch.biome, drawKind: h.drawKind, shapeKey: def.shapeKey, isDanger: h.color === run.palette.danger, effect: def.onHit.effect };
+                  live();
+                  hits.length = 0;
+                  const s0 = speed();
+                  const mul0 = run.currentPhys.speedMul;
+                  run.onHazard(h);
+                  res.hz.ratio = speed() / Math.max(1e-6, s0);
+                  res.hz.crash = run.pendingCrash ? run.pendingCrash.hazardId : null;
+                  res.hz.hitEvents = hits.map((p) => p.hazardId);
+                  res.hz.slowMs = run.slowMs;
+                  keepAlive();
+                  step(2);
+                  res.hz.mulRatio = run.currentPhys.speedMul / mul0;
+                  run.tickEffects(3000);
+                  run.slowMs = 0;
+                  step(1);
+                }
+                // ---- power-up
+                run._resetBiomeEffects();
+                keepAlive();
+                step(2);
+                const fp = find(B.powerup, 'powerups');
+                const p = fp && entity(fp, 'powerups');
+                if (!p) res.pu = { fatal: `no ${B.powerup} in the first 200 chunks of ${B.seed}@${B.mask}` };
+                else {
+                  res.pu = { m: Math.round(fp.sp.x / 20), chunkBiome: fp.ch.biome, drawKind: p.drawKind, shapeKey: p.def.shapeKey };
+                  const s0 = speed();
+                  const ph0 = run.currentPhys;
+                  if (B.powerup === 'mapleWax') {
+                    run.onPowerUp(p);
+                    res.pu.ratio = speed() / Math.max(1e-6, s0);
+                    step(2);
+                    res.pu.mulRatio = run.currentPhys.speedMul / ph0.speedMul;
+                    res.pu.chip = !!(ui && ui.powerups && ui.powerups.has('mapleWax'));
+                    run.tickEffects(2100);
+                    step(1);
+                    res.pu.mulAfter = run.currentPhys.speedMul / ph0.speedMul;
+                  } else if (B.powerup === 'slickWaxSpray' || B.powerup === 'aquaLungBubble') {
+                    const mod = B.powerup === 'slickWaxSpray' ? 'stickyPatch' : 'slowMotion';
+                    const key = mod === 'stickyPatch' ? 'groundResist' : 'gravityPxS2';
+                    withZone(mod, () => {
+                      step(2);
+                      const zoned = run.currentPhys;
+                      const zs = speed();
+                      run.onPowerUp(p);
+                      res.pu.ratio = speed() / Math.max(1e-6, zs);
+                      step(2);
+                      const warded = run.currentPhys;
+                      res.pu.chip = !!(ui && ui.powerups && ui.powerups.has(B.powerup));
+                      run.tickEffects(4100);
+                      step(1);
+                      const after = run.currentPhys;
+                      res.pu.key = key;
+                      res.pu.base = ph0[key];
+                      res.pu.zoned = zoned[key];
+                      res.pu.warded = warded[key];
+                      res.pu.after = after[key];
+                      res.pu.mulRatio = warded.speedMul / zoned.speedMul;
+                      res.pu.mulAfter = after.speedMul / zoned.speedMul;
+                    });
+                  } else if (B.powerup === 'sweetToothCoating') {
+                    // the real Chocolate River of this run, hit while the coating runs: nothing happens
+                    const river = res.hz && !res.hz.fatal ? entity(find('chocolateRiver', 'hazards'), 'hazards') : null;
+                    if (!river) res.pu.fatal = 'no Chocolate River to test the coating against';
+                    else {
+                      run.onPowerUp(p);
+                      res.pu.chip = !!(ui && ui.powerups && ui.powerups.has(B.powerup));
+                      live();
+                      river.hit = false;
+                      hits.length = 0;
+                      const rs0 = speed();
+                      run.onHazard(river);
+                      res.pu.wardedRatio = speed() / Math.max(1e-6, rs0);
+                      res.pu.wardedHits = hits.length;
+                      res.pu.wardedSlowMs = run.slowMs;
+                      keepAlive();
+                      step(2);
+                      res.pu.mulRatio = run.currentPhys.speedMul / ph0.speedMul;
+                      run.tickEffects(5100);
+                      step(1);
+                      live();
+                      river.hit = false;
+                      hits.length = 0;
+                      const rs1 = speed();
+                      run.onHazard(river);
+                      res.pu.afterRatio = speed() / Math.max(1e-6, rs1);
+                      res.pu.afterHits = hits.length;
+                      keepAlive();
+                    }
+                  }
+                }
+              } catch (e) { res.fatal = String(e && e.stack || e); }
+              g.events.off('bb:hazardHit', onHit);
+              for (const idx of taken) run.dropChunk(idx);
+              run._resetBiomeEffects();
+              return res;
+            }, B).catch((e) => ({ fatal: String(e) }));
+            return { errors, out };
+          } finally { await page.close(); }
+        })();
+        const o = c.out;
+        const near = (a, b, eps) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= eps;
+        if (o.fatal || c.errors.length) {
+          fail(hzName, o.fatal || `page errors: ${c.errors.join(' | ')}`);
+          fail(puName, o.fatal || `page errors: ${c.errors.join(' | ')}`);
+          continue;
+        }
+        const run = `run ${o.seed}@${o.mask}`;
+        const hz = o.hz;
+        const hd = HAZ_DEFS[B.hazard];
+        if (o.seed !== B.seed || o.mask !== B.mask) fail(hzName, `the run is ${run}, not ${B.seed}@${B.mask}`);
+        else if (hz.fatal) fail(hzName, hz.fatal);
+        else if (hz.chunkBiome !== B.biome) fail(hzName, `spawned in a ${hz.chunkBiome} chunk`);
+        else if (hz.drawKind !== hz.shapeKey) fail(hzName, `entity draws '${hz.drawKind}', not its own '${hz.shapeKey}'`);
+        else if (hd.onHit.effect === 'crash') {
+          if (hz.crash !== B.hazard) fail(hzName, `a hit queued no ${B.hazard} crash (pendingCrash ${hz.crash})`);
+          else if (!hz.isDanger) fail(hzName, 'a biome crash hazard is not drawn in danger');
+          else pass(hzName, `${run}: at ${hz.m} m; real hit queued crash '${hz.crash}', drawn '${hz.drawKind}' in danger`);
+        } else if (!near(hz.ratio, hd.onHit.speedFactor, 0.01)) fail(hzName, `sled speed x${hz.ratio} on hit, want x${hd.onHit.speedFactor}`);
+        else if (!near(hz.mulRatio, hd.onHit.speedFactor, 1e-6)) fail(hzName, `frame speedMul x${hz.mulRatio}, want x${hd.onHit.speedFactor}`);
+        else if (hz.slowMs !== hd.onHit.durationMs || hz.hitEvents.join() !== B.hazard) fail(hzName, `slowMs ${hz.slowMs} (want ${hd.onHit.durationMs}), HAZARD_HIT ${hz.hitEvents}`);
+        else pass(hzName, `${run}: at ${hz.m} m; real sled speed x${hz.ratio.toFixed(3)}, frame speedMul x${hz.mulRatio.toFixed(3)} for ${hz.slowMs} ms, drawn '${hz.drawKind}'`);
+
+        const pu = o.pu;
+        const pd = PU_DEFS[B.powerup];
+        if (pu.fatal) fail(puName, pu.fatal);
+        else if (pu.chunkBiome !== B.biome) fail(puName, `spawned in a ${pu.chunkBiome} chunk`);
+        else if (pu.drawKind !== pu.shapeKey) fail(puName, `entity draws '${pu.drawKind}', not its own '${pu.shapeKey}'`);
+        else if (!pu.chip) fail(puName, 'no HUD chip for the pickup');
+        else if (B.powerup === 'mapleWax') {
+          if (!near(pu.ratio, pd.effect.speedFactor, 0.01) || !near(pu.mulRatio, pd.effect.speedFactor, 1e-6)) fail(puName, `speed x${pu.ratio}, speedMul x${pu.mulRatio}, want x${pd.effect.speedFactor}`);
+          else if (!near(pu.mulAfter, 1, 1e-6)) fail(puName, `boost did not end (speedMul x${pu.mulAfter})`);
+          else pass(puName, `${run}: at ${pu.m} m; real sled speed x${pu.ratio.toFixed(3)}, speedMul x${pu.mulRatio.toFixed(3)} for 2 s, then x1`);
+        } else if (B.powerup === 'slickWaxSpray' || B.powerup === 'aquaLungBubble') {
+          const sf = pd.effect.speedFactor || 1;
+          if (near(pu.zoned, pu.base, 1e-9)) fail(puName, `the injected zone did not reach the frame (${pu.key} ${pu.base} -> ${pu.zoned})`);
+          else if (!near(pu.warded, pu.base, 1e-9)) fail(puName, `warded ${pu.key} ${pu.warded} != unzoned ${pu.base} (zoned ${pu.zoned})`);
+          else if (!near(pu.after, pu.zoned, 1e-9)) fail(puName, `the zone did not come back after the ward (${pu.after} vs ${pu.zoned})`);
+          else if (!near(pu.mulRatio, sf, 1e-6) || !near(pu.ratio, sf, 0.01) || !near(pu.mulAfter, 1, 1e-6)) fail(puName, `speed part: sled x${pu.ratio}, speedMul x${pu.mulRatio} then x${pu.mulAfter} (want x${sf} then x1)`);
+          else pass(puName, `${run}: at ${pu.m} m; ${pu.key} zoned ${pu.zoned.toFixed(4)} -> warded ${pu.warded.toFixed(4)} (= unzoned) -> expired ${pu.after.toFixed(4)}${sf > 1 ? `; speed x${pu.ratio.toFixed(3)}, speedMul x${pu.mulRatio.toFixed(3)} while warded` : ''}`);
+        } else if (B.powerup === 'sweetToothCoating') {
+          if (pu.wardedHits !== 0 || !near(pu.wardedRatio, 1, 1e-6) || pu.wardedSlowMs !== 0 || !near(pu.mulRatio, 1, 1e-6)) fail(puName, `river hit while coated: ${pu.wardedHits} HAZARD_HIT, speed x${pu.wardedRatio}, slowMs ${pu.wardedSlowMs}, speedMul x${pu.mulRatio}`);
+          else if (pu.afterHits !== 1 || !near(pu.afterRatio, HAZ_DEFS.chocolateRiver.onHit.speedFactor, 0.01)) fail(puName, `control: after the coating the river should slow x0.5 (got x${pu.afterRatio}, ${pu.afterHits} hits)`);
+          else pass(puName, `${run}: at ${pu.m} m; the run's real Chocolate River while coated: 0 HAZARD_HIT, speed x1, speedMul x1; after 5 s: x${pu.afterRatio.toFixed(3)}`);
+        }
       }
     }
 

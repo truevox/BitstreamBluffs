@@ -3,7 +3,7 @@
  * Underwater Mountain and Candy Cane Canyon. Loader + schema check for the new JSON, the values the spec names, and the
  * pairing rule (each ward switches off something its own biome has).
  */
-import { readDir, loadContent } from './_helpers.js';
+import { readDir, loadContent, makeGen } from './_helpers.js';
 import { PALETTE_KEYS } from '../../src/constants.js';
 import { emptyWards, addWard, isWarded, tickWards, wardSpeedFactor, wardSpeedMul, WARD_MIN_MS, WARD_MAX_MS, WARD_MAX_SPEED_FACTOR } from '../../src/systems/Wards.js';
 import { hazardDrawKind, powerupDrawKind, hazardColorKey } from '../../src/systems/BiomeEffects.js';
@@ -145,5 +145,42 @@ describe('Wards.js B1 extension: optional ward speedFactor', () => {
     expect(wardSpeedMul(null)).toBe(1);
     tickWards(w, 4001);
     expect(wardSpeedMul(w)).toBe(1);
+  });
+});
+
+describe('B1 content: measured presence in biome chunks (slot rule, spec §4 amendment)', () => {
+  // Spec target: 40-60 % of biome chunks. The §4 chance cap (0.5) and the base `slow`-before-a-descent rule bound it far
+  // lower for these defs (see the B1 report: a spec conflict). Measured on 8 seeds x 300 chunks: share of ELIGIBLE chunks
+  // (ground: not bridge, not gen-jump; air: gen-jump) = groomerCat 16.3 %, seagullDive 23.7 %, seaweedTangle 12.6 %,
+  // chocolateRiver 10.5 %; every ground placement is a slot-rule replacement (0 free slots). The floors (about half, for
+  // 4-seed variance) pin it against regressions; without the slot rule the three slow hazards place ~0.
+  const ROWS = [
+    [1, 'debumont', 'groomerCat', 'mapleWax', 0.08],
+    [2, 'garbage-dump-glacier', 'seagullDive', 'slickWaxSpray', 0.12],
+    [8, 'underwater-mountain', 'seaweedTangle', 'aquaLungBubble', 0.06],
+    [64, 'candy-cane-canyon', 'chocolateRiver', 'sweetToothCoating', 0.05],
+  ];
+  test.each(ROWS)('mask %p (%s): hazard %s, power-up %s, hazard share of eligible chunks >= %p, power-up in 25-45 %% of biome chunks', (mask, biome, hz, pu, floor) => {
+    const air = c.hazards[hz].placement === 'air';
+    let all = 0;
+    let elig = 0;
+    let h = 0;
+    let p = 0;
+    for (const seed of ['b1-share-a', 'b1-share-b', 'b1-share-c', 'b1-share-d']) {
+      const g = makeGen(seed, { biomeMask: mask });
+      for (let i = 1; i < 300; i++) {
+        const ch = g.getChunk(i);
+        if (ch.biome !== biome) continue;
+        all++;
+        const ok = air ? ch.defId === 'gen-jump' : ch.kind !== 'bridge' && ch.defId !== 'gen-jump';
+        if (ok) elig++;
+        if (ch.hazards.some((q) => q.defId === hz)) h++;
+        if (ch.powerups.some((q) => q.defId === pu)) p++;
+      }
+    }
+    expect(elig).toBeGreaterThan(60);
+    expect(h / elig).toBeGreaterThanOrEqual(floor);
+    expect(p / all).toBeGreaterThanOrEqual(0.25);
+    expect(p / all).toBeLessThanOrEqual(0.45);
   });
 });
