@@ -153,7 +153,6 @@ export class MissionsService {
     if (active.length >= 3) return null;
     // Reuse the roll path with a synthetic empty record: no mission completes, it only refills.
     const out = rollSet(p, [], { ledgerHash: '', distanceM: 0 }, this.templates, {
-      ruleId: p.missions && p.missions.ruleId ? p.missions.ruleId : null,
       tierUnlock: this.tierUnlock || undefined,
       biomeDefs: this.biomeDefs,
     });
@@ -174,7 +173,6 @@ export class MissionsService {
     if (!p || !this.store) return null;
     const active = activeTemplates(p, this.templates);
     const out = rollSet(p, active, record || {}, this.templates, {
-      ruleId: p.missions && p.missions.ruleId ? p.missions.ruleId : null,
       tierUnlock: this.tierUnlock || undefined,
       biomeDefs: this.biomeDefs,
       completedComboIds: this._completedThisRun,

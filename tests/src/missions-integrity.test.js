@@ -160,3 +160,19 @@ describe('MS-2: a biome mission completes only on a run with that biome switched
     expect(await liveToasts(deb.bit)).toEqual([t.id]);
   });
 });
+
+describe('F9: missions carry no daily-rule id', () => {
+  // The ruleId plumbing was removed as dead code: nothing produced a ruleId and nothing consumed one.
+  test('rollSet never returns a ruleId and no shipped template uses excludedRuleIds', () => {
+    const out = rollSet(v1(), [], rec(), MISSIONS.templates, { ruleId: 'lowGravity' });
+    expect(out.ruleId).toBeUndefined();
+    expect(MISSIONS.templates.filter((t) => t.excludedRuleIds)).toEqual([]);
+  });
+
+  test('the stored missions block has exactly counter, active and progress', () => {
+    const store = new ProfileStore({ levels: LEVELS, storage: memStorage() });
+    store.load();
+    store.applyMissions({ active: [], counter: 1, progress: {}, xp: 0, shards: 0, ruleId: 'lowGravity' });
+    expect(Object.keys(store.profile.missions).sort()).toEqual(['active', 'counter', 'progress']);
+  });
+});

@@ -513,8 +513,6 @@ export class ProfileStore {
       counter: nonNeg(roll.counter),
       active: strArr(roll.active).slice(0, 3),
       progress: roll.progress && typeof roll.progress === 'object' ? { ...roll.progress } : {},
-      // The daily rule the set was drawn under, so a save/load mid-day cannot re-filter differently.
-      ruleId: typeof roll.ruleId === 'string' ? roll.ruleId : (p.missions && p.missions.ruleId) || null,
     };
     const next = {
       ...p,
