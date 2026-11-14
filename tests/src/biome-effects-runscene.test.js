@@ -15,7 +15,7 @@ const Body = {
 class Stub { constructor() { this.alpha = 0; } setAlpha(a) { this.alpha = a; return this; } setFillStyle() { return this; } }
 const FakePhaser = {
   Scene: class {},
-  Physics: { Matter: { Matter: { Bodies: {}, Body } } },
+  Physics: { Matter: { Matter: { Bodies: { rectangle: (x, y, w, h, o) => ({ x, y, w, h, ...o }), circle: (x, y, r, o) => ({ x, y, r, ...o }) }, Body } } },
   Renderer: { WebGL: { Pipelines: { PostFXPipeline: class {} } } },
   GameObjects: { Container: class {}, Graphics: class {}, BitmapText: class {}, Zone: class {}, Image: class {}, Rectangle: class {}, Text: class {} },
   BlendModes: { ADD: 1 },
@@ -27,6 +27,8 @@ jest.unstable_mockModule('../../src/shaders/GlitchPipeline.js', () => ({ GlitchP
 
 const { RunScene } = await import('../../src/scenes/RunScene.js');
 const { UIScene } = await import('../../src/scenes/UIScene.js');
+const { Hazard } = await import('../../src/entities/Hazard.js');
+const { PowerUp } = await import('../../src/entities/PowerUp.js');
 const { EVT } = await import('../../src/events.js');
 const { PhysicsTuner, TUNING, BASE_STEP_MS } = await import('../../src/systems/PhysicsTuner.js');
 const { GUST_MAX_PX_S, BLIND_MIN_VISIBILITY } = await import('../../src/systems/BiomeEffects.js');
@@ -246,5 +248,45 @@ describe('UIScene: HUD entries for every new kind', () => {
     expect(made[0].text).toContain('BLINDED');
     expect(made[1].text).toContain('GUST');
     expect(u.effects.get('gust').remaining).toBeGreaterThanOrEqual(700);
+  });
+});
+
+describe('Hazard.js / PowerUp.js: biome defs with a new shapeKey still draw, crash hazards keep `danger`', () => {
+  const PAL = { danger: 0xff0000, magenta: 0xff00ff, lime: 0x00ff00, cyan: 0x00ffff, amber: 0xffaa00, bg: 0, text: 0xffffff };
+  const scene = () => ({
+    matter: { world: { add() {}, remove() {} } },
+    add: {
+      graphics: () => {
+        const ops = [];
+        const g = new Proxy({ ops, y: 0 }, {
+          get: (t, k) => (k in t ? t[k] : (...a) => { ops.push([k, ...a]); return g; }),
+          set: (t, k, v) => { t[k] = v; return true; },
+        });
+        return g;
+      },
+    },
+  });
+  const fills = (gfx) => gfx.ops.filter(([k]) => /^fill|^stroke/.test(k));
+
+  test('a biome crash hazard is drawn in `danger` even when its JSON names another colour; a base def is not recoloured', () => {
+    const biome = new Hazard(scene(), { id: 'meteor', biome: 'space-mountain', shapeKey: 'meteor', size: { w: 30, h: 30 }, onHit: { effect: 'crash' }, placement: 'air', colorKey: 'magenta' }, { x: 100, y: 50, rotationDeg: 0 }, PAL);
+    expect(biome.color).toBe(PAL.danger);
+    const chasm = new Hazard(scene(), { id: 'glitchChasm', shapeKey: 'chasm', size: { w: 64, h: 40 }, onHit: { effect: 'crash' }, placement: 'ground', colorKey: 'magenta' }, { x: 100, y: 50, rotationDeg: 0 }, PAL);
+    expect(chasm.color).toBe(PAL.magenta);
+    const slow = new Hazard(scene(), { id: 'seaweed', biome: 'underwater-mountain', shapeKey: 'seaweed', size: { w: 30, h: 30 }, onHit: { effect: 'slow' }, placement: 'ground', colorKey: 'lime' }, { x: 100, y: 50, rotationDeg: 0 }, PAL);
+    expect(slow.color).toBe(PAL.lime);
+  });
+
+  test('an unknown hazard shapeKey draws the visible generic box', () => {
+    const h = new Hazard(scene(), { id: 'groomer', biome: 'debumont', shapeKey: 'groomerCat', size: { w: 30, h: 20 }, onHit: { effect: 'slow' }, placement: 'ground', colorKey: 'lime' }, { x: 100, y: 50, rotationDeg: 0 }, PAL);
+    expect(h.drawKind).toBe('generic');
+    const ops = fills(h.gfx);
+    expect(ops.some(([k, , , w, ht]) => k === 'fillRect' && w === 30 && ht === 20)).toBe(true);
+  });
+
+  test('an unknown power-up shapeKey draws a filled glyph, not just the ring', () => {
+    const p = new PowerUp(scene(), { id: 'mapleWax', biome: 'debumont', shapeKey: 'mapleWax', radius: 10, effect: { kind: 'speedBoost' }, colorKey: 'amber' }, { x: 100, y: 50 }, PAL);
+    expect(p.drawKind).toBe('generic');
+    expect(p.gfx.ops.some(([k, pts]) => k === 'fillPoints' && Array.isArray(pts) && pts.length === 4)).toBe(true);
   });
 });
