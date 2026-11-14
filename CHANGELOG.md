@@ -3,6 +3,13 @@
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 
 ### ✨ Added
+- **Shop autoprompt on Game Over.** A finished run that newly makes something in the Shard Shop affordable
+  opens the shop by itself ~1.2 s after the awards settle; `newlyAffordable(before, after)` in
+  `src/systems/ShopPrompt.js` compares the bank/level before and after this run's credit, so a player who
+  is already sitting on enough shards is not interrupted every round. A quiet `SHOP: B` (pad: LB) hint sits
+  right-aligned on the footer whenever anything is affordable, so the shop is reachable on demand without
+  the popup. RETRY still wins from the first frame and from inside the open shop; Esc closes the shop back
+  to Game Over. No new profile field, `saveVersion` unchanged, no new ledger field.
 - **Biomes (batch 1).** Debumont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal
   Cavern. A biome is a masked sector of ordinary terrain rather than a separate generator:
   `biomeForSector(seed, sector, biomeMask)` forks `Rng` under `biome`, so no existing random stream is

@@ -238,6 +238,111 @@ async function main() {
   const { server, port } = await serve();
   const browser = await chromium.launch();
   try {
+    // ---- W4.1 shop autoprompt: pops when rich, silent when broke, and retry still wins
+    //
+    // Real game, real economy: the run is credited by production code, which is the only way to prove the
+    // before/after bank arithmetic and the popup decision agree with the bank the shop then shows.
+    {
+      const SHOP_RICH = { ...JSON.parse(JSON.stringify(PROFILE)), bank: 400 };
+      const probeShop = async (profile, { pressRetry = false, shards = 95 } = {}) => {
+        const { page, errors } = await bootWithProfile(browser, port, profile);
+        try {
+          return await page.evaluate(async ({ pressRetry, shards }) => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.registry.set('biomeMask', 0);
+            g.scene.start('TitleScene');
+            await wait(900);
+            const title = g.scene.getScene('TitleScene');
+            title.starting = false;
+            title.startRun('shop-seed', 0);
+            await wait(1600);
+            const run = g.scene.getScene('RunScene');
+            if (!run) return { fatal: 'RunScene did not start' };
+            // Give the run shards so the credit moves the bank by a known amount. `shards` in the record is
+            // `shardCount` (a count, 1 shard each), so that is what a real run would have incremented per
+            // pickup; setting it here is the same value the collect loop would have produced.
+            run.runTimeMs = 5000;
+            run.shardCount = shards;
+            run.pendingCrash = { cause: 'chasm' };
+            // Wait for Game Over to build, then for the autoprompt delay to elapse.
+            for (let i = 0; i < 60 && !(g.scene.getScene('GameOverScene') && g.scene.getScene('GameOverScene').scene.isActive()); i += 1) await wait(250);
+            const over = g.scene.getScene('GameOverScene');
+            if (!over) return { fatal: 'GameOverScene never became active' };
+            const bankAtOver = (g.registry.get('profile') || {}).bank;
+            const flag = (g.registry.get('lastAwards') || {}).shopAutoprompt;
+            const texts = () => {
+              const out = [];
+              const seen = new Set();
+              const walk = (list) => {
+                for (const obj of list || []) {
+                  if (!obj) continue;
+                  if (typeof obj.text === 'string' && obj.text && !seen.has(obj.text)) { seen.add(obj.text); out.push(obj.text); }
+                  if (obj.list) walk(obj.list);
+                }
+              };
+              walk(over.children && over.children.list);
+              if (over.shopView && over.shopView.panel) walk(over.shopView.panel.list);
+              return out;
+            };
+            const hintBefore = texts().some((t) => /SHOP:\s*B/i.test(t));
+            if (pressRetry) {
+              // Press retry BEFORE the popup would fire: the run must restart and no shop may appear.
+              over.retry();
+              await wait(1800);
+              return {
+                bankAtOver, flag, hintBefore,
+                shopOpenAfterRetry: Boolean(g.scene.getScene('RunScene')) && !g.scene.getScene('GameOverScene'),
+                sceneIsRun: Boolean(g.scene.getScene('RunScene') && g.scene.getScene('RunScene').scene.isActive()),
+              };
+            }
+            await wait(1800); // > SHOP_PROMPT_MS
+            const openAfterDelay = Boolean(over.shopOpen);
+            const hasShopTitle = texts().some((t) => /SHARD SHOP/i.test(t));
+            // Retry while the shop is open must close it and start a run.
+            over._onAction('confirm');
+            await wait(900);
+            const retried = Boolean(g.scene.getScene('RunScene') && g.scene.getScene('RunScene').scene.isActive());
+            return { bankAtOver, flag, hintBefore, openAfterDelay, hasShopTitle, retried };
+          }, { pressRetry, shards }).catch((e) => ({ fatal: String(e) }));
+        } finally { await page.close(); }
+      };
+
+      // Rich: crosses nothing new? bank 400 already covers every level-1 price, so the amendment says NO popup
+      // even though the hint must show. This is the case that separates "affordable" from "newly affordable".
+      const rich = await probeShop(SHOP_RICH);
+      if (rich.fatal) fail('shop autoprompt: rich profile reaches Game Over', rich.fatal);
+      else if (!rich.hintBefore) fail('shop hint shows for a stockpile player', `texts had no SHOP: B (bank ${rich.bankAtOver})`);
+      else if (rich.openAfterDelay) fail('stockpile player is not interrupted', `flag=${rich.flag}`);
+      else if (!rich.retried) fail('retry works from a stockpile Game Over', 'RunScene did not start');
+      else pass('stockpile: hint shown, no unrequested popup, retry works', `bank=${rich.bankAtOver}`);
+
+      // Broke: nothing affordable at all -> no hint, no popup.
+      const poor = { ...JSON.parse(JSON.stringify(PROFILE)), bank: 0 };
+      // A run that PAYS shards cannot leave the player broke, so the broke case must also earn nothing.
+      const broke = await probeShop(poor, { shards: 0 });
+      if (broke.fatal) fail('shop autoprompt: broke profile reaches Game Over', broke.fatal);
+      else if (broke.hintBefore) fail('broke player sees no shop hint', `bank ${broke.bankAtOver}`);
+      else if (broke.openAfterDelay) fail('broke player gets no popup', `flag=${broke.flag}`);
+      else pass('broke: no hint, no popup', `bank=${broke.bankAtOver}`);
+
+      // Crossing a price: bank 0, a run that pays 95, and the 90-shard item was not affordable before, so the
+      // popup MUST fire — and retry from inside it must work.
+      const crosser = await probeShop(poor, { shards: 95 });
+      if (crosser.fatal) fail('shop autoprompt: crossing run reaches Game Over', crosser.fatal);
+      else if (!(crosser.bankAtOver >= 95)) fail('the crossing run is credited', `bank ${crosser.bankAtOver}, expected at least the 95 shards the run collected`);
+      else if (!crosser.flag) fail('crossing a price sets the autoprompt flag', `bank=${crosser.bankAtOver}`);
+      else if (!crosser.openAfterDelay) fail('crossing a price opens the shop', 'shopOpen false after the delay');
+      else if (!crosser.hasShopTitle) fail('the opened panel is the Shard Shop', 'no SHARD SHOP title on screen');
+      else if (!crosser.retried) fail('retry from inside the opened shop', 'RunScene did not start');
+      else pass('crossing a price pops the shop once, and retry from it starts the run', `bank=${crosser.bankAtOver}`);
+
+      const early = await probeShop(SHOP_RICH, { pressRetry: true });
+      if (early.fatal) fail('shop autoprompt: early-retry probe', early.fatal);
+      else if (!early.sceneIsRun) fail('retry before the popup fires restarts at once', 'RunScene not active');
+      else pass('retry before the popup fires restarts at once', 'no popup');
+    }
+
     // ---- 1. mask 0: the screen that crashed must build, cleanly
     {
       const { page, errors, out } = await playToGameOver(browser, port, 0);
