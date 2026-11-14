@@ -6,12 +6,13 @@ import fs from 'fs';
 
 import { sanitizeProfile, SHOP_ITEMS } from '../../src/systems/ProfileStore.js';
 import { canAffordAnything, newlyAffordable, shopState } from '../../src/systems/ShopPrompt.js';
-import { shopLayout } from '../../src/ui/ShopLayout.js';
+import { shopAllRows } from '../../src/ui/ShopLayout.js';
 
 const LEVELS = JSON.parse(fs.readFileSync('src/data/progression/levels.json', 'utf8'));
 const MAX_XP = LEVELS.levels[LEVELS.levels.length - 1].xpMin + 1;
 const v1 = (o = {}) => sanitizeProfile({ v: 1, ...o }, LEVELS);
-const buyableRows = (p) => shopLayout({ profile: p }).rows.filter((r) => r.kind === 'item' && !r.owned && !r.disabled);
+// F4 fit: the shop pages by slot, so its buyable rows are those on every page.
+const buyableRows = (p) => shopAllRows({ profile: p }).filter((r) => r.kind === 'item' && !r.owned && !r.disabled);
 
 describe('SHOP-1: the prompt agrees with the rows the shop shows', () => {
   test('anything the shop prompt calls affordable is a buyable row in the shop', () => {

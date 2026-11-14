@@ -22,12 +22,18 @@ import { SHOP_ITEMS, isOwned } from '../systems/ProfileStore.js';
 /** Shop panel: wide enough for "NAME .......... 120" with the price right-aligned. */
 export const SHOP_PANEL = Object.freeze({ w: 416, h: 236 });
 
+/**
+ * The catalogue is shown one slot per page (audit F4 fit). The flat list was 247 of 248 px tall with nine
+ * cosmetic rows; the eleven level rewards would have pushed it off a 270 px screen. Titles are not a page:
+ * they are equipped (and Static Rider bought) from the Profile view's TITLES screen.
+ */
+export const SHOP_PAGES = Object.freeze(['trail', 'glow', 'rider', 'theme']);
+
 const GLYPH_H = 8;
 const PAD = 12;
-// 11, not 13: the panel carries 18 rows (a bank line, four slot headers, eight items, a boosts header,
-// two toggles, a loadout header and the loadout line). At 13 that is 234px of rows plus margins, which
-// grew the panel to 272 and pushed it off a 270px screen; at 11 it is 198px and the panel is 236. A glyph
-// is 8 tall, so 11 still leaves 3px of clear air between lines.
+// A glyph is 8 tall, so an 11 px pitch leaves 3 px of clear air between lines. The tallest page is the
+// bank line, the page row, six items, a boosts header, two toggles, a loadout header and the loadout line:
+// 13 rows, 143 px plus margins, inside the 236 px panel.
 const ROW_H = 11;
 
 const BOOSTS = Object.freeze([
@@ -41,6 +47,7 @@ const upper = (s) => String(s === undefined || s === null ? '' : s).toUpperCase(
  * The whole shop as one ordered list of rows.
  *
  * Row shapes:
+ *   { kind:'page',   key, label, state, slot, page }  — the page selector ("← TRAIL →", "1/4"); selectable
  *   { kind:'header', key, label }                    — section heading, never selectable
  *   { kind:'item',   key, id, label, state, disabled, owned, equipped, locked, price }
  *   { kind:'boost',  key, id, label, on, locked, unlockLevel, state, disabled }
@@ -52,8 +59,10 @@ const upper = (s) => String(s === undefined || s === null ? '' : s).toUpperCase(
  * @param {Object|null} o.profile
  * @param {Object} [o.levels] parsed levels.json (content.progression); only used to name the level that
  *   unlocks a locked boost. Without it a locked boost reads "LOCKED".
+ * @param {number} [o.page] index into SHOP_PAGES (default 0); wraps both ways
  * @returns {{w:number,h:number,rows:Array,texts:Array<{key:string,text:string,x:number,y:number,w:number,h:number,color:string}>,
- *            rowH:number, band:{x:number,y:number,w:number}, bankText:string, loadoutText:string, firstSelectable:number}}
+ *            rowH:number, band:{x:number,y:number,w:number}, bankText:string, loadoutText:string, firstSelectable:number,
+ *            page:number, pageCount:number, pageSlot:string}}
  */
 export function shopLayout(o = {}) {
   const profile = o.profile || {};
@@ -73,17 +82,22 @@ export function shopLayout(o = {}) {
   const bankText = `BANK ${bank}`;
   rows.push({ kind: 'head', key: 'head', label: '', right: bankText });
 
-  // Catalogue: grouped by slot, cheapest first inside a group, so like is compared with like.
+  // One slot per page, cheapest first inside it, so like is compared with like.
+  const n = SHOP_PAGES.length;
+  const rawPage = Number.isFinite(o.page) ? Math.trunc(o.page) : 0;
+  const page = ((rawPage % n) + n) % n;
+  const pageSlot = SHOP_PAGES[page];
+  // The page row doubles as the slot heading: "← TRAIL →" with its position, so a player always knows
+  // there is more than one page and where they are in it.
+  rows.push({
+    kind: 'page', key: 'page', slot: pageSlot, page, label: `← ${upper(pageSlot)} →`, state: `${page + 1}/${n}`,
+    disabled: false,
+  });
   const sorted = [...SHOP_ITEMS]
-    .filter((i) => i && i.slot !== 'title') // titles are equipped in PROFILE, not sold again here
-    .sort((a, b) => (a.slot === b.slot ? a.price - b.price : String(a.slot).localeCompare(String(b.slot))));
+    .filter((i) => i && i.slot === pageSlot)
+    .sort((a, b) => (a.price - b.price) || ((a.unlockLevel || 1) - (b.unlockLevel || 1)));
 
-  let lastSlot = null;
   for (const it of sorted) {
-    if (it.slot !== lastSlot) {
-      rows.push({ kind: 'header', key: `hdr-${it.slot}`, label: upper(it.slot) });
-      lastSlot = it.slot;
-    }
     const owned = isOwned(profile, it.id);
     // equip() stores the catalogue's VALUE ('mint'), older profiles may hold the ID; accept both.
     const isEquipped = equipped[it.slot] === it.id || equipped[it.slot] === it.value;
@@ -100,8 +114,7 @@ export function shopLayout(o = {}) {
 
     // SHOP-3: the EQUIPPED row is selectable, and selecting it returns the slot to DEFAULT (the view calls
     // ProfileStore.unequip). It used to be disabled, so focus skipped it and nothing on screen could ever
-    // take a cosmetic back off. A separate DEFAULT row per slot would be four more rows, and this panel is
-    // already the full height of the canvas.
+    // take a cosmetic back off. A separate DEFAULT row per page would cost a row the tallest page needs.
     rows.push({
       kind: 'item', key: `item-${it.id}`, id: it.id, slot: it.slot, label: upper(it.name), state,
       owned, equipped: isEquipped, locked, affordable, price: it.price,
@@ -146,6 +159,13 @@ export function shopLayout(o = {}) {
     if (r.kind === 'head') {
       const bw = measureText(r.right);
       r.texts = [{ key: 'head-right', text: r.right, x: SHOP_PANEL.w - PAD - bw, y, w: bw, h: GLYPH_H, color: 'amber' }];
+    } else if (r.kind === 'page') {
+      if (firstSelectable < 0) firstSelectable = i;
+      const rw = measureText(r.state);
+      r.texts = [
+        { key: `${r.key}-label`, text: r.label, x: PAD + 6, y, w: measureText(r.label), h: GLYPH_H, color: 'magenta' },
+        { key: `${r.key}-right`, text: r.state, x: SHOP_PANEL.w - PAD - 6 - rw, y, w: rw, h: GLYPH_H, color: 'magenta' },
+      ];
     } else if (r.kind === 'item') {
       if (firstSelectable < 0) firstSelectable = i;
       const right = r.state;
@@ -183,7 +203,24 @@ export function shopLayout(o = {}) {
     bankText,
     loadoutText,
     firstSelectable,
+    page,
+    pageCount: n,
+    pageSlot,
   };
+}
+
+/**
+ * Every item row the shop shows, across all of its pages, in page order. For callers that need the whole
+ * catalogue as the shop presents it (the shop prompt's "is anything buyable here" agreement, for one).
+ * @param {Object} o same options as shopLayout, minus `page`
+ * @returns {Array<Object>} the `kind:'item'` rows
+ */
+export function shopAllRows(o = {}) {
+  const out = [];
+  for (let page = 0; page < SHOP_PAGES.length; page++) {
+    for (const r of shopLayout({ ...o, page }).rows) if (r.kind === 'item') out.push(r);
+  }
+  return out;
 }
 
 /**
@@ -198,6 +235,9 @@ export function shopLayout(o = {}) {
  */
 export function shopMenuItems(layout) {
   return layout.rows.map((r) => {
+    if (r.kind === 'page') {
+      return { kind: 'action', rowKind: 'page', label: r.label, sub: r.state, page: r.page, disabled: false, onSelect: null };
+    }
     if (r.kind === 'item') {
       return { kind: 'action', id: r.id, label: r.label, sub: r.state, rowKind: 'item', disabled: r.disabled, onSelect: null };
     }

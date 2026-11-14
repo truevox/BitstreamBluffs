@@ -624,3 +624,91 @@ describe('F3: ShopView does not let a locked boost be switched on', () => {
     expect(s.registry.get(REG.PROFILE).boosts.headStart).toBe(true);
   });
 });
+
+// ================================================================== F4 fit: the shop pages by slot
+
+describe('F4 fit: ShopView pages by slot, by key, pad and pointer', () => {
+  const ids = (view) => view.menu.items.filter((i) => i.id && !i.boostId).map((i) => i.id);
+  const pageRowIdx = (view) => view.menu.items.findIndex((i) => i.rowKind === 'page');
+  const lvl30 = () => ({
+    ...defaultProfile(), xp: LEVELS.levels[LEVELS.levels.length - 1].xpMin + 1, level: 30, bank: 0,
+    unlocked: { ...defaultProfile().unlocked, boosts: { headStart: 8, errorCorrection: 15 } },
+  });
+
+  test('the shop opens on TRAIL with focus on the page row', () => {
+    const { view } = shopHost(richProfile());
+    expect(view.menu.selected).toBe(pageRowIdx(view));
+    expect(ids(view).every((id) => id.startsWith('trail-'))).toBe(true);
+  });
+
+  test('right / left on the page row turn the page and wrap; focus stays on the page row', () => {
+    const { view } = shopHost(richProfile());
+    view.handleAction('right');
+    expect(ids(view).length).toBeGreaterThan(0);
+    expect(ids(view).every((id) => /glow/.test(id))).toBe(true);
+    expect(view.menu.selected).toBe(pageRowIdx(view));
+    view.handleAction('left');
+    view.handleAction('left');
+    expect(ids(view).every((id) => id.startsWith('theme-'))).toBe(true);
+    expect(texts(view.panel).some((x) => /4\/4/.test(x))).toBe(true);
+  });
+
+  test('left / right on an item row also page (the slot is the page), confirm on the page row turns it forward', () => {
+    const { view } = shopHost(richProfile());
+    focusItem(view, (i) => i.id === 'trail-hue-ember');
+    view.handleAction('right');
+    expect(ids(view).every((id) => /glow/.test(id))).toBe(true);
+    focusItem(view, (i) => i.rowKind === 'page');
+    view.handleAction('confirm');
+    expect(ids(view).every((id) => /rider/.test(id))).toBe(true);
+  });
+
+  test('a pointer click on the page row turns the page', () => {
+    const { view } = shopHost(richProfile());
+    const z = view.menu.rows[pageRowIdx(view)].zone;
+    z.emit('pointerdown', {}, 10);
+    expect(ids(view).every((id) => /glow/.test(id))).toBe(true);
+  });
+
+  test('left / right on an unlocked boost row toggle the boost and do not turn the page', () => {
+    const { s, view } = shopHost(lvl30());
+    const before = ids(view);
+    focusItem(view, (i) => i.boostId === 'headStart');
+    view.handleAction('right');
+    expect(s.registry.get(REG.PROFILE).boosts.headStart).toBe(true);
+    expect(ids(view)).toEqual(before);
+  });
+
+  test('buying works from any page, and the bank line refreshes', () => {
+    const { s, view } = shopHost(richProfile());
+    view._choose('rider-hue-mint'); // the built-game gate calls exactly this from the first page
+    const p = s.registry.get(REG.PROFILE);
+    expect(p.bank).toBe(400);
+    expect(p.equipped.rider).toBe('mint');
+    expect(texts(view.panel)).toContain('BANK 400');
+  });
+
+  test('SHOP-3 holds on a later page: confirm on EQUIPPED returns the slot to DEFAULT', () => {
+    const p = { ...richProfile(), unlocked: { ...defaultProfile().unlocked, cosmetics: ['rider-hue-mint'] }, equipped: { ...defaultProfile().equipped, rider: 'mint' } };
+    const { s, view } = shopHost(p);
+    view.handleAction('right');
+    view.handleAction('right');
+    focusItem(view, (i) => i.id === 'rider-hue-mint');
+    expect(view.menu.items[view.menu.selected].sub).toBe('EQUIPPED');
+    view.handleAction('confirm');
+    expect(s.registry.get(REG.PROFILE).equipped.rider).toBe('default');
+    expect(ids(view).every((id) => /rider/.test(id))).toBe(true); // the page did not jump back
+  });
+
+  test('every page reaches every one of its rows by up/down', () => {
+    const { view } = shopHost(lvl30());
+    for (let page = 0; page < 4; page++) {
+      const want = new Set(view.menu.items.map((it, i) => (it.disabled ? -1 : i)).filter((i) => i >= 0));
+      const seen = new Set();
+      for (let n = 0; n < view.menu.items.length * 2; n++) { seen.add(view.menu.selected); view.handleAction('down'); }
+      expect([...want].filter((i) => !seen.has(i))).toEqual([]);
+      focusItem(view, (i) => i.rowKind === 'page');
+      view.handleAction('right');
+    }
+  });
+});

@@ -15,7 +15,7 @@
  *   3. the menu IS the layout — same rows, same order, same count, so a second layer cannot reappear;
  *   4. the layout is a pure function of the profile, which is what makes the refresh possible at all.
  */
-import { shopLayout, shopMenuItems, SHOP_PANEL, SHOP_ROW_H, SHOP_GLYPH_H } from '../../src/ui/ShopLayout.js';
+import { shopLayout, shopMenuItems, shopAllRows, SHOP_PAGES, SHOP_PANEL, SHOP_ROW_H, SHOP_GLYPH_H } from '../../src/ui/ShopLayout.js';
 import { SHOP_ITEMS } from '../../src/systems/ProfileStore.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../src/constants.js';
 
@@ -99,16 +99,15 @@ describe('shopLayout — nothing is drawn twice', () => {
 
 describe('shopLayout — content', () => {
   test('one row per sellable item, and titles are not sold here', () => {
-    const L = shopLayout({ profile: PROFILE });
-    const items = L.rows.filter((r) => r.kind === 'item');
+    // F4 fit: the shop pages by slot, so "the shop" is every page (shopAllRows), not the first one.
+    const items = shopAllRows({ profile: PROFILE });
     const sellable = SHOP_ITEMS.filter((i) => i.slot !== 'title');
     expect(items.map((r) => r.id).sort()).toEqual(sellable.map((i) => i.id).sort());
-    expect(L.rows.some((r) => r.slot === 'title')).toBe(false);
+    expect(items.some((r) => r.slot === 'title')).toBe(false);
   });
 
   test('state is spelled out, not colour-only', () => {
-    const L = shopLayout({ profile: PROFILE });
-    const byId = Object.fromEntries(L.rows.filter((r) => r.kind === 'item').map((r) => [r.id, r]));
+    const byId = Object.fromEntries(shopAllRows({ profile: PROFILE }).map((r) => [r.id, r]));
     // Equipped vs owned-not-equipped vs affordable vs locked each read differently as TEXT.
     expect(byId['trail-hue-ember'].state).toBe('EQUIPPED');
     expect(byId['sled-glow-warm'].state).toBe('EQUIP');
@@ -174,7 +173,8 @@ describe('shopMenuItems — the menu IS the layout', () => {
     const labels = statics.map((s) => s.label);
     expect(labels).toContain('BOOSTS');
     expect(labels).toContain('LOADOUT');
-    expect(labels).toContain('TRAIL');
+    // F4 fit: the TRAIL heading is now the page selector ("← TRAIL →"), a selectable row, not a static.
+    expect(shopMenuItems(L).find((m) => m.rowKind === 'page').label).toContain('TRAIL');
   });
 
   test('an equipped item is selectable: selecting it returns the slot to DEFAULT (audit SHOP-3)', () => {
@@ -186,7 +186,7 @@ describe('shopMenuItems — the menu IS the layout', () => {
   });
 
   test('an owned, un-equipped item is selectable', () => {
-    const warm = shopMenuItems(shopLayout({ profile: PROFILE })).find((m) => m.id === 'sled-glow-warm');
+    const warm = shopMenuItems(shopLayout({ profile: PROFILE, page: SHOP_PAGES.indexOf('glow') })).find((m) => m.id === 'sled-glow-warm');
     expect(warm.disabled).toBe(false);
   });
 
@@ -202,7 +202,8 @@ describe('shopMenuItems — the menu IS the layout', () => {
   test('the first selectable row is a real row, not a heading', () => {
     const L = shopLayout({ profile: RICH });
     expect(L.firstSelectable).toBeGreaterThanOrEqual(0);
-    expect(['item', 'boost']).toContain(L.rows[L.firstSelectable].kind);
+    // F4 fit: the page selector is a real, selectable row (it turns the page).
+    expect(['item', 'boost', 'page']).toContain(L.rows[L.firstSelectable].kind);
   });
 });
 

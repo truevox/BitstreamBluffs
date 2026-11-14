@@ -746,7 +746,7 @@ export class AchievementsView extends View {
 export class ShopView extends View {
   /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
   constructor(scene, theme, o) {
-    const layout = shopLayout({ profile: scene.registry.get(REG.PROFILE), levels: (scene.registry.get(REG.CONTENT) || {}).progression });
+    const layout = shopLayout({ profile: scene.registry.get(REG.PROFILE), levels: (scene.registry.get(REG.CONTENT) || {}).progression, page: 0 });
     super(scene, theme, {
       w: layout.w, h: layout.h, title: 'SHARD SHOP', color: 'amber', onClose: o.onClose, y: 22, backLabel: 'BACK',
     });
@@ -758,6 +758,9 @@ export class ShopView extends View {
     // same list, so they all share one row pitch and cannot be drawn over each other. Nothing else is
     // drawn into this panel except the frame and BACK.
     this.menu = null;
+    // F4 fit: the catalogue is paged by slot (ShopLayout.SHOP_PAGES). The page row is the first selectable
+    // row, so the shop opens with focus on "← TRAIL →" and left/right is the first thing a player tries.
+    this.page = 0;
     this._build();
   }
 
@@ -768,8 +771,14 @@ export class ShopView extends View {
   /** The panel's single source of truth: layout rows + menu items, rebuilt together every time. */
   _menuItems(layout) {
     return shopMenuItems(layout).map((m) => {
+      if (m.rowKind === 'page') {
+        // Confirm or a click turns the page forward; left/right are handled in handleAction. An action
+        // row, not a choice row: MenuList repaints a choice row after its setter runs, and the setter here
+        // rebuilds the whole menu.
+        return { kind: 'action', rowKind: 'page', label: m.label, sub: m.sub, disabled: false, onSelect: () => this._turnPage(1) };
+      }
       if (m.rowKind === 'item') {
-        return { kind: 'action', id: m.id, label: m.label, sub: m.sub, disabled: m.disabled, onSelect: () => this._choose(m.id) };
+        return { kind: 'action', rowKind: 'item', id: m.id, label: m.label, sub: m.sub, disabled: m.disabled, onSelect: () => this._choose(m.id) };
       }
       if (m.rowKind === 'boost' && m.disabled) {
         // F3: not unlocked yet. Drawn with its unlock level, never focusable, never toggled.
@@ -798,7 +807,8 @@ export class ShopView extends View {
   }
 
   _build() {
-    const layout = shopLayout({ profile: this._profile(), levels: this._levels() });
+    const layout = shopLayout({ profile: this._profile(), levels: this._levels(), page: this.page });
+    this.page = layout.page;
     if (this.menu) { this.menu.destroy(); this.menu = null; }
     // The bank value is drawn outside the list (the list right-aligns only row state), so it has to be
     // torn down with it or every rebuild would stack another "BANK n" on the same pixel.
@@ -882,8 +892,35 @@ export class ShopView extends View {
     if (this.menu) this.menu.setSelected(Math.min(keep, this.menu.items.length - 1), true);
   }
 
+  /**
+   * Show the next (dir 1) or previous (dir -1) slot page, wrapping. Focus stays on the page row when it was
+   * there; from an item row it stays on the same row index if the new page has an item there, else it goes
+   * to the page row, so focus never lands on a heading.
+   */
+  _turnPage(dir) {
+    const was = this.menu ? this.menu.items[this.menu.selected] : null;
+    const keep = this.menu ? this.menu.selected : 0;
+    this.page += dir < 0 ? -1 : 1;
+    this._build();
+    if (!this.menu) return;
+    const pageIdx = this.menu.items.findIndex((i) => i.rowKind === 'page');
+    const at = this.menu.items[keep];
+    const target = (was && was.rowKind === 'item' && at && at.rowKind === 'item' && !at.disabled) ? keep : pageIdx;
+    this.menu.setSelected(Math.max(0, target), true);
+    uiSfx(this.scene, 'uiMove');
+  }
+
   handleAction(action) {
     if (action === 'cancel') { this.close(); return true; }
+    if (action === 'left' || action === 'right') {
+      // The slot IS the page, so left/right on the page row or on any catalogue row turns it. On a boost
+      // row they still toggle the boost (MenuList's own choice handling).
+      const cur = this.menu && this.menu.items[this.menu.selected];
+      if (cur && (cur.rowKind === 'page' || cur.rowKind === 'item')) {
+        this._turnPage(action === 'left' ? -1 : 1);
+        return true;
+      }
+    }
     return this.menu.handleAction(action);
   }
 }
