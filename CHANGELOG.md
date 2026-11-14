@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased - Marvin decisions 7/8/9 (Game Over shop buy, Sugar Rush steering, combo achievement order)
+
+- **Achievements are in one deterministic order (decision 9).** The whole catalogue is sorted by group (DISTANCE, SKILL, DAILY, COLLECTION, BIOMES), then metric (so one ladder stays together), then target, ascending and stable. The grid, unlock evaluation, the awards list and the toast all use it. The combo ladder now reads x1.25, x1.5, x1.75, x2.0; the x2.0 achievement used to be listed first.
+- **Every achievement earned at once is granted at once, in order.** A run that reaches x1.75 unlocks Combo Starter, Chain Reaction and Unbroken in one evaluation, with one timestamp.
+- **Combo names match their rung.** Ids are unchanged (saves key on them). combo-5 (x1.25) is now Combo Starter, combo-10 (x1.5) Chain Reaction, combo-20 (x1.75) Unbroken, and combo-2 (x2.0) stays Doubled Up, now described as "Land a x2 combo." "Wireless Legend" sat on the x1.75 rung and is retired.
+- **The Game Over toast names up to three unlocks in order.** More than three: two names and "+N MORE". One: its name and description, as before.
+- `AchievementsLayout.GROUPS` is derived from `Achievements.GROUP_ORDER` (it listed SKILL first while the grid drew DISTANCE first). `achievements.json` is stored in the same order, and a test compares the two.
+- Tests: `tests/src/achievements-order.test.js`. Two existing tests changed their pinned contract with this decision: the toast test that expected "+2 MORE" for three unlocks now expects all three names, and the ACH-2 name test pins the new names.
+
 ## v2.5.1 - cosmetics, titles and themes complete (audit F4/SHOP-2/SHOP-5, 2026-11-14)
 
 - **The eleven level-reward cosmetics work (F4).** Cyan, Magenta and Amber Trail (levels 2, 15, 26), Lime, Ice Cyan and Magenta Glow (5, 18, 29), Amber and Lime Rider (9, 20) and the Magenta, Amber and Legend themes (12, 23, 30) were "unlocked" on level-up but existed in no catalogue. They are now shop rows owned from their level (price 0), equippable, and drawn: the trails go from a deep shade at low speed to white-hot at top speed, so the speed read survives. Ice Cyan Glow is paler than the default cyan glow, so the level-18 reward visibly changes the sled.

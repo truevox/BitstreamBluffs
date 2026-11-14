@@ -164,10 +164,16 @@ describe('toastLayout', () => {
     expect(l.lines[1].text).toBe('FINISH YOUR FIRST RUN.');
   });
 
-  test('several unlocks show the first and a count of the rest', () => {
+  // Decision 9 (2026-11-14) changed this contract: up to three unlocks are all named, in order; more than
+  // three show two names and a count. It used to be the first name and "+2 MORE" here.
+  test('several unlocks are named in order, all three when they fit', () => {
     const l = toastLayout([A('First Descent', 'x'), A('Doubled Up', 'y'), A('Kilometre Club', 'z')], { ellipsize: cut });
-    expect(l.lines[0].text).toBe('UNLOCKED FIRST DESCENT');
-    expect(l.lines[1].text).toBe('+2 MORE');
+    expect(l.lines.map((x) => x.text)).toEqual(['UNLOCKED FIRST DESCENT', 'DOUBLED UP', 'KILOMETRE CLUB']);
+    for (const line of l.lines) {
+      expect(line.y + line.h).toBeLessThanOrEqual(TOAST_BOX.maxY);
+      expect(line.x + line.w).toBeLessThanOrEqual(TOAST_BOX.x + TOAST_BOX.w);
+    }
+    expect(overlappingPairs(l.lines)).toEqual([]);
   });
 
   test('a long name is ellipsised inside the box, not allowed to run under the header', () => {

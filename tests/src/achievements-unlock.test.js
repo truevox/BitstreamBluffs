@@ -113,8 +113,10 @@ describe('ACH-2: every combo achievement is reachable by the combo multiplier', 
     expect(t['combo-10']).toBeLessThan(t['combo-20']);
   });
 
-  test('ids and names are unchanged and each description states its own target', () => {
-    const want = { 'combo-2': 'Doubled Up', 'combo-5': 'Chain Reaction', 'combo-10': 'Unbroken', 'combo-20': 'Wireless Legend' };
+  // Decision 9 (2026-11-14): ids stay (saves key on them) but the names climb with the targets. Before it,
+  // this pinned the old names, with "Wireless Legend" at x1.75 and the x2.0 capstone listed first.
+  test('ids are unchanged, names climb with the targets, and each description states its own target', () => {
+    const want = { 'combo-2': 'Doubled Up', 'combo-5': 'Combo Starter', 'combo-10': 'Chain Reaction', 'combo-20': 'Unbroken' };
     for (const a of combos()) {
       expect({ id: a.id, name: a.name, states: a.desc.includes(`x${a.target}`) || a.desc.includes(`${a.target}x`) })
         .toEqual({ id: a.id, name: want[a.id], states: true });

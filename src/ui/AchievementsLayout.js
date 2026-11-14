@@ -9,7 +9,7 @@
  * Paging is computed here, not in the view, so "does every row fit above the BACK button" is a unit test.
  */
 import { measureText } from './PixelFont.js';
-import { ACHIEVEMENTS, progressFor, metricsFrom, groupedAchievements } from '../systems/Achievements.js';
+import { ACHIEVEMENTS, progressFor, metricsFrom, groupedAchievements, GROUP_ORDER } from '../systems/Achievements.js';
 
 export const ACH_PANEL = Object.freeze({ w: 432, h: 244 });
 
@@ -19,13 +19,15 @@ const GLYPH_H = 8;
 /** Rows per page. Row pitch 13 with a header row, leaving clear space above BACK at h - 22. */
 export const ROWS_PER_PAGE = 13;
 
-export const GROUPS = Object.freeze([
-  { id: 'skill', label: 'SKILL' },
-  { id: 'distance', label: 'DISTANCE' },
-  { id: 'daily', label: 'DAILY' },
-  { id: 'collection', label: 'COLLECTION' },
-  { id: 'biomes', label: 'BIOMES' },
-]);
+const GROUP_LABELS = Object.freeze({
+  skill: 'SKILL', distance: 'DISTANCE', daily: 'DAILY', collection: 'COLLECTION', biomes: 'BIOMES',
+});
+
+/**
+ * Section labels, in Achievements.GROUP_ORDER (decision 9). Derived rather than listed a second time: this
+ * array used to say SKILL first while the grid actually drew DISTANCE first.
+ */
+export const GROUPS = Object.freeze(GROUP_ORDER.map((id) => Object.freeze({ id, label: GROUP_LABELS[id] || String(id).toUpperCase() })));
 
 /**
  * Flatten the catalogue into display rows: a group header row, then its achievements.
@@ -146,10 +148,15 @@ export function overlappingPairs(items) {
  * covering something the player is reading. Measured from those three boxes, so the toast can never be
  * placed over the header by a future edit.
  *
- * Two lines: the first achievement, then a count of the rest. A player who unlocks four at once reads
- * "FIRST DESCENT" and "+3 MORE" rather than a truncated run-on.
+ * Up to three lines at a 10 px pitch (y 14, 24, 34; the last ends at 42, inside maxY 46). Decision 9: the
+ * names are listed in the order they were unlocked (the canonical catalogue order), so a run that reaches
+ * x1.75 reads COMBO STARTER, CHAIN REACTION, UNBROKEN. More than three: two names and "+N MORE", rather
+ * than a truncated run-on. One: its name and its description.
  */
 export const TOAST_BOX = Object.freeze({ x: 14, y: 14, w: 138, maxY: 46 });
+
+/** Lines the toast band holds (TOAST_BOX.y .. maxY at a 10 px pitch). */
+export const TOAST_LINES = 3;
 
 /**
  * @param {Array<Object>} added achievement defs newly unlocked, in catalogue order
@@ -162,9 +169,15 @@ export function toastLayout(added, o = {}) {
   const cut = typeof o.ellipsize === 'function' ? o.ellipsize : (s) => s;
   const lines = [];
   lines.push(box('toast-1', cut(`UNLOCKED ${list[0].name.toUpperCase()}`, TOAST_BOX.w), TOAST_BOX.x, TOAST_BOX.y, 'amber'));
-  const rest = list.length - 1;
-  if (rest > 0) lines.push(box('toast-n', `+${rest} MORE`, TOAST_BOX.x, TOAST_BOX.y + 10, 'magenta', { alpha: 0.9 }));
-  else if (list[0].desc) {
+  if (list.length > 1) {
+    // Every name fits: list them all. Otherwise keep the last line for the count of the rest.
+    const named = list.length <= TOAST_LINES ? list.length : TOAST_LINES - 1;
+    for (let i = 1; i < named; i += 1) {
+      lines.push(box(`toast-${i + 1}`, cut(list[i].name.toUpperCase(), TOAST_BOX.w), TOAST_BOX.x, TOAST_BOX.y + 10 * i, 'amber'));
+    }
+    const rest = list.length - named;
+    if (rest > 0) lines.push(box('toast-n', `+${rest} MORE`, TOAST_BOX.x, TOAST_BOX.y + 10 * named, 'magenta', { alpha: 0.9 }));
+  } else if (list[0].desc) {
     // A single unlock has room for its description, which is the whole point of announcing it.
     lines.push(box('toast-d', cut(String(list[0].desc).toUpperCase(), TOAST_BOX.w), TOAST_BOX.x, TOAST_BOX.y + 10, 'text', { alpha: 0.8 }));
   }

@@ -25,23 +25,69 @@ export const METRICS = Object.freeze([
 ]);
 
 /**
+ * Marvin decision 9: one canonical order for the whole catalogue. Group first (the grid's section order),
+ * then metric (so one ladder such as runs 1/10/50 stays together instead of interleaving with another
+ * metric's thresholds), then target ascending. The grid, `qualified` / `newlyUnlocked` (and so the order
+ * creditRun reports and the toast shows) all read this order, so the easiest rung of a ladder is always
+ * listed, evaluated and announced before the harder ones.
+ */
+export const GROUP_ORDER = Object.freeze(['distance', 'skill', 'daily', 'collection', 'biomes']);
+
+/** Metric rank inside a group: exactly the METRICS set, ordered for display. */
+export const METRIC_ORDER = Object.freeze([
+  'runs', 'bestDistanceM', 'totalDistanceM', 'bestScore',
+  'bestCombo', 'maxAirtimeMs', 'tricksLanded', 'trickKinds', 'nearMisses',
+  'dailyRuns', 'bestStreak',
+  'shards', 'level', 'biomesDiscovered',
+]);
+
+const rankIn = (list, v) => {
+  const i = list.indexOf(v);
+  return i < 0 ? list.length : i;
+};
+
+/**
+ * Sort achievement defs into the canonical order: group, metric, target. Stable: ties keep their input
+ * order. An unknown group or metric sorts after every known one rather than jumping to the front.
+ * Pure: returns a new array and leaves the input alone.
+ * @param {Array<Object>} list
+ * @returns {Array<Object>}
+ */
+export function sortAchievements(list) {
+  const arr = Array.isArray(list) ? list.filter(Boolean) : [];
+  return arr
+    .map((a, i) => ({ a, i }))
+    .sort((x, y) => (rankIn(GROUP_ORDER, x.a.group) - rankIn(GROUP_ORDER, y.a.group))
+      || (rankIn(METRIC_ORDER, x.a.metric) - rankIn(METRIC_ORDER, y.a.metric))
+      || ((Number.isFinite(x.a.target) ? x.a.target : Infinity) - (Number.isFinite(y.a.target) ? y.a.target : Infinity))
+      || (x.i - y.i))
+    .map((e) => e.a);
+}
+
+/**
  * The shipped catalogue. Loaded from data/achievements/achievements.json by the service; this fallback
  * keeps a pure test or a headless caller independent of the bundler, exactly as SHOP_ITEMS does.
  */
 // ACH-2: bestCombo is the combo MULTIPLIER (x1 plus 0.25 per unique flip/helicopter type in one jump, so
 // x2.0 at most). The old 5/10/20 targets could never be met. combo-5/10/20 now ask for x1.25 / x1.5 /
 // x1.75 (one, two, three step tricks in a jump); combo-2 keeps x2.0, all four step types in one jump.
-export const ACHIEVEMENTS = Object.freeze([
+// Decision 9: the ids stay (saves key on them) but the names now climb with the targets: Combo Starter,
+// Chain Reaction, Unbroken, and Doubled Up for the x2.0 capstone ("Wireless Legend" sat at x1.75).
+// Stored in canonical order (decision 9) AND sorted at load, so a future entry appended out of place
+// still lands in its rung instead of leading the grid and the toast.
+export const ACHIEVEMENTS = Object.freeze(sortAchievements([
   { id: 'first-descent', name: 'First Descent', desc: 'Finish your first run.', group: 'distance', metric: 'runs', target: 1 },
   { id: 'ten-runs', name: 'Regular', desc: 'Finish 10 runs.', group: 'distance', metric: 'runs', target: 10 },
   { id: 'fifty-runs', name: 'Committed', desc: 'Finish 50 runs.', group: 'distance', metric: 'runs', target: 50 },
   { id: 'dist-1k', name: 'Kilometre Club', desc: 'Ride 1,000 m in a single run.', group: 'distance', metric: 'bestDistanceM', target: 1000 },
   { id: 'dist-5k', name: 'Long Haul', desc: 'Ride 5,000 m in a single run.', group: 'distance', metric: 'bestDistanceM', target: 5000 },
   { id: 'dist-25k-total', name: 'Marathon Machine', desc: 'Ride 25,000 m in total.', group: 'distance', metric: 'totalDistanceM', target: 25000 },
-  { id: 'combo-2', name: 'Doubled Up', desc: 'Land a 2x combo.', group: 'skill', metric: 'bestCombo', target: 2 },
-  { id: 'combo-5', name: 'Chain Reaction', desc: 'Land a x1.25 combo.', group: 'skill', metric: 'bestCombo', target: 1.25 },
-  { id: 'combo-10', name: 'Unbroken', desc: 'Land a x1.5 combo.', group: 'skill', metric: 'bestCombo', target: 1.5 },
-  { id: 'combo-20', name: 'Wireless Legend', desc: 'Land a x1.75 combo.', group: 'skill', metric: 'bestCombo', target: 1.75 },
+  { id: 'score-10k', name: 'Five Figures', desc: 'Score 10,000 in a run.', group: 'distance', metric: 'bestScore', target: 10000 },
+  { id: 'score-50k', name: 'Six Figures', desc: 'Score 50,000 in a run.', group: 'distance', metric: 'bestScore', target: 50000 },
+  { id: 'combo-5', name: 'Combo Starter', desc: 'Land a x1.25 combo.', group: 'skill', metric: 'bestCombo', target: 1.25 },
+  { id: 'combo-10', name: 'Chain Reaction', desc: 'Land a x1.5 combo.', group: 'skill', metric: 'bestCombo', target: 1.5 },
+  { id: 'combo-20', name: 'Unbroken', desc: 'Land a x1.75 combo.', group: 'skill', metric: 'bestCombo', target: 1.75 },
+  { id: 'combo-2', name: 'Doubled Up', desc: 'Land a x2 combo.', group: 'skill', metric: 'bestCombo', target: 2 },
   { id: 'airtime-2s', name: 'Airborne', desc: 'Stay in the air for 2 seconds.', group: 'skill', metric: 'maxAirtimeMs', target: 2000 },
   { id: 'airtime-5s', name: 'Sky Writer', desc: 'Stay in the air for 5 seconds.', group: 'skill', metric: 'maxAirtimeMs', target: 5000 },
   { id: 'tricks-10', name: 'Trick Bag', desc: 'Land 10 tricks.', group: 'skill', metric: 'tricksLanded', target: 10 },
@@ -49,8 +95,6 @@ export const ACHIEVEMENTS = Object.freeze([
   { id: 'tricks-500', name: 'Muscle Memory', desc: 'Land 500 tricks.', group: 'skill', metric: 'tricksLanded', target: 500 },
   { id: 'trick-kinds-5', name: 'Versatile', desc: 'Land 5 different tricks.', group: 'skill', metric: 'trickKinds', target: 5 },
   { id: 'near-miss-50', name: 'Close Call', desc: '50 near misses.', group: 'skill', metric: 'nearMisses', target: 50 },
-  { id: 'score-10k', name: 'Five Figures', desc: 'Score 10,000 in a run.', group: 'distance', metric: 'bestScore', target: 10000 },
-  { id: 'score-50k', name: 'Six Figures', desc: 'Score 50,000 in a run.', group: 'distance', metric: 'bestScore', target: 50000 },
   { id: 'daily-1', name: 'Daily Habit', desc: 'Finish a Daily run.', group: 'daily', metric: 'dailyRuns', target: 1 },
   { id: 'streak-3', name: 'Three in a Row', desc: 'A 3-day Daily streak.', group: 'daily', metric: 'bestStreak', target: 3 },
   { id: 'streak-7', name: 'Week of Pain', desc: 'A 7-day Daily streak.', group: 'daily', metric: 'bestStreak', target: 7 },
@@ -61,7 +105,7 @@ export const ACHIEVEMENTS = Object.freeze([
   { id: 'biomes-2', name: 'Explorer', desc: 'Discover 2 biomes.', group: 'biomes', metric: 'biomesDiscovered', target: 2, reward: { cosmetic: 'trail-hue-aurora' } },
   { id: 'biomes-5', name: 'Cartographer', desc: 'Discover 5 biomes.', group: 'biomes', metric: 'biomesDiscovered', target: 5, reward: { title: 'CARTOGRAPHER' } },
   { id: 'biomes-11', name: 'Every Mountain', desc: 'Discover all 11 biomes.', group: 'biomes', metric: 'biomesDiscovered', target: 11, reward: { title: 'OMNISCIENT' } },
-]);
+]));
 
 /** @param {string} id @returns {Object|null} */
 export function achievementFor(id) {
@@ -122,7 +166,7 @@ export function metricsFrom(profile, run, extra = {}) {
 }
 
 /**
- * Which achievements the state qualifies for, in catalogue order.
+ * Which achievements the state qualifies for, in canonical catalogue order (decision 9).
  * @param {Object<string,number>} metrics
  * @returns {Array<Object>} achievement defs
  */
@@ -142,7 +186,7 @@ export function qualified(metrics) {
  *
  * @param {Object<string,number>} metrics
  * @param {Object|Array} unlocked the profile's stored achievements ({id: timestamp} or [{id, at}])
- * @returns {Array<Object>} achievement defs, in catalogue order
+ * @returns {Array<Object>} achievement defs, in canonical catalogue order (decision 9)
  */
 export function newlyUnlocked(metrics, unlocked) {
   const have = new Set();
@@ -197,11 +241,12 @@ export function progressFor(def, metrics) {
  * @returns {Array<{group:string,items:Array<Object>}>}
  */
 export function groupedAchievements() {
-  const order = [];
+  // GROUP_ORDER, not first appearance: the section order is a decision, not an accident of the file.
   const by = new Map();
   for (const a of ACHIEVEMENTS) {
-    if (!by.has(a.group)) { by.set(a.group, []); order.push(a.group); }
+    if (!by.has(a.group)) by.set(a.group, []);
     by.get(a.group).push(a);
   }
+  const order = [...by.keys()].sort((x, y) => rankIn(GROUP_ORDER, x) - rankIn(GROUP_ORDER, y));
   return order.map((g) => ({ group: g, items: by.get(g) }));
 }

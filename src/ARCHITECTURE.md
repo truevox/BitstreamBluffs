@@ -853,3 +853,14 @@ Profile opens it from `titlesButton` (focus target kind `'titles'`). `ProfileLay
 in place of the level title in `profileLayout` (key `title`) and in `titleBadgeLayout`. TitleScene calls
 `_refreshLevelBadge()` when Profile closes.
 
+## Addendum: Marvin decisions 7/8/9 (Game Over shop buy, Sugar Rush steering, combo order; additive)
+
+**Achievement order (decision 9).** `Achievements.sortAchievements(list)` is the one ordering: group
+(`GROUP_ORDER`: distance, skill, daily, collection, biomes), then metric (`METRIC_ORDER`, the same set as
+`METRICS`, so one ladder stays together), then `target` ascending; stable on input order; an unknown group or
+metric sorts last. `ACHIEVEMENTS` is stored in this order and also sorted at load. `qualified` and
+`newlyUnlocked` filter it, so `creditRun` reports the newly unlocked defs in this order, all of them in one
+evaluation with one caller timestamp, and the Game Over toast shows them in this order (up to three names;
+more than three: two names and `+N MORE`). `groupedAchievements` and `AchievementsLayout.GROUPS` follow
+`GROUP_ORDER`. Ids never change (saves key on them); names and descriptions follow the targets.
+`data/achievements/achievements.json` is kept in the same order (tested).
