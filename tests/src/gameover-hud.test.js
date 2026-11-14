@@ -541,3 +541,77 @@ describe('U5: HudLayout.stackY full-width items', () => {
     expect(stackY([{ w: 200, h: 17, pref: 59, full: true }], { cx: 240, keepOuts: edge })).toEqual([73]);
   });
 });
+
+// ================================================================== UI-3: mission toasts at RUN_END
+
+describe('UI-3: mission toasts emitted at RUN_END finish before RunScene stops the HUD', () => {
+  // RunScene stops the HUD CRASH_TO_GAMEOVER_MS after the crash, and RUN_END is emitted at the crash.
+  const HUD_STOP_MS = Math.min(950, TIMING.crashToGameOverMs);
+
+  /** UIScene stub with the real strip queue; records every strip text it shows. */
+  const hudWith = (completed, queued = []) => {
+    const s = makeScene(UIScene.prototype, { [REG.LAST_AWARDS]: { missions: { completed } } });
+    const shown = [];
+    const c = { visible: false, x: 0, setVisible(v) { this.visible = v; return this; }, setX(x) { this.x = x; return this; } };
+    Object.assign(s, {
+      stripQueue: queued.map((text) => ({ text, key: 'cyan' })), stripBusy: false, missionToastsThisRun: new Set(), stripC: c,
+      stripT: { setText(t) { shown.push(t); return this; }, setColorKey() { return this; } }, _paintStrip() {},
+      comboInfo: { setText() { return this; } }, _setPending() {},
+    });
+    return { s, shown };
+  };
+  /** Walk the strip queue on the tween clock: each job's slide-out tween completes at delay + duration. */
+  const run = (s) => {
+    let clock = 0;
+    const finished = [];
+    for (let guard = 0; guard < 10; guard++) {
+      const out = s.__tweens.find((tw) => !tw.done && tw.cfg.onComplete);
+      if (!out) break;
+      out.done = true;
+      clock += (out.cfg.delay || 0) + out.cfg.duration;
+      finished.push(clock);
+      out.cfg.onComplete();
+    }
+    return finished;
+  };
+
+  test('two completions at RUN_END collapse into one strip that names both and their XP, and finishes in time', () => {
+    const { s, shown } = hudWith([{ id: 'm1', title: 'Grab 15 shards', xp: 60 }, { id: 'm2', title: 'Land 3 flips', xp: 40 }]);
+    s.onRunEnd();
+    const finished = run(s);
+    expect(shown).toEqual(['2 MISSIONS DONE  +100 XP']);
+    expect(finished.length).toBe(1);
+    // A frame of margin (the HUD stop is checked once per frame in RunScene.update).
+    expect(finished[0]).toBeLessThanOrEqual(HUD_STOP_MS - 17);
+  });
+
+  test('one completion at RUN_END shows its title and finishes in time', () => {
+    const { s, shown } = hudWith([{ id: 'm1', title: 'Grab 15 shards', xp: 60 }]);
+    s.onRunEnd();
+    const finished = run(s);
+    expect(shown).toEqual(['GRAB 15 SHARDS DONE  +60 XP']);
+    expect(finished[0]).toBeLessThanOrEqual(HUD_STOP_MS - 17);
+  });
+
+  test('missions already toasted mid-run are not counted again', () => {
+    const { s, shown } = hudWith([{ id: 'm1', title: 'Grab 15 shards', xp: 60 }, { id: 'm2', title: 'Land 3 flips', xp: 40 }]);
+    s.missionToastsThisRun.add('m1');
+    s.onRunEnd();
+    run(s);
+    expect(shown).toEqual(['LAND 3 FLIPS DONE  +40 XP']);
+  });
+
+  test('the run-end toast goes ahead of stale strips still waiting in the queue', () => {
+    const { s, shown } = hudWith([{ id: 'm1', title: 'Grab 15 shards', xp: 60 }], ['SECTOR 4']);
+    s.stripBusy = true; // something is mid-slide; SECTOR 4 is waiting behind it
+    s.onRunEnd();
+    expect(s.stripQueue[0].text).toBe('GRAB 15 SHARDS DONE  +60 XP');
+    expect(shown).toEqual([]);
+  });
+
+  test('a mid-run toast keeps the normal, slower timing', () => {
+    const { s } = hudWith([]);
+    s.onMissionCompleted({ id: 'm9', title: 'Reach 500 m in one run', xp: 60 });
+    expect(run(s)).toEqual([940]);
+  });
+});

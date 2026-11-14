@@ -19,7 +19,7 @@
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, SCORING } from '../constants.js';
 import { EVT } from '../events.js';
-import { missionToastText } from '../ui/MissionsUi.js';
+import { missionToastText, stripToastText } from '../ui/MissionsUi.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText, strokeRectPx } from '../ui/Neon.js';
@@ -78,6 +78,14 @@ const MAX_POPUPS = 3;
 const SHARD_Y = 53;
 /** Classic top y of each centre slot (used when nothing above it is showing). */
 const SLOT = { warn: 22, boost: 24, flash: 46, strip: 59, bank: BANK_Y, banner: 86, popup: POPUP_Y };
+/**
+ * Strip slide timings. `runEnd` must finish well inside RunScene's 950 ms crash-to-Game-Over stop (RUN_END is
+ * emitted at the crash, and the stop is checked once per frame), so it ends at 800 ms.
+ */
+const STRIP_TIMING = {
+  normal: { inMs: 220, holdMs: 500, outMs: 220 },
+  runEnd: { inMs: 200, holdMs: 400, outMs: 200 },
+};
 const POWER_Y = GAME_HEIGHT - 28;
 const POWER_PITCH = 62;
 const HINT_ROWS = [GAME_HEIGHT - 23, GAME_HEIGHT - 44];
@@ -428,13 +436,6 @@ export class UIScene extends Phaser.Scene {
   }
 
   /**
-   * W2: toast each mission this run completed. Reuses the existing strip queue instead of a new HUD
-   * band, so stacking is unchanged and overlapping toasts serialise exactly as milestones do.
-   * ProgressionService has already published the awards by the time RUN_END reaches this scene
-   * (it is registered first in createServices), so reading the registry here is safe; if it somehow
-   * is not, nothing is toasted rather than throwing at run end.
-   */
-  /**
    * W2: a mission was completed mid-run. Shares the milestone strip queue so HUD stacking is
    * unchanged and the toast cannot collide with a MILESTONE or NEW BEST slide.
    * @param {{id:string,title?:string,xp?:number,shards?:number}} p
@@ -445,16 +446,32 @@ export class UIScene extends Phaser.Scene {
     this._strip(missionToastText(p, p.title), 'lime');
   }
 
+  /**
+   * Run-end mission toast. RunScene stops this HUD CRASH_TO_GAMEOVER_MS (950 ms) after RUN_END, and one strip
+   * already takes 940 ms, so a second queued toast was always cut off (audit UI-3). Every completion not
+   * already toasted mid-run is folded into ONE strip ("2 MISSIONS DONE  +100 XP"; a single one keeps its
+   * title), run on the shorter RUN_END timing and put ahead of any stale strip still waiting in the queue.
+   * Game Over lists the missions by name right after. ProgressionService has already published the awards
+   * by the time RUN_END reaches this scene (it is registered first in createServices); if it somehow has
+   * not, nothing is toasted rather than throwing at run end.
+   */
   _toastMissions() {
     try {
       const awards = this.registry.get(REG.LAST_AWARDS);
       const done = awards && awards.missions && Array.isArray(awards.missions.completed)
         ? awards.missions.completed : [];
+      const fresh = [];
       for (const c of done) {
+        if (!c) continue;
         if (c.id && this.missionToastsThisRun.has(c.id)) continue;
         if (c.id) this.missionToastsThisRun.add(c.id);
-        this._strip(missionToastText(c, c.title), 'lime');
+        fresh.push(c);
       }
+      if (!fresh.length) return;
+      const text = fresh.length === 1
+        ? missionToastText(fresh[0], fresh[0].title)
+        : stripToastText(`${fresh.length} MISSIONS`, fresh.reduce((n, c) => n + (Number(c.xp) || 0), 0));
+      this._strip(text, 'lime', { front: true, timing: STRIP_TIMING.runEnd });
     } catch (e) { /* cosmetic */ }
   }
 
@@ -582,8 +599,15 @@ export class UIScene extends Phaser.Scene {
     this._paintHint();
   }
 
-  _strip(text, key) {
-    this.stripQueue.push({ text, key });
+  /**
+   * @param {string} text
+   * @param {string} key palette key
+   * @param {{front?:boolean, timing?:{inMs:number,holdMs:number,outMs:number}}} [o] front = jump the queue
+   */
+  _strip(text, key, o = {}) {
+    const job = { text, key, timing: o.timing || STRIP_TIMING.normal };
+    if (o.front) this.stripQueue.unshift(job);
+    else this.stripQueue.push(job);
     if (!this.stripBusy) this._nextStrip();
   }
 
@@ -601,10 +625,11 @@ export class UIScene extends Phaser.Scene {
     this.tweens.killTweensOf(c);
     c.__snap = true;
     c.setVisible(true).setX(-GAME_WIDTH);
-    // slide in 220 ms, hold 500 ms, slide out 220 ms (< 1 s total)
-    this.tweens.add({ targets: c, x: 0, duration: 220, ease: 'Cubic.easeOut' });
+    // normal: slide in 220 ms, hold 500 ms, slide out 220 ms (< 1 s total); RUN_END: shorter, see STRIP_TIMING
+    const tm = job.timing || STRIP_TIMING.normal;
+    this.tweens.add({ targets: c, x: 0, duration: tm.inMs, ease: 'Cubic.easeOut' });
     this.tweens.add({
-      targets: c, x: GAME_WIDTH, delay: 720, duration: 220, ease: 'Cubic.easeIn',
+      targets: c, x: GAME_WIDTH, delay: tm.inMs + tm.holdMs, duration: tm.outMs, ease: 'Cubic.easeIn',
       onComplete: () => { c.setVisible(false); this._nextStrip(); },
     });
   }
