@@ -2,6 +2,7 @@
 
 ## Unreleased - post-sprint audit fixes
 
+- **`npm run gate:playthrough` runs the full gate** (F5). It now passes `--with-boosts`; the gate also fails when fewer checks ran than the mode requires, and says so when boosts are off, instead of printing "0 skipped, GATE PASS" with 11 checks absent. The Daily boost check now presses the real DAILY RUN item and asserts the date mask (F7).
 - **Golden mask-0 test now hashes every chunk field** (T6). The hand-written `full` projection missed power-ups, launches and the zone `modId` (it hashed `z.id`, which does not exist). A new `complete` digest per seed, recorded identically at `06e79f5` and `e0ae90f`, closes the gap. Proven by mutation: changing a zone modId past 2 km now fails 5 golden tests (before: none).
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)

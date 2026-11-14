@@ -52,6 +52,10 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 
 // W4 adds boosts. The flag keeps this one gate file honest in both trees instead of forking it.
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
+// How many results each mode must record. Raise these when you add a check; a lower count means a
+// block silently did not run.
+const EXPECTED_WITH_BOOSTS = 25;
+const EXPECTED_WITHOUT_BOOSTS = 14;
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -1229,13 +1233,19 @@ async function main() {
           const daily = (t.daily && t.daily.seed) || null;
           if (!daily) return { fatal: 'no daily seed available' };
           t.starting = false;
-          // Start the daily through the same call the DAILY RUN menu item makes.
-          t.startRun(daily, null);
+          // Press the real DAILY RUN menu item. It passes the date-derived mask as an override;
+          // `startRun(daily, null)` (what this gate used to call) fell back to the PROFILE mask,
+          // so it exercised a different path from the one players press (audit F7, 2026-11-14).
+          const item = t.menu && t.menu.items.find((i) => i.label === 'DAILY RUN');
+          if (!item) return { fatal: 'no DAILY RUN menu item' };
+          item.onSelect();
           await wait(1600);
           const run = g.scene.getScene('RunScene');
           if (!run) return { fatal: 'daily run did not start' };
           return {
             seed: run.seed,
+            mask: run.biomeMask,
+            regMask: g.registry.get('biomeMask'),
             shield: run.shieldCharges || 0,
             modded: run.modded === true,
             factor: run.boostFx ? run.boostFx.speedFactor : null,
@@ -1247,7 +1257,10 @@ async function main() {
         else if (out.shield !== 0) fail('daily refuses the shield boost', `shieldCharges ${out.shield}`);
         else if (out.modded) fail('daily run is not marked modded', 'modded true');
         else if (out.factor !== 1) fail('daily refuses Head Start', `speedFactor ${out.factor}`);
-        else pass('daily run refuses both boosts while the profile has them ON', 'shield 0, factor 1, not modded');
+        // The fixture profile's mask is 31; the date cycle never produces 31, so 31 here means the
+        // run took the profile mask instead of the Daily's shared one.
+        else if (out.mask === PROFILE.biomeMask || out.mask !== out.regMask) fail('daily uses the date mask, not the profile mask', `run mask ${out.mask}, registry ${out.regMask}`);
+        else pass('daily run (real DAILY RUN item) refuses both boosts and uses the date mask', `shield 0, factor 1, not modded, mask ${out.mask}`);
       } finally { await page.close(); }
     }
 
@@ -1530,6 +1543,14 @@ async function main() {
     console.log(`  ${mark}  ${r.name}${r.detail ? `  — ${r.detail}` : ''}`);
   }
   console.log(`\n${results.length - bad.length - skipped.length} passed, ${bad.length} failed, ${skipped.length} skipped`);
+  // A block that is skipped by a flag pushes nothing, so "0 skipped" used to hide 11 absent W4
+  // checks (audit F5, 2026-11-14). Count what ran against what this mode must run.
+  const expected = WITH_BOOSTS ? EXPECTED_WITH_BOOSTS : EXPECTED_WITHOUT_BOOSTS;
+  if (results.length < expected) {
+    console.error(`\nGATE FAIL: ${results.length} checks recorded, expected at least ${expected}${WITH_BOOSTS ? '' : ' (run with --with-boosts for the full gate)'}`);
+    process.exit(1);
+  }
+  if (!WITH_BOOSTS) console.log('NOTE: --with-boosts not given; the 11 W4 boost/shop checks did not run.');
   if (bad.length) { console.error('\nGATE FAIL'); process.exit(1); }
   console.log('GATE PASS');
 }
