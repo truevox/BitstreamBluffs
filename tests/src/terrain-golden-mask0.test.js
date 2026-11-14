@@ -74,6 +74,33 @@ const GOLDEN = {
 };
 
 /**
+ * Whole-chunk digests, recorded at BOTH `06e79f5` and `e0ae90f` with `biomeMask = 0` (identical at
+ * both, 2026-11-14 audit). `full` above was written by hand and misses things that are gameplay:
+ * power-ups, launches, the zone `modId` (it hashes `z.id`, which does not exist, so every zone
+ * hashed as `null`), and hazard rotation (it hashes `speedPxS`, which does not exist either). The
+ * audit proved the gap by mutation: swapping a zone modId past 2 km left `full` green. `complete`
+ * hashes every field of every chunk instead, so nothing that ships in a chunk can move unseen.
+ * `shape` and `full` stay as they were so their history and failure-layer diagnosis still hold.
+ */
+const COMPLETE = {
+  alpha: 'e18f051a5ad2f594bc39f748e61403f6',
+  'bitstream-bluffs': 'a11305dc97011fed89c4f69817b55d68',
+  42: '4ea6be7e07ea665a31f2a4ac380b7367',
+  'seed@mask0': '195bb43cdec549f317ffd43063d2b047',
+  '2026-11-13': '8a4a990ba2d5de392c78bd532bd40d37',
+};
+
+/** Every field, keys sorted, numbers rounded like `round` below. */
+const completeOf = (v) =>
+  Array.isArray(v)
+    ? v.map(completeOf)
+    : v && typeof v === 'object'
+      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, completeOf(v[k])]))
+      : typeof v === 'number'
+        ? round(v)
+        : v;
+
+/**
  * A chunk reduced to everything that affects play, in a fixed key order.
  *
  * Built explicitly rather than by `JSON.stringify(chunk)` so that adding a purely cosmetic field to
@@ -132,6 +159,7 @@ describe('golden terrain — mask 0 must never change (SPEC §9)', () => {
       });
     }
     expect(Object.keys(GOLDEN).sort()).toEqual([...SEEDS].sort());
+    expect(Object.keys(COMPLETE).sort()).toEqual([...SEEDS].sort());
   });
 
   for (const seed of SEEDS) {
@@ -142,6 +170,10 @@ describe('golden terrain — mask 0 must never change (SPEC §9)', () => {
 
       test('geometry plus every spawned object is bit-identical to the baseline', () => {
         expect(digest(stream(seed, fullOf))).toBe(GOLDEN[seed].full);
+      });
+
+      test('every field of every chunk (power-ups, launches, zone modIds included) is bit-identical', () => {
+        expect(digest(stream(seed, completeOf))).toBe(COMPLETE[seed]);
       });
     });
   }
