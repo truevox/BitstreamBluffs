@@ -166,8 +166,9 @@ numbers above come from.
 ## What I did not do
 
 No merge, no force-push, no branch deletion — Marvin merges, per the task. My repair is on
-`luna/w41-shop-affordability-agrees`, rebased onto `e0ae90f`, two commits
-(`68ffbd7` fix, `17c594f` release note/bump to v2.4.1).
+`origin/luna/w41-shop-affordability-agrees`, rebased onto `e0ae90f`, four commits: `6e0b69d` (the fix),
+`1ba35d8` (v2.4.1 CHANGELOG + bump), `bd9de4f` (this note), `f98516e` (ShopPrompt header correction).
+Tip `f98516e`; gates re-run on it — 50 suites / 964 tests, build clean, playthrough 15/15.
 
 I did not fix W5 audit finding 1 (`creditRun` double-counts trick lands against `metricsFrom`). It is not
 in this branch, does not block it, and is recorded separately in `notes/w5-audit-findings-verified.txt`.
