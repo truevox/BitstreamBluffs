@@ -64,7 +64,10 @@ const EXPECTED_WITHOUT_BOOSTS = 14;
 const PROFILE = {
   v: 1, xp: 48400, level: 16, bank: 0, biomeMask: 31,
   pendingBiomes: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'],
-  unlocked: { biomes: [], cosmetics: [], boosts: {} },
+  // Level 16 has crossed both boost unlock levels (Head Start 8, Error Correction 15). A real profile
+  // gets these from grantLevelRewards when the level is crossed; a fixture that sets XP directly must
+  // carry them, or the boost checks would be testing a locked boost (which correctly does nothing).
+  unlocked: { biomes: [], cosmetics: [], boosts: { headStart: 8, errorCorrection: 15 } },
   boosts: { errorCorrection: false, headStart: false },
   missions: { counter: 0, active: [], progress: {} }, achievements: {}, credited: [],
   lifetime: { runs: 0, distanceM: 0, playMs: 0, score: 0, tricks: {}, shards: 0, nearMisses: 0,
