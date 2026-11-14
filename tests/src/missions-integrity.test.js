@@ -155,6 +155,13 @@ describe('MS-2: a biome mission completes only on a run with that biome switched
     return got;
   }
 
+  test('stateFor (live mission state) applies the same gate', async () => {
+    const { missions } = await boot(memStorage());
+    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: 0 } }).done).toBe(false);
+    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: other.bit } }).done).toBe(false);
+    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: deb.bit } }).done).toBe(true);
+  });
+
   test('the live toast follows the same rule as the payout', async () => {
     expect(await liveToasts(0)).toEqual([]);
     expect(await liveToasts(deb.bit)).toEqual([t.id]);

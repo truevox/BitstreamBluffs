@@ -194,7 +194,8 @@ export class MissionsService {
    */
   stateFor(template, ctx) {
     const p = this.profile;
-    return missionState(template, { ...ctx, profile: p });
+    // The biome table rides along so a biome mission's live state uses the same mask gate as the payout.
+    return missionState(template, { biomeDefs: this.biomeDefs, ...ctx, profile: p });
   }
 
   /**
