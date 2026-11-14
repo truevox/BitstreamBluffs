@@ -6,10 +6,12 @@
  * saves via saveStore.setInitials + updateSetting('lastInitials'); then the leaderboard is shown with the new entry
  * highlighted.
  *
- * INSTANT RETRY: Space / Enter / gamepad A / tap restarts with the SAME seed immediately - input is live from the very
- * first frame and never waits for animations or for the (async) leaderboard queries. While the initials entry is open:
- * Enter saves, Space saves and retries at once, Esc skips. N / X = new seed. Esc and pad B (both MenuInput
- * 'cancel') = title. Keyboard B and pad LB / LT (MenuInput 'shop') = Shard Shop, when anything is affordable.
+ * INSTANT RETRY: Space / Enter / gamepad A / RB / tap restarts with the SAME seed immediately - input is live from the
+ * very first frame and never waits for animations or for the (async) leaderboard queries. While the initials entry is
+ * open: Enter saves, Space (or pad RB) saves and retries at once, Esc skips. N / X = new seed. Esc and pad B (both
+ * MenuInput 'cancel') = title. Keyboard B and pad LB / LT (MenuInput 'shop') = Shard Shop, when anything is affordable.
+ * In the open shop (Marvin decision 7): Enter / pad A buy or equip the highlighted row once the shop is armed, Space /
+ * pad RB (MenuInput 'retry') retry, Esc / pad B / B / LB close it, N / X / Y start a new seed.
  */
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, SCORING } from '../constants.js';
@@ -60,6 +62,19 @@ const SHOP_AFTER_ENTRY_MS = 500;
  * (LT works too). Naming only "B" misled pad players, for whom B is cancel = Title (audit U6b).
  */
 const SHOP_HINT = 'SHOP: B / LB';
+/**
+ * Marvin decision 7: how long an UNREQUESTED (autoprompt) shop waits before Enter / pad A buy in it.
+ *
+ * The popup appears only after SHOP_PROMPT_MS with no input at all, so the risky press is one the player
+ * started before they saw the panel: a retry already on its way. Simple visual reaction time is about
+ * 200-300 ms and a choice reaction (see a new panel, decide to act on it) about 400-500 ms, so any confirm
+ * inside 500 ms of the popup was aimed at Game Over, not at the shop, and keeps today's close-and-retry.
+ * Moving the cursor arms the shop at once (the player chose that row), and a shop opened with B / LB is
+ * armed from its first frame, so a deliberate buyer never waits for this.
+ */
+export const SHOP_ARM_MS = 500;
+/** The footer while an armed shop is open; replaces the retry line, which is no longer true for Enter. */
+export const SHOP_FOOTER = 'ENTER / A = BUY   SPACE / RB = RETRY   ESC / B = BACK';
 
 /** Display name of a biome, upper-cased: from the loaded content when a registry is given, else from the id. */
 function biomeLabel(id, registry) {
@@ -142,7 +157,8 @@ export class GameOverScene extends Phaser.Scene {
     addScanlines(this);
 
     // Input is live immediately; nothing below waits on async work.
-    this.input_ = new MenuInput(this, (a) => this._onAction(a));
+    // retryAction: Space and pad RB also send 'retry', which retries even from inside the shop (decision 7).
+    this.input_ = new MenuInput(this, (a) => this._onAction(a), { retryAction: true });
     this._onPointer = (pointer, over) => {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.
@@ -156,6 +172,10 @@ export class GameOverScene extends Phaser.Scene {
       this.input.off('pointerdown', this._onPointer);
       // W4.1: no timer or view may outlive the scene, or a popup fires into a scene that is gone.
       if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
+      if (this.shopArmTimer) {
+        try { this.shopArmTimer.remove(false); } catch (e) { /* already gone */ }
+        this.shopArmTimer = null;
+      }
       if (this.shopView) {
         try { this.shopView.destroy(); } catch (e) { /* already torn down */ }
         this.shopView = null;
@@ -819,19 +839,52 @@ export class GameOverScene extends Phaser.Scene {
    * The shop is reachable from PROFILE at the Title screen, which stays true (Marvin: no Title menu item).
    * This is the same ShopView, so a purchase here behaves identically — including persisting — and closing
    * it lands back on Game Over with its buttons untouched.
+   *
+   * Decision 7: `requested` (B / LB) opens it armed, so Enter / pad A buy at once. The autoprompt opens it
+   * unarmed for SHOP_ARM_MS (see there); until then the footer keeps its retry line, which is what Enter does.
+   * @param {{requested?:boolean}} [o]
    * @returns {void}
    */
-  _openShop() {
+  _openShop(o = {}) {
     if (this.shopOpen || !this.alive || this.leaving) return;
     this._cancelShopAutoprompt();
     this.shopOpen = true;
-    // While the shop is up, the footer's retry promise is still true (RETRY closes and retries), so it is
-    // left alone rather than being replaced with something the player has to re-learn on the way back.
+    this.shopArmed = false;
+    // "SHOP: B / LB" reads as "open the shop" while it is open; _closeShop re-measures and puts it back.
+    this._hideShopHint();
     // An interactive full-screen dim under the panel (depth 400 < the panel's 500), as Title and Pause do:
     // without it a click on empty panel space fell through to RETRY / NEW SEED / TITLE (audit U4b). It is
     // inert on purpose; Esc / pad B / the shop's BACK close the shop.
     this.shopDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
     this.shopView = new ShopView(this, this.theme, { onClose: () => this._closeShop() });
+    if (o && o.requested === true) {
+      this._armShop();
+    } else {
+      this.shopArmTimer = this.time.delayedCall(SHOP_ARM_MS, () => {
+        this.shopArmTimer = null;
+        if (this.alive && this.shopOpen && !this.leaving) this._armShop();
+      });
+    }
+  }
+
+  /**
+   * From now on Enter / pad A belong to the shop. The footer switches to the shop's keys, drawn above the
+   * dim (depth 400) on the row under the panel (the panel ends at y 258, the footer ink starts at y 261).
+   * @returns {void}
+   */
+  _armShop() {
+    if (this.shopArmed || !this.shopOpen) return;
+    this.shopArmed = true;
+    if (this.shopArmTimer) {
+      try { this.shopArmTimer.remove(false); } catch (e) { /* already gone */ }
+      this.shopArmTimer = null;
+    }
+    const f = this.footer;
+    if (f && typeof f.setText === 'function') {
+      this.footerBeforeShop = { text: f.text, depth: f.depth || 0 };
+      f.setText(SHOP_FOOTER);
+      if (typeof f.setDepth === 'function') f.setDepth(501);
+    }
   }
 
   /**
@@ -839,6 +892,17 @@ export class GameOverScene extends Phaser.Scene {
    * @returns {void}
    */
   _closeShop() {
+    if (this.shopArmTimer) {
+      try { this.shopArmTimer.remove(false); } catch (e) { /* already gone */ }
+      this.shopArmTimer = null;
+    }
+    const f = this.footer;
+    if (this.footerBeforeShop && f && typeof f.setText === 'function') {
+      f.setText(this.footerBeforeShop.text);
+      if (typeof f.setDepth === 'function') f.setDepth(this.footerBeforeShop.depth);
+    }
+    this.footerBeforeShop = null;
+    this.shopArmed = false;
     if (this.shopView) {
       try { this.shopView.destroy(); } catch (e) { /* a failed teardown must not wedge the screen */ }
       this.shopView = null;
@@ -892,14 +956,31 @@ export class GameOverScene extends Phaser.Scene {
     // Typing in the initials entry is not "the player is already playing": it must not drop a pending popup.
     if (!this.entry && typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
     if (this.leaving) return;
-    // W4.1: while the shop is open, RETRY (confirm) and NEW SEED (alt) still win. CC's hard rule is that
-    // the popup never eats the retry input: a player mashing Space after a crash must restart, not buy.
+    // Decision 7: Space / pad RB ('retry') retry from every state in one press: shop open or not, armed or
+    // not, and during initials entry (where it saves first, like Space does there).
+    if (action === 'retry') {
+      if (this.shopOpen) this._closeShop();
+      this.retry();
+      return;
+    }
     if (this.shopOpen) {
-      if (action === 'confirm') { this._closeShop(); this.retry(); return; }
+      // Decision 7: in an ARMED shop Enter / pad A buy, equip, unequip or turn the page on the highlighted
+      // row (ShopView's own rules, the same as Title -> Profile -> Shop). In an unarmed autoprompt shop
+      // they keep the old close-and-retry, so a retry press already on its way is never swallowed.
+      if (action === 'confirm') {
+        if (this.shopArmed && this.shopView) { this.shopView.handleAction('confirm'); return; }
+        this._closeShop();
+        this.retry();
+        return;
+      }
       if (action === 'cancel') { this._closeShop(); return; }
       if (action === 'shop') { this._closeShop(); return; }
       if (action === 'alt') { this._closeShop(); this.newSeed(); return; }
-      // Everything else (cursor movement, left/right on a toggle) belongs to the shop.
+      // Cursor movement (and left/right paging or toggles) belongs to the shop, and arms it: the row the
+      // player moved to is the clearly selected one. Guarded like _cancelShopAutoprompt: older scene tests
+      // drive _onAction on partial stubs.
+      const move = action === 'up' || action === 'down' || action === 'left' || action === 'right';
+      if (move && typeof this._armShop === 'function') this._armShop();
       if (this.shopView) this.shopView.handleAction(action);
       return;
     }
@@ -912,7 +993,7 @@ export class GameOverScene extends Phaser.Scene {
     if (action === 'shop') {
       // The footer advertises this key, so it must open the shop even when the popup did not fire — a
       // stockpile player is told about the shop but not interrupted by it.
-      if (this._anythingAffordable()) this._openShop();
+      if (this._anythingAffordable()) this._openShop({ requested: true });
       return;
     }
     if (action === 'confirm') this.retry();

@@ -654,7 +654,10 @@ describe('UI-3: mission toasts emitted at RUN_END finish before RunScene stops t
 describe('F4 fit: the Game Over shop popup pages by slot', () => {
   const slotIds = (g) => g.shopView.menu.items.filter((i) => i.rowKind === 'item').map((i) => i.id);
 
-  test('left/right reach the popup and turn its page; confirm still retries (retry always wins)', () => {
+  // Marvin decision 7 (2026-11-14) overturned "retry always wins" in the open shop: once the player has moved
+  // the cursor, confirm acts on the highlighted row (here the page row, so it turns the page) and Space /
+  // pad RB ('retry') retry. This test used to end with confirm closing the shop and retrying.
+  test('left/right reach the popup and turn its page; then confirm turns it too, and retry still retries', () => {
     const g = gameOverHost();
     g._openShop();
     expect(slotIds(g).every((id) => id.startsWith('trail-'))).toBe(true);
@@ -666,8 +669,40 @@ describe('F4 fit: the Game Over shop popup pages by slot', () => {
     expect(slotIds(g).every((id) => id.startsWith('theme-'))).toBe(true);
     expect(g.shopOpen).toBe(true);
     g._onAction('confirm');
-    expect(g.retry).toHaveBeenCalled();
+    expect(slotIds(g).every((id) => id.startsWith('trail-'))).toBe(true);
+    expect(g.retry).not.toHaveBeenCalled();
+    expect(g.shopOpen).toBe(true);
+    g._onAction('retry');
+    expect(g.retry).toHaveBeenCalledTimes(1);
     expect(g.shopOpen).toBe(false);
+  });
+
+  // Decision 7, end to end through the REAL ShopView: Enter buys the highlighted row with the same rules as
+  // Title -> Profile -> Shop (buy + equip in one save, then confirm on EQUIPPED takes it off).
+  test('in a shop opened with B, Enter buys and equips the highlighted row, and Enter again unequips it', () => {
+    const g = gameOverHost();
+    g._onAction('shop');
+    expect(g.shopOpen).toBe(true);
+    const m = g.shopView.menu;
+    const target = m.items.findIndex((i) => i.rowKind === 'item' && !i.disabled && /^\d+$/.test(String(i.sub)));
+    expect(target).toBeGreaterThan(-1);
+    const id = m.items[target].id;
+    while (g.shopView.menu.selected < target) g._onAction('down');
+    expect(g.shopView.menu.items[g.shopView.menu.selected].id).toBe(id);
+    const bankBefore = g.registry.get(REG.PROFILE).bank;
+    g._onAction('confirm');
+    const after = g.registry.get(REG.PROFILE);
+    expect(after.unlocked.cosmetics).toContain(id);
+    expect(after.bank).toBeLessThan(bankBefore);
+    expect(Object.values(after.equipped || {}).some((v) => v === id || id.endsWith(`-${v}`))).toBe(true);
+    expect(g.retry).not.toHaveBeenCalled();
+    expect(g.shopOpen).toBe(true);
+    // The highlighted row is still that item (paging and focus intact), and confirm on EQUIPPED takes it off.
+    expect(g.shopView.menu.items[g.shopView.menu.selected].id).toBe(id);
+    g._onAction('confirm');
+    const off = g.registry.get(REG.PROFILE);
+    expect(Object.values(off.equipped || {}).some((v) => v === id || id.endsWith(`-${v}`))).toBe(false);
+    expect(off.bank).toBe(after.bank);
   });
 
   test('a click on the page row turns the page and stays inside the popup', () => {

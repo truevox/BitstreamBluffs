@@ -52,6 +52,10 @@ No assets are loaded, so: page load -> first interactive title <= `TIMING.maxBoo
 <= 1.2 s; GameOver retry key -> first RunScene frame <= 0.5 s. Therefore: `RunScene.create()` must be synchronous and
 fast (generate only the first buffer of chunks), GameOverScene must accept retry input **immediately** (not wait for
 IndexedDB/leaderboard queries), and nothing may `await` network. Never rebuild services on retry.
+Retry is one press from every Game Over state: Space / Enter / pad A / pad RB / tap with no panel up; Space / pad RB
+(MenuInput `retry`) from inside the Shard Shop, where an armed shop gives Enter / pad A to the highlighted row
+(decision 7); an unrequested autoprompt shop is unarmed for `SHOP_ARM_MS` (500 ms) so an Enter already on its way
+still retries. See "Addendum: Marvin decisions 7/8/9".
 
 ## 3. Data shapes
 
@@ -296,7 +300,7 @@ All additive; no public signature changed.
    every listener on shutdown.
 5. **GameOverScene** shows the initials entry only when `qualifiesForTop10(score)` is true AND `score > 0` AND `cause !== 'quit'`.
    Initials length is `INITIALS_LENGTH` in `ui/Format.js` (default 3; the widget supports any length, SaveStore allows 3..12).
-   Space/Enter/A/tap retry immediately with `registry REG.SEED` reset to `record.seed`; a pending, unsaved entry is saved
+   Space/Enter/A/RB/tap retry immediately with `registry REG.SEED` reset to `record.seed`; a pending, unsaved entry is saved
    fire-and-forget (prefilled from `settings.lastInitials`, default `AAA`) so a retry never loses a top-10 score.
 6. **Menu input**: UI scenes accept `EVT.INPUT_ACTION` (`up/down/left/right/confirm/cancel/hop/pause`) AND fall back to Phaser
    keyboard + `navigator.getGamepads()`; duplicates from different sources within 60 ms are merged (`ui/MenuInput.js`). While typing
@@ -695,15 +699,17 @@ levels and owned-sets on the shipped catalogue, in both directions: anything the
 actually buyable, and when every purchase is refused the helper says so. Repricing the catalogue therefore
 breaks the tests rather than the popup.
 
-**Frequency.** The popup fires only when this run crossed something; the footer hint `SHOP: B` (pad LB) shows
+**Frequency.** The popup fires only when this run crossed something; the footer hint `SHOP: B / LB` shows
 whenever anything is affordable, popup or not, so a stockpile player is told about the shop without being
 interrupted every round. `B`/`b` is a `MenuInput` action (`shop`) rather than a scene-local key listener, so it
 gets the same debouncing and a gamepad equivalent, and the footer cannot advertise a key that does not exist.
 
-**Retry always wins.** Input is live from the first frame; any action or tap before the timer fires cancels the
-popup; while the shop is open, `confirm` closes it and retries, `cancel` closes it back to Game Over, `alt`
-closes it and starts a new seed, and only cursor/toggle actions reach the shop. The pending timer and the open
-view are both torn down on shutdown, so nothing fires into a scene that is gone.
+**Retry always wins** (superseded in part by Marvin decision 7, 2026-11-14; see the decisions 7/8/9 addendum).
+Input is live from the first frame; any action or tap before the timer fires cancels the popup; while the shop is
+open, `retry` (Space / pad RB) closes it and retries, `confirm` (Enter / pad A) acts on the highlighted row once
+the shop is armed (before that it closes and retries), `cancel` closes it back to Game Over, `alt` closes it and
+starts a new seed. The pending timer, the arm timer and the open view are all torn down on shutdown, so nothing
+fires into a scene that is gone.
 
 **Known gap.** `notes/cc-friday-shop-popup-2.txt` mentions "boosts not yet owned" as part of purchasability.
 Boosts have no price in this economy — they are level rewards toggled in the shop, not bought — so there is
@@ -870,4 +876,21 @@ only. The effective `steerMul` (0 under a parachute, the daily `tuckSteerMul` wh
 factor, so ground lean (`tiltTorqueDegS2 * TUNING.groundTiltMul * steerMul * tiltSign` in `Sled`) is the same
 inside and outside any zone. A zone may dull air control but must never take ground steering away from the
 player. `tests/src/sugar-rush-steering.test.js` pins this against PhysicsTuner's pure output.
+
+**Game Over shop buy (decision 7).** In the Shard Shop over Game Over, Enter / pad A (`confirm`) go to `ShopView`
+once the shop is **armed**: buy + equip, equip, unequip (confirm on EQUIPPED) or turn the page, exactly the Title ->
+Profile -> Shop rules. Retry stays one press: `MenuInput` opt-in `{ retryAction: true }` (GameOverScene only) fires
+`retry` for keyboard Space (before Space's usual `confirm`; InputRouter's keyboard `hop` is how Space is told from
+Enter) and for pad RB (button 5; free in MenuInput and in InputRouter's menu actions; Y is `alt` = new seed and
+Start is `cancel`). `retry` closes the shop and retries from every state, and during initials entry it saves and
+retries like Space. Esc / pad B / B / LB close the shop; N / X / Y start a new seed.
+Arming: a shop opened with B / LB (`_openShop({requested: true})`) is armed at once. The autoprompt (and its resumed
+form after initials entry) opens unarmed, and arms after `SHOP_ARM_MS` = 500 ms or on the first cursor move. The
+popup only appears after 1.2 s with no input, so the press at risk is one started before the panel was seen; choice
+reaction time is about 400-500 ms, so a confirm inside that window was aimed at Game Over and keeps the old
+close-and-retry (pillar 3). The default focus is the page row, so even a later stray Enter only turns the page.
+Hints: while unarmed the footer keeps `SPACE / ENTER / A / TAP = RETRY SAME SEED` (true for Enter then); once armed
+it reads `ENTER / A = BUY   SPACE / RB = RETRY   ESC / B = BACK` (263 px, centred) at depth 501, above the dim (400),
+on the row under the panel (panel y 22..258, footer ink y 261..269). `SHOP: B / LB` is hidden while the shop is open.
+Closing restores the footer text and depth. With the shop closed nothing changed except that pad RB also retries.
 

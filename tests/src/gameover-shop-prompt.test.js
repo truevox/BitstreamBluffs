@@ -154,6 +154,9 @@ describe('(b) does not pop when broke', () => {
   });
 });
 
+// Marvin decision 7 (2026-11-14): these stubs open the shop through the AUTOPROMPT and never arm it, so they
+// now pin the pillar-3 half of the new contract: an unarmed, unrequested shop still hands confirm to retry.
+// The armed half (Enter / pad A buy, Space / pad RB retry) is in gameover-shop-buy.test.js.
 describe('(c) retry wins while the shop is open', () => {
   test('confirm closes the shop and retries immediately', () => {
     const ctx = scene({ profile: rich(), prompt: true });
