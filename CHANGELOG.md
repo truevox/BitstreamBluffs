@@ -41,6 +41,7 @@
 - **LVL-1:** the Game Over awards view measures the level-up from before the run to after mission XP, so a level crossed by mission XP gets the same level-up line, `leveledTo` and `rewardsEarned` entry as one crossed by run XP.
 - **ACH-3 (daily/streak only):** `creditRun` now feeds the achievement evaluator `dailyRuns` and `streak`, so Daily Habit, Three in a Row and Week of Pain can unlock. A run on a `daily-YYYY-MM-DD` seed counts into a new `lifetime.dailyRuns`; `ProgressionService` passes `SaveStore.getDailyStreak(now).streak` in and the best is kept as `lifetime.bestStreak`, which the achievements grid also reads. The biome achievements are unchanged and still wait on the definition of "discovered".
 - **ACH-2:** combo-5/10/20 asked for x5/x10/x20, but the combo multiplier tops out at x2.0. They now ask for x1.25 / x1.5 / x1.75 (Chain Reaction, Unbroken, Wireless Legend; ids and names unchanged, descriptions updated). combo-2 (Doubled Up) keeps x2.0. Both `Achievements.js` and `achievements.json` are updated.
+- **U6c:** the Game Over header comment now names the real keys: Esc and pad B go to the title; keyboard B and pad LB / LT open the shop.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 

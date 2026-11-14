@@ -8,7 +8,8 @@
  *
  * INSTANT RETRY: Space / Enter / gamepad A / tap restarts with the SAME seed immediately - input is live from the very
  * first frame and never waits for animations or for the (async) leaderboard queries. While the initials entry is open:
- * Enter saves, Space saves and retries at once, Esc skips. N / X = new seed, Esc / B = title.
+ * Enter saves, Space saves and retries at once, Esc skips. N / X = new seed. Esc and pad B (both MenuInput
+ * 'cancel') = title. Keyboard B and pad LB / LT (MenuInput 'shop') = Shard Shop, when anything is affordable.
  */
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT, SCORING } from '../constants.js';
