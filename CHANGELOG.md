@@ -27,6 +27,13 @@
   per-biome survival/speed table against the W0 baseline.
 
 ### 🐛 Fixed
+- **The shop autoprompt could promise a shop with nothing to buy.** `canAffordAnything` judged the raw
+  `SHOP_ITEMS` catalogue while the shop panel filters titles out of it. A player who had bought every item
+  the shop sells at their level, and whose bank covered `title-static` (220, a catalogue entry that is only
+  ever equipped from PROFILE), read as "affordable": Game Over showed `SHOP: B`, and a run that crossed 220
+  popped a shop whose every row was already owned. `soldInShop(item)` is now the single predicate for "the
+  panel sells this", read by both `ShopLayout` and the helper; the equivalence tests pin both directions
+  against it instead of against `purchase()`, which accepts that title and therefore hid the gap.
 - Game Over threw `ReferenceError: shareableSeed is not defined` on the first frame of every finished
   run: the W3 COPY fix called the helper but never imported it, and 678 green tests missed it because
   they exercised `shareableSeed()` directly and never ran the scene's build path. Bound the import and

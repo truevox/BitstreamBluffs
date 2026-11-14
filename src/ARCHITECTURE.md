@@ -704,6 +704,17 @@ popup; while the shop is open, `confirm` closes it and retries, `cancel` closes 
 closes it and starts a new seed, and only cursor/toggle actions reach the shop. The pending timer and the open
 view are both torn down on shutdown, so nothing fires into a scene that is gone.
 
+**One predicate decides what the shop sells.** Titles are catalogue entries (`title-rookie`, `title-static`)
+because `shopItem()`/`equip()`/`isOwned()` must resolve them — a level's title reward and a W5 achievement
+title both land in `profile.equipped.title`. They are not drawn by the shop panel, which equips titles from
+PROFILE instead. `soldInShop(item)` in `ProfileStore.js` is now the single answer to "can the panel sell
+this", and both `shopLayout()` and the affordability helper read it. Before that, the helper judged the raw
+catalogue while the panel judged the filtered one: a level-1 player who had bought every item the shop sells
+them and was holding 220+ shards read as "affordable" on `title-static` alone, so Game Over showed `SHOP: B`
+and could pop a shop whose every row was already owned. `tests/src/shop-prompt.test.js` pins the two
+directions against `soldInShop`, and keeps a control proving `purchase()` alone would accept that title —
+which is why `purchase()` cannot be the oracle on its own.
+
 **Known gap.** `notes/cc-friday-shop-popup-2.txt` mentions "boosts not yet owned" as part of purchasability.
 Boosts have no price in this economy — they are level rewards toggled in the shop, not bought — so there is
 nothing for that clause to match. Inventing a price would be a new economy decision, which is Marvin's, not

@@ -363,6 +363,59 @@ async function main() {
       if (early.fatal) fail('shop autoprompt: early-retry probe', early.fatal);
       else if (!early.sceneIsRun) fail('retry before the popup fires restarts at once', 'RunScene not active');
       else pass('retry before the popup fires restarts at once', 'no popup');
+
+      // A fully-bought level-1 player whose bank covers only `title-static` (220). The shop panel never
+      // draws titles, so nothing is buyable: no hint, no popup, and B must be inert. This is the case the
+      // v1 helper got wrong by judging the raw catalogue instead of what the panel sells.
+      {
+        const BOUGHT_OUT = {
+          ...JSON.parse(JSON.stringify(PROFILE)), xp: 0, bank: 250,
+          unlocked: { biomes: [], cosmetics: ['trail-hue-ember', 'sled-glow-warm', 'rider-hue-mint', 'theme-mono'], boosts: {} },
+        };
+        const { page, errors } = await bootWithProfile(browser, port, BOUGHT_OUT);
+        try {
+          const out = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.registry.set('biomeMask', 0);
+            g.scene.start('TitleScene');
+            await wait(900);
+            const title = g.scene.getScene('TitleScene');
+            title.starting = false;
+            title.startRun('bought-out', 0);
+            await wait(1600);
+            const run = g.scene.getScene('RunScene');
+            if (!run) return { fatal: 'RunScene did not start' };
+            run.runTimeMs = 5000;
+            run.shardCount = 150; // 100 -> 250 crosses title-static's 220 and nothing the panel sells
+            run.pendingCrash = { cause: 'chasm' };
+            for (let i = 0; i < 80 && !(g.scene.getScene('GameOverScene') && g.scene.getScene('GameOverScene').scene.isActive()); i += 1) await wait(250);
+            const over = g.scene.getScene('GameOverScene');
+            if (!over) return { fatal: 'GameOverScene never became active' };
+            await wait(1900);
+            if (over.entry) { over.skipEntry(); await wait(1500); }
+            const texts = [];
+            const seen = new Set();
+            const walk = (l) => { for (const o of l || []) { if (!o) continue; if (typeof o.text === 'string' && o.text && !seen.has(o.text)) { seen.add(o.text); texts.push(o.text); } if (o.list) walk(o.list); } };
+            walk(over.children && over.children.list);
+            if (over.shopView && over.shopView.panel) walk(over.shopView.panel.list);
+            over._onAction('shop'); // B must be inert: nothing is buyable
+            await wait(500);
+            return {
+              bank: (g.registry.get('profile') || {}).bank,
+              flag: Boolean((g.registry.get('lastAwards') || {}).shopAutoprompt),
+              hint: texts.some((t) => /SHOP:\s*B/i.test(t)),
+              openedOnB: Boolean(over.shopOpen),
+            };
+          }).catch((e) => ({ fatal: String(e) }));
+          if (out.fatal) fail('shop autoprompt: bought-out probe', out.fatal);
+          else if (out.flag) fail('a bought-out player is not told the shop is worth opening', `flag=true, bank ${out.bank}`);
+          else if (out.hint) fail('a bought-out player sees no shop hint', `hint shown, bank ${out.bank}`);
+          else if (out.openedOnB) fail('B is inert when nothing is buyable', 'shop opened with nothing purchasable');
+          else if (errors.length) fail('bought-out Game Over is error-free', errors.join(' | '));
+          else pass('bought-out: no hint, no popup, B inert (only a title was covered)', `bank=${out.bank}`);
+        } finally { await page.close(); }
+      }
     }
 
     // ---- 1. mask 0: the screen that crashed must build, cleanly

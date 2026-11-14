@@ -23,7 +23,7 @@
  * against the real `purchase()` across a grid of banks, levels and owned-sets on the SHIPPED catalogue.
  * If the shop's refusals ever change order or meaning, that test fails.
  */
-import { SHOP_ITEMS } from './ProfileStore.js';
+import { SHOP_ITEMS, soldInShop } from './ProfileStore.js';
 
 /** @param {*} n @returns {number} */
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
@@ -45,14 +45,20 @@ function ownedHere(state, item) {
 
 /**
  * Is `item` buyable from this state? Mirrors `purchase()`'s refusals in its order — unknown/absent item,
- * already owned, level too low, not enough shards — plus `price > 0`, because a price-0 item is a level
- * reward and is never something to buy.
+ * already owned, level too low, not enough shards — plus two clauses `purchase()` does not have because
+ * its callers can only reach it from a drawn row: `soldInShop(item)` (a title is resolvable but never
+ * sold) and `price > 0` (a price-0 item is a level reward and is never something to buy).
+ *
+ * The `soldInShop` clause is what keeps this helper and the panel answering the same question. Without
+ * it, a player who owned every level-1 item and was saving for nothing in particular read as
+ * "affordable" on `title-static` alone, which the shop cannot sell them.
  * @param {{bank:number, level:number, owned:Array<string>}} state
  * @param {Object} item
  * @returns {boolean}
  */
 function buyableHere(state, item) {
   if (!item || !item.id) return false;
+  if (!soldInShop(item)) return false;
   const price = num(item.price);
   if (price <= 0) return false;
   if (ownedHere(state, item)) return false;

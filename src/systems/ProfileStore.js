@@ -578,6 +578,25 @@ export function shopItem(id) {
 }
 
 /**
+ * Is this catalogue entry something the SHOP PANEL actually sells?
+ *
+ * Titles are catalogue entries so `shopItem()`/`equip()`/`isOwned()` can resolve them — a level's
+ * `title` reward and a W5 achievement title both end up in `profile.equipped.title`, so they must be
+ * resolvable by id. They are NOT sold in the shop: `ShopLayout` does not draw them (they are equipped
+ * from PROFILE), so `purchase()` on a title is unreachable from the UI.
+ *
+ * Anything asking "can the player buy something right now" must use this predicate rather than the raw
+ * catalogue, or it answers about a shop that does not exist. Luna W4.1: `title-static` (220 shards) made
+ * `canAffordAnything` return true over a panel with nothing buyable, so Game Over promised a shop —
+ * and could pop it — where every row was already owned.
+ *
+ * @param {Object} item @returns {boolean}
+ */
+export function soldInShop(item) {
+  return Boolean(item && item.id && item.slot !== 'title');
+}
+
+/**
  * Whether the profile owns an item. Level-reward items (price 0) are owned once the player reaches their
  * unlockLevel, which is how W1's level rewards already work; paid items are owned by purchase.
  * @param {Object} profile @param {string} id @returns {boolean}

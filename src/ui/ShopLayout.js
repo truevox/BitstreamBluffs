@@ -17,7 +17,7 @@
  * list, so rebuilding after a purchase redraws all of it.
  */
 import { measureText } from './PixelFont.js';
-import { SHOP_ITEMS, isOwned } from '../systems/ProfileStore.js';
+import { SHOP_ITEMS, isOwned, soldInShop } from '../systems/ProfileStore.js';
 
 /** Shop panel: wide enough for "NAME .......... 120" with the price right-aligned. */
 export const SHOP_PANEL = Object.freeze({ w: 416, h: 236 });
@@ -69,7 +69,7 @@ export function shopLayout(o = {}) {
 
   // Catalogue: grouped by slot, cheapest first inside a group, so like is compared with like.
   const sorted = [...SHOP_ITEMS]
-    .filter((i) => i && i.slot !== 'title') // titles are equipped in PROFILE, not sold again here
+    .filter((i) => soldInShop(i)) // single predicate, shared with the affordability helper: see soldInShop()
     .sort((a, b) => (a.slot === b.slot ? a.price - b.price : String(a.slot).localeCompare(String(b.slot))));
 
   let lastSlot = null;

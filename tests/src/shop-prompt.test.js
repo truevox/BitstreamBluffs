@@ -10,7 +10,7 @@
  * would have made the tests pass while the popup disagreed with the real shop, because `isOwned`/`purchase`
  * resolve items from the module-level SHOP_ITEMS and cannot be pointed elsewhere.
  */
-import { SHOP_ITEMS, purchase } from '../../src/systems/ProfileStore.js';
+import { SHOP_ITEMS, purchase, soldInShop } from '../../src/systems/ProfileStore.js';
 import { levelForXp, loadLevelTable } from '../../src/systems/Progression.js';
 import { canAffordAnything, newlyAffordable, stateBeforeRun } from '../../src/systems/ShopPrompt.js';
 
@@ -77,33 +77,57 @@ describe('canAffordAnything', () => {
 });
 
 describe('equivalence with the real shop', () => {
-  test('anything this says is affordable, purchase() actually buys', () => {
+  // The oracle is "what the SHOP PANEL can sell", not "what purchase() accepts over the whole catalogue".
+  // Those differ for exactly one shipped item (`title-static`): purchase() takes it, the panel never draws
+  // it. Using purchase() alone as the oracle is what let a v1 helper claim a shop was worth opening over a
+  // panel where every row was already owned.
+  const sells = (bank, level, owned) => SHOP_ITEMS
+    .filter(soldInShop)
+    .filter((i) => i.price > 0 && !owned.includes(i.id) && (i.unlockLevel || 1) <= level && bank >= i.price)
+    .map((i) => i.id);
+
+  test('anything this says is affordable, the panel can actually sell', () => {
     // The popup must never open a panel where every row is refused. Exhaustive over a bank/level/owned grid.
     const ids = SHOP_ITEMS.map((i) => i.id);
     for (const bank of [0, 45, 89, 90, 100, 120, 150, 199, 200, 250, 300, 999]) {
       for (const level of [1, 2, 3, 4, 5, 6, 8, 9]) {
         for (const owned of [[], [CHEAP], [CHEAP, MID], ids.filter((id) => id !== LEVEL5)]) {
           if (!canAffordAnything(st(bank, level, owned))) continue;
-          const prof = profileAt(bank, level, owned);
-          const bought = ids.some((id) => purchase(prof, id) !== prof);
-          expect(bought).toBe(true);
+          expect(sells(bank, level, owned).length).toBeGreaterThan(0);
         }
       }
     }
   });
 
-  test('and the converse: when every purchase() is refused, it says nothing is affordable', () => {
+  test('and the converse: when the panel has nothing to sell, it says nothing is affordable', () => {
     const ids = SHOP_ITEMS.map((i) => i.id);
     for (const bank of [0, 89, 90, 200, 999]) {
       for (const level of [1, 4, 5, 9]) {
         for (const owned of [[], ids.filter((id) => id !== LEVEL5), ids]) {
-          const prof = profileAt(bank, level, owned);
-          const bought = ids.some((id) => purchase(prof, id) !== prof);
-          if (bought) continue;
+          if (sells(bank, level, owned).length) continue;
           expect(canAffordAnything(st(bank, level, owned))).toBe(false);
         }
       }
     }
+  });
+
+  test('a fully-owned panel that still owes a title is NOT affordable', () => {
+    // The exact endgame state that used to lie: a level-1 player has bought everything the shop sells them,
+    // and `title-static` (220) is the only catalogue entry their bank still covers. The shop cannot sell it,
+    // so nothing is affordable.
+    const sellableAt1 = SHOP_ITEMS.filter(soldInShop).filter((i) => i.price > 0 && (i.unlockLevel || 1) <= 1).map((i) => i.id);
+    expect(canAffordAnything(st(250, 1, sellableAt1))).toBe(false);
+    expect(canAffordAnything(st(9999, 1, sellableAt1))).toBe(false);
+    expect(sells(250, 1, sellableAt1)).toEqual([]);
+    // Control: those very shards DO buy the title if anyone called purchase() directly, which is why the
+    // oracle above cannot be purchase() alone.
+    expect(purchase(profileAt(250, 1, sellableAt1), 'title-static').bank).toBe(30);
+  });
+
+  test('a run that only crosses a title price does not pop the shop', () => {
+    const sellableAt1 = SHOP_ITEMS.filter(soldInShop).filter((i) => i.price > 0 && (i.unlockLevel || 1) <= 1).map((i) => i.id);
+    // 100 -> 250 crosses title-static's 220 and nothing the panel sells.
+    expect(newlyAffordable(st(100, 1, sellableAt1), st(250, 1, sellableAt1))).toBe(false);
   });
 });
 
