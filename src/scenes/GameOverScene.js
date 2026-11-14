@@ -136,6 +136,10 @@ export class GameOverScene extends Phaser.Scene {
         try { this.shopView.destroy(); } catch (e) { /* already torn down */ }
         this.shopView = null;
       }
+      if (this.shopDim) {
+        try { this.shopDim.destroy(); } catch (e) { /* already torn down */ }
+        this.shopDim = null;
+      }
       this.shopOpen = false;
       this.shopHint = null;
       if (this.unbindBar) { this.unbindBar(); this.unbindBar = null; }
@@ -719,6 +723,7 @@ export class GameOverScene extends Phaser.Scene {
     this.shopOpen = false;
     this.shopTimer = null;
     this.shopView = null;
+    this.shopDim = null;
     this.shopHint = null;
     // Read the profile fresh: the registry value was set when this run was credited, so its bank already
     // includes this run's shards.
@@ -794,6 +799,10 @@ export class GameOverScene extends Phaser.Scene {
     this.shopOpen = true;
     // While the shop is up, the footer's retry promise is still true (RETRY closes and retries), so it is
     // left alone rather than being replaced with something the player has to re-learn on the way back.
+    // An interactive full-screen dim under the panel (depth 400 < the panel's 500), as Title and Pause do:
+    // without it a click on empty panel space fell through to RETRY / NEW SEED / TITLE (audit U4b). It is
+    // inert on purpose; Esc / pad B / the shop's BACK close the shop.
+    this.shopDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
     this.shopView = new ShopView(this, this.theme, { onClose: () => this._closeShop() });
   }
 
@@ -805,6 +814,11 @@ export class GameOverScene extends Phaser.Scene {
     if (this.shopView) {
       try { this.shopView.destroy(); } catch (e) { /* a failed teardown must not wedge the screen */ }
       this.shopView = null;
+    }
+    // Inline rather than a helper: the shop-prompt tests drive _closeShop on a hand-built context.
+    if (this.shopDim) {
+      try { this.shopDim.destroy(); } catch (e) { /* already torn down */ }
+      this.shopDim = null;
     }
     this.shopOpen = false;
     // Re-measure: a purchase changes the bank, so the hint may now be wrong (nothing affordable left) or

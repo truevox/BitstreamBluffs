@@ -395,3 +395,65 @@ describe('UI-A: the SHOP hint is not shown while initials entry is active', () =
     expect(g.shopView).toBe(null);
   });
 });
+
+// ================================================================== U4b: the Game Over shop swallows stray clicks
+
+describe('U4b: clicks inside the open Game Over shop never reach the buttons underneath', () => {
+  test('a click on empty shop-panel space never reaches RETRY / NEW SEED / TITLE (emulated topOnly hit test)', () => {
+    const g = gameOverHost();
+    g._openShop();
+    const panel = g.shopView.panel;
+    const pr = { x: panel.x, y: panel.y, w: panel.w, h: panel.h };
+    const leaks = [];
+    for (const b of g.buttons) {
+      for (let x = b.x + 2; x < b.x + b.w - 2; x += 8) {
+        for (let y = b.y + 2; y < b.y + b.h - 2; y += 4) {
+          if (x < pr.x || x >= pr.x + pr.w || y < pr.y || y >= pr.y + pr.h) continue; // outside the panel
+          const hit = topHit(g, x, y);
+          if (hit && hit === b.zone) leaks.push(`${b.label.main.text}@${x},${y}`);
+        }
+      }
+    }
+    expect(leaks).toEqual([]);
+  });
+
+  test('a click anywhere outside the panel does not reach the buttons either', () => {
+    const g = gameOverHost();
+    g._openShop();
+    for (const b of g.buttons) {
+      const hit = topHit(g, b.x + Math.round(b.w / 2), b.y + Math.round(b.h / 2));
+      expect(hit === b.zone).toBe(false);
+    }
+  });
+
+  test('the shop rows still take clicks: the dim is under the panel', () => {
+    const g = gameOverHost();
+    g._openShop();
+    const zones = [];
+    const walk = (o) => { if (o.input && o.input.enabled && o !== g.shopDim) zones.push(o); (o.list || []).forEach(walk); };
+    walk(g.shopView.panel);
+    expect(zones.length).toBeGreaterThan(0);
+    const z = zones[0];
+    const r = worldRect(z);
+    expect(topHit(g, r.x + 1, r.y + 1) === z).toBe(true);
+  });
+
+  test('ESC closes the shop and removes the dim, so the buttons take clicks again', () => {
+    const g = gameOverHost();
+    g._openShop();
+    g._onAction('cancel');
+    expect(g.shopOpen).toBe(false);
+    expect(g.toTitle).not.toHaveBeenCalled();
+    const b = g.buttons[0];
+    expect(topHit(g, b.x + Math.round(b.w / 2), b.y + Math.round(b.h / 2)) === b.zone).toBe(true);
+    expect(g.shopDim).toBe(null);
+  });
+
+  test('RETRY still wins from inside the open shop', () => {
+    const g = gameOverHost();
+    g._openShop();
+    g._onAction('confirm');
+    expect(g.retry).toHaveBeenCalledTimes(1);
+    expect(g.shopOpen).toBe(false);
+  });
+});
