@@ -21,6 +21,10 @@ const KEY_MAP = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
   w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right',
   Enter: 'confirm', ' ': 'confirm', Escape: 'cancel', n: 'alt', N: 'alt',
+  // W4.1: open the Shard Shop. Added here rather than as a scene-local key listener so every menu gets
+  // the same debouncing and the same gamepad equivalent (LB), and so the Game Over footer hint can
+  // promise a key that actually exists.
+  b: 'shop', B: 'shop',
 };
 const DIRS = new Set(['up', 'down', 'left', 'right']);
 const ROUTER_MAP = {
@@ -145,6 +149,9 @@ export class MenuInput {
     if (edge(0)) this._fire('confirm', 'gamepad');
     if (edge(1) || edge(9)) this._fire('cancel', 'gamepad');
     if (edge(2) || edge(3)) this._fire('alt', 'gamepad');
+    // W4.1: LB / LT opens the shop, mirroring the keyboard's B so a pad player is not locked out of the
+    // footer hint the keyboard player can use.
+    if (edge(4) || edge(6)) this._fire('shop', 'gamepad');
     const dirs = {
       up: cur.btn[12] || cur.ay < -0.6,
       down: cur.btn[13] || cur.ay > 0.6,
