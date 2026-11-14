@@ -54,8 +54,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 25;
-const EXPECTED_WITHOUT_BOOSTS = 14;
+const EXPECTED_WITH_BOOSTS = 30;
+const EXPECTED_WITHOUT_BOOSTS = 19;
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -1548,6 +1548,204 @@ async function main() {
       else if (!(c.out.dvy < -100)) fail('W6: a geyser throws the sled upward with real force', `dvy=${c.out.dvy} px/s (need a real upward kick, not a rounding error)`);
       else if (!(c.out.dvySecond > -1)) fail('W6: the vent does not re-fire while on cooldown', `second dvy=${c.out.dvySecond}`);
       else pass('W6: a geyser vent launches the real sled, once per cooldown', `dvy=${c.out.dvy.toFixed(1)} of ${c.out.launchVelocity} px/s, then ${c.out.dvySecond.toFixed(1)}`);
+    }
+
+    // ---- B0 (biome full treatment): every new effect acts on the REAL run. Fixture defs are injected into the registry
+    // content at runtime (B0 ships no biome content), then the pickup / hit goes through the shipped RunScene.onPowerUp /
+    // onHazard dispatch, and the effect is read back from what the live frame loop produced (run.update -> physicsContext
+    // -> PhysicsTuner -> run.currentPhys), from the real sled body, or from the real overlay. Deleting a dispatch branch in
+    // RunScene fails the matching line below (negative controls in the B0 report). The scene is paused so Phaser's own loop
+    // cannot interleave; frames are driven with run.update(t, 16).
+    {
+      const c = await (async () => {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        try {
+          const out = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.registry.set('biomeMask', 0);
+            g.scene.start('TitleScene');
+            const t0 = Date.now();
+            let run = null;
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              if (!started && tt && !tt.starting) { started = true; tt.startRun('b0-effects-probe', 0); }
+              const rr = g.scene.getScene('RunScene');
+              if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'RunScene never produced a live sled' };
+            await wait(300);
+            if (run.sled.destroyed || !run.sled.inWorld || run.crashed) return { fatal: 'sled died before the probe' };
+            run.scene.pause();
+            const res = {};
+            const content = run.content;
+            const PX = (v) => (v * 1000) / (1000 / 60);
+            const vel = () => ({ x: PX(run.sled.body.velocity.x), y: PX(run.sled.body.velocity.y) });
+            let clock = run.runTimeMs;
+            const step = (n) => { for (let i = 0; i < n; i++) { clock += 16; run.update(clock, 16); } };
+            const keepAlive = () => { run.sled.invulnerableMs = 1e9; run.pendingCrash = null; };
+            // Fixtures: B1-B4 ship the real defs. Injected into the SAME content object the scenes read.
+            const FX = {
+              ward: { id: 'gateFxWard', biome: 'garbage-dump-glacier', shapeKey: 'gateFx', radius: 10, colorKey: 'cyan',
+                effect: { kind: 'ward', durationMs: 4000, mods: ['stickyPatch'], hazards: [], effects: [] }, spawn: { baseChance: 0.5 } },
+              glide: { id: 'gateFxGlide', biome: 'pyramid-peak', shapeKey: 'gateFx', radius: 10, colorKey: 'lime',
+                effect: { kind: 'glide', frictionMul: 0.7, durationMs: 4000 }, spawn: { baseChance: 0.5 } },
+              stabilize: { id: 'gateFxStab', biome: 'space-mountain', shapeKey: 'gateFx', radius: 10, colorKey: 'amber',
+                effect: { kind: 'stabilize', landingToleranceDeg: 12, durationMs: 5000 }, spawn: { baseChance: 0.5 } },
+              gust: { id: 'gateFxGust', biome: 'sky-jellyfish-mountain', shapeKey: 'gateFx', size: { w: 30, h: 30 }, placement: 'air',
+                colorKey: 'cyan', onHit: { effect: 'gust', impulsePxS: [400, -300] }, weight: 1, minDistanceM: 0, spawn: { baseChance: 0.5 } },
+              blind: { id: 'gateFxBlind', biome: 'crystal-cavern', shapeKey: 'gateFx', size: { w: 30, h: 30 }, placement: 'ground',
+                colorKey: 'amber', onHit: { effect: 'blind', durationMs: 1200, visibility: 0.1 }, weight: 1, minDistanceM: 0, spawn: { baseChance: 0.5 } },
+            };
+            for (const k of ['ward', 'glide', 'stabilize']) content.powerups[FX[k].id] = FX[k];
+            for (const k of ['gust', 'blind']) content.hazards[FX[k].id] = FX[k];
+            const pickup = (def) => ({ def, spawn: { x: run.sled.x, y: run.sled.y }, color: 0xffffff, key: null, destroy() {} });
+            const hit = (def) => ({ def, cx: run.sled.x, cy: run.sled.y, color: 0xffffff, gfx: null, hit: false });
+            const zonesAt = (x) => run.terrain._chunkAt(x).zones;
+
+            // ward vs stickyPatch: the effective groundResist the frame loop produces is the un-sticky value while it lasts
+            try {
+              keepAlive();
+              run._resetBiomeEffects();
+              step(2);
+              const base = run.currentPhys.groundResist;
+              const x = run.sled.x;
+              const touched = [...new Set([zonesAt(x), zonesAt(x + 400)])]; // one zone per chunk: never the same list twice
+              const lens = touched.map((z) => z.length);
+              for (const z of touched) z.push({ modId: 'stickyPatch', x0: x - 3000, x1: x + 3000 });
+              step(2);
+              const sticky = run.currentPhys.groundResist;
+              run.onPowerUp(pickup(FX.ward));
+              step(2);
+              const warded = run.currentPhys.groundResist;
+              run.tickEffects(4100);
+              step(1);
+              const after = run.currentPhys.groundResist;
+              touched.forEach((z, i) => { z.length = lens[i]; });
+              res.ward = { base, sticky, warded, after };
+            } catch (e) { res.ward = { fatal: String(e) }; }
+
+            // glide: lower ground friction in the frame loop, and the real sled body keeps more speed on the ground
+            try {
+              keepAlive();
+              run._resetBiomeEffects();
+              step(2);
+              const base = run.currentPhys.groundResist;
+              const basePhys = run.currentPhys;
+              run.onPowerUp(pickup(FX.glide));
+              step(2);
+              const glided = run.currentPhys.groundResist;
+              const glidePhys = run.currentPhys;
+              const emptyPad = { push: false, brake: false, tuck: false, tilt: 0, hop: false, heli: 0, pressed: {}, airBrake: false, parachute: false };
+              const keep = (phys) => {
+                const v0 = vel();
+                for (let i = 0; i < 10; i++) { run.sled.msSinceContact = 0; run.sled.applyControls(emptyPad, phys, 16); }
+                const v1 = vel();
+                return Math.hypot(v1.x, v1.y) / Math.max(1, Math.hypot(v0.x, v0.y));
+              };
+              const keepGlide = keep(glidePhys);
+              const keepBase = keep(basePhys);
+              res.glide = { base, glided, keepGlide, keepBase };
+            } catch (e) { res.glide = { fatal: String(e) }; }
+
+            // gust: the real sled body's velocity changes by the bounded impulse
+            try {
+              run._resetBiomeEffects();
+              run.sled.invulnerableMs = 0;
+              run.pendingCrash = null;
+              const v0 = vel();
+              run.onHazard(hit(FX.gust));
+              const v1 = vel();
+              res.gust = { dvx: v1.x - v0.x, dvy: v1.y - v0.y, crashed: !!run.pendingCrash };
+              keepAlive();
+            } catch (e) { res.gust = { fatal: String(e) }; }
+
+            // blind: the overlay comes up within the visibility floor, the run keeps going, and it clears afterwards
+            try {
+              run._resetBiomeEffects();
+              run.sled.invulnerableMs = 0;
+              run.pendingCrash = null;
+              run.onHazard(hit(FX.blind));
+              const crashedByHit = !!run.pendingCrash;
+              keepAlive();
+              step(12);
+              const mid = run.blindRect ? run.blindRect.alpha : null;
+              const visible = run.blindRect ? run.blindRect.visible : null;
+              step(80);
+              const end = run.blindRect ? run.blindRect.alpha : null;
+              res.blind = { crashedByHit, mid, end, visible, crashed: run.crashed, inWorld: run.sled.inWorld };
+            } catch (e) { res.blind = { fatal: String(e) }; }
+
+            // stabilize: a landing just past the forgiveness angle crashes without it and is a wobble with it
+            try {
+              run._resetBiomeEffects();
+              keepAlive();
+              const fs = { x: run.sled.x, y: run.sled.y, vx: run.sled.vx, vy: run.sled.vy };
+              const land = () => ({ quality: 'crash', angleDeg: 86, impactSpeedPxS: 400, airtimeMs: 600, hard: false });
+              run.pendingCrash = null;
+              run.handleTricksAndLanding({ tricks: [], landing: land() }, fs);
+              const without = run.pendingCrash ? run.pendingCrash.cause : null;
+              run.pendingCrash = null;
+              run.onPowerUp(pickup(FX.stabilize));
+              run.handleTricksAndLanding({ tricks: [], landing: land() }, fs);
+              const withStab = run.pendingCrash ? run.pendingCrash.cause : null;
+              run.pendingCrash = null;
+              res.stabilize = { without, withStab };
+            } catch (e) { res.stabilize = { fatal: String(e) }; }
+
+            run._resetBiomeEffects();
+            return res;
+          }).catch((e) => ({ fatal: String(e) }));
+          return { errors, out };
+        } finally { await page.close(); }
+      })();
+      const o = c.out;
+      const near = (a, b, eps) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= eps;
+      const name = {
+        ward: 'B0: a ward vs stickyPatch makes the real effective groundResist un-sticky while it lasts',
+        glide: 'B0: a glide lowers ground friction on the real sled',
+        gust: 'B0: a gust changes the real sled velocity by the bounded impulse',
+        blind: 'B0: blind dims the screen (>= 35 % visibility) without crashing',
+        stabilize: 'B0: stabilize widens landing tolerance in the real landing path',
+      };
+      if (o.fatal || c.errors.length) {
+        for (const k of Object.keys(name)) fail(name[k], o.fatal || `page errors: ${c.errors.join(' | ')}`);
+      } else {
+        const w = o.ward;
+        if (w.fatal) fail(name.ward, w.fatal);
+        else if (!(w.sticky > w.base * 1.2)) fail(name.ward, `the injected stickyPatch did not reach the frame (base ${w.base}, sticky ${w.sticky})`);
+        else if (!near(w.warded, w.base, 1e-9)) fail(name.ward, `warded groundResist ${w.warded} != un-sticky ${w.base} (sticky ${w.sticky})`);
+        else if (!near(w.after, w.sticky, 1e-9)) fail(name.ward, `sticky did not come back after the ward expired (${w.after} vs ${w.sticky})`);
+        else pass(name.ward, `groundResist sticky ${w.sticky.toFixed(4)} -> warded ${w.warded.toFixed(4)} (= base ${w.base.toFixed(4)}) -> expired ${w.after.toFixed(4)}`);
+
+        const gl = o.glide;
+        if (gl.fatal) fail(name.glide, gl.fatal);
+        else if (!near(gl.glided, gl.base * 0.7, 1e-9)) fail(name.glide, `groundResist ${gl.glided} != 0.7 x ${gl.base}`);
+        else if (!(gl.keepGlide > gl.keepBase)) fail(name.glide, `sled kept ${gl.keepGlide} of its speed gliding vs ${gl.keepBase} without`);
+        else pass(name.glide, `groundResist ${gl.base.toFixed(4)} -> ${gl.glided.toFixed(4)}; sled keeps ${(gl.keepGlide * 100).toFixed(2)} % vs ${(gl.keepBase * 100).toFixed(2)} % over 10 grounded steps`);
+
+        const gu = o.gust;
+        const mag = gu.fatal ? NaN : Math.hypot(gu.dvx, gu.dvy);
+        if (gu.fatal) fail(name.gust, gu.fatal);
+        else if (gu.crashed) fail(name.gust, 'a gust hit queued a crash');
+        else if (!near(mag, 180, 0.5) || !(gu.dvx > 0) || !(gu.dvy < 0)) fail(name.gust, `dv=(${gu.dvx}, ${gu.dvy}) |dv|=${mag} (want 180 px/s along (400,-300))`);
+        else pass(name.gust, `dv=(${gu.dvx.toFixed(1)}, ${gu.dvy.toFixed(1)}) px/s, |dv| ${mag.toFixed(2)} of a requested 500`);
+
+        const b = o.blind;
+        if (b.fatal) fail(name.blind, b.fatal);
+        else if (b.crashedByHit || b.crashed || !b.inWorld) fail(name.blind, `blind crashed the run (hit ${b.crashedByHit}, crashed ${b.crashed}, inWorld ${b.inWorld})`);
+        else if (!(b.mid > 0.3) || !(b.mid <= 0.65 + 1e-9)) fail(name.blind, `overlay alpha mid-effect ${b.mid} (want (0.3, 0.65])`);
+        else if (b.end !== 0) fail(name.blind, `overlay did not clear: alpha ${b.end}`);
+        else pass(name.blind, `overlay alpha ${b.mid.toFixed(3)} mid-effect (visibility floor 0.35 -> max 0.65), 0 after; no crash`);
+
+        const st = o.stabilize;
+        if (st.fatal) fail(name.stabilize, st.fatal);
+        else if (st.without !== 'badLanding') fail(name.stabilize, `control: an 86 deg landing should crash without stabilize, got ${st.without}`);
+        else if (st.withStab !== null) fail(name.stabilize, `with stabilize the 86 deg landing still crashed (${st.withStab})`);
+        else pass(name.stabilize, 'an 86 deg landing: crash without, wobble with a +12 deg stabilize');
+      }
     }
 
   } finally {
