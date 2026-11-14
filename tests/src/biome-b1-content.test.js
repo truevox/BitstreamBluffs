@@ -7,7 +7,7 @@ import { readDir, loadContent, makeGen } from './_helpers.js';
 import { PALETTE_KEYS } from '../../src/constants.js';
 import { emptyWards, addWard, isWarded, tickWards, wardSpeedFactor, wardSpeedMul, WARD_MIN_MS, WARD_MAX_MS, WARD_MAX_SPEED_FACTOR } from '../../src/systems/Wards.js';
 import { hazardDrawKind, powerupDrawKind, hazardColorKey } from '../../src/systems/BiomeEffects.js';
-import { BIOME_SPAWN_MAX_CHANCE } from '../../src/systems/TerrainGenerator.js';
+import { BIOME_SPAWN_MAX_CHANCE, BIOME_HAZARD_MAX_CHANCE } from '../../src/systems/TerrainGenerator.js';
 
 const c = loadContent();
 const biomeHaz = readDir('hazards').filter((d) => d.biome);
@@ -48,7 +48,7 @@ describe('B1 content: loader and schema', () => {
       expect(['ground', 'air']).toContain(h.placement);
       expect(PALETTE_KEYS).toContain(h.colorKey);
       expect(h.spawn.baseChance).toBeGreaterThan(0);
-      expect(h.spawn.baseChance).toBeLessThanOrEqual(BIOME_SPAWN_MAX_CHANCE);
+      expect(h.spawn.baseChance).toBeLessThanOrEqual(BIOME_HAZARD_MAX_CHANCE); // B1 presence amendment (c): 0.75 for hazards
     }
     for (const p of biomePu) {
       expect(c.biomes[p.biome]).toBeDefined();

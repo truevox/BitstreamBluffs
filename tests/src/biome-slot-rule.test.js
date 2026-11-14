@@ -14,7 +14,7 @@
 import crypto from 'crypto';
 import { makeGen, loadContent, readDir } from './_helpers.js';
 import { FX_GROUND_HAZARD, FX_AIR_HAZARD, FX_WARD_POWERUP, FX_STABILIZE_POWERUP, FX_MASK } from './_biomeFixtures.js';
-import { BIOME_SLOT_DRAWS, BIOME_REPLACE_SLACK_PX, SPACING_PX } from '../../src/systems/TerrainGenerator.js';
+import { BIOME_SLOT_DRAWS, BIOME_REPLACE_SLACK_PX, SPACING_PX, BIOME_EDGE_MARGIN_PX } from '../../src/systems/TerrainGenerator.js';
 
 const content = loadContent();
 /** Shipped content WITHOUT any biome-tagged def (the engine under test, not the B1 tuning). */
@@ -79,7 +79,7 @@ describe('slot rule: replacing one base ground hazard', () => {
         expect(content.hazards[was.defId].biome).toBeUndefined();
       }
     }
-    expect(replaced).toBeGreaterThan(40);
+    expect(replaced).toBeGreaterThan(20); // fewer since amendment (a) frees more slots: 28 measured
   });
 
   test('every other hazard, power-up, shard, zone and point of the chunk is unchanged; at most one base hazard per chunk is replaced', () => {
@@ -134,21 +134,28 @@ describe('slot rule: replacing one base ground hazard', () => {
     expect(free).toBeGreaterThanOrEqual(1);
   });
 
-  test('a replaced `slow` biome hazard still sits before a descent (the base fairness rule holds on swapped slots)', () => {
-    const slow = { ...clone(FX_GROUND_HAZARD), id: 'fxGroundHazard', onHit: { effect: 'slow', durationMs: 900, speedFactor: 0.7 } };
-    let n = 0;
-    for (const seed of SEEDS) {
-      const g = gen(seed, [slow, FX_AIR_HAZARD]);
-      for (let i = 0; i < N; i++) {
-        const c = g.getChunk(i);
-        const h = c.hazards.find(isFx);
-        if (!h) continue;
-        n++;
-        const k = Math.max(0, Math.min(c.points.length - 2, Math.floor((h.x - c.startX) / SPACING_PX)));
-        expect(g._descentAhead(c.points, k, c.endX)).toBe(true);
+  test('a `slow` biome hazard keeps its fairness rule on swapped and free slots: descent ahead below 0.6, no climb ahead from 0.6', () => {
+    // B1 presence amendment (b): speedFactor < 0.6 needs a descent ahead; a gentler slow needs no climbing segment ahead.
+    for (const [k0, needDescent] of [[0.5, true], [0.7, false]]) {
+      const slow = { ...clone(FX_GROUND_HAZARD), id: 'fxGroundHazard', onHit: { effect: 'slow', durationMs: 900, speedFactor: k0 } };
+      let n = 0;
+      for (const seed of SEEDS) {
+        const g = gen(seed, [slow, FX_AIR_HAZARD]);
+        for (let i = 0; i < N; i++) {
+          const c = g.getChunk(i);
+          const h = c.hazards.find(isFx);
+          if (!h) continue;
+          n++;
+          const k = Math.max(0, Math.min(c.points.length - 2, Math.floor((h.x - c.startX) / SPACING_PX)));
+          if (needDescent) expect(g._descentAhead(c.points, k, c.endX)).toBe(true);
+          else {
+            const k1 = Math.min(c.points.length - 2, k + Math.ceil(BIOME_EDGE_MARGIN_PX / SPACING_PX));
+            for (let j = k; j <= k1; j++) expect(c.points[j + 1].y).toBeGreaterThanOrEqual(c.points[j].y);
+          }
+        }
       }
+      expect(n).toBeGreaterThan(10);
     }
-    expect(n).toBeGreaterThan(10);
   });
 
   test('share: with chance 0.5 the biome hazard sits in 40-60 % of GROUND-ELIGIBLE biome chunks (not bridge, not gen-jump)', () => {
@@ -167,23 +174,39 @@ describe('slot rule: replacing one base ground hazard', () => {
     expect(has / eligible).toBeLessThanOrEqual(0.6);
   });
 
-  test('the pick among candidates comes from the slot\'s draw, not always the first candidate', () => {
-    // A replaced hazard that has an EARLIER base hazard in its chunk which the fixture would also fit: with the draw, this
-    // happens often; a "first candidate" pick would only allow it when every earlier fitting one failed a ground rule.
-    let later = 0;
-    let replaced = 0;
-    for (const { fx, base } of runs) {
-      for (let i = 0; i < N; i++) {
-        const h = fx[i].hazards.find(isFx);
-        const k = h ? base[i].hazards.findIndex((q) => q.x === h.x) : -1;
-        if (k < 0) continue;
-        replaced++;
-        const fits = (q) => { const d = content.hazards[q.defId]; return d.placement !== 'air' && FX_GROUND_HAZARD.size.w <= d.size.w + 8 && FX_GROUND_HAZARD.size.h <= d.size.h + 8; };
-        if (base[i].hazards.slice(0, k).some(fits)) later++;
-      }
+  test('the pick among candidates is cands[floor(r * n)] with r the slot\'s 5th draw (spied on the real generator)', () => {
+    // Spy on this instance: inside _replaceBiomeGround, every candidate that passes the ground rules goes through
+    // _biomeGroundAt with itself as `skip`, in chunk order, so the spy sees the real candidate list and the draw r.
+    let multi = 0;
+    let notFirst = 0;
+    let total = 0;
+    for (const seed of [...SEEDS, 'slot-e', 'slot-f', 'slot-g', 'slot-h']) {
+      const g = gen(seed);
+      const at = g._biomeGroundAt.bind(g);
+      const rep = g._replaceBiomeGround.bind(g);
+      let log = null;
+      g._biomeGroundAt = (...args) => { const r = at(...args); if (log && r && args[6]) log.push(args[6]); return r; };
+      g._replaceBiomeGround = (chunk, def, r, ...rest) => {
+        log = [];
+        const before = chunk.hazards.slice();
+        const ok = rep(chunk, def, r, ...rest);
+        const cands = log;
+        log = null;
+        if (ok) {
+          total++;
+          const k = before.findIndex((q, j) => chunk.hazards[j] !== q);
+          const want = cands[Math.min(cands.length - 1, Math.floor(r * cands.length))];
+          expect(before[k]).toBe(want);
+          if (cands.length > 1) multi++;
+          if (want !== cands[0]) notFirst++;
+        }
+        return ok;
+      };
+      for (let i = 0; i < 600; i++) g.getChunk(i);
     }
-    console.log(`slot-rule pick: ${later}/${replaced} replacements took a later candidate`);
-    expect(later / replaced).toBeGreaterThan(0.25);
+    console.log(`slot-rule pick: ${total} replacements, ${multi} with > 1 candidate, ${notFirst} not the first candidate`);
+    expect(total).toBeGreaterThan(20);
+    expect(notFirst).toBeGreaterThan(3);
   });
 
   test('determinism: same (seed, mask, content) twice and in reverse call order is deep-equal', () => {

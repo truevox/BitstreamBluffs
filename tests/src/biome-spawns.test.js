@@ -8,7 +8,8 @@
 import { makeGen, loadContent } from './_helpers.js';
 import { withBiomeFixtures } from './_biomeFixtures.js';
 import {
-  HAZARD_MIN_SPACING_PX, BIOME_SPAWN_MAX_CHANCE, BIOME_EDGE_MARGIN_PX, BIOME_SLOT_DRAWS,
+  HAZARD_MIN_SPACING_PX, BIOME_SPAWN_MAX_CHANCE, BIOME_EDGE_MARGIN_PX, BIOME_SLOT_DRAWS, BIOME_HAZARD_MAX_CHANCE,
+  BIOME_HAZARD_CLEARANCE_PX,
 } from '../../src/systems/TerrainGenerator.js';
 import { FX_GROUND_HAZARD, FX_AIR_HAZARD, FX_WARD_POWERUP, FX_STABILIZE_POWERUP, FX_MASK, baseOnly } from './_biomeFixtures.js';
 
@@ -128,8 +129,11 @@ describe('_placeBiomeSpawns: placement of biome hazards and power-ups', () => {
       let prev = null;
       for (const c of cs) {
         for (const h of c.hazards) {
-          if (prev != null) expect(h.x - prev).toBeGreaterThanOrEqual(HAZARD_MIN_SPACING_PX); // across chunk borders too
-          prev = h.x;
+          // across chunk borders too. B1 presence amendment (a): a pair involving a biome GROUND hazard keeps
+          // BIOME_HAZARD_CLEARANCE_PX (240); every other pair keeps the base HAZARD_MIN_SPACING_PX (480).
+          const biomeGround = h.defId === FX_GROUND_HAZARD.id || (prev && prev.defId === FX_GROUND_HAZARD.id);
+          if (prev != null) expect(h.x - prev.x).toBeGreaterThanOrEqual(biomeGround ? BIOME_HAZARD_CLEARANCE_PX : HAZARD_MIN_SPACING_PX);
+          prev = h;
         }
         const h = c.hazards.find((q) => q.defId === FX_GROUND_HAZARD.id);
         if (!h) continue;
@@ -199,16 +203,19 @@ describe('_placeBiomeSpawns: placement of biome hazards and power-ups', () => {
     }
   });
 
-  test('spawn chance comes from the def and is capped at BIOME_SPAWN_MAX_CHANCE (0.5)', () => {
+  test('spawn chance comes from the def: power-ups capped at BIOME_SPAWN_MAX_CHANCE (0.5), hazards at BIOME_HAZARD_MAX_CHANCE (0.75)', () => {
     expect(BIOME_SPAWN_MAX_CHANCE).toBe(0.5);
+    // B1 presence amendment (c): the hazard slot's cap rose to 0.75; power-ups keep 0.5
+    expect(BIOME_HAZARD_MAX_CHANCE).toBe(0.75);
     const n = (cs) => cs.reduce((k, c) => k + c.hazards.filter((h) => h.defId === FX_GROUND_HAZARD.id).length
       + c.powerups.filter((p) => p.defId === FX_WARD_POWERUP.id).length, 0);
     let half = 0;
     let low = 0;
     for (const seed of SEEDS) {
       const capped = chunks(fxGen(seed, { fxGroundHazard: { spawn: { baseChance: 1 } }, fxWardPowerup: { spawn: { baseChance: 1, distanceDecayM: 1 } } }));
+      const atCaps = chunks(fxGen(seed, { fxGroundHazard: { spawn: { baseChance: 0.75 } }, fxWardPowerup: { spawn: { baseChance: 0.5 } } }));
+      expect(capped).toEqual(atCaps);
       const h = chunks(fxGen(seed));
-      expect(capped).toEqual(h);
       half += n(h);
       low += n(chunks(fxGen(seed, { fxGroundHazard: { spawn: { baseChance: 0.1 } }, fxWardPowerup: { spawn: { baseChance: 0.1 } } })));
       // weight 0 disables a def (weight || 1 would resurrect it)
@@ -226,10 +233,15 @@ describe('_placeBiomeSpawns: placement of biome hazards and power-ups', () => {
         const hiH = hi[i].hazards.filter(isFx);
         const loH = lo[i].hazards.filter(isFx);
         for (const h of loH) expect(hiH).toContainEqual(h);
-        // power-ups: removing a hazard can only UNBLOCK a power-up slot, never move one
+        // power-ups: removing a hazard can only UNBLOCK a power-up position. The slot tries two positions; when the hazard
+        // blocked the first, the power-up sat at the second in `hi` and moves to the freed first one in `lo`.
         const hiP = hi[i].powerups.filter(isFx);
         const loP = lo[i].powerups.filter(isFx);
-        for (const p of hiP) expect(loP).toContainEqual(p);
+        for (const p of hiP) {
+          if (loP.some((q) => q.x === p.x && q.y === p.y)) continue;
+          expect(loP.length).toBe(1);
+          expect(hiH.some((h) => Math.abs(h.x - loP[0].x) < 90)).toBe(true);
+        }
         for (const p of loP) {
           if (hiP.some((q) => q.x === p.x)) continue;
           expect(hiH.some((h) => Math.abs(h.x - p.x) < 90)).toBe(true);

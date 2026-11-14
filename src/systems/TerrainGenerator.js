@@ -154,6 +154,8 @@ export const POWERUP_FLOOR_FRACTION = 0.4;
  * own `spawn.baseChance`, capped here. The power-up chance has no distance decay (spec: "a fixed spawn chance").
  */
 export const BIOME_SPAWN_MAX_CHANCE = 0.5;
+/** B1 presence amendment (c) (spec author, 2026-11-14): the biome HAZARD slot's chance cap. Power-ups keep 0.5. */
+export const BIOME_HAZARD_MAX_CHANCE = 0.75;
 /** Chance used when a biome def carries no `spawn.baseChance` (mirrors the base power-up default). */
 export const BIOME_SPAWN_DEFAULT_CHANCE = 0.2;
 /**
@@ -170,6 +172,17 @@ export const BIOME_SLOT_DRAWS = 5;
  * shard and power-up clearances computed around the base hazard still hold.
  */
 export const BIOME_REPLACE_SLACK_PX = 8;
+/**
+ * B1 presence amendment (spec author, 2026-11-14) (a): a biome ground hazard keeps this far from any other hazard, instead of
+ * the base HAZARD_MIN_SPACING_PX. BIOME_EDGE_MARGIN_PX still keeps it 240 px inside its chunk, so base hazards across a
+ * chunk border are untouched.
+ */
+export const BIOME_HAZARD_CLEARANCE_PX = 240;
+/**
+ * (b): the descent-ahead rule (anti-stall) binds a biome `slow` hazard only when its speedFactor is below this. A gentler slow
+ * may sit on flat or downhill ground, but never before an uphill (no segment climbing within BIOME_EDGE_MARGIN_PX ahead).
+ */
+export const BIOME_GENTLE_SLOW_FACTOR = 0.6;
 /** Difficulty tail: past the old caps the ramp keeps creeping up (gently) to a hard ceiling. */
 export const HAZARD_DENSITY_CAP_M = 3500;
 export const HAZARD_DENSITY_TAIL_END_M = 10000;
@@ -206,9 +219,12 @@ const groupByBiome = (sorted) => {
 };
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smooth = (t) => t * t * (3 - 2 * t);
-/** Spawn chance of one biome slot: the def's `spawn.baseChance`, capped at BIOME_SPAWN_MAX_CHANCE (spec §4). */
-const biomeChance = (d) => clamp(
-  d.spawn && Number.isFinite(d.spawn.baseChance) ? d.spawn.baseChance : BIOME_SPAWN_DEFAULT_CHANCE, 0, BIOME_SPAWN_MAX_CHANCE,
+/**
+ * Spawn chance of one biome slot: the def's `spawn.baseChance`, capped at `cap` (spec §4: BIOME_SPAWN_MAX_CHANCE; B1
+ * presence amendment (c): BIOME_HAZARD_MAX_CHANCE for the hazard slot).
+ */
+const biomeChance = (d, cap = BIOME_SPAWN_MAX_CHANCE) => clamp(
+  d.spawn && Number.isFinite(d.spawn.baseChance) ? d.spawn.baseChance : BIOME_SPAWN_DEFAULT_CHANCE, 0, cap,
 );
 
 /** 1-D smooth value noise in [-1,1]. */
@@ -1339,7 +1355,7 @@ export class TerrainGenerator {
     const hDefs = this.biomeHazards[biome];
     if (hDefs && chunk.index > 0) {
       const def = this._pickBiomeDef(hDefs, h1, distM);
-      if (def && h0 < biomeChance(def)) {
+      if (def && h0 < biomeChance(def, BIOME_HAZARD_MAX_CHANCE)) {
         if (def.placement === 'air') {
           const s = !isJump || breather ? null : this._airSpan(lips);
           if (s) {
@@ -1414,18 +1430,28 @@ export class TerrainGenerator {
     if (breather && x < chunk.startX + BREATHER_CALM_PX) return null;
     for (const l of lips) if (x >= l.x - 40 && x <= l.zoneEnd) return null;
     for (const g of chunk.gaps) if (x >= g.x0 - 96 && x <= g.x1 + 96) return null;
-    for (const q of chunk.hazards) if (q !== skip && Math.abs(q.x - x) < HAZARD_MIN_SPACING_PX) return null;
+    for (const q of chunk.hazards) if (q !== skip && Math.abs(q.x - x) < BIOME_HAZARD_CLEARANCE_PX) return null;
     for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return null;
     const pts = chunk.points;
     const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
     const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
     if (!(slope > -12 && slope < 28) || !this._flatAround(pts, i)) return null;
-    if (def.onHit && def.onHit.effect === 'slow' && !this._descentAhead(pts, i, chunk.endX)) return null;
+    if (def.onHit && def.onHit.effect === 'slow') {
+      const f = Number.isFinite(def.onHit.speedFactor) ? def.onHit.speedFactor : 0.5;
+      if (f < BIOME_GENTLE_SLOW_FACTOR ? !this._descentAhead(pts, i, chunk.endX) : !this._noClimbAhead(pts, i)) return null;
+    }
     const w = (def.size && def.size.w) || 24;
     const ht = (def.size && def.size.h) || 24;
     const y = this._yAtLocal(pts, x);
     for (const s of chunk.shards) if (s.x >= x - w / 2 - 22 && s.x <= x + w / 2 + 22 && s.y >= y - ht - 22) return null;
     return { y, slope };
+  }
+
+  /** B1 (b): no segment climbs (angle < 0, y down) from point i over the next BIOME_EDGE_MARGIN_PX (always inside the chunk). */
+  _noClimbAhead(pts, i) {
+    const k1 = Math.min(pts.length - 2, i + Math.ceil(BIOME_EDGE_MARGIN_PX / SPACING_PX));
+    for (let k = i; k <= k1; k++) if (pts[k + 1].y < pts[k].y) return false;
+    return true;
   }
 
   /**
