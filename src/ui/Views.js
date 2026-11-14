@@ -15,7 +15,7 @@ import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
-import { ellipsize } from './PixelFont.js';
+import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
 import { ACHIEVEMENTS } from '../systems/Achievements.js';
@@ -67,7 +67,9 @@ class View {
 export class LeaderboardView extends View {
   /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
   constructor(scene, theme, o) {
-    super(scene, theme, { w: 440, h: 178, title: 'LEDGER // TOP 10 ON THIS DEVICE', color: 'cyan', onClose: o.onClose, y: 40 });
+    // 188, not 178: the board switch needs an on-screen key hint, and the only free line is between the
+    // tenth table row (panel y ~146) and the button strip. At y 40 the panel still ends at 228 of 270.
+    super(scene, theme, { w: 440, h: 188, title: 'LEDGER // TOP 10 ON THIS DEVICE', color: 'cyan', onClose: o.onClose, y: 40 });
     this.table = new LeaderboardTable(scene, theme, { x: 12, y: 24, w: 416, entries: null, parent: this.panel });
     this.panel.add(new NeonText(scene, theme, 12, this.h - 18, 'ONE LEDGER PER DEVICE. MAGENTA RULE FLAG = DAILY PATCH ACTIVE.', {
       color: 'text', outline: 'none',
@@ -78,38 +80,98 @@ export class LeaderboardView extends View {
     this.store = scene.registry.get(REG.SAVE_STORE);
     this.showingModded = false;
     this.emptyText = null;
+    this.loadToken = 0;
     this.tabBtn = new Button(scene, theme, {
       x: this.w - 148, y: this.h - 24, w: 68, h: 16, label: 'MODDED', color: 'amber',
       onClick: () => this._toggleBoard(),
     });
     this.panel.add(this.tabBtn);
+    // The switch was pointer-only: no key reached it. The hint names every key that now does, in the
+    // same quiet style as the other view hints, right-aligned above the button it drives.
+    const hintText = '← → / N / PAD X: SWITCH BOARD';
+    this.panel.add(new NeonText(scene, theme, this.w - 12 - measureText(hintText), this.h - 38, hintText, {
+      color: 'text', outline: 'none',
+    }).setAlpha(0.55));
+    // Focus ring for the two buttons (MODDED/CLEAN, BACK). Starts on the tab so confirm switches boards.
+    this.focusIdx = 0;
+    this.focusG = new Phaser.GameObjects.Graphics(scene);
+    this.panel.add(this.focusG);
+    this._paintFocus();
     this._loadBoard();
   }
 
   _loadBoard() {
     const store = this.store;
+    this.tabBtn.setLabel(this.showingModded ? 'CLEAN' : 'MODDED');
     if (!store) { this.table.setEntries([]); return; }
-    const p = this.showingModded
+    // A request token: a slow read for the board the player has already left must not paint over the
+    // board they switched to.
+    this.loadToken += 1;
+    const token = this.loadToken;
+    const modded = this.showingModded;
+    const p = modded
       ? Promise.resolve(store.getModdedLeaderboard(10))
       : Promise.resolve(store.getLeaderboard(10));
     p.then((rows) => {
-      if (!this.alive) return;
-      this.table.setEntries(rows || []);
-      // An empty modded board must say WHY it is empty, or it reads as a bug rather than as "no boosted
-      // runs yet".
-      if (!rows || rows.length === 0) {
-        this.emptyText = `NO ${this.showingModded ? 'MODDED' : 'CLEAN'} RUNS RECORDED YET`;
-      }
+      if (!this.alive || token !== this.loadToken) return;
+      // An empty board must say WHICH board is empty and why, or an empty modded board reads as a bug
+      // rather than as "no boosted runs yet". The table draws it in place of its generic message.
+      const empty = !rows || rows.length === 0;
+      this.emptyText = empty ? `NO ${modded ? 'MODDED' : 'CLEAN'} RUNS RECORDED YET` : null;
+      this.table.setEntries(rows || [], undefined, empty ? {
+        title: this.emptyText,
+        sub: modded ? 'RUNS WITH A BOOST ON LAND HERE' : 'FINISH A RUN TO CLAIM A SPOT',
+      } : undefined);
     }).catch(() => {
-      if (this.alive) this.table.setEntries([]);
+      if (this.alive && token === this.loadToken) this.table.setEntries([]);
     });
-    this.tabBtn.setLabel(this.showingModded ? 'CLEAN' : 'MODDED');
+  }
+
+  /** @param {boolean} modded which board to show; a no-op when it is already showing. */
+  _showBoard(modded) {
+    if (this.showingModded === Boolean(modded)) return;
+    this._toggleBoard();
   }
 
   _toggleBoard() {
     this.showingModded = !this.showingModded;
     uiSfx(this.scene, 'uiSelect');
     this._loadBoard();
+  }
+
+  _paintFocus() {
+    const g = this.focusG;
+    if (!g) return;
+    g.clear();
+    const b = this.focusIdx === 0 ? this.tabBtn : this.back;
+    g.lineStyle(1, this.theme.pal[this.focusIdx === 0 ? 'amber' : 'magenta'], 1);
+    g.strokeRect(b.x - 1.5, b.y - 1.5, b.w + 3, b.h + 3);
+  }
+
+  /**
+   * Left shows CLEAN and right shows MODDED (directional, so a held key cannot flicker between boards);
+   * N / pad X-Y ('alt') toggles from anywhere; up/down move focus between the tab and BACK; confirm
+   * activates whichever holds focus.
+   */
+  handleAction(action) {
+    if (action === 'cancel') { this.close(); return true; }
+    if (action === 'left' || action === 'right') { this._showBoard(action === 'right'); return true; }
+    if (action === 'alt') { this._toggleBoard(); return true; }
+    if (action === 'up' || action === 'down') {
+      const next = action === 'up' ? 0 : 1;
+      if (next !== this.focusIdx) {
+        this.focusIdx = next;
+        this._paintFocus();
+        uiSfx(this.scene, 'uiMove');
+      }
+      return true;
+    }
+    if (action === 'confirm') {
+      if (this.focusIdx === 0) this._toggleBoard();
+      else this.close();
+      return true;
+    }
+    return true;
   }
 }
 

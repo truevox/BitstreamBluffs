@@ -355,3 +355,116 @@ describe('U2: ACHIEVEMENTS is reachable without a pointer', () => {
     expect(t.view).toBeInstanceOf(AchievementsView);
   });
 });
+
+// ================================================================== U3: leaderboard tabs
+
+describe('U3: leaderboard tabs and empty state', () => {
+  const store = () => ({ getLeaderboard: async () => [], getModdedLeaderboard: async () => [] });
+
+  test('U3: a keyboard/pad action switches the leaderboard to the MODDED board', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    expect(view).toBeInstanceOf(LeaderboardView);
+    const flipped = [];
+    for (const a of ['left', 'right', 'up', 'down', 'confirm', 'alt', 'shop']) {
+      if (t.view !== view) break;
+      t._onAction(a);
+      if (view.showingModded) flipped.push(a);
+    }
+    expect(flipped.length).toBeGreaterThan(0);
+  });
+
+  test('U3b: an empty MODDED board says why it is empty', async () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    view._toggleBoard(); // the gate's own route (gate-playthrough.mjs ~:1203)
+    await flush();
+    expect(view.emptyText).toBe('NO MODDED RUNS RECORDED YET'); // the view computed it...
+    expect(texts(view.panel)).toContain(view.emptyText); // ...and puts it on screen
+  });
+
+  test('U3: right shows MODDED, left shows CLEAN, N / pad X (alt) toggles', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    t._onAction('right');
+    expect(view.showingModded).toBe(true);
+    t._onAction('right'); // directional, so a held key does not flicker between boards
+    expect(view.showingModded).toBe(true);
+    t._onAction('left');
+    expect(view.showingModded).toBe(false);
+    t._onAction('alt');
+    expect(view.showingModded).toBe(true);
+    t._onAction('alt');
+    expect(view.showingModded).toBe(false);
+    expect(t.view).toBe(view);
+  });
+
+  test('U3: the tab button is a focus target: it holds focus first, confirm switches, down moves to BACK', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    const ring = () => view.focusG.ops.find((o) => o[0] === 'strokeRect');
+    expect(ring()[1]).toBeCloseTo(view.tabBtn.x - 1.5); // painted from the start
+    t._onAction('confirm');
+    expect(view.showingModded).toBe(true);
+    expect(view.tabBtn.label.main.text).toBe('CLEAN');
+    t._onAction('down');
+    expect(ring()[1]).toBeCloseTo(view.back.x - 1.5);
+    t._onAction('confirm');
+    expect(t.view).toBeNull();
+  });
+
+  test('U3: an on-screen hint names the switch keys and stays clear of the buttons', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    const hint = view.panel.list.find((o) => o.main && /SWITCH BOARD/.test(o.main.text));
+    expect(hint).toBeTruthy();
+    expect(hint.main.text).toMatch(/←/);
+    expect(hint.main.text).toMatch(/\bN\b/);
+    expect(hint.main.text).toMatch(/PAD X/);
+    const box = { x: hint.x, y: hint.y, w: measureText(hint.main.text), h: 8 };
+    expect(box.x).toBeGreaterThanOrEqual(4);
+    expect(box.x + box.w).toBeLessThanOrEqual(view.w - 4);
+    for (const b of [view.tabBtn, view.back]) {
+      const hit = box.x < b.x + b.w && b.x < box.x + box.w && box.y < b.y + b.h && b.y < box.y + box.h;
+      expect(hit).toBe(false);
+    }
+    // The panel still fits the 480x270 canvas.
+    expect(view.panel.y + view.h).toBeLessThanOrEqual(GAME_HEIGHT);
+  });
+
+  test('U3b: the empty CLEAN board names its board, and only one empty message is drawn', async () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    await flush();
+    const all = texts(view.panel);
+    expect(all).toContain('NO CLEAN RUNS RECORDED YET');
+    expect(all).not.toContain('NO ENTRIES YET');
+    view._toggleBoard();
+    await flush();
+    expect(texts(view.panel)).not.toContain('NO CLEAN RUNS RECORDED YET');
+  });
+
+  test('U3c: a slow CLEAN result that lands after switching to MODDED does not overwrite the MODDED board', async () => {
+    let releaseClean;
+    const slow = {
+      getLeaderboard: () => new Promise((r) => { releaseClean = () => r([{ id: 'c1', initials: 'CLN', score: 5, distanceM: 1 }]); }),
+      getModdedLeaderboard: async () => [{ id: 'm1', initials: 'MOD', score: 9, distanceM: 2 }],
+    };
+    const t = titleHost({ [REG.SAVE_STORE]: slow });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    t._onAction('right'); // MODDED requested while CLEAN is still in flight
+    await flush();
+    releaseClean();
+    await flush();
+    const all = texts(view.panel);
+    expect(all).toContain('MOD');
+    expect(all).not.toContain('CLN');
+  });
+});

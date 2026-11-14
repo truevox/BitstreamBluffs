@@ -54,8 +54,14 @@ export class LeaderboardTable extends Phaser.GameObjects.Container {
     return t;
   }
 
-  /** @param {object[]|null} entries @param {string} [highlightId] @returns {void} */
-  setEntries(entries, highlightId) {
+  /**
+   * @param {object[]|null} entries
+   * @param {string} [highlightId]
+   * @param {{title:string, sub?:string}} [empty] what an empty board says instead of the generic
+   *   "NO ENTRIES YET" (the leaderboard view names WHICH board is empty). Omitted = the generic text.
+   * @returns {void}
+   */
+  setEntries(entries, highlightId, empty) {
     if (highlightId !== undefined) this.highlightId = highlightId;
     for (const c of this.cells || []) c.destroy();
     this.cells = [];
@@ -80,8 +86,9 @@ export class LeaderboardTable extends Phaser.GameObjects.Container {
     }
     const list = entries.slice(0, this.rows);
     if (list.length === 0) {
-      this._cell(w / 2, 52, 'NO ENTRIES YET', 'amber', 'center');
-      this._cell(w / 2, 66, 'FINISH A TOP-10 RUN TO CLAIM A SPOT', 'text', 'center').setAlpha(0.6);
+      const e = empty && empty.title ? empty : { title: 'NO ENTRIES YET', sub: 'FINISH A TOP-10 RUN TO CLAIM A SPOT' };
+      this._cell(w / 2, 52, e.title, 'amber', 'center');
+      if (e.sub) this._cell(w / 2, 66, e.sub, 'text', 'center').setAlpha(0.6);
     }
     list.forEach((e, i) => {
       const y = 14 + i * this.rowH;

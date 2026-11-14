@@ -9,6 +9,10 @@
 - **FAIRNESS-3.** DAILY RUN derives its seed and its biome mask from one clock read at press time, so a press just after 00:00 UTC (before the Title's 15 s refresh) can no longer pair yesterday's seed with today's mask.
 - **F3 (run side).** A run applies only the boosts the profile has unlocked (`unlocked.boosts`: Head Start at Sync Level 8, Error Correction Engine at 15) as well as switched on. A toggled-but-locked boost does nothing and does not mark the run modded. The rule lives in `Boosts.js` (`boostEffects` / `isModdedRun` / `loadoutForRun` take `o.unlocked`; an omitted set owns nothing). The shop-side gate is a separate fix.
 - **TERRAIN-2.** At biome mask 0, RunScene no longer calls `refreshPalette()` (which rebuilds every collider) on the first frame and at every 500 m sector crossing; a mask-0 run repaints only on a palette setting change, as before W3.
+- U3: the leaderboard CLEAN/MODDED board switches by keyboard and pad (Left = CLEAN, Right = MODDED, N or
+  pad X/Y toggles, and the tab button takes focus so confirm switches). A hint above the buttons names the
+  keys. An empty board now says which board is empty (U3b), and a slow read for the board you just left no
+  longer paints over the one you switched to (U3c).
 - U2: ACHIEVEMENTS on the Profile screen is reachable by keyboard and pad (Up from SHARD SHOP, then confirm).
 - U1 / U1b: backing out of ACHIEVEMENTS destroys the grid (it stayed pinned over the Title menu), and the
   rebuilt Profile still opens SHARD SHOP.
