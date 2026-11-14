@@ -205,9 +205,31 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
     // `chasm` and not `terrain`: an opening-grace terrain crash is deliberately forgiven and respawns,
     // which is correct behaviour and would leave the gate waiting for a Game Over that never comes.
     run.pendingCrash = { cause: 'chasm' };
-    await wait(3000);
+    // Wait for the Game Over scene to actually become ACTIVE rather than sleeping a fixed 3s. The fixed
+    // sleep is flaky under load (a jest run or a second gate beside it): the run has not yet handed off,
+    // the probe reads an inactive scene, and the gate reports "scene not active" — a harness timing bug
+    // that looks exactly like a broken Game Over screen. This is the same fix W6 carries; the shop branch
+    // is cut from main at W5, which predates it. Poll the real condition, then let the panels build.
+    const deadline = Date.now() + 15000;
+    let active = false;
+    while (Date.now() < deadline) {
+      const s = g.scene.getScene('GameOverScene');
+      active = Boolean(s && s.scene && s.scene.isActive && s.scene.isActive());
+      if (active) break;
+      await wait(100);
+    }
+    if (active) await wait(350);
     const over = g.scene.getScene('GameOverScene');
-    const active = Boolean(over && over.scene && over.scene.isActive && over.scene.isActive());
+    if (!active) {
+      // Say what the scene actually is, not just that it is not active -- a real recurrence should diagnose
+      // itself instead of needing a reproduction.
+      const s = g.scene.getScene('GameOverScene');
+      return { active, sceneMissing: !s, sceneKey: s ? s.scene.key : null, sceneState: s && s.scene ? {
+        isActive: typeof s.scene.isActive === 'function' ? s.scene.isActive() : null,
+        isSleeping: typeof s.scene.isSleeping === 'function' ? s.scene.isSleeping() : null,
+        isPaused: typeof s.scene.isPaused === 'function' ? s.scene.isPaused() : null,
+      } : null, scenes: g.scene.getScenes(true).map((x) => x.scene.key), out: { texts: [] } };
+    }
     const rec = g.registry.get('lastRecord') || g.registry.get('record') || null;
     const texts = [];
     const seen = new Set();
