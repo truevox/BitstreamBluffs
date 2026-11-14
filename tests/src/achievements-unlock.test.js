@@ -89,3 +89,42 @@ describe('ACH-3 (daily and streak half): creditRun feeds the evaluator dailyRuns
     expect({ dailyRuns: m.dailyRuns, bestStreak: m.bestStreak }).toEqual({ dailyRuns: 1, bestStreak: 3 });
   });
 });
+
+describe('ACH-2: every combo achievement is reachable by the combo multiplier', () => {
+  const maxMult = SCORING.comboStart + SCORING.comboStep * SCORING.comboStepTypes.length;
+  const combos = () => ACHIEVEMENTS.filter((a) => a.metric === 'bestCombo');
+
+  test('every bestCombo target is at or below the top multiplier', () => {
+    expect(maxMult).toBe(2);
+    expect(combos().filter((a) => a.target > maxMult).map((a) => a.id)).toEqual([]);
+  });
+
+  test('every target is a multiplier the game can produce (x1 plus whole combo steps)', () => {
+    for (const a of combos()) {
+      const steps = (a.target - SCORING.comboStart) / SCORING.comboStep;
+      expect({ id: a.id, whole: Number.isInteger(steps) && steps >= 1 }).toEqual({ id: a.id, whole: true });
+    }
+  });
+
+  test('the four combo achievements have four distinct targets, and 5/10/20 climb', () => {
+    const t = Object.fromEntries(combos().map((a) => [a.id, a.target]));
+    expect(new Set(Object.values(t)).size).toBe(4);
+    expect(t['combo-5']).toBeLessThan(t['combo-10']);
+    expect(t['combo-10']).toBeLessThan(t['combo-20']);
+  });
+
+  test('ids and names are unchanged and each description states its own target', () => {
+    const want = { 'combo-2': 'Doubled Up', 'combo-5': 'Chain Reaction', 'combo-10': 'Unbroken', 'combo-20': 'Wireless Legend' };
+    for (const a of combos()) {
+      expect({ id: a.id, name: a.name, states: a.desc.includes(`x${a.target}`) || a.desc.includes(`${a.target}x`) })
+        .toEqual({ id: a.id, name: want[a.id], states: true });
+    }
+  });
+
+  test('achievements.json carries the same combo entries as the built-in catalogue', () => {
+    const json = read('src/data/achievements/achievements.json');
+    const list = Array.isArray(json) ? json : json.achievements;
+    const pick = (a) => ({ id: a.id, name: a.name, desc: a.desc, target: a.target });
+    expect(list.filter((a) => a.metric === 'bestCombo').map(pick)).toEqual(combos().map(pick));
+  });
+});

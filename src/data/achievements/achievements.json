@@ -10,9 +10,9 @@
     { "id": "dist-25k-total", "name": "Marathon Machine", "desc": "Ride 25,000 m in total.", "group": "distance", "metric": "totalDistanceM", "target": 25000 },
 
     { "id": "combo-2", "name": "Doubled Up", "desc": "Land a 2x combo.", "group": "skill", "metric": "bestCombo", "target": 2 },
-    { "id": "combo-5", "name": "Chain Reaction", "desc": "Land a 5x combo.", "group": "skill", "metric": "bestCombo", "target": 5 },
-    { "id": "combo-10", "name": "Unbroken", "desc": "Land a 10x combo.", "group": "skill", "metric": "bestCombo", "target": 10 },
-    { "id": "combo-20", "name": "Wireless Legend", "desc": "Land a 20x combo.", "group": "skill", "metric": "bestCombo", "target": 20 },
+    { "id": "combo-5", "name": "Chain Reaction", "desc": "Land a x1.25 combo.", "group": "skill", "metric": "bestCombo", "target": 1.25 },
+    { "id": "combo-10", "name": "Unbroken", "desc": "Land a x1.5 combo.", "group": "skill", "metric": "bestCombo", "target": 1.5 },
+    { "id": "combo-20", "name": "Wireless Legend", "desc": "Land a x1.75 combo.", "group": "skill", "metric": "bestCombo", "target": 1.75 },
     { "id": "airtime-2s", "name": "Airborne", "desc": "Stay in the air for 2 seconds.", "group": "skill", "metric": "maxAirtimeMs", "target": 2000 },
     { "id": "airtime-5s", "name": "Sky Writer", "desc": "Stay in the air for 5 seconds.", "group": "skill", "metric": "maxAirtimeMs", "target": 5000 },
     { "id": "tricks-10", "name": "Trick Bag", "desc": "Land 10 tricks.", "group": "skill", "metric": "tricksLanded", "target": 10 },

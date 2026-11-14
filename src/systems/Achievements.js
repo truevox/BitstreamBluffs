@@ -28,6 +28,9 @@ export const METRICS = Object.freeze([
  * The shipped catalogue. Loaded from data/achievements/achievements.json by the service; this fallback
  * keeps a pure test or a headless caller independent of the bundler, exactly as SHOP_ITEMS does.
  */
+// ACH-2: bestCombo is the combo MULTIPLIER (x1 plus 0.25 per unique flip/helicopter type in one jump, so
+// x2.0 at most). The old 5/10/20 targets could never be met. combo-5/10/20 now ask for x1.25 / x1.5 /
+// x1.75 (one, two, three step tricks in a jump); combo-2 keeps x2.0, all four step types in one jump.
 export const ACHIEVEMENTS = Object.freeze([
   { id: 'first-descent', name: 'First Descent', desc: 'Finish your first run.', group: 'distance', metric: 'runs', target: 1 },
   { id: 'ten-runs', name: 'Regular', desc: 'Finish 10 runs.', group: 'distance', metric: 'runs', target: 10 },
@@ -36,9 +39,9 @@ export const ACHIEVEMENTS = Object.freeze([
   { id: 'dist-5k', name: 'Long Haul', desc: 'Ride 5,000 m in a single run.', group: 'distance', metric: 'bestDistanceM', target: 5000 },
   { id: 'dist-25k-total', name: 'Marathon Machine', desc: 'Ride 25,000 m in total.', group: 'distance', metric: 'totalDistanceM', target: 25000 },
   { id: 'combo-2', name: 'Doubled Up', desc: 'Land a 2x combo.', group: 'skill', metric: 'bestCombo', target: 2 },
-  { id: 'combo-5', name: 'Chain Reaction', desc: 'Land a 5x combo.', group: 'skill', metric: 'bestCombo', target: 5 },
-  { id: 'combo-10', name: 'Unbroken', desc: 'Land a 10x combo.', group: 'skill', metric: 'bestCombo', target: 10 },
-  { id: 'combo-20', name: 'Wireless Legend', desc: 'Land a 20x combo.', group: 'skill', metric: 'bestCombo', target: 20 },
+  { id: 'combo-5', name: 'Chain Reaction', desc: 'Land a x1.25 combo.', group: 'skill', metric: 'bestCombo', target: 1.25 },
+  { id: 'combo-10', name: 'Unbroken', desc: 'Land a x1.5 combo.', group: 'skill', metric: 'bestCombo', target: 1.5 },
+  { id: 'combo-20', name: 'Wireless Legend', desc: 'Land a x1.75 combo.', group: 'skill', metric: 'bestCombo', target: 1.75 },
   { id: 'airtime-2s', name: 'Airborne', desc: 'Stay in the air for 2 seconds.', group: 'skill', metric: 'maxAirtimeMs', target: 2000 },
   { id: 'airtime-5s', name: 'Sky Writer', desc: 'Stay in the air for 5 seconds.', group: 'skill', metric: 'maxAirtimeMs', target: 5000 },
   { id: 'tricks-10', name: 'Trick Bag', desc: 'Land 10 tricks.', group: 'skill', metric: 'tricksLanded', target: 10 },
