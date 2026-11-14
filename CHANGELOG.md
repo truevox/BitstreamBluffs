@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - post-sprint audit fixes
+## v2.4.1 - post-sprint audit fixes (2026-11-14)
 
 - **Mission rows no longer show '?' when a title is cut.** `MissionsLayout.ellipsize` used '…', which the pixel font cannot draw; it now uses the font's '..' mark.
 - **`npm run gate:playthrough` runs the full gate** (F5). It now passes `--with-boosts`; the gate also fails when fewer checks ran than the mode requires, and says so when boosts are off, instead of printing "0 skipped, GATE PASS" with 11 checks absent. The Daily boost check now presses the real DAILY RUN item and asserts the date mask (F7).
