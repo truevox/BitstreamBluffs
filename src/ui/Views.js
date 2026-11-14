@@ -460,7 +460,9 @@ export class ProfileView extends View {
       const band = layout.toggleMenu;
       this.sigMenu = new MenuList(scene, theme, {
         x: band.x, y: band.y, w: band.w, rowH: band.rowH, items, color: 'magenta', parent: this.panel,
-        columns: band.columns, rowsPerColumn: band.rowsPerColumn,
+        // The layout balances the columns from its own count; never let a longer item list spill into a
+        // third, off-panel column if the two counts ever disagree.
+        columns: band.columns, rowsPerColumn: Math.max(band.rowsPerColumn, Math.ceil(items.length / band.columns)),
       });
     }
 

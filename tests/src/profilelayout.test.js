@@ -102,11 +102,13 @@ describe('ProfileLayout.profileLayout — no overlap, nothing clipped', () => {
     expect(byText('VERTIGO VENTS').alpha).toBeGreaterThanOrEqual(0.55); // 0.45 dropped contrast below 4.5:1
   });
 
-  test('header counts how many signatures were reached', () => {
+  test('header counts how many signatures are unlocked', () => {
+    // Was "BIOMES REACHED n/11": audit F11 found the count is biomes UNLOCKED by level (a player has them
+    // with zero runs), so the label now says what it counts.
     const head = (xp) => profileLayout({ profile: atXp(xp), levels }).items.find((i) => i.key === 'sig-head').text;
-    expect(head(0)).toBe('BIOMES REACHED 0/11');
-    expect(head(4000)).toBe('BIOMES REACHED 1/11'); // Debumont at level 4
-    expect(head(148700)).toBe('BIOMES REACHED 11/11'); // level 29 clears every biome reward (last at level 28)
+    expect(head(0)).toBe('SIGNATURES UNLOCKED 0/11');
+    expect(head(4000)).toBe('SIGNATURES UNLOCKED 1/11'); // Debumont at level 4
+    expect(head(148700)).toBe('SIGNATURES UNLOCKED 11/11'); // level 29 clears every biome reward (last at level 28)
   });
 });
 
@@ -165,7 +167,7 @@ describe('ProfileLayout.profileLayout — content', () => {
       ['BEST DISTANCE', '999,999 M'],
       ['BEST COMBO', 'x9.99'],
       ['BEST AIR', '123.5 S'],
-      ['DATA SHARDS', '98,765'],
+      ['RUN SHARDS', '98,765'], // was DATA SHARDS: lifetime.shards is run shards only (audit F11)
       ['NEAR MISSES', '4,321'],
       ['TRICKS', '18,887'],
     ]);
@@ -347,7 +349,10 @@ describe('the signature toggle menu cannot cover the biome names', () => {
     // Measured against the real shipped table: five unlocked signatures, 11 biomes in the order. The
     // first version passed this with a stub table and still overflowed the panel by 4px in the game,
     // because the names were listed twice - once as plain rows and again as toggle labels.
-    const layout = profileLayout({ profile: withBiomes(12), levels });
+    // Production inputs (every shipped id is playable): since audit F11 the locked biomes are listed as
+    // names too, and without playable ids no toggle row exists at all, so the band would be measured under
+    // a name grid the real screen never draws together with toggles.
+    const layout = profileLayout({ profile: withBiomes(12), levels, playableBiomeIds: playable });
     const bottom = layout.toggleMenu.y + 5 * layout.toggleMenu.rowH;
     expect(bottom).toBeLessThanOrEqual(PROFILE_PANEL.h);
   });

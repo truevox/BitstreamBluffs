@@ -564,3 +564,24 @@ describe('SHOP-3: the shop offers a way back to DEFAULT', () => {
     expect(seen.has('trail-hue-ember')).toBe(true);
   });
 });
+
+// ================================================================== F11: Profile view draws locked biomes
+
+describe('F11: the Profile view draws locked biomes and keeps the toggles on the panel', () => {
+  test('F11: at Sync Level 20 the locked names and their LVL tags are drawn, and every toggle row is inside the panel', () => {
+    const xp = LEVELS.levels.find((l) => l.level === 20).xpMin;
+    const profile = { ...defaultProfile(), xp, level: 20, pendingBiomes: LEVELS.levels.filter((l) => l.biome && l.level <= 20).map((l) => l.biome) };
+    const t = titleHost({ [REG.PROFILE]: profile });
+    const prof = openProfile(t);
+    const all = texts(prof.panel);
+    expect(all).toContain('CANDY CANE CANYON'); // unlocks at 22
+    expect(all).toContain('LVL 22');
+    expect(all).toContain('SIGNATURES UNLOCKED 6/11');
+    const m = prof.sigMenu;
+    expect(m.items.length).toBe(6);
+    for (const r of m.rows) {
+      expect(m.x + r.label.x).toBeLessThan(prof.w);
+      expect(m.y + r.label.y).toBeLessThan(prof.h - 34); // above the ACHIEVEMENTS n/29 line
+    }
+  });
+});

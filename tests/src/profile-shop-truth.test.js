@@ -14,11 +14,20 @@ jest.unstable_mockModule('../../src/data/index.js', () => ({ content: {}, loadCo
 
 const { sanitizeProfile, equip, unequip, SHOP_ITEMS } = await import('../../src/systems/ProfileStore.js');
 const { shopLayout, shopMenuItems } = await import('../../src/ui/ShopLayout.js');
+const { profileLayout, overlappingPairs, PROFILE_PANEL } = await import('../../src/ui/ProfileLayout.js');
 
 const read = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const LEVELS = read('src/data/progression/levels.json');
 
+const BIOME_DEFS = fs.readdirSync('src/data/biomes').filter((f) => f.endsWith('.json'))
+  .map((f) => read(path.join('src/data/biomes', f)));
+const ALL_IDS = BIOME_DEFS.map((d) => d.id); // what Views.js passes as playableBiomeIds in production
+const MAX_XP = LEVELS.levels[LEVELS.levels.length - 1].xpMin + 1;
+
 const v1 = (o = {}) => sanitizeProfile({ v: 1, ...o }, LEVELS);
+const atLevel = (level, o = {}) => v1({ xp: LEVELS.levels.find((l) => l.level === level).xpMin, ...o });
+const prodLayout = (profile) => profileLayout({ profile, levels: LEVELS, playableBiomeIds: ALL_IDS, achievementTotal: 29 });
+const label = (id) => id.replace(/-/g, ' ').toUpperCase();
 
 describe('SHOP-3: a way back to DEFAULT', () => {
   test('SHOP-3: after equipping, the equipped row stays visible, says EQUIPPED and is selectable', () => {
@@ -36,5 +45,68 @@ describe('SHOP-3: a way back to DEFAULT', () => {
     expect(back.equipped.trail).toBe('default');
     expect(shopLayout({ profile: back }).loadoutText).toContain('TRAIL DEFAULT');
     expect(shopLayout({ profile: back }).rows.find((r) => r.id === 'trail-hue-ember').state).toBe('EQUIP');
+  });
+});
+
+describe('F11: Profile lists locked biomes', () => {
+  test('F11: with the production inputs a level-1 player can still see the locked biomes', () => {
+    const texts = prodLayout(v1()).items.map((i) => i.text);
+    expect(texts).toContain('DEBUMONT');
+  });
+
+  test('F11: a locked biome shows its unlock level beside its name', () => {
+    const items = prodLayout(atLevel(5)).items; // Debumont (level 4) unlocked, Garbage Dump Glacier (7) not
+    const lock = (id) => items.find((i) => i.key === `lock-${id}`);
+    expect(lock('garbage-dump-glacier').text).toBe('LVL 7');
+    expect(lock('vertigo-vents').text).toBe('LVL 28');
+    const name = items.find((i) => i.text === 'GARBAGE DUMP GLACIER');
+    expect(lock('garbage-dump-glacier').x).toBeGreaterThan(name.x + name.w);
+    expect(lock('garbage-dump-glacier').y).toBe(name.y);
+    // Unlocked: no lock tag and no plain name row - it is a toggle row in the menu below.
+    expect(lock('debumont')).toBeUndefined();
+    expect(items.some((i) => i.text === 'DEBUMONT')).toBe(false);
+  });
+
+  test('F11: at every level 1-30 each biome is listed once (name if locked, toggle if unlocked) and nothing overlaps', () => {
+    for (let level = 1; level <= 30; level++) {
+      const p = atLevel(level);
+      const L = prodLayout(p);
+      const unlocked = new Set(p.pendingBiomes);
+      const named = L.items.filter((i) => /^sig-/.test(i.key) && i.key !== 'sig-head' && i.key !== 'sig-note').map((i) => i.text);
+      expect({ level, named }).toEqual({ level, named: LEVELS.biomeOrder.filter((id) => !unlocked.has(id)).map(label) });
+      expect({ level, toggles: L.toggleRowCount }).toEqual({ level, toggles: unlocked.size });
+      expect({ level, overlaps: overlappingPairs(L.items) }).toEqual({ level, overlaps: [] });
+      for (const it of L.items) {
+        expect({ level, key: it.key, inside: it.x >= 4 && it.x + it.w <= PROFILE_PANEL.w - 4 }).toEqual({ level, key: it.key, inside: true });
+      }
+      // The toggle menu sits under the last name row and above the ACHIEVEMENTS n/29 line, in every case.
+      const band = L.toggleMenu;
+      const lowestName = Math.max(0, ...L.items.filter((i) => /^(sig|lock)-/.test(i.key) && i.key !== 'sig-head' && i.key !== 'sig-note').map((i) => i.y + i.h));
+      const ach = L.items.find((i) => i.key === 'ach-summary');
+      if (L.toggleRowCount) {
+        expect({ level, below: band.y >= lowestName }).toEqual({ level, below: true });
+        expect({ level, rowsFit: band.columns * band.rowsPerColumn >= L.toggleRowCount }).toEqual({ level, rowsFit: true });
+        const bottom = band.y + L.togglePhysicalRows * band.rowH;
+        expect({ level, clear: bottom <= ach.y }).toEqual({ level, clear: true });
+      }
+    }
+  });
+});
+
+describe('F11: Profile labels say what they count', () => {
+  test('F11: the spendable bank is the primary shard figure, and the lifetime figure is named for runs', () => {
+    const p = v1({ bank: 5000, lifetime: { shards: 32 } });
+    const items = prodLayout(p).items;
+    expect(items.find((i) => i.key === 'bank').text).toBe('BANK 5,000');
+    expect(items.find((i) => i.key === 'stat-k7').text).toBe('RUN SHARDS');
+    expect(items.find((i) => i.key === 'stat-v7').text).toBe('32');
+    expect(items.some((i) => /DATA SHARDS/.test(i.text))).toBe(false);
+  });
+
+  test('F11: the biome header counts unlocked signatures and says so', () => {
+    const head = (p) => prodLayout(p).items.find((i) => i.key === 'sig-head').text;
+    expect(head(v1())).toBe('SIGNATURES UNLOCKED 0/11');
+    expect(head(atLevel(5))).toBe('SIGNATURES UNLOCKED 1/11');
+    expect(head(v1({ xp: MAX_XP }))).toBe('SIGNATURES UNLOCKED 11/11');
   });
 });

@@ -89,7 +89,10 @@ export function statRows(life) {
     ['BEST DISTANCE', `${fmtInt(l.bestDistanceM)} M`],
     ['BEST COMBO', `x${(Number(l.bestCombo) || 0).toFixed(2)}`],
     ['BEST AIR', `${fmtSec(l.maxAirtimeMs)} S`],
-    ['DATA SHARDS', fmtInt(l.shards)],
+    // RUN SHARDS, not DATA SHARDS: lifetime.shards counts shards earned by runs only (mission shards and
+    // spending never touch it), so it is neither the spendable balance nor all shards ever earned. The
+    // spendable figure is the bank, drawn on the LIFETIME header row.
+    ['RUN SHARDS', fmtInt(l.shards)],
     ['NEAR MISSES', fmtInt(l.nearMisses)],
     ['TRICKS', fmtInt(trickTotal)],
   ];
@@ -126,6 +129,8 @@ export function profileLayout(o = {}) {
 
   // Lifetime block: two columns of five, so ten numbers fit without shrinking the font.
   items.push(box('lifetime-head', 'LIFETIME', PAD, 54, 'amber'));
+  // The spendable balance is the shard figure a player acts on, so it is the primary one on this screen.
+  items.push(box('bank', `BANK ${fmtInt(Math.max(0, Number(p.bank) || 0))}`, RIGHT, 54, 'amber', { align: 'right' }));
   const rows = statRows(life);
   rows.forEach(([k, v], i) => {
     const col = i < 5 ? 0 : 1;
@@ -145,7 +150,9 @@ export function profileLayout(o = {}) {
   const reachedCount = order.filter((id) => reached.has(id)).length;
   const sigIds = new Set(Array.isArray(o.playableBiomeIds) ? o.playableBiomeIds : []);
   const sigCount = order.filter((id) => reached.has(id) && sigIds.has(id)).length;
-  items.push(box('sig-head', `BIOMES REACHED ${reachedCount}/${order.length}`, PAD, 132, 'magenta'));
+  // SIGNATURES UNLOCKED, not BIOMES REACHED: the count is biomes unlocked by Sync Level (pendingBiomes),
+  // which a player has with zero runs played, so "reached" claimed something that never happened.
+  items.push(box('sig-head', `SIGNATURES UNLOCKED ${reachedCount}/${order.length}`, PAD, 132, 'magenta'));
   const note = sigIds.size === 0
     ? 'SIGNATURE LOCKED - COMING ONLINE'
     : `${sigCount} SIGNATURE${sigCount === 1 ? '' : 'S'} ONLINE`;
@@ -160,22 +167,36 @@ export function profileLayout(o = {}) {
   // plus five toggle rows fit in a 224px panel.
   const NAME_TOP = 141;
   const NAME_PITCH = 9;
-  // Only the NOT-YET-PLAYABLE signatures get a plain name row. An unlocked biome already appears in the
-  // toggle menu below, labelled with its unlock level, so listing it twice was pure duplication - and it
-  // was the duplication that pushed the menu off the bottom of the panel.
-  const namedOnly = order.filter((id) => !sigIds.has(id));
+  // Every signature WITHOUT a toggle row gets a plain name row: a toggle exists only for a biome that is
+  // both unlocked and playable. An unlocked biome already appears in the toggle menu below, labelled with
+  // its unlock level, so listing it twice was pure duplication. This used to list only the not-playable
+  // ones, and production passes every shipped id as playable, so LOCKED biomes vanished from the screen
+  // (audit F11): a new player could not see what was coming.
+  // Two columns (x 12 and 208, the LIFETIME columns), not three: a locked name carries a "LVL n" tag, and
+  // "SKY JELLYFISH MOUNTAIN LVL 25" does not fit a 134px third of the panel.
+  const NAME_COLS = 2;
+  const NAME_COL_X = [PAD, 208];
+  const levelOf = (id) => {
+    const e = table.levels.find((l) => l.biome === id);
+    return e ? e.level : null;
+  };
+  const namedOnly = order.filter((id) => !(reached.has(id) && sigIds.has(id)));
   namedOnly.forEach((id, i) => {
-    const col = i % 3;
-    const y = NAME_TOP + Math.floor(i / 3) * NAME_PITCH;
+    const x = NAME_COL_X[i % NAME_COLS];
+    const y = NAME_TOP + Math.floor(i / NAME_COLS) * NAME_PITCH;
     const has = reached.has(id);
     // 0.55 alpha keeps even the unreached names above the 4.5:1 contrast floor in both palettes.
-    items.push(box(`sig-${id}`, label(id), PAD + col * 134, y, has ? 'amber' : 'text', { alpha: has ? 1 : 0.55 }));
+    const name = box(`sig-${id}`, label(id), x, y, has ? 'amber' : 'text', { alpha: has ? 1 : 0.55 });
+    items.push(name);
+    // A locked signature says when it unlocks, in the shop's own "LVL n" wording.
+    const lv = levelOf(id);
+    if (!has && lv) items.push(box(`lock-${id}`, `LVL ${lv}`, name.x + name.w + 6, y, 'text', { alpha: 0.55 }));
   });
 
   // The toggle menu's band: below the last name row, sized so the deepest row still clears the panel
   // floor. Five signatures is the worst case; a sixth would push past h, which is why the height is
   // computed from `order` rather than hardcoded.
-  const nameRows = Math.max(1, Math.ceil(namedOnly.length / 3));
+  const nameRows = Math.max(1, Math.ceil(namedOnly.length / NAME_COLS));
   const lastNameBottom = namedOnly.length
     ? NAME_TOP + (nameRows - 1) * NAME_PITCH + GLYPH_H
     : NAME_TOP - NAME_PITCH + GLYPH_H; // no plain rows: sit directly under the header
@@ -183,8 +204,12 @@ export function profileLayout(o = {}) {
   // BACK starts at 218, so the last three would be covered by a button the player cannot see through —
   // the exact defect W3's audit already caught once. Split into two columns instead of shrinking the pitch:
   // 6 rows per column at 9px is 54px, clearing BACK by 22px, and the font stays legible.
-  const TOGGLE_ROWS_PER_COL = 6;
-  const TOGGLE_COLS = order.length > TOGGLE_ROWS_PER_COL ? 2 : 1;
+  // Balanced columns (ceil(n/2) rows each, at most 6) rather than always filling 6 before wrapping: now that
+  // locked names are listed above the menu, 6-7 unlocked signatures under two name rows would otherwise
+  // reach the ACHIEVEMENTS line at y 206. Balanced, names plus toggles never exceed six rows in total.
+  const TOGGLE_MAX_ROWS = 6;
+  const TOGGLE_COLS = order.length > TOGGLE_MAX_ROWS ? 2 : 1;
+  const TOGGLE_ROWS_PER_COL = Math.max(1, Math.min(TOGGLE_MAX_ROWS, Math.ceil(sigCount / TOGGLE_COLS)));
   const toggleMenu = {
     x: PAD + 2,
     y: lastNameBottom + 2,
@@ -212,7 +237,7 @@ export function profileLayout(o = {}) {
 
   // Physical rows the menu occupies: with two columns that is the taller column, not the row count, which
   // is what the overlap test has to measure.
-  const togglePhysicalRows = Math.min(sigCount, TOGGLE_ROWS_PER_COL) || 0;
+  const togglePhysicalRows = sigCount ? TOGGLE_ROWS_PER_COL : 0;
   return {
     w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu,
     toggleRowCount: sigCount, togglePhysicalRows, achButton, achUnlocked, achTotal, shopButton,
