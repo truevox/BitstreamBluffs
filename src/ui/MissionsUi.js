@@ -9,6 +9,11 @@
 import { NeonText } from './Neon.js';
 import { Panel } from './Panel.js';
 import { missionPanelLayout, missionListLayout, ellipsize } from './MissionsLayout.js';
+// Two different ellipsize helpers exist: MissionsLayout's takes a row width at a fixed 6 px advance, PixelFont's
+// takes real measured font pixels. The toast is measured text on the HUD strip, so it uses PixelFont's.
+import { ellipsize as ellipsizePx, measureText } from './PixelFont.js';
+import { stripTextMaxPx } from './HudLayout.js';
+import { GAME_WIDTH } from '../constants.js';
 
 const fmt = (n) => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
@@ -118,11 +123,29 @@ export function gameOverMissionLines(m) {
 }
 
 /**
+ * Fit "<NAME> DONE  +<XP> XP" on the HUD strip, cutting only the name (with the font's "..") so the reward
+ * always shows. The limit is the strip's real text width (HudLayout.stripTextMaxPx), in measured font px.
+ * @param {string} name already upper-cased
+ * @param {number} xp
+ * @returns {string}
+ */
+export function stripToastText(name, xp) {
+  const suffix = ` DONE  +${fmt(xp)} XP`;
+  const maxPx = stripTextMaxPx(GAME_WIDTH);
+  const full = `${name}${suffix}`;
+  if (measureText(full) <= maxPx) return full;
+  return `${ellipsizePx(name, Math.max(0, maxPx - measureText(suffix)))}${suffix}`;
+}
+
+/**
  * Completion toast text for one finished mission, sized for the MILESTONE strip.
+ *
+ * It used to call MissionsLayout.ellipsize(text, 36), whose second argument is a row width in PIXELS at a
+ * 6 px advance, so every toast was cut to about five letters ("LAND …", audit MT-1).
  * @param {{id:string,xp:number,shards:number}} c @param {string} [title]
  */
 export function missionToastText(c, title) {
   if (!c) return '';
   const name = typeof title === 'string' && title ? title.toUpperCase() : 'MISSION';
-  return ellipsize(`${name} DONE  +${fmt(c.xp)} XP`, 36);
+  return stripToastText(name, c.xp);
 }

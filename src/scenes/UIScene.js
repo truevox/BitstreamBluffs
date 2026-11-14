@@ -26,7 +26,7 @@ import { measureText } from '../ui/PixelFont.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { fmtInt, fmtMult, fmtSec, idToLabel } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
-import { stackY, placeX, placeBand } from '../ui/HudLayout.js';
+import { stackY, placeX, placeBand, STRIP_BAND } from '../ui/HudLayout.js';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -243,7 +243,7 @@ export class UIScene extends Phaser.Scene {
     this.stripC = this.add.container(0, 0);
     this.hud.add(this.stripC);
     this.stripG = new Phaser.GameObjects.Graphics(this);
-    this.stripT = new NeonText(this, this.theme, cx, 61, '', { color: 'cyan', scale: 2, anchor: 'center', outline: 'glow' });
+    this.stripT = new NeonText(this, this.theme, cx, 61, '', { color: 'cyan', scale: STRIP_BAND.textScale, anchor: 'center', outline: 'glow' });
     this.stripC.add([this.stripG, this.stripT]);
     this.stripC.setVisible(false);
     this.hud.sendToBack(this.stripC); // the band sits behind the HUD rows it crosses (score / shards / flow stay readable)

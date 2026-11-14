@@ -149,6 +149,8 @@ const { UIScene } = await import('../../src/scenes/UIScene.js');
 const { measureText } = await import('../../src/ui/PixelFont.js');
 const { defaultProfile } = await import('../../src/systems/Progression.js');
 const { loadContent } = await import('./_helpers.js');
+const { missionToastText } = await import('../../src/ui/MissionsUi.js');
+const { xpForTemplate } = await import('../../src/systems/Missions.js');
 
 const LEVELS = JSON.parse(fs.readFileSync(path.resolve('src/data/progression/levels.json'), 'utf8'));
 const PALETTES = JSON.parse(fs.readFileSync(path.resolve('src/data/palettes.json'), 'utf8'));
@@ -265,5 +267,44 @@ describe('GO-1 / U6a: a level-up that unlocks a biome names it', () => {
     const line = g._rewardsLine({ leveledTo: 5, rewardsEarned: [{ level: 5, biome: 'garbage-dump-glacier' }] });
     expect(line).toBe(`SIGNATURE ONLINE: ${CONTENT.biomes['garbage-dump-glacier'].name.toUpperCase()}`);
     expect(measureText(line)).toBeLessThanOrEqual(280);
+  });
+});
+
+// ================================================================== MT-1: mission toast width
+
+describe('MT-1: the in-run mission toast fits the 480 px strip, not 36 px', () => {
+  const MISSIONS = JSON.parse(fs.readFileSync(path.resolve('src/data/missions/missions.json'), 'utf8'));
+  // The strip text is drawn at scale 2 across the full-width band; 8 px clear at each edge.
+  const STRIP_TEXT_PX = GAME_WIDTH - 2 * 8;
+  const toastFor = (t) => missionToastText({ id: t.id, xp: xpForTemplate(t), shards: 0 }, t.title);
+
+  test('the longest mission title in missions.json is shown whole', () => {
+    const full = (t) => `${t.title.toUpperCase()} DONE  +${xpForTemplate(t)} XP`;
+    const longest = [...MISSIONS.templates].sort((a, b) => measureText(full(b)) - measureText(full(a)))[0];
+    const text = toastFor(longest);
+    expect(text).toBe(full(longest));
+    expect(measureText(text) * 2).toBeLessThanOrEqual(STRIP_TEXT_PX);
+  });
+
+  test('every mission title fits whole', () => {
+    for (const t of MISSIONS.templates) {
+      const text = toastFor(t);
+      expect(text).toContain(t.title.toUpperCase());
+      expect(measureText(text) * 2).toBeLessThanOrEqual(STRIP_TEXT_PX);
+    }
+  });
+
+  test('a title that truly cannot fit is cut with the font\'s ".." and keeps its XP', () => {
+    const text = missionToastText({ id: 'x', xp: 60 }, 'Land a quadruple backflip into a heli into a parachute without touching the ground');
+    expect(text).toMatch(/\.\. DONE {2}\+60 XP$/);
+    expect(measureText(text) * 2).toBeLessThanOrEqual(STRIP_TEXT_PX);
+    expect(text).not.toContain('\u2026'); // the pixel font has no ellipsis glyph
+  });
+
+  test('the strip text object is drawn at the scale the limit assumes', async () => {
+    const { STRIP_BAND } = await import('../../src/ui/HudLayout.js');
+    expect(STRIP_BAND.textScale).toBe(2);
+    const src = fs.readFileSync(path.resolve('src/scenes/UIScene.js'), 'utf8');
+    expect(src).toMatch(/this\.stripT = new NeonText\([^)]*scale: STRIP_BAND\.textScale/);
   });
 });

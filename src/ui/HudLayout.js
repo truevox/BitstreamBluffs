@@ -5,6 +5,22 @@
  * HUD rows and the on-screen touch buttons, and to find a free spot for the bottom row (power-ups, tutorial chip).
  */
 
+/**
+ * The full-width HUD strip (sector, NEW BEST, biome banner, mission toasts): band height, the scale its text
+ * is drawn at, and the clear margin kept at each screen edge. UIScene draws the strip from these numbers and
+ * MissionsUi sizes the mission toast from them, so the two cannot disagree about how much text fits.
+ */
+export const STRIP_BAND = Object.freeze({ h: 17, textScale: 2, margin: 8 });
+
+/**
+ * Widest strip text, in UNSCALED font pixels (PixelFont.measureText units), that fits the band.
+ * @param {number} [width=480] screen width in game px
+ * @returns {number}
+ */
+export function stripTextMaxPx(width = 480) {
+  return Math.floor((width - 2 * STRIP_BAND.margin) / STRIP_BAND.textScale);
+}
+
 /** True when the two rectangles overlap (pad grows `b` on every side: a minimum clear gap). */
 export function rectsHit(a, b, pad = 0) {
   return a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
