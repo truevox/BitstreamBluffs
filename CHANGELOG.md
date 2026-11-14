@@ -48,7 +48,7 @@
 - **U6b:** the Game Over shop hint reads `SHOP: B / LB`, so pad players (for whom B means back to Title) see the pad key too. It still clears every footer variant at 480x270.
 - **F-LEAD-2:** Game Over's DISTANCE BEST line for a clean run now ignores boosted runs (filtered through `Ranking.rankableOnly`), so a clean player is no longer told they are thousands of metres short of a Head Start run.
 - **MT-1:** in-run mission-complete toasts show the whole mission title again (they were cut to about five letters, "LAND …"). The limit now comes from the strip's real text width and scale (`HudLayout.STRIP_BAND`, `stripTextMaxPx`), measured in font pixels; only a title that truly cannot fit is cut, with "..", and the XP always shows.
-- **GO-1 / U6a:** a Game Over level-up that unlocks a biome now says `SIGNATURE ONLINE: <BIOME NAME>` instead of the stale `SIGNATURE LOCKED - COMING ONLINE` (all 11 biomes ship).
+- **GO-1 / U6a:** a Game Over level-up that unlocks a biome now says `SIGNATURE ONLINE: <BIOME NAME>` instead of the stale `SIGNATURE LOCKED - COMING ONLINE` (all 11 biomes ship). The biome comes first and is never cut; a double level-up that unlocks two names both (`SIGNATURES ONLINE: A, B`) or, if they cannot fit, says `2 SIGNATURES ONLINE`.
 - **U6c:** the Game Over header comment now names the real keys: Esc and pad B go to the title; keyboard B and pad LB / LT open the shop.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)

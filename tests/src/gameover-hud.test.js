@@ -262,6 +262,27 @@ describe('GO-1 / U6a: a level-up that unlocks a biome names it', () => {
     expect(line).toContain('SIGNATURE ONLINE: DEBUMONT');
   });
 
+  test('every biome level names its biome in full, alone, with its own cosmetic, or after a double level-up', () => {
+    const g = makeScene(GameOverScene.prototype);
+    const levels = LEVELS.levels;
+    const nameOf = (id) => CONTENT.biomes[id].name.toUpperCase();
+    for (let i = 0; i < levels.length; i++) {
+      const lv = levels[i];
+      if (!lv.biome) continue;
+      for (const earned of [[lv], [levels[i - 1], lv].filter(Boolean)]) {
+        const line = g._rewardsLine({ leveledTo: lv.level, rewardsEarned: earned });
+        const ids = earned.filter((r) => r.biome).map((r) => r.biome);
+        // One biome: always named in full. Two at once (a double level-up): both named, or the count when
+        // both names cannot fit 280 px - never a name cut to "..".
+        const ok = ids.length === 1
+          ? line.startsWith(`SIGNATURE ONLINE: ${nameOf(lv.biome)}`)
+          : line.startsWith(`SIGNATURES ONLINE: ${ids.map(nameOf).join(', ')}`) || line.startsWith(`${ids.length} SIGNATURES ONLINE`);
+        expect([lv.level, line, ok]).toEqual([lv.level, line, true]);
+        expect(measureText(line)).toBeLessThanOrEqual(280);
+      }
+    }
+  });
+
   test('with content loaded, the biome display name is used, not its id', () => {
     const g = makeScene(GameOverScene.prototype);
     const line = g._rewardsLine({ leveledTo: 5, rewardsEarned: [{ level: 5, biome: 'garbage-dump-glacier' }] });

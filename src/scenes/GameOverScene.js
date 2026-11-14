@@ -21,7 +21,7 @@ import {
   columnRows, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, GAMEOVER_BOARD_ROW_H,
   GAMEOVER_MISSIONS_RULE_Y, entryLayout,
 } from '../ui/MissionsLayout.js';
-import { ellipsize } from '../ui/PixelFont.js';
+import { ellipsize, measureText } from '../ui/PixelFont.js';
 // Whether a boosted run may rank is Ranking.js's decision alone (W4's single-helper rule), so this scene
 // asks it instead of testing rec.modded itself.
 import { boardsModded, rankableOnly } from '../systems/Ranking.js';
@@ -61,15 +61,8 @@ const SHOP_AFTER_ENTRY_MS = 500;
  */
 const SHOP_HINT = 'SHOP: B / LB';
 
-/**
- * "SIGNATURE ONLINE: <BIOME>" for a level that unlocked a biome. All 11 biomes ship, so the old
- * "SIGNATURE LOCKED - COMING ONLINE" was false (audit GO-1 / U6a). The display name comes from the loaded
- * content when a registry is given; the id is the fallback, so this never throws on a partial scene.
- * @param {string} id biome id
- * @param {{get:function(string):*}} [registry]
- * @returns {string}
- */
-function biomeOnlineLine(id, registry) {
+/** Display name of a biome, upper-cased: from the loaded content when a registry is given, else from the id. */
+function biomeLabel(id, registry) {
   let name = '';
   try {
     const biomes = (registry && typeof registry.get === 'function' && (registry.get(REG.CONTENT) || {}).biomes) || {};
@@ -77,7 +70,38 @@ function biomeOnlineLine(id, registry) {
     name = def && def.name ? String(def.name) : '';
   } catch (e) { /* fall back to the id */ }
   if (!name) name = String(id || '').replace(/[-_]/g, ' ');
-  return `SIGNATURE ONLINE: ${name.toUpperCase()}`;
+  return name.toUpperCase();
+}
+
+/**
+ * What a level-up unlocked in biomes: "SIGNATURE ONLINE: <BIOME>", or "SIGNATURES ONLINE: A, B" for a
+ * multi-level jump. All 11 biomes ship, so the old "SIGNATURE LOCKED - COMING ONLINE" was false (audit GO-1 /
+ * U6a). When several names cannot fit `maxPx`, it says how many came online instead of cutting a name.
+ * @param {string[]} ids biome ids
+ * @param {{get:function(string):*}} [registry]
+ * @param {number} [maxPx]
+ * @returns {string} '' when there are none
+ */
+function biomeOnlineLine(ids, registry, maxPx = 280) {
+  const names = ids.map((id) => biomeLabel(id, registry));
+  if (!names.length) return '';
+  if (names.length === 1) return `SIGNATURE ONLINE: ${names[0]}`;
+  const all = `SIGNATURES ONLINE: ${names.join(', ')}`;
+  return measureText(all) <= maxPx ? all : `${names.length} SIGNATURES ONLINE`;
+}
+
+/**
+ * `head / tail` within maxPx, cutting only the tail (and dropping it when too little room is left for a
+ * readable piece). The head is the part that must never lose its words.
+ * @param {string} head @param {string} tail @param {number} maxPx
+ * @returns {string}
+ */
+function withTail(head, tail, maxPx) {
+  if (!tail) return ellipsize(head, maxPx);
+  const full = `${head} / ${tail}`;
+  if (measureText(full) <= maxPx) return full;
+  const room = maxPx - measureText(`${head} / `);
+  return room >= 40 ? `${head} / ${ellipsize(tail, room)}` : ellipsize(head, maxPx);
 }
 
 export class GameOverScene extends Phaser.Scene {
@@ -448,20 +472,24 @@ export class GameOverScene extends Phaser.Scene {
   _rewardsLine(awards) {
     if (awards.leveledTo && Array.isArray(awards.rewardsEarned)) {
       const bits = [];
+      // A new biome is the biggest unlock, so it goes first and is never cut: the line is limited to 280 px,
+      // and a biome listed after a cosmetic or a boost lost its name to the ".." on a double level-up.
+      const biomes = biomeOnlineLine(awards.rewardsEarned.filter((r) => r && r.biome).map((r) => r.biome), this && this.registry);
       for (const reward of awards.rewardsEarned) {
+        if (!reward) continue;
         // Label the cosmetic as an unlock: a bare "TRAIL-CYAN" reads like a leftover id, not something
         // the player just earned (CC Friday's PR #17 note). Boosts stay bare-but-dashed for width.
         if (reward.cosmetic) bits.push(`UNLOCKED ${String(reward.cosmetic).toUpperCase().replace(/-/g, ' ')}`);
         if (reward.boost) bits.push(String(reward.boost).toUpperCase());
-        if (reward.biome) bits.push(biomeOnlineLine(reward.biome, this && this.registry));
       }
+      if (biomes) return withTail(biomes, bits.join(' / '), 280);
       if (bits.length) return ellipsize(bits.join(' / '), 280);
     }
     if (awards.leveledTo && awards.rewards) {
       const bits = [];
       if (awards.rewards.title) bits.push(String(awards.rewards.title).toUpperCase());
       if (awards.rewards.cosmetic) bits.push(String(awards.rewards.cosmetic).toUpperCase());
-      if (awards.rewards.biome) bits.push(biomeOnlineLine(awards.rewards.biome, this && this.registry));
+      if (awards.rewards.biome) return withTail(biomeOnlineLine([awards.rewards.biome], this && this.registry), bits.join(' / '), 280);
       if (bits.length) return ellipsize(bits.join(' / '), 280);
     }
     const toNext = awards.progress ? awards.progress.xpToNext : 0;
