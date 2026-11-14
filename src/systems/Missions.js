@@ -151,6 +151,15 @@ function comboRequirement(t) {
  */
 export function satisfies(t, ctx) {
   if (!t || typeof t !== 'object') return false;
+  // A biome mission ("1500 m in Debumont") is met only on a run that had that biome switched on. The mask
+  // is the run's (record.biomeMask, or the live counters' copy mid-run); the bit is resolved exactly as the
+  // draw gate resolves it, so a mission can never be offered under one rule and completed under another.
+  if (t.biome) {
+    const live = ctx && ctx.live;
+    const record = ctx && ctx.record;
+    const runMask = live && isNum(live.biomeMask) ? live.biomeMask : (record && isNum(record.biomeMask) ? record.biomeMask : 0);
+    if (!maskCoversBiome(runMask, t.biome, ctx && ctx.biomeDefs)) return false;
+  }
   if (t.type === 'combo') {
     const req = comboRequirement(t);
     if (!req.length) return false;
@@ -245,17 +254,29 @@ export function isOfferable(t, profile, ruleId, biomeDefs) {
     // from the biome table, because `profile.biomeOrder` is never set - gating on it meant the mask was
     // never consulted at all.
     const mask = profile && isNum(profile.biomeMask) ? profile.biomeMask : 0;
-    const def = defs.find((d) => d && d.id === t.biome);
-    const bit = def && isNum(def.bit) ? def.bit : null;
-    if (bit === null) {
-      // No table to resolve against (a legacy two-argument caller): fail closed on the mask only if the
-      // profile has switched everything off, which is the one case we can decide without the table.
-      if (!mask) return false;
-    } else if ((mask & bit) === 0) {
-      return false;
-    }
+    if (!maskCoversBiome(mask, t.biome, defs)) return false;
   }
   return true;
+}
+
+/**
+ * Does a biome mask include this biome? Shared by the draw gate (the profile's mask) and the completion gate
+ * (the run's mask) so the two can never drift.
+ *
+ * With no table to resolve the id against (a legacy caller), the only decidable case is "everything off",
+ * so that fails closed and any non-zero mask passes; with a table, the biome's own bit must be set.
+ * @param {number} mask
+ * @param {string} biomeId
+ * @param {Array<{id:string,bit:number}>} [biomeDefs]
+ * @returns {boolean}
+ */
+function maskCoversBiome(mask, biomeId, biomeDefs) {
+  const m = isNum(mask) ? mask >>> 0 : 0;
+  const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
+  const def = defs.find((d) => d && d.id === biomeId);
+  const bit = def && isNum(def.bit) ? def.bit : null;
+  if (bit === null) return m !== 0;
+  return (m & bit) !== 0;
 }
 
 /**
@@ -393,7 +414,9 @@ export function rollSet(profile, activeTemplates, record, allTemplates, o = {}) 
   let shards = 0;
 
   for (const t of slots) {
-    const ctx = { record: record || {}, profile: { ...p, missions: { ...prevMissions, progress: prevProgress } }, live: o.live };
+    const ctx = {
+      record: record || {}, profile: { ...p, missions: { ...prevMissions, progress: prevProgress } }, live: o.live, biomeDefs: o.biomeDefs,
+    };
     const done = (t.type === 'combo' && o.completedComboIds instanceof Set && o.completedComboIds.has(t.id)) || satisfies(t, ctx);
     if (done) {
       const gainXp = xpForTemplate(t);

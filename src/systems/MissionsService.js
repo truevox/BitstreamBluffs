@@ -84,7 +84,15 @@ export class MissionsService {
     const on = (name, fn) => { ev.on(name, fn); this._bound.push([name, fn]); };
 
     this.resetLive();
-    on(EVT.RUN_START, () => { this.resetLive(); this._completedThisRun.clear(); });
+    on(EVT.RUN_START, () => {
+      this.resetLive();
+      this._completedThisRun.clear();
+      // The run's biome mask, so a biome mission toasts live only when this run can actually pay it.
+      // RunScene resolves REG.BIOME_MASK once in create(), before it emits RUN_START, and never re-reads it.
+      const reg = this.game.registry;
+      const mask = reg && typeof reg.get === 'function' ? reg.get(REG.BIOME_MASK) : 0;
+      this.live.biomeMask = Number.isFinite(mask) ? mask >>> 0 : 0;
+    });
     on(EVT.DISTANCE_CHANGED, (p) => { this.live.distanceM = (p && p.meters) || 0; this._checkLive(); });
     on(EVT.SCORE_CHANGED, (p) => { this.live.score = (p && p.total) || 0; this._checkLive(); });
     on(EVT.SHARD_COLLECTED, () => { this.live.shards += 1; this._checkLive(); });
@@ -123,7 +131,7 @@ export class MissionsService {
     if (!this.alive || !this.store) return;
     const p = this.profile;
     if (!p) return;
-    const ctx = { live: this.live, record: this.live, profile: p };
+    const ctx = { live: this.live, record: this.live, profile: p, biomeDefs: this.biomeDefs };
     for (const t of activeTemplates(p, this.templates)) {
       if (!t || this._completedThisRun.has(t.id)) continue;
       if (t.type === 'combo' && !landed) continue;

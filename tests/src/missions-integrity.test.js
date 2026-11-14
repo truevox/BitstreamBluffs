@@ -12,6 +12,7 @@ import { ProgressionService } from '../../src/systems/ProgressionService.js';
 import { MissionsService } from '../../src/systems/MissionsService.js';
 import { rollSet } from '../../src/systems/Missions.js';
 import { REG } from '../../src/constants.js';
+import { EVT } from '../../src/events.js';
 
 const read = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const LEVELS = read('src/data/progression/levels.json');
@@ -111,5 +112,51 @@ describe('MS-1: published cumulative progress is what is banked', () => {
     store.applyMissions({ active: [t.id], counter: 5, progress: {}, xp: 0, shards: 0 });
     missions.publish();
     expect(game.registry.get(REG.MISSIONS).active.find((r) => r.id === t.id)).toMatchObject({ text: '0/500', done: false });
+  });
+});
+
+describe('MS-2: a biome mission completes only on a run with that biome switched on', () => {
+  const t = MISSIONS.templates.find((x) => x.id === 't4-biome-debumont');
+  const deb = BIOME_DEFS.find((d) => d.id === 'debumont');
+  const other = BIOME_DEFS.find((d) => d.id !== 'debumont');
+  const prof = () => v1({ xp: MAX_XP, biomeMask: deb.bit, missions: { counter: 1, active: [t.id], progress: {} } });
+  const roll = (mask, defs = BIOME_DEFS) => rollSet(prof(), [t], rec({ distanceM: 1600, ...(mask === undefined ? {} : { biomeMask: mask }) }), MISSIONS.templates, { biomeDefs: defs })
+    .completed.map((c) => c.id);
+
+  test('"1500 m in Debumont" is not completed by a run with no biome on', () => {
+    expect(roll(0)).toEqual([]);
+    expect(roll(undefined)).toEqual([]);
+  });
+
+  test('nor by a run whose mask has only other biomes', () => {
+    expect(roll(other.bit)).toEqual([]);
+  });
+
+  test('a 1600 m run with the Debumont bit on completes it', () => {
+    expect(roll(deb.bit)).toEqual([t.id]);
+    expect(roll(deb.bit | other.bit)).toEqual([t.id]);
+  });
+
+  test('without a biome table the gate still needs some biome on (legacy fallback)', () => {
+    expect(roll(0, undefined)).toEqual([]);
+    expect(roll(deb.bit, undefined)).toEqual([t.id]);
+  });
+
+  async function liveToasts(mask) {
+    const { game, store, missions } = await boot(memStorage());
+    store.applyMissions({ active: [t.id], counter: 5, progress: {}, xp: 0, shards: 0 });
+    store.save({ ...store.profile, xp: MAX_XP, biomeMask: deb.bit });
+    const got = [];
+    game.events.on(EVT.MISSION_COMPLETED, (p) => got.push(p.id));
+    game.registry.set(REG.BIOME_MASK, mask);
+    game.events.emit(EVT.RUN_START, { runId: 'r', seed: 's' });
+    game.events.emit(EVT.DISTANCE_CHANGED, { meters: 1600 });
+    missions.destroy();
+    return got;
+  }
+
+  test('the live toast follows the same rule as the payout', async () => {
+    expect(await liveToasts(0)).toEqual([]);
+    expect(await liveToasts(deb.bit)).toEqual([t.id]);
   });
 });
