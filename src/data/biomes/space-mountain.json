@@ -1,0 +1,14 @@
+{
+  "id": "space-mountain",
+  "bit": 32,
+  "name": "Space Mountain",
+  "unlockLevel": 19,
+  "lore": "The whole mountain is in freefall and so are you. Land late, land long.",
+  "background": "stars",
+  "mod": "lowGravity",
+  "chunks": ["big-air-drop", "valley-launch", "ski-jump"],
+  "palettes": {
+    "default": { "bg": "#02040e", "bgAlt": "#0a1030", "cyan": "#6fd8ff", "magenta": "#b07cff", "lime": "#8dffd0", "amber": "#ffd98a", "text": "#e6f2ff" },
+    "colorblind": { "bg": "#02040e", "bgAlt": "#0a1030", "cyan": "#7fb8dc", "magenta": "#a48cd0", "lime": "#86dcc0", "amber": "#dcc08a", "text": "#eef4fb" }
+  }
+}

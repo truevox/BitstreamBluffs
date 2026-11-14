@@ -1,0 +1,14 @@
+{
+  "id": "steampunk-slopes",
+  "bit": 256,
+  "name": "Steampunk Slopes",
+  "unlockLevel": 26,
+  "lore": "Somebody bolted a belt to the mountain. It is going the wrong way on purpose.",
+  "background": "brass-pipes",
+  "mod": "conveyorBelt",
+  "chunks": ["plateau-cruise", "gentle-roller", "step-down"],
+  "palettes": {
+    "default": { "bg": "#1a1008", "bgAlt": "#33200c", "cyan": "#ffc46b", "magenta": "#d08850", "lime": "#c8e88a", "amber": "#ffe0a0", "text": "#fff6e8" },
+    "colorblind": { "bg": "#1a1008", "bgAlt": "#33200c", "cyan": "#dcc09a", "magenta": "#c09c80", "lime": "#c8dca0", "amber": "#e8d4b0", "text": "#fbf4ea" }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "micro-mountain",
+  "bit": 512,
+  "name": "Micro Mountain",
+  "unlockLevel": 27,
+  "lore": "Six centimetres of mountain, swelling under you like a held breath.",
+  "background": "dew-drops",
+  "mod": "dewSwell",
+  "chunks": ["rolling-hills", "gentle-roller", "noise-glitch-field"],
+  "palettes": {
+    "default": { "bg": "#04140c", "bgAlt": "#0c2a18", "cyan": "#8fffc0", "magenta": "#c08fff", "lime": "#d8ff8a", "amber": "#ffe8a0", "text": "#eafff2" },
+    "colorblind": { "bg": "#04140c", "bgAlt": "#0c2a18", "cyan": "#8fd8b0", "magenta": "#a8a0d0", "lime": "#c8e8a0", "amber": "#dcd0a0", "text": "#eefaf4" }
+  }
+}

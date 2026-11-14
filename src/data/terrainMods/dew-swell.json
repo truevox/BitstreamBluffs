@@ -1,0 +1,9 @@
+{
+  "id": "dewSwell",
+  "colorKey": "cyan",
+  "physics": {},
+  "terrainSwell": { "amplitudePx": 26, "periodPx": 220 },
+  "weight": 3,
+  "minDistanceM": 150,
+  "lengthPx": [420, 900]
+}

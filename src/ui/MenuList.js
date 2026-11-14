@@ -19,7 +19,13 @@ export class MenuList extends Phaser.GameObjects.Container {
    * @param {Phaser.Scene} scene
    * @param {import('./Theme.js').Theme} theme
    * @param {{x:number,y:number,w:number,rowH?:number,items:object[],color?:string,align?:'left'|'center',scale?:number,
-   *          parent?:Phaser.GameObjects.Container, onBack?:function():void}} o
+   *          parent?:Phaser.GameObjects.Container, onBack?:function():void,
+   *          columns?:number, rowsPerColumn?:number}} o
+   *
+   * `columns` > 1 lays the SAME list out column-major: item i fills column floor(i / rowsPerColumn),
+   * row i % rowsPerColumn. Column-major rather than row-major so up/down keep walking down a column and
+   * only wrap into the next one at the bottom; row-major would make `down` jump sideways. Default 1
+   * leaves every existing menu pixel-identical.
    */
   constructor(scene, theme, o) {
     super(scene, o.x, o.y);
@@ -30,6 +36,11 @@ export class MenuList extends Phaser.GameObjects.Container {
     this.colorKey = o.color || 'cyan';
     this.align = o.align || 'left';
     this.scale1 = o.scale || 1;
+    // W6: the biome toggle list outgrew one column (11 signatures), so the list can split. Geometry is
+    // computed once here and every row reads it, so a row can never disagree with its own hit zone.
+    this.columns = Math.max(1, Math.floor(o.columns || 1));
+    this.rowsPerColumn = Math.max(1, Math.floor(o.rowsPerColumn || this.items.length || 1));
+    this.colW = this.w / this.columns;
     this.selected = this.items.findIndex((i) => !i.disabled);
     if (this.selected < 0) this.selected = 0;
     this.dragging = -1;
@@ -41,27 +52,37 @@ export class MenuList extends Phaser.GameObjects.Container {
     this._unbind = theme.bind(() => this.refresh());
   }
 
+  /** Column-major cell for item i: which column, and which row inside it. */
+  _cell(i) {
+    return { col: Math.floor(i / this.rowsPerColumn), rowInCol: i % this.rowsPerColumn };
+  }
+
   _buildRow(scene, item, i) {
-    const y = i * this.rowH;
+    const { col, rowInCol } = this._cell(i);
+    const x0 = col * this.colW;
+    const y = rowInCol * this.rowH;
     const cy = y + this.rowH / 2;
     const center = this.align === 'center';
-    const label = new NeonText(scene, this.theme, center ? this.w / 2 : 14, cy, item.label, {
+    const label = new NeonText(scene, this.theme, x0 + (center ? this.colW / 2 : 14), cy, item.label, {
       color: item.color || 'text', scale: this.scale1, anchor: center ? 'center' : 'left', vAnchor: 0.5,
     });
     this.add(label);
     const row = { label, value: null, sub: null, zone: null };
     if (item.kind === 'choice' || item.kind === 'slider') {
-      row.value = new NeonText(scene, this.theme, this.w - 8, cy, '', { color: this.colorKey, anchor: 'right', vAnchor: 0.5 });
+      row.value = new NeonText(scene, this.theme, x0 + this.colW - 8, cy, '', { color: this.colorKey, anchor: 'right', vAnchor: 0.5 });
       this.add(row.value);
     }
     if (item.sub) {
-      row.sub = new NeonText(scene, this.theme, this.w - 8, cy, item.sub, {
+      row.sub = new NeonText(scene, this.theme, x0 + this.colW - 8, cy, item.sub, {
         color: 'text', anchor: 'right', vAnchor: 0.5, outline: 'none',
       });
       row.sub.setAlpha(0.6);
       this.add(row.sub);
     }
-    const zone = new Phaser.GameObjects.Zone(scene, 0, y, this.w, this.rowH).setOrigin(0, 0);
+    // W6's column geometry AND W5's static rows: the zone is sized to the COLUMN, and a static row gets no
+    // zone at all. Both matter — a full-width zone under a two-column list would let a click in the left
+    // column select a row in the right one.
+    const zone = new Phaser.GameObjects.Zone(scene, x0, y, this.colW, this.rowH).setOrigin(0, 0);
     // 'static' rows are headings and summary lines: they are drawn by the same list so they share its
     // geometry, but they must never take focus or swallow a click meant for the row beneath.
     if (item.kind === 'static') {

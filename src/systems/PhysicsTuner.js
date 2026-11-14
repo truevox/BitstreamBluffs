@@ -250,6 +250,8 @@ export const TUNING = Object.freeze({
  * @property {number} [groundResist]     manual runner resistance 1/s.
  * @property {number} [quadDrag]
  * @property {number} [pushForceMul]
+ * @property {number} [beltDrivePxS2]  horizontal drive from conveyor-belt zones (px/s^2), always >= 0.
+ * @property {number} [beltDirection]  +1 the belt carries you forward, -1 it fights you.
  * @property {number} [scrambleJitterDegS2] random torque amplitude while scrambled.
  * @property {number} [restitution]
  */
@@ -297,6 +299,49 @@ export function airIdleSpin(w, angle, vx, vy, dt, t = TUNING, ctx = null) {
   const u = Math.min(t.airIdleUrgencyMax, Math.max(1, t.airIdleUrgencyRefMs / Math.max(eta, 1)));
   const spring = Math.max(-1.2, Math.min(1.2, err)) * t.airIdleLevelK * u * u * dt;
   return (w + spring) * Math.exp(-t.airIdleSpinDamp * u * dt);
+}
+
+/**
+ * Conveyor belt, one physics step (pure; Sled.applyControls feeds it and applies the result).
+ * A belt carries the sled along the surface tangent while it is grounded, with no player input — that is
+ * the whole mechanic. `drivePxS2` is always a positive magnitude and `direction` carries the sign, so a
+ * caller cannot add a negative magnitude by mistake, and `direction: -1` is a belt fighting the player.
+ * Returns a velocity delta in px/s to add this step; zero when airborne or when no belt is under the sled.
+ * @param {{grounded:boolean, drivePxS2:number, direction:number, slopeDeg:number, stepMs:number}} i
+ * @returns {{dvx:number, dvy:number}}
+ */
+export function conveyorStep(i) {
+  if (!i || !i.grounded || !(i.drivePxS2 > 0)) return { dvx: 0, dvy: 0 };
+  const rad = ((i.slopeDeg || 0) * Math.PI) / 180;
+  const drive = i.drivePxS2 * (i.direction === -1 ? -1 : 1) * ((i.stepMs || 0) / 1000);
+  return { dvx: Math.cos(rad) * drive, dvy: Math.sin(rad) * drive };
+}
+
+/**
+ * Geyser vent, one physics step (W6, Vertigo Vents; pure — Sled.applyControls supplies it and applies the result).
+ *
+ * The spec's W6 table says "Geysers that launch you", and `geyser-vent.json` has carried
+ * `launch: { velocityPxS, cooldownMs }` since the biome shipped — but nothing ever read the field, so the
+ * mechanic did not exist while its data and schema looked present. This is the same failure shape as the
+ * conveyor belt's unused `direction`; both are why "the data is there" is never evidence that a mechanic works.
+ *
+ * A vent fires only from the ground, and only when its cooldown has expired — without that, a vent under the
+ * sled would kick on every physics step and hold the sled in the air forever.
+ *
+ * @param {{grounded:boolean, launch?:{velocityPxS?:number, cooldownMs?:number}, cooldownLeftMs?:number}} i
+ * @param {number} [defaultCooldownMs] used when the vent's data omits a usable cooldown.
+ * @returns {{fire:boolean, dvy:number, cooldownMs:number}} upward velocity change (px/s, negative = up).
+ */
+export function geyserStep(i, defaultCooldownMs = 900) {
+  const inert = { fire: false, dvy: 0, cooldownMs: 0 };
+  if (!i || !i.grounded) return inert;
+  const l = i.launch;
+  if (!l || typeof l !== 'object') return inert;
+  const v = l.velocityPxS;
+  if (!Number.isFinite(v) || v <= 0) return inert;
+  if ((i.cooldownLeftMs || 0) > 0) return inert;
+  const cd = Number.isFinite(l.cooldownMs) && l.cooldownMs > 0 ? l.cooldownMs : defaultCooldownMs;
+  return { fire: true, dvy: -v, cooldownMs: cd };
 }
 
 /**
@@ -351,14 +396,39 @@ export class PhysicsTuner {
     let gravityMul = daily.gravityMul || 1;
     let frictionMul = daily.frictionMul || 1;
     let bounceMul = 1;
+    // W6: the surface-feel multipliers a zone can carry. Kept separate from the three base ones so the
+    // existing mods read exactly as before; each defaults to 1 and multiplies, so two overlapping zones
+    // compound rather than one silently winning.
+    let zoneSpeedMul = 1;
+    let zoneSteerMul = 1;
+    let zonePushMul = 1;
+    // W6 conveyor: a belt drives the sled itself, so its force must not be folded into a multiplier on
+    // the player's push key (which only fires on flat ground while W is held — a belt that needs you to
+    // push is not a belt). The magnitude accumulates and the sign is carried separately in
+    // beltDirection, so a consumer cannot add a negative magnitude by mistake.
+    let beltDrive = 0;
+    let beltDirection = 1;
+    // W6 geysers: the vent's launch data, resolved here so the consumer does not walk the zone list again.
+    // `launch` lives on the MOD DEF (geyser-vent.json), not on zone.physics, so it is read from the def.
+    let geyserLaunch = null;
     for (const z of zones) {
       const p = (z && z.physics) || {};
       if (p.gravityMul) gravityMul *= p.gravityMul;
       if (p.frictionMul) frictionMul *= p.frictionMul;
       if (p.bounceMul) bounceMul *= p.bounceMul;
+      if (p.speedMul) zoneSpeedMul *= p.speedMul;
+      if (p.steerMul) zoneSteerMul *= p.steerMul;
+      if (p.pushForceMul) zonePushMul *= p.pushForceMul;
+      if (p.beltDrivePxS2 > 0) {
+        beltDrive += p.beltDrivePxS2;
+        // Last zone wins the sign. Two belts facing opposite ways is a data situation the shipped table
+        // does not produce; picking the nearer (last) zone keeps the behaviour deterministic.
+        beltDirection = (z && z.direction) === -1 || (z && z.physics && z.physics.direction) === -1 ? -1 : 1;
+      }
+      if (z && z.launch && typeof z.launch === 'object') geyserLaunch = z.launch;
     }
 
-    let speedMul = ctx.speedBoost || 1;
+    let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul;
     if (ctx.slowed) speedMul *= ctx.slowFactor || b.slowFactor;
     let dragMul = 1;
     let steerMul = 1;
@@ -393,14 +463,17 @@ export class PhysicsTuner {
       frictionAir: (b.dragUntucked * t.dragFeelMul * dragMul) / Math.max(0.2, speedMul),
       groundFriction: t.groundFriction * frictionMul * frictionBrake,
       tiltTorqueDegS2: b.maxTiltTorqueDegS2,
-      airControl: b.airControlFactor * t.airTiltFeelMul * (daily.airControlMul || 1),
+      airControl: b.airControlFactor * t.airTiltFeelMul * (daily.airControlMul || 1) * zoneSteerMul,
       bounceMul,
       speedMul,
       steerMul,
       tiltSign,
       groundResist: resistBase,
       quadDrag: t.quadDrag,
-      pushForceMul: daily.pushForceMul || 1,
+      pushForceMul: (daily.pushForceMul || 1) * zonePushMul,
+      beltDrivePxS2: beltDrive,
+      beltDirection,
+      geyserLaunch,
       scrambleJitterDegS2: jitter,
       restitution: Math.min(0.9, 0.02 * bounceMul * bounceMul),
     };

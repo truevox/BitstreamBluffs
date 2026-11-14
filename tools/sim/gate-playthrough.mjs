@@ -538,6 +538,21 @@ async function main() {
                 bad,
                 clipped: clipped.map((r) => `${r.text}(${r.x.toFixed(1)},${r.y.toFixed(1)},${r.w.toFixed(1)}x${r.inkH.toFixed(1)})`),
                 minInkH: rects.length ? Math.min(...rects.map((r) => r.inkH)) : 0,
+                // Diagnostics for a title read that comes back empty: is the scene active, does the panel
+                // exist, does the panel have a title object, and what does the raw string look like?
+                diag: {
+                  active: Boolean(over.scene && over.scene.isActive && over.scene.isActive()),
+                  hasRight: Boolean(over.right),
+                  hasTitleText: Boolean(tt),
+                  hasMain: Boolean(tt && tt.main),
+                  rawTitle: tt && tt.main ? JSON.stringify(tt.main.text) : 'no-main',
+                  titleVisible: tt ? tt.visible !== false : null,
+                  rightTitle: over.right && over.right.titleText && over.right.titleText.main
+                    ? JSON.stringify(over.right.titleText.main.text) : 'n/a',
+                  hasEntry: Boolean(over.entry),
+                  recId: over.rec ? over.rec.id : null,
+                  moddedFlag: over.modded,
+                },
               };
             };
 
@@ -575,7 +590,7 @@ async function main() {
               const all = st.texts.join(' | ') + ' | ' + st.title;
               const claimsClean = /\bNEW TOP 10\b/.test(all) || /NEW SEED BEST/.test(all) || /TODAY'S BEST/.test(all);
               if (claimsClean) return `claims clean-board honour: ${all.slice(0, 160)}`;
-              if (!st.title) return 'missing ledger title';
+              if (!st.title) return `missing ledger title ${JSON.stringify(st.diag)}`;
               if (!/MODDED/i.test(st.title)) return `title missing MODDED: "${st.title}"`;
               if (!/MODDED/i.test(all)) return `screen missing MODDED: ${all.slice(0, 160)}`;
               if (st.count < 25) return `too few glyphs (${st.count})`;
@@ -1337,6 +1352,170 @@ async function main() {
         else pass('colourblind mode refuses the equipped cosmetics', 'rider fell back to the palette');
       } finally { /* page closed above */ }
     }
+
+    // ---- W6: a conveyor belt moves the real sled with no input. This is the check the pure-unit test
+    // cannot make: it proves Sled.applyControls is wired to the belt, not merely that PhysicsTuner can
+    // report a drive. Without the wiring, the sled's x-velocity is identical with and without the belt.
+    {
+      const c = await (async () => {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        try {
+          const out = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.registry.set('biomeMask', 0);
+            g.scene.start('TitleScene');
+            // Poll for RunScene and a LIVE sled instead of sleeping a fixed 1600ms. A fixed sleep here is the
+            // same bug class as the Game Over 3000ms sleep: under load the run has not started, or the sled
+            // has already crashed, and applyControls early-returns on a destroyed body -- which reads as
+            // "the belt does nothing" (dvx exactly 0) when in fact nothing was ever stepped.
+            const t0 = Date.now();
+            let run = null;
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              // Start EXACTLY ONCE. Calling startRun on every tick restarts the run each time, which tears
+              // down the sled we are waiting for -- the probe then waits forever for a live sled it keeps
+              // destroying. This is why the previous version needed `if (!run)` and still raced.
+              if (!started && tt && !tt.starting) { started = true; tt.startRun('belt-probe', 0); }
+              const rr = g.scene.getScene('RunScene');
+              if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'RunScene never produced a live sled (scene active + sled inWorld)' };
+            await wait(200);
+            if (run.sled.destroyed || !run.sled.inWorld) {
+              return { fatal: `sled died between liveness check and probe (destroyed=${run.sled.destroyed} inWorld=${run.sled.inWorld})` };
+            }
+
+            // Put a conveyor under the sled, exactly as the generator would.
+            const belt = run.content.terrainMods.conveyorBelt;
+            const x = run.sled.x;
+            const chunk = run.terrain._chunkAt(x);
+            const zones = chunk.zones;
+            const existing = zones.length;
+            zones.push({ modId: 'conveyorBelt', x0: x - 400, x1: x + 400 });
+
+            // Force a grounded, stable state and step physics with NO input at all.
+            const phys = run.tuner.getEffective({ zones: [belt] });
+            const before = run.sled.body.velocity.x;
+
+            // Drive several real physics steps with an empty pad so nothing but the belt can act.
+            const emptyPad = { push: false, brake: false, tuck: false, left: false, right: false, hop: false, heli: 0, pressed: {}, airBrake: false };
+            run.sled.grounded = true;
+            run.sled.groundAngleDeg = 0;
+            for (let i = 0; i < 12; i++) run.sled.applyControls(emptyPad, phys, 16);
+            const after = run.sled.body.velocity.x;
+
+            const noBeltPhys = run.tuner.getEffective({ zones: [] });
+            run.sled.grounded = true;
+            run.sled.groundAngleDeg = 0;
+            const before2 = run.sled.body.velocity.x;
+            for (let i = 0; i < 12; i++) run.sled.applyControls(emptyPad, noBeltPhys, 16);
+            const after2 = run.sled.body.velocity.x;
+
+            zones.length = existing; // leave the terrain as we found it
+            return {
+              beltDrive: phys.beltDrivePxS2,
+              withBelt: after - before,
+              withoutBelt: after2 - before2,
+              // Liveness at the moment of measurement: dvx exactly 0 with these false means the sled was
+              // never stepped, which is a harness problem, not "the belt does nothing".
+              destroyed: run.sled.destroyed,
+              inWorld: run.sled.inWorld,
+              grounded: run.sled.grounded,
+              beltDirection: phys.beltDirection,
+            };
+          }).catch((e) => ({ fatal: String(e) }));
+          return { errors, out };
+        } finally { await page.close(); }
+      })();
+      if (c.out.fatal) fail('W6: conveyor belt moves the sled', c.out.fatal);
+      else if (c.errors.length) fail('W6: conveyor belt — no page errors', c.errors.join(' | '));
+      else if (c.out.destroyed || !c.out.inWorld) {
+        fail('W6: conveyor belt — the sled under test was not live', `destroyed=${c.out.destroyed} inWorld=${c.out.inWorld} (harness, not belt)`);
+      }
+      else if (!(c.out.beltDrive > 0)) fail('W6: conveyor belt carries a drive', `beltDrivePxS2=${c.out.beltDrive}`);
+      else if (!(c.out.withBelt > 0)) fail('W6: conveyor belt moves the sled with no input', `dvx=${c.out.withBelt} destroyed=${c.out.destroyed} inWorld=${c.out.inWorld} grounded=${c.out.grounded}`);
+      else if (Math.abs(c.out.withoutBelt) >= Math.abs(c.out.withBelt)) {
+        fail('W6: the movement comes from the belt, not from drift', `with=${c.out.withBelt} without=${c.out.withoutBelt}`);
+      } else pass('W6: a conveyor belt drives the real sled with no player input', `dvx=${c.out.withBelt.toFixed(2)} vs no-belt ${c.out.withoutBelt.toFixed(2)}`);
+    }
+
+    // ---- W6: a geyser vent LAUNCHES the real sled. Same shape as the conveyor check, and for the same
+    // reason: geyser-vent.json carried `launch` from the start while nothing read it, so a schema unit test
+    // could pass forever with the mechanic absent. This drives Sled.applyControls with the vent's real
+    // physics and requires an upward velocity kick plus a cooldown that stops an immediate re-fire.
+    {
+      const c = await (async () => {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        try {
+          const out = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.registry.set('biomeMask', 0);
+            g.scene.start('TitleScene');
+            const t0 = Date.now();
+            let run = null;
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              if (!started && tt && !tt.starting) { started = true; tt.startRun('geyser-probe', 0); }
+              const rr = g.scene.getScene('RunScene');
+              if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'RunScene never produced a live sled' };
+            await wait(200);
+            if (run.sled.destroyed || !run.sled.inWorld) return { fatal: 'sled died before the probe' };
+
+            // The vent as the generator would place it: a zone whose MOD DEF carries the launch data.
+            const vent = run.content.terrainMods.geyserVent;
+            const x = run.sled.x;
+            const chunk = run.terrain._chunkAt(x);
+            const zones = chunk.zones;
+            const existing = zones.length;
+            zones.push({ modId: 'geyserVent', x0: x - 400, x1: x + 400 });
+
+            const phys = run.tuner.getEffective({ zones: [vent] });
+            const emptyPad = { push: false, brake: false, tuck: false, left: false, right: false, hop: false, heli: 0, pressed: {}, airBrake: false };
+
+            run.sled.grounded = true;
+            run.sled.groundAngleDeg = 0;
+            run.sled.geyserCooldownMs = 0;
+            const vyBefore = run.sled.body.velocity.y;
+            run.sled.applyControls(emptyPad, phys, 16);
+            const vyAfter = run.sled.body.velocity.y;
+
+            // Immediately again, with the cooldown now set: must NOT fire a second time.
+            run.sled.grounded = true;
+            const vyBefore2 = run.sled.body.velocity.y;
+            run.sled.applyControls(emptyPad, phys, 16);
+            const vyAfter2 = run.sled.body.velocity.y;
+
+            zones.length = existing;
+            // Matter carries velocity in engine units per step; convert to px/s the way Sled does so the
+            // number in the gate output is the same quantity the vent's data is expressed in.
+            const PX = (v) => (v * 1000) / 16.666666666666668;
+            return {
+              hasLaunchData: Boolean(phys.geyserLaunch && phys.geyserLaunch.velocityPxS > 0),
+              launchVelocity: phys.geyserLaunch ? phys.geyserLaunch.velocityPxS : null,
+              dvy: PX(vyAfter) - PX(vyBefore),
+              dvySecond: PX(vyAfter2) - PX(vyBefore2),
+              cooldownAfter: run.sled.geyserCooldownMs,
+            };
+          }).catch((e) => ({ fatal: String(e) }));
+          return { errors, out };
+        } finally { await page.close(); }
+      })();
+      if (c.out.fatal) fail('W6: geyser vent launches the sled', c.out.fatal);
+      else if (c.errors.length) fail('W6: geyser vent — no page errors', c.errors.join(' | '));
+      else if (!c.out.hasLaunchData) fail('W6: the vent\'s launch data reaches the tuner', JSON.stringify(c.out));
+      else if (!(c.out.dvy < -100)) fail('W6: a geyser throws the sled upward with real force', `dvy=${c.out.dvy} px/s (need a real upward kick, not a rounding error)`);
+      else if (!(c.out.dvySecond > -1)) fail('W6: the vent does not re-fire while on cooldown', `second dvy=${c.out.dvySecond}`);
+      else pass('W6: a geyser vent launches the real sled, once per cooldown', `dvy=${c.out.dvy.toFixed(1)} of ${c.out.launchVelocity} px/s, then ${c.out.dvySecond.toFixed(1)}`);
+    }
+
   } finally {
     await browser.close();
     server.close();

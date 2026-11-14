@@ -1,0 +1,8 @@
+{
+  "id": "sugarRush",
+  "colorKey": "magenta",
+  "physics": { "speedMul": 1.3, "steerMul": 0.6 },
+  "weight": 3,
+  "minDistanceM": 150,
+  "lengthPx": [380, 820]
+}

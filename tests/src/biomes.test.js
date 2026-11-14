@@ -30,16 +30,22 @@ const byId = (arr) => Object.fromEntries(arr.map((d) => [d.id, d]));
 const bitOf = (id) => BIOMES.find((b) => b.id === id).bit;
 
 describe('biome content — src/data/biomes/*.json', () => {
-  test('exactly the five batch-1 biomes are defined', () => {
-    // W6 adds the other six. If this list changes, W6 is in progress and the count belongs updating
-    // with it — but a missing batch-1 biome here would silently mean a locked biome that can never
-    // appear, which is the failure mode worth pinning.
+  test('all eleven biomes are defined, batch 1 and batch 2 together', () => {
+    // Pinned by NAME, not by count: a missing biome would silently be a locked sector that can never
+    // appear, which is the failure mode worth catching. D1 puts all 11 SledHEAD biomes in scope, so this
+    // is the complete set W1-W6 must ship.
     expect(BIOMES.map((b) => b.id).sort()).toEqual([
+      'candy-cane-canyon',
       'crystal-cavern',
       'debumont',
       'garbage-dump-glacier',
+      'micro-mountain',
       'pyramid-peak',
+      'sky-jellyfish-mountain',
+      'space-mountain',
+      'steampunk-slopes',
       'underwater-mountain',
+      'vertigo-vents',
     ]);
   });
 
@@ -47,8 +53,10 @@ describe('biome content — src/data/biomes/*.json', () => {
     // The mask is a bitfield and is stored in run records; a collision would make two biomes
     // indistinguishable in saved data forever.
     const bits = BIOMES.map((b) => b.bit).sort((a, b) => a - b);
-    expect(bits).toEqual([1, 2, 4, 8, 16]);
+    expect(bits).toEqual([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]);
     expect(new Set(bits).size).toBe(bits.length);
+    // Every bit must fit the mask the profile stores, or the 11th biome would be silently unselectable.
+    for (const b of BIOMES) expect({ id: b.id, fits: b.bit > 0 && b.bit <= 1024 }).toMatchObject({ id: b.id, fits: true });
   });
 
   test('every biome carries the fields the loader and UI read', () => {
@@ -113,11 +121,17 @@ describe('biome content — src/data/biomes/*.json', () => {
         id: b.id, mod: b.mod, exists: true,
       });
       const p = def.physics || {};
-      const muls = ['frictionMul', 'gravityMul', 'bounceMul'].filter((k) => Number.isFinite(p[k]));
+      // W6 widened the vocabulary: speedMul (sugar rush) and steerMul are physics too, and two mechanics
+      // are neither physics nor scoring — a terrain swell and a launch act on the surface and on contact.
+      const muls = ['frictionMul', 'gravityMul', 'bounceMul', 'speedMul', 'steerMul', 'pushForceMul']
+        .filter((k) => Number.isFinite(p[k]));
       const hasScore = Number.isFinite(def.scoreMul);
-      expect({ id: b.id, kind: hasScore ? 'score' : muls.length ? 'physics' : 'none' })
-        .toMatchObject({ id: b.id, kind: hasScore ? 'score' : 'physics' });
-      // Never both: that would be two mechanics in one biome.
+      const hasSwell = Boolean(def.terrainSwell);
+      const hasLaunch = Boolean(def.launch);
+      const kinds = [muls.length > 0, hasScore, hasSwell, hasLaunch].filter(Boolean).length;
+      // Exactly ONE kind of mechanic per biome (D2), whichever kind it is.
+      expect({ id: b.id, kinds }).toMatchObject({ id: b.id, kinds: 1 });
+      // Never both score and physics: that would be two mechanics in one biome.
       if (hasScore) {
         expect({ id: b.id, alsoPhysics: muls.length }).toMatchObject({ id: b.id, alsoPhysics: 0 });
       }
@@ -270,12 +284,19 @@ describe('biome mechanics actually reach the physics', () => {
   test('every physics biome changes gravity, ground resistance or bounce', () => {
     for (const b of BIOMES) {
       const def = mods[b.mod];
-      if (Number.isFinite(def.scoreMul)) continue; // Crystal Cavern is scoring; covered below.
+      // Scoring and the two W6 surface/contact mechanics are covered by their own tests below; this one
+      // is about the biomes whose mechanic is an effective constant.
+      if (Number.isFinite(def.scoreMul) || def.terrainSwell || def.launch) continue;
       const { base, mod } = effectOf(b.mod);
+      // W6 widened this from three fields: sugar rush changes terminal speed and steering, the conveyor
+      // changes push force. A mechanic that reaches NO effective constant is the bug being caught.
       const changed =
         mod.gravityPxS2 !== base.gravityPxS2 ||
         mod.groundResist !== base.groundResist ||
-        mod.bounceMul !== base.bounceMul;
+        mod.bounceMul !== base.bounceMul ||
+        mod.speedMul !== base.speedMul ||
+        mod.pushForceMul !== base.pushForceMul ||
+        mod.airControl !== base.airControl;
       expect({ biome: b.id, mod: b.mod, changed }).toMatchObject({ biome: b.id, mod: b.mod, changed: true });
     }
   });
@@ -303,13 +324,22 @@ describe('biome mechanics actually reach the physics', () => {
     // Bounds, not direction: a zone may flavour a sector, never disable physics.
     for (const b of BIOMES) {
       const def = mods[b.mod];
-      if (Number.isFinite(def.scoreMul)) continue;
+      if (Number.isFinite(def.scoreMul) || def.terrainSwell || def.launch) continue;
       const { base, mod } = effectOf(b.mod);
-      expect({ biome: b.id, ratio: mod.gravityPxS2 / base.gravityPxS2 })
-        .toMatchObject({ biome: b.id, ratio: expect.any(Number) });
       const ratio = mod.gravityPxS2 / base.gravityPxS2;
+      expect({ biome: b.id, ratio: expect.any(Number) }).toMatchObject({ biome: b.id, ratio: expect.any(Number) });
       expect(ratio).toBeGreaterThanOrEqual(0.7);
       expect(ratio).toBeLessThanOrEqual(1.3);
+      // The same bound has to hold for the multipliers W6 added, or a biome could quietly make the sled
+      // unsteerable (steer ~0) or launch it off the map (speed 3x) without tripping the gravity check.
+      expect({ biome: b.id, speed: mod.speedMul }).toMatchObject({ biome: b.id, speed: expect.any(Number) });
+      expect(mod.speedMul).toBeGreaterThanOrEqual(0.5);
+      expect(mod.speedMul).toBeLessThanOrEqual(1.4);
+      // Steering may be reduced hard (that is sugar rush's whole idea) but never to zero: a biome that
+      // takes steering away entirely is not a mechanic, it is a cutscene.
+      expect(mod.airControl).toBeGreaterThan(0);
+      expect(mod.pushForceMul).toBeGreaterThanOrEqual(0.5);
+      expect(mod.pushForceMul).toBeLessThanOrEqual(2.5);
     }
   });
 

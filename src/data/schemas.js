@@ -86,9 +86,16 @@
  * @typedef {Object} TerrainModDef
  * @property {string} id              camelCase, e.g. 'highBandwidth', 'stickyPatch', 'echoZone'.
  * @property {string} colorKey         telegraph colour (palette key).
- * @property {{frictionMul?:number, gravityMul?:number, bounceMul?:number}} [physics]
+ * @property {{frictionMul?:number, gravityMul?:number, bounceMul?:number, speedMul?:number,
+ *             steerMul?:number, pushForceMul?:number}} [physics]
  * @property {number} [scoreMul]      W3: multiplier on banked trick points inside the zone, >= 1.
  *                                    Never applies to the flat perfect-landing bonus or to distance.
+ * @property {{amplitudePx:number, periodPx:number}} [terrainSwell]
+ *                                    W6: periodic terrain swells (Micro Mountain's rolling dew drops).
+ *                                    Bounded so the surface can never invert or bury the sled.
+ * @property {{velocityPxS:number, cooldownMs:number}} [launch]
+ *                                    W6: upward kicks from the ground (Vertigo Vents' geysers). Cooldown
+ *                                    prevents a vent from re-firing on the same contact every frame.
  * @property {number} weight
  * @property {number} minDistanceM
  * @property {[number,number]} [lengthPx]  min,max zone length.

@@ -1,0 +1,14 @@
+{
+  "id": "candy-cane-canyon",
+  "bit": 64,
+  "name": "Candy Cane Canyon",
+  "unlockLevel": 22,
+  "lore": "The stripes are pure sugar and they want you going faster than you can steer.",
+  "background": "candy-stripes",
+  "mod": "sugarRush",
+  "chunks": ["speed-chute", "long-carve", "whoops"],
+  "palettes": {
+    "default": { "bg": "#1a0510", "bgAlt": "#3a0c22", "cyan": "#ff9ec4", "magenta": "#ff5f8f", "lime": "#fff3a8", "amber": "#ffc46b", "text": "#fff0f6" },
+    "colorblind": { "bg": "#1a0510", "bgAlt": "#3a0c22", "cyan": "#d8a0b8", "magenta": "#d08898", "lime": "#e8e0a8", "amber": "#d8bc8a", "text": "#fbf0f4" }
+  }
+}

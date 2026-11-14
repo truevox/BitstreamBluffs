@@ -1,0 +1,14 @@
+{
+  "id": "vertigo-vents",
+  "bit": 1024,
+  "name": "Vertigo Vents",
+  "unlockLevel": 28,
+  "lore": "The mountain is breathing out. Do not argue with it.",
+  "background": "vents",
+  "mod": "geyserVent",
+  "chunks": ["valley-launch", "ski-jump", "big-air-drop"],
+  "palettes": {
+    "default": { "bg": "#12041a", "bgAlt": "#260a36", "cyan": "#9ec4ff", "magenta": "#ff8ad0", "lime": "#c8ffb0", "amber": "#ffd98a", "text": "#f2eaff" },
+    "colorblind": { "bg": "#12041a", "bgAlt": "#260a36", "cyan": "#a0b8dc", "magenta": "#d8a0c0", "lime": "#b8dcb0", "amber": "#dcc88a", "text": "#f4effa" }
+  }
+}
