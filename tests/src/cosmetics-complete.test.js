@@ -226,18 +226,35 @@ describe('F4: the equipped glow and rider are what Sled draws', () => {
     expect(c).toContain(INTS.magenta);
   });
 
+  // The level riders are palette amber and lime, which the sled already draws (arms, helmet, runner), so
+  // "the colour appears" proves nothing. These count uses instead, and check the default rider (magenta,
+  // drawn nowhere else on an unscrambled sled without a chute) is gone.
+  const count = (c, v) => c.filter((x) => x === v).length;
+
   test('the level-29 Magenta Glow and level-9 Amber Rider are drawn', () => {
+    const base = drawSled(null);
     const look = resolveCosmetics({ equipped: { glow: 'magenta', rider: 'amber' } }, INTS, HEX);
     const c = drawSled(look);
     expect(c).toContain(int(COSMETIC_HUES.glow.magenta.color));
-    expect(c).toContain(int(COSMETIC_HUES.rider.amber.color));
+    const amber = int(COSMETIC_HUES.rider.amber.color);
+    expect(count(c, amber)).toBeGreaterThan(count(base, amber));
   });
 
-  test('the level-18 Cyan Glow is drawn, and the default glow colour is not used for the sled body', () => {
-    const look = resolveCosmetics({ equipped: { glow: 'cyan', rider: 'lime' } }, INTS, HEX);
+  test('the level-20 Lime Rider replaces the magenta rider', () => {
+    const base = drawSled(null);
+    const look = resolveCosmetics({ equipped: { rider: 'lime' } }, INTS, HEX);
+    const c = drawSled(look);
+    const lime = int(COSMETIC_HUES.rider.lime.color);
+    expect(count(c, lime)).toBeGreaterThan(count(base, lime));
+    expect(c).not.toContain(INTS.magenta);
+  });
+
+  test('the level-18 Cyan Glow is drawn, and the default glow colour is used less (visor only)', () => {
+    const base = drawSled(null);
+    const look = resolveCosmetics({ equipped: { glow: 'cyan' } }, INTS, HEX);
     const c = drawSled(look);
     expect(c).toContain(int(COSMETIC_HUES.glow.cyan.color));
-    expect(c).toContain(int(COSMETIC_HUES.rider.lime.color));
+    expect(count(c, INTS.cyan)).toBeLessThan(count(base, INTS.cyan));
   });
 });
 
