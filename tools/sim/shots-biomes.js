@@ -17,6 +17,18 @@
     { bit: 4, id: 'pyramid-peak', seed: 'biome-pyramid-peak-0', sector: 2 },
     { bit: 8, id: 'underwater-mountain', seed: 'biome-underwater-mountain-0', sector: 2 },
     { bit: 16, id: 'crystal-cavern', seed: 'biome-crystal-cavern-0', sector: 2 },
+    // W6 batch 2. Same generator path, so the same scenarios apply; a shot only counts if the
+    // generator reports it is actually producing this biome (see the meta check below).
+    // Sectors are NOT free: biomeForSector draws base-vs-biome per sector from Rng.fork, so a shot has to
+    // sit in a sector that seed actually produces the biome in. These pairs were found by scanning seeds
+    // against the real function, not guessed -- sector 2 gave base terrain for five of six, which is what
+    // the first run reported as biome:null.
+    { bit: 32, id: 'space-mountain', seed: 'biome-space-mountain-0', sector: 4 },
+    { bit: 64, id: 'candy-cane-canyon', seed: 'biome-candy-cane-canyon-0', sector: 3 },
+    { bit: 128, id: 'sky-jellyfish-mountain', seed: 'biome-sky-jellyfish-mountain-0', sector: 2 },
+    { bit: 256, id: 'steampunk-slopes', seed: 'biome-steampunk-slopes-0', sector: 5 },
+    { bit: 512, id: 'micro-mountain', seed: 'biome-micro-mountain-1', sector: 2 },
+    { bit: 1024, id: 'vertigo-vents', seed: 'biome-vertigo-vents-0', sector: 3 },
   ];
 
   async function ctx() {
@@ -127,7 +139,8 @@
       for (let i = 0; i < 20; i++) { pin(); step(env, 1); read(); }
     }
     const meta = { biome: biome || null, sector, mask: b.bit, sledX: scene.sled ? Math.round(scene.sled.x) : null };
-    await window.__shot(`w3-biome-${b.id}-${paletteName}`, meta);
+    const ws = b.bit >= 32 ? 'w6' : 'w3';
+    await window.__shot(`${ws}-biome-${b.id}-${paletteName}`, meta);
     return meta;
   }
 
