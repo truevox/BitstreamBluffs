@@ -1,13 +1,19 @@
 /**
  * OWNER: UI engineer.
  * Normalises every input device into a small menu vocabulary:
- *   'up' | 'down' | 'left' | 'right' | 'confirm' | 'cancel' | 'alt'
+ *   'up' | 'down' | 'left' | 'right' | 'confirm' | 'cancel' | 'alt' | 'shop' | 'retry' (opt-in)
  * Sources: EVT.INPUT_ACTION (InputRouter: keyboard / gamepad / touch), Phaser keyboard (redundant, so menus work
  * with the stub router too) and a direct navigator.getGamepads() poll. The same action arriving from two sources
  * within DEDUPE_MS is delivered once. All listeners are removed on scene shutdown.
  *
  * Raw text entry: set `rawKeyHandler` (returns true when it consumed the event). While set, keyboard-sourced
  * INPUT_ACTIONs are ignored (typing "A" must not also move a cursor) and keyboard input arrives only as raw events.
+ *
+ * Opt-in 'retry' (`{ retryAction: true }`, Marvin decision 7, used by GameOverScene only): keyboard Space fires
+ * 'retry' FIRST and then its usual 'confirm', and pad RB (button 5) fires 'retry'. Space is told apart from
+ * Enter by InputRouter's 'hop' action: on the keyboard only Space sends it (Space = 'hop' + 'confirm', Enter =
+ * 'confirm'). Pad A also sends 'hop' but from source 'gamepad', so it stays a plain 'confirm'. A host that acts
+ * on 'retry' (and leaves the screen) never sees the trailing 'confirm' do anything; other menus do not opt in.
  */
 import Phaser from 'phaser';
 import { REG } from '../constants.js';
@@ -36,7 +42,8 @@ export class MenuInput {
   /**
    * @param {Phaser.Scene} scene
    * @param {function(string, string):void} handler called with (action, source)
-   * @param {{graceMs?:number}} [opts] ignore all input for graceMs after creation
+   * @param {{graceMs?:number, retryAction?:boolean}} [opts] ignore all input for graceMs after creation;
+   *   retryAction: also fire 'retry' for keyboard Space and pad RB (see the file header)
    */
   constructor(scene, handler, opts = {}) {
     this.scene = scene;
@@ -47,6 +54,7 @@ export class MenuInput {
     this.rawKeyHandler = null;
     this.born = performance.now();
     this.graceMs = opts.graceMs || 0;
+    this.retryAction = opts.retryAction === true;
     this.last = {};
     this.padPrev = this._readPad();
     this.padHold = {};
@@ -54,6 +62,9 @@ export class MenuInput {
     this._onAction = (p) => {
       if (!p || !p.pressed) return;
       if (this.rawKeyHandler && p.source === 'keyboard') return;
+      // Keyboard 'hop' is Space (Enter sends 'confirm' only). 'retry' goes first so a host that leaves on it
+      // never acts on the 'confirm' that follows.
+      if (this.retryAction && p.action === 'hop' && (p.source || 'keyboard') === 'keyboard') this._fire('retry', 'keyboard');
       const a = ROUTER_MAP[p.action];
       if (a) this._fire(a, p.source || 'keyboard');
     };
@@ -67,6 +78,7 @@ export class MenuInput {
       const a = KEY_MAP[e.key];
       if (!a) return;
       if (e.repeat && !DIRS.has(a)) return;
+      if (this.retryAction && e.key === ' ') this._fire('retry', 'keyboard');
       this._fire(a, 'keyboard', true);
     };
     // Phaser's keyboard plugin is used for plain menu keys only. In raw text-entry mode (initials) native window events
@@ -152,6 +164,8 @@ export class MenuInput {
     // W4.1: LB / LT opens the shop, mirroring the keyboard's B so a pad player is not locked out of the
     // footer hint the keyboard player can use.
     if (edge(4) || edge(6)) this._fire('shop', 'gamepad');
+    // Decision 7: RB retries on Game Over (opt-in). Free here, and InputRouter gives it no menu action.
+    if (this.retryAction && edge(5)) this._fire('retry', 'gamepad');
     const dirs = {
       up: cur.btn[12] || cur.ay < -0.6,
       down: cur.btn[13] || cur.ay > 0.6,
