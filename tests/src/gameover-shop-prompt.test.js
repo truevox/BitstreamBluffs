@@ -64,6 +64,8 @@ function scene(o = {}) {
     add: { existing: () => {} },
     _anythingAffordable: proto._anythingAffordable,
     _cancelShopAutoprompt: proto._cancelShopAutoprompt,
+    _resumeShopAutoprompt: proto._resumeShopAutoprompt,
+    shopPending: false,
     _closeShop: proto._closeShop,
     _hideShopHint: proto._hideShopHint,
     _buildShopHint() { this.shopHint = { destroy() {} }; },
@@ -81,6 +83,7 @@ function scene(o = {}) {
 function fireTimer(ctx) {
   const t = ctx.timers.find((x) => !x.removed);
   if (!t) return false;
+  t.removed = true; // a delayedCall runs once
   t.fn();
   return true;
 }
@@ -271,12 +274,76 @@ describe('(d) shutdown mid-popup is clean', () => {
     expect(ctx.shopOpen).toBe(false);
   });
 
-  test('the timer callback never opens the shop during initials entry', () => {
+  test('the timer callback never opens the shop during initials entry, but remembers it', () => {
     const ctx = scene({ profile: rich(), prompt: true });
     proto._buildShopAccess.call(ctx);
     ctx.entry = { handleAction: jest.fn() };
     fireTimer(ctx);
     expect(ctx.shopOpen).toBe(false);
+    expect(ctx.shopPending).toBe(true);
+  });
+
+  // CC Friday, shop-popup rejection 1: a run that also makes the Top-10 opens initials entry, which used to
+  // swallow the popup for good. Early runs on a thin board are exactly when prices get crossed.
+  test('the popup that fired under initials entry opens once the entry closes', () => {
+    const ctx = scene({ profile: rich(), prompt: true });
+    proto._buildShopAccess.call(ctx);
+    ctx.entry = { handleAction: jest.fn() };
+    fireTimer(ctx);
+    ctx.entry = null; // SAVE or SKIP
+    proto._resumeShopAutoprompt.call(ctx);
+    expect(ctx.shopOpen).toBe(false); // after a beat, not on the same frame as the board appearing
+    expect(fireTimer(ctx)).toBe(true);
+    expect(ctx.shopOpen).toBe(true);
+    expect(ctx.shopPending).toBe(false);
+  });
+
+  test('typing in the entry does not drop the pending popup', () => {
+    const ctx = scene({ profile: rich(), prompt: true });
+    proto._buildShopAccess.call(ctx);
+    ctx.entry = { handleAction: jest.fn() };
+    fireTimer(ctx);
+    proto._onAction.call(ctx, 'up');
+    expect(ctx.shopPending).toBe(true);
+  });
+
+  test('closing the entry with nothing pending opens nothing', () => {
+    const ctx = scene({ profile: rich(), prompt: false });
+    proto._buildShopAccess.call(ctx);
+    proto._resumeShopAutoprompt.call(ctx);
+    expect(fireTimer(ctx)).toBe(false);
+    expect(ctx.shopOpen).toBe(false);
+  });
+
+  test('retry after the entry closes cancels the resumed popup', () => {
+    const ctx = scene({ profile: rich(), prompt: true });
+    proto._buildShopAccess.call(ctx);
+    ctx.entry = { handleAction: jest.fn() };
+    fireTimer(ctx);
+    ctx.entry = null;
+    proto._resumeShopAutoprompt.call(ctx);
+    proto._onAction.call(ctx, 'confirm');
+    expect(ctx.retried).toBe(true);
+    expect(fireTimer(ctx)).toBe(false);
+    expect(ctx.shopOpen).toBe(false);
+  });
+
+  test('a resumed popup is inert once the scene is gone', () => {
+    const ctx = scene({ profile: rich(), prompt: true });
+    proto._buildShopAccess.call(ctx);
+    ctx.entry = { handleAction: jest.fn() };
+    fireTimer(ctx);
+    ctx.entry = null;
+    proto._resumeShopAutoprompt.call(ctx);
+    ctx.alive = false;
+    expect(() => fireTimer(ctx)).not.toThrow();
+    expect(ctx.shopOpen).toBe(false);
+  });
+
+  test('the TITLE button does not promise B, which belongs to the shop', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync(new URL('../../src/scenes/GameOverScene.js', import.meta.url), 'utf8');
+    expect(src).not.toMatch(/label: 'TITLE', hint: 'ESC \/ B'/);
   });
 });
 

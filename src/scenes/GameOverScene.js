@@ -52,6 +52,8 @@ const MAX_ROWS = 8;
  * all before it fires cancels it — see `_cancelShopAutoprompt`.
  */
 const SHOP_PROMPT_MS = 1200;
+// After initials entry closes: a beat so the board appearing and the shop appearing are not one frame.
+const SHOP_AFTER_ENTRY_MS = 500;
 /** The key the footer hint advertises. Must match MenuInput's `shop` action. */
 const SHOP_KEY = 'B';
 
@@ -446,7 +448,7 @@ export class GameOverScene extends Phaser.Scene {
     const defs = [
       { w: 150, label: 'RETRY', hint: 'SPACE / ENTER / A', color: 'lime', fn: () => this.retry() },
       { w: 130, label: 'NEW SEED', hint: 'N / X', color: 'cyan', fn: () => this.newSeed() },
-      { w: 110, label: 'TITLE', hint: 'ESC / B', color: 'magenta', fn: () => this.toTitle() },
+      { w: 110, label: 'TITLE', hint: 'ESC', color: 'magenta', fn: () => this.toTitle() },
     ];
     let x = Math.round((GAME_WIDTH - (150 + 130 + 110 + 24)) / 2);
     this.buttons = defs.map((d) => {
@@ -603,6 +605,7 @@ export class GameOverScene extends Phaser.Scene {
     if (!this.entry) return;
     this._leaveEntry();
     this._showBoard(undefined, boardsModded(this.rec));
+    this._resumeShopAutoprompt();
   }
 
   /**
@@ -650,6 +653,7 @@ export class GameOverScene extends Phaser.Scene {
     if (!this.alive || this.leaving) return;
     this.rows = rows;
     this._showBoard(ok ? this.rec.id : undefined, modded);
+    this._resumeShopAutoprompt();
   }
 
   /**
@@ -697,7 +701,10 @@ export class GameOverScene extends Phaser.Scene {
     // playing, and a panel appearing over a run they just restarted would be a bug report.
     this.shopTimer = this.time.delayedCall(SHOP_PROMPT_MS, () => {
       this.shopTimer = null;
-      if (!this.alive || this.leaving || this.entry) return;
+      if (!this.alive || this.leaving) return;
+      // A run that also makes the Top-10 is under initials entry right now. Remember the popup instead of
+      // dropping it: _resumeShopAutoprompt() opens it once the entry is saved or skipped.
+      if (this.entry) { this.shopPending = true; return; }
       if (this.shopOpen) return;
       this._openShop();
     });
@@ -780,16 +787,34 @@ export class GameOverScene extends Phaser.Scene {
    * @returns {void}
    */
   _cancelShopAutoprompt() {
+    this.shopPending = false;
     if (!this.shopTimer) return;
     try { this.shopTimer.remove(false); } catch (e) { /* already gone */ }
     this.shopTimer = null;
+  }
+
+  /**
+   * The initials entry just closed (SAVE or SKIP). If the popup came due while it was open, open it now,
+   * after a short beat. RETRY / NEW SEED / TITLE cancel it like the first timer.
+   * @returns {void}
+   */
+  _resumeShopAutoprompt() {
+    if (!this.shopPending || !this.alive || this.leaving || this.shopOpen) return;
+    this.shopPending = false;
+    this._cancelShopAutoprompt();
+    this.shopTimer = this.time.delayedCall(SHOP_AFTER_ENTRY_MS, () => {
+      this.shopTimer = null;
+      if (!this.alive || this.leaving || this.entry || this.shopOpen) return;
+      this._openShop();
+    });
   }
 
   // ------------------------------------------------------------ actions
 
   _onAction(action) {
     // W4.1: any action cancels a pending auto-open — the player is already interacting.
-    if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
+    // Typing in the initials entry is not "the player is already playing": it must not drop a pending popup.
+    if (!this.entry && typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
     if (this.leaving) return;
     // W4.1: while the shop is open, RETRY (confirm) and NEW SEED (alt) still win. CC's hard rule is that
     // the popup never eats the retry input: a player mashing Space after a crash must restart, not buy.
