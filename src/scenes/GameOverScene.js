@@ -588,6 +588,9 @@ export class GameOverScene extends Phaser.Scene {
     this.right.add([hint, hint2]);
     this.entryGroup = [t1, hint, hint2];
     this.input_.rawKeyHandler = (e) => this._rawKey(e);
+    // While typing, keyboard B is a letter, not the shop key, so the hint would be a lie (audit UI-A).
+    // _leaveEntry() puts it back once the entry is saved or skipped.
+    this._hideShopHint();
     this.footer.setText('TYPE INITIALS - ENTER SAVE - SPACE SAVE + RETRY');
     this._retryHint('SPACE = SAVE + RETRY');
     uiSfx(this, 'combo');
@@ -623,6 +626,7 @@ export class GameOverScene extends Phaser.Scene {
     this.input_.rawKeyHandler = null;
     this.footer.setText('SPACE / ENTER / A / TAP = RETRY SAME SEED');
     this._retryHint('SPACE / ENTER / A');
+    if (this._anythingAffordable()) this._buildShopHint();
   }
 
   _retryHint(text) {
@@ -761,7 +765,8 @@ export class GameOverScene extends Phaser.Scene {
    * anchored right, and the geometry is asserted in tests against the footer's measured ink width.
    */
   _buildShopHint() {
-    if (this.shopHint) return;
+    // Never during initials entry: B types a letter there (audit UI-A).
+    if (this.shopHint || this.entry) return;
     this.shopHint = new NeonText(this, this.theme, GAME_WIDTH - 4, GAME_HEIGHT - 5, SHOP_HINT, {
       color: 'amber', anchor: 'right', vAnchor: 0.5, outline: 'none',
     });

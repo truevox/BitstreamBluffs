@@ -342,3 +342,56 @@ describe('U6b: the Game Over shop hint names the pad key', () => {
     }
   });
 });
+
+// ================================================================== UI-A: no SHOP hint while typing initials
+
+describe('UI-A: the SHOP hint is not shown while initials entry is active', () => {
+  /** Game Over with the real entry widget, a stand-in board and LEDGER panel, and the shop hint built. */
+  const entryHost = () => {
+    const g = gameOverHost();
+    g.right = Object.assign(new GO(g), { setColorKey() { return this; }, setTitle() { return this; } });
+    g.board = { visible: true, setVisible(v) { this.visible = v; return this; }, setEntries() { return this; } };
+    g.input_ = { rawKeyHandler: null };
+    g.rows = [];
+    g._buildShopAccess();
+    expect(g.shopHint).toBeTruthy(); // control: a rich profile gets the hint
+    return g;
+  };
+  const hintUp = (g) => Boolean(g.shopHint && !g.shopHint.destroyed);
+
+  test('opening the entry hides the hint; skipping it brings the hint back', () => {
+    const g = entryHost();
+    g._showEntry();
+    expect(g.entry).toBeTruthy();
+    expect(hintUp(g)).toBe(false);
+    g.skipEntry();
+    expect(g.entry).toBe(null);
+    expect(hintUp(g)).toBe(true);
+  });
+
+  test('saving the entry brings the hint back too', () => {
+    const g = entryHost();
+    g._showEntry();
+    g._leaveEntry(); // the synchronous part of saveEntry
+    expect(hintUp(g)).toBe(true);
+  });
+
+  test('nothing re-adds the hint while the entry is up', () => {
+    const g = entryHost();
+    g._showEntry();
+    g._buildShopHint();
+    expect(hintUp(g)).toBe(false);
+  });
+
+  test('keyboard B types a letter and pad LB does nothing: neither opens the shop during entry', () => {
+    const g = entryHost();
+    g._showEntry();
+    const before = g.entry.getValue();
+    g._rawKey({ key: 'b' });
+    expect(g.entry.getValue()).not.toBe(before);
+    expect(g.entry.getValue()).toContain('B');
+    g._onAction('shop'); // pad LB / LT
+    expect(g.shopOpen).toBe(false);
+    expect(g.shopView).toBe(null);
+  });
+});
