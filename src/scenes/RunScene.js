@@ -144,8 +144,12 @@ export class RunScene extends Phaser.Scene {
     this.dailyRuleId = (daily && daily.rule && daily.rule.id) || 'none';
     // W4 loadout: the boosts the player switched on, read from the profile. Absent profile or absent
     // boosts means a clean run, which is the default-off rule.
+    // The owned set (`unlocked.boosts`, granted at Sync Level 8 / 15) gates them: a toggle switched on
+    // before the boost is unlocked does nothing and does not mark the run modded (Boosts.boostEffects).
     const prof = this.registry.get(REG.PROFILE) || {};
     this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
+    const owned = prof && prof.unlocked && typeof prof.unlocked === 'object' ? prof.unlocked.boosts : null;
+    this.unlockedBoosts = owned && typeof owned === 'object' ? { ...owned } : {};
     this.dailyMods = (daily && daily.rule && daily.rule.modifiers) || {};
 
     // pure systems
@@ -254,7 +258,7 @@ export class RunScene extends Phaser.Scene {
     // "this is the daily". A run is the daily iff its seed is a daily seed — the same date-in-seed test
     // the streak uses, which is immune to clock skew.
     const isDaily = DailyPatch.dateKeyFromSeed(this.seed) !== null;
-    this.boostFx = boostEffects(this.loadout, { daily: isDaily });
+    this.boostFx = boostEffects(this.loadout, { daily: isDaily, unlocked: this.unlockedBoosts });
     this.modded = this.boostFx.modded;
     if (this.boostFx.shieldCharges > 0) {
       this.shieldCharges = (this.shieldCharges || 0) + this.boostFx.shieldCharges;

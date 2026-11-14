@@ -7,6 +7,7 @@
 - **F-LEAD-1.** A clean run's in-world BEST marker and its NEW BEST now chase the best clean (rankable) run only; a boosted run chases the modded runs. The split is `Ranking.sameBoardAs`, the same board choice Game Over makes.
 - **FAIRNESS-1.** The Title "BEST n M   n PTS" line now reads clean (rankable) runs only, so a boosted run no longer sets it.
 - **FAIRNESS-3.** DAILY RUN derives its seed and its biome mask from one clock read at press time, so a press just after 00:00 UTC (before the Title's 15 s refresh) can no longer pair yesterday's seed with today's mask.
+- **F3 (run side).** A run applies only the boosts the profile has unlocked (`unlocked.boosts`: Head Start at Sync Level 8, Error Correction Engine at 15) as well as switched on. A toggled-but-locked boost does nothing and does not mark the run modded. The rule lives in `Boosts.js` (`boostEffects` / `isModdedRun` / `loadoutForRun` take `o.unlocked`; an omitted set owns nothing). The shop-side gate is a separate fix.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 

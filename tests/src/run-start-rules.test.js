@@ -292,3 +292,56 @@ describe('DAILY RUN takes its seed and its mask from the same UTC day', () => {
     expect(values.get(REG.BIOME_MASK)).toBe(DailyPatch.biomeMaskForDate(new Date(`${seedDay}T12:00:00Z`)));
   });
 });
+
+// ================================================================ F3: RunScene applies owned boosts only
+
+describe('RunScene applies only the boosts the profile owns', () => {
+  test('a level-1 profile with both toggles on gets a clean run: no shield, no Head Start, not modded', () => {
+    const store = memStore();
+    const levelOne = { boosts: { errorCorrection: true, headStart: true }, unlocked: { biomes: [], cosmetics: [], titles: [], boosts: {} } };
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, levelOne], [REG.SAVE_STORE, store]]);
+    pressTitle(values, 'START RUN');
+    const s = runScene(values);
+    expect(s.modded).toBe(false);
+    expect(s.shieldCharges).toBe(0);
+    expect(s.boostFx).toEqual({ shieldCharges: 0, speedFactor: 1, modded: false });
+    expect(sledCalls.filter((c) => c[0] === 'scaleVelocity')).toEqual([]);
+    expect(crash(s).modded).toBeUndefined();
+  });
+
+  test('a profile that owns only Head Start gets Head Start and no shield', () => {
+    const lvl8 = { boosts: { errorCorrection: true, headStart: true }, unlocked: { biomes: [], cosmetics: [], titles: [], boosts: { headStart: 8 } } };
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, lvl8], [REG.SAVE_STORE, memStore()]]);
+    pressTitle(values, 'START RUN');
+    const s = runScene(values);
+    expect(s.modded).toBe(true);
+    expect(s.shieldCharges).toBe(0);
+    expect(sledCalls.filter((c) => c[0] === 'scaleVelocity')).toEqual([['scaleVelocity', 1.25]]);
+  });
+
+  test('a profile that owns both boosts really is boosted on START RUN', () => {
+    const store = memStore();
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, BOOSTED_PROFILE], [REG.SAVE_STORE, store]]);
+    pressTitle(values, 'START RUN');
+    const s = runScene(values);
+    expect(s.modded).toBe(true);
+    expect(s.shieldCharges).toBe(1);
+    expect(sledCalls.filter((c) => c[0] === 'scaleVelocity')).toEqual([['scaleVelocity', 1.25]]);
+    expect(crash(s).modded).toBe(true);
+  });
+
+  test('the same owning profile on DAILY RUN gets no shield, no Head Start, and a clean record', () => {
+    const store = memStore();
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, BOOSTED_PROFILE], [REG.SAVE_STORE, store]]);
+    pressTitle(values, 'DAILY RUN');
+    const s = runScene(values);
+    expect(s.seed).toBe(TODAY_SEED);
+    expect(s.biomeMask).toBe(8);
+    expect(s.modded).toBe(false);
+    expect(s.boostFx).toEqual({ shieldCharges: 0, speedFactor: 1, modded: false });
+    expect(sledCalls.filter((c) => c[0] === 'scaleVelocity')).toEqual([]);
+    const r = crash(s);
+    expect(r.modded).toBeUndefined();
+    expect(store.runs.map((x) => x.id)).toEqual([r.id]);
+  });
+});

@@ -15,6 +15,10 @@ import {
   BOOSTS, BOOST_DEFS, enabledBoosts, loadoutForRun, isModdedRun, boostEffects, setBoost,
 } from '../../src/systems/Boosts.js';
 
+// F3: a boost applies only once the profile owns it (`unlocked.boosts`, Sync Level 8 / 15). These tests are
+// about what an OWNED boost does, so they pass the owned set; boost-unlocks.test.js covers the gate itself.
+const OWNED = { unlocked: { errorCorrection: 15, headStart: 8 } };
+
 describe('defaults', () => {
   test('an absent or empty loadout enables nothing', () => {
     for (const l of [undefined, null, {}, { boosts: {} }, { boosts: { headStart: false } }]) {
@@ -41,7 +45,7 @@ describe('defaults', () => {
 
   test('any boost reports modded true', () => {
     for (const id of BOOSTS) {
-      expect({ id, modded: isModdedRun({ boosts: { [id]: true } }) }).toMatchObject({ id, modded: true });
+      expect({ id, modded: isModdedRun({ boosts: { [id]: true } }, OWNED) }).toMatchObject({ id, modded: true });
     }
   });
 });
@@ -66,20 +70,20 @@ describe('the Daily refuses boosts', () => {
 
 describe('effects', () => {
   test('Error Correction Engine starts with exactly one shield charge', () => {
-    const eff = boostEffects({ boosts: { errorCorrection: true } });
+    const eff = boostEffects({ boosts: { errorCorrection: true } }, OWNED);
     expect(eff.shieldCharges).toBe(1);
     expect(eff.speedFactor).toBe(1);
     expect(eff.modded).toBe(true);
   });
 
   test('Head Start raises the starting speed and nothing else', () => {
-    const eff = boostEffects({ boosts: { headStart: true } });
+    const eff = boostEffects({ boosts: { headStart: true } }, OWNED);
     expect(eff.speedFactor).toBeGreaterThan(1);
     expect(eff.shieldCharges).toBe(0);
   });
 
   test('both together apply both, and their factors multiply once', () => {
-    const eff = boostEffects({ boosts: { errorCorrection: true, headStart: true } });
+    const eff = boostEffects({ boosts: { errorCorrection: true, headStart: true } }, OWNED);
     expect(eff.shieldCharges).toBe(1);
     expect(eff.speedFactor).toBe(BOOST_DEFS.headStart.speedFactor);
   });
@@ -92,7 +96,7 @@ describe('effects', () => {
     // Spec W4 / §6: no change to physics tuning constants outside a biome's own bounded mod. Head Start
     // is a starting velocity, so PHYSICS must be identical to a clean run's; this asserts the module
     // exposes no physics override at all.
-    const eff = boostEffects({ boosts: { headStart: true } });
+    const eff = boostEffects({ boosts: { headStart: true } }, OWNED);
     expect(Object.keys(eff).sort()).toEqual(['modded', 'shieldCharges', 'speedFactor']);
     expect(eff).not.toHaveProperty('gravityPxS2');
     expect(eff).not.toHaveProperty('dragUntucked');

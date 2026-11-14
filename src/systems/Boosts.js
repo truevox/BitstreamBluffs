@@ -15,8 +15,9 @@
  * which Routing (systems/Ranking.js) then keeps off every clean board.
  *
  * Why this is a separate pure module rather than three lines in RunScene: `record.modded` has to be
- * computed from the loadout at run start and stored on the record, and that is a rule with an edge case
- * (a Daily run refuses boosts entirely). Both are testable here without a Phaser scene.
+ * computed from the loadout at run start and stored on the record, and that is a rule with two edge cases
+ * (a Daily run refuses boosts entirely, and a boost the profile has not unlocked yet does not apply). All
+ * of it is testable here without a Phaser scene.
  */
 
 /** The boost ids, in loadout order. */
@@ -44,38 +45,65 @@ export function enabledBoosts(loadout) {
 }
 
 /**
+ * Whether the player OWNS this boost. ProfileStore records a level reward in `profile.unlocked.boosts` as
+ * `{ id: levelGranted }` (Head Start at Sync Level 8, Error Correction at 15), so ownership is a positive
+ * finite number. Anything else, including a missing set, owns nothing: the same default-off rule as the
+ * toggles, so a hand-edited save or a caller that forgot the set cannot start a boosted run.
+ * @param {Object<string,number>} [unlocked] @param {string} id
+ * @returns {boolean}
+ */
+export function boostUnlocked(unlocked, id) {
+  if (!unlocked || typeof unlocked !== 'object') return false;
+  const v = unlocked[id];
+  return typeof v === 'number' && Number.isFinite(v) && v > 0;
+}
+
+/**
+ * The boosts that actually apply to a run: switched on, owned (`o.unlocked`), and not on the Daily.
+ * @param {Object} loadout @param {{daily?:boolean, unlocked?:Object<string,number>}} [o]
+ * @returns {string[]}
+ */
+function activeBoosts(loadout, o) {
+  if (o && o.daily) return [];
+  const unlocked = o ? o.unlocked : undefined;
+  return enabledBoosts(loadout).filter((id) => boostUnlocked(unlocked, id));
+}
+
+/**
  * The loadout a run should actually use.
  *
  * The Daily Run refuses boosts (spec W4), and it does so by returning an EMPTY loadout rather than by
  * erroring: a player whose saved loadout has boosts can still start the daily, they just play it clean.
  * That is also what keeps the daily leaderboard meaningful while MODDED_RUNS_RANKED is false.
- * @param {Object} loadout @param {{daily?:boolean}} [o]
+ * A boost the player has switched on but not yet unlocked (`o.unlocked`, the profile's
+ * `unlocked.boosts`) is off for the run too.
+ * @param {Object} loadout @param {{daily?:boolean, unlocked?:Object<string,number>}} [o]
  * @returns {{boosts:Object<string,boolean>}}
  */
 export function loadoutForRun(loadout, o) {
-  const active = enabledBoosts(loadout);
-  if (o && o.daily) return { boosts: Object.fromEntries(BOOSTS.map((id) => [id, false])) };
+  const active = activeBoosts(loadout, o);
   return { boosts: Object.fromEntries(BOOSTS.map((id) => [id, active.includes(id)])) };
 }
 
 /**
- * Whether a run with this loadout counts as modded. The single source of `record.modded`.
- * @param {Object} loadout @param {{daily?:boolean}} [o]
+ * Whether a run with this loadout counts as modded. The single source of `record.modded`. Only a boost
+ * that actually applies (on, owned, not the Daily) makes a run modded.
+ * @param {Object} loadout @param {{daily?:boolean, unlocked?:Object<string,number>}} [o]
  * @returns {boolean}
  */
 export function isModdedRun(loadout, o) {
-  if (o && o.daily) return false;
-  return enabledBoosts(loadout).length > 0;
+  return activeBoosts(loadout, o).length > 0;
 }
 
 /**
  * What the boosts do at run start, as plain numbers a scene applies. Returning numbers rather than
  * mutating anything keeps this testable and keeps the scene the only thing that touches the sled.
- * @param {Object} loadout @param {{daily?:boolean}} [o]
+ * Pass the profile's `unlocked.boosts` as `o.unlocked`: without it nothing is owned and nothing applies.
+ * @param {Object} loadout @param {{daily?:boolean, unlocked?:Object<string,number>}} [o]
  * @returns {{shieldCharges:number, speedFactor:number, modded:boolean}}
  */
 export function boostEffects(loadout, o) {
-  const active = o && o.daily ? [] : enabledBoosts(loadout);
+  const active = activeBoosts(loadout, o);
   let shieldCharges = 0;
   let speedFactor = 1;
   for (const id of active) {
@@ -93,7 +121,9 @@ export function boostEffects(loadout, o) {
  * @returns {{boosts:Object<string,boolean>}}
  */
 export function setBoost(loadout, id, on) {
-  if (!BOOSTS.includes(id)) return loadoutForRun(loadout);
+  // An unknown id leaves the TOGGLES as they are. Not loadoutForRun: that is the run's view (owned boosts
+  // only), and a toggle edit must not silently switch off a boost the player has not unlocked yet.
+  if (!BOOSTS.includes(id)) return { boosts: Object.fromEntries(BOOSTS.map((b) => [b, enabledBoosts(loadout).includes(b)])) };
   const current = enabledBoosts(loadout);
   const next = new Set(current);
   if (on) next.add(id); else next.delete(id);
