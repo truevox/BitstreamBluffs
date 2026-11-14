@@ -73,7 +73,8 @@ Authoritative typedefs: `src/data/schemas.js` (terrain/content), `src/events.js`
   `'noise'` (1-D noise params, used for difficulty spikes), `'bridge'` (wireless bridge: gap + bounce pads). Adding a
   JSON file adds content; nothing is hard-coded.
 * **Hazards** (`HazardDef`): `{id, shapeKey, size{w,h}, onHit{effect: crash|slow|scramble, durationMs?, speedFactor?},
-  weight, minDistanceM, placement, colorKey}`. Ids: `glitchChasm`, `overflowFirewall`, `packetSpike`,
+  weight, minDistanceM, placement, colorKey}` (B0 adds `biome`, `spawn` and the `blind` / `gust` effects; power-ups gain
+  `biome` and the `ward` / `glide` / `stabilize` kinds: see "Addendum: biome full treatment, B0"). Ids: `glitchChasm`, `overflowFirewall`, `packetSpike`,
   `garbageDataVent`. **Power-ups** (`PowerUpDef`): ids `clockPulse` (slowmo), `packetBurst` (speedBoost), `hashedBackup`
   (shield); spawn chance per candidate slot = `baseChance / (1 + distanceM / distanceDecayM)`. **Terrain mods**
   (`TerrainModDef`): ids `highBandwidth` (frictionMul), `compression` (gravityMul), `wirelessBridge` (bounceMul).
@@ -741,3 +742,80 @@ Rules (the tests enforce them):
 * Decor stays inside 480x270, with an overhang of up to 96 px at the left and right edges only.
 * Each frame is still redrawn into one Graphics. A W6 frame makes at most 2.5x the draw calls of the
   base backdrop (2.1x was measured for `candy-stripes`, the most expensive).
+
+## Addendum: biome full treatment, B0 groundwork (engine only; additive)
+
+B0 adds the engine for each biome's own hazard and power-up (spec `bitstream-biome-treatment-spec.md` §5-§6). It ships
+**no biome content**: B1-B4 add the JSON under `data/hazards` / `data/powerups`. With no biome defs in content every
+generator output is unchanged except the E7 zone rule below, and mask 0 is byte-identical (golden `shape` / `full` /
+`complete` digests unchanged).
+
+**New data fields (all optional, `data/schemas.js`).**
+* `HazardDef.biome` / `PowerUpDef.biome`: a biome id. Such a def is removed from `hazardList`, `airHazardList` and
+  `powerupList` in the `TerrainGenerator` constructor and kept in `biomeHazards[biome]` / `biomePowerups[biome]`
+  (sorted by id). Base placement can never see it, so it cannot move a mask-0 pick (isolation test:
+  `tests/src/biome-spawns.test.js`).
+* `HazardDef.spawn.baseChance` (biome defs only) and the existing `PowerUpDef.spawn.baseChance`: the chance of the
+  chunk's biome slot, capped at `BIOME_SPAWN_MAX_CHANCE` 0.5 (default `BIOME_SPAWN_DEFAULT_CHANCE` 0.2). Biome
+  power-ups have no distance decay. `weight: 0` disables a biome def (the biome pick does not use `weight || 1`).
+* `HazardDef.onHit.effect` gains `'blind'` `{durationMs?, visibility?}` and `'gust'` `{impulsePxS:[x,y]}`.
+* `PowerUpDef.effect.kind` gains `'ward'` `{durationMs, mods[], hazards[], effects[]}`, `'glide'`
+  `{frictionMul, durationMs}` and `'stabilize'` `{landingToleranceDeg, bounceMul?, durationMs}`.
+* Not in B0: `HazardDef.motion` (`roll`, `gate`) lands with B3.
+
+**Generator pass `_placeBiomeSpawns`.** Runs last in `_build`, after `'air'`, only when the chunk's `biome` is set, from
+`crng.fork('biomeHaz')` and `crng.fork('biomePu')` (forks derive from the chunk root's initial state, so creating them
+moves no other stream). One hazard slot and one power-up slot per biome chunk; each draws exactly `BIOME_SLOT_DRAWS` (5)
+numbers up front whatever happens, so one def's chance or a blocked position never shifts the other slot.
+* Ground hazards: never on bridge or jump chunks; `BIOME_EDGE_MARGIN_PX` (= `HAZARD_END_MARGIN_PX`, 240) from the chunk
+  edges (spec asks >= 96; 240 is what keeps `HAZARD_MIN_SPACING_PX` across a chunk border); the breather calm stretch,
+  lip windows `[lip.x - 40, zoneEnd]`, `noHazX`, gaps +/- 96 px, 480 px from any hazard, 90 px from any power-up,
+  the base slope / flatness rules, `slow` only before a descent, and no shard over the box. The slot scans the chunk in
+  `HAZARD_RETRY_STEP_PX` steps from a drawn start. `chunk.hazards` stays sorted by x.
+* Air biome hazards (`placement: 'air'`): only in jump chunks, using the base jump-arc box (`_airSpan`, `_airHiMul`,
+  `_tryAirBox`, shared with `_placeAirHazard` and maths-identical to it) and `_airBlocked`. `AIR_HAZARD_MIN_M` does not
+  apply (biome sectors start at 1000 m); the def's own `minDistanceM` does.
+* Power-ups: inside the same edge margins, > 480 px from x = 0, 90 px from any hazard and any power-up, clear of gaps and
+  shards, lifted like a base pickup. `chunk.powerups` stays sorted by x.
+* Measured with a fixture def at chance 0.5: base hazards fill eligible ground every ~480 px past 2 km, so the 480 px
+  spacing blocks most ground slots (about 10 placements per 4 seeds x 300 chunks at mask 2|32). Power-up slots land
+  in about 40 % of biome chunks.
+
+**E7 zone rule (Marvin 2026-11-14, audit TERRAIN-1).** In a chunk where `_placeBiomeZone` placed a zone, `_placeZones`
+places no template zone, so a biome mechanic is never multiplied into its opposite. `_placeBiomeZone` now runs first
+and returns whether it placed a zone; both keep their own forks. This moves mask != 0 zones (and seed@mask bests) on
+purpose; mask 0 is untouched. Test: `tests/src/biome-zone-stacking.test.js`.
+
+**Effects (math in pure modules; scenes only call them).**
+* `systems/Wards.js`: `emptyWards()`, `addWard(state, id, effect)` (durations clamped to `WARD_MIN_MS`..`WARD_MAX_MS`,
+  4-6 s; re-collecting refreshes), `tickWards(state, dtMs)` -> `{state, expired}`, `isWarded(state, {modId|hazardId|effect})`,
+  `wardMsLeft(state, id)`. `PhysicsTuner.getEffective` skips a zone whose mod id is warded. `RunScene.onHazard`
+  ignores a hit whose hazard id or effect is warded (no `HAZARD_HIT`), and a warded slow / scramble / blind stops acting.
+* `systems/BiomeEffects.js`: `gustImpulse` (vector norm capped at `GUST_MAX_PX_S` 180), `blindVisibility` (>=
+  `BLIND_MIN_VISIBILITY` 0.35) and `blindOverlayAlpha(msLeft, totalMs, visibility)` (pure function of time, <= 0.65),
+  `glideFrictionMul` ([0.2, 1], default 0.7), `stabilizeToleranceDeg` ([0, 30]), `stabilizeBounceMul`,
+  `resolveLanding(landing, toleranceDeg, TUNING)` (the old forgiveness rule when the tolerance is 0; a stabilize
+  re-grades with the angle reduced by the tolerance and widens the forgiveness angle by it), `hazardEffectDurationMs`,
+  `timedPowerupMs`, `hazardColorKey` (a **biome** crash hazard is always `danger`; base defs keep their colorKey),
+  `hazardDrawKind` / `powerupDrawKind` (an unknown shapeKey draws the generic shape).
+* `TunerContext` gains `wards`, `glideFrictionMul` (multiplies `frictionMul`, so `groundResist`; Matter friction stays
+  0) and `stabilizeBounceMul` (multiplies `bounceMul`).
+* `RunScene`: `onHazard` branches `blind` (white flash, then a `palette.bg` overlay `blindRect` at depth 99 under the
+  flash; the HUD scene stays on top) and `gust` (`_addSledVelocity` through Matter `Body.setVelocity`); `onPowerUp`
+  branches `ward`, `glide`, `stabilize`. New methods: `physicsContext(pad, zoneDefs?)` (the frame's tuner context, now
+  testable), `_resetBiomeEffects()`, `_endBiomeEffects(reason)`, `tickBiomeEffects(dt)`, `updateBlindOverlay()`.
+  Events reuse the existing payloads: `HAZARD_HIT.effect` can be `'blind'` (with its duration) or `'gust'`
+  (`durationMs` 0); `EFFECT_END {effect:'blind'}`; `POWERUP_COLLECTED {id, durationMs}` for ward / glide / stabilize;
+  `POWERUP_EXPIRED {id, reason}` with reason `'timeout'`, `'respawn'` (manual reset) or `'replaced'` (a different
+  glide / stabilize def took over). Biome pickups never touch `modded` or Ranking.
+* `UIScene`: `EFFECT_INFO` rows `blind` ("BLINDED") and `gust` ("GUST", shown >= 700 ms); `POWERUP_KIND_INFO` gives
+  ward / glide / stabilize a chip colour and its own icon in `_drawIcon` until a pickup id gets its own `POWERUP_INFO` row
+  (`_powerInfo(id)`, `_powerKind(id)`). The active-effect chip is the existing power-up chip.
+* `Hazard.js` / `PowerUp.js` draw through `hazardDrawKind` / `powerupDrawKind`; the generic pickup glyph is a filled
+  diamond.
+
+**Tests and gates.** `tests/src/biome-effects.test.js` (pure math), `tests/src/biome-effects-runscene.test.js` (the first
+Jest test that imports RunScene, UIScene, Hazard and PowerUp: a small fake Phaser and the shipped methods on a prototype
+stub), `tests/src/biome-spawns.test.js`, `tests/src/biome-zone-stacking.test.js`. The built-game gate has five B0 checks
+that act on the real run (ward vs stickyPatch, glide, gust, blind, stabilize) with fixture defs injected into the registry
+content. Sim baseline for B1-B4: `tools/sim/baselines/biomes-b0.json` (README there).
