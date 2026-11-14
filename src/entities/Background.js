@@ -269,12 +269,12 @@ function tileX(x0, scrollX, factor) {
   return x > GAME_WIDTH + DECOR_MARGIN ? null : x;
 }
 
-/** Fixed per-(motif, seed) item layout, generated once from mulberry32 and memoised (never Math.random). */
-const layoutCache = new Map();
+/**
+ * Fixed per-(motif, seed) item layout from mulberry32 (never Math.random). Rebuilt on every call (about
+ * 50 PRNG draws): no module-level cache, so the output cannot depend on what was drawn before.
+ */
 function decorLayout(motif, seed) {
-  const key = `${motif}|${seed}`;
-  let lay = layoutCache.get(key);
-  if (lay) return lay;
+  let lay;
   const rnd = mulberry32((DECOR_SEEDS[motif] ^ Math.imul(seed | 0, 0x9e3779b1)) >>> 0);
   const items = (n, make) => Array.from({ length: n }, (_, i) => make(i));
   const span = (lo, hi) => lo + rnd() * (hi - lo);
@@ -311,8 +311,6 @@ function decorLayout(motif, seed) {
   } else {
     lay = null;
   }
-  if (layoutCache.size > 64) layoutCache.clear();
-  layoutCache.set(key, lay);
   return lay;
 }
 
