@@ -205,9 +205,21 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
     // `chasm` and not `terrain`: an opening-grace terrain crash is deliberately forgiven and respawns,
     // which is correct behaviour and would leave the gate waiting for a Game Over that never comes.
     run.pendingCrash = { cause: 'chasm' };
-    await wait(3000);
+    // Wait for the Game Over scene to actually become ACTIVE rather than sleeping a fixed 3s. The fixed
+    // sleep was flaky under load (a jest run or a second gate beside it): the run had not yet handed off,
+    // the probe read an inactive scene, and the gate reported "scene not active" — a harness timing bug
+    // that looked exactly like a broken Game Over screen. Poll the real condition, then give the scene a
+    // beat to finish building its panels.
+    const deadline = Date.now() + 15000;
+    let active = false;
+    while (Date.now() < deadline) {
+      const s = g.scene.getScene('GameOverScene');
+      active = Boolean(s && s.scene && s.scene.isActive && s.scene.isActive());
+      if (active) break;
+      await wait(100);
+    }
+    if (active) await wait(350);
     const over = g.scene.getScene('GameOverScene');
-    const active = Boolean(over && over.scene && over.scene.isActive && over.scene.isActive());
     const rec = g.registry.get('lastRecord') || g.registry.get('record') || null;
     const texts = [];
     const seen = new Set();
@@ -411,6 +423,21 @@ async function main() {
                 bad,
                 clipped: clipped.map((r) => `${r.text}(${r.x.toFixed(1)},${r.y.toFixed(1)},${r.w.toFixed(1)}x${r.inkH.toFixed(1)})`),
                 minInkH: rects.length ? Math.min(...rects.map((r) => r.inkH)) : 0,
+                // Diagnostics for a title read that comes back empty: is the scene active, does the panel
+                // exist, does the panel have a title object, and what does the raw string look like?
+                diag: {
+                  active: Boolean(over.scene && over.scene.isActive && over.scene.isActive()),
+                  hasRight: Boolean(over.right),
+                  hasTitleText: Boolean(tt),
+                  hasMain: Boolean(tt && tt.main),
+                  rawTitle: tt && tt.main ? JSON.stringify(tt.main.text) : 'no-main',
+                  titleVisible: tt ? tt.visible !== false : null,
+                  rightTitle: over.right && over.right.titleText && over.right.titleText.main
+                    ? JSON.stringify(over.right.titleText.main.text) : 'n/a',
+                  hasEntry: Boolean(over.entry),
+                  recId: over.rec ? over.rec.id : null,
+                  moddedFlag: over.modded,
+                },
               };
             };
 
@@ -448,7 +475,7 @@ async function main() {
               const all = st.texts.join(' | ') + ' | ' + st.title;
               const claimsClean = /\bNEW TOP 10\b/.test(all) || /NEW SEED BEST/.test(all) || /TODAY'S BEST/.test(all);
               if (claimsClean) return `claims clean-board honour: ${all.slice(0, 160)}`;
-              if (!st.title) return 'missing ledger title';
+              if (!st.title) return `missing ledger title ${JSON.stringify(st.diag)}`;
               if (!/MODDED/i.test(st.title)) return `title missing MODDED: "${st.title}"`;
               if (!/MODDED/i.test(all)) return `screen missing MODDED: ${all.slice(0, 160)}`;
               if (st.count < 25) return `too few glyphs (${st.count})`;
