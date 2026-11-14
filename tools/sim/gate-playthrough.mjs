@@ -503,10 +503,75 @@ async function main() {
             if (s) walk(s.children && s.children.list);
             return out;
           });
+          // The toast is transient text laid OVER a screen the player is reading (header, RUN REPORT,
+          // LEDGER, buttons). Reading its strings proves it exists; only its RECT proves it is not
+          // covering the text underneath. This is the W4 lesson applied to W5's new screen element.
+          const toast = await page.evaluate(() => {
+            const g = window.__bbGame;
+            const s = g.scene.getScene('GameOverScene');
+            if (!s) return { fatal: 'no GameOverScene' };
+            if (!s.toast || !s.toast.length) return { fatal: 'no achievement toast drawn' };
+            const rectOf = (o) => {
+              const b = o.getBounds ? o.getBounds() : null;
+              return b ? { text: (o.main && o.main.text) || '', x: b.x, y: b.y, w: b.width, h: b.height, inkH: b.height * (8 / 9) } : null;
+            };
+            const toastRects = s.toast.map(rectOf).filter(Boolean);
+            // Everything ELSE that is drawn, so the toast can be tested against the real screen.
+            const others = [];
+            const skip = new Set(s.toast);
+            const seenObjs = new Set();
+            const walk = (list, hidden = false) => {
+              for (const o of list || []) {
+                if (!o || seenObjs.has(o) || skip.has(o)) continue;
+                seenObjs.add(o);
+                const vis = !hidden && o.visible !== false && (o.alpha === undefined || o.alpha > 0);
+                if (vis && o.main && typeof o.main.text === 'string' && o.main.text) {
+                  const r = rectOf(o);
+                  // Chromatic-aberration ghosts are deliberate duplicates of the CRASHED header.
+                  if (r && o !== s.ghostA && o !== s.ghostB) others.push(r);
+                  continue;
+                }
+                const kids = Array.isArray(o.list) ? o.list : [];
+                if (kids.length) walk(kids, !vis);
+              }
+            };
+            walk(s.children && s.children.list);
+            const hits = [];
+            for (const t of toastRects) {
+              for (const o of others) {
+                if (t.x < o.x + o.w && o.x < t.x + t.w && t.y < o.y + o.inkH && o.y < t.y + t.inkH) {
+                  hits.push(`${t.text} <-> ${o.text}`);
+                }
+              }
+            }
+            const outOfBounds = toastRects.filter((r) => r.x < 0 || r.y < 0 || r.x + r.w > 480 || r.y + r.inkH > 270);
+            // And the toast must not overlap ITSELF line-on-line.
+            const selfHit = [];
+            for (let i = 0; i < toastRects.length; i++) {
+              for (let j = i + 1; j < toastRects.length; j++) {
+                const a = toastRects[i]; const b = toastRects[j];
+                if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.inkH && b.y < a.y + a.inkH) selfHit.push(`${a.text} <-> ${b.text}`);
+              }
+            }
+            return {
+              lines: toastRects.map((r) => r.text),
+              hits: hits.slice(0, 6),
+              selfHit,
+              outOfBounds: outOfBounds.map((r) => `${r.text}@${r.x.toFixed(0)},${r.y.toFixed(0)}`),
+              minInkH: toastRects.length ? Math.min(...toastRects.map((r) => r.inkH)) : 0,
+              othersCount: others.length,
+            };
+          });
           // A run always credits at least one run, so FIRST DESCENT must unlock and be announced.
           if (!ach.stored) fail('W5: achievement persisted', `stored=${ach.stored}`);
           else if (!over.some((t) => /UNLOCKED|MORE/i.test(t))) fail('W5: unlock announced on Game Over', `texts=${JSON.stringify(over.filter((t) => /UNLOCK/i.test(t)))}`);
-          else pass('W5: achievement unlocked, persisted, and announced', `stored=${ach.stored} ${ach.keys.slice(0, 3).join(',')}`);
+          else if (toast.fatal) fail('W5 toast: drawn and measurable', toast.fatal);
+          else if (toast.othersCount < 20) fail('W5 toast: the probe read the whole screen', `only ${toast.othersCount} other glyphs`);
+          else if (toast.minInkH < 7.9) fail('W5 toast: full ink height', `minInkH=${toast.minInkH}`);
+          else if (toast.outOfBounds.length) fail('W5 toast: inside the 480x270 screen', toast.outOfBounds.join(' | '));
+          else if (toast.selfHit.length) fail('W5 toast: its own lines do not overlap', toast.selfHit.join(' | '));
+          else if (toast.hits.length) fail('W5 toast: covers no text the player is reading', toast.hits.join(' | '));
+          else pass('W5: achievement unlocked, persisted, announced, and the toast covers nothing', `stored=${ach.stored} lines=${JSON.stringify(toast.lines)}`);
         }
       } finally { await page.close(); }
     }
@@ -547,18 +612,77 @@ async function main() {
               if (v && v.panel) walk(v.panel.list);
               return out;
             };
+            // Geometry, not strings: CC Friday asked for overlap checks on every new W5 screen. Read the
+            // drawn glyph rects for EVERY page (a later page can overflow even when page 1 fits), plus the
+            // BACK button and the panel frame, all in screen space.
+            const marks = () => {
+              const out = []; const seenObjs = new Set();
+              const walk = (list, hidden = false) => {
+                for (const o of list || []) {
+                  if (!o || seenObjs.has(o)) continue;
+                  seenObjs.add(o);
+                  const vis = !hidden && o.visible !== false && (o.alpha === undefined || o.alpha > 0);
+                  // A NeonText draws glow+main with different metrics; read the wrapper once.
+                  if (vis && o.main && typeof o.main.text === 'string' && o.main.text) {
+                    const b = o.getBounds ? o.getBounds() : null;
+                    if (b) out.push({ text: o.main.text, x: b.x, y: b.y, w: b.width, h: b.height, inkH: b.height * (8 / 9) });
+                    continue;
+                  }
+                  const kids = Array.isArray(o.list) ? o.list : [];
+                  if (kids.length) walk(kids, !vis);
+                }
+              };
+              if (v && v.panel) walk(v.panel.list);
+              const byPos = new Map();
+              for (const r of out) {
+                const k = `${r.text}@${Math.round(r.x)},${Math.round(r.y)}`;
+                if (!byPos.has(k)) byPos.set(k, r);
+              }
+              return [...byPos.values()];
+            };
+            const audit = () => {
+              const rects = marks();
+              const bad = [];
+              for (let i = 0; i < rects.length; i++) {
+                for (let j = i + 1; j < rects.length; j++) {
+                  const a = rects[i]; const b = rects[j];
+                  if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.inkH && b.y < a.y + a.inkH) bad.push(`${a.text} <-> ${b.text}`);
+                }
+              }
+              const panel = v && v.panel ? { x: v.panel.x, y: v.panel.y, w: v.panel.w, h: v.panel.h } : null;
+              const outside = panel
+                ? rects.filter((r) => r.x < panel.x || r.y < panel.y || r.x + r.w > panel.x + panel.w || r.y + r.inkH > panel.y + panel.h)
+                : [];
+              return {
+                count: rects.length,
+                bad,
+                outside: outside.map((r) => `${r.text}@${r.x.toFixed(0)},${r.y.toFixed(0)}`),
+                minInkH: rects.length ? Math.min(...rects.map((r) => r.inkH)) : 0,
+              };
+            };
             const page1 = read();
             const pages = v.pages;
             const kind = v.constructor ? v.constructor.name : 'none';
-            if (v._turn) v._turn(1);
+            const audits = [audit()];
+            // Walk every page, so a latent overflow on page 3 cannot hide behind a tidy page 1.
+            for (let i = 1; i < (pages || 1); i++) {
+              v._turn(1);
+              await wait(220);
+              audits.push(audit());
+            }
+            // Return to page 1 so the caller's later assertions read a stable state.
+            for (let i = 1; i < (pages || 1); i++) v._turn(-1);
+            await wait(200);
+            const page1Again = read();
+            v._turn(1);
             await wait(300);
             const page2 = read();
             return {
-              kind, pages,
+              kind, pages, audits,
               page1HasHeader: page1.some((t) => /SKILL|DISTANCE|DAILY/i.test(t)),
               hasAchRows: page1.some((t) => /FIRST DESCENT|DOUBLED UP|KILOMETRE CLUB|REGULAR/i.test(t)),
               page1Text: page1.slice(0, 6),
-              diff: page1.join('|') !== page2.join('|'),
+              diff: page1Again.join('|') !== page2.join('|'),
               page2Num: v.page,
               hasPageLabel: page1.some((t) => /PAGE \d+\/\d+/.test(t)),
               // Backing out must return to PROFILE, not all the way to the Title screen.
@@ -576,7 +700,15 @@ async function main() {
           else if (!grid.page1HasHeader) fail('W5 grid: shows group headers', JSON.stringify(grid.page1Text));
           else if (!grid.hasPageLabel) fail('W5 grid: shows a page indicator', JSON.stringify(grid.page1Text));
           else if (grid.pages > 1 && !grid.diff) fail('W5 grid: paging changes the rows', `pages=${grid.pages} page2=${grid.page2Num}`);
-          else pass('W5 grid: opens from PROFILE, headers and page label render, paging works', `pages=${grid.pages}`);
+          else if (grid.audits.some((a) => a.count < 8)) fail('W5 grid: the probe actually measured the screen', `glyph counts ${JSON.stringify(grid.audits.map((a) => a.count))}`);
+          else if (grid.audits.some((a) => a.minInkH < 7.9)) fail('W5 grid: every glyph keeps a full ink height', `min ${Math.min(...grid.audits.map((a) => a.minInkH))}`);
+          else if (grid.audits.some((a) => a.bad.length)) {
+            const a = grid.audits.find((x) => x.bad.length);
+            fail('W5 grid: no two glyphs overlap on any page', a.bad.slice(0, 4).join(' | '));
+          } else if (grid.audits.some((a) => a.outside.length)) {
+            const a = grid.audits.find((x) => x.outside.length);
+            fail('W5 grid: every glyph sits inside the panel on every page', a.outside.slice(0, 4).join(' | '));
+          } else pass('W5 grid: opens from PROFILE, headers and page label render, paging works, no overlap on any page', `pages=${grid.pages}, glyphs=${JSON.stringify(grid.audits.map((a) => a.count))}`);
         }
       } finally { await page.close(); }
     }
