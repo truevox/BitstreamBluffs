@@ -252,3 +252,15 @@ describe('the on-screen hint', () => {
     expect(22 + SHOP_PANEL.h).toBeLessThanOrEqual(GAME_HEIGHT - 5 - 4);
   });
 });
+
+describe('the retry keys are wired', () => {
+  // No suite constructs GameOverScene.create() (it builds the whole screen), so the opt-in is checked at the
+  // source, the same way the SHOP key is; the built-game probe presses the real keys.
+  test('Game Over opts in to MenuInput\'s retry action, and Title / Pause do not', async () => {
+    const fs = await import('node:fs');
+    const src = (f) => fs.readFileSync(new URL(`../../src/scenes/${f}`, import.meta.url), 'utf8');
+    expect(src('GameOverScene.js')).toMatch(/new MenuInput\(this, \(a\) => this\._onAction\(a\), \{ retryAction: true \}\)/);
+    expect(src('TitleScene.js')).not.toMatch(/retryAction/);
+    expect(src('PauseScene.js')).not.toMatch(/retryAction/);
+  });
+});
