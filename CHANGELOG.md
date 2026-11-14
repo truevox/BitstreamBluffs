@@ -7,6 +7,7 @@
 - **Combo names match their rung.** Ids are unchanged (saves key on them). combo-5 (x1.25) is now Combo Starter, combo-10 (x1.5) Chain Reaction, combo-20 (x1.75) Unbroken, and combo-2 (x2.0) stays Doubled Up, now described as "Land a x2 combo." "Wireless Legend" sat on the x1.75 rung and is retired.
 - **The Game Over toast names up to three unlocks in order.** More than three: two names and "+N MORE". One: its name and description, as before.
 - `AchievementsLayout.GROUPS` is derived from `Achievements.GROUP_ORDER` (it listed SKILL first while the grid drew DISTANCE first). `achievements.json` is stored in the same order, and a test compares the two.
+- **Sugar Rush keeps ground steering (decision 8, audit T4).** A terrain mod's `steerMul` cuts air tilt authority only; ground lean is unchanged inside the zone. This was already the behaviour; `tests/src/sugar-rush-steering.test.js` now pins it (ground torque inside a sugarRush zone equals the base, also tucked under a daily rule and with two overlapping zones), so folding the zone factor into ground steering fails the suite. No data changed: `steerMul` 0.6 in `data/terrainMods/sugar-rush.json` stays.
 - Tests: `tests/src/achievements-order.test.js`. Two existing tests changed their pinned contract with this decision: the toast test that expected "+2 MORE" for three unlocks now expects all three names, and the ACH-2 name test pins the new names.
 
 ## v2.5.1 - cosmetics, titles and themes complete (audit F4/SHOP-2/SHOP-5, 2026-11-14)

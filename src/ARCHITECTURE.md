@@ -864,3 +864,10 @@ evaluation with one caller timestamp, and the Game Over toast shows them in this
 more than three: two names and `+N MORE`). `groupedAchievements` and `AchievementsLayout.GROUPS` follow
 `GROUP_ORDER`. Ids never change (saves key on them); names and descriptions follow the targets.
 `data/achievements/achievements.json` is kept in the same order (tested).
+
+**Zone steering (decision 8).** A terrain mod's `physics.steerMul` multiplies `EffectivePhysics.airControl`
+only. The effective `steerMul` (0 under a parachute, the daily `tuckSteerMul` when tucked) never takes a zone
+factor, so ground lean (`tiltTorqueDegS2 * TUNING.groundTiltMul * steerMul * tiltSign` in `Sled`) is the same
+inside and outside any zone. A zone may dull air control but must never take ground steering away from the
+player. `tests/src/sugar-rush-steering.test.js` pins this against PhysicsTuner's pure output.
+
