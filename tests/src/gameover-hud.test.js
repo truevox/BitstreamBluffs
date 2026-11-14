@@ -630,6 +630,18 @@ describe('UI-3: mission toasts emitted at RUN_END finish before RunScene stops t
     expect(shown).toEqual([]);
   });
 
+  test('mid-run toasts still waiting in the queue at RUN_END are folded into the run-end strip', () => {
+    // Real order: something is mid-slide, two missions complete just before the crash (queued behind it),
+    // then RUN_END arrives with the same two in the awards.
+    const done = [{ id: 'm1', title: 'Grab 15 shards', xp: 60 }, { id: 'm2', title: 'Land 3 flips', xp: 40 }];
+    const { s } = hudWith(done, ['SECTOR 4']);
+    s.stripBusy = true;
+    for (const c of done) s.onMissionCompleted(c);
+    expect(s.stripQueue.map((j) => j.text)).toEqual(['SECTOR 4', 'GRAB 15 SHARDS DONE  +60 XP', 'LAND 3 FLIPS DONE  +40 XP']);
+    s.onRunEnd();
+    expect(s.stripQueue.map((j) => j.text)).toEqual(['2 MISSIONS DONE  +100 XP', 'SECTOR 4']);
+  });
+
   test('a mid-run toast keeps the normal, slower timing', () => {
     const { s } = hudWith([]);
     s.onMissionCompleted({ id: 'm9', title: 'Reach 500 m in one run', xp: 60 });

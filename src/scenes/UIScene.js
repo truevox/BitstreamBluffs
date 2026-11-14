@@ -443,14 +443,15 @@ export class UIScene extends Phaser.Scene {
   onMissionCompleted(p) {
     if (!p) return;
     if (p.id) this.missionToastsThisRun.add(p.id);
-    this._strip(missionToastText(p, p.title), 'lime');
+    this._strip(missionToastText(p, p.title), 'lime', { mission: p });
   }
 
   /**
    * Run-end mission toast. RunScene stops this HUD CRASH_TO_GAMEOVER_MS (950 ms) after RUN_END, and one strip
    * already takes 940 ms, so a second queued toast was always cut off (audit UI-3). Every completion not
    * already toasted mid-run is folded into ONE strip ("2 MISSIONS DONE  +100 XP"; a single one keeps its
-   * title), run on the shorter RUN_END timing and put ahead of any stale strip still waiting in the queue.
+   * title), together with any mid-run mission toast still waiting in the queue, run on the shorter RUN_END
+   * timing and put ahead of any stale strip still waiting in the queue.
    * Game Over lists the missions by name right after. ProgressionService has already published the awards
    * by the time RUN_END reaches this scene (it is registered first in createServices); if it somehow has
    * not, nothing is toasted rather than throwing at run end.
@@ -460,7 +461,9 @@ export class UIScene extends Phaser.Scene {
       const awards = this.registry.get(REG.LAST_AWARDS);
       const done = awards && awards.missions && Array.isArray(awards.missions.completed)
         ? awards.missions.completed : [];
-      const fresh = [];
+      // Mid-run toasts that have not started sliding yet would be cut off too: fold them in.
+      const fresh = this.stripQueue.filter((j) => j.mission).map((j) => j.mission);
+      this.stripQueue = this.stripQueue.filter((j) => !j.mission);
       for (const c of done) {
         if (!c) continue;
         if (c.id && this.missionToastsThisRun.has(c.id)) continue;
@@ -602,10 +605,12 @@ export class UIScene extends Phaser.Scene {
   /**
    * @param {string} text
    * @param {string} key palette key
-   * @param {{front?:boolean, timing?:{inMs:number,holdMs:number,outMs:number}}} [o] front = jump the queue
+   * @param {{front?:boolean, timing?:{inMs:number,holdMs:number,outMs:number}, mission?:Object}} [o]
+   *   front = jump the queue; mission = the completion this toast announces (so RUN_END can fold it)
    */
   _strip(text, key, o = {}) {
     const job = { text, key, timing: o.timing || STRIP_TIMING.normal };
+    if (o.mission) job.mission = o.mission;
     if (o.front) this.stripQueue.unshift(job);
     else this.stripQueue.push(job);
     if (!this.stripBusy) this._nextStrip();
