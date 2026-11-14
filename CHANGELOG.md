@@ -33,6 +33,7 @@
 - **BF-1:** the one-time backfill credits stored runs oldest first (by `endedAt`), so First Descent carries the first run's time and the credited ring keeps the newest hashes. Removed the no-op `credited ? out : out`.
 - **ACH-1:** `tricksLanded` sums the per-kind max of lifetime and run tricks, so the run being credited is counted once (5 backflips no longer unlock "Land 10 tricks").
 - **ACH-5:** the `bestCombo` metric is no longer floored at x1, so a profile with no runs shows 0 progress toward the combo achievements instead of 1/2.
+- **MS-1:** the published mission view builds cumulative rows from the banked progress alone, so 20/50 no longer shows 40/50 (or 25/50 as DONE), and a cumulative `runs` mission no longer shows one extra run.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 

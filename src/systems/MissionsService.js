@@ -11,8 +11,23 @@
 import { EVT } from '../events.js';
 import { REG } from '../constants.js';
 import {
-  rollSet, activeTemplates, missionState, xpForTemplate, shardsForTemplate, satisfies,
+  rollSet, activeTemplates, missionState, missionProgressText, xpForTemplate, shardsForTemplate, satisfies,
 } from './Missions.js';
+
+/**
+ * UI state of a cumulative mission from its banked progress only (no run in flight).
+ * @param {Object} t template @param {*} banked profile.missions.progress[t.id]
+ * @returns {{fraction:number, text:string, done:boolean}}
+ */
+function bankedState(t, banked) {
+  const target = Number.isFinite(t.target) ? t.target : 0;
+  const have = Math.min(target, Math.max(0, Number.isFinite(banked) ? banked : 0));
+  return {
+    fraction: target > 0 ? have / target : 0,
+    text: missionProgressText(t, have),
+    done: target > 0 && have >= target,
+  };
+}
 
 export class MissionsService {
   /**
@@ -183,11 +198,11 @@ export class MissionsService {
     const actives = activeTemplates(p, this.templates);
     const progress = (p.missions && p.missions.progress) || {};
     const rows = actives.map((t) => {
-      const banked = progress[t.id] || 0;
-      const st = missionState(t, {
-        record: banked ? { shards: banked, distanceM: banked, score: banked, nearMisses: banked, maxAirtimeMs: banked, bestCombo: banked, tricks: {} } : {},
-        profile: p,
-      });
+      // Between runs there is no run to add. A cumulative mission's progress is exactly what is banked in
+      // the profile; feeding the banked value in as a record as well published it twice (20/50 showed
+      // 40/50, 25/50 showed DONE), and missionState counts any record as one more run for a `runs`
+      // metric, so cumulative rows are built from the bank alone. Single-run and combo rows start at 0.
+      const st = t.type === 'cumulative' ? bankedState(t, progress[t.id]) : missionState(t, { record: {}, profile: p });
       return {
         id: t.id,
         title: t.title,

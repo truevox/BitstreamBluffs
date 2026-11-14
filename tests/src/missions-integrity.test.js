@@ -77,3 +77,39 @@ describe('MS-3: the sanitizer keeps each active mission once', () => {
     expect(p.missions.active).toEqual(['a', 'b', 'c']);
   });
 });
+
+describe('MS-1: published cumulative progress is what is banked', () => {
+  test('20 of 50 banked shards publishes 20/50, not 40/50', async () => {
+    const { game, store, missions } = await boot(memStorage());
+    const t = MISSIONS.templates.find((x) => x.id === 't1-cum-shards-50');
+    store.applyMissions({ active: [t.id], counter: 5, progress: { [t.id]: 20 }, xp: 0, shards: 0 });
+    missions.publish();
+    const row = game.registry.get(REG.MISSIONS).active.find((r) => r.id === t.id);
+    expect(row).toMatchObject({ text: '20/50', fraction: 0.4, done: false });
+  });
+
+  test('25 of 50 is not published as DONE', async () => {
+    const { game, store, missions } = await boot(memStorage());
+    const t = MISSIONS.templates.find((x) => x.id === 't1-cum-shards-50');
+    store.applyMissions({ active: [t.id], counter: 5, progress: { [t.id]: 25 }, xp: 0, shards: 0 });
+    missions.publish();
+    expect(game.registry.get(REG.MISSIONS).active.find((r) => r.id === t.id).done).toBe(false);
+  });
+
+  test('a cumulative "runs" mission publishes the banked count, not banked + 1', async () => {
+    const { game, store, missions } = await boot(memStorage());
+    const t = MISSIONS.templates.find((x) => x.type === 'cumulative' && x.metric === 'runs');
+    store.applyMissions({ active: [t.id], counter: 5, progress: { [t.id]: 3 }, xp: 0, shards: 0 });
+    missions.publish();
+    const row = game.registry.get(REG.MISSIONS).active.find((r) => r.id === t.id);
+    expect(row.text).toBe(`3/${t.target}`);
+  });
+
+  test('a single-run mission publishes zero between runs', async () => {
+    const { game, store, missions } = await boot(memStorage());
+    const t = MISSIONS.templates.find((x) => x.id === 't1-distance-500');
+    store.applyMissions({ active: [t.id], counter: 5, progress: {}, xp: 0, shards: 0 });
+    missions.publish();
+    expect(game.registry.get(REG.MISSIONS).active.find((r) => r.id === t.id)).toMatchObject({ text: '0/500', done: false });
+  });
+});
