@@ -113,12 +113,23 @@ describe('RunScene.onPowerUp: ward', () => {
     expect(events(s, EVT.HAZARD_HIT).map((p) => p.effect)).toEqual(['slow']);
   });
 
-  test('a manual reset ends every ward with reason respawn', () => {
+  test('a manual reset (Shift) ends every ward, glide, stabilize and blind with reason respawn', () => {
     const s = makeRun();
+    Object.assign(s, {
+      pickSafe: () => ({}), respawnAt: () => ({ x: 0, y: 0 }), emitFlow() {}, emitCombo() {}, emitScore() {},
+      score: { penalizeReset: () => ({ comboPenalty: 0, pointsLost: 0 }) },
+    });
     s.onPowerUp(pickup({ kind: 'ward', durationMs: 5000, mods: ['stickyPatch'] }, 'slickWax'));
-    s._endBiomeEffects('respawn');
-    expect(events(s, EVT.POWERUP_EXPIRED)).toEqual([{ id: 'slickWax', reason: 'respawn' }]);
+    s.onPowerUp(pickup({ kind: 'glide', frictionMul: 0.7, durationMs: 4000 }, 'sandrunner'));
+    s.onPowerUp(pickup({ kind: 'stabilize', landingToleranceDeg: 12, durationMs: 5000 }, 'gravStab'));
+    s.onHazard(hazard({ effect: 'blind', durationMs: 1200 }, 'shatterWall'));
+    s.manualReset();
+    expect(events(s, EVT.POWERUP_EXPIRED)).toEqual([
+      { id: 'slickWax', reason: 'respawn' }, { id: 'sandrunner', reason: 'respawn' }, { id: 'gravStab', reason: 'respawn' },
+    ]);
+    expect(events(s, EVT.EFFECT_END)).toEqual([{ effect: 'blind' }]);
     expect(s.wards.wards).toEqual([]);
+    expect([s.glideMs, s.stabilizeMs, s.blindMs]).toEqual([0, 0, 0]);
   });
 });
 

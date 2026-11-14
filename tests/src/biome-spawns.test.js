@@ -246,6 +246,19 @@ describe('_placeBiomeSpawns: placement of biome hazards and power-ups', () => {
     }
   });
 
+  test('a biome with no biome defs gets no biome spawn, even when another biome has some', () => {
+    // debumont (bit 1) has no fixture def; garbage-dump-glacier and space-mountain do
+    let debumontChunks = 0;
+    for (const seed of SEEDS) {
+      for (const c of chunks(fxGen(seed, {}, 1 | FX_MASK))) {
+        if (c.biome !== 'debumont') continue;
+        debumontChunks++;
+        expect([...c.hazards, ...c.powerups].filter(isFx)).toEqual([]);
+      }
+    }
+    expect(debumontChunks).toBeGreaterThan(20);
+  });
+
   test('a biome not in the mask gets nothing; base spawns in a biome chunk are untouched by the pass', () => {
     const onlyGarbage = chunks(fxGen('bs-mask', {}, 2));
     for (const c of onlyGarbage) for (const s of [...c.hazards, ...c.powerups]) expect([FX_AIR_HAZARD.id, FX_STABILIZE_POWERUP.id]).not.toContain(s.defId);
