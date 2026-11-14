@@ -1090,7 +1090,9 @@ export class RunScene extends Phaser.Scene {
       else if (this._lastBiome) this.emitIf(EVT.BIOME_ENTER, { id: null, name: 'Bitstream', sector: sectorNow, entering: false });
       // The biome's palette only takes effect if something applies it. Repaint on entry AND on exit
       // back to base terrain, or the tint would persist past the biome that owns it.
-      this.refreshPalette();
+      // Never at mask 0: no sector can carry a biome there, and refreshPalette rebuilds every collider,
+      // so a mask-0 run repaints only on a palette setting change, exactly as it did before W3.
+      if (this.biomeMask) this.refreshPalette();
       this._lastBiome = Boolean(def);
     }
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {

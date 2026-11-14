@@ -28,7 +28,10 @@ function deep() {
       if (Object.prototype.hasOwnProperty.call(t, k) && k !== 'name' && k !== 'prototype') return t[k];
       return deep();
     },
-    set(t, k, v) { t[k] = v; return true; },
+    // Reflect.set with the receiver, not `t[k] = v`: the scenes' prototype chain runs through one of these
+    // (the mocked Phaser.Scene), so a plain write would park every new instance field on that SHARED
+    // object and leak it into the next scene built in the same file (a stale `_biomeSector`, for one).
+    set(t, k, v, receiver) { return Reflect.set(t, k, v, receiver); },
     apply() { return deep(); },
     construct() { return deep(); },
   });
@@ -343,5 +346,34 @@ describe('RunScene applies only the boosts the profile owns', () => {
     const r = crash(s);
     expect(r.modded).toBeUndefined();
     expect(store.runs.map((x) => x.id)).toEqual([r.id]);
+  });
+});
+
+// ================================================================ TERRAIN-2: no palette rebuilds at mask 0
+
+describe('the biome palette repaint runs only when a biome mask is set', () => {
+  /** Create the run at `mask`, then drive updateFun on the first frame and across two sector boundaries. */
+  const repaintsOver = (mask) => {
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SEED, 'alpha'], [REG.BIOME_MASK, mask], [REG.SAVE_STORE, memStore()]]);
+    const s = runScene(values);
+    s.refreshPalette = jest.fn();
+    s.emitIf = () => {};
+    const sectors = new Set();
+    for (let x = s.startX; sectors.size < 3; x += 200) {
+      s.sled.x = x;
+      s.sled.y = s.terrain.heightAt(x);
+      s.sled.grounded = true;
+      sectors.add(s.terrain._sectorOf(x));
+      s.updateFun(16, {}, Math.max(0, (x - s.startX) / 10));
+    }
+    return s.refreshPalette.mock.calls.length;
+  };
+
+  test('at mask 0 neither the first frame nor a sector crossing rebuilds the palette', () => {
+    expect(repaintsOver(0)).toBe(0);
+  });
+
+  test('at a non-zero mask the first frame and each crossing still repaint (control)', () => {
+    expect(repaintsOver(8)).toBe(3);
   });
 });
