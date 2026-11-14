@@ -15,7 +15,8 @@ import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
-import { ellipsize } from './PixelFont.js';
+import { ellipsize, measureText } from './PixelFont.js';
+import { ledgerFooterLayout } from './LeaderboardLayout.js';
 import { profileLayout } from './ProfileLayout.js';
 import { shopLayout, shopMenuItems } from './ShopLayout.js';
 import { toggleBiome, biomeToggleRows, purchase, equip, isOwned } from '../systems/ProfileStore.js';
@@ -67,9 +68,19 @@ export class LeaderboardView extends View {
   constructor(scene, theme, o) {
     super(scene, theme, { w: 440, h: 178, title: 'LEDGER // TOP 10 ON THIS DEVICE', color: 'cyan', onClose: o.onClose, y: 40 });
     this.table = new LeaderboardTable(scene, theme, { x: 12, y: 24, w: 416, entries: null, parent: this.panel });
-    this.panel.add(new NeonText(scene, theme, 12, this.h - 18, 'ONE LEDGER PER DEVICE. MAGENTA RULE FLAG = DAILY PATCH ACTIVE.', {
+    // Footer legend + board tab. Both come from LeaderboardLayout so the footnote can never be drawn wider
+    // than the space the tab leaves it: W4 put the tab on the footer line and the 329px footnote ran 30px
+    // underneath it on both boards. The gate reads the drawn rects; the layout module makes it testable.
+    const foot = ledgerFooterLayout();
+    if (!foot.fits) {
+      // Loud, because the failure mode is a silent overlap that only a screenshot catches.
+      console.warn(`[BitstreamBluffs] leaderboard footnote ${foot.textW}px exceeds ${foot.footMaxW}px before the board tab`);
+    }
+    this.footnote = new NeonText(scene, theme, foot.footX, foot.footY, foot.text, {
       color: 'text', outline: 'none',
-    }).setAlpha(0.55));
+    });
+    this.footnote.setAlpha(0.55);
+    this.panel.add(this.footnote);
     // W4: two boards. The clean board is what the game has always shown; the modded board is where a
     // boosted run goes instead of vanishing. Both come from SaveStore, both decide through Ranking.js, so
     // this view never tests `modded` itself.
@@ -77,7 +88,7 @@ export class LeaderboardView extends View {
     this.showingModded = false;
     this.emptyText = null;
     this.tabBtn = new Button(scene, theme, {
-      x: this.w - 148, y: this.h - 24, w: 68, h: 16, label: 'MODDED', color: 'amber',
+      x: foot.tab.x, y: foot.tab.y, w: foot.tab.w, h: foot.tab.h, label: 'MODDED', color: 'amber',
       onClick: () => this._toggleBoard(),
     });
     this.panel.add(this.tabBtn);
@@ -92,12 +103,15 @@ export class LeaderboardView extends View {
       : Promise.resolve(store.getLeaderboard(10));
     p.then((rows) => {
       if (!this.alive) return;
-      this.table.setEntries(rows || []);
       // An empty modded board must say WHY it is empty, or it reads as a bug rather than as "no boosted
-      // runs yet".
-      if (!rows || rows.length === 0) {
-        this.emptyText = `NO ${this.showingModded ? 'MODDED' : 'CLEAN'} RUNS RECORDED YET`;
-      }
+      // runs yet". Passed into the table rather than stored on the view, because storing it here is what
+      // made the explanation invisible: `emptyText` was set and never drawn, so both boards said
+      // "NO ENTRIES YET".
+      const emptyLabel = rows && rows.length === 0
+        ? `NO ${this.showingModded ? 'MODDED' : 'CLEAN'} RUNS RECORDED YET`
+        : undefined;
+      this.table.setEntries(rows || [], undefined, emptyLabel);
+      this.emptyText = emptyLabel || null;
     }).catch(() => {
       if (this.alive) this.table.setEntries([]);
     });

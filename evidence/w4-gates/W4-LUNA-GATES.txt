@@ -1,0 +1,53 @@
+W4 LUNA RE-VERIFICATION — independent gate run
+repo: truevox/BitstreamBluffs  branch: feature/progression-w4-bank-shop-boosts
+audit target: d32ad95aa7d0593244fc68527fed791eca9fc7ea   base: c8caf02 (W3, on main)
+audit head:   be77f2b  (Luna repairs f5baa51 + be77f2b on top of the target)
+date: 2026-11-13
+host: galfriday  worktree: /home/hermes/campaigns/bitstream-progression/wt-w4
+
+== npm test -- --runInBand tests/src ==
+Test Suites: 43 passed, 43 total
+Tests:       791 passed, 791 total
+
+== npm run build ==
+dist/index.html                    0.59 kB
+dist/assets/index-D65bi6lF.js  1,799.03 kB | gzip: 449.75 kB
+built in 9.74s  (115 modules transformed)
+
+== node tools/sim/gate-playthrough.mjs --with-boosts ==
+  PASS  mask 0: Game Over builds, RETRY offered, bare seed, record mask 0  — texts=41
+  PASS  mask 31: Game Over builds, seed@mask shown, record carries mask 31  — texts=41
+  PASS  retry keeps the run mask  — mask 31 preserved
+  PASS  COPY matches the panel  — gate-seed@31
+  PASS  NEW SEED resets to the profile mask  — mask 31
+  PASS  Error Correction Engine grants a shield, absorbs a crash, and the run is marked modded  — charges=1
+  PASS  modded Game Over labels the run modded, keeps MODDED across saveEntry, and has zero glyph overlaps  — board="MODDED // TOP 10", saved="MODDED // YOU ARE ON THE BOARD", glyphs=48
+  PASS  clean run is not marked modded  — modded absent/false
+  PASS  shop: opens from PROFILE, no glyphs overlap, bank refreshes, buying debits/owns/equips, boost row reflects the toggle  — 32 glyphs, bank 275 -> 175
+  PASS  title: six rows, no overlapping glyphs, and the menu clears the DAILY PATCH strip  — 41 glyphs, last row bottom 191.0 vs strip 202
+  PASS  keys: PROFILE -> SHARD SHOP opens with arrow keys and Enter only  — title="SHARD SHOP"
+  PASS  keys: BACK stays reachable by keys and closes the view  — ArrowDown -> Enter
+  PASS  leaderboard: clean/modded tab both ways, no glyph overlaps, each empty board names itself  — MODDED -> CLEAN, 12/12 glyphs
+  PASS  daily run refuses both boosts while the profile has them ON  — shield 0, factor 1, not modded
+  PASS  boosted run still earns Resonance and shards despite not ranking  — xp 60, bank 12
+  PASS  equipped cosmetics reach the drawn sled, glow and trail  — rider=5cffb0 glow=ffc46b
+  PASS  colourblind mode refuses the equipped cosmetics  — rider fell back to the palette
+17 passed, 0 failed, 0 skipped
+GATE PASS
+
+== mask-0 golden ==
+Test Suites: 1 passed, 1 total
+Tests:       13 passed, 13 total
+
+== protected state ==
+src/constants.js:198  saveVersion: 1          (unchanged)
+computeLedgerHash body  md5 1a221eb5a16aa917545a95df3d69923f  (identical at c8caf02 and HEAD)
+MODDED_RUNS_RANKED = false; imported by Ranking.js only
+package.json devDeps: no additions (playwright ^1.65.0 already in base); version 2.4.0 -> 2.5.0
+prohibited paths: no change under js/, netlify.toml, or any pre-existing test
+skipped/focused tests: none in tests/src
+
+== leaderboard overlap, measured on the built bundle (960x540 @2x) ==
+BEFORE (d32ad95): footnote x32..362 y200..208  vs  tab x328..396 y197.5..206.5  -> 30 x 5.5 px collision, both boards
+AFTER  (HEAD):    footnote x32..273 y200..208  vs  tab x328..396 y197.5..206.5  -> 55 px clear, 0 overlapping pairs
+evidence: lb-clean-before.png, lb-modded-before.png, lb-clean-after.png, lb-modded-after.png

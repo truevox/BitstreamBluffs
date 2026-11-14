@@ -1,5 +1,48 @@
 # Changelog
 
+## v2.5.0 - unreleased (W4 Bank, Shard Shop and Boosts)
+
+### ✨ Added
+- **Data Shard bank.** A finished run credits its shards to `profile.bank` as well as the
+  `lifetime.shards` total. Two numbers on purpose: `lifetime.shards` is what the player has earned and
+  never falls when they spend, `bank` is the balance. `creditRun` is the one place a run pays, so a
+  replay that returns null pays neither.
+- **Shard Shop.** Buy and equip trails, sled glows, rider hues and themes with shards, and toggle the
+  two boosts. Reachable from PROFILE by pointer *and* by keys (`PROFILE → DOWN → ENTER`). Buying equips
+  in the same action; the bank line and the row states are rebuilt rather than left stale.
+- **Boosts.** `errorCorrection` (one shield charge that absorbs a crash) and `headStart` (a speed
+  factor). Boosts default OFF and are refused on a Daily run, whatever the profile says.
+- **MODDED leaderboard.** A boosted run gets its own top-10 instead of vanishing. The clean board is
+  unchanged for everyone who plays without boosts.
+- **Cosmetics reach the game.** The equipped trail, sled glow and rider hue are drawn on the sled and
+  its trail. Colourblind mode refuses them and falls back to the palette.
+
+### 🐛 Fixed
+- A boosted run flipped to the clean board the moment initials were saved: `saveEntry()` and
+  `skipEntry()` both called `_showBoard()` without the `modded` argument, so the title and the row list
+  reverted. `_showBoard()` now takes the board explicitly and `this.modded` records it.
+- A boosted run was offered clean-board initials and a "NEW SEED BEST" the clean board would never keep.
+  It is now judged against the MODDED board for both the qualifying check and the best comparison.
+- The leaderboard footnote ran underneath the new MODDED/CLEAN tab on both boards: 329px of text drawn
+  from x 12 against a tab starting at panel-local x 272, a 30x5.5px collision with the tab's border
+  cutting the last word. Shortened to "MAGENTA = DAILY PATCH. MODDED = BOOSTED RUNS." and both boxes now
+  come from `src/ui/LeaderboardLayout.js`, so they cannot drift apart.
+- Both empty leaderboards said "NO ENTRIES YET": the view computed `NO CLEAN RUNS…` / `NO MODDED RUNS…`
+  and never drew it. The table takes the label from its caller now.
+- SETTINGS overflowed the panel into the DAILY PATCH strip, and the Title menu could silently gain a
+  seventh row. The row count that fits is computed and proven.
+- SHARD SHOP and BACK were unreachable by keyboard and gamepad: ProfileView forwarded every action to
+  the signature menu, which wraps inside its own rows.
+
+### ✅ Tests
+- 43 suites / 791 tests (from 16/338 at the W3 baseline). New W4 suites cover the bank, purchase/equip
+  purity, boost refusal on dailies, the modded board and its exclusion from every clean surface, the
+  shop and Title layouts, the ledger footer, and a grep that keeps `MODDED_RUNS_RANKED` read in exactly
+  one module.
+- `tools/sim/gate-playthrough.mjs` grew from 2 steps to 17 and now reads DRAWN GLYPH RECTS on the Title,
+  shop, Game Over and both leaderboard boards, because W4's defects were all invisible-to-logic screen
+  faults. Two of its own probes were caught measuring nothing; both now assert a glyph count.
+
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 
 ### ✨ Added

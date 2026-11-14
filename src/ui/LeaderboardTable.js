@@ -39,6 +39,7 @@ export class LeaderboardTable extends Phaser.GameObjects.Container {
     this.g = new Phaser.GameObjects.Graphics(scene);
     this.add(this.g);
     this.highlightId = o.highlightId;
+    this.emptyLabel = o.emptyLabel;
     this.highlightRow = -1;
     this.pulse = 0;
     scene.add.existing(this);
@@ -55,8 +56,9 @@ export class LeaderboardTable extends Phaser.GameObjects.Container {
   }
 
   /** @param {object[]|null} entries @param {string} [highlightId] @returns {void} */
-  setEntries(entries, highlightId) {
+  setEntries(entries, highlightId, emptyLabel) {
     if (highlightId !== undefined) this.highlightId = highlightId;
+    if (emptyLabel !== undefined) this.emptyLabel = emptyLabel;
     for (const c of this.cells || []) c.destroy();
     this.cells = [];
     this.highlightRow = -1;
@@ -80,7 +82,10 @@ export class LeaderboardTable extends Phaser.GameObjects.Container {
     }
     const list = entries.slice(0, this.rows);
     if (list.length === 0) {
-      this._cell(w / 2, 52, 'NO ENTRIES YET', 'amber', 'center');
+      // `emptyLabel` is the caller's own explanation ("NO MODDED RUNS RECORDED YET"), because the word that
+      // makes the empty state legible is WHICH board is empty. Ellipsized to the table width so a longer
+      // label can never run off the panel.
+      this._cell(w / 2, 52, ellipsize(this.emptyLabel || 'NO ENTRIES YET', w - 24), 'amber', 'center');
       this._cell(w / 2, 66, 'FINISH A TOP-10 RUN TO CLAIM A SPOT', 'text', 'center').setAlpha(0.6);
     }
     list.forEach((e, i) => {
