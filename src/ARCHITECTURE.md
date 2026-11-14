@@ -819,3 +819,37 @@ Jest test that imports RunScene, UIScene, Hazard and PowerUp: a small fake Phase
 stub), `tests/src/biome-spawns.test.js`, `tests/src/biome-zone-stacking.test.js`. The built-game gate has five B0 checks
 that act on the real run (ward vs stickyPatch, glide, gust, blind, stabilize) with fixture defs injected into the registry
 content. Sim baseline for B1-B4: `tools/sim/baselines/biomes-b0.json` (README there).
+## Addendum: cosmetics, titles and themes (audit F4 / F4b / SHOP-2 / SHOP-5, additive)
+
+**One catalogue.** `systems/Cosmetics.js` exports `COSMETIC_ITEMS`, a frozen array of
+`{id, kind, slot, name, price, unlockLevel, value, grant?}`. `kind === slot` for every item. `ProfileStore.SHOP_ITEMS`
+is the same array (identity), and the resolver's id table is derived from it. `data/cosmetics/cosmetics.json` is a
+mirror only: `tests/src/cosmetics-complete.test.js` fails if any field differs. Pure modules cannot import JSON
+under Jest, so the JS constant is the source.
+
+**Ownership.** `isOwned`: listed in `unlocked.cosmetics`; or `grant === 'achievement'` and `value` is in
+`unlocked.titles`; or price 0 and `unlockLevel <= level` (level rewards, including the eleven in `levels.json`).
+`purchase` refuses price-0 items.
+
+**Lookups.** `cosmeticInSlot(slot, idOrValue)` matches an id or an equipped value inside one slot. Values repeat
+across slots, so `resolveCosmetics` uses it. `cosmeticFor(idOrValue)` is unchanged (first match by value).
+`equippedTitle(profile)` returns the equipped title text or null.
+
+**Themes.** `COSMETIC_HUES.theme[value].ui` is a partial palette over `UI_THEME_KEYS` = cyan, magenta, text,
+bgAlt. `themedUiPalette(baseHex, profile, {colorblind})` lays it over the active palette. It returns the base
+unchanged under colour-blind mode, and it can never move `danger`, `bg`, `lime` or `amber`.
+`ui/Theme.js` builds `pal`/`css` through `themedPalette(game)`, which reads `REG.PROFILE` and
+`REG.SETTINGS`, so every Theme consumer is themed: menus, panels and the UIScene HUD. The world palette
+(`Palette.getPalette`, used by RunScene) is never themed. Call `theme.refresh()` after the equipped theme
+changes; ShopView does this after every buy or equip.
+
+**Shop pages.** `ShopLayout.SHOP_PAGES` = trail, glow, rider, theme. `shopLayout({profile, levels, page})` lays
+out one page: BANK head, the page row (`kind:'page'`, first selectable), that slot's items, boosts and loadout.
+It returns `page`, `pageCount` and `pageSlot`. `shopAllRows(o)` returns every page's item rows. ShopView pages
+on left/right when focus is on the page row or an item row, and on confirm or click of the page row.
+
+**Titles.** `ShopLayout.titlesLayout({profile, levels})` / `titlesMenuItems(layout)` drive `Views.TitlesView`.
+Profile opens it from `titlesButton` (focus target kind `'titles'`). `ProfileLayout` shows `equippedTitle()`
+in place of the level title in `profileLayout` (key `title`) and in `titleBadgeLayout`. TitleScene calls
+`_refreshLevelBadge()` when Profile closes.
+
