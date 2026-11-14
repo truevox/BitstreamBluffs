@@ -89,8 +89,12 @@ export function metricsFrom(profile, run, extra = {}) {
   const tricks = (L.tricks && typeof L.tricks === 'object') ? L.tricks : {};
   const runTricks = (r.tricks && typeof r.tricks === 'object') ? r.tricks : {};
   const trickKinds = new Set([...Object.keys(tricks), ...Object.keys(runTricks)].filter((k) => (tricks[k] || 0) > 0 || (runTricks[k] || 0) > 0));
-  const tricksLanded = Object.values(tricks).reduce((a, v) => a + n(v), 0)
-    + Object.values(runTricks).reduce((a, v) => a + n(v), 0);
+  // Per-kind max, summed: the same "max, not sum" rule as the bests. When the run is already credited (the
+  // normal path, creditRun) lifetime[k] already includes run[k], so max() counts this run's tricks once;
+  // summing both counted them twice, and one run of 5 backflips unlocked "Land 10 tricks". A kind the
+  // lifetime has not seen yet still folds in from the run.
+  const tricksLanded = [...new Set([...Object.keys(tricks), ...Object.keys(runTricks)])]
+    .reduce((a, k) => a + Math.max(n(tricks[k]), n(runTricks[k]), 0), 0);
 
   return {
     runs: Math.max(n(L.runs), 0),
