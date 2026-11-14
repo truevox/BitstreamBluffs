@@ -177,6 +177,12 @@ const BUILTIN_DEF = Object.freeze({
 
 const toList = (x) => (Array.isArray(x) ? x.slice() : x && typeof x === 'object' ? Object.values(x) : []);
 const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+/** Defs carrying a `biome` field, grouped by biome id; input order (sorted by id) is kept inside each group. */
+const groupByBiome = (sorted) => {
+  const out = {};
+  for (const d of sorted) if (d.biome) (out[d.biome] || (out[d.biome] = [])).push(d);
+  return out;
+};
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smooth = (t) => t * t * (3 - 2 * t);
 
@@ -256,11 +262,19 @@ export class TerrainGenerator {
     this.noiseDefs = defs.filter((d) => d.kind === 'noise');
     this.bridgeDefs = defs.filter((d) => d.kind === 'bridge');
     if (this.splineDefs.length === 0) this.splineDefs = [BUILTIN_DEF];
-    // ground hazards feed the original placement loop untouched; air hazards are placed per jump from their own list
-    const allHazards = toList(options.hazardDefs).sort(byId);
+    // ground hazards feed the original placement loop untouched; air hazards are placed per jump from their own list.
+    // Biome defs (a `biome` field, B0) never enter the base lists: they are kept per biome and placed only by
+    // _placeBiomeSpawns, so base placement and mask-0 output cannot see them (spec §5, E4).
+    const allDefs = toList(options.hazardDefs).filter(Boolean).sort(byId);
+    const allHazards = allDefs.filter((h) => !h.biome);
     this.hazardList = allHazards.filter((h) => h.placement !== 'air');
     this.airHazardList = allHazards.filter((h) => h.placement === 'air');
-    this.powerupList = toList(options.powerupDefs).sort(byId);
+    const allPowerups = toList(options.powerupDefs).filter(Boolean).sort(byId);
+    this.powerupList = allPowerups.filter((p) => !p.biome);
+    /** @type {Object<string, import('../data/schemas.js').HazardDef[]>} biome id -> its hazard defs (sorted by id). */
+    this.biomeHazards = groupByBiome(allDefs);
+    /** @type {Object<string, import('../data/schemas.js').PowerUpDef[]>} biome id -> its power-up defs (sorted by id). */
+    this.biomePowerups = groupByBiome(allPowerups);
     this.modMap = {};
     for (const m of toList(options.modDefs)) this.modMap[m.id] = m;
     /** Biome defs (W3, additive): drives sector assignment, palettes and biome chunk preference. */
