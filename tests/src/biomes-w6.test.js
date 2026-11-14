@@ -11,7 +11,7 @@
  * anticipated W6 by name). This file covers what is genuinely new.
  */
 import fs from 'fs';
-import { PhysicsTuner } from '../../src/systems/PhysicsTuner.js';
+import { PhysicsTuner, geyserStep } from '../../src/systems/PhysicsTuner.js';
 import { TerrainGenerator } from '../../src/systems/TerrainGenerator.js';
 
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -102,9 +102,15 @@ describe('the three constant-based mechanics reach the physics', () => {
     expect(mod.restitution).toBeGreaterThan(base.restitution);
   });
 
-  test('Steampunk raises push force', () => {
+  test('Steampunk drives the sled along the belt, with the sign carried separately', () => {
     const { base, mod } = effectOf(MODS.conveyorBelt);
-    expect(mod.pushForceMul).toBeGreaterThan(base.pushForceMul);
+    // The MECHANIC is a drive the belt applies by itself, not a multiplier on the player's push key. The
+    // original assertion here checked pushForceMul rose, which was true while the belt did nothing at all
+    // -- that is exactly how an absent mechanic passed its own test for a whole workstream.
+    expect(mod.beltDrivePxS2).toBeGreaterThan(0);
+    expect(base.beltDrivePxS2).toBe(0);
+    expect(MODS.conveyorBelt.direction === 1 || MODS.conveyorBelt.direction === -1).toBe(true);
+    expect(mod.beltDirection).toBe(MODS.conveyorBelt.direction);
   });
 
   test('two overlapping sugar strips compound rather than one winning', () => {
@@ -173,12 +179,20 @@ describe('Micro Mountain lifts the surface', () => {
 });
 
 describe('Vertigo Vents launches the sled', () => {
-  test('the launch is bounded and cooldown-backed', () => {
+  test('the launch is bounded, cooldown-backed, and actually fires through geyserStep', () => {
     const l = MODS.geyserVent.launch;
     // Enough to clear a normal jump, not enough to leave the playfield.
     expect(l.velocityPxS).toBeGreaterThan(300);
     expect(l.velocityPxS).toBeLessThan(1200);
     // Without a cooldown the vent would re-fire on every contact frame and the sled would never land.
     expect(l.cooldownMs).toBeGreaterThanOrEqual(250);
+    // The data being sane is not the mechanic. These assert the consumer exists and behaves.
+    const fired = geyserStep({ grounded: true, launch: l, cooldownLeftMs: 0 });
+    expect(fired.fire).toBe(true);
+    expect(fired.dvy).toBe(-l.velocityPxS);
+    expect(fired.cooldownMs).toBe(l.cooldownMs);
+    // ...and the tuner actually surfaces it from the mod def, so the sled can see it.
+    const { mod } = effectOf(MODS.geyserVent);
+    expect(mod.geyserLaunch).toEqual(l);
   });
 });
