@@ -1,11 +1,6 @@
 # Changelog
 
-## v2.4.2 - W6 biome backdrops (audit T1, 2026-11-14)
-
-- **The six W6 biomes now have their own backdrops (T1).** Space Mountain (`stars`), Candy Cane Canyon (`candy-stripes`), Sky Jellyfish Mountain (`jellyfish`), Steampunk Slopes (`brass-pipes`), Micro Mountain (`dew-drops`) and Vertigo Vents (`vents`) named backgrounds that did not exist. They fell back to the base ridges, and `bg.motif` was null inside them. Each one now has its own silhouette and drawn decor: a crater horizon with a starfield and a ringed planet; gumdrop hills with a candy-striped sky, candy canes and lollipops; cloud banks with drifting jellyfish; a factory roofline with turning gears and a brass pipe run; moss with grass blades and big dew drops; flat-topped cones with glowing vents and smoke plumes. All of it is drawn in code from the biome's palette keys (no assets), so colour-blind mode still applies. Nothing uses the `danger` colour. Animation comes from scene time only.
-- The base backdrop and the five batch-1 motifs make the same draw calls as before.
-- `tests/src/biome-background.test.js` now reads the biome files instead of a hardcoded list, so a biome that names a missing motif fails the suite. `tests/src/biome-backdrops-w6.test.js` checks that the geometry is deterministic per seed and stays in bounds, that no geometry or draw call uses `danger`, and that the draw cost stays at or below 2.5x the base backdrop.
-## Unreleased - biome treatment B0 (groundwork)
+## v2.5.0 - biome treatment B0: groundwork + zone stacking fix (2026-11-14)
 
 - **Biome-tagged content is invisible at mask 0.** A hazard or power-up def with a `biome` field never enters the base hazard, air-hazard or power-up lists; the generator keeps it per biome. Isolation test: fixture biome defs change nothing in 300 chunks x 3 seeds at mask 0 (full-chunk projection).
 - **New generator pass `_placeBiomeSpawns`** (last in `_build`, forks `biomeHaz` / `biomePu`, only in biome chunks): one biome hazard slot and one biome power-up slot per chunk, a fixed 5 draws per slot, spawn chance from the def capped at 0.5, base clearances kept (240 px chunk edges, gaps, lips, 480 px hazard spacing, 90 px power-up spacing, slope rules, shards). Air biome hazards use the base jump-arc box. No biome content ships yet, so nothing is placed.
@@ -15,6 +10,11 @@
 - **Tests and gate:** the first Jest tests that import RunScene, UIScene, Hazard and PowerUp (fake Phaser); five new built-game gate checks on the real run (ward vs sticky ground, glide, gust, blind, stabilize). Gate expected counts 25 -> 30 (with boosts) and 14 -> 19.
 - **Sim baseline** for the B1-B4 +/-15 % tolerance: `tools/sim/baselines/biomes-b0.json`.
 
+## v2.4.2 - W6 biome backdrops (audit T1, 2026-11-14)
+
+- **The six W6 biomes now have their own backdrops (T1).** Space Mountain (`stars`), Candy Cane Canyon (`candy-stripes`), Sky Jellyfish Mountain (`jellyfish`), Steampunk Slopes (`brass-pipes`), Micro Mountain (`dew-drops`) and Vertigo Vents (`vents`) named backgrounds that did not exist. They fell back to the base ridges, and `bg.motif` was null inside them. Each one now has its own silhouette and drawn decor: a crater horizon with a starfield and a ringed planet; gumdrop hills with a candy-striped sky, candy canes and lollipops; cloud banks with drifting jellyfish; a factory roofline with turning gears and a brass pipe run; moss with grass blades and big dew drops; flat-topped cones with glowing vents and smoke plumes. All of it is drawn in code from the biome's palette keys (no assets), so colour-blind mode still applies. Nothing uses the `danger` colour. Animation comes from scene time only.
+- The base backdrop and the five batch-1 motifs make the same draw calls as before.
+- `tests/src/biome-background.test.js` now reads the biome files instead of a hardcoded list, so a biome that names a missing motif fails the suite. `tests/src/biome-backdrops-w6.test.js` checks that the geometry is deterministic per seed and stays in bounds, that no geometry or draw call uses `danger`, and that the draw cost stays at or below 2.5x the base backdrop.
 ## v2.4.1 - post-sprint audit fixes (2026-11-14)
 
 - **Mission rows no longer show '?' when a title is cut.** `MissionsLayout.ellipsize` used '…', which the pixel font cannot draw; it now uses the font's '..' mark.
