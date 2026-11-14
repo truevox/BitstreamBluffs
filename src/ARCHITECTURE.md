@@ -894,3 +894,55 @@ it reads `ENTER / A = BUY   SPACE / RB = RETRY   ESC / B = BACK` (263 px, centre
 on the row under the panel (panel y 22..258, footer ink y 261..269). `SHOP: B / LB` is hidden while the shop is open.
 Closing restores the footer text and depth. With the shop closed nothing changed except that pad RB also retries.
 
+
+## Addendum: biome full treatment, B1 "Wards" (content + slot rule; additive)
+
+B1 ships the first biome content: one hazard and one power-up for each of Debumont, Garbage Dump Glacier, Underwater
+Mountain and Candy Cane Canyon (spec §4). Mask 0 is byte-identical (golden `shape` / `full` / `complete` unchanged): every
+def below carries a `biome` field, so the B0 constructor filter keeps it out of the base lists.
+
+| Biome (bit) | Hazard (file) | Hazard effect | Power-up (file) | Power-up effect |
+|---|---|---|---|---|
+| Debumont (1) | `groomerCat` (`groomer-cat.json`), ground 24x20, shape `groomer`, amber | `slow` 0.7 x 900 ms | `mapleWax` (`maple-wax.json`), shape `maple` | `speedBoost` 1.2 x 2 s |
+| Garbage Dump Glacier (2) | `seagullDive` (`seagull-dive.json`), air 40x24 in jump arcs, shape `seagull`, `danger`, >= 1000 m | `crash` | `slickWaxSpray` (`slick-wax-spray.json`), shape `waxSpray` | `ward` mods `['stickyPatch']` 4 s + `speedFactor` 1.1 |
+| Underwater Mountain (8) | `seaweedTangle` (`seaweed-tangle.json`), ground 22x30, shape `seaweed`, lime | `slow` 0.6 x 1.2 s | `aquaLungBubble` (`aqua-lung-bubble.json`), shape `bubble` | `ward` mods `['slowMotion']` 4 s |
+| Candy Cane Canyon (64) | `chocolateRiver` (`chocolate-river.json`), ground strip 36x9, shape `chocoRiver`, amber | `slow` 0.5 x 1.5 s | `sweetToothCoating` (`sweet-tooth-coating.json`), shape `candyCoat` | `ward` effects `['slow']` 5 s (wards off the Chocolate River) |
+
+Hazard `spawn.baseChance` 0.5 (the §4 cap), power-up 0.4. Groomer Cat is static; motion kinds land in B3.
+
+**Slot rule (`TerrainGenerator._placeBiomeSpawns`, spec §4 amendment).** When the ground hazard slot fires and the free
+scan finds no slot, `_replaceBiomeGround` swaps ONE base ground hazard of the chunk for the biome def, in place (same `x`,
+`y`, `rotationDeg`). Candidates are base ground defs (`hazardList`; never a biome or air def) whose box grown by
+`BIOME_REPLACE_SLACK_PX` (8) in w and h holds the biome box, and whose spot passes every biome ground rule with the biome
+def (`_biomeGroundAt`, shared with the free scan; the spacing check skips the candidate itself, the shard check uses the
+biome box, `slow` still needs a descent ahead). The pick is `cands[floor(h4 * n)]`, where `h4` is the slot's 5th draw (B0
+drew and discarded it), so `BIOME_SLOT_DRAWS` stays 5 and no other stream moves. Air biome hazards are not replaced.
+With no biome defs, output at every mask is unchanged (digests pinned at 00978f6: `tests/src/biome-slot-rule.test.js`).
+
+Measured presence (8 seeds x 300 chunks; share of eligible chunks, ground = not bridge / not `gen-jump`, air =
+`gen-jump`): groomerCat 16.3 %, seagullDive 23.7 %, seaweedTangle 12.6 %, chocolateRiver 10.5 %. Every ground placement is
+a replacement (the free scan places none of these `slow` defs). The spec's 40-60 % target is not reachable under the 0.5
+chance cap plus the base `slow`-before-a-descent rule; a chance-0.5 `blind` fixture (no descent rule) reaches 43.8 %.
+Power-ups land in 31-35 % of biome chunks.
+
+**Effects (all existing paths except one additive field).**
+* `Wards.js`: a ward may carry `speedFactor` (clamped to [1, `WARD_MAX_SPEED_FACTOR` 1.2], `wardSpeedFactor`), lasting as
+  long as the ward. `wardSpeedMul(state)` is the product over active wards; `RunScene.physicsContext` multiplies it into
+  `speedBoost`, separate from `boostMs` / `boostFactor`, so a Packet Burst or Maple Wax never overwrites it. On pickup
+  RunScene also kicks the sled by `speedFactor` (like `speedBoost`).
+* `RunScene`: the `speedBoost` branch records `boostId`; its expiry reports `POWERUP_EXPIRED {id: boostId}` (was the
+  hard-coded `packetBurst`, which would have expired Maple Wax under the wrong chip). Packet Burst still reports
+  `packetBurst`.
+* `UIScene`: `POWERUP_INFO` rows MAPLE WAX, SLICK WAX, AQUA-LUNG, SWEET-TOOTH with their own `_drawIcon` glyphs;
+  `HAZARD_LABEL` names the B1 slow hazards on the effect warning line (GROOMER CAT, SEAWEED TANGLE, CHOCOLATE RIVER); other
+  hits keep their `EFFECT_INFO` label.
+* `BiomeEffects.HAZARD_SHAPES` / `POWERUP_SHAPES` gain the 8 new shapeKeys; `Hazard.js` (`_groomer`, `_seaweed`,
+  `_chocoRiver`, `_seagull` drawn like the drone, without corner brackets) and `PowerUp.js` draw each one.
+
+**Tests and gates.** `tests/src/biome-slot-rule.test.js`, `tests/src/biome-b1-content.test.js` (loader / schema, spec
+values, ward pairing, measured presence floors), `tests/src/biome-b1-effects.test.js` (shipped defs through the shipped
+RunScene / UIScene / Hazard / PowerUp). Tests that listed ALL content now list base defs (biome defs separately):
+`data.test.js`, `terrain.test.js` "all hazard types", `_biomeFixtures.withBiomeFixtures` (base content + fixtures).
+`biome-spawns.test.js`'s last test states the amended contract (at most one base hazard swapped in place). The built-game
+gate has 8 B1 checks, one hazard and one power-up per biome, each on a real `seed@bit` run with entities built by
+`RunScene.takeChunk` from that run's terrain (expected counts 30 -> 38 with boosts, 19 -> 27).

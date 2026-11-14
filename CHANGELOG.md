@@ -26,6 +26,17 @@
 - **Titles (SHOP-2).** Profile has a TITLES button (keyboard and pad reachable; first focus still lands on SHARD SHOP). It lists the level title as DEFAULT, ROOKIE, STATIC RIDER for 220 shards, and the achievement titles CARTOGRAPHER and OMNISCIENT (shown as ACHIEVEMENT until earned). Confirm buys and equips; confirm on EQUIPPED or DEFAULT goes back to the level title. The equipped title replaces the level title on the Title screen badge and on the Profile view.
 - `purchase()` refuses any price-0 item. Level rewards and achievement titles are owned, never bought.
 - Tests: `tests/src/cosmetics-complete.test.js`, `tests/src/shop-paging.test.js`, and new blocks in `views-navigation.test.js` and `gameover-hud.test.js`. TrailParticles and `Sled._draw` are driven with a recording Graphics, so deleting the code that draws an equipped trail, glow or rider fails the suite. Three shop tests that read only the first page (`shop-layout`, `shop-prompt-visible`) now read every page through `shopAllRows`, with the same assertions.
+## Unreleased - biome treatment B1 (Wards)
+
+- **Debumont:** Groomer Cat (ground, slows the sled to 0.7 for 0.9 s) and Maple Wax (speed boost 1.2 for 2 s).
+- **Garbage Dump Glacier:** Seagull Dive (air, in jump arcs, crash, `danger`) and Slick Wax Spray (wards off sticky ground for 4 s, plus a 1.1 speed boost while it lasts).
+- **Underwater Mountain:** Seaweed Tangle (ground, slow 0.6 for 1.2 s) and Aqua-Lung Bubble (wards off the slow-motion current for 4 s).
+- **Candy Cane Canyon:** Chocolate River (a ground strip, slow 0.5 for 1.5 s) and Sweet-Tooth Coating (wards off every slow for 5 s, so a river hit does nothing).
+- **Slot rule:** when a biome chunk has no free ground slot, its biome hazard can replace one base ground hazard in place, if its box fits within that hazard's box + 8 px and the spot passes every biome ground rule. The pick uses the slot's existing 5th draw, so no other stream moves. Without it the three slow biome hazards would almost never appear.
+- **Ward speed boost:** a ward can carry a `speedFactor` (1 to 1.2) that lasts as long as the ward and stacks with, never replaces, a Packet Burst or Maple Wax.
+- **Fix:** a speed boost now expires under its own id (it always reported `packetBurst`).
+- **HUD and art:** each new pickup has its own name and icon; the B1 slow hazards name themselves on the warning line; every new hazard and pickup has its own drawing.
+- **Gate:** 8 new built-game checks (one hazard and one power-up per biome, each on a real `seed@bit` run). Expected counts 30 -> 38 (with boosts) and 19 -> 27. Mask 0 is unchanged.
 
 ## v2.5.0 - biome treatment B0: groundwork + zone stacking fix (2026-11-14)
 
