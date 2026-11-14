@@ -1,7 +1,7 @@
 {
   "id": "conveyorBelt",
   "colorKey": "amber",
-  "physics": { "pushForceMul": 2.0 },
+  "physics": { "pushForceMul": 2.0, "beltDrivePxS2": 900 },
   "direction": 1,
   "weight": 3,
   "minDistanceM": 160,

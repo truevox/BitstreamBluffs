@@ -250,6 +250,8 @@ export const TUNING = Object.freeze({
  * @property {number} [groundResist]     manual runner resistance 1/s.
  * @property {number} [quadDrag]
  * @property {number} [pushForceMul]
+ * @property {number} [beltDrivePxS2]  horizontal drive from conveyor-belt zones (px/s^2), always >= 0.
+ * @property {number} [beltDirection]  +1 the belt carries you forward, -1 it fights you.
  * @property {number} [scrambleJitterDegS2] random torque amplitude while scrambled.
  * @property {number} [restitution]
  */
@@ -297,6 +299,22 @@ export function airIdleSpin(w, angle, vx, vy, dt, t = TUNING, ctx = null) {
   const u = Math.min(t.airIdleUrgencyMax, Math.max(1, t.airIdleUrgencyRefMs / Math.max(eta, 1)));
   const spring = Math.max(-1.2, Math.min(1.2, err)) * t.airIdleLevelK * u * u * dt;
   return (w + spring) * Math.exp(-t.airIdleSpinDamp * u * dt);
+}
+
+/**
+ * Conveyor belt, one physics step (pure; Sled.applyControls feeds it and applies the result).
+ * A belt carries the sled along the surface tangent while it is grounded, with no player input — that is
+ * the whole mechanic. `drivePxS2` is always a positive magnitude and `direction` carries the sign, so a
+ * caller cannot add a negative magnitude by mistake, and `direction: -1` is a belt fighting the player.
+ * Returns a velocity delta in px/s to add this step; zero when airborne or when no belt is under the sled.
+ * @param {{grounded:boolean, drivePxS2:number, direction:number, slopeDeg:number, stepMs:number}} i
+ * @returns {{dvx:number, dvy:number}}
+ */
+export function conveyorStep(i) {
+  if (!i || !i.grounded || !(i.drivePxS2 > 0)) return { dvx: 0, dvy: 0 };
+  const rad = ((i.slopeDeg || 0) * Math.PI) / 180;
+  const drive = i.drivePxS2 * (i.direction === -1 ? -1 : 1) * ((i.stepMs || 0) / 1000);
+  return { dvx: Math.cos(rad) * drive, dvy: Math.sin(rad) * drive };
 }
 
 /**
@@ -357,6 +375,12 @@ export class PhysicsTuner {
     let zoneSpeedMul = 1;
     let zoneSteerMul = 1;
     let zonePushMul = 1;
+    // W6 conveyor: a belt drives the sled itself, so its force must not be folded into a multiplier on
+    // the player's push key (which only fires on flat ground while W is held — a belt that needs you to
+    // push is not a belt). The magnitude accumulates and the sign is carried separately in
+    // beltDirection, so a consumer cannot add a negative magnitude by mistake.
+    let beltDrive = 0;
+    let beltDirection = 1;
     for (const z of zones) {
       const p = (z && z.physics) || {};
       if (p.gravityMul) gravityMul *= p.gravityMul;
@@ -365,6 +389,12 @@ export class PhysicsTuner {
       if (p.speedMul) zoneSpeedMul *= p.speedMul;
       if (p.steerMul) zoneSteerMul *= p.steerMul;
       if (p.pushForceMul) zonePushMul *= p.pushForceMul;
+      if (p.beltDrivePxS2 > 0) {
+        beltDrive += p.beltDrivePxS2;
+        // Last zone wins the sign. Two belts facing opposite ways is a data situation the shipped table
+        // does not produce; picking the nearer (last) zone keeps the behaviour deterministic.
+        beltDirection = (z && z.direction) === -1 || (z && z.physics && z.physics.direction) === -1 ? -1 : 1;
+      }
     }
 
     let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul;
@@ -410,6 +440,8 @@ export class PhysicsTuner {
       groundResist: resistBase,
       quadDrag: t.quadDrag,
       pushForceMul: (daily.pushForceMul || 1) * zonePushMul,
+      beltDrivePxS2: beltDrive,
+      beltDirection,
       scrambleJitterDegS2: jitter,
       restitution: Math.min(0.9, 0.02 * bounceMul * bounceMul),
     };

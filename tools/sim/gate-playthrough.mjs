@@ -1238,6 +1238,71 @@ async function main() {
       } finally { /* page closed above */ }
     }
 
+    // ---- W6: a conveyor belt moves the real sled with no input. This is the check the pure-unit test
+    // cannot make: it proves Sled.applyControls is wired to the belt, not merely that PhysicsTuner can
+    // report a drive. Without the wiring, the sled's x-velocity is identical with and without the belt.
+    {
+      const c = await (async () => {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        try {
+          const out = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.registry.set('biomeMask', 0);
+            g.scene.start('TitleScene');
+            await wait(800);
+            const t = g.scene.getScene('TitleScene');
+            t.starting = false;
+            t.startRun('belt-probe', 0);
+            await wait(1600);
+            const run = g.scene.getScene('RunScene');
+            if (!run) return { fatal: 'RunScene did not start' };
+
+            // Put a conveyor under the sled, exactly as the generator would.
+            const belt = run.content.terrainMods.conveyorBelt;
+            const x = run.sled.x;
+            const chunk = run.terrain._chunkAt(x);
+            const zones = chunk.zones;
+            const existing = zones.length;
+            zones.push({ modId: 'conveyorBelt', x0: x - 400, x1: x + 400 });
+
+            // Force a grounded, stable state and step physics with NO input at all.
+            const phys = run.tuner.getEffective({ zones: [belt] });
+            const before = run.sled.body.velocity.x;
+
+            // Drive several real physics steps with an empty pad so nothing but the belt can act.
+            const emptyPad = { push: false, brake: false, tuck: false, left: false, right: false, hop: false, heli: 0, pressed: {}, airBrake: false };
+            run.sled.grounded = true;
+            run.sled.groundAngleDeg = 0;
+            for (let i = 0; i < 12; i++) run.sled.applyControls(emptyPad, phys, 16);
+            const after = run.sled.body.velocity.x;
+
+            const noBeltPhys = run.tuner.getEffective({ zones: [] });
+            run.sled.grounded = true;
+            run.sled.groundAngleDeg = 0;
+            const before2 = run.sled.body.velocity.x;
+            for (let i = 0; i < 12; i++) run.sled.applyControls(emptyPad, noBeltPhys, 16);
+            const after2 = run.sled.body.velocity.x;
+
+            zones.length = existing; // leave the terrain as we found it
+            return {
+              beltDrive: phys.beltDrivePxS2,
+              withBelt: after - before,
+              withoutBelt: after2 - before2,
+            };
+          }).catch((e) => ({ fatal: String(e) }));
+          return { errors, out };
+        } finally { await page.close(); }
+      })();
+      if (c.out.fatal) fail('W6: conveyor belt moves the sled', c.out.fatal);
+      else if (c.errors.length) fail('W6: conveyor belt — no page errors', c.errors.join(' | '));
+      else if (!(c.out.beltDrive > 0)) fail('W6: conveyor belt carries a drive', `beltDrivePxS2=${c.out.beltDrive}`);
+      else if (!(c.out.withBelt > 0)) fail('W6: conveyor belt moves the sled with no input', `dvx=${c.out.withBelt}`);
+      else if (Math.abs(c.out.withoutBelt) >= Math.abs(c.out.withBelt)) {
+        fail('W6: the movement comes from the belt, not from drift', `with=${c.out.withBelt} without=${c.out.withoutBelt}`);
+      } else pass('W6: a conveyor belt drives the real sled with no player input', `dvx=${c.out.withBelt.toFixed(2)} vs no-belt ${c.out.withoutBelt.toFixed(2)}`);
+    }
+
   } finally {
     await browser.close();
     server.close();

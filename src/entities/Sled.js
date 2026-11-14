@@ -10,7 +10,7 @@
  */
 import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
-import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin } from '../systems/PhysicsTuner.js';
+import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep } from '../systems/PhysicsTuner.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -294,6 +294,18 @@ export class Sled {
         vy -= ny * cut;
         this.snapSteps = (this.snapSteps || 0) + 1;
       }
+    }
+
+    // conveyor belt (W6): a belt carries the sled while it is touching the ground, with no input from the
+    // player. It is a direct velocity change, not a multiplier on the W-key kick, because a belt that only
+    // works while you hold push is not a belt.
+    if (grounded && phys.beltDrivePxS2 > 0) {
+      const belt = conveyorStep({
+        grounded, drivePxS2: phys.beltDrivePxS2, direction: phys.beltDirection,
+        slopeDeg: this.groundAngleDeg, stepMs,
+      });
+      vx += belt.dvx;
+      vy += belt.dvy;
     }
 
     Body.setVelocity(b, { x: fromPxS(vx), y: fromPxS(vy) });
