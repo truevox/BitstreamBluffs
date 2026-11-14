@@ -648,3 +648,46 @@ describe('UI-3: mission toasts emitted at RUN_END finish before RunScene stops t
     expect(run(s)).toEqual([940]);
   });
 });
+
+// ================================================================== F4 fit: the Game Over shop pages too
+
+describe('F4 fit: the Game Over shop popup pages by slot', () => {
+  const slotIds = (g) => g.shopView.menu.items.filter((i) => i.rowKind === 'item').map((i) => i.id);
+
+  test('left/right reach the popup and turn its page; confirm still retries (retry always wins)', () => {
+    const g = gameOverHost();
+    g._openShop();
+    expect(slotIds(g).every((id) => id.startsWith('trail-'))).toBe(true);
+    g._onAction('right');
+    expect(slotIds(g).length).toBeGreaterThan(0);
+    expect(slotIds(g).every((id) => /glow/.test(id))).toBe(true);
+    g._onAction('left');
+    g._onAction('left');
+    expect(slotIds(g).every((id) => id.startsWith('theme-'))).toBe(true);
+    expect(g.shopOpen).toBe(true);
+    g._onAction('confirm');
+    expect(g.retry).toHaveBeenCalled();
+    expect(g.shopOpen).toBe(false);
+  });
+
+  test('a click on the page row turns the page and stays inside the popup', () => {
+    const g = gameOverHost();
+    g._openShop();
+    const m = g.shopView.menu;
+    const idx = m.items.findIndex((i) => i.rowKind === 'page');
+    m.rows[idx].zone.emit('pointerdown', {}, 10);
+    expect(slotIds(g).every((id) => /glow/.test(id))).toBe(true);
+    expect(g.retry).not.toHaveBeenCalled();
+  });
+
+  test('every page of the popup keeps its panel on screen and inside the dim', () => {
+    const g = gameOverHost();
+    g._openShop();
+    for (let p = 0; p < 4; p++) {
+      const pn = g.shopView.panel;
+      expect(pn.y + g.shopView.h).toBeLessThanOrEqual(GAME_HEIGHT);
+      expect(pn.x + g.shopView.w).toBeLessThanOrEqual(GAME_WIDTH);
+      g._onAction('right');
+    }
+  });
+});
