@@ -3,7 +3,7 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * One hazard instance built from a HazardDef + HazardSpawn. Sensor body; draws shape from def.shapeKey
- * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
+ * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; B1: 'groomer' | 'seagull' | 'seaweed' | 'chocoRiver'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
  * (design doc pillar 2); faint corner brackets mark the exact hit-box.
  */
 import Phaser from 'phaser';
@@ -106,6 +106,10 @@ export class Hazard {
       this._drone(g, t, frame, col, pal);
       return;
     }
+    if (this.drawKind === 'seagull') {
+      this._seagull(g, t, frame, col, pal);
+      return;
+    }
 
     // hit-box corner brackets (the drawn box; crash hit-boxes are ~25% smaller)
     g.lineStyle(1, col, 0.5);
@@ -125,6 +129,9 @@ export class Hazard {
       case 'firewall': this._firewall(g, t, frame, col, pal); break;
       case 'spike': this._spike(g, t, frame, col, pal); break;
       case 'vent': this._vent(g, t, frame, col, pal); break;
+      case 'groomer': this._groomer(g, t, frame, col, pal); break;
+      case 'seaweed': this._seaweed(g, t, frame, col, pal); break;
+      case 'chocoRiver': this._chocoRiver(g, t, frame, col, pal); break;
       default: this._generic(g, col); break;
     }
   }
@@ -278,6 +285,127 @@ export class Hazard {
       g.fillStyle(i % 3 === 0 ? pal.cyan : col, 1 - ph * 0.8);
       g.fillRect(gx - s / 2, gy - s / 2, s, s);
     }
+  }
+
+  // B1 Debumont: Groomer Cat, a little tracked snow groomer facing the sled, its blade out front (left) and a puffing stack
+  _groomer(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const trackH = Math.max(5, h * 0.3);
+    // track: dark belt with three road wheels that turn with time
+    g.fillStyle(pal.bg, 0.95);
+    g.fillRect(-w / 2 + 3, -trackH, w - 4, trackH);
+    g.lineStyle(1.5, col, 1);
+    g.strokeRect(-w / 2 + 3, -trackH, w - 4, trackH);
+    for (let i = 0; i < 3; i++) {
+      const wx = -w / 2 + 6 + i * ((w - 10) / 2);
+      g.fillStyle(col, 0.8);
+      g.fillCircle(wx, -trackH / 2, trackH * 0.32);
+      g.fillStyle(pal.bg, 1);
+      g.fillCircle(wx + Math.cos(t / 120 + i) * 1.2, -trackH / 2 + Math.sin(t / 120 + i) * 1.2, 0.8);
+    }
+    // body and cab
+    const bodyTop = -h * 0.62;
+    g.fillStyle(col, 0.35);
+    g.fillRect(-w / 2 + 5, bodyTop, w - 8, -trackH - bodyTop);
+    g.lineStyle(1.5, col, 1);
+    g.strokeRect(-w / 2 + 5, bodyTop, w - 8, -trackH - bodyTop);
+    g.fillStyle(col, 0.55);
+    g.fillRect(-2, -h, w / 2 - 2, h + bodyTop);
+    g.fillStyle(pal.text, 0.8);
+    g.fillRect(0, -h + 2, w / 2 - 6, (h + bodyTop) * 0.5); // cab window
+    // front blade (a wedge on the uphill side)
+    g.fillStyle(col, 0.9);
+    g.fillTriangle(-w / 2, 0, -w / 2 + 4, -h * 0.55, -w / 2 + 4, 0);
+    // exhaust puff rising from the stack
+    const ph = (t / 700) % 1;
+    g.fillStyle(pal.text, 0.5 * (1 - ph));
+    g.fillCircle(w / 2 - 4 + ph * 3, -h - 2 - ph * 6, 1.5 + ph * 2);
+  }
+
+  // B1 Underwater Mountain: Seaweed Tangle, three fronds swaying from a rooted clump
+  _seaweed(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    g.fillStyle(col, 0.4);
+    g.fillEllipse(0, -1.5, w, 4);
+    for (let f = 0; f < 3; f++) {
+      const x0 = (f - 1) * (w / 3.2);
+      const tall = h * (f === 1 ? 1 : 0.8);
+      const pts = [];
+      for (let k = 0; k <= 6; k++) {
+        const u = k / 6;
+        pts.push({ x: x0 + Math.sin(u * 3.2 + t / 380 + f * 1.7 + this.seed) * 3.2 * u, y: -u * tall });
+      }
+      g.lineStyle(2.5, col, 1);
+      g.strokePoints(pts, false, false);
+      // leaf blobs along the frond
+      for (let k = 2; k <= 6; k += 2) {
+        g.fillStyle(col, 0.6);
+        g.fillEllipse(pts[k].x + (k % 4 === 0 ? 2.5 : -2.5), pts[k].y, 4, 2.5);
+      }
+    }
+    g.fillStyle(pal.text, 0.7);
+    g.fillCircle(Math.sin(t / 500 + this.seed) * 3, -h * 0.55 - ((t / 40) % 10), 1); // a rising bubble
+  }
+
+  // B1 Candy Cane Canyon: Chocolate River, a wide glossy strip flush with the ground, ripples flowing downhill (right)
+  _chocoRiver(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const band = [
+      { x: -w / 2 - 2, y: 0 }, { x: -w / 2 + 3, y: -h * 0.7 }, { x: -w / 4, y: -h }, { x: w / 4, y: -h * 0.85 },
+      { x: w / 2 - 3, y: -h * 0.65 }, { x: w / 2 + 2, y: 0 },
+    ];
+    g.fillStyle(pal.bg, 1);
+    g.fillPoints(band, true);
+    g.fillStyle(col, 0.45);
+    g.fillPoints(band, true);
+    g.lineStyle(1.5, col, 1);
+    g.strokePoints(band, true, true);
+    // flowing ripples: short dashes sliding right, wrapping inside the strip
+    for (let i = 0; i < 4; i++) {
+      const ph = ((t / 900 + i / 4) % 1);
+      const rx = -w / 2 + 4 + ph * (w - 12);
+      const ry = -h * (0.3 + 0.35 * (i % 2));
+      g.lineStyle(1, pal.text, 0.75);
+      g.lineBetween(rx, ry, rx + 5, ry);
+    }
+    // a sugar bubble that swells and pops
+    const b = (t / 1100 + this.seed) % 1;
+    g.lineStyle(1, col, 1 - b);
+    g.strokeCircle(-w * 0.15, -h * 0.55, 0.8 + b * 2);
+  }
+
+  // B1 Garbage Dump Glacier: Seagull Dive, a gull in a steep dive (crash, `danger`): beating wings, beak first, with the
+  // same soft halo as the drone so it reads against the sky at speed. Drawn around the box centre; the hit-box stays put.
+  _seagull(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const pulse = 0.5 + 0.5 * Math.sin(t / (this.alert ? 90 : 190) + this.seed);
+    const cy = -h / 2 + Math.sin(t / 240 + this.seed) * 2;
+    g.fillStyle(col, 0.1 + 0.1 * pulse);
+    g.fillEllipse(0, cy, w + 18 + 6 * pulse, h + 14 + 4 * pulse);
+    if (this.alert) {
+      g.lineStyle(1, pal.text, 0.35 + 0.4 * pulse);
+      g.strokeEllipse(0, cy, w + 26 - 8 * pulse, h + 20 - 6 * pulse);
+    }
+    // wings: two poses (up / down) so the beat reads at 15 Hz redraw
+    const up = frame % 4 < 2;
+    const tipY = up ? cy - h * 0.5 : cy + h * 0.15;
+    const elbowY = up ? cy - h * 0.15 : cy - h * 0.05;
+    g.lineStyle(3, col, 1);
+    g.strokePoints([{ x: -w / 2, y: tipY }, { x: -w * 0.22, y: elbowY }, { x: 0, y: cy }], false, false);
+    g.strokePoints([{ x: w / 2, y: tipY }, { x: w * 0.22, y: elbowY }, { x: 0, y: cy }], false, false);
+    // body: a pale teardrop pointing down-left (the dive), outlined in danger
+    g.fillStyle(pal.text, 0.95);
+    g.fillEllipse(0, cy + 1, 9, 13);
+    g.lineStyle(1.5, col, 1);
+    g.strokeEllipse(0, cy + 1, 9, 13);
+    // beak and eye
+    g.fillStyle(col, 1);
+    g.fillTriangle(-2, cy + 6, 2, cy + 6, -3, cy + 11);
+    g.fillCircle(-1.5, cy - 1, 1.3);
   }
 
   /** @returns {void} */

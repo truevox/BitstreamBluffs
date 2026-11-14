@@ -45,6 +45,17 @@ const POWERUP_INFO = {
   clockPulse: { name: 'CLOCK PULSE', color: 'cyan' },
   packetBurst: { name: 'PACKET BURST', color: 'lime' },
   hashedBackup: { name: 'HASHED BACKUP', color: 'amber' },
+  // B1 biome pickups (spec §4): each has its own name and icon (_drawIcon)
+  mapleWax: { name: 'MAPLE WAX', color: 'amber' },
+  slickWaxSpray: { name: 'SLICK WAX', color: 'cyan' },
+  aquaLungBubble: { name: 'AQUA-LUNG', color: 'cyan' },
+  sweetToothCoating: { name: 'SWEET-TOOTH', color: 'magenta' },
+};
+/** B1: a biome hazard names itself on the effect warning line instead of the generic effect label. */
+const HAZARD_LABEL = {
+  groomerCat: 'GROOMER CAT',
+  seaweedTangle: 'SEAWEED TANGLE',
+  chocolateRiver: 'CHOCOLATE RIVER',
 };
 /**
  * Power-up KINDS (B0, biome full treatment). Biome pickups are keyed by id like the base ones once their content lands;
@@ -406,6 +417,33 @@ export class UIScene extends Phaser.Scene {
       // stabilize: a level bar on a pivot
       g.lineBetween(cx - 6, cy - 1, cx + 6, cy - 1);
       g.fillTriangle(cx, cy, cx - 4, cy + 6, cx + 4, cy + 6);
+    } else if (id === 'mapleWax') {
+      // maple leaf: a three-lobed leaf on a stem
+      g.fillTriangle(cx, cy - 7, cx - 3, cy - 1, cx + 3, cy - 1);
+      g.fillTriangle(cx - 7, cy - 3, cx - 1, cy + 1, cx - 2, cy - 4);
+      g.fillTriangle(cx + 7, cy - 3, cx + 1, cy + 1, cx + 2, cy - 4);
+      g.fillRect(cx - 2, cy - 2, 4, 4);
+      g.lineBetween(cx, cy + 2, cx, cy + 7);
+    } else if (id === 'slickWaxSpray') {
+      // spray can with a mist of dots
+      g.strokeRect(cx - 6, cy - 2, 5, 9);
+      g.fillRect(cx - 5, cy - 5, 3, 3);
+      g.fillCircle(cx + 2, cy - 4, 1);
+      g.fillCircle(cx + 5, cy - 6, 1);
+      g.fillCircle(cx + 5, cy - 2, 1);
+      g.fillCircle(cx + 2, cy, 1);
+    } else if (id === 'aquaLungBubble') {
+      // one big bubble with a glint, two small ones rising
+      g.strokeCircle(cx - 1, cy + 2, 5);
+      g.fillCircle(cx - 3, cy, 1);
+      g.strokeCircle(cx + 5, cy - 4, 2);
+      g.strokeCircle(cx + 2, cy - 7, 1);
+    } else if (id === 'sweetToothCoating') {
+      // a tooth (crown + two roots) with a coating line across it
+      g.fillRect(cx - 5, cy - 6, 10, 6);
+      g.fillTriangle(cx - 5, cy, cx - 1, cy, cx - 4, cy + 6);
+      g.fillTriangle(cx + 1, cy, cx + 5, cy, cx + 4, cy + 6);
+      g.lineBetween(cx - 7, cy - 3, cx + 7, cy - 3);
     } else if (id === 'clockPulse') {
       g.strokeCircle(cx, cy, 6);
       g.lineBetween(cx, cy, cx, cy - 4);
@@ -875,12 +913,13 @@ export class UIScene extends Phaser.Scene {
       this.effects.set(p.effect, e);
     }
     e.remaining = e.total = dur;
+    e.label = (p.hazardId && HAZARD_LABEL[p.hazardId]) || null;
     this._updateEffect(p.effect, e);
   }
 
   _updateEffect(key, e) {
     const info = EFFECT_INFO[key];
-    e.text.setText(`!! ${info.label} ${fmtSec(e.remaining)} !!`);
+    e.text.setText(`!! ${e.label || info.label} ${fmtSec(e.remaining)} !!`);
     e.text.setColorKey(Math.floor(this.nowMs / 150) % 2 === 0 ? info.color : 'text');
   }
 

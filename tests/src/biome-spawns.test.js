@@ -10,7 +10,7 @@ import { withBiomeFixtures } from './_biomeFixtures.js';
 import {
   HAZARD_MIN_SPACING_PX, BIOME_SPAWN_MAX_CHANCE, BIOME_EDGE_MARGIN_PX, BIOME_SLOT_DRAWS,
 } from '../../src/systems/TerrainGenerator.js';
-import { FX_GROUND_HAZARD, FX_AIR_HAZARD, FX_WARD_POWERUP, FX_STABILIZE_POWERUP, FX_MASK } from './_biomeFixtures.js';
+import { FX_GROUND_HAZARD, FX_AIR_HAZARD, FX_WARD_POWERUP, FX_STABILIZE_POWERUP, FX_MASK, baseOnly } from './_biomeFixtures.js';
 
 const content = loadContent();
 
@@ -46,7 +46,7 @@ describe('constructor filter: biome defs leave the base lists and are kept per b
     expect(g.airHazardList.some((d) => d.biome)).toBe(false);
     expect(g.powerupList.some((d) => d.biome)).toBe(false);
     // base lists are exactly what they were without the fixtures
-    const base = makeGen('filter');
+    const base = makeGen('filter', { hazardDefs: baseOnly(content.hazards), powerupDefs: baseOnly(content.powerups) });
     expect(ids(g.hazardList)).toEqual(ids(base.hazardList));
     expect(ids(g.airHazardList)).toEqual(ids(base.airHazardList));
     expect(ids(g.powerupList)).toEqual(ids(base.powerupList));
@@ -263,7 +263,7 @@ describe('_placeBiomeSpawns: placement of biome hazards and power-ups', () => {
     const onlyGarbage = chunks(fxGen('bs-mask', {}, 2));
     for (const c of onlyGarbage) for (const s of [...c.hazards, ...c.powerups]) expect([FX_AIR_HAZARD.id, FX_STABILIZE_POWERUP.id]).not.toContain(s.defId);
     const withFx = chunks(fxGen('bs-mask'));
-    const noFx = chunks(makeGen('bs-mask', { biomeMask: FX_MASK }));
+    const noFx = chunks(makeGen('bs-mask', { biomeMask: FX_MASK, hazardDefs: baseOnly(content.hazards), powerupDefs: baseOnly(content.powerups) }));
     for (let i = 0; i < N; i++) {
       expect(withFx[i].points).toEqual(noFx[i].points);
       expect(withFx[i].zones).toEqual(noFx[i].zones);

@@ -33,7 +33,7 @@ import { boostEffects } from '../systems/Boosts.js';
 import { sameBoardAs } from '../systems/Ranking.js';
 import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
-import { emptyWards, addWard, tickWards, isWarded, wardMsLeft } from '../systems/Wards.js';
+import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
   resolveLanding, hazardEffectDurationMs, timedPowerupMs,
@@ -604,6 +604,7 @@ export class RunScene extends Phaser.Scene {
       durationMs = eff.durationMs || 3000;
       this.boostMs = durationMs;
       this.boostFactor = eff.speedFactor || 1.3;
+      this.boostId = def.id; // B1: Maple Wax expires under its own id, not packetBurst's
       this.sled.scaleVelocity(this.boostFactor);
     } else if (eff.kind === 'shield') {
       this.shieldCharges += eff.charges || 1;
@@ -613,6 +614,10 @@ export class RunScene extends Phaser.Scene {
       // B0: switches off its listed mods / hazards / effects for 4-6 s (Wards.js; PhysicsTuner and onHazard consult it)
       this.wards = addWard(this.wards, def.id, eff);
       durationMs = wardMsLeft(this.wards, def.id);
+      // B1: a ward's optional speed boost (Slick Wax Spray 1.1): an instant kick now, and wardSpeedMul in the tuner context
+      // while the ward lasts. Kept apart from boostMs so a Packet Burst / Maple Wax never overwrites it (or vice versa).
+      const wf = this.wards.wards.find((w) => w.id === def.id).speedFactor;
+      if (wf > 1) this.sled.scaleVelocity(wf);
     } else if (eff.kind === 'glide') {
       // B0: lower ground friction (PhysicsTuner glideFrictionMul)
       durationMs = timedPowerupMs(eff);
@@ -833,7 +838,7 @@ export class RunScene extends Phaser.Scene {
       scrambled: this.scrambleMs > 0 && !isWarded(this.wards, { effect: 'scramble' }),
       slowed: this.slowMs > 0 && !isWarded(this.wards, { effect: 'slow' }),
       slowFactor: this.slowFactor,
-      speedBoost: this.boostMs > 0 ? this.boostFactor : 1,
+      speedBoost: (this.boostMs > 0 ? this.boostFactor : 1) * wardSpeedMul(this.wards),
       timeMs: this.runTimeMs,
       parachute: sled.parachuteMs > 0,
       airBrake: sled.airBrakeActive,
@@ -961,7 +966,7 @@ export class RunScene extends Phaser.Scene {
       this.boostMs -= dt;
       if (this.boostMs <= 0) {
         this.boostMs = 0;
-        this.game.events.emit(EVT.POWERUP_EXPIRED, { id: 'packetBurst', reason: 'timeout' });
+        this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.boostId || 'packetBurst', reason: 'timeout' });
       }
     }
     if (this.slowmoMs > 0) {

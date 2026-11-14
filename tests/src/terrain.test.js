@@ -245,7 +245,8 @@ describe('TerrainGenerator spawns', () => {
 
   test('all hazard types eventually appear (weighted, data driven)', () => {
     const seen = new Set(chunks.flatMap((c) => c.hazards.map((h) => h.defId)));
-    expect([...seen].sort()).toEqual(Object.keys(content.hazards).sort());
+    // base defs only: a biome-tagged def (B1+) never spawns at mask 0 by design (spec §5, E4)
+    expect([...seen].sort()).toEqual(Object.keys(content.hazards).filter((id) => !content.hazards[id].biome).sort());
   });
 
   test('hazard density increases past 1000 m', () => {

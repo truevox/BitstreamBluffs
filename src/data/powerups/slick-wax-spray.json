@@ -1,0 +1,3 @@
+{ "id": "slickWaxSpray", "biome": "garbage-dump-glacier", "shapeKey": "waxSpray", "radius": 10,
+  "effect": { "kind": "ward", "durationMs": 4000, "mods": ["stickyPatch"], "hazards": [], "effects": [], "speedFactor": 1.1 },
+  "spawn": { "baseChance": 0.4 }, "colorKey": "cyan" }

@@ -8,7 +8,10 @@
  *   - RunScene.onHazard ignores a hit whose hazard id or effect is warded, and RunScene stops an active slow /
  *     scramble / blind effect from acting while it is warded.
  *
- * @typedef {{id:string, msLeft:number, mods:string[], hazards:string[], effects:string[]}} Ward
+ * B1 (additive): a ward may carry a small speed boost (`speedFactor`, Slick Wax Spray 1.1) that lasts exactly as long as
+ * the ward; `wardSpeedMul` is the product the frame's PhysicsTuner context multiplies into `speedBoost`.
+ *
+ * @typedef {{id:string, msLeft:number, mods:string[], hazards:string[], effects:string[], speedFactor:number}} Ward
  * @typedef {{wards: Ward[]}} WardState
  * @typedef {{modId?:string, hazardId?:string, effect?:string}} WardQuery  exactly one key is read, in that order.
  */
@@ -16,6 +19,8 @@
 /** Spec §4: ward durations are 4-6 s. A def outside the band is clamped into it. */
 export const WARD_MIN_MS = 4000;
 export const WARD_MAX_MS = 6000;
+/** B1: a ward's optional speed boost is clamped to [1, WARD_MAX_SPEED_FACTOR]: a small bonus, never a slow. */
+export const WARD_MAX_SPEED_FACTOR = 1.2;
 
 const NONE = Object.freeze([]);
 const strList = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
@@ -30,7 +35,7 @@ export function emptyWards() {
  * Does not mutate `state`.
  * @param {WardState} state
  * @param {string} id power-up def id.
- * @param {{durationMs?:number, mods?:string[], hazards?:string[], effects?:string[]}} effect the def's `effect`.
+ * @param {{durationMs?:number, mods?:string[], hazards?:string[], effects?:string[], speedFactor?:number}} effect the def's `effect`.
  * @returns {WardState}
  */
 export function addWard(state, id, effect) {
@@ -42,6 +47,7 @@ export function addWard(state, id, effect) {
     mods: strList(e.mods),
     hazards: strList(e.hazards),
     effects: strList(e.effects),
+    speedFactor: wardSpeedFactor(e.speedFactor),
   };
   const rest = (state && state.wards ? state.wards : []).filter((w) => w.id !== ward.id);
   return { wards: rest.concat([ward]) };
@@ -84,4 +90,22 @@ export function wardMsLeft(state, id) {
   if (!state || !state.wards) return 0;
   const w = state.wards.find((q) => q.id === id);
   return w ? Math.max(0, w.msLeft) : 0;
+}
+
+/** A ward's speed boost from its def value: 1 when absent, else clamped to [1, WARD_MAX_SPEED_FACTOR]. @param {number} f @returns {number} */
+export function wardSpeedFactor(f) {
+  return Number.isFinite(f) ? Math.min(WARD_MAX_SPEED_FACTOR, Math.max(1, f)) : 1;
+}
+
+/**
+ * Product of the speed boosts of every active ward (1 when none carries one). RunScene multiplies it into the tuner
+ * context's `speedBoost`, kept apart from the Packet Burst / Maple Wax boost so the two never overwrite each other.
+ * @param {WardState|null|undefined} state
+ * @returns {number}
+ */
+export function wardSpeedMul(state) {
+  if (!state || !state.wards || !state.wards.length) return 1;
+  let m = 1;
+  for (const w of state.wards) if (w.msLeft > 0 && w.speedFactor > 1) m *= w.speedFactor;
+  return m;
 }

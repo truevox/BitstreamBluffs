@@ -2,7 +2,8 @@
  * OWNER: gameplay engineer.
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
- * Floating pickup (sensor body). shapeKey: 'clock' (Clock Pulse), 'burst' (Packet Burst), 'shield' (Hashed Backup).
+ * Floating pickup (sensor body). shapeKey: 'clock' (Clock Pulse), 'burst' (Packet Burst), 'shield' (Hashed Backup);
+ * B1 biome pickups: 'maple' (Maple Wax), 'waxSpray' (Slick Wax Spray), 'bubble' (Aqua-Lung Bubble), 'candyCoat' (Sweet-Tooth).
  * Visual: a rotating dashed ring + bobbing glyph, glow pulse. The sensor stays put while the glyph bobs.
  */
 import Phaser from 'phaser';
@@ -105,6 +106,52 @@ export class PowerUp {
         g.strokePoints([{ x: -4.5, y: -4.5 }, { x: 0, y: -6.5 }, { x: 4.5, y: -4.5 }, { x: 4, y: 2 }, { x: 0, y: 6 }, { x: -4, y: 2 }], true, true);
         g.fillStyle(col, 0.7);
         g.fillCircle(0, -0.5, 1.8);
+        break;
+      }
+      case 'maple': {
+        // B1 Maple Wax: a maple leaf (three lobes and a stem)
+        g.fillStyle(col, 1);
+        g.fillTriangle(0, -6.5, -2.5, -1, 2.5, -1);
+        g.fillTriangle(-6, -2.5, -0.5, 1, -1.5, -3.5);
+        g.fillTriangle(6, -2.5, 0.5, 1, 1.5, -3.5);
+        g.fillRect(-2, -2, 4, 3.5);
+        g.lineStyle(1.5, pal.text, 1);
+        g.lineBetween(0, 1, 0.5, 6);
+        break;
+      }
+      case 'waxSpray': {
+        // B1 Slick Wax Spray: a spray can with a puff of mist
+        g.fillStyle(col, 0.85);
+        g.fillRect(-5, -2, 4.5, 8);
+        g.fillStyle(pal.text, 1);
+        g.fillRect(-4, -4.5, 2.5, 2.5);
+        const ph = (t / 300) % 1;
+        g.fillStyle(pal.text, 1 - ph * 0.7);
+        g.fillCircle(1.5 + ph * 2, -4, 1);
+        g.fillCircle(3.5 + ph * 2, -6, 0.9);
+        g.fillCircle(3.5 + ph * 2, -2, 0.9);
+        break;
+      }
+      case 'bubble': {
+        // B1 Aqua-Lung Bubble: a breathing bubble with a glint and a small one rising
+        const breathe = 1 + 0.12 * Math.sin(t / 250);
+        g.lineStyle(1.5, pal.text, 1);
+        g.strokeCircle(-0.5, 1, 4.5 * breathe);
+        g.fillStyle(pal.text, 0.9);
+        g.fillCircle(-2.2, -0.8, 1.1);
+        g.lineStyle(1, col, 1);
+        g.strokeCircle(4, -4.5 - ((t / 120) % 2), 1.4);
+        break;
+      }
+      case 'candyCoat': {
+        // B1 Sweet-Tooth Coating: a tooth with a candy-stripe coat
+        g.fillStyle(pal.text, 1);
+        g.fillRect(-4.5, -5.5, 9, 5);
+        g.fillTriangle(-4.5, -0.5, -0.8, -0.5, -3.5, 5.5);
+        g.fillTriangle(0.8, -0.5, 4.5, -0.5, 3.5, 5.5);
+        g.lineStyle(1.5, col, 1);
+        g.lineBetween(-4.5, -2, 4.5, -4.5);
+        g.lineBetween(-4.5, -4.8, 0, -5.5);
         break;
       }
       default: {

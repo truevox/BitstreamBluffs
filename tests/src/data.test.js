@@ -120,13 +120,15 @@ describe('terrain mods', () => {
       expect(typeof h.shapeKey).toBe('string');
       expect(h.size.w).toBeGreaterThan(0);
       expect(h.size.h).toBeGreaterThan(0);
-      expect(['crash', 'slow', 'scramble']).toContain(h.onHit.effect);
+      // B0 added 'blind' / 'gust' for biome defs; base defs keep the original three
+      expect(h.biome ? ['crash', 'slow', 'scramble', 'blind', 'gust'] : ['crash', 'slow', 'scramble']).toContain(h.onHit.effect);
       expect(h.weight).toBeGreaterThan(0);
       expect(h.minDistanceM).toBeGreaterThanOrEqual(0);
       expect(['ground', 'air']).toContain(h.placement);
       expect(PALETTE_KEYS).toContain(h.colorKey);
     }
-    const air = hazards.filter((h) => h.placement === 'air');
+    // the BASE air hazard (biome air hazards such as B1's seagullDive are checked in biome-b1-content.test.js)
+    const air = hazards.filter((h) => h.placement === 'air' && !h.biome);
     expect(air.map((h) => h.id)).toEqual(['roguePacket']);
     expect(air[0].onHit.effect).toBe('crash');
     expect(air[0].minDistanceM).toBeGreaterThanOrEqual(1500);
@@ -135,7 +137,12 @@ describe('terrain mods', () => {
   test('loadContent exposes every group', () => {
     const c = loadContent();
     expect(c.chunks.length).toBe(chunks.length);
-    expect(Object.keys(c.hazards).sort()).toEqual(['garbageDataVent', 'glitchChasm', 'overflowFirewall', 'packetSpike', 'roguePacket']);
-    expect(Object.keys(c.powerups).sort()).toEqual(['clockPulse', 'hashedBackup', 'packetBurst']);
+    // base content is unchanged (spec §8: no new base hazard or power-up); biome-tagged defs are listed separately
+    const base = (o) => Object.keys(o).filter((id) => !o[id].biome).sort();
+    const biome = (o) => Object.keys(o).filter((id) => o[id].biome).sort();
+    expect(base(c.hazards)).toEqual(['garbageDataVent', 'glitchChasm', 'overflowFirewall', 'packetSpike', 'roguePacket']);
+    expect(base(c.powerups)).toEqual(['clockPulse', 'hashedBackup', 'packetBurst']);
+    expect(biome(c.hazards)).toEqual(['chocolateRiver', 'groomerCat', 'seagullDive', 'seaweedTangle']);
+    expect(biome(c.powerups)).toEqual(['aquaLungBubble', 'mapleWax', 'slickWaxSpray', 'sweetToothCoating']);
   });
 });

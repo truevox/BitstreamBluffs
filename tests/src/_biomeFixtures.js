@@ -54,11 +54,14 @@ export const FX_STABILIZE_POWERUP = Object.freeze({
 
 const byId = (arr) => Object.fromEntries(arr.map((d) => [d.id, JSON.parse(JSON.stringify(d))]));
 
-/** Shipped content plus every fixture above, as TerrainGenerator options overrides. */
+/** Shipped content WITHOUT its biome-tagged defs (B1+ ships real ones): the fixture tests test the engine, not the tuning. */
+export const baseOnly = (o) => Object.fromEntries(Object.entries(o).filter(([, d]) => !d.biome));
+
+/** Shipped BASE content plus every fixture above, as TerrainGenerator options overrides. */
 export function withBiomeFixtures(content, extra = {}) {
   return {
-    hazardDefs: { ...content.hazards, ...byId([FX_GROUND_HAZARD, FX_AIR_HAZARD]), ...(extra.hazards || {}) },
-    powerupDefs: { ...content.powerups, ...byId([FX_WARD_POWERUP, FX_STABILIZE_POWERUP]), ...(extra.powerups || {}) },
+    hazardDefs: { ...baseOnly(content.hazards), ...byId([FX_GROUND_HAZARD, FX_AIR_HAZARD]), ...(extra.hazards || {}) },
+    powerupDefs: { ...baseOnly(content.powerups), ...byId([FX_WARD_POWERUP, FX_STABILIZE_POWERUP]), ...(extra.powerups || {}) },
   };
 }
 

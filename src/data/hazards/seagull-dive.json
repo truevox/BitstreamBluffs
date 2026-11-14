@@ -1,0 +1,3 @@
+{ "id": "seagullDive", "biome": "garbage-dump-glacier", "shapeKey": "seagull", "size": { "w": 40, "h": 24 },
+  "onHit": { "effect": "crash" }, "spawn": { "baseChance": 0.5 },
+  "weight": 1, "minDistanceM": 1000, "placement": "air", "colorKey": "danger" }
