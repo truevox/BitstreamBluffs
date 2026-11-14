@@ -284,3 +284,41 @@ describe('MenuList single column stays pixel-identical', () => {
     expect({ x, y, w }).toEqual({ x: 0, y: 48, w: 200 });
   });
 });
+
+// ================================================================== U1: Profile -> Achievements -> back
+
+describe('U1: Profile -> ACHIEVEMENTS -> BACK', () => {
+  test('harness control: the first Profile view reaches SHARD SHOP by keyboard (control)', () => {
+    const t = titleHost();
+    expect(openProfile(t)).toBeInstanceOf(ProfileView);
+    t._onAction('down'); // lands focus on SHARD SHOP (no unlocked biomes = no toggle rows)
+    t._onAction('confirm');
+    expect(t.view).toBeInstanceOf(ShopView);
+  });
+
+  test('U1: backing out of ACHIEVEMENTS destroys the Achievements panel', () => {
+    const t = titleHost();
+    const prof = openProfile(t);
+    prof.achButton.zone.emit('pointerdown'); // the pointer path, exactly as the gate and the live check did
+    const ach = t.view;
+    expect(ach).toBeInstanceOf(AchievementsView);
+    const achPanel = ach.panel;
+    t._onAction('cancel'); // grid -> profile
+    expect(t.view).toBeInstanceOf(ProfileView);
+    t._onAction('cancel'); // profile -> title
+    expect(t.view).toBeNull();
+    // Correct: nothing of the grid survives.
+    expect(achPanel.destroyed).toBe(true);
+    expect(ach.alive).toBe(false);
+  });
+
+  test('U1b: the Profile view rebuilt after ACHIEVEMENTS still opens SHARD SHOP', () => {
+    const t = titleHost();
+    openProfile(t).achButton.zone.emit('pointerdown');
+    t._onAction('cancel'); // back to the rebuilt profile
+    expect(t.view).toBeInstanceOf(ProfileView);
+    t._onAction('down');
+    t._onAction('confirm');
+    expect(t.view).toBeInstanceOf(ShopView);
+  });
+});

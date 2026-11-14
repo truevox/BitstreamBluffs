@@ -326,6 +326,7 @@ export class ProfileView extends View {
       achievementTotal: ACHIEVEMENTS.length,
     });
     super(scene, theme, { w: layout.w, h: layout.h, title: 'PILOT PROFILE', color: 'lime', onClose: o.onClose, y: 22, backLabel: 'BACK' });
+    this._onShop = o.onShop;
 
     for (const it of layout.items) {
       // Layout boxes are always top-left, so draw left-anchored and never let Phaser re-apply an
@@ -367,7 +368,6 @@ export class ProfileView extends View {
       // The button is pointer-only by design (Button's own doc says keyboard users reach the action
       // through scene-level keys). That was fine while the shop also had a Title row; it is now the ONLY
       // way in, so Profile has to provide the key path itself.
-      this._onShop = o.onShop;
       this.shopFocus = new Phaser.GameObjects.Graphics(scene);
       this.panel.add(this.shopFocus);
     }
@@ -412,13 +412,20 @@ export class ProfileView extends View {
   /** Open the achievements grid from inside the profile, replacing this view. */
   _openAchievements() {
     uiSfx(this.scene, 'uiSelect');
-    const next = new AchievementsView(this.scene, this.theme, {
+    const scene = this.scene;
+    const theme = this.theme;
+    const onClose = this.onClose;
+    const onShop = this._onShop;
+    const next = new AchievementsView(scene, theme, {
       onClose: () => {
         // Backing out of the grid returns to the PROFILE view the player came from, not to the Title
         // screen: ejecting them a screen further than they went in is a navigation bug the player feels.
-        const back = new ProfileView(this.scene, this.theme, { onClose: this.onClose });
-        this.destroy();
-        this.scene.view = back;
+        // The GRID is what gets destroyed here (this profile is already gone): destroying `this` instead
+        // left the depth-500 grid pinned over the Title menu for good. The rebuilt profile keeps onShop,
+        // or SHARD SHOP would silently just close it.
+        const back = new ProfileView(scene, theme, { onClose, onShop });
+        next.destroy();
+        scene.view = back;
       },
       biomeDefs: this.biomeDefs,
     });
