@@ -101,7 +101,9 @@ export function metricsFrom(profile, run, extra = {}) {
     totalDistanceM: Math.max(n(L.distanceM), 0),
     bestDistanceM: Math.max(n(L.bestDistanceM), n(r.distanceM)),
     bestScore: Math.max(n(L.bestScore), n(r.score)),
-    bestCombo: Math.max(n(L.bestCombo), 1, n(r.bestCombo)),
+    // No floor at x1: a profile that has never run reads 0, so the grid shows no combo progress until a
+    // multiplier has actually been recorded (the old floor showed a fresh profile 1/2 toward "Doubled Up").
+    bestCombo: Math.max(n(L.bestCombo), n(r.bestCombo), 0),
     maxAirtimeMs: Math.max(n(L.maxAirtimeMs), n(r.maxAirtimeMs)),
     tricksLanded,
     trickKinds: trickKinds.size,

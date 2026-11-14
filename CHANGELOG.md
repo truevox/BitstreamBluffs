@@ -32,6 +32,7 @@
 - **MS-3:** the profile sanitizer (and `applyMissions`) now dedupes active mission ids before the three-slot cap, so a hand-edited save cannot pay one mission three times.
 - **BF-1:** the one-time backfill credits stored runs oldest first (by `endedAt`), so First Descent carries the first run's time and the credited ring keeps the newest hashes. Removed the no-op `credited ? out : out`.
 - **ACH-1:** `tricksLanded` sums the per-kind max of lifetime and run tricks, so the run being credited is counted once (5 backflips no longer unlock "Land 10 tricks").
+- **ACH-5:** the `bestCombo` metric is no longer floored at x1, so a profile with no runs shows 0 progress toward the combo achievements instead of 1/2.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 

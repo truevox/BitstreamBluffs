@@ -34,4 +34,18 @@ describe('ACH-1: tricksLanded counts the credited run once', () => {
   });
 });
 
+describe('ACH-5: combo progress starts from nothing', () => {
+  test('a fresh profile with 0 runs shows no progress toward the combo achievements', () => {
+    const m = metricsFrom(v1(), null, {});
+    const shown = ACHIEVEMENTS.filter((a) => a.metric === 'bestCombo').map((a) => achShown(a, m));
+    expect(shown.every((v) => v === 0)).toBe(true);
+  });
+
+  test('a recorded multiplier still reads through', () => {
+    const p = v1({ lifetime: { bestCombo: 1.5 } });
+    expect(metricsFrom(p, null, {}).bestCombo).toBe(1.5);
+    expect(metricsFrom(v1(), { bestCombo: 1.25 }, {}).bestCombo).toBe(1.25);
+  });
+});
+
 function achShown(a, m) { return progressFor(a, m).value; }
