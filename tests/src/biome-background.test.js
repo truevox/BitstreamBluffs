@@ -16,7 +16,42 @@
  * Geometry is asserted through `motifGeometry`, a pure function, rather than by pixel-diffing, because
  * the point is that the *shape* differs per motif — a screenshot would only prove something was drawn.
  */
-import { motifGeometry, MOTIFS } from '../../src/entities/Background.js';
+import { motifGeometry, MOTIFS, Background } from '../../src/entities/Background.js';
+import { readDir } from './_helpers.js';
+
+/** A scene stub with just what the Background constructor touches. */
+function fakeScene() {
+  const gfx = { setScrollFactor() { return gfx; }, setDepth() { return gfx; }, destroy() {} };
+  return { add: { graphics: () => gfx } };
+}
+
+describe('audit T1: every backdrop a biome file names is a real motif', () => {
+  // Read the biome files, not a list: the W6 batch named six motifs that did not exist, and the old
+  // hardcoded test below only knew the batch-1 five, so it stayed green while six biomes fell back.
+  const biomes = readDir('biomes');
+  const named = [...new Set(biomes.map((b) => b.background))];
+
+  test('the biome files name backgrounds at all (the loader found them)', () => {
+    expect(biomes.length).toBeGreaterThanOrEqual(11);
+    expect(named.every((id) => typeof id === 'string' && id.length > 0)).toBe(true);
+  });
+
+  test.each(biomes.map((b) => [b.id, b.background]))('%s: background "%s" is a motif with its own geometry', (biome, id) => {
+    // `motif === id` matters: the fallback returns 'ridges' with two layers, so "has layers" alone
+    // would pass for a motif that does not exist.
+    const g = motifGeometry(id, 777);
+    expect({ biome, id, known: MOTIFS.includes(id), motif: g.motif }).toEqual({ biome, id, known: true, motif: id });
+    expect(g.layers.length).toBeGreaterThan(0);
+  });
+
+  test.each(biomes.map((b) => [b.id, b.background]))('%s: setMotif("%s") leaves a non-null motif on the Background', (biome, id) => {
+    const bg = new Background(fakeScene(), {});
+    bg.setMotif(id);
+    expect({ biome, motif: bg.motif }).toEqual({ biome, motif: id });
+    bg.setMotif(null);
+    expect(bg.motif).toBeNull();
+  });
+});
 
 describe('background motifs exist and are distinct', () => {
   test('every motif the biome files name is a real motif', () => {
