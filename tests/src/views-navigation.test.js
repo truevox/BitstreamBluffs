@@ -322,3 +322,36 @@ describe('U1: Profile -> ACHIEVEMENTS -> BACK', () => {
     expect(t.view).toBeInstanceOf(ShopView);
   });
 });
+
+describe('U2: ACHIEVEMENTS is reachable without a pointer', () => {
+  test('U2: some keyboard/pad sequence on PROFILE opens the achievements grid', () => {
+    const tried = [];
+    let opened = false;
+    for (const dir of ['down', 'up', 'left', 'right']) {
+      for (let n = 0; n <= 6 && !opened; n += 1) {
+        const t = titleHost();
+        openProfile(t);
+        t._onAction('down'); // land focus
+        for (let i = 0; i < n; i += 1) t._onAction(dir);
+        // Confirm only while still on the profile: confirm on BACK closes it, which is not a find.
+        if (t.view instanceof ProfileView) t._onAction('confirm');
+        tried.push(`${dir}x${n}->${t.view ? t.view.constructor.name : 'null'}`);
+        if (t.view instanceof AchievementsView) opened = true;
+      }
+    }
+    expect({ opened, tried }).toEqual(expect.objectContaining({ opened: true }));
+  });
+
+  test('U2: ACHIEVEMENTS sits before SHARD SHOP in the focus order, gets a focus ring, and confirm opens the grid', () => {
+    const t = titleHost();
+    const prof = openProfile(t);
+    t._onAction('down'); // land: SHARD SHOP (no toggle rows on a fresh profile)
+    t._onAction('up'); // ACHIEVEMENTS, which is left of SHARD SHOP on screen
+    expect(prof._focusTargets()[prof.focusIdx]).toEqual({ kind: 'ach' });
+    const ring = prof.shopFocus.ops.find((o) => o[0] === 'strokeRect');
+    expect(ring).toBeTruthy();
+    expect(ring[1]).toBeCloseTo(prof.achButton.x - 1.5);
+    t._onAction('confirm');
+    expect(t.view).toBeInstanceOf(AchievementsView);
+  });
+});

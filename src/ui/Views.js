@@ -476,19 +476,25 @@ export class ProfileView extends View {
   }
 
   /**
-   * Focus targets in visual order: the signature rows, then SHARD SHOP, then BACK.
+   * Focus targets in visual order: the signature rows, then ACHIEVEMENTS, SHARD SHOP and BACK (the
+   * bottom strip, left to right).
    *
    * ProfileView used to forward every action straight to `sigMenu`, which wraps inside its own five
    * rows — so keyboard and gamepad could never leave the toggles, and SHARD SHOP (the only route to the
    * shop) was unreachable without a mouse. A single ordered list is what makes it reachable: up/down walk
    * it, and confirm activates whichever entry holds focus.
    *
-   * @returns {Array<{kind:'row'|'buy'|'back', index?:number}>}
+   * ACHIEVEMENTS was pointer-only (its button was never a target), so the grid could not be opened by
+   * keyboard or pad. It sits before SHARD SHOP because it is left of it on screen; first focus still
+   * lands on SHARD SHOP (`length - 2`) when there are no toggle rows.
+   *
+   * @returns {Array<{kind:'row'|'ach'|'buy'|'back', index?:number}>}
    */
   _focusTargets() {
     const out = [];
     const rows = this.sigMenu ? this.sigMenu.items.length : 0;
     for (let i = 0; i < rows; i += 1) out.push({ kind: 'row', index: i });
+    if (this.achButton) out.push({ kind: 'ach' });
     if (this.shopButton) out.push({ kind: 'buy' });
     out.push({ kind: 'back' });
     return out;
@@ -503,10 +509,11 @@ export class ProfileView extends View {
     const t = this._focusTargets()[this.focusIdx];
     if (!t) return;
     let r = null;
+    if (t.kind === 'ach' && this.achButton) r = { x: this.achButton.x, y: this.achButton.y, w: this.achButton.w, h: this.achButton.h };
     if (t.kind === 'buy' && this.shopButton) r = { x: this.shopButton.x, y: this.shopButton.y, w: this.shopButton.w, h: this.shopButton.h };
     if (t.kind === 'back' && this.back) r = { x: this.back.x, y: this.back.y, w: this.back.w, h: this.back.h };
     if (!r) return;
-    g.lineStyle(1, pal[t.kind === 'buy' ? 'amber' : 'magenta'], 1);
+    g.lineStyle(1, pal[t.kind === 'back' ? 'magenta' : 'amber'], 1);
     g.strokeRect(r.x - 1.5, r.y - 1.5, r.w + 3, r.h + 3);
   }
 
@@ -555,6 +562,8 @@ export class ProfileView extends View {
       } else if (cur.kind === 'buy') {
         uiSfx(this.scene, 'uiSelect');
         this._openShop();
+      } else if (cur.kind === 'ach') {
+        this._openAchievements();
       } else {
         this.close();
       }
