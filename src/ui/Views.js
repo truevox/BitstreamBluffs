@@ -19,7 +19,7 @@ import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
 import { ACHIEVEMENTS } from '../systems/Achievements.js';
-import { shopLayout, shopMenuItems } from './ShopLayout.js';
+import { shopLayout, shopMenuItems, titlesLayout, titlesMenuItems } from './ShopLayout.js';
 import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopItem } from '../systems/ProfileStore.js';
 
 /** Base: centred panel with a BACK button. */
@@ -477,6 +477,37 @@ export class ProfileView extends View {
       });
       this.panel.add(this.achButton);
     }
+
+    // SHOP-2: TITLES, third in the bottom strip. Opens the title picker, which replaces this view the way
+    // the achievements grid does and returns here on BACK.
+    if (layout.titlesButton) {
+      const tb = layout.titlesButton;
+      this.titlesButton = new Button(scene, theme, {
+        x: tb.x, y: tb.y, w: tb.w, h: tb.h, label: 'TITLES', color: 'lime',
+        onClick: () => this._openTitles(),
+      });
+      this.panel.add(this.titlesButton);
+    }
+  }
+
+  /** Open the TITLES picker from inside the profile, replacing this view; BACK rebuilds the profile. */
+  _openTitles() {
+    uiSfx(this.scene, 'uiSelect');
+    const scene = this.scene;
+    const theme = this.theme;
+    const onClose = this.onClose;
+    const onShop = this._onShop;
+    const next = new TitlesView(scene, theme, {
+      onClose: () => {
+        // Same order as the achievements grid: build the profile first, then destroy the picker, so the
+        // picker's panel can never be left pinned over the Title menu.
+        const back = new ProfileView(scene, theme, { onClose, onShop });
+        next.destroy();
+        scene.view = back;
+      },
+    });
+    this.destroy();
+    this.scene.view = next;
   }
 
   /** Open the achievements grid from inside the profile, replacing this view. */
@@ -566,6 +597,7 @@ export class ProfileView extends View {
     for (let i = 0; i < rows; i += 1) out.push({ kind: 'row', index: i });
     if (this.achButton) out.push({ kind: 'ach' });
     if (this.shopButton) out.push({ kind: 'buy' });
+    if (this.titlesButton) out.push({ kind: 'titles' });
     out.push({ kind: 'back' });
     return out;
   }
@@ -581,6 +613,7 @@ export class ProfileView extends View {
     let r = null;
     if (t.kind === 'ach' && this.achButton) r = { x: this.achButton.x, y: this.achButton.y, w: this.achButton.w, h: this.achButton.h };
     if (t.kind === 'buy' && this.shopButton) r = { x: this.shopButton.x, y: this.shopButton.y, w: this.shopButton.w, h: this.shopButton.h };
+    if (t.kind === 'titles' && this.titlesButton) r = { x: this.titlesButton.x, y: this.titlesButton.y, w: this.titlesButton.w, h: this.titlesButton.h };
     if (t.kind === 'back' && this.back) r = { x: this.back.x, y: this.back.y, w: this.back.w, h: this.back.h };
     if (!r) return;
     g.lineStyle(1, pal[t.kind === 'back' ? 'magenta' : 'amber'], 1);
@@ -600,7 +633,9 @@ export class ProfileView extends View {
     if (this.focusIdx === undefined || this.focusIdx === null || this.focusIdx >= targets.length) {
       // Land on the first row if there is one; otherwise on the first button. Never on BACK, so the
       // first press moves into the screen rather than leaving it.
-      this.focusIdx = this.sigMenu ? 0 : Math.max(0, targets.length - 2);
+      // With no rows, SHARD SHOP (found by kind: TITLES now sits between it and BACK).
+      const buyIdx = targets.findIndex((x) => x.kind === 'buy');
+      this.focusIdx = this.sigMenu ? 0 : (buyIdx >= 0 ? buyIdx : Math.max(0, targets.length - 2));
       this._syncMenu();
       this._paintFocus();
       if (action !== 'confirm') return true;
@@ -634,6 +669,8 @@ export class ProfileView extends View {
         this._openShop();
       } else if (cur.kind === 'ach') {
         this._openAchievements();
+      } else if (cur.kind === 'titles') {
+        this._openTitles();
       } else {
         this.close();
       }
@@ -925,5 +962,102 @@ export class ShopView extends View {
       }
     }
     return this.menu.handleAction(action);
+  }
+}
+
+/**
+ * SHOP-2: TITLES — buy (Static Rider) and equip titles, or go back to the level title.
+ *
+ * Same one-action-per-row rule as the shop: an owned title equips, an affordable one buys and equips in one
+ * atomic save, EQUIPPED (or the DEFAULT row) puts the slot back to DEFAULT. Achievement titles show
+ * ACHIEVEMENT until earned and cannot be selected. Opened from the Profile view; BACK returns there.
+ */
+export class TitlesView extends View {
+  /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
+  constructor(scene, theme, o) {
+    const layout = titlesLayout({ profile: scene.registry.get(REG.PROFILE), levels: (scene.registry.get(REG.CONTENT) || {}).progression });
+    super(scene, theme, { w: layout.w, h: layout.h, title: 'TITLES', color: 'lime', onClose: o.onClose, y: 40, backLabel: 'BACK' });
+    const service = scene.registry.get(REG.PROGRESSION);
+    this.store = (service && service.store) || null;
+    this.menu = null;
+    this.bankTexts = [];
+    this._build();
+  }
+
+  _profile() {
+    return this.scene.registry.get(REG.PROFILE) || {};
+  }
+
+  _build() {
+    const layout = titlesLayout({ profile: this._profile(), levels: (this.scene.registry.get(REG.CONTENT) || {}).progression });
+    if (this.menu) { this.menu.destroy(); this.menu = null; }
+    for (const t of this.bankTexts) t.destroy();
+    this.bankTexts = [];
+    const items = titlesMenuItems(layout).map((m) => (m.kind === 'action'
+      ? { ...m, onSelect: () => this._choose(m.id) }
+      : { kind: 'static', label: m.label, disabled: true }));
+    const band = layout.band;
+    this.menu = new MenuList(this.scene, this.theme, {
+      x: band.x, y: band.y, w: band.w, rowH: layout.rowH, items, color: 'lime', parent: this.panel,
+    });
+    const head = layout.rows.find((r) => r.kind === 'head');
+    for (const t of (head && head.texts) || []) {
+      const txt = new NeonText(this.scene, this.theme, t.x, t.y, t.text, { color: t.color });
+      this.panel.add(txt);
+      this.bankTexts.push(txt);
+    }
+  }
+
+  _save(next) {
+    try {
+      this.scene.registry.set(REG.PROFILE, this.store ? this.store.save(next) : next);
+    } catch (e) {
+      this.scene.registry.set(REG.PROFILE, next);
+    }
+  }
+
+  /** Buy-or-equip a title, or return the slot to DEFAULT. Atomic: a refused purchase changes nothing. */
+  _choose(id) {
+    const prof = this._profile();
+    const eq = (prof.equipped && typeof prof.equipped === 'object') ? prof.equipped : {};
+    if (id === 'default') {
+      this._save(unequip(prof, 'title'));
+      uiSfx(this.scene, 'uiBack');
+      this._refresh();
+      return;
+    }
+    const item = shopItem(id);
+    if (!item || item.slot !== 'title') return;
+    if (isOwned(prof, id) && (eq.title === item.value || eq.title === id)) {
+      this._save(unequip(prof, 'title'));
+      uiSfx(this.scene, 'uiBack');
+      this._refresh();
+      return;
+    }
+    let next = prof;
+    if (!isOwned(prof, id)) {
+      next = purchase(prof, id);
+      if (next === prof) { uiSfx(this.scene, 'uiBack'); return; }
+      uiSfx(this.scene, 'uiSelect', { pitch: 1.4 });
+    }
+    this._save(equip(next, id));
+    this._refresh();
+  }
+
+  _refresh() {
+    const keep = this.menu ? this.menu.selected : 0;
+    this._build();
+    if (this.menu) this.menu.setSelected(Math.min(keep, this.menu.items.length - 1), true);
+  }
+
+  handleAction(action) {
+    if (action === 'cancel') { this.close(); return true; }
+    return this.menu.handleAction(action);
+  }
+
+  destroy() {
+    for (const t of this.bankTexts || []) t.destroy();
+    this.bankTexts = [];
+    super.destroy();
   }
 }

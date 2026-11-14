@@ -589,7 +589,8 @@ export function shopItem(id) {
 
 /**
  * Whether the profile owns an item. Level-reward items (price 0) are owned once the player reaches their
- * unlockLevel, which is how W1's level rewards already work; paid items are owned by purchase.
+ * unlockLevel, which is how W1's level rewards already work; paid items are owned by purchase; an
+ * achievement title (`grant: 'achievement'`) is owned once its achievement put it in `unlocked.titles`.
  * @param {Object} profile @param {string} id @returns {boolean}
  */
 export function isOwned(profile, id) {
@@ -597,6 +598,11 @@ export function isOwned(profile, id) {
   if (!item || !profile || typeof profile !== 'object') return false;
   const owned = profile.unlocked && Array.isArray(profile.unlocked.cosmetics) ? profile.unlocked.cosmetics : [];
   if (owned.includes(id)) return true;
+  // Achievement titles (SHOP-2) are owned by the grant record unlockAchievementsFor writes, never by level.
+  if (item.grant === 'achievement') {
+    const titles = profile.unlocked && Array.isArray(profile.unlocked.titles) ? profile.unlocked.titles : [];
+    return titles.includes(item.value);
+  }
   const lvl = Number(profile.level) || 1;
   return item.price === 0 && Number(item.unlockLevel) <= lvl;
 }

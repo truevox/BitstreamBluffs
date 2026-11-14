@@ -13,9 +13,11 @@ jest.unstable_mockModule('phaser', () => ({
   default: { Physics: { Matter: { Matter: { Bodies: {}, Body: { getVelocity: () => ({ x: 0, y: 0 }) } } } } },
 }));
 
-const { COSMETIC_ITEMS, COSMETIC_HUES, cosmeticFor, resolveCosmetics, themedUiPalette, UI_THEME_KEYS } = await import('../../src/systems/Cosmetics.js');
-const { SHOP_ITEMS, sanitizeProfile, equip, isOwned, purchase } = await import('../../src/systems/ProfileStore.js');
-const { shopAllRows } = await import('../../src/ui/ShopLayout.js');
+const { COSMETIC_ITEMS, COSMETIC_HUES, cosmeticFor, resolveCosmetics, themedUiPalette, UI_THEME_KEYS, equippedTitle } = await import('../../src/systems/Cosmetics.js');
+const { SHOP_ITEMS, sanitizeProfile, equip, unequip, isOwned, purchase } = await import('../../src/systems/ProfileStore.js');
+const { shopAllRows, titlesLayout, titlesMenuItems } = await import('../../src/ui/ShopLayout.js');
+const { profileLayout, titleBadgeLayout, PROFILE_PANEL } = await import('../../src/ui/ProfileLayout.js');
+const { ACHIEVEMENTS } = await import('../../src/systems/Achievements.js');
 const { TrailParticles } = await import('../../src/entities/TrailParticles.js');
 const { Sled } = await import('../../src/entities/Sled.js');
 
@@ -314,5 +316,107 @@ describe('SHOP-5: a theme recolours the UI palette, never danger, and never unde
       const other = themedUiPalette(HEX, { equipped: { theme: t.value } });
       expect({ id: t.id, same: other.cyan === legend.cyan && other.magenta === legend.magenta }).toEqual({ id: t.id, same: false });
     }
+  });
+});
+
+// ------------------------------------------------------------------ SHOP-2: titles
+
+describe('SHOP-2: titles can be owned, bought, equipped and are shown', () => {
+  const titleOf = (lvl) => LEVELS.levels.find((l) => l.level === lvl).title.toUpperCase();
+
+  test('every achievement reward (cosmetic or title) is a catalogue item', () => {
+    for (const a of ACHIEVEMENTS.filter((x) => x.reward)) {
+      if (a.reward.cosmetic) expect({ a: a.id, ok: SHOP_ITEMS.some((i) => i.id === a.reward.cosmetic) }).toEqual({ a: a.id, ok: true });
+      if (a.reward.title) {
+        expect({ a: a.id, ok: SHOP_ITEMS.some((i) => i.slot === 'title' && i.value === a.reward.title && i.grant === 'achievement') })
+          .toEqual({ a: a.id, ok: true });
+      }
+    }
+  });
+
+  test('an achievement title is owned only once the achievement granted it, and is never for sale', () => {
+    for (const id of ['title-cartographer', 'title-omniscient']) {
+      const it = SHOP_ITEMS.find((i) => i.id === id);
+      const lvl30 = v1({ xp: MAX_XP, bank: 99999 });
+      expect({ id, owned: isOwned(lvl30, id) }).toEqual({ id, owned: false });
+      expect(purchase(lvl30, id)).toBe(lvl30);
+      expect(equip(lvl30, id)).toBe(lvl30);
+      const granted = v1({ unlocked: { titles: [it.value] } });
+      expect({ id, owned: isOwned(granted, id) }).toEqual({ id, owned: true });
+      expect(equip(granted, id).equipped.title).toBe(it.value);
+    }
+  });
+
+  test('audit SHOP-2 (adapted): Static Rider is offered for 220 on the TITLES screen and can be bought and equipped', () => {
+    // The audit test looked for STATIC RIDER on the Profile panel; titles now have their own screen opened
+    // from Profile, so the same question is asked of that screen's layout.
+    const p = v1({ bank: 1000 });
+    const row = titlesLayout({ profile: p, levels: LEVELS }).rows.find((r) => r.id === 'title-static');
+    expect(row).toMatchObject({ label: 'STATIC RIDER', state: '220', disabled: false });
+    const after = equip(purchase(p, 'title-static'), 'title-static');
+    expect(after.bank).toBe(780);
+    expect(after.equipped.title).toBe('STATIC RIDER');
+  });
+
+  test('the TITLES screen lists the level title as DEFAULT and spells out every state', () => {
+    const p = v1({ xp: LEVELS.levels.find((l) => l.level === 3).xpMin, bank: 0, unlocked: { titles: ['CARTOGRAPHER'] } });
+    const L = titlesLayout({ profile: p, levels: LEVELS });
+    const by = Object.fromEntries(L.rows.filter((r) => r.id).map((r) => [r.id, r]));
+    expect(by.default).toMatchObject({ label: `LEVEL: ${titleOf(3)}`, state: 'EQUIPPED', disabled: false });
+    expect(by['title-rookie']).toMatchObject({ state: 'EQUIP', disabled: false });
+    expect(by['title-static']).toMatchObject({ state: '220', disabled: true }); // broke
+    expect(by['title-cartographer']).toMatchObject({ state: 'EQUIP', disabled: false });
+    expect(by['title-omniscient']).toMatchObject({ state: 'ACHIEVEMENT', disabled: true });
+    const eq = titlesLayout({ profile: equip(p, 'title-rookie'), levels: LEVELS });
+    const by2 = Object.fromEntries(eq.rows.filter((r) => r.id).map((r) => [r.id, r]));
+    expect(by2['title-rookie']).toMatchObject({ state: 'EQUIPPED', disabled: false });
+    expect(by2.default).toMatchObject({ state: 'EQUIP', disabled: false });
+    expect(titlesMenuItems(eq).length).toBe(eq.rows.length);
+  });
+
+  test('the TITLES screen fits: no overlaps, inside its panel, clear of BACK, on screen', () => {
+    const p = v1({ xp: MAX_XP, bank: 99999, unlocked: { titles: ['CARTOGRAPHER', 'OMNISCIENT'] } });
+    const L = titlesLayout({ profile: p, levels: LEVELS });
+    const ov = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const back = { x: L.w - 76, y: L.h - 22, w: 68, h: 16 };
+    expect(L.h).toBeLessThanOrEqual(270 - 22);
+    for (let i = 0; i < L.texts.length; i++) {
+      const t = L.texts[i];
+      expect({ k: t.key, ok: t.x >= 0 && t.y >= 0 && t.x + t.w <= L.w && t.y + t.h <= L.h && !ov(t, back) }).toEqual({ k: t.key, ok: true });
+      for (let j = i + 1; j < L.texts.length; j++) expect({ pair: `${t.key}/${L.texts[j].key}`, hit: ov(t, L.texts[j]) }).toEqual({ pair: `${t.key}/${L.texts[j].key}`, hit: false });
+    }
+  });
+
+  test('equippedTitle: the equipped title, or null for DEFAULT or an unknown value', () => {
+    expect(equippedTitle({ equipped: { title: 'STATIC RIDER' } })).toBe('STATIC RIDER');
+    expect(equippedTitle({ equipped: { title: 'title-rookie' } })).toBe('ROOKIE');
+    expect(equippedTitle({ equipped: { title: 'default' } })).toBeNull();
+    expect(equippedTitle({ equipped: { title: 'NOT A TITLE' } })).toBeNull();
+    expect(equippedTitle(null)).toBeNull();
+  });
+
+  test('the Title-screen badge shows the equipped title instead of the level title; DEFAULT shows the level title', () => {
+    const p = v1({ xp: LEVELS.levels.find((l) => l.level === 3).xpMin, bank: 1000 });
+    expect(titleBadgeLayout({ profile: p, levels: LEVELS }).items.map((i) => i.text)).toEqual(['SYNC LEVEL 3', titleOf(3)]);
+    const eq = equip(purchase(p, 'title-static'), 'title-static');
+    expect(titleBadgeLayout({ profile: eq, levels: LEVELS }).items.map((i) => i.text)).toEqual(['SYNC LEVEL 3', 'STATIC RIDER']);
+    expect(titleBadgeLayout({ profile: unequip(eq, 'title'), levels: LEVELS }).items.map((i) => i.text)).toEqual(['SYNC LEVEL 3', titleOf(3)]);
+  });
+
+  test('the Profile view shows the equipped title where the level title was', () => {
+    const p = v1({ xp: LEVELS.levels.find((l) => l.level === 3).xpMin, unlocked: { titles: ['OMNISCIENT'] } });
+    const text = (q) => profileLayout({ profile: q, levels: LEVELS, playableBiomeIds: [] }).items.find((i) => i.key === 'title').text;
+    expect(text(p)).toBe(titleOf(3));
+    expect(text(equip(p, 'title-omniscient'))).toBe('OMNISCIENT');
+  });
+
+  test('the Profile layout has a TITLES button in the bottom strip, clear of ACHIEVEMENTS, SHARD SHOP and BACK', () => {
+    const L = profileLayout({ profile: v1({}), levels: LEVELS, playableBiomeIds: [] });
+    const back = { x: PROFILE_PANEL.w - 76, y: PROFILE_PANEL.h - 22, w: 68, h: 16 };
+    const ov = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(L.titlesButton).toBeTruthy();
+    for (const b of [L.achButton, L.shopButton, back]) expect(ov(L.titlesButton, b)).toBe(false);
+    expect(L.titlesButton.x + L.titlesButton.w).toBeLessThanOrEqual(PROFILE_PANEL.w);
+    expect(L.titlesButton.x).toBeGreaterThan(L.shopButton.x); // left to right: ACHIEVEMENTS, SHOP, TITLES, BACK
   });
 });

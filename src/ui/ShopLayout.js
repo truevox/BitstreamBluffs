@@ -18,6 +18,7 @@
  */
 import { measureText } from './PixelFont.js';
 import { SHOP_ITEMS, isOwned } from '../systems/ProfileStore.js';
+import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 
 /** Shop panel: wide enough for "NAME .......... 120" with the price right-aligned. */
 export const SHOP_PANEL = Object.freeze({ w: 416, h: 236 });
@@ -258,3 +259,97 @@ export function shopMenuItems(layout) {
 }
 
 export { ROW_H as SHOP_ROW_H, GLYPH_H as SHOP_GLYPH_H };
+
+// ---- SHOP-2: the TITLES screen (opened from the Profile view) -----------------------------------------
+
+/** TITLES panel: narrower than the shop, one row per title plus the level-title DEFAULT row. */
+export const TITLES_PANEL = Object.freeze({ w: 300 });
+
+/**
+ * The TITLES screen as one ordered list of rows, the same single-list rule as the shop.
+ *
+ * Rows: the BANK head; a DEFAULT row that names the level title ("LEVEL: PACKET JOCKEY") and puts the slot
+ * back to DEFAULT; then one row per catalogue title. States are spelled out: EQUIPPED, EQUIP, a price,
+ * ACHIEVEMENT (an achievement title not earned yet) or LVL n. Selecting EQUIPPED returns to DEFAULT, as
+ * in the shop (SHOP-3).
+ *
+ * @param {{profile?:Object, levels?:Object}} o
+ * @returns {{w:number,h:number,rows:Array,texts:Array,rowH:number,band:{x:number,y:number,w:number},bankText:string,firstSelectable:number}}
+ */
+export function titlesLayout(o = {}) {
+  const profile = o.profile || {};
+  const equipped = (profile.equipped && typeof profile.equipped === 'object') ? profile.equipped : {};
+  const bank = Number.isFinite(profile.bank) ? profile.bank : 0;
+  const table = loadLevelTable(o.levels);
+  const level = levelForXp(Number(profile.xp) || 0, table);
+  const entry = table.levels.find((e) => e.level === level) || { title: '' };
+  const rows = [];
+  const texts = [];
+  const bankText = `BANK ${bank}`;
+  rows.push({ kind: 'head', key: 'head', right: bankText });
+
+  const items = SHOP_ITEMS.filter((i) => i && i.slot === 'title');
+  const anyEquipped = items.some((it) => equipped.title === it.id || equipped.title === it.value);
+  rows.push({
+    kind: 'default', key: 'title-default', id: 'default', label: `LEVEL: ${upper(entry.title)}`,
+    state: anyEquipped ? 'EQUIP' : 'EQUIPPED', equipped: !anyEquipped, disabled: false,
+  });
+  for (const it of items) {
+    const owned = isOwned(profile, it.id);
+    const isEquipped = equipped.title === it.id || equipped.title === it.value;
+    const locked = !owned && it.grant !== 'achievement' && level < (it.unlockLevel || 1);
+    let state;
+    if (isEquipped) state = 'EQUIPPED';
+    else if (owned) state = 'EQUIP';
+    else if (it.grant === 'achievement') state = 'ACHIEVEMENT';
+    else if (locked) state = `LVL ${it.unlockLevel}`;
+    else state = String(it.price);
+    const buyable = !owned && it.price > 0 && !locked && bank >= it.price;
+    rows.push({
+      kind: 'item', key: `title-${it.id}`, id: it.id, label: upper(it.name), state, owned, equipped: isEquipped,
+      locked, price: it.price, disabled: !isEquipped && !owned && !buyable,
+    });
+  }
+
+  let y = 8;
+  let firstSelectable = -1;
+  rows.forEach((r, i) => {
+    r.y = y;
+    r.index = i;
+    if (r.kind === 'head') {
+      const bw = measureText(r.right);
+      r.texts = [{ key: 'head-right', text: r.right, x: TITLES_PANEL.w - PAD - bw, y, w: bw, h: GLYPH_H, color: 'amber' }];
+    } else {
+      if (firstSelectable < 0) firstSelectable = i;
+      const rw = measureText(r.state);
+      r.texts = [
+        { key: `${r.key}-label`, text: r.label, x: PAD + 6, y, w: measureText(r.label), h: GLYPH_H, color: r.equipped ? 'lime' : 'text' },
+        { key: `${r.key}-right`, text: r.state, x: TITLES_PANEL.w - PAD - 6 - rw, y, w: rw, h: GLYPH_H,
+          color: r.equipped ? 'cyan' : (r.owned ? 'lime' : 'amber') },
+      ];
+    }
+    for (const t of r.texts) texts.push(t);
+    y += ROW_H;
+  });
+  return {
+    w: TITLES_PANEL.w,
+    h: y + 30,
+    rows,
+    texts,
+    rowH: ROW_H,
+    band: { x: PAD - 6, y: 8, w: TITLES_PANEL.w - (PAD - 6) * 2 },
+    bankText,
+    firstSelectable,
+  };
+}
+
+/**
+ * MenuList items for the TITLES screen: the same rows in the same order. The view attaches onSelect.
+ * @param {Object} layout @returns {Array<Object>}
+ */
+export function titlesMenuItems(layout) {
+  return layout.rows.map((r) => {
+    if (r.kind === 'head') return { kind: 'static', label: '', rowKind: 'head', disabled: true };
+    return { kind: 'action', rowKind: r.kind, id: r.id, label: r.label, sub: r.state, disabled: r.disabled, onSelect: null };
+  });
+}

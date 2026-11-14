@@ -199,6 +199,26 @@
       "price": 220,
       "unlockLevel": 1,
       "value": "STATIC RIDER"
+    },
+    {
+      "id": "title-cartographer",
+      "kind": "title",
+      "slot": "title",
+      "name": "Cartographer",
+      "price": 0,
+      "unlockLevel": 1,
+      "value": "CARTOGRAPHER",
+      "grant": "achievement"
+    },
+    {
+      "id": "title-omniscient",
+      "kind": "title",
+      "slot": "title",
+      "name": "Omniscient",
+      "price": 0,
+      "unlockLevel": 1,
+      "value": "OMNISCIENT",
+      "grant": "achievement"
     }
   ]
 }

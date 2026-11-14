@@ -112,7 +112,8 @@ export class TitleScene extends Phaser.Scene {
           // would make Escape a two-screen jump — the player pressed back once and lost their place,
           // and a keys-only player had no way to tell what had happened.
           const openProfile = () => this._openView(new ProfileView(this, theme, {
-            onClose: () => this._closeView(),
+            // SHOP-2: a title equipped inside Profile -> TITLES changes the badge, so redraw it on the way out.
+            onClose: () => { this._closeView(); this._refreshLevelBadge(); },
             onShop: () => this._openView(new ShopView(this, theme, { onClose: () => { openProfile(); } })),
           }));
           openProfile();
@@ -153,6 +154,15 @@ export class TitleScene extends Phaser.Scene {
       const t = new NeonText(this, theme, it.x, it.y, it.text, { color: it.color, outline: it.outline, alpha: it.alpha });
       this.levelBadge.push(t);
     }
+  }
+
+  /** Redraw the level badge from the current profile (SHOP-2: the equipped title replaces the level title). */
+  _refreshLevelBadge() {
+    for (const t of this.levelBadge || []) {
+      try { t.destroy(); } catch (e) { /* already gone */ }
+    }
+    this.levelBadge = [];
+    this._buildLevelBadge();
   }
 
   _buildControls() {

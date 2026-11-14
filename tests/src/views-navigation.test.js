@@ -147,7 +147,7 @@ jest.unstable_mockModule('../../src/data/index.js', () => ({ content: {}, loadCo
 const { REG, GAME_WIDTH, GAME_HEIGHT } = await import('../../src/constants.js');
 const { Theme } = await import('../../src/ui/Theme.js');
 const Views = await import('../../src/ui/Views.js');
-const { ProfileView, AchievementsView, ShopView, LeaderboardView } = Views;
+const { ProfileView, AchievementsView, ShopView, LeaderboardView, TitlesView } = Views;
 const { MenuList } = await import('../../src/ui/MenuList.js');
 const { TitleScene } = await import('../../src/scenes/TitleScene.js');
 const { copyText } = await import('../../src/ui/Clipboard.js');
@@ -750,5 +750,84 @@ describe('SHOP-5: Theme applies the equipped UI theme', () => {
     expect(view.theme.pal.cyan).not.toBe(before);
     view._choose('theme-legend'); // confirm on EQUIPPED -> DEFAULT (SHOP-3)
     expect(view.theme.pal.cyan).toBe(before);
+  });
+});
+
+// ================================================================== SHOP-2: titles, by keyboard / pad
+
+describe('SHOP-2: TITLES opens from Profile and buys / equips by keys', () => {
+  const lvl3 = (bank = 500, extra = {}) => ({ ...defaultProfile(), xp: LEVELS.levels.find((l) => l.level === 3).xpMin, level: 3, bank, ...extra });
+  const toTarget = (prof, kind) => {
+    for (let n = 0; n < 40 && (prof._focusTargets()[prof.focusIdx] || {}).kind !== kind; n++) prof.handleAction('down');
+    return (prof._focusTargets()[prof.focusIdx] || {}).kind === kind;
+  };
+
+  test('first focus on Profile still lands on SHARD SHOP when there are no toggle rows', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3() });
+    const prof = openProfile(t);
+    prof.handleAction('down'); // the first action only places focus
+    expect(prof._focusTargets()[prof.focusIdx].kind).toBe('buy');
+  });
+
+  test('down reaches TITLES, confirm opens the TITLES view, Static Rider buys and equips by keys', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3() });
+    const prof = openProfile(t);
+    expect(toTarget(prof, 'titles')).toBe(true);
+    prof.handleAction('confirm');
+    const v = t.view;
+    expect(v).toBeInstanceOf(TitlesView);
+    for (let n = 0; n < 20 && v.menu.items[v.menu.selected].id !== 'title-static'; n++) v.handleAction('down');
+    expect(v.menu.items[v.menu.selected].id).toBe('title-static');
+    v.handleAction('confirm');
+    const p = t.registry.get(REG.PROFILE);
+    expect(p.bank).toBe(280);
+    expect(p.equipped.title).toBe('STATIC RIDER');
+    expect(texts(v.panel)).toContain('BANK 280');
+    expect(v.menu.items[v.menu.selected].sub).toBe('EQUIPPED');
+  });
+
+  test('BACK from TITLES returns to Profile, which shows the equipped title; confirm on EQUIPPED restores the level title', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3(0, { unlocked: { ...defaultProfile().unlocked, titles: ['CARTOGRAPHER'] } }) });
+    const prof = openProfile(t);
+    prof.titlesButton.zone.emit('pointerdown');
+    let v = t.view;
+    for (let n = 0; n < 20 && v.menu.items[v.menu.selected].id !== 'title-cartographer'; n++) v.handleAction('down');
+    v.handleAction('confirm');
+    v.handleAction('cancel');
+    expect(t.view).toBeInstanceOf(ProfileView);
+    expect(texts(t.view.panel)).toContain('CARTOGRAPHER');
+    expect(v.panel).toBe(null); // the TITLES view is destroyed, not pinned over the menu
+    expect(v.alive).toBe(false);
+    t.view.titlesButton.zone.emit('pointerdown');
+    v = t.view;
+    for (let n = 0; n < 20 && v.menu.items[v.menu.selected].id !== 'title-cartographer'; n++) v.handleAction('down');
+    v.handleAction('confirm'); // EQUIPPED -> DEFAULT
+    expect(t.registry.get(REG.PROFILE).equipped.title).toBe('default');
+    v.handleAction('cancel');
+    expect(texts(t.view.panel)).toContain(LEVELS.levels[2].title.toUpperCase());
+  });
+
+  test('the Title badge redraws with the equipped title when Profile closes', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3() });
+    t._buildLevelBadge();
+    const badge = () => t.levelBadge.map((b) => texts(b)[0]); // NeonText draws shadow + fill: read one
+    expect(badge()).toContain(LEVELS.levels[2].title.toUpperCase());
+    const prof = openProfile(t);
+    prof.titlesButton.zone.emit('pointerdown');
+    t.view._choose('title-static');
+    t.view.handleAction('cancel'); // back to Profile
+    t.view.handleAction('cancel'); // back to Title
+    expect(t.view).toBe(null);
+    expect(badge()).toContain('STATIC RIDER');
+    expect(badge()).not.toContain(LEVELS.levels[2].title.toUpperCase());
+  });
+
+  test('a locked achievement title cannot be equipped by any key', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3(99999) });
+    openProfile(t).titlesButton.zone.emit('pointerdown');
+    const v = t.view;
+    for (let n = 0; n < 20; n++) { v.handleAction('confirm'); v.handleAction('down'); }
+    expect(['default', 'ROOKIE', 'STATIC RIDER']).toContain(t.registry.get(REG.PROFILE).equipped.title);
+    expect(v.menu.items.find((i) => i.id === 'title-omniscient').disabled).toBe(true);
   });
 });

@@ -54,6 +54,9 @@ export const COSMETIC_ITEMS = Object.freeze([
   { id: 'theme-legend', kind: 'theme', slot: 'theme', name: 'Legend Theme', price: 0, unlockLevel: 30, value: 'legend' },
   { id: 'title-rookie', kind: 'title', slot: 'title', name: 'Rookie', price: 0, unlockLevel: 1, value: 'ROOKIE' },
   { id: 'title-static', kind: 'title', slot: 'title', name: 'Static Rider', price: 220, unlockLevel: 1, value: 'STATIC RIDER' },
+  // Achievement titles (W5 rewards). Owned only when the achievement wrote `value` into unlocked.titles.
+  { id: 'title-cartographer', kind: 'title', slot: 'title', name: 'Cartographer', price: 0, unlockLevel: 1, value: 'CARTOGRAPHER', grant: 'achievement' },
+  { id: 'title-omniscient', kind: 'title', slot: 'title', name: 'Omniscient', price: 0, unlockLevel: 1, value: 'OMNISCIENT', grant: 'achievement' },
 ].map((i) => Object.freeze(i)));
 
 /**
@@ -255,4 +258,18 @@ export function themedUiPalette(baseHex, profile, o = {}) {
     if (typeof ui[k] === 'string' && /^#[0-9a-fA-F]{6}$/.test(ui[k])) out[k] = ui[k];
   }
   return out;
+}
+
+/**
+ * The title a profile has equipped, as drawn text, or null for DEFAULT (audit SHOP-2). Pure.
+ *
+ * Callers show this in place of the level title, and the level title when it is null. An equipped value
+ * this build does not know (a hand edit, a removed title) is null, so the badge falls back rather than
+ * printing junk.
+ * @param {Object|null} profile @returns {string|null}
+ */
+export function equippedTitle(profile) {
+  const eq = (profile && profile.equipped && typeof profile.equipped === 'object') ? profile.equipped : {};
+  const entry = cosmeticInSlot('title', eq.title);
+  return entry ? entry.value : null;
 }

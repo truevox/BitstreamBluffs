@@ -11,6 +11,7 @@
 import { measureText } from './PixelFont.js';
 import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 import { fmtInt, fmtSec, fmtClock, idToLabel } from './Format.js';
+import { equippedTitle } from '../systems/Cosmetics.js';
 
 /**
  * PROFILE view panel size. Taller than the leaderboard because it carries 10 stats and 11 signatures.
@@ -120,7 +121,8 @@ export function profileLayout(o = {}) {
   const items = [];
   // Sync Level row: level + the title earned at that level.
   items.push(box('level', `SYNC LEVEL ${level}`, PAD, 24, 'lime'));
-  items.push(box('title', String(entry.title || '').toUpperCase(), RIGHT, 24, 'text', { align: 'right', alpha: 0.85 }));
+  // SHOP-2: an equipped title replaces the level title; DEFAULT shows the level title.
+  items.push(box('title', equippedTitle(p) || String(entry.title || '').toUpperCase(), RIGHT, 24, 'text', { align: 'right', alpha: 0.85 }));
   // XP row: figure, Resonance bar, and what is left to the next level.
   items.push(box('xp', `XP ${fmtInt(xp)}`, PAD, 36, 'amber'));
   const bar = { x: 96, y: 36, w: 190, h: 7, ratio, color: ratio >= 1 ? 'amber' : 'lime' };
@@ -234,13 +236,15 @@ export function profileLayout(o = {}) {
   const BTN_Y = PROFILE_PANEL.h - 22;
   const achButton = { x: PAD, y: BTN_Y, w: 96, h: 16 };
   const shopButton = { x: PAD + 96 + 8, y: BTN_Y, w: 96, h: 16 };
+  // SHOP-2: TITLES opens the title picker. Third in the strip (x 220..316), still clear of BACK at x 340.
+  const titlesButton = { x: PAD + (96 + 8) * 2, y: BTN_Y, w: 96, h: 16 };
 
   // Physical rows the menu occupies: with two columns that is the taller column, not the row count, which
   // is what the overlap test has to measure.
   const togglePhysicalRows = sigCount ? TOGGLE_ROWS_PER_COL : 0;
   return {
     w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu,
-    toggleRowCount: sigCount, togglePhysicalRows, achButton, achUnlocked, achTotal, shopButton,
+    toggleRowCount: sigCount, togglePhysicalRows, achButton, achUnlocked, achTotal, shopButton, titlesButton,
   };
 }
 
@@ -259,7 +263,8 @@ export function titleBadgeLayout(o = {}) {
   const entry = table.levels.find((e) => e.level === level) || { title: '' };
   const items = [
     box('badge-level', `SYNC LEVEL ${level}`, TITLE_BADGE.x, TITLE_BADGE.y, 'lime', { outline: 'dark' }),
-    box('badge-title', String(entry.title || '').toUpperCase(), TITLE_BADGE.x, TITLE_BADGE.y + TITLE_BADGE.lineH, 'text', { outline: 'dark', alpha: 0.85 }),
+    // SHOP-2: the equipped title, else the level title.
+    box('badge-title', equippedTitle(p) || String(entry.title || '').toUpperCase(), TITLE_BADGE.x, TITLE_BADGE.y + TITLE_BADGE.lineH, 'text', { outline: 'dark', alpha: 0.85 }),
   ];
   return { level, items };
 }
