@@ -93,3 +93,54 @@ describe('BF-1: backfill credits runs oldest first', () => {
     expect(copy.map((r) => r.id)).toEqual(['new', 'mid', 'old']);
   });
 });
+
+describe('LVL-1: a level crossed by mission XP is announced like one crossed by run XP', () => {
+  function serviceWithMissionXp(missionXp) {
+    const game = fakeGame();
+    const store = new ProfileStore({ levels: LEVELS, storage: memStorage() });
+    const svc = new ProgressionService(game, {
+      levels: LEVELS, store,
+      missions: {
+        onRunCredited: () => {
+          store.applyMissions({ active: [], counter: 1, progress: {}, xp: missionXp, shards: 0 });
+          return { completed: missionXp ? [{ id: 'm' }] : [], xp: missionXp, shards: 0 };
+        },
+      },
+    });
+    return { game, store, svc };
+  }
+
+  test('a level crossed by mission XP is announced on Game Over with its reward', async () => {
+    const { game, store, svc } = serviceWithMissionXp(60);
+    await svc.init();
+    // 500 m = 50 XP; 50 + 60 mission XP = 110 >= 100 (Sync Level 2).
+    game.events.emit(EVT.RUN_END, { record: rec({ distanceM: 500 }) });
+    const view = game.registry.get(REG.LAST_AWARDS);
+    expect(store.profile.level).toBe(2);
+    expect(view.progress.level).toBe(2);
+    expect({ levelBefore: view.levelBefore, levelAfter: view.levelAfter, leveledTo: view.leveledTo, rewards: view.rewardsEarned.map((r) => r.cosmetic) })
+      .toEqual({ levelBefore: 1, levelAfter: 2, leveledTo: 2, rewards: ['trail-cyan'] });
+    expect(view.rewards).toMatchObject({ cosmetic: 'trail-cyan' });
+    expect(view.earnedCosmetics).toEqual(['trail-cyan']);
+  });
+
+  test('run XP and mission XP crossing two levels list both rewards', async () => {
+    const { game, svc } = serviceWithMissionXp(1150);
+    await svc.init();
+    // 1000 m = 100 XP (level 2), + 1150 mission XP = 1250: past level 3's threshold as well.
+    game.events.emit(EVT.RUN_END, { record: rec({ distanceM: 1000 }) });
+    const view = game.registry.get(REG.LAST_AWARDS);
+    const lv3 = LEVELS.levels[2];
+    expect(1250 >= lv3.xpMin).toBe(true);
+    expect(view.leveledTo).toBe(3);
+    expect(view.rewardsEarned.map((r) => r.level)).toEqual([2, 3]);
+  });
+
+  test('a run with no level-up and no mission XP still reports no level-up', async () => {
+    const { game, svc } = serviceWithMissionXp(0);
+    await svc.init();
+    game.events.emit(EVT.RUN_END, { record: rec({ distanceM: 100 }) });
+    const view = game.registry.get(REG.LAST_AWARDS);
+    expect({ leveledTo: view.leveledTo, rewards: view.rewards, earned: view.rewardsEarned }).toEqual({ leveledTo: 0, rewards: null, earned: [] });
+  });
+});

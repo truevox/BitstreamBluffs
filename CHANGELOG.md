@@ -38,6 +38,7 @@
 - **SHOP-1:** the shop autoprompt and the `SHOP: B` hint ignore title items (`slot === 'title'`), which the Shard Shop hides until a title UI exists, so they no longer fire over a 220-shard title the player cannot see.
 - **F9:** removed the dead `missions.ruleId` plumbing (the `applyMissions` writer and the two `MissionsService` readers). Nothing produced a rule id, the sanitizer dropped it, and no template uses `excludedRuleIds`; the pure `excludedRuleIds` filter in `Missions.js` stays for a future caller.
 - **BOOT-1:** `MissionsService.init` republishes `REG.PROFILE` after it fills the mission slots, so a boost toggle before the first run no longer saves the pre-draw profile and wipes the missions.
+- **LVL-1:** the Game Over awards view measures the level-up from before the run to after mission XP, so a level crossed by mission XP gets the same level-up line, `leveledTo` and `rewardsEarned` entry as one crossed by run XP.
 
 ## v2.4.0 - unreleased (W3 Biomes batch 1)
 

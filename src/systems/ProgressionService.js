@@ -128,17 +128,25 @@ export class ProgressionService {
     const levelXp = table.levels[level - 1] ? table.levels[level - 1].xpMin : 0;
     const nextXp = level < table.cap ? table.levels[level].xpMin : levelXp;
     const rw = rewardsForLevel(level, table);
+    // LVL-1: the level-up is measured from before the run to the profile AFTER missions folded their XP in,
+    // not taken from credit() alone. A threshold crossed by mission XP used to raise the level silently: no
+    // level-up line, no reward line, even though applyMissions granted the reward. Same shape as creditRun.
+    const levelBefore = awards ? awards.levelBefore : level;
+    const leveledTo = awards && level > levelBefore ? level : 0;
+    const rewards = leveledTo ? rewardsForLevel(leveledTo, table) : null;
+    // Every level crossed by THIS run, not just the last one: a big run can jump L1 -> L3 and the L2 reward
+    // (e.g. trail-cyan) is still earned. Game Over lists all of them.
+    const rewardsEarned = leveledTo
+      ? table.levels.filter((e) => e.level > levelBefore && e.level <= leveledTo).map((e) => rewardsForLevel(e.level, table))
+      : [];
     return {
       xp: awards ? awards.xp : { total: 0, parts: [] },
-      levelBefore: awards ? awards.levelBefore : level,
-      levelAfter: awards ? awards.levelAfter : level,
-      leveledTo: awards ? awards.leveledTo : 0,
-      rewards: awards ? awards.rewards : null,
-      // Every level crossed by THIS run, not just the last one: a big run can jump L1 -> L3 and the
-      // L2 reward (e.g. trail-cyan) is still earned. Forwarded so Game Over can list all of them;
-      // without this the rewards loop there reads undefined and silently drops prizes.
-      rewardsEarned: awards && Array.isArray(awards.rewardsEarned) ? awards.rewardsEarned : [],
-      title: awards ? awards.title : rw.title,
+      levelBefore,
+      levelAfter: level,
+      leveledTo,
+      rewards,
+      rewardsEarned,
+      title: rewards ? rewards.title : (awards ? null : rw.title),
       credited: Boolean(awards),
       // Resonance bar: XP progress inside the current level.
       progress: {
@@ -150,8 +158,8 @@ export class ProgressionService {
         ratio: nextXp > levelXp ? Math.min(1, Math.max(0, (p.xp - levelXp) / (nextXp - levelXp))) : 1,
       },
       record: record ? { id: record.id, seed: record.seed } : null,
-      earnedCosmetics: awards && awards.rewards && awards.rewards.cosmetic ? [awards.rewards.cosmetic] : [],
-      pendingBiomes: awards && awards.rewards && awards.rewards.biome ? [awards.rewards.biome] : [],
+      earnedCosmetics: rewards && rewards.cosmetic ? [rewards.cosmetic] : [],
+      pendingBiomes: rewards && rewards.biome ? [rewards.biome] : [],
       // W5: achievements unlocked BY THIS RUN, so Game Over can announce them. Forwarded from the credit
       // result rather than re-read from the profile, which would include unlocks from earlier sessions and
       // re-announce them on every run.
