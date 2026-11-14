@@ -46,13 +46,20 @@ function ownedHere(state, item) {
 /**
  * Is `item` buyable from this state? Mirrors `purchase()`'s refusals in its order — unknown/absent item,
  * already owned, level too low, not enough shards — plus `price > 0`, because a price-0 item is a level
- * reward and is never something to buy.
+ * reward and is never something to buy, plus "the shop shows it" (titles are hidden until a title UI
+ * exists, SHOP-1). The prompt may therefore say "nothing" where purchase() would still buy a title; it
+ * never says "something" where the panel has nothing to offer.
  * @param {{bank:number, level:number, owned:Array<string>}} state
  * @param {Object} item
  * @returns {boolean}
  */
 function buyableHere(state, item) {
   if (!item || !item.id) return false;
+  // Only what the Shard Shop actually shows can be "affordable". Titles have no UI yet, so ShopLayout drops
+  // `slot === 'title'` from the panel; counting them here opened the shop (and lit "SHOP: B") over a
+  // 220-shard title the player could not see. Same field as ShopLayout's filter, so the two cannot drift.
+  // Remove this line when a title UI ships.
+  if (item.slot === 'title') return false;
   const price = num(item.price);
   if (price <= 0) return false;
   if (ownedHere(state, item)) return false;
