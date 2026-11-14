@@ -708,3 +708,36 @@ view are both torn down on shutdown, so nothing fires into a scene that is gone.
 Boosts have no price in this economy — they are level rewards toggled in the shop, not bought — so there is
 nothing for that clause to match. Inventing a price would be a new economy decision, which is Marvin's, not
 this workstream's.
+
+## Addendum: W6 biome backdrops (audit T1, additive)
+
+Every biome file's `background` id must name an entry in `Background.MOTIFS`;
+`tests/src/biome-background.test.js` reads the biome files to check this, so a new biome that names a
+motif which does not exist fails the suite. Before this fix, the six W6 biomes fell back to base ridges.
+`MOTIFS` now has 11 ids. Each W6 id adds a silhouette shape and a decor pass:
+
+| motif | biome | silhouette shape | decor |
+|---|---|---|---|
+| `stars` | Space Mountain | `crater` | starfield (twinkles) and a ringed planet |
+| `candy-stripes` | Candy Cane Canyon | `gumdrop` | candy-stripe sky, canes (far ridge), lollipops (near ridge) |
+| `jellyfish` | Sky Jellyfish Mountain | `cloud` | drifting, pulsing jellyfish with swaying tendrils |
+| `brass-pipes` | Steampunk Slopes | `works` | turning gears behind the roofline, a brass pipe run |
+| `dew-drops` | Micro Mountain | `moss` | grass blades with big dew drops that glint |
+| `vents` | Vertigo Vents | `cone` | an amber glow at each vent mouth and a rising smoke plume |
+
+New pure exports in `entities/Background.js`. Both are additive; `motifGeometry` is unchanged.
+* `motifProfile(shape, wx, seed) -> number`: the layer height sample. `Background._profile` delegates to it.
+  The batch-1 shapes and `peak` give the same values as before.
+* `motifDecor(motif, scrollX, timeMs = 0, seed = 0) -> ReadonlyArray<primitive>`: the decor primitives
+  (`poly`, `line`, `circle`, `rect`). Each primitive has a palette colour **key** and a `depth`:
+  -1 = sky, k = drawn right after silhouette layer k. The decor is a pure function of its arguments.
+  The layout comes from a seeded mulberry32, and the animation comes only from `timeMs` (scene time).
+  `Background` uses `decorSeed = 0`, so one biome looks the same in every run.
+  It returns `[]` for the base backdrop and the five batch-1 motifs, so their draw calls are unchanged.
+
+Rules (the tests enforce them):
+* Decor never uses the `danger` key, so only hazards use the hazard colour. The renderer test records
+  real draw calls with a sentinel `danger` value.
+* Decor stays inside 480x270, with an overhang of up to 96 px at the left and right edges only.
+* Each frame is still redrawn into one Graphics. A W6 frame makes at most 2.5x the draw calls of the
+  base backdrop (2.1x was measured for `candy-stripes`, the most expensive).
