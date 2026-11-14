@@ -20,7 +20,7 @@ import { profileLayout } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
 import { ACHIEVEMENTS } from '../systems/Achievements.js';
 import { shopLayout, shopMenuItems } from './ShopLayout.js';
-import { toggleBiome, biomeToggleRows, purchase, equip, isOwned } from '../systems/ProfileStore.js';
+import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopItem } from '../systems/ProfileStore.js';
 
 /** Base: centred panel with a BACK button. */
 class View {
@@ -767,7 +767,7 @@ export class ShopView extends View {
   _menuItems(layout) {
     return shopMenuItems(layout).map((m) => {
       if (m.rowKind === 'item') {
-        return { kind: 'action', label: m.label, sub: m.sub, disabled: m.disabled, onSelect: () => this._choose(m.id) };
+        return { kind: 'action', id: m.id, label: m.label, sub: m.sub, disabled: m.disabled, onSelect: () => this._choose(m.id) };
       }
       if (m.rowKind === 'boost') {
         return {
@@ -815,11 +815,23 @@ export class ShopView extends View {
   /**
    * Buy-or-equip, atomically. A refused purchase leaves the profile untouched: `purchase` returns the same
    * object by identity when it declines, which is how that is detected without duplicating its rules here.
+   *
+   * Selecting the row that is already EQUIPPED takes it off: the slot goes back to DEFAULT (SHOP-3). That
+   * is the only way back to the default look, so it is the same one-action-per-row rule run in reverse.
    */
   _choose(id) {
     const prof = this._profile();
     let next = prof;
     try {
+      const item = shopItem(id);
+      const eq = (prof.equipped && typeof prof.equipped === 'object') ? prof.equipped : {};
+      if (item && isOwned(prof, id) && (eq[item.slot] === item.value || eq[item.slot] === id)) {
+        uiSfx(this.scene, 'uiBack');
+        next = unequip(prof, item.slot);
+        this.scene.registry.set(REG.PROFILE, this.store ? this.store.save(next) : next);
+        this._refresh();
+        return;
+      }
       if (!isOwned(prof, id)) {
         const bought = purchase(prof, id);
         if (bought === prof) { uiSfx(this.scene, 'uiBack'); return; }

@@ -177,9 +177,12 @@ describe('shopMenuItems — the menu IS the layout', () => {
     expect(labels).toContain('TRAIL');
   });
 
-  test('an equipped item cannot be re-selected, so EQUIP is not a no-op', () => {
+  test('an equipped item is selectable: selecting it returns the slot to DEFAULT (audit SHOP-3)', () => {
+    // This used to pin `disabled: true`, which the post-sprint audit (SHOP-3) found to be the defect: with
+    // the equipped row skipped there was no way back to the default look. ShopView unequips on select.
     const ember = shopMenuItems(shopLayout({ profile: PROFILE })).find((m) => m.id === 'trail-hue-ember');
-    expect(ember.disabled).toBe(true);
+    expect(ember.disabled).toBe(false);
+    expect(ember.sub).toBe('EQUIPPED');
   });
 
   test('an owned, un-equipped item is selectable', () => {

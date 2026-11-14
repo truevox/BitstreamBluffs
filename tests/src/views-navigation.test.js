@@ -517,3 +517,50 @@ describe('UI-1: the leaderboard footer fits at 480x270', () => {
     }
   });
 });
+
+// ================================================================== SHOP-3: back to DEFAULT
+
+/** A ShopView on a bare scene stub, the way the Title and Game Over hosts open it. */
+function shopHost(profile) {
+  const s = makeScene(null, { [REG.PROFILE]: profile });
+  const theme = new Theme(s);
+  return { s, view: new ShopView(s, theme, { onClose: () => {} }) };
+}
+const focusItem = (view, pred) => {
+  const idx = view.menu.items.findIndex(pred);
+  expect(idx).toBeGreaterThanOrEqual(0);
+  view.menu.setSelected(idx, true);
+  return idx;
+};
+
+describe('SHOP-3: the shop offers a way back to DEFAULT', () => {
+  const equippedEmber = () => ({
+    ...defaultProfile(), bank: 0,
+    unlocked: { biomes: [], cosmetics: ['trail-hue-ember'], titles: [], boosts: {} },
+    equipped: { ...defaultProfile().equipped, trail: 'ember' },
+  });
+
+  test('SHOP-3: the equipped row takes focus and confirm returns the slot to DEFAULT; confirm again re-equips', () => {
+    const { s, view } = shopHost(equippedEmber());
+    focusItem(view, (i) => i.id === 'trail-hue-ember');
+    view.handleAction('confirm');
+    expect(s.registry.get(REG.PROFILE).equipped.trail).toBe('default');
+    expect(texts(view.panel).some((x) => /TRAIL DEFAULT/.test(x))).toBe(true);
+    // The row is still there, now offering EQUIP, and focus stayed on it.
+    const again = view.menu.items[view.menu.selected];
+    expect(again.id).toBe('trail-hue-ember');
+    expect(again.sub).toBe('EQUIP');
+    view.handleAction('confirm');
+    expect(s.registry.get(REG.PROFILE).equipped.trail).toBe('ember');
+  });
+
+  test('SHOP-3: keyboard focus can reach the equipped row (it is no longer skipped)', () => {
+    const { view } = shopHost(equippedEmber());
+    const seen = new Set();
+    for (let i = 0; i < view.menu.items.length + 2; i++) {
+      seen.add(view.menu.items[view.menu.selected].id);
+      view.handleAction('down');
+    }
+    expect(seen.has('trail-hue-ember')).toBe(true);
+  });
+});

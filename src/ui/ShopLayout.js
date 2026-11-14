@@ -92,10 +92,14 @@ export function shopLayout(o = {}) {
     else if (locked) state = `LVL ${it.unlockLevel}`;
     else state = it.price > 0 ? String(it.price) : 'REWARD';
 
+    // SHOP-3: the EQUIPPED row is selectable, and selecting it returns the slot to DEFAULT (the view calls
+    // ProfileStore.unequip). It used to be disabled, so focus skipped it and nothing on screen could ever
+    // take a cosmetic back off. A separate DEFAULT row per slot would be four more rows, and this panel is
+    // already the full height of the canvas.
     rows.push({
       kind: 'item', key: `item-${it.id}`, id: it.id, slot: it.slot, label: upper(it.name), state,
       owned, equipped: isEquipped, locked, affordable, price: it.price,
-      disabled: locked || isEquipped || (!owned && !affordable),
+      disabled: !isEquipped && (locked || (!owned && !affordable)),
     });
   }
 
