@@ -776,8 +776,12 @@ export class TerrainGenerator {
         target.zones.push({ modId: 'wirelessBridge', x0: Math.max(startX + SPACING_PX, padC - 56), x1: Math.min(target.endX - SPACING_PX, x1 + 48) });
       }
     } else {
-      this._placeZones(target, def, crng.fork('zone'), distM, L);
-      if (biomeDef) this._placeBiomeZone(target, biomeDef, crng.fork('biomeZone'), distM);
+      // E7 (Marvin 2026-11-14, audit TERRAIN-1): a chunk that hosts a biome zone gets NO template zone, so the biome's
+      // mechanic is never multiplied into its opposite (stickyPatch x highBandwidth = slippery). The biome zone is placed
+      // first only to know whether it landed; both passes draw from their own forks, so the order moves no stream, and a
+      // base chunk (biomeDef null, every mask-0 chunk) runs _placeZones exactly as before.
+      const hosted = biomeDef ? this._placeBiomeZone(target, biomeDef, crng.fork('biomeZone'), distM) : false;
+      if (!hosted) this._placeZones(target, def, crng.fork('zone'), distM, L);
     }
     const vExp = expectedSpeedPxS(distM);
     const lips = kind === 'bridge' ? this._padLips(target, vExp) : this._findLips(target.points, isJump ? Math.min(vExp, JUMP_LAUNCH_SPEED_PX_S) : vExp * TEMPLATE_LIP_SPEED_MUL, target.endX);
@@ -1156,18 +1160,20 @@ export class TerrainGenerator {
    * @param {{id:string, mod:string}} biomeDef
    * @param {import('./Rng.js').Rng} rng
    * @param {number} distM
+   * @returns {boolean} true when a biome zone was placed (E7: the chunk then gets no template zone).
    */
   _placeBiomeZone(chunk, biomeDef, rng, distM) {
     const m = this.modMap[biomeDef.mod];
-    if (!m) return;
-    if ((m.minDistanceM || 0) > distM) return;
+    if (!m) return false;
+    if ((m.minDistanceM || 0) > distM) return false;
     const range = m.lengthPx || [400, 800];
     const maxLen = chunk.endX - chunk.startX - 2 * 96;
-    if (maxLen < 160) return;
-    if (!rng.chance(0.75)) return;
+    if (maxLen < 160) return false;
+    if (!rng.chance(0.75)) return false;
     const len = Math.min(maxLen, Math.round(rng.range(range[0], range[1])));
     const x0 = Math.round(chunk.startX + rng.range(96, chunk.endX - chunk.startX - len - 96));
     chunk.zones.push({ modId: m.id, x0, x1: x0 + len });
+    return true;
   }
 
   _placeZones(chunk, def, rng, distM, L) {
