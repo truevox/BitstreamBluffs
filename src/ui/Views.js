@@ -888,6 +888,9 @@ export class ShopView extends View {
    */
   _refresh() {
     const keep = this.menu ? this.menu.selected : 0;
+    // SHOP-5: an equipped (or removed) theme recolours the UI, so the scene's Theme re-reads the profile
+    // and repaints every bound painter, the screen under the shop included.
+    if (this.theme && typeof this.theme.refresh === 'function') this.theme.refresh();
     this._build();
     if (this.menu) this.menu.setSelected(Math.min(keep, this.menu.items.length - 1), true);
   }

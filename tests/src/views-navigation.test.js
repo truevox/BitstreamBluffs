@@ -712,3 +712,43 @@ describe('F4 fit: ShopView pages by slot, by key, pad and pointer', () => {
     }
   });
 });
+
+// ================================================================== SHOP-5: the equipped theme reaches the UI
+
+describe('SHOP-5: Theme applies the equipped UI theme', () => {
+  const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;
+  const base = PALETTES.default;
+
+  test('a scene Theme reads the equipped theme: accents change, danger does not', () => {
+    const s = makeScene(null, { [REG.PROFILE]: { ...defaultProfile(), equipped: { ...defaultProfile().equipped, theme: 'sunset' } } });
+    const th = new Theme(s);
+    expect(hex(th.pal.cyan)).not.toBe(base.cyan);
+    expect(th.css.cyan).toBe(hex(th.pal.cyan));
+    expect(hex(th.pal.danger)).toBe(base.danger);
+    expect(th.color('danger')).toBe(parseInt(base.danger.slice(1), 16));
+  });
+
+  test('no theme equipped: the Theme is the plain palette', () => {
+    const th = new Theme(makeScene(null, { [REG.PROFILE]: defaultProfile() }));
+    expect(th.css).toEqual(base);
+  });
+
+  test('colourblind keeps priority over an equipped theme', () => {
+    const s = makeScene(null, {
+      [REG.PROFILE]: { ...defaultProfile(), equipped: { ...defaultProfile().equipped, theme: 'legend' } },
+      [REG.SETTINGS]: { palette: 'colorblind' },
+    });
+    expect(new Theme(s).css).toEqual(PALETTES.colorblind);
+  });
+
+  test('equipping a theme in the shop repaints the open screen live; unequipping restores it', () => {
+    const lvl30 = { ...defaultProfile(), xp: LEVELS.levels[LEVELS.levels.length - 1].xpMin + 1, level: 30, bank: 0 };
+    const { s, view } = shopHost(lvl30);
+    const before = view.theme.pal.cyan;
+    view._choose('theme-legend');
+    expect(s.registry.get(REG.PROFILE).equipped.theme).toBe('legend');
+    expect(view.theme.pal.cyan).not.toBe(before);
+    view._choose('theme-legend'); // confirm on EQUIPPED -> DEFAULT (SHOP-3)
+    expect(view.theme.pal.cyan).toBe(before);
+  });
+});

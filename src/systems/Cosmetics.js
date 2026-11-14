@@ -89,16 +89,40 @@ const HUES = {
     magenta: Object.freeze({ stops: Object.freeze(['#8a1f9e', '#c824c8', '#ff2bd6', '#ffb8f0']) }),
     amber: Object.freeze({ stops: Object.freeze(['#a05a00', '#e08a00', '#ffb000', '#ffe6a0']) }),
   }),
+  // A theme is a UI theme (audit SHOP-5): `color` is its swatch, `ui` the partial palette it lays over the
+  // menus, panels and HUD accents through ui/Theme.js. Only UI_THEME_KEYS may appear in `ui`: never
+  // `danger`, never the world `bg`, and never lime/amber, which carry meaning (owned/on, money/warning).
+  // Every `bgAlt` here is at least as dark as the default panel tone, so danger contrast never drops.
   theme: Object.freeze({
-    mono: Object.freeze({ color: '#c8d4e0' }),
-    sunset: Object.freeze({ color: '#ff7a5c' }),
-    magenta: Object.freeze({ color: '#ff2bd6' }),
-    amber: Object.freeze({ color: '#ffb000' }),
-    legend: Object.freeze({ color: '#ffd66b' }),
+    mono: Object.freeze({
+      color: '#c8d4e0',
+      ui: Object.freeze({ cyan: '#c8d4e0', magenta: '#9aa6b4', text: '#e8edf2', bgAlt: '#0e1014' }),
+    }),
+    sunset: Object.freeze({
+      color: '#ff7a5c',
+      ui: Object.freeze({ cyan: '#ff7a5c', magenta: '#ff4d8a', text: '#ffe8dc', bgAlt: '#1a0a12' }),
+    }),
+    magenta: Object.freeze({
+      color: '#ff2bd6',
+      ui: Object.freeze({ cyan: '#ff2bd6', magenta: '#b46bff', text: '#ffe6f8', bgAlt: '#160a1e' }),
+    }),
+    amber: Object.freeze({
+      color: '#ffb000',
+      ui: Object.freeze({ cyan: '#ffb000', magenta: '#ff7a30', text: '#fff1d8', bgAlt: '#161006' }),
+    }),
+    // Level 30. Gold leads, an ice-blue second accent answers it, on a deep royal panel tone: the one
+    // theme with a warm/cool pair, so it reads as earned without shouting.
+    legend: Object.freeze({
+      color: '#ffd66b',
+      ui: Object.freeze({ cyan: '#ffd66b', magenta: '#8fe9ff', text: '#fff6e0', bgAlt: '#120c22' }),
+    }),
   }),
 };
 Object.defineProperty(HUES, 'sledGlow', { value: HUES.glow, enumerable: false });
 export const COSMETIC_HUES = Object.freeze(HUES);
+
+/** The palette keys a UI theme may override. Never `danger`, `bg`, `lime` or `amber`. */
+export const UI_THEME_KEYS = Object.freeze(['cyan', 'magenta', 'text', 'bgAlt']);
 
 /** Cosmetic id -> catalogue entry, derived from COSMETIC_ITEMS so it cannot disagree with the shop. */
 const CATALOGUE = Object.freeze(Object.fromEntries(
@@ -204,4 +228,31 @@ export function resolveCosmetics(profile, palette, paletteHex, o = {}) {
   if (theme) out.theme = theme.entry.value;
 
   return { ...out, danger: hex.danger, overridden: false, missing };
+}
+
+/**
+ * The UI palette with the profile's equipped theme laid over it (audit SHOP-5). Pure.
+ *
+ * ui/Theme.js calls this for every menu, panel and HUD painter, so a theme reaches everything that already
+ * reads the UI palette. The world (terrain, hazards, the sled) is drawn from Palette.getPalette() by
+ * RunScene and is never themed. Under a colourblind palette the theme is refused wholesale, the same rule
+ * resolveCosmetics applies, and only UI_THEME_KEYS can move, so `danger` is untouchable here.
+ *
+ * @param {Object<string,string>} baseHex the active palette as '#rrggbb' strings
+ * @param {Object|null} profile
+ * @param {{colorblind?:boolean}} [o]
+ * @returns {Object<string,string>} a new palette object (the input is never mutated)
+ */
+export function themedUiPalette(baseHex, profile, o = {}) {
+  const out = { ...(baseHex || {}) };
+  if (o && o.colorblind) return out;
+  const eq = (profile && profile.equipped && typeof profile.equipped === 'object') ? profile.equipped : {};
+  const entry = cosmeticInSlot('theme', eq.theme);
+  const hue = entry && COSMETIC_HUES.theme[entry.value];
+  const ui = hue && hue.ui;
+  if (!ui) return out;
+  for (const k of UI_THEME_KEYS) {
+    if (typeof ui[k] === 'string' && /^#[0-9a-fA-F]{6}$/.test(ui[k])) out[k] = ui[k];
+  }
+  return out;
 }

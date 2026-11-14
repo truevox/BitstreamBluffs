@@ -13,7 +13,7 @@ jest.unstable_mockModule('phaser', () => ({
   default: { Physics: { Matter: { Matter: { Bodies: {}, Body: { getVelocity: () => ({ x: 0, y: 0 }) } } } } },
 }));
 
-const { COSMETIC_ITEMS, COSMETIC_HUES, cosmeticFor, resolveCosmetics } = await import('../../src/systems/Cosmetics.js');
+const { COSMETIC_ITEMS, COSMETIC_HUES, cosmeticFor, resolveCosmetics, themedUiPalette, UI_THEME_KEYS } = await import('../../src/systems/Cosmetics.js');
 const { SHOP_ITEMS, sanitizeProfile, equip, isOwned, purchase } = await import('../../src/systems/ProfileStore.js');
 const { shopAllRows } = await import('../../src/ui/ShopLayout.js');
 const { TrailParticles } = await import('../../src/entities/TrailParticles.js');
@@ -236,5 +236,83 @@ describe('F4: the equipped glow and rider are what Sled draws', () => {
     const c = drawSled(look);
     expect(c).toContain(int(COSMETIC_HUES.glow.cyan.color));
     expect(c).toContain(int(COSMETIC_HUES.rider.lime.color));
+  });
+});
+
+// ------------------------------------------------------------------ SHOP-5: themes are UI themes
+
+/** WCAG relative luminance and contrast ratio. */
+const lum = (h) => {
+  const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
+const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+const THEMES = SHOP_ITEMS.filter((i) => i.slot === 'theme');
+
+describe('SHOP-5: a theme recolours the UI palette, never danger, and never under colourblind', () => {
+  test('the themeable keys are the UI accents and panel tone: never danger, lime or amber, never the world bg', () => {
+    expect([...UI_THEME_KEYS].sort()).toEqual(['bgAlt', 'cyan', 'magenta', 'text']);
+  });
+
+  test('no theme defines danger (or any key outside the themeable set)', () => {
+    for (const t of THEMES) {
+      const ui = COSMETIC_HUES.theme[t.value].ui;
+      expect({ id: t.id, ui: Boolean(ui) }).toEqual({ id: t.id, ui: true });
+      expect({ id: t.id, extra: Object.keys(ui).filter((k) => !UI_THEME_KEYS.includes(k)) }).toEqual({ id: t.id, extra: [] });
+    }
+  });
+
+  test('default equipment leaves the palette untouched', () => {
+    expect(themedUiPalette(HEX, v1({}))).toEqual(HEX);
+    expect(themedUiPalette(HEX, null)).toEqual(HEX);
+    expect(themedUiPalette(HEX, { equipped: { theme: 'no-such-theme' } })).toEqual(HEX);
+  });
+
+  test('every theme (bought or level reward) changes the primary accent and keeps danger, lime, amber and bg', () => {
+    for (const t of THEMES) {
+      const out = themedUiPalette(HEX, { equipped: { theme: t.value } });
+      expect({ id: t.id, cyan: out.cyan !== HEX.cyan }).toEqual({ id: t.id, cyan: true });
+      for (const k of ['danger', 'lime', 'amber', 'bg']) expect({ id: t.id, k, v: out[k] }).toEqual({ id: t.id, k, v: HEX[k] });
+    }
+  });
+
+  test('an equipped ID works as well as an equipped value', () => {
+    expect(themedUiPalette(HEX, { equipped: { theme: 'theme-sunset' } }).cyan)
+      .toBe(themedUiPalette(HEX, { equipped: { theme: 'sunset' } }).cyan);
+  });
+
+  test('colourblind mode refuses every theme', () => {
+    const cb = PALETTES.colorblind;
+    for (const t of THEMES) expect(themedUiPalette(cb, { equipped: { theme: t.value } }, { colorblind: true })).toEqual(cb);
+  });
+
+  test('every theme stays readable: text and accents at 4.5:1 or better on bg and bgAlt', () => {
+    for (const t of THEMES) {
+      const p = themedUiPalette(HEX, { equipped: { theme: t.value } });
+      for (const fg of ['text', 'cyan', 'magenta', 'lime', 'amber']) {
+        for (const bg of ['bg', 'bgAlt']) {
+          const r = contrast(p[fg], p[bg]);
+          expect({ id: t.id, fg, bg, ok: r >= 4.5, r: Math.round(r * 10) / 10 }).toMatchObject({ id: t.id, fg, bg, ok: true });
+        }
+      }
+    }
+  });
+
+  test('no theme lowers danger contrast below the default palette (panel tone stays as dark or darker)', () => {
+    const floor = Math.min(contrast(HEX.danger, HEX.bg), contrast(HEX.danger, HEX.bgAlt));
+    for (const t of THEMES) {
+      const p = themedUiPalette(HEX, { equipped: { theme: t.value } });
+      for (const bg of ['bg', 'bgAlt']) {
+        expect({ id: t.id, bg, ok: contrast(p.danger, p[bg]) >= floor }).toEqual({ id: t.id, bg, ok: true });
+      }
+    }
+  });
+
+  test('the level-30 Legend theme is distinct from every other theme', () => {
+    const legend = themedUiPalette(HEX, { equipped: { theme: 'legend' } });
+    for (const t of THEMES.filter((x) => x.value !== 'legend')) {
+      const other = themedUiPalette(HEX, { equipped: { theme: t.value } });
+      expect({ id: t.id, same: other.cyan === legend.cyan && other.magenta === legend.magenta }).toEqual({ id: t.id, same: false });
+    }
   });
 });
