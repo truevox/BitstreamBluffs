@@ -6,12 +6,29 @@
  *    field by field, so the three can never drift again (the JSON's glow `kind` already had).
  */
 import fs from 'fs';
+import { jest } from '@jest/globals';
 
-import { COSMETIC_ITEMS, cosmeticFor } from '../../src/systems/Cosmetics.js';
-import { SHOP_ITEMS } from '../../src/systems/ProfileStore.js';
+// Sled.js imports Phaser for Matter; its draw path needs only Body.getVelocity.
+jest.unstable_mockModule('phaser', () => ({
+  default: { Physics: { Matter: { Matter: { Bodies: {}, Body: { getVelocity: () => ({ x: 0, y: 0 }) } } } } },
+}));
+
+const { COSMETIC_ITEMS, COSMETIC_HUES, cosmeticFor, resolveCosmetics } = await import('../../src/systems/Cosmetics.js');
+const { SHOP_ITEMS, sanitizeProfile, equip, isOwned, purchase } = await import('../../src/systems/ProfileStore.js');
+const { shopAllRows } = await import('../../src/ui/ShopLayout.js');
+const { TrailParticles } = await import('../../src/entities/TrailParticles.js');
+const { Sled } = await import('../../src/entities/Sled.js');
 
 const read = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const COSMETICS_JSON = read('src/data/cosmetics/cosmetics.json');
+const LEVELS = read('src/data/progression/levels.json');
+const PALETTES = read('src/data/palettes.json');
+const MAX_XP = LEVELS.levels[LEVELS.levels.length - 1].xpMin + 1;
+const v1 = (o = {}) => sanitizeProfile({ v: 1, ...o }, LEVELS);
+const HEX = PALETTES.default;
+const INTS = Object.fromEntries(Object.entries(HEX).map(([k, v]) => [k, parseInt(v.slice(1), 16)]));
+const int = (h) => parseInt(h.slice(1), 16);
+const DRAWN_SLOTS = ['trail', 'glow', 'rider', 'theme'];
 
 describe('F4b: one cosmetic catalogue', () => {
   test('ProfileStore.SHOP_ITEMS is the Cosmetics catalogue, not a copy', () => {
@@ -54,5 +71,170 @@ describe('F4b: one cosmetic catalogue', () => {
   test('the catalogue is frozen, so no caller can edit the shared source at runtime', () => {
     expect(Object.isFrozen(COSMETIC_ITEMS)).toBe(true);
     for (const i of COSMETIC_ITEMS) expect(Object.isFrozen(i)).toBe(true);
+  });
+});
+
+describe('F4: the eleven level-reward cosmetics are real catalogue items', () => {
+  const rewards = LEVELS.levels.filter((l) => l.cosmetic).map((l) => ({ id: l.cosmetic, level: l.level }));
+  const rewardIds = rewards.map((r) => r.id);
+
+  test('audit F4: levels.json grants eleven cosmetics', () => {
+    expect(rewardIds).toEqual(['trail-cyan', 'glow-lime', 'rider-amber', 'theme-magenta', 'trail-magenta',
+      'glow-cyan', 'rider-lime', 'theme-amber', 'trail-amber', 'glow-magenta', 'theme-legend']);
+  });
+
+  test('each is in the catalogue as a level reward: price 0, unlockLevel = the level that grants it', () => {
+    for (const r of rewards) {
+      const it = SHOP_ITEMS.find((i) => i.id === r.id);
+      expect({ id: r.id, found: Boolean(it) }).toEqual({ id: r.id, found: true });
+      expect({ id: r.id, price: it.price, unlockLevel: it.unlockLevel, slot: it.slot })
+        .toEqual({ id: r.id, price: 0, unlockLevel: r.level, slot: r.id.split('-')[0] });
+    }
+  });
+
+  test('audit F4: every level-reward cosmetic can be equipped by a level-30 profile', () => {
+    const p = v1({ xp: MAX_XP, unlocked: { cosmetics: rewardIds } });
+    expect(rewardIds.filter((id) => equip(p, id) === p)).toEqual([]);
+  });
+
+  test('audit F4: an equipped level-reward trail is drawn, not reported missing', () => {
+    const hex = { cyan: '#00f0ff', lime: '#a0ff00', amber: '#ffb020', magenta: '#ff2bd6', danger: '#ff0000' };
+    const look = resolveCosmetics({ equipped: { trail: 'trail-cyan' } }, {}, hex);
+    expect(look.missing).toEqual([]);
+  });
+
+  test('owned exactly from its level: not at level-1, yes at level, and never bought', () => {
+    for (const r of rewards) {
+      const below = v1({ xp: LEVELS.levels.find((l) => l.level === r.level - 1).xpMin, bank: 99999 });
+      const at = v1({ xp: LEVELS.levels.find((l) => l.level === r.level).xpMin });
+      expect({ id: r.id, below: isOwned(below, r.id), at: isOwned(at, r.id) }).toEqual({ id: r.id, below: false, at: true });
+      expect(purchase(below, r.id)).toBe(below); // a level reward is never for sale
+      const row = shopAllRows({ profile: below }).find((x) => x.id === r.id);
+      expect({ id: r.id, state: row.state, disabled: row.disabled }).toEqual({ id: r.id, state: `LVL ${r.level}`, disabled: true });
+    }
+  });
+
+  test('a price-0 item is never bought, even when its level is reached but it is somehow not owned', () => {
+    // purchase() used to check only level and bank, so any un-owned price-0 item was "bought" for free.
+    const p = v1({ xp: MAX_XP, bank: 5 });
+    for (const it of SHOP_ITEMS.filter((i) => i.price === 0)) {
+      const after = purchase(p, it.id);
+      expect({ id: it.id, bank: after.bank, owned: (after.unlocked.cosmetics || []).includes(it.id) })
+        .toEqual({ id: it.id, bank: 5, owned: false });
+    }
+  });
+});
+
+describe('F4: every drawable catalogue item reaches the screen', () => {
+  const drawable = SHOP_ITEMS.filter((i) => DRAWN_SLOTS.includes(i.slot));
+  const rich = () => v1({ xp: MAX_XP, bank: 99999 });
+  const own = (p, id) => (isOwned(p, id) ? p : purchase(p, id));
+
+  test('every drawable item has a hue of the right shape', () => {
+    for (const it of drawable) {
+      const hue = COSMETIC_HUES[it.kind] && COSMETIC_HUES[it.kind][it.value];
+      expect({ id: it.id, hue: Boolean(hue) }).toEqual({ id: it.id, hue: true });
+      if (it.slot === 'trail') expect(hue.stops).toHaveLength(4);
+      else expect(hue.color).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
+  test('buy or own, equip, resolve: the slot changes and nothing is missing', () => {
+    const base = resolveCosmetics(v1({}), INTS, HEX);
+    for (const it of drawable) {
+      const p = equip(own(rich(), it.id), it.id);
+      expect({ id: it.id, eq: p.equipped[it.slot] }).toEqual({ id: it.id, eq: it.value });
+      const look = resolveCosmetics(p, INTS, HEX);
+      expect({ id: it.id, missing: look.missing }).toEqual({ id: it.id, missing: [] });
+      if (it.slot === 'theme') expect(look.theme).toBe(it.value);
+      else expect({ id: it.id, changed: JSON.stringify(look[it.slot]) !== JSON.stringify(base[it.slot]) }).toEqual({ id: it.id, changed: true });
+    }
+  });
+
+  test('values shared across slots resolve to their own slot (cyan trail vs cyan glow)', () => {
+    const p = { equipped: { trail: 'cyan', glow: 'cyan', rider: 'amber', theme: 'magenta' } };
+    const look = resolveCosmetics(p, INTS, HEX);
+    expect(look.missing).toEqual([]);
+    expect(look.trail).toEqual([...COSMETIC_HUES.trail.cyan.stops]);
+    expect(look.glow).toBe(COSMETIC_HUES.glow.cyan.color);
+  });
+
+  test('Cyan Glow is visibly not the default glow (palette cyan) nor the paid Cold Glow', () => {
+    const c = COSMETIC_HUES.glow.cyan.color.toLowerCase();
+    expect(c).not.toBe(HEX.cyan.toLowerCase());
+    expect(c).not.toBe(COSMETIC_HUES.glow.cold.color.toLowerCase());
+  });
+
+  test('colourblind mode refuses every level-reward hue too', () => {
+    const p = { equipped: { trail: 'cyan', glow: 'lime', rider: 'amber', theme: 'legend' } };
+    const look = resolveCosmetics(p, INTS, HEX, { colorblind: true });
+    expect(look).toMatchObject({ overridden: true, rider: HEX.magenta, glow: HEX.cyan, theme: 'default' });
+    expect(look.trail).toEqual([HEX.cyan, HEX.lime, HEX.amber, HEX.magenta]);
+  });
+});
+
+/** A Graphics stand-in that records every colour it is asked to stroke or fill with. */
+function recordingGfx() {
+  const colors = [];
+  const g = {
+    colors,
+    clear() { return g; },
+    lineStyle(w, c) { colors.push(c); return g; },
+    fillStyle(c) { colors.push(c); return g; },
+  };
+  return new Proxy(g, { get: (t, k) => (k in t ? t[k] : () => t) });
+}
+
+describe('F4: the equipped trail is what TrailParticles draws', () => {
+  const fakeScene = () => ({
+    textures: { exists: () => true },
+    add: {
+      graphics: () => { const g = recordingGfx(); g.setDepth = () => g; return g; },
+      particles: () => ({ setDepth() { return this; }, setParticleTint() {}, emitParticleAt() {}, destroy() {} }),
+    },
+  });
+
+  test('the level-15 Magenta Trail colours the ribbon from its own stops', () => {
+    const look = resolveCosmetics({ equipped: { trail: 'magenta' } }, INTS, HEX);
+    const tp = new TrailParticles(fakeScene(), INTS, look.trail);
+    expect(tp.colorForSpeed(0)).toBe(int(COSMETIC_HUES.trail.magenta.stops[0]));
+    tp.update(0, 0, 0);
+    tp.update(10, 0, 0);
+    expect(tp.gfx.colors).toContain(int(COSMETIC_HUES.trail.magenta.stops[0]));
+    expect(tp.gfx.colors).not.toContain(INTS.cyan);
+  });
+});
+
+describe('F4: the equipped glow and rider are what Sled draws', () => {
+  const drawSled = (look) => {
+    const s = Object.create(Sled.prototype);
+    Object.assign(s, {
+      gfx: recordingGfx(), palette: INTS, look,
+      body: { angle: 0, position: { x: 0, y: 0 } }, off: { x: 0, y: 0 },
+      heliPhase: 0, heliVel: 0, squash: 0, pose: { chute: 0, phi: 0, tuck: 0, brake: 0 },
+      invulnerableMs: 0, _time: 0, scrambled: false, shield: false, msSinceContact: 0,
+    });
+    s._draw();
+    return s.gfx.colors;
+  };
+
+  test('default look: the sled is palette cyan and the rider palette magenta', () => {
+    const c = drawSled(null);
+    expect(c).toContain(INTS.cyan);
+    expect(c).toContain(INTS.magenta);
+  });
+
+  test('the level-29 Magenta Glow and level-9 Amber Rider are drawn', () => {
+    const look = resolveCosmetics({ equipped: { glow: 'magenta', rider: 'amber' } }, INTS, HEX);
+    const c = drawSled(look);
+    expect(c).toContain(int(COSMETIC_HUES.glow.magenta.color));
+    expect(c).toContain(int(COSMETIC_HUES.rider.amber.color));
+  });
+
+  test('the level-18 Cyan Glow is drawn, and the default glow colour is not used for the sled body', () => {
+    const look = resolveCosmetics({ equipped: { glow: 'cyan', rider: 'lime' } }, INTS, HEX);
+    const c = drawSled(look);
+    expect(c).toContain(int(COSMETIC_HUES.glow.cyan.color));
+    expect(c).toContain(int(COSMETIC_HUES.rider.lime.color));
   });
 });

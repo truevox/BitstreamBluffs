@@ -39,6 +39,19 @@ export const COSMETIC_ITEMS = Object.freeze([
   { id: 'rider-hue-plum', kind: 'rider', slot: 'rider', name: 'Plum Rider', price: 180, unlockLevel: 6, value: 'plum' },
   { id: 'theme-mono', kind: 'theme', slot: 'theme', name: 'Mono Theme', price: 250, unlockLevel: 1, value: 'mono' },
   { id: 'theme-sunset', kind: 'theme', slot: 'theme', name: 'Sunset Theme', price: 300, unlockLevel: 8, value: 'sunset' },
+  // Level rewards (audit F4): levels.json grants these on level-up. Price 0, unlockLevel = the granting
+  // level, so isOwned() owns them from that level on; colours are the palette's own neon hues.
+  { id: 'trail-cyan', kind: 'trail', slot: 'trail', name: 'Cyan Trail', price: 0, unlockLevel: 2, value: 'cyan' },
+  { id: 'glow-lime', kind: 'glow', slot: 'glow', name: 'Lime Glow', price: 0, unlockLevel: 5, value: 'lime' },
+  { id: 'rider-amber', kind: 'rider', slot: 'rider', name: 'Amber Rider', price: 0, unlockLevel: 9, value: 'amber' },
+  { id: 'theme-magenta', kind: 'theme', slot: 'theme', name: 'Magenta Theme', price: 0, unlockLevel: 12, value: 'magenta' },
+  { id: 'trail-magenta', kind: 'trail', slot: 'trail', name: 'Magenta Trail', price: 0, unlockLevel: 15, value: 'magenta' },
+  { id: 'glow-cyan', kind: 'glow', slot: 'glow', name: 'Ice Cyan Glow', price: 0, unlockLevel: 18, value: 'cyan' },
+  { id: 'rider-lime', kind: 'rider', slot: 'rider', name: 'Lime Rider', price: 0, unlockLevel: 20, value: 'lime' },
+  { id: 'theme-amber', kind: 'theme', slot: 'theme', name: 'Amber Theme', price: 0, unlockLevel: 23, value: 'amber' },
+  { id: 'trail-amber', kind: 'trail', slot: 'trail', name: 'Amber Trail', price: 0, unlockLevel: 26, value: 'amber' },
+  { id: 'glow-magenta', kind: 'glow', slot: 'glow', name: 'Magenta Glow', price: 0, unlockLevel: 29, value: 'magenta' },
+  { id: 'theme-legend', kind: 'theme', slot: 'theme', name: 'Legend Theme', price: 0, unlockLevel: 30, value: 'legend' },
   { id: 'title-rookie', kind: 'title', slot: 'title', name: 'Rookie', price: 0, unlockLevel: 1, value: 'ROOKIE' },
   { id: 'title-static', kind: 'title', slot: 'title', name: 'Static Rider', price: 220, unlockLevel: 1, value: 'STATIC RIDER' },
 ].map((i) => Object.freeze(i)));
@@ -55,19 +68,33 @@ const HUES = {
   rider: Object.freeze({
     mint: Object.freeze({ color: '#5cffb0' }),
     plum: Object.freeze({ color: '#c060ff' }),
+    amber: Object.freeze({ color: '#ffb000' }), // palette amber (level 9)
+    lime: Object.freeze({ color: '#9dff3a' }), // palette lime (level 20)
   }),
   glow: Object.freeze({
     warm: Object.freeze({ color: '#ffc46b' }),
     cold: Object.freeze({ color: '#7fd0ff' }),
+    lime: Object.freeze({ color: '#9dff3a' }), // palette lime (level 5)
+    // Level 18. The DEFAULT glow is palette cyan (#00f0ff), so a literal cyan reward would change nothing on
+    // screen. This is a paler, icier cyan: still reads as cyan, visibly not the default, and not Cold Glow.
+    cyan: Object.freeze({ color: '#a8fcff' }),
+    magenta: Object.freeze({ color: '#ff2bd6' }), // palette magenta (level 29)
   }),
   trail: Object.freeze({
     aurora: Object.freeze({ stops: Object.freeze(['#5cffb0', '#00f0ff', '#7fd0ff', '#c060ff']) }),
     ember: Object.freeze({ stops: Object.freeze(['#ffb020', '#ff7a30', '#ff4d2e', '#ffd66b']) }),
     tidal: Object.freeze({ stops: Object.freeze(['#0d9bd6', '#00f0ff', '#5cffb0', '#0a4f8a']) }),
+    // Level rewards: one hue, deep at low speed to white-hot at top speed, so the speed read survives.
+    cyan: Object.freeze({ stops: Object.freeze(['#0a7fa0', '#00c8e6', '#00f0ff', '#b8fbff']) }),
+    magenta: Object.freeze({ stops: Object.freeze(['#8a1f9e', '#c824c8', '#ff2bd6', '#ffb8f0']) }),
+    amber: Object.freeze({ stops: Object.freeze(['#a05a00', '#e08a00', '#ffb000', '#ffe6a0']) }),
   }),
   theme: Object.freeze({
     mono: Object.freeze({ color: '#c8d4e0' }),
     sunset: Object.freeze({ color: '#ff7a5c' }),
+    magenta: Object.freeze({ color: '#ff2bd6' }),
+    amber: Object.freeze({ color: '#ffb000' }),
+    legend: Object.freeze({ color: '#ffd66b' }),
   }),
 };
 Object.defineProperty(HUES, 'sledGlow', { value: HUES.glow, enumerable: false });

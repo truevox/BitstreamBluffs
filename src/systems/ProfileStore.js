@@ -605,7 +605,8 @@ export function isOwned(profile, id) {
  * Buy one item. PURE, and atomic: on ANY refusal it returns the profile object it was given, untouched,
  * so a caller that saves unconditionally still cannot persist a partial purchase.
  *
- * Refusals, in order: unknown id, already owned, level too low, not enough shards. The affordability
+ * Refusals, in order: unknown id, already owned, not for sale (price 0: a level reward or an achievement
+ * grant, owned by reaching it, never bought), level too low, not enough shards. The affordability
  * check is a single comparison against `price` rather than a subtraction followed by a clamp, because a
  * clamp would silently let a player buy with shards they do not have.
  * @param {Object} profile @param {string} id @returns {Object}
@@ -614,6 +615,7 @@ export function purchase(profile, id) {
   const item = shopItem(id);
   if (!item || !profile || typeof profile !== 'object') return profile;
   if (isOwned(profile, id)) return profile;
+  if (!(Number(item.price) > 0)) return profile;
   if ((Number(profile.level) || 1) < (Number(item.unlockLevel) || 1)) return profile;
   const bank = nonNeg(profile.bank);
   if (bank < item.price) return profile;

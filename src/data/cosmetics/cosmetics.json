@@ -84,6 +84,105 @@
       "value": "sunset"
     },
     {
+      "id": "trail-cyan",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Cyan Trail",
+      "price": 0,
+      "unlockLevel": 2,
+      "value": "cyan"
+    },
+    {
+      "id": "glow-lime",
+      "kind": "glow",
+      "slot": "glow",
+      "name": "Lime Glow",
+      "price": 0,
+      "unlockLevel": 5,
+      "value": "lime"
+    },
+    {
+      "id": "rider-amber",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Amber Rider",
+      "price": 0,
+      "unlockLevel": 9,
+      "value": "amber"
+    },
+    {
+      "id": "theme-magenta",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Magenta Theme",
+      "price": 0,
+      "unlockLevel": 12,
+      "value": "magenta"
+    },
+    {
+      "id": "trail-magenta",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Magenta Trail",
+      "price": 0,
+      "unlockLevel": 15,
+      "value": "magenta"
+    },
+    {
+      "id": "glow-cyan",
+      "kind": "glow",
+      "slot": "glow",
+      "name": "Ice Cyan Glow",
+      "price": 0,
+      "unlockLevel": 18,
+      "value": "cyan"
+    },
+    {
+      "id": "rider-lime",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Lime Rider",
+      "price": 0,
+      "unlockLevel": 20,
+      "value": "lime"
+    },
+    {
+      "id": "theme-amber",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Amber Theme",
+      "price": 0,
+      "unlockLevel": 23,
+      "value": "amber"
+    },
+    {
+      "id": "trail-amber",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Amber Trail",
+      "price": 0,
+      "unlockLevel": 26,
+      "value": "amber"
+    },
+    {
+      "id": "glow-magenta",
+      "kind": "glow",
+      "slot": "glow",
+      "name": "Magenta Glow",
+      "price": 0,
+      "unlockLevel": 29,
+      "value": "magenta"
+    },
+    {
+      "id": "theme-legend",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Legend Theme",
+      "price": 0,
+      "unlockLevel": 30,
+      "value": "legend"
+    },
+    {
       "id": "title-rookie",
       "kind": "title",
       "slot": "title",
