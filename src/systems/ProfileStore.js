@@ -404,13 +404,18 @@ export function backfillFromRuns(profile, runs, levels) {
   const table = loadLevelTable(levels);
   const base = sanitizeProfile(profile, table);
   if (base.lifetime.runs > 0) return base;
+  // Credit in play order, oldest first. SaveStore.getRecentRuns hands runs over newest first; crediting in
+  // that order stamped First Descent with the NEWEST run's time and left the credited ring holding the
+  // OLDEST hashes once it overflowed. A copy is sorted so the caller's array is never reordered; Array#sort
+  // is stable, so runs with equal or missing end times keep their given order.
+  const endedAt = (r) => (r && typeof r === 'object' && isNum(r.endedAt) ? r.endedAt : 0);
+  const ordered = (Array.isArray(runs) ? runs.slice() : []).sort((a, b) => endedAt(a) - endedAt(b));
   let out = base;
-  let credited = false;
-  for (const r of Array.isArray(runs) ? runs : []) {
+  for (const r of ordered) {
     const res = creditRun(out, r, table);
-    if (res) { out = res.profile; credited = true; }
+    if (res) out = res.profile;
   }
-  return credited ? out : out;
+  return out;
 }
 
 /**
