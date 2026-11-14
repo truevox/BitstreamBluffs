@@ -1250,13 +1250,28 @@ async function main() {
             const wait = (ms) => new Promise((r) => setTimeout(r, ms));
             g.registry.set('biomeMask', 0);
             g.scene.start('TitleScene');
-            await wait(800);
-            const t = g.scene.getScene('TitleScene');
-            t.starting = false;
-            t.startRun('belt-probe', 0);
-            await wait(1600);
-            const run = g.scene.getScene('RunScene');
-            if (!run) return { fatal: 'RunScene did not start' };
+            // Poll for RunScene and a LIVE sled instead of sleeping a fixed 1600ms. A fixed sleep here is the
+            // same bug class as the Game Over 3000ms sleep: under load the run has not started, or the sled
+            // has already crashed, and applyControls early-returns on a destroyed body -- which reads as
+            // "the belt does nothing" (dvx exactly 0) when in fact nothing was ever stepped.
+            const t0 = Date.now();
+            let run = null;
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              // Start EXACTLY ONCE. Calling startRun on every tick restarts the run each time, which tears
+              // down the sled we are waiting for -- the probe then waits forever for a live sled it keeps
+              // destroying. This is why the previous version needed `if (!run)` and still raced.
+              if (!started && tt && !tt.starting) { started = true; tt.startRun('belt-probe', 0); }
+              const rr = g.scene.getScene('RunScene');
+              if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'RunScene never produced a live sled (scene active + sled inWorld)' };
+            await wait(200);
+            if (run.sled.destroyed || !run.sled.inWorld) {
+              return { fatal: `sled died between liveness check and probe (destroyed=${run.sled.destroyed} inWorld=${run.sled.inWorld})` };
+            }
 
             // Put a conveyor under the sled, exactly as the generator would.
             const belt = run.content.terrainMods.conveyorBelt;
@@ -1289,6 +1304,12 @@ async function main() {
               beltDrive: phys.beltDrivePxS2,
               withBelt: after - before,
               withoutBelt: after2 - before2,
+              // Liveness at the moment of measurement: dvx exactly 0 with these false means the sled was
+              // never stepped, which is a harness problem, not "the belt does nothing".
+              destroyed: run.sled.destroyed,
+              inWorld: run.sled.inWorld,
+              grounded: run.sled.grounded,
+              beltDirection: phys.beltDirection,
             };
           }).catch((e) => ({ fatal: String(e) }));
           return { errors, out };
@@ -1296,8 +1317,11 @@ async function main() {
       })();
       if (c.out.fatal) fail('W6: conveyor belt moves the sled', c.out.fatal);
       else if (c.errors.length) fail('W6: conveyor belt — no page errors', c.errors.join(' | '));
+      else if (c.out.destroyed || !c.out.inWorld) {
+        fail('W6: conveyor belt — the sled under test was not live', `destroyed=${c.out.destroyed} inWorld=${c.out.inWorld} (harness, not belt)`);
+      }
       else if (!(c.out.beltDrive > 0)) fail('W6: conveyor belt carries a drive', `beltDrivePxS2=${c.out.beltDrive}`);
-      else if (!(c.out.withBelt > 0)) fail('W6: conveyor belt moves the sled with no input', `dvx=${c.out.withBelt}`);
+      else if (!(c.out.withBelt > 0)) fail('W6: conveyor belt moves the sled with no input', `dvx=${c.out.withBelt} destroyed=${c.out.destroyed} inWorld=${c.out.inWorld} grounded=${c.out.grounded}`);
       else if (Math.abs(c.out.withoutBelt) >= Math.abs(c.out.withBelt)) {
         fail('W6: the movement comes from the belt, not from drift', `with=${c.out.withBelt} without=${c.out.withoutBelt}`);
       } else pass('W6: a conveyor belt drives the real sled with no player input', `dvx=${c.out.withBelt.toFixed(2)} vs no-belt ${c.out.withoutBelt.toFixed(2)}`);
