@@ -12,6 +12,7 @@
 import { defaultProfile, loadLevelTable, levelForXp, rewardsForLevel, xpForRun, PROFILE_VERSION } from './Progression.js';
 import { metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
 import { DailyPatch } from './DailyPatch.js';
+import { COSMETIC_ITEMS } from './Cosmetics.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -573,25 +574,13 @@ export class ProfileStore {
 // ---- W4 economy: the shop -------------------------------------------------------------------------
 
 /**
- * The cosmetic catalogue. Loaded from data/cosmetics/cosmetics.json where a bundler is available, with
- * the shipped fallback below so a pure test or a headless caller never depends on the glob.
+ * The cosmetic catalogue. Audit F4b: this is Cosmetics.COSMETIC_ITEMS itself, not a copy, so the shop, the
+ * resolver that draws an item and data/cosmetics/cosmetics.json (a pinned mirror) can never disagree.
  *
  * `slot` matches a key in `profile.equipped` (trail/glow/rider/theme/title), so equipping is a direct
  * assignment rather than a second mapping table that could drift from the profile shape.
  */
-export const SHOP_ITEMS = Object.freeze([
-  { id: 'trail-hue-aurora', kind: 'trail', slot: 'trail', name: 'Aurora Trail', price: 0, unlockLevel: 3, value: 'aurora' },
-  { id: 'trail-hue-ember', kind: 'trail', slot: 'trail', name: 'Ember Trail', price: 120, unlockLevel: 1, value: 'ember' },
-  { id: 'trail-hue-tidal', kind: 'trail', slot: 'trail', name: 'Tidal Trail', price: 200, unlockLevel: 5, value: 'tidal' },
-  { id: 'sled-glow-warm', kind: 'glow', slot: 'glow', name: 'Warm Glow', price: 90, unlockLevel: 1, value: 'warm' },
-  { id: 'sled-glow-cold', kind: 'glow', slot: 'glow', name: 'Cold Glow', price: 150, unlockLevel: 4, value: 'cold' },
-  { id: 'rider-hue-mint', kind: 'rider', slot: 'rider', name: 'Mint Rider', price: 100, unlockLevel: 1, value: 'mint' },
-  { id: 'rider-hue-plum', kind: 'rider', slot: 'rider', name: 'Plum Rider', price: 180, unlockLevel: 6, value: 'plum' },
-  { id: 'theme-mono', kind: 'theme', slot: 'theme', name: 'Mono Theme', price: 250, unlockLevel: 1, value: 'mono' },
-  { id: 'theme-sunset', kind: 'theme', slot: 'theme', name: 'Sunset Theme', price: 300, unlockLevel: 8, value: 'sunset' },
-  { id: 'title-rookie', kind: 'title', slot: 'title', name: 'Rookie', price: 0, unlockLevel: 1, value: 'ROOKIE' },
-  { id: 'title-static', kind: 'title', slot: 'title', name: 'Static Rider', price: 220, unlockLevel: 1, value: 'STATIC RIDER' },
-]);
+export const SHOP_ITEMS = COSMETIC_ITEMS;
 
 /** @param {string} id @returns {Object|null} */
 export function shopItem(id) {

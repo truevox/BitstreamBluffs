@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "note": "W4 cosmetic catalogue. `kind` routes the item to what it changes; `slot` is the profile.cosmetics key it equips into. Some items are level rewards (price 0, unlockLevel set) and some are bought. Prices are in Data Shards.",
+  "note": "W4 cosmetic catalogue MIRROR. The source of truth is COSMETIC_ITEMS in src/systems/Cosmetics.js (audit F4b); tests/src/cosmetics-complete.test.js fails if this file and that constant ever disagree in any field. kind equals slot. price 0 = never bought: a level reward (unlockLevel = the level that grants it) or an achievement grant (grant: achievement). Prices are in Data Shards.",
   "items": [
     {
       "id": "trail-hue-aurora",
@@ -31,7 +31,7 @@
     },
     {
       "id": "sled-glow-warm",
-      "kind": "sledGlow",
+      "kind": "glow",
       "slot": "glow",
       "name": "Warm Glow",
       "price": 90,
@@ -40,7 +40,7 @@
     },
     {
       "id": "sled-glow-cold",
-      "kind": "sledGlow",
+      "kind": "glow",
       "slot": "glow",
       "name": "Cold Glow",
       "price": 150,

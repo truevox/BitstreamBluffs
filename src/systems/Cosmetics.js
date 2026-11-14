@@ -13,18 +13,50 @@
  */
 
 /**
- * The hue table. `kind` matches a catalogue item's `kind`; each entry is what that hue does.
+ * THE cosmetic catalogue (audit F4b). This is the one source of truth: ProfileStore.SHOP_ITEMS is this same
+ * array, the resolver's id lookup below is derived from it, and data/cosmetics/cosmetics.json is a mirror
+ * that tests/src/cosmetics-complete.test.js pins field by field. It is a JS constant rather than the JSON
+ * because pure modules and Jest (ESM, no transform) cannot import a .json file.
+ *
+ * Fields:
+ *   id          stable id, what `unlocked.cosmetics` and levels.json `cosmetic` hold
+ *   kind        what it changes; equals `slot` for every cosmetic (glow is "glow", never "sledGlow")
+ *   slot        the `profile.equipped` key it equips into (trail/glow/rider/theme/title)
+ *   name        shop label
+ *   price       Data Shards; 0 = never bought (a level reward or an achievement grant)
+ *   unlockLevel price 0: the level that grants it; price > 0: the level it can first be bought at
+ *   value       what `equip()` stores in the slot; unique within a slot
+ *   grant       optional; 'achievement' = owned only when an achievement put `value` in `unlocked.titles`
+ * @type {ReadonlyArray<Readonly<{id:string,kind:string,slot:string,name:string,price:number,unlockLevel:number,value:string,grant?:string}>>}
+ */
+export const COSMETIC_ITEMS = Object.freeze([
+  { id: 'trail-hue-aurora', kind: 'trail', slot: 'trail', name: 'Aurora Trail', price: 0, unlockLevel: 3, value: 'aurora' },
+  { id: 'trail-hue-ember', kind: 'trail', slot: 'trail', name: 'Ember Trail', price: 120, unlockLevel: 1, value: 'ember' },
+  { id: 'trail-hue-tidal', kind: 'trail', slot: 'trail', name: 'Tidal Trail', price: 200, unlockLevel: 5, value: 'tidal' },
+  { id: 'sled-glow-warm', kind: 'glow', slot: 'glow', name: 'Warm Glow', price: 90, unlockLevel: 1, value: 'warm' },
+  { id: 'sled-glow-cold', kind: 'glow', slot: 'glow', name: 'Cold Glow', price: 150, unlockLevel: 4, value: 'cold' },
+  { id: 'rider-hue-mint', kind: 'rider', slot: 'rider', name: 'Mint Rider', price: 100, unlockLevel: 1, value: 'mint' },
+  { id: 'rider-hue-plum', kind: 'rider', slot: 'rider', name: 'Plum Rider', price: 180, unlockLevel: 6, value: 'plum' },
+  { id: 'theme-mono', kind: 'theme', slot: 'theme', name: 'Mono Theme', price: 250, unlockLevel: 1, value: 'mono' },
+  { id: 'theme-sunset', kind: 'theme', slot: 'theme', name: 'Sunset Theme', price: 300, unlockLevel: 8, value: 'sunset' },
+  { id: 'title-rookie', kind: 'title', slot: 'title', name: 'Rookie', price: 0, unlockLevel: 1, value: 'ROOKIE' },
+  { id: 'title-static', kind: 'title', slot: 'title', name: 'Static Rider', price: 220, unlockLevel: 1, value: 'STATIC RIDER' },
+].map((i) => Object.freeze(i)));
+
+/**
+ * The hue table, keyed by catalogue `kind`, then by item `value`.
  *
  * `trail` hues are four-stop gradients because the trail already colours by speed (cyan -> lime -> amber
  * -> magenta); replacing one stop would fight that gradient, so a trail hue replaces all four.
+ * `sledGlow` is kept as a non-enumerable alias of `glow` for older callers; the catalogue kind is `glow`.
  * @type {Object<string,Object<string,Object>>}
  */
-export const COSMETIC_HUES = Object.freeze({
+const HUES = {
   rider: Object.freeze({
     mint: Object.freeze({ color: '#5cffb0' }),
     plum: Object.freeze({ color: '#c060ff' }),
   }),
-  sledGlow: Object.freeze({
+  glow: Object.freeze({
     warm: Object.freeze({ color: '#ffc46b' }),
     cold: Object.freeze({ color: '#7fd0ff' }),
   }),
@@ -37,22 +69,31 @@ export const COSMETIC_HUES = Object.freeze({
     mono: Object.freeze({ color: '#c8d4e0' }),
     sunset: Object.freeze({ color: '#ff7a5c' }),
   }),
-});
+};
+Object.defineProperty(HUES, 'sledGlow', { value: HUES.glow, enumerable: false });
+export const COSMETIC_HUES = Object.freeze(HUES);
 
-/** Cosmetic id -> catalogue entry, built once. Kept here so the resolver needs no data loader. */
-const CATALOGUE = Object.freeze({
-  'trail-hue-aurora': { kind: 'trail', slot: 'trail', value: 'aurora' },
-  'trail-hue-ember': { kind: 'trail', slot: 'trail', value: 'ember' },
-  'trail-hue-tidal': { kind: 'trail', slot: 'trail', value: 'tidal' },
-  'sled-glow-warm': { kind: 'sledGlow', slot: 'glow', value: 'warm' },
-  'sled-glow-cold': { kind: 'sledGlow', slot: 'glow', value: 'cold' },
-  'rider-hue-mint': { kind: 'rider', slot: 'rider', value: 'mint' },
-  'rider-hue-plum': { kind: 'rider', slot: 'rider', value: 'plum' },
-  'theme-mono': { kind: 'theme', slot: 'theme', value: 'mono' },
-  'theme-sunset': { kind: 'theme', slot: 'theme', value: 'sunset' },
-  'title-rookie': { kind: 'title', slot: 'title', value: 'ROOKIE' },
-  'title-static': { kind: 'title', slot: 'title', value: 'STATIC RIDER' },
-});
+/** Cosmetic id -> catalogue entry, derived from COSMETIC_ITEMS so it cannot disagree with the shop. */
+const CATALOGUE = Object.freeze(Object.fromEntries(
+  COSMETIC_ITEMS.map((i) => [i.id, Object.freeze({ kind: i.kind, slot: i.slot, value: i.value })]),
+));
+
+/**
+ * The catalogue entry a SLOT holds, matched by id or by equipped value but only within that slot.
+ *
+ * Values repeat across slots ('cyan' is a trail, a glow and a theme), so a slot-blind lookup by value would
+ * hand the glow slot the trail entry and the item would render as missing.
+ * @param {string} slot @param {string} idOrValue @returns {{kind:string,slot:string,value:string,id:string}|null}
+ */
+export function cosmeticInSlot(slot, idOrValue) {
+  if (typeof idOrValue !== 'string' || !idOrValue) return null;
+  const direct = CATALOGUE[idOrValue];
+  if (direct && direct.slot === slot) return { ...direct, id: idOrValue };
+  for (const [id, entry] of Object.entries(CATALOGUE)) {
+    if (entry.slot === slot && entry.value === idOrValue) return { ...entry, id };
+  }
+  return null;
+}
 
 /**
  * Resolve a catalogue entry by ID **or by equipped value**.
@@ -68,9 +109,8 @@ export function cosmeticFor(idOrValue) {
   const direct = CATALOGUE[idOrValue];
   if (direct) return { ...direct, id: idOrValue };
   for (const [id, entry] of Object.entries(CATALOGUE)) {
-    // `value` is only unique within a slot, so this can only be used when the caller knows the slot.
-    // Returning the first match is safe for the single-owner slots the game ships (rider/glow/trail/theme
-    // never share a value across kinds); a future clash would be caught by the uniqueness test.
+    // `value` is only unique within a slot ('cyan' is a trail, a glow and a theme), so a bare value returns
+    // the first match. Callers that know the slot use cosmeticInSlot(), which the resolver does.
     if (entry.value === idOrValue) return { ...entry, id };
   }
   return null;
@@ -113,12 +153,10 @@ export function resolveCosmetics(profile, palette, paletteHex, o = {}) {
   const lookup = (slot) => {
     const id = equipped[slot];
     if (!id || id === 'default') return null;
-    // Match within the slot's own kind: `equip()` writes a bare value ('mint'), so a value that exists in
-    // two kinds must resolve to the one this slot draws.
-    const entry = cosmeticFor(id) || Object.entries(CATALOGUE)
-      .filter(([, e]) => e.slot === slot && e.value === id)
-      .map(([cid, e]) => ({ ...e, id: cid }))[0] || null;
-    if (!entry || entry.slot !== slot) { if (id) missing.push(id); return null; }
+    // Match within the slot: `equip()` writes a bare value ('mint'), so a value that exists in two slots
+    // must resolve to the one this slot draws.
+    const entry = cosmeticInSlot(slot, id);
+    if (!entry) { missing.push(id); return null; }
     const hue = COSMETIC_HUES[entry.kind] && COSMETIC_HUES[entry.kind][entry.value];
     if (!hue) { missing.push(id); return null; }
     return { entry, hue };
