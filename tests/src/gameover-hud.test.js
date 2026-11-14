@@ -308,3 +308,37 @@ describe('MT-1: the in-run mission toast fits the 480 px strip, not 36 px', () =
     expect(src).toMatch(/this\.stripT = new NeonText\([^)]*scale: STRIP_BAND\.textScale/);
   });
 });
+
+// ================================================================== U6b: the shop hint names the pad key
+
+describe('U6b: the Game Over shop hint names the pad key', () => {
+  const FOOTERS = [
+    'SPACE / ENTER / A / TAP = RETRY SAME SEED',
+    'TYPE INITIALS - ENTER SAVE - SPACE SAVE + RETRY',
+    'SPACE = SAVE + RETRY   ESC = SKIP',
+  ];
+  const builtHint = () => {
+    const g = makeScene(GameOverScene.prototype);
+    g.theme = new Theme(g);
+    g.shopHint = null;
+    g.entry = null;
+    g._buildShopHint();
+    return g.shopHint;
+  };
+
+  test('the hint names LB as well as keyboard B (pad B is cancel = Title)', () => {
+    // ARCHITECTURE: the footer hint is "SHOP: B (pad LB)".
+    const text = builtHint().main.text;
+    expect(text).toMatch(/\bB\b/);
+    expect(text).toMatch(/\bLB\b/);
+  });
+
+  test('the real hint string clears every footer variant at 480x270 with daylight', () => {
+    const hint = builtHint();
+    const hintLeft = GAME_WIDTH - 4 - measureText(hint.main.text);
+    for (const f of FOOTERS) {
+      const right = Math.round(GAME_WIDTH / 2) + measureText(f) / 2;
+      expect(hintLeft - right).toBeGreaterThan(8);
+    }
+  });
+});

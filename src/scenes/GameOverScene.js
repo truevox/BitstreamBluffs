@@ -55,8 +55,11 @@ const MAX_ROWS = 8;
 const SHOP_PROMPT_MS = 1200;
 // After initials entry closes: a beat so the board appearing and the shop appearing are not one frame.
 const SHOP_AFTER_ENTRY_MS = 500;
-/** The key the footer hint advertises. Must match MenuInput's `shop` action. */
-const SHOP_KEY = 'B';
+/**
+ * The keys the footer hint advertises. Both must match MenuInput's `shop` action: keyboard B, and pad LB
+ * (LT works too). Naming only "B" misled pad players, for whom B is cancel = Title (audit U6b).
+ */
+const SHOP_HINT = 'SHOP: B / LB';
 
 /**
  * "SIGNATURE ONLINE: <BIOME>" for a level that unlocked a biome. All 11 biomes ship, so the old
@@ -751,7 +754,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   /**
-   * The quiet "SHOP: B" line, right-aligned on the footer row.
+   * The quiet "SHOP: B / LB" line, right-aligned on the footer row.
    *
    * The footer already carries the retry hint centred, and the awards line sits at y 246. Rather than
    * invent a third row (there is no free band at 480x270), the hint is drawn on the same y as the footer,
@@ -759,7 +762,7 @@ export class GameOverScene extends Phaser.Scene {
    */
   _buildShopHint() {
     if (this.shopHint) return;
-    this.shopHint = new NeonText(this, this.theme, GAME_WIDTH - 4, GAME_HEIGHT - 5, `SHOP: ${SHOP_KEY}`, {
+    this.shopHint = new NeonText(this, this.theme, GAME_WIDTH - 4, GAME_HEIGHT - 5, SHOP_HINT, {
       color: 'amber', anchor: 'right', vAnchor: 0.5, outline: 'none',
     });
     this.shopHint.setAlpha(0.75);
