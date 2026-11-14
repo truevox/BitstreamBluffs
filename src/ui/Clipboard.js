@@ -16,17 +16,20 @@ export async function copyText(text) {
   } catch (e) {
     /* fall through to execCommand */
   }
+  let ta = null;
   try {
-    const ta = document.createElement('textarea');
+    ta = document.createElement('textarea');
     ta.value = text;
     ta.setAttribute('readonly', '');
     ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
     document.body.appendChild(ta);
     ta.select();
-    const ok = document.execCommand('copy');
-    ta.remove();
-    return !!ok;
+    return !!document.execCommand('copy');
   } catch (e) {
     return false;
+  } finally {
+    // A throwing execCommand used to skip the remove and leave a focused, invisible textarea in the page,
+    // which then swallowed the next keystrokes.
+    if (ta) ta.remove();
   }
 }
