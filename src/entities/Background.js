@@ -73,8 +73,8 @@ const MOTIF_DEFS = {
   stars: {
     shape: 'crater',
     layers: [
-      { baseY: 0.6, amp: 34, factor: 0.06, seed: 2.6, color: 'magenta', fillAlpha: 0.1, lineAlpha: 0.42 },
-      { baseY: 0.72, amp: 26, factor: 0.17, seed: 5.3, color: 'cyan', fillAlpha: 0.09, lineAlpha: 0.4 },
+      { baseY: 0.62, amp: 52, factor: 0.06, seed: 2.6, color: 'magenta', fillAlpha: 0.1, lineAlpha: 0.45 },
+      { baseY: 0.76, amp: 40, factor: 0.17, seed: 5.3, color: 'cyan', fillAlpha: 0.09, lineAlpha: 0.42 },
     ],
   },
   // Candy Cane Canyon: round gumdrop hills under a candy-striped sky, canes and lollipops on the ridges.
@@ -162,12 +162,12 @@ export function motifProfile(shape, wx, seed) {
     const f = (wx + seed * 97) / 150;
     const c = Math.floor(f);
     const u = f - c;
-    let h = 0.5 + 0.06 * Math.sin(wx * 0.02 + seed);
+    let h = 0.45 + 0.03 * Math.sin(wx * 0.02 + seed);
     if (hash01(c, seed * 1000) < 0.8) {
-      const r = 0.2 + 0.16 * hash01(c + 7919, seed * 1000);
+      const r = 0.22 + 0.16 * hash01(c + 7919, seed * 1000);
       const t = (u - 0.5) / r;
-      if (Math.abs(t) < 1) h -= 0.38 * (1 - t * t);
-      h += 0.3 * Math.exp(-(((Math.abs(t) - 1) / 0.18) ** 2));
+      if (Math.abs(t) < 1) h -= 0.4 * (1 - t * t);
+      h += 0.3 * Math.exp(-(((Math.abs(t) - 1) / 0.24) ** 2));
     }
     return clamp01(h);
   }
@@ -285,24 +285,24 @@ function decorLayout(motif, seed) {
     };
   } else if (motif === 'candy-stripes') {
     lay = {
-      canes: items(4, (i) => ({ x0: (i + rnd() * 0.7) * (DECOR_TILE / 4), h: span(30, 44), flip: rnd() < 0.5 })),
-      pops: items(3, (i) => ({ x0: (i + rnd() * 0.7) * (DECOR_TILE / 3), r: span(8, 12), stick: span(18, 26), color: ['magenta', 'amber', 'lime'][i % 3], ph: rnd() * 6.28 })),
+      canes: items(6, (i) => ({ x0: (i + rnd() * 0.7) * (DECOR_TILE / 6), h: span(30, 44), flip: rnd() < 0.5 })),
+      pops: items(5, (i) => ({ x0: (i + rnd() * 0.7) * (DECOR_TILE / 5), r: span(8, 12), stick: span(18, 26), color: ['magenta', 'amber', 'lime'][i % 3], ph: rnd() * 6.28 })),
     };
   } else if (motif === 'jellyfish') {
     lay = {
-      jellies: items(5, (i) => {
+      jellies: items(7, (i) => {
         const size = span(7, 14);
-        return { x0: (i + rnd() * 0.6) * (DECOR_TILE / 5), y: span(GAME_HEIGHT * 0.15, GAME_HEIGHT * 0.4), s: size, f: 0.03 + ((size - 7) / 7) * 0.06, color: ['magenta', 'cyan', 'lime'][i % 3], ph: rnd() * 6.28 };
+        return { x0: (i + rnd() * 0.6) * (DECOR_TILE / 7), y: span(GAME_HEIGHT * 0.15, GAME_HEIGHT * 0.4), s: size, f: 0.03 + ((size - 7) / 7) * 0.06, color: ['magenta', 'cyan', 'lime'][i % 3], ph: rnd() * 6.28 };
       }),
     };
   } else if (motif === 'brass-pipes') {
     lay = {
-      gears: items(3, (i) => ({ x0: (i + rnd() * 0.6) * (DECOR_TILE / 3), y: span(GAME_HEIGHT * 0.34, GAME_HEIGHT * 0.44), r: span(15, 26), ph: rnd() * 6.28, dir: i % 2 ? -1 : 1 })),
+      gears: items(4, (i) => ({ x0: (i + rnd() * 0.6) * (DECOR_TILE / 4), y: span(GAME_HEIGHT * 0.2, GAME_HEIGHT * 0.28), r: span(15, 24), ph: rnd() * 6.28, dir: i % 2 ? -1 : 1 })),
       pipeY: GAME_HEIGHT * 0.555,
       drops: items(15, () => rnd() < 0.3),
     };
   } else if (motif === 'dew-drops') {
-    const blade = (layer, lo, hi) => (i, n) => ({ layer, x0: (i + rnd() * 0.8) * (DECOR_TILE / n), h: span(lo, hi), w: span(3, 6) * (hi / 70), lean: span(-18, 18), drop: rnd() < 0.75, dt: span(0.45, 0.8), ph: rnd() * 6.28 });
+    const blade = (layer, lo, hi) => (i, n) => ({ layer, x0: (i + rnd() * 0.8) * (DECOR_TILE / n), h: span(lo, hi), w: span(5, 8) * (hi / 70), lean: span(-18, 18), drop: rnd() < 0.75, dt: span(0.45, 0.8), ph: rnd() * 6.28 });
     const far = blade(0, 34, 60);
     const near = blade(1, 62, 100);
     lay = { blades: [...items(6, (i) => far(i, 6)), ...items(5, (i) => near(i, 5))] };
@@ -381,12 +381,13 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0) {
     // Candy-cane sky: slanted alternating bands across the upper sky, scrolling slowly.
     const P = 28;
     const yb = H * 0.5;
-    const K = yb * 0.6;
+    const K = yb * 0.4;
     const off = sx * 0.04;
-    const k0 = Math.floor(off / P) - 1;
-    for (let k = k0; ; k++) {
+    // First band whose top edge reaches the screen; the last one must cover the bottom-right corner,
+    // which the slant pushes K px to the left of its top edge.
+    for (let k = Math.floor(off / P); ; k++) {
       const x = k * P - off;
-      if (x > W + 4) break;
+      if (x > W + K) break;
       out.push({
         kind: 'poly', depth: -1, color: k % 2 === 0 ? 'magenta' : 'text', fillAlpha: 0.05, lineAlpha: 0,
         pts: [{ x, y: 0 }, { x: x + P, y: 0 }, { x: x + P - K, y: yb }, { x: x - K, y: yb }],
@@ -407,8 +408,10 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0) {
         path.push({ x: x + dir * (6 + Math.cos(a) * 6), y: top - Math.sin(a) * 6 });
       }
       path.push({ x: x + dir * 12, y: top + 5 });
-      for (let i = 0; i < path.length - 1; i++) {
-        out.push({ kind: 'line', depth: 0, color: i % 2 === 0 ? 'magenta' : 'text', alpha: 0.7, width: 3, pts: [path[i], path[i + 1]] });
+      // One white stroke for the whole cane, then a red stripe on every other segment.
+      out.push({ kind: 'line', depth: 0, color: 'text', alpha: 0.7, width: 3, pts: path });
+      for (let i = 0; i < path.length - 1; i += 2) {
+        out.push({ kind: 'line', depth: 0, color: 'magenta', alpha: 0.8, width: 3, pts: [path[i], path[i + 1]] });
       }
     }
     // Lollipops on the near ridge: stick, disc, and a slowly turning spiral.
@@ -512,7 +515,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0) {
       out.push({ kind: 'poly', depth: b.layer, color: 'lime', fillAlpha: 0.18, lineAlpha: 0.5, pts: [...left, ...right.reverse()] });
       if (b.drop) {
         const c = centre(b.dt);
-        const r = 3 + b.h / 28;
+        const r = 3.5 + b.h / 16;
         const dx = c.x + (b.lean >= 0 ? -1 : 1) * b.w * (1 - b.dt) * 0.4;
         const dy = c.y - r * 0.6;
         out.push({ kind: 'circle', depth: b.layer, color: 'cyan', fillAlpha: 0.3, lineAlpha: 0.75, x: dx, y: dy, r });
@@ -530,13 +533,14 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0) {
       for (let c = c0; c <= c1; c++) {
         if (hash01(c, L.seed * 1000 + 17) < 0.25) continue;
         const cx = (c + 0.5) * CONE_W - s71 - off;
+        if (cx < -60 || cx > W + 60) continue;
         const top = layerYAt(def.shape, L, sx, cx) + 1;
         out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 });
         const cell = hash01(c, 4242);
         for (let k = 0; k < 6; k++) {
           const age = (((t / 3800 + k / 6 + cell) % 1) + 1) % 1;
           out.push({
-            kind: 'circle', depth: li, color: 'text', fillAlpha: 0.22 * (1 - age), lineAlpha: 0,
+            kind: 'circle', depth: li, color: 'text', fillAlpha: 0.3 * (1 - age), lineAlpha: 0,
             x: cx + age * 14 * lay.wind + Math.sin(age * 5 + lay.ph + c) * 3,
             y: top - 4 - age * plumeH,
             r: (2.5 + age * 8) * (li === 0 ? 1 : 0.8),
