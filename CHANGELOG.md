@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - W6 biome backdrops (audit T1)
+## v2.4.2 - W6 biome backdrops (audit T1, 2026-11-14)
 
 - **The six W6 biomes now have their own backdrops (T1).** Space Mountain (`stars`), Candy Cane Canyon (`candy-stripes`), Sky Jellyfish Mountain (`jellyfish`), Steampunk Slopes (`brass-pipes`), Micro Mountain (`dew-drops`) and Vertigo Vents (`vents`) named backgrounds that did not exist. They fell back to the base ridges, and `bg.motif` was null inside them. Each one now has its own silhouette and drawn decor: a crater horizon with a starfield and a ringed planet; gumdrop hills with a candy-striped sky, candy canes and lollipops; cloud banks with drifting jellyfish; a factory roofline with turning gears and a brass pipe run; moss with grass blades and big dew drops; flat-topped cones with glowing vents and smoke plumes. All of it is drawn in code from the biome's palette keys (no assets), so colour-blind mode still applies. Nothing uses the `danger` colour. Animation comes from scene time only.
 - The base backdrop and the five batch-1 motifs make the same draw calls as before.
