@@ -2,11 +2,11 @@
 
 ## v2.6.0 - biome treatment B1: Wards (Debumont, Garbage Dump Glacier, Underwater Mountain, Candy Cane Canyon) (2026-11-14)
 
-- **Chocolate River slow 0.5 → 0.6, chance 0.75 → 0.5** (lead ruling): it now sits under the gentle-slow rule, so it reaches the 35–55 % presence band (it was ~21 %); Sweet-Tooth Coating still wards it.
+- **Chocolate River slow 0.5 → 0.6 for 1.0 s (was 1.5 s), chance 0.75 → 0.5** (lead ruling): it now sits under the gentle-slow rule, so it reaches the 35–55 % presence band (it was ~21 %); the shorter slow keeps Candy inside the ±15 % sim tolerance (hop survival 20/48 = baseline, distance −2.8 %, speed −0.4 %; flip distance +1.8 %, speed −0.8 %, measured with the Sugar Rush 0.8 air steer). Sweet-Tooth Coating still wards it.
 - **Debumont:** Groomer Cat (ground, slows the sled to 0.7 for 0.9 s) and Maple Wax (speed boost 1.2 for 2 s).
 - **Garbage Dump Glacier:** Seagull Dive (air, in jump arcs, crash, `danger`) and Slick Wax Spray (wards off sticky ground for 4 s, plus a 1.1 speed boost while it lasts).
 - **Underwater Mountain:** Seaweed Tangle (ground, slow 0.6 for 1.2 s) and Aqua-Lung Bubble (wards off the slow-motion current for 4 s).
-- **Candy Cane Canyon:** Chocolate River (a ground strip, slow 0.6 for 1.5 s) and Sweet-Tooth Coating (wards off every slow for 5 s, so a river hit does nothing).
+- **Candy Cane Canyon:** Chocolate River (a ground strip, slow 0.6 for 1.0 s) and Sweet-Tooth Coating (wards off every slow for 5 s, so a river hit does nothing).
 - **Slot rule:** when a biome chunk has no free ground slot, its biome hazard can replace one base ground hazard in place, if its box fits within that hazard's box + 8 px and the spot passes every biome ground rule. The pick uses the slot's existing 5th draw, so no other stream moves. Without it the three slow biome hazards would almost never appear.
 - **Ward speed boost:** a ward can carry a `speedFactor` (1 to 1.2) that lasts as long as the ward and stacks with, never replaces, a Packet Burst or Maple Wax.
 - **Fix:** a speed boost now expires under its own id (it always reported `packetBurst`).

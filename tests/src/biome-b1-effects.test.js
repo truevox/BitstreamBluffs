@@ -75,7 +75,7 @@ describe('B1 hazards through RunScene.onHazard (shipped defs)', () => {
   test.each([
     ['groomerCat', 0.7, 900],
     ['seaweedTangle', 0.6, 1200],
-    ['chocolateRiver', 0.6, 1500],
+    ['chocolateRiver', 0.6, 1000],
   ])('%s: a slow of %p x %p ms on the sled (instant velocity cut + tuner speedMul), then it ends', (id, k, ms) => {
     const s = makeRun();
     s.onHazard(hit(id));
