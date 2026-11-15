@@ -411,3 +411,37 @@ e2fsck -n reported the filesystem clean. We did NOT modify LV flags,
 repair the volume, or disrupt current inference services. If we
 proceed with ACE-Step, fix and back up CT214 deliberately, or use an
 isolated new runtime after checking model weights / hardware.
+
+## Single authorized Kie.ai organ cover spin (2026-11-15)
+
+**Marvin explicitly authorized ONE paid Kie.ai generation** using
+Maxi's separated vocal stem, aiming for either church organ or
+holographic pads. Gal Friday selected church organ because V3
+Vertigo organ is the established artistic benchmark.
+
+**Task and result:** Kie Upload & Cover V6 processed a 256kbps MP3
+copy of the entire 214.976-second original isolated vocal (original
+FLAC untouched), instrumental=true, style solo cathedral organ,
+audio_weight=0.95, style_weight=0.85, weirdness_constraint=0.05,
+variety=0, target duration 215s. Exactly one Kie generation task
+2a05f8478617530bec35454aa1d9e686 was accepted and completed,
+consuming **12 credits TOTAL**. That same task returned **two**
+48kHz stereo MP3 takes, each 214.824s long. This is not two spins.
+
+Both downloaded and archived on CT223 under
+/home/hermes/experiments/bitstream-kie-cover-20261115/.
+Same-clock excerpt switching against unchanged V3 Vertigo organ,
+Maxi original vocal, optional backing, with links to both full MP3s:
+http://100.115.120.66:8181/tools/music/audition-kie-organ/
+
+Research/provenance document:
+tools/music/kie-cover-proof/README.md
+Listening site:
+tools/music/audition-kie-organ/
+Generated audio is Git-ignored; no game audio or old labs changed.
+
+**Limits:** Kie is a *generative cover*, not a guaranteed
+time-synchronous vocal-to-organ timbre converter. It may
+reinterpret pitches, timing and instrumentation despite strong
+style requests. User has NOT yet audited/approved either take
+or replacement in the game. V3 organ is preserved as reference.

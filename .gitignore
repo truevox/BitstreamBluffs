@@ -45,3 +45,5 @@ public/music/
 *.pyc
 /public/music-audition-spice/
 /dist-music-audition-spice/
+/public/music-audition-kie-organ/
+/dist-music-audition-kie-organ/
