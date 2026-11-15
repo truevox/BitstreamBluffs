@@ -234,6 +234,7 @@ describe('the on-screen hint', () => {
     ctx._onAction('cancel');
     expect(ctx.footer.text).toBe(RETRY_FOOTER);
     expect(ctx.footer.depth).toBe(0);
+    expect(ctx.shopArmed).toBe(false); // a closed shop is never left armed
   });
 
   test('unarmed: the footer still promises retry, which is what Enter does then', () => {

@@ -142,6 +142,15 @@ describe('one group order for the grid', () => {
     expect(groupedAchievements().map((g) => g.group)).toEqual(GROUP_ORDER.filter((g) => ACHIEVEMENTS.some((a) => a.group === g)));
   });
 
+  test('sections follow GROUP_ORDER even when the list starts with a later group', () => {
+    const fx = [
+      { id: 'b', group: 'biomes', metric: 'biomesDiscovered', target: 2 },
+      { id: 's', group: 'skill', metric: 'bestCombo', target: 1.25 },
+      { id: 'd', group: 'distance', metric: 'runs', target: 1 },
+    ];
+    expect(groupedAchievements(fx).map((g) => g.group)).toEqual(['distance', 'skill', 'biomes']);
+  });
+
   test('the grid labels list the same groups in the same order', () => {
     expect(GROUPS.map((g) => g.id)).toEqual([...GROUP_ORDER]);
   });

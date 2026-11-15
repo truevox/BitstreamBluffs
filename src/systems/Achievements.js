@@ -238,12 +238,13 @@ export function progressFor(def, metrics) {
 
 /**
  * Group the catalogue for the grid display.
+ * @param {Array<Object>} [list] defaults to the shipped catalogue (the optional list is additive, for tests)
  * @returns {Array<{group:string,items:Array<Object>}>}
  */
-export function groupedAchievements() {
+export function groupedAchievements(list = ACHIEVEMENTS) {
   // GROUP_ORDER, not first appearance: the section order is a decision, not an accident of the file.
   const by = new Map();
-  for (const a of ACHIEVEMENTS) {
+  for (const a of Array.isArray(list) ? list.filter(Boolean) : []) {
     if (!by.has(a.group)) by.set(a.group, []);
     by.get(a.group).push(a);
   }
