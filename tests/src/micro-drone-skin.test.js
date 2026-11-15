@@ -166,7 +166,7 @@ describe('Neon Sled Drone: granted as the completion is credited', () => {
     expect(out.awards.achievements.map((a) => a.id)).toEqual([DRONE]);
     const toast = toastLayout(out.awards.achievements);
     expect(toast.lines[0].text).toBe('UNLOCKED NEON SLED DRONE');
-    expect(toast.lines[1].text).toMatch(/RIDER SKIN/);
+    expect(toast.lines[1].text).toBe('RIDER SKIN: EQUIP IN SHOP'); // whole, not ellipsized (138 px line)
   });
 
   test('encountering Micro Mountain without completing it grants nothing', () => {

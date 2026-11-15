@@ -394,7 +394,8 @@ function grantBiomeCosmetics(before, next) {
     grantAchievementReward(next, { reward: { cosmetic: it.id } });
     out.push({
       id: it.id, kind: 'cosmetic', grant: 'biome', biome: it.biome, slot: it.slot, name: it.name,
-      desc: it.slot === 'rider' ? 'Rider skin. Equip it in the Shard Shop.' : 'Equip it in the Shard Shop.',
+      // fits the 138 px toast line uncut (RIDER SKIN: EQUIP IN SHOP is 125 px)
+      desc: `${it.slot} skin: equip in shop`.replace(/^./, (c) => c.toUpperCase()),
     });
   }
   return out;

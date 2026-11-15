@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 58; // Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
-const EXPECTED_WITHOUT_BOOSTS = 46; // Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
+const EXPECTED_WITH_BOOSTS = 64; // Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 52; // Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -3099,6 +3099,232 @@ async function main() {
           else if (base.grounded < 20 || glide.grounded < 20) fail(puName, `the sled was not on the ground (grounded frames ${base.grounded} / ${glide.grounded})`);
           else if (!(glide.speed > base.speed + 0.5)) fail(puName, `speed after 45 frames: ${glide.speed.toFixed(2)} gliding vs ${base.speed.toFixed(2)} without`);
           else pass(puName, `${run}: groundResist ${base.resist.toFixed(4)} -> ${glide.resist.toFixed(4)}; same pose, 45 frames: speed ${base.speed.toFixed(1)} -> ${glide.speed.toFixed(1)} px/s, x ${base.x.toFixed(0)} -> ${glide.x.toFixed(0)}`);
+        }
+      }
+    }
+
+    // ---- Micro Mountain glow-up. (1) HUGE bees: a real beegate0@512 run (sector 2, 1000-1500 m, is Micro Mountain,
+    // sector 3 is base terrain) rides the live loop into Micro; the backdrop draws bees (Background.beeCount, sampled
+    // over 3 s since a bee drifts on and off screen), and the backdrop Graphics is below the terrain, hazard,
+    // pickup and sled depths. A mask-0 run draws none. (2) The Neon Sled Drone: the real Shard Shop lists it locked
+    // (COMPLETE MICRO MOUNTAIN, disabled, selecting it changes nothing); the same seed ridden through the whole Micro
+    // sector and crashed in sector 3 completes it, the credit grants rider-drone and Game Over toasts it; the shop
+    // then reads EQUIP, equipping writes equipped.rider = drone; and the next run's real Sled draws the drone.
+    // Lead hand-play: seed beegate0@512, ride past 1500 m, crash; Profile -> SHARD SHOP -> RIDER page.
+    {
+      const name = {
+        bees: 'Micro glow: a beegate0@512 run in its Micro sector draws HUGE bees in the backdrop, behind the terrain, hazards, pickups and sled',
+        noBees: 'Micro glow: a mask-0 run draws no bees',
+        locked: 'Micro glow: the Shard Shop rider page lists NEON SLED DRONE locked as COMPLETE MICRO MOUNTAIN, and selecting it does nothing',
+        grant: 'Micro glow: a beegate0@512 run that completes the Micro sector grants rider-drone, and Game Over toasts UNLOCKED NEON SLED DRONE',
+        equip: 'Micro glow: the shop then shows NEON SLED DRONE as EQUIP, and equipping it writes equipped.rider = drone',
+        draws: 'Micro glow: the next run\'s real Sled draws the drone (riderShape drone, rotors and blinking lights)',
+      };
+      const startRunAt = `async (g, seed, mask) => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        // a live run must be stopped first, or the wait below would find ITS sled and return the old run
+        for (const k of ['RunScene', 'UIScene', 'GameOverScene']) { try { g.scene.stop(k); } catch (e) { /* not running */ } }
+        await wait(200);
+        if (Number.isFinite(mask)) g.registry.set('biomeMask', mask);
+        g.scene.start('TitleScene');
+        await wait(900);
+        const t = g.scene.getScene('TitleScene');
+        t.starting = false;
+        if (Number.isFinite(mask)) t.startRun(seed, mask); else t.startRun(seed);
+        const t0 = Date.now();
+        while (Date.now() - t0 < 15000) {
+          const rr = g.scene.getScene('RunScene');
+          if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) return rr;
+          await wait(100);
+        }
+        return null;
+      }`;
+      // (1) bees, then a mask-0 control
+      {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        let out;
+        try {
+          out = await page.evaluate(async (src) => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const startAt = eval(src); // eslint-disable-line no-eval
+            const sample = async (run, ms) => {
+              let most = 0; let frames = 0; let motif = null;
+              const t0 = Date.now();
+              while (Date.now() - t0 < ms) {
+                run.sled.invulnerableMs = 600000;
+                most = Math.max(most, run.bg.beeCount || 0);
+                motif = run.bg.motif;
+                frames += 1;
+                await wait(50);
+              }
+              return { most, frames, motif };
+            };
+            let run = await startAt(g, 'beegate0@512');
+            if (!run) return { fatal: 'RunScene never produced a live sled (micro)' };
+            const s = run.sled;
+            const sx = 1060 * 20;
+            run.streamTerrain(sx);
+            const ang = run.slopeAt(sx);
+            s.setPose(sx, run.terrain.heightAt(sx) - 18, ang, Math.cos((ang * Math.PI) / 180) * 300, Math.sin((ang * Math.PI) / 180) * 300);
+            const micro = await sample(run, 3000);
+            const depths = {
+              bg: run.bg.gfx.depth,
+              terrain: Math.min(...run.children.list.filter((o) => o !== run.bg.gfx && o.type === 'Graphics' && o.depth >= 0).map((o) => o.depth)),
+              sled: run.sled.gfx.depth,
+              hazards: [...run.hazards.values()].flat().map((h) => h.gfx && h.gfx.depth).filter((d) => Number.isFinite(d)),
+              powerups: [...run.powerups.values()].flat().map((p) => p.gfx && p.gfx.depth).filter((d) => Number.isFinite(d)),
+            };
+            run = await startAt(g, 'beegate0', 0);
+            if (!run) return { fatal: 'RunScene never produced a live sled (mask 0)' };
+            const baseMask = run.biomeMask;
+            run.streamTerrain(1060 * 20);
+            run.sled.setPose(1060 * 20, run.terrain.heightAt(1060 * 20) - 18, run.slopeAt(1060 * 20), 300, 0);
+            const base = await sample(run, 2000);
+            run.sled.invulnerableMs = 0;
+            return { micro, depths, base: { ...base, mask: baseMask } };
+          }, startRunAt).catch((e) => ({ fatal: String(e) }));
+        } finally { await page.close(); }
+        if (out.fatal || errors.length) {
+          fail(name.bees, out.fatal || `page errors: ${errors.join(' | ')}`);
+          fail(name.noBees, out.fatal || `page errors: ${errors.join(' | ')}`);
+        } else {
+          const d = out.depths;
+          const front = [d.terrain, d.sled, ...d.hazards, ...d.powerups];
+          if (out.micro.motif !== 'dew-drops') fail(name.bees, `backdrop motif ${out.micro.motif} (want dew-drops)`);
+          else if (!(out.micro.most >= 1 && out.micro.most <= 2)) fail(name.bees, `beeCount peaked at ${out.micro.most} over ${out.micro.frames} samples (want 1..2)`);
+          else if (!front.every((x) => d.bg < x)) fail(name.bees, `backdrop depth ${d.bg} is not below ${JSON.stringify(d)}`);
+          else pass(name.bees, `motif dew-drops, up to ${out.micro.most} bee(s) over ${out.micro.frames} samples; backdrop depth ${d.bg} < terrain ${d.terrain}, sled ${d.sled}, hazards ${[...new Set(d.hazards)]}, pickups ${[...new Set(d.powerups)]}`);
+          if (out.base.mask !== 0) fail(name.noBees, `the control run is at mask ${out.base.mask}, not 0`);
+          else if (out.base.most !== 0) fail(name.noBees, `mask-0 run drew ${out.base.most} bee(s) (motif ${out.base.motif})`);
+          else pass(name.noBees, `run mask 0 at 1060 m: beeCount 0 over ${out.base.frames} samples, motif ${out.base.motif}`);
+        }
+      }
+      // (2) the skin, end to end
+      {
+        // Every achievement already stamped, so the drone is this run's only unlock and the toast names it (the
+        // mixed-with-achievements order is pinned in tests/src/micro-drone-skin.test.js).
+        const allAch = Object.fromEntries(readJson('src/data/achievements/achievements.json').achievements.map((a) => [a.id, 1]));
+        const profile = { ...JSON.parse(JSON.stringify(PROFILE)), biomeMask: 0, achievements: allAch };
+        const { page, errors } = await bootWithProfile(browser, port, profile);
+        let out;
+        try {
+          out = await page.evaluate(async (src) => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const startAt = eval(src); // eslint-disable-line no-eval
+            const openRiderShop = async () => {
+              g.scene.start('TitleScene');
+              await wait(900);
+              const title = g.scene.getScene('TitleScene');
+              const idx = title.menu.items.findIndex((i) => String(i.label).toUpperCase() === 'PROFILE');
+              title.menu.setSelected(idx);
+              title.menu.activate(idx);
+              await wait(400);
+              title.view._openShop();
+              await wait(300);
+              const shop = title.view;
+              for (let i = 0; i < 4 && shop.page !== 2; i++) shop._turnPage(1);
+              return { title, shop };
+            };
+            const droneRow = (shop) => {
+              const idx = shop.menu.items.findIndex((i) => i.id === 'rider-drone');
+              const it = shop.menu.items[idx];
+              return { idx, label: it && it.label, sub: it && it.sub, disabled: it && it.disabled };
+            };
+            const prof = () => g.registry.get('profile') || {};
+            // locked
+            let { shop } = await openRiderShop();
+            const lockedRow = droneRow(shop);
+            shop.menu.setSelected(lockedRow.idx, true);
+            shop.menu.activate(lockedRow.idx);
+            await wait(100);
+            const afterLockedTry = { rider: (prof().equipped || {}).rider, owned: ((prof().unlocked || {}).cosmetics || []).includes('rider-drone') };
+            shop.close();
+            // complete the Micro sector (sector 2) and crash in sector 3
+            const run = await startAt(g, 'beegate0@512');
+            if (!run) return { fatal: 'RunScene never produced a live sled' };
+            const entered = [];
+            const onEnter = (p) => { if (p && p.id) entered.push(p.id); };
+            g.events.on('bb:biomeEnter', onEnter);
+            let visits = null;
+            const onEnd = (p) => { visits = p && p.biomeVisits; };
+            g.events.on('bb:runEnd', onEnd);
+            const s = run.sled;
+            const ride = async (m, untilMs, stop) => {
+              const x = m * 20;
+              run.streamTerrain(x);
+              const ang = run.slopeAt(x);
+              s.setPose(x, run.terrain.heightAt(x) - 18, ang, Math.cos((ang * Math.PI) / 180) * 400, Math.sin((ang * Math.PI) / 180) * 400);
+              const t0 = Date.now();
+              while (Date.now() - t0 < untilMs && !(stop && stop())) { s.invulnerableMs = 600000; await wait(50); }
+            };
+            await ride(1060, 1500, () => entered.includes('micro-mountain'));
+            await ride(1520, 600);
+            s.invulnerableMs = 0;
+            run.pendingCrash = { cause: 'chasm' };
+            let over = null;
+            const t2 = Date.now();
+            while (Date.now() - t2 < 15000) {
+              const go = g.scene.getScene('GameOverScene');
+              if (go && go.scene.isActive()) { over = go; break; }
+              await wait(100);
+            }
+            g.events.off('bb:biomeEnter', onEnter);
+            g.events.off('bb:runEnd', onEnd);
+            if (!over) return { fatal: 'Game Over never became active' };
+            await wait(400);
+            const toast = (over.toast || []).map((t) => (t && t.main ? t.main.text : null)).filter(Boolean);
+            const awardIds = ((g.registry.get('lastAwards') || {}).achievements || []).map((a) => a.id);
+            const rec = g.registry.get('lastRecord') || {};
+            const granted = { cosmetics: (prof().unlocked || {}).cosmetics || [], completed: (prof().biomeProgress || {}).completed || [] };
+            // owned in the shop, equip it
+            ({ shop } = await openRiderShop());
+            const ownedRow = droneRow(shop);
+            shop.menu.setSelected(ownedRow.idx, true);
+            shop.menu.activate(ownedRow.idx);
+            await wait(150);
+            const equippedRow = droneRow(shop);
+            const equipped = (prof().equipped || {}).rider;
+            shop.close();
+            // the next run draws it
+            const next = await startAt(g, 'beegate0', 0);
+            if (!next) return { fatal: 'the next run never produced a live sled' };
+            await wait(600);
+            const lights0 = next.sled.drone ? next.sled.drone.lights.map((l) => l.on) : null;
+            await wait(300);
+            const lights1 = next.sled.drone ? next.sled.drone.lights.map((l) => l.on) : null;
+            return {
+              lockedRow, afterLockedTry, entered, visits, distanceM: rec.distanceM, toast, awardIds, granted, ownedRow, equippedRow, equipped,
+              draw: {
+                look: next.look ? next.look.riderShape : null,
+                shape: next.sled.lastRiderShape,
+                rotors: next.sled.drone ? next.sled.drone.rotors.length : 0,
+                lights0, lights1,
+              },
+            };
+          }, startRunAt).catch((e) => ({ fatal: String(e) }));
+        } finally { await page.close(); }
+        if (out.fatal || errors.length) {
+          for (const k of ['locked', 'grant', 'equip', 'draws']) fail(name[k], out.fatal || `page errors: ${errors.join(' | ')}`);
+        } else {
+          const L = out.lockedRow;
+          if (L.label !== 'NEON SLED DRONE' || L.sub !== 'COMPLETE MICRO MOUNTAIN' || L.disabled !== true) fail(name.locked, `row ${JSON.stringify(L)}`);
+          else if (out.afterLockedTry.rider !== 'default' || out.afterLockedTry.owned) fail(name.locked, `selecting the locked row changed the profile ${JSON.stringify(out.afterLockedTry)}`);
+          else pass(name.locked, `row ${L.label} / ${L.sub}, disabled; profile unchanged after selecting it`);
+          if (!out.entered.includes('micro-mountain')) fail(name.grant, `the run never announced Micro Mountain (BIOME_ENTER ${out.entered})`);
+          else if (!out.visits || !out.visits.completed.includes('micro-mountain')) fail(name.grant, `RUN_END.biomeVisits ${JSON.stringify(out.visits)} (${out.distanceM} m)`);
+          else if (!out.granted.cosmetics.includes('rider-drone')) fail(name.grant, `rider-drone not granted (${out.granted.cosmetics}; completed ${out.granted.completed})`);
+          else if (out.awardIds.join() !== 'rider-drone') fail(name.grant, `awards toast list ${JSON.stringify(out.awardIds)} (want ["rider-drone"])`);
+          else if (!out.toast.includes('UNLOCKED NEON SLED DRONE')) fail(name.grant, `toast ${JSON.stringify(out.toast)}`);
+          else pass(name.grant, `${out.distanceM} m, biomeVisits ${JSON.stringify(out.visits)}, unlocked.cosmetics has rider-drone, toast ${JSON.stringify(out.toast)}`);
+          if (out.ownedRow.sub !== 'EQUIP' || out.ownedRow.disabled) fail(name.equip, `owned row ${JSON.stringify(out.ownedRow)}`);
+          else if (out.equipped !== 'drone' || out.equippedRow.sub !== 'EQUIPPED') fail(name.equip, `equipped.rider ${out.equipped}, row ${JSON.stringify(out.equippedRow)}`);
+          else pass(name.equip, `row EQUIP -> EQUIPPED, equipped.rider = ${out.equipped}`);
+          const D = out.draw;
+          if (D.look !== 'drone' || D.shape !== 'drone') fail(name.draws, `look.riderShape ${D.look}, sled.lastRiderShape ${D.shape}`);
+          else if (D.rotors !== 2 || !D.lights0 || D.lights0[0] === D.lights0[1]) fail(name.draws, `drone draw state ${JSON.stringify(D)}`);
+          else pass(name.draws, `look.riderShape drone, sled.lastRiderShape drone, 2 rotors, lights ${JSON.stringify(D.lights0)} -> ${JSON.stringify(D.lights1)}`);
         }
       }
     }
