@@ -98,12 +98,14 @@ Authoritative typedefs: `src/data/schemas.js` (terrain/content), `src/events.js`
   touchOverlay: 'auto'|'on'|'off', touchRotate90, lastInitials}`. Live copy at `registry REG.SETTINGS`.
 * **RunRecord**: `{version, id, seed, dailyRuleId, startedAt, endedAt, durationMs, score, distanceM, trickPoints,
   tricks{type:count}, bestCombo, maxAirtimeMs, cause: 'crash'|'quit', ledgerHash, initials?}`.
-  `ledgerHash = SaveStore.computeLedgerHash(record)`. RunScene builds it and calls `saveRun` (no initials);
+  `ledgerHash = SaveStore.computeLedgerHash(record)` (versioned since decisions 1/2/4/6: see the addendum at the end;
+  new records also carry `hashV: 2`, `dailyOfficial`, `bestFlow`, and `boosts` when modded). RunScene builds it and calls `saveRun` (no initials);
   GameOverScene later calls `setInitials(id, initials)` (3+ chars). Leaderboard = runs with initials.
 * **DailyRule.modifiers** (multipliers, default 1): `tuckSpeedMul, tuckSteerMul, gravityMul, frictionMul,
   airControlMul, pushForceMul`. The daily rule (chosen from the UTC date) applies to **every** run that day and its id is
   stored in every RunRecord. RunScene reads `DailyPatch.getDailyInfo()` once at run start and feeds `rule.modifiers`
-  to `PhysicsTuner`.
+  to `PhysicsTuner`. Exception (decision 2): a run on a `daily-YYYY-MM-DD` seed plays THAT date's rule
+  (`DailyPatch.infoForDateKey`).
 * **Scoring** (`ScoreManager`): distance +1/m (whole metres, monotonic); trick value = `SCORING.trickBase[type] x
   rotation x airtime modifier` (core engineer defines the two factors, documents them in the file header); combo x1,
   +0.25 per *unique* trick type before landing; tricks are **provisional until landing** and are discarded on crash;
@@ -116,6 +118,7 @@ Authoritative typedefs: `src/data/schemas.js` (terrain/content), `src/events.js`
 | `SAVE_STORE`, `SETTINGS`, `CONTENT`, `INPUT`, `AUDIO` | `createServices(game)` (`services.js`), called by `PreloadScene.create()` | once, at boot | whole session |
 | `SEED` | `createServices` (random default); overwritten by `TitleScene` | boot / title | until changed |
 | `LAST_RECORD` | `RunScene` | on run end | until next run end |
+| `DAILY_OFFICIAL` | `TitleScene.startRun` (true only from DAILY RUN), `GameOverScene.retry` / `newSeed` | run start | until the next start (decision 2) |
 
 Per-run objects (**not** in the registry; created by `RunScene.create()` and dropped on shutdown): `Rng`-seeded
 `TerrainGenerator`, `ScoreManager`, `TrickTracker`, `GlitchDirector`, `PhysicsTuner`, `Sled`, `TerrainMesh`, entity
@@ -655,9 +658,8 @@ scope so seed-best compares within one mask; omitting it keeps pre-W3 behaviour.
 
 **Daily.** The Daily Run's mask is derived from the UTC date key alone - identical for every
 player, independent of unlocks (a locked biome may appear as a preview, per D6). 9-day cycle:
-4 clear days plus one day per batch-1 biome. `getDailyStats` does *not* filter on the stored
-mask: every run on `daily-YYYY-MM-DD` was played at that day's mask by definition, so the seed
-already scopes it, and filtering as well would hide every pre-W3 daily run.
+4 clear days plus one day per batch-1 biome. SUPERSEDED by decisions 1/2 (addendum at the end):
+`getDailyStats` now counts only official Daily runs and filters on the date's mask explicitly.
 
 **UI.** Biome entry raises a banner through the same serialised strip queue as the mission
 toast, so the two cannot overlap. Seed entry accepts `seed@mask`; a bare seed parses to mask 0
@@ -965,3 +967,54 @@ amendment its spacing test reads biome pairs >= 240 / base pairs >= 480, its cap
 its fixed-draws test allows a power-up to move to its freed first position. The built-game
 gate has 8 B1 checks, one hazard and one power-up per biome, each on a real `seed@bit` run with entities built by
 `RunScene.takeChunk` from that run's terrain (expected counts 30 -> 38 with boosts, 19 -> 27).
+
+## Addendum: Marvin decisions 1/2/4/6 (official Daily, mask-scoped Daily bests, Head Start, ledger hash v2)
+
+**Official Daily (decision 2).** `REG.DAILY_OFFICIAL` (additive) is set on every Title start: true only from the DAILY RUN
+item (`TitleScene._startDaily` -> `startRun(seed, mask, {official: true})`). Game Over RETRY sets it to the retried
+record's `dailyOfficial`; NEW SEED sets false; PauseScene's restart keeps it (same seed, same mask). `RunScene.create`
+sets `this.dailyOfficial = flag && seed is TODAY's daily seed`, writes `dailyOfficial` on the record and in the
+`RUN_START` payload (additive), and passes it as Boosts' `daily` option, so only the official Daily refuses boosts. A
+typed `daily-YYYY-MM-DD` with no suffix gets that date's mask in `TitleScene.startRun` (precedence: override, suffix,
+typed daily date, profile mask); RunScene plays that date's rule for any daily seed.
+
+**Ranking (decisions 1/2).** In `systems/Ranking.js`, additive:
+* `isOfficialDaily(record)`: daily seed, the date's mask (absent = 0) and rule (`DailyPatch.infoForDateKey`). A v2 record
+  (`hashV >= 2`) must also have `dailyOfficial === true`. A legacy record (no `hashV`) needs only the mask and rule. The v2
+  rule is what keeps a typed `daily-<today>` (today's mask and rule) from passing as a legacy official run.
+* `countsForDailyBest(record, o)` = `isRankable && isOfficialDaily`. `countsForStreak(record, o)` adds `imported !== true`.
+* `SaveStore.getDailyStats(when, {excludeRunId})`: same signature and shape. It counts only `countsForDailyBest` runs on
+  the date's seed and mask. `getDailyStreak(now)`: same signature and shape, counting only `countsForStreak` runs.
+* `ProfileStore.creditRun` counts `lifetime.dailyRuns` (and so the Daily achievements) only for an official, non-imported
+  record.
+
+**DailyPatch (additive).** `infoForDateKey(dateKey)` -> `{dateKey, seed, rule, biomeMask} | null` (frozen, memoised, pure).
+`dailyRunLabel(seed, official)` -> `'DAILY RUN'`, `'DAILY PRACTICE YYYY-MM-DD'` or `''`.
+
+**Ledger hash v2 (decision 6).** SaveStore exports `LEDGER_HASH_V` (2), `computeLedgerHashV1` (the old function,
+byte-identical), `computeLedgerHashV2` and `verifyLedgerHash(record)`. `SaveStore.computeLedgerHash` keeps its
+signature and dispatches: `hashV === 2` -> v2, otherwise v1.
+* v2 covers `'v2'`, version, id, seed, dailyRuleId, biomeMask (absent = 0), modded (strict boolean), the sorted `boosts`
+  ids, dailyOfficial (strict boolean), startedAt, endedAt, durationMs, score, distanceM, trickPoints, sorted tricks,
+  bestCombo, bestFlow, maxAirtimeMs, cause, shards, nearMisses and bonusPoints (absent = 0). It excludes initials,
+  ledgerHash and `imported`.
+* `sanitizeRun` whitelists `hashV` (exactly 2, never defaulted), `bestFlow`, `dailyOfficial` (boolean), `boosts` (id
+  strings, sorted, unique, max 8) and `imported` (true only). A record without `hashV` is never re-hashed, so crediting
+  (keyed on `ledgerHash`) cannot double-credit. `STORAGE.saveVersion` is unchanged.
+* `importSharecode` uses `verifyLedgerHash`: per version, and an empty hash is rejected. It never throws. It forces
+  `imported: true` on what it adds. `saveRun` drops `imported`. Leaderboard rows and `exportSharecode` omit it.
+
+**Head Start (decision 4).** `BOOST_DEFS.headStart`: `speedFactor` 12 (launch multiplier on the ~50 px/s spawn,
+through `Sled.scaleVelocity`), `openingSpeedMul` 1.6, `openingMs` 8000, `openingFadeMs` 2000. Pure, additive:
+* `headStartOpening(loadout, o)` -> `{speedMul, ms, fadeMs}`. It is `{1, 0, 0}` unless Head Start applies (on, owned,
+  not the official Daily).
+* `openingSpeedMul(opening, runTimeMs)`: full strength, then a linear fade, then exactly 1.
+* `RunScene.physicsContext` multiplies it into `speedBoost`, separate from `boostMs` and the ward factor.
+`boostEffects` keeps its `{shieldCharges, speedFactor, modded}` shape.
+
+**Gate.** `dailyOutcome` (typed seed vs the real DAILY RUN item, through the production crash path, plus the ledger v2
+export / tamper / import round trip) and `distanceAt10s` (loop stopped, `headlessStep` at 1/60 s, hands off, seed `hs-1`).
+Expected counts 38 -> 42 with boosts, 27 -> 30 without.
+
+**Known gap.** `UIScene._buildSeedInfo` still labels any run on today's daily seed `DAILY RUN` in the HUD. UIScene was
+outside this change's files. The fix is to use `DailyPatch.dailyRunLabel(seed, payload.dailyOfficial)` from `RUN_START`.

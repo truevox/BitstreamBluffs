@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased - Marvin decisions 1/2/4/6 (official Daily, mask-scoped Daily bests, Head Start, ledger hash v2)
+
+- **Official Daily vs practice (decision 2).** Only a run started from the **DAILY RUN** menu item is the official Daily. Its record carries `dailyOfficial: true`. A typed `daily-YYYY-MM-DD[@mask]` seed is a practice run:
+  - It replays that date's rule and that date's mask, unless an `@mask` suffix is given. Before, a typed past date played today's rule (FAIRNESS-2).
+  - Boosts are allowed, and they make the run MODDED as usual. Only the official Daily refuses boosts.
+  - It never counts toward Daily stats, Daily best, the streak or the Daily achievements (Daily Habit, the streak achievements).
+  - Game Over says `DAILY PRACTICE <date>` and shows the ordinary seed-best line within its mask. The official Daily says `DAILY RUN` and shows TODAY'S BEST and the streak.
+  - RETRY of an official Daily is another official attempt; RETRY of a practice run stays practice. A run counts as official only while its seed is today's daily seed, so a retry or a pause restart after 00:00 UTC cannot back-fill yesterday.
+- **Daily bests are scoped by mask, and only official runs count (decision 1).** `getDailyStats` (TODAY'S BEST on Title and Game Over) counts only official runs on the date's mask. The streak counts only official runs played on this device; imported runs never extend it (F1, F1-streak).
+- **Legacy records** (saved before this change) count as official only when their biome mask and daily rule are the ones that date really had. That keeps the history of real Daily runs. It drops typed runs at another mask, and also pre-W3 runs on days whose derived mask is not 0, because those runs have no mask field.
+- **Ledger hash v2 (decision 6).** New records carry `hashV: 2`. Their `ledgerHash` covers every gameplay and result field: seed, daily rule, biome mask, `modded`, the applied boost ids, `dailyOfficial`, timestamps, score, distance, tricks, combo, flow, airtime, cause, shards, near misses and bonus points. Initials and cosmetics are excluded.
+  - Records without `hashV` keep verifying under the unchanged v1 function and are never re-hashed, so crediting cannot double-credit. `STORAGE.saveVersion` is unchanged.
+  - Sharecode import verifies each record under its own version and rejects an empty hash (F2). Stripping `modded` from an exported boosted run now fails verification.
+  - Imported runs are marked `imported` on this device (never part of any hash).
+- **Head Start is a real opening advantage (decision 4).** A x12 launch on the spawn velocity (was x1.25), plus a x1.6 opening speed surge for 8 s that fades to exactly x1 over the last 2 s. It uses PhysicsTuner's existing `speedBoost` path; no physics constant changes.
+  - Measured on the built game, hands-off, same seed: +19.5 % to +24.4 % distance at 10 s (was +1.7 % at 5 s, audit F8). Speed is ordinary after the window.
+  - It is still MODDED, never applies on the official Daily, and applies only when owned.
+- **Gate:** 4 new built-game checks: typed daily seed is practice, DAILY RUN is official, ledger v2 tamper rejection, and Head Start >= +15 % at 10 s. Expected counts 38 -> 42 (with boosts) and 27 -> 30.
+- **Not done here (needs `src/scenes/UIScene.js`, outside this change's files):** the in-run HUD still labels any run on today's daily seed `DAILY RUN`. The label text exists as `DailyPatch.dailyRunLabel(seed, official)`, and `RUN_START` now carries `dailyOfficial`.
+
 ## v2.6.0 - biome treatment B1: Wards (Debumont, Garbage Dump Glacier, Underwater Mountain, Candy Cane Canyon) (2026-11-14)
 
 - **Chocolate River slow 0.5 → 0.6 for 1.0 s (was 1.5 s), chance 0.75 → 0.5** (lead ruling): it now sits under the gentle-slow rule, so it reaches the 35–55 % presence band (it was ~21 %); the shorter slow keeps Candy inside the ±15 % sim tolerance (hop survival 20/48 = baseline, distance −2.8 %, speed −0.4 %; flip distance +1.8 %, speed −0.8 %, measured with the Sugar Rush 0.8 air steer). Sweet-Tooth Coating still wards it.

@@ -24,6 +24,8 @@
  *   - COPY yields the same string the panel shows
  *   - the saved record carries biomeMask
  *   - a boosted run actually reaches the run (shield charge) and the saved record is marked modded
+ *   - decisions 1/2/4/6: a typed daily seed is practice, the DAILY RUN item is official, ledger v2
+ *     rejects tampering, and Head Start is >= +15 % distance at 10 s on the same seed
  */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -54,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 38; // B1: +8 (hazard and power-up per Wards biome)
-const EXPECTED_WITHOUT_BOOSTS = 27; // B1: +8
+const EXPECTED_WITH_BOOSTS = 42; // B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4
+const EXPECTED_WITHOUT_BOOSTS = 30; // B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts)
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -268,6 +270,131 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
   return { page, errors, consoleErrors, out };
 }
 
+
+/**
+ * Decisions 1/2: start a run on today's daily seed either through the REAL DAILY RUN menu item
+ * (`viaMenu`) or as a typed seed (TitleScene.startRun, what ENTER SEED's submit calls), end it through the
+ * production crash path, and read back the saved record, the Daily surfaces before/after, and Game Over.
+ */
+async function dailyOutcome(browser, port, { viaMenu }) {
+  const profile = JSON.parse(JSON.stringify(PROFILE));
+  const { page, errors } = await bootWithProfile(browser, port, profile);
+  try {
+    const out = await page.evaluate(async ({ viaMenu }) => {
+      const g = window.__bbGame;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      g.scene.start('TitleScene');
+      await wait(900);
+      const t = g.scene.getScene('TitleScene');
+      t.starting = false;
+      const store = g.registry.get('saveStore');
+      const seed = t.daily && t.daily.seed;
+      if (!seed) return { fatal: 'no daily seed' };
+      const statsBefore = store.getDailyStats(Date.now());
+      const streakBefore = store.getDailyStreak(Date.now());
+      if (viaMenu) {
+        const item = t.menu && t.menu.items.find((i) => i.label === 'DAILY RUN');
+        if (!item) return { fatal: 'no DAILY RUN menu item' };
+        item.onSelect();
+      } else {
+        t.startRun(seed);
+      }
+      await wait(1600);
+      const run = g.scene.getScene('RunScene');
+      if (!run || !run.sled) return { fatal: 'run did not start' };
+      const official = run.dailyOfficial === true;
+      run.runTimeMs = 5000;
+      run.pendingCrash = { cause: 'chasm' };
+      const deadline = Date.now() + 15000;
+      let active = false;
+      while (Date.now() < deadline) {
+        const s = g.scene.getScene('GameOverScene');
+        active = Boolean(s && s.scene && s.scene.isActive && s.scene.isActive());
+        if (active) break;
+        await wait(100);
+      }
+      if (!active) return { fatal: 'Game Over never became active' };
+      await wait(350);
+      const rec = g.registry.get('lastRecord');
+      const over = g.scene.getScene('GameOverScene');
+      const texts = [];
+      const walk = (list) => { for (const o of list || []) { if (!o) continue; if (typeof o.text === 'string' && o.text) texts.push(o.text); if (o.list) walk(o.list); } };
+      walk(over.children && over.children.list);
+      const statsAfter = store.getDailyStats(Date.now());
+      const streakAfter = store.getDailyStreak(Date.now());
+      // Ledger v2 tamper (decision 6): export the saved run, import it into a fresh in-memory store, then
+      // re-import tampered copies. Exercises the shipped SaveStore class, not a re-implementation.
+      let ledger = null;
+      if (viaMenu && rec) {
+        const S = store.constructor;
+        await store.setInitials(rec.id, 'GAT');
+        const code = await store.exportSharecode();
+        const payload = JSON.parse(atob(code.slice(4)));
+        const mine = payload.runs.find((r) => r.id === rec.id);
+        const ok = await new S().importSharecode(JSON.stringify({ runs: [mine] }));
+        const tampered = [
+          { ...mine, score: mine.score + 1000 },
+          { ...mine, dailyOfficial: false },
+          { ...mine, biomeMask: ((mine.biomeMask || 0) + 1) },
+          { ...mine, ledgerHash: '' },
+        ];
+        const bad = await new S().importSharecode(JSON.stringify({ runs: tampered }));
+        const stripped = { ...mine }; delete stripped.hashV;
+        const down = await new S().importSharecode(JSON.stringify({ runs: [stripped] }));
+        ledger = { hashV: mine.hashV, ok, bad, down };
+      }
+      return {
+        official, seed: run.seed,
+        rec: rec ? { dailyOfficial: rec.dailyOfficial, hashV: rec.hashV, seed: rec.seed } : null,
+        statsBefore: statsBefore ? statsBefore.attempts : 0, statsAfter: statsAfter ? statsAfter.attempts : 0,
+        playedTodayBefore: streakBefore.playedToday, playedTodayAfter: streakAfter.playedToday,
+        streakBefore: streakBefore.streak, streakAfter: streakAfter.streak,
+        practiceLabel: texts.find((x) => /DAILY PRACTICE/.test(x)) || null,
+        officialLabel: texts.find((x) => /^DAILY RUN/.test(x)) || null,
+        todaysLine: texts.find((x) => /TODAY'S/.test(x)) || null,
+        ledger,
+      };
+    }, { viaMenu }).catch((e) => ({ fatal: String(e) }));
+    return { errors, out };
+  } finally { await page.close(); }
+}
+
+/**
+ * Decision 4: same-seed distance at 10 s of run time, clean vs Head Start, on the REAL sled. The game loop
+ * is stopped and the run is advanced with headlessStep at a fixed 1/60 s (as tools/sim/browser.js does),
+ * so the comparison does not depend on frame timing. Hands off: no input in either run.
+ */
+async function distanceAt10s(browser, port, headStart, seed) {
+  const profile = JSON.parse(JSON.stringify(PROFILE));
+  profile.boosts = { errorCorrection: false, headStart };
+  const { page, errors } = await bootWithProfile(browser, port, profile);
+  try {
+    const out = await page.evaluate(({ seed }) => {
+      const g = window.__bbGame;
+      const DT = 1000 / 60;
+      g.loop.stop();
+      for (const k of ['RunScene', 'UIScene', 'PauseScene', 'GameOverScene', 'TitleScene']) { try { g.scene.stop(k); } catch (e) { /* not running */ } }
+      g.registry.set('seed', seed);
+      g.registry.set('biomeMask', 0);
+      g.registry.set('dailyOfficial', false);
+      let scene = null;
+      g.events.once('bb:runStart', () => { scene = g.scene.getScene('RunScene'); });
+      g.scene.start('RunScene');
+      let t = 0;
+      for (let i = 0; i < 6 && !scene; i++) { g.headlessStep(t, DT); t += DT; }
+      if (!scene) return { fatal: 'RunScene did not start' };
+      let m10 = null;
+      let crashedAt = null;
+      for (let i = 0; i < 2000 && m10 === null; i++) {
+        g.headlessStep(t, DT); t += DT;
+        if (!scene.sled || scene.crashed || scene.pendingCrash) { crashedAt = Math.round(scene.runTimeMs); break; }
+        if (scene.runTimeMs >= 10000) m10 = (scene.sled.x - scene.startX) / 20;
+      }
+      return { m10, crashedAt, modded: scene.modded === true, opening: scene.opening };
+    }, { seed }).catch((e) => ({ fatal: String(e) }));
+    return { errors, out };
+  } finally { await page.close(); }
+}
 
 async function main() {
   const { server, port } = await serve();
@@ -1981,6 +2108,62 @@ async function main() {
           else if (pu.afterHits !== 1 || !near(pu.afterRatio, HAZ_DEFS.chocolateRiver.onHit.speedFactor, 0.01)) fail(puName, `control: after the coating the river should slow x0.5 (got x${pu.afterRatio}, ${pu.afterHits} hits)`);
           else pass(puName, `${run}: at ${pu.m} m; the run's real Chocolate River while coated: 0 HAZARD_HIT, speed x1, speedMul x1; after 5 s: x${pu.afterRatio.toFixed(3)}`);
         }
+      }
+    }
+
+    // ---- Decisions 1/2: a typed daily seed is PRACTICE (not the Daily best, not the streak); the DAILY RUN
+    // item is OFFICIAL. Practice runs first: the browser context shares IndexedDB across pages, so an
+    // official run saved earlier would otherwise already sit on today's surfaces.
+    {
+      const { errors, out } = await dailyOutcome(browser, port, { viaMenu: false });
+      const name = 'daily: a typed daily seed is practice (not TODAY\'S BEST, not the streak, labelled DAILY PRACTICE)';
+      if (out.fatal) fail(name, out.fatal);
+      else if (errors.length) fail(name, `page errors: ${errors.join(' | ')}`);
+      else if (out.official) fail(name, 'RunScene marked the typed seed official');
+      else if (!out.rec || out.rec.dailyOfficial !== false || out.rec.hashV !== 2) fail(name, `record ${JSON.stringify(out.rec)}`);
+      else if (out.statsAfter !== out.statsBefore) fail(name, `getDailyStats attempts ${out.statsBefore} -> ${out.statsAfter}`);
+      else if (out.playedTodayAfter !== out.playedTodayBefore || out.streakAfter !== out.streakBefore) fail(name, `streak ${out.streakBefore} -> ${out.streakAfter}`);
+      else if (!out.practiceLabel) fail(name, 'Game Over shows no DAILY PRACTICE label');
+      else if (out.todaysLine) fail(name, `Game Over shows ${out.todaysLine}`);
+      else pass(name, `${out.seed}: dailyOfficial false, Daily attempts ${out.statsAfter}, streak ${out.streakAfter}, "${out.practiceLabel}"`);
+    }
+    {
+      const { errors, out } = await dailyOutcome(browser, port, { viaMenu: true });
+      const name = 'daily: the DAILY RUN item is official (counts toward TODAY\'S BEST and the streak)';
+      if (out.fatal) fail(name, out.fatal);
+      else if (errors.length) fail(name, `page errors: ${errors.join(' | ')}`);
+      else if (!out.official) fail(name, 'RunScene did not mark the DAILY RUN item official');
+      else if (!out.rec || out.rec.dailyOfficial !== true || out.rec.hashV !== 2) fail(name, `record ${JSON.stringify(out.rec)}`);
+      else if (out.statsAfter !== out.statsBefore + 1) fail(name, `getDailyStats attempts ${out.statsBefore} -> ${out.statsAfter}`);
+      else if (!out.playedTodayAfter || out.streakAfter < 1) fail(name, `streak ${out.streakAfter}, playedToday ${out.playedTodayAfter}`);
+      else if (!out.officialLabel || !out.todaysLine) fail(name, `Game Over label ${out.officialLabel}, line ${out.todaysLine}`);
+      else pass(name, `${out.seed}: dailyOfficial true, Daily attempts ${out.statsBefore} -> ${out.statsAfter}, streak ${out.streakAfter}, "${out.todaysLine}"`);
+
+      // Decision 6: the saved v2 record survives export/import, and every tampered copy is rejected.
+      const lname = 'ledger v2: a saved run round-trips; tampered score/dailyOfficial/biomeMask, an empty hash and a stripped hashV are rejected';
+      const L = out.ledger;
+      if (out.fatal || !L) fail(lname, out.fatal || 'no ledger result');
+      else if (L.hashV !== 2) fail(lname, `exported hashV ${L.hashV}`);
+      else if (L.ok.imported !== 1) fail(lname, `clean import ${JSON.stringify(L.ok)}`);
+      else if (L.bad.imported !== 0 || L.bad.skipped !== 4) fail(lname, `tampered import ${JSON.stringify(L.bad)}`);
+      else if (L.down.imported !== 0) fail(lname, `hashV-stripped import ${JSON.stringify(L.down)}`);
+      else pass(lname, `clean ${JSON.stringify(L.ok)}, tampered ${JSON.stringify(L.bad)}, downgraded ${JSON.stringify(L.down)}`);
+    }
+
+    // ---- Decision 4: Head Start is a real opening advantage on the real sled (>= +15 % at 10 s, same seed).
+    if (WITH_BOOSTS) {
+      const seed = 'hs-1';
+      const a = await distanceAt10s(browser, port, false, seed);
+      const b = await distanceAt10s(browser, port, true, seed);
+      const name = 'Head Start: same seed, >= +15 % distance at 10 s versus clean, and MODDED';
+      if (a.out.fatal || b.out.fatal) fail(name, a.out.fatal || b.out.fatal);
+      else if (a.errors.length || b.errors.length) fail(name, `page errors: ${[...a.errors, ...b.errors].join(' | ')}`);
+      else if (a.out.m10 === null || b.out.m10 === null) fail(name, `no 10 s reading (clean crash ${a.out.crashedAt}, HS crash ${b.out.crashedAt})`);
+      else if (a.out.modded || !b.out.modded) fail(name, `modded clean=${a.out.modded} headStart=${b.out.modded}`);
+      else {
+        const gain = b.out.m10 / a.out.m10 - 1;
+        if (gain < 0.15) fail(name, `clean ${a.out.m10.toFixed(1)} m, Head Start ${b.out.m10.toFixed(1)} m: +${(gain * 100).toFixed(1)} %`);
+        else pass(name, `${seed}: clean ${a.out.m10.toFixed(1)} m, Head Start ${b.out.m10.toFixed(1)} m at 10 s: +${(gain * 100).toFixed(1)} %`);
       }
     }
 
