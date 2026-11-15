@@ -1025,3 +1025,26 @@ Expected counts 38 -> 42 with boosts, 27 -> 30 without.
 date's mask and rule can still hold a streak day. `events.js`' RUN_START typedef does not list the additive `dailyOfficial`
 field (foundation file, outside this change). `UIScene._buildSeedInfo` still labels any run on today's daily seed `DAILY RUN` in the HUD. UIScene was
 outside this change's files. The fix is to use `DailyPatch.dailyRunLabel(seed, payload.dailyOfficial)` from `RUN_START`.
+
+## Addendum: Micro Mountain dew swell is in the ground (audit T2, additive)
+
+* **One surface.** A zone whose mod has `terrainSwell` displaces the chunk **points** inside the zone
+  (`TerrainGenerator._applySwell`, called in `_build` right after zone placement and before lips, hazards, power-ups,
+  shards and biome spawns). The Matter collider and the drawn edge (`TerrainMesh`, which reads the points), `slopeDegAt`,
+  `heightAt` and every spawn therefore describe the same ground. `heightAt` is the plain polyline again; it does not add
+  the swell. `_swellAt(x)` remains as a diagnostic: the displacement already baked into the points at x.
+* **Shape.** `amplitudePx * sin(2 pi (x - x0) / periodPx) * w(x)`, where `w` is a raised-cosine window that rises from 0
+  to 1 over `taperPx` at each zone edge (clamped to half the zone; absent = no taper). Offset and slope are 0 at the
+  edges: no step, no kink. Only `points` change: zones sit >= 96 px inside their chunk, so the end points, the next
+  chunk's bound, the rise state and the roll speed (all built from the scratch `ys`) are untouched. Chunks with no swell
+  zone return before touching a point, so every chunk outside Micro Mountain is byte-identical
+  (`tests/src/micro-swell-isolation.test.js` pins masks 0, 1, ..., 1024 except 512 at e080803).
+* **Spacing.** The 16 px point spacing is kept (`_segIndex`, `_yAtLocal`, hazard placement and `_flatAround` assume it).
+  A 660 px period is ~41 points; even the old 220 px period was ~14 points with < 1 px chord error.
+* **Data.** `TerrainModDef.terrainSwell` gains `taperPx` (`{amplitudePx, periodPx, taperPx}`); shipped dewSwell is
+  20 / 660 / 165. The `schemas.js` typedef still lists only amplitudePx and periodPx (not on the T2 file list).
+* **Tests and gate.** `tests/src/micro-swell.test.js` (heightAt == polyline, slopeDegAt == segment, continuity and
+  bend at the edges, ~2A swing, taperPx read, determinism, spawns on the swelled ground, audit T2 copies).
+  `biome-slot-rule.test.js` hashes its 00978f6 pin with the swell stripped (reproduces it exactly) and pins the ALL-mask
+  digest of the shipped content separately. Built-game proof: a gate block (sd of sled.y - heightAt < 3 px on a
+  `t2-probe@512` swell zone) is handed to the lead; it raises the expected counts by 1 in both modes.
