@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: readable chaos (fable-10x)
+
+- **Ground hazards now announce themselves.** Every ground hazard gets a marker about 2 s of travel before the sled reaches it (speed-scaled, 700 to 1600 px), instead of first showing as a 20 px sprite 0.5 to 0.85 s out. While the hazard is off screen, a badge with its silhouette stands at the right screen edge on the terrain line, with chevrons marching toward the edge and a bar that fills as it closes in; once it is in view, a faint light column stands on it.
+- **Colour is what to do.** Red with up-chevrons = hop (Packet Spike, Glitch Chasm). Amber with flat bars = brace, it slows or scrambles (Overflow Firewall, Garbage-Data Vent, the biome slows). The marker turns **lime, with a filled arrow, exactly inside the ideal hop window** (the same rule the sim's hop oracle uses: 380 ms down to 130 ms before the box).
+- **Sound:** a rising two-note warning for a hop hazard, one soft low note for a brace hazard, and a short bright tick when the marker turns lime (`groundWarn`, `hopCue`).
+- A warded hazard is not announced, and a hazard the sled is already flying over is shown dim and silent.
+- Measured on the built game (24 seeds, hop policy, mask 0, 270 ground crash hazards): warning lead p10 0.67 s → 1.87 s, median 0.85 s → 2.25 s, minimum 1.67 s; hazards with at least 1.0 s of warning 29 % → 100 %. Physics, terrain, score and the run record are untouched (same 12/24 survivors, same 2129 m mean).
+
 ## v2.10.0 - biome treatment B3: Motion (Pyramid Peak, Micro Mountain, Steampunk Slopes) (2026-11-15)
 
 - **Pyramid Peak:** new ground hazard **Rolling Boulder** (crash, `danger`). It waits on the ground until the sled is 340 px behind it (it is on screen by then), then rolls toward the sled at 140 px/s along the ground for at most 160 px and rests. New pickup **Sandrunner Skis**: a glide, ground friction x0.7 for 4 s.

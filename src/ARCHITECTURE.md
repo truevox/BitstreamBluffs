@@ -1223,3 +1223,37 @@ hop survival unchanged (17 -> 17), distance +1.6 %, speed +0.1 %. Flip distance 
 +0.1 % / +0.3 % (flip survival exempt). Crashes on the new hazards per 48 hop runs: Rolling Boulder 2, Gear Gate 2, Dew
 Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), hence 0.45.
 
+## Addendum: readable chaos (fable-10x; additive)
+
+### Phase 1: ground-hazard telegraph
+
+* **Why**: measured on the built game, a ground hazard was first visible ~481 px ahead (camera geometry), a median 0.85 s
+  (p10 0.67 s) before the sled reached it, the hop must be pressed ~0.38 s out, and every death is a hazard death. The only
+  earlier warning was the first-run `SPACE HOP` hint. The air hazard already had `entities/AirTelegraph.js`.
+* **`systems/HazardTelegraph.js`** (pure; no Phaser, clock or randomness):
+  * `GROUND_WARN` (frozen): `leadS` 2.0, `minPx` 700, `maxPx` 1600 (inside the 3 generated screens; 1.33 s at 1200 px/s),
+    `hopLeadMs` 380 / `hopWindowMs` 250 / `minVxPxS` 60 (the hop oracle's numbers, `tools/sim/browser.js`), `maxMarks` 6,
+    `warnGapMs` 220, `clearMarginPx` 60. UI timing, so it lives here and not in `TUNING`.
+  * `hazardResponse(def)` -> `'hop'` (crash, or no `onHit`) | `'brace'` (any other effect) | `null` (air: not ours).
+  * `warnDistancePx(speedPxS)` -> `clamp(speed x leadS, minPx, maxPx)`.
+  * `inHopWindow(dx, vx)`: the oracle's rule, `hopLeadMs - hopWindowMs < dx / max(vx, 60) x 1000 <= hopLeadMs`.
+  * `planTelegraph(hazards, sled, viewRight, {isMuted}?)` -> `TelegraphMark[]`, nearest first, at most `maxMarks`:
+    `{ref, kind, state: 'warn'|'go'|'clear', color: 'danger'|'amber'|'lime', clear, dx, etaS, urgency, onScreen}`. Skips hit,
+    passed, air and muted hazards. `go` (lime) only for a grounded sled inside the hop window. `clear` when airborne and
+    the ballistic touchdown (`sled.landX`) is more than `clearMarginPx` past the box.
+  * `TelegraphTracker.update(nowMs, marks)` -> events `{type: 'warn'|'go', kind, ref, sound}`: `warn` once per hazard at its
+    first non-clear mark (`sound` false when another warn sounded under `warnGapMs` ago), `go` once when it first turns lime.
+    `firstWarnMs(ref)`.
+* **`entities/GroundTelegraph.js`** (drawing only; does not import Phaser): `update(timeMs, marks, view, zoom, heightAt)`,
+  `setPalette`, `destroy`. Off-screen mark: a badge at `view.right - EDGE_INSET_PX / zoom` on the terrain line (glyph by
+  `BiomeEffects.hazardDrawKind`, marching chevrons, proximity bar, response cue), stacked upward, at most `EDGE_MAX_STACK` (3).
+  On-screen mark: a light column on the box (shortened to stay inside the view) with the cue on top. Cue shapes repeat the
+  colour: open up-chevrons = hop, filled up-arrow = hop now, two bars = brace. Every size is game px (480 x 270) / zoom.
+* **`RunScene`**: `updateGroundTelegraph(now)` is called from `updateFun` (live frames only) right after the air telegraph:
+  it plans the marks (muting warded hazards via `Wards.isWarded` by id and by effect; `landX` from `sled.airEtaMs`), plays
+  `groundWarn` (`opts.brace` for a brace hazard) / `hopCue`, stamps `hazard.teleAtMs` (read only by the measurement harness
+  and the gate) and stores `_teleMarks`; `renderFrame` draws them after `_view` is computed (nothing while crashed).
+  Nothing here reads into physics, terrain, score, the RunRecord or the ledger hash.
+* **`AudioSynth`**: SFX `groundWarn` (hop: rising two notes; `opts.brace`: one soft low note) and `hopCue` (bright tick).
+* **Tests**: `tests/src/hazard-telegraph.test.js` (pure rules, oracle agreement on a grid), `tests/src/hazard-telegraph-runscene.test.js`
+  (the shipped `RunScene` methods on a prototype stub, the entity against a recording graphics fake, the sounds).

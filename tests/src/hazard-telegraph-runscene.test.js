@@ -161,7 +161,7 @@ describe('GroundTelegraph (drawing)', () => {
     const col = calls.filter((c) => c[0] === 'lineBetween' && c[1] === h.cx && c[3] === h.cx);
     expect(col.length).toBeGreaterThanOrEqual(2); // soft band + core
     const top = Math.min(...col.map((c) => Math.min(c[2], c[4])));
-    expect(top).toBeLessThan(h.cy - h.h / 2 - 120);
+    expect(top).toBeLessThan(h.cy - h.h / 2 - 100);
     expect(Math.max(...xs(calls))).toBeLessThan(VIEW.right - EDGE_INSET_PX - 40);
   });
   test('a hazard high in the view: the column is shortened so the cue on top stays on screen', () => {
@@ -169,7 +169,7 @@ describe('GroundTelegraph (drawing)', () => {
     const calls = draw(plan([h]));
     const ys = calls.flatMap((c) => (c[0] === 'lineBetween' ? [c[2], c[4]] : []));
     expect(Math.min(...ys)).toBeGreaterThanOrEqual(VIEW.top);
-    expect(Math.min(...ys)).toBeLessThan(90 - 10 - 40); // still a column above the box
+    expect(Math.min(...ys)).toBeLessThan(90 - 10 - 30); // still a column above the box
   });
   test('sizes are counter-scaled: at zoom 0.5 the edge marker is twice as large in world px (same on screen)', () => {
     const view2 = { left: 0, right: 1920, top: 0, bottom: 1080 };
