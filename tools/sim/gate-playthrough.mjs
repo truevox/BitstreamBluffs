@@ -2759,7 +2759,9 @@ async function main() {
                     queued: run.pendingCrash ? run.pendingCrash.hazardId : null, crashed: run.crashed, sledX: Math.round(run.sled.x), hcx: Math.round(h.cx), speed: Math.round(run.sled.speed) };
                 } else {
                   res.hz = { m: Math.round(fh.sp.x / 20), chunkBiome: fh.ch.biome, drawKind: h.drawKind, danger: h.color === run.palette.danger, phase: h.phase };
-                  // the cycle: 3 s of frames, sled far away
+                  // the cycle: 3 s of frames, the sled held still on the ground 800 px before the gate (it cannot crash or
+                  // reach anything while the cycle and the forced hits are sampled)
+                  const hold = () => { keepAlive(); poseAt(h.x0 - 800, 0); };
                   let flips = 0;
                   let closedRun = 0;
                   let worstClosed = 0;
@@ -2767,7 +2769,7 @@ async function main() {
                   let last = null;
                   let openFrames = 0;
                   for (let i = 0; i < 190; i++) {
-                    keepAlive();
+                    hold();
                     step(1);
                     if (h.open !== h.isPassable(run.runTimeMs)) mismatch++;
                     if (last !== null && h.open !== last) flips++;
@@ -2777,12 +2779,12 @@ async function main() {
                   res.hz = { ...res.hz, flips, worstClosed, mismatch, openShare: openFrames / 190 };
                   // forced: onHazard while open (passed, stays armed), then while closed (crash queued)
                   let k = 0;
-                  while (!h.open && k++ < 200) { keepAlive(); step(1); }
+                  while (!h.open && k++ < 200) { hold(); step(1); }
                   live(); h.hit = false; hits.length = 0;
                   run.onHazard(h);
                   res.hz.openHit = { hits: hits.length, armed: !h.hit, queued: run.pendingCrash ? run.pendingCrash.hazardId : null };
                   k = 0;
-                  while (h.open && k++ < 200) { keepAlive(); step(1); }
+                  while (h.open && k++ < 200) { hold(); step(1); }
                   live(); h.hit = false; hits.length = 0;
                   run.onHazard(h);
                   res.hz.closedHit = { hits: hits.map((p) => `${p.hazardId}:${p.effect}`), queued: run.pendingCrash ? run.pendingCrash.hazardId : null,
