@@ -496,3 +496,47 @@ the canonical shared project task ledger before spending; use a
 single cross-process durable idempotency sentinel for each explicitly
 authorized paid spin. An uncertain response is NOT authorization to
 retry a chargeable API request.
+
+## Local ACE-Step 1.5 organ and holo cover A/B (2026-11-15)
+
+**Marvin baseline and request:** Both prior Kie V6 organ covers were
+tonally "head and shoulders above" the earlier MIDI-like and DDSP
+attempts. Marvin approved testing locally hosted ACE-Step 1.5 as a
+possible replacement, with cathedral organ and holographic pads
+and 0.9 vs 0.7 source-cover strengths.
+
+**Safely recovered CT214:** Original ext4 LV was marked read-only
+despite passing offline read-only e2fsck. Native recovery snapshot
+before-ace-test-20261115 was created FIRST, then LV permission
+returned to RW and CT214 started. Existing ACE-Step Turbo weights
+and Nvidia RTX 3060 CUDA validated. No forced filesystem repair or
+model reinstall. Keep recovery snapshot.
+
+**Actual audio-to-audio inference:** Original ~215s Maxi isolated
+vocal waveform, not MIDI or V3 pitch, fed to existing ACE-Step
+1.5 Turbo cover model with instrumental mode, 8 steps, fixed seed
+20261115, batch 1 and CPU offload. All four runs succeeded,
+organ s0.9, organ s0.7, holo s0.9, holo s0.7.
+Each full cover duration 214.9665s; derived 25s excerpt 25.0065s.
+No cloud credits spent. Source FLAC and all game audio untouched.
+
+**Tailnet-only level-matched listening lab:**
+http://100.115.120.66:8181/tools/music/audition-ace15/
+
+Seven selectable versions: four ACE 1.5 candidates, prior two
+Kie V6 organ takes, unchanged V3 organ; original Maxi vocal plus
+optional backing, and links to all six complete generative covers.
+Independent Chrome smoke verified seven switching paths, all nine
+25-second media assets and six full links with no errors.
+
+Reproducible research source:
+tools/music/ace15-proof/README.md,
+tools/music/ace15-proof/{generate.py,run-matrix.sh,export.py},
+tools/music/ace15-proof/export-results.json.
+Private audio/gitignored under public/music-audition-ace15/.
+Game production code, original stems and older audition labs unchanged.
+
+These are generative covers and not necessarily sample-synchronous,
+melody-faithful or instrument-isolated. User has NOT listened to or
+approved these ACE outputs as music art. Kie tonal-quality verdict
+and V3 organ artistic baseline are preserved as prior judgments.
