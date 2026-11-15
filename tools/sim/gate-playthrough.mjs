@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 55; // B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
-const EXPECTED_WITHOUT_BOOSTS = 43; // B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
+const EXPECTED_WITH_BOOSTS = 58; // Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 46; // Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -1774,6 +1774,241 @@ async function main() {
       else if (!(o.sd < 3)) fail(name, `sd(sled.y - heightAt) ${o.sd.toFixed(2)} px over ${o.n} grounded frames (want < 3); vs raw ground ${o.sdRaw.toFixed(2)}`);
       else if (!(o.sdRaw > 3 * o.sd)) fail(name, `the sled follows the raw ground as well as the swelled one (sd ${o.sd.toFixed(2)} vs raw ${o.sdRaw.toFixed(2)})`);
       else pass(name, `t2-probe@512 zone ${(o.x0 / 20).toFixed(0)}-${(o.x1 / 20).toFixed(0)} m: sd(sled.y - heightAt) ${o.sd.toFixed(2)} px vs raw ground ${o.sdRaw.toFixed(2)} px over ${o.n} grounded frames; swell ${o.p2p.toFixed(1)} px peak-to-peak`);
+    }
+
+    // ---- Readable Chaos phase 1 (fable-10x): the ground-hazard telegraph announces a real hazard before it is on screen
+    //
+    // A real mask-0 run, hands off. The first ground crash hazard the run's own terrain produces must be stamped by
+    // RunScene.updateGroundTelegraph while it is still OFF screen and at least 1.2 s of travel away, the telegraph
+    // entity must have drawn something that frame, and the warn sound must have been requested once.
+    {
+      const name = 'readable chaos: a ground crash hazard is telegraphed off-screen, >= 1.2 s out, with a sound';
+      const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+      try {
+        const o = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.registry.set('biomeMask', 0);
+          g.scene.start('TitleScene');
+          await wait(900);
+          const title = g.scene.getScene('TitleScene');
+          title.starting = false;
+          title.startRun('gate-seed', 0);
+          await wait(1200);
+          const run = g.scene.getScene('RunScene');
+          if (!run) return { fatal: 'RunScene did not start' };
+          if (!run.groundTelegraph || !run.teleTracker) return { fatal: 'RunScene has no ground telegraph' };
+          const sfx = [];
+          const audio = g.registry.get('audioSynth');
+          const orig = audio && audio.playSfx ? audio.playSfx.bind(audio) : null;
+          if (audio) audio.playSfx = (n, opts) => { sfx.push(n); if (orig) orig(n, opts); };
+          const deadline = Date.now() + 40000;
+          let hit = null;
+          while (Date.now() < deadline && !hit) {
+            await new Promise((r) => requestAnimationFrame(r));
+            if (!run.sled || run.crashed) break;
+            for (const list of run.hazards.values()) for (const h of list) {
+              if (hit || h.teleAtMs == null || h.def.placement === 'air' || (h.def.onHit && h.def.onHit.effect !== 'crash')) continue;
+              const dx = h.cx - run.sled.x;
+              hit = {
+                id: h.def.id, dx, speed: run.sled.speed, m: Math.round((run.sled.x - run.startX) / 10),
+                offScreen: h.cx - h.w / 2 > run._view.right,
+                mark: (run._teleMarks || []).find((mk) => mk.ref === h) || null,
+              };
+            }
+          }
+          if (!hit) return { fatal: run.crashed ? 'the run crashed before any hazard was telegraphed' : 'no ground crash hazard was telegraphed in 40 s' };
+          await new Promise((r) => requestAnimationFrame(r));
+          await new Promise((r) => requestAnimationFrame(r));
+          const buf = run.groundTelegraph.gfx && run.groundTelegraph.gfx.commandBuffer;
+          return {
+            ...hit, mark: hit.mark ? { color: hit.mark.color, kind: hit.mark.kind, onScreen: hit.mark.onScreen } : null,
+            leadS: hit.dx / Math.max(hit.speed, 60), drawn: buf ? buf.length : 0, warnSounds: sfx.filter((n) => n === 'groundWarn').length,
+          };
+        }).catch((e) => ({ fatal: String(e) }));
+        if (o.fatal) fail(name, o.fatal);
+        else if (errors.length) fail(name, `page errors: ${errors.join(' | ')}`);
+        else if (!o.offScreen) fail(name, `${o.id} was already on screen when first telegraphed (dx ${Math.round(o.dx)})`);
+        else if (!(o.leadS >= 1.2)) fail(name, `${o.id} telegraphed only ${o.leadS.toFixed(2)} s out (dx ${Math.round(o.dx)} at ${Math.round(o.speed)} px/s)`);
+        else if (!o.mark || o.mark.kind !== 'hop' || o.mark.color !== 'danger' || o.mark.onScreen) fail(name, `wrong mark for a crash hazard: ${JSON.stringify(o.mark)}`);
+        else if (!(o.drawn > 0)) fail(name, 'the telegraph entity drew nothing while a mark was up');
+        else if (o.warnSounds < 1) fail(name, 'groundWarn was never requested');
+        else pass(name, `${o.id} at ${o.m} m: announced ${Math.round(o.dx)} px / ${o.leadS.toFixed(2)} s out, off screen, ${o.drawn} draw commands, groundWarn x${o.warnSounds}`);
+      } finally {
+        await page.close();
+      }
+    }
+
+    // ---- Readable Chaos phase 2 (fable-10x): at 1200 px/s the camera is farther out than the old 0.6 clamp allowed
+    //
+    // The shipped RunScene.updateCamera, driven for 12 s with a stand-in sled moving at 1200 px/s over the run's real
+    // terrain (the loop is asleep, so nothing else moves). Zoom must settle between the new floor and 0.53, the
+    // screen-space layers must be counter-scaled by exactly 1 / zoom, and the rider must stay on screen.
+    {
+      const name = 'readable chaos: at 1200 px/s the camera settles near zoom 0.515, layers (B2 blind overlay too) counter-scaled, rider on screen';
+      const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+      try {
+        const o = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.registry.set('biomeMask', 0);
+          g.scene.start('TitleScene');
+          await wait(900);
+          const title = g.scene.getScene('TitleScene');
+          title.starting = false;
+          title.startRun('gate-seed', 0);
+          await wait(1400);
+          const run = g.scene.getScene('RunScene');
+          if (!run || !run.sled) return { fatal: 'RunScene did not start' };
+          g.loop.sleep();
+          const real = run.sled;
+          const V = 1200;
+          const fake = { x: real.x + 300, y: 0, vx: V, vy: 0, speed: V };
+          fake.y = run.terrain.heightAt(fake.x) - 14;
+          run.sled = fake;
+          run._camX = fake.x - 182;
+          run._camY = fake.y - 90;
+          let prevY = fake.y;
+          let minSx = Infinity;
+          let maxSx = -Infinity;
+          for (let i = 0; i < 750; i++) {
+            fake.x += V * 0.016;
+            run.streamTerrain(fake.x);
+            const y = run.terrain.heightAt(fake.x) - 14;
+            fake.vy = (y - prevY) / 0.016;
+            prevY = y;
+            fake.y = y;
+            run.updateCamera(16);
+            if (i >= 450) {
+              const cam = run.cameras.main;
+              const sx = (fake.x - (cam.scrollX + 240 - 240 / cam.zoom)) * cam.zoom;
+              minSx = Math.min(minSx, sx);
+              maxSx = Math.max(maxSx, sx);
+            }
+          }
+          const cam = run.cameras.main;
+          const out = {
+            zoom: cam.zoom, ahead: Math.round(cam.scrollX + 240 + 240 / cam.zoom - fake.x), minSx: Math.round(minSx), maxSx: Math.round(maxSx),
+            bgScale: run.bg && run.bg.gfx ? run.bg.gfx.scaleX : null, flashScale: run.flashRect ? run.flashRect.scaleX : null,
+            blindScale: run.blindRect ? run.blindRect.scaleX : null,
+          };
+          run.sled = real;
+          return out;
+        }).catch((e) => ({ fatal: String(e) }));
+        const near = (a, b, eps) => Math.abs(a - b) <= eps;
+        if (o.fatal) fail(name, o.fatal);
+        else if (errors.length) fail(name, `page errors: ${errors.join(' | ')}`);
+        else if (!(o.zoom >= 0.45 && o.zoom <= 0.53)) fail(name, `zoom ${o.zoom} at 1200 px/s (want 0.45 .. 0.53; v2.6.0 gave 0.62)`);
+        else if (!near(o.bgScale, 1 / o.zoom, 1e-6) || !near(o.flashScale, 1 / o.zoom, 1e-6) || !near(o.blindScale, 1 / o.zoom, 1e-6)) fail(name, `layers not counter-scaled: bg ${o.bgScale}, flash ${o.flashScale}, blind ${o.blindScale}, want ${1 / o.zoom}`);
+        else if (!(o.minSx >= 35 && o.maxSx <= 160)) fail(name, `rider screen x ${o.minSx} .. ${o.maxSx} (want 36 .. 160 of 480)`);
+        else if (!(o.ahead >= 700)) fail(name, `only ${o.ahead} px visible ahead of the rider (v2.6.0: 563)`);
+        else pass(name, `zoom ${o.zoom}, ${o.ahead} px (${(o.ahead / 1200).toFixed(2)} s) ahead, rider at screen x ${o.minSx} .. ${o.maxSx}, layers x${o.bgScale.toFixed(3)}`);
+      } finally {
+        await page.close();
+      }
+    }
+
+    // ---- Readable Chaos (B3): a moving hazard is telegraphed with its PREDICTED arrival, and a Gear Gate with its verdict
+    //
+    // Real seed@bit runs, paused and stepped through the shipped run.update (-> updateFun -> updateGroundTelegraph). A
+    // Rolling Boulder: once its roll has started, the mark's arrival must match the closing-speed solution on the
+    // entity's own predictX (within 4 px at the meeting point; the mark is planned one frame of roll earlier, 2.2 px) and must differ from the static dx / vx (direction is not
+    // assumed: either sign passes). A Gear Gate: the mark's verdict must agree with isPassable at the predicted arrival
+    // whenever that arrival is clear of a change, and an 'open' mark must never be lime.
+    {
+      const name = 'readable chaos: a B3 Rolling Boulder is telegraphed with its predicted arrival, a Gear Gate with its open/closed verdict';
+      const { ROLL_ACTIVATE_PX: ACT } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
+      const { GROUND_WARN } = await import(path.join(ROOT, 'src/systems/HazardTelegraph.js'));
+      const probe = async (seedMask, hazardId) => {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        try {
+          const out = await page.evaluate(async ({ seedMask, hazardId, ACT, margin }) => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.scene.start('TitleScene');
+            const t0 = Date.now();
+            let run = null;
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              if (!started && tt && !tt.starting) { started = true; tt.startRun(seedMask); }
+              const rr = g.scene.getScene('RunScene');
+              if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'RunScene never produced a live sled' };
+            await wait(300);
+            run.scene.pause();
+            let clock = run.runTimeMs;
+            const keepAlive = () => { run.sled.invulnerableMs = 1e9; run.pendingCrash = null; };
+            const step = () => { keepAlive(); clock += 16; run.update(clock, 16); };
+            let f = null;
+            for (let i = 0; i < 200 && !f; i++) {
+              const ch = run.terrain.getChunk(i);
+              const sp = ch.hazards.find((s) => s.defId === hazardId);
+              if (sp) f = { ch, sp };
+            }
+            if (!f) return { fatal: `no ${hazardId} in the first 200 chunks of ${seedMask}` };
+            if (!run.mesh.chunks.has(f.ch.index)) run.takeChunk(f.ch);
+            const h = (run.hazards.get(f.ch.index) || []).find((e) => e.def.id === hazardId && e.spawn.x === f.sp.x);
+            if (!h) return { fatal: 'hazard entity not built' };
+            const x = h.x0 - ACT - 520;
+            run.streamTerrain(x);
+            const ang = run.slopeAt(x);
+            const v = 520;
+            run.sled.setPose(x, run.terrain.heightAt(x) - 18, ang, Math.cos((ang * Math.PI) / 180) * v, Math.sin((ang * Math.PI) / 180) * v);
+            if (run.snapCamera) run.snapCamera();
+            const res = { m: Math.round(h.x0 / 20), samples: [], gate: [], teleAt: null };
+            for (let i = 0; i < 260; i++) {
+              step();
+              if (h.destroyed || run.sled.x > h.cx) break;
+              if (h.teleAtMs != null && res.teleAt === null) res.teleAt = { dx: Math.round(h.cx - run.sled.x), onScreen: h.cx - h.w / 2 < run._view.right };
+              const mk = (run._teleMarks || []).find((q) => q.ref === h);
+              if (!mk) continue;
+              const now = run.runTimeMs;
+              const vx = Math.max(run.sled.vx, 60);
+              // a roll that started this very frame was planned as resting (the telegraph runs before Hazard.update steps it)
+              if (h.motion && h.motion.kind === 'roll' && h.roll.activeAtMs !== null && h.roll.activeAtMs < now && Number.isFinite(mk.etaS) && mk.arrivalMs != null) {
+                const predCx = h.cx + h.predictX(mk.arrivalMs) - h.predictX(now);
+                const sledAt = run.sled.x + vx * mk.etaS;
+                res.samples.push({ err: Math.abs(predCx - sledAt), staticS: (h.cx - run.sled.x) / vx, etaS: mk.etaS, arrivalOk: Math.abs(mk.arrivalMs - (now + mk.etaS * 1000)) < 1e-6 });
+              }
+              if (h.motion && h.motion.kind === 'gate' && mk.arrivalMs != null && Number.isFinite(mk.arrivalMs)) {
+                const nc = h.gateNextChangeMs(mk.arrivalMs - margin);
+                const clearOfChange = nc > 2 * margin || !h.isPassable(mk.arrivalMs - margin);
+                res.gate.push({ verdict: mk.gate, state: mk.state, color: mk.color, passable: h.isPassable(mk.arrivalMs), clearOfChange, wide: nc > 2 * margin });
+              }
+            }
+            return res;
+          }, { seedMask, hazardId, ACT, margin: GROUND_WARN.gateMarginMs });
+          return { out, errors };
+        } catch (e) {
+          return { out: { fatal: String(e) }, errors };
+        } finally { await page.close(); }
+      };
+      const r = await probe('b3pyramid54@4', 'rollingBoulder');
+      const gq = await probe('b3steam63@256', 'gearGate');
+      const ro = r.out;
+      const go = gq.out;
+      const s = ro.samples || [];
+      const maxErr = s.length ? Math.max(...s.map((q) => q.err)) : NaN;
+      const maxDiff = s.length ? Math.max(...s.map((q) => Math.abs(q.etaS - q.staticS))) : NaN;
+      const gs = go.gate || [];
+      // when the verdict is 'open', the gate must be open across the margin at arrival; when 'closed', it must not be open
+      // across the margin
+      const gateBad = gs.filter((q) => (q.verdict === 'open' && !(q.passable && q.wide)) || (q.verdict === 'closed' && q.passable && q.wide) || (q.state === 'open' && q.color === 'lime'));
+      const verdicts = new Set(gs.map((q) => q.verdict));
+      if (ro.fatal || go.fatal) fail(name, ro.fatal || go.fatal);
+      else if (r.errors.length || gq.errors.length) fail(name, `page errors: ${[...r.errors, ...gq.errors].join(' | ')}`);
+      else if (!ro.teleAt) fail(name, 'the Rolling Boulder was never announced');
+      else if (s.length < 5) fail(name, `only ${s.length} frames with a started roll and a mark`);
+      else if (!s.every((q) => q.arrivalOk)) fail(name, 'mark.arrivalMs is not now + etaS');
+      else if (!(maxErr <= 4)) fail(name, `predicted meeting point off by ${maxErr.toFixed(1)} px (want <= 4)`);
+      else if (!(maxDiff >= 0.03)) fail(name, `the moving boulder is timed like a static one (max |eta - dx/vx| ${maxDiff.toFixed(3)} s)`);
+      else if (gs.length < 20) fail(name, `only ${gs.length} Gear Gate frames with a mark`);
+      else if (gateBad.length) fail(name, `${gateBad.length} gate frames disagree with isPassable at arrival: ${JSON.stringify(gateBad[0])}`);
+      else if (!verdicts.has('open') || !verdicts.has('closed')) fail(name, `gate verdict never changed (${[...verdicts].join(',')})`);
+      else pass(name, `boulder at ${ro.m} m announced ${ro.teleAt.dx} px out (on screen ${ro.teleAt.onScreen}); ${s.length} rolling frames, meeting point within ${maxErr.toFixed(2)} px, up to ${maxDiff.toFixed(2)} s from static dx/vx; gate at ${go.m} m: ${gs.length} frames, verdicts ${[...verdicts].join('/')}, all agree with isPassable at arrival`);
     }
 
     // ---- B0 (biome full treatment): every new effect acts on the REAL run. Fixture defs are injected into the registry
