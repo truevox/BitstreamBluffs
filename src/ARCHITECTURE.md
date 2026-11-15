@@ -1296,3 +1296,53 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
   30, sled 19. The ground telegraph is drawn at a constant screen size, so it does not shrink with the view.
 * **Tests**: `tests/src/camera-zoom.test.js` (curve identity below 600 px/s, anchors, monotone, floor, the shipped
   `updateCamera` settling on the curve, eased under hard acceleration, rider framing and pin).
+
+## Addendum: Micro Mountain glow-up (huge bees, Neon Sled Drone; additive, cosmetic only)
+
+SledHEAD canon: Micro Mountain is the wild space Pete keeps for his bees, ridden as an RC micro sled drone. The
+bees are ordinary bees, so next to the micro rider they are HUGE.
+
+**Bees (`systems/MicroBees.js`, pure).**
+* `beeLayout(seed)`: `BEE_COUNT` = 2 bees per `BEE_TILE` = 1800 px, from a seeded mulberry32.
+* `beesAt(scrollX, timeMs, seed)`: the bees on screen. Parallax `BEE_PARALLAX` = 0.04 plus 7-14 px/s of their own;
+  full height `BEE_HEIGHT` 0.3-0.4 of the screen; at most 2 visible; alpha fades at the screen edges.
+* `beePrimitives(bees, depth)`: motifDecor-format primitives (palette keys, never `danger`; fills <=
+  `BEE_MAX_FILL_ALPHA` 0.1, lines <= `BEE_MAX_LINE_ALPHA` 0.3; the `bg` stripes only darken), each tagged `bee: id`.
+* `motifDecor(motif, scrollX, timeMs, seed, o = {})` gains an optional 5th argument. For `dew-drops` it appends
+  the bees at the last silhouette layer's depth (over the moss and blades); `{bees: false}` leaves them out.
+* `Background.bees` (default true) switches them and `Background.beeCount` is the number drawn last frame. The
+  backdrop is one Graphics at depth -100, below the terrain (5), hazards (8), pickups (9) and sled (20).
+* Zero gameplay effect: no generator, physics, presence or sim input; every digest is unchanged.
+
+**Neon Sled Drone (rider cosmetic).**
+* Catalogue: `{id:'rider-drone', slot:'rider', price:0, unlockLevel:1, value:'drone', grant:'biome',
+  biome:'micro-mountain', unlockText:'COMPLETE MICRO MOUNTAIN'}`. The `grant`, `biome` and `unlockText` fields are
+  additive and mirrored in `data/cosmetics/cosmetics.json`.
+* `isOwned`: a `grant:'biome'` item is owned when its id is in `unlocked.cosmetics` or its `biome` is in
+  `biomeProgress.completed`. It is never owned through the price-0 level rule, and `purchase` refuses it.
+* Grant: `creditRun` calls `grantBiomeCosmetics(base, next)` after merging `biomeVisits`. An item that the run made
+  owned is written to `unlocked.cosmetics` through `grantAchievementReward`. It is reported in `awards.grants` and
+  appended to `awards.achievements` after the decision-9-sorted defs, which is the Game Over toast list. A grant
+  entry is `{id, kind:'cosmetic', grant:'biome', biome, slot, name, desc}`. It is never stamped into
+  `profile.achievements`. A profile that completed Micro before this build owns the drone by its completion, so
+  it gets no toast. No new profile field, no `PROFILE_VERSION` or `saveVersion` change, and nothing in the ledger.
+* `resolveCosmetics` returns `riderShape` ('default' | a rider hue's `shape`). `COSMETIC_HUES.rider.drone` is
+  `{color:'#8a7dff', shape:'drone'}`. The shape is resolved before the colourblind refusal, so under colourblind
+  the drone is still drawn, with the hue refused, in the palette rider colour and palette keys.
+* Sled: `_draw` calls `_drawRider` (the unchanged neon rider) or `_drawDrone`. The drone is a pod, a camera eye,
+  rotor arms, rotor discs with a blade turning from sled time, and arm lights blinking out of phase every 250 ms.
+  `lastRiderShape` and `drone` ({rotors, lights}) record the frame. `_buildBody` is unchanged, so the hitbox is
+  the same.
+* Shop: on the rider page, an unowned biome grant is `locked`, disabled, and reads its `unlockText`.
+
+**Tests and gate.** `tests/src/micro-bees.test.js`, `tests/src/micro-drone-skin.test.js` and
+`tests/src/micro-drone-draw.test.js`. `cosmetics-complete`'s `own()` helper earns a biome grant through a credited
+completing run. The built-game gate adds 6 checks on `beegate0@512` (sector 2 is Micro, sector 3 base):
+* bees drawn on Micro, behind the terrain, hazards, pickups and sled;
+* none on a mask-0 run;
+* the drone locked in the real shop;
+* granted with the toast;
+* EQUIP, then equipped;
+* drawn by the next run's Sled.
+
+Expected counts 58 -> 64 (with boosts) and 46 -> 52.

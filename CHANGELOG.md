@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased - Micro Mountain glow-up: huge bees and the Neon Sled Drone
+
+- **HUGE bees on Micro Mountain.** In SledHEAD canon the player rides Pete's bee meadow as an RC micro sled drone, so ordinary bees are huge. The dew-drops backdrop now has one or two bees at a time, each 0.3-0.4 of the screen high. They drift slowly with their wings a blur, in the neon vector style and palette colours, so they follow the colourblind palette and theme changes. They are backdrop only, behind the terrain, hazards, pickups and rider, at low alpha: the brightest pixel a bee can put behind a Dew Drop or a Royal Jelly Wax is darker than the moss and grass the backdrop already has there. They are seeded and animated from scene time only, and have zero gameplay effect (all digests unchanged). New pure module `systems/MicroBees.js`. Cost: a backdrop redraw with a bee on screen goes from 0.067 to 0.108 ms (built game, Chrome), and the live frame time is unchanged (16.8 ms both ways). In screenshots a bee directly behind a Dew Drop lowers its measured contrast by 3-6 %, and behind a Royal Jelly Wax by 7-10 %; every ratio stays above 6:1.
+- **Neon Sled Drone rider skin.** Complete Micro Mountain (decision 3: ride one of its sectors start to end) to earn an RC micro drone that rides the deck. It has rotor arms, spinning rotor discs and blinking lights. The run that completes it grants it and the Game Over toast says UNLOCKED NEON SLED DRONE, after any achievements that run unlocked (decision 9 order). The Shard Shop rider page lists it as COMPLETE MICRO MOUNTAIN until then, and after that it can be equipped like any rider. It is never for sale. Under the colourblind palette the drone is still drawn, in palette colours. Players who completed Micro on v2.8+ already own it. The default neon rider stays the default.
+- **Gate:** 6 new built-game checks:
+  - bees on a Micro run, behind the terrain;
+  - no bees on a mask-0 run;
+  - the drone locked in the shop;
+  - granted with its toast by a run that completes the Micro sector;
+  - EQUIP, then equipped;
+  - drawn by the next run's real sled.
+
+  Expected counts 58 -> 64 (with boosts) and 46 -> 52.
+- `todo.txt` item 10: more beeishness for Micro Mountain later.
+
 ## v2.11.0 - Readable Chaos, phases 1-2 (hazard telegraph, speed zoom) (2026-11-15)
 
 - **Ground hazards now announce themselves.** Every ground hazard gets a marker about 2 s of travel before the sled reaches it (speed-scaled, 700 to 1600 px), instead of first showing as a 20 px sprite 0.5 to 0.85 s out. While the hazard is off screen, a badge with its silhouette stands at the right screen edge on the terrain line, with chevrons marching toward the edge and a bar that fills as it closes in; once it is in view, a faint light column stands on it.
