@@ -183,6 +183,21 @@ export const BIOME_HAZARD_CLEARANCE_PX = 240;
  * may sit on flat or downhill ground, but never before an uphill (no segment climbing within BIOME_EDGE_MARGIN_PX ahead).
  */
 export const BIOME_GENTLE_SLOW_FACTOR = 0.6;
+/**
+ * B2 blind fairness: a biome `blind` ground hazard (Shatter Wall) needs the stretch the sled covers while blinded, plus a
+ * reaction margin, clear of every crash hazard, so a hazard hidden by the dimming is never a cheap death. The stretch is
+ * (durationMs + BIOME_BLIND_REACT_MS) at BIOME_BLIND_SPEED_MUL x the expected speed. The per-chunk pass cannot see the
+ * next chunk, so only this chunk's hazards are checked: requiring the stretch to end inside the chunk cut Shatter Wall
+ * presence to ~4 %. Measured residual (32 seeds x 300 chunks): ~3 % of placements have a next-chunk crash hazard within
+ * 1.2 s at the expected speed, against ~29 % without the rule.
+ */
+export const BIOME_BLIND_REACT_MS = 500;
+export const BIOME_BLIND_SPEED_MUL = 1.2;
+/** px ahead of a blind ground hazard at distM that must hold no crash hazard. @param {{durationMs?:number}} onHit @param {number} distM */
+export function blindClearAheadPx(onHit, distM) {
+  const ms = (onHit && Number.isFinite(onHit.durationMs) ? onHit.durationMs : 1200) + BIOME_BLIND_REACT_MS;
+  return Math.round((expectedSpeedPxS(distM) * BIOME_BLIND_SPEED_MUL * ms) / 1000);
+}
 /** Difficulty tail: past the old caps the ramp keeps creeping up (gently) to a hard ceiling. */
 export const HAZARD_DENSITY_CAP_M = 3500;
 export const HAZARD_DENSITY_TAIL_END_M = 10000;
@@ -316,6 +331,8 @@ export class TerrainGenerator {
     this.biomeHazards = groupByBiome(allDefs);
     /** @type {Object<string, import('../data/schemas.js').PowerUpDef[]>} biome id -> its power-up defs (sorted by id). */
     this.biomePowerups = groupByBiome(allPowerups);
+    /** B2: ids of every crash hazard def (base and biome), for the blind fairness rule in _biomeGroundAt. */
+    this.crashHazardIds = new Set(allDefs.filter((h) => !h.onHit || !h.onHit.effect || h.onHit.effect === 'crash').map((h) => h.id));
     this.modMap = {};
     for (const m of toList(options.modDefs)) this.modMap[m.id] = m;
     /** Biome defs (W3, additive): drives sector assignment, palettes and biome chunk preference. */
@@ -1463,6 +1480,11 @@ export class TerrainGenerator {
     for (const g of chunk.gaps) if (x >= g.x0 - 96 && x <= g.x1 + 96) return null;
     for (const q of chunk.hazards) if (q !== skip && Math.abs(q.x - x) < BIOME_HAZARD_CLEARANCE_PX) return null;
     for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return null;
+    if (def.onHit && def.onHit.effect === 'blind') {
+      // B2 blind fairness: nothing that crashes in the stretch the sled rides blinded (see BIOME_BLIND_REACT_MS)
+      const ahead = blindClearAheadPx(def.onHit, x / this.ppm);
+      for (const q of chunk.hazards) if (q !== skip && q.x > x && q.x - x <= ahead && this.crashHazardIds.has(q.defId)) return null;
+    }
     const pts = chunk.points;
     const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
     const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
