@@ -1,0 +1,14 @@
+{
+  "name": "bitstream-ddsp-isolated-experiment",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Research-only Magenta DDSP. Not a game dependency.",
+  "type": "module",
+  "scripts": {
+    "render": "node --max-old-space-size=8192 render-ddsp.mjs"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "4.22.0",
+    "@tensorflow/tfjs-node": "4.22.0"
+  }
+}

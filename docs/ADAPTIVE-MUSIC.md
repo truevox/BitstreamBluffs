@@ -314,3 +314,56 @@ neural instrument-transfer model. V4 should be called an architecture
 challenger rather than a complete upgraded transcription pipeline.
 The game still uses V1 home synthesized voice only. No V4 voice
 package is integrated with gameplay, nor is any new dependency installed.
+
+## Genuine pretrained neural DDSP trial (2026-11-15)
+
+**Marvin's actual V4 artistic feedback:** the Candy saw may be a little
+better in V4; Vertigo's continuous V4 organ sounds much worse overall,
+even if it might have improved pitch accuracy. V4 organ lost V3's soul.
+V3 Vertigo organ is the artistic keeper/benchmark. This assessment is
+a user listening judgment, not an agent metric.
+
+**Marvin explicitly approved an isolated DDSP experiment.** Implemented
+using the real official Google Magenta pretrained TFJS DDSP checkpoints
+for violin, trumpet, tenor saxophone and flute; an organ checkpoint was
+not available among these four. Model inputs are original 25-second
+isolated vocal loudness and the continuous V3 stabilized F0, resampled
+at 250 frames/s. NO MIDI note events or tempo-grid quantization.
+DDSP is genuine neural timbre synthesis, but it is still limited by the
+source pitch detector's errors and is NOT a raw audio-to-audio model.
+
+Execution was on CT223 native TFJS CPU without needing CT211's
+temporarily unavailable NVIDIA driver. Both npm dependencies are pinned
+inside a *separate research manifest*, NOT the game root or Demucs
+venv. A 5-second model emits 80,000 samples; six overlapping chunks
+using 1s crossfades make exactly 25s of seamless output. Every model
+rendered valid finite audio with preview RMS about -23dBFS and no
+clipping. Local waveform check: source-to-DDSP loudness correlations
+0.922–0.948, with best offset 8–28ms. These metrics only support
+approximate timing/dynamics retention; they do NOT establish pitch
+or musical quality.
+
+Research source scripts, environment notes and restrictions:
+tools/music/ddsp-proof/README.md
+tools/music/ddsp-proof/extract_features.py
+tools/music/ddsp-proof/render-ddsp.mjs
+
+Real inference artifacts were created outside Git in
+/home/hermes/experiments/bitstream-ddsp-20261115/audio/rendered/.
+Official model weights/downloads are in the isolated work directory
+under models/ and were not committed.
+
+**Private listening demo** (original Maxi vocal + optional backing,
+4 neural instrument models, untouched V3 organ and V3 saw benchmarks):
+http://100.115.120.66:8181/tools/music/audition-ddsp/
+
+Site source: tools/music/audition-ddsp/. Private 25-second Opus
+clips and gallery metadata are gitignored in public/music-audition-ddsp/.
+Chromium tested all 6 switching paths plus original, backing, room,
+25s lengths and exact audio filename availability, with zero JS or
+HTTP errors.
+
+The DDSP *software* is Apache-2.0, but the rights to distribute its
+pretrained checkpoints and outputs in a public commercial game still
+need verifying separately. Do not silently claim the audio is ready
+for publication. Marvin has not yet listened to the DDSP outputs.
