@@ -112,6 +112,15 @@ describe('RunScene.updateCamera uses the curve', () => {
     expect(sx(1200)).toBeGreaterThanOrEqual(35);
     expect(Math.abs(sx(650) - 122)).toBeLessThan(12); // cruise framing is unchanged
   });
+  test('the 36 px pin still binds: a camera that got ahead of the rider is pulled back on the same frame', () => {
+    const s = makeCam(1200);
+    settle(s);
+    s._camX = s.sled.x + 60; // camera past the rider (as after a hard slow)
+    s.updateCamera(16);
+    const cam = s.cameras.main;
+    const sx = (s.sled.x - (cam.scrollX + GAME_WIDTH / 2 - GAME_WIDTH / (2 * cam.zoom))) * cam.zoom;
+    expect(sx).toBeGreaterThanOrEqual(35);
+  });
   test('the rider stays on screen at the floor: screen x between the 36 px pin and the right edge', () => {
     const s = makeCam(1700);
     settle(s);

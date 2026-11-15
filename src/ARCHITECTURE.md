@@ -1257,3 +1257,24 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
 * **`AudioSynth`**: SFX `groundWarn` (hop: rising two notes; `opts.brace`: one soft low note) and `hopCue` (bright tick).
 * **Tests**: `tests/src/hazard-telegraph.test.js` (pure rules, oracle agreement on a grid), `tests/src/hazard-telegraph-runscene.test.js`
   (the shipped `RunScene` methods on a prototype stub, the entity against a recording graphics fake, the sounds).
+
+### Phase 2: farther zoom-out at speed (supersedes the numbers in "Addendum: camera at speed")
+
+* **`systems/CameraZoom.js`** (pure): `speedZoom(speedPxS, t = TUNING)` is the target zoom. Stage 1 is unchanged and still
+  reads `TUNING.zoomMin` / `zoomSpeedLo` / `zoomSpeedHi` (1 -> 0.82 between 150 and 600 px/s). `ZOOM_STAGES` then eases
+  (smoothstep) to 0.56 at 1000 px/s and to 0.47 at 1400 px/s (v2.6.0: one stage, 0.62 at 1200). `ZOOM_FLOOR` 0.45 is the
+  hard clamp (was 0.6). `aheadPx(zoom, riderScreenX)` = `(GAME_WIDTH - riderScreenX) / zoom`. `TUNING` is not changed.
+* **`RunScene.updateCamera`**: `zt = speedZoom(s.speed)`, clamp at `ZOOM_FLOOR`; easing (`TUNING.zoomLerp`), the 0.005 zoom
+  step, the boost kick and the rider-keeps-its-screen-x pivot are as before. `ZOOM_FAR_MIN` / `ZOOM_FAR_SPEED_HI` are gone.
+  New RunScene-local `LOOK_ULTRA_EXTRA_PX` 110 ramps in between 850 and 1300 px/s on top of `LOOK_FAR_EXTRA_PX`: the x
+  follow (`cameraLerpX` 5.5 /s) lags `speed / 5.5` px, which left the rider ~130 px in at 1200 px/s. `RIDER_MIN_SCREEN_X`
+  36 still bounds it.
+* **Measured** (scratchpad `fable-10x/zoom-probe.cjs`, the shipped `updateCamera` at a steady speed over real terrain;
+  before -> after): 650 px/s zoom 0.815 -> 0.81, 440 -> 442 px ahead, 0.68 s; 850: 0.745 -> 0.64, 512 -> 596 px, 0.60 -> 0.70 s;
+  1000: 0.67 -> 0.56, 572 -> 736 px, 0.57 -> 0.74 s; 1200: 0.62 -> 0.515, 563 -> 862 px, 0.47 -> 0.72 s (rider at screen x 131 -> 36).
+* **Still true at the new floor**: view width 480 / 0.45 = 1067 px, under the 3 generated screens (1440 px ahead of the
+  sled); `applyZoomCompensation` counter-scales the background, flash and blind layers by exactly 1 / zoom (checked at
+  0.565 on the built game); cull margins use the zoomed `_view`; sizes at 0.47: Packet Spike 9.4 game px, Glitch Chasm
+  30, sled 19. The ground telegraph is drawn at a constant screen size, so it does not shrink with the view.
+* **Tests**: `tests/src/camera-zoom.test.js` (curve identity below 600 px/s, anchors, monotone, floor, the shipped
+  `updateCamera` settling on the curve, eased under hard acceleration, rider framing and pin).
