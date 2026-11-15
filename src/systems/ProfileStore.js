@@ -612,7 +612,8 @@ export function shopItem(id) {
 /**
  * Whether the profile owns an item. Level-reward items (price 0) are owned once the player reaches their
  * unlockLevel, which is how W1's level rewards already work; paid items are owned by purchase; an
- * achievement title (`grant: 'achievement'`) is owned once its achievement put it in `unlocked.titles`.
+ * achievement title (`grant: 'achievement'`) is owned once its achievement put it in `unlocked.titles`; a
+ * biome grant (`grant: 'biome'`) once its `biome` is in `biomeProgress.completed` (or its id was granted).
  * @param {Object} profile @param {string} id @returns {boolean}
  */
 export function isOwned(profile, id) {
@@ -624,6 +625,11 @@ export function isOwned(profile, id) {
   if (item.grant === 'achievement') {
     const titles = profile.unlocked && Array.isArray(profile.unlocked.titles) ? profile.unlocked.titles : [];
     return titles.includes(item.value);
+  }
+  // Biome grants (Micro glow-up: the Neon Sled Drone) are owned by completing their biome (decision 3), never by
+  // level, so a level-30 profile that has not completed it does not get it for free through the price-0 rule.
+  if (item.grant === 'biome') {
+    return sanitizeBiomeProgress(profile.biomeProgress).completed.includes(item.biome);
   }
   const lvl = Number(profile.level) || 1;
   return item.price === 0 && Number(item.unlockLevel) <= lvl;

@@ -102,7 +102,10 @@ export function shopLayout(o = {}) {
     const owned = isOwned(profile, it.id);
     // equip() stores the catalogue's VALUE ('mint'), older profiles may hold the ID; accept both.
     const isEquipped = equipped[it.slot] === it.id || equipped[it.slot] === it.value;
-    const locked = level < (it.unlockLevel || 1);
+    // A biome grant (the Neon Sled Drone) is locked until its biome is completed, whatever the level, and its
+    // locked state names the condition ("COMPLETE MICRO MOUNTAIN") rather than a level it does not have.
+    const grantLocked = it.grant === 'biome' && !owned;
+    const locked = grantLocked || level < (it.unlockLevel || 1);
     const affordable = bank >= (it.price || 0);
 
     // State is in the TEXT, not only the colour: colourblind mode and a small screen both have to tell
@@ -110,6 +113,7 @@ export function shopLayout(o = {}) {
     let state;
     if (isEquipped) state = 'EQUIPPED';
     else if (owned) state = 'EQUIP';
+    else if (grantLocked) state = upper(it.unlockText || 'LOCKED');
     else if (locked) state = `LVL ${it.unlockLevel}`;
     else state = it.price > 0 ? String(it.price) : 'REWARD';
 

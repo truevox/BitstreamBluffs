@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "note": "W4 cosmetic catalogue MIRROR. The source of truth is COSMETIC_ITEMS in src/systems/Cosmetics.js (audit F4b); tests/src/cosmetics-complete.test.js fails if this file and that constant ever disagree in any field. kind equals slot. price 0 = never bought: a level reward (unlockLevel = the level that grants it) or an achievement grant (grant: achievement). Prices are in Data Shards.",
+  "note": "W4 cosmetic catalogue MIRROR. The source of truth is COSMETIC_ITEMS in src/systems/Cosmetics.js (audit F4b); tests/src/cosmetics-complete.test.js fails if this file and that constant ever disagree in any field. kind equals slot. price 0 = never bought: a level reward (unlockLevel = the level that grants it), an achievement grant (grant: achievement), or a biome grant (grant: biome, owned by completing `biome`; unlockText is the shop's locked text). Prices are in Data Shards.",
   "items": [
     {
       "id": "trail-hue-aurora",
@@ -219,6 +219,18 @@
       "unlockLevel": 1,
       "value": "OMNISCIENT",
       "grant": "achievement"
+    },
+    {
+      "id": "rider-drone",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Neon Sled Drone",
+      "price": 0,
+      "unlockLevel": 1,
+      "value": "drone",
+      "grant": "biome",
+      "biome": "micro-mountain",
+      "unlockText": "COMPLETE MICRO MOUNTAIN"
     }
   ]
 }

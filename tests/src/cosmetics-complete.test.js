@@ -14,7 +14,7 @@ jest.unstable_mockModule('phaser', () => ({
 }));
 
 const { COSMETIC_ITEMS, COSMETIC_HUES, cosmeticFor, resolveCosmetics, themedUiPalette, UI_THEME_KEYS, equippedTitle } = await import('../../src/systems/Cosmetics.js');
-const { SHOP_ITEMS, sanitizeProfile, equip, unequip, isOwned, purchase } = await import('../../src/systems/ProfileStore.js');
+const { SHOP_ITEMS, sanitizeProfile, equip, unequip, isOwned, purchase, creditRun } = await import('../../src/systems/ProfileStore.js');
 const { shopAllRows, titlesLayout, titlesMenuItems } = await import('../../src/ui/ShopLayout.js');
 const { profileLayout, titleBadgeLayout, PROFILE_PANEL } = await import('../../src/ui/ProfileLayout.js');
 const { ACHIEVEMENTS } = await import('../../src/systems/Achievements.js');
@@ -130,7 +130,15 @@ describe('F4: the eleven level-reward cosmetics are real catalogue items', () =>
 describe('F4: every drawable catalogue item reaches the screen', () => {
   const drawable = SHOP_ITEMS.filter((i) => DRAWN_SLOTS.includes(i.slot));
   const rich = () => v1({ xp: MAX_XP, bank: 99999 });
-  const own = (p, id) => (isOwned(p, id) ? p : purchase(p, id));
+  // Micro glow-up: a biome grant (the Neon Sled Drone) is never sold, so it is earned the way a player earns
+  // it: a credited run that completed its biome. Every other item is still owned or bought exactly as before.
+  const earn = (p, it) => creditRun(p, { id: `earn-${it.id}`, distanceM: 1 }, LEVELS,
+    { biomeVisits: { encountered: [it.biome], completed: [it.biome] } }).profile;
+  const own = (p, id) => {
+    if (isOwned(p, id)) return p;
+    const it = SHOP_ITEMS.find((i) => i.id === id);
+    return it && it.grant === 'biome' ? earn(p, it) : purchase(p, id);
+  };
 
   test('every drawable item has a hue of the right shape', () => {
     for (const it of drawable) {

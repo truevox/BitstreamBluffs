@@ -26,8 +26,12 @@
  *   price       Data Shards; 0 = never bought (a level reward or an achievement grant)
  *   unlockLevel price 0: the level that grants it; price > 0: the level it can first be bought at
  *   value       what `equip()` stores in the slot; unique within a slot
- *   grant       optional; 'achievement' = owned only when an achievement put `value` in `unlocked.titles`
- * @type {ReadonlyArray<Readonly<{id:string,kind:string,slot:string,name:string,price:number,unlockLevel:number,value:string,grant?:string}>>}
+ *   grant       optional; 'achievement' = owned only when an achievement put `value` in `unlocked.titles`;
+ *               'biome' = owned only when `biome` is in `biomeProgress.completed` (decision 3) or the
+ *               credit wrote the id into `unlocked.cosmetics` (ProfileStore.creditRun, the grant path)
+ *   biome       grant 'biome' only: the biome id whose completion earns it
+ *   unlockText  grant 'biome' only: the shop's locked-state text (the condition, spelled out)
+ * @type {ReadonlyArray<Readonly<{id:string,kind:string,slot:string,name:string,price:number,unlockLevel:number,value:string,grant?:string,biome?:string,unlockText?:string}>>}
  */
 export const COSMETIC_ITEMS = Object.freeze([
   { id: 'trail-hue-aurora', kind: 'trail', slot: 'trail', name: 'Aurora Trail', price: 0, unlockLevel: 3, value: 'aurora' },
@@ -57,6 +61,9 @@ export const COSMETIC_ITEMS = Object.freeze([
   // Achievement titles (W5 rewards). Owned only when the achievement wrote `value` into unlocked.titles.
   { id: 'title-cartographer', kind: 'title', slot: 'title', name: 'Cartographer', price: 0, unlockLevel: 1, value: 'CARTOGRAPHER', grant: 'achievement' },
   { id: 'title-omniscient', kind: 'title', slot: 'title', name: 'Omniscient', price: 0, unlockLevel: 1, value: 'OMNISCIENT', grant: 'achievement' },
+  // Micro Mountain glow-up: a rider SHAPE, earned by completing Micro Mountain (SledHEAD canon: the player
+  // rides Pete's bee meadow as an RC micro sled drone). Never sold; unlockLevel 1 because no level gates it.
+  { id: 'rider-drone', kind: 'rider', slot: 'rider', name: 'Neon Sled Drone', price: 0, unlockLevel: 1, value: 'drone', grant: 'biome', biome: 'micro-mountain', unlockText: 'COMPLETE MICRO MOUNTAIN' },
 ].map((i) => Object.freeze(i)));
 
 /**
@@ -73,6 +80,9 @@ const HUES = {
     plum: Object.freeze({ color: '#c060ff' }),
     amber: Object.freeze({ color: '#ffb000' }), // palette amber (level 9)
     lime: Object.freeze({ color: '#9dff3a' }), // palette lime (level 20)
+    // The Neon Sled Drone. `shape` swaps the drawn rider for the drone (Sled._drawDrone); `color` is its
+    // frame, an electric violet-blue that is no palette key, so it never reads as a hazard or a pickup.
+    drone: Object.freeze({ color: '#8a7dff', shape: 'drone' }),
   }),
   glow: Object.freeze({
     warm: Object.freeze({ color: '#ffc46b' }),
@@ -180,8 +190,10 @@ export function cosmeticFor(idOrValue) {
  * @param {Object} palette the active palette as ints (0xRRGGBB)
  * @param {Object<string,string>} paletteHex the same palette as '#rrggbb' strings
  * @param {{colorblind?:boolean}} [o]
- * @returns {{rider:string, glow:string, trail:string[], theme:string, danger:string,
+ * @returns {{rider:string, riderShape:string, glow:string, trail:string[], theme:string, danger:string,
  *            overridden:boolean, missing:string[]}}
+ *   `riderShape` is 'default' (the neon rider) or a rider hue's `shape` ('drone'). A shape is drawn in the
+ *   rider colour and palette keys only, so unlike a hue it survives the colourblind palette.
  */
 export function resolveCosmetics(profile, palette, paletteHex, o = {}) {
   const hex = paletteHex || {};
@@ -195,6 +207,13 @@ export function resolveCosmetics(profile, palette, paletteHex, o = {}) {
     trail: [hex.cyan, hex.lime, hex.amber, hex.magenta],
     theme: 'default',
   };
+
+  // The equipped rider's SHAPE (Micro glow-up). Resolved before the colourblind refusal on purpose: a shape
+  // recolours nothing (the drone is drawn in the rider colour, which colourblind mode has already reset to
+  // palette magenta, plus palette keys), so refusing it would only take away something the player earned.
+  const riderEntry = cosmeticInSlot('rider', equipped.rider);
+  const riderHue = riderEntry && COSMETIC_HUES.rider[riderEntry.value];
+  base.riderShape = (riderHue && typeof riderHue.shape === 'string') ? riderHue.shape : 'default';
 
   if (colorblind) {
     return { ...base, danger: hex.danger, overridden: true, missing: [] };
