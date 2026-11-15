@@ -16,7 +16,7 @@ import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
 import { ellipsize, measureText } from './PixelFont.js';
-import { profileLayout } from './ProfileLayout.js';
+import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
 import { ACHIEVEMENTS } from '../systems/Achievements.js';
 import { shopLayout, shopMenuItems, titlesLayout, titlesMenuItems } from './ShopLayout.js';
@@ -447,7 +447,9 @@ export class ProfileView extends View {
     if (this.toggleRows.length) {
       const items = this.toggleRows.map((r) => ({
         kind: 'choice',
-        label: `${r.name.toUpperCase()} ${r.unlockLevel}`,
+        // Decision 3: NAME + NEW / SEEN / DONE (ProfileLayout.toggleLabel), coloured by state.
+        label: toggleLabel(r).text,
+        color: toggleLabel(r).color,
         options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
         get: () => {
           const p = scene.registry.get(REG.PROFILE) || {};
@@ -714,11 +716,14 @@ export class AchievementsView extends View {
     const layout = achievementsLayout({
       profile,
       page: o.page || 0,
-      biomeCount: o.biomeCount !== undefined ? o.biomeCount : biomeDefs.length,
+      // ACH-6: no catalogue-size default. The grid reads the profile's ENCOUNTERED count (decision 3); only an
+      // explicit caller figure is passed through.
+      biomeCount: o.biomeCount,
     });
     super(scene, theme, { w: layout.w, h: layout.h, title: 'ACHIEVEMENTS', color: 'amber', onClose: o.onClose, y: 13, backLabel: 'BACK' });
     this.profile = profile;
     this.biomeDefs = biomeDefs;
+    this.biomeCount = o.biomeCount;
     this.page = layout.page;
     this.rows = [];
     this._paint();
@@ -731,7 +736,7 @@ export class AchievementsView extends View {
     const layout = achievementsLayout({
       profile: this.scene.registry.get(REG.PROFILE) || this.profile,
       page: this.page,
-      biomeCount: this.biomeDefs.length,
+      biomeCount: this.biomeCount,
     });
     this.page = layout.page;
     this.pages = layout.pages;

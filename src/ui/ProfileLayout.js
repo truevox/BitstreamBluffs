@@ -12,6 +12,27 @@ import { measureText } from './PixelFont.js';
 import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 import { fmtInt, fmtSec, fmtClock, idToLabel } from './Format.js';
 import { equippedTitle } from '../systems/Cosmetics.js';
+import { sanitizeBiomeProgress, BIOME_IDS } from '../systems/BiomeDiscovery.js';
+
+/**
+ * Decision 3: the tag an UNLOCKED biome's toggle row carries. It replaces the unlock level on that row (the
+ * level is already reached, so it told the player nothing). NEW = unlocked, never entered; SEEN = a run
+ * entered one of its sectors; DONE = a run rode one of its sectors to the end. Locked biomes keep "LVL n".
+ */
+export const BIOME_STATE_TAGS = Object.freeze({ unlocked: 'NEW', encountered: 'SEEN', completed: 'DONE' });
+const STATE_COLORS = Object.freeze({ unlocked: 'text', encountered: 'cyan', completed: 'lime' });
+
+/**
+ * Label and colour of one unlocked biome's toggle row. The widest (SKY JELLYFISH MOUNTAIN SEEN/DONE) is
+ * 148 px, inside the ~150 px a two-column toggle band leaves before the ON/OFF value (unit-tested).
+ * @param {{name:string, state:string}} row a ProfileStore.biomeToggleRows row
+ * @returns {{text:string, color:string}}
+ */
+export function toggleLabel(row) {
+  const r = row && typeof row === 'object' ? row : {};
+  const state = BIOME_STATE_TAGS[r.state] ? r.state : 'unlocked';
+  return { text: `${String(r.name || r.id || '').toUpperCase()} ${BIOME_STATE_TAGS[state]}`, color: STATE_COLORS[state] };
+}
 
 /**
  * PROFILE view panel size. Taller than the leaderboard because it carries 10 stats and 11 signatures.
@@ -182,6 +203,7 @@ export function profileLayout(o = {}) {
     const e = table.levels.find((l) => l.biome === id);
     return e ? e.level : null;
   };
+  const prog = sanitizeBiomeProgress(p.biomeProgress);
   const namedOnly = order.filter((id) => !(reached.has(id) && sigIds.has(id)));
   namedOnly.forEach((id, i) => {
     const x = NAME_COL_X[i % NAME_COLS];
@@ -192,7 +214,15 @@ export function profileLayout(o = {}) {
     items.push(name);
     // A locked signature says when it unlocks, in the shop's own "LVL n" wording.
     const lv = levelOf(id);
-    if (!has && lv) items.push(box(`lock-${id}`, `LVL ${lv}`, name.x + name.w + 6, y, 'text', { alpha: 0.55 }));
+    let right = name;
+    if (!has && lv) {
+      right = box(`lock-${id}`, `LVL ${lv}`, name.x + name.w + 6, y, 'text', { alpha: 0.55 });
+      items.push(right);
+    }
+    // Decision 3: a biome can be entered before it is unlocked (a Daily plays the date's mask), so a plain
+    // name row also says SEEN / DONE when that happened. Its own box: the name and LVL texts stay exact.
+    const st = prog.completed.includes(id) ? 'completed' : prog.encountered.includes(id) ? 'encountered' : null;
+    if (st) items.push(box(`state-${id}`, BIOME_STATE_TAGS[st], right.x + right.w + 6, y, STATE_COLORS[st]));
   });
 
   // The toggle menu's band: below the last name row, sized so the deepest row still clears the panel
@@ -233,6 +263,11 @@ export function profileLayout(o = {}) {
   items.push(box('ach-summary',
     achTotal ? `ACHIEVEMENTS ${achUnlocked}/${achTotal}` : `ACHIEVEMENTS ${achUnlocked}`,
     PAD, PROFILE_PANEL.h - 34, 'amber', { alpha: 0.9 }));
+  // Decision 3: how many biomes this pilot has actually entered and ridden through, on the same line as the
+  // achievements count (right-aligned; the toggle band always ends above this line).
+  const biomeTotal = order.length || BIOME_IDS.length;
+  items.push(box('biome-progress', `BIOMES SEEN ${prog.encountered.length}/${biomeTotal} DONE ${prog.completed.length}/${biomeTotal}`,
+    RIGHT, PROFILE_PANEL.h - 34, 'cyan', { align: 'right', alpha: 0.9 }));
   const BTN_Y = PROFILE_PANEL.h - 22;
   const achButton = { x: PAD, y: BTN_Y, w: 96, h: 16 };
   const shopButton = { x: PAD + 96 + 8, y: BTN_Y, w: 96, h: 16 };

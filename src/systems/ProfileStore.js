@@ -259,12 +259,21 @@ export function enabledBiomeMask(profile, biomeDefs) {
  * current state. Pure, so the view stays a renderer and this stays testable.
  * @param {Object} profile
  * @param {Array<{id:string,bit:number,name:string,unlockLevel:number}>} biomeDefs
- * @returns {Array<{id:string,name:string,bit:number,unlockLevel:number,unlocked:boolean,enabled:boolean}>}
+ * @returns {Array<{id:string,name:string,bit:number,unlockLevel:number,unlocked:boolean,enabled:boolean,
+ *   encountered:boolean,completed:boolean,state:'locked'|'unlocked'|'encountered'|'completed'}>}
  */
 export function biomeToggleRows(profile, biomeDefs) {
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   const unlocked = unlockedBiomeIds(profile);
   const mask = (profile && profile.biomeMask) >>> 0 || 0;
+  // Decision 3: encountered / completed are separate from unlocked. A Daily plays the date's mask whatever
+  // the player has unlocked, so a LOCKED biome can be encountered too; `state` reports the strongest fact.
+  const prog = sanitizeBiomeProgress(profile && profile.biomeProgress);
+  const stateOf = (id) => {
+    if (prog.completed.includes(id)) return 'completed';
+    if (prog.encountered.includes(id)) return 'encountered';
+    return unlocked.includes(id) ? 'unlocked' : 'locked';
+  };
   return defs
     .filter((d) => d && d.id && Number.isFinite(d.bit))
     .slice()
@@ -276,6 +285,9 @@ export function biomeToggleRows(profile, biomeDefs) {
       unlockLevel: d.unlockLevel || 1,
       unlocked: unlocked.includes(d.id),
       enabled: unlocked.includes(d.id) && (mask & d.bit) !== 0,
+      encountered: prog.encountered.includes(d.id),
+      completed: prog.completed.includes(d.id),
+      state: stateOf(d.id),
     }));
 }
 
