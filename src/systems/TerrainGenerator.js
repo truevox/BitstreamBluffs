@@ -28,6 +28,7 @@
  *  - Chunk `index` is stable; chunk.startX of chunk i+1 === chunk.endX of chunk i.
  */
 import { Rng, xxHash32, hashInts } from './Rng.js';
+import { rollSweep } from './HazardMotion.js';
 import { TERRAIN } from '../constants.js';
 
 /** Horizontal distance between consecutive polyline points (px). */
@@ -198,6 +199,16 @@ export function blindClearAheadPx(onHit, distM) {
   const ms = (onHit && Number.isFinite(onHit.durationMs) ? onHit.durationMs : 1200) + BIOME_BLIND_REACT_MS;
   return Math.round((expectedSpeedPxS(distM) * BIOME_BLIND_SPEED_MUL * ms) / 1000);
 }
+/**
+ * B3: the HazardSpawn of a biome ground hazard. A Gear Gate (motion gate) also carries `phase` (0..1), the slot's 4th
+ * pre-drawn number (h3, unused by ground slots before B3), so each gate's cycle is its own draw (spec §5) and no stream
+ * moves. Other defs get exactly the pre-B3 shape.
+ */
+function biomeSpawn(def, x, y, rotationDeg, h3) {
+  const sp = { defId: def.id, x, y, rotationDeg };
+  if (def.motion && def.motion.kind === 'gate') sp.phase = Math.round((Number.isFinite(h3) ? h3 : 0) * 1e6) / 1e6;
+  return sp;
+}
 /** Difficulty tail: past the old caps the ramp keeps creeping up (gently) to a hard ceiling. */
 export const HAZARD_DENSITY_CAP_M = 3500;
 export const HAZARD_DENSITY_TAIL_END_M = 10000;
@@ -331,6 +342,8 @@ export class TerrainGenerator {
     this.biomeHazards = groupByBiome(allDefs);
     /** @type {Object<string, import('../data/schemas.js').PowerUpDef[]>} biome id -> its power-up defs (sorted by id). */
     this.biomePowerups = groupByBiome(allPowerups);
+    /** B3: biome hazard defs by id (the power-up slot keeps clear of a rolling hazard's whole track). */
+    this.biomeHazardById = Object.fromEntries(allDefs.filter((h) => h.biome).map((h) => [h.id, h]));
     /** B2: ids of every crash hazard def (base and biome), for the blind fairness rule in _biomeGroundAt. */
     this.crashHazardIds = new Set(allDefs.filter((h) => !h.onHit || !h.onHit.effect || h.onHit.effect === 'crash').map((h) => h.id));
     this.modMap = {};
@@ -1416,9 +1429,9 @@ export class TerrainGenerator {
           const span = chunk.endX - chunk.startX - 2 * BIOME_EDGE_MARGIN_PX;
           const steps = span > 0 ? Math.floor(span / HAZARD_RETRY_STEP_PX) + 1 : 0;
           let placed = false;
-          for (let k = 0; k < steps && !placed; k++) placed = this._tryBiomeGround(chunk, def, (h2 + (k * HAZARD_RETRY_STEP_PX) / span) % 1, b, breather, lips);
+          for (let k = 0; k < steps && !placed; k++) placed = this._tryBiomeGround(chunk, def, (h2 + (k * HAZARD_RETRY_STEP_PX) / span) % 1, b, breather, lips, h3);
           // B1 slot rule (spec §4 amendment): no free slot -> replace one base ground hazard, picked with the 5th draw
-          if (!placed) this._replaceBiomeGround(chunk, def, h4, b, breather, lips);
+          if (!placed) this._replaceBiomeGround(chunk, def, h4, b, breather, lips, h3);
         }
       }
     }
@@ -1454,14 +1467,14 @@ export class TerrainGenerator {
   }
 
   /** Ground biome hazard at fraction u of the chunk's inner span, if every base clearance holds. @returns {boolean} placed */
-  _tryBiomeGround(chunk, def, u, b, breather, lips) {
+  _tryBiomeGround(chunk, def, u, b, breather, lips, h3) {
     const lo = chunk.startX + BIOME_EDGE_MARGIN_PX;
     const hi = chunk.endX - BIOME_EDGE_MARGIN_PX;
     if (hi < lo) return false;
     const x = Math.round(lo + (hi - lo) * u);
     const at = this._biomeGroundAt(chunk, def, x, b, breather, lips, null);
     if (!at) return false;
-    chunk.hazards.push({ defId: def.id, x, y: at.y, rotationDeg: at.slope });
+    chunk.hazards.push(biomeSpawn(def, x, at.y, at.slope, h3));
     chunk.hazards.sort((p, q) => p.x - q.x);
     return true;
   }
@@ -1480,6 +1493,7 @@ export class TerrainGenerator {
     for (const g of chunk.gaps) if (x >= g.x0 - 96 && x <= g.x1 + 96) return null;
     for (const q of chunk.hazards) if (q !== skip && Math.abs(q.x - x) < BIOME_HAZARD_CLEARANCE_PX) return null;
     for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return null;
+    if (!this._rollTrackClear(chunk, def, x, lips, skip)) return null;
     if (def.onHit && def.onHit.effect === 'blind') {
       // B2 blind fairness: nothing that crashes in the stretch the sled rides blinded (see BIOME_BLIND_REACT_MS)
       const ahead = blindClearAheadPx(def.onHit, x / this.ppm);
@@ -1500,6 +1514,38 @@ export class TerrainGenerator {
     return { y, slope };
   }
 
+  /**
+   * B3 roll track rule: a rolling hazard (motion roll) can be anywhere on [x + sweep.lo, x + sweep.hi] (HazardMotion.rollSweep),
+   * so that whole track keeps the clearances its spawn point keeps: inside the chunk's edge margins, off lip windows and
+   * gaps +/- 96, BIOME_HAZARD_CLEARANCE_PX from every other hazard and 90 px from every power-up. A def that does not move
+   * along x (sweep 0) passes trivially. @returns {boolean}
+   */
+  _rollTrackClear(chunk, def, x, lips, skip) {
+    const sw = rollSweep(def.motion);
+    if (sw.lo === 0 && sw.hi === 0) return true;
+    const lo = x + sw.lo;
+    const hi = x + sw.hi;
+    if (lo < chunk.startX + BIOME_EDGE_MARGIN_PX || hi > chunk.endX - BIOME_EDGE_MARGIN_PX) return false;
+    const away = (q) => (q < lo ? lo - q : q > hi ? q - hi : 0);
+    for (const l of lips) if (hi >= l.x - 40 && lo <= l.zoneEnd) return false;
+    for (const g of chunk.gaps) if (hi >= g.x0 - 96 && lo <= g.x1 + 96) return false;
+    for (const q of chunk.hazards) if (q !== skip && away(q.x) < BIOME_HAZARD_CLEARANCE_PX) return false;
+    for (const p of chunk.powerups) if (away(p.x) < 90) return false;
+    return true;
+  }
+
+  /**
+   * B3: distance from x to the track a hazard spawn can occupy (a static hazard: |q.x - x|; a rolling one: its whole
+   * rollSweep span). Base and B1/B2 defs have no motion, so this is exactly the old |q.x - x| for them.
+   */
+  _trackDist(q, x) {
+    const d = this.biomeHazardById ? this.biomeHazardById[q.defId] : null;
+    const sw = d ? rollSweep(d.motion) : { lo: 0, hi: 0 };
+    const lo = q.x + sw.lo;
+    const hi = q.x + sw.hi;
+    return x < lo ? lo - x : x > hi ? x - hi : 0;
+  }
+
   /** B1 (b): no segment climbs (angle < 0, y down) from point i over the next BIOME_EDGE_MARGIN_PX (always inside the chunk). */
   _noClimbAhead(pts, i) {
     const k1 = Math.min(pts.length - 2, i + Math.ceil(BIOME_EDGE_MARGIN_PX / SPACING_PX));
@@ -1514,7 +1560,7 @@ export class TerrainGenerator {
    * def (spacing ignores the candidate itself). `r` is the slot's pre-drawn 5th number: the draw count never changes, so
    * base streams and the power-up slot are untouched. @returns {boolean} replaced
    */
-  _replaceBiomeGround(chunk, def, r, b, breather, lips) {
+  _replaceBiomeGround(chunk, def, r, b, breather, lips, h3) {
     const w = (def.size && def.size.w) || 24;
     const ht = (def.size && def.size.h) || 24;
     const cands = [];
@@ -1531,7 +1577,7 @@ export class TerrainGenerator {
     if (!cands.length) return false;
     const k = cands[Math.min(cands.length - 1, Math.floor(r * cands.length))];
     const q = chunk.hazards[k];
-    chunk.hazards[k] = { defId: def.id, x: q.x, y: q.y, rotationDeg: q.rotationDeg };
+    chunk.hazards[k] = biomeSpawn(def, q.x, q.y, q.rotationDeg, h3);
     return true;
   }
 
@@ -1542,7 +1588,7 @@ export class TerrainGenerator {
     if (hi < lo) return false;
     const x = Math.round(lo + (hi - lo) * u);
     if (x <= 480) return false;
-    for (const q of chunk.hazards) if (Math.abs(q.x - x) < 90) return false;
+    for (const q of chunk.hazards) if (this._trackDist(q, x) < 90) return false;
     for (const g of chunk.gaps) if (x > g.x0 - 80 && x < g.x1 + 40) return false;
     for (const p of chunk.powerups) if (Math.abs(p.x - x) < 90) return false;
     const r = def.radius || 10;
