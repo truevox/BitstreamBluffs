@@ -30,3 +30,6 @@ config.txt
 
 public/music/
 /tools/music/__pycache__/
+
+/public/music-audition/
+/dist-music-audition/
