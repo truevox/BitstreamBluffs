@@ -23,11 +23,14 @@
  * of it is testable here without a Phaser scene.
  */
 
-// Head Start tuning (decision 4). Measured on the real sled with the gate's same-seed 10 s probe.
-const HS_LAUNCH = 8;
-const HS_OPEN_MUL = 1.5;
-const HS_OPEN_MS = 6000;
-const HS_FADE_MS = 1500;
+// Head Start tuning (decision 4). Measured on the built game, hands-off, same seed, clean vs Head Start
+// (2026-11-14, five seeds): +19.5 % to +24.4 % distance at 10 s (target >= +15 %), back to an ordinary
+// speed after the 8 s window. 12 x the ~50 px/s spawn is a ~600 px/s launch; x1.6 is the Packet Burst
+// path's drag scaling (Packet Burst itself is x1.3). The old values (x1.25 launch only) gave +1.7 % at 5 s.
+const HS_LAUNCH = 12;
+const HS_OPEN_MUL = 1.6;
+const HS_OPEN_MS = 8000;
+const HS_FADE_MS = 2000;
 
 /** The boost ids, in loadout order. */
 export const BOOSTS = Object.freeze(['errorCorrection', 'headStart']);
