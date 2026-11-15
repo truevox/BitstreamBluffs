@@ -153,7 +153,7 @@ describe('Gear Gate: the cue says whether it will be open at arrival', () => {
   test('open at arrival with room on both sides: state open, drawn dim, never lime (even inside the hop window)', () => {
     // arrival at t = 450 (open 0..900)
     expect(at(-550)).toMatchObject({ kind: 'hop', state: 'open', color: 'danger', gate: 'open' });
-    expect(at(450 - 300, 700 * 0.3)).toMatchObject({ state: 'open', gate: 'open' });
+    expect(at(450 - 300, 700 * 0.3)).toMatchObject({ state: 'open', gate: 'open', color: 'danger' });
   });
   test('open at arrival but within the margin of a change: judged closed (the arrival time is an estimate)', () => {
     const m = GROUND_WARN.gateMarginMs;
