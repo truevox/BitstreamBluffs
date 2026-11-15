@@ -75,6 +75,10 @@ function rawTwin(gen, index, terrainSwell = null) {
   return twin.getChunk(index);
 }
 
+// Two of the audit's three T2 tests, verbatim. The third ("slopeDegAt describes the same surface as heightAt") samples a
+// +-1 px chord every 4 px; in a zone whose x0 + 3 is a multiple of 4 every 4th sample sits EXACTLY on a vertex, where the
+// chord averages two segments and reads half the vertex turn (4.4 deg at 20/660). Off the vertices its error is ~4e-10
+// deg. Its vertex-safe form is the slopeDegAt test below; the verbatim one is left to the lead (see the T2 report).
 describe('T2 (audit, copied from audit/terrain tests/src/audit-terrain.test.js): dewSwell reaches the surface the sled rides', () => {
   test('T2: heightAt agrees with the collider polyline (chunk.points) inside a dew-swell zone', () => {
     const { gen, out } = swellZones('alpha');
