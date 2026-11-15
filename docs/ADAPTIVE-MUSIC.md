@@ -210,3 +210,46 @@ individual instrument identity. No claims of finished art or 32-song migration.
 Readable Chaos warning SFX; V2 is OFFLINE resynthesis plus separate lab only.
 It does not change the live AudioSynth API, game physics or SFX hooks.
 Rebase the unmerged draft PR onto CC's moving main before review.
+
+## V3 pitch-control experiment (2026-11-15)
+
+Marvin's **actual listening feedback after V2**: major sonic improvement,
+with Candy sawtooth and Vertigo church organ among the best, but audible
+small pitch slides and wobbling; larger deliberate glides are less bad.
+Marvin asked whether timing is quantized and whether detection can improve.
+
+**Answer grounded in V2 source:**
+- NO beat/BPM timing quantization.
+- V2 pitch samples and note onsets occupy a 10ms grid. New note onsets
+  closer than 70ms apart are suppressed, and notes shorter than 55ms are
+  discarded. SF2 instrument note-on/off and pitch wheel events run in 10ms
+  audio blocks. This IS coarse time discretization, not rhythmic snapping.
+- SF2 sample instruments choose an integer MIDI note nearest detected
+  note pitch, then use pitch bend updates every 10ms to follow source F0.
+  It is MIDI-like events, not a MIDI file or tempo-quantized note grid.
+- Raw source NCCF is not yet independently confidence-validated or checked
+  against a separate F0 tracker. Bad harmonics/octaves can still corrupt it.
+
+**Separate agent-authored V3 pitch-control test; NOT yet listening-approved,
+not installed in game, not a raw-detector upgrade:**
+- tools/music/pitch_stability_v3.py keeps existing onsets unchanged,
+  estimates per-note pitch centers robustly, suppresses slides under
+  25 cents, reduces modest deviations to ~35%, preserves established
+  larger glides at ~80%, and rejects transient spikes.
+- Existing 1,234 event times (10ms grid) are unchanged. Frame-to-frame
+  pitch steps over 10 cents dropped from 4,840 to 4,035 in the source
+  under this method. This is not proof of audible improvement.
+- Three synthetic-control tests pass: tiny jitter suppressed, sustained
+  larger glides preserved, genuine note-to-note interval preserved.
+- New separate two-voice 25s A/B lab with V1/V2/V3 and original vocal:
+  http://100.115.120.66:8181/tools/music/audition-v3/
+  Rendered sawtooth and church-organ preview assets are on CT211 under
+  /root/bitstream-maxi/mountain-voice-gallery-v3/; originals untouched.
+  Browser test passes for revision switching and original voice reference.
+- Next raw-detector improvement should independently compare a confidence-
+  aware second estimator and temporal continuity, and test accurate
+  attack timing against source audio. Do not re-quantize notes to BPM
+  or install new dependencies without Marvin's approval.
+
+V3 is a limited two-instrument pitch-treatment experiment, not a
+twelve-instrument accepted art revision or production audio change.
