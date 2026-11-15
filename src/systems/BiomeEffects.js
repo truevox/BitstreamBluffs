@@ -206,11 +206,13 @@ export function spendShieldSource(sources) {
 }
 
 /**
- * Charges a pickup's chip shows: the whole pool minus the charges other tracked sources own. With only Hashed Backups in
- * play this is the whole pool, as before B2. @param {string[]|undefined} sources @param {string} id @param {number} pool
- * @returns {number}
+ * Charges a pickup's chip shows. A biome shield (any id but SHIELD_DEFAULT_SOURCE) shows only its own tracked charges.
+ * The Hashed Backup shows the pool minus the charges other tracked pickups own, so untracked charges (the W4 Error
+ * Correction boost) stay on its chip and a lone Hashed Backup shows the whole pool, as before B2.
+ * @param {string[]|undefined} sources @param {string} id @param {number} pool @returns {number}
  */
 export function shieldChargesFor(sources, id, pool) {
-  const others = Array.isArray(sources) ? sources.filter((s) => s !== id).length : 0;
-  return Math.max(0, (pool || 0) - others);
+  const list = Array.isArray(sources) ? sources : [];
+  if (id !== SHIELD_DEFAULT_SOURCE) return Math.min(pool || 0, list.filter((s) => s === id).length);
+  return Math.max(0, (pool || 0) - list.filter((s) => s !== id).length);
 }

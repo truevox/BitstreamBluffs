@@ -148,10 +148,20 @@ describe('BiomeEffects B2: shield sources (which pickup a spent shield charge ca
     expect(addShieldSource([], 'heatShield', 0)).toEqual(['heatShield']);
   });
 
-  test('shieldChargesFor: the pool minus the charges other tracked sources own (a lone Hashed Backup keeps the whole pool)', () => {
+  test('shieldChargesFor: a biome shield counts its own charges; the Hashed Backup keeps the pool minus the others (a lone Backup keeps it all)', () => {
     expect(shieldChargesFor(['hashedBackup'], 'hashedBackup', 2)).toBe(2); // 1 pickup + 1 boost charge: unchanged x2
     expect(shieldChargesFor(['hashedBackup', 'heatShield'], 'heatShield', 2)).toBe(1);
     expect(shieldChargesFor(['hashedBackup', 'heatShield'], 'hashedBackup', 2)).toBe(1);
-    expect(shieldChargesFor(undefined, 'heatShield', 1)).toBe(1);
+    expect(shieldChargesFor(undefined, 'heatShield', 1)).toBe(0); // an untracked charge is never a Heat Shield's
+    expect(shieldChargesFor(undefined, 'hashedBackup', 1)).toBe(1);
+  });
+
+  test('an untracked charge (Error Correction boost, granted at spawn) belongs to the Hashed Backup, never to the Heat Shield chip', () => {
+    // pool 2 = 1 boost charge + 1 Heat Shield pickup
+    expect(shieldChargesFor(['heatShield'], 'heatShield', 2)).toBe(1);
+    expect(shieldChargesFor(['heatShield'], 'hashedBackup', 2)).toBe(1);
+    // pool 3 = 1 boost charge + 1 Hashed Backup + 1 Heat Shield: the Backup chip keeps the boost charge as before B2
+    expect(shieldChargesFor(['hashedBackup', 'heatShield'], 'hashedBackup', 3)).toBe(2);
+    expect(shieldChargesFor(['hashedBackup', 'heatShield'], 'heatShield', 3)).toBe(1);
   });
 });

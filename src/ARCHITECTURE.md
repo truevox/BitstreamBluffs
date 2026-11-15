@@ -1124,7 +1124,7 @@ blind at the expected speed; with it 2.9 % (22 of 771), all in the next chunk. A
 (`spendShieldSource`, LIFO), so `POWERUP_EXPIRED {reason: 'consumed'}` carries `heatShield` or `hashedBackup` (was always
 `hashedBackup`, which left a Heat Shield chip on screen). A charge with no tracked source (the W4 shield boost) is the
 Hashed Backup's (`SHIELD_DEFAULT_SOURCE`). `POWERUP_COLLECTED.charges` is `shieldChargesFor(sources, id, pool)`: the pool
-minus the charges other tracked pickups own, so a lone Hashed Backup still shows the whole pool. `shieldSources` is set
+minus the charges other tracked pickups own for the Hashed Backup (so a lone Backup and the Error Correction boost charge show as before), and only its own tracked charges for a biome shield. `shieldSources` is set
 with `shieldCharges` at run start; a manual reset keeps both.
 
 **HUD (`UIScene`).** `POWERUP_INFO` rows GOGGLES (cyan) and HEAT SHIELD (magenta) with their own `_drawIcon` glyphs;
