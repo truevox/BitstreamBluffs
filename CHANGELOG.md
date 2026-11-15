@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - decision 3: biome unlocked / encountered / completed
+## v2.8.0 - decision 3: biome unlocked / encountered / completed (2026-11-15)
 
 - **Three separate biome facts (Marvin decision 3).** *Unlocked* is the existing Sync Level unlock. *Encountered* means a run's sled actually reached a sector of that biome. *Completed* means a run rode one of that biome's sectors from start to end (500 m) and its run-ending crash was not inside that sector. A crash a Hashed Backup absorbs does not void completion.
 - **Detection is pure** (`src/systems/BiomeDiscovery.js`, `detectBiomeVisits`). It uses the generator's own `biomeForSector` and sector rule, from the run's seed, mask, furthest x and crash x.
