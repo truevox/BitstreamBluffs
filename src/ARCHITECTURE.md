@@ -1048,3 +1048,41 @@ outside this change's files. The fix is to use `DailyPatch.dailyRunLabel(seed, p
   `biome-slot-rule.test.js` hashes its 00978f6 pin with the swell stripped (reproduces it exactly) and pins the ALL-mask
   digest of the shipped content separately. Built-game proof: a gate block (sd of sled.y - heightAt < 3 px on a
   `t2-probe@512` swell zone) is handed to the lead; it raises the expected counts by 1 in both modes.
+
+## Addendum: Marvin decision 3 (biome unlocked / encountered / completed; additive)
+
+Decision 3: "Biome discovery means actually encountering the biome; track unlocked, encountered, and completed separately."
+
+- **Unlocked** is unchanged: the Sync Level unlock (`ProfileStore.unlockedBiomeIds`, from `pendingBiomes`).
+- **Encountered:** the sled's x reached a sector `s` with `biomeForSector(seed, s, mask) === id`. The sector rule is the generator's own (`floor(x / ppm / SECTOR_M)`, the same as `_sectorOf` and BIOME_ENTER).
+- **Completed:** the sled rode one of that biome's sectors from its start to its end (`SECTOR_M`, 500 m), and the run's crash is not inside that sector. Only the run-ending crash counts. A crash absorbed by a Hashed Backup, or an opening-grace recovery, does not void completion, because the run went on. Completed implies encountered.
+
+**Detection** is the pure `BiomeDiscovery.detectBiomeVisits({seed, biomeMask, biomeDefs, furthestX, crashX, pxPerMeter})`, which returns `{encountered, completed}` in canonical `BIOME_IDS` order.
+- The sled moves forward through sectors and a respawn never skips one, so every sector from 0 to `sectorOfX(furthestX)` was entered. Sector `s` was crossed to its end if and only if the furthest sector is past `s`.
+- `BIOME_IDS` is a static list, pinned by a test to `src/data/biomes` and to `levels.json` `biomeOrder`. The sanitizer must not depend on the level table it is handed: the fallback table's empty `biomeOrder` would erase every encounter on the next save.
+
+**Data flow.**
+1. `RunScene.doCrash` calls `detectBiomeVisits`. Furthest x is `startX + ScoreManager furthest metres * PIXELS_PER_METER`, or the crash x if that is larger.
+2. It emits `RUN_END { record, biomeVisits }`. `biomeVisits` is an additive `RunEndPayload` field, typed in events.js. It is never part of the RunRecord or `computeLedgerHash`.
+3. `ProgressionService.onRunEnd` forwards it as `credit(record, { streak, biomeVisits })`.
+4. `creditRun` merges it as a union into `profile.biomeProgress`. A replayed run is refused before the merge, so it records nothing.
+
+**Profile.** `bb.profile` v1 gains `biomeProgress: { encountered: string[], completed: string[] }` (`defaultProfile`).
+- The change is additive. `PROFILE_VERSION` and `STORAGE.saveVersion` are unchanged, and an old profile loads with empty sets.
+- `sanitizeBiomeProgress` keeps known ids only, dedupes them, sorts them canonically and adds every completed id to encountered.
+
+**Achievements.** `metricsFrom` gives `biomesDiscovered = max(extra.biomeCount, encountered count of the profile)`.
+- `creditRun` still forwards no caller `biomeCount`, so only a real encounter can unlock biomes-2/5/11.
+- Their rewards go through the existing `grantAchievementReward` path in the same credit, in decision 9 order.
+- `AchievementsView` no longer passes `biomeDefs.length` (ACH-6), so the grid shows encountered / target.
+
+**Views.**
+- `biomeToggleRows` rows gain `encountered`, `completed` and `state` (`'locked'|'unlocked'|'encountered'|'completed'`, strongest fact first). A Daily plays the date's mask whatever is unlocked, so a locked biome can be encountered.
+- `ProfileLayout.toggleLabel(row)` labels an unlocked row `NAME NEW|SEEN|DONE`, coloured text, cyan or lime. The widest label is 148 px, which fits the two-column band before the ON/OFF value.
+- Locked names keep `LVL n` and get a separate `state-<id>` box (SEEN / DONE) when they were encountered.
+- A `biome-progress` line (`BIOMES SEEN n/11 DONE m/11`) is right-aligned on the ACHIEVEMENTS summary row.
+
+**No backfill from stored runs.** It would not be exact:
+- `distanceM` is floored and the spawn is 44 px in, so one integer distance per sector boundary is ambiguous.
+- The first-time backfill only runs on a profile with no runs.
+- Absorbed crashes are not stored.
