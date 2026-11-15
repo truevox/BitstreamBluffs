@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 45; // B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
-const EXPECTED_WITHOUT_BOOSTS = 33; // B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
+const EXPECTED_WITH_BOOSTS = 49; // B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 37; // B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -2361,6 +2361,233 @@ async function main() {
         else if (Number.isFinite(out.ach['biomes-5'])) fail(name.ach, 'biomes-5 unlocked with only 2 biomes');
         else if (!out.gridTexts.includes('2/2') || !out.gridTexts.includes('2/5') || !out.gridTexts.includes('2/11')) fail(name.ach, `grid biome progress missing (has 2/2 ${out.gridTexts.includes('2/2')}, 2/5 ${out.gridTexts.includes('2/5')}, 2/11 ${out.gridTexts.includes('2/11')})`);
         else pass(name.ach, 'biomes-2 stamped, trail-hue-aurora owned, biomes-5 still locked; grid 2/2, 2/5, 2/11');
+      }
+    }
+
+    // ---- B2 (biome full treatment, "Sight"): per biome, a real seed@<bit> run of the built game, like B1. The blind
+    // hazard's real entity goes through the shipped onHazard and the live frame loop (run.update -> tickEffects ->
+    // updateBlindOverlay): the overlay's on-screen opacity (fillAlpha x alpha) is sampled every frame, so the check sees
+    // when it comes up, how dark it gets and when it clears. The Goggles are checked against the run's real Shatter Wall and
+    // a real base Garbage Data Vent (scramble); the Heat Shield against a real crash hazard resolved by the frame loop.
+    {
+      const B2 = [
+        { biome: 'crystal-cavern', name: 'Crystal Cavern', seed: 'b2crystal13', mask: 16, hazard: 'shatterWall', powerup: 'crystalClearGoggles' },
+        { biome: 'vertigo-vents', name: 'Vertigo Vents', seed: 'b2vertigo56', mask: 1024, hazard: 'ashCloud', powerup: 'heatShield' },
+      ];
+      for (const B of B2) {
+        const hzName = `B2 ${B.name}: ${B.hazard} spawns on ${B.seed}@${B.mask} and blinds the real run (overlay up, timed, no crash)`;
+        const puName = B.powerup === 'crystalClearGoggles'
+          ? `B2 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and wards both blind and scramble on the real run`
+          : `B2 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and its shield negates a real crash (own chip)`;
+        const c = await (async () => {
+          const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+          try {
+            const out = await page.evaluate(async (B) => {
+              const g = window.__bbGame;
+              const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+              g.scene.start('TitleScene');
+              const t0 = Date.now();
+              let run = null;
+              let started = false;
+              while (Date.now() - t0 < 15000) {
+                const tt = g.scene.getScene('TitleScene');
+                if (!started && tt && !tt.starting) { started = true; tt.startRun(`${B.seed}@${B.mask}`); }
+                const rr = g.scene.getScene('RunScene');
+                if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+                await wait(100);
+              }
+              if (!run) return { fatal: 'RunScene never produced a live sled' };
+              await wait(300);
+              if (run.sled.destroyed || !run.sled.inWorld || run.crashed) return { fatal: 'sled died before the probe' };
+              run.scene.pause();
+              const res = { seed: run.seed, mask: run.biomeMask };
+              let clock = run.runTimeMs;
+              const step = (n) => { for (let i = 0; i < n; i++) { clock += 16; run.update(clock, 16); } };
+              const keepAlive = () => { run.sled.invulnerableMs = 1e9; run.pendingCrash = null; };
+              const live = () => { run.sled.invulnerableMs = 0; run.pendingCrash = null; };
+              const opacity = () => (run.blindRect && run.blindRect.visible ? run.blindRect.fillAlpha * run.blindRect.alpha : null);
+              const hits = [];
+              const crashes = [];
+              const expired = [];
+              const onHit = (p) => hits.push(p);
+              const onCrash = (p) => crashes.push(p);
+              const onExp = (p) => expired.push(p);
+              g.events.on('bb:hazardHit', onHit);
+              g.events.on('bb:crash', onCrash);
+              g.events.on('bb:powerupExpired', onExp);
+              const ui = g.scene.getScene('UIScene');
+              const find = (id, list, from = 0) => {
+                for (let i = from; i < 200; i++) {
+                  const ch = run.terrain.getChunk(i);
+                  const sp = ch[list].find((s) => s.defId === id);
+                  if (sp) return { ch, sp };
+                }
+                return null;
+              };
+              const taken = [];
+              const entity = (f, map) => {
+                if (!f) return null;
+                if (!run.mesh.chunks.has(f.ch.index)) { run.takeChunk(f.ch); taken.push(f.ch.index); }
+                return (run[map].get(f.ch.index) || []).find((e) => e.def.id === f.sp.defId && e.spawn.x === f.sp.x) || null;
+              };
+              /** Hit `h` live, then run frames; returns the per-frame overlay opacity trace (ms -> opacity). */
+              const blindTrace = (h, frames) => {
+                live();
+                h.hit = false;
+                run.onHazard(h);
+                const crashedByHit = !!run.pendingCrash;
+                // the HUD warning right after the hit (EFFECT_END removes it when the blind ends)
+                const label = ui && ui.effects && ui.effects.get('blind') ? (ui.effects.get('blind').label || 'BLINDED') : null;
+                keepAlive();
+                const trace = [];
+                for (let i = 1; i <= frames; i++) { step(1); trace.push([i * 16, opacity()]); }
+                return { crashedByHit, trace, label };
+              };
+              try {
+                keepAlive();
+                run._resetBiomeEffects();
+                step(2);
+                // ---- hazard: the blind
+                const fh = find(B.hazard, 'hazards');
+                const h = entity(fh, 'hazards');
+                if (!h) res.hz = { fatal: `no ${B.hazard} in the first 200 chunks of ${B.seed}@${B.mask}` };
+                else {
+                  res.hz = { m: Math.round(fh.sp.x / 20), chunkBiome: fh.ch.biome, drawKind: h.drawKind, shapeKey: h.def.shapeKey, notDanger: h.color !== run.palette.danger };
+                  hits.length = 0;
+                  const before = opacity();
+                  const { crashedByHit, trace, label } = blindTrace(h, 100);
+                  const up = trace.find(([, o]) => o > 0);
+                  const peak = Math.max(...trace.map(([, o]) => o || 0));
+                  const clear = trace.find(([t, o]) => t > 200 && o === 0);
+                  res.hz = { ...res.hz, before, crashedByHit, crashed: run.crashed, inWorld: run.sled.inWorld, hitEvents: hits.map((p) => `${p.hazardId}:${p.effect}:${p.durationMs}`),
+                    label, upMs: up ? up[0] : null, peak, at600: trace[37][1], clearMs: clear ? clear[0] : null, end: trace[trace.length - 1][1] };
+                }
+                // ---- power-up
+                run._resetBiomeEffects();
+                keepAlive();
+                step(2);
+                const fp = find(B.powerup, 'powerups');
+                const p = entity(fp, 'powerups');
+                if (!p) res.pu = { fatal: `no ${B.powerup} in the first 200 chunks of ${B.seed}@${B.mask}` };
+                else if (B.powerup === 'crystalClearGoggles') {
+                  res.pu = { m: Math.round(fp.sp.x / 20), chunkBiome: fp.ch.biome, drawKind: p.drawKind, shapeKey: p.def.shapeKey };
+                  const vent = entity(find('garbageDataVent', 'hazards'), 'hazards');
+                  if (!h || !vent) res.pu.fatal = `need the run's real ${B.hazard} and a Garbage Data Vent (got ${!!h}, ${!!vent})`;
+                  else {
+                    // (a) a blind and a scramble already acting stop when the Goggles are taken
+                    live(); h.hit = false; run.onHazard(h); live(); vent.hit = false; run.onHazard(vent); keepAlive();
+                    step(10);
+                    res.pu.preOpacity = opacity();
+                    res.pu.preScrambled = run.sled.scrambled;
+                    res.pu.preTilt = run.currentPhys.tiltSign;
+                    run.onPowerUp(p);
+                    res.pu.chip = !!(ui && ui.powerups && ui.powerups.has(B.powerup));
+                    step(2);
+                    res.pu.cutOpacity = opacity();
+                    res.pu.cutScrambled = run.sled.scrambled;
+                    res.pu.cutTilt = run.currentPhys.tiltSign;
+                    // (b) new hits while the Goggles run do nothing
+                    run.blindMs = 0; run.scrambleMs = 0;
+                    hits.length = 0;
+                    const t1 = blindTrace(h, 20);
+                    live(); vent.hit = false; run.onHazard(vent); keepAlive();
+                    step(4);
+                    res.pu.wardHits = hits.length;
+                    res.pu.wardPeak = Math.max(...t1.trace.map(([, o]) => o || 0));
+                    res.pu.wardScrambled = run.sled.scrambled;
+                    res.pu.wardTilt = run.currentPhys.tiltSign;
+                    res.pu.wardMs = run.wards.wards.length ? Math.round(run.wards.wards[0].msLeft) : 0;
+                    // (c) after 6 s the Goggles expire and blind acts again (control)
+                    run.tickEffects(6100);
+                    step(1);
+                    res.pu.expired = expired.filter((e) => e.id === B.powerup).map((e) => e.reason);
+                    hits.length = 0;
+                    const t2 = blindTrace(h, 37);
+                    res.pu.afterHits = hits.length;
+                    res.pu.afterOpacity = t2.trace[t2.trace.length - 1][1];
+                    run.tickEffects(3000);
+                    step(1);
+                  }
+                } else {
+                  res.pu = { m: Math.round(fp.sp.x / 20), chunkBiome: fp.ch.biome, drawKind: p.drawKind, shapeKey: p.def.shapeKey };
+                  const fs0 = find('packetSpike', 'hazards');
+                  const spike = entity(fs0, 'hazards');
+                  if (!spike) res.pu.fatal = 'no Packet Spike to crash into';
+                  else {
+                    const q0 = run.shieldCharges;
+                    run.onPowerUp(p);
+                    const chip = ui && ui.powerups ? ui.powerups.get('heatShield') : null;
+                    res.pu.chip = !!chip;
+                    res.pu.chipCharges = chip ? chip.charges : null;
+                    res.pu.charges = run.shieldCharges - q0;
+                    res.pu.sledShield = run.sled.shield;
+                    crashes.length = 0;
+                    expired.length = 0;
+                    live();
+                    spike.hit = false;
+                    run.onHazard(spike);
+                    res.pu.queued = run.pendingCrash ? run.pendingCrash.hazardId : null;
+                    step(1); // the frame loop resolves the queued crash (RunScene.resolveCrash)
+                    keepAlive();
+                    res.pu.crashed = run.crashed;
+                    res.pu.inWorld = run.sled.inWorld;
+                    res.pu.crashEvents = crashes.map((e) => `${e.hazardId}:${e.negated ? 'negated' : 'real'}`);
+                    res.pu.expired = expired.map((e) => `${e.id}:${e.reason}`);
+                    res.pu.chipAfter = !!(ui && ui.powerups && ui.powerups.has('heatShield'));
+                    res.pu.chargesAfter = run.shieldCharges - q0;
+                  }
+                }
+              } catch (e) { res.fatal = String(e && e.stack || e); }
+              g.events.off('bb:hazardHit', onHit);
+              g.events.off('bb:crash', onCrash);
+              g.events.off('bb:powerupExpired', onExp);
+              for (const idx of taken) run.dropChunk(idx);
+              run._resetBiomeEffects();
+              return res;
+            }, B).catch((e) => ({ fatal: String(e) }));
+            return { errors, out };
+          } finally { await page.close(); }
+        })();
+        const o = c.out;
+        if (o.fatal || c.errors.length) {
+          fail(hzName, o.fatal || `page errors: ${c.errors.join(' | ')}`);
+          fail(puName, o.fatal || `page errors: ${c.errors.join(' | ')}`);
+          continue;
+        }
+        const run = `run ${o.seed}@${o.mask}`;
+        const hz = o.hz;
+        const hd = HAZ_DEFS[B.hazard];
+        const want = 1 - hd.onHit.visibility;
+        const dur = hd.onHit.durationMs;
+        if (o.seed !== B.seed || o.mask !== B.mask) fail(hzName, `the run is ${run}, not ${B.seed}@${B.mask}`);
+        else if (hz.fatal) fail(hzName, hz.fatal);
+        else if (hz.chunkBiome !== B.biome) fail(hzName, `spawned in a ${hz.chunkBiome} chunk`);
+        else if (hz.drawKind !== hz.shapeKey || !hz.notDanger) fail(hzName, `entity draws '${hz.drawKind}' (own '${hz.shapeKey}'), notDanger ${hz.notDanger}`);
+        else if (hz.crashedByHit || hz.crashed || !hz.inWorld) fail(hzName, `blind crashed the run (hit ${hz.crashedByHit}, crashed ${hz.crashed}, inWorld ${hz.inWorld})`);
+        else if (hz.hitEvents.join() !== `${B.hazard}:blind:${dur}`) fail(hzName, `HAZARD_HIT ${hz.hitEvents}`);
+        else if (hz.before !== 0) fail(hzName, `overlay was already up (${hz.before})`);
+        else if (!(hz.upMs <= 32)) fail(hzName, `overlay not up within 2 frames (first at ${hz.upMs} ms)`);
+        else if (!(Math.abs(hz.at600 - want) <= 1e-6) || hz.peak > 0.65 + 1e-9) fail(hzName, `opacity at 600 ms ${hz.at600} (want ${want}), peak ${hz.peak} (max 0.65)`);
+        else if (!(hz.clearMs >= dur && hz.clearMs <= dur + 32) || hz.end !== 0) fail(hzName, `overlay cleared at ${hz.clearMs} ms (want ${dur}-${dur + 32}), end ${hz.end}`);
+        else if (hz.label !== { shatterWall: 'SHATTER WALL', ashCloud: 'ASH CLOUD' }[B.hazard]) fail(hzName, `HUD warning label ${hz.label}`);
+        else pass(hzName, `${run}: at ${hz.m} m; overlay up at ${hz.upMs} ms, opacity ${hz.at600.toFixed(3)} at 600 ms (visibility ${hd.onHit.visibility}), clear at ${hz.clearMs} ms; no crash; HUD "${hz.label}"`);
+
+        const pu = o.pu;
+        if (pu.fatal) fail(puName, pu.fatal);
+        else if (pu.chunkBiome !== B.biome) fail(puName, `spawned in a ${pu.chunkBiome} chunk`);
+        else if (pu.drawKind !== pu.shapeKey) fail(puName, `entity draws '${pu.drawKind}', not its own '${pu.shapeKey}'`);
+        else if (!pu.chip) fail(puName, 'no HUD chip for the pickup');
+        else if (B.powerup === 'crystalClearGoggles') {
+          if (!(pu.preOpacity > 0.3) || pu.preScrambled !== true || pu.preTilt !== -1) fail(puName, `control: blind ${pu.preOpacity} / scramble ${pu.preScrambled} tilt ${pu.preTilt} did not act before the Goggles`);
+          else if (pu.cutOpacity !== 0 || pu.cutScrambled !== false || pu.cutTilt !== 1) fail(puName, `active effects not stopped: opacity ${pu.cutOpacity}, scrambled ${pu.cutScrambled}, tilt ${pu.cutTilt}`);
+          else if (pu.wardHits !== 0 || pu.wardPeak !== 0 || pu.wardScrambled !== false || pu.wardTilt !== 1) fail(puName, `hits while warded: ${pu.wardHits} HAZARD_HIT, overlay peak ${pu.wardPeak}, scrambled ${pu.wardScrambled}, tilt ${pu.wardTilt}`);
+          else if (pu.expired.join() !== 'timeout' || pu.afterHits !== 1 || !(pu.afterOpacity > 0.3)) fail(puName, `after 6 s: expired ${pu.expired}, ${pu.afterHits} hits, opacity ${pu.afterOpacity}`);
+          else pass(puName, `${run}: at ${pu.m} m; active blind ${pu.preOpacity.toFixed(2)} + scramble cut to 0 / tilt 1; warded hits: 0 HAZARD_HIT, overlay 0, not scrambled (${pu.wardMs} ms left); after 6 s blind acts again (${pu.afterOpacity.toFixed(2)})`);
+        } else if (pu.charges !== 1 || !pu.sledShield || pu.chipCharges !== 1) fail(puName, `pickup gave ${pu.charges} charges, sled.shield ${pu.sledShield}, chip x${pu.chipCharges}`);
+        else if (pu.queued !== 'packetSpike') fail(puName, `the spike queued no crash (${pu.queued})`);
+        else if (pu.crashed || !pu.inWorld || pu.crashEvents.join() !== 'packetSpike:negated') fail(puName, `crash not negated: crashed ${pu.crashed}, CRASH ${pu.crashEvents}`);
+        else if (pu.expired.join() !== 'heatShield:consumed' || pu.chipAfter || pu.chargesAfter !== 0) fail(puName, `expired ${pu.expired}, chip left ${pu.chipAfter}, charges ${pu.chargesAfter}`);
+        else pass(puName, `${run}: at ${pu.m} m; +1 charge (chip x1), the run's real Packet Spike: CRASH negated, heatShield chip expired (consumed), 0 charges left`);
       }
     }
 
