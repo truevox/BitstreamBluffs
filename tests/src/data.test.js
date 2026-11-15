@@ -142,7 +142,7 @@ describe('terrain mods', () => {
     const biome = (o) => Object.keys(o).filter((id) => o[id].biome).sort();
     expect(base(c.hazards)).toEqual(['garbageDataVent', 'glitchChasm', 'overflowFirewall', 'packetSpike', 'roguePacket']);
     expect(base(c.powerups)).toEqual(['clockPulse', 'hashedBackup', 'packetBurst']);
-    expect(biome(c.hazards)).toEqual(['chocolateRiver', 'groomerCat', 'seagullDive', 'seaweedTangle']);
-    expect(biome(c.powerups)).toEqual(['aquaLungBubble', 'mapleWax', 'slickWaxSpray', 'sweetToothCoating']);
+    expect(biome(c.hazards)).toEqual(['ashCloud', 'chocolateRiver', 'groomerCat', 'seagullDive', 'seaweedTangle', 'shatterWall']);
+    expect(biome(c.powerups)).toEqual(['aquaLungBubble', 'crystalClearGoggles', 'heatShield', 'mapleWax', 'slickWaxSpray', 'sweetToothCoating']);
   });
 });

@@ -3,7 +3,7 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * One hazard instance built from a HazardDef + HazardSpawn. Sensor body; draws shape from def.shapeKey
- * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; B1: 'groomer' | 'seagull' | 'seaweed' | 'chocoRiver'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
+ * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; B1: 'groomer' | 'seagull' | 'seaweed' | 'chocoRiver'; B2: 'shatterWall' | 'ashCloud'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
  * (design doc pillar 2); faint corner brackets mark the exact hit-box.
  */
 import Phaser from 'phaser';
@@ -132,6 +132,8 @@ export class Hazard {
       case 'groomer': this._groomer(g, t, frame, col, pal); break;
       case 'seaweed': this._seaweed(g, t, frame, col, pal); break;
       case 'chocoRiver': this._chocoRiver(g, t, frame, col, pal); break;
+      case 'shatterWall': this._shatterWall(g, t, frame, col, pal); break;
+      case 'ashCloud': this._ashCloud(g, t, frame, col, pal); break;
       default: this._generic(g, col); break;
     }
   }
@@ -379,6 +381,51 @@ export class Hazard {
 
   // B1 Garbage Dump Glacier: Seagull Dive, a gull in a steep dive (crash, `danger`): beating wings, beak first, with the
   // same soft halo as the drone so it reads against the sky at speed. Drawn around the box centre; the hit-box stays put.
+  /** B2 Crystal Cavern: a cracked wall of crystal facets that glints (its hit flashes and dims the screen). */
+  _shatterWall(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const glint = 0.5 + 0.5 * Math.sin(t / 210 + this.seed);
+    g.fillStyle(col, 0.12 + 0.12 * glint);
+    g.fillRect(-w / 2 - 3, -h - 3, w + 6, h + 3);
+    // three tall facets leaning together
+    g.fillStyle(col, 0.55);
+    g.fillPoints([{ x: -w / 2, y: 0 }, { x: -w / 2 + 2, y: -h * 0.7 }, { x: -w * 0.12, y: -h * 0.92 }, { x: -w * 0.05, y: 0 }], true);
+    g.fillStyle(col, 0.8);
+    g.fillPoints([{ x: -w * 0.08, y: 0 }, { x: -w * 0.1, y: -h * 0.95 }, { x: w * 0.08, y: -h }, { x: w * 0.14, y: 0 }], true);
+    g.fillStyle(col, 0.55);
+    g.fillPoints([{ x: w * 0.1, y: 0 }, { x: w * 0.16, y: -h * 0.85 }, { x: w / 2 - 1, y: -h * 0.6 }, { x: w / 2, y: 0 }], true);
+    // cracks and a moving glint line
+    g.lineStyle(1, pal.text, 0.7);
+    g.lineBetween(-w * 0.02, -h * 0.9, w * 0.05, -h * 0.55);
+    g.lineBetween(w * 0.05, -h * 0.55, -w * 0.04, -h * 0.3);
+    g.lineBetween(w * 0.05, -h * 0.55, w * 0.12, -h * 0.4);
+    const gy = -h * ((t / 900 + this.seed) % 1);
+    g.lineStyle(1.5, pal.text, 0.35 + 0.5 * glint);
+    g.lineBetween(-w / 2 + 2, gy, w / 2 - 2, gy - 4);
+  }
+
+  /** B2 Vertigo Vents: a drifting ash cloud with glowing embers (an air hazard; its hit dims the screen, no crash). */
+  _ashCloud(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const drift = Math.sin(t / 400 + this.seed) * 2;
+    g.fillStyle(pal.bgAlt, 0.85);
+    g.fillEllipse(-w * 0.22 + drift, -h * 0.45, w * 0.55, h * 0.7);
+    g.fillEllipse(w * 0.2 - drift, -h * 0.5, w * 0.6, h * 0.8);
+    g.fillEllipse(drift * 0.5, -h * 0.62, w * 0.5, h * 0.7);
+    g.lineStyle(1.5, col, 0.8);
+    g.strokeEllipse(-w * 0.22 + drift, -h * 0.45, w * 0.55, h * 0.7);
+    g.strokeEllipse(w * 0.2 - drift, -h * 0.5, w * 0.6, h * 0.8);
+    g.strokeEllipse(drift * 0.5, -h * 0.62, w * 0.5, h * 0.7);
+    for (let k = 0; k < 5; k++) {
+      const u = hash01(this.seed * 10 + k);
+      const ph = ((t / 700) + u) % 1;
+      g.fillStyle(col, 1 - ph);
+      g.fillCircle(-w * 0.4 + u * w * 0.8, -h * 0.25 - ph * h * 0.6, 1.3);
+    }
+  }
+
   _seagull(g, t, frame, col, pal) {
     const w = this.w;
     const h = this.h;

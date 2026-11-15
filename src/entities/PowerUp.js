@@ -3,7 +3,8 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * Floating pickup (sensor body). shapeKey: 'clock' (Clock Pulse), 'burst' (Packet Burst), 'shield' (Hashed Backup);
- * B1 biome pickups: 'maple' (Maple Wax), 'waxSpray' (Slick Wax Spray), 'bubble' (Aqua-Lung Bubble), 'candyCoat' (Sweet-Tooth).
+ * B1 biome pickups: 'maple' (Maple Wax), 'waxSpray' (Slick Wax Spray), 'bubble' (Aqua-Lung Bubble), 'candyCoat' (Sweet-Tooth);
+ * B2: 'goggles' (Crystal Clear Goggles), 'heatShield' (Heat Shield).
  * Visual: a rotating dashed ring + bobbing glyph, glow pulse. The sensor stays put while the glyph bobs.
  */
 import Phaser from 'phaser';
@@ -152,6 +153,28 @@ export class PowerUp {
         g.lineStyle(1.5, col, 1);
         g.lineBetween(-4.5, -2, 4.5, -4.5);
         g.lineBetween(-4.5, -4.8, 0, -5.5);
+        break;
+      }
+      case 'goggles': {
+        // B2 Crystal Clear Goggles: two lenses on a strap, a glint sweeping across
+        g.lineStyle(1.5, pal.text, 1);
+        g.strokeCircle(-3, 0.5, 2.6);
+        g.strokeCircle(3, 0.5, 2.6);
+        g.lineStyle(1.5, col, 1);
+        g.lineBetween(-6.5, -1, 6.5, -1);
+        g.fillStyle(pal.text, 0.9);
+        g.fillCircle(-3.8 + ((t / 500) % 1) * 7.6, -0.3, 0.9);
+        break;
+      }
+      case 'heatShield': {
+        // B2 Heat Shield: a round shield with a flickering flame
+        g.lineStyle(1.5, pal.text, 1);
+        g.strokeCircle(0, 0, 5);
+        const fl = 1 + 0.15 * Math.sin(t / 90);
+        g.fillStyle(col, 1);
+        g.fillTriangle(0, -4 * fl, -2.6, 3, 2.6, 3);
+        g.fillStyle(pal.text, 0.9);
+        g.fillTriangle(0, -1.5 * fl, -1.2, 2.5, 1.2, 2.5);
         break;
       }
       default: {

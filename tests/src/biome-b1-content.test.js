@@ -26,8 +26,10 @@ describe('B1 content: loader and schema', () => {
     const byBiome = (list) => Object.fromEntries(Object.keys(B1).map((b) => [b, list.filter((d) => d.biome === b).map((d) => d.id)]));
     expect(byBiome(biomeHaz)).toEqual(Object.fromEntries(Object.entries(B1).map(([b, r]) => [b, [r.hazard]])));
     expect(byBiome(biomePu)).toEqual(Object.fromEntries(Object.entries(B1).map(([b, r]) => [b, [r.powerup]])));
-    expect(biomeHaz.length).toBe(4);
-    expect(biomePu.length).toBe(4);
+    // B2 adds Crystal Cavern and Vertigo Vents defs; the B1 biomes still hold exactly 4 + 4 (the 6 + 6 total is pinned in
+    // biome-b2-content.test.js)
+    expect(biomeHaz.filter((d) => B1[d.biome]).length).toBe(4);
+    expect(biomePu.filter((d) => B1[d.biome]).length).toBe(4);
     // loadContent (the shape the game's loader produces) carries them by id
     for (const r of Object.values(B1)) {
       expect(c.hazards[r.hazard]).toBeDefined();

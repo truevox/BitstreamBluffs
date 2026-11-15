@@ -50,12 +50,18 @@ const POWERUP_INFO = {
   slickWaxSpray: { name: 'SLICK WAX', color: 'cyan' },
   aquaLungBubble: { name: 'AQUA-LUNG', color: 'cyan' },
   sweetToothCoating: { name: 'SWEET-TOOTH', color: 'magenta' },
+  // B2 biome pickups
+  crystalClearGoggles: { name: 'GOGGLES', color: 'cyan' },
+  heatShield: { name: 'HEAT SHIELD', color: 'magenta' },
 };
 /** B1: a biome hazard names itself on the effect warning line instead of the generic effect label. */
 const HAZARD_LABEL = {
   groomerCat: 'GROOMER CAT',
   seaweedTangle: 'SEAWEED TANGLE',
   chocolateRiver: 'CHOCOLATE RIVER',
+  // B2: the two blind hazards
+  shatterWall: 'SHATTER WALL',
+  ashCloud: 'ASH CLOUD',
 };
 /**
  * Power-up KINDS (B0, biome full treatment). Biome pickups are keyed by id like the base ones once their content lands;
@@ -448,6 +454,17 @@ export class UIScene extends Phaser.Scene {
       g.fillTriangle(cx - 5, cy, cx - 1, cy, cx - 4, cy + 6);
       g.fillTriangle(cx + 1, cy, cx + 5, cy, cx + 4, cy + 6);
       g.lineBetween(cx - 7, cy - 3, cx + 7, cy - 3);
+    } else if (id === 'crystalClearGoggles') {
+      // B2: goggles (two lenses on a strap) with a glint
+      g.strokeCircle(cx - 3.5, cy + 1, 3);
+      g.strokeCircle(cx + 3.5, cy + 1, 3);
+      g.lineBetween(cx - 7, cy - 1, cx + 7, cy - 1);
+      g.fillCircle(cx - 4.5, cy, 1);
+    } else if (id === 'heatShield') {
+      // B2: a round shield with a flame inside
+      g.strokeCircle(cx, cy, 6);
+      g.fillTriangle(cx, cy - 4, cx - 3, cy + 3, cx + 3, cy + 3);
+      g.fillTriangle(cx - 2, cy - 1, cx - 4, cy + 3, cx, cy + 3);
     } else if (id === 'clockPulse') {
       g.strokeCircle(cx, cy, 6);
       g.lineBetween(cx, cy, cx, cy - 4);

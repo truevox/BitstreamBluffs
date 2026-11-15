@@ -1,0 +1,3 @@
+{ "id": "crystalClearGoggles", "biome": "crystal-cavern", "shapeKey": "goggles", "radius": 10,
+  "effect": { "kind": "ward", "durationMs": 6000, "mods": [], "hazards": [], "effects": ["blind", "scramble"] },
+  "spawn": { "baseChance": 0.4 }, "colorKey": "cyan" }

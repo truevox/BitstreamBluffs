@@ -161,10 +161,10 @@ export function hazardColorKey(def) {
   return def.colorKey || 'danger';
 }
 
-/** Hazard shapeKeys with their own drawing routine in entities/Hazard.js (B1 adds groomer, seagull, seaweed, chocoRiver). */
-export const HAZARD_SHAPES = Object.freeze(['chasm', 'firewall', 'spike', 'vent', 'drone', 'groomer', 'seagull', 'seaweed', 'chocoRiver']);
-/** Power-up shapeKeys with their own glyph in entities/PowerUp.js (B1 adds maple, waxSpray, bubble, candyCoat). */
-export const POWERUP_SHAPES = Object.freeze(['clock', 'burst', 'shield', 'maple', 'waxSpray', 'bubble', 'candyCoat']);
+/** Hazard shapeKeys with their own drawing routine in entities/Hazard.js (B1 adds groomer, seagull, seaweed, chocoRiver; B2 shatterWall, ashCloud). */
+export const HAZARD_SHAPES = Object.freeze(['chasm', 'firewall', 'spike', 'vent', 'drone', 'groomer', 'seagull', 'seaweed', 'chocoRiver', 'shatterWall', 'ashCloud']);
+/** Power-up shapeKeys with their own glyph in entities/PowerUp.js (B1 adds maple, waxSpray, bubble, candyCoat; B2 goggles, heatShield). */
+export const POWERUP_SHAPES = Object.freeze(['clock', 'burst', 'shield', 'maple', 'waxSpray', 'bubble', 'candyCoat', 'goggles', 'heatShield']);
 
 /** Drawing routine for a hazard: its shapeKey when Hazard.js knows it, else 'generic' (a visible filled box). */
 export function hazardDrawKind(def) {
@@ -174,4 +174,43 @@ export function hazardDrawKind(def) {
 /** Glyph for a power-up: its shapeKey when PowerUp.js knows it, else 'generic' (a visible diamond). */
 export function powerupDrawKind(def) {
   return POWERUP_SHAPES.includes(def && def.shapeKey) ? def.shapeKey : 'generic';
+}
+
+// ------------------------------------------------------------------------------------------------ shield sources (B2)
+
+/**
+ * B2: Vertigo Vents' Heat Shield is the existing `shield` kind (spec §4), so it feeds RunScene's one `shieldCharges` pool.
+ * The HUD keeps a chip per pickup id, so RunScene also remembers which pickup each charge came from, one entry per charge,
+ * and reports the spent charge's id. A charge with no tracked source (the W4 shield boost, granted at spawn) is the base
+ * Hashed Backup's, exactly as before B2.
+ */
+export const SHIELD_DEFAULT_SOURCE = 'hashedBackup';
+
+/** Add `charges` (at least 1) entries for pickup `id`. Does not mutate. @param {string[]|undefined} sources @returns {string[]} */
+export function addShieldSource(sources, id, charges) {
+  const n = Math.max(1, Number.isFinite(charges) ? Math.floor(charges) : 1);
+  const out = Array.isArray(sources) ? sources.slice() : [];
+  for (let i = 0; i < n; i++) out.push(String(id));
+  return out;
+}
+
+/**
+ * Spend one charge: the most recent source goes first. Does not mutate.
+ * @param {string[]|undefined} sources
+ * @returns {{sources:string[], id:string}} the remaining sources and the id whose charge was spent.
+ */
+export function spendShieldSource(sources) {
+  const list = Array.isArray(sources) ? sources : [];
+  if (!list.length) return { sources: [], id: SHIELD_DEFAULT_SOURCE };
+  return { sources: list.slice(0, -1), id: list[list.length - 1] };
+}
+
+/**
+ * Charges a pickup's chip shows: the whole pool minus the charges other tracked sources own. With only Hashed Backups in
+ * play this is the whole pool, as before B2. @param {string[]|undefined} sources @param {string} id @param {number} pool
+ * @returns {number}
+ */
+export function shieldChargesFor(sources, id, pool) {
+  const others = Array.isArray(sources) ? sources.filter((s) => s !== id).length : 0;
+  return Math.max(0, (pool || 0) - others);
 }

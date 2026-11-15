@@ -37,7 +37,7 @@ import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '.
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
-  resolveLanding, hazardEffectDurationMs, timedPowerupMs,
+  resolveLanding, hazardEffectDurationMs, timedPowerupMs, addShieldSource, spendShieldSource, shieldChargesFor,
 } from '../systems/BiomeEffects.js';
 import { GlitchPipeline } from '../shaders/GlitchPipeline.js';
 import { getPalette, getPaletteCss } from '../ui/Palette.js';
@@ -204,6 +204,7 @@ export class RunScene extends Phaser.Scene {
     this.slowmoMs = 0;
     this.slowmoScale = 0.5;
     this.shieldCharges = 0;
+    this.shieldSources = []; // B2: which pickup each shield charge came from (BiomeEffects.spendShieldSource)
     this._resetBiomeEffects();
     this.openingGraces = 0;
     this.activeZones = new Map();
@@ -623,7 +624,9 @@ export class RunScene extends Phaser.Scene {
       this.sled.scaleVelocity(this.boostFactor);
     } else if (eff.kind === 'shield') {
       this.shieldCharges += eff.charges || 1;
-      charges = this.shieldCharges;
+      // B2: a biome shield (Heat Shield) shares the pool but keeps its own HUD chip and charge count
+      this.shieldSources = addShieldSource(this.shieldSources, def.id, eff.charges || 1);
+      charges = shieldChargesFor(this.shieldSources, def.id, this.shieldCharges);
       this.sled.shield = true;
     } else if (eff.kind === 'ward') {
       // B0: switches off its listed mods / hazards / effects for 4-6 s (Wards.js; PhysicsTuner and onHazard consult it)
@@ -1420,10 +1423,12 @@ export class RunScene extends Phaser.Scene {
     }
     if (this.shieldCharges > 0) {
       this.shieldCharges -= 1;
+      const spent = spendShieldSource(this.shieldSources); // B2: expire the chip of the pickup whose charge this was
+      this.shieldSources = spent.sources;
       this.game.events.emit(EVT.CRASH, {
         cause: c.cause, x: fs.x, y: fs.y, speedPxS: speed, hazardId: c.hazardId, negated: true,
       });
-      this.game.events.emit(EVT.POWERUP_EXPIRED, { id: 'hashedBackup', reason: 'consumed' });
+      this.game.events.emit(EVT.POWERUP_EXPIRED, { id: spent.id, reason: 'consumed' });
       this.sled.invulnerableMs = Math.max(this.sled.invulnerableMs, 1200);
       this.fx.ring(fs.x, fs.y, this.palette.amber, 46, 450);
       this.fx.sparks(fs.x, fs.y, this.palette.amber, 20, 260);

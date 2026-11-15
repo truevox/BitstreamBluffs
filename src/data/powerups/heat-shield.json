@@ -1,0 +1,3 @@
+{ "id": "heatShield", "biome": "vertigo-vents", "shapeKey": "heatShield", "radius": 10,
+  "effect": { "kind": "shield", "charges": 1 },
+  "spawn": { "baseChance": 0.4 }, "colorKey": "magenta" }

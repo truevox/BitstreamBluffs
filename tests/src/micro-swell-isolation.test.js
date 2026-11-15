@@ -10,7 +10,7 @@
  * WHEN THIS FAILS, do not re-pin. A change outside Micro reached terrain that has no business changing.
  */
 import crypto from 'crypto';
-import { makeGen } from './_helpers.js';
+import { makeGen, loadContent } from './_helpers.js';
 
 const CHUNKS = 300;
 const PINNED = {
@@ -71,8 +71,19 @@ const PINNED = {
   }
 };
 
+/**
+ * Biome content that landed AFTER e080803 on purpose (spec §4: a biome batch changes its own masks' spawns). Its defs are
+ * left out of the digest so this pin keeps proving its own claim (the swell fix and everything else moved nothing outside
+ * Micro) without being re-pinned. Only these biome-tagged defs are dropped; base defs and every earlier biome def stay in.
+ * B2 "Sight" (2026-11-15): Crystal Cavern (16) and Vertigo Vents (1024). Their own determinism and mask-0 isolation are
+ * pinned in biome-b2-presence.test.js and terrain-golden-mask0.test.js.
+ */
+const LATER_BIOMES = new Set(['crystal-cavern', 'vertigo-vents']);
+const c = loadContent();
+const without = (o) => Object.fromEntries(Object.entries(o).filter(([, d]) => !LATER_BIOMES.has(d.biome)));
+
 function digest(seed, mask) {
-  const g = makeGen(seed, { biomeMask: mask });
+  const g = makeGen(seed, { biomeMask: mask, hazardDefs: without(c.hazards), powerupDefs: without(c.powerups) });
   const h = crypto.createHash('sha256');
   for (let i = 0; i < CHUNKS; i++) h.update(JSON.stringify(g.getChunk(i)));
   return h.digest('hex').slice(0, 16);
