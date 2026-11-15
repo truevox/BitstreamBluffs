@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - biome treatment B3: Motion (Pyramid Peak, Micro Mountain, Steampunk Slopes)
+## v2.10.0 - biome treatment B3: Motion (Pyramid Peak, Micro Mountain, Steampunk Slopes) (2026-11-15)
 
 - **Pyramid Peak:** new ground hazard **Rolling Boulder** (crash, `danger`). It waits on the ground until the sled is 340 px behind it (it is on screen by then), then rolls toward the sled at 140 px/s along the ground for at most 160 px and rests. New pickup **Sandrunner Skis**: a glide, ground friction x0.7 for 4 s.
 - **Micro Mountain:** new ground hazard **Dew Drop** (crash, `danger`): the same roll, smaller and slower (110 px/s, 140 px). It follows the real ground, the dew swell included (the same surface the sled rides). New pickup **Royal Jelly Wax**: the same glide as the Skis.
