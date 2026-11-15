@@ -5,6 +5,7 @@
  * functions of (scrollX * factor) so nothing accumulates and it stays stable at any distance (no pooled objects).
  */
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
+import { beesAt, beePrimitives } from '../systems/MicroBees.js';
 
 const STAR_COUNT = 70;
 const TILE = 960;
@@ -345,9 +346,11 @@ function ellipsePts(cx, cy, rx, ry, rot, n) {
  * @param {number} scrollX camera scroll X (world px)
  * @param {number} [timeMs=0] scene time
  * @param {number} [seed=0] layout seed (Background uses 0; any integer gives a different but stable layout)
+ * @param {{bees?:boolean}} [o] Micro glow-up: `bees: false` leaves out the dew-drops bees (systems/MicroBees.js;
+ *   the perf comparison switch). Default on. Bee primitives carry `bee: id`.
  * @returns {ReadonlyArray<Object>} primitives in draw order
  */
-export function motifDecor(motif, scrollX, timeMs = 0, seed = 0) {
+export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
   if (typeof motif !== 'string' || !DECOR_SEEDS[motif] || !MOTIFS.includes(motif)) return EMPTY_DECOR;
   const sx = Number.isFinite(scrollX) ? scrollX : 0;
   const t = Number.isFinite(timeMs) ? timeMs : 0;
@@ -520,6 +523,12 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0) {
         out.push({ kind: 'circle', depth: b.layer, color: 'text', fillAlpha: 0.5 + 0.4 * Math.sin(t / 900 + b.ph), lineAlpha: 0, x: dx - r * 0.35, y: dy - r * 0.35, r: Math.max(1, r * 0.3) });
       }
     }
+    // Micro glow-up: HUGE bees (they are ordinary bees; the rider is the micro one). After the near layer and its
+    // blades, so a bee flies over the moss but under the terrain, the hazards and everything else in the run.
+    if (!(o && o.bees === false)) {
+      const seedI = Number.isFinite(seed) ? Math.trunc(seed) : 0;
+      for (const d of beePrimitives(beesAt(sx, t, seedI), def.layers.length - 1)) out.push(d);
+    }
   } else if (motif === 'vents') {
     // A plume over every active cone, on the same layer as its cone, so the near ridge hides far smoke.
     def.layers.forEach((L, li) => {
@@ -560,6 +569,8 @@ export class Background {
     this.palette = palette;
     this.motif = null; // null = base backdrop ('ridges'), so pre-W3 runs are unchanged
     this.decorSeed = 0; // layout seed for motifDecor; fixed so a biome's backdrop looks the same every run
+    this.bees = true; // Micro glow-up: draw the dew-drops bees (false = the perf comparison baseline)
+    this.beeCount = 0; // bees drawn in the last frame (the built-game gate reads it)
     this.gfx = scene.add.graphics().setScrollFactor(0).setDepth(-100);
     const rnd = mulberry32(0xb175);
     this.stars = [];
@@ -733,7 +744,12 @@ export class Background {
     const geom = motifGeometry(this.motif, scrollX);
     // Audit T1: W6 motifs add decor between/over their layers. The base backdrop and the batch-1 motifs
     // have none, so their draw calls are exactly what they were.
-    const decor = this.motif ? motifDecor(this.motif, scrollX, timeMs, this.decorSeed) : EMPTY_DECOR;
+    const decor = this.motif ? motifDecor(this.motif, scrollX, timeMs, this.decorSeed, { bees: this.bees }) : EMPTY_DECOR;
+    let beeMask = 0;
+    for (const d of decor) if (d.bee !== undefined) beeMask |= 1 << d.bee;
+    let bees = 0;
+    for (; beeMask; beeMask &= beeMask - 1) bees += 1;
+    this.beeCount = bees;
     if (decor.length) this._decor(g, decor, -1, p);
     for (let i = 0; i < geom.layers.length; i++) {
       this._layer(g, scrollX, geom.layers[i], p, geom.shape);
