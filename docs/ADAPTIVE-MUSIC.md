@@ -445,3 +445,54 @@ time-synchronous vocal-to-organ timbre converter. It may
 reinterpret pitches, timing and instrumentation despite strong
 style requests. User has NOT yet audited/approved either take
 or replacement in the game. V3 organ is preserved as reference.
+
+## Kie.ai duplicate-submission reconciliation (2026-11-15)
+
+Marvin explicitly authorized ONE paid Kie.ai Upload & Cover generation
+on Maxi's isolated vocal stem, with the expectation that its two audio
+variants would BOTH be saved for listening. Two independent Gal Friday
+processes accidentally ran separate paid submissions with different
+local idempotency sentinels. That was an agent coordination error, NOT
+a second Marvin authorization. Marvin was informed. No additional
+paid submissions were made after the overlap was discovered.
+
+Task A (first) is 2a05f8478617530bec35454aa1d9e686: 12 credits,
+uploaded the 214.976s vocal as 256kbps MP3. Two output MP3 SHA256
+digests: 3efd3022e8e2b050fda94c1e4a824279688da7322d94615b69108e58d08ff6f3
+and 48b399668205d067cc516a497972f01a19ed106f6074811716a190697227480c.
+
+Task B (unintended duplicate) is de4cf96e280b04256906de5090771d93:
+12 credits, uploaded original full FLAC. Its two MP3 SHA256 digests:
+cf9e1df919445d4f970f1932e6e2e5c2a997b531c13416345acec8d8f8355a48
+and c416f4dacab331f9ad74bc718cd929598f229aa1b4a6557d938db8aedf2ccb01.
+
+Total: TWO Kie tasks, 24 credits, FOUR distinct complete MP3 files.
+All four were retained in their respective CT223 source directories
+and backed up on CT211 (checksums verified). The canonical receipt is:
+/home/hermes/experiments/bitstream-kie-organ-20261115/two-task-archive-receipt.json
+plus independent CT211 archive:
+/root/bitstream-maxi/mountain-voice-gallery-kie/2026-11-15-vertigo-organ-v6/two-task-archive-receipt.json
+
+Consolidated private listening archive for all four original full MP3s:
+http://100.115.120.66:8182/tools/music/audition-kie/
+
+This persistent Tailscale-only range-serving web lab includes the
+two variants from each Kie task, Maxi's original vocal preview,
+and an unchanged 25-second V3 organ benchmark (2:30-2:55).
+Native audio controls and synchronized A/B switching were tested
+in headless Chromium. Four distinct download URLs were verified.
+A second tailnet host confirmed the 206 byte-range response. This
+service survives reboots through enabled user systemd unit
+bitstream-kie-range.service with Linger=yes. It serves from a
+stable experiments/site directory independent of this Git worktree.
+
+Repo sources: tools/music/audition-kie; private MP3 files are ignored
+under public/music-audition-kie. No game audio or SFX was changed, and
+no new Kie task will be launched without distinct user authorization.
+The original V3 organ sound remains the musical benchmark.
+
+Future Kie safety: ALWAYS check both the provider task list and
+the canonical shared project task ledger before spending; use a
+single cross-process durable idempotency sentinel for each explicitly
+authorized paid spin. An uncertain response is NOT authorization to
+retry a chargeable API request.

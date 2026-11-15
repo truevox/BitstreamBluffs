@@ -67,3 +67,18 @@ No new game dependencies. No merge into main.
 Marvin's V3 organ artistic preference remains unchanged.
 Audio quality, melody fidelity, commercial rights and user approval
 must all be reviewed separately before considering any release.
+
+## Coordination correction (2026-11-15)
+
+The first-task description above is accurate for that one task,
+but another Gal Friday process independently submitted a second
+Kie task while the first was in progress. This was not approved.
+Two tasks each charged 12 credits and returned two generated tracks
+each. The mistake was disclosed and all four audio files archived,
+with separate checksum-verified backups on CT211.
+
+The consolidated 4-choice private A/B archive is
+http://100.115.120.66:8182/tools/music/audition-kie/
+
+Second task ID: de4cf96e280b04256906de5090771d93.
+No further paid submissions were made.
