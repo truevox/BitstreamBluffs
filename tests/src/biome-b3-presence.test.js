@@ -143,6 +143,39 @@ const PRESENCE = {
   dewDrop: { lo: 0.35, hi8: 0.55, robFails: 2 },
 };
 
+describe('B3 presence: long range (4 seeds x 300 chunks), hazard floor and power-up band', () => {
+  // Measured: rollingBoulder 83/252 = 32.9 %, sandrunnerSkis 126/356 = 35.4 %; gearGate 75/208 = 36.1 %, clockworkTreads
+  // 134/341 = 39.3 %; dewDrop 82/227 = 36.1 %, royalJellyWax 130/348 = 37.4 %. The pickups keep 90 px from a rolling
+  // hazard's whole track (_trackDist); they stay inside B1's 25-45 % power-up band.
+  const ROWS = [
+    [4, 'pyramid-peak', 'rollingBoulder', 'sandrunnerSkis', 0.3, 0.25, 0.45],
+    [256, 'steampunk-slopes', 'gearGate', 'clockworkTreads', 0.33, 0.25, 0.45],
+    [512, 'micro-mountain', 'dewDrop', 'royalJellyWax', 0.33, 0.25, 0.45],
+  ];
+  test.each(ROWS)('mask %p (%s): hazard %s, power-up %s, hazard share of eligible chunks >= %p, power-up share of biome chunks in [%p, %p]', (mask, biome, hz, pu, floor, lo, hi) => {
+    let all = 0;
+    let elig = 0;
+    let h = 0;
+    let p = 0;
+    for (const seed of ['b1-share-a', 'b1-share-b', 'b1-share-c', 'b1-share-d']) {
+      const g = makeGen(seed, { biomeMask: mask });
+      for (let i = 1; i < 300; i++) {
+        const ch = g.getChunk(i);
+        if (ch.biome !== biome) continue;
+        all++;
+        if (eligibleFor(c.hazards[hz], ch)) elig++;
+        if (ch.hazards.some((q) => q.defId === hz)) h++;
+        if (ch.powerups.some((q) => q.defId === pu)) p++;
+      }
+    }
+    console.log(`${hz}: ${h}/${elig} eligible = ${(100 * h / elig).toFixed(1)} %; ${pu}: ${p}/${all} = ${(100 * p / all).toFixed(1)} %`);
+    expect(elig).toBeGreaterThan(60);
+    expect(h / elig).toBeGreaterThanOrEqual(floor);
+    expect(p / all).toBeGreaterThanOrEqual(lo);
+    expect(p / all).toBeLessThanOrEqual(hi);
+  });
+});
+
 describe('B3 fairness numbers (moving hazards)', () => {
   test('a rolling hazard starts while it is on screen, and rolls before it can reach the sled', () => {
     // B2's built-game view probe: at least 348 px of ground are on screen ahead of the sled at any speed >= 100 px/s.

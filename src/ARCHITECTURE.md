@@ -1191,6 +1191,11 @@ on an overlapping sled crashes it.
 * Gate phase: `biomeSpawn(def, x, y, rot, h3)` adds `phase` = the slot's 4th pre-drawn number (h3, drawn and unused by
   ground slots before B3). `BIOME_SLOT_DRAWS` stays 5; no stream moves.
 
+**Presence (tests/src/biome-b3-presence.test.js).** Chunks 0-44, share of eligible biome chunks, 8 / 32 seeds: Rolling
+Boulder 41.9 % / 35.4 %, Gear Gate 55.6 % / 39.5 %, Dew Drop 44.4 % / 37.2 %. Long range (4 seeds x 300 chunks): Rolling
+Boulder 32.9 %, Gear Gate 36.1 %, Dew Drop 36.1 % of eligible chunks; Sandrunner Skis 35.4 %, Clockwork Treads 39.3 %,
+Royal Jelly Wax 37.4 % of biome chunks.
+
 **Fairness numbers (tests/src/biome-b3-presence.test.js).** Roll: starts with the sled 340 px away (B2's view probe:
 >= 348 px of ground on screen ahead at any speed >= 100 px/s; the gate check confirms the hazard is inside `_view` at the
 start); its range (160 / 140 px) is shorter than 340 px minus its width, so a sled stopped at the start line is never
