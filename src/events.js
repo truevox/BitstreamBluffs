@@ -163,6 +163,8 @@ export const EVT = Object.freeze({
 /**
  * @typedef {Object} RunEndPayload
  * @property {import('./systems/SaveStore.js').RunRecord} record  the finished run (same object stored in REG.LAST_RECORD).
+ * @property {{encountered:string[], completed:string[]}} [biomeVisits] additive (decision 3): biomes this run entered
+ *           and rode through (BiomeDiscovery.detectBiomeVisits). Not part of the record or its ledger hash.
  */
 
 /**

@@ -25,6 +25,7 @@ import {
 import { EVT } from '../events.js';
 import { SaveStore, LEDGER_HASH_V } from '../systems/SaveStore.js';
 import { TerrainGenerator, biomeForSector } from '../systems/TerrainGenerator.js';
+import { detectBiomeVisits } from '../systems/BiomeDiscovery.js';
 import { ScoreManager } from '../systems/ScoreManager.js';
 import { TrickTracker } from '../systems/TrickTracker.js';
 import { GlitchDirector } from '../systems/GlitchDirector.js';
@@ -1503,7 +1504,13 @@ export class RunScene extends Phaser.Scene {
         if (pr && pr.catch) pr.catch(() => {});
       }
     } catch (e) { /* saving must never break the loop */ }
-    this.game.events.emit(EVT.RUN_END, { record });
+    // Decision 3: which biomes this run entered / rode through (pure, BiomeDiscovery). Beside the record, never
+    // in it, so the RunRecord and its ledger hash are unchanged. Furthest x = the ScoreManager's furthest metres.
+    const biomeVisits = detectBiomeVisits({
+      seed: this.seed, biomeMask: this.biomeMask, biomeDefs: Object.values(this.content.biomes || {}),
+      furthestX: Math.max(fs.x, this.startX + (snap.distanceM || 0) * PIXELS_PER_METER), crashX: fs.x, pxPerMeter: PIXELS_PER_METER,
+    });
+    this.game.events.emit(EVT.RUN_END, { record, biomeVisits });
   }
 
   updateCrashed(dt) {
