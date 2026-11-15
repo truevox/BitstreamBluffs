@@ -64,7 +64,7 @@ describe('B1 presence: the biome hazard is felt in early terrain (chunks 0-44, s
       const b = presence(mask, biome, id, ROB);
       expect(b.share).toBeGreaterThanOrEqual(0.35);
       expect(b.share).toBeLessThanOrEqual(0.55);
-      expect(b.fails).toBeLessThanOrEqual(2); // 2/30 groomer, 1/30 seaweed: seeds with < 1 km of biome terrain
+      expect(b.fails).toBeLessThanOrEqual(2); // 2/30 groomer, 2/30 seaweed: seeds with < 1 km of biome terrain
     });
 
   test('mask 2 (garbage-dump-glacier): seagullDive meets the band; OPEN for the lead: the 1-per-2-km rule fails on some seeds', () => {

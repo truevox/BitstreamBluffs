@@ -908,7 +908,7 @@ def below carries a `biome` field, so the B0 constructor filter keeps it out of 
 | Underwater Mountain (8) | `seaweedTangle` (`seaweed-tangle.json`), ground 22x30, shape `seaweed`, lime | `slow` 0.6 x 1.2 s | `aquaLungBubble` (`aqua-lung-bubble.json`), shape `bubble` | `ward` mods `['slowMotion']` 4 s |
 | Candy Cane Canyon (64) | `chocolateRiver` (`chocolate-river.json`), ground strip 24x8, shape `chocoRiver`, amber | `slow` 0.5 x 1.5 s | `sweetToothCoating` (`sweet-tooth-coating.json`), shape `candyCoat` | `ward` effects `['slow']` 5 s (wards off the Chocolate River) |
 
-Hazard `spawn.baseChance`: groomerCat 0.5, seaweedTangle 0.65, seagullDive and chocolateRiver 0.75 (the amended cap);
+Hazard `spawn.baseChance`: groomerCat 0.5, seaweedTangle 0.55, seagullDive and chocolateRiver 0.75 (the amended cap);
 power-ups 0.4. Groomer Cat is static; motion kinds land in B3.
 
 **Slot rule (`TerrainGenerator._placeBiomeSpawns`, spec §4 amendment).** When the ground hazard slot fires and the free
@@ -934,7 +934,7 @@ too rare to be felt. Amended rules, all in `_biomeGroundAt` / `_placeBiomeSpawns
 
 Measured presence, share of the biome's chunks eligible for the placement kind (ground = not bridge / not `gen-jump`, air
 = `gen-jump`), chunks 0-44 at a single biome bit: groomerCat 44.4 % (8 seeds) / 42.9 % (32 seeds), seagullDive 35.3 % /
-42.9 %, seaweedTangle 35.7 % / 47.8 %, chocolateRiver 24.0 % / 20.9 %. The lead's target is 35-55 % and >= 1 per 2 km on every
+42.9 %, seaweedTangle 35.7 % / 37.5 %, chocolateRiver 24.0 % / 20.9 %. The lead's target is 35-55 % and >= 1 per 2 km on every
 seed. Open items: the river stays below the band under rule (b) (36x9 reached 15 %); the seagull (air slot, not covered by
 the amendment, often 2-3 biome jump chunks per seed) misses the per-seed rule on 3 of 6 seeds with biome terrain. No-stall
 check: a point mass entering any biome slow placement at 300 px/s keeps >= 128 px/s for the next 2 s. Power-ups land in
