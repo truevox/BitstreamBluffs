@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased - Micro Mountain dew swell is real (audit T2)
+
+- **Fix (audit T2):** the dew swell is now IN the ground. Before, only `heightAt` added it, so the collider, the drawn edge and `slopeDegAt` stayed flat and the sled never felt it (in the built game the sled tracked the raw ground, sd 0.03 px, not the swell, sd 18 px). The generator now displaces the chunk points inside each dewSwell zone, right after zone placement, so hazards, pads, power-ups and shards sit on the swelled ground. `heightAt` is the plain polyline again; it no longer adds the swell twice or steps at a zone end.
+- **Taper:** new `terrainSwell.taperPx`. The swell fades in and out with a raised-cosine window at both zone edges, so there is no step and no kink.
+- **Swell retuned 26 px / 220 px → 20 px / 660 px, taper 165 px:** in real ground, 26/220 left pits that stalled 29 of 48 hop sim runs (survival 2/48 against 20/48). At 20/660/165: hop survival 17/48, distance −3.0 %, speed −0.5 %; flip distance +2.9 %, speed +0.7 % (B0 baseline, ±15 %). The swell is 40 px peak-to-peak.
+- **Built game:** on a `t2-probe@512` run the real sled now follows the swelled surface (sd of sled.y − heightAt 0.4–1.1 px over 4 zones) and not the raw ground (13–16 px).
+- **Only Micro moved:** chunk digests of every other single-biome mask and of mask 0 are pinned at e080803 and unchanged; the golden mask-0 test is unchanged.
+
 ## v2.7.0 - Marvin decisions 1/2/4/6: official Daily, mask-scoped Daily bests, Head Start, ledger hash v2 (2026-11-15)
 
 - **Official Daily vs practice (decision 2).** Only a run started from the **DAILY RUN** menu item is the official Daily. Its record carries `dailyOfficial: true`. A typed `daily-YYYY-MM-DD[@mask]` seed is a practice run:
