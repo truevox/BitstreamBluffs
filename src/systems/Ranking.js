@@ -12,10 +12,15 @@
  * constant on requires finding all five, and that a sixth ranking surface added later silently defaults
  * to excluding modded runs. tests/src/modded-ranking.test.js greps the tree to keep it to one place.
  *
- * Deliberately NOT here: `computeLedgerHash`. The hash is unchanged and `modded` is not part of it, so a
- * recorded run re-imported from a sharecode computes the same hash it always did.
+ * Deliberately NOT here: `computeLedgerHash`. Hashing is integrity, not ranking. Since decision 6 the v2
+ * hash covers `modded` (so a sharecode cannot strip it), but WHETHER a modded run ranks is still decided
+ * only here.
+ *
+ * Decisions 1 and 2 (2026-11-14) add the other ranking rule: which runs are OFFICIAL Daily runs
+ * (isOfficialDaily). Daily best and the streak count only those.
  */
 import { MODDED_RUNS_RANKED } from '../constants.js';
+import { DailyPatch } from './DailyPatch.js';
 
 /**
  * Whether this record plays on the MODDED board rather than the clean one.
@@ -103,4 +108,51 @@ export function rankableOnly(records, o) {
  */
 export function sameBoardAs(record, o) {
   return boardsModded(record, o) ? (r) => isModdedOnly(r, o) : (r) => isRankable(r, o);
+}
+
+/**
+ * Decision 2: whether this record is an OFFICIAL Daily run. Only a run started from the DAILY RUN menu
+ * item is official; a typed `daily-YYYY-MM-DD[@mask]` seed is a practice run.
+ *
+ *  - The seed must be a daily seed, and the record must have been played on THAT date's mask and rule.
+ *    Official runs are on them by construction; the explicit check keeps a mis-stamped record out.
+ *  - A v2 record (`hashV` 2, written since decision 6) is official only when `dailyOfficial === true`.
+ *    This matters most for a typed `daily-<today>` with no suffix: it plays today's mask AND today's rule,
+ *    so it is indistinguishable from a legacy official run by mask and rule alone.
+ *  - A legacy record (no `hashV`) has no flag. It counts as official when its mask (absent = 0) and its
+ *    `dailyRuleId` are the date's. That keeps the history of real Daily runs and drops typed runs that
+ *    used a different mask.
+ * @param {Object} record
+ * @returns {boolean}
+ */
+export function isOfficialDaily(record) {
+  if (!record || typeof record !== 'object') return false;
+  const key = DailyPatch.dateKeyFromSeed(record.seed);
+  if (!key) return false;
+  const info = DailyPatch.infoForDateKey(key);
+  if (!info) return false;
+  if (((Number(record.biomeMask) >>> 0) || 0) !== info.biomeMask) return false;
+  if (record.dailyRuleId !== info.rule.id) return false;
+  const versioned = Number.isFinite(record.hashV) && record.hashV >= 2;
+  return versioned ? record.dailyOfficial === true : true;
+}
+
+/**
+ * Decision 1: whether this record may set a Daily best (TODAY'S BEST on Title and Game Over). An
+ * official Daily run that is allowed on a clean surface.
+ * @param {Object} record @param {{ranked?:boolean}} [o]
+ * @returns {boolean}
+ */
+export function countsForDailyBest(record, o) {
+  return isRankable(record, o) && isOfficialDaily(record);
+}
+
+/**
+ * Decision 1: whether this record holds a day of the Daily streak. Official, clean, and played on THIS
+ * device: an imported run (`imported: true`, set by SaveStore.importSharecode) never extends the streak.
+ * @param {Object} record @param {{ranked?:boolean}} [o]
+ * @returns {boolean}
+ */
+export function countsForStreak(record, o) {
+  return countsForDailyBest(record, o) && record.imported !== true;
 }

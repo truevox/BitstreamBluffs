@@ -13,6 +13,16 @@ import { MissionsService } from '../../src/systems/MissionsService.js';
 import { rollSet } from '../../src/systems/Missions.js';
 import { REG } from '../../src/constants.js';
 import { EVT } from '../../src/events.js';
+import { DailyPatch } from '../../src/systems/DailyPatch.js';
+
+// Decisions 1/2: only an OFFICIAL Daily run (started from the DAILY RUN item: a v2 record with
+// dailyOfficial, on the date's own rule and mask) counts as a Daily run. These fixtures used to be any run
+// on a daily seed; they are stamped official so the Daily achievements they test are still reached.
+const off = (k) => {
+  const info = DailyPatch.infoForDateKey(k);
+  return { seed: `daily-${k}`, hashV: 2, dailyOfficial: true, dailyRuleId: info.rule.id, ...(info.biomeMask ? { biomeMask: info.biomeMask } : {}) };
+};
+
 
 const read = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const LEVELS = read('src/data/progression/levels.json');
@@ -161,7 +171,7 @@ describe('ACH-3 (daily and streak half): ProgressionService passes the SaveStore
   test('a 3-day streak in SaveStore unlocks Three in a Row on the run that makes it', async () => {
     const asked = [];
     const saveStore = { getDailyStreak: (now) => { asked.push(now); return { streak: 3, playedToday: true }; } };
-    const { view, store } = await runWith(saveStore, rec({ seed: 'daily-2026-11-13' }));
+    const { view, store } = await runWith(saveStore, rec({ ...off('2026-11-13') }));
     expect(view.achievements.map((a) => a.id)).toEqual(expect.arrayContaining(['daily-1', 'streak-3']));
     expect(store.profile.lifetime.bestStreak).toBe(3);
     expect(asked).toEqual([Date.parse('2026-11-13T12:00:00Z')]);
@@ -169,7 +179,7 @@ describe('ACH-3 (daily and streak half): ProgressionService passes the SaveStore
 
   test('a SaveStore that throws or lacks getDailyStreak never blocks the credit', async () => {
     for (const saveStore of [{ getDailyStreak: () => { throw new Error('x'); } }, {}]) {
-      const { view } = await runWith(saveStore, rec({ seed: 'daily-2026-11-13' }));
+      const { view } = await runWith(saveStore, rec({ ...off('2026-11-13') }));
       expect(view.credited).toBe(true);
       expect(view.achievements.map((a) => a.id)).toContain('daily-1');
     }

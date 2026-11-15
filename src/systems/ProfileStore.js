@@ -11,7 +11,7 @@
  */
 import { defaultProfile, loadLevelTable, levelForXp, rewardsForLevel, xpForRun, PROFILE_VERSION } from './Progression.js';
 import { metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
-import { DailyPatch } from './DailyPatch.js';
+import { isOfficialDaily } from './Ranking.js';
 import { COSMETIC_ITEMS } from './Cosmetics.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
@@ -308,10 +308,12 @@ export function creditRun(profile, record, levels, extra = {}) {
   L.bestDistanceM = Math.max(L.bestDistanceM, nonNeg(record.distanceM));
   L.bestCombo = Math.max(L.bestCombo, nonNegFloat(record.bestCombo));
   L.maxAirtimeMs = Math.max(L.maxAirtimeMs, nonNeg(record.maxAirtimeMs));
-  // ACH-3: a run on a `daily-YYYY-MM-DD` seed is a Daily run (the same seed rule SaveStore's streak uses).
+  // ACH-3 + decisions 1/2: only an OFFICIAL Daily run played on this device counts (Ranking.isOfficialDaily,
+  // the same rule SaveStore's streak uses). A typed `daily-*` seed is practice and an imported run was not
+  // played here, so neither moves dailyRuns or the Daily achievements.
   // The streak itself is the caller's fact: it needs every stored run, which this pure function does not
   // see, so ProgressionService passes SaveStore.getDailyStreak's value in and the best one is kept.
-  if (DailyPatch.dateKeyFromSeed(record.seed)) L.dailyRuns += 1;
+  if (isOfficialDaily(record) && record.imported !== true) L.dailyRuns += 1;
   const ex = extra && typeof extra === 'object' ? extra : {};
   L.bestStreak = Math.max(L.bestStreak, nonNeg(ex.streak));
   if (record.tricks && typeof record.tricks === 'object') {

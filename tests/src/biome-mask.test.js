@@ -80,11 +80,12 @@ describe('mask-scoped seed and daily stats', () => {
     expect(s.getSeedStats('alpha')).toMatchObject({ attempts: 2, bestScore: 900, bestDistanceM: 90 });
   });
 
-  test('daily stats are scoped by the daily seed, which already fixes the mask', () => {
-    // D6 asks for daily-best to compare only within one mask. For a daily run that needs no stored-mask
-    // filter: the mask is derived from the DATE, so every run on `daily-YYYY-MM-DD` was played at that
-    // day's mask by definition. The seed is the scope. Filtering on the stored field as well would hide
-    // pre-W3 daily runs (no field => mask 0) on any day whose derived mask is non-zero.
+  test('daily stats count only official Daily runs on the date\'s mask (decisions 1/2)', () => {
+    // Replaces the old "scoped by the daily seed, which already fixes the mask" test. That rule let a
+    // typed `daily-<date>@mask` run, or one replayed from SHARE SEED at another mask, become TODAY'S BEST
+    // (audit F1). Marvin's decisions: Daily bests are scoped by gameplay mask, and only a run started from
+    // the DAILY RUN item is official. A legacy record (no hashV) counts only on the date's mask and rule,
+    // so a pre-W3 record with no mask field no longer counts on a day whose derived mask is non-zero.
     let when = null;
     for (let i = 0; i < 30 && !when; i++) {
       const d = new Date(Date.UTC(2026, 10, 13 + i, 12));
@@ -92,13 +93,19 @@ describe('mask-scoped seed and daily stats', () => {
     }
     expect(when).not.toBeNull();
     const dateKey = when.toISOString().slice(0, 10);
+    const info = DailyPatch.infoForDateKey(dateKey);
     const s = store([
-      // A record written before this campaign existed: no biomeMask field at all.
-      run({ id: 'd-old', seed: `daily-${dateKey}`, score: 900, distanceM: 90 }),
-      run({ id: 'd-new', seed: `daily-${dateKey}`, score: 300, distanceM: 30, biomeMask: 3 }),
+      // A record written before this campaign existed: no biomeMask field at all (mask 0 != the date's).
+      run({ id: 'd-old', seed: `daily-${dateKey}`, score: 900, distanceM: 90, dailyRuleId: info.rule.id }),
+      // A typed run at another mask: practice, not the Daily.
+      run({ id: 'd-new', seed: `daily-${dateKey}`, score: 300, distanceM: 30, biomeMask: 3, dailyRuleId: info.rule.id }),
+      // A legacy record on the date's own mask and rule: kept (real Daily history).
+      run({ id: 'd-legacy', seed: `daily-${dateKey}`, score: 200, distanceM: 20, biomeMask: info.biomeMask, dailyRuleId: info.rule.id }),
+      // A new official run from the DAILY RUN item.
+      run({ id: 'd-off', seed: `daily-${dateKey}`, score: 250, distanceM: 25, biomeMask: info.biomeMask, dailyRuleId: info.rule.id, hashV: 2, dailyOfficial: true }),
       run({ id: 'd-other', seed: 'daily-1999-01-01', score: 9999 }),
     ]);
-    expect(s.getDailyStats(when)).toMatchObject({ attempts: 2, bestScore: 900, dateKey });
+    expect(s.getDailyStats(when)).toMatchObject({ attempts: 2, bestScore: 250, dateKey });
   });
 });
 

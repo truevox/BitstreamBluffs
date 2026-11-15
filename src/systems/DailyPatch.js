@@ -152,6 +152,35 @@ export class DailyPatch {
   }
 
   /**
+   * Additive helper (decisions 1/2): everything a given UTC date's Daily was, from its date key alone.
+   * A practice run of a past date replays THAT date's rule and mask; the official surfaces use the same
+   * answer to check a record really was played on the date's mask and rule. Pure.
+   * @param {string} dateKey 'YYYY-MM-DD'
+   * @returns {{dateKey:string, seed:string, rule:DailyRule, biomeMask:number}|null} null for a malformed key.
+   */
+  static infoForDateKey(dateKey) {
+    const k = typeof dateKey === 'string' ? DailyPatch.dateKeyFromSeed(`daily-${dateKey}`) : null;
+    if (!k) return null;
+    // Noon UTC: well inside the day whatever the rounding, so the rule and the mask are that day's.
+    const noon = new Date(Date.parse(`${k}T12:00:00.000Z`));
+    const info = DailyPatch.getDailyInfo(noon);
+    return { dateKey: k, seed: info.seed, rule: info.rule, biomeMask: DailyPatch.biomeMaskForDate(noon) };
+  }
+
+  /**
+   * Additive helper (decision 2): the label a run on this seed wears on the HUD and on Game Over.
+   * An official Daily (started from the DAILY RUN menu item) is 'DAILY RUN'; any other run on a
+   * `daily-YYYY-MM-DD` seed is a practice run, 'DAILY PRACTICE YYYY-MM-DD'; every other seed has none.
+   * @param {string} seed @param {boolean} official
+   * @returns {string}
+   */
+  static dailyRunLabel(seed, official) {
+    const k = DailyPatch.dateKeyFromSeed(seed);
+    if (!k) return '';
+    return official === true ? 'DAILY RUN' : `DAILY PRACTICE ${k}`;
+  }
+
+  /**
    * Additive helper: format a millisecond duration for the "NEXT PATCH IN" countdown, e.g. '3H 12M'.
    * Under one hour it reads '12M'; under one minute '<1M'. Rounds minutes up so the display never shows 0 early.
    * Non-finite or non-positive input gives '0M'.

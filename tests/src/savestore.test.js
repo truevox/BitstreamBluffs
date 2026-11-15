@@ -4,6 +4,7 @@ import {
   SHARECODE_PREFIX,
 } from '../../src/systems/SaveStore.js';
 import { STORAGE } from '../../src/constants.js';
+import { DailyPatch } from '../../src/systems/DailyPatch.js';
 
 let seq = 0;
 function makeRun(over = {}) {
@@ -478,6 +479,13 @@ describe('IndexedDB persistence (fake indexedDB)', () => {
 describe('chase queries (seed best, daily best, daily streak)', () => {
   const NOW = Date.parse('2025-03-10T15:00:00Z');
   const dseed = (k) => `daily-${k}`;
+  // Decisions 1/2: Daily best and the streak count only OFFICIAL Daily runs (started from the DAILY RUN
+  // item: v2 record with dailyOfficial, on the date's own rule and mask). These fixtures used to be any run
+  // on a daily seed; they are now stamped official so the surfaces they test are still reached.
+  const official = (k) => {
+    const info = DailyPatch.infoForDateKey(k);
+    return { hashV: 2, dailyOfficial: true, dailyRuleId: info.rule.id, ...(info.biomeMask ? { biomeMask: info.biomeMask } : {}) };
+  };
 
   test('getSeedStats: null when none, maxima and attempts, excludeRunId', async () => {
     const s = await fresh();
@@ -493,9 +501,9 @@ describe('chase queries (seed best, daily best, daily streak)', () => {
 
   test('getDailyStats uses the UTC day seed', async () => {
     const s = await fresh();
-    await s.saveRun(makeRun({ id: 'd1', seed: dseed('2025-03-10'), score: 70, distanceM: 5 }));
-    await s.saveRun(makeRun({ id: 'd2', seed: dseed('2025-03-10'), score: 40, distanceM: 50 }));
-    await s.saveRun(makeRun({ id: 'd3', seed: dseed('2025-03-09'), score: 999 }));
+    await s.saveRun(makeRun({ id: 'd1', seed: dseed('2025-03-10'), score: 70, distanceM: 5, ...official('2025-03-10') }));
+    await s.saveRun(makeRun({ id: 'd2', seed: dseed('2025-03-10'), score: 40, distanceM: 50, ...official('2025-03-10') }));
+    await s.saveRun(makeRun({ id: 'd3', seed: dseed('2025-03-09'), score: 999, ...official('2025-03-09') }));
     expect(s.getDailyStats(new Date('2025-03-10T23:59:59Z'))).toEqual({
       seed: dseed('2025-03-10'), dateKey: '2025-03-10', attempts: 2, bestScore: 70, bestDistanceM: 50,
     });
@@ -506,7 +514,7 @@ describe('chase queries (seed best, daily best, daily streak)', () => {
   async function storeWith(keys) {
     const s = await fresh();
     let i = 0;
-    for (const k of keys) await s.saveRun(makeRun({ id: `x${i++}`, seed: dseed(k), startedAt: 0, endedAt: 0 }));
+    for (const k of keys) await s.saveRun(makeRun({ id: `x${i++}`, seed: dseed(k), startedAt: 0, endedAt: 0, ...official(k) }));
     return s;
   }
 

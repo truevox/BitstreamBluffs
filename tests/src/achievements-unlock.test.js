@@ -7,6 +7,16 @@ import fs from 'fs';
 import { sanitizeProfile, creditRun } from '../../src/systems/ProfileStore.js';
 import { ACHIEVEMENTS, metricsFrom, progressFor } from '../../src/systems/Achievements.js';
 import { SCORING } from '../../src/constants.js';
+import { DailyPatch } from '../../src/systems/DailyPatch.js';
+
+// Decisions 1/2: only an OFFICIAL Daily run (started from the DAILY RUN item: a v2 record with
+// dailyOfficial, on the date's own rule and mask) counts as a Daily run. These fixtures used to be any run
+// on a daily seed; they are stamped official so the Daily achievements they test are still reached.
+const off = (k) => {
+  const info = DailyPatch.infoForDateKey(k);
+  return { seed: `daily-${k}`, hashV: 2, dailyOfficial: true, dailyRuleId: info.rule.id, ...(info.biomeMask ? { biomeMask: info.biomeMask } : {}) };
+};
+
 
 const read = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const LEVELS = read('src/data/progression/levels.json');
@@ -52,7 +62,7 @@ function achShown(a, m) { return progressFor(a, m).value; }
 
 describe('ACH-3 (daily and streak half): creditRun feeds the evaluator dailyRuns and streak', () => {
   test('a run on a daily seed unlocks Daily Habit', () => {
-    const res = creditRun(v1(), rec({ seed: 'daily-2026-11-13' }), LEVELS);
+    const res = creditRun(v1(), rec({ ...off('2026-11-13') }), LEVELS);
     expect(res.awards.achievements.map((a) => a.id)).toContain('daily-1');
     expect(res.profile.lifetime.dailyRuns).toBe(1);
   });
@@ -66,14 +76,14 @@ describe('ACH-3 (daily and streak half): creditRun feeds the evaluator dailyRuns
   });
 
   test('a caller-supplied streak unlocks the streak achievements and is kept as the best streak', () => {
-    const three = creditRun(v1(), rec({ seed: 'daily-2026-11-13' }), LEVELS, { streak: 3 });
+    const three = creditRun(v1(), rec({ ...off('2026-11-13') }), LEVELS, { streak: 3 });
     expect(three.awards.achievements.map((a) => a.id)).toEqual(expect.arrayContaining(['daily-1', 'streak-3']));
     expect(three.profile.achievements['streak-7']).toBeUndefined();
     expect(three.profile.lifetime.bestStreak).toBe(3);
-    const seven = creditRun(three.profile, rec({ id: 'r2', ledgerHash: 'h2', seed: 'daily-2026-11-17' }), LEVELS, { streak: 7 });
+    const seven = creditRun(three.profile, rec({ id: 'r2', ledgerHash: 'h2', ...off('2026-11-17') }), LEVELS, { streak: 7 });
     expect(seven.awards.achievements.map((a) => a.id)).toEqual(['streak-7']);
     // A broken streak later never lowers the best.
-    const later = creditRun(seven.profile, rec({ id: 'r3', ledgerHash: 'h3', seed: 'daily-2026-11-30' }), LEVELS, { streak: 1 });
+    const later = creditRun(seven.profile, rec({ id: 'r3', ledgerHash: 'h3', ...off('2026-11-30') }), LEVELS, { streak: 1 });
     expect(later.profile.lifetime.bestStreak).toBe(7);
   });
 
@@ -84,7 +94,7 @@ describe('ACH-3 (daily and streak half): creditRun feeds the evaluator dailyRuns
   });
 
   test('the grid reads the stored counts, so an unlocked daily row is not shown at 0', () => {
-    const res = creditRun(v1(), rec({ seed: 'daily-2026-11-13' }), LEVELS, { streak: 3 });
+    const res = creditRun(v1(), rec({ ...off('2026-11-13') }), LEVELS, { streak: 3 });
     const m = metricsFrom(res.profile, null, {});
     expect({ dailyRuns: m.dailyRuns, bestStreak: m.bestStreak }).toEqual({ dailyRuns: 1, bestStreak: 3 });
   });

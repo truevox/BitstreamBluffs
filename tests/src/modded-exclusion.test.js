@@ -13,6 +13,7 @@
  * and mission progress are earned by boosted runs too, so suppressing those would be a second, wrong
  * change hiding behind the first.
  */
+import { DailyPatch } from '../../src/systems/DailyPatch.js';
 import { SaveStore, sanitizeRun } from '../../src/systems/SaveStore.js';
 import { isRankable, rankableOnly } from '../../src/systems/Ranking.js';
 
@@ -41,9 +42,14 @@ const RUNS = [
  */
 const DAY = new Date('2026-11-13T12:00:00Z');
 const DAILY_SEED = `daily-${DAY.toISOString().slice(0, 10)}`;
+// Decisions 1/2: the Daily surfaces count only OFFICIAL Daily runs, so both records are stamped as runs
+// started from the DAILY RUN item, on the date's own rule and mask. They still differ only in `modded`,
+// so the modded gate is the one thing keeping 9999 off these surfaces.
+const DAY_INFO = DailyPatch.infoForDateKey(DAY.toISOString().slice(0, 10));
+const OFFICIAL = { dailyRuleId: DAY_INFO.rule.id, biomeMask: DAY_INFO.biomeMask, hashV: 2, dailyOfficial: true };
 const DAILY_RUNS = [
-  { ...RUNS[0], id: 'daily-clean', seed: DAILY_SEED, dailyRuleId: 'r1', startedAt: DAY.getTime(), endedAt: DAY.getTime() + 1000 },
-  { ...RUNS[1], id: 'daily-mod', seed: DAILY_SEED, dailyRuleId: 'r1', startedAt: DAY.getTime() + 2000, endedAt: DAY.getTime() + 3000 },
+  { ...RUNS[0], id: 'daily-clean', seed: DAILY_SEED, ...OFFICIAL, startedAt: DAY.getTime(), endedAt: DAY.getTime() + 1000 },
+  { ...RUNS[1], id: 'daily-mod', seed: DAILY_SEED, ...OFFICIAL, startedAt: DAY.getTime() + 2000, endedAt: DAY.getTime() + 3000 },
 ];
 
 const load = (store, runs) => { store.runs = runs.map((r) => sanitizeRun(r)).filter(Boolean); return store; };

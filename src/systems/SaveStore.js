@@ -14,7 +14,7 @@
 import { STORAGE } from '../constants.js';
 import { xxHash32 } from './Rng.js';
 import { DailyPatch } from './DailyPatch.js';
-import { isRankable, isModdedOnly } from './Ranking.js';
+import { isRankable, isModdedOnly, countsForDailyBest, countsForStreak } from './Ranking.js';
 
 /**
  * @typedef {Object} Settings
@@ -674,26 +674,36 @@ export class SaveStore {
   }
 
   /**
-   * Stats for the daily seed of a UTC day (seed built by DailyPatch.getDailyInfo, `daily-YYYY-MM-DD`).
-   * Same semantics and `excludeRunId` option as getSeedStats.
+   * Stats for the OFFICIAL Daily of a UTC day (decisions 1/2): only runs started from the DAILY RUN menu
+   * item (Ranking.countsForDailyBest), on that date's seed AND that date's mask. A typed `daily-*` seed is
+   * a practice run: it compares only as an ordinary seed (getSeedStats within its mask), never here.
+   * Same return shape and `excludeRunId` option as getSeedStats.
    * @param {Date|number} [when=new Date()] instant inside the UTC day (Date or epoch ms).
    * @param {{excludeRunId?: string}} [opts]
    * @returns {{seed:string, dateKey:string, attempts:number, bestScore:number, bestDistanceM:number}|null}
    */
   getDailyStats(when = new Date(), opts = {}) {
-    const info = DailyPatch.getDailyInfo(toDate(when));
-    // D6's "daily-best compares only within the same biome mask" needs no filter here, and adding one
-    // would be wrong: the daily mask is derived from the DATE (DailyPatch.biomeMaskForDate), so every
-    // run on a given daily seed was played at that same mask by definition. Filtering on the stored
-    // field would additionally hide every run recorded before W3 - those have no `biomeMask`, count as
-    // mask 0, and would silently vanish from the daily leaderboard on any day whose derived mask is
-    // non-zero. The seed already scopes the mask; that is the invariant.
-    const s = this.getSeedStats(info.seed, opts);
-    return s ? { ...s, dateKey: info.dateKey } : null;
+    const info = DailyPatch.infoForDateKey(DailyPatch.getDailyInfo(toDate(when)).dateKey);
+    if (!info) return null;
+    const ex = opts && typeof opts.excludeRunId === 'string' ? opts.excludeRunId : null;
+    let attempts = 0;
+    let bestScore = 0;
+    let bestDistanceM = 0;
+    for (const r of this.runs) {
+      if (r.seed !== info.seed || (ex !== null && r.id === ex)) continue;
+      // Official runs are on the date's mask by construction; filter explicitly anyway (decision 1).
+      if (((r.biomeMask >>> 0) || 0) !== info.biomeMask) continue;
+      if (!countsForDailyBest(r, opts)) continue;
+      attempts++;
+      if (r.score > bestScore) bestScore = r.score;
+      if (r.distanceM > bestDistanceM) bestDistanceM = r.distanceM;
+    }
+    return attempts ? { seed: info.seed, dateKey: info.dateKey, attempts, bestScore, bestDistanceM } : null;
   }
 
   /**
-   * Daily streak: consecutive UTC days with at least one stored run on that day's daily seed, ending today or
+   * Daily streak: consecutive UTC days with at least one OFFICIAL, LOCAL Daily run (Ranking.countsForStreak:
+   * started from the DAILY RUN item, clean, not imported; decisions 1/2), ending today or
    * yesterday (ending yesterday = still live, today's run would extend it; an older last day = 0).
    * Day membership comes from the date inside each run's SEED (`daily-YYYY-MM-DD`), not from timestamps: it is
    * immune to clock skew, zero/missing timestamps, and midnight-straddling runs, and it is exactly the day whose
@@ -710,7 +720,8 @@ export class SaveStore {
       // W4: a boosted run does not hold a daily streak. Scanned here rather than through _board()
       // because the streak is about DAYS played, not placed runs, so it has its own loop - which is
       // exactly why this surface needed its own route through the one helper.
-      if (!isRankable(r, opts)) continue;
+      // Decisions 1/2: a typed daily seed (practice) or an imported run never holds a day.
+      if (!countsForStreak(r, opts)) continue;
       const k = DailyPatch.dateKeyFromSeed(r.seed);
       if (k && k <= todayKey) days.add(k);
     }
