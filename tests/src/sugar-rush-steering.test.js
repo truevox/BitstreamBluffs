@@ -59,4 +59,19 @@ describe('decision 8: Sugar Rush keeps ground steering', () => {
     expect(src).toContain('const torqueDeg = phys.tiltTorqueDegS2 * (g ? TUNING.groundTiltMul : phys.airControl) * tilt;');
     expect(src).toMatch(/\* \(phys\.steerMul == null \? 1 : phys\.steerMul\);/);
   });
+
+  // Decision 8 also asks for player agency in the air: Sugar Rush may dull air rotation, but a single
+  // flip must still fit in ordinary air. 0.8 s is a short, common jump. Rotation from rest accelerates at
+  // tiltTorqueDegS2 * airControl up to TUNING.maxAngularVelDegS, then holds the cap.
+  test('inside a sugarRush zone a single 360 from rest still fits in 0.8 s of air', () => {
+    const s = eff({ zones: [SUGAR] });
+    const a = s.tiltTorqueDegS2 * s.airControl;
+    const cap = TUNING.maxAngularVelDegS;
+    const T = 0.8;
+    const tCap = cap / a;
+    const deg = tCap >= T ? 0.5 * a * T * T : 0.5 * a * tCap * tCap + cap * (T - tCap);
+    expect(deg).toBeGreaterThanOrEqual(360);
+    // ...and it is still dulled compared with base air control.
+    expect(s.airControl).toBeLessThan(eff({}).airControl);
+  });
 });

@@ -328,8 +328,8 @@ async function main() {
             await wait(1800); // > SHOP_PROMPT_MS
             const openAfterDelay = Boolean(over.shopOpen);
             const hasShopTitle = texts().some((t) => /SHARD SHOP/i.test(t));
-            // Retry while the shop is open must close it and start a run.
-            over._onAction('confirm');
+            // Retry while the shop is open must close it and start a run. Decision 7: confirm buys in an armed shop, so retry is its own action (Space / pad RB).
+            over._onAction('retry');
             await wait(900);
             const retried = Boolean(g.scene.getScene('RunScene') && g.scene.getScene('RunScene').scene.isActive());
             return { bankAtOver, flag, hintBefore, openAfterDelay, hasShopTitle, retried };

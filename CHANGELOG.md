@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased - Marvin decisions 7/8/9 (Game Over shop buy, Sugar Rush steering, combo achievement order)
+## v2.5.2 - Marvin decisions 7/8/9: Game Over shop buy, Sugar Rush agency, combo achievement order (2026-11-14)
 
+- **Sugar Rush air steering 0.6 → 0.8** (decision 8, player agency): a single 360 from rest now fits in 0.8 s of air inside a Sugar Rush zone (it reached only ~282° at 0.6); air rotation is still dulled by 20 %. Ground steering is unchanged.
+- **Gate:** the in-shop retry check presses the `retry` action (Space / pad RB); in an armed Game Over shop, confirm now buys (decision 7).
 - **Achievements are in one deterministic order (decision 9).** The whole catalogue is sorted by group (DISTANCE, SKILL, DAILY, COLLECTION, BIOMES), then metric (so one ladder stays together), then target, ascending and stable. The grid, unlock evaluation, the awards list and the toast all use it. The combo ladder now reads x1.25, x1.5, x1.75, x2.0; the x2.0 achievement used to be listed first.
 - **Every achievement earned at once is granted at once, in order.** A run that reaches x1.75 unlocks Combo Starter, Chain Reaction and Unbroken in one evaluation, with one timestamp.
 - **Combo names match their rung.** Ids are unchanged (saves key on them). combo-5 (x1.25) is now Combo Starter, combo-10 (x1.5) Chain Reaction, combo-20 (x1.75) Unbroken, and combo-2 (x2.0) stays Doubled Up, now described as "Land a x2 combo." "Wireless Legend" sat on the x1.75 rung and is retired.
