@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 43; // B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell)
-const EXPECTED_WITHOUT_BOOSTS = 31; // B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1
+const EXPECTED_WITH_BOOSTS = 45; // B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 33; // B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -2257,6 +2257,110 @@ async function main() {
         const gain = b.out.m10 / a.out.m10 - 1;
         if (gain < 0.15) fail(name, `clean ${a.out.m10.toFixed(1)} m, Head Start ${b.out.m10.toFixed(1)} m: +${(gain * 100).toFixed(1)} %`);
         else pass(name, `${seed}: clean ${a.out.m10.toFixed(1)} m, Head Start ${b.out.m10.toFixed(1)} m at 10 s: +${(gain * 100).toFixed(1)} %`);
+      }
+    }
+
+    // ---- Decision 3: a real seed@1 run that rides into a Debumont sector (sector 2, from 1000 m; d3gate0 is
+    // chosen so sector 2 is Debumont and sector 3 is base terrain) records Debumont ENCOUNTERED through the real
+    // RUN_END -> ProgressionService path. The fixture has already encountered Pyramid Peak, so this second
+    // biome unlocks Explorer (biomes-2) and its reward trail-hue-aurora; then the real Profile view and
+    // Achievements grid show SEEN and 2/2. Lead hand-play: seed d3gate0@1 (Debumont on), ride past 1000 m.
+    {
+      const name = {
+        enc: 'decision 3: a d3gate0@1 run that enters a Debumont sector records it encountered, and Profile labels it DEBUMONT SEEN',
+        ach: 'decision 3: the second encountered biome unlocks Explorer (biomes-2) with trail-hue-aurora, and the grid shows 2/2',
+      };
+      const profile = { ...JSON.parse(JSON.stringify(PROFILE)), biomeMask: 1, biomeProgress: { encountered: ['pyramid-peak'], completed: [] } };
+      const { page, errors } = await bootWithProfile(browser, port, profile);
+      let out;
+      try {
+        out = await page.evaluate(async () => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.scene.start('TitleScene');
+          await wait(900);
+          const t = g.scene.getScene('TitleScene');
+          t.starting = false;
+          t.startRun('d3gate0@1');
+          let run = null;
+          const t0 = Date.now();
+          while (Date.now() - t0 < 15000) {
+            const rr = g.scene.getScene('RunScene');
+            if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+            await wait(100);
+          }
+          if (!run) return { fatal: 'RunScene never produced a live sled' };
+          const before = (g.registry.get('profile') || {}).biomeProgress;
+          const entered = [];
+          const onEnter = (p) => { if (p && p.id) entered.push(p.id); };
+          g.events.on('bb:biomeEnter', onEnter);
+          let visits = null;
+          const onEnd = (p) => { visits = p && p.biomeVisits; };
+          g.events.on('bb:runEnd', onEnd);
+          // Put the real sled 60 m into sector 2 and let the live loop ride it (BIOME_ENTER, furthest distance).
+          const s = run.sled;
+          const sx = 1060 * 20;
+          run.streamTerrain(sx);
+          const ang = run.slopeAt(sx);
+          s.setPose(sx, run.terrain.heightAt(sx) - 18, ang, Math.cos((ang * Math.PI) / 180) * 400, Math.sin((ang * Math.PI) / 180) * 400);
+          const t1 = Date.now();
+          while (Date.now() - t1 < 1500 && !entered.includes('debumont')) { s.invulnerableMs = 600000; await wait(50); }
+          s.invulnerableMs = 0;
+          run.pendingCrash = { cause: 'chasm' };
+          let over = false;
+          const t2 = Date.now();
+          while (Date.now() - t2 < 15000) {
+            const go = g.scene.getScene('GameOverScene');
+            if (go && go.scene.isActive()) { over = true; break; }
+            await wait(100);
+          }
+          g.events.off('bb:biomeEnter', onEnter);
+          g.events.off('bb:runEnd', onEnd);
+          if (!over) return { fatal: 'Game Over never became active' };
+          const prof = g.registry.get('profile') || {};
+          const rec = g.registry.get('lastRecord') || {};
+          // The real Profile view and grid, reached from the real Title menu.
+          g.scene.start('TitleScene');
+          await wait(900);
+          const title = g.scene.getScene('TitleScene');
+          const idx = title.menu.items.findIndex((i) => String(i.label).toUpperCase() === 'PROFILE');
+          title.menu.setSelected(idx);
+          title.menu.activate(idx);
+          await wait(400);
+          const pv = title.view;
+          const labels = pv && pv.sigMenu ? pv.sigMenu.items.map((i) => i.label) : [];
+          const walk = (list, acc) => { for (const o of list || []) { if (!o) continue; if (typeof o.text === 'string' && o.text) acc.push(o.text); if (o.list) walk(o.list, acc); } return acc; };
+          const profTexts = pv && pv.panel ? walk(pv.panel.list, []) : [];
+          pv._openAchievements();
+          await wait(300);
+          const grid = title.view;
+          const gridTexts = [];
+          for (let i = 0; i < 10 && grid; i++) { walk(grid.panel.list, gridTexts); if (!grid._turn(1)) break; }
+          return {
+            before, after: prof.biomeProgress, entered, visits, distanceM: rec.distanceM, mask: rec.biomeMask,
+            recKeys: Object.keys(rec), ach: prof.achievements || {}, cosmetics: (prof.unlocked || {}).cosmetics || [],
+            labels, profTexts, gridTexts,
+          };
+        }).catch((e) => ({ fatal: String(e) }));
+      } finally { await page.close(); }
+      if (out.fatal || errors.length) {
+        fail(name.enc, out.fatal || `page errors: ${errors.join(' | ')}`);
+        fail(name.ach, out.fatal || `page errors: ${errors.join(' | ')}`);
+      } else {
+        const enc = (out.after && out.after.encountered) || [];
+        if (out.mask !== 1 || !(out.distanceM >= 1000)) fail(name.enc, `record mask ${out.mask}, distance ${out.distanceM} m (want mask 1, >= 1000 m)`);
+        else if (!out.entered.includes('debumont')) fail(name.enc, `the live run never announced Debumont (BIOME_ENTER ${out.entered})`);
+        else if (!out.visits || !out.visits.encountered.includes('debumont')) fail(name.enc, `RUN_END.biomeVisits ${JSON.stringify(out.visits)}`);
+        else if (out.recKeys.includes('biomeVisits')) fail(name.enc, 'biomeVisits leaked into the RunRecord');
+        else if (!enc.includes('debumont') || !enc.includes('pyramid-peak')) fail(name.enc, `profile biomeProgress ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}`);
+        else if (!out.labels.includes('DEBUMONT SEEN')) fail(name.enc, `Profile toggle labels ${JSON.stringify(out.labels)}`);
+        else if (!out.profTexts.includes('BIOMES SEEN 2/11 DONE 0/11')) fail(name.enc, `Profile summary missing (${out.profTexts.filter((x) => /BIOMES/.test(x))})`);
+        else pass(name.enc, `${out.distanceM} m at mask 1: BIOME_ENTER debumont, biomeVisits ${JSON.stringify(out.visits)}, profile ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}, label DEBUMONT SEEN`);
+        if (!Number.isFinite(out.ach['biomes-2'])) fail(name.ach, `biomes-2 not unlocked (achievements ${Object.keys(out.ach)})`);
+        else if (!out.cosmetics.includes('trail-hue-aurora')) fail(name.ach, `trail-hue-aurora not granted (${out.cosmetics})`);
+        else if (Number.isFinite(out.ach['biomes-5'])) fail(name.ach, 'biomes-5 unlocked with only 2 biomes');
+        else if (!out.gridTexts.includes('2/2') || !out.gridTexts.includes('2/5') || !out.gridTexts.includes('2/11')) fail(name.ach, `grid biome progress missing (has 2/2 ${out.gridTexts.includes('2/2')}, 2/5 ${out.gridTexts.includes('2/5')}, 2/11 ${out.gridTexts.includes('2/11')})`);
+        else pass(name.ach, 'biomes-2 stamped, trail-hue-aurora owned, biomes-5 still locked; grid 2/2, 2/5, 2/11');
       }
     }
 
