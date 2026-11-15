@@ -19,6 +19,10 @@ Unlike the procedural loop, the playlist survives run ends, aborts and retries.
   and ~215 seconds, each segment referenced by exact 48 kHz sample frame offsets.
 - Separately generated full-length Bitstream Bluffs synthesized vocal melody,
   produced with offline continuous pitch/dynamics analysis (not MIDI or Suno).
+- **All twelve** full-length mountain candidate instruments have been rendered
+  from the Pope song's shared F0/phrasing, sample-aligned to exact 48k frames.
+  Each has a 25-second level-matched demo and optional instrumental backing.
+  They are provisional sound designs, not yet game-installed masters.
 - Original vocals default OFF and toggle independently of timed captions
   (captions default OFF and require real word alignment metadata).
 - Twelve biome definitions: Bitstream Bluffs home/virtual mountain plus 11
@@ -56,6 +60,13 @@ public/music/packs/01_FEsxYVStla4/0000-voice-bitstream-bluffs.ogg
 The master-to-Opus pack builder is tools/music/pack_song.py.
 The F0/dynamics extractor and prototype synth are tools/music/voice_resynth.py.
 The derived-stem injector is tools/music/augment_voice.py.
+The twelve full-length candidate renderers and gallery metadata preparation
+are tools/music/render_mountain_voices.py and tools/music/prepare_voice_gallery.py.
+Current generated audio is on CT211 at /root/bitstream-maxi/mountain-voice-gallery/.
+The separate browser demo is tools/music/audition/. Preview assets belong
+under ignored public/music-audition/. Use node tools/music/audition/build.mjs
+to build the gallery *and copy private audio assets*: a bare Vite audition build
+clears its output directory and does not copy those files.
 Use the scripts with explicit source/out/pack paths; scripts refuse obvious
 source-bank overwrites and check frame alignment.
 
@@ -83,15 +94,22 @@ With an independent song pack deployed to public/music and Vite running on
 127.0.0.1:5173, the real-browser smoke tests are:
 node tools/music/smoke.mjs
 node tools/music/game-smoke.mjs
+node tools/music/retry-smoke.mjs
+
+With ignored 25-second audio previews available:
+node tools/music/audition/build.mjs
+node tools/music/audition-smoke.mjs
 
 These browser tests require Chromium and the test song; they are not part of
 the default CI suite.
 
 ## What is NOT finished
 
-- Only the home/Bitstream synthesized voice is an actual render. It is a crude
-  PROTOTYPE, not listening-approved sound design. The other eleven distinctive
-  singing voices must be rendered and auditioned from shared F0/dynamics.
+- Twelve candidate voices have been rendered for the Pope song, but only
+  the *home Bitstream voice* is installed in the playable game pack.
+  The other eleven remain standalone audition WAVs/Opus clips.
+  None is listening-approved; all need audition, refinement, level matching
+  and packaging into a production song manifest.
 - No real word-aligned lyric captions have been packaged yet; caption display
   correctly stays empty until the timing data exists.
 - Twelve IRs are designed synthetic placeholders, not recorded acoustic spaces.
@@ -102,8 +120,10 @@ the default CI suite.
   music-reactive design awaits visual readability testing.
 - Listening QA: separation leakage, Opus chunk seam audibility, output loudness,
   synthetic voice expressiveness, room reverb wet levels, phone/Steam Deck CPU.
-- Full 32-song game pack generation must wait for validated six-stem masters,
-  then check rights/attribution and bandwidth/device budgets.
+- Seeking Friday verified all 32 songs / 192 FLAC stems are fully validated.
+  Six piano stems are effectively silent; the graph must tolerate sparse sources.
+  Full 32-song derivatives still need settings, processing, rights/attribution
+  and bandwidth/device budgets. Demucs is no longer a blocker.
 - The original-minus-separated-stem reconstruction method is intentionally
   OFF because MP3 priming/alignment can create comb filtering.
 - New music UI is essential settings only; full playlist/custom mix controls
@@ -124,3 +144,13 @@ the current virtual Bitstream voice stays audible as a temporary melodic lead.
 
 A browser retry smoke test verifies the song clock and segment scheduling
 survive run-end, retry and abort events.
+
+## Collaboration boundary with CC Friday
+
+The music feature branch / draft PR #21 was cleanly rebased on CC's
+fast-forward-only main v2.8.0 (454e5ed). Do not merge or push to main.
+CC handles biome gameplay and Readable Chaos warning SFX. This music branch
+extends AudioSynth.js without altering playSfx or replacing procedural SFX.
+Added music methods: setMusicProvider, setAirborne, currentMusicCaption and
+musicEnergy. Changes to run/biome event subscriptions are music-only. RunScene
+calls setAirborne. Future main changes will need another rebase and fresh tests.
