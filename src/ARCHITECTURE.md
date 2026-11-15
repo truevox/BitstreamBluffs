@@ -1258,6 +1258,24 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
 * **Tests**: `tests/src/hazard-telegraph.test.js` (pure rules, oracle agreement on a grid), `tests/src/hazard-telegraph-runscene.test.js`
   (the shipped `RunScene` methods on a prototype stub, the entity against a recording graphics fake, the sounds).
 
+### Phase 1 on the biome hazards (rebased onto v2.10.0; additive)
+
+* `hazardResponse` is unchanged: B3 Rolling Boulder / Dew Drop / Gear Gate -> `hop`; B1 Groomer Cat / Seaweed Tangle /
+  Chocolate River (slow) and B2 Shatter Wall (blind) -> `brace`; Ash Cloud (air) -> `null`. `tests/src/hazard-telegraph-biomes.test.js`
+  pins every shipped def in an explicit table.
+* `GROUND_WARN` gains `arrivalHorizonMs` 4000, `arrivalStepMs` 20, `gateMarginMs` 150.
+* `predictArrival(h, sled, nowMs)` -> `{etaMs, cxAtArrival}`: with `h.predictX` (Hazard, B3) and a run time, the centre at
+  now + tau is `h.cx + predictX(now + tau) - predictX(now)`; the first tau where the sled (constant `max(vx, 60)`) reaches
+  it, by 20 ms steps then bisection; `Infinity` past the horizon. Static (or no `predictX` / no `nowMs`): exactly `dx / vx`.
+  No roll direction is assumed. Limit: `Hazard.predictX` holds a not-yet-started roll at its spawn x.
+* `inHopWindowMs(etaMs)`: the oracle's window in time. `gateVerdict(h, arrivalMs)` -> `'open'` when `isPassable` holds at
+  `arrivalMs - gateMarginMs` and `gateNextChangeMs` there exceeds `2 x gateMarginMs`, else `'closed'`; `null` without the
+  gate API (or when `gateNextChangeMs` returns null).
+* `planTelegraph(..., {isMuted, nowMs})`: marks gain `arrivalMs` (null without `nowMs`) and `gate`; `etaS` and the lime
+  window come from `predictArrival`; `clear` compares `landX` with `cxAtArrival`; new state `'open'` (gate open at
+  arrival: drawn dim with still chevrons, silent in `TelegraphTracker`, never lime). `RunScene.updateGroundTelegraph`
+  passes `nowMs: runTimeMs` (the time base of `Hazard.stepMotion`).
+
 ### Phase 2: farther zoom-out at speed (supersedes the numbers in "Addendum: camera at speed")
 
 * **`systems/CameraZoom.js`** (pure): `speedZoom(speedPxS, t = TUNING)` is the target zoom. Stage 1 is unchanged and still
