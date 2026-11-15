@@ -154,3 +154,59 @@ extends AudioSynth.js without altering playSfx or replacing procedural SFX.
 Added music methods: setMusicProvider, setAirborne, currentMusicCaption and
 musicEnergy. Changes to run/biome event subscriptions are music-only. RunScene
 calls setAirborne. Future main changes will need another rebase and fresh tests.
+
+## V2 voice audition — owner feedback and implementation (2026-11-15)
+
+**Owner feedback (Marvin, NOT an agent inference):** V1 concept and audition
+interface are well liked, but **many sounds are much too alike**; transitions
+between notes are too soft for Maxi's frequent hard onsets; **Crystal Cavern
+and Steampunk Slopes are particularly disappointing**. Switching back to
+Maxi's original voice makes the intended melody/phrasing intelligible even
+where isolated synthetic instruments were not. Instruments must be judged
+alone as melodic performances.
+
+**Friday's diagnosis (inference, requiring listening verification):** V1 drove
+related continuous oscillators with a shared slow vocal envelope. Original
+128ms windows and smoothing can erase note attacks and introduce octave
+errors. Timbre and articulation diversity were both insufficient.
+
+**Agent implementation (never overwrite the read-only FLAC masters):**
+- voice_phrasing_v2.py: 10ms pitch and fast (32ms) source RMS/spectral-onset
+  analysis; torchaudio NCCF, octave correction, distinct onset and velocity
+  estimates; still a heuristic, not trusted transcription.
+- sf2_melody_v2.py: genuine sampled note-on/note-off events and continuous
+  MIDI pitch-wheel changes for original bends and vibrato. Uses the existing
+  CT211 FluidSynth/FluidR3_GM.sf2; no new browser/npm dependency. Debian's
+  FluidR3 GM soundfont package identifies the license as MIT.
+- articulated_gallery_v2.py: 12 distinct sample-or-procedural instrument
+  generators with fast onset attacks. Crystal combines sampled glockenspiel
+  mallets with independently ringing glass modes. Steampunk combines sampled
+  calliope pipes with a distinct steam chiff/mechanical valve transient.
+  Other sample families include brass, reed, saw lead, choir, music box and
+  church organ; remaining digital synths add timed note transients.
+- measure_voice_contrast.py: numerical comparison of the common 25-second
+  excerpt. Median log-spectrum correlation across 66 instrument pairs fell
+  from 0.956 to 0.905. Normalized median onset rise at 126 candidate onsets:
+  Crystal -0.068 -> +0.293; Steampunk -0.008 -> +0.991. Directional engineering
+  checks, NOT evidence of musical approval.
+- tools/music/audition-v2: separate V1 vs V2 browser UI with sample-aligned
+  crossfades and original Maxi reference. The 26 Opus preview assets are
+  generated separately and excluded from Git.
+
+**Test deployment:**
+http://192.168.86.223:8181/tools/music/audition-v2/
+The previous V1 audition remains available independently.
+CT211 V2 derivative gallery: /root/bitstream-maxi/mountain-voice-gallery-v2/.
+This iteration is 25-second clips; old full-song V1 files and the game's
+draft-Pope pack are intentionally unchanged pending owner listening approval.
+
+**Open risks:** about 1,234 triggered notes over 215 seconds (126 in the
+25-second excerpt), including possible false triggers from Demucs bleed.
+Pitch can still jump incorrectly. Audition each instrument SOLO, not just
+with Maxi reference; check sample onset timing, musical legibility and
+individual instrument identity. No claims of finished art or 32-song migration.
+
+**Repository coordination:** CC Friday owns fast-forward-only main and
+Readable Chaos warning SFX; V2 is OFFLINE resynthesis plus separate lab only.
+It does not change the live AudioSynth API, game physics or SFX hooks.
+Rebase the unmerged draft PR onto CC's moving main before review.
