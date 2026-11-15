@@ -8,8 +8,11 @@
  *    treats a charge as absorbing one hazard. A second shield implementation is exactly what the spec
  *    forbids, so this only sets the starting count.
  *  - **Head Start** raises the starting speed via `Sled.scaleVelocity`, the same method the speed-boost
- *    pickup uses. Not a physics-constant edit: PHYSICS is untouched, so a boosted run is the same game
- *    with a different launch.
+ *    pickup uses, and (decision 4, 2026-11-14) adds a short opening surge: a speed multiplier for the first
+ *    seconds of the run, fed to PhysicsTuner's existing `speedBoost` context (the Packet Burst path), that
+ *    fades to exactly 1. Not a physics-constant edit: PHYSICS is untouched, so a boosted run is the same
+ *    game with a stronger opening and an ordinary run afterwards. The old launch alone (x1.25 on a
+ *    50 px/s spawn) was worth +1.7 % distance at 5 s (audit F8).
  *
  * Boosts are chosen on a pre-run loadout and DEFAULT OFF. A run with any boost sets `record.modded`,
  * which Routing (systems/Ranking.js) then keeps off every clean board.
@@ -20,6 +23,12 @@
  * of it is testable here without a Phaser scene.
  */
 
+// Head Start tuning (decision 4). Measured on the real sled with the gate's same-seed 10 s probe.
+const HS_LAUNCH = 8;
+const HS_OPEN_MUL = 1.5;
+const HS_OPEN_MS = 6000;
+const HS_FADE_MS = 1500;
+
 /** The boost ids, in loadout order. */
 export const BOOSTS = Object.freeze(['errorCorrection', 'headStart']);
 
@@ -29,7 +38,12 @@ export const BOOSTS = Object.freeze(['errorCorrection', 'headStart']);
  */
 export const BOOST_DEFS = Object.freeze({
   errorCorrection: Object.freeze({ id: 'errorCorrection', name: 'ERROR CORRECTION ENGINE', shieldCharges: 1 }),
-  headStart: Object.freeze({ id: 'headStart', name: 'HEAD START', speedFactor: 1.25 }),
+  // Decision 4: speedFactor multiplies the spawn velocity (~50 px/s along the slope); openingSpeedMul is the
+  // tuner speedBoost for the first openingMs, fading to 1 over the last openingFadeMs. Tuned on the real
+  // sled so a same-seed Head Start run is >= +15 % distance at 10 s (gate check), then ordinary.
+  headStart: Object.freeze({
+    id: 'headStart', name: 'HEAD START', speedFactor: HS_LAUNCH, openingSpeedMul: HS_OPEN_MUL, openingMs: HS_OPEN_MS, openingFadeMs: HS_FADE_MS,
+  }),
 });
 
 /**
@@ -113,6 +127,37 @@ export function boostEffects(loadout, o) {
     if (Number.isFinite(def.speedFactor)) speedFactor *= def.speedFactor;
   }
   return { shieldCharges, speedFactor, modded: active.length > 0 };
+}
+
+/**
+ * Decision 4: Head Start's opening surge for this run, as plain numbers. Applies under the same rule as
+ * every boost effect (switched on, owned, never on the official Daily), so a run that gets it is MODDED.
+ * Kept out of boostEffects so that function's shape (and its "no physics override" guarantee) is unchanged.
+ * @param {Object} loadout @param {{daily?:boolean, unlocked?:Object<string,number>}} [o]
+ * @returns {{speedMul:number, ms:number, fadeMs:number}} `{1, 0, 0}` when Head Start does not apply.
+ */
+export function headStartOpening(loadout, o) {
+  if (!activeBoosts(loadout, o).includes('headStart')) return { speedMul: 1, ms: 0, fadeMs: 0 };
+  const d = BOOST_DEFS.headStart;
+  return { speedMul: d.openingSpeedMul, ms: d.openingMs, fadeMs: Math.min(d.openingFadeMs, d.openingMs) };
+}
+
+/**
+ * The opening surge's speed multiplier at `runTimeMs`: full strength, then a linear fade over the last
+ * `fadeMs` of the window, then EXACTLY 1 for the rest of the run (no permanent speed buff). PURE.
+ * Junk or a multiplier below 1 is neutral, so this can never slow a run.
+ * @param {{speedMul:number, ms:number, fadeMs:number}} opening @param {number} runTimeMs
+ * @returns {number}
+ */
+export function openingSpeedMul(opening, runTimeMs) {
+  if (!opening || typeof opening !== 'object') return 1;
+  const { speedMul, ms } = opening;
+  if (!Number.isFinite(speedMul) || speedMul <= 1 || !Number.isFinite(ms) || ms <= 0) return 1;
+  if (!Number.isFinite(runTimeMs) || runTimeMs >= ms) return 1;
+  const fade = Number.isFinite(opening.fadeMs) ? Math.min(Math.max(0, opening.fadeMs), ms) : 0;
+  const left = ms - Math.max(0, runTimeMs);
+  if (fade <= 0 || left >= fade) return speedMul;
+  return 1 + (speedMul - 1) * (left / fade);
 }
 
 /**

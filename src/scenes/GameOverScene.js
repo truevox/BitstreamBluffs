@@ -26,7 +26,7 @@ import {
 import { ellipsize, measureText } from '../ui/PixelFont.js';
 // Whether a boosted run may rank is Ranking.js's decision alone (W4's single-helper rule), so this scene
 // asks it instead of testing rec.modded itself.
-import { boardsModded, rankableOnly } from '../systems/Ranking.js';
+import { boardsModded, rankableOnly, isOfficialDaily } from '../systems/Ranking.js';
 import { Panel } from '../ui/Panel.js';
 import { Button } from '../ui/Button.js';
 import { MenuInput } from '../ui/MenuInput.js';
@@ -213,7 +213,12 @@ export class GameOverScene extends Phaser.Scene {
     this.ghostA.setAlpha(0.45);
     this.ghostB.setAlpha(0.45);
     this.title = new NeonText(this, theme, GAME_WIDTH / 2, y, text, { color: 'danger', scale: 4, anchor: 'center', outline: 'dark' });
-    const seedLine = this.rec.dailyRuleId && this.rec.dailyRuleId !== 'none' ? `DAILY RULE  ${ruleLabel(this.rec.dailyRuleId)}` : '';
+    // Decision 2: a run on a daily seed says whether it was the official Daily or a practice run of a date.
+    const dailyLabel = DailyPatch.dailyRunLabel(this.rec.seed, isOfficialDaily(this.rec));
+    const hasRule = this.rec.dailyRuleId && this.rec.dailyRuleId !== 'none';
+    const seedLine = dailyLabel
+      ? `${dailyLabel}${hasRule ? `  ${ruleLabel(this.rec.dailyRuleId)}` : ''}`
+      : hasRule ? `DAILY RULE  ${ruleLabel(this.rec.dailyRuleId)}` : '';
     this.rule = new NeonText(this, theme, GAME_WIDTH / 2, 42, seedLine, { color: 'amber', anchor: 'center', outline: 'none' });
   }
 
@@ -381,9 +386,11 @@ export class GameOverScene extends Phaser.Scene {
       out.seedKey = l.key;
     } catch (e) { /* cosmetic */ }
     try {
+      // Decisions 1/2: only the OFFICIAL Daily is judged against TODAY'S BEST and shows the streak. A
+      // practice run (a typed daily seed) keeps the ordinary seed-best line above, within its own mask.
       const daily = DailyPatch.getDailyInfo(new Date(rec.startedAt || Date.now()));
-      if (daily.seed === rec.seed) {
-        // a daily seed: today's best is the seed's best, so it replaces the generic seed line
+      if (daily.seed === rec.seed && isOfficialDaily(rec)) {
+        // the official Daily: today's best replaces the generic seed line
         const l = line("TODAY'S", store.getDailyStats(new Date(rec.startedAt || Date.now()), { excludeRunId: rec.id }));
         out.seedLine = l.text;
         out.seedKey = l.key;
@@ -1016,6 +1023,10 @@ export class GameOverScene extends Phaser.Scene {
     if (this.pulse) { this.pulse.remove(); this.pulse = null; }
     this._commitPending();
     if (this.rec.seed) this.registry.set(REG.SEED, this.rec.seed);
+    // Decision 2: retrying the official Daily is another official attempt (the core chase loop: TODAY'S
+    // BEST must count retries), and retrying a practice run stays practice. RunScene still requires the
+    // seed to be TODAY's daily seed, so a retry after 00:00 UTC cannot back-fill yesterday.
+    this.registry.set(REG.DAILY_OFFICIAL, this.rec.dailyOfficial === true);
     // CC Friday: retry keeps the mask of the run being retried. Set it explicitly rather than letting the
     // previous value survive in the registry, which was correct only by accident.
     this.registry.set(REG.BIOME_MASK, Number(this.rec.biomeMask) || 0);
@@ -1030,6 +1041,7 @@ export class GameOverScene extends Phaser.Scene {
     if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
     this._commitPending();
     this.registry.set(REG.SEED, randomSeed());
+    this.registry.set(REG.DAILY_OFFICIAL, false); // decision 2: a fresh seed is never the Daily
     // A fresh seed is an ordinary run, so it uses the profile mask. Leaving the previous value behind
     // meant NEW SEED after a Daily run inherited that day's date-derived mask.
     this.registry.set(REG.BIOME_MASK, enabledBiomeMask(

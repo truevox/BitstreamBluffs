@@ -58,6 +58,12 @@ export const REG = Object.freeze({
   MISSIONS: 'missions',
   /** W2: the MissionsService instance (registry view is REG.MISSIONS). Additive. */
   MISSIONS_SERVICE: 'missionsService',
+  /**
+   * @type {boolean} decision 2: the next run is the OFFICIAL Daily. Set true only by TitleScene's DAILY RUN
+   * item (and kept by Game Over RETRY of an official run); every other start path sets it false. RunScene
+   * also requires the seed to be today's daily seed. Additive: absent means a practice/ordinary run.
+   */
+  DAILY_OFFICIAL: 'dailyOfficial',
 });
 
 /** Palette keys. Each palette in src/data/palettes.json must define every key (as "#rrggbb"). */

@@ -100,6 +100,10 @@ const { REG } = await import('../../src/constants.js');
 const { EVT } = await import('../../src/events.js');
 const { SaveStore, sanitizeRun } = await import('../../src/systems/SaveStore.js');
 const { DailyPatch } = await import('../../src/systems/DailyPatch.js');
+const { BOOST_DEFS, openingSpeedMul } = await import('../../src/systems/Boosts.js');
+const { GameOverScene } = await import('../../src/scenes/GameOverScene.js');
+const { isOfficialDaily } = await import('../../src/systems/Ranking.js');
+const { verifyLedgerHash } = await import('../../src/systems/SaveStore.js');
 
 // ---------------------------------------------------------------- harness
 
@@ -319,7 +323,7 @@ describe('RunScene applies only the boosts the profile owns', () => {
     const s = runScene(values);
     expect(s.modded).toBe(true);
     expect(s.shieldCharges).toBe(0);
-    expect(sledCalls.filter((c) => c[0] === 'scaleVelocity')).toEqual([['scaleVelocity', 1.25]]);
+    expect(sledCalls.filter((c) => c[0] === 'scaleVelocity')).toEqual([['scaleVelocity', BOOST_DEFS.headStart.speedFactor]]);
   });
 
   test('a profile that owns both boosts really is boosted on START RUN', () => {
@@ -329,7 +333,7 @@ describe('RunScene applies only the boosts the profile owns', () => {
     const s = runScene(values);
     expect(s.modded).toBe(true);
     expect(s.shieldCharges).toBe(1);
-    expect(sledCalls.filter((c) => c[0] === 'scaleVelocity')).toEqual([['scaleVelocity', 1.25]]);
+    expect(sledCalls.filter((c) => c[0] === 'scaleVelocity')).toEqual([['scaleVelocity', BOOST_DEFS.headStart.speedFactor]]);
     expect(crash(s).modded).toBe(true);
   });
 
@@ -375,5 +379,176 @@ describe('the biome palette repaint runs only when a biome mask is set', () => {
 
   test('at a non-zero mask the first frame and each crossing still repaint (control)', () => {
     expect(repaintsOver(8)).toBe(3);
+  });
+});
+
+// ================================================================ decisions 1/2: official Daily vs practice
+
+describe('decision 2: only the DAILY RUN item starts an official Daily', () => {
+  const today = DailyPatch.infoForDateKey('2026-11-13');
+
+  test('DAILY RUN: official flag, today\'s seed, mask and rule; boosts refused; record official and v2', () => {
+    const store = memStore();
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, BOOSTED_PROFILE], [REG.SAVE_STORE, store]]);
+    pressTitle(values, 'DAILY RUN');
+    expect(values.get(REG.DAILY_OFFICIAL)).toBe(true);
+    const s = runScene(values);
+    expect(s.dailyOfficial).toBe(true);
+    expect(s.dailyRuleId).toBe(today.rule.id);
+    expect(s.modded).toBe(false);
+    expect(s.opening).toEqual({ speedMul: 1, ms: 0, fadeMs: 0 });
+    const r = crash(s);
+    expect(r).toMatchObject({ dailyOfficial: true, hashV: 2, seed: TODAY_SEED, biomeMask: 8 });
+    expect(verifyLedgerHash(sanitizeRun(r))).toBe(true);
+    expect(isOfficialDaily(store.runs[0])).toBe(true);
+    expect(store.getDailyStats(NOW)).toMatchObject({ attempts: 1 });
+    expect(store.getDailyStreak(NOW).streak).toBe(1);
+  });
+
+  test('ENTER SEED with today\'s daily seed: practice, today\'s mask, boosts apply and mark it MODDED', () => {
+    const store = memStore();
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, BOOSTED_PROFILE], [REG.SAVE_STORE, store]]);
+    const t = titleCtx(values);
+    t.startRun(TODAY_SEED);
+    expect(values.get(REG.DAILY_OFFICIAL)).toBe(false);
+    expect(values.get(REG.BIOME_MASK)).toBe(8); // the date's mask, not the profile's
+    const s = runScene(values);
+    expect(s.dailyOfficial).toBe(false);
+    expect(s.modded).toBe(true);
+    expect(s.shieldCharges).toBe(1);
+    const r = crash(s);
+    expect(r).toMatchObject({ dailyOfficial: false, hashV: 2, modded: true, boosts: ['errorCorrection', 'headStart'] });
+    expect(verifyLedgerHash(sanitizeRun(r))).toBe(true);
+    expect(isOfficialDaily(store.runs[0])).toBe(false);
+    expect(store.getDailyStats(NOW)).toBeNull();
+    expect(store.getDailyStreak(NOW).streak).toBe(0);
+  });
+
+  test('a clean typed today\'s seed (no boosts) is still practice: not TODAY\'S BEST, not the streak', () => {
+    const store = memStore();
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SAVE_STORE, store]]);
+    titleCtx(values).startRun(TODAY_SEED);
+    const s = runScene(values);
+    expect(s.modded).toBe(false);
+    crash(s);
+    expect(store.getDailyStats(NOW)).toBeNull();
+    expect(store.getDailyStreak(NOW).streak).toBe(0);
+  });
+
+  test('a typed PAST daily seed replays that date\'s rule and mask (FAIRNESS-2), not today\'s', () => {
+    // Pick a past date whose rule differs from today's so the assertion cannot pass by coincidence.
+    let k = null;
+    for (let i = 1; i < 9 && !k; i++) {
+      const c = new Date(NOW - i * 86400000).toISOString().slice(0, 10);
+      if (DailyPatch.infoForDateKey(c).rule.id !== today.rule.id) k = c;
+    }
+    const past = DailyPatch.infoForDateKey(k);
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SAVE_STORE, memStore()]]);
+    titleCtx(values).startRun(`daily-${k}`);
+    expect(values.get(REG.BIOME_MASK)).toBe(past.biomeMask);
+    const s = runScene(values);
+    expect(s.dailyRuleId).toBe(past.rule.id);
+    expect(s.dailyMods).toEqual(past.rule.modifiers);
+    expect(s.dailyOfficial).toBe(false);
+  });
+
+  test('a typed daily seed with an @mask suffix plays that mask', () => {
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SAVE_STORE, memStore()]]);
+    titleCtx(values).startRun(`${TODAY_SEED}@3`);
+    expect(values.get(REG.SEED)).toBe(TODAY_SEED);
+    expect(values.get(REG.BIOME_MASK)).toBe(3);
+  });
+
+  test('a stale official flag never makes another date official (retry or restart after midnight)', () => {
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SAVE_STORE, memStore()],
+      [REG.SEED, 'daily-2026-11-12'], [REG.BIOME_MASK, DailyPatch.infoForDateKey('2026-11-12').biomeMask], [REG.DAILY_OFFICIAL, true]]);
+    expect(runScene(values).dailyOfficial).toBe(false);
+    const plain = new Map([[REG.CONTENT, CONTENT], [REG.SAVE_STORE, memStore()], [REG.SEED, 'alpha'], [REG.DAILY_OFFICIAL, true]]);
+    expect(runScene(plain).dailyOfficial).toBe(false);
+  });
+
+  test('START RUN after a Daily clears the flag', () => {
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.DAILY_OFFICIAL, true]]);
+    pressTitle(values, 'START RUN');
+    expect(values.get(REG.DAILY_OFFICIAL)).toBe(false);
+  });
+});
+
+describe('decision 4: Head Start opening surge reaches the run, and ends', () => {
+  test('a Head Start run gets a launch and an opening speedBoost that is exactly 1 after its window', () => {
+    const lvl8 = { boosts: { headStart: true }, unlocked: { biomes: [], cosmetics: [], titles: [], boosts: { headStart: 8 } } };
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, lvl8], [REG.SAVE_STORE, memStore()]]);
+    pressTitle(values, 'START RUN');
+    const s = runScene(values);
+    expect(s.opening.speedMul).toBeGreaterThan(1);
+    s.wards = s.wards || { wards: [] };
+    s.runTimeMs = 0;
+    const early = s.physicsContext({}, []).speedBoost;
+    expect(early).toBeCloseTo(openingSpeedMul(s.opening, 0), 9);
+    expect(early).toBeGreaterThan(1);
+    s.runTimeMs = s.opening.ms + 1;
+    expect(s.physicsContext({}, []).speedBoost).toBe(1);
+  });
+
+  test('a clean run has no surge', () => {
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SAVE_STORE, memStore()]]);
+    pressTitle(values, 'START RUN');
+    const s = runScene(values);
+    s.runTimeMs = 0;
+    expect(s.physicsContext({}, []).speedBoost).toBe(1);
+  });
+});
+
+describe('decisions 1/2: Game Over labels practice and judges it as a plain seed', () => {
+  function gameOverCtx(store, r, values = new Map()) {
+    values.set(REG.SAVE_STORE, store);
+    const g = Object.create(GameOverScene.prototype);
+    Object.assign(g, {
+      registry: registry(values), rec: r, alive: true, leaving: false, theme: deep(), tweens: deep(),
+      scene: { start: jest.fn(), stop: jest.fn() }, sound: deep(), time: deep(), add: deep(),
+    });
+    return g;
+  }
+  const today = DailyPatch.infoForDateKey('2026-11-13');
+  const official = (o = {}) => rec({ seed: TODAY_SEED, dailyRuleId: today.rule.id, biomeMask: 8, hashV: 2, dailyOfficial: true, startedAt: NOW - 1000, ...o });
+  const practice = (o = {}) => official({ dailyOfficial: false, ...o });
+
+  test('an official Daily is judged against TODAY\'S BEST and shows the streak', () => {
+    const prev = official({ score: 500 });
+    const store = memStore([prev]);
+    const g = gameOverCtx(store, official({ score: 100 }));
+    const c = g._chase(g.rec);
+    expect(c.seedLine).toBe("TODAY'S BEST 500");
+    expect(c.streak).toBe(1);
+  });
+
+  test('a practice run never shows TODAY\'S BEST or the streak, even when it beats the official best', () => {
+    const store = memStore([official({ score: 500 })]);
+    const g = gameOverCtx(store, practice({ score: 9000 }));
+    const c = g._chase(g.rec);
+    expect(c.seedLine).not.toMatch(/TODAY/);
+    expect(c.seedLine).toBe('NEW SEED BEST');
+    expect(c.streak).toBe(0);
+  });
+
+  test('the header labels it DAILY PRACTICE <date>, and the official run DAILY RUN', () => {
+    texts.length = 0;
+    GameOverScene.prototype._buildHeader.call(gameOverCtx(memStore(), practice({ seed: 'daily-2026-11-10', dailyRuleId: DailyPatch.infoForDateKey('2026-11-10').rule.id })));
+    expect(texts.some((t) => /^DAILY PRACTICE 2026-11-10/.test(String(t)))).toBe(true);
+    texts.length = 0;
+    GameOverScene.prototype._buildHeader.call(gameOverCtx(memStore(), official()));
+    expect(texts.some((t) => /^DAILY RUN /.test(String(t)))).toBe(true);
+  });
+
+  test('RETRY keeps an official Daily official and a practice run practice; NEW SEED clears it', () => {
+    const v1 = new Map();
+    gameOverCtx(memStore(), official(), v1).retry();
+    expect(v1.get(REG.DAILY_OFFICIAL)).toBe(true);
+    const v2 = new Map([[REG.DAILY_OFFICIAL, true]]);
+    gameOverCtx(memStore(), practice(), v2).retry();
+    expect(v2.get(REG.DAILY_OFFICIAL)).toBe(false);
+    const v3 = new Map([[REG.DAILY_OFFICIAL, true], [REG.CONTENT, CONTENT]]);
+    gameOverCtx(memStore(), official(), v3).newSeed();
+    expect(v3.get(REG.DAILY_OFFICIAL)).toBe(false);
   });
 });

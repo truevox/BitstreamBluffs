@@ -34,6 +34,9 @@
  */
 
 const DAY_MS = 86400000;
+/** infoForDateKey memo (pure answers, bounded). */
+const INFO_CACHE = new Map();
+const INFO_CACHE_MAX = 4096;
 
 export class DailyPatch {
   /** All rules, order is stable (index = days since epoch % length). Append only: reordering changes history. @type {DailyRule[]} */
@@ -159,12 +162,22 @@ export class DailyPatch {
    * @returns {{dateKey:string, seed:string, rule:DailyRule, biomeMask:number}|null} null for a malformed key.
    */
   static infoForDateKey(dateKey) {
-    const k = typeof dateKey === 'string' ? DailyPatch.dateKeyFromSeed(`daily-${dateKey}`) : null;
-    if (!k) return null;
-    // Noon UTC: well inside the day whatever the rounding, so the rule and the mask are that day's.
-    const noon = new Date(Date.parse(`${k}T12:00:00.000Z`));
-    const info = DailyPatch.getDailyInfo(noon);
-    return { dateKey: k, seed: info.seed, rule: info.rule, biomeMask: DailyPatch.biomeMaskForDate(noon) };
+    if (typeof dateKey !== 'string') return null;
+    // Memoised: the Daily surfaces ask once per stored run, and a device can hold thousands. The answer is
+    // a pure function of the key, so the cache can never go stale; it is bounded and returns frozen objects.
+    const hit = INFO_CACHE.get(dateKey);
+    if (hit !== undefined) return hit;
+    const k = DailyPatch.dateKeyFromSeed(`daily-${dateKey}`);
+    let out = null;
+    if (k) {
+      // Noon UTC: well inside the day whatever the rounding, so the rule and the mask are that day's.
+      const noon = new Date(Date.parse(`${k}T12:00:00.000Z`));
+      const info = DailyPatch.getDailyInfo(noon);
+      out = Object.freeze({ dateKey: k, seed: info.seed, rule: info.rule, biomeMask: DailyPatch.biomeMaskForDate(noon) });
+    }
+    if (INFO_CACHE.size >= INFO_CACHE_MAX) INFO_CACHE.clear();
+    INFO_CACHE.set(dateKey, out);
+    return out;
   }
 
   /**

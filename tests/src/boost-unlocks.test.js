@@ -15,7 +15,7 @@ jest.unstable_mockModule('phaser', () => ({
 jest.unstable_mockModule('../../src/data/index.js', () => ({ content: {}, loadContent: () => ({}) }));
 
 const { sanitizeProfile } = await import('../../src/systems/ProfileStore.js');
-const { boostEffects, isModdedRun, loadoutForRun } = await import('../../src/systems/Boosts.js');
+const { boostEffects, isModdedRun, loadoutForRun, BOOST_DEFS } = await import('../../src/systems/Boosts.js');
 
 const LEVELS = JSON.parse(fs.readFileSync('src/data/progression/levels.json', 'utf8'));
 const v1 = (o = {}) => sanitizeProfile({ v: 1, ...o }, LEVELS);
@@ -33,14 +33,14 @@ describe('boosts are gated by their level unlock', () => {
 
   test('only owned boosts apply, and only an owned boost marks the run modded', () => {
     const headStartOnly = { headStart: 8 };
-    expect(boostEffects(BOTH_ON, { unlocked: headStartOnly })).toEqual({ shieldCharges: 0, speedFactor: 1.25, modded: true });
+    expect(boostEffects(BOTH_ON, { unlocked: headStartOnly })).toEqual({ shieldCharges: 0, speedFactor: BOOST_DEFS.headStart.speedFactor, modded: true });
     expect(isModdedRun(BOTH_ON, { unlocked: headStartOnly })).toBe(true);
     expect(loadoutForRun(BOTH_ON, { unlocked: headStartOnly }).boosts).toEqual({ errorCorrection: false, headStart: true });
 
     expect(isModdedRun(BOTH_ON, { unlocked: {} })).toBe(false);
     expect(loadoutForRun(BOTH_ON, { unlocked: {} }).boosts).toEqual({ errorCorrection: false, headStart: false });
     expect(boostEffects(BOTH_ON, { unlocked: { headStart: 8, errorCorrection: 15 } }))
-      .toEqual({ shieldCharges: 1, speedFactor: 1.25, modded: true });
+      .toEqual({ shieldCharges: 1, speedFactor: BOOST_DEFS.headStart.speedFactor, modded: true });
   });
 
   test('an omitted owned set owns nothing', () => {

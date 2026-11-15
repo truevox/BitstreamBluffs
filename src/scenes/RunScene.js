@@ -23,13 +23,13 @@ import {
   SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, PHYSICS, STORAGE, TIMING,
 } from '../constants.js';
 import { EVT } from '../events.js';
-import { SaveStore } from '../systems/SaveStore.js';
+import { SaveStore, LEDGER_HASH_V } from '../systems/SaveStore.js';
 import { TerrainGenerator, biomeForSector } from '../systems/TerrainGenerator.js';
 import { ScoreManager } from '../systems/ScoreManager.js';
 import { TrickTracker } from '../systems/TrickTracker.js';
 import { GlitchDirector } from '../systems/GlitchDirector.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
-import { boostEffects } from '../systems/Boosts.js';
+import { boostEffects, loadoutForRun, headStartOpening, openingSpeedMul } from '../systems/Boosts.js';
 import { sameBoardAs } from '../systems/Ranking.js';
 import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
@@ -144,8 +144,16 @@ export class RunScene extends Phaser.Scene {
     this.startedAt = Date.now();
     this.runId = `${this.startedAt}-${this.seed}`;
 
-    // daily rule (read ONCE per run)
-    const daily = DailyPatch.getDailyInfo();
+    // Decision 2: is this the OFFICIAL Daily? Only when the DAILY RUN item asked for it (REG.DAILY_OFFICIAL)
+    // AND the seed is today's daily seed. Any other run on a `daily-YYYY-MM-DD` seed is a practice run.
+    // The today check means a retry or a pause-restart after 00:00 UTC cannot back-fill yesterday.
+    const seedDay = DailyPatch.dateKeyFromSeed(this.seed);
+    const todayKey = DailyPatch.getDailyInfo().dateKey;
+    this.dailyOfficial = reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
+    // daily rule (read ONCE per run). A run on a daily seed plays THAT date's rule (decision 2: a practice
+    // run of a past date replays that date, FAIRNESS-2); every other run plays today's rule as before.
+    const seedDayInfo = seedDay ? DailyPatch.infoForDateKey(seedDay) : null;
+    const daily = seedDayInfo ? { rule: seedDayInfo.rule } : DailyPatch.getDailyInfo();
     this.dailyRuleId = (daily && daily.rule && daily.rule.id) || 'none';
     // W4 loadout: the boosts the player switched on, read from the profile. Absent profile or absent
     // boosts means a clean run, which is the default-off rule.
@@ -264,12 +272,17 @@ export class RunScene extends Phaser.Scene {
     // W4 boosts. Applied at spawn from the loadout chosen before the run: the shield reuses the Hashed
     // Backup charge counter the pickup already feeds, and Head Start scales the launch velocity through
     // the same method the speed-boost pickup uses. No physics constant is touched.
-    // `dailyRuleId` is set to TODAY's rule on every run (it dresses the daily's rule), so it cannot mean
-    // "this is the daily". A run is the daily iff its seed is a daily seed — the same date-in-seed test
-    // the streak uses, which is immune to clock skew.
-    const isDaily = DailyPatch.dateKeyFromSeed(this.seed) !== null;
-    this.boostFx = boostEffects(this.loadout, { daily: isDaily, unlocked: this.unlockedBoosts });
+    // Decision 2: only the OFFICIAL Daily refuses boosts. A typed daily seed is a practice run, so its
+    // boosts apply and make it MODDED like any other boosted run.
+    const isDaily = this.dailyOfficial;
+    const boostOpts = { daily: isDaily, unlocked: this.unlockedBoosts };
+    this.boostFx = boostEffects(this.loadout, boostOpts);
     this.modded = this.boostFx.modded;
+    // The ids that actually applied, written onto the record (and so into the v2 ledger hash).
+    const applied = loadoutForRun(this.loadout, boostOpts).boosts;
+    this.appliedBoosts = Object.keys(applied).filter((id) => applied[id]).sort();
+    // Decision 4: Head Start's opening surge (a speedBoost multiplier that fades to 1; see physicsContext).
+    this.opening = headStartOpening(this.loadout, boostOpts);
     if (this.boostFx.shieldCharges > 0) {
       this.shieldCharges = (this.shieldCharges || 0) + this.boostFx.shieldCharges;
       this.sled.shield = true;
@@ -314,6 +327,7 @@ export class RunScene extends Phaser.Scene {
     this.scene.launch(SCENES.UI);
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
+      dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
     });
   }
 
@@ -838,7 +852,8 @@ export class RunScene extends Phaser.Scene {
       scrambled: this.scrambleMs > 0 && !isWarded(this.wards, { effect: 'scramble' }),
       slowed: this.slowMs > 0 && !isWarded(this.wards, { effect: 'slow' }),
       slowFactor: this.slowFactor,
-      speedBoost: (this.boostMs > 0 ? this.boostFactor : 1) * wardSpeedMul(this.wards),
+      // Decision 4: Head Start's opening surge multiplies in for its window only (exactly 1 afterwards).
+      speedBoost: (this.boostMs > 0 ? this.boostFactor : 1) * wardSpeedMul(this.wards) * openingSpeedMul(this.opening, this.runTimeMs),
       timeMs: this.runTimeMs,
       parachute: sled.parachuteMs > 0,
       airBrake: sled.airBrakeActive,
@@ -1464,16 +1479,20 @@ export class RunScene extends Phaser.Scene {
       trickPoints: Math.round(snap.trickPoints),
       tricks: { ...this.trickCounts },
       bestCombo: Math.max(this.bestCombo, snap.bestCombo || 1),
-      bestFlow: Math.max(1, snap.bestFlow || 1), // not hashed; SaveStore's sanitiser may drop it, GameOver reads it from here
+      bestFlow: Math.max(1, snap.bestFlow || 1), // stored and v2-hashed since decision 6
       maxAirtimeMs: Math.round(this.maxAirtimeMs),
       cause: 'crash',
-      // W4: set only when a boost was actually active, so a clean run writes exactly the record it wrote
-      // before W4 (same keys, same ledger-hash input). Ranking keeps it off clean boards; the hash is
-      // unchanged and does not include it.
-      ...(this.modded ? { modded: true } : {}),
+      // W4: set only when a boost was actually active. Ranking keeps it off clean boards; since decision 6
+      // the v2 ledger hash covers it, with the ids of the boosts that applied.
+      ...(this.modded ? { modded: true, boosts: [...(this.appliedBoosts || [])] } : {}),
+      // Decision 2: true only for the official Daily (DAILY RUN item, today's seed). Written on every
+      // record so a v2 record is never mistaken for a legacy one (Ranking.isOfficialDaily).
+      dailyOfficial: this.dailyOfficial === true,
       shards: this.shardCount || 0,
       nearMisses: this.nearMissCount || 0,
       bonusPoints: Math.round(snap.bonusPoints || 0),
+      // Decision 6: new records are ledger-hash v2 (every gameplay and result field).
+      hashV: LEDGER_HASH_V,
       ledgerHash: '',
     };
     record.ledgerHash = SaveStore.computeLedgerHash(record);

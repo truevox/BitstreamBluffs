@@ -305,30 +305,41 @@ export class TitleScene extends Phaser.Scene {
    */
   _startDaily() {
     const now = new Date();
-    this.startRun(DailyPatch.getDailyInfo(now).seed, DailyPatch.biomeMaskForDate(now));
+    // Decision 2: this menu item is the ONLY way to start an official Daily.
+    this.startRun(DailyPatch.getDailyInfo(now).seed, DailyPatch.biomeMaskForDate(now), { official: true });
   }
 
   /**
    * @param {string} seed seed text, optionally with a `seed@mask` suffix (W3).
    * @param {number} [maskOverride] explicit mask (daily run); wins over any suffix.
+   * @param {{official?:boolean}} [o] `official: true` only from the DAILY RUN item (decision 2).
    * @returns {void}
    */
-  startRun(seed, maskOverride) {
+  startRun(seed, maskOverride, o) {
     if (this.starting) return;
     this.starting = true;
     const biomeDefs = Object.values((this.registry.get(REG.CONTENT) || {}).biomes || {});
     const parsed = parseSeedMask(seed, biomeDefs);
     this.registry.set(REG.SEED, parsed.seed || seed);
+    // Decision 2: set on EVERY Title start, so a typed `daily-*` seed (ENTER SEED) is never official.
+    this.registry.set(REG.DAILY_OFFICIAL, !!(o && o.official === true));
+    // A typed `daily-YYYY-MM-DD` with no suffix is a PRACTICE run of that date: it replays that date's
+    // mask (and RunScene plays that date's rule), not the profile's own biomes.
+    const typedDay = parsed.hadSuffix ? null : DailyPatch.dateKeyFromSeed(parsed.seed);
+    const typedDayInfo = typedDay ? DailyPatch.infoForDateKey(typedDay) : null;
     // W3 mask precedence, highest first:
     //   1. an explicit maskOverride (the Daily: date-derived, identical for every player)
     //   2. a `seed@mask` suffix (a shared seed must reproduce the sender's world)
-    //   3. the profile's own enabled-and-unlocked signatures (an ordinary run)
-    // Falling back to 0 at step 3 is what CC Friday caught: START RUN ignored the profile entirely.
+    //   3. a typed `daily-YYYY-MM-DD`: that date's Daily mask (decision 2, practice run)
+    //   4. the profile's own enabled-and-unlocked signatures (an ordinary run)
+    // Falling back to 0 at step 4 is what CC Friday caught: START RUN ignored the profile entirely.
     const mask = Number.isFinite(maskOverride)
       ? maskOverride >>> 0
       : parsed.hadSuffix
         ? parsed.biomeMask
-        : enabledBiomeMask(this.registry.get(REG.PROFILE), biomeDefs);
+        : typedDayInfo
+          ? typedDayInfo.biomeMask
+          : enabledBiomeMask(this.registry.get(REG.PROFILE), biomeDefs);
     this.registry.set(REG.BIOME_MASK, mask);
     uiSfx(this, 'uiSelect', { pitch: 1.3 });
     this._closeView();
