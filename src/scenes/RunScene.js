@@ -52,6 +52,8 @@ import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
 import { BestMarker } from '../entities/BestMarker.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
+import { GroundTelegraph } from '../entities/GroundTelegraph.js';
+import { planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 
@@ -253,6 +255,9 @@ export class RunScene extends Phaser.Scene {
     this.trail = new TrailParticles(this, this.palette, this.look && this.look.trail);
     this.shardField = new ShardField(this, this.palette);
     this.airTelegraph = new AirTelegraph(this, this.palette);
+    this.groundTelegraph = new GroundTelegraph(this, this.palette);
+    this.teleTracker = new TelegraphTracker();
+    this._teleMarks = [];
     this.streaks = this.add.graphics().setDepth(12).setBlendMode(Phaser.BlendModes.ADD);
     this.flashRect = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0)
       .setOrigin(0).setScrollFactor(0).setDepth(100);
@@ -358,6 +363,8 @@ export class RunScene extends Phaser.Scene {
     safe(this.shardField);
     safe(this.bestMarker);
     safe(this.airTelegraph);
+    safe(this.groundTelegraph);
+    this.groundTelegraph = null;
     safe(this.streaks);
     this.shardField = this.bestMarker = this.streaks = this.airTelegraph = null;
     this.sled = this.mesh = this.trail = this.fx = this.bg = null;
@@ -837,6 +844,7 @@ export class RunScene extends Phaser.Scene {
     if (this.shardField) this.shardField.update(t, left, right);
     if (this.bestMarker) this.bestMarker.update(t, sled.x, this.heightFn);
     this.drawStreaks(t);
+    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.heightFn);
     this.bg.update(cam.scrollX, t, sled.speed);
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
     this.updateBlindOverlay();
@@ -1216,6 +1224,7 @@ export class RunScene extends Phaser.Scene {
     }
 
     if (this.airTelegraph) this.airTelegraph.update(now, sled.x, marks);
+    this.updateGroundTelegraph(now);
 
     // milestones + best marker
     // ScoreManager pays each completed sector exactly once (addBonus 'milestone'); the scene only announces it
@@ -1271,6 +1280,27 @@ export class RunScene extends Phaser.Scene {
     this._steepMs = steep ? this._steepMs + dt : 0;
     wants.tuck = this._landings > 0 && now > TUCK_HINT_MIN_RUN_MS && this.tuckShows < TUNING.tuckHintMaxShows && (this._steepMs > TUNING.tuckHintMs || this.tutShown.has('tuck') && steep);
     this.applyHintEvents(this.hints.update(now, wants, danger));
+  }
+
+  /**
+   * Ground-hazard telegraph (systems/HazardTelegraph.js): plan this frame's marks (drawn by entities/GroundTelegraph.js in
+   * renderFrame) and play each hazard's warn / hop cue once. Reads state only; never touches physics, score or the record.
+   * @param {number} now run time (ms).
+   */
+  updateGroundTelegraph(now) {
+    const sled = this.sled;
+    const live = [];
+    for (const list of this.hazards.values()) for (const h of list) live.push(h);
+    const landX = !sled.grounded && Number.isFinite(sled.airEtaMs) ? sled.x + sled.vx * sled.airEtaMs / 1000 : null;
+    const isMuted = (h) => isWarded(this.wards, { hazardId: h.def.id }) || isWarded(this.wards, { effect: h.def.onHit ? h.def.onHit.effect : 'crash' });
+    const marks = planTelegraph(live, { x: sled.x, vx: sled.vx, speed: sled.speed, grounded: sled.grounded, landX }, this._view ? this._view.right : sled.x + GAME_WIDTH, { isMuted });
+    for (const e of this.teleTracker.update(now, marks)) {
+      if (e.type === 'warn') {
+        e.ref.teleAtMs = now; // read by the measurement harness and the gate; nothing in the game depends on it
+        if (e.sound) this.playSfx('groundWarn', { brace: e.kind === 'brace' });
+      } else this.playSfx('hopCue');
+    }
+    this._teleMarks = marks;
   }
 
   /** Distance (px) from x to the next generated launch lip ahead, or Infinity. */
@@ -1578,6 +1608,7 @@ export class RunScene extends Phaser.Scene {
     this.bg.setPalette(this.palette);
     this.fx.palette = this.palette;
     if (this.airTelegraph) this.airTelegraph.setPalette(this.palette);
+    if (this.groundTelegraph) this.groundTelegraph.setPalette(this.palette);
     this.mesh.setPalette(this.palette);
     for (const chunk of this.terrain.getActiveChunks()) {
       if (!this.mesh.chunks.has(chunk.index)) continue;

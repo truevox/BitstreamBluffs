@@ -30,6 +30,7 @@ export const SFX = Object.freeze([
   'push', 'hop', 'land', 'landPerfect', 'landHard', 'trick', 'combo', 'crash', 'respawn',
   'powerup', 'powerupEnd', 'hazardSlow', 'hazardScramble', 'uiMove', 'uiSelect', 'uiBack', 'glitch',
   'boost', 'nearMiss', 'shard', 'milestone', 'newBest', 'flowUp', 'flowLost', 'airWarn',
+  'groundWarn', 'hopCue',
 ]);
 
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
@@ -491,6 +492,21 @@ export class AudioSynth {
       case 'airWarn':
         o('square', 1180, 1180, 0.045, 0.1);
         o('square', 1180, 1180, 0.045, 0.1, 0.09);
+        break;
+      case 'groundWarn':
+        // ground-hazard telegraph. hop (crash hazard): a rising two-note "get up"; brace (slow / scramble): one soft low note
+        if (opts.brace) {
+          o('triangle', 330, 294, 0.13, 0.13);
+        } else {
+          o('square', 660, 660, 0.05, 0.085);
+          o('square', 880, 880, 0.075, 0.1, 0.07);
+          o('triangle', 440, 440, 0.12, 0.1);
+        }
+        break;
+      case 'hopCue':
+        // the chevron turned lime: a short bright tick, "press now"
+        o('triangle', 1320, 1760, 0.05, 0.15);
+        o('square', 1760, 1760, 0.03, 0.045, 0.012);
         break;
       case 'milestone':
         [67, 72, 76, 79].forEach((n, i) => o('square', midi(n), midi(n), 0.12, 0.13, 0.07 * i));
