@@ -13,8 +13,8 @@ import {createHash} from 'node:crypto';
 const ROOT=resolve(import.meta.dirname || new URL('.',import.meta.url).pathname);
 const RATE=16000,FPS=250;
 const NAMES=['violin','trumpet','tenor_saxophone','flute'];
-const FEATURES=JSON.parse(readFileSync(join(ROOT,'audio/ddsp-25s-v3.json'),'utf8'));
-const OUT=join(ROOT,'audio/rendered');
+const FEATURES=JSON.parse(readFileSync(join(ROOT,process.env.DDSP_FEATURES || 'audio/ddsp-25s-v3.json'),'utf8'));
+const OUT=join(ROOT,process.env.DDSP_OUTPUT || 'audio/rendered');
 mkdirSync(OUT,{recursive:true});
 if(FEATURES.seconds!==25||FEATURES.frameRate!==FPS||FEATURES.f0_hz.length!==6250)
 	throw new Error('Invalid source audio feature window');

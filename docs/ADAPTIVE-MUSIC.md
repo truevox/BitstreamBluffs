@@ -367,3 +367,47 @@ The DDSP *software* is Apache-2.0, but the rights to distribute its
 pretrained checkpoints and outputs in a public commercial game still
 need verifying separately. Do not silently claim the audio is ready
 for publication. Marvin has not yet listened to the DDSP outputs.
+
+## Independent SPICE pitch pipeline and ACE-Step cover assessment (2026-11-15)
+
+**Marvin guidance:** existing underlying instruments are musically
+close enough that improving pitch data is a priority; also asked about
+ACE-Step covering the material. This is user planning guidance, NOT
+approval to overwrite V3 Vertigo organ or deploy new game audio.
+
+**Implemented in separate SPICE/V3 audition:** official Google
+SPICE TFJS neural pitch model ran on Maxi's **original isolated vocal
+waveform**, 16kHz, 25s, 32ms inference hop. 783 frames; 564 with
+confidence >=0.7. This was the *full* SPICE detector from Magenta's
+Tone Transfer pipeline, not the previous V3 F0 workaround. No changes
+to Demucs source masters. New confidence-aware SPICE F0 interpolated
+to 250Hz DDSP conditions with unchanged source loudness, four genuine
+neural DDSP targets re-rendered. Separate CT211 V3 sampled church organ
+and Candy saw retuned using SPICE F0 while preserving their 1,234
+original note timestamps and sampled instrument program identities.
+
+**Finding:** among 546 overlapping high-confidence voiced frames,
+median V3/SPICE absolute pitch disagreement ~27.5 cents, with 63
+>700-cent disagreements. This is an *independent-detector mismatch*
+and not conclusive proof that either F0 source is correct. It gives us
+a bounded, causally interpretable listening test: leave instruments
+mostly fixed, change source pitch estimates.
+
+New 12-selection, 14-audio-file mobile/Tailscale A/B lab:
+http://100.115.120.66:8181/tools/music/audition-spice/
+
+Reproducible research scripts in tools/music/ddsp-proof/.
+The private model/source audio and generated 25s test clips remain
+outside Git. Do not ship or merge neural outputs without commercial
+rights review and Marvin's listening approval. V3 organ untouched.
+
+**ACE-Step:** official ACE-Step 1.5 supports Cover mode but its maintainers
+confirm that regenerated covers can vary melody, unsuitable as an
+assumed sample-exact replacement for the game's original vocal stem.
+It could still produce a separate polished promotional interpretation.
+Local CT214 ACE-Step LXC was stopped, and its ext4 LV is flagged
+read-only (blkdev --getro = 1) so Proxmox cannot start it. A read-only
+e2fsck -n reported the filesystem clean. We did NOT modify LV flags,
+repair the volume, or disrupt current inference services. If we
+proceed with ACE-Step, fix and back up CT214 deliberately, or use an
+isolated new runtime after checking model weights / hardware.

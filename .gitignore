@@ -43,3 +43,5 @@ public/music/
 /public/music-audition-ddsp/
 /dist-music-audition-ddsp/
 *.pyc
+/public/music-audition-spice/
+/dist-music-audition-spice/
