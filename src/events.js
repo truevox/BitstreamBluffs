@@ -157,6 +157,7 @@ export const EVT = Object.freeze({
  * @property {string} seed         seed string used for terrain + glitch schedule.
  * @property {string} dailyRuleId  id of the daily patch rule in effect (see DailyPatch), e.g. 'tuckBoost'.
  * @property {number} startedAt    epoch ms.
+ * @property {boolean} [dailyOfficial] additive (decision 2): true only for the official Daily run, so the HUD can tell it from a typed daily-* practice run.
  */
 
 /**

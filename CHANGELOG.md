@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Marvin decisions 1/2/4/6 (official Daily, mask-scoped Daily bests, Head Start, ledger hash v2)
+## v2.7.0 - Marvin decisions 1/2/4/6: official Daily, mask-scoped Daily bests, Head Start, ledger hash v2 (2026-11-15)
 
 - **Official Daily vs practice (decision 2).** Only a run started from the **DAILY RUN** menu item is the official Daily. Its record carries `dailyOfficial: true`. A typed `daily-YYYY-MM-DD[@mask]` seed is a practice run:
   - It replays that date's rule and that date's mask, unless an `@mask` suffix is given. Before, a typed past date played today's rule (FAIRNESS-2).
@@ -19,7 +19,7 @@
   - It is still MODDED, never applies on the official Daily, and applies only when owned.
 - **Gate:** 4 new built-game checks: typed daily seed is practice, DAILY RUN is official, ledger v2 tamper rejection, and Head Start >= +15 % at 10 s. Expected counts 38 -> 42 (with boosts) and 27 -> 30.
 - **Known gap:** imported runs saved before this change have no `imported` marker. A legacy imported record on its date's real mask and rule can still hold a streak day.
-- **Not done here (needs `src/scenes/UIScene.js`, outside this change's files):** the in-run HUD still labels any run on today's daily seed `DAILY RUN`. The label text exists as `DailyPatch.dailyRunLabel(seed, official)`, and `RUN_START` now carries `dailyOfficial`.
+- **HUD:** the in-run rule line now reads `DAILY RUN` only for the official Daily, `DAILY PRACTICE <date>` for a typed `daily-*` seed, and `DAILY RULE` otherwise (`DailyPatch.hudRuleLabel`; `RUN_START` carries `dailyOfficial`, typed in events.js).
 
 ## v2.6.0 - biome treatment B1: Wards (Debumont, Garbage Dump Glacier, Underwater Mountain, Candy Cane Canyon) (2026-11-14)
 

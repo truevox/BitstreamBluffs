@@ -297,21 +297,24 @@ export class UIScene extends Phaser.Scene {
     this.theme.bind(() => this._paintPowerups());
   }
 
-  _buildSeedInfo(seed) {
+  _buildSeedInfo(seed, official) {
     if (this.seedText) {
       this.seedText.destroy();
       this.ruleText.destroy();
     }
     const info = DailyPatch.getDailyInfo();
     this.dailyRuleId = this.dailyRuleId || (info.rule && info.rule.id) || '';
-    const isDailySeed = String(seed || '') === info.seed;
+    // decision 2: before RUN_START arrives, mirror RunScene's rule (registry flag AND today's daily seed)
+    const isOfficial = typeof official === 'boolean'
+      ? official
+      : this.registry.get(REG.DAILY_OFFICIAL) === true && String(seed || '') === info.seed;
     this.seedText = this._t(GAME_WIDTH - 8, GAME_HEIGHT - 20, `SEED ${String(seed || '-').toUpperCase()}`, {
       color: 'text', anchor: 'right', outline: 'dark',
     });
     this.seedText.setAlpha(0.7);
     const rule = DailyPatch.getRuleById(this.dailyRuleId);
     const name = rule ? rule.name.toUpperCase() : idToLabel(this.dailyRuleId);
-    this.ruleText = this._t(GAME_WIDTH - 8, GAME_HEIGHT - 10, this.dailyRuleId ? `${isDailySeed ? 'DAILY RUN  ' : 'DAILY RULE  '}${name}` : '', {
+    this.ruleText = this._t(GAME_WIDTH - 8, GAME_HEIGHT - 10, this.dailyRuleId ? `${DailyPatch.hudRuleLabel(seed, isOfficial)}  ${name}` : '', {
       color: 'amber', anchor: 'right', outline: 'dark',
     });
     this.ruleText.setAlpha(0.85);
@@ -501,7 +504,7 @@ export class UIScene extends Phaser.Scene {
     this.tweens.resumeAll();
     if (p) {
       this.dailyRuleId = p.dailyRuleId || this.dailyRuleId;
-      this._buildSeedInfo(p.seed);
+      this._buildSeedInfo(p.seed, p.dailyOfficial === true);
     }
   }
 

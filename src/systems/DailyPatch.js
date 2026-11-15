@@ -187,6 +187,17 @@ export class DailyPatch {
    * @param {string} seed @param {boolean} official
    * @returns {string}
    */
+  /**
+   * Additive helper (decision 2, HUD): the in-run rule-line prefix. 'DAILY RUN' only for the official Daily,
+   * 'DAILY PRACTICE <date>' for any other daily-YYYY-MM-DD seed, 'DAILY RULE' for every other seed.
+   * @param {string|null|undefined} seed
+   * @param {boolean|undefined} official
+   * @returns {string}
+   */
+  static hudRuleLabel(seed, official) {
+    return DailyPatch.dailyRunLabel(seed, official) || 'DAILY RULE';
+  }
+
   static dailyRunLabel(seed, official) {
     const k = DailyPatch.dateKeyFromSeed(seed);
     if (!k) return '';
