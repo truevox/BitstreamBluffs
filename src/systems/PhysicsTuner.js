@@ -13,6 +13,7 @@
 import { PHYSICS, MAX_PHYSICS_STEP_MS } from '../constants.js';
 import { AIR_NEAR_MISS_BELOW_PX } from './TerrainGenerator.js';
 import { isWarded } from './Wards.js';
+import { glideFriction } from './BiomeEffects.js';
 
 /** Matter's internal base delta in ms (Body._baseDelta). */
 export const BASE_STEP_MS = 1000 / 60;
@@ -435,7 +436,7 @@ export class PhysicsTuner {
     }
 
     // B0 glide / stabilize power-ups (values already clamped by BiomeEffects at pickup).
-    if (ctx.glideFrictionMul > 0) frictionMul *= ctx.glideFrictionMul;
+    frictionMul = glideFriction(frictionMul, ctx.glideFrictionMul); // B3: the pure glide math (BiomeEffects)
     if (ctx.stabilizeBounceMul > 0) bounceMul *= ctx.stabilizeBounceMul;
 
     let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul;

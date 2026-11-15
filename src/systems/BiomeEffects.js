@@ -80,6 +80,18 @@ export function glideFrictionMul(m) {
   return clamp(Number.isFinite(m) ? m : GLIDE_DEFAULT_FRICTION_MUL, GLIDE_MIN_FRICTION_MUL, 1);
 }
 
+/**
+ * B3: the ground-friction multiplier with a glide applied: `frictionMul` x glideFrictionMul(glideMul). PhysicsTuner calls
+ * this (it scales groundResist and groundFriction). No glide (glideMul missing, <= 0 or 1) leaves frictionMul unchanged.
+ * @param {number} frictionMul the multiplier before the glide (daily rule x zones)
+ * @param {number} [glideMul] the active glide's frictionMul (TunerContext.glideFrictionMul)
+ * @returns {number}
+ */
+export function glideFriction(frictionMul, glideMul) {
+  if (!(glideMul > 0)) return frictionMul;
+  return frictionMul * glideFrictionMul(glideMul);
+}
+
 /** Largest landing tolerance a stabilize may add (deg). */
 export const STABILIZE_MAX_DEG = 30;
 
