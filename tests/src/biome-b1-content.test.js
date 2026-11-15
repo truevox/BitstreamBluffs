@@ -149,11 +149,9 @@ describe('Wards.js B1 extension: optional ward speedFactor', () => {
 });
 
 describe('B1 content: measured presence in biome chunks (slot rule, spec §4 amendment)', () => {
-  // Spec target: 40-60 % of biome chunks. The §4 chance cap (0.5) and the base `slow`-before-a-descent rule bound it far
-  // lower for these defs (see the B1 report: a spec conflict). Measured on 8 seeds x 300 chunks: share of ELIGIBLE chunks
-  // (ground: not bridge, not gen-jump; air: gen-jump) = groomerCat 16.3 %, seagullDive 23.7 %, seaweedTangle 12.6 %,
-  // chocolateRiver 10.5 %; every ground placement is a slot-rule replacement (0 free slots). The floors (about half, for
-  // 4-seed variance) pin it against regressions; without the slot rule the three slow hazards place ~0.
+  // Long-range floors (8 seeds x 300 chunks). After the presence amendment the measured shares of ELIGIBLE chunks are
+  // groomerCat 42.5 %, seagullDive 33.5 %, seaweedTangle 51.2 %, chocolateRiver 27.3 %; the early-terrain target and its
+  // open items live in biome-b1-presence.test.js. These floors stay as a second, long-range regression pin.
   const ROWS = [
     [1, 'debumont', 'groomerCat', 'mapleWax', 0.08],
     [2, 'garbage-dump-glacier', 'seagullDive', 'slickWaxSpray', 0.12],

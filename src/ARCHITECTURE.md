@@ -906,24 +906,39 @@ def below carries a `biome` field, so the B0 constructor filter keeps it out of 
 | Debumont (1) | `groomerCat` (`groomer-cat.json`), ground 24x20, shape `groomer`, amber | `slow` 0.7 x 900 ms | `mapleWax` (`maple-wax.json`), shape `maple` | `speedBoost` 1.2 x 2 s |
 | Garbage Dump Glacier (2) | `seagullDive` (`seagull-dive.json`), air 40x24 in jump arcs, shape `seagull`, `danger`, >= 1000 m | `crash` | `slickWaxSpray` (`slick-wax-spray.json`), shape `waxSpray` | `ward` mods `['stickyPatch']` 4 s + `speedFactor` 1.1 |
 | Underwater Mountain (8) | `seaweedTangle` (`seaweed-tangle.json`), ground 22x30, shape `seaweed`, lime | `slow` 0.6 x 1.2 s | `aquaLungBubble` (`aqua-lung-bubble.json`), shape `bubble` | `ward` mods `['slowMotion']` 4 s |
-| Candy Cane Canyon (64) | `chocolateRiver` (`chocolate-river.json`), ground strip 36x9, shape `chocoRiver`, amber | `slow` 0.5 x 1.5 s | `sweetToothCoating` (`sweet-tooth-coating.json`), shape `candyCoat` | `ward` effects `['slow']` 5 s (wards off the Chocolate River) |
+| Candy Cane Canyon (64) | `chocolateRiver` (`chocolate-river.json`), ground strip 24x8, shape `chocoRiver`, amber | `slow` 0.5 x 1.5 s | `sweetToothCoating` (`sweet-tooth-coating.json`), shape `candyCoat` | `ward` effects `['slow']` 5 s (wards off the Chocolate River) |
 
-Hazard `spawn.baseChance` 0.5 (the §4 cap), power-up 0.4. Groomer Cat is static; motion kinds land in B3.
+Hazard `spawn.baseChance`: groomerCat 0.5, seaweedTangle 0.65, seagullDive and chocolateRiver 0.75 (the amended cap);
+power-ups 0.4. Groomer Cat is static; motion kinds land in B3.
 
 **Slot rule (`TerrainGenerator._placeBiomeSpawns`, spec §4 amendment).** When the ground hazard slot fires and the free
 scan finds no slot, `_replaceBiomeGround` swaps ONE base ground hazard of the chunk for the biome def, in place (same `x`,
 `y`, `rotationDeg`). Candidates are base ground defs (`hazardList`; never a biome or air def) whose box grown by
 `BIOME_REPLACE_SLACK_PX` (8) in w and h holds the biome box, and whose spot passes every biome ground rule with the biome
 def (`_biomeGroundAt`, shared with the free scan; the spacing check skips the candidate itself, the shard check uses the
-biome box, `slow` still needs a descent ahead). The pick is `cands[floor(h4 * n)]`, where `h4` is the slot's 5th draw (B0
+biome box, a `slow` keeps its slope rule below). The pick is `cands[floor(h4 * n)]`, where `h4` is the slot's 5th draw (B0
 drew and discarded it), so `BIOME_SLOT_DRAWS` stays 5 and no other stream moves. Air biome hazards are not replaced.
 With no biome defs, output at every mask is unchanged (digests pinned at 00978f6: `tests/src/biome-slot-rule.test.js`).
 
-Measured presence (8 seeds x 300 chunks; share of eligible chunks, ground = not bridge / not `gen-jump`, air =
-`gen-jump`): groomerCat 16.3 %, seagullDive 23.7 %, seaweedTangle 12.6 %, chocolateRiver 10.5 %. Every ground placement is
-a replacement (the free scan places none of these `slow` defs). The spec's 40-60 % target is not reachable under the 0.5
-chance cap plus the base `slow`-before-a-descent rule; a chance-0.5 `blind` fixture (no descent rule) reaches 43.8 %.
-Power-ups land in 31-35 % of biome chunks.
+**Presence amendment (spec author, 2026-11-14).** The first B1 cut placed biome hazards in about 7 % of early biome chunks:
+too rare to be felt. Amended rules, all in `_biomeGroundAt` / `_placeBiomeSpawns`:
+* (a) a biome ground hazard keeps `BIOME_HAZARD_CLEARANCE_PX` (240) from any other hazard, not `HAZARD_MIN_SPACING_PX`
+  (480). `BIOME_EDGE_MARGIN_PX` (240) stays, so hazards across a chunk border are still >= 480 apart and base pairs never
+  change.
+* (b) the descent-ahead rule (`_descentAhead`, anti-stall) binds a biome `slow` only when its `speedFactor` is below
+  `BIOME_GENTLE_SLOW_FACTOR` (0.6): Chocolate River. A gentler slow (Groomer 0.7, Seaweed 0.6) may sit on flat or downhill
+  ground but never before a climb: `_noClimbAhead` rejects any rising segment in the `BIOME_EDGE_MARGIN_PX` ahead (always
+  inside the chunk).
+* (c) the biome HAZARD slot's chance cap is `BIOME_HAZARD_MAX_CHANCE` (0.75); power-ups keep `BIOME_SPAWN_MAX_CHANCE` 0.5.
+* (d) the replace rule stays the fallback.
+
+Measured presence, share of the biome's chunks eligible for the placement kind (ground = not bridge / not `gen-jump`, air
+= `gen-jump`), chunks 0-44 at a single biome bit: groomerCat 44.4 % (8 seeds) / 42.9 % (32 seeds), seagullDive 35.3 % /
+42.9 %, seaweedTangle 35.7 % / 47.8 %, chocolateRiver 24.0 % / 20.9 %. The lead's target is 35-55 % and >= 1 per 2 km on every
+seed. Open items: the river stays below the band under rule (b) (36x9 reached 15 %); the seagull (air slot, not covered by
+the amendment, often 2-3 biome jump chunks per seed) misses the per-seed rule on 3 of 6 seeds with biome terrain. No-stall
+check: a point mass entering any biome slow placement at 300 px/s keeps >= 128 px/s for the next 2 s. Power-ups land in
+31-35 % of biome chunks.
 
 **Effects (all existing paths except one additive field).**
 * `Wards.js`: a ward may carry `speedFactor` (clamped to [1, `WARD_MAX_SPEED_FACTOR` 1.2], `wardSpeedFactor`), lasting as
@@ -939,10 +954,14 @@ Power-ups land in 31-35 % of biome chunks.
 * `BiomeEffects.HAZARD_SHAPES` / `POWERUP_SHAPES` gain the 8 new shapeKeys; `Hazard.js` (`_groomer`, `_seaweed`,
   `_chocoRiver`, `_seagull` drawn like the drone, without corner brackets) and `PowerUp.js` draw each one.
 
-**Tests and gates.** `tests/src/biome-slot-rule.test.js`, `tests/src/biome-b1-content.test.js` (loader / schema, spec
+**Tests and gates.** `tests/src/biome-b1-presence.test.js` (presence on the 8 + 32 seeds, rules (a) and (b), no-stall),
+`tests/src/biome-slot-rule.test.js` (now also a spy test that the pick is `cands[floor(r * n)]`),
+`tests/src/biome-b1-content.test.js` (loader / schema, spec
 values, ward pairing, measured presence floors), `tests/src/biome-b1-effects.test.js` (shipped defs through the shipped
 RunScene / UIScene / Hazard / PowerUp). Tests that listed ALL content now list base defs (biome defs separately):
 `data.test.js`, `terrain.test.js` "all hazard types", `_biomeFixtures.withBiomeFixtures` (base content + fixtures).
-`biome-spawns.test.js`'s last test states the amended contract (at most one base hazard swapped in place). The built-game
+`biome-spawns.test.js`'s last test states the amended contract (at most one base hazard swapped in place); after the presence
+amendment its spacing test reads biome pairs >= 240 / base pairs >= 480, its cap test 0.75 (hazards) / 0.5 (power-ups), and
+its fixed-draws test allows a power-up to move to its freed first position. The built-game
 gate has 8 B1 checks, one hazard and one power-up per biome, each on a real `seed@bit` run with entities built by
 `RunScene.takeChunk` from that run's terrain (expected counts 30 -> 38 with boosts, 19 -> 27).
