@@ -1231,7 +1231,7 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
   (p10 0.67 s) before the sled reached it, the hop must be pressed ~0.38 s out, and every death is a hazard death. The only
   earlier warning was the first-run `SPACE HOP` hint. The air hazard already had `entities/AirTelegraph.js`.
 * **`systems/HazardTelegraph.js`** (pure; no Phaser, clock or randomness):
-  * `GROUND_WARN` (frozen): `leadS` 2.0, `minPx` 700, `maxPx` 1600 (inside the 3 generated screens; 1.33 s at 1200 px/s),
+  * `GROUND_WARN` (frozen): `leadS` 2.0, `minPx` 700, `maxPx` 1600 (1.33 s at 1200 px/s; terrain exists 3 screens = 1440 px ahead, so faster than ~720 px/s a hazard is announced when its chunk is generated),
     `hopLeadMs` 380 / `hopWindowMs` 250 / `minVxPxS` 60 (the hop oracle's numbers, `tools/sim/browser.js`), `maxMarks` 6,
     `warnGapMs` 220, `clearMarginPx` 60. UI timing, so it lives here and not in `TUNING`.
   * `hazardResponse(def)` -> `'hop'` (crash, or no `onHit`) | `'brace'` (any other effect) | `null` (air: not ours).

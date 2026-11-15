@@ -11,8 +11,9 @@
 
 /**
  * Telegraph tuning. Kept here (not in PhysicsTuner.TUNING): it is UI timing, not physics.
- *  - leadS / minPx / maxPx: a hazard is announced when it is within speed x leadS px, clamped. maxPx stays inside the
- *    generated terrain (TERRAIN.bufferAheadScreens = 3 screens = 2880 px) and gives 1.33 s at 1200 px/s.
+ *  - leadS / minPx / maxPx: a hazard is announced when it is within speed x leadS px, clamped. maxPx gives 1.33 s at
+ *    1200 px/s. Terrain is generated TERRAIN.bufferAheadScreens = 3 screens = 1440 px ahead (to the end of that chunk),
+ *    so above ~720 px/s a hazard is announced as soon as its chunk exists; measured minimum lead 1.67 s.
  *  - hopLeadMs / hopWindowMs / minVxPxS: the sim hop oracle's rule (tools/sim/browser.js policies.hop): hop when the box
  *    centre is hopLeadMs away, down to hopWindowMs later.
  *  - maxMarks: nearest N hazards are planned (late-game density is ~4.5 ground hazards per maxPx).

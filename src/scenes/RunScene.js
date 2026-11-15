@@ -54,6 +54,7 @@ import { BestMarker } from '../entities/BestMarker.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
 import { planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
+import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 
@@ -83,13 +84,7 @@ const FLIP_AIR_MS = 250;
 const BOOST_HINT_MS = 2200;
 /** The tuck hint (an advanced technique) waits for this much run time and for the first landing. */
 const TUCK_HINT_MIN_RUN_MS = 12000;
-/**
- * Second zoom stage: TUNING.zoomMin is reached at TUNING.zoomSpeedHi (600 px/s); past that the camera keeps pulling out to
- * ZOOM_FAR_MIN at ZOOM_FAR_SPEED_HI. Measured (tools/sim/shots.mjs zoom): at 850+ px/s only 0.33-0.45 s of terrain was visible ahead
- * of the sled, too little to see a ground hazard coming; the clamp in updateCamera already allows 0.6.
- */
-const ZOOM_FAR_MIN = 0.62;
-const ZOOM_FAR_SPEED_HI = 1200;
+/** The speed -> zoom curve (three stages, floor 0.45) lives in systems/CameraZoom.js since the readable-chaos pass. */
 /** Extra look-ahead (px, on top of TUNING.lookAheadMaxPx) that ramps in between 600 and 1000 px/s; the follow lag eats the base look-ahead at speed. */
 const LOOK_FAR_EXTRA_PX = 90;
 /** The rider is never allowed closer than this many screen px to the left edge. */
@@ -1684,11 +1679,10 @@ export class RunScene extends Phaser.Scene {
 
     // speed zoom: 1.0 at rest -> zoomMin at zoomSpeedHi, smoothed, with a brief extra pull-out on boosts. Stepped to 0.005
     // so the vector terrain does not shimmer from continuous sub-pixel scale changes.
-    const zNear = 1 - (1 - TUNING.zoomMin) * smooth01((s.speed - TUNING.zoomSpeedLo) / (TUNING.zoomSpeedHi - TUNING.zoomSpeedLo));
-    const zt = zNear - (TUNING.zoomMin - ZOOM_FAR_MIN) * smooth01((s.speed - TUNING.zoomSpeedHi) / (ZOOM_FAR_SPEED_HI - TUNING.zoomSpeedHi));
+    const zt = speedZoom(s.speed);
     this._zoom += (zt - this._zoom) * (1 - Math.exp((-TUNING.zoomLerp * dt) / 1000));
     this._zoomKick = Math.max(0, this._zoomKick - dt / 260 * 0.05);
-    const z = Math.round(clamp(this._zoom - this._zoomKick, 0.6, 1.2) * 200) / 200;
+    const z = Math.round(clamp(this._zoom - this._zoomKick, ZOOM_FLOOR, 1.2) * 200) / 200;
     if (z !== cam.zoom) {
       cam.setZoom(z);
       this.applyZoomCompensation(z);
