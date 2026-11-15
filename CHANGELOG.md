@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - biome treatment B2: Sight (Crystal Cavern, Vertigo Vents)
+## v2.9.0 - biome treatment B2: Sight (Crystal Cavern, Vertigo Vents) (2026-11-15)
 
 - **Crystal Cavern:** new ground hazard **Shatter Wall**. A hit flashes the screen and dims it for 1.2 s (40 % visibility, never below the 35 % floor). It does not crash, and the rider and terrain line stay dimly visible. New pickup **Crystal Clear Goggles**: a 6 s ward against `blind` and `scramble`. It stops a blind or scramble that is already acting, and the base Garbage Data Vent's scramble too.
 - **Vertigo Vents:** new air hazard **Ash Cloud**, the same blind. It sits in a generated jump, above the no-hop arc, like Seagull Dive. New pickup **Heat Shield**: the existing shield, 1 charge, as a biome-only def.
