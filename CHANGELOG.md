@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased - decision 3: biome unlocked / encountered / completed
+
+- **Three separate biome facts (Marvin decision 3).** *Unlocked* is the existing Sync Level unlock. *Encountered* means a run's sled actually reached a sector of that biome. *Completed* means a run rode one of that biome's sectors from start to end (500 m) and its run-ending crash was not inside that sector. A crash a Hashed Backup absorbs does not void completion.
+- **Detection is pure** (`src/systems/BiomeDiscovery.js`, `detectBiomeVisits`). It uses the generator's own `biomeForSector` and sector rule, from the run's seed, mask, furthest x and crash x.
+- **RunScene** computes the visits at run end and sends them on `RUN_END` as `biomeVisits`, beside the record. The RunRecord, its ledger hash and `STORAGE.saveVersion` do not change.
+- **Profile:** `bb.profile` gains `biomeProgress: {encountered, completed}`. The change is additive (`v` stays 1), so old profiles load with empty sets. The sanitizer keeps known biome ids only, and a completed biome is always encountered. A replayed run records nothing.
+- **Achievements (ACH-3):** `biomesDiscovered` is now the encountered count, so Explorer, Cartographer and Every Mountain can unlock. Their rewards (trail-hue-aurora, CARTOGRAPHER, OMNISCIENT) are granted in the same credit, in canonical order, together when several are crossed at once (decision 9).
+- **Achievements grid (ACH-6):** biome rows show encountered / target (for example 3/5), not 2/2, 5/5 and 11/11 for everyone.
+- **Profile view:** unlocked biome rows read `NAME NEW` (unlocked, never entered), `NAME SEEN` (encountered) or `NAME DONE` (completed), each in its own colour. Locked biomes stay listed with `LVL n`, plus `SEEN` / `DONE` when a Daily took the player there before the unlock. A new line reads `BIOMES SEEN n/11 DONE m/11`. Checked in the built game at 960x540.
+- **No backfill.** Stored runs cannot rebuild encounters exactly: `distanceM` is floored and the spawn is 44 px in, so one distance per sector boundary is ambiguous; the first-time backfill also runs only on profiles with no runs, and absorbed crashes are not stored. Encounters count from this version on.
+- **Gate:** 2 new built-game checks (a `d3gate0@1` run that enters Debumont records it and shows DEBUMONT SEEN; the second encountered biome unlocks Explorer with its trail and the grid shows 2/2). Expected counts 43 -> 45 (with boosts) and 31 -> 33.
+
 ## v2.7.1 - Micro Mountain dew swell is real (audit T2) (2026-11-15)
 
 - **Fix (audit T2):** the dew swell is now IN the ground. Before, only `heightAt` added it, so the collider, the drawn edge and `slopeDegAt` stayed flat and the sled never felt it (in the built game the sled tracked the raw ground, sd 0.03 px, not the swell, sd 18 px). The generator now displaces the chunk points inside each dewSwell zone, right after zone placement, so hazards, pads, power-ups and shards sit on the swelled ground. `heightAt` is the plain polyline again; it no longer adds the swell twice or steps at a zone end.
