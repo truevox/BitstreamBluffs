@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased - biome treatment B3: Motion (Pyramid Peak, Micro Mountain, Steampunk Slopes)
+
+- **Pyramid Peak:** new ground hazard **Rolling Boulder** (crash, `danger`). It waits on the ground until the sled is 340 px behind it (it is on screen by then), then rolls toward the sled at 140 px/s along the ground for at most 160 px and rests. New pickup **Sandrunner Skis**: a glide, ground friction x0.7 for 4 s.
+- **Micro Mountain:** new ground hazard **Dew Drop** (crash, `danger`): the same roll, smaller and slower (110 px/s, 140 px). It follows the real ground, the dew swell included (the same surface the sled rides). New pickup **Royal Jelly Wax**: the same glide as the Skis.
+- **Steampunk Slopes:** new ground hazard **Gear Gate** (`danger`). It is open for 900 ms and closed for 500 ms of every 1.4 s cycle; each gate's phase is its own seeded draw. It crashes the sled only while closed; an open gate is passed. A hop clears it like any ground hazard. New pickup **Clockwork Treads**: a 4 s ward against the conveyor belt.
+- **Motion is deterministic:** the new pure module `systems/HazardMotion.js` (`rollStep`, `rollOffsetAt`, `gateOpenAt`, and `rollPredictX` / `gateNextChangeMs` for a later telegraph). A roll's position is a pure function of the run time since the sled reached its start line, so the frame rate never moves it. The glide math is the pure `BiomeEffects.glideFriction`, which PhysicsTuner now calls.
+- **Fairness:** a rolling hazard's whole track keeps the clearances of its spawn point (chunk edge margins, lips, gaps, 240 px from other hazards, 90 px from power-ups). A gate is never closed longer than 500 ms, less than the time it is on screen before the sled reaches it at 1.2x the expected speed (560 ms at the top speed). Hop window over a rolling hazard at the expected speed: 611-657 ms.
+- **Presence** (chunks 0-44, share of eligible biome chunks, 8 / 32 seeds): Rolling Boulder 41.9 % / 35.4 % (chance 0.45), Gear Gate 55.6 % / 39.5 % (chance 0.45), Dew Drop 44.4 % / 37.2 % (chance 0.45).
+- **HUD:** SANDRUNNER SKIS, JELLY WAX and CLOCKWORK TREADS chips with their own icons.
+- **Gate:** 6 new built-game checks (each moving hazard moves and crashes the real sled, each glide keeps the real sled faster, the Treads cut a real conveyor push). Expected counts 49 -> 55 (with boosts) and 37 -> 43.
+- **Sim** (B0 baseline, ±15 %): hop mask 4 survival 18 -> 17/48 (-5.6 %), distance -2.6 %, speed -0.1 %; mask 256 14 -> 15/48 (+7.1 %), +3.7 %, -0.5 %; mask 512 20 -> 17/48 (-15.0 %, exactly at the line), -1.5 %, -0.4 %. Micro was already at 17/48 on v2.9.0 (T2): against a fresh v2.9.0 run B3 leaves Micro hop survival unchanged (17 -> 17), distance +1.6 %. Flip distance +1.4 % / -6.8 % / -7.5 %, speed within +0.5 % (flip survival is exempt).
+- Mask 0 is unchanged (golden digests untouched). The T2 isolation digest now also leaves B3-tagged defs out.
+
 ## v2.9.0 - biome treatment B2: Sight (Crystal Cavern, Vertigo Vents) (2026-11-15)
 
 - **Crystal Cavern:** new ground hazard **Shatter Wall**. A hit flashes the screen and dims it for 1.2 s (40 % visibility, never below the 35 % floor). It does not crash, and the rider and terrain line stay dimly visible. New pickup **Crystal Clear Goggles**: a 6 s ward against `blind` and `scramble`. It stops a blind or scramble that is already acting, and the base Garbage Data Vent's scramble too.

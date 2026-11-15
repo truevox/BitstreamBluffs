@@ -1138,3 +1138,83 @@ Changed pins: `data.test.js` lists the 6 + 6 biome defs; `biome-b1-content.test.
 total is pinned in the B2 file); `micro-swell-isolation.test.js` leaves B2-tagged defs out of its digest (B2 content is
 meant to change masks 16 and 1024; nothing else moved). The built-game gate has 4 B2 checks on real `b2crystal13@16` and
 `b2vertigo56@1024` runs (expected counts 45 -> 49 with boosts, 33 -> 37).
+
+## Addendum: biome full treatment, B3 "Motion" (content + moving hazards + roll track rule; additive)
+
+B3 ships Pyramid Peak's, Steampunk Slopes' and Micro Mountain's hazard and power-up (spec §4) and the two motion kinds
+(`HazardDef.motion`, spec §5). Mask 0 is byte-identical (golden `shape` / `full` / `complete` unchanged): every def below
+carries a `biome` field.
+
+| Biome (bit) | Hazard (file) | Hazard | Power-up (file) | Power-up effect |
+|---|---|---|---|---|
+| Pyramid Peak (4) | `rollingBoulder` (`rolling-boulder.json`), ground 22x22, shape `boulder`, `danger`, chance 0.45 | `crash`; motion `roll` 140 px/s, range 160 px, dir -1 | `sandrunnerSkis` (`sandrunner-skis.json`), shape `skis`, amber, chance 0.4 | `glide` frictionMul 0.7, 4 s |
+| Steampunk Slopes (256) | `gearGate` (`gear-gate.json`), ground 20x28, shape `gearGate`, `danger`, chance 0.45 | `crash` only while closed; motion `gate` period 1400 ms, open 900 ms | `clockworkTreads` (`clockwork-treads.json`), shape `treads`, cyan, chance 0.4 | `ward` mods `['conveyorBelt']` 4 s |
+| Micro Mountain (512) | `dewDrop` (`dew-drop.json`), ground 18x16, shape `dewDrop`, `danger`, chance 0.45 | `crash`; motion `roll` 110 px/s, range 140 px, dir -1 | `royalJellyWax` (`royal-jelly-wax.json`), shape `jellyWax`, amber, chance 0.4 | `glide` frictionMul 0.7, 4 s (shared kind) |
+
+**New data fields (optional, additive).** `HazardDef.motion`: `{kind: 'roll', speedPxS, rangePx?, dir?}` or
+`{kind: 'gate', periodMs, openMs}`. `HazardSpawn.phase` (0..1): only on a Gear Gate spawn. The crash JSONs set
+`colorKey: 'danger'` (RunScene's palette switch reads `def.colorKey` directly).
+
+**`systems/HazardMotion.js` (pure; no Phaser, Math.random or Date).**
+* Roll: `rollParams(motion)` (speed <= `ROLL_MAX_SPEED_PX_S` 200, range <= `ROLL_MAX_RANGE_PX` 200, `dir` -1 toward the
+  sled / +1 downhill away), `rollSweep(motion)` (x span relative to the spawn: `{lo, hi}`), `rollOffsetAt(motion, msActive)`
+  (signed, speed x time, clamped to the range), `emptyRollState()`, `rollStep(state, motion, x0, sledX, tMs)` (starts on the
+  first step with `sledX >= x0 - ROLL_ACTIVATE_PX` (340); afterwards offset = rollOffsetAt(tMs - activeAtMs), so the frame
+  rate never changes the position), `rollPredictX(state, motion, x0, tMs)`.
+* Gate: `gateTiming(motion)` (open >= `GATE_MIN_OPEN_MS` 400, closed in [`GATE_MIN_CLOSED_MS` 100, `GATE_MAX_CLOSED_MS` 500]),
+  `gateOpenAt(motion, phase, tMs)` (each cycle starts open), `gateNextChangeMs(motion, phase, tMs)`.
+* `BiomeEffects.glideFriction(frictionMul, glideMul)`: the one place a glide changes friction; `PhysicsTuner.getEffective`
+  calls it (was an inline multiply). Same numbers as before.
+
+**Entity (`Hazard.js`).** A def with a `roll` or `gate` motion keeps every usual field and draws through the normal
+`Hazard.draw` switch (corner brackets included). `update(timeMs, camLeft, camRight)` (signature unchanged) first calls
+`stepMotion(timeMs, sledX?)` every frame, on or off camera, BEFORE its visibility early return:
+* roll: `rollStep` with `scene.sled.x`; the sensor body (`Body.setPosition` / `setAngle`), the drawing and `cx` / `cy`
+  move to `x0 + offset` on `scene.heightFn` (the generator's `heightAt`, i.e. the collider polyline, dew swell included) at
+  `terrain.slopeDegAt`. `rolling`, `rollDir` and `spin` drive the drawing. `cx` tracks the moving box, so the hop hint,
+  near-miss and the sim's hop policy see the real position.
+* gate: `open` follows `gateOpenAt(motion, spawn.phase, run time)`; a flip redraws at once.
+* New methods: `stepMotion`, `isPassable(tMs)` (true only for an open gate), and for a telegraph `predictX(tMs)` and
+  `gateNextChangeMs(tMs)`. A telegraph needs, for a roll, `predictX` (it waits at `x0` until the sled is 340 px behind it,
+  then moves toward the sled), and for a gate, `isPassable` / `gateNextChangeMs` at the sled's arrival time.
+
+**RunScene.** One line at the top of `onHazard`: `if (h.isPassable && h.isPassable(this.runTimeMs)) return;` before
+`h.hit` is set, so an open gate is passed and stays armed; `collisionactive` re-queues the contact, so a gate that closes
+on an overlapping sled crashes it.
+
+**Generator (`TerrainGenerator`).**
+* Roll track rule (`_rollTrackClear`, called from `_biomeGroundAt`, so the slot-rule replacement inherits it): the whole
+  `[x + sweep.lo, x + sweep.hi]` stays inside `BIOME_EDGE_MARGIN_PX`, off lip windows `[l.x - 40, zoneEnd]` and gaps +/- 96,
+  `BIOME_HAZARD_CLEARANCE_PX` from every other hazard and 90 px from every power-up. The biome power-up slot keeps 90 px
+  from a rolling hazard's whole track (`_trackDist`; equals `|q.x - x|` for every def without motion, so masks without a
+  roll def are unchanged). A def with no x motion passes trivially.
+* Gate phase: `biomeSpawn(def, x, y, rot, h3)` adds `phase` = the slot's 4th pre-drawn number (h3, drawn and unused by
+  ground slots before B3). `BIOME_SLOT_DRAWS` stays 5; no stream moves.
+
+**Fairness numbers (tests/src/biome-b3-presence.test.js).** Roll: starts with the sled 340 px away (B2's view probe:
+>= 348 px of ground on screen ahead at any speed >= 100 px/s; the gate check confirms the hazard is inside `_view` at the
+start); its range (160 / 140 px) is shorter than 340 px minus its width, so a sled stopped at the start line is never
+reached. Hop window (sled underside above the crash box minus the closing pass) at the expected speed: Rolling Boulder
+611-626 ms, Dew Drop 641-657 ms (1000-4000 m). Gate: closed spell 500 ms vs 560-878 ms on screen before reach at 1.2x the
+expected speed (500-10000 m); open 900 ms vs a 71-116 ms crossing. A closed gate is also hop-clearable (28 px box, crash
+box 22 px, hop apex ~72 px), like every ground hazard.
+
+**HUD (`UIScene`).** `POWERUP_INFO` rows SANDRUNNER SKIS (amber), JELLY WAX (amber), CLOCKWORK TREADS (cyan) with their own
+`_drawIcon` glyphs. `BiomeEffects.HAZARD_SHAPES` gains `boulder`, `dewDrop`, `gearGate`; `POWERUP_SHAPES` gains `skis`,
+`jellyWax`, `treads`. Crash hazards end the run, so no `HAZARD_LABEL` rows.
+
+**Tests and gates.** `tests/src/biome-b3-motion.test.js` (pure motion and glide math), `tests/src/biome-b3-content.test.js`
+(loader / schema, spec values, motion blocks, ward and glide pairing), `tests/src/biome-b3-effects.test.js` (shipped defs
+through the shipped Hazard motion, RunScene dispatch, UIScene and drawing; the Dew Drop rides the real dew swell
+polyline), `tests/src/biome-b3-presence.test.js` (phase from the draw, roll track rule, presence, fairness numbers,
+determinism). Changed pins (none re-pinned): `data.test.js` lists the 9 + 9 biome defs; `biome-b2-content.test.js` counts
+only the B1 + B2 biomes' defs; `micro-swell-isolation.test.js` leaves B3-tagged defs out. The built-game gate has 6 B3
+checks on real `b3pyramid54@4`, `b3steam63@256` and `b3micro26@512` runs (expected counts 49 -> 55 with boosts, 37 -> 43).
+
+**Sim (B0 baseline `biomes-b0.json`, +/-15 %, git archive of f9f3f91).** Hop (48 seeds): mask 4 survival 18 -> 17 (-5.6 %),
+distance -2.6 %, speed -0.1 %; mask 256 14 -> 15 (+7.1 %), +3.7 %, -0.5 %; mask 512 20 -> 17 (-15.0 %, at the line),
+-1.5 %, -0.4 %. Mask 512 was already 17/48 (-15.0 %) on a fresh v2.9.0 run (T2 moved it): against v2.9.0, B3 leaves Micro
+hop survival unchanged (17 -> 17), distance +1.6 %, speed +0.1 %. Flip distance +1.4 % / -6.8 % / -7.5 %, speed +0.5 % /
++0.1 % / +0.3 % (flip survival exempt). Crashes on the new hazards per 48 hop runs: Rolling Boulder 2, Gear Gate 2, Dew
+Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), hence 0.45.
+
