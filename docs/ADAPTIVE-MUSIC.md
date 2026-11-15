@@ -253,3 +253,64 @@ not installed in game, not a raw-detector upgrade:**
 
 V3 is a limited two-instrument pitch-treatment experiment, not a
 twelve-instrument accepted art revision or production audio change.
+
+## V4 architecture consultation and first controlled challenger (2026-11-15)
+
+**Owner-origin suggestion (Marvin):** after V3 improvements, consider a
+**generative conversion** of singing into instrument audio instead of
+continuing to fix a MIDI-like note-trigger pipeline. Preserve exact singing
+rhythm, phrasing, melody and deliberate large glides, without unwanted tiny
+slides. This is a suggestion to research, NOT approval of new dependencies,
+commercial model licenses or use of a neural model in the game.
+
+**Astra Friday consulted before V4 implementation:** read-only Kanban
+bitstream-progression task t_6fa9e952. Astra independently recommended:
+1. Stop using discrete notes as the master performance representation; use
+   continuous F0/voicing/amplitude/attack curves with distinct articulation
+   layers. Keep SF2 as a separate instrument-specific alternative.
+2. Fix SF2 false reattacks from pitch changes, wrong held sample through
+   rests, 10ms block onset scheduling, silence/pre-roll and clipping/range
+   assumptions. These are static code findings and must be validated.
+3. Build a manually checked 25s vocal-performance reference; distinguish
+   pitch detector failure from synthesis failure before full song conversion.
+4. Candidate YIN/harmonic analysis + confidence/continuity and 5ms
+   acoustic onset extraction, NOT semitone-state quantization.
+5. Explore DDSP as a neural timbre-transfer challenger only after dependency
+   and checkpoint license approval; DDSP still depends on accurate F0.
+   RAVE/diffusion are potential research lanes but do not yet warrant
+   swapping our deterministic architecture, especially given model/domain
+   and commercial licensing concerns. No source audio was actually
+   listened to by Astra, only code and sources were reviewed.
+
+**V4 engineering proof (agent-authored, not musically approved):**
+- tools/music/continuous_challenger_v4.py: source-guided continuous
+  oscillator-bank synthesis for Candy's sawtooth and Vertigo's organ,
+  with phase integration and band-limited partials; no note-on/off MIDI
+  messages, no semitone sample selection and no 70ms onset exclusion.
+  Voice amplitude and separate short attack exciter come from 5ms
+  source-envelope/spectral evidence. The V3 pitch stabilizer output is
+  deliberately reused as the pitch control: this is NOT yet a repaired
+  raw pitch detector nor a neural generative model.
+- First 25s rendered to CT211 /root/bitstream-maxi/mountain-voice-gallery-v4/.
+  V1/V2/V3 renderings and all six FLAC masters remain untouched.
+- tools/music/audition-v4/: new 2-voice 4-way V1->V2->V3->V4
+  same-song-position A/B interface, independent instrumental backing,
+  original Maxi vocal reference and feedback UI.
+  Private 10 Ogg files are ignored under public/music-audition-v4/;
+  build script also publishes to current CT223 tailnet-only lab server.
+  http://100.115.120.66:8181/tools/music/audition-v4/
+- test_continuous_challenger_v4.py: confirms true acoustically separate
+  40ms-apart attacks can be found on 5ms frames, continuous synth
+  renders non-silent valid sound without discrete note events, and
+  impulse exciters do not reset sustained oscillator phases (3/3 pass).
+  Browser A/B smoke checks all four revisions, source reference and
+  25-second media synchronization (no JS/network errors).
+
+**Important limitations:** V4 currently retains V3 flawed raw F0
+(including occasional octave errors), uses a simple source RMS energy
+gate rather than separately validated lead-voicing confidence, and
+does not include a manually checked oracle or an independently trained
+neural instrument-transfer model. V4 should be called an architecture
+challenger rather than a complete upgraded transcription pipeline.
+The game still uses V1 home synthesized voice only. No V4 voice
+package is integrated with gameplay, nor is any new dependency installed.
