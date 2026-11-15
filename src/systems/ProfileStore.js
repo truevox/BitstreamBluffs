@@ -335,6 +335,9 @@ export function creditRun(profile, record, levels, extra = {}) {
   // Decision 3: what RunScene saw this run (RUN_END.biomeVisits, BiomeDiscovery.detectBiomeVisits), merged
   // as a union. A new object, so the caller's profile is never written through.
   next.biomeProgress = mergeBiomeVisits(base.biomeProgress, ex.biomeVisits);
+  // Micro glow-up: a biome grant (the Neon Sled Drone) is granted by the credit that first completes its biome,
+  // through the same grant path achievement rewards use, before achievements are evaluated.
+  const grants = grantBiomeCosmetics(base, next);
   if (record.tricks && typeof record.tricks === 'object') {
     for (const [k, v] of Object.entries(record.tricks)) {
       if (typeof k === 'string' && k && isNum(v) && v > 0) L.tricks[k] = (L.tricks[k] || 0) + Math.round(v);
@@ -364,9 +367,37 @@ export function creditRun(profile, record, levels, extra = {}) {
     rewards,
     rewardsEarned,
     title: rewards ? rewards.title : null,
-    achievements: unlockedNow.added,
+    // The Game Over toast list (decision 9): this run's achievement defs in the one sort order, then its
+    // biome grants (biomes is the last group, and a grant names its biome). A grant entry has a name and a
+    // desc like a def but is never stamped into profile.achievements.
+    achievements: [...unlockedNow.added, ...grants],
+    grants,
   };
   return { profile: unlockedNow.profile, awards };
+}
+
+/**
+ * Grant every biome cosmetic (`grant: 'biome'`) that `next` owns and `before` did not, i.e. whose biome this
+ * credit completed for the first time. Writes the id into `next.unlocked.cosmetics` through
+ * grantAchievementReward (so the grant record and the toast cannot disagree), in catalogue order.
+ * A profile that completed the biome before this build already owns the item by its completion, so it is
+ * never re-announced.
+ * @param {Object} before the profile as it was before this run's visits were merged
+ * @param {Object} next the profile being credited (mutated: `unlocked` is already a fresh copy)
+ * @returns {Array<{id:string,kind:'cosmetic',grant:'biome',biome:string,slot:string,name:string,desc:string}>}
+ */
+function grantBiomeCosmetics(before, next) {
+  const out = [];
+  for (const it of SHOP_ITEMS) {
+    if (!it || it.grant !== 'biome') continue;
+    if (isOwned(before, it.id) || !isOwned(next, it.id)) continue;
+    grantAchievementReward(next, { reward: { cosmetic: it.id } });
+    out.push({
+      id: it.id, kind: 'cosmetic', grant: 'biome', biome: it.biome, slot: it.slot, name: it.name,
+      desc: it.slot === 'rider' ? 'Rider skin. Equip it in the Shard Shop.' : 'Equip it in the Shard Shop.',
+    });
+  }
+  return out;
 }
 
 /**

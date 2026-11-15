@@ -139,3 +139,85 @@ describe('Neon Sled Drone: the Shard Shop rider page', () => {
     expect(rowOf(equip(p, DRONE))).toMatchObject({ state: 'EQUIPPED', equipped: true, disabled: false });
   });
 });
+
+describe('Neon Sled Drone: granted as the completion is credited', () => {
+  // eslint-disable-next-line global-require
+  let creditRun; let toastLayout; let sortAchievements;
+  beforeAll(async () => {
+    ({ creditRun } = await import('../../src/systems/ProfileStore.js'));
+    ({ toastLayout } = await import('../../src/ui/AchievementsLayout.js'));
+    ({ sortAchievements } = await import('../../src/systems/Achievements.js'));
+  });
+  let n = 0;
+  const rec = (o = {}) => ({ id: `drone-run-${n += 1}`, distanceM: 600, score: 10, endedAt: 1_700_000_000_000, ...o });
+  const visits = (encountered, completed) => ({ biomeVisits: { encountered, completed } });
+
+  test('a run that completes Micro Mountain writes the grant record and reports the grant', () => {
+    const out = creditRun(v1({}), rec(), LEVELS, visits(['micro-mountain'], ['micro-mountain']));
+    expect(out.profile.unlocked.cosmetics).toContain(DRONE);
+    expect(isOwned(out.profile, DRONE)).toBe(true);
+    expect(out.awards.grants).toEqual([expect.objectContaining({ id: DRONE, kind: 'cosmetic', grant: 'biome', biome: 'micro-mountain', name: 'Neon Sled Drone' })]);
+  });
+
+  test('the toast list carries it: one unlock reads UNLOCKED NEON SLED DRONE plus how to use it', () => {
+    // A first credit stamps whatever a short run unlocks, so the second run's only unlock is the drone.
+    const first = creditRun(v1({}), rec({ distanceM: 1 }), LEVELS, {});
+    const out = creditRun(first.profile, rec({ distanceM: 1 }), LEVELS, visits(['micro-mountain'], ['micro-mountain']));
+    expect(out.awards.achievements.map((a) => a.id)).toEqual([DRONE]);
+    const toast = toastLayout(out.awards.achievements);
+    expect(toast.lines[0].text).toBe('UNLOCKED NEON SLED DRONE');
+    expect(toast.lines[1].text).toMatch(/RIDER SKIN/);
+  });
+
+  test('encountering Micro Mountain without completing it grants nothing', () => {
+    const out = creditRun(v1({}), rec(), LEVELS, visits(['micro-mountain'], []));
+    expect(out.profile.unlocked.cosmetics).not.toContain(DRONE);
+    expect(out.awards.grants).toEqual([]);
+    expect(out.awards.achievements.some((a) => a.id === DRONE)).toBe(false);
+  });
+
+  test('a run with no visits grants nothing', () => {
+    const out = creditRun(v1({}), rec(), LEVELS, {});
+    expect(out.awards.grants).toEqual([]);
+  });
+
+  test('already completed before this run: no second grant and no second toast', () => {
+    const p = v1({ biomeProgress: { completed: ['micro-mountain'] } });
+    const out = creditRun(p, rec(), LEVELS, visits(['micro-mountain'], ['micro-mountain']));
+    expect(out.awards.grants).toEqual([]);
+    expect(out.awards.achievements.some((a) => a.id === DRONE)).toBe(false);
+    expect(isOwned(out.profile, DRONE)).toBe(true);
+  });
+
+  test('a replayed run (same ledger key) is refused and grants nothing', () => {
+    const r = rec();
+    const first = creditRun(v1({}), r, LEVELS, visits([], []));
+    expect(creditRun(first.profile, r, LEVELS, visits(['micro-mountain'], ['micro-mountain']))).toBeNull();
+  });
+
+  test('alongside achievements in one credit: the achievements in decision 9 order, then the grant', () => {
+    // Pyramid already seen; this run sees Micro and completes it: biomes-2 (Explorer) unlocks in the same credit.
+    const p = v1({ biomeProgress: { encountered: ['pyramid-peak'], completed: [] } });
+    const out = creditRun(p, rec({ distanceM: 1200 }), LEVELS, visits(['micro-mountain'], ['micro-mountain']));
+    const ids = out.awards.achievements.map((a) => a.id);
+    expect(ids).toContain('biomes-2');
+    expect(ids[ids.length - 1]).toBe(DRONE);
+    const defs = out.awards.achievements.filter((a) => a.id !== DRONE);
+    expect(defs.map((a) => a.id)).toEqual(sortAchievements(defs).map((a) => a.id));
+    expect(Number.isFinite(out.profile.achievements['biomes-2'])).toBe(true);
+    // The grant is never stamped as an achievement (the grid would draw a nameless row).
+    expect(out.profile.achievements[DRONE]).toBeUndefined();
+    expect(out.profile.unlocked.cosmetics).toEqual(expect.arrayContaining(['trail-hue-aurora', DRONE]));
+  });
+
+  test('with more than three unlocks the toast ends +N MORE, and the order is the same every time', () => {
+    const p = v1({ biomeProgress: { encountered: ['pyramid-peak'], completed: [] } });
+    const r = rec({ distanceM: 5000, score: 999999, maxAirtimeMs: 9000, bestCombo: 50 });
+    const a = creditRun(p, r, LEVELS, visits(['micro-mountain'], ['micro-mountain']));
+    const b = creditRun(p, { ...r }, LEVELS, visits(['micro-mountain'], ['micro-mountain']));
+    expect(a.awards.achievements.map((x) => x.id)).toEqual(b.awards.achievements.map((x) => x.id));
+    expect(a.awards.achievements.length).toBeGreaterThan(3);
+    const lines = toastLayout(a.awards.achievements).lines.map((l) => l.text);
+    expect(lines[lines.length - 1]).toBe(`+${a.awards.achievements.length - 2} MORE`);
+  });
+});
