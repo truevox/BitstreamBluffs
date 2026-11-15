@@ -350,12 +350,11 @@ export function creditRun(profile, record, levels, extra = {}) {
   // W5: evaluate achievements as part of the same credit, so a run that crosses a threshold unlocks it
   // on the Game Over screen rather than on some later unrelated save. `now` comes from the record's
   // end time, not from inside the pure evaluator.
-  // Only the daily facts and the profile's own encountered count are forwarded. Decision 3: discovered means
-  // encountered, and the count comes from `next.biomeProgress` (sanitized, known ids only); a caller's
-  // `biomeCount` is still ignored, so nothing but a real encounter can unlock the biome achievements.
+  // Only the daily facts are forwarded. Decision 3: discovered means encountered, and metricsFrom reads it from
+  // `next.biomeProgress` (sanitized, known ids only, merged above); a caller's `biomeCount` is still ignored,
+  // so nothing but a real encounter can unlock the biome achievements.
   const unlockedNow = unlockAchievementsFor(next, record, {
     at: nonNeg(record.endedAt), dailyRuns: L.dailyRuns, streak: L.bestStreak,
-    biomeCount: next.biomeProgress.encountered.length,
   });
   const awards = {
     xp,
