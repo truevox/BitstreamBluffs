@@ -43,16 +43,27 @@ describe('slot rule: base streams untouched', () => {
   test('with biome defs absent, nothing changes at ANY mask (digests pinned at 00978f6, before the slot rule)', () => {
     // Recorded on 00978f6 (v2.5.0, B0) with the same projection: 2 seeds x 200 chunks of JSON.stringify(getChunk(i)).
     const PINNED = { 1: 'ba7a764bc87f8a44', 2: '3abca580d8e3b709', 8: 'b9d8da9bde0a6517', 64: '3b2af138f1ac87ae', [ALL]: 'd65be5a81a4903b4' };
-    const out = {};
-    for (const mask of Object.keys(PINNED).map(Number)) {
+    // Audit T2 (v2.6.x) moved Micro Mountain's dew swell INTO the chunk points on purpose, so the ALL mask (it contains
+    // Micro, bit 512) now has other bytes. To keep this pin about the slot rule, the masks are hashed with the swell
+    // stripped from content: that reproduces the 00978f6 bytes exactly, so nothing else moved. The shipped-content
+    // digest of the ALL mask is pinned separately below.
+    const preT2Mods = { ...content.terrainMods, dewSwell: { ...content.terrainMods.dewSwell } };
+    delete preT2Mods.dewSwell.terrainSwell;
+    const digestOf = (mask, modDefs) => {
       const parts = [];
       for (const seed of ['slot-a', 'slot-b']) {
-        const g = baseGen(seed, mask);
+        const g = makeGen(seed, { biomeMask: mask, hazardDefs: BASE_H, powerupDefs: BASE_P, modDefs });
         for (let i = 0; i < 200; i++) parts.push(JSON.stringify(g.getChunk(i)));
       }
-      out[mask] = crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
-    }
+      return crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
+    };
+    const out = {};
+    for (const mask of Object.keys(PINNED).map(Number)) out[mask] = digestOf(mask, preT2Mods);
     expect(out).toEqual(Object.fromEntries(Object.entries(PINNED).map(([k, v]) => [Number(k), v])));
+    // Masks without Micro are byte-identical with the shipped content too (the swell only touches dewSwell zones)...
+    for (const mask of [1, 2, 8, 64]) expect(digestOf(mask, content.terrainMods)).toBe(PINNED[mask]);
+    // ...and the ALL mask with the shipped (swelled) content, recorded after audit T2.
+    expect(digestOf(ALL, content.terrainMods)).toBe('8c6926fe2d588e04');
   });
 
   test('the slot keeps a fixed draw count: BIOME_SLOT_DRAWS is still 5', () => {

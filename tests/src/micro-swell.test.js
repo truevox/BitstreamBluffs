@@ -53,6 +53,17 @@ function modsWithSwell(terrainSwell) {
   return mods;
 }
 
+/**
+ * Chunk `index` of `gen`'s run, rebuilt with the swell switched off in content (raw geometry, same zones). A whole
+ * no-swell RUN drifts after the first swelled chunk (the swell moves lips, so later bounds get another sinceLaunch /
+ * noHazX); copying the swelled run's bounds builds the twin from the identical bound.
+ */
+function rawTwin(gen, index, terrainSwell = null) {
+  const twin = makeGen(gen.seed, { biomeMask: MICRO, modDefs: modsWithSwell(terrainSwell) });
+  twin.bounds = gen.bounds.slice(0, index + 1).map((b) => ({ ...b }));
+  return twin.getChunk(index);
+}
+
 describe('T2 (audit, copied from audit/terrain tests/src/audit-terrain.test.js): dewSwell reaches the surface the sled rides', () => {
   test('T2: heightAt agrees with the collider polyline (chunk.points) inside a dew-swell zone', () => {
     const { gen, out } = swellZones('alpha');
@@ -110,41 +121,56 @@ describe('Micro swell: one surface for collider, edge, heightAt and slopeDegAt',
 
   test('heightAt is continuous at both zone edges, and the swell fades in and out with no kink', () => {
     for (const seed of SEEDS) {
-      const ref = swellZones(seed, { modDefs: modsWithSwell(null) });
       const { gen, out } = swellZones(seed);
       let maxStep = 0;
       let edgeDisp = 0;
+      let edgeTurn = 0;
+      let innerTurn = 0;
       for (let k = 0; k < out.length; k++) {
-        const { c, z } = out[k];
+        const { c, z, i } = out[k];
         for (const e of [z.x0, z.x1]) maxStep = Math.max(maxStep, Math.abs(gen.heightAt(e) - gen.heightAt(e + 0.001)), Math.abs(gen.heightAt(e) - gen.heightAt(e - 0.001)));
-        // within one segment of either edge the displacement (and so its slope) has faded to almost nothing
-        const raw = ref.out[k].c.points;
-        c.points.forEach((pt, j) => {
-          if (Math.min(Math.abs(pt.x - z.x0), Math.abs(pt.x - z.x1)) <= 16) edgeDisp = Math.max(edgeDisp, Math.abs(pt.y - raw[j].y));
-        });
+        // Turn the swell ADDS at each vertex (swelled turn minus raw turn). Within one segment of an edge the window has
+        // barely opened, so the displacement is ~1 px and the added turn is well under the swell's own crest turn.
+        // Without a taper the edge is a 26 px step: an added turn near 90 deg (measured 87).
+        const p = c.points;
+        const raw = rawTwin(gen, i).points;
+        for (let j = 1; j < p.length - 1; j++) {
+          const added = Math.abs(segDeg(p, j) - segDeg(p, j - 1) - (segDeg(raw, j) - segDeg(raw, j - 1)));
+          const fromEdge = Math.min(Math.abs(p[j].x - z.x0), Math.abs(p[j].x - z.x1));
+          if (fromEdge <= 16) {
+            edgeTurn = Math.max(edgeTurn, added);
+            edgeDisp = Math.max(edgeDisp, Math.abs(p[j].y - raw[j].y));
+          } else if (p[j].x > z.x0 && p[j].x < z.x1) innerTurn = Math.max(innerTurn, added);
+        }
       }
       expect(maxStep).toBeLessThan(0.01);
-      expect(edgeDisp).toBeLessThan(0.5);
+      expect(edgeDisp).toBeLessThan(1.5);
+      expect(edgeTurn).toBeLessThan(0.5 * innerTurn);
     }
   });
 });
 
 describe('Micro swell: the displacement is really in the points', () => {
-  test('zones are identical with and without the swell (displacement is the only difference)', () => {
-    const a = swellZones('beta', { modDefs: modsWithSwell(null) });
-    const b = swellZones('beta');
-    expect(b.out.map(({ z }) => [z.x0, z.x1])).toEqual(a.out.map(({ z }) => [z.x0, z.x1]));
+  test('the raw twin of a swelled chunk has the same zones and the same x grid (displacement is the only difference)', () => {
+    const { gen, out } = swellZones('beta');
+    for (const { c, i } of out) {
+      const raw = rawTwin(gen, i);
+      expect(raw.zones).toEqual(c.zones);
+      expect(raw.points.map((p) => p.x)).toEqual(c.points.map((p) => p.x));
+      expect(raw.points[0].y).toBe(c.points[0].y);
+      expect(raw.points[raw.points.length - 1].y).toBe(c.points[c.points.length - 1].y);
+    }
   });
 
   test('peak-to-peak of the displacement is about 2 x amplitude in the zone middle, and zero outside zones', () => {
     for (const seed of SEEDS) {
-      const ref = swellZones(seed, { modDefs: modsWithSwell(null) });
       const { gen, out } = swellZones(seed);
+      const raws = out.map(({ i }) => rawTwin(gen, i));
       let checked = 0;
       let outside = 0;
       for (let k = 0; k < out.length; k++) {
         const { c, z } = out[k];
-        const raw = ref.out[k].c.points;
+        const raw = raws[k].points;
         const taper = Math.min(SW.taperPx, (z.x1 - z.x0) / 2);
         let lo = Infinity;
         let hi = -Infinity;
@@ -167,7 +193,7 @@ describe('Micro swell: the displacement is really in the points', () => {
       let lo = Infinity;
       let hi = -Infinity;
       for (let x = z.x0 + SW.taperPx; x <= z.x1 - SW.taperPx; x += 2) {
-        const d = gen.heightAt(x) - polylineY(ref.out[k].c, x);
+        const d = gen.heightAt(x) - polylineY(raws[k], x);
         lo = Math.min(lo, d);
         hi = Math.max(hi, d);
       }
@@ -180,10 +206,9 @@ describe('Micro swell: the displacement is really in the points', () => {
     expect(SW.taperPx).toBeGreaterThan(0);
     expect(SW.taperPx).toBeLessThanOrEqual(DEW.lengthPx[0] / 2);
     const noTaper = swellZones('alpha', { modDefs: modsWithSwell({ ...SW, taperPx: 0 }) });
-    const ref = swellZones('alpha', { modDefs: modsWithSwell(null) });
     let edge = 0;
-    noTaper.out.forEach(({ c, z }, k) => {
-      const raw = ref.out[k].c.points;
+    noTaper.out.forEach(({ c, z, i }) => {
+      const raw = rawTwin(noTaper.gen, i).points;
       c.points.forEach((pt, j) => {
         if (pt.x >= z.x1 - 16 && pt.x <= z.x1) edge = Math.max(edge, Math.abs(pt.y - raw[j].y));
       });

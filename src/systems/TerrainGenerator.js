@@ -437,25 +437,30 @@ export class TerrainGenerator {
     const i = this._segIndex(c, x);
     const a = p[i];
     const b = p[i + 1];
-    const y = a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x);
-    // W6: a swelled zone lifts and drops the SURFACE, so the hills the sled rides are the hills it sees.
-    // Applied here rather than by rewriting generator points, because heightAt is the one place the
-    // surface is read: contact, slope, drawing and the golden terrain test all go through it, so a swell
-    // cannot be visible in one and absent in another.
-    return y + this._swellAt(x);
+    // Audit T2: a dew swell is already IN the points (see _applySwell), so heightAt is the plain polyline - the same
+    // surface TerrainMesh builds the collider and the drawn edge from, and the one slopeDegAt reads.
+    return a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x);
   }
 
   /**
-   * Surface offset from any rolling-dew swell covering x.
-   *
-   * Sine, bounded by amplitudePx, so the surface can never invert or swallow the sled. Zones are read
-   * from the same chunks heightAt already resolved, so this costs one extra zone scan only when a swell
-   * exists at all; the common path (no swell) returns 0 before any maths.
+   * Swell displacement at x from the zones of the chunk containing x (diagnostic; the points already carry it).
    * @param {number} x world px
    * @returns {number} px offset, down positive
    */
   _swellAt(x) {
-    const zones = this._chunkAt(x).zones;
+    return this._swellOffset(this._chunkAt(x).zones, x);
+  }
+
+  /**
+   * Sum of the rolling-dew swells of `zones` at x: a sine bounded by amplitudePx, multiplied by a raised-cosine window
+   * that rises from 0 to 1 over `taperPx` at each zone edge (clamped to half the zone). Offset and slope are both 0 at
+   * the edges, so the swelled ground meets the raw ground with no step and no kink. taperPx absent = no taper.
+   * Pure: reads only the zones and modMap, never _chunkAt, so _build can call it on a chunk under construction.
+   * @param {import('../data/schemas.js').TerrainZone[]} zones
+   * @param {number} x world px
+   * @returns {number} px offset, down positive
+   */
+  _swellOffset(zones, x) {
     let sum = 0;
     for (let i = 0; i < zones.length; i++) {
       const z = zones[i];
@@ -464,9 +469,34 @@ export class TerrainGenerator {
       const mod = this.modMap && this.modMap[z.modId];
       const sw = mod && mod.terrainSwell;
       if (!sw || !Number.isFinite(sw.amplitudePx) || !Number.isFinite(sw.periodPx) || sw.periodPx <= 0) continue;
-      sum += Math.sin(((x - z.x0) / sw.periodPx) * Math.PI * 2) * sw.amplitudePx;
+      const taper = Math.min(Number.isFinite(sw.taperPx) && sw.taperPx > 0 ? sw.taperPx : 0, (z.x1 - z.x0) / 2);
+      const t = Math.min(x - z.x0, z.x1 - x);
+      const w = taper > 0 && t < taper ? 0.5 - 0.5 * Math.cos((Math.PI * t) / taper) : 1;
+      sum += Math.sin(((x - z.x0) / sw.periodPx) * Math.PI * 2) * sw.amplitudePx * w;
     }
     return sum;
+  }
+
+  /**
+   * Audit T2: move the swell of every terrainSwell zone INTO the chunk points, so the collider, the drawn edge,
+   * slopeDegAt, heightAt and every spawn placed after this call describe one surface. Runs right after the zones are
+   * placed and before lips, hazards, power-ups and shards. Only `points` change: zones sit >= 96 px inside the chunk
+   * and the window is 0 at their edges, so the chunk end points (and with them the next chunk's bound, rise state and
+   * roll speed, all built from `ys`) are untouched. 16 px spacing samples a 220 px period at ~14 points (chord error
+   * < 1 px), so no extra points are needed and _segIndex keeps its uniform-spacing contract.
+   * A chunk with no swell zone (every chunk outside Micro Mountain) returns before touching a point.
+   * @param {import('../data/schemas.js').TerrainChunk} chunk
+   */
+  _applySwell(chunk) {
+    const zones = chunk.zones;
+    let any = false;
+    for (let i = 0; i < zones.length && !any; i++) {
+      const mod = this.modMap[zones[i].modId];
+      if (mod && mod.terrainSwell) any = true;
+    }
+    if (!any) return;
+    const pts = chunk.points;
+    for (let i = 0; i < pts.length; i++) pts[i].y += this._swellOffset(zones, pts[i].x);
   }
 
   /**
@@ -805,6 +835,7 @@ export class TerrainGenerator {
       const hosted = biomeDef ? this._placeBiomeZone(target, biomeDef, crng.fork('biomeZone'), distM) : false;
       if (!hosted) this._placeZones(target, def, crng.fork('zone'), distM, L);
     }
+    this._applySwell(target);
     const vExp = expectedSpeedPxS(distM);
     const lips = kind === 'bridge' ? this._padLips(target, vExp) : this._findLips(target.points, isJump ? Math.min(vExp, JUMP_LAUNCH_SPEED_PX_S) : vExp * TEMPLATE_LIP_SPEED_MUL, target.endX);
     let landEnd = 0;
