@@ -164,6 +164,13 @@ describe('GroundTelegraph (drawing)', () => {
     expect(top).toBeLessThan(h.cy - h.h / 2 - 120);
     expect(Math.max(...xs(calls))).toBeLessThan(VIEW.right - EDGE_INSET_PX - 40);
   });
+  test('a hazard high in the view: the column is shortened so the cue on top stays on screen', () => {
+    const h = hz('packetSpike', 1500, { cy: 90 });
+    const calls = draw(plan([h]));
+    const ys = calls.flatMap((c) => (c[0] === 'lineBetween' ? [c[2], c[4]] : []));
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(VIEW.top);
+    expect(Math.min(...ys)).toBeLessThan(90 - 10 - 40); // still a column above the box
+  });
   test('sizes are counter-scaled: at zoom 0.5 the edge marker is twice as large in world px (same on screen)', () => {
     const view2 = { left: 0, right: 1920, top: 0, bottom: 1080 };
     const span = (calls) => { const x = xs(calls); return Math.max(...x) - Math.min(...x); };

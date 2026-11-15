@@ -48,20 +48,21 @@ export class GroundTelegraph {
     const k = 1 / (zoom || 1);
     let slot = 0;
     for (const m of marks) {
-      if (m.onScreen) this._column(g, timeMs, m, k);
+      if (m.onScreen) this._column(g, timeMs, m, k, view);
       else if (slot < EDGE_MAX_STACK) this._edge(g, timeMs, m, k, view, heightAt, slot++);
     }
   }
 
   /** Light column on an on-screen hazard. */
-  _column(g, t, m, k) {
+  _column(g, t, m, k, view) {
     const h = m.ref;
     const col = this.palette[m.color];
     const go = m.state === 'go';
     const dim = m.clear ? 0.3 : 1;
     const x = h.cx;
     const y0 = h.cy - h.h / 2 - 3 * k;
-    const y1 = y0 - COLUMN_PX * k;
+    // the cue on top must stay on screen when the hazard stands high in the view
+    const y1 = Math.min(y0 - 40 * k, Math.max(y0 - COLUMN_PX * k, view.top + 40 * k));
     const pulse = 0.5 + 0.5 * Math.sin(t / (go ? 45 : 150 - 70 * m.urgency));
     // fades once the box is close enough to read on its own, unless it is time to hop
     const near = go ? 1 : 1 - 0.55 * Math.max(0, (m.urgency - 0.6) / 0.4);
