@@ -8,6 +8,8 @@
  *    finds a 20 px sprite the moment it enters the view.
  * Colour is the response (mark.color): danger = hop, amber = brace, lime = hop NOW. Shape repeats it (colour-blind safe):
  * the hop cue is open up-chevrons, the hop-now cue a filled up-arrow, the brace cue two flat bars.
+ * Dim (and silent, see TelegraphTracker): a hazard the sled is flying over (state 'clear') and a Gear Gate that will be
+ * open when the sled gets there (state 'open'; its glyph is drawn without the bar across it).
  * All sizes are game px (GAME_WIDTH x GAME_HEIGHT = 480 x 270, shown 2x) divided by the camera zoom, so the marker is the
  * same size on screen at every zoom.
  * Pure drawing: no physics, no score, no state that outlives a frame. Does not import Phaser (uses scene.add.graphics()).
@@ -61,7 +63,7 @@ export class GroundTelegraph {
     const h = m.ref;
     const col = this.palette[m.color];
     const go = m.state === 'go';
-    const dim = m.clear ? 0.3 : 1;
+    const dim = m.clear || m.state === 'open' ? 0.3 : 1;
     const x = h.cx;
     const y0 = h.cy - h.h / 2 - 3 * k;
     // the cue on top must stay on screen when the hazard stands high in the view
@@ -79,7 +81,7 @@ export class GroundTelegraph {
   /** Badge at the right screen edge for an off-screen hazard. */
   _edge(g, t, m, k, view, heightAt, slot) {
     const col = this.palette[m.color];
-    const dim = m.clear ? 0.3 : 1;
+    const dim = m.clear || m.state === 'open' ? 0.3 : 1;
     const x = view.right - EDGE_INSET_PX * k;
     let ground = heightAt(x);
     if (!Number.isFinite(ground)) ground = (view.top + view.bottom) / 2;
@@ -97,12 +99,12 @@ export class GroundTelegraph {
     g.fillRect(x - b, y - b, 2 * b, 2 * b);
     g.lineStyle((1.5 + 0.8 * pulse) * k, col, (0.75 + 0.25 * pulse) * dim);
     g.strokeRect(x - b, y - b, 2 * b, 2 * b);
-    this._glyph(g, m.ref, x, y, 7.5 * k, k, col, dim);
+    this._glyph(g, m.ref, x, y, 7.5 * k, k, col, dim, m);
     // proximity bar under the glyph: fills as the hazard closes in
     g.fillStyle(col, 0.9 * dim);
     g.fillRect(x - b + 1.5 * k, y + b - 3 * k, (2 * b - 3 * k) * m.urgency, 1.5 * k);
     // marching chevrons toward the screen edge: "it comes from there"
-    const step = m.clear ? 0 : Math.floor(t / 110) % 3;
+    const step = m.clear || m.state === 'open' ? 0 : Math.floor(t / 110) % 3;
     for (let i = 0; i < 2; i++) {
       const cx = x + b + (3 + i * 4.5) * k;
       const lit = step === i + 1;
@@ -139,8 +141,8 @@ export class GroundTelegraph {
     }
   }
 
-  /** The hazard's silhouette, simplified, centred at (x, y) with half-size s. */
-  _glyph(g, h, x, y, s, k, col, a) {
+  /** The hazard's silhouette, simplified, centred at (x, y) with half-size s. m (optional): the mark (gate open/closed). */
+  _glyph(g, h, x, y, s, k, col, a, m) {
     const kind = hazardDrawKind(h.def);
     g.lineStyle(1.5 * k, col, a);
     if (kind === 'spike') {
@@ -194,6 +196,22 @@ export class GroundTelegraph {
       g.lineBetween(x, y - s * 0.1, x, y - s * 0.8);
       g.lineBetween(x, y - s * 0.8, x + s * 0.8, y - s * 0.8);
       g.lineBetween(x + s * 0.8, y - s * 0.8, x + s * 0.8, y - s * 0.1);
+    } else if (kind === 'boulder' || kind === 'dewDrop') {
+      // a ball on the ground line, with a motion streak (no direction implied: both sides)
+      const r = kind === 'boulder' ? s * 0.7 : s * 0.55;
+      g.strokeCircle(x, y + s * 0.7 - r, r);
+      g.lineBetween(x - s, y + s * 0.7, x + s, y + s * 0.7);
+    } else if (kind === 'gearGate') {
+      // two posts; a bar across them while the gate will be closed
+      g.lineBetween(x - s * 0.6, y + s * 0.7, x - s * 0.6, y - s * 0.8);
+      g.lineBetween(x + s * 0.6, y + s * 0.7, x + s * 0.6, y - s * 0.8);
+      g.strokeCircle(x, y - s * 0.8, s * 0.3);
+      if (!m || m.state !== 'open') g.lineBetween(x - s * 0.6, y, x + s * 0.6, y);
+    } else if (kind === 'shatterWall') {
+      // a crystal pane with a crack
+      g.strokeRect(x - s * 0.5, y - s, s, s * 1.7);
+      g.lineBetween(x - s * 0.2, y - s, x + s * 0.1, y - s * 0.2);
+      g.lineBetween(x + s * 0.1, y - s * 0.2, x - s * 0.15, y + s * 0.7);
     } else {
       g.fillStyle(col, 0.5 * a);
       g.fillRect(x - s * 0.7, y - s * 0.7, s * 1.4, s * 1.4);

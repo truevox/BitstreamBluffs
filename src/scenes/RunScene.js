@@ -1290,7 +1290,7 @@ export class RunScene extends Phaser.Scene {
     for (const list of this.hazards.values()) for (const h of list) live.push(h);
     const landX = !sled.grounded && Number.isFinite(sled.airEtaMs) ? sled.x + sled.vx * sled.airEtaMs / 1000 : null;
     const isMuted = (h) => isWarded(this.wards, { hazardId: h.def.id }) || isWarded(this.wards, { effect: h.def.onHit ? h.def.onHit.effect : 'crash' });
-    const marks = planTelegraph(live, { x: sled.x, vx: sled.vx, speed: sled.speed, grounded: sled.grounded, landX }, this._view ? this._view.right : sled.x + GAME_WIDTH, { isMuted });
+    const marks = planTelegraph(live, { x: sled.x, vx: sled.vx, speed: sled.speed, grounded: sled.grounded, landX }, this._view ? this._view.right : sled.x + GAME_WIDTH, { isMuted, nowMs: now });
     for (const e of this.teleTracker.update(now, marks)) {
       if (e.type === 'warn') {
         e.ref.teleAtMs = now; // read by the measurement harness and the gate; nothing in the game depends on it

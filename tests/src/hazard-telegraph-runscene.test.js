@@ -93,6 +93,20 @@ describe('RunScene.updateGroundTelegraph', () => {
     expect(s._teleMarks[0]).toMatchObject({ clear: false });
     expect(s.sfx).toEqual([['groundWarn', { brace: false }]]);
   });
+  test('passes the run time: a moving hazard is timed with its predictX, an open Gear Gate stays silent', () => {
+    // rolls toward the sled at 200 px/s from run time 5000: dx 243 closes at 850 px/s -> 0.286 s (static: 0.374 s)
+    const roll = hz('rollingBoulder', 1243, { predictX: (t) => 1240 - 200 * Math.max(0, t - 5000) / 1000 });
+    const s = makeRun([roll]);
+    s.updateGroundTelegraph(5000);
+    expect(s._teleMarks[0].etaS).toBeCloseTo(243 / 850, 3);
+    expect(s._teleMarks[0].arrivalMs).toBeCloseTo(5000 + 243 / 850 * 1000, 0);
+    // a gate that is open from 5000 to 6400 (arrival at 5000 + 650 / 650 s): no sound, state open
+    const gate = hz('gearGate', 1650, { predictX: () => 1650, isPassable: (t) => t >= 5000 && t < 6400, gateNextChangeMs: (t) => (t < 5000 ? 5000 - t : 6400 - t) });
+    const s2 = makeRun([gate]);
+    s2.updateGroundTelegraph(5000);
+    expect(s2._teleMarks[0]).toMatchObject({ state: 'open', gate: 'open' });
+    expect(s2.sfx).toEqual([]);
+  });
   test('updateFun runs the telegraph every live frame', () => {
     const h = hz('packetSpike', 2200);
     const s = makeRun([h]);
@@ -192,6 +206,23 @@ describe('GroundTelegraph (drawing)', () => {
     const alphas = (calls) => calls.filter((c) => c[0] === 'lineStyle').map((c) => c[3]);
     expect(Math.max(...alphas(draw(m)))).toBeLessThanOrEqual(0.35);
     expect(Math.max(...alphas(draw(plan([hz('packetSpike', 2200)]))))).toBeGreaterThan(0.8);
+  });
+  test('an open Gear Gate is drawn dim, and its glyph has no bar across it (closed has one)', () => {
+    const g = (open) => ({ ...hz('gearGate', 2200), predictX: () => 2200, isPassable: () => open, gateNextChangeMs: () => 1000 });
+    const mk = (open) => planTelegraph([g(open)], { x: 1000, vx: 650, speed: 650, grounded: true, landX: null }, VIEW.right, { nowMs: 0 });
+    const alphas = (calls) => calls.filter((c) => c[0] === 'lineStyle').map((c) => c[3]);
+    expect(mk(true)[0].state).toBe('open');
+    expect(Math.max(...alphas(draw(mk(true))))).toBeLessThanOrEqual(0.35);
+    expect(Math.max(...alphas(draw(mk(false))))).toBeGreaterThan(0.8);
+    const lines = (calls) => calls.filter((c) => c[0] === 'lineBetween').length;
+    expect(lines(draw(mk(false)))).toBe(lines(draw(mk(true))) + 1);
+  });
+  test('the B3 and B2 hazards get their own glyphs (not the generic box)', () => {
+    for (const id of ['rollingBoulder', 'dewDrop', 'gearGate', 'shatterWall']) {
+      const calls = draw(plan([hz(id, 2200)]));
+      // the generic glyph is a filled square at half alpha
+      expect(calls.some((c) => c[0] === 'fillRect' && c[3] === c[4] && c[3] < 20 && c[2] !== undefined && c[5] === undefined)).toBe(false);
+    }
   });
   test('setPalette and destroy', () => {
     const sc = fakeScene();
