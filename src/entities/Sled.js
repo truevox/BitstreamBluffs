@@ -593,7 +593,46 @@ export class Sled {
     // deck grid ticks (data motif)
     for (let i = -18; i <= 16; i += 7) line([[i, 2.2], [i, 5]], pal.bg, 1, 0.7);
 
-    // ----- rider -----
+    // Micro glow-up: the Neon Sled Drone replaces the neon rider (draw only; the collision parts in _buildBody
+    // are unchanged, so the drone is exactly as hittable as the rider it replaces). `lastRiderShape` records
+    // what this frame drew, for the built-game gate.
+    const shape = this.look && this.look.riderShape === 'drone' ? 'drone' : 'default';
+    this.lastRiderShape = shape;
+    if (shape === 'drone') {
+      this._drawDrone(g, P, poly, line, limb, riderCol, aMul);
+    } else {
+      this.drone = null;
+      this._drawRider(g, P, poly, limb, riderCol, aMul, sx, flip);
+    }
+
+    // air-brake flap
+    if (pose.brake > 0.05) {
+      const h = 18 * pose.brake;
+      poly([[24, 2], [32, 2 - h], [34, 2 - h], [28, 2]], pal.amber, 0.6, pal.amber, 1.2);
+    }
+
+    // helicopter blur ring (edge-on cue)
+    if (edgeOn > 0.5 && Math.abs(this.heliVel) > 200) {
+      const p0 = P(0, -2);
+      g.lineStyle(1, pal.cyan, 0.5);
+      g.strokeEllipse(p0.x, p0.y, 56, 14);
+    }
+
+    // shield (Hashed Backup)
+    if (this.shield) {
+      const p0 = P(0, -6);
+      const pulse = 0.55 + 0.25 * Math.sin(this._time / 90);
+      g.lineStyle(1.5, pal.amber, pulse);
+      g.strokeCircle(p0.x, p0.y, 30);
+      g.fillStyle(pal.amber, 0.08);
+      g.fillCircle(p0.x, p0.y, 30);
+    }
+  }
+
+  /** The neon rider (the default rider shape): legs, torso, arm, helmet and visor. */
+  _drawRider(g, P, poly, limb, riderCol, aMul, sx, flip) {
+    const pal = this.palette;
+    const pose = this.pose;
     const phi = pose.phi * DEG;
     const hip = [-6, 0];
     const sh = [hip[0] + Math.sin(phi) * 13, hip[1] - Math.cos(phi) * 13];
@@ -628,29 +667,75 @@ export class Sled {
     const vs = P(head[0] + 2.6 * (flip ? -1 : 1) / Math.max(0.2, Math.abs(sx)) * Math.abs(sx), head[1] - 0.6);
     g.fillStyle(pal.cyan, 1);
     g.fillRect(vs.x - 1.5, vs.y - 1.6, 3, 3);
+  }
 
-    // air-brake flap
-    if (pose.brake > 0.05) {
-      const h = 18 * pose.brake;
-      poly([[24, 2], [32, 2 - h], [34, 2 - h], [28, 2]], pal.amber, 0.6, pal.amber, 1.2);
-    }
-
-    // helicopter blur ring (edge-on cue)
-    if (edgeOn > 0.5 && Math.abs(this.heliVel) > 200) {
-      const p0 = P(0, -2);
-      g.lineStyle(1, pal.cyan, 0.5);
-      g.strokeEllipse(p0.x, p0.y, 56, 14);
-    }
-
-    // shield (Hashed Backup)
-    if (this.shield) {
-      const p0 = P(0, -6);
-      const pulse = 0.55 + 0.25 * Math.sin(this._time / 90);
-      g.lineStyle(1.5, pal.amber, pulse);
-      g.strokeCircle(p0.x, p0.y, 30);
-      g.fillStyle(pal.amber, 0.08);
-      g.fillCircle(p0.x, p0.y, 30);
-    }
+  /**
+   * The Neon Sled Drone (Micro glow-up): an RC micro drone riding the deck. A pod in the rider colour with a
+   * cyan camera eye, a mast, two rotor arms, a spinning rotor disc at each tip and a light on each arm that
+   * blinks from sled time, the two arms out of phase. All in local sled space through P, so it tilts, squashes
+   * and spins (helicopter) with the sled exactly like the rider. Colours: the rider colour and palette keys
+   * only (never danger), so under colourblind mode, where the rider colour is palette magenta, it is all palette.
+   * Records `this.drone` ({rotors, lights}) for tests and the gate.
+   */
+  _drawDrone(g, P, poly, line, limb, riderCol, aMul) {
+    const pal = this.palette;
+    const pose = this.pose;
+    const t = this._time || 0;
+    // Tuck lowers the mast, lean pitches the pod a little (the same inputs that pose the rider).
+    const drop = 3 * (pose.tuck || 0);
+    const lean = Math.max(-0.5, Math.min(0.5, ((pose.phi || 0) - 8) * DEG * 0.35));
+    const L = (x, y) => [x + (y - 0) * lean * -0.4, y + drop * (y < -6 ? 1 : 0.4)];
+    // pod: dark backing first so it reads on any backdrop, then the frame
+    const pod = [L(-16, 1), L(-13, -7), L(4, -9), L(11, -6), L(13, 1)];
+    poly(pod, pal.bg, 0.9, null, 0);
+    poly(pod, riderCol, 0.45 * aMul, riderCol, 1.4);
+    // skid struts down to the deck
+    line([L(-9, 1), L(-9, 1.8)], riderCol, 1.2, aMul);
+    line([L(7, 1), L(7, 1.8)], riderCol, 1.2, aMul);
+    // camera eye at the nose
+    const eye = P(...L(9, -4));
+    g.fillStyle(pal.bg, 1);
+    g.fillCircle(eye.x, eye.y, 2.8);
+    g.fillStyle(pal.cyan, 1);
+    g.fillCircle(eye.x, eye.y, 1.7);
+    // mast and rotor arms
+    const hub = L(-2, -14);
+    limb(L(-2, -8), hub, riderCol, 2);
+    const tips = [L(-16, -18), L(12, -18)];
+    for (const tip of tips) limb(hub, tip, riderCol, 1.8);
+    const rotors = [];
+    const lights = [];
+    tips.forEach((tip, i) => {
+      // rotor disc: a flat ring of points in sled space (so it tilts with the sled), a translucent blur fill
+      // and a cyan rim, then one blade turning fast from sled time
+      const ring = [];
+      for (let k = 0; k < 10; k++) {
+        const a = (k / 10) * Math.PI * 2;
+        ring.push(P(tip[0] + Math.cos(a) * 8, tip[1] - 1.2 + Math.sin(a) * 1.6));
+      }
+      g.fillStyle(pal.text, 0.14 * aMul);
+      g.fillPoints(ring, true);
+      g.lineStyle(1, pal.cyan, 0.65 * aMul);
+      g.strokePoints(ring, true, true);
+      const spin = t / 22 + i * 1.7;
+      const bx = Math.cos(spin) * 8;
+      const blade = [P(tip[0] - bx, tip[1] - 1.2), P(tip[0] + bx, tip[1] - 1.2)];
+      g.lineStyle(1.2, pal.text, 0.8 * aMul);
+      g.lineBetween(blade[0].x, blade[0].y, blade[1].x, blade[1].y);
+      rotors.push({ ring, blade: [blade[0].x, blade[0].y, blade[1].x, blade[1].y] });
+      // the arm light: the two arms blink out of phase, 250 ms each
+      const on = (Math.floor(t / 250) + i) % 2 === 0;
+      const lp = P(tip[0] + (i ? -3 : 3), tip[1] + 1.2);
+      const col = i ? pal.lime : pal.magenta;
+      g.fillStyle(col, on ? 1 : 0.25);
+      g.fillCircle(lp.x, lp.y, on ? 1.8 : 1.2);
+      if (on) {
+        g.fillStyle(col, 0.25 * aMul);
+        g.fillCircle(lp.x, lp.y, 3.6);
+      }
+      lights.push({ on, color: col, x: lp.x, y: lp.y });
+    });
+    this.drone = { rotors, lights };
   }
 
   _drawChute(g, ox, oy, t, c, s) {
