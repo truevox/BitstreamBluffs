@@ -80,15 +80,15 @@ describe('B1 presence: the biome hazard is felt in early terrain (chunks 0-44, s
     expect(b.fails).toBeLessThanOrEqual(4); // measured 3/30
   });
 
-  test('mask 64 (candy-cane-canyon): chocolateRiver, OPEN for the lead: below the band under rule (b) (descent ahead)', () => {
-    // At speedFactor 0.5 the river keeps the descent-ahead rule (amendment b). At 24x8 and chance 0.75 (the caps) it reaches
-    // 24 % (8 seeds) / 20.9 % (32 seeds); 36x9 reached 15 %. Pinned at its measured floor so it cannot drop again.
+  test('mask 64 (candy-cane-canyon): chocolateRiver meets the band', () => {
+    // Lead ruling (2026-11-14): speedFactor 0.5 -> 0.6 puts the river under the gentle-slow rule (amendment b)
+    // instead of descent-ahead; at 0.5 it reached only ~21 % of eligible chunks. Sweet-Tooth still wards it.
     const a = presence(64, 'candy-cane-canyon', 'chocolateRiver', SEEDS);
-    expect(a.share).toBeGreaterThanOrEqual(0.2);
-    for (const p of a.perSeed) expect(p).toMatchObject({ ok: true });
+    expect(a.share).toBeGreaterThanOrEqual(0.35);
+    expect(a.share).toBeLessThanOrEqual(0.55);
     const b = presence(64, 'candy-cane-canyon', 'chocolateRiver', ROB);
-    expect(b.share).toBeGreaterThanOrEqual(0.18);
-    expect(b.fails).toBeLessThanOrEqual(8); // measured 7/30
+    expect(b.share).toBeGreaterThanOrEqual(0.35);
+    expect(b.share).toBeLessThanOrEqual(0.55);
   });
 });
 
@@ -128,17 +128,8 @@ describe('B1 amended placement rules (a) and (b)', () => {
     expect(closer).toBeGreaterThan(10);
   });
 
-  test(`(b) Chocolate River (speedFactor < ${0.6}) always sits before a descent`, () => {
-    expect(BIOME_GENTLE_SLOW_FACTOR).toBe(0.6);
-    const ps = placements(64, 'chocolateRiver');
-    expect(ps.length).toBeGreaterThan(20);
-    for (const { g, ch, h } of ps) {
-      const k = Math.max(0, Math.min(ch.points.length - 2, Math.floor((h.x - ch.startX) / SPACING_PX)));
-      expect(g._descentAhead(ch.points, k, ch.endX)).toBe(true);
-    }
-  });
 
-  test.each([[1, 'groomerCat'], [8, 'seaweedTangle']])('(b) mask %p: %s never sits before an uphill (240 px ahead), and some sit off a descent', (mask, id) => {
+  test.each([[1, 'groomerCat'], [8, 'seaweedTangle'], [64, 'chocolateRiver']])('(b) mask %p: %s never sits before an uphill (240 px ahead), and some sit off a descent', (mask, id) => {
     const ps = placements(mask, id);
     expect(ps.length).toBeGreaterThan(20);
     let offDescent = 0;

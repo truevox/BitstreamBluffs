@@ -75,7 +75,7 @@ describe('B1 hazards through RunScene.onHazard (shipped defs)', () => {
   test.each([
     ['groomerCat', 0.7, 900],
     ['seaweedTangle', 0.6, 1200],
-    ['chocolateRiver', 0.5, 1500],
+    ['chocolateRiver', 0.6, 1500],
   ])('%s: a slow of %p x %p ms on the sled (instant velocity cut + tuner speedMul), then it ends', (id, k, ms) => {
     const s = makeRun();
     s.onHazard(hit(id));
@@ -170,7 +170,7 @@ describe('B1 power-ups through RunScene.onPowerUp (shipped defs)', () => {
   test('Sweet-Tooth Coating also stops a river slow that is already acting', () => {
     const s = makeRun();
     s.onHazard(hit('chocolateRiver'));
-    expect(phys(s).speedMul).toBeCloseTo(0.5, 12);
+    expect(phys(s).speedMul).toBeCloseTo(0.6, 12);
     s.onPowerUp(take('sweetToothCoating'));
     expect(phys(s).speedMul).toBeCloseTo(1, 12);
   });

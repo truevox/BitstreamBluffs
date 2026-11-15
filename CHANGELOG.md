@@ -29,6 +29,7 @@
 ## Unreleased - biome treatment B1 (Wards)
 ## v2.6.0 - biome treatment B1: Wards (Debumont, Garbage Dump Glacier, Underwater Mountain, Candy Cane Canyon) (2026-11-14)
 
+- **Chocolate River slow 0.5 → 0.6, chance 0.75 → 0.5** (lead ruling): it now sits under the gentle-slow rule, so it reaches the 35–55 % presence band (it was ~21 %); Sweet-Tooth Coating still wards it.
 - **Debumont:** Groomer Cat (ground, slows the sled to 0.7 for 0.9 s) and Maple Wax (speed boost 1.2 for 2 s).
 - **Garbage Dump Glacier:** Seagull Dive (air, in jump arcs, crash, `danger`) and Slick Wax Spray (wards off sticky ground for 4 s, plus a 1.1 speed boost while it lasts).
 - **Underwater Mountain:** Seaweed Tangle (ground, slow 0.6 for 1.2 s) and Aqua-Lung Bubble (wards off the slow-motion current for 4 s).

@@ -90,9 +90,9 @@ describe('B1 content: the spec §4 values', () => {
     expect(c.powerups.aquaLungBubble.effect).toEqual({ kind: 'ward', durationMs: 4000, mods: ['slowMotion'], hazards: [], effects: [] });
   });
 
-  test('Candy Cane Canyon: Chocolate River is a wide ground strip, slow 0.5 x 1.5 s; Sweet-Tooth wards slow effects 5 s', () => {
+  test('Candy Cane Canyon: Chocolate River is a wide ground strip, slow 0.6 x 1.5 s; Sweet-Tooth wards slow effects 5 s', () => {
     const r = c.hazards.chocolateRiver;
-    expect(r).toMatchObject({ placement: 'ground', onHit: { effect: 'slow', speedFactor: 0.5, durationMs: 1500 } });
+    expect(r).toMatchObject({ placement: 'ground', onHit: { effect: 'slow', speedFactor: 0.6, durationMs: 1500 } });
     expect(r.size.w).toBeGreaterThanOrEqual(3 * r.size.h); // a strip: much wider than tall
     expect(c.powerups.sweetToothCoating.effect).toEqual({ kind: 'ward', durationMs: 5000, mods: [], hazards: [], effects: ['slow'] });
   });
