@@ -63,7 +63,7 @@ describe('slot rule: base streams untouched', () => {
     // Masks without Micro are byte-identical with the shipped content too (the swell only touches dewSwell zones)...
     for (const mask of [1, 2, 8, 64]) expect(digestOf(mask, content.terrainMods)).toBe(PINNED[mask]);
     // ...and the ALL mask with the shipped (swelled) content, recorded after audit T2.
-    expect(digestOf(ALL, content.terrainMods)).toBe('8c6926fe2d588e04');
+    expect(digestOf(ALL, content.terrainMods)).toBe('c07cd7bed3b3716f');
   });
 
   test('the slot keeps a fixed draw count: BIOME_SLOT_DRAWS is still 5', () => {

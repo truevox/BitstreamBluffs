@@ -13,6 +13,7 @@
  */
 import fs from 'fs';
 import { makeGen, loadContent } from './_helpers.js';
+import { MAX_TURN_DEG } from '../../src/systems/TerrainGenerator.js';
 
 const MICRO = 512;
 const SEEDS = ['alpha', 'beta', 'swell'];
@@ -43,6 +44,16 @@ function swellZones(seed, overrides = {}, n = CHUNKS) {
     for (const z of c.zones) if (z.modId === 'dewSwell') out.push({ c, z, i });
   }
   return { gen, out };
+}
+
+/**
+ * True when the zone's untapered middle holds both a crest (x0 + P/4) and a trough (x0 + 3P/4) of the sine, so the full
+ * 2A swing is there to measure. A whole period would need len >= P + 2T, which a long period rarely fits in 420-900 px.
+ */
+function swings(z) {
+  const len = z.x1 - z.x0;
+  const taper = Math.min(SW.taperPx, len / 2);
+  return taper <= SW.periodPx / 4 && len >= (3 * SW.periodPx) / 4 + taper;
 }
 
 /** The same run with the swell switched off in content: same zones, raw geometry. */
@@ -124,28 +135,30 @@ describe('Micro swell: one surface for collider, edge, heightAt and slopeDegAt',
       const { gen, out } = swellZones(seed);
       let maxStep = 0;
       let edgeDisp = 0;
-      let edgeTurn = 0;
-      let innerTurn = 0;
+      let maxD2 = 0;
+      let maxAdded = 0;
       for (let k = 0; k < out.length; k++) {
         const { c, z, i } = out[k];
         for (const e of [z.x0, z.x1]) maxStep = Math.max(maxStep, Math.abs(gen.heightAt(e) - gen.heightAt(e + 0.001)), Math.abs(gen.heightAt(e) - gen.heightAt(e - 0.001)));
-        // Turn the swell ADDS at each vertex (swelled turn minus raw turn). Within one segment of an edge the window has
-        // barely opened, so the displacement is ~1 px and the added turn is well under the swell's own crest turn.
-        // Without a taper the edge is a 26 px step: an added turn near 90 deg (measured 87).
+        // d = swelled - raw at each point. Its second difference over 16 px is the swell's own bend (curvature x 256),
+        // independent of the base slope. A raised-cosine taper of P/4 peaks at ~3x the sine's bend (0.0054 /px at
+        // 20/660/165, radius ~185 px); a radius of 167 px is the bound. No taper is a step of up to A (second difference
+        // ~A); 26/220 bent at 0.021 /px. The turn the swell adds at a vertex also stays inside the generator's
+        // ordinary MAX_TURN_DEG (10 deg).
         const p = c.points;
         const raw = rawTwin(gen, i).points;
+        const d = p.map((pt, j) => pt.y - raw[j].y);
         for (let j = 1; j < p.length - 1; j++) {
-          const added = Math.abs(segDeg(p, j) - segDeg(p, j - 1) - (segDeg(raw, j) - segDeg(raw, j - 1)));
-          const fromEdge = Math.min(Math.abs(p[j].x - z.x0), Math.abs(p[j].x - z.x1));
-          if (fromEdge <= 16) {
-            edgeTurn = Math.max(edgeTurn, added);
-            edgeDisp = Math.max(edgeDisp, Math.abs(p[j].y - raw[j].y));
-          } else if (p[j].x > z.x0 && p[j].x < z.x1) innerTurn = Math.max(innerTurn, added);
+          if (p[j].x < z.x0 - 16 || p[j].x > z.x1 + 16) continue;
+          maxD2 = Math.max(maxD2, Math.abs(d[j + 1] - 2 * d[j] + d[j - 1]));
+          maxAdded = Math.max(maxAdded, Math.abs(segDeg(p, j) - segDeg(p, j - 1) - (segDeg(raw, j) - segDeg(raw, j - 1))));
+          if (Math.min(Math.abs(p[j].x - z.x0), Math.abs(z.x1 - p[j].x)) <= 16) edgeDisp = Math.max(edgeDisp, Math.abs(d[j]));
         }
       }
       expect(maxStep).toBeLessThan(0.01);
-      expect(edgeDisp).toBeLessThan(1.5);
-      expect(edgeTurn).toBeLessThan(0.5 * innerTurn);
+      expect(edgeDisp).toBeLessThan(1);
+      expect(maxD2).toBeLessThan(0.006 * 16 * 16);
+      expect(maxAdded).toBeLessThan(MAX_TURN_DEG);
     }
   });
 });
@@ -180,7 +193,7 @@ describe('Micro swell: the displacement is really in the points', () => {
           else if (pt.x >= z.x0 + taper && pt.x <= z.x1 - taper) { lo = Math.min(lo, d); hi = Math.max(hi, d); }
           expect(Math.abs(d)).toBeLessThanOrEqual(SW.amplitudePx + 1e-9);
         });
-        if (z.x1 - z.x0 - 2 * taper >= SW.periodPx) {
+        if (swings(z)) {
           checked++;
           expect(hi - lo).toBeGreaterThan(0.9 * 2 * SW.amplitudePx);
         }
@@ -188,7 +201,7 @@ describe('Micro swell: the displacement is really in the points', () => {
       expect(checked).toBeGreaterThan(0);
       expect(outside).toBe(0);
       // the read side sees it too: heightAt swings by ~2A around the raw line in the zone middle
-      const { c, z } = out.find(({ z: q }) => q.x1 - q.x0 - 2 * Math.min(SW.taperPx, (q.x1 - q.x0) / 2) >= SW.periodPx);
+      const { c, z } = out.find(({ z: q }) => swings(q));
       const k = out.findIndex((o) => o.z === z);
       let lo = Infinity;
       let hi = -Infinity;

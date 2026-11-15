@@ -2,7 +2,7 @@
   "id": "dewSwell",
   "colorKey": "cyan",
   "physics": {},
-  "terrainSwell": { "amplitudePx": 26, "periodPx": 220, "taperPx": 110 },
+  "terrainSwell": { "amplitudePx": 20, "periodPx": 660, "taperPx": 165 },
   "weight": 3,
   "minDistanceM": 150,
   "lengthPx": [420, 900]
