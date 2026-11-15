@@ -540,3 +540,32 @@ These are generative covers and not necessarily sample-synchronous,
 melody-faithful or instrument-isolated. User has NOT listened to or
 approved these ACE outputs as music art. Kie tonal-quality verdict
 and V3 organ artistic baseline are preserved as prior judgments.
+
+## SheetSage2 and Basic Pitch, V3 organ × SheetSage -12 (2026-11-15)
+
+**Marvin's direct audition:** SheetSage -12 preferred ("fucking TIGHT");
+SheetSage Raw perhaps closer to Maxi's literal soprano singing pitch,
+but too shrill for the organ. He asked for V3 church organ with the
+SheetSage -12 setup. This is artistic registration preference,
+NOT evidence that the original sung pitches were one octave lower.
+
+**Verified synthesis:** the earlier SheetSage -12 audio ALREADY used
+exactly the V3 FluidR3 GM organ program 19 and its previous
+sample/attack/texture and distortion polish, but with 68 SheetSage
+notes and constant pitches instead of V3's 127 note triggers and
+continuous pitch expression.
+
+**New isolated rendered test:** keep all 68 SheetSage -12 note
+pitches, attacks and timing; restore only within-note V3 pitch
+movement centered on the SheetSage notes, preventing old V3
+absolute pitch/octave slips. Two versions, Gentle (+/-32 cents)
+and Expressive (+/-70 cents), successfully rendered via existing
+V3 church-organ engine. Both and prior versions available at:
+http://100.115.120.66:8181/tools/music/audition-transcription/
+
+Browser smoke: six selections, eight 25s audio clips successfully
+loaded/decoded, no errors. No game integration, main merge or
+artist approval yet. Detailed reproducibility and model
+corroboration: tools/music/transcription-ear-test/README.md.
+Research SheetSage/MERT pretrained weights are CC-BY-NC;
+do not adopt output into game until rights review.

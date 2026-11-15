@@ -1,0 +1,317 @@
+{
+  "rawSheetNotes": 68,
+  "rawBasicNotes": 129,
+  "matchedPairsOneToOne": 57,
+  "exactPitchClassMatches": 56,
+  "sheetWithIndependentBasicSupport": 57,
+  "sheetWithoutBasicSupport": 11,
+  "basicWithoutSheetPair": 72,
+  "rawBasicOverlapsSamePitchClassSheet": 23,
+  "basicWithoutSheetPairYetSpiceSupports": 19,
+  "sheetNotesSpiceSupported": 56,
+  "sheetNotesBothBasicAndSpiceSupported": 50,
+  "sheetNotesSpiceNoSupport": 12,
+  "sheetSuggestedOctaveShift": -12,
+  "matchExamples": [
+    {
+      "start": 0.0,
+      "sheet": "F5",
+      "basic": "F4",
+      "onsetDeltaMs": 11,
+      "durationS": 0.4,
+      "score": 3.72
+    },
+    {
+      "start": 1.21,
+      "sheet": "G#5",
+      "basic": "G#4",
+      "onsetDeltaMs": 101,
+      "durationS": 0.4,
+      "score": 2.92
+    },
+    {
+      "start": 1.61,
+      "sheet": "F#5",
+      "basic": "F#4",
+      "onsetDeltaMs": 97,
+      "durationS": 0.21,
+      "score": 2.62
+    },
+    {
+      "start": 1.82,
+      "sheet": "F5",
+      "basic": "F4",
+      "onsetDeltaMs": 42,
+      "durationS": 0.4,
+      "score": 3.55
+    },
+    {
+      "start": 2.22,
+      "sheet": "D#5",
+      "basic": "D#4",
+      "onsetDeltaMs": 46,
+      "durationS": 0.2,
+      "score": 2.92
+    },
+    {
+      "start": 2.42,
+      "sheet": "F5",
+      "basic": "F4",
+      "onsetDeltaMs": 148,
+      "durationS": 0.61,
+      "score": 3.3
+    },
+    {
+      "start": 3.02,
+      "sheet": "D#5",
+      "basic": "D#4",
+      "onsetDeltaMs": 111,
+      "durationS": 0.61,
+      "score": 3.42
+    },
+    {
+      "start": 4.03,
+      "sheet": "C5",
+      "basic": "C5",
+      "onsetDeltaMs": 24,
+      "durationS": 0.2,
+      "score": 3.68
+    },
+    {
+      "start": 4.23,
+      "sheet": "A#4",
+      "basic": "A#3",
+      "onsetDeltaMs": 40,
+      "durationS": 0.21,
+      "score": 3.63
+    },
+    {
+      "start": 4.44,
+      "sheet": "C5",
+      "basic": "C5",
+      "onsetDeltaMs": 21,
+      "durationS": 0.2,
+      "score": 3.69
+    },
+    {
+      "start": 4.64,
+      "sheet": "A#4",
+      "basic": "A#4",
+      "onsetDeltaMs": 5,
+      "durationS": 0.2,
+      "score": 3.73
+    },
+    {
+      "start": 4.84,
+      "sheet": "C5",
+      "basic": "C4",
+      "onsetDeltaMs": 28,
+      "durationS": 0.4,
+      "score": 3.67
+    },
+    {
+      "start": 5.24,
+      "sheet": "C5",
+      "basic": "C4",
+      "onsetDeltaMs": 33,
+      "durationS": 0.2,
+      "score": 3.26
+    },
+    {
+      "start": 5.44,
+      "sheet": "A#4",
+      "basic": "A#3",
+      "onsetDeltaMs": 37,
+      "durationS": 0.41,
+      "score": 3.64
+    },
+    {
+      "start": 5.85,
+      "sheet": "C5",
+      "basic": "C4",
+      "onsetDeltaMs": 39,
+      "durationS": 0.2,
+      "score": 3.05
+    },
+    {
+      "start": 6.05,
+      "sheet": "D5",
+      "basic": "D4",
+      "onsetDeltaMs": 166,
+      "durationS": 0.4,
+      "score": 2.41
+    },
+    {
+      "start": 6.86,
+      "sheet": "C5",
+      "basic": "C4",
+      "onsetDeltaMs": 17,
+      "durationS": 0.4,
+      "score": 3.57
+    },
+    {
+      "start": 7.26,
+      "sheet": "C5",
+      "basic": "C4",
+      "onsetDeltaMs": 47,
+      "durationS": 0.41,
+      "score": 3.61
+    },
+    {
+      "start": 7.67,
+      "sheet": "C5",
+      "basic": "C4",
+      "onsetDeltaMs": 7,
+      "durationS": 0.2,
+      "score": 3.62
+    },
+    {
+      "start": 7.87,
+      "sheet": "A#4",
+      "basic": "A#3",
+      "onsetDeltaMs": 17,
+      "durationS": 0.2,
+      "score": 3.45
+    },
+    {
+      "start": 8.07,
+      "sheet": "C5",
+      "basic": "C4",
+      "onsetDeltaMs": 5,
+      "durationS": 0.2,
+      "score": 3.72
+    },
+    {
+      "start": 8.27,
+      "sheet": "A#4",
+      "basic": "A#2",
+      "onsetDeltaMs": 1,
+      "durationS": 0.2,
+      "score": 3.75
+    }
+  ],
+  "sheetWithoutBasicStartExamples": [
+    {
+      "start": 0.4,
+      "note": "A#5"
+    },
+    {
+      "start": 3.83,
+      "note": "A#4"
+    },
+    {
+      "start": 8.47,
+      "note": "C5"
+    },
+    {
+      "start": 9.28,
+      "note": "D5"
+    },
+    {
+      "start": 11.3,
+      "note": "A#4"
+    },
+    {
+      "start": 19.8,
+      "note": "C6"
+    },
+    {
+      "start": 20.41,
+      "note": "A#5"
+    },
+    {
+      "start": 22.02,
+      "note": "A#4"
+    },
+    {
+      "start": 22.13,
+      "note": "A#4"
+    },
+    {
+      "start": 22.83,
+      "note": "A#4"
+    },
+    {
+      "start": 23.44,
+      "note": "D5"
+    }
+  ],
+  "basicsWithoutSheetSpiceSupportedExamples": [
+    {
+      "start": 0.98,
+      "note": "A#4",
+      "duration": 0.27
+    },
+    {
+      "start": 1.43,
+      "note": "G#5",
+      "duration": 0.19
+    },
+    {
+      "start": 2.83,
+      "note": "F4",
+      "duration": 0.24
+    },
+    {
+      "start": 3.57,
+      "note": "D#4",
+      "duration": 0.27
+    },
+    {
+      "start": 4.04,
+      "note": "C4",
+      "duration": 0.22
+    },
+    {
+      "start": 4.46,
+      "note": "C4",
+      "duration": 0.2
+    },
+    {
+      "start": 4.66,
+      "note": "A#3",
+      "duration": 0.12
+    },
+    {
+      "start": 6.12,
+      "note": "C#4",
+      "duration": 0.09
+    },
+    {
+      "start": 7.56,
+      "note": "C4",
+      "duration": 0.12
+    },
+    {
+      "start": 8.28,
+      "note": "A#4",
+      "duration": 0.16
+    },
+    {
+      "start": 8.28,
+      "note": "A#3",
+      "duration": 0.22
+    },
+    {
+      "start": 8.71,
+      "note": "A#4",
+      "duration": 0.14
+    },
+    {
+      "start": 9.11,
+      "note": "A#3",
+      "duration": 0.23
+    },
+    {
+      "start": 9.33,
+      "note": "C6",
+      "duration": 0.09
+    },
+    {
+      "start": 15.47,
+      "note": "E4",
+      "duration": 0.13
+    }
+  ],
+  "method": "One-to-one Hungarian optimal matching with overlap >= 40ms, onset difference <=180ms, same pitch class up to 1 semitone. No claims of ground truth. SPICE F0 independently measures pitch. SheetSage2 pitch class down octave."
+}
