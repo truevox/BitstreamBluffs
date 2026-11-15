@@ -19,7 +19,7 @@
   - It is still MODDED, never applies on the official Daily, and applies only when owned.
 - **Gate:** 4 new built-game checks: typed daily seed is practice, DAILY RUN is official, ledger v2 tamper rejection, and Head Start >= +15 % at 10 s. Expected counts 38 -> 42 (with boosts) and 27 -> 30.
 - **Known gap:** imported runs saved before this change have no `imported` marker. A legacy imported record on its date's real mask and rule can still hold a streak day.
-- **HUD:** the in-run rule line now reads `DAILY RUN` only for the official Daily, `DAILY PRACTICE <date>` for a typed `daily-*` seed, and `DAILY RULE` otherwise (`DailyPatch.hudRuleLabel`; `RUN_START` carries `dailyOfficial`, typed in events.js).
+- **HUD:** the in-run rule line now reads `DAILY RUN` only for the official Daily, `DAILY PRACTICE <date>` for a typed `daily-*` seed, and `DAILY RULE` otherwise (`DailyPatch.hudRuleLabel`; `RUN_START` carries `dailyOfficial`, typed in events.js). Before RUN_START reaches the HUD, the rule name comes from `DailyPatch.ruleIdForSeed`, so a typed past date shows that date's rule, not today's (found in hand-play).
 
 ## v2.6.0 - biome treatment B1: Wards (Debumont, Garbage Dump Glacier, Underwater Mountain, Candy Cane Canyon) (2026-11-14)
 

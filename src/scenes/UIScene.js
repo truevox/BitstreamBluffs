@@ -303,7 +303,8 @@ export class UIScene extends Phaser.Scene {
       this.ruleText.destroy();
     }
     const info = DailyPatch.getDailyInfo();
-    this.dailyRuleId = this.dailyRuleId || (info.rule && info.rule.id) || '';
+    // before RUN_START arrives, use the rule this seed plays (a typed daily-<date> replays that date's rule)
+    this.dailyRuleId = this.dailyRuleId || DailyPatch.ruleIdForSeed(seed);
     // decision 2: before RUN_START arrives, mirror RunScene's rule (registry flag AND today's daily seed)
     const isOfficial = typeof official === 'boolean'
       ? official

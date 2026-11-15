@@ -33,3 +33,18 @@ describe('UIScene uses the label', () => {
     expect(body).toMatch(/REG\.DAILY_OFFICIAL/);
   });
 });
+
+describe('DailyPatch.ruleIdForSeed (the HUD fallback before RUN_START arrives)', () => {
+  test('a daily-YYYY-MM-DD seed plays THAT date\'s rule, same as RunScene', () => {
+    const k = '2026-11-10';
+    expect(DailyPatch.ruleIdForSeed(`daily-${k}`)).toBe(DailyPatch.infoForDateKey(k).rule.id);
+  });
+  test('any other seed plays today\'s rule', () => {
+    const now = new Date(Date.parse('2026-11-15T12:00:00Z'));
+    expect(DailyPatch.ruleIdForSeed('alpha', now)).toBe(DailyPatch.getDailyInfo(now).rule.id);
+  });
+  test('UIScene falls back to ruleIdForSeed, not to today\'s rule', () => {
+    const src = fs.readFileSync('src/scenes/UIScene.js', 'utf8');
+    expect(src).toMatch(/DailyPatch\.ruleIdForSeed\(seed\)/);
+  });
+});

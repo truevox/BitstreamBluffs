@@ -187,6 +187,12 @@ export class DailyPatch {
    * @param {string} seed @param {boolean} official
    * @returns {string}
    */
+  static dailyRunLabel(seed, official) {
+    const k = DailyPatch.dateKeyFromSeed(seed);
+    if (!k) return '';
+    return official === true ? 'DAILY RUN' : `DAILY PRACTICE ${k}`;
+  }
+
   /**
    * Additive helper (decision 2, HUD): the in-run rule-line prefix. 'DAILY RUN' only for the official Daily,
    * 'DAILY PRACTICE <date>' for any other daily-YYYY-MM-DD seed, 'DAILY RULE' for every other seed.
@@ -198,10 +204,17 @@ export class DailyPatch {
     return DailyPatch.dailyRunLabel(seed, official) || 'DAILY RULE';
   }
 
-  static dailyRunLabel(seed, official) {
+  /**
+   * Additive helper (decision 2, HUD): the rule a run on this seed plays, the same answer RunScene gives.
+   * A daily-YYYY-MM-DD seed plays that date's rule; every other seed plays today's. Pure for a given `now`.
+   * @param {string|null|undefined} seed
+   * @param {Date} [now]
+   * @returns {string} rule id, or '' if none
+   */
+  static ruleIdForSeed(seed, now) {
     const k = DailyPatch.dateKeyFromSeed(seed);
-    if (!k) return '';
-    return official === true ? 'DAILY RUN' : `DAILY PRACTICE ${k}`;
+    const info = k ? DailyPatch.infoForDateKey(k) : DailyPatch.getDailyInfo(now);
+    return (info && info.rule && info.rule.id) || '';
   }
 
   /**
