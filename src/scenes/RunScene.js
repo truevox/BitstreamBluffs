@@ -552,6 +552,7 @@ export class RunScene extends Phaser.Scene {
   onHazard(h) {
     if (h.hit || this.crashed) return;
     if (this.sled.invulnerableMs > 0) return;
+    if (h.isPassable && h.isPassable(this.runTimeMs)) return; // B3: an open Gear Gate is passed (stays armed)
     h.hit = true;
     const def = h.def;
     const eff = def.onHit || { effect: 'crash' };

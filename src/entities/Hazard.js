@@ -9,9 +9,10 @@
 import Phaser from 'phaser';
 import { CAT } from './Sled.js';
 import { hazardColorKey, hazardDrawKind } from '../systems/BiomeEffects.js';
+import { emptyRollState, rollStep, rollParams, rollPredictX, gateOpenAt, gateNextChangeMs } from '../systems/HazardMotion.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
-const { Bodies } = Matter;
+const { Bodies, Body } = Matter;
 const DEG = Math.PI / 180;
 
 /** Tiny deterministic hash -> [0,1). */
@@ -46,17 +47,14 @@ export class Hazard {
     this.h = h;
     const rot = (spawn.rotationDeg || 0) * DEG;
     const air = def.placement === 'air';
-    // centre of the hit-box: sits on the surface (up vector rotated with the ground), or floats at spawn.y for 'air'
-    const cx = air ? spawn.x : spawn.x + Math.sin(rot) * (h / 2);
-    const cy = air ? spawn.y : spawn.y - Math.cos(rot) * (h / 2);
-    this.cx = cx;
-    this.cy = cy;
     // crash hit-boxes are a little smaller than the drawn brackets (forgiving: a normal hop clears a spike)
     const crashy = !def.onHit || def.onHit.effect === 'crash';
     const bw = crashy ? w * 0.72 : w;
     const bh = crashy ? h * 0.8 : h;
-    const bcy = crashy && !air ? cy + (h - bh) / 2 * Math.cos(rot) : cy;
-    const bcx = crashy && !air ? cx - (h - bh) / 2 * Math.sin(rot) : cx;
+    this._crashy = crashy;
+    const { cx, cy, bcx, bcy } = this._boxAt(spawn.x, spawn.y, rot);
+    this.cx = cx;
+    this.cy = cy;
     this.body = Bodies.rectangle(bcx, bcy, bw, bh, {
       isStatic: true,
       isSensor: true,
@@ -69,6 +67,19 @@ export class Hazard {
     this.gfx = scene.add.graphics({ x: air ? spawn.x : spawn.x, y: air ? spawn.y + h / 2 : spawn.y }).setDepth(8);
     this.gfx.setRotation(rot);
     this.seed = spawn.x * 0.013 + spawn.y * 0.007;
+    /**
+     * B3 motion (HazardDef.motion, systems/HazardMotion.js). `roll`: this.roll is the RollState, the entity (cx, cy, body,
+     * gfx) follows the ground at x0 + offset, `spin` turns the drawing, `rolling` is true while it moves. `gate`: `open`
+     * follows gateOpenAt(motion, spawn.phase, run time). Stepped in update(), on or off camera.
+     */
+    this.motion = def.motion && (def.motion.kind === 'roll' || def.motion.kind === 'gate') ? def.motion : null;
+    this.x0 = spawn.x;
+    this.phase = Number.isFinite(spawn.phase) ? spawn.phase : 0;
+    this.roll = emptyRollState();
+    this.rolling = false;
+    this.rollDir = this.motion && this.motion.kind === 'roll' ? rollParams(this.motion).dir : 0;
+    this.spin = 0;
+    this.open = this.motion && this.motion.kind === 'gate' ? gateOpenAt(this.motion, this.phase, 0) : false;
     /** Set by RunScene when an air hazard is about to enter view: faster pulse + a wider warning glow. */
     this.alert = false;
     this._lastDraw = -1e9;
@@ -84,11 +95,87 @@ export class Hazard {
    */
   update(timeMs, camLeft, camRight) {
     if (this.destroyed) return;
+    if (this.motion) this.stepMotion(timeMs);
     const vis = this.cx > camLeft - 80 && this.cx < camRight + 80;
     this.gfx.setVisible(vis);
     if (!vis) return;
     if (timeMs - this._lastDraw < 66) return;
     this.draw(timeMs);
+  }
+
+  /**
+   * Centre of the drawn box and of the (smaller, ground-anchored) crash hit-box for a ground point (x, y) and rotation.
+   * Ground hazards sit on the surface (up vector rotated with the ground); 'air' floats at y. Pure geometry.
+   * @param {number} x @param {number} y @param {number} rot radians
+   * @returns {{cx:number, cy:number, bcx:number, bcy:number}}
+   */
+  _boxAt(x, y, rot) {
+    const air = this.def.placement === 'air';
+    const h = this.h;
+    const cx = air ? x : x + Math.sin(rot) * (h / 2);
+    const cy = air ? y : y - Math.cos(rot) * (h / 2);
+    const bh = this._crashy ? h * 0.8 : h;
+    const bcy = this._crashy && !air ? cy + (h - bh) / 2 * Math.cos(rot) : cy;
+    const bcx = this._crashy && !air ? cx - (h - bh) / 2 * Math.sin(rot) : cx;
+    return { cx, cy, bcx, bcy };
+  }
+
+  /**
+   * B3: advance this hazard's motion to run time `timeMs` (HazardMotion). A roll starts when the sled comes within
+   * ROLL_ACTIVATE_PX and then moves the sensor body, the drawing and cx / cy along the ground (scene.heightFn and
+   * terrain.slopeDegAt: the same surface the sled rides). A gate updates `open` (redrawn at once when it flips).
+   * @param {number} timeMs run time
+   * @param {number} [sledX] defaults to scene.sled.x
+   * @returns {void}
+   */
+  stepMotion(timeMs, sledX) {
+    const m = this.motion;
+    if (!m || this.destroyed) return;
+    if (m.kind === 'gate') {
+      const o = gateOpenAt(m, this.phase, timeMs);
+      if (o !== this.open) { this.open = o; this._lastDraw = -1e9; }
+      return;
+    }
+    const sx = Number.isFinite(sledX) ? sledX : (this.scene.sled && Number.isFinite(this.scene.sled.x) ? this.scene.sled.x : -Infinity);
+    const before = this.roll.offsetPx;
+    this.roll = rollStep(this.roll, m, this.x0, sx, timeMs);
+    const off = this.roll.offsetPx;
+    this.rolling = this.roll.activeAtMs !== null && Math.abs(off) < rollParams(m).rangePx;
+    if (off === before) return;
+    const x = this.x0 + off;
+    const hf = this.scene.heightFn || (this.scene.terrain && this.scene.terrain.heightAt ? (q) => this.scene.terrain.heightAt(q) : null);
+    const y = hf ? hf(x) : this.spawn.y;
+    const slope = this.scene.terrain && this.scene.terrain.slopeDegAt ? this.scene.terrain.slopeDegAt(x) : this.spawn.rotationDeg || 0;
+    const rot = (Number.isFinite(slope) ? slope : 0) * DEG;
+    const b = this._boxAt(x, y, rot);
+    this.cx = b.cx;
+    this.cy = b.cy;
+    Body.setPosition(this.body, { x: b.bcx, y: b.bcy });
+    Body.setAngle(this.body, rot);
+    if (this.gfx) { this.gfx.setPosition(x, y); this.gfx.setRotation(rot); }
+    this.spin = off / Math.max(4, Math.min(this.w, this.h) / 2); // rolling toward -x turns it counter-clockwise
+  }
+
+  /**
+   * B3: can the sled pass through this hazard at run time tMs without a hit? True only for an open Gear Gate.
+   * @param {number} tMs @returns {boolean}
+   */
+  isPassable(tMs) {
+    return !!(this.motion && this.motion.kind === 'gate' && gateOpenAt(this.motion, this.phase, tMs));
+  }
+
+  /**
+   * B3, for a telegraph: the hazard's x at a later run time (a roll that has not started waits at its spawn x; anything
+   * else stays put), and ms until a gate next opens or closes (null for anything but a gate).
+   * @param {number} tMs @returns {number}
+   */
+  predictX(tMs) {
+    return this.motion && this.motion.kind === 'roll' ? rollPredictX(this.roll, this.motion, this.x0, tMs) : this.x0;
+  }
+
+  /** @param {number} tMs @returns {number|null} */
+  gateNextChangeMs(tMs) {
+    return this.motion && this.motion.kind === 'gate' ? gateNextChangeMs(this.motion, this.phase, tMs) : null;
   }
 
   /** @param {number} t time ms. @returns {void} */
