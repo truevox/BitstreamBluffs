@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 49; // B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
-const EXPECTED_WITHOUT_BOOSTS = 37; // B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
+const EXPECTED_WITH_BOOSTS = 55; // B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 43; // B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -2588,6 +2588,281 @@ async function main() {
         else if (pu.crashed || !pu.inWorld || pu.crashEvents.join() !== 'packetSpike:negated') fail(puName, `crash not negated: crashed ${pu.crashed}, CRASH ${pu.crashEvents}`);
         else if (pu.expired.join() !== 'heatShield:consumed' || pu.chipAfter || pu.chargesAfter !== 0) fail(puName, `expired ${pu.expired}, chip left ${pu.chipAfter}, charges ${pu.chargesAfter}`);
         else pass(puName, `${run}: at ${pu.m} m; +1 charge (chip x1), the run's real Packet Spike: CRASH negated, heatShield chip expired (consumed), 0 charges left`);
+      }
+    }
+
+    // ---- B3 (biome full treatment, "Motion"): per biome, a real seed@<bit> run of the built game. The moving hazard's real
+    // entity is driven by the live frame loop (run.update -> renderFrame -> Hazard.update -> HazardMotion) with the real
+    // sled riding toward it: a roll must wait, start while on screen, roll toward the sled at its speed along the ground
+    // (heightAt), and crash the sled on real contact; a gate must open and close on its seeded cycle, be passed while
+    // open and crash while closed. Each glide is measured on the real sled: same seed, same pose, same frames, with and
+    // without it. The Clockwork Treads are measured against a real Steampunk conveyor zone of the run.
+    {
+      const B3 = [
+        { biome: 'pyramid-peak', name: 'Pyramid Peak', seed: 'b3pyramid54', mask: 4, hazard: 'rollingBoulder', powerup: 'sandrunnerSkis' },
+        { biome: 'steampunk-slopes', name: 'Steampunk Slopes', seed: 'b3steam63', mask: 256, hazard: 'gearGate', powerup: 'clockworkTreads' },
+        { biome: 'micro-mountain', name: 'Micro Mountain', seed: 'b3micro26', mask: 512, hazard: 'dewDrop', powerup: 'royalJellyWax' },
+      ];
+      const { ROLL_ACTIVATE_PX, gateTiming } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
+      for (const B of B3) {
+        const hd = HAZ_DEFS[B.hazard];
+        const hzName = hd.motion.kind === 'roll'
+          ? `B3 ${B.name}: ${B.hazard} spawns on ${B.seed}@${B.mask}, starts on screen, rolls toward the real sled along the ground and crashes it on contact`
+          : `B3 ${B.name}: ${B.hazard} spawns on ${B.seed}@${B.mask}, opens and closes on its seeded cycle, is passed open and crashes closed`;
+        const puName = B.powerup === 'clockworkTreads'
+          ? `B3 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and wards off the run's real conveyor push on the real sled`
+          : `B3 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and its glide keeps the real sled faster (same seed, pose and frames)`;
+        const c = await (async () => {
+          const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+          try {
+            const out = await page.evaluate(async ({ B, ACT, motion, gt }) => {
+              const g = window.__bbGame;
+              const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+              g.scene.start('TitleScene');
+              const t0 = Date.now();
+              let run = null;
+              let started = false;
+              while (Date.now() - t0 < 15000) {
+                const tt = g.scene.getScene('TitleScene');
+                if (!started && tt && !tt.starting) { started = true; tt.startRun(`${B.seed}@${B.mask}`); }
+                const rr = g.scene.getScene('RunScene');
+                if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+                await wait(100);
+              }
+              if (!run) return { fatal: 'RunScene never produced a live sled' };
+              await wait(300);
+              if (run.sled.destroyed || !run.sled.inWorld || run.crashed) return { fatal: 'sled died before the probe' };
+              run.scene.pause();
+              const res = { seed: run.seed, mask: run.biomeMask };
+              let clock = run.runTimeMs;
+              const step = (n) => { for (let i = 0; i < n; i++) { clock += 16; run.update(clock, 16); } };
+              const keepAlive = () => { run.sled.invulnerableMs = 1e9; run.pendingCrash = null; };
+              const live = () => { run.sled.invulnerableMs = 0; run.pendingCrash = null; };
+              const hits = [];
+              const onHit = (p) => hits.push({ ...p, t: run.runTimeMs });
+              g.events.on('bb:hazardHit', onHit);
+              const ui = g.scene.getScene('UIScene');
+              const find = (id, list) => {
+                for (let i = 0; i < 200; i++) {
+                  const ch = run.terrain.getChunk(i);
+                  const sp = ch[list].find((s) => s.defId === id);
+                  if (sp) return { ch, sp };
+                }
+                return null;
+              };
+              const taken = [];
+              const entity = (f, map) => {
+                if (!f) return null;
+                if (!run.mesh.chunks.has(f.ch.index)) { run.takeChunk(f.ch); taken.push(f.ch.index); }
+                return (run[map].get(f.ch.index) || []).find((e) => e.def.id === f.sp.defId && e.spawn.x === f.sp.x) || null;
+              };
+              /** Put the real sled on the ground at x, moving along the slope at v px/s. */
+              const poseAt = (x, v) => {
+                run.streamTerrain(x);
+                const ang = run.slopeAt(x);
+                run.sled.setPose(x, run.terrain.heightAt(x) - 18, ang, Math.cos((ang * Math.PI) / 180) * v, Math.sin((ang * Math.PI) / 180) * v);
+                if (run.snapCamera) run.snapCamera(); // the camera follows a teleported sled at once, as it does a respawn
+              };
+              try {
+                keepAlive();
+                run._resetBiomeEffects();
+                step(2);
+                // ---- power-up first (the hazard check ends in a real crash)
+                keepAlive();
+                run._resetBiomeEffects();
+                const fp = find(B.powerup, 'powerups');
+                const p = entity(fp, 'powerups');
+                if (!p) res.pu = { fatal: `no ${B.powerup} in the first 200 chunks of ${B.seed}@${B.mask}` };
+                else if (B.powerup === 'clockworkTreads') {
+                  res.pu = { m: Math.round(fp.sp.x / 20), chunkBiome: fp.ch.biome, drawKind: p.drawKind };
+                  let zc = null;
+                  let zone = null;
+                  for (let i = 0; i < 200 && !zone; i++) {
+                    const ch = run.terrain.getChunk(i);
+                    const z = ch.biome === B.biome && ch.zones.find((q) => q.modId === 'conveyorBelt' && q.x1 - q.x0 >= 300);
+                    if (z) { zc = ch; zone = z; }
+                  }
+                  if (!zone) res.pu.fatal = 'no conveyor zone in a Steampunk chunk';
+                  else {
+                    if (!run.mesh.chunks.has(zc.index)) { run.takeChunk(zc); taken.push(zc.index); }
+                    const ride = (treads) => {
+                      run._resetBiomeEffects();
+                      keepAlive();
+                      poseAt(zone.x0 + 30, 260);
+                      if (treads) run.onPowerUp(p);
+                      step(1);
+                      const drive = run.currentPhys.beltDrivePxS2;
+                      const v0 = run.sled.vx;
+                      for (let i = 0; i < 20; i++) { keepAlive(); step(1); }
+                      return { drive, dv: run.sled.vx - v0, chip: !!(ui && ui.powerups && ui.powerups.has(B.powerup)) };
+                    };
+                    res.pu.belt = ride(false);
+                    res.pu.ward = ride(true);
+                    res.pu.zoneM = Math.round(zone.x0 / 20);
+                  }
+                } else {
+                  res.pu = { m: Math.round(fp.sp.x / 20), chunkBiome: fp.ch.biome, drawKind: p.drawKind };
+                  const sx = fp.sp.x - 900;
+                  const ride = (glide) => {
+                    run._resetBiomeEffects();
+                    keepAlive();
+                    poseAt(sx, 420);
+                    if (glide) run.onPowerUp(p);
+                    step(1);
+                    const resist = run.currentPhys.groundResist;
+                    let grounded = 0;
+                    for (let i = 0; i < 45; i++) { keepAlive(); step(1); if (run.sled.grounded) grounded++; }
+                    return { resist, speed: run.sled.speed, x: run.sled.x, grounded, chip: !!(ui && ui.powerups && ui.powerups.has(B.powerup)) };
+                  };
+                  res.pu.base = ride(false);
+                  res.pu.glide = ride(true);
+                }
+                run._resetBiomeEffects();
+                keepAlive();
+                step(2);
+                // ---- hazard
+                const fh = find(B.hazard, 'hazards');
+                const h = entity(fh, 'hazards');
+                if (!h) res.hz = { fatal: `no ${B.hazard} in the first 200 chunks of ${B.seed}@${B.mask}` };
+                else if (motion.kind === 'roll') {
+                  res.hz = { m: Math.round(fh.sp.x / 20), chunkBiome: fh.ch.biome, drawKind: h.drawKind, danger: h.color === run.palette.danger };
+                  const x0 = h.x0;
+                  const cx0 = h.cx;
+                  poseAt(x0 - ACT - 260, 320);
+                  let actT = null;
+                  let actSledGap = null;
+                  let actOnScreen = null;
+                  let movedEarly = 0;
+                  let groundErr = 0;
+                  let at500 = null;
+                  let liveFrom = null;
+                  hits.length = 0;
+                  for (let i = 0; i < 400; i++) {
+                    if (liveFrom === null) keepAlive();
+                    step(1);
+                    if (h.destroyed) break;
+                    groundErr = Math.max(groundErr, Math.abs(h.gfx.y - run.terrain.heightAt(h.gfx.x)));
+                    if (h.roll.activeAtMs === null) { if (h.cx !== cx0) movedEarly++; continue; }
+                    if (actT === null) {
+                      actT = h.roll.activeAtMs;
+                      actSledGap = x0 - run.sled.x;
+                      const v = run._view;
+                      actOnScreen = h.cx > v.left && h.cx < v.right;
+                    }
+                    if (at500 === null && run.runTimeMs - actT >= 500) at500 = { dt: run.runTimeMs - actT, dx: h.gfx.x - x0 };
+                    // live once it has been seen rolling for 0.3 s (the sled is still well short of it)
+                    if (liveFrom === null && run.runTimeMs - actT >= 300) { live(); liveFrom = run.runTimeMs; res.hz.gapAtLive = Math.round(h.cx - run.sled.x); }
+                    if (hits.length || run.crashed || run.pendingCrash) break;
+                    if (run.sled.x > h.cx + 120) break;
+                  }
+                  res.hz = { ...res.hz, movedEarly, actT, actSledGap, actOnScreen, at500, groundErr, hitEvents: hits.map((p) => `${p.hazardId}:${p.effect}`),
+                    queued: run.pendingCrash ? run.pendingCrash.hazardId : null, crashed: run.crashed, sledX: Math.round(run.sled.x), hcx: Math.round(h.cx), speed: Math.round(run.sled.speed) };
+                } else {
+                  res.hz = { m: Math.round(fh.sp.x / 20), chunkBiome: fh.ch.biome, drawKind: h.drawKind, danger: h.color === run.palette.danger, phase: h.phase };
+                  // the cycle: 3 s of frames, sled far away
+                  let flips = 0;
+                  let closedRun = 0;
+                  let worstClosed = 0;
+                  let mismatch = 0;
+                  let last = null;
+                  let openFrames = 0;
+                  for (let i = 0; i < 190; i++) {
+                    keepAlive();
+                    step(1);
+                    if (h.open !== h.isPassable(run.runTimeMs)) mismatch++;
+                    if (last !== null && h.open !== last) flips++;
+                    last = h.open;
+                    if (h.open) { openFrames++; closedRun = 0; } else { closedRun += 16; worstClosed = Math.max(worstClosed, closedRun); }
+                  }
+                  res.hz = { ...res.hz, flips, worstClosed, mismatch, openShare: openFrames / 190 };
+                  // forced: onHazard while open (passed, stays armed), then while closed (crash queued)
+                  let k = 0;
+                  while (!h.open && k++ < 200) { keepAlive(); step(1); }
+                  live(); h.hit = false; hits.length = 0;
+                  run.onHazard(h);
+                  res.hz.openHit = { hits: hits.length, armed: !h.hit, queued: run.pendingCrash ? run.pendingCrash.hazardId : null };
+                  k = 0;
+                  while (h.open && k++ < 200) { keepAlive(); step(1); }
+                  live(); h.hit = false; hits.length = 0;
+                  run.onHazard(h);
+                  res.hz.closedHit = { hits: hits.map((p) => `${p.hazardId}:${p.effect}`), queued: run.pendingCrash ? run.pendingCrash.hazardId : null,
+                    open: h.open, passable: h.isPassable(run.runTimeMs), crashed: run.crashed, inv: run.sled.invulnerableMs, t: run.runTimeMs, k };
+                  keepAlive();
+                  h.hit = false;
+                  // a real ride through the gate: whatever the state at contact, the outcome must match it
+                  poseAt(h.x0 - 280, 340);
+                  live();
+                  hits.length = 0;
+                  let passed = false;
+                  for (let i = 0; i < 200; i++) {
+                    step(1);
+                    if (hits.length || run.crashed || run.pendingCrash) break;
+                    if (run.sled.x > h.cx + 60) { passed = true; break; }
+                  }
+                  const hit = hits[0];
+                  res.hz.ride = { passed, hit: hit ? `${hit.hazardId}:${hit.effect}` : null, openAtHit: hit ? h.isPassable(hit.t) : null, crashed: run.crashed || !!run.pendingCrash, cross: Math.round(run.sled.x - h.cx) };
+                }
+              } catch (e) { res.fatal = String(e && e.stack || e); }
+              g.events.off('bb:hazardHit', onHit);
+              for (const idx of taken) run.dropChunk(idx);
+              run._resetBiomeEffects();
+              return res;
+            }, { B, ACT: ROLL_ACTIVATE_PX, motion: hd.motion, gt: gateTiming(hd.motion) }).catch((e) => ({ fatal: String(e) }));
+            return { errors, out };
+          } finally { await page.close(); }
+        })();
+        const o = c.out;
+        if (o.fatal || c.errors.length) {
+          fail(hzName, o.fatal || `page errors: ${c.errors.join(' | ')}`);
+          fail(puName, o.fatal || `page errors: ${c.errors.join(' | ')}`);
+          continue;
+        }
+        const run = `run ${o.seed}@${o.mask}`;
+        const hz = o.hz;
+        if (o.seed !== B.seed || o.mask !== B.mask) fail(hzName, `the run is ${run}, not ${B.seed}@${B.mask}`);
+        else if (hz.fatal) fail(hzName, hz.fatal);
+        else if (hz.chunkBiome !== B.biome) fail(hzName, `spawned in a ${hz.chunkBiome} chunk`);
+        else if (hz.drawKind !== hd.shapeKey || !hz.danger) fail(hzName, `entity draws '${hz.drawKind}', danger ${hz.danger}`);
+        else if (hd.motion.kind === 'roll') {
+          const v = hd.motion.speedPxS;
+          const want = -v * (hz.at500 ? hz.at500.dt : 500) / 1000;
+          if (hz.movedEarly) fail(hzName, `moved ${hz.movedEarly} frames before the sled reached the activation line`);
+          else if (hz.actT === null) fail(hzName, 'never started rolling');
+          else if (!hz.actOnScreen || hz.actSledGap > ROLL_ACTIVATE_PX + 1 || hz.actSledGap < ROLL_ACTIVATE_PX - 20) fail(hzName, `started with the sled ${hz.actSledGap} px away (want ~${ROLL_ACTIVATE_PX}), on screen ${hz.actOnScreen}`);
+          else if (!hz.at500 || Math.abs(hz.at500.dx - want) > 3) fail(hzName, `rolled ${hz.at500 && hz.at500.dx} px in ${hz.at500 && hz.at500.dt} ms (want ${want.toFixed(1)}, toward the sled)`);
+          else if (!(hz.groundErr < 0.01)) fail(hzName, `left the ground: |y - heightAt| up to ${hz.groundErr}`);
+          else if (hz.hitEvents.join() !== `${B.hazard}:crash` || !(hz.queued === B.hazard || hz.crashed)) fail(hzName, `no real crash on contact: HAZARD_HIT ${hz.hitEvents}, queued ${hz.queued}, sled x ${hz.sledX} vs hazard ${hz.hcx}, speed ${hz.speed}`);
+          else pass(hzName, `${run}: at ${hz.m} m; still until the sled was ${hz.actSledGap} px away (on screen), then ${hz.at500.dx.toFixed(1)} px in ${hz.at500.dt} ms on the ground (max |y - heightAt| ${hz.groundErr.toExponential(1)}); live at ${hz.gapAtLive} px, the real sled hit it: ${hz.hitEvents}, run crashed ${hz.crashed}`);
+        } else {
+          const gt = gateTiming(hd.motion);
+          const r = hz.ride;
+          const rideOk = r && ((r.passed && !r.hit && !r.crashed) || (r.hit === `${B.hazard}:crash` && r.openAtHit === false));
+          if (hz.mismatch) fail(hzName, `open flag disagreed with isPassable on ${hz.mismatch} frames`);
+          else if (hz.flips < 3 || hz.worstClosed > gt.closedMs + 16 || Math.abs(hz.openShare - gt.openMs / gt.periodMs) > 0.1) fail(hzName, `cycle: ${hz.flips} flips, worst closed ${hz.worstClosed} ms (max ${gt.closedMs}), open share ${hz.openShare.toFixed(2)}`);
+          else if (hz.openHit.hits || !hz.openHit.armed || hz.openHit.queued) fail(hzName, `open gate was hit: ${JSON.stringify(hz.openHit)}`);
+          else if (hz.closedHit.hits.join() !== `${B.hazard}:crash` || hz.closedHit.queued !== B.hazard) fail(hzName, `closed gate did not crash: ${JSON.stringify(hz.closedHit)}`);
+          else if (!rideOk) fail(hzName, `real ride outcome does not match the gate state: ${JSON.stringify(r)}`);
+          else pass(hzName, `${run}: at ${hz.m} m, phase ${hz.phase}; ${hz.flips} flips in 3 s, worst closed ${hz.worstClosed} ms, open share ${hz.openShare.toFixed(2)}; open: passed and still armed; closed: crash queued; real ride: ${r.passed ? 'passed while open' : `crashed while closed (${r.hit})`}`);
+        }
+
+        const pu = o.pu;
+        if (pu.fatal) fail(puName, pu.fatal);
+        else if (pu.chunkBiome !== B.biome) fail(puName, `spawned in a ${pu.chunkBiome} chunk`);
+        else if (pu.drawKind !== PU_DEFS[B.powerup].shapeKey) fail(puName, `entity draws '${pu.drawKind}'`);
+        else if (B.powerup === 'clockworkTreads') {
+          const { belt, ward } = pu;
+          if (!(belt.drive > 0)) fail(puName, `control: no conveyor drive on the zone (${belt.drive})`);
+          else if (ward.drive !== 0 || !ward.chip) fail(puName, `with the Treads: drive ${ward.drive}, chip ${ward.chip}`);
+          else if (!(Math.abs(belt.dv - ward.dv) > 5)) fail(puName, `the sled's speed change did not differ: belt ${belt.dv.toFixed(1)} vs warded ${ward.dv.toFixed(1)} px/s over 20 frames`);
+          else pass(puName, `${run}: conveyor zone at ${pu.zoneM} m: drive ${belt.drive} -> ${ward.drive} px/s^2; the real sled's vx change over 20 frames ${belt.dv.toFixed(1)} -> ${ward.dv.toFixed(1)} px/s`);
+        } else {
+          const { base, glide } = pu;
+          if (!(Math.abs(glide.resist - base.resist * 0.7) < 1e-9)) fail(puName, `groundResist ${base.resist} -> ${glide.resist} (want x0.7)`);
+          else if (!glide.chip) fail(puName, 'no HUD chip');
+          else if (base.grounded < 20 || glide.grounded < 20) fail(puName, `the sled was not on the ground (grounded frames ${base.grounded} / ${glide.grounded})`);
+          else if (!(glide.speed > base.speed + 0.5)) fail(puName, `speed after 45 frames: ${glide.speed.toFixed(2)} gliding vs ${base.speed.toFixed(2)} without`);
+          else pass(puName, `${run}: groundResist ${base.resist.toFixed(4)} -> ${glide.resist.toFixed(4)}; same pose, 45 frames: speed ${base.speed.toFixed(1)} -> ${glide.speed.toFixed(1)} px/s, x ${base.x.toFixed(0)} -> ${glide.x.toFixed(0)}`);
+        }
       }
     }
 
