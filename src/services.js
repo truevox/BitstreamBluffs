@@ -8,6 +8,7 @@ import { loadContent } from './data/index.js';
 import { SaveStore } from './systems/SaveStore.js';
 import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
+import { StemMusicDirector } from './systems/music/StemMusicDirector.js';
 import { createProgressionService } from './systems/ProgressionService.js';
 import { createMissionsService } from './systems/MissionsService.js';
 
@@ -26,7 +27,9 @@ export async function createServices(game) {
   game.registry.set(REG.SETTINGS, settings);
   game.registry.set(REG.CONTENT, loadContent());
   game.registry.set(REG.INPUT, new InputRouter(game));
-  game.registry.set(REG.AUDIO, new AudioSynth(game));
+  const audio = new AudioSynth(game);
+  game.registry.set(REG.AUDIO, audio);
+  audio.setMusicProvider(new StemMusicDirector(audio));
   if (!game.registry.get(REG.SEED)) game.registry.set(REG.SEED, String(Date.now()));
   game.registry.get(REG.INPUT).applySettings(settings);
   game.registry.get(REG.AUDIO).applySettings(settings);

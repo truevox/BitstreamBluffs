@@ -173,6 +173,13 @@ export class UIScene extends Phaser.Scene {
     this._buildStats();
     this._buildCenter();
     this._buildFooter();
+    // Captions are independent of audible vocals, and hidden without aligned metadata.
+    // Keep out of the main HUD container so visual glitch jitter cannot ruin readability.
+    this.lyricCaption = new NeonText(this, theme, GAME_WIDTH / 2, GAME_HEIGHT - 69,
+      '', { color: 'cyan', anchor: 'center', outline: 'dark' });
+    this.lyricCaption.setDepth(100);
+    this.lyricCaption.setVisible(false);
+    this._captionPollMs = 0;
     this._buildSeedInfo(this.registry.get(REG.SEED));
     this.scan = addScanlines(this, 0.55);
 
@@ -1224,6 +1231,20 @@ export class UIScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this.frozen) return;
+    this._captionPollMs += delta;
+    if (this._captionPollMs >= 60) {
+      this._captionPollMs = 0;
+      const audio = this.registry.get(REG.AUDIO);
+      const caption = audio?.currentMusicCaption?.();
+      const text = caption ? String(caption.text).toUpperCase().slice(0, 56) : '';
+      this.lyricCaption?.setText(text);
+      this.lyricCaption?.setVisible(Boolean(text));
+      // Cheap audio-reactive scanline shimmer: visual-only, with a small bounded range.
+      const energy = audio?.musicEnergy?.();
+      if (this.scan?.setAlpha && energy) {
+        this.scan.setAlpha(0.52 + Math.min(0.1, Math.max(0, energy.bass || 0) * 0.1));
+      }
+    }
     this.nowMs += delta;
     // power-up timers
     let dirty = false;

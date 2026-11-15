@@ -27,3 +27,6 @@ config.txt
 /coverage
 /tools/sim/.pacing
 /tools/sim/__pycache__
+
+public/music/
+/tools/music/__pycache__/

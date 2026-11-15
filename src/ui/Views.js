@@ -185,7 +185,7 @@ export class LeaderboardView extends View {
 export class SettingsView extends View {
   /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
   constructor(scene, theme, o) {
-    super(scene, theme, { w: 320, h: 186, title: 'SETTINGS', color: 'amber', onClose: o.onClose, y: 40, backLabel: 'DONE' });
+    super(scene, theme, { w: 320, h: 202, title: 'SETTINGS', color: 'amber', onClose: o.onClose, y: 30, backLabel: 'DONE' });
     const game = scene.game;
     const s = () => game.registry.get(REG.SETTINGS) || {};
     const items = [
@@ -196,6 +196,10 @@ export class SettingsView extends View {
       { kind: 'slider', label: 'MASTER VOLUME', get: () => s().masterVolume, set: (v) => updateSetting(game, 'masterVolume', v) },
       { kind: 'slider', label: 'MUSIC VOLUME', get: () => s().musicVolume, set: (v) => updateSetting(game, 'musicVolume', v) },
       { kind: 'slider', label: 'SFX VOLUME', get: () => s().sfxVolume, set: (v) => updateSetting(game, 'sfxVolume', v) },
+      { kind: 'choice', label: 'MUSIC VOCALS', options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+        get: () => s().musicVocals === true, set: (v) => updateSetting(game, 'musicVocals', v) },
+      { kind: 'choice', label: 'LYRIC CAPTIONS', options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+        get: () => s().musicCaptions === true, set: (v) => updateSetting(game, 'musicCaptions', v) },
       { kind: 'choice', label: 'TILT CONTROLS (90)', options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
         get: () => !!s().touchRotate90, set: (v) => updateSetting(game, 'touchRotate90', v) },
       { kind: 'choice', label: 'TOUCH BUTTONS', options: [{ value: 'auto', label: 'AUTO' }, { value: 'on', label: 'ON' }, { value: 'off', label: 'OFF' }],
