@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 64; // Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
-const EXPECTED_WITHOUT_BOOSTS = 52; // Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
+const EXPECTED_WITH_BOOSTS = 66; // B3 tuning: +2 (each rolling hazard never catches a moving sled and overtakes a stopped one slowly, in view); Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 54; // B3 tuning: +2; Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -2838,7 +2838,7 @@ async function main() {
         { biome: 'steampunk-slopes', name: 'Steampunk Slopes', seed: 'b3steam63', mask: 256, hazard: 'gearGate', powerup: 'clockworkTreads' },
         { biome: 'micro-mountain', name: 'Micro Mountain', seed: 'b3micro26', mask: 512, hazard: 'dewDrop', powerup: 'royalJellyWax' },
       ];
-      const { ROLL_ACTIVATE_PX, gateTiming } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
+      const { ROLL_ACTIVATE_PX, gateTiming, rollParams, rollOffsetAt } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
       const { glideDrag, glideFrictionMul } = await import(path.join(ROOT, 'src/systems/BiomeEffects.js'));
       // B3 tuning (Marvin 2026-11-15, "make it felt"): after 2 s on the same seed and pose a glide must be this much faster
       // and further than the same ride without it. A friction-only glide measured +17 px/s / +15 px (Royal Jelly Wax).
@@ -2847,7 +2847,7 @@ async function main() {
       for (const B of B3) {
         const hd = HAZ_DEFS[B.hazard];
         const hzName = hd.motion.kind === 'roll'
-          ? `B3 ${B.name}: ${B.hazard} spawns on ${B.seed}@${B.mask}, starts on screen, rolls toward the real sled along the ground and crashes it on contact`
+          ? `B3 ${B.name}: ${B.hazard} spawns on ${B.seed}@${B.mask}, starts on screen, rolls downhill away from the real sled along the ground (under its cap), and the sled catches it and crashes on contact`
           : `B3 ${B.name}: ${B.hazard} spawns on ${B.seed}@${B.mask}, opens and closes on its seeded cycle, is passed open and crashes closed`;
         const puName = B.powerup === 'clockworkTreads'
           ? `B3 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and wards off the run's real conveyor push on the real sled`
@@ -2983,6 +2983,9 @@ async function main() {
                   res.hz = { m: Math.round(fh.sp.x / 20), chunkBiome: fh.ch.biome, drawKind: h.drawKind, danger: h.color === run.palette.danger };
                   const x0 = h.x0;
                   const cx0 = h.cx;
+                  // B3 tuning: only this hazard can hit (the downhill placement can put a base hazard on the approach)
+                  const onHzAll = run.onHazard;
+                  run.onHazard = (q) => { if (q === h) onHzAll.call(run, q); };
                   poseAt(x0 - ACT - 260, 320);
                   let actT = null;
                   let actSledGap = null;
@@ -2991,11 +2994,17 @@ async function main() {
                   let groundErr = 0;
                   let at500 = null;
                   let liveFrom = null;
+                  let maxV = 0;
+                  let minV = Infinity;
+                  let lastX = h.gfx.x;
                   hits.length = 0;
                   for (let i = 0; i < 400; i++) {
                     if (liveFrom === null) keepAlive();
                     step(1);
                     if (h.destroyed) break;
+                    const fv = (h.gfx.x - lastX) / 0.016;
+                    lastX = h.gfx.x;
+                    if (h.roll.activeAtMs !== null && h.rolling) { maxV = Math.max(maxV, fv); minV = Math.min(minV, fv); }
                     groundErr = Math.max(groundErr, Math.abs(h.gfx.y - run.terrain.heightAt(h.gfx.x)));
                     if (h.roll.activeAtMs === null) { if (h.cx !== cx0) movedEarly++; continue; }
                     if (actT === null) {
@@ -3004,13 +3013,14 @@ async function main() {
                       const v = run._view;
                       actOnScreen = h.cx > v.left && h.cx < v.right;
                     }
-                    if (at500 === null && run.runTimeMs - actT >= 500) at500 = { dt: run.runTimeMs - actT, dx: h.gfx.x - x0 };
+                    if (at500 === null && run.runTimeMs - actT >= 300) at500 = { dt: run.runTimeMs - actT, dx: h.gfx.x - x0 };
                     // live once it has been seen rolling for 0.3 s (the sled is still well short of it)
                     if (liveFrom === null && run.runTimeMs - actT >= 300) { live(); liveFrom = run.runTimeMs; res.hz.gapAtLive = Math.round(h.cx - run.sled.x); }
                     if (hits.length || run.crashed || run.pendingCrash) break;
                     if (run.sled.x > h.cx + 120) break;
                   }
-                  res.hz = { ...res.hz, movedEarly, actT, actSledGap, actOnScreen, at500, groundErr, hitEvents: hits.map((p) => `${p.hazardId}:${p.effect}`),
+                  run.onHazard = onHzAll;
+                  res.hz = { ...res.hz, movedEarly, actT, actSledGap, actOnScreen, at500, groundErr, maxV, minV, hitEvents: hits.map((p) => `${p.hazardId}:${p.effect}`),
                     queued: run.pendingCrash ? run.pendingCrash.hazardId : null, crashed: run.crashed, sledX: Math.round(run.sled.x), hcx: Math.round(h.cx), speed: Math.round(run.sled.speed) };
                 } else {
                   res.hz = { m: Math.round(fh.sp.x / 20), chunkBiome: fh.ch.biome, drawKind: h.drawKind, danger: h.color === run.palette.danger, phase: h.phase };
@@ -3081,15 +3091,19 @@ async function main() {
         else if (hz.chunkBiome !== B.biome) fail(hzName, `spawned in a ${hz.chunkBiome} chunk`);
         else if (hz.drawKind !== hd.shapeKey || !hz.danger) fail(hzName, `entity draws '${hz.drawKind}', danger ${hz.danger}`);
         else if (hd.motion.kind === 'roll') {
-          const v = hd.motion.speedPxS;
-          const want = -v * (hz.at500 ? hz.at500.dt : 500) / 1000;
+          // B3 tuning: downhill (+x), from rest, at a slope-following speed between the flat-ground floor and the cap
+          const cap = rollParams(hd.motion).speedPxS;
+          const dt500 = hz.at500 ? hz.at500.dt : 300;
+          const lo500 = rollOffsetAt(hd.motion, dt500, () => 0, 0);
+          const hi500 = rollOffsetAt(hd.motion, dt500, () => 90, 0);
           if (hz.movedEarly) fail(hzName, `moved ${hz.movedEarly} frames before the sled reached the activation line`);
           else if (hz.actT === null) fail(hzName, 'never started rolling');
           else if (!hz.actOnScreen || hz.actSledGap > ROLL_ACTIVATE_PX + 1 || hz.actSledGap < ROLL_ACTIVATE_PX - 20) fail(hzName, `started with the sled ${hz.actSledGap} px away (want ~${ROLL_ACTIVATE_PX}), on screen ${hz.actOnScreen}`);
-          else if (!hz.at500 || Math.abs(hz.at500.dx - want) > 3) fail(hzName, `rolled ${hz.at500 && hz.at500.dx} px in ${hz.at500 && hz.at500.dt} ms (want ${want.toFixed(1)}, toward the sled)`);
+          else if (!hz.at500 || !(hz.at500.dx >= lo500 - 0.5 && hz.at500.dx <= hi500 + 0.5)) fail(hzName, `rolled ${hz.at500 && hz.at500.dx} px in ${dt500} ms (want downhill, +${lo500.toFixed(1)}..+${hi500.toFixed(1)} px)`);
+          else if (!(hz.maxV <= cap + 0.5) || !(hz.minV >= -0.5)) fail(hzName, `speed ${hz.minV.toFixed(1)}..${hz.maxV.toFixed(1)} px/s while rolling (want 0..${cap}, never back toward the sled)`);
           else if (!(hz.groundErr < 0.01)) fail(hzName, `left the ground: |y - heightAt| up to ${hz.groundErr}`);
           else if (hz.hitEvents.join() !== `${B.hazard}:crash` || !(hz.queued === B.hazard || hz.crashed)) fail(hzName, `no real crash on contact: HAZARD_HIT ${hz.hitEvents}, queued ${hz.queued}, sled x ${hz.sledX} vs hazard ${hz.hcx}, speed ${hz.speed}`);
-          else pass(hzName, `${run}: at ${hz.m} m; still until the sled was ${hz.actSledGap} px away (on screen), then ${hz.at500.dx.toFixed(1)} px in ${hz.at500.dt} ms on the ground (max |y - heightAt| ${hz.groundErr.toExponential(1)}); live at ${hz.gapAtLive} px, the real sled hit it: ${hz.hitEvents}, run crashed ${hz.crashed}`);
+          else pass(hzName, `${run}: at ${hz.m} m; still until the sled was ${hz.actSledGap} px away (on screen), then +${hz.at500.dx.toFixed(1)} px downhill in ${hz.at500.dt} ms (${lo500.toFixed(1)}..${hi500.toFixed(1)}), top ${hz.maxV.toFixed(1)} px/s (cap ${cap}) on the ground (max |y - heightAt| ${hz.groundErr.toExponential(1)}); live at ${hz.gapAtLive} px, the real sled hit it: ${hz.hitEvents}, run crashed ${hz.crashed}`);
         } else {
           const gt = gateTiming(hd.motion);
           const r = hz.ride;
@@ -3129,6 +3143,147 @@ async function main() {
       }
     }
 
+
+    // ---- B3 tuning (Marvin 2026-11-15): a rolling hazard rolls downhill, away from the sled. One that catches the sled up
+    // from behind never reaches a sled moving at a normal speed, and overtakes a stopped sled slowly and in view. Real
+    // seed@<bit> runs of the built game; the hazard entity is driven by the live frame loop. Only this hazard can hit.
+    {
+      const { ROLL_ACTIVATE_PX, rollParams } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
+      const ROLLERS = [
+        { name: 'Pyramid Peak', seed: 'b3pyramid54', mask: 4, hazard: 'rollingBoulder' },
+        { name: 'Micro Mountain', seed: 'b3micro26', mask: 512, hazard: 'dewDrop' },
+      ];
+      for (const R of ROLLERS) {
+        const hd = HAZ_DEFS[R.hazard];
+        const rp = rollParams(hd.motion);
+        const name = `B3 tuning ${R.name}: ${R.hazard} on ${R.seed}@${R.mask} never catches a sled moving at 200 px/s, and overtakes a stopped sled slowly (<= ${rp.speedPxS} px/s) and in view`;
+        const c = await (async () => {
+          const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+          try {
+            const out = await page.evaluate(async ({ R, ACT }) => {
+              const g = window.__bbGame;
+              const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+              g.scene.start('TitleScene');
+              const t0 = Date.now();
+              let run = null;
+              let started = false;
+              while (Date.now() - t0 < 15000) {
+                const tt = g.scene.getScene('TitleScene');
+                if (!started && tt && !tt.starting) { started = true; tt.startRun(`${R.seed}@${R.mask}`); }
+                const rr = g.scene.getScene('RunScene');
+                if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+                await wait(100);
+              }
+              if (!run) return { fatal: 'RunScene never produced a live sled' };
+              await wait(300);
+              if (run.sled.destroyed || !run.sled.inWorld || run.crashed) return { fatal: 'sled died before the probe' };
+              run.scene.pause();
+              const res = { seed: run.seed, mask: run.biomeMask };
+              let clock = run.runTimeMs;
+              const step = () => { clock += 16; run.update(clock, 16); };
+              const keepAlive = () => { run.sled.invulnerableMs = 1e9; run.pendingCrash = null; };
+              const live = () => { run.sled.invulnerableMs = 0; };
+              const hits = [];
+              const onHit = (p) => hits.push({ ...p, t: run.runTimeMs });
+              g.events.on('bb:hazardHit', onHit);
+              const taken = [];
+              const poseAt = (x, v) => {
+                run.streamTerrain(x);
+                const ang = run.slopeAt(x);
+                run.sled.setPose(x, run.terrain.heightAt(x) - 18, ang, Math.cos((ang * Math.PI) / 180) * v, Math.sin((ang * Math.PI) / 180) * v);
+                if (run.snapCamera) run.snapCamera();
+              };
+              const onPU = run.onPowerUp;
+              const onHz = run.onHazard;
+              try {
+                let f = null;
+                for (let i = 0; i < 200 && !f; i++) {
+                  const ch = run.terrain.getChunk(i);
+                  const sp = ch.hazards.find((q) => q.defId === R.hazard);
+                  if (sp) f = { ch, sp };
+                }
+                if (!f) return { ...res, fatal: `no ${R.hazard} in the first 200 chunks` };
+                if (!run.mesh.chunks.has(f.ch.index)) { run.takeChunk(f.ch); taken.push(f.ch.index); }
+                const h = (run.hazards.get(f.ch.index) || []).find((e) => e.def.id === R.hazard && e.spawn.x === f.sp.x);
+                if (!h) return { ...res, fatal: 'no hazard entity' };
+                res.m = Math.round(h.x0 / 20);
+                run.onPowerUp = () => {};
+                run.onHazard = (q) => { if (q === h) onHz.call(run, q); };
+                const restart = () => {
+                  h.roll = { activeAtMs: null, offsetPx: 0, vPxS: 0, simMs: 0, simDist: 0, simV: 0 };
+                  h.hit = false;
+                  h.stepMotion(run.runTimeMs, -Infinity);
+                  keepAlive();
+                  // the sled reaches the activation line (sled.x syncs from the body after a frame): the roll starts there
+                  for (let k = 0; k < 3 && h.roll.activeAtMs === null; k++) { poseAt(h.x0 - ACT + 2, 0); step(); }
+                };
+                // (1) a sled moving at 200 px/s, 60 px ahead of the hazard when it starts
+                restart();
+                const startedA = h.roll.activeAtMs !== null;
+                poseAt(h.x0 + 60, 200);
+                live();
+                hits.length = 0;
+                let behind = true;
+                let gapMin = Infinity;
+                for (let i = 0; i < 150; i++) {
+                  run.pendingCrash = null;
+                  step();
+                  if (h.cx >= run.sled.x) behind = false;
+                  gapMin = Math.min(gapMin, run.sled.x - h.cx);
+                  if (hits.length) break;
+                }
+                res.moving = { started: startedA, hits: hits.map((p) => p.hazardId), behind, gapMin: Math.round(gapMin), sledV: Math.round(run.sled.speed) };
+                // (2) a stopped sled 80 px ahead of the start, held still: the hazard must reach it slowly and in view
+                restart();
+                const startedB = h.roll.activeAtMs !== null;
+                const xs = h.x0 + 80;
+                keepAlive();
+                for (let i = 0; i < 30; i++) { poseAt(xs, 0); step(); } // camera settles on the stopped sled
+                h.roll = { activeAtMs: null, offsetPx: 0, vPxS: 0, simMs: 0, simDist: 0, simV: 0 };
+                h.stepMotion(run.runTimeMs, xs); // it starts now (the sled is past its activation line)
+                const tStart = run.runTimeMs;
+                live();
+                hits.length = 0;
+                let offScreen = 0;
+                let maxV = 0;
+                let lastX = h.cx;
+                let behindPx = null;
+                let hitT = null;
+                for (let i = 0; i < 600; i++) {
+                  poseAt(xs, 0);
+                  run.pendingCrash = null;
+                  step();
+                  const v = run._view;
+                  if (behindPx === null) behindPx = Math.round(xs - v.left);
+                  if (!(h.cx > v.left && h.cx < v.right)) offScreen++;
+                  maxV = Math.max(maxV, (h.cx - lastX) / 0.016);
+                  lastX = h.cx;
+                  if (hits.length) { hitT = run.runTimeMs - tStart; break; }
+                }
+                res.stopped = { started: startedB, hits: hits.map((p) => `${p.hazardId}:${p.effect}`), hitMs: hitT, offScreen, maxV: +maxV.toFixed(1), behindPx, startGap: Math.round(xs - h.x0) };
+              } catch (e) { res.fatal = String(e && e.stack || e); }
+              run.onPowerUp = onPU;
+              run.onHazard = onHz;
+              g.events.off('bb:hazardHit', onHit);
+              for (const idx of taken) run.dropChunk(idx);
+              return res;
+            }, { R, ACT: ROLL_ACTIVATE_PX }).catch((e) => ({ fatal: String(e) }));
+            return { errors, out };
+          } finally { await page.close(); }
+        })();
+        const o = c.out;
+        if (o.fatal || c.errors.length) { fail(name, o.fatal || `page errors: ${c.errors.join(' | ')}`); continue; }
+        const run = `run ${o.seed}@${o.mask}`;
+        const { moving, stopped } = o;
+        if (o.seed !== R.seed || o.mask !== R.mask) fail(name, `the run is ${run}`);
+        else if (!moving.started || !stopped.started) fail(name, `the roll did not start at the activation line (${moving.started} / ${stopped.started})`);
+        else if (moving.hits.length || !moving.behind) fail(name, `a sled moving at 200 px/s was caught: hits ${moving.hits}, stayed ahead ${moving.behind}, closest ${moving.gapMin} px`);
+        else if (stopped.hits.join() !== `${R.hazard}:crash`) fail(name, `the stopped sled was never reached: hits ${stopped.hits}`);
+        else if (!(stopped.maxV <= rp.speedPxS + 0.5)) fail(name, `overtook at up to ${stopped.maxV} px/s (cap ${rp.speedPxS})`);
+        else if (stopped.offScreen) fail(name, `the hazard was off screen for ${stopped.offScreen} frames of its approach`);
+        else pass(name, `${run}: at ${o.m} m; moving sled (200 px/s): never caught, closest ${moving.gapMin} px ahead; stopped sled ${stopped.startGap} px ahead of the start: reached after ${stopped.hitMs} ms at <= ${stopped.maxV} px/s, on screen the whole approach (${stopped.behindPx} px of ground on screen behind the sled), ${stopped.hits}`);
+      }
+    }
     // ---- Micro Mountain glow-up. (1) HUGE bees: a real beegate0@512 run (sector 2, 1000-1500 m, is Micro Mountain,
     // sector 3 is base terrain) rides the live loop into Micro; the backdrop draws bees (Background.beeCount, sampled
     // over 3 s since a bee drifts on and off screen), and the backdrop Graphics is below the terrain, hazard,
