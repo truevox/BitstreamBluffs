@@ -53,6 +53,10 @@ const POWERUP_INFO = {
   // B2 biome pickups
   crystalClearGoggles: { name: 'GOGGLES', color: 'cyan' },
   heatShield: { name: 'HEAT SHIELD', color: 'magenta' },
+  // B3 biome pickups
+  sandrunnerSkis: { name: 'SANDRUNNER SKIS', color: 'amber' },
+  royalJellyWax: { name: 'JELLY WAX', color: 'amber' },
+  clockworkTreads: { name: 'CLOCKWORK TREADS', color: 'cyan' },
 };
 /** B1: a biome hazard names itself on the effect warning line instead of the generic effect label. */
 const HAZARD_LABEL = {
@@ -460,6 +464,23 @@ export class UIScene extends Phaser.Scene {
       g.strokeCircle(cx + 3.5, cy + 1, 3);
       g.lineBetween(cx - 7, cy - 1, cx + 7, cy - 1);
       g.fillCircle(cx - 4.5, cy, 1);
+    } else if (id === 'sandrunnerSkis') {
+      // B3: two skis with upturned tips
+      g.lineBetween(cx - 7, cy - 2, cx + 4, cy - 2);
+      g.lineBetween(cx - 7, cy + 3, cx + 4, cy + 3);
+      g.lineBetween(cx + 4, cy - 2, cx + 7, cy - 5);
+      g.lineBetween(cx + 4, cy + 3, cx + 7, cy);
+    } else if (id === 'royalJellyWax') {
+      // B3: a honeycomb cell with a drop of jelly
+      const hx = [];
+      for (let k = 0; k < 6; k++) hx.push({ x: cx + Math.cos((k * Math.PI) / 3) * 6, y: cy + Math.sin((k * Math.PI) / 3) * 6 });
+      g.strokePoints(hx, true, true);
+      g.fillCircle(cx, cy + 1, 2.5);
+    } else if (id === 'clockworkTreads') {
+      // B3: a tread loop round a cog
+      g.strokeRect(cx - 7, cy - 4, 14, 8);
+      g.strokeCircle(cx, cy, 2.5);
+      for (let k = 0; k < 4; k++) g.fillRect(cx - 6 + k * 3.5, cy - 5, 1.5, 1.5);
     } else if (id === 'heatShield') {
       // B2: a round shield with a flame inside
       g.strokeCircle(cx, cy, 6);

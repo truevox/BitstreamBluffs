@@ -76,9 +76,15 @@ const PINNED = {
  * left out of the digest so this pin keeps proving its own claim (the swell fix and everything else moved nothing outside
  * Micro) without being re-pinned. Only these biome-tagged defs are dropped; base defs and every earlier biome def stay in.
  * B2 "Sight" (2026-11-15): Crystal Cavern (16) and Vertigo Vents (1024). Their own determinism and mask-0 isolation are
- * pinned in biome-b2-presence.test.js and terrain-golden-mask0.test.js.
+ * pinned in biome-b2-presence.test.js and terrain-golden-mask0.test.js. B3 "Motion": Pyramid Peak, Steampunk Slopes and
+ * Micro Mountain (see LATER_BIOMES).
  */
-const LATER_BIOMES = new Set(['crystal-cavern', 'vertigo-vents']);
+const LATER_BIOMES = new Set([
+  'crystal-cavern', 'vertigo-vents',
+  // B3 "Motion" (2026-11-15): Pyramid Peak (4), Steampunk Slopes (256), Micro Mountain (512). Pinned in
+  // biome-b3-presence.test.js (determinism, placement rules) and terrain-golden-mask0.test.js (mask 0).
+  'pyramid-peak', 'steampunk-slopes', 'micro-mountain',
+]);
 const c = loadContent();
 const without = (o) => Object.fromEntries(Object.entries(o).filter(([, d]) => !LATER_BIOMES.has(d.biome)));
 

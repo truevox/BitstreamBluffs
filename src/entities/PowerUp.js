@@ -4,7 +4,8 @@
  *
  * Floating pickup (sensor body). shapeKey: 'clock' (Clock Pulse), 'burst' (Packet Burst), 'shield' (Hashed Backup);
  * B1 biome pickups: 'maple' (Maple Wax), 'waxSpray' (Slick Wax Spray), 'bubble' (Aqua-Lung Bubble), 'candyCoat' (Sweet-Tooth);
- * B2: 'goggles' (Crystal Clear Goggles), 'heatShield' (Heat Shield).
+ * B2: 'goggles' (Crystal Clear Goggles), 'heatShield' (Heat Shield); B3: 'skis' (Sandrunner Skis), 'jellyWax' (Royal Jelly
+ * Wax), 'treads' (Clockwork Treads).
  * Visual: a rotating dashed ring + bobbing glyph, glow pulse. The sensor stays put while the glyph bobs.
  */
 import Phaser from 'phaser';
@@ -175,6 +176,41 @@ export class PowerUp {
         g.fillTriangle(0, -4 * fl, -2.6, 3, 2.6, 3);
         g.fillStyle(pal.text, 0.9);
         g.fillTriangle(0, -1.5 * fl, -1.2, 2.5, 1.2, 2.5);
+        break;
+      }
+      case 'skis': {
+        // B3 Sandrunner Skis: two skis with upturned tips and a sand streak sliding under them
+        g.lineStyle(1.8, pal.text, 1);
+        g.lineBetween(-5.5, -1.5, 4, -1.5);
+        g.lineBetween(-5.5, 2, 4, 2);
+        g.lineBetween(4, -1.5, 6, -3.5);
+        g.lineBetween(4, 2, 6, 0);
+        const sx = -6 + ((t / 400) % 1) * 10;
+        g.lineStyle(1, col, 1);
+        g.lineBetween(sx, 4.5, sx + 3, 4.5);
+        break;
+      }
+      case 'jellyWax': {
+        // B3 Royal Jelly Wax: a honeycomb cell with a glossy drop of jelly
+        g.lineStyle(1.5, pal.text, 1);
+        const hx = [];
+        for (let k = 0; k < 6; k++) hx.push({ x: Math.cos((k * Math.PI) / 3) * 5.5, y: Math.sin((k * Math.PI) / 3) * 5.5 });
+        g.strokePoints(hx, true, true);
+        g.fillStyle(col, 1);
+        g.fillCircle(0, 0.8 + Math.sin(t / 300) * 0.6, 2.6);
+        g.fillStyle(pal.text, 0.9);
+        g.fillCircle(-0.8, 0, 0.8);
+        break;
+      }
+      case 'treads': {
+        // B3 Clockwork Treads: a tread loop whose links run round a cog
+        g.lineStyle(1.5, pal.text, 1);
+        g.strokeRect(-6, -3.5, 12, 7);
+        const ph = (t / 120) % 3;
+        g.fillStyle(col, 1);
+        for (let k = 0; k < 4; k++) g.fillRect(-5 + ((k * 3 + ph) % 10), -4.5, 1.4, 1.4);
+        g.lineStyle(1.2, col, 1);
+        g.strokeCircle(0, 0, 2);
         break;
       }
       default: {

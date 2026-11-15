@@ -3,7 +3,7 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * One hazard instance built from a HazardDef + HazardSpawn. Sensor body; draws shape from def.shapeKey
- * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; B1: 'groomer' | 'seagull' | 'seaweed' | 'chocoRiver'; B2: 'shatterWall' | 'ashCloud'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
+ * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; B1: 'groomer' | 'seagull' | 'seaweed' | 'chocoRiver'; B2: 'shatterWall' | 'ashCloud'; B3: 'boulder' | 'dewDrop' | 'gearGate'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
  * (design doc pillar 2); faint corner brackets mark the exact hit-box.
  */
 import Phaser from 'phaser';
@@ -134,6 +134,9 @@ export class Hazard {
       case 'chocoRiver': this._chocoRiver(g, t, frame, col, pal); break;
       case 'shatterWall': this._shatterWall(g, t, frame, col, pal); break;
       case 'ashCloud': this._ashCloud(g, t, frame, col, pal); break;
+      case 'boulder': this._boulder(g, t, frame, col, pal); break;
+      case 'dewDrop': this._dewDrop(g, t, frame, col, pal); break;
+      case 'gearGate': this._gearGate(g, t, frame, col, pal); break;
       default: this._generic(g, col); break;
     }
   }
@@ -424,6 +427,83 @@ export class Hazard {
       g.fillStyle(col, 1 - ph);
       g.fillCircle(-w * 0.4 + u * w * 0.8, -h * 0.25 - ph * h * 0.6, 1.3);
     }
+  }
+
+  /** B3 Pyramid Peak: a sandstone boulder (crash, `danger`) whose cracks turn as it rolls (this.spin, radians). */
+  _boulder(g, t, frame, col, pal) {
+    const r = Math.min(this.w, this.h) / 2;
+    const cy = -this.h / 2;
+    const a = this.spin || 0;
+    g.fillStyle(pal.bgAlt, 1);
+    g.fillCircle(0, cy, r);
+    g.fillStyle(col, 0.3);
+    g.fillCircle(0, cy, r);
+    g.lineStyle(2, col, 1);
+    g.strokeCircle(0, cy, r);
+    // three cracks fixed to the stone, so they turn with the roll
+    g.lineStyle(1.5, pal.text, 0.75);
+    for (let k = 0; k < 3; k++) {
+      const u = a + k * 2.1;
+      g.lineBetween(Math.cos(u) * r * 0.15, cy + Math.sin(u) * r * 0.15, Math.cos(u + 0.3) * r * 0.8, cy + Math.sin(u + 0.3) * r * 0.8);
+    }
+    // dust kicked up behind it while it rolls
+    if (this.rolling) {
+      for (let k = 0; k < 3; k++) {
+        const ph = ((t / 300) + k / 3) % 1;
+        g.fillStyle(col, 0.5 * (1 - ph));
+        g.fillCircle(r * (0.8 + ph * 1.2) * (this.rollDir > 0 ? -1 : 1), -2 - ph * 5, 1.5 + ph * 1.5);
+      }
+    }
+  }
+
+  /** B3 Micro Mountain: a dew drop (crash, `danger`) that wobbles as it rolls, with a highlight that turns with it. */
+  _dewDrop(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const a = this.spin || 0;
+    const wob = this.rolling ? Math.sin(t / 70 + this.seed) * 1.2 : 0;
+    g.fillStyle(pal.bgAlt, 0.9);
+    g.fillEllipse(0, -h / 2, w + wob, h - wob);
+    g.fillStyle(col, 0.35);
+    g.fillEllipse(0, -h / 2, w + wob, h - wob);
+    g.lineStyle(2, col, 1);
+    g.strokeEllipse(0, -h / 2, w + wob, h - wob);
+    g.fillStyle(pal.text, 0.85);
+    g.fillCircle(Math.cos(a - 2.2) * w * 0.25, -h / 2 + Math.sin(a - 2.2) * h * 0.25, 2);
+  }
+
+  /**
+   * B3 Steampunk Slopes: a gear gate (crash, `danger`, only while closed). Two brass posts with a turning gear on top;
+   * closed, a row of bars fills the box; open, the bars sit retracted below the posts' tops and the box goes faint.
+   */
+  _gearGate(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const open = !!this.open;
+    // posts
+    g.fillStyle(pal.bgAlt, 1);
+    g.fillRect(-w / 2, -h, 4, h);
+    g.fillRect(w / 2 - 4, -h, 4, h);
+    g.lineStyle(1.5, col, 1);
+    g.strokeRect(-w / 2, -h, 4, h);
+    g.strokeRect(w / 2 - 4, -h, 4, h);
+    // bars: full height while closed, a short stub while open
+    const barH = open ? h * 0.18 : h - 3;
+    g.fillStyle(col, open ? 0.35 : 0.9);
+    for (let k = 0; k < 3; k++) g.fillRect(-w / 2 + 5 + k * ((w - 12) / 2) - 1, -barH, 2.5, barH);
+    // gear on top, turning faster while it moves the bars
+    const gr = Math.max(4, w * 0.28);
+    const gy = -h - gr * 0.4;
+    const ang = (t / (open ? 700 : 250)) % (Math.PI * 2);
+    g.fillStyle(col, 1);
+    for (let k = 0; k < 6; k++) {
+      const u = ang + (k * Math.PI) / 3;
+      g.fillCircle(Math.cos(u) * gr, gy + Math.sin(u) * gr, 1.6);
+    }
+    g.lineStyle(1.5, col, 1);
+    g.strokeCircle(0, gy, gr * 0.75);
+    g.fillStyle(pal.text, 0.9);
+    g.fillCircle(0, gy, 1.5);
   }
 
   _seagull(g, t, frame, col, pal) {

@@ -173,10 +173,10 @@ export function hazardColorKey(def) {
   return def.colorKey || 'danger';
 }
 
-/** Hazard shapeKeys with their own drawing routine in entities/Hazard.js (B1 adds groomer, seagull, seaweed, chocoRiver; B2 shatterWall, ashCloud). */
-export const HAZARD_SHAPES = Object.freeze(['chasm', 'firewall', 'spike', 'vent', 'drone', 'groomer', 'seagull', 'seaweed', 'chocoRiver', 'shatterWall', 'ashCloud']);
-/** Power-up shapeKeys with their own glyph in entities/PowerUp.js (B1 adds maple, waxSpray, bubble, candyCoat; B2 goggles, heatShield). */
-export const POWERUP_SHAPES = Object.freeze(['clock', 'burst', 'shield', 'maple', 'waxSpray', 'bubble', 'candyCoat', 'goggles', 'heatShield']);
+/** Hazard shapeKeys with their own drawing routine in entities/Hazard.js (B1 adds groomer, seagull, seaweed, chocoRiver; B2 shatterWall, ashCloud; B3 boulder, dewDrop, gearGate). */
+export const HAZARD_SHAPES = Object.freeze(['chasm', 'firewall', 'spike', 'vent', 'drone', 'groomer', 'seagull', 'seaweed', 'chocoRiver', 'shatterWall', 'ashCloud', 'boulder', 'dewDrop', 'gearGate']);
+/** Power-up shapeKeys with their own glyph in entities/PowerUp.js (B1 adds maple, waxSpray, bubble, candyCoat; B2 goggles, heatShield; B3 skis, jellyWax, treads). */
+export const POWERUP_SHAPES = Object.freeze(['clock', 'burst', 'shield', 'maple', 'waxSpray', 'bubble', 'candyCoat', 'goggles', 'heatShield', 'skis', 'jellyWax', 'treads']);
 
 /** Drawing routine for a hazard: its shapeKey when Hazard.js knows it, else 'generic' (a visible filled box). */
 export function hazardDrawKind(def) {
