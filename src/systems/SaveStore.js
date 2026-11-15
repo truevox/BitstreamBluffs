@@ -177,9 +177,101 @@ export function sanitizeRun(raw) {
   // keeps its identity and every pre-W4 run stays clean by omission rather than being retroactively
   // disqualified. The decision to exclude it from a board lives in systems/Ranking.js, not here.
   if (raw.modded === true) r.modded = true;
+  // Decision 6 (ledger hash v2). Every field the v2 hash reads must survive this whitelist, or a record
+  // hashed in RunScene would fail verification after saveRun or an export/import round trip.
+  //  - `hashV`: kept only when it is exactly a known version. Never defaulted: a record without it is a
+  //    v1 record and keeps verifying under the v1 function, so it is never re-hashed (crediting is keyed
+  //    on ledgerHash, so a re-hash would double-credit).
+  //  - `bestFlow`: a result shown on Game Over; stored from now on so the hash can cover it.
+  //  - `dailyOfficial`: decision 2, true only for a run started from the DAILY RUN menu item. Stored as a
+  //    boolean (false too) because the v2 hash covers it and Ranking.isOfficialDaily reads it.
+  //  - `boosts`: the ids of the boosts that actually applied (sorted, de-duplicated); `modded` says
+  //    whether any did, `boosts` says which, so the v2 hash covers the applied effects.
+  //  - `imported`: LOCAL provenance only (set by importSharecode, never by a sharecode itself). Not in
+  //    any hash: it is not gameplay. Imported runs never extend the Daily streak (decision 1).
+  if (raw.hashV === LEDGER_HASH_V) r.hashV = LEDGER_HASH_V;
+  if (typeof raw.bestFlow === 'number' && Number.isFinite(raw.bestFlow) && raw.bestFlow >= 0) r.bestFlow = raw.bestFlow;
+  if (typeof raw.dailyOfficial === 'boolean') r.dailyOfficial = raw.dailyOfficial;
+  if (Array.isArray(raw.boosts)) {
+    const ids = [...new Set(raw.boosts.filter((b) => typeof b === 'string' && /^[A-Za-z][A-Za-z0-9]{0,31}$/.test(b)))].sort().slice(0, 8);
+    r.boosts = ids;
+  }
+  if (raw.imported === true) r.imported = true;
   const ini = normalizeInitials(raw.initials);
   if (ini.length >= INITIALS_MIN) r.initials = ini;
   return r;
+}
+
+// ---- ledger hash (versioned, decision 6) --------------------------------------------------------------------
+
+/** The ledger-hash version new records are written with. Records without `hashV` are v1. */
+export const LEDGER_HASH_V = 2;
+
+const sortedTricksOf = (r) => {
+  const tricks = r.tricks && typeof r.tricks === 'object' ? r.tricks : {};
+  const out = {};
+  for (const k of Object.keys(tricks).sort()) out[k] = tricks[k];
+  return out;
+};
+
+/**
+ * v1 ledger hash, UNCHANGED since before W3: xxHash32 of canonical JSON of the original stable fields
+ * (excludes ledgerHash, initials, biomeMask, modded and every later field). Kept byte-identical so every
+ * record written before decision 6 keeps verifying and keeps its crediting key.
+ * @param {RunRecord} record
+ * @returns {string} 8 lowercase hex chars.
+ */
+export function computeLedgerHashV1(record) {
+  const r = record || {};
+  const canon = JSON.stringify([
+    r.version, r.id, r.seed, r.dailyRuleId, r.startedAt, r.endedAt, r.durationMs, r.score, r.distanceM,
+    r.trickPoints, sortedTricksOf(r), r.bestCombo, r.maxAirtimeMs, r.cause,
+  ]);
+  return xxHash32(canon).toString(16).padStart(8, '0');
+}
+
+/**
+ * v2 ledger hash (decision 6): every gameplay-affecting setting and every score/result field. Excludes
+ * cosmetics and local bookkeeping: initials, ledgerHash, imported. Absent and default values are
+ * canonicalised the same way (absent `modded` == false, absent `biomeMask` == 0, absent counters == 0,
+ * absent `boosts` == []) so a sanitised copy hashes like the original.
+ *
+ * `hashV` itself is the first element: stripping it makes the record a v1 record, whose v1 hash then
+ * cannot match, so a version downgrade cannot be used to drop the newly covered fields.
+ * @param {RunRecord} record
+ * @returns {string} 8 lowercase hex chars.
+ */
+export function computeLedgerHashV2(record) {
+  const r = record || {};
+  const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  const boosts = Array.isArray(r.boosts) ? [...new Set(r.boosts.filter((b) => typeof b === 'string'))].sort() : [];
+  // Canonicalisation only, not a ranking decision: the flag is hashed as a strict boolean so an absent
+  // field and `false` hash alike. Whether a modded run may RANK is still decided only in Ranking.js.
+  const { modded, dailyOfficial } = r;
+  const canon = JSON.stringify([
+    'v2', r.version, r.id, r.seed, r.dailyRuleId, (Number(r.biomeMask) >>> 0) || 0, modded === true, boosts,
+    dailyOfficial === true, r.startedAt, r.endedAt, r.durationMs, r.score, r.distanceM, r.trickPoints,
+    sortedTricksOf(r), r.bestCombo, n(r.bestFlow), r.maxAirtimeMs, r.cause, n(r.shards), n(r.nearMisses),
+    n(r.bonusPoints),
+  ]);
+  return xxHash32(canon).toString(16).padStart(8, '0');
+}
+
+/**
+ * Whether a record's ledgerHash matches its contents under ITS version (v2 when `hashV === 2`, else v1).
+ * An empty or missing hash never verifies (audit F2: it used to skip verification). Never throws.
+ * @param {RunRecord} record
+ * @returns {boolean}
+ */
+export function verifyLedgerHash(record) {
+  try {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return false;
+    const h = typeof record.ledgerHash === 'string' ? record.ledgerHash : '';
+    if (!h) return false;
+    return h === SaveStore.computeLedgerHash(record);
+  } catch (e) {
+    return false;
+  }
 }
 
 // ---- base64 (UTF-8 safe, no reliance on btoa/atob/Buffer) -------------------------------------------------------
@@ -286,6 +378,16 @@ const txDone = (tx) =>
     tx.onabort = () => reject(tx.error || new Error('idb tx aborted'));
   });
 
+/**
+ * A leaderboard row: a copy of the record without the LOCAL `imported` marker (provenance on this device,
+ * not part of the run), so a board reads the same on the device that set it and on the one that imported it.
+ * @param {RunRecord} r @returns {RunRecord}
+ */
+function boardRow(r) {
+  const { imported, ...rest } = r; // eslint-disable-line no-unused-vars
+  return { ...rest, tricks: { ...r.tricks } };
+}
+
 /** @param {Date|number} v @returns {Date} valid Date (invalid input falls back to now). */
 function toDate(v) {
   const d = v instanceof Date ? v : new Date(typeof v === 'number' ? v : NaN);
@@ -387,6 +489,8 @@ export class SaveStore {
   async saveRun(record) {
     const rec = sanitizeRun(record);
     if (!rec || this.runs.some((r) => r.id === rec.id)) return;
+    // A run saved here was played on this device: the `imported` marker is only ever set by import.
+    delete rec.imported;
     this.runs.push(rec);
     await this._persist(rec);
   }
@@ -413,7 +517,7 @@ export class SaveStore {
    * @returns {Promise<RunRecord[]>}
    */
   async getLeaderboard(limit = 10, opts = {}) {
-    return this._board(opts).slice(0, Math.max(0, limit)).map((r) => ({ ...r, tricks: { ...r.tricks } }));
+    return this._board(opts).slice(0, Math.max(0, limit)).map(boardRow);
   }
 
   /**
@@ -426,7 +530,7 @@ export class SaveStore {
     const idx = this.runs.map((r, i) => [r, i])
       .filter(([r]) => r.initials && isModdedOnly(r, opts));
     idx.sort((a, b) => b[0].score - a[0].score || a[0].endedAt - b[0].endedAt || a[1] - b[1]);
-    return idx.slice(0, Math.max(0, limit)).map(([r]) => ({ ...r, tricks: { ...r.tricks } }));
+    return idx.slice(0, Math.max(0, limit)).map(([r]) => boardRow(r));
   }
 
   /**
@@ -472,21 +576,15 @@ export class SaveStore {
   }
 
   /**
-   * Short non-cryptographic fingerprint of a record (xxHash32 of canonical JSON of its stable fields; excludes
-   * ledgerHash and initials).
+   * Short non-cryptographic fingerprint of a record, VERSIONED (decision 6): a record with `hashV: 2` is
+   * hashed by computeLedgerHashV2 (every gameplay and result field), any other record by the unchanged
+   * computeLedgerHashV1. Excludes ledgerHash and initials in both versions.
    * @param {RunRecord} record
    * @returns {string} 8 lowercase hex chars.
    */
   static computeLedgerHash(record) {
     const r = record || {};
-    const tricks = r.tricks && typeof r.tricks === 'object' ? r.tricks : {};
-    const sortedTricks = {};
-    for (const k of Object.keys(tricks).sort()) sortedTricks[k] = tricks[k];
-    const canon = JSON.stringify([
-      r.version, r.id, r.seed, r.dailyRuleId, r.startedAt, r.endedAt, r.durationMs, r.score, r.distanceM,
-      r.trickPoints, sortedTricks, r.bestCombo, r.maxAirtimeMs, r.cause,
-    ]);
-    return xxHash32(canon).toString(16).padStart(8, '0');
+    return r.hashV === LEDGER_HASH_V ? computeLedgerHashV2(r) : computeLedgerHashV1(r);
   }
 
   /**
@@ -495,7 +593,8 @@ export class SaveStore {
    * @returns {Promise<string>}
    */
   async exportSharecode() {
-    const runs = this._board({ ranked: true });
+    // The local `imported` marker does not travel: the receiving store sets its own on import.
+    const runs = this._board({ ranked: true }).map(boardRow);
     return SHARECODE_PREFIX + base64Encode(JSON.stringify({ app: 'bitstream-bluffs', v: STORAGE.saveVersion, runs }));
   }
 
@@ -521,15 +620,18 @@ export class SaveStore {
     let skipped = 0;
     for (const raw of list.slice(0, MAX_IMPORT)) {
       const rec = sanitizeRun(raw);
+      // Verified per version, and an empty hash is rejected (audit F2: it used to skip verification).
       const ok =
         rec &&
         rec.initials &&
-        (!rec.ledgerHash || rec.ledgerHash === SaveStore.computeLedgerHash(rec)) &&
+        verifyLedgerHash(rec) &&
         !this.runs.some((r) => r.id === rec.id);
       if (!ok) {
         skipped++;
         continue;
       }
+      // Local provenance, forced whatever the sharecode said: imported runs never extend the streak.
+      rec.imported = true;
       this.runs.push(rec);
       imported++;
       await this._persist(rec);
