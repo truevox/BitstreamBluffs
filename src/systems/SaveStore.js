@@ -691,8 +691,8 @@ export class SaveStore {
     let bestDistanceM = 0;
     for (const r of this.runs) {
       if (r.seed !== info.seed || (ex !== null && r.id === ex)) continue;
-      // Official runs are on the date's mask by construction; filter explicitly anyway (decision 1).
-      if (((r.biomeMask >>> 0) || 0) !== info.biomeMask) continue;
+      // Official runs are on the date's mask by construction; the explicit mask (and rule) filter is
+      // inside Ranking.isOfficialDaily, so it is one tested check rather than two copies (decision 1).
       if (!countsForDailyBest(r, opts)) continue;
       attempts++;
       if (r.score > bestScore) bestScore = r.score;
