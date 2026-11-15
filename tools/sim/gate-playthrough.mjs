@@ -2839,6 +2839,11 @@ async function main() {
         { biome: 'micro-mountain', name: 'Micro Mountain', seed: 'b3micro26', mask: 512, hazard: 'dewDrop', powerup: 'royalJellyWax' },
       ];
       const { ROLL_ACTIVATE_PX, gateTiming } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
+      const { glideDrag, glideFrictionMul } = await import(path.join(ROOT, 'src/systems/BiomeEffects.js'));
+      // B3 tuning (Marvin 2026-11-15, "make it felt"): after 2 s on the same seed and pose a glide must be this much faster
+      // and further than the same ride without it. A friction-only glide measured +17 px/s / +15 px (Royal Jelly Wax).
+      const GLIDE_FELT_PX_S = 25;
+      const GLIDE_FELT_PX = 25;
       for (const B of B3) {
         const hd = HAZ_DEFS[B.hazard];
         const hzName = hd.motion.kind === 'roll'
@@ -2846,7 +2851,7 @@ async function main() {
           : `B3 ${B.name}: ${B.hazard} spawns on ${B.seed}@${B.mask}, opens and closes on its seeded cycle, is passed open and crashes closed`;
         const puName = B.powerup === 'clockworkTreads'
           ? `B3 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and wards off the run's real conveyor push on the real sled`
-          : `B3 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and its glide keeps the real sled faster (same seed, pose and frames)`;
+          : `B3 ${B.name}: ${B.powerup} spawns on ${B.seed}@${B.mask} and its glide is felt on the real sled (>= 25 px/s faster and >= 25 px further after 2 s, same seed and pose)`;
         const c = await (async () => {
           const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
           try {
@@ -2938,16 +2943,31 @@ async function main() {
                 } else {
                   res.pu = { m: Math.round(fp.sp.x / 20), chunkBiome: fp.ch.biome, drawKind: p.drawKind };
                   const sx = fp.sp.x - 900;
+                  // B3 tuning: 2 s rides with nothing else acting on the sled (no other pickup or hazard; the base ride
+                  // cannot collect this glide on the way), so the difference is the glide alone
+                  const onPU = run.onPowerUp;
+                  const onHz = run.onHazard;
                   const ride = (glide) => {
                     run._resetBiomeEffects();
                     keepAlive();
                     poseAt(sx, 420);
+                    p.collected = false;
                     if (glide) run.onPowerUp(p);
+                    p.collected = true;
+                    run.onPowerUp = () => {};
+                    run.onHazard = () => {};
+                    const x0 = run.sled.x;
                     step(1);
-                    const resist = run.currentPhys.groundResist;
+                    const ph = run.currentPhys;
+                    const r = { resist: ph.groundResist, speedMul: ph.speedMul, quadDrag: ph.quadDrag, chip: !!(ui && ui.powerups && ui.powerups.has(B.powerup)) };
                     let grounded = 0;
-                    for (let i = 0; i < 45; i++) { keepAlive(); step(1); if (run.sled.grounded) grounded++; }
-                    return { resist, speed: run.sled.speed, x: run.sled.x, grounded, chip: !!(ui && ui.powerups && ui.powerups.has(B.powerup)) };
+                    for (let i = 2; i <= 125; i++) {
+                      keepAlive(); step(1); if (run.sled.grounded) grounded++;
+                      if (i === 62) r.at1 = { v: run.sled.speed, dx: run.sled.x - x0 };
+                    }
+                    run.onPowerUp = onPU;
+                    run.onHazard = onHz;
+                    return { ...r, speed: run.sled.speed, dx: run.sled.x - x0, x: run.sled.x, grounded };
                   };
                   res.pu.base = ride(false);
                   res.pu.glide = ride(true);
@@ -3094,11 +3114,17 @@ async function main() {
           else pass(puName, `${run}: conveyor zone at ${pu.zoneM} m: drive ${belt.drive} -> ${ward.drive} px/s^2; the real sled's vx change over 20 frames ${belt.dv.toFixed(1)} -> ${ward.dv.toFixed(1)} px/s`);
         } else {
           const { base, glide } = pu;
-          if (!(Math.abs(glide.resist - base.resist * 0.7) < 1e-9)) fail(puName, `groundResist ${base.resist} -> ${glide.resist} (want x0.7)`);
+          const e = PU_DEFS[B.powerup].effect;
+          const d = glideDrag(1, glideFrictionMul(e.frictionMul));
+          const dv = glide.speed - base.speed;
+          const ddx = glide.dx - base.dx;
+          // the felt-size line comes first, so a glide that is not felt fails on it whatever its parameters say
+          if (base.grounded < 60 || glide.grounded < 60) fail(puName, `the sled was not on the ground (grounded frames ${base.grounded} / ${glide.grounded} of 124)`);
+          else if (!(dv >= GLIDE_FELT_PX_S && ddx >= GLIDE_FELT_PX)) fail(puName, `not felt: after 2 s the glide is ${dv.toFixed(1)} px/s faster (want >= ${GLIDE_FELT_PX_S}) and ${ddx.toFixed(1)} px further (want >= ${GLIDE_FELT_PX}); speed ${base.speed.toFixed(1)} -> ${glide.speed.toFixed(1)}`);
+          else if (!(Math.abs(glide.resist - base.resist * d.frictionMul) < 1e-9)) fail(puName, `groundResist ${base.resist} -> ${glide.resist} (want x${d.frictionMul})`);
+          else if (!(Math.abs(glide.speedMul - base.speedMul * d.speedMul) < 1e-9) || !(Math.abs(glide.quadDrag - base.quadDrag * d.quadMul) < 1e-12)) fail(puName, `speedMul ${base.speedMul} -> ${glide.speedMul} (want x${d.speedMul}), quadDrag ${base.quadDrag} -> ${glide.quadDrag} (want x${d.quadMul})`);
           else if (!glide.chip) fail(puName, 'no HUD chip');
-          else if (base.grounded < 20 || glide.grounded < 20) fail(puName, `the sled was not on the ground (grounded frames ${base.grounded} / ${glide.grounded})`);
-          else if (!(glide.speed > base.speed + 0.5)) fail(puName, `speed after 45 frames: ${glide.speed.toFixed(2)} gliding vs ${base.speed.toFixed(2)} without`);
-          else pass(puName, `${run}: groundResist ${base.resist.toFixed(4)} -> ${glide.resist.toFixed(4)}; same pose, 45 frames: speed ${base.speed.toFixed(1)} -> ${glide.speed.toFixed(1)} px/s, x ${base.x.toFixed(0)} -> ${glide.x.toFixed(0)}`);
+          else pass(puName, `${run}: frictionMul ${e.frictionMul} for ${e.durationMs} ms: groundResist x${d.frictionMul}, speedMul x${d.speedMul.toFixed(3)}, quadDrag x${d.quadMul.toFixed(3)}; same pose, nothing else acting: +1 s ${base.at1.v.toFixed(0)} -> ${glide.at1.v.toFixed(0)} px/s (+${(glide.at1.v - base.at1.v).toFixed(1)}), +2 s ${base.speed.toFixed(0)} -> ${glide.speed.toFixed(0)} px/s (+${dv.toFixed(1)}), ${ddx.toFixed(1)} px further`);
         }
       }
     }
