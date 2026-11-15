@@ -92,6 +92,36 @@ export function glideFriction(frictionMul, glideMul) {
   return frictionMul * glideFrictionMul(glideMul);
 }
 
+/**
+ * B3 tuning ("make the glides felt"): how far into the glide range a glide multiplier is, 0 (no glide: m >= 1, missing
+ * or <= 0) .. 1 (the floor GLIDE_MIN_FRICTION_MUL). @param {number} [glideMul] @returns {number}
+ */
+export function glideStrength(glideMul) {
+  if (!(glideMul > 0) || glideMul >= 1) return 0;
+  return (1 - glideFrictionMul(glideMul)) / (1 - GLIDE_MIN_FRICTION_MUL);
+}
+
+/**
+ * B3 tuning: the whole drag change of a glide, one pure function of its frictionMul (PhysicsTuner calls it). Ground
+ * friction alone is only ~a quarter of the sled's drag at cruise speed (groundResist ~48 px/s^2 vs frictionAir ~65 and
+ * quadDrag ~69 at 480 px/s), so a friction-only glide measured ~+10 px/s: not felt. A glide of strength s
+ * (glideStrength) also lifts speedMul by `t.glideSpeedLift * s` (frictionAir / speedMul: the Packet Burst path) and cuts
+ * quadDrag by `t.glideQuadCut * s`. No glide is exactly {frictionMul, speedMul: 1, quadMul: 1}.
+ * @param {number} frictionMul the multiplier before the glide (daily rule x zones)
+ * @param {number} [glideMul] the active glide's frictionMul (TunerContext.glideFrictionMul)
+ * @param {{glideSpeedLift:number, glideQuadCut:number}} [t] TUNING
+ * @returns {{frictionMul:number, speedMul:number, quadMul:number}}
+ */
+export function glideDrag(frictionMul, glideMul, t = TUNING) {
+  const s = glideStrength(glideMul);
+  if (s === 0) return { frictionMul: glideFriction(frictionMul, glideMul), speedMul: 1, quadMul: 1 };
+  return {
+    frictionMul: glideFriction(frictionMul, glideMul),
+    speedMul: 1 + clamp(t.glideSpeedLift, 0, 1) * s,
+    quadMul: 1 - clamp(t.glideQuadCut, 0, 0.9) * s,
+  };
+}
+
 /** Largest landing tolerance a stabilize may add (deg). */
 export const STABILIZE_MAX_DEG = 30;
 

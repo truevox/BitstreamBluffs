@@ -7,7 +7,7 @@
 import { readDir, loadContent, makeGen } from './_helpers.js';
 import { PALETTE_KEYS } from '../../src/constants.js';
 import { emptyWards, addWard, isWarded, tickWards, WARD_MIN_MS, WARD_MAX_MS } from '../../src/systems/Wards.js';
-import { hazardDrawKind, powerupDrawKind, hazardColorKey, glideFrictionMul, timedPowerupMs } from '../../src/systems/BiomeEffects.js';
+import { hazardDrawKind, powerupDrawKind, hazardColorKey, glideFrictionMul, timedPowerupMs, glideStrength, glideDrag } from '../../src/systems/BiomeEffects.js';
 import { rollParams, gateTiming, GATE_MAX_CLOSED_MS, ROLL_MAX_RANGE_PX } from '../../src/systems/HazardMotion.js';
 import { BIOME_SPAWN_MAX_CHANCE, BIOME_HAZARD_MAX_CHANCE, BIOME_REPLACE_SLACK_PX } from '../../src/systems/TerrainGenerator.js';
 import { PhysicsTuner } from '../../src/systems/PhysicsTuner.js';
@@ -101,13 +101,18 @@ describe('B3 content: the spec §4 values and the motion blocks', () => {
     expect(t.openMs).toBeGreaterThan(t.closedMs);
   });
 
-  test('Sandrunner Skis and Royal Jelly Wax: glide, ground friction x0.7 for 4 s (Royal Jelly Wax shares the kind)', () => {
-    for (const id of ['sandrunnerSkis', 'royalJellyWax']) {
-      const e = c.powerups[id].effect;
-      expect(e).toEqual({ kind: 'glide', frictionMul: 0.7, durationMs: 4000 });
-      expect(glideFrictionMul(e.frictionMul)).toBe(0.7);
-      expect(timedPowerupMs(e)).toBe(4000);
+  test('B3 tuning: Sandrunner Skis are a short punchy slick burst, Royal Jelly Wax a longer gentler glide (both kind glide)', () => {
+    const skis = c.powerups.sandrunnerSkis.effect;
+    const jelly = c.powerups.royalJellyWax.effect;
+    expect(skis).toEqual({ kind: 'glide', frictionMul: 0.3, durationMs: 2500 });
+    expect(jelly).toEqual({ kind: 'glide', frictionMul: 0.55, durationMs: 5000 });
+    for (const e of [skis, jelly]) {
+      expect(glideFrictionMul(e.frictionMul)).toBe(e.frictionMul); // inside the bounds: not clamped
+      expect(timedPowerupMs(e)).toBe(e.durationMs);
     }
+    // their own flavours: the Skis are slicker and shorter, the wax gentler and longer
+    expect(glideStrength(skis.frictionMul)).toBeGreaterThan(glideStrength(jelly.frictionMul));
+    expect(skis.durationMs).toBeLessThan(jelly.durationMs);
   });
 
   test('Clockwork Treads: ward against the conveyorBelt mod for 4 s', () => {
@@ -143,12 +148,17 @@ describe('B3 content: each power-up counters its own biome', () => {
     expect(t.getEffective({ zones: zone, wards: w }).beltDrivePxS2).toBeGreaterThan(0);
   });
 
-  test('a glide lowers the ground resistance of the real tuner by x0.7 in each glide biome (no zone needed)', () => {
+  test('a glide lowers all three drags of the real tuner in each glide biome (no zone needed)', () => {
     const t = new PhysicsTuner();
     const base = t.getEffective({});
     for (const id of ['sandrunnerSkis', 'royalJellyWax']) {
-      const g = t.getEffective({ glideFrictionMul: glideFrictionMul(c.powerups[id].effect.frictionMul) });
-      expect(g.groundResist).toBeCloseTo(base.groundResist * 0.7, 12);
+      const m = glideFrictionMul(c.powerups[id].effect.frictionMul);
+      const g = t.getEffective({ glideFrictionMul: m });
+      const d = glideDrag(1, m);
+      expect(g.groundResist).toBeCloseTo(base.groundResist * m, 12);
+      expect(g.frictionAir).toBeCloseTo(base.frictionAir / d.speedMul, 12);
+      expect(g.quadDrag).toBeCloseTo(base.quadDrag * d.quadMul, 12);
+      expect(d.speedMul).toBeGreaterThan(1.1);
     }
   });
 

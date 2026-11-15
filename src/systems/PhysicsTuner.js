@@ -13,7 +13,7 @@
 import { PHYSICS, MAX_PHYSICS_STEP_MS } from '../constants.js';
 import { AIR_NEAR_MISS_BELOW_PX } from './TerrainGenerator.js';
 import { isWarded } from './Wards.js';
-import { glideFriction } from './BiomeEffects.js';
+import { glideDrag } from './BiomeEffects.js';
 
 /** Matter's internal base delta in ms (Body._baseDelta). */
 export const BASE_STEP_MS = 1000 / 60;
@@ -217,6 +217,12 @@ export const TUNING = Object.freeze({
   shardPointsPerChain: 5,
   shardPointsCap: 50,
   milestoneEveryM: 500,
+  /**
+   * B3 tuning, glide power-ups (BiomeEffects.glideDrag): at full glide strength (frictionMul at the 0.2 floor) speedMul is
+   * lifted by glideSpeedLift (frictionAir / speedMul) and quadDrag cut by glideQuadCut, both scaled by the strength.
+   */
+  glideSpeedLift: 0.35,
+  glideQuadCut: 0.35,
   /** Screen shake amplitudes (px). */
   shakeHardLanding: 3,
   shakeCrash: 7,
@@ -436,10 +442,11 @@ export class PhysicsTuner {
     }
 
     // B0 glide / stabilize power-ups (values already clamped by BiomeEffects at pickup).
-    frictionMul = glideFriction(frictionMul, ctx.glideFrictionMul); // B3: the pure glide math (BiomeEffects)
+    const glide = glideDrag(frictionMul, ctx.glideFrictionMul, t); // B3: the pure glide math (BiomeEffects)
+    frictionMul = glide.frictionMul;
     if (ctx.stabilizeBounceMul > 0) bounceMul *= ctx.stabilizeBounceMul;
 
-    let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul;
+    let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul * glide.speedMul;
     if (ctx.slowed) speedMul *= ctx.slowFactor || b.slowFactor;
     let dragMul = 1;
     let steerMul = 1;
@@ -480,7 +487,7 @@ export class PhysicsTuner {
       steerMul,
       tiltSign,
       groundResist: resistBase,
-      quadDrag: t.quadDrag,
+      quadDrag: t.quadDrag * glide.quadMul,
       pushForceMul: (daily.pushForceMul || 1) * zonePushMul,
       beltDrivePxS2: beltDrive,
       beltDirection,

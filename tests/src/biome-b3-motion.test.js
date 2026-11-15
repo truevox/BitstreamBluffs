@@ -9,8 +9,8 @@ import {
   ROLL_ACTIVATE_PX, ROLL_MAX_RANGE_PX, ROLL_MAX_SPEED_PX_S, rollParams, rollOffsetAt, rollStep, rollPredictX, rollSweep,
   GATE_MIN_OPEN_MS, GATE_MAX_CLOSED_MS, gateTiming, gateOpenAt, gateNextChangeMs, emptyRollState,
 } from '../../src/systems/HazardMotion.js';
-import { glideFriction, glideFrictionMul } from '../../src/systems/BiomeEffects.js';
-import { PhysicsTuner } from '../../src/systems/PhysicsTuner.js';
+import { glideFriction, glideFrictionMul, glideStrength, glideDrag, GLIDE_MIN_FRICTION_MUL } from '../../src/systems/BiomeEffects.js';
+import { PhysicsTuner, TUNING } from '../../src/systems/PhysicsTuner.js';
 
 const ROLL = { kind: 'roll', speedPxS: 140, rangePx: 160, dir: -1 };
 const GATE = { kind: 'gate', periodMs: 1400, openMs: 900 };
@@ -166,5 +166,52 @@ describe('BiomeEffects.glideFriction (the glide math PhysicsTuner calls)', () =>
     expect(g.groundResist).toBeCloseTo(base.groundResist * glideFriction(1, 0.7), 12);
     // out-of-range context values are clamped by the same math (the B0 pickup already clamps; the tuner never trusts it)
     expect(t.getEffective({ glideFrictionMul: 0.05 }).groundResist).toBeCloseTo(base.groundResist * 0.2, 12);
+  });
+});
+
+describe('B3 tuning: a glide is felt (BiomeEffects.glideDrag cuts all three drags, not only ground friction)', () => {
+  test('glideStrength: 0 for no glide, 1 at the friction floor, linear between', () => {
+    for (const m of [undefined, null, 0, -1, 1, 1.5, NaN]) expect(glideStrength(m)).toBe(0);
+    expect(glideStrength(GLIDE_MIN_FRICTION_MUL)).toBeCloseTo(1, 12);
+    expect(glideStrength(0.01)).toBeCloseTo(1, 12); // clamped to the floor
+    expect(glideStrength(0.6)).toBeCloseTo(0.5, 12);
+  });
+
+  test('glideDrag: no glide is exactly the old math (frictionMul unchanged, speedMul 1, quadMul 1)', () => {
+    for (const m of [undefined, 0, 1, 3]) expect(glideDrag(0.8, m)).toEqual({ frictionMul: glideFriction(0.8, m), speedMul: 1, quadMul: 1 });
+  });
+
+  test('glideDrag: a glide of strength s lifts speedMul by glideSpeedLift x s and cuts quadDrag by glideQuadCut x s', () => {
+    const t = { glideSpeedLift: 0.4, glideQuadCut: 0.3 };
+    const g = glideDrag(1, 0.6, t);
+    expect(g.frictionMul).toBeCloseTo(0.6, 12);
+    expect(g.speedMul).toBeCloseTo(1 + 0.4 * 0.5, 12);
+    expect(g.quadMul).toBeCloseTo(1 - 0.3 * 0.5, 12);
+    const full = glideDrag(1, GLIDE_MIN_FRICTION_MUL, t);
+    expect(full.speedMul).toBeCloseTo(1.4, 12);
+    expect(full.quadMul).toBeCloseTo(0.7, 12);
+    // the shipped TUNING knobs are positive (a glide really lifts), bounded (a glide never removes drag)
+    expect(TUNING.glideSpeedLift).toBeGreaterThan(0);
+    expect(TUNING.glideSpeedLift).toBeLessThanOrEqual(1);
+    expect(TUNING.glideQuadCut).toBeGreaterThan(0);
+    expect(TUNING.glideQuadCut).toBeLessThanOrEqual(0.9);
+    expect(glideDrag(1, 0.6).speedMul).toBeCloseTo(1 + TUNING.glideSpeedLift * 0.5, 12);
+  });
+
+  test('PhysicsTuner: a glide lowers groundResist, frictionAir and quadDrag; no glide leaves every output exactly as before', () => {
+    const t = new PhysicsTuner();
+    const base = t.getEffective({});
+    // no glide: byte-identical outputs for every no-glide context value
+    for (const m of [undefined, 1, 0]) expect(t.getEffective({ glideFrictionMul: m })).toEqual(base);
+    expect(base.speedMul).toBe(1);
+    expect(base.quadDrag).toBe(TUNING.quadDrag);
+    const g = t.getEffective({ glideFrictionMul: 0.6 });
+    const d = glideDrag(1, 0.6);
+    expect(g.groundResist).toBeCloseTo(base.groundResist * 0.6, 12);
+    expect(g.speedMul).toBeCloseTo(d.speedMul, 12);
+    expect(g.frictionAir).toBeCloseTo(base.frictionAir / d.speedMul, 12);
+    expect(g.quadDrag).toBeCloseTo(TUNING.quadDrag * d.quadMul, 12);
+    // stacks with a Packet Burst (both multiply speedMul)
+    expect(t.getEffective({ glideFrictionMul: 0.6, speedBoost: 1.3 }).speedMul).toBeCloseTo(1.3 * d.speedMul, 12);
   });
 });

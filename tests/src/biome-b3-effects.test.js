@@ -35,6 +35,7 @@ const { EVT } = await import('../../src/events.js');
 const { PhysicsTuner, BASE_STEP_MS } = await import('../../src/systems/PhysicsTuner.js');
 const { ROLL_ACTIVATE_PX, gateOpenAt, gateTiming } = await import('../../src/systems/HazardMotion.js');
 const { loadContent, makeGen } = await import('./_helpers.js');
+const { glideDrag } = await import('../../src/systems/BiomeEffects.js');
 
 const C = loadContent();
 const PAD = { tuck: false, brake: false };
@@ -226,14 +227,21 @@ describe('B3 Gear Gate: open/closed from the seeded phase and run time', () => {
 });
 
 describe('B3 power-ups through RunScene.onPowerUp (shipped defs)', () => {
-  test.each(['sandrunnerSkis', 'royalJellyWax'])('%s: glide, groundResist x0.7 for 4 s, then back', (id) => {
+  test.each(['sandrunnerSkis', 'royalJellyWax'])('%s: glide, all three drags lowered for its duration, then back', (id) => {
     const s = makeRun();
-    const base = phys(s).groundResist;
+    const b = phys(s);
+    const e = C.powerups[id].effect;
     s.onPowerUp(take(id));
-    expect(events(s, EVT.POWERUP_COLLECTED)).toEqual([{ id, durationMs: 4000, charges: 0 }]);
-    expect(phys(s).groundResist).toBeCloseTo(base * 0.7, 12);
-    s.tickEffects(4001);
-    expect(phys(s).groundResist).toBeCloseTo(base, 12);
+    expect(events(s, EVT.POWERUP_COLLECTED)).toEqual([{ id, durationMs: e.durationMs, charges: 0 }]);
+    const d = glideDrag(1, e.frictionMul);
+    const g = phys(s);
+    expect(g.groundResist).toBeCloseTo(b.groundResist * e.frictionMul, 12);
+    expect(g.frictionAir).toBeCloseTo(b.frictionAir / d.speedMul, 12);
+    expect(g.quadDrag).toBeCloseTo(b.quadDrag * d.quadMul, 12);
+    s.tickEffects(e.durationMs - 1);
+    expect(phys(s).speedMul).toBeCloseTo(d.speedMul, 12);
+    s.tickEffects(2);
+    expect(phys(s)).toEqual(b);
     expect(events(s, EVT.POWERUP_EXPIRED)).toEqual([{ id, reason: 'timeout' }]);
   });
 

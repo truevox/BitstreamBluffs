@@ -1,3 +1,3 @@
 { "id": "royalJellyWax", "biome": "micro-mountain", "shapeKey": "jellyWax", "radius": 10,
-  "effect": { "kind": "glide", "frictionMul": 0.7, "durationMs": 4000 },
+  "effect": { "kind": "glide", "frictionMul": 0.55, "durationMs": 5000 },
   "spawn": { "baseChance": 0.4 }, "colorKey": "amber" }
