@@ -107,9 +107,11 @@
  *             steerMul?:number, pushForceMul?:number}} [physics]
  * @property {number} [scoreMul]      W3: multiplier on banked trick points inside the zone, >= 1.
  *                                    Never applies to the flat perfect-landing bonus or to distance.
- * @property {{amplitudePx:number, periodPx:number}} [terrainSwell]
+ * @property {{amplitudePx:number, periodPx:number, taperPx?:number}} [terrainSwell]
  *                                    W6: periodic terrain swells (Micro Mountain's rolling dew drops).
  *                                    Bounded so the surface can never invert or bury the sled.
+ *                                    T2: displaces the chunk points (the collider); taperPx is the raised-cosine
+ *                                    ramp at each zone edge (additive, optional).
  * @property {{velocityPxS:number, cooldownMs:number}} [launch]
  *                                    W6: upward kicks from the ground (Vertigo Vents' geysers). Cooldown
  *                                    prevents a vent from re-firing on the same contact every frame.

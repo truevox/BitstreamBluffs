@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Micro Mountain dew swell is real (audit T2)
+## v2.7.1 - Micro Mountain dew swell is real (audit T2) (2026-11-15)
 
 - **Fix (audit T2):** the dew swell is now IN the ground. Before, only `heightAt` added it, so the collider, the drawn edge and `slopeDegAt` stayed flat and the sled never felt it (in the built game the sled tracked the raw ground, sd 0.03 px, not the swell, sd 18 px). The generator now displaces the chunk points inside each dewSwell zone, right after zone placement, so hazards, pads, power-ups and shards sit on the swelled ground. `heightAt` is the plain polyline again; it no longer adds the swell twice or steps at a zone end.
 - **Taper:** new `terrainSwell.taperPx`. The swell fades in and out with a raised-cosine window at both zone edges, so there is no step and no kink.

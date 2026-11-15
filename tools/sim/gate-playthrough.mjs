@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 42; // B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4
-const EXPECTED_WITHOUT_BOOSTS = 30; // B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts)
+const EXPECTED_WITH_BOOSTS = 43; // B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell)
+const EXPECTED_WITHOUT_BOOSTS = 31; // B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -1681,6 +1681,99 @@ async function main() {
       else if (!(c.out.dvy < -100)) fail('W6: a geyser throws the sled upward with real force', `dvy=${c.out.dvy} px/s (need a real upward kick, not a rounding error)`);
       else if (!(c.out.dvySecond > -1)) fail('W6: the vent does not re-fire while on cooldown', `second dvy=${c.out.dvySecond}`);
       else pass('W6: a geyser vent launches the real sled, once per cooldown', `dvy=${c.out.dvy.toFixed(1)} of ${c.out.launchVelocity} px/s, then ${c.out.dvySecond.toFixed(1)}`);
+    }
+
+    // ---- T2 (audit): the REAL sled rides the Micro Mountain dew swell. Before T2 the swell was added only by
+    // heightAt; the collider (chunk points) was raw, so the sled tracked the raw ground (sd ~0 px) and NOT the
+    // swelled heightAt (sd ~18 px). Now the swell is in the points. A `seed@512` run, Phaser's loop stopped and the
+    // game stepped with headlessStep (as tools/sim/browser.js does), empty pad; the sled is placed 360 px before
+    // the first dew-swell zone whose untapered middle holds a crest and a trough, and rides it.
+    {
+      const c = await (async () => {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        try {
+          const out = await page.evaluate(async () => {
+            const g = window.__bbGame;
+            const DT = 1000 / 60;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.scene.start('TitleScene');
+            const t0 = Date.now();
+            let run = null;
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              if (!started && tt && !tt.starting) { started = true; tt.startRun('t2-probe', 512); }
+              const rr = g.scene.getScene('RunScene');
+              if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'RunScene never produced a live sled (scene active + sled inWorld)' };
+            if (run.biomeMask !== 512) return { fatal: `run mask is ${run.biomeMask}, not 512` };
+            g.loop.stop();
+            const pad = {
+              push: false, tilt: 0, tuck: false, brake: false, hop: false, reset: false, heli: 0, airBrake: false,
+              parachute: false, pause: false, lastSource: 'keyboard',
+              pressed: { hop: false, reset: false, pause: false, airBrake: false, parachute: false, confirm: false },
+            };
+            run.inputRouter = { poll() { return pad; }, setEnabled() {} };
+            let clock = 100000;
+            const step = () => { clock += DT; g.headlessStep(clock, DT); };
+            for (let i = 0; i < 5; i++) step();
+            const T = run.terrain;
+            const sw = run.content.terrainMods.dewSwell && run.content.terrainMods.dewSwell.terrainSwell;
+            if (!sw) return { fatal: 'dewSwell has no terrainSwell in the shipped content' };
+            let z = null;
+            for (let i = 1; i < 260 && !z; i++) {
+              const ch = T.getChunk(i);
+              for (const q of ch.zones) {
+                if (q.modId !== 'dewSwell') continue;
+                const taper = Math.min(sw.taperPx || 0, (q.x1 - q.x0) / 2);
+                if (taper <= sw.periodPx / 4 + 1e-9 && q.x1 - q.x0 >= (3 * sw.periodPx) / 4 + taper) { z = { x0: q.x0, x1: q.x1, taper }; break; }
+              }
+            }
+            if (!z) return { fatal: 'no dew-swell zone with a crest and a trough in 260 chunks' };
+            const s = run.sled;
+            const sx = z.x0 - 360;
+            const ang = run.slopeAt(sx);
+            s.setPose(sx, T.heightAt(sx) - 18, ang, Math.cos((ang * Math.PI) / 180) * 500, Math.sin((ang * Math.PI) / 180) * 500);
+            const offs = []; // sled.y - heightAt, grounded frames in the untapered middle
+            const raws = []; // sled.y - raw (un-swelled) ground, same frames
+            let lo = Infinity;
+            let hi = -Infinity;
+            let frames = 0;
+            let crashed = false;
+            while (s.x < z.x1 + 40 && frames < 1800) {
+              s.invulnerableMs = 600000;
+              step();
+              frames++;
+              if (s.destroyed || !s.inWorld) { crashed = true; break; }
+              const x = s.x;
+              if (x < z.x0 + z.taper || x > z.x1 - z.taper) continue;
+              const h = T.heightAt(x);
+              const swell = T._swellAt(x);
+              lo = Math.min(lo, swell);
+              hi = Math.max(hi, swell);
+              if (s.grounded) { offs.push(s.y - h); raws.push(s.y - (h - swell)); }
+            }
+            const sd = (a) => { const m = a.reduce((p, q) => p + q, 0) / a.length; return Math.sqrt(a.reduce((p, q) => p + (q - m) * (q - m), 0) / a.length); };
+            return {
+              x0: z.x0, x1: z.x1, amp: sw.amplitudePx, reached: s.x >= z.x1, crashed, frames, n: offs.length,
+              sd: offs.length ? sd(offs) : NaN, sdRaw: raws.length ? sd(raws) : NaN, p2p: hi - lo,
+            };
+          }).catch((e) => ({ fatal: String(e) }));
+          return { errors, out };
+        } finally { await page.close(); }
+      })();
+      const name = 'T2: the real sled rides the Micro dew swell (collider = heightAt)';
+      const o = c.out;
+      if (o.fatal) fail(name, o.fatal);
+      else if (c.errors.length) fail(`${name} — no page errors`, c.errors.join(' | '));
+      else if (o.crashed || !o.reached) fail(name, `sled did not ride the zone through (crashed=${o.crashed} reached=${o.reached} frames=${o.frames})`);
+      else if (o.n < 20) fail(name, `only ${o.n} grounded frames in the zone middle (need 20)`);
+      else if (!(o.p2p > 0.9 * 2 * o.amp)) fail(name, `swell peak-to-peak ${o.p2p.toFixed(1)} px, want ~${2 * o.amp}`);
+      else if (!(o.sd < 3)) fail(name, `sd(sled.y - heightAt) ${o.sd.toFixed(2)} px over ${o.n} grounded frames (want < 3); vs raw ground ${o.sdRaw.toFixed(2)}`);
+      else if (!(o.sdRaw > 3 * o.sd)) fail(name, `the sled follows the raw ground as well as the swelled one (sd ${o.sd.toFixed(2)} vs raw ${o.sdRaw.toFixed(2)})`);
+      else pass(name, `t2-probe@512 zone ${(o.x0 / 20).toFixed(0)}-${(o.x1 / 20).toFixed(0)} m: sd(sled.y - heightAt) ${o.sd.toFixed(2)} px vs raw ground ${o.sdRaw.toFixed(2)} px over ${o.n} grounded frames; swell ${o.p2p.toFixed(1)} px peak-to-peak`);
     }
 
     // ---- B0 (biome full treatment): every new effect acts on the REAL run. Fixture defs are injected into the registry
