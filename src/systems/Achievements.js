@@ -13,6 +13,7 @@
  * state QUALIFIES for, and `newlyUnlocked` subtracts what the profile already has. That keeps the module
  * stateless, so evaluating the same state twice is idempotent.
  */
+import { sanitizeBiomeProgress } from './BiomeDiscovery.js';
 
 /**
  * Every metric the evaluator can compute. A catalogue entry naming something else is a bug in the data,
@@ -161,7 +162,10 @@ export function metricsFrom(profile, run, extra = {}) {
     bestStreak: Math.max(n(extra.streak), n(L.bestStreak), 0),
     shards: Math.max(n(L.shards), 0),
     level: Math.max(n(p.level), 1),
-    biomesDiscovered: Math.max(n(extra.biomeCount), 0),
+    // Decision 3: discovered = ENCOUNTERED (the sled reached one of the biome's sectors), read from the
+    // profile's own sanitized set, so the grid and the unlock see the same number. A caller's figure is
+    // still honoured (pure callers and tests pass one); the views no longer pass the catalogue size (ACH-6).
+    biomesDiscovered: Math.max(n(extra.biomeCount), sanitizeBiomeProgress(p.biomeProgress).encountered.length, 0),
   };
 }
 

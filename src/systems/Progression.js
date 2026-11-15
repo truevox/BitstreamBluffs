@@ -187,5 +187,9 @@ export function defaultProfile() {
     missions: { counter: 0, active: [], progress: {} },
     achievements: {},
     credited: [],
+    // Marvin decision 3: biomes actually ENTERED in a run, and biomes ridden through a whole sector without
+    // the run-ending crash inside it. Additive (an old v1 profile loads with empty sets); the unlock itself
+    // stays where it was (pendingBiomes / unlocked.biomes). See BiomeDiscovery.js.
+    biomeProgress: { encountered: [], completed: [] },
   };
 }

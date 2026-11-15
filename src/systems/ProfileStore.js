@@ -13,6 +13,7 @@ import { defaultProfile, loadLevelTable, levelForXp, rewardsForLevel, xpForRun, 
 import { metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
 import { isOfficialDaily } from './Ranking.js';
 import { COSMETIC_ITEMS } from './Cosmetics.js';
+import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -126,6 +127,8 @@ export function sanitizeProfile(raw, levels) {
     }
   }
   p.credited = strArr(raw.credited).slice(-CREDITED_MAX);
+  // Decision 3: only known biome ids survive, completed implies encountered, absent reads as empty sets.
+  p.biomeProgress = sanitizeBiomeProgress(raw.biomeProgress);
   return finishShape(p, table);
 }
 
@@ -158,8 +161,9 @@ function grantLevelRewards(profile, levelBefore, table) {
  * @param {Object} profile
  * @param {Object} record
  * @param {*} levels
- * @param {{streak?:number}} [extra] caller-owned facts: `streak` is the current Daily streak
- *        (SaveStore.getDailyStreak), kept as lifetime.bestStreak.
+ * @param {{streak?:number, biomeVisits?:{encountered:string[],completed:string[]}}} [extra] caller-owned facts:
+ *        `streak` is the current Daily streak (SaveStore.getDailyStreak), kept as lifetime.bestStreak;
+ *        `biomeVisits` is what the run saw (decision 3), merged into profile.biomeProgress.
  * @returns {{profile:Object, awards:Object}|null} null when already credited or the record is unusable.
  */
 /**
@@ -316,6 +320,9 @@ export function creditRun(profile, record, levels, extra = {}) {
   if (isOfficialDaily(record) && record.imported !== true) L.dailyRuns += 1;
   const ex = extra && typeof extra === 'object' ? extra : {};
   L.bestStreak = Math.max(L.bestStreak, nonNeg(ex.streak));
+  // Decision 3: what RunScene saw this run (RUN_END.biomeVisits, BiomeDiscovery.detectBiomeVisits), merged
+  // as a union. A new object, so the caller's profile is never written through.
+  next.biomeProgress = mergeBiomeVisits(base.biomeProgress, ex.biomeVisits);
   if (record.tricks && typeof record.tricks === 'object') {
     for (const [k, v] of Object.entries(record.tricks)) {
       if (typeof k === 'string' && k && isNum(v) && v > 0) L.tricks[k] = (L.tricks[k] || 0) + Math.round(v);
@@ -331,10 +338,12 @@ export function creditRun(profile, record, levels, extra = {}) {
   // W5: evaluate achievements as part of the same credit, so a run that crosses a threshold unlocks it
   // on the Game Over screen rather than on some later unrelated save. `now` comes from the record's
   // end time, not from inside the pure evaluator.
-  // Only the daily facts are forwarded. `biomesDiscovered` waits on the definition of "discovered", and
-  // spreading `extra` wholesale would let a caller's biomeCount unlock the biome achievements early.
+  // Only the daily facts and the profile's own encountered count are forwarded. Decision 3: discovered means
+  // encountered, and the count comes from `next.biomeProgress` (sanitized, known ids only); a caller's
+  // `biomeCount` is still ignored, so nothing but a real encounter can unlock the biome achievements.
   const unlockedNow = unlockAchievementsFor(next, record, {
     at: nonNeg(record.endedAt), dailyRuns: L.dailyRuns, streak: L.bestStreak,
+    biomeCount: next.biomeProgress.encountered.length,
   });
   const awards = {
     xp,
