@@ -19,6 +19,11 @@
  *  - maxMarks: nearest N hazards are planned (late-game density is ~4.5 ground hazards per maxPx).
  *  - warnGapMs: at most one warn sound per this long (events are never dropped, only the sound).
  *  - clearMarginPx: an airborne sled forecast to land this far past the box is "clear" of it.
+ *  - arrivalHorizonMs / arrivalStepMs: a moving hazard's arrival is searched this far ahead, in steps this long, then
+ *    refined by bisection (predictArrival).
+ *  - gateMarginMs: a gate (B3 Gear Gate) counts as open at arrival only if it is open from this long before the predicted
+ *    arrival to this long after it. It covers the crossing (~30 ms) and the drift of a 1 to 2 s estimate while the speed
+ *    changes, and 2x it fits inside the 900 ms open spell.
  */
 export const GROUND_WARN = Object.freeze({
   leadS: 2.0,
@@ -30,6 +35,9 @@ export const GROUND_WARN = Object.freeze({
   maxMarks: 6,
   warnGapMs: 220,
   clearMarginPx: 60,
+  arrivalHorizonMs: 4000,
+  arrivalStepMs: 20,
+  gateMarginMs: 150,
 });
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -71,14 +79,84 @@ export function inHopWindow(dx, vx, t = GROUND_WARN) {
 }
 
 /**
+ * True while a hop pressed now puts the apex over the box, from the time to arrival (ms): the oracle's rule in time.
+ * @param {number} etaMs
+ * @param {typeof GROUND_WARN} [t]
+ * @returns {boolean}
+ */
+export function inHopWindowMs(etaMs, t = GROUND_WARN) {
+  return etaMs > 0 && etaMs <= t.hopLeadMs && etaMs > t.hopLeadMs - t.hopWindowMs;
+}
+
+/**
+ * When the sled (at constant horizontal speed) reaches a hazard's box centre. A hazard with `predictX(tMs)` (B3: Hazard
+ * entity, systems/HazardMotion.js) is timed with it: its centre at run time now + tau is cx + predictX(now + tau) -
+ * predictX(now) (predictX gives the ground x, the centre may sit off it on a slope). Nothing here assumes which way, how
+ * fast or how far a hazard moves. Without predictX, without nowMs, or when predictX does not change between now and the
+ * static arrival, the answer is exactly dx / vx (the sim oracle's rule).
+ * Known limit: Hazard.predictX treats a roll that has not started as resting at its spawn point; it starts when the sled
+ * is ROLL_ACTIVATE_PX (340 px) behind it, and from that frame on the estimate is exact.
+ * @param {{cx:number, predictX?:(tMs:number)=>number}} h
+ * @param {{x:number, vx:number}} sled
+ * @param {number|undefined} nowMs run time (the time base of predictX).
+ * @param {typeof GROUND_WARN} [t]
+ * @returns {{etaMs:number, cxAtArrival:number}} etaMs Infinity when the sled does not catch it within the horizon.
+ */
+export function predictArrival(h, sled, nowMs, t = GROUND_WARN) {
+  const vx = Math.max(sled.vx, t.minVxPxS);
+  const dx = h.cx - sled.x;
+  const staticEta = dx / vx * 1000;
+  if (typeof h.predictX !== 'function' || !Number.isFinite(nowMs)) return { etaMs: staticEta, cxAtArrival: h.cx };
+  const p0 = h.predictX(nowMs);
+  if (!Number.isFinite(p0)) return { etaMs: staticEta, cxAtArrival: h.cx };
+  const cxAt = (tau) => h.cx + h.predictX(nowMs + tau) - p0;
+  if (cxAt(staticEta) === h.cx && cxAt(staticEta / 2) === h.cx) return { etaMs: staticEta, cxAtArrival: h.cx };
+  const gap = (tau) => cxAt(tau) - (sled.x + vx * tau / 1000);
+  if (!(gap(0) > 0)) return { etaMs: 0, cxAtArrival: cxAt(0) };
+  let lo = 0;
+  let hi = null;
+  for (let tau = t.arrivalStepMs; tau <= t.arrivalHorizonMs; tau += t.arrivalStepMs) {
+    if (gap(tau) <= 0) { hi = tau; break; }
+    lo = tau;
+  }
+  if (hi === null) return { etaMs: Infinity, cxAtArrival: h.cx };
+  for (let i = 0; i < 14; i++) {
+    const mid = (lo + hi) / 2;
+    if (gap(mid) > 0) lo = mid; else hi = mid;
+  }
+  return { etaMs: hi, cxAtArrival: cxAt(hi) };
+}
+
+/**
+ * B3 Gear Gate verdict at the predicted arrival: 'open' when `isPassable` holds from gateMarginMs before arrivalMs and
+ * the next change is more than 2 x gateMarginMs after that (so open across the whole margin), else 'closed'. null for
+ * a hazard without the gate API or without an arrival.
+ * @param {{isPassable?:(t:number)=>boolean, gateNextChangeMs?:(t:number)=>number|null}} h
+ * @param {number} arrivalMs run time.
+ * @param {typeof GROUND_WARN} [t]
+ * @returns {'open'|'closed'|null}
+ */
+export function gateVerdict(h, arrivalMs, t = GROUND_WARN) {
+  if (typeof h.isPassable !== 'function' || typeof h.gateNextChangeMs !== 'function') return null;
+  if (h.gateNextChangeMs(0) == null) return null; // not a gate (Hazard.gateNextChangeMs is null for anything else)
+  if (!Number.isFinite(arrivalMs)) return 'closed';
+  const from = arrivalMs - t.gateMarginMs;
+  return h.isPassable(from) && h.gateNextChangeMs(from) > 2 * t.gateMarginMs ? 'open' : 'closed';
+}
+
+/**
  * @typedef {Object} TelegraphMark
  * @property {Object} ref the hazard object passed in (identity is the mark's key).
  * @property {'hop'|'brace'} kind
- * @property {'warn'|'go'|'clear'} state 'go' = inside the hop window; 'clear' = the sled is flying over it.
+ * @property {'warn'|'go'|'clear'|'open'} state 'go' = inside the hop window; 'clear' = the sled is flying over it;
+ *   'open' = a Gear Gate that will be open when the sled gets there (drawn dim, silent, never lime).
  * @property {'danger'|'amber'|'lime'} color palette key: red = hop, amber = brace, lime = hop now.
  * @property {boolean} clear draw dim, play nothing.
  * @property {number} dx px from the sled to the box centre.
- * @property {number} etaS seconds to the box centre at the current horizontal speed.
+ * @property {number} etaS seconds to the box centre at the current horizontal speed (moving hazards: predicted with
+ *   predictArrival; Infinity when the sled will not catch it).
+ * @property {number|null} arrivalMs run time of the predicted arrival (null without opts.nowMs).
+ * @property {'open'|'closed'|null} gate Gear Gate verdict at arrival (gateVerdict); null for anything else.
  * @property {number} urgency 0 at the warn distance .. 1 at the box.
  * @property {boolean} onScreen the box has entered the view (the marker leaves the screen edge and stands on the hazard).
  */
@@ -88,7 +166,8 @@ export function inHopWindow(dx, vx, t = GROUND_WARN) {
  * @param {Iterable<{def:Object, cx:number, w:number, hit?:boolean}>} hazards live hazards (Hazard entities or plain objects).
  * @param {{x:number, vx:number, speed:number, grounded:boolean, landX?:number|null}} sled landX = ballistic touchdown x while airborne.
  * @param {number} viewRight world x of the right screen edge.
- * @param {{isMuted?:(h:Object)=>boolean}} [opts] isMuted: hazards that currently do nothing (warded) are skipped.
+ * @param {{isMuted?:(h:Object)=>boolean, nowMs?:number}} [opts] isMuted: hazards that currently do nothing (warded) are
+ *   skipped. nowMs: run time, needed to time moving hazards (predictX) and judge gates; without it all are static.
  * @param {typeof GROUND_WARN} [t]
  * @returns {TelegraphMark[]} nearest first, at most t.maxMarks.
  */
@@ -105,16 +184,22 @@ export function planTelegraph(hazards, sled, viewRight, opts = {}, t = GROUND_WA
     if (!(dx > 0) || dx > warn) continue;
     if (opts.isMuted && opts.isMuted(h)) continue;
     const half = (h.w || 0) / 2;
-    const clear = flying && sled.landX > h.cx + half + t.clearMarginPx;
-    const go = !clear && kind === 'hop' && sled.grounded && inHopWindow(dx, sled.vx, t);
+    const arr = predictArrival(h, sled, opts.nowMs, t);
+    const arrivalMs = Number.isFinite(opts.nowMs) ? opts.nowMs + arr.etaMs : null;
+    const gate = Number.isFinite(opts.nowMs) ? gateVerdict(h, arrivalMs, t) : null;
+    const clear = flying && sled.landX > arr.cxAtArrival + half + t.clearMarginPx;
+    const open = !clear && gate === 'open';
+    const go = !clear && !open && kind === 'hop' && sled.grounded && inHopWindowMs(arr.etaMs, t);
     marks.push({
       ref: h,
       kind,
-      state: clear ? 'clear' : go ? 'go' : 'warn',
+      state: clear ? 'clear' : open ? 'open' : go ? 'go' : 'warn',
       color: go ? 'lime' : kind === 'hop' ? 'danger' : 'amber',
       clear,
       dx,
-      etaS: dx / vx,
+      etaS: arr.etaMs / 1000,
+      arrivalMs,
+      gate,
       urgency: clamp(1 - dx / warn, 0, 1),
       onScreen: h.cx - half < viewRight,
     });
@@ -146,7 +231,7 @@ export class TelegraphTracker {
   update(nowMs, marks) {
     const events = [];
     for (const m of marks) {
-      if (m.clear) continue;
+      if (m.clear || m.state === 'open') continue;
       if (!this._warned.has(m.ref)) {
         this._warned.set(m.ref, nowMs);
         const sound = nowMs - this._lastWarnSoundMs >= this.t.warnGapMs;
