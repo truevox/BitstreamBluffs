@@ -1086,3 +1086,55 @@ Decision 3: "Biome discovery means actually encountering the biome; track unlock
 - `distanceM` is floored and the spawn is 44 px in, so one integer distance per sector boundary is ambiguous.
 - The first-time backfill only runs on a profile with no runs.
 - Absorbed crashes are not stored.
+
+## Addendum: biome full treatment, B2 "Sight" (content + blind fairness rule; additive)
+
+B2 ships Crystal Cavern's and Vertigo Vents' hazard and power-up (spec §4). It adds no new effect kind: `blind` and its
+overlay came in B0, `ward` in B0/B1, `shield` is the base Hashed Backup kind. Mask 0 is byte-identical (golden `shape` /
+`full` / `complete` unchanged): every def below carries a `biome` field.
+
+| Biome (bit) | Hazard (file) | Hazard effect | Power-up (file) | Power-up effect |
+|---|---|---|---|---|
+| Crystal Cavern (16) | `shatterWall` (`shatter-wall.json`), ground 24x34, shape `shatterWall`, lime, chance 0.6 | `blind` 1200 ms, visibility 0.4, no crash | `crystalClearGoggles` (`crystal-clear-goggles.json`), shape `goggles`, cyan, chance 0.4 | `ward` effects `['blind', 'scramble']` 6 s |
+| Vertigo Vents (1024) | `ashCloud` (`ash-cloud.json`), air 56x34 in jump arcs, shape `ashCloud`, amber, chance 0.75 | `blind` 1200 ms, visibility 0.4 | `heatShield` (`heat-shield.json`), shape `heatShield`, magenta, chance 0.25 | `shield`, 1 charge |
+
+* Both blind hazards are non-crash, so they are drawn in their own colour (never `danger`), and RunScene's air telegraph,
+  near-miss and hop hint (crash hazards only) ignore the Ash Cloud. Both draw through the bracketed `Hazard.draw` switch
+  (corner brackets included), like any ground hazard, so a later telegraph needs no special case.
+* "Air zone" (spec table) is the existing air pass: `ashCloud` is placed by `_placeBiomeSpawns` in a generated jump of a
+  Vertigo sector (`isJump`), above the no-hop arc, like Seagull Dive. Vertigo's template chunks (valley-launch, ski-jump,
+  big-air-drop) are spline chunks, not `isJump`, so they hold none.
+* The Shatter Wall box fits a Garbage Data Vent, Overflow Firewall or Glitch Chasm box + `BIOME_REPLACE_SLACK_PX`, so the
+  slot rule can swap it in.
+* The Goggles ward's `effects` list switches off every `blind` and `scramble` hit (the base Garbage Data Vent's scramble
+  included) and stops one that is already acting, through the B0 consumers: `onHazard` ignores the hit,
+  `updateBlindOverlay` drops the overlay to 0, and `sled.scrambled` / `physicsContext.scrambled` read false.
+
+**Blind fairness rule (`TerrainGenerator._biomeGroundAt`).** A biome ground def whose `onHit.effect` is `blind` needs no
+crash hazard of its own chunk within `blindClearAheadPx(onHit, distM)` ahead: `(durationMs + BIOME_BLIND_REACT_MS 500)` at
+`BIOME_BLIND_SPEED_MUL` (1.2) x `expectedSpeedPxS(distM)`. The replacement path checks it too (the swapped hazard is
+skipped). `crashHazardIds` (constructor) lists every crash def id, base and biome. The pass cannot see the next chunk;
+requiring the stretch to end inside the chunk cut Shatter Wall presence to about 4 %, so only the chunk's own hazards are
+checked. Measured over 32 seeds x 300 chunks: without the rule 29 % of Shatter Walls had a crash hazard within the 1.2 s
+blind at the expected speed; with it 2.9 % (22 of 771), all in the next chunk. Ash Cloud: 0 of 268. The rule binds only
+`blind` defs: masks 1, 2, 8 and 64 keep their e080803 digests.
+
+**Shield sources (`BiomeEffects`, B2).** The Heat Shield feeds the one `shieldCharges` pool. RunScene also keeps
+`shieldSources`, one pickup id per charge (`addShieldSource`); a spent charge reports the most recent source
+(`spendShieldSource`, LIFO), so `POWERUP_EXPIRED {reason: 'consumed'}` carries `heatShield` or `hashedBackup` (was always
+`hashedBackup`, which left a Heat Shield chip on screen). A charge with no tracked source (the W4 shield boost) is the
+Hashed Backup's (`SHIELD_DEFAULT_SOURCE`). `POWERUP_COLLECTED.charges` is `shieldChargesFor(sources, id, pool)`: the pool
+minus the charges other tracked pickups own, so a lone Hashed Backup still shows the whole pool. `shieldSources` is set
+with `shieldCharges` at run start; a manual reset keeps both.
+
+**HUD (`UIScene`).** `POWERUP_INFO` rows GOGGLES (cyan) and HEAT SHIELD (magenta) with their own `_drawIcon` glyphs;
+`HAZARD_LABEL` names SHATTER WALL and ASH CLOUD on the blind warning line. `BiomeEffects.HAZARD_SHAPES` gains
+`shatterWall`, `ashCloud`; `POWERUP_SHAPES` gains `goggles`, `heatShield`.
+
+**Tests and gates.** `tests/src/biome-b2-content.test.js` (loader / schema, spec values, ward pairing, slot-rule fit,
+shield-source helpers), `tests/src/biome-b2-effects.test.js` (shipped defs through the shipped RunScene / UIScene / Hazard /
+PowerUp), `tests/src/biome-b2-presence.test.js` (presence, the fairness rule and its measured residue, determinism).
+Changed pins: `data.test.js` lists the 6 + 6 biome defs; `biome-b1-content.test.js` counts only the B1 biomes' defs (the
+total is pinned in the B2 file); `micro-swell-isolation.test.js` leaves B2-tagged defs out of its digest (B2 content is
+meant to change masks 16 and 1024; nothing else moved). The built-game gate has 4 B2 checks on real `b2crystal13@16` and
+`b2vertigo56@1024` runs (expected counts 45 -> 49 with boosts, 33 -> 37).

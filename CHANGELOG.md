@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased - biome treatment B2: Sight (Crystal Cavern, Vertigo Vents)
+
+- **Crystal Cavern:** new ground hazard **Shatter Wall**. A hit flashes the screen and dims it for 1.2 s (40 % visibility, never below the 35 % floor). It does not crash, and the rider and terrain line stay dimly visible. New pickup **Crystal Clear Goggles**: a 6 s ward against `blind` and `scramble`. It stops a blind or scramble that is already acting, and the base Garbage Data Vent's scramble too.
+- **Vertigo Vents:** new air hazard **Ash Cloud**, the same blind. It sits in a generated jump, above the no-hop arc, like Seagull Dive. New pickup **Heat Shield**: the existing shield, 1 charge, as a biome-only def.
+- **Heat Shield has its own HUD chip.** RunScene now remembers which pickup each shield charge came from. A spent Heat Shield charge expires the Heat Shield chip, not Hashed Backup's, and each chip shows its own charge count. A lone Hashed Backup behaves as before.
+- **Blind fairness:** a Shatter Wall needs its own chunk clear of crash hazards for the stretch the sled rides while blinded, plus 0.5 s to react, at 1.2x the expected speed. Without the rule 29 % of Shatter Walls had a crash hazard inside the 1.2 s blind. Now 2.9 % do, all in the next chunk, which the per-chunk pass cannot see. No Ash Cloud has one.
+- **Presence** (chunks 0-44, share of eligible biome chunks): Shatter Wall 43 % (8 and 32 seeds), at least 1 per 2 km on every seed. Ash Cloud 50 % / 43 %; the per-seed 1-per-2-km rule fails on 2 of 6 seeds, an open item like B1's Seagull Dive. Goggles are in 38 % of Crystal chunks, Heat Shield in 19 % of Vertigo chunks (chance 0.25, lowered from 0.4 to keep hop survival inside the sim tolerance).
+- **HUD:** GOGGLES and HEAT SHIELD chips with their own icons. The blind warning line names SHATTER WALL or ASH CLOUD.
+- **Gate:** 4 new built-game checks: each blind hazard's overlay on a real run, the Goggles against a real Shatter Wall and Garbage Data Vent, and the Heat Shield against a real Packet Spike. Expected counts 45 -> 49 (with boosts) and 33 -> 37.
+- **Sim** (B0 baseline, ±15 %): hop mask 16 survival 20 -> 19/48 (-5 %), distance +0.1 %, speed +0.1 %; hop mask 1024 survival 18 -> 20/48 (+11 %), distance +6.3 %, speed -0.6 %; flip distance +5.0 % / +8.1 %, speed -0.5 % / -0.2 % (flip survival is exempt: 1 -> 0 and 0 -> 1 of 24).
+- Mask 0 is unchanged (golden digests untouched). The T2 isolation digest now leaves B2-tagged defs out, so it still shows that nothing else moved.
+
 ## v2.8.0 - decision 3: biome unlocked / encountered / completed (2026-11-15)
 
 - **Three separate biome facts (Marvin decision 3).** *Unlocked* is the existing Sync Level unlock. *Encountered* means a run's sled actually reached a sector of that biome. *Completed* means a run rode one of that biome's sectors from start to end (500 m) and its run-ending crash was not inside that sector. A crash a Hashed Backup absorbs does not void completion.
