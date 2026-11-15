@@ -87,6 +87,8 @@ const TUCK_HINT_MIN_RUN_MS = 12000;
 /** The speed -> zoom curve (three stages, floor 0.45) lives in systems/CameraZoom.js since the readable-chaos pass. */
 /** Extra look-ahead (px, on top of TUNING.lookAheadMaxPx) that ramps in between 600 and 1000 px/s; the follow lag eats the base look-ahead at speed. */
 const LOOK_FAR_EXTRA_PX = 90;
+/** Readable chaos: a further look-ahead between 850 and 1300 px/s. The 5.5 /s follow lags speed / 5.5 px behind (218 px at 1200), which left the rider ~130 px in. */
+const LOOK_ULTRA_EXTRA_PX = 110;
 /** The rider is never allowed closer than this many screen px to the left edge. */
 const RIDER_MIN_SCREEN_X = 36;
 const smooth01 = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
@@ -1649,7 +1651,7 @@ export class RunScene extends Phaser.Scene {
     const s = this.sled;
     // Look ahead in the direction of travel; Y keeps ~1/3 of the screen above the rider and peeks lower when falling.
     const look = clamp(s.vx * TUNING.lookAheadSec, -TUNING.lookAheadMaxPx * 0.5, TUNING.lookAheadMaxPx)
-      + LOOK_FAR_EXTRA_PX * smooth01((s.vx - 600) / 400);
+      + LOOK_FAR_EXTRA_PX * smooth01((s.vx - 600) / 400) + LOOK_ULTRA_EXTRA_PX * smooth01((s.vx - 850) / 450);
     const tx = s.x + look - GAME_WIDTH * 0.38;
     const ty = s.y - GAME_HEIGHT / 3 - clamp(s.vy * 0.05, -26, 34);
     const kx = 1 - Math.exp((-TUNING.cameraLerpX * dt) / 1000);

@@ -105,6 +105,13 @@ describe('RunScene.updateCamera uses the curve', () => {
     for (let i = 1; i < s.zooms.length; i++) expect(Math.abs(s.zooms[i] - s.zooms[i - 1])).toBeLessThanOrEqual(0.0101);
     expect(s.cameras.main.zoom).toBeLessThan(0.5);
   });
+  test('at 1000+ px/s the look-ahead outruns the follow lag: the rider settles in the left quarter of the screen', () => {
+    const sx = (v) => { const s = makeCam(v); settle(s); const cam = s.cameras.main; return (s.sled.x - (cam.scrollX + GAME_WIDTH / 2 - GAME_WIDTH / (2 * cam.zoom))) * cam.zoom; };
+    expect(sx(1200)).toBeLessThanOrEqual(75); // was ~130: the 5.5 /s follow lags 218 px behind at this speed
+    expect(sx(1000)).toBeLessThanOrEqual(80);
+    expect(sx(1200)).toBeGreaterThanOrEqual(35);
+    expect(Math.abs(sx(650) - 122)).toBeLessThan(12); // cruise framing is unchanged
+  });
   test('the rider stays on screen at the floor: screen x between the 36 px pin and the right edge', () => {
     const s = makeCam(1700);
     settle(s);
