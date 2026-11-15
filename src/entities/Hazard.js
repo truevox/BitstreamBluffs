@@ -138,7 +138,7 @@ export class Hazard {
     }
     const sx = Number.isFinite(sledX) ? sledX : (this.scene.sled && Number.isFinite(this.scene.sled.x) ? this.scene.sled.x : -Infinity);
     const before = this.roll.offsetPx;
-    this.roll = rollStep(this.roll, m, this.x0, sx, timeMs);
+    this.roll = rollStep(this.roll, m, this.x0, sx, timeMs, this._slopeFn());
     const off = this.roll.offsetPx;
     this.rolling = this.roll.activeAtMs !== null && Math.abs(off) < rollParams(m).rangePx;
     if (off === before) return;
@@ -153,7 +153,13 @@ export class Hazard {
     Body.setPosition(this.body, { x: b.bcx, y: b.bcy });
     Body.setAngle(this.body, rot);
     if (this.gfx) { this.gfx.setPosition(x, y); this.gfx.setRotation(rot); }
-    this.spin = off / Math.max(4, Math.min(this.w, this.h) / 2); // rolling toward -x turns it counter-clockwise
+    this.spin = off / Math.max(4, Math.min(this.w, this.h) / 2); // rolling downhill (+x) turns it clockwise
+  }
+
+  /** B3 tuning: the ground slope (deg) a roll reads, x -> terrain.slopeDegAt (the surface it rides); null = flat. */
+  _slopeFn() {
+    const t = this.scene && this.scene.terrain;
+    return t && typeof t.slopeDegAt === 'function' ? (x) => t.slopeDegAt(x) : null;
   }
 
   /**
@@ -165,12 +171,14 @@ export class Hazard {
   }
 
   /**
-   * B3, for a telegraph: the hazard's x at a later run time (a roll that has not started waits at its spawn x; anything
-   * else stays put), and ms until a gate next opens or closes (null for anything but a gate).
+   * B3, for a telegraph: the hazard's x at a later run time (a roll that has not started waits at its spawn x, then rolls
+   * downhill on the ground it rides; anything else stays put), and ms until a gate next opens or closes (null for
+   * anything but a gate). A roll's current signed x speed is `this.roll.vPxS` (closing speed = sled speed - vPxS, which
+   * is negative while a roll catches a slower sled up).
    * @param {number} tMs @returns {number}
    */
   predictX(tMs) {
-    return this.motion && this.motion.kind === 'roll' ? rollPredictX(this.roll, this.motion, this.x0, tMs) : this.x0;
+    return this.motion && this.motion.kind === 'roll' ? rollPredictX(this.roll, this.motion, this.x0, tMs, this._slopeFn()) : this.x0;
   }
 
   /** @param {number} tMs @returns {number|null} */

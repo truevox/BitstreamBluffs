@@ -209,6 +209,13 @@ function biomeSpawn(def, x, y, rotationDeg, h3) {
   if (def.motion && def.motion.kind === 'gate') sp.phase = Math.round((Number.isFinite(h3) ? h3 : 0) * 1e6) / 1e6;
   return sp;
 }
+/**
+ * B3 tuning: how far inside the chunk edges a rolling hazard's TRACK must stay (its spawn keeps BIOME_EDGE_MARGIN_PX).
+ * A roll now goes downhill (+x), so its track ends toward the chunk end. 120 >= the spec §4 96 px edge clearance, and a
+ * neighbour chunk's hazards sit >= HAZARD_END_MARGIN_PX (240) inside its own edge, so a track end is still >= 360 px
+ * from them (more than BIOME_HAZARD_CLEARANCE_PX); tests/src/biome-b3-presence.test.js checks the neighbours too.
+ */
+export const ROLL_TRACK_EDGE_MARGIN_PX = 120;
 /** Difficulty tail: past the old caps the ramp keeps creeping up (gently) to a hard ceiling. */
 export const HAZARD_DENSITY_CAP_M = 3500;
 export const HAZARD_DENSITY_TAIL_END_M = 10000;
@@ -1525,7 +1532,7 @@ export class TerrainGenerator {
     if (sw.lo === 0 && sw.hi === 0) return true;
     const lo = x + sw.lo;
     const hi = x + sw.hi;
-    if (lo < chunk.startX + BIOME_EDGE_MARGIN_PX || hi > chunk.endX - BIOME_EDGE_MARGIN_PX) return false;
+    if (lo < chunk.startX + ROLL_TRACK_EDGE_MARGIN_PX || hi > chunk.endX - ROLL_TRACK_EDGE_MARGIN_PX) return false;
     const away = (q) => (q < lo ? lo - q : q > hi ? q - hi : 0);
     for (const l of lips) if (hi >= l.x - 40 && lo <= l.zoneEnd) return false;
     for (const g of chunk.gaps) if (hi >= g.x0 - 96 && lo <= g.x1 + 96) return false;

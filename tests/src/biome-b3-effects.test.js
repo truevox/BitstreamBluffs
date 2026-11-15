@@ -33,7 +33,7 @@ const { Hazard } = await import('../../src/entities/Hazard.js');
 const { PowerUp } = await import('../../src/entities/PowerUp.js');
 const { EVT } = await import('../../src/events.js');
 const { PhysicsTuner, BASE_STEP_MS } = await import('../../src/systems/PhysicsTuner.js');
-const { ROLL_ACTIVATE_PX, gateOpenAt, gateTiming } = await import('../../src/systems/HazardMotion.js');
+const { ROLL_ACTIVATE_PX, gateOpenAt, gateTiming, rollOffsetAt, rollParams } = await import('../../src/systems/HazardMotion.js');
 const { loadContent, makeGen } = await import('./_helpers.js');
 const { glideDrag } = await import('../../src/systems/BiomeEffects.js');
 
@@ -107,7 +107,7 @@ const phys = (s) => s.tuner.getEffective(s.physicsContext(PAD));
 const events = (s, name) => s.emitted.filter(([e]) => e === name).map(([, p]) => p);
 
 describe('B3 rolling hazards: the shipped entity moves along the ground (Hazard.update -> HazardMotion.rollStep)', () => {
-  test.each(['rollingBoulder', 'dewDrop'])('%s waits at its spawn until the sled is within ROLL_ACTIVATE_PX, then rolls toward it', (id) => {
+  test.each(['rollingBoulder', 'dewDrop'])('%s waits at its spawn until the sled is within ROLL_ACTIVATE_PX, then rolls downhill, away from it', (id) => {
     const sc = scene();
     const x0 = 3000;
     const h = new Hazard(sc, C.hazards[id], spawnOn(sc, x0), PAL);
@@ -121,20 +121,25 @@ describe('B3 rolling hazards: the shipped entity moves along the ground (Hazard.
     sc.sled.x = x0 - ROLL_ACTIVATE_PX;
     h.update(3000, 0, 99999); // starts here
     h.update(3500, 0, 99999);
-    const v = C.hazards[id].motion.speedPxS;
-    expect(h.cx - cx0).toBeCloseTo(-v * 0.5, 6); // toward the sled
+    const m = C.hazards[id].motion;
+    const off = rollOffsetAt(m, 500, sc.terrain.slopeDegAt, x0); // the pure motion over the ground the entity rides
+    expect(off).toBeGreaterThan(20);
+    expect(h.cx - cx0).toBeCloseTo(off, 6); // downhill (+x), away from the sled
+    expect(h.roll.vPxS).toBeGreaterThan(0);
+    expect(h.roll.vPxS).toBeLessThanOrEqual(rollParams(m).speedPxS);
+    expect(h.predictX(4000)).toBeCloseTo(x0 + rollOffsetAt(m, 1000, sc.terrain.slopeDegAt, x0), 6); // the telegraph API
     expect(h.rolling).toBe(true);
     // it follows the ground: y moves with heightAt at its new x (the box centre stays h/2 above the surface)
-    expect(h.cy).toBeLessThan(cy0);
+    expect(h.cy).toBeGreaterThan(cy0);
     const box = h._boxAt(h.gfx.x, h.gfx.y, h.gfx.rotation);
     expect(h.body.x).toBeCloseTo(box.bcx, 9); // the sensor moved with it (same hit-box geometry as a static hazard)
     expect(h.body.y).toBeCloseTo(box.bcy, 9);
     expect(h.body.angle).toBeCloseTo(h.gfx.rotation, 12);
-    expect(h.gfx.x).toBeCloseTo(x0 - v * 0.5, 6);
-    expect(h.gfx.y).toBeCloseTo(sc.heightFn(x0 - v * 0.5), 6);
+    expect(h.gfx.x).toBeCloseTo(x0 + off, 6);
+    expect(h.gfx.y).toBeCloseTo(sc.heightFn(x0 + off), 6);
     // after its range it rests
     h.update(60000, 0, 99999);
-    expect(h.gfx.x).toBeCloseTo(x0 - C.hazards[id].motion.rangePx, 6);
+    expect(h.gfx.x).toBeCloseTo(x0 + C.hazards[id].motion.rangePx, 6);
     expect(h.rolling).toBe(false);
   });
 
@@ -144,7 +149,8 @@ describe('B3 rolling hazards: the shipped entity moves along the ground (Hazard.
     h.update(0, -5000, -4000); // camera far away
     h.update(500, -5000, -4000);
     expect(h.gfx.visible).toBe(false);
-    expect(h.gfx.x).toBeCloseTo(3000 - 70, 6);
+    expect(h.gfx.x).toBeCloseTo(3000 + rollOffsetAt(C.hazards.rollingBoulder.motion, 500, sc.terrain.slopeDegAt, 3000), 6);
+    expect(h.gfx.x).toBeGreaterThan(3020);
   });
 
   test('a Dew Drop on the Micro dew swell rides the same surface the sled rides (generator heightAt == collider points)', () => {
@@ -175,7 +181,7 @@ describe('B3 rolling hazards: the shipped entity moves along the ground (Hazard.
       h.update(t, 0, 99999);
       worst = Math.max(worst, Math.abs(h.gfx.y - polyY(h.gfx.x)));
     }
-    expect(h.gfx.x).toBeLessThan(x0 - 100); // it really rolled across the swell
+    expect(h.gfx.x).toBeGreaterThan(x0 + 40); // it really rolled (downhill) across the swell
     expect(worst).toBeLessThan(1e-6);
   });
 });

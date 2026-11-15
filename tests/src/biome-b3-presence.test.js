@@ -7,10 +7,10 @@
 import { makeGen, loadContent } from './_helpers.js';
 import { Rng, hashInts } from '../../src/systems/Rng.js';
 import {
-  BIOME_HAZARD_CLEARANCE_PX, BIOME_EDGE_MARGIN_PX, BIOME_SLOT_DRAWS, expectedSpeedPxS,
+  BIOME_HAZARD_CLEARANCE_PX, BIOME_EDGE_MARGIN_PX, BIOME_SLOT_DRAWS, expectedSpeedPxS, ROLL_TRACK_EDGE_MARGIN_PX,
 } from '../../src/systems/TerrainGenerator.js';
 import {
-  rollSweep, rollParams, ROLL_ACTIVATE_PX, gateTiming, GATE_MAX_CLOSED_MS,
+  rollSweep, rollParams, rollTargetSpeed, ROLL_ACTIVATE_PX, gateTiming, GATE_MAX_CLOSED_MS,
 } from '../../src/systems/HazardMotion.js';
 import { TUNING } from '../../src/systems/PhysicsTuner.js';
 import { PHYSICS } from '../../src/constants.js';
@@ -85,9 +85,10 @@ describe('B3 Gear Gate phase: the gate\'s own draw', () => {
 });
 
 describe('B3 rolling hazards: the whole roll track keeps the spawn clearances', () => {
-  test.each([[4, 'rollingBoulder'], [512, 'dewDrop']])('mask %p: every %s track is inside the edge margins, clear of lips, gaps, other hazards (240) and power-ups (90)', (mask, id) => {
+  test.each([[4, 'rollingBoulder'], [512, 'dewDrop']])('mask %p: every %s track is inside the track edge margins, clear of lips, gaps (its own and the neighbour chunks\' ), other hazards (240) and power-ups (90)', (mask, id) => {
     const sw = rollSweep(c.hazards[id].motion);
-    expect(sw.lo).toBeLessThan(0); // it really moves (toward the sled)
+    expect(sw.lo).toBe(0); // B3 tuning: it really moves, downhill (+x), away from the sled
+    expect(sw.hi).toBeGreaterThan(0);
     let n = 0;
     for (const seed of ['roll1', 'roll2', 'roll3', 'roll4', 'roll5', 'roll6']) {
       const { out } = chunks(seed, mask);
@@ -97,8 +98,13 @@ describe('B3 rolling hazards: the whole roll track keeps the spawn clearances', 
           n++;
           const lo = h.x + sw.lo;
           const hi = h.x + sw.hi;
-          expect(lo).toBeGreaterThanOrEqual(ch.startX + BIOME_EDGE_MARGIN_PX);
-          expect(hi).toBeLessThanOrEqual(ch.endX - BIOME_EDGE_MARGIN_PX);
+          // the spawn keeps the biome edge margin; B3 tuning: the downhill track may run on into it, up to
+          // ROLL_TRACK_EDGE_MARGIN_PX (>= the spec's 96 px) from the chunk end
+          expect(h.x).toBeGreaterThanOrEqual(ch.startX + BIOME_EDGE_MARGIN_PX);
+          expect(h.x).toBeLessThanOrEqual(ch.endX - BIOME_EDGE_MARGIN_PX);
+          expect(lo).toBeGreaterThanOrEqual(ch.startX + ROLL_TRACK_EDGE_MARGIN_PX);
+          expect(hi).toBeLessThanOrEqual(ch.endX - ROLL_TRACK_EDGE_MARGIN_PX);
+          expect(ROLL_TRACK_EDGE_MARGIN_PX).toBeGreaterThanOrEqual(96);
           for (const q of all) {
             if (q === h) continue;
             const d = q.x < lo ? lo - q.x : q.x > hi ? q.x - hi : 0;
@@ -108,8 +114,11 @@ describe('B3 rolling hazards: the whole roll track keeps the spawn clearances', 
             const d = p.x < lo ? lo - p.x : p.x > hi ? p.x - hi : 0;
             expect({ p: p.defId, d, ok: d >= 90 }).toMatchObject({ ok: true });
           }
-          for (const gp of ch.gaps) expect(hi < gp.x0 - 96 || lo > gp.x1 + 96).toBe(true);
-          for (const l of ch.launches) expect(hi < l.x - 40 || lo > l.x + 40).toBe(true);
+          const near = out.slice(Math.max(0, ch.index - 1), ch.index + 2); // this chunk and its neighbours
+          for (const nc of near) {
+            for (const gp of nc.gaps) expect(hi < gp.x0 - 96 || lo > gp.x1 + 96).toBe(true);
+            for (const l of nc.launches) expect(hi < l.x - 40 || lo > l.x + 40).toBe(true);
+          }
         }
       }
     }
@@ -198,14 +207,29 @@ describe('B3 fairness numbers (moving hazards)', () => {
       const disc = v0 * v0 - 2 * g * boxH;
       expect(disc).toBeGreaterThan(0);
       const above = (2 * Math.sqrt(disc)) / g;
-      for (const distM of [1000, 2000, 4000]) {
+      for (const distM of [0, 1000, 2000, 4000]) {
         const v = expectedSpeedPxS(distM);
-        const closing = v + p.speedPxS * (p.dir < 0 ? 1 : -1);
+        const closing = v - p.speedPxS * p.dir; // B3 tuning: it rolls away, so the sled closes at v - roll (worst case: the cap)
         const overlap = (def.size.w * 0.72 + 40) / closing; // box + sled length (~40 px) pass under the sled
         const windowMs = (above - overlap) * 1000;
         console.log(`${id} @ ${distM} m: v ${v.toFixed(0)}, closing ${closing.toFixed(0)} px/s, above box ${(above * 1000).toFixed(0)} ms, pass ${(overlap * 1000).toFixed(0)} ms, hop window ${windowMs.toFixed(0)} ms`);
         expect(windowMs).toBeGreaterThan(300);
       }
+    }
+  });
+
+  test('B3 tuning: a roll that catches a sled up from behind never reaches a moving sled, and overtakes a stopped one slowly', () => {
+    for (const id of ['rollingBoulder', 'dewDrop']) {
+      const m = c.hazards[id].motion;
+      const p = rollParams(m);
+      expect(p.dir).toBe(1); // downhill, away from the sled
+      // its top speed (the cap) is under the stall net's restart speed and far under the slowest expected sled speed
+      expect(p.speedPxS).toBeLessThan(TUNING.stallNudgeToPxS);
+      expect(p.speedPxS).toBeLessThan(expectedSpeedPxS(0) / 3);
+      // where a sled stops (flat or rising ground) the roll is at its floor: slower than one push kick, so W escapes it
+      const flat = rollTargetSpeed(m, 0);
+      expect(flat).toBeLessThan(TUNING.pushKickPxS);
+      console.log(`${id}: cap ${p.speedPxS} px/s (flat ground ${flat.toFixed(0)} px/s); closing on a stopped sled ${flat.toFixed(0)}-${p.speedPxS} px/s; push kick ${TUNING.pushKickPxS}, stall net ${TUNING.stallNudgeToPxS}`);
     }
   });
 

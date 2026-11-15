@@ -7,91 +7,151 @@
  */
 import {
   ROLL_ACTIVATE_PX, ROLL_MAX_RANGE_PX, ROLL_MAX_SPEED_PX_S, rollParams, rollOffsetAt, rollStep, rollPredictX, rollSweep,
+  rollTargetSpeed, ROLL_FLOOR_SHARE, ROLL_FULL_SLOPE_DEG, ROLL_ACCEL_PX_S2,
   GATE_MIN_OPEN_MS, GATE_MAX_CLOSED_MS, gateTiming, gateOpenAt, gateNextChangeMs, emptyRollState,
 } from '../../src/systems/HazardMotion.js';
 import { glideFriction, glideFrictionMul, glideStrength, glideDrag, GLIDE_MIN_FRICTION_MUL } from '../../src/systems/BiomeEffects.js';
 import { PhysicsTuner, TUNING } from '../../src/systems/PhysicsTuner.js';
 
-const ROLL = { kind: 'roll', speedPxS: 140, rangePx: 160, dir: -1 };
+const ROLL = { kind: 'roll', speedPxS: 100, rangePx: 160, dir: 1 };
 const GATE = { kind: 'gate', periodMs: 1400, openMs: 900 };
+const FLAT = () => 0;
+const STEEP = () => 30;
+const WAVY = (x) => 10 + 12 * Math.sin(x / 37);
+/** continuous-time offset on a constant slope: ramp at ROLL_ACCEL_PX_S2 from rest to the target, then constant */
+const onSlope = (motion, slopeDeg, ms) => {
+  const v = rollTargetSpeed(motion, slopeDeg);
+  const t = ms / 1000;
+  const tr = v / ROLL_ACCEL_PX_S2;
+  const d = t <= tr ? (ROLL_ACCEL_PX_S2 * t * t) / 2 : (v * tr) / 2 + v * (t - tr);
+  return Math.min(rollParams(motion).rangePx, d);
+};
 
-describe('HazardMotion: roll parameters', () => {
-  test('rollParams reads speed, range and direction, clamped to the bounds; direction is -1 (toward the sled) or +1', () => {
-    expect(rollParams(ROLL)).toEqual({ speedPxS: 140, rangePx: 160, dir: -1 });
-    expect(rollParams({ kind: 'roll', speedPxS: 999, rangePx: 999, dir: 1 })).toEqual({ speedPxS: ROLL_MAX_SPEED_PX_S, rangePx: ROLL_MAX_RANGE_PX, dir: 1 });
-    expect(rollParams({ kind: 'roll' }).dir).toBe(-1);
+describe('HazardMotion: roll parameters (B3 tuning: downhill, away from the sled, gently capped)', () => {
+  test('rollParams reads speed (the cap), range and direction, clamped to the bounds; direction defaults to +1 (downhill)', () => {
+    expect(rollParams(ROLL)).toEqual({ speedPxS: 100, rangePx: 160, dir: 1 });
+    expect(rollParams({ kind: 'roll', speedPxS: 999, rangePx: 999, dir: -1 })).toEqual({ speedPxS: ROLL_MAX_SPEED_PX_S, rangePx: ROLL_MAX_RANGE_PX, dir: -1 });
+    expect(rollParams({ kind: 'roll' }).dir).toBe(1);
     expect(rollParams({ kind: 'roll', dir: 7 }).dir).toBe(1);
+    expect(rollParams({ kind: 'roll', dir: -3 }).dir).toBe(-1);
     expect(rollParams({ kind: 'roll', speedPxS: -5, rangePx: -5 })).toMatchObject({ speedPxS: 0, rangePx: 0 });
+    // the cap stays gentle: below the stall net's restart speed, so a restarted sled always outruns a roll
+    expect(ROLL_MAX_SPEED_PX_S).toBeLessThanOrEqual(120);
   });
 
   test('rollSweep is the x span the hazard can occupy, relative to its spawn x', () => {
-    expect(rollSweep(ROLL)).toEqual({ lo: -160, hi: 0 });
-    expect(rollSweep({ ...ROLL, dir: 1 })).toEqual({ lo: 0, hi: 160 });
+    expect(rollSweep(ROLL)).toEqual({ lo: 0, hi: 160 });
+    expect(rollSweep({ ...ROLL, dir: -1 })).toEqual({ lo: -160, hi: 0 });
     expect(rollSweep(null)).toEqual({ lo: 0, hi: 0 });
     expect(rollSweep(GATE)).toEqual({ lo: 0, hi: 0 }); // a gate never moves along x
   });
+
+  test('rollTargetSpeed follows the slope: the floor share of the cap on flat or rising ground, the cap on steep ground', () => {
+    expect(rollTargetSpeed(ROLL, 0)).toBeCloseTo(100 * ROLL_FLOOR_SHARE, 12);
+    expect(rollTargetSpeed(ROLL, -15)).toBeCloseTo(100 * ROLL_FLOOR_SHARE, 12); // never stalls or turns back on a rise
+    expect(rollTargetSpeed(ROLL, ROLL_FULL_SLOPE_DEG)).toBeCloseTo(100, 12);
+    expect(rollTargetSpeed(ROLL, 60)).toBeCloseTo(100, 12);
+    expect(rollTargetSpeed(ROLL, ROLL_FULL_SLOPE_DEG / 2)).toBeCloseTo(100 * (ROLL_FLOOR_SHARE + (1 - ROLL_FLOOR_SHARE) / 2), 12);
+    expect(rollTargetSpeed(ROLL, 5)).toBeLessThan(rollTargetSpeed(ROLL, 12));
+    expect(rollTargetSpeed(ROLL, NaN)).toBeCloseTo(100 * ROLL_FLOOR_SHARE, 12);
+    // an uphill (dir -1) roll reads the slope along its own travel: rising ground (negative slope) is "downhill" for it
+    expect(rollTargetSpeed({ ...ROLL, dir: -1 }, -ROLL_FULL_SLOPE_DEG)).toBeCloseTo(100, 12);
+    expect(ROLL_FLOOR_SHARE).toBeGreaterThan(0);
+  });
 });
 
-describe('HazardMotion: rollOffsetAt (a pure function of the time since the roll started)', () => {
-  test('0 before it starts, speed x time while rolling, then rests at the end of its range', () => {
-    expect(rollOffsetAt(ROLL, -100)).toBe(0);
-    expect(rollOffsetAt(ROLL, 0)).toBe(0);
-    expect(rollOffsetAt(ROLL, 500)).toBeCloseTo(-70, 9);
-    expect(rollOffsetAt(ROLL, 1000)).toBeCloseTo(-140, 9);
-    expect(rollOffsetAt(ROLL, 5000)).toBe(-160);
-    expect(rollOffsetAt({ ...ROLL, dir: 1 }, 500)).toBeCloseTo(70, 9);
-    expect(rollOffsetAt(null, 500)).toBe(0);
+describe('HazardMotion: rollOffsetAt (a pure function of the time since the roll started and the ground)', () => {
+  test('0 before it starts; it starts from rest, speeds up to the slope\'s speed, and rests at the end of its range', () => {
+    expect(rollOffsetAt(ROLL, -100, FLAT, 0)).toBe(0);
+    expect(rollOffsetAt(ROLL, 0, FLAT, 0)).toBe(0);
+    for (const ms of [50, 100, 250, 500, 1000, 2000]) {
+      expect(rollOffsetAt(ROLL, ms, FLAT, 0)).toBeCloseTo(onSlope(ROLL, 0, ms), 1);
+      expect(rollOffsetAt(ROLL, ms, STEEP, 0)).toBeCloseTo(onSlope(ROLL, 30, ms), 1);
+    }
+    expect(rollOffsetAt(ROLL, 100, FLAT, 0)).toBeLessThan(100 * ROLL_FLOOR_SHARE * 0.1); // from rest: slower than full speed at first
+    expect(rollOffsetAt(ROLL, 60000, FLAT, 0)).toBe(160);
+    expect(rollOffsetAt({ ...ROLL, dir: -1 }, 500, () => -30, 0)).toBeCloseTo(-onSlope(ROLL, 30, 500), 1);
+    expect(rollOffsetAt(null, 500, FLAT, 0)).toBe(0);
+    expect(rollOffsetAt(ROLL, 500)).toBeCloseTo(onSlope(ROLL, 0, 500), 1); // no ground function = flat
   });
 
-  test('frame-rate independent: the same run time gives the same offset whatever the frame steps', () => {
+  test('it follows the slope: faster down steep ground than on flat ground, and never faster than the cap', () => {
+    expect(rollOffsetAt(ROLL, 1500, STEEP, 0)).toBeGreaterThan(rollOffsetAt(ROLL, 1500, FLAT, 0) * 1.5);
+    let last = 0;
+    for (let ms = 10; ms <= 4000; ms += 10) {
+      const o = rollOffsetAt(ROLL, ms, WAVY, 500);
+      expect(o - last).toBeGreaterThanOrEqual(0); // always downhill (+x), never back
+      expect((o - last) / 0.01).toBeLessThanOrEqual(100 + 1e-9);
+      last = o;
+    }
+  });
+
+  test('frame-rate independent: the same run time gives the same offset whatever the frame steps, on any ground', () => {
     const run = (dts) => {
-      let s = rollStep(emptyRollState(), ROLL, 1000, 1000, 0); // starts at run time 0 in every case
+      let s = rollStep(emptyRollState(), ROLL, 1000, 1000, 0, WAVY); // starts at run time 0 in every case
       let t = 0;
-      for (const dt of dts) { t += dt; s = rollStep(s, ROLL, 1000, 1000, t); }
-      return s.offsetPx;
+      for (const dt of dts) { t += dt; s = rollStep(s, ROLL, 1000, 1000, t, WAVY); }
+      return s;
     };
     const a = run(Array(60).fill(10));
     const b = run(Array(30).fill(20));
     const c = run([7, 13, 50, 30, 100, 200, 100, 100]);
-    expect(a).toBeCloseTo(b, 9);
-    expect(a).toBeCloseTo(c, 9);
+    const d = run([600]);
+    expect(a.offsetPx).toBeGreaterThan(20);
+    for (const q of [b, c, d]) {
+      expect(q.offsetPx).toBeCloseTo(a.offsetPx, 9);
+      expect(q.vPxS).toBeCloseTo(a.vPxS, 9);
+    }
+    expect(a.offsetPx).toBeCloseTo(rollOffsetAt(ROLL, 600, WAVY, 1000), 9);
   });
 });
 
 describe('HazardMotion: rollStep (starts when the sled comes within ROLL_ACTIVATE_PX)', () => {
   test('stays put while the sled is further than ROLL_ACTIVATE_PX behind its spawn x', () => {
     let s = emptyRollState();
-    s = rollStep(s, ROLL, 2000, 2000 - ROLL_ACTIVATE_PX - 1, 100);
-    expect(s).toEqual({ activeAtMs: null, offsetPx: 0 });
-    s = rollStep(s, ROLL, 2000, 2000 - ROLL_ACTIVATE_PX - 1, 5000);
+    s = rollStep(s, ROLL, 2000, 2000 - ROLL_ACTIVATE_PX - 1, 100, FLAT);
+    expect(s).toEqual(emptyRollState());
+    expect(s.activeAtMs).toBe(null);
+    s = rollStep(s, ROLL, 2000, 2000 - ROLL_ACTIVATE_PX - 1, 5000, FLAT);
     expect(s.offsetPx).toBe(0);
   });
 
-  test('starts on the step the sled reaches the activation line, then rolls with run time', () => {
+  test('starts on the step the sled reaches the activation line, then rolls downhill (+x) with run time', () => {
     let s = emptyRollState();
-    s = rollStep(s, ROLL, 2000, 2000 - ROLL_ACTIVATE_PX, 1000);
-    expect(s).toEqual({ activeAtMs: 1000, offsetPx: 0 });
-    s = rollStep(s, ROLL, 2000, 1500, 1500); // the sled x no longer matters once rolling
+    s = rollStep(s, ROLL, 2000, 2000 - ROLL_ACTIVATE_PX, 1000, FLAT);
     expect(s.activeAtMs).toBe(1000);
-    expect(s.offsetPx).toBeCloseTo(-70, 9);
-    s = rollStep(s, ROLL, 2000, 0, 9000);
-    expect(s.offsetPx).toBe(-160);
+    expect(s.offsetPx).toBe(0);
+    expect(s.vPxS).toBe(0);
+    s = rollStep(s, ROLL, 2000, 1500, 1500, FLAT); // the sled x no longer matters once rolling
+    expect(s.activeAtMs).toBe(1000);
+    expect(s.offsetPx).toBeCloseTo(onSlope(ROLL, 0, 500), 1);
+    expect(s.offsetPx).toBeGreaterThan(0); // away from the sled
+    expect(s.vPxS).toBeCloseTo(rollTargetSpeed(ROLL, 0), 6); // reached the flat-ground speed
+    s = rollStep(s, ROLL, 2000, 0, 90000, FLAT);
+    expect(s.offsetPx).toBe(160);
+    expect(s.vPxS).toBe(0); // resting
   });
 
-  test('does not mutate its input; a missing state is a fresh one', () => {
+  test('does not mutate its input; a missing state is a fresh one; an earlier run time recomputes from the start', () => {
     const s0 = emptyRollState();
-    const s1 = rollStep(s0, ROLL, 2000, 1900, 50);
-    expect(s0).toEqual({ activeAtMs: null, offsetPx: 0 });
+    const snap = JSON.stringify(s0);
+    const s1 = rollStep(s0, ROLL, 2000, 1900, 50, FLAT);
+    expect(JSON.stringify(s0)).toBe(snap);
     expect(s1.activeAtMs).toBe(50);
-    expect(rollStep(undefined, ROLL, 2000, 1900, 50)).toEqual(s1);
+    expect(rollStep(undefined, ROLL, 2000, 1900, 50, FLAT)).toEqual(s1);
+    const late = rollStep(s1, ROLL, 2000, 1900, 2050, FLAT);
+    const back = rollStep(late, ROLL, 2000, 1900, 550, FLAT);
+    expect(back.offsetPx).toBeCloseTo(rollStep(s1, ROLL, 2000, 1900, 550, FLAT).offsetPx, 9);
   });
 
-  test('rollPredictX: where the hazard will be at a later run time (for a telegraph)', () => {
+  test('rollPredictX: where the hazard will be at a later run time (for a telegraph), consistent with rollStep', () => {
     const idle = emptyRollState();
-    expect(rollPredictX(idle, ROLL, 2000, 99999)).toBe(2000); // not started: it waits at its spawn x
-    const s = rollStep(idle, ROLL, 2000, 1900, 1000);
-    expect(rollPredictX(s, ROLL, 2000, 1500)).toBeCloseTo(1930, 9);
-    expect(rollPredictX(s, ROLL, 2000, 60000)).toBe(1840);
+    expect(rollPredictX(idle, ROLL, 2000, 99999, WAVY)).toBe(2000); // not started: it waits at its spawn x
+    const s = rollStep(idle, ROLL, 2000, 1900, 1000, WAVY);
+    const snap = JSON.stringify(s);
+    for (const t of [1000, 1234, 1500, 3000]) expect(rollPredictX(s, ROLL, 2000, t, WAVY)).toBeCloseTo(2000 + rollStep(s, ROLL, 2000, 1900, t, WAVY).offsetPx, 9);
+    expect(rollPredictX(s, ROLL, 2000, 60000, WAVY)).toBe(2160);
+    expect(JSON.stringify(s)).toBe(snap);
   });
 });
 

@@ -1346,3 +1346,51 @@ completing run. The built-game gate adds 6 checks on `beegate0@512` (sector 2 is
 * drawn by the next run's Sled.
 
 Expected counts 58 -> 64 (with boosts) and 46 -> 52.
+
+
+## Addendum: B3 tuning, felt glides and downhill rolls (Marvin's rulings 2026-11-15; additive)
+
+Supersedes the B3 addendum's glide values, roll direction, roll speed model and the telegraph note on closing speed.
+Mask 0 is byte-identical (golden digests untouched): every changed def carries a `biome` field.
+
+**Glides are felt (`BiomeEffects.glideStrength`, `BiomeEffects.glideDrag`).** Ground friction is only about a quarter of
+the sled's drag at cruise speed (groundResist ~48 px/s^2, frictionAir ~65, quadDrag ~69 at 480 px/s), so the old
+friction-only x0.7 glide was hard to feel. `glideStrength(m)` = (1 - m) / (1 - GLIDE_MIN_FRICTION_MUL), 0 for no glide.
+`glideDrag(frictionMul, glideMul, t = TUNING)` returns `{frictionMul, speedMul, quadMul}`: ground friction as before
+(`glideFriction`), speedMul x (1 + `TUNING.glideSpeedLift` x s) (frictionAir / speedMul: the Packet Burst path) and
+quadDrag x (1 - `TUNING.glideQuadCut` x s). `PhysicsTuner.getEffective` calls it; with no glide every output is exactly
+the old one. TUNING gains `glideSpeedLift` 0.35 and `glideQuadCut` 0.35. No RunScene change: the strength comes from
+the pickup's `frictionMul`, which RunScene already passes as `TunerContext.glideFrictionMul`.
+
+| Pickup | effect | Flavour |
+|---|---|---|
+| Sandrunner Skis | `glide` frictionMul 0.3, 2.5 s (strength 0.875: speedMul x1.306, quadDrag x0.694) | short, punchy slick burst |
+| Royal Jelly Wax | `glide` frictionMul 0.55, 5 s (strength 0.5625: speedMul x1.197, quadDrag x0.803) | longer, gentler glide |
+
+**Rolls go downhill, away from the sled (`systems/HazardMotion.js`).**
+* `rollParams(motion)`: `dir` defaults to +1 (downhill, +x); `speedPxS` is the roll's cap, clamped to
+  `ROLL_MAX_SPEED_PX_S` 120 (under `TUNING.stallNudgeToPxS` 130). Shipped: Rolling Boulder cap 100 px/s, range 120 px;
+  Dew Drop cap 75 px/s, range 120 px; both `dir: 1`.
+* `rollTargetSpeed(motion, slopeDeg)` (new, pure): "fake but fun" slope-following speed. `ROLL_FLOOR_SHARE` 0.4 of the cap
+  on flat or rising ground (it never stalls or rolls back), the cap from `ROLL_FULL_SLOPE_DEG` 20 down, linear between.
+  The slope is read along the roll's direction.
+* The speed starts at 0 when the roll starts and moves toward the target at `ROLL_ACCEL_PX_S2` 250. It is integrated
+  (trapezoid) on a fixed `ROLL_STEP_MS` 10 ms grid counted from `activeAtMs`, so the position is a pure function of the
+  run time since the start and the terrain; the frame rate never changes it.
+* Signatures (additive: a new optional last argument `slopeFn`, x -> slope deg; missing = flat):
+  `rollOffsetAt(motion, msActive, slopeFn?, x0?)`, `rollStep(state, motion, x0, sledX, tMs, slopeFn?)`,
+  `rollPredictX(state, motion, x0, tMs, slopeFn?)`. `RollState` gains `vPxS` (signed x speed now) and the grid fields
+  `simMs`, `simDist`, `simV`; `emptyRollState()` has them all at 0. A `tMs` earlier than the last grid point recomputes
+  from the start. `rollSweep` is unchanged: `{lo: 0, hi: rangePx}` for `dir` +1.
+* `Hazard.stepMotion` passes `terrain.slopeDegAt` (the surface it rides; y still follows `scene.heightFn`, the collider
+  polyline with the Micro swell). `Hazard.predictX(tMs)` (signature unchanged) uses the same slope function.
+* **Telegraph note (replaces the B3 one).** A roll waits at `x0` until the sled is 340 px behind it, then rolls
+  downhill. Its current signed speed is `hazard.roll.vPxS`; **closing speed = sled speed - vPxS**, which is negative while
+  a roll catches up a slower or stopped sled. `predictX(tMs)` integrates the same model forward.
+
+**Placement (`TerrainGenerator._rollTrackClear`).** Unchanged except for one bound: the spawn keeps
+`BIOME_EDGE_MARGIN_PX` (240), and the track (now `[x, x + range]`, downhill) must stay `ROLL_TRACK_EDGE_MARGIN_PX` (120,
+new export, >= the spec §4 96 px) inside the chunk edges. A neighbour chunk's hazards sit >= 240 px inside its own edge,
+so a track end is >= 360 px from them. The clearances from lips, gaps, other hazards (240) and power-ups (90) are the
+same; the presence test now also checks the neighbour chunks' gaps and lips. Without the change the downhill track lost
+placements near chunk ends (Rolling Boulder 32-seed presence 35.4 % -> 29.2 % at range 160).
