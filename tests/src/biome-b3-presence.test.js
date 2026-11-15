@@ -132,7 +132,7 @@ describe('B3 presence: the biome hazard is felt in early terrain (chunks 0-44, s
 });
 
 /**
- * Measured (chunks 0-44): rollingBoulder 41.9 % (8 seeds) / 38.5 % (32), dewDrop 44.4 % / 37.2 %, gearGate 55.6 % / 39.5 %.
+ * Measured (chunks 0-44): rollingBoulder 41.9 % (8 seeds) / 35.4 % (32; chance 0.45), dewDrop 44.4 % / 37.2 %, gearGate 55.6 % / 39.5 %.
  * The 8-seed Gear Gate share is 15 of 27 eligible chunks, one placement above the 55 % band edge (14.85); its 32-seed share
  * sits inside the band, so hi8 is 0.56 for it only. robFails: seeds with biome terrain that miss 1 per 2 km (those with
  * < 0.7 km of the biome in chunks 0-44, or 0 km).
