@@ -18,6 +18,7 @@
   - Measured on the built game, hands-off, same seed: +19.5 % to +24.4 % distance at 10 s (was +1.7 % at 5 s, audit F8). Speed is ordinary after the window.
   - It is still MODDED, never applies on the official Daily, and applies only when owned.
 - **Gate:** 4 new built-game checks: typed daily seed is practice, DAILY RUN is official, ledger v2 tamper rejection, and Head Start >= +15 % at 10 s. Expected counts 38 -> 42 (with boosts) and 27 -> 30.
+- **Known gap:** imported runs saved before this change have no `imported` marker. A legacy imported record on its date's real mask and rule can still hold a streak day.
 - **Not done here (needs `src/scenes/UIScene.js`, outside this change's files):** the in-run HUD still labels any run on today's daily seed `DAILY RUN`. The label text exists as `DailyPatch.dailyRunLabel(seed, official)`, and `RUN_START` now carries `dailyOfficial`.
 
 ## v2.6.0 - biome treatment B1: Wards (Debumont, Garbage Dump Glacier, Underwater Mountain, Candy Cane Canyon) (2026-11-14)

@@ -166,16 +166,16 @@ export function sanitizeRun(raw) {
   for (const k of ['shards', 'nearMisses', 'bonusPoints']) {
     if (typeof raw[k] === 'number' && Number.isFinite(raw[k]) && raw[k] >= 0) r[k] = raw[k];
   }
-  // W3 (mask-scoped stats): the biome mask the run was played on. Whitelisted ONLY - deliberately not
-  // part of the ledger hash (computeLedgerHash is unchanged) and not accompanied by a saveVersion bump,
-  // so every existing record keeps its identity and old records without the field count as mask 0.
+  // W3 (mask-scoped stats): the biome mask the run was played on. Absent from the v1 ledger hash (so
+  // every pre-decision-6 record keeps its identity) and covered by the v2 hash (decision 6). No
+  // saveVersion bump; old records without the field count as mask 0.
   if (typeof raw.biomeMask === 'number' && Number.isFinite(raw.biomeMask) && raw.biomeMask >= 0) {
     r.biomeMask = Math.floor(raw.biomeMask) >>> 0;
   }
-  // W4 (modded runs): true when the run used a boost. Whitelisted ONLY - like `biomeMask`, it is
-  // deliberately absent from computeLedgerHash and needs no saveVersion bump, so an existing record
-  // keeps its identity and every pre-W4 run stays clean by omission rather than being retroactively
-  // disqualified. The decision to exclude it from a board lives in systems/Ranking.js, not here.
+  // W4 (modded runs): true when the run used a boost. Like `biomeMask`, absent from the v1 hash and
+  // covered by the v2 hash (decision 6: a sharecode can no longer strip it). No saveVersion bump; every
+  // pre-W4 run stays clean by omission rather than being retroactively disqualified. The decision to
+  // exclude it from a board lives in systems/Ranking.js, not here.
   if (raw.modded === true) r.modded = true;
   // Decision 6 (ledger hash v2). Every field the v2 hash reads must survive this whitelist, or a record
   // hashed in RunScene would fail verification after saveRun or an export/import round trip.

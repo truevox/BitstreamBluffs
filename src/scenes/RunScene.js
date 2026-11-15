@@ -1468,8 +1468,8 @@ export class RunScene extends Phaser.Scene {
       id: this.runId,
       seed: this.seed,
       dailyRuleId: this.dailyRuleId,
-      // W3: only recorded when non-zero, so a mask-0 run writes exactly the record it wrote before W3
-      // (same keys, same ledger hash input) and old and new mask-0 runs stay comparable.
+      // W3: only recorded when non-zero; absent reads as mask 0 everywhere (the v2 hash canonicalises it
+      // to 0), so old and new mask-0 runs stay comparable.
       ...(this.biomeMask ? { biomeMask: this.biomeMask } : {}),
       startedAt: this.startedAt,
       endedAt: Date.now(),

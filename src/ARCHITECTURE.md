@@ -281,7 +281,8 @@ All additive; no public signature changed.
   A `crash` landing quality banks nothing (no separate `onCrash` call needed, though it is harmless).
 * **SaveStore**: `init()` never rejects (memory fallback, `store.backend` is `'idb'` or `'memory'`). Records are
   sanitised on save/load/import (unknown keys dropped). Sharecode = `BB1:` + base64(UTF-8 JSON `{app,v,runs}`), importer
-  also accepts bare base64 / raw JSON, skips runs whose `ledgerHash` does not match their contents, and never throws.
+  also accepts bare base64 / raw JSON, skips runs whose `ledgerHash` does not match their contents (per hash version; an
+  empty hash is rejected since decision 6), and never throws.
   `setInitials` throws `RangeError` for < 3 chars (after trim) and clamps to 12; unknown run ids are ignored.
 * **DailyPatch**: 8 rules; index = whole UTC days since epoch modulo `RULES.length`. Added `msUntilNextRule(date)`.
 * **Rng**: `fork(label)` derives from the *initial* seed (independent of how much the parent has been consumed). New
@@ -434,12 +435,15 @@ All additive; no public signature changed.
 Additive, read-only helpers. No change to RunRecord, `computeLedgerHash`, the `BB1:` sharecode, the IndexedDB layout or the memory fallback.
 All SaveStore helpers below are **synchronous** scans of the in-memory `this.runs` mirror (filled once by `init()`), so they never touch I/O and
 are safe to call in `RunScene.create()`, `GameOverScene.create()` and `TitleScene.create()` without blocking retry. O(n) per call, fine for thousands of runs.
-Every stored run counts (crash and quit); runs imported via sharecode count too (they carry initials).
+Every stored run counts (crash and quit); runs imported via sharecode count too (they carry initials). SUPERSEDED for the Daily
+surfaces by decisions 1/2 (addendum at the end): Daily best counts only official runs, and the streak only official local runs.
 
 * `store.getSeedStats(seed, {excludeRunId}?)` -> `{seed, attempts, bestScore, bestDistanceM} | null`. Best score and best distance are independent maxima.
 * `store.getDailyStats(when = now, {excludeRunId}?)` -> same plus `dateKey`, for `DailyPatch.getDailyInfo(when).seed` (`when` is a Date or epoch ms).
+  Since decisions 1/2: only official Daily runs on that date's mask (`Ranking.countsForDailyBest`).
 * `store.getDailyStreak(now = new Date())` -> `{streak, playedToday, todayKey, lastPlayedKey}`. Day membership is the date inside the run's seed
   (`daily-YYYY-MM-DD`), not its timestamps (robust to clock skew and midnight-straddling runs). Streak ends today or yesterday, else 0; future-dated seeds ignored.
+  Since decisions 1/2: only official, local Daily runs hold a day (`Ranking.countsForStreak`).
 * `DailyPatch.dateKeyFromSeed(seed)` -> `'YYYY-MM-DD' | null`; `DailyPatch.formatCountdown(ms)` -> `'3H 12M'` / `'12M'` / `'<1M'` / `'0M'` (minutes rounded up).
 
 **GameOver usage.** `saveRun` is async and pushes to `this.runs` synchronously before its first await, so the finished run is already in the mirror when the
@@ -476,8 +480,8 @@ Owner: core-logic engineer. All additive except the two rule changes marked RULE
   HUD getters: `getFlow()`, `getFlowTimeoutFraction()` (0 when flow is 1), snapshot fields `flow`, `flowTimeoutFrac`, `bestFlow`,
   `comboCounts`. `onLanding` additionally returns `flowUsed` and `comboName`.
 * **bestFlow in the record**: the scene may add an optional `bestFlow` (from `snapshot.bestFlow`) to the RunRecord. It is NOT covered by
-  `computeLedgerHash` (which hashes a fixed field list), so old saved runs stay valid; SaveStore's record sanitiser must default it
-  (`>= 1`) when absent. Until SaveStore carries it, read it from the snapshot only.
+  the v1 `computeLedgerHash` (which hashes a fixed field list), so old saved runs stay valid. SUPERSEDED by decision 6: SaveStore now
+  whitelists `bestFlow` and the v2 hash covers it (absent = 0); readers default it to 1 for display.
 * **RULE: combo step**: only `SCORING.comboStepTypes` (backflip, frontflip, helicopterCCW, helicopterCW) add `comboStep`. Air brake and
   parachute keep base points and still appear in `comboTricks`, but `addTrick().isNew` and `TrickPayload.isNew` are false for them.
 * **Incomplete helicopter**: `classifyLanding(angleDiffDeg, impactSpeedPxS, midSpin?)`; `midSpin` is `true` or a helicopter phase in
@@ -651,8 +655,9 @@ score a combo bonus" cannot be written as a physics multiplier, so its mod carri
 `scoreMul` applied to banked trick points only - never the flat perfect-landing bonus, never
 distance points, clamped to `>= 1`. This is an intentional extension of `TerrainModDef`.
 
-**Persistence.** `biomeMask` is in `sanitizeRun`'s whitelist and is *not* part of
-`computeLedgerHash` (which hashes a fixed field list); there is no `saveVersion` bump. Records
+**Persistence.** `biomeMask` is in `sanitizeRun`'s whitelist and is *not* part of the v1
+`computeLedgerHash` (which hashes a fixed field list); there is no `saveVersion` bump. Since decision 6
+the v2 hash (new records, `hashV: 2`) covers `biomeMask` and `modded`; see the addendum at the end. Records
 written before W3 have no field and count as mask 0. `getSeedStats` takes an opt-in `biomeMask`
 scope so seed-best compares within one mask; omitting it keeps pre-W3 behaviour.
 
@@ -1016,5 +1021,7 @@ through `Sled.scaleVelocity`), `openingSpeedMul` 1.6, `openingMs` 8000, `opening
 export / tamper / import round trip) and `distanceAt10s` (loop stopped, `headlessStep` at 1/60 s, hands off, seed `hs-1`).
 Expected counts 38 -> 42 with boosts, 27 -> 30 without.
 
-**Known gap.** `UIScene._buildSeedInfo` still labels any run on today's daily seed `DAILY RUN` in the HUD. UIScene was
+**Known gaps.** Imported runs saved before this change have no `imported` marker, so a legacy imported record on its
+date's mask and rule can still hold a streak day. `events.js`' RUN_START typedef does not list the additive `dailyOfficial`
+field (foundation file, outside this change). `UIScene._buildSeedInfo` still labels any run on today's daily seed `DAILY RUN` in the HUD. UIScene was
 outside this change's files. The fix is to use `DailyPatch.dailyRunLabel(seed, payload.dailyOfficial)` from `RUN_START`.
