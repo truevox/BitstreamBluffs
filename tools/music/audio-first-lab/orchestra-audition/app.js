@@ -12,7 +12,7 @@ const palette = {
 };
 const state = {
 	catalog:null,song:'pope',biome:'debumont',
-	arrangement:'orchestra',terrain:'air',vocals:false,
+	arrangement:'orchestra',terrain:'air',revision:'orchestral',vocals:false,
 	ctx:null,master:null,main:null,voice:null,
 	playing:false,position:0,startClock:0,
 	request:0,vocalRequest:0,cache:new Map(),
@@ -35,9 +35,9 @@ function playPosition(){
 function desiredPath(){
 	const song=getSong();
 	if(!song)throw new Error('Missing song');
-	return state.arrangement==='original'
-		? song.id+'/'+song.originalReference
-		: song.id+'/'+song.variants[state.biome][state.terrain];
+	if(state.arrangement==='original')return song.id+'/'+song.originalReference;
+	const prefix=state.revision==='original'?'':('revisions/'+state.revision+'/');
+	return prefix+song.id+'/'+song.variants[state.biome][state.terrain];
 }
 function setStatus(text){
 	$('status').textContent=text;
@@ -94,6 +94,10 @@ function stopSlot(slot,fade=.2){
 	}catch{}
 }
 function flags(){
+	for(const button of document.querySelectorAll('#versions button[data-revision]')){
+		button.setAttribute('aria-pressed',String(button.dataset.revision===state.revision));
+		button.disabled=state.arrangement==='original';
+	}
 	for(const [button,active] of [
 		['original',state.arrangement==='original'],
 		['new',state.arrangement==='orchestra'],
@@ -145,7 +149,7 @@ async function vocalSync(){
 async function swap(){
 	const token=++state.request;
 	const next=desiredPath();
-	setStatus('Loading '+(state.arrangement==='original'?'original':'orchestra')+' audio…');
+	setStatus('Loading '+(state.arrangement==='original'?'original':state.revision+' orchestra')+' audio…');
 	try{
 		const buffer=await decoded(next);
 		if(token!==state.request)return;
@@ -206,6 +210,13 @@ function changeArrangement(mode){
 	state.arrangement=mode;
 	display();
 	swap();
+}
+function changeRevision(version){
+	if(!['original','articulation','orchestral'].includes(version))return;
+	if(state.revision===version)return;
+	state.revision=version;
+	flags();
+	if(state.arrangement==='orchestra')swap();
 }
 function changeTerrain(mode){
 	if(state.terrain===mode)return;
@@ -268,6 +279,9 @@ async function init(){
 		}
 		$('song').value=state.song;
 		$('song').addEventListener('change',event=>changeSong(event.target.value));
+		for(const button of document.querySelectorAll('#versions button[data-revision]')){
+			button.addEventListener('click',()=>changeRevision(button.dataset.revision));
+		}
 		$('original').addEventListener('click',()=>changeArrangement('original'));
 		$('new').addEventListener('click',()=>changeArrangement('orchestra'));
 		$('ground').addEventListener('click',()=>changeTerrain('ground'));
