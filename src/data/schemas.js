@@ -48,13 +48,15 @@
 /** @typedef {{modId:'highBandwidth'|'compression'|'wirelessBridge', x0:number, x1:number}} TerrainZone  world px, x0<x1. */
 /** @typedef {{x0:number, x1:number}} GapSpan  both x values coincide with polyline points; no collider/mesh between them. */
 /** @typedef {{x:number, y:number, width:number, boost:number}} BouncePad  y = ground surface at x; boost = upward speed px/s. */
-/** @typedef {{defId:string, x:number, y:number, rotationDeg:number}} HazardSpawn  ground hazards: y = ground surface height at x (sit on it). Air hazards (def.placement 'air'): y = CENTRE of the box, floating in a jump arc, rotationDeg 0. */
+/** @typedef {{defId:string, x:number, y:number, rotationDeg:number, phase?:number}} HazardSpawn  B3 (additive): `phase` (0..1, rounded to 1e-6) is set ONLY on a Gear Gate (def.motion.kind 'gate'): where in its open/closed cycle the gate starts, from the slot's own pre-drawn number so no seeded stream moves (TerrainGenerator.biomeSpawn). Other spawns have no `phase`. Ground hazards: y = ground surface height at x (sit on it). Air hazards (def.placement 'air'): y = CENTRE of the box, floating in a jump arc, rotationDeg 0. */
 /** @typedef {{defId:string, x:number, y:number}} PowerUpSpawn  y = centre, already lifted above ground by the generator. */
 
 /**
  * Hazard def (src/data/hazards/*.json).
  * @typedef {Object} HazardDef
  * @property {string} id
+ * @property {string} [name]          player-facing name (additive; today Meteor, Gust Front). The crash banner / Game Over line
+ *                                    use it upper-cased; a def without one is named from its camelCase id (systems/CrashReport.killerName).
  * @property {string} shapeKey        key of the Graphics draw routine (gameplay entity switch), e.g. 'chasm'.
  * @property {{w:number,h:number}} size   collision box in px.
  * @property {{effect:'crash'|'slow'|'scramble'|'blind'|'gust', durationMs?:number, speedFactor?:number,
@@ -69,6 +71,12 @@
  * @property {string} [biome]         B0 (additive): biome id. A def with this field never enters the base hazard lists;
  *                                    it spawns only in that biome's chunks (TerrainGenerator._placeBiomeSpawns).
  * @property {{baseChance:number}} [spawn]  B0, biome defs only: chance of the chunk's biome hazard slot, capped at 0.5.
+ * @property {{kind:'roll', speedPxS?:number, rangePx?:number, dir?:1|-1}|{kind:'gate', periodMs?:number, openMs?:number}} [motion]
+ *                                    B3 (additive): a moving ground hazard (systems/HazardMotion.js; every number is clamped to its bounds).
+ *                                    'roll' (Rolling Boulder, Dew Drop): rolls along the slope up to `speedPxS` (<= 120) across a track
+ *                                    `rangePx` (<= 200) long; `dir` +1 (default) rolls downhill, away from the sled, -1 uphill.
+ *                                    'gate' (Gear Gate): open for `openMs`, closed for the rest of each `periodMs` (defaults 900 / 1400),
+ *                                    offset by the spawn's `phase`. Absent = the hazard stands still.
  * @property {number} [maxDistanceM]  optional upper distance bound.
  */
 
@@ -85,6 +93,9 @@
  *                                    off those terrain-mod ids, hazard ids and hazard effects (systems/Wards.js); 'glide'
  *                                    {frictionMul, durationMs} multiplies ground friction; 'stabilize' {landingToleranceDeg,
  *                                    bounceMul?, durationMs} widens landing tolerance (systems/BiomeEffects.js).
+ *                                    Shipped shapes: ward {durationMs: 4000-6000, mods|hazards|effects lists, optional speedFactor
+ *                                    (Slick Wax Spray, 1.1)}; glide {frictionMul 0.3 | 0.55, durationMs 2000 | 5000}; stabilize
+ *                                    {landingToleranceDeg 12, bounceMul? 0.5 (Stabilizer Rails only), durationMs 5000}.
  * @property {{baseChance:number, distanceDecayM:number}} spawn  chance per candidate slot = max(0.4 x baseChance, baseChance / (1 + distanceM / distanceDecayM)).
  *                                    Biome defs: baseChance alone, capped at 0.5 (no distance decay).
  * @property {string} colorKey
@@ -144,5 +155,38 @@
  * @property {Object<string, Object<string,string>>} palettes  palette name -> partial overrides,
  *                                  merged over the ACTIVE palette. Partial so colour-blind keys the
  *                                  biome does not name survive. `danger` is never overridable.
+ */
+
+/**
+ * Cosmetic catalogue entry (systems/Cosmetics.js COSMETIC_ITEMS is the source of truth; data/cosmetics/cosmetics.json mirrors it).
+ * @typedef {Object} CosmeticDef
+ * @property {string} id              stable id, what `unlocked.cosmetics` and levels.json `cosmetic` hold.
+ * @property {string} kind            what it changes; equals `slot`.
+ * @property {'trail'|'glow'|'rider'|'theme'|'title'} slot  the `profile.equipped` key it equips into.
+ * @property {string} name            shop label.
+ * @property {number} price           Data Shards; 0 = never bought (level reward, achievement or biome grant).
+ * @property {number} unlockLevel     price 0: the level that grants it; price > 0: the level it can first be bought at.
+ * @property {string} value           what equip() stores in the slot; unique within a slot.
+ * @property {'achievement'|'biome'} [grant]  additive: 'achievement' = owned only when an achievement put `value` in
+ *                                    `unlocked.titles`; 'biome' = owned only when `biome` is in `biomeProgress.completed`
+ *                                    (or ProfileStore.creditRun wrote the id into `unlocked.cosmetics`).
+ * @property {string} [biome]         grant 'biome' only: the biome id whose completion earns it.
+ * @property {string} [unlockText]    grant 'biome' only: the shop's locked-state text (the condition spelled out).
+ */
+
+/**
+ * REG.LAST_CRASH: the last run-ending crash. Registry only, never in the RunRecord or its ledger hash. Built by
+ * systems/CrashReport.crashReport; read by GameOverScene (header line) and RunScene (DIED HERE on a same-seed, same-mask retry).
+ * @typedef {Object} LastCrash
+ * @property {string|null} runId      RunRecord.id of the run that crashed (Game Over shows the line only for that run).
+ * @property {string} seed
+ * @property {number} biomeMask
+ * @property {number} x               world px of the crash (the DIED HERE pole).
+ * @property {number} distM           metres at the crash.
+ * @property {string} cause           'hazard' | 'terrain' | 'badLanding' | 'chasm'.
+ * @property {string|null} hazardId   the killing hazard's def id for a hazard crash, else null.
+ * @property {string} name            killer name, upper case.
+ * @property {string} verdict         hop verdict ('' when not a hazard crash), e.g. 'HOP WAS 0.21 S LATE'.
+ * @property {string} line            Game Over header line, e.g. 'PACKET SPIKE AT 301 M - HOP WAS 0.21 S LATE'.
  */
 export {};
