@@ -608,3 +608,45 @@ render-full-pope.py and tools/music/stem-bank group+manifest scripts.
 New music remains research-only due to noncommercial SheetSage2
 weights; no game installation, commercial release approval,
 original master overwrite or further Kie spending.
+
+## Full twelve-mountain Gentle-score treatment for BOTH songs (Nov 15 2026)
+
+Marvin requested completing Pope and One More Run with the same
+SheetSage2 -12 / V3 Gentle note/timbre design used in the earlier
+successful 25-second audition. Completed: twelve complete mountain
+instrument tracks EACH, 3:35 Pope (642 full score notes) and
+2:54.6 One More Run (333 full isolated-vocal score notes).
+
+The original Pope full Gentle pipe organ is preserved exactly:
+SHA256-identical byte copy in its 12-mountain gallery. Other
+11 instruments per song use the same score-corrected pitch
+centers and original V2 palette/FX with bounded within-note
+expressive movement max 32 cents/weight .72. One More Run's
+vocal rests/introduction are preserved. Original stem masters,
+11 supplied One More Run WAVs and 6 compatible groups remain
+unchanged.
+
+Tailscale-only listening:
+http://100.115.120.66:8181/tools/music/audition-full-pope/
+http://100.115.120.66:8181/tools/music/audition-full-one-more-run/
+
+Twelve switchable full audio tracks in each lab with
+original isolated vocal, 5-stem backing, biome acoustics,
+song master reference, synchronized seeking and feedback.
+All 28 audio files duration-validated, source voice outputs
+SHA256-verified, real Chromium browser switch/audio tests
+passed, 168 focused Jest tests and production build passed.
+No game deployment, main merge or paid cloud inference.
+
+User offered eleven more One More Run stems from exact
+same Suno mix, and hypothesized their separation is
+generative. That batch is NOT received; compare potential
+alternative stems by sum-against-master residual, leakage,
+timing and phase before preferring them. Exact source mix
+alone does NOT guarantee a generative rerun improves fit.
+
+Full scripts, provenance and caveats:
+tools/music/full-palette/README.md.
+SheetSage2/MERT noncommercial weights remain a rights
+gate; all files are private research auditions pending
+Marvin's actual full-song artistic verdict.

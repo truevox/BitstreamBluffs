@@ -109,3 +109,21 @@ Reproduction: build-full-pope.py and render-full-pope.py.
 Noncommercial SheetSage2/MERT pretrained weights were used in
 research. Do not ship in paid game or claim commercial clearance;
 the owner has yet to approve the entire new full song by ear.
+
+## Two complete twelve-instrument full-song palettes
+
+User asked to extend the short Gentle organ experience
+across all 12 mountains and both complete songs.
+Pope: 642 full-score notes/3:35; One More Run: 333
+full-song lead notes/2:54.6. Same octave-lowered
+score pitch centers and bounded V3 microexpression.
+Pope Vertigo organ exactly equals previous full Gentle,
+not approximated.
+
+Full interactive listening labs:
+http://100.115.120.66:8181/tools/music/audition-full-pope/
+http://100.115.120.66:8181/tools/music/audition-full-one-more-run/
+
+Full details: tools/music/full-palette/README.md.
+Private audio and noncommercial model checkpoints excluded
+from Git; user listening/rights still pending.
