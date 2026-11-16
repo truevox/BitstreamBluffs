@@ -1297,6 +1297,29 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
 * **Tests**: `tests/src/camera-zoom.test.js` (curve identity below 600 px/s, anchors, monotone, floor, the shipped
   `updateCamera` settling on the curve, eased under hard acceleration, rider framing and pin).
 
+## Addendum: readable chaos phase 3, death legibility (additive)
+
+* **`systems/CrashReport.js`** (pure): `CRASH_BEAT` {slowMs 400, slowScale 0.25, hitStopScale 0.08, zoomIn 0.18};
+  `killerName(cause, def)` (a crash def's `name`, else its id spaced and upper-cased; a non-crash def -> `'CRASH'`;
+  causes `terrain` HEAD FIRST, `badLanding` BAD LANDING, `chasm` FELL INTO THE VOID); `hopTiming(lastHopMs, arrivalMs)`
+  -> `{kind: 'none'|'early'|'late'|'onTime', s}` against `[arrival - hopLeadMs, + hopWindowMs]` (a hop over 1 s before
+  the window is none); `verdictText`; `crashReport({runId, seed, biomeMask, cause, def, x, startX, pxPerMeter,
+  lastHopMs, arrivalMs, crashMs})` -> `CrashReportData` `{runId, seed, biomeMask, x, distM, cause, hazardId, name,
+  verdict, line}` (arrival falls back to crashMs); `crashBeat(msSinceCrash, hitStopMs)` -> `{fxScale, zoomMul}`;
+  `deathMarkerX(lastCrash, seed, mask)`; `gameOverLine(lastCrash, rec)` (same run id and `cause: 'crash'` only).
+* **`REG.LAST_CRASH`** (`constants.js`, additive): the last run-ending crash. Never in the RunRecord or the ledger hash.
+* **`HazardTelegraph.TelegraphTracker.lastArrivalMs(ref)`**: latest finite planned arrival per hazard (clear / open marks too).
+* **`RunScene`**: `onHazard` keeps the crashing entity in `_crashHazard` (`pendingCrash` keeps its `{cause, hazardId}`
+  shape); the frame loop stamps `_lastHopMs` when a hop executes; `doCrash` calls `reportCrash(c, fs)` (an absorbed
+  crash returns earlier in `resolveCrash`, so never reports); `renderFrame` scales FX by `crashBeat().fxScale` while
+  crashed; `updateCamera` multiplies the zoom by `crashBeat().zoomMul` while crashed; `create` builds
+  `entities/LastDeathMarker.js` (a BestMarker clone, `DIED HERE Nm`, lime `BEAT IT` once passed) when `deathMarkerX`
+  matches. `CRASH_TO_GAMEOVER_MS` (950) is unchanged.
+* **`UIScene.onCrash`**: the non-negated banner is `killerName(cause, content.hazards[hazardId])`.
+* **`GameOverScene._buildHeader`**: `crashLine` (danger) from `gameOverLine`; y 42, or title scale 3 with rule y 33 / line y 43 when a rule line is shown.
+* **Tests**: `crash-report`, `crash-legibility-runscene` (real create / onHazard / resolveCrash / doCrash), `crash-beat-runscene`, `crash-gameover`.
+  Gate: 4 checks in the Readable Chaos block (66 -> 70 / 54 -> 58).
+
 ## Addendum: Micro Mountain glow-up (huge bees, Neon Sled Drone; additive, cosmetic only)
 
 SledHEAD canon: Micro Mountain is the wild space Pete keeps for his bees, ridden as an RC micro sled drone. The

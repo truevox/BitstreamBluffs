@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased - Readable Chaos, phase 3 (death legibility)
+
+- **The crash says who did it.** The CRASH banner now names the killer: PACKET SPIKE, GLITCH CHASM, ROLLING BOULDER, DEW DROP, GEAR GATE, SEAGULL DIVE, ROGUE PACKET; HEAD FIRST, BAD LANDING or FELL INTO THE VOID for the other crashes. A hazard that cannot kill (Shatter Wall, Ash Cloud, the slows) is never named.
+- **The crash beat.** After the 70 ms hit-stop the shards and sparks run at 0.25x for 400 ms while the camera eases in 18 % on the wreck and holds it. It all fits inside the old 950 ms before Game Over, and starts only after the crash is decided: score, record, ledger hash, Daily, the sim and decision 3's biome completion are untouched.
+- **Game Over tells you how it went**, under CRASHED: e.g. `PACKET SPIKE AT 301 M - HOP WAS 0.21 S LATE`, or `... - NO HOP`, `HOP WAS 0.10 S EARLY`, `HOP WAS ON TIME`. "Late" and "early" are measured against the telegraph's own ideal-hop window (380 to 130 ms before the box, the hop oracle's rule), with the moving hazards' arrival predicted from their own motion. It travels in the registry (`REG.LAST_CRASH`), never in the run record or its hash. With a daily rule line too, the title shrinks one step so both lines fit.
+- **"A crash that is avoided by a hashed backup isn't a crash."** A hit that Hashed Backup or Heat Shield absorbs (or the respawn grace) gets no killer banner, no beat and no report.
+- **DIED HERE.** On a retry of the same seed and mask, a red gate stands at the x where the last run died (`DIED HERE 301m`); it turns lime (`BEAT IT 301m`) once you ride past it.
+- **Gate:** 4 new built-game checks in the Readable Chaos block (a real crash named, slowed and on Game Over; a real late hop reported late; an absorbed hit is no crash; DIED HERE on a same-seed retry only). Expected counts 66 -> 70 (with boosts) and 54 -> 58.
+
 ## v2.12.1 - B3 tuning: felt glides, downhill rolls (2026-11-15)
 
 - **Glides are felt (Marvin's ruling 2026-11-15).** A glide now cuts all three of the sled's drags, not only ground friction: ground resistance x frictionMul as before, plus a speed lift (frictionAir / speedMul, the Packet Burst path) and a quadratic-drag cut, both scaled by the glide's strength (new pure `BiomeEffects.glideStrength` / `glideDrag`; TUNING `glideSpeedLift` 0.35, `glideQuadCut` 0.35). With no glide every tuner output is exactly as before. No RunScene change.
