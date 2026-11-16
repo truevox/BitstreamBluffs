@@ -15,6 +15,7 @@ import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
+import { openStreamerPolicy } from './StreamerPolicy.js';
 import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
@@ -204,8 +205,11 @@ export class SettingsView extends View {
         get: () => !!s().touchRotate90, set: (v) => updateSetting(game, 'touchRotate90', v) },
       { kind: 'choice', label: 'TOUCH BUTTONS', options: [{ value: 'auto', label: 'AUTO' }, { value: 'on', label: 'ON' }, { value: 'off', label: 'OFF' }],
         get: () => s().touchOverlay || 'auto', set: (v) => updateSetting(game, 'touchOverlay', v) },
+      { kind: 'action', label: 'STREAMING / VIDEO', sub: 'MUSIC OK', color: 'cyan',
+        onSelect: () => openStreamerPolicy(typeof window === 'undefined' ? null : window) },
     ];
-    this.menu = new MenuList(scene, theme, { x: 10, y: 22, w: 300, rowH: 16, items, color: 'amber', parent: this.panel });
+    // Ten rows at a 15px pitch still clear the palette swatches and DONE button.
+    this.menu = new MenuList(scene, theme, { x: 10, y: 22, w: 300, rowH: 15, items, color: 'amber', parent: this.panel });
     this.panel.add(new NeonText(scene, theme, 104, this.h - 17, 'PALETTE PREVIEW', { color: 'text', outline: 'none' }).setAlpha(0.5));
     this.swatch = scene.add.graphics();
     this.panel.add(this.swatch);

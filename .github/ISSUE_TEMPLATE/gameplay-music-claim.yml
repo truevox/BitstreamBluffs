@@ -1,0 +1,56 @@
+name: Stream/VOD music claim assistance
+description: Get help with a copyright claim on gameplay featuring Bitstream Bluffs music.
+title: "[Music claim] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We want streamers to keep the game music on. Normal monetized gameplay
+        is welcome. See https://github.com/truevox/BitstreamBluffs/blob/main/public/streamers.html
+        (or /streamers.html on the deployed game).
+        Do not post your legal name, private email, account credentials, or appeal tokens.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - YouTube
+        - Twitch
+        - TikTok
+        - Kick
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: video
+    attributes:
+      label: Public gameplay video / clip URL
+      description: A public video link is enough. Do not submit private account access.
+    validations:
+      required: true
+  - type: input
+    id: claimant
+    attributes:
+      label: Claimant or rights manager displayed by the platform
+      placeholder: Claimant as shown in the copyright notice
+  - type: textarea
+    id: song
+    attributes:
+      label: Which song, and approximately when?
+      placeholder: Song or biome if known, approximate timestamp in your stream
+  - type: dropdown
+    id: effect
+    attributes:
+      label: What happened?
+      options:
+        - Revenue diverted / claim
+        - VOD muted
+        - Video blocked
+        - Stream interrupted / strike
+        - Other
+  - type: textarea
+    id: details
+    attributes:
+      label: Public-safe details
+      description: What did the platform say? Please remove account IDs and personal data.

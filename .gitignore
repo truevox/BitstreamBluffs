@@ -57,3 +57,30 @@ public/music/
 /public/music-full-one-more-run/
 /dist-music-audition-full-pope/
 /dist-music-audition-full-one-more-run/
+
+# Pretrained neural checkpoints / local model caches: NEVER commit.
+# A separate Git-index and release-build guard enforces these despite add -f.
+*.safetensors
+*.gguf
+*.ggml
+*.onnx
+*.tflite
+*.ckpt
+*.pt
+*.pth
+*.h5
+*.hdf5
+*.mlmodel
+*.pte
+*.pkl
+*.pickle
+*.joblib
+*.npz
+*.bin
+**/checkpoints/
+**/model-checkpoints/
+**/pretrained-weights/
+**/model-weights/
+**/hf-cache/
+**/huggingface/
+**/.cache/huggingface/
