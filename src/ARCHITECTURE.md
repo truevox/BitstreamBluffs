@@ -351,8 +351,8 @@ All additive; no public signature changed.
   `fs.groundAngleDeg`, so a `bouncySpring` descent cannot turn forward speed into extra bounce; bounce pads keep
   `Sled.launchUp`. `BiomeEffects.springRebound` treats a result below `SPRING_REBOUND_MIN_PX_S` (120 px/s) as no
   rebound: at the shipped 0.2 share only impacts of 600 px/s or more are felt, while the Rails' 0.05 share stays below
-  the floor even at 801 px/s. The 120 px/s floor is the measured point that keeps the bounce felt without regressing
-  the mask-128 hop survival baseline; the normal projection is checked on uniform slopes and makes no general
+  the floor even at 801 px/s. The 120 px/s floor is the measured point that keeps the bounce felt within the accepted ±15%
+  mask-128 hop survival tolerance; the normal projection is checked on uniform slopes and makes no general
   irregular-terrain safety claim.
 
 ## Integration / QA addenda (QA engineer; additive, nothing in sections 1-9 changed)
