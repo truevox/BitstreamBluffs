@@ -228,6 +228,29 @@ const JUMP_DEF = Object.freeze({
 });
 
 /** Typical sled speed (px/s) at a distance: the "speed budget" that jump geometry and shard arcs are sized for. */
+/**
+ * B4 low-gravity fairness for biome air boxes: the gravity multiplier a flight from x0 to x1 may ride, for the arc model
+ * (_arcY assumes the base g). The product of every gravityMul < 1 of the zones overlapping [x0, x1] (a conservative
+ * bound: under a lowGravity zone a no-hop flight drops less, so the box must sit higher to keep AIR_CLEARANCE_PX). Zones
+ * that only make the sled heavier (gravityMul > 1) or carry no gravityMul count as 1. Space Mountain's own mod is
+ * lowGravity (x0.7); without this its Meteor sat on the arc of a 1.3x-expected-speed flight (measured on the real sled).
+ * @param {Array<{modId:string, x0:number, x1:number}>} zones the chunk's zones
+ * @param {Object<string, {physics?:{gravityMul?:number}}>} modMap mod defs by id
+ * @param {number} x0 lip x
+ * @param {number} x1 landing x
+ * @returns {number} in (0, 1]
+ */
+export function flightGravityMul(zones, modMap, x0, x1) {
+  let g = 1;
+  for (const z of zones || []) {
+    if (!z || z.x1 < x0 || z.x0 > x1) continue;
+    const m = modMap && modMap[z.modId];
+    const gm = m && m.physics && m.physics.gravityMul;
+    if (gm > 0 && gm < 1) g *= gm;
+  }
+  return g;
+}
+
 export function expectedSpeedPxS(distM) {
   const d = Math.max(0, distM);
   const capM = (620 - 340) / 0.18; // ~1556 m: where the original ramp reached its 620 px/s cap
@@ -1427,7 +1450,8 @@ export class TerrainGenerator {
         if (def.placement === 'air') {
           const s = !isJump || breather ? null : this._airSpan(lips);
           if (s) {
-            const hiMul = this._airHiMul(s.lip, distM);
+            // B4: under a low-gravity zone the no-hop arcs are flatter; lift the box by the zone gravity (flightGravityMul)
+            const hiMul = this._airHiMul(s.lip, distM) / Math.sqrt(flightGravityMul(chunk.zones, this.modMap, s.lip.x, s.lip.landX));
             for (const u of [h2, (h2 + 0.5) % 1]) {
               if (this._tryAirBox(chunk, def, s.lip, hiMul, Math.round(s.lip.x + s.lo + (s.hi - s.lo) * u), h3)) break;
             }
