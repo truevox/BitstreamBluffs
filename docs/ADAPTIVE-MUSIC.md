@@ -650,3 +650,30 @@ tools/music/full-palette/README.md.
 SheetSage2/MERT noncommercial weights remain a rights
 gate; all files are private research auditions pending
 Marvin's actual full-song artistic verdict.
+
+## November 15 — both complete songs IN the actual private game
+
+Marvin said "OK, let's hear it" when asked to install the full
+twelve-instrument soundtracks in gameplay rather than only audio
+labs. Completed a private full-game preview:
+http://100.115.120.66:8184/
+
+Pope (642 notes, 3:35) and One More Run (333 notes, 2:54.6)
+now have twelve mountain voices AND six standard music stems
+each in sample-clock-aligned, engine-compatible gameplay
+manifests. In total: 720 derived Opus chunks, 18 sources
+per segment; the actual StemMusicDirector controls them.
+
+The private overlay selects track and instrument without a
+long wait, but is NEVER included in public game builds.
+The actual Phaser game, ordinary effects and RunScene work.
+Chromium confirmed playback, both track IDs, dynamic biome
+switching, active audio sources and no browser errors.
+
+Existing original masters, repo public music, all pretrained
+model weights and normal sanitized game release dist are
+unchanged. Private preview runs from a dedicated directory
+outside Git under a persistent tailnet-bound user service.
+Reproduction scripts and exact provenance:
+tools/music/private-game-proof/README.md.
+No merge, source rights waiver or artistic approval implied.
