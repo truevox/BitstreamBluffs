@@ -1424,3 +1424,57 @@ placements near chunk ends (Rolling Boulder 32-seed presence 35.4 % -> 29.2 % at
 mask 512 20 -> 17 (-15.0 %, unchanged from v2.10.0), -6.5 %; mask 256 15/48 unchanged. Flip distance -9.7 % / -4.2 %. At
 Skis 2.5 s mask 4 fell to 15/48 and at a boulder cap of 100 px/s without the landing clearance to 14/48, hence 2 s and
 80 px/s plus the `zoneEnd + range` lip window.
+
+## Addendum: biome full treatment, B4 "Air" (content + low-gravity air-box rule; additive)
+
+B4 ships Space Mountain's and Sky Jellyfish Mountain's hazard and power-up (spec §4). It adds no new effect kind: `gust`
+and `stabilize` and their consumers came in B0 (`RunScene.onHazard` gust branch -> `BiomeEffects.gustImpulse` ->
+`_addSledVelocity`; `onPowerUp` stabilize -> `resolveLanding` in `handleTricksAndLanding` and `stabilizeBounceMul` in
+`physicsContext` -> `PhysicsTuner`). B4 verified that both are read on the real sled (built-game gate, below). Mask 0 is
+byte-identical (golden `shape` / `full` / `complete` unchanged): every def below carries a `biome` field.
+
+| Biome (bit) | Hazard (file) | Hazard effect | Power-up (file) | Power-up effect |
+|---|---|---|---|---|
+| Space Mountain (32) | `meteor` (`meteor.json`), name "Meteor", air 34x30 in jump arcs, shape `meteor`, danger, chance 0.75, minDistanceM 1000 | `crash` | `gravityStabilizer` (`gravity-stabilizer.json`), shape `gravStabilizer`, amber, chance 0.4 | `stabilize` +12 deg, 5 s |
+| Sky Jellyfish Mountain (128) | `gustFront` (`gust-front.json`), name "Gust Front", air 64x40 in jump arcs, shape `gustFront`, cyan, chance 0.75 | `gust` impulsePxS [60, -150] (162 px/s, under the 180 cap) | `stabilizerRails` (`stabilizer-rails.json`), shape `stabRails`, lime, chance 0.3 | `stabilize` +12 deg, bounceMul 0.5, 5 s |
+
+* Hazard defs carry an optional display `name` (additive; no schema change): Readable Chaos phase 3's
+  `CrashReport.killerName` uses it, so a Meteor crash reads METEOR. A gust never queues a crash, so it is never the killer:
+  whatever it pushes the sled into is (`biome-b4-effects.test.js`, gate).
+* Both hazards use the existing air pass (`_placeBiomeSpawns`, generated jumps only, above the no-hop arc), like Seagull
+  Dive and Ash Cloud. The Meteor is a crash hazard, so RunScene's `AirTelegraph` marks its lip (STAY LOW) and the
+  near-miss rules apply; the Gust Front (no crash) is skipped by both and is read from its own drawing: a pale zone with
+  wind streaks and an arrowhead pointing along its impulse.
+* The Meteor is drawn around its box centre with a halo (like the seagull, no corner brackets); the Gust Front through the
+  bracketed `Hazard.draw` switch.
+
+**Low-gravity air-box rule (`TerrainGenerator.flightGravityMul`).** `_arcY` models a flight at the base gravity.
+`flightGravityMul(zones, modMap, x0, x1)` is the product of every `gravityMul < 1` of the chunk zones overlapping the
+flight `[lip.x, lip.landX]` (1 with none; `gravityMul > 1` counts as 1). The biome air path divides `hiMul` by its square
+root, which is the same as running the clearance arc at that gravity, so the box keeps `AIR_CLEARANCE_PX` over the flatter
+arcs under a lowGravity zone. Only the biome air path uses it (the base `'air'` pass is untouched); in shipped content only
+Space Mountain's own `lowGravity` (x0.7) triggers it, and masks 2 and 1024 keep their T2 isolation digests. Measured on the
+real sled before the rule: a hands-off flight at 1.3x the expected speed hit the Meteor in 2 of 26 cases, both under
+lowGravity; after: 0 of 43 at 1x, 1.3x and 1.5x (10 seeds).
+
+**HUD (`UIScene`).** `POWERUP_INFO` rows GRAV STABILIZER (amber) and STABILIZER RAILS (lime) with their own `_drawIcon`
+glyphs; `HAZARD_LABEL.gustFront` names GUST FRONT on the gust warning line. `BiomeEffects.HAZARD_SHAPES` gains `meteor`,
+`gustFront`; `POWERUP_SHAPES` gains `gravStabilizer`, `stabRails`. Taking one stabilizer while the other runs replaces
+it (the first chip expires `replaced`, the B0 rule).
+
+**Known limit: the bouncySpring bounce is not felt.** Measured on the real sled in the built game: a drop onto a
+bouncySpring zone (restitution 0.0722) rebounds 0-16 px/s with 0-1 airborne frames, the same as ordinary ground (0.02);
+the probe sees a bounce at restitution 0.26 (77-95 px/s, 9-11 airborne frames). No bounce pad ever falls inside a
+bouncySpring zone (0 of 45 pads, 16 seeds), so the zone's `max(1, bounceMul)` pad boost never applies either. The Rails'
+bounceMul 0.5 does cut the body restitution to 0.018 (gate-checked), but the felt counter is the landing tolerance.
+
+**Tests and gates.** `tests/src/biome-b4-content.test.js` (loader / schema, spec values, counter pairing, 11 + 11 biome defs,
+one of each per biome), `tests/src/biome-b4-effects.test.js` (shipped defs through RunScene / UIScene / Hazard / PowerUp,
+gust never the killer), `tests/src/biome-b4-presence.test.js` (presence, `flightGravityMul`, the lift, determinism).
+Changed pins: `data.test.js` lists the 11 + 11 biome defs; `biome-b3-content.test.js` counts only the B1-B3 biomes' defs;
+`hazard-telegraph-biomes.test.js` classifies both new air hazards (null: AirTelegraph); `micro-swell-isolation.test.js`
+leaves B4-tagged defs out of its digest. The built-game gate has 5 B4 checks at the end, on real `b4space15@32` and
+`b4jelly54@128` runs (expected counts 70 -> 75 with boosts, 58 -> 63): meteor crash named METEOR; meteor STAY LOW mark
+before the lip plus a hands-off ride under it; gust impulse on the real body, never the killer; each stabilizer saves a
+real landing (same seed, pose, tilt input and frames: about 81 deg crashes without, sloppy with); Rails cut the
+bouncySpring touchdown restitution.

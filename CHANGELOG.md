@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased - biome treatment B4: Air (Space Mountain, Sky Jellyfish Mountain)
+
+- **Space Mountain: Meteor and Gravity Stabilizer.** A burning Meteor (air, crash, `danger`) floats in the arc of a generated jump, like Seagull Dive; the AirTelegraph puts STAY LOW over its lip, and a crash on it reads METEOR (its def `name`). The Gravity Stabilizer (`stabilize`) widens the landing tolerance by 12 deg for 5 s.
+- **Sky Jellyfish Mountain: Gust Front and Stabilizer Rails.** A Gust Front (air zone, cyan, no crash) gives one kick of (60, -150) px/s = 162 px/s (cap 180); it is drawn as a pale zone with wind streaks and an arrowhead along its push, and the HUD line names GUST FRONT. A gust is never named as the killer. The Stabilizer Rails are the shared `stabilize` kind: +12 deg for 5 s, plus bounceMul 0.5 on the bouncySpring mod (chance 0.3).
+- **Low-gravity fairness for biome air boxes (new pure `TerrainGenerator.flightGravityMul`).** Under Space's own lowGravity zone a hands-off flight drops less, so the biome air box is lifted to keep the usual 70 px over the flatter arcs. Before: a hands-off flight at 1.3x the expected speed hit the Meteor in 2 of 26 cases, both under lowGravity. After: 0 of 43 at 1x, 1.3x and 1.5x (10 seeds). The base air pass is untouched.
+- **Fairness, measured on the real sled in the built game:**
+  - Meteor: the STAY LOW mark comes up 384-480 ms before the lip at the expected speed (median 432 ms). The answer is to not hop, and a hands-off ride always passes under it (164 px clear on the gate seed). A hop at the lip hits it in 7 of 43 cases.
+  - Gust Front: 157 flights into a gust (71 gusts, 16 seeds, 5 hop points) crashed within 1.5 s 0 times, against 0 of 157 for the same flights with the gust disabled. With a backflip held for 30 or 45 frames: 0 of 77 and 0 of 83, both arms.
+- **Stabilizers on the real sled:** the same seed, pose, tilt input and frames twice. An 81-84 deg landing crashes (badLanding) without the pickup and becomes a sloppy wobble with it, for both pickups.
+- **Known limit, not changed (W6):** the bouncySpring bounce is not felt. A drop onto the zone (restitution 0.072) rebounds 0-16 px/s, the same as ordinary ground. No bounce pad falls inside a bouncySpring zone (0 of 45). The Rails cut the restitution to 0.018 (gate-checked), but what you feel is their landing tolerance.
+- **Presence:** each hazard appears in 43-57 % of its biome's generated jumps (8 and 32 seeds, chunks 0-44). Long range: Meteor 34 %, because most Space jumps past 2 km already carry a base air hazard; Gust Front 36 %. Power-ups: Gravity Stabilizer 32 %, Rails 30 % of biome chunks.
+- **Gate:** 5 new checks at the end: Meteor crash named METEOR; Meteor telegraph plus a hands-off ride under it; gust impulse on the real body, never the killer (a gust then a Packet Spike names PACKET SPIKE); each stabilizer saves a real landing; the Rails halve the bouncySpring restitution. Expected counts 70 -> 75 (with boosts) and 58 -> 63.
+- **Sim** (B0 baseline, ±15 %, git archive of the branch): hop mask 32 survival 21 -> 20/48 (-4.8 %), distance -1.2 %, speed +0.9 %; hop mask 128 18 -> 16/48 (-11.1 %), -3.8 %, +0.9 %; flip 32 / 128 distance -0.0 % / -0.1 %, speed 0.0 % / +0.1 % (flip survival is exempt). Hop mask 512 17/48, the same as v2.12.1. The Rails at chance 0.4 gave 15/48 on mask 128: the +12 deg re-grade turns some good landings into perfect ones, the landing boost shifts the hop timing, and 3 seeds die on base hazards. Chance 0.3 keeps it inside the tolerance.
+- Mask 0 is unchanged (golden digests untouched). The T2 isolation digest leaves out B4-tagged defs.
+
 ## v2.13.0 - Readable Chaos, phase 3 (death legibility) (2026-11-16)
 
 - **The crash says who did it.** The CRASH banner now names the killer: PACKET SPIKE, GLITCH CHASM, ROLLING BOULDER, DEW DROP, GEAR GATE, SEAGULL DIVE, ROGUE PACKET; HEAD FIRST, BAD LANDING or FELL INTO THE VOID for the other crashes. A hazard that cannot kill (Shatter Wall, Ash Cloud, the slows) is never named.
