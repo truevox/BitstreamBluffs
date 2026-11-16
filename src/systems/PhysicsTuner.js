@@ -265,6 +265,8 @@ export const TUNING = Object.freeze({
  * @property {number} [beltDirection]  +1 the belt carries you forward, -1 it fights you.
  * @property {number} [scrambleJitterDegS2] random torque amplitude while scrambled.
  * @property {number} [restitution]
+ * @property {number} [landingRebound] share of the touchdown speed a scored landing gets back as an upward rebound (0 =
+ *   none; zone `physics.landingRebound`, larger share wins, times stabilizeBounceMul^2; BiomeEffects.springRebound).
  */
 
 /** px/s -> Matter per-step velocity for a step of deltaMs. @param {number} pxPerS @param {number} deltaMs @returns {number} */
@@ -422,6 +424,9 @@ export class PhysicsTuner {
     // W6 geysers: the vent's launch data, resolved here so the consumer does not walk the zone list again.
     // `launch` lives on the MOD DEF (geyser-vent.json), not on zone.physics, so it is read from the def.
     let geyserLaunch = null;
+    // Sky Jellyfish felt bounce: the share of the touchdown speed a landing gets back (BiomeEffects.springRebound).
+    // Overlapping zones take the larger share, never a compounded one (a bounce, not a launch).
+    let landingRebound = 0;
     for (const z of zones) {
       // B0 ward: a warded mod is skipped entirely, as if the sled were not in that zone (Wards.js).
       if (ctx.wards && z && isWarded(ctx.wards, { modId: z.id })) continue;
@@ -432,6 +437,7 @@ export class PhysicsTuner {
       if (p.speedMul) zoneSpeedMul *= p.speedMul;
       if (p.steerMul) zoneSteerMul *= p.steerMul;
       if (p.pushForceMul) zonePushMul *= p.pushForceMul;
+      if (p.landingRebound > landingRebound) landingRebound = p.landingRebound;
       if (p.beltDrivePxS2 > 0) {
         beltDrive += p.beltDrivePxS2;
         // Last zone wins the sign. Two belts facing opposite ways is a data situation the shipped table
@@ -445,6 +451,8 @@ export class PhysicsTuner {
     const glide = glideDrag(frictionMul, ctx.glideFrictionMul, t); // B3: the pure glide math (BiomeEffects)
     frictionMul = glide.frictionMul;
     if (ctx.stabilizeBounceMul > 0) bounceMul *= ctx.stabilizeBounceMul;
+    // the Rails damp the rebound as they damp restitution: by bounceMul squared (a bounce's energy)
+    if (ctx.stabilizeBounceMul > 0) landingRebound *= ctx.stabilizeBounceMul * ctx.stabilizeBounceMul;
 
     let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul * glide.speedMul;
     if (ctx.slowed) speedMul *= ctx.slowFactor || b.slowFactor;
@@ -494,6 +502,7 @@ export class PhysicsTuner {
       geyserLaunch,
       scrambleJitterDegS2: jitter,
       restitution: Math.min(0.9, 0.02 * bounceMul * bounceMul),
+      landingRebound,
     };
   }
 }

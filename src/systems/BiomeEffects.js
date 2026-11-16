@@ -135,6 +135,31 @@ export function stabilizeBounceMul(m) {
   return clamp(Number.isFinite(m) ? m : 1, 0.1, 1);
 }
 
+// ------------------------------------------------------------------------------------------------ spring rebound
+
+/** A spring rebound slower than this is no rebound: it is what ends the chain of touchdowns (px/s). */
+export const SPRING_REBOUND_MIN_PX_S = 45;
+/** A spring rebound never exceeds this (px/s, about 32 px of rise at 900 px/s^2): a bounce, never a launch. */
+export const SPRING_REBOUND_MAX_PX_S = 240;
+/** Largest share of the impact speed a rebound may return: always less than it got, so the chain decays. */
+export const SPRING_REBOUND_MAX_SHARE = 0.6;
+
+/**
+ * Sky Jellyfish's felt bounce: the upward speed (px/s, positive = up) a scored landing gets back inside a zone that
+ * carries `physics.landingRebound` (combined by PhysicsTuner.getEffective, Rails already applied). The share is clamped
+ * to [0, SPRING_REBOUND_MAX_SHARE], the result to SPRING_REBOUND_MAX_PX_S, and a result under SPRING_REBOUND_MIN_PX_S is
+ * 0, so a chain of touchdowns (each landing at about the speed the last rebound left at) always stops.
+ * @param {number} impactSpeedPxS speed into the ground at touchdown (TrickTracker LandingResult.impactSpeedPxS).
+ * @param {number} share effective landingRebound.
+ * @returns {number}
+ */
+export function springRebound(impactSpeedPxS, share) {
+  if (!Number.isFinite(impactSpeedPxS) || impactSpeedPxS <= 0 || !Number.isFinite(share) || share <= 0) return 0;
+  const v = impactSpeedPxS * clamp(share, 0, SPRING_REBOUND_MAX_SHARE);
+  if (v < SPRING_REBOUND_MIN_PX_S) return 0;
+  return Math.min(v, SPRING_REBOUND_MAX_PX_S);
+}
+
 const RANK = { crash: 0, sloppy: 1, good: 2, perfect: 3 };
 
 /**
