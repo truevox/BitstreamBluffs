@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased - campaign follow-ups
+
+- **BEST and DIED HERE labels never overprint.** When your best distance is (nearly) where you died, the two poles stand a few px apart and the DIED HERE pole, X and label crossed the BEST label, and the ground telegraph's column could touch DIED HERE. New pure `systems/MarkerLayout.js` (`layoutMarkerLabels`): poles closer than 220 px hang both labels to the left of the leftmost pole on one anchor, DIED HERE stacked above BEST on a shared baseline (so a slope between the poles cannot make them meet), away from the hazard that killed you; further apart each label stays centred over its own pole as before. Drawing only: no gameplay, sim or digest change. Checked in the built game at 2x with the death x 4 px right of, 6 px left of and exactly at the best x.
+- **Palette switch recolours a hazard exactly like a fresh spawn.** `RunScene.refreshPalette` read `def.colorKey` directly, so a biome crash hazard whose JSON colorKey is not `danger` changed colour on a palette switch. New `BiomeEffects.hazardColor(def, palette)` is now the one resolution used by `Hazard`'s constructor and by the redraw.
+- **Typedefs caught up (doc only).** `data/schemas.js`: hazard `motion` (`roll`, `gate`), `HazardSpawn.phase`, hazard `name`, the shipped ward / glide / stabilize effect shapes, `CosmeticDef` (`grant`, `biome`, `unlockText`) and `LastCrash` (REG.LAST_CRASH).
+- **Event typedefs caught up (doc only).** `events.js`: `POWERUP_EXPIRED` reason `replaced` and the meaning of `consumed` / `respawn`, any power-up id on the power-up events, `HAZARD_HIT` effects `blind` and `gust`, and where the CRASH report lives (the registry, not the payload). RUN_START `dailyOfficial` and RUN_END `biomeVisits` were already documented.
+- **Air hazard readability, measured and unchanged.** Built game, real sled at the expected speed, 8 seeds, ms before the lip (box fully on screen / STAY LOW label fully on screen): Meteor 80 / 640 (median, n 35), Seagull Dive 64 / 640 (n 40), Rogue Packet 64 / 640 (n 161), Gust Front 48 / no label (n 35), Ash Cloud 64 / no label (n 35). Camera and AirTelegraph are untouched; framing is a lead / Marvin decision.
+
 ## v2.14.0 - biome treatment B4: Air (Space Mountain, Sky Jellyfish Mountain) (2026-11-16)
 
 - **Space Mountain: Meteor and Gravity Stabilizer.** A burning Meteor (air, crash, `danger`) floats in the arc of a generated jump, like Seagull Dive; the AirTelegraph puts STAY LOW over its lip, and a crash on it reads METEOR (its def `name`). The Gravity Stabilizer (`stabilize`) widens the landing tolerance by 12 deg for 5 s.
