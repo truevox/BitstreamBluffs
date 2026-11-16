@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - decision 5: every biome in the Daily rotation
+## v2.15.0 - decision 5: every biome in the Daily rotation (2026-11-16)
 
 - **The Daily now features all 11 biomes** (Marvin's decision 5). From 2026-11-17 (UTC) the Daily biome mask follows a 15-day cycle anchored at that date: the six newly treated W6 biomes premiere first (Space Mountain, Candy Cane Canyon, Sky Jellyfish, Steampunk Slopes, Micro Mountain, Vertigo Vents), each followed by a clear day until the last pair, then the five batch-1 biomes. Four clear days per cycle.
 - **Every past date keeps its mask.** Dates before the cutover still use the old 9-day cycle (4 clear days and the batch-1 biomes), so past Daily records, practice replays of past dates and the official-run checks are unchanged. `DailyPatch.CUTOVER_DATE_KEY` names the date.
