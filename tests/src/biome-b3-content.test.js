@@ -76,10 +76,10 @@ describe('B3 content: loader and schema', () => {
 });
 
 describe('B3 content: the spec §4 values and the motion blocks', () => {
-  test('Pyramid Peak: Rolling Boulder rolls (motion roll, B3 tuning: downhill away from the sled, capped at 100 px/s), crash on contact', () => {
+  test('Pyramid Peak: Rolling Boulder rolls (motion roll, B3 tuning: downhill away from the sled, capped at 80 px/s), crash on contact', () => {
     const b = c.hazards.rollingBoulder;
     expect(b.motion.kind).toBe('roll');
-    expect(rollParams(b.motion)).toEqual({ speedPxS: 100, rangePx: 120, dir: 1 }); // inside the bounds: not clamped
+    expect(rollParams(b.motion)).toEqual({ speedPxS: 80, rangePx: 120, dir: 1 }); // inside the bounds: not clamped
   });
 
   test('Micro Mountain: Dew Drop reuses motion roll (smaller and slower than the boulder), crash on contact', () => {

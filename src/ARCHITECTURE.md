@@ -1369,7 +1369,7 @@ the pickup's `frictionMul`, which RunScene already passes as `TunerContext.glide
 
 **Rolls go downhill, away from the sled (`systems/HazardMotion.js`).**
 * `rollParams(motion)`: `dir` defaults to +1 (downhill, +x); `speedPxS` is the roll's cap, clamped to
-  `ROLL_MAX_SPEED_PX_S` 120 (under `TUNING.stallNudgeToPxS` 130). Shipped: Rolling Boulder cap 100 px/s, range 120 px;
+  `ROLL_MAX_SPEED_PX_S` 120 (under `TUNING.stallNudgeToPxS` 130). Shipped: Rolling Boulder cap 80 px/s, range 120 px;
   Dew Drop cap 75 px/s, range 120 px; both `dir: 1`.
 * `rollTargetSpeed(motion, slopeDeg)` (new, pure): "fake but fun" slope-following speed. `ROLL_FLOOR_SHARE` 0.4 of the cap
   on flat or rising ground (it never stalls or rolls back), the cap from `ROLL_FULL_SLOPE_DEG` 20 down, linear between.
@@ -1392,5 +1392,7 @@ the pickup's `frictionMul`, which RunScene already passes as `TunerContext.glide
 `BIOME_EDGE_MARGIN_PX` (240), and the track (now `[x, x + range]`, downhill) must stay `ROLL_TRACK_EDGE_MARGIN_PX` (120,
 new export, >= the spec §4 96 px) inside the chunk edges. A neighbour chunk's hazards sit >= 240 px inside its own edge,
 so a track end is >= 360 px from them. The clearances from lips, gaps, other hazards (240) and power-ups (90) are the
-same; the presence test now also checks the neighbour chunks' gaps and lips. Without the change the downhill track lost
+same, with one addition: a sled landing from a lip gets the roll's whole range of ground before the track (lip window
+`[l.x - 40, zoneEnd + range]`; the old uphill track had that for free, and without it the sim's hop runs landed on
+boulders). The presence test now also checks the neighbour chunks' gaps and lips. Without the change the downhill track lost
 placements near chunk ends (Rolling Boulder 32-seed presence 35.4 % -> 29.2 % at range 160).

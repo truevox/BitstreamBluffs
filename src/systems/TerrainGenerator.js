@@ -1534,7 +1534,9 @@ export class TerrainGenerator {
     const hi = x + sw.hi;
     if (lo < chunk.startX + ROLL_TRACK_EDGE_MARGIN_PX || hi > chunk.endX - ROLL_TRACK_EDGE_MARGIN_PX) return false;
     const away = (q) => (q < lo ? lo - q : q > hi ? q - hi : 0);
-    for (const l of lips) if (hi >= l.x - 40 && lo <= l.zoneEnd) return false;
+    // B3 tuning: a sled landing from a lip gets the roll's whole range of ground before the track (the old uphill
+    // track gave it that for free: its far end had to clear the landing zone)
+    for (const l of lips) if (hi >= l.x - 40 && lo <= l.zoneEnd + (hi - lo)) return false;
     for (const g of chunk.gaps) if (hi >= g.x0 - 96 && lo <= g.x1 + 96) return false;
     for (const q of chunk.hazards) if (q !== skip && away(q.x) < BIOME_HAZARD_CLEARANCE_PX) return false;
     for (const p of chunk.powerups) if (away(p.x) < 90) return false;

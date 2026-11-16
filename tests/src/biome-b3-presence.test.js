@@ -117,7 +117,12 @@ describe('B3 rolling hazards: the whole roll track keeps the spawn clearances', 
           const near = out.slice(Math.max(0, ch.index - 1), ch.index + 2); // this chunk and its neighbours
           for (const nc of near) {
             for (const gp of nc.gaps) expect(hi < gp.x0 - 96 || lo > gp.x1 + 96).toBe(true);
-            for (const l of nc.launches) expect(hi < l.x - 40 || lo > l.x + 40).toBe(true);
+            for (const l of nc.launches) {
+              expect(hi < l.x - 40 || lo > l.x + 40).toBe(true);
+              // B3 tuning: a sled landing from a lip gets the roll's whole range of ground before the spawn (as the old
+              // uphill track gave it): the spawn sits >= range past the landing zone (landX + 160)
+              if (l.landX != null && h.x > l.x) expect({ id, past: h.x - (l.landX + 160), ok: h.x - (l.landX + 160) > sw.hi - sw.lo }).toMatchObject({ ok: true });
+            }
           }
         }
       }
