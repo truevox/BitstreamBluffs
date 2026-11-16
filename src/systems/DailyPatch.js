@@ -110,8 +110,13 @@ export class DailyPatch {
    * of D6: a locked biome may appear as a preview. Widening it with unlocks would make the daily
    * leaderboard compare different terrain for different players.
    *
-   * Cycle is 9 days: 4 clear days (mask 0, the terrain everyone knows) followed by one day for each of the
-   * batch-1 signature biomes, so a daily is usually the classic run with a preview featured regularly.
+   * Before CUTOVER_DATE_KEY the cycle is 9 days, indexed by the epoch day: 4 clear days (mask 0, the terrain
+   * everyone knows) and one day for each batch-1 signature biome. Every past date keeps exactly that mask, so
+   * past Daily records and practice replays of past dates stay valid.
+   *
+   * From CUTOVER_DATE_KEY (decision 5, Marvin 2026-11-16) the cycle is 15 days, indexed from the cutover
+   * day: all 11 biomes once plus 4 clear days. The six W6 biomes premiere first, each followed by a clear day
+   * until the last pair, then the batch-1 biomes.
    * @param {Date|number} [when=new Date()]
    * @returns {number} biome mask.
    */
@@ -119,10 +124,17 @@ export class DailyPatch {
     const d = when instanceof Date ? when : new Date(typeof when === 'number' ? when : Date.now());
     const t = Number.isNaN(d.getTime()) ? Date.now() : d.getTime();
     const dayNumber = Math.floor(t / DAY_MS);
-    // 4 clear days + one day per batch-1 biome (bits 1,2,4,8,16). W6 extends this with the other six.
-    const CYCLE = [0, 0, 0, 0, 1, 2, 4, 8, 16];
-    return CYCLE[((dayNumber % CYCLE.length) + CYCLE.length) % CYCLE.length];
+    const cutoverDay = Math.floor(Date.parse(`${DailyPatch.CUTOVER_DATE_KEY}T00:00:00Z`) / DAY_MS);
+    if (dayNumber < cutoverDay) {
+      const CYCLE_V1 = [0, 0, 0, 0, 1, 2, 4, 8, 16];
+      return CYCLE_V1[((dayNumber % CYCLE_V1.length) + CYCLE_V1.length) % CYCLE_V1.length];
+    }
+    const CYCLE_V2 = [32, 0, 64, 0, 128, 0, 256, 0, 512, 1024, 1, 2, 4, 8, 16];
+    return CYCLE_V2[(dayNumber - cutoverDay) % CYCLE_V2.length];
   }
+
+  /** First UTC date of the 15-day, all-biome Daily rotation (decision 5). Dates before it keep the 9-day cycle. */
+  static get CUTOVER_DATE_KEY() { return '2026-11-17'; }
 
   /**
    * @param {string} id

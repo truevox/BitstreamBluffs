@@ -120,18 +120,19 @@ describe('daily mask derivation (D6)', () => {
   test('is independent of unlocks — a locked biome can appear as a preview', () => {
     // Nothing about the player is an input. This is the whole of D6's "same for every player".
     const masks = new Set();
-    for (let i = 0; i < 9; i++) masks.add(DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 10, 13 + i))));
+    for (let i = 0; i < 9; i++) masks.add(DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 9, 1 + i))));
     expect([...masks].sort((a, b) => a - b)).toEqual([0, 1, 2, 4, 8, 16]);
   });
 
+  // Before the decision-5 cutover (2026-11-17); the 15-day rotation after it is pinned in daily-w6-rotation.test.js.
   test('mostly mask 0, and cycles rather than drifting', () => {
     const masks = [];
-    for (let i = 0; i < 9; i++) masks.push(DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 10, 13 + i))));
+    for (let i = 0; i < 9; i++) masks.push(DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 9, 1 + i))));
     expect(masks.filter((m) => m === 0).length).toBe(4);
     // 9-day cycle: the mask repeats exactly 9 days later, so there is no drift.
     for (let i = 0; i < 9; i++) {
-      const a = DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 10, 13 + i)));
-      const b = DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 10, 22 + i)));
+      const a = DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 9, 1 + i)));
+      const b = DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 9, 10 + i)));
       expect({ i, b }).toMatchObject({ i, b: a });
     }
   });

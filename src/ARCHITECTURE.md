@@ -1478,3 +1478,11 @@ leaves B4-tagged defs out of its digest. The built-game gate has 5 B4 checks at 
 before the lip plus a hands-off ride under it; gust impulse on the real body, never the killer; each stabilizer saves a
 real landing (same seed, pose, tilt input and frames: about 81 deg crashes without, sloppy with); Rails cut the
 bouncySpring touchdown restitution.
+
+## Addendum: decision 5, the Daily rotation cutover
+
+`DailyPatch.biomeMaskForDate` is a pure function of the UTC day, with two cycles split at `DailyPatch.CUTOVER_DATE_KEY` (`2026-11-17`).
+- **Before the cutover:** the original 9-day cycle `[0,0,0,0,1,2,4,8,16]`, indexed by the epoch day. Every past date's mask is unchanged.
+- **From the cutover:** a 15-day cycle `[32,0,64,0,128,0,256,0,512,1024,1,2,4,8,16]`, indexed by days since the cutover.
+
+`infoForDateKey` and the DAILY RUN button go through the same function, so the official check on a record still compares it against the mask its own date had. Changing the rotation again means a new cutover date. Never edit a cycle in place, or past dates change mask.

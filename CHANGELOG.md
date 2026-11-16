@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased - decision 5: every biome in the Daily rotation
+
+- **The Daily now features all 11 biomes** (Marvin's decision 5). From 2026-11-17 (UTC) the Daily biome mask follows a 15-day cycle anchored at that date: the six newly treated W6 biomes premiere first (Space Mountain, Candy Cane Canyon, Sky Jellyfish, Steampunk Slopes, Micro Mountain, Vertigo Vents), each followed by a clear day until the last pair, then the five batch-1 biomes. Four clear days per cycle.
+- **Every past date keeps its mask.** Dates before the cutover still use the old 9-day cycle (4 clear days and the batch-1 biomes), so past Daily records, practice replays of past dates and the official-run checks are unchanged. `DailyPatch.CUTOVER_DATE_KEY` names the date.
+- Tests: `daily-w6-rotation.test.js` pins one full year of pre-cutover masks, the cutover day, the 15-day cycle and its order. Two `biome-mask.test.js` v1-cycle tests that sampled across the cutover now sample October.
+
 ## v2.14.1 - campaign follow-ups (2026-11-16)
 
 - **BEST and DIED HERE labels never overprint.** When your best distance is (nearly) where you died, the two poles stand a few px apart and the DIED HERE pole, X and label crossed the BEST label, and the ground telegraph's column could touch DIED HERE. New pure `systems/MarkerLayout.js` (`layoutMarkerLabels`): poles closer than 220 px hang both labels to the left of the leftmost pole on one anchor, DIED HERE stacked above BEST on a shared baseline (so a slope between the poles cannot make them meet), away from the hazard that killed you; further apart each label stays centred over its own pole as before. Drawing only: no gameplay, sim or digest change. Checked in the built game at 2x with the death x 4 px right of, 6 px left of and exactly at the best x.
