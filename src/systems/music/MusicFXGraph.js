@@ -218,18 +218,23 @@ export class StemFXMixer {
 		input.gain.value = clamp(gain, 0, 2, 1);
 		const motion = this.ctx.createGain();
 		input.connect(motion);
+		// Separate the user's mix level and gameplay motion from adaptive
+		// original↔replacement fades. Default gain=1 preserves legacy packs.
+		const mix = this.ctx.createGain();
+		mix.gain.value = 1;
+		motion.connect(mix);
 		const output = this.ctx.createGain();
 		output.connect(this.mixInput);
 		const chain = buildMusicChain(this.ctx, effects, output);
-		motion.connect(chain.input);
+		mix.connect(chain.input);
 		const send = this.ctx.createGain();
 		const defaultRoomSend = id.startsWith('voice:') ? 0.38 :
 			id === 'vocals' ? 0.12 : id === 'piano' ? 0.09 :
 			id === 'guitar' || id === 'other' ? 0.04 : 0;
 		send.gain.value = defaultRoomSend;
-		motion.connect(send);
+		mix.connect(send);
 		send.connect(this.space.input);
-		const source = { input, motion, output, chain, send, defaultRoomSend };
+		const source = { input, motion, mix, output, chain, send, defaultRoomSend };
 		this.sources.set(id, source);
 		return input;
 	}
@@ -248,6 +253,20 @@ export class StemFXMixer {
 		if (!src) return false;
 		const param = motion ? src.motion.gain : src.input.gain;
 		numericParam(param, clamp(value, 0, 2), this.ctx.currentTime, clamp(time, 0.005, 1, 0.04));
+		return true;
+	}
+
+	setMixGain(id, value, { time = 0.20 } = {}) {
+		const src = this.sources.get(id);
+		if (!src) return false;
+		const now = this.ctx.currentTime;
+		const param = src.mix.gain;
+		param.cancelScheduledValues(now);
+		param.setValueAtTime(param.value, now);
+		// An explicit 200ms crossfade duration, not a 200ms exponential
+		// time constant (which takes ~1 second to actually finish).
+		param.linearRampToValueAtTime(clamp(value, 0, 1),
+			now + clamp(time, 0.005, 1, 0.20));
 		return true;
 	}
 
@@ -270,7 +289,7 @@ export class StemFXMixer {
 		output.gain.value = 0;
 		const chain = buildMusicChain(this.ctx, effects, output);
 		output.connect(this.mixInput);
-		src.motion.connect(chain.input);
+		src.mix.connect(chain.input);
 		const previous = { chain: src.chain, output: src.output };
 		src.chain = chain;
 		src.output = output;
@@ -283,7 +302,7 @@ export class StemFXMixer {
 		output.gain.linearRampToValueAtTime(1, t + fade);
 		const timer = setTimeout(() => {
 			this.timers.delete(timer);
-			try { src.motion.disconnect(previous.chain.input); } catch {}
+			try { src.mix.disconnect(previous.chain.input); } catch {}
 			previous.chain.dispose();
 			try { previous.output.disconnect(); } catch {}
 		}, (fade + 0.15) * 1000);
@@ -309,7 +328,7 @@ export class StemFXMixer {
 		for (const timer of this.timers) clearTimeout(timer);
 		this.timers.clear();
 		for (const src of this.sources.values()) {
-			try { src.input.disconnect(); src.motion.disconnect(); src.output.disconnect(); src.send.disconnect(); } catch {}
+			try { src.input.disconnect(); src.motion.disconnect(); src.mix.disconnect(); src.output.disconnect(); src.send.disconnect(); } catch {}
 			src.chain.dispose();
 		}
 		this.sources.clear();

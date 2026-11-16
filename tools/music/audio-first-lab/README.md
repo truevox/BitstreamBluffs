@@ -321,3 +321,32 @@ unchanged and no V3 audio entered the public game.
 
 See [RESEARCH-V3.md](RESEARCH-V3.md) for measured results, assumptions,
 private CT211/CT223 outputs, and explicit musical approval gates.
+
+
+## Adaptive 4x12 six-stem playback router (source-only feature branch)
+
+The all-six-original-stems/three-reusable-backings implementation lives in
+src/systems/music/AdaptiveBiomeRouter.js with an optional adaptive music-pack
+manifest. The four changing families are Melody, Bass, Airborne Drums, and
+ONE featured Guitar/Piano/Other source. The other two source stems remain
+sample-clock-aligned and audible; even the featured original stays available
+as a safe fallback. This is NOT a four-stream cap.
+
+- [ADAPTIVE-4X12-MANIFEST.md](ADAPTIVE-4X12-MANIFEST.md) defines exact safe
+  per-segment variant paths, crossfades and transition behaviors.
+- [BIOME-ORCHESTRAS-V1.md](BIOME-ORCHESTRAS-V1.md) contains eleven proposed
+  **unapproved** biome orchestra identities and instrument-agnostic sound
+  production methods, not constrained to GM or source stem label.
+- smoke_adaptive_browser.mjs runs REAL Chromium/Web Audio smoke tests
+  with temporary manifests using the unchanged private 32-second Ogg site.
+  --segments tests the 8-second decoded Ogg boundary; --missing-second-segment
+  deliberately tests the missing source fallback and bounded retries.
+
+Verification on 2026-11-16: 39/39 focused music tests and all three
+real-browser smoke variants PASS, 21 registered mixer buses, 0 unexpected
+media errors. Production Vite build and 7 release-security tests PASS.
+The full repository has **7 failing test suites (9 tests) on BOTH the
+unchanged ee4923e baseline and the new feature branch**: pre-existing
+tricks/terrain/UI/config/performance suites, not a new music regression.
+Neither private audition audio nor public game music was modified.
+No full-song 33x12 pack or user-approved new orchestras have been produced.

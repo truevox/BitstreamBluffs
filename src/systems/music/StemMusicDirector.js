@@ -6,6 +6,7 @@
  */
 import { CORE_STEMS, normalizeCatalog, normalizePack, resolveMusicAsset } from './MusicPack.js';
 import { StemFXMixer } from './MusicFXGraph.js';
+import { AdaptiveBiomeRouter } from './AdaptiveBiomeRouter.js';
 import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
 import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.js';
 
@@ -27,6 +28,7 @@ export class StemMusicDirector {
 		this.clockStart = null;
 		this.ctx = null;
 		this.gains = new Map();
+		this._stemUserLevels = new Map(CORE_STEMS.map(name => [name, 1]));
 		this._effectSignatures = new Map();
 		this.activeNodes = new Set();
 		this.cache = new Map();
@@ -72,6 +74,10 @@ export class StemMusicDirector {
 			const g = this.mixer.addSource(name, { gain: name === 'vocals' && !this.vocals ? 0 : 1 });
 			this.gains.set(name, g);
 		}
+		// Optional 4x12 sources use only three additional reusable mixer buses.
+		// Legacy packs do not create or play any alternate source.
+		this.adaptive = new AdaptiveBiomeRouter(ctx, this.mixer,
+			(index, path) => this._fetchAdaptiveSegment(index, path));
 	}
 
 	applySettings(settings) {
@@ -82,7 +88,15 @@ export class StemMusicDirector {
 
 	setStemGain(name, gain) {
 		if (!CORE_STEMS.includes(name) || name === 'vocals') return false;
-		return this.mixer?.setGain(name, clamp(Number(gain) || 0, 0, 1.5)) || false;
+		const level = clamp(Number(gain) || 0, 0, 1.5);
+		this._stemUserLevels?.set(name, level);
+		const changed = this.mixer?.setGain(name, level) || false;
+		// Keep user-mix level consistent as an original stem is replaced.
+		const featured = this.pack?.adaptive?.featuredStem;
+		const alternate = name === 'bass' || name === 'drums' ? name :
+			name === featured ? 'featured' : null;
+		if (alternate) this.mixer?.setGain('adaptive:' + alternate, level);
+		return changed;
 	}
 
 	setVocals(on) {
@@ -95,6 +109,7 @@ export class StemMusicDirector {
 		this.biome = typeof id === 'string' && id ? id : HOME_BIOME;
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.biome);
+		this.adaptive?.setBiome(this.biome);
 		if (this.started) this._pump();
 	}
 
@@ -120,18 +135,27 @@ export class StemMusicDirector {
 		const next = !!airborne;
 		if (next === this.airborne) return;
 		this.airborne = next;
-		this.mixer?.setGain('drums', this.airborne ? 0.58 : 1, { motion: true, time: 0.12 });
+		// New adaptive packs crossfade full original drums with an actual
+		// airborne kit. The legacy 0.58 airborne duck remains unchanged.
+		this.mixer?.setGain('drums', this.pack?.adaptive ? 1 :
+			this.airborne ? 0.58 : 1, { motion: true, time: 0.12 });
+		this.adaptive?.setAirborne(this.airborne);
+		if (this.started) this._pump();
 	}
 
 	setSpeed(speedPxS) {
 		// Effects marked speed-filter react without altering source playback rate.
 		const normalized = clamp((Number(speedPxS) || 0) / 1000, 0, 1);
 		this.mixer?.setEffectParam('other', 'speed-filter', 'frequency', 400 + normalized * 15000);
+		this.adaptive?.setSpeed(speedPxS);
 	}
 
 	setCombo(multiplier = 1) {
-		this.mixer?.setGain('other', clamp(1 + (Number(multiplier) - 1) * 0.05, 0.8, 1.25),
-			{ motion: true, time: 0.09 });
+		const level = clamp(1 + (Number(multiplier) - 1) * 0.05, 0.8, 1.25);
+		this.mixer?.setGain('other', level, { motion: true, time: 0.09 });
+		if (this.pack?.adaptive?.featuredStem === 'other') {
+			this.mixer?.setGain('adaptive:featured', level, { motion: true, time: 0.09 });
+		}
 	}
 
 	getEnergy() { return this.mixer?.energy() || { bass: 0, mid: 0, treble: 0 }; }
@@ -220,6 +244,35 @@ export class StemMusicDirector {
 		finally { if (this.inflight.get(key) === promise) this.inflight.delete(key); }
 	}
 
+	// Biome assets are in the optional adaptive manifest map, not the 48
+	// permanent segment sources. Cache by segment AND relative asset path;
+	// source identity remains stable through biome switches.
+	_syncAdaptiveUserLevels() {
+		if (!this.pack?.adaptive || !this.mixer) return;
+		const level = name => this._stemUserLevels?.get(name) ?? 1;
+		this.mixer.setGain('adaptive:bass', level('bass'));
+		this.mixer.setGain('adaptive:drums', level('drums'));
+		this.mixer.setGain('adaptive:featured', level(this.pack.adaptive.featuredStem));
+	}
+
+	async _fetchAdaptiveSegment(index, path) {
+		const token = this._token;
+		if (!this.pack || this.clockStart === null || !this.pack.adaptive) return null;
+		const key = String(index) + '/adaptive:' + path;
+		if (this.cache.has(key)) return this.cache.get(key);
+		if (this.inflight.has(key)) return this.inflight.get(key);
+		const promise = (async () => {
+			const response = await fetch(resolveMusicAsset(this.packBase, path));
+			if (!response.ok) throw new Error('Missing optional adaptive source');
+			const buffer = await this.ctx.decodeAudioData(await response.arrayBuffer());
+			if (token === this._token && !this.disposed) this.cache.set(key, buffer);
+			return buffer;
+		})();
+		this.inflight.set(key, promise);
+		try { return await promise; }
+		finally { if (this.inflight.get(key) === promise) this.inflight.delete(key); }
+	}
+
 	async _beginTrack(index, desiredAt) {
 		const token = ++this._token;
 		this.cache.clear();
@@ -268,6 +321,11 @@ export class StemMusicDirector {
 			}
 			if (token !== this._token || this.disposed) return;
 			this.clockStart = Math.max(this.ctx.currentTime + 0.12, desiredAt || 0);
+			this.adaptive?.configure(this.pack, this.clockStart,
+				{ biome: this.biome, airborne: this.airborne });
+			this._syncAdaptiveUserLevels();
+			this.mixer?.setGain('drums', this.pack.adaptive ? 1 :
+				this.airborne ? 0.58 : 1, { motion: true, time: 0.12 });
 			this._pump();
 		} catch (e) {
 			if (token === this._token) {
@@ -339,12 +397,16 @@ export class StemMusicDirector {
 		}
 		const info = { track: this.track, pack: this.pack, base: this.packBase };
 		const token = this._token;
+		this.adaptive?.pump();
 		for (let i = 0; i < this.pack.segments.length; i++) {
 			const seg = this.pack.segments[i];
 			const begin = this.clockStart + seg.startFrame / this.pack.sampleRate;
 			const end = begin + seg.frames / this.pack.sampleRate;
 			if (end < now - 0.2) {
-				for (const name of this.pack.sourceNames) this.cache.delete(String(i) + '/' + name);
+				const prefix = String(i) + '/';
+				for (const key of this.cache.keys()) {
+					if (key.startsWith(prefix)) this.cache.delete(key);
+				}
 				continue;
 			}
 			if (begin > now + 8) break;
@@ -363,6 +425,7 @@ export class StemMusicDirector {
 		if (this._timer) clearInterval(this._timer);
 		this._timer = null;
 		this._loading = null;
+		this.adaptive?.reset();
 		this.pack = null;
 		this.clockStart = null;
 		this.cache.clear();
@@ -380,6 +443,7 @@ export class StemMusicDirector {
 	destroy() {
 		this.disposed = true;
 		this.stop();
+		this.adaptive?.destroy();
 		this.mixer?.destroy();
 		if (this.bus) this.bus.disconnect();
 	}

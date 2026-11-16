@@ -1,4 +1,5 @@
 /** Validated, versioned music-pack data. No Phaser, DOM or I/O. */
+import { BIOME_IDS, HOME_BIOME } from './BiomeVoices.js';
 export const CORE_STEMS = Object.freeze(['vocals', 'drums', 'bass', 'guitar', 'piano', 'other']);
 const validId = (s) => typeof s === 'string' && /^[a-zA-Z0-9:_-]{1,100}$/.test(s);
 const safePath = (s) => typeof s === 'string' && s.length < 300 &&
@@ -6,6 +7,45 @@ const safePath = (s) => typeof s === 'string' && s.length < 300 &&
   /^[a-zA-Z0-9_.\/-]+$/.test(s);
 const whole = (v) => Number.isSafeInteger(v) && v >= 0;
 const effectTypes = new Set(['gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser']);
+
+const ADAPTIVE_FAMILIES = Object.freeze(['bass', 'drums', 'featured']);
+const FEATURE_STEMS = Object.freeze(['guitar', 'piano', 'other']);
+
+/**
+ * Biome-specific files are indexed separately from the 48 permanent pack
+ * source IDs. Each role uses one reusable mix bus; its individual instrument
+ * recordings may come from any synthesis, sampling or sound-design method.
+ * Variant arrays are complete segment-aligned safe relative paths.
+ */
+function normalizeAdaptive(raw, count) {
+	if (raw === undefined) return null;
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw) ||
+		!FEATURE_STEMS.includes(raw.featuredStem) ||
+		!raw.variants || typeof raw.variants !== 'object' ||
+		Array.isArray(raw.variants)) {
+		throw new Error('Invalid adaptive music map');
+	}
+	const variants = Object.create(null);
+	for (const role of Object.keys(raw.variants)) {
+		if (!ADAPTIVE_FAMILIES.includes(role)) throw new Error('Unknown adaptive role');
+	}
+	for (const role of ADAPTIVE_FAMILIES) {
+		const biomeFiles = raw.variants[role] ?? {};
+		if (!biomeFiles || typeof biomeFiles !== 'object' ||
+			Array.isArray(biomeFiles)) throw new Error('Invalid adaptive variants');
+		const mapping = Object.create(null);
+		for (const [biome, files] of Object.entries(biomeFiles)) {
+			if (biome === HOME_BIOME || !BIOME_IDS.includes(biome) ||
+				!Array.isArray(files) || files.length !== count ||
+				!files.every(safePath)) {
+				throw new Error('Invalid biome audio segment mapping');
+			}
+			mapping[biome] = files.slice();
+		}
+		variants[role] = mapping;
+	}
+	return { featuredStem: raw.featuredStem, variants };
+}
 
 export function normalizeCatalog(raw) {
 	if (!raw || raw.format !== 'bitstream-music-catalog-v1' || !Array.isArray(raw.tracks) || raw.tracks.length > 500) {
@@ -31,7 +71,11 @@ export function normalizePack(raw) {
 	}
 	let cursor = 0;
 	const baselineNames = Object.keys(raw.segments[0]?.sources || {}).sort();
-	if (baselineNames.length < CORE_STEMS.length || baselineNames.length > 48) throw new Error('Too many music sources');
+	if (baselineNames.length < CORE_STEMS.length ||
+		baselineNames.length > (raw.adaptive === undefined ? 48 : 45)) {
+		// An adaptive pack needs three stable extra buses beyond base sources.
+		throw new Error('Too many music sources');
+	}
 	const segments = raw.segments.map((seg) => {
 		if (!whole(seg.startFrame) || !whole(seg.frames) || seg.frames < 1 || seg.startFrame !== cursor ||
 			!seg.sources || typeof seg.sources !== 'object') {
@@ -105,6 +149,7 @@ export function normalizePack(raw) {
 		effects,
 		roomSends,
 		layers,
+		adaptive: normalizeAdaptive(raw.adaptive, segments.length),
 		captions,
 		bpm: beat,
 	};
