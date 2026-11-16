@@ -35,7 +35,7 @@ const { EVT } = await import('../../src/events.js');
 const { PhysicsTuner, BASE_STEP_MS, TUNING } = await import('../../src/systems/PhysicsTuner.js');
 
 const { loadContent, makeGen } = await import('./_helpers.js');
-const { GUST_MAX_PX_S } = await import('../../src/systems/BiomeEffects.js');
+const { GUST_MAX_PX_S, springRebound } = await import('../../src/systems/BiomeEffects.js');
 
 const C = loadContent();
 const PAD = { tuck: false, brake: false };
@@ -293,5 +293,49 @@ describe('B4 drawing: every new shapeKey has its own routine', () => {
       expect(out[id]).not.toBe(shape(generic.gfx));
     }
     expect(new Set(Object.values(out)).size).toBe(2);
+  });
+});
+
+describe('Sky Jellyfish felt bounce through RunScene.handleTricksAndLanding (shipped bouncySpring def)', () => {
+  const GOOD = { quality: 'good', angleDeg: 3, impactSpeedPxS: 500, airtimeMs: 600 };
+  /** A landable run whose sled records launchUp, with the frame tuner as update() leaves it. */
+  const springy = (zones, rails = false) => {
+    const s = landable(makeRun({ zones }));
+    s.ups = [];
+    s.sled.launchUp = (v) => { s.ups.push(v); };
+    if (rails) s.onPowerUp(take('stabilizerRails'));
+    s.currentPhys = phys(s);
+    return s;
+  };
+
+  test('a scored landing in a bouncySpring zone rebounds once, by the shipped share of its impact speed', () => {
+    const s = springy([C.terrainMods.bouncySpring]);
+    s.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
+    expect(s.ups).toEqual([springRebound(500, C.terrainMods.bouncySpring.physics.landingRebound)]);
+    expect(s.ups[0]).toBeGreaterThanOrEqual(100);
+  });
+
+  test('negative controls: plain ground, a crash landing and an unscored touchdown give no rebound', () => {
+    const plain = springy([]);
+    plain.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
+    expect(plain.ups).toEqual([]);
+    const crash = springy([C.terrainMods.bouncySpring]);
+    crash.handleTricksAndLanding({ tricks: [], landing: { ...GOOD, angleDeg: 120, quality: 'crash' } }, FS);
+    expect(crash.ups).toEqual([]);
+    expect(crash.pendingCrash).toEqual({ cause: 'badLanding' });
+    const none = springy([C.terrainMods.bouncySpring]);
+    none.handleTricksAndLanding({ tricks: [] }, FS);
+    expect(none.ups).toEqual([]);
+  });
+
+  test('with the Stabilizer Rails the same landing rebounds far less (here: not at all), and the bounce is back after 5 s', () => {
+    const s = springy([C.terrainMods.bouncySpring], true);
+    s.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
+    const bare = springRebound(500, C.terrainMods.bouncySpring.physics.landingRebound);
+    expect(s.ups.reduce((a, b) => a + b, 0)).toBeLessThan(bare * 0.5);
+    s.tickEffects(5001);
+    s.currentPhys = phys(s);
+    s.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
+    expect(s.ups[s.ups.length - 1]).toBeCloseTo(bare, 9);
   });
 });

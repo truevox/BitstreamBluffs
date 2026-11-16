@@ -37,7 +37,7 @@ import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '.
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, hazardColor, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
-  resolveLanding, hazardEffectDurationMs, timedPowerupMs, addShieldSource, spendShieldSource, shieldChargesFor,
+  resolveLanding, hazardEffectDurationMs, timedPowerupMs, addShieldSource, spendShieldSource, shieldChargesFor, springRebound,
 } from '../systems/BiomeEffects.js';
 import { GlitchPipeline } from '../shaders/GlitchPipeline.js';
 import { getPalette, getPaletteCss } from '../ui/Palette.js';
@@ -1126,6 +1126,20 @@ export class RunScene extends Phaser.Scene {
     } else if (imp > 250) this.sled.squash = 0.35;
     this._landings += 1;
     this.applyLandingBoost(l, mult, nTricks, fs);
+    this.applySpringRebound(l, fs);
+  }
+
+  /**
+   * Sky Jellyfish felt bounce: a scored (non-crash) landing inside a zone with `physics.landingRebound` throws the sled
+   * back up by BiomeEffects.springRebound of its impact speed (bounded, decaying; the Rails damp the share in
+   * PhysicsTuner). Runs after the landing boost, so a sloppy wobble's velocity cut does not eat the rebound.
+   */
+  applySpringRebound(l, fs) {
+    const share = this.currentPhys ? this.currentPhys.landingRebound : 0;
+    const up = springRebound(l.impactSpeedPxS || 0, share);
+    if (!(up > 0)) return;
+    this.sled.launchUp(up);
+    if (fs) this.fx.ring(fs.x, fs.y + 8, this.palette.lime, 20, 260);
   }
 
   /** Trick -> speed loop (TUNING.boost*): a clean landing after tricks gives a forward burst and a stretch of low drag. */
