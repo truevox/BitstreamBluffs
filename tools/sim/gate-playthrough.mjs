@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 70; // Readable Chaos 3: +4 (real crash named / slowed / on Game Over, late hop verdict, absorbed hit is no crash, DIED HERE on retry); B3 tuning: +2 (each rolling hazard never catches a moving sled and overtakes a stopped one slowly, in view); Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
-const EXPECTED_WITHOUT_BOOSTS = 58; // Readable Chaos 3: +4; B3 tuning: +2; Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
+const EXPECTED_WITH_BOOSTS = 75; // B4: +5 (meteor crash + killer named, meteor air-telegraphed + dodged hands-off, gust impulse on the real sled and never the killer, each stabilizer saves a real landing; Rails damp the bouncySpring); Readable Chaos 3: +4 (real crash named / slowed / on Game Over, late hop verdict, absorbed hit is no crash, DIED HERE on retry); B3 tuning: +2 (each rolling hazard never catches a moving sled and overtakes a stopped one slowly, in view); Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 63; // B4: +5; Readable Chaos 3: +4; B3 tuning: +2; Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -3754,6 +3754,317 @@ async function main() {
           if (D.look !== 'drone' || D.shape !== 'drone') fail(name.draws, `look.riderShape ${D.look}, sled.lastRiderShape ${D.shape}`);
           else if (D.rotors !== 2 || !D.lights0 || D.lights0[0] === D.lights0[1]) fail(name.draws, `drone draw state ${JSON.stringify(D)}`);
           else pass(name.draws, `look.riderShape drone, sled.lastRiderShape drone, 2 rotors, lights ${JSON.stringify(D.lights0)} -> ${JSON.stringify(D.lights1)}`);
+        }
+      }
+    }
+
+    // ---- B4 (biome full treatment, "Air"): per biome, a real seed@<bit> run of the built game, appended last. The air
+    // hazards' real entities go through the shipped onHazard / AirTelegraph / frame loop; both stabilizers are checked on a
+    // REAL landing: the same seed, pose, input and frames twice, once with nothing and once with the pickup taken, and the
+    // frame loop lands the sled (TrickTracker -> RunScene.handleTricksAndLanding -> BiomeEffects.resolveLanding). The
+    // queued crash is read where the frame loop hands it to resolveCrash (swapped for a recorder during the probe, so the
+    // run goes on). Rails are also measured on the Sky Jellyfish bouncySpring zone (body restitution and rebound).
+    {
+      const B4 = [
+        { biome: 'space-mountain', name: 'Space Mountain', seed: 'b4space15', mask: 32, hazard: 'meteor', powerup: 'gravityStabilizer' },
+        { biome: 'sky-jellyfish-mountain', name: 'Sky Jellyfish Mountain', seed: 'b4jelly54', mask: 128, hazard: 'gustFront', powerup: 'stabilizerRails' },
+      ];
+      const { TUNING: GT } = await import(path.join(ROOT, 'src/systems/PhysicsTuner.js'));
+      const { GUST_MAX_PX_S } = await import(path.join(ROOT, 'src/systems/BiomeEffects.js'));
+      const { expectedSpeedPxS } = await import(path.join(ROOT, 'src/systems/TerrainGenerator.js'));
+      // the expected speed every 10 m (the page interpolates it at the meteor's distance)
+      const EXP = Array.from({ length: 1001 }, (_, i) => expectedSpeedPxS(i * 10));
+      const SPRING = defsIn('src/data/terrainMods').bouncySpring.physics.bounceMul;
+      for (const B of B4) {
+        const names = B.hazard === 'meteor'
+          ? {
+            hz: `B4 ${B.name}: meteor spawns on ${B.seed}@${B.mask} in a jump arc, drawn in danger, and a real hit crashes the run (named meteor)`,
+            tele: `B4 ${B.name}: the meteor is air-telegraphed (STAY LOW over its lip) before the lip, and a hands-off ride at the expected speed passes under it`,
+            pu: `B4 ${B.name}: gravityStabilizer spawns on ${B.seed}@${B.mask} and saves a real landing that crashes without it (same seed, pose, frames)`,
+          }
+          : {
+            hz: `B4 ${B.name}: gustFront spawns on ${B.seed}@${B.mask} and changes the real sled's velocity by its bounded impulse (no crash, own HUD line)`,
+            pu: `B4 ${B.name}: stabilizerRails spawns on ${B.seed}@${B.mask}, saves a real landing that crashes without it, and damps the bouncySpring restitution`,
+          };
+        const c = await (async () => {
+          const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+          try {
+            const out = await page.evaluate(async ({ B, warnPx, EXP }) => {
+              const g = window.__bbGame;
+              const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+              g.scene.start('TitleScene');
+              const t0 = Date.now();
+              let run = null;
+              let started = false;
+              while (Date.now() - t0 < 15000) {
+                const tt = g.scene.getScene('TitleScene');
+                if (!started && tt && !tt.starting) { started = true; tt.startRun(`${B.seed}@${B.mask}`); }
+                const rr = g.scene.getScene('RunScene');
+                if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+                await wait(100);
+              }
+              if (!run) return { fatal: 'RunScene never produced a live sled' };
+              await wait(300);
+              if (run.sled.destroyed || !run.sled.inWorld || run.crashed) return { fatal: 'sled died before the probe' };
+              run.scene.pause();
+              const res = { seed: run.seed, mask: run.biomeMask };
+              const T = run.terrain;
+              const PX = (v) => (v * 1000) / (1000 / 60);
+              const vel = () => ({ x: PX(run.sled.body.velocity.x), y: PX(run.sled.body.velocity.y) });
+              let clock = run.runTimeMs;
+              const step = (n) => { for (let i = 0; i < n; i++) { clock += 16; run.update(clock, 16); } };
+              const keepAlive = () => { run.sled.invulnerableMs = 1e9; run.pendingCrash = null; };
+              const live = () => { run.sled.invulnerableMs = 0; run.pendingCrash = null; };
+              // the frame loop's crash hand-off, recorded instead of ending the run
+              const resolveCrash = run.resolveCrash;
+              let queued = null;
+              run.resolveCrash = function () { if (!queued) queued = this.pendingCrash; this.pendingCrash = null; };
+              // scripted input (the sim harness does the same): tilt held for `hold` frames, hop on one frame
+              const router = run.inputRouter;
+              let fr = 0;
+              let hold = -1;
+              let tiltDir = 1;
+              run.inputRouter = { poll: () => ({ tilt: fr < hold ? tiltDir : 0, pressed: {} }) };
+              const hits = [];
+              const lands = [];
+              const onHit = (p) => hits.push(p);
+              const onLand = (p) => lands.push(p);
+              g.events.on('bb:hazardHit', onHit);
+              g.events.on('bb:landing', onLand);
+              const ui = g.scene.getScene('UIScene');
+              const find = (id, list) => {
+                for (let i = 0; i < 200; i++) {
+                  const ch = T.getChunk(i);
+                  const sp = ch[list].find((s) => s.defId === id);
+                  if (sp) return { ch, sp };
+                }
+                return null;
+              };
+              const taken = [];
+              const entity = (f, map) => {
+                if (!f) return null;
+                if (!run.mesh.chunks.has(f.ch.index)) { run.takeChunk(f.ch); taken.push(f.ch.index); }
+                return (run[map].get(f.ch.index) || []).find((e) => e.def.id === f.sp.defId && e.spawn.x === f.sp.x) || null;
+              };
+              /** Same start state for every arm: same run time, no timers or biome effects left over. */
+              const fresh = () => {
+                const T0 = Math.ceil((clock + 60000) / 1000) * 1000;
+                run._resetBiomeEffects();
+                run.runTimeMs = T0; clock = T0; run.hitStopMs = 0; run.slowmoMs = 0; run.boostMs = 0; run.sled.boostMs = 0;
+              };
+              const slope = (x) => Math.atan2(T.heightAt(x + 10) - T.heightAt(x - 10), 20) * 180 / Math.PI;
+              /**
+               * One real landing: settle on the ground (no air or trick state carries over), then the same pose (h px above
+               * x, along the slope, 380 / 150 px/s) and input (tilt held `k` frames); optional pickup taken right before.
+               */
+              const landX = run.sled.x + 500;
+              const landing = (h, td, k, p) => {
+                keepAlive(); hold = -1;
+                run.sled.setPose(landX - 300, T.heightAt(landX - 300) - 18, slope(landX), 300, 0);
+                step(40);
+                fresh();
+                if (p) { p.collected = false; run.onPowerUp(p); }
+                live(); queued = null; lands.length = 0; hold = k; tiltDir = td; fr = 0;
+                run.sled.setPose(landX, T.heightAt(landX) - h, slope(landX), 380, 150);
+                let f = 0;
+                for (; f < 120 && !queued && !lands.length; f++) { step(1); fr++; }
+                keepAlive(); hold = -1;
+                const l = lands[0];
+                return { crash: queued ? queued.cause : null, q: l ? l.quality : null, ang: l ? Math.round(l.angleDeg) : null, imp: l ? Math.round(l.impactSpeedPxS) : null, frames: f };
+              };
+              /** Find a pose the real sled lands at 79-90 deg (a crash without a stabilizer), then land it again with p. */
+              const stabilizeProbe = (p) => {
+                for (const td of [1, -1]) {
+                  for (let h = 92; h <= 116; h += 4) {
+                    for (const k of [21, 22, 23]) {
+                      const a = landing(h, td, k, null);
+                      if (a.crash === 'badLanding' && a.q === 'crash' && Math.abs(a.ang) > 78 && Math.abs(a.ang) <= 90) {
+                        const again = landing(h, td, k, null);
+                        const b = landing(h, td, k, p);
+                        return { pose: { h, td, k, x: Math.round(landX) }, without: a, again, withP: b, tolDeg: run.stabilizeDeg };
+                      }
+                    }
+                  }
+                }
+                return { fatal: 'no 79-90 deg crash landing found near the start of the run' };
+              };
+              try {
+                keepAlive();
+                run._resetBiomeEffects();
+                step(2);
+                // the landing probe runs first, near the start of the run: the meteor ride below moves the live window
+                // far ahead, and the colliders behind it are gone
+                const fp = find(B.powerup, 'powerups');
+                const p = entity(fp, 'powerups');
+                const land = p ? stabilizeProbe(p) : null;
+                run._resetBiomeEffects();
+                keepAlive();
+                const fh = find(B.hazard, 'hazards');
+                const h = entity(fh, 'hazards');
+                if (!h) res.hz = { fatal: `no ${B.hazard} in the first 200 chunks of ${B.seed}@${B.mask}` };
+                else {
+                  res.hz = { m: Math.round(fh.sp.x / 20), chunkBiome: fh.ch.biome, chunkDef: fh.ch.defId, drawKind: h.drawKind, shapeKey: h.def.shapeKey, isDanger: h.color === run.palette.danger, placement: h.def.placement };
+                  if (B.hazard === 'meteor') {
+                    // ---- the hit itself
+                    live(); hits.length = 0; h.hit = false;
+                    run.onHazard(h);
+                    res.hz.crash = run.pendingCrash ? run.pendingCrash.hazardId : null;
+                    res.hz.hitEvents = hits.map((p) => `${p.hazardId}:${p.effect}`);
+                    keepAlive();
+                    // ---- telegraph + hands-off ride at the expected speed through the jump
+                    const lip = h.lip;
+                    res.tele = { lip: lip ? { x: Math.round(lip.x), y: Math.round(lip.y) } : null };
+                    if (lip) {
+                      keepAlive(); hold = -1;
+                      run.sled.setPose(lip.x - 900, T.heightAt(lip.x - 900) - 18, slope(lip.x - 900), 200, 0);
+                      step(6);
+                      fresh();
+                      h.hit = false; h.warned = false; h.alert = false; h.nearMissed = false;
+                      const dm = Math.min(9999, fh.sp.x / 20) / 10;
+                      const v = EXP[Math.floor(dm)] + (EXP[Math.floor(dm) + 1] - EXP[Math.floor(dm)]) * (dm - Math.floor(dm));
+                      const sx = lip.x - 260;
+                      const a = slope(sx);
+                      run.sled.setPose(sx, T.heightAt(sx) - 18, a, Math.cos(a * Math.PI / 180) * v, Math.sin(a * Math.PI / 180) * v);
+                      live(); queued = null; hits.length = 0;
+                      let alertAt = null; let lipAt = null; let labelSeen = null; let markInk = 0; let underMin = Infinity;
+                      for (let f = 0; f < 240; f++) {
+                        step(1);
+                        const sl = run.sled;
+                        if (h.alert && alertAt == null) alertAt = f;
+                        if (run.airTelegraph && run.airTelegraph.label && run.airTelegraph.label.visible && labelSeen == null && sl.x < lip.x) {
+                          labelSeen = { f, text: run.airTelegraph.label.text, x: Math.round(run.airTelegraph.label.x) };
+                          markInk = run.airTelegraph.gfx && run.airTelegraph.gfx.commandBuffer ? run.airTelegraph.gfx.commandBuffer.length : -1;
+                        }
+                        if (lipAt == null && sl.x >= lip.x) lipAt = f;
+                        if (Math.abs(sl.x - h.cx) < h.w / 2) underMin = Math.min(underMin, (sl.y - 22) - (h.cy + h.h / 2));
+                        if (queued || sl.x > h.cx + 200) break;
+                      }
+                      keepAlive();
+                      res.tele = { ...res.tele, v: Math.round(v), alertAt, lipAt, labelSeen, markInk, warnPx, hitEvents: hits.map((p) => p.hazardId), queued: queued ? (queued.hazardId || queued.cause) : null, underPx: Math.round(underMin), passedX: run.sled.x > h.cx };
+                    }
+                  } else {
+                    // ---- gust: the run's real Gust Front, hit live; the body velocity before and after
+                    live(); hits.length = 0; h.hit = false;
+                    const v0 = vel();
+                    const c0 = { vx: run.sled.vx, vy: run.sled.vy };
+                    run.onHazard(h);
+                    const v1 = vel();
+                    res.hz.dv = { x: v1.x - v0.x, y: v1.y - v0.y };
+                    res.hz.cache = { x: run.sled.vx - c0.vx, y: run.sled.vy - c0.vy };
+                    res.hz.crashed = !!run.pendingCrash;
+                    res.hz.hitEvents = hits.map((p) => `${p.hazardId}:${p.effect}:${p.durationMs}`);
+                    res.hz.label = ui && ui.effects && ui.effects.get('gust') ? (ui.effects.get('gust').label || 'GUST') : null;
+                    keepAlive();
+                    step(2);
+                    res.hz.inWorld = run.sled.inWorld;
+                  }
+                }
+                // ---- power-up: the shared stabilize kind on a real landing
+                run._resetBiomeEffects();
+                keepAlive();
+                if (!p) res.pu = { fatal: `no ${B.powerup} in the first 200 chunks of ${B.seed}@${B.mask}` };
+                else {
+                  res.pu = { m: Math.round(fp.sp.x / 20), chunkBiome: fp.ch.biome, drawKind: p.drawKind, shapeKey: p.def.shapeKey };
+                  res.pu.land = land;
+                  res.pu.chip = !!(ui && ui.powerups && ui.powerups.has(B.powerup));
+                  run._resetBiomeEffects();
+                  if (B.powerup === 'stabilizerRails') {
+                    // ---- the bouncySpring zone of this run: restitution of the real body at touchdown, and the rebound
+                    let zone = null;
+                    for (let i = 0; i < 200 && !zone; i++) { const ch = T.getChunk(i); const z = ch.zones.find((q) => q.modId === 'bouncySpring'); if (z) zone = z; }
+                    if (!zone) res.pu.bounce = { fatal: 'no bouncySpring zone in the first 200 chunks' };
+                    else {
+                      const zx = Math.round((zone.x0 + zone.x1) / 2);
+                      keepAlive();
+                      run.sled.setPose(zone.x0, T.heightAt(zone.x0) - 18, slope(zone.x0), 100, 0);
+                      step(10);
+                      const drop = (rails) => {
+                        fresh(); keepAlive(); hold = -1;
+                        if (rails) { p.collected = false; run.onPowerUp(p); }
+                        run.sled.setPose(zx, T.heightAt(zx) - 200, slope(zx), 200, 700);
+                        let rest = null; let first = -1; let up = 0; let air = 0;
+                        for (let f = 0; f < 90; f++) {
+                          step(1);
+                          const sl = run.sled;
+                          if (first < 0 && sl.grounded) { first = f; rest = sl.body.restitution; }
+                          if (first >= 0) {
+                            const n = Math.atan2(T.heightAt(sl.x + 10) - T.heightAt(sl.x - 10), 20);
+                            const vv = vel();
+                            up = Math.max(up, -(vv.y * Math.cos(n) - vv.x * Math.sin(n)));
+                            if (!sl.grounded) air++;
+                          }
+                        }
+                        const out = { rest, up: Math.round(up), air, bounceMul: run.currentPhys.bounceMul };
+                        run._resetBiomeEffects();
+                        return out;
+                      };
+                      const bare = drop(false);
+                      const railed = drop(true);
+                      const after = drop(false);
+                      res.pu.bounce = { bare, railed, after };
+                    }
+                  }
+                }
+              } catch (e) { res.fatal = String(e && e.stack || e); }
+              g.events.off('bb:hazardHit', onHit);
+              g.events.off('bb:landing', onLand);
+              run.resolveCrash = resolveCrash;
+              run.inputRouter = router;
+              for (const idx of taken) run.dropChunk(idx);
+              run._resetBiomeEffects();
+              return res;
+            }, { B, warnPx: GT.airWarnAheadPx, EXP }).catch((e) => ({ fatal: String(e) }));
+            return { errors, out };
+          } finally { await page.close(); }
+        })();
+        const o = c.out;
+        const all = Object.values(names);
+        if (o.fatal || c.errors.length) {
+          for (const n of all) fail(n, o.fatal || `page errors: ${c.errors.join(' | ')}`);
+          continue;
+        }
+        const run = `run ${o.seed}@${o.mask}`;
+        const hz = o.hz;
+        if (o.seed !== B.seed || o.mask !== B.mask) { for (const n of all) fail(n, `the run is ${run}, not ${B.seed}@${B.mask}`); continue; }
+        if (hz.fatal) fail(names.hz, hz.fatal);
+        else if (hz.chunkBiome !== B.biome) fail(names.hz, `spawned in a ${hz.chunkBiome} chunk`);
+        else if (hz.drawKind !== hz.shapeKey || hz.placement !== 'air') fail(names.hz, `entity draws '${hz.drawKind}' (own '${hz.shapeKey}'), placement ${hz.placement}`);
+        else if (B.hazard === 'meteor') {
+          if (!hz.isDanger) fail(names.hz, 'the meteor is not drawn in danger');
+          else if (hz.crash !== 'meteor' || hz.hitEvents.join() !== 'meteor:crash') fail(names.hz, `a hit queued ${hz.crash}, HAZARD_HIT ${hz.hitEvents}`);
+          else pass(names.hz, `${run}: at ${hz.m} m in a ${hz.chunkDef}; drawn '${hz.drawKind}' in danger; real hit queued crash 'meteor'`);
+          const t = o.tele;
+          if (!t || !t.lip) fail(names.tele, 'the meteor entity has no launch lip (AirTelegraph cannot mark it)');
+          else if (t.alertAt == null || t.lipAt == null || t.alertAt >= t.lipAt) fail(names.tele, `alert at frame ${t.alertAt}, lip at frame ${t.lipAt} (the warning must come first)`);
+          else if (!t.labelSeen || t.labelSeen.text !== 'STAY LOW' || Math.abs(t.labelSeen.x - t.lip.x) > 1 || !(t.markInk > 0)) fail(names.tele, `STAY LOW mark ${JSON.stringify(t.labelSeen)}, telegraph ink ${t.markInk}`);
+          else if (t.queued || t.hitEvents.length || !t.passedX || !(t.underPx > 0)) fail(names.tele, `hands-off ride at ${t.v} px/s: crash ${t.queued}, hits ${t.hitEvents}, passed ${t.passedX}, ${t.underPx} px under the box`);
+          else pass(names.tele, `${run}: STAY LOW over the lip at x ${t.lip.x}, ${(t.lipAt - t.alertAt) * 16} ms before the lip at ${t.v} px/s (warn ${t.warnPx} px ahead); hands-off ride passes ${t.underPx} px under the box, no hit`);
+        } else {
+          const [ix, iy] = HAZ_DEFS.gustFront.onHit.impulsePxS;
+          const mag = Math.hypot(hz.dv.x, hz.dv.y);
+          if (hz.isDanger) fail(names.hz, 'a gust (no crash) is drawn in danger');
+          else if (!(Math.abs(hz.dv.x - ix) < 0.5 && Math.abs(hz.dv.y - iy) < 0.5) || mag > GUST_MAX_PX_S + 1e-6) fail(names.hz, `body velocity changed by (${hz.dv.x.toFixed(2)}, ${hz.dv.y.toFixed(2)}) px/s, want (${ix}, ${iy}), |dv| ${mag.toFixed(1)} (max ${GUST_MAX_PX_S})`);
+          else if (Math.abs(hz.cache.x - ix) > 1e-6 || Math.abs(hz.cache.y - iy) > 1e-6) fail(names.hz, `the sled's px/s cache moved (${hz.cache.x}, ${hz.cache.y})`);
+          else if (hz.crashed || !hz.inWorld) fail(names.hz, `the gust crashed the run (queued ${hz.crashed}, inWorld ${hz.inWorld})`);
+          else if (hz.hitEvents.join() !== 'gustFront:gust:0') fail(names.hz, `HAZARD_HIT ${hz.hitEvents}`);
+          else if (hz.label !== 'GUST FRONT') fail(names.hz, `HUD warning label ${hz.label}`);
+          else pass(names.hz, `${run}: at ${hz.m} m in a ${hz.chunkDef}; body velocity +(${hz.dv.x.toFixed(1)}, ${hz.dv.y.toFixed(1)}) px/s = |${mag.toFixed(1)}| <= ${GUST_MAX_PX_S}; no crash; HUD "${hz.label}"`);
+        }
+        const pu = o.pu;
+        const L = pu && pu.land;
+        if (pu.fatal) fail(names.pu, pu.fatal);
+        else if (pu.chunkBiome !== B.biome) fail(names.pu, `spawned in a ${pu.chunkBiome} chunk`);
+        else if (pu.drawKind !== pu.shapeKey) fail(names.pu, `entity draws '${pu.drawKind}', not its own '${pu.shapeKey}'`);
+        else if (!L || L.fatal) fail(names.pu, (L && L.fatal) || 'no landing probe');
+        else if (JSON.stringify(L.again) !== JSON.stringify(L.without)) fail(names.pu, `the pose is not repeatable: ${JSON.stringify(L.without)} then ${JSON.stringify(L.again)}`);
+        else if (L.withP.crash !== null || L.withP.q !== 'sloppy' || L.withP.ang !== L.without.ang) fail(names.pu, `with the pickup the ${L.without.ang} deg landing gave crash ${L.withP.crash}, ${L.withP.q} at ${L.withP.ang} deg`);
+        else if (L.tolDeg !== PU_DEFS[B.powerup].effect.landingToleranceDeg) fail(names.pu, `stabilize tolerance ${L.tolDeg}`);
+        else if (B.powerup === 'gravityStabilizer') pass(names.pu, `${run}: at ${pu.m} m; pose h ${L.pose.h} tilt ${L.pose.td} x ${L.pose.k} frames: ${L.without.ang} deg at ${L.without.imp} px/s crashes (badLanding, twice) without, a sloppy wobble with +${L.tolDeg} deg`);
+        else {
+          const bo = pu.bounce;
+          if (!bo || bo.fatal) fail(names.pu, (bo && bo.fatal) || 'no bounce probe');
+          else if (!(Math.abs(bo.bare.rest - 0.02 * SPRING * SPRING) < 1e-6) || !(Math.abs(bo.railed.rest - 0.02 * (SPRING * PU_DEFS.stabilizerRails.effect.bounceMul) ** 2) < 1e-6) || bo.after.rest !== bo.bare.rest) fail(names.pu, `touchdown restitution bare ${bo.bare.rest}, railed ${bo.railed.rest}, after ${bo.after.rest}`);
+          else pass(names.pu, `${run}: at ${pu.m} m; ${L.without.ang} deg landing: crash without, sloppy with +${L.tolDeg} deg; bouncySpring touchdown restitution ${bo.bare.rest.toFixed(4)} -> ${bo.railed.rest.toFixed(4)} with Rails (rebound ${bo.bare.up} -> ${bo.railed.up} px/s, airborne frames ${bo.bare.air} -> ${bo.railed.air})`);
         }
       }
     }
