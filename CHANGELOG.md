@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Readable Chaos, phase 3 (death legibility)
+## v2.13.0 - Readable Chaos, phase 3 (death legibility) (2026-11-16)
 
 - **The crash says who did it.** The CRASH banner now names the killer: PACKET SPIKE, GLITCH CHASM, ROLLING BOULDER, DEW DROP, GEAR GATE, SEAGULL DIVE, ROGUE PACKET; HEAD FIRST, BAD LANDING or FELL INTO THE VOID for the other crashes. A hazard that cannot kill (Shatter Wall, Ash Cloud, the slows) is never named.
 - **The crash beat.** After the 70 ms hit-stop the shards and sparks run at 0.25x for 400 ms while the camera eases in 18 % on the wreck and holds it. It all fits inside the old 950 ms before Game Over, and starts only after the crash is decided: score, record, ledger hash, Daily, the sim and decision 3's biome completion are untouched.
