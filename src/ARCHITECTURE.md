@@ -1396,3 +1396,8 @@ same, with one addition: a sled landing from a lip gets the roll's whole range o
 `[l.x - 40, zoneEnd + range]`; the old uphill track had that for free, and without it the sim's hop runs landed on
 boulders). The presence test now also checks the neighbour chunks' gaps and lips. Without the change the downhill track lost
 placements near chunk ends (Rolling Boulder 32-seed presence 35.4 % -> 29.2 % at range 160).
+
+**Sim (B0 baseline, +/-15 %, git archive of the rebased branch).** Hop (48 seeds): mask 4 18 -> 18 (0 %), distance -1.9 %;
+mask 512 20 -> 17 (-15.0 %, unchanged from v2.10.0), -6.5 %; mask 256 15/48 unchanged. Flip distance -9.7 % / -4.2 %. At
+Skis 2.5 s mask 4 fell to 15/48 and at a boulder cap of 100 px/s without the landing clearance to 14/48, hence 2 s and
+80 px/s plus the `zoneEnd + range` lip window.

@@ -10,6 +10,7 @@
 - **Placement:** the roll track now runs downhill. Its end may run into the chunk edge margin up to 120 px from the edge (the spawn keeps 240); a spawn keeps the roll's range past a landing zone. Lips, gaps, other hazards (240) and power-ups (90) keep their clearances; the presence test also checks neighbour chunks.
 - **Telegraph API:** `rollStep`, `rollOffsetAt` and `rollPredictX` take an optional ground slope function; `RollState.vPxS` is the roll's signed speed. `Hazard.predictX(tMs)` is unchanged.
 - **Gate:** the glide checks ride 2 s and need >= 25 px/s and >= 25 px (the speed line comes first); both arms start from the same run time with no hit-stop, slow-mo or landing boost left over, so they are deterministic (5 of 5 runs identical); the roll checks want a downhill start under the cap; 2 new checks (each rolling hazard never catches a 200 px/s sled and overtakes a stopped one slowly, on screen). Expected counts 64 -> 66 and 52 -> 54 (on v2.12.0).
+- **Sim** (B0 baseline, ±15 %, git archive of the rebased branch): hop mask 4 survival 18 -> 18/48 (0 %; v2.10.0 17), distance -1.9 %, speed +0.7 %; mask 512 20 -> 17/48 (-15.0 %, same as v2.10.0), -6.5 %, +0.5 %; mask 256 unchanged (15/48). Flip distance -9.7 % (mask 4) / -4.2 % (mask 512), speed within +1 % (flip survival exempt). New-hazard crashes per 48 hop runs: Rolling Boulder 3, Dew Drop 0.
 - Mask 0 is unchanged (golden digests untouched).
 
 ## v2.12.0 - Micro Mountain glow-up: huge bees and the Neon Sled Drone (2026-11-15)
