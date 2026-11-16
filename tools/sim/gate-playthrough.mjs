@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 75; // B4: +5 (meteor crash + killer named, meteor air-telegraphed + dodged hands-off, gust impulse on the real sled and never the killer, each stabilizer saves a real landing; Rails damp the bouncySpring); Readable Chaos 3: +4 (real crash named / slowed / on Game Over, late hop verdict, absorbed hit is no crash, DIED HERE on retry); B3 tuning: +2 (each rolling hazard never catches a moving sled and overtakes a stopped one slowly, in view); Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
-const EXPECTED_WITHOUT_BOOSTS = 63; // B4: +5; Readable Chaos 3: +4; B3 tuning: +2; Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
+const EXPECTED_WITH_BOOSTS = 77; // B4 Sky Jellyfish bounce: +2 (the bouncySpring rebound is felt on the real sled - same pose, three arms: plain ground, spring zone, spring + Rails - and it does not pogo); B4: +5 (meteor crash + killer named, meteor air-telegraphed + dodged hands-off, gust impulse on the real sled and never the killer, each stabilizer saves a real landing; Rails damp the bouncySpring); Readable Chaos 3: +4 (real crash named / slowed / on Game Over, late hop verdict, absorbed hit is no crash, DIED HERE on retry); B3 tuning: +2 (each rolling hazard never catches a moving sled and overtakes a stopped one slowly, in view); Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 65; // B4 Sky Jellyfish bounce: +2; B4: +5; Readable Chaos 3: +4; B3 tuning: +2; Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -1781,6 +1781,12 @@ async function main() {
     // A real mask-0 run, hands off. The first ground crash hazard the run's own terrain produces must be stamped by
     // RunScene.updateGroundTelegraph while it is still OFF screen and at least 1.2 s of travel away, the telegraph
     // entity must have drawn something that frame, and the warn sound must have been requested once.
+    //
+    // FIXED STEPS, not requestAnimationFrame. The old version waited on rAF with a 40 s WALL-CLOCK deadline: under load
+    // (a busy machine) the browser's rAF ticks slower than real time, the sled covered less ground in those 40 s and
+    // the check failed for a reason that had nothing to do with the telegraph. The run is now driven 16 ms at a time by
+    // hand (the scene is paused, so the game loop never advances it), with a BOUNDED frame count and a yield for the
+    // event loop every few frames: the game time the check measures is the same on a loaded box and on an idle one.
     {
       const name = 'readable chaos: a ground crash hazard is telegraphed off-screen, >= 1.2 s out, with a sound';
       const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
@@ -1794,36 +1800,54 @@ async function main() {
           const title = g.scene.getScene('TitleScene');
           title.starting = false;
           title.startRun('gate-seed', 0);
-          await wait(1200);
-          const run = g.scene.getScene('RunScene');
+          // wait for the real run to be live (polled, bounded: never a fixed sleep that a slow box can miss)
+          let run = null;
+          const t0 = Date.now();
+          while (Date.now() - t0 < 15000) {
+            const rr = g.scene.getScene('RunScene');
+            if (rr && rr.sled && rr.sled.inWorld && !rr.crashed) { run = rr; break; }
+            await wait(100);
+          }
           if (!run) return { fatal: 'RunScene did not start' };
           if (!run.groundTelegraph || !run.teleTracker) return { fatal: 'RunScene has no ground telegraph' };
           const sfx = [];
           const audio = g.registry.get('audioSynth');
           const orig = audio && audio.playSfx ? audio.playSfx.bind(audio) : null;
           if (audio) audio.playSfx = (n, opts) => { sfx.push(n); if (orig) orig(n, opts); };
-          const deadline = Date.now() + 40000;
+          // the scene is paused: we advance it by hand, 16 ms a step, so the run's game time does not depend on the host
+          run.scene.pause();
+          let clock = run.runTimeMs;
+          const step = () => { clock += 16; run.update(clock, 16); };
+          const MAX_FRAMES = 3600; // 60 s of game time; the first ground crash hazard is far inside that
           let hit = null;
-          while (Date.now() < deadline && !hit) {
-            await new Promise((r) => requestAnimationFrame(r));
+          let drawn = 0;
+          let frames = 0;
+          for (let f = 0; f < MAX_FRAMES && !hit; f++) {
+            step();
+            frames = f + 1;
             if (!run.sled || run.crashed) break;
             for (const list of run.hazards.values()) for (const h of list) {
               if (hit || h.teleAtMs == null || h.def.placement === 'air' || (h.def.onHit && h.def.onHit.effect !== 'crash')) continue;
               const dx = h.cx - run.sled.x;
+              const buf = run.groundTelegraph.gfx && run.groundTelegraph.gfx.commandBuffer;
+              drawn = buf ? buf.length : 0;
               hit = {
                 id: h.def.id, dx, speed: run.sled.speed, m: Math.round((run.sled.x - run.startX) / 10),
                 offScreen: h.cx - h.w / 2 > run._view.right,
                 mark: (run._teleMarks || []).find((mk) => mk.ref === h) || null,
               };
             }
+            if ((f + 1) % 45 === 0) await wait(0); // yield for the event loop; never a wall-clock deadline
           }
-          if (!hit) return { fatal: run.crashed ? 'the run crashed before any hazard was telegraphed' : 'no ground crash hazard was telegraphed in 40 s' };
-          await new Promise((r) => requestAnimationFrame(r));
-          await new Promise((r) => requestAnimationFrame(r));
-          const buf = run.groundTelegraph.gfx && run.groundTelegraph.gfx.commandBuffer;
+          if (!hit) return { fatal: run.crashed ? 'the run crashed before any hazard was telegraphed' : `no ground crash hazard was telegraphed in ${MAX_FRAMES} fixed steps (${frames} run)` };
+          if (!drawn) { // the mark is drawn in the same frame it is planned; one more step if the buffer was empty
+            step();
+            const buf = run.groundTelegraph.gfx && run.groundTelegraph.gfx.commandBuffer;
+            drawn = buf ? buf.length : 0;
+          }
           return {
-            ...hit, mark: hit.mark ? { color: hit.mark.color, kind: hit.mark.kind, onScreen: hit.mark.onScreen } : null,
-            leadS: hit.dx / Math.max(hit.speed, 60), drawn: buf ? buf.length : 0, warnSounds: sfx.filter((n) => n === 'groundWarn').length,
+            ...hit, frames, mark: hit.mark ? { color: hit.mark.color, kind: hit.mark.kind, onScreen: hit.mark.onScreen } : null,
+            leadS: hit.dx / Math.max(hit.speed, 60), drawn, warnSounds: sfx.filter((n) => n === 'groundWarn').length,
           };
         }).catch((e) => ({ fatal: String(e) }));
         if (o.fatal) fail(name, o.fatal);
@@ -1833,7 +1857,7 @@ async function main() {
         else if (!o.mark || o.mark.kind !== 'hop' || o.mark.color !== 'danger' || o.mark.onScreen) fail(name, `wrong mark for a crash hazard: ${JSON.stringify(o.mark)}`);
         else if (!(o.drawn > 0)) fail(name, 'the telegraph entity drew nothing while a mark was up');
         else if (o.warnSounds < 1) fail(name, 'groundWarn was never requested');
-        else pass(name, `${o.id} at ${o.m} m: announced ${Math.round(o.dx)} px / ${o.leadS.toFixed(2)} s out, off screen, ${o.drawn} draw commands, groundWarn x${o.warnSounds}`);
+        else pass(name, `${o.id} at ${o.m} m: announced ${Math.round(o.dx)} px / ${o.leadS.toFixed(2)} s out, off screen, ${o.drawn} draw commands, groundWarn x${o.warnSounds} (frame ${o.frames} of the fixed-step run)`);
       } finally {
         await page.close();
       }
@@ -4091,6 +4115,150 @@ async function main() {
           else pass(names.pu, `${run}: at ${pu.m} m; ${L.without.ang} deg landing: crash without, sloppy with +${L.tolDeg} deg; bouncySpring touchdown restitution ${bo.bare.rest.toFixed(4)} -> ${bo.railed.rest.toFixed(4)} with Rails (rebound ${bo.bare.up} -> ${bo.railed.up} px/s, airborne frames ${bo.bare.air} -> ${bo.railed.air})`);
         }
       }
+    }
+
+    // ---- B4 Sky Jellyfish: the bouncySpring rebound is FELT on the real sled, and the Stabilizer Rails damp the SAME landing.
+    //
+    // Three arms of ONE run (same seed, same x, same pose, same frame budget): the plain control (the same x and the
+    // same colliders, with NO zone mods - only getZoneDefs returns nothing, and it is restored right after), the
+    // bouncySpring zone, and the same zone with the run's REAL stabilizerRails pickup taken. The pose is the same in
+    // every arm - 200 px above the ground, 200 px/s along, 700 px/s down, aligned with the local slope.
+    // Nothing is suppressed: invulnerableMs stays 0, so a crash is a real crash and is reported.
+    // The measurement starts at the first bb:landing EVENT (a launch resets `grounded`, so "the first grounded frame"
+    // would measure the wrong thing): from there the real Matter body gives the upward speed along the slope normal
+    // (the rebound), the airborne frames, the height of the bounce and the number of bounces (a pogo).
+    // The B4 block above measures the ZONE's restitution; this block measures what the player feels, which is the
+    // landing rebound (BiomeEffects.springRebound) and not the body's restitution.
+    {
+      const nameFelt = 'B4 Sky Jellyfish Mountain: the bouncySpring rebound is felt on the real sled (same x and pose, three arms: no zone mods, spring zone, spring + Rails)';
+      const namePogo = 'B4 Sky Jellyfish Mountain: the spring rebound does not pogo (the chain of touchdowns stops)';
+      // the bar from the brief: a bounce you can feel is at least 50 px/s up and at least 5 airborne frames
+      const FELT_UP_PX_S = 50;
+      const FELT_AIR_FRAMES = 5;
+      const RAILS_CUT = 0.5; // the Rails must damp the same landing to at most half of it
+      const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+      try {
+        const o = await page.evaluate(async ({ seed, mask, frames }) => {
+          const g = window.__bbGame;
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          g.scene.start('TitleScene');
+          const t0 = Date.now();
+          let run = null;
+          let started = false;
+          while (Date.now() - t0 < 15000) {
+            const tt = g.scene.getScene('TitleScene');
+            if (!started && tt && !tt.starting) { started = true; tt.startRun(`${seed}@${mask}`); }
+            const rr = g.scene.getScene('RunScene');
+            if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) { run = rr; break; }
+            await wait(100);
+          }
+          if (!run) return { fatal: 'RunScene never produced a live sled' };
+          await wait(300);
+          if (run.sled.destroyed || !run.sled.inWorld || run.crashed) return { fatal: 'sled died before the probe' };
+          run.scene.pause();
+          const T = run.terrain;
+          const PX = (v) => (v * 1000) / (1000 / 60);
+          const vel = () => ({ x: PX(run.sled.body.velocity.x), y: PX(run.sled.body.velocity.y) });
+          let clock = run.runTimeMs;
+          const step = (n) => { for (let i = 0; i < n; i++) { clock += 16; run.update(clock, 16); } };
+          const slope = (x) => Math.atan2(T.heightAt(x + 10) - T.heightAt(x - 10), 20) * 180 / Math.PI;
+          // the frame loop's crash hand-off, recorded instead of ending the run (the crash itself is NOT suppressed)
+          const resolveCrash = run.resolveCrash;
+          const crashes = [];
+          run.resolveCrash = function () { crashes.push(this.pendingCrash && this.pendingCrash.cause); this.pendingCrash = null; };
+          const lands = [];
+          const onLand = (p) => lands.push({ q: p.quality, imp: Math.round(p.impactSpeedPxS), ang: Math.round(p.angleDeg) });
+          g.events.on('bb:landing', onLand);
+          try {
+            // the run's own bouncySpring zone and its own Stabilizer Rails
+            let zone = null;
+            for (let i = 0; i < 200 && !zone; i++) { const ch = T.getChunk(i); const z = ch.zones.find((q) => q.modId === 'bouncySpring'); if (z) zone = { ...z, chunk: i }; }
+            if (!zone) return { fatal: 'no bouncySpring zone in the first 200 chunks' };
+            let rails = null;
+            for (let i = 0; i < 200 && !rails; i++) { const ch = T.getChunk(i); const s = ch.powerups.find((q) => q.defId === 'stabilizerRails'); if (s) rails = { ch, sp: s }; }
+            // the colliders of the zone have to exist before the sled is dropped into it
+            for (let k = Math.max(0, zone.chunk - 3); k <= zone.chunk + 4; k++) if (!run.mesh.chunks.has(k)) run.takeChunk(T.getChunk(k));
+            if (rails && !run.mesh.chunks.has(rails.ch.index)) run.takeChunk(rails.ch);
+            const pu = rails ? (run.powerups.get(rails.ch.index) || []).find((e) => e.def.id === 'stabilizerRails') : null;
+            if (!pu) return { fatal: 'no stabilizerRails pickup in the first 200 chunks' };
+            const zx = Math.round((zone.x0 + zone.x1) / 2);
+            const H = 200; const VX = 200; const VY = 700;
+            /**
+             * One arm: the same pose, the same frames, from a clean state.
+             * mode 'plain' = the plain control (the same x and colliders, no zone mods), 'zone' = the zone,
+             * 'rails' = the zone with the run's real Stabilizer Rails pickup.
+             */
+            const trial = (arm, mode) => {
+              const T0 = Math.ceil((clock + 60000) / 1000) * 1000;
+              run._resetBiomeEffects();
+              run.runTimeMs = T0; clock = T0; run.hitStopMs = 0; run.slowmoMs = 0; run.boostMs = 0; run.sled.boostMs = 0;
+              run.sled.invulnerableMs = 0; run.pendingCrash = null; run.crashed = false;
+              crashes.length = 0; lands.length = 0;
+              const zoneDefs = run.getZoneDefs;
+              if (mode === 'plain') run.getZoneDefs = () => [];
+              try {
+                if (mode === 'rails') { pu.collected = false; run.onPowerUp(pu); }
+                run.sled.setPose(zx, T.heightAt(zx) - H, slope(zx), VX, VY);
+                let landedAt = -1; let up = 0; let air = 0; let lift = 0; let base = 0; let bounces = 0; let wasAir = false;
+                let share = null; let zoneIds = null; const peaks = [];
+                for (let f = 0; f < frames; f++) {
+                  const nl = lands.length;
+                  step(1);
+                  const sl = run.sled;
+                  if (landedAt < 0 && lands.length > nl) {
+                    landedAt = f;
+                    base = T.heightAt(sl.x) - sl.y;
+                    zoneIds = run.getZoneDefs(sl.x).map((d) => d.id).join(',');
+                    share = run.currentPhys ? +run.currentPhys.landingRebound.toFixed(4) : null;
+                  }
+                  if (landedAt >= 0) {
+                    const n = Math.atan2(T.heightAt(sl.x + 10) - T.heightAt(sl.x - 10), 20);
+                    const vv = vel();
+                    const u = -(vv.y * Math.cos(n) - vv.x * Math.sin(n)); // upward along the slope normal
+                    if (u > up) up = u;
+                    if (!sl.grounded) { air++; if (!wasAir) { bounces++; peaks.push(Math.round(u)); } wasAir = true; } else wasAir = false;
+                    const l = T.heightAt(sl.x) - sl.y - base;
+                    if (l > lift) lift = l;
+                  }
+                  if (crashes.length) break;
+                }
+                const out = {
+                  arm, mode, x: zx, up: Math.round(up), air, liftPx: Math.round(lift), bounces, peaks,
+                  crash: crashes.slice(), lands: lands.slice(), zoneIds, share, settled: !!run.sled.grounded,
+                };
+                return out;
+              } finally { run.getZoneDefs = zoneDefs; run._resetBiomeEffects(); }
+            };
+            const plain = trial('no zone mods (plain control)', 'plain');
+            const zoneArm = trial('spring zone', 'zone');
+            const railed = trial('spring zone + Rails', 'rails');
+            const again = trial('spring zone', 'zone'); // the same arm again: the pose must be repeatable
+            return { seed: run.seed, mask: run.biomeMask, zone: { x0: zone.x0, x1: zone.x1, chunk: zone.chunk }, plain, zoneArm, railed, again };
+          } catch (e) { return { fatal: String(e && e.stack || e) }; }
+          finally { g.events.off('bb:landing', onLand); run.resolveCrash = resolveCrash; }
+        }, { seed: 'b4jelly54', mask: 128, frames: 120 }).catch((e) => ({ fatal: String(e) }));
+        if (o.fatal) { fail(nameFelt, o.fatal); fail(namePogo, o.fatal); }
+        else if (errors.length) { fail(nameFelt, `page errors: ${errors.join(' | ')}`); fail(namePogo, `page errors: ${errors.join(' | ')}`); }
+        else {
+          const z = o.zoneArm; const p = o.plain; const r = o.railed; const again = o.again;
+          const arm = (a) => `up ${a.up} px/s, ${a.air} airborne frames, ${a.liftPx} px high, ${a.bounces} bounce(s), crash ${JSON.stringify(a.crash)}, landing ${JSON.stringify(a.lands[0] || null)}`;
+          const same = JSON.stringify({ up: z.up, air: z.air, liftPx: z.liftPx, bounces: z.bounces }) === JSON.stringify({ up: again.up, air: again.air, liftPx: again.liftPx, bounces: again.bounces });
+          if (o.seed !== 'b4jelly54' || o.mask !== 128) fail(nameFelt, `the run is ${o.seed}@${o.mask}, not b4jelly54@128`);
+          else if (!same) fail(nameFelt, `the zone arm is not repeatable: ${arm(z)} then ${arm(again)}`);
+          else if (p.x !== z.x || r.x !== z.x) fail(nameFelt, `the arms are not comparable: x ${p.x}, ${z.x}, ${r.x}`);
+          else if (z.zoneIds !== 'bouncySpring' || p.zoneIds !== '') fail(nameFelt, `the arms are not comparable: the zone arm landed in "${z.zoneIds}", the plain control in "${p.zoneIds}"`);
+          else if (!p.lands.length || !z.lands.length || !r.lands.length) fail(nameFelt, `an arm never landed: plain ${arm(p)}, zone ${arm(z)}, railed ${arm(r)}`);
+          else if (p.lands[0].imp !== z.lands[0].imp) fail(nameFelt, `the plain control and the zone arm did not land the same: impact ${p.lands[0].imp} vs ${z.lands[0].imp} px/s`);
+          else if (z.up < FELT_UP_PX_S || z.air < FELT_AIR_FRAMES) fail(nameFelt, `the spring zone is not felt: ${arm(z)} (want >= ${FELT_UP_PX_S} px/s up and >= ${FELT_AIR_FRAMES} airborne frames)`);
+          else if (p.up >= FELT_UP_PX_S || p.up >= z.up * RAILS_CUT) fail(nameFelt, `the plain control bounces too: ${arm(p)} against the zone's ${arm(z)}`);
+          else if (r.up > z.up * RAILS_CUT || r.air >= z.air) fail(nameFelt, `the Stabilizer Rails do not damp the same landing: ${arm(r)} against the zone's ${arm(z)}`);
+          else if (p.crash.length || z.crash.length || r.crash.length) fail(nameFelt, `an arm crashed: plain ${JSON.stringify(p.crash)}, zone ${JSON.stringify(z.crash)}, railed ${JSON.stringify(r.crash)}`);
+          else pass(nameFelt, `run ${o.seed}@${o.mask}: the same pose (x ${z.x}, 200 px up, 200 px/s along, 700 px/s down) and the same frames in three arms, nothing suppressed - no zone mods: ${arm(p)}; spring zone: ${arm(z)}; spring + Rails: ${arm(r)} (rebound share ${z.share} -> ${r.share})`);
+          if (z.bounces > 3 || !z.settled) fail(namePogo, `the spring zone pogos: ${z.bounces} bounces, settled ${z.settled}`);
+          else if (r.bounces > 0 && !r.settled) fail(namePogo, `the railed arm pogos: ${r.bounces} bounces, settled ${r.settled}`);
+          else pass(namePogo, `run ${o.seed}@${o.mask}: the spring zone bounced ${z.bounces} time(s) and settled (peaks ${JSON.stringify(z.peaks)}); the railed arm bounced ${r.bounces} time(s) and settled`);
+        }
+      } finally { await page.close(); }
     }
 
   } finally {
