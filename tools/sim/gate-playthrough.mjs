@@ -1952,14 +1952,18 @@ async function main() {
             if (!run.mesh.chunks.has(f.ch.index)) run.takeChunk(f.ch);
             const h = (run.hazards.get(f.ch.index) || []).find((e) => e.def.id === hazardId && e.spawn.x === f.sp.x);
             if (!h) return { fatal: 'hazard entity not built' };
-            const x = h.x0 - ACT - 520;
+            const v = 520;
+            const res = { m: Math.round(h.x0 / 20), samples: [], gate: [], teleAt: null };
+            // a gate is approached 4 times, each start 0.35 s of travel farther back, so the predicted arrivals sweep its
+            // whole 1.4 s cycle (one approach at constant speed sees a nearly constant arrival and so one verdict)
+            const passes = h.motion && h.motion.kind === 'gate' ? 4 : 1;
+            for (let pass = 0; pass < passes; pass++) {
+            const x = h.x0 - ACT - 520 - pass * 0.35 * v;
             run.streamTerrain(x);
             const ang = run.slopeAt(x);
-            const v = 520;
             run.sled.setPose(x, run.terrain.heightAt(x) - 18, ang, Math.cos((ang * Math.PI) / 180) * v, Math.sin((ang * Math.PI) / 180) * v);
             if (run.snapCamera) run.snapCamera();
-            const res = { m: Math.round(h.x0 / 20), samples: [], gate: [], teleAt: null };
-            for (let i = 0; i < 260; i++) {
+            for (let i = 0; i < 320; i++) {
               step();
               if (h.destroyed || run.sled.x > h.cx) break;
               if (h.teleAtMs != null && res.teleAt === null) res.teleAt = { dx: Math.round(h.cx - run.sled.x), onScreen: h.cx - h.w / 2 < run._view.right };
@@ -1978,6 +1982,7 @@ async function main() {
                 const clearOfChange = nc > 2 * margin || !h.isPassable(mk.arrivalMs - margin);
                 res.gate.push({ verdict: mk.gate, state: mk.state, color: mk.color, passable: h.isPassable(mk.arrivalMs), clearOfChange, wide: nc > 2 * margin });
               }
+            }
             }
             return res;
           }, { seedMask, hazardId, ACT, margin: GROUND_WARN.gateMarginMs });
