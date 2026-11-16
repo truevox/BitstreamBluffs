@@ -74,13 +74,13 @@ describe('BiomeEffects.springReboundVelocity (slope-normal, no forward energy)',
         const after = springReboundVelocity(vx, vy, angle, up);
         expect(tangent(after, angle)).toBeCloseTo(tangent(before, angle), 9);
         expect(outwardNormal(after, angle)).toBeCloseTo(Math.max(outwardNormal(before, angle), up), 9);
-        // a rebound may never inject speed along the slope (the old global launchUp did on descents)
+        // a rebound may never inject speed along the slope (a global vertical launch changes this component)
         expect(Math.abs(tangent(after, angle))).toBeLessThanOrEqual(Math.abs(tangent(before, angle)) + 1e-9);
       }
     }
   });
 
-  test('a downhill 600 px/s roll plus a 120 px/s rebound is 600 / 120, not the 848 px/s the old global launch made', () => {
+  test('a downhill 600 px/s roll keeps its tangent and gains only the requested 120 px/s normal rebound', () => {
     const a = (30 * Math.PI) / 180;
     const out = springReboundVelocity(600 * Math.cos(a), 600 * Math.sin(a), 30, 120);
     expect(tangent(out, 30)).toBeCloseTo(600, 9);

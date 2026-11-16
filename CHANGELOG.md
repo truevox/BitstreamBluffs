@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- **The Sky Jellyfish bounce stays on the slope.** A scored landing in a `bouncySpring` zone now uses a slope-normal rebound: the along-slope velocity is preserved and only the outward normal component is raised (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). The old global `launchUp` added the rebound as pure vertical speed, so on a descent forward motion became extra bounce (600 px/s downhill + 120 px/s rebound read 848 px/s). Bounce pads still use `launchUp`, and the Stabilizer Rails still damp the share. Tests cover slopes and assert no tangential energy is injected.
+- **Sky Jellyfish springs now visibly rebound on scored landings.** The rebound returns a bounded share of impact speed, follows the ground normal, and preserves along-slope velocity (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). Stabilizer Rails damp the rebound; bounce pads retain their existing launch behaviour.
+- **Built-game checks measure the effect on the sled.** The same landing is compared without a zone, with the spring, and with Rails, using normal collision handling. The ground-warning check uses bounded fixed steps instead of a load-sensitive wall-clock deadline.
 
 ## v2.15.0 - decision 5: every biome in the Daily rotation (2026-11-16)
 
