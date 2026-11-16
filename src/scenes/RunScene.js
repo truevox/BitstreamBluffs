@@ -1131,14 +1131,17 @@ export class RunScene extends Phaser.Scene {
 
   /**
    * Sky Jellyfish felt bounce: a scored (non-crash) landing inside a zone with `physics.landingRebound` throws the sled
-   * back up by BiomeEffects.springRebound of its impact speed (bounded, decaying; the Rails damp the share in
-   * PhysicsTuner). Runs after the landing boost, so a sloppy wobble's velocity cut does not eat the rebound.
+   * back away from the landing slope by BiomeEffects.springRebound of its impact speed (bounded, decaying; the Rails
+   * damp the share in PhysicsTuner). Sled.launchNormal preserves the along-slope velocity, so a descent never turns
+   * forward speed into extra bounce. Runs after the landing boost, so a sloppy wobble's velocity cut does not eat the
+   * rebound.
    */
   applySpringRebound(l, fs) {
     const share = this.currentPhys ? this.currentPhys.landingRebound : 0;
     const up = springRebound(l.impactSpeedPxS || 0, share);
     if (!(up > 0)) return;
-    this.sled.launchUp(up);
+    const angle = fs && Number.isFinite(fs.groundAngleDeg) ? fs.groundAngleDeg : this.sled.groundAngleDeg;
+    this.sled.launchNormal(up, Number.isFinite(angle) ? angle : 0);
     if (fs) this.fx.ring(fs.x, fs.y + 8, this.palette.lime, 20, 260);
   }
 

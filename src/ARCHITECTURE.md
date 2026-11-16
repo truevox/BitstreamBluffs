@@ -343,6 +343,12 @@ All additive; no public signature changed.
   Manual Shift reset: `RESPAWN reason 'manual'`, ends timed power-ups with `POWERUP_EXPIRED reason 'respawn'`.
 * **Extra emissions**: `HUD_SPEED_EVENT` ~10 Hz; `audio.playSfx('hop'|'push')` and `audio.setSpeed()` from RunScene.
 * **Entity files added**: `entities/Background.js` (parallax), `entities/Fx.js` (pooled shards/sparks/rings).
+* **Slope-normal landing rebound** (additive): `BiomeEffects.springReboundVelocity(vx, vy, groundAngleDeg, upPxS)` keeps
+  the along-slope velocity and raises the outward normal component to `max(existing outward, upPxS)`; a non-positive
+  `upPxS` is a no-op. `Sled.launchNormal(upPxS, groundAngleDeg)` applies it through `Body.setVelocity` in Matter 0.20
+  base-step units and resets contact/snap state like `launchUp`. `RunScene.applySpringRebound` uses it once per scored
+  (non-crash) landing with `fs.groundAngleDeg`, so a `bouncySpring` descent cannot turn forward speed into extra bounce;
+  bounce pads keep `Sled.launchUp`.
 
 ## Integration / QA addenda (QA engineer; additive, nothing in sections 1-9 changed)
 

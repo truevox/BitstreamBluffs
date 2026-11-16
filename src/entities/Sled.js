@@ -11,6 +11,7 @@
 import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
 import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyserStep } from '../systems/PhysicsTuner.js';
+import { springReboundVelocity } from '../systems/BiomeEffects.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -368,6 +369,26 @@ export class Sled {
     if (!this.inWorld) return;
     const v = Body.getVelocity(this.body);
     Body.setVelocity(this.body, { x: v.x, y: Math.min(v.y, -fromPxS(upPxS)) });
+    this.msSinceContact = TUNING.groundedGraceMs + 1;
+    this._sinceLaunchMs = 0;
+    this.chuteUsed = false;
+    this._sync();
+  }
+
+  /**
+   * Spring rebound along the ground normal (Sky Jellyfish bouncySpring): keep the along-slope velocity and raise the
+   * outward normal component to at least `upPxS` (BiomeEffects.springReboundVelocity). Matter 0.20 normalises
+   * Body.setVelocity to the 1000/60 ms base step, so convert px/s with fromPxS. Resets contact/snap state like
+   * launchUp, but never converts forward speed into extra bounce on a slope.
+   * @param {number} upPxS desired outward normal speed, positive = away from the ground.
+   * @param {number} groundAngleDeg slope under the sled (deg, clockwise positive = descending right).
+   * @returns {void}
+   */
+  launchNormal(upPxS, groundAngleDeg) {
+    if (!this.inWorld || !this.body) return;
+    const v = Body.getVelocity(this.body);
+    const next = springReboundVelocity(toPxS(v.x), toPxS(v.y), groundAngleDeg, upPxS);
+    Body.setVelocity(this.body, { x: fromPxS(next.vx), y: fromPxS(next.vy) });
     this.msSinceContact = TUNING.groundedGraceMs + 1;
     this._sinceLaunchMs = 0;
     this.chuteUsed = false;

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **The Sky Jellyfish bounce stays on the slope.** A scored landing in a `bouncySpring` zone now uses a slope-normal rebound: the along-slope velocity is preserved and only the outward normal component is raised (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). The old global `launchUp` added the rebound as pure vertical speed, so on a descent forward motion became extra bounce (600 px/s downhill + 120 px/s rebound read 848 px/s). Bounce pads still use `launchUp`, and the Stabilizer Rails still damp the share. Tests cover slopes and assert no tangential energy is injected.
+
 ## v2.15.0 - decision 5: every biome in the Daily rotation (2026-11-16)
 
 - **The Daily now features all 11 biomes** (Marvin's decision 5). From 2026-11-17 (UTC) the Daily biome mask follows a 15-day cycle anchored at that date: the six newly treated W6 biomes premiere first (Space Mountain, Candy Cane Canyon, Sky Jellyfish, Steampunk Slopes, Micro Mountain, Vertigo Vents), each followed by a clear day until the last pair, then the five batch-1 biomes. Four clear days per cycle.

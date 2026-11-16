@@ -116,7 +116,7 @@ const landable = (s) => {
   return s;
 };
 const LAND = { quality: 'crash', angleDeg: TUNING.forgiveAngleDeg + 6, impactSpeedPxS: 450, airtimeMs: 900 };
-const FS = { x: 1000, y: 0, vx: 300, vy: 0 };
+const FS = { x: 1000, y: 0, vx: 300, vy: 0, groundAngleDeg: 22 };
 
 describe('B4 hazards through RunScene.onHazard (shipped defs)', () => {
   test('Meteor: a hit queues a crash named meteor (the killer death legibility shows)', () => {
@@ -298,44 +298,45 @@ describe('B4 drawing: every new shapeKey has its own routine', () => {
 
 describe('Sky Jellyfish felt bounce through RunScene.handleTricksAndLanding (shipped bouncySpring def)', () => {
   const GOOD = { quality: 'good', angleDeg: 3, impactSpeedPxS: 500, airtimeMs: 600 };
-  /** A landable run whose sled records launchUp, with the frame tuner as update() leaves it. */
+  /** A landable run whose sled records the slope-normal rebound, with the frame tuner as update() leaves it. */
   const springy = (zones, rails = false) => {
     const s = landable(makeRun({ zones }));
-    s.ups = [];
-    s.sled.launchUp = (v) => { s.ups.push(v); };
+    s.calls = [];
+    s.sled.launchNormal = (up, angleDeg) => { s.calls.push([up, angleDeg]); };
     if (rails) s.onPowerUp(take('stabilizerRails'));
     s.currentPhys = phys(s);
     return s;
   };
 
-  test('a scored landing in a bouncySpring zone rebounds once, by the shipped share of its impact speed', () => {
+  test('a scored landing in a bouncySpring zone rebounds once along the landing slope normal', () => {
     const s = springy([C.terrainMods.bouncySpring]);
     s.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
-    expect(s.ups).toEqual([springRebound(500, C.terrainMods.bouncySpring.physics.landingRebound)]);
-    expect(s.ups[0]).toBeGreaterThanOrEqual(100);
+    const up = springRebound(500, C.terrainMods.bouncySpring.physics.landingRebound);
+    expect(s.calls).toEqual([[up, FS.groundAngleDeg]]);
+    expect(s.calls[0][0]).toBeGreaterThanOrEqual(100);
   });
 
   test('negative controls: plain ground, a crash landing and an unscored touchdown give no rebound', () => {
     const plain = springy([]);
     plain.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
-    expect(plain.ups).toEqual([]);
+    expect(plain.calls).toEqual([]);
     const crash = springy([C.terrainMods.bouncySpring]);
     crash.handleTricksAndLanding({ tricks: [], landing: { ...GOOD, angleDeg: 120, quality: 'crash' } }, FS);
-    expect(crash.ups).toEqual([]);
+    expect(crash.calls).toEqual([]);
     expect(crash.pendingCrash).toEqual({ cause: 'badLanding' });
     const none = springy([C.terrainMods.bouncySpring]);
     none.handleTricksAndLanding({ tricks: [] }, FS);
-    expect(none.ups).toEqual([]);
+    expect(none.calls).toEqual([]);
   });
 
   test('with the Stabilizer Rails the same landing rebounds far less (here: not at all), and the bounce is back after 5 s', () => {
     const s = springy([C.terrainMods.bouncySpring], true);
     s.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
     const bare = springRebound(500, C.terrainMods.bouncySpring.physics.landingRebound);
-    expect(s.ups.reduce((a, b) => a + b, 0)).toBeLessThan(bare * 0.5);
+    expect(s.calls.reduce((a, [up]) => a + up, 0)).toBeLessThan(bare * 0.5);
     s.tickEffects(5001);
     s.currentPhys = phys(s);
     s.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
-    expect(s.ups[s.ups.length - 1]).toBeCloseTo(bare, 9);
+    expect(s.calls[s.calls.length - 1]).toEqual([bare, FS.groundAngleDeg]);
   });
 });
