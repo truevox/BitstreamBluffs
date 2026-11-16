@@ -122,11 +122,20 @@ def decode(audio):
 	}
 
 def main():
-	assert len(sys.argv)==3,'Usage: extract.py guitar.flac output.json'
-	infile=Path(sys.argv[1])
-	outfile=Path(sys.argv[2])
+	import argparse
+	p=argparse.ArgumentParser(description=__doc__)
+	p.add_argument('input',type=Path,help='Original separated source stem')
+	p.add_argument('output',type=Path,help='Private note-event JSON')
+	p.add_argument('--start',type=float,default=4.5,help='Excerpt offset in full song')
+	p.add_argument('--seconds',type=int,default=32)
+	a=p.parse_args()
+	infile=a.input
+	outfile=a.output
 	assert infile.is_file()
-	notes=decode(load(infile))
+	assert a.seconds==32,'Currently 32-second passages only'
+	notes=decode(load(infile,a.start,a.seconds))
+	notes['excerptStartSeconds']=a.start
+	notes['sourceStem']=str(infile)
 	outfile.write_text(json.dumps(notes,indent=2)+'\n')
 	print('EXTRACTED',notes['notesCount'],'events',notes['coveredSeconds'],'seconds',
 		'peak_polyphony',notes['polyphonyMax'],flush=True)

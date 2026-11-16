@@ -741,3 +741,35 @@ featured solo, blend and absence of browser/audio errors.
 Reproducible scripts and source/derived audio paths documented in
 tools/music/audio-first-lab/README.md. No game-engine, BSOD chase,
 public release audio, music masters or model weights changed.
+
+## 2026-11-16 latest — finished first-draft sampled drums/Piano/Other/Candy
+
+Owner asked us to continue source-first SOUND work: make eleven
+actual percussion kits for each test song, eleven sampled piano
+sounds for One More Run, eleven sampled Other instruments for Pope
+and new, distinct Candy Cane melodic voice. Preserve all previous
+guitar and bass performances, which the owner has not listened to.
+
+On the same private three-song audio laboratory at
+http://100.115.120.66:8185/ there are now 231 Ogg clips.
+57 newly rendered clips comprise 33 distinct native FluidR3
+airborne percussion performances triggered from original isolated
+drum hits, 11 sampled piano renditions, 11 sampled Other renditions,
+and 2 new Candy Cane Sugar Pop marimba/bubble melodic excerpts.
+All prior source/variant paths untouched and available.
+The PERFECT Pyramid Peak melody remains completely unchanged.
+
+The audio-only webpage now adds independent version selectors
+for sampled vs earlier effects-only Drums, sampled vs earlier
+effects-only Featured Piano/Other, and new vs previous Candy
+melodic instrument (shown only in Candy on songs with synthetic
+lead). Both bass approaches and eleven previously delivered
+sampled Guitar instruments remain available with original/50-50/
+biome blends and family Solo.
+
+Original score clock aligned, but automatic hit classification
+and polyphonic Piano/Other note extraction are approximate.
+This is a first-draft sound preview, not approved score or
+complete 33-song release. Existing private game at :8184,
+public game engine and real BSOD chase unchanged. Reproducible
+source and limitations: tools/music/audio-first-lab/README.md.

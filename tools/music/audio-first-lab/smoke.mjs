@@ -16,6 +16,8 @@ try{
  await page.waitForFunction(()=>window.__fourFamilyLab?.getState().song==='pope',{timeout:12000});
  console.log('READY',JSON.stringify(await state()));
  console.log('BIOMES',await page.locator('.mountain').count());
+ if(!(await page.locator('.candy-only').isHidden()))
+  throw Error('Candy version selector must be hidden outside Candy biome');
  await page.locator('.mountain[data-biome="crystal-cavern"]').click();
  await page.locator('#play').click();
  await page.waitForFunction(()=>{
@@ -24,6 +26,44 @@ try{
      p.biome==='crystal-cavern' && p.playing && !p.error;
  },{timeout:45000});
  await page.waitForTimeout(1000);
+ const initialPope=await state();
+ if(!initialPope.deckPaths.some(p=>p.includes('/drums-sampled/crystal-cavern.ogg')))
+  throw Error('NEW sampled drum kit did not load as default');
+ if(!initialPope.deckPaths.some(p=>p.includes('/featured-sampled/crystal-cavern.ogg')))
+  throw Error('NEW sampled Other-family instrument did not load');
+ console.log('POPE_NEW_SAMPLED_DRUMS_AND_OTHER',JSON.stringify(initialPope));
+ await page.locator('#drumsMode').selectOption('dsp');
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().deckPaths?.some(p=>
+  p.includes('/drums/crystal-cavern.ogg')),{timeout:30000});
+ console.log('OLD_AIR_DRUMS_RETAINED',JSON.stringify(await state()));
+ await page.locator('#drumsMode').selectOption('sampled');
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().deckPaths?.some(p=>
+  p.includes('/drums-sampled/crystal-cavern.ogg')),{timeout:30000});
+ await page.locator('#featuredMode').selectOption('dsp');
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().deckPaths?.some(p=>
+  p.includes('/featured/crystal-cavern.ogg')),{timeout:30000});
+ console.log('OLD_FEATURED_DSP_RETAINED',JSON.stringify(await state()));
+ await page.locator('#featuredMode').selectOption('sampled');
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().deckPaths?.some(p=>
+  p.includes('/featured-sampled/crystal-cavern.ogg')),{timeout:30000});
+ await page.locator('.mountain[data-biome="candy-cane-canyon"]').click();
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().deckPaths?.some(p=>
+  p.includes('/melody-candy-v3/candy-cane-canyon.ogg')),{timeout:30000});
+ console.log('NEW_SUGAR_POP_MELODY',JSON.stringify(await state()));
+ if(!(await page.locator('.candy-only').isVisible()))
+  throw Error('Candy selector was not displayed for correct song/biome');
+ await page.locator('#candyMode').selectOption('legacy');
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().deckPaths?.some(p=>
+  p.includes('/melody/candy-cane-canyon.ogg')),{timeout:30000});
+ console.log('OLD_CANDY_LEAD_RETAINED',JSON.stringify(await state()));
+ await page.locator('#candyMode').selectOption('new');
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().deckPaths?.some(p=>
+  p.includes('/melody-candy-v3/candy-cane-canyon.ogg')),{timeout:30000});
+ await page.locator('.mountain[data-biome="crystal-cavern"]').click();
+ if(!(await page.locator('.candy-only').isHidden()))
+  throw Error('Candy-only selector still visible after changing biome');
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().deckBiome==='crystal-cavern',
+  {timeout:30000});
  console.log('POPE_CRYSTAL_PLAYING',JSON.stringify(await state()));
  for(const role of ['melody','bass','drums','featured']){
   await page.locator('.stem[data-role="'+role+'"] [data-value="50"]').click();
@@ -70,6 +110,11 @@ try{
  },{timeout:45000});
  await page.waitForTimeout(1000);
  console.log('OTHER_SONG_PLAYING',JSON.stringify(await state()));
+ const newPiano=await state();
+ if(!newPiano.deckPaths.some(p=>p.includes('/featured-sampled/space-mountain.ogg')))
+  throw Error('ONE MORE RUN sampled piano was not selected by default');
+ if(!newPiano.deckPaths.some(p=>p.includes('/drums-sampled/space-mountain.ogg')))
+  throw Error('ONE MORE RUN sampled air drums were not selected by default');
  const info=await page.locator('#featuredInfo').innerText();
  if(!info.includes('PIANO'))throw Error('One More Run featured piano not displayed: '+info);
  await page.screenshot({path:'/tmp/bb-4family-audio-first-lab.png',fullPage:true});
@@ -95,6 +140,10 @@ try{
    p?.deckPaths?.some(x=>x.includes('/featured/space-mountain.ogg')) && p.playing;
  },{timeout:45000});
  const guitarState=await state();
+ if(!(await page.locator('#featuredMode').isDisabled()))
+  throw Error('Sampled Guitar should not show unavailable older-effects version');
+ if(!guitarState.deckPaths.some(p=>p.includes('/drums-sampled/space-mountain.ogg')))
+  throw Error('Guitar third song sampled drums missing');
  if(!guitarState.deckInputs.includes('original:guitar')||!guitarState.deckInputs.includes('biome:featured'))
   throw Error('Third track missing original vs sampled guitar');
  if(!(await page.locator('.stem[data-role="melody"] input[type=range]').isDisabled()))
@@ -119,7 +168,8 @@ try{
  if(paused.audioState!=='running')throw Error('Audio context unexpectedly interrupted');
  if(errors.length)throw Error(errors.join('\n'));
  console.log('PASS_PRIVATE_AUDIO_AB_LAB',JSON.stringify({
-  songs:3,biomes:await page.locator('.mountain').count(),guitarShowcase:true,
+   songs:3,biomes:await page.locator('.mountain').count(),guitarShowcase:true,
+  newDrumKits:33,otherInstruments:11,pianoInstruments:11,candyNewMelodies:2,allPreviousPreserved:true,
   mixedStemFamilies:4,originalAndBiomeBlend:true,
   simulatedBSOD:true,simulatedSpeed:true,featuredOneMoreRun:'piano',
   seekSeconds:Math.round(now.position),

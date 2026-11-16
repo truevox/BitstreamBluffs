@@ -11,7 +11,8 @@ const mix={melody:100,bass:100,drums:100,featured:100};
 const loaded=new Map();const LIMIT=22;
 const HOME='bitstream-bluffs';
 let catalog=null,song=null,biome=HOME;
-let ctx=null,buses=null,playing=false,position=0,deck=null,epoch=0,error=null,solo=null,bassMode='sampled';
+let ctx=null,buses=null,playing=false,position=0,deck=null,epoch=0,error=null,solo=null;
+let bassMode='sampled',drumsMode='sampled',featuredMode='sampled',candyMode='new';
 const roleCard=name=>document.querySelector('.stem[data-role="'+name+'"]');
 const biomeLabel=id=>catalog?.biomes?.find(x=>x.id===id)?.label||id;
 const status=(message,bad=false)=>{
@@ -71,12 +72,16 @@ function getSpecs(){
    group:role==='melody'?'melody':stem,role,kind:'original'});
  }
  if(s.melodyVariants!==false){
-  out.push({key:'biome:melody',path:s.id+'/melody/'+b+'.ogg',
+  const folder=(b==='candy-cane-canyon'&&candyMode==='new')?'melody-candy-v3':'melody';
+  out.push({key:'biome:melody',path:s.id+'/'+folder+'/'+b+'.ogg',
    group:'melody',role:'melody',kind:'biome'});
  }
  if(b!==HOME){
   for(const role of ['bass','drums','featured']){
-   const folder=role==='bass'&&bassMode==='dsp'?'bass-dsp':role;
+   const folder=role==='bass'?(bassMode==='dsp'?'bass-dsp':'bass'):
+    role==='drums'?(drumsMode==='dsp'?'drums':'drums-sampled'):
+    s.featured==='guitar'?'featured':
+    featuredMode==='dsp'?'featured':'featured-sampled';
    out.push({key:'biome:'+role,path:s.id+'/'+folder+'/'+b+'.ogg',
     group:role==='featured'?s.featured:role,role,kind:'biome'});
   }
@@ -94,7 +99,8 @@ function roleGain(item){
  const value=clamp(mix[item.role]/100);
  // Correlated A/B stems use LINEAR crossfade to avoid +3dB summation
  // at 50/50. Independent sampled melodies/basses use equal power.
- const correlated=item.role==='drums'||item.role==='featured'||
+ const correlated=(item.role==='drums'&&drumsMode==='dsp')||
+  (item.role==='featured'&&featuredMode==='dsp'&&song.featured!=='guitar')||
   (item.role==='bass'&&bassMode==='dsp');
  if(item.kind==='biome')return correlated?value:Math.sin(value*Math.PI/2);
  if(!hasVariant(item.role))return 1;
@@ -203,6 +209,23 @@ function renderInfo(){
  melodyDescription.textContent=newMelody?
   'Original isolated Maxi vocal ↔ biome melodic instrument. 50/50 allows both.':
   'GUITAR SHOWCASE: this song has only its original vocal. Twelve new melody voices have NOT been produced. Listen to the featured guitar alternatives instead.';
+ const candySelector=document.querySelector('.candy-only');
+ candySelector.hidden=!(newMelody&&biome==='candy-cane-canyon');
+ const kit=song.drumsInstruments?.[biome];
+ $('#drumsInfo').textContent=biome===HOME?
+  'Home: original drums remain unchanged (they fade when airborne in the planned game).':
+  drumsMode==='sampled'?
+   'Sampled airborne kit: '+(kit?.label||biome)+'; source drum-hit estimates, not a source EQ.':
+   'Previous airy version: original drum recording with atmospheric filtering and echoes.';
+ const feature=song.featuredInstruments?.[biome];
+ const featureTitle=feature?.name||feature?.instrument;
+ $('#featuredVersionInfo').textContent=song.featured==='guitar'?
+  'Guitar showcase: original sampled guitar instruments remain untouched. There was no earlier effects-only Guitar set on this song.':
+  featuredMode==='sampled'?
+   'NEW sampled '+song.featured+' performance: '+(featureTitle||biome)+
+   ' (note/chord transcription is preliminary).':
+   'PREVIOUS effects-only '+song.featured+' texture: the original recording with filter/reverb effects.';
+ $('#featuredMode').disabled=song.featured==='guitar';
  const bassName=song.bassInstruments?.[biome]?.description;
  $('#bassInfo').textContent=biome===HOME?'Original bass only in the home signal.':
   bassMode==='sampled'?'Sampled instrument: '+(bassName||'themed bass')+
@@ -326,6 +349,18 @@ function setup(){
   bassMode=e.target.value==='dsp'?'dsp':'sampled';
   renderInfo();rebuild(false);
  });
+ $('#drumsMode').addEventListener('change',e=>{
+  drumsMode=e.target.value==='dsp'?'dsp':'sampled';
+  renderInfo();rebuild(false);
+ });
+ $('#featuredMode').addEventListener('change',e=>{
+  featuredMode=e.target.value==='dsp'?'dsp':'sampled';
+  renderInfo();rebuild(false);
+ });
+ $('#candyMode').addEventListener('change',e=>{
+  candyMode=e.target.value==='legacy'?'legacy':'new';
+  renderInfo();rebuild(false);
+ });
  $('#play').addEventListener('click',()=>play(!playing));
  $('#restart').addEventListener('click',()=>rebuild(true));
  $('#seek').addEventListener('change',e=>{position=clamp(Number(e.target.value),0,song.durationSeconds);rebuild(false,position)});
@@ -336,7 +371,7 @@ function setup(){
  requestAnimationFrame(animate);
  window.__fourFamilyLab={
   getState:()=>({song:song?.id,biome,playing,position:currentPosition(),
-   mix:{...mix},solo,bassMode,simulatedBSOD:Number($('#bsod').value),speed:Number($('#speed').value),
+   mix:{...mix},solo,bassMode,drumsMode,featuredMode,candyMode,simulatedBSOD:Number($('#bsod').value),speed:Number($('#speed').value),
    deckInputs:deck?.inputs.map(x=>x.key)||[],deckPaths:deck?.inputs.map(x=>x.path)||[],deckSong:deck?.songId||null,deckBiome:deck?.biomeId||null,deckOffset:deck?.offset??null,audioState:ctx?.state||null,error}),
   setBlend,setBiome,setSong,setSolo,play,
   seek:(v)=>{position=clamp(v,0,song.durationSeconds);return rebuild(false,position)},

@@ -207,3 +207,93 @@ automatically transcribed polyphonic guitar notes may be imperfect:
 owner musical approval remains pending. Pyramid original existing
 melody and game engine, BSOD physics, other song assets, and all
 release/weight safety checks remain unchanged.
+
+## November 16: remaining ACTUAL sampled instrument families (latest)
+
+**Owner direction:** Complete eleven airborne drum kits, eleven piano
+instruments, eleven other instruments and genuinely distinct Candy
+Cane lead. Critically, retain ALL previous bass, guitar, source,
+melody and effect-only audio: these have not been audited by Marvin.
+
+### New sound assets, preserved alongside previous drafts
+
+- **33 NEW sampled percussion kit clips:** eleven nonhome airy GM bank
+  percussion kits across ALL THREE songs. From original separated
+  drum stems, detect onset times and approximate kick/snare/hat roles,
+  then trigger DIFFERENT native FluidR3 GM drum samples for each
+  biome. Source hit counts: Pope=157, One More Run=192 and Every
+  Hacker=103 across each 32-second excerpt. Source beat mapping is
+  preliminary; user listening is the final quality gate.
+- **11 NEW Piano-family actual samples:** source One More Run piano,
+  approximately 122 preliminary polyphonic note events, about 106
+  retained for render; eleven real SoundFont instruments, including
+  Crystal Cavern HoloPad and Steampunk Clockwork Upright.
+- **11 NEW Other-family actual samples:** source Pope Other, about 54
+  preliminary polyphonic note events and 50 rendered, instruments
+  including Candy Gumdrop Sequencer and Debumont Snowstrings.
+- **2 NEW Sugar Pop Candy melody clips**, one Pope and one One More
+  Run, from previously-established Gentle-score vocal melody notes.
+  Actually sampled GM Marimba + lower-level square synth plus
+  independent bouncing rubber-plop note attacks. Deliberately
+  NOT the old Candy GM81 saw lead, and no similarity to original
+  Pyramid GM61 brass lead intended. Original previous Candy and
+  PERFECT Pyramid are both fully preserved.
+
+New synced assets are additive, so there are **231 PRIVATE Ogg
+clips** across all three songs. Files went into independent
+new directories below the private CT223 listening lab:
+- /song/drums-sampled/biome.ogg — new actual sampled percussion.
+- /pope/featured-sampled/biome.ogg — new sampled Other.
+- /one-more-run/featured-sampled/biome.ogg — new sampled Piano.
+- /song/melody-candy-v3/candy-cane-canyon.ogg — NEW Sugar Pop
+  for Pope and One More Run only.
+
+Old drum and featured versions remain at the ORIGINAL paths
+/song/drums/biome.ogg and /song/featured/biome.ogg. Both existing
+bass folders (bass and bass-dsp) and eleven earlier guitar
+samples for Every Hacker remain unchanged. The prior Candy lead
+remains /song/melody/candy-cane-canyon.ogg. All six source
+recordings for each song remain unchanged.
+
+**All version controls are now wired:** AIR DRUMS has NEW sampled
+vs OLD effects; FEATURED has NEW sampled vs OLD effects for Pope
+and One More Run, while Guitar remains its original sampled version;
+CANDY has NEW Sugar Pop vs OLD Candy only when there is an actual
+synthetic melody and Candy biome selected. Original/50-50/Biome
+blend for all four families, solo, song/biome choice, Bass V1/V2
+selection, BSOD and speed sound-only manual test knobs all remain.
+All three changes default to NEW but are reversible without
+restarting or losing the place in the song.
+
+### Reproduction & provenance, NOT Git media
+
+Native sampled audio generation is fully reproducible via:
+- render_sampled_air_drums.py, with original DRUM source and start.
+- render_sampled_featured.py, with original Piano/Other source
+  and note-estimation source from extract_polyphonic_guitar.py
+  (now supports --start for generic source stems).
+- render_candy_melody_v3.py, with the old approved gentle/notes.json
+  for Pope or One More Run.
+All are under tools/music/audio-first-lab. These are SOURCE ONLY;
+rendered assets, weights, original music and any protected data are
+outside Git. Scripts use Python tabs.
+
+Private CT211 rendered roots:
+- /root/bitstream-maxi/private-sampled-drums-20261116
+- /root/bitstream-maxi/private-featured-samples-20261116
+- /root/bitstream-maxi/private-candy-sugar-pop-v3-20261116
+
+The listener stays the SAME Tailscale-only page at
+http://100.115.120.66:8185/ with private source audio in
+/home/hermes/experiments/bitstream-audio-first-4x12-20261116/site.
+
+**QA:** Actual Chromium verified new sampled drum and feature
+source paths in both original two songs, old V1 drum/featured
+switches and back during playback, original bass switching,
+NEW and old Candy lead selections and return, guitar preserved
+as sampled in the third song, correct hidden Candy selector when
+not in Candy biome, 10/9 source count as appropriate, no JS or
+HTTP errors. Independently checked 22 new-vs-old audio pairs:
+nonzero audio, safe peaks, and distinct waveform samples.
+No game chase/physics or public soundtrack modifications; this
+is first draft AUDIO, pending user listening approval.
