@@ -25,9 +25,18 @@ describe('BiomeEffects.springRebound (pure)', () => {
     expect(springRebound(-500, 0.3)).toBe(0);
   });
 
-  test('the rebound is the share of the impact speed, inside the bounds', () => {
+  test('the rebound is the share of the impact speed above the felt floor', () => {
     expect(springRebound(500, 0.3)).toBeCloseTo(150, 9);
-    expect(springRebound(300, 0.3)).toBeCloseTo(90, 9);
+    expect(springRebound(300, 0.3)).toBe(0);
+  });
+
+  test('the felt floor is 120 px/s, inclusive: 500*.2 is quiet, 600*.2 and 800*.2 are felt', () => {
+    expect(SPRING_REBOUND_MIN_PX_S).toBe(120);
+    expect(springRebound(500, 0.2)).toBe(0);
+    expect(springRebound(600, 0.2)).toBeCloseTo(120, 9);
+    expect(springRebound(800, 0.2)).toBeCloseTo(160, 9);
+    // the Rails cut the share to 0.05: even an 801 px/s impact stays under the floor
+    expect(springRebound(801, 0.05)).toBe(0);
   });
 
   test('a small rebound is no rebound (it ends the chain), a big one is capped (never a launch)', () => {
@@ -121,15 +130,17 @@ describe('PhysicsTuner: landingRebound', () => {
     expect(e.landingRebound).toBeLessThanOrEqual(0.45);
     expect(MODS.bouncySpring.physics.bounceMul).toBe(1.9);
     expect(e.restitution).toBeCloseTo(0.02 * 1.9 * 1.9, 12);
-    // a normal 500 px/s touchdown in the zone rebounds at a felt speed
-    expect(springRebound(500, e.landingRebound)).toBeGreaterThanOrEqual(100);
+    // a strong 800 px/s touchdown in the zone rebounds at the felt 160 px/s the shrink-test measured
+    expect(springRebound(800, e.landingRebound)).toBeCloseTo(160, 9);
   });
 
   test('the Stabilizer Rails scale the share by bounceMul squared (as restitution): the same landing rebounds far less', () => {
     const bare = t.getEffective({ zones: [MODS.bouncySpring] }).landingRebound;
     const railed = t.getEffective({ zones: [MODS.bouncySpring], stabilizeBounceMul: RAILS }).landingRebound;
     expect(railed).toBeCloseTo(bare * RAILS * RAILS, 12);
-    expect(springRebound(500, railed)).toBeLessThan(springRebound(500, bare) * 0.5);
+    expect(springRebound(800, railed)).toBeLessThan(springRebound(800, bare) * 0.5);
+    // at the shipped share the railed 801 px/s impact (40 px/s) is below the 120 px/s floor: no rebound at all
+    expect(springRebound(801, railed)).toBe(0);
   });
 
   test('two overlapping spring zones do not compound into a bigger launch (the larger share wins)', () => {

@@ -137,8 +137,12 @@ export function stabilizeBounceMul(m) {
 
 // ------------------------------------------------------------------------------------------------ spring rebound
 
-/** A spring rebound slower than this is no rebound: it is what ends the chain of touchdowns (px/s). */
-export const SPRING_REBOUND_MIN_PX_S = 45;
+/**
+ * A spring rebound slower than this is no rebound: it is what ends the chain of touchdowns (px/s). 120 px/s is the
+ * floor that keeps the bounce visibly felt on the real sled without regressing the mask-128 hop survival baseline;
+ * below it a touchdown reads as ordinary ground (500 px/s at the shipped 0.2 share is 100 px/s and does not rebound).
+ */
+export const SPRING_REBOUND_MIN_PX_S = 120;
 /** A spring rebound never exceeds this (px/s, about 32 px of rise at 900 px/s^2): a bounce, never a launch. */
 export const SPRING_REBOUND_MAX_PX_S = 240;
 /** Largest share of the impact speed a rebound may return: always less than it got, so the chain decays. */

@@ -59,3 +59,32 @@ test('Sled.launchNormal preserves the tangent and applies the rebound in Matter 
   expect(s._sinceLaunchMs).toBe(0);
   expect(s.chuteUsed).toBe(false);
 });
+
+test.each([
+  ['zero', 0],
+  ['negative', -120],
+  ['NaN', NaN],
+  ['Infinity', Infinity],
+])('launchNormal(%s up) is a no-op before any body or state mutation', (_name, up) => {
+  const s = Object.create(Sled.prototype);
+  let syncs = 0;
+  const body = { velocity: { x: toMatter(320), y: -toMatter(180) } };
+  const vx0 = body.velocity.x;
+  const vy0 = body.velocity.y;
+  Object.assign(s, {
+    inWorld: true,
+    msSinceContact: 77,
+    _sinceLaunchMs: 321,
+    chuteUsed: true,
+    body,
+    _sync() { syncs += 1; },
+  });
+
+  s.launchNormal(up, 25);
+
+  expect(body.velocity).toEqual({ x: vx0, y: vy0 });
+  expect(s.msSinceContact).toBe(77);
+  expect(s._sinceLaunchMs).toBe(321);
+  expect(s.chuteUsed).toBe(true);
+  expect(syncs).toBe(0);
+});

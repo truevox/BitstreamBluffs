@@ -297,7 +297,7 @@ describe('B4 drawing: every new shapeKey has its own routine', () => {
 });
 
 describe('Sky Jellyfish felt bounce through RunScene.handleTricksAndLanding (shipped bouncySpring def)', () => {
-  const GOOD = { quality: 'good', angleDeg: 3, impactSpeedPxS: 500, airtimeMs: 600 };
+  const GOOD = { quality: 'good', angleDeg: 3, impactSpeedPxS: 800, airtimeMs: 600 };
   /** A landable run whose sled records the slope-normal rebound, with the frame tuner as update() leaves it. */
   const springy = (zones, rails = false) => {
     const s = landable(makeRun({ zones }));
@@ -311,9 +311,16 @@ describe('Sky Jellyfish felt bounce through RunScene.handleTricksAndLanding (shi
   test('a scored landing in a bouncySpring zone rebounds once along the landing slope normal', () => {
     const s = springy([C.terrainMods.bouncySpring]);
     s.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
-    const up = springRebound(500, C.terrainMods.bouncySpring.physics.landingRebound);
+    const up = springRebound(800, C.terrainMods.bouncySpring.physics.landingRebound);
+    expect(up).toBeCloseTo(160, 9);
     expect(s.calls).toEqual([[up, FS.groundAngleDeg]]);
-    expect(s.calls[0][0]).toBeGreaterThanOrEqual(100);
+  });
+
+  test('an impact under the 120 px/s felt floor gives no rebound, even inside the zone', () => {
+    const s = springy([C.terrainMods.bouncySpring]);
+    s.handleTricksAndLanding({ tricks: [], landing: { ...GOOD, impactSpeedPxS: 500 } }, FS);
+    expect(springRebound(500, C.terrainMods.bouncySpring.physics.landingRebound)).toBe(0);
+    expect(s.calls).toEqual([]);
   });
 
   test('negative controls: plain ground, a crash landing and an unscored touchdown give no rebound', () => {
@@ -332,7 +339,7 @@ describe('Sky Jellyfish felt bounce through RunScene.handleTricksAndLanding (shi
   test('with the Stabilizer Rails the same landing rebounds far less (here: not at all), and the bounce is back after 5 s', () => {
     const s = springy([C.terrainMods.bouncySpring], true);
     s.handleTricksAndLanding({ tricks: [], landing: GOOD }, FS);
-    const bare = springRebound(500, C.terrainMods.bouncySpring.physics.landingRebound);
+    const bare = springRebound(800, C.terrainMods.bouncySpring.physics.landingRebound);
     expect(s.calls.reduce((a, [up]) => a + up, 0)).toBeLessThan(bare * 0.5);
     s.tickEffects(5001);
     s.currentPhys = phys(s);

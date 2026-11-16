@@ -379,13 +379,15 @@ export class Sled {
    * Spring rebound along the ground normal (Sky Jellyfish bouncySpring): keep the along-slope velocity and raise the
    * outward normal component to at least `upPxS` (BiomeEffects.springReboundVelocity). Matter 0.20 normalises
    * Body.setVelocity to the 1000/60 ms base step, so convert px/s with fromPxS. Resets contact/snap state like
-   * launchUp, but never converts forward speed into extra bounce on a slope.
+   * launchUp, but never converts forward speed into extra bounce on a slope. A zero, negative or non-finite `upPxS`
+   * is a no-op before any body or state change.
    * @param {number} upPxS desired outward normal speed, positive = away from the ground.
    * @param {number} groundAngleDeg slope under the sled (deg, clockwise positive = descending right).
    * @returns {void}
    */
   launchNormal(upPxS, groundAngleDeg) {
-    if (!this.inWorld || !this.body) return;
+    // Zero, negative and non-finite requests are no-ops before the body or contact/snap state is touched.
+    if (!this.inWorld || !this.body || !Number.isFinite(upPxS) || upPxS <= 0) return;
     const v = Body.getVelocity(this.body);
     const next = springReboundVelocity(toPxS(v.x), toPxS(v.y), groundAngleDeg, upPxS);
     Body.setVelocity(this.body, { x: fromPxS(next.vx), y: fromPxS(next.vy) });

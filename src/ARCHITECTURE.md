@@ -346,9 +346,14 @@ All additive; no public signature changed.
 * **Slope-normal landing rebound** (additive): `BiomeEffects.springReboundVelocity(vx, vy, groundAngleDeg, upPxS)` keeps
   the along-slope velocity and raises the outward normal component to `max(existing outward, upPxS)`; a non-positive
   `upPxS` is a no-op. `Sled.launchNormal(upPxS, groundAngleDeg)` applies it through `Body.setVelocity` in Matter 0.20
-  base-step units and resets contact/snap state like `launchUp`. `RunScene.applySpringRebound` uses it once per scored
-  (non-crash) landing with `fs.groundAngleDeg`, so a `bouncySpring` descent cannot turn forward speed into extra bounce;
-  bounce pads keep `Sled.launchUp`.
+  base-step units and resets contact/snap state like `launchUp`; a zero, negative or non-finite `upPxS` is a no-op
+  before any body or state change. `RunScene.applySpringRebound` uses it once per scored (non-crash) landing with
+  `fs.groundAngleDeg`, so a `bouncySpring` descent cannot turn forward speed into extra bounce; bounce pads keep
+  `Sled.launchUp`. `BiomeEffects.springRebound` treats a result below `SPRING_REBOUND_MIN_PX_S` (120 px/s) as no
+  rebound: at the shipped 0.2 share only impacts of 600 px/s or more are felt, while the Rails' 0.05 share stays below
+  the floor even at 801 px/s. The 120 px/s floor is the measured point that keeps the bounce felt without regressing
+  the mask-128 hop survival baseline; the normal projection is checked on uniform slopes and makes no general
+  irregular-terrain safety claim.
 
 ## Integration / QA addenda (QA engineer; additive, nothing in sections 1-9 changed)
 

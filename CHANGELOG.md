@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Sky Jellyfish springs now visibly rebound on scored landings.** The rebound returns a bounded share of impact speed, follows the ground normal, and preserves along-slope velocity (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). Stabilizer Rails damp the rebound; bounce pads retain their existing launch behaviour.
+- **Sky Jellyfish springs now visibly rebound on scored landings.** The rebound returns a bounded share of impact speed, follows the ground normal, and preserves along-slope velocity (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). A rebound under 120 px/s is treated as no rebound, so at the shipped 0.2 share only impacts of 600 px/s or more are felt (800 px/s returns 160 px/s); the floor is the measured point that keeps the bounce felt without regressing the mask-128 hop survival baseline. Stabilizer Rails damp the share to 0.05, below the floor even at an 801 px/s impact. A zero, negative or non-finite rebound request leaves `Sled.launchNormal` and its contact/snap/chute state untouched. The normal projection is checked on uniform slopes; it makes no general irregular-terrain safety claim. Bounce pads retain their existing launch behaviour.
 - **Built-game checks measure the effect on the sled.** The same landing is compared without a zone, with the spring, and with Rails, using normal collision handling. The ground-warning check uses bounded fixed steps instead of a load-sensitive wall-clock deadline.
 
 ## v2.15.0 - decision 5: every biome in the Daily rotation (2026-11-16)

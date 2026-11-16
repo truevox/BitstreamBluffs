@@ -115,7 +115,11 @@
  * @property {string} id              camelCase, e.g. 'highBandwidth', 'stickyPatch', 'echoZone'.
  * @property {string} colorKey         telegraph colour (palette key).
  * @property {{frictionMul?:number, gravityMul?:number, bounceMul?:number, speedMul?:number,
- *             steerMul?:number, pushForceMul?:number}} [physics]
+ *             steerMul?:number, pushForceMul?:number, landingRebound?:number}} [physics]
+ *                                    `landingRebound` (additive, B4): the share of a scored touchdown's impact speed
+ *                                    returned as a slope-normal rebound (BiomeEffects.springRebound; below its 120 px/s
+ *                                    floor there is no rebound). Overlapping zones take the larger share; the Stabilizer
+ *                                    Rails scale it by bounceMul squared.
  * @property {number} [scoreMul]      W3: multiplier on banked trick points inside the zone, >= 1.
  *                                    Never applies to the flat perfect-landing bonus or to distance.
  * @property {{amplitudePx:number, periodPx:number, taperPx?:number}} [terrainSwell]
