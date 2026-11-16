@@ -179,7 +179,10 @@ export const EVT = Object.freeze({
  * @property {number} y           world px.
  * @property {number} speedPxS    sled speed at impact, px/s.
  * @property {string} [hazardId]  hazard def id when cause==='hazard'.
- * @property {boolean} negated    true if a Hashed Backup power-up absorbed it (run continues; no RUN_END).
+ * @property {boolean} negated    true if a shield charge (Hashed Backup, or a biome shield pickup such as Heat Shield) absorbed it
+ *           (run continues; no RUN_END; a POWERUP_EXPIRED 'consumed' follows).
+ * Nothing else is added by the Readable Chaos pass: the killer name, hop verdict and Game Over line travel in the registry
+ * (REG.LAST_CRASH, src/data/schemas.js `LastCrash`), never on this payload, the RunRecord or its ledger hash.
  */
 
 /**
@@ -239,22 +242,24 @@ export const EVT = Object.freeze({
 
 /**
  * @typedef {Object} PowerUpCollectedPayload
- * @property {'clockPulse'|'packetBurst'|'hashedBackup'} id   power-up def id (src/data/powerups).
+ * @property {string} id         power-up def id (src/data/powerups): 'clockPulse' | 'packetBurst' | 'hashedBackup' and, since B1-B4, every biome pickup id.
  * @property {number} durationMs  0 for instant/charge based (hashedBackup).
  * @property {number} charges     remaining charges (hashedBackup), else 0.
  */
 
 /**
  * @typedef {Object} PowerUpExpiredPayload
- * @property {'clockPulse'|'packetBurst'|'hashedBackup'} id
- * @property {'timeout'|'consumed'|'respawn'} reason
+ * @property {string} id         power-up def id (see PowerUpCollectedPayload).
+ * @property {'timeout'|'consumed'|'respawn'|'replaced'} reason  timeout = ran out; consumed = a shield charge was spent
+ *           (id = the pickup that granted it); respawn = the effect ended on a manual respawn (Shift); replaced (additive, B3/B4)
+ *           = a different glide / stabilize pickup took over the single slot (id = the one that was replaced).
  */
 
 /**
  * @typedef {Object} HazardHitPayload
  * @property {string} hazardId   hazard def id (src/data/hazards).
- * @property {'crash'|'slow'|'scramble'} effect
- * @property {number} durationMs  0 for crash; effect length otherwise.
+ * @property {'crash'|'slow'|'scramble'|'blind'|'gust'} effect  blind / gust are additive (B0, HazardDef.onHit.effect).
+ * @property {number} durationMs  0 for crash and gust; effect length otherwise.
  * @property {number} x
  * @property {number} y
  */
