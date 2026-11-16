@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Bitstream Bluffs — Four Kie Organ Covers (Two Tasks)</title>
+<style>
+:root{font-family:system-ui,-apple-system,Arial,sans-serif;color-scheme:dark;background:#110c1c;color:#f0edff}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 15% 0,#3a2456,transparent 55%),radial-gradient(ellipse at 90% 30%,#183c46,transparent 55%),#110c1c;min-height:100vh}
+main{max-width:920px;margin:auto;padding:32px 18px 65px}
+h1{font-size:clamp(2rem,6vw,3rem);letter-spacing:-.04em;line-height:1.12;margin:9px 0 18px}
+h1 em{font-style:normal;color:#edb2e3}
+h2{margin:0 0 12px;font-size:1.1rem}
+.eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#7de5e0}
+.description{color:#cabbd9;line-height:1.6}
+.card{border:1px solid #594969;border-radius:16px;background:#221c34ee;padding:20px;margin:16px 0}
+.card.highlight{border-color:#85ded8}
+audio{width:100%;height:48px;margin:8px 0;display:block}
+button{background:#f2afd8;color:#2c1232;border:none;border-radius:9px;font-weight:800;cursor:pointer;padding:12px 16px}
+button:hover{filter:brightness(1.12)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.actions button{background:#2e3852;color:#dffcf9;border:1px solid #629b9b}
+.note{font-size:.83rem;line-height:1.6;color:#bbaccd}
+a{color:#92e5e0;overflow-wrap:anywhere}
+.tag{display:inline-block;padding:4px 8px;border:1px solid #6b5a77;border-radius:99px;font-size:.75rem;margin:4px 4px 0 0}
+@media(max-width:600px){.card{padding:15px}main{padding:22px 14px 65px}}
+</style>
+</head>
+<body><main>
+<div class="eyebrow">Bitstream Bluffs · Maxi's original vocal · Kie V6</div>
+<h1>Two tasks. <em>Four organ interpretations.</em></h1>
+<p class="description">You authorized one Kie.ai cover task. Two processes accidentally submitted separate jobs, so two tasks returned four independent full-length results (24 credits total). All four original MP3s are archived on CT223 and CT211. Compare both pairs, Maxi’s original vocal, and the V3 organ. No further Kie generations were submitted.</p>
+<div><span class="tag">Full 3:35 performance</span><span class="tag">Two tasks · 24 credits</span><span class="tag">Four results preserved</span></div>
+<div class="card highlight">
+<h2>Task A (first job) — Option 1</h2>
+<p class="note">From the first paid task, source uploaded as 256 kbps MP3 · Kie V6 · original unmodified output.</p>
+<audio id="first1" controls preload="metadata" src="/music-audition-kie/task-a-option-1-full.mp3"></audio>
+<a href="/music-audition-kie/task-a-option-1-full.mp3" download="kie-first-task-organ-option-1.mp3">Save first-task Option 1 MP3 (5.78 MB)</a>
+<div class="actions"><button data-switch="first1">A/B switch to first-task Option 1</button></div>
+</div>
+<div class="card highlight">
+<h2>Task A (first job) — Option 2</h2>
+<p class="note">Independent second output from the SAME first paid task.</p>
+<audio id="first2" controls preload="metadata" src="/music-audition-kie/task-a-option-2-full.mp3"></audio>
+<a href="/music-audition-kie/task-a-option-2-full.mp3" download="kie-first-task-organ-option-2.mp3">Save first-task Option 2 MP3 (5.70 MB)</a>
+<div class="actions"><button data-switch="first2">A/B switch to first-task Option 2</button></div>
+</div>
+<div class="card highlight">
+<h2>Task B (duplicate job) — Option 1</h2>
+<audio id="option1" controls preload="metadata" src="/music-audition-kie/option-1-full.mp3"></audio>
+<a href="/music-audition-kie/option-1-full.mp3" download="kie-organ-option-1.mp3">Save full Option 1 MP3 (5.59 MB)</a>
+<div class="actions"><button data-switch="option1">A/B switch to Option 1</button></div>
+</div>
+<div class="card highlight">
+<h2>Task B (duplicate job) — Option 2</h2>
+<audio id="option2" controls preload="metadata" src="/music-audition-kie/option-2-full.mp3"></audio>
+<a href="/music-audition-kie/option-2-full.mp3" download="kie-organ-option-2.mp3">Save full Option 2 MP3 (5.63 MB)</a>
+<div class="actions"><button data-switch="option2">A/B switch to Option 2</button></div>
+</div>
+<div class="card">
+<h2>Original — Maxi's isolated vocal stem</h2>
+<audio id="vocal" controls preload="metadata" src="/music-audition-kie/maxi-original-vocal-full.mp3"></audio>
+<div class="actions"><button data-switch="vocal">Switch to Maxi's original performance</button></div>
+</div>
+<div class="card">
+<h2>V3 Vertigo Vents organ — preserved reference</h2>
+<p class="note">This benchmark is only 25 seconds, beginning 2:30 into the source. Tap the jump button to compare the same section of both Kie covers.</p>
+<audio id="organ" controls preload="metadata" src="/music-audition-kie/v3-organ-reference-150-175.mp3"></audio>
+<div class="actions">
+<button data-switch="organ">Switch to the V3 organ excerpt</button>
+<button id="jump" type="button">Jump all tracks to 2:30</button>
+</div>
+</div>
+<p id="status" role="status" class="note">Tap a player or use the A/B switch buttons to keep the same song position.</p>
+<p class="note">These are generative covers: matching duration does not guarantee note-for-note or beat-perfect alignment. They are private listening tests and have not replaced any game audio. Kie tasks: first 2a05f8478617530bec35454aa1d9e686; duplicate de4cf96e280b04256906de5090771d93. Each consumed 12 credits. These are not release-approved game assets.</p>
+</main>
+<script>
+(function(){
+  var map={first1:document.getElementById('first1'),first2:document.getElementById('first2'),option1:document.getElementById('option1'),option2:document.getElementById('option2'),vocal:document.getElementById('vocal'),organ:document.getElementById('organ')};
+  var active='first1'; var anchor=0;
+  var names=Object.keys(map);
+  var status=document.getElementById('status');
+  function globalTime(key){return key==='organ'?150+map.organ.currentTime:map[key].currentTime;}
+  names.forEach(function(key){
+    map[key].addEventListener('timeupdate',function(){if(active===key && !map[key].seeking)anchor=globalTime(key);});
+    map[key].addEventListener('seeking',function(){if(active===key)anchor=globalTime(key);});
+    map[key].addEventListener('play',function(){
+      names.forEach(function(other){if(other!==key)map[other].pause();});
+      active=key;
+      anchor=globalTime(key);
+      status.textContent='Playing '+key+'. Switch with the A/B buttons to retain your place.';
+    });
+  });
+  async function change(key){
+    if(!map[key])return;
+    var position=anchor;
+    map[active].pause();
+    if(key==='organ' && (position<150 || position>=175))position=150;
+    var target=key==='organ'?position-150:position;
+    target=Math.max(0,Math.min(target,key==='organ'?24.8:214.5));
+    active=key;
+    try{
+      if(map[key].readyState<1){
+        await new Promise(function(resolve){
+          map[key].addEventListener('loadedmetadata',resolve,{once:true});
+          map[key].addEventListener('error',resolve,{once:true});
+          map[key].load();
+          setTimeout(resolve,6000);
+        });
+      }
+      map[key].currentTime=target;
+      await map[key].play();
+    }catch(err){
+      status.textContent='Selected '+key+'. Tap Play on the player above to start.';
+    }
+  }
+  document.querySelectorAll('[data-switch]').forEach(function(button){
+    button.addEventListener('click',function(){change(button.dataset.switch);});
+  });
+  document.getElementById('jump').addEventListener('click',function(){
+    anchor=150;
+    var key=active;
+    try{map[key].currentTime=key==='organ'?0:150;}catch(err){}
+    status.textContent='All tracks positioned at source time 2:30. Tap the one you want.';
+  });
+})();
+</script>
+</body></html>

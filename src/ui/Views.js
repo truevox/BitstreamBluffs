@@ -15,6 +15,7 @@ import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
+import { openStreamerPolicy } from './StreamerPolicy.js';
 import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
@@ -185,7 +186,7 @@ export class LeaderboardView extends View {
 export class SettingsView extends View {
   /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
   constructor(scene, theme, o) {
-    super(scene, theme, { w: 320, h: 186, title: 'SETTINGS', color: 'amber', onClose: o.onClose, y: 40, backLabel: 'DONE' });
+    super(scene, theme, { w: 320, h: 202, title: 'SETTINGS', color: 'amber', onClose: o.onClose, y: 30, backLabel: 'DONE' });
     const game = scene.game;
     const s = () => game.registry.get(REG.SETTINGS) || {};
     const items = [
@@ -196,12 +197,19 @@ export class SettingsView extends View {
       { kind: 'slider', label: 'MASTER VOLUME', get: () => s().masterVolume, set: (v) => updateSetting(game, 'masterVolume', v) },
       { kind: 'slider', label: 'MUSIC VOLUME', get: () => s().musicVolume, set: (v) => updateSetting(game, 'musicVolume', v) },
       { kind: 'slider', label: 'SFX VOLUME', get: () => s().sfxVolume, set: (v) => updateSetting(game, 'sfxVolume', v) },
+      { kind: 'choice', label: 'MUSIC VOCALS', options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+        get: () => s().musicVocals === true, set: (v) => updateSetting(game, 'musicVocals', v) },
+      { kind: 'choice', label: 'LYRIC CAPTIONS', options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+        get: () => s().musicCaptions === true, set: (v) => updateSetting(game, 'musicCaptions', v) },
       { kind: 'choice', label: 'TILT CONTROLS (90)', options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
         get: () => !!s().touchRotate90, set: (v) => updateSetting(game, 'touchRotate90', v) },
       { kind: 'choice', label: 'TOUCH BUTTONS', options: [{ value: 'auto', label: 'AUTO' }, { value: 'on', label: 'ON' }, { value: 'off', label: 'OFF' }],
         get: () => s().touchOverlay || 'auto', set: (v) => updateSetting(game, 'touchOverlay', v) },
+      { kind: 'action', label: 'STREAMING / VIDEO', sub: 'MUSIC OK', color: 'cyan',
+        onSelect: () => openStreamerPolicy(typeof window === 'undefined' ? null : window) },
     ];
-    this.menu = new MenuList(scene, theme, { x: 10, y: 22, w: 300, rowH: 16, items, color: 'amber', parent: this.panel });
+    // Ten rows at a 15px pitch still clear the palette swatches and DONE button.
+    this.menu = new MenuList(scene, theme, { x: 10, y: 22, w: 300, rowH: 15, items, color: 'amber', parent: this.panel });
     this.panel.add(new NeonText(scene, theme, 104, this.h - 17, 'PALETTE PREVIEW', { color: 'text', outline: 'none' }).setAlpha(0.5));
     this.swatch = scene.add.graphics();
     this.panel.add(this.swatch);

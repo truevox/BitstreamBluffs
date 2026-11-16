@@ -1,0 +1,36 @@
+{
+  "inputStartSeconds": 150.0,
+  "inputLengthSeconds": 25.0,
+  "sheetRawNotes": 68,
+  "basicRawNotes": 129,
+  "basicCandidates": 123,
+  "rawModelsReadOnly": true,
+  "pitchRendering": "constant note pitch without expressive bends (diagnostic)",
+  "instrument": "FluidR3_GM sf2, GM program 19, identical V3 Vertigo Vents polish",
+  "versions": {
+    "sheet-original": {
+      "rawNotes": 68,
+      "renderedNotes": 68,
+      "octaveShift": 0,
+      "medianPitch": 74,
+      "notesPath": "/root/bitstream-maxi/transcription-lab-20261115/organ-ear-test/sheet-original/notes.json",
+      "analysisPath": "/root/bitstream-maxi/transcription-lab-20261115/organ-ear-test/sheet-original/control.npz"
+    },
+    "sheet-down12": {
+      "rawNotes": 68,
+      "renderedNotes": 68,
+      "octaveShift": -12,
+      "medianPitch": 62,
+      "notesPath": "/root/bitstream-maxi/transcription-lab-20261115/organ-ear-test/sheet-down12/notes.json",
+      "analysisPath": "/root/bitstream-maxi/transcription-lab-20261115/organ-ear-test/sheet-down12/control.npz"
+    },
+    "basic-monophonic": {
+      "rawNotes": 72,
+      "renderedNotes": 72,
+      "octaveShift": 0,
+      "medianPitch": 63,
+      "notesPath": "/root/bitstream-maxi/transcription-lab-20261115/organ-ear-test/basic-monophonic/notes.json",
+      "analysisPath": "/root/bitstream-maxi/transcription-lab-20261115/organ-ear-test/basic-monophonic/control.npz"
+    }
+  }
+}

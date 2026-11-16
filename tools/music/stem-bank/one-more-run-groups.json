@@ -1,0 +1,114 @@
+{
+  "trackSlot": 33,
+  "id": "local-one-more-run-bitstream-bluffs",
+  "title": "One More Run (The Ballad of Bitstream Bluffs)",
+  "sourceStemCount": 11,
+  "compatibilityStemCount": 6,
+  "sourceLayout": "stems/original_11s/33_one_more_run/",
+  "compatibilityLayout": "stems/grouped_6s/33_one_more_run/",
+  "groups": {
+    "vocals": {
+      "sourceNames": [
+        "vocals",
+        "backing_vocals"
+      ],
+      "output": "stems/grouped_6s/33_one_more_run/vocals.flac",
+      "sourceGainApplied": 1.0,
+      "runtimeGainToRecoverSourceSummation": 1.0,
+      "sampleRate": 44100,
+      "frames": 7699860,
+      "channels": 2,
+      "bitsPerSample": 24,
+      "bytes": 29957206,
+      "sha256": "30b5252b3960e4033e7f0ead4c57fe38bed4f44aa745024689232a5c870bf3ab"
+    },
+    "drums": {
+      "sourceNames": [
+        "drums",
+        "percussion"
+      ],
+      "output": "stems/grouped_6s/33_one_more_run/drums.flac",
+      "sourceGainApplied": 0.9936,
+      "runtimeGainToRecoverSourceSummation": 1.006441224,
+      "sampleRate": 44100,
+      "frames": 7699860,
+      "channels": 2,
+      "bitsPerSample": 24,
+      "bytes": 33335045,
+      "sha256": "9da939833b8a1ff7d8ff7a968ed6dbc3073d81015e37387989e6b66bdec5b1df"
+    },
+    "bass": {
+      "sourceNames": [
+        "bass"
+      ],
+      "output": "stems/grouped_6s/33_one_more_run/bass.flac",
+      "sourceGainApplied": 1.0,
+      "runtimeGainToRecoverSourceSummation": 1.0,
+      "sampleRate": 44100,
+      "frames": 7699860,
+      "channels": 2,
+      "bitsPerSample": 24,
+      "bytes": 22470088,
+      "sha256": "9f38b7221b4bc4942d53c3e1e174af9c7b481bf8a69e9db2b7967b1591f0d49a"
+    },
+    "guitar": {
+      "sourceNames": [
+        "guitar"
+      ],
+      "output": "stems/grouped_6s/33_one_more_run/guitar.flac",
+      "sourceGainApplied": 1.0,
+      "runtimeGainToRecoverSourceSummation": 1.0,
+      "sampleRate": 44100,
+      "frames": 7699860,
+      "channels": 2,
+      "bitsPerSample": 24,
+      "bytes": 20019201,
+      "sha256": "2f1928ac5c898c148c24aad0cad502b3a7702ff3e7b8d0e790ec2719faeb14a5"
+    },
+    "piano": {
+      "sourceNames": [
+        "keyboard"
+      ],
+      "output": "stems/grouped_6s/33_one_more_run/piano.flac",
+      "sourceGainApplied": 1.0,
+      "runtimeGainToRecoverSourceSummation": 1.0,
+      "sampleRate": 44100,
+      "frames": 7699860,
+      "channels": 2,
+      "bitsPerSample": 24,
+      "bytes": 25166845,
+      "sha256": "e6c4f7b70ee7df0a962511412225c09df38011e7cf005a32f0d314cc80f5bc22"
+    },
+    "other": {
+      "sourceNames": [
+        "synth",
+        "strings",
+        "woodwinds",
+        "fx"
+      ],
+      "output": "stems/grouped_6s/33_one_more_run/other.flac",
+      "sourceGainApplied": 1.0,
+      "runtimeGainToRecoverSourceSummation": 1.0,
+      "sampleRate": 44100,
+      "frames": 7699860,
+      "channels": 2,
+      "bitsPerSample": 24,
+      "bytes": 29499235,
+      "sha256": "2f6f4a7bb42b8087797f057944fbf04ef45b0f42c9e7e41dfefe459ebdc8130f"
+    }
+  },
+  "originalSampleRate": 48000,
+  "outputSampleRate": 44100,
+  "originalFrames": 8380800,
+  "targetFrames": 7699860,
+  "originalMaster": "audio/33_one_more_run.wav",
+  "originalMasterPreserved": true,
+  "neutralMixPolicy": "play original WAV at all gains unity; for ducking groups use grouped stems, not a claim of perfect reconstruction",
+  "notes": [
+    "Original supplied 11 WAV stems, original ZIP, original WAV/MP3 master remain untouched.",
+    "All 11 channels have semantic homes in one and only one of six groups.",
+    "11-stem direct sum has significant residual vs supplied original WAV, so six-stem sum also differs; no fake perfect reconstruction assertion.",
+    "Drums+percussion combination peaks slightly above 0dBFS. Apply 0.9936 scale before integer FLAC to prevent clipping; metadata records this scale.",
+    "FX is grouped with other because it is not a reliable melodic-keyboard or guitar source."
+  ]
+}

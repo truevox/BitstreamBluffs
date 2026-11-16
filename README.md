@@ -1,6 +1,23 @@
 # Bitstream Bluffs
 
-A downhill-only, neon-styled trick-and-race game built with Phaser 3.90 and Matter physics. You ride a sled down an endless, seeded track, carve and hop over terrain, pull tricks for combo points, and dodge glitch hazards until you crash. Runs are deterministic per seed, so a seed can be shared. Visuals are procedural shapes and audio is synthesised with WebAudio, so there are no image or audio assets. The design is specified in `docs/DESIGN-DOC.md`.
+A downhill-only, neon-styled trick-and-race game built with Phaser 3.90 and Matter physics. You ride a sled down an endless, seeded track, carve and hop over terrain, pull tricks for combo points, and dodge glitch hazards until you crash. Runs are deterministic per seed, so a seed can be shared. Most visuals are procedural and gameplay SFX are synthesized in WebAudio. An optional, sample-synchronized music pack plays approved pre-rendered Ogg assets; the game never ships neural model weights or private research auditions. The design is specified in `docs/DESIGN-DOC.md`.
+
+## Streamers, VODs and videos
+
+**Streamers welcome, including monetized gameplay!** Keep the music on:
+normal live streams, VODs, Let's Plays, clips, reviews and guides are
+permitted by the game's developer without a special mute mode.
+Read the public [streamer permission statement](public/streamers.html)
+(also shipped as /streamers.html).
+
+This permission covers audiovisual gameplay, not standalone music
+redistribution. If a platform issues a music claim on gameplay,
+[report it here](https://github.com/truevox/BitstreamBluffs/issues/new?template=gameplay-music-claim.yml)
+so we can investigate and help with rights documentation.
+
+Model weights, research music auditions and other local lab data are
+excluded from Git and public release builds. See
+[release/streamer policy](docs/STREAMING-AND-ASSET-RIGHTS.md).
 
 ## Running
 

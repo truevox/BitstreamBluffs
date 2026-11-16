@@ -1,0 +1,64 @@
+{
+  "experiment": "bitstream-maxi-ace15-cover",
+  "model": "ACE-Step 1.5 Turbo",
+  "gpu": "NVIDIA RTX 3060 12GB on CT214",
+  "source_sha256": "5c5d6d1e92b3b1423f06ee5bffbae879b5a64734c60d793c897f23f8c63a4c63",
+  "profiles": {
+    "ace-organ-s90": {
+      "instrument": "organ",
+      "strength": 0.9,
+      "seed": 20261115,
+      "steps": 8,
+      "flac_sha256": "2727240e95072c37c94a0d872fede0a51ed1871137d853c0283f0585f3374269",
+      "full_name": "ace-organ-s90-full.ogg",
+      "full_seconds": 214.9665,
+      "full_bytes": 4563585,
+      "excerpt_name": "ace-organ-s90-excerpt.ogg",
+      "excerpt_seconds": 25.0065,
+      "excerpt_mean_dbfs": -16.4,
+      "inference_seconds": 25.79
+    },
+    "ace-organ-s70": {
+      "instrument": "organ",
+      "strength": 0.7,
+      "seed": 20261115,
+      "steps": 8,
+      "flac_sha256": "68dadfcaf3ff7d5d2a4bb3d46f6f0910bc8ed3f140e973e30901020b2b3f863f",
+      "full_name": "ace-organ-s70-full.ogg",
+      "full_seconds": 214.9665,
+      "full_bytes": 4586963,
+      "excerpt_name": "ace-organ-s70-excerpt.ogg",
+      "excerpt_seconds": 25.0065,
+      "excerpt_mean_dbfs": -16.4,
+      "inference_seconds": 24.23
+    },
+    "ace-holo-s90": {
+      "instrument": "holo",
+      "strength": 0.9,
+      "seed": 20261115,
+      "steps": 8,
+      "flac_sha256": "5368b2f20b01f685fd69aae9c212c4002bb2795bab73851b000d6df3b54a1ba8",
+      "full_name": "ace-holo-s90-full.ogg",
+      "full_seconds": 214.9665,
+      "full_bytes": 4564276,
+      "excerpt_name": "ace-holo-s90-excerpt.ogg",
+      "excerpt_seconds": 25.0065,
+      "excerpt_mean_dbfs": -16.0,
+      "inference_seconds": 25.17
+    },
+    "ace-holo-s70": {
+      "instrument": "holo",
+      "strength": 0.7,
+      "seed": 20261115,
+      "steps": 8,
+      "flac_sha256": "9eea65079360b067e3d74c19a3abfa70fca6b028853ccc4191d9c7a84c132d66",
+      "full_name": "ace-holo-s70-full.ogg",
+      "full_seconds": 214.9665,
+      "full_bytes": 4603318,
+      "excerpt_name": "ace-holo-s70-excerpt.ogg",
+      "excerpt_seconds": 25.0065,
+      "excerpt_mean_dbfs": -16.0,
+      "inference_seconds": 26.05
+    }
+  }
+}

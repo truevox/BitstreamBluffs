@@ -2,7 +2,8 @@
  * OWNER: input/audio/glitch engineer.
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
- * All audio is synthesized with WebAudio (no files). Instantiated ONCE by createServices(game) at REG.AUDIO.
+ * SFX are synthesized with WebAudio. Music may be an optional sample-synchronized stem jukebox.
+ * Instantiated ONCE by createServices(game) at REG.AUDIO.
  * The AudioContext is created lazily and resumed on the first user gesture (browser autoplay policy) via unlock();
  * the constructor also installs its own one-shot gesture listeners, and unlocks on the first INPUT_ACTION.
  * AudioSynth SUBSCRIBES ITSELF to game.events in its constructor:
@@ -67,12 +68,13 @@ export class AudioSynth {
     this.game = game;
     /** @type {AudioContext|null} */
     this.ctx = null;
-    this.settings = { masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.8 };
+    this.settings = { masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.8, musicVocals: false, musicCaptions: false };
     this.unavailable = false;
     this.nodes = null;
     this._musicTimer = null;
     this._musicSeed = null;
     this._musicWanted = false;
+    this._musicProvider = null;
     this._intensity = 0;
     this._distIntensity = 0;
     this._speedIntensity = 0;
@@ -95,12 +97,16 @@ export class AudioSynth {
           ev.on(name, fn);
           this._gameListeners.push([name, fn]);
         };
-        on(EVT.RUN_START, (p) => this.startMusic((p && p.seed) || ''));
-        on(EVT.RUN_END, () => this.stopMusic());
-        on(EVT.RUN_ABORT, () => this.stopMusic());
+        on(EVT.RUN_START, (p) => {
+          this._musicProvider?.setBiome('bitstream-bluffs');
+          this.startMusic((p && p.seed) || '');
+        });
+        on(EVT.RUN_END, () => { if (this._musicProvider?.ready) this._stopWind(); else this.stopMusic(); });
+        on(EVT.RUN_ABORT, () => { if (this._musicProvider?.ready) this._stopWind(); else this.stopMusic(); });
         on(EVT.LANDING, (p) => this._onLanding(p));
         on(EVT.TRICK, (p) => this.playSfx('trick', { pitch: 1 + Math.min(0.5, ((p && p.count) || 1) * 0.08 - 0.08) }));
         on(EVT.COMBO_CHANGED, (p) => {
+          if (p) this._musicProvider?.setCombo(p.multiplier || 1);
           if (p && p.reason === 'trick' && p.multiplier > 1) {
             this.playSfx('combo', { pitch: 1 + Math.min(1, (p.multiplier - 1) * 0.25) });
           }
@@ -120,6 +126,7 @@ export class AudioSynth {
           else if (p.effect === 'scramble') this.playSfx('hazardScramble');
         });
         on(EVT.ZONE_ENTER, () => this.playSfx('uiMove', { pitch: 0.5, volume: 0.5 }));
+        on(EVT.BIOME_ENTER, (p) => this._musicProvider?.setBiome(p?.entering ? p.id : 'bitstream-bluffs'));
         on(EVT.GLITCH_START, (p) => { if (p) this.glitch(p.kind, p.durationMs, p.intensity); });
         on(EVT.DISTANCE_CHANGED, (p) => {
           this._distIntensity = clamp01(((p && p.meters) || 0) / 2000);
@@ -256,6 +263,7 @@ export class AudioSynth {
     n.staticGain.connect(n.master);
     n.staticSrc.start();
     this.nodes = n;
+    if (this._musicProvider) this._musicProvider.attach(c, n.musicFilter);
   }
 
   /**
@@ -291,7 +299,8 @@ export class AudioSynth {
       }
       this._domListeners = this._domListeners.filter((d) => d[1] === 'visibilitychange');
     }
-    if (this._musicWanted && !this._musicTimer) this._startScheduler();
+    if (this._musicWanted && this._musicProvider?.ready) this._musicProvider.onResume();
+    else if (this._musicWanted && !this._musicTimer) this._startScheduler();
   }
 
   /** @returns {boolean} */
@@ -536,9 +545,12 @@ export class AudioSynth {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
           sfxVolume: clamp01(Number(settings.sfxVolume)),
+          musicVocals: settings.musicVocals === true,
+          musicCaptions: settings.musicCaptions === true,
         };
-        for (const k of Object.keys(this.settings)) if (Number.isNaN(this.settings[k])) this.settings[k] = 0.8;
+        for (const k of ['masterVolume', 'musicVolume', 'sfxVolume']) if (Number.isNaN(this.settings[k])) this.settings[k] = 0.8;
       }
+      this._musicProvider?.applySettings(settings);
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
       this.nodes.master.gain.setTargetAtTime(this.settings.masterVolume, t, 0.02);
@@ -583,6 +595,7 @@ export class AudioSynth {
    */
   setSpeed(pxPerSec) {
     try {
+      this._musicProvider?.setSpeed(pxPerSec);
       if (!this._ready() || this._paused) return;
       const s = clamp01((Number(pxPerSec) || 0) / 1000);
       this._speedIntensity = s;
@@ -592,6 +605,21 @@ export class AudioSynth {
       this.nodes.windFilter.frequency.setTargetAtTime(300 + s * 2600, t, 0.12);
       this._updateIntensity();
     } catch (e) { /* ignore */ }
+  }
+
+  /** Current word-level lyric caption, if the player enabled captions and a track supplies timing. */
+  currentMusicCaption() {
+    try { return this._musicProvider?.currentCaption() || null; } catch { return null; }
+  }
+
+  /** Read-only, normalized spectrum energy for subtle visuals; never affects physics. */
+  musicEnergy() {
+    try { return this._musicProvider?.getEnergy() || null; } catch { return null; }
+  }
+
+  /** Route airborne state to adaptive stem processing; procedural SFX are unchanged. */
+  setAirborne(airborne) {
+    try { this._musicProvider?.setAirborne(airborne); } catch { /* ignore */ }
   }
 
   /**
@@ -610,6 +638,42 @@ export class AudioSynth {
 
   // ----------------------------------------------------------------------------------------------------------- music
 
+  /** Attach an optional streamed-music provider; SFX and public audio API remain unchanged. */
+  setMusicProvider(provider) {
+    this._musicProvider = provider;
+    provider.onReady = () => {
+      if (this._musicWanted) this._activateMusicProvider();
+    };
+    if (this.ctx && this.nodes) provider.attach(this.ctx, this.nodes.musicFilter);
+    provider.applySettings(this.game?.registry?.get('settings'));
+    if (provider.ready && this._musicWanted) this._activateMusicProvider();
+  }
+
+  _activateMusicProvider() {
+    if (!this._musicProvider?.ready || !this._ensureCtx()) return false;
+    if (this._musicTimer) clearInterval(this._musicTimer);
+    this._musicTimer = null;
+    const t = this.ctx.currentTime;
+    this.nodes.musicSrc.gain.cancelScheduledValues(t);
+    this.nodes.musicSrc.gain.setTargetAtTime(0, t, 0.04);
+    this._musicProvider.start();
+    if (this.ctx.state !== 'running') this.unlock();
+    return true;
+  }
+
+  /** A missing/corrupt music pack falls back to the original procedural soundtrack. */
+  musicProviderFailed() {
+    if (this._destroyed) return;
+    if (this._musicProvider) this._musicProvider.ready = false;
+    if (this._musicWanted) this.startMusic(this._musicSeed || '');
+  }
+
+  _stopWind() {
+    this._musicProvider?.setAirborne(false);
+    this._musicProvider?.setCombo(1);
+    if (this.nodes && this.ctx) this.nodes.windGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
+  }
+
   /**
    * Start the FM-ish music loop. Deterministic per seed (arrangement chosen from Rng(seed).fork('music')).
    * @param {string} seed
@@ -619,6 +683,7 @@ export class AudioSynth {
     try {
       this._musicSeed = String(seed == null ? '' : seed);
       this._musicWanted = true;
+      if (this._activateMusicProvider()) return;
       this._arrCache.clear();
       const base = new Rng(this._musicSeed).fork('music');
       this._baseBpm = 118 + base.int(0, 14);
@@ -647,6 +712,7 @@ export class AudioSynth {
   stopMusic() {
     try {
       this._musicWanted = false;
+      this._musicProvider?.stop();
       if (this._musicTimer) clearInterval(this._musicTimer);
       this._musicTimer = null;
       if (this.nodes) {
@@ -836,6 +902,7 @@ export class AudioSynth {
     this._destroyed = true;
     try {
       this.stopMusic();
+      this._musicProvider?.destroy();
       for (const [t, type, fn, opt] of this._domListeners) t.removeEventListener(type, fn, opt);
       this._domListeners = [];
       const ev = this.game && this.game.events;
