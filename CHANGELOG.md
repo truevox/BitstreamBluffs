@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - B3 tuning: felt glides, downhill rolls
+## v2.12.1 - B3 tuning: felt glides, downhill rolls (2026-11-15)
 
 - **Glides are felt (Marvin's ruling 2026-11-15).** A glide now cuts all three of the sled's drags, not only ground friction: ground resistance x frictionMul as before, plus a speed lift (frictionAir / speedMul, the Packet Burst path) and a quadratic-drag cut, both scaled by the glide's strength (new pure `BiomeEffects.glideStrength` / `glideDrag`; TUNING `glideSpeedLift` 0.35, `glideQuadCut` 0.35). With no glide every tuner output is exactly as before. No RunScene change.
 - **Sandrunner Skis:** a short, punchy slick burst: frictionMul 0.3 for 2 s. **Royal Jelly Wax:** a longer, gentler glide: frictionMul 0.55 for 5 s. (Skis at 2.5 s took mask 4 hop survival to 15/48; 2 s keeps it at 18/48.)
