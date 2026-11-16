@@ -68,6 +68,7 @@ export function verdictText(h) {
 
 /**
  * @typedef {Object} CrashReportData  REG.LAST_CRASH (registry only).
+ * @property {string|null} runId the run's id (RunRecord.id), so Game Over shows the line only for that run
  * @property {string} seed @property {number} biomeMask @property {number} x world px of the crash
  * @property {number} distM @property {string} cause @property {string|null} hazardId
  * @property {string} name killer name @property {string} verdict hop verdict ('' when not a hazard crash)
@@ -75,7 +76,7 @@ export function verdictText(h) {
  */
 
 /**
- * @param {{seed:string, biomeMask?:number, cause:string, def?:Object, x:number, startX:number, pxPerMeter:number,
+ * @param {{runId?:string, seed:string, biomeMask?:number, cause:string, def?:Object, x:number, startX:number, pxPerMeter:number,
  *   lastHopMs?:number|null, arrivalMs?:number|null, crashMs:number}} o
  * @returns {CrashReportData}
  */
@@ -86,6 +87,7 @@ export function crashReport(o) {
   const verdict = isHazard ? verdictText(hopTiming(o.lastHopMs, arrival)) : '';
   const distM = Math.max(0, Math.floor((o.x - o.startX) / (o.pxPerMeter || 1)));
   return {
+    runId: o.runId == null ? null : o.runId,
     seed: o.seed,
     biomeMask: o.biomeMask || 0,
     x: o.x,
@@ -120,4 +122,14 @@ export function crashBeat(msSinceCrash, hitStopMs) {
 export function deathMarkerX(lastCrash, seed, biomeMask) {
   if (!lastCrash || lastCrash.seed !== seed || (lastCrash.biomeMask || 0) !== (biomeMask || 0)) return null;
   return Number.isFinite(lastCrash.x) ? lastCrash.x : null;
+}
+
+/**
+ * The Game Over header line for this record: only when the report is for this very run (same id) and it crashed.
+ * @param {CrashReportData|null|undefined} lastCrash @param {{id?:string, cause?:string}|null|undefined} rec
+ * @returns {string}
+ */
+export function gameOverLine(lastCrash, rec) {
+  if (!lastCrash || !rec || rec.cause !== 'crash' || lastCrash.runId == null || lastCrash.runId !== rec.id) return '';
+  return lastCrash.line || '';
 }

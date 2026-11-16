@@ -183,3 +183,24 @@ describe('Gear Gate: the cue says whether it will be open at arrival', () => {
     expect(tr.update(116, plan(116))).toEqual([]);
   });
 });
+
+describe('TelegraphTracker.lastArrivalMs: the latest planned arrival per hazard (read by the crash report)', () => {
+  test('updates every frame a hazard is marked, keeps the last finite value, null when never planned', () => {
+    const tr = new TelegraphTracker();
+    const h = base('packetSpike', 1700);
+    expect(tr.lastArrivalMs(h)).toBe(null);
+    tr.update(1000, planTelegraph([h], sled(1000, 700), FAR, { nowMs: 1000 }));
+    expect(tr.lastArrivalMs(h)).toBeCloseTo(2000, 6);
+    tr.update(1500, planTelegraph([h], sled(1300, 600), FAR, { nowMs: 1500 }));
+    expect(tr.lastArrivalMs(h)).toBeCloseTo(1500 + 400 / 600 * 1000, 6);
+    // a mark without an arrival (no nowMs) leaves the last one
+    tr.update(1600, planTelegraph([h], sled(1350, 600), FAR));
+    expect(tr.lastArrivalMs(h)).toBeCloseTo(1500 + 400 / 600 * 1000, 6);
+  });
+  test('clear and open marks still record their arrival (the sled may crash into it anyway)', () => {
+    const tr = new TelegraphTracker();
+    const h = base('packetSpike', 1400);
+    tr.update(0, planTelegraph([h], sled(1000, 700, { grounded: false, landX: 2000 }), FAR, { nowMs: 0 }));
+    expect(tr.lastArrivalMs(h)).toBeCloseTo(400 / 700 * 1000, 6);
+  });
+});

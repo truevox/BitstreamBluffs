@@ -4,7 +4,7 @@
  * DIED HERE marker stands on a same-seed retry.
  */
 import {
-  CRASH_BEAT, killerName, hopTiming, verdictText, crashReport, crashBeat, deathMarkerX,
+  CRASH_BEAT, killerName, hopTiming, verdictText, crashReport, crashBeat, deathMarkerX, gameOverLine,
 } from '../../src/systems/CrashReport.js';
 import { GROUND_WARN } from '../../src/systems/HazardTelegraph.js';
 import { loadContent } from './_helpers.js';
@@ -130,5 +130,22 @@ describe('deathMarkerX: DIED HERE only on a same-seed, same-mask retry', () => {
   test('an absent mask reads as 0 on both sides', () => {
     expect(deathMarkerX({ seed: 'abc', x: 900 }, 'abc', 0)).toBe(900);
     expect(deathMarkerX({ seed: 'abc', biomeMask: 0, x: 900 }, 'abc', undefined)).toBe(900);
+  });
+});
+
+describe('gameOverLine: only for the run that just crashed', () => {
+  const lc = crashReport({ runId: 'r-9', seed: 's', startX: 0, pxPerMeter: 20, crashMs: 5000, cause: 'hazard', def: DEFS.gearGate, x: 4000, lastHopMs: null, arrivalMs: 5000 });
+  test('the report carries the run id', () => {
+    expect(lc.runId).toBe('r-9');
+    expect(lc.line).toBe('GEAR GATE AT 200 M - NO HOP');
+  });
+  test('same run id and a crash record: the line', () => {
+    expect(gameOverLine(lc, { id: 'r-9', cause: 'crash' })).toBe('GEAR GATE AT 200 M - NO HOP');
+  });
+  test('a quit, another run (stale report), or nothing: empty', () => {
+    expect(gameOverLine(lc, { id: 'r-9', cause: 'quit' })).toBe('');
+    expect(gameOverLine(lc, { id: 'r-10', cause: 'crash' })).toBe('');
+    expect(gameOverLine(null, { id: 'r-9', cause: 'crash' })).toBe('');
+    expect(gameOverLine(lc, null)).toBe('');
   });
 });

@@ -219,6 +219,8 @@ export class TelegraphTracker {
     /** @type {WeakMap<Object, number>} hazard -> run time (ms) of its first non-clear mark. */
     this._warned = new WeakMap();
     this._cued = new WeakSet();
+    /** @type {WeakMap<Object, number>} hazard -> latest finite planned arrival (run time, ms). */
+    this._arrival = new WeakMap();
     this._lastWarnSoundMs = -1e9;
   }
 
@@ -231,6 +233,7 @@ export class TelegraphTracker {
   update(nowMs, marks) {
     const events = [];
     for (const m of marks) {
+      if (Number.isFinite(m.arrivalMs)) this._arrival.set(m.ref, m.arrivalMs);
       if (m.clear || m.state === 'open') continue;
       if (!this._warned.has(m.ref)) {
         this._warned.set(m.ref, nowMs);
@@ -244,6 +247,15 @@ export class TelegraphTracker {
       }
     }
     return events;
+  }
+
+  /**
+   * The latest planned arrival for a hazard (crash report: the ideal-hop window of the hazard that killed).
+   * @param {Object} ref hazard. @returns {number|null} run time (ms), or null if it was never planned with a run time.
+   */
+  lastArrivalMs(ref) {
+    const v = this._arrival.get(ref);
+    return v == null ? null : v;
   }
 
   /** @param {Object} ref hazard. @returns {number|null} run time (ms) it was first announced, or null. */
