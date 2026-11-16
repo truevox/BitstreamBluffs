@@ -4066,7 +4066,7 @@ async function main() {
           const [ix, iy] = HAZ_DEFS.gustFront.onHit.impulsePxS;
           const mag = Math.hypot(hz.dv.x, hz.dv.y);
           if (hz.isDanger) fail(names.hz, 'a gust (no crash) is drawn in danger');
-          else if (!(Math.abs(hz.dv.x - ix) < 0.5 && Math.abs(hz.dv.y - iy) < 0.5) || mag > GUST_MAX_PX_S + 1e-6) fail(names.hz, `body velocity changed by (${hz.dv.x.toFixed(2)}, ${hz.dv.y.toFixed(2)}) px/s, want (${ix}, ${iy}), |dv| ${mag.toFixed(1)} (max ${GUST_MAX_PX_S})`);
+          else if (!(Math.abs(hz.dv.x - ix) < 0.5 && Math.abs(hz.dv.y - iy) < 0.5) || mag > GUST_MAX_PX_S + 1e-6 || mag < 100) fail(names.hz, `body velocity changed by (${hz.dv.x.toFixed(2)}, ${hz.dv.y.toFixed(2)}) px/s, want (${ix}, ${iy}), |dv| ${mag.toFixed(1)} (felt: 100 .. ${GUST_MAX_PX_S})`);
           else if (Math.abs(hz.cache.x - ix) > 1e-6 || Math.abs(hz.cache.y - iy) > 1e-6) fail(names.hz, `the sled's px/s cache moved (${hz.cache.x}, ${hz.cache.y})`);
           else if (hz.crashed || !hz.inWorld) fail(names.hz, `the gust crashed the run (queued ${hz.crashed}, inWorld ${hz.inWorld})`);
           else if (hz.hitEvents.join() !== 'gustFront:gust:0') fail(names.hz, `HAZARD_HIT ${hz.hitEvents}`);
@@ -4087,7 +4087,7 @@ async function main() {
         else {
           const bo = pu.bounce;
           if (!bo || bo.fatal) fail(names.pu, (bo && bo.fatal) || 'no bounce probe');
-          else if (!(Math.abs(bo.bare.rest - 0.02 * SPRING * SPRING) < 1e-6) || !(Math.abs(bo.railed.rest - 0.02 * (SPRING * PU_DEFS.stabilizerRails.effect.bounceMul) ** 2) < 1e-6) || bo.after.rest !== bo.bare.rest) fail(names.pu, `touchdown restitution bare ${bo.bare.rest}, railed ${bo.railed.rest}, after ${bo.after.rest}`);
+          else if (!(Math.abs(bo.bare.rest - 0.02 * SPRING * SPRING) < 1e-6) || !(Math.abs(bo.railed.rest - 0.02 * (SPRING * PU_DEFS.stabilizerRails.effect.bounceMul) ** 2) < 1e-6) || bo.after.rest !== bo.bare.rest || !(bo.railed.rest < bo.bare.rest * 0.5)) fail(names.pu, `touchdown restitution bare ${bo.bare.rest}, railed ${bo.railed.rest}, after ${bo.after.rest}`);
           else pass(names.pu, `${run}: at ${pu.m} m; ${L.without.ang} deg landing: crash without, sloppy with +${L.tolDeg} deg; bouncySpring touchdown restitution ${bo.bare.rest.toFixed(4)} -> ${bo.railed.rest.toFixed(4)} with Rails (rebound ${bo.bare.up} -> ${bo.railed.up} px/s, airborne frames ${bo.bare.air} -> ${bo.railed.air})`);
         }
       }
