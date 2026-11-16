@@ -104,7 +104,7 @@ describe('B3 content: the spec §4 values and the motion blocks', () => {
   test('B3 tuning: Sandrunner Skis are a short punchy slick burst, Royal Jelly Wax a longer gentler glide (both kind glide)', () => {
     const skis = c.powerups.sandrunnerSkis.effect;
     const jelly = c.powerups.royalJellyWax.effect;
-    expect(skis).toEqual({ kind: 'glide', frictionMul: 0.3, durationMs: 2500 });
+    expect(skis).toEqual({ kind: 'glide', frictionMul: 0.3, durationMs: 2000 });
     expect(jelly).toEqual({ kind: 'glide', frictionMul: 0.55, durationMs: 5000 });
     for (const e of [skis, jelly]) {
       expect(glideFrictionMul(e.frictionMul)).toBe(e.frictionMul); // inside the bounds: not clamped

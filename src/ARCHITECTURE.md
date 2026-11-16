@@ -1364,7 +1364,7 @@ the pickup's `frictionMul`, which RunScene already passes as `TunerContext.glide
 
 | Pickup | effect | Flavour |
 |---|---|---|
-| Sandrunner Skis | `glide` frictionMul 0.3, 2.5 s (strength 0.875: speedMul x1.306, quadDrag x0.694) | short, punchy slick burst |
+| Sandrunner Skis | `glide` frictionMul 0.3, 2 s (strength 0.875: speedMul x1.306, quadDrag x0.694) | short, punchy slick burst |
 | Royal Jelly Wax | `glide` frictionMul 0.55, 5 s (strength 0.5625: speedMul x1.197, quadDrag x0.803) | longer, gentler glide |
 
 **Rolls go downhill, away from the sled (`systems/HazardMotion.js`).**
