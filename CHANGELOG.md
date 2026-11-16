@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Readable Chaos (hazard telegraph, speed zoom, death legibility)
+## v2.11.0 - Readable Chaos, phases 1-2 (hazard telegraph, speed zoom) (2026-11-15)
 
 - **Ground hazards now announce themselves.** Every ground hazard gets a marker about 2 s of travel before the sled reaches it (speed-scaled, 700 to 1600 px), instead of first showing as a 20 px sprite 0.5 to 0.85 s out. While the hazard is off screen, a badge with its silhouette stands at the right screen edge on the terrain line, with chevrons marching toward the edge and a bar that fills as it closes in; once it is in view, a faint light column stands on it.
 - **Colour is what to do.** Red with up-chevrons = hop (Packet Spike, Glitch Chasm). Amber with flat bars = brace, it slows or scrambles (Overflow Firewall, Garbage-Data Vent, the biome slows). The marker turns **lime, with a filled arrow, exactly inside the ideal hop window** (the same rule the sim's hop oracle uses: 380 ms down to 130 ms before the box).
