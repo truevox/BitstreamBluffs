@@ -77,3 +77,35 @@ voice switches and eight decoded media clips with no errors.
 All generated private audio under public/music-transcription-audition/
 is excluded from Git; source model weights and rights-restricted
 SheetSage outputs are research-only, not shipped game assets.
+
+## Full Pope song Gentle and Pure (2026-11-15)
+
+After praising 25s Gentle as "PRETTY damn tight", Marvin asked
+to extend the organ arrangement to the complete Pope song.
+This was performed, not automatically integrated into the game.
+
+The complete SheetSage2 original-vocal transcription supplied 642
+notes across 214.976 seconds. Within the former 25s test window
+the full-song and 25s score agree on all 68 MIDI pitches and nearby
+onsets (median delta 15 milliseconds), rather than a new unrelated
+melody. SheetSage pitches were shifted one octave down as an
+instrumental registration choice, not a claim that the soprano
+actually sang one octave lower.
+
+Using the exact original V3 sampled pipe-organ program 19, attack
+layer, V1 texture and polish, two full 3:35 variants were rendered:
+- Gentle: bounded V3 within-note fluctuations maximum +/-32 cents,
+  movement weight 0.72; 642 notes, -24.03dBFS RMS/-9.36dBFS peak
+- Pure: same 642 SheetSage note pitches and timings, no bends,
+  -24.03dBFS RMS/-9.76dBFS peak
+
+Both OGG Opus 144kbps and PCM WAV masters are saved privately on
+CT211 under transcription-lab-20261115/full-song-pope/output.
+Private full song OGGs on CT223 were verified by SHA256 against
+the source render. They play below the 25s comparison at:
+http://100.115.120.66:8181/tools/music/audition-transcription/
+
+Reproduction: build-full-pope.py and render-full-pope.py.
+Noncommercial SheetSage2/MERT pretrained weights were used in
+research. Do not ship in paid game or claim commercial clearance;
+the owner has yet to approve the entire new full song by ear.

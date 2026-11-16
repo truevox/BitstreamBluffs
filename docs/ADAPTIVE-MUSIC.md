@@ -569,3 +569,42 @@ artist approval yet. Detailed reproducibility and model
 corroboration: tools/music/transcription-ear-test/README.md.
 Research SheetSage/MERT pretrained weights are CC-BY-NC;
 do not adopt output into game until rights review.
+
+## Pope full Gentle and track 33 One More Run (2026-11-15)
+
+Marvin asked for two tasks: extend 25-second Gentle V3 organ plus
+SheetSage -12 to the entire Pope song; include One More Run alongside
+the other 32 songs, collapsing its eleven original stems as needed.
+
+DONE, Pope research master: SheetSage2 full-song vocal transcription
+642 notes. Full Gentle and Pure comparators rendered 214.976 seconds
+using the original V3 church organ program, source texture and
+original performance clock; bounded V3 pitch expression only
+inside fixed SheetSage -12 notes (Gentle +/-32 cents, weight 0.72).
+All 68 notes in the prior 25s test are supported by the full-song
+transcription with 15ms median onset difference. Full OGG previews
+and WAV masters preserved; original Pope and V3 unaffected.
+
+DONE, One More Run: Already listed as song 33 of CT211 launch33,
+with eleven user-supplied WAV stems and source ZIP/master. Generated
+six aligned 44.1kHz stereo 24-bit FLAC compatibility groups:
+vocals=lead+backing, drums=drums+percussion, bass=bass,
+guitar=guitar, piano=keyboard, other=synth+strings+woodwinds+fx.
+All 11 source inputs appear in one group; all 6 outputs have
+7,699,860 sample frames. Drum group uses gain 0.9936 to avoid
+clipping. Three existing track-33 manifest records expose optional
+grouped_6s alongside original_11s; manifests backed up atomically.
+The original 11 stem sum does not reconstruct the original master,
+so use unmodified master at neutral levels and six groups for
+gameplay ducking with audio QA.
+
+Private listening site for full Pope Gentle, Pure, original and
+One More Run original:
+http://100.115.120.66:8181/tools/music/audition-transcription/
+Read-only 33-track bank: http://192.168.86.211:8767/
+
+Repro scripts: tools/music/transcription-ear-test/build-full-pope.py,
+render-full-pope.py and tools/music/stem-bank group+manifest scripts.
+New music remains research-only due to noncommercial SheetSage2
+weights; no game installation, commercial release approval,
+original master overwrite or further Kie spending.

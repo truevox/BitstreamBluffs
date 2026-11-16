@@ -1,0 +1,32 @@
+{
+  "song": "Pope Leo Wants the AI Root Password",
+  "sourceMidi": "/root/bitstream-maxi/transcription-lab-20261115/full-song-pope/input/sheetsage2-vocal-full.mid",
+  "sourceNotes": 642,
+  "recordableNotes": 642,
+  "originalV3Analysis": "/root/bitstream-maxi/mountain-voice-gallery-v3/pope-pitch-stable-35.npz",
+  "originalWavFrames": 10318847,
+  "fps": 48000,
+  "controlRateHz": 100,
+  "fullDurationSeconds": 214.97597916666666,
+  "organProgram": 19,
+  "registerShiftSemitones": -12,
+  "exactRegisterMeaning": "musical arrangement octave; not a claim Maxi sang an octave lower",
+  "variants": {
+    "pure": {
+      "controlsPath": "/root/bitstream-maxi/transcription-lab-20261115/full-song-pope/output/pure/controls.npz",
+      "notesPath": "/root/bitstream-maxi/transcription-lab-20261115/full-song-pope/output/pure/notes.json",
+      "expressiveBoundCents": 0.0,
+      "expressiveWeight": 0.0,
+      "processedNotes": 0,
+      "changedFrames": 0
+    },
+    "gentle": {
+      "controlsPath": "/root/bitstream-maxi/transcription-lab-20261115/full-song-pope/output/gentle/controls.npz",
+      "notesPath": "/root/bitstream-maxi/transcription-lab-20261115/full-song-pope/output/gentle/notes.json",
+      "expressiveBoundCents": 32.0,
+      "expressiveWeight": 0.72,
+      "processedNotes": 642,
+      "changedFrames": 13101
+    }
+  }
+}
