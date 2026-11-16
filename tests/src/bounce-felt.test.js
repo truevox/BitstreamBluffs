@@ -6,7 +6,9 @@
  * sled is thrown back up by a share of its touchdown impact speed (BiomeEffects.springRebound), bounded and decaying.
  * PhysicsTuner combines the share (zones, then the Stabilizer Rails' bounceMul squared, as restitution does).
  */
-import { springRebound, SPRING_REBOUND_MIN_PX_S, SPRING_REBOUND_MAX_PX_S, stabilizeBounceMul } from '../../src/systems/BiomeEffects.js';
+import {
+  springRebound, springReboundVelocity, SPRING_REBOUND_MIN_PX_S, SPRING_REBOUND_MAX_PX_S, stabilizeBounceMul,
+} from '../../src/systems/BiomeEffects.js';
 import { PhysicsTuner } from '../../src/systems/PhysicsTuner.js';
 import { CRASH_IMPACT_PX_S } from '../../src/systems/TrickTracker.js';
 import { loadContent } from './_helpers.js';
@@ -46,6 +48,59 @@ describe('BiomeEffects.springRebound (pure)', () => {
       while ((v = springRebound(v, share)) > 0) { n++; if (n > 10) break; }
       expect(n).toBeLessThanOrEqual(4);
     }
+  });
+});
+
+const tangent = (v, angleDeg) => {
+  const a = (angleDeg * Math.PI) / 180;
+  return v.vx * Math.cos(a) + v.vy * Math.sin(a);
+};
+const outwardNormal = (v, angleDeg) => {
+  const a = (angleDeg * Math.PI) / 180;
+  return v.vx * Math.sin(a) - v.vy * Math.cos(a);
+};
+
+describe('BiomeEffects.springReboundVelocity (slope-normal, no forward energy)', () => {
+  test('on flat ground it is a vertical rebound: horizontal speed is untouched', () => {
+    const out = springReboundVelocity(420, 180, 0, 150);
+    expect(out.vx).toBeCloseTo(420, 9);
+    expect(out.vy).toBeCloseTo(-150, 9);
+  });
+
+  test('on every slope the along-slope speed is exactly preserved and the outward normal becomes max(old, desired)', () => {
+    for (const angle of [-35, -18, 0, 12, 30, 42]) {
+      for (const [vx, vy, up] of [[520, 180, 140], [0, 0, 100], [-80, 260, 90], [600, -40, 60]]) {
+        const before = { vx, vy };
+        const after = springReboundVelocity(vx, vy, angle, up);
+        expect(tangent(after, angle)).toBeCloseTo(tangent(before, angle), 9);
+        expect(outwardNormal(after, angle)).toBeCloseTo(Math.max(outwardNormal(before, angle), up), 9);
+        // a rebound may never inject speed along the slope (the old global launchUp did on descents)
+        expect(Math.abs(tangent(after, angle))).toBeLessThanOrEqual(Math.abs(tangent(before, angle)) + 1e-9);
+      }
+    }
+  });
+
+  test('a downhill 600 px/s roll plus a 120 px/s rebound is 600 / 120, not the 848 px/s the old global launch made', () => {
+    const a = (30 * Math.PI) / 180;
+    const out = springReboundVelocity(600 * Math.cos(a), 600 * Math.sin(a), 30, 120);
+    expect(tangent(out, 30)).toBeCloseTo(600, 9);
+    expect(outwardNormal(out, 30)).toBeCloseTo(120, 9);
+    expect(Math.hypot(out.vx, out.vy)).toBeCloseTo(Math.hypot(600, 120), 9);
+    expect(Math.hypot(out.vx, out.vy)).toBeLessThan(Math.hypot(600, 600));
+  });
+
+  test('an already-outward velocity faster than the wanted rebound is left alone', () => {
+    const out = springReboundVelocity(300, -220, 0, 100);
+    expect(out.vx).toBeCloseTo(300, 9);
+    expect(out.vy).toBeCloseTo(-220, 9);
+    const touching = springReboundVelocity(300, 20, 0, 0);
+    expect(touching.vx).toBeCloseTo(300, 9);
+    expect(touching.vy).toBeCloseTo(20, 9);
+  });
+
+  test('bad input is safe (no NaN velocity)', () => {
+    expect(springReboundVelocity(NaN, 5, NaN, NaN)).toEqual({ vx: 0, vy: 5 });
+    expect(Number.isFinite(springReboundVelocity(Infinity, 5, undefined, 90).vx)).toBe(true);
   });
 });
 

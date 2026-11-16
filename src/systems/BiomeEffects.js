@@ -148,7 +148,7 @@ export const SPRING_REBOUND_MAX_SHARE = 0.6;
  * Sky Jellyfish's felt bounce: the upward speed (px/s, positive = up) a scored landing gets back inside a zone that
  * carries `physics.landingRebound` (combined by PhysicsTuner.getEffective, Rails already applied). The share is clamped
  * to [0, SPRING_REBOUND_MAX_SHARE], the result to SPRING_REBOUND_MAX_PX_S, and a result under SPRING_REBOUND_MIN_PX_S is
- * 0, so a chain of touchdowns (each landing at about the speed the last rebound left at) always stops.
+ * 0, so on flat ground a chain of touchdowns (each landing at about the speed the last rebound left at) always stops.
  * @param {number} impactSpeedPxS speed into the ground at touchdown (TrickTracker LandingResult.impactSpeedPxS).
  * @param {number} share effective landingRebound.
  * @returns {number}
@@ -158,6 +158,33 @@ export function springRebound(impactSpeedPxS, share) {
   const v = impactSpeedPxS * clamp(share, 0, SPRING_REBOUND_MAX_SHARE);
   if (v < SPRING_REBOUND_MIN_PX_S) return 0;
   return Math.min(v, SPRING_REBOUND_MAX_PX_S);
+}
+
+/**
+ * Slope-normal spring rebound: keep the velocity along the slope and raise the velocity away from it to at least
+ * `upPxS`. `groundAngleDeg` is the terrain slope (clockwise positive = descending right, as SledFrameState defines it),
+ * so the outward normal is `(sin a, -cos a)` and the tangent `(cos a, sin a)`. The outward normal becomes
+ * `max(existing outward, upPxS)`: a touchdown never converts forward/tangential speed into extra bounce energy, which
+ * a global vertical `launchUp` did on descents. A non-positive `upPxS` leaves the velocity unchanged, and bad input is
+ * treated as zero rather than producing NaN. Values are world px/s, y down.
+ * @param {number} vx world px/s.
+ * @param {number} vy world px/s.
+ * @param {number} groundAngleDeg slope under the sled (deg).
+ * @param {number} upPxS desired outward normal speed (px/s, positive = away from the ground).
+ * @returns {{vx:number, vy:number}}
+ */
+export function springReboundVelocity(vx, vy, groundAngleDeg, upPxS) {
+  const x = Number.isFinite(vx) ? vx : 0;
+  const y = Number.isFinite(vy) ? vy : 0;
+  const want = Number.isFinite(upPxS) && upPxS > 0 ? upPxS : 0;
+  if (want === 0) return { vx: x, vy: y };
+  const a = ((Number.isFinite(groundAngleDeg) ? groundAngleDeg : 0) * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const along = x * cos + y * sin;
+  const outward = x * sin - y * cos;
+  const n = Math.max(outward, want);
+  return { vx: cos * along + sin * n, vy: sin * along - cos * n };
 }
 
 const RANK = { crash: 0, sloppy: 1, good: 2, perfect: 3 };
