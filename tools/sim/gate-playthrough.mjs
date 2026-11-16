@@ -56,8 +56,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const WITH_BOOSTS = process.argv.includes('--with-boosts');
 // How many results each mode must record. Raise these when you add a check; a lower count means a
 // block silently did not run.
-const EXPECTED_WITH_BOOSTS = 66; // B3 tuning: +2 (each rolling hazard never catches a moving sled and overtakes a stopped one slowly, in view); Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
-const EXPECTED_WITHOUT_BOOSTS = 54; // B3 tuning: +2; Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
+const EXPECTED_WITH_BOOSTS = 70; // Readable Chaos 3: +4 (real crash named / slowed / on Game Over, late hop verdict, absorbed hit is no crash, DIED HERE on retry); B3 tuning: +2 (each rolling hazard never catches a moving sled and overtakes a stopped one slowly, in view); Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
+const EXPECTED_WITHOUT_BOOSTS = 58; // Readable Chaos 3: +4; B3 tuning: +2; Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
 // xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
@@ -2009,6 +2009,240 @@ async function main() {
       else if (gateBad.length) fail(name, `${gateBad.length} gate frames disagree with isPassable at arrival: ${JSON.stringify(gateBad[0])}`);
       else if (!verdicts.has('open') || !verdicts.has('closed')) fail(name, `gate verdict never changed (${[...verdicts].join(',')})`);
       else pass(name, `boulder at ${ro.m} m announced ${ro.teleAt.dx} px out (on screen ${ro.teleAt.onScreen}); ${s.length} rolling frames, meeting point within ${maxErr.toFixed(2)} px, up to ${maxDiff.toFixed(2)} s from static dx/vx; gate at ${go.m} m: ${gs.length} frames, verdicts ${[...verdicts].join('/')}, all agree with isPassable at arrival`);
+    }
+
+    // ---- Readable Chaos phase 3: death legibility on the built game
+    //
+    // Real seed@mask runs, paused and stepped through the shipped run.update (the crash goes through onHazard ->
+    // resolveCrash -> doCrash -> reportCrash, the beat through updateCrashed -> renderFrame / updateCamera). A shared
+    // page helper finds a real ground crash hazard of the run's own terrain and poses the real sled in front of it.
+    {
+      const RC3 = async (seedMask, body, arg) => {
+        const { page, errors } = await bootWithProfile(browser, port, JSON.parse(JSON.stringify(PROFILE)));
+        try {
+          const ok = await page.evaluate(async ({ seedMask }) => {
+            const g = window.__bbGame;
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            g.scene.start('TitleScene');
+            const t0 = Date.now();
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              if (!started && tt && !tt.starting) { started = true; tt.startRun(seedMask); }
+              const rr = g.scene.getScene('RunScene');
+              if (rr && rr.scene.isActive() && rr.sled && !rr.sled.destroyed && rr.sled.inWorld) {
+                await wait(300);
+                rr.scene.pause();
+                const H = {
+                  g, run: rr, clock: rr.runTimeMs, wait,
+                  step(n = 1) { for (let i = 0; i < n; i++) { this.clock += 16; this.run.update(this.clock, 16); } },
+                  /** The k-th hazard of id `id` in the first 200 chunks, as a live entity. */
+                  hazard(id, k = 0) {
+                    const run = this.run;
+                    let n = 0;
+                    for (let i = 0; i < 200; i++) {
+                      const ch = run.terrain.getChunk(i);
+                      for (const sp of ch.hazards) {
+                        if (sp.defId !== id || n++ < k) continue;
+                        if (!run.mesh.chunks.has(ch.index)) run.takeChunk(ch);
+                        return (run.hazards.get(ch.index) || []).find((e) => e.def.id === id && e.spawn.x === sp.x) || null;
+                      }
+                    }
+                    return null;
+                  },
+                  pose(x, v) {
+                    const run = this.run;
+                    run.streamTerrain(x);
+                    const ang = run.slopeAt(x);
+                    run.sled.setPose(x, run.terrain.heightAt(x) - 18, ang, Math.cos((ang * Math.PI) / 180) * v, Math.sin((ang * Math.PI) / 180) * v);
+                    if (run.snapCamera) run.snapCamera();
+                  },
+                  noInput() { this.run.inputRouter = { poll: () => null }; },
+                };
+                H.noInput();
+                window.__rc3 = H;
+                return true;
+              }
+              await wait(100);
+            }
+            return false;
+          }, { seedMask });
+          if (!ok) return { out: { fatal: 'RunScene never produced a live sled' }, errors, page };
+          const out = await page.evaluate(body, arg || {}).catch((e) => ({ fatal: String(e) }));
+          return { out, errors };
+        } finally { await page.close(); }
+      };
+
+      // A: a real hazard crash: the banner names it, the beat runs (0.25x FX for 400 ms, zoom-in), REG.LAST_CRASH carries
+      // the line, the record has none of it and still verifies, and Game Over shows the line within the crash time.
+      {
+        const name = 'readable chaos 3: a real Packet Spike crash is named on the banner, slowed 400 ms at 0.25x with a zoom-in, and named on Game Over';
+        const { out: o, errors } = await RC3('gate-seed@0', async () => {
+          const H = window.__rc3;
+          const { run, g } = H;
+          const ui = g.scene.getScene('UIScene');
+          g.registry.set('lastCrash', null);
+          let h = null;
+          for (let k = 0; k < 6 && !run.crashed; k++) {
+            h = H.hazard('packetSpike', k);
+            if (!h) break;
+            H.pose(h.cx - 260, 420);
+            for (let i = 0; i < 90 && !run.crashed && run.sled.x < h.cx + 40; i++) { run.sled.invulnerableMs = 0; run.shieldCharges = 0; H.step(); }
+          }
+          if (!run.crashed) return { fatal: 'no Packet Spike crashed the real sled' };
+          const lc = g.registry.get('lastCrash');
+          const record = g.registry.get('lastRecord');
+          const banner = ui && ui.banner && ui.banner.main ? ui.banner.main.text : null;
+          const fxDts = [];
+          const fxUpdate = run.fx.update.bind(run.fx);
+          run.fx.update = (d, hf) => { fxDts.push(d); return fxUpdate(d, hf); };
+          const zooms = [run.cameras.main.zoom];
+          let frames = 0;
+          while (!run._leaving && frames < 120) { H.step(); frames++; if (!run._leaving) zooms.push(run.cameras.main.zoom); }
+          const t0 = Date.now();
+          while (!g.scene.isActive('GameOverScene') && Date.now() - t0 < 4000) await H.wait(50);
+          await H.wait(200);
+          const go = g.scene.getScene('GameOverScene');
+          return {
+            lc, banner, frames, fxRatios: fxDts.map((d) => Math.round((d / 16) * 100) / 100), zoom0: zooms[0], zoomMax: Math.max(...zooms),
+            recordKeys: record ? Object.keys(record) : null, recordId: record && record.id, recordCause: record && record.cause,
+            goActive: g.scene.isActive('GameOverScene'), goLine: go && go.crashLine && go.crashLine.main ? go.crashLine.main.text : null,
+            goLineY: go && go.crashLine ? go.crashLine.y : null, titleBottom: go && go.title ? go.title.y + 8 * (go.title.scale || go.title.scaleY || 4) : null,
+          };
+        });
+        const slow = (o.fxRatios || []).filter((r) => r === 0.25).length;
+        if (o.fatal) fail(name, o.fatal);
+        else if (errors.length) fail(name, `page errors: ${errors.join(' | ')}`);
+        else if (!o.lc || !/^PACKET SPIKE AT \d+ M - (NO HOP|HOP WAS .+)$/.test(o.lc.line)) fail(name, `REG.LAST_CRASH line ${JSON.stringify(o.lc && o.lc.line)}`);
+        else if (o.lc.runId !== o.recordId) fail(name, `report runId ${o.lc.runId} is not the record id ${o.recordId}`);
+        else if (o.recordKeys.some((k) => /line|verdict|killer|lastCrash/i.test(k)) || o.recordCause !== 'crash') fail(name, `the record carries crash-report fields: ${o.recordKeys.join(',')}`);
+        else if (o.banner !== 'PACKET SPIKE') fail(name, `banner ${JSON.stringify(o.banner)} (want PACKET SPIKE)`);
+        else if (!(slow >= 23 && slow <= 27)) fail(name, `${slow} frames at 0.25x (want 25 = 400 ms): ${o.fxRatios.slice(0, 40).join(' ')}`);
+        else if (!(o.zoomMax >= o.zoom0 * 1.12)) fail(name, `no zoom-in: ${o.zoom0} -> max ${o.zoomMax}`);
+        else if (!(o.frames * 16 <= 1200)) fail(name, `crash to Game Over took ${o.frames * 16} ms of frames (limit 1200)`);
+        else if (!o.goActive || o.goLine !== o.lc.line) fail(name, `Game Over line ${JSON.stringify(o.goLine)} (want ${o.lc.line})`);
+        else if (!(o.goLineY >= o.titleBottom && o.goLineY + 8 <= 54)) fail(name, `Game Over line at y ${o.goLineY} overlaps the title (bottom ${o.titleBottom}) or the panels (54)`);
+        else pass(name, `banner PACKET SPIKE; ${slow} frames at 0.25x; zoom ${o.zoom0} -> ${o.zoomMax}; Game Over after ${o.frames * 16} ms: "${o.goLine}"`);
+      }
+
+      // B: a real hop pressed too late (after the ideal window, before the box) is reported LATE by the telegraph's window.
+      {
+        const name = 'readable chaos 3: a real late hop before a Packet Spike is reported "HOP WAS x S LATE" against the telegraph window';
+        const { out: o, errors } = await RC3('gate-seed@0', async () => {
+          const H = window.__rc3;
+          const { run, g } = H;
+          g.registry.set('lastCrash', null);
+          let hopT = null;
+          let h = null;
+          for (let k = 0; k < 8 && !run.crashed; k++) {
+            h = H.hazard('packetSpike', k);
+            if (!h) break;
+            H.pose(h.cx - 300, 420);
+            hopT = null;
+            for (let i = 0; i < 100 && !run.crashed && run.sled.x < h.cx + 40; i++) {
+              run.sled.invulnerableMs = 0;
+              run.shieldCharges = 0;
+              const eta = (h.cx - run.sled.x) / Math.max(run.sled.vx, 60) * 1000;
+              // the sled's nose meets the box ~55 ms out at this speed; the window closes 130 ms out: hop 60-110 ms out
+              if (hopT === null && run.sled.grounded && eta <= 110 && eta > 60) {
+                run.inputRouter = { poll: () => ({ hop: true, pressed: { hop: true } }) };
+                H.step();
+                H.noInput();
+                if (run._lastHopMs != null) hopT = run._lastHopMs;
+              } else H.step();
+            }
+            if (!run.crashed) continue;
+          }
+          if (!run.crashed) return { fatal: 'no late-hopped Packet Spike crashed the real sled' };
+          const lc = g.registry.get('lastCrash');
+          return { lc, hopT, arr: run.teleTracker.lastArrivalMs(h), lastHop: run._lastHopMs };
+        });
+        const m = o.lc && /HOP WAS (\d+\.\d\d) S LATE$/.exec(o.lc.line || '');
+        const want = o.arr != null && o.hopT != null ? (o.hopT - (o.arr - 380 + 250)) / 1000 : NaN;
+        if (o.fatal) fail(name, o.fatal);
+        else if (errors.length) fail(name, `page errors: ${errors.join(' | ')}`);
+        else if (o.hopT == null) fail(name, `the injected hop never executed (lastHop ${o.lastHop})`);
+        else if (!m) fail(name, `line ${JSON.stringify(o.lc && o.lc.line)} does not say LATE`);
+        else if (!(Math.abs(Number(m[1]) - want) <= 0.011)) fail(name, `late by ${m[1]} s, the telegraph window says ${want.toFixed(3)} s`);
+        else pass(name, `"${o.lc.line}" (hop at ${Math.round(o.hopT)} ms, planned arrival ${Math.round(o.arr)} ms)`);
+      }
+
+      // C: a hazard hit a Hashed Backup charge absorbs is not a crash: no report, no killer banner, the run goes on.
+      {
+        const name = 'readable chaos 3: a Packet Spike hit absorbed by a shield charge is not a crash (no report, no killer banner, run goes on)';
+        const { out: o, errors } = await RC3('gate-seed@0', async () => {
+          const H = window.__rc3;
+          const { run, g } = H;
+          const ui = g.scene.getScene('UIScene');
+          g.registry.set('lastCrash', null);
+          const crashes = [];
+          const onCrash = (p) => crashes.push(p);
+          g.events.on('bb:crash', onCrash);
+          let h = null;
+          for (let k = 0; k < 6 && !crashes.length; k++) {
+            h = H.hazard('packetSpike', k);
+            if (!h) break;
+            H.pose(h.cx - 260, 420);
+            run.shieldCharges = 1;
+            for (let i = 0; i < 90 && !crashes.length && run.sled.x < h.cx + 40; i++) { run.sled.invulnerableMs = 0; H.step(); }
+          }
+          g.events.off('bb:crash', onCrash);
+          H.step(5);
+          return {
+            crashes: crashes.map((p) => ({ negated: p.negated, hazardId: p.hazardId })), crashed: run.crashed, lc: g.registry.get('lastCrash'),
+            banner: ui && ui.banner && ui.banner.main ? ui.banner.main.text : null, shield: run.shieldCharges,
+          };
+        });
+        if (o.fatal) fail(name, o.fatal);
+        else if (errors.length) fail(name, `page errors: ${errors.join(' | ')}`);
+        else if (!o.crashes.length || !o.crashes[0].negated) fail(name, `no negated crash: ${JSON.stringify(o.crashes)}`);
+        else if (o.crashed) fail(name, 'the run ended');
+        else if (o.lc) fail(name, `REG.LAST_CRASH was written: ${JSON.stringify(o.lc)}`);
+        else if (o.banner === 'PACKET SPIKE') fail(name, 'the killer banner showed for an absorbed hit');
+        else pass(name, `negated ${o.crashes[0].hazardId}, run alive, no report, banner "${o.banner}"`);
+      }
+
+      // D: a same-seed retry plants DIED HERE at the death x; another seed does not.
+      {
+        const name = 'readable chaos 3: a same-seed retry shows DIED HERE at the death x; another seed shows none';
+        const { out: o, errors } = await RC3('gate-seed@0', async () => {
+          const H = window.__rc3;
+          const { g } = H;
+          const lc = { runId: 'old', seed: 'gate-seed', biomeMask: 0, x: H.run.startX + 640 * 20, distM: 640, line: 'X' };
+          const start = async (seedMask) => {
+            g.registry.set('lastCrash', lc);
+            const prevId = g.scene.getScene('RunScene') ? g.scene.getScene('RunScene').runId : null;
+            const old = g.scene.getScene('RunScene');
+            if (old && old.scene.isActive()) old.scene.stop();
+            g.scene.start('TitleScene');
+            const t0 = Date.now();
+            let started = false;
+            while (Date.now() - t0 < 15000) {
+              const tt = g.scene.getScene('TitleScene');
+              if (!started && tt && tt.scene.isActive() && !tt.starting) { started = true; tt.startRun(seedMask); }
+              const rr = g.scene.getScene('RunScene');
+              if (started && rr && rr.runId !== prevId && rr.scene.isActive() && rr.sled && rr.sled.inWorld) return rr;
+              await H.wait(100);
+            }
+            return null;
+          };
+          const same = await start('gate-seed@0');
+          if (!same) return { fatal: 'retry did not start' };
+          const dm = same.deathMarker;
+          const sameOut = dm ? { x: dm.x, label: dm.label && dm.label.text } : null;
+          // the marker is drawn once the sled is near: pose close and render a frame
+          if (dm) { same.scene.pause(); same.sled.setPose(lc.x - 600, same.terrain.heightAt(lc.x - 600) - 18, 0, 300, 0); same.streamTerrain(lc.x); same.renderFrame(16); }
+          const drawn = dm && dm.gfx ? dm.gfx.commandBuffer.length : 0;
+          const other = await start('gate-seed-2@0');
+          return { lcX: lc.x, same: sameOut, drawn, other: other ? !!other.deathMarker : 'no run' };
+        });
+        if (o.fatal) fail(name, o.fatal);
+        else if (errors.length) fail(name, `page errors: ${errors.join(' | ')}`);
+        else if (!o.same || o.same.x !== o.lcX || o.same.label !== 'DIED HERE 640m') fail(name, `same-seed marker ${JSON.stringify(o.same)} (want x ${o.lcX}, DIED HERE 640m)`);
+        else if (!(o.drawn > 0)) fail(name, 'the marker drew nothing near the sled');
+        else if (o.other !== false) fail(name, `another seed: marker ${o.other}`);
+        else pass(name, `retry: ${o.same.label} at x ${o.same.x} (${o.drawn} draw commands); gate-seed-2: none`);
+      }
     }
 
     // ---- B0 (biome full treatment): every new effect acts on the REAL run. Fixture defs are injected into the registry
