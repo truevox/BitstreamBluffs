@@ -297,3 +297,13 @@ HTTP errors. Independently checked 22 new-vs-old audio pairs:
 nonzero audio, safe peaks, and distinct waveform samples.
 No game chase/physics or public soundtrack modifications; this
 is first draft AUDIO, pending user listening approval.
+
+## November 16 research V2 — not in the listening lab
+
+While the owner has not yet listened to guitar/bass/drums/featured alternatives,
+we performed a strictly ADDITIVE technical research pass: audited all 33 sources,
+ran independent Basic Pitch and co-hit drum transcripts on the three excerpt
+songs, and smoke-tested a versioned, cache-safe 33-song task planner.
+The original 231 listening clips and all selections are untouched. See
+[RESEARCH-V2.md](RESEARCH-V2.md) for precise evidence, scripts, CT211 paths,
+proxy-score limitations, and the explicit owner-approval gate.
