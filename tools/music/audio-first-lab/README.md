@@ -124,3 +124,86 @@ and final Candy Cane melody are still UNAPPROVED. The lab is ONLY
 32-second previews, not 33 full-song soundtracks or commercial
 release clearance. No game-engine BSOD work until music direction
 is approved. Keep public release media and model-weight safeguards.
+
+## Third song — actual sampled guitar-family audition (2026-11-16)
+
+Marvin requested a third song to hear the guitar family, suggesting
+Varmont Is Saved first. The exact original song and separated stems
+are in the 33-song CT211 launch33 archive (slot 31). However:
+Varmont guitar active coverage ~8.7%; Other ~20%, so guitar would
+not be its featured source under Marvin's actual per-song winner rule.
+
+Scanned the whole archive for genuine guitar-dominant sources.
+Only two of 32 original six-stem songs choose guitar from the
+offline temporal musical coverage metric:
+
+- Every Hacker (Runs Out of Code) — Part 2, slot 03 and YouTube ID
+  WRBGQUqD54U: guitar ~26.2% vs Other ~22.7%, piano ~0%;
+  selected 32s excerpt from 4.5s where guitar is ~71.9% active.
+- scada_plaintext.err, slot 26: guitar ~24.1%, Other ~11.2%,
+  piano ~0.5%, its best 32s guitar passage ~48.4% active.
+
+The better ear-test candidate Every Hacker is now the third track
+of the SAME private A/B page at http://100.115.120.66:8185/ .
+Its displayed title ends in [GUITAR] so it is easy to find.
+This third track uses the real original six source stems and ELEVEN
+NEW distinct sampled-guitar performances from actual GM SoundFont
+patches, rather than just filters on the original audio.
+
+Source-only reproduction stages (all experimental source paths
+remain read-only):
+
+- tools/music/audio-first-lab/rank_guitar_full_archive.py:
+  measure all 32 separated tracks, persist guitar activity ranking.
+- tools/music/audio-first-lab/extract_polyphonic_guitar.py:
+  transcribe guitar musical content for the chosen 32 seconds using
+  local harmonic FFT templates, nonnegative sparse matching and
+  simple note-on smoothing; 41 raw candidates, 35 final events for
+  most patches. The source stem and output are in the CT211
+  launch33 archive; estimated pitches/chords MUST be ear-checked.
+- tools/music/audio-first-lab/render_sampled_guitar_showcase.py:
+  use libfluidsynth with eleven GM instruments to reperform the
+  extracted notes, including Steampunk picked BANJO (GM 105),
+  Crystal HARP (46), Candy muted FUNK guitar (28), Debumont nylon
+  guitar (24), and Pyramid sitar-like plucked lute (104). All
+  samples are source-clock-aligned and preserve a little original
+  source for attack continuity; they are not pure EQ transforms.
+- tools/music/audio-first-lab/render_third_song_excerpt.py:
+  generate six unchanged source-stem clips, eleven airy-drum
+  retextures, eleven source-based bass reference transforms and
+  eleven note-guided sampled bass alternatives for the third
+  excerpt. Needs the existing tools/music/audio_first_render.py,
+  the existing tools/music/sf2_melody_v2.py and the 2 earlier
+  bass scripts from this audio-first-lab directory on Python path.
+
+CT211 generated private music paths (NOT in Git):
+
+  /root/bitstream-maxi/launch33/guitar-showcase-ranking-20261116.json
+  /root/bitstream-maxi/launch33/hacker-guitar-notes-private.json
+  /root/bitstream-maxi/private-hacker-guitar-20261116/
+  /root/bitstream-maxi/private-hacker-full-lab-excerpt-20261116/
+
+CT223 serves 50 additional private synchronized 32s clips under
+  /home/hermes/experiments/bitstream-audio-first-4x12-20261116/site/every-hacker-pt2/
+
+The overall lab now has THREE songs and 174 independent Ogg clips.
+In the new third track, all eleven biome guitar patch alternatives
+are selected under FEATURED ACCOMPANIMENT, with Original/half/Biome
+and Solo controls. Existing bass V1/V2 and airy drum alternatives
+are also present. A 12-voice lead melody score for Every Hacker
+DOES NOT YET EXIST: the lab correctly leaves original sung Maxi
+vocals in place and DISABLES only that song's Melody A/B controls,
+rather than implying a missing instrument is available.
+
+Actual Chromium tested all three songs: sample-accurate original and
+replacement guitar start together, switching to Steampunk Banjo,
+soloing featured guitar, 0/50/100 blending, switching from Pope and
+One More Run, 9 media sources on the guitar track versus 10 on
+the other two, and zero JS/HTTP failures.
+
+This work does not add Varmont or guitar to the released game.
+The new sampled guitar voices are real DIFFERENT instruments, but
+automatically transcribed polyphonic guitar notes may be imperfect:
+owner musical approval remains pending. Pyramid original existing
+melody and game engine, BSOD physics, other song assets, and all
+release/weight safety checks remain unchanged.

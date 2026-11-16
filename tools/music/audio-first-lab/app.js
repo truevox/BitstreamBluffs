@@ -70,8 +70,10 @@ function getSpecs(){
   out.push({key:'original:'+stem,path:s.id+'/original/'+stem+'.ogg',
    group:role==='melody'?'melody':stem,role,kind:'original'});
  }
- out.push({key:'biome:melody',path:s.id+'/melody/'+b+'.ogg',
-  group:'melody',role:'melody',kind:'biome'});
+ if(s.melodyVariants!==false){
+  out.push({key:'biome:melody',path:s.id+'/melody/'+b+'.ogg',
+   group:'melody',role:'melody',kind:'biome'});
+ }
  if(b!==HOME){
   for(const role of ['bass','drums','featured']){
    const folder=role==='bass'&&bassMode==='dsp'?'bass-dsp':role;
@@ -85,7 +87,7 @@ function currentPosition(){
  if(!playing||!deck||!ctx)return position;
  return clamp(deck.offset+Math.max(0,ctx.currentTime-deck.at),0,song.durationSeconds);
 }
-const hasVariant=r=>(r==='melody'||biome!==HOME);
+const hasVariant=r=>(r==='melody'?song?.melodyVariants!==false:biome!==HOME);
 function roleGain(item){
  if(solo && item.role!==solo)return 0;
  if(item.role==='unchanged')return $('#unchanged').checked?0.8:0;
@@ -196,25 +198,34 @@ function setBlend(role,value){
 function renderInfo(){
  if(!song)return;
  const feat=song.featured;
+ const newMelody=song.melodyVariants!==false;
+ const melodyDescription=roleCard('melody').querySelector('.desc');
+ melodyDescription.textContent=newMelody?
+  'Original isolated Maxi vocal ↔ biome melodic instrument. 50/50 allows both.':
+  'GUITAR SHOWCASE: this song has only its original vocal. Twelve new melody voices have NOT been produced. Listen to the featured guitar alternatives instead.';
  const bassName=song.bassInstruments?.[biome]?.description;
  $('#bassInfo').textContent=biome===HOME?'Original bass only in the home signal.':
   bassMode==='sampled'?'Sampled instrument: '+(bassName||'themed bass')+
    '. Note detection is experimental and should be checked by ear.':
    'V1: subtly recolored ORIGINAL bass spectrum; useful as a reference against the sampled instrument.';
+ const instrumentalTitle=song.featuredInstruments?.[biome]?.instrument;
  $('#featuredInfo').textContent=feat.toUpperCase()+
   ' selected for this song by offline coverage ('+Math.round(song.activity[feat]*100)+
-  '% meaningful activity). ORIGINAL '+feat+' ↔ themed replacement.';
+  '% meaningful activity). ORIGINAL '+feat+' ↔ themed replacement.'+
+  (instrumentalTitle?' Current sampled instrument: '+instrumentalTitle+'.':'');
  $('#songMetadata').textContent=song.label+
   ' · 32-second extract from '+fmt(song.excerptStartSeconds)+
   ' · Original accompaniment activity: guitar '+Math.round(song.activity.guitar*100)+
   '%, piano '+Math.round(song.activity.piano*100)+
-  '%, Other '+Math.round(song.activity.other*100)+'%.';
+  '%, Other '+Math.round(song.activity.other*100)+'%.'+
+  (newMelody?'':' Guitar-only demo: original Maxi vocal stays as recorded; synthetic melody variants not generated.');
  const home=biome===HOME;
- for(const role of ['bass','drums','featured']){
+ for(const role of ['melody','bass','drums','featured']){
   const card=roleCard(role);
-  card.style.opacity=home?'.68':'1';
-  card.querySelector('input[type=range]').disabled=home;
-  card.querySelectorAll('[data-value]').forEach(button=>button.disabled=home);
+  const disabled=role==='melody'?!newMelody:home;
+  card.style.opacity=disabled?'.68':'1';
+  card.querySelector('input[type=range]').disabled=disabled;
+  card.querySelectorAll('[data-value]').forEach(button=>button.disabled=disabled);
  }
 }
 function setBiome(next){
@@ -337,7 +348,7 @@ function setup(){
   const response=await fetch('/catalog.json');
   if(!response.ok)throw new Error('Private audio catalog missing');
   catalog=await response.json();
-  if(!Array.isArray(catalog.songs)||catalog.songs.length!==2)throw new Error('Expected two songs');
+  if(!Array.isArray(catalog.songs)||catalog.songs.length<2)throw new Error('Expected at least two songs');
   setup();
  }catch(e){status('Cannot start lab: '+String(e),true)}
 })();

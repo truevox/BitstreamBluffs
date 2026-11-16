@@ -86,13 +86,40 @@ try{
  const now=await state();
  if(Math.abs(now.position-17) > 1.4 || now.deckOffset!==17)throw Error('seek failed: '+JSON.stringify(now));
  console.log('SEEK',JSON.stringify(now));
+ // Guitar showcase: third track has eleven real SF2 instrument renditions
+ // of the separated guitar, while melody intentionally remains original.
+ await page.locator('#song').selectOption('every-hacker-pt2');
+ await page.waitForFunction(()=>{
+  const p=window.__fourFamilyLab?.getState();
+  return p?.deckSong==='every-hacker-pt2' && p?.deckInputs?.length===9 &&
+   p?.deckPaths?.some(x=>x.includes('/featured/space-mountain.ogg')) && p.playing;
+ },{timeout:45000});
+ const guitarState=await state();
+ if(!guitarState.deckInputs.includes('original:guitar')||!guitarState.deckInputs.includes('biome:featured'))
+  throw Error('Third track missing original vs sampled guitar');
+ if(!(await page.locator('.stem[data-role="melody"] input[type=range]').isDisabled()))
+  throw Error('Third song incorrectly claims to have 12 synthetic melody voices');
+ await page.locator('.mountain[data-biome="steampunk-slopes"]').click();
+ await page.waitForFunction(()=>{
+  const p=window.__fourFamilyLab?.getState();
+  return p?.deckBiome==='steampunk-slopes' &&
+   p.deckPaths?.some(x=>x.includes('/featured/steampunk-slopes.ogg'));
+ },{timeout:40000});
+ await page.locator('.stem[data-role="featured"] [data-value="0"]').click();
+ await page.locator('.stem[data-role="featured"] [data-value="50"]').click();
+ await page.locator('.stem[data-role="featured"] [data-value="100"]').click();
+ await page.locator('.stem[data-role="featured"] [data-solo]').click();
+ await page.waitForFunction(()=>window.__fourFamilyLab?.getState().solo==='featured');
+ console.log('SAMPLED_GUITAR_SHOWCASE',JSON.stringify(await state()));
+ await page.screenshot({path:'/tmp/bitstream-guitar-third-audio-lab.png',fullPage:true});
+ await page.locator('.stem[data-role="featured"] [data-solo]').click();
  await page.locator('#play').click();
  await page.waitForFunction(()=>!window.__fourFamilyLab?.getState().playing);
  const paused=await state();
  if(paused.audioState!=='running')throw Error('Audio context unexpectedly interrupted');
  if(errors.length)throw Error(errors.join('\n'));
  console.log('PASS_PRIVATE_AUDIO_AB_LAB',JSON.stringify({
-  songs:2,biomes:await page.locator('.mountain').count(),
+  songs:3,biomes:await page.locator('.mountain').count(),guitarShowcase:true,
   mixedStemFamilies:4,originalAndBiomeBlend:true,
   simulatedBSOD:true,simulatedSpeed:true,featuredOneMoreRun:'piano',
   seekSeconds:Math.round(now.position),

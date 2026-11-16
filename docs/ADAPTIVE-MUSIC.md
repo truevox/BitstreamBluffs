@@ -708,3 +708,36 @@ The private playable game :8184 remains unchanged, as do source
 master recordings, game release assets and original Pyramid voice.
 The 33-song full soundtrack and Candy Cane revision remain pending
 Marvin's listening evaluation.
+
+## 2026-11-16 — third audio-first Guitar showcase (real sampled instruments)
+
+Marvin requested another song featuring guitar as chosen accompaniment,
+suggesting Varmont Is Saved first. Its source guitar was only about
+8.7% musically active versus Other at 20%, so this did not meet his
+own selected-feature rule. Scanned 32 songs instead; only TWO
+selected guitar. Best: Every Hacker (Runs Out of Code) — Part 2
+(track 03; WRBGQUqD54U), guitar ~26.2% active across full source
+and ~71.9% active in 32s excerpt starting 4.5s.
+
+Extended the SAME standalone audio-only Tailscale lab at
+http://100.115.120.66:8185/ to THREE songs. This third track now
+has eleven actual FluidR3 sampled-guitar instrument reperformances
+(banjo, harp, nylon, muted electric, etc.), plus real source original
+stems, sample-guided bass V2, source-colored bass V1 and airborne
+drum tests. 50 additional clips; 174 private audio files in total.
+
+Guitar notes/chords were estimated offline by sparse FFT harmonic
+pitch transcription, with 41 raw events and roughly 35 surviving
+note-confidence tests, not guaranteed perfect. Use the live
+Original/50-50/Biome and Solo FEATURED controls to judge notes
+and timber. This third song's full twelve synthetic lead melodies
+do not yet exist, so its original Maxi singing remains present
+and the Melody replacement slider is disabled ONLY for this song.
+Existing two-song successful vocal melody instruments unchanged.
+
+Real Chromium smoke verified three songs, new guitar soundfont
+media and Steampunk banjo selection, synchronized source switching,
+featured solo, blend and absence of browser/audio errors.
+Reproducible scripts and source/derived audio paths documented in
+tools/music/audio-first-lab/README.md. No game-engine, BSOD chase,
+public release audio, music masters or model weights changed.
