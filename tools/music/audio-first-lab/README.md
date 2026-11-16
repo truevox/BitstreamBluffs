@@ -307,3 +307,17 @@ songs, and smoke-tested a versioned, cache-safe 33-song task planner.
 The original 231 listening clips and all selections are untouched. See
 [RESEARCH-V2.md](RESEARCH-V2.md) for precise evidence, scripts, CT211 paths,
 proxy-score limitations, and the explicit owner-approval gate.
+
+## November 16 V3 research — objective benchmarks and stem label confusion
+
+Without any musical sign-off from Marvin, V3 added scored synthetic
+note tests, all-family semantic profiles, a controlled htdemucs_6s
+instrument-routing probe, held-out-kit drum classifier calibration,
+relative note-expression metadata, and full SHA256 source/preview
+preservation checks. **Guitar caught an acoustic piano and strings**
+in controlled synthetic examples, confirming its label is not an
+instrument identity. All 231 original private audio clips remain
+unchanged and no V3 audio entered the public game.
+
+See [RESEARCH-V3.md](RESEARCH-V3.md) for measured results, assumptions,
+private CT211/CT223 outputs, and explicit musical approval gates.
