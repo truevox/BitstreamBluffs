@@ -1,0 +1,3 @@
+{ "id": "gustFront", "name": "Gust Front", "biome": "sky-jellyfish-mountain", "shapeKey": "gustFront", "size": { "w": 64, "h": 40 },
+  "onHit": { "effect": "gust", "impulsePxS": [60, -150] }, "spawn": { "baseChance": 0.75 },
+  "weight": 1, "minDistanceM": 0, "placement": "air", "colorKey": "cyan" }

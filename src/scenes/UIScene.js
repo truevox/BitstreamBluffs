@@ -58,6 +58,9 @@ const POWERUP_INFO = {
   sandrunnerSkis: { name: 'SANDRUNNER SKIS', color: 'amber' },
   royalJellyWax: { name: 'JELLY WAX', color: 'amber' },
   clockworkTreads: { name: 'CLOCKWORK TREADS', color: 'cyan' },
+  // B4 biome pickups (both the shared stabilize kind)
+  gravityStabilizer: { name: 'GRAV STABILIZER', color: 'amber' },
+  stabilizerRails: { name: 'STABILIZER RAILS', color: 'lime' },
 };
 /** B1: a biome hazard names itself on the effect warning line instead of the generic effect label. */
 const HAZARD_LABEL = {
@@ -67,6 +70,8 @@ const HAZARD_LABEL = {
   // B2: the two blind hazards
   shatterWall: 'SHATTER WALL',
   ashCloud: 'ASH CLOUD',
+  // B4: the gust (a crash hazard such as the Meteor never shows an effect line)
+  gustFront: 'GUST FRONT',
 };
 /**
  * Power-up KINDS (B0, biome full treatment). Biome pickups are keyed by id like the base ones once their content lands;
@@ -477,6 +482,20 @@ export class UIScene extends Phaser.Scene {
       for (let k = 0; k < 6; k++) hx.push({ x: cx + Math.cos((k * Math.PI) / 3) * 6, y: cy + Math.sin((k * Math.PI) / 3) * 6 });
       g.strokePoints(hx, true, true);
       g.fillCircle(cx, cy + 1, 2.5);
+    } else if (id === 'gravityStabilizer') {
+      // B4: a gyroscope ring with a level bar
+      g.strokeEllipse(cx, cy, 13, 9);
+      g.lineBetween(cx - 6, cy, cx + 6, cy);
+      g.fillCircle(cx, cy, 1.5);
+    } else if (id === 'stabilizerRails') {
+      // B4: two rails with ties under a squashed spring
+      g.lineBetween(cx - 7, cy + 2, cx + 7, cy + 2);
+      g.lineBetween(cx - 7, cy + 5, cx + 7, cy + 5);
+      for (let k = -5; k <= 5; k += 5) g.lineBetween(cx + k, cy + 1, cx + k, cy + 6);
+      g.lineBetween(cx - 5, cy - 1, cx - 2.5, cy - 4);
+      g.lineBetween(cx - 2.5, cy - 4, cx, cy - 1);
+      g.lineBetween(cx, cy - 1, cx + 2.5, cy - 4);
+      g.lineBetween(cx + 2.5, cy - 4, cx + 5, cy - 1);
     } else if (id === 'clockworkTreads') {
       // B3: a tread loop round a cog
       g.strokeRect(cx - 7, cy - 4, 14, 8);

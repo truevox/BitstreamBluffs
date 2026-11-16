@@ -84,6 +84,9 @@ const LATER_BIOMES = new Set([
   // B3 "Motion" (2026-11-15): Pyramid Peak (4), Steampunk Slopes (256), Micro Mountain (512). Pinned in
   // biome-b3-presence.test.js (determinism, placement rules) and terrain-golden-mask0.test.js (mask 0).
   'pyramid-peak', 'steampunk-slopes', 'micro-mountain',
+  // B4 "Air" (2026-11-16): Space Mountain (32), Sky Jellyfish Mountain (128). Pinned in biome-b4-presence.test.js
+  // (determinism, presence) and terrain-golden-mask0.test.js (mask 0).
+  'space-mountain', 'sky-jellyfish-mountain',
 ]);
 const c = loadContent();
 const without = (o) => Object.fromEntries(Object.entries(o).filter(([, d]) => !LATER_BIOMES.has(d.biome)));

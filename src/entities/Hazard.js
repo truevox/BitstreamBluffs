@@ -3,12 +3,12 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * One hazard instance built from a HazardDef + HazardSpawn. Sensor body; draws shape from def.shapeKey
- * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; B1: 'groomer' | 'seagull' | 'seaweed' | 'chocoRiver'; B2: 'shatterWall' | 'ashCloud'; B3: 'boulder' | 'dewDrop' | 'gearGate'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
+ * ('chasm' | 'firewall' | 'spike' | 'vent' | 'drone'; B1: 'groomer' | 'seagull' | 'seaweed' | 'chocoRiver'; B2: 'shatterWall' | 'ashCloud'; B3: 'boulder' | 'dewDrop' | 'gearGate'; B4: 'meteor' | 'gustFront'; any other key draws the generic box, BiomeEffects.hazardDrawKind). Silhouettes fill their hit-box so the danger is always legible
  * (design doc pillar 2); faint corner brackets mark the exact hit-box.
  */
 import Phaser from 'phaser';
 import { CAT } from './Sled.js';
-import { hazardColorKey, hazardDrawKind } from '../systems/BiomeEffects.js';
+import { hazardColorKey, hazardDrawKind, gustImpulse } from '../systems/BiomeEffects.js';
 import { emptyRollState, rollStep, rollParams, rollPredictX, gateOpenAt, gateNextChangeMs } from '../systems/HazardMotion.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
@@ -205,6 +205,10 @@ export class Hazard {
       this._seagull(g, t, frame, col, pal);
       return;
     }
+    if (this.drawKind === 'meteor') {
+      this._meteor(g, t, frame, col, pal);
+      return;
+    }
 
     // hit-box corner brackets (the drawn box; crash hit-boxes are ~25% smaller)
     g.lineStyle(1, col, 0.5);
@@ -232,6 +236,7 @@ export class Hazard {
       case 'boulder': this._boulder(g, t, frame, col, pal); break;
       case 'dewDrop': this._dewDrop(g, t, frame, col, pal); break;
       case 'gearGate': this._gearGate(g, t, frame, col, pal); break;
+      case 'gustFront': this._gustFront(g, t, frame, col, pal); break;
       default: this._generic(g, col); break;
     }
   }
@@ -628,6 +633,83 @@ export class Hazard {
     g.fillStyle(col, 1);
     g.fillTriangle(-2, cy + 6, 2, cy + 6, -3, cy + 11);
     g.fillCircle(-1.5, cy - 1, 1.3);
+  }
+
+  /**
+   * B4 Space Mountain: Meteor, a burning rock falling through the jump arc (crash, `danger`). A flickering tail streams up
+   * and back from it and the same soft halo as the seagull makes it read against the star field; drawn around the box
+   * centre, the hit-box stays put.
+   */
+  _meteor(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const pulse = 0.5 + 0.5 * Math.sin(t / (this.alert ? 90 : 190) + this.seed);
+    const cy = -h / 2;
+    g.fillStyle(col, 0.1 + 0.1 * pulse);
+    g.fillEllipse(0, cy, w + 18 + 6 * pulse, h + 16 + 4 * pulse);
+    if (this.alert) {
+      g.lineStyle(1, pal.text, 0.35 + 0.4 * pulse);
+      g.strokeEllipse(0, cy, w + 26 - 8 * pulse, h + 22 - 6 * pulse);
+    }
+    // tail: three flickering streaks up and to the right (it falls down-left, toward the oncoming sled)
+    for (let k = 0; k < 3; k++) {
+      const len = w * (0.7 + 0.35 * hash01(this.seed + k + frame * 0.73));
+      const off = (k - 1) * h * 0.18;
+      g.lineStyle(3 - k * 0.7, k === 1 ? pal.amber : col, 0.75 - k * 0.15);
+      g.lineBetween(w * 0.12, cy - h * 0.12 + off, w * 0.12 + len * 0.8, cy - h * 0.12 + off - len * 0.55);
+    }
+    // the rock: a lumpy disc in danger with a pale molten rim and two craters
+    const r = Math.min(w, h) * 0.36;
+    const pts = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const rr = r * (0.85 + 0.25 * hash01(this.seed * 3 + i));
+      pts.push({ x: -w * 0.08 + Math.cos(a) * rr, y: cy + h * 0.06 + Math.sin(a) * rr });
+    }
+    g.fillStyle(col, 1);
+    g.fillPoints(pts, true);
+    g.lineStyle(1.5, pal.text, 0.6 + 0.3 * pulse);
+    g.strokePoints(pts, true, true);
+    g.fillStyle(pal.bg, 0.55);
+    g.fillCircle(-w * 0.14, cy + h * 0.02, r * 0.28);
+    g.fillCircle(w * 0.02, cy + h * 0.18, r * 0.2);
+  }
+
+  /**
+   * B4 Sky Jellyfish Mountain: Gust Front, a band of moving air (no crash). A pale zone with wind streaks flowing the way
+   * the gust pushes, so the push direction reads before the sled flies in. The streak direction comes from the def's
+   * impulse (BiomeEffects.gustImpulse).
+   */
+  _gustFront(g, t, frame, col, pal) {
+    const w = this.w;
+    const h = this.h;
+    const imp = gustImpulse(this.def.onHit && this.def.onHit.impulsePxS);
+    const m = Math.hypot(imp.dvx, imp.dvy) || 1;
+    const ux = imp.dvx / m;
+    const uy = imp.dvy / m;
+    const breathe = 0.5 + 0.5 * Math.sin(t / 300 + this.seed);
+    g.fillStyle(col, 0.1 + 0.06 * breathe);
+    g.fillEllipse(0, -h / 2, w + 6, h + 4);
+    g.lineStyle(1, col, 0.45);
+    g.strokeEllipse(0, -h / 2, w + 6, h + 4);
+    // streaks drifting along the push direction, wrapping inside the box
+    for (let k = 0; k < 6; k++) {
+      const u = hash01(this.seed * 7 + k);
+      const ph = ((t / 520) + u) % 1;
+      const bx = (hash01(this.seed + k * 2.3) - 0.5) * w * 0.7;
+      const by = -h / 2 + (u - 0.5) * h * 0.7;
+      const d = (ph - 0.5) * Math.min(w, h) * 0.8;
+      const x0 = bx + ux * d;
+      const y0 = by + uy * d;
+      const len = 9 + 5 * u;
+      g.lineStyle(1.5, k % 2 ? pal.text : col, 0.8 * Math.sin(ph * Math.PI));
+      g.lineBetween(x0, y0, x0 + ux * len, y0 + uy * len);
+    }
+    // one arrowhead at the centre: the push direction
+    const ax = ux * 8;
+    const ay = -h / 2 + uy * 8;
+    g.fillStyle(pal.text, 0.6 + 0.3 * breathe);
+    g.fillTriangle(ax + ux * 5, ay + uy * 5, ax - uy * 4, ay + ux * 4, ax + uy * 4, ay - ux * 4);
   }
 
   /** @returns {void} */

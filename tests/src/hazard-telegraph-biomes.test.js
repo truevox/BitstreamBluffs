@@ -45,6 +45,8 @@ describe('every shipped hazard has a deliberate response', () => {
     rollingBoulder: 'hop', dewDrop: 'hop', gearGate: 'hop',
     // air hazards have their own telegraph (AirTelegraph)
     roguePacket: null, seagullDive: null, ashCloud: null,
+    // B4: both air (the Meteor crashes and gets the AirTelegraph STAY LOW mark; the Gust Front is a visible zone, no crash)
+    meteor: null, gustFront: null,
   };
   test('the table covers every def in src/data/hazards (a new def must be classified here)', () => {
     expect(Object.keys(DEFS).sort()).toEqual(Object.keys(TABLE).sort());

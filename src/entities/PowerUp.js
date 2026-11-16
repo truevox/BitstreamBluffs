@@ -5,7 +5,7 @@
  * Floating pickup (sensor body). shapeKey: 'clock' (Clock Pulse), 'burst' (Packet Burst), 'shield' (Hashed Backup);
  * B1 biome pickups: 'maple' (Maple Wax), 'waxSpray' (Slick Wax Spray), 'bubble' (Aqua-Lung Bubble), 'candyCoat' (Sweet-Tooth);
  * B2: 'goggles' (Crystal Clear Goggles), 'heatShield' (Heat Shield); B3: 'skis' (Sandrunner Skis), 'jellyWax' (Royal Jelly
- * Wax), 'treads' (Clockwork Treads).
+ * Wax), 'treads' (Clockwork Treads); B4: 'gravStabilizer' (Gravity Stabilizer), 'stabRails' (Stabilizer Rails).
  * Visual: a rotating dashed ring + bobbing glyph, glow pulse. The sensor stays put while the glyph bobs.
  */
 import Phaser from 'phaser';
@@ -211,6 +211,29 @@ export class PowerUp {
         for (let k = 0; k < 4; k++) g.fillRect(-5 + ((k * 3 + ph) % 10), -4.5, 1.4, 1.4);
         g.lineStyle(1.2, col, 1);
         g.strokeCircle(0, 0, 2);
+        break;
+      }
+      case 'gravStabilizer': {
+        // B4 Gravity Stabilizer: a gyroscope, a level bar held flat inside a ring that tilts back and forth
+        const tilt = Math.sin(t / 260) * 0.5;
+        g.lineStyle(1.5, pal.text, 1);
+        g.strokeEllipse(0, 0, 12, 12 * (0.55 + 0.35 * Math.abs(Math.cos(tilt))));
+        g.lineStyle(2, col, 1);
+        g.lineBetween(-5.5, 0, 5.5, 0);
+        g.fillStyle(col, 1);
+        g.fillCircle(0, 0, 1.6);
+        break;
+      }
+      case 'stabRails': {
+        // B4 Stabilizer Rails: two parallel rails with ties, and a spring above them squashed flat (the bounce damped)
+        g.lineStyle(1.5, pal.text, 1);
+        g.lineBetween(-6, 1.5, 6, 1.5);
+        g.lineBetween(-6, 4.5, 6, 4.5);
+        g.lineStyle(1, col, 1);
+        for (let k = -4; k <= 4; k += 4) g.lineBetween(k, 0.5, k, 5.5);
+        const sq = 1 + 0.4 * Math.abs(Math.sin(t / 220));
+        g.lineStyle(1.3, col, 1);
+        g.strokePoints([{ x: -4, y: -1 }, { x: -2, y: -1 - 2 * sq }, { x: 0, y: -1 }, { x: 2, y: -1 - 2 * sq }, { x: 4, y: -1 }], false, false);
         break;
       }
       default: {

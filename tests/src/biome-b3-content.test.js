@@ -30,8 +30,11 @@ describe('B3 content: loader and schema', () => {
     const byBiome = (list) => Object.fromEntries(Object.keys(B3).map((b) => [b, list.filter((d) => d.biome === b).map((d) => d.id)]));
     expect(byBiome(biomeHaz)).toEqual(Object.fromEntries(Object.entries(B3).map(([b, r]) => [b, [r.hazard]])));
     expect(byBiome(biomePu)).toEqual(Object.fromEntries(Object.entries(B3).map(([b, r]) => [b, [r.powerup]])));
-    expect(biomeHaz.length).toBe(9);
-    expect(biomePu.length).toBe(9);
+    // B4 adds Space Mountain and Sky Jellyfish Mountain defs; the B1-B3 biomes still hold exactly 9 + 9 (the 11 + 11 total
+    // is pinned in biome-b4-content.test.js)
+    const B4_BIOMES = new Set(['space-mountain', 'sky-jellyfish-mountain']);
+    expect(biomeHaz.filter((d) => !B4_BIOMES.has(d.biome)).length).toBe(9);
+    expect(biomePu.filter((d) => !B4_BIOMES.has(d.biome)).length).toBe(9);
     for (const r of Object.values(B3)) {
       expect(c.hazards[r.hazard]).toBeDefined();
       expect(c.powerups[r.powerup]).toBeDefined();
