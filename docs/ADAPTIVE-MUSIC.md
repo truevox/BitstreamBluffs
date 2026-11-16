@@ -677,3 +677,34 @@ outside Git under a persistent tailnet-bound user service.
 Reproduction scripts and exact provenance:
 tools/music/private-game-proof/README.md.
 No merge, source rights waiver or artistic approval implied.
+
+## 2026-11-16 — private audio-first four-family A/B, no gameplay BSOD changes
+
+Marvin explicitly put sonic/instrumentation work ahead of game
+physics and BSOD chase implementation, and requested synchronized
+Original / Biome / live-blend controls for all four audio families.
+Completed an independent Tailscale-only Web Audio listening lab:
+http://100.115.120.66:8185/
+
+Each of two source songs has 32-second high-activity passages,
+six original recording clips, twelve already-tested melody voices,
+eleven airy drum prototypes, eleven featured accompaniment textures
+and eleven biome bass treatments plus eleven V2 experimental
+FluidR3 sampled-instrument bass variants. **124 private Ogg clips**.
+Pope selected OTHER and One More Run selected PIANO from offline
+stem musical-activity coverage rather than RMS loudness.
+
+Four independent Original/50-50/Biome blend mixers plus solo,
+biome/song switching, bass V1-vs-V2 selection, seek and loop are live.
+Manual sliders let the user test synthesized BSOD proximity corruption
+of ALL guitar/piano/Other families independently from simulated
+sled-speed bass punch. NO chase simulation or physical BSOD
+stub is in the game; this is exclusively a sound-design controller.
+
+Full source description, CT211 paths, testing, and preliminary
+source-reinstrumentation limitations are in
+tools/music/audio-first-lab/README.md.
+The private playable game :8184 remains unchanged, as do source
+master recordings, game release assets and original Pyramid voice.
+The 33-song full soundtrack and Candy Cane revision remain pending
+Marvin's listening evaluation.

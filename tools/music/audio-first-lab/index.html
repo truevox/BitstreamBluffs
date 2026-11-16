@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0d1a">
+<title>Bitstream Bluffs // Four-Family Audio A/B Laboratory</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#0a0d19;color:#f5f2ff}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 0% 0%,#2a1949 0,transparent 45%),radial-gradient(circle at 100% 0%,#123e47 0,transparent 38%),#0a0d19;min-height:100vh}
+main{max-width:1260px;margin:auto;padding:24px clamp(14px,3vw,36px) 60px}
+a{color:#79e9ee}button,select,input{font:inherit}
+button{cursor:pointer}
+.eyebrow{font-weight:800;letter-spacing:.24em;font-size:11px;color:#67e6df}
+h1{font-size:clamp(29px,4.9vw,56px);margin:8px 0 12px;line-height:1.1;letter-spacing:-.045em}
+h1 span{color:#f3a0df}
+.subtitle{max-width:900px;color:#b8b5ca;line-height:1.6;margin:0 0 21px}
+.meta{display:flex;flex-wrap:wrap;gap:8px}
+.pill{border:1px solid #655078;border-radius:100px;color:#dfc6ee;font-size:12px;padding:6px 11px}
+.player{position:sticky;top:6px;z-index:5;background:rgba(15,17,32,.97);backdrop-filter:blur(20px);border:1px solid #52506b;border-radius:16px;padding:16px;box-shadow:0 16px 48px #0009;margin-top:22px}
+.row{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+button.primary{background:#ee7dc5;color:#160f24;font-weight:800;border:0;border-radius:11px;padding:12px 20px}
+button.secondary{background:#27283d;color:#e8e4ff;border:1px solid #6a637f;border-radius:9px;padding:9px 12px}
+button.secondary:hover{background:#38324c}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #7ef4f1;outline-offset:3px}
+input[type=range]{accent-color:#fa9bdd;min-width:80px}
+select{background:#20243b;color:#f0ecff;border:1px solid #6f6886;border-radius:9px;padding:11px;max-width:100%}
+.selector{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.selector label{font-size:12px;color:#c5bee1;font-weight:700}
+#song{min-width:min(380px,90vw)}
+.seek{display:block;width:100%;margin:15px 0 1px}
+.progress{display:flex;justify-content:space-between;color:#9b9ab4;font-size:12px;font-variant-numeric:tabular-nums}
+.status{font-size:12px;color:#7de0ad;min-height:18px;flex:1;line-height:1.5}
+.alert{color:#ffb2b2}
+section{margin:25px 0 0}
+h2{font-size:19px;margin:0 0 9px}
+small,.muted{color:#a6a2be}
+.mountains{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:9px;margin-top:12px}
+.mountain{background:#181a2e;border:1px solid #44405d;color:#e9e6fa;border-radius:11px;padding:13px;text-align:left;min-height:77px}
+.mountain strong{font-size:13px;display:block}
+.mountain span{font-size:11px;color:#9c97b9;display:block;margin-top:4px}
+.mountain.selected{border-color:#f698cc;background:#35223e;box-shadow:inset 0 0 0 1px #f698cc77}
+.mountain:hover{border-color:#86e4e6}
+.bulk{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:13px 0}
+.bulk strong{font-size:12px;color:#bbb5d0;margin-right:5px}
+.mixgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.stem{border:1px solid #3e405e;border-radius:14px;background:#141827;padding:17px}
+.stem h3{margin:0 0 5px;font-size:18px}
+.stem .desc{font-size:12px;color:#a9aac4;margin:0 0 12px;min-height:31px;line-height:1.5}
+.stem .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.solo-button{display:block;margin-top:13px;background:#1d2733;color:#83e8e5;border:1px solid #336969;border-radius:8px;padding:7px 10px;font-size:12px}
+.solo-button.active{background:#205255;color:#ddfffb;border-color:#76dfe3;font-weight:700}
+.stem .top span{color:#b9b3c9;font-size:11px}
+.ab{display:flex;gap:5px;flex-wrap:wrap;margin:9px 0}
+.ab button{background:#22243a;color:#ded9f1;border:1px solid #53516d;padding:6px 9px;border-radius:7px;font-size:11px;font-weight:700}
+.ab button.active{background:#4b2d57;border-color:#e995c8;color:#ffd5f0}
+.mixline{display:flex;align-items:center;gap:10px}
+.mixline input{flex:1}
+.percent{width:42px;text-align:right;font:700 12px monospace;color:#f4b2df}
+.trackline{font-size:11px;color:#8ee1e5;line-height:1.5;margin-top:10px}
+.labpanels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.lab{border:1px solid #46405f;background:#151728;padding:18px;border-radius:13px}
+.lab h3{font-size:16px;margin:0 0 10px}
+.lab label{display:block;color:#d9d6e7;font-size:13px;margin-top:14px}
+.lab input[type=range]{width:100%;margin:9px 0 1px}
+.val{font-size:13px;font-weight:700;color:#eeb0d9}
+.lab p{font-size:12px;line-height:1.5;color:#aba6bc}
+.checkline{margin-top:9px;display:flex;align-items:center;gap:6px;font-size:12px}
+.checkline input{accent-color:#91ebea}
+pre{overflow:auto;white-space:pre-wrap;font-size:11px;background:#101121;padding:11px;border-radius:9px;color:#a3c5cb}
+footer{font-size:12px;color:#85819b;margin-top:32px;line-height:1.6}
+@media(max-width:820px){.mixgrid,.labpanels{grid-template-columns:1fr}.player{position:static}}
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">TRUEVOX / BITSTREAM BLUFFS / PRIVATE TIMBRE PROOF</div>
+<h1>The <span>Four-Family</span> Mix Lab</h1>
+<p class="subtitle">Listen to the <strong>original recording, a biome-colored rendition, or any blend between them</strong> for each of four source families. The mix stays synchronized as you switch mountains. This is deliberately an <strong>audio-only</strong> experiment; gameplay physics, BSOD chase, and the good-sounding playable proof have not been changed.</p>
+<div class="meta"><span class="pill">2 songs · 32-second high-activity passages</span><span class="pill">12 biomes</span><span class="pill">Original + equal-power blending</span><span class="pill">Draft source-preserving audio textures, not finished instrument resynthesis</span></div>
+
+<div class="player">
+<div class="row">
+<button class="primary" id="play">▶ Play</button>
+<button class="secondary" id="restart">↺ Restart</button>
+<div class="selector"><label for="song">SONG</label><select id="song"></select></div>
+<label class="checkline"><input type="checkbox" id="loop" checked> Loop</label>
+<span id="status" class="status" aria-live="polite">Loading catalog…</span>
+</div>
+<input id="seek" class="seek" type="range" min="0" max="32" step=".05" value="0" aria-label="Playback position">
+<div class="progress"><span id="time">0:00.0</span><span id="range">32-second sample</span></div>
+</div>
+
+<section>
+<h2>Choose a mountain</h2>
+<div class="muted" style="font-size:12px">The home signal keeps the original bass, drums, and featured accompaniment. Every other mountain has three different draft timbres plus its existing melodic voice. The approved Pyramid melody is unmodified.</div>
+<div id="mountains" class="mountains"></div>
+</section>
+<section>
+<h2>Compare four musical families</h2>
+<div class="bulk"><strong>PRESETS FOR ALL FOUR:</strong><button class="secondary" data-all="0">All original</button><button class="secondary" data-all="50">All 50 / 50</button><button class="secondary" data-all="100">All biome</button></div>
+<div class="mixgrid">
+  <div class="stem" data-role="melody"><h3>🎤 Melody / Maxi voice</h3><p class="desc">Original isolated Maxi vocal ↔ biome's melodic instrument. A 50/50 blend allows both.</p><div class="ab"><button data-value="0">Original</button><button data-value="50">50 / 50</button><button data-value="100">Biome</button></div><div class="mixline"><span>Maxi</span><input type="range" min="0" max="100" step="1" value="100" aria-label="Melody original to biome blend"><span>Biome</span><span class="percent">100%</span></div><div class="trackline">Use Biome-only to judge the instrument; blend to hear Maxi singing with it.</div></div>
+  <div class="stem" data-role="bass"><h3>🔊 Bass</h3><p class="desc">Original song bass ↔ bass-shaped biome timbre. The speed control below changes punch without affecting the original source pitch.</p><div class="ab"><button data-value="0">Original</button><button data-value="50">50 / 50</button><button data-value="100">Biome</button></div><div class="mixline"><span>Original</span><input type="range" min="0" max="100" step="1" value="100" aria-label="Bass original to biome blend"><span>Biome</span><span class="percent">100%</span></div><div class="selector" style="margin-top:12px"><label for="bassMode">BASS INSTRUMENT APPROACH</label><select id="bassMode"><option value="sampled">Real sampled instruments · V2</option><option value="dsp">Original-stem texture · V1</option></select></div><div id="bassInfo" class="trackline">Compare a distinct sampled instrument against a subtler transformation of the original recording.</div><div class="trackline">Cruise-speed bass is separate from distance-to-BSOD. Note-guided V2 pitch transcription is automatic and may need correction.</div></div>
+  <div class="stem" data-role="drums"><h3>🥁 Airborne drums</h3><p class="desc">Original grounded drums ↔ airy biome drums for flight. Home biome has only the original drum recording.</p><div class="ab"><button data-value="0">Ground / original</button><button data-value="50">Half</button><button data-value="100">Air / biome</button></div><div class="mixline"><span>Ground</span><input type="range" min="0" max="100" step="1" value="100" aria-label="Drum original to airborne blend"><span>Air</span><span class="percent">100%</span></div><div class="trackline">In the future: ground always original; air becomes this version (home air fades down).</div></div>
+  <div class="stem" data-role="featured"><h3>✨ Featured accompaniment</h3><p class="desc" id="featuredInfo">Original piano, guitar, or Other ↔ biome sound, chosen once per song by musical activity.</p><div class="ab"><button data-value="0">Original</button><button data-value="50">50 / 50</button><button data-value="100">Biome</button></div><div class="mixline"><span>Original</span><input type="range" min="0" max="100" step="1" value="100" aria-label="Featured accompaniment original to biome blend"><span>Biome</span><span class="percent">100%</span></div><div class="trackline">The two unfeatured accompaniment stems stay original, but all three respond to the BSOD control.</div></div>
+</div>
+</section>
+
+<section>
+<h2>Audio-behavior audition controls</h2>
+<div class="labpanels">
+<div class="lab">
+<h3>🚨 BSOD proximity — manually simulated</h3>
+<p>This is <strong>NOT a real chase</strong>. Test how Guitar, Piano and Other—all three, even the untouched ones—sound increasingly corrupted as imaginary deletion approaches.</p>
+<label for="bsod">Distance-to-corruption <span id="bsodValue" class="val">Far / clean</span></label>
+<input id="bsod" type="range" min="0" max="100" value="0" step="1" aria-label="Simulated proximity to BSOD">
+<div class="row"><button class="secondary" data-danger="0">Safe</button><button class="secondary" data-danger="50">Closing</button><button class="secondary" data-danger="80">Danger</button><button class="secondary" data-danger="100">Imminent</button></div>
+</div>
+<div class="lab">
+<h3>⚡ Bass velocity — manually simulated</h3>
+<p>Test how the original or biome bass gets louder and punchier. The upper range demonstrates a boost above an approximate ordinary cruising speed, not a physics cap.</p>
+<label for="speed">Simulated sled speed <span id="speedValue" class="val">Cruising</span></label>
+<input id="speed" type="range" min="0" max="1400" value="600" step="10" aria-label="Simulated sled speed for bass mix">
+<div class="row"><button class="secondary" data-speed="0">Stop</button><button class="secondary" data-speed="600">Cruise</button><button class="secondary" data-speed="900">Fast</button><button class="secondary" data-speed="1300">Boost!</button></div>
+<label class="checkline"><input id="unchanged" type="checkbox" checked> Play both unfeatured original accompaniment stems</label>
+</div>
+</div>
+</section>
+<section class="lab">
+<h3>What's real and what's still a draft</h3>
+<p>The lead instruments are our existing complete Gentle-score performances. The bass, airborne drums and selected accompaniment are <strong>new source-preserving spectral/dynamic timbre candidates</strong> processed from the original multi-instrument stems. They are synchronized, have their source pitches, and offer honest A/B tests, but are <strong>not yet note-level re-recordings with new SoundFonts or sampled instruments</strong>. We audition their musical identities before investing in that expensive step.</p>
+<p><strong>Original recordings remain unchanged.</strong> No pretrained model weights are present. This lab is available only over your Tailscale network, and it does not modify the game or the public soundtrack.</p>
+<p id="songMetadata" class="muted"></p>
+</section>
+<footer>Private research lab · independent original/biome stem controls · 4×12 musical-family design · no public deployment, licensing change, or gameplay/BSOD mechanics.</footer>
+</main>
+<script type="module" src="/app.js"></script>
+</body></html>
