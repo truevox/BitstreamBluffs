@@ -9,3 +9,4 @@
 
 9. REFACTOR TO DOCTESTS, AND ADD DOCTESTS FOR ALL FUNCTIONS, AND ADD DOCTESTING TO INSTRUCTIONS
 10. Look into a little more beeishness for Micro Mountain down the road (e.g. a bee-swarm hazard that Royal Jelly Wax wards; needs a spec change and Micro sim balance, since Micro hop survival sits at the -15% tolerance line).
+11. Revise the Neon Sled Drone rider skin: swap the rotors for antennae (Marvin, 2026-11-15).
