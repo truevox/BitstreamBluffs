@@ -51,6 +51,8 @@ import { Background } from '../entities/Background.js';
 import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
 import { BestMarker } from '../entities/BestMarker.js';
+import { LastDeathMarker } from '../entities/LastDeathMarker.js';
+import { crashReport, crashBeat, deathMarkerX } from '../systems/CrashReport.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
 import { planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
@@ -306,6 +308,11 @@ export class RunScene extends Phaser.Scene {
     } catch (e) { this.bestM = 0; }
     this.bestMarker = this.bestM >= 20
       ? new BestMarker(this, this.palette, this.startX + this.bestM * PIXELS_PER_METER, this.bestM) : null;
+    // Readable Chaos phase 3: DIED HERE at the last crash x, only on a same-seed, same-mask retry
+    const lastCrash = this.registry.get(REG.LAST_CRASH);
+    const deathX = deathMarkerX(lastCrash, this.seed, this.biomeMask);
+    this.deathMarker = deathX != null ? new LastDeathMarker(this, this.palette, deathX, lastCrash.distM) : null;
+    this._lastHopMs = null;
 
     // events
     this._onCollide = (event) => {
@@ -359,6 +366,8 @@ export class RunScene extends Phaser.Scene {
     safe(this.bg);
     safe(this.shardField);
     safe(this.bestMarker);
+    safe(this.deathMarker);
+    this.deathMarker = null;
     safe(this.airTelegraph);
     safe(this.groundTelegraph);
     this.groundTelegraph = null;
@@ -570,7 +579,10 @@ export class RunScene extends Phaser.Scene {
     const dur = hazardEffectDurationMs(eff);
     this.game.events.emit(EVT.HAZARD_HIT, { hazardId: def.id, effect: kind, durationMs: dur, x: h.cx, y: h.cy });
     if (kind === 'crash') {
-      if (!this.pendingCrash) this.pendingCrash = { cause: 'hazard', hazardId: def.id };
+      if (!this.pendingCrash) {
+        this.pendingCrash = { cause: 'hazard', hazardId: def.id };
+        this._crashHazard = h; // crash report: the entity, for its telegraph arrival (pendingCrash keeps its shape)
+      }
     } else if (kind === 'slow') {
       this.slowMs = dur;
       this.slowFactor = eff.speedFactor != null ? eff.speedFactor : PHYSICS.slowFactor;
@@ -756,6 +768,7 @@ export class RunScene extends Phaser.Scene {
         if (audio.setSpeed) audio.setSpeed(sled.speed);
       } catch (e) { /* audio must never break the loop */ }
     }
+    if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict
     this._hopped = !!sled.hopPulse;
     this._pushed = !!sled.pushPulse;
     sled.hopPulse = 0;
@@ -826,7 +839,8 @@ export class RunScene extends Phaser.Scene {
       const s = Math.sin(a);
       this.trail.update(sled.x + c * -16 - s * 6, sled.y + s * -16 + c * 6, sled.speed);
     }
-    const fxDt = this.hitStopMs > 0 || (this.crashed && this.crashTimerMs < TUNING.hitStopCrashMs) ? dt * 0.08 : dt;
+    // the crash beat (CrashReport.crashBeat): hit-stop, then 400 ms of FX at 0.25x; visual only, the run clock is stopped
+    const fxDt = this.hitStopMs > 0 ? dt * 0.08 : this.crashed ? dt * crashBeat(this.crashTimerMs, TUNING.hitStopCrashMs).fxScale : dt;
     this.updateCamera(dt);
     const cam = this.cameras.main;
     const halfW = GAME_WIDTH / (2 * cam.zoom);
@@ -840,6 +854,7 @@ export class RunScene extends Phaser.Scene {
     this.fx.update(fxDt, this.heightFn);
     if (this.shardField) this.shardField.update(t, left, right);
     if (this.bestMarker) this.bestMarker.update(t, sled.x, this.heightFn);
+    if (this.deathMarker) this.deathMarker.update(t, sled.x, this.heightFn);
     this.drawStreaks(t);
     if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.heightFn);
     this.bg.update(cam.scrollX, t, sled.speed);
@@ -1494,6 +1509,7 @@ export class RunScene extends Phaser.Scene {
     this.sled.vanish();
     this.shake(TUNING.shakeCrash);
     this.flashRect.setFillStyle(0xffffff, 1).setAlpha(0.55);
+    this.reportCrash(c, fs);
 
     // persist + hand off
     const snap = this.score.getSnapshot();
@@ -1544,6 +1560,23 @@ export class RunScene extends Phaser.Scene {
       furthestX: Math.max(fs.x, this.startX + (snap.distanceM || 0) * PIXELS_PER_METER), crashX: fs.x, pxPerMeter: PIXELS_PER_METER,
     });
     this.game.events.emit(EVT.RUN_END, { record, biomeVisits });
+  }
+
+  /**
+   * Readable Chaos phase 3: name the killer and time the hop (systems/CrashReport.js) into REG.LAST_CRASH. Only a crash
+   * that ends the run gets here (an absorbed one returns in resolveCrash). Registry only; reads state, changes none.
+   * @param {{cause:string, hazardId?:string}} c @param {{x:number}} fs
+   */
+  reportCrash(c, fs) {
+    const hz = this.content && this.content.hazards;
+    const h = this._crashHazard;
+    const ent = c.cause === 'hazard' && h && h.def && h.def.id === c.hazardId ? h : null;
+    const def = ent ? ent.def : c.hazardId && hz ? hz[c.hazardId] : null;
+    const arrivalMs = ent && this.teleTracker ? this.teleTracker.lastArrivalMs(ent) : null;
+    this.registry.set(REG.LAST_CRASH, crashReport({
+      runId: this.runId, seed: this.seed, biomeMask: this.biomeMask, cause: c.cause, def, x: fs.x, startX: this.startX,
+      pxPerMeter: PIXELS_PER_METER, lastHopMs: this._lastHopMs, arrivalMs, crashMs: this.runTimeMs,
+    }));
   }
 
   updateCrashed(dt) {
@@ -1684,7 +1717,8 @@ export class RunScene extends Phaser.Scene {
     const zt = speedZoom(s.speed);
     this._zoom += (zt - this._zoom) * (1 - Math.exp((-TUNING.zoomLerp * dt) / 1000));
     this._zoomKick = Math.max(0, this._zoomKick - dt / 260 * 0.05);
-    const z = Math.round(clamp(this._zoom - this._zoomKick, ZOOM_FLOOR, 1.2) * 200) / 200;
+    const crashZoom = this.crashed ? crashBeat(this.crashTimerMs, TUNING.hitStopCrashMs).zoomMul : 1; // crash beat zoom-in
+    const z = Math.round(clamp((this._zoom - this._zoomKick) * crashZoom, ZOOM_FLOOR, 1.2) * 200) / 200;
     if (z !== cam.zoom) {
       cam.setZoom(z);
       this.applyZoomCompensation(z);

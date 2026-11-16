@@ -28,6 +28,7 @@ import { addScanlines } from '../ui/Scanlines.js';
 import { fmtInt, fmtMult, fmtSec, idToLabel } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { stackY, placeX, STRIP_BAND } from '../ui/HudLayout.js';
+import { killerName } from '../systems/CrashReport.js';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -1022,7 +1023,10 @@ export class UIScene extends Phaser.Scene {
     if (p && p.negated) {
       this._banner('HASHED BACKUP USED', 'amber', 1);
     } else {
-      this._banner('CRASH', 'danger', 3);
+      // Readable Chaos phase 3: the banner names the killer (CrashReport.killerName; a hazard that cannot kill never is)
+      const hz = (this.registry.get(REG.CONTENT) || {}).hazards || {};
+      const name = killerName(p && p.cause, p && p.hazardId ? hz[p.hazardId] : null);
+      this._banner(name, 'danger', name.length * 18 > 460 ? 2 : 3); // 6 px a glyph at scale 3 in a 480 px HUD
       this.comboInfo.setText('');
     }
   }
