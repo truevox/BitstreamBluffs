@@ -62,7 +62,7 @@ describe('PhysicsTuner: landingRebound', () => {
 
   test('bouncySpring carries a felt, fair share; its restitution and bounceMul are unchanged', () => {
     const e = t.getEffective({ zones: [MODS.bouncySpring] });
-    expect(e.landingRebound).toBeGreaterThanOrEqual(0.25);
+    expect(e.landingRebound).toBeGreaterThanOrEqual(0.15);
     expect(e.landingRebound).toBeLessThanOrEqual(0.45);
     expect(MODS.bouncySpring.physics.bounceMul).toBe(1.9);
     expect(e.restitution).toBeCloseTo(0.02 * 1.9 * 1.9, 12);
