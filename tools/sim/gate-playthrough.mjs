@@ -3778,12 +3778,12 @@ async function main() {
       for (const B of B4) {
         const names = B.hazard === 'meteor'
           ? {
-            hz: `B4 ${B.name}: meteor spawns on ${B.seed}@${B.mask} in a jump arc, drawn in danger, and a real hit crashes the run (named meteor)`,
+            hz: `B4 ${B.name}: meteor spawns on ${B.seed}@${B.mask} in a jump arc, drawn in danger, and a real hit crashes the run (the banner names the Meteor)`,
             tele: `B4 ${B.name}: the meteor is air-telegraphed (STAY LOW over its lip) before the lip, and a hands-off ride at the expected speed passes under it`,
             pu: `B4 ${B.name}: gravityStabilizer spawns on ${B.seed}@${B.mask} and saves a real landing that crashes without it (same seed, pose, frames)`,
           }
           : {
-            hz: `B4 ${B.name}: gustFront spawns on ${B.seed}@${B.mask} and changes the real sled's velocity by its bounded impulse (no crash, own HUD line)`,
+            hz: `B4 ${B.name}: gustFront spawns on ${B.seed}@${B.mask} and changes the real sled's velocity by its bounded impulse (no crash, own HUD line, never named as the killer)`,
             pu: `B4 ${B.name}: stabilizerRails spawns on ${B.seed}@${B.mask}, saves a real landing that crashes without it, and damps the bouncySpring restitution`,
           };
         const c = await (async () => {
@@ -4005,6 +4005,28 @@ async function main() {
                     }
                   }
                 }
+                // ---- last (it ends the run): a REAL crash through the shipped resolveCrash, and the killer the banner and
+                // REG.LAST_CRASH name (Readable Chaos phase 3). Space: the meteor itself. Sky Jellyfish: a gust first, then
+                // the base Packet Spike it pushes the sled into: the spike is the killer, never the gust.
+                if (h) {
+                  run.resolveCrash = resolveCrash;
+                  run.inputRouter = router;
+                  g.registry.set('lastCrash', null);
+                  run._resetBiomeEffects();
+                  live(); run.shieldCharges = 0; run.sled.shield = false;
+                  h.hit = false;
+                  run.onHazard(h);
+                  let killer = null;
+                  if (B.hazard === 'gustFront') {
+                    res.killer = { gustQueued: !!run.pendingCrash };
+                    killer = entity(find('packetSpike', 'hazards'), 'hazards');
+                    if (killer) { killer.hit = false; run.onHazard(killer); }
+                  }
+                  step(1);
+                  const lc = g.registry.get('lastCrash');
+                  res.killer = { ...(res.killer || {}), crashed: run.crashed, banner: ui && ui.banner && ui.banner.main ? ui.banner.main.text : null,
+                    lcName: lc ? lc.name : null, lcHazard: lc ? lc.hazardId : null, other: killer ? killer.def.id : null };
+                }
               } catch (e) { res.fatal = String(e && e.stack || e); }
               g.events.off('bb:hazardHit', onHit);
               g.events.off('bb:landing', onLand);
@@ -4032,7 +4054,8 @@ async function main() {
         else if (B.hazard === 'meteor') {
           if (!hz.isDanger) fail(names.hz, 'the meteor is not drawn in danger');
           else if (hz.crash !== 'meteor' || hz.hitEvents.join() !== 'meteor:crash') fail(names.hz, `a hit queued ${hz.crash}, HAZARD_HIT ${hz.hitEvents}`);
-          else pass(names.hz, `${run}: at ${hz.m} m in a ${hz.chunkDef}; drawn '${hz.drawKind}' in danger; real hit queued crash 'meteor'`);
+          else if (!o.killer || !o.killer.crashed || o.killer.banner !== String(HAZ_DEFS.meteor.name || 'meteor').toUpperCase() || o.killer.lcName !== String(HAZ_DEFS.meteor.name || 'meteor').toUpperCase() || o.killer.lcHazard !== 'meteor') fail(names.hz, `real meteor crash: ${JSON.stringify(o.killer)} (want the banner and REG.LAST_CRASH to name ${String(HAZ_DEFS.meteor.name || 'meteor').toUpperCase()})`);
+          else pass(names.hz, `${run}: at ${hz.m} m in a ${hz.chunkDef}; drawn '${hz.drawKind}' in danger; real hit queued crash 'meteor'; the real crash banner and REG.LAST_CRASH name "${o.killer.banner}"`);
           const t = o.tele;
           if (!t || !t.lip) fail(names.tele, 'the meteor entity has no launch lip (AirTelegraph cannot mark it)');
           else if (t.alertAt == null || t.lipAt == null || t.alertAt >= t.lipAt) fail(names.tele, `alert at frame ${t.alertAt}, lip at frame ${t.lipAt} (the warning must come first)`);
@@ -4048,7 +4071,8 @@ async function main() {
           else if (hz.crashed || !hz.inWorld) fail(names.hz, `the gust crashed the run (queued ${hz.crashed}, inWorld ${hz.inWorld})`);
           else if (hz.hitEvents.join() !== 'gustFront:gust:0') fail(names.hz, `HAZARD_HIT ${hz.hitEvents}`);
           else if (hz.label !== 'GUST FRONT') fail(names.hz, `HUD warning label ${hz.label}`);
-          else pass(names.hz, `${run}: at ${hz.m} m in a ${hz.chunkDef}; body velocity +(${hz.dv.x.toFixed(1)}, ${hz.dv.y.toFixed(1)}) px/s = |${mag.toFixed(1)}| <= ${GUST_MAX_PX_S}; no crash; HUD "${hz.label}"`);
+          else if (!o.killer || o.killer.gustQueued || o.killer.other !== 'packetSpike' || !o.killer.crashed || o.killer.banner !== 'PACKET SPIKE' || o.killer.lcHazard !== 'packetSpike' || /GUST/.test(`${o.killer.banner} ${o.killer.lcName}`)) fail(names.hz, `gust then Packet Spike: ${JSON.stringify(o.killer)} (the spike must be the killer, never the gust)`);
+          else pass(names.hz, `${run}: at ${hz.m} m in a ${hz.chunkDef}; body velocity +(${hz.dv.x.toFixed(1)}, ${hz.dv.y.toFixed(1)}) px/s = |${mag.toFixed(1)}| <= ${GUST_MAX_PX_S}; no crash; HUD "${hz.label}"; gust then a real Packet Spike: the banner and REG.LAST_CRASH name "${o.killer.banner}", never the gust`);
         }
         const pu = o.pu;
         const L = pu && pu.land;
