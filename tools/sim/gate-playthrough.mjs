@@ -2841,7 +2841,7 @@ async function main() {
       const { ROLL_ACTIVATE_PX, gateTiming, rollParams, rollOffsetAt } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
       const { glideDrag, glideFrictionMul } = await import(path.join(ROOT, 'src/systems/BiomeEffects.js'));
       // B3 tuning (Marvin 2026-11-15, "make it felt"): after 2 s on the same seed and pose a glide must be this much faster
-      // and further than the same ride without it. A friction-only glide measured +17 px/s / +15 px (Royal Jelly Wax).
+      // and further than the same ride without it. A friction-only glide measured +17 px/s / +15 px (Royal Jelly Wax); the shipped one +31.8 / +28.1 (5 of 5 runs identical).
       const GLIDE_FELT_PX_S = 25;
       const GLIDE_FELT_PX = 25;
       for (const B of B3) {
@@ -2947,9 +2947,18 @@ async function main() {
                   // cannot collect this glide on the way), so the difference is the glide alone
                   const onPU = run.onPowerUp;
                   const onHz = run.onHazard;
+                  // both arms start from the same state: same run time, no hit-stop, slow-mo or landing boost left over
+                  // (on v2.10.0 the base arm depended on the run time at the pause: hit-stop / boost from the boot)
+                  const T0 = Math.ceil((clock + 60000) / 1000) * 1000;
                   const ride = (glide) => {
                     run._resetBiomeEffects();
                     keepAlive();
+                    run.runTimeMs = T0;
+                    clock = T0;
+                    run.hitStopMs = 0;
+                    run.slowmoMs = 0;
+                    run.boostMs = 0;
+                    run.sled.boostMs = 0;
                     poseAt(sx, 420);
                     p.collected = false;
                     if (glide) run.onPowerUp(p);
