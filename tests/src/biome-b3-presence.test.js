@@ -131,6 +131,18 @@ describe('B3 rolling hazards: the whole roll track keeps the spawn clearances', 
   });
 });
 
+describe('B3 tuning: the downhill track end keeps ROLL_TRACK_EDGE_MARGIN_PX from the chunk end', () => {
+  test('a long roll (range 200) spawned at the spawn margin is refused; range 120 there is allowed', () => {
+    const g = makeGen('edge-rule', { biomeMask: 4 });
+    const ch = g.getChunk(5);
+    const chunk = { ...ch, hazards: [], powerups: [], gaps: [] };
+    const x = chunk.endX - BIOME_EDGE_MARGIN_PX;
+    const def = (rangePx) => ({ id: 'probe', motion: { kind: 'roll', speedPxS: 80, rangePx, dir: 1 } });
+    expect(g._rollTrackClear(chunk, def(200), x, [], null)).toBe(false); // track end 40 px from the chunk end
+    expect(g._rollTrackClear(chunk, def(120), x, [], null)).toBe(true); // exactly ROLL_TRACK_EDGE_MARGIN_PX
+  });
+});
+
 describe('B3 presence: the biome hazard is felt in early terrain (chunks 0-44, single biome bit)', () => {
   test.each(B3)('mask %p (%s): %s share of eligible chunks and 1 per 2 km', (mask, biome, id) => {
     const a = presence(mask, biome, id, SEEDS);
