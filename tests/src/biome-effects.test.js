@@ -8,7 +8,7 @@ import {
 import {
   GUST_MAX_PX_S, gustImpulse, BLIND_MIN_VISIBILITY, BLIND_DEFAULT_MS, blindVisibility, blindOverlayAlpha,
   glideFrictionMul, GLIDE_MIN_FRICTION_MUL, stabilizeToleranceDeg, STABILIZE_MAX_DEG, resolveLanding,
-  hazardEffectDurationMs, hazardColorKey, hazardDrawKind, powerupDrawKind, timedPowerupMs,
+  hazardEffectDurationMs, hazardColorKey, hazardColor, hazardDrawKind, powerupDrawKind, timedPowerupMs,
 } from '../../src/systems/BiomeEffects.js';
 import { PhysicsTuner, TUNING } from '../../src/systems/PhysicsTuner.js';
 import { PHYSICS } from '../../src/constants.js';
@@ -241,5 +241,15 @@ describe('BiomeEffects.js: effect durations, colours and draw kinds', () => {
     expect(hazardDrawKind({})).toBe('generic');
     for (const k of ['clock', 'burst', 'shield']) expect(powerupDrawKind({ shapeKey: k })).toBe(k);
     expect(powerupDrawKind({ shapeKey: 'mapleWax' })).toBe('generic');
+  });
+});
+
+describe('hazardColor: one resolution for spawn and palette switch', () => {
+  const pal = { danger: 1, magenta: 2, amber: 3 };
+  test('biome crash hazard is danger; base def keeps its colorKey; unknown key falls back to danger', () => {
+    expect(hazardColor({ biome: 'b', onHit: { effect: 'crash' }, colorKey: 'amber' }, pal)).toBe(1);
+    expect(hazardColor({ colorKey: 'magenta' }, pal)).toBe(2);
+    expect(hazardColor({ colorKey: 'nope' }, pal)).toBe(1);
+    expect(hazardColor({ biome: 'b', onHit: { effect: 'gust' }, colorKey: 'amber' }, pal)).toBe(3);
   });
 });

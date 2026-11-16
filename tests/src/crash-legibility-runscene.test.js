@@ -80,7 +80,7 @@ jest.unstable_mockModule('../../src/shaders/GlitchPipeline.js', () => ({ GlitchP
 jest.unstable_mockModule('../../src/scenes/UIScene.js', () => ({ HUD_SPEED_EVENT: 'hud', UIScene: class {} }));
 jest.unstable_mockModule('../../src/systems/TerrainContact.js', () => ({ installTerrainContactFix() {}, terrainTopNormal() {}, snapTerrainNormal() {} }));
 jest.unstable_mockModule('../../src/ui/Palette.js', () => ({
-  getPalette: () => new Proxy({}, { get: (t, k) => (k === 'then' ? undefined : 0xffffff) }),
+  getPalette: () => globalThis.__testPalette || new Proxy({}, { get: (t, k) => (k === 'then' ? undefined : 0xffffff) }),
   getPaletteCss: () => new Proxy({}, { get: (t, k) => (k === 'then' ? undefined : '#ffffff') }),
   withBiomePalette: (b) => b,
 }));
@@ -300,6 +300,24 @@ describe('onHazard keeps the hazard that crashed (for its telegraph arrival)', (
     s.onHazard(h);
     expect(s.pendingCrash).toEqual({ cause: 'hazard', hazardId: 'gearGate' });
     expect(s._crashHazard).toBe(h);
+  });
+});
+
+describe('palette switch recolours hazards exactly like a fresh spawn', () => {
+  test('a biome crash hazard stays danger through refreshPalette; a base hazard keeps its own colorKey', () => {
+    globalThis.__testPalette = { bg: 1, danger: 0xaa0001, amber: 0xaa0002, magenta: 0xaa0003, cyan: 0xaa0004 };
+    const s = runScene(baseValues());
+    const biomeHz = { def: { biome: 'space-mountain', onHit: { effect: 'crash' }, colorKey: 'amber' }, color: -1 };
+    const baseHz = { def: { colorKey: 'magenta' }, color: -1 };
+    s.terrain = { getActiveChunks: () => [{ index: 7 }] };
+    s.mesh = { chunks: new Map([[7, true]]), setPalette() {}, addChunk() {} };
+    s.hazards = new Map([[7, [biomeHz, baseHz]]]);
+    s.powerups = new Map();
+    s.refreshPalette();
+    expect(biomeHz.color).toBe(s.palette.danger);
+    expect(biomeHz.color).not.toBe(s.palette.amber);
+    expect(baseHz.color).toBe(s.palette.magenta);
+    delete globalThis.__testPalette;
   });
 });
 

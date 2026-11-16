@@ -203,6 +203,18 @@ export function hazardColorKey(def) {
   return def.colorKey || 'danger';
 }
 
+/**
+ * The palette colour a hazard is drawn in: `hazardColorKey`, falling back to `danger`. The single resolution used by
+ * Hazard's constructor (fresh spawn) AND RunScene's palette switch, so a switch never recolours a hazard differently.
+ * @param {{biome?:string, onHit?:{effect?:string}, colorKey?:string}} def
+ * @param {Object<string,number>} palette
+ * @returns {number}
+ */
+export function hazardColor(def, palette) {
+  const c = palette[hazardColorKey(def)];
+  return c != null ? c : palette.danger;
+}
+
 /** Hazard shapeKeys with their own drawing routine in entities/Hazard.js (B1 adds groomer, seagull, seaweed, chocoRiver; B2 shatterWall, ashCloud; B3 boulder, dewDrop, gearGate; B4 meteor, gustFront). */
 export const HAZARD_SHAPES = Object.freeze(['chasm', 'firewall', 'spike', 'vent', 'drone', 'groomer', 'seagull', 'seaweed', 'chocoRiver', 'shatterWall', 'ashCloud', 'boulder', 'dewDrop', 'gearGate', 'meteor', 'gustFront']);
 /** Power-up shapeKeys with their own glyph in entities/PowerUp.js (B1 adds maple, waxSpray, bubble, candyCoat; B2 goggles, heatShield; B3 skis, jellyWax, treads; B4 gravStabilizer, stabRails). */

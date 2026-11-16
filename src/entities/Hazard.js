@@ -8,7 +8,7 @@
  */
 import Phaser from 'phaser';
 import { CAT } from './Sled.js';
-import { hazardColorKey, hazardDrawKind, gustImpulse } from '../systems/BiomeEffects.js';
+import { hazardColor, hazardDrawKind, gustImpulse } from '../systems/BiomeEffects.js';
 import { emptyRollState, rollStep, rollParams, rollPredictX, gateOpenAt, gateNextChangeMs } from '../systems/HazardMotion.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
@@ -37,8 +37,7 @@ export class Hazard {
     this.hit = false;
     this.destroyed = false;
     // BiomeEffects.hazardColorKey: a biome crash hazard is always `danger` (spec §4); base defs keep their colorKey
-    const ck = hazardColorKey(def);
-    this.color = palette[ck] != null ? palette[ck] : palette.danger;
+    this.color = hazardColor(def, palette);
     /** Drawing routine: the def's shapeKey when known, else 'generic' (a biome def with a new shapeKey still draws). */
     this.drawKind = hazardDrawKind(def);
     const w = (def.size && def.size.w) || 24;

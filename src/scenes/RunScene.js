@@ -36,7 +36,7 @@ import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
-  gustImpulse, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
+  gustImpulse, hazardColor, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
   resolveLanding, hazardEffectDurationMs, timedPowerupMs, addShieldSource, spendShieldSource, shieldChargesFor,
 } from '../systems/BiomeEffects.js';
 import { GlitchPipeline } from '../shaders/GlitchPipeline.js';
@@ -1652,7 +1652,7 @@ export class RunScene extends Phaser.Scene {
       if (!this.mesh.chunks.has(chunk.index)) continue;
       this.mesh.addChunk(chunk); // redraws (removes + re-adds)
       const hz = this.hazards.get(chunk.index);
-      if (hz) hz.forEach((h) => { h.palette = this.palette; h.color = this.palette[h.def.colorKey] != null ? this.palette[h.def.colorKey] : this.palette.danger; });
+      if (hz) hz.forEach((h) => { h.palette = this.palette; h.color = hazardColor(h.def, this.palette); });
       const pu = this.powerups.get(chunk.index);
       if (pu) pu.forEach((p) => { p.palette = this.palette; p.color = this.palette[p.def.colorKey] != null ? this.palette[p.def.colorKey] : this.palette.cyan; });
     }
