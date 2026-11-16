@@ -41,6 +41,7 @@ import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
 import { uiSfx } from '../ui/Sound.js';
+import { gameOverLine } from '../systems/CrashReport.js';
 
 const PANEL_Y = 54;
 const PANEL_H = 160;
@@ -207,19 +208,27 @@ export class GameOverScene extends Phaser.Scene {
   _buildHeader() {
     const theme = this.theme;
     const text = this.rec.cause === 'quit' ? 'RUN ENDED' : 'CRASHED';
-    const y = 8;
-    this.ghostA = new NeonText(this, theme, GAME_WIDTH / 2 - 2, y, text, { color: 'cyan', scale: 4, anchor: 'center', outline: 'none' });
-    this.ghostB = new NeonText(this, theme, GAME_WIDTH / 2 + 2, y, text, { color: 'lime', scale: 4, anchor: 'center', outline: 'none' });
-    this.ghostA.setAlpha(0.45);
-    this.ghostB.setAlpha(0.45);
-    this.title = new NeonText(this, theme, GAME_WIDTH / 2, y, text, { color: 'danger', scale: 4, anchor: 'center', outline: 'dark' });
     // Decision 2: a run on a daily seed says whether it was the official Daily or a practice run of a date.
     const dailyLabel = DailyPatch.dailyRunLabel(this.rec.seed, isOfficialDaily(this.rec));
     const hasRule = this.rec.dailyRuleId && this.rec.dailyRuleId !== 'none';
     const seedLine = dailyLabel
       ? `${dailyLabel}${hasRule ? `  ${ruleLabel(this.rec.dailyRuleId)}` : ''}`
       : hasRule ? `DAILY RULE  ${ruleLabel(this.rec.dailyRuleId)}` : '';
-    this.rule = new NeonText(this, theme, GAME_WIDTH / 2, 42, seedLine, { color: 'amber', anchor: 'center', outline: 'none' });
+    // Readable Chaos phase 3: who killed this run, and how the hop was timed (REG.LAST_CRASH, this run's id only).
+    // With a rule line as well, the title drops to scale 3 so both lines fit above the panels.
+    const crashLine = gameOverLine(this.registry.get(REG.LAST_CRASH), this.rec);
+    const both = !!crashLine && !!seedLine;
+    const ts = both ? 3 : 4;
+    const y = 8;
+    this.ghostA = new NeonText(this, theme, GAME_WIDTH / 2 - 2, y, text, { color: 'cyan', scale: ts, anchor: 'center', outline: 'none' });
+    this.ghostB = new NeonText(this, theme, GAME_WIDTH / 2 + 2, y, text, { color: 'lime', scale: ts, anchor: 'center', outline: 'none' });
+    this.ghostA.setAlpha(0.45);
+    this.ghostB.setAlpha(0.45);
+    this.title = new NeonText(this, theme, GAME_WIDTH / 2, y, text, { color: 'danger', scale: ts, anchor: 'center', outline: 'dark' });
+    this.rule = new NeonText(this, theme, GAME_WIDTH / 2, both ? 33 : 42, seedLine, { color: 'amber', anchor: 'center', outline: 'none' });
+    this.crashLine = crashLine
+      ? new NeonText(this, theme, GAME_WIDTH / 2, both ? 43 : 42, crashLine, { color: 'danger', anchor: 'center', outline: 'dark' })
+      : null;
   }
 
   _buildStats() {
