@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bitstream Bluffs • Orchestra Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#090f1d;--card:#111b30;--card2:#14243a;--line:#2b4161;--ink:#f1f6ff;--muted:#a2b4cc;--accent:#70e4d4;--gold:#f7bf78}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 75% 12%,#213b52 0,transparent 35%),radial-gradient(ellipse at 12% 72%,#251f41 0,transparent 43%),var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif;min-height:100vh}
+main{max-width:1100px;margin:auto;padding:38px 22px 60px}
+.meta{font-size:11px;letter-spacing:.21em;font-weight:750;color:var(--accent);text-transform:uppercase}
+header{border-bottom:1px solid var(--line);padding-bottom:25px;margin-bottom:26px}
+h1{font-size:clamp(32px,5vw,58px);line-height:1.03;letter-spacing:-.045em;margin:9px 0;font-weight:850}
+h1 em{font-style:normal;color:var(--accent)}
+.subtitle{color:var(--muted);font-size:16px;max-width:740px;margin:12px 0 0}
+.grid{display:grid;grid-template-columns:360px 1fr;gap:20px}
+.card{border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,var(--card),var(--card2));padding:22px;box-shadow:0 12px 30px #0003}
+.label{color:var(--muted);font-size:11px;letter-spacing:.16em;font-weight:750;text-transform:uppercase}
+label{display:block;margin:10px 0 7px;color:var(--muted);font-size:12px;font-weight:700}
+select,button,input{font:inherit}
+select{width:100%;border:1px solid #40597b;border-radius:9px;background:#0a1425;color:var(--ink);padding:12px;margin:0 0 14px}
+button{cursor:pointer;border:1px solid #426280;background:#16273f;color:var(--ink);border-radius:11px;padding:10px 15px;transition:background .1s}
+button:hover{background:#264261}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button[aria-pressed="true"]{background:#21796f;border-color:#54cbb9;color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+.picks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:13px}
+.biome{padding:10px 8px;text-align:left;font-size:12px;min-height:55px}
+.biome span{display:block;font-size:10px;color:#bad1d7;opacity:.88}
+.biome[aria-pressed="true"] span{color:#e8fff8}
+.now{font-size:clamp(25px,4vw,38px);font-weight:790;letter-spacing:-.03em;line-height:1.1;margin:9px 0 12px}
+.desc{color:#cbd9e9;font-size:16px;min-height:50px}
+.role{font-size:13px;color:var(--muted);margin:8px 0 20px}
+.mode{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 17px}
+.mode button{flex:1}
+.divider{border-top:1px solid var(--line);margin:19px 0}
+.transport{display:flex;align-items:center;gap:12px}
+.play{background:var(--accent);border-color:var(--accent);color:#092130;font-size:18px;min-width:118px;font-weight:800}
+.play:hover{background:#a1fff1;color:#092130}
+#seek{width:100%;accent-color:var(--accent);cursor:pointer}
+.clock{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}
+.control{display:flex;align-items:center;gap:9px;margin:10px 0;color:#d4deeb}
+.control input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
+.status{color:#b6dbde;font-size:12px;min-height:21px;margin:16px 0 0}
+.note{background:#122239;border:1px solid var(--line);border-radius:12px;padding:15px;color:#cbd8e9;margin-top:18px;font-size:13px}
+.note strong{color:var(--gold)}
+.legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+.legend div{background:#091624;padding:11px;border-radius:10px;font-size:12px;color:#b6c7db}
+.legend b{display:block;color:#fff}
+footer{margin-top:30px;color:#96abc4;font-size:12px}
+a{color:var(--accent)}
+@media(max-width:810px){.grid{grid-template-columns:1fr}.picks{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:520px){main{padding:24px 13px 35px}.card{padding:16px}.picks{grid-template-columns:repeat(2,minmax(0,1fr))}.legend{grid-template-columns:1fr}.transport{flex-wrap:wrap}.play{min-width:92px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="meta">TrueVox • Bitstream Bluffs • Private audio research</div>
+<h1>THE <em>ORCHESTRA</em> LAB</h1>
+<p class="subtitle">Eleven mountains. Eleven distinct ensembles. The same song underneath. First-pass instrumental reinterpretations beyond General MIDI—waiting for your ears.</p>
+</header>
+<div class="grid">
+<section class="card" aria-labelledby="biomeLabel">
+<div class="label" id="biomeLabel">01 / Pick a mountain</div>
+<label for="song">SOURCE SONG</label><select id="song" aria-label="Song selection"></select>
+<div class="picks" id="biomes" role="group" aria-label="Biomes"></div>
+</section>
+<section class="card">
+<div class="label">02 / Listen and compare</div>
+<h2 class="now" id="orchestra">Select a biome</h2>
+<p class="desc" id="description">Choose a mountain to preview its new instrumental arrangement.</p>
+<p class="role" id="sourceInfo"></p>
+<div class="label">A/B arrangement</div>
+<div class="mode">
+<button id="original" aria-pressed="false">Original instrumental</button>
+<button id="new" aria-pressed="true">Biome orchestra</button>
+</div>
+<div class="label">Terrain phase</div>
+<div class="mode">
+<button id="ground" aria-pressed="false">🛷 Ground drums</button>
+<button id="air" aria-pressed="true">☁️ Airborne kit</button>
+</div>
+<div class="control"><input type="checkbox" id="vocal"><label for="vocal" style="display:inline;color:var(--ink);margin:0">Play Maxi’s original vocal too</label></div>
+<div class="divider"></div>
+<div class="transport">
+<button class="play" id="play">▶ Play</button>
+<div style="flex:1"><input id="seek" type="range" min="0" max="32" step=".01" value="0" aria-label="Seek within excerpt"><div class="clock"><span id="current">0:00</span><span>0:32</span></div></div>
+</div>
+<p class="status" id="status" role="status" aria-live="polite">Loading instruments…</p>
+<div class="legend">
+<div><b>Six stems preserved</b>Both unfeatured accompaniment stems remain in the arrangement.</div>
+<div><b>Custom sound design</b>New FM, resonator and modal instruments complement samples.</div>
+<div><b>Pyramid Peak protected</b>The approved lead source recording was not modified.</div>
+</div>
+<div class="note"><strong>Creative research audition—not final music.</strong> Two 32-second excerpts, eleven ensembles, and both ground/air previews. Source-note transcriptions are experimental. No game chase telemetry, release approval or commercial clearance implied.</div>
+</section>
+</div>
+<footer>Private Tailnet listening session • Existing <a href="http://100.115.120.66:8185/">A/B archive at :8185</a> remains untouched.</footer>
+</main>
+<script type="module" src="./app.js"></script>
+</body></html>
