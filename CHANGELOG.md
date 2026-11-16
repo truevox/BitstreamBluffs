@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - biome treatment B4: Air (Space Mountain, Sky Jellyfish Mountain)
+## v2.14.0 - biome treatment B4: Air (Space Mountain, Sky Jellyfish Mountain) (2026-11-16)
 
 - **Space Mountain: Meteor and Gravity Stabilizer.** A burning Meteor (air, crash, `danger`) floats in the arc of a generated jump, like Seagull Dive; the AirTelegraph puts STAY LOW over its lip, and a crash on it reads METEOR (its def `name`). The Gravity Stabilizer (`stabilize`) widens the landing tolerance by 12 deg for 5 s.
 - **Sky Jellyfish Mountain: Gust Front and Stabilizer Rails.** A Gust Front (air zone, cyan, no crash) gives one kick of (60, -150) px/s = 162 px/s (cap 180); it is drawn as a pale zone with wind streaks and an arrowhead along its push, and the HUD line names GUST FRONT. A gust is never named as the killer. The Stabilizer Rails are the shared `stabilize` kind: +12 deg for 5 s, plus bounceMul 0.5 on the bouncySpring mod (chance 0.3).
