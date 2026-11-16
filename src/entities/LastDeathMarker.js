@@ -1,9 +1,13 @@
 /**
  * OWNER: gameplay (readable-chaos pass, phase 3). A "DIED HERE" gate at the last crash x, shown only on a retry of the
  * same seed and mask (CrashReport.deathMarkerX decides). A BestMarker clone in `danger`: drawn lazily once the terrain
- * around it is in reach, pulses, and turns lime once the sled gets past it (you beat your own death).
+ * around it is in reach, pulses, and turns lime once the sled gets past it (you beat your own death). It stands taller
+ * than the BEST gate (label at -126 vs -96): your best is often exactly where you died, and the labels must not overprint.
  * Drawing only; destroyed with the run.
  */
+/** Gate height (px); the BEST gate is 90 with its label at -96. */
+const GATE_H = 118;
+
 export class LastDeathMarker {
   /**
    * @param {Phaser.Scene} scene
@@ -36,7 +40,7 @@ export class LastDeathMarker {
       const y = heightAt(this.x);
       if (!Number.isFinite(y)) return;
       this.y = y;
-      this.label.setPosition(this.x, y - 96).setVisible(true);
+      this.label.setPosition(this.x, y - GATE_H - 8).setVisible(true);
     }
     if (!this.passed && sledX > this.x + 10) {
       this.passed = true;
@@ -49,13 +53,13 @@ export class LastDeathMarker {
     const x = this.x;
     const y = this.y;
     g.lineStyle(9, col, 0.14 * pulse);
-    g.lineBetween(x, y, x, y - 90);
+    g.lineBetween(x, y, x, y - GATE_H);
     g.lineStyle(2, col, 0.95);
-    g.lineBetween(x, y, x, y - 90);
+    g.lineBetween(x, y, x, y - GATE_H);
     // an X at the top: where it ended
     g.lineStyle(2, col, 0.6 + 0.4 * pulse);
-    g.lineBetween(x - 8, y - 98, x + 8, y - 82);
-    g.lineBetween(x + 8, y - 98, x - 8, y - 82);
+    g.lineBetween(x - 7, y - GATE_H + 7, x + 7, y - GATE_H - 7);
+    g.lineBetween(x + 7, y - GATE_H + 7, x - 7, y - GATE_H - 7);
     g.lineStyle(1.5, col, 0.5 * pulse);
     for (let i = 0; i < 5; i++) g.lineBetween(x - 12, y - 8 - i * 14, x, y - 12 - i * 14);
   }

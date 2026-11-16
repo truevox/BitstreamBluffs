@@ -23,6 +23,8 @@ const { TUNING } = await import('../../src/systems/PhysicsTuner.js');
 const { speedZoom } = await import('../../src/systems/CameraZoom.js');
 const { REG } = await import('../../src/constants.js');
 const { loadContent } = await import('./_helpers.js');
+const { LastDeathMarker } = await import('../../src/entities/LastDeathMarker.js');
+const { BestMarker } = await import('../../src/entities/BestMarker.js');
 
 const HS = TUNING.hitStopCrashMs;
 
@@ -110,5 +112,27 @@ describe('the crash banner names the killer', () => {
     s.onCrash({ cause: 'chasm', negated: false });
     const [text, , scale] = banners[0];
     expect(text.length * 6 * scale).toBeLessThanOrEqual(470);
+  });
+});
+
+describe('DIED HERE marker vs the BEST marker (both often stand at the same distance: your best is where you died)', () => {
+  const scene = () => {
+    const labels = [];
+    const chain = (o) => new Proxy(o, { get: (t, k) => (k in t ? t[k] : () => chain(t)) });
+    return {
+      labels,
+      add: {
+        graphics: () => chain({}),
+        text: (x, y, s) => { const l = chain({ s, x, y, setPosition(px, py) { this.x = px; this.y = py; return this; } }); labels.push(l); return l; },
+      },
+    };
+  };
+  test('labels sit on different rows, so they never overprint', () => {
+    const PAL = { danger: 1, lime: 2, amber: 3 };
+    const sb = scene();
+    new BestMarker(sb, PAL, 1000, 344).update(0, 900, () => 500);
+    const sd = scene();
+    new LastDeathMarker(sd, PAL, 1004, 344).update(0, 900, () => 500);
+    expect(Math.abs(sb.labels[0].y - sd.labels[0].y)).toBeGreaterThanOrEqual(16);
   });
 });
