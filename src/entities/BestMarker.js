@@ -24,6 +24,16 @@ export class BestMarker {
     this.passed = false;
   }
 
+
+  /**
+   * Where the label hangs (MarkerLayout.layoutMarkerLabels): world x/y of its bottom edge and the text origin x.
+   * @param {{x:number, y:number, originX:number}|null} p @returns {void}
+   */
+  setPlacement(p) {
+    if (!this.label || !p) return;
+    this.label.setOrigin(p.originX, 1).setPosition(p.x, p.y);
+  }
+
   /**
    * @param {number} timeMs
    * @param {number} sledX
