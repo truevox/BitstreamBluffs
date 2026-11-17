@@ -10,8 +10,14 @@ const palette = {
 	'candy-cane-canyon':'🍬','sky-jellyfish-mountain':'☁️',
 	'steampunk-slopes':'⚙️','micro-mountain':'🔬','vertigo-vents':'🌋',
 };
+const diagnosticBiome = {
+	id:'sine-timing-lab',label:'Sine / Timing Reference',
+	orchestra:'Flat Sine Timing Bench',
+	description:'Dry 1ms-gated sine notes for original vocal melody, extracted bass and scored featured accompaniment. 3–10ms electronic drum clicks. NO source backing, SoundFonts, envelopes, effects, room or artificial delay.',
+};
 const state = {
 	catalog:null,song:'pope',biome:'debumont',
+	lastRealRevision:'controlled',lastRealAccompaniment:'new',
 	arrangement:'orchestra',terrain:'air',revision:'controlled',accompaniment:'new',vocals:false,
 	ctx:null,master:null,main:null,voice:null,
 	playing:false,position:0,startClock:0,
@@ -21,7 +27,9 @@ const state = {
 function getSong(){
 	return state.catalog?.songs.find(song=>song.id===state.song);
 }
+function isDiagnostic(){return state.biome===diagnosticBiome.id;}
 function getBiome(){
+	if(isDiagnostic())return diagnosticBiome;
 	return state.catalog?.biomes.find(row=>row.id===state.biome);
 }
 function clockText(seconds){
@@ -36,6 +44,10 @@ function desiredPath(){
 	const song=getSong();
 	if(!song)throw new Error('Missing song');
 	if(state.arrangement==='original')return song.id+'/'+song.originalReference;
+	if(isDiagnostic()){
+		if(state.accompaniment==='stock')throw new Error('Stock audio has no sine note score. Select Current orchestra.');
+		return 'revisions/diagnostic/'+song.id+'/'+state.accompaniment+'.ogg';
+	}
 	if(state.revision==='controlled'){
 		return 'revisions/controlled-'+state.accompaniment+'/'+song.id+'/'+
 			song.variants[state.biome][state.terrain];
@@ -105,11 +117,12 @@ function stopSlot(slot,fade=.2,at=null){
 function flags(){
 	for(const button of document.querySelectorAll('#versions button[data-revision]')){
 		button.setAttribute('aria-pressed',String(button.dataset.revision===state.revision));
-		button.disabled=state.arrangement==='original';
+		button.disabled=state.arrangement==='original'||isDiagnostic();
 	}
 	for(const button of document.querySelectorAll('#accompaniment button[data-accompaniment]')){
 		button.setAttribute('aria-pressed',String(button.dataset.accompaniment===state.accompaniment));
 		button.disabled=state.arrangement==='original'||!['rhythm','controlled'].includes(state.revision)||
+			(isDiagnostic()&&button.dataset.accompaniment==='stock')||
 			(button.dataset.accompaniment==='reattacks'&&state.song!=='pope');
 	}
 	for(const [button,active] of [
@@ -120,8 +133,11 @@ function flags(){
 	]){
 		$(button).setAttribute('aria-pressed',String(active));
 	}
-	$('ground').disabled=state.arrangement==='original';
-	$('air').disabled=state.arrangement==='original';
+	$('ground').disabled=state.arrangement==='original'||isDiagnostic();
+	$('air').disabled=state.arrangement==='original'||isDiagnostic();
+	$('new').textContent=isDiagnostic()?'Sine timing reference':'Biome orchestra';
+	const current=$('accompaniment').querySelector('[data-accompaniment="new"]');
+	if(current)current.textContent=isDiagnostic()?'Detected note score':'Current orchestra';
 	$('vocal').checked=state.vocals;
 	$('play').textContent=state.playing?'❚❚ Pause':'▶ Play';
 	$('seek').value=Math.min(32,playPosition());
@@ -132,16 +148,24 @@ function display(){
 	if(!song||!biome)return;
 	$('orchestra').textContent=biome.orchestra;
 	$('description').textContent=biome.description;
-	$('sourceInfo').textContent='Re-performed featured stem: '+song.featured.toUpperCase()
-		+' • '+song.unselectedPreserved.map(name=>name.toUpperCase()).join(' + ')
-		+' are ALWAYS original • '+song.excerptStartSeconds.toFixed(0)
-		+'s source start';
+	$('sourceInfo').textContent=isDiagnostic()
+		? 'LAB ONLY • '+song.featured.toUpperCase()+' note clock + lead + bass + V3 percussion clicks • NO original accompaniment audio • source excerpt '+song.excerptStartSeconds.toFixed(0)+'s'
+		: 'Re-performed featured stem: '+song.featured.toUpperCase()
+			+' • '+song.unselectedPreserved.map(name=>name.toUpperCase()).join(' + ')
+			+' are ALWAYS original • '+song.excerptStartSeconds.toFixed(0)
+			+'s source start';
 	const status={stock:'Original Guitar + Piano + Other, unchanged at source timing.',
 		new:'Current re-performance of '+song.featured.toUpperCase()+'; the other two are stock.',
 		aligned:'Experimental source-transient retiming of '+song.featured.toUpperCase()+
 			'; same notes/timbres. Not human-verified.',
 		reattacks:'Pope only: experimental 18 new same-pitch retriggers within long Other notes. No new pitches or octave deletions. Not human-verified.'};
-	$('accompExplanation').textContent=status[state.accompaniment];
+	$('accompExplanation').textContent=isDiagnostic()
+		? ({
+			new:'Current detected '+song.featured.toUpperCase()+' notes: immediate flat sine onsets. Other notes and drum clicks are identical across timing variants.',
+			aligned:'Same sine note pitches and durations; onset times move per the source-transient-aligned candidate.',
+			reattacks:'Pope only: same pure sine score with 18 proposed repeated attacks. Brief right-channel ticks mark featured-note onsets.',
+		})[state.accompaniment]
+		: status[state.accompaniment];
 	for(const button of $('biomes').querySelectorAll('button[data-biome]')){
 		button.setAttribute('aria-pressed',String(button.dataset.biome===state.biome));
 	}
@@ -227,6 +251,16 @@ function pause(){
 }
 function changeBiome(id){
 	if(state.biome===id)return;
+	const wasDiagnostic=isDiagnostic();
+	if(id===diagnosticBiome.id){
+		state.lastRealRevision=state.revision;
+		state.lastRealAccompaniment=state.accompaniment;
+		state.revision='controlled';
+		if(state.accompaniment==='stock')state.accompaniment='new';
+	}else if(wasDiagnostic){
+		state.revision=state.lastRealRevision||'controlled';
+		state.accompaniment=state.lastRealAccompaniment||'new';
+	}
 	state.biome=id;
 	display();
 	swap();
@@ -238,6 +272,7 @@ function changeArrangement(mode){
 	swap();
 }
 function changeRevision(version){
+	if(isDiagnostic())return;
 	if(!['original','articulation','orchestral','rhythm','controlled'].includes(version))return;
 	if(state.revision===version)return;
 	state.revision=version;
@@ -245,6 +280,7 @@ function changeRevision(version){
 	if(state.arrangement==='orchestra')swap();
 }
 function changeAccompaniment(mode){
+	if(isDiagnostic()&&mode==='stock')return;
 	if(!['stock','new','aligned','reattacks'].includes(mode)||state.accompaniment===mode)return;
 	if(mode==='reattacks'&&state.song!=='pope')return;
 	state.accompaniment=mode;
@@ -252,6 +288,7 @@ function changeAccompaniment(mode){
 	if(state.arrangement==='orchestra'&&['rhythm','controlled'].includes(state.revision))swap();
 }
 function changeTerrain(mode){
+	if(isDiagnostic())return; // Both phases use the same dry high-resolution click score.
 	if(state.terrain===mode)return;
 	state.terrain=mode;
 	display();
@@ -299,12 +336,12 @@ async function init(){
 			option.textContent=song.title;
 			$('song').append(option);
 		}
-		for(const row of cat.biomes){
+		for(const row of [...cat.biomes,diagnosticBiome]){
 			const button=document.createElement('button');
 			button.type='button';
 			button.className='biome';
 			button.dataset.biome=row.id;
-			button.textContent=(palette[row.id]||'🎵')+' '+row.label;
+			button.textContent=(row.id===diagnosticBiome.id?'🧪 ':palette[row.id]||'🎵 ') +row.label;
 			const sub=document.createElement('span');
 			sub.textContent=row.orchestra;
 			button.append(sub);

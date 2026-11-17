@@ -58,13 +58,14 @@ a{color:var(--accent)}
 <header>
 <div class="meta">TrueVox • Bitstream Bluffs • Private audio research</div>
 <h1>THE <em>ORCHESTRA</em> LAB</h1>
-<p class="subtitle">Eleven mountains. Eleven distinct ensembles. The same song underneath. First-pass instrumental reinterpretations beyond General MIDI—waiting for your ears.</p>
+<p class="subtitle">Eleven mountains plus a lab-only Sine Timing Reference. Hear the orchestra, then isolate the actual detected note positions with dry tones and percussion ticks.</p>
 </header>
 <div class="grid">
 <section class="card" aria-labelledby="biomeLabel">
 <div class="label" id="biomeLabel">01 / Pick a mountain</div>
 <label for="song">SOURCE SONG</label><select id="song" aria-label="Song selection"></select>
 <div class="picks" id="biomes" role="group" aria-label="Biomes"></div>
+<p class="role">🧪 Sine / Timing Reference is a diagnostic instrument, <strong>not</strong> a twelfth game biome. It plays no original accompaniment recordings.</p>
 </section>
 <section class="card">
 <div class="label">02 / Listen and compare</div>
@@ -92,6 +93,7 @@ a{color:var(--accent)}
 <button data-accompaniment="reattacks" aria-pressed="false">Recovered attacks (Pope)</button>
 </div>
 <p class="role" id="accompExplanation">Switch only the source-derived accompaniment; melody, bass, and selected drums stay the same.</p>
+<p class="role">In the Sine Reference, Ground/Air is deliberately locked: both use the <strong>same unquantized dry percussion clicks</strong> derived from the high-resolution V3 drum detections.</p>
 <div class="label">Terrain phase</div>
 <div class="mode">
 <button id="ground" aria-pressed="false">🛷 Ground drums</button>
@@ -105,14 +107,15 @@ a{color:var(--accent)}
 </div>
 <p class="status" id="status" role="status" aria-live="polite">Loading instruments…</p>
 <div class="legend">
-<div><b>Six stems preserved</b>Both unfeatured accompaniment stems remain in the arrangement.</div>
-<div><b>Custom sound design</b>New FM, resonator and modal instruments complement samples.</div>
+<div><b>Real biomes unchanged</b>Existing orchestra versions preserve the two unfeatured original stems; the diagnostic intentionally mutes all original accompaniment.</div>
+<div><b>Sine timing bench</b>1ms click-safe gates, no ADSR/reverb, plus tiny featured-note onset markers and dry percussion ticks.</div>
 <div><b>Pyramid Peak protected</b>The approved lead source recording was not modified.</div>
 </div>
+<div class="note"><strong>🧪 Lab-only Sine Timing Reference:</strong> Select it alongside the real mountain buttons. Current orchestra means original detected featured-note timestamps, Timing candidate means onset-aligned featured-note timestamps, and Recovered attacks (Pope) means 18 proposed extra strikes. The common lead, bass, and ultra-short V3 drum-click score stay identical across these choices. Its right-channel ticks mark featured-note onsets. No source backing, sampled instruments, effect tails, musical attack/decay or drum-kit simulation. The only 1ms ramps prevent digital clicking; the scored timestamps are unchanged. Stock trio is intentionally disabled there because a source recording is not a scored sine performance: use Original instrumental for a source A/B. No diagnostic audio is added to the game. <strong>This reveals the detector timestamps, not ground-truth instrument attacks.</strong></div>
 <div class="note"><strong>Controlled score A/B ✨:</strong> In this new revision only, all four choices use an identical synthesized instrumental backing (same lead, bass, unfeatured original stems, and whichever ground/air drums you select), a single shared gain, and stable timbre/panning for unchanged notes. The player also keeps one continuous song clock across swaps and optional Maxi vocals. The earlier high-speed drums revision is still here for historical comparison but is NOT gain/pan isolated. <strong>Four accompaniment choices:</strong> Stock trio plays all three original Guitar/Piano/Other stems. Current orchestra replaces only the featured stem (Other for Pope; Piano for One More Run). Timing candidate retains that replacement sound but gently moves selected note clusters toward source-stem attacks (maximum 47ms). All four preserve the SAME melody, bass, and selected Ground or High-speed Air kit. <strong>Recovered attacks (Pope)</strong> tests 18 newly inferred same-pitch strikes inside long original notes, without deleting notes or octave doubling. It is deliberately unavailable on One More Run, which has not been audited the same way. These controls work with Controlled score A/B and the historical High-speed drums revision; only Controlled score A/B is the corrected isolation test. The original full-song instrumental A/B above is a DIFFERENT, broader comparison. All audio is still experimental, not artist-approved.</div>
 </section>
 </div>
 <footer>Private Tailnet listening session • Existing <a href="http://100.115.120.66:8185/">A/B archive at :8185</a> remains untouched.</footer>
 </main>
-<script type="module" src="./app.js?revision=6"></script>
+<script type="module" src="./app.js?revision=7"></script>
 </body></html>

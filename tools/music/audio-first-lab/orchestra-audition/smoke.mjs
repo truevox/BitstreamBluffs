@@ -13,7 +13,12 @@ assert.equal(catalog.format,'bitstream-orchestra-auditions-v1');
 assert.equal(catalog.songs.length,2);
 assert.equal(catalog.biomes.length,11);
 
-const paths = new Set(['/', '/index.html', '/app.js', '/catalog.json']);
+const paths = new Set(['/', '/index.html', '/app.js', '/catalog.json',
+	'/revisions/diagnostic/pope/new.ogg',
+	'/revisions/diagnostic/pope/aligned.ogg',
+	'/revisions/diagnostic/pope/reattacks.ogg',
+	'/revisions/diagnostic/one-more-run/new.ogg',
+	'/revisions/diagnostic/one-more-run/aligned.ogg']);
 for (const song of catalog.songs) {
 	paths.add('/'+song.id+'/'+song.originalReference);
 	paths.add('/'+song.id+'/'+song.vocals);
@@ -75,7 +80,8 @@ try {
 		window.orchestraDebug?.state?.catalog?.biomes?.length===11,null,
 		{timeout:18000});
 	assert.equal(await page.locator('#song option').count(),2);
-	assert.equal(await page.locator('#biomes button').count(),11);
+	assert.equal(await page.locator('#biomes button').count(),12);
+	assert.equal(await page.locator('button[data-biome="sine-timing-lab"]').count(),1);
 	await page.click('#play');
 	await page.waitForFunction(() => {
 		const s=window.orchestraDebug.state;
@@ -169,6 +175,40 @@ try {
 	await page.click('button[data-accompaniment="aligned"]');
 	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/controlled-aligned/one-more-run/vertigo-vents-air.ogg'),null,{timeout:14000});
 	await page.click('button[data-accompaniment="new"]');
+	// A TWELFTH button is a virtual LAB ONLY sine instrument. It does
+	// not affect the 11-biome production catalog or their audio hashes.
+	await page.click('button[data-biome="sine-timing-lab"]');
+	await page.waitForFunction(() =>
+		window.orchestraDebug.state.cache.has(
+			'revisions/diagnostic/one-more-run/new.ogg'),null,{timeout:16000});
+	assert.equal(await page.locator('button[data-revision="controlled"]').isDisabled(),true);
+	assert.equal(await page.locator('button[data-accompaniment="stock"]').isDisabled(),true);
+	assert.equal(await page.locator('#ground').isDisabled(),true);
+	assert.equal(await page.locator('#air').isDisabled(),true);
+	assert.equal(await page.locator('button[data-accompaniment="reattacks"]').isDisabled(),true);
+	assert.ok((await page.locator('#sourceInfo').textContent()).includes('NO original accompaniment audio'));
+	await assertClockSwap('button[data-accompaniment="aligned"]');
+	await page.click('#original'); // Original source reference is intentionally still available.
+	await page.waitForFunction(() =>
+		window.orchestraDebug.state.cache.has('one-more-run/original-instrumental.ogg'),
+		null,{timeout:14000});
+	await page.click('#new');
+	await page.click('button[data-accompaniment="new"]');
+	await page.selectOption('#song','pope');
+	// Cache presence means fetching started, NOT that decoded audio
+	// has begun playing. Wait for actual new song playback first.
+	await page.waitForFunction(() => {
+		const s=window.orchestraDebug.state;
+		return s.song==='pope' && s.playing && s.main &&
+			s.cache.has('revisions/diagnostic/pope/new.ogg');
+	},null,{timeout:16000});
+	await assertClockSwap('button[data-accompaniment="aligned"]');
+	await assertClockSwap('button[data-accompaniment="reattacks"]');
+	// Leaving the virtual biome restores the earlier real-biome controls.
+	await page.click('button[data-biome="debumont"]');
+	assert.equal(await page.locator('button[data-revision="controlled"]').isDisabled(),false);
+	assert.equal(await page.locator('#ground').isDisabled(),false);
+	await page.click('button[data-biome="sine-timing-lab"]');
 	await page.locator('#seek').fill('15');
 	await page.locator('#seek').dispatchEvent('change');
 	await page.waitForFunction(() =>
@@ -185,6 +225,7 @@ try {
 	assert.equal(errors.length,0,errors.join('\n'));
 	assert.equal(state.playing,true);
 	assert.equal(state.voice,true);
+	assert.equal(state.biome,'sine-timing-lab');
 	console.log('REAL_CHROMIUM_ORCHESTRA_TEST_PASS',JSON.stringify(state));
 }finally{
 	await browser.close();
