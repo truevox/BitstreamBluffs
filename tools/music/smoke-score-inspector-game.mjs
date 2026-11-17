@@ -105,6 +105,12 @@ try {
 	const octave=await world(6+306+27,7+210+7);
 	await page.mouse.click(late.x,late.y);
 	await page.mouse.click(octave.x,octave.y);
+	await page.waitForFunction(({pitch,frame})=>{
+		const i=window.__bbGame.scene.getScene('TitleScene').view.soundView.labView.inspector;
+		const v=i.draft.preview(i.selectedId);
+		return i.draft.count===1&&v?.pitch===pitch+12&&
+			v.startFrame===frame+480;
+	},{pitch:safe.pitch,frame:safe.startFrame},{timeout:5000});
 	const modified=await page.evaluate(()=>{
 		const i=window.__bbGame.scene.getScene('TitleScene').view.soundView.labView.inspector;
 		return {count:i.draft.count,preview:i.draft.preview(i.selectedId),

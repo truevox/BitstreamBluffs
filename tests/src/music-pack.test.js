@@ -20,6 +20,24 @@ describe('Bitstream Music Pack v1', () => {
 		expect(p.segments).toHaveLength(2);
 		expect(p.sourceNames).toEqual(['bass','drums','guitar','other','piano','vocals']);
 	});
+	test('experimental score descriptor is optional and never a stem',()=>{
+		const original=pack();
+		const scoreHash='a'.repeat(64),candidate='b'.repeat(64);
+		original.performance={path:'performance.json',scoreHash};
+		original.experimentalPerformance={
+			path:'performance-candidate-v2.json',scoreHash:candidate,
+			parentScoreHash:scoreHash,
+		};
+		const parsed=normalizePack(original);
+		expect(parsed.experimentalPerformance).toEqual(original.experimentalPerformance);
+		expect(parsed.sourceNames).not.toContain('experimentalPerformance');
+		expect(parsed.adaptive).toBeDefined();
+		original.experimentalPerformance.parentScoreHash='c'.repeat(64);
+		expect(()=>normalizePack(original)).toThrow(/Invalid experimental/);
+		original.experimentalPerformance.parentScoreHash=scoreHash;
+		original.experimentalPerformance.path='../wrong.json';
+		expect(()=>normalizePack(original)).toThrow(/Invalid experimental/);
+	});
 	test('the optional score sidecar is path-safe and revision-pinned',()=>{
 		const original=pack();
 		expect(normalizePack(original).performance).toBe(null);

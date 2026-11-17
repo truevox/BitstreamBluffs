@@ -27,8 +27,8 @@ import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
 import { ScoreInspectorView } from './ScoreInspectorView.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
 import { resolveMusicAsset } from '../systems/music/MusicPack.js';
-import { validatePerformanceScore, nearbyPerformanceEvents,
-  makeIssueMarker, PERFORMANCE_ROLES } from '../systems/music/PerformanceScore.js';
+import { validatePerformanceScore, validateExperimentalPerformanceScore,
+  nearbyPerformanceEvents, makeIssueMarker, PERFORMANCE_ROLES } from '../systems/music/PerformanceScore.js';
 
 /** Base: centred panel with a BACK button. */
 class View {
@@ -403,6 +403,8 @@ export class SoundLabView extends View {
     this.scoreRequest=0;
     this.score=null;
     this.scoreStatus='WAITING FOR SCORE MANIFEST';
+    this.experimentalScore=null;
+    this.experimentalStatus='EXPERIMENTAL COMPARISON NOT LOADED';
     this.markers=[]; // lab session only, not localStorage or profile
     this.markerStatus='NO AUDIO OR GAME SAVES ARE CHANGED';
     this.inspector=null;
@@ -543,6 +545,8 @@ export class SoundLabView extends View {
   async _loadPerformanceScore(id){
     const generation=++this.scoreRequest;
     this.score=null;
+    this.experimentalScore=null;
+    this.experimentalStatus='EXPERIMENTAL COMPARISON NOT LOADED';
     this.inspectButton.setDisabled(true);
     const lab=this.lab;
     const scoreAsset=lab?.pack?.performance;
@@ -565,6 +569,8 @@ export class SoundLabView extends View {
       this.score=score;
       this.inspectButton.setDisabled(false);
       this.scoreStatus='SOURCE SCORE LOADED (UNCALIBRATED)';
+      // Optional candidate fetch never delays, edits, or gates music.
+      void this._loadExperimentalScore(lab,id,generation,score);
     }catch(err){
       if(this.alive&&generation===this.scoreRequest){
         this.score=null;
@@ -572,6 +578,32 @@ export class SoundLabView extends View {
       }
     }
     this._tick();
+  }
+  async _loadExperimentalScore(lab,id,generation,base){
+    const asset=lab.pack?.experimentalPerformance;
+    if(!asset){
+      this.experimentalStatus='NO EXPERIMENTAL SCORE AVAILABLE';
+      return;
+    }
+    this.experimentalStatus='EXPERIMENTAL SCORE LOADING';
+    try{
+      const response=await fetch(resolveMusicAsset(lab.packBase,asset.path),
+        {cache:'default'});
+      if(!response.ok)throw new Error('Candidate HTTP '+response.status);
+      const raw=await response.json();
+      const experimental=validateExperimentalPerformanceScore(raw,
+        lab.pack,base);
+      if(!this.alive||generation!==this.scoreRequest||this.lab!==lab||
+        lab.track?.id!==id||this.score!==base)return;
+      this.experimentalScore=experimental;
+      this.experimentalStatus='V2 EXPERIMENTAL SCORE LOADED (NOT GOLD)';
+    }catch(err){
+      if(this.alive&&generation===this.scoreRequest){
+        this.experimentalScore=null;
+        this.experimentalStatus='V2 REJECTED: '+String(err?.message||err);
+      }
+    }
+    this.inspector?.refresh();
   }
   _clockFrame(){
     const lab=this.lab;
@@ -648,6 +680,8 @@ export class SoundLabView extends View {
     this._closeInspector();
     ++this.scoreRequest;
     this.score=null;
+    this.experimentalScore=null;
+    this.experimentalStatus='SWITCHING EXPERIMENTAL SCORE';
     this.scoreStatus='SWITCHING SOURCE SCORE';
     this.songIndex=index;
     const lab=this.lab;
@@ -774,6 +808,7 @@ export class SoundLabView extends View {
     this.scene.input?.keyboard?.off('keydown-M',this._markKey);
     this._markKey=null;
     this.score=null;
+    this.experimentalScore=null;
     this.tickTimer?.remove();
     this.lab?.destroy();
     this.lab=null;

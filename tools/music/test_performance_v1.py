@@ -122,6 +122,19 @@ class TestPerformanceV1(unittest.TestCase):
 		validate(applied)
 		self.assertEqual(to_legacy(applied,'guitar')[0]['start'],.13)
 
+	def test_experimental_candidate_quality_must_never_claim_approval(self):
+		from performance_v1 import DETECTORS
+		raw=from_legacy('song-001',RATE*2,'guitar',
+			sample(),self.hashes,quality='experimental-candidate-unreviewed',
+			detectors=DETECTORS)
+		validate(raw)
+		self.assertEqual(raw['quality'],'experimental-candidate-unreviewed')
+		self.assertFalse(raw['calibratedConfidence'])
+		self.assertNotEqual(raw['scoreHash'],self.doc['scoreHash'])
+		with self.assertRaisesRegex(ValueError,'unapproved score creation quality'):
+			from_legacy('song-001',RATE*2,'guitar',
+				sample(),self.hashes,quality='artist-approved')
+
 	def test_never_silently_reinterpret_old_patches_on_new_score(self):
 		patch={'format':'bitstream-performance-patches-v1',
 			'songId':self.doc['songId'],'baseScoreHash':self.doc['scoreHash'],

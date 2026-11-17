@@ -78,7 +78,7 @@ def _seconds_to_frame(value,frames):
 	if frame<0:return 0
 	return min(frame,frames)
 
-def from_legacy(song_id,frame_count,featured,events_by_role,source_hashes,extra_provenance=None):
+def from_legacy(song_id,frame_count,featured,events_by_role,source_hashes,extra_provenance=None,quality='provisional-unreviewed',detectors=None):
 	"""Losslessly preserve legacy 4-decimal event times as integer samples.
 
 	Return values reconstitute source times at 4 decimals and reproduce
@@ -91,6 +91,10 @@ def from_legacy(song_id,frame_count,featured,events_by_role,source_hashes,extra_
 		raise ValueError('invalid song duration')
 	if set(events_by_role)!=set(ROLES):raise ValueError('missing score roles')
 	if set(source_hashes)!=set(STEMS):raise ValueError('missing source stems')
+	if quality not in ('provisional-unreviewed','experimental-candidate-unreviewed'):
+		raise ValueError('unapproved score creation quality')
+	if detectors is not None and set(detectors)!=set(ROLES):
+		raise ValueError('incomplete detector version roster')
 	layers={}
 	for role in ROLES:
 		collisions=Counter()
@@ -130,7 +134,7 @@ def from_legacy(song_id,frame_count,featured,events_by_role,source_hashes,extra_
 	record={
 		'format':FORMAT,'songId':song_id,'sampleRate':RATE,
 		'frameCount':frame_count,'featuredStem':featured,
-		'quality':'provisional-unreviewed',
+		'quality':quality,
 		'calibratedConfidence':False,
 		'clock':{'status':'unannotated','beats':[],'sections':[]},
 		'harmony':{'status':'unannotated','chords':[]},
@@ -139,7 +143,7 @@ def from_legacy(song_id,frame_count,featured,events_by_role,source_hashes,extra_
 			'encoderRevision':'release-v1-score-capture',
 			'sourceStemSha256':dict(sorted(source_hashes.items())),
 			'evidence':dict(sorted((extra_provenance or {}).items())),
-			'detectors':dict(sorted(DETECTORS.items())),
+			'detectors':dict(sorted((detectors or DETECTORS).items())),
 			'notes':'The release FFT/YIN estimators are approximate, NOT calibrated. '
 				'No guessed confidence is treated as a probability; '
 				'original note times, durations, pitches and order preserved.',
@@ -158,7 +162,7 @@ def validate(record):
 		raise ValueError('missing song id')
 	if not isinstance(record.get('frameCount'),int) or record['frameCount']<1:
 		raise ValueError('wrong duration')
-	if record.get('quality') not in ('provisional-unreviewed','human-correction-layer-applied'):
+	if record.get('quality') not in ('provisional-unreviewed','human-correction-layer-applied','experimental-candidate-unreviewed'):
 		raise ValueError('unexpected approval metadata')
 	if record['quality']=='human-correction-layer-applied' and (
 		not isinstance(record.get('derivedFromScoreHash'),str) or

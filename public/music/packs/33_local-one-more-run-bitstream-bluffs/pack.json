@@ -1325,5 +1325,10 @@
   "performance": {
     "path": "performance.json",
     "scoreHash": "de3cb9b095e183c9996b1edec22bc870f3d2bdbf3502c67615f9a687aa32529c"
+  },
+  "experimentalPerformance": {
+    "path": "performance-candidate-v2.json",
+    "scoreHash": "4b8e9b42230e532539e096e4b0855f0a914fea792f477681ca97ab5c3fa2275a",
+    "parentScoreHash": "de3cb9b095e183c9996b1edec22bc870f3d2bdbf3502c67615f9a687aa32529c"
   }
 }

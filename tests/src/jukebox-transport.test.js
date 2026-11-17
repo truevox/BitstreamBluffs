@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import { StemMusicDirector } from '../../src/systems/music/StemMusicDirector.js';
 import { GAME_SONGS, defaultSongSelection } from '../../src/systems/music/MusicPlaylist.js';
+import { JukeboxHUD } from '../../src/ui/JukeboxHUD.js';
 
 function bare(){
 	const d=Object.create(StemMusicDirector.prototype);
@@ -32,6 +33,22 @@ function bare(){
 	d._ensureRunning=jest.fn();
 	return d;
 }
+
+test('Game Over background tap guard owns real jukebox and open queue geometry',()=>{
+	const owns=JukeboxHUD.prototype.ownsPointer;
+	const hud={_closed:false,bounds:{x:335,y:4,w:141,h:31},
+		queueBounds:{x:245,y:94,w:230,h:93},queue:null};
+	expect(owns.call(hud,{x:400,y:18})).toBe(true);
+	expect(owns.call(hud,{x:252,y:181})).toBe(false);
+	expect(owns.call(hud,{x:120,y:200})).toBe(false);
+	hud.queue={};
+	expect(owns.call(hud,{x:252,y:181})).toBe(true);
+	expect(owns.call(hud,{x:469,y:180})).toBe(true);
+	expect(owns.call(hud,{x:250,y:188})).toBe(false);
+	expect(owns.call(hud,{x:Number.NaN,y:101})).toBe(false);
+	hud._closed=true;
+	expect(owns.call(hud,{x:252,y:181})).toBe(false);
+});
 
 describe('Jukebox: one shared music director, reliable paused and skipped intent',()=>{
 	test('snapshot shows current, previous, two queued and true clock time',()=>{

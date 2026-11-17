@@ -15,16 +15,16 @@ const hex64=s=>typeof s==='string'&&/^[0-9a-f]{64}$/.test(s);
 const int=n=>Number.isSafeInteger(n)&&n>=0;
 const safeId=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{3,48}$/.test(s);
 
-export function validatePerformanceScore(raw,pack){
+function validateScoreShape(raw,pack,asset,quality){
 	if(!raw||raw.format!==PERFORMANCE_FORMAT||
 		raw.songId!==pack.id||raw.frameCount!==pack.frameCount||
 		raw.sampleRate!==PERFORMANCE_SAMPLE_RATE||
 		raw.sampleRate!==pack.sampleRate||
 		raw.featuredStem!==pack.adaptive?.featuredStem||
-		raw.quality!=='provisional-unreviewed'||
+		raw.quality!==quality||
 		raw.calibratedConfidence!==false||
 		!hex64(raw.scoreHash)||
-		raw.scoreHash!==pack.performance?.scoreHash){
+		raw.scoreHash!==asset?.scoreHash){
 		throw new Error('Performance score identity/revision mismatch');
 	}
 	const stems=raw.provenance?.sourceStemSha256;
@@ -63,6 +63,45 @@ export function validatePerformanceScore(raw,pack){
 				throw new Error('Performance note event corrupt');
 			}
 		}
+	}
+	return raw;
+}
+
+export function validatePerformanceScore(raw,pack){
+	return validateScoreShape(raw,pack,pack.performance,'provisional-unreviewed');
+}
+
+/** This is READ-ONLY source-disagreement evidence; it can never be
+ * substituted for the actual game's authoritative base performance score.
+ * The parent hash and six original stem fingerprints must match exactly.
+ */
+export function validateExperimentalPerformanceScore(raw,pack,original){
+	if(!original||!pack.experimentalPerformance||
+		pack.experimentalPerformance.parentScoreHash!==original.scoreHash){
+		throw new Error('Experimental score has no validated released parent');
+	}
+	validateScoreShape(raw,pack,pack.experimentalPerformance,
+		'experimental-candidate-unreviewed');
+	if(raw.provenance?.evidence?.parentScoreHash!==original.scoreHash){
+		throw new Error('Experimental score is not descended from released score');
+	}
+	for(const role of ['vocals','bass','drums','guitar','piano','other']){
+		if(raw.provenance.sourceStemSha256[role]!==
+			original.provenance.sourceStemSha256[role]){
+			throw new Error('Experimental candidate used different source audio');
+		}
+	}
+	// The current experiment intentionally leaves released melody alone.
+	// If future experiments modify it, they must explicitly version this
+	// invariant rather than quietly claiming a like-for-like comparison.
+	const before=original.events.melody;
+	const after=raw.events.melody;
+	if(before.length!==after.length||before.some((event,index)=>
+		event.id!==after[index].id||
+		event.startFrame!==after[index].startFrame||
+		event.endFrame!==after[index].endFrame||
+		event.pitch!==after[index].pitch)){
+		throw new Error('Candidate unexpectedly changed baseline melody');
 	}
 	return raw;
 }

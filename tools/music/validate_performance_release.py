@@ -41,8 +41,10 @@ def run(current,baseline):
 		pack=json.loads(new_path.read_text())
 		old_pack=json.loads(old_path.read_text())
 		meta=pack.pop('performance')
-		# The JSON *contents* other than the new score pointer must be
-		# identical. No source, DSP, timbre or instrument selector changed.
+		comparison=pack.pop('experimentalPerformance',None)
+		# Both pointers are diagnostic metadata ONLY. Every field
+		# controlling source audio, rendering, effects and selection must
+		# match the prior published release byte-for-byte as JSON values.
 		assert pack==old_pack,'SHIPPING_AUDIO_MANIFEST_WAS_MODIFIED '+id
 		assert meta['path']=='performance.json'
 		score_path=(new_path.parent/meta['path']).resolve()
@@ -55,6 +57,24 @@ def run(current,baseline):
 		assert {name:len(rows) for name,rows in score['events'].items()}==EXPECTED_COUNTS[id],id
 		assert score['quality']=='provisional-unreviewed'
 		assert score['calibratedConfidence'] is False
+		if comparison is not None:
+			assert comparison['path']=='performance-candidate-v2.json'
+			assert comparison['parentScoreHash']==score['scoreHash']
+			sidecar=(new_path.parent/comparison['path']).resolve()
+			assert sidecar.is_relative_to(current.resolve())
+			candidate=read(sidecar)
+			assert candidate['songId']==id
+			assert candidate['quality']=='experimental-candidate-unreviewed'
+			assert candidate['calibratedConfidence'] is False
+			assert candidate['scoreHash']==comparison['scoreHash']
+			assert candidate['scoreHash']!=score['scoreHash']
+			assert candidate['frameCount']==score['frameCount']
+			assert candidate['featuredStem']==score['featuredStem']
+			assert (candidate['provenance']['sourceStemSha256']==
+				score['provenance']['sourceStemSha256'])
+			assert (candidate['provenance']['evidence']['parentScoreHash']==
+				score['scoreHash'])
+			assert candidate['events']['melody']==score['events']['melody']
 		# All 4,745 packaged Ogg clips unchanged: compare hashes for each
 		# relative path in both deployed trees, not only file size.
 		original={p.relative_to(old_path.parent):p for p in
@@ -67,6 +87,7 @@ def run(current,baseline):
 				raise AssertionError('OGG_CHANGED '+id+' '+str(rel))
 		ogg_count+=len(new)
 		scores[id]={'scoreHash':score['scoreHash'],
+			'experimentalScoreHash':candidate['scoreHash'] if comparison else None,
 			'events':sum(len(score['events'][role]) for role in ROLES),
 			'unchangedAudio':len(new)}
 		print('ORIGINAL_AUDIO_AND_SCORE_IDENTITY_PASS',id,

@@ -27,6 +27,12 @@ try{
 	assert.deepEqual(title.buttons,['PREV','PLAY','NEXT','LIST']);
 	assert.ok(title.queueNext.startsWith('NEXT:'));
 	console.log('TITLE_JUKEBOX_VISIBLE_LAST_NOW_NEXT_QUEUE_PASS',title);
+	// The catalog loads asynchronously. Do not press a legitimately
+	// disabled PLAY button and then mistake that for audio failure.
+	await page.waitForFunction(()=>{
+		const j=window.__bbGame.scene.getScene('TitleScene').jukebox;
+		return j&&!j.buttons[1].disabled&&!!j.audio.jukeboxSnapshot().current;
+	},null,{timeout:30000});
 
 	await page.evaluate(()=>{
 		window.__bbGame.scene.getScene('TitleScene').jukebox.buttons[1].zone.emit('pointerdown');

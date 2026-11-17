@@ -1483,5 +1483,10 @@
   "performance": {
     "path": "performance.json",
     "scoreHash": "6a5211cde6c1f6ac893c0cd3199c46f52f5c963dcc0dd031a110cb40e524d59c"
+  },
+  "experimentalPerformance": {
+    "path": "performance-candidate-v2.json",
+    "scoreHash": "861ae36b905863904a0abcbc50b2470793bbfc1fca1826f0ab7eab2d5372fe78",
+    "parentScoreHash": "6a5211cde6c1f6ac893c0cd3199c46f52f5c963dcc0dd031a110cb40e524d59c"
   }
 }

@@ -146,6 +146,21 @@ export function normalizePack(raw) {
 	const performance=score===undefined?null:{
 		path:score.path,scoreHash:score.scoreHash,
 	};
+	// The V2 file is an OPTIONAL, unverified comparison timeline. It is
+	// intentionally NOT a music stem, rendering asset, or selection input.
+	const experiment=raw.experimentalPerformance;
+	if(experiment!==undefined && (
+		!experiment||typeof experiment!=='object'||
+		Array.isArray(experiment)||!safePath(experiment.path)||
+		!/^[0-9a-f]{64}$/.test(experiment.scoreHash)||
+		!/^[0-9a-f]{64}$/.test(experiment.parentScoreHash)||
+		experiment.parentScoreHash!==performance?.scoreHash)){
+		throw new Error('Invalid experimental performance comparison');
+	}
+	const experimentalPerformance=experiment===undefined?null:{
+		path:experiment.path,scoreHash:experiment.scoreHash,
+		parentScoreHash:experiment.parentScoreHash,
+	};
 	const tempo = Number(raw.tempo);
 	const beat = Number.isFinite(tempo) && tempo >= 30 && tempo <= 350 ? tempo : null;
 	return {
@@ -161,6 +176,7 @@ export function normalizePack(raw) {
 		layers,
 		adaptive: normalizeAdaptive(raw.adaptive, segments.length),
 		performance,
+		experimentalPerformance,
 		captions,
 		bpm: beat,
 	};

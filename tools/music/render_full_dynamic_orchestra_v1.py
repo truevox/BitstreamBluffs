@@ -256,6 +256,9 @@ def run(a):
 		if a.performance_root:
 			performance=read_performance(a.performance_root/Path(track['manifest']).parent/
 				'performance.json')
+			if performance['quality']!='provisional-unreviewed' and not a.allow_unapproved_scores:
+				raise ValueError('Experimental/corrected score requires explicit '
+					'--allow-unapproved-scores in private rendering only')
 			verify_origin(performance,track['id'],frames,featured,{
 				role:a.master/srcstem[role] for role in STEMS})
 			verify_melody_audit(performance,
@@ -306,6 +309,8 @@ if __name__=='__main__':
 	p.add_argument('--source-packs',required=True,type=Path)
 	p.add_argument('--melody-source',required=True,type=Path)
 	p.add_argument('--out',required=True,type=Path)
+	p.add_argument('--allow-unapproved-scores',action='store_true',
+		help='PRIVATE AUDITION ONLY: permit experimental source candidates')
 	group=p.add_mutually_exclusive_group(required=True)
 	group.add_argument('--performance-root',type=Path,
 		help='Root of immutable versioned performance-v1 song scores')

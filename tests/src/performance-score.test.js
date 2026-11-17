@@ -1,4 +1,5 @@
-import {validatePerformanceScore,nearbyPerformanceEvents,makeIssueMarker,
+import {validatePerformanceScore,validateExperimentalPerformanceScore,
+	nearbyPerformanceEvents,makeIssueMarker,
 	PERFORMANCE_ROLES} from '../../src/systems/music/PerformanceScore.js';
 
 function fixture(){
@@ -26,6 +27,34 @@ function fixture(){
 }
 
 describe('Single-game-score performance-v1 and mark export contract',()=>{
+	test('V2 comparison can only load as unreviewed descendant of exact released score',()=>{
+		const {score,pack}=fixture();
+		pack.experimentalPerformance={path:'performance-candidate-v2.json',
+			scoreHash:'c'.repeat(64),parentScoreHash:score.scoreHash};
+		const experimental=JSON.parse(JSON.stringify(score));
+		experimental.quality='experimental-candidate-unreviewed';
+		experimental.scoreHash='c'.repeat(64);
+		experimental.provenance.evidence={parentScoreHash:score.scoreHash};
+		validatePerformanceScore(score,pack);
+		expect(validateExperimentalPerformanceScore(experimental,pack,score))
+			.toBe(experimental);
+		expect(()=>validatePerformanceScore(experimental,pack))
+			.toThrow(/identity/);
+		experimental.provenance.sourceStemSha256.bass='d'.repeat(64);
+		expect(()=>validateExperimentalPerformanceScore(experimental,pack,score))
+			.toThrow(/different source audio/);
+		experimental.provenance.sourceStemSha256.bass='b'.repeat(64);
+		experimental.provenance.evidence.parentScoreHash='d'.repeat(64);
+		expect(()=>validateExperimentalPerformanceScore(experimental,pack,score))
+			.toThrow(/not descended/);
+		experimental.provenance.evidence.parentScoreHash=score.scoreHash;
+		experimental.events.melody=[{
+			id:'me-00000000000000000000',startFrame:10,endFrame:400,
+			pitch:50,class:'note',confidence:null,
+		}];
+		expect(()=>validateExperimentalPerformanceScore(experimental,pack,score))
+			.toThrow(/melody/);
+	});
 	test('source revision and song ID must exactly match game pack',()=>{
 		const {score,pack}=fixture();
 		expect(validatePerformanceScore(score,pack)).toBe(score);

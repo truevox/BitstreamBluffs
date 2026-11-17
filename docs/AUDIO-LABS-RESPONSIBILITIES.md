@@ -18,6 +18,10 @@ The full and additional instrument renderers can now consume this one frozen sco
 
 Note inspection is now inside the game, not the standalone sound-design lab. The inspector draws unverified release event candidates and offers reject/accept, ±10ms and ±12-semitone draft edits keyed to source event IDs; a downloadable versioned patch file may be applied offline to a new score (never directly to live music or a save). The patch status is always draft-unreviewed, not verified ground truth. Actual game source playback continues unchanged.
 
+## V2 model disagreement (November 17, 2026)
+
+Actual-game Music Lab → NOTES (N) → V2 toggles a **visual-only, read-only experimental score overlay** (pink) against the released note guesses (cyan). It does **not** synthesize V2 notes or replace released songs, is not a gold reference, and cannot modify the player's save. The V2 source is six-stem-fingerprint-checked, source-score-hash-pinned, and explicitly experimental. The candidate's quiet drum/ghost-note holdout tests FAILED, so no automatic musical promotion is authorized. The sound-design-only standalone lab is excluded from this comparison. See MUSIC-DETECTOR-V2-UNREVIEWED-RESEARCH-20261117.md.
+
 ## Safety and release rules
 
 - Keep Dynamic Orchestra OFF by default, with visible PRE-ALPHA badge.

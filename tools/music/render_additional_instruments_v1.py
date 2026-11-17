@@ -49,6 +49,9 @@ def render(a):
 		if a.performance_root:
 			performance=read_performance(a.performance_root/Path(song['manifest']).parent/
 				'performance.json')
+			if performance['quality']!='provisional-unreviewed' and not a.allow_unapproved_scores:
+				raise ValueError('Experimental/corrected score requires explicit '
+					'--allow-unapproved-scores in private rendering only')
 			verify_origin(performance,id,frames,FEATURED[id],{
 				role:a.master/stem_files[role] for role in STEMS})
 			print('LOCKED_EXTRA_SCORE',id,performance['scoreHash'],flush=True)
@@ -85,6 +88,8 @@ if __name__=='__main__':
 	p.add_argument('--master',type=Path,required=True)
 	p.add_argument('--source-packs',type=Path,required=True)
 	p.add_argument('--out',type=Path,required=True)
+	p.add_argument('--allow-unapproved-scores',action='store_true',
+		help='PRIVATE AUDITION ONLY: permit experimental source candidates')
 	group=p.add_mutually_exclusive_group(required=True)
 	group.add_argument('--performance-root',type=Path)
 	group.add_argument('--legacy-direct-extraction',action='store_true')

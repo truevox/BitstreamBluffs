@@ -50,6 +50,10 @@ Human candidate edits never change running sounds: ±10 ms onset and correspondi
 
 tools/music/performance_v1.py can materialize a compliant correct operation into a separate corrected-score artifact via apply_patch_layer; invalid or stale IDs/hash/reordered events fail closed with explicit conflicts. The browser E2E actually clicked a bass note, nudged +10 ms, raised octave +12, rejected and undid a different note, exported a patch, and validated that exact downloaded JSON using the Python materializer without altering the source. Still NO corrected performance audio rendered or human-approved.
 
+## Experimental V2 overlay, no production audio changes
+
+The game now accepts an optional experimentalPerformance sidecar path and score hash, strictly linked to the original performance-v1 score. V2 cannot become the canonical score or an audio stem. From Music Lab → NOTES (N) → V2, a read-only magenta overlay shows candidate event guesses behind the cyan original release events. Only the cyan base candidates are selectable/editable into draft patches. The V2 file has quality experimental-candidate-unreviewed and the same original six audio stem hashes and unchanged melody; failure to load, wrong parent hashes and stale responses do not stop playback. No real-song gold labels have been produced. Full detector limitations, full-song audit comparisons and release blockers appear in MUSIC-DETECTOR-V2-UNREVIEWED-RESEARCH-20261117.md.
+
 ## Quantitative gold evaluation: ready to run, without fake results
 
 tools/music/evaluate_performance_v1.py accepts a separate bitstream-performance-gold-v1 with status human-verified, the correct source score hash, manually labelled excerpts, role, pitch/class, and exact note onset frame. We have **not** created any human-verified gold set and no actual-song F1 score exists.

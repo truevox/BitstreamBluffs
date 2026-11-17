@@ -20,6 +20,11 @@ export class JukeboxHUD {
 		this.scene=scene;
 		this.theme=theme;
 		this.audio=scene.registry.get(REG.AUDIO);
+		// Scene-level tap-to-retry cannot rely solely on Phaser's
+		// pointerover array: overlapping UI/backdrops can briefly report
+		// zero interactive objects during a real queue click.
+		this.bounds={x,y,w:141,h:31};
+		this.queueBounds={x:245,y:94,w:230,h:93};
 		this.panel=new Panel(scene,theme,{
 			x,y,w:141,h:31,fillAlpha:.88,color:'cyan',
 		}).setDepth(320);
@@ -56,6 +61,19 @@ export class JukeboxHUD {
 			}else this.audio.jukeboxStep(command==='previous'?-1:1);
 		}catch(e){/* unavailable audio stays silent; never breaks menu */}
 		this.refresh();
+	}
+
+	/** Conservative ownership of a tap on jukebox or its open queue.
+	 * Coordinates are Phaser GAME coordinates, never CSS pixel offsets.
+	 * Only Game Over's background-tap retry uses this explicit guard.
+	 */
+	ownsPointer(pointer){
+		if(this._closed||!pointer)return false;
+		const x=Number(pointer.x),y=Number(pointer.y);
+		if(!Number.isFinite(x)||!Number.isFinite(y))return false;
+		const inside=rect=>x>=rect.x&&x<=rect.x+rect.w&&
+			y>=rect.y&&y<=rect.y+rect.h;
+		return inside(this.bounds)||(!!this.queue&&inside(this.queueBounds));
 	}
 
 	_toggleQueue(){

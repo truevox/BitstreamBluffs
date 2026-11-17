@@ -167,6 +167,9 @@ export class GameOverScene extends Phaser.Scene {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.
       if (this.shopOpen) return;
+      // A tap on the jukebox or its open queue is NOT a retry, even if
+      // Phaser's over[] misses the translucent queue's backing Zone.
+      if (this.jukebox?.ownsPointer(pointer)) return;
       this._cancelShopAutoprompt();
       if (!this.entry && over.length === 0) this.retry();
     };

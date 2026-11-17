@@ -40,6 +40,7 @@ export class ScoreInspectorView {
 			lab.solo.toLowerCase():lab.score.featuredStem;
 		this.anchorFrame=lab._clockFrame()||0;
 		this.follow=true;
+		this.comparison=false; // V2 is overlay ONLY, never live audio
 		this.selectedId=null;
 		this.message='TENTATIVE NOTES. NO EDITS ARE APPLIED TO MUSIC.';
 		this.windowStart=0;
@@ -101,7 +102,8 @@ export class ScoreInspectorView {
 			reject:control(10,233,66,'REJECT',()=>this.modify('reject'), 'magenta'),
 			accept:control(81,233,66,'ACCEPT',()=>this.modify('accept'), 'lime'),
 			undo:control(152,233,62,'UNDO',()=>this.modify('undo'), 'amber'),
-			export:control(219,233,108,'EXPORT PATCH',()=>this.exportPatch()),
+			export:control(219,233,63,'PATCH',()=>this.exportPatch()),
+			compare:control(286,233,41,'V2',()=>this.toggleComparison(),'magenta'),
 			follow:control(332,233,53,'FOLLOW',()=>this.toggleFollow()),
 		};
 		this.back=control(390,231,68,'BACK',()=>this.close(),'magenta');
@@ -210,6 +212,20 @@ export class ScoreInspectorView {
 		this.refresh();
 	}
 
+	toggleComparison(){
+		if(!this.labView?.experimentalScore){
+			this.comparison=false;
+			this.message=this.labView?.experimentalStatus||
+				'UNVERIFIED CANDIDATE NOT AVAILABLE';
+		}else{
+			this.comparison=!this.comparison;
+			this.message=this.comparison?
+				'PINK V2 EXPERIMENTAL; CYAN RELEASE. NEITHER IS GOLD.':
+				'RELEASE SCORE ONLY. MUSIC IS UNCHANGED.';
+		}
+		this.refresh();
+	}
+
 	toggleFollow(){
 		this.follow=!this.follow;
 		if(this.follow)this.anchorFrame=this._clock();
@@ -257,10 +273,14 @@ export class ScoreInspectorView {
 		}
 		let events=nearbyPerformanceEvents(this.score,[this.role],
 			this.windowStart+HALF_WINDOW,HALF_WINDOW);
+		const experimental=this.comparison?this.labView?.experimentalScore:null;
+		const candidateEvents=experimental?nearbyPerformanceEvents(experimental,
+			[this.role],this.windowStart+HALF_WINDOW,HALF_WINDOW):[];
 		// A role's events are original-source hypotheses, not rendered
 		// audio transients. The viewed clock is the real game's clock.
 		this._hitBoxes=[];
-		const pitches=events.filter(e=>e.event.pitch!==undefined).map(e=>e.event.pitch);
+		const pitches=[...events,...candidateEvents]
+			.filter(e=>e.event.pitch!==undefined).map(e=>e.event.pitch);
 		const sorted=pitches.slice().sort((a,b)=>a-b);
 		const median=sorted.length?sorted[Math.floor(sorted.length/2)]:60;
 		const minPitch=Math.max(0,Math.min(103,median-11));
@@ -286,6 +306,21 @@ export class ScoreInspectorView {
 				g.lineBetween(0,y,GRAPH.w,y);
 			}
 		}
+		// Purple/pink V2 is drawn behind CYAN release events, but cannot
+		// be selected, edited or exported as an approved/gold source.
+		// Its notes have NEVER been synthesized into released audio.
+		for(const {event} of candidateEvents){
+			const x=(event.startFrame-this.windowStart)/
+				(2*HALF_WINDOW)*GRAPH.w;
+			if(x<0||x>=GRAPH.w)continue;
+			const y=yFor(event);
+			if(y<0||y>=GRAPH.h-4)continue;
+			const width=roleDrums?3:Math.max(3,Math.min(120,
+				(event.endFrame-event.startFrame)/
+				(2*HALF_WINDOW)*GRAPH.w));
+			g.fillStyle(pal.magenta,.38);
+			g.fillRect(x,y,width,roleDrums?11:4);
+		}
 		for(const {event} of events){
 			const adjusted=this._preview(event);
 			if(adjusted.status==='reject')continue;
@@ -300,7 +335,7 @@ export class ScoreInspectorView {
 			const height=roleDrums?11:4;
 			const selected=event.id===this.selectedId;
 			const color=selected?pal.amber:
-				this.draft.edits.has(event.id)?pal.magenta:pal.cyan;
+				this.draft.edits.has(event.id)?pal.lime:pal.cyan;
 			g.fillStyle(color,selected?1:.7);
 			g.fillRect(x,y,width,height);
 			this._hitBoxes.push({id:event.id,x,y,w:width,h:height});
@@ -329,12 +364,19 @@ export class ScoreInspectorView {
 			'NO SOURCE CANDIDATES';
 		this.detailLine.setText(ellipsize(desc,446));
 		this.helpLine.setText(ellipsize(
-			'SELECT A NOTE; SHIFT/OCTAVE/REJECT/ACCEPT ARE PATCH DRAFTS ONLY. ',446));
+			this.comparison&&experimental?
+				'CYAN RELEASE / PINK V2 EXPERIMENTAL / GREEN DRAFT: NEITHER IS GOLD':
+				'CYAN RELEASE; +10MS/OCTAVE/REJECT/ACCEPT ARE DRAFTS ONLY',
+			446));
+		const counts=this.comparison&&experimental?
+			'  BASE '+events.length+' / V2 '+candidateEvents.length:'';
 		this.messageLine.setText(ellipsize(
-			this.message+'  ('+this.draft.count+' EDITS)',447));
+			this.message+counts+'  ('+this.draft.count+' EDITS)',447));
 		this.controls.up.setDisabled(!event||roleDrums);
 		this.controls.down.setDisabled(!event||roleDrums);
 		this.controls.export.setDisabled(!this.draft.count);
+		this.controls.compare.setDisabled(!this.labView?.experimentalScore);
+		this.controls.compare.setLabel(this.comparison?'V2 ON':'V2');
 		this.controls.follow.setLabel(this.follow?'FREEZE':'FOLLOW');
 	}
 
