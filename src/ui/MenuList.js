@@ -6,10 +6,12 @@
  *   choice : { label, options:[{value,label}], get(), set(v) }   left/right cycles, click cycles forward
  *   slider : { label, get() -> 0..1, set(v), step? }              left/right adjusts, click/drag on the bar sets
  *   static : { label }                                            drawn but never focusable or clickable
- * Optional per item: sub (dim secondary text), color (palette key), disabled.
+ * Optional per item: sub (dim secondary text), color (palette key), disabled,
+ *   badge (noninteractive in-row warning), badgeColor (palette key).
  */
 import Phaser from 'phaser';
 import { NeonText } from './Neon.js';
+import { measureText } from './PixelFont.js';
 import { uiSfx } from './Sound.js';
 
 const SLIDER_W = 70;
@@ -67,7 +69,21 @@ export class MenuList extends Phaser.GameObjects.Container {
       color: item.color || 'text', scale: this.scale1, anchor: center ? 'center' : 'left', vAnchor: 0.5,
     });
     this.add(label);
-    const row = { label, value: null, sub: null, zone: null };
+    const row = { label, value: null, sub: null, zone: null, badge: null, badgeBox: null };
+    if (item.badge) {
+      const text = String(item.badge).toUpperCase();
+      const badgeX = x0 + 14 + measureText(item.label) * this.scale1 + 7;
+      const badgeW = measureText(text) * this.scale1 + 10;
+      if (badgeX + badgeW > x0 + this.colW - 62) {
+        throw new Error('Menu warning badge would overlap the choice value: ' + item.label);
+      }
+      row.badgeBox = { x: badgeX, y: y + 2, w: badgeW, h: this.rowH - 4 };
+      row.badge = new NeonText(scene, this.theme, badgeX + 5, cy, text, {
+        color: item.badgeColor || 'magenta', scale: this.scale1,
+        anchor: 'left', vAnchor: .5,
+      });
+      this.add(row.badge);
+    }
     if (item.kind === 'choice' || item.kind === 'slider') {
       row.value = new NeonText(scene, this.theme, x0 + this.colW - 8, cy, '', { color: this.colorKey, anchor: 'right', vAnchor: 0.5 });
       this.add(row.value);
@@ -211,6 +227,16 @@ export class MenuList extends Phaser.GameObjects.Container {
       const row = this.rows[i];
       const sel = i === this.selected && !item.disabled;
       const c = pal[item.color || this.colorKey];
+      if (row.badgeBox) {
+        const box = row.badgeBox;
+        const badgeColor = pal[item.badgeColor || 'magenta'];
+        g.fillStyle(badgeColor, sel ? .24 : .14);
+        g.fillRoundedRect(box.x, box.y, box.w, box.h, 2);
+        g.lineStyle(1, badgeColor, sel ? 1 : .7);
+        g.strokeRoundedRect(box.x+.5, box.y+.5, box.w-1, box.h-1, 2);
+        row.badge.setColorKey(item.badgeColor || 'magenta');
+        row.badge.setAlpha(item.disabled ? .35 : 1);
+      }
       // Same cell as the row's own label and zone: in a multi-column list item i is NOT at i * rowH, and
       // painting it there put the highlight below the list, in the wrong column.
       const { col, rowInCol } = this._cell(i);

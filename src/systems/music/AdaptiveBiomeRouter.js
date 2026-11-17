@@ -11,7 +11,7 @@
  */
 import { HOME_BIOME } from './BiomeVoices.js';
 
-export const ADAPTIVE_FAMILIES = Object.freeze(['bass', 'drums', 'featured']);
+export const ADAPTIVE_FAMILIES = Object.freeze(['bass', 'drums', 'featured', 'guitar', 'piano', 'other']);
 const FADE_SECONDS = 0.20;
 
 const clamped = (v, low, high) => Math.max(low, Math.min(high, v));
@@ -25,6 +25,9 @@ export class AdaptiveBiomeRouter {
 		this.clockStart = null;
 		this.biome = HOME_BIOME;
 		this.airborne = false;
+		// Standalone router callers retain the legacy enabled default.
+		// StemMusicDirector sets the actual user toggle on every track.
+		this.enabled = true;
 		this.speed = null;
 		this.channels = new Map();
 		this.retired = new Set();
@@ -56,6 +59,11 @@ export class AdaptiveBiomeRouter {
 		this._reconcile();
 	}
 
+	setEnabled(on) {
+		this.enabled = on === true;
+		this._reconcile();
+	}
+
 	setBiome(id) {
 		this.biome = id || HOME_BIOME;
 		this._reconcile();
@@ -74,7 +82,6 @@ export class AdaptiveBiomeRouter {
 	_applySpeed() {
 		if (!this.pack || this.speed === null) return;
 		const speedGain = clamped(0.28 + this.speed / 820, 0.28, 1.35);
-		this.mixer.setGain('bass', speedGain, { motion: true, time: .16 });
 		this.mixer.setGain('adaptive:bass', speedGain, { motion: true, time: .16 });
 	}
 
@@ -84,7 +91,11 @@ export class AdaptiveBiomeRouter {
 
 	_variant(role) {
 		const variants = this.pack?.adaptive?.variants?.[role];
-		if (!variants || this.biome === HOME_BIOME) return null;
+		if (!this.enabled || !variants || this.biome === HOME_BIOME) return null;
+		// The featured part already has its own adaptive bus. Don't
+		// simultaneously route that same source into a second named bus.
+		if (['guitar','piano','other'].includes(role) &&
+			this.pack.adaptive.featuredStem===role) return null;
 		if (role === 'drums' && !this.airborne) return null;
 		return variants[this.biome] ? this.biome : null;
 	}

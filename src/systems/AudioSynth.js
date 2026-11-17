@@ -558,6 +558,7 @@ export class AudioSynth {
           musicEnabledSongs: sanitizeSongSelection(settings.musicEnabledSongs),
           musicVocals: settings.musicVocals === true,
           musicCaptions: settings.musicCaptions === true,
+          dynamicOrchestra: settings.dynamicOrchestra === true,
         };
         this._stemMusic?.applySettings(this.settings);
         // The owner-defined all-off state is TRUE SILENCE, including

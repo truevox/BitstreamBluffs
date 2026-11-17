@@ -24,6 +24,7 @@ import { isRankable, isModdedOnly, countsForDailyBest, countsForStreak } from '.
  * @property {number} musicVolume        0..1
  * @property {number} sfxVolume          0..1
  * @property {Object<string,boolean>} musicEnabledSongs   Per-song switches. All false = silence.
+ * @property {boolean} dynamicOrchestra  OFF: only melody colored per biome; all other source stems kept.
  * @property {boolean} screenShake       false disables shake (accessibility).
  * @property {'default'|'colorblind'} palette
  * @property {'auto'|'on'|'off'} touchOverlay  on-screen controls.
@@ -65,6 +66,7 @@ export function defaultSettings() {
     version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, screenShake: true,
     palette: 'default', touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
+    dynamicOrchestra: false,
   };
 }
 
@@ -93,6 +95,7 @@ export function sanitizeSettings(raw) {
     touchRotate90: typeof raw.touchRotate90 === 'boolean' ? raw.touchRotate90 : d.touchRotate90,
     lastInitials: str(raw.lastInitials).slice(0, INITIALS_MAX),
     musicEnabledSongs: sanitizeSongSelection(raw.musicEnabledSongs),
+    dynamicOrchestra: typeof raw.dynamicOrchestra === 'boolean' ? raw.dynamicOrchestra : false,
   };
 }
 

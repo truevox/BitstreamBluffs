@@ -40,7 +40,7 @@ describe('StemMusicDirector optional adaptive integration', () => {
 		]);
 		gainCalls.length=0;
 		director.setStemGain('piano',.65);
-		expect(gainCalls.map(call => call[0])).toEqual(['piano']);
+		expect(gainCalls.map(call => call[0])).toEqual(['piano','adaptive:piano']);
 		gainCalls.length=0;
 		director.setStemGain('bass',.45);
 		expect(gainCalls.map(call => call[0])).toEqual(['bass','adaptive:bass']);
@@ -51,12 +51,16 @@ describe('StemMusicDirector optional adaptive integration', () => {
 			['bass',.8],['drums',.55],['guitar',.27],['piano',.92],['other',.63],
 		]);
 		director._syncAdaptiveUserLevels();
-		expect(gainCalls.slice(-3).map(call=>call.slice(0,2)))
+		expect(gainCalls.map(call=>call.slice(0,2)))
 			.toEqual([['adaptive:bass',.8],['adaptive:drums',.55],
-				['adaptive:featured',.63]]);
+				['adaptive:featured',.63],['adaptive:guitar',.27],
+				['adaptive:piano',.92]]);
 		director.pack.adaptive.featuredStem='piano';
 		director._syncAdaptiveUserLevels();
-		expect(gainCalls.at(-1).slice(0,2)).toEqual(['adaptive:featured',.92]);
+		expect(gainCalls.slice(-5).map(call=>call.slice(0,2)))
+			.toEqual([['adaptive:bass',.8],['adaptive:drums',.55],
+				['adaptive:featured',.92],['adaptive:guitar',.27],
+				['adaptive:other',.63]]);
 	});
 	test('changing biome forwards to the adaptive router without touching source levels', () => {
 		const {director,gainCalls} = bareDirector();
@@ -64,16 +68,19 @@ describe('StemMusicDirector optional adaptive integration', () => {
 		expect(director.adaptive.setBiome).toHaveBeenCalledWith('crystal-cavern');
 		expect(gainCalls).toHaveLength(0);
 	});
-	test('airborne drums use full source when adaptive, legacy packs keep old duck', () => {
+	test('airborne drums duck ORIGINAL source in both dynamic orchestra modes', () => {
 		const {director,gainCalls} = bareDirector();
 		director.setAirborne(true);
-		expect(gainCalls.at(-1)[0]).toBe('drums');
-		expect(gainCalls.at(-1)[1]).toBe(1);
+		expect(gainCalls.map(c=>c.slice(0,2))).toEqual([
+			['drums',.22],['adaptive:drums',.38],
+		]);
 		expect(director.adaptive.setAirborne).toHaveBeenCalledWith(true);
 		const legacy = bareDirector();
 		legacy.director.pack.adaptive = null;
 		legacy.director.setAirborne(true);
-		expect(legacy.gainCalls.at(-1)[1]).toBe(.58);
+		expect(legacy.gainCalls.map(c=>c.slice(0,2))).toEqual([
+			['drums',.22],['adaptive:drums',.38],
+		]);
 	});
 	test('speed and combo remain independent; featured Other receives combo automation', () => {
 		const {director,gainCalls,effectCalls} = bareDirector('other');

@@ -10,6 +10,7 @@ import { AdaptiveBiomeRouter } from './AdaptiveBiomeRouter.js';
 import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
 import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.js';
 import { defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex } from './MusicPlaylist.js';
+import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
@@ -20,6 +21,9 @@ export class StemMusicDirector {
 		this.catalogUrl = catalogUrl;
 		this.catalog = [];
 		this.songEnabled = defaultSongSelection();
+		this.dynamicOrchestra = false;
+		this.speedPxS = 0;
+		this._timbreSignatures = new Map();
 		this.ready = false;
 		this.started = false;
 		this.disposed = false;
@@ -87,6 +91,7 @@ export class StemMusicDirector {
 		this.musicCaptions = settings.musicCaptions === true;
 		this.setVocals(settings.musicVocals === true);
 		this.setSongSelection(settings.musicEnabledSongs);
+		this.setDynamicOrchestra(settings.dynamicOrchestra === true);
 	}
 
 	setSongSelection(selection) {
@@ -107,6 +112,40 @@ export class StemMusicDirector {
 		}
 	}
 
+	setDynamicOrchestra(on) {
+		const next = on === true;
+		if (next === this.dynamicOrchestra) return;
+		this.dynamicOrchestra = next;
+		this.adaptive?.setEnabled(next);
+		this._applyMusicTimbres();
+	}
+
+	/** The melody is colored by biome IN BOTH modes. All other stems are
+	 * original and dry when OFF. ON uses provisional biome DSP, and if
+	 * proper re-performed stems are installed, enables adaptive swaps.
+	 * Effects use smooth crossfades, no source rewind or track restart.
+	 */
+	_applyMusicTimbres(force=false) {
+		if (!this.mixer || !this.gains) return;
+		const lead = this._activeVoiceFor(this.pack);
+		const sourceNames = ['bass','drums','guitar','piano','other'];
+		if (lead) sourceNames.push(lead);
+		for (const name of sourceNames) {
+			if (!this.gains.has(name)) continue;
+			const effects = name===lead ? melodyPreset(this.biome) :
+				(this.dynamicOrchestra ? orchestraPreset(this.biome,name) : []);
+			const key = JSON.stringify(effects);
+			if (force || this._timbreSignatures.get(name)!==key) {
+				this.mixer.replaceEffects(name,effects,.18);
+				this._timbreSignatures.set(name,key);
+			}
+			// OFF must not send the original instrumental tracks through
+			// the biome's room bus, but lead character stays biome-colored.
+			this.mixer.setRoomSend(name,name===lead ? null :
+				this.dynamicOrchestra ? null : 0);
+		}
+	}
+
 	_nextEnabledIndex(previous = -1) {
 		return nextEnabledSongIndex(this.catalog, this.songEnabled, previous);
 	}
@@ -119,7 +158,8 @@ export class StemMusicDirector {
 		// Keep user-mix level consistent as an original stem is replaced.
 		const featured = this.pack?.adaptive?.featuredStem;
 		const alternate = name === 'bass' || name === 'drums' ? name :
-			name === featured ? 'featured' : null;
+			name === featured ? 'featured' :
+			['guitar','piano','other'].includes(name) ? name : null;
 		if (alternate) this.mixer?.setGain('adaptive:' + alternate, level);
 		return changed;
 	}
@@ -135,6 +175,7 @@ export class StemMusicDirector {
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.biome);
 		this.adaptive?.setBiome(this.biome);
+		this._applyMusicTimbres();
 		if (this.started) this._pump();
 	}
 
@@ -162,8 +203,14 @@ export class StemMusicDirector {
 		this.airborne = next;
 		// New adaptive packs crossfade full original drums with an actual
 		// airborne kit. The legacy 0.58 airborne duck remains unchanged.
-		this.mixer?.setGain('drums', this.pack?.adaptive ? 1 :
-			this.airborne ? 0.58 : 1, { motion: true, time: 0.12 });
+		// Airborne ducking applies to the ORIGINAL stem regardless
+		// of orchestra mode or availability of alternate kit assets.
+		this.mixer?.setGain('drums', this.airborne ? .22 : 1,
+			{ motion: true, time: .15 });
+		// Actual alternate air drums also soften rather than becoming
+		// a permanent full-volume replacement under a low source bed.
+		this.mixer?.setGain('adaptive:drums', this.airborne ? .38 : 1,
+			{ motion: true, time: .15 });
 		this.adaptive?.setAirborne(this.airborne);
 		if (this.started) this._pump();
 	}
@@ -172,14 +219,19 @@ export class StemMusicDirector {
 		// Effects marked speed-filter react without altering source playback rate.
 		const normalized = clamp((Number(speedPxS) || 0) / 1000, 0, 1);
 		this.mixer?.setEffectParam('other', 'speed-filter', 'frequency', 400 + normalized * 15000);
+		this.speedPxS = Math.max(0, Number(speedPxS)||0);
+		const speedGain = clamp(.2+this.speedPxS/850,.2,1.18);
+		this.mixer?.setGain('bass',speedGain,{motion:true,time:.16});
+		this.mixer?.setGain('adaptive:bass',speedGain,{motion:true,time:.16});
 		this.adaptive?.setSpeed(speedPxS);
 	}
 
 	setCombo(multiplier = 1) {
 		const level = clamp(1 + (Number(multiplier) - 1) * 0.05, 0.8, 1.25);
 		this.mixer?.setGain('other', level, { motion: true, time: 0.09 });
-		if (this.pack?.adaptive?.featuredStem === 'other') {
-			this.mixer?.setGain('adaptive:featured', level, { motion: true, time: 0.09 });
+		if (this.pack?.adaptive) {
+			const role=this.pack.adaptive.featuredStem === 'other' ? 'featured' : 'other';
+			this.mixer?.setGain('adaptive:'+role, level, { motion: true, time: 0.09 });
 		}
 	}
 
@@ -285,6 +337,10 @@ export class StemMusicDirector {
 		this.mixer.setGain('adaptive:bass', level('bass'));
 		this.mixer.setGain('adaptive:drums', level('drums'));
 		this.mixer.setGain('adaptive:featured', level(this.pack.adaptive.featuredStem));
+		for (const stem of ['guitar','piano','other']) {
+			if (stem!==this.pack.adaptive.featuredStem)
+				this.mixer.setGain('adaptive:'+stem,level(stem));
+		}
 	}
 
 	async _fetchAdaptiveSegment(index, path) {
@@ -354,6 +410,8 @@ export class StemMusicDirector {
 				this.mixer.setGain(name, level, { time: 0.1 });
 			}
 			this._refreshVoices();
+			this._timbreSignatures.clear();
+			this._applyMusicTimbres(true);
 			if (info.pack.captions) this._loadCaptions(info, token);
 			this._nextPromise = null;
 			this._nextIndex = null;
@@ -366,9 +424,13 @@ export class StemMusicDirector {
 			this.clockStart = Math.max(this.ctx.currentTime + 0.12, desiredAt || 0);
 			this.adaptive?.configure(this.pack, this.clockStart,
 				{ biome: this.biome, airborne: this.airborne });
+			this.adaptive?.setEnabled(this.dynamicOrchestra);
 			this._syncAdaptiveUserLevels();
-			this.mixer?.setGain('drums', this.pack.adaptive ? 1 :
-				this.airborne ? 0.58 : 1, { motion: true, time: 0.12 });
+			this.mixer?.setGain('drums',this.airborne ? .22 : 1,
+				{ motion:true,time:.15 });
+			this.mixer?.setGain('adaptive:drums',this.airborne ? .38 : 1,
+				{ motion:true,time:.15 });
+			this.setSpeed(this.speedPxS);
 			this._pump();
 			if (this.onTrackStarted) this.onTrackStarted({
 				id: this.track.id, title: this.track.title, index: this.trackIndex,

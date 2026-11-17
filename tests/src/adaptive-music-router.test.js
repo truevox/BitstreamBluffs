@@ -109,7 +109,7 @@ describe('Independent 4x12 adaptive source manifest', () => {
 		expect(Object.values(result.adaptive.variants)
 			.flatMap(biomes => Object.values(biomes)).length).toBe(33);
 	});
-	test('adaptive variants reserve three mixer slots from the 48-bus limit', () => {
+	test('adaptive variants reserve six mixer slots from the 48-bus limit', () => {
 		const raw=pack();
 		for(let i=0;i<40;i++) {
 			for(const seg of raw.segments) seg.sources['pad:'+i]='pad'+i+'.ogg';
@@ -117,7 +117,10 @@ describe('Independent 4x12 adaptive source manifest', () => {
 		expect(Object.keys(raw.segments[0].sources)).toHaveLength(46);
 		expect(()=>normalizePack(raw)).toThrow(/Too many music sources/);
 		for(const seg of raw.segments) delete seg.sources['pad:39'];
-		expect(normalizePack(raw).sourceNames).toHaveLength(45);
+		for (let i=36;i<39;i++) {
+			for(const seg of raw.segments) delete seg.sources['pad:'+i];
+		}
+		expect(normalizePack(raw).sourceNames).toHaveLength(42);
 	});
 	test('rejects path traversal, partial segments, unknown biomes and bad featured labels', () => {
 		const x = pack(); x.adaptive.variants.bass.debumont[0] = '../leak.wav';
@@ -131,7 +134,7 @@ describe('Independent 4x12 adaptive source manifest', () => {
 		const home = pack(); home.adaptive.variants.bass['bitstream-bluffs'] = ['a.ogg','b.ogg'];
 		expect(() => normalizePack(home)).toThrow(/Invalid biome/);
 	});
-	test('adaptive packs reserve room for three reusable mixer buses', () => {
+	test('adaptive packs reserve room for six reusable mixer buses', () => {
 		const raw=pack();
 		for(let i=0;i<40;i++){
 			for(const segment of raw.segments) {
@@ -139,7 +142,7 @@ describe('Independent 4x12 adaptive source manifest', () => {
 			}
 		}
 		expect(() => normalizePack(raw)).toThrow(/Too many music sources/);
-		// 6 core + 12 melody + three adaptive buses is comfortably below 48.
+		// 6 core + 12 melody + six adaptive buses is comfortably below 48.
 		for(let i=0;i<40;i++){
 			for(const segment of raw.segments) delete segment.sources['texture:'+i];
 		}
@@ -156,13 +159,43 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 	beforeEach(() => jest.useFakeTimers());
 	afterEach(() => { jest.runOnlyPendingTimers(); jest.useRealTimers(); });
 
+	test('full ON replaces all FIVE original instrumental stems; OFF restores sources', async () => {
+		const raw=pack();
+		// Featured source=Guitar, with Piano and Other independently re-synthesized.
+		raw.adaptive.variants.piano={debumont:['piano1.ogg','piano2.ogg']};
+		raw.adaptive.variants.other={debumont:['other1.ogg','other2.ogg']};
+		const {ctx,mixer}=mocks();
+		const router=new AdaptiveBiomeRouter(ctx,mixer,async ()=>({duration:1}));
+		router.setEnabled(true);
+		router.configure(normalizePack(raw),0,{biome:'debumont',airborne:true});
+		await tick(router);
+		for(const source of ['guitar','piano','other','bass','drums']) {
+			expect(mixer.levels[source]).toBe(0);
+		}
+		expect(mixer.levels.vocals).toBe(1);
+		for(const role of ['featured','piano','other','bass','drums']) {
+			expect(router.channels.get(role).current?.live).toBe(true);
+		}
+		// The originally featured guitar cannot also be routed via the named
+		// guitar bus, even if an inconsistent manifest provides it.
+		expect(router.channels.get('guitar').current).toBeNull();
+		router.setEnabled(false);
+		for(const source of ['guitar','piano','other','bass','drums']) {
+			expect(mixer.levels[source]).toBe(1);
+		}
+		for(const role of ['featured','guitar','piano','other','bass','drums']) {
+			expect(router.channels.get(role).current).toBeNull();
+		}
+		router.destroy();
+	});
+
 	test('six originals persist and the two unfeatured roles are never ducked', async () => {
 		const { ctx, mixer } = mocks();
 		const loader = jest.fn(async () => ({ duration: 1 }));
 		const router = new AdaptiveBiomeRouter(ctx,mixer,loader);
 		router.configure(normalizePack(pack()), 0, { biome: 'debumont' });
 		await tick(router);
-		expect(mixer.sources.size).toBe(9);
+		expect(mixer.sources.size).toBe(12);
 		expect(loader).toHaveBeenCalledTimes(4);
 		expect(mixer.levels.bass).toBe(0);
 		expect(mixer.levels.guitar).toBe(0);
@@ -201,7 +234,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 		expect(mixer.levels.guitar).toBe(0);
 		router.setBiome('bitstream-bluffs');
 		for (const name of CORE_STEMS) expect(mixer.levels[name]).toBe(1);
-		expect(mixer.sources.size).toBe(9);
+		expect(mixer.sources.size).toBe(12);
 		router.destroy();
 	});
 
@@ -356,7 +389,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 			router.setBiome(k%2 ? 'candy-cane-canyon' : 'debumont');
 			await tick(router);
 		}
-		expect(mixer.sources.size).toBe(9);
+		expect(mixer.sources.size).toBe(12);
 		router.destroy();
 	});
 });

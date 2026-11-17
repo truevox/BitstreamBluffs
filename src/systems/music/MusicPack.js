@@ -8,7 +8,7 @@ const safePath = (s) => typeof s === 'string' && s.length < 300 &&
 const whole = (v) => Number.isSafeInteger(v) && v >= 0;
 const effectTypes = new Set(['gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser']);
 
-const ADAPTIVE_FAMILIES = Object.freeze(['bass', 'drums', 'featured']);
+const ADAPTIVE_FAMILIES = Object.freeze(['bass', 'drums', 'featured', 'guitar', 'piano', 'other']);
 const FEATURE_STEMS = Object.freeze(['guitar', 'piano', 'other']);
 
 /**
@@ -72,8 +72,8 @@ export function normalizePack(raw) {
 	let cursor = 0;
 	const baselineNames = Object.keys(raw.segments[0]?.sources || {}).sort();
 	if (baselineNames.length < CORE_STEMS.length ||
-		baselineNames.length > (raw.adaptive === undefined ? 48 : 45)) {
-		// An adaptive pack needs three stable extra buses beyond base sources.
+		baselineNames.length > (raw.adaptive === undefined ? 48 : 42)) {
+		// Adaptive packs reserve SIX reusable mixer buses (featured, bass, drums, plus individual source guitar/piano/other).
 		throw new Error('Too many music sources');
 	}
 	const segments = raw.segments.map((seg) => {

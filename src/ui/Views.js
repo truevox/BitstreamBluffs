@@ -197,6 +197,9 @@ export class SettingsView extends View {
       { kind: 'slider', label: 'MASTER VOLUME', get: () => s().masterVolume, set: (v) => updateSetting(game, 'masterVolume', v) },
       { kind: 'slider', label: 'MUSIC VOLUME', get: () => s().musicVolume, set: (v) => updateSetting(game, 'musicVolume', v) },
       { kind: 'slider', label: 'SFX VOLUME', get: () => s().sfxVolume, set: (v) => updateSetting(game, 'sfxVolume', v) },
+      { kind: 'choice', label: 'DYNAMIC ORCHESTRA', badge: 'PRE-ALPHA', badgeColor: 'magenta',
+        options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+        get: () => s().dynamicOrchestra === true, set: (v) => updateSetting(game, 'dynamicOrchestra', v) },
       ...GAME_SONGS.map(song => ({
         kind: 'choice', label: '▶ ' + song.label,
         options: [{ value: true, label: 'ON' }, { value: false, label: 'OFF' }],
