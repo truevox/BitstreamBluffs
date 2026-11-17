@@ -17,7 +17,7 @@ const paths = new Set(['/', '/index.html', '/app.js', '/catalog.json']);
 for (const song of catalog.songs) {
 	paths.add('/'+song.id+'/'+song.originalReference);
 	paths.add('/'+song.id+'/'+song.vocals);
-	for (const revision of ['articulation','orchestral']) {
+	for (const revision of ['articulation','orchestral','rhythm']) {
 		paths.add('/revisions/'+revision+'/'+song.id+'/'+song.originalReference);
 		paths.add('/revisions/'+revision+'/'+song.id+'/'+song.vocals);
 	}
@@ -26,18 +26,23 @@ for (const song of catalog.songs) {
 		assert.ok(variant);
 		for (const role of ['ground','air']) {
 			paths.add('/'+song.id+'/'+variant[role]);
-			for (const revision of ['articulation','orchestral']) {
+			for (const revision of ['articulation','orchestral','rhythm']) {
 				paths.add('/revisions/'+revision+'/'+song.id+'/'+variant[role]);
 			}
 		}
 	}
 }
-const checks = [...paths].map(async path => {
-	const response = await fetch(url + path, {method:'HEAD'});
-	assert.equal(response.status,200,'Missing HEAD '+path);
-	return path;
-});
-await Promise.all(checks);
+// Tailnet forwarding is intentionally small; a burst of >190 requests
+// exceeds its SSH channel budget. Run bounded HTTP checks in groups.
+const allPaths = [...paths];
+for (let i=0;i<allPaths.length;i+=8) {
+	await Promise.all(allPaths.slice(i,i+8).map(async path => {
+		const response = await fetch(url + path, {
+			method:'HEAD',signal:AbortSignal.timeout(15000),
+		});
+		assert.equal(response.status,200,'Missing HEAD '+path);
+	}));
+}
 console.log('LIBRARY_HTTP_CHECKS',paths.size,'PASS');
 
 const browser = await chromium.launch({
@@ -60,7 +65,7 @@ try {
 	await page.click('#play');
 	await page.waitForFunction(() => {
 		const s=window.orchestraDebug.state;
-		return s.playing && s.main && s.cache.has('revisions/orchestral/pope/debumont-air.ogg');
+		return s.playing && s.main && s.cache.has('revisions/rhythm/pope/debumont-air.ogg');
 	},null,{timeout:18000});
 	// Compare actual audio at the same song-clock position. The first
 	// pass, envelope-only repair and new sounds are distinct choices.
@@ -70,6 +75,8 @@ try {
 	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/articulation/pope/debumont-air.ogg'),null,{timeout:14000});
 	await page.click('button[data-revision="orchestral"]');
 	await page.waitForFunction(() => window.orchestraDebug.state.revision==='orchestral',null,{timeout:14000});
+	await page.click('button[data-revision="rhythm"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/rhythm/pope/debumont-air.ogg'),null,{timeout:14000});
 	await page.click('#original');
 	await page.waitForFunction(() =>
 		window.orchestraDebug.state.cache.has('pope/original-instrumental.ogg'),
@@ -77,7 +84,7 @@ try {
 	await page.click('#new');
 	await page.click('#ground');
 	await page.waitForFunction(() =>
-		window.orchestraDebug.state.cache.has('revisions/orchestral/pope/debumont-ground.ogg'),
+		window.orchestraDebug.state.cache.has('revisions/rhythm/pope/debumont-ground.ogg'),
 		null,{timeout:13000});
 	await page.click('#vocal');
 	await page.waitForFunction(() =>
@@ -85,7 +92,7 @@ try {
 	for(const biome of ['crystal-cavern','pyramid-peak','steampunk-slopes']){
 		await page.click('button[data-biome="'+biome+'"]');
 		await page.waitForFunction(b =>
-			window.orchestraDebug.state.cache.has('revisions/orchestral/pope/'+b+'-ground.ogg'),
+			window.orchestraDebug.state.cache.has('revisions/rhythm/pope/'+b+'-ground.ogg'),
 			biome,{timeout:14000});
 	}
 	await page.click('#air');
@@ -97,7 +104,7 @@ try {
 	for(const biome of ['candy-cane-canyon','micro-mountain','vertigo-vents']){
 		await page.click('button[data-biome="'+biome+'"]');
 		await page.waitForFunction(b =>
-			window.orchestraDebug.state.cache.has('revisions/orchestral/one-more-run/'+b+'-air.ogg'),
+			window.orchestraDebug.state.cache.has('revisions/rhythm/one-more-run/'+b+'-air.ogg'),
 			biome,{timeout:14000});
 	}
 	await page.locator('#seek').fill('15');

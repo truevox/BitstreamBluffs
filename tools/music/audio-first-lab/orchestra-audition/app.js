@@ -12,7 +12,7 @@ const palette = {
 };
 const state = {
 	catalog:null,song:'pope',biome:'debumont',
-	arrangement:'orchestra',terrain:'air',revision:'orchestral',vocals:false,
+	arrangement:'orchestra',terrain:'air',revision:'rhythm',vocals:false,
 	ctx:null,master:null,main:null,voice:null,
 	playing:false,position:0,startClock:0,
 	request:0,vocalRequest:0,cache:new Map(),
@@ -212,7 +212,7 @@ function changeArrangement(mode){
 	swap();
 }
 function changeRevision(version){
-	if(!['original','articulation','orchestral'].includes(version))return;
+	if(!['original','articulation','orchestral','rhythm'].includes(version))return;
 	if(state.revision===version)return;
 	state.revision=version;
 	flags();
