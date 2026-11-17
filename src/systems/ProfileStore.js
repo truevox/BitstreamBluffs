@@ -18,6 +18,28 @@ import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
 
+/** Temporary/pre-alpha music-vocals entitlement price.
+ * Eventually earned by level, with existing purchases grandfathered.
+ */
+export const VOCALS_UNLOCK_SHARDS = 200;
+
+/** Pure, idempotent entitlement and bank transaction, no UI/localStorage.
+ * Rejects malformed balances, missing funds or repeat purchase.
+ */
+export function purchaseVocals(profile,price=VOCALS_UNLOCK_SHARDS) {
+  if (!profile || typeof profile !== 'object') return {ok:false,reason:'invalid-profile',profile};
+  if (profile.unlocked?.musicVocals===true)
+    return {ok:true,reason:'already-owned',profile};
+  if (!Number.isSafeInteger(price)||price<1)
+    return {ok:false,reason:'invalid-price',profile};
+  if (!Number.isSafeInteger(profile.bank)||profile.bank<price)
+    return {ok:false,reason:'not-enough-shards',profile};
+  const next={...profile,bank:profile.bank-price,
+    unlocked:{...(profile.unlocked||{}),musicVocals:true}};
+  return {ok:true,reason:'purchased',profile:next};
+}
+
+
 /** Bounded ring of credited run hashes: enough for thousands of runs, cannot grow forever. */
 export const CREDITED_MAX = 500;
 
@@ -96,6 +118,7 @@ export function sanitizeProfile(raw, levels) {
     // W5: achievement title rewards land here. Without this line the sanitizer would drop them on the
     // very next load, so a player would win OMNISCIENT and lose it at the next boot.
     titles: strArr(u.titles),
+    musicVocals: u.musicVocals === true,
     boosts: u.boosts && typeof u.boosts === 'object' ? Object.fromEntries(Object.entries(u.boosts).filter(([k, v]) => typeof k === 'string' && k && isNum(v))) : {},
   };
   const e = raw.equipped && typeof raw.equipped === 'object' ? raw.equipped : {};
@@ -550,6 +573,26 @@ export class ProfileStore {
       this.backend = 'memory';
     }
     return this.profile;
+  }
+
+  /** Atomic persistent purchase: charge + unlock are a SINGLE storage
+   * commit. On storage failure, do not debit the in-memory account.
+   * Music unlock is a permanent entitlement even if the final build
+   * later changes its unlock source to level progression.
+   */
+  buyMusicVocals() {
+    const tx=purchaseVocals(this.profile);
+    if (!tx.ok || tx.reason==='already-owned') return tx;
+    const next=sanitizeProfile(tx.profile,this.levels);
+    if (!this.storage) return {ok:false,reason:'storage-unavailable',profile:this.profile};
+    try {
+      this.storage.setItem(PROFILE_KEY,JSON.stringify(next));
+    } catch {
+      return {ok:false,reason:'storage-failed',profile:this.profile};
+    }
+    this.profile=next;
+    this.backend='localStorage';
+    return {ok:true,reason:'purchased',profile:this.profile};
   }
 
   /**

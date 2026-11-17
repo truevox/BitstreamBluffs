@@ -22,6 +22,9 @@ import { achievementsLayout, clampPage } from './AchievementsLayout.js';
 import { ACHIEVEMENTS } from '../systems/Achievements.js';
 import { shopLayout, shopMenuItems, titlesLayout, titlesMenuItems } from './ShopLayout.js';
 import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopItem } from '../systems/ProfileStore.js';
+import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
+import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
+import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
 
 /** Base: centred panel with a BACK button. */
 class View {
@@ -184,63 +187,419 @@ export class LeaderboardView extends View {
 
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
-  /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
   constructor(scene, theme, o) {
-    super(scene, theme, { w: 360, h: 244, title: 'SETTINGS', color: 'amber', onClose: o.onClose, y: 12, backLabel: 'DONE' });
-    const game = scene.game;
-    const s = () => game.registry.get(REG.SETTINGS) || {};
-    const items = [
-      { kind: 'choice', label: 'PALETTE', options: [{ value: 'default', label: 'NEON' }, { value: 'colorblind', label: 'COLOR-BLIND' }],
-        get: () => s().palette, set: (v) => updateSetting(game, 'palette', v) },
-      { kind: 'choice', label: 'SCREEN SHAKE', options: [{ value: true, label: 'ON' }, { value: false, label: 'OFF' }],
-        get: () => s().screenShake !== false, set: (v) => updateSetting(game, 'screenShake', v) },
-      { kind: 'slider', label: 'MASTER VOLUME', get: () => s().masterVolume, set: (v) => updateSetting(game, 'masterVolume', v) },
-      { kind: 'slider', label: 'MUSIC VOLUME', get: () => s().musicVolume, set: (v) => updateSetting(game, 'musicVolume', v) },
-      { kind: 'slider', label: 'SFX VOLUME', get: () => s().sfxVolume, set: (v) => updateSetting(game, 'sfxVolume', v) },
-      { kind: 'choice', label: 'DYNAMIC ORCHESTRA', badge: 'PRE-ALPHA', badgeColor: 'magenta',
-        options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
-        get: () => s().dynamicOrchestra === true, set: (v) => updateSetting(game, 'dynamicOrchestra', v) },
-      ...GAME_SONGS.map(song => ({
-        kind: 'choice', label: '▶ ' + song.label,
-        options: [{ value: true, label: 'ON' }, { value: false, label: 'OFF' }],
-        get: () => s().musicEnabledSongs?.[song.id] !== false,
-        set: (v) => updateSetting(game, 'musicEnabledSongs', {
-          ...(s().musicEnabledSongs || {}), [song.id]: v,
-        }),
-      })),
-      { kind: 'choice', label: 'TILT CONTROLS (90)', options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
-        get: () => !!s().touchRotate90, set: (v) => updateSetting(game, 'touchRotate90', v) },
-      { kind: 'choice', label: 'TOUCH BUTTONS', options: [{ value: 'auto', label: 'AUTO' }, { value: 'on', label: 'ON' }, { value: 'off', label: 'OFF' }],
-        get: () => s().touchOverlay || 'auto', set: (v) => updateSetting(game, 'touchOverlay', v) },
+    super(scene, theme, { w: 360, h: 190, title: 'SETTINGS',
+      color: 'amber', onClose: o.onClose, y: 40, backLabel: 'DONE' });
+    this.soundView=null;
+    const game=scene.game;
+    const settings=()=>game.registry.get(REG.SETTINGS)||{};
+    const items=[
+      { kind:'choice',label:'PALETTE',options:[
+        {value:'default',label:'NEON'},{value:'colorblind',label:'COLOR-BLIND'}],
+        get:()=>settings().palette,set:v=>updateSetting(game,'palette',v) },
+      { kind:'choice',label:'SCREEN SHAKE',options:[
+        {value:true,label:'ON'},{value:false,label:'OFF'}],
+        get:()=>settings().screenShake!==false,set:v=>updateSetting(game,'screenShake',v) },
+      {kind:'slider',label:'MASTER VOLUME',get:()=>settings().masterVolume,
+        set:v=>updateSetting(game,'masterVolume',v)},
+      {kind:'slider',label:'MUSIC VOLUME',get:()=>settings().musicVolume,
+        set:v=>updateSetting(game,'musicVolume',v)},
+      {kind:'slider',label:'SFX VOLUME',get:()=>settings().sfxVolume,
+        set:v=>updateSetting(game,'sfxVolume',v)},
+      {kind:'slider',label:'SLED WIND',get:()=>settings().windVolume??1,
+        set:v=>updateSetting(game,'windVolume',v)},
+      {kind:'action',label:'MANAGE SOUND',color:'cyan',sub:'SONGS / VOCALS / LAB',
+        onSelect:()=>this._openSoundManager()},
+      {kind:'choice',label:'TILT CONTROLS (90)',options:[
+        {value:false,label:'OFF'},{value:true,label:'ON'}],
+        get:()=>!!settings().touchRotate90,set:v=>updateSetting(game,'touchRotate90',v)},
+      {kind:'choice',label:'TOUCH BUTTONS',options:[
+        {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
+        get:()=>settings().touchOverlay||'auto',set:v=>updateSetting(game,'touchOverlay',v)},
     ];
-    this.menu = new MenuList(scene, theme, { x: 10, y: 22, w: 340, rowH: 16, items, color: 'amber', parent: this.panel });
-    this.panel.add(new NeonText(scene, theme, 104, this.h - 17, 'PALETTE PREVIEW', { color: 'text', outline: 'none' }).setAlpha(0.5));
-    this.swatch = scene.add.graphics();
+    this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:16,
+      items,color:'amber',parent:this.panel});
+    this.swatch=scene.add.graphics();
     this.panel.add(this.swatch);
-    this.unbindSwatch = theme.bind((pal) => {
-      const g = this.swatch;
+    this.unbindSwatch=theme.bind(pal=>{
+      const g=this.swatch;
       g.clear();
-      ['cyan', 'magenta', 'lime', 'amber'].forEach((k, i) => {
-        g.fillStyle(pal[k], 1);
-        g.fillRect(10 + i * 22, this.h - 20, 18, 12);
-        g.fillStyle(pal.bg, 1);
-        g.fillRect(12 + i * 22, this.h - 18, 14, 8);
-        g.fillStyle(pal[k], 1);
-        g.fillRect(14 + i * 22, this.h - 16, 10, 4);
+      ['cyan','magenta','lime','amber'].forEach((k,i)=>{
+        g.fillStyle(pal[k],1);g.fillRect(10+i*22,this.h-20,18,12);
+        g.fillStyle(pal.bg,1);g.fillRect(12+i*22,this.h-18,14,8);
+        g.fillStyle(pal[k],1);g.fillRect(14+i*22,this.h-16,10,4);
       });
     });
   }
-
-  handleAction(action) {
-    if (action === 'cancel') {
-      this.close();
-      return true;
-    }
+  _openSoundManager(){
+    if(this.soundView)return;
+    this.panel.setVisible(false);
+    this.soundView=new SoundManagerView(this.scene,this.theme,{
+      onClose:()=>{
+        this.soundView?.destroy();
+        this.soundView=null;
+        this.panel.setVisible(true);
+      },
+    });
+  }
+  handleAction(action){
+    if(this.soundView)return this.soundView.handleAction(action);
+    if(action==='cancel'){this.close();return true;}
     return this.menu.handleAction(action);
   }
+  destroy(){
+    this.soundView?.destroy();this.soundView=null;
+    this.unbindSwatch?.();
+    super.destroy();
+  }
+}
 
-  destroy() {
-    if (this.unbindSwatch) this.unbindSwatch();
+/** One level deeper than ordinary Settings. The live game music engine is
+ * shared by the playlist, laboratory and game - never use a separate player.
+ */
+export class SoundManagerView extends View {
+  constructor(scene,theme,o){
+    super(scene,theme,{w:448,h:238,title:'MANAGE SOUND',
+      color:'cyan',onClose:o.onClose,y:15});
+    this.labView=null;
+    this._build();
+  }
+  _profile(){return this.scene.registry.get(REG.PROGRESSION)?.store?.profile||
+    this.scene.registry.get(REG.PROFILE)||{};}
+  _unlocked(){return this._profile()?.unlocked?.musicVocals===true;}
+  _build(){
+    const game=this.scene.game;
+    const settings=()=>game.registry.get(REG.SETTINGS)||{};
+    const unlocked=this._unlocked();
+    const bank=Number(this._profile().bank)||0;
+    const menuItems=[
+      ...GAME_SONGS.map((song,index)=>({
+        kind:'choice',label:'TRACK '+(index+1)+'  '+ellipsize(song.label.toUpperCase(),190),
+        options:[{value:true,label:'ON'},{value:false,label:'OFF'}],
+        get:()=>settings().musicEnabledSongs?.[song.id]!==false,
+        set:v=>updateSetting(game,'musicEnabledSongs',{
+          ...(settings().musicEnabledSongs||{}),[song.id]:v,
+        }),
+      })),
+      {kind:'choice',label:'DYNAMIC ORCHESTRA',badge:'PRE-ALPHA',
+        badgeColor:'magenta',options:[
+          {value:false,label:'OFF'},{value:true,label:'ON'}],
+        get:()=>settings().dynamicOrchestra===true,
+        set:v=>updateSetting(game,'dynamicOrchestra',v)},
+      ...(unlocked ? [
+        {kind:'choice',label:'ORIGINAL VOCALS',options:[
+          {value:false,label:'OFF'},{value:true,label:'ON'}],
+          get:()=>settings().musicVocals===true,
+          set:v=>updateSetting(game,'musicVocals',v)},
+        {kind:'slider',label:'VOCALS LEVEL',
+          disabled:settings().musicVocals!==true,
+          get:()=>settings().vocalGain??1,
+          set:v=>updateSetting(game,'vocalGain',v)},
+        {kind:'slider',label:'SYNTH MELODY WITH VOCALS',
+          disabled:settings().musicVocals!==true,
+          get:()=>settings().melodyWithVocalsGain??.18,
+          set:v=>updateSetting(game,'melodyWithVocalsGain',v)},
+      ] : [
+        {kind:'action',label:'UNLOCK ORIGINAL VOCALS ('+
+          VOCALS_UNLOCK_SHARDS+' SHARDS)',color:'amber',
+          sub:bank+' AVAILABLE',onSelect:()=>this._buyVocals()},
+        {kind:'static',label:'VOCALS + MELODY MIX LOCKED'},
+      ]),
+      {kind:'action',label:'MUSIC LAB',color:'lime',
+        sub:'USE REAL GAME ENGINE',onSelect:()=>this._openLab()},
+    ];
+    const selected=this.menu?.selected||0;
+    this.menu?.destroy();
+    this.menu=new MenuList(this.scene,this.theme,{x:10,y:24,w:428,
+      rowH:17,items:menuItems,color:'cyan',parent:this.panel});
+    this.menu.setSelected(Math.min(selected,menuItems.length-1),true);
+    if(!this.note){
+      this.note=new NeonText(this.scene,this.theme,12,this.h-39,
+        'DYNAMIC ORCHESTRA OFF = SOURCE STEMS + ALL GAME DSP',{
+          color:'text',outline:'none',
+        });
+      this.note.setAlpha(.6);
+      this.panel.add(this.note);
+    }
+  }
+  _buyVocals(){
+    const progression=this.scene.registry.get(REG.PROGRESSION);
+    const store=progression?.store;
+    const tx=store?.buyMusicVocals();
+    if(tx?.ok){
+      this.scene.registry.set(REG.PROFILE,tx.profile);
+      uiSfx(this.scene,'uiSelect',{pitch:1.4});
+      updateSetting(this.scene.game,'musicVocals',false);
+      this._build();
+    }else{
+      uiSfx(this.scene,'uiBack');
+      this.note.setText(tx?.reason==='not-enough-shards'
+        ? 'NOT ENOUGH SHARDS TO UNLOCK VOCALS'
+        : 'VOCAL PURCHASE COULD NOT BE SAVED');
+    }
+  }
+  _openLab(){
+    if(this.labView)return;
+    this.panel.setVisible(false);
+    this.labView=new SoundLabView(this.scene,this.theme,{
+      onClose:()=>{
+        this.labView?.destroy();
+        this.labView=null;
+        this.panel.setVisible(true);
+        this._build();
+      },
+    });
+  }
+  handleAction(action){
+    if(this.labView)return this.labView.handleAction(action);
+    if(action==='cancel'){this.close();return true;}
+    const result=this.menu.handleAction(action);
+    // A change to vocals changes whether sliders are selectable.
+    if(this._unlocked() && this._vocalVisibility!==this.scene.registry.get(REG.SETTINGS).musicVocals){
+      this._vocalVisibility=this.scene.registry.get(REG.SETTINGS).musicVocals;
+      this._build();
+    }
+    return result;
+  }
+  destroy(){
+    this.labView?.destroy();this.labView=null;
+    super.destroy();
+  }
+}
+
+
+/** Actual-engine research lab. The only trusted place to check note-event
+ * transcription, exact media lengths and timing, sound swap alignment,
+ * repeated attacks and synchronization. Standalone :8186 is ART DESIGN ONLY.
+ *
+ * An isolated director instance uses the identical StemMusicDirector,
+ * StemFXMixer, pack manifests and audio context as gameplay; only its
+ * sandbox output is audible while this view is open. No game state writes.
+ */
+export class SoundLabView extends View {
+  constructor(scene,theme,o){
+    super(scene,theme,{w:468,h:253,title:'MUSIC LAB  //  REAL GAME AUDIO',
+      color:'lime',onClose:o.onClose,y:7});
+    this.audio=scene.registry.get(REG.AUDIO);
+    this.biome='crystal-cavern';
+    this.songIndex=0;
+    this.dynamic=false;
+    this.solo='ALL';
+    this.airborne=false;
+    this.speed=0;
+    this.lab=null;
+    this.request=0;
+    this.sourceBus=null;
+    this.prevBusVolume=null;
+    this.statusText=new NeonText(scene,theme,13,192,
+      'LOADING THE GAME MUSIC ENGINE...',{color:'amber',outline:'none'});
+    this.panel.add(this.statusText);
+    this.clockText=new NeonText(scene,theme,13,205,
+      'SAMPLE-FRAME CHECK: WAITING FOR A DECODE',
+      {color:'cyan',outline:'none'});
+    this.panel.add(this.clockText);
+    this.infoText=new NeonText(scene,theme,13,220,
+      'SANDBOX: SCORES / SHARDS / SETTINGS NOT MODIFIED',
+      {color:'text',outline:'none'});
+    this.infoText.setAlpha(.6);
+    this.panel.add(this.infoText);
+    this._build();
+    this._openSandbox();
+    this.tickTimer=scene.time.addEvent({delay:220,loop:true,callback:()=>this._tick()});
+  }
+  _build(){
+    const titles=this.lab?.catalog?.length ?
+      this.lab.catalog.map(track=>track.title) : GAME_SONGS.map(track=>track.label);
+    const options=(items)=>items.map(([value,label])=>({value,label}));
+    const items=[
+      {kind:'choice',label:'SONG',options:titles.map((title,i)=>({
+        value:i,label:ellipsize(title.toUpperCase(),215)})),
+        get:()=>this.songIndex,set:i=>this._song(i)},
+      {kind:'choice',label:'BIOME',options:options([
+        [HOME_BIOME,'HOME'],
+        ...BIOME_IDS.filter(id=>id!==HOME_BIOME).map(id=>[
+          id,id.replace(/-/g,' ').toUpperCase()]),
+      ]),get:()=>this.biome,set:id=>this._biome(id)},
+      {kind:'choice',label:'REPLACEMENTS',options:options([
+        [false,'SOURCE + DSP'],[true,'NEW ORCHESTRA']]),
+        get:()=>this.dynamic,set:value=>this._dynamic(value)},
+      {kind:'choice',label:'ISOLATE',options:options([
+        ['ALL','ALL'],['MELODY','MELODY'],['DRUMS','DRUMS'],
+        ['BASS','BASS'],['GUITAR','GUITAR'],['PIANO','PIANO'],
+        ['OTHER','OTHER']]),
+        get:()=>this.solo,set:value=>this._solo(value)},
+      {kind:'choice',label:'DRUM PHASE',options:options([
+        [false,'GROUND'],[true,'AIRBORNE']]),
+        get:()=>this.airborne,set:value=>this._air(value)},
+      {kind:'choice',label:'SLED SPEED',options:options([
+        [0,'STOPPED'],[350,'SLOW'],[850,'FAST'],[1500,'EXTREME']]),
+        get:()=>this.speed,set:value=>this._speed(value)},
+      {kind:'action',label:'BACK 10 SECONDS',color:'amber',
+        onSelect:()=>this._jump(-10)},
+      {kind:'action',label:'FORWARD 10 SECONDS',color:'amber',
+        onSelect:()=>this._jump(10)},
+      {kind:'action',label:'RESTART THIS SONG',color:'cyan',
+        onSelect:()=>this._jump(-10000)},
+      {kind:'action',label:'STOP / PLAY',color:'magenta',
+        onSelect:()=>this._toggle()},
+    ];
+    this.menu?.destroy();
+    this.menu=new MenuList(this.scene,this.theme,{
+      x:10,y:23,w:446,rowH:16,items,parent:this.panel,color:'lime'});
+  }
+  async _openSandbox(){
+    const generation=++this.request;
+    const audio=this.audio;
+    try {
+      if(!audio)throw new Error('Game music engine missing');
+      audio.unlock(); // user gesture opens this view, respecting autoplay.
+      if(!audio._ensureCtx()||!audio.nodes)throw new Error('Audio unavailable');
+      const main=audio._stemMusic;
+      // Opening from pause/title/end must not advance the user's actual
+      // music stream or change any persistent gameplay music setting.
+      this.sourceBus=main?.bus||null;
+      if(this.sourceBus){
+        this.prevBusVolume=this.sourceBus.gain.value;
+        this.sourceBus.gain.setTargetAtTime(0,audio.ctx.currentTime,.02);
+      }
+      const lab=new StemMusicDirector(audio);
+      this.lab=lab;
+      await lab.initPromise;
+      if(!this.alive||generation!==this.request){lab.destroy();return;}
+      if(!lab.ready)throw new Error('No valid song packs in this build');
+      if(audio.ctx.state!=='running')await audio.ctx.resume();
+      if(!this.alive||generation!==this.request){lab.destroy();return;}
+      lab.attach(audio.ctx,audio.nodes.musicFilter);
+      lab.applySettings({
+        musicEnabledSongs:Object.fromEntries(
+          GAME_SONGS.map(song=>[song.id,true])),
+        dynamicOrchestra:this.dynamic,
+        musicVocals:false,musicCaptions:false,
+      });
+      lab.setBiome(this.biome);
+      lab.setAirborne(this.airborne);
+      lab.setSpeed(this.speed);
+      lab.trackIndex=this.songIndex;
+      lab.onTrackStarted=()=>this._applySolo();
+      lab.start();
+      this._build();
+      this._tick();
+    }catch(e){
+      if(this.alive)this.statusText.setText(
+        'LAB UNAVAILABLE: '+ellipsize(String(e?.message||e),340));
+    }
+  }
+  _song(index){
+    this.songIndex=index;
+    const lab=this.lab;
+    if(!lab?.ready)return;
+    lab.stop();
+    lab.trackIndex=index;
+    lab.start();
+  }
+  _biome(id){
+    this.biome=id;
+    this.lab?.setBiome(id);
+    this._applySolo();
+  }
+  _dynamic(value){
+    this.dynamic=value===true;
+    this.lab?.setDynamicOrchestra(this.dynamic);
+  }
+  _air(value){
+    this.airborne=value===true;
+    this.lab?.setAirborne(this.airborne);
+  }
+  _speed(value){
+    this.speed=Number(value)||0;
+    this.lab?.setSpeed(this.speed);
+    this._applySolo();
+  }
+  _solo(value){
+    this.solo=value;
+    this._applySolo();
+  }
+  _applySolo(){
+    const lab=this.lab;
+    if(!lab?.mixer||!lab.pack)return;
+    const core=['drums','bass','guitar','piano','other'];
+    for(const role of core){
+      const on=this.solo==='ALL'||this.solo===role.toUpperCase();
+      lab.setStemGain(role,on?1:0);
+    }
+    // Keep the biome-specific melody independent from source versus
+    // replacement; don't accidentally sneak the actual vocal back in.
+    const active=lab._activeVoiceFor(lab.pack);
+    for(const name of lab.gains.keys()){
+      if(name.startsWith('voice:'))
+        lab.mixer.setGain(name,
+          name===active&&(this.solo==='ALL'||this.solo==='MELODY')?1:0,
+          {time:.07});
+    }
+    lab.setSpeed(this.speed); // restore speed automation after solo.
+    lab.setAirborne(this.airborne);
+  }
+  _jump(delta){
+    const lab=this.lab;
+    if(!lab?.pack)return;
+    const position=Math.max(0,Math.min(lab.pack.duration-1,
+      (lab.ctx.currentTime-lab.clockStart)+delta));
+    if(typeof lab.seekTo==='function')lab.seekTo(position);
+  }
+  _toggle(){
+    const lab=this.lab;
+    if(!lab)return;
+    if(lab.started)lab.stop();
+    else{
+      lab.trackIndex=this.songIndex;
+      lab.start();
+    }
+    this._tick();
+  }
+  _tick(){
+    if(!this.alive)return;
+    const lab=this.lab;
+    if(!lab?.ready){
+      this.statusText.setText('ENGINE: WAITING FOR THE SAME GAME CATALOG');
+      return;
+    }
+    const name=lab.track?.title||lab.catalog[this.songIndex]?.title||'NO SONG';
+    const elapsed=lab.pack&&lab.clockStart!==null ?
+      Math.max(0,lab.ctx.currentTime-lab.clockStart) : 0;
+    this.statusText.setText(ellipsize(
+      name+'  '+(this.dynamic?'NEW INSTRUMENTS':'SOURCE + DSP'),436));
+    const second=Math.floor(elapsed);
+    const minutes=Math.floor(second/60);
+    const stamp=minutes+':'+String(second%60).padStart(2,'0');
+    let diagnostic='WAITING FOR AUDIO DECODE';
+    if(lab.pack){
+      const index=lab.pack.segments.findIndex(seg=>
+        seg.startFrame<=elapsed*lab.pack.sampleRate &&
+        seg.startFrame+seg.frames>elapsed*lab.pack.sampleRate);
+      const segment=lab.pack.segments[Math.max(0,index)];
+      const name=lab._activeVoiceFor(lab.pack)||'drums';
+      const buffer=lab.cache.get(Math.max(0,index)+'/'+name);
+      diagnostic=buffer?
+        'DECODED '+buffer.length+' / EXPECTED '+segment.frames+
+        ' FRAMES ['+(buffer.length-segment.frames)+']' :
+        'BUFFER FETCH / DECODE PENDING';
+    }
+    this.clockText.setText('TIME '+stamp+'  '+diagnostic);
+  }
+  handleAction(action){
+    if(action==='cancel'){this.close();return true;}
+    return this.menu.handleAction(action);
+  }
+  destroy(){
+    ++this.request;
+    this.tickTimer?.remove();
+    this.lab?.destroy();
+    this.lab=null;
+    if(this.sourceBus&&this.audio?.ctx){
+      this.sourceBus.gain.setTargetAtTime(
+        this.prevBusVolume??1,this.audio.ctx.currentTime,.05);
+    }
+    this.sourceBus=null;
     super.destroy();
   }
 }

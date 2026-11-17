@@ -33,6 +33,10 @@ export async function createServices(game) {
   // W1: progression service (profile load + one-time backfill + RUN_END listener). Additive.
   const progression = await createProgressionService(game, { levels: game.registry.get(REG.CONTENT).progression });
   game.registry.set(REG.PROGRESSION, progression);
+  // Profile entitlement is not available during initial AudioSynth
+  // construction. Reapply once progression has loaded it so saved,
+  // purchased vocal enablement is honored on a new browser session.
+  game.registry.get(REG.AUDIO).applySettings(settings);
   // W2: missions. The service is created after progression so it can borrow the already-loaded
   // profile store, and it is attached to progression BEFORE RUN_END can fire (both happen during
   // preload, before TitleScene exists). Additive.

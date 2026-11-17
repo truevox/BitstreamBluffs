@@ -63,10 +63,13 @@ const IDB_TIMEOUT_MS = 2500;
 /** @returns {Settings} defaults. */
 export function defaultSettings() {
   return {
-    version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, screenShake: true,
+    version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, windVolume: 1, screenShake: true,
     palette: 'default', touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
     dynamicOrchestra: false,
+    musicVocals: false,
+    vocalGain: 1,
+    melodyWithVocalsGain: 0.18,
   };
 }
 
@@ -89,6 +92,7 @@ export function sanitizeSettings(raw) {
     masterVolume: num(raw.masterVolume, d.masterVolume, 0, 1),
     musicVolume: num(raw.musicVolume, d.musicVolume, 0, 1),
     sfxVolume: num(raw.sfxVolume, d.sfxVolume, 0, 1),
+    windVolume: num(raw.windVolume, d.windVolume, 0, 1),
     screenShake: typeof raw.screenShake === 'boolean' ? raw.screenShake : d.screenShake,
     palette: raw.palette === 'colorblind' || raw.palette === 'default' ? raw.palette : d.palette,
     touchOverlay: ['auto', 'on', 'off'].includes(raw.touchOverlay) ? raw.touchOverlay : d.touchOverlay,
@@ -96,6 +100,9 @@ export function sanitizeSettings(raw) {
     lastInitials: str(raw.lastInitials).slice(0, INITIALS_MAX),
     musicEnabledSongs: sanitizeSongSelection(raw.musicEnabledSongs),
     dynamicOrchestra: typeof raw.dynamicOrchestra === 'boolean' ? raw.dynamicOrchestra : false,
+    musicVocals: raw.musicVocals === true,
+    vocalGain: num(raw.vocalGain, d.vocalGain, 0, 1),
+    melodyWithVocalsGain: num(raw.melodyWithVocalsGain, d.melodyWithVocalsGain, 0, 1),
   };
 }
 

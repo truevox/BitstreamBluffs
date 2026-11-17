@@ -89,6 +89,8 @@ export class StemMusicDirector {
 	applySettings(settings) {
 		if (!settings) return;
 		this.musicCaptions = settings.musicCaptions === true;
+		this.vocalGain = clamp(Number(settings.vocalGain ?? 1),0,1);
+		this.melodyWithVocalsGain = clamp(Number(settings.melodyWithVocalsGain ?? 0.18),0,1);
 		this.setVocals(settings.musicVocals === true);
 		this.setSongSelection(settings.musicEnabledSongs);
 		this.setDynamicOrchestra(settings.dynamicOrchestra === true);
@@ -170,7 +172,7 @@ export class StemMusicDirector {
 
 	setVocals(on) {
 		this.vocals = !!on;
-		this.mixer?.setGain('vocals', this.vocals ? 1 : 0, { time: 0.03 });
+		this.mixer?.setGain('vocals', this.vocals ? (this.vocalGain ?? 1) : 0, { time: 0.03 });
 		this._refreshVoices();
 	}
 
@@ -197,7 +199,9 @@ export class StemMusicDirector {
 		for (const name of this.gains.keys()) {
 			if (!name.startsWith('voice:')) continue;
 			// Maxi's real voice replaces most of the synthetic melodic lead when enabled.
-			this.mixer.setGain(name, name === active ? (this.vocals ? 0.18 : 1) : 0, { time: 0.22 });
+			this.mixer.setGain(name,name === active ?
+				(this.vocals ? (this.melodyWithVocalsGain ?? .18) : 1) : 0,
+				{ time: 0.22 });
 		}
 	}
 
@@ -531,6 +535,41 @@ export class StemMusicDirector {
 				else sleepSafe(this._fetchSource(info, i, name, token));
 			}
 		}
+	}
+
+	/** Real-engine passage seek used by the in-game lab.
+	 * This changes the actual WebAudio clock anchor, invalidates pending
+	 * network/decoder requests, and reconfigures adaptive replacement
+	 * instruments at the same sample position. Never creates a second
+	 * score or playback engine. It does not affect persistent settings.
+	 */
+	seekTo(seconds) {
+		if (!this.started || !this.pack || !this.ctx ||
+			this.ctx.state !== 'running') return false;
+		if (!Number.isFinite(seconds)) return false;
+		const position = clamp(seconds, 0, Math.max(0, this.pack.duration-0.1));
+		const t = this.ctx.currentTime;
+		this.bus.gain.cancelScheduledValues(t);
+		this.bus.gain.setTargetAtTime(0,t,.007);
+		++this._token; // all older fetches are now stale
+		for(const src of this.activeNodes){
+			try {src.stop(t+.014);} catch {}
+		}
+		this.activeNodes.clear();
+		this.scheduled.clear();
+		this.inflight.clear();
+		this._nextPromise=null;
+		this._nextIndex=null;
+		this.clockStart=t+.085-position;
+		this.adaptive?.reset();
+		this.adaptive?.configure(this.pack,this.clockStart,{
+			biome:this.biome,airborne:this.airborne,
+		});
+		this.adaptive?.setEnabled(this.dynamicOrchestra);
+		this._syncAdaptiveUserLevels();
+		this.bus.gain.setTargetAtTime(1,t+.045,.018);
+		this._pump();
+		return true;
 	}
 
 	stop() {

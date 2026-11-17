@@ -177,7 +177,7 @@ export function defaultProfile() {
     },
     // W5: `titles` holds achievement title rewards. It is present from the start so a fresh profile and a
     // reloaded one have the identical shape — a missing key would make the two disagree on first save.
-    unlocked: { biomes: [], cosmetics: [], titles: [], boosts: {} },
+    unlocked: { biomes: [], cosmetics: [], titles: [], boosts: {}, musicVocals: false },
     equipped: { trail: 'default', glow: 'default', rider: 'default', theme: 'default', title: 'default' },
     biomeMask: 0,
     // W4 loadout: which boosts are switched ON for the next run. Separate from `unlocked.boosts`, which

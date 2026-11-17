@@ -555,8 +555,12 @@ export class AudioSynth {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
           sfxVolume: clamp01(Number(settings.sfxVolume)),
+          windVolume: clamp01(Number(settings.windVolume ?? 1)),
+          vocalGain: clamp01(Number(settings.vocalGain ?? 1)),
+          melodyWithVocalsGain: clamp01(Number(settings.melodyWithVocalsGain ?? 0.18)),
           musicEnabledSongs: sanitizeSongSelection(settings.musicEnabledSongs),
-          musicVocals: settings.musicVocals === true,
+          musicVocals: settings.musicVocals === true &&
+            this.game?.registry?.get(REG.PROFILE)?.unlocked?.musicVocals === true,
           musicCaptions: settings.musicCaptions === true,
           dynamicOrchestra: settings.dynamicOrchestra === true,
         };
@@ -573,7 +577,7 @@ export class AudioSynth {
             this._startScheduler();
           }
         }
-        for (const k of ['masterVolume','musicVolume','sfxVolume']) {
+        for (const k of ['masterVolume','musicVolume','sfxVolume','windVolume','vocalGain','melodyWithVocalsGain']) {
           if (Number.isNaN(this.settings[k])) this.settings[k] = 0.8;
         }
       }
@@ -582,6 +586,11 @@ export class AudioSynth {
       this.nodes.master.gain.setTargetAtTime(this.settings.masterVolume, t, 0.02);
       this.nodes.musicBus.gain.setTargetAtTime(this.settings.musicVolume * 0.55, t, 0.02);
       this.nodes.sfxBus.gain.setTargetAtTime(this.settings.sfxVolume * 0.9, t, 0.02);
+      // Wind/hiss is independent of both musical playback and the SFX
+      // slider. Changing its dedicated slider updates the running loop.
+      this.nodes.windGain.gain.setTargetAtTime(
+        (this._paused ? 0 : 1) * Math.pow(this._windSpeed || 0,1.6) *
+          0.22 * this.settings.windVolume,t,0.08);
     } catch (e) { /* ignore */ }
   }
 
@@ -626,8 +635,11 @@ export class AudioSynth {
       this._speedIntensity = s;
       this._stemMusic?.setSpeed(pxPerSec);
       const t = this.ctx.currentTime;
-      const on = this._musicWanted ? 1 : 0;
-      this.nodes.windGain.gain.setTargetAtTime(on * Math.pow(s, 1.6) * 0.22, t, 0.12);
+      this._windSpeed = s;
+      // The sled wind is an environmental effect, never music.
+      // Selecting no songs must NOT silence the sled whoosh.
+      this.nodes.windGain.gain.setTargetAtTime(
+        Math.pow(s, 1.6) * 0.22 * (this.settings.windVolume ?? 1),t,0.12);
       this.nodes.windFilter.frequency.setTargetAtTime(300 + s * 2600, t, 0.12);
       this._updateIntensity();
     } catch (e) { /* ignore */ }
