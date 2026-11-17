@@ -12,7 +12,7 @@ const palette = {
 };
 const state = {
 	catalog:null,song:'pope',biome:'debumont',
-	arrangement:'orchestra',terrain:'air',revision:'rhythm',vocals:false,
+	arrangement:'orchestra',terrain:'air',revision:'rhythm',accompaniment:'new',vocals:false,
 	ctx:null,master:null,main:null,voice:null,
 	playing:false,position:0,startClock:0,
 	request:0,vocalRequest:0,cache:new Map(),
@@ -36,6 +36,10 @@ function desiredPath(){
 	const song=getSong();
 	if(!song)throw new Error('Missing song');
 	if(state.arrangement==='original')return song.id+'/'+song.originalReference;
+	if(state.revision==='rhythm' && state.accompaniment!=='new'){
+		return 'revisions/accompaniment-'+state.accompaniment+'/'+song.id+'/'+
+			song.variants[state.biome][state.terrain];
+	}
 	const prefix=state.revision==='original'?'':('revisions/'+state.revision+'/');
 	return prefix+song.id+'/'+song.variants[state.biome][state.terrain];
 }
@@ -98,6 +102,10 @@ function flags(){
 		button.setAttribute('aria-pressed',String(button.dataset.revision===state.revision));
 		button.disabled=state.arrangement==='original';
 	}
+	for(const button of document.querySelectorAll('#accompaniment button[data-accompaniment]')){
+		button.setAttribute('aria-pressed',String(button.dataset.accompaniment===state.accompaniment));
+		button.disabled=state.arrangement==='original'||state.revision!=='rhythm';
+	}
 	for(const [button,active] of [
 		['original',state.arrangement==='original'],
 		['new',state.arrangement==='orchestra'],
@@ -118,10 +126,15 @@ function display(){
 	if(!song||!biome)return;
 	$('orchestra').textContent=biome.orchestra;
 	$('description').textContent=biome.description;
-	$('sourceInfo').textContent='Featured original source: '+song.featured.toUpperCase()
+	$('sourceInfo').textContent='Re-performed featured stem: '+song.featured.toUpperCase()
 		+' • '+song.unselectedPreserved.map(name=>name.toUpperCase()).join(' + ')
-		+' stay original • '+(song.excerptStartSeconds/60).toFixed(2)
-		+' min source excerpt';
+		+' are ALWAYS original • '+song.excerptStartSeconds.toFixed(0)
+		+'s source start';
+	const status={stock:'Original Guitar + Piano + Other, unchanged at source timing.',
+		new:'Current re-performance of '+song.featured.toUpperCase()+'; the other two are stock.',
+		aligned:'Experimental source-transient retiming of '+song.featured.toUpperCase()+
+			'; same notes/timbres. Not human-verified.'};
+	$('accompExplanation').textContent=status[state.accompaniment];
 	for(const button of $('biomes').querySelectorAll('button[data-biome]')){
 		button.setAttribute('aria-pressed',String(button.dataset.biome===state.biome));
 	}
@@ -218,6 +231,12 @@ function changeRevision(version){
 	flags();
 	if(state.arrangement==='orchestra')swap();
 }
+function changeAccompaniment(mode){
+	if(!['stock','new','aligned'].includes(mode)||state.accompaniment===mode)return;
+	state.accompaniment=mode;
+	display();
+	if(state.arrangement==='orchestra'&&state.revision==='rhythm')swap();
+}
 function changeTerrain(mode){
 	if(state.terrain===mode)return;
 	state.terrain=mode;
@@ -281,6 +300,9 @@ async function init(){
 		$('song').addEventListener('change',event=>changeSong(event.target.value));
 		for(const button of document.querySelectorAll('#versions button[data-revision]')){
 			button.addEventListener('click',()=>changeRevision(button.dataset.revision));
+		}
+		for(const button of document.querySelectorAll('#accompaniment button[data-accompaniment]')){
+			button.addEventListener('click',()=>changeAccompaniment(button.dataset.accompaniment));
 		}
 		$('original').addEventListener('click',()=>changeArrangement('original'));
 		$('new').addEventListener('click',()=>changeArrangement('orchestra'));

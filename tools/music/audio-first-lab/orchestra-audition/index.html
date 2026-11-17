@@ -83,6 +83,13 @@ a{color:var(--accent)}
 <button id="original" aria-pressed="false">Original instrumental</button>
 <button id="new" aria-pressed="true">Biome orchestra</button>
 </div>
+<div class="label">Guitar / Piano / Other — hold all other buses steady</div>
+<div class="mode" id="accompaniment" role="group" aria-label="Accompaniment comparison">
+<button data-accompaniment="stock" aria-pressed="false">Stock trio</button>
+<button data-accompaniment="new" aria-pressed="true">Current orchestra</button>
+<button data-accompaniment="aligned" aria-pressed="false">Timing candidate</button>
+</div>
+<p class="role" id="accompExplanation">Switch only the source-derived accompaniment; melody, bass, and selected drums stay the same.</p>
 <div class="label">Terrain phase</div>
 <div class="mode">
 <button id="ground" aria-pressed="false">🛷 Ground drums</button>
@@ -100,10 +107,10 @@ a{color:var(--accent)}
 <div><b>Custom sound design</b>New FM, resonator and modal instruments complement samples.</div>
 <div><b>Pyramid Peak protected</b>The approved lead source recording was not modified.</div>
 </div>
-<div class="note"><strong>Four useful comparisons:</strong> First pass = the original render. Timing / envelopes = original timbres with corrected note releases. Distinct orchestra = new instrument construction and biome percussion. <strong>High-speed drums</strong> = the same redesigned pitched instruments and EXACT same ground mix, but airborne drum kits now use a 5.8 ms onset analysis grid, preserve simultaneous hits and fast rolls, and trigger foley from the same source events without the old 160 ms restriction. Drum transcription and pitched accompaniment remain unapproved; this is a research audition, not a final score.</div>
+<div class="note"><strong>Three clean accompaniment comparisons:</strong> Stock trio plays all three original Guitar/Piano/Other stems. Current orchestra replaces only the featured stem (Other for Pope; Piano for One More Run). Timing candidate retains that replacement sound but gently moves selected note clusters toward source-stem attacks (maximum 47ms). All three preserve the SAME melody, bass, and selected Ground or High-speed Air kit. These controls work with the High-speed drums revision; selecting any earlier revision temporarily disables them. The original full-song instrumental A/B above is a DIFFERENT, broader comparison. All audio is still experimental, not artist-approved.</div>
 </section>
 </div>
 <footer>Private Tailnet listening session • Existing <a href="http://100.115.120.66:8185/">A/B archive at :8185</a> remains untouched.</footer>
 </main>
-<script type="module" src="./app.js?revision=3"></script>
+<script type="module" src="./app.js?revision=4"></script>
 </body></html>

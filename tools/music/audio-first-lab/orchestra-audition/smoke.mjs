@@ -21,6 +21,10 @@ for (const song of catalog.songs) {
 		paths.add('/revisions/'+revision+'/'+song.id+'/'+song.originalReference);
 		paths.add('/revisions/'+revision+'/'+song.id+'/'+song.vocals);
 	}
+	for (const style of ['stock','aligned']) {
+		paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+song.originalReference);
+		paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+song.vocals);
+	}
 	for (const biome of catalog.biomes) {
 		const variant = song.variants[biome.id];
 		assert.ok(variant);
@@ -28,6 +32,9 @@ for (const song of catalog.songs) {
 			paths.add('/'+song.id+'/'+variant[role]);
 			for (const revision of ['articulation','orchestral','rhythm']) {
 				paths.add('/revisions/'+revision+'/'+song.id+'/'+variant[role]);
+			}
+			for (const style of ['stock','aligned']) {
+				paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+variant[role]);
 			}
 		}
 	}
@@ -77,6 +84,14 @@ try {
 	await page.waitForFunction(() => window.orchestraDebug.state.revision==='orchestral',null,{timeout:14000});
 	await page.click('button[data-revision="rhythm"]');
 	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/rhythm/pope/debumont-air.ogg'),null,{timeout:14000});
+	// The three controls preserve the lead, bass and selected drum kit.
+	await page.click('button[data-accompaniment="stock"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-stock/pope/debumont-air.ogg'),null,{timeout:14000});
+	assert.equal(await page.locator('button[data-accompaniment="stock"]').getAttribute('aria-pressed'),'true');
+	await page.click('button[data-accompaniment="aligned"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-aligned/pope/debumont-air.ogg'),null,{timeout:14000});
+	await page.click('button[data-accompaniment="new"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.accompaniment==='new',null,{timeout:14000});
 	await page.click('#original');
 	await page.waitForFunction(() =>
 		window.orchestraDebug.state.cache.has('pope/original-instrumental.ogg'),
@@ -107,6 +122,11 @@ try {
 			window.orchestraDebug.state.cache.has('revisions/rhythm/one-more-run/'+b+'-air.ogg'),
 			biome,{timeout:14000});
 	}
+	await page.click('button[data-accompaniment="stock"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-stock/one-more-run/vertigo-vents-air.ogg'),null,{timeout:14000});
+	await page.click('button[data-accompaniment="aligned"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-aligned/one-more-run/vertigo-vents-air.ogg'),null,{timeout:14000});
+	await page.click('button[data-accompaniment="new"]');
 	await page.locator('#seek').fill('15');
 	await page.locator('#seek').dispatchEvent('change');
 	await page.waitForFunction(() =>
