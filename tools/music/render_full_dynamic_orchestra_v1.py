@@ -224,27 +224,15 @@ def render_drums(events,biome,frames):
 	return out
 
 def encode_segments(audio,dest,stem_name,segments):
-	"""Encode discrete exact 12-second *sample-counted* clips from a
-	newly rendered WAV array. No source stem is modified."""
-	dest.mkdir(parents=True,exist_ok=True)
-	peak=float(np.max(np.abs(audio)))
-	if peak>.78:audio=audio*(.78/peak)
-	# Pipe continuous stereo to one libopus encoder with exact 12-second
-	# 20ms frames. Forced file transitions at the 12s grid, native Ogg.
-	segment_time=segments[0]['frames']/RATE
-	pattern=str(dest/(stem_name+'-%04d.ogg'))
-	cmd=['ffmpeg','-v','error','-nostdin','-f','f32le','-ar','48000','-ac','2',
-		'-i','pipe:0','-c:a','libopus','-b:a','52k','-application','audio',
-		'-frame_duration','20','-f','segment','-segment_time',str(segment_time),
-		'-reset_timestamps','1',pattern]
-	p=subprocess.run(cmd,input=audio.astype('<f4').tobytes(),
-		capture_output=True,timeout=180)
-	if p.returncode:
-		raise RuntimeError(p.stderr.decode(errors='replace')[-500:])
-	files=sorted(dest.glob(stem_name+'-*.ogg'))
-	if len(files)!=len(segments):
-		raise ValueError(f'Unexpected segment files: {len(files)} vs {len(segments)} in {dest}')
-	return [f.name for f in files]
+	"""Sample-exact independent Opus files, never ffmpeg segment muxer.
+
+	Each file starts a NEW encoder so Opus pre-skip and end-granule trimming
+	apply to its own exact source frames. Real decoded PCM count MUST match
+	the corresponding pack.json segment length, including a partial tail.
+	"""
+	from opus_exact_segments import encode_exact_segments
+	return encode_exact_segments(audio,dest,stem_name,segments,rate=RATE,bitrate='52k')
+
 
 def run(a):
 	if a.out.exists():raise FileExistsError(a.out)

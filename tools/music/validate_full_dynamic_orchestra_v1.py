@@ -33,6 +33,14 @@ def probe(file):
 	assert stream['channels']==2
 	return float(data['format']['duration'])
 
+def decoded_frames(file):
+	p=subprocess.run(['ffmpeg','-v','error','-nostdin','-i',str(file),
+		'-ac','2','-ar','48000','-f','s16le','pipe:1'],
+		capture_output=True,check=True,timeout=30)
+	assert len(p.stdout)%4==0, ('Corrupt decoded audio',file)
+	return len(p.stdout)//4
+
+
 def validate(music,baseline):
 	catalog=json.loads((music/'catalog.json').read_text())
 	assert catalog['format']=='bitstream-music-catalog-v1'
@@ -93,8 +101,10 @@ def validate(music,baseline):
 					name=(seg['sources']['voice:'+biome] if role=='melody' else
 						pack['adaptive']['variants'][role][biome][idx])
 					full=music/Path(track['manifest']).parent/name
-					duration=probe(full)
-					assert required-.04<=duration<=required+.06,(full,required,duration)
+					actual_frames=decoded_frames(full)
+					assert actual_frames==seg['frames'], (
+						full,'decoded',actual_frames,'required',seg['frames'])
+					assert probe(full)>0
 		report['songs'].append({'id':track['id'],'duration':pack['frameCount']/48000,
 			'segments':n,'originalStems':len(STEMS),
 			'biomes':len(BIOMES),'reperformedRoles':list(ROLES)})
