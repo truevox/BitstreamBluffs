@@ -61,6 +61,8 @@ export const EVT = Object.freeze({
   GAME_RESUME: 'bb:gameResume',
   /** Emitter: helper updateSetting() in src/services.js ONLY. Payload: SettingsChangedPayload. */
   SETTINGS_CHANGED: 'bb:settingsChanged',
+  /** Emitter: StemMusicDirector. Payload {id,title}; fired for each actually started track. */
+  MUSIC_TRACK_CHANGED: 'bb:musicTrackChanged',
   /**
    * Emitter: InputRouter. Edge-triggered discrete input (press/release) for UI + one-shot actions.
    * Payload: InputActionPayload. Continuous control is read by polling InputRouter.poll() instead.

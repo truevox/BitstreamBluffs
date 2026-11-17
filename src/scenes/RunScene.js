@@ -767,6 +767,7 @@ export class RunScene extends Phaser.Scene {
         if (sled.hopPulse) audio.playSfx('hop');
         if (sled.pushPulse) audio.playSfx('push');
         if (audio.setSpeed) audio.setSpeed(sled.speed);
+        if (audio.setAirborne) audio.setAirborne(!sled.grounded);
       } catch (e) { /* audio must never break the loop */ }
     }
     if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict

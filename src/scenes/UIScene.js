@@ -23,7 +23,7 @@ import { missionToastText, stripToastText } from '../ui/MissionsUi.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText, strokeRectPx } from '../ui/Neon.js';
-import { measureText } from '../ui/PixelFont.js';
+import { measureText, ellipsize } from '../ui/PixelFont.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { fmtInt, fmtMult, fmtSec, idToLabel } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
@@ -224,6 +224,7 @@ export class UIScene extends Phaser.Scene {
     on(EVT.FLOW_LOST, this.onFlowLost);
     // W2: toast the moment a mission is met, not just at run end.
     on(EVT.MISSION_COMPLETED, this.onMissionCompleted);
+    on(EVT.MUSIC_TRACK_CHANGED, this.onMusicTrackChanged);
 
     const cleanup = () => {
       for (const [evt, fn] of this.listeners) this.game.events.off(evt, fn, this);
@@ -700,6 +701,14 @@ export class UIScene extends Phaser.Scene {
     if (!p || !p.name) return;
     if (p.entering) this._strip(p.name.toUpperCase(), 'magenta');
     else this._strip('BITSTREAM', 'cyan');
+  }
+
+  onMusicTrackChanged(payload) {
+    if (!payload || !payload.title) return;
+    // Existing serialized strip queue handles overlap with biome and
+    // achievement announcements. No recurring toast for every segment.
+    this._strip(ellipsize('▶ NOW PLAYING: ' + String(payload.title).toUpperCase(), GAME_WIDTH - 24),
+      'cyan', { timing: { inMs: 200, holdMs: 1850, outMs: 260 } });
   }
 
   onNewBest() {

@@ -24,6 +24,8 @@
  */
 import { EVT } from '../events.js';
 import { Rng } from './Rng.js';
+import { StemMusicDirector } from './music/StemMusicDirector.js';
+import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
 
 /** SFX names playSfx() must support (callers outside the engineer's files may use these). */
 export const SFX = Object.freeze([
@@ -82,6 +84,15 @@ export class AudioSynth {
     this._gameListeners = [];
     this._domListeners = [];
     this._destroyed = false;
+    this._stemMusic = new StemMusicDirector(this);
+    this._stemMusic.onReady = () => {
+      if (this._musicWanted && hasEnabledSongs(this.settings.musicEnabledSongs)) {
+        this._activateStemMusic();
+      }
+    };
+    this._stemMusic.onTrackStarted = (track) => {
+      this.game?.events?.emit(EVT.MUSIC_TRACK_CHANGED, { id: track.id, title: track.title });
+    };
     this._bind();
   }
 
@@ -101,6 +112,7 @@ export class AudioSynth {
         on(EVT.LANDING, (p) => this._onLanding(p));
         on(EVT.TRICK, (p) => this.playSfx('trick', { pitch: 1 + Math.min(0.5, ((p && p.count) || 1) * 0.08 - 0.08) }));
         on(EVT.COMBO_CHANGED, (p) => {
+          this._stemMusic?.setCombo(p?.multiplier || 1);
           if (p && p.reason === 'trick' && p.multiplier > 1) {
             this.playSfx('combo', { pitch: 1 + Math.min(1, (p.multiplier - 1) * 0.25) });
           }
@@ -120,6 +132,7 @@ export class AudioSynth {
           else if (p.effect === 'scramble') this.playSfx('hazardScramble');
         });
         on(EVT.ZONE_ENTER, () => this.playSfx('uiMove', { pitch: 0.5, volume: 0.5 }));
+        on(EVT.BIOME_ENTER, (p) => this._stemMusic?.setBiome(p?.id || 'bitstream-bluffs'));
         on(EVT.GLITCH_START, (p) => { if (p) this.glitch(p.kind, p.durationMs, p.intensity); });
         on(EVT.DISTANCE_CHANGED, (p) => {
           this._distIntensity = clamp01(((p && p.meters) || 0) / 2000);
@@ -256,6 +269,10 @@ export class AudioSynth {
     n.staticGain.connect(n.master);
     n.staticSrc.start();
     this.nodes = n;
+    // The rendered stem director connects DIRECTLY into the legacy music
+    // filter, bypassing muted procedural musicSrc but retaining volume, SFX
+    // ducking, pause low-pass, glitch bus, master and compressor.
+    this._stemMusic?.attach(c, n.musicFilter);
   }
 
   /**
@@ -291,7 +308,9 @@ export class AudioSynth {
       }
       this._domListeners = this._domListeners.filter((d) => d[1] === 'visibilitychange');
     }
-    if (this._musicWanted && !this._musicTimer) this._startScheduler();
+    if (this._musicWanted && hasEnabledSongs(this.settings.musicEnabledSongs)) {
+      if (!this._activateStemMusic() && !this._musicTimer) this._startScheduler();
+    }
   }
 
   /** @returns {boolean} */
@@ -536,8 +555,26 @@ export class AudioSynth {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
           sfxVolume: clamp01(Number(settings.sfxVolume)),
+          musicEnabledSongs: sanitizeSongSelection(settings.musicEnabledSongs),
+          musicVocals: settings.musicVocals === true,
+          musicCaptions: settings.musicCaptions === true,
         };
-        for (const k of Object.keys(this.settings)) if (Number.isNaN(this.settings[k])) this.settings[k] = 0.8;
+        this._stemMusic?.applySettings(this.settings);
+        // The owner-defined all-off state is TRUE SILENCE, including
+        // muting the procedural synth. SFX uses a separate bus.
+        if (!hasEnabledSongs(this.settings.musicEnabledSongs)) {
+          if (this._musicTimer) clearInterval(this._musicTimer);
+          this._musicTimer = null;
+          this._stemMusic?.stop();
+          if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
+        } else if (this._musicWanted && this.ctx) {
+          if (!this._activateStemMusic() && !this._musicTimer && this.ctx.state === 'running') {
+            this._startScheduler();
+          }
+        }
+        for (const k of ['masterVolume','musicVolume','sfxVolume']) {
+          if (Number.isNaN(this.settings[k])) this.settings[k] = 0.8;
+        }
       }
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
@@ -586,6 +623,7 @@ export class AudioSynth {
       if (!this._ready() || this._paused) return;
       const s = clamp01((Number(pxPerSec) || 0) / 1000);
       this._speedIntensity = s;
+      this._stemMusic?.setSpeed(pxPerSec);
       const t = this.ctx.currentTime;
       const on = this._musicWanted ? 1 : 0;
       this.nodes.windGain.gain.setTargetAtTime(on * Math.pow(s, 1.6) * 0.22, t, 0.12);
@@ -608,9 +646,37 @@ export class AudioSynth {
     this._intensity = clamp01(this._distIntensity * 0.75 + this._speedIntensity * 0.35);
   }
 
+  /** Stem phase follows the actual sled state, independently of tempo. */
+  setAirborne(value) {
+    this._stemMusic?.setAirborne(value);
+  }
+
   // ----------------------------------------------------------------------------------------------------------- music
 
-  /**
+  /** Start selected six-stem soundtrack; fall back to procedural only
+   * when a song IS selected but its pack cannot be loaded. */
+  _activateStemMusic() {
+    if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+    const player = this._stemMusic;
+    if (!player || !player.ready || !this.ctx || !this.nodes) return false;
+    player.attach(this.ctx, this.nodes.musicFilter);
+    player.applySettings(this.settings);
+    if (!player.start()) return false;
+    if (this._musicTimer) clearInterval(this._musicTimer);
+    this._musicTimer = null;
+    this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
+    return true;
+  }
+
+  /** Failure of a pack load only falls back to procedural when some
+   * songs remain selected, never in the all-off state. */
+  musicProviderFailed() {
+    if (!this._musicWanted || !hasEnabledSongs(this.settings.musicEnabledSongs)) return;
+    if (this.ctx?.state === 'running' && !this._musicTimer) this._startScheduler();
+  }
+
+  /** Full soundtrack and synth fallback are both muted if no tracks selected.
+   *
    * Start the FM-ish music loop. Deterministic per seed (arrangement chosen from Rng(seed).fork('music')).
    * @param {string} seed
    * @returns {void}
@@ -620,6 +686,13 @@ export class AudioSynth {
       this._musicSeed = String(seed == null ? '' : seed);
       this._musicWanted = true;
       this._arrCache.clear();
+      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) {
+        this._stemMusic?.stop();
+        if (this._musicTimer) clearInterval(this._musicTimer);
+        this._musicTimer = null;
+        if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
+        return;
+      }
       const base = new Rng(this._musicSeed).fork('music');
       this._baseBpm = 118 + base.int(0, 14);
       const order = [0, 1, 2, 3];
@@ -633,6 +706,7 @@ export class AudioSynth {
       this._speedIntensity = 0;
       this._updateIntensity();
       if (!this._ensureCtx()) return;
+      if (this._activateStemMusic()) return;
       const t = this.ctx.currentTime;
       this.nodes.musicSrc.gain.cancelScheduledValues(t);
       this.nodes.musicSrc.gain.setTargetAtTime(this._paused ? 0.45 : 1, t, 0.04);
@@ -647,6 +721,7 @@ export class AudioSynth {
   stopMusic() {
     try {
       this._musicWanted = false;
+      this._stemMusic?.stop();
       if (this._musicTimer) clearInterval(this._musicTimer);
       this._musicTimer = null;
       if (this.nodes) {
@@ -671,7 +746,8 @@ export class AudioSynth {
   }
 
   _tickMusic() {
-    if (!this._ready() || !this._musicWanted) return;
+    if (!this._ready() || !this._musicWanted ||
+      !hasEnabledSongs(this.settings.musicEnabledSongs) || this._stemMusic?.started) return;
     const c = this.ctx;
     if (this._nextTime < c.currentTime - 0.1) this._nextTime = c.currentTime + 0.05; // fell behind (tab throttled)
     while (this._nextTime < c.currentTime + 0.22) {
@@ -836,6 +912,7 @@ export class AudioSynth {
     this._destroyed = true;
     try {
       this.stopMusic();
+      this._stemMusic?.destroy();
       for (const [t, type, fn, opt] of this._domListeners) t.removeEventListener(type, fn, opt);
       this._domListeners = [];
       const ev = this.game && this.game.events;

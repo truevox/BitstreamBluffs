@@ -7,6 +7,7 @@
 import Phaser from 'phaser';
 import { REG, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
 import { updateSetting } from '../services.js';
+import { GAME_SONGS } from '../systems/music/MusicPlaylist.js';
 import { Panel } from './Panel.js';
 import { NeonText } from './Neon.js';
 import { Button } from './Button.js';
@@ -185,7 +186,7 @@ export class LeaderboardView extends View {
 export class SettingsView extends View {
   /** @param {Phaser.Scene} scene @param {import('./Theme.js').Theme} theme @param {{onClose:function():void}} o */
   constructor(scene, theme, o) {
-    super(scene, theme, { w: 320, h: 186, title: 'SETTINGS', color: 'amber', onClose: o.onClose, y: 40, backLabel: 'DONE' });
+    super(scene, theme, { w: 360, h: 244, title: 'SETTINGS', color: 'amber', onClose: o.onClose, y: 12, backLabel: 'DONE' });
     const game = scene.game;
     const s = () => game.registry.get(REG.SETTINGS) || {};
     const items = [
@@ -196,12 +197,20 @@ export class SettingsView extends View {
       { kind: 'slider', label: 'MASTER VOLUME', get: () => s().masterVolume, set: (v) => updateSetting(game, 'masterVolume', v) },
       { kind: 'slider', label: 'MUSIC VOLUME', get: () => s().musicVolume, set: (v) => updateSetting(game, 'musicVolume', v) },
       { kind: 'slider', label: 'SFX VOLUME', get: () => s().sfxVolume, set: (v) => updateSetting(game, 'sfxVolume', v) },
+      ...GAME_SONGS.map(song => ({
+        kind: 'choice', label: '▶ ' + song.label,
+        options: [{ value: true, label: 'ON' }, { value: false, label: 'OFF' }],
+        get: () => s().musicEnabledSongs?.[song.id] !== false,
+        set: (v) => updateSetting(game, 'musicEnabledSongs', {
+          ...(s().musicEnabledSongs || {}), [song.id]: v,
+        }),
+      })),
       { kind: 'choice', label: 'TILT CONTROLS (90)', options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
         get: () => !!s().touchRotate90, set: (v) => updateSetting(game, 'touchRotate90', v) },
       { kind: 'choice', label: 'TOUCH BUTTONS', options: [{ value: 'auto', label: 'AUTO' }, { value: 'on', label: 'ON' }, { value: 'off', label: 'OFF' }],
         get: () => s().touchOverlay || 'auto', set: (v) => updateSetting(game, 'touchOverlay', v) },
     ];
-    this.menu = new MenuList(scene, theme, { x: 10, y: 22, w: 300, rowH: 16, items, color: 'amber', parent: this.panel });
+    this.menu = new MenuList(scene, theme, { x: 10, y: 22, w: 340, rowH: 16, items, color: 'amber', parent: this.panel });
     this.panel.add(new NeonText(scene, theme, 104, this.h - 17, 'PALETTE PREVIEW', { color: 'text', outline: 'none' }).setAlpha(0.5));
     this.swatch = scene.add.graphics();
     this.panel.add(this.swatch);
