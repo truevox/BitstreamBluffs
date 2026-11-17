@@ -134,8 +134,18 @@ export function normalizePack(raw) {
 			layers[name] = level;
 		}
 	}
-		const captions = raw.captions === undefined ? null : raw.captions;
+	const captions = raw.captions === undefined ? null : raw.captions;
 	if (captions !== null && !safePath(captions)) throw new Error('Invalid caption asset');
+	// This is diagnostic metadata. It never changes normal playback routing.
+	// An explicit expected content hash ties the score to this song revision.
+	const score=raw.performance;
+	if(score!==undefined && (!score||typeof score!=='object'||
+		Array.isArray(score)||!safePath(score.path)||
+		!/^[0-9a-f]{64}$/.test(score.scoreHash)))
+		throw new Error('Invalid performance score asset');
+	const performance=score===undefined?null:{
+		path:score.path,scoreHash:score.scoreHash,
+	};
 	const tempo = Number(raw.tempo);
 	const beat = Number.isFinite(tempo) && tempo >= 30 && tempo <= 350 ? tempo : null;
 	return {
@@ -150,6 +160,7 @@ export function normalizePack(raw) {
 		roomSends,
 		layers,
 		adaptive: normalizeAdaptive(raw.adaptive, segments.length),
+		performance,
 		captions,
 		bpm: beat,
 	};

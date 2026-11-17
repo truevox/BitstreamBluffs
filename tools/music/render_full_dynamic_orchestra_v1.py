@@ -20,6 +20,7 @@ from scipy.signal import find_peaks, resample_poly
 from scipy.ndimage import median_filter
 
 import render_biome_orchestras_v2 as orchestra
+from performance_v1 import read as read_performance, verify_origin, verify_melody_audit, to_legacy, STEMS
 
 RATE=48000
 SYNTH_RATE=24000
@@ -251,12 +252,31 @@ def run(a):
 			source['grouped_6s']['stemFiles'])
 		featured={'FEsxYVStla4':'other','local-one-more-run-bitstream-bluffs':'piano',
 			'WRBGQUqD54U':'guitar','FYImnz5-hXs':'other'}[track['id']]
-		print('EXTRACTING',track['id'],'featured',featured,flush=True)
-		feature_notes,fs=choose_feature_events(sample_mono(a.master/srcstem[featured]))
-		bass_notes,bs=choose_bass_events(sample_mono(a.master/srcstem['bass']))
-		drum_notes,ds=choose_drum_events(sample_mono(a.master/srcstem['drums']))
-		melody_notes=json.loads((a.melody_source/Path(track['manifest']).parent/
-			'melody-audit-private.json').read_text())['notes']
+		performance=None
+		if a.performance_root:
+			performance=read_performance(a.performance_root/Path(track['manifest']).parent/
+				'performance.json')
+			verify_origin(performance,track['id'],frames,featured,{
+				role:a.master/srcstem[role] for role in STEMS})
+			verify_melody_audit(performance,
+				a.melody_source/Path(track['manifest']).parent/
+				'melody-audit-private.json')
+			feature_notes=to_legacy(performance,featured)
+			bass_notes=to_legacy(performance,'bass')
+			drum_notes=to_legacy(performance,'drums')
+			melody_notes=to_legacy(performance,'melody')
+			fs=bs=ds={'method':'content-addressed-performance-v1'}
+			print('LOCKED_SCORE',track['id'],performance['scoreHash'],flush=True)
+		else:
+			if not a.legacy_direct_extraction:
+				raise ValueError('New releases require --performance-root; '
+					'legacy direct extraction needs explicit --legacy-direct-extraction')
+			print('LEGACY_UNVERSIONED_EXTRACTION',track['id'],flush=True)
+			feature_notes,fs=choose_feature_events(sample_mono(a.master/srcstem[featured]))
+			bass_notes,bs=choose_bass_events(sample_mono(a.master/srcstem['bass']))
+			drum_notes,ds=choose_drum_events(sample_mono(a.master/srcstem['drums']))
+			melody_notes=json.loads((a.melody_source/Path(track['manifest']).parent/
+				'melody-audit-private.json').read_text())['notes']
 		scores={'featured':feature_notes,'bass':bass_notes,'drums':drum_notes,
 			'melody':melody_notes}
 		relative=Path(track['manifest']).parent
@@ -275,6 +295,7 @@ def run(a):
 		report['songs'][track['id']]={'featuredStem':featured,
 			'noteCounts':{k:len(v) for k,v in scores.items()},
 			'extraction':{'featured':fs,'bass':bs,'drums':ds},
+			'scoreHash':performance['scoreHash'] if performance else None,
 			'biomes':len(BIOMES)}
 	(a.out/'private-audit.json').write_text(json.dumps(report,indent=2)+'\n')
 	print('TRUE_FULL_SONG_ORCHESTRA_COMPLETE',flush=True)
@@ -285,4 +306,9 @@ if __name__=='__main__':
 	p.add_argument('--source-packs',required=True,type=Path)
 	p.add_argument('--melody-source',required=True,type=Path)
 	p.add_argument('--out',required=True,type=Path)
+	group=p.add_mutually_exclusive_group(required=True)
+	group.add_argument('--performance-root',type=Path,
+		help='Root of immutable versioned performance-v1 song scores')
+	group.add_argument('--legacy-direct-extraction',action='store_true',
+		help='Historical reproduction ONLY; bypasses canonical score capture')
 	run(p.parse_args())

@@ -1321,5 +1321,9 @@
     }
   },
   "orchestraVersion": "provisional-full-reperformance-v2",
-  "scoreDisclaimer": "PRE-ALPHA: independently regenerated full-length melody, guitar, piano, other, bass, and airborne percussion. Onset/pitch detection is provisional and will be rerendered. Dynamic Orchestra defaults OFF: original six source stems (other than synthesized biome lead) stay intact; airborne drums and bass speed fades still operate."
+  "scoreDisclaimer": "PRE-ALPHA: independently regenerated full-length melody, guitar, piano, other, bass, and airborne percussion. Onset/pitch detection is provisional and will be rerendered. Dynamic Orchestra defaults OFF: original six source stems (other than synthesized biome lead) stay intact; airborne drums and bass speed fades still operate.",
+  "performance": {
+    "path": "performance.json",
+    "scoreHash": "de3cb9b095e183c9996b1edec22bc870f3d2bdbf3502c67615f9a687aa32529c"
+  }
 }

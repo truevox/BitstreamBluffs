@@ -27,21 +27,23 @@ try {
 		const g=window.__bbGame;
 		const title=g.scene.getScene('TitleScene');
 		title.menu.items.find(i=>i.label==='SETTINGS').onSelect();
-		const view=title.view;
-		const option=view.menu.items.find(i=>i.label==='DYNAMIC ORCHESTRA');
-		const all=view.menu.items.filter(i=>i.label.startsWith('▶ '));
-		const rowIndex=view.menu.items.indexOf(option);
-		const badge=view.menu.rows[rowIndex]?.badge;
+		const settings=title.view;
+		settings.menu.items.find(i=>i.label==='MANAGE SOUND').onSelect();
+		const sound=settings.soundView;
+		const option=sound.menu.items.find(i=>i.label==='DYNAMIC ORCHESTRA');
+		const all=sound.menu.items.filter(i=>i.label.startsWith('TRACK '));
+		const rowIndex=sound.menu.items.indexOf(option);
+		const badge=sound.menu.rows[rowIndex]?.badge;
 		return {dynamicPresent:!!option,dynamicDefault:option?.get(),
 			badgeText:badge?.main?.text,badgeVisible:!!badge?.visible,
-			badgeWithinRow:(view.menu.rows[rowIndex]?.badgeBox?.x +
-				view.menu.rows[rowIndex]?.badgeBox?.w) < view.menu.w-62,
-			fourSongs:all.length,rows:view.menu.items.length,
-			fits:22+(view.menu.items.length-1)*16+16 <view.h-22};
+			badgeWithinRow:(sound.menu.rows[rowIndex]?.badgeBox?.x +
+				sound.menu.rows[rowIndex]?.badgeBox?.w) < sound.menu.w-62,
+			fourSongs:all.length,rows:sound.menu.items.length,
+			fits:24+(sound.menu.items.length-1)*17+17 <sound.h-22};
 	});
 	assert.deepEqual(setup,{dynamicPresent:true,dynamicDefault:false,
 		badgeText:'PRE-ALPHA',badgeVisible:true,badgeWithinRow:true,
-		fourSongs:4,rows:12,fits:true});
+		fourSongs:4,rows:8,fits:true});
 	console.log('DYNAMIC_SETTINGS_VISIBLE_DEFAULT_OFF_PASS',setup);
 	await page.evaluate(()=>{
 		const g=window.__bbGame;

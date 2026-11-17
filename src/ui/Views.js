@@ -25,6 +25,9 @@ import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopIt
 import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
 import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
+import { resolveMusicAsset } from '../systems/music/MusicPack.js';
+import { validatePerformanceScore, nearbyPerformanceEvents,
+  makeIssueMarker, PERFORMANCE_ROLES } from '../systems/music/PerformanceScore.js';
 
 /** Base: centred panel with a BACK button. */
 class View {
@@ -396,20 +399,48 @@ export class SoundLabView extends View {
     this.speed=0;
     this.lab=null;
     this.request=0;
+    this.scoreRequest=0;
+    this.score=null;
+    this.scoreStatus='WAITING FOR SCORE MANIFEST';
+    this.markers=[]; // lab session only, not localStorage or profile
+    this.markerStatus='NO AUDIO OR GAME SAVES ARE CHANGED';
     this.sourceBus=null;
     this.prevBusVolume=null;
-    this.statusText=new NeonText(scene,theme,13,192,
+    this.statusText=new NeonText(scene,theme,13,188,
       'LOADING THE GAME MUSIC ENGINE...',{color:'amber',outline:'none'});
     this.panel.add(this.statusText);
-    this.clockText=new NeonText(scene,theme,13,205,
+    this.clockText=new NeonText(scene,theme,13,199,
       'SAMPLE-FRAME CHECK: WAITING FOR A DECODE',
       {color:'cyan',outline:'none'});
     this.panel.add(this.clockText);
-    this.infoText=new NeonText(scene,theme,13,220,
-      'SANDBOX: SCORES / SHARDS / SETTINGS NOT MODIFIED',
+    this.scoreText=new NeonText(scene,theme,13,210,
+      'SOURCE SCORE: WAITING FOR CAPTURED EVENTS',
+      {color:'amber',outline:'none'});
+    this.panel.add(this.scoreText);
+    this.infoText=new NeonText(scene,theme,13,221,
+      'SCORES ARE NOT GROUND TRUTH; MARKERS DO NOT CHANGE AUDIO',
       {color:'text',outline:'none'});
-    this.infoText.setAlpha(.6);
+    this.infoText.setAlpha(.7);
     this.panel.add(this.infoText);
+    // Touch/pointer buttons leave gamepad and the ten existing lab menu
+    // rows untouched. The normal View BACK button already occupies x392.
+    this.markButton=new Button(scene,theme,{
+      x:13,y:235,w:112,h:14,label:'MARK (M)',color:'amber',
+      onClick:()=>this._markIssue(),parent:this.panel,
+    });
+    this.exportButton=new Button(scene,theme,{
+      x:134,y:235,w:119,h:14,label:'EXPORT MARKS',color:'cyan',
+      onClick:()=>this._exportMarks(),parent:this.panel,
+    }).setDisabled(true);
+    this.clearButton=new Button(scene,theme,{
+      x:263,y:235,w:94,h:14,label:'CLEAR MARKS',color:'magenta',
+      onClick:()=>this._clearMarks(),parent:this.panel,
+    }).setDisabled(true);
+    this._markKey=event=>{
+      if(!this.alive||event?.repeat)return;
+      if(this.lab?.pack)this._markIssue();
+    };
+    scene.input?.keyboard?.on('keydown-M',this._markKey);
     this._build();
     this._openSandbox();
     this.tickTimer=scene.time.addEvent({delay:220,loop:true,callback:()=>this._tick()});
@@ -490,6 +521,7 @@ export class SoundLabView extends View {
       lab.onTrackStarted=track=>{
         this.songIndex=track.index;
         this._applySolo();
+        this._loadPerformanceScore(track.id);
         this.menu?.refresh();
       };
       lab.start();
@@ -500,7 +532,96 @@ export class SoundLabView extends View {
         'LAB UNAVAILABLE: '+ellipsize(String(e?.message||e),340));
     }
   }
+  async _loadPerformanceScore(id){
+    const generation=++this.scoreRequest;
+    this.score=null;
+    const lab=this.lab;
+    const scoreAsset=lab?.pack?.performance;
+    if(!scoreAsset){
+      this.scoreStatus='NO VERSIONED SCORE IN THIS GAME PACK';
+      this._tick();
+      return;
+    }
+    this.scoreStatus='CAPTURED SCORE LOADING';
+    try{
+      const url=resolveMusicAsset(lab.packBase,scoreAsset.path);
+      const response=await fetch(url,{cache:'default'});
+      if(!response.ok)throw new Error('Score HTTP '+response.status);
+      const raw=await response.json();
+      // The score must be for this pack, hash-pinned in its actual
+      // shipping manifest, not merely an unrelated file with notes.
+      const score=validatePerformanceScore(raw,lab.pack);
+      if(!this.alive||generation!==this.scoreRequest||this.lab!==lab||
+        lab.track?.id!==id)return;
+      this.score=score;
+      this.scoreStatus='SOURCE SCORE LOADED (UNCALIBRATED)';
+    }catch(err){
+      if(this.alive&&generation===this.scoreRequest){
+        this.score=null;
+        this.scoreStatus='SCORE REJECTED: '+String(err?.message||err);
+      }
+    }
+    this._tick();
+  }
+  _clockFrame(){
+    const lab=this.lab;
+    if(!lab?.pack||lab.clockStart===null||!lab.ctx)return null;
+    return Math.max(0,Math.min(lab.pack.frameCount-1,Math.round(
+      (lab.ctx.currentTime-lab.clockStart)*lab.pack.sampleRate)));
+  }
+  _markIssue(){
+    const lab=this.lab;
+    const frame=this._clockFrame();
+    if(!lab?.track||frame===null)return;
+    const role=this.solo==='ALL'?'ALL':this.solo.toLowerCase();
+    this.markers.push(makeIssueMarker(this.score,{
+      songId:lab.track.id,role,frame,
+      biome:this.biome,airborne:this.airborne,speed:this.speed,
+      replacements:this.dynamic,
+    }));
+    this.markerStatus='MARKED '+this.markers.length+' SUSPECT MOMENT(S), NOT GOLD NOTES';
+    this.exportButton.setDisabled(false);
+    this.clearButton.setDisabled(false);
+    this._tick();
+  }
+  _clearMarks(){
+    this.markers=[];
+    this.markerStatus='ALL SESSION MARKS CLEARED; NO GAME SAVE CHANGED';
+    this.exportButton.setDisabled(true);
+    this.clearButton.setDisabled(true);
+    this._tick();
+  }
+  _exportMarks(){
+    if(!this.markers.length||typeof document==='undefined')return;
+    const payload={
+      format:'bitstream-music-issue-markers-v1',
+      status:'human-listening-suspicions-not-gold-annotations',
+      sampleRate:48000,
+      count:this.markers.length,
+      markers:this.markers,
+    };
+    const data=JSON.stringify(payload,null,2)+'\n';
+    const blob=new Blob([data],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    try{
+      const link=document.createElement('a');
+      link.href=url;
+      link.download='bitstream-music-issues-'+Date.now()+'.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }finally{
+      // A queued download owns the Blob by this point; defer revoke so
+      // Firefox/Chrome can both consume the object URL.
+      setTimeout(()=>URL.revokeObjectURL(url),10000);
+    }
+    this.markerStatus='EXPORTED '+this.markers.length+' ISSUE MARK(S), NO CHANGES SAVED';
+    this._tick();
+  }
   _song(index){
+    ++this.scoreRequest;
+    this.score=null;
+    this.scoreStatus='SWITCHING SOURCE SCORE';
     this.songIndex=index;
     const lab=this.lab;
     if(!lab?.ready)return;
@@ -596,6 +717,21 @@ export class SoundLabView extends View {
         'BUFFER FETCH / DECODE PENDING';
     }
     this.clockText.setText('TIME '+stamp+'  '+diagnostic);
+    const frame=this._clockFrame();
+    if(this.score && frame!==null){
+      const roles=this.solo==='ALL'?PERFORMANCE_ROLES:
+        [this.solo.toLowerCase()];
+      const near=nearbyPerformanceEvents(this.score,roles,frame,4800);
+      const examples=near.slice(0,3).map(({role,event})=>
+        role.toUpperCase().slice(0,2)+':'+(event.pitch??event.class)+
+        '@'+Math.round((event.startFrame-frame)/48)+'MS').join(' ');
+      this.scoreText.setText(ellipsize(
+        'SCORE '+this.score.scoreHash.slice(0,8)+' '+
+        near.length+' ATTACK(S) +-100MS  '+examples,436));
+    }else{
+      this.scoreText.setText(ellipsize('SCORE: '+this.scoreStatus,436));
+    }
+    this.infoText.setText(ellipsize(this.markerStatus,436));
   }
   handleAction(action){
     if(action==='cancel'){this.close();return true;}
@@ -603,6 +739,10 @@ export class SoundLabView extends View {
   }
   destroy(){
     ++this.request;
+    ++this.scoreRequest;
+    this.scene.input?.keyboard?.off('keydown-M',this._markKey);
+    this._markKey=null;
+    this.score=null;
     this.tickTimer?.remove();
     this.lab?.destroy();
     this.lab=null;

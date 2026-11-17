@@ -20,6 +20,21 @@ describe('Bitstream Music Pack v1', () => {
 		expect(p.segments).toHaveLength(2);
 		expect(p.sourceNames).toEqual(['bass','drums','guitar','other','piano','vocals']);
 	});
+	test('the optional score sidecar is path-safe and revision-pinned',()=>{
+		const original=pack();
+		expect(normalizePack(original).performance).toBe(null);
+		const scoreHash='a'.repeat(64);
+		original.performance={path:'performance.json',scoreHash};
+		expect(normalizePack(original).performance).toEqual({
+			path:'performance.json',scoreHash,
+		});
+		original.performance.path='../private.json';
+		expect(()=>normalizePack(original)).toThrow(/Invalid performance/);
+		original.performance.path='performance.json';
+		original.performance.scoreHash='unsigned';
+		expect(()=>normalizePack(original)).toThrow(/Invalid performance/);
+	});
+
 	test('accepts arbitrary derived voice sources and bounded DSP chains', () => {
 		const p = pack();
 		for (const seg of p.segments) seg.sources['voice:bitstream-bluffs'] = 'chip.ogg';

@@ -10,6 +10,12 @@
 
 The offline research and full-song render must share one versioned performance/event representation and one rendering toolchain. Build source-grounded, immutable integer-sample note timelines with provenance, then run exactly the same renderer on selected bars or whole songs; do not silently promote detector heuristics.
 
+## New real-engine score diagnostics (2026-11-17)
+
+The game now consumes a versioned and hash-pinned, six-role performance-v1 event score captured from the ACTUAL release for all four songs. Exactly 33,752 unverified source note/hit hypotheses were captured; source FLAC hashes and extractor fingerprint are preserved. The lab displays sample-clock-relative candidates and supports M / Mark Error, Export Marks (JSON), and Clear Marks. Exported annotations are UNVERIFIED listener suspicions; they do not edit source scores or game state. An offline human-correction patch layer and strict 20/50ms one-to-one gold evaluator exist, but there are NO verified gold musical annotations or accuracy results yet.
+
+The full and additional instrument renderers can now consume this one frozen score via --performance-root; legacy direct extraction must be explicitly opted into. Tests confirmed all original Opus assets byte-for-byte unchanged, four real game scores loaded and marked in Chromium, async score race isolation and corrupted-score fail-closed behavior. See docs/MUSIC-PERFORMANCE-V1-SCORES-AND-GOLD-GATE.md.
+
 ## Safety and release rules
 
 - Keep Dynamic Orchestra OFF by default, with visible PRE-ALPHA badge.
