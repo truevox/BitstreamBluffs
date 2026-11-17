@@ -85,13 +85,20 @@ try {
 			drumsMotion:mixer.sources.get('drums').motion.gain.value,
 			voice:d._activeVoiceFor(d.pack),
 			originalEffects:Object.fromEntries(['guitar','piano','other','bass','drums']
-				.map(n=>[n,mixer.sources.get(n).chain.stages.length]))};
+				.map(n=>[n,mixer.sources.get(n).chain.stages.map(stage=>stage.id)])),
+			originalRoomSends:Object.fromEntries(['guitar','piano','other','bass','drums']
+				.map(n=>[n,mixer.sources.get(n).send.gain.value]))};
 	});
 	assert.equal(off.enabled,false);
 	assert.equal(off.replacementCurrent,false);
 	assert.equal(off.voice,'voice:crystal-cavern');
-	assert.deepEqual(Object.values(off.originalEffects),[0,0,0,0,0]);
-	console.log('DYNAMIC_OFF_SOURCE_INSTRUMENTS_UNCHANGED_PASS',off);
+	for(const [stem,effects] of Object.entries(off.originalEffects)) {
+		assert.ok(effects.length>0,'OFF bypassed source '+stem+' processing');
+	}
+	for(const stem of ['guitar','piano','other']) {
+		assert.ok(off.originalRoomSends[stem]>0,'OFF muted source '+stem+' room bus');
+	}
+	console.log('DYNAMIC_OFF_SOURCE_INSTRUMENTS_STILL_PROCESSED_PASS',off);
 	await page.waitForFunction(()=>{
 		const d=window.__bbGame.registry.get('audioSynth')._stemMusic;
 		return [...d.activeNodes].length>=7&&d.cache.has('0/voice:crystal-cavern');
@@ -119,9 +126,13 @@ try {
 					events:d.adaptive.channels.get(role)?.current?.scheduled?.size}])),
 			originalMix:Object.fromEntries(['guitar','piano','other','bass','drums'].map(n=>[
 				n,d.mixer.sources.get(n).mix.gain.value])),
+			originalEffects:Object.fromEntries(['guitar','piano','other','bass','drums']
+				.map(n=>[n,d.mixer.sources.get(n).chain.stages.map(stage=>stage.id)])),
 		};
 	});
 	assert.equal(on.clock,off.clock,'Music clock changed when toggling ON');
+	assert.deepEqual(on.originalEffects,off.originalEffects,
+		'Toggling ON unexpectedly rebuilt or disabled original audio DSP');
 	for (const role of ['featured','bass','drums','guitar','piano']) {
 		assert.equal(on.roles[role].biome,'crystal-cavern');
 		assert.ok(on.roles[role].events>=1);
@@ -144,11 +155,18 @@ try {
 		return {clock:d.clockStart,
 			sourceCount:d.activeNodes.size,
 			originalEffects:Object.fromEntries(['guitar','piano','other','bass','drums']
-				.map(n=>[n,d.mixer.sources.get(n).chain.stages.length]))};
+				.map(n=>[n,d.mixer.sources.get(n).chain.stages.map(stage=>stage.id)])),
+			originalRoomSends:Object.fromEntries(['guitar','piano','other','bass','drums']
+				.map(n=>[n,d.mixer.sources.get(n).send.gain.value]))};
 	});
 	assert.equal(back.clock,off.clock,'Toggling OFF rewound soundtrack');
-	assert.deepEqual(Object.values(back.originalEffects),[0,0,0,0,0]);
-	console.log('DYNAMIC_OFF_RESTORES_ORIGINALS_WITHOUT_REWIND_PASS',back);
+	assert.deepEqual(back.originalEffects,off.originalEffects,
+		'OFF changed processing rather than only restoring original source recordings');
+	for(const stem of ['guitar','piano','other']) {
+		assert.ok(back.originalRoomSends[stem]>0,
+			'Original '+stem+' room send was lost by toggling OFF');
+	}
+	console.log('DYNAMIC_OFF_RESTORES_PROCESSED_ORIGINALS_WITHOUT_REWIND_PASS',back);
 	// ALL four off ALWAYS means absolute silence, regardless of dynamic.
 	await page.evaluate(()=>{
 		const g=window.__bbGame;const s=g.registry.get('settings');

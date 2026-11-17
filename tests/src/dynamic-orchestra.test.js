@@ -23,7 +23,7 @@ function fakeDirector() {
 	d.airborne=false;
 	return d;
 }
-describe('Owner dynamic orchestra OFF = original instruments and biome-only melody',()=>{
+describe('Dynamic Orchestra gates only replacement recordings, not original-stem DSP',()=>{
 	test('defaults OFF and survives strict settings sanitation',()=>{
 		expect(defaultSettings().dynamicOrchestra).toBe(false);
 		expect(sanitizeSettings({dynamicOrchestra:true}).dynamicOrchestra).toBe(true);
@@ -35,37 +35,49 @@ describe('Owner dynamic orchestra OFF = original instruments and biome-only melo
 		expect(signatures.size).toBe(BIOME_IDS.length);
 		expect(melodyPreset(HOME_BIOME).length).toBeGreaterThan(0);
 	});
-	test('OFF keeps five original instrumental buses dry and only lead synthesized/colored',()=>{
+	test('OFF keeps original instrument samples but runs all biome source FX and room sends',()=>{
 		const d=fakeDirector();
 		d._applyMusicTimbres();
 		const map=new Map(d.mixer.replaceEffects.mock.calls.map(x=>[x[0],x[1]]));
-		expect(map.get(home).length).toBeGreaterThan(0);
+		expect(map.get(home)).toEqual(melodyPreset('debumont'));
 		for(const stem of ['bass','drums','guitar','piano','other']){
-			expect(map.get(stem)).toEqual([]);
-			expect(d.mixer.setRoomSend).toHaveBeenCalledWith(stem,0);
+			expect(map.get(stem)).toEqual(orchestraPreset('debumont',stem));
+			expect(map.get(stem).length).toBeGreaterThan(0);
+			// NULL resets each input's standard biome space send. OFF must
+			// never force zero or bypass its source effects.
+			expect(d.mixer.setRoomSend).toHaveBeenCalledWith(stem,null);
 		}
+		expect(d.adaptive.setEnabled).not.toHaveBeenCalled();
 	});
-	test('ON changes instrumental processing, but does not restart music or change lead routing',()=>{
+	test('ON/OFF changes ONLY adaptive replacement routing, leaves processing + clock untouched',()=>{
 		const d=fakeDirector();
 		d.started=true;
 		d.clockStart=12.78;
 		d.trackIndex=2;
+		d._applyMusicTimbres(); // normally applied on song start/biome change
+		const before=new Map(d.mixer.replaceEffects.mock.calls.map(x=>[x[0],x[1]]));
+		d.mixer.replaceEffects.mockClear();
+		d.mixer.setRoomSend.mockClear();
 		d.setDynamicOrchestra(true);
 		expect(d.adaptive.setEnabled).toHaveBeenLastCalledWith(true);
 		expect(d.started).toBe(true);
 		expect(d.clockStart).toBe(12.78);
 		expect(d.trackIndex).toBe(2);
-		const map=new Map(d.mixer.replaceEffects.mock.calls.map(x=>[x[0],x[1]]));
-		expect(map.get(home).length).toBeGreaterThan(0);
-		for(const stem of ['bass','drums','guitar','piano','other']){
-			expect(map.get(stem).length).toBeGreaterThan(0);
-		}
-		d.mixer.replaceEffects.mockClear();
+		// No FX rebuild, no source dryness/mute just because DO toggles.
+		expect(d.mixer.replaceEffects).not.toHaveBeenCalled();
+		expect(d.mixer.setRoomSend).not.toHaveBeenCalled();
 		d.setDynamicOrchestra(false);
 		expect(d.adaptive.setEnabled).toHaveBeenLastCalledWith(false);
-		const off=new Map(d.mixer.replaceEffects.mock.calls.map(x=>[x[0],x[1]]));
+		expect(d.mixer.replaceEffects).not.toHaveBeenCalled();
+		expect(d.mixer.setRoomSend).not.toHaveBeenCalled();
+		for(const stem of ['bass','drums','guitar','piano','other',home])
+			expect(before.get(stem).length).toBeGreaterThan(0);
+		// Returning to OFF does not stop an original-source effects chain.
+		d.biome='crystal-cavern';
+		d._applyMusicTimbres();
 		for(const stem of ['bass','drums','guitar','piano','other']){
-			expect(off.get(stem)).toEqual([]);
+			expect(d.mixer.replaceEffects).toHaveBeenCalledWith(
+				stem,orchestraPreset('crystal-cavern',stem),.18);
 		}
 	});
 	test('original bass speed motion works with adaptive OFF and no replacement files',()=>{

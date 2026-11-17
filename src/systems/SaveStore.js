@@ -24,7 +24,7 @@ import { isRankable, isModdedOnly, countsForDailyBest, countsForStreak } from '.
  * @property {number} musicVolume        0..1
  * @property {number} sfxVolume          0..1
  * @property {Object<string,boolean>} musicEnabledSongs   Per-song switches. All false = silence.
- * @property {boolean} dynamicOrchestra  OFF: only melody colored per biome; all other source stems kept.
+ * @property {boolean} dynamicOrchestra  OFF: original instrumental stems with full FX; ON: separately rendered replacement instruments.
  * @property {boolean} screenShake       false disables shake (accessibility).
  * @property {'default'|'colorblind'} palette
  * @property {'auto'|'on'|'off'} touchOverlay  on-screen controls.

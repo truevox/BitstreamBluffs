@@ -1,8 +1,8 @@
-/** Lab-independent, small WebAudio presets for the full-song provisional melody.
- * OFF dynamic orchestra means the *lead* still changes character by biome,
- * while bass, drums, guitar, piano and other retain their ORIGINAL stems.
- * ON currently uses reversible biome FX on source stems; future full-length
- * replacement recordings can be added to the adaptive manifest independently.
+/** Independent non-destructive processing presets for source-stem playback.
+ * They are active regardless of Dynamic Orchestra ON/OFF.
+ * OFF disables re-performed replacement stems, NOT filtering, ambience,
+ * distortion, tremolo, EQ, speed controls or other processing of originals.
+ * The separately synthesized biome-specific lead stays active in both modes.
  */
 import { BIOME_IDS, HOME_BIOME } from './BiomeVoices.js';
 
@@ -49,9 +49,9 @@ export function orchestraPreset(biome, stem) {
 		return [filter('drum-color','lowpass',edge),
 			...(biome==='steampunk-slopes'||biome==='micro-mountain'?[tremolo(6,.17)]:[])];
 	}
-	// Preserve source note timing, using only FX to make provisional
-	// full-length instrument colors; artist-approved re-performances
-	// will replace these with independent adaptive note stems later.
+	// Never replace, retrigger, rescore or move source note attacks here.
+	// These are purely effects on the *original* waveform and apply
+	// even when the separate re-performance playback is switched OFF.
 	return [filter('accompaniment-color','lowpass',edge),
 		...(biome==='crystal-cavern'||biome==='space-mountain'?[delay(.19,.17)]:[]),
 		...(biome==='garbage-dump-glacier'||biome==='vertigo-vents'?[distortion(.2)]:[])];

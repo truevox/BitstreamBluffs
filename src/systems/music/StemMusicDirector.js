@@ -116,14 +116,18 @@ export class StemMusicDirector {
 		const next = on === true;
 		if (next === this.dynamicOrchestra) return;
 		this.dynamicOrchestra = next;
+		// The user toggle governs *replacement recordings only*. All
+		// processing of original stem audio (FX, room, speed and dynamics)
+		// remains active in either mode and must not be rebuilt here.
 		this.adaptive?.setEnabled(next);
-		this._applyMusicTimbres();
 	}
 
-	/** The melody is colored by biome IN BOTH modes. All other stems are
-	 * original and dry when OFF. ON uses provisional biome DSP, and if
-	 * proper re-performed stems are installed, enables adaptive swaps.
-	 * Effects use smooth crossfades, no source rewind or track restart.
+	/** Original stem processing runs INDEPENDENTLY of the Dynamic
+	 * Orchestra toggle: source-stem filtering, coloration, room sends,
+	 * speed-dependent ducking and FX are all legitimate in OFF mode.
+	 * The only mode-gated action is the AdaptiveBiomeRouter replacing
+	 * an original instrumental source with its re-performed alternative.
+	 * The separately synthesized biome melody stays active in BOTH modes.
 	 */
 	_applyMusicTimbres(force=false) {
 		if (!this.mixer || !this.gains) return;
@@ -133,16 +137,16 @@ export class StemMusicDirector {
 		for (const name of sourceNames) {
 			if (!this.gains.has(name)) continue;
 			const effects = name===lead ? melodyPreset(this.biome) :
-				(this.dynamicOrchestra ? orchestraPreset(this.biome,name) : []);
+				orchestraPreset(this.biome,name);
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
 				this.mixer.replaceEffects(name,effects,.18);
 				this._timbreSignatures.set(name,key);
 			}
-			// OFF must not send the original instrumental tracks through
-			// the biome's room bus, but lead character stays biome-colored.
-			this.mixer.setRoomSend(name,name===lead ? null :
-				this.dynamicOrchestra ? null : 0);
+			// Restore each source's normal biome room send in either
+			// mode. Muting reverb when the toggle is OFF would wrongly
+			// disable legitimate processing of the ORIGINAL recordings.
+			this.mixer.setRoomSend(name,null);
 		}
 	}
 
