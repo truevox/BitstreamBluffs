@@ -12,7 +12,7 @@ const palette = {
 };
 const state = {
 	catalog:null,song:'pope',biome:'debumont',
-	arrangement:'orchestra',terrain:'air',revision:'rhythm',accompaniment:'new',vocals:false,
+	arrangement:'orchestra',terrain:'air',revision:'controlled',accompaniment:'new',vocals:false,
 	ctx:null,master:null,main:null,voice:null,
 	playing:false,position:0,startClock:0,
 	request:0,vocalRequest:0,cache:new Map(),
@@ -36,6 +36,10 @@ function desiredPath(){
 	const song=getSong();
 	if(!song)throw new Error('Missing song');
 	if(state.arrangement==='original')return song.id+'/'+song.originalReference;
+	if(state.revision==='controlled'){
+		return 'revisions/controlled-'+state.accompaniment+'/'+song.id+'/'+
+			song.variants[state.biome][state.terrain];
+	}
 	if(state.revision==='rhythm' && state.accompaniment!=='new'){
 		return 'revisions/accompaniment-'+state.accompaniment+'/'+song.id+'/'+
 			song.variants[state.biome][state.terrain];
@@ -74,9 +78,9 @@ async function decoded(path){
 	}
 	return state.cache.get(path);
 }
-function startSlot(buffer,position=0,level=1,fade=.22){
+function startSlot(buffer,position=0,level=1,fade=.22,scheduledBegin=null){
 	const ctx=state.ctx;
-	const begin=ctx.currentTime+.028;
+	const begin=scheduledBegin===null?ctx.currentTime+.028:scheduledBegin;
 	const node=ctx.createBufferSource();
 	const gain=ctx.createGain();
 	node.buffer=buffer;
@@ -84,17 +88,18 @@ function startSlot(buffer,position=0,level=1,fade=.22){
 	gain.connect(state.master);
 	gain.gain.setValueAtTime(fade?0:level,begin);
 	if(fade)gain.gain.linearRampToValueAtTime(level,begin+fade);
-	node.start(begin,Math.max(0,Math.min(31.95,position)));
-	return {node,gain};
+	const offset=Math.max(0,Math.min(31.95,position));
+	node.start(begin,offset);
+	return {node,gain,begin,offset};
 }
-function stopSlot(slot,fade=.2){
+function stopSlot(slot,fade=.2,at=null){
 	if(!slot)return;
-	const now=state.ctx?.currentTime||0;
+	const begin=at===null?(state.ctx?.currentTime||0):at;
 	try{
-		slot.gain.gain.cancelScheduledValues(now);
-		slot.gain.gain.setValueAtTime(slot.gain.gain.value,now);
-		slot.gain.gain.linearRampToValueAtTime(0,now+fade);
-		slot.node.stop(now+fade+.06);
+		slot.gain.gain.cancelScheduledValues(begin);
+		slot.gain.gain.setValueAtTime(slot.gain.gain.value,begin);
+		slot.gain.gain.linearRampToValueAtTime(0,begin+fade);
+		slot.node.stop(begin+fade+.06);
 	}catch{}
 }
 function flags(){
@@ -104,7 +109,7 @@ function flags(){
 	}
 	for(const button of document.querySelectorAll('#accompaniment button[data-accompaniment]')){
 		button.setAttribute('aria-pressed',String(button.dataset.accompaniment===state.accompaniment));
-		button.disabled=state.arrangement==='original'||state.revision!=='rhythm'||
+		button.disabled=state.arrangement==='original'||!['rhythm','controlled'].includes(state.revision)||
 			(button.dataset.accompaniment==='reattacks'&&state.song!=='pope');
 	}
 	for(const [button,active] of [
@@ -153,10 +158,13 @@ async function vocalSync(){
 		const path=getSong().id+'/'+getSong().vocals;
 		const buffer=await decoded(path);
 		if(token!==state.vocalRequest||!state.vocals||!state.playing)return;
-		const position=playPosition();
+		// This timestamp is on the SAME immutable song clock as the main
+		// music; asynchronous fetch/decode must never pull vocals backwards.
+		const begin=state.ctx.currentTime+.028;
+		const position=Math.max(0,Math.min(31.95,begin-state.startClock));
 		const old=state.voice;
-		state.voice=startSlot(buffer,position,.72,.16);
-		stopSlot(old,.14);
+		state.voice=startSlot(buffer,position,.72,.16,begin);
+		stopSlot(old,.14,begin);
 	}catch(error){
 		setStatus('Could not add Maxi vocal: '+String(error.message||error));
 	}
@@ -172,11 +180,14 @@ async function swap(){
 			setStatus('Ready. Press Play to hear '+getBiome().orchestra+'.');
 			return;
 		}
-		const position=playPosition();
+		// The audio source that begins in the FUTURE must start at that
+		// FUTURE song offset. Never restart the shared song clock on a swap.
+		// The old playing slot and original vocal continue on that clock.
+		const begin=state.ctx.currentTime+.028;
+		const position=Math.max(0,Math.min(31.95,begin-state.startClock));
 		const old=state.main;
-		state.main=startSlot(buffer,position,1,.22);
-		state.startClock=state.ctx.currentTime+.028-position;
-		stopSlot(old,.22);
+		state.main=startSlot(buffer,position,1,.22,begin);
+		stopSlot(old,.22,begin);
 		setStatus('Playing '+(state.arrangement==='original'?'original song':'orchestra')+' · '+getBiome().orchestra);
 		flags();
 	}catch(error){
@@ -193,7 +204,7 @@ async function play(){
 		const buffer=await decoded(desiredPath());
 		if(token!==state.request||state.playing)return;
 		state.main=startSlot(buffer,state.position,1,.05);
-		state.startClock=state.ctx.currentTime+.028-state.position;
+		state.startClock=state.main.begin-state.position;
 		state.playing=true;
 		flags();
 		setStatus('Playing · '+getBiome().orchestra);
@@ -227,7 +238,7 @@ function changeArrangement(mode){
 	swap();
 }
 function changeRevision(version){
-	if(!['original','articulation','orchestral','rhythm'].includes(version))return;
+	if(!['original','articulation','orchestral','rhythm','controlled'].includes(version))return;
 	if(state.revision===version)return;
 	state.revision=version;
 	flags();
@@ -238,7 +249,7 @@ function changeAccompaniment(mode){
 	if(mode==='reattacks'&&state.song!=='pope')return;
 	state.accompaniment=mode;
 	display();
-	if(state.arrangement==='orchestra'&&state.revision==='rhythm')swap();
+	if(state.arrangement==='orchestra'&&['rhythm','controlled'].includes(state.revision))swap();
 }
 function changeTerrain(mode){
 	if(state.terrain===mode)return;

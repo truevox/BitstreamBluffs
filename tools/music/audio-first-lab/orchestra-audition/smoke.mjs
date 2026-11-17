@@ -25,6 +25,10 @@ for (const song of catalog.songs) {
 		paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+song.originalReference);
 		paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+song.vocals);
 	}
+	for (const style of ['stock','new','aligned','reattacks']) {
+		paths.add('/revisions/controlled-'+style+'/'+song.id+'/'+song.originalReference);
+		paths.add('/revisions/controlled-'+style+'/'+song.id+'/'+song.vocals);
+	}
 	for (const biome of catalog.biomes) {
 		const variant = song.variants[biome.id];
 		assert.ok(variant);
@@ -35,6 +39,9 @@ for (const song of catalog.songs) {
 			}
 			for (const style of ['stock','aligned','reattacks']) {
 				paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+variant[role]);
+			}
+			for (const style of ['stock','new','aligned','reattacks']) {
+				paths.add('/revisions/controlled-'+style+'/'+song.id+'/'+variant[role]);
 			}
 		}
 	}
@@ -72,8 +79,34 @@ try {
 	await page.click('#play');
 	await page.waitForFunction(() => {
 		const s=window.orchestraDebug.state;
-		return s.playing && s.main && s.cache.has('revisions/rhythm/pope/debumont-air.ogg');
+		return s.playing && s.main && s.cache.has('revisions/controlled-new/pope/debumont-air.ogg');
 	},null,{timeout:18000});
+	// A source scheduled in the future must start at the matching FUTURE
+	// position on the one immutable song clock.
+	async function assertClockSwap(selector){
+		const before=await page.evaluate(()=>{
+			const s=window.orchestraDebug.state;
+			return {clock:s.startClock,slot:s.main?.begin,position:s.ctx.currentTime-s.startClock};
+		});
+		await page.click(selector);
+		await page.waitForFunction(previous => {
+			const s=window.orchestraDebug.state;
+			return s.main?.begin>previous+0.00005;
+		},before.slot,{timeout:18000});
+		const after=await page.evaluate(()=>{
+			const s=window.orchestraDebug.state;
+			return {clock:s.startClock,begin:s.main.begin,offset:s.main.offset,
+				position:s.ctx.currentTime-s.startClock,
+				voice:s.voice?{begin:s.voice.begin,offset:s.voice.offset}:null};
+		});
+		assert.ok(Math.abs(after.clock-before.clock)<1e-6,'Song clock changed while A/B swapping');
+		assert.ok(after.position>=before.position-.001,'Song time rewound on swap');
+		assert.ok(Math.abs((after.begin-after.clock)-after.offset)<.00003,
+			'Newly scheduled track is not on the shared song clock');
+		if(after.voice)assert.ok(Math.abs((after.voice.begin-after.clock)-after.voice.offset)<.00003,
+			'Original vocal is not on the same song clock');
+	}
+
 	// Compare actual audio at the same song-clock position. The first
 	// pass, envelope-only repair and new sounds are distinct choices.
 	await page.click('button[data-revision="original"]');
@@ -84,16 +117,17 @@ try {
 	await page.waitForFunction(() => window.orchestraDebug.state.revision==='orchestral',null,{timeout:14000});
 	await page.click('button[data-revision="rhythm"]');
 	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/rhythm/pope/debumont-air.ogg'),null,{timeout:14000});
-	// The three controls preserve the lead, bass and selected drum kit.
+	// Historic rhythm remains available but is NOT the controlled A/B.
 	await page.click('button[data-accompaniment="stock"]');
 	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-stock/pope/debumont-air.ogg'),null,{timeout:14000});
+	await page.click('button[data-revision="controlled"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/controlled-stock/pope/debumont-air.ogg'),null,{timeout:14000});
 	assert.equal(await page.locator('button[data-accompaniment="stock"]').getAttribute('aria-pressed'),'true');
-	await page.click('button[data-accompaniment="aligned"]');
-	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-aligned/pope/debumont-air.ogg'),null,{timeout:14000});
-	await page.click('button[data-accompaniment="reattacks"]');
-	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-reattacks/pope/debumont-air.ogg'),null,{timeout:14000});
-	await page.click('button[data-accompaniment="new"]');
-	await page.waitForFunction(() => window.orchestraDebug.state.accompaniment==='new',null,{timeout:14000});
+	await assertClockSwap('button[data-accompaniment="new"]');
+	await assertClockSwap('button[data-accompaniment="aligned"]');
+	await assertClockSwap('button[data-accompaniment="reattacks"]');
+	await assertClockSwap('button[data-accompaniment="stock"]');
+	await assertClockSwap('button[data-accompaniment="new"]');
 	await page.click('#original');
 	await page.waitForFunction(() =>
 		window.orchestraDebug.state.cache.has('pope/original-instrumental.ogg'),
@@ -101,20 +135,22 @@ try {
 	await page.click('#new');
 	await page.click('#ground');
 	await page.waitForFunction(() =>
-		window.orchestraDebug.state.cache.has('revisions/rhythm/pope/debumont-ground.ogg'),
+		window.orchestraDebug.state.cache.has('revisions/controlled-new/pope/debumont-ground.ogg'),
 		null,{timeout:13000});
 	await page.click('#vocal');
 	await page.waitForFunction(() =>
 		window.orchestraDebug.state.voice!==null,null,{timeout:13000});
+	await assertClockSwap('button[data-accompaniment="stock"]');
+	await assertClockSwap('button[data-accompaniment="new"]');
 	for(const biome of ['crystal-cavern','pyramid-peak','steampunk-slopes']){
 		await page.click('button[data-biome="'+biome+'"]');
 		await page.waitForFunction(b =>
-			window.orchestraDebug.state.cache.has('revisions/rhythm/pope/'+b+'-ground.ogg'),
+			window.orchestraDebug.state.cache.has('revisions/controlled-new/pope/'+b+'-ground.ogg'),
 			biome,{timeout:14000});
 	}
 	await page.click('#air');
 	await page.click('button[data-accompaniment="reattacks"]');
-	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-reattacks/pope/steampunk-slopes-air.ogg'),null,{timeout:14000});
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/controlled-reattacks/pope/steampunk-slopes-air.ogg'),null,{timeout:14000});
 	await page.selectOption('#song','one-more-run');
 	await page.waitForFunction(() =>
 		window.orchestraDebug.state.song==='one-more-run' &&
@@ -125,13 +161,13 @@ try {
 	for(const biome of ['candy-cane-canyon','micro-mountain','vertigo-vents']){
 		await page.click('button[data-biome="'+biome+'"]');
 		await page.waitForFunction(b =>
-			window.orchestraDebug.state.cache.has('revisions/rhythm/one-more-run/'+b+'-air.ogg'),
+			window.orchestraDebug.state.cache.has('revisions/controlled-new/one-more-run/'+b+'-air.ogg'),
 			biome,{timeout:14000});
 	}
 	await page.click('button[data-accompaniment="stock"]');
-	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-stock/one-more-run/vertigo-vents-air.ogg'),null,{timeout:14000});
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/controlled-stock/one-more-run/vertigo-vents-air.ogg'),null,{timeout:14000});
 	await page.click('button[data-accompaniment="aligned"]');
-	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-aligned/one-more-run/vertigo-vents-air.ogg'),null,{timeout:14000});
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/controlled-aligned/one-more-run/vertigo-vents-air.ogg'),null,{timeout:14000});
 	await page.click('button[data-accompaniment="new"]');
 	await page.locator('#seek').fill('15');
 	await page.locator('#seek').dispatchEvent('change');
