@@ -24,6 +24,7 @@ import { shopLayout, shopMenuItems, titlesLayout, titlesMenuItems } from './Shop
 import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopItem } from '../systems/ProfileStore.js';
 import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
 import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
+import { ScoreInspectorView } from './ScoreInspectorView.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
 import { resolveMusicAsset } from '../systems/music/MusicPack.js';
 import { validatePerformanceScore, nearbyPerformanceEvents,
@@ -404,6 +405,9 @@ export class SoundLabView extends View {
     this.scoreStatus='WAITING FOR SCORE MANIFEST';
     this.markers=[]; // lab session only, not localStorage or profile
     this.markerStatus='NO AUDIO OR GAME SAVES ARE CHANGED';
+    this.inspector=null;
+    this.drafts=new Map(); // per-source-revision, session only
+
     this.sourceBus=null;
     this.prevBusVolume=null;
     this.statusText=new NeonText(scene,theme,13,188,
@@ -425,19 +429,23 @@ export class SoundLabView extends View {
     // Touch/pointer buttons leave gamepad and the ten existing lab menu
     // rows untouched. The normal View BACK button already occupies x392.
     this.markButton=new Button(scene,theme,{
-      x:13,y:235,w:112,h:14,label:'MARK (M)',color:'amber',
+      x:13,y:235,w:91,h:14,label:'MARK (M)',color:'amber',
       onClick:()=>this._markIssue(),parent:this.panel,
     });
+    this.inspectButton=new Button(scene,theme,{
+      x:109,y:235,w:91,h:14,label:'NOTES (N)',color:'lime',
+      onClick:()=>this._openInspector(),parent:this.panel,
+    }).setDisabled(true);
     this.exportButton=new Button(scene,theme,{
-      x:134,y:235,w:119,h:14,label:'EXPORT MARKS',color:'cyan',
+      x:205,y:235,w:100,h:14,label:'EXPORT MARKS',color:'cyan',
       onClick:()=>this._exportMarks(),parent:this.panel,
     }).setDisabled(true);
     this.clearButton=new Button(scene,theme,{
-      x:263,y:235,w:94,h:14,label:'CLEAR MARKS',color:'magenta',
+      x:310,y:235,w:73,h:14,label:'CLEAR',color:'magenta',
       onClick:()=>this._clearMarks(),parent:this.panel,
     }).setDisabled(true);
     this._markKey=event=>{
-      if(!this.alive||event?.repeat)return;
+      if(!this.alive||this.inspector||event?.repeat)return;
       if(this.lab?.pack)this._markIssue();
     };
     scene.input?.keyboard?.on('keydown-M',this._markKey);
@@ -535,6 +543,7 @@ export class SoundLabView extends View {
   async _loadPerformanceScore(id){
     const generation=++this.scoreRequest;
     this.score=null;
+    this.inspectButton.setDisabled(true);
     const lab=this.lab;
     const scoreAsset=lab?.pack?.performance;
     if(!scoreAsset){
@@ -554,6 +563,7 @@ export class SoundLabView extends View {
       if(!this.alive||generation!==this.scoreRequest||this.lab!==lab||
         lab.track?.id!==id)return;
       this.score=score;
+      this.inspectButton.setDisabled(false);
       this.scoreStatus='SOURCE SCORE LOADED (UNCALIBRATED)';
     }catch(err){
       if(this.alive&&generation===this.scoreRequest){
@@ -618,7 +628,24 @@ export class SoundLabView extends View {
     this.markerStatus='EXPORTED '+this.markers.length+' ISSUE MARK(S), NO CHANGES SAVED';
     this._tick();
   }
+  _openInspector(){
+    if(this.inspector||!this.score||!this.lab?.pack)return;
+    const scoreHash=this.score.scoreHash;
+    const draft=this.drafts.get(scoreHash);
+    const inspector=new ScoreInspectorView(this.scene,this.theme,{
+      lab:this,draft,
+      onClose:()=>this._closeInspector(),
+    });
+    this.inspector=inspector;
+    this.drafts.set(scoreHash,inspector.draft);
+  }
+  _closeInspector(){
+    this.inspector?.destroy();
+    this.inspector=null;
+    this._tick();
+  }
   _song(index){
+    this._closeInspector();
     ++this.scoreRequest;
     this.score=null;
     this.scoreStatus='SWITCHING SOURCE SCORE';
@@ -732,12 +759,16 @@ export class SoundLabView extends View {
       this.scoreText.setText(ellipsize('SCORE: '+this.scoreStatus,436));
     }
     this.infoText.setText(ellipsize(this.markerStatus,436));
+    this.inspector?.refresh();
   }
   handleAction(action){
+    if(this.inspector)return this.inspector.handleAction(action);
+    if(action==='alt'){this._openInspector();return true;}
     if(action==='cancel'){this.close();return true;}
     return this.menu.handleAction(action);
   }
   destroy(){
+    this._closeInspector();
     ++this.request;
     ++this.scoreRequest;
     this.scene.input?.keyboard?.off('keydown-M',this._markKey);

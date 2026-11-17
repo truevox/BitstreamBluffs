@@ -16,6 +16,8 @@ The game now consumes a versioned and hash-pinned, six-role performance-v1 event
 
 The full and additional instrument renderers can now consume this one frozen score via --performance-root; legacy direct extraction must be explicitly opted into. Tests confirmed all original Opus assets byte-for-byte unchanged, four real game scores loaded and marked in Chromium, async score race isolation and corrupted-score fail-closed behavior. See docs/MUSIC-PERFORMANCE-V1-SCORES-AND-GOLD-GATE.md.
 
+Note inspection is now inside the game, not the standalone sound-design lab. The inspector draws unverified release event candidates and offers reject/accept, ±10ms and ±12-semitone draft edits keyed to source event IDs; a downloadable versioned patch file may be applied offline to a new score (never directly to live music or a save). The patch status is always draft-unreviewed, not verified ground truth. Actual game source playback continues unchanged.
+
 ## Safety and release rules
 
 - Keep Dynamic Orchestra OFF by default, with visible PRE-ALPHA badge.

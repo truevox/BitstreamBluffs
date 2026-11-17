@@ -135,5 +135,48 @@ class TestPerformanceV1(unittest.TestCase):
 		self.assertIsNone(other)
 		self.assertEqual(conflicts[0]['reason'],'base-score-changed')
 
+	def test_atomic_combined_note_patch_retains_nudge_and_octave(self):
+		e=self.doc['events']['guitar'][0]
+		patch={'format':'bitstream-performance-patches-v1',
+			'status':'draft-unreviewed-not-applied-to-audio',
+			'songId':self.doc['songId'],'baseScoreHash':self.doc['scoreHash'],
+			'operations':[{'action':'correct','id':e['id'],
+				'startFrame':round(.10*RATE),'endFrame':round(.55*RATE),
+				'pitch':e['pitch']+12}]}
+		applied,conflicts=apply_patch_layer(self.doc,patch)
+		self.assertEqual(conflicts,[])
+		validate(applied)
+		self.assertEqual(applied['events']['guitar'][0]['startFrame'],round(.10*RATE))
+		self.assertEqual(applied['events']['guitar'][0]['pitch'],e['pitch']+12)
+		self.assertEqual(self.doc['events']['guitar'][0]['pitch'],e['pitch'])
+		self.assertEqual(to_legacy(applied,'guitar')[0]['start'],.10)
+
+	def test_patch_cannot_cross_adjacent_attack_or_corrupt_note(self):
+		e=self.doc['events']['melody'][0]
+		patch={'format':'bitstream-performance-patches-v1',
+			'songId':self.doc['songId'],'baseScoreHash':self.doc['scoreHash'],
+			'operations':[{'action':'correct','id':e['id'],
+				'startFrame':round(.4*RATE),'endFrame':round(.42*RATE),
+				'pitch':e['pitch']}]}
+		applied,conflicts=apply_patch_layer(self.doc,patch)
+		self.assertIsNone(applied)
+		self.assertEqual(conflicts[0]['reason'],'would-cross-neighbor-onset')
+		patch['operations'][0]['startFrame']=round(.10*RATE)
+		patch['operations'][0]['pitch']=200
+		applied,conflicts=apply_patch_layer(self.doc,patch)
+		self.assertIsNone(applied)
+		self.assertEqual(conflicts[0]['reason'],'invalid-combined-correction')
+
+	def test_drum_atomic_correct_keeps_class_and_source(self):
+		e=self.doc['events']['drums'][0]
+		patch={'format':'bitstream-performance-patches-v1',
+			'songId':self.doc['songId'],'baseScoreHash':self.doc['scoreHash'],
+			'operations':[{'action':'correct','id':e['id'],
+				'startFrame':e['startFrame']}]}
+		applied,conflicts=apply_patch_layer(self.doc,patch)
+		self.assertEqual(conflicts,[])
+		self.assertEqual(applied['events']['drums'][0]['class'],'kick')
+		self.assertEqual(applied['events']['drums'][1]['class'],'snare')
+
 if __name__=='__main__':
 	unittest.main()

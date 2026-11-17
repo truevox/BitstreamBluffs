@@ -279,8 +279,26 @@ def apply_patch_layer(record,layer):
 			conflicts.append({'id':eid,'reason':'missing-event'});continue
 		action=op.get('action')
 		role,event=by_id[eid]
-		if action not in ('accept','reject','retime','octave'):
+		if action not in ('accept','reject','retime','octave','correct'):
 			conflicts.append({'id':eid,'reason':'unsupported-operation'});continue
+		if action=='correct':
+			start,end,pitch=op.get('startFrame'),op.get('endFrame'),op.get('pitch')
+			valid_start=isinstance(start,int) and not isinstance(start,bool) and 0<=start<record['frameCount']
+			valid_end=role=='drums' and end is None or (
+				role!='drums' and isinstance(end,int) and not isinstance(end,bool)
+				and valid_start and start<end<=record['frameCount'])
+			valid_pitch=role=='drums' and pitch is None or (
+				role!='drums' and isinstance(pitch,int) and not isinstance(pitch,bool)
+				and 0<=pitch<=127)
+			if not (valid_start and valid_end and valid_pitch):
+				conflicts.append({'id':eid,'reason':'invalid-combined-correction'});continue
+			# Do not cross the onsets of adjacent source events; render
+			# ordinal controls legacy timbre/pan and stays unchanged.
+			ordered=clean['events'][role]
+			index=next((i for i,e in enumerate(ordered) if e['id']==eid),None)
+			if index is None or (index>0 and ordered[index-1]['startFrame']>start) or (
+				index+1<len(ordered) and ordered[index+1]['startFrame']<start):
+				conflicts.append({'id':eid,'reason':'would-cross-neighbor-onset'});continue
 		if action=='retime':
 			start,end=op.get('startFrame'),op.get('endFrame')
 			if not isinstance(start,int) or start<0 or start>=record['frameCount'] or (
@@ -301,10 +319,19 @@ def apply_patch_layer(record,layer):
 		elif action=='octave':
 			event['pitch']+=op['offset']
 			event['humanStatus']='corrected'
+		elif action=='correct':
+			event['startFrame']=start
+			if role!='drums':
+				event['endFrame']=end
+				event['pitch']=pitch
+			event['humanStatus']='corrected'
 	if conflicts:return None,conflicts
 	clean['quality']='human-correction-layer-applied'
 	clean['derivedFromScoreHash']=record['scoreHash']
 	# Preserve the source score; corrected scores are a new artifact.
 	clean['scoreHash']=content_hash({k:v for k,v in clean.items() if k!='scoreHash'})
-	validate(clean)
+	try:
+		validate(clean)
+	except ValueError as exc:
+		return None,[{'reason':'corrected-score-invalid','detail':str(exc)}]
 	return clean,[]
