@@ -71,6 +71,10 @@ try{
 			y:rect.top+(7+233+7)/270*rect.height};
 	});
 	await page.mouse.click(point.x,point.y);
+	await page.waitForFunction(()=>{
+		const v=window.__bbGame.scene.getScene('TitleScene').view.soundView.labView;
+		return v?.inspector?.comparison===true;
+	},null,{timeout:6000});
 	const visual=await page.evaluate(()=>{
 		const v=window.__bbGame.scene.getScene('TitleScene').view.soundView.labView;
 		const i=v.inspector;
@@ -102,6 +106,10 @@ try{
 	assert.ok(visual.message.includes('EXPERIMENTAL'));
 	console.log('SCORE_INSPECTOR_REAL_MOUSE_TOGGLE_PINK_V2_READ_ONLY_VISUAL_PASS',visual);
 	await page.mouse.click(point.x,point.y);
+	await page.waitForFunction(()=>{
+		const v=window.__bbGame.scene.getScene('TitleScene').view.soundView.labView;
+		return v?.inspector?.comparison===false;
+	},null,{timeout:6000});
 	assert.equal((await state(page)).comparison,false);
 	console.log('COMPARE_ON_OFF_NEVER_EDITED_SCORE_OR_AUDIO_PASS');
 	await page.evaluate(()=>{
