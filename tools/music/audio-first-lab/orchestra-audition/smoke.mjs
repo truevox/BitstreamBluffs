@@ -21,7 +21,7 @@ for (const song of catalog.songs) {
 		paths.add('/revisions/'+revision+'/'+song.id+'/'+song.originalReference);
 		paths.add('/revisions/'+revision+'/'+song.id+'/'+song.vocals);
 	}
-	for (const style of ['stock','aligned']) {
+	for (const style of ['stock','aligned','reattacks']) {
 		paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+song.originalReference);
 		paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+song.vocals);
 	}
@@ -33,7 +33,7 @@ for (const song of catalog.songs) {
 			for (const revision of ['articulation','orchestral','rhythm']) {
 				paths.add('/revisions/'+revision+'/'+song.id+'/'+variant[role]);
 			}
-			for (const style of ['stock','aligned']) {
+			for (const style of ['stock','aligned','reattacks']) {
 				paths.add('/revisions/accompaniment-'+style+'/'+song.id+'/'+variant[role]);
 			}
 		}
@@ -90,6 +90,8 @@ try {
 	assert.equal(await page.locator('button[data-accompaniment="stock"]').getAttribute('aria-pressed'),'true');
 	await page.click('button[data-accompaniment="aligned"]');
 	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-aligned/pope/debumont-air.ogg'),null,{timeout:14000});
+	await page.click('button[data-accompaniment="reattacks"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-reattacks/pope/debumont-air.ogg'),null,{timeout:14000});
 	await page.click('button[data-accompaniment="new"]');
 	await page.waitForFunction(() => window.orchestraDebug.state.accompaniment==='new',null,{timeout:14000});
 	await page.click('#original');
@@ -111,11 +113,15 @@ try {
 			biome,{timeout:14000});
 	}
 	await page.click('#air');
+	await page.click('button[data-accompaniment="reattacks"]');
+	await page.waitForFunction(() => window.orchestraDebug.state.cache.has('revisions/accompaniment-reattacks/pope/steampunk-slopes-air.ogg'),null,{timeout:14000});
 	await page.selectOption('#song','one-more-run');
 	await page.waitForFunction(() =>
 		window.orchestraDebug.state.song==='one-more-run' &&
 		window.orchestraDebug.state.main!==null &&
 		window.orchestraDebug.state.playing,null,{timeout:16000});
+	assert.equal(await page.locator('button[data-accompaniment="reattacks"]').isDisabled(),true);
+	assert.equal(await page.evaluate(()=>window.orchestraDebug.state.accompaniment),'new');
 	for(const biome of ['candy-cane-canyon','micro-mountain','vertigo-vents']){
 		await page.click('button[data-biome="'+biome+'"]');
 		await page.waitForFunction(b =>

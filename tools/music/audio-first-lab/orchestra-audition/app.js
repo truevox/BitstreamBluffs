@@ -104,7 +104,8 @@ function flags(){
 	}
 	for(const button of document.querySelectorAll('#accompaniment button[data-accompaniment]')){
 		button.setAttribute('aria-pressed',String(button.dataset.accompaniment===state.accompaniment));
-		button.disabled=state.arrangement==='original'||state.revision!=='rhythm';
+		button.disabled=state.arrangement==='original'||state.revision!=='rhythm'||
+			(button.dataset.accompaniment==='reattacks'&&state.song!=='pope');
 	}
 	for(const [button,active] of [
 		['original',state.arrangement==='original'],
@@ -133,7 +134,8 @@ function display(){
 	const status={stock:'Original Guitar + Piano + Other, unchanged at source timing.',
 		new:'Current re-performance of '+song.featured.toUpperCase()+'; the other two are stock.',
 		aligned:'Experimental source-transient retiming of '+song.featured.toUpperCase()+
-			'; same notes/timbres. Not human-verified.'};
+			'; same notes/timbres. Not human-verified.',
+		reattacks:'Pope only: experimental 18 new same-pitch retriggers within long Other notes. No new pitches or octave deletions. Not human-verified.'};
 	$('accompExplanation').textContent=status[state.accompaniment];
 	for(const button of $('biomes').querySelectorAll('button[data-biome]')){
 		button.setAttribute('aria-pressed',String(button.dataset.biome===state.biome));
@@ -232,7 +234,8 @@ function changeRevision(version){
 	if(state.arrangement==='orchestra')swap();
 }
 function changeAccompaniment(mode){
-	if(!['stock','new','aligned'].includes(mode)||state.accompaniment===mode)return;
+	if(!['stock','new','aligned','reattacks'].includes(mode)||state.accompaniment===mode)return;
+	if(mode==='reattacks'&&state.song!=='pope')return;
 	state.accompaniment=mode;
 	display();
 	if(state.arrangement==='orchestra'&&state.revision==='rhythm')swap();
@@ -248,6 +251,7 @@ async function changeSong(song){
 	const restart=state.playing;
 	pause();
 	state.song=song;
+	if(song!=='pope'&&state.accompaniment==='reattacks')state.accompaniment='new';
 	state.position=0;
 	$('seek').value=0;
 	display();
