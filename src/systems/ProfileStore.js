@@ -118,8 +118,8 @@ export function sanitizeProfile(raw, levels) {
     // W5: achievement title rewards land here. Without this line the sanitizer would drop them on the
     // very next load, so a player would win OMNISCIENT and lose it at the next boot.
     titles: strArr(u.titles),
-    musicVocals: u.musicVocals === true,
     boosts: u.boosts && typeof u.boosts === 'object' ? Object.fromEntries(Object.entries(u.boosts).filter(([k, v]) => typeof k === 'string' && k && isNum(v))) : {},
+    musicVocals: u.musicVocals === true,
   };
   const e = raw.equipped && typeof raw.equipped === 'object' ? raw.equipped : {};
   for (const k of ['trail', 'glow', 'rider', 'theme', 'title']) {

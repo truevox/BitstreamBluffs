@@ -223,7 +223,7 @@ describe('defaultProfile', () => {
     expect(p.lifetime.tricks).toEqual({});
     // W5 added `titles` (achievement title rewards). The key is part of the v1 shape from the start so a
     // fresh profile and a reloaded one stay byte-identical; adding it lazily made the two disagree.
-    expect(p.unlocked).toEqual({ biomes: [], cosmetics: [], titles: [], boosts: {} });
+    expect(p.unlocked).toEqual({ biomes: [], cosmetics: [], titles: [], boosts: {}, musicVocals: false });
     expect(p.equipped).toEqual({ trail: 'default', glow: 'default', rider: 'default', theme: 'default', title: 'default' });
     expect(p.biomeMask).toBe(0);
     expect(p.missions).toEqual({ counter: 0, active: [], progress: {} });

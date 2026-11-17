@@ -24,6 +24,7 @@ import { LeaderboardView, SettingsView, SeedView, ProfileView, ShopView } from '
 import { titleBadgeLayout } from '../ui/ProfileLayout.js';
 import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
+import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 
 const CONTROLS_A = [['W', 'PUSH'], ['A/D', 'TILT'], ['A+D', 'TUCK'], ['S', 'BRAKE'], ['SPACE', 'HOP']];
 const CONTROLS_B = [['SHIFT', 'RESET'], ['← →', 'HELI SPIN'], ['↑', 'AIR BRAKE'], ['↓', 'CHUTE'], ['ESC', 'PAUSE']];
@@ -64,7 +65,12 @@ export class TitleScene extends Phaser.Scene {
     addScanlines(this);
 
     this.input_ = new MenuInput(this, (a) => this._onAction(a));
-    this.events.once('shutdown', () => this._closeView());
+    // Compact song/transport controls in the empty upper-right band.
+    this.jukebox = new JukeboxHUD(this,theme,{x:335,y:61});
+    this.events.once('shutdown', () => {
+      this.jukebox?.destroy();this.jukebox=null;
+      this._closeView();
+    });
     this.cameras.main.fadeIn(180, 5, 6, 15);
   }
 

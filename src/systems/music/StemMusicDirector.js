@@ -9,7 +9,7 @@ import { StemFXMixer } from './MusicFXGraph.js';
 import { AdaptiveBiomeRouter } from './AdaptiveBiomeRouter.js';
 import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
 import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.js';
-import { defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex } from './MusicPlaylist.js';
+import { defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices } from './MusicPlaylist.js';
 import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -50,6 +50,11 @@ export class StemMusicDirector {
 		this._nextPromise = null;
 		this._nextIndex = null;
 		this._loading = null;
+		this.transportPaused = false;
+		this._resumeOffset = 0;
+		this._transportHistory = [];
+		this._lastPlayed = null;
+		this._skipHistoryOnce = false;
 		this.initPromise = this._loadCatalog();
 	}
 
@@ -100,7 +105,17 @@ export class StemMusicDirector {
 		const selected = sanitizeSongSelection(selection);
 		const changed = JSON.stringify(selected) !== JSON.stringify(this.songEnabled);
 		this.songEnabled = selected;
-		if (!changed || !this.started) return;
+		if (!changed) return;
+		if (this.transportPaused) {
+			const next = nextEnabledSongIndex(this.catalog, this.songEnabled, -1);
+			if(next<0){this.stop();return;}
+			if(this.songEnabled[this.catalog[this.trackIndex]?.id]===false){
+				this.trackIndex=next;
+				this._resumeOffset=0;
+			}
+			return;
+		}
+		if (!this.started) return;
 		const next = nextEnabledSongIndex(this.catalog, this.songEnabled, -1);
 		if (next < 0) {
 			// Crucially NO procedural fallback: the owner's all-off setting
@@ -269,7 +284,10 @@ export class StemMusicDirector {
 		if (this.disposed || !this.ready) return false;
 		const first = this._nextEnabledIndex(-1);
 		if (first < 0) { this.stop(); return false; }
-		if (!this.pack || this.songEnabled[this.track?.id] === false) this.trackIndex = first;
+		if (!this.catalog[this.trackIndex] ||
+			this.songEnabled[this.catalog[this.trackIndex].id] === false)
+			this.trackIndex = first;
+		this.transportPaused = false;
 		this.started = true;
 		if (this.bus && this.ctx) this.bus.gain.setTargetAtTime(1, this.ctx.currentTime, 0.025);
 		this._ensureRunning();
@@ -287,7 +305,11 @@ export class StemMusicDirector {
 		if (!this.pack && !this._loading) {
 			const index = this.songEnabled[this.catalog[this.trackIndex]?.id] !== false
 				? this.trackIndex : next;
-			this._loading = this._beginTrack(index, null).finally(() => { this._loading = null; });
+			const offset=this._resumeOffset;
+			this._resumeOffset=0;
+			const pending=this._beginTrack(index,null,offset);
+			this._loading=pending;
+			pending.finally(()=>{if(this._loading===pending)this._loading=null;});
 		}
 		if (!this._timer) this._timer = setInterval(() => { this._pump(); }, 75);
 	}
@@ -369,7 +391,7 @@ export class StemMusicDirector {
 		finally { if (this.inflight.get(key) === promise) this.inflight.delete(key); }
 	}
 
-	async _beginTrack(index, desiredAt) {
+	async _beginTrack(index, desiredAt, offsetSeconds=0) {
 		if (index < 0 || !this.catalog[index] ||
 			this.songEnabled[this.catalog[index].id] === false) {
 			if (this._nextEnabledIndex(-1) < 0) this.stop();
@@ -390,6 +412,16 @@ export class StemMusicDirector {
 				else if (next !== index) this._beginTrack(next, null);
 				return;
 			}
+			// Record history when a track actually begins, not when a stale
+			// async request *intended* to begin one.
+			if(this.track?.id && this.track.id!==info.track.id){
+				this._lastPlayed={id:this.track.id,title:this.track.title};
+				if(!this._skipHistoryOnce){
+					this._transportHistory.push({id:this.track.id,title:this.track.title});
+					if(this._transportHistory.length>12)this._transportHistory.shift();
+				}
+			}
+			this._skipHistoryOnce=false;
 			this.pack = info.pack;
 			this.track = info.track;
 			this.packBase = info.base;
@@ -429,7 +461,8 @@ export class StemMusicDirector {
 				await Promise.all(this._wantedNames(info.pack).map((s) => this._fetchSource(info, 0, s, token)));
 			}
 			if (token !== this._token || this.disposed) return;
-			this.clockStart = Math.max(this.ctx.currentTime + 0.12, desiredAt || 0);
+			this.clockStart=Math.max(this.ctx.currentTime+.12,desiredAt||0)-
+				clamp(Number(offsetSeconds)||0,0,Math.max(0,this.pack.duration-.1));
 			this.adaptive?.configure(this.pack, this.clockStart,
 				{ biome: this.biome, airborne: this.airborne });
 			this.adaptive?.setEnabled(this.dynamicOrchestra);
@@ -508,8 +541,9 @@ export class StemMusicDirector {
 			if (!this._loading) {
 				const nextIndex = this._nextEnabledIndex(this.trackIndex);
 				if (nextIndex < 0) { this.stop(); return; }
-				this._loading = this._beginTrack(nextIndex, this.clockStart + duration)
-					.finally(() => { this._loading = null; });
+				const pending=this._beginTrack(nextIndex,this.clockStart+duration);
+				this._loading=pending;
+				pending.finally(()=>{if(this._loading===pending)this._loading=null;});
 			}
 			return;
 		}
@@ -535,6 +569,85 @@ export class StemMusicDirector {
 				else sleepSafe(this._fetchSource(info, i, name, token));
 			}
 		}
+	}
+
+	/** One canonical transport for Title, Pause, and Game-Over. These
+	 * screens never instantiate a second audio player or own a playback
+	 * clock. Browser AudioContext suspension is distinct from user pause.
+	 */
+	transportSnapshot() {
+		const enabled=enabledSongIndices(this.catalog,this.songEnabled);
+		const current=this.catalog[this.trackIndex]||null;
+		const index=enabled.includes(this.trackIndex) ? this.trackIndex : enabled[0];
+		const upcoming=[];
+		if(enabled.length && index!==undefined){
+			let cursor=enabled.indexOf(index);
+			for(let i=0;i<Math.min(2,enabled.length);i++){
+				cursor=(cursor+1)%enabled.length;
+				upcoming.push(this.catalog[enabled[cursor]]);
+			}
+		}
+		return {
+			state:!enabled.length?'stopped':
+				this.transportPaused?'paused':
+				this.started?(this.pack?'playing':'loading'):'stopped',
+			current: enabled.length ? (current||this.track) : null,
+			previous:this._lastPlayed||this._transportHistory.at(-1)||null,
+			upcoming,
+			position:this.transportPaused?this._resumeOffset:
+				this.started&&this.ctx&&this.clockStart!==null?
+					Math.max(0,this.ctx.currentTime-this.clockStart):0,
+			audioSuspended:this.ctx?.state==='suspended',
+		};
+	}
+
+	transportPause() {
+		if(!this.started)return false;
+		const position=this.pack&&this.ctx&&this.clockStart!==null?
+			clamp(this.ctx.currentTime-this.clockStart,0,
+				Math.max(0,this.pack.duration-.1)):0;
+		this.stop();
+		this._resumeOffset=position;
+		this.transportPaused=true;
+		return true;
+	}
+
+	transportPlay() {
+		if(this.disposed||!this.ready||this._nextEnabledIndex(-1)<0)
+			return false;
+		if(this.started)return true;
+		return this.start();
+	}
+
+	/** Previous takes the actual last-played song where possible; if
+	 * there is no history, wrap to the preceding enabled playlist slot.
+	 * Paused intent is retained across skips; only Play resumes sound.
+	 */
+	transportStep(direction) {
+		if(this.disposed||!this.ready)return false;
+		const enabled=enabledSongIndices(this.catalog,this.songEnabled);
+		if(!enabled.length){this.stop();return false;}
+		const wasPaused=this.transportPaused;
+		const current=enabled.includes(this.trackIndex)?
+			enabled.indexOf(this.trackIndex):0;
+		let target;
+		if(direction<0){
+			while(this._transportHistory.length){
+				const previous=this._transportHistory.pop();
+				const found=this.catalog.findIndex(t=>t.id===previous.id);
+				if(enabled.includes(found)){target=found;break;}
+			}
+			if(target===undefined)target=enabled[(current+enabled.length-1)%enabled.length];
+			this._skipHistoryOnce=true;
+		}else{
+			target=enabled[(current+1)%enabled.length];
+			this._skipHistoryOnce=false;
+		}
+		this.stop();
+		this.trackIndex=target;
+		this._resumeOffset=0;
+		if(wasPaused){this.transportPaused=true;return true;}
+		return this.start();
 	}
 
 	/** Real-engine passage seek used by the in-game lab.
@@ -574,6 +687,8 @@ export class StemMusicDirector {
 
 	stop() {
 		this.started = false;
+		this.transportPaused=false;
+		this._resumeOffset=0;
 		this._token++;
 		if (this._timer) clearInterval(this._timer);
 		this._timer = null;

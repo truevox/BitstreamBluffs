@@ -41,6 +41,7 @@ import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
 import { uiSfx } from '../ui/Sound.js';
+import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { gameOverLine } from '../systems/CrashReport.js';
 
 const PANEL_Y = 54;
@@ -156,6 +157,8 @@ export class GameOverScene extends Phaser.Scene {
     });
     this.footer.setAlpha(0.7);
     addScanlines(this);
+    // End screen permits a soundtrack audition without starting a new run.
+    this.jukebox=new JukeboxHUD(this,theme,{x:335,y:4});
 
     // Input is live immediately; nothing below waits on async work.
     // retryAction: Space and pad RB also send 'retry', which retries even from inside the shop (decision 7).
@@ -169,6 +172,7 @@ export class GameOverScene extends Phaser.Scene {
     };
     this.input.on('pointerdown', this._onPointer);
     this.events.once('shutdown', () => {
+      this.jukebox?.destroy();this.jukebox=null;
       this.alive = false;
       this.input.off('pointerdown', this._onPointer);
       // W4.1: no timer or view may outlive the scene, or a popup fires into a scene that is gone.

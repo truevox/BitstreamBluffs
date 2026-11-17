@@ -23,6 +23,7 @@
  * unavailable (headless, Jest) and no public method ever throws.
  */
 import { EVT } from '../events.js';
+import { REG } from '../constants.js';
 import { Rng } from './Rng.js';
 import { StemMusicDirector } from './music/StemMusicDirector.js';
 import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
@@ -75,6 +76,7 @@ export class AudioSynth {
     this._musicTimer = null;
     this._musicSeed = null;
     this._musicWanted = false;
+    this._jukeboxMode = false;
     this._intensity = 0;
     this._distIntensity = 0;
     this._speedIntensity = 0;
@@ -140,7 +142,10 @@ export class AudioSynth {
         });
         on(EVT.SETTINGS_CHANGED, (p) => { if (p && p.settings) this.applySettings(p.settings); });
         on(EVT.GAME_PAUSE, () => this._setPaused(true));
-        on(EVT.GAME_RESUME, () => this._setPaused(false));
+        on(EVT.GAME_RESUME, () => {
+          this._jukeboxMode=false;
+          this._setPaused(false);
+        });
         on(EVT.INPUT_ACTION, () => { if (!this.ctx || this.ctx.state !== 'running') this.unlock(); });
       }
       if (typeof window !== 'undefined') {
@@ -309,7 +314,8 @@ export class AudioSynth {
       this._domListeners = this._domListeners.filter((d) => d[1] === 'visibilitychange');
     }
     if (this._musicWanted && hasEnabledSongs(this.settings.musicEnabledSongs)) {
-      if (!this._activateStemMusic() && !this._musicTimer) this._startScheduler();
+      if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode)
+        this._startScheduler();
     }
   }
 
@@ -573,7 +579,8 @@ export class AudioSynth {
           this._stemMusic?.stop();
           if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
         } else if (this._musicWanted && this.ctx) {
-          if (!this._activateStemMusic() && !this._musicTimer && this.ctx.state === 'running') {
+          if (!this._activateStemMusic() && !this._musicTimer &&
+              this.ctx.state === 'running' && !this._jukeboxMode) {
             this._startScheduler();
           }
         }
@@ -696,6 +703,7 @@ export class AudioSynth {
    */
   startMusic(seed) {
     try {
+      this._jukeboxMode = false;
       this._musicSeed = String(seed == null ? '' : seed);
       this._musicWanted = true;
       this._arrCache.clear();
@@ -730,10 +738,58 @@ export class AudioSynth {
     } catch (e) { /* ignore */ }
   }
 
+  /** One audio system, shared by Title/Pause/GameOver: never spin up
+   * a competing menu player. No procedural fallback in jukebox mode,
+   * because a disabled playlist means genuine silence.
+   */
+  jukeboxSnapshot() {
+    return this._stemMusic?.transportSnapshot()||{
+      state:'stopped',current:null,previous:null,upcoming:[],position:0,
+    };
+  }
+
+  jukeboxPlay() {
+    try {
+      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      if (!this._ensureCtx()) return false;
+      this._jukeboxMode = true;
+      this._musicWanted = true;
+      this.unlock();  // called from actual user interaction
+      if (!this._stemMusic.ready) return true; // onReady starts it
+      return this._activateStemMusic();
+    } catch { return false; }
+  }
+
+  jukeboxPause() {
+    const ok=this._stemMusic?.transportPause()||false;
+    if(ok){
+      this._musicWanted=false; // don't auto-resume after tab suspension
+      if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
+    }
+    return ok;
+  }
+
+  jukeboxStep(direction) {
+    try {
+      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      if (!this._ensureCtx()) return false;
+      const wasPaused=this._stemMusic.transportPaused;
+      this._jukeboxMode=true;
+      this._musicWanted=!wasPaused;
+      if(!this._stemMusic.ready){this.unlock();return false;}
+      // Choose and invalidate the previous async generation BEFORE
+      // AudioContext unlock can call _afterResume() and load another song.
+      const moved=this._stemMusic.transportStep(direction<0?-1:1);
+      this.unlock(); // browser user-gesture policy
+      return moved;
+    } catch {return false;}
+  }
+
   /** @returns {void} */
   stopMusic() {
     try {
       this._musicWanted = false;
+      this._jukeboxMode = false;
       this._stemMusic?.stop();
       if (this._musicTimer) clearInterval(this._musicTimer);
       this._musicTimer = null;

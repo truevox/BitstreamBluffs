@@ -20,6 +20,7 @@ import { MenuInput } from '../ui/MenuInput.js';
 import { LeaderboardView, SettingsView, SharecodeView } from '../ui/Views.js';
 import { fmtClock } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
+import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -103,7 +104,12 @@ export class PauseScene extends Phaser.Scene {
     this.hint.setAlpha(0.7);
 
     this.input_ = new MenuInput(this, (a) => this._onAction(a), { graceMs: 250 });
-    this.events.once('shutdown', () => this._close());
+    // The same shared soundtrack; pause scene does not own a music player.
+    this.jukebox=new JukeboxHUD(this,theme,{x:335,y:4});
+    this.events.once('shutdown',()=>{
+      this.jukebox?.destroy();this.jukebox=null;
+      this._close();
+    });
   }
 
   _onAction(action) {

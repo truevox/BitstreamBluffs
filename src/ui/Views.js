@@ -290,7 +290,7 @@ export class SoundManagerView extends View {
         {kind:'choice',label:'ORIGINAL VOCALS',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
           get:()=>settings().musicVocals===true,
-          set:v=>updateSetting(game,'musicVocals',v)},
+          set:v=>this._changeVocals(v)},
         {kind:'slider',label:'VOCALS LEVEL',
           disabled:settings().musicVocals!==true,
           get:()=>settings().vocalGain??1,
@@ -321,6 +321,19 @@ export class SoundManagerView extends View {
       this.note.setAlpha(.6);
       this.panel.add(this.note);
     }
+  }
+  _changeVocals(enabled){
+    updateSetting(this.scene.game,'musicVocals',enabled===true);
+    // The menu object is still active during click/keypress dispatch:
+    // update existing row availability in place instead of destroying
+    // the menu from inside one of its own pointer callbacks.
+    for(const item of this.menu.items){
+      if(item.label==='VOCALS LEVEL'||
+        item.label==='SYNTH MELODY WITH VOCALS'){
+        item.disabled=enabled!==true;
+      }
+    }
+    this.menu.refresh();
   }
   _buyVocals(){
     const progression=this.scene.registry.get(REG.PROGRESSION);
@@ -353,13 +366,7 @@ export class SoundManagerView extends View {
   handleAction(action){
     if(this.labView)return this.labView.handleAction(action);
     if(action==='cancel'){this.close();return true;}
-    const result=this.menu.handleAction(action);
-    // A change to vocals changes whether sliders are selectable.
-    if(this._unlocked() && this._vocalVisibility!==this.scene.registry.get(REG.SETTINGS).musicVocals){
-      this._vocalVisibility=this.scene.registry.get(REG.SETTINGS).musicVocals;
-      this._build();
-    }
-    return result;
+    return this.menu.handleAction(action);
   }
   destroy(){
     this.labView?.destroy();this.labView=null;
@@ -480,7 +487,11 @@ export class SoundLabView extends View {
       lab.setAirborne(this.airborne);
       lab.setSpeed(this.speed);
       lab.trackIndex=this.songIndex;
-      lab.onTrackStarted=()=>this._applySolo();
+      lab.onTrackStarted=track=>{
+        this.songIndex=track.index;
+        this._applySolo();
+        this.menu?.refresh();
+      };
       lab.start();
       this._build();
       this._tick();
