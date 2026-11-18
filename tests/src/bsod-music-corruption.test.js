@@ -41,12 +41,31 @@ describe('real BSOD proximity: original accompaniment corruption only',()=>{
 		expect(bsodThreatParameters(-7).blend).toBe(0);
 		expect(bsodThreatParameters(.08).blend).toBe(0);
 		const mid=bsodThreatParameters(.62),near=bsodThreatParameters(1);
+		expect(bsodThreatParameters(0).midMakeup).toBe(1);
+		expect(bsodThreatParameters(.5).midMakeup).toBeGreaterThan(1.18);
+		expect(bsodThreatParameters(.5).midMakeup).toBeLessThan(1.21);
+		expect(bsodThreatParameters(1).midMakeup).toBeCloseTo(1);
 		expect(mid.blend).toBeGreaterThan(0);
 		expect(near.blend).toBeGreaterThan(mid.blend);
 		expect(near.cutoffHz).toBeLessThan(mid.cutoffHz);
 		expect(near.tremoloDepth).toBeGreaterThan(mid.tremoloDepth);
 		expect(near.blend).toBeLessThan(1);
 		expect(bsodThreatParameters(Infinity).blend).toBe(0);
+	});
+
+	test('calibrated waveshaper cannot reproduce the old ~11 dB small-signal boost',()=>{
+		const ctx=fakeContext(),effect=createBsodThreatProcessor(ctx,ctx.createGain());
+		const curve=effect.shaper.curve;
+		const near=(index)=>({
+			x:index*2/(curve.length-1)-1,
+			y:curve[index],
+		});
+		const tiny=near(1034);
+		const smallSignalGain=tiny.y/tiny.x;
+		expect(smallSignalGain).toBeGreaterThan(1);
+		expect(smallSignalGain).toBeLessThan(1.65);
+		expect(Math.abs(curve[curve.length-1])).toBeLessThan(.34);
+		effect.destroy();
 	});
 
 	test('static DSP remains dry at a distance, corrupts as danger approaches, recovers',()=>{
@@ -61,12 +80,14 @@ describe('real BSOD proximity: original accompaniment corruption only',()=>{
 		expect(effect.wet.gain.value).toBeGreaterThan(.75);
 		expect(effect.filter.frequency.value).toBeLessThan(3000);
 		expect(effect.mod.gain.value).toBeGreaterThan(.15);
+		expect(effect.mixGain.gain.value).toBeGreaterThanOrEqual(1);
 		const count=effect.wet.gain.calls.length;
 		expect(effect.setDanger(.99)).toBe(false);
 		expect(effect.wet.gain.calls).toHaveLength(count);
 		expect(effect.setDanger(0)).toBe(true);
 		expect(effect.dry.gain.value).toBe(1);
 		expect(effect.wet.gain.value).toBe(0);
+		expect(effect.mixGain.gain.value).toBe(1);
 		effect.destroy();effect.destroy();
 		expect(effect.osc.stopCount).toBe(1);
 		expect(effect.setDanger(1)).toBe(false);
