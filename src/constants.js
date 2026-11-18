@@ -102,7 +102,7 @@ export const PHYSICS = Object.freeze({
   pushMinSlopeDeg: -5, // ...and when slope >= -5 degrees
   airBrakeDecel: 0.25, // up arrow: -25% horizontal speed
   parachuteGravityMul: 0.5, // down arrow
-  parachuteDurationMs: 800,
+  parachuteDurationMs: 880, // +10%; hold-to-spend shared reservoir each jump
   slowFactor: 0.5, // 'slow' hazard default speed multiplier
   scrambleDurationMs: 2000, // 'scramble' hazard default duration
 });

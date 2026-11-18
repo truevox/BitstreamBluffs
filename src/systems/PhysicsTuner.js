@@ -464,11 +464,12 @@ export class PhysicsTuner {
       speedMul *= daily.tuckSpeedMul || 1;
       steerMul *= daily.tuckSteerMul == null ? 1 : daily.tuckSteerMul;
     }
-    if (ctx.parachute) {
-      gravityMul *= b.parachuteGravityMul;
+    const airDensity = Number.isFinite(ctx.atmosphereDensity) ? Math.max(0, Math.min(1, ctx.atmosphereDensity)) : 1;
+    if (ctx.parachute && airDensity > 0) {
+      gravityMul *= 1 - (1 - b.parachuteGravityMul) * airDensity;
       steerMul = 0;
-    } else if (ctx.airBrake) {
-      gravityMul *= t.airBrakeGravityMul;
+    } else if (ctx.airBrake && airDensity > 0) {
+      gravityMul *= 1 - (1 - t.airBrakeGravityMul) * airDensity;
     }
 
     let tiltSign = 1;

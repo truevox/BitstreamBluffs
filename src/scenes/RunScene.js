@@ -812,7 +812,10 @@ export class RunScene extends Phaser.Scene {
     stepWorld(
       this.matter.world,
       simDt,
-      (stepMs) => sled.applyControls(pad, phys, stepMs),
+      (stepMs) => {
+        const air = this.bsod ? this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere()) : null;
+        sled.applyControls(pad, phys, stepMs, air);
+      },
       (stepMs) => {
         sled.endStep(stepMs);
         this.processContacts();
@@ -970,8 +973,9 @@ export class RunScene extends Phaser.Scene {
       // Decision 4: Head Start's opening surge multiplies in for its window only (exactly 1 afterwards).
       speedBoost: (this.boostMs > 0 ? this.boostFactor : 1) * wardSpeedMul(this.wards) * openingSpeedMul(this.opening, this.runTimeMs),
       timeMs: this.runTimeMs,
-      parachute: sled.parachuteMs > 0,
-      airBrake: sled.airBrakeActive,
+      parachute: !!pad.parachute && !sled.grounded && (sled.parachuteFuelMs ?? PHYSICS.parachuteDurationMs) > 0,
+      airBrake: !!pad.airBrake && !sled.grounded,
+      atmosphereDensity: this.bsodAtmosphere(),
       airborne: !sled.grounded,
       braking: !!pad.brake,
       wards: this.wards,

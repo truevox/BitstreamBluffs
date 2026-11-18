@@ -12,6 +12,7 @@ import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
 import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyserStep } from '../systems/PhysicsTuner.js';
 import { springReboundVelocity } from '../systems/BiomeEffects.js';
+import { aerodynamicStep, canopyFuelStep } from '../systems/BsodAerodynamics.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -59,6 +60,7 @@ export class Sled {
     this.hopBufferMs = 0;
     this.pushCooldownMs = 0;
     this.parachuteMs = 0;
+    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
     this.chuteUsed = false;
     this.tucked = false;
     this.airBrakeActive = false;
@@ -156,6 +158,7 @@ export class Sled {
     if (this._contactFlag) {
       if (this.msSinceContact >= TUNING.groundedGraceMs) {
         this.chuteUsed = false; // freshly landed
+        this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
         this._landSettleMs = TUNING.landSettleMs;
         this.touchdownVx = this._preVx;
         this.touchdownVy = this._preVy;
@@ -183,7 +186,7 @@ export class Sled {
    * @param {number} stepMs
    * @returns {void}
    */
-  applyControls(pad, phys, stepMs) {
+  applyControls(pad, phys, stepMs, atmosphere = null) {
     if (this.destroyed || !this.inWorld) return;
     const dt = stepMs / 1000;
     const b = this.body;
@@ -196,19 +199,19 @@ export class Sled {
     // ---- one-shot edges (only on the first sub-step of a frame) ----
     if (firstOfFrame) {
       if (pressed.hop) this.hopBufferMs = TUNING.hopBufferMs;
-      if (pressed.parachute && !grounded && !this.chuteUsed) {
-        this.parachuteMs = PHYSICS.parachuteDurationMs;
-        this.chuteUsed = true;
-      }
+      // Parachute uses continuous hold input, not a one-shot pulse. Fuel is shared
+      // between every deployment in this flight and restored on actual touchdown.
       this.heliInput = (pad && pad.heli) || 0;
     }
     this.hopBufferMs = Math.max(0, this.hopBufferMs - stepMs);
     this.pushCooldownMs = Math.max(0, this.pushCooldownMs - stepMs);
     this.geyserCooldownMs = Math.max(0, (this.geyserCooldownMs || 0) - stepMs);
     this.invulnerableMs = Math.max(0, this.invulnerableMs - stepMs);
-    if (this.parachuteMs > 0) this.parachuteMs = Math.max(0, this.parachuteMs - stepMs);
-    if (grounded) this.parachuteMs = 0;
-    const chute = this.parachuteMs > 0;
+    const fuel = canopyFuelStep(this.parachuteFuelMs, !!(pad && pad.parachute), !grounded, stepMs, PHYSICS.parachuteDurationMs);
+    this.parachuteFuelMs = fuel.fuelMs;
+    const chute = fuel.deployed;
+    this.parachuteMs = chute ? Math.max(0.001, this.parachuteFuelMs) : 0;
+    if (chute) this.chuteUsed = true;
     this.airBrakeActive = !!(pad && pad.airBrake) && !grounded;
     this.tucked = !!(pad && pad.tuck);
 
@@ -245,11 +248,20 @@ export class Sled {
     }
     // air brake (Up): -25 % horizontal speed over airBrakeSpanMs, reduced descent
     if (this.airBrakeActive) {
-      vx *= Math.exp((Math.log(1 - PHYSICS.airBrakeDecel) * stepMs) / TUNING.airBrakeSpanMs);
-      if (vy > 0) vy *= Math.exp(-TUNING.airBrakeDescentDamp * dt);
+      const density = atmosphere ? atmosphere.atmosphereDensity : 1;
+      vx *= Math.exp((Math.log(1 - PHYSICS.airBrakeDecel) * stepMs * density) / TUNING.airBrakeSpanMs);
+      if (vy > 0) vy *= Math.exp(-TUNING.airBrakeDescentDamp * dt * density);
     }
     // parachute stall: float
-    if (chute && vy > 0) vy *= Math.exp(-1.6 * dt);
+    if (chute && vy > 0 && (!atmosphere || atmosphere.atmosphereDensity > 0)) vy *= Math.exp(-1.6 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1));
+    // Deterministic physical BSOD airflow; wind/audio renderers never affect physics.
+    if (!grounded && atmosphere) {
+      const wind = aerodynamicStep({ vx, vy, relativeAirX: atmosphere.relativeAirX,
+        atmosphereDensity: atmosphere.atmosphereDensity, parachute: chute,
+        airBrake: this.airBrakeActive, stepMs });
+      vx += wind.dvx;
+      vy += wind.dvy;
+    }
 
     // push (W): only when nearly stopped on flat / uphill ground
     speed = Math.hypot(vx, vy);
@@ -372,6 +384,7 @@ export class Sled {
     this.msSinceContact = TUNING.groundedGraceMs + 1;
     this._sinceLaunchMs = 0;
     this.chuteUsed = false;
+    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
     this._sync();
   }
 
@@ -394,6 +407,7 @@ export class Sled {
     this.msSinceContact = TUNING.groundedGraceMs + 1;
     this._sinceLaunchMs = 0;
     this.chuteUsed = false;
+    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
     this._sync();
   }
 
@@ -455,6 +469,7 @@ export class Sled {
     this._groundRunMs = 0;
     this._sinceLaunchMs = 0;
     this.parachuteMs = 0;
+    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
     this.chuteUsed = false;
     this.airtimeMs = 0;
     this._sync();

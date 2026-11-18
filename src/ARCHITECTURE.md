@@ -1521,3 +1521,14 @@ and balancing infinite high-risk flights are separate follow-up stages.
 Settings: windEnabled default true is additive to already-shipped windVolume. Controls branch
 owns SaveStore persistence and SettingsView toggle; music team owns consumption in
 AudioSynth, so do not claim muting is functional before its audio-side change lands.
+
+## v2.16 in-progress: atmospheric effects (separate gameplay slice)
+
+Sled.applyControls accepts an optional authoritative BSOD state snapshot. A pure
+BsodAerodynamics module applies signed wind-driven canopy propulsion, mild canopy
+lift and speed-dependent airbrake lift. PHYSICS.parachuteDurationMs is 880ms,
+consumed only while held airborne, preserved between releases and refilled on
+landing or externally launched new flight. PhysicsTuner gates parachute and
+airbrake gravity effects by atmospheric density; Space Mountain nulls both.
+These numerical coefficients are provisional pending arcade playtesting.
+No music source or audio rendering has been modified.
