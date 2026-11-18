@@ -10,6 +10,14 @@ const strategies={
   max:{advanced:false,rank:80},
   tall:{advanced:true,rank:0},
   tallmax:{advanced:true,rank:80},
+  'trial12-fast':{advanced:true,ranks:{canopy:12,airbrake:12},
+    setup:{gapPx:220,wallSpeedPxS:450,launchHeightPx:700,launchSpeedPxS:450,launchRisePxS:-700}},
+  'trial12-sprint':{advanced:true,ranks:{canopy:12,airbrake:12},
+    setup:{gapPx:460,wallSpeedPxS:850,launchHeightPx:700,launchSpeedPxS:700,launchRisePxS:-700}},
+  'trial12-tall':{advanced:true,ranks:{canopy:12,airbrake:12},
+    setup:{gapPx:680,wallSpeedPxS:450,launchHeightPx:1100,launchSpeedPxS:450,launchRisePxS:-900}},
+  'trial12-wild':{advanced:true,ranks:{canopy:12,airbrake:12},
+    setup:{gapPx:220,wallSpeedPxS:850,launchHeightPx:1100,launchSpeedPxS:700,launchRisePxS:-900}},
 };
 const rankMatch=/^rank-(\d+)$/.exec(scenario);
 if(rankMatch&&Number(rankMatch[1])<=200)strategies[scenario]={advanced:false,rank:Number(rankMatch[1])};
@@ -34,7 +42,7 @@ try{
     const g=window.__bbGame,store=g.registry.get('progression').store;
     const ranks=setup.ranks||(setup.rank?{canopy:setup.rank,bsodGrace:setup.rank,hop:setup.rank,airbrake:setup.rank}:{});
     const gym={discovered:true,owned:true,advanced:setup.advanced};
-    if(setup.advanced)gym.setup={
+    if(setup.advanced)gym.setup=setup.setup||{
       gapPx:460,wallSpeedPxS:450,launchHeightPx:1100,
       launchSpeedPxS:450,launchRisePxS:-900,
     };

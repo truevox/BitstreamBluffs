@@ -2199,3 +2199,19 @@ buying both rank 25 tiers from zero costs 4,400 (canopy) + 3,594
 The same-seed rank-24 success would cost **7,282 shards** for both tiers.
 The browser fixture pregrants ranks for reproducibility; it does not prove
 that the hidden setup is economically accessible or comfortable for humans.
+
+### Alternative launch conditions tested, not adopted
+
+Four **bounded**, test-only advanced launch fixtures were tried with canopy
+rank 12 + airbrake rank 12, on the same frozen seed and with the same simple
+controller. `gap / wall speed / height / speed / rise` in game px units:
+
+- `trial12-fast`: 220 / 450 / 700 / 450 / -700: zero Bluffs, two catches
+- `trial12-sprint`: 460 / 850 / 700 / 700 / -700: zero Bluffs, two catches
+- `trial12-tall`: 680 / 450 / 1100 / 450 / -900: one Bluff, two catches
+- `trial12-wild`: 220 / 850 / 1100 / 700 / -900: zero Bluffs, two catches
+
+The normal default course yielded two scored Bluffs at rank 12 with this
+controller, so none of these four was an evidence-backed improvement.
+They do not establish impossibility for a better controller or human.
+**No default or gameplay balancing values were changed.**
