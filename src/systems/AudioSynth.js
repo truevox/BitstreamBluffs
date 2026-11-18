@@ -669,6 +669,9 @@ export class AudioSynth {
       Number.isFinite(state?.relativeAirX) ? state.relativeAirX : 0;
     this._bsodDanger01 = this._windActive && Number.isFinite(state?.proximity01)
       ? clamp01(state.proximity01) : 0;
+    // Musical threat is a READ-ONLY proximity bus, independent of airflow.
+    // Zero relative wind may be quiet next to the lethal wall.
+    this._stemMusic?.setBsodDanger?.(this._bsodDanger01);
     this._applyWindFromBsod();
   }
 

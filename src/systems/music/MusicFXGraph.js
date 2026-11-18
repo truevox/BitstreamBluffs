@@ -1,4 +1,5 @@
 import { BiomeSpaceBus } from './BiomeSpaceBus.js';
+import { BSOD_THREAT_STEMS, createBsodThreatProcessor } from './BsodThreatProcessor.js';
 /**
  * Low-cost WebAudio processors. Types are trusted code, specifications are validated data.
  * Each returned chain owns its oscillators/connections and can be disposed independently.
@@ -224,7 +225,11 @@ export class StemFXMixer {
 		mix.gain.value = 1;
 		motion.connect(mix);
 		const output = this.ctx.createGain();
-		output.connect(this.mixInput);
+		// Only the three ORIGINAL accompaniment stems get BSOD corruption.
+		// This permanent processor survives every biome FX replacement.
+		const threat = BSOD_THREAT_STEMS.includes(id)
+			? createBsodThreatProcessor(this.ctx, this.mixInput) : null;
+		output.connect(threat?.input || this.mixInput);
 		const chain = buildMusicChain(this.ctx, effects, output);
 		mix.connect(chain.input);
 		const send = this.ctx.createGain();
@@ -234,7 +239,7 @@ export class StemFXMixer {
 		send.gain.value = defaultRoomSend;
 		mix.connect(send);
 		send.connect(this.space.input);
-		const source = { input, motion, mix, output, chain, send, defaultRoomSend };
+		const source = { input, motion, mix, output, chain, send, threat, defaultRoomSend };
 		this.sources.set(id, source);
 		return input;
 	}
@@ -254,6 +259,11 @@ export class StemFXMixer {
 		const param = motion ? src.motion.gain : src.input.gain;
 		numericParam(param, clamp(value, 0, 2), this.ctx.currentTime, clamp(time, 0.005, 1, 0.04));
 		return true;
+	}
+
+	/** Authoritative BSOD proximity on ORIGINAL guitar, piano, Other only. */
+	setThreatLevel(id, proximity01) {
+		return this.sources.get(id)?.threat?.setDanger(proximity01) || false;
 	}
 
 	setMixGain(id, value, { time = 0.20 } = {}) {
@@ -288,7 +298,7 @@ export class StemFXMixer {
 		const output = this.ctx.createGain();
 		output.gain.value = 0;
 		const chain = buildMusicChain(this.ctx, effects, output);
-		output.connect(this.mixInput);
+		output.connect(src.threat?.input || this.mixInput);
 		src.mix.connect(chain.input);
 		const previous = { chain: src.chain, output: src.output };
 		src.chain = chain;
@@ -330,6 +340,7 @@ export class StemFXMixer {
 		for (const src of this.sources.values()) {
 			try { src.input.disconnect(); src.motion.disconnect(); src.mix.disconnect(); src.output.disconnect(); src.send.disconnect(); } catch {}
 			src.chain.dispose();
+			src.threat?.destroy();
 		}
 		this.sources.clear();
 		this.space.destroy();

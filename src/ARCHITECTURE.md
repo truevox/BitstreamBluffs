@@ -244,7 +244,8 @@ All additive; no existing signature or payload changed.
   Menu uses unprocessed original accompaniment with Debumont melody and no speed/jump/BSOD DSP.
   Settings `musicShuffle` persists through SaveStore; ON shuffles following enabled songs in non-repeating rounds,
   not the fresh-load One More Run opener. All songs OFF remains music silence.
-  Music intensity also follows `DISTANCE_CHANGED` during runs only. There is **no event for push or hop**, so RunScene
+  Music intensity also follows `DISTANCE_CHANGED` during runs only.
+* **BSOD accompaniment corruption:** the authoritative post-physics `BSOD_STATE_CHANGED.proximity01` independently drives music-only WebAudio darkening/distortion/tremolo on the ORIGINAL guitar, piano and Other buses via `BsodThreatProcessor`. It never drives or changes global SFX, environmental wind, vocals, bass, drums, note timing or source files. The signed `relativeAirX` continues to control wind separately, so quiet relative airflow near the wall can coexist with maximal musical threat. Original accompaniment recovers smoothly on escape, and Title/Pause/GameOver force clean neutral music without resetting the active track clock. The provisional effect intensity awaits human audition before release. There is **no event for push or hop**, so RunScene
   must call `audio.playSfx('push')` / `playSfx('hop')` itself. Everything else is event driven (also `COMBO_CHANGED`
   reason `'trick'` -> `combo` SFX, `ZONE_ENTER` -> soft blip). It never throws without WebAudio.
 * **GlitchDirector**: event ids are `g<n>-<4 hex>`; the hex tag is the seed-derived pattern that `GlitchPipeline` uses

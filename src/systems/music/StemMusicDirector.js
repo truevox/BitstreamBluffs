@@ -24,6 +24,7 @@ export class StemMusicDirector {
 		this.shuffleEnabled = false;
 		this._shuffleRemaining = [];
 		this.menuMode = false;
+		this.bsodDanger = 0;
 		this.dynamicOrchestra = false;
 		this.speedPxS = 0;
 		this._timbreSignatures = new Map();
@@ -164,6 +165,8 @@ export class StemMusicDirector {
 		if (this.menuMode === next) return;
 		this.menuMode = next;
 		if (next) {
+			// Menus restore all three original accompaniments to clean DSP.
+			this.setBsodDanger(0);
 			this.setAirborne(false);
 			this.setCombo(1);
 			this.setSpeed(0);
@@ -173,6 +176,16 @@ export class StemMusicDirector {
 		this.adaptive?.setBiome(next ? HOME_BIOME : this.biome);
 		this.adaptive?.setEnabled(this.dynamicOrchestra && !next);
 		this._applyMusicTimbres(true);
+	}
+
+	/** The real physical BSOD proximity drives only accompaniment corruption.
+	 * The wind signal is independent and only AudioSynth reads airflow.
+	 */
+	setBsodDanger(proximity01) {
+		this.bsodDanger = this.menuMode || !Number.isFinite(proximity01) ? 0 :
+			Math.max(0, Math.min(1, proximity01));
+		for (const stem of ['guitar','piano','other'])
+			this.mixer?.setThreatLevel?.(stem, this.bsodDanger);
 	}
 
 	/** Original stem processing runs INDEPENDENTLY of the Dynamic
