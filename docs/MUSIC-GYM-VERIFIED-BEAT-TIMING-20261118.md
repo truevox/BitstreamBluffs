@@ -103,3 +103,21 @@ uv run --no-project --with numpy --with scipy python tools/music/research_gym_ph
 ```
 
 The tools refuse to overwrite evidence. For future production grid approval, derive exact source-frame pulse positions, validate the metrical identity/section boundaries with independent methods and human spot checks, then verify durable original-recording provenance. Under no circumstances should these research FFT phases be copied directly into the production catalog as `verified`.
+
+## November 18: portable eight-window visual review and two-reviewer gate
+
+The exact original WAV, drums, bass and independent beat-tracker hypotheses
+are now available as **offline visual evidence** in
+[`docs/music-review/README.md`](./music-review/README.md). The self-contained
+HTML is [`one-more-run-timestamped-onsets-20261118.html`](./music-review/one-more-run-timestamped-onsets-20261118.html), with eight original-source time ranges, separate WAV/drums/bass onset lanes, and **unverified** 81/161 BPM tempo-hypothesis ticks. A read-only source hashing and regeneration check produced identical HTML bytes; no audio recording is bundled.
+
+`tools/music/compile_gym_quarter_note_reviews.py` prepares two independently
+completed, source-bound annotation files and checks exact original WAV/pack
+hashes, regular quarter-note identity, source-frame pulse coverage,
+confidence >=0.90 and **<=45ms** agreement between the two reviewers.
+Where there is disagreement it returns an **uncertain** section without
+candidate pulses. Crucially its output is intentionally **not** in the runtime
+beat-grid format; even two agreeing reviewers cannot silently make the Gym
+wait for an unapproved beat. Blank templates and source JSON evidence are
+portable in `docs/music-review/`. Human reviews and final explicit promotion
+remain **NOT DONE**; the real released soundtrack remains fail-closed.

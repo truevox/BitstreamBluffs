@@ -1,0 +1,144 @@
+{
+  "format": "bitstream-quarter-pulse-human-review-v1",
+  "trackId": "local-one-more-run-bitstream-bluffs",
+  "originalWavSha256": "636bbd42f7ece1c085b4768f25fb0e65d7f29963a22a948e0b6e697ef0284721",
+  "manifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
+  "sourceFrameCount": 8380800,
+  "sourceSampleRate": 48000,
+  "reviewerId": "",
+  "reviewerRole": "independent-human",
+  "attestation": "PENDING",
+  "reviewVersion": "1",
+  "sections": [
+    {
+      "segmentIndex": 0,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 1,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 2,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 3,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 4,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 5,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 6,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 7,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 8,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 9,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 10,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 11,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 12,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 13,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    },
+    {
+      "segmentIndex": 14,
+      "status": "uncertain",
+      "confidence": 0,
+      "meter": "unresolved",
+      "pulseFrames": [],
+      "notes": "Not yet independently reviewed"
+    }
+  ],
+  "instructions": [
+    "Enter your own nonempty reviewer ID, without using another reviewer's answers",
+    "Review the actual original WAV whose SHA-256 is recorded above",
+    "For every source section, independently identify the regular quarter-note pulse",
+    "Only use status reviewed if you listened and marked every expected pulse in that segment",
+    "Set meter regular-quarter-note, confidence >=0.90, pulseFrames as original 48kHz sample indices",
+    "Otherwise leave uncertain with empty pulseFrames; document ambiguity",
+    "Set attestation to the documented exact sentence only after actually reviewing",
+    "Do not merge or promote this template, or output from this tool, into the game"
+  ]
+}

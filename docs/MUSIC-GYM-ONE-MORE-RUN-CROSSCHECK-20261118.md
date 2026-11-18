@@ -45,3 +45,21 @@ Each queued section contains exact original 48 kHz source-frame ranges, candidat
 Research scripts use existing Python numerical packages through `uv run --no-project --with numpy --with scipy` (and `--with librosa` for the different dynamic tracker), and streamed FFmpeg on the **remote original**. They refuse overwrites and do not generate replacement source tracks, shipping beat metadata, or audio for the user. Once the user can listen, the eight bounded windows provide a specific and efficient human-review protocol, rather than asking for a full 175-second manual transcription.
 
 **Safety and release gates:** Source and model provenance are not equivalent to listening confirmation. No song has passed an accountable musical quarter-note review; no real beat timings can yet be served. Control Friday can integrate the API now, but its result for the released songs remains `{trusted:false,release:'immediate',reason:'unverified-beat-grid'}`. Cross-browser and full playback timing can be checked separately after real grids have independent musical verification. Control owns READY, the optional 300 ms timer, and exactly one GO per attempt.
+
+## Follow-up: portable, timestamped visual evidence (2026-11-18)
+
+The source-bound review has been made independently inspectable via
+[`docs/music-review/README.md`](./music-review/README.md) and a self-contained
+[8-window SVG HTML report](./music-review/one-more-run-timestamped-onsets-20261118.html).
+It draws separate full original mix, drums and bass onset-energy lanes, and
+three *distinct unverified* rhythmic pulse hypotheses (the 80.75 BPM and
+161.50 BPM dynamic-programming prior paths, plus 163.839 BPM Fourier
+onset-comb phase). Curves are normalized per window and are NOT comparable
+loudness measurements. Original source hashes and every source segment frame
+are checked, no audio is embedded, and the generator produced byte-identical
+HTML on a second read-only WAV stream. All 15 segments remain **uncertain**.
+Two independently human-completed review templates are required before even
+a non-authoritative consensus candidate can be made. The consensus checker
+is structurally separate from the runtime `bitstream-beat-grid-v1` schema;
+tests confirm the real game validator rejects this research output. The
+actual music/game implementation is unchanged.
