@@ -109,3 +109,10 @@ reset. This is a **gameplay event test**, not an audible assertion that the
 unimplemented musical death sequence already works. Once Music Friday's
 state machine is committed, test the *same* contract against her six-stem
 mixer to ensure the four-beat recovery persists into the next run.
+
+**Fault isolation:** `RunScene` catches exceptions from synchronous
+`EVT.CRASH` observers so record finalization and `RUN_END` still execute.
+Music Friday's optional count-in listener should independently contain its
+own exceptions; a throwing EventEmitter handler may prevent other listeners
+from receiving that same event. The Control browser smoke injects an audio
+observer failure and proves a fatal record still completes.

@@ -1917,10 +1917,15 @@ export class RunScene extends Phaser.Scene {
     this.crashTimerMs = 0;
     this.emitFlow(this.score.onCrash());
     this.emitCombo('crash');
-    this.game.events.emit(EVT.CRASH, {
-      cause: c.cause, x: fs.x, y: fs.y, speedPxS: speed, hazardId: c.hazardId,
-      negated: false, fatal: true, runId: this.runId,
-    });
+    // A third-party/music observer may fail while constructing optional
+    // scratch/count-in audio. Fatal score, record, and GameOver must still
+    // finish; audio is never authoritative over a life ending.
+    try {
+      this.game.events.emit(EVT.CRASH, {
+        cause: c.cause, x: fs.x, y: fs.y, speedPxS: speed, hazardId: c.hazardId,
+        negated: false, fatal: true, runId: this.runId,
+      });
+    } catch (e) { console.warn('Fatal crash observer failed; finalizing run anyway',e); }
     const p = this.palette;
     this.fx.shards(fs.x, fs.y, fs.vx, fs.vy, [p.cyan, p.magenta, p.lime, p.amber, p.text], 46);
     this.fx.ring(fs.x, fs.y, p.danger, 64, 500);

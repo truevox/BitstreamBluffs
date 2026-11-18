@@ -2413,3 +2413,13 @@ approved music contract:
 `docs/MUSIC-DEATH-TURNTABLE-COUNT-IN-DESIGN-20261118.md`. Actual fatal
 music scratch/count-in DSP remains **Music Friday-owned and not present in
 this gameplay branch**; integration is a separate follow-up.
+
+The fatal `EVT.CRASH` emission is exception-contained at its producer, so a
+broken synchronous music listener cannot prevent the actual run record from
+being finalized and delivered via `RUN_END` (or prevent GameOver). The
+Chromium contract smoke injects a throwing fatal-audio observer after an
+immediate retry, forces another real physical BSOD death, and verifies the
+new run record and one `RUN_END` still complete. A throwing EventEmitter
+observer can still suppress *later* listeners on the same `EVT.CRASH`; each
+subsystem should contain its own audio callback failures. No synth/music
+exception is permitted to hold gameplay hostage.

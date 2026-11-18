@@ -122,6 +122,30 @@ try {
    fatalId:proof.state.runId,nextRunId:retry.runId,starts:starts.length,
    fatalCrashes:1,shielded:1,endEvents:1,manualEvents:0,
   });
+  // A broken audio/count-in listener must not strand the player or prevent
+  // the run from being saved. The shared emitter can throw synchronously.
+  const fault=await page.evaluate(()=>{
+   const g=window.__bbGame,r=g.scene.getScene('RunScene');
+   const beforeEnds=window.__fatalMusicContractEvents.filter(e=>e.name==='end').length;
+   const bad=()=>{throw Error('injected fatal music event listener crash')};
+   g.events.on('bb:crash',bad);
+   try {
+    r.bsod.wallX=r.sled.body.bounds.min.x+12;
+    r.bsod.wallSpeedPxS=10000;
+    g.headlessStep(16000,16.67);g.headlessStep(16017,16.67);
+   } finally {g.events.off('bb:crash',bad);}
+   return {crashed:r.crashed,runId:r.runId,
+    recordId:g.registry.get('lastRecord')?.id,
+    newEndCount:window.__fatalMusicContractEvents.filter(e=>e.name==='end').length-beforeEnds,
+    newCrashes:window.__fatalMusicContractEvents.filter(e=>e.name==='crash'&&
+      e.p?.fatal===true&&e.p?.runId===r.runId).length};
+  });
+  assert.equal(fault.crashed,true);
+  assert.equal(fault.runId,retry.runId);
+  assert.equal(fault.recordId,fault.runId);
+  assert.equal(fault.newEndCount,1);
+  assert.equal(fault.newCrashes,1);
+  console.log('THROWING_FATAL_MUSIC_LISTENER_CANNOT_PREVENT_RECORD_FINALIZATION_PASS',fault);
  } finally {await page.close();}
  const gym=await openRun(true);
  try {
