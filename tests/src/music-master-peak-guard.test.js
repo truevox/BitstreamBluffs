@@ -1,6 +1,6 @@
 import {
 	PEAK_KNEE,PEAK_MAX,masterPeakGuardSample,masterPeakGuardCurve,
-	createMasterPeakGuard,
+	createMasterPeakGuard,finalSampleCeilingCurve,createFinalSampleCeiling,
 } from '../../src/systems/music/MasterPeakGuard.js';
 
 describe('shared music/SFX/wind final output peak guard',()=>{
@@ -34,6 +34,20 @@ describe('shared music/SFX/wind final output peak guard',()=>{
 			expect(Math.abs(sample)).toBeLessThan(PEAK_MAX);
 		}
 	});
+	test('final sample-level stage is exactly bounded and unoversampled',()=>{
+		const curve=finalSampleCeilingCurve(8192);
+		expect(curve).toBeInstanceOf(Float32Array);
+		expect(curve.length).toBe(8192);
+		expect(curve[0]).toBeCloseTo(-PEAK_MAX);
+		expect(curve.at(-1)).toBeCloseTo(PEAK_MAX);
+		for(const x of curve)expect(Math.abs(x)).toBeLessThanOrEqual(PEAK_MAX+1e-7);
+		const mock={curve:null,oversample:'4x'};
+		const node=createFinalSampleCeiling({createWaveShaper:()=>mock});
+		expect(node).toBe(mock);
+		expect(node.oversample).toBe('none');
+		expect(node.curve).toBeInstanceOf(Float32Array);
+	});
+
 	test('creates exactly one oversampled WaveShaper node for full output',()=>{
 		const node={curve:null,oversample:'none'};
 		const calls=[];

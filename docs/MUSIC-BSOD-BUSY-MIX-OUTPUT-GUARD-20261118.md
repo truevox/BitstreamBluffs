@@ -1,4 +1,19 @@
-# Busy gameplay music/SFX/wind headroom — final shared output guard
+# Busy gameplay music/SFX/wind headroom — original soft-guard milestone
+
+**Superseded warning (added November 18, Gal Friday):** The single 4×
+oversampled soft WaveShaper at commit `454de31` was NOT a reliable
+sample-peak ceiling on narrow transients. A new source-bound 60-state
+Chromium OfflineAudioContext diagnostic measured **+0.291 dBFS** on
+sharp pulse inputs at 44.1, 48 and 96 kHz, even though earlier four-song
+music+SFX samples stayed under full scale. The built and browser-tested
+corrective two-stage candidate adds a **nonoversampled final sample
+ceiling** AFTER the existing 4× soft processor. See
+`docs/MUSIC-MASTER-PEAK-CEILING-20261118.md` for exact evidence,
+remaining limitations and independent review status.
+
+The following earlier report preserves the **historical** measured
+`454de31` state; do not use its 4× curve alone as a final sample-level
+ceiling or as a human mixing approval.
 
 **November 18, 2026. Engineering research, not human sonic approval.**
 **Branch:** `feature/music-bsod-corruption-20261118`, isolated; do not merge to `main` or Control Friday's `59cbb2d` without their integration/regression gate.

@@ -66,7 +66,8 @@ async function measure(position,mode){
 		for(const [name,source] of Object.entries({
 			music:a.nodes.musicBus,wind:a.nodes.windGain,
 			sfx:a.nodes.sfxBus,preGuard:a.nodes.comp,
-			master:a.nodes.peakGuard || a.nodes.comp,
+			softGuard:a.nodes.peakGuard,
+			master:a.nodes.finalSampleCeiling || a.nodes.peakGuard || a.nodes.comp,
 		})){
 			const analyser=c.createAnalyser();
 			analyser.fftSize=2048;analyser.smoothingTimeConstant=0;
@@ -76,7 +77,7 @@ async function measure(position,mode){
 		}
 		// Default AnalyserNode downmixes stereo; protect against a hot L/R
 		// channel being concealed by opposite-polarity stereo cancellation.
-		const masterOutput=a.nodes.peakGuard;
+		const masterOutput=a.nodes.finalSampleCeiling;
 		if(!masterOutput)throw Error('Expected final shared peak guard');
 		const splitter=c.createChannelSplitter(2);
 		masterOutput.connect(splitter);
@@ -249,6 +250,7 @@ try{
 			busyWindPeakDbfs:max('wind','busy'),
 			busySfxPeakDbfs:max('sfx','busy'),
 			busyPreGuardPeakDbfs:max('preGuard','busy'),
+			busySoftGuardPeakDbfs:max('softGuard','busy'),
 			busyLeftPeakDbfs:max('masterL','busy'),
 			busyRightPeakDbfs:max('masterR','busy')},afterCrash:after,entries};
 	writeFileSync(dest,JSON.stringify(report,null,2)+'\n');

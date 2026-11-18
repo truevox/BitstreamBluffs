@@ -250,11 +250,14 @@ All additive; no existing signature or payload changed.
   reason `'trick'` -> `combo` SFX, `ZONE_ENTER` -> soft blip). It never throws without WebAudio.
 * **Shared output peak guard (provisional):** all WebAudio buses (music including vocals,
   SFX, wind and static) reach the existing master compressor and then exactly
-  ONE `MasterPeakGuard` WaveShaper before AudioContext destination. The
+  ONE oversampled `MasterPeakGuard` plus a final nonoversampled `SampleCeiling` WaveShaper before AudioContext destination. The
   compressor is not a brickwall limiter: a real four-song, maximum-slider
   busy-SFX stress test measured up to +0.50 dBFS **after** the compressor.
   The final guard is mathematically linear below absolute sample 0.82 and
   applies a gentle, bounded, 4× oversampled soft knee only on louder peaks.
+  A separate final nonoversampled exact sample ceiling is necessary because
+  the 4× oversampling downfilter can itself ring beyond unity for abrupt
+  transients (confirmed at 44.1, 48 and 96 kHz).
   It does not change the SFX/wind/music mixing controls or any song/scene
   clock. Real-game sampled headroom testing is mandatory; mathematical
   curve bounds do not replace listening or true-peak verification. See

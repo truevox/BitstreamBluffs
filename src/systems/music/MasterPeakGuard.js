@@ -35,3 +35,25 @@ export function createMasterPeakGuard(ctx){
 	node.oversample='4x';
 	return node;
 }
+
+/** A final *sample-level* bound must follow the 4x oversampled stage:
+ * WebAudio's oversampling down-filter can ring OVER the shaping curve's
+ * 0.89 limit on sharp pulses (observed 1.034 at 44.1/48/96 kHz).
+ * This final stage deliberately does not oversample or add a postfilter.
+ * It is not an intersample/device true-peak guarantee.
+ */
+export function finalSampleCeilingCurve(points=8192){
+	const curve=new Float32Array(points);
+	for(let i=0;i<points;i++){
+		const x=i*2/(points-1)-1;
+		curve[i]=Math.max(-PEAK_MAX,Math.min(PEAK_MAX,x));
+	}
+	return curve;
+}
+
+export function createFinalSampleCeiling(ctx){
+	const node=ctx.createWaveShaper();
+	node.curve=finalSampleCeilingCurve();
+	node.oversample='none';
+	return node;
+}
