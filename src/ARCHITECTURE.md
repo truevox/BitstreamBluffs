@@ -1715,3 +1715,53 @@ ground collision and score events were not injected or faked.
 The timing probe must *observe closing* before opening the canopy.
 The near-miss thresholds, coefficient curves, human execution and
 audio mix still require Marvin's playtest/approval.
+
+## 2026-11-18 — high-tier earned canopy re-pressurization (provisional)
+
+A seven-setup **real Matter** autopilot without refills earned six single
+Bluffs and zero same-flight double Bluffs, mostly because the second
+approach ran out of its single shared parachute fuel tank. Controlled
+diagnostics with a hypothetical 50–100% *post-success* recovery yielded
+five successful same-flight doubles out of eight selected test setups,
+including rank-30 and rank-100 flight. These are **staged autopilot**
+observations, not representative human success probabilities. A still-faster
+900px/s wall wiped out the staged rank-100 attempt; recovery did not
+automatically guarantee indefinite survival.
+
+The first implementation adds an **opt-in MODDED high-tier canopy milestone**
+at rank 12: each genuinely scored BSOD Bluff can recover spent parachute
+fuel, with initial `0.74*(rank-11)/(rank-9)/sqrt(chain)` of the
+per-flight upgraded reservoir (then clamped to the full tank).
+This milestone does not change clean runs or Daily mode, does not
+grant infinite fuel merely by holding a button, and never triggers on
+landing, collision, non-scoring proximity, or ordinary unearned trick events.
+A HUD strip announces positive recovery separately from the near-miss
+points. Numeric threshold and formula are **Friday balancing proposals,
+not owner-frozen values**, pending successful real-Matter chain regression
+and Marvin's playtest.
+
+
+## 2026-11-18 — Marvin approves earned canopy recharge (design decision)
+
+**Owner decision:** Marvin explicitly replied, "I like the fuel mechanic -
+great idea!" to the demonstrated high-tier perk. The underlying mechanism
+(successful close BSOD escapes earn partial canopy replenishment, permitting
+repeated Surfing the Void attempts, with diminishing recovery per chain) is
+accepted. **Not frozen by Marvin:** 12 as the unlock rank, exact 0.74
+coefficient, 2-rank smoothing, purchase prices, and HUD copy are Gal Friday's
+first-playtest balance proposals.
+
+**Verified implementation:** The feature-branch code uses an actual
+successful BSOD_BLUFF event to replenish only the equipped, enabled,
+high-tier canopy tank. The Shard Shop now advertises the unlock at
+CANOPY R12 and confirms when reached, rather than hiding the perk.
+All tests and build checks: 134/134 source suites and 2236/2236 source
+tests, plus targeted post-shop-edit layout tests, final Vite build,
+seven deterministic true-Matter staged flight scenarios, physical
+BSOD and relative-wind Chromium tests, WebAudio BSOD corruption,
+continuous music, Music Lab, and upgrade-purchase browser checks.
+A rank-30 and rank-100 selected pilot each earned two genuine Bluffs
+in the same flight with NO injected in-flight fuel; the 900px/s wall
+still defeated rank 100. Real player control timing remains untested.
+The existing camera was validated from 300 to 2500px/s and needed no
+source changes.

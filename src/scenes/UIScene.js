@@ -674,6 +674,9 @@ export class UIScene extends Phaser.Scene {
     const label = !bsod ? 'NEAR MISS' : p.surfing
       ? `SURFING THE VOID x${p.chain}` : 'BITSTREAM BLUFF';
     this._popup(`${label} +${fmtInt((p && p.points) || 25)}`, bsod ? 'amber' : 'magenta');
+    if (bsod && p.canopyRecoveredMs > 0) {
+      this._strip(`CANOPY +${fmtInt(Math.round(p.canopyRecoveredMs))}MS`, 'cyan');
+    }
     uiSfx(this, 'nearMiss');
   }
 

@@ -86,6 +86,9 @@ describe('permanent upgrade economy',()=>{
     expect(layout.rows.filter(r=>r.kind==='upgradeItem')).toHaveLength(7);
     expect(layout.rows.find(r=>r.kind==='upgradeToggle').state).toBe('OFF');
     expect(shopLayout({profile:p}).rows.some(r=>r.kind==='upgradeLink')).toBe(true);
+    expect(layout.rows.find(r=>r.key==='canopy-perk').label).toContain('R12');
+    expect(upgradeShopLayout({profile:{...p,upgrades:{...p.upgrades,canopy:12}}})
+      .rows.find(r=>r.key==='canopy-perk').label).toContain('BLUFFS RESTORE FUEL');
     expect(layout.h).toBeLessThanOrEqual(248);
     const overlaps=[];
     for(let i=0;i<layout.texts.length;i++)

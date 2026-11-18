@@ -24,7 +24,7 @@ import {
 } from '../constants.js';
 import { EVT } from '../events.js';
 import { SaveStore, LEDGER_HASH_V, UPGRADE_LEDGER_HASH_V } from '../systems/SaveStore.js';
-import { upgradeLoadoutForRun } from '../systems/PermanentUpgrades.js';
+import { upgradeLoadoutForRun, canopyBluffRecoveryMs } from '../systems/PermanentUpgrades.js';
 import { TerrainGenerator, biomeForSector } from '../systems/TerrainGenerator.js';
 import { detectBiomeVisits } from '../systems/BiomeDiscovery.js';
 import { ScoreManager } from '../systems/ScoreManager.js';
@@ -475,9 +475,19 @@ export class RunScene extends Phaser.Scene {
     // Existing near-miss accounting feeds scoring, missions, achievements and run records.
     this.nearMissCount = (this.nearMissCount || 0) + 1;
     this.bonus(event.points, 'nearMiss');
+    // Milestone perk: ONLY an actual, verified midair Bluff refills part of
+    // an upgraded canopy. This is off in clean and official Daily runs.
+    const rank = this.upgradeRun?.enabled ? this.upgradeRun.ranks?.canopy : 0;
+    const full = s.canopyFuelFullMs || PHYSICS.parachuteDurationMs;
+    const spent = Number.isFinite(s.parachuteFuelMs) ? s.parachuteFuelMs : full;
+    const recovery = canopyBluffRecoveryMs(rank, event.chain, full);
+    const newFuel = Math.min(full, spent + recovery);
+    const canopyRecoveredMs = Math.max(0, newFuel - spent);
+    if (canopyRecoveredMs > 0) s.parachuteFuelMs = newFuel;
     const payload = {
       hazardType: 'bsod', points: event.points, x: s.x, y: s.y,
       chain: event.chain, surfing: event.surfing, closestGapPx: event.closestGapPx,
+      ...(canopyRecoveredMs > 0 ? { canopyRecoveredMs } : {}),
     };
     this.game.events.emit(EVT.NEAR_MISS, payload);
     this.game.events.emit(EVT.BSOD_BLUFF, payload);

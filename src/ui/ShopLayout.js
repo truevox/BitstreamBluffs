@@ -17,7 +17,7 @@
  * list, so rebuilding after a purchase redraws all of it.
  */
 import { measureText } from './PixelFont.js';
-import { UPGRADE_CATALOG, sanitizeUpgradeRanks, nextUpgradePrice } from '../systems/PermanentUpgrades.js';
+import { UPGRADE_CATALOG, sanitizeUpgradeRanks, nextUpgradePrice, CANOPY_BLUFF_RECOVERY_RANK } from '../systems/PermanentUpgrades.js';
 import { SHOP_ITEMS, isOwned } from '../systems/ProfileStore.js';
 import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 
@@ -291,6 +291,12 @@ export function upgradeShopLayout(o = {}) {
       disabled: price == null,
     });
   }
+  // No hidden milestone: show when an earned Bluff can pressurize the sail.
+  // This is a purely informational line in the existing shop geometry.
+  rows.push({ kind: 'static', key: 'canopy-perk',
+    label: ranks.canopy >= CANOPY_BLUFF_RECOVERY_RANK
+      ? 'CANOPY: BLUFFS RESTORE FUEL'
+      : `CANOPY R${CANOPY_BLUFF_RECOVERY_RANK}: BLUFF FUEL REFILL` });
   rows.push({ kind: 'static', key: 'softcap', label: 'UNLIMITED RANKS / DIMINISHING RETURNS' });
   rows.push({ kind: 'static', key: 'ranked', label: 'MODE ON = MODDED, OFFICIAL DAILY CLEAN' });
   const texts = [];

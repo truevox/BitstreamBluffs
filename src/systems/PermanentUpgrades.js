@@ -17,6 +17,24 @@ export const UPGRADE_CATALOG = Object.freeze([
   { id: 'divebomb', label: 'DIVEBOMB POWER', basePrice: 27, priceScale: 4, curveK: 10, cap: .48 },
   { id: 'bsodGrace', label: 'BSOD HEAD START', basePrice: 48, priceScale: 7, curveK: 18, cap: .25 },
 ]);
+/**
+ * High-tier canopy milestone: successful BSOD Bluffing pressurizes the sail.
+ * The original 880ms one-tank-per-flight rule remains intact for every
+ * clean run and for purchased ranks below 12. Only an actual earned escape
+ * (never merely surviving near the wall) can restore spent canopy fuel.
+ *
+ * Milestone and coefficients are provisional balancing values; recovery
+ * per successive Bluff declines without imposing a hard chain limit.
+ */
+export const CANOPY_BLUFF_RECOVERY_RANK = 12;
+export function canopyBluffRecoveryMs(rank, chain, fullMs) {
+  if (!Number.isSafeInteger(rank) || rank < CANOPY_BLUFF_RECOVERY_RANK
+      || !Number.isSafeInteger(chain) || chain < 1
+      || !Number.isFinite(fullMs) || fullMs <= 0) return 0;
+  const milestoneRanks = rank - CANOPY_BLUFF_RECOVERY_RANK + 1;
+  const fraction = 0.74 * milestoneRanks / (milestoneRanks + 2) / Math.sqrt(chain);
+  return Math.max(0, Math.min(fullMs, fullMs * fraction));
+}
 export const UPGRADE_IDS = Object.freeze(UPGRADE_CATALOG.map(u => u.id));
 const byId = Object.fromEntries(UPGRADE_CATALOG.map(u => [u.id, u]));
 const validRank = n => Number.isSafeInteger(n) && n >= 0;

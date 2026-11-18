@@ -104,6 +104,7 @@ export const EVT = Object.freeze({
  * @property {number} chain  successful bluffs without landing; >1 is Surfing the Void.
  * @property {boolean} surfing
  * @property {number} closestGapPx  minimum positive collision-edge separation.
+ * @property {number} [canopyRecoveredMs]  bonus fuel restored only for enabled high-tier canopy loadouts.
  */
 
 /**
