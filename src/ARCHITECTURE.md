@@ -2215,3 +2215,20 @@ The normal default course yielded two scored Bluffs at rank 12 with this
 controller, so none of these four was an evidence-backed improvement.
 They do not establish impossibility for a better controller or human.
 **No default or gameplay balancing values were changed.**
+
+## 2026-11-18 — READY wall-clock integrity at low frame rates
+
+The first Gym READY implementation subtracted `dt` (the **50ms capped
+physics delta**) from the 1000ms hold. At 5 FPS, 200ms real frame intervals
+were counted as only 50ms, stretching a one-second READY to four seconds.
+That incorrectly coupled player-visible launch timing to the physics safety
+clamp. The pure `advanceGymReadyMs` helper now subtracts the **actual
+nonnegative finite Phaser frame delta** from the READY hold; Matter's 50ms
+limit and all running-game physics are unchanged.
+
+Unit tests cover slow, normal, invalid and overlong frames. Chromium
+`tools/bsod-gym-ready-lowfps-browser-smoke.mjs` stages the owned Gym
+and then a real BSOD-collision retry at 5 FPS: five 200ms frames release
+each READY exactly once, without moving rider or wall or incrementing the
+game clock. Physics resumes the next frame. This is *not* musical phase
+synchronization and does not assume that Music Friday's beat API exists.

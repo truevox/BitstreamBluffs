@@ -62,7 +62,7 @@ import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
-import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN } from '../systems/BsodGym.js';
+import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, advanceGymReadyMs } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
 const DEG = Math.PI / 180;
@@ -911,7 +911,10 @@ export class RunScene extends Phaser.Scene {
     if (this.bsodGym && this.gymReadyMs > 0) {
       const readyPad = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
       if (readyPad.pressed.pause) { this.pauseRun(); return; }
-      this.gymReadyMs = Math.max(0, this.gymReadyMs - dt);
+      // Physics delta is clamped to 50ms, but READY is a real-time hold.
+      // Consume the actual supplied frame interval so 15/5 FPS does not
+      // stretch a one-second retry into 1.3/4 seconds.
+      this.gymReadyMs = advanceGymReadyMs(this.gymReadyMs, delta);
       if (this.gymReadyMs === 0) this.game.events.emit(EVT.GYM_READY_GO, {});
       this.renderFrame(0);
       return;

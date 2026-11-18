@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import { ProfileStore, sanitizeProfile } from '../../src/systems/ProfileStore.js';
 import { BSOD_GYM_PRICE, gymVisible, gymOwned, gymAdvanced,
   GYM_MASTERY_CHAIN, GYM_READY_MS, GYM_DEFAULT_SETUP, GYM_SETUP_OPTIONS,
-  gymSetupForProfile, sanitizeGymSetup, placeGymWall } from '../../src/systems/BsodGym.js';
+  gymSetupForProfile, sanitizeGymSetup, placeGymWall, advanceGymReadyMs } from '../../src/systems/BsodGym.js';
 import { BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
 import { upgradeLoadoutForRun, canopyBluffRecoveryMs } from '../../src/systems/PermanentUpgrades.js';
 import { BsodPursuit, BSOD_DEFAULTS } from '../../src/systems/BsodPursuit.js';
@@ -49,6 +49,17 @@ function scoreBluff(r){
 describe('Secret BSOD Gym discovery, shop and practice state',()=>{
  test('Gym price is the Marvin-approved 200-shard trial price; no implicit unlock',()=>{
    expect(BSOD_GYM_PRICE).toBe(200);
+ });
+ test('READY duration consumes real frame time, not the 50ms physics clamp',()=>{
+   expect(Array.from({length:5}).reduce(ms=>advanceGymReadyMs(ms,200),1000)).toBe(0);
+   expect(advanceGymReadyMs(1000,200)).toBe(800);
+   expect(advanceGymReadyMs(1000,50)).toBe(950);
+   expect(advanceGymReadyMs(1000,NaN)).toBe(1000);
+   expect(advanceGymReadyMs(1000,-20)).toBe(1000);
+   expect(advanceGymReadyMs(15,3000)).toBe(0);
+   const source=RunScene.prototype.update.toString();
+   expect(source).toContain('advanceGymReadyMs(this.gymReadyMs, delta)');
+   expect(source).toContain('clamp(Number.isFinite(delta) ? delta : 16.7, 0, 50)');
  });
  test('Gym allows only realistic launch inputs; BSOD is forward-only and keeps live acceleration',()=>{
    const lvl=12,fx=upgradeLoadoutForRun({upgradesEnabled:true,

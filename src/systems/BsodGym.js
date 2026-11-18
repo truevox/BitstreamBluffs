@@ -6,6 +6,16 @@ export const BSOD_GYM_PRICE = 200; // Owner-approved current trial price.
 export const GYM_MASTERY_CHAIN = 5; // Five genuine scored Bluffs without landing.
 export const GYM_READY_MS = 1000; // Real-world pause; physics and run clock freeze.
 
+/** READY is wall-clock elapsed time, NOT the capped physics step. At low FPS,
+ * a 200ms browser frame must advance READY by 200ms even though Matter's
+ * next running frame is still substepped and capped independently.
+ */
+export function advanceGymReadyMs(remainingMs, frameDeltaMs) {
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 0;
+  const elapsed = Number.isFinite(frameDeltaMs) ? Math.max(0, frameDeltaMs) : 0;
+  return Math.max(0, remainingMs - elapsed);
+}
+
 export const GYM_SETUP_OPTIONS = Object.freeze({
   gapPx: Object.freeze([220, 460, 680, 1000, 1600]),
   wallSpeedPxS: Object.freeze([115, 240, 450, 850, 1500]),
