@@ -15,3 +15,16 @@
 - **After** minimum hold, use the next *verified* regular pulse only if its extra wait is <=300 ms. Otherwise GO at once. A new/invalid track, disabled music, suspended audio, stale transport snapshot, missing API, exception or rejected timing always means immediate normal GO.
 - Never wait for measure start, lock to upbeat subdivisions, step Matter physics from audio, reset the musical transport, or play/start a new track just to synchronize Gym.
 - Preserve one uninterrupted *in-Gym* flight's five scored Bluffs for the hidden configuration unlock, and all existing non-ranked retry/mission/save isolation.
+
+## Integration follow-through (2026-11-18)
+
+The public music API from Music Friday commit `5325f5b` has been integrated on
+`integration/gym-verified-beats-20261118`. RunScene owns the original READY,
+queries at the boundary only, may add one bounded 0–300ms hold for a verified
+pulse, and releases unconditionally even if the playback revision changes.
+Collision resets and scene shutdown discard pending advice. All production
+beat grids remain unverified, so the current release still uses normal
+one-second GO. Browser-only synthetic grids exercise the trusted positive
+path and actual original OGG transport without asserting musical correctness.
+See the appended integration section in `src/ARCHITECTURE.md` and
+`docs/MUSIC-GYM-VERIFIED-BEAT-TIMING-20261118.md` for the music-owned contract.

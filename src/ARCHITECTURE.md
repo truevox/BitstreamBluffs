@@ -2257,3 +2257,38 @@ section-aware validation, and `BeatGridCatalog.js` is currently explicitly
 research only; no human-reviewed beat-phase grid is authorized yet. The legacy
 `StemMusicDirector.nextBeat()` BPM/zero-phase helper must NOT be used for Gym.
 Tests and Control handoff: `docs/MUSIC-GYM-VERIFIED-BEAT-TIMING-20261118.md`.
+
+## 2026-11-18 — Music Friday's verified beat API integrated into BSOD Gym (isolated branch)
+
+On `integration/gym-verified-beats-20261118`, the music-owned public interface
+from commit `5325f5b` is cherry-picked without altering its beat grid validator,
+production catalog, or the legacy BPM-only `nextBeat()` helper. **All four real
+recording grids remain unverified**: normal Gym starts/releases after its
+one-second real-time READY exactly as before.
+
+The gameplay-owned READY state machine now queries
+`audio.getBeatTiming({maxWaitMs:300})` **exactly once**, only after the minimum
+READY has completed, and accepts only an internally consistent trusted pulse
+with a finite positive `waitMs <= 300`, matching WebAudio clock timestamps and
+a non-empty transport revision. Missing, muted, unavailable, uncertain,
+malformed or throwing audio gives immediate GO. For a trusted pulse, the
+single extra real-time Gym countdown freezes rider, pursuer, scores, timers and
+run clock; there is no new Matter step or music-owned timer. At completion,
+`audio.isBeatTimingCurrent(snapshot)` is evaluated for `onBeat` telemetry,
+**never** as a condition on GO. Changes of track, seek, mute, pause, or stalled
+AudioContext can invalidate that status; there is never a second lookup or
+additional wait. The optional snapshot is cleared on collision retry, scene
+shutdown, and successful release. Low-FPS READY logic and the five-Bluff Gym
+mastery rule are unchanged.
+
+The new Chromium `tools/bsod-gym-beat-release-browser-smoke.mjs` exercises the
+real unverified production catalog, a trusted synthetic 200ms extra wait,
+stale transport, throwing music, malicious 1200ms advice, and reset while
+waiting. `tools/bsod-gym-real-audio-beat-browser-smoke.mjs` goes further:
+actual original OGG playback through the real WebAudio clock, actual
+`AudioSynth` public API, and actual frozen Gym READY/GO. It uses a test-only,
+browser-injected **FAKE pulse grid** which is never committed to the release
+catalog; success proves wiring and transport timing, **not musical verification**.
+The music-side real-OGG smoke now also handles title music already playing
+rather than accidentally toggling it off by clicking Play twice. Music Friday
+retains ownership of real recording-specific beat certification.

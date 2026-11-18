@@ -5,6 +5,29 @@
 export const BSOD_GYM_PRICE = 200; // Owner-approved current trial price.
 export const GYM_MASTERY_CHAIN = 5; // Five genuine scored Bluffs without landing.
 export const GYM_READY_MS = 1000; // Real-world pause; physics and run clock freeze.
+export const GYM_MAX_BEAT_WAIT_MS = 300; // Absolute cap; never gate gameplay on music.
+
+/** Query a music timing suggestion ONCE, after the gameplay-owned READY.
+ * Fail closed for missing, stale-looking, malformed, or throwing audio APIs.
+ * This never starts/stops music, schedules callbacks or advances physics.
+ * The snapshot is used for exactly one pending release and then discarded.
+ */
+export function gymBeatSuggestion(audio) {
+  if (typeof audio?.getBeatTiming !== 'function' ||
+      typeof audio?.isBeatTimingCurrent !== 'function') return null;
+  try {
+    const result = audio.getBeatTiming({ maxWaitMs: GYM_MAX_BEAT_WAIT_MS });
+    if (result?.trusted !== true || result.release !== 'on-beat') return null;
+    const { waitMs, audioContextTime, dueAudioTime, transportRevision } = result;
+    if (!Number.isFinite(waitMs) || waitMs <= 0 ||
+        waitMs > GYM_MAX_BEAT_WAIT_MS || !Number.isFinite(audioContextTime) ||
+        !Number.isFinite(dueAudioTime) ||
+        typeof transportRevision !== 'string' || !transportRevision ||
+        Math.abs((dueAudioTime - audioContextTime) * 1000 - waitMs) > 5)
+      return null;
+    return Object.freeze({ ...result });
+  } catch { return null; }
+}
 
 /** READY is wall-clock elapsed time, NOT the capped physics step. At low FPS,
  * a 200ms browser frame must advance READY by 200ms even though Matter's

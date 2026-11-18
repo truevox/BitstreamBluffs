@@ -2,7 +2,8 @@ import { jest } from '@jest/globals';
 import { ProfileStore, sanitizeProfile } from '../../src/systems/ProfileStore.js';
 import { BSOD_GYM_PRICE, gymVisible, gymOwned, gymAdvanced,
   GYM_MASTERY_CHAIN, GYM_READY_MS, GYM_DEFAULT_SETUP, GYM_SETUP_OPTIONS,
-  gymSetupForProfile, sanitizeGymSetup, placeGymWall, advanceGymReadyMs } from '../../src/systems/BsodGym.js';
+  gymSetupForProfile, sanitizeGymSetup, placeGymWall, advanceGymReadyMs,
+  gymBeatSuggestion, GYM_MAX_BEAT_WAIT_MS } from '../../src/systems/BsodGym.js';
 import { BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
 import { upgradeLoadoutForRun, canopyBluffRecoveryMs } from '../../src/systems/PermanentUpgrades.js';
 import { BsodPursuit, BSOD_DEFAULTS } from '../../src/systems/BsodPursuit.js';
@@ -49,6 +50,29 @@ function scoreBluff(r){
 describe('Secret BSOD Gym discovery, shop and practice state',()=>{
  test('Gym price is the Marvin-approved 200-shard trial price; no implicit unlock',()=>{
    expect(BSOD_GYM_PRICE).toBe(200);
+ });
+ test('music can offer one bounded verified pulse but never become a gameplay dependency',()=>{
+   expect(GYM_MAX_BEAT_WAIT_MS).toBe(300);
+   const snap={trusted:true,release:'on-beat',waitMs:225,transportRevision:'8:song:12',
+     audioContextTime:12,dueAudioTime:12.225,trackId:'song',confidence:.97};
+   let reads=0;
+   const audio={getBeatTiming:(opts)=>{reads++;expect(opts).toEqual({maxWaitMs:300});return snap;},
+     isBeatTimingCurrent:()=>true};
+   const suggestion=gymBeatSuggestion(audio);
+   expect(reads).toBe(1);
+   expect(suggestion).toEqual(snap);
+   expect(Object.isFrozen(suggestion)).toBe(true);
+   for(const changes of [
+     {trusted:false},{release:'immediate'},{waitMs:301},{waitMs:0},
+     {waitMs:Infinity},{waitMs:-5},{waitMs:NaN},
+     {dueAudioTime:NaN},{audioContextTime:NaN},
+     {dueAudioTime:12.27},{transportRevision:''},
+   ]){
+     expect(gymBeatSuggestion({...audio,getBeatTiming:()=>({...snap,...changes})})).toBe(null);
+   }
+   expect(gymBeatSuggestion(null)).toBe(null);
+   expect(gymBeatSuggestion({getBeatTiming:()=>snap})).toBe(null);
+   expect(gymBeatSuggestion({...audio,getBeatTiming:()=>{throw Error('music broke')}})).toBe(null);
  });
  test('READY duration consumes real frame time, not the 50ms physics clamp',()=>{
    expect(Array.from({length:5}).reduce(ms=>advanceGymReadyMs(ms,200),1000)).toBe(0);

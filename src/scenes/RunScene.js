@@ -62,7 +62,7 @@ import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
-import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, advanceGymReadyMs } from '../systems/BsodGym.js';
+import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, advanceGymReadyMs, gymBeatSuggestion } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
 const DEG = Math.PI / 180;
@@ -182,6 +182,8 @@ export class RunScene extends Phaser.Scene {
     // Every Gym attempt—including first entry—starts with the same short,
     // deterministic READY hold. Music may decorate it, never delay physics.
     this.gymReadyMs = this.bsodGym ? GYM_READY_MS : 0;
+    this.gymBeatWaitMs = 0;
+    this.gymBeatSnapshot = null;
     this.dailyMods = (daily && daily.rule && daily.rule.modifiers) || {};
 
     // pure systems — the exact same deterministic world factory is also used
@@ -383,6 +385,8 @@ export class RunScene extends Phaser.Scene {
 
   /** Remove every listener / pooled object / body (runs on scene shutdown). @returns {void} */
   teardown() {
+    this.gymBeatSnapshot = null;
+    this.gymBeatWaitMs = 0;
     try {
       this.game.events.off(EVT.SETTINGS_CHANGED, this._onSettings);
       this.game.events.off(EVT.GAME_RESUME, this._onResume);
@@ -895,6 +899,23 @@ export class RunScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ main loop
 
+  /** Release gameplay unconditionally. A stale beat affects only whether
+   * the optional music alignment was successful, NEVER whether the sled GOes.
+   * Clear the one-shot snapshot before emitting, so event listeners cannot
+   * accidentally turn a completed release into another audio wait.
+   */
+  finishGymReady() {
+    const timing = this.gymBeatSnapshot;
+    this.gymBeatSnapshot = null;
+    this.gymBeatWaitMs = 0;
+    let onBeat = false;
+    if (timing) {
+      try { onBeat = this.registry?.get?.(REG.AUDIO)?.isBeatTimingCurrent?.(timing) === true; }
+      catch { /* failed audio cannot prevent GO */ }
+    }
+    this.game.events.emit(EVT.GYM_READY_GO, { onBeat });
+  }
+
   update(time, delta) {
     if (!this.sled) return;
     const dt = clamp(Number.isFinite(delta) ? delta : 16.7, 0, 50);
@@ -905,17 +926,34 @@ export class RunScene extends Phaser.Scene {
       return;
     }
 
-    // A one-second READY beat after each Gym catch: gameplay physics, BSOD,
-    // score, effect timers and run clock remain frozen. The player can still
-    // pause or quit. The ready display is handled independently by UIScene.
-    if (this.bsodGym && this.gymReadyMs > 0) {
+    // Every attempt first freezes real-time gameplay for ~1000ms. Only at
+    // that boundary can MUSIC SUGGEST a verified regular pulse <=300ms away.
+    // The optional delay is Gym-owned, never a music-engine timer or physics
+    // step. Both holds freeze the rider, pursuer, score and run clock.
+    if (this.bsodGym && (this.gymReadyMs > 0 || this.gymBeatWaitMs > 0)) {
       const readyPad = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
       if (readyPad.pressed.pause) { this.pauseRun(); return; }
-      // Physics delta is clamped to 50ms, but READY is a real-time hold.
-      // Consume the actual supplied frame interval so 15/5 FPS does not
-      // stretch a one-second retry into 1.3/4 seconds.
-      this.gymReadyMs = advanceGymReadyMs(this.gymReadyMs, delta);
-      if (this.gymReadyMs === 0) this.game.events.emit(EVT.GYM_READY_GO, {});
+      if (this.gymReadyMs > 0) {
+        // The physics delta is capped at 50ms, not the real-time READY.
+        this.gymReadyMs = advanceGymReadyMs(this.gymReadyMs, delta);
+        if (this.gymReadyMs === 0) {
+          const timing = gymBeatSuggestion(this.registry?.get?.(REG.AUDIO));
+          if (timing) {
+            this.gymBeatSnapshot = timing;
+            this.gymBeatWaitMs = timing.waitMs;
+          } else this.finishGymReady();
+        }
+      } else {
+        // No requery and never wait for a second pulse. A late/suspended tab
+        // must not prolong the hold beyond the supplied original suggestion.
+        this.gymBeatWaitMs = advanceGymReadyMs(this.gymBeatWaitMs, delta);
+        let audioNow = NaN;
+        try { audioNow = this.registry?.get?.(REG.AUDIO)?.ctx?.currentTime; }
+        catch { /* audio cannot block a release */ }
+        if (this.gymBeatWaitMs === 0 ||
+            (Number.isFinite(audioNow) && audioNow >= this.gymBeatSnapshot?.dueAudioTime))
+          this.finishGymReady();
+      }
       this.renderFrame(0);
       return;
     }
@@ -1841,6 +1879,8 @@ export class RunScene extends Phaser.Scene {
     this.lastTotal = 0;
     this.gymRetries = (this.gymRetries || 0) + 1;
     this.gymReadyMs = GYM_READY_MS;
+    this.gymBeatWaitMs = 0;
+    this.gymBeatSnapshot = null;
     // Reset HUD and show the beat; no frame may advance the wall until it ends.
     this.game?.events?.emit?.(EVT.GYM_ATTEMPT_RESET,
       { attempt: this.gymRetries, readyMs: GYM_READY_MS });

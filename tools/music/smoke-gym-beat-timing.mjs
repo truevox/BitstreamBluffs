@@ -25,7 +25,11 @@ try{
 		return j?.buttons?.[1]&&!j.buttons[1].disabled;
 	},null,{timeout:15000});
 	await page.evaluate(()=>{
-		const j=window.__bbGame.scene.getScene('TitleScene').jukebox;
+		const g=window.__bbGame,a=g.registry.get('audioSynth'),d=a?._stemMusic;
+		// Some integrations already start music after the real keyboard gesture.
+		// Clicking PLAY again would toggle it OFF and hang this smoke test.
+		if(d?.started&&d.activeNodes?.size>=6)return;
+		const j=g.scene.getScene('TitleScene').jukebox;
 		if(!j?.buttons?.[1]?.zone)throw Error('Missing title jukebox Play');
 		j.buttons[1].zone.emit('pointerdown');
 	});
