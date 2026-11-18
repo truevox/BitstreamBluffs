@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import {writeFileSync,existsSync} from 'node:fs';
 import {chromium} from 'playwright';
+import {PEAK_MAX} from '../../src/systems/music/MasterPeakGuard.js';
 
 const url=process.env.GAME_URL||'http://100.115.120.66:8206/';
 const path=process.env.REPORT_OUT||'/home/hermes/experiments/bitstream-bsod-full-mix-live-20261118.json';
@@ -58,18 +59,28 @@ async function sample(songId,danger){
 			const sink=c.createGain();sink.gain.value=0;
 			source.connect(analyser);
 			analyser.connect(sink);sink.connect(c.destination);
-			inputs.push({source,analyser,sink});
+			inputs.push({name,source,analyser,sink});
 			captures[name]={sumSquares:0,n:0,peak:0};
+		}
+		const output=targets.master;
+		const splitter=c.createChannelSplitter(2);
+		output.connect(splitter);
+		for(let channel=0;channel<2;channel++){
+			const analyser=c.createAnalyser();analyser.fftSize=2048;
+			const sink=c.createGain();sink.gain.value=0;
+			splitter.connect(analyser,channel,0);
+			analyser.connect(sink);sink.connect(c.destination);
+			inputs.push({name:channel?'masterR':'masterL',source:splitter,analyser,sink});
+			captures[channel?'masterR':'masterL']={sumSquares:0,n:0,peak:0};
 		}
 		try{
 			const length=2048;
 			const series=new Map(inputs.map(({analyser})=>
 				[analyser,new Float32Array(length)]));
 			for(let tick=0;tick<48;tick++){
-				for(const [name,input] of Object.entries(targets)){
-					const target=inputs.find(x=>x.source===input);
-					const buffer=series.get(target.analyser);
-					target.analyser.getFloatTimeDomainData(buffer);
+				for(const {name,analyser} of inputs){
+					const buffer=series.get(analyser);
+					analyser.getFloatTimeDomainData(buffer);
 					for(const sample of buffer){
 						const measure=captures[name];
 						measure.sumSquares+=sample*sample;
@@ -94,6 +105,8 @@ async function sample(songId,danger){
 				try{analyser.disconnect()}catch{}
 				try{sink.disconnect()}catch{}
 			}
+			try{output.disconnect(splitter)}catch{}
+			try{splitter.disconnect()}catch{}
 		}
 	},{danger});
 }
@@ -150,7 +163,9 @@ try{
 	assert.equal(menuState.mode,'menu');
 	const menuSample=await sample(menuState.song,0);
 	assert.ok(menuSample.music.peak>0&&menuSample.master.peak>0);
-	assert.ok(menuSample.master.peak<=1.0);
+	for(const key of ['master','masterL','masterR'])
+		assert.ok(Number.isFinite(menuSample[key].peak)&&menuSample[key].peak<=PEAK_MAX+2e-4,
+			'Menu ceiling '+key);
 	console.log('DEBUMONT_MENU_MIX_PEAK_DBFS',menuSample.master.peakDbfs.toFixed(2));
 	assert.deepEqual(errors,[]);assert.deepEqual(failedHttp,[]);
 	const report={format:'bitstream-real-web-audio-master-sampled-headroom-v1',
@@ -164,10 +179,12 @@ try{
 		assert.ok(x.clean.music.peak>0&&x.clean.master.peak>0&&
 			x.dangerous.music.peak>0&&x.dangerous.master.peak>0,
 			'Missing actual live WebAudio signal: '+x.song);
-		assert.ok(x.clean.master.peak<=1.0,
-			'Measured clean master output clipped: '+x.song);
-		assert.ok(x.dangerous.master.peak<=1.0,
-			'Measured master output clipped during near-danger '+x.song);
+		for(const key of ['master','masterL','masterR']){
+			assert.ok(Number.isFinite(x.clean[key].peak)&&
+				x.clean[key].peak<=PEAK_MAX+2e-4,'Clean ceiling '+x.song+'/'+key);
+			assert.ok(Number.isFinite(x.dangerous[key].peak)&&
+				x.dangerous[key].peak<=PEAK_MAX+2e-4,'Danger ceiling '+x.song+'/'+key);
+		}
 	}
 	console.log('SAMPLED_FOUR_SONGS_FULL_STEM_MIX_HEADROOM_PASS',
 		entries.length,'results',path);

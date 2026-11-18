@@ -211,9 +211,20 @@ export class AudioSynth {
       this.applySettings(this.settings);
       return true;
     } catch (e) {
+      // An incomplete graph can still own a live AudioContext (and started
+      // noise sources). Close it before losing the only reference. This is a
+      // permanent initialization failure: never resurrect its partial mixer.
+      const failedCtx = this.ctx;
       this.unavailable = true;
       this.ctx = null;
       this.nodes = null;
+      try { this._stemMusic?.destroy(); } catch (_) { /* partial attachment */ }
+      if (failedCtx) {
+        try {
+          const closing = failedCtx.close();
+          if (closing?.catch) closing.catch(() => {});
+        } catch (_) { /* some engines throw synchronously */ }
+      }
       return false;
     }
   }

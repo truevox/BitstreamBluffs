@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { chromium } from 'playwright';
+import { PEAK_MAX } from '../../src/systems/music/MasterPeakGuard.js';
 
 const origin=process.env.GAME_URL||'http://100.115.120.66:8206/';
 const dest=process.env.REPORT_OUT||
@@ -21,6 +22,25 @@ const page=await browser.newPage({viewport:{width:1200,height:780}});
 const pageErrors=[],badHttp=[];
 page.on('pageerror',e=>pageErrors.push(String(e)));
 page.on('response',r=>{if(r.status()>=400)badHttp.push([r.status(),r.url()])});
+const sha=buf=>createHash('sha256').update(buf).digest('hex');
+// Hard-bind every report to the exact production JS/HTML bytes actually
+// served, rather than trusting source-checkout hashes or a guessed commit.
+async function verifyServedBuild(){
+	const localHtml=readFileSync(new URL('../../dist/index.html',import.meta.url));
+	const htmlResponse=await page.request.get(origin);
+	assert.equal(htmlResponse.status(),200,'QA origin did not serve index');
+	const remoteHtml=await htmlResponse.body();
+	assert.equal(sha(remoteHtml),sha(localHtml),'Served HTML differs from local build');
+	const asset=/\bsrc=["'](\/assets\/[^"']+\.js)["']/.exec(localHtml.toString('utf8'))?.[1];
+	assert.ok(asset,'No built entry JS found in local index');
+	const localJs=readFileSync(new URL('../../dist'+asset,import.meta.url));
+	const jsResponse=await page.request.get(new URL(asset,origin).href);
+	assert.equal(jsResponse.status(),200,'QA entry module unavailable');
+	const remoteJs=await jsResponse.body();
+	assert.equal(sha(remoteJs),sha(localJs),'Served JavaScript differs from local build');
+	return {servedOrigin:origin,script:asset,htmlSha256:sha(remoteHtml),
+		entryJsSha256:sha(remoteJs),entryBytes:remoteJs.length};
+}
 const waitReady=()=>page.waitForFunction(()=>{
 	const a=window.__bbGame?.registry?.get('audioSynth'),d=a?._stemMusic;
 	return d?.started&&d.pack&&d.activeNodes.size>=6&&
@@ -34,6 +54,9 @@ function assertPeak(sample,label){
 		// Internal sum buses may legitimately exceed unity before the master
 		// compressor. We record (rather than mask) post-master overshoots.
 	}
+	for(const key of ['master','masterL','masterR'])
+		assert.ok(sample[key].peak<=PEAK_MAX+2e-4,
+			label+' '+key+' exceeded final sample ceiling '+sample[key].peak);
 	assert.ok(sample.master.rms>1e-6, label+' suspiciously silent master');
 }
 async function measure(position,mode){
@@ -59,7 +82,7 @@ async function measure(position,mode){
 	},{position,mode});
 	await waitReady();
 	await page.waitForTimeout(900);
-	const observed=await page.evaluate(async({mode})=>{
+	const observed=await page.evaluate(async({mode,ceiling})=>{
 		const a=window.__bbGame.registry.get('audioSynth');
 		const d=a._stemMusic,c=a.ctx;
 		const taps=[];
@@ -77,22 +100,27 @@ async function measure(position,mode){
 		}
 		// Default AnalyserNode downmixes stereo; protect against a hot L/R
 		// channel being concealed by opposite-polarity stereo cancellation.
-		const masterOutput=a.nodes.finalSampleCeiling;
-		if(!masterOutput)throw Error('Expected final shared peak guard');
-		const splitter=c.createChannelSplitter(2);
-		masterOutput.connect(splitter);
-		for(let channel=0;channel<2;channel++){
-			const analyser=c.createAnalyser();
-			analyser.fftSize=2048;analyser.smoothingTimeConstant=0;
-			const sink=c.createGain();sink.gain.value=0;
-			splitter.connect(analyser,channel,0);
-			analyser.connect(sink);sink.connect(c.destination);
-			taps.push({name:channel?'masterR':'masterL',
-				source:splitter,analyser,sink,arr:new Float32Array(2048)});
+		const stageOutputs=[['master',a.nodes.finalSampleCeiling],
+			['soft',a.nodes.peakGuard]];
+		if(stageOutputs.some(([,source])=>!source))
+			throw Error('Missing final safety stage');
+		const splitters=[];
+		for(const [prefix,source] of stageOutputs){
+			const splitter=c.createChannelSplitter(2);
+			source.connect(splitter);splitters.push({source,splitter});
+			for(let channel=0;channel<2;channel++){
+				const analyser=c.createAnalyser();
+				analyser.fftSize=2048;analyser.smoothingTimeConstant=0;
+				const sink=c.createGain();sink.gain.value=0;
+				splitter.connect(analyser,channel,0);
+				analyser.connect(sink);sink.connect(c.destination);
+				taps.push({name:prefix+(channel?'R':'L'),
+					source:splitter,analyser,sink,arr:new Float32Array(2048)});
+			}
 		}
 		try{
 			const stats=Object.fromEntries(taps.map(t=>
-				[t.name,{peak:0,energy:0,n:0}]));
+				[t.name,{peak:0,energy:0,n:0,overCeilingSamples:0}]));
 			const sfx=['hop','trick','nearMiss','landPerfect','boost','landHard'];
 			for(let t=0;t<44;t++){
 				if(mode==='busy'&&t%8===0)
@@ -102,6 +130,7 @@ async function measure(position,mode){
 					const st=stats[tap.name];
 					for(const v of tap.arr){
 						st.peak=Math.max(st.peak,Math.abs(v));st.energy+=v*v;st.n++;
+						if(Math.abs(v)>ceiling+2e-4)st.overCeilingSamples++;
 					}
 				}
 				await new Promise(r=>setTimeout(r,25));
@@ -112,7 +141,8 @@ async function measure(position,mode){
 				levels[name]={peak:st.peak,rms,
 					peakDbfs:20*Math.log10(Math.max(st.peak,1e-12)),
 					rmsDbfs:20*Math.log10(Math.max(rms,1e-12)),
-					sampledFrames:st.n};
+					sampledFrames:st.n,overCeilingSamples:st.overCeilingSamples,
+					aboveCeilingFraction:st.overCeilingSamples/st.n};
 			}
 			return {song:d.track.id,mode:a._musicMode,danger:a._bsodDanger01,
 				relativeAir:a._windRelativePxS,windGain:a.nodes.windGain.gain.value,
@@ -125,20 +155,25 @@ async function measure(position,mode){
 				try{t.analyser.disconnect()}catch{}
 				try{t.sink.disconnect()}catch{}
 			}
-			try{masterOutput.disconnect(splitter)}catch{}
-			try{splitter.disconnect()}catch{}
+			for(const {source,splitter} of splitters){
+				try{source.disconnect(splitter)}catch{}
+				try{splitter.disconnect()}catch{}
+			}
 		}
-	},{mode});
+	},{mode,ceiling:PEAK_MAX});
 	assert.equal(p.song,observed.song);
 	assertPeak(observed,p.song+'/'+position+'/'+mode);
 	return {...p,...observed};
 }
 try{
+	const servedBuild=await verifyServedBuild();
 	await page.goto(origin,{waitUntil:'domcontentloaded',timeout:30000});
 	await page.waitForFunction(()=>window.__bbGame?.scene
 		?.getScene('TitleScene')?.sys?.isActive(),null,{timeout:35000});
 	await page.keyboard.press('x');
 	await waitReady();
+	const browserInfo={version:browser.version(),
+		audioSampleRate:await page.evaluate(()=>window.__bbGame.registry.get('audioSynth').ctx.sampleRate)};
 	const init=await page.evaluate(()=>{
 		const g=window.__bbGame, a=g.registry.get('audioSynth'),d=a._stemMusic;
 		// Fresh, non-persistent browser only. This DIRECTLY enables the existing
@@ -229,12 +264,13 @@ try{
 	const max=(key,mode)=>Math.max(...all.map(x=>x[mode][key].peakDbfs));
 	const clipCases=all.flatMap(row=>['normal','busy'].flatMap(mode=>
 		['master','masterL','masterR'].flatMap(channel=>
-			row[mode][channel].peak>1?[{song:row.busy.song,position:row.seconds,
+			(!Number.isFinite(row[mode][channel].peak)||row[mode][channel].peak>PEAK_MAX+2e-4)?[{song:row.busy.song,position:row.seconds,
 				mode,channel,masterPeak:row[mode][channel].peak,
 				peakDbfs:row[mode][channel].peakDbfs}]:[])));
 	const report={format:'bitstream-busy-live-stereo-mix-v2',
 		status:'twelve-sampled-passages-with-vocals-wind-sfx-not-full-song-proof',
 		baseCommit:'cd38ad14552725f1558ca24f1ea23ec48f50bd98',
+		servedBuild,browserInfo,
 		sourceSha256:Object.fromEntries([
 			['AudioSynth.js','../../src/systems/AudioSynth.js'],
 			['MasterPeakGuard.js','../../src/systems/music/MasterPeakGuard.js'],
@@ -252,12 +288,22 @@ try{
 			busyPreGuardPeakDbfs:max('preGuard','busy'),
 			busySoftGuardPeakDbfs:max('softGuard','busy'),
 			busyLeftPeakDbfs:max('masterL','busy'),
-			busyRightPeakDbfs:max('masterR','busy')},afterCrash:after,entries};
+			busyRightPeakDbfs:max('masterR','busy'),
+			busySoftLeftPeakDbfs:max('softL','busy'),
+			busySoftRightPeakDbfs:max('softR','busy')},
+		guardActivity:{statesWithSoftOverCeiling:all.filter(row=>
+			['normal','busy'].some(mode=>row[mode].softL.overCeilingSamples>0||
+				row[mode].softR.overCeilingSamples>0)).length,
+			maxSoftFraction:Math.max(...all.flatMap(row=>['normal','busy'].flatMap(mode=>
+				[row[mode].softL.aboveCeilingFraction,row[mode].softR.aboveCeilingFraction]))),
+			maxFinalFraction:Math.max(...all.flatMap(row=>['normal','busy'].flatMap(mode=>
+				[row[mode].masterL.aboveCeilingFraction,row[mode].masterR.aboveCeilingFraction])))},
+		afterCrash:after,entries};
 	writeFileSync(dest,JSON.stringify(report,null,2)+'\n');
 	console.log('BUSY_MIX_SCENARIOS_COMPLETE',JSON.stringify(report.extremes));
 	console.log('POST_COMPRESSOR_CLIPPING',JSON.stringify(clipCases));
 	console.log('CRASH_RESET_AND_SONG_CLOCK_PASS',JSON.stringify(after));
 	console.log('REPORT_SHA256',createHash('sha256')
 		.update(JSON.stringify(report)).digest('hex'));
-	assert.equal(clipCases.length,0,'Post-compressor digital peaks > 0 dBFS');
+	assert.equal(clipCases.length,0,'Final-stereo samples exceeded bounded ceiling');
 }finally{await browser.close();}

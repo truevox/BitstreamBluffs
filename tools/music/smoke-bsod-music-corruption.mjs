@@ -55,7 +55,11 @@ try{
 			worldTailwindPxS:850,sledVelocityXPxS:850,relativeAirX:0,
 			proximity01:.97,timeToImpactMs:160,atmosphereDensity:1});
 	});
-	await page.waitForTimeout(550);
+	await page.waitForFunction(()=>{
+		const d=window.__bbGame?.registry?.get('audioSynth')?._stemMusic;
+		return ['guitar','piano','other'].every(id=>
+			d?.mixer?.sources?.get(id)?.threat?.filter?.frequency?.value<3500);
+	},null,{timeout:5000}); // Observe WebAudio filter convergence, not a 550ms guess.
 	const dangerous=await state();
 	assert.equal(dangerous.song,menu.song);
 	assert.equal(dangerous.clock,menu.clock);

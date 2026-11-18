@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { existsSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { chromium } from 'playwright';
+import { PEAK_MAX } from '../../src/systems/music/MasterPeakGuard.js';
 
 const origin=process.env.GAME_URL||'http://100.115.120.66:8206/';
 const dest=process.env.REPORT_OUT||
@@ -28,11 +29,12 @@ const waitReady=async()=>page.waitForFunction(()=>{
 },null,{timeout:45000});
 function db(x){return 20*Math.log10(Math.max(x,1e-12));}
 const checkConditions=(x,label)=>{
-	for(const bus of ['music','master']){
+	for(const bus of ['music','master','masterL','masterR']){
 		assert.ok(Number.isFinite(x[bus].peakDbfs)&&
 			Number.isFinite(x[bus].rmsDbfs),'nonfinite '+label+'/'+bus);
 		assert.ok(x[bus].rms>1e-7,'silent '+label+'/'+bus);
-		assert.ok(x[bus].peak<=1,'clipped '+label+'/'+bus+' peak '+x[bus].peak);
+		if(bus.startsWith('master'))assert.ok(x[bus].peak<=PEAK_MAX+2e-4,
+			'ceiling exceeded '+label+'/'+bus+' peak '+x[bus].peak);
 	}
 };
 async function tapRead(position,danger,mode='run'){
@@ -69,6 +71,17 @@ async function tapRead(position,danger,mode='run'){
 			analyser.connect(sink);sink.connect(c.destination);
 			taps.push({name,source,analyser,sink,buffer:new Float32Array(2048)});
 		}
+		const output=buses.master;
+		const splitter=c.createChannelSplitter(2);
+		output.connect(splitter);
+		for(let channel=0;channel<2;channel++){
+			const analyser=c.createAnalyser();analyser.fftSize=2048;
+			const sink=c.createGain();sink.gain.value=0;
+			splitter.connect(analyser,channel,0);
+			analyser.connect(sink);sink.connect(c.destination);
+			taps.push({name:channel?'masterR':'masterL',source:splitter,
+				analyser,sink,buffer:new Float32Array(2048)});
+		}
 		try{
 			const captures=Object.fromEntries(taps.map(t=>[t.name,
 				{maxPeak:0,energy:0,count:0}]));
@@ -104,6 +117,8 @@ async function tapRead(position,danger,mode='run'){
 				try{t.analyser.disconnect()}catch{}
 				try{t.sink.disconnect()}catch{}
 			}
+			try{output.disconnect(splitter)}catch{}
+			try{splitter.disconnect()}catch{}
 		}
 	});
 	assert.equal(captured.song,prepared.song);
