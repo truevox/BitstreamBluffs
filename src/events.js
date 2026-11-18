@@ -25,7 +25,7 @@ export const EVT = Object.freeze({
   BSOD_STATE_CHANGED: 'bb:bsodStateChanged',
   /** Emitter: RunScene (after crash, once). Payload: RunEndPayload. */
   RUN_END: 'bb:runEnd',
-  /** Emitter: PauseScene when player quits to title. Payload: RunAbortPayload. */
+  /** Emitter: PauseScene on restart/quit; additive {runId,reason,pauseToken}. Never a manual resume. */
   RUN_ABORT: 'bb:runAbort',
   /** Emitter: RunScene. Payload: CrashPayload. */
   CRASH: 'bb:crash',
@@ -63,9 +63,9 @@ export const EVT = Object.freeze({
   GLITCH_START: 'bb:glitchStart',
   /** Emitter: RunScene (driven by GlitchDirector). Payload: GlitchEndPayload. */
   GLITCH_END: 'bb:glitchEnd',
-  /** Emitter: RunScene when it actually pauses (after PAUSE input). Payload: PausePayload. */
+  /** Emitter: RunScene on intentional Pause only; additive {runTimeMs,runId,reason:'manual',pauseToken,gym}. */
   GAME_PAUSE: 'bb:gamePause',
-  /** Emitter: PauseScene on resume. Payload: PausePayload. */
+  /** Emitter: PauseScene on real Resume only; same runId/pauseToken as preceding GAME_PAUSE. */
   GAME_RESUME: 'bb:gameResume',
   /** Emitter: helper updateSetting() in src/services.js ONLY. Payload: SettingsChangedPayload. */
   SETTINGS_CHANGED: 'bb:settingsChanged',

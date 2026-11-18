@@ -152,6 +152,10 @@ export class RunScene extends Phaser.Scene {
     this.biomeMask = Number.isFinite(maskReg) ? maskReg >>> 0 : 0;
     this.startedAt = Date.now();
     this.runId = `${this.startedAt}-${this.seed}`;
+    // A manual pause is a distinct session, never a death or title transition.
+    // Audio can pair and cancel turntable effects without guessing scene state.
+    this._manualPauseSeq = 0;
+    this._manualPausePending = false;
 
     // Decision 2: is this the OFFICIAL Daily? Only when the DAILY RUN item asked for it (REG.DAILY_OFFICIAL)
     // AND the seed is today's daily seed. Any other run on a `daily-YYYY-MM-DD` seed is a practice run.
@@ -364,6 +368,7 @@ export class RunScene extends Phaser.Scene {
     this.matter.world.on('collisionactive', this._onCollide);
     this._onSettings = (payload) => this.onSettingsChanged(payload);
     this._onResume = () => {
+      this._manualPausePending = false;
       if (this.inputRouter && this.inputRouter.setEnabled) this.inputRouter.setEnabled(true);
       // consume the stale one-shot edge (the Esc that resumed) so it cannot re-pause immediately
       try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
@@ -2005,9 +2010,17 @@ export class RunScene extends Phaser.Scene {
   // ------------------------------------------------------------------ pause
 
   pauseRun() {
-    this.game.events.emit(EVT.GAME_PAUSE, { runTimeMs: this.runTimeMs });
+    // A held Escape/input edge must not dispatch two scratch starts or launch
+    // two PauseScenes. This is only the intentional player pause path; death
+    // and automatic scene transitions never route through this method.
+    if (this._manualPausePending || this.scene?.isPaused?.(SCENES.RUN)) return;
+    this._manualPausePending = true;
+    const pauseToken = `${this.runId}:${++this._manualPauseSeq}`;
+    const manual = { runTimeMs: this.runTimeMs, runId: this.runId,
+      reason: 'manual', pauseToken, gym: this.bsodGym === true };
+    this.game.events.emit(EVT.GAME_PAUSE, manual);
     this.scene.pause();
-    this.scene.launch(SCENES.PAUSE, { runTimeMs: this.runTimeMs, runId: this.runId });
+    this.scene.launch(SCENES.PAUSE, manual);
   }
 
   // ------------------------------------------------------------------ settings

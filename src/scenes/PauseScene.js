@@ -1,8 +1,8 @@
 /**
  * OWNER: UI engineer.
  * "Pascal's Ledger". Launched ON TOP of the paused RunScene by RunScene (scene.pause(RUN) + scene.launch(PAUSE, {runTimeMs})).
- * Resume: `scene.stop()`, `scene.resume(SCENES.RUN)`, emit EVT.GAME_RESUME {runTimeMs}. Restart (same seed) and Quit to
- * title emit EVT.RUN_ABORT {runId} first (nothing is saved for an aborted run). Also contains the leaderboard,
+ * Resume: `scene.stop()`, `scene.resume(SCENES.RUN)`, emit EVT.GAME_RESUME {runTimeMs,runId,reason,pauseToken,gym}. Restart (same seed) and Quit to
+ * title emit EVT.RUN_ABORT {runId,reason,pauseToken} first (nothing is saved for an aborted run). Also contains the leaderboard,
  * settings (palette, screen shake, volumes, tilt controls - only through updateSetting()) and sharecode export / import.
  * Optional launch data `runId` is used for RUN_ABORT; otherwise it is read from UIScene.runId.
  */
@@ -31,6 +31,8 @@ export class PauseScene extends Phaser.Scene {
   init(data) {
     this.runTimeMs = (data && data.runTimeMs) || 0;
     this.runIdFromData = (data && data.runId) || '';
+    this.manualPauseToken = (data && data.pauseToken) || '';
+    this.manualPauseGym = data?.gym === true;
   }
 
   create() {
@@ -166,7 +168,11 @@ export class PauseScene extends Phaser.Scene {
     uiSfx(this, 'uiBack');
     this.scene.stop();
     this.scene.resume(SCENES.RUN);
-    this.game.events.emit(EVT.GAME_RESUME, { runTimeMs: this.runTimeMs });
+    this.game.events.emit(EVT.GAME_RESUME, {
+      runTimeMs: this.runTimeMs, runId: this._runId(),
+      reason: 'manual', pauseToken: this.manualPauseToken,
+      gym: this.manualPauseGym,
+    });
     this._flushPadEdges();
   }
 
@@ -194,7 +200,9 @@ export class PauseScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     uiSfx(this, 'uiSelect');
-    this.game.events.emit(EVT.RUN_ABORT, { runId: this._runId() });
+    this.game.events.emit(EVT.RUN_ABORT, {
+      runId: this._runId(), reason: 'restart', pauseToken: this.manualPauseToken,
+    });
     this.scene.stop(SCENES.RUN);
     this.scene.stop(SCENES.UI);
     this.scene.start(SCENES.RUN);
@@ -205,7 +213,9 @@ export class PauseScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     uiSfx(this, 'uiBack');
-    this.game.events.emit(EVT.RUN_ABORT, { runId: this._runId() });
+    this.game.events.emit(EVT.RUN_ABORT, {
+      runId: this._runId(), reason: 'quit', pauseToken: this.manualPauseToken,
+    });
     // Clear the practice flag before showing the normal title/menu.
     this.registry.set(REG.BSOD_GYM, false);
     this.scene.stop(SCENES.RUN);

@@ -2309,3 +2309,23 @@ three transitions in actual Chromium/Phaser scenes, asserting the wall,
 player, run clock, scores and progression remain unchanged through the hold.
 This is a gameplay-only lifecycle fix: Music Friday's public timing API,
 production beat catalog and original audio assets remain untouched.
+
+## 2026-11-18 — Manual pause turntable audio contract (Control-owned gameplay)
+
+To support Marvin's approved descending-scratch Pause / mirrored-scratch
+Resume feature, `RunScene.pauseRun()` now emits an additive
+`EVT.GAME_PAUSE {runTimeMs,runId,reason:'manual',pauseToken,gym}` **once**
+per explicit player pause. Duplicate calls before Phaser's queued scene
+transition are ignored. `PauseScene.resume()` emits the matching
+`EVT.GAME_RESUME` payload with the same token; `PauseScene.restart()` and
+`quit()` instead emit `EVT.RUN_ABORT` with `reason:'restart'|'quit'`
+and the token, never a synthetic `GAME_RESUME`. Real crashes and Gym
+collision retries do not emit the manual pause signal.
+
+This is a **gameplay event contract only**. The original soundtrack
+transport, scratch DSP/samples, pause-menu jukebox override semantics,
+volume/mute/accessibility behavior and audio anti-stacking are explicitly
+**Music Friday-owned and not yet integrated**. Existing Gym one-second READY
+and stale-beat invalidation are unchanged. Browser contract/regression:
+`tools/manual-turntable-pause-gameplay-browser-smoke.mjs`. Full handoff:
+`docs/TURNTABLE-MANUAL-PAUSE-GAMEPLAY-HANDOFF-20261118.md`.
