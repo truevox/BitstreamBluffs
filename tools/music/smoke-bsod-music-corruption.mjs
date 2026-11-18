@@ -108,7 +108,16 @@ try{
 	assert.ok(vacuum.guitar.wet>.6);
 	console.log('VACUUM_NO_WIND_BUT_BSOD_DANGER_MUSIC_THREAT_PASS');
 	await page.evaluate(()=>window.__bbGame.events.emit('bb:runEnd',{cause:'crash'}));
-	await page.waitForTimeout(570);
+	// Chrome AudioParam setTargetAtTime is an exponential *approach*, not an
+	// instantaneous switch. Wait for the real wet/dry audio parameters to
+	// converge rather than assuming a fixed 570ms under shared CI load.
+	await page.waitForFunction(()=>{
+		const d=window.__bbGame.registry.get('audioSynth')._stemMusic;
+		return ['guitar','piano','other'].every(name=>{
+			const p=d.mixer?.sources.get(name)?.threat;
+			return p&&p.dry.gain.value>.98&&p.wet.gain.value<.02;
+		});
+	},null,{timeout:7000});
 	const after=await state();
 	assert.equal(after.clock,menu.clock);
 	assert.equal(after.song,menu.song);
