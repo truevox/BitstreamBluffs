@@ -9,8 +9,9 @@
  *   LANDING/TRICK/COMBO_CHANGED/CRASH/RESPAWN/POWERUP_x/HAZARD_HIT -> SFX, RUN_START -> startMusic,
  *   RUN_END/RUN_ABORT -> stopMusic, GLITCH_START -> glitch bus, DISTANCE_CHANGED -> music intensity,
  *   SETTINGS_CHANGED -> volumes, GAME_PAUSE/RESUME -> muffle music.
- * Additive public methods (not in the original contract): setSpeed(pxPerSec) drives the wind whoosh and a little
- * music intensity; RunScene may call it every frame. setIntensity(0..1) sets music intensity directly.
+ * Additive public methods: setSpeed(pxPerSec) drives music speed/intensity and bass, never wind.
+ * Wind reads RunScene's authoritative BSOD_STATE_CHANGED snapshots; no independent chase timer.
+ * setIntensity(0..1) sets music intensity directly.
  * RunScene must call playSfx('push') / playSfx('hop') itself (there is no event for those two).
  *
  * Signal graph:
@@ -80,6 +81,10 @@ export class AudioSynth {
     this._intensity = 0;
     this._distIntensity = 0;
     this._speedIntensity = 0;
+    this._windRelativePxS = 0;
+    this._windAtmosphere = 0;
+    this._windActive = false;
+    this._bsodDanger01 = 0;
     this._paused = false;
     this._lastSfx = {};
     this._arrCache = new Map();
@@ -108,9 +113,13 @@ export class AudioSynth {
           ev.on(name, fn);
           this._gameListeners.push([name, fn]);
         };
-        on(EVT.RUN_START, (p) => this.startMusic((p && p.seed) || ''));
-        on(EVT.RUN_END, () => this.stopMusic());
-        on(EVT.RUN_ABORT, () => this.stopMusic());
+        on(EVT.RUN_START, (p) => {
+          this._onBsodState(null);
+          this.startMusic((p && p.seed) || '');
+        });
+        on(EVT.RUN_END, () => { this._onBsodState(null); this.stopMusic(); });
+        on(EVT.RUN_ABORT, () => { this._onBsodState(null); this.stopMusic(); });
+        on(EVT.BSOD_STATE_CHANGED, (p) => this._onBsodState(p));
         on(EVT.LANDING, (p) => this._onLanding(p));
         on(EVT.TRICK, (p) => this.playSfx('trick', { pitch: 1 + Math.min(0.5, ((p && p.count) || 1) * 0.08 - 0.08) }));
         on(EVT.COMBO_CHANGED, (p) => {
@@ -562,6 +571,7 @@ export class AudioSynth {
           musicVolume: clamp01(Number(settings.musicVolume)),
           sfxVolume: clamp01(Number(settings.sfxVolume)),
           windVolume: clamp01(Number(settings.windVolume ?? 1)),
+          windEnabled: settings.windEnabled !== false,
           vocalGain: clamp01(Number(settings.vocalGain ?? 1)),
           melodyWithVocalsGain: clamp01(Number(settings.melodyWithVocalsGain ?? 0.18)),
           musicEnabledSongs: sanitizeSongSelection(settings.musicEnabledSongs),
@@ -595,9 +605,7 @@ export class AudioSynth {
       this.nodes.sfxBus.gain.setTargetAtTime(this.settings.sfxVolume * 0.9, t, 0.02);
       // Wind/hiss is independent of both musical playback and the SFX
       // slider. Changing its dedicated slider updates the running loop.
-      this.nodes.windGain.gain.setTargetAtTime(
-        (this._paused ? 0 : 1) * Math.pow(this._windSpeed || 0,1.6) *
-          0.22 * this.settings.windVolume,t,0.08);
+      this._applyWindFromBsod();
     } catch (e) { /* ignore */ }
   }
 
@@ -624,14 +632,42 @@ export class AudioSynth {
       const t = this.ctx.currentTime;
       this.nodes.musicFilter.frequency.setTargetAtTime(paused ? 500 : 18000, t, 0.05);
       this.nodes.musicSrc.gain.setTargetAtTime(paused ? 0.45 : this._musicWanted ? 1 : 0, t, 0.05);
-      if (paused) this.nodes.windGain.gain.setTargetAtTime(0, t, 0.05);
+      this._applyWindFromBsod();
     } catch (e) { /* ignore */ }
   }
 
   // --------------------------------------------------------------------------------------------------- speed / wind
 
+  /** Read-only authoritative gameplay state; never predicts a BSOD position or collision. */
+  _onBsodState(state) {
+    this._windActive = state?.active === true;
+    this._windAtmosphere = this._windActive && Number.isFinite(state?.atmosphereDensity)
+      ? clamp01(state.atmosphereDensity) : 0;
+    this._windRelativePxS = this._windActive && this._windAtmosphere > 0 &&
+      Number.isFinite(state?.relativeAirX) ? state.relativeAirX : 0;
+    this._bsodDanger01 = this._windActive && Number.isFinite(state?.proximity01)
+      ? clamp01(state.proximity01) : 0;
+    this._applyWindFromBsod();
+  }
+
+  /** Wind is environmental: never driven by the music-speed or song-selection state. */
+  _applyWindFromBsod() {
+    if (!this.ctx || !this.nodes) return;
+    const enabled = this.settings?.windEnabled !== false;
+    const volume = Number.isFinite(this.settings?.windVolume)
+      ? clamp01(this.settings.windVolume) : 1;
+    const normalized = this._windActive ?
+      clamp01(Math.abs(this._windRelativePxS) / 1000) : 0;
+    const gain = enabled && !this._paused ?
+      Math.pow(normalized, 1.6) * 0.22 * this._windAtmosphere * volume : 0;
+    const t = this.ctx.currentTime;
+    this.nodes.windGain.gain.setTargetAtTime(gain, t, 0.08);
+    this.nodes.windFilter.frequency.setTargetAtTime(300 + normalized * 2600, t, 0.12);
+  }
+
   /**
-   * Optional per-frame hook: sled speed in px/s drives the wind whoosh and slightly the music intensity.
+   * Optional per-frame hook: sled speed only affects music intensity and bass.
+   * Authoritative BSOD relative airflow is a separate wind-only signal.
    * @param {number} pxPerSec
    * @returns {void}
    */
@@ -641,13 +677,6 @@ export class AudioSynth {
       const s = clamp01((Number(pxPerSec) || 0) / 1000);
       this._speedIntensity = s;
       this._stemMusic?.setSpeed(pxPerSec);
-      const t = this.ctx.currentTime;
-      this._windSpeed = s;
-      // The sled wind is an environmental effect, never music.
-      // Selecting no songs must NOT silence the sled whoosh.
-      this.nodes.windGain.gain.setTargetAtTime(
-        Math.pow(s, 1.6) * 0.22 * (this.settings.windVolume ?? 1),t,0.12);
-      this.nodes.windFilter.frequency.setTargetAtTime(300 + s * 2600, t, 0.12);
       this._updateIntensity();
     } catch (e) { /* ignore */ }
   }
