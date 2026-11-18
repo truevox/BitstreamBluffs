@@ -14,7 +14,7 @@ export function canopySailFactor(vx) {
 /** Proposed first-playtest aerodynamic forces (velocity change in px/s). */
 export function aerodynamicStep({
   vx = 0, vy = 0, relativeAirX = 0, atmosphereDensity = 1,
-  parachute = false, airBrake = false, stepMs = 8,
+  parachute = false, airBrake = false, airbrakeLiftMul = 1, stepMs = 8,
 } = {}) {
   const dt = Number.isFinite(stepMs) ? clamp(stepMs, 0, 50) / 1000 : 0;
   const density = clamp(Number.isFinite(atmosphereDensity) ? atmosphereDensity : 0, 0, 1);
@@ -33,7 +33,7 @@ export function aerodynamicStep({
     // Cannot generate endless upward thrust while standing still.
     const flowSpeed = Math.abs(Number(vx) || 0);
     const aero = 215 * Math.tanh(flowSpeed / 450) * density;
-    dvy -= aero * dt;
+    dvy -= aero * Math.max(1, Number.isFinite(airbrakeLiftMul) ? airbrakeLiftMul : 1) * dt;
   }
   return { dvx, dvy };
 }

@@ -459,7 +459,7 @@ export class PhysicsTuner {
     // the Rails damp the rebound as they damp restitution: by bounceMul squared (a bounce's energy)
     if (ctx.stabilizeBounceMul > 0) landingRebound *= ctx.stabilizeBounceMul * ctx.stabilizeBounceMul;
 
-    let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul * glide.speedMul;
+    let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul * glide.speedMul * (ctx.upgradeEffects?.speedMul || 1);
     if (ctx.slowed) speedMul *= ctx.slowFactor || b.slowFactor;
     let dragMul = 1;
     let steerMul = 1;
@@ -498,6 +498,10 @@ export class PhysicsTuner {
       airControl: b.airControlFactor * t.airTiltFeelMul * (daily.airControlMul || 1) * zoneSteerMul,
       bounceMul,
       speedMul,
+      hopMul: ctx.upgradeEffects?.hopMul || 1,
+      flipMul: ctx.upgradeEffects?.flipMul || 1,
+      airbrakeLiftMul: ctx.upgradeEffects?.airbrakeLiftMul || 1,
+      divebombMul: ctx.upgradeEffects?.divebombMul || 1,
       steerMul,
       tiltSign,
       groundResist: resistBase,

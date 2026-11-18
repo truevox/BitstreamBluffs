@@ -20,7 +20,7 @@ import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
 import { ACHIEVEMENTS } from '../systems/Achievements.js';
-import { shopLayout, shopMenuItems, titlesLayout, titlesMenuItems } from './ShopLayout.js';
+import { shopLayout, upgradeShopLayout, shopMenuItems, titlesLayout, titlesMenuItems } from './ShopLayout.js';
 import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopItem } from '../systems/ProfileStore.js';
 import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
 import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
@@ -1435,6 +1435,7 @@ export class ShopView extends View {
     // F4 fit: the catalogue is paged by slot (ShopLayout.SHOP_PAGES). The page row is the first selectable
     // row, so the shop opens with focus on "← TRAIL →" and left/right is the first thing a player tries.
     this.page = 0;
+    this.upgradePage = false;
     this._build();
   }
 
@@ -1444,7 +1445,24 @@ export class ShopView extends View {
 
   /** The panel's single source of truth: layout rows + menu items, rebuilt together every time. */
   _menuItems(layout) {
+    if (this.upgradePage) return layout.rows.map((r) => {
+      if (r.kind === 'upgradeBack') return { kind: 'action', label: r.label, onSelect: () => this._showShop() };
+      if (r.kind === 'upgradeToggle') return {
+        kind: 'choice', label: r.label,
+        options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }],
+        get: () => this._profile().upgradesEnabled === true,
+        set: v => this._setUpgradeMode(v === true),
+      };
+      if (r.kind === 'upgradeItem') return {
+        kind: 'action', id: r.id, label: r.label, sub: r.state,
+        disabled: r.disabled === true, onSelect: () => this._buyUpgrade(r.id),
+      };
+      return { kind: 'static', label: r.label, disabled: true };
+    });
     return shopMenuItems(layout).map((m) => {
+      if (m.rowKind === 'upgradeLink') return {
+        kind: 'action', label: m.label, sub: m.sub, onSelect: () => this._showUpgrades(),
+      };
       if (m.rowKind === 'page') {
         // Confirm or a click turns the page forward; left/right are handled in handleAction. An action
         // row, not a choice row: MenuList repaints a choice row after its setter runs, and the setter here
@@ -1481,8 +1499,9 @@ export class ShopView extends View {
   }
 
   _build() {
-    const layout = shopLayout({ profile: this._profile(), levels: this._levels(), page: this.page });
-    this.page = layout.page;
+    const layout = this.upgradePage ? upgradeShopLayout({ profile: this._profile() })
+      : shopLayout({ profile: this._profile(), levels: this._levels(), page: this.page });
+    if (!this.upgradePage) this.page = layout.page;
     if (this.menu) { this.menu.destroy(); this.menu = null; }
     // The bank value is drawn outside the list (the list right-aligns only row state), so it has to be
     // torn down with it or every rebuild would stack another "BANK n" on the same pixel.
@@ -1504,6 +1523,41 @@ export class ShopView extends View {
         this.bankTexts.push(txt);
       }
     }
+  }
+
+  /** Change only this shop panel, keeping the title/profile ownership and Back semantics. */
+  _showUpgrades() {
+    this.upgradePage = true;
+    this._build();
+  }
+
+  _showShop() {
+    this.upgradePage = false;
+    this._build();
+  }
+
+  _setUpgradeMode(on) {
+    const prof = this._profile();
+    const next = { ...prof, upgradesEnabled: !!on };
+    try {
+      this.scene.registry.set(REG.PROFILE, this.store ? this.store.save(next) : next);
+    } catch {
+      this.scene.registry.set(REG.PROFILE, next);
+    }
+    // MenuList._adjust refreshes its own choice after the setter returns.
+    // Do NOT destroy that same menu mid-setter: keyboard/gamepad controls keep
+    // their focus and the display updates via the live get() callback.
+  }
+
+  _buyUpgrade(id) {
+    const tx = this.store?.buyUpgrade(id);
+    if (tx?.ok) {
+      this.scene.registry.set(REG.PROFILE, tx.profile);
+      uiSfx(this.scene, 'uiSelect', { pitch: 1.3 });
+    } else {
+      uiSfx(this.scene, 'uiBack');
+    }
+    this._refresh();
   }
 
   /**

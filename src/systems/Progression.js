@@ -21,6 +21,8 @@
  * workstreams (W2 missions, W4 bank/shop, W5 achievements) need, so they never need a migration.
  */
 
+import { emptyUpgradeRanks } from "./PermanentUpgrades.js";
+
 /** Profile schema version, independent of STORAGE.saveVersion. */
 export const PROFILE_VERSION = 1;
 
@@ -184,6 +186,9 @@ export function defaultProfile() {
     // records what the player owns. Additive, default-off, and safe on an old save by omission - which is
     // why it needs no saveVersion bump.
     boosts: { errorCorrection: false, headStart: false },
+    // Permanent ranks persist forever; OFF by default so clean/daily competition stays unchanged.
+    upgrades: emptyUpgradeRanks(),
+    upgradesEnabled: false,
     missions: { counter: 0, active: [], progress: {} },
     achievements: {},
     credited: [],

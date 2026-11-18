@@ -353,6 +353,68 @@ describe('RunScene applies only the boosts the profile owns', () => {
   });
 });
 
+// ================================================================ Permanent upgrades — clean competition is opt-in
+
+describe('permanent upgrade loadout is snapshot at the start, forbidden in official Daily', () => {
+  const UPGRADED = {
+    upgradesEnabled: true,
+    upgrades: { speed: 7, hop: 4, flip: 3, canopy: 4, airbrake: 5, divebomb: 2, bsodGrace: 7 },
+    boosts: { headStart: false, errorCorrection: false },
+    unlocked: { biomes: [], cosmetics: [], boosts: {} },
+  };
+
+  test('START RUN applies purchased ranks, marks it modded and preserves ledger-v3 integrity', () => {
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, UPGRADED], [REG.SAVE_STORE, memStore()]]);
+    pressTitle(values, 'START RUN');
+    const scene = runScene(values);
+    expect(scene.upgradeRun.enabled).toBe(true);
+    expect(scene.modded).toBe(true);
+    const phys = scene.tuner.getEffective(scene.physicsContext({}));
+    expect(phys.speedMul).toBeGreaterThan(1);
+    expect(phys.hopMul).toBeGreaterThan(1);
+    expect(phys.flipMul).toBeGreaterThan(1);
+    expect(phys.airbrakeLiftMul).toBeGreaterThan(1);
+    expect(phys.divebombMul).toBeGreaterThan(1);
+    expect(scene.sled.canopyFuelFullMs).toBeGreaterThan(880);
+    expect(scene.bsod.accelerationPxS2).toBeLessThan(1.15);
+    const r = crash(scene);
+    expect(r).toMatchObject({
+      hashV: 3, modded: true, upgradeRanks: UPGRADED.upgrades,
+      dailyOfficial: false,
+    });
+    expect(verifyLedgerHash(sanitizeRun(r))).toBe(true);
+    expect(verifyLedgerHash({...r,upgradeRanks:{...r.upgradeRanks,speed:99}})).toBe(false);
+  });
+
+  test('purchased ranks do nothing with mode OFF; run stays clean and v2', () => {
+    const p = {...UPGRADED, upgradesEnabled:false};
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, p], [REG.SAVE_STORE, memStore()]]);
+    pressTitle(values, 'START RUN');
+    const scene = runScene(values);
+    expect(scene.upgradeRun.enabled).toBe(false);
+    expect(scene.modded).toBe(false);
+    expect(scene.tuner.getEffective(scene.physicsContext({})).hopMul).toBe(1);
+    expect(scene.sled.canopyFuelFullMs).toBe(880);
+    const r = crash(scene);
+    expect(r.hashV).toBe(2);
+    expect(r.upgradeRanks).toBeUndefined();
+    expect(verifyLedgerHash(sanitizeRun(r))).toBe(true);
+  });
+
+  test('DAILY RUN ignores all permanent ranks even with UPGRADE MODE ON', () => {
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, UPGRADED], [REG.SAVE_STORE, memStore()]]);
+    pressTitle(values, 'DAILY RUN');
+    const scene = runScene(values);
+    expect(scene.dailyOfficial).toBe(true);
+    expect(scene.upgradeRun.enabled).toBe(false);
+    expect(scene.modded).toBe(false);
+    const r = crash(scene);
+    expect(r.hashV).toBe(2);
+    expect(r.upgradeRanks).toBeUndefined();
+    expect(verifyLedgerHash(sanitizeRun(r))).toBe(true);
+  });
+});
+
 // ================================================================ TERRAIN-2: no palette rebuilds at mask 0
 
 describe('the biome palette repaint runs only when a biome mask is set', () => {

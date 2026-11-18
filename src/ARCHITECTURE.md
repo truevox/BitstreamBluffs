@@ -1602,3 +1602,47 @@ established EVT.NEAR_MISS exactly once per scored escape, so the existing
 ScoreManager bonus, missions, achievements, XP and HUD accounting stay aligned.
 Music and physical BSOD pursuit code are unchanged; no artificial BSOD
 unbeatable timer is introduced.
+
+## 2026-11-18 — Permanent softcapped upgrades (feature branch, first-playtest parameters)
+
+**Ownership/provenance:** Marvin established unlimited permanent purchases with
+diminishing physical returns, stronger high-level riders, opt-in MODDED
+competition and a BSOD which continues accelerating without a forced-death
+timer. Friday chose the initial numerical cost/softcap curves and seven
+catalogue IDs for playtesting; these are not permanently frozen owner decisions.
+
+- Open **PROFILE → SHARD SHOP → PERMANENT UPGRADES**. The single-panel shop
+  changes to a seven-row permanent catalog, with bank, rank/next-price and
+  UPGRADE MODE ON/OFF. No extra Title row or independently overlaid text layer.
+  Upgrades are purchased using existing credited Data Shards in the bank.
+- `PermanentUpgrades.js` is the pure source for prices, validation, ranks,
+  opt-in loadouts and physical benefit curves. An unlimited sequence of ranks
+  has softcapped effect `cap * rank / (rank + k)` and an increasing next
+  price `ceil(base + scale*rank*(1 + rank/12))`. No hard preset tier cap.
+  Ranks, funds and toggle are persisted in the existing `bb.profile`
+  object, without discarding old profile fields or changing W1 crediting.
+  ProfileStore.buyUpgrade performs an atomic charge/persist transaction,
+  failing without a debit when storage cannot commit. Default mode is OFF.
+- First-playtest seven tracks: Race Speed (max +30% speed multiplier),
+  Hop Height (+22% initial normal impulse), Flip Control (+33% target speed
+  and acceleration), Parachute Fuel (+70% reservoir), Airbrake Lift (+55%
+  BSOD aerodynamic lift), Divebomb Power (+48% downward impulse),
+  BSOD Head Start (up to 25% reduction in wall acceleration). Finite
+  asymptotes do not make permanent infinite flight free; the wall never
+  stops accelerating.
+- RunScene snapshots enabled ranks *once* at run start. In official Daily,
+  all purchased upgrades are ignored regardless of toggle. In ordinary
+  runs, if mode is ON and any rank exists, the run is MODDED (clean rankings
+  excluded through the preexisting Ranking.js contract). Run records with
+  upgrades carry `hashV:3` and a canonical `upgradeRanks` snapshot; the
+  digest includes prior v2 gameplay/result fields AND all equipped ranks.
+  Unupgraded runs remain v2, and the extra fields never appear on those.
+- PhysicsTuner applies the speed and hop/flip/divebomb/airbrake multipliers;
+  Sled manages its upgraded 880ms canopy reservoir, and BsodPursuit receives
+  a run-start reduction in acceleration. Nothing reads audio to decide
+  physics or permits upgrades to modify the official Daily.
+- Validation gates: model tests for monotonic softcaps, atomic purchases,
+  reloads/failed writes, unmodified legacy hashes, v3 tampering, mixed
+  shop layout, and run-scene behavior; real Chromium shop purchase and
+  physical run application tested; still requires gameplay feel/balance
+  and sound checks before a merge into main.

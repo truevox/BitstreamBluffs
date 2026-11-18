@@ -15,6 +15,7 @@ import { STORAGE } from '../constants.js';
 import { defaultSongSelection, sanitizeSongSelection } from './music/MusicPlaylist.js';
 import { xxHash32 } from './Rng.js';
 import { DailyPatch } from './DailyPatch.js';
+import { activeUpgradeRanks } from './PermanentUpgrades.js';
 import { DEFAULT_CONTROL_LAYOUT, normalizeControlLayout } from './ControlLayouts.js';
 import { isRankable, isModdedOnly, countsForDailyBest, countsForStreak } from './Ranking.js';
 
@@ -209,7 +210,8 @@ export function sanitizeRun(raw) {
   //    whether any did, `boosts` says which, so the v2 hash covers the applied effects.
   //  - `imported`: LOCAL provenance only (set by importSharecode, never by a sharecode itself). Not in
   //    any hash: it is not gameplay. Imported runs never extend the Daily streak (decision 1).
-  if (raw.hashV === LEDGER_HASH_V) r.hashV = LEDGER_HASH_V;
+  if (raw.hashV === LEDGER_HASH_V || raw.hashV === UPGRADE_LEDGER_HASH_V) r.hashV = raw.hashV;
+  if (raw.hashV === UPGRADE_LEDGER_HASH_V) r.upgradeRanks = activeUpgradeRanks(raw.upgradeRanks);
   if (typeof raw.bestFlow === 'number' && Number.isFinite(raw.bestFlow) && raw.bestFlow >= 0) r.bestFlow = raw.bestFlow;
   if (typeof raw.dailyOfficial === 'boolean') r.dailyOfficial = raw.dailyOfficial;
   if (Array.isArray(raw.boosts)) {
@@ -224,8 +226,9 @@ export function sanitizeRun(raw) {
 
 // ---- ledger hash (versioned, decision 6) --------------------------------------------------------------------
 
-/** The ledger-hash version new records are written with. Records without `hashV` are v1. */
+/** Clean/boost runs remain on hash v2; permanent-upgrade loadouts require v3. */
 export const LEDGER_HASH_V = 2;
+export const UPGRADE_LEDGER_HASH_V = 3;
 
 const sortedTricksOf = (r) => {
   const tricks = r.tricks && typeof r.tricks === 'object' ? r.tricks : {};
@@ -278,7 +281,21 @@ export function computeLedgerHashV2(record) {
 }
 
 /**
- * Whether a record's ledgerHash matches its contents under ITS version (v2 when `hashV === 2`, else v1).
+ * Version 3 snapshots permanent purchased ranks at RUN START.
+ * The digest of the v2 fields commits the established score and session facts;
+ * the ordered rank pairs commit every gameplay-affecting permanent upgrade.
+ * No hypothetical old user migration is required: only upgraded runs use v3.
+ */
+export function computeLedgerHashV3(record) {
+  const r = record || {};
+  const ranks = activeUpgradeRanks(r.upgradeRanks);
+  const applied = Object.keys(ranks).length > 0;
+  const pairs = Object.keys(ranks).map(id => [id, ranks[id]]);
+  return xxHash32(JSON.stringify(['v3', computeLedgerHashV2(r), applied, pairs])).toString(16).padStart(8, '0');
+}
+
+/**
+ * Whether a record's ledgerHash matches its contents under ITS version (v3 for permanent-upgrade snapshots, v2 otherwise when versioned).
  * An empty or missing hash never verifies (audit F2: it used to skip verification). Never throws.
  * @param {RunRecord} record
  * @returns {boolean}
@@ -596,15 +613,16 @@ export class SaveStore {
   }
 
   /**
-   * Short non-cryptographic fingerprint of a record, VERSIONED (decision 6): a record with `hashV: 2` is
-   * hashed by computeLedgerHashV2 (every gameplay and result field), any other record by the unchanged
-   * computeLedgerHashV1. Excludes ledgerHash and initials in both versions.
+   * Short non-cryptographic fingerprint: v3 includes the active permanent-upgrade snapshot;
+   * v2 hashes existing gameplay/score fields; unversioned records use v1.
+   * Excludes local initials and ledgerHash in every version.
    * @param {RunRecord} record
    * @returns {string} 8 lowercase hex chars.
    */
   static computeLedgerHash(record) {
     const r = record || {};
-    return r.hashV === LEDGER_HASH_V ? computeLedgerHashV2(r) : computeLedgerHashV1(r);
+    return r.hashV === UPGRADE_LEDGER_HASH_V ? computeLedgerHashV3(r)
+      : r.hashV === LEDGER_HASH_V ? computeLedgerHashV2(r) : computeLedgerHashV1(r);
   }
 
   /**

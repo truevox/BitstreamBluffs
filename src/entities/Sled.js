@@ -62,7 +62,7 @@ export class Sled {
     this._playerHopElapsedMs = 0;
     this.pushCooldownMs = 0;
     this.parachuteMs = 0;
-    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
+    this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
     this.chuteUsed = false;
     this.tucked = false;
     this.airBrakeActive = false;
@@ -161,7 +161,7 @@ export class Sled {
     if (this._contactFlag) {
       if (this.msSinceContact >= TUNING.groundedGraceMs) {
         this.chuteUsed = false; // freshly landed
-        this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
+        this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
         this._landSettleMs = TUNING.landSettleMs;
         this.touchdownVx = this._preVx;
         this.touchdownVy = this._preVy;
@@ -210,7 +210,7 @@ export class Sled {
     this.pushCooldownMs = Math.max(0, this.pushCooldownMs - stepMs);
     this.geyserCooldownMs = Math.max(0, (this.geyserCooldownMs || 0) - stepMs);
     this.invulnerableMs = Math.max(0, this.invulnerableMs - stepMs);
-    const fuel = canopyFuelStep(this.parachuteFuelMs, !!(pad && pad.parachute), !grounded, stepMs, PHYSICS.parachuteDurationMs);
+    const fuel = canopyFuelStep(this.parachuteFuelMs, !!(pad && pad.parachute), !grounded, stepMs, (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs));
     this.parachuteFuelMs = fuel.fuelMs;
     const chute = fuel.deployed;
     this.parachuteMs = chute ? Math.max(0.001, this.parachuteFuelMs) : 0;
@@ -260,13 +260,13 @@ export class Sled {
     if (chute && vy > 0 && (!atmosphere || atmosphere.atmosphereDensity > 0)) vy *= Math.exp(-1.6 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1));
     // Divebomb trades altitude for time, not horizontal momentum. Airflow is required.
     if (!grounded && pad && pad.divebomb && !chute && !this.airBrakeActive) {
-      vy += TUNING.divebombDownPxS2 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1);
+      vy += TUNING.divebombDownPxS2 * (phys.divebombMul || 1) * dt * (atmosphere ? atmosphere.atmosphereDensity : 1);
     }
     // Deterministic physical BSOD airflow; wind/audio renderers never affect physics.
     if (!grounded && atmosphere) {
       const wind = aerodynamicStep({ vx, vy, relativeAirX: atmosphere.relativeAirX,
         atmosphereDensity: atmosphere.atmosphereDensity, parachute: chute,
-        airBrake: this.airBrakeActive, stepMs });
+        airBrake: this.airBrakeActive, airbrakeLiftMul: phys.airbrakeLiftMul || 1, stepMs });
       vx += wind.dvx;
       vy += wind.dvy;
     }
@@ -297,7 +297,7 @@ export class Sled {
     // hop / bump jump (Space) with coyote time and input buffer
     if (this.hopBufferMs > 0 && this.msSinceContact < TUNING.hopCoyoteMs) {
       const vn = vx * nx + vy * ny;
-      const want = TUNING.hopPxS;
+      const want = TUNING.hopPxS * (phys.hopMul || 1);
       if (vn < want) {
         vx += nx * (want - vn);
         vy += ny * (want - vn);
@@ -372,8 +372,8 @@ export class Sled {
     if (!g && tilt !== 0) {
       // Continuous flip input approaches a stable angular velocity. Once the
       // target is reached, holding the button no longer accelerates the flip.
-      const desired = tilt * TUNING.flipTargetDegS * DEG;
-      const step = TUNING.flipAccelDegS2 * DEG * dt;
+      const desired = tilt * TUNING.flipTargetDegS * (phys.flipMul || 1) * DEG;
+      const step = TUNING.flipAccelDegS2 * (phys.flipMul || 1) * DEG * dt;
       w += clamp(desired - w, -step, step);
     } else {
       w += torqueDeg * DEG * dt;
@@ -385,7 +385,7 @@ export class Sled {
     }
     if (pad && pad.brake && !g) w *= Math.exp(-TUNING.airBrakeAngularDamp * dt);
     if (chute) w *= Math.exp(-2.5 * dt);
-    const wMax = TUNING.maxAngularVelDegS * DEG;
+    const wMax = TUNING.maxAngularVelDegS * (phys.flipMul || 1) * DEG;
     w = clamp(w, -wMax, wMax);
     Body.setAngularVelocity(b, (w * BASE_STEP_MS) / 1000);
   }
@@ -415,7 +415,7 @@ export class Sled {
     this._sinceLaunchMs = 0;
     this._playerHopActive = false;
     this.chuteUsed = false;
-    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
+    this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
     this._sync();
   }
 
@@ -439,7 +439,7 @@ export class Sled {
     this._sinceLaunchMs = 0;
     this._playerHopActive = false;
     this.chuteUsed = false;
-    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
+    this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
     this._sync();
   }
 
@@ -501,7 +501,7 @@ export class Sled {
     this._groundRunMs = 0;
     this._sinceLaunchMs = 0;
     this.parachuteMs = 0;
-    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
+    this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
     this.chuteUsed = false;
     this.airtimeMs = 0;
     this._sync();

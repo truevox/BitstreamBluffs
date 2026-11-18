@@ -17,6 +17,7 @@
  * list, so rebuilding after a purchase redraws all of it.
  */
 import { measureText } from './PixelFont.js';
+import { UPGRADE_CATALOG, sanitizeUpgradeRanks, nextUpgradePrice } from '../systems/PermanentUpgrades.js';
 import { SHOP_ITEMS, isOwned } from '../systems/ProfileStore.js';
 import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 
@@ -153,6 +154,7 @@ export function shopLayout(o = {}) {
     })
     .join('  ');
   rows.push({ kind: 'static', key: 'loadout', label: loadoutText, color: 'text' });
+  rows.push({ kind: 'upgradeLink', key: 'upgradeLink', label: 'PERMANENT UPGRADES', state: 'OPEN' });
 
   // Lay the rows out and measure every drawn string. Because y comes from this single loop, a row's text
   // and the menu's own row geometry cannot disagree.
@@ -170,6 +172,12 @@ export function shopLayout(o = {}) {
       r.texts = [
         { key: `${r.key}-label`, text: r.label, x: PAD + 6, y, w: measureText(r.label), h: GLYPH_H, color: 'magenta' },
         { key: `${r.key}-right`, text: r.state, x: SHOP_PANEL.w - PAD - 6 - rw, y, w: rw, h: GLYPH_H, color: 'magenta' },
+      ];
+    } else if (r.kind === 'upgradeLink') {
+      const rw = measureText(r.state);
+      r.texts = [
+        { key: r.key + '-label', text: r.label, x: PAD + 6, y, w: measureText(r.label), h: GLYPH_H, color: 'lime' },
+        { key: r.key + '-right', text: r.state, x: SHOP_PANEL.w - PAD - 6 - rw, y, w: rw, h: GLYPH_H, color: 'lime' },
       ];
     } else if (r.kind === 'item') {
       if (firstSelectable < 0) firstSelectable = i;
@@ -243,6 +251,7 @@ export function shopMenuItems(layout) {
     if (r.kind === 'page') {
       return { kind: 'action', rowKind: 'page', label: r.label, sub: r.state, page: r.page, disabled: false, onSelect: null };
     }
+    if (r.kind === 'upgradeLink') return { kind: 'action', rowKind: 'upgradeLink', label: r.label, sub: r.state, disabled: false };
     if (r.kind === 'item') {
       return { kind: 'action', id: r.id, label: r.label, sub: r.state, rowKind: 'item', disabled: r.disabled, onSelect: null };
     }
@@ -260,6 +269,53 @@ export function shopMenuItems(layout) {
     // head / header / static: drawn, never selectable, never focusable.
     return { kind: 'static', label: r.label, rowKind: r.kind, key: r.key, disabled: true };
   });
+}
+
+/** Pure page for the permanent-upgrade catalog; shares the shop's single-row geometry. */
+export function upgradeShopLayout(o = {}) {
+  const profile = o.profile || {};
+  const bank = Number.isSafeInteger(profile.bank) ? profile.bank : 0;
+  const ranks = sanitizeUpgradeRanks(profile.upgrades);
+  const rows = [
+    { kind: 'head', key: 'head', label: '', right: 'BANK ' + bank },
+    { kind: 'upgradeBack', key: 'upgradeBack', label: '← BACK TO SHOP', state: '' },
+    { kind: 'upgradeToggle', key: 'upgradeToggle', label: 'UPGRADE MODE', state: profile.upgradesEnabled === true ? 'ON' : 'OFF' },
+    { kind: 'header', key: 'header', label: 'PURCHASE PERMANENT RANKS' },
+  ];
+  for (const spec of UPGRADE_CATALOG) {
+    const rank = ranks[spec.id];
+    const price = nextUpgradePrice(spec.id, rank);
+    rows.push({ kind: 'upgradeItem', key: 'upgrade-' + spec.id, id: spec.id,
+      label: spec.label + ' R' + rank,
+      state: price == null ? 'UNAVAILABLE' : '' + price,
+      disabled: price == null,
+    });
+  }
+  rows.push({ kind: 'static', key: 'softcap', label: 'UNLIMITED RANKS / DIMINISHING RETURNS' });
+  rows.push({ kind: 'static', key: 'ranked', label: 'MODE ON = MODDED, OFFICIAL DAILY CLEAN' });
+  const texts = [];
+  let y = 8;
+  for (const row of rows) {
+    row.y = y;
+    if (row.kind === 'head') {
+      const w = measureText(row.right);
+      row.texts = [{ key: 'head-bank', text: row.right, x: SHOP_PANEL.w - PAD - w, y, w, h: GLYPH_H, color: 'amber' }];
+    } else {
+      const left = row.kind === 'header' || row.kind === 'static' ? PAD : PAD + 6;
+      row.texts = [{ key: row.key + '-label', text: row.label,
+        x: left, y, w: measureText(row.label), h: GLYPH_H,
+        color: row.kind === 'upgradeItem' ? 'text' : row.kind === 'upgradeBack' ? 'cyan' : 'magenta' }];
+      if (row.state) {
+        const w = measureText(row.state);
+        row.texts.push({ key: row.key + '-state', text: row.state,
+          x: SHOP_PANEL.w - PAD - 6 - w, y, w, h: GLYPH_H, color: 'amber' });
+      }
+    }
+    texts.push(...row.texts);
+    y += ROW_H;
+  }
+  return { w: SHOP_PANEL.w, h: SHOP_PANEL.h, rows, texts, rowH: ROW_H,
+    band: { x: PAD - 6, y: 8, w: SHOP_PANEL.w - (PAD - 6) * 2 } };
 }
 
 export { ROW_H as SHOP_ROW_H, GLYPH_H as SHOP_GLYPH_H };

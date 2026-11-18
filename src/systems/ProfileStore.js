@@ -14,6 +14,7 @@ import { metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
 import { isOfficialDaily } from './Ranking.js';
 import { COSMETIC_ITEMS } from './Cosmetics.js';
 import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
+import { sanitizeUpgradeRanks, purchaseUpgrade } from './PermanentUpgrades.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -110,6 +111,8 @@ export function sanitizeProfile(raw, levels) {
   if (raw.v !== PROFILE_VERSION) return finishShape(p, table);
   p.xp = nonNeg(raw.xp);
   p.bank = nonNeg(raw.bank);
+  p.upgrades = sanitizeUpgradeRanks(raw.upgrades);
+  p.upgradesEnabled = raw.upgradesEnabled === true;
   p.lifetime = sanitizeLifetime(raw.lifetime);
   const u = raw.unlocked && typeof raw.unlocked === 'object' ? raw.unlocked : {};
   p.unlocked = {
@@ -573,6 +576,23 @@ export class ProfileStore {
       this.backend = 'memory';
     }
     return this.profile;
+  }
+
+  /** Buy one permanent upgrade with the exact same atomic persistence guarantees
+   * as music-vocals. Refused transactions do not modify memory or storage. */
+  buyUpgrade(id) {
+    const next = purchaseUpgrade(this.profile, id);
+    if (next === this.profile) return { ok: false, reason: 'unavailable-or-insufficient-shards', profile: this.profile };
+    if (!this.storage) return { ok: false, reason: 'storage-unavailable', profile: this.profile };
+    const clean = sanitizeProfile(next, this.levels);
+    try {
+      this.storage.setItem(PROFILE_KEY, JSON.stringify(clean));
+    } catch {
+      return { ok: false, reason: 'storage-unavailable', profile: this.profile };
+    }
+    this.profile = clean;
+    this.backend = 'localStorage';
+    return { ok: true, reason: 'purchased', profile: this.profile };
   }
 
   /** Atomic persistent purchase: charge + unlock are a SINGLE storage

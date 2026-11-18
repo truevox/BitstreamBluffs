@@ -23,7 +23,8 @@ import {
   SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, PHYSICS, STORAGE, TIMING,
 } from '../constants.js';
 import { EVT } from '../events.js';
-import { SaveStore, LEDGER_HASH_V } from '../systems/SaveStore.js';
+import { SaveStore, LEDGER_HASH_V, UPGRADE_LEDGER_HASH_V } from '../systems/SaveStore.js';
+import { upgradeLoadoutForRun } from '../systems/PermanentUpgrades.js';
 import { TerrainGenerator, biomeForSector } from '../systems/TerrainGenerator.js';
 import { detectBiomeVisits } from '../systems/BiomeDiscovery.js';
 import { ScoreManager } from '../systems/ScoreManager.js';
@@ -60,7 +61,7 @@ import { planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
-import { BsodPursuit, emptyBsodState } from '../systems/BsodPursuit.js';
+import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
 const DEG = Math.PI / 180;
@@ -170,6 +171,9 @@ export class RunScene extends Phaser.Scene {
     this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
     const owned = prof && prof.unlocked && typeof prof.unlocked === 'object' ? prof.unlocked.boosts : null;
     this.unlockedBoosts = owned && typeof owned === 'object' ? { ...owned } : {};
+    // Permanent upgrades are opt-in, frozen for the run, and never applied to official Dailies.
+    this.upgradeRun = upgradeLoadoutForRun(prof, { daily: this.dailyOfficial });
+    this.upgradeFx = this.upgradeRun.effects;
     this.dailyMods = (daily && daily.rule && daily.rule.modifiers) || {};
 
     // pure systems
@@ -288,7 +292,7 @@ export class RunScene extends Phaser.Scene {
     const isDaily = this.dailyOfficial;
     const boostOpts = { daily: isDaily, unlocked: this.unlockedBoosts };
     this.boostFx = boostEffects(this.loadout, boostOpts);
-    this.modded = this.boostFx.modded;
+    this.modded = this.boostFx.modded || this.upgradeRun.enabled;
     // The ids that actually applied, written onto the record (and so into the v2 ledger hash).
     const applied = loadoutForRun(this.loadout, boostOpts).boosts;
     this.appliedBoosts = Object.keys(applied).filter((id) => applied[id]).sort();
@@ -300,7 +304,10 @@ export class RunScene extends Phaser.Scene {
     }
     if (this.boostFx.speedFactor !== 1) this.sled.scaleVelocity(this.boostFx.speedFactor);
     // Authoritative physical chase: gap is from the wall's leading edge to the compound sled body left bound.
-    this.bsod = new BsodPursuit({ sledLeftEdgeX: sledLeftCollisionEdge(this.sled), level: prof.level });
+    this.sled.canopyFuelFullMs = PHYSICS.parachuteDurationMs * this.upgradeFx.canopyFuelMul;
+    this.sled.parachuteFuelMs = this.sled.canopyFuelFullMs;
+    this.bsod = new BsodPursuit({ sledLeftEdgeX: sledLeftCollisionEdge(this.sled), level: prof.level,
+      config: { ...BSOD_DEFAULTS, accelerationPxS2: BSOD_DEFAULTS.accelerationPxS2 * this.upgradeFx.bsodAccelerationMul } });
     this.bsodState = this.bsod.state(sledLeftCollisionEdge(this.sled), this.sled.vx, 1);
     this.bsodCaught = false;
     this.bsodBluffs = new BsodBluffTracker();
@@ -1007,6 +1014,7 @@ export class RunScene extends Phaser.Scene {
       slowFactor: this.slowFactor,
       // Decision 4: Head Start's opening surge multiplies in for its window only (exactly 1 afterwards).
       speedBoost: (this.boostMs > 0 ? this.boostFactor : 1) * wardSpeedMul(this.wards) * openingSpeedMul(this.opening, this.runTimeMs),
+      upgradeEffects: this.upgradeFx,
       timeMs: this.runTimeMs,
       parachute: !!pad.parachute && !sled.grounded && (sled.parachuteFuelMs ?? PHYSICS.parachuteDurationMs) > 0,
       airBrake: !!pad.airBrake && !sled.grounded,
@@ -1684,6 +1692,7 @@ export class RunScene extends Phaser.Scene {
       // W4: set only when a boost was actually active. Ranking keeps it off clean boards; since decision 6
       // the v2 ledger hash covers it, with the ids of the boosts that applied.
       ...(this.modded ? { modded: true, boosts: [...(this.appliedBoosts || [])] } : {}),
+      ...(this.upgradeRun?.enabled ? { upgradeRanks: { ...this.upgradeRun.ranks } } : {}),
       // Decision 2: true only for the official Daily (DAILY RUN item, today's seed). Written on every
       // record so a v2 record is never mistaken for a legacy one (Ranking.isOfficialDaily).
       dailyOfficial: this.dailyOfficial === true,
@@ -1691,7 +1700,7 @@ export class RunScene extends Phaser.Scene {
       nearMisses: this.nearMissCount || 0,
       bonusPoints: Math.round(snap.bonusPoints || 0),
       // Decision 6: new records are ledger-hash v2 (every gameplay and result field).
-      hashV: LEDGER_HASH_V,
+      hashV: this.upgradeRun?.enabled ? UPGRADE_LEDGER_HASH_V : LEDGER_HASH_V,
       ledgerHash: '',
     };
     record.ledgerHash = SaveStore.computeLedgerHash(record);
