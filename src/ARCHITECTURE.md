@@ -2159,3 +2159,43 @@ This is a deterministic browser integration regression, **not yet evidence
 that a human/automated physics controller can successfully perform five
 consecutive escapes in normal real-time play**. That physical playability and
 balance remain separate playtest work.
+
+## 2026-11-18 — Five uninterrupted Gym Bluffs proven with *real Matter physics*
+
+The previous five-Bluff regression used actual `BsodBluffTracker` observations
+but scripted the near-wall gap; that proved **correct gating**, not natural
+playability. An additional Chromium `headlessStep` probe now controls **only
+the rider's regular held AIRBRAKE and PARACHUTE buttons** based on the actual
+post-physics BSOD gap (brake until 240px, sail until 460px). Once the default
+Gym starts, it never teleports the rider, modifies wall position/speed, changes
+gravity, injects Bluff events, or calls unlock methods. Normal finite canopy,
+real near-wall wind, Matter collisions, score events, and earned rank-12+
+canopy refills all remain active.
+
+With the hidden advanced setup **locked**, the ordinary 460px gap / 240px/s
+wall / 260px launch height / 280px/s launch velocity / -330px/s rise is
+physically playable for five consecutive scored Bluffs by a scripted rider
+with opt-in **Parachute Fuel rank 25 and Airbrake Lift rank 25** (other
+permanent upgrade ranks zero). The validated trace scored chains 1 through
+5 at 3.317, 8.817, 14.217, 19.600, and 24.717 seconds of the play clock.
+No terrain landing, BSOD collision, retry or non-ranked persistence change
+occurred; the *actual* fifth score unlocked the previously hidden setup.
+See `tools/bsod-gym-real-five-flight-browser-smoke.mjs`, which asserts all
+these conditions against the running browser game.
+
+Exploratory controls found five with both ranks 23 and 24, but only four
+with both ranks 22; these are results of **one deterministic controller on
+one course**, not minimum required ranks. Rank 25 fuel alone reached only
+two before landing. A clean/unupgraded rider reached one with this naive
+controller. This does **not** certify that rank 12 or a clean rider cannot
+succeed with better driving, nor that human play will feel fair. Granting
+pre-owned ranks is a **test fixture only**, not a shop cheat or gameplay
+adjustment. Future playtests should evaluate upgrade accessibility, human
+control timing, and whether the unlock is excessively prestigious.
+
+**Upgrade cost caveat:** Under `PermanentUpgrades.nextUpgradePrice`,
+buying both rank 25 tiers from zero costs 4,400 (canopy) + 3,594
+(airbrake) = **7,994 shards**, plus the separate 200-shard Gym purchase.
+The cheaper rank-23 physical success still represents 6,613 shards.
+The browser fixture pregrants ranks for reproducibility; it does not prove
+that the hidden setup is economically accessible or comfortable for humans.
