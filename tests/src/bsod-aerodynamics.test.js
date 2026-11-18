@@ -1,4 +1,4 @@
-import { aerodynamicStep, canopyFuelStep, canopySailFactor } from '../../src/systems/BsodAerodynamics.js';
+import { aerodynamicStep, canopyFuelStep, canopySailFactor, vacuumDivebombStep } from '../../src/systems/BsodAerodynamics.js';
 
 describe('BSOD aerodynamics (pure)', () => {
   test('fuel only drains while held in flight; successive taps share one tank', () => {
@@ -52,5 +52,28 @@ describe('BSOD aerodynamics (pure)', () => {
   });
   test('vacuum kills all aerodynamic force even during contact-danger', () => {
     expect(aerodynamicStep({vx:900,relativeAirX:1200,atmosphereDensity:0,parachute:true,airBrake:true})).toEqual({dvx:0,dvy:0});
+  });
+});
+
+
+describe('Space Mountain keeps genuine vacuum but has a small powered divebomb', () => {
+  test('only a held airborne divebomb with zero atmosphere produces forward purchase', () => {
+    expect(vacuumDivebombStep({airborne:true,divebomb:true,atmosphereDensity:0,stepMs:100}))
+      .toEqual({dvx:3.5,dvy:14}); // capped 50ms per physics call
+    expect(vacuumDivebombStep({airborne:true,divebomb:true,atmosphereDensity:1}))
+      .toEqual({dvx:0,dvy:0});
+    expect(vacuumDivebombStep({airborne:true,divebomb:false,atmosphereDensity:0}))
+      .toEqual({dvx:0,dvy:0});
+    expect(vacuumDivebombStep({airborne:false,divebomb:true,atmosphereDensity:0}))
+      .toEqual({dvx:0,dvy:0});
+  });
+  test('thrust costs altitude but does not create any wind in space', () => {
+    const r=vacuumDivebombStep({airborne:true,divebomb:true,atmosphereDensity:0,stepMs:8});
+    expect(r.dvx).toBeGreaterThan(0);
+    expect(r.dvy).toBeGreaterThan(r.dvx);
+    expect(aerodynamicStep({atmosphereDensity:0,relativeAirX:10000,parachute:true}))
+      .toEqual({dvx:0,dvy:0});
+    expect(vacuumDivebombStep({airborne:true,divebomb:true,atmosphereDensity:0,power:1.4}).dvx)
+      .toBeGreaterThan(r.dvx);
   });
 });

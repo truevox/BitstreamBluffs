@@ -125,7 +125,7 @@ for(const rank of [30,100]){
  assert.equal(r.grounded,false);
  assert.equal(r.crashed,false);
  assert.ok(r.awards[0].canopyRecoveredMs>r.awards[1].canopyRecoveredMs);
- assert.ok(r.uiStrips.some(m=>m.startsWith('CANOPY +')));
+ assert.ok(!r.uiStrips.some(m=>m.startsWith('CANOPY +'))); // secret has no repeat fuel popup
 }
 assert.equal(find(900,100).awards.length,0);
 assert.equal(find(900,100).crashed,true);

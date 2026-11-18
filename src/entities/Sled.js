@@ -12,7 +12,7 @@ import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
 import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyserStep } from '../systems/PhysicsTuner.js';
 import { springReboundVelocity } from '../systems/BiomeEffects.js';
-import { aerodynamicStep, canopyFuelStep } from '../systems/BsodAerodynamics.js';
+import { aerodynamicStep, canopyFuelStep, vacuumDivebombStep } from '../systems/BsodAerodynamics.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -258,9 +258,21 @@ export class Sled {
     }
     // parachute stall: float
     if (chute && vy > 0 && (!atmosphere || atmosphere.atmosphereDensity > 0)) vy *= Math.exp(-1.6 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1));
-    // Divebomb trades altitude for time, not horizontal momentum. Airflow is required.
+    // Normal divebomb drops without killing horizontal momentum. In zero-atmo
+    // Space Mountain the small board thruster instead trades flight height/time
+    // for modest forward purchase; no false atmospheric wind is generated.
     if (!grounded && pad && pad.divebomb && !chute && !this.airBrakeActive) {
-      vy += TUNING.divebombDownPxS2 * (phys.divebombMul || 1) * dt * (atmosphere ? atmosphere.atmosphereDensity : 1);
+      const density = atmosphere ? atmosphere.atmosphereDensity : 1;
+      if (density === 0) {
+        const impulse = vacuumDivebombStep({
+          airborne: true, divebomb: true, atmosphereDensity: 0,
+          power: phys.divebombMul || 1, stepMs,
+        });
+        vx += impulse.dvx;
+        vy += impulse.dvy;
+      } else {
+        vy += TUNING.divebombDownPxS2 * (phys.divebombMul || 1) * dt * density;
+      }
     }
     // Deterministic physical BSOD airflow; wind/audio renderers never affect physics.
     if (!grounded && atmosphere) {

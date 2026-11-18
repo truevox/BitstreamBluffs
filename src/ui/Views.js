@@ -1457,6 +1457,10 @@ export class ShopView extends View {
         get: () => this._profile().upgradesEnabled === true,
         set: v => this._setUpgradeMode(v === true),
       };
+      if (r.kind === 'gym') return {
+        kind: 'action', id: r.id, label: r.label, sub: r.state,
+        disabled: r.disabled, onSelect: () => this._chooseBsodGym(),
+      };
       if (r.kind === 'upgradeItem') return {
         kind: 'action', id: r.id, label: r.label, sub: r.state,
         disabled: r.disabled === true, onSelect: () => this._buyUpgrade(r.id),
@@ -1551,6 +1555,22 @@ export class ShopView extends View {
     // MenuList._adjust refreshes its own choice after the setter returns.
     // Do NOT destroy that same menu mid-setter: keyboard/gamepad controls keep
     // their focus and the display updates via the live get() callback.
+  }
+
+  _chooseBsodGym() {
+    if (this._profile().bsodGym?.owned === true) {
+      // The TitleScene owns this route. Gym sessions are never official or ranked.
+      this.scene.startRun('bsod-gym', 0, { gym: true });
+      return;
+    }
+    const tx = this.store?.buyBsodGym();
+    if (tx?.ok) {
+      this.scene.registry.set(REG.PROFILE, tx.profile);
+      uiSfx(this.scene, 'uiSelect', { pitch: 1.3 });
+    } else {
+      uiSfx(this.scene, 'uiBack');
+    }
+    this._refresh();
   }
 
   _buyUpgrade(id) {

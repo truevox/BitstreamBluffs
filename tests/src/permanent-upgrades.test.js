@@ -86,9 +86,13 @@ describe('permanent upgrade economy',()=>{
     expect(layout.rows.filter(r=>r.kind==='upgradeItem')).toHaveLength(7);
     expect(layout.rows.find(r=>r.kind==='upgradeToggle').state).toBe('OFF');
     expect(shopLayout({profile:p}).rows.some(r=>r.kind==='upgradeLink')).toBe(true);
-    expect(layout.rows.find(r=>r.key==='canopy-perk').label).toContain('R12');
-    expect(upgradeShopLayout({profile:{...p,upgrades:{...p.upgrades,canopy:12}}})
-      .rows.find(r=>r.key==='canopy-perk').label).toContain('BLUFFS RESTORE FUEL');
+    // Secret gameplay may not be explained or offered before discovery.
+    expect(layout.rows.some(r=>r.kind==='gym')).toBe(false);
+    expect(layout.texts.some(r=>/BLUFF|SURFING|FUEL REFILL/i.test(r.text))).toBe(false);
+    expect(upgradeShopLayout({profile:{...p,bsodGym:{discovered:true,owned:false}}})
+      .rows.find(r=>r.kind==='gym').state).toContain('LOCKED');
+    expect(upgradeShopLayout({profile:{...p,bsodGym:{discovered:true,owned:true}}})
+      .rows.find(r=>r.kind==='gym').state).toBe('ENTER');
     expect(layout.h).toBeLessThanOrEqual(248);
     const overlaps=[];
     for(let i=0;i<layout.texts.length;i++)

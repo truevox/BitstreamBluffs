@@ -671,12 +671,13 @@ export class UIScene extends Phaser.Scene {
 
   onNearMiss(p) {
     const bsod = p && p.hazardType === 'bsod';
-    const label = !bsod ? 'NEAR MISS' : p.surfing
-      ? `SURFING THE VOID x${p.chain}` : 'BITSTREAM BLUFF';
+    // One discovery is allowed; after that, no Surfing the Void tutorial,
+    // chain callout or refill popup. Players notice the behavior themselves.
+    const first = bsod && p.gymDiscovered === true;
+    if (bsod && !first) return; // Secret mechanic: no repeat popups after discovery.
+    const label = first ? 'BITSTREAM BLUFF' : 'NEAR MISS';
     this._popup(`${label} +${fmtInt((p && p.points) || 25)}`, bsod ? 'amber' : 'magenta');
-    if (bsod && p.canopyRecoveredMs > 0) {
-      this._strip(`CANOPY +${fmtInt(Math.round(p.canopyRecoveredMs))}MS`, 'cyan');
-    }
+    if (first) this._strip('BSOD GYM DISCOVERED', 'cyan');
     uiSfx(this, 'nearMiss');
   }
 
@@ -734,7 +735,16 @@ export class UIScene extends Phaser.Scene {
     const ov = router && router.pad && router.pad.overlay;
     const src = router && router.pad && router.pad.state && router.pad.state.lastSource;
     const mode = (ov && ov.isVisible && ov.isVisible()) || src === 'touch' ? 'touch' : src === 'gamepad' ? 'gamepad' : 'keyboard';
-    const label = HINT_TEXT[mode][p.id] || '';
+    // A valley-recovery hint is allowed, but it must NEVER teach the secret
+    // BSOD close-escape trick. The default Trick Deck uses the canopy where
+    // Classic used a manual push; swapped controls use UP for the sail.
+    const layout = this.registry.get(REG.SETTINGS)?.controlLayout || 'tricksRight';
+    const valley = p.id === 'push' && layout !== 'classic';
+    const label = valley
+      ? (mode === 'keyboard'
+        ? layout === 'tricksLeft' ? 'STALLED? HOP + UP SAIL' : 'STALLED? HOP + W SAIL'
+        : 'STALLED? HOP + SAIL')
+      : HINT_TEXT[mode][p.id] || '';
     if (!label) return;
     this.hintId = p.id;
     this.hintX = 0; // _layout picks the free spot on the next frame

@@ -31,6 +31,8 @@ export const SCENES = Object.freeze({
 export const REG = Object.freeze({
   /** @type {string} current run seed string (set by TitleScene, read by RunScene). */
   SEED: 'seed',
+  /** One-shot mode set by TitleScene: discovered & bought BSOD Gym only. */
+  BSOD_GYM: 'bsodGymMode',
   /**
    * @type {number} biome mask for the next run (W3; set by TitleScene, read by RunScene). 0 = base terrain.
    * Additive: absent means 0, so every existing path that never sets it behaves exactly as before.

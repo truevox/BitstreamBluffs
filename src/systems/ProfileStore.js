@@ -15,6 +15,7 @@ import { isOfficialDaily } from './Ranking.js';
 import { COSMETIC_ITEMS } from './Cosmetics.js';
 import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
 import { sanitizeUpgradeRanks, purchaseUpgrade } from './PermanentUpgrades.js';
+import { BSOD_GYM_PRICE } from './BsodGym.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -113,6 +114,8 @@ export function sanitizeProfile(raw, levels) {
   p.bank = nonNeg(raw.bank);
   p.upgrades = sanitizeUpgradeRanks(raw.upgrades);
   p.upgradesEnabled = raw.upgradesEnabled === true;
+  const gym = raw.bsodGym && typeof raw.bsodGym === 'object' ? raw.bsodGym : {};
+  p.bsodGym = { discovered: gym.discovered === true || gym.owned === true, owned: gym.owned === true };
   p.lifetime = sanitizeLifetime(raw.lifetime);
   const u = raw.unlocked && typeof raw.unlocked === 'object' ? raw.unlocked : {};
   p.unlocked = {
@@ -576,6 +579,33 @@ export class ProfileStore {
       this.backend = 'memory';
     }
     return this.profile;
+  }
+
+  /** Reveal an unpurchased Gym after a genuine first BSOD escape. */
+  discoverBsodGym() {
+    if (this.profile.bsodGym?.discovered) return { discovered: false, profile: this.profile };
+    const next = sanitizeProfile({ ...this.profile, bsodGym: { discovered: true, owned: false } }, this.levels);
+    if (this.storage) {
+      try { this.storage.setItem(PROFILE_KEY, JSON.stringify(next)); }
+      catch { return { discovered: false, profile: this.profile }; }
+    }
+    this.profile = next;
+    return { discovered: true, profile: this.profile };
+  }
+
+  /** Atomic, one-time shop unlock; never charges without persisting ownership. */
+  buyBsodGym() {
+    if (!this.profile.bsodGym?.discovered || this.profile.bsodGym?.owned
+        || !Number.isSafeInteger(this.profile.bank) || this.profile.bank < BSOD_GYM_PRICE
+        || !this.storage) return { ok: false, profile: this.profile };
+    const next = sanitizeProfile({
+      ...this.profile, bank: this.profile.bank - BSOD_GYM_PRICE,
+      bsodGym: { discovered: true, owned: true },
+    }, this.levels);
+    try { this.storage.setItem(PROFILE_KEY, JSON.stringify(next)); }
+    catch { return { ok: false, profile: this.profile }; }
+    this.profile = next;
+    return { ok: true, profile: this.profile };
   }
 
   /** Buy one permanent upgrade with the exact same atomic persistence guarantees
