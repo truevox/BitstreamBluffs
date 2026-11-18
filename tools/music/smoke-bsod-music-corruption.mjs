@@ -55,8 +55,13 @@ try{
 			worldTailwindPxS:850,sledVelocityXPxS:850,relativeAirX:0,
 			proximity01:.97,timeToImpactMs:160,atmosphereDensity:1});
 	});
-	await page.waitForTimeout(550);
+	await page.waitForFunction(()=>{
+		const d=window.__bbGame?.registry?.get("audioSynth")?._stemMusic;
+		return ["guitar","piano","other"].every(id=>
+			d?.mixer?.sources?.get(id)?.threat?.filter?.frequency?.value<3500);
+	},null,{timeout:5000}); // Real AudioParams smooth asynchronously; do not assume a fixed wall clock.
 	const dangerous=await state();
+	console.log("DANGEROUS_WEB_AUDIO_READBACK",JSON.stringify(dangerous));
 	assert.equal(dangerous.song,menu.song);
 	assert.equal(dangerous.clock,menu.clock);
 	assert.equal(dangerous.menu,false);
