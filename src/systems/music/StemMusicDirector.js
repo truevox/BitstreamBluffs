@@ -9,7 +9,7 @@ import { StemFXMixer } from './MusicFXGraph.js';
 import { AdaptiveBiomeRouter } from './AdaptiveBiomeRouter.js';
 import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
 import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.js';
-import { defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices } from './MusicPlaylist.js';
+import { FIRST_SONG_ID, defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices, shuffledSongRound } from './MusicPlaylist.js';
 import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -21,6 +21,9 @@ export class StemMusicDirector {
 		this.catalogUrl = catalogUrl;
 		this.catalog = [];
 		this.songEnabled = defaultSongSelection();
+		this.shuffleEnabled = false;
+		this._shuffleRemaining = [];
+		this.menuMode = false;
 		this.dynamicOrchestra = false;
 		this.speedPxS = 0;
 		this._timbreSignatures = new Map();
@@ -64,6 +67,9 @@ export class StemMusicDirector {
 			if (!response.ok) return false; // No music installed: existing synth stays in service.
 			const parsed = normalizeCatalog(await response.json());
 			this.catalog = parsed.tracks;
+			// A fresh game begins with One More Run, including with shuffle enabled.
+			const opening = this.catalog.findIndex(song => song.id === FIRST_SONG_ID);
+			if (opening >= 0) this.trackIndex = opening;
 			this.ready = this.catalog.length > 0;
 			if (this.ready && this.onReady && !this.disposed) this.onReady();
 			return this.ready;
@@ -98,6 +104,7 @@ export class StemMusicDirector {
 		this.melodyWithVocalsGain = clamp(Number(settings.melodyWithVocalsGain ?? 0.18),0,1);
 		this.setVocals(settings.musicVocals === true);
 		this.setSongSelection(settings.musicEnabledSongs);
+		this.setShuffle(settings.musicShuffle === true);
 		this.setDynamicOrchestra(settings.dynamicOrchestra === true);
 	}
 
@@ -106,6 +113,9 @@ export class StemMusicDirector {
 		const changed = JSON.stringify(selected) !== JSON.stringify(this.songEnabled);
 		this.songEnabled = selected;
 		if (!changed) return;
+		this._shuffleRemaining = [];
+		this._nextIndex = null;
+		this._nextPromise = null;
 		if (this.transportPaused) {
 			const next = nextEnabledSongIndex(this.catalog, this.songEnabled, -1);
 			if(next<0){this.stop();return;}
@@ -136,7 +146,33 @@ export class StemMusicDirector {
 		// The user toggle governs *replacement recordings only*. All
 		// processing of original stem audio (FX, room, speed and dynamics)
 		// remains active in either mode and must not be rebuilt here.
-		this.adaptive?.setEnabled(next);
+		this.adaptive?.setEnabled(next && !this.menuMode);
+	}
+
+	setShuffle(on) {
+		const next = on === true;
+		if (this.shuffleEnabled === next) return;
+		this.shuffleEnabled = next;
+		this._shuffleRemaining = [];
+		this._nextIndex = null;
+		this._nextPromise = null;
+	}
+
+	/** Preserve the song clock while menus use unprocessed originals and Debumont lead. */
+	setMenuMode(on) {
+		const next = on === true;
+		if (this.menuMode === next) return;
+		this.menuMode = next;
+		if (next) {
+			this.setAirborne(false);
+			this.setCombo(1);
+			this.setSpeed(0);
+		}
+		this._refreshVoices();
+		this.mixer?.selectBiome(next ? HOME_BIOME : this.biome);
+		this.adaptive?.setBiome(next ? HOME_BIOME : this.biome);
+		this.adaptive?.setEnabled(this.dynamicOrchestra && !next);
+		this._applyMusicTimbres(true);
 	}
 
 	/** Original stem processing runs INDEPENDENTLY of the Dynamic
@@ -153,8 +189,8 @@ export class StemMusicDirector {
 		if (lead) sourceNames.push(lead);
 		for (const name of sourceNames) {
 			if (!this.gains.has(name)) continue;
-			const effects = name===lead ? melodyPreset(this.biome) :
-				orchestraPreset(this.biome,name);
+			const effects = name===lead ? melodyPreset(this.menuMode ? 'debumont' : this.biome) :
+				this.menuMode ? [] : orchestraPreset(this.biome,name);
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
 				this.mixer.replaceEffects(name,effects,.18);
@@ -163,12 +199,21 @@ export class StemMusicDirector {
 			// Restore each source's normal biome room send in either
 			// mode. Muting reverb when the toggle is OFF would wrongly
 			// disable legitimate processing of the ORIGINAL recordings.
-			this.mixer.setRoomSend(name,null);
+			this.mixer.setRoomSend(name,this.menuMode ? 0 : null);
 		}
 	}
 
 	_nextEnabledIndex(previous = -1) {
-		return nextEnabledSongIndex(this.catalog, this.songEnabled, previous);
+		if (!this.shuffleEnabled || previous < 0)
+			return nextEnabledSongIndex(this.catalog, this.songEnabled, previous);
+		if (!this._shuffleRemaining?.length)
+			this._shuffleRemaining = shuffledSongRound(this.catalog, this.songEnabled, previous);
+		return this._shuffleRemaining[0] ?? -1;
+	}
+
+	_consumeShuffledIndex(index) {
+		if (this.shuffleEnabled)
+			this._shuffleRemaining = (this._shuffleRemaining || []).filter(i => i !== index);
 	}
 
 	setStemGain(name, gain) {
@@ -194,14 +239,14 @@ export class StemMusicDirector {
 	setBiome(id) {
 		this.biome = typeof id === 'string' && id ? id : HOME_BIOME;
 		this._refreshVoices();
-		this.mixer?.selectBiome(this.biome);
-		this.adaptive?.setBiome(this.biome);
+		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
+		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this._applyMusicTimbres();
 		if (this.started) this._pump();
 	}
 
 	_activeVoiceFor(pack) {
-		const desired = voiceSourceForBiome(this.biome);
+		const desired = voiceSourceForBiome(this.menuMode ? 'debumont' : this.biome);
 		if (pack?.sourceNames?.includes(desired)) return desired;
 		// Until all mountain instruments are rendered, keep the home melody audible.
 		const home = voiceSourceForBiome(HOME_BIOME);
@@ -221,7 +266,7 @@ export class StemMusicDirector {
 	}
 
 	setAirborne(airborne) {
-		const next = !!airborne;
+		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
 		this.airborne = next;
 		// New adaptive packs crossfade full original drums with an actual
@@ -239,17 +284,19 @@ export class StemMusicDirector {
 	}
 
 	setSpeed(speedPxS) {
+		if (this.menuMode) speedPxS = 0;
 		// Effects marked speed-filter react without altering source playback rate.
 		const normalized = clamp((Number(speedPxS) || 0) / 1000, 0, 1);
 		this.mixer?.setEffectParam('other', 'speed-filter', 'frequency', 400 + normalized * 15000);
 		this.speedPxS = Math.max(0, Number(speedPxS)||0);
-		const speedGain = clamp(.2+this.speedPxS/850,.2,1.18);
+		const speedGain = this.menuMode ? 1 : clamp(.2+this.speedPxS/850,.2,1.18);
 		this.mixer?.setGain('bass',speedGain,{motion:true,time:.16});
 		this.mixer?.setGain('adaptive:bass',speedGain,{motion:true,time:.16});
 		this.adaptive?.setSpeed(speedPxS);
 	}
 
 	setCombo(multiplier = 1) {
+		if (this.menuMode) multiplier = 1;
 		const level = clamp(1 + (Number(multiplier) - 1) * 0.05, 0.8, 1.25);
 		this.mixer?.setGain('other', level, { motion: true, time: 0.09 });
 		if (this.pack?.adaptive) {
@@ -426,6 +473,7 @@ export class StemMusicDirector {
 			this.track = info.track;
 			this.packBase = info.base;
 			this.trackIndex = index;
+			this._consumeShuffledIndex(index);
 			this.captionWords = [];
 			for (const name of info.pack.sourceNames) {
 				if (!this.gains.has(name)) {
@@ -464,8 +512,8 @@ export class StemMusicDirector {
 			this.clockStart=Math.max(this.ctx.currentTime+.12,desiredAt||0)-
 				clamp(Number(offsetSeconds)||0,0,Math.max(0,this.pack.duration-.1));
 			this.adaptive?.configure(this.pack, this.clockStart,
-				{ biome: this.biome, airborne: this.airborne });
-			this.adaptive?.setEnabled(this.dynamicOrchestra);
+				{ biome: this.menuMode ? HOME_BIOME : this.biome, airborne: this.airborne });
+			this.adaptive?.setEnabled(this.dynamicOrchestra && !this.menuMode);
 			this._syncAdaptiveUserLevels();
 			this.mixer?.setGain('drums',this.airborne ? .22 : 1,
 				{ motion:true,time:.15 });
@@ -581,10 +629,16 @@ export class StemMusicDirector {
 		const index=enabled.includes(this.trackIndex) ? this.trackIndex : enabled[0];
 		const upcoming=[];
 		if(enabled.length && index!==undefined){
-			let cursor=enabled.indexOf(index);
-			for(let i=0;i<Math.min(2,enabled.length);i++){
-				cursor=(cursor+1)%enabled.length;
-				upcoming.push(this.catalog[enabled[cursor]]);
+			if (this.shuffleEnabled) {
+				this._nextEnabledIndex(index);
+				for (const next of (this._shuffleRemaining || []).slice(0,2))
+					upcoming.push(this.catalog[next]);
+			} else {
+				let cursor=enabled.indexOf(index);
+				for(let i=0;i<Math.min(2,enabled.length);i++){
+					cursor=(cursor+1)%enabled.length;
+					upcoming.push(this.catalog[enabled[cursor]]);
+				}
 			}
 		}
 		return {
@@ -640,7 +694,8 @@ export class StemMusicDirector {
 			if(target===undefined)target=enabled[(current+enabled.length-1)%enabled.length];
 			this._skipHistoryOnce=true;
 		}else{
-			target=enabled[(current+1)%enabled.length];
+			target=this.shuffleEnabled ? this._nextEnabledIndex(this.trackIndex) :
+				enabled[(current+1)%enabled.length];
 			this._skipHistoryOnce=false;
 		}
 		this.stop();
@@ -676,9 +731,9 @@ export class StemMusicDirector {
 		this.clockStart=t+.085-position;
 		this.adaptive?.reset();
 		this.adaptive?.configure(this.pack,this.clockStart,{
-			biome:this.biome,airborne:this.airborne,
+			biome:this.menuMode ? HOME_BIOME : this.biome,airborne:this.airborne,
 		});
-		this.adaptive?.setEnabled(this.dynamicOrchestra);
+		this.adaptive?.setEnabled(this.dynamicOrchestra && !this.menuMode);
 		this._syncAdaptiveUserLevels();
 		this.bus.gain.setTargetAtTime(1,t+.045,.018);
 		this._pump();

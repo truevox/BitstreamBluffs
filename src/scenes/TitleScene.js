@@ -2,7 +2,7 @@
  * OWNER: UI engineer.
  * Title / main menu. Menu: Start Run (random seed), Daily Run (UTC-date seed + today's Daily Patch rule),
  * Enter Seed, Leaderboard, Settings. Operable by keyboard, gamepad and touch/mouse. Writes the chosen seed to
- * registry REG.SEED, unlocks audio on first input (MenuInput does this) and starts SCENES.RUN.
+ * registry REG.SEED, requests auto music on load (browser first-gesture policy still applies), and starts SCENES.RUN.
  */
 import Phaser from 'phaser';
 import { SCENES, REG, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
@@ -67,6 +67,9 @@ export class TitleScene extends Phaser.Scene {
     this.input_ = new MenuInput(this, (a) => this._onAction(a));
     // Compact song/transport controls in the empty upper-right band.
     this.jukebox = new JukeboxHUD(this,theme,{x:335,y:61});
+    // One soundtrack across Title, Run and Game Over. Browser policy may
+    // defer sound until the first gesture, but it is requested immediately.
+    this.game.registry.get(REG.AUDIO)?.startMenuMusic?.();
     this.events.once('shutdown', () => {
       this.jukebox?.destroy();this.jukebox=null;
       this._closeView();

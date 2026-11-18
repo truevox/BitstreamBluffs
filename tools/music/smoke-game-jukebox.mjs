@@ -24,7 +24,9 @@ try{
 			current:j.audio.jukeboxSnapshot().current?.title};
 	});
 	assert.equal(title.exists,true);
-	assert.deepEqual(title.buttons,['PREV','PLAY','NEXT','LIST']);
+	assert.equal(title.buttons[0],'PREV');
+	assert.ok(['PLAY','PAUSE'].includes(title.buttons[1]));
+	assert.deepEqual(title.buttons.slice(2),['NEXT','LIST']);
 	assert.ok(title.queueNext.startsWith('NEXT:'));
 	console.log('TITLE_JUKEBOX_VISIBLE_LAST_NOW_NEXT_QUEUE_PASS',title);
 	// The catalog loads asynchronously. Do not press a legitimately
@@ -34,8 +36,11 @@ try{
 		return j&&!j.buttons[1].disabled&&!!j.audio.jukeboxSnapshot().current;
 	},null,{timeout:30000});
 
+	// The soundtrack starts on load; only press PLAY if the browser deferred it.
 	await page.evaluate(()=>{
-		window.__bbGame.scene.getScene('TitleScene').jukebox.buttons[1].zone.emit('pointerdown');
+		const audio=window.__bbGame.registry.get('audioSynth');
+		if (!audio._stemMusic.started && !audio._stemMusic.transportPaused)
+			audio.jukeboxPlay();
 	});
 	await page.waitForFunction(()=>{
 		const d=window.__bbGame.registry.get('audioSynth')._stemMusic;
@@ -84,18 +89,18 @@ try{
 	await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').jukebox.buttons[2].zone.emit('pointerdown'));
 	await page.waitForFunction(()=>{
 		const d=window.__bbGame.registry.get('audioSynth')._stemMusic;
-		return d.trackIndex===1 && !!d.pack;
+		return d.trackIndex===2 && !!d.pack;
 	},null,{timeout:35000});
 	const next=await page.evaluate(()=>window.__bbGame.registry.get('audioSynth').jukeboxSnapshot());
-	assert.equal(next.current.title.includes('One More Run'),true);
-	assert.ok(next.previous?.title.includes('Pope'));
+	assert.equal(next.current.title.includes('Every Hacker'),true);
+	assert.ok(next.previous?.title.includes('One More Run'));
 	console.log('NEXT_AND_LAST_HISTORY_PASS',{now:next.current.title,previous:next.previous.title,
 		after:next.upcoming.map(s=>s.title)});
 
 	await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').jukebox.buttons[0].zone.emit('pointerdown'));
 	await page.waitForFunction(()=>{
 		const d=window.__bbGame.registry.get('audioSynth')._stemMusic;
-		return d.trackIndex===0&&!!d.pack;
+		return d.trackIndex===1&&!!d.pack;
 	},null,{timeout:35000});
 	console.log('PREVIOUS_RETURNS_LAST_PLAYED_SONG_PASS');
 
@@ -115,10 +120,13 @@ try{
 	});
 	console.log('ALL_SONGS_OFF_STATE',off);
 	assert.ok(off.enabled.every(x=>x===false));
-	// Original wind must remain a GAME SFX even with all music OFF.
+	// Real BSOD relative airflow still drives environmental audio if all songs are OFF.
 	await page.evaluate(()=>{
-		const a=window.__bbGame.registry.get('audioSynth');
-		a.setSpeed(1000);
+		const g=window.__bbGame,a=g.registry.get('audioSynth');
+		a.setSpeed(1000); // title speed alone is silent
+		g.events.emit('bb:runStart',{seed:'wind-bus-check'});
+		g.events.emit('bb:bsodStateChanged',{active:true,relativeAirX:1000,
+			atmosphereDensity:1,proximity01:.8});
 		a.playSfx('uiMove');
 	});
 	await page.waitForTimeout(350);
@@ -128,7 +136,7 @@ try{
 			sfx:a.nodes.sfxBus.gain.value,
 			music:a._stemMusic.activeNodes.size};
 	});
-	assert.ok(hiss.wind>.06,'All-off incorrectly silenced sled wind');
+	assert.ok(hiss.wind>.06,'All-off incorrectly silenced authoritative BSOD wind');
 	assert.ok(hiss.sfx>.5,'All-off incorrectly muted sound effects');
 	assert.equal(hiss.music,0);
 	await page.evaluate(()=>{
@@ -149,6 +157,7 @@ try{
 		const on=Object.fromEntries(g.registry.get('audioSynth')._stemMusic.catalog.map(t=>[t.id,true]));
 		const s=g.registry.get('settings');s.musicEnabledSongs=on;
 		g.events.emit('bb:settingsChanged',{key:'musicEnabledSongs',value:on,settings:s});
+		g.events.emit('bb:runEnd',{cause:'preview-reset'});
 		g.scene.start('PauseScene',{runTimeMs:0});
 	});
 	await page.waitForFunction(()=>window.__bbGame.scene.getScene('PauseScene')?.sys?.isActive(),null,{timeout:12000});

@@ -2,13 +2,13 @@
  * OWNER: input/audio/glitch engineer.
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
- * All audio is synthesized with WebAudio (no files). Instantiated ONCE by createServices(game) at REG.AUDIO.
+ * Procedural audio and six-stem soundtrack playback share ONE WebAudio graph. Instantiated ONCE by createServices(game) at REG.AUDIO.
  * The AudioContext is created lazily and resumed on the first user gesture (browser autoplay policy) via unlock();
  * the constructor also installs its own one-shot gesture listeners, and unlocks on the first INPUT_ACTION.
  * AudioSynth SUBSCRIBES ITSELF to game.events in its constructor:
  *   LANDING/TRICK/COMBO_CHANGED/CRASH/RESPAWN/POWERUP_x/HAZARD_HIT -> SFX, RUN_START -> startMusic,
- *   RUN_END/RUN_ABORT -> stopMusic, GLITCH_START -> glitch bus, DISTANCE_CHANGED -> music intensity,
- *   SETTINGS_CHANGED -> volumes, GAME_PAUSE/RESUME -> muffle music.
+ *   RUN_END/RUN_ABORT -> neutral menu timbre (never stop current song), GLITCH_START -> run-only effects, DISTANCE_CHANGED -> run music intensity,
+ *   SETTINGS_CHANGED -> volumes/shuffle, GAME_PAUSE/RESUME -> neutral menu/run timbre without resetting song clock.
  * Additive public methods: setSpeed(pxPerSec) drives music speed/intensity and bass, never wind.
  * Wind reads RunScene's authoritative BSOD_STATE_CHANGED snapshots; no independent chase timer.
  * setIntensity(0..1) sets music intensity directly.
@@ -78,6 +78,8 @@ export class AudioSynth {
     this._musicSeed = null;
     this._musicWanted = false;
     this._jukeboxMode = false;
+    this._musicMode = 'run';
+    this._autoStartAttempted = false;
     this._intensity = 0;
     this._distIntensity = 0;
     this._speedIntensity = 0;
@@ -113,17 +115,15 @@ export class AudioSynth {
           ev.on(name, fn);
           this._gameListeners.push([name, fn]);
         };
-        on(EVT.RUN_START, (p) => {
-          this._onBsodState(null);
-          this.startMusic((p && p.seed) || '');
-        });
-        on(EVT.RUN_END, () => { this._onBsodState(null); this.stopMusic(); });
-        on(EVT.RUN_ABORT, () => { this._onBsodState(null); this.stopMusic(); });
+        on(EVT.RUN_START, (p) => this._enterRunMusic((p && p.seed) || ''));
+        // Never stop or restart the shared song on crashes, death, or quitting.
+        on(EVT.RUN_END, () => this._enterMenuMusic());
+        on(EVT.RUN_ABORT, () => this._enterMenuMusic());
         on(EVT.BSOD_STATE_CHANGED, (p) => this._onBsodState(p));
         on(EVT.LANDING, (p) => this._onLanding(p));
         on(EVT.TRICK, (p) => this.playSfx('trick', { pitch: 1 + Math.min(0.5, ((p && p.count) || 1) * 0.08 - 0.08) }));
         on(EVT.COMBO_CHANGED, (p) => {
-          this._stemMusic?.setCombo(p?.multiplier || 1);
+          if (this._musicMode === 'run') this._stemMusic?.setCombo(p?.multiplier || 1);
           if (p && p.reason === 'trick' && p.multiplier > 1) {
             this.playSfx('combo', { pitch: 1 + Math.min(1, (p.multiplier - 1) * 0.25) });
           }
@@ -143,16 +143,24 @@ export class AudioSynth {
           else if (p.effect === 'scramble') this.playSfx('hazardScramble');
         });
         on(EVT.ZONE_ENTER, () => this.playSfx('uiMove', { pitch: 0.5, volume: 0.5 }));
-        on(EVT.BIOME_ENTER, (p) => this._stemMusic?.setBiome(p?.id || 'bitstream-bluffs'));
-        on(EVT.GLITCH_START, (p) => { if (p) this.glitch(p.kind, p.durationMs, p.intensity); });
+        on(EVT.BIOME_ENTER, (p) => {
+          if (this._musicMode === 'run') this._stemMusic?.setBiome(p?.id || 'bitstream-bluffs');
+        });
+        on(EVT.GLITCH_START, (p) => {
+          if (p && this._musicMode === 'run') this.glitch(p.kind, p.durationMs, p.intensity);
+        });
         on(EVT.DISTANCE_CHANGED, (p) => {
+          if (this._musicMode !== 'run') return;
           this._distIntensity = clamp01(((p && p.meters) || 0) / 2000);
           this._updateIntensity();
         });
         on(EVT.SETTINGS_CHANGED, (p) => { if (p && p.settings) this.applySettings(p.settings); });
-        on(EVT.GAME_PAUSE, () => this._setPaused(true));
+        on(EVT.GAME_PAUSE, () => { this._enterMenuMusic(); this._setPaused(true); });
         on(EVT.GAME_RESUME, () => {
-          this._jukeboxMode=false;
+          this._musicMode = 'run';
+          this._jukeboxMode = false;
+          this._stemMusic?.setMenuMode(false);
+          this._onBsodState(null);
           this._setPaused(false);
         });
         on(EVT.INPUT_ACTION, () => { if (!this.ctx || this.ctx.state !== 'running') this.unlock(); });
@@ -566,6 +574,7 @@ export class AudioSynth {
   applySettings(settings) {
     try {
       if (settings) {
+        const hadMusic = hasEnabledSongs(this.settings?.musicEnabledSongs);
         this.settings = {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
@@ -579,8 +588,14 @@ export class AudioSynth {
             this.game?.registry?.get(REG.PROFILE)?.unlocked?.musicVocals === true,
           musicCaptions: settings.musicCaptions === true,
           dynamicOrchestra: settings.dynamicOrchestra === true,
+          musicShuffle: settings.musicShuffle === true,
         };
         this._stemMusic?.applySettings(this.settings);
+        // Re-enabling music from the all-off state should not require
+        // pressing PLAY a second time during an auto-started menu session.
+        if (this._autoStartAttempted && this._musicMode === 'menu' &&
+            !hadMusic && hasEnabledSongs(this.settings.musicEnabledSongs) &&
+            !this._stemMusic?.transportPaused) this.jukeboxPlay();
         // The owner-defined all-off state is TRUE SILENCE, including
         // muting the procedural synth. SFX uses a separate bus.
         if (!hasEnabledSongs(this.settings.musicEnabledSongs)) {
@@ -630,8 +645,14 @@ export class AudioSynth {
     try {
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
-      this.nodes.musicFilter.frequency.setTargetAtTime(paused ? 500 : 18000, t, 0.05);
-      this.nodes.musicSrc.gain.setTargetAtTime(paused ? 0.45 : this._musicWanted ? 1 : 0, t, 0.05);
+      // Menus keep the original soundtrack fully audible; pausing gameplay
+      // still suppresses wind and gameplay motion.
+      const menu = this._musicMode === 'menu';
+      this.nodes.musicFilter.frequency.setTargetAtTime(menu ? 18000 : paused ? 500 : 18000, t, 0.05);
+      const sourceGain = this._stemMusic?.started ? 0 :
+        menu ? (this._musicWanted ? 1 : 0) :
+          paused ? 0.45 : this._musicWanted ? 1 : 0;
+      this.nodes.musicSrc.gain.setTargetAtTime(sourceGain, t, 0.05);
       this._applyWindFromBsod();
     } catch (e) { /* ignore */ }
   }
@@ -640,6 +661,7 @@ export class AudioSynth {
 
   /** Read-only authoritative gameplay state; never predicts a BSOD position or collision. */
   _onBsodState(state) {
+    if (this._musicMode === 'menu') state = null;
     this._windActive = state?.active === true;
     this._windAtmosphere = this._windActive && Number.isFinite(state?.atmosphereDensity)
       ? clamp01(state.atmosphereDensity) : 0;
@@ -674,9 +696,10 @@ export class AudioSynth {
   setSpeed(pxPerSec) {
     try {
       if (!this._ready() || this._paused) return;
-      const s = clamp01((Number(pxPerSec) || 0) / 1000);
+      const applied = this._musicMode === 'menu' ? 0 : pxPerSec;
+      const s = clamp01((Number(applied) || 0) / 1000);
       this._speedIntensity = s;
-      this._stemMusic?.setSpeed(pxPerSec);
+      this._stemMusic?.setSpeed(applied);
       this._updateIntensity();
     } catch (e) { /* ignore */ }
   }
@@ -697,10 +720,60 @@ export class AudioSynth {
 
   /** Stem phase follows the actual sled state, independently of tempo. */
   setAirborne(value) {
-    this._stemMusic?.setAirborne(value);
+    this._stemMusic?.setAirborne(this._musicMode === 'menu' ? false : value);
   }
 
   // ----------------------------------------------------------------------------------------------------------- music
+
+  /** Switch only the musical presentation; keep the same track and WebAudio clock. */
+  _enterMenuMusic() {
+    this._musicMode = 'menu';
+    this._jukeboxMode = true;
+    this._distIntensity = 0;
+    this._speedIntensity = 0;
+    this._updateIntensity();
+    this._stemMusic?.setMenuMode(true);
+    this._onBsodState(null);
+    this._setPaused(false);
+    // An in-flight gameplay glitch must not distort music in the menus.
+    try {
+      if (this.ctx && this.nodes) {
+        const t = this.ctx.currentTime;
+        for (const [node, gain] of [
+          [this.nodes.dry, 1], [this.nodes.wet, 0],
+          [this.nodes.gate, 1], [this.nodes.staticGain, 0],
+        ]) {
+          if (!node?.gain) continue;
+          node.gain.cancelScheduledValues(t);
+          node.gain.setTargetAtTime(gain, t, 0.025);
+        }
+      }
+    } catch { /* headless audio and unsupported nodes remain harmless */ }
+  }
+
+  /** Called on first Title display. Browser autoplay policy may defer sound
+   * until the earliest user gesture; that gesture is already wired in _bind(). */
+  startMenuMusic() {
+    this._enterMenuMusic();
+    if (this._autoStartAttempted) return;
+    this._autoStartAttempted = true;
+    if (hasEnabledSongs(this.settings.musicEnabledSongs)) this.jukeboxPlay();
+  }
+
+  /** Run transitions change timbre and effects but never restart a playing song. */
+  _enterRunMusic(seed) {
+    this._musicMode = 'run';
+    this._jukeboxMode = false;
+    this._stemMusic?.setMenuMode(false);
+    this._stemMusic?.setBiome('bitstream-bluffs');
+    this._onBsodState(null);
+    this._setPaused(false);
+    // Respect an explicit manual pause in the jukebox.
+    // An existing song is already advancing: don't call even a nominal
+    // start routine, and do not reset the clock at the next run.
+    if (!this._stemMusic?.transportPaused && !this._stemMusic?.started)
+      this.startMusic(seed);
+  }
 
   /** Start selected six-stem soundtrack; fall back to procedural only
    * when a song IS selected but its pack cannot be loaded. */
