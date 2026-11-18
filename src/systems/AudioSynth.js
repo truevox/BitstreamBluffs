@@ -28,6 +28,8 @@ import { REG } from '../constants.js';
 import { Rng } from './Rng.js';
 import { StemMusicDirector } from './music/StemMusicDirector.js';
 import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
+import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
+import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
 
 /** SFX names playSfx() must support (callers outside the engineer's files may use these). */
 export const SFX = Object.freeze([
@@ -812,6 +814,70 @@ export class AudioSynth {
       this.unlock(); // browser user-gesture policy
       return moved;
     } catch {return false;}
+  }
+
+  /** PUBLIC readonly music timing for gameplay such as the BSOD Gym.
+   * Return either an imminent validated quarter-note pulse, or an immediate
+   * no-wait fallback. Never creates a player, starts music, or mutates physics.
+   * Source beat frames are relative to the original recording, not the bar.
+   */
+  getBeatTiming({maxWaitMs=300,expectedRevision=null}={}) {
+    const fallback=reason=>Object.freeze({trusted:false,release:'immediate',reason});
+    try {
+      const d=this._stemMusic,c=this.ctx;
+      if(this._destroyed||this.unavailable||!d||!c||c.state!=='running')
+        return fallback('audio-unavailable');
+      if(!this._musicWanted||!d.started||d.transportPaused||this._paused)
+        return fallback('music-not-playing');
+      if(!(this.settings?.masterVolume>0&&this.settings?.musicVolume>0)||
+        !hasEnabledSongs(this.settings?.musicEnabledSongs))
+        return fallback('music-muted-or-disabled');
+      if(!d.pack||!d.track||d.pack.id!==d.track.id||
+        d.clockStart===null||d._loading||d.activeNodes?.size<1||
+        !Number.isFinite(c.currentTime))
+        return fallback('transport-loading');
+      if(d.songEnabled?.[d.track.id]===false)return fallback('song-disabled');
+      const revision=String(d._token)+':'+d.track.id+':'+d.clockStart;
+      if(expectedRevision!==null&&revision!==expectedRevision)
+        return fallback('transport-revision-changed');
+      const grid=validateBeatGrid((this._beatGrids||RELEASE_BEAT_GRIDS)[d.track.id],d.pack);
+      const now=c.currentTime;
+      const result=nextVerifiedPulse(grid,now-d.clockStart,maxWaitMs);
+      if(!result.trusted)return fallback(result.reason);
+      const dueAudioTime=d.clockStart+result.beatSeconds;
+      if(dueAudioTime<now-.001||dueAudioTime-now>.300001)
+        return fallback('stale-or-distant-beat');
+      return Object.freeze({trusted:true,release:'on-beat',
+        trackId:d.track.id,transportRevision:revision,
+        gridVersion:result.gridVersion,confidence:result.confidence,
+        beatFrame:result.beatFrame,beatSeconds:result.beatSeconds,
+        audioContextTime:now,dueAudioTime,
+        waitMs:Math.max(0,(dueAudioTime-now)*1000)});
+    } catch {return fallback('timing-unavailable');}
+  }
+
+  /** Double-check the pulse and transport immediately before Gym releases.
+   * Never wait for these checks: false => GO normally.
+   */
+  isBeatTimingCurrent(snapshot) {
+    try {
+      if(!snapshot?.trusted||snapshot.release!=='on-beat'||
+        !Number.isFinite(snapshot.dueAudioTime))return false;
+      const d=this._stemMusic,c=this.ctx;
+      if(!c||c.state!=='running'||this.unavailable||this._paused||
+        !this._musicWanted||!d?.started||d.transportPaused||
+        !this.settings?.masterVolume||!this.settings?.musicVolume||
+        !hasEnabledSongs(this.settings?.musicEnabledSongs)||
+        !d.track||!d.pack||d.pack.id!==d.track.id||d._loading||
+        d.activeNodes?.size<1||d.songEnabled?.[d.track.id]===false)return false;
+      const revision=String(d._token)+':'+d.track.id+':'+d.clockStart;
+      if(revision!==snapshot.transportRevision||d.track.id!==snapshot.trackId)
+        return false;
+      const grid=validateBeatGrid((this._beatGrids||RELEASE_BEAT_GRIDS)[d.track.id],d.pack);
+      if(!grid.trusted||grid.version!==snapshot.gridVersion)return false;
+      return c.currentTime>=snapshot.dueAudioTime-.035&&
+        c.currentTime<=snapshot.dueAudioTime+.055;
+    }catch{return false;}
   }
 
   /** @returns {void} */
