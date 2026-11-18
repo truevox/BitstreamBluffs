@@ -35,21 +35,24 @@ export class PauseScene extends Phaser.Scene {
 
   create() {
     this.leaving = false;
+    this.gymPractice = this.registry.get(REG.BSOD_GYM) === true;
     this.view = null;
     this.dim = null;
     const theme = (this.theme = new Theme(this));
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72).setOrigin(0, 0).setInteractive();
     const px = 30;
     const py = 36;
-    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: "PASCAL'S LEDGER // PAUSED", fillAlpha: 0.96 }));
+    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER // PAUSED", fillAlpha: 0.96 }));
 
     const items = [
       { kind: 'action', label: 'RESUME', color: 'lime', onSelect: () => this.resume() },
       { kind: 'action', label: 'RESTART', color: 'amber', onSelect: () => this.restart() },
-      { kind: 'action', label: 'LEADERBOARD', color: 'cyan', onSelect: () => this._open(new LeaderboardView(this, theme, { onClose: () => this._close() })) },
+      ...(!this.gymPractice ? [{ kind: 'action', label: 'LEADERBOARD', color: 'cyan', onSelect: () => this._open(new LeaderboardView(this, theme, { onClose: () => this._close() })) }] : []),
       { kind: 'action', label: 'SETTINGS', color: 'cyan', onSelect: () => this._open(new SettingsView(this, theme, { onClose: () => this._close() })) },
-      { kind: 'action', label: 'EXPORT CODE', color: 'cyan', onSelect: () => this._open(new SharecodeView(this, theme, { mode: 'export', onClose: () => this._close() })) },
-      { kind: 'action', label: 'IMPORT CODE', color: 'cyan', onSelect: () => this._open(new SharecodeView(this, theme, { mode: 'import', onClose: () => this._close() })) },
+      ...(!this.gymPractice ? [
+        { kind: 'action', label: 'EXPORT CODE', color: 'cyan', onSelect: () => this._open(new SharecodeView(this, theme, { mode: 'export', onClose: () => this._close() })) },
+        { kind: 'action', label: 'IMPORT CODE', color: 'cyan', onSelect: () => this._open(new SharecodeView(this, theme, { mode: 'import', onClose: () => this._close() })) },
+      ] : []),
       { kind: 'action', label: 'QUIT TO TITLE', color: 'magenta', onSelect: () => this.quit() },
     ];
     this.menu = new MenuList(this, theme, { x: 6, y: 22, w: 214, rowH: 20, items, scale: 2, parent: panel });
@@ -62,14 +65,24 @@ export class PauseScene extends Phaser.Scene {
       panel.add(new NeonText(this, theme, 236, y, label, { color: 'text', outline: 'none' }).setAlpha(0.55));
       panel.add(new NeonText(this, theme, 236, y + 10, value, { color, scale, outline: 'dark' }));
     };
-    col(24, 'RUN TIME', fmtClock(this.runTimeMs), 'lime', 2);
-    col(54, 'SEED', ellipsize(seed, 172), 'cyan');
-    col(80, 'DAILY RULE', ellipsize(rule.name.toUpperCase(), 172), 'amber');
-    panel.add(new NeonText(this, theme, 236, 102, wrapText(rule.description || '', 176, 3), { color: 'text', outline: 'none' }).setAlpha(0.7));
+    if (this.gymPractice) {
+      // No seed-sharing, Daily-rule or progression promises inside a sandbox.
+      col(24, 'MODE', 'PRACTICE', 'lime', 2);
+      col(54, 'RETRIES', 'UNLIMITED', 'cyan');
+      col(80, 'XP / SHARDS', 'NONE', 'amber');
+      panel.add(new NeonText(this, theme, 236, 110, 'NOT RANKED', {
+        color: 'magenta', outline: 'none',
+      }).setAlpha(0.9));
+    } else {
+      col(24, 'RUN TIME', fmtClock(this.runTimeMs), 'lime', 2);
+      col(54, 'SEED', ellipsize(seed, 172), 'cyan');
+      col(80, 'DAILY RULE', ellipsize(rule.name.toUpperCase(), 172), 'amber');
+      panel.add(new NeonText(this, theme, 236, 102, wrapText(rule.description || '', 176, 3), { color: 'text', outline: 'none' }).setAlpha(0.7));
+    }
     // W2: the three active missions. Keep the full three-line rule description clear; the panel is
     // extended so the mission bars and ledger line fit without colliding with the hint below.
     const mview = this.registry.get(REG.MISSIONS);
-    const mrows = (mview && mview.active) || [];
+    const mrows = this.gymPractice ? [] : (mview && mview.active) || [];
     if (mrows.length) {
       const geom = columnRows({ x: 236, y: 138, w: 172, count: Math.min(3, mrows.length), rowH: 11, barH: 2 });
       panel.add(new NeonText(this, theme, 236, 128, 'MISSIONS', { color: 'cyan', outline: 'none' }).setAlpha(0.8));
@@ -96,7 +109,9 @@ export class PauseScene extends Phaser.Scene {
         panel.add(g);
       });
     }
-    panel.add(new NeonText(this, theme, 236, 174, 'THE LEDGER NEVER FORGETS.', { color: 'magenta', outline: 'none' }).setAlpha(0.6));
+    panel.add(new NeonText(this, theme, 236, 174,
+      this.gymPractice ? 'LEARN. RETRY. REPEAT.' : 'THE LEDGER NEVER FORGETS.',
+      { color: 'magenta', outline: 'none' }).setAlpha(0.6));
 
     this.hint = new NeonText(this, theme, GAME_WIDTH / 2, py + 172 + 12, 'ESC RESUME    ↑↓ SELECT    ENTER/SPACE/A CONFIRM', {
       color: 'text', anchor: 'center', vAnchor: 0.5,
@@ -191,6 +206,8 @@ export class PauseScene extends Phaser.Scene {
     this.leaving = true;
     uiSfx(this, 'uiBack');
     this.game.events.emit(EVT.RUN_ABORT, { runId: this._runId() });
+    // Clear the practice flag before showing the normal title/menu.
+    this.registry.set(REG.BSOD_GYM, false);
     this.scene.stop(SCENES.RUN);
     this.scene.stop(SCENES.UI);
     this.scene.start(SCENES.TITLE);

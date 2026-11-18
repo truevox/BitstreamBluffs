@@ -238,6 +238,34 @@ describe('mid-run live evaluation (spec W2)', () => {
     expect(store.profile.xp).toBe(xpBefore);
   });
 
+  test('BSOD Gym mission events cannot toast; the next normal run still can', async () => {
+    const { game, store, missions } = await withEasy();
+    const seen = [];
+    game.events.on(EVT.MISSION_COMPLETED, (p) => seen.push(p.id));
+    const bankBefore = store.profile.bank, xpBefore = store.profile.xp;
+    game.registry.set(REG.BSOD_GYM, true);
+    game.events.emit(EVT.RUN_START, { gym: true });
+    for (let i = 0; i < 12; i++) {
+      game.events.emit(EVT.SHARD_COLLECTED, {});
+      game.events.emit(EVT.NEAR_MISS, { hazardType: 'bsod' });
+      game.events.emit(EVT.SCORE_CHANGED, { total: 9999999 });
+      game.events.emit(EVT.TRICK, { type: 'frontflip' });
+      game.events.emit(EVT.DISTANCE_CHANGED, { meters: 999999 });
+    }
+    expect(seen).toEqual([]);
+    expect(missions._completedThisRun.has('zzz-live')).toBe(false);
+    expect(store.profile.bank).toBe(bankBefore);
+    expect(store.profile.xp).toBe(xpBefore);
+    game.events.emit(EVT.RUN_ABORT, {});
+    game.registry.set(REG.BSOD_GYM, false);
+    game.events.emit(EVT.RUN_START, { gym: false });
+    game.events.emit(EVT.SHARD_COLLECTED, {});
+    game.events.emit(EVT.SHARD_COLLECTED, {});
+    expect(seen).toEqual([]);
+    game.events.emit(EVT.SHARD_COLLECTED, {});
+    expect(seen).toEqual(['zzz-live']);
+  });
+
   test('live counters reset on a new run', async () => {
     const { game } = await withEasy();
     game.events.emit(EVT.RUN_START, {});

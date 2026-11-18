@@ -1822,3 +1822,40 @@ and an authentic BSOD contact causing practice reset without changing the
 saved run, bank, or lifetime stats. Music Friday's independent latest DSP
 headroom corrections `6c1a2bd` and `e7a8698` were merged into a *separate*
 integration worktree, not into this gameplay branch or main.
+
+
+## 2026-11-18 — BSOD Gym playtest isolation and retry integrity
+
+**Verified assistant QA finding, not a new owner request:** The first
+BSOD Gym implementation correctly avoided `RUN_END`, persistent scores,
+leaderboard entries and XP payout. However, Gym gameplay still emitted
+normal `SCORE_CHANGED`, `TRICK`, `NEAR_MISS` and `SHARD_COLLECTED`
+events, so `MissionsService._checkLive()` could display a completed
+mission toast without the mission being banked. That was misleading in a
+mode Marvin explicitly wanted to be low-stakes and consequence-free.
+
+**Fix:** `RunScene` now announces `gym:true` on `RUN_START`;
+`MissionsService` suppresses *only live mission evaluation* for the
+Gym, and clears that suppression on abort/normal next run. All ordinary
+run mission crediting and event contracts are unchanged. Each Gym
+collision already respawned the rider rather than persisting a
+`RunRecord`. Now it also resets local ScoreManager, TrickTracker, shard,
+near-miss and combo counters and republishes a fresh score HUD. A new
+attempt may immediately collect *new* distance points on the next
+physics frame, which is correct. None of this modifies the profile.
+
+**Practice UX:** The paused Gym uses a clearly labeled
+`BSOD GYM // PRACTICE` panel with `UNLIMITED` retries,
+`XP / SHARDS: NONE` and `NOT RANKED`. Its menu keeps
+Resume/Restart/Settings/Quit, but hides leaderboard and run
+share-code actions. Quitting clears the Gym registry flag; restarting
+retains Gym mode. The normal pause menu and official Daily route
+remain unchanged.
+
+**Scope/provenance:** These are implementation QA repairs by
+Gal Friday, preserving Marvin's approved *secret discovery and
+consequence-free practice* concept. The exact 200-shard Gym price,
+recovery coefficients and Space Mountain propulsion remain
+provisional. Code was branched from the already tested combined
+music/headroom-safe `ab029ac` baseline, not from `main`;
+Music Friday's DSP source and other music features were not edited.

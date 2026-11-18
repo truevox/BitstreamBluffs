@@ -362,6 +362,7 @@ export class RunScene extends Phaser.Scene {
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
+      gym: this.bsodGym === true, // non-ranked practice must never trigger live mission-completion toasts
     });
   }
 
@@ -1690,6 +1691,19 @@ export class RunScene extends Phaser.Scene {
     this.bsod.wallSpeedPxS = GYM_CHASE.initialSpeedPxS;
     this.bsod.accelerationPxS2 = GYM_CHASE.accelerationPxS2;
     this.bsodBluffs?.reset?.();
+    // Each retry is a NEW training attempt. Do not retain the previous
+    // attempt's score/combos/shard tally in the HUD or its internal trackers.
+    this.score?.reset?.();
+    this.tricks?.reset?.();
+    this.nearMissCount = 0;
+    this.shardCount = 0;
+    this.shardTotal = 0;
+    this.shardChain = 0;
+    this.trickCounts = {};
+    this.bestCombo = 1;
+    this.maxAirtimeMs = 0;
+    this.lastTotal = 0;
+    if (this.score) this.emitScore();
     this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
     this.game?.events?.emit?.(EVT.BSOD_STATE_CHANGED, this.bsodState);
     this.gymRetries = (this.gymRetries || 0) + 1;

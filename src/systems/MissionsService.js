@@ -88,7 +88,8 @@ export class MissionsService {
     const on = (name, fn) => { ev.on(name, fn); this._bound.push([name, fn]); };
 
     this.resetLive();
-    on(EVT.RUN_START, () => {
+    on(EVT.RUN_START, (payload) => {
+      this._gymPractice = payload?.gym === true;
       this.resetLive();
       this._completedThisRun.clear();
       // The run's biome mask, so a biome mission toasts live only when this run can actually pay it.
@@ -97,6 +98,7 @@ export class MissionsService {
       const mask = reg && typeof reg.get === 'function' ? reg.get(REG.BIOME_MASK) : 0;
       this.live.biomeMask = Number.isFinite(mask) ? mask >>> 0 : 0;
     });
+    on(EVT.RUN_ABORT, () => { this._gymPractice = false; this.resetLive(); });
     on(EVT.DISTANCE_CHANGED, (p) => { this.live.distanceM = (p && p.meters) || 0; this._checkLive(); });
     on(EVT.SCORE_CHANGED, (p) => { this.live.score = (p && p.total) || 0; this._checkLive(); });
     on(EVT.SHARD_COLLECTED, () => { this.live.shards += 1; this._checkLive(); });
@@ -132,7 +134,11 @@ export class MissionsService {
    * double-award even if a metric oscillates.
    */
   _checkLive(landed = false) {
-    if (!this.alive || !this.store) return;
+    // The Gym emits ordinary trick/score/near-miss events for responsive
+    // practice feedback. They must NEVER satisfy a live mission, show a
+    // mission-completion toast, or consume a mission's per-run completion key.
+    if (!this.alive || !this.store || this._gymPractice === true
+        || this.game?.registry?.get?.(REG.BSOD_GYM) === true) return;
     const p = this.profile;
     if (!p) return;
     const ctx = { live: this.live, record: this.live, profile: p, biomeDefs: this.biomeDefs };

@@ -99,6 +99,39 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
   expect(s.profile.bank).toBe(BSOD_GYM_PRICE+5);
   expect(s.profile.bsodGym.owned).toBe(false);
  });
+ test('Gym retry zeroes local score, tricks and shards without touching persistence',()=>{
+   const scene=Object.create(RunScene.prototype);
+   const emitted=[],score={
+     reset:jest.fn(), getTotal:()=>0,getDistancePoints:()=>0,trickPoints:0,
+   };
+   const sled={
+     x:2000,y:100,vx:220,body:{bounds:{min:{x:1980}}},
+     canopyFuelFullMs:1500,parachuteFuelMs:0,
+     setPose:jest.fn(function(x,y){this.x=x;this.y=y}),
+   };
+   scene.bsodGym=true;scene.startX=100;scene.sled=sled;
+   scene.terrain={heightAt:()=>900};
+   scene.bsod=new BsodPursuit({sledLeftEdgeX:1800});
+   scene.bsodBluffs=new BsodBluffTracker();
+   scene.bsodAtmosphere=()=>1;
+   scene.score=score;
+   scene.tricks={reset:jest.fn()};
+   scene.game={events:{emit:(e,p)=>emitted.push([e,p])}};
+   scene.nearMissCount=5;scene.shardCount=3;scene.shardTotal=60;
+   scene.shardChain=2;scene.trickCounts={frontflip:2};scene.bestCombo=2.5;
+   scene.maxAirtimeMs=1800;scene.lastTotal=300;
+   scene.resetBsodGym();
+   expect(score.reset).toHaveBeenCalledTimes(1);
+   expect(scene.tricks.reset).toHaveBeenCalledTimes(1);
+   expect(scene.nearMissCount).toBe(0);
+   expect(scene.shardCount).toBe(0);
+   expect(scene.shardTotal).toBe(0);
+   expect(scene.trickCounts).toEqual({});
+   expect(scene.bestCombo).toBe(1);
+   expect(scene.lastTotal).toBe(0);
+   expect(emitted.map(([evt])=>evt)).toContain(EVT.SCORE_CHANGED);
+   expect(emitted.map(([evt])=>evt)).toContain(EVT.BSOD_STATE_CHANGED);
+ });
  test('Gym death respawns a calm chase without writing records or changing profile',()=>{
   const scene=Object.create(RunScene.prototype);
   const calls=[],sled={
