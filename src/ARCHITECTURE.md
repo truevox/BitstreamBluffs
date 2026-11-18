@@ -248,6 +248,17 @@ All additive; no existing signature or payload changed.
 * **BSOD accompaniment corruption:** the authoritative post-physics `BSOD_STATE_CHANGED.proximity01` independently drives music-only WebAudio darkening/distortion/tremolo on the ORIGINAL guitar, piano and Other buses via `BsodThreatProcessor`. It never drives or changes global SFX, environmental wind, vocals, bass, drums, note timing or source files. The signed `relativeAirX` continues to control wind separately, so quiet relative airflow near the wall can coexist with maximal musical threat. Original accompaniment recovers smoothly on escape, and Title/Pause/GameOver force clean neutral music without resetting the active track clock. The provisional effect intensity awaits human audition before release. There is **no event for push or hop**, so RunScene
   must call `audio.playSfx('push')` / `playSfx('hop')` itself. Everything else is event driven (also `COMBO_CHANGED`
   reason `'trick'` -> `combo` SFX, `ZONE_ENTER` -> soft blip). It never throws without WebAudio.
+* **Shared output peak guard (provisional):** all WebAudio buses (music including vocals,
+  SFX, wind and static) reach the existing master compressor and then exactly
+  ONE `MasterPeakGuard` WaveShaper before AudioContext destination. The
+  compressor is not a brickwall limiter: a real four-song, maximum-slider
+  busy-SFX stress test measured up to +0.50 dBFS **after** the compressor.
+  The final guard is mathematically linear below absolute sample 0.82 and
+  applies a gentle, bounded, 4× oversampled soft knee only on louder peaks.
+  It does not change the SFX/wind/music mixing controls or any song/scene
+  clock. Real-game sampled headroom testing is mandatory; mathematical
+  curve bounds do not replace listening or true-peak verification. See
+  `docs/MUSIC-BSOD-BUSY-MIX-OUTPUT-GUARD-20261118.md`.
 * **GlitchDirector**: event ids are `g<n>-<4 hex>`; the hex tag is the seed-derived pattern that `GlitchPipeline` uses
   (RunScene just forwards `id/kind/durationMs/intensity`). Extra exports: `glitchRamp`, `glitchGapRange`, `preview(count)`.
   The gap blend runs from 0.5 x to 1.0 x `TERRAIN.difficultyRampStartM` (early 5-15 s below 500 m, 3-6 s from 1000 m).

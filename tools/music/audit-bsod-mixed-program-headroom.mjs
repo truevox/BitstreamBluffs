@@ -49,7 +49,7 @@ async function sample(songId,danger){
 	await page.waitForTimeout(850); // time for both WebAudio smoothing and segment fetch
 	return page.evaluate(async({danger})=>{
 		const a=window.__bbGame.registry.get('audioSynth');
-		const c=a.ctx,targets={music:a.nodes.musicBus,master:a.nodes.comp};
+		const c=a.ctx,targets={music:a.nodes.musicBus,master:a.nodes.peakGuard || a.nodes.comp};
 		const captures={};
 		const inputs=[];
 		for(const [name,source] of Object.entries(targets)){

@@ -59,7 +59,7 @@ async function tapRead(position,danger,mode='run'){
 	await delay(850);
 	const captured=await page.evaluate(async()=>{
 		const a=window.__bbGame.registry.get('audioSynth'),d=a._stemMusic,c=a.ctx;
-		const buses={music:a.nodes.musicBus,master:a.nodes.comp};
+		const buses={music:a.nodes.musicBus,master:a.nodes.peakGuard || a.nodes.comp};
 		const taps=[];
 		for(const [name,source] of Object.entries(buses)){
 			const analyser=c.createAnalyser();

@@ -16,7 +16,7 @@
  *
  * Signal graph:
  *   music voices -> musicSrc -> musicFilter -> duck -> musicBus -+
- *   sfx voices  -----------------------------------> sfxBus ----+-> mix -> dry --------+-> gate -> master -> comp -> out
+ *   sfx voices  -----------------------------------> sfxBus ----+-> mix -> dry --------+-> gate -> master -> comp -> peakGuard -> out
  *   wind noise ------------------------------------> windGain --+      -> crusher -> wet +
  *   static noise -> staticGain ---------------------------------------------------------> master
  * The "glitch bus" is the dry/wet crusher + gate + static section: bit-crush (staircase WaveShaper), stutter
@@ -27,6 +27,7 @@ import { EVT } from '../events.js';
 import { REG } from '../constants.js';
 import { Rng } from './Rng.js';
 import { StemMusicDirector } from './music/StemMusicDirector.js';
+import { createMasterPeakGuard } from './music/MasterPeakGuard.js';
 import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
 
 /** SFX names playSfx() must support (callers outside the engineer's files may use these). */
@@ -230,7 +231,11 @@ export class AudioSynth {
     n.comp.threshold.value = -10;
     n.comp.ratio.value = 6;
     n.master.connect(n.comp);
-    n.comp.connect(c.destination);
+    // Final common output soft ceiling: compressor alone may overshoot
+    // 0 dBFS when music, wind, vocals and several SFX overlap.
+    n.peakGuard = createMasterPeakGuard(c);
+    n.comp.connect(n.peakGuard);
+    n.peakGuard.connect(c.destination);
     n.gate = g(1);
     n.gate.connect(n.master);
     n.mix = g(1);
