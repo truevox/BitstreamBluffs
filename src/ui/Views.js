@@ -20,7 +20,7 @@ import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
 import { ACHIEVEMENTS } from '../systems/Achievements.js';
-import { shopLayout, upgradeShopLayout, shopMenuItems, titlesLayout, titlesMenuItems } from './ShopLayout.js';
+import { shopLayout, upgradeShopLayout, shopMenuItems, titlesLayout, titlesMenuItems, gymSetupLayout } from './ShopLayout.js';
 import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopItem } from '../systems/ProfileStore.js';
 import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
 import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
@@ -1440,6 +1440,7 @@ export class ShopView extends View {
     // row, so the shop opens with focus on "← TRAIL →" and left/right is the first thing a player tries.
     this.page = 0;
     this.upgradePage = false;
+    this.gymSetupPage = false;
     this._build();
   }
 
@@ -1449,6 +1450,20 @@ export class ShopView extends View {
 
   /** The panel's single source of truth: layout rows + menu items, rebuilt together every time. */
   _menuItems(layout) {
+    if (this.gymSetupPage) return layout.rows.map((r) => {
+      if (r.kind === 'gymSetupBack') return {kind:'action',label:r.label,
+        onSelect:()=>this._showUpgrades()};
+      if (r.kind === 'gymSetupChoice') return {
+        kind:'choice',id:r.id,label:r.label,
+        options:r.choices.map(n=>({value:n,label:r.id==='launchRisePxS'
+          ? 'UP '+Math.abs(n) : String(n)})),
+        get:()=>this._gymSetup()[r.id],
+        set:v=>this._setGymOption(r.id,v),
+      };
+      if (r.kind === 'gymSetupStart') return {kind:'action',label:r.label,
+        onSelect:()=>this.scene.startRun('bsod-gym',0,{gym:true})};
+      return {kind:'static',label:r.label,disabled:true};
+    });
     if (this.upgradePage) return layout.rows.map((r) => {
       if (r.kind === 'upgradeBack') return { kind: 'action', label: r.label, onSelect: () => this._showShop() };
       if (r.kind === 'upgradeToggle') return {
@@ -1460,6 +1475,10 @@ export class ShopView extends View {
       if (r.kind === 'gym') return {
         kind: 'action', id: r.id, label: r.label, sub: r.state,
         disabled: r.disabled, onSelect: () => this._chooseBsodGym(),
+      };
+      if (r.kind === 'gymSetupLink') return {
+        kind:'action',id:r.id,label:r.label,sub:r.state,
+        onSelect:()=>this._showGymSetup(),
       };
       if (r.kind === 'upgradeItem') return {
         kind: 'action', id: r.id, label: r.label, sub: r.state,
@@ -1507,7 +1526,8 @@ export class ShopView extends View {
   }
 
   _build() {
-    const layout = this.upgradePage ? upgradeShopLayout({ profile: this._profile() })
+    const layout = this.gymSetupPage ? gymSetupLayout({profile:this._profile()})
+      : this.upgradePage ? upgradeShopLayout({ profile: this._profile() })
       : shopLayout({ profile: this._profile(), levels: this._levels(), page: this.page });
     if (!this.upgradePage) this.page = layout.page;
     if (this.menu) { this.menu.destroy(); this.menu = null; }
@@ -1535,11 +1555,30 @@ export class ShopView extends View {
 
   /** Change only this shop panel, keeping the title/profile ownership and Back semantics. */
   _showUpgrades() {
+    this.gymSetupPage = false;
     this.upgradePage = true;
     this._build();
   }
 
+  /** Invisible until five legitimate uninterrupted Bluffs IN THE GYM. */
+  _showGymSetup() {
+    if (this._profile().bsodGym?.advanced !== true) return;
+    this.upgradePage = false;
+    this.gymSetupPage = true;
+    this._build();
+  }
+
+  _gymSetup() {
+    return this._profile().bsodGym?.setup || {};
+  }
+
+  _setGymOption(key, value) {
+    const result = this.store?.setGymSetup({...this._gymSetup(),[key]:value});
+    if (result?.ok) this.scene.registry.set(REG.PROFILE,result.profile);
+  }
+
   _showShop() {
+    this.gymSetupPage = false;
     this.upgradePage = false;
     this._build();
   }

@@ -24,6 +24,9 @@ try {
   const result=await page.evaluate(()=>{
     const g=window.__bbGame,r=g.scene.getScene('RunScene'),u=g.scene.getScene('UIScene');
     g.loop.stop();
+    // The very first Gym launch has the same full frozen beat as retries.
+    for(let i=0;i<20;i++)g.headlessStep(100+i*50,50);
+    if(r.gymReadyMs!==0)throw Error('First READY did not release');
     const original={
       bank:g.registry.get('profile').bank,
       lifetime:JSON.stringify(g.registry.get('profile').lifetime),
@@ -89,9 +92,15 @@ try {
       bankUnchanged:g.registry.get('profile').bank===original.bank,
       lifetimeUnchanged:JSON.stringify(g.registry.get('profile').lifetime)===original.lifetime,
     };
-    // Check the second actual wall contact, not just the first reset path.
+    // During the new mandatory one-second READY beat, the wall MUST freeze.
+    const frozenWall=r.bsod.wallX,frozenRunClock=r.runTimeMs;
+    for(let i=0;i<19;i++)g.headlessStep(6033+i*50,50);
+    if(Math.abs(r.bsod.wallX-frozenWall)>0.001 || r.runTimeMs!==frozenRunClock)
+      throw Error('READY beat advanced wall or run clock');
+    g.headlessStep(7033,50); // release READY; gameplay resumes NEXT frame
+    // Only now can a second physically resolved catch occur.
     r.bsod.wallX=r.sled.body.bounds.min.x+12;r.bsod.wallSpeedPxS=10000;
-    g.headlessStep(6033,16.67);g.headlessStep(6050,16.67);
+    g.headlessStep(7083,16.67);g.headlessStep(7100,16.67);
     return {before,after,resetEvents:seen,secondRetries:r.gymRetries,
       tutorialSame,crashed:r.crashed};
   });

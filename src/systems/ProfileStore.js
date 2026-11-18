@@ -15,7 +15,7 @@ import { isOfficialDaily } from './Ranking.js';
 import { COSMETIC_ITEMS } from './Cosmetics.js';
 import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
 import { sanitizeUpgradeRanks, purchaseUpgrade } from './PermanentUpgrades.js';
-import { BSOD_GYM_PRICE } from './BsodGym.js';
+import { BSOD_GYM_PRICE, sanitizeGymSetup } from './BsodGym.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -115,7 +115,15 @@ export function sanitizeProfile(raw, levels) {
   p.upgrades = sanitizeUpgradeRanks(raw.upgrades);
   p.upgradesEnabled = raw.upgradesEnabled === true;
   const gym = raw.bsodGym && typeof raw.bsodGym === 'object' ? raw.bsodGym : {};
-  p.bsodGym = { discovered: gym.discovered === true || gym.owned === true, owned: gym.owned === true };
+  p.bsodGym = { discovered: gym.discovered === true || gym.owned === true,
+    owned: gym.owned === true };
+  // Backward compatible: old owned profiles remain {discovered,owned}.
+  // Setup is a nested, permanent Easter egg with no tease before genuine
+  // five-in-one-flight Gym mastery; it cannot be earned by a normal run.
+  if (p.bsodGym.owned && gym.advanced === true) {
+    p.bsodGym.advanced = true;
+    p.bsodGym.setup = sanitizeGymSetup(gym.setup);
+  }
   p.lifetime = sanitizeLifetime(raw.lifetime);
   const u = raw.unlocked && typeof raw.unlocked === 'object' ? raw.unlocked : {};
   p.unlocked = {
@@ -602,6 +610,38 @@ export class ProfileStore {
       ...this.profile, bank: this.profile.bank - BSOD_GYM_PRICE,
       bsodGym: { discovered: true, owned: true },
     }, this.levels);
+    try { this.storage.setItem(PROFILE_KEY, JSON.stringify(next)); }
+    catch { return { ok: false, profile: this.profile }; }
+    this.profile = next;
+    return { ok: true, profile: this.profile };
+  }
+
+  /** Unlock nested Gym setup after 5 genuinely scored Bluffs in ONE Gym
+   * flight. Called by RunScene ONLY for Gym events; normal run Bluff events
+   * never call this. Never gives shards, XP, missions or ranked records.
+   * Storage failure leaves both persisted and in-memory state untouched. */
+  unlockGymSetup() {
+    if (!this.profile.bsodGym?.owned || this.profile.bsodGym.advanced || !this.storage)
+      return { unlocked: false, profile: this.profile };
+    const next = sanitizeProfile({ ...this.profile, bsodGym: {
+      ...this.profile.bsodGym, advanced: true,
+      setup: sanitizeGymSetup(),
+    } }, this.levels);
+    try { this.storage.setItem(PROFILE_KEY, JSON.stringify(next)); }
+    catch { return { unlocked: false, profile: this.profile }; }
+    this.profile = next;
+    return { unlocked: true, profile: this.profile };
+  }
+
+  /** Save a bounded, forward-only launch configuration after Gym-specific
+   * mastery. The same localStorage atomicity as purchase applies; no free
+   * user-editable knobs before the Easter egg is earned. */
+  setGymSetup(candidate) {
+    if (!this.profile.bsodGym?.owned || this.profile.bsodGym.advanced !== true || !this.storage)
+      return { ok: false, profile: this.profile };
+    const next = sanitizeProfile({ ...this.profile, bsodGym: {
+      ...this.profile.bsodGym, setup: sanitizeGymSetup(candidate),
+    } }, this.levels);
     try { this.storage.setItem(PROFILE_KEY, JSON.stringify(next)); }
     catch { return { ok: false, profile: this.profile }; }
     this.profile = next;

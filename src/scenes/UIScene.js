@@ -192,6 +192,8 @@ export class UIScene extends Phaser.Scene {
     };
     on(EVT.RUN_START, this.onRunStart);
     on(EVT.GYM_ATTEMPT_RESET, this.onGymAttemptReset);
+    on(EVT.GYM_READY_GO, this.onGymReadyGo);
+    on(EVT.GYM_SETUP_UNLOCKED, this.onGymSetupUnlocked);
     on(EVT.SCORE_CHANGED, this.onScore);
     on(EVT.COMBO_CHANGED, this.onCombo);
     on(EVT.DISTANCE_CHANGED, this.onDistance);
@@ -285,6 +287,13 @@ export class UIScene extends Phaser.Scene {
     this.flash.setAlpha(0);
     this.banner = this._t(cx, 100, '', { color: 'danger', scale: 3, anchor: 'center', vAnchor: 0.5 });
     this.banner.setAlpha(0);
+    // Only shown during the one-second frozen respawn beat. No trick hints.
+    this.gymReadyText = this._t(cx, 126, 'READY', {
+      color: 'lime', scale: 3, anchor: 'center', vAnchor: 0.5, outline: 'glow',
+    });
+    // UIScene can miss RUN_START while being launched, so also read the
+    // authoritative Gym flag directly for the very first READY hold.
+    this.gymReadyText.setVisible(this.registry.get(REG.BSOD_GYM) === true);
     this.boostText = this._t(cx, 24, '', { color: 'lime', scale: 2, anchor: 'center', vAnchor: 0.5, outline: 'glow' });
     this.boostText.setAlpha(0);
     // payoff line of a landing: "DOUBLE BACKFLIP + HELI x1.5 +450" (big, glowing, fades after ~1.1 s)
@@ -533,6 +542,8 @@ export class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------- events
 
   onRunStart(p) {
+    // First Gym launch gets the same frozen READY cue as later catches.
+    this.gymReadyText?.setVisible?.(p?.gym === true);
     this.missionToastsThisRun.clear();
     this.runId = (p && p.runId) || '';
     this.score = 0;
@@ -571,7 +582,7 @@ export class UIScene extends Phaser.Scene {
 
   /** Gym retries keep the gameplay scene alive. Clear ALL attempt-local HUD
    * projections without resetting music, controls, or scene-level ownership. */
-  onGymAttemptReset() {
+  onGymAttemptReset(p) {
     this.score = 0;
     this.meters = 0;
     this.multiplier = 1;
@@ -600,6 +611,16 @@ export class UIScene extends Phaser.Scene {
     this.flowLostText.setAlpha(0);
     this.tweens.killTweensOf(this.bankLine);
     this.bankLine.setAlpha(0);
+    this.gymReadyText?.setVisible?.(!!p?.readyMs);
+  }
+
+  onGymReadyGo() {
+    this.gymReadyText?.setVisible?.(false);
+    this._flash('GO');
+  }
+
+  onGymSetupUnlocked() {
+    this._banner('GYM SETUP UNLOCKED', 'cyan', 1);
   }
 
   onRunEnd() {

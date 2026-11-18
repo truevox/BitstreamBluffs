@@ -70,6 +70,8 @@ try {
   const live=await page.evaluate(()=>{
     const g=window.__bbGame,r=g.scene.getScene('RunScene');
     g.loop.stop();
+    for(let i=0;i<20;i++)g.headlessStep(100+i*50,50);
+    if(r.gymReadyMs!==0)throw Error('First READY did not release');
     const savedBefore=g.registry.get('lastRecord');
     const bankBefore=g.registry.get('profile').bank;
     const lifetimeBefore=JSON.stringify(g.registry.get('profile').lifetime);

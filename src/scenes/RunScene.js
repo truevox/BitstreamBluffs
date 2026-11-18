@@ -62,7 +62,7 @@ import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
-import { GYM_CHASE, gymChaseForLoadout, gymRechargeMs } from '../systems/BsodGym.js';
+import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
 const DEG = Math.PI / 180;
@@ -176,21 +176,17 @@ export class RunScene extends Phaser.Scene {
     // Permanent upgrades are opt-in, frozen for the run, and never applied to official Dailies.
     this.upgradeRun = upgradeLoadoutForRun(prof, { daily: this.dailyOfficial });
     this.upgradeFx = this.upgradeRun.effects;
-    // The Gym uses the player's chosen, enabled upgrades—not a normalized
-    // loadout. Its gentler base chase is scaled by canopy/grace upgrades.
-    this.gymChase = this.bsodGym ? gymChaseForLoadout(this.upgradeFx) : null;
+    // Player abilities and BSOD behavior are unchanged in the Gym. Only the
+    // starting pose, pursuit gap/speed and post-catch retry are different.
+    this.gymSetup = this.bsodGym ? gymSetupForProfile(prof) : null;
+    // Every Gym attempt—including first entry—starts with the same short,
+    // deterministic READY hold. Music may decorate it, never delay physics.
+    this.gymReadyMs = this.bsodGym ? GYM_READY_MS : 0;
     this.dailyMods = (daily && daily.rule && daily.rule.modifiers) || {};
 
-    // pure systems
-    this.terrain = new TerrainGenerator({
-      seed: this.seed,
-      chunkDefs: this.content.chunks,
-      hazardDefs: this.content.hazards,
-      powerupDefs: this.content.powerups,
-      modDefs: this.content.terrainMods,
-      biomeDefs: Object.values(this.content.biomes || {}),
-      biomeMask: this.biomeMask,
-    });
+    // pure systems — the exact same deterministic world factory is also used
+    // when a Gym attempt restarts at its ORIGINAL launch position.
+    this.terrain = this.createTerrainGenerator();
     this.heightFn = (x) => this.terrain.heightAt(x); // allocated once; reads this.terrain at call time
     this.score = new ScoreManager({ pxPerMeter: PIXELS_PER_METER });
     this.score.reset();
@@ -200,6 +196,7 @@ export class RunScene extends Phaser.Scene {
 
     // run state
     this.runTimeMs = 0;
+    this.gymAttemptStartTimeMs = 0;
     this._leaving = false;
     this._hudMs = 0;
     this._despawn = [];
@@ -289,6 +286,7 @@ export class RunScene extends Phaser.Scene {
     this.startX = spawnX;
     // Gym score/distance is per practice attempt; normal runs keep startX.
     this.gymAttemptStartX = spawnX;
+    this.gymStartX = spawnX;
     this.sled = new Sled(this, spawnX, spawnY - 14, this.palette, this.look);
     this.sled.setPose(spawnX, spawnY - 15, spawnAng, 50 * Math.cos(spawnAng * DEG), 50 * Math.sin(spawnAng * DEG));
     // W4 boosts. Applied at spawn from the loadout chosen before the run: the shield reuses the Hashed
@@ -310,13 +308,25 @@ export class RunScene extends Phaser.Scene {
       this.sled.shield = true;
     }
     if (this.boostFx.speedFactor !== 1) this.sled.scaleVelocity(this.boostFx.speedFactor);
-    // Authoritative physical chase: gap is from the wall's leading edge to the compound sled body left bound.
-    this.sled.canopyFuelFullMs = this.bsodGym ? this.gymChase.parachuteFuelMs
-      : PHYSICS.parachuteDurationMs * this.upgradeFx.canopyFuelMul;
+    // An actual Gym attempt starts at a prepared launch pose. After that,
+    // NORMAL sled physics, boosts, aero, progression and pursuer acceleration
+    // are authoritative. Never override an upgrade or rank-12 refill rule.
+    if (this.bsodGym) {
+      const setup = this.gymSetup;
+      this.sled.setPose(spawnX, spawnY - setup.launchHeightPx, 0,
+        setup.launchSpeedPxS, setup.launchRisePxS);
+    }
+    // Authoritative physical chase: gap is measured from the wall's leading
+    // edge to the compound sled body left bound, not center x.
+    this.sled.canopyFuelFullMs = PHYSICS.parachuteDurationMs * this.upgradeFx.canopyFuelMul;
     this.sled.parachuteFuelMs = this.sled.canopyFuelFullMs;
-    this.bsod = new BsodPursuit({ sledLeftEdgeX: sledLeftCollisionEdge(this.sled), level: this.bsodGym ? 1 : prof.level,
-      config: this.bsodGym ? { ...BSOD_DEFAULTS, ...this.gymChase }
-        : { ...BSOD_DEFAULTS, accelerationPxS2: BSOD_DEFAULTS.accelerationPxS2 * this.upgradeFx.bsodAccelerationMul } });
+    this.bsod = new BsodPursuit({
+      sledLeftEdgeX: sledLeftCollisionEdge(this.sled),
+      level: prof.level,
+      config: { ...BSOD_DEFAULTS,
+        accelerationPxS2: BSOD_DEFAULTS.accelerationPxS2 * this.upgradeFx.bsodAccelerationMul },
+    });
+    if (this.bsodGym) placeGymWall(this.bsod, sledLeftCollisionEdge(this.sled), this.gymSetup);
     this.bsodState = this.bsod.state(sledLeftCollisionEdge(this.sled), this.sled.vx, 1);
     this.bsodCaught = false;
     this.bsodBluffs = new BsodBluffTracker();
@@ -503,8 +513,7 @@ export class RunScene extends Phaser.Scene {
     const rank = this.upgradeRun?.enabled ? this.upgradeRun.ranks?.canopy : 0;
     const full = s.canopyFuelFullMs || PHYSICS.parachuteDurationMs;
     const spent = Number.isFinite(s.parachuteFuelMs) ? s.parachuteFuelMs : full;
-    const recovery = this.bsodGym ? gymRechargeMs(event.chain, full)
-      : canopyBluffRecoveryMs(rank, event.chain, full);
+    const recovery = canopyBluffRecoveryMs(rank, event.chain, full);
     const newFuel = Math.min(full, spent + recovery);
     const canopyRecoveredMs = Math.max(0, newFuel - spent);
     if (canopyRecoveredMs > 0) s.parachuteFuelMs = newFuel;
@@ -513,6 +522,15 @@ export class RunScene extends Phaser.Scene {
     const store = this.registry?.get?.(REG.PROGRESSION)?.store;
     const discovered = !this.bsodGym && store?.discoverBsodGym?.();
     if (discovered?.discovered) this.registry?.set?.(REG.PROFILE, discovered.profile);
+    // The nested Easter egg is earned ONLY by five genuine scored escapes
+    // WITHOUT LANDING in the GYM. Normal-world chains never advance it.
+    if (this.bsodGym && event.chain >= GYM_MASTERY_CHAIN) {
+      const mastery = store?.unlockGymSetup?.();
+      if (mastery?.unlocked) {
+        this.registry?.set?.(REG.PROFILE, mastery.profile);
+        this.game.events.emit(EVT.GYM_SETUP_UNLOCKED, {});
+      }
+    }
     const payload = {
       hazardType: 'bsod', points: event.points, x: s.x, y: s.y,
       ...(discovered?.discovered ? { gymDiscovered: true } : {}),
@@ -521,6 +539,37 @@ export class RunScene extends Phaser.Scene {
     };
     this.game.events.emit(EVT.NEAR_MISS, payload);
     this.game.events.emit(EVT.BSOD_BLUFF, payload);
+  }
+
+  /** Stable world factory: practice retries regenerate the same launch track,
+   * rather than teleporting the rider into terrain streamed far down-course. */
+  createTerrainGenerator() {
+    return new TerrainGenerator({
+      seed: this.seed,
+      chunkDefs: this.content.chunks,
+      hazardDefs: this.content.hazards,
+      powerupDefs: this.content.powerups,
+      modDefs: this.content.terrainMods,
+      biomeDefs: Object.values(this.content.biomes || {}),
+      biomeMask: this.biomeMask,
+    });
+  }
+
+  /** Restore the entire Gym course between attempts: physical terrain bodies,
+   * hit hazards, picked-up items, and collected shards. We only call this
+   * AFTER Matter stepping has completed, never from collision callbacks.
+   * The same seed/mask and generation rules are reused; physics unchanged. */
+  resetGymWorld() {
+    if (!this.mesh?.chunks || !this.terrain?.getActiveChunks || !this.content) return;
+    for (const index of [...this.mesh.chunks.keys()]) this.dropChunk(index);
+    this.terrain = this.createTerrainGenerator();
+    this.collectedPowerups?.clear?.();
+    this.shardField?.collected?.clear?.();
+    this.shardField?.byChunk?.clear?.();
+    this.activeZones?.clear?.();
+    this._despawn?.splice?.(0);
+    this.glitch = new GlitchDirector({seed:this.seed});
+    this.streamTerrain(0);
   }
 
   // ------------------------------------------------------------------ terrain streaming
@@ -856,6 +905,18 @@ export class RunScene extends Phaser.Scene {
       return;
     }
 
+    // A one-second READY beat after each Gym catch: gameplay physics, BSOD,
+    // score, effect timers and run clock remain frozen. The player can still
+    // pause or quit. The ready display is handled independently by UIScene.
+    if (this.bsodGym && this.gymReadyMs > 0) {
+      const readyPad = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
+      if (readyPad.pressed.pause) { this.pauseRun(); return; }
+      this.gymReadyMs = Math.max(0, this.gymReadyMs - dt);
+      if (this.gymReadyMs === 0) this.game.events.emit(EVT.GYM_READY_GO, {});
+      this.renderFrame(0);
+      return;
+    }
+
     const pad = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
     if (pad.pressed.pause) {
       this.pauseRun();
@@ -968,6 +1029,8 @@ export class RunScene extends Phaser.Scene {
     if (this.bsodCaught) this.pendingCrash = { cause: "bsod" };
     // crash resolution (may be negated by Hashed Backup, except the BSOD)
     if (this.pendingCrash) this.resolveCrash(fs);
+    // The replacement attempt remains frozen even for this crash frame.
+    if (this.bsodGym && this.gymReadyMs > 0) { this.renderFrame(0); return; }
 
     if (!this.crashed) {
       this.updateBsodBluff();
@@ -1056,7 +1119,9 @@ export class RunScene extends Phaser.Scene {
       slowed: this.slowMs > 0 && !isWarded(this.wards, { effect: 'slow' }),
       slowFactor: this.slowFactor,
       // Decision 4: Head Start's opening surge multiplies in for its window only (exactly 1 afterwards).
-      speedBoost: (this.boostMs > 0 ? this.boostFactor : 1) * wardSpeedMul(this.wards) * openingSpeedMul(this.opening, this.runTimeMs),
+      speedBoost: (this.boostMs > 0 ? this.boostFactor : 1) * wardSpeedMul(this.wards)
+        * openingSpeedMul(this.opening, this.bsodGym
+          ? this.runTimeMs - this.gymAttemptStartTimeMs : this.runTimeMs),
       upgradeEffects: this.upgradeFx,
       timeMs: this.runTimeMs,
       parachute: !!pad.parachute && !sled.grounded && (sled.parachuteFuelMs ?? PHYSICS.parachuteDurationMs) > 0,
@@ -1711,16 +1776,30 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** Non-ranked practice retry: never advance a normal life/ledger.
-   * One real physics attempt ended; this starts a fresh, calmer pursuit. */
+   * Rebuild the same course, repeat the player-selected initial conditions,
+   * then hold physics for one second. Once released the normal live-world
+   * wall and canopy rules resume unchanged. */
   resetBsodGym() {
     if (!this.bsodGym || !this.sled || !this.bsod) return;
     const sled = this.sled;
-    const x = Math.max(this.startX + 100, sled.x);
-    const y = this.terrain.heightAt(x) - 240;
-    sled.setPose(x, y, 0, 270, -330);
+    // Rebuild fixed-seed terrain, hazards, pickups and shards as well as the
+    // player so repeated attempts truly rehearse the same initial situation.
+    this.resetGymWorld();
+    // Reset to a repeatable practice launch, not farther along a random
+    // course. These are allowed initial conditions, never special movement.
+    const setup = this.gymSetup || gymSetupForProfile(this.registry?.get?.(REG.PROFILE));
+    const x = this.gymStartX ?? this.startX;
+    const y = this.terrain.heightAt(x) - setup.launchHeightPx;
+    sled.setPose(x, y, 0, setup.launchSpeedPxS, setup.launchRisePxS);
     sled.parachuteFuelMs = sled.canopyFuelFullMs;
     sled.invulnerableMs = 0;
-    // The score is per attempt, even when terrain/world X remains continuous.
+    // Each attempt starts with the same actually-enabled bonus loadout, with
+    // normal timed boosts and their duration restarting for the new attempt.
+    this.shieldCharges = this.boostFx?.shieldCharges || 0;
+    this.shieldSources = [];
+    sled.shield = this.shieldCharges > 0;
+    this.openingGraces = 0;
+    this.gymAttemptStartTimeMs = this.runTimeMs;
     this.gymAttemptStartX = x;
     this.pendingCrash = null;
     this.bsodCaught = false;
@@ -1728,9 +1807,10 @@ export class RunScene extends Phaser.Scene {
     this.hitStopMs = 0;
     this.blinkMs = 0;
     this.clearTemporaryEffects('gym-retry');
-    this.bsod.wallX = sledLeftCollisionEdge(sled) - GYM_CHASE.respawnGapPx;
-    this.bsod.wallSpeedPxS = (this.gymChase || GYM_CHASE).initialSpeedPxS;
-    this.bsod.accelerationPxS2 = (this.gymChase || GYM_CHASE).accelerationPxS2;
+    // Starting the NEXT attempt may reposition the wall. Once released,
+    // the existing BsodPursuit.advance() strictly moves it forward; we
+    // NEVER reverse the wall or change its live-run acceleration.
+    placeGymWall(this.bsod, sledLeftCollisionEdge(sled), setup);
     this.bsodBluffs?.reset?.();
     this._airTricks = 0;
     this._landings = 0;
@@ -1757,8 +1837,10 @@ export class RunScene extends Phaser.Scene {
     this.maxAirtimeMs = 0;
     this.lastTotal = 0;
     this.gymRetries = (this.gymRetries || 0) + 1;
-    // Reset HUD projections and outstanding transient banners as one operation.
-    this.game?.events?.emit?.(EVT.GYM_ATTEMPT_RESET, { attempt: this.gymRetries });
+    this.gymReadyMs = GYM_READY_MS;
+    // Reset HUD and show the beat; no frame may advance the wall until it ends.
+    this.game?.events?.emit?.(EVT.GYM_ATTEMPT_RESET,
+      { attempt: this.gymRetries, readyMs: GYM_READY_MS });
     if (this.score) this.emitScore();
     this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
     this.publishBsodState(this.bsodState);

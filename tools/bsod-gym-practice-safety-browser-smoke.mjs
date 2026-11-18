@@ -41,6 +41,8 @@ try {
     g.events.emit('bb:trick',{type:'frontflip',count:100});
     const unsolicitedMissions=events.slice();
     g.loop.stop();
+    for(let i=0;i<20;i++)g.headlessStep(100+i*50,50);
+    if(r.gymReadyMs!==0)throw Error('First READY did not release');
     r.score.addBonus(1245,'nearMiss');r.emitScore();
     r.nearMissCount=4;r.shardCount=5;r.shardTotal=200;r.shardChain=3;
     r.trickCounts={frontflip:5};r.bestCombo=3.5;

@@ -1,9 +1,11 @@
 import { jest } from '@jest/globals';
 import { ProfileStore, sanitizeProfile } from '../../src/systems/ProfileStore.js';
-import { BSOD_GYM_PRICE, gymVisible, gymOwned, GYM_CHASE, gymChaseForLoadout, gymRechargeMs } from '../../src/systems/BsodGym.js';
+import { BSOD_GYM_PRICE, gymVisible, gymOwned, gymAdvanced,
+  GYM_MASTERY_CHAIN, GYM_READY_MS, GYM_DEFAULT_SETUP, GYM_SETUP_OPTIONS,
+  gymSetupForProfile, sanitizeGymSetup, placeGymWall } from '../../src/systems/BsodGym.js';
 import { BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
-import { upgradeLoadoutForRun } from '../../src/systems/PermanentUpgrades.js';
-import { BsodPursuit } from '../../src/systems/BsodPursuit.js';
+import { upgradeLoadoutForRun, canopyBluffRecoveryMs } from '../../src/systems/PermanentUpgrades.js';
+import { BsodPursuit, BSOD_DEFAULTS } from '../../src/systems/BsodPursuit.js';
 import { upgradeShopLayout } from '../../src/ui/ShopLayout.js';
 import { EVT } from '../../src/events.js';
 import { REG } from '../../src/constants.js';
@@ -48,54 +50,41 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
  test('Gym price is the Marvin-approved 200-shard trial price; no implicit unlock',()=>{
    expect(BSOD_GYM_PRICE).toBe(200);
  });
- test('enabled purchased canopy and BSOD Head Start scale the practice baseline',()=>{
-   const profile={upgradesEnabled:true,upgrades:{canopy:12,bsodGrace:15,speed:8,hop:6}};
-   const actual=upgradeLoadoutForRun(profile);
-   expect(actual.enabled).toBe(true);
-   const chase=gymChaseForLoadout(actual.effects);
-   expect(chase.parachuteFuelMs).toBeCloseTo(GYM_CHASE.parachuteFuelMs*actual.effects.canopyFuelMul);
-   expect(chase.accelerationPxS2).toBeCloseTo(GYM_CHASE.accelerationPxS2*actual.effects.bsodAccelerationMul);
-   expect(chase.parachuteFuelMs).toBeGreaterThan(GYM_CHASE.parachuteFuelMs);
-   expect(chase.accelerationPxS2).toBeLessThan(GYM_CHASE.accelerationPxS2);
-   expect(chase.earnedRechargeFraction).toBe(GYM_CHASE.earnedRechargeFraction);
-   expect(chase.initialGapPx).toBe(GYM_CHASE.initialGapPx);
-   expect(chase.initialSpeedPxS).toBe(GYM_CHASE.initialSpeedPxS);
-   // Turning UPGRADE MODE off—even if purchased—must remove those benefits.
-   const disabled=upgradeLoadoutForRun({...profile,upgradesEnabled:false});
-   expect(disabled.enabled).toBe(false);
-   expect(gymChaseForLoadout(disabled.effects)).toEqual(GYM_CHASE);
-   expect(gymChaseForLoadout(upgradeLoadoutForRun(profile,{daily:true}).effects)).toEqual(GYM_CHASE);
- });
- test('invalid/infinite chase coefficients cannot turn the Gym into a zero-speed exploit',()=>{
-   expect(gymChaseForLoadout({canopyFuelMul:Infinity,bsodAccelerationMul:0})).toEqual(GYM_CHASE);
-   expect(gymChaseForLoadout({canopyFuelMul:-1,bsodAccelerationMul:NaN})).toEqual(GYM_CHASE);
- });
- test('training recharge is finite, bounded, strictly decreasing with chain, and rank-independent',()=>{
-   for(const rank of [0,11,12,30,80]){
-     const full=gymChaseForLoadout(upgradeLoadoutForRun({
-       upgradesEnabled:true,upgrades:{canopy:rank},
-     }).effects).parachuteFuelMs;
-     let previous=Infinity;
-     for(let chain=1;chain<=1000;chain++){
-       const award=gymRechargeMs(chain,full);
-       expect(Number.isFinite(award)).toBe(true);
-       expect(award).toBeGreaterThan(0);
-       expect(award).toBeLessThanOrEqual(full);
-       expect(award).toBeLessThan(previous);
-       previous=award;
-     }
-     expect(gymRechargeMs(1,full)).toBeCloseTo(full*0.68);
-     expect(gymRechargeMs(2,full)).toBeCloseTo(gymRechargeMs(1,full)/Math.sqrt(2));
+ test('Gym allows only realistic launch inputs; BSOD is forward-only and keeps live acceleration',()=>{
+   const lvl=12,fx=upgradeLoadoutForRun({upgradesEnabled:true,
+     upgrades:{canopy:12,bsodGrace:15}}).effects;
+   const config={...BSOD_DEFAULTS,
+     accelerationPxS2:BSOD_DEFAULTS.accelerationPxS2*fx.bsodAccelerationMul};
+   const live=new BsodPursuit({sledLeftEdgeX:1000,level:lvl,config});
+   const gym=new BsodPursuit({sledLeftEdgeX:1000,level:lvl,config});
+   const setup=sanitizeGymSetup({gapPx:220,wallSpeedPxS:1500,
+     launchSpeedPxS:1000,launchRisePxS:-900,launchHeightPx:1100});
+   placeGymWall(gym,1000,setup);
+   expect(gym.accelerationPxS2).toBe(live.accelerationPxS2);
+   expect(gym.config.compressionPxS).toBe(live.config.compressionPxS);
+   expect(gym.wallSpeedPxS).toBe(1500);
+   expect(gym.wallX).toBe(780);
+   for(let i=0;i<1000;i++){
+     const was=gym.wallX;
+     gym.advance(8);
+     expect(gym.wallX).toBeGreaterThan(was);
+     expect(gym.wallSpeedPxS).toBeGreaterThanOrEqual(1500);
    }
-   for(const args of [[0,1500],[-1,1500],[NaN,1500],[1,0],[1,-1],
-     [1,NaN],[1,Infinity],[Infinity,1500],[1.5,1500]])
-     expect(gymRechargeMs(...args)).toBe(0);
+   const bad=sanitizeGymSetup({gapPx:0,wallSpeedPxS:-500,
+     launchHeightPx:999999,launchSpeedPxS:-100,launchRisePxS:900});
+   expect(bad).toEqual(GYM_DEFAULT_SETUP);
+   expect(gymSetupForProfile({bsodGym:{owned:true,advanced:false,setup}})).toEqual(GYM_DEFAULT_SETUP);
+   expect(GYM_SETUP_OPTIONS.wallSpeedPxS.every(n=>n>0)).toBe(true);
  });
- test('practice refill is not the normal-run rank-12 gate',()=>{
-   const full=1500;
-   expect(gymRechargeMs(1,full)).toBeGreaterThan(0);
-   // Practice gives safe repetitions before ranked canopy recharge is unlocked.
-   expect(gymRechargeMs(4,full)).toBeCloseTo(gymRechargeMs(1,full)/2);
+ test('Gym shares EXACT normal canopy recovery rank gate, no special practice refills',()=>{
+   expect(canopyBluffRecoveryMs(0,1,880)).toBe(0);
+   expect(canopyBluffRecoveryMs(11,1,1400)).toBe(0);
+   expect(canopyBluffRecoveryMs(12,1,1400)).toBeGreaterThan(0);
+   expect(canopyBluffRecoveryMs(12,2,1400)).toBeLessThan(canopyBluffRecoveryMs(12,1,1400));
+   // Both Gym and live RunScene use the ONE normal-world function.
+   const src=RunScene.prototype.updateBsodBluff.toString();
+   expect(src).toContain('canopyBluffRecoveryMs(rank, event.chain, full)');
+   expect(src).not.toContain('gymRechargeMs(');
  });
  test('Gym is absent by default, never accidentally revealed by purchasing a canopy rank',()=>{
   const {s}=store();
@@ -152,6 +141,60 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
   expect(s.profile.bank).toBe(BSOD_GYM_PRICE+5);
   expect(s.profile.bsodGym.owned).toBe(false);
  });
+ test('Five consecutive scored Bluffs IN GYM reveal nested setup; normal-world five never do',()=>{
+   expect(GYM_MASTERY_CHAIN).toBe(5);
+   const run=(inside,withLanding=false)=>{
+     const {s,disk}=store();
+     s.save({...s.profile,bank:500});
+     s.discoverBsodGym();s.buyBsodGym();
+     const {scene,emitted}=bluffScene(s);
+     scene.bsodGym=inside;scene.sled.parachuteMs=250;
+     for(let i=0;i<5;i++){
+       if(withLanding && i===2){
+         scene.sled.grounded=true;scene.bsodState.gapPx=700;
+         scene.updateBsodBluff();scene.sled.grounded=false;
+       }
+       const t=1000+i*1300;
+       scene.bsodState.gapPx=1000;scene.runTimeMs=t;scene.updateBsodBluff();
+       scene.bsodState.gapPx=225;scene.runTimeMs=t+150;scene.updateBsodBluff();
+       scene.bsodState.gapPx=455;scene.runTimeMs=t+850;scene.sled.x+=330;
+       scene.updateBsodBluff();
+     }
+     return {s,disk,scene,emitted};
+   };
+   const live=run(false);
+   expect(live.s.profile.bsodGym.advanced).toBeUndefined();
+   expect(live.emitted.some(([e])=>e===EVT.GYM_SETUP_UNLOCKED)).toBe(false);
+   const landed=run(true,true);
+   expect(landed.s.profile.bsodGym.advanced).toBeUndefined();
+   const gym=run(true);
+   expect(gym.s.profile.bsodGym.advanced).toBe(true);
+   expect(gym.s.profile.bsodGym.setup).toEqual(GYM_DEFAULT_SETUP);
+   expect(gym.emitted.filter(([e])=>e===EVT.GYM_SETUP_UNLOCKED)).toHaveLength(1);
+   expect(gym.emitted.filter(([e])=>e===EVT.BSOD_BLUFF)).toHaveLength(5);
+   expect(new ProfileStore({storage:gym.disk}).load().bsodGym.advanced).toBe(true);
+   expect(upgradeShopLayout({profile:gym.s.profile}).rows.find(r=>r.id==='bsodGymSetup'))
+     .toMatchObject({kind:'gymSetupLink',label:'GYM SETUP'});
+ });
+ test('Advanced setup is persisted atomically only after in-Gym mastery and stays bounded',()=>{
+   const {s,disk}=store();s.save({...s.profile,bank:550});
+   s.discoverBsodGym();s.buyBsodGym();
+   expect(s.setGymSetup({wallSpeedPxS:1500}).ok).toBe(false);
+   expect(upgradeShopLayout({profile:s.profile}).rows.some(r=>r.id==='bsodGymSetup')).toBe(false);
+   expect(s.unlockGymSetup().unlocked).toBe(true);
+   expect(s.unlockGymSetup().unlocked).toBe(false);
+   const beforeBank=s.profile.bank;
+   const tx=s.setGymSetup({gapPx:220,wallSpeedPxS:1500,
+     launchHeightPx:700,launchSpeedPxS:1000,launchRisePxS:-900});
+   expect(tx.ok).toBe(true);
+   expect(s.profile.bank).toBe(beforeBank);
+   expect(gymSetupForProfile(s.profile).wallSpeedPxS).toBe(1500);
+   expect(gymSetupForProfile(new ProfileStore({storage:disk}).load()).gapPx).toBe(220);
+   const bad=s.setGymSetup({wallSpeedPxS:-3000,gapPx:-100,
+     launchSpeedPxS:Infinity});
+   expect(bad.ok).toBe(true);
+   expect(gymSetupForProfile(s.profile)).toEqual(GYM_DEFAULT_SETUP);
+ });
  test('Gym retry zeroes local score, tricks and shards without touching persistence',()=>{
    const scene=Object.create(RunScene.prototype);
    const emitted=[],score={
@@ -194,7 +237,7 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
    expect(scene.shardChainAt).toBe(-1e9);
    expect(scene.safeSamples).toHaveLength(0);
    expect(scene.gymAttemptStartX).toBe(sled.x);
-   expect(emitted.find(([evt])=>evt===EVT.GYM_ATTEMPT_RESET)?.[1]).toEqual({attempt:1});
+   expect(emitted.find(([evt])=>evt===EVT.GYM_ATTEMPT_RESET)?.[1]).toEqual({attempt:1,readyMs:GYM_READY_MS});
    expect(emitted.map(([evt])=>evt)).toContain(EVT.SCORE_CHANGED);
    expect(emitted.map(([evt])=>evt)).toContain(EVT.BSOD_STATE_CHANGED);
  });
@@ -240,7 +283,7 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
   const scene=Object.create(RunScene.prototype);
   const calls=[],sled={
     x:3000,y:100,body:{bounds:{min:{x:2980}}},
-    canopyFuelFullMs:GYM_CHASE.parachuteFuelMs,parachuteFuelMs:0,
+    canopyFuelFullMs:880,parachuteFuelMs:0,
     setPose:jest.fn(function(x,y){this.x=x;this.y=y}),
     vx:270,
   };
@@ -262,9 +305,11 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
   expect(scene.pendingCrash).toBeNull();
   expect(scene.bsodCaught).toBe(false);
   expect(sled.setPose).toHaveBeenCalled();
-  expect(sled.parachuteFuelMs).toBe(GYM_CHASE.parachuteFuelMs);
+  expect(sled.parachuteFuelMs).toBe(880);
+  expect(scene.gymReadyMs).toBe(GYM_READY_MS);
   expect(scene.gymRetries).toBe(1);
-  expect(scene.bsod.wallSpeedPxS).toBe(GYM_CHASE.initialSpeedPxS);
+  expect(scene.bsod.wallSpeedPxS).toBe(GYM_DEFAULT_SETUP.wallSpeedPxS);
+  expect(scene.bsod.accelerationPxS2).toBeCloseTo(1.15);
   expect(scene.saveStore.saveRun).not.toHaveBeenCalled();
   expect(scene.registry.set).not.toHaveBeenCalled();
   expect(calls.map(([k])=>k)).toEqual([EVT.GYM_ATTEMPT_RESET, EVT.BSOD_STATE_CHANGED]);

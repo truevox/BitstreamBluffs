@@ -110,6 +110,8 @@ try {
       lifetime:JSON.stringify(g.registry.get('profile').lifetime),
       record:g.registry.get('lastRecord')};
     g.loop.stop();
+    for(let i=0;i<20;i++)g.headlessStep(100+i*50,50);
+    if(r.gymReadyMs!==0)throw Error('Initial READY did not release');
     r.bsod.wallX=r.sled.body.bounds.min.x+12;r.bsod.wallSpeedPxS=10000;
     g.headlessStep(35000,16.67);g.headlessStep(35016,16.67);
     return {gym:r.bsodGym,retries:r.gymRetries,crashed:r.crashed,

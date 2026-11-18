@@ -29,8 +29,12 @@ export const EVT = Object.freeze({
   RUN_ABORT: 'bb:runAbort',
   /** Emitter: RunScene. Payload: CrashPayload. */
   CRASH: 'bb:crash',
-  /** Emitter: RunScene, only on a non-ranked Gym catch. Payload: {attempt:number}. */
+  /** Emitter: RunScene, only on a non-ranked Gym catch. Payload: {attempt,readyMs}. */
   GYM_ATTEMPT_RESET: 'bb:gymAttemptReset',
+  /** Emitter: RunScene, after real-time retry freeze expires. */
+  GYM_READY_GO: 'bb:gymReadyGo',
+  /** Emitter: RunScene, a real 5x in-flight Bluff achieved INSIDE Gym only. */
+  GYM_SETUP_UNLOCKED: 'bb:gymSetupUnlocked',
   /** Emitter: RunScene. Payload: RespawnPayload. */
   RESPAWN: 'bb:respawn',
   /** Emitter: RunScene (from TrickTracker landing result). Payload: LandingPayload. */

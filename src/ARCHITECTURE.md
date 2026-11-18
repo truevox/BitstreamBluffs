@@ -8,6 +8,74 @@ methods) are fine. Everything is plain JS ES modules + JSDoc; Phaser 3.90, Matte
 
 The legacy implementation in `js/` is untouched and unrelated; do not import from it.
 
+## CURRENT 2026-11-18 OWNER CONTRACT — faithful BSOD Gym and nested 5x Gym-only Easter egg
+
+## CURRENT 2026-11-18 OWNER CONTRACT — faithful BSOD Gym and nested 5x Gym-only Easter egg
+
+**Marvin's direct decision (supersedes earlier assistant practice-only balancing):**
+The BSOD Gym is **100% faithful to live-run gameplay once an attempt begins**.
+It uses the actual player's active upgrades, earned canopy rank-12 requirement,
+recharge formula, real Sync Level-dependent BSOD acceleration, ordinary
+wind/atmosphere, boost/effect physics, and hazards. No practice-only fuel tank
+or below-rank-12 refill, no reduced BSOD acceleration. The initial 200-shard
+Gym price remains accepted for now. Only the **initial conditions**, the
+lack of ranked/progression rewards, and the **consequence-free recovery** differ.
+
+At first entry and at each retry, the Gym uses a repeatable fixed-seed
+launch with selectable (post-unlock) **BSOD gap, forward-only initial wall
+speed, rider launch height, forward velocity and upward velocity**.
+`BsodPursuit.advance()` is NEVER overridden: within an attempt the wall
+always moves strictly forward under exactly the same live acceleration.
+No teleporting, reversal, wall cha-cha, or extra wind assistance is allowed
+after release. The default initial setup is 460 px gap / 240 px/s wall,
+260 px launch height / 280 px/s forward and -330 px/s upward rider velocity.
+These are **initial conditions**, not changed movement rules. The values can
+be tuned from automated tests without any owner approval of feel/balance.
+
+**Fast repeated practice:** When caught, reconstruct deterministic initial
+terrain, hazards, powerups and collected shard state at the same fixed launch,
+restore the player's actually enabled initial boost loadout, clear all
+attempt-local scores/combos/status, place the rider and wall, and freeze
+the **whole gameplay simulation and run clock for 1000 real ms**. UIScene
+shows a small `READY` cue; on expiry `GO` flashes and ordinary gameplay
+resumes on the next frame. The pause menu stays functional during this
+beat. This process never credits runs, shards, XP, mission completion,
+achievements, or leaderboard entries.
+
+**Matryoshka Easter egg:** Gym launch-configuration controls are completely
+ABSENT from all player UI before **five successful scored BSOD Bluffs within
+ONE uninterrupted airborne flight inside the GYM**. Specifically:
+
+- Five Bluffs anywhere in the LIVE world **do NOT count** toward Gym setup.
+- Five separated by landing, death or Gym reset **do NOT count**.
+- A genuine 5x chain IN GYM unlocks setup exactly once via
+  `ProfileStore.unlockGymSetup()`, safely persisted without XP/shards.
+- Only THEN does the Shard Shop's existing Permanent Upgrades view gain a
+  `GYM SETUP` row. Its nested five-choice page can change *bounded starting
+  conditions* and enter practice. It is absent, not greyed out, before mastery.
+- The one-time post-mastery `GYM SETUP UNLOCKED` notification is allowed;
+  there are no advance tutorials, streak counters or spoilers.
+- `bsodGym.advanced` and `bsodGym.setup` extend v1 profile shapes only
+  after the Gym-specific milestone. Existing player profiles continue to
+  deserialize unchanged; setup writes are atomically persisted and sanitized
+  to physically forward-only values.
+
+**Code ownership/verification contract:** `src/systems/BsodGym.js` owns
+pure setup sanitization, preset options, forward-only placement and the
+Gym-only mastery threshold. `RunScene` owns physics, the signed-relative
+BSOD wind, 5x scoring gate, world reset and cooldown. `ProfileStore` owns
+persistence. `ShopLayout` + `ShopView` own the hidden post-mastery menu;
+`UIScene` owns READY/GO and one-time unlocked feedback. Events
+`GYM_ATTEMPT_RESET {attempt,readyMs}`, `GYM_READY_GO {}` and
+`GYM_SETUP_UNLOCKED {}` are additive.
+
+The older dated passages farther down mentioning a 1500ms practice tank,
+0.65px/s² Gym wall acceleration, or `0.68*full/sqrt(chain)` practice-only
+refill are **historical development records, no longer active rules**.
+Do not reintroduce those overrides. This is an owner decision, not
+an invented Gal Friday balance change. Human audition and play-feel
+testing are still pending; automated tests establish logic, not fun.
+
 ## 1. File ownership
 
 | Owner | Files (all under `src/` unless noted) |
@@ -1999,3 +2067,51 @@ be sustained in a ranked run at low rank. Marvin said this balance
 *seems okay* but has not approved final tuning. These computed data
 and source unit gates are evidence for playtesting, **not** a reason
 to alter the formula or reveal the hidden mechanic in public UI.
+
+
+## 2026-11-18 — Optional musical timing for Gym READY/GO (design note, not yet enabled)
+
+**Marvin's clarification:** By *downbeat* he means **on a regular musical
+beat rather than on an upbeat/offbeat or syncopated subdivision**. He does
+NOT mean the first beat of a measure/bar. After a Gym attempt is staged for
+roughly one second, release on a real, reliable musical pulse when feasible;
+do not wait for a bar boundary. This applies to first launch and retries.
+This is an optional timing idea, not approval for arbitrary waiting, guessing
+tempo, or changing music tracks.
+
+**Actual source audit:** `StemMusicDirector.nextBeat()` and
+`CaptionSequencer.nextBeatTime()` support the next *individual beat*
+from the active audio transport's `AudioContext.currentTime`, but use
+`pack.bpm`. As of 2026-11-18, **all four installed
+`public/music/packs/*/pack.json` files omit validated `tempo`**;
+`MusicPack` therefore normalizes BPM to `null`, and
+`nextBeatTime()` falls back to current time. There is currently **no trusted quarter-note pulse phase or tempo**, so
+invoking `nextBeat()` does *not* yield real musical synchronization for
+the installed songs. Bar/meter/downbeat metadata may be useful elsewhere,
+but **is not required for Marvin's on-beat-vs-offbeat release preference**.
+
+**Recommended future metadata owned by Music Friday, not fabricated:**
+Each validated recording/arrangement needs a reliable **pulse grid** with
+source provenance and confidence: BPM plus measured on-beat phase, or
+per-event beat markers for rubato/variable tempo. Meter, beat-one and
+bar-markers are OPTIONAL enrichment; never infer those as prerequisites
+or pretend that every on-beat event is a measure downbeat. Maintain
+timings in the original recorded performance's sample/second
+coordinates and translate through actual transport pause/resume,
+seek, track switch, and `clockStart` to `AudioContext.currentTime`.
+A manual listening/spot-check gate must reject dubious markers.
+A confidence-labeled transport timing snapshot can then be offered
+through a small public (not `_stemMusic` private) API to gameplay.
+
+**Safety and feel rule, still a recommendation:** The one-second frozen
+Gym release is authoritative and works with music muted, missing,
+disabled, suspended, or changed mid-READY. Optionally select the next
+*validated beat* after that minimum hold ONLY when the extra delay is
+small (e.g. no more than 300ms); otherwise use the ordinary one-second
+GO. Avoid offbeat/syncopated timing; do NOT wait for the next bar boundary,
+which could keep the rider frozen for multiple extra seconds. Never couple
+the gameplay clock or Matter step to audio scheduling, and never let
+an exception or stalled audio block release. Test paused/silent and
+low-confidence tracks, shuffled transitions, different BPMs, and an
+honest long-wait fallback before enabling. Music-only animations/SFX
+may synchronize even without delaying gameplay.

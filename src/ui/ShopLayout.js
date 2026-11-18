@@ -18,7 +18,7 @@
  */
 import { measureText } from './PixelFont.js';
 import { UPGRADE_CATALOG, sanitizeUpgradeRanks, nextUpgradePrice } from '../systems/PermanentUpgrades.js';
-import { BSOD_GYM_PRICE, gymVisible, gymOwned } from '../systems/BsodGym.js';
+import { BSOD_GYM_PRICE, gymVisible, gymOwned, gymAdvanced, gymSetupForProfile, GYM_SETUP_OPTIONS } from '../systems/BsodGym.js';
 import { SHOP_ITEMS, isOwned } from '../systems/ProfileStore.js';
 import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 
@@ -299,6 +299,9 @@ export function upgradeShopLayout(o = {}) {
     rows.push({ kind: 'gym', key: 'bsodGym', id: 'bsodGym',
       label: 'BSOD GYM', state: owned ? 'ENTER' : `LOCKED ${BSOD_GYM_PRICE}`,
       disabled: !owned && bank < BSOD_GYM_PRICE });
+    // No disabled / mysterious hint row before the actual in-Gym 5x unlock.
+    if (gymAdvanced(profile)) rows.push({ kind: 'gymSetupLink', key: 'bsodGymSetup',
+      id: 'bsodGymSetup', label: 'GYM SETUP', state: 'OPEN' });
   }
   rows.push({ kind: 'static', key: 'softcap', label: 'UNLIMITED RANKS / DIMINISHING RETURNS' });
   rows.push({ kind: 'static', key: 'ranked', label: 'MODE ON = MODDED, OFFICIAL DAILY CLEAN' });
@@ -421,4 +424,31 @@ export function titlesMenuItems(layout) {
     if (r.kind === 'head') return { kind: 'static', label: '', rowKind: 'head', disabled: true };
     return { kind: 'action', rowKind: r.kind, id: r.id, label: r.label, sub: r.state, disabled: r.disabled, onSelect: null };
   });
+}
+
+
+/** Only referenced after real five-in-one-flight Gym mastery. No fallback
+ * teaser exists in the normal Shop or permanent upgrades page. */
+export function gymSetupLayout(o = {}) {
+  const profile = o.profile || {};
+  const bank = Number.isSafeInteger(profile.bank) ? profile.bank : 0;
+  const setup = gymSetupForProfile(profile);
+  const fields = [
+    {id:'gapPx',label:'WALL GAP'},
+    {id:'wallSpeedPxS',label:'WALL START SPEED'},
+    {id:'launchHeightPx',label:'LAUNCH HEIGHT'},
+    {id:'launchSpeedPxS',label:'START VELOCITY'},
+    {id:'launchRisePxS',label:'UPWARD VELOCITY'},
+  ];
+  const rows = [
+    {kind:'head',key:'head',label:'',right:'BANK '+bank},
+    {kind:'gymSetupBack',key:'gymSetupBack',label:'← BACK TO UPGRADES'},
+    {kind:'header',key:'gymSetupHead',label:'BSOD GYM / CUSTOM LAUNCH'},
+    ...fields.map(f=>({kind:'gymSetupChoice',key:f.id,id:f.id,label:f.label,
+      state:String(setup[f.id]),choices:GYM_SETUP_OPTIONS[f.id]})),
+    {kind:'gymSetupStart',key:'gymSetupStart',label:'START PRACTICE'},
+    {kind:'static',key:'gymSetupNote',label:'REAL PHYSICS / FORWARD-ONLY WALL'},
+  ];
+  return { w:SHOP_PANEL.w,h:SHOP_PANEL.h,rows,rowH:ROW_H,
+    band:{x:PAD-6,y:8,w:SHOP_PANEL.w-(PAD-6)*2} };
 }
