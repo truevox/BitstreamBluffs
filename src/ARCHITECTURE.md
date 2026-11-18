@@ -1497,3 +1497,27 @@ bouncySpring touchdown restitution.
 - **From the cutover:** a 15-day cycle `[32,0,64,0,128,0,256,0,512,1024,1,2,4,8,16]`, indexed by days since the cutover.
 
 `infoForDateKey` and the DAILY RUN button go through the same function, so the official check on a record still compares it against the mask its own date had. Changing the rotation again means a new cutover date. Never edit a cycle in place, or past dates change mask.
+
+
+## v2.16 in-progress: BSOD gameplay authority / audio handoff
+
+RunScene owns a pure BsodPursuit controller and emits EVT.BSOD_STATE_CHANGED on the global
+scene.game.events emitter after physics substeps are resolved. ONE payload object per event,
+with no audio callback or dependency from simulation. BSOD collision is from the
+wall's leading/rightmost edge X to the compound Matter sled body's bounds.min.x;
+signed gapPx = sledLeftEdgeX - wallX, zero = contact. World X is increasing forward.
+The wall advances during each bounded <=8ms Matter step; it ignores shields and
+opening/invulnerability grace. Deactivation emits a full inactive payload on run
+termination/teardown. timeToImpactMs is a closing-speed estimate, never a death timer.
+
+Payload: active, gapPx, wallSpeedPxS, worldTailwindPxS, sledVelocityXPxS,
+relativeAirX, proximity01, timeToImpactMs, atmosphereDensity. Space Mountain
+forces atmosphereDensity 0 and zero wind, although the wall still collides.
+The player sees a camera easing toward the approaching BSOD and a wind-direction pom-pom.
+The audio/music team should subscribe read-only; their setSpeed() music-intensity
+contract remains untouched. Physically applying the new wind to parachute/airbrake
+and balancing infinite high-risk flights are separate follow-up stages.
+
+Settings: windEnabled default true is additive to already-shipped windVolume. Controls branch
+owns SaveStore persistence and SettingsView toggle; music team owns consumption in
+AudioSynth, so do not claim muting is functional before its audio-side change lands.

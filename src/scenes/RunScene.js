@@ -60,6 +60,7 @@ import { planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
+import { BsodPursuit, emptyBsodState } from '../systems/BsodPursuit.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -95,6 +96,8 @@ const LOOK_ULTRA_EXTRA_PX = 110;
 /** The rider is never allowed closer than this many screen px to the left edge. */
 const RIDER_MIN_SCREEN_X = 36;
 const smooth01 = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
+/** Production uses actual Matter bounds; fallback supports legacy scene test doubles. */
+const sledLeftCollisionEdge = (sled) => Number.isFinite(sled?.body?.bounds?.min?.x) ? sled.body.bounds.min.x : sled.x - 20;
 
 /** Tutorial hints already completed on this device. SaveStore.sanitizeSettings drops unknown keys, so use our own key. */
 function loadTutorialDone() {
@@ -295,6 +298,12 @@ export class RunScene extends Phaser.Scene {
       this.sled.shield = true;
     }
     if (this.boostFx.speedFactor !== 1) this.sled.scaleVelocity(this.boostFx.speedFactor);
+    // Authoritative physical chase: gap is from the wall's leading edge to the compound sled body left bound.
+    this.bsod = new BsodPursuit({ sledLeftEdgeX: sledLeftCollisionEdge(this.sled), level: prof.level });
+    this.bsodState = this.bsod.state(sledLeftCollisionEdge(this.sled), this.sled.vx, 1);
+    this.bsodCaught = false;
+    this.bsodEdge = this.add.graphics().setDepth(16);
+    this.windPom = this.add.graphics().setDepth(22);
     this.startGate = this.add.graphics().setDepth(6);
     this.drawStartGate(this.startGate, start.x + 14, this.terrain.heightAt(start.x + 14));
     this.snapCamera();
@@ -373,6 +382,11 @@ export class RunScene extends Phaser.Scene {
     safe(this.groundTelegraph);
     this.groundTelegraph = null;
     safe(this.streaks);
+    safe(this.bsodEdge);
+    safe(this.windPom);
+    this.deactivateBsod();
+    this.bsod = null;
+    this.bsodEdge = this.windPom = null;
     this.shardField = this.bestMarker = this.streaks = this.airTelegraph = null;
     this.sled = this.mesh = this.trail = this.fx = this.bg = null;
     this.terrain = null;
@@ -382,6 +396,54 @@ export class RunScene extends Phaser.Scene {
     this.safeSamples = [];
     this._contactQueue = [];
     try { this.scene.stop(SCENES.UI); } catch (e) { /* ignore */ }
+  }
+
+  /** Active Space Mountain has no atmosphere, even though the BSOD still chases. */
+  bsodAtmosphere() {
+    if (!this.terrain || !this.sled || !this.biomeMask) return 1;
+    const sector = this.terrain._sectorOf(this.sled.x);
+    const biome = this._biomeDefForSector(sector);
+    return biome && biome.id === 'space-mountain' ? 0 : 1;
+  }
+
+  /** Reset wind/music subscriptions on end, abort or teardown; never mutate the music mixer. */
+  deactivateBsod() {
+    if (!this.bsod || !this.bsod.active) return;
+    this.bsodState = this.bsod.stop();
+    if (this.game && this.game.events) this.game.events.emit(EVT.BSOD_STATE_CHANGED, emptyBsodState());
+  }
+
+  /** World-coordinate visual cues. They do not affect physics, danger, input or accessibility settings. */
+  drawBsodCues() {
+    const s = this.sled, view = this._view, state = this.bsodState;
+    const wall = this.bsodEdge, pom = this.windPom;
+    if (!s || !view) return;
+    if (wall && wall.clear) {
+      wall.clear();
+      if (this.bsod && (this.bsod.active || this.bsodCaught) && this.bsod.wallX > view.left) {
+        const edge = Math.min(view.right, this.bsod.wallX);
+        const width = Math.max(0, edge - (view.left - 12));
+        const y = view.top - 15, height = view.bottom - view.top + 30;
+        wall.fillStyle(this.palette.magenta, 0.23);
+        wall.fillRect(view.left - 12, y, width, height);
+        wall.lineStyle(3, this.palette.magenta, 0.95);
+        wall.lineBetween(this.bsod.wallX, y, this.bsod.wallX, y + height);
+      }
+    }
+    if (pom && pom.clear) {
+      pom.clear();
+      const wind = state && state.active ? state.relativeAirX : 0;
+      const density = state && state.active ? state.atmosphereDensity : 0;
+      const strength = Math.min(1, Math.abs(wind) / 900) * density;
+      const dir = wind > 0 ? 1 : wind < 0 ? -1 : 0;
+      const anchorX = s.x - 4, anchorY = s.y - 30;
+      const endX = anchorX + dir * (5 + 23 * strength);
+      const endY = anchorY - (strength > 0.08 ? 7 * strength : -5);
+      pom.lineStyle(1.6, this.palette.text, 0.9);
+      pom.lineBetween(anchorX, anchorY, endX, endY);
+      pom.fillStyle(this.palette.amber, 0.98);
+      pom.fillCircle(endX, endY, 3);
+    }
   }
 
   // ------------------------------------------------------------------ terrain streaming
@@ -754,9 +816,25 @@ export class RunScene extends Phaser.Scene {
       (stepMs) => {
         sled.endStep(stepMs);
         this.processContacts();
+        // The BSOD advances with the SAME capped physics substeps as the sled. A fast wall cannot
+        // jump over the rider between render frames. Do not depend on audio or animation timers.
+        if (this.bsod && !this.bsodCaught) {
+          this.bsod.advance(stepMs);
+          const s = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
+          if (s.gapPx <= 0) {
+            this.bsodCaught = true;
+            this.pendingCrash = { cause: 'bsod' };
+          }
+        }
       },
     );
     this.flushDespawn();
+    // One authoritative post-physics snapshot per frame. Music will subscribe later; physics never
+    // reads from that subscriber. An inactive/reset snapshot is emitted at run termination.
+    if (this.bsod && !this.crashed) {
+      this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
+      this.game.events.emit(EVT.BSOD_STATE_CHANGED, this.bsodState);
+    }
     // flow timeout runs on the same scaled run clock as physics (slow-mo stretches it, pause / hit-stop freeze it)
     this.emitFlow(this.score.tick(simDt));
 
@@ -802,7 +880,9 @@ export class RunScene extends Phaser.Scene {
     this.updateZones(sled.x);
     this.sampleSafeGround(dt, fs);
 
-    // crash resolution (may be negated by Hashed Backup)
+    // Collision with the deletion wall always wins if any other contact/landing happened during this frame.
+    if (this.bsodCaught) this.pendingCrash = { cause: "bsod" };
+    // crash resolution (may be negated by Hashed Backup, except the BSOD)
     if (this.pendingCrash) this.resolveCrash(fs);
 
     if (!this.crashed) {
@@ -867,6 +947,7 @@ export class RunScene extends Phaser.Scene {
     this.drawStreaks(t);
     if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.heightFn);
     this.bg.update(cam.scrollX, t, sled.speed);
+    this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
     this.updateBlindOverlay();
   }
@@ -1473,6 +1554,8 @@ export class RunScene extends Phaser.Scene {
     const c = this.pendingCrash;
     this.pendingCrash = null;
     const speed = Math.hypot(fs.vx, fs.vy);
+    // The advancing deletion wall overrides even shield, respawn grace and opening grace.
+    if (c.cause === 'bsod') { this.doCrash(c, fs, speed); return; }
     if (this.sled.invulnerableMs > 0 && c.cause !== 'chasm') return; // brief grace after a respawn / backup
     const distM = (fs.x - this.startX) / PIXELS_PER_METER;
     if (c.cause !== 'hazard' && c.cause !== 'chasm' && distM < TUNING.openingGraceM && this.openingGraces < TUNING.openingGraceMax) {
@@ -1522,6 +1605,7 @@ export class RunScene extends Phaser.Scene {
 
   doCrash(c, fs, speed) {
     this.crashed = true;
+    this.deactivateBsod();
     this.crashTimerMs = 0;
     this.emitFlow(this.score.onCrash());
     this.emitCombo('crash');
@@ -1710,7 +1794,8 @@ export class RunScene extends Phaser.Scene {
     const s = this.sled;
     // Look ahead in the direction of travel; Y keeps ~1/3 of the screen above the rider and peeks lower when falling.
     const look = clamp(s.vx * TUNING.lookAheadSec, -TUNING.lookAheadMaxPx * 0.5, TUNING.lookAheadMaxPx)
-      + LOOK_FAR_EXTRA_PX * smooth01((s.vx - 600) / 400) + LOOK_ULTRA_EXTRA_PX * smooth01((s.vx - 850) / 450);
+      + LOOK_FAR_EXTRA_PX * smooth01((s.vx - 600) / 400) + LOOK_ULTRA_EXTRA_PX * smooth01((s.vx - 850) / 450)
+      - 225 * smooth01((this.bsodState && this.bsodState.proximity01) || 0);
     const tx = s.x + look - GAME_WIDTH * 0.38;
     const ty = s.y - GAME_HEIGHT / 3 - clamp(s.vy * 0.05, -26, 34);
     const kx = 1 - Math.exp((-TUNING.cameraLerpX * dt) / 1000);
@@ -1735,6 +1820,9 @@ export class RunScene extends Phaser.Scene {
     // ... and horizontally: the extra look-ahead must not push the rider off the left edge (the zoom below keeps the rider at
     // screen x = s.x - _camX whatever the zoom, so this is a plain screen-px bound)
     if (s.x - this._camX < RIDER_MIN_SCREEN_X) this._camX = s.x - RIDER_MIN_SCREEN_X;
+    // The BSOD camera pullback must NEVER drive the rider off the right edge or hide all terrain ahead.
+    const riderMaxScreenX = GAME_WIDTH - 72;
+    if (s.x - this._camX > riderMaxScreenX) this._camX = s.x - riderMaxScreenX;
     // never show far past the start edge of the world
     if (this._camX < -30) this._camX = -30;
 

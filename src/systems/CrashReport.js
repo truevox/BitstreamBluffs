@@ -17,7 +17,7 @@ export const CRASH_BEAT = Object.freeze({ slowMs: 400, slowScale: 0.25, hitStopS
 /** A hop older than this before the ideal window counts as no hop at all (ms). */
 const NO_HOP_BEFORE_MS = 1000;
 
-const CAUSE_NAMES = Object.freeze({ terrain: 'HEAD FIRST', badLanding: 'BAD LANDING', chasm: 'FELL INTO THE VOID' });
+const CAUSE_NAMES = Object.freeze({ terrain: 'HEAD FIRST', badLanding: 'BAD LANDING', chasm: 'FELL INTO THE VOID', bsod: 'ERASED BY THE BSOD' });
 
 const crashes = (def) => !!def && (!def.onHit || def.onHit.effect === 'crash');
 
