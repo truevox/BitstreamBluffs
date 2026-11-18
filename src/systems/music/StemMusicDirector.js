@@ -672,7 +672,11 @@ export class StemMusicDirector {
 			upcoming,
 			position:this.transportPaused?this._resumeOffset:
 				this.started&&this.ctx&&this.clockStart!==null?
-					Math.max(0,this.ctx.currentTime-this.clockStart):0,
+					// A manually resumed source is scheduled slightly in the future.
+					// Don't show its saved position moving BACKWARD during that silent
+					// pre-start window; audio itself already has the exact-frame gate.
+					Math.max(0,Math.max(this.ctx.currentTime,
+						this._resumeGateAt??this.ctx.currentTime)-this.clockStart):0,
 			audioSuspended:this.ctx?.state==='suspended',
 		};
 	}

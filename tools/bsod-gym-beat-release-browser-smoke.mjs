@@ -28,6 +28,7 @@ try {
     const events=[];
     g.events.on('bb:gymReadyGo',e=>events.push(e));
     const originalGet=a.getBeatTiming,originalCheck=a.isBeatTimingCurrent;
+    const originalCtx=a.ctx;
     let stepId=0;
     const step=ms=>g.headlessStep(100000+(++stepId)*ms,ms);
     const snap=()=>({ready:r.gymReadyMs,extra:r.gymBeatWaitMs,
@@ -40,6 +41,10 @@ try {
       unverified={realTrusted:realFallback.trusted,after:snap(),payload:events.at(-1)};
       if(r.gymReadyMs!==0||events.length!==1||r.gymBeatWaitMs!==0)
         throw Error('Released songs failed immediate READY/GO fallback');
+      // HeadlessStep advances simulated frame time without advancing the real
+      // WebAudio clock. Pin a TEST-ONLY audio clock for deterministic countdown
+      // scenarios; the separate real-OGG smoke verifies actual clock release.
+      a.ctx={currentTime:20,state:'running'};
       function run(name,mode){
         let queries=0,checks=0;
         const now=Number.isFinite(a.ctx?.currentTime)?a.ctx.currentTime:20;
@@ -91,6 +96,7 @@ try {
     } finally {
       a.getBeatTiming=originalGet;
       a.isBeatTimingCurrent=originalCheck;
+      a.ctx=originalCtx;
     }
     return {unverified,valid,changed,throwing,oversized,reset,errors:[],goPayloads:events};
   });

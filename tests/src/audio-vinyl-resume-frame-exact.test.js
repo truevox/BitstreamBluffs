@@ -24,6 +24,35 @@ function sourceAt(now,{savedOffset=22.375,gate=true}={}) {
   return {player,calls,buffer};
 }
 
+describe('vinyl jukebox position readout during scheduled resume',()=>{
+  const playerAt=(now,gate)=>{
+    const d=Object.create(StemMusicDirector.prototype);
+    d.catalog=[{id:'soundtrack'}];d.songEnabled={soundtrack:true};
+    d.trackIndex=0;d.track=d.catalog[0];
+    d._lastPlayed=null;d._transportHistory=[];
+    d.shuffleEnabled=false;d.transportPaused=false;d.started=true;
+    d.pack={duration:180};d.ctx={currentTime:now};
+    d.clockStart=30;d._resumeGateAt=gate;
+    return d;
+  };
+  test('silent scheduled resume holds original offset instead of showing a 120ms rewind',()=>{
+    const d=playerAt(40,40.12);
+    expect(d.transportSnapshot().position).toBeCloseTo(10.12,8);
+    d.ctx.currentTime=40.08;
+    expect(d.transportSnapshot().position).toBeCloseTo(10.12,8);
+    d.ctx.currentTime=40.12;
+    expect(d.transportSnapshot().position).toBeCloseTo(10.12,8);
+    d.ctx.currentTime=40.25;
+    expect(d.transportSnapshot().position).toBeCloseTo(10.25,8);
+  });
+  test('normal continuous playback and a deliberately paused transport keep their old semantics',()=>{
+    const d=playerAt(40,null);
+    expect(d.transportSnapshot().position).toBeCloseTo(10,8);
+    d.transportPaused=true;d._resumeOffset=14.75;
+    expect(d.transportSnapshot().position).toBeCloseTo(14.75,8);
+  });
+});
+
 describe('vinyl musical resume must start from precisely the saved frame',()=>{
   test('manual resume never decodes audible 100ms of pre-roll before saved position',()=>{
     const {player,calls,buffer}=sourceAt(40);

@@ -2360,3 +2360,34 @@ force. Current death audio and continuous soundtrack stay unchanged while
 Music Friday completes the separate intentional PAUSE/RESUME vinyl feature.
 Full decision, authorship and research gates:
 `docs/MUSIC-DEATH-TURNTABLE-COUNT-IN-DESIGN-20261118.md`.
+
+### 2026-11-18 — Combined turntable integration and exact resume readout
+
+Music Friday's committed, continuity-safe vinyl implementation `8cc95fc`
+was cherry-picked to the dedicated combined branch as `561f0dc`, based on
+Control's `7605387` (manual pause tokens, real Escape-key lifecycle checks,
+continuity through fatal death, and future-only crash count-in design).
+Only intentional Pause/Resume runs the 205ms vinyl gestures. The original
+six-stem OGG survives fatal death, Game Over, ordinary title/menu transitions,
+and user-selected PauseScene jukebox changes remain authoritative. No crash
+scratch/count-in implementation and no real song beat-grid promotion occur.
+
+The inherited deterministic Gym beat-wait smoke occasionally compared the
+simulated 200ms countdown with the unrelated *real* WebAudio clock, causing
+an early legitimate release when a real clock advanced between synthetic
+frames. Its test-only fake clock is now pinned while exercising the
+artificial countdown; the independent real-original-OGG/WebAudio smoke tests
+the genuine clock in Chromium. This changes test isolation only.
+
+On a manually resumed song, the WebAudio director schedules first audible
+sources about 120ms in the future and gates source offsets at the exact
+saved frame. Before that first audible frame, `transportSnapshot().position`
+used to temporarily report a position ~120ms earlier than where the player
+paused, even though the sources weren't rewinding. The jukebox position
+readout now clamps to the already-existing `_resumeGateAt` while awaiting
+source playback, so its displayed position stays at the saved point and
+then advances with the live clock. No source scheduling, timing grid, mix,
+clip content or physics behavior changed. Two unit tests cover the gate and
+normal/paused semantics; two sequential full-original-OGG browser tests
+verified no visible backward position jump. All changes remain on the
+isolated integration branch; not on `main` or either owner worktree.

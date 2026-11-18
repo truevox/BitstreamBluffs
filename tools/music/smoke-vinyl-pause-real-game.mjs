@@ -117,9 +117,11 @@ try{
   assert.equal(restored.trackId,before.trackId);
   assert.equal(restored.transportPaused,false);
   assert.equal(restored.scratchLog.length,2);
-  assert.ok(restored.position>=frozen.position-.15&&
+  // The scheduler's exact-frame gate should also be reflected in the HUD:
+  // no visible 100–120ms backward jump while the first source is preparing.
+  assert.ok(restored.position>=frozen.position-.005&&
     restored.position<frozen.position+3,
-    'Resumed from an obsolete offset: '+JSON.stringify({frozen,restored}));
+    'Resumed position appeared to rewind: '+JSON.stringify({frozen,restored}));
   assert.ok(restored.activeNodes>=6&&restored.activeNodes<=16,
     'Unexpected duplicate playback sources');
   console.log('REAL_GAME_RESUME_AFTER_RISING_SCRATCH_SAME_OFFSET_PASS',
