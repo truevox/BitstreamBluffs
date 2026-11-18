@@ -2349,3 +2349,14 @@ When vinyl commits arrive, transplant only vinyl-specific code on top of
 this up-to-date branch, retain all existing continuous-music behavior, and
 run `tests/src/continuous-soundtrack-menu-shuffle.test.js` plus both vinyl
 and Gym browser suites before any promotion.
+
+### 2026-11-18 — Approved but NOT IMPLEMENTED death-music count-in concept
+
+Marvin approved the future design of a crash scratch, 1–3 silent musical beats,
+4 drum-only beats, then full-band return, with no restriction on fast retries:
+the count-in would carry into the next run independently of gameplay. The
+explicit instruction **not to implement crash scratching yet** remains in
+force. Current death audio and continuous soundtrack stay unchanged while
+Music Friday completes the separate intentional PAUSE/RESUME vinyl feature.
+Full decision, authorship and research gates:
+`docs/MUSIC-DEATH-TURNTABLE-COUNT-IN-DESIGN-20261118.md`.
