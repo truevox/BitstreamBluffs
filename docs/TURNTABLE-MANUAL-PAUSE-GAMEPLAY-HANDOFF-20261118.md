@@ -83,3 +83,14 @@ without a fake resume; and uses an actual fatal BSOD death to prove there
 is no manual-pause event. It **does not claim any scratch audio has been
 implemented or heard**. Audio success needs a separate combined smoke after
 Music Friday's implementation lands.
+
+## Fault isolation
+
+The four scene transitions now catch exceptions raised by synchronous
+`GAME_PAUSE`, `GAME_RESUME` and `RUN_ABORT` observers; an audio bug must not
+strand the player in a half-paused scene. This guarantees the **gameplay
+scene transition** continues, not that all remaining event subscribers run
+after a throwing callback (the shared EventEmitter may stop dispatch at the
+throw). **Music Friday's listener should therefore contain its own failures**
+and avoid throwing from event handlers. The browser smoke deliberately injects
+faulting event observers and checks Pause, Resume, Restart and Quit still work.

@@ -168,11 +168,13 @@ export class PauseScene extends Phaser.Scene {
     uiSfx(this, 'uiBack');
     this.scene.stop();
     this.scene.resume(SCENES.RUN);
-    this.game.events.emit(EVT.GAME_RESUME, {
-      runTimeMs: this.runTimeMs, runId: this._runId(),
-      reason: 'manual', pauseToken: this.manualPauseToken,
-      gym: this.manualPauseGym,
-    });
+    try {
+      this.game.events.emit(EVT.GAME_RESUME, {
+        runTimeMs: this.runTimeMs, runId: this._runId(),
+        reason: 'manual', pauseToken: this.manualPauseToken,
+        gym: this.manualPauseGym,
+      });
+    } catch (e) { console.warn('Manual resume observer failed; continuing', e); }
     this._flushPadEdges();
   }
 
@@ -200,9 +202,11 @@ export class PauseScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     uiSfx(this, 'uiSelect');
-    this.game.events.emit(EVT.RUN_ABORT, {
-      runId: this._runId(), reason: 'restart', pauseToken: this.manualPauseToken,
-    });
+    try {
+      this.game.events.emit(EVT.RUN_ABORT, {
+        runId: this._runId(), reason: 'restart', pauseToken: this.manualPauseToken,
+      });
+    } catch (e) { console.warn('Restart observer failed; continuing', e); }
     this.scene.stop(SCENES.RUN);
     this.scene.stop(SCENES.UI);
     this.scene.start(SCENES.RUN);
@@ -213,9 +217,11 @@ export class PauseScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     uiSfx(this, 'uiBack');
-    this.game.events.emit(EVT.RUN_ABORT, {
-      runId: this._runId(), reason: 'quit', pauseToken: this.manualPauseToken,
-    });
+    try {
+      this.game.events.emit(EVT.RUN_ABORT, {
+        runId: this._runId(), reason: 'quit', pauseToken: this.manualPauseToken,
+      });
+    } catch (e) { console.warn('Quit observer failed; continuing', e); }
     // Clear the practice flag before showing the normal title/menu.
     this.registry.set(REG.BSOD_GYM, false);
     this.scene.stop(SCENES.RUN);

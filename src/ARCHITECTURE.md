@@ -2329,3 +2329,9 @@ volume/mute/accessibility behavior and audio anti-stacking are explicitly
 and stale-beat invalidation are unchanged. Browser contract/regression:
 `tools/manual-turntable-pause-gameplay-browser-smoke.mjs`. Full handoff:
 `docs/TURNTABLE-MANUAL-PAUSE-GAMEPLAY-HANDOFF-20261118.md`.
+
+Manual pause/resume/restart/quit scene transitions are also protected against
+synchronous exceptions from audio/event observers; exceptions are logged and
+scene navigation continues. Every subscriber should still catch its own
+exceptions, since the EventEmitter may not deliver to later listeners after
+one throws. The Chromium smoke injects intentional observer exceptions.

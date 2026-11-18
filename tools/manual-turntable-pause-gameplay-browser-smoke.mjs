@@ -107,6 +107,30 @@ try{
     abortReason:'restart',pauseToken:first.pauseToken,manualResumes:0,
   });
  }finally{await restartPage.close();}
+ const faultPage=await startRun(false,'manual-turntable-audio-fault');
+ try{
+  await faultPage.evaluate(()=>{
+   const g=window.__bbGame;
+   // Simulated throwing audio integration. Real Phaser transitions must still
+   // succeed, even though global emitter listeners may be hostile.
+   for(const evt of ['bb:gamePause','bb:gameResume','bb:runAbort'])
+    g.events.on(evt,()=>{throw Error('injected faulty audio observer '+evt)});
+  });
+  const first=await pauseRun(faultPage);
+  assert.equal(first.scenePaused,true);
+  await faultPage.evaluate(()=>window.__bbGame.scene.getScene('PauseScene').resume());
+  await faultPage.waitForFunction(()=>window.__bbGame?.scene?.getScene('RunScene')?.sys?.isActive()&&
+   !window.__bbGame.scene.getScene('PauseScene').sys.isActive(),null,{timeout:15000});
+  await pauseRun(faultPage);
+  await faultPage.evaluate(()=>window.__bbGame.scene.getScene('PauseScene').restart());
+  await faultPage.waitForFunction(()=>window.__bbGame?.scene?.getScene('RunScene')?.sys?.isActive()&&
+   !window.__bbGame.scene.getScene('PauseScene').sys.isActive(),null,{timeout:15000});
+  await pauseRun(faultPage);
+  await faultPage.evaluate(()=>window.__bbGame.scene.getScene('PauseScene').quit());
+  await faultPage.waitForFunction(()=>window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(),
+   null,{timeout:15000});
+  console.log('TURNTABLE_THROWING_AUDIO_OBSERVERS_NEVER_STRAND_PAUSE_SCENE_PASS');
+ }finally{await faultPage.close();}
  const page=await startRun(false,'manual-turntable-death-contract');
  try{
   const d=await page.evaluate(()=>{

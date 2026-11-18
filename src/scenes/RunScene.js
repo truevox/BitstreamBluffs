@@ -2018,7 +2018,10 @@ export class RunScene extends Phaser.Scene {
     const pauseToken = `${this.runId}:${++this._manualPauseSeq}`;
     const manual = { runTimeMs: this.runTimeMs, runId: this.runId,
       reason: 'manual', pauseToken, gym: this.bsodGym === true };
-    this.game.events.emit(EVT.GAME_PAUSE, manual);
+    // The transition must complete even if an audio/third-party observer
+    // throws while constructing its scratch. Nothing may hold gameplay hostage.
+    try { this.game.events.emit(EVT.GAME_PAUSE, manual); }
+    catch (e) { console.warn('Manual pause observer failed; pausing anyway', e); }
     this.scene.pause();
     this.scene.launch(SCENES.PAUSE, manual);
   }
