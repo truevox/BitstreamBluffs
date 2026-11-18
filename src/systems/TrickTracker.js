@@ -53,7 +53,7 @@ export const DEFAULT_MIN_AIRTIME_MS = 120;
  * @property {boolean} grounded     sled has wheel/runner contact with terrain this frame.
  * @property {number} groundAngleDeg  slope of terrain under/near sled in degrees (clockwise positive = descending right);
  *                                  used for landing alignment. Use last known value while airborne.
- * @property {{heli:-1|0|1, airBrake:boolean, parachute:boolean}} input  heli: -1 = CCW (left arrow), +1 = CW (right arrow).
+ * @property {{heli:-1|0|1, airBrake:boolean, parachute:boolean, corkscrew?:boolean}} input  heli: -1 = CCW (left arrow), +1 = CW (right arrow).
  * @property {number} [heliDeg]     OPTIONAL continuous (unwrapped) helicopter spin phase of the sled drawing, clockwise positive.
  *                                  The helicopter spin is a visual rotation about the sled's vertical axis (the physics body does
  *                                  not rotate), so when this is provided helicopter turns are counted from it, whatever the
@@ -70,7 +70,7 @@ export const DEFAULT_MIN_AIRTIME_MS = 120;
 
 /**
  * @typedef {Object} TrickEvent
- * @property {'backflip'|'frontflip'|'helicopterCCW'|'helicopterCW'|'airBrake'|'parachute'} type
+ * @property {'backflip'|'frontflip'|'helicopterCCW'|'helicopterCW'|'corkscrew'|'airBrake'|'parachute'} type
  *   backflip = counter-clockwise body rotation (A / tilt back), frontflip = clockwise; helicopter* only when
  *   rotation was driven by the arrow keys (input.heli != 0), so rotation source separates the two families.
  * @property {number} count         completed rotations so far this air phase (flips/helis; cumulative, 2 = double) or 1.
@@ -126,19 +126,29 @@ export function isMidSpin(spin) {
  * Classify a touchdown. Pure helper (exported for tests / UI).
  * @param {number} angleDiffDeg sled angle minus ground slope, wrapped.
  * @param {number} impactSpeedPxS
- * @param {boolean|number} [midSpin] additive: incomplete helicopter (see isMidSpin). Drops the grade one level
- *   (perfect->good, good->sloppy, sloppy stays sloppy); never turns a landing into a crash and never rescues one.
+ * @param {boolean|number} [midSpin] numeric is actual helicopter yaw phase: grade at 40/75/120 deg
+ *   and crash when backwards beyond 120. Legacy boolean true drops one grade without forcing a crash.
  * @returns {{quality:'perfect'|'good'|'sloppy'|'crash', hard:boolean}}
  */
 export function classifyLanding(angleDiffDeg, impactSpeedPxS, midSpin) {
-  const a = Math.abs(angleDiffDeg);
+  // Backward/nose-up pitch has an extra 10 degrees of leeway; nose-down retains
+  // the original +12/+28/+55 bounds. Signed angle is terrain-relative.
+  const a = angleDiffDeg;
   const hard = impactSpeedPxS >= HARD_IMPACT_PX_S;
   let quality;
-  if (impactSpeedPxS >= CRASH_IMPACT_PX_S || a > SLOPPY_ANGLE_DEG) quality = 'crash';
-  else if (a <= PERFECT_ANGLE_DEG && impactSpeedPxS <= PERFECT_MAX_IMPACT_PX_S) quality = 'perfect';
-  else if (a <= GOOD_ANGLE_DEG) quality = 'good';
+  if (impactSpeedPxS >= CRASH_IMPACT_PX_S || a < -65 || a > SLOPPY_ANGLE_DEG) quality = 'crash';
+  else if (a >= -22 && a <= PERFECT_ANGLE_DEG && impactSpeedPxS <= PERFECT_MAX_IMPACT_PX_S) quality = 'perfect';
+  else if (a >= -38 && a <= GOOD_ANGLE_DEG) quality = 'good';
   else quality = 'sloppy';
-  if (isMidSpin(midSpin)) {
+  // Numeric phases are the actual visual yaw axis: incomplete ~180-degree
+  // helicopter landings crash, even if physical pitch is perfectly aligned.
+  // The legacy boolean true retains old one-grade penalty for older callers.
+  if (typeof midSpin === 'number' && Number.isFinite(midSpin)) {
+    const folded = Math.abs(wrapAngle(midSpin));
+    const yawQuality = folded > 120 ? 'crash' : folded > 75 ? 'sloppy' : folded > 40 ? 'good' : 'perfect';
+    const rank = { perfect: 0, good: 1, sloppy: 2, crash: 3 };
+    if (rank[yawQuality] > rank[quality]) quality = yawQuality;
+  } else if (midSpin === true) {
     if (quality === 'perfect') quality = 'good';
     else if (quality === 'good') quality = 'sloppy';
   }
@@ -187,6 +197,8 @@ export class TrickTracker {
         this._heliNet = 0;
         this._tiltDone = 0;
         this._heliDone = 0;
+        this._corkscrewNet = 0;
+        this._corkscrewDone = 0;
         this._brakeMs = 0;
         this._chuteMs = 0;
         this._brakeDone = false;
@@ -197,11 +209,12 @@ export class TrickTracker {
       }
       const airtime = t - this._airStart;
       this._accumulate(angle, heli, input);
-      this._heliMax = Math.max(this._heliMax, Math.abs(this._heliNet));
-      this._heliHeld = !!input.heli;
+      this._heliMax = Math.max(this._heliMax, Math.abs(this._heliNet), Math.abs(this._corkscrewNet));
+      this._heliHeld = !!input.heli || !!input.corkscrew;
 
       this._emitRotations(tricks, this._tiltNet, '_tiltDone', 'backflip', 'frontflip', airtime);
       this._emitRotations(tricks, this._heliNet, '_heliDone', 'helicopterCCW', 'helicopterCW', airtime);
+      this._emitRotations(tricks, this._corkscrewNet, '_corkscrewDone', 'corkscrew', 'corkscrew', airtime);
 
       if (input.airBrake) this._brakeMs += dt;
       if (input.parachute) this._chuteMs += dt;
@@ -230,6 +243,7 @@ export class TrickTracker {
         // a rotation completed on the touchdown frame still counts
         this._emitRotations(tricks, this._tiltNet, '_tiltDone', 'backflip', 'frontflip', airtime);
         this._emitRotations(tricks, this._heliNet, '_heliDone', 'helicopterCCW', 'helicopterCW', airtime);
+        this._emitRotations(tricks, this._corkscrewNet, '_corkscrewDone', 'corkscrew', 'corkscrew', airtime);
         landing = this._makeLanding(state, angle, t, false);
         landing.rotationDeg = rot;
       } else {
@@ -251,6 +265,8 @@ export class TrickTracker {
     this._heliNet = 0;
     this._tiltDone = 0;
     this._heliDone = 0;
+    this._corkscrewNet = 0;
+    this._corkscrewDone = 0;
     this._brakeMs = 0;
     this._chuteMs = 0;
     this._brakeDone = false;
@@ -266,11 +282,18 @@ export class TrickTracker {
   _accumulate(angle, heli, input) {
     const delta = angle - this._prevAngle;
     if (heli != null) {
-      this._tiltNet += delta;
       let hd = this._prevHeli != null ? heli - this._prevHeli : 0;
       if (Math.abs(hd) > 720) hd = 0; // the drawing's phase was re-based
-      this._heliNet += hd;
-    } else if (input.heli) this._heliNet += delta;
+      if (input.corkscrew) {
+        // A composite pitch+yaw maneuver: only the corkscrew bucket scores its
+        // yaw, preventing a single hold from double-scoring helis and flips.
+        this._corkscrewNet += hd;
+      } else {
+        this._tiltNet += delta;
+        this._heliNet += hd;
+      }
+    } else if (input.corkscrew) this._corkscrewNet += delta;
+    else if (input.heli) this._heliNet += delta;
     else this._tiltNet += delta;
   }
 
@@ -297,13 +320,15 @@ export class TrickTracker {
     const impact = Math.max(0, -vx * Math.sin(th) + vy * Math.cos(th));
     // residual visual coast / a key nudge is not an unfinished spin: needs a real spin attempt or the key still down
     // _heliMax is only updated in the airborne branch, so fold in the touchdown frame's own spin
-    const spunDeg = Math.max(this._heliMax, Math.abs(this._heliNet));
+    const spunDeg = Math.max(this._heliMax, Math.abs(this._heliNet), Math.abs(this._corkscrewNet));
     const coast = typeof state.midSpin === 'number' && !this._heliHeld && spunDeg < MID_SPIN_MIN_DEG;
-    const midSpin = !coast && isMidSpin(state.midSpin);
-    let { quality, hard } = classifyLanding(diff, impact, midSpin);
-    // report the penalty only when it actually lowered a clean grade (a sloppy or crash grade has nothing to lose)
+    const yaw = !coast && typeof state.midSpin === 'number' ? state.midSpin : 0;
+    const yawAttempt = !coast && (spunDeg >= MID_SPIN_MIN_DEG || this._heliHeld);
+    const heliPhase = typeof state.midSpin === "boolean" ? state.midSpin : yawAttempt ? yaw : 0;
+    let { quality, hard } = classifyLanding(diff, impact, heliPhase);
+    // Report whether yaw actually degraded the pitch-only landing.
     const base = classifyLanding(diff, impact, false).quality;
-    const penalised = midSpin && (base === 'perfect' || base === 'good') && quality !== base;
+    const penalised = quality !== base;
     if (crashFrame) {
       quality = 'crash';
       hard = true;
@@ -320,4 +345,4 @@ export class TrickTracker {
   }
 }
 
-const NO_INPUT = Object.freeze({ heli: 0, airBrake: false, parachute: false });
+const NO_INPUT = Object.freeze({ heli: 0, corkscrew: false, airBrake: false, parachute: false });

@@ -19,6 +19,7 @@
 import { VirtualPad, emptyPadState } from './VirtualPad.js';
 import { EVT } from '../events.js';
 import { getPaletteCss } from '../ui/Palette.js';
+import { layoutButton } from './ControlLayouts.js';
 
 /** Keyboard bindings by KeyboardEvent.code: pad button name and INPUT_ACTION names. */
 const KEYMAP = {
@@ -86,6 +87,7 @@ export class InputRouter {
     this.runActive = false;
     /** @type {Set<string>} KeyboardEvent.code currently held. */
     this.keysDown = new Set();
+    this._activeKeyBindings = new Map();
     /** @type {Object<string,boolean>} previous gamepad binding states. */
     this.gpPrev = {};
     this.gpConnected = false;
@@ -115,9 +117,9 @@ export class InputRouter {
     const ev = this.game && this.game.events;
     if (ev) {
       this._onGame('prestep', this._tickBound);
-      this._onGame(EVT.RUN_START, () => { this.runActive = true; this.pad.setOverlayContext(true); });
-      this._onGame(EVT.RUN_END, () => { this.runActive = false; this.pad.setOverlayContext(false); });
-      this._onGame(EVT.RUN_ABORT, () => { this.runActive = false; this.pad.setOverlayContext(false); });
+      this._onGame(EVT.RUN_START, () => { this._releaseKeyboard(); this.runActive = true; this.pad.setOverlayContext(true); });
+      this._onGame(EVT.RUN_END, () => { this._releaseKeyboard(); this.runActive = false; this.pad.setOverlayContext(false); });
+      this._onGame(EVT.RUN_ABORT, () => { this._releaseKeyboard(); this.runActive = false; this.pad.setOverlayContext(false); });
       this._onGame(EVT.GAME_PAUSE, () => this.pad.setOverlayContext(false));
       this._onGame(EVT.GAME_RESUME, () => this.pad.setOverlayContext(this.runActive));
       this._onGame(EVT.SETTINGS_CHANGED, (p) => { if (p && p.settings) this.applySettings(p.settings); });
@@ -141,12 +143,20 @@ export class InputRouter {
 
   // ---------------------------------------------------------------------------------------------------------- keyboard
 
+  /** Gameplay rebinding NEVER changes the menu's logical directional/NOTES actions. */
+  _binding(code) {
+    const old = KEYMAP[code];
+    if (!old || !this.runActive || !this.settings) return old;
+    const override = layoutButton(this.settings.controlLayout, code);
+    return override === undefined ? old : { ...old, pad: override };
+  }
+
   _onKeyDown(e) {
     if (this._destroyed) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return; // keep browser shortcuts working
     if (isEditable(e.target)) return;
     const code = e.code;
-    const b = KEYMAP[code];
+    const b = this._binding(code);
     if (PREVENT.has(code)) e.preventDefault();
     if (!b) {
       if (!e.repeat && code) this._emit('anyKey', true, 'keyboard');
@@ -157,6 +167,7 @@ export class InputRouter {
       return;
     }
     this.keysDown.add(code);
+    this._activeKeyBindings.set(code, b);
     if (b.pad) this.pad.setButton(b.pad, true, 'keyboard');
     if (b.confirm) this.pad.setButton('confirm', true, 'keyboard');
     for (const a of b.actions) this._emit(a, true, 'keyboard');
@@ -166,13 +177,14 @@ export class InputRouter {
   _onKeyUp(e) {
     if (this._destroyed) return;
     const code = e.code;
-    const b = KEYMAP[code];
+    const b = this._activeKeyBindings.get(code) || KEYMAP[code];
     if (PREVENT.has(code) && !isEditable(e.target)) e.preventDefault();
     if (!b || !this.keysDown.has(code)) return;
     this.keysDown.delete(code);
+    this._activeKeyBindings.delete(code);
     if (b.pad) {
       // another physical key may still hold the same pad button (e.g. both Shift keys)
-      const still = Object.keys(KEYMAP).some((k) => this.keysDown.has(k) && KEYMAP[k].pad === b.pad);
+      const still = [...this._activeKeyBindings.entries()].some(([k, other]) => this.keysDown.has(k) && other.pad === b.pad);
       if (!still) this.pad.setButton(b.pad, false, 'keyboard');
     }
     if (b.confirm) this.pad.setButton('confirm', false, 'keyboard');
@@ -181,10 +193,11 @@ export class InputRouter {
 
   _releaseKeyboard() {
     for (const code of [...this.keysDown]) {
-      const b = KEYMAP[code];
+      const b = this._activeKeyBindings.get(code) || KEYMAP[code];
       if (b) for (const a of b.actions) this._emit(a, false, 'keyboard');
     }
     this.keysDown.clear();
+    this._activeKeyBindings.clear();
     this.pad.releaseSource('keyboard');
   }
 
@@ -313,6 +326,7 @@ export class InputRouter {
    */
   applySettings(settings) {
     if (this._destroyed || !settings) return;
+    if (this.settings && this.settings.controlLayout !== settings.controlLayout) this._releaseKeyboard();
     this.settings = settings;
     try {
       const canvas = this.game && this.game.canvas;

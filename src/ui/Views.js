@@ -193,7 +193,7 @@ export class LeaderboardView extends View {
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
   constructor(scene, theme, o) {
-    super(scene, theme, { w: 360, h: 190, title: 'SETTINGS',
+    super(scene, theme, { w: 360, h: 200, title: 'SETTINGS',
       color: 'amber', onClose: o.onClose, y: 40, backLabel: 'DONE' });
     this.soundView=null;
     const game=scene.game;
@@ -213,6 +213,13 @@ export class SettingsView extends View {
         set:v=>updateSetting(game,'sfxVolume',v)},
       {kind:'slider',label:'SLED WIND',get:()=>settings().windVolume??1,
         set:v=>updateSetting(game,'windVolume',v)},
+      {kind:'choice',label:'WIND',options:[
+        {value:true,label:'ON'},{value:false,label:'OFF'}],
+        get:()=>settings().windEnabled!==false,set:v=>updateSetting(game,'windEnabled',v)},
+      {kind:'choice',label:'CONTROLS',options:[
+        {value:'tricksRight',label:'TRICKS RIGHT'},{value:'tricksLeft',label:'TRICKS LEFT'},
+        {value:'classic',label:'CLASSIC'}],
+        get:()=>settings().controlLayout||'tricksRight',set:v=>updateSetting(game,'controlLayout',v)},
       {kind:'action',label:'MANAGE SOUND',color:'cyan',sub:'SONGS / VOCALS / LAB',
         onSelect:()=>this._openSoundManager()},
       {kind:'choice',label:'TILT CONTROLS (90)',options:[
@@ -222,7 +229,7 @@ export class SettingsView extends View {
         {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
         get:()=>settings().touchOverlay||'auto',set:v=>updateSetting(game,'touchOverlay',v)},
     ];
-    this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:16,
+    this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:14,
       items,color:'amber',parent:this.panel});
     this.swatch=scene.add.graphics();
     this.panel.add(this.swatch);

@@ -35,7 +35,7 @@ export const HUD_SPEED_EVENT = 'bb:hudSpeed';
 
 const TRICK_NAMES = {
   backflip: 'BACKFLIP', frontflip: 'FRONTFLIP', helicopterCCW: 'HELI CCW', helicopterCW: 'HELI CW',
-  airBrake: 'AIR BRAKE', parachute: 'PARACHUTE',
+  airBrake: 'AIR BRAKE', parachute: 'PARACHUTE', corkscrew: 'CORKSCREW',
 };
 const ZONE_INFO = {
   highBandwidth: { name: 'HIGH BANDWIDTH', sub: 'LOW FRICTION', color: 'cyan' },

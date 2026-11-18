@@ -102,7 +102,7 @@ export const PHYSICS = Object.freeze({
   pushMinSlopeDeg: -5, // ...and when slope >= -5 degrees
   airBrakeDecel: 0.25, // up arrow: -25% horizontal speed
   parachuteGravityMul: 0.5, // down arrow
-  parachuteDurationMs: 800,
+  parachuteDurationMs: 880, // +10%; hold-to-spend shared reservoir each jump
   slowFactor: 0.5, // 'slow' hazard default speed multiplier
   scrambleDurationMs: 2000, // 'scramble' hazard default duration
 });
@@ -144,6 +144,7 @@ export const SCORING = Object.freeze({
     frontflip: 100,
     helicopterCCW: 80,
     helicopterCW: 80,
+    corkscrew: 135, // composite pitch+yaw: harder than a helicopter
     airBrake: 40,
     parachute: 40,
   }),
@@ -155,6 +156,7 @@ export const TRICK_TYPES = Object.freeze([
   'frontflip',
   'helicopterCCW',
   'helicopterCW',
+  'corkscrew',
   'airBrake',
   'parachute',
 ]);

@@ -1497,3 +1497,77 @@ bouncySpring touchdown restitution.
 - **From the cutover:** a 15-day cycle `[32,0,64,0,128,0,256,0,512,1024,1,2,4,8,16]`, indexed by days since the cutover.
 
 `infoForDateKey` and the DAILY RUN button go through the same function, so the official check on a record still compares it against the mask its own date had. Changing the rotation again means a new cutover date. Never edit a cycle in place, or past dates change mask.
+
+
+## v2.16 in-progress: BSOD gameplay authority / audio handoff
+
+RunScene owns a pure BsodPursuit controller and emits EVT.BSOD_STATE_CHANGED on the global
+scene.game.events emitter after physics substeps are resolved. ONE payload object per event,
+with no audio callback or dependency from simulation. BSOD collision is from the
+wall's leading/rightmost edge X to the compound Matter sled body's bounds.min.x;
+signed gapPx = sledLeftEdgeX - wallX, zero = contact. World X is increasing forward.
+The wall advances during each bounded <=8ms Matter step; it ignores shields and
+opening/invulnerability grace. Deactivation emits a full inactive payload on run
+termination/teardown. timeToImpactMs is a closing-speed estimate, never a death timer.
+
+Payload: active, gapPx, wallSpeedPxS, worldTailwindPxS, sledVelocityXPxS,
+relativeAirX, proximity01, timeToImpactMs, atmosphereDensity. Space Mountain
+forces atmosphereDensity 0 and zero wind, although the wall still collides.
+The player sees a camera easing toward the approaching BSOD and a wind-direction pom-pom.
+The audio/music team should subscribe read-only; their setSpeed() music-intensity
+contract remains untouched. Physically applying the new wind to parachute/airbrake
+and balancing infinite high-risk flights are separate follow-up stages.
+
+Settings: windEnabled default true is additive to already-shipped windVolume. Controls branch
+owns SaveStore persistence and SettingsView toggle; music team owns consumption in
+AudioSynth, so do not claim muting is functional before its audio-side change lands.
+
+## v2.16 in-progress: atmospheric effects (separate gameplay slice)
+
+Sled.applyControls accepts an optional authoritative BSOD state snapshot. A pure
+BsodAerodynamics module applies signed wind-driven canopy propulsion, mild canopy
+lift and speed-dependent airbrake lift. PHYSICS.parachuteDurationMs is 880ms,
+consumed only while held airborne, preserved between releases and refilled on
+landing or externally launched new flight. PhysicsTuner gates parachute and
+airbrake gravity effects by atmospheric density; Space Mountain nulls both.
+These numerical coefficients are provisional pending arcade playtesting.
+No music source or audio rendering has been modified.
+
+## v2.16 in-progress: asymmetric landings / predictable flip speed
+
+TrickTracker.classifyLanding now accepts pitch bands [-22,+12] perfect,
+[-38,+28] good and [-65,+55] sloppy (hard impacts still crash).
+Numeric helicopter phase is graded independently at 40/75/120 degrees;
+a backwards touchdown beyond 120 is a crash. The boolean legacy
+midSpin indicator retains its original one-grade penalty contract for
+older callers. Airborne tilt follows a 680deg/s target at 1300deg/s^2
+rather than accumulating acceleration all the way to the old 900deg/s cap.
+Values require player feel and high-speed replay validation.
+
+## v2.16 in progress: Trick Deck control layouts (2026-11-18)
+
+Saved `controlLayout` defaults to `tricksRight`; alternatives `tricksLeft`,
+`classic`. Keyboard remapping is applied by InputRouter **only while
+runActive**. Logical INPUT_ACTION events (up/down/left/right, N shortcut,
+pause/cancel/confirm) remain unchanged in all menus. Layout changes release
+stale held keyboard buttons before rebinding; touch overlays replace unused
+push and reverse-helicopter controls with divebomb/corkscrew in Trick Deck,
+but Classic retains the original overlay. No gamepad remapping yet.
+
+Default Tricks Right: ArrowUp frontflip, ArrowDown backflip, ArrowRight
+helicopter, ArrowLeft corkscrew; W parachute, A airbrake (ground brake),
+S divebomb, D tuck; Space hop. Tricks Left swaps WASD and arrows by role.
+Classic retains original WASD/arrow mapping. Corkscrew is a **separately
+tracked compound yaw+pitch trick**, not a renamed reverse helicopter;
+rotation is charged to corkscrew without simultaneous free flip/heli score.
+Corkscrew earns its own 135-point base trick but does not increment the established
+x2 maximum combo multiplier, preserving existing mission/achievement math.
+
+Airborne Space hop: held input retains preexisting maximum ascent, releasing
+it truncates the *player's own* launch only after 150ms of effective hold,
+with no artificial taller maximum; spring/geyser launches must not be
+truncated by releasing Space. New layouts disable legacy auto-stall-nudge
+and manual push; airbrake is the grounded brake. Divebomb adds downward
+velocity acceleration without reducing horizontal speed at baseline;
+initial numeric tuning is provisional. RunScene owns gameplay state and
+Settings controls; audio files belong to Music Friday's separate branch.

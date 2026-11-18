@@ -12,6 +12,7 @@ import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
 import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyserStep } from '../systems/PhysicsTuner.js';
 import { springReboundVelocity } from '../systems/BiomeEffects.js';
+import { aerodynamicStep, canopyFuelStep } from '../systems/BsodAerodynamics.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -57,12 +58,16 @@ export class Sled {
     this.groundAngleDeg = 0;
     this.airtimeMs = 0;
     this.hopBufferMs = 0;
+    this._playerHopActive = false;
+    this._playerHopElapsedMs = 0;
     this.pushCooldownMs = 0;
     this.parachuteMs = 0;
+    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
     this.chuteUsed = false;
     this.tucked = false;
     this.airBrakeActive = false;
     this.heliInput = 0;
+    this.corkscrewActive = false;
     this.heliPhase = 0; // degrees, visual only
     this.heliVel = 0;
     this.shield = false;
@@ -156,6 +161,7 @@ export class Sled {
     if (this._contactFlag) {
       if (this.msSinceContact >= TUNING.groundedGraceMs) {
         this.chuteUsed = false; // freshly landed
+        this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
         this._landSettleMs = TUNING.landSettleMs;
         this.touchdownVx = this._preVx;
         this.touchdownVy = this._preVy;
@@ -183,7 +189,7 @@ export class Sled {
    * @param {number} stepMs
    * @returns {void}
    */
-  applyControls(pad, phys, stepMs) {
+  applyControls(pad, phys, stepMs, atmosphere = null) {
     if (this.destroyed || !this.inWorld) return;
     const dt = stepMs / 1000;
     const b = this.body;
@@ -196,20 +202,21 @@ export class Sled {
     // ---- one-shot edges (only on the first sub-step of a frame) ----
     if (firstOfFrame) {
       if (pressed.hop) this.hopBufferMs = TUNING.hopBufferMs;
-      if (pressed.parachute && !grounded && !this.chuteUsed) {
-        this.parachuteMs = PHYSICS.parachuteDurationMs;
-        this.chuteUsed = true;
-      }
-      this.heliInput = (pad && pad.heli) || 0;
+      // Parachute uses continuous hold input, not a one-shot pulse. Fuel is shared
+      // between every deployment in this flight and restored on actual touchdown.
+      this.heliInput = (pad && (pad.heli || (pad.corkscrew && !grounded ? 1 : 0))) || 0;
     }
     this.hopBufferMs = Math.max(0, this.hopBufferMs - stepMs);
     this.pushCooldownMs = Math.max(0, this.pushCooldownMs - stepMs);
     this.geyserCooldownMs = Math.max(0, (this.geyserCooldownMs || 0) - stepMs);
     this.invulnerableMs = Math.max(0, this.invulnerableMs - stepMs);
-    if (this.parachuteMs > 0) this.parachuteMs = Math.max(0, this.parachuteMs - stepMs);
-    if (grounded) this.parachuteMs = 0;
-    const chute = this.parachuteMs > 0;
+    const fuel = canopyFuelStep(this.parachuteFuelMs, !!(pad && pad.parachute), !grounded, stepMs, PHYSICS.parachuteDurationMs);
+    this.parachuteFuelMs = fuel.fuelMs;
+    const chute = fuel.deployed;
+    this.parachuteMs = chute ? Math.max(0.001, this.parachuteFuelMs) : 0;
+    if (chute) this.chuteUsed = true;
     this.airBrakeActive = !!(pad && pad.airBrake) && !grounded;
+    this.corkscrewActive = !!(pad && pad.corkscrew) && !grounded;
     this.tucked = !!(pad && pad.tuck);
 
     // ---- world / body tunables ----
@@ -245,11 +252,24 @@ export class Sled {
     }
     // air brake (Up): -25 % horizontal speed over airBrakeSpanMs, reduced descent
     if (this.airBrakeActive) {
-      vx *= Math.exp((Math.log(1 - PHYSICS.airBrakeDecel) * stepMs) / TUNING.airBrakeSpanMs);
-      if (vy > 0) vy *= Math.exp(-TUNING.airBrakeDescentDamp * dt);
+      const density = atmosphere ? atmosphere.atmosphereDensity : 1;
+      vx *= Math.exp((Math.log(1 - PHYSICS.airBrakeDecel) * stepMs * density) / TUNING.airBrakeSpanMs);
+      if (vy > 0) vy *= Math.exp(-TUNING.airBrakeDescentDamp * dt * density);
     }
     // parachute stall: float
-    if (chute && vy > 0) vy *= Math.exp(-1.6 * dt);
+    if (chute && vy > 0 && (!atmosphere || atmosphere.atmosphereDensity > 0)) vy *= Math.exp(-1.6 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1));
+    // Divebomb trades altitude for time, not horizontal momentum. Airflow is required.
+    if (!grounded && pad && pad.divebomb && !chute && !this.airBrakeActive) {
+      vy += TUNING.divebombDownPxS2 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1);
+    }
+    // Deterministic physical BSOD airflow; wind/audio renderers never affect physics.
+    if (!grounded && atmosphere) {
+      const wind = aerodynamicStep({ vx, vy, relativeAirX: atmosphere.relativeAirX,
+        atmosphereDensity: atmosphere.atmosphereDensity, parachute: chute,
+        airBrake: this.airBrakeActive, stepMs });
+      vx += wind.dvx;
+      vy += wind.dvy;
+    }
 
     // push (W): only when nearly stopped on flat / uphill ground
     speed = Math.hypot(vx, vy);
@@ -262,14 +282,17 @@ export class Sled {
       this.pushPulse = 1;
     }
 
-    // stall safety net (see stallNudgeStep): stopped or rolling backwards on non-steep ground with no brake -> gentle auto-push forward
-    const nudge = stallNudgeStep({ crawlMs: this._crawlMs || 0, nudging: !!this._nudging }, {
-      grounded, braking: !!(pad && (pad.brake || pad.airBrake)), slopeDeg: this.groundAngleDeg, vx, vy, stepMs, gravityPxS2: phys.gravityPxS2,
-    });
-    this._crawlMs = nudge.crawlMs;
-    this._nudging = nudge.nudging;
-    vx += nudge.dvx;
-    vy += nudge.dvy;
+    // Classic retains legacy stall assistance; Trick Deck deliberately makes a stall a
+    // recoverable risk via hop + BSOD tailwind + held parachute, without an auto-shove.
+    if (!pad || !pad.noAutoNudge) {
+      const nudge = stallNudgeStep({ crawlMs: this._crawlMs || 0, nudging: !!this._nudging }, {
+        grounded, braking: !!(pad && (pad.brake || pad.airBrake)), slopeDeg: this.groundAngleDeg, vx, vy, stepMs, gravityPxS2: phys.gravityPxS2,
+      });
+      this._crawlMs = nudge.crawlMs;
+      this._nudging = nudge.nudging;
+      vx += nudge.dvx;
+      vy += nudge.dvy;
+    } else { this._crawlMs = 0; this._nudging = false; }
 
     // hop / bump jump (Space) with coyote time and input buffer
     if (this.hopBufferMs > 0 && this.msSinceContact < TUNING.hopCoyoteMs) {
@@ -283,6 +306,17 @@ export class Sled {
       this.msSinceContact = TUNING.groundedGraceMs + 1; // leave the ground immediately
       this.hopPulse = 1;
       this._sinceLaunchMs = 0;
+      this._playerHopActive = !!pad.variableHop;
+      this._playerHopElapsedMs = 0;
+    }
+    if (this._playerHopActive) {
+      this._playerHopElapsedMs += stepMs;
+      if (!pad.hop && this._playerHopElapsedMs >= TUNING.hopMinimumHoldMs) {
+        // Do not add upward height or alter horizontal momentum. Only player's own
+        // Space launch has this cutoff; geyser/spring/rebound impulses do not.
+        if (vy < 0) vy = 0;
+        this._playerHopActive = false;
+      } else if (vy >= 0) this._playerHopActive = false;
     }
 
     // ground snap / crest smoothing: kill the small upward drift off convex crests (see TUNING.snap*)
@@ -330,12 +364,20 @@ export class Sled {
 
     // ---- rotation (rad/s) ----
     let w = (Body.getAngularVelocity(b) * 1000) / BASE_STEP_MS;
-    const tilt = clamp((pad && pad.tilt) || 0, -1, 1) * (phys.tiltSign == null ? 1 : phys.tiltSign)
+    const tilt = clamp(((pad && pad.tilt) || (this.corkscrewActive ? 0.72 : 0)), -1, 1) * (phys.tiltSign == null ? 1 : phys.tiltSign)
       * (phys.steerMul == null ? 1 : phys.steerMul);
     this._lastTilt = tilt;
     const g = this.grounded;
     const torqueDeg = phys.tiltTorqueDegS2 * (g ? TUNING.groundTiltMul : phys.airControl) * tilt;
-    w += torqueDeg * DEG * dt;
+    if (!g && tilt !== 0) {
+      // Continuous flip input approaches a stable angular velocity. Once the
+      // target is reached, holding the button no longer accelerates the flip.
+      const desired = tilt * TUNING.flipTargetDegS * DEG;
+      const step = TUNING.flipAccelDegS2 * DEG * dt;
+      w += clamp(desired - w, -step, step);
+    } else {
+      w += torqueDeg * DEG * dt;
+    }
     if (phys.scrambleJitterDegS2) w += (Math.random() * 2 - 1) * phys.scrambleJitterDegS2 * DEG * dt;
     if (!g && tilt === 0) {
       // hands off: spin bleeds off and the nose eases toward the travel direction, so a pitch-over at a lip does not tumble the sled
@@ -371,7 +413,9 @@ export class Sled {
     Body.setVelocity(this.body, { x: v.x, y: Math.min(v.y, -fromPxS(upPxS)) });
     this.msSinceContact = TUNING.groundedGraceMs + 1;
     this._sinceLaunchMs = 0;
+    this._playerHopActive = false;
     this.chuteUsed = false;
+    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
     this._sync();
   }
 
@@ -393,7 +437,9 @@ export class Sled {
     Body.setVelocity(this.body, { x: fromPxS(next.vx), y: fromPxS(next.vy) });
     this.msSinceContact = TUNING.groundedGraceMs + 1;
     this._sinceLaunchMs = 0;
+    this._playerHopActive = false;
     this.chuteUsed = false;
+    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
     this._sync();
   }
 
@@ -455,6 +501,7 @@ export class Sled {
     this._groundRunMs = 0;
     this._sinceLaunchMs = 0;
     this.parachuteMs = 0;
+    this.parachuteFuelMs = PHYSICS.parachuteDurationMs;
     this.chuteUsed = false;
     this.airtimeMs = 0;
     this._sync();
@@ -496,6 +543,7 @@ export class Sled {
       groundAngleDeg: this.groundAngleDeg,
       input: {
         heli: this.grounded ? 0 : this.heliInput,
+        corkscrew: this.corkscrewActive,
         airBrake: this.airBrakeActive,
         parachute: this.parachuteMs > 0,
       },

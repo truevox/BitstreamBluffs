@@ -86,6 +86,11 @@ export const TUNING = Object.freeze({
    * release added ~100 deg of spin the player could not time; 900 keeps a double flip possible in ~1.4 s of air (see airTiltFeelMul).
    */
   maxAngularVelDegS: 900,
+  /** Held airborne flips approach a stable, controllable rate instead of accelerating forever. */
+  flipTargetDegS: 680,
+  flipAccelDegS2: 1300,
+  hopMinimumHoldMs: 150, // candidate minimum variable-hop ascent
+  divebombDownPxS2: 1400, // atmospheric downward push, no horizontal penalty
   /** Push kick: surface speed set by W when stalled (px/s), and re-trigger delay. */
   pushKickPxS: 90,
   /**
@@ -464,11 +469,12 @@ export class PhysicsTuner {
       speedMul *= daily.tuckSpeedMul || 1;
       steerMul *= daily.tuckSteerMul == null ? 1 : daily.tuckSteerMul;
     }
-    if (ctx.parachute) {
-      gravityMul *= b.parachuteGravityMul;
+    const airDensity = Number.isFinite(ctx.atmosphereDensity) ? Math.max(0, Math.min(1, ctx.atmosphereDensity)) : 1;
+    if (ctx.parachute && airDensity > 0) {
+      gravityMul *= 1 - (1 - b.parachuteGravityMul) * airDensity;
       steerMul = 0;
-    } else if (ctx.airBrake) {
-      gravityMul *= t.airBrakeGravityMul;
+    } else if (ctx.airBrake && airDensity > 0) {
+      gravityMul *= 1 - (1 - t.airBrakeGravityMul) * airDensity;
     }
 
     let tiltSign = 1;

@@ -21,6 +21,8 @@
 export const EVT = Object.freeze({
   /** Emitter: RunScene. Payload: RunStartPayload. */
   RUN_START: 'bb:runStart',
+  /** Emitter: RunScene after physics resolution. Exactly one BsodStatePayload snapshot. */
+  BSOD_STATE_CHANGED: 'bb:bsodStateChanged',
   /** Emitter: RunScene (after crash, once). Payload: RunEndPayload. */
   RUN_END: 'bb:runEnd',
   /** Emitter: PauseScene when player quits to title. Payload: RunAbortPayload. */
@@ -90,6 +92,19 @@ export const EVT = Object.freeze({
   /** W2: a mission's target was met mid-run (payload {id,title,xp,shards}). Additive. */
   MISSION_COMPLETED: 'bb:missionCompleted',
 });
+
+/**
+ * @typedef {Object} BsodStatePayload
+ * @property {boolean} active whether the physical chase is running.
+ * @property {number|null} gapPx signed distance in px: sled Matter body's leftmost bounds.min.x minus the BSOD's rightmost/front collision edge X. Zero means contact. Null when inactive.
+ * @property {number} wallSpeedPxS nonnegative world-X BSOD wall speed.
+ * @property {number} worldTailwindPxS world-X air speed (0 in vacuum).
+ * @property {number} sledVelocityXPxS signed world-X sled velocity, never scalar speed.
+ * @property {number} relativeAirX worldTailwindPxS - sledVelocityXPxS, zero in vacuum.
+ * @property {number} proximity01 normalized physical danger, from 0 to 1.
+ * @property {number|null} timeToImpactMs instantaneous time to contact, null when nonclosing/indeterminate. Not a guaranteed death timer.
+ * @property {number} atmosphereDensity aerodynamic coupling from 0 (vacuum) to 1.
+ */
 
 /**
  * @typedef {Object} LandingBoostPayload
@@ -176,7 +191,7 @@ export const EVT = Object.freeze({
 
 /**
  * @typedef {Object} CrashPayload
- * @property {'hazard'|'terrain'|'badLanding'|'chasm'} cause
+ * @property {'hazard'|'terrain'|'badLanding'|'chasm'|'bsod'} cause
  * @property {number} x           world px.
  * @property {number} y           world px.
  * @property {number} speedPxS    sled speed at impact, px/s.
@@ -214,7 +229,7 @@ export const EVT = Object.freeze({
 
 /**
  * @typedef {Object} TrickPayload
- * @property {'backflip'|'frontflip'|'helicopterCCW'|'helicopterCW'|'airBrake'|'parachute'} type
+ * @property {'backflip'|'frontflip'|'helicopterCCW'|'helicopterCW'|'corkscrew'|'airBrake'|'parachute'} type
  * @property {number} count        completed repetitions inside this event (e.g. 2 for a double flip).
  * @property {number} value        provisional (unbanked) points for this trick, before combo multiplier.
  * @property {boolean} isNew       true if this trick type is new in the current combo (raised the multiplier).
