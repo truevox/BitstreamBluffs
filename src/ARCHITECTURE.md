@@ -1929,3 +1929,44 @@ speeds, full-song auditory quality, or fairness of the trial Gym price.
 No human approval for these trial parameters is implied. Music Friday's
 separate branch (including subsequent music-only updates) remains
 untouched. `main` remains unmerged.
+
+
+## 2026-11-18 — Marvin selects actual player upgrades in the Gym
+
+**Direct owner decisions (Marvin, 2026-11-18):** The BSOD Gym should use
+**the player's own upgrades**, not normalized gear. The initial **200-shard**
+Gym purchase price is acceptable **for now**. The earned canopy recharge
+balance sounds plausible but is **not frozen**; it still needs playtesting.
+This resolves Astra Friday's open normalized-versus-player-equipment
+question in favor of actual user equipment, with no more input needed.
+
+**Gal Friday implementation, separate from those owner decisions:** The
+existing `upgradeLoadoutForRun(profile)` continues to gate purchased
+ranks behind Upgrade Mode; buying a rank does not turn that mode ON.
+Physical speed, hop, flips, airbrake, divebomb and all other upgrade
+multipliers were already used by the Gym's regular PhysicsTuner context.
+However, Gym creation **overrode** two purchased benefits with fixed
+practice values: canopyFuelFullMs = 1500 and wall acceleration = 0.65.
+These now come from `gymChaseForLoadout(upgradeFx)`, preserving the
+Gym's extra-forgiving *base* (1,500ms canopy, 0.65px/s² BSOD acceleration)
+while applying the exact enabled Parachute Fuel multiplier and BSOD Head
+Start acceleration reduction from the player's normal upgrade snapshot.
+Both starting session and Gym contact retries use this same frozen
+snapshot; none of this affects regular or official Daily run tuning.
+This does **not** change the Gym's provisional extra recharge
+(`0.68 * full / sqrt(chain)`) or the separate normal-run rank-12
+earned refill. The price constant remains 200. No sound file, music
+effect or UI spoiler text is touched.
+
+**Verification (engineer-run, not owner human balance approval):** Pure
+unit regressions assert default, bought-but-disabled, enabled ranks and
+official Daily's clean loadout; invalid multipliers cannot cause a
+zero-speed or infinite-fuel Gym. Chromium actual-run regressions inspect
+the real initialized RunScene and subsequent real BSOD catch, with
+independent profiles at no purchased ranks, purchased-but-disabled
+ranks, enabled moderate ranks, and enabled high ranks. After catch the
+Gym keeps those exact fuel and wall-acceleration coefficients, remains
+non-ranked, and has no profile-bank, lifetime-stat, or run-record write.
+The 200-shard Gym price is deliberately left subject to future playtest
+judgment. Site instructional pages still reveal no Surfing the Void
+instructions or pre-discovery Gym hint.

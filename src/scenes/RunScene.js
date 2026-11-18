@@ -62,7 +62,7 @@ import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
-import { GYM_CHASE } from '../systems/BsodGym.js';
+import { GYM_CHASE, gymChaseForLoadout } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
 const DEG = Math.PI / 180;
@@ -176,6 +176,9 @@ export class RunScene extends Phaser.Scene {
     // Permanent upgrades are opt-in, frozen for the run, and never applied to official Dailies.
     this.upgradeRun = upgradeLoadoutForRun(prof, { daily: this.dailyOfficial });
     this.upgradeFx = this.upgradeRun.effects;
+    // The Gym uses the player's chosen, enabled upgrades—not a normalized
+    // loadout. Its gentler base chase is scaled by canopy/grace upgrades.
+    this.gymChase = this.bsodGym ? gymChaseForLoadout(this.upgradeFx) : null;
     this.dailyMods = (daily && daily.rule && daily.rule.modifiers) || {};
 
     // pure systems
@@ -308,11 +311,11 @@ export class RunScene extends Phaser.Scene {
     }
     if (this.boostFx.speedFactor !== 1) this.sled.scaleVelocity(this.boostFx.speedFactor);
     // Authoritative physical chase: gap is from the wall's leading edge to the compound sled body left bound.
-    this.sled.canopyFuelFullMs = this.bsodGym ? GYM_CHASE.parachuteFuelMs
+    this.sled.canopyFuelFullMs = this.bsodGym ? this.gymChase.parachuteFuelMs
       : PHYSICS.parachuteDurationMs * this.upgradeFx.canopyFuelMul;
     this.sled.parachuteFuelMs = this.sled.canopyFuelFullMs;
     this.bsod = new BsodPursuit({ sledLeftEdgeX: sledLeftCollisionEdge(this.sled), level: this.bsodGym ? 1 : prof.level,
-      config: this.bsodGym ? { ...BSOD_DEFAULTS, ...GYM_CHASE }
+      config: this.bsodGym ? { ...BSOD_DEFAULTS, ...this.gymChase }
         : { ...BSOD_DEFAULTS, accelerationPxS2: BSOD_DEFAULTS.accelerationPxS2 * this.upgradeFx.bsodAccelerationMul } });
     this.bsodState = this.bsod.state(sledLeftCollisionEdge(this.sled), this.sled.vx, 1);
     this.bsodCaught = false;
@@ -1726,8 +1729,8 @@ export class RunScene extends Phaser.Scene {
     this.blinkMs = 0;
     this.clearTemporaryEffects('gym-retry');
     this.bsod.wallX = sledLeftCollisionEdge(sled) - GYM_CHASE.respawnGapPx;
-    this.bsod.wallSpeedPxS = GYM_CHASE.initialSpeedPxS;
-    this.bsod.accelerationPxS2 = GYM_CHASE.accelerationPxS2;
+    this.bsod.wallSpeedPxS = (this.gymChase || GYM_CHASE).initialSpeedPxS;
+    this.bsod.accelerationPxS2 = (this.gymChase || GYM_CHASE).accelerationPxS2;
     this.bsodBluffs?.reset?.();
     this._airTricks = 0;
     this._landings = 0;

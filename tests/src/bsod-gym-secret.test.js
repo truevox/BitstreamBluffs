@@ -1,7 +1,8 @@
 import { jest } from '@jest/globals';
 import { ProfileStore, sanitizeProfile } from '../../src/systems/ProfileStore.js';
-import { BSOD_GYM_PRICE, gymVisible, gymOwned, GYM_CHASE } from '../../src/systems/BsodGym.js';
+import { BSOD_GYM_PRICE, gymVisible, gymOwned, GYM_CHASE, gymChaseForLoadout } from '../../src/systems/BsodGym.js';
 import { BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
+import { upgradeLoadoutForRun } from '../../src/systems/PermanentUpgrades.js';
 import { BsodPursuit } from '../../src/systems/BsodPursuit.js';
 import { upgradeShopLayout } from '../../src/ui/ShopLayout.js';
 import { EVT } from '../../src/events.js';
@@ -44,6 +45,31 @@ function scoreBluff(r){
  r.bsodState.gapPx=455;r.runTimeMs=850;r.sled.x+=320;r.updateBsodBluff();
 }
 describe('Secret BSOD Gym discovery, shop and practice state',()=>{
+ test('Gym price is the Marvin-approved 200-shard trial price; no implicit unlock',()=>{
+   expect(BSOD_GYM_PRICE).toBe(200);
+ });
+ test('enabled purchased canopy and BSOD Head Start scale the practice baseline',()=>{
+   const profile={upgradesEnabled:true,upgrades:{canopy:12,bsodGrace:15,speed:8,hop:6}};
+   const actual=upgradeLoadoutForRun(profile);
+   expect(actual.enabled).toBe(true);
+   const chase=gymChaseForLoadout(actual.effects);
+   expect(chase.parachuteFuelMs).toBeCloseTo(GYM_CHASE.parachuteFuelMs*actual.effects.canopyFuelMul);
+   expect(chase.accelerationPxS2).toBeCloseTo(GYM_CHASE.accelerationPxS2*actual.effects.bsodAccelerationMul);
+   expect(chase.parachuteFuelMs).toBeGreaterThan(GYM_CHASE.parachuteFuelMs);
+   expect(chase.accelerationPxS2).toBeLessThan(GYM_CHASE.accelerationPxS2);
+   expect(chase.earnedRechargeFraction).toBe(GYM_CHASE.earnedRechargeFraction);
+   expect(chase.initialGapPx).toBe(GYM_CHASE.initialGapPx);
+   expect(chase.initialSpeedPxS).toBe(GYM_CHASE.initialSpeedPxS);
+   // Turning UPGRADE MODE off—even if purchased—must remove those benefits.
+   const disabled=upgradeLoadoutForRun({...profile,upgradesEnabled:false});
+   expect(disabled.enabled).toBe(false);
+   expect(gymChaseForLoadout(disabled.effects)).toEqual(GYM_CHASE);
+   expect(gymChaseForLoadout(upgradeLoadoutForRun(profile,{daily:true}).effects)).toEqual(GYM_CHASE);
+ });
+ test('invalid/infinite chase coefficients cannot turn the Gym into a zero-speed exploit',()=>{
+   expect(gymChaseForLoadout({canopyFuelMul:Infinity,bsodAccelerationMul:0})).toEqual(GYM_CHASE);
+   expect(gymChaseForLoadout({canopyFuelMul:-1,bsodAccelerationMul:NaN})).toEqual(GYM_CHASE);
+ });
  test('Gym is absent by default, never accidentally revealed by purchasing a canopy rank',()=>{
   const {s}=store();
   expect(s.profile.bsodGym).toEqual({discovered:false,owned:false});
