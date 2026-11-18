@@ -15,6 +15,7 @@ import { STORAGE } from '../constants.js';
 import { defaultSongSelection, sanitizeSongSelection } from './music/MusicPlaylist.js';
 import { xxHash32 } from './Rng.js';
 import { DailyPatch } from './DailyPatch.js';
+import { DEFAULT_CONTROL_LAYOUT, normalizeControlLayout } from './ControlLayouts.js';
 import { isRankable, isModdedOnly, countsForDailyBest, countsForStreak } from './Ranking.js';
 
 /**
@@ -23,7 +24,9 @@ import { isRankable, isModdedOnly, countsForDailyBest, countsForStreak } from '.
  * @property {number} masterVolume       0..1
  * @property {number} musicVolume        0..1
  * @property {number} sfxVolume
- * @property {boolean} windEnabled  true unless explicitly disabled; physical BSOD wind remains active.          0..1
+ * @property {number} windVolume   0..1
+ * @property {boolean} windEnabled  false mutes wind audio but not wind forces.
+ * @property {'tricksRight'|'tricksLeft'|'classic'} controlLayout
  * @property {Object<string,boolean>} musicEnabledSongs   Per-song switches. All false = silence.
  * @property {boolean} dynamicOrchestra  OFF: original instrumental stems with full FX; ON: separately rendered replacement instruments.
  * @property {boolean} screenShake       false disables shake (accessibility).
@@ -65,7 +68,7 @@ const IDB_TIMEOUT_MS = 2500;
 export function defaultSettings() {
   return {
     version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, windVolume: 1, windEnabled: true, screenShake: true,
-    palette: 'default', touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
+    palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
     dynamicOrchestra: false,
     musicVocals: false,
@@ -97,6 +100,7 @@ export function sanitizeSettings(raw) {
     windEnabled: typeof raw.windEnabled === 'boolean' ? raw.windEnabled : d.windEnabled,
     screenShake: typeof raw.screenShake === 'boolean' ? raw.screenShake : d.screenShake,
     palette: raw.palette === 'colorblind' || raw.palette === 'default' ? raw.palette : d.palette,
+    controlLayout: normalizeControlLayout(raw.controlLayout),
     touchOverlay: ['auto', 'on', 'off'].includes(raw.touchOverlay) ? raw.touchOverlay : d.touchOverlay,
     touchRotate90: typeof raw.touchRotate90 === 'boolean' ? raw.touchRotate90 : d.touchRotate90,
     lastInitials: str(raw.lastInitials).slice(0, INITIALS_MAX),

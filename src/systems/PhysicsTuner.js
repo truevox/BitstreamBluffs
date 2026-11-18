@@ -89,6 +89,8 @@ export const TUNING = Object.freeze({
   /** Held airborne flips approach a stable, controllable rate instead of accelerating forever. */
   flipTargetDegS: 680,
   flipAccelDegS2: 1300,
+  hopMinimumHoldMs: 150, // candidate minimum variable-hop ascent
+  divebombDownPxS2: 1400, // atmospheric downward push, no horizontal penalty
   /** Push kick: surface speed set by W when stalled (px/s), and re-trigger delay. */
   pushKickPxS: 90,
   /**

@@ -216,6 +216,10 @@ export class SettingsView extends View {
       {kind:'choice',label:'WIND',options:[
         {value:true,label:'ON'},{value:false,label:'OFF'}],
         get:()=>settings().windEnabled!==false,set:v=>updateSetting(game,'windEnabled',v)},
+      {kind:'choice',label:'CONTROLS',options:[
+        {value:'tricksRight',label:'TRICKS RIGHT'},{value:'tricksLeft',label:'TRICKS LEFT'},
+        {value:'classic',label:'CLASSIC'}],
+        get:()=>settings().controlLayout||'tricksRight',set:v=>updateSetting(game,'controlLayout',v)},
       {kind:'action',label:'MANAGE SOUND',color:'cyan',sub:'SONGS / VOCALS / LAB',
         onSelect:()=>this._openSoundManager()},
       {kind:'choice',label:'TILT CONTROLS (90)',options:[
@@ -225,7 +229,7 @@ export class SettingsView extends View {
         {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
         get:()=>settings().touchOverlay||'auto',set:v=>updateSetting(game,'touchOverlay',v)},
     ];
-    this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:15,
+    this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:14,
       items,color:'amber',parent:this.panel});
     this.swatch=scene.add.graphics();
     this.panel.add(this.swatch);

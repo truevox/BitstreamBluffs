@@ -24,6 +24,8 @@ const ICONS = {
   heliR: SVG('<path d="M19 12a7 7 0 1 1-3-5.7"/><polyline points="20,3 16,7 21,8"/>'),
   air: SVG('<polyline points="5,15 12,7 19,15"/><line x1="5" y1="19" x2="19" y2="19"/>'),
   chute: SVG('<path d="M4 11a8 7 0 0 1 16 0z"/><line x1="4" y1="11" x2="12" y2="20"/><line x1="20" y1="11" x2="12" y2="20"/>'),
+  corkscrew: SVG('<path d="M12 3 C22 3 23 19 12 20 C2 20 2 8 11 8 C17 8 16 16 12 16"/>'),
+  divebomb: SVG('<path d="M12 3v16m-7-7 7 8 7-8"/>'),
   pause: SVG('<line x1="9" y1="6" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="18"/>'),
   reset: SVG('<path d="M5 12a7 7 0 1 0 2.2-5"/><polyline points="4,4 5,9 10,8"/>'),
 };
@@ -56,6 +58,7 @@ export class TouchOverlay {
    */
   constructor(pad) {
     this.pad = pad;
+    this.controlLayout = 'classic';
     /** @type {HTMLElement|null} */
     this.root = null;
     this.colors = { ...DEFAULT_COLORS };
@@ -78,6 +81,28 @@ export class TouchOverlay {
       if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return true;
     } catch (e) { /* ignore */ }
     return false;
+  }
+
+  /** The touch UI keeps its own spatial layout but replaces obsolete push/reverse-heli
+   *  buttons with the newly approved divebomb and corkscrew in Trick Deck mode. */
+  setControlLayout(layout) {
+    const mode = layout === 'classic' ? 'classic' : 'trickDeck';
+    if (this.controlLayout === mode) return;
+    this.releaseAll();
+    this.controlLayout = mode;
+    if (!this.root) return;
+    for (const el of this.root.querySelectorAll('[data-base-btn]')) {
+      const base = el.dataset.baseBtn;
+      const name = mode === 'classic' ? base :
+        base === 'push' ? 'divebomb' : base === 'heliLeft' ? 'corkscrew' : base;
+      const label = name === 'divebomb' ? 'DIVEBOMB' : name === 'corkscrew' ? 'CORKSCREW'
+        : el.dataset.baseLabel;
+      const icon = name === 'divebomb' ? 'divebomb' : name === 'corkscrew' ? 'corkscrew'
+        : el.dataset.baseIcon;
+      el.dataset.btn = name;
+      el.setAttribute('aria-label', label);
+      el.innerHTML = ICONS[icon];
+    }
   }
 
   /** @param {Object<string,string>} colors css colours keyed cyan/magenta/lime/amber. */
@@ -166,6 +191,9 @@ export class TouchOverlay {
         const el = document.createElement('div');
         el.className = 'bb-btn' + (b.big ? ' bb-big' : '');
         el.dataset.btn = b.name;
+        el.dataset.baseBtn = b.name;
+        el.dataset.baseLabel = b.label;
+        el.dataset.baseIcon = b.icon;
         el.setAttribute('role', 'button');
         el.setAttribute('aria-label', b.label);
         el.style.color = `var(--bb-${b.color})`;

@@ -229,7 +229,7 @@ export const EVT = Object.freeze({
 
 /**
  * @typedef {Object} TrickPayload
- * @property {'backflip'|'frontflip'|'helicopterCCW'|'helicopterCW'|'airBrake'|'parachute'} type
+ * @property {'backflip'|'frontflip'|'helicopterCCW'|'helicopterCW'|'corkscrew'|'airBrake'|'parachute'} type
  * @property {number} count        completed repetitions inside this event (e.g. 2 for a double flip).
  * @property {number} value        provisional (unbanked) points for this trick, before combo multiplier.
  * @property {boolean} isNew       true if this trick type is new in the current combo (raised the multiplier).

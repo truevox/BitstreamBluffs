@@ -1,3 +1,4 @@
+import { SCORING } from '../../src/constants.js';
 import {
   TrickTracker, wrapAngle, classifyLanding, FLIP_TOLERANCE_DEG, AIR_BRAKE_MIN_MS, PARACHUTE_MIN_MS,
   PERFECT_ANGLE_DEG, GOOD_ANGLE_DEG, SLOPPY_ANGLE_DEG, HARD_IMPACT_PX_S, CRASH_IMPACT_PX_S, isMidSpin,
@@ -577,4 +578,24 @@ describe('incomplete helicopter landing penalty', () => {
       expect(r.frame({ grounded: true, state: { vx: 100, vy: 50, midSpin: true } }).landing.midSpin).toBe(true);
     });
   });
+});
+
+
+describe('Corkscrew is a distinct composite trick', () => {
+  test('full yaw turn while corkscrewing awards corkscrew, not free heli or flip points', () => {
+    const r=rig();
+    r.frame({grounded:true,state:{heliDeg:0}});
+    const results=[];
+    for(let i=1;i<=26;i++) results.push(r.frame({input:{corkscrew:true},state:{heliDeg:i*15},dAngle:8}));
+    const types=allTricks(results).map(t=>t.type);
+    expect(types).toContain('corkscrew');
+    expect(types).not.toContain('helicopterCW');
+    expect(types).not.toContain('frontflip');
+  });
+});
+
+test('Corkscrew is a real scored trick without changing the established x2 combo cap', () => {
+  expect(SCORING.trickBase.corkscrew).toBeGreaterThan(SCORING.trickBase.helicopterCW);
+  expect(SCORING.comboStepTypes).not.toContain('corkscrew');
+  expect(SCORING.comboStart + SCORING.comboStep * SCORING.comboStepTypes.length).toBe(2);
 });

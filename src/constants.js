@@ -144,6 +144,7 @@ export const SCORING = Object.freeze({
     frontflip: 100,
     helicopterCCW: 80,
     helicopterCW: 80,
+    corkscrew: 135, // composite pitch+yaw: harder than a helicopter
     airBrake: 40,
     parachute: 40,
   }),
@@ -155,6 +156,7 @@ export const TRICK_TYPES = Object.freeze([
   'frontflip',
   'helicopterCCW',
   'helicopterCW',
+  'corkscrew',
   'airBrake',
   'parachute',
 ]);

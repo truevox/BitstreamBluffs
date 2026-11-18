@@ -748,8 +748,12 @@ export class RunScene extends Phaser.Scene {
     return {
       push: !!p.push,
       tilt: Number.isFinite(p.tilt) ? p.tilt : 0,
+      variableHop: (this.settings?.controlLayout || 'tricksRight') !== 'classic',
+      noAutoNudge: (this.settings?.controlLayout || 'tricksRight') !== 'classic',
+      divebomb: !!p.divebomb,
+      corkscrew: !!p.corkscrew,
       tuck: !!p.tuck,
-      brake: !!p.brake,
+      brake: !!p.brake || (!!p.airBrake && !!this.sled && this.sled.grounded),
       hop: !!p.hop,
       reset: !!p.reset,
       heli: p.heli > 0 ? 1 : p.heli < 0 ? -1 : 0,

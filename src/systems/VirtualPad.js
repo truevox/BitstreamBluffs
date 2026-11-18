@@ -13,7 +13,7 @@ export const ANALOG_DEADZONE = 0.15;
 
 const EDGE_NAMES = ['hop', 'reset', 'pause', 'airBrake', 'parachute', 'confirm'];
 const HELD_NAMES = [
-  'push', 'tuck', 'brake', 'hop', 'reset', 'airBrake', 'parachute', 'pause', 'confirm',
+  'push', 'tuck', 'brake', 'hop', 'reset', 'airBrake', 'parachute', 'divebomb', 'corkscrew', 'pause', 'confirm',
   'tiltBack', 'tiltForward', 'heliLeft', 'heliRight',
 ];
 
@@ -31,6 +31,8 @@ const HELD_NAMES = [
  * @property {-1|0|1}  heli        Left arrow = -1 (CCW), right arrow = +1 (CW), both/none = 0.
  * @property {boolean} airBrake    Up arrow. Held.
  * @property {boolean} parachute   Down arrow. Held (use `pressed.parachute` to trigger the 0.8 s stall).
+ * @property {boolean} divebomb    Held aerodynamic downward plunge without horizontal deceleration.
+ * @property {boolean} corkscrew   Held compound pitch+yaw aerial rotation.
  * @property {boolean} pause       Esc / Start. Held.
  * @property {{hop:boolean,reset:boolean,pause:boolean,airBrake:boolean,parachute:boolean,confirm:boolean}} pressed
  *           Edge flags: true for exactly ONE poll() after a press, then cleared (consumed by poll()).
@@ -41,7 +43,7 @@ const HELD_NAMES = [
 export function emptyPadState() {
   return {
     push: false, tilt: 0, tuck: false, brake: false, hop: false, reset: false, heli: 0,
-    airBrake: false, parachute: false, pause: false,
+    airBrake: false, parachute: false, divebomb: false, corkscrew: false, pause: false,
     pressed: { hop: false, reset: false, pause: false, airBrake: false, parachute: false, confirm: false },
     lastSource: 'keyboard',
   };
@@ -107,6 +109,8 @@ export class VirtualPad {
     s.reset = h('reset');
     s.airBrake = h('airBrake');
     s.parachute = h('parachute');
+    s.divebomb = h('divebomb');
+    s.corkscrew = h('corkscrew');
     s.pause = h('pause');
     const back = h('tiltBack');
     const fwd = h('tiltForward');
@@ -158,6 +162,7 @@ export class VirtualPad {
     if (typeof document === 'undefined') return;
     if (!this.overlay) this.overlay = new TouchOverlay(this);
     this.overlay.mount(parent, (options && options.touchOverlay) || 'auto');
+    this.overlay.setControlLayout((options && options.controlLayout) || 'tricksRight');
   }
 
   /** @param {boolean} visible show/hide the overlay for the current context. @returns {void} */

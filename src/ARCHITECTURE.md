@@ -1543,3 +1543,31 @@ midSpin indicator retains its original one-grade penalty contract for
 older callers. Airborne tilt follows a 680deg/s target at 1300deg/s^2
 rather than accumulating acceleration all the way to the old 900deg/s cap.
 Values require player feel and high-speed replay validation.
+
+## v2.16 in progress: Trick Deck control layouts (2026-11-18)
+
+Saved `controlLayout` defaults to `tricksRight`; alternatives `tricksLeft`,
+`classic`. Keyboard remapping is applied by InputRouter **only while
+runActive**. Logical INPUT_ACTION events (up/down/left/right, N shortcut,
+pause/cancel/confirm) remain unchanged in all menus. Layout changes release
+stale held keyboard buttons before rebinding; touch overlays replace unused
+push and reverse-helicopter controls with divebomb/corkscrew in Trick Deck,
+but Classic retains the original overlay. No gamepad remapping yet.
+
+Default Tricks Right: ArrowUp frontflip, ArrowDown backflip, ArrowRight
+helicopter, ArrowLeft corkscrew; W parachute, A airbrake (ground brake),
+S divebomb, D tuck; Space hop. Tricks Left swaps WASD and arrows by role.
+Classic retains original WASD/arrow mapping. Corkscrew is a **separately
+tracked compound yaw+pitch trick**, not a renamed reverse helicopter;
+rotation is charged to corkscrew without simultaneous free flip/heli score.
+Corkscrew earns its own 135-point base trick but does not increment the established
+x2 maximum combo multiplier, preserving existing mission/achievement math.
+
+Airborne Space hop: held input retains preexisting maximum ascent, releasing
+it truncates the *player's own* launch only after 150ms of effective hold,
+with no artificial taller maximum; spring/geyser launches must not be
+truncated by releasing Space. New layouts disable legacy auto-stall-nudge
+and manual push; airbrake is the grounded brake. Divebomb adds downward
+velocity acceleration without reducing horizontal speed at baseline;
+initial numeric tuning is provisional. RunScene owns gameplay state and
+Settings controls; audio files belong to Music Friday's separate branch.

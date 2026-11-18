@@ -96,11 +96,12 @@ const NAME_PARTS = {
   frontflip: 'FRONTFLIP',
   helicopterCCW: 'HELI',
   helicopterCW: 'HELI',
+  corkscrew: 'CORKSCREW',
   airBrake: 'AIR BRAKE',
   parachute: 'PARACHUTE',
 };
 const SHORT_PARTS = { 'AIR BRAKE': 'BRAKE', PARACHUTE: 'CHUTE' };
-const NAME_ORDER = ['BACKFLIP', 'FRONTFLIP', 'HELI', 'AIR BRAKE', 'PARACHUTE'];
+const NAME_ORDER = ['BACKFLIP', 'FRONTFLIP', 'HELI', 'CORKSCREW', 'AIR BRAKE', 'PARACHUTE'];
 const COUNT_WORDS = ['', '', 'DOUBLE ', 'TRIPLE ', 'QUAD '];
 
 /**
