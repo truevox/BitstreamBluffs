@@ -2155,10 +2155,9 @@ attempt** unlock setup once; the observed sequence is `1,2,3,4`, `1,2,3,4`,
 `1,2,3,4,5`. The test then reloads the page, tunes all five bounded setup
 options, and confirms forward-only pursuit with the saved wildest settings.
 
-This is a deterministic browser integration regression, **not yet evidence
-that a human/automated physics controller can successfully perform five
-consecutive escapes in normal real-time play**. That physical playability and
-balance remain separate playtest work.
+This is a deterministic browser integration regression for score origin and
+unlock isolation. The independent **physical** controller result appears in
+the next section; neither test yet establishes human control fairness.
 
 ## 2026-11-18 — Five uninterrupted Gym Bluffs proven with *real Matter physics*
 
@@ -2183,11 +2182,12 @@ occurred; the *actual* fifth score unlocked the previously hidden setup.
 See `tools/bsod-gym-real-five-flight-browser-smoke.mjs`, which asserts all
 these conditions against the running browser game.
 
-Exploratory controls found five with both ranks 23 and 24, but only four
-with both ranks 22; these are results of **one deterministic controller on
-one course**, not minimum required ranks. Rank 25 fuel alone reached only
-two before landing. A clean/unupgraded rider reached one with this naive
-controller. This does **not** certify that rank 12 or a clean rider cannot
+**Same-seed comparisons** on the frozen `gym-physical-probe-aero-25`
+terrain found five with both ranks **24 and 25**, but only four with both
+ranks **22 and 23**; these are results of one deterministic controller on
+one course, not minimum required ranks. Earlier mixed-seed probes are NOT
+valid rank comparisons. Rank 25 fuel alone reached only two before landing.
+A clean/unupgraded rider reached one with this naive controller. This does **not** certify that rank 12 or a clean rider cannot
 succeed with better driving, nor that human play will feel fair. Granting
 pre-owned ranks is a **test fixture only**, not a shop cheat or gameplay
 adjustment. Future playtests should evaluate upgrade accessibility, human
@@ -2196,6 +2196,6 @@ control timing, and whether the unlock is excessively prestigious.
 **Upgrade cost caveat:** Under `PermanentUpgrades.nextUpgradePrice`,
 buying both rank 25 tiers from zero costs 4,400 (canopy) + 3,594
 (airbrake) = **7,994 shards**, plus the separate 200-shard Gym purchase.
-The cheaper rank-23 physical success still represents 6,613 shards.
+The same-seed rank-24 success would cost **7,282 shards** for both tiers.
 The browser fixture pregrants ranks for reproducibility; it does not prove
 that the hidden setup is economically accessible or comfortable for humans.

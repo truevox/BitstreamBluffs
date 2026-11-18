@@ -43,7 +43,8 @@ try{
       upgrades:{...store.profile.upgrades,...ranks},
       bsodGym:gym,
     }));
-    g.scene.getScene('TitleScene').startRun('gym-physical-probe-'+scenario,0,{gym:true});
+    // Use ONE seed across loadouts: otherwise rank comparisons are confounded by terrain.
+    g.scene.getScene('TitleScene').startRun('gym-physical-probe-aero-25',0,{gym:true});
   },{scenario,setup});
   await page.waitForFunction(()=>window.__bbGame?.scene?.getScene('RunScene')?.sys?.isActive(),null,{timeout:30000});
   const result=await page.evaluate(({scenario,frames})=>{
