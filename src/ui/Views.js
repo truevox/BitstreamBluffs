@@ -1529,7 +1529,9 @@ export class ShopView extends View {
     const layout = this.gymSetupPage ? gymSetupLayout({profile:this._profile()})
       : this.upgradePage ? upgradeShopLayout({ profile: this._profile() })
       : shopLayout({ profile: this._profile(), levels: this._levels(), page: this.page });
-    if (!this.upgradePage) this.page = layout.page;
+    // Only the ordinary Shop layout has a page index. Nested Gym setup
+    // must preserve the last selected catalogue category for BACK navigation.
+    if (!this.upgradePage && !this.gymSetupPage) this.page = layout.page;
     if (this.menu) { this.menu.destroy(); this.menu = null; }
     // The bank value is drawn outside the list (the list right-aligns only row state), so it has to be
     // torn down with it or every rebuild would stack another "BANK n" on the same pixel.

@@ -2115,3 +2115,29 @@ an exception or stalled audio block release. Test paused/silent and
 low-confidence tracks, shuffled transitions, different BPMs, and an
 honest long-wait fallback before enabling. Music-only animations/SFX
 may synchronize even without delaying gameplay.
+
+
+## 2026-11-18 — Gym setup menu interaction and shop page preservation
+
+Gal Friday's post-integration browser QA exercised the **actual** MenuList
+`left`/`right` and `confirm` actions on the earned advanced Gym setup screen,
+not just calling individual setter callbacks directly. Selecting and reversing
+a launch speed, changing the wall gap, exiting through both nested BACK rows,
+reloading the page, and launching practice all passed. The setup values
+persist through ProfileStore's already-atomic bounded configuration writes;
+the bank is never charged for tuning.
+
+The QA identified one minor UI bug: `ShopView._build()` used to assign
+`layout.page` for any screen except Permanent Upgrades. The nested Gym setup
+layout intentionally has no catalogue `page`, so opening it could overwrite
+the previous regular Shop category selection with `undefined`. The view now
+updates its saved page **only** when rendering the ordinary Shop layout.
+The regression opens the Gym screen from catalogue category index 2, uses
+both BACK actions, and verifies category 2 is preserved.
+
+This changes **no** Gym physics, reward gating, unlock prerequisites,
+recharge quantities or music release timing. The correct owner preference
+for a potential music-aligned launch remains **on a regular beat, not on
+an upbeat/offbeat or syncopated subdivision**, with a guaranteed fallback to
+the existing one-second frozen READY/GO until trusted beat-grid metadata
+is available.
