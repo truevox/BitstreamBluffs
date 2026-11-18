@@ -332,6 +332,9 @@ export class TitleScene extends Phaser.Scene {
     this.registry.set(REG.SEED, parsed.seed || seed);
     // Decision 2: set on EVERY Title start, so a typed `daily-*` seed (ENTER SEED) is never official.
     this.registry.set(REG.DAILY_OFFICIAL, !!(o && o.official === true));
+    // A normal/daily start MUST clear the one-shot training flag.
+    const owned = this.registry.get(REG.PROFILE)?.bsodGym?.owned === true;
+    this.registry.set(REG.BSOD_GYM, !!(o && o.gym === true && owned));
     // A typed `daily-YYYY-MM-DD` with no suffix is a PRACTICE run of that date: it replays that date's
     // mask (and RunScene plays that date's rule), not the profile's own biomes.
     const typedDay = parsed.hadSuffix ? null : DailyPatch.dateKeyFromSeed(parsed.seed);

@@ -62,6 +62,7 @@ import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
+import { GYM_CHASE } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
 const DEG = Math.PI / 180;
@@ -168,6 +169,7 @@ export class RunScene extends Phaser.Scene {
     // The owned set (`unlocked.boosts`, granted at Sync Level 8 / 15) gates them: a toggle switched on
     // before the boost is unlocked does nothing and does not mark the run modded (Boosts.boostEffects).
     const prof = this.registry.get(REG.PROFILE) || {};
+    this.bsodGym = reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
     this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
     const owned = prof && prof.unlocked && typeof prof.unlocked === 'object' ? prof.unlocked.boosts : null;
     this.unlockedBoosts = owned && typeof owned === 'object' ? { ...owned } : {};
@@ -304,10 +306,12 @@ export class RunScene extends Phaser.Scene {
     }
     if (this.boostFx.speedFactor !== 1) this.sled.scaleVelocity(this.boostFx.speedFactor);
     // Authoritative physical chase: gap is from the wall's leading edge to the compound sled body left bound.
-    this.sled.canopyFuelFullMs = PHYSICS.parachuteDurationMs * this.upgradeFx.canopyFuelMul;
+    this.sled.canopyFuelFullMs = this.bsodGym ? GYM_CHASE.parachuteFuelMs
+      : PHYSICS.parachuteDurationMs * this.upgradeFx.canopyFuelMul;
     this.sled.parachuteFuelMs = this.sled.canopyFuelFullMs;
-    this.bsod = new BsodPursuit({ sledLeftEdgeX: sledLeftCollisionEdge(this.sled), level: prof.level,
-      config: { ...BSOD_DEFAULTS, accelerationPxS2: BSOD_DEFAULTS.accelerationPxS2 * this.upgradeFx.bsodAccelerationMul } });
+    this.bsod = new BsodPursuit({ sledLeftEdgeX: sledLeftCollisionEdge(this.sled), level: this.bsodGym ? 1 : prof.level,
+      config: this.bsodGym ? { ...BSOD_DEFAULTS, ...GYM_CHASE }
+        : { ...BSOD_DEFAULTS, accelerationPxS2: BSOD_DEFAULTS.accelerationPxS2 * this.upgradeFx.bsodAccelerationMul } });
     this.bsodState = this.bsod.state(sledLeftCollisionEdge(this.sled), this.sled.vx, 1);
     this.bsodCaught = false;
     this.bsodBluffs = new BsodBluffTracker();
@@ -480,12 +484,19 @@ export class RunScene extends Phaser.Scene {
     const rank = this.upgradeRun?.enabled ? this.upgradeRun.ranks?.canopy : 0;
     const full = s.canopyFuelFullMs || PHYSICS.parachuteDurationMs;
     const spent = Number.isFinite(s.parachuteFuelMs) ? s.parachuteFuelMs : full;
-    const recovery = canopyBluffRecoveryMs(rank, event.chain, full);
+    const recovery = this.bsodGym ? GYM_CHASE.earnedRechargeFraction * full / Math.sqrt(event.chain)
+      : canopyBluffRecoveryMs(rank, event.chain, full);
     const newFuel = Math.min(full, spent + recovery);
     const canopyRecoveredMs = Math.max(0, newFuel - spent);
     if (canopyRecoveredMs > 0) s.parachuteFuelMs = newFuel;
+    // Only the FIRST actually survived escape reveals a secret shop item.
+    // No hints, previews, or tutorial actions exist before that event.
+    const store = this.registry?.get?.(REG.PROGRESSION)?.store;
+    const discovered = !this.bsodGym && store?.discoverBsodGym?.();
+    if (discovered?.discovered) this.registry?.set?.(REG.PROFILE, discovered.profile);
     const payload = {
       hazardType: 'bsod', points: event.points, x: s.x, y: s.y,
+      ...(discovered?.discovered ? { gymDiscovered: true } : {}),
       chain: event.chain, surfing: event.surfing, closestGapPx: event.closestGapPx,
       ...(canopyRecoveredMs > 0 ? { canopyRecoveredMs } : {}),
     };
@@ -1660,7 +1671,37 @@ export class RunScene extends Phaser.Scene {
     this.doCrash(c, fs, speed);
   }
 
+  /** Non-ranked practice retry: never advance a normal life/ledger.
+   * One real physics attempt ended; this starts a fresh, calmer pursuit. */
+  resetBsodGym() {
+    if (!this.bsodGym || !this.sled || !this.bsod) return;
+    const sled = this.sled;
+    const x = Math.max(this.startX + 100, sled.x);
+    const y = this.terrain.heightAt(x) - 240;
+    sled.setPose(x, y, 0, 270, -330);
+    sled.parachuteFuelMs = sled.canopyFuelFullMs;
+    this.pendingCrash = null;
+    this.bsodCaught = false;
+    this.crashed = false;
+    this.hitStopMs = 0;
+    this.blinkMs = 0;
+    this.slowmoMs = 0;
+    this.bsod.wallX = sledLeftCollisionEdge(sled) - GYM_CHASE.respawnGapPx;
+    this.bsod.wallSpeedPxS = GYM_CHASE.initialSpeedPxS;
+    this.bsod.accelerationPxS2 = GYM_CHASE.accelerationPxS2;
+    this.bsodBluffs?.reset?.();
+    this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
+    this.game?.events?.emit?.(EVT.BSOD_STATE_CHANGED, this.bsodState);
+    this.gymRetries = (this.gymRetries || 0) + 1;
+  }
+
   doCrash(c, fs, speed) {
+    if (this.bsodGym) {
+      // Gym is a sandbox. Every impact restores a playable attempt in-place:
+      // no run record, progression, leaderboard, shards or earned achievements.
+      this.resetBsodGym();
+      return;
+    }
     this.crashed = true;
     this.deactivateBsod();
     this.crashTimerMs = 0;

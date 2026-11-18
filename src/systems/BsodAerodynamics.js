@@ -55,3 +55,19 @@ export function canopyFuelStep(fuelMs, held, airborne, stepMs, fullMs = 880) {
   const spent = clamp(Number.isFinite(stepMs) ? stepMs : 0, 0, available);
   return { fuelMs: Math.max(0, available - spent), deployed: spent > 0 };
 }
+
+
+/** Airless Space Mountain divebomb: a small board-mounted vectored impulse.
+ * This is NOT wind/aerodynamics: the BSOD still cannot push atmospheric air
+ * through a vacuum. Extra downward acceleration trades glide time/altitude
+ * for a modest forward purchase. Provisional feel tuning.
+ */
+export function vacuumDivebombStep({
+  airborne = false, divebomb = false, atmosphereDensity = 1,
+  power = 1, stepMs = 8,
+} = {}) {
+  if (!airborne || !divebomb || atmosphereDensity !== 0) return { dvx: 0, dvy: 0 };
+  const dt = Number.isFinite(stepMs) ? clamp(stepMs, 0, 50) / 1000 : 0;
+  const mul = Number.isFinite(power) ? clamp(power, 1, 1.5) : 1;
+  return { dvx: 70 * mul * dt, dvy: 280 * mul * dt };
+}

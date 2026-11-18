@@ -1765,3 +1765,60 @@ in the same flight with NO injected in-flight fuel; the 900px/s wall
 still defeated rank 100. Real player control timing remains untested.
 The existing camera was validated from 300 to 2500px/s and needed no
 source changes.
+
+
+## 2026-11-18 — Hidden Surfing the Void, BSOD Gym discovery, and Space Mountain proposal
+
+**Owner design decisions:** Marvin explicitly requested that Surfing the Void and
+the ability to bluff the BSOD remain **secret**, without anticipatory tutorials,
+streak popups, advance shop spoilers, or exposed controls. Valley-stall recovery
+hints may explain how to hop and catch a tailwind; the BSOD and its tailwind can
+be mentioned generally. After the *first real successful Bluff*, a one-time
+toast can reveal a locked purchasable **BSOD Gym** item in the store. The Gym
+should allow low-stakes practice without changing real progression.
+
+**Implemented only on this feature branch (assistant engineering choices):**
+- Removed the every-Bluff `SURFING THE VOID xN` announcement and the
+  `CANOPY +NMS` streak popup. Only the first genuine scored BSOD escape
+  displays `BITSTREAM BLUFF` and `BSOD GYM DISCOVERED`. Subsequent BSOD escapes earn points silently, with no repeat popup.
+  Ordinary non-BSOD near misses still use the generic `NEAR MISS` label. Music and physical
+  chase events remain unchanged.
+- Removed the explanatory pre-discovery rank-12 fuel mechanic row from the
+  Shard Shop. Before discovery, no BSOD Gym row exists. Once discovered,
+  the existing **SHARD SHOP → PERMANENT UPGRADES** page reveals `BSOD GYM`
+  with `LOCKED 200` (initial *assistant-proposed* price). A one-time atomic
+  purchase changes that row to `ENTER`. ProfileStore persists
+  `bsodGym:{discovered,owned}` with both flags default OFF. Discovery
+  requires `RunScene.updateBsodBluff()` to emit a *legitimately scored*
+  close escape; it is never awarded from proximity alone.
+- Purchased Gym mode starts a separate practice session through the existing
+  Title → RunScene route. It uses a calmer starting wall, a 1.5-second canopy
+  reservoir, a special earned recharge, and **retry-on-collision** (the wall
+  remains an actual catch). The entire mode is non-ranked: no real game-over
+  record, XP, shards credited, leaderboard or profile progression; hitting
+  the wall resets the challenge in-place. Gym entry requires an owned
+  profile flag and always clears when starting a normal or Daily run.
+  No scripted how-to instruction is displayed in the Gym.
+- The standard stall hint now reads (Trick Deck Right) `STALLED? HOP + W SAIL`
+  or (Tricks Left) `STALLED? HOP + UP SAIL`, with a generic touch/gamepad
+  variant. It mentions *valley recovery* only, not Bluff timing, chains, or
+  special events.
+
+**Space Mountain discussion:** Marvin considered two possible design families:
+(1) airless space with a little forward propulsion from Divebomb or Corkscrew;
+(2) all tailwind from the BSOD pushing air through other biomes. Gal Friday's
+engineering recommendation is **(1)**, retaining a true near-vacuum so the
+BSOD pressure wave cannot make parachutes work where there is no atmosphere.
+The initial *provisional* prototype uses a tiny **board-powered** vacuum-only
+Divebomb impulse (+70 px/s² horizontally, +280 px/s² down); it trades remaining
+altitude/time for modest forward purchase but creates **no atmospheric wind**.
+Corkscrew remains an aerial rotation maneuver, not unexplained reactionless
+vacuum translation. This numeric effect and the sci-fi mechanism are suggestions
+for Marvin's playtest, **not a settled owner selection**.
+
+The first Gym browser integration verified the pre-discovery absence, one real
+Bluff unlocking the item, locked 200-shard purchase and persistent ownership,
+and an authentic BSOD contact causing practice reset without changing the
+saved run, bank, or lifetime stats. Music Friday's independent latest DSP
+headroom corrections `6c1a2bd` and `e7a8698` were merged into a *separate*
+integration worktree, not into this gameplay branch or main.

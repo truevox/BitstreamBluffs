@@ -17,7 +17,8 @@
  * list, so rebuilding after a purchase redraws all of it.
  */
 import { measureText } from './PixelFont.js';
-import { UPGRADE_CATALOG, sanitizeUpgradeRanks, nextUpgradePrice, CANOPY_BLUFF_RECOVERY_RANK } from '../systems/PermanentUpgrades.js';
+import { UPGRADE_CATALOG, sanitizeUpgradeRanks, nextUpgradePrice } from '../systems/PermanentUpgrades.js';
+import { BSOD_GYM_PRICE, gymVisible, gymOwned } from '../systems/BsodGym.js';
 import { SHOP_ITEMS, isOwned } from '../systems/ProfileStore.js';
 import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 
@@ -291,12 +292,14 @@ export function upgradeShopLayout(o = {}) {
       disabled: price == null,
     });
   }
-  // No hidden milestone: show when an earned Bluff can pressurize the sail.
-  // This is a purely informational line in the existing shop geometry.
-  rows.push({ kind: 'static', key: 'canopy-perk',
-    label: ranks.canopy >= CANOPY_BLUFF_RECOVERY_RANK
-      ? 'CANOPY: BLUFFS RESTORE FUEL'
-      : `CANOPY R${CANOPY_BLUFF_RECOVERY_RANK}: BLUFF FUEL REFILL` });
+  // The Gym remains entirely absent until the first legitimately scored
+  // BSOD escape. Do not reveal how to earn that discovery in store copy.
+  if (gymVisible(profile)) {
+    const owned = gymOwned(profile);
+    rows.push({ kind: 'gym', key: 'bsodGym', id: 'bsodGym',
+      label: 'BSOD GYM', state: owned ? 'ENTER' : `LOCKED ${BSOD_GYM_PRICE}`,
+      disabled: !owned && bank < BSOD_GYM_PRICE });
+  }
   rows.push({ kind: 'static', key: 'softcap', label: 'UNLIMITED RANKS / DIMINISHING RETURNS' });
   rows.push({ kind: 'static', key: 'ranked', label: 'MODE ON = MODDED, OFFICIAL DAILY CLEAN' });
   const texts = [];
@@ -310,7 +313,7 @@ export function upgradeShopLayout(o = {}) {
       const left = row.kind === 'header' || row.kind === 'static' ? PAD : PAD + 6;
       row.texts = [{ key: row.key + '-label', text: row.label,
         x: left, y, w: measureText(row.label), h: GLYPH_H,
-        color: row.kind === 'upgradeItem' ? 'text' : row.kind === 'upgradeBack' ? 'cyan' : 'magenta' }];
+        color: row.kind === 'gym' ? 'cyan' : row.kind === 'upgradeItem' ? 'text' : row.kind === 'upgradeBack' ? 'cyan' : 'magenta' }];
       if (row.state) {
         const w = measureText(row.state);
         row.texts.push({ key: row.key + '-state', text: row.state,
