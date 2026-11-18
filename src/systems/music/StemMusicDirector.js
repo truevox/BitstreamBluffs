@@ -56,6 +56,7 @@ export class StemMusicDirector {
 		this._loading = null;
 		this.transportPaused = false;
 		this._resumeOffset = 0;
+		this._resumeGateAt = null; // precise first audible frame after manual pause
 		this._transportHistory = [];
 		this._lastPlayed = null;
 		this._skipHistoryOnce = false;
@@ -522,8 +523,14 @@ export class StemMusicDirector {
 				await Promise.all(this._wantedNames(info.pack).map((s) => this._fetchSource(info, 0, s, token)));
 			}
 			if (token !== this._token || this.disposed) return;
-			this.clockStart=Math.max(this.ctx.currentTime+.12,desiredAt||0)-
-				clamp(Number(offsetSeconds)||0,0,Math.max(0,this.pack.duration-.1));
+			const actualResumeOffset=clamp(Number(offsetSeconds)||0,0,
+				Math.max(0,this.pack.duration-.1));
+			const firstSourceTime=Math.max(this.ctx.currentTime+.12,desiredAt||0);
+			this.clockStart=firstSourceTime-actualResumeOffset;
+			// For normal track-start this is a no-op. For a manual pause resume,
+			// offsets MUST begin on this first sound frame, never 100ms before it
+			// just because buffers were fetched early in the WebAudio scheduler.
+			this._resumeGateAt=actualResumeOffset>0 ? firstSourceTime : null;
 			this.adaptive?.configure(this.pack, this.clockStart,
 				{ biome: this.menuMode ? HOME_BIOME : this.biome, airborne: this.airborne });
 			this.adaptive?.setEnabled(this.dynamicOrchestra && !this.menuMode);
@@ -565,7 +572,8 @@ export class StemMusicDirector {
 		const desired = this.clockStart + seg.startFrame / this.pack.sampleRate;
 		const duration = seg.frames / this.pack.sampleRate;
 		const now = this.ctx.currentTime;
-		const late = Math.max(0, now + 0.02 - desired);
+		const firstAllowed=Math.max(desired,now+.02,this._resumeGateAt??0);
+		const late = Math.max(0,firstAllowed-desired);
 		if (late >= duration) { this.scheduled.add(key); return; }
 		const dest = this.gains.get(name);
 		if (!dest) return;
@@ -578,7 +586,8 @@ export class StemMusicDirector {
 			try { src.disconnect(); } catch {}
 		};
 		try {
-			src.start(Math.max(desired, now + 0.02), late, Math.max(0.001, Math.min(duration - late, buffer.duration - late)));
+			src.start(firstAllowed, late,
+				Math.max(0.001, Math.min(duration-late,buffer.duration-late)));
 			this.scheduled.add(key);
 		} catch (e) {
 			this.activeNodes.delete(src);
@@ -742,6 +751,7 @@ export class StemMusicDirector {
 		this._nextPromise=null;
 		this._nextIndex=null;
 		this.clockStart=t+.085-position;
+		this._resumeGateAt=null; // an explicit seek owns a separate transport generation
 		this.adaptive?.reset();
 		this.adaptive?.configure(this.pack,this.clockStart,{
 			biome:this.menuMode ? HOME_BIOME : this.biome,airborne:this.airborne,
@@ -757,6 +767,7 @@ export class StemMusicDirector {
 		this.started = false;
 		this.transportPaused=false;
 		this._resumeOffset=0;
+		this._resumeGateAt=null;
 		this._token++;
 		if (this._timer) clearInterval(this._timer);
 		this._timer = null;
