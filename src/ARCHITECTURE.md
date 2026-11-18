@@ -2350,15 +2350,20 @@ this up-to-date branch, retain all existing continuous-music behavior, and
 run `tests/src/continuous-soundtrack-menu-shuffle.test.js` plus both vinyl
 and Gym browser suites before any promotion.
 
-### 2026-11-18 — Approved but NOT IMPLEMENTED death-music count-in concept
+### 2026-11-18 — Death-music count-in: AUTHORIZED to implement (supersedes hold)
 
-Marvin approved the future design of a crash scratch, 1–3 silent musical beats,
-4 drum-only beats, then full-band return, with no restriction on fast retries:
-the count-in would carry into the next run independently of gameplay. The
-explicit instruction **not to implement crash scratching yet** remains in
-force. Current death audio and continuous soundtrack stay unchanged while
-Music Friday completes the separate intentional PAUSE/RESUME vinyl feature.
-Full decision, authorship and research gates:
+Marvin wants the complete fatal-crash sequence: scratch, 1–3 silent musical
+beats, four drum-only beats from the current recording, and full-band return.
+The sequence **continues through an immediate retry** without blocking game
+physics, score, initials, shop or scene transitions. Earlier in the day this
+was approved as a design but held from implementation; Marvin's subsequent
+explicit approval **supersedes that temporary hold**. As of the approval
+update, the music implementation had **not yet appeared in the reviewed
+branch**. Manual Pause/Resume vinyl effects are a separate, completed feature.
+Do not confuse fatal crashes with shield-negated hits or in-place Gym resets;
+never fake verified music pulses. Music Friday owns the audio feature,
+Control owns the scene event contract and integration tests. No unauthorized
+merge/deploy. Full provenance and musical validation rules:
 `docs/MUSIC-DEATH-TURNTABLE-COUNT-IN-DESIGN-20261118.md`.
 
 ### 2026-11-18 — Combined turntable integration and exact resume readout

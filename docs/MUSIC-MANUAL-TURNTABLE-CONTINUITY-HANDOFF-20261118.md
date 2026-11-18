@@ -47,3 +47,17 @@ The public read-only Gym timing API stays **fail closed**: manual pause makes `A
 - `tools/music/smoke-vinyl-scratch-webaudio.mjs`: exact original scratch module rendered in offline Chromium, objective brightness inversion and silence. Does not play audio through speakers.
 
 This branch is **feature-only**: do not merge into `main`, deploy, or modify Control Friday's current worktree. Control Friday owns creating the final combined integration and browser gameplay testing. The separately discussed **crash-stops-with-scratch → silent beats → four-drum-beat count-in → band** is still an **unimplemented design experiment**; Marvin approved only the rule that if that effect is eventually implemented, its ongoing drum count-in must persist through an immediate retry without delaying gameplay. This project does **not** alter crash audio.
+
+
+## Subsequent owner approval: fatal-death count-in is now IMPLEMENTATION-APPROVED
+
+This handoff captured the earlier state when the death sequence was only a
+future experiment. On November 18, Marvin explicitly superseded the earlier
+implementation hold: **build the fatal-death scratch → 1–3 silent beats →
+four drum-only beats → original band's return**, carrying any in-progress
+count-in through instant retry with **no gameplay delay**. The current vinyl
+commit `8cc95fc` and its combined integration `561f0dc` implement only
+manual PAUSE/RESUME, **not** the newly approved fatal-death effect.
+See `docs/MUSIC-DEATH-TURNTABLE-COUNT-IN-DESIGN-20261118.md`. The original
+manual-vinyl implementation and continuous death playback stay intact until
+a distinct, separately verified death-sequence implementation is integrated.

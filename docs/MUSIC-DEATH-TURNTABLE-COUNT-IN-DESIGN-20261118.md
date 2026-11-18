@@ -1,13 +1,11 @@
-# Crash scratch → drum count-in → full band: approved DESIGN, not implementation
+# Fatal-crash scratch → silence → four drum beats → full band: implementation approved
 
 Recorded: 2026-11-18. Source: Marvin's discussion with Music Friday,
 relayed to Control Friday in the same day's project coordination.
 
-**Status: DESIGN APPROVED, IMPLEMENTATION NOT AUTHORIZED / NOT STARTED.**
-This is distinct from the approved-and-in-progress vinyl effect for the user's
-intentional **PAUSE/RESUME**. The earlier explicit instruction **not to
-implement crash scratching yet** still applies. This note must not cause any
-new crash audio code, event subscription, or release beat-grid promotion.
+**Current status (superseding clarification, November 18, 2026): Marvin explicitly WANTS THIS IMPLEMENTED.** This affirmative instruction supersedes the earlier temporary "don't implement this yet" hold. Music Friday owns the death-sequence audio/music implementation; Control Friday owns event and lifecycle integration, QA and the separate integration branch. **Not implemented in the reviewed code as of this update.** The independently completed manual **PAUSE/RESUME** vinyl feature is not the fatal-death sequence.
+
+**Decision history:** The prior status was "design approved, implementation on hold" while the manual vinyl feature was being finished. That previous hold was real *at the time*, but is no longer the controlling instruction. Preserve this chronology; do not present it as Marvin's current preference. Authorization to implement is **not** authorization to mark unreviewed beat grids verified, merge into `main`, or deploy without validation.
 
 ## Decision (Marvin)
 
@@ -41,16 +39,19 @@ Nevertheless, immediate retry is possible. Therefore **audio must not own
 or block the death-to-retry timeline**, and the sequence may finish in the
 next live run. A second fatal crash while an earlier count-in is pending,
 manual Pause/Resume, user jukebox choices, mute, track changes, or a suspended
-audio context need a deliberately designed precedence policy *before*
-implementation. No such policy is approved merely by documenting it here.
+audio context need a carefully defined precedence policy *during*
+implementation. Music Friday should propose and test those rules without
+blocking the approved feature on additional gameplay questions.
 
-## Current default remains unchanged
+## Until the new audio implementation is complete
 
-Until explicitly approved for implementation, ordinary crashes preserve the
-**continuous soundtrack** across death, Game Over, menus, and retries, using
-the current `_enterMenuMusic()` and `_enterRunMusic()` contracts. They do not
-emit `GAME_PAUSE` or the intentional-pause scratch. The manual-pause feature
-is separate and should ship independently after real-browser validation.
+The currently reviewed build still preserves the **continuous soundtrack**
+across death, Game Over, menus, and retries, using the existing
+`_enterMenuMusic()` and `_enterRunMusic()` contracts. The approved fatal-crash
+sequence should *modify the musical arrangement on that same uninterrupted
+transport* while it runs, never reset/recreate the song. Fatal crashes do not
+emit `GAME_PAUSE`, and this sequence must not use the intentional manual-pause
+state machine. The separate manual-pause feature can ship independently.
 
 ## Later listening / A-B gate
 
@@ -59,7 +60,8 @@ The earlier research options remain useful: (A) uninterrupted music,
 band recovery. Test across several rapid fatal crashes, immediate retries,
 short Game Over visits, long initials/shop visits, and tracks with ambiguous
 or changing pulse. Record subjective preference and frame/music timing before
-promoting option C. Design approval alone is **not** release approval.
+promoting option C. Implementation is now explicitly approved; **release remains gated on
+regression tests, source/pulse confidence, and human listening**.
 
 **Provenance:** Marvin proposed the crash scratch + 1–3 silent beats + four
 drum-only beats + band return; Marvin explicitly approved carrying the
