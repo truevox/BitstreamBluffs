@@ -27,6 +27,7 @@ import { EVT } from '../events.js';
 import { REG } from '../constants.js';
 import { Rng } from './Rng.js';
 import { StemMusicDirector } from './music/StemMusicDirector.js';
+import { TurntableScratch } from './music/TurntableScratch.js';
 import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
 import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
 import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
@@ -90,6 +91,12 @@ export class AudioSynth {
     this._windActive = false;
     this._bsodDanger01 = 0;
     this._paused = false;
+    // Only intentional GAME_PAUSE owns this token; ordinary deaths keep the
+    // existing continuously advancing soundtrack/track generation intact.
+    this._vinylScratch = null;
+    this._vinylPauseSession = null;
+    this._vinylResume = null;
+    this._vinylResumeTimer = null;
     this._lastSfx = {};
     this._arrCache = new Map();
     this._gameListeners = [];
@@ -119,8 +126,10 @@ export class AudioSynth {
         };
         on(EVT.RUN_START, (p) => this._enterRunMusic((p && p.seed) || ''));
         // Never stop or restart the shared song on crashes, death, or quitting.
-        on(EVT.RUN_END, () => this._enterMenuMusic());
-        on(EVT.RUN_ABORT, () => this._enterMenuMusic());
+        on(EVT.RUN_END, () => { this._exitVinylRun(); this._enterMenuMusic(); });
+        on(EVT.RUN_ABORT, (p) => {
+          if (this._exitVinylRun(p) !== false) this._enterMenuMusic();
+        });
         on(EVT.BSOD_STATE_CHANGED, (p) => this._onBsodState(p));
         on(EVT.LANDING, (p) => this._onLanding(p));
         on(EVT.TRICK, (p) => this.playSfx('trick', { pitch: 1 + Math.min(0.5, ((p && p.count) || 1) * 0.08 - 0.08) }));
@@ -157,14 +166,8 @@ export class AudioSynth {
           this._updateIntensity();
         });
         on(EVT.SETTINGS_CHANGED, (p) => { if (p && p.settings) this.applySettings(p.settings); });
-        on(EVT.GAME_PAUSE, () => { this._enterMenuMusic(); this._setPaused(true); });
-        on(EVT.GAME_RESUME, () => {
-          this._musicMode = 'run';
-          this._jukeboxMode = false;
-          this._stemMusic?.setMenuMode(false);
-          this._onBsodState(null);
-          this._setPaused(false);
-        });
+        on(EVT.GAME_PAUSE, (payload) => this._onVinylManualPause(payload));
+        on(EVT.GAME_RESUME, (payload) => this._onVinylManualResume(payload));
         on(EVT.INPUT_ACTION, () => { if (!this.ctx || this.ctx.state !== 'running') this.unlock(); });
       }
       if (typeof window !== 'undefined') {
@@ -293,6 +296,7 @@ export class AudioSynth {
     n.staticGain.connect(n.master);
     n.staticSrc.start();
     this.nodes = n;
+    this._vinylScratch = new TurntableScratch(c, n.noiseBuf, n.musicBus);
     // The rendered stem director connects DIRECTLY into the legacy music
     // filter, bypassing muted procedural musicSrc but retaining volume, SFX
     // ducking, pause low-pass, glitch bus, master and compressor.
@@ -318,6 +322,8 @@ export class AudioSynth {
 
   _afterResume() {
     if (!this.ctx || this.ctx.state !== 'running') return;
+    // AudioContext suspension cannot unpause the recording by accident.
+    if (this._vinylResume?.awaitingContext) this._finishVinylResume(this._vinylResume);
     if (!this._unlocked) {
       this._unlocked = true;
       try { // iOS: play a silent buffer inside the gesture to fully unlock
@@ -616,6 +622,7 @@ export class AudioSynth {
         }
       }
       if (!this.nodes) return;
+      if (!this._vinylAudible()) this._vinylScratch?.cancel();
       const t = this.ctx.currentTime;
       this.nodes.master.gain.setTargetAtTime(this.settings.masterVolume, t, 0.02);
       this.nodes.musicBus.gain.setTargetAtTime(this.settings.musicVolume * 0.55, t, 0.02);
@@ -647,16 +654,172 @@ export class AudioSynth {
     try {
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
-      // Menus keep the original soundtrack fully audible; pausing gameplay
-      // still suppresses wind and gameplay motion.
-      const menu = this._musicMode === 'menu';
-      this.nodes.musicFilter.frequency.setTargetAtTime(menu ? 18000 : paused ? 500 : 18000, t, 0.05);
-      const sourceGain = this._stemMusic?.started ? 0 :
-        menu ? (this._musicWanted ? 1 : 0) :
-          paused ? 0.45 : this._musicWanted ? 1 : 0;
-      this.nodes.musicSrc.gain.setTargetAtTime(sourceGain, t, 0.05);
+      // Only manual gameplay pauses silence the source. Title/GameOver
+      // still play continuous full-bandwidth music, and explicit PauseScene
+      // jukebox actions can play during pause without a low-pass filter.
+      const manualJukebox = !!(paused && this._vinylPauseSession?.manualOverride &&
+        this._jukeboxMode && this._musicWanted);
+      const fadeTime = paused ? 0.025 : 0.05;
+      this.nodes.musicFilter.frequency.setTargetAtTime(
+        paused && !manualJukebox ? 500 : 18000, t, fadeTime);
+      const sourceGain = paused && !manualJukebox ? 0 :
+        this._stemMusic?.started ? 0 : this._musicWanted ? 1 : 0;
+      this.nodes.musicSrc.gain.setTargetAtTime(sourceGain, t, fadeTime);
       this._applyWindFromBsod();
-    } catch (e) { /* ignore */ }
+    } catch { /* unsupported/closed nodes must never block gameplay */ }
+  }
+
+  _cancelVinylTransition() {
+    if (this._vinylResumeTimer !== null) clearTimeout(this._vinylResumeTimer);
+    this._vinylResumeTimer = null;
+    const old = this._vinylResume;
+    this._vinylResume = null;
+    this._vinylScratch?.cancel();
+    return old;
+  }
+
+  _vinylAudible() {
+    const s = this.settings;
+    return !!(this.ctx && this.ctx.state === 'running' && this.nodes &&
+      !this.unavailable && !this._destroyed &&
+      s?.masterVolume > 0 && s?.musicVolume > 0 &&
+      hasEnabledSongs(s?.musicEnabledSongs));
+  }
+
+  /** Jukebox intent is authoritative over automatic song restoration. */
+  _vinylJukeboxIntent() {
+    if (!this._vinylPauseSession && !this._vinylResume) return;
+    if (this._vinylPauseSession) this._vinylPauseSession.manualOverride = true;
+    this._cancelVinylTransition();
+    if (this._paused) this._setPaused(true);
+  }
+
+  /** Crash, quit, restart and GameOver are NEVER synthetic manual pauses.
+   * If a run exits directly from PauseScene, undo only *our own* frozen
+   * transport, preserving any explicit pause-menu jukebox decision.
+   */
+  _exitVinylRun(payload) {
+    const session = this._vinylPauseSession || this._vinylResume?.snapshot;
+    // A stale restart/quit from an earlier pause may not tear down a
+    // different active paused run. Matching controls are authoritative.
+    if (session && ((payload?.pauseToken && session.pauseToken &&
+      payload.pauseToken !== session.pauseToken) ||
+      (payload?.runId && session.runId && payload.runId !== session.runId)))
+      return false;
+    const pending = this._cancelVinylTransition();
+    this._vinylPauseSession = null;
+    this._paused = false;
+    const snap = session || pending?.snapshot;
+    if (!snap?.shouldResume || snap.manualOverride) return;
+    const d = this._stemMusic;
+    if (snap.procedural) {
+      this._musicWanted = true;
+      if (this.ctx?.state === 'running') {
+        if (!this._activateStemMusic() && !this._musicTimer) this._startScheduler();
+      }
+      return;
+    }
+    if (!d?.transportPaused || d.started || d._token !== snap.token ||
+        d.trackIndex !== snap.trackIndex || d._resumeOffset !== snap.offset ||
+        !hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+    // No vinyl on run-end or run-abort; restore the SAME source once.
+    this._musicWanted = true;
+    try { if (!d.transportPlay()) this._musicWanted = false; }
+    catch { this._musicWanted = false; }
+  }
+
+  /** True manual input only: Control Friday owns pauseToken/runId and
+   * guarantees gameplay transitions even when audio fails. */
+  _onVinylManualPause(payload) {
+    try {
+      if (this._destroyed || this._paused ||
+          (payload?.reason && payload.reason !== 'manual')) return;
+      const old = this._cancelVinylTransition();
+      const d = this._stemMusic;
+      const originallyWanted = this._musicWanted || old?.shouldResume === true;
+      // Synthetic/half-built directors must never be treated as a live
+      // WebAudio transport. This also preserves historic menu continuity.
+      const live = !!(d?.started && !d.transportPaused &&
+        d.ctx === this.ctx && d.pack && d.activeNodes?.size > 0);
+      const audible = this._vinylAudible() && originallyWanted && live;
+      const frozen = live ? d.transportPause() :
+        !!(old?.shouldResume && d?.transportPaused);
+      const procedural = originallyWanted && !live && !frozen &&
+        this._musicTimer !== null;
+      if (frozen || procedural) {
+        this._musicWanted = false; // tab unlock cannot restart a paused song
+        if (this._musicTimer !== null) clearInterval(this._musicTimer);
+        this._musicTimer = null;
+      }
+      this._vinylPauseSession = {
+        shouldResume:!!(originallyWanted && (frozen || procedural)),
+        procedural,manualOverride:false,
+        runId:payload?.runId??null,pauseToken:payload?.pauseToken??null,
+        token:d?._token,trackIndex:d?.trackIndex,offset:d?._resumeOffset,
+      };
+      this._enterMenuMusic(); // neutral menu arrangement, same source clock
+      this._setPaused(true);
+      if (audible) this._vinylScratch?.play('pause');
+    } catch { /* audio failure must not block Control's physical pause */ }
+  }
+
+  _finishVinylResume(pending) {
+    if (!pending || this._vinylResume !== pending || this._destroyed ||
+        this._paused) return;
+    const d = this._stemMusic;
+    if (!this.ctx || this.ctx.state !== 'running') {
+      pending.awaitingContext = true;
+      return;
+    }
+    this._vinylResume = null;
+    this._vinylResumeTimer = null;
+    const snap = pending.snapshot;
+    if (!hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+    if (!snap.procedural && (!d?.transportPaused || d.started ||
+        d._token !== snap.token || d.trackIndex !== snap.trackIndex ||
+        d._resumeOffset !== snap.offset)) return;
+    this._musicWanted = true;
+    this._jukeboxMode = false;
+    if (snap.procedural) {
+      if (!this._activateStemMusic() && this.ctx.state === 'running' &&
+          !this._musicTimer) this._startScheduler();
+    } else if (!d.transportPlay()) this._musicWanted = false;
+  }
+
+  /** Music owns only the optional effect; Control owns a single GO/RESUME. */
+  _onVinylManualResume(payload) {
+    try {
+      if (this._destroyed) return;
+      const session = this._vinylPauseSession;
+      // Only the pending intentional manual pause owns a matching resume.
+      if (!session || (payload?.reason && payload.reason !== 'manual')) return;
+      // A late old resume token may not unpause another manual session.
+      if ((payload?.pauseToken && session.pauseToken &&
+          payload.pauseToken !== session.pauseToken) ||
+          (payload?.runId && session.runId && payload.runId !== session.runId))
+        return;
+      this._vinylPauseSession = null;
+      this._cancelVinylTransition();
+      this._musicMode = 'run';
+      this._jukeboxMode = false;
+      this._stemMusic?.setMenuMode(false);
+      this._onBsodState(null);
+      this._setPaused(false);
+      if (!session?.shouldResume || session.manualOverride) return;
+      const d = this._stemMusic;
+      if (!hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+      if (!session.procedural && (!d?.transportPaused || d.started ||
+          d._token !== session.token || d.trackIndex !== session.trackIndex ||
+          d._resumeOffset !== session.offset)) return;
+      const pending = {snapshot:session,shouldResume:true,awaitingContext:false};
+      this._vinylResume = pending;
+      const seconds = this._vinylAudible() ?
+        (this._vinylScratch?.play('resume') || 0) : 0;
+      if (seconds>0) {
+        this._vinylResumeTimer=setTimeout(()=>this._finishVinylResume(pending),
+          Math.ceil(seconds*1000));
+      } else this._finishVinylResume(pending);
+    } catch { /* async audio optional; never blocks a game RESUME */ }
   }
 
   // --------------------------------------------------------------------------------------------------- speed / wind
@@ -789,6 +952,8 @@ export class AudioSynth {
    * when a song IS selected but its pack cannot be loaded. */
   _activateStemMusic() {
     if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+    if (this._paused && this._vinylPauseSession &&
+        !this._vinylPauseSession.manualOverride) return false;
     const player = this._stemMusic;
     if (!player || !player.ready || !this.ctx || !this.nodes) return false;
     player.attach(this.ctx, this.nodes.musicFilter);
@@ -863,9 +1028,11 @@ export class AudioSynth {
   jukeboxPlay() {
     try {
       if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       this._jukeboxMode = true;
       this._musicWanted = true;
+      if (this._paused) this._setPaused(true);
       this.unlock();  // called from actual user interaction
       if (!this._stemMusic.ready) return true; // onReady starts it
       return this._activateStemMusic();
@@ -873,10 +1040,12 @@ export class AudioSynth {
   }
 
   jukeboxPause() {
+    this._vinylJukeboxIntent();
     const ok=this._stemMusic?.transportPause()||false;
     if(ok){
       this._musicWanted=false; // don't auto-resume after tab suspension
       if(this._musicTimer){clearInterval(this._musicTimer);this._musicTimer=null;}
+      if (this._paused) this._setPaused(true);
     }
     return ok;
   }
@@ -884,10 +1053,12 @@ export class AudioSynth {
   jukeboxStep(direction) {
     try {
       if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       const wasPaused=this._stemMusic.transportPaused;
       this._jukeboxMode=true;
       this._musicWanted=!wasPaused;
+      if (this._paused) this._setPaused(true);
       if(!this._stemMusic.ready){this.unlock();return false;}
       // Choose and invalidate the previous async generation BEFORE
       // AudioContext unlock can call _afterResume() and load another song.
@@ -964,9 +1135,13 @@ export class AudioSynth {
   /** @returns {void} */
   stopMusic() {
     try {
+      this._cancelVinylTransition();
+      this._vinylPauseSession = null;
       this._musicWanted = false;
       this._jukeboxMode = false;
+      this._paused = false;
       this._stemMusic?.stop();
+      this._setPaused(false);
       if (this._musicTimer) clearInterval(this._musicTimer);
       this._musicTimer = null;
       if (this.nodes) {
@@ -1157,6 +1332,8 @@ export class AudioSynth {
     this._destroyed = true;
     try {
       this.stopMusic();
+      this._vinylScratch?.destroy();
+      this._vinylScratch = null;
       this._stemMusic?.destroy();
       for (const [t, type, fn, opt] of this._domListeners) t.removeEventListener(type, fn, opt);
       this._domListeners = [];
