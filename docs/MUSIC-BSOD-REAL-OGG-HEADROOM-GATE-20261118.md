@@ -39,3 +39,31 @@ npm test -- --runInBand --silent tests/src/bsod-music-corruption.test.js tests/s
 ```
 
 Sound contracts are unchanged: authoritative physical BSOD proximity corrupts **original guitar/piano/Other only**; relative airflow drives wind independently; bass/drums/melody/vocals/SFX are not run through this processor. Menus restore the clean Debumont arrangement while preserving the current song clock. The existing GBrain design [[projects/truevox-bitstreambluffs/audio-stem-graph/reactive-accompaniment]] remains the owner-approved intent; the exact calibrated DSP values and measurement thresholds are engineering proposals.
+
+
+## Supplementary *live combined music mix* sampling
+
+A second, independent Chromium regression, `tools/music/audit-bsod-mixed-program-headroom.mjs`, attaches **non-audible analyser taps** to the actual game's `musicBus` and **post-master-compressor** nodes while the real `StemMusicDirector` plays all four released songs. It does **not** rebuild the audio in a stand-in mixer; the same game source/stems, tempo, effects and one shared playback clock are active. It never alters persistent settings, song assets, user profile, game code or the original playback graph; analyser outputs connect only to zero-gain sinks and are disconnected afterward.
+
+Conditions for this **limited sampled check**, selected for potential worst-case music gain: `masterVolume=1`, `musicVolume=1`, `sfxVolume=0`, wind disabled, vocals disabled, Dynamic Orchestra disabled, run-mode Crystal Cavern melody, sled speed 850 px/s and authoritative BSOD danger 0 versus 0.97 with silent relative wind. For each song, the test seeks to source time 14 seconds, waits for the WebAudio smoothing/streaming graph to settle, then samples 48 blocks of 2,048 output samples at approximately 25 ms intervals. It checks **both clean and high-danger** master peaks and confirms a real nonzero audio signal. It also checks Debumont menu music after a run-end transition without restarting the track.
+
+**Observed sampled peaks (final post-compressor output, near-danger):**
+
+| Song | Measured peak |
+|---|---:|
+| One More Run | −12.26 dBFS |
+| Runs Out of Code | −19.85 dBFS |
+| Varmont | −11.57 dBFS |
+| Pope | −15.68 dBFS |
+| Debumont menu after run-end | −9.16 dBFS |
+
+**PASS:** None of those sampled clean/danger/menu output peaks approached 0 dBFS clipping. The measurement includes the live combined music stems, normal game gain structure and main compressor. This is a *short-window sample of four songs*, not a full-length sample-perfect proof of unclipped music under all volume/voice/SFX/wind combinations or a human listening test. The non-sampled portions and full program with environmental SFX enabled remain unverified.
+
+Immutable raw second report outside Git:
+`/home/hermes/experiments/bitstream-bsod-mixed-program-final-20261118.json`,
+SHA-256 `9d7f0cfeac4468c652828930bbbf8dccf32a141ba0104eb19626b356bb644817`.
+The script refuses to overwrite the evidence path. Re-run it only on an isolated private build (output filename must be new):
+
+```bash
+GAME_URL=http://100.115.120.66:8206/ REPORT_OUT=/home/hermes/experiments/bsod-mixed-program-new.json node tools/music/audit-bsod-mixed-program-headroom.mjs
+```
