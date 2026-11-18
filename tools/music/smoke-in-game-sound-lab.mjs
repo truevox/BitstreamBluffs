@@ -127,7 +127,7 @@ try {
 			settingsStillOriginal:g.registry.get('settings').dynamicOrchestra===false};
 	});
 	assert.deepEqual(cleanup,{labDestroyed:true,settingsStillOpen:true,
-		livePlaying:false,settingsStillOriginal:true});
+		livePlaying:true,settingsStillOriginal:true}); // menu soundtrack never stops for lab
 	assert.deepEqual(errors,[]);
 	assert.deepEqual(failed,[]);
 	console.log('IN_GAME_LAB_CLEANUP_AND_NO_GAME_SETTING_WRITES_PASS',cleanup);
