@@ -265,7 +265,7 @@ export class Sled {
     // Deterministic physical BSOD airflow; wind/audio renderers never affect physics.
     if (!grounded && atmosphere) {
       const wind = aerodynamicStep({ vx, vy, relativeAirX: atmosphere.relativeAirX,
-        atmosphereDensity: atmosphere.atmosphereDensity, parachute: chute,
+        atmosphereDensity: atmosphere.atmosphereDensity, proximity01: atmosphere.proximity01, parachute: chute,
         airBrake: this.airBrakeActive, airbrakeLiftMul: phys.airbrakeLiftMul || 1, stepMs });
       vx += wind.dvx;
       vy += wind.dvy;

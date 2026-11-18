@@ -1646,3 +1646,66 @@ catalogue IDs for playtesting; these are not permanently frozen owner decisions.
   shop layout, and run-scene behavior; real Chromium shop purchase and
   physical run application tested; still requires gameplay feel/balance
   and sound checks before a merge into main.
+
+## 2026-11-18 — Balance probe adjustment (feature branch only)
+
+The real game's ten hands-off and ten scripted-hop seed sims generated 109
+airborne phases: median around 0.75-0.85 s, longest 1.583 s, zero longer than
+3 s. The optimistic pure-flight BSOD near-miss envelope (18 synthetic cases
+at wall speed 300/600/900 and rank 0/10/30) produced **zero** accepted
+bluffs under the first 280->850px requirement. These are diagnostics, not
+human-playtest statistics. The first-pass force model also capped airbrake
+lift near 215 px/s² versus baseline gravity of 900 px/s², so it could
+not satisfy Marvin's meaningful upward airbrake requirement.
+
+The revised experimental curve increases BSOD tailwind compression to
+600px/s, creates a short near-wall sail impulse from the *relative* airflow
+(`180+1400*proximity^4` times signed tanh(flow/420), times low-speed sail
+efficiency), and converts the airbrake's separately paid horizontal-speed
+loss to materially stronger upward lift (`1250*tanh(|vx|/450)`). A stopped
+rider gets zero airbrake lift; airbrake cannot hover forever without losing
+speed. The bluff detector now requires opening at least to 500px and a
+net gain of >=170px from its closest sampled wall gap, while still needing
+an observed closing approach, positive actual tailwind canopy use and
+survival in-air. All values are unapproved first-playtest tuning.
+
+## 2026-11-18 — Balance iteration 2 (verified feature-branch tuning)
+
+**Observed, source-grounded limitation:** The first optimistic 18-case BSOD
+airflow envelope looked promising after adjustment, but the real Matter
+simulation showed a 600 px/s wall was still effectively impossible to bluff
+after friction/drag. This is why a reduced-order test must NOT be reported
+as a real-game success rate. The original scripted-hop generation of ten
+seeds generated 92 real airborne phases; their longest was 1.583 s.
+
+**Current implementation, all first-playtest values:** After staged
+real-Matter tests, the near-wall compressed tailwind remains 600 px/s at
+zero gap (tapered as gap grows); canopy sail factor
+`0.30 + 0.70/(1+(|vx|/520)^2)`; signed canopy acceleration
+`(180 + 2800*proximity01^4)*tanh(relativeAirX/420)*sailFactor`.
+Wind velocity matching still causes zero thrust, a headwind slows the
+rider, and a stalled rider presents more sail than a racer.
+The airbrake keeps `1250*tanh(|vx|/450)` upward-force
+coupling, with real horizontal speed loss from Sled's existing airbrake.
+No stationary hover, no vacuum aerodynamics, no hard wall-speed cap.
+
+Bluffing now requires a **real observed closing wall** within 280 px,
+a parachute in positive actual tailwind and a genuine escape to >=450 px
+AND >=170 px recovery from minimum gap, still airborne and alive.
+No proximity-only or per-frame score farming. This is **not** a claim that
+sustained same-flight Surfing the Void is easy or infinitely viable.
+
+**Validation evidence:** The reduced-order pure envelope tests now use
+a delayed canopy deployment, not magic sail power at the initial state;
+all 18 favorable scripted cases score, but these exclude drag and
+terrain and are NOT statistical success rates. The source tests
+also explicitly reject a late BSOD already far faster than a plausible
+rider. More importantly, a live Chromium Matter step test starts only
+the initial position/velocity and the chase edge; real physics then
+produces a 300 px/s physical bluff and, with 160 ms airbrake timing,
+a 600 px/s wall bluff in baseline and staged level-30 physics;
+real wall advancement, canopy fuel, upward speed-paid airbrake,
+ground collision and score events were not injected or faked.
+The timing probe must *observe closing* before opening the canopy.
+The near-miss thresholds, coefficient curves, human execution and
+audio mix still require Marvin's playtest/approval.

@@ -35,6 +35,21 @@ describe('BSOD aerodynamics (pure)', () => {
     expect(fast.dvy).toBeLessThan(0);
     expect(fast.dvx).toBe(0);
   });
+  test('a near-wall tailwind pays for an actual emergency sail catch, not distant free thrust', () => {
+    const args={vx:700,relativeAirX:600,parachute:true,stepMs:8};
+    const far=aerodynamicStep({...args,proximity01:0});
+    const close=aerodynamicStep({...args,proximity01:.95});
+    expect(close.dvx).toBeGreaterThan(far.dvx*5);
+    expect(aerodynamicStep({...args,relativeAirX:0,proximity01:1}).dvx).toBe(0);
+  });
+  test('high-speed airbrake can briefly overpower gravity, but stationary lift is zero', () => {
+    const fast=aerodynamicStep({vx:900,airBrake:true,stepMs:8});
+    const stationary=aerodynamicStep({vx:0,airBrake:true,stepMs:8});
+    expect(-fast.dvy).toBeGreaterThan(900*.8*.008); // normal airbrake gravity
+    expect(stationary.dvy).toBe(0);
+    const boost=aerodynamicStep({vx:900,airBrake:true,airbrakeLiftMul:1.3,stepMs:8});
+    expect(boost.dvy).toBeLessThan(fast.dvy);
+  });
   test('vacuum kills all aerodynamic force even during contact-danger', () => {
     expect(aerodynamicStep({vx:900,relativeAirX:1200,atmosphereDensity:0,parachute:true,airBrake:true})).toEqual({dvx:0,dvy:0});
   });

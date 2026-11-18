@@ -8,13 +8,13 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** Treat low-speed riders as a sail, fast riders as a glider. */
 export function canopySailFactor(vx) {
   const speed = Math.abs(Number(vx) || 0);
-  return 0.20 + 0.80 / (1 + Math.pow(speed / 370, 2));
+  return 0.30 + 0.70 / (1 + Math.pow(speed / 520, 2));
 }
 
 /** Proposed first-playtest aerodynamic forces (velocity change in px/s). */
 export function aerodynamicStep({
   vx = 0, vy = 0, relativeAirX = 0, atmosphereDensity = 1,
-  parachute = false, airBrake = false, airbrakeLiftMul = 1, stepMs = 8,
+  parachute = false, airBrake = false, airbrakeLiftMul = 1, proximity01 = 0, stepMs = 8,
 } = {}) {
   const dt = Number.isFinite(stepMs) ? clamp(stepMs, 0, 50) / 1000 : 0;
   const density = clamp(Number.isFinite(atmosphereDensity) ? atmosphereDensity : 0, 0, 1);
@@ -24,7 +24,12 @@ export function aerodynamicStep({
   if (parachute) {
     // Sail coupling follows signed relative airflow, not an arbitrary forward kick.
     // Soft aerodynamic saturation limits acceleration through finite sail area.
-    const sailAccel = 180 * Math.tanh(flow / 420) * canopySailFactor(vx);
+    // The near-wall pressure wave can rescue a timed near miss but cannot
+    // accelerate a rider when airflow matches their velocity. Racing riders
+    // extract less thrust than a slow rider presenting the entire sail.
+    const near = clamp(Number.isFinite(proximity01) ? proximity01 : 0, 0, 1);
+    const sailAccel = (180 + 2800 * Math.pow(near, 4))
+      * Math.tanh(flow / 420) * canopySailFactor(vx);
     dvx += sailAccel * density * dt;
     dvy -= (65 + 45 * Math.tanh(Math.abs(flow) / 600)) * density * dt;
   }
@@ -32,7 +37,11 @@ export function aerodynamicStep({
     // Braking buys altitude by converting available forward speed to lift.
     // Cannot generate endless upward thrust while standing still.
     const flowSpeed = Math.abs(Number(vx) || 0);
-    const aero = 215 * Math.tanh(flowSpeed / 450) * density;
+    // The separate horizontal airbrake already removes substantial speed.
+    // Convert that spent momentum into meaningful, speed-dependent upward lift:
+    // above ~400px/s it can briefly overcome gravity; as the rider slows the
+    // lift collapses, preventing stationary hovering or free infinite flight.
+    const aero = 1250 * Math.tanh(flowSpeed / 450) * density;
     dvy -= aero * Math.max(1, Number.isFinite(airbrakeLiftMul) ? airbrakeLiftMul : 1) * dt;
   }
   return { dvx, dvy };

@@ -20,9 +20,9 @@ describe('physical BSOD pursuit contract', () => {
   test('tailwind faster than wall, increases as gap compresses, relative flow is signed', () => {
     expect(compressedTailwind(150, 100)).toBeGreaterThan(compressedTailwind(150, 2000));
     expect(compressedTailwind(150, 2000)).toBeGreaterThan(150);
-    const s = bsodSnapshot({ active: true, wallX: 0, wallSpeedPxS: 150, sledLeftEdgeX: 100, sledVelocityXPxS: 500 });
+    const s = bsodSnapshot({ active: true, wallX: 0, wallSpeedPxS: 150, sledLeftEdgeX: 100, sledVelocityXPxS: 1000 });
     expect(s.relativeAirX).toBeLessThan(0);
-    expect(s.relativeAirX).toBeCloseTo(s.worldTailwindPxS - 500);
+    expect(s.relativeAirX).toBeCloseTo(s.worldTailwindPxS - 1000);
   });
   test('vacuum eliminates wind regardless of wall proximity and sled velocity', () => {
     const s = bsodSnapshot({ active: true, wallX: 10, wallSpeedPxS: 500, sledLeftEdgeX: 12, sledVelocityXPxS: -200, atmosphereDensity: 0 });

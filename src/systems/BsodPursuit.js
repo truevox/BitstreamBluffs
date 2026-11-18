@@ -12,7 +12,7 @@ export const BSOD_DEFAULTS = Object.freeze({
   initialSpeedPxS: 115,
   accelerationPxS2: 1.15,
   dangerRangePx: 3400,
-  compressionPxS: 260,
+  compressionPxS: 600, // denser near-wall compressed tailwind: an actual last-second sail catch
 });
 
 export const emptyBsodState = () => ({

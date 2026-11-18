@@ -12,8 +12,8 @@ describe('Bitstream Bluffing — actual approach, canopy rescue, escape', () => 
     expect(t.update(frame(1200))).toBeNull();
     expect(t.update(frame(270, { nowMs: 100, playerX: 600 }))).toBeNull();
     expect(t.update(frame(260, { nowMs: 200, playerX: 630, canopyDeployed: true }))).toBeNull();
-    expect(t.update(frame(840, { nowMs: 600, playerX: 780 }))).toBeNull();
-    const r=t.update(frame(855, { nowMs: 800, playerX: 820 }));
+    expect(t.update(frame(440, { nowMs: 600, playerX: 780 }))).toBeNull();
+    const r=t.update(frame(455, { nowMs: 800, playerX: 820 }));
     expect(r).toEqual({type:'bitstreamBluff',points:150,chain:1,surfing:false,closestGapPx:260});
     expect(t.update(frame(1400, { nowMs: 900, playerX: 950 }))).toBeNull();
     expect(t.update(frame(1900, { nowMs: 2000, playerX: 1200 }))).toBeNull();

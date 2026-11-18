@@ -10,7 +10,8 @@
 const finite = (n) => Number.isFinite(n);
 export const BLUFF = Object.freeze({
   armGapPx: 280,
-  escapeGapPx: 850,
+  escapeGapPx: 450, // must escape a meaningful distance; actual tuning is provisional
+  minRegainedGapPx: 170,
   minTravelBetweenPx: 120,
   minAwardIntervalMs: 400,
   basePoints: 150,
@@ -76,7 +77,7 @@ export class BsodBluffTracker {
 
       // A genuine escape must leave the hazard band *alive*, not simply oscillate
       // around the arm threshold while accumulating per-frame points.
-      if (gapPx >= cfg.escapeGapPx) {
+      if (gapPx >= Math.max(cfg.escapeGapPx, this.closestGapPx + cfg.minRegainedGapPx)) {
         const enoughTravel = finite(playerX) && playerX - this.lastAwardX >= cfg.minTravelBetweenPx;
         const enoughTime = finite(nowMs) && nowMs - this.lastAwardTimeMs >= cfg.minAwardIntervalMs;
         if (this.usedCanopy && enoughTravel && enoughTime) {
