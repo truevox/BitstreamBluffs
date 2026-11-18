@@ -28,6 +28,7 @@ import { isRankable, isModdedOnly, countsForDailyBest, countsForStreak } from '.
  * @property {boolean} windEnabled  false mutes wind audio but not wind forces.
  * @property {'tricksRight'|'tricksLeft'|'classic'} controlLayout
  * @property {Object<string,boolean>} musicEnabledSongs   Per-song switches. All false = silence.
+ * @property {boolean} musicShuffle     Shuffle following tracks without repeats; first launch track remains One More Run.
  * @property {boolean} dynamicOrchestra  OFF: original instrumental stems with full FX; ON: separately rendered replacement instruments.
  * @property {boolean} screenShake       false disables shake (accessibility).
  * @property {'default'|'colorblind'} palette
@@ -70,6 +71,7 @@ export function defaultSettings() {
     version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, windVolume: 1, windEnabled: true, screenShake: true,
     palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
+    musicShuffle: false,
     dynamicOrchestra: false,
     musicVocals: false,
     vocalGain: 1,
@@ -105,6 +107,7 @@ export function sanitizeSettings(raw) {
     touchRotate90: typeof raw.touchRotate90 === 'boolean' ? raw.touchRotate90 : d.touchRotate90,
     lastInitials: str(raw.lastInitials).slice(0, INITIALS_MAX),
     musicEnabledSongs: sanitizeSongSelection(raw.musicEnabledSongs),
+    musicShuffle: typeof raw.musicShuffle === 'boolean' ? raw.musicShuffle : d.musicShuffle,
     dynamicOrchestra: typeof raw.dynamicOrchestra === 'boolean' ? raw.dynamicOrchestra : false,
     musicVocals: raw.musicVocals === true,
     vocalGain: num(raw.vocalGain, d.vocalGain, 0, 1),

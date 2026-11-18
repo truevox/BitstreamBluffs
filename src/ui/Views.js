@@ -293,6 +293,10 @@ export class SoundManagerView extends View {
           ...(settings().musicEnabledSongs||{}),[song.id]:v,
         }),
       })),
+      {kind:'choice',label:'SHUFFLE SONGS',options:[
+          {value:false,label:'OFF'},{value:true,label:'ON'}],
+        get:()=>settings().musicShuffle===true,
+        set:v=>updateSetting(game,'musicShuffle',v)},
       {kind:'choice',label:'DYNAMIC ORCHESTRA',badge:'PRE-ALPHA',
         badgeColor:'magenta',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],

@@ -140,14 +140,14 @@ only gameplay emitter.
 
 | Event | Emitter | Listeners |
 |---|---|---|
-| `RUN_START` | RunScene | AudioSynth (start music), UIScene (reset HUD), GlitchPipeline |
-| `RUN_END` | RunScene | AudioSynth (stop music), UIScene |
-| `RUN_ABORT` | PauseScene | AudioSynth (stop music) |
+| `RUN_START` | RunScene | AudioSynth (switch music to biome-aware run DSP without restarting the current song), UIScene (reset HUD), GlitchPipeline |
+| `RUN_END` | RunScene | AudioSynth (neutral menu audio and Debumont lead; current song continues), UIScene |
+| `RUN_ABORT` | PauseScene | AudioSynth (return to menu music without restarting) |
 | `CRASH`, `RESPAWN`, `LANDING`, `TRICK`, `HAZARD_HIT`, `POWERUP_COLLECTED`, `POWERUP_EXPIRED`, `EFFECT_END` | RunScene | AudioSynth (SFX), UIScene (popups/indicators) |
 | `COMBO_CHANGED`, `SCORE_CHANGED`, `DISTANCE_CHANGED` | RunScene (from ScoreManager results) | UIScene |
 | `ZONE_ENTER`, `ZONE_EXIT` | RunScene (compares `getZonesAt(sled.x)` each frame) | UIScene (indicator), AudioSynth |
 | `GLITCH_START`, `GLITCH_END` | RunScene (from `GlitchDirector.update`) | GlitchPipeline (shader intensity), AudioSynth (glitch bus), UIScene (flicker) |
-| `GAME_PAUSE` | RunScene | AudioSynth (duck), UIScene |
+| `GAME_PAUSE` | RunScene | AudioSynth (menu-neutral music; actual playlist clock continues), UIScene |
 | `GAME_RESUME` | PauseScene | AudioSynth, RunScene (re-enable input) |
 | `SETTINGS_CHANGED` | `updateSetting()` | AudioSynth, InputRouter, UIScene, RunScene (screenShake), anything cached from palette |
 | `INPUT_ACTION` | InputRouter | Title/Pause/GameOver scenes (menus), AudioSynth (unlock on first) |
@@ -238,8 +238,13 @@ All additive; no existing signature or payload changed.
   Keys typed into `input`/`textarea` are ignored; Ctrl/Meta/Alt combos are ignored.
 * **Gamepad** (standard mapping, Steam Deck): left stick X analog tilt, RT push, LT tuck, A hop(+confirm), B brake(+cancel),
   X air brake, Y parachute, LB/RB (or right stick X) helicopter CCW/CW, Back reset, Start pause, d-pad = menu + digital tilt.
-* **AudioSynth** additive methods: `setSpeed(pxPerSec)` (wind whoosh + music intensity; RunScene should call it every frame),
-  `setIntensity(0..1)`. Music intensity also follows `DISTANCE_CHANGED`. There is **no event for push or hop**, so RunScene
+* **AudioSynth** additive methods: `setSpeed(pxPerSec)` (music speed/intensity only; RunScene calls it every frame; BSOD event exclusively drives environmental wind),
+  `setIntensity(0..1)`, and `startMenuMusic()` (called once by Title, requests immediate One More Run, browser user gesture permitting).
+  The same playback clock runs through Title, gameplay, death, pause and menus; only mix/melody/biome DSP changes.
+  Menu uses unprocessed original accompaniment with Debumont melody and no speed/jump/BSOD DSP.
+  Settings `musicShuffle` persists through SaveStore; ON shuffles following enabled songs in non-repeating rounds,
+  not the fresh-load One More Run opener. All songs OFF remains music silence.
+  Music intensity also follows `DISTANCE_CHANGED` during runs only. There is **no event for push or hop**, so RunScene
   must call `audio.playSfx('push')` / `playSfx('hop')` itself. Everything else is event driven (also `COMBO_CHANGED`
   reason `'trick'` -> `combo` SFX, `ZONE_ENTER` -> soft blip). It never throws without WebAudio.
 * **GlitchDirector**: event ids are `g<n>-<4 hex>`; the hex tag is the seed-derived pattern that `GlitchPipeline` uses
