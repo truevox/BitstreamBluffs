@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { ProfileStore, sanitizeProfile } from '../../src/systems/ProfileStore.js';
-import { BSOD_GYM_PRICE, gymVisible, gymOwned, GYM_CHASE, gymChaseForLoadout } from '../../src/systems/BsodGym.js';
+import { BSOD_GYM_PRICE, gymVisible, gymOwned, GYM_CHASE, gymChaseForLoadout, gymRechargeMs } from '../../src/systems/BsodGym.js';
 import { BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
 import { upgradeLoadoutForRun } from '../../src/systems/PermanentUpgrades.js';
 import { BsodPursuit } from '../../src/systems/BsodPursuit.js';
@@ -69,6 +69,33 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
  test('invalid/infinite chase coefficients cannot turn the Gym into a zero-speed exploit',()=>{
    expect(gymChaseForLoadout({canopyFuelMul:Infinity,bsodAccelerationMul:0})).toEqual(GYM_CHASE);
    expect(gymChaseForLoadout({canopyFuelMul:-1,bsodAccelerationMul:NaN})).toEqual(GYM_CHASE);
+ });
+ test('training recharge is finite, bounded, strictly decreasing with chain, and rank-independent',()=>{
+   for(const rank of [0,11,12,30,80]){
+     const full=gymChaseForLoadout(upgradeLoadoutForRun({
+       upgradesEnabled:true,upgrades:{canopy:rank},
+     }).effects).parachuteFuelMs;
+     let previous=Infinity;
+     for(let chain=1;chain<=1000;chain++){
+       const award=gymRechargeMs(chain,full);
+       expect(Number.isFinite(award)).toBe(true);
+       expect(award).toBeGreaterThan(0);
+       expect(award).toBeLessThanOrEqual(full);
+       expect(award).toBeLessThan(previous);
+       previous=award;
+     }
+     expect(gymRechargeMs(1,full)).toBeCloseTo(full*0.68);
+     expect(gymRechargeMs(2,full)).toBeCloseTo(gymRechargeMs(1,full)/Math.sqrt(2));
+   }
+   for(const args of [[0,1500],[-1,1500],[NaN,1500],[1,0],[1,-1],
+     [1,NaN],[1,Infinity],[Infinity,1500],[1.5,1500]])
+     expect(gymRechargeMs(...args)).toBe(0);
+ });
+ test('practice refill is not the normal-run rank-12 gate',()=>{
+   const full=1500;
+   expect(gymRechargeMs(1,full)).toBeGreaterThan(0);
+   // Practice gives safe repetitions before ranked canopy recharge is unlocked.
+   expect(gymRechargeMs(4,full)).toBeCloseTo(gymRechargeMs(1,full)/2);
  });
  test('Gym is absent by default, never accidentally revealed by purchasing a canopy rank',()=>{
   const {s}=store();

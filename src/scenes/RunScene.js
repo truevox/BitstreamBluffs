@@ -62,7 +62,7 @@ import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
-import { GYM_CHASE, gymChaseForLoadout } from '../systems/BsodGym.js';
+import { GYM_CHASE, gymChaseForLoadout, gymRechargeMs } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
 const DEG = Math.PI / 180;
@@ -503,7 +503,7 @@ export class RunScene extends Phaser.Scene {
     const rank = this.upgradeRun?.enabled ? this.upgradeRun.ranks?.canopy : 0;
     const full = s.canopyFuelFullMs || PHYSICS.parachuteDurationMs;
     const spent = Number.isFinite(s.parachuteFuelMs) ? s.parachuteFuelMs : full;
-    const recovery = this.bsodGym ? GYM_CHASE.earnedRechargeFraction * full / Math.sqrt(event.chain)
+    const recovery = this.bsodGym ? gymRechargeMs(event.chain, full)
       : canopyBluffRecoveryMs(rank, event.chain, full);
     const newFuel = Math.min(full, spent + recovery);
     const canopyRecoveredMs = Math.max(0, newFuel - spent);

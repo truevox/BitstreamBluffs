@@ -1970,3 +1970,32 @@ non-ranked, and has no profile-bank, lifetime-stat, or run-record write.
 The 200-shard Gym price is deliberately left subject to future playtest
 judgment. Site instructional pages still reveal no Surfing the Void
 instructions or pre-discovery Gym hint.
+
+
+## 2026-11-18 — Pure recharge regression and bounded training economy
+
+**No balancing values changed.** `gymRechargeMs(chain,fullFuelMs)` now owns
+the existing Gym formula `0.68 * fullFuelMs / sqrt(chain)`, validating
+finite positive fuel and safe integer chains. It always awards at most the
+reservoir and strictly declines with greater chain length. Actual earned
+fuel remains capped by the available remaining room in the tank.
+
+**Deterministic baseline matrix (rounded milliseconds; first/second = first
+and second successful scored BSOD Bluffs, not merely proximity):**
+
+| Canopy rank (UPGRADE MODE ON) | Gym full tank | Gym refill 1 | Gym refill 2 | Normal-run refill 1 |
+|---:|---:|---:|---:|---:|
+| 0 | 1,500 | 1,020 | 721 | 0 |
+| 11 | 1,962 | 1,334 | 943 | 0 |
+| 12 | 1,985 | 1,350 | 954 | 287 |
+| 30 | 2,216 | 1,507 | 1,065 | 870 |
+| 80 | 2,394 | 1,628 | 1,151 | 1,010 |
+
+**Interpretation:** Actual owned/equipped upgrades now matter in Gym.
+The separate **practice-only recharge** deliberately allows repeat
+practice even below the rank-12 normal-run earned-refill unlock.
+Thus a successful Gym chain does not guarantee the same maneuver can
+be sustained in a ranked run at low rank. Marvin said this balance
+*seems okay* but has not approved final tuning. These computed data
+and source unit gates are evidence for playtesting, **not** a reason
+to alter the formula or reveal the hidden mechanic in public UI.

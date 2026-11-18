@@ -34,3 +34,15 @@ export function gymChaseForLoadout(effects = {}) {
     accelerationPxS2: GYM_CHASE.accelerationPxS2 * grace,
   };
 }
+
+
+/** Practice-only training refill. This is deliberately NOT the ranked,
+ * rank-12-gated canopyBluffRecoveryMs() perk. The Gym may teach chaining at
+ * any rank, while the real player's active upgrades still scale the tank.
+ * Return a bounded finite positive award only for actual scored chain IDs. */
+export function gymRechargeMs(chain, fullFuelMs) {
+  if (!Number.isSafeInteger(chain) || chain < 1 ||
+      !Number.isFinite(fullFuelMs) || fullFuelMs <= 0) return 0;
+  return Math.min(fullFuelMs,
+    GYM_CHASE.earnedRechargeFraction * fullFuelMs / Math.sqrt(chain));
+}
