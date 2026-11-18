@@ -83,6 +83,7 @@ def candidates(envelope):
 def main():
 	p = argparse.ArgumentParser()
 	p.add_argument('--out', required=True)
+	p.add_argument('--all-segments', action='store_true', help='inspect every 12s source segment, not three representative excerpts')
 	args = p.parse_args()
 	out = Path(args.out)
 	if out.exists():
@@ -91,7 +92,7 @@ def main():
 	for manifest in sorted(PACKS.glob('*/pack.json')):
 		meta = json.loads(manifest.read_text())
 		segments = meta['segments']
-		selected = sorted(set([0, len(segments) // 2, max(0, len(segments) - 2)]))
+		selected = list(range(len(segments))) if args.all_segments else sorted(set([0, len(segments) // 2, max(0, len(segments) - 2)]))
 		windows = []
 		for index in selected:
 			seg = segments[index]
@@ -115,6 +116,7 @@ def main():
 			[(w['startSeconds'],w['stemEvidence']['drums']['candidatePulses'][0]['bpm']
 				if w['stemEvidence']['drums']['candidatePulses'] else None) for w in windows], flush=True)
 	report=dict(format='bitstream-gym-beat-candidate-research-v1',
+		coverage='all source segments' if args.all_segments else '3 source segments per song',
 		status='RESEARCH_ONLY_NO_TRUSTED_GRIDS',
 		method='dual-stem onset envelopes + autocorrelation + phase ranking in 3 sampled 11.5s sections',
 		limitations=['half/double-time ambiguity','cannot distinguish quarter pulse from syncopation',
