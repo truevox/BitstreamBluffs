@@ -74,6 +74,8 @@ No claim is made that the effects sound musically good yet.
 
 **Completed functional gate:** combined source suite 129/129 and 2,196/2,196 tests; isolated Vite production build PASS; eight real Chromium sound workflows PASS, including new danger-specific browser smoke, natural song rollover, session/shuffle persistence, three-screen jukebox, in-game Sound Lab, score inspector, source review queue and vocals/shard purchase. The audio was not listened to or personally approved by Marvin. No playable production deployment was performed.
 
+**Update — real-source loudness correction:** later headroom measurements on shipped Oggs exposed a severe unintentional +5.6 to +11.4 dB near-danger average-gain boost in the first waveshaper. The proposed calibration now uses controlled saturation makeup and gentle mid-danger compensation, with an auditable 36-passage real-source WebAudio loudness/headroom gate. Full evidence, exact fixed thresholds and remaining limitations: `docs/MUSIC-BSOD-REAL-OGG-HEADROOM-GATE-20261118.md`. This changes audio processing only, not the gameplay BSOD signal.
+
 Future ear-validation: compare real four-song excerpts at several danger
 levels in actual in-game music engine; pay special attention to hard
 harmonic transients, gain headroom, and low instrument activity. The older
