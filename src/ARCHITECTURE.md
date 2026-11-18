@@ -1582,3 +1582,23 @@ the wind indicator from `sled.windPomAnchor` and removes it when the rider
 is hidden; using an arbitrary offset from `sled.x/y` (Matter COM) was incorrect.
 This is a visual/accessibility fix only: physical BSOD wind and audio stay
 authoritative and unchanged.
+
+## 2026-11-18 — Bitstream Bluffing scoring (feature branch, initial tune)
+
+A pure BsodBluffTracker observes actual post-physics collision-edge gap,
+closing direction, airborne state, BSOD tailwind and canopy. An attempt arms
+inside 280px **only while the wall closes**. It awards a *single* bonus after
+the rider survives and opens >=850px separation while airborne, having deployed
+the canopy in positive atmospheric BSOD wind. Contact/collision, grounding,
+stale snapshots and non-canopy escapes cannot score. Multiple close/escape
+cycles within one airtime streak form **SURFING THE VOID**; landing breaks the
+streak. Repeated awards require real world-X travel and elapsed time.
+The initial award is 150 points, +75 per chain step, +40 for use of airbrake
+during the dangerous approach, capped at 850 points per successful escape.
+All numerical thresholds are candidates for human playtesting.
+
+RunScene emits additive EVT.BSOD_BLUFF for the distinct mechanic AND the
+established EVT.NEAR_MISS exactly once per scored escape, so the existing
+ScoreManager bonus, missions, achievements, XP and HUD accounting stay aligned.
+Music and physical BSOD pursuit code are unchanged; no artificial BSOD
+unbeatable timer is introduced.

@@ -670,7 +670,10 @@ export class UIScene extends Phaser.Scene {
   }
 
   onNearMiss(p) {
-    this._popup(`NEAR MISS +${fmtInt((p && p.points) || 25)}`, 'magenta');
+    const bsod = p && p.hazardType === 'bsod';
+    const label = !bsod ? 'NEAR MISS' : p.surfing
+      ? `SURFING THE VOID x${p.chain}` : 'BITSTREAM BLUFF';
+    this._popup(`${label} +${fmtInt((p && p.points) || 25)}`, bsod ? 'amber' : 'magenta');
     uiSfx(this, 'nearMiss');
   }
 

@@ -61,6 +61,7 @@ import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, emptyBsodState } from '../systems/BsodPursuit.js';
+import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -302,6 +303,7 @@ export class RunScene extends Phaser.Scene {
     this.bsod = new BsodPursuit({ sledLeftEdgeX: sledLeftCollisionEdge(this.sled), level: prof.level });
     this.bsodState = this.bsod.state(sledLeftCollisionEdge(this.sled), this.sled.vx, 1);
     this.bsodCaught = false;
+    this.bsodBluffs = new BsodBluffTracker();
     this.bsodEdge = this.add.graphics().setDepth(16);
     this.windPom = this.add.graphics().setDepth(22);
     this.startGate = this.add.graphics().setDepth(6);
@@ -408,6 +410,7 @@ export class RunScene extends Phaser.Scene {
 
   /** Reset wind/music subscriptions on end, abort or teardown; never mutate the music mixer. */
   deactivateBsod() {
+    if (this.bsodBluffs) this.bsodBluffs.reset();
     if (!this.bsod || !this.bsod.active) return;
     this.bsodState = this.bsod.stop();
     if (this.game && this.game.events) this.game.events.emit(EVT.BSOD_STATE_CHANGED, emptyBsodState());
@@ -447,6 +450,30 @@ export class RunScene extends Phaser.Scene {
       pom.fillStyle(this.palette.amber, 0.98);
       pom.fillCircle(endX, endY, 3);
     }
+  }
+
+  /** A real close approach followed by a parachute escape; zero score for proximity alone. */
+  updateBsodBluff() {
+    if (!this.bsodBluffs || !this.sled || !this.bsodState) return;
+    const s = this.sled, danger = this.bsodState;
+    const event = this.bsodBluffs.update({
+      active: danger.active, gapPx: danger.gapPx, playerX: s.x, nowMs: this.runTimeMs,
+      grounded: !!s.grounded, crashed: !!this.crashed || !!this.bsodCaught,
+      canopyDeployed: (s.parachuteMs || 0) > 0,
+      airbrakeDeployed: !!s.airBrakeActive,
+      relativeAirX: danger.relativeAirX,
+      atmosphereDensity: danger.atmosphereDensity,
+    });
+    if (!event) return;
+    // Existing near-miss accounting feeds scoring, missions, achievements and run records.
+    this.nearMissCount = (this.nearMissCount || 0) + 1;
+    this.bonus(event.points, 'nearMiss');
+    const payload = {
+      hazardType: 'bsod', points: event.points, x: s.x, y: s.y,
+      chain: event.chain, surfing: event.surfing, closestGapPx: event.closestGapPx,
+    };
+    this.game.events.emit(EVT.NEAR_MISS, payload);
+    this.game.events.emit(EVT.BSOD_BLUFF, payload);
   }
 
   // ------------------------------------------------------------------ terrain streaming
@@ -896,6 +923,7 @@ export class RunScene extends Phaser.Scene {
     if (this.pendingCrash) this.resolveCrash(fs);
 
     if (!this.crashed) {
+      this.updateBsodBluff();
       this.updateFun(dt, pad, Math.max(0, (sled.x - this.startX) / PIXELS_PER_METER));
       // distance
       const metres = Math.max(0, (sled.x - this.startX) / PIXELS_PER_METER);

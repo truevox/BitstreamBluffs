@@ -74,6 +74,8 @@ export const EVT = Object.freeze({
   LANDING_BOOST: 'bb:landingBoost',
   /** Emitter: RunScene (fun-pass). Payload: NearMissPayload. */
   NEAR_MISS: 'bb:nearMiss',
+  /** Emitter: RunScene after a physically completed BSOD near-miss escape. Payload: BitstreamBluffPayload. */
+  BSOD_BLUFF: 'bb:bsodBluff',
   /** Emitter: RunScene (fun-pass). Payload: ShardCollectedPayload. */
   SHARD_COLLECTED: 'bb:shardCollected',
   /** Emitter: RunScene (fun-pass). Payload: MilestonePayload. */
@@ -92,6 +94,17 @@ export const EVT = Object.freeze({
   /** W2: a mission's target was met mid-run (payload {id,title,xp,shards}). Additive. */
   MISSION_COMPLETED: 'bb:missionCompleted',
 });
+
+/**
+ * @typedef {Object} BitstreamBluffPayload
+ * @property {'bsod'} hazardType
+ * @property {number} points  immediate bonus (also emitted once via NEAR_MISS).
+ * @property {number} x  world rider position on escaping BSOD danger band.
+ * @property {number} y
+ * @property {number} chain  successful bluffs without landing; >1 is Surfing the Void.
+ * @property {boolean} surfing
+ * @property {number} closestGapPx  minimum positive collision-edge separation.
+ */
 
 /**
  * @typedef {Object} BsodStatePayload

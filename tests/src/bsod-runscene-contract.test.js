@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { BsodPursuit } from '../../src/systems/BsodPursuit.js';
+import { BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
 import { EVT } from '../../src/events.js';
 import { killerName } from '../../src/systems/CrashReport.js';
 
@@ -106,5 +107,60 @@ describe('Wind pom-pom visual anchor', () => {
     scene.sled.hidden = true;
     scene.drawBsodCues();
     expect(calls).toEqual([['clear']]);
+  });
+});
+
+
+describe('Bitstream Bluffing RunScene integration', () => {
+  test('exactly one successful escape becomes existing near-miss scoring and one named bluff event', () => {
+    const scene=Object.create(RunScene.prototype);
+    const emitted=[],bonuses=[];
+    scene.sled={x:1000,y:200,grounded:false,parachuteMs:0,airBrakeActive:false};
+    scene.bsodState={active:true,gapPx:1000,relativeAirX:440,atmosphereDensity:1};
+    scene.bsodBluffs=new BsodBluffTracker();
+    scene.game={events:{emit:(key,payload)=>emitted.push([key,payload])}};
+    scene.bonus=(points,kind)=>{ bonuses.push([points,kind]);return true; };
+    scene.nearMissCount=0;
+    scene.crashed=false;
+    scene.bsodCaught=false;
+    scene.runTimeMs=0;
+    scene.updateBsodBluff();
+    scene.bsodState.gapPx=200;
+    scene.sled.parachuteMs=360;
+    scene.sled.airBrakeActive=true;
+    scene.runTimeMs=100;
+    scene.updateBsodBluff();
+    scene.sled.x=1300;
+    scene.bsodState.gapPx=860;
+    scene.runTimeMs=900;
+    scene.updateBsodBluff();
+    expect(bonuses).toEqual([[190,'nearMiss']]);
+    expect(scene.nearMissCount).toBe(1);
+    expect(emitted.map(([k])=>k)).toEqual([EVT.NEAR_MISS,EVT.BSOD_BLUFF]);
+    expect(emitted[0][1]).toMatchObject({
+      hazardType:'bsod',points:190,chain:1,surfing:false,closestGapPx:200,
+    });
+    scene.updateBsodBluff();
+    expect(bonuses).toHaveLength(1);
+  });
+
+  test('terminal collision never awards a last-frame BSOD bluff', () => {
+    const scene=Object.create(RunScene.prototype);
+    scene.sled={x:1200,y:200,grounded:false,parachuteMs:300,airBrakeActive:true};
+    scene.bsodBluffs=new BsodBluffTracker();
+    scene.bsodState={active:true,gapPx:1000,relativeAirX:440,atmosphereDensity:1};
+    scene.game={events:{emit:jest.fn()}};
+    scene.bonus=jest.fn();
+    scene.runTimeMs=0;
+    scene.updateBsodBluff();
+    scene.bsodState.gapPx=210;
+    scene.runTimeMs=100;
+    scene.updateBsodBluff();
+    scene.bsodCaught=true;
+    scene.bsodState.gapPx=0;
+    scene.runTimeMs=500;
+    scene.updateBsodBluff();
+    expect(scene.bonus).not.toHaveBeenCalled();
+    expect(scene.bsodBluffs.chain).toBe(0);
   });
 });
