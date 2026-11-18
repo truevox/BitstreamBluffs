@@ -1532,3 +1532,14 @@ landing or externally launched new flight. PhysicsTuner gates parachute and
 airbrake gravity effects by atmospheric density; Space Mountain nulls both.
 These numerical coefficients are provisional pending arcade playtesting.
 No music source or audio rendering has been modified.
+
+## v2.16 in-progress: asymmetric landings / predictable flip speed
+
+TrickTracker.classifyLanding now accepts pitch bands [-22,+12] perfect,
+[-38,+28] good and [-65,+55] sloppy (hard impacts still crash).
+Numeric helicopter phase is graded independently at 40/75/120 degrees;
+a backwards touchdown beyond 120 is a crash. The boolean legacy
+midSpin indicator retains its original one-grade penalty contract for
+older callers. Airborne tilt follows a 680deg/s target at 1300deg/s^2
+rather than accumulating acceleration all the way to the old 900deg/s cap.
+Values require player feel and high-speed replay validation.

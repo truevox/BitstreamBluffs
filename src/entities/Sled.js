@@ -347,7 +347,15 @@ export class Sled {
     this._lastTilt = tilt;
     const g = this.grounded;
     const torqueDeg = phys.tiltTorqueDegS2 * (g ? TUNING.groundTiltMul : phys.airControl) * tilt;
-    w += torqueDeg * DEG * dt;
+    if (!g && tilt !== 0) {
+      // Continuous flip input approaches a stable angular velocity. Once the
+      // target is reached, holding the button no longer accelerates the flip.
+      const desired = tilt * TUNING.flipTargetDegS * DEG;
+      const step = TUNING.flipAccelDegS2 * DEG * dt;
+      w += clamp(desired - w, -step, step);
+    } else {
+      w += torqueDeg * DEG * dt;
+    }
     if (phys.scrambleJitterDegS2) w += (Math.random() * 2 - 1) * phys.scrambleJitterDegS2 * DEG * dt;
     if (!g && tilt === 0) {
       // hands off: spin bleeds off and the nose eases toward the travel direction, so a pitch-over at a lip does not tumble the sled

@@ -47,7 +47,7 @@ describe('helpers', () => {
   test('classifyLanding thresholds', () => {
     expect(classifyLanding(0, 100).quality).toBe('perfect');
     expect(classifyLanding(PERFECT_ANGLE_DEG, 100).quality).toBe('perfect');
-    expect(classifyLanding(-(PERFECT_ANGLE_DEG + 1), 100).quality).toBe('good');
+    expect(classifyLanding(-(PERFECT_ANGLE_DEG + 1), 100).quality).toBe('perfect');
     expect(classifyLanding(GOOD_ANGLE_DEG, 100).quality).toBe('good');
     expect(classifyLanding(GOOD_ANGLE_DEG + 1, 100).quality).toBe('sloppy');
     expect(classifyLanding(SLOPPY_ANGLE_DEG, 100).quality).toBe('sloppy');
@@ -56,6 +56,21 @@ describe('helpers', () => {
     expect(classifyLanding(0, CRASH_IMPACT_PX_S).quality).toBe('crash');
     expect(classifyLanding(0, 899).quality).toBe('perfect');
     expect(classifyLanding(0, 1000).quality).toBe('good'); // too violent to be perfect
+    // Keep original nose-down limits, extend only the lean-back side.
+    expect(classifyLanding(-22, 100).quality).toBe('perfect');
+    expect(classifyLanding(-23, 100).quality).toBe('good');
+    expect(classifyLanding(-38, 100).quality).toBe('good');
+    expect(classifyLanding(-39, 100).quality).toBe('sloppy');
+    expect(classifyLanding(-65, 100).quality).toBe('sloppy');
+    expect(classifyLanding(-66, 100).quality).toBe('crash');
+    // Yaw is separate: helicopters are more forgiving than pitch, never safe backwards.
+    expect(classifyLanding(0, 100, 40).quality).toBe('perfect');
+    expect(classifyLanding(0, 100, 41).quality).toBe('good');
+    expect(classifyLanding(0, 100, 75).quality).toBe('good');
+    expect(classifyLanding(0, 100, 76).quality).toBe('sloppy');
+    expect(classifyLanding(0, 100, 120).quality).toBe('sloppy');
+    expect(classifyLanding(0, 100, 121).quality).toBe('crash');
+
     expect(classifyLanding(0, HARD_IMPACT_PX_S).hard).toBe(true);
     expect(classifyLanding(0, HARD_IMPACT_PX_S - 1).hard).toBe(false);
   });
@@ -467,7 +482,7 @@ describe('incomplete helicopter landing penalty', () => {
     expect(classifyLanding(SLOPPY_ANGLE_DEG + 1, 100, true).quality).toBe('crash');
     expect(classifyLanding(0, CRASH_IMPACT_PX_S, true).quality).toBe('crash');
     expect(classifyLanding(0, 100, 10).quality).toBe('perfect'); // within tolerance of a whole turn
-    expect(classifyLanding(0, 100, 90).quality).toBe('good');
+    expect(classifyLanding(0, 100, 90).quality).toBe('sloppy');
     expect(classifyLanding(0, 100, 40).quality).toBe('perfect'); // coast
     expect(classifyLanding(0, 100).quality).toBe('perfect'); // legacy callers unchanged
   });
@@ -519,7 +534,7 @@ describe('incomplete helicopter landing penalty', () => {
     test('a real half-turn that was released is still mid-spin and drops a grade', () => {
       const l = spinLanding({ heldFrames: 20, perFrame: 9, releaseFrames: 4, coastDeg: 5 }); // ~185 deg
       expect(l.midSpin).toBe(true);
-      expect(l.quality).toBe('good');
+      expect(l.quality).toBe('crash');
     });
 
     test('key still held at touchdown with a short spin is mid-spin (the spin is unfinished)', () => {
@@ -529,7 +544,7 @@ describe('incomplete helicopter landing penalty', () => {
       r.frame({ input: { heli: 1 }, state: { heliDeg: 80, midSpin: 80 } });
       const l = r.frame({ grounded: true, state: { vx: 100, vy: 50, heliDeg: 90, midSpin: 90 } }).landing;
       expect(l.midSpin).toBe(true);
-      expect(l.quality).toBe('good');
+      expect(l.quality).toBe('sloppy');
     });
 
     test('a spin that crosses the quarter-turn minimum on the touchdown frame is still penalised', () => {
@@ -539,7 +554,7 @@ describe('incomplete helicopter landing penalty', () => {
       r.frame({ state: { heliDeg: 85, midSpin: 85 } }); // key released, still airborne: max spin so far 85 < 90
       const l = r.frame({ grounded: true, state: { vx: 100, vy: 50, heliDeg: 95, midSpin: 95 } }).landing; // 95 on touchdown
       expect(l.midSpin).toBe(true);
-      expect(l.quality).toBe('good');
+      expect(l.quality).toBe('sloppy');
     });
 
     test('a landing that is already sloppy does not report a spin cut', () => {

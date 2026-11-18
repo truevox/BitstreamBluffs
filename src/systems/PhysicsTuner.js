@@ -86,6 +86,9 @@ export const TUNING = Object.freeze({
    * release added ~100 deg of spin the player could not time; 900 keeps a double flip possible in ~1.4 s of air (see airTiltFeelMul).
    */
   maxAngularVelDegS: 900,
+  /** Held airborne flips approach a stable, controllable rate instead of accelerating forever. */
+  flipTargetDegS: 680,
+  flipAccelDegS2: 1300,
   /** Push kick: surface speed set by W when stalled (px/s), and re-trigger delay. */
   pushKickPxS: 90,
   /**
