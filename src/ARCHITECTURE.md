@@ -2423,3 +2423,52 @@ new run record and one `RUN_END` still complete. A throwing EventEmitter
 observer can still suppress *later* listeners on the same `EVT.CRASH`; each
 subsystem should contain its own audio callback failures. No synth/music
 exception is permitted to hold gameplay hostage.
+
+
+### 2026-11-18 — Music Friday fatal crash count-in implemented on ISOLATED MUSIC branch
+
+**Newest branch-only audio implementation:**
+`feature/music-fatal-countin-20261118` descends from the integrated
+manual-vinyl base `9abb3f7`, and has incorporated Control Friday's fatal
+identity/fault-isolation gameplay commits `1000852` and `afeff56`.
+The music-owned implementation is in `src/systems/music/FatalCrashCountIn.js`,
+`src/systems/music/MusicFXGraph.js`, and `src/systems/AudioSynth.js`.
+This newer status supersedes the *historical*, accurate previous-section
+statement that music crash processing was not yet implemented at that time.
+
+A **strictly genuine** `EVT.CRASH {fatal:true,negated:false,runId}` triggers
+one short descending record scratch, two **synthetic** 0.5-second silent
+pulses, exactly four short accents cut from the original track's decoded
+`drums.ogg` AudioBuffer, and the complete same original six-stem source
+return. The source mixer has a distinct per-source recovery gain ahead of
+motion and adaptive routing; the same source transport, original track token,
+WebAudio playback clock and note/beat catalog remain unchanged. The extra
+four accents share the **existing mixer**: no second player, no new song,
+no rewind. `RUN_END` and immediate `RUN_START` never cancel the sequence,
+but explicit user jukebox choices, manual pause, mute and song changes do.
+Repeated `CRASH` events with the same runId cannot restart the effect;
+shield-negated hits and Gym catches never start it.
+
+**The research 0.5-second beat grid is unverified and NOT release-grade.**
+The two silent pulses and four accents are deterministic test fixtures,
+not newly approved song beat positions. `getBeatTiming()` and
+`isBeatTimingCurrent()` fail closed while an automatic fatal count-in is
+active; neither the Gym's verified-pulse catalog nor original OGG tracks
+were modified. Once real human-reviewed source quarter-note grids are
+available, replace the research pulse selection without changing gameplay
+or creating another source transport.
+
+**QA:** `tests/src/fatal-crash-countin.test.js` covers strict event metadata,
+source-derived drum transient selection, duplicate fatal events, exact
+four-hit scheduling, cross-run carry and cancellation. Chromium checks
+`tools/music/smoke-fatal-crash-countin-original-ogg.mjs`,
+`tools/music/smoke-fatal-countin-four-songs-ogg.mjs`, and
+`tools/music/audit-fatal-countin-real-webaudio.mjs` validate the actual
+original song sources and audible waveform envelopes. Control's
+`tools/fatal-death-countin-gameplay-contract-browser-smoke.mjs` validates
+shield, real fatal BSOD, Game Over, instant retry, Gym catches and
+fault isolation. Full implementation contract and remaining musical-review
+gates: `docs/MUSIC-FATAL-CRASH-COUNTIN-AUDIO-HANDOFF-20261118.md`.
+
+**No merge to `main`, gameplay deployment, or human listening sign-off**
+occurs by creating this feature branch.

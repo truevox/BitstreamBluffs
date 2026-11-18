@@ -208,6 +208,12 @@ export class StemFXMixer {
 		this._spectrum = new Uint8Array(this.analyser.frequencyBinCount);
 		this.mixInput = ctx.createGain();
 		this.mixInput.connect(this.analyser);
+		// A tiny four-hit count-in may borrow short percussion excerpts from
+		// already decoded original drum audio. It shares THIS same bus and
+		// music transport but bypasses original-source recovery mute gates.
+		this.countInInput=ctx.createGain();
+		this.countInInput.connect(this.mixInput);
+		this.recoveryPlan=null;
 		this.space = new BiomeSpaceBus(ctx, this.mixInput, { quality: roomQuality });
 	}
 
@@ -223,7 +229,10 @@ export class StemFXMixer {
 		// original↔replacement fades. Default gain=1 preserves legacy packs.
 		const mix = this.ctx.createGain();
 		mix.gain.value = 1;
-		motion.connect(mix);
+		const recovery=this.ctx.createGain();
+		recovery.gain.value=1;
+		motion.connect(recovery);
+		recovery.connect(mix);
 		const output = this.ctx.createGain();
 		// Only the three ORIGINAL accompaniment stems get BSOD corruption.
 		// This permanent processor survives every biome FX replacement.
@@ -239,8 +248,9 @@ export class StemFXMixer {
 		send.gain.value = defaultRoomSend;
 		mix.connect(send);
 		send.connect(this.space.input);
-		const source = { input, motion, mix, output, chain, send, threat, defaultRoomSend };
+		const source = { input, motion, recovery, mix, output, chain, send, threat, defaultRoomSend };
 		this.sources.set(id, source);
+		if(this.recoveryPlan)this._scheduleRecoveryGate(source,this.recoveryPlan);
 		return input;
 	}
 
@@ -251,6 +261,42 @@ export class StemFXMixer {
 		if (!source) return false;
 		numericParam(source.send.gain, value == null ? source.defaultRoomSend : clamp(value, 0, 1), this.ctx.currentTime, 0.15);
 		return true;
+	}
+
+	/** Music-only crash gate, independent of user level, motion gain,
+	 * original-vs-adaptive mix crossfade, and room send. ALL source
+	 * channels are gated; exactly four short drum accents may use
+	 * countInInput before the existing master/music compressor.
+	 */
+	_scheduleRecoveryGate(source,plan){
+		const param=source.recovery.gain;
+		const now=this.ctx.currentTime;
+		param.cancelScheduledValues(now);
+		param.setValueAtTime(param.value,now);
+		if(now<plan.bandAt){
+			param.linearRampToValueAtTime(0,Math.min(plan.bandAt,now+.014));
+			param.setValueAtTime(0,plan.bandAt);
+		}
+		param.linearRampToValueAtTime(1,Math.max(now+.01,plan.bandAt+.055));
+	}
+
+	setRecoveryPlan(plan){
+		if(!plan||!Number.isFinite(plan.bandAt)||
+			plan.bandAt<=this.ctx.currentTime)return false;
+		this.recoveryPlan=plan;
+		for(const source of this.sources.values())this._scheduleRecoveryGate(source,plan);
+		return true;
+	}
+
+	cancelRecoveryPlan(){
+		this.recoveryPlan=null;
+		const now=this.ctx.currentTime;
+		for(const source of this.sources.values()){
+			const param=source.recovery.gain;
+			param.cancelScheduledValues(now);
+			param.setValueAtTime(param.value,now);
+			param.linearRampToValueAtTime(1,now+.04);
+		}
 	}
 
 	setGain(id, value, { motion = false, time = 0.04 } = {}) {
@@ -338,12 +384,13 @@ export class StemFXMixer {
 		for (const timer of this.timers) clearTimeout(timer);
 		this.timers.clear();
 		for (const src of this.sources.values()) {
-			try { src.input.disconnect(); src.motion.disconnect(); src.mix.disconnect(); src.output.disconnect(); src.send.disconnect(); } catch {}
+			try { src.input.disconnect(); src.motion.disconnect(); src.recovery.disconnect(); src.mix.disconnect(); src.output.disconnect(); src.send.disconnect(); } catch {}
 			src.chain.dispose();
 			src.threat?.destroy();
 		}
 		this.sources.clear();
 		this.space.destroy();
+		this.countInInput.disconnect();
 		this.mixInput.disconnect();
 		this.analyser.disconnect();
 	}

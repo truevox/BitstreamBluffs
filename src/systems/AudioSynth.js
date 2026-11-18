@@ -28,6 +28,7 @@ import { REG } from '../constants.js';
 import { Rng } from './Rng.js';
 import { StemMusicDirector } from './music/StemMusicDirector.js';
 import { TurntableScratch } from './music/TurntableScratch.js';
+import { FatalCrashCountIn } from './music/FatalCrashCountIn.js';
 import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
 import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
 import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
@@ -97,6 +98,9 @@ export class AudioSynth {
     this._vinylPauseSession = null;
     this._vinylResume = null;
     this._vinylResumeTimer = null;
+    this._fatalCountIn = null;
+    this._lastFatalCountIn = null;
+    this._lastFatalRunId = null;
     this._lastSfx = {};
     this._arrCache = new Map();
     this._gameListeners = [];
@@ -109,6 +113,17 @@ export class AudioSynth {
       }
     };
     this._stemMusic.onTrackStarted = (track) => {
+      const current=this._fatalCountIn?.active;
+      if(current && (current.trackId!==track.id ||
+          current.transportToken!==this._stemMusic._token))
+        this._cancelFatalCountIn();
+      // Preload a single later ORIGINAL drum segment if the song begins
+      // nearly drumless; one track's first 12 seconds are near silent.
+      // This never starts a new music transport or blocks menu/gameplay.
+      // An optional source warmup failure must never produce an unhandled
+      // rejection or disrupt the existing song-start notification.
+      try { this._fatalCountIn?.prepare(this._stemMusic)?.catch?.(()=>{}); }
+      catch { /* pack decode warming is always best-effort */ }
       this.game?.events?.emit(EVT.MUSIC_TRACK_CHANGED, { id: track.id, title: track.title });
     };
     this._bind();
@@ -128,7 +143,10 @@ export class AudioSynth {
         // Never stop or restart the shared song on crashes, death, or quitting.
         on(EVT.RUN_END, () => { this._exitVinylRun(); this._enterMenuMusic(); });
         on(EVT.RUN_ABORT, (p) => {
-          if (this._exitVinylRun(p) !== false) this._enterMenuMusic();
+          if (this._exitVinylRun(p) !== false) {
+            this._cancelFatalCountIn(); // intentional quit, not instant GameOver retry
+            this._enterMenuMusic();
+          }
         });
         on(EVT.BSOD_STATE_CHANGED, (p) => this._onBsodState(p));
         on(EVT.LANDING, (p) => this._onLanding(p));
@@ -143,7 +161,12 @@ export class AudioSynth {
           if (p && p.negated) {
             this.playSfx('powerupEnd', { pitch: 0.7 });
             this.playSfx('crash', { volume: 0.4, pitch: 1.4 });
-          } else this.playSfx('crash');
+          } else {
+            this.playSfx('crash');
+            // Only the authoritative Control Friday fatal contract, never
+            // ordinary non-negated telemetry or a stale legacy event.
+            if(p?.fatal===true)this._onFatalCrashMusic(p);
+          }
         });
         on(EVT.RESPAWN, () => this.playSfx('respawn'));
         on(EVT.POWERUP_COLLECTED, () => this.playSfx('powerup'));
@@ -301,6 +324,10 @@ export class AudioSynth {
     // filter, bypassing muted procedural musicSrc but retaining volume, SFX
     // ducking, pause low-pass, glitch bus, master and compressor.
     this._stemMusic?.attach(c, n.musicFilter);
+    // The same original stem director/mixer owns all fatal count-in audio.
+    // The vinyl one-shot is reused; no second playlist or transport.
+    this._fatalCountIn=new FatalCrashCountIn(c,this._stemMusic?.mixer,
+      this._vinylScratch);
   }
 
   /**
@@ -622,7 +649,10 @@ export class AudioSynth {
         }
       }
       if (!this.nodes) return;
-      if (!this._vinylAudible()) this._vinylScratch?.cancel();
+      if (!this._vinylAudible()) {
+        this._vinylScratch?.cancel();
+        this._cancelFatalCountIn();
+      }
       const t = this.ctx.currentTime;
       this.nodes.master.gain.setTargetAtTime(this.settings.masterVolume, t, 0.02);
       this.nodes.musicBus.gain.setTargetAtTime(this.settings.musicVolume * 0.55, t, 0.02);
@@ -688,6 +718,7 @@ export class AudioSynth {
 
   /** Jukebox intent is authoritative over automatic song restoration. */
   _vinylJukeboxIntent() {
+    this._cancelFatalCountIn();
     if (!this._vinylPauseSession && !this._vinylResume) return;
     if (this._vinylPauseSession) this._vinylPauseSession.manualOverride = true;
     this._cancelVinylTransition();
@@ -706,7 +737,10 @@ export class AudioSynth {
       payload.pauseToken !== session.pauseToken) ||
       (payload?.runId && session.runId && payload.runId !== session.runId)))
       return false;
-    const pending = this._cancelVinylTransition();
+    // RUN_END follows a real fatal CRASH in the SAME tick. Do NOT
+    // cancel its descending vinyl scratch as if it were an obsolete
+    // MANUAL-resume effect. Only a real manual pause owns this cleanup.
+    const pending = session ? this._cancelVinylTransition() : null;
     this._vinylPauseSession = null;
     this._paused = false;
     const snap = session || pending?.snapshot;
@@ -734,6 +768,9 @@ export class AudioSynth {
     try {
       if (this._destroyed || this._paused ||
           (payload?.reason && payload.reason !== 'manual')) return;
+      // User manual pause supersedes an automatic death-count-in even after
+      // an immediate retry; no incompatible scratches may overlap.
+      this._cancelFatalCountIn();
       const old = this._cancelVinylTransition();
       const d = this._stemMusic;
       const originallyWanted = this._musicWanted || old?.shouldResume === true;
@@ -1068,6 +1105,40 @@ export class AudioSynth {
     } catch {return false;}
   }
 
+  /** Read-only fatal-recovery state; never exposes a synthetic beat as
+   * trusted Gym timing or as a release-approved score annotation. */
+  getFatalCountInStatus() {
+    return this._fatalCountIn?.snapshot() ||
+      Object.freeze({active:false,stage:'idle'});
+  }
+
+  _cancelFatalCountIn() {
+    try { this._fatalCountIn?.cancel(); }
+    catch { /* optional audio may never trap game transitions */ }
+  }
+
+  _onFatalCrashMusic(payload) {
+    try {
+      const d=this._stemMusic;
+      // Only real fatal in-run impacts with an original playing pack.
+      // Gym catches, shield-negated hits, quit/restart and manual Pause
+      // NEVER request a new count-in or synthetic trusted Gym beat.
+      if(payload?.fatal!==true||payload.negated!==false||
+        typeof payload.runId!=='string'||!payload.runId.trim()||
+        payload.runId===this._lastFatalRunId||
+        this._paused||this._destroyed||this._musicMode!=='run'||
+        !this._vinylAudible()||!this._musicWanted||!d?.started||
+        d.transportPaused||this._vinylPauseSession||this._vinylResume)
+        return null;
+      const result=this._fatalCountIn?.start(d,{runId:payload.runId});
+      if(result){
+        this._lastFatalCountIn=result;
+        this._lastFatalRunId=payload.runId;
+      }
+      return result;
+    } catch { return null; }
+  }
+
   /** PUBLIC readonly music timing for gameplay such as the BSOD Gym.
    * Return either an imminent validated quarter-note pulse, or an immediate
    * no-wait fallback. Never creates a player, starts music, or mutates physics.
@@ -1081,6 +1152,8 @@ export class AudioSynth {
         return fallback('audio-unavailable');
       if(!this._musicWanted||!d.started||d.transportPaused||this._paused)
         return fallback('music-not-playing');
+      if(this.getFatalCountInStatus().active)
+        return fallback('fatal-recovery-grid-unverified');
       if(!(this.settings?.masterVolume>0&&this.settings?.musicVolume>0)||
         !hasEnabledSongs(this.settings?.musicEnabledSongs))
         return fallback('music-muted-or-disabled');
@@ -1114,7 +1187,8 @@ export class AudioSynth {
   isBeatTimingCurrent(snapshot) {
     try {
       if(!snapshot?.trusted||snapshot.release!=='on-beat'||
-        !Number.isFinite(snapshot.dueAudioTime))return false;
+        !Number.isFinite(snapshot.dueAudioTime)||
+        this.getFatalCountInStatus().active)return false;
       const d=this._stemMusic,c=this.ctx;
       if(!c||c.state!=='running'||this.unavailable||this._paused||
         !this._musicWanted||!d?.started||d.transportPaused||
@@ -1135,6 +1209,7 @@ export class AudioSynth {
   /** @returns {void} */
   stopMusic() {
     try {
+      this._cancelFatalCountIn();
       this._cancelVinylTransition();
       this._vinylPauseSession = null;
       this._musicWanted = false;
@@ -1332,6 +1407,8 @@ export class AudioSynth {
     this._destroyed = true;
     try {
       this.stopMusic();
+      this._fatalCountIn?.destroy();
+      this._fatalCountIn=null;
       this._vinylScratch?.destroy();
       this._vinylScratch = null;
       this._stemMusic?.destroy();
