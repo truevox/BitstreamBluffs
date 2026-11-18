@@ -68,3 +68,44 @@ drum-only beats + band return; Marvin explicitly approved carrying the
 count-in into an immediate retry. Music Friday supplied pacing/implementation
 analysis and suggested reusing the same stems. This file does not assert that
 any crash transition has been coded, tested, or deployed.
+
+## Control Friday's death-event contract (isolated branch, November 18)
+
+The existing global `EVT.CRASH` signal now carries **additive**, unambiguous
+`runId` and `fatal` fields. It remains **exactly one original event name**,
+not a new soundtrack transport event:
+
+```js
+// A saved collision, continuing the same run:
+EVT.CRASH, {negated:true, fatal:false, runId:'<current-run>', /* prior fields */}
+// Genuine run-ending death:
+EVT.CRASH, {negated:false, fatal:true, runId:'<current-run>', /* prior fields */}
+EVT.RUN_END, {record:{id:'<same-run>',cause:'crash', /* existing record */}, biomeVisits}
+// Later, on immediate retry, a new run is allowed immediately:
+EVT.RUN_START, {runId:'<different-run>',gym:false, /* existing fields */}
+```
+
+**Ordering:** on a genuine fatal collision, `CRASH` fires once **before**
+`RUN_END`. After approximately 950ms of crash animation the Game Over screen
+opens; the user can retry immediately, producing a fresh `RUN_START` with a
+different run identity. Game Over and the next `RUN_START` must **not** cancel,
+restart, or rewind the audio count-in. Music must not wait for Game Over to
+begin its sequence or depend on a UI timer. No new score/ledger fields are
+added by this change; the original `RunRecord`/ledger hash is untouched.
+
+**Exclusions:** an absorbed shield hit emits `CRASH {negated:true,fatal:false}`
+and **no** `RUN_END`; a non-ranked Gym BSOD catch emits
+`EVT.GYM_ATTEMPT_RESET` and emits neither `EVT.CRASH` nor `EVT.RUN_END`.
+Manual Shift respawns, intentional Pause/Resume, restart/quit, and ordinary
+menu navigation also do not emit a fatal crash. Music Friday may bind the
+state machine to `CRASH {fatal:true,runId}` and use `RUN_END` as supporting
+identity, not as a competing second scratch trigger.
+
+**Control browser regression:**
+`tools/fatal-death-countin-gameplay-contract-browser-smoke.mjs` validates
+shield impact, an actual fatal BSOD physics collision, the real crash-to-
+GameOver transition, immediate scene retry, a new `runId`, and a real Gym
+reset. This is a **gameplay event test**, not an audible assertion that the
+unimplemented musical death sequence already works. Once Music Friday's
+state machine is committed, test the *same* contract against her six-stem
+mixer to ensure the four-beat recovery persists into the next run.

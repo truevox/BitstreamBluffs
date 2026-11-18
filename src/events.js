@@ -218,6 +218,10 @@ export const EVT = Object.freeze({
  * @property {string} [hazardId]  hazard def id when cause==='hazard'.
  * @property {boolean} negated    true if a shield charge (Hashed Backup, or a biome shield pickup such as Heat Shield) absorbed it
  *           (run continues; no RUN_END; a POWERUP_EXPIRED 'consumed' follows).
+ * @property {boolean} fatal    additive explicit discriminator: true exactly for a real run-ending death,
+ *           false for a shield-negated crash. A Gym catch emits only GYM_ATTEMPT_RESET.
+ * @property {string} runId    owning run identity, shared with subsequent RUN_END record.id;
+ *           retries use a new runId. A fatal-music consumer may key its trigger to this.
  * Nothing else is added by the Readable Chaos pass: the killer name, hop verdict and Game Over line travel in the registry
  * (REG.LAST_CRASH, src/data/schemas.js `LastCrash`), never on this payload, the RunRecord or its ledger hash.
  */

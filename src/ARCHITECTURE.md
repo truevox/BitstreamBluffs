@@ -2396,3 +2396,20 @@ clip content or physics behavior changed. Two unit tests cover the gate and
 normal/paused semantics; two sequential full-original-OGG browser tests
 verified no visible backward position jump. All changes remain on the
 isolated integration branch; not on `main` or either owner worktree.
+
+### 2026-11-18 — Control's explicitly identified fatal-crash audio trigger
+
+To implement Marvin's newly approved death scratch/silence/four-drum-beat/
+band-return sound independently of gameplay, `RunScene` now adds `runId`
+and `fatal` to *existing* `EVT.CRASH` payloads. Shield-absorbed impact uses
+`negated:true,fatal:false` and survives; genuine run-ending collision uses
+`negated:false,fatal:true` followed by one `EVT.RUN_END` for that same run.
+Gym catches still emit only `EVT.GYM_ATTEMPT_RESET`. An immediate Game Over
+retry emits `EVT.RUN_START` with a new runId; **no music timer can delay it**.
+The payload additions do not alter run records, hash, score, physics, or
+existing manual vinyl behavior. Chromium regression:
+`tools/fatal-death-countin-gameplay-contract-browser-smoke.mjs`. Full
+approved music contract:
+`docs/MUSIC-DEATH-TURNTABLE-COUNT-IN-DESIGN-20261118.md`. Actual fatal
+music scratch/count-in DSP remains **Music Friday-owned and not present in
+this gameplay branch**; integration is a separate follow-up.

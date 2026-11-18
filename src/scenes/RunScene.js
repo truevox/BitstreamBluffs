@@ -1806,7 +1806,8 @@ export class RunScene extends Phaser.Scene {
       const spent = spendShieldSource(this.shieldSources); // B2: expire the chip of the pickup whose charge this was
       this.shieldSources = spent.sources;
       this.game.events.emit(EVT.CRASH, {
-        cause: c.cause, x: fs.x, y: fs.y, speedPxS: speed, hazardId: c.hazardId, negated: true,
+        cause: c.cause, x: fs.x, y: fs.y, speedPxS: speed, hazardId: c.hazardId,
+        negated: true, fatal: false, runId: this.runId,
       });
       this.game.events.emit(EVT.POWERUP_EXPIRED, { id: spent.id, reason: 'consumed' });
       this.sled.invulnerableMs = Math.max(this.sled.invulnerableMs, 1200);
@@ -1917,7 +1918,8 @@ export class RunScene extends Phaser.Scene {
     this.emitFlow(this.score.onCrash());
     this.emitCombo('crash');
     this.game.events.emit(EVT.CRASH, {
-      cause: c.cause, x: fs.x, y: fs.y, speedPxS: speed, hazardId: c.hazardId, negated: false,
+      cause: c.cause, x: fs.x, y: fs.y, speedPxS: speed, hazardId: c.hazardId,
+      negated: false, fatal: true, runId: this.runId,
     });
     const p = this.palette;
     this.fx.shards(fs.x, fs.y, fs.vx, fs.vy, [p.cyan, p.magenta, p.lime, p.amber, p.text], 46);
