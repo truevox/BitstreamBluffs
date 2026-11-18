@@ -284,6 +284,8 @@ export class RunScene extends Phaser.Scene {
     const spawnY = this.terrain.heightAt(spawnX);
     const spawnAng = this.slopeAt(spawnX);
     this.startX = spawnX;
+    // Gym score/distance is per practice attempt; normal runs keep startX.
+    this.gymAttemptStartX = spawnX;
     this.sled = new Sled(this, spawnX, spawnY - 14, this.palette, this.look);
     this.sled.setPose(spawnX, spawnY - 15, spawnAng, 50 * Math.cos(spawnAng * DEG), 50 * Math.sin(spawnAng * DEG));
     // W4 boosts. Applied at spawn from the loadout chosen before the run: the shield reuses the Hashed
@@ -325,7 +327,7 @@ export class RunScene extends Phaser.Scene {
     // be told it fell short of, a Head Start run's distance. boostFx carries this run's `modded`.
     this.bestM = 0;
     try {
-      const runs = this.saveStore && this.saveStore.runs;
+      const runs = !this.bsodGym && this.saveStore && this.saveStore.runs;
       const onBoard = sameBoardAs(this.boostFx);
       if (Array.isArray(runs)) for (const r of runs) if (r && onBoard(r) && r.distanceM > this.bestM) this.bestM = Math.floor(r.distanceM);
     } catch (e) { this.bestM = 0; }
@@ -420,12 +422,25 @@ export class RunScene extends Phaser.Scene {
     return biome && biome.id === 'space-mountain' ? 0 : 1;
   }
 
+  /** Authoritative BSOD event must not let a faulty *observer* abort collision
+   * resolution. The actual audio subscriber additionally handles its own errors,
+   * so a failing mixer cannot suppress unrelated listeners. */
+  publishBsodState(state) {
+    try { this.game?.events?.emit?.(EVT.BSOD_STATE_CHANGED, state); }
+    catch (e) {
+      if (!this._bsodObserverErrorLogged) {
+        this._bsodObserverErrorLogged = true;
+        console.warn('BSOD observer failed; gameplay continues', e);
+      }
+    }
+  }
+
   /** Reset wind/music subscriptions on end, abort or teardown; never mutate the music mixer. */
   deactivateBsod() {
     if (this.bsodBluffs) this.bsodBluffs.reset();
     if (!this.bsod || !this.bsod.active) return;
     this.bsodState = this.bsod.stop();
-    if (this.game && this.game.events) this.game.events.emit(EVT.BSOD_STATE_CHANGED, emptyBsodState());
+    this.publishBsodState(emptyBsodState());
   }
 
   /** World-coordinate visual cues. They do not affect physics, danger, input or accessibility settings. */
@@ -899,7 +914,7 @@ export class RunScene extends Phaser.Scene {
     // reads from that subscriber. An inactive/reset snapshot is emitted at run termination.
     if (this.bsod && !this.crashed) {
       this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
-      this.game.events.emit(EVT.BSOD_STATE_CHANGED, this.bsodState);
+      this.publishBsodState(this.bsodState);
     }
     // flow timeout runs on the same scaled run clock as physics (slow-mo stretches it, pause / hit-stop freeze it)
     this.emitFlow(this.score.tick(simDt));
@@ -953,9 +968,12 @@ export class RunScene extends Phaser.Scene {
 
     if (!this.crashed) {
       this.updateBsodBluff();
-      this.updateFun(dt, pad, Math.max(0, (sled.x - this.startX) / PIXELS_PER_METER));
+      // Gym may continue through the same terrain, but score/distance belongs
+      // only to the current attempt. Never recredit earlier travel on a retry.
+      const origin = this.bsodGym ? this.gymAttemptStartX : this.startX;
+      const metres = Math.max(0, (sled.x - origin) / PIXELS_PER_METER);
+      this.updateFun(dt, pad, metres);
       // distance
-      const metres = Math.max(0, (sled.x - this.startX) / PIXELS_PER_METER);
       if (this.score.setDistance(metres)) {
         this.game.events.emit(EVT.DISTANCE_CHANGED, { meters: Math.floor(this.score.distanceM) });
         this.emitScore();
@@ -1336,7 +1354,7 @@ export class RunScene extends Phaser.Scene {
       this.emitIf(EVT.TUTORIAL_HINT, e);
       if (e.id === 'tuck' && e.show) {
         this.tuckShows += 1;
-        saveTuckShows(this.tuckShows);
+        if (!this.bsodGym) saveTuckShows(this.tuckShows);
       } else if (!e.show && ((e.id === 'boost') || (e.id === 'tuck' && this.tuckShows >= TUNING.tuckHintMaxShows))) {
         this.tutDoneId(e.id); // explained once / shown often enough
       }
@@ -1347,7 +1365,9 @@ export class RunScene extends Phaser.Scene {
   tutDoneId(id) {
     if (this.tutDone.has(id)) return;
     const ev = this.hints.complete(id, this.runTimeMs);
-    saveTutorialDone(this.tutDone);
+    // Practice hints may be completed for this session, but never consume a
+    // first-run hint in the player's permanent normal-game tutorial history.
+    if (!this.bsodGym) saveTutorialDone(this.tutDone);
     this.applyHintEvents(ev);
   }
 
@@ -1600,18 +1620,33 @@ export class RunScene extends Phaser.Scene {
     return { x, y };
   }
 
+  /** End temporary pickups/hazards consistently on manual and Gym recovery.
+   * Permanent upgrade/loadout settings are intentionally not modified. */
+  clearTemporaryEffects(reason) {
+    if (this.boostMs > 0) this.game.events.emit(EVT.POWERUP_EXPIRED,
+      { id: this.boostId || 'packetBurst', reason });
+    if (this.slowmoMs > 0) this.game.events.emit(EVT.POWERUP_EXPIRED,
+      { id: 'clockPulse', reason });
+    if (this.slowMs > 0) this.game.events.emit(EVT.EFFECT_END, { effect: 'slow' });
+    if (this.scrambleMs > 0) this.game.events.emit(EVT.EFFECT_END, { effect: 'scramble' });
+    this.boostMs = 0;
+    this.boostFactor = 1;
+    this.boostId = null;
+    this.slowmoMs = 0;
+    this.slowMs = 0;
+    this.scrambleMs = 0;
+    if (this.sled) this.sled.scrambled = false;
+    this._endBiomeEffects(reason);
+  }
+
   manualReset() {
     const sample = this.pickSafe(250);
     const r = this.score.penalizeReset() || { comboPenalty: 0, pointsLost: 0 };
     this.emitFlow(r.flowChange);
     const pos = this.respawnAt(sample, 'manual', 0.6);
     this.resetCooldownMs = 600;
-    // timed pickups / hazard effects end with the respawn
-    if (this.boostMs > 0) { this.boostMs = 0; this.game.events.emit(EVT.POWERUP_EXPIRED, { id: 'packetBurst', reason: 'respawn' }); }
-    if (this.slowmoMs > 0) { this.slowmoMs = 0; this.game.events.emit(EVT.POWERUP_EXPIRED, { id: 'clockPulse', reason: 'respawn' }); }
-    if (this.slowMs > 0) { this.slowMs = 0; this.game.events.emit(EVT.EFFECT_END, { effect: 'slow' }); }
-    if (this.scrambleMs > 0) { this.scrambleMs = 0; this.sled.scrambled = false; this.game.events.emit(EVT.EFFECT_END, { effect: 'scramble' }); }
-    this._endBiomeEffects('respawn');
+    // Shared cleanup prevents different recovery paths from retaining hazard timers.
+    this.clearTemporaryEffects('respawn');
     this.game.events.emit(EVT.RESPAWN, { reason: 'manual', x: pos.x, y: pos.y, comboPenalty: r.comboPenalty || 0 });
     this.emitCombo('reset');
     this.emitScore();
@@ -1681,16 +1716,31 @@ export class RunScene extends Phaser.Scene {
     const y = this.terrain.heightAt(x) - 240;
     sled.setPose(x, y, 0, 270, -330);
     sled.parachuteFuelMs = sled.canopyFuelFullMs;
+    sled.invulnerableMs = 0;
+    // The score is per attempt, even when terrain/world X remains continuous.
+    this.gymAttemptStartX = x;
     this.pendingCrash = null;
     this.bsodCaught = false;
     this.crashed = false;
     this.hitStopMs = 0;
     this.blinkMs = 0;
-    this.slowmoMs = 0;
+    this.clearTemporaryEffects('gym-retry');
     this.bsod.wallX = sledLeftCollisionEdge(sled) - GYM_CHASE.respawnGapPx;
     this.bsod.wallSpeedPxS = GYM_CHASE.initialSpeedPxS;
     this.bsod.accelerationPxS2 = GYM_CHASE.accelerationPxS2;
     this.bsodBluffs?.reset?.();
+    this._airTricks = 0;
+    this._landings = 0;
+    this._steepMs = 0;
+    this._lastHopMs = null;
+    this._hopped = false;
+    this._pushed = false;
+    this.shardChainAt = -1e9;
+    this.safeSamples?.splice?.(0);
+    this._safeTimer = 0;
+    this._contactQueue?.splice?.(0);
+    this.trail?.reset?.();
+    this.resetCooldownMs = 0;
     // Each retry is a NEW training attempt. Do not retain the previous
     // attempt's score/combos/shard tally in the HUD or its internal trackers.
     this.score?.reset?.();
@@ -1703,10 +1753,12 @@ export class RunScene extends Phaser.Scene {
     this.bestCombo = 1;
     this.maxAirtimeMs = 0;
     this.lastTotal = 0;
+    this.gymRetries = (this.gymRetries || 0) + 1;
+    // Reset HUD projections and outstanding transient banners as one operation.
+    this.game?.events?.emit?.(EVT.GYM_ATTEMPT_RESET, { attempt: this.gymRetries });
     if (this.score) this.emitScore();
     this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
-    this.game?.events?.emit?.(EVT.BSOD_STATE_CHANGED, this.bsodState);
-    this.gymRetries = (this.gymRetries || 0) + 1;
+    this.publishBsodState(this.bsodState);
   }
 
   doCrash(c, fs, speed) {

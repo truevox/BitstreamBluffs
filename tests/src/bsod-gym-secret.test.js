@@ -117,9 +117,16 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
    scene.score=score;
    scene.tricks={reset:jest.fn()};
    scene.game={events:{emit:(e,p)=>emitted.push([e,p])}};
+   scene._resetBiomeEffects();
+   scene.updateBlindOverlay=jest.fn();
+   scene.safeSamples=[];scene._contactQueue=[];
+   scene.trail={reset:jest.fn()};
    scene.nearMissCount=5;scene.shardCount=3;scene.shardTotal=60;
    scene.shardChain=2;scene.trickCounts={frontflip:2};scene.bestCombo=2.5;
    scene.maxAirtimeMs=1800;scene.lastTotal=300;
+   scene._airTricks=4;scene._landings=2;
+   scene.shardChainAt=120;scene.safeSamples=[{x:1700,t:4}];
+   scene.gymAttemptStartX=123;
    scene.resetBsodGym();
    expect(score.reset).toHaveBeenCalledTimes(1);
    expect(scene.tricks.reset).toHaveBeenCalledTimes(1);
@@ -129,8 +136,52 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
    expect(scene.trickCounts).toEqual({});
    expect(scene.bestCombo).toBe(1);
    expect(scene.lastTotal).toBe(0);
+   expect(scene._airTricks).toBe(0);
+   expect(scene._landings).toBe(0);
+   expect(scene.shardChainAt).toBe(-1e9);
+   expect(scene.safeSamples).toHaveLength(0);
+   expect(scene.gymAttemptStartX).toBe(sled.x);
+   expect(emitted.find(([evt])=>evt===EVT.GYM_ATTEMPT_RESET)?.[1]).toEqual({attempt:1});
    expect(emitted.map(([evt])=>evt)).toContain(EVT.SCORE_CHANGED);
    expect(emitted.map(([evt])=>evt)).toContain(EVT.BSOD_STATE_CHANGED);
+ });
+ test('temporary effects expire across Gym attempts without leaking biome or hazard state',()=>{
+   const scene=Object.create(RunScene.prototype),events=[];
+   scene.game={events:{emit:(name,payload)=>events.push([name,payload])}};
+   scene.sled={scrambled:true};
+   scene.updateBlindOverlay=jest.fn();
+   scene._resetBiomeEffects();
+   scene.boostMs=600;scene.boostId='packetBurst';scene.boostFactor=2;
+   scene.slowmoMs=250;scene.slowMs=300;
+   scene.scrambleMs=400;scene.glideMs=500;scene.glideId='slickWaxSpray';
+   scene.stabilizeMs=100;scene.stabilizeId='gravityStabilizer';
+   scene.blindMs=600;
+   scene.wards.wards.push({id:'mapleWax'});
+   scene.clearTemporaryEffects('gym-retry');
+   for (const k of ['boostMs','slowmoMs','slowMs','scrambleMs','glideMs','stabilizeMs','blindMs'])
+     expect(scene[k]).toBe(0);
+   expect(scene.boostFactor).toBe(1);
+   expect(scene.sled.scrambled).toBe(false);
+   expect(scene.wards.wards).toHaveLength(0);
+   expect(scene.updateBlindOverlay).toHaveBeenCalled();
+   const ended=events.filter(([e])=>e===EVT.POWERUP_EXPIRED).map(([,p])=>p.id);
+   expect(ended).toEqual(expect.arrayContaining(['packetBurst','clockPulse','mapleWax','slickWaxSpray','gravityStabilizer']));
+   const effectEnd=events.filter(([e])=>e===EVT.EFFECT_END).map(([,p])=>p.effect);
+   expect(effectEnd).toEqual(expect.arrayContaining(['slow','scramble','blind']));
+   // Same cleanup is used by manual recovery: there is no longer a divergent timer path.
+   expect(RunScene.prototype.manualReset.toString()).toContain("this.clearTemporaryEffects('respawn')");
+ });
+ test('BSOD observer exceptions cannot block frame continuation and are logged only once',()=>{
+   const r=Object.create(RunScene.prototype),seen=[];
+   const warn=jest.spyOn(console,'warn').mockImplementation(()=>{});
+   r.game={events:{emit:()=>{throw Error('broken optional observer')}}};
+   r.bsodState={active:true,gapPx:5};
+   try {
+     expect(()=>r.publishBsodState(r.bsodState)).not.toThrow();
+     expect(()=>r.publishBsodState(r.bsodState)).not.toThrow();
+     expect(r.bsodState.gapPx).toBe(5);
+     expect(warn).toHaveBeenCalledTimes(1);
+   } finally {warn.mockRestore();}
  });
  test('Gym death respawns a calm chase without writing records or changing profile',()=>{
   const scene=Object.create(RunScene.prototype);
@@ -148,6 +199,10 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
   scene.saveStore={saveRun:jest.fn()};
   scene.registry={set:jest.fn()};
   scene.game={events:{emit:(k,v)=>calls.push([k,v])}};
+  scene._resetBiomeEffects();
+  scene.updateBlindOverlay=jest.fn();
+  scene.safeSamples=[];scene._contactQueue=[];
+  scene.trail={reset:jest.fn()};
   scene.bsodAtmosphere=()=>1;
   scene.doCrash({cause:'bsod'}, {x:3000,y:100,vx:200,vy:0},200);
   expect(scene.crashed).toBe(false);
@@ -159,6 +214,6 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
   expect(scene.bsod.wallSpeedPxS).toBe(GYM_CHASE.initialSpeedPxS);
   expect(scene.saveStore.saveRun).not.toHaveBeenCalled();
   expect(scene.registry.set).not.toHaveBeenCalled();
-  expect(calls.map(([k])=>k)).toEqual([EVT.BSOD_STATE_CHANGED]);
+  expect(calls.map(([k])=>k)).toEqual([EVT.GYM_ATTEMPT_RESET, EVT.BSOD_STATE_CHANGED]);
  });
 });

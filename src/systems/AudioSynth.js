@@ -671,8 +671,13 @@ export class AudioSynth {
       ? clamp01(state.proximity01) : 0;
     // Musical threat is a READ-ONLY proximity bus, independent of airflow.
     // Zero relative wind may be quiet next to the lethal wall.
-    this._stemMusic?.setBsodDanger?.(this._bsodDanger01);
-    this._applyWindFromBsod();
+    // Mixers/WebAudio are optional consumers; their failures must never stop
+    // authoritative BSOD physics or prevent other gameplay event listeners.
+    // Contain these independently so a failed music DSP does not silence wind.
+    try { this._stemMusic?.setBsodDanger?.(this._bsodDanger01); }
+    catch (e) { /* corrupted/closed mixer: preserve simulation and wind */ }
+    try { this._applyWindFromBsod(); }
+    catch (e) { /* closed AudioContext/AudioParam: ignore safely */ }
   }
 
   /** Wind is environmental: never driven by the music-speed or song-selection state. */

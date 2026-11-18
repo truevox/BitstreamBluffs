@@ -1859,3 +1859,73 @@ recovery coefficients and Space Mountain propulsion remain
 provisional. Code was branched from the already tested combined
 music/headroom-safe `ab029ac` baseline, not from `main`;
 Music Friday's DSP source and other music features were not edited.
+
+
+## 2026-11-18 — Astra review fixes and physically earned Gym discovery gate
+
+**Source and decision provenance:** Marvin asked Control Friday to implement what
+could be fixed after Astra Friday's independent, read-only review of
+`581d2d2`. Astra independently identified a P1 audio/event exception leak and
+P2 Gym retry HUD, trick, effects and score-origin problems. An additional
+tutorial-history leak was noted by Control Friday. None of the work below
+changes Marvin's intentional **hidden** Surfing the Void or BSOD Gym
+discovery. Gym difficulty, the 200-shard trial price, rank-12 refill balance,
+Space Mountain propulsion alternatives and musical mix decisions are *still
+unapproved trial parameters*, not frozen owner preferences.
+
+**Hardening implementation, new child branch `feature/astra-gym-safety-20261118`
+off `581d2d2`:**
+
+- RunScene's `publishBsodState` protects the authoritative simulation
+  against *arbitrary* synchronous BSOD event observer exceptions; a bad
+  listener cannot cancel the frame before `resolveCrash`. One diagnostic
+  warning is recorded per run. `AudioSynth._onBsodState` independently catches
+  mixer and wind AudioParam failures, so a failed DSP path does not block wind
+  or other event listeners. No music source, stem mixing gain, BSOD danger,
+  or physical chase coefficients were modified.
+- `EVT.GYM_ATTEMPT_RESET` is a new **RunScene-owned, one-payload** event
+  `{attempt: positive integer}`, emitted on each actual practice wall catch.
+  UIScene consumes it to clear old shard/chain counters and displays,
+  pending combos, stale HUD popups/strips, flow and warning effects, while
+  preserving the audio and progression systems. The event is never fired
+  for a normal or official Daily run.
+- The common `RunScene.clearTemporaryEffects(reason)` is used by both
+  ordinary manual respawns and Gym collisions. Slow, scramble, boost,
+  slowdown, ward, blind, glide and stabilization states expire with HUD
+  notifications. The cleanup also fixes manual respawn to use the actual
+  boost ID rather than a hardcoded Packet Burst identifier.
+- Gym retry clears `_airTricks`, landing/hop and chain clocks,
+  contact/safe-ground samples and previous ScoreManager/TrickTracker
+  values, so an old flight cannot contaminate a new landing. Each attempt
+  has a `gymAttemptStartX` **score origin**, while the real physical terrain,
+  sled and advancing BSOD stay in world coordinates; non-Gym scoring
+  continues using `startX`.
+- While playing Gym, normal tutorial-completion and tuck-hint-show counts
+  can update ephemeral run state but are NOT saved to the ordinary
+  first-run tutorial keys `bb.tutorialDone` or `bb.tuckShows`.
+  Normal tutorial behavior is unchanged.
+- Gym intentionally remains **loadout-faithful** for this playtest:
+  current daily modifier, owned boosts and permanent upgrades continue
+  applying as before. Astra's normalized-versus-faithful training mode
+  is an **open owner choice**, not silently implemented.
+
+**Evidence:** The complete source suite passed **135/135 suites and
+2249/2249 tests**; the production Vite build succeeded. The existing
+12-game/music Chromium workflows all passed, including true Matter
+multi-Bluff scenarios, Gym isolation, wind and corrected musical BSOD DSP.
+A new stress browser test stages genuine BSOD collision in both normal
+and Gym modes with deliberately throwing WebAudio/third-party observers;
+it verifies normal crash completion, two Gym retries, immediate HUD and
+effect cleanup, no lost tutorial opportunities and no profile/ledger change.
+A separate new physical-discovery browser test pilots a real Matter
+airbrake/sail escape (staged initial flight, **not** fabricated near-miss
+events), confirms it earned the initial scored Bluff after 88 scripted
+frames, then RELOADS the browser and confirms the locked Shop item,
+one-time 200-shard purchase and working low-stakes Gym.
+
+**Limits:** The test scenarios stage flight starting conditions and do not
+prove organic player discovery, play-feel, accessibility at extreme chase
+speeds, full-song auditory quality, or fairness of the trial Gym price.
+No human approval for these trial parameters is implied. Music Friday's
+separate branch (including subsequent music-only updates) remains
+untouched. `main` remains unmerged.

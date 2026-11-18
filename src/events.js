@@ -29,6 +29,8 @@ export const EVT = Object.freeze({
   RUN_ABORT: 'bb:runAbort',
   /** Emitter: RunScene. Payload: CrashPayload. */
   CRASH: 'bb:crash',
+  /** Emitter: RunScene, only on a non-ranked Gym catch. Payload: {attempt:number}. */
+  GYM_ATTEMPT_RESET: 'bb:gymAttemptReset',
   /** Emitter: RunScene. Payload: RespawnPayload. */
   RESPAWN: 'bb:respawn',
   /** Emitter: RunScene (from TrickTracker landing result). Payload: LandingPayload. */

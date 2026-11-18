@@ -191,6 +191,7 @@ export class UIScene extends Phaser.Scene {
       this.listeners.push([evt, fn]);
     };
     on(EVT.RUN_START, this.onRunStart);
+    on(EVT.GYM_ATTEMPT_RESET, this.onGymAttemptReset);
     on(EVT.SCORE_CHANGED, this.onScore);
     on(EVT.COMBO_CHANGED, this.onCombo);
     on(EVT.DISTANCE_CHANGED, this.onDistance);
@@ -566,6 +567,39 @@ export class UIScene extends Phaser.Scene {
       this.dailyRuleId = p.dailyRuleId || this.dailyRuleId;
       this._buildSeedInfo(p.seed, p.dailyOfficial === true);
     }
+  }
+
+  /** Gym retries keep the gameplay scene alive. Clear ALL attempt-local HUD
+   * projections without resetting music, controls, or scene-level ownership. */
+  onGymAttemptReset() {
+    this.score = 0;
+    this.meters = 0;
+    this.multiplier = 1;
+    this.lastDist = { m: 0, t: this.nowMs };
+    this.scoreText.setText('0');
+    this.distText.setText('0 M');
+    this.comboText.setText(fmtMult(1)).setColorKey('lime');
+    this.comboInfo.setText('');
+    this._setFlow(1, 0);
+    this._setPending(0, true);
+    this.shards = 0;
+    this.chain = 0;
+    this.chainUntil = 0;
+    this.shardLabel = '';
+    this.shardText.setText('').setVisible(false);
+    this.chainText.setText('').setVisible(false);
+    for (const p of [...this.popups]) this._dropPopup(p);
+    this.stripQueue = [];
+    this.stripBusy = false;
+    this.tweens.killTweensOf(this.stripC);
+    this.stripC.setVisible(false);
+    this._hideHint();
+    for (const id of [...this.powerups.keys()]) this._removePowerup(id);
+    for (const id of [...this.effects.keys()]) this._removeEffect(id);
+    this.tweens.killTweensOf(this.flowLostText);
+    this.flowLostText.setAlpha(0);
+    this.tweens.killTweensOf(this.bankLine);
+    this.bankLine.setAlpha(0);
   }
 
   onRunEnd() {

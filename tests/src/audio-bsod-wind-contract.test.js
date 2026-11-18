@@ -108,6 +108,21 @@ describe('authoritative BSOD wind signal consumed read-only', () => {
     a.destroy();
     expect(game.events.listenerCount(EVT.BSOD_STATE_CHANGED)).toBe(0);
   });
+  test('throwing music and WebAudio consumers never abort BSOD signal propagation',()=>{
+    const {a,events,gain}=makeAudio();
+    a._stemMusic.setBsodDanger=jest.fn(()=>{throw Error('DSP failed')});
+    expect(()=>events.emit(EVT.BSOD_STATE_CHANGED,state())).not.toThrow();
+    expect(gain).toHaveBeenCalled();
+    a._stemMusic.setBsodDanger=jest.fn();
+    const original=a.nodes.windGain.gain.setTargetAtTime;
+    a.nodes.windGain.gain.setTargetAtTime=jest.fn(()=>{throw Error('closed AudioParam')});
+    expect(()=>events.emit(EVT.BSOD_STATE_CHANGED,state({proximity01:0.99}))).not.toThrow();
+    expect(a._stemMusic.setBsodDanger).toHaveBeenCalledWith(0.99);
+    a.nodes.windGain.gain.setTargetAtTime=original;
+    events.emit(EVT.BSOD_STATE_CHANGED,state({relativeAirX:1000}));
+    expect(gain.mock.lastCall[0]).toBeGreaterThan(0);
+    a.destroy();
+  });
   test('settings event actually toggles environmental wind with music disabled', () => {
     const { a, events, gain } = makeAudio();
     events.emit(EVT.BSOD_STATE_CHANGED, state());
