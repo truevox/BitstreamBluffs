@@ -78,3 +78,33 @@ describe('BSOD RunScene contract', () => {
     expect(r.bsodAtmosphere()).toBe(1);
   });
 });
+
+describe('Wind pom-pom visual anchor', () => {
+  test('RunScene tethers to helmet coordinates, not sled COM; clears on rider death', () => {
+    const scene = Object.create(RunScene.prototype);
+    const calls = [];
+    const gfx = {
+      clear() { calls.push(['clear']); return this; },
+      lineStyle() { return this; },
+      lineBetween(...coords) { calls.push(['lineBetween', ...coords]); return this; },
+      fillStyle() { return this; },
+      fillCircle(...coords) { calls.push(['fillCircle', ...coords]); return this; },
+    };
+    scene.sled = {
+      x: 500, y: 200, inWorld: true, hidden: false,
+      windPomAnchor: { x: 477, y: 153 },
+    };
+    scene._view = { left: 0, right: 600, top: 0, bottom: 320 };
+    scene.bsodState = { active: true, relativeAirX: 500, atmosphereDensity: 1 };
+    scene.windPom = gfx;
+    scene.bsodEdge = null;
+    scene.palette = { text: 0xffffff, amber: 0xffcc55 };
+    scene.drawBsodCues();
+    expect(calls.find(c => c[0] === 'lineBetween').slice(1,3)).toEqual([477, 153]);
+    expect(calls.find(c => c[0] === 'fillCircle')[1]).toBeGreaterThan(477);
+    calls.length = 0;
+    scene.sled.hidden = true;
+    scene.drawBsodCues();
+    expect(calls).toEqual([['clear']]);
+  });
+});

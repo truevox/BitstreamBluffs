@@ -1571,3 +1571,14 @@ and manual push; airbrake is the grounded brake. Divebomb adds downward
 velocity acceleration without reducing horizontal speed at baseline;
 initial numeric tuning is provisional. RunScene owns gameplay state and
 Settings controls; audio files belong to Music Friday's separate branch.
+
+## 2026-11-18 — Wind pom-pom attachment correction
+
+The pom-pom tether's world anchor is authored by `Sled._drawRider` using
+the **actual helmet crown transform**, including Matter body angle,
+body-to-draw origin, pose lean, squash and helicopter perspective.
+Drone cosmetics attach to the transformed rotor mast instead. RunScene draws
+the wind indicator from `sled.windPomAnchor` and removes it when the rider
+is hidden; using an arbitrary offset from `sled.x/y` (Matter COM) was incorrect.
+This is a visual/accessibility fix only: physical BSOD wind and audio stay
+authoritative and unchanged.

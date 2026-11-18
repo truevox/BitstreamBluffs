@@ -514,6 +514,7 @@ export class Sled {
       this.inWorld = false;
     }
     this.hidden = true;
+    this.windPomAnchor = null; // Hide the tether as soon as the rider vanishes.
     if (this.gfx) this.gfx.clear();
   }
 
@@ -729,6 +730,9 @@ export class Sled {
     limb(sh, hand, pal.amber, 2.4);
     // helmet + visor (visor faces travel direction, flips with the spin)
     const hp = P(head[0], head[1]);
+    // Wind pom-pom must share the EXACT helmet pose transform: COM coordinates
+    // and a fixed world-space Y offset drift away during flips and helicopter spins.
+    this.windPomAnchor = P(head[0] + Math.sin(phi) * 5.5, head[1] - Math.cos(phi) * 5.5);
     g.fillStyle(pal.bg, 1);
     g.fillCircle(hp.x, hp.y, 5.8);
     g.fillStyle(pal.amber, 0.9 * aMul);
@@ -771,6 +775,8 @@ export class Sled {
     g.fillCircle(eye.x, eye.y, 1.7);
     // mast and rotor arms
     const hub = L(-2, -14);
+    // Drone skin has no helmet. Fasten the tether to the same transformed mast hub.
+    this.windPomAnchor = P(hub[0], hub[1] - 2);
     limb(L(-2, -8), hub, riderCol, 2);
     const tips = [L(-16, -18), L(12, -18)];
     for (const tip of tips) limb(hub, tip, riderCol, 1.8);

@@ -93,3 +93,39 @@ describe('Neon Sled Drone: Sled draws it', () => {
     expect(colours(s)).not.toContain(int(COSMETIC_HUES.rider.drone.color));
   });
 });
+
+describe('Wind pom-pom helmet and drone attachment', () => {
+  test('stays on the transformed helmet crown through lean, flip, and COM offset', () => {
+    const s = drawSled(null, { pose: { phi: -28, tuck: 0.7 } });
+    const circles = s.gfx.calls.filter(c => c[0] === 'fillCircle' && c[3] === 4.6);
+    const helmet = circles[circles.length - 1];
+    const distance = (a, h) => Math.hypot(a.x - h[1], a.y - h[2]);
+    expect(s.windPomAnchor).toBeDefined();
+    expect(distance(s.windPomAnchor, helmet)).toBeCloseTo(5.5, 3);
+    const before = { ...s.windPomAnchor };
+
+    // A center-of-mass offset, 90-degree body flip, and yaw must change the tether
+    // in exactly the same frame as they change the rendered helmet.
+    s.body.angle = Math.PI / 2;
+    s.off = { x: 7, y: -12 };
+    s.heliPhase = 165;
+    s.gfx.calls.length = 0;
+    s._draw();
+    const turnedHelmet = s.gfx.calls.find(c => c[0] === 'fillCircle' && c[3] === 4.6);
+    expect(s.windPomAnchor).not.toEqual(before);
+    expect(Math.abs(distance(s.windPomAnchor, turnedHelmet) - 5.5)).toBeLessThan(0.12); // helicopter yaw foreshortens the crown offset
+  });
+
+  test('the drone skin attaches the wind indicator to its transformed rotor mast', () => {
+    const s = drawSled(DRONE_LOOK);
+    const a = { ...s.windPomAnchor };
+    expect(a).toMatchObject({ x: expect.any(Number), y: expect.any(Number) });
+    s.body.angle = Math.PI / 3;
+    s.off = { x: 9, y: 5 };
+    s.gfx.calls.length = 0;
+    s._draw();
+    expect(s.windPomAnchor).not.toEqual(a);
+    expect(Number.isFinite(s.windPomAnchor.x)).toBe(true);
+    expect(Number.isFinite(s.windPomAnchor.y)).toBe(true);
+  });
+});

@@ -432,11 +432,14 @@ export class RunScene extends Phaser.Scene {
     }
     if (pom && pom.clear) {
       pom.clear();
+      // Sled._draw supplies an exact helmet/drone anchor in rendered world coords.
+      // Never leave a free-floating pom after the rider vanishes on BSOD impact.
+      if (s.hidden || s.inWorld === false || !s.windPomAnchor) return;
       const wind = state && state.active ? state.relativeAirX : 0;
       const density = state && state.active ? state.atmosphereDensity : 0;
       const strength = Math.min(1, Math.abs(wind) / 900) * density;
       const dir = wind > 0 ? 1 : wind < 0 ? -1 : 0;
-      const anchorX = s.x - 4, anchorY = s.y - 30;
+      const { x: anchorX, y: anchorY } = s.windPomAnchor;
       const endX = anchorX + dir * (5 + 23 * strength);
       const endY = anchorY - (strength > 0.08 ? 7 * strength : -5);
       pom.lineStyle(1.6, this.palette.text, 0.9);
