@@ -2292,3 +2292,20 @@ catalog; success proves wiring and transport timing, **not musical verification*
 The music-side real-OGG smoke now also handles title music already playing
 rather than accidentally toggling it off by clicking Play twice. Music Friday
 retains ownership of real recording-specific beat certification.
+
+### 2026-11-18 — Pause/resume invalidates optional beat wait
+
+A real Phaser lifecycle regression exposed one edge case after verified-beat
+integration: pausing inside the optional 0–300ms music window preserved a
+now-stale music deadline across resume. `RunScene._onResume` now **discards**
+any pending music snapshot and calls the existing one-shot GO release without
+waiting, requerying or setting an `onBeat` flag. It deliberately does *not*
+call the music validator on this invalidated snapshot. A pause during the
+minimum 1000ms READY keeps its remaining time instead; quitting from a
+pending beat wait cancels its snapshot during scene teardown.
+
+`tools/bsod-gym-beat-lifecycle-browser-smoke.mjs` reproduces and guards these
+three transitions in actual Chromium/Phaser scenes, asserting the wall,
+player, run clock, scores and progression remain unchanged through the hold.
+This is a gameplay-only lifecycle fix: Music Friday's public timing API,
+production beat catalog and original audio assets remain untouched.

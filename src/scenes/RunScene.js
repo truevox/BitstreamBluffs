@@ -367,6 +367,16 @@ export class RunScene extends Phaser.Scene {
       if (this.inputRouter && this.inputRouter.setEnabled) this.inputRouter.setEnabled(true);
       // consume the stale one-shot edge (the Esc that resumed) so it cannot re-pause immediately
       try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
+      // A beat prediction predating a user-controlled pause is no longer a
+      // reliable launch deadline. Release once on resume, without querying
+      // music again or extending the hold. The original 1000ms READY, if
+      // incomplete, remains paused and resumes normally.
+      if (this.bsodGym && this.gymBeatSnapshot) {
+        // A paused suggestion cannot count as a synchronized beat even if
+        // the music happens to be near its original due time on resume.
+        this.gymBeatSnapshot = null;
+        this.finishGymReady();
+      }
     };
     this.game.events.on(EVT.SETTINGS_CHANGED, this._onSettings);
     this.game.events.on(EVT.GAME_RESUME, this._onResume);
