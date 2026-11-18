@@ -46,7 +46,7 @@ try {
 	},null,{timeout:35000});
 
 	// Real physical click at NOTES button inside Music Lab.
-	const noteButton=await world(6+109+46,7+235+7);
+	const noteButton=await world(6+80+35,7+235+7);
 	await page.mouse.click(noteButton.x,noteButton.y);
 	await page.waitForFunction(()=>
 		!!window.__bbGame.scene.getScene('TitleScene').view.soundView.labView.inspector,

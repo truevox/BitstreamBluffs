@@ -1,6 +1,7 @@
 /**
  * Score inspector INSIDE the game, over the actual StemMusicDirector lab.
- * Draws unverified SOURCE candidates (not the actual waveform / gold notes).
+ * Draws unverified MIDI-like SOURCE candidates with a separate
+ * visible ORIGINAL OGG PCM waveform (not a post-FX output or gold notes).
  *
  * Any edit is an isolated, exported PATCH, NOT a live music correction.
  * The game's audio, saved profile, settings and base performance.json stay
@@ -14,6 +15,7 @@ import { NeonText } from './Neon.js';
 import { ellipsize } from './PixelFont.js';
 import { ScoreCorrectionDraft } from '../systems/music/ScoreCorrectionDraft.js';
 import { nearbyPerformanceEvents } from '../systems/music/PerformanceScore.js';
+import { originalStemWaveform } from '../systems/music/SourceStemWaveform.js';
 
 const RATE=48000;
 const HALF_WINDOW=2*RATE;
@@ -45,6 +47,8 @@ export class ScoreInspectorView {
 		this.selectedId=null;
 		this.message='TENTATIVE NOTES. NO EDITS ARE APPLIED TO MUSIC.';
 		this.windowStart=0;
+		this.waveformCoverage=0;
+		this.waveformSource=null;
 		this._hitBoxes=[];
 		this.panel=new Panel(scene,theme,{
 			x:6,y:7,w:468,h:253,title:'SCORE INSPECTOR  //  DRAFT ONLY',
@@ -148,6 +152,7 @@ export class ScoreInspectorView {
 		this.selectedId=null;
 		this._selectNearest();
 		this.message='CHANGED ROLE. SOURCE ESTIMATES ARE NOT GOLD NOTES.';
+		this.menu?.refresh(); // keep the selected instrument selector in sync
 		this.refresh();
 	}
 
@@ -302,6 +307,32 @@ export class ScoreInspectorView {
 		for(let i=1;i<4;i++){
 			g.lineBetween(i*GRAPH.w/4,0,i*GRAPH.w/4,GRAPH.h);
 		}
+		// The actual ORIGINAL OGG decode cache, not synthesized MIDI notes:
+		// these source PCM peaks follow the same four-second source-frame
+		// window as the provisional piano roll and its moving WebAudio playhead.
+		// The original recording may be replaced/routed or FX-processed, so
+		// NEVER claim this overlay represents final DSP/rendered amplitude.
+		const director=this.labView?.lab;
+		const sourceRole=this.role==='melody' ?
+			director?._activeVoiceFor(director.pack) : this.role;
+		const waveform=sourceRole ? originalStemWaveform(
+			director?.pack,director?.cache,sourceRole,this.windowStart,
+			this.windowStart+2*HALF_WINDOW,204) : null;
+		this.waveformSource=sourceRole||null;
+		this.waveformCoverage=waveform?.coverage||0;
+		if(waveform?.available){
+			const h=19,yBottom=GRAPH.h-2;
+			g.lineStyle(1,pal.amber,.23);
+			g.lineBetween(0,yBottom-h,GRAPH.w,yBottom-h);
+			g.fillStyle(pal.amber,.43);
+			for(let i=0;i<waveform.bins.length;i++){
+				const peak=waveform.bins[i];
+				if(peak<=0)continue;
+				const x=i/waveform.bins.length*GRAPH.w;
+				g.fillRect(x,yBottom-Math.max(1,peak*h),
+					Math.ceil(GRAPH.w/waveform.bins.length),Math.max(1,peak*h));
+			}
+		}
 		let events=nearbyPerformanceEvents(this.score,[this.role],
 			this.windowStart+HALF_WINDOW,HALF_WINDOW);
 		const experimental=this.comparison?this.labView?.experimentalScore:null;
@@ -366,7 +397,7 @@ export class ScoreInspectorView {
 			const height=roleDrums?11:4;
 			const selected=event.id===this.selectedId;
 			const color=selected?pal.amber:
-				this.draft.edits.has(event.id)?pal.lime:pal.cyan;
+				this.draft.edits.has(event.id)?pal.text:pal.cyan;
 			g.fillStyle(color,selected?1:.7);
 			g.fillRect(x,y,width,height);
 			this._hitBoxes.push({id:event.id,x,y,w:width,h:height});
@@ -382,9 +413,10 @@ export class ScoreInspectorView {
 		const a=Math.floor(this.windowStart/RATE*10)/10;
 		const b=Math.ceil((this.windowStart+2*HALF_WINDOW)/RATE*10)/10;
 		this.windowLabel.setText(ellipsize(
-			this.role.toUpperCase()+'  '+a.toFixed(1)+'-'+b.toFixed(1)+
-			'S  /  '+(roleDrums?'DRUM CLASS':'MIDI PITCH')+
-			'  /  GREEN = LIVE CLOCK',331));
+			this.role.toUpperCase()+' '+a.toFixed(1)+'-'+b.toFixed(1)+
+			'S / '+(roleDrums?'DRUM HITS':'MIDI*')+
+			' / OGG '+Math.round(this.waveformCoverage*100)+'%'+
+			' / GREEN = LIVE',331));
 		const event=this._selected();
 		const preview=event&&this._preview(event);
 		const desc=preview?(this.role.toUpperCase()+'  '+
@@ -395,10 +427,10 @@ export class ScoreInspectorView {
 			'NO SOURCE CANDIDATES';
 		this.detailLine.setText(ellipsize(desc,446));
 		this.helpLine.setText(ellipsize(
-			this.comparison&&experimental?
-				'CYAN RELEASE / PINK V2 EXPERIMENTAL / GREEN DRAFT: NEITHER IS GOLD':
-				'CYAN RELEASE; +10MS/OCTAVE/REJECT/ACCEPT ARE DRAFTS ONLY',
-			446));
+			(this.comparison&&experimental?
+				'CYAN BASE / PINK V2 / WHITE DRAFT / AMBER RAW OGG':
+				'CYAN NOTES / WHITE DRAFT / AMBER RAW OGG')+
+			' / GREEN LIVE / NO GOLD NOTES',446));
 		// The selected eight-second machine-review record already states
 		// the count comparison. Do not append overlapping four-second counts.
 		const counts=this.comparison&&experimental&&this.reviewIndex<0?
