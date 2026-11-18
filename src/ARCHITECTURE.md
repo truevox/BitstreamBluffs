@@ -2335,3 +2335,17 @@ synchronous exceptions from audio/event observers; exceptions are logged and
 scene navigation continues. Every subscriber should still catch its own
 exceptions, since the EventEmitter may not deliver to later listeners after
 one throws. The Chromium smoke injects intentional observer exceptions.
+
+### 2026-11-18 — Vinyl merge compatibility: continuous soundtrack MUST survive death
+
+Music Friday's vinyl worktree started from a commit predating the merged
+continuous soundtrack/menu-shuffle integration. Its inherited `AudioSynth`
+`RUN_END` / `RUN_ABORT` handlers call `stopMusic()`; that is NOT a vinyl
+feature and MUST NOT replace the current integration's `_enterMenuMusic()`
+handlers. A real OGG Chromium regression proves the unchanged song and
+WebAudio clock anchor still advance through an actual fatal BSOD death:
+`tools/manual-turntable-death-soundtrack-continuity-browser-smoke.mjs`.
+When vinyl commits arrive, transplant only vinyl-specific code on top of
+this up-to-date branch, retain all existing continuous-music behavior, and
+run `tests/src/continuous-soundtrack-menu-shuffle.test.js` plus both vinyl
+and Gym browser suites before any promotion.

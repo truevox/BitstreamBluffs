@@ -94,3 +94,40 @@ after a throwing callback (the shared EventEmitter may stop dispatch at the
 throw). **Music Friday's listener should therefore contain its own failures**
 and avoid throwing from event handlers. The browser smoke deliberately injects
 faulting event observers and checks Pause, Resume, Restart and Quit still work.
+
+## CRITICAL: Feature-branch merge base and continuous soundtrack
+
+The Music Friday branch `feature/music-vinyl-pause-20261118` was forked
+from `03c50fd` (ancestor `17aaad9`) **before** Control Friday's combined
+Gym integration and the independent continuous-soundtrack/menu-shuffle
+changes reached this gameplay branch. In its inherited baseline,
+`AudioSynth` handles `RUN_END` and `RUN_ABORT` by calling `stopMusic()`.
+On the current Control integration branch, those events instead call
+`_enterMenuMusic()` so the *same song keeps playing through real death,
+Game Over, new runs and menus*, unless the user explicitly pauses the
+soundtrack. This difference **predates** Music Friday's vinyl patch; it
+must not be accidentally reintroduced by merging the older `AudioSynth`.
+
+**Integration requirement:** Transplant the *vinyl-specific* state machine,
+WebAudio scratch synthesis and tests onto Control's up-to-date AudioSynth.
+Preserve `_enterRunMusic` / `_enterMenuMusic` and every existing continuous
+music/menu/biome listener. Do **not** copy an entire older AudioSynth as the
+replacement. The root event names remain unchanged.
+
+Music Friday should consume the additive `reason`, `runId` and `pauseToken`
+fields on manual `GAME_PAUSE` / `GAME_RESUME` and `RUN_ABORT`, checking that
+a `GAME_RESUME` matches the pending manual pause session. This prevents a
+stale or synthetic event from resuming a prior track. Legacy event payloads
+may be supported by explicit compatibility policy, but must not silently
+override a newer session. Event handlers must catch their own exceptions;
+Control has a catch around scene navigation, but a throwing EventEmitter
+subscriber can prevent later subscribers from seeing an event.
+
+Test compatibility *before* promotion with
+`tests/src/continuous-soundtrack-menu-shuffle.test.js` and the new real
+OGG `tools/manual-turntable-death-soundtrack-continuity-browser-smoke.mjs`.
+The browser test plays original six-stem `One More Run`, causes an actual
+fatal BSOD collision, and verifies `RUN_END`, playback continuity, stable
+WebAudio clock anchor, and zero manual-pause events. These checks are
+**separate** from the vinyl scratch's own sound quality and user-initiated
+pause semantics. They apply equally to normal Game Over and music re-entry.
