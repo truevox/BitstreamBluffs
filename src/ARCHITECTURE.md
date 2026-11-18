@@ -2232,3 +2232,28 @@ and then a real BSOD-collision retry at 5 FPS: five 200ms frames release
 each READY exactly once, without moving rider or wall or incrementing the
 game clock. Physics resumes the next frame. This is *not* musical phase
 synchronization and does not assume that Music Friday's beat API exists.
+
+## 2026-11-18 — Public verified Gym music timing API (Music Friday feature)
+
+`AudioSynth.getBeatTiming({maxWaitMs:300,expectedRevision:null})` returns an immutable
+read-only source-recording pulse snapshot (`trusted:true`, `release:'on-beat'`,
+`trackId`, `transportRevision`, `gridVersion`, `beatFrame`, `beatSeconds`,
+`audioContextTime`, `dueAudioTime`, `waitMs`, `confidence`) **only** for a
+verified quarter-note grid section in the actively playing WebAudio transport.
+Otherwise it returns `{trusted:false,release:'immediate',reason}`; it must not
+start, stop, seek, or pause the song or manipulate gameplay physics. Control
+Friday's Gym timer owns the minimum 1000ms READY and may wait **at most 300ms
+extra** for a returned, imminent verified regular pulse. Gameplay releases
+normally after READY if timing is unavailable, muted, suspended, stale or
+unverified. Before an optional beat-delayed release, check
+`AudioSynth.isBeatTimingCurrent(snapshot)` and release regardless of the answer
+(failure means *unsynchronized* GO, never more waiting). Changes of track,
+seek, playback generation, pause, source decoding and AudioContext state
+invalidate any previous pulse snapshot.
+
+`src/systems/music/BeatGridTiming.js` implements strict frame-indexed and
+section-aware validation, and `BeatGridCatalog.js` is currently explicitly
+**unverified for all four released songs**. Machine onset candidates are
+research only; no human-reviewed beat-phase grid is authorized yet. The legacy
+`StemMusicDirector.nextBeat()` BPM/zero-phase helper must NOT be used for Gym.
+Tests and Control handoff: `docs/MUSIC-GYM-VERIFIED-BEAT-TIMING-20261118.md`.
