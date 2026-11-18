@@ -35,11 +35,13 @@ try {
   const events=[];g.events.on('bb:gymSetupUnlocked',p=>events.push(p));
   const bluff=[];g.events.on('bb:bsodBluff',p=>bluff.push(p.chain));
   g.loop.stop();
-  r.bsodBluffs.reset();r.sled.grounded=false;
+  r.bsodBluffs.reset();r.sled.msSinceContact=1e5; // grounded is a getter
   r.sled.parachuteMs=330;r.sled.airBrakeActive=false;
-  let lockedThroughFour=true;
-  for(let i=0;i<5;i++){
-   const t=1000+i*1300;
+  let simulatedMs=1000;
+  const scoredBluff=()=>{
+   const t=simulatedMs;simulatedMs+=1300;
+   r.sled.msSinceContact=1e5;
+   r.sled.parachuteMs=330;
    r.bsodState={...r.bsodState,active:true,gapPx:1000,
       relativeAirX:400,atmosphereDensity:1};
    r.runTimeMs=t;r.updateBsodBluff();
@@ -47,14 +49,32 @@ try {
    r.runTimeMs=t+150;r.updateBsodBluff();
    r.bsodState={...r.bsodState,gapPx:460};
    r.sled.x+=330;r.runTimeMs=t+850;r.updateBsodBluff();
+  };
+  // A tempting cross-flight sum of five must NOT unlock anything.
+  for(let i=0;i<4;i++)scoredBluff();
+  const lockedAfterFour=!store.profile.bsodGym.advanced;
+  r.sled.msSinceContact=0;r.bsodState={...r.bsodState,gapPx:600};
+  r.runTimeMs=simulatedMs;r.updateBsodBluff(); // actual grounded tracker update
+  for(let i=0;i<4;i++)scoredBluff();
+  const lockedAfterLanding=!store.profile.bsodGym.advanced;
+  r.resetBsodGym(); // any caught/restarted attempt must clear mastery progress
+  const lockedAfterRetry=!store.profile.bsodGym.advanced;
+  let lockedThroughFour=true;
+  for(let i=0;i<5;i++){
+   scoredBluff();
    if(i<4 && store.profile.bsodGym.advanced)lockedThroughFour=false;
   }
-  return {lockedThroughFour,chains:bluff,unlocks:events.length,
+  return {lockedAfterFour,lockedAfterLanding,lockedAfterRetry,
+    lockedThroughFour,chains:bluff,unlocks:events.length,
     profile:store.profile.bsodGym,bank:store.profile.bank,
     retryCount:r.gymRetries||0};
  });
+ assert.equal(earned.lockedAfterFour,true);
+ assert.equal(earned.lockedAfterLanding,true);
+ assert.equal(earned.lockedAfterRetry,true);
  assert.equal(earned.lockedThroughFour,true);
- assert.deepEqual(earned.chains,[1,2,3,4,5]);
+ assert.deepEqual(earned.chains,[1,2,3,4,1,2,3,4,1,2,3,4,5]);
+ assert.equal(earned.retryCount,1);
  assert.equal(earned.unlocks,1);
  assert.equal(earned.profile.advanced,true);
  assert.equal(earned.profile.owned,true);

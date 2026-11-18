@@ -2141,3 +2141,21 @@ for a potential music-aligned launch remains **on a regular beat, not on
 an upbeat/offbeat or syncopated subdivision**, with a guaranteed fallback to
 the existing one-second frozen READY/GO until trusted beat-grid metadata
 is available.
+
+## 2026-11-18 — Stronger Gym-only secret mastery regression
+
+An expanded live-browser integration test now verifies the negative cases,
+using the **real BSOD Bluff tracker and RunScene scoring path** (the fixture
+controls the simulated proximity/canopy observations, not the unlock method).
+Four scored airborne Bluffs, followed by a grounded update, do **not** unlock
+setup. Four more airborne Bluffs after that landing still do **not** unlock it.
+An in-place Gym collision/retry resets the chain again and stays locked. Only
+five consecutive airborne scored escapes in the **next uninterrupted Gym
+attempt** unlock setup once; the observed sequence is `1,2,3,4`, `1,2,3,4`,
+`1,2,3,4,5`. The test then reloads the page, tunes all five bounded setup
+options, and confirms forward-only pursuit with the saved wildest settings.
+
+This is a deterministic browser integration regression, **not yet evidence
+that a human/automated physics controller can successfully perform five
+consecutive escapes in normal real-time play**. That physical playability and
+balance remain separate playtest work.
