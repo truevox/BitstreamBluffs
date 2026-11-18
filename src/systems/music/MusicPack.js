@@ -161,6 +161,21 @@ export function normalizePack(raw) {
 		path:experiment.path,scoreHash:experiment.scoreHash,
 		parentScoreHash:experiment.parentScoreHash,
 	};
+	// Machine disagreement is a future human review queue, not gold and
+	// not an audio or music playback asset.
+	const review=raw.diagnosticReviewQueue;
+	if(review!==undefined&&(!review||typeof review!=='object'||
+		Array.isArray(review)||!safePath(review.path)||
+		!/^[0-9a-f]{64}$/.test(review.baselineScoreHash)||
+		!/^[0-9a-f]{64}$/.test(review.experimentalScoreHash)||
+		review.baselineScoreHash!==performance?.scoreHash||
+		review.experimentalScoreHash!==experimentalPerformance?.scoreHash)){
+		throw new Error('Invalid non-gold review queue descriptor');
+	}
+	const diagnosticReviewQueue=review===undefined?null:{
+		path:review.path,baselineScoreHash:review.baselineScoreHash,
+		experimentalScoreHash:review.experimentalScoreHash,
+	};
 	const tempo = Number(raw.tempo);
 	const beat = Number.isFinite(tempo) && tempo >= 30 && tempo <= 350 ? tempo : null;
 	return {
@@ -177,6 +192,7 @@ export function normalizePack(raw) {
 		adaptive: normalizeAdaptive(raw.adaptive, segments.length),
 		performance,
 		experimentalPerformance,
+		diagnosticReviewQueue,
 		captions,
 		bpm: beat,
 	};

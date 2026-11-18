@@ -1330,5 +1330,10 @@
     "path": "performance-candidate-v2.json",
     "scoreHash": "a3fcf588f46f109aa11483aa9840774f675174c94cb5836ac618532fbfe855dd",
     "parentScoreHash": "576e3b5ea1bf4701442da006ab265bbbbdc2dc6f9a4e52eabb22a1d7bf478fb4"
+  },
+  "diagnosticReviewQueue": {
+    "path": "review-queue-v1.json",
+    "baselineScoreHash": "576e3b5ea1bf4701442da006ab265bbbbdc2dc6f9a4e52eabb22a1d7bf478fb4",
+    "experimentalScoreHash": "a3fcf588f46f109aa11483aa9840774f675174c94cb5836ac618532fbfe855dd"
   }
 }

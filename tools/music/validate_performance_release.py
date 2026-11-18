@@ -33,6 +33,7 @@ def run(current,baseline):
 	assert cat==oldcat
 	assert len(cat['tracks'])==4
 	ogg_count=0
+	review_total=0
 	scores={}
 	for song in cat['tracks']:
 		id=song['id']
@@ -42,7 +43,8 @@ def run(current,baseline):
 		old_pack=json.loads(old_path.read_text())
 		meta=pack.pop('performance')
 		comparison=pack.pop('experimentalPerformance',None)
-		# Both pointers are diagnostic metadata ONLY. Every field
+		review_descriptor=pack.pop('diagnosticReviewQueue',None)
+		# All diagnostic pointers are metadata ONLY. Every field
 		# controlling source audio, rendering, effects and selection must
 		# match the prior published release byte-for-byte as JSON values.
 		assert pack==old_pack,'SHIPPING_AUDIO_MANIFEST_WAS_MODIFIED '+id
@@ -75,6 +77,30 @@ def run(current,baseline):
 			assert (candidate['provenance']['evidence']['parentScoreHash']==
 				score['scoreHash'])
 			assert candidate['events']['melody']==score['events']['melody']
+		if review_descriptor is not None:
+			assert comparison is not None
+			assert review_descriptor['path']=='review-queue-v1.json'
+			assert review_descriptor['baselineScoreHash']==score['scoreHash']
+			assert review_descriptor['experimentalScoreHash']==candidate['scoreHash']
+			review_path=(new_path.parent/review_descriptor['path']).resolve()
+			assert review_path.is_relative_to(current.resolve())
+			review=json.loads(review_path.read_text())
+			assert review['format']=='bitstream-music-review-queue-v1'
+			assert review['status']=='machine-ranked-disagreement-not-human-verified'
+			assert review['songId']==id
+			assert review['baselineScoreHash']==score['scoreHash']
+			assert review['experimentalScoreHash']==candidate['scoreHash']
+			assert 'NOT correctness' in review['selectionMethod']
+			rows=review['excerpts']
+			assert isinstance(rows,list) and 1<=len(rows)<=20
+			assert all(row['role'] in ('bass','drums','guitar','piano','other')
+				and row['startFrame']>=0 and row['endFrame']<=score['frameCount']
+				and row['startFrame']<row['endFrame']
+				and row['endFrame']-row['startFrame']<=8*48000
+				and row['samePitchWithin50ms']<=min(row['releaseCount'],
+					row['candidateCount']) for row in rows)
+			assert len({row['id'] for row in rows})==len(rows)
+			review_total+=len(rows)
 		# All 4,745 packaged Ogg clips unchanged: compare hashes for each
 		# relative path in both deployed trees, not only file size.
 		original={p.relative_to(old_path.parent):p for p in
@@ -94,8 +120,10 @@ def run(current,baseline):
 			'OGG',len(new),'events',scores[id]['events'],flush=True)
 	assert ogg_count==4745,ogg_count
 	assert sum(row['events'] for row in scores.values())==33752
+	assert review_total in (0,20),'incomplete original 20-passage review shortlist'
 	return {'format':'bitstream-performance-release-gate-v1',
 		'scores':scores,'unchangedOgg':ogg_count,'sourceTracks':4,
+		'unverifiedReviewExcerpts':review_total,
 		'uncalibrated':True,
 		'meaning':'source event provenance and score playback markers only; no improved pitch/timing'}
 

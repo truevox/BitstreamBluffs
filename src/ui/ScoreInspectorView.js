@@ -41,6 +41,7 @@ export class ScoreInspectorView {
 		this.anchorFrame=lab._clockFrame()||0;
 		this.follow=true;
 		this.comparison=false; // V2 is overlay ONLY, never live audio
+		this.reviewIndex=-1;
 		this.selectedId=null;
 		this.message='TENTATIVE NOTES. NO EDITS ARE APPLIED TO MUSIC.';
 		this.windowStart=0;
@@ -75,6 +76,10 @@ export class ScoreInspectorView {
 			color:'cyan',outline:'none',
 		});
 		this.panel.add(this.windowLabel);
+		this.reviewButton=new Button(scene,theme,{
+			x:352,y:158,w:99,h:13,label:'NEXT SUSPECT',color:'magenta',
+			onClick:()=>this.nextReview(),parent:this.panel,
+		}).setDisabled(true);
 		this.detailLine=new NeonText(scene,theme,10,172,'',{
 			color:'amber',outline:'none',
 		});
@@ -109,6 +114,32 @@ export class ScoreInspectorView {
 		this.back=control(390,231,68,'BACK',()=>this.close(),'magenta');
 		this._paletteUnbind=theme.bind(()=>this.refresh());
 		this.refresh();
+	}
+
+	/** Jump to a machine-DISAGREEMENT passage on the SAME song's real
+	 * source game clock. This is not a confirmed bad note or gold label.
+	 * It seeks only the lab's sandbox engine, never the main game stream.
+	 */
+	nextReview(){
+		const rows=this.labView?.reviewQueue?.excerpts||[];
+		if(!rows.length||!this.labView?.experimentalScore)return false;
+		this.reviewIndex=(this.reviewIndex+1)%rows.length;
+		const row=rows[this.reviewIndex];
+		this.role=row.role;
+		this.anchorFrame=Math.min(this.score.frameCount-1,
+			row.startFrame+2*RATE);
+		this.follow=false;
+		this.comparison=true;
+		this.selectedId=null;
+		this._selectNearest();
+		this.menu.refresh();
+		this.labView._solo(row.role.toUpperCase());
+		this.labView.lab.seekTo(Math.max(0,row.startFrame/RATE-.2));
+		this.message='UNVERIFIED RANK '+row.priorityOrder+
+			' '+row.role.toUpperCase()+' BASE '+row.releaseCount+
+			' / V2 '+row.candidateCount+'; MATCH '+row.samePitchWithin50ms;
+		this.refresh();
+		return true;
 	}
 
 	setRole(role){
@@ -352,8 +383,8 @@ export class ScoreInspectorView {
 		const b=Math.ceil((this.windowStart+2*HALF_WINDOW)/RATE*10)/10;
 		this.windowLabel.setText(ellipsize(
 			this.role.toUpperCase()+'  '+a.toFixed(1)+'-'+b.toFixed(1)+
-			'S  /  VERTICAL = '+(roleDrums?'DRUM CLASS':'MIDI PITCH')+
-			'  /  GREEN = LIVE AUDIO CLOCK',443));
+			'S  /  '+(roleDrums?'DRUM CLASS':'MIDI PITCH')+
+			'  /  GREEN = LIVE CLOCK',331));
 		const event=this._selected();
 		const preview=event&&this._preview(event);
 		const desc=preview?(this.role.toUpperCase()+'  '+
@@ -368,13 +399,20 @@ export class ScoreInspectorView {
 				'CYAN RELEASE / PINK V2 EXPERIMENTAL / GREEN DRAFT: NEITHER IS GOLD':
 				'CYAN RELEASE; +10MS/OCTAVE/REJECT/ACCEPT ARE DRAFTS ONLY',
 			446));
-		const counts=this.comparison&&experimental?
+		// The selected eight-second machine-review record already states
+		// the count comparison. Do not append overlapping four-second counts.
+		const counts=this.comparison&&experimental&&this.reviewIndex<0?
 			'  BASE '+events.length+' / V2 '+candidateEvents.length:'';
+		const corrupted=this.labView?.reviewStatus?.startsWith(
+			'REVIEW SHORTLIST REJECTED:');
 		this.messageLine.setText(ellipsize(
-			this.message+counts+'  ('+this.draft.count+' EDITS)',447));
+			(corrupted?this.labView.reviewStatus:this.message)+counts+
+			'  ('+this.draft.count+' EDITS)',447));
 		this.controls.up.setDisabled(!event||roleDrums);
 		this.controls.down.setDisabled(!event||roleDrums);
 		this.controls.export.setDisabled(!this.draft.count);
+		this.reviewButton.setDisabled(!this.labView?.reviewQueue?.excerpts?.length||
+			!this.labView?.experimentalScore);
 		this.controls.compare.setDisabled(!this.labView?.experimentalScore);
 		this.controls.compare.setLabel(this.comparison?'V2 ON':'V2');
 		this.controls.follow.setLabel(this.follow?'FREEZE':'FOLLOW');
@@ -382,6 +420,7 @@ export class ScoreInspectorView {
 
 	handleAction(action){
 		if(action==='cancel'){this.close();return true;}
+		if(action==='alt'){this.nextReview();return true;}
 		if(action==='left'){this.shift(-1);return true;}
 		if(action==='right'){this.shift(1);return true;}
 		if(action==='up'||action==='down'){

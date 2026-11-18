@@ -27,6 +27,7 @@ import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
 import { ScoreInspectorView } from './ScoreInspectorView.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
 import { resolveMusicAsset } from '../systems/music/MusicPack.js';
+import { validateMusicReviewQueue } from '../systems/music/MusicReviewQueue.js';
 import { validatePerformanceScore, validateExperimentalPerformanceScore,
   nearbyPerformanceEvents, makeIssueMarker, PERFORMANCE_ROLES } from '../systems/music/PerformanceScore.js';
 
@@ -405,6 +406,8 @@ export class SoundLabView extends View {
     this.scoreStatus='WAITING FOR SCORE MANIFEST';
     this.experimentalScore=null;
     this.experimentalStatus='EXPERIMENTAL COMPARISON NOT LOADED';
+    this.reviewQueue=null;
+    this.reviewStatus='NO MACHINE REVIEW SHORTLIST LOADED';
     this.markers=[]; // lab session only, not localStorage or profile
     this.markerStatus='NO AUDIO OR GAME SAVES ARE CHANGED';
     this.inspector=null;
@@ -547,6 +550,8 @@ export class SoundLabView extends View {
     this.score=null;
     this.experimentalScore=null;
     this.experimentalStatus='EXPERIMENTAL COMPARISON NOT LOADED';
+    this.reviewQueue=null;
+    this.reviewStatus='REVIEW SHORTLIST NOT LOADED';
     this.inspectButton.setDisabled(true);
     const lab=this.lab;
     const scoreAsset=lab?.pack?.performance;
@@ -597,10 +602,39 @@ export class SoundLabView extends View {
         lab.track?.id!==id||this.score!==base)return;
       this.experimentalScore=experimental;
       this.experimentalStatus='V2 EXPERIMENTAL SCORE LOADED (NOT GOLD)';
+      // Ranked disagreements remain optional and never touch playback.
+      void this._loadReviewQueue(lab,id,generation,base,experimental);
     }catch(err){
       if(this.alive&&generation===this.scoreRequest){
         this.experimentalScore=null;
         this.experimentalStatus='V2 REJECTED: '+String(err?.message||err);
+      }
+    }
+    this.inspector?.refresh();
+  }
+  async _loadReviewQueue(lab,id,generation,base,experimental){
+    const asset=lab.pack?.diagnosticReviewQueue;
+    if(!asset){
+      this.reviewStatus='NO REVIEW SHORTLIST IN THIS PACK';
+      return;
+    }
+    this.reviewStatus='MACHINE DISAGREEMENT SHORTLIST LOADING';
+    try{
+      const response=await fetch(resolveMusicAsset(lab.packBase,asset.path),
+        {cache:'default'});
+      if(!response.ok)throw new Error('Review HTTP '+response.status);
+      const raw=await response.json();
+      const queue=validateMusicReviewQueue(raw,lab.pack,base,experimental);
+      if(!this.alive||generation!==this.scoreRequest||this.lab!==lab||
+        lab.track?.id!==id||this.score!==base||
+        this.experimentalScore!==experimental)return;
+      this.reviewQueue=queue;
+      this.reviewStatus='MACHINE DISAGREEMENTS (NOT VERIFIED ERRORS)';
+    }catch(err){
+      if(this.alive&&generation===this.scoreRequest&&this.lab===lab&&
+        this.experimentalScore===experimental){
+        this.reviewQueue=null;
+        this.reviewStatus='REVIEW SHORTLIST REJECTED: '+String(err?.message||err);
       }
     }
     this.inspector?.refresh();
@@ -681,6 +715,8 @@ export class SoundLabView extends View {
     ++this.scoreRequest;
     this.score=null;
     this.experimentalScore=null;
+    this.reviewQueue=null;
+    this.reviewStatus='SWITCHING REVIEW SHORTLIST';
     this.experimentalStatus='SWITCHING EXPERIMENTAL SCORE';
     this.scoreStatus='SWITCHING SOURCE SCORE';
     this.songIndex=index;
@@ -809,6 +845,7 @@ export class SoundLabView extends View {
     this._markKey=null;
     this.score=null;
     this.experimentalScore=null;
+    this.reviewQueue=null;
     this.tickTimer?.remove();
     this.lab?.destroy();
     this.lab=null;

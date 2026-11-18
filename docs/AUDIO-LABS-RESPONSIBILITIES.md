@@ -22,6 +22,10 @@ Note inspection is now inside the game, not the standalone sound-design lab. The
 
 Actual-game Music Lab → NOTES (N) → V2 toggles a **visual-only, read-only experimental score overlay** (pink) against the released note guesses (cyan). It does **not** synthesize V2 notes or replace released songs, is not a gold reference, and cannot modify the player's save. The V2 source is six-stem-fingerprint-checked, source-score-hash-pinned, and explicitly experimental. The candidate's quiet drum/ghost-note holdout tests FAILED, so no automatic musical promotion is authorized. The sound-design-only standalone lab is excluded from this comparison. See MUSIC-DETECTOR-V2-UNREVIEWED-RESEARCH-20261117.md.
 
+## Machine-ranked suspect passage navigation (2026-11-17)
+
+The actual-game score inspector now has a **NEXT SUSPECT** button to jump between 20 source-score-hash-bound, eight-second role discrepancies (3 Pope, 9 One More Run, 3 Runs Out of Code, 5 Varmont). It uses the game music engine's sandbox to seek and isolate each instrument. A ranked *model disagreement* is neither a verified erroneous note nor gold truth; it does not change music, render audio, or write a profile. A failed experimental V3 anchored drum hybrid also remains research-only. See MUSIC-REVIEW-QUEUE-V3-FAILED-20261117.md. The old standalone lab stays SOUND DESIGN ONLY.
+
 ## Safety and release rules
 
 - Keep Dynamic Orchestra OFF by default, with visible PRE-ALPHA badge.

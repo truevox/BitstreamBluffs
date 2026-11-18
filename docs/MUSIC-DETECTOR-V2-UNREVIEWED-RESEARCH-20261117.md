@@ -49,6 +49,10 @@ Each real music pack may contain an optional experimentalPerformance descriptor 
 
 The original 4,745 Ogg files were verified byte-for-byte unchanged by tools/music/validate_performance_release.py, including checking that all music-controlling pack fields remain identical to the previous published release. Renderer scripts require explicit --allow-unapproved-scores for an experimental private render; no release replacement was made.
 
+## Later V3 negative result and source-ranked in-game review shortcuts
+
+An experimental V3 anchored drum fusion failed macro-F1 across nine synthetic scenarios (0.5489 versus original release v1 0.5758 and V2 0.6294); no V3 music or scores were promoted. The 20 existing real-source model-disagreement passages now have tiny per-song, source-hash-pinned unverified review-queue sidecars and a genuine in-game NEXT SUSPECT button inside NOTES. These shortcuts use the current game music engine, not the standalone lab. See MUSIC-REVIEW-QUEUE-V3-FAILED-20261117.md. None constitute gold annotations or proof of actual-song musical accuracy.
+
 ## Release decision
 
 **BLOCK candidate musical promotion.** Synthetic F1 and model disagreement are not real-song accuracy. In particular, drum quiet ghost hits, source bleed and echoed attacks need annotated real-source references. The review queue, manual-score patch workflow, and currently instrumented actual-game Music Lab provide a way to build this gold set when Marvin is ready. The legacy standalone lab remains sound design only, as directed.
