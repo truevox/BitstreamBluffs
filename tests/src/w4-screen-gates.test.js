@@ -16,12 +16,16 @@ import { MODDED_RUNS_RANKED } from '../../src/constants.js';
 
 const overlaps = (a, b) => !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
 
+// The synthwave Title reorganisation moved the menu onto the grid floor (y 154..254, left) and the DAILY PATCH
+// into the right-hand cabinet card, so the band the menu must stay out of from below is now the control hint
+// (y 258), and the Daily Patch is beside it rather than under it. The gates are the same: the row count that
+// fits is computed and proven, and the panel overlaps nothing live.
 describe('Title menu geometry (defect 3: SETTINGS overflowed into DAILY PATCH)', () => {
   test('the shipped six-row menu fits the band', () => {
     const geo = titleMenuLayout(6);
     expect(geo.fits).toBe(true);
     expect(geo.lastRowBottom).toBeLessThanOrEqual(TITLE_BANDS.menu.y + TITLE_BANDS.menu.h);
-    expect(geo.lastRowBottom).toBeLessThanOrEqual(TITLE_BANDS.daily.y);
+    expect(geo.lastRowBottom).toBeLessThanOrEqual(TITLE_BANDS.hint.y);
   });
 
   test('a seventh row would NOT fit — this is why SHARD SHOP moved to PROFILE', () => {
@@ -29,14 +33,15 @@ describe('Title menu geometry (defect 3: SETTINGS overflowed into DAILY PATCH)',
     // it is the reason the shop entry lives on the Profile screen and the proof that the reason is real.
     const geo = titleMenuLayout(7);
     expect(geo.fits).toBe(false);
-    expect(geo.lastRowBottom).toBeGreaterThan(TITLE_BANDS.daily.y);
+    expect(geo.lastRowBottom).toBeGreaterThan(TITLE_BANDS.hint.y);
   });
 
-  test('the panel never overlaps the DAILY PATCH strip or the screen edge', () => {
+  test('the panel never overlaps the DAILY PATCH, the hint or the screen edge', () => {
     const geo = titleMenuLayout(6);
     const panel = { x: geo.x, y: geo.y, w: geo.w, h: geo.h };
     expect(overlaps(panel, TITLE_BANDS.daily)).toBe(false);
-    expect(panel.y + panel.h).toBeLessThanOrEqual(TITLE_BANDS.daily.y);
+    expect(overlaps(panel, TITLE_BANDS.hint)).toBe(false);
+    expect(panel.y + panel.h).toBeLessThanOrEqual(TITLE_BANDS.hint.y);
     expect(panel.y + panel.h).toBeLessThanOrEqual(SCREEN.h);
   });
 
@@ -49,12 +54,14 @@ describe('Title menu geometry (defect 3: SETTINGS overflowed into DAILY PATCH)',
     expect(six.h).toBeLessThan(TITLE_BANDS.menu.h + 40);
   });
 
-  test('the panel clears the CONTROLS panel beside it', () => {
-    // Both sit at y 92; the menu is 216 wide at x 24 and controls start at x 252. Overlap would cover a
-    // control legend, which is the kind of thing only a screenshot catches.
+  test('the panel clears the cabinet card and the HOW TO PLAY chip beside it', () => {
+    // The CONTROLS panel that used to sit beside the menu is now the HOW TO PLAY view; the right-hand
+    // neighbour is the cabinet card, with the help chip in the open column between them. Overlap would cover
+    // the Daily Patch or the chip, which is the kind of thing only a screenshot catches.
     const geo = titleMenuLayout(6);
-    const controls = { x: 252, y: 92, w: 204, h: 104 };
-    expect(overlaps({ x: geo.x, y: geo.y, w: geo.w, h: geo.h }, controls)).toBe(false);
+    const panel = { x: geo.x, y: geo.y, w: geo.w, h: geo.h };
+    expect(overlaps(panel, TITLE_BANDS.card)).toBe(false);
+    expect(overlaps(panel, TITLE_BANDS.help)).toBe(false);
   });
 });
 

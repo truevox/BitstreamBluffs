@@ -37,7 +37,7 @@ import { MenuList } from '../ui/MenuList.js';
 import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
 import { buildTitleMissionList } from '../ui/MissionsUi.js';
-import { TITLE_BEST_X, TITLE_BEST_Y, TITLE_BANDS, TITLE_CARD, TITLE_CARD_INNER_W, TITLE_HORIZON, titleMenuLayout } from '../ui/MissionsLayout.js';
+import { TITLE_BEST_X, TITLE_BEST_Y, TITLE_BANDS, TITLE_CARD, TITLE_CARD_INNER_W, TITLE_HORIZON, titleMenuLayout, titleBestText, titleChaseText } from '../ui/MissionsLayout.js';
 import { addScanlines, playCrtPowerOn } from '../ui/Scanlines.js';
 import { openDim, closeDim, sceneTransition, isReducedMotion, tweenProgress, Ease } from '../ui/Motion.js';
 import { artImage, hasArt, mixColor } from '../ui/MenuArt.js';
@@ -142,8 +142,8 @@ export class TitleScene extends Phaser.Scene {
     const fill = artImage(this, w.fill, x, w.y, {
       ...o,
       tint: (pal) => {
-        const top = mixColor(pal.text, pal.cyan, 0.3);
-        const bottom = mixColor(pal.text, pal.magenta, 0.5);
+        const top = mixColor(pal.text, pal.cyan, 0.42);
+        const bottom = mixColor(pal.text, pal.magenta, 0.62);
         return [top, top, bottom, bottom];
       },
     });
@@ -353,13 +353,15 @@ export class TitleScene extends Phaser.Scene {
     if (!layout) return;
     this.levelBadge = [];
     const card = this.cardPanel && this.cardPanel.scene ? this.cardPanel : null;
-    for (const it of layout.items) {
+    layout.items.forEach((it, i) => {
       const x = card ? it.x - card.x : it.x;
       const y = card ? it.y - card.y : it.y;
-      const t = new NeonText(this, theme, x, y, ellipsize(it.text, TITLE_CARD_INNER_W - 22), { color: it.color, outline: it.outline, alpha: it.alpha });
+      // the first line shares its row with the card's 1UP label
+      const room = TITLE_CARD_INNER_W - (i === 0 ? 22 : 0);
+      const t = new NeonText(this, theme, x, y, ellipsize(it.text, room), { color: it.color, outline: it.outline, alpha: it.alpha });
       if (card) card.add(t);
       this.levelBadge.push(t);
-    }
+    });
   }
 
   /** Redraw the level badge from the current profile (SHOP-2: the equipped title replaces the level title). */
@@ -381,7 +383,7 @@ export class TitleScene extends Phaser.Scene {
         if (!runs.length || !this.bestText.scene) return;
         const m = Math.max(...runs.map((r) => r.distanceM || 0));
         const sc = Math.max(...runs.map((r) => r.score || 0));
-        if (m > 0) this.bestText.setText(`BEST ${fmtInt(m)} M   ${fmtInt(sc)} PTS`);
+        if (m > 0) this.bestText.setText(titleBestText(fmtInt(m), fmtInt(sc)));
       }).catch(() => {});
     } catch (e) { /* cosmetic */ }
   }
@@ -470,15 +472,9 @@ export class TitleScene extends Phaser.Scene {
       const store = this.registry.get(REG.SAVE_STORE);
       const st = store.getDailyStreak(now.getTime());
       const today = store.getDailyStats(now.getTime());
-      const parts = [];
-      if (st && st.streak > 0) parts.push(`STREAK ${st.streak}`);
-      if (today && today.attempts > 0) {
-        parts.push(`TODAY ${fmtInt(today.bestScore)}`);
-        key = 'lime';
-      } else {
-        parts.push('NOT PLAYED TODAY');
-      }
-      chase = parts.join('  ');
+      const played = !!(today && today.attempts > 0);
+      chase = titleChaseText(st && st.streak > 0 ? st.streak : 0, played ? fmtInt(today.bestScore) : null);
+      if (played) key = 'lime';
     } catch (e) { /* cosmetic: leave the default */ }
     this.chaseText.setText(ellipsize(chase, TITLE_CARD_INNER_W)).setColorKey(key);
   }
@@ -653,8 +649,9 @@ export class TitleScene extends Phaser.Scene {
     if (this.attractPrompt) {
       const on = reduced || Math.floor(t / 530) % 2 === 0;
       this.attractPrompt.setVisible(on);
-      this.attractPrompt.setColorKey(Math.floor(t / 1060) % 2 ? 'magenta' : 'text');
-      this.attractSub.setText(Math.floor(t / 2120) % 2 ? 'FREE PLAY' : 'INSERT COIN');
+      // reduced: nothing flashes or swaps, the prompt just sits there
+      this.attractPrompt.setColorKey(!reduced && Math.floor(t / 1060) % 2 ? 'magenta' : 'text');
+      this.attractSub.setText(!reduced && Math.floor(t / 2120) % 2 ? 'FREE PLAY' : 'INSERT COIN');
     }
     if (!reduced && t >= this.nextTrickAt) {
       this.backdrop.trick({ height: 30, flips: 2 });
@@ -733,42 +730,13 @@ export class TitleScene extends Phaser.Scene {
     this.registry.set(REG.BIOME_MASK, mask);
     uiSfx(this, 'uiSelect', { pitch: 1.3 });
     this._closeView();
-    this._launch();
+    // a module function, not this._launch(): startRun is also driven on plain contexts (title-biome-start)
+    launchRun(this);
   }
 
-  /**
-   * Leave for the run: the grid and ranges warp, the panels slide off, then the scanline wipe into RunScene.
-   * Reduced motion: no warp, a short fade. Without a backdrop or a tween manager (tests) the scene starts at
-   * once, exactly as before.
-   */
+  /** Leave for the run (see launchRun). Kept as a method so a scene can be driven through it directly. */
   _launch() {
-    const go = () => this.scene.start(SCENES.RUN);
-    const bd = this.backdrop;
-    const warpMs = bd && typeof bd.warp === 'function' ? bd.warp({ duration: 700 }) : 0;
-    const accent = bd ? this.theme.pal.cyan : undefined;
-    if (warpMs > 0 && this.time && typeof this.time.delayedCall === 'function') {
-      this._launchFx(warpMs);
-      this.time.delayedCall(Math.round(warpMs * 0.6), () => sceneTransition(this, go, { duration: 320, accent }));
-      return;
-    }
-    sceneTransition(this, go, { accent });
-  }
-
-  /** The launch flourish: menu out left, card out right, footer, tagline and jukebox fade. */
-  _launchFx(ms) {
-    const slide = (o, dx) => {
-      if (!o || !o.scene) return;
-      const x0 = o.x;
-      const a0 = o.alpha;
-      tweenProgress(this, {
-        duration: ms,
-        ease: Ease.inCubic,
-        onUpdate: (p) => { if (o.scene) o.setPosition(x0 + dx * p, o.y).setAlpha(a0 * (1 - p)); },
-      });
-    };
-    slide(this.menuPanel, -240);
-    slide(this.cardPanel, 180);
-    for (const o of [this.hint, this.helpButton, this.jukebox && this.jukebox.panel, this.sub]) slide(o, 0);
+    launchRun(this);
   }
 
   update(time) {
@@ -779,4 +747,41 @@ export class TitleScene extends Phaser.Scene {
     this._pollPadSelect();
     this._updateAttract(time, reduced);
   }
+}
+
+/**
+ * Leave the Title for the run: the grid and ranges warp, the panels slide off, then the scanline wipe into
+ * RunScene. Reduced motion: no warp (Backdrop.warp returns 0), a short fade. Without a backdrop or a tween
+ * manager (tests) the scene starts at once, exactly as before.
+ * @param {TitleScene} scene
+ * @returns {void}
+ */
+function launchRun(scene) {
+  const go = () => scene.scene.start(SCENES.RUN);
+  const bd = scene.backdrop;
+  const warpMs = bd && typeof bd.warp === 'function' ? bd.warp({ duration: 700 }) : 0;
+  const accent = bd && scene.theme && scene.theme.pal ? scene.theme.pal.cyan : undefined;
+  if (warpMs > 0 && scene.time && typeof scene.time.delayedCall === 'function') {
+    launchFx(scene, warpMs);
+    scene.time.delayedCall(Math.round(warpMs * 0.6), () => sceneTransition(scene, go, { duration: 320, accent }));
+    return;
+  }
+  sceneTransition(scene, go, { accent });
+}
+
+/** The launch flourish: menu out left, card out right, footer, tagline and jukebox fade. */
+function launchFx(scene, ms) {
+  const slide = (o, dx) => {
+    if (!o || !o.scene) return;
+    const x0 = o.x;
+    const a0 = o.alpha;
+    tweenProgress(scene, {
+      duration: ms,
+      ease: Ease.inCubic,
+      onUpdate: (p) => { if (o.scene) o.setPosition(x0 + dx * p, o.y).setAlpha(a0 * (1 - p)); },
+    });
+  };
+  slide(scene.menuPanel, -240);
+  slide(scene.cardPanel, 180);
+  for (const o of [scene.hint, scene.helpButton, scene.jukebox && scene.jukebox.panel, scene.sub]) slide(o, 0);
 }

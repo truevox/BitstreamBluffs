@@ -28,6 +28,17 @@ import { isReducedMotion, Ease, clamp01, lerp } from './Motion.js';
 
 const STAR_COUNT = 84;
 const SUN_D = 112;
+
+/**
+ * Where the sun sits for a given horizon (pure, so a host's layout tests can keep panels off it): centred on
+ * the screen, high enough that the far range bites into the slices rather than hiding them.
+ * @param {number} horizon
+ * @returns {{cx:number, cy:number, r:number, top:number, bottom:number}}
+ */
+export function sunGeometry(horizon) {
+  const cy = horizon - Math.round(SUN_D * 0.55);
+  return { cx: GAME_WIDTH / 2, cy, r: SUN_D / 2, top: cy - SUN_D / 2, bottom: cy + SUN_D / 2 };
+}
 /** Phaser.BlendModes.ADD; a literal so this module does not need Phaser itself. */
 const BLEND_ADD = 1;
 /** Rider: which range it rides, and its hop timing. */
@@ -80,9 +91,9 @@ export class Backdrop {
     this._makeStars();
 
     // --- sun: glow + disc (art or fallback) + the slice gaps overdrawn in sky colour
-    this.sunX = GAME_WIDTH / 2;
-    // high enough that the far range bites into the slices rather than hiding them
-    this.sunY = hy - Math.round(SUN_D * 0.55);
+    const sun = sunGeometry(hy);
+    this.sunX = sun.cx;
+    this.sunY = sun.cy;
     this.sunGlow = artImage(scene, 'sunGlow', this.sunX, this.sunY, {
       theme, tint: 'magenta', alpha: 0.32 * this.alpha, depth: d + 0.02, blend: BLEND_ADD,
     });

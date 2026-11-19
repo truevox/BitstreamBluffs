@@ -8,6 +8,7 @@
  */
 import Phaser from 'phaser';
 import { NeonText } from './Neon.js';
+import { mixColor } from './MenuArt.js';
 import { Panel } from './Panel.js';
 import { missionPanelLayout, missionListLayout, ellipsize } from './MissionsLayout.js';
 // Two different ellipsize helpers exist: MissionsLayout's takes a row width at a fixed 6 px advance, PixelFont's
@@ -41,7 +42,9 @@ export function buildTitleMissionList(scene, theme, rows) {
     const r = L.rows[i];
     if (!r) return;
     const title = String(row.title || '').toUpperCase();
-    const text = ellipsizePx(row.done ? `✓ ${title}` : title, r.w);
+    // a done row gets a tick when it fits; the lime colour and the full bar say "done" either way
+    const ticked = `✓ ${title}`;
+    const text = row.done && measureText(ticked) <= r.w ? ticked : ellipsizePx(title, r.w);
     const label = new NeonText(scene, theme, r.x - L.panel.x, r.y - L.panel.y, text, {
       color: row.done ? 'lime' : 'text', outline: 'none',
     });
@@ -59,9 +62,9 @@ export function buildTitleMissionList(scene, theme, rows) {
       const frac = Math.max(0, Math.min(1, row.fraction || 0));
       const c = row.done ? pal.lime : pal.cyan;
       // track: a dim groove with tick marks every quarter, so an empty bar still reads as a gauge
-      g.fillStyle(pal.bgAlt, 0.9);
+      g.fillStyle(mixColor(pal.bgAlt, c, 0.28), 1);
       g.fillRect(bx, by, bar.w, bar.h);
-      g.fillStyle(c, 0.22);
+      g.fillStyle(c, 0.5);
       for (let q = 1; q < 4; q++) g.fillRect(bx + Math.round((bar.w * q) / 4), by, 1, bar.h);
       if (frac > 0) {
         const fw = Math.max(1, Math.round(bar.w * frac));

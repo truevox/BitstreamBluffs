@@ -9,7 +9,7 @@
  */
 
 // PixelFont has no Phaser import, so this stays a pure module dependency (the file's stated rule).
-import { FONT_LINE_H } from './PixelFont.js';
+import { FONT_LINE_H, measureText } from './PixelFont.js';
 
 export const SCREEN = Object.freeze({ w: 480, h: 270 });
 
@@ -232,7 +232,7 @@ export const TITLE_BANDS = Object.freeze({
   // The tappable HOW TO PLAY chip, in the open centre column above the hint.
   help: Object.freeze({ x: 226, y: 240, w: 80, h: 14 }),
   // The attract-mode PRESS START prompt (2x) and its sub line, over the sun between the tagline and the horizon.
-  attract: Object.freeze({ x: 160, y: 110, w: 160, h: 30 }),
+  attract: Object.freeze({ x: 170, y: 110, w: 140, h: 30 }),
   // The control hint at GAME_HEIGHT - 8 (glyphs 258..266).
   hint: Object.freeze({ x: 0, y: 258, w: 480, h: 9 }),
 });
@@ -271,6 +271,30 @@ export function titleMenuLayout(count) {
 export const TITLE_BEST_X = TITLE_BANDS.best.x;
 /** Top y of the Title BEST line. */
 export const TITLE_BEST_Y = TITLE_BANDS.best.y;
+
+/**
+ * The card's BEST line: the full `BEST <m> M   <score> PTS` when it fits the card's text column, else the
+ * same numbers without the PTS label and with tighter spacing. Fitting is measured in the real font.
+ * @param {string} m formatted distance @param {string} sc formatted score
+ * @returns {string}
+ */
+export function titleBestText(m, sc) {
+  const full = `BEST ${m} M   ${sc} PTS`;
+  return measureText(full) <= TITLE_CARD_INNER_W ? full : `BEST ${m} M  ${sc}`;
+}
+
+/**
+ * The card's Daily chase line: streak and today's best (or NOT PLAYED TODAY), shortened the same way.
+ * @param {number} streak 0 = no streak shown @param {string|null} todayBest formatted, null = not played today
+ * @returns {string}
+ */
+export function titleChaseText(streak, todayBest) {
+  const tail = todayBest === null ? 'NOT PLAYED TODAY' : `TODAY ${todayBest}`;
+  const parts = streak > 0 ? [`STREAK ${streak}`, tail] : [tail];
+  const full = parts.join('  ');
+  if (measureText(full) <= TITLE_CARD_INNER_W || streak <= 0) return full;
+  return `STREAK ${streak}  ${todayBest === null ? 'NOT PLAYED' : todayBest}`;
+}
 
 /**
  * Every rect the cabinet card draws text into, in SCREEN coordinates, for overlap tests (the scene reads
