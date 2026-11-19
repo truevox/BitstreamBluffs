@@ -57,13 +57,14 @@ export function addScanlines(scene, alpha = 1, o = {}) {
     const band = scene.add.image(0, -BAND_H, BAND_KEY).setOrigin(0, 0).setDepth(10000).setAlpha(0.035 * alpha);
     if (typeof band.setBlendMode === 'function') band.setBlendMode(1); // Phaser.BlendModes.ADD
     // One pass every 7 s, then a pause: a constant band would become wallpaper, an occasional one reads as
-    // the tube. Visibility follows the reduce-motion setting live (checked each repeat).
+    // the tube. Read reduced motion on each update so a preference change hides a moving band immediately.
     const tw = scene.tweens.add({
       targets: band,
       y: { from: -BAND_H, to: GAME_HEIGHT },
       duration: 7000,
       repeatDelay: 2500,
       repeat: -1,
+      onUpdate: () => band.setVisible(!isReducedMotion(scene)),
       onRepeat: () => band.setVisible(!isReducedMotion(scene)),
     });
     band.setVisible(!isReducedMotion(scene));
