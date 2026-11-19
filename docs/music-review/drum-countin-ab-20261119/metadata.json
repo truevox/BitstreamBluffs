@@ -1,0 +1,51 @@
+{
+  "song": "One More Run",
+  "promptBpm": 160,
+  "releaseBeatVerification": "NOT VERIFIED",
+  "researchBeatSeconds": 0.375,
+  "originalSourceSegment": "0005",
+  "originalSourceStartSeconds": 61.8,
+  "originalSourceStemHashesSha256": {
+    "drums": "2039d22ef1c626c2d1c1d279ff0afb2240329ca32ffcbe87f258c72ff2961c57",
+    "bass": "2e00c8626cf9f67cf23d3a324e8eda81797a5f34722fbe2e1edc0b85512b1ba5",
+    "guitar": "57f16a43e342b11ada6928e3f38edde7e84d7b3750864cff4e60839ee8b9d979",
+    "piano": "a336bf2a889a17262a316eaebe1a958b89661e072369d77024e9d404702aee10",
+    "other": "a3a8db00430eb440897b2a112e68adb1f3f0b12aab7114da4ac99f8dd1ab24c4",
+    "melody": "2d5ae8ca2ca19902fc86bb10137b55fee88983a21480fb29c052da31e7e8d3ba"
+  },
+  "testCrashAtClipSeconds": 0.9,
+  "countInStartAtClipSeconds": 1.855,
+  "fullBandReturnsAtClipSeconds": 3.355,
+  "clipDurationSeconds": 5.755,
+  "scratch": "INTENTIONALLY OMITTED in all 3: compare drum treatment without existing artificial scratch",
+  "drumKitB": "MIDI SMF0, GM channel 10, original synthesized kit, kick/snare/hats, humanized velocity",
+  "differentOriginalHitsC": [
+    60.76,
+    61.44,
+    63.68,
+    65.54
+  ],
+  "outputs": [
+    {
+      "file": "A_original-natural-drum-stem.mp3",
+      "bytes": 92972,
+      "sha256": "8c90e31ef5809c0cd67132bc922f837bdf3ca0b0970c83098073752fd61971bf",
+      "drumRms": 0.05758,
+      "peak": 0.4963
+    },
+    {
+      "file": "B_recorded-midi-drum-kit.mp3",
+      "bytes": 84932,
+      "sha256": "c89057a15c7433347d2aca12d9b0ef6b35973504c8b500a7108ba85651ee14ac",
+      "drumRms": 0.05758,
+      "peak": 0.6225
+    },
+    {
+      "file": "C_four-varied-original-drum-hits.mp3",
+      "bytes": 83300,
+      "sha256": "cb47bac8d84db0b9ea3b27823ab18a1f845ea793c0cc1f2949ca93b8291a268f",
+      "drumRms": 0.05758,
+      "peak": 0.5512
+    }
+  ]
+}
