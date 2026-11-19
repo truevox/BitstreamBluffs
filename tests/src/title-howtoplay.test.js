@@ -149,7 +149,7 @@ const { REG, GAME_WIDTH, GAME_HEIGHT, SCENES } = await import('../../src/constan
 // Views FIRST, then HowToPlayView: the import order a Settings-first load produces.
 const { View } = await import('../../src/ui/Views.js');
 const { HowToPlayView } = await import('../../src/ui/HowToPlayView.js');
-const { HOW_TO_PLAY, howToPlayLayout, howToPlayRects, keyboardRows, GAMEPAD_ROWS, TOUCH_GROUPS, LAYOUT_NAMES } = await import('../../src/ui/HowToPlayLayout.js');
+const { HOW_TO_PLAY, howToPlayLayout, howToPlayRects, keyboardRows, GAMEPAD_ROWS, touchGroups, LAYOUT_NAMES } = await import('../../src/ui/HowToPlayLayout.js');
 const { TRICK_KEYS_RIGHT, TRICK_KEYS_LEFT } = await import('../../src/systems/ControlLayouts.js');
 const { Theme } = await import('../../src/ui/Theme.js');
 const { TitleScene, ATTRACT_MS } = await import('../../src/scenes/TitleScene.js');
@@ -241,7 +241,32 @@ describe('HowToPlayLayout', () => {
       for (const r of keyboardRows(layout)) for (const s of [...r.keys, r.label, r.join || '']) for (const ch of s) expect([s, ch === ' ' || hasGlyph(ch)]).toEqual([s, true]);
     }
     for (const r of GAMEPAD_ROWS) for (const s of [r.label, ...r.glyphs.map((g) => g.text)]) for (const ch of s) expect([s, ch === ' ' || hasGlyph(ch)]).toEqual([s, true]);
-    for (const g of TOUCH_GROUPS) for (const s of [g.title, ...g.items]) for (const ch of s) expect([s, ch === ' ' || hasGlyph(ch)]).toEqual([s, true]);
+    for (const layout of LAYOUTS) for (const g of touchGroups(layout)) for (const s of [g.title, ...g.items]) for (const ch of s) expect([s, ch === ' ' || hasGlyph(ch)]).toEqual([s, true]);
+  });
+
+  test('the touch legend lists the buttons the overlay really shows for each layout', async () => {
+    const { TOUCH_CLUSTERS, touchButtonFor } = await import('../../src/systems/TouchOverlay.js');
+    const short = (l) => (l === 'SPIN CCW' || l === 'SPIN CW' ? 'SPIN' : l);
+    for (const layout of LAYOUTS) {
+      const mode = layout === 'classic' ? 'classic' : 'trickDeck';
+      const groups = touchGroups(layout);
+      const legend = Object.fromEntries(groups.map((g) => [g.title, [...g.items].sort()]));
+      const real = (cluster) => [...new Set(TOUCH_CLUSTERS[cluster].map((b) => short(touchButtonFor(b, mode).label)))].sort();
+      expect(legend['LEFT THUMB']).toEqual(real('LEFT'));
+      expect(legend['RIGHT THUMB']).toEqual(real('RIGHT'));
+      expect(legend['TOP BAR']).toEqual(real('TOP'));
+      const right = groups.find((g) => g.title === 'RIGHT THUMB').items;
+      if (layout === 'classic') {
+        expect(right).toContain('PUSH');
+        expect(right).not.toContain('DIVEBOMB');
+      } else {
+        // TouchOverlay.setControlLayout swaps PUSH -> DIVEBOMB and SPIN CCW -> CORKSCREW in trick layouts.
+        expect(right).toEqual(expect.arrayContaining(['DIVEBOMB', 'CORKSCREW', 'SPIN']));
+        expect(right).not.toContain('PUSH');
+      }
+      // the (longer) trick legend line still fits inside the panel
+      for (const g of howToPlayLayout(layout).touch.groups) expect(g.items.x + g.items.w).toBeLessThanOrEqual(HOW_TO_PLAY.w - 8);
+    }
   });
 
   test('the trick layouts teach exactly the keys ControlLayouts binds in a run', () => {

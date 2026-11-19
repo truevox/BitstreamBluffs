@@ -13,6 +13,7 @@
  */
 import { measureText } from './PixelFont.js';
 import { normalizeControlLayout } from '../systems/ControlLayouts.js';
+import { TOUCH_CLUSTERS, touchButtonFor } from '../systems/TouchOverlay.js';
 
 /** Panel size and screen y. 452 x 236 leaves 14 px either side of the 480 px screen and ends at y 253. */
 export const HOW_TO_PLAY = Object.freeze({ w: 452, h: 236, y: 17 });
@@ -88,11 +89,42 @@ export const GAMEPAD_ROWS = Object.freeze([
  * Touch overlay legend (TouchOverlay BUTTONS), grouped by thumb, with the colours the overlay itself uses so
  * the diagram and the real buttons match.
  */
-export const TOUCH_GROUPS = Object.freeze([
-  { title: 'LEFT THUMB', color: 'cyan', items: ['TILT BACK', 'TILT FWD', 'BRAKE', 'TUCK'] },
-  { title: 'RIGHT THUMB', color: 'magenta', items: ['HOP', 'PUSH', 'CHUTE', 'SPIN', 'AIR BRAKE'] },
-  { title: 'TOP BAR', color: 'amber', items: ['RESET', 'PAUSE'] },
-]);
+/** Legend order inside each cluster (most-used first), by base button name. */
+const TOUCH_ORDER = Object.freeze({
+  LEFT: ['tiltBack', 'tiltForward', 'brake', 'tuck'],
+  RIGHT: ['hop', 'push', 'parachute', 'heliLeft', 'heliRight', 'airBrake'],
+  TOP: ['reset', 'pause'],
+});
+
+/** Short legend names: the two classic spin buttons collapse into one SPIN entry. */
+const LEGEND_NAME = Object.freeze({ 'SPIN CCW': 'SPIN', 'SPIN CW': 'SPIN' });
+
+/**
+ * Touch overlay legend for a control layout, derived from the overlay's own buttons through
+ * TouchOverlay.touchButtonFor, so Trick Deck layouts list DIVEBOMB and CORKSCREW (not PUSH) exactly as the
+ * on-screen buttons do. Colours match the overlay so the diagram and the real buttons agree.
+ * @param {string} layout settings.controlLayout
+ * @returns {{title:string,color:string,items:string[]}[]}
+ */
+export function touchGroups(layout) {
+  const mode = normalizeControlLayout(layout) === 'classic' ? 'classic' : 'trickDeck';
+  const names = (cluster) => {
+    const out = [];
+    for (const base of TOUCH_ORDER[cluster]) {
+      const b = TOUCH_CLUSTERS[cluster].find((x) => x.name === base);
+      if (!b) continue;
+      const label = touchButtonFor(b, mode).label;
+      const shown = LEGEND_NAME[label] || label;
+      if (!out.includes(shown)) out.push(shown);
+    }
+    return out;
+  };
+  return [
+    { title: 'LEFT THUMB', color: 'cyan', items: names('LEFT') },
+    { title: 'RIGHT THUMB', color: 'magenta', items: names('RIGHT') },
+    { title: 'TOP BAR', color: 'amber', items: names('TOP') },
+  ];
+}
 
 /** One line of advice under the sections. */
 export const HOW_TO_PLAY_TIP = 'IN THE AIR, HOLD TILT TO FLIP. LAND FLAT FOR A SPEED BOOST.';
@@ -170,11 +202,13 @@ export function howToPlayLayout(layout) {
   const touch = {
     header: r(10, touchY, 432, GLYPH_H),
     phone,
-    groups: TOUCH_GROUPS.map((gr, i) => {
+    groups: touchGroups(layout).map((gr, i) => {
       const y = touchY + 14 + i * 13;
       const title = { ...r(114, y, measureText(gr.title), GLYPH_H), text: gr.title };
-      const text = gr.items.join(' / ');
-      return { ...gr, title, items: { ...r(186, y, measureText(text), GLYPH_H), text } };
+      // ', ' rather than ' / ': the Trick Deck right thumb has six buttons (DIVEBOMB and CORKSCREW replace
+      // PUSH and SPIN CCW), and the wider separator pushed that line past the panel edge.
+      const text = gr.items.join(', ');
+      return { ...gr, title, items: { ...r(182, y, measureText(text), GLYPH_H), text } };
     }),
   };
   const tip = { ...r(10, phone.y + phone.h + 8, measureText(HOW_TO_PLAY_TIP), GLYPH_H), text: HOW_TO_PLAY_TIP };
