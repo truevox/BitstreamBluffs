@@ -551,13 +551,19 @@ export class SoundLabView extends View {
       onClick:()=>this._openMixer(),parent:this.panel,
     });
     this.exportButton=new Button(scene,theme,{
-      x:230,y:235,w:88,h:14,label:'EXPORT MARKS',color:'cyan',
+      x:230,y:235,w:58,h:14,label:'EXPORT',color:'cyan',
       onClick:()=>this._exportMarks(),parent:this.panel,
     }).setDisabled(true);
     this.clearButton=new Button(scene,theme,{
-      x:323,y:235,w:60,h:14,label:'CLEAR',color:'magenta',
+      x:293,y:235,w:42,h:14,label:'CLEAR',color:'magenta',
       onClick:()=>this._clearMarks(),parent:this.panel,
     }).setDisabled(true);
+    // A separate, research-only A/B/C audio page. It does not swap any
+    // game stem, modify the published score, change user settings or save.
+    this.pianoButton=new Button(scene,theme,{
+      x:340,y:235,w:48,h:14,label:'PIANO',color:'amber',
+      onClick:()=>this._openPianoReview(),parent:this.panel,
+    });
     this._markKey=event=>{
       if(!this.alive||this.inspector||this.mixerView||event?.repeat)return;
       if(this.lab?.pack)this._markIssue();
@@ -802,6 +808,20 @@ export class SoundLabView extends View {
     }
     this.markerStatus='EXPORTED '+this.markers.length+' ISSUE MARK(S), NO CHANGES SAVED';
     this._tick();
+  }
+  _openPianoReview(){
+    if(!this.alive||this.inspector||this.mixerView)return;
+    // This is deliberately a separate review tab, NOT a parallel game music
+    // transport. Stop only the LAB audition so the review does not compete
+    // with another song; the active gameplay song bus stays owned by the Lab.
+    // A blocked popup must not change the player's persistent music settings.
+    this.lab?.stop();
+    this.markerStatus='OPTIONAL MAXI PIANO A/B/C OPENS IN SEPARATE TAB';
+    this._tick();
+    if(typeof window!=='undefined'&&typeof window.open==='function'){
+      window.open('/music-review/piano-friendly/index.html',
+        '_blank','noopener,noreferrer');
+    }
   }
   _openInspector(){
     if(this.inspector||this.mixerView||!this.score||!this.lab?.pack)return;

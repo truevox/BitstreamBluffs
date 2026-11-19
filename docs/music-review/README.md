@@ -14,10 +14,14 @@ Marvin requested three different four-beat versions before deciding what sounds 
 
 The existing synthetic scratch is deliberately **not included** in the comparisons so only the drum treatment changes. The three preview MP3s have been rendered, reproduction hash-checked, and tested for playback in Chromium. They are not currently available as an in-game A/B/C switch. Full [method and source notes](drum-countin-ab-20261119/README.md) and [preview metadata](drum-countin-ab-20261119/metadata.json) are retained.
 
-## 🛠️ Designs, not playable audio
+## 🎹 New: playable piano-friendly melody experiment
+
+**Issue [#37](https://github.com/truevox/BitstreamBluffs/issues/37) — source-grounded A/B/C piano-friendly melody, unverified.** This research feature is **not merged to `main` yet**. In the feature build: Settings → Manage Sound → Music Lab → **PIANO**, or open `/music-review/piano-friendly/index.html`. Compare 4×24-second passages of Maxi's **original sung melody** against a **simplified piano-style lead** and a **selectively expressive piano-style lead** with unchanged original accompaniment. Full-length detected note score is also available as editable MIDI. No automatic song-time quantization: original beat phase is unverified. No original game music, score, or save is changed. [Technical and listening handoff](piano-friendly-audition-20261119.md).
+
+## 🛠️ Earlier designs and remaining work
 
 - [Realistic scratch and original-drum hybrid design](20261119-realistic-scratch-and-four-beat-arrangement-design.md): how to replace today's filtered-noise imitation with a real original-music platter-scrub, plus the possibility of mixing a naturally continuous drum stem with selective distinct accents. **No new scratch recording has been generated.**
-- [Piano-friendly, lightly quantized melody design](20261119-piano-friendly-quantized-melody-design.md): an optional future interpretation of Maxi's melody with simplified pitch ornamentation and slight timing quantization. Preserve meaningful vocal/scream glides, remove incidental note-tail scoops. **This is fact-finding only—there is no playable version yet, and no approval to implement it.**
+- [Piano-friendly, lightly quantized melody design](20261119-piano-friendly-quantized-melody-design.md): an optional future interpretation of Maxi's melody with simplified pitch ornamentation and slight timing quantization. Preserve meaningful vocal/scream glides, remove incidental note-tail scoops. **Historical design-only checkpoint. Issue #37 later approved implementation of a separate provisional A/B/C listening prototype; the original specs remain as an earlier decision.**
 
 ## Access and safeguards
 
