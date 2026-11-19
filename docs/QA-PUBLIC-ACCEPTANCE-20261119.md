@@ -47,3 +47,18 @@ At **1,200 Draft Credits**, *Parachute Fuel* rank 12 costs **953 credits**, leav
 ## Publication scope
 
 This QA fix and report live on isolated branch `fix/public-browser-smoke-minification-20261119` unless merged separately. No production deployment, mainline change, GitHub settings adjustment, or automatic scheduled monitor was part of this QA pass.
+
+## Repeatable public release and separated Jest lanes — independently tested
+
+Subsequent QA work on the same branch added a **single failure-sensitive release gate**: `npm run gate:live`, equivalent to `node tools/qa/live-acceptance.mjs` (use `--dist /path/to/full/dist` from a sparse checkout). It runs the exact deployed HTML/JS verifier and the four actual public Chromium smokes without retries. All **five gates PASSED** against the public Netlify game and GitHub `main` build on November 19.
+
+The runner also **failed closed** during two negative tests: nonexistent local build path and an insecure HTTP `--url`. A missing build cannot accidentally be reported as a pass. It does not make any network writes or affect real player profiles.
+
+To untangle old test debt while retaining the original complete suite, the package now exposes two **additional, explicit** diagnostic scripts:
+
+- `npm run test:runtime` (Jest `tests/src/`): **145 passing suites, 2,363 passing tests, zero failures**.
+- `npm run test:legacy` (all other Jest tests): **11 passing suites, seven failing suites; 68 passing tests, nine failures**, exactly the known historical failing-suite names.
+
+`npm test` itself still runs **all suites**, including the seven historical failures. This separation does not mask the failures or imply the legacy test code is correct. The README was also brought up to date with the real default Tricks Right keyboard bindings (where S is Divebomb, not Brake), the optional Classic layout, the original multi-stem OGG soundtrack, and these QA commands.
+
+See `docs/DAILY-DRAFT-BALANCE-TRIALS-20261119.md` for five source-calculated, within-budget Draft builds to compare in future hands-on or controlled automated playtesting. They are **assistant-selected trials, not proven balanced and not an owner-approved rebalance**.

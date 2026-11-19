@@ -1,6 +1,6 @@
 # Bitstream Bluffs
 
-A downhill-only, neon-styled trick-and-race game built with Phaser 3.90 and Matter physics. You ride a sled down an endless, seeded track, carve and hop over terrain, pull tricks for combo points, and dodge glitch hazards until you crash. Runs are deterministic per seed, so a seed can be shared. Visuals are procedural shapes and audio is synthesised with WebAudio, so there are no image or audio assets. The design is specified in `docs/DESIGN-DOC.md`.
+A downhill-only, neon-styled trick-and-race game built with Phaser 3.90 and Matter physics. You ride a sled down an endless, seeded track, carve and hop over terrain, pull tricks for combo points, and dodge glitch hazards until you crash. Runs are deterministic per seed, so a seed can be shared. Visuals are largely procedural shapes; the soundtrack uses original multi-stem OGG recordings alongside synthesised WebAudio effects. The full music library lives under `public/music/`. The design is specified in `docs/DESIGN-DOC.md`.
 
 ## Running
 
@@ -10,15 +10,30 @@ Requires Node.js and npm.
 npm install
 npm run dev        # Vite dev server (port 5173)
 npm run build      # production build to dist/
-npm test -- tests/src   # unit tests for the new src/ code
-npm run sim -- --seeds 100 --policy handsOff --out result.json   # headless simulation, see below
+npm run test:runtime # current src/ tests, explicit separate result
+npm test             # complete suite, including historical js/ tests
+npm run test:legacy  # only historical tests; known pre-existing failures
+npm run sim -- --seeds 100 --policy handsOff --out result.json  # simulation
 ```
 
-`npm test` with no arguments also runs the legacy tests in `tests/`, several of which were failing before the rebuild.
+`npm test` still executes **every** Jest test: the seven historically failing suites remain visible, never silently skipped or marked passing. `test:runtime` and `test:legacy` are **additional diagnostic lanes**, not replacements for the complete suite. The latest public-acceptance evidence and legacy triage live in `docs/QA-PUBLIC-ACCEPTANCE-20261119.md`.
+
+## Public release acceptance (read-only)
+
+The public game is at **https://simulate.sledhead.ing/**. After building a candidate that should already be deployed to Netlify, verify the published HTML/JavaScript bytes and run the five public browser gates:
+
+```sh
+npm run build
+npm run gate:live
+# Or, from a code-only sparse worktree, reuse a full build:
+node tools/qa/live-acceptance.mjs --dist /path/to/full-worktree/dist
+```
+
+`gate:live` checks **SHA-256 byte parity** of the served HTML and compiled JS, then drives Daily Draft/Classic, the original-OGG Music Lab, genuine BSOD fatal/retry music, and five uninterrupted Gym Bluffs in disposable headless Chromium contexts. It fails immediately on any mismatch or test failure and **does not retry automatically, deploy, or alter actual player profiles**. Do not use it as proof that every remotely hosted media file has identical bytes; that check covers HTML/JS, while the media smokes exercise real playback.
 
 ## Simulation harness
 
-`tools/sim/` runs the real game in headless Chromium, faster than real time, to measure how runs behave across many seeds. It uses a fixed 1000/60 ms step and seeded randomness, so the same seed and policy give the same result. It needs the `playwright` package and a Chromium it can launch; `playwright` is not listed in `package.json`, so install it first.
+`tools/sim/` runs the real game in headless Chromium, faster than real time, to measure how runs behave across many seeds. It uses a fixed 1000/60 ms step and seeded randomness, so the same seed and policy give the same result. It needs the `playwright` package (already declared in `package.json`) and a Chromium browser installation available to Playwright.
 
 - `npm run sim -- --seeds 100 --policy handsOff --out result.json` runs 100 seeds (`sim-01` to `sim-100`) and writes JSON.
 - Policies: `handsOff`, `hop`, `flip`, `stallProbe` and `terrain` (terrain generation only, no physics).
@@ -27,22 +42,23 @@ npm run sim -- --seeds 100 --policy handsOff --out result.json   # headless simu
 
 ## Controls
 
-Keyboard (from design doc section 4.1):
+The shipped default keyboard layout is **Tricks Right**, configured in Settings. There are also **Tricks Left** and **Classic** layouts. Important: **S is Divebomb by default, not ground Brake**; the Classic layout assigns S to Brake. The default has no dedicated keyboard ground-brake key. The game's menu-navigation keys remain independent of the chosen gameplay layout.
 
-| Key | Action |
-| --- | --- |
-| W | Push forward (only when nearly stopped on flat or upslope) |
-| A / D | Tilt back / forward (air and ground lean) |
-| S | Brake |
-| A + D | Tuck (less drag, reduced gravity) |
-| Space | Hop / bump jump |
-| Shift | Emergency reset (respawn on last safe ground, costs combo) |
-| Left / Right | Helicopter CCW / CW (style) |
-| Up | Air brake |
-| Down | Parachute stall (half gravity for 0.8 s, steering locked) |
-| Esc | Pause ("Pascal's Ledger" menu) |
+| Key | Tricks Right (default) | Classic |
+| --- | --- | --- |
+| W | Parachute | Push forward on suitable ground |
+| A | Airbrake | Tilt back |
+| S | Divebomb | Ground Brake |
+| D | Tuck | Tilt forward |
+| Up | Frontflip / forward tilt | Airbrake |
+| Down | Backflip / backward tilt | Parachute |
+| Right | Helicopter | Helicopter right |
+| Left | Corkscrew | Helicopter left |
+| Space | Hop | Hop |
+| Shift | Emergency reset | Emergency reset |
+| Esc | Pause | Pause |
 
-Gamepad (standard mapping): left stick tilts, right trigger pushes, left trigger tucks, A hops, B brakes, X air brakes, Y parachutes, LB/RB helicopter, Back resets, Start pauses. A touch overlay mirrors the same virtual buttons during runs.
+In **Tricks Left**, W/S control forward/back tilt, D helicopter, A corkscrew, Up parachute, Left airbrake, Down divebomb, and Right tuck. Gamepad standard mapping includes A hop, **B ground Brake**, X airbrake, Y parachute, right trigger push, left trigger tuck, and Start pause. A touch overlay provides on-screen controls during runs. See `src/systems/ControlLayouts.js` and `src/systems/InputRouter.js` for the authoritative bindings.
 
 ## Project layout
 
@@ -54,6 +70,7 @@ Gamepad (standard mapping): left stick tilts, right trigger pushes, left trigger
 - `src/shaders/` holds the glitch fragment shader and its pipeline.
 - `tests/src/` holds unit tests for the new code.
 - `tools/sim/` holds the headless simulation harness.
+- `tools/qa/` holds the read-only deployed-build verifier and consolidated public Chromium acceptance gate.
 - `docs/DESIGN-DOC.md` is the design specification.
 
 ## Legacy code
