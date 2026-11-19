@@ -50,13 +50,17 @@ export class Backdrop {
   /**
    * @param {Phaser.Scene} scene
    * @param {import('./Theme.js').Theme} theme
-   * @param {{horizon?:number, alpha?:number, depth?:number}} [o]
+   * @param {{horizon?:number, alpha?:number, depth?:number, riderX?:number, riderRange?:number}} [o]
+   *   riderX / riderRange: the centre and half-width of the band the attract rider drifts across (default
+   *   320 / 60, the right half). A host whose layout covers that band can move the rider somewhere visible.
    */
   constructor(scene, theme, o = {}) {
     this.scene = scene;
     this.theme = theme;
     this.horizon = o.horizon === undefined ? 196 : o.horizon;
     this.alpha = o.alpha === undefined ? 1 : o.alpha;
+    this.riderCx = o.riderX === undefined ? 320 : o.riderX;
+    this.riderRange = o.riderRange === undefined ? 60 : o.riderRange;
     const d = o.depth === undefined ? -10 : o.depth;
     const hy = this.horizon;
     this.lastT = null;
@@ -185,9 +189,13 @@ export class Backdrop {
         g.fillRect(-3, -15, 4, 4);
       });
     }
-    this.riderX = 330;
+    this.riderX = this.riderCx + 10;
     this.hopStart = -1;
     this.nextHopAt = 5000;
+    /** Current hop's height (px) and full flips; trick() raises both for one hop. */
+    this.hopH = 16;
+    this.hopFlips = 1;
+    this.hopMs = HOP_MS;
   }
 
   // ------------------------------------------------------------------ painting
@@ -228,6 +236,23 @@ export class Backdrop {
     this.warpFrom = this.t;
     this.warpMs = o.duration || 700;
     return this.warpMs;
+  }
+
+  /**
+   * Make the attract rider throw a big trick now: a higher hop with a double flip. No-op under reduce motion
+   * or while a hop is already in the air (it never cuts a flip short).
+   * @param {{height?:number, flips?:number, duration?:number}} [o]
+   * @returns {boolean} whether a trick started
+   */
+  trick(o = {}) {
+    if (isReducedMotion(this.scene) || (!this.riderParts && !this.riderG) || this.hopStart >= 0) return false;
+    this.hopStart = this.t;
+    this.hopH = o.height || 30;
+    this.hopFlips = o.flips || 2;
+    this.hopMs = o.duration || 1500;
+    // the regular hop waits until this one has landed
+    this.nextHopAt = Math.max(this.nextHopAt, this.t + this.hopMs + 2500);
+    return true;
   }
 
   /** Current speed multiplier from warp(). */
@@ -373,7 +398,7 @@ export class Backdrop {
     if (!this.riderParts && !this.riderG) return;
     const L = this.layers[RIDER_LAYER];
     // drift slowly back and forth across the right half so the carve reads as speed changes
-    if (!this.reduced) this.riderX = 320 + 60 * Math.sin(t / 7000);
+    if (!this.reduced) this.riderX = this.riderCx + this.riderRange * Math.sin(t / 7000);
     const worldX = this.riderX + Math.floor(this.layerScroll[RIDER_LAYER]);
     let y = L.top + ridgeY(RIDER_LAYER, worldX);
     let rot = ridgeSlope(RIDER_LAYER, worldX);
@@ -381,14 +406,17 @@ export class Backdrop {
     if (!this.reduced) {
       if (this.hopStart < 0 && t >= this.nextHopAt) {
         this.hopStart = t;
+        this.hopH = 16;
+        this.hopFlips = 1;
+        this.hopMs = HOP_MS;
         this.nextHopAt = t + 6000 + this.rand() * 4000;
       }
       if (this.hopStart >= 0) {
-        const p = (t - this.hopStart) / HOP_MS;
+        const p = (t - this.hopStart) / this.hopMs;
         if (p >= 1) this.hopStart = -1;
         else {
-          y -= Math.round(16 * 4 * p * (1 - p));
-          rot -= Math.PI * 2 * Ease.inOutCubic(p);
+          y -= Math.round(this.hopH * 4 * p * (1 - p));
+          rot -= Math.PI * 2 * this.hopFlips * Ease.inOutCubic(p);
         }
       }
     } else this.hopStart = -1;

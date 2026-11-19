@@ -7,7 +7,10 @@
  *   slider : { label, get() -> 0..1, set(v), step? }              left/right adjusts, click/drag on the bar sets
  *   static : { label }                                            drawn but never focusable or clickable
  * Optional per item: sub (dim secondary text), color (palette key), disabled,
- *   badge (noninteractive in-row warning), badgeColor (palette key).
+ *   badge (noninteractive in-row warning), badgeColor (palette key),
+ *   subColor / subAlpha (palette key and alpha of the `sub` text; default text at 0.6),
+ *   tint (palette key the label always wears when enabled; default only the selected row is coloured),
+ *   heading (on a 'static' row: draw it as a bright section heading in `color` instead of a dim line).
  *
  * Selection look (synthwave pass): `g` paints the static state exactly where the selected row IS (a faint
  * wash over the selected cell, badges, sliders); it is what layout tests measure, so its first fillRect is
@@ -264,8 +267,13 @@ export class MenuList extends Phaser.GameObjects.Container {
         g.fillStyle(c, 0.1);
         g.fillRect(x0, y, this.colW, this.rowH - 1);
       }
-      row.label.setColorKey(item.disabled ? 'text' : sel ? (item.color || 'text') : 'text');
-      row.label.setAlpha(item.disabled ? 0.35 : sel ? 1 : 0.85);
+      if (item.kind === 'static' && item.heading) {
+        row.label.setColorKey(item.color || 'text');
+        row.label.setAlpha(1);
+      } else {
+        row.label.setColorKey(item.disabled ? 'text' : sel ? (item.color || 'text') : (item.tint || 'text'));
+        row.label.setAlpha(item.disabled ? 0.35 : sel ? 1 : 0.85);
+      }
       if (item.kind === 'choice') {
         const opt = item.options.find((o) => o.value === item.get()) || item.options[0];
         row.value.setText(sel ? `← ${opt.label} →` : opt.label);
@@ -286,7 +294,10 @@ export class MenuList extends Phaser.GameObjects.Container {
         row.value.setText(`${Math.round(v * 100)}%`);
         row.value.setColorKey(item.color || this.colorKey);
       }
-      if (row.sub) row.sub.setColorKey('text');
+      if (row.sub) {
+        row.sub.setColorKey(item.subColor || 'text');
+        if (item.subAlpha !== undefined) row.sub.setAlpha(item.subAlpha);
+      }
     });
     this._paintCursor();
   }
