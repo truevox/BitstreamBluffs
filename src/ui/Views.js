@@ -29,6 +29,7 @@ import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
 import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
 import { ScoreInspectorView } from './ScoreInspectorView.js';
 import { StemMixerView } from './StemMixerView.js';
+import { HowToPlayView } from './HowToPlayView.js';
 import { freshLabLevels,applyLabStemLevels,LAB_STEMS } from '../systems/music/LabStemMix.js';
 import {DRAFT_BUDGET,DRAFT_RULES_VERSION,DRAFT_UPGRADES,draftCost,changeDraftRank,sanitizeDraftRanks} from '../systems/DailyDraft.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
@@ -229,18 +230,19 @@ export class LeaderboardView extends View {
 }
 
 /** Rows in the Settings list; the panel height is derived from it (see SettingsView). */
-const SETTINGS_ROWS = 12;
+const SETTINGS_ROWS = 13;
 
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
   constructor(scene, theme, o) {
     // Height follows the row count (22 + rows * 14 + 30): the rows end at 22 + rows * 14, then a divider
-    // and the palette-swatch row. Twelve rows is 220, which at y 40 still ends at 260 of 270.
+    // and the palette-swatch row. Thirteen rows is 234, which at y 28 ends at 262 of 270.
     const h = 22 + SETTINGS_ROWS * 14 + 30;
     super(scene, theme, { w: 360, h, title: 'SETTINGS',
       color: 'amber', onClose: o.onClose, y: Math.max(8, Math.min(40, 262 - h)), backLabel: 'DONE',
       hints: [{ keys: ['↑', '↓'], label: 'SELECT' }, { keys: ['←', '→'], label: 'CHANGE' }] });
     this.soundView=null;
+    this.howView=null;
     const game=scene.game;
     const settings=()=>game.registry.get(REG.SETTINGS)||{};
     const items=[
@@ -271,6 +273,10 @@ export class SettingsView extends View {
         get:()=>settings().controlLayout||'tricksRight',set:v=>updateSetting(game,'controlLayout',v)},
       {kind:'action',label:'MANAGE SOUND',color:'cyan',sub:'SONGS / VOCALS / LAB',
         onSelect:()=>this._openSoundManager()},
+      // Opens the controls reference as a sibling view over this one (same hand-off as MANAGE SOUND), so
+      // neither host scene needs to know about it; closing it returns here.
+      {kind:'action',label:'HOW TO PLAY',color:'cyan',sub:'CONTROLS / GAMEPAD / TOUCH',
+        onSelect:()=>this._openHowToPlay()},
       {kind:'choice',label:'TILT CONTROLS (90)',options:[
         {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>!!settings().touchRotate90,set:v=>updateSetting(game,'touchRotate90',v)},
@@ -310,13 +316,26 @@ export class SettingsView extends View {
       },
     });
   }
+  _openHowToPlay(){
+    if(this.howView||this.soundView)return;
+    this.panel.setVisible(false);
+    this.howView=new HowToPlayView(this.scene,this.theme,{
+      onClose:()=>{
+        this.howView?.destroy();
+        this.howView=null;
+        this.panel.setVisible(true);
+      },
+    });
+  }
   handleAction(action){
+    if(this.howView)return this.howView.handleAction(action);
     if(this.soundView)return this.soundView.handleAction(action);
     if(action==='cancel'){this.close();return true;}
     return this.menu.handleAction(action);
   }
   destroy(){
     this.soundView?.destroy();this.soundView=null;
+    this.howView?.destroy();this.howView=null;
     this.unbindSwatch?.();
     super.destroy();
   }
