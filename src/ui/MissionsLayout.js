@@ -183,7 +183,7 @@ export function entryLayout(o = {}) {
  * the sun, the ranges, the rider and the grid's vanishing point always read. Every band is asserted
  * pairwise-disjoint in tests/src/missionslayout.test.js.
  */
-export const TITLE_HORIZON = 150;
+export const TITLE_HORIZON = 192;
 
 /** The right-hand "cabinet card": level badge, BEST, Daily Patch and missions. Section ys are card-local. */
 export const TITLE_CARD = Object.freeze({
