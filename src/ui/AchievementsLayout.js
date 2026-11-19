@@ -9,7 +9,7 @@
  * Paging is computed here, not in the view, so "does every row fit above the BACK button" is a unit test.
  */
 import { measureText } from './PixelFont.js';
-import { ACHIEVEMENTS, progressFor, metricsFrom, groupedAchievements, GROUP_ORDER } from '../systems/Achievements.js';
+import { ACHIEVEMENTS, visibleAchievements, progressFor, metricsFrom, groupedAchievements, GROUP_ORDER } from '../systems/Achievements.js';
 
 export const ACH_PANEL = Object.freeze({ w: 432, h: 244 });
 
@@ -33,9 +33,12 @@ export const GROUPS = Object.freeze(GROUP_ORDER.map((id) => Object.freeze({ id, 
  * Flatten the catalogue into display rows: a group header row, then its achievements.
  * @returns {Array<{kind:'header'|'row', label?:string, id?:string}>}
  */
-export function achievementRows() {
+export function achievementRows(profile) {
+  // Catalogue introspection (no profile) retains all defs for source audits.
+  // Actual player views always pass a profile and hide secret rows until earned.
+  const defs = profile === undefined ? ACHIEVEMENTS : visibleAchievements(profile);
   const out = [];
-  for (const g of groupedAchievements()) {
+  for (const g of groupedAchievements(defs)) {
     const meta = GROUPS.find((x) => x.id === g.group);
     out.push({ kind: 'header', label: meta ? meta.label : String(g.group).toUpperCase() });
     for (const a of g.items) out.push({ kind: 'row', id: a.id });
@@ -69,7 +72,7 @@ export function achievementsLayout(o = {}) {
     biomeCount: o.biomeCount, streak: o.streak, dailyRuns: o.dailyRuns,
   });
   const unlocked = (o.profile && o.profile.achievements) || {};
-  const rows = achievementRows();
+  const rows = achievementRows(o.profile);
   const pages = pageCount(rows);
   const page = clampPage(o.page, rows);
   const start = page * ROWS_PER_PAGE;

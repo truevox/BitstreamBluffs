@@ -10,7 +10,7 @@
  * most once, so a replayed RUN_END or a double-scene start cannot double-award.
  */
 import { defaultProfile, loadLevelTable, levelForXp, rewardsForLevel, xpForRun, PROFILE_VERSION } from './Progression.js';
-import { metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
+import { ACHIEVEMENTS, metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
 import { isOfficialDaily } from './Ranking.js';
 import { COSMETIC_ITEMS } from './Cosmetics.js';
 import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
@@ -77,6 +77,8 @@ function sanitizeLifetime(raw) {
     tricks,
     shards: nonNeg(o.shards),
     nearMisses: nonNeg(o.nearMisses),
+    bsodBluffs: nonNeg(o.bsodBluffs),
+    bsodSurfs: nonNeg(o.bsodSurfs),
     bestScore: nonNeg(o.bestScore),
     bestDistanceM: nonNeg(o.bestDistanceM),
     bestCombo: nonNegFloat(o.bestCombo),
@@ -162,6 +164,13 @@ export function sanitizeProfile(raw, levels) {
     for (const [k, v] of Object.entries(raw.achievements)) {
       if (typeof k === 'string' && k && Number.isFinite(v)) p.achievements[k] = v;
     }
+  }
+  // Legacy one-time backfill: discovering the purchasable Gym required a
+  // genuine first Bluff. Preserve that evidence without guessing an unlock
+  // timestamp; zero means historical date unknown, not an unearned trophy.
+  if (p.bsodGym?.discovered && !Number.isFinite(p.achievements['bluff-the-bsod'])) {
+    p.achievements['bluff-the-bsod'] = 0;
+    p.lifetime.bsodBluffs = Math.max(1, p.lifetime.bsodBluffs);
   }
   p.credited = strArr(raw.credited).slice(-CREDITED_MAX);
   // Decision 3: only known biome ids survive, completed implies encountered, absent reads as empty sets.
@@ -563,6 +572,13 @@ export class ProfileStore {
       this.backend = 'memory';
     }
     this.profile = sanitizeProfile(raw, this.levels);
+    // Existing pilots keep earned progress when new catalogue rungs ship.
+    // Stamp any newly qualified achievements once from persisted lifetime
+    // metrics, but never guess a Surfing chain from raw near-miss counts.
+    if (raw && typeof raw === 'object') {
+      const historical = unlockAchievementsFor(this.profile,null,{at:Date.now()});
+      if (historical.added.length) this.save(historical.profile);
+    }
     // Nothing usable was stored at all: persist the clean default now instead of re-deriving it on
     // every load. (A future-version blob is deliberately LEFT on disk rather than overwritten, in case
     // the player returns to a build that understands it; the in-memory profile is a clean default and
@@ -599,6 +615,28 @@ export class ProfileStore {
     }
     this.profile = next;
     return { discovered: true, profile: this.profile };
+  }
+
+  /** Persist a genuinely scored live Bitstream Bluff (never Gym practice).
+   * A second unbroken midair Bluff reveals the Surfing achievement, not a
+   * gameplay unlock or purchase. Earning is immediate, before run end.
+   */
+  recordBsodBluff(chain,at) {
+    if (!Number.isSafeInteger(chain)||chain<1||!Number.isFinite(at))
+      return {added:[],profile:this.profile};
+    const p=this.profile;
+    const was=p.achievements||{};
+    const wanted=[chain>=1?'bluff-the-bsod':null,
+      chain>=2?'surfing-the-void':null].filter(Boolean);
+    const defs=ACHIEVEMENTS.filter(a=>wanted.includes(a.id)&&!Number.isFinite(was[a.id]));
+    const stamped=stampNew(was,defs,at);
+    const next=sanitizeProfile({...p,
+      lifetime:{...p.lifetime,
+        bsodBluffs:(p.lifetime?.bsodBluffs||0)+1,
+        bsodSurfs:(p.lifetime?.bsodSurfs||0)+(chain>=2?1:0)},
+      achievements:stamped.store},this.levels);
+    this.save(next);
+    return {added:stamped.added,profile:this.profile};
   }
 
   /** Atomic, one-time shop unlock; never charges without persisting ownership. */

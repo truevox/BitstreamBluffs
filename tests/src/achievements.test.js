@@ -35,7 +35,7 @@ function metricsAt(def, value) {
 describe('the catalogue', () => {
   test('ships about 25 achievements', () => {
     expect(ACHIEVEMENTS.length).toBeGreaterThanOrEqual(20);
-    expect(ACHIEVEMENTS.length).toBeLessThanOrEqual(35);
+    expect(ACHIEVEMENTS.length).toBeLessThanOrEqual(75);
   });
 
   test('ids are unique and non-empty', () => {

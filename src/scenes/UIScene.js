@@ -733,6 +733,9 @@ export class UIScene extends Phaser.Scene {
     const label = first ? 'BITSTREAM BLUFF' : 'NEAR MISS';
     this._popup(`${label} +${fmtInt((p && p.points) || 25)}`, bsod ? 'amber' : 'magenta');
     if (first) this._strip('BSOD GYM DISCOVERED', 'cyan');
+    const earned = Array.isArray(p?.achievementsEarned) ? p.achievementsEarned : [];
+    if (earned.includes('bluff-the-bsod')) this._strip('BLUFFING THE BSOD UNLOCKED', 'amber');
+    if (earned.includes('surfing-the-void')) this._strip('SURFING THE VOID UNLOCKED', 'amber');
     uiSfx(this, 'nearMiss');
   }
 

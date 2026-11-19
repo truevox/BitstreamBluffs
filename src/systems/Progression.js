@@ -168,6 +168,8 @@ export function defaultProfile() {
       tricks: {},
       shards: 0,
       nearMisses: 0,
+      bsodBluffs: 0,
+      bsodSurfs: 0,
       bestScore: 0,
       bestDistanceM: 0,
       bestCombo: 0,

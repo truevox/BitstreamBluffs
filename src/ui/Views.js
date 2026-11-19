@@ -19,7 +19,7 @@ import { uiSfx } from './Sound.js';
 import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
-import { ACHIEVEMENTS } from '../systems/Achievements.js';
+import { visibleAchievements } from '../systems/Achievements.js';
 import { shopLayout, upgradeShopLayout, shopMenuItems, titlesLayout, titlesMenuItems, gymSetupLayout } from './ShopLayout.js';
 import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopItem } from '../systems/ProfileStore.js';
 import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
@@ -1050,7 +1050,7 @@ export class ProfileView extends View {
       profile: scene.registry.get(REG.PROFILE),
       levels: content.progression,
       playableBiomeIds: biomeDefs.map((d) => d.id),
-      achievementTotal: ACHIEVEMENTS.length,
+      achievementTotal: visibleAchievements(scene.registry.get(REG.PROFILE)).length,
     });
     super(scene, theme, { w: layout.w, h: layout.h, title: 'PILOT PROFILE', color: 'lime', onClose: o.onClose, y: 22, backLabel: 'BACK' });
     this._onShop = o.onShop;
@@ -1411,7 +1411,7 @@ export class AchievementsView extends View {
 
   /** Move by `delta` pages, clamped, and repaint only when the page actually changes. */
   _turn(delta) {
-    const next = clampPage(this.page + delta);
+    const next = Math.max(0,Math.min(this.pages - 1,this.page + delta));
     if (next === this.page) return false;
     this.page = next;
     this._paint();

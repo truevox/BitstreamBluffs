@@ -539,8 +539,13 @@ export class RunScene extends Phaser.Scene {
     // Only the FIRST actually survived escape reveals a secret shop item.
     // No hints, previews, or tutorial actions exist before that event.
     const store = this.registry?.get?.(REG.PROGRESSION)?.store;
+    // Stamp the actual live achievement BEFORE the store marks the Gym as
+    // discovered. Otherwise legacy-migration logic would infer a historical
+    // unlock at timestamp zero and swallow the real first-time reveal toast.
+    const achieved = !this.bsodGym ? store?.recordBsodBluff?.(event.chain,Date.now()) : null;
     const discovered = !this.bsodGym && store?.discoverBsodGym?.();
-    if (discovered?.discovered) this.registry?.set?.(REG.PROFILE, discovered.profile);
+    if (discovered?.discovered || achieved?.added?.length)
+      this.registry?.set?.(REG.PROFILE, store.profile);
     // The nested Easter egg is earned ONLY by five genuine scored escapes
     // WITHOUT LANDING in the GYM. Normal-world chains never advance it.
     if (this.bsodGym && event.chain >= GYM_MASTERY_CHAIN) {
@@ -553,6 +558,7 @@ export class RunScene extends Phaser.Scene {
     const payload = {
       hazardType: 'bsod', points: event.points, x: s.x, y: s.y,
       ...(discovered?.discovered ? { gymDiscovered: true } : {}),
+      ...(achieved?.added?.length ? { achievementsEarned: achieved.added.map(x=>x.id) } : {}),
       chain: event.chain, surfing: event.surfing, closestGapPx: event.closestGapPx,
       ...(canopyRecoveredMs > 0 ? { canopyRecoveredMs } : {}),
     };
