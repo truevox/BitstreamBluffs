@@ -8,11 +8,16 @@
  * Positive transient changes make scenery squash; a quick spring-like decay
  * returns the world to its ordinary geometry between musical accents.
  */
+import { resolveReduceMotion } from '../ui/Motion.js';
+
 const clamp01 = n => Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0;
 
 export function worldDanceMotionAllowed(settings, prefersReducedMotion = false) {
-  return settings?.reduceMotion !== true && settings?.worldDance !== false &&
-    prefersReducedMotion !== true;
+  // Match the actual persisted Auto/On/Off setting used throughout the UI.
+  // Explicit OFF must override OS reduced motion; explicit ON must suppress
+  // movement even without OS preference. Legacy boolean true is fail-safe.
+  return settings?.worldDance !== false && settings?.reduceMotion !== true &&
+    !resolveReduceMotion(settings?.reduceMotion, prefersReducedMotion);
 }
 
 /** Each biome interprets the same musical accents in its own visual voice.
