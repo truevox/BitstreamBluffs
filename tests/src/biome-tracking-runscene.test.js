@@ -83,7 +83,7 @@ jest.unstable_mockModule('../../src/ui/Palette.js', () => ({
   withBiomePalette: (b) => b,
 }));
 jest.unstable_mockModule('../../src/ui/Neon.js', () => ({
-  NeonText: FakeNeonText, neonText: () => new FakeNeonText(), strokeRectPx() {}, cornerTicks() {}, FONT_LINE_H: 9, measureText: () => 10,
+  NeonText: FakeNeonText, neonText: () => new FakeNeonText(), strokeRectPx() {}, glowRectPx() {}, cornerTicks() {}, FONT_LINE_H: 9, measureText: () => 10,
 }));
 jest.unstable_mockModule('../../src/ui/MenuList.js', () => ({ MenuList: FakeMenuList }));
 jest.unstable_mockModule('../../src/ui/Panel.js', () => ({ Panel: FakePanel }));

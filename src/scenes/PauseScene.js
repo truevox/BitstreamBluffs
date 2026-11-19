@@ -18,6 +18,7 @@ import { Panel } from '../ui/Panel.js';
 import { MenuList } from '../ui/MenuList.js';
 import { MenuInput } from '../ui/MenuInput.js';
 import { LeaderboardView, SettingsView, SharecodeView } from '../ui/Views.js';
+import { openDim, closeDim } from '../ui/Motion.js';
 import { fmtClock } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
@@ -143,15 +144,18 @@ export class PauseScene extends Phaser.Scene {
   }
 
   _open(view) {
+    // As on the Title: the dim is kept across a view-to-view hop and faded in/out by Motion otherwise.
+    const keepDim = this.dim;
+    this.dim = null;
     this._close();
-    this.dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7).setOrigin(0, 0).setDepth(400).setInteractive();
+    this.dim = openDim(this, keepDim, 0.7);
     this.view = view;
   }
 
   _close() {
     if (this.view) this.view.destroy();
     this.view = null;
-    if (this.dim) this.dim.destroy();
+    closeDim(this, this.dim);
     this.dim = null;
   }
 

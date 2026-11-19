@@ -8,11 +8,19 @@
  *   static : { label }                                            drawn but never focusable or clickable
  * Optional per item: sub (dim secondary text), color (palette key), disabled,
  *   badge (noninteractive in-row warning), badgeColor (palette key).
+ *
+ * Selection look (synthwave pass): `g` paints the static state exactly where the selected row IS (a faint
+ * wash over the selected cell, badges, sliders); it is what layout tests measure, so its first fillRect is
+ * always the selected cell. On top of that, `cursorG` paints the animated cursor: a gradient bar with a
+ * chevron that GLIDES from the previous row to the new one (eased, frame-rate independent), pulses gently,
+ * runs a light sweep every few seconds and flashes on confirm. Reduce motion: the cursor snaps and holds
+ * still. The cursor is paint only: hit zones, column layout and every input path are unchanged.
  */
 import Phaser from 'phaser';
 import { NeonText } from './Neon.js';
 import { measureText } from './PixelFont.js';
 import { uiSfx } from './Sound.js';
+import { approach, isReducedMotion, onTick } from './Motion.js';
 
 const SLIDER_W = 70;
 
@@ -48,10 +56,17 @@ export class MenuList extends Phaser.GameObjects.Container {
     this.dragging = -1;
     this.g = new Phaser.GameObjects.Graphics(scene);
     this.add(this.g);
+    // Under the labels, over the wash: the animated cursor (see the header).
+    this.cursorG = new Phaser.GameObjects.Graphics(scene);
+    this.add(this.cursorG);
+    /** @type {{x:number,y:number}|null} where the cursor bar is drawn now (null = snap on next paint) */
+    this.glide = null;
+    this.confirmFlash = 0;
     this.rows = this.items.map((item, i) => this._buildRow(scene, item, i));
     scene.add.existing(this);
     if (o.parent) o.parent.add(this);
     this._unbind = theme.bind(() => this.refresh());
+    this._stopTick = onTick(scene, (time, delta) => this._tick(time, delta));
   }
 
   /** Column-major cell for item i: which column, and which row inside it. */
@@ -194,6 +209,8 @@ export class MenuList extends Phaser.GameObjects.Container {
     else if (item.kind === 'slider') this._adjust(i, 1);
     else if (item.onSelect) {
       uiSfx(this.scene, 'uiSelect');
+      this.confirmFlash = 1;
+      this._paintCursor();
       item.onSelect();
     }
   }
@@ -243,10 +260,9 @@ export class MenuList extends Phaser.GameObjects.Container {
       const x0 = col * this.colW;
       const y = rowInCol * this.rowH;
       if (sel) {
-        g.fillStyle(c, 0.16);
+        // the settled highlight; the bright edge and chevron belong to the gliding cursor (cursorG)
+        g.fillStyle(c, 0.1);
         g.fillRect(x0, y, this.colW, this.rowH - 1);
-        g.fillStyle(c, 1);
-        g.fillRect(x0, y, 2, this.rowH - 1);
       }
       row.label.setColorKey(item.disabled ? 'text' : sel ? (item.color || 'text') : 'text');
       row.label.setAlpha(item.disabled ? 0.35 : sel ? 1 : 0.85);
@@ -272,9 +288,90 @@ export class MenuList extends Phaser.GameObjects.Container {
       }
       if (row.sub) row.sub.setColorKey('text');
     });
+    this._paintCursor();
+  }
+
+  /** Top-left of the selected cell, or null when nothing selectable is selected. */
+  _targetCell() {
+    const item = this.items[this.selected];
+    if (!item || item.disabled || item.kind === 'static') return null;
+    const { col, rowInCol } = this._cell(this.selected);
+    return { x: col * this.colW, y: rowInCol * this.rowH };
+  }
+
+  _tick(time, delta) {
+    if (!this.scene || !this.visible) return;
+    const target = this._targetCell();
+    if (target && this.glide && !isReducedMotion(this.scene)) {
+      // eased glide toward the selected cell; ~40 ms half-life feels instant to the hand but reads as motion
+      const k = approach(delta, 40);
+      this.glide.x += (target.x - this.glide.x) * k;
+      this.glide.y += (target.y - this.glide.y) * k;
+      if (Math.abs(target.x - this.glide.x) < 0.3 && Math.abs(target.y - this.glide.y) < 0.3) this.glide = { ...target };
+    }
+    if (this.confirmFlash > 0) this.confirmFlash = Math.max(0, this.confirmFlash - (delta || 16) / 220);
+    this._paintCursor(time);
+  }
+
+  /** @param {number} [time] scene time, for the pulse and the sweep */
+  _paintCursor(time) {
+    const f = this.cursorG;
+    if (!f || !this.scene) return;
+    f.clear();
+    const target = this._targetCell();
+    if (!target) return;
+    const reduced = isReducedMotion(this.scene);
+    if (!this.glide || reduced) this.glide = { ...target };
+    const t = time === undefined ? ((this.scene.time && this.scene.time.now) || 0) : time;
+    const pal = this.theme.pal;
+    const item = this.items[this.selected];
+    const c = pal[item.color || this.colorKey];
+    const x = Math.round(this.glide.x);
+    const y = Math.round(this.glide.y);
+    const w = this.colW;
+    const h = this.rowH - 1;
+    const pulse = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(t / 340);
+    // gradient bar: strong at the left edge, fading to nothing at the right
+    const steps = 8;
+    const sw = Math.ceil(w / steps);
+    for (let i = 0; i < steps; i++) {
+      f.fillStyle(c, (0.22 + 0.08 * pulse) * (1 - i / steps));
+      f.fillRect(x + i * sw, y, Math.min(sw, w - i * sw), h);
+    }
+    // hairlines top and bottom over the bright half
+    f.fillStyle(c, 0.3 + 0.25 * pulse);
+    f.fillRect(x, y, Math.round(w * 0.55), 1);
+    f.fillRect(x, y + h - 1, Math.round(w * 0.55), 1);
+    // light sweep: a narrow bright band crossing the bar every 2.8 s
+    if (!reduced) {
+      const sx = ((t % 2800) / 1100) * (w + 24) - 24;
+      if (sx < w) {
+        f.fillStyle(pal.text, 0.12);
+        f.fillRect(Math.max(x, x + Math.round(sx)), y + 1, Math.max(0, Math.min(8, w - Math.round(sx))), h - 2);
+      }
+    }
+    if (this.confirmFlash > 0) {
+      f.fillStyle(pal.text, 0.4 * this.confirmFlash);
+      f.fillRect(x, y, w, h);
+    }
+    // the bright left edge, then the chevron (bobbing a pixel toward the label)
+    f.fillStyle(c, 1);
+    f.fillRect(x, y, 2, h);
+    const row = this.rows[this.selected];
+    const bob = reduced ? 0 : (Math.sin(t / 220) > 0 ? 1 : 0);
+    const cx = this.align === 'center' && row && row.label
+      ? Math.round(x + w / 2 - row.label.textWidth / 2 - 9) + bob
+      : x + 5 + bob;
+    const cy = y + Math.floor(h / 2);
+    f.fillStyle(pal.text, 0.95);
+    f.fillRect(cx, cy - 2, 1, 5);
+    f.fillRect(cx + 1, cy - 1, 1, 3);
+    f.fillRect(cx + 2, cy, 1, 1);
   }
 
   destroy(fromScene) {
+    if (this._stopTick) this._stopTick();
+    this._stopTick = null;
     if (this._unbind) this._unbind();
     this._unbind = null;
     super.destroy(fromScene);

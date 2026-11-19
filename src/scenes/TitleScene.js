@@ -19,7 +19,8 @@ import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
 import { buildTitleMissionList } from '../ui/MissionsUi.js';
 import { TITLE_BEST_X, TITLE_BEST_Y, TITLE_BANDS, titleMenuLayout } from '../ui/MissionsLayout.js';
-import { addScanlines } from '../ui/Scanlines.js';
+import { addScanlines, playCrtPowerOn } from '../ui/Scanlines.js';
+import { openDim, closeDim } from '../ui/Motion.js';
 import { LeaderboardView, SettingsView, SeedView, ProfileView, ShopView, DailyModesView, DailyDraftEditorView, DailyDraftLeaderboardView } from '../ui/Views.js';
 import { titleBadgeLayout } from '../ui/ProfileLayout.js';
 import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
@@ -62,7 +63,9 @@ export class TitleScene extends Phaser.Scene {
       color: 'text', anchor: 'center', vAnchor: 0.5,
     });
     this.hint.setAlpha(0.7);
-    addScanlines(this);
+    // the rolling band is a menu-only flourish; the power-on plays once per page load (Scanlines.js)
+    addScanlines(this, 1, { roll: true });
+    playCrtPowerOn(this);
 
     this.input_ = new MenuInput(this, (a) => this._onAction(a));
     // Compact song/transport controls in the empty upper-right band.
@@ -284,15 +287,18 @@ export class TitleScene extends Phaser.Scene {
   }
 
   _openView(view) {
+    // The dim survives a view-to-view hop (Profile -> Shop) so it does not flash; Motion fades it otherwise.
+    const keepDim = this.dim;
+    this.dim = null;
     this._closeView();
-    this.dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8).setOrigin(0, 0).setDepth(400).setInteractive();
+    this.dim = openDim(this, keepDim, 0.8);
     this.view = view;
   }
 
   _closeView() {
     if (this.view) this.view.destroy();
     this.view = null;
-    if (this.dim) this.dim.destroy();
+    closeDim(this, this.dim);
     this.dim = null;
   }
 

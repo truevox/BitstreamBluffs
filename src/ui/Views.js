@@ -16,6 +16,7 @@ import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
+import { transitionIn, transitionOut } from './Motion.js';
 import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
@@ -34,7 +35,16 @@ import { validateMusicReviewQueue } from '../systems/music/MusicReviewQueue.js';
 import { validatePerformanceScore, validateExperimentalPerformanceScore,
   nearbyPerformanceEvents, makeIssueMarker, PERFORMANCE_ROLES } from '../systems/music/PerformanceScore.js';
 
-/** Base: centred panel with a BACK button. */
+/**
+ * Base: centred panel with a BACK button.
+ *
+ * Motion: the panel opens with Motion.transitionIn (a CRT zip: a line draws across, the panel unfolds from
+ * it) and closes with Motion.transitionOut (a ghost frame collapses where the panel was). Both collapse to a
+ * short fade under reduce motion. The panel's geometry is never animated away from its layout outside the
+ * open tween, and destroy() stays synchronous (the ghost is a separate, self-destroying graphic), so view
+ * navigation and teardown behave exactly as before for every caller and test. The host scene owns the
+ * dim layer behind the panel (Motion.openDim/closeDim).
+ */
 class View {
   /**
    * @param {Phaser.Scene} scene
@@ -48,7 +58,8 @@ class View {
     this.alive = true;
     const x = Math.round((GAME_WIDTH - o.w) / 2);
     const y = o.y !== undefined ? o.y : Math.round((GAME_HEIGHT - o.h) / 2);
-    this.panel = new Panel(scene, theme, { x, y, w: o.w, h: o.h, title: o.title, color: o.color || 'cyan', fillAlpha: 1 });
+    this.frameColorKey = o.color || 'cyan';
+    this.panel = new Panel(scene, theme, { x, y, w: o.w, h: o.h, title: o.title, color: this.frameColorKey, fillAlpha: 1 });
     this.panel.setDepth(500);
     this.w = o.w;
     this.h = o.h;
@@ -56,6 +67,7 @@ class View {
       x: o.w - 76, y: o.h - 22, w: 68, h: 16, label: o.backLabel || 'BACK', color: 'magenta', onClick: () => this.close(),
     });
     this.panel.add(this.back);
+    transitionIn(scene, this.panel, { w: o.w, h: o.h, color: theme.color(this.frameColorKey) });
   }
 
   close() {
@@ -70,7 +82,16 @@ class View {
 
   destroy() {
     this.alive = false;
-    if (this.panel) this.panel.destroy();
+    if (this.panel) {
+      // A hidden panel (Settings while Manage Sound is open over it) leaves no ghost: it was not on screen.
+      if (this.panel.visible !== false && this.panel.scene) {
+        transitionOut(this.scene, {
+          x: this.panel.x, y: this.panel.y, w: this.w, h: this.h,
+          color: this.theme.color(this.frameColorKey), depth: 501,
+        });
+      }
+      this.panel.destroy();
+    }
     this.panel = null;
   }
 }
@@ -196,7 +217,9 @@ export class LeaderboardView extends View {
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
   constructor(scene, theme, o) {
-    super(scene, theme, { w: 360, h: 200, title: 'SETTINGS',
+    // 214, not 200: REDUCE MOTION made it twelve 14px rows (22..190), which would have run into the palette
+    // swatch at h-20. At y 40 the panel still ends at 254 of 270, in Title and Pause alike.
+    super(scene, theme, { w: 360, h: 214, title: 'SETTINGS',
       color: 'amber', onClose: o.onClose, y: 40, backLabel: 'DONE' });
     this.soundView=null;
     const game=scene.game;
@@ -208,6 +231,10 @@ export class SettingsView extends View {
       { kind:'choice',label:'SCREEN SHAKE',options:[
         {value:true,label:'ON'},{value:false,label:'OFF'}],
         get:()=>settings().screenShake!==false,set:v=>updateSetting(game,'screenShake',v) },
+      // Next to SCREEN SHAKE: both are motion-comfort switches. AUTO follows the OS reduced-motion setting.
+      { kind:'choice',label:'REDUCE MOTION',options:[
+        {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
+        get:()=>settings().reduceMotion||'auto',set:v=>updateSetting(game,'reduceMotion',v) },
       {kind:'slider',label:'MASTER VOLUME',get:()=>settings().masterVolume,
         set:v=>updateSetting(game,'masterVolume',v)},
       {kind:'slider',label:'MUSIC VOLUME',get:()=>settings().musicVolume,
