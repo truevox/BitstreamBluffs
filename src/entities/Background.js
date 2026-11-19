@@ -6,6 +6,7 @@
  */
 import { GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
 import { beesAt, beePrimitives } from '../systems/MicroBees.js';
+import { biomeDanceStyle, sunDanceGeometry } from '../systems/WorldDance.js';
 
 const STAR_COUNT = 70;
 const TILE = 960;
@@ -207,11 +208,21 @@ export function motifProfile(shape, wx, seed) {
   return Math.sin(wx * 0.011 + seed) * 0.55 + Math.sin(wx * 0.027 + seed * 2.3) * 0.3 + Math.sin(wx * 0.061 + seed * 4.1) * 0.15;
 }
 
-/** Screen y of a layer's silhouette at screen x (same expression _layer draws, minus the 8 px sampling). */
-function layerYAt(shape, layer, scrollX, sx) {
+/** Identical visual-only ridge offset for the silhouette and rooted decor.
+ * No terrain/physics subsystem ever calls this helper.
+ */
+function horizonDanceOffset(scrollX, screenX, layer, dance = 0) {
+  if (!(dance > 0)) return 0;
+  const wx = screenX + scrollX * layer.factor;
+  return 1.7 * dance * Math.sin(wx * 0.02 + layer.seed);
+}
+
+/** Screen y of the background silhouette; decor roots track its tiny sway. */
+function layerYAt(shape, layer, scrollX, sx, dance = 0) {
   const h = motifProfile(shape, sx + scrollX * layer.factor, layer.seed);
   const crest = CRESTLESS.has(shape) ? 0 : (h > 0 ? h * layer.amp * 0.2 : 0);
-  return GAME_HEIGHT * layer.baseY - Math.abs(h) * layer.amp - crest;
+  return GAME_HEIGHT * layer.baseY - Math.abs(h) * layer.amp - crest +
+    horizonDanceOffset(scrollX, sx, layer, dance);
 }
 
 /**
@@ -356,6 +367,9 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
   const t = Number.isFinite(timeMs) ? timeMs : 0;
   const lay = decorLayout(motif, Number.isFinite(seed) ? Math.trunc(seed) : 0);
   const def = MOTIF_DEFS[motif];
+  const dance = Number.isFinite(o.dance) ? Math.min(1, Math.max(0, o.dance)) : 0;
+  const horizonDance = Number.isFinite(o.horizonDance)
+    ? Math.min(1, Math.max(0, o.horizonDance)) : 0;
   const out = [];
   const W = GAME_WIDTH;
   const H = GAME_HEIGHT;
@@ -375,8 +389,9 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     const pl = lay.planet;
     const px = tileX(pl.x0, sx, 0.012);
     if (px !== null) {
-      out.push({ kind: 'circle', depth: -1, color: 'lime', fillAlpha: 0.2, lineAlpha: 0.6, x: px, y: pl.y, r: pl.r });
-      out.push({ kind: 'poly', depth: -1, color: 'amber', fillAlpha: 0, lineAlpha: 0.65, pts: ellipsePts(px, pl.y, pl.r * 1.9, pl.r * 0.42, pl.tilt, 20) });
+      const r = pl.r * (1 + 0.04 * dance);
+      out.push({ kind: 'circle', depth: -1, color: 'lime', fillAlpha: 0.2, lineAlpha: 0.6, x: px, y: pl.y, r });
+      out.push({ kind: 'poly', depth: -1, color: 'amber', fillAlpha: 0, lineAlpha: 0.65, pts: ellipsePts(px, pl.y, r * 1.9, r * 0.42, pl.tilt, 20) });
     }
   } else if (motif === 'candy-stripes') {
     // Candy-cane sky: slanted alternating bands across the upper sky, scrolling slowly.
@@ -399,16 +414,18 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     for (const c of lay.canes) {
       const x = tileX(c.x0, sx, L0.factor);
       if (x === null) continue;
-      const yB = layerYAt(def.shape, L0, sx, x) + 2;
+      const yB = layerYAt(def.shape, L0, sx, x, horizonDance) + 2;
       const top = yB - c.h;
       const dir = c.flip ? -1 : 1;
       const path = [];
-      for (let y = yB; y > top; y -= 5) path.push({ x, y });
+      const flex = dance * 3 * dir;
+      for (let y = yB; y > top; y -= 5)
+        path.push({ x: x + flex * ((yB - y) / c.h), y });
       for (let i = 0; i <= 6; i++) {
         const a = Math.PI - (i / 6) * Math.PI;
-        path.push({ x: x + dir * (6 + Math.cos(a) * 6), y: top - Math.sin(a) * 6 });
+        path.push({ x: x + flex + dir * (6 + Math.cos(a) * 6), y: top - Math.sin(a) * 6 });
       }
-      path.push({ x: x + dir * 12, y: top + 5 });
+      path.push({ x: x + flex + dir * 12, y: top + 5 });
       // One white stroke for the whole cane, then a red stripe on every other segment.
       out.push({ kind: 'line', depth: 0, color: 'text', alpha: 0.7, width: 3, pts: path });
       for (let i = 0; i < path.length - 1; i += 2) {
@@ -420,8 +437,8 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     for (const lp of lay.pops) {
       const x = tileX(lp.x0, sx, L1.factor);
       if (x === null) continue;
-      const yB = layerYAt(def.shape, L1, sx, x) + 2;
-      const cy = yB - lp.stick - lp.r;
+      const yB = layerYAt(def.shape, L1, sx, x, horizonDance) + 2;
+      const cy = yB - lp.stick - lp.r - dance * 2.5;
       out.push({ kind: 'line', depth: 1, color: 'text', alpha: 0.55, width: 2, pts: [{ x, y: yB }, { x, y: cy + lp.r }] });
       out.push({ kind: 'circle', depth: 1, color: lp.color, fillAlpha: 0.32, lineAlpha: 0.75, x, y: cy, r: lp.r });
       const spiral = [];
@@ -437,7 +454,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     for (const j of lay.jellies) {
       const x = tileX(j.x0, sx, j.f);
       if (x === null) continue;
-      const pulse = 1 + 0.08 * Math.sin(t / 520 + j.ph);
+      const pulse = 1 + 0.08 * Math.sin(t / 520 + j.ph) + 0.09 * dance;
       const y = j.y + Math.sin(t / 1400 + j.ph) * 5;
       const rx = j.s * pulse;
       const ry = (j.s * 0.8) / pulse;
@@ -466,7 +483,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(gr.x0, sx, 0.06);
       if (x === null) continue;
       const teeth = Math.max(6, Math.round(gr.r / 2.4));
-      const rot = gr.ph + gr.dir * t * (0.012 / gr.r);
+      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * 0.055 * gr.dir;
       const pts = [];
       for (let i = 0; i < teeth; i++) {
         const a = rot + (i / teeth) * Math.PI * 2;
@@ -502,8 +519,12 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const L = def.layers[b.layer];
       const x = tileX(b.x0, sx, L.factor);
       if (x === null) continue;
-      const yB = layerYAt(def.shape, L, sx, x) + 3;
-      const centre = (u) => ({ x: x + b.lean * u * u, y: yB - b.h * u });
+      const yB = layerYAt(def.shape, L, sx, x, horizonDance) + 3;
+      const beatSway = dance * (3 + b.h * 0.045) * Math.sin(b.ph);
+      const centre = (u) => ({
+        x: x + (b.lean + beatSway) * u * u,
+        y: yB - b.h * u,
+      });
       const left = [];
       const right = [];
       for (let i = 0; i <= 5; i++) {
@@ -541,8 +562,8 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
         if (hash01(c, L.seed * 1000 + 17) < 0.25) continue;
         const cx = (c + 0.5) * CONE_W - s71 - off;
         if (cx < -60 || cx > W + 60) continue;
-        const top = layerYAt(def.shape, L, sx, cx) + 1;
-        out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 });
+        const top = layerYAt(def.shape, L, sx, cx, horizonDance) + 1;
+        out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 + dance * 0.7 });
         const cell = hash01(c, 4242);
         for (let k = 0; k < 6; k++) {
           const age = (((t / 3800 + k / 6 + cell) % 1) + 1) % 1;
@@ -613,7 +634,7 @@ export class Background {
    * @param {string} shape
    * @returns {void}
    */
-  _layer(g, scrollX, layer, palette, shape) {
+  _layer(g, scrollX, layer, palette, shape, dance = 0) {
     const step = 8;
     const off = scrollX * layer.factor;
     const baseY = GAME_HEIGHT * layer.baseY;
@@ -625,7 +646,10 @@ export class Background {
       // Sharpen crests slightly (wireframe-mountain feel). Step/facet shapes already carry their own
       // character from _profile, so the extra crest term only applies to the smooth profiles.
       const crest = CRESTLESS.has(shape) ? 0 : (h > 0 ? h * layer.amp * 0.2 : 0);
-      pts.push({ x: sx, y: baseY - Math.abs(h) * layer.amp - crest });
+      // Only the decorative horizon dances; the terrain mesh and collision
+      // geometry are owned by separate systems and never use this offset.
+      const sway = horizonDanceOffset(scrollX, sx, layer, dance);
+      pts.push({ x: sx, y: baseY - Math.abs(h) * layer.amp - crest + sway });
     }
     pts.push({ x: GAME_WIDTH + step, y: GAME_HEIGHT });
     g.fillStyle(palette.bg, 1);
@@ -704,9 +728,10 @@ export class Background {
    * @param {number} speedPxS rider speed (streaks the grid at high speed).
    * @returns {void}
    */
-  update(scrollX, timeMs, speedPxS = 0) {
+  update(scrollX, timeMs, speedPxS = 0, danceStrength = 0) {
     const g = this.gfx;
     const p = this.palette;
+    const dance = biomeDanceStyle(this.motif,danceStrength);
     g.clear();
     // sky gradient (banded)
     const bands = 8;
@@ -728,23 +753,30 @@ export class Background {
     const sunX = GAME_WIDTH * 0.72 - ((scrollX * 0.02) % 40);
     const sunY = GAME_HEIGHT * 0.27;
     const R = 40;
+    // Real-sound-transient response, NOT a verified beat grid. Alternate
+    // width/height a few px around the same centre: gentle Popeye-like
+    // squish, with no camera motion or strobe. Zero reproduces old drawing.
+    const {widthRadius:rx,heightRadius:ry}=sunDanceGeometry(dance.sun,R);
     for (let i = 0; i < 9; i++) {
-      const y0 = sunY - R + (i * 2 * R) / 9;
-      const y1 = y0 + (2 * R) / 9 - (i * 0.45 + 0.4);
+      const y0 = sunY - ry + (i * 2 * ry) / 9;
+      const y1 = y0 + (2 * ry) / 9 - (i * 0.45 + 0.4);
       const mid = (y0 + y1) / 2;
       const dy = mid - sunY;
-      if (Math.abs(dy) >= R) continue;
-      const hw = Math.sqrt(R * R - dy * dy);
+      if (Math.abs(dy) >= ry) continue;
+      const hw = rx * Math.sqrt(1 - (dy * dy) / (ry * ry));
       g.fillStyle(i < 4 ? p.amber : p.magenta, 0.2 + i * 0.012);
       g.fillRect(sunX - hw, y0, hw * 2, Math.max(1, y1 - y0));
     }
     g.lineStyle(1, p.amber, 0.35);
-    g.strokeCircle(sunX, sunY, R);
+    if(dance.sun > 0.001) g.strokeEllipse(sunX, sunY, rx * 2, ry * 2);
+    else g.strokeCircle(sunX, sunY, R);
     // ridges / biome motif
     const geom = motifGeometry(this.motif, scrollX);
     // Audit T1: W6 motifs add decor between/over their layers. The base backdrop and the batch-1 motifs
     // have none, so their draw calls are exactly what they were.
-    const decor = this.motif ? motifDecor(this.motif, scrollX, timeMs, this.decorSeed, { bees: this.bees }) : EMPTY_DECOR;
+    const decor = this.motif ? motifDecor(this.motif, scrollX, timeMs, this.decorSeed,
+      { bees: this.bees, dance: dance.decor,
+        horizonDance: dance.horizon }) : EMPTY_DECOR;
     let beeMask = 0;
     for (const d of decor) if (d.bee !== undefined) beeMask |= 1 << d.bee;
     let bees = 0;
@@ -752,7 +784,7 @@ export class Background {
     this.beeCount = bees;
     if (decor.length) this._decor(g, decor, -1, p);
     for (let i = 0; i < geom.layers.length; i++) {
-      this._layer(g, scrollX, geom.layers[i], p, geom.shape);
+      this._layer(g, scrollX, geom.layers[i], p, geom.shape, dance.horizon);
       if (decor.length) this._decor(g, decor, i, p);
     }
     // data grid (faint), vertical lines scroll with parallax, speed streaks stretch them
