@@ -11,9 +11,11 @@ try{
  await page.goto(base,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(),null,{timeout:30000});
  // Through the real keyboard: Title menu row one -> Daily menu modal.
+ // Do not key browser assertions to constructor.name: Vite minifies class names
+ // in production. Stable visible row labels and view controls work on both.
  await page.keyboard.press('ArrowDown',{delay:50});
  await page.keyboard.press('Enter',{delay:50});
- await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')?.view?.constructor.name==='DailyModesView',null,{timeout:10000});
+ await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')?.view?.menu?.items?.some(i=>i.label==='DAILY DRAFT BOARD'),null,{timeout:10000});
  const choice=await page.evaluate(()=>{
   const t=window.__bbGame.scene.getScene('TitleScene');
   return {rows:t.view.menu.items.map(x=>x.label),budget:t.view.panel?.list?.length};
@@ -26,7 +28,7 @@ try{
  const selected=await page.evaluate(()=>({index:window.__bbGame.scene.getScene('TitleScene').view.menu.selected,items:window.__bbGame.scene.getScene('TitleScene').view.menu.items.map(x=>x.label)}));
  console.log('DRAFT_CHOICES_NAV_PROBE',JSON.stringify(selected));
  await page.keyboard.press('Enter',{delay:45});
- await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')?.view?.constructor.name==='DailyDraftEditorView',null,{timeout:10000});
+ await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')?.view?.itemRows?.length===7,null,{timeout:10000});
  const before=await page.evaluate(()=>{
   const g=window.__bbGame,p=g.registry.get('progression').store.profile;
   return {bank:p.bank,owned:p.upgrades.speed,rank:p.dailyDraft.ranks.canopy};
@@ -53,7 +55,7 @@ try{
  // Enter the Daily mode picker and launch the ranked Draft lane.
  await page.keyboard.press('ArrowDown',{delay:30});
  await page.keyboard.press('Enter',{delay:30});
- await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')?.view?.constructor.name==='DailyModesView',null,{timeout:10000});
+ await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')?.view?.menu?.items?.some(i=>i.label==='DAILY DRAFT BOARD'),null,{timeout:10000});
  await page.keyboard.press('ArrowDown',{delay:30});
  await page.keyboard.press('Enter',{delay:30});
  await page.waitForFunction(()=>window.__bbGame.scene.getScene('RunScene')?.sys?.isActive(),null,{timeout:25000});
@@ -127,7 +129,7 @@ try{
   const t=window.__bbGame.scene.getScene('TitleScene');
   t._openDailyModes();t.view.menu.activate(3);
  });
- await page.waitForFunction(()=>window.__bbGame.scene.getScene('TitleScene')?.view?.constructor.name==='DailyDraftLeaderboardView',null,{timeout:10000});
+ await page.waitForFunction(()=>!!window.__bbGame.scene.getScene('TitleScene')?.view?.board?.cells,null,{timeout:10000});
  await page.waitForTimeout(200);
  const shown=await page.evaluate(()=>{
   const t=window.__bbGame.scene.getScene('TitleScene');
@@ -146,7 +148,7 @@ try{
       boosts:{...p.unlocked.boosts,headStart:8}}});
   g.registry.set('profile',s.profile);
   t.view.close();
-  if(t.view?.constructor?.name!=='DailyModesView')throw Error('Back did not restore Daily choices');
+  if(!t.view?.menu?.items?.some(i=>i.label==='DAILY DRAFT BOARD'))throw Error('Back did not restore Daily choices');
   t.view.menu.activate(0);
   // The prior fatal-scene test stopped RAF for deterministic 950ms advancement.
   // Explicitly flush its queued Title -> RunScene transition.
