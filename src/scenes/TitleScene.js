@@ -124,7 +124,7 @@ export class TitleScene extends Phaser.Scene {
       this._buildLogoFallback();
     }
     this.sub = new NeonText(this, theme, GAME_WIDTH / 2, TITLE_BANDS.tagline.y, 'A DOWNHILL NEON TRICK RACE', {
-      color: 'amber', anchor: 'center', outline: 'dark',
+      color: 'cyan', anchor: 'center', outline: 'dark',
     }).setDepth(LOGO_DEPTH);
   }
 

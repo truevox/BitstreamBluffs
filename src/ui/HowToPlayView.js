@@ -139,8 +139,8 @@ function buildImpl() {
       for (const row of L.gamepad.rows) {
         for (const c of row.caps) {
           if (!c.glyph.text) continue;
-          const tx = c.x + Math.floor((c.w - measureText(c.glyph.text)) / 2) + (c.glyph.shape === 'face' ? 0 : 0);
-          add(tx, c.y + (c.glyph.shape === 'pill' ? 2 : 2), c.glyph.text, { color: c.glyph.shape === 'stick' ? c.glyph.color : 'text' });
+          const tx = c.x + Math.floor((c.w - measureText(c.glyph.text)) / 2);
+          add(tx, c.y + 2, c.glyph.text, { color: 'text' });
         }
         add(row.label.x, row.label.y, row.label.text, { color: 'text', alpha: 0.9 });
       }

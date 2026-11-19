@@ -91,7 +91,7 @@ export const GAMEPAD_ROWS = Object.freeze([
 export const TOUCH_GROUPS = Object.freeze([
   { title: 'LEFT THUMB', color: 'cyan', items: ['TILT BACK', 'TILT FWD', 'BRAKE', 'TUCK'] },
   { title: 'RIGHT THUMB', color: 'magenta', items: ['HOP', 'PUSH', 'CHUTE', 'SPIN', 'AIR BRAKE'] },
-  { title: 'TOP', color: 'amber', items: ['RESET', 'PAUSE'] },
+  { title: 'TOP BAR', color: 'amber', items: ['RESET', 'PAUSE'] },
 ]);
 
 /** One line of advice under the sections. */
@@ -173,7 +173,7 @@ export function howToPlayLayout(layout) {
     groups: TOUCH_GROUPS.map((gr, i) => {
       const y = touchY + 14 + i * 13;
       const title = { ...r(114, y, measureText(gr.title), GLYPH_H), text: gr.title };
-      const text = gr.items.join('  ');
+      const text = gr.items.join(' / ');
       return { ...gr, title, items: { ...r(186, y, measureText(text), GLYPH_H), text } };
     }),
   };
