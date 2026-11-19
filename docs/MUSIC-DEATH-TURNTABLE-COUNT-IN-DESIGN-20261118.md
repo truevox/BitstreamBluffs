@@ -43,9 +43,9 @@ audio context need a carefully defined precedence policy *during*
 implementation. Music Friday should propose and test those rules without
 blocking the approved feature on additional gameplay questions.
 
-## Until the new audio implementation is complete
+## Historical pre-implementation baseline (superseded by integrated commit)
 
-The currently reviewed build still preserves the **continuous soundtrack**
+At this earlier stage, the reviewed build preserved the **continuous soundtrack**
 across death, Game Over, menus, and retries, using the existing
 `_enterMenuMusic()` and `_enterRunMusic()` contracts. The approved fatal-crash
 sequence should *modify the musical arrangement on that same uninterrupted
@@ -66,8 +66,9 @@ regression tests, source/pulse confidence, and human listening**.
 **Provenance:** Marvin proposed the crash scratch + 1–3 silent beats + four
 drum-only beats + band return; Marvin explicitly approved carrying the
 count-in into an immediate retry. Music Friday supplied pacing/implementation
-analysis and suggested reusing the same stems. This file does not assert that
-any crash transition has been coded, tested, or deployed.
+analysis and suggested reusing the same stems. This original decision record did not claim implementation at the time;
+the subsequently completed, tested branch integration is documented below.
+There has still been no production deployment.
 
 ## Control Friday's death-event contract (isolated branch, November 18)
 
@@ -106,9 +107,8 @@ identity, not as a competing second scratch trigger.
 shield impact, an actual fatal BSOD physics collision, the real crash-to-
 GameOver transition, immediate scene retry, a new `runId`, and a real Gym
 reset. This is a **gameplay event test**, not an audible assertion that the
-unimplemented musical death sequence already works. Once Music Friday's
-state machine is committed, test the *same* contract against her six-stem
-mixer to ensure the four-beat recovery persists into the next run.
+new musical audio itself works. The subsequent real-OGG browser integration
+tests described below separately prove the musical stages and cross-run carry.
 
 **Fault isolation:** `RunScene` catches exceptions from synchronous
 `EVT.CRASH` observers so record finalization and `RUN_END` still execute.
@@ -116,3 +116,61 @@ Music Friday's optional count-in listener should independently contain its
 own exceptions; a throwing EventEmitter handler may prevent other listeners
 from receiving that same event. The Control browser smoke injects an audio
 observer failure and proves a fatal record still completes.
+
+### Verified integration gate — actual Game Over retry, not a simulated event
+
+Control's `tools/fatal-death-countin-real-retry-audio-browser-smoke.mjs`
+**PASSED** against the integrated Music Friday `bfd7778` code, cherry-picked
+as `e3d88a9` onto the isolated combined branch. The old pending status
+was accurate before integration but is now superseded. The integrated code
+contains `getFatalCountInStatus()` and the original-OGG drum controller.
+The script plays the actual original six-stem OGG, causes a genuine fatal
+Matter/BSOD collision, waits through the real `GameOverScene`, invokes
+`GameOverScene.retry()`, and verifies the next live `RunScene` uses a different
+`runId` while the **same recovery generation, four original drum cues, song,
+clock anchor and transport token** continue. It then observes the full band
+return in the new run. No collision/death-count-in timing changes are staged
+in this script, and no release beat grid is marked verified.
+
+This is intentionally stronger than the music-owned real-OGG smoke's
+synthetic `bb:runStart` emission for retry: it exercises the actual scene
+lifecycle and prevents future accidental Game Over music cancellations.
+Both browser tests passed. The real Game Over retry preserved the original
+`runId` transition, count-in generation, four scheduled drum accents,
+original track/token/clock anchor, and full-band recovery inside the next
+live RunScene. This **validates mechanism only**: 0.5-second synthetic pulse
+remains unverified and cannot qualify the sequence for a production release.
+
+
+## November 18 — Combined fatal-count-in verification (newest status)
+
+- **Music source:** published GitHub `bfd7778` (Music Friday); combined isolated
+  branch `integration/turntable-pause-continuity-20261118` cherry-pick `e3d88a9`.
+- **Control verification:** `tools/fatal-death-countin-real-retry-audio-browser-smoke.mjs`
+  PASSED using the real Matter fatal collision, GameOverScene and actual retry,
+  then WebAudio recovery. It confirmed four original drum-cue source starts,
+  same musical recovery generation and original song clock/transport, and
+  full band return after the next RunScene started. No delayed gameplay.
+- **Original source tests:** `tools/music/smoke-fatal-crash-countin-original-ogg.mjs`,
+  `tools/music/smoke-fatal-countin-four-songs-ogg.mjs`, and
+  `tools/music/audit-fatal-countin-real-webaudio.mjs` PASSED in Chromium;
+  verified waveform scratch/silence/drum excerpt/full-band gating and the
+  three other shipped track drum-source choices. Manual vinyl, jukebox
+  overrides, Gym, shielded crashes and the five-Bluff flight also passed.
+- **Unit tests:** targeted 82/82 across eight suites; independent repository
+  run **150 passed suites, seven pre-existing failed suites** (2,371 passing
+  tests, nine failed), with **identical seven failing suite names** to the
+  prior combined baseline. Production Vite build passed. The source-based
+  implementation is tested but not yet rhythmically approved.
+- **Remaining release blockers:** the currently playing recovery uses a
+  synthetic **0.5s pulse** and two silent pulses, not source-verified musical
+  beat timestamps. *One More Run* has unresolved ~81 versus ~161 BPM
+  pulse interpretation; independently review the true perceived beat and
+  phase across all four songs, audition four-hit feel, and replace the
+  synthetic pulse with verified source-specific cues before shipping.
+- **Safety:** No main merge, deployment, or claim of final musical approval.
+  No changes to the original OGG assets or release beat-grid catalog.
+
+Implementation ownership: Music Friday wrote the audio engine; Control
+Friday integrated it and independently checked gameplay/audio interactions.
+Marvin approved the behavior, not the synthetic pulse as verified rhythm.

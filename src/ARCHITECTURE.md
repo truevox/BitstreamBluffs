@@ -2424,6 +2424,23 @@ observer can still suppress *later* listeners on the same `EVT.CRASH`; each
 subsystem should contain its own audio callback failures. No synth/music
 exception is permitted to hold gameplay hostage.
 
+### 2026-11-18 — Actual Game Over retry → fatal count-in cross-scene integration gate
+
+Added `tools/fatal-death-countin-real-retry-audio-browser-smoke.mjs` as a
+Control-owned **integration test**. Originally prepared as pending before Music
+Friday committed the real fatal count-in implementation; now available for
+combined verification. It differs from her
+music smoke's synthetic `RUN_START`: forces genuine BSOD fatal physics,
+progresses the actual GameOverScene, calls its real retry(), and verifies
+that a new RunScene starts immediately while the **same AudioContext song,
+clock anchor, count-in generation, and four original drum cue positions**
+continue through to full-band recovery. Uses real OGG and WebAudio; no
+synthetic beat grids are added to any release catalog. Before `bfd7778`, integration lacked `getFatalCountInStatus`; the test
+**PASSED** against `e3d88a9` plus Control's integrated event contract:
+real BSOD fatal collision, actual GameOverScene retry, same drum recovery
+generation, original song clock and transport, full-band return in the new
+run. The beat pulses remain synthetic and cannot be released as verified.
+
 
 ### 2026-11-18 — Music Friday fatal crash count-in implemented on ISOLATED MUSIC branch
 
@@ -2472,3 +2489,29 @@ gates: `docs/MUSIC-FATAL-CRASH-COUNTIN-AUDIO-HANDOFF-20261118.md`.
 
 **No merge to `main`, gameplay deployment, or human listening sign-off**
 occurs by creating this feature branch.
+
+
+### 2026-11-18 — Fatal scratch/count-in CONTROL + MUSIC integration VERIFIED
+
+Published Music Friday commit `bfd7778` was cherry-picked into the isolated
+Control integration branch as `e3d88a9` (documentation conflict only, both
+notes preserved). The previously pending REAL Game Over retry test now
+**passes**: actual Matter fatal BSOD collision emits `fatal:true`/runId,
+GameOver opens, immediate retry launches a different runId without waiting,
+then all **four original-OGG drum excerpt cues** and full-band return keep
+the same WebAudio clock, original song transport and count-in generation.
+
+The three music real-OGG/real-WebAudio checks pass, including source selection
+for the remaining shipped recordings, audible four-cue envelope, silence and
+full-band recovery. Manual vinyl transport, jukebox, Gym pause READY, shield
+nonfatal handling, and real five-Bluff flight also remain browser-green.
+The independent combined full run: 150/157 passing suites and 2371/2380
+passing tests; the identical seven pre-existing failing suites and nine tests
+remain (not newly introduced by this integration). Production Vite build
+passes. Tests do not imply human rhythm verification.
+
+**Release blocker:** Synthetic test pulse = 0.5s, deliberately NOT a verified
+source recording-specific beat/phase. The 81/161 BPM interpretation remains
+open, and no production beat grid was promoted. Listening and pulse review
+are still required before shipping. Isolated branch only: `main` and the live
+site were not merged/deployed.
