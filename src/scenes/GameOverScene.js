@@ -31,6 +31,8 @@ import { Panel } from '../ui/Panel.js';
 import { Button } from '../ui/Button.js';
 import { MenuInput } from '../ui/MenuInput.js';
 import { Backdrop } from '../ui/Backdrop.js';
+import { isReducedMotion, tweenProgress, transitionIn, Ease, lerp, motionMs } from '../ui/Motion.js';
+import { glowRectPx } from '../ui/Neon.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { InitialsEntry } from '../ui/InitialsEntry.js';
 import { LeaderboardTable, ruleLabel } from '../ui/LeaderboardTable.js';
@@ -167,6 +169,7 @@ export class GameOverScene extends Phaser.Scene {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.
       if (this.shopOpen) return;
+      this.skipReveal();
       // A tap on the jukebox or its open queue is NOT a retry, even if
       // Phaser's over[] misses the translucent queue's backing Zone.
       if (this.jukebox?.ownsPointer(pointer)) return;
@@ -203,6 +206,7 @@ export class GameOverScene extends Phaser.Scene {
     this._loadBoard();
     // W4.1: last, so the footer and buttons already exist when the hint is measured against them.
     this._buildShopAccess();
+    this._startReveal();
   }
 
   _emptyRecord() {
@@ -273,11 +277,31 @@ export class GameOverScene extends Phaser.Scene {
     ].filter(Boolean);
     const keep = new Set(cand.slice().sort((a, b) => a.pri - b.pri).slice(0, MAX_ROWS));
     const rows = cand.filter((c) => keep.has(c));
+    this.tallies = [];
+    this.statRows = [];
     rows.forEach(({ row: [k, v, pts], negative }, i) => {
       const y = 56 + i * ROW_H;
-      p.add(new NeonText(this, theme, 8, y, k, { color: 'text', outline: 'none' }).setAlpha(0.7));
-      if (v) p.add(new NeonText(this, theme, 106, y, v, { color: 'cyan', outline: 'none' }));
-      if (pts) p.add(new NeonText(this, theme, 218, y, pts, { color: negative ? 'danger' : 'lime', anchor: 'right', outline: 'none' }));
+      const group = [];
+      const kt = new NeonText(this, theme, 8, y, k, { color: 'text', outline: 'none' }).setAlpha(0.7);
+      p.add(kt);
+      group.push(kt);
+      if (v) {
+        const vt = new NeonText(this, theme, 106, y, v, { color: 'cyan', outline: 'none' });
+        p.add(vt);
+        group.push(vt);
+        // DISTANCE and TRICKS tally up with the score; the final text is what is built here.
+        if (k === 'DISTANCE') this.tallies.push({ obj: vt, to: Math.floor(Number(rec.distanceM) || 0), fmt: (n) => `${fmtInt(n)} M` });
+        else if (k === 'TRICKS') this.tallies.push({ obj: vt, to: trickCount, fmt: (n) => `${fmtInt(n)} DONE` });
+      }
+      if (pts) {
+        const pt = new NeonText(this, theme, 218, y, pts, { color: negative ? 'danger' : 'lime', anchor: 'right', outline: 'none' });
+        p.add(pt);
+        group.push(pt);
+        const sign = pts.charAt(0);
+        const n = Number(String(pts).replace(/[^0-9]/g, '')) || 0;
+        this.tallies.push({ obj: pt, to: n, fmt: (m) => `${sign}${fmtInt(m)}` });
+      }
+      this.statRows.push(group);
     });
     this._buildChaseLines(p, chase);
     p.add(new NeonText(this, theme, 8, 132, 'LEDGER HASH', { color: 'text', outline: 'none' }).setAlpha(0.7));
@@ -293,11 +317,9 @@ export class GameOverScene extends Phaser.Scene {
       x: 182, y: 140, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
     });
     p.add(this.copyBtn);
-    this.tweens.addCounter({
-      from: 0, to: rec.score || 0, duration: Math.min(700, 200 + (rec.score || 0) * 0.2),
-      onUpdate: (t) => this.scoreText.setText(fmtInt(t.getValue())),
-      onComplete: () => this.scoreText.setText(fmtInt(rec.score)),
-    });
+    // The score is built at its final value; _startReveal() counts it up from zero (and shows the final
+    // value at once under reduced motion or when the player skips).
+    this.scoreText.setText(fmtInt(rec.score));
   }
 
   /**
@@ -641,6 +663,7 @@ export class GameOverScene extends Phaser.Scene {
       if (key === 'lime') {
         this.tweens.add({ targets: a, alpha: { from: 1, to: 0.4 }, duration: 260, yoyo: true, repeat: -1 });
         uiSfx(this, 'newBest');
+        if (typeof this._fanfare === 'function') this._fanfare('best');
       }
     });
   }
@@ -676,9 +699,11 @@ export class GameOverScene extends Phaser.Scene {
     this.footer.setText('TYPE INITIALS - ENTER SAVE - SPACE SAVE + RETRY');
     this._retryHint('SPACE = SAVE + RETRY');
     uiSfx(this, 'combo');
+    if (typeof this._fanfare === 'function') this._fanfare('rank');
   }
 
   _rawKey(e) {
+    if (typeof this.skipReveal === 'function') this.skipReveal();
     if (e.key === ' ') {
       if (!e.repeat) this.retry();
       return true;
@@ -882,6 +907,7 @@ export class GameOverScene extends Phaser.Scene {
   _openShop(o = {}) {
     if (this.shopOpen || !this.alive || this.leaving) return;
     this._cancelShopAutoprompt();
+    if (typeof this.skipReveal === 'function') this.skipReveal();
     this.shopOpen = true;
     this.shopArmed = false;
     // "SHOP: B / LB" reads as "open the shop" while it is open; _closeShop re-measures and puts it back.
@@ -983,9 +1009,272 @@ export class GameOverScene extends Phaser.Scene {
     });
   }
 
+  // ------------------------------------------------------------ results reveal
+
+  /** Tween through Motion.tweenProgress, tracked so skipReveal() can finish it. While skipping: instant. */
+  _tw(o) {
+    const t = tweenProgress(this, this._skipping ? { ...o, duration: 0, delay: 0 } : o);
+    if (t) (this._rt = this._rt || []).push(t);
+    return t;
+  }
+
+  /** Run `fn` after `ms` (on skip: at once, with `this._skipping` true). */
+  _at(ms, fn) {
+    return this._tw({ duration: 1, delay: ms, onUpdate: () => {}, onComplete: fn });
+  }
+
+  /** Fade an object to the alpha it had before the reveal hid it. */
+  _fadeIn(obj, ms, delay) {
+    if (!obj || !obj.scene) return;
+    const a = obj._a === undefined ? 1 : obj._a;
+    this._tw({ duration: ms, delay, ease: Ease.outQuad, onUpdate: (p) => { if (obj.scene) obj.setAlpha(a * p); } });
+  }
+
+  _openPanel(panel, delay, color) {
+    if (!panel) return;
+    this._at(delay, () => {
+      if (!panel.scene) return;
+      if (this._skipping) { panel.setAlpha(1).setScale(1, 1); return; }
+      const t = transitionIn(this, panel, { w: panel.w, h: panel.h, color: this.theme.color(color), duration: 240 });
+      if (t) (this._rt = this._rt || []).push(t);
+    });
+  }
+
+  /**
+   * Staged reveal: header slam, then the two panels unfold, the rows and tallies count up, and the buttons
+   * and footer come in. Input is live throughout (it only ever fast-forwards, see skipReveal). Reduced motion:
+   * everything fades in together, no slam, shake or count-up.
+   */
+  _startReveal() {
+    this.revealDone = false;
+    this._skipping = false;
+    this._slam = false;
+    this._rt = [];
+    this.reduced = isReducedMotion(this);
+    const rec = this.rec;
+    const aw = this.registry.get(REG.LAST_AWARDS) || null;
+    const quiet = [this.rule, this.crashLine, this.footer, this.shopHint, this.xpText, this.levelText, this.rewardsText, this.resonance,
+      ...(this.buttons || [])].filter(Boolean);
+    for (const o of quiet) o._a = o === this.rewardsText ? (aw && aw.leveledTo ? 1 : 0.7) : o.alpha;
+    const panels = [this.left, this.right];
+    if (this.reduced) {
+      for (const o of quiet) { o.setAlpha(0); this._fadeIn(o, motionMs(200, true), 0); }
+      for (const pn of panels) transitionIn(this, pn, { w: pn.w, h: pn.h, duration: 120 });
+      this.revealDone = true;
+      return;
+    }
+    // hide everything the staged reveal brings in
+    for (const o of quiet) o.setAlpha(0);
+    for (const pn of panels) pn.setAlpha(0);
+    const stat = this.statRows || [];
+    for (const g of stat) for (const o of g) { o._a = o.alpha; o.setAlpha(0); }
+    this.scoreText.setText('0');
+    for (const t of this.tallies || []) t.obj.setText(t.fmt(0));
+    const sx = this.title.scaleX;
+    const ghosts = [this.ghostA, this.ghostB];
+    const all = [this.title, ...ghosts];
+    const ghostA = 0.45;
+    this.title.setAlpha(0);
+    ghosts.forEach((g) => g.setAlpha(0));
+
+    // 0: slam. The header drops in oversized and fast, the RGB split snaps shut, the screen flashes and shakes.
+    this._slam = true;
+    this._tw({
+      duration: 260,
+      ease: Ease.outCubic,
+      onUpdate: (p) => {
+        const k = lerp(2.4, 1, p);
+        this.title.setScale(sx * k).setAlpha(Math.min(1, p * 4));
+        const d = Math.round(lerp(22, 2, p));
+        ghosts.forEach((g, i) => g.setScale(sx * k).setX(GAME_WIDTH / 2 + (i ? d : -d)).setAlpha(ghostA * Math.min(1, p * 3)));
+      },
+      onComplete: () => {
+        all.forEach((o) => o.setScale(sx));
+        this.title.setAlpha(1).setX(GAME_WIDTH / 2);
+        this.ghostA.setX(GAME_WIDTH / 2 - 2).setAlpha(ghostA);
+        this.ghostB.setX(GAME_WIDTH / 2 + 2).setAlpha(ghostA);
+        this._slam = false;
+        this.ghostT = 400;
+      },
+    });
+    this._at(0, () => {
+      if (this._skipping) return;
+      uiSfx(this, 'glitch', { volume: 0.6 });
+      this._flash();
+      this._shockwave();
+      const st = this.registry.get(REG.SETTINGS) || {};
+      if (st.screenShake !== false && this.cameras && this.cameras.main && typeof this.cameras.main.shake === 'function') this.cameras.main.shake(220, 0.006);
+    });
+    // 260: rule + crash line, 330/470: panels unfold, 700: buttons + footer
+    this._fadeIn(this.rule, 200, 260);
+    this._fadeIn(this.crashLine, 200, 300);
+    this._openPanel(this.left, 330, 'magenta');
+    this._openPanel(this.right, 470, 'cyan');
+    for (const o of [...(this.buttons || []), this.footer, this.shopHint, this.xpText, this.levelText, this.rewardsText, this.resonance]) this._fadeIn(o, 240, 760);
+    // 560: rows slide in, score and row tallies count up with ticks
+    stat.forEach((g, i) => g.forEach((o) => this._fadeIn(o, 160, 560 + i * 55)));
+    this._tally(560);
+  }
+
+  _tally(delay) {
+    const target = Number(this.rec.score) || 0;
+    const items = this.tallies || [];
+    const dur = Math.round(Math.min(1100, 380 + target * 0.12));
+    const steps = 16;
+    let lastStep = 0;
+    this._tw({
+      duration: dur,
+      delay,
+      ease: Ease.outCubic,
+      onUpdate: (p, raw) => {
+        this.scoreText.setText(fmtInt(Math.round(target * p)));
+        for (const t of items) if (t.obj.scene) t.obj.setText(t.fmt(Math.round(t.to * p)));
+        const stp = Math.floor(raw * steps);
+        if (stp > lastStep && !this._skipping) {
+          lastStep = stp;
+          uiSfx(this, 'uiMove', { pitch: 0.8 + raw * 0.9, volume: 0.35 });
+        }
+      },
+      onComplete: () => {
+        this.scoreText.setText(fmtInt(target));
+        for (const t of items) if (t.obj.scene) t.obj.setText(t.fmt(t.to));
+        if (this._skipping) return;
+        uiSfx(this, 'combo', { volume: 0.7 });
+        // score punch
+        this._tw({
+          duration: 260,
+          onUpdate: (_p, raw) => { if (this.scoreText.scene) this.scoreText.setScale(3 * (1 + 0.08 * Math.sin(Math.PI * raw))); },
+          onComplete: () => { if (this.scoreText.scene) this.scoreText.setScale(3); this._finishReveal(); },
+        });
+      },
+    });
+  }
+
+  _finishReveal() {
+    if (this.revealDone) return;
+    this.revealDone = true;
+    const f = this._pendingFanfare;
+    this._pendingFanfare = null;
+    if (f) this._playFanfare(f);
+  }
+
+  /** Fast-forward to the final state. Safe to call any time, any number of times. @returns {void} */
+  skipReveal() {
+    if (this.revealDone || this._skipping || !this._rt) return;
+    this._skipping = true;
+    const list = this._rt;
+    this._rt = [];
+    for (const t of list) { try { t.stop(); } catch (e) { /* already finished */ } }
+    this._skipping = false;
+    this._slam = false;
+    if (this.scoreText && this.scoreText.scene) this.scoreText.setScale(3);
+    this._finishReveal();
+  }
+
+  _flash() {
+    const r = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0.35).setOrigin(0, 0).setDepth(9000);
+    this._tw({ duration: 170, onUpdate: (p) => { if (r.scene) r.setAlpha(0.35 * (1 - p)); }, onComplete: () => { if (r.scene) r.destroy(); } });
+  }
+
+  /** A hard horizontal line blown out from the header's centre. */
+  _shockwave() {
+    const g = this.add.graphics().setDepth(9000);
+    const y = 8 + Math.round((this.title.scaleY * 8) / 2) + 2;
+    const col = this.theme.color('danger');
+    this._tw({
+      duration: 300,
+      ease: Ease.outCubic,
+      onUpdate: (p) => {
+        if (!g.scene) return;
+        g.clear();
+        const w = Math.round(GAME_WIDTH * p);
+        g.fillStyle(col, 0.5 * (1 - p));
+        g.fillRect(Math.round((GAME_WIDTH - w) / 2), y, w, 2);
+        g.fillStyle(0xffffff, 0.8 * (1 - p));
+        g.fillRect(Math.round((GAME_WIDTH - w) / 2), y, w, 1);
+      },
+      onComplete: () => { if (g.scene) g.destroy(); },
+    });
+  }
+
+  /**
+   * NEW BEST ('best', around the score) or a Top-10 rank ('rank', around the ledger): a sparkle burst and a
+   * pulsing glow. Queued until the reveal has finished so it lands on a settled screen.
+   * @param {'best'|'rank'} kind
+   */
+  _fanfare(kind) {
+    if (!this.alive) return;
+    if (!this.revealDone) {
+      if (this._pendingFanfare !== 'rank') this._pendingFanfare = kind;
+      return;
+    }
+    this._playFanfare(kind);
+  }
+
+  _playFanfare(kind) {
+    if (!this.alive || this.leaving || !this.left || !this.left.scene) return;
+    const panel = kind === 'rank' ? this.right : this.left;
+    const color = this.theme.color('lime');
+    const reduced = isReducedMotion(this);
+    // glow pulse: three breaths of a falling-alpha border outside the panel
+    const g = this.add.graphics().setDepth(9000);
+    this._tw({
+      duration: reduced ? 400 : 1100,
+      onUpdate: (_p, raw) => {
+        if (!g.scene) return;
+        g.clear();
+        const k = reduced ? 1 - raw : (0.5 + 0.5 * Math.sin(raw * Math.PI * 6 - Math.PI / 2)) * (1 - raw * 0.6);
+        glowRectPx(g, panel.x, panel.y, panel.w, panel.h, color, 1 + 5 * k);
+        g.lineStyle(1, color, 0.5 * k);
+        g.strokeRect(panel.x - 0.5, panel.y - 0.5, panel.w + 1, panel.h + 1);
+      },
+      onComplete: () => { if (g.scene) g.destroy(); },
+    });
+    if (reduced) return;
+    if (kind === 'rank') this._sparkBurst(panel.x + panel.w / 2, panel.y + 70, 34);
+    else {
+      this._sparkBurst(panel.x + 56, panel.y + 52, 26);
+      this._sparkBurst(panel.x + panel.w - 30, panel.y + 24, 18);
+    }
+  }
+
+  /** Pixel sparks flung out from (x, y) that fall and twinkle out. */
+  _sparkBurst(x, y, count) {
+    const pal = this.theme.pal;
+    const cols = [pal.lime, pal.amber, pal.cyan, pal.text];
+    const sp = [];
+    for (let i = 0; i < count; i++) {
+      sp.push({
+        a: Math.random() * Math.PI * 2, v: 35 + Math.random() * 95, life: 480 + Math.random() * 420,
+        c: cols[i % cols.length], size: Math.random() < 0.3 ? 2 : 1, ph: i,
+      });
+    }
+    const g = this.add.graphics().setDepth(9000);
+    const dur = 950;
+    this._tw({
+      duration: dur,
+      onUpdate: (_p, raw) => {
+        if (!g.scene) return;
+        g.clear();
+        const t = raw * dur;
+        for (const s of sp) {
+          const k = t / s.life;
+          if (k >= 1) continue;
+          if (((Math.floor(t / 55) + s.ph) % 4) === 0) continue; // twinkle
+          const sec = t / 1000;
+          g.fillStyle(s.c, 1 - k * 0.7);
+          g.fillRect(Math.round(x + Math.cos(s.a) * s.v * sec), Math.round(y + Math.sin(s.a) * s.v * sec + 70 * sec * sec), s.size, s.size);
+        }
+      },
+      onComplete: () => { if (g.scene) g.destroy(); },
+    });
+  }
+
   // ------------------------------------------------------------ actions
 
   _onAction(action) {
+    // Any input fast-forwards the results reveal to its final state, then still does what it always did.
+    if (typeof this.skipReveal === 'function') this.skipReveal();
     // W4.1: any action cancels a pending auto-open — the player is already interacting.
     // Typing in the initials entry is not "the player is already playing": it must not drop a pending popup.
     if (!this.entry && typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
@@ -1112,7 +1401,8 @@ export class GameOverScene extends Phaser.Scene {
   update(time, delta) {
     this.backdrop.update(time);
     if (this.board && this.board.visible) this.board.tick(delta);
-    // glitchy header
+    // glitchy header (held still while the slam plays, and under reduced motion)
+    if (this._slam || isReducedMotion(this)) return;
     this.ghostT -= delta;
     if (this.ghostT <= 0) {
       const j = Math.random() < 0.25;

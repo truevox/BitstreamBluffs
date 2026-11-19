@@ -163,7 +163,7 @@ Authoritative typedefs: `src/data/schemas.js` (terrain/content), `src/events.js`
   `pause` (Esc/Start), `pressed{hop,reset,pause,airBrake,parachute,confirm}` one-shot edges, `lastSource`.
   Gamepad: left stick X = tilt, RT = push, face buttons = tricks; touch overlay maps to the same fields.
 * **Settings**: `{version, masterVolume, musicVolume, sfxVolume (0..1), screenShake, palette: 'default'|'colorblind',
-  touchOverlay: 'auto'|'on'|'off', touchRotate90, lastInitials}`. Live copy at `registry REG.SETTINGS`.
+  touchOverlay: 'auto'|'on'|'off', touchRotate90, lastInitials, reduceMotion: 'auto'|'on'|'off'}`. Live copy at `registry REG.SETTINGS`.
 * **RunRecord**: `{version, id, seed, dailyRuleId, startedAt, endedAt, durationMs, score, distanceM, trickPoints,
   tricks{type:count}, bestCombo, maxAirtimeMs, cause: 'crash'|'quit', ledgerHash, initials?}`.
   `ledgerHash = SaveStore.computeLedgerHash(record)` (versioned since decisions 1/2/4/6: see the addendum at the end;

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- menu rider sled: white, tinted at runtime. Foot row 18 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="20" viewBox="0 0 26 20" shape-rendering="crispEdges">
+<path fill="#ffffff" d="M3 15h19v1h-19zM22 16h2v1h-2zM5 17h1v1h-1zM16 17h1v1h-1zM23 17h1v1h-1zM2 18h22v1h-22z"/>
+<path fill="#999999" d="M3 16h19v1h-19z"/>
+</svg>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- menu rider body: white, tinted at runtime -->
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="20" viewBox="0 0 26 20" shape-rendering="crispEdges">
+<path fill="#ffffff" d="M9 6h4v1h-4zM8 7h6v1h-6zM8 8h2v1h-2zM11 8h6v1h-6zM7 9h2v1h-2zM11 9h1v1h-1zM15 9h3v1h-3zM7 10h2v1h-2zM11 10h1v1h-1zM7 11h3v1h-3zM11 11h4v1h-4zM8 12h8v1h-8zM13 13h3v1h-3zM12 14h3v1h-3z"/>
+<path fill="#aaaaaa" d="M10 8h1v1h-1zM9 9h2v1h-2zM9 10h2v1h-2zM10 11h1v1h-1z"/>
+</svg>

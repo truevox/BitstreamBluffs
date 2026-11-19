@@ -4,11 +4,15 @@
  */
 import {
   SCREEN, MISSION_PANEL, MISSION_LIST_TITLE, TITLE_BANDS, TITLE_BEST_X, TITLE_BEST_Y,
+  TITLE_CARD, TITLE_CARD_INNER_W, TITLE_HORIZON, titleCardLayout, titleMenuLayout, titleBestText, titleChaseText,
   rect, overlaps, insideScreen, missionPanelLayout, missionListLayout, toastSlot,
   charsThatFit, ellipsize, GAMEOVER_MISSIONS_Y, GAMEOVER_ROW_H, GAMEOVER_BOARD_ROWS, columnRows,
   GAMEOVER_BOARD_ROW_H, GAMEOVER_MISSIONS_RULE_Y, LABEL_H, GLYPH_H, entryLayout,
 } from '../../src/ui/MissionsLayout.js';
 import { measureText, hasGlyph } from '../../src/ui/PixelFont.js';
+import { sunGeometry } from '../../src/ui/Backdrop.js';
+import fs from 'fs';
+import path from 'path';
 // The font's own line height, read from the font module rather than from the layout that consumes it.
 // This is what stops the "label is one glyph tall" assertion from being a tautology about a local
 // constant: the expected height comes from the code that actually draws the glyphs.
@@ -102,9 +106,10 @@ describe('missionListLayout', () => {
     }
   });
 
-  test('the list clears the Title menu and the DAILY PATCH strip', () => {
-    // These are the real occupied bands on TitleScene, not guesses: menu+controls y92..196 and the
-    // daily panel y202..228. A mission list that overlapped either would cover live UI.
+  test('the list clears the Title menu and the DAILY PATCH section', () => {
+    // These are the real occupied bands on TitleScene, not guesses: the menu panel on the left and the
+    // Daily Patch section of the cabinet card directly above the list. A mission list that overlapped
+    // either would cover live UI.
     const L = missionListLayout(3);
     expect(overlaps(L.panel, TITLE_BANDS.menu)).toBe(false);
     expect(overlaps(L.panel, TITLE_BANDS.daily)).toBe(false);
@@ -128,14 +133,21 @@ describe('missionListLayout', () => {
     }
   });
 
-  test('BEST sits to the right of the list and the hint sits below both', () => {
+  test('BEST sits above the list in the cabinet card, and the hint sits below both', () => {
+    // The synthwave Title moved BEST out of the bottom strip, where it shared a band with the list, into
+    // the card's player section: same column as the list, so the clearance that matters is now vertical.
     const L = missionListLayout(3);
-    expect(TITLE_BANDS.best.x).toBeGreaterThanOrEqual(L.panel.x + L.panel.w);
-    expect(TITLE_BANDS.hint.y).toBeGreaterThanOrEqual(L.panel.y + L.panel.h);
-    // BEST shares the band with the list, so only its horizontal clearance is required; the hint must
-    // sit fully below the list, which is what makes the band arithmetic work.
-    expect(TITLE_BEST_X).toBeGreaterThanOrEqual(L.panel.x + L.panel.w);
-    expect(TITLE_BEST_Y).toBeGreaterThanOrEqual(L.panel.y);
+    expect(TITLE_BANDS.best.y + TITLE_BANDS.best.h).toBeLessThanOrEqual(L.panel.y);
+    expect(TITLE_BEST_X).toBe(TITLE_BANDS.best.x);
+    expect(TITLE_BEST_Y).toBe(TITLE_BANDS.best.y);
+    expect(TITLE_BEST_Y).toBeLessThan(L.panel.y);
+    // the whole BEST line (the widest real one) stays inside the card's text column
+    expect(TITLE_BEST_X).toBeGreaterThanOrEqual(TITLE_CARD.x + TITLE_CARD.pad);
+    for (const [m, sc] of [['500', '500'], ['12,345', '123,456'], ['99,999', '9,999,999']]) {
+      expect(TITLE_BEST_X + measureText(titleBestText(m, sc))).toBeLessThanOrEqual(TITLE_CARD.x + TITLE_CARD.w - TITLE_CARD.pad);
+    }
+    // the common case keeps the exact line the FAIRNESS tests read (run-start-rules)
+    expect(titleBestText('500', '500')).toBe('BEST 500 M   500 PTS');
     expect(TITLE_BANDS.hint.y).toBeGreaterThanOrEqual(L.panel.y + L.panel.h);
   });
 
@@ -182,17 +194,109 @@ describe('missionListLayout', () => {
     }
   });
 
-  test('the mission title fits its text box at the real maximum title length', () => {
-    // 47 templates, longest title 25 chars. Nothing may be silently ellipsized away at scale 1: the
-    // row has to be wide enough for the longest real title, and the bar gets the rest.
+  test('every real mission title fits its text box, measured in the real font, upper-cased', () => {
+    // Nothing may be silently ellipsized away at scale 1. The Title list draws titles upper-cased and
+    // fits them with the MEASURED font width (PixelFont), so the check measures every real template
+    // rather than assuming a 6 px advance: the widest is 138 px against a 140 px row (the bar is under
+    // the label now, so it no longer takes any of the row's width).
     const L = missionListLayout(3);
-    const longest = 25;
-    expect(charsThatFit(L.rows[0].w)).toBeGreaterThanOrEqual(longest);
-    expect(ellipsize('X'.repeat(longest), L.rows[0].w)).toHaveLength(longest);
+    const raw = fs.readFileSync(path.resolve('src/data/missions/missions.json'), 'utf8');
+    const titles = [...raw.matchAll(/"title":\s*"([^"]*)"/g)].map((m) => m[1].toUpperCase());
+    expect(titles.length).toBeGreaterThanOrEqual(40);
+    for (const t of titles) expect(measureText(t)).toBeLessThanOrEqual(L.rows[0].w);
+    for (const b of L.bars) expect(b.w).toBe(L.rows[0].w);
   });
 
   test('the in-run panel and the Title list do not overlap', () => {
     expect(overlaps(missionPanelLayout(3).panel, missionListLayout(3).panel)).toBe(false);
+  });
+});
+
+describe('Title cabinet layout (synthwave reorganisation)', () => {
+  const B = TITLE_BANDS;
+  const named = Object.entries(B).filter(([k]) => k !== 'daily' && k !== 'best');
+
+  test('every band is on screen', () => {
+    for (const [, r] of Object.entries(B)) expect(insideScreen(r)).toBe(true);
+  });
+
+  test('the top-level bands are pairwise disjoint', () => {
+    // daily and best are sections INSIDE the card, so they are checked against the card separately
+    for (let i = 0; i < named.length; i++) {
+      for (let j = i + 1; j < named.length; j++) {
+        expect([named[i][0], named[j][0], overlaps(named[i][1], named[j][1])]).toEqual([named[i][0], named[j][0], false]);
+      }
+    }
+  });
+
+  test('the card sections sit inside the card and never overlap each other', () => {
+    const C = titleCardLayout();
+    const lines = Object.entries(C).filter(([k]) => k !== 'card');
+    for (const [, r] of lines) {
+      expect(r.x).toBeGreaterThanOrEqual(C.card.x);
+      expect(r.y).toBeGreaterThanOrEqual(C.card.y + 2);
+      expect(r.x + r.w).toBeLessThanOrEqual(C.card.x + C.card.w);
+      expect(r.y + r.h).toBeLessThanOrEqual(C.card.y + C.card.h - 2);
+    }
+    for (let i = 0; i < lines.length; i++) {
+      for (let j = i + 1; j < lines.length; j++) expect([lines[i][0], lines[j][0], overlaps(lines[i][1], lines[j][1])]).toEqual([lines[i][0], lines[j][0], false]);
+    }
+    // the named bands the scene and other tests read agree with the card's own sections
+    expect(overlaps(B.best, C.best)).toBe(true);
+    for (const k of ['dailyHead', 'ruleName', 'desc1', 'desc2', 'next', 'chase']) {
+      expect(C[k].y).toBeGreaterThanOrEqual(B.daily.y);
+      expect(C[k].y + C[k].h).toBeLessThanOrEqual(B.daily.y + B.daily.h);
+    }
+  });
+
+  test('the card is wide enough for its widest real lines', () => {
+    expect(measureText('NEXT PATCH IN 23H 59M')).toBeLessThanOrEqual(TITLE_CARD_INNER_W);
+    for (const [st, best] of [[0, null], [12, null], [999, null], [3, '45,678'], [999, '9,999,999']]) {
+      expect(measureText(titleChaseText(st, best))).toBeLessThanOrEqual(TITLE_CARD_INNER_W);
+    }
+    expect(titleChaseText(3, '45,678')).toBe('STREAK 3  TODAY 45,678');
+    expect(titleChaseText(0, null)).toBe('NOT PLAYED TODAY');
+    // a 2x rule name is used only when it fits; every current rule fits at 1x
+    expect(measureText('FEATHERWEIGHT')).toBeLessThanOrEqual(TITLE_CARD_INNER_W);
+  });
+
+  test('the six-row menu fills its band on the grid floor, under the horizon, above the hint', () => {
+    const g = titleMenuLayout(6);
+    expect(g.fits).toBe(true);
+    expect({ x: g.x, y: g.y, w: g.w }).toEqual({ x: B.menu.x, y: B.menu.y, w: B.menu.w });
+    expect(g.y + g.h).toBeLessThanOrEqual(B.hint.y);
+    expect(g.lastRowBottom).toBeLessThanOrEqual(B.menu.y + B.menu.h);
+  });
+
+  test('the centre column between the menu and the card stays open from the tagline to the hint', () => {
+    // This is what lets the sun, the ranges, the rider and the grid's vanishing point read. Only the help
+    // chip (at the foot) and the attract prompt (shown only while the menu is dimmed) may sit in it.
+    const centre = rect(B.menu.x + B.menu.w, B.tagline.y + B.tagline.h, B.card.x - (B.menu.x + B.menu.w), B.help.y - (B.tagline.y + B.tagline.h));
+    expect(centre.w).toBeGreaterThanOrEqual(90);
+    for (const k of ['menu', 'card', 'jukebox', 'logo', 'tagline', 'help', 'hint']) expect([k, overlaps(centre, B[k])]).toEqual([k, false]);
+  });
+
+  test('the upper half of the sun is covered only by the logo, never by a panel', () => {
+    // the logo over the sun is the intended composition; a panel over it is what the reorganisation fixed
+    const s = sunGeometry(TITLE_HORIZON);
+    const upper = rect(s.cx - s.r, s.top, s.r * 2, s.r);
+    for (const k of ['menu', 'card', 'jukebox', 'help', 'hint']) expect([k, overlaps(upper, B[k])]).toEqual([k, false]);
+    // and some of it shows between the logo and the horizon
+    expect(s.top).toBeLessThan(B.logo.y + B.logo.h);
+    expect(s.cy).toBeGreaterThan(B.logo.y + B.logo.h);
+    expect(TITLE_HORIZON).toBeGreaterThan(s.cy);
+  });
+
+  test('the attract prompt sits over the sun, clear of the tagline and the panels', () => {
+    for (const k of ['logo', 'tagline', 'menu', 'card', 'jukebox']) expect([k, overlaps(B.attract, B[k])]).toEqual([k, false]);
+    expect(B.attract.y + B.attract.h).toBeLessThanOrEqual(TITLE_HORIZON);
+    // PRESS START at 2x fits its band
+    expect(measureText('PRESS START') * 2).toBeLessThanOrEqual(B.attract.w);
+  });
+
+  test('the help chip label fits the chip and the hint fits the screen', () => {
+    expect(measureText('? HOW TO PLAY') + 6).toBeLessThanOrEqual(B.help.w);
+    expect(measureText('↑↓ SELECT   ENTER / A CONFIRM   H / X HOW TO PLAY')).toBeLessThanOrEqual(SCREEN.w - 16);
   });
 });
 

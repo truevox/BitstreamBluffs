@@ -7,7 +7,7 @@
  * The widget owns no input listeners; the scene feeds it `handleAction()` (MenuInput) and `handleKey()` (raw keys).
  */
 import Phaser from 'phaser';
-import { NeonText, strokeRectPx } from './Neon.js';
+import { NeonText, strokeRectPx, glowRectPx } from './Neon.js';
 import { Button } from './Button.js';
 import { uiSfx } from './Sound.js';
 
@@ -159,6 +159,7 @@ export class InitialsEntry extends Phaser.GameObjects.Container {
     for (let i = 0; i < this.slots; i++) {
       const sx = this.x0 + i * (this.slotW + this.gap);
       const sel = i === this.cursor;
+      if (sel) glowRectPx(g, sx, this.slotY, this.slotW, this.slotH, c, 1.4);
       g.fillStyle(pal.bgAlt, 1);
       g.fillRect(sx, this.slotY, this.slotW, this.slotH);
       strokeRectPx(g, sx, this.slotY, this.slotW, this.slotH, c, sel ? 1 : 0.4);

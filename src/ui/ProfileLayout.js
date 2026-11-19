@@ -13,6 +13,7 @@ import { loadLevelTable, levelForXp } from '../systems/Progression.js';
 import { fmtInt, fmtSec, fmtClock, idToLabel } from './Format.js';
 import { equippedTitle } from '../systems/Cosmetics.js';
 import { sanitizeBiomeProgress, BIOME_IDS } from '../systems/BiomeDiscovery.js';
+import { TITLE_CARD } from './MissionsLayout.js';
 
 /**
  * Decision 3: the tag an UNLOCKED biome's toggle row carries. It replaces the unlock level on that row (the
@@ -45,8 +46,18 @@ export function toggleLabel(row) {
  */
 export const PROFILE_PANEL = Object.freeze({ w: 416, h: 240 });
 
-/** Screen x of the Title badge: left of the 4x logo (BITSTREAM starts at 138), so the two never touch. */
-export const TITLE_BADGE = Object.freeze({ x: 8, y: 6, lineH: 10 });
+/**
+ * Screen position of the Title level badge: the top of the right-hand cabinet card (MissionsLayout.TITLE_CARD),
+ * its player section, above BEST and the Daily Patch. Overlap with the logo and the card's other lines is
+ * asserted in tests/src/profilelayout.test.js and tests/src/missionslayout.test.js.
+ */
+export const TITLE_BADGE = Object.freeze({
+  x: TITLE_CARD.x + TITLE_CARD.pad,
+  y: TITLE_CARD.y + TITLE_CARD.sections.level,
+  lineH: TITLE_CARD.sections.title - TITLE_CARD.sections.level,
+  /** The badge text column's width: the card's inner width. */
+  w: TITLE_CARD.w - TITLE_CARD.pad * 2,
+});
 
 const GLYPH_H = 8; // 7 cap rows + the descender row: a conservative box for overlap tests
 const PAD = 12;

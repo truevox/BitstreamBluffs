@@ -128,6 +128,18 @@ export function strokeRectPx(g, x, y, w, h, color, alpha = 1) {
 }
 
 /**
+ * Soft neon glow around a rectangle: 1px strokes OUTSIDE it at falling alpha (2 px reach). Pixel-exact rects
+ * rather than a blur shader, so it stays crisp under pixelArt, costs nothing, and paints in tests' fakes.
+ * @param {Phaser.GameObjects.Graphics} g
+ * @param {number} x @param {number} y @param {number} w @param {number} h
+ * @param {number} color @param {number} [strength=1] scales both passes (hover glows use ~1.5)
+ */
+export function glowRectPx(g, x, y, w, h, color, strength = 1) {
+  strokeRectPx(g, x - 2, y - 2, w + 4, h + 4, color, Math.min(1, 0.08 * strength));
+  strokeRectPx(g, x - 1, y - 1, w + 2, h + 2, color, Math.min(1, 0.2 * strength));
+}
+
+/**
  * Draw neon corner brackets (Tron-style) around a rectangle.
  * @param {Phaser.GameObjects.Graphics} g
  * @param {number} x @param {number} y @param {number} w @param {number} h

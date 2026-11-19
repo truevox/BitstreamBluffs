@@ -5,6 +5,7 @@ import { profileLayout, titleBadgeLayout, overlappingPairs, statRows, fmtPlaytim
 import { defaultProfile, levelForXp } from '../../src/systems/Progression.js';
 import { PALETTE_KEYS } from '../../src/constants.js';
 import { measureText, hasGlyph } from '../../src/ui/PixelFont.js';
+import { TITLE_BANDS, overlaps } from '../../src/ui/MissionsLayout.js';
 import { readdirSync } from 'fs';
 
 const levels = JSON.parse(readFileSync(path.resolve('src/data/progression/levels.json'), 'utf8'));
@@ -231,15 +232,20 @@ describe('ProfileLayout.titleBadgeLayout', () => {
     expect(b.items.map((i) => i.text)).toEqual(['SYNC LEVEL 3', 'PACKET JOCKEY']);
   });
 
-  test('sits left of the 4x logo and above the menu panel', () => {
+  test('sits at the top of the cabinet card, clear of the logo, the menu and the BEST line', () => {
+    // The synthwave Title moved the badge from the top-left corner into the right-hand card's player
+    // section. Widest real level title and the longest equipped title both have to fit the card column.
     const b = titleBadgeLayout({ profile: maxedProfile(), levels });
-    const logoLeft = 240 - (measureText('BITSTREAM') * 4) / 2;
     for (const it of b.items) {
       expect(it.x).toBeGreaterThanOrEqual(TITLE_BADGE.x);
-      expect(it.x + it.w).toBeLessThan(logoLeft);
-      expect(it.y + it.h).toBeLessThanOrEqual(92); // menu panel top
+      expect(it.x).toBeGreaterThanOrEqual(TITLE_BANDS.card.x);
+      expect(it.y).toBeGreaterThanOrEqual(TITLE_BANDS.card.y);
+      for (const k of ['logo', 'menu', 'best', 'daily', 'jukebox']) expect([k, overlaps(it, TITLE_BANDS[k])]).toEqual([k, false]);
     }
     expect(overlappingPairs(b.items)).toEqual([]);
+    // every level title fits the card column (the scene leaves 22 px on the first line for the 1UP label)
+    for (const lv of levels.levels) expect(measureText(String(lv.title).toUpperCase())).toBeLessThanOrEqual(TITLE_BADGE.w);
+    expect(measureText('SYNC LEVEL 30')).toBeLessThanOrEqual(TITLE_BADGE.w - 22);
   });
 
   test('badge text clears the backdrop in both palettes (dark outline, not a flat panel)', () => {

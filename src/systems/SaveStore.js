@@ -33,6 +33,8 @@ import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './Dail
  * @property {boolean} musicShuffle     Shuffle following tracks without repeats; first launch track remains One More Run.
  * @property {boolean} dynamicOrchestra  OFF: original instrumental stems with full FX; ON: separately rendered replacement instruments.
  * @property {boolean} screenShake       false disables shake (accessibility).
+ * @property {'auto'|'on'|'off'} reduceMotion  menu motion (accessibility). 'auto' follows the OS
+ *           prefers-reduced-motion query; resolved by ui/Motion.js isReducedMotion().
  * @property {'default'|'colorblind'} palette
  * @property {'auto'|'on'|'off'} touchOverlay  on-screen controls.
  * @property {boolean} touchRotate90     90-degree tilt controls for mobile (design doc section 9).
@@ -75,6 +77,7 @@ export function defaultSettings() {
     musicEnabledSongs: defaultSongSelection(),
     musicShuffle: false,
     dynamicOrchestra: false,
+    reduceMotion: 'auto',
     musicVocals: false,
     vocalGain: 1,
     melodyWithVocalsGain: 0.18,
@@ -111,6 +114,7 @@ export function sanitizeSettings(raw) {
     musicEnabledSongs: sanitizeSongSelection(raw.musicEnabledSongs),
     musicShuffle: typeof raw.musicShuffle === 'boolean' ? raw.musicShuffle : d.musicShuffle,
     dynamicOrchestra: typeof raw.dynamicOrchestra === 'boolean' ? raw.dynamicOrchestra : false,
+    reduceMotion: ['auto', 'on', 'off'].includes(raw.reduceMotion) ? raw.reduceMotion : d.reduceMotion,
     musicVocals: raw.musicVocals === true,
     vocalGain: num(raw.vocalGain, d.vocalGain, 0, 1),
     melodyWithVocalsGain: num(raw.melodyWithVocalsGain, d.melodyWithVocalsGain, 0, 1),

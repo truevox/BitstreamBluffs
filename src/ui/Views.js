@@ -9,13 +9,16 @@ import { REG, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
 import { updateSetting } from '../services.js';
 import { GAME_SONGS } from '../systems/music/MusicPlaylist.js';
 import { Panel } from './Panel.js';
-import { NeonText } from './Neon.js';
+import { NeonText, glowRectPx, strokeRectPx } from './Neon.js';
+import { Keycaps, SectionHeader, paintRule, paintGlowBar, paintFocusRing, paintStateChip, paintPattern,
+  staggerMenuRows, staggerAlpha, LOCK_GLYPH, SHARD_GLYPH, CHECK_GLYPH } from './ViewChrome.js';
 import { Button } from './Button.js';
 import { MenuList } from './MenuList.js';
 import { LeaderboardTable } from './LeaderboardTable.js';
 import { DomTextBox } from './DomTextBox.js';
 import { copyText } from './Clipboard.js';
 import { uiSfx } from './Sound.js';
+import { transitionIn, transitionOut } from './Motion.js';
 import { ellipsize, measureText } from './PixelFont.js';
 import { profileLayout, toggleLabel } from './ProfileLayout.js';
 import { achievementsLayout, clampPage } from './AchievementsLayout.js';
@@ -26,6 +29,7 @@ import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
 import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
 import { ScoreInspectorView } from './ScoreInspectorView.js';
 import { StemMixerView } from './StemMixerView.js';
+import { HowToPlayView } from './HowToPlayView.js';
 import { freshLabLevels,applyLabStemLevels,LAB_STEMS } from '../systems/music/LabStemMix.js';
 import {DRAFT_BUDGET,DRAFT_RULES_VERSION,DRAFT_UPGRADES,draftCost,changeDraftRank,sanitizeDraftRanks} from '../systems/DailyDraft.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
@@ -34,12 +38,24 @@ import { validateMusicReviewQueue } from '../systems/music/MusicReviewQueue.js';
 import { validatePerformanceScore, validateExperimentalPerformanceScore,
   nearbyPerformanceEvents, makeIssueMarker, PERFORMANCE_ROLES } from '../systems/music/PerformanceScore.js';
 
-/** Base: centred panel with a BACK button. */
-class View {
+/**
+ * Base: centred panel with a BACK button.
+ *
+ * Motion: the panel opens with Motion.transitionIn (a CRT zip: a line draws across, the panel unfolds from
+ * it) and closes with Motion.transitionOut (a ghost frame collapses where the panel was). Both collapse to a
+ * short fade under reduce motion. The panel's geometry is never animated away from its layout outside the
+ * open tween, and destroy() stays synchronous (the ghost is a separate, self-destroying graphic), so view
+ * navigation and teardown behave exactly as before for every caller and test. The host scene owns the
+ * dim layer behind the panel (Motion.openDim/closeDim).
+ */
+export class View {
   /**
    * @param {Phaser.Scene} scene
    * @param {import('./Theme.js').Theme} theme
-   * @param {{w:number,h:number,title:string,color?:string,onClose:function():void,y?:number,backLabel?:string}} o
+   * @param {{w:number,h:number,title:string,color?:string,onClose:function():void,y?:number,backLabel?:string,
+   *          hints?:Array<{keys?:string[],key?:string,label?:string}>, hintsAt?:'tab'|'foot'}} o
+   *   `hints` draws a keycap row: in the title-tab line (right-aligned, the default) or at the panel foot,
+   *   left of BACK. A tab-row hint that would run into the title tab is dropped, never overlapped.
    */
   constructor(scene, theme, o) {
     this.scene = scene;
@@ -48,7 +64,8 @@ class View {
     this.alive = true;
     const x = Math.round((GAME_WIDTH - o.w) / 2);
     const y = o.y !== undefined ? o.y : Math.round((GAME_HEIGHT - o.h) / 2);
-    this.panel = new Panel(scene, theme, { x, y, w: o.w, h: o.h, title: o.title, color: o.color || 'cyan', fillAlpha: 1 });
+    this.frameColorKey = o.color || 'cyan';
+    this.panel = new Panel(scene, theme, { x, y, w: o.w, h: o.h, title: o.title, color: this.frameColorKey, fillAlpha: 1 });
     this.panel.setDepth(500);
     this.w = o.w;
     this.h = o.h;
@@ -56,6 +73,18 @@ class View {
       x: o.w - 76, y: o.h - 22, w: 68, h: 16, label: o.backLabel || 'BACK', color: 'magenta', onClick: () => this.close(),
     });
     this.panel.add(this.back);
+    this.hintRow = null;
+    if (o.hints && o.hints.length) {
+      const foot = o.hintsAt === 'foot';
+      const caps = new Keycaps(scene, theme, {
+        x: foot ? 12 : o.w - 10, y: foot ? o.h - 19 : 2, items: o.hints, align: foot ? 'left' : 'right', color: this.frameColorKey,
+      });
+      // the tab is the title plus 16 px padding, a 10 px slant and the three data ticks (~26 px)
+      const tabEnd = measureText(String(o.title || '')) + 16 + 10 + 26;
+      if (!foot && caps.x < tabEnd) caps.destroy();
+      else { this.panel.add(caps); this.hintRow = caps; }
+    }
+    transitionIn(scene, this.panel, { w: o.w, h: o.h, color: theme.color(this.frameColorKey) });
   }
 
   close() {
@@ -70,7 +99,16 @@ class View {
 
   destroy() {
     this.alive = false;
-    if (this.panel) this.panel.destroy();
+    if (this.panel) {
+      // A hidden panel (Settings while Manage Sound is open over it) leaves no ghost: it was not on screen.
+      if (this.panel.visible !== false && this.panel.scene) {
+        transitionOut(this.scene, {
+          x: this.panel.x, y: this.panel.y, w: this.w, h: this.h,
+          color: this.theme.color(this.frameColorKey), depth: 501,
+        });
+      }
+      this.panel.destroy();
+    }
     this.panel = null;
   }
 }
@@ -81,7 +119,10 @@ export class LeaderboardView extends View {
   constructor(scene, theme, o) {
     // 188, not 178: the board switch needs an on-screen key hint, and the only free line is between the
     // tenth table row (panel y ~146) and the button strip. At y 40 the panel still ends at 228 of 270.
-    super(scene, theme, { w: 440, h: 188, title: 'LEDGER // TOP 10 ON THIS DEVICE', color: 'cyan', onClose: o.onClose, y: 40 });
+    super(scene, theme, { w: 440, h: 188, title: 'LEDGER // TOP 10 ON THIS DEVICE', color: 'cyan', onClose: o.onClose, y: 40,
+      hints: [{ keys: ['← →', 'N', 'PAD X'], label: 'SWITCH BOARD' }] });
+    // opt-in: a host that knows the player's latest run can pass its id to light that row up
+    this.highlightId = o.highlightId;
     this.table = new LeaderboardTable(scene, theme, { x: 12, y: 24, w: 416, entries: null, parent: this.panel });
     // The footer used to be one 329px line on the button row, so it ran under MODDED and BACK. It is split:
     // the short half stays on the button row (it ends at x 129, MODDED starts at 292) and the rule-flag
@@ -104,12 +145,8 @@ export class LeaderboardView extends View {
       onClick: () => this._toggleBoard(),
     });
     this.panel.add(this.tabBtn);
-    // The switch was pointer-only: no key reached it. The hint names every key that now does, in the
-    // same quiet style as the other view hints, right-aligned above the button it drives.
-    const hintText = '← → / N / PAD X: SWITCH BOARD';
-    this.panel.add(new NeonText(scene, theme, this.w - 12 - measureText(hintText), this.h - 38, hintText, {
-      color: 'text', outline: 'none',
-    }).setAlpha(0.55));
+    // The switch was pointer-only: no key reached it. The keycap row in the title-tab line (see the super
+    // call) names every key that now does.
     // Focus ring for the two buttons (MODDED/CLEAN, BACK). Starts on the tab so confirm switches boards.
     this.focusIdx = 0;
     this.focusG = new Phaser.GameObjects.Graphics(scene);
@@ -136,7 +173,7 @@ export class LeaderboardView extends View {
       // rather than as "no boosted runs yet". The table draws it in place of its generic message.
       const empty = !rows || rows.length === 0;
       this.emptyText = empty ? `NO ${modded ? 'MODDED' : 'CLEAN'} RUNS RECORDED YET` : null;
-      this.table.setEntries(rows || [], undefined, empty ? {
+      this.table.setEntries(rows || [], this.highlightId, empty ? {
         title: this.emptyText,
         sub: modded ? 'RUNS WITH A BOOST ON LAND HERE' : 'FINISH A RUN TO CLAIM A SPOT',
       } : undefined);
@@ -162,8 +199,7 @@ export class LeaderboardView extends View {
     if (!g) return;
     g.clear();
     const b = this.focusIdx === 0 ? this.tabBtn : this.back;
-    g.lineStyle(1, this.theme.pal[this.focusIdx === 0 ? 'amber' : 'magenta'], 1);
-    g.strokeRect(b.x - 1.5, b.y - 1.5, b.w + 3, b.h + 3);
+    paintFocusRing(g, this.theme.pal, b, this.focusIdx === 0 ? 'amber' : 'magenta');
   }
 
   /**
@@ -193,12 +229,20 @@ export class LeaderboardView extends View {
   }
 }
 
+/** Rows in the Settings list; the panel height is derived from it (see SettingsView). */
+const SETTINGS_ROWS = 13;
+
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
   constructor(scene, theme, o) {
-    super(scene, theme, { w: 360, h: 200, title: 'SETTINGS',
-      color: 'amber', onClose: o.onClose, y: 40, backLabel: 'DONE' });
+    // Height follows the row count (22 + rows * 14 + 30): the rows end at 22 + rows * 14, then a divider
+    // and the palette-swatch row. Thirteen rows is 234, which at y 28 ends at 262 of 270.
+    const h = 22 + SETTINGS_ROWS * 14 + 30;
+    super(scene, theme, { w: 360, h, title: 'SETTINGS',
+      color: 'amber', onClose: o.onClose, y: Math.max(8, Math.min(40, 262 - h)), backLabel: 'DONE',
+      hints: [{ keys: ['↑', '↓'], label: 'SELECT' }, { keys: ['←', '→'], label: 'CHANGE' }] });
     this.soundView=null;
+    this.howView=null;
     const game=scene.game;
     const settings=()=>game.registry.get(REG.SETTINGS)||{};
     const items=[
@@ -208,6 +252,10 @@ export class SettingsView extends View {
       { kind:'choice',label:'SCREEN SHAKE',options:[
         {value:true,label:'ON'},{value:false,label:'OFF'}],
         get:()=>settings().screenShake!==false,set:v=>updateSetting(game,'screenShake',v) },
+      // Next to SCREEN SHAKE: both are motion-comfort switches. AUTO follows the OS reduced-motion setting.
+      { kind:'choice',label:'REDUCE MOTION',options:[
+        {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
+        get:()=>settings().reduceMotion||'auto',set:v=>updateSetting(game,'reduceMotion',v) },
       {kind:'slider',label:'MASTER VOLUME',get:()=>settings().masterVolume,
         set:v=>updateSetting(game,'masterVolume',v)},
       {kind:'slider',label:'MUSIC VOLUME',get:()=>settings().musicVolume,
@@ -225,6 +273,10 @@ export class SettingsView extends View {
         get:()=>settings().controlLayout||'tricksRight',set:v=>updateSetting(game,'controlLayout',v)},
       {kind:'action',label:'MANAGE SOUND',color:'cyan',sub:'SONGS / VOCALS / LAB',
         onSelect:()=>this._openSoundManager()},
+      // Opens the controls reference as a sibling view over this one (same hand-off as MANAGE SOUND), so
+      // neither host scene needs to know about it; closing it returns here.
+      {kind:'action',label:'HOW TO PLAY',color:'cyan',sub:'CONTROLS / GAMEPAD / TOUCH',
+        onSelect:()=>this._openHowToPlay()},
       {kind:'choice',label:'TILT CONTROLS (90)',options:[
         {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>!!settings().touchRotate90,set:v=>updateSetting(game,'touchRotate90',v)},
@@ -234,16 +286,23 @@ export class SettingsView extends View {
     ];
     this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:14,
       items,color:'amber',parent:this.panel});
+    staggerMenuRows(scene,this.menu);
     this.swatch=scene.add.graphics();
     this.panel.add(this.swatch);
+    // what the live palette looks like: four glowing chips and its name, under a divider
+    this.swatchLabel=new NeonText(scene,theme,10+4*22+6,this.h-17,'',{color:'text',outline:'none',alpha:0.7});
+    this.panel.add(this.swatchLabel);
     this.unbindSwatch=theme.bind(pal=>{
       const g=this.swatch;
       g.clear();
+      paintRule(g,10,this.w-10,this.h-27,pal.amber,0.6);
       ['cyan','magenta','lime','amber'].forEach((k,i)=>{
+        glowRectPx(g,10+i*22,this.h-20,18,12,pal[k],1);
         g.fillStyle(pal[k],1);g.fillRect(10+i*22,this.h-20,18,12);
         g.fillStyle(pal.bg,1);g.fillRect(12+i*22,this.h-18,14,8);
         g.fillStyle(pal[k],1);g.fillRect(14+i*22,this.h-16,10,4);
       });
+      this.swatchLabel.setText(settings().palette==='colorblind'?'COLOR-BLIND PALETTE':'NEON PALETTE');
     });
   }
   _openSoundManager(){
@@ -257,13 +316,26 @@ export class SettingsView extends View {
       },
     });
   }
+  _openHowToPlay(){
+    if(this.howView||this.soundView)return;
+    this.panel.setVisible(false);
+    this.howView=new HowToPlayView(this.scene,this.theme,{
+      onClose:()=>{
+        this.howView?.destroy();
+        this.howView=null;
+        this.panel.setVisible(true);
+      },
+    });
+  }
   handleAction(action){
+    if(this.howView)return this.howView.handleAction(action);
     if(this.soundView)return this.soundView.handleAction(action);
     if(action==='cancel'){this.close();return true;}
     return this.menu.handleAction(action);
   }
   destroy(){
     this.soundView?.destroy();this.soundView=null;
+    this.howView?.destroy();this.howView=null;
     this.unbindSwatch?.();
     super.destroy();
   }
@@ -275,7 +347,8 @@ export class SettingsView extends View {
 export class SoundManagerView extends View {
   constructor(scene,theme,o){
     super(scene,theme,{w:448,h:238,title:'MANAGE SOUND',
-      color:'cyan',onClose:o.onClose,y:15});
+      color:'cyan',onClose:o.onClose,y:15,
+      hints:[{keys:['↑','↓'],label:'SELECT'},{keys:['←','→'],label:'CHANGE'}]});
     this.labView=null;
     this._build();
   }
@@ -320,8 +393,8 @@ export class SoundManagerView extends View {
           set:v=>updateSetting(game,'melodyWithVocalsGain',v)},
       ] : [
         {kind:'action',label:'UNLOCK ORIGINAL VOCALS ('+
-          VOCALS_UNLOCK_SHARDS+' SHARDS)',color:'amber',
-          sub:bank+' AVAILABLE',onSelect:()=>this._buyVocals()},
+          VOCALS_UNLOCK_SHARDS+' SHARDS)',color:'amber',tint:'amber',
+          sub:bank+' AVAILABLE',subColor:'amber',subAlpha:0.9,onSelect:()=>this._buyVocals()},
         {kind:'static',label:'VOCALS + MELODY MIX LOCKED'},
       ]),
       {kind:'action',label:'MUSIC LAB',color:'lime',
@@ -332,6 +405,7 @@ export class SoundManagerView extends View {
     this.menu=new MenuList(this.scene,this.theme,{x:10,y:24,w:428,
       rowH:17,items:menuItems,color:'cyan',parent:this.panel});
     this.menu.setSelected(Math.min(selected,menuItems.length-1),true);
+    if(!this._revealed){this._revealed=true;staggerMenuRows(this.scene,this.menu);}
     if(!this.note){
       this.note=new NeonText(this.scene,this.theme,12,this.h-39,
         'DYNAMIC ORCHESTRA OFF = SOURCE STEMS + ALL GAME DSP',{
@@ -405,7 +479,8 @@ export class SoundManagerView extends View {
 export class SoundLabView extends View {
   constructor(scene,theme,o){
     super(scene,theme,{w:468,h:253,title:'MUSIC LAB  //  REAL GAME AUDIO',
-      color:'lime',onClose:o.onClose,y:7});
+      color:'lime',onClose:o.onClose,y:7,
+      hints:[{keys:['M'],label:'MARK'},{keys:['N'],label:'NOTES'}]});
     this.audio=scene.registry.get(REG.AUDIO);
     this.biome='crystal-cavern';
     this.songIndex=0;
@@ -431,6 +506,17 @@ export class SoundLabView extends View {
 
     this.sourceBus=null;
     this.prevBusVolume=null;
+    // The four readout lines sit in an inset "display": dark well, thin frame, an amber edge. Added before
+    // the texts so it paints under them.
+    this.readout=scene.add.graphics();
+    this.panel.add(this.readout);
+    this._unbindReadout=theme.bind(pal=>{
+      const g=this.readout;
+      g.clear();
+      g.fillStyle(pal.bg,0.85);g.fillRect(8,184,this.w-16,46);
+      strokeRectPx(g,8,184,this.w-16,46,pal.cyan,0.3);
+      g.fillStyle(pal.amber,0.9);g.fillRect(8,184,2,46);
+    });
     this.statusText=new NeonText(scene,theme,13,188,
       'LOADING THE GAME MUSIC ENGINE...',{color:'amber',outline:'none'});
     this.panel.add(this.statusText);
@@ -889,6 +975,7 @@ export class SoundLabView extends View {
         this.prevBusVolume??1,this.audio.ctx.currentTime,.05);
     }
     this.sourceBus=null;
+    this._unbindReadout?.();this._unbindReadout=null;
     super.destroy();
   }
 }
@@ -905,12 +992,21 @@ export class SeedView extends View {
     this.onSubmit = o.onSubmit;
     const px = this.panel.x;
     const py = this.panel.y;
+    // a lime halo around the DOM field (the field itself is an HTML element above the canvas)
+    this.slot = scene.add.graphics();
+    this.panel.add(this.slot);
+    this._unbindSlot = theme.bind((pal) => {
+      this.slot.clear();
+      glowRectPx(this.slot, 12, 40, 316, 20, pal.lime, 1.4);
+      paintRule(this.slot, 12, this.w - 12, this.h - 30, pal.lime, 0.5);
+    });
     this.panel.add(new NeonText(scene, theme, 12, 24, 'SAME SEED = SAME TRACK. SHARE IT WITH FRIENDS.', { color: 'text', outline: 'none' }).setAlpha(0.7));
     this.box = new DomTextBox(scene, theme, {
       x: px + 12, y: py + 40, w: 316, h: 20, value: o.initial || '', maxLength: 32, placeholder: 'TYPE A SEED (EMPTY = RANDOM)',
       color: 'lime', onSubmit: () => this.submit(), onCancel: () => this.close(),
     });
-    this.panel.add(new NeonText(scene, theme, 12, 68, 'ENTER = GO     ESC = BACK', { color: 'text', outline: 'none' }).setAlpha(0.55));
+    this.panel.add(new Keycaps(scene, theme, { x: 12, y: 66, color: 'lime',
+      items: [{ keys: ['ENTER'], label: 'GO' }, { keys: ['ESC'], label: 'BACK' }] }));
     this.go = new Button(scene, theme, { x: 12, y: this.h - 22, w: 96, h: 16, label: 'GO!', color: 'lime', onClick: () => this.submit() });
     this.panel.add(this.go);
     scene.time.delayedCall(30, () => this.alive && this.box.focus());
@@ -929,6 +1025,8 @@ export class SeedView extends View {
   destroy() {
     if (this.box) this.box.destroy();
     this.box = null;
+    if (this._unbindSlot) this._unbindSlot();
+    this._unbindSlot = null;
     super.destroy();
   }
 }
@@ -942,7 +1040,8 @@ export class SharecodeView extends View {
    */
   constructor(scene, theme, o) {
     const exp = o.mode === 'export';
-    super(scene, theme, { w: 400, h: 168, title: exp ? 'EXPORT SHARECODE' : 'IMPORT SHARECODE', color: exp ? 'cyan' : 'lime', onClose: o.onClose, y: 50 });
+    super(scene, theme, { w: 400, h: 168, title: exp ? 'EXPORT SHARECODE' : 'IMPORT SHARECODE', color: exp ? 'cyan' : 'lime', onClose: o.onClose, y: 50,
+      hints: exp ? [{ keys: ['ENTER'], label: 'COPY' }] : [{ keys: ['CTRL+V'], label: 'PASTE' }, { keys: ['ENTER'], label: 'IMPORT' }] });
     this.exp = exp;
     this.store = scene.registry.get(REG.SAVE_STORE);
     const px = this.panel.x;
@@ -952,6 +1051,15 @@ export class SharecodeView extends View {
     });
     this.hint.setAlpha(0.7);
     this.panel.add(this.hint);
+    // halo round the DOM text box, and a divider above the status line
+    this.slot = scene.add.graphics();
+    this.panel.add(this.slot);
+    const accent = exp ? 'cyan' : 'lime';
+    this._unbindSlot = theme.bind((pal) => {
+      this.slot.clear();
+      glowRectPx(this.slot, 12, 36, 376, 76, pal[accent], 1.2);
+      paintRule(this.slot, 12, this.w - 12, this.h - 43, pal[accent], 0.5);
+    });
     this.status = new NeonText(scene, theme, 12, this.h - 38, exp ? 'PREPARING...' : 'WAITING FOR PASTE', { color: 'amber', outline: 'none' });
     this.panel.add(this.status);
     this.box = new DomTextBox(scene, theme, {
@@ -1028,11 +1136,17 @@ export class SharecodeView extends View {
   }
 
   destroy() {
+    if (this._unbindSlot) this._unbindSlot();
+    this._unbindSlot = null;
     if (this.box) this.box.destroy();
     this.box = null;
     super.destroy();
   }
 }
+
+/** Left edges of the two stat columns' zebra stripes (the layout's PAD and its second column, minus 2). */
+const PAD_STAT_L = 10;
+const PAD_STAT_R = 206;
 
 /**
  * W1: PROFILE view — lifetime stats, Sync Level, Resonance progress, and the list of biome
@@ -1056,6 +1170,29 @@ export class ProfileView extends View {
     super(scene, theme, { w: layout.w, h: layout.h, title: 'PILOT PROFILE', color: 'lime', onClose: o.onClose, y: 22, backLabel: 'BACK' });
     this._onShop = o.onShop;
 
+    // Decoration UNDER the text: zebra stripes behind the stat rows and a fading rule after each section
+    // heading (LIFETIME, SIGNATURES), drawn from the layout's own boxes so they cannot drift from the text.
+    const byKey = new Map(layout.items.map((it) => [it.key, it]));
+    this.deco = scene.add.graphics();
+    this.panel.add(this.deco);
+    this.unbindDeco = theme.bind((pal) => {
+      const g = this.deco;
+      g.clear();
+      for (let i = 0; i < 10; i++) {
+        const k = byKey.get(`stat-k${i}`);
+        if (!k || i % 5 % 2 === 1) continue;
+        const left = i < 5 ? PAD_STAT_L : PAD_STAT_R;
+        g.fillStyle(pal.text, 0.045);
+        g.fillRect(left, k.y - 2, i < 5 ? 178 : 198, 12);
+      }
+      for (const [head, right, ck] of [['lifetime-head', 'bank', 'amber'], ['sig-head', 'sig-note', 'magenta']]) {
+        const h = byKey.get(head);
+        const r = byKey.get(right);
+        if (h && r) paintRule(g, h.x + h.w + 6, r.x - 6, h.y + 4, pal[ck], 0.7);
+      }
+    });
+
+    const texts = [];
     for (const it of layout.items) {
       // Layout boxes are always top-left, so draw left-anchored and never let Phaser re-apply an
       // origin: passing anchor:'right' with a left edge shifted right-aligned text a second time.
@@ -1063,7 +1200,11 @@ export class ProfileView extends View {
         color: it.color, outline: it.outline, alpha: it.alpha,
       });
       this.panel.add(t);
+      texts.push([it.y, t]);
     }
+    // reveal row by row (objects sharing a y fade together)
+    const ys = [...new Set(texts.map((e) => e[0]))].sort((a, b) => a - b);
+    staggerAlpha(scene, ys.map((y) => texts.filter((e) => e[0] === y).map((e) => e[1])), { start: 110, step: 20 });
 
     // Resonance bar: XP progress inside the current level. Same paint as Game Over, so a player who
     // just levelled sees the same fill they saw there.
@@ -1072,12 +1213,7 @@ export class ProfileView extends View {
     this.panel.add(bar);
     this.unbindBar = theme.bind((pal) => {
       bar.clear();
-      bar.fillStyle(pal.bg, 1);
-      bar.fillRect(b.x, b.y, b.w, b.h);
-      bar.fillStyle(pal[b.color], 1);
-      bar.fillRect(b.x + 1, b.y + 1, Math.round((b.w - 2) * b.ratio), b.h - 2);
-      bar.lineStyle(1, pal[b.color], 0.9);
-      bar.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+      paintGlowBar(bar, pal, b, b.ratio, b.color);
     });
 
     // W3: signature toggles. Only unlocked biomes get a row, and toggling one persists the profile so a
@@ -1126,6 +1262,7 @@ export class ProfileView extends View {
         // third, off-panel column if the two counts ever disagree.
         columns: band.columns, rowsPerColumn: Math.max(band.rowsPerColumn, Math.ceil(items.length / band.columns)),
       });
+      staggerMenuRows(scene, this.sigMenu, { start: 260, step: 14 });
     }
 
     // W5: the achievements grid opens from here, as the spec places it in the Profile view. The button
@@ -1278,8 +1415,7 @@ export class ProfileView extends View {
     if (t.kind === 'titles' && this.titlesButton) r = { x: this.titlesButton.x, y: this.titlesButton.y, w: this.titlesButton.w, h: this.titlesButton.h };
     if (t.kind === 'back' && this.back) r = { x: this.back.x, y: this.back.y, w: this.back.w, h: this.back.h };
     if (!r) return;
-    g.lineStyle(1, pal[t.kind === 'back' ? 'magenta' : 'amber'], 1);
-    g.strokeRect(r.x - 1.5, r.y - 1.5, r.w + 3, r.h + 3);
+    paintFocusRing(g, pal, r, t.kind === 'back' ? 'magenta' : 'amber');
   }
 
   handleAction(action) {
@@ -1351,6 +1487,8 @@ export class ProfileView extends View {
   destroy() {
     if (this.unbindBar) this.unbindBar();
     this.unbindBar = null;
+    if (this.unbindDeco) this.unbindDeco();
+    this.unbindDeco = null;
     super.destroy();
   }
 }
@@ -1386,7 +1524,74 @@ export class AchievementsView extends View {
     this.biomeCount = o.biomeCount;
     this.page = layout.page;
     this.rows = [];
+    // Decoration under the rows (card washes, progress rails, section rules, pager) and the header summary:
+    // how much of the catalogue is unlocked, as a count and a glowing bar in the title-tab line.
+    this.deco = scene.add.graphics();
+    this.panel.add(this.deco);
+    const got = Object.keys((profile && profile.achievements) || {}).length;
+    const total = Math.max(got, visibleAchievements(profile).length);
+    this.summary = { ratio: total ? got / total : 0, x: this.w - 10 - 64, y: 4, w: 64, h: 7 };
+    const txt = `${got}/${total}`;
+    const sumText = new NeonText(scene, theme, this.summary.x - 6 - measureText(txt), 4, txt, { color: 'amber', outline: 'none' });
+    this.panel.add(sumText);
+    const caps = new Keycaps(scene, theme, { x: sumText.x - 14, y: 2, align: 'right', color: 'amber',
+      items: [{ keys: ['←', '→'], label: 'PAGE' }] });
+    this.panel.add(caps);
+    this.unbindDeco = theme.bind((pal) => this._paintDeco(pal));
     this._paint();
+  }
+
+  /** Painted under the row texts; repainted on page turns and palette swaps. */
+  _paintDeco(pal) {
+    const g = this.deco;
+    const L = this._layout;
+    if (!g || !L) return;
+    g.clear();
+    paintGlowBar(g, pal, this.summary, this.summary.ratio, 'amber', { segments: 0, glow: 0.6 });
+    const left = 12;
+    const right = this.w - 12;
+    const byKey = new Map(L.items.map((it) => [it.key, it]));
+    for (const r of L.rows) {
+      if (r.kind === 'header') {
+        paintRule(g, left + measureText(r.label) + 6, right, r.y + 4, pal.amber, 0.7);
+        continue;
+      }
+      if (r.done) {
+        // earned: lime wash, a bright edge and a tick beside the count
+        g.fillStyle(pal.lime, 0.07);
+        g.fillRect(8, r.y - 2, this.w - 16, 12);
+        g.fillStyle(pal.lime, 0.9);
+        g.fillRect(8, r.y - 2, 2, 12);
+        const p = byKey.get(`p-${r.id}`);
+        if (p) paintPattern(g, p.x - 9, r.y + 1, CHECK_GLYPH, pal.lime, 1);
+      } else {
+        // pending: a thin rail under the row with its progress filled in
+        const rw = right - left;
+        g.fillStyle(pal.cyan, 0.12);
+        g.fillRect(left, r.y + 10, rw, 1);
+        const fw = Math.round(rw * Math.min(1, Math.max(0, r.ratio || 0)));
+        if (fw > 0) {
+          g.fillStyle(pal.cyan, 0.75);
+          g.fillRect(left, r.y + 10, fw, 1);
+          g.fillStyle(pal.cyan, 0.2);
+          g.fillRect(left, r.y + 11, fw, 1);
+          g.fillStyle(pal.text, 0.9);
+          g.fillRect(left + fw - 1, r.y + 10, 1, 1);
+        }
+      }
+    }
+    // pager: one square per page, the current one lit
+    const pages = L.pages;
+    const px = 12 + measureText(L.footer.text) + 10;
+    for (let i = 0; i < pages; i++) {
+      const on = i === L.page;
+      const x = px + i * 8;
+      const y = L.footer.y + 1;
+      if (on) glowRectPx(g, x, y, 5, 5, pal.magenta, 1);
+      g.fillStyle(pal.magenta, on ? 1 : 0.3);
+      g.fillRect(x, y, 5, 5);
+      if (!on) { g.fillStyle(pal.bg, 1); g.fillRect(x + 1, y + 1, 3, 3); }
+    }
   }
 
   /** Draw the current page, replacing whatever was drawn for the previous one. */
@@ -1400,6 +1605,8 @@ export class AchievementsView extends View {
     });
     this.page = layout.page;
     this.pages = layout.pages;
+    this._layout = layout;
+    const byY = new Map();
     for (const it of layout.items) {
       // Same rule as ProfileView: layout boxes are top-left, so never re-apply an origin.
       const t = new NeonText(this.scene, this.theme, it.x, it.y, it.text, {
@@ -1407,7 +1614,13 @@ export class AchievementsView extends View {
       });
       this.panel.add(t);
       this.rows.push(t);
+      if (!byY.has(it.y)) byY.set(it.y, []);
+      byY.get(it.y).push(t);
     }
+    if (this.deco) this._paintDeco(this.theme.pal);
+    // each page deals its rows in, top to bottom
+    staggerAlpha(this.scene, [...byY.keys()].sort((a, b) => a - b).map((y) => byY.get(y)), { start: this._dealt ? 0 : 120, step: 16 });
+    this._dealt = true;
   }
 
   /** Move by `delta` pages, clamped, and repaint only when the page actually changes. */
@@ -1431,6 +1644,112 @@ export class AchievementsView extends View {
     // otherwise be ejected from the screen they were reading.
     if (action === 'confirm') return true;
     return true;
+  }
+
+  destroy() {
+    if (this.unbindDeco) this.unbindDeco();
+    this.unbindDeco = null;
+    super.destroy();
+  }
+}
+
+/**
+ * Shop/Titles row state -> how it looks. Returns null for rows with no state chip. The wording of the state
+ * stays in the layout (state is text, not only colour); this only chooses the dressing:
+ *   EQUIPPED  solid lime chip, lime row wash          (clearly "on")
+ *   EQUIP     outline lime chip, lime dot in the gutter  (owned)
+ *   price     bright amber chip with a shard           (buy it now)
+ *   too dear  dim amber chip                           (unlocked, cannot afford)
+ *   LVL n     dim chip with a padlock                  (locked)
+ */
+function chipStyle(r) {
+  switch (r.kind) {
+    case 'item':
+    case 'default':
+      if (r.equipped) return { mode: 'solid', key: 'lime', text: 'lime', alpha: 1 };
+      if (r.owned || r.kind === 'default') return { mode: 'outline', key: 'lime', text: 'lime', alpha: 1 };
+      if (r.locked || r.state === 'ACHIEVEMENT') return { mode: 'dim', key: 'text', text: 'text', alpha: 0.55, glyph: 'lock' };
+      if (r.disabled) return { mode: 'dim', key: 'amber', text: 'amber', alpha: 0.6, glyph: 'shard' };
+      return { mode: 'bright', key: 'amber', text: 'amber', alpha: 1, glyph: 'shard' };
+    case 'boost':
+      return r.locked ? { mode: 'dim', key: 'text', text: 'text', alpha: 0.55, glyph: 'lock' } : null;
+    case 'upgradeItem':
+      if (!r.state) return null;
+      return r.disabled ? { mode: 'dim', key: 'amber', text: 'amber', alpha: 0.6, glyph: 'shard' }
+        : { mode: 'bright', key: 'amber', text: 'amber', alpha: 1, glyph: 'shard' };
+    case 'gym':
+      return r.disabled ? { mode: 'dim', key: 'text', text: 'text', alpha: 0.55, glyph: 'lock' }
+        : String(r.state).startsWith('LOCKED') ? { mode: 'bright', key: 'amber', text: 'amber', alpha: 1, glyph: 'lock' }
+          : { mode: 'outline', key: 'lime', text: 'lime', alpha: 1 };
+    case 'upgradeLink':
+    case 'gymSetupLink':
+      return { mode: 'outline', key: 'lime', text: 'lime', alpha: 1 };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Give MenuList items (aligned 1:1 with the layout rows) the colours their state chips need: the state word
+ * wears the chip's colour, equipped labels wear lime, section headers become bright headings.
+ * @param {object[]} items @param {object[]} rows
+ * @returns {object[]} items
+ */
+function dressShopItems(items, rows) {
+  items.forEach((it, i) => {
+    const r = rows[i];
+    if (!r) return;
+    if (r.kind === 'header') { it.heading = true; it.color = 'magenta'; return; }
+    const st = chipStyle(r);
+    if (st && it.sub) { it.subColor = st.text; it.subAlpha = st.alpha; }
+    if (r.equipped) it.tint = 'lime';
+  });
+  return items;
+}
+
+/** Number of catalogue pages the pager dots show (ShopLayout.SHOP_PAGES). */
+const SHOP_PAGE_COUNT = 4;
+
+/**
+ * Paint the shop/titles decoration (under the MenuList text): state chips, equipped washes, owned dots,
+ * section rules, the shard glyph by BANK and the page pips.
+ * @param {Phaser.GameObjects.Graphics} g @param {Object<string,number>} pal
+ * @param {{rows:object[], rowH:number, band:{x:number,y:number,w:number}}} layout
+ */
+function paintShopDeco(g, pal, layout) {
+  const { band, rowH } = layout;
+  const edge = band.x + band.w - 8; // where MenuList right-aligns sub text
+  for (const r of layout.rows) {
+    if (r.kind === 'head') {
+      const t = r.texts && r.texts[0];
+      if (t) paintPattern(g, t.x - 9, r.y + 1, SHARD_GLYPH, pal.amber, 1);
+      continue;
+    }
+    if (r.kind === 'header') {
+      paintRule(g, band.x + 14 + measureText(r.label) + 6, edge, r.y + 5, pal.magenta, 0.7);
+      continue;
+    }
+    if (r.equipped) {
+      g.fillStyle(pal.lime, 0.09);
+      g.fillRect(band.x, r.y, band.w, rowH - 1);
+      g.fillStyle(pal.lime, 0.85);
+      g.fillRect(band.x, r.y, 2, rowH - 1);
+    } else if (r.owned) {
+      g.fillStyle(pal.lime, 0.8);
+      g.fillRect(band.x + 10, r.y + 4, 2, 2);
+    }
+    if (r.kind === 'page') {
+      const w = SHOP_PAGE_COUNT * 7 - 2;
+      const x0 = edge - measureText(r.state) - 8 - w;
+      for (let i = 0; i < SHOP_PAGE_COUNT; i++) {
+        const on = i === r.page;
+        g.fillStyle(pal.magenta, on ? 1 : 0.3);
+        g.fillRect(x0 + i * 7, r.y + 3, 5, 4);
+      }
+      continue;
+    }
+    const st = chipStyle(r);
+    if (st && r.state) paintStateChip(g, pal, { right: edge + 3, y: r.y + 1, textW: measureText(String(r.state)), colorKey: st.key, mode: st.mode, glyph: st.glyph });
   }
 }
 
@@ -1465,7 +1784,22 @@ export class ShopView extends View {
     this.page = 0;
     this.upgradePage = false;
     this.gymSetupPage = false;
+    // state chips, washes and rules live on one Graphics UNDER the list (added before any menu exists, so
+    // every rebuilt menu lands above it); repainted from the current layout on every _build
+    this.deco = scene.add.graphics();
+    this.panel.add(this.deco);
+    this._layout = null;
+    this.unbindDeco = theme.bind((pal) => this._paintDeco(pal));
+    this.hintRow = new Keycaps(scene, theme, { x: 12, y: this.h - 19, color: 'amber',
+      items: [{ keys: ['←', '→'], label: 'PAGE' }, { keys: ['ENTER'], label: 'BUY / EQUIP' }] });
+    this.panel.add(this.hintRow);
     this._build();
+  }
+
+  _paintDeco(pal) {
+    if (!this.deco || !this._layout) return;
+    this.deco.clear();
+    paintShopDeco(this.deco, pal, this._layout);
   }
 
   _profile() {
@@ -1562,10 +1896,13 @@ export class ShopView extends View {
     for (const t of (this.bankTexts || [])) t.destroy();
     this.bankTexts = [];
     const band = layout.band;
+    this._layout = layout;
+    this._paintDeco(this.theme.pal);
     this.menu = new MenuList(this.scene, this.theme, {
       x: band.x, y: band.y, w: band.w, rowH: layout.rowH,
-      items: this._menuItems(layout), color: 'lime', parent: this.panel,
+      items: dressShopItems(this._menuItems(layout), layout.rows), color: 'lime', parent: this.panel,
     });
+    if (!this._revealed) { this._revealed = true; staggerMenuRows(this.scene, this.menu); }
     // The BANK line is a right-aligned value in the list, not a separate static string, so it refreshes
     // with everything else. MenuList would draw it as a label, so it is rendered beside the list at the
     // head row's own y.
@@ -1743,6 +2080,14 @@ export class ShopView extends View {
     }
     return this.menu.handleAction(action);
   }
+
+  destroy() {
+    if (this.unbindDeco) this.unbindDeco();
+    this.unbindDeco = null;
+    for (const t of this.bankTexts || []) t.destroy();
+    this.bankTexts = [];
+    super.destroy();
+  }
 }
 
 /**
@@ -1761,7 +2106,20 @@ export class TitlesView extends View {
     this.store = (service && service.store) || null;
     this.menu = null;
     this.bankTexts = [];
+    this.deco = scene.add.graphics();
+    this.panel.add(this.deco);
+    this._layout = null;
+    this.unbindDeco = theme.bind((pal) => this._paintDeco(pal));
+    this.hintRow = new Keycaps(scene, theme, { x: 12, y: this.h - 19, color: 'lime',
+      items: [{ keys: ['ENTER'], label: 'EQUIP' }] });
+    this.panel.add(this.hintRow);
     this._build();
+  }
+
+  _paintDeco(pal) {
+    if (!this.deco || !this._layout) return;
+    this.deco.clear();
+    paintShopDeco(this.deco, pal, this._layout);
   }
 
   _profile() {
@@ -1773,10 +2131,12 @@ export class TitlesView extends View {
     if (this.menu) { this.menu.destroy(); this.menu = null; }
     for (const t of this.bankTexts) t.destroy();
     this.bankTexts = [];
-    const items = titlesMenuItems(layout).map((m) => (m.kind === 'action'
+    const items = dressShopItems(titlesMenuItems(layout).map((m) => (m.kind === 'action'
       ? { ...m, onSelect: () => this._choose(m.id) }
-      : { kind: 'static', label: m.label, disabled: true }));
+      : { kind: 'static', label: m.label, disabled: true })), layout.rows);
     const band = layout.band;
+    this._layout = layout;
+    this._paintDeco(this.theme.pal);
     this.menu = new MenuList(this.scene, this.theme, {
       x: band.x, y: band.y, w: band.w, rowH: layout.rowH, items, color: 'lime', parent: this.panel,
     });
@@ -1836,6 +2196,8 @@ export class TitlesView extends View {
   }
 
   destroy() {
+    if (this.unbindDeco) this.unbindDeco();
+    this.unbindDeco = null;
     for (const t of this.bankTexts || []) t.destroy();
     this.bankTexts = [];
     super.destroy();
@@ -1847,18 +2209,41 @@ export class TitlesView extends View {
  */
 export class DailyModesView extends View {
   constructor(scene,theme,o){
-    super(scene,theme,{w:432,h:242,title:'DAILY CHALLENGE // TWO LANES',color:'magenta',onClose:o.onClose});
+    super(scene,theme,{w:432,h:242,title:'DAILY CHALLENGE // TWO LANES',color:'magenta',onClose:o.onClose,
+      hints:[{keys:['↑','↓'],label:'SELECT'},{keys:['ENTER'],label:'GO'}]});
     this.panel.add(new NeonText(scene,theme,14,29,'SAME DAILY SEED + RULE. SEPARATE RANKINGS.',{
       color:'cyan',outline:'none'}));
     this.panel.add(new NeonText(scene,theme,14,43,`DRAFT: ${DRAFT_BUDGET} FREE CREDITS, REBUILD ANYTIME`,{
       color:'text',outline:'none'}));
+    // Each lane is a card: a framed slot in its own colour behind the row, with a lane number tab. Painted
+    // before the list so the cursor and labels sit on top.
+    const LANES=[['lime','01'],['magenta','02'],['cyan','03'],['amber','04']];
+    this.cards=scene.add.graphics();
+    this.panel.add(this.cards);
+    this.unbindCards=theme.bind(pal=>{
+      const g=this.cards;
+      g.clear();
+      LANES.forEach(([k,n],i)=>{
+        const y=62+i*31+2,w=408,h=26,x=12;
+        g.fillStyle(pal[k],0.05);g.fillRect(x,y,w,h);
+        strokeRectPx(g,x,y,w,h,pal[k],0.4);
+        g.fillStyle(pal[k],0.8);g.fillRect(x+w-3,y+1,2,h-2);
+        // corner notch: a bright pixel at each end of the top edge
+        g.fillStyle(pal.text,0.8);g.fillRect(x,y,1,1);g.fillRect(x+w-1,y,1,1);
+      });
+    });
     this.menu=new MenuList(scene,theme,{x:12,y:62,w:408,rowH:31,parent:this.panel,items:[
-      {kind:'action',label:'DAILY CLASSIC',color:'lime',sub:'NO UPGRADES',onSelect:o.onClassic},
-      {kind:'action',label:'DAILY DRAFT',color:'magenta',sub:'EQUAL-BUDGET BUILDS',onSelect:o.onDraft},
-      {kind:'action',label:'BUILD / REBUILD DRAFT',color:'cyan',sub:'FREE - NO SHARDS',onSelect:o.onEdit},
-      {kind:'action',label:'DAILY DRAFT BOARD',color:'amber',sub:'TODAY ONLY',onSelect:o.onBoard},
+      {kind:'action',label:'DAILY CLASSIC',color:'lime',sub:'NO UPGRADES',tint:'lime',onSelect:o.onClassic},
+      {kind:'action',label:'DAILY DRAFT',color:'magenta',sub:'EQUAL-BUDGET BUILDS',tint:'magenta',onSelect:o.onDraft},
+      {kind:'action',label:'BUILD / REBUILD DRAFT',color:'cyan',sub:'FREE - NO SHARDS',tint:'cyan',onSelect:o.onEdit},
+      {kind:'action',label:'DAILY DRAFT BOARD',color:'amber',sub:'TODAY ONLY',tint:'amber',onSelect:o.onBoard},
     ]});
     this.menu.refresh();
+    staggerMenuRows(scene,this.menu);
+  }
+  destroy(){
+    this.unbindCards?.();this.unbindCards=null;
+    super.destroy();
   }
   handleAction(action){
     if(action==='cancel'){this.close();return true;}
@@ -1878,6 +2263,10 @@ export class DailyDraftEditorView extends View {
     this.onPlay=o.onPlay;
     this.selected=0;
     this.itemRows=[];
+    // Under everything else: the budget gauge, the selected row's band and each row's rank pips.
+    this.deco=scene.add.graphics();
+    this.panel.add(this.deco);
+    this.unbindDeco=theme.bind(()=>this._paintDeco());
     this.remaining=new NeonText(scene,theme,13,25,'',{color:'lime'});
     this.panel.add(this.remaining);
     this.errorText=new NeonText(scene,theme,13,36,'LEFT/RIGHT ADJUST RANKS - NO SHARDS SPENT',{
@@ -1936,6 +2325,35 @@ export class DailyDraftEditorView extends View {
     this.resetBtn.setHover(this.selected===7);
     this.playBtn.setHover(this.selected===8);
     this.back.setHover(this.selected===9);
+    this._paintDeco();
+  }
+  _paintDeco(){
+    const g=this.deco;
+    if(!g||!this.itemRows.length)return;
+    const pal=this.theme.pal;
+    const ranks=this._ranks();
+    g.clear();
+    const spent=draftCost(ranks);
+    paintGlowBar(g,pal,{x:230,y:26,w:196,h:7},DRAFT_BUDGET>0?spent/DRAFT_BUDGET:0,spent>=DRAFT_BUDGET?'amber':'lime',{segments:10,glow:0.6});
+    this.itemRows.forEach((row,i)=>{
+      const y=51+i*19;
+      if(i===this.selected){
+        g.fillStyle(pal.lime,0.1);g.fillRect(10,y-4,356,15);
+        g.fillStyle(pal.lime,1);g.fillRect(10,y-4,2,15);
+      }
+      const r=Math.min(8,ranks[row.id]||0);
+      for(let k=0;k<8;k++){
+        const on=k<r;
+        const x=176+k*9;
+        if(on){glowRectPx(g,x,y+1,6,6,pal.cyan,0.8);}
+        g.fillStyle(pal.cyan,on?1:0.16);g.fillRect(x,y+1,6,6);
+        if(!on){g.fillStyle(pal.bg,1);g.fillRect(x+1,y+2,4,4);}
+      }
+    });
+  }
+  destroy(){
+    this.unbindDeco?.();this.unbindDeco=null;
+    super.destroy();
   }
   handleAction(action){
     if(action==='cancel'){this.close();return true;}
@@ -1964,6 +2382,7 @@ export class DailyDraftEditorView extends View {
 export class DailyDraftLeaderboardView extends View {
   constructor(scene,theme,o){
     super(scene,theme,{w:440,h:202,title:"DAILY DRAFT // TODAY'S TOP 10",color:'amber',onClose:o.onClose});
+    this.highlightId=o.highlightId;
     this.board=new LeaderboardTable(scene,theme,{x:12,y:25,w:416,entries:null,parent:this.panel});
     this.panel.add(new NeonText(scene,theme,12,180,`RULES V${DRAFT_RULES_VERSION}  BUDGET ${DRAFT_BUDGET}  CLASSIC EXCLUDED`,{
       color:'cyan',outline:'none'}));
@@ -1976,7 +2395,7 @@ export class DailyDraftLeaderboardView extends View {
     Promise.resolve(store?.getDailyDraftLeaderboard?.(10,new Date())||[])
       .then(rows=>{
         if(!this.alive||token!==this.loadToken)return;
-        this.board.setEntries(rows||[],undefined,{
+        this.board.setEntries(rows||[],this.highlightId,{
           title:'NO DRAFT RUNS TODAY',sub:'PLAY DAILY DRAFT, THEN ENTER INITIALS',
         });
       }).catch(()=>{
