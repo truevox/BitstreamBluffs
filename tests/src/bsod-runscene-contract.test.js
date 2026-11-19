@@ -111,6 +111,40 @@ describe('Wind pom-pom visual anchor', () => {
 });
 
 
+describe('BSOD pom threat buildup from actual RunScene draw geometry', () => {
+  test('far, medium and near-wall cues grow progressively with identical powerful airflow', () => {
+    const scene=Object.create(RunScene.prototype);
+    const calls=[];
+    scene.windPom={clear(){calls.push(['clear']);},lineStyle(){},lineBetween(...a){calls.push(['line',...a]);},
+      fillStyle(){},fillCircle(...a){calls.push(['circle',...a]);}};
+    scene.bsodEdge=null;
+    scene._view={left:0,right:600,top:0,bottom:300};
+    scene.palette={text:0xffffff,amber:0xffcc00};
+    scene.sled={hidden:false,inWorld:true,windPomAnchor:{x:100,y:80}};
+    const sample=(proximity01,relativeAirX=1000,atmosphereDensity=1)=>{
+      scene.bsodState={active:true,proximity01,relativeAirX,atmosphereDensity};
+      calls.length=0;scene.drawBsodCues();
+      const line=calls.find(c=>c[0]==='line');
+      const dot=calls.find(c=>c[0]==='circle');
+      return {extension:line[3]-line[1],height:line[4]-line[2],radius:dot[3]};
+    };
+    const far=sample(0),mid=sample(0.5),near=sample(1);
+    expect(far.extension).toBeGreaterThan(5);
+    expect(far.extension).toBeLessThan(10);
+    expect(mid.extension).toBeGreaterThan(far.extension+3);
+    expect(near.extension).toBeGreaterThan(mid.extension+12);
+    expect(near.extension).toBeCloseTo(28);
+    expect(far.height).toBeGreaterThan(mid.height);
+    expect(mid.height).toBeGreaterThan(near.height);
+    expect(far.radius).toBeLessThan(near.radius);
+    const reversed=sample(1,-1000);
+    expect(reversed.extension).toBeCloseTo(-28);
+    const vacuum=sample(1,0,0);
+    expect(vacuum.extension).toBe(0);
+    expect(vacuum.height).toBe(5);
+  });
+});
+
 describe('Bitstream Bluffing RunScene integration', () => {
   test('exactly one successful escape becomes existing near-miss scoring and one named bluff event', () => {
     const scene=Object.create(RunScene.prototype);

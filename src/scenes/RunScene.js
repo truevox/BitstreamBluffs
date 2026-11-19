@@ -63,6 +63,7 @@ import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
+import { bsodWindVisualStrength } from '../systems/BsodWindVisual.js';
 import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, advanceGymReadyMs, gymBeatSuggestion } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
 
@@ -512,16 +513,19 @@ export class RunScene extends Phaser.Scene {
       // Never leave a free-floating pom after the rider vanishes on BSOD impact.
       if (s.hidden || s.inWorld === false || !s.windPomAnchor) return;
       const wind = state && state.active ? state.relativeAirX : 0;
-      const density = state && state.active ? state.atmosphereDensity : 0;
-      const strength = Math.min(1, Math.abs(wind) / 900) * density;
+      const strength = bsodWindVisualStrength(state);
       const dir = wind > 0 ? 1 : wind < 0 ? -1 : 0;
       const { x: anchorX, y: anchorY } = s.windPomAnchor;
+      // The visual THREAT cue has a gentle, continuous buildup instead of
+      // saturating from raw relative airspeed while the BSOD is still far.
+      // At zero wind the pom dangles; at close range it stretches and rises.
+      // Signed wind direction remains authoritative; all physics is unchanged.
       const endX = anchorX + dir * (5 + 23 * strength);
-      const endY = anchorY - (strength > 0.08 ? 7 * strength : -5);
-      pom.lineStyle(1.6, this.palette.text, 0.9);
+      const endY = anchorY + 5 - 12 * strength;
+      pom.lineStyle(1.6, this.palette.text, 0.50 + 0.44 * strength);
       pom.lineBetween(anchorX, anchorY, endX, endY);
-      pom.fillStyle(this.palette.amber, 0.98);
-      pom.fillCircle(endX, endY, 3);
+      pom.fillStyle(this.palette.amber, 0.62 + 0.35 * strength);
+      pom.fillCircle(endX, endY, 2.6 + 0.4 * strength);
     }
   }
 
