@@ -65,7 +65,10 @@ export class DomTextBox {
     this.el.style.color = css.text;
     this.el.style.caretColor = css.lime;
     this.el.style.border = `1px solid ${focused ? css.lime : css[this.o.color || 'cyan']}`;
-    this.el.style.boxShadow = focused ? `0 0 6px ${css.lime}66` : 'none';
+    // a neon halo: faint at rest in the box's own colour, brighter plus an inner glow when focused
+    this.el.style.boxShadow = focused
+      ? `0 0 8px ${css.lime}99, inset 0 0 6px ${css.lime}33`
+      : `0 0 4px ${css[this.o.color || 'cyan']}44`;
   }
 
   _reposition() {

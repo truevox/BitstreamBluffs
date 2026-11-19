@@ -50,6 +50,25 @@ const TOP = [
   { name: 'pause', label: 'PAUSE', icon: 'pause', color: 'cyan', grid: '2/1' },
 ];
 
+/** The three on-screen clusters, exported so HOW TO PLAY can describe the real buttons. */
+export const TOUCH_CLUSTERS = Object.freeze({ LEFT, RIGHT, TOP });
+
+/**
+ * What a base touch button becomes under a control layout. The overlay keeps its spatial layout but, in every
+ * non-classic (Trick Deck) layout, swaps PUSH for DIVEBOMB and SPIN CCW for CORKSCREW. This is the single
+ * source of truth for that swap: setControlLayout() applies it to the DOM buttons and HowToPlayLayout uses it
+ * for the touch legend, so the help screen can never teach a button the player does not have.
+ * @param {{name:string,label:string,icon:string}} base a LEFT/RIGHT/TOP entry
+ * @param {string} layout settings.controlLayout ('classic' or a trick layout) or 'trickDeck'
+ * @returns {{name:string,label:string,icon:string}}
+ */
+export function touchButtonFor(base, layout) {
+  if (layout === 'classic') return { name: base.name, label: base.label, icon: base.icon };
+  if (base.name === 'push') return { name: 'divebomb', label: 'DIVEBOMB', icon: 'divebomb' };
+  if (base.name === 'heliLeft') return { name: 'corkscrew', label: 'CORKSCREW', icon: 'corkscrew' };
+  return { name: base.name, label: base.label, icon: base.icon };
+}
+
 const DEFAULT_COLORS = { cyan: '#00f0ff', magenta: '#ff2bd6', lime: '#9dff3a', amber: '#ffb000' };
 
 export class TouchOverlay {
@@ -92,13 +111,8 @@ export class TouchOverlay {
     this.controlLayout = mode;
     if (!this.root) return;
     for (const el of this.root.querySelectorAll('[data-base-btn]')) {
-      const base = el.dataset.baseBtn;
-      const name = mode === 'classic' ? base :
-        base === 'push' ? 'divebomb' : base === 'heliLeft' ? 'corkscrew' : base;
-      const label = name === 'divebomb' ? 'DIVEBOMB' : name === 'corkscrew' ? 'CORKSCREW'
-        : el.dataset.baseLabel;
-      const icon = name === 'divebomb' ? 'divebomb' : name === 'corkscrew' ? 'corkscrew'
-        : el.dataset.baseIcon;
+      const { name, label, icon } = touchButtonFor(
+        { name: el.dataset.baseBtn, label: el.dataset.baseLabel, icon: el.dataset.baseIcon }, mode);
       el.dataset.btn = name;
       el.setAttribute('aria-label', label);
       el.innerHTML = ICONS[icon];

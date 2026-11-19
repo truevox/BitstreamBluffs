@@ -18,6 +18,9 @@ import { Panel } from '../ui/Panel.js';
 import { MenuList } from '../ui/MenuList.js';
 import { MenuInput } from '../ui/MenuInput.js';
 import { LeaderboardView, SettingsView, SharecodeView } from '../ui/Views.js';
+import { openDim, closeDim, transitionIn, fadeTo, tweenProgress, isReducedMotion, motionMs, Ease } from '../ui/Motion.js';
+import { mixColor } from '../ui/MenuArt.js';
+import { addScanlines } from '../ui/Scanlines.js';
 import { fmtClock } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
@@ -41,10 +44,18 @@ export class PauseScene extends Phaser.Scene {
     this.view = null;
     this.dim = null;
     const theme = (this.theme = new Theme(this));
-    this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72).setOrigin(0, 0).setInteractive();
+    this.reduced = isReducedMotion(this);
+    // Freeze-frame: the run stays visible behind a dark, magenta-tinted shade (palette-bound, so the
+    // colour-blind palette and UI themes apply), with a faint CRT glitch layer on top of it.
+    this.shade = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.74).setOrigin(0, 0).setInteractive();
+    theme.bind((pal) => { if (this.shade && this.shade.scene) this.shade.setFillStyle(mixColor(0x000000, pal.magenta, 0.16), 0.74); });
+    this.glitchG = this.add.graphics().setDepth(1);
+    this.glitchT = 1400;
+    this.glitchLeft = 0;
+    this._buildHeader(theme);
     const px = 30;
     const py = 36;
-    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER // PAUSED", fillAlpha: 0.96 }));
+    const panel = (this.panel = new Panel(this, theme, { x: px, y: py, w: 420, h: 180, color: 'magenta', title: this.gymPractice ? 'BSOD GYM // PRACTICE' : "PASCAL'S LEDGER", fillAlpha: 0.96 }));
 
     const items = [
       { kind: 'action', label: 'RESUME', color: 'lime', onSelect: () => this.resume() },
@@ -111,7 +122,8 @@ export class PauseScene extends Phaser.Scene {
         panel.add(g);
       });
     }
-    panel.add(new NeonText(this, theme, 236, 174,
+    // Under the menu column, clear of the panel's inner border hairline (panel floor 180, hairline at 176).
+    panel.add(new NeonText(this, theme, 10, 165,
       this.gymPractice ? 'LEARN. RETRY. REPEAT.' : 'THE LEDGER NEVER FORGETS.',
       { color: 'magenta', outline: 'none' }).setAlpha(0.6));
 
@@ -120,12 +132,75 @@ export class PauseScene extends Phaser.Scene {
     });
     this.hint.setAlpha(0.7);
 
+    addScanlines(this, 1, { roll: true });
+    this._playIntro();
+
     this.input_ = new MenuInput(this, (a) => this._onAction(a), { graceMs: 250 });
     // The same shared soundtrack; pause scene does not own a music player.
     this.jukebox=new JukeboxHUD(this,theme,{x:335,y:4});
     this.events.once('shutdown',()=>{
       this.jukebox?.destroy();this.jukebox=null;
       this._close();
+    });
+  }
+
+  /** Neon PAUSED header with a chromatic split (cyan left, magenta right, `danger` never used). */
+  _buildHeader(theme) {
+    const x = GAME_WIDTH / 2;
+    const y = 10;
+    const mk = (dx, color, alpha, outline) => new NeonText(this, theme, x + dx, y, 'PAUSED', { color, scale: 2, outline, anchor: 'center' }).setAlpha(alpha);
+    this.hdrA = mk(-1, 'cyan', 0.5, 'none');
+    this.hdrB = mk(1, 'magenta', 0.5, 'none');
+    this.hdr = mk(0, 'text', 1, 'dark');
+    this.hdrX = x;
+    this.hdrParts = [this.hdrA, this.hdrB, this.hdr];
+    this.hdrBar = this.add.graphics();
+    theme.bind((pal) => {
+      const g = this.hdrBar;
+      if (!g || !g.scene) return;
+      g.clear();
+      g.fillStyle(pal.magenta, 0.35);
+      g.fillRect(x - 70, 28, 140, 1);
+      g.fillStyle(pal.magenta, 0.95);
+      g.fillRect(x - 30, 28, 60, 1);
+      g.fillStyle(pal.cyan, 0.7);
+      g.fillRect(x - 12, 30, 24, 1);
+    });
+  }
+
+  /** Open: shade fades in, header glitches in, the panel CRT-zips open. Reduced motion: short fades only. */
+  _playIntro() {
+    const panel = this.panel;
+    const parts = [...this.hdrParts, this.hdrBar, this.hint];
+    const targetA = parts.map((o) => o.alpha);
+    this.shade.setAlpha(0);
+    fadeTo(this, this.shade, 1, motionMs(180, this.reduced));
+    parts.forEach((o) => o.setAlpha(0));
+    tweenProgress(this, {
+      duration: motionMs(260, this.reduced),
+      delay: this.reduced ? 0 : 60,
+      ease: Ease.outQuad,
+      onUpdate: (p) => {
+        parts.forEach((o, i) => { if (o.scene) o.setAlpha(targetA[i] * p); });
+        if (this.reduced) return;
+        // split opens wide and snaps shut
+        const d = Math.round(7 * (1 - p));
+        if (this.hdrA.scene) { this.hdrA.setX(this.hdrX - 1 - d); this.hdrB.setX(this.hdrX + 1 + d); }
+      },
+      onComplete: () => { this.hdrA.setX(this.hdrX - 1); this.hdrB.setX(this.hdrX + 1); },
+    });
+    transitionIn(this, panel, { w: panel.w, h: panel.h, color: this.theme.color('magenta'), duration: 240 });
+  }
+
+  /** Close: everything fades quickly, then `done` runs the real action. */
+  _playOutro(done) {
+    const objs = [this.shade, this.panel, this.hint, this.hdrBar, ...this.hdrParts];
+    const from = objs.map((o) => o.alpha);
+    tweenProgress(this, {
+      duration: motionMs(110, this.reduced),
+      ease: Ease.inQuad,
+      onUpdate: (p) => objs.forEach((o, i) => { if (o.scene) o.setAlpha(from[i] * (1 - p)); }),
+      onComplete: done,
     });
   }
 
@@ -143,15 +218,18 @@ export class PauseScene extends Phaser.Scene {
   }
 
   _open(view) {
+    // As on the Title: the dim is kept across a view-to-view hop and faded in/out by Motion otherwise.
+    const keepDim = this.dim;
+    this.dim = null;
     this._close();
-    this.dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7).setOrigin(0, 0).setDepth(400).setInteractive();
+    this.dim = openDim(this, keepDim, 0.7);
     this.view = view;
   }
 
   _close() {
     if (this.view) this.view.destroy();
     this.view = null;
-    if (this.dim) this.dim.destroy();
+    closeDim(this, this.dim);
     this.dim = null;
   }
 
@@ -166,6 +244,10 @@ export class PauseScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     uiSfx(this, 'uiBack');
+    this._playOutro(() => this._doResume());
+  }
+
+  _doResume() {
     this.scene.stop();
     this.scene.resume(SCENES.RUN);
     try {
@@ -231,5 +313,44 @@ export class PauseScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this.view && this.view.table) this.view.table.tick(delta);
+    this._tickGlitch(delta);
+  }
+
+  /**
+   * Freeze-frame glitch: every couple of seconds the paused picture tears for ~100 ms (a few displaced
+   * tinted strips, the header split jitters). Still under reduced motion.
+   */
+  _tickGlitch(delta) {
+    const g = this.glitchG;
+    if (!g || !g.scene || this.leaving) return;
+    if (isReducedMotion(this)) { if (this.glitchLeft !== -1) { g.clear(); this.glitchLeft = -1; } return; }
+    this.glitchT -= delta;
+    if (this.glitchLeft > 0) {
+      this.glitchLeft -= delta;
+      if (this.glitchLeft <= 0) {
+        g.clear();
+        this.hdrA.setX(this.hdrX - 1);
+        this.hdrB.setX(this.hdrX + 1);
+        this.hdr.setX(this.hdrX);
+      }
+    }
+    if (this.glitchT > 0) return;
+    this.glitchT = Phaser.Math.Between(1800, 3600);
+    this.glitchLeft = 110;
+    const pal = this.theme.pal;
+    g.clear();
+    const n = Phaser.Math.Between(2, 4);
+    for (let i = 0; i < n; i++) {
+      const y = Phaser.Math.Between(0, GAME_HEIGHT - 12);
+      const h = Phaser.Math.Between(2, 9);
+      g.fillStyle(i % 2 ? pal.cyan : pal.magenta, 0.1);
+      g.fillRect(0, y, GAME_WIDTH, h);
+      g.fillStyle(pal.text, 0.12);
+      g.fillRect(0, y, GAME_WIDTH, 1);
+    }
+    const j = Phaser.Math.Between(2, 4);
+    this.hdrA.setX(this.hdrX - j);
+    this.hdrB.setX(this.hdrX + j);
+    this.hdr.setX(this.hdrX + Phaser.Math.Between(-1, 1));
   }
 }

@@ -9,7 +9,7 @@
  */
 
 // PixelFont has no Phaser import, so this stays a pure module dependency (the file's stated rule).
-import { FONT_LINE_H } from './PixelFont.js';
+import { FONT_LINE_H, measureText } from './PixelFont.js';
 
 export const SCREEN = Object.freeze({ w: 480, h: 270 });
 
@@ -29,34 +29,33 @@ export const MISSION_PANEL = Object.freeze({
 });
 
 /**
- * Title-screen mission list. The Title screen is already full: menu + CONTROLS panels occupy
- * y 92..196 and the DAILY PATCH strip y 202..228, so the only free band is y 228..254. The list is
- * deliberately compact and headerless — justified by the band arithmetic, not by eye.
+ * Title-screen mission list: the last section of the right-hand "cabinet card" (TITLE_CARD below).
+ *
+ * The synthwave Title reorganisation moved the list out of the old y 228..254 strip and into the card, where
+ * it has the card's full inner width. That changed the row shape:
+ *   * the progress bar sits UNDER its label again, but at a 12 px pitch: 8 px glyph box + 1 px gap + 2 px
+ *     bar + 1 px gap. The old "bar under the label" defect was a 9 px pitch, where the bar landed inside
+ *     the glyph box (CC Friday's "text sliced in half"); at 12 the bar is clear of its own label and of the
+ *     next row, and both are asserted in tests/src/missionslayout.test.js.
+ *   * the row is 140 px wide, which fits the widest real mission title upper-cased (138 measured font px),
+ *     so a title is never ellipsized at all.
+ *   * still headerless as a panel: the card draws a MISSIONS rule above it (TITLE_CARD.sections.missionsHead).
  */
 export const MISSION_LIST_TITLE = Object.freeze({
-  x: 24,
-  y: 228,
-  // The only free band on Title is y 228..270 (menu+CONTROLS end at 196, DAILY PATCH at 228), and it
-  // also has to hold BEST and the control hint. Three things follow, all asserted in
-  // tests/src/missionslayout.test.js rather than eyeballed:
-  //   * the list is a LEFT COLUMN (x 24..240), because BEST needs the right half;
-  //   * it carries no "MISSIONS" header, because 26 px of vertical space only fits three rows;
-  //   * the progress bar sits BESIDE its label, not under it. A glyph is 8 rows tall (FONT_LINE_H 9),
-  //     so label + bar stacked needs 10 px and three rows would need 30 of the 26 px available. At an
-  //     8 px pitch the bar landed 5 px down, straight through the label's lower glyph rows — the
-  //     "text sliced in half" CC Friday saw at native resolution on a real Chrome pane. Beside the
-  //     text the bar cannot cover a single glyph row, and a 9 px pitch (8 px glyph + 1 px gap) fits
-  //     three fully legible rows in 27 px.
-  w: 216,
+  x: 324,
+  y: 216,
+  w: 140,
   rows: 3,
-  /** 8 px glyph + 1 px gap: the minimum pitch that never clips a descender. */
-  rowH: 9,
+  /** 8 px glyph + 1 gap + 2 px bar + 1 gap. */
+  rowH: 12,
   /** Full glyph box. Must equal the font's 8 rows or descenders are cut. */
   labelH: 8,
   barH: 2,
-  /** Width of the inline progress bar at the right end of each row. */
-  barW: 40,
-  padX: 4,
+  /** Gap between the glyph box and the bar under it. */
+  barGap: 1,
+  /** The bar spans the row (it sits under the label, not beside it). */
+  barW: 140,
+  padX: 0,
   padTop: 0,
 });
 
@@ -170,15 +169,71 @@ export function entryLayout(o = {}) {
   };
 }
 
-/** The Title screen's existing occupied bands, for overlap assertions. */
+/**
+ * Title screen geometry (synthwave arcade-cabinet layout). Virtual screen 480x270.
+ *
+ *   y   4..94   logo (centre, over the retro sun) + tagline; jukebox top-right; stars elsewhere
+ *   y  94..150  sun + mountains, left and centre left OPEN (nothing drawn over the backdrop)
+ *   y 150       horizon (TITLE_HORIZON)
+ *   y 154..254  menu panel (left, over the grid floor) | open centre (rider, help chip) | cabinet card (right,
+ *               y 94..254)
+ *   y 258..266  control hint
+ *
+ * The centre column between the menu and the card (x 216..316) is kept free from the logo down to the hint so
+ * the sun, the ranges, the rider and the grid's vanishing point always read. Every band is asserted
+ * pairwise-disjoint in tests/src/missionslayout.test.js.
+ */
+export const TITLE_HORIZON = 192;
+
+/** The right-hand "cabinet card": level badge, BEST, Daily Patch and missions. Section ys are card-local. */
+export const TITLE_CARD = Object.freeze({
+  x: 316,
+  y: 94,
+  w: 156,
+  h: 160,
+  pad: 8,
+  /** Local y of every line, top edge of its 8 px glyph box (the rule name is 2x: 16 px). */
+  sections: Object.freeze({
+    level: 5,
+    title: 15,
+    best: 26,
+    rule1: 37,
+    dailyHead: 41,
+    ruleName: 52,
+    desc1: 71,
+    desc2: 80,
+    next: 91,
+    chase: 101,
+    missionsHead: 111,
+    missions: 122,
+  }),
+});
+
+/** Inner text width of the card. */
+export const TITLE_CARD_INNER_W = TITLE_CARD.w - TITLE_CARD.pad * 2;
+
+/** The Title screen's occupied bands, for overlap assertions. Screen coordinates. */
 export const TITLE_BANDS = Object.freeze({
-  menu: Object.freeze({ x: 24, y: 92, w: 432, h: 104 }),
-  daily: Object.freeze({ x: 24, y: 202, w: 432, h: 26 }),
-  // Where TitleScene draws BEST: the right column, sharing the band with the list.
-  best: Object.freeze({ x: 248, y: 234, w: 208, h: 14 }),
-  // The control hint, now at GAME_HEIGHT - 8 (glyphs 258..266). It sat at 254..262 and the mission
-  // list needed 228..255 to give each of three rows its full 8 px glyph box at a 9 px pitch, so the
-  // hint moved down 4 px to buy a real gap instead of a zero-margin join.
+  // Both chrome words, plus 3 px either side for the wave and the glitch slices' sideways kick.
+  logo: Object.freeze({ x: 110, y: 2, w: 260, h: 92 }),
+  tagline: Object.freeze({ x: 160, y: 96, w: 150, h: 8 }),
+  jukebox: Object.freeze({ x: 372, y: 6, w: 102, h: 30 }),
+  menu: Object.freeze({ x: 8, y: 154, w: 208, h: 100 }),
+  card: Object.freeze({ x: TITLE_CARD.x, y: TITLE_CARD.y, w: TITLE_CARD.w, h: TITLE_CARD.h }),
+  // The Daily Patch section of the card: DAILY PATCH header down to the streak line.
+  daily: Object.freeze({
+    x: TITLE_CARD.x,
+    y: TITLE_CARD.y + TITLE_CARD.sections.dailyHead,
+    w: TITLE_CARD.w,
+    h: TITLE_CARD.sections.chase + 8 - TITLE_CARD.sections.dailyHead,
+  }),
+  // BEST: one line in the card's player section, above the Daily Patch.
+  best: Object.freeze({ x: TITLE_CARD.x + TITLE_CARD.pad, y: TITLE_CARD.y + TITLE_CARD.sections.best, w: TITLE_CARD_INNER_W, h: 8 }),
+  // The tappable HOW TO PLAY chip, in the open centre column above the hint.
+  help: Object.freeze({ x: 226, y: 240, w: 80, h: 14 }),
+  // The attract-mode PRESS START prompt (2x) and its sub line, over the sun between the tagline and the horizon.
+  attract: Object.freeze({ x: 170, y: 110, w: 140, h: 30 }),
+  // The control hint at GAME_HEIGHT - 8 (glyphs 258..266).
   hint: Object.freeze({ x: 0, y: 258, w: 480, h: 9 }),
 });
 
@@ -189,31 +244,86 @@ export const TITLE_BANDS = Object.freeze({
  * DAILY PATCH strip (CC Friday's W4 defect 3). The scene's panel height had multiplied the row pitch by the
  * text scale, so it reported a 228px panel for 112px of rows and nothing noticed it was lying.
  *
- * The menu is drawn at 2x, so a row is ROW_H * SCALE = 32px tall inside a band that only allows 104px
- * (y 92..196, with the daily strip at 202). That is 3 rows of 32, or 6 rows at the 16px pitch MenuList
- * actually uses — the pre-W4 screen. Six is the ceiling: 92 + 6*16 = 188, and a seventh lands at 204.
+ * The menu sits on the grid floor under the horizon, in the band y 154..254 (the hint is at 258). MenuList
+ * uses rowH as the pitch and scales only the glyphs, so six 2x rows at a 16 px pitch need 96 px plus a 2 px
+ * inset top and bottom: exactly the band. Six is the ceiling: a seventh row reaches 268, through the hint.
  *
  * @param {number} count number of menu rows
- * @returns {{x:number,y:number,w:number,h:number,rowH:number,scale:number,rows:number,lastRowBottom:number,fits:boolean}}
+ * @returns {{x:number,y:number,w:number,h:number,rowH:number,scale:number,rows:number,inset:number,lastRowBottom:number,fits:boolean}}
  */
 export function titleMenuLayout(count) {
   const ROW_H = 16;
   const SCALE = 2;
+  const INSET = 2;
+  const band = TITLE_BANDS.menu;
   const rows = Math.max(0, Math.floor(count) || 0);
-  // Panel height is rows * pitch plus a 4px frame inset. NOT multiplied by scale: MenuList treats rowH as
-  // the pitch and scales only the glyphs, so scaling here double-counted it.
-  const h = 4 + rows * ROW_H;
-  const lastRowBottom = 92 + rows * ROW_H;
+  // Panel height is rows * pitch plus the inset top and bottom. NOT multiplied by scale: MenuList treats rowH
+  // as the pitch and scales only the glyphs, so scaling here double-counted it.
+  const h = INSET * 2 + rows * ROW_H;
+  const lastRowBottom = band.y + INSET + rows * ROW_H;
   return {
-    x: 24, y: 92, w: 216, h, rowH: ROW_H, scale: SCALE, rows, lastRowBottom,
-    fits: lastRowBottom <= TITLE_BANDS.menu.y + TITLE_BANDS.menu.h && h <= TITLE_BANDS.menu.h,
+    x: band.x, y: band.y, w: band.w, h, rowH: ROW_H, scale: SCALE, rows, inset: INSET, lastRowBottom,
+    fits: lastRowBottom <= band.y + band.h && h <= band.h,
   };
 }
 
-/** Centre x for the Title BEST line: right column, clear of the mission list. */
-export const TITLE_BEST_X = 440;
-/** Baseline y for the Title BEST line. */
-export const TITLE_BEST_Y = 240;
+/** Left x of the Title BEST line: the card's text column. */
+export const TITLE_BEST_X = TITLE_BANDS.best.x;
+/** Top y of the Title BEST line. */
+export const TITLE_BEST_Y = TITLE_BANDS.best.y;
+
+/**
+ * The card's BEST line: the full `BEST <m> M   <score> PTS` when it fits the card's text column, else the
+ * same numbers without the PTS label and with tighter spacing. Fitting is measured in the real font.
+ * @param {string} m formatted distance @param {string} sc formatted score
+ * @returns {string}
+ */
+export function titleBestText(m, sc) {
+  const full = `BEST ${m} M   ${sc} PTS`;
+  return measureText(full) <= TITLE_CARD_INNER_W ? full : `BEST ${m} M  ${sc}`;
+}
+
+/**
+ * The card's Daily chase line: streak and today's best (or NOT PLAYED TODAY), shortened the same way.
+ * @param {number} streak 0 = no streak shown @param {string|null} todayBest formatted, null = not played today
+ * @returns {string}
+ */
+export function titleChaseText(streak, todayBest) {
+  const tail = todayBest === null ? 'NOT PLAYED TODAY' : `TODAY ${todayBest}`;
+  const parts = streak > 0 ? [`STREAK ${streak}`, tail] : [tail];
+  const full = parts.join('  ');
+  if (measureText(full) <= TITLE_CARD_INNER_W || streak <= 0) return full;
+  return `STREAK ${streak}  ${todayBest === null ? 'NOT PLAYED' : todayBest}`;
+}
+
+/**
+ * Every rect the cabinet card draws text into, in SCREEN coordinates, for overlap tests (the scene reads
+ * TITLE_CARD.sections for the same numbers). The rule name band is 16 px: 2x when it fits the inner width,
+ * else 1x centred in the band.
+ * @returns {Object<string, {x:number,y:number,w:number,h:number}>}
+ */
+export function titleCardLayout() {
+  const C = TITLE_CARD;
+  const S = C.sections;
+  const x = C.x + C.pad;
+  const w = TITLE_CARD_INNER_W;
+  const line = (y, h = GLYPH_H) => rect(x, C.y + y, w, h);
+  return {
+    card: rect(C.x, C.y, C.w, C.h),
+    level: line(S.level),
+    title: line(S.title),
+    best: line(S.best),
+    rule1: line(S.rule1, 1),
+    dailyHead: line(S.dailyHead),
+    ruleName: line(S.ruleName, 16),
+    desc1: line(S.desc1),
+    desc2: line(S.desc2),
+    next: line(S.next),
+    chase: line(S.chase),
+    missionsHead: line(S.missionsHead),
+    missions: missionListLayout(3).panel,
+  };
+}
 
 /**
  * A rect as {x, y, w, h} — the one shape every consumer (Jest tests, Phaser Graphics) understands.
@@ -258,29 +368,25 @@ export function missionPanelLayout(count, o = {}) {
 }
 
 /**
- * Geometry for the Title-screen mission list. Deliberately a separate, shorter layout: the Title
- * menu occupies its own band and the list must not collide with it or with the footer.
+ * Geometry for the Title-screen mission list (the cabinet card's last section).
  * @param {number} count
  * @param {{x?:number,y?:number}} [o]
  */
 export function missionListLayout(count, o = {}) {
   const L = { ...MISSION_LIST_TITLE, ...o };
   const n = Math.max(0, Math.min(L.rows, Math.round(count || 0)));
-  const panel = rect(L.x, L.y, L.w, L.padTop + n * L.rowH + 1);
+  const panel = rect(L.x, L.y, L.w, L.padTop + n * L.rowH);
   const rows = [];
   const bars = [];
   const top = L.y + L.padTop;
-  // The bar is inline: same 8 px line as the label, at the right end, so the label keeps its full
-  // glyph height. The text box is narrowed by the bar's width plus a gap, which is what makes the two
-  // rects disjoint rather than merely on the same row.
-  const barX = L.x + L.w - L.padX - L.barW;
-  const textW = Math.max(24, barX - 4 - (L.x + L.padX));
+  // The bar sits under the label, separated from its full 8 px glyph box by barGap, and the pitch leaves a
+  // gap under the bar too, so a bar can touch neither its own label nor the next row's glyphs.
+  const textW = L.w - L.padX * 2;
+  const barW = Math.min(L.barW, textW);
   for (let i = 0; i < n; i++) {
     const y = top + i * L.rowH;
     rows.push(rect(L.x + L.padX, y, textW, L.labelH));
-    // Vertically centred in the glyph box, where a 2 px bar reads as a progress line and covers
-    // nothing: the text is to its left, never underneath it.
-    bars.push(rect(barX, y + Math.floor((L.labelH - L.barH) / 2), L.barW, L.barH));
+    bars.push(rect(L.x + L.padX, y + L.labelH + L.barGap, barW, L.barH));
   }
   return { panel, header: null, rows, bars };
 }

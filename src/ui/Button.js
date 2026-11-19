@@ -2,10 +2,16 @@
  * OWNER: UI engineer.
  * Small pointer/touch button: bordered box + label (+ optional hotkey hint). Keyboard/gamepad users reach the same
  * actions through scene-level hotkeys; Button handles mouse and touch.
+ *
+ * Look: dark glass face with a neon border; hover lights a soft outer glow (falling-alpha strokes outside the
+ * box, like Panel) and a brighter face; a press flashes the face bright and fades it out (flash(), also
+ * callable by a host that triggers the button from a hotkey so keyboard users see the same feedback).
+ * The hit zone is exactly the w x h box; the glow is paint only.
  */
 import Phaser from 'phaser';
-import { NeonText, strokeRectPx } from './Neon.js';
+import { NeonText, strokeRectPx, glowRectPx } from './Neon.js';
 import { uiSfx } from './Sound.js';
+import { tweenProgress, Ease, isReducedMotion, REDUCED_MS } from './Motion.js';
 
 export class Button extends Phaser.GameObjects.Container {
   /**
@@ -22,6 +28,7 @@ export class Button extends Phaser.GameObjects.Container {
     this.colorKey = o.color || 'cyan';
     this.hover = false;
     this.disabled = false;
+    this.flashT = 0; // 1 = press flash at full strength, decays to 0
     this.g = new Phaser.GameObjects.Graphics(scene);
     this.add(this.g);
     this.label = new NeonText(scene, theme, this.w / 2, this.h / 2 + (o.hint ? -3 : 0), o.label, {
@@ -44,6 +51,7 @@ export class Button extends Phaser.GameObjects.Container {
     this.zone.on('pointerdown', () => {
       if (this.disabled) return;
       uiSfx(scene, 'uiSelect');
+      this.flash();
       o.onClick();
     });
     scene.add.existing(this);
@@ -69,18 +77,58 @@ export class Button extends Phaser.GameObjects.Container {
     return this;
   }
 
+  /** Bright press flash that fades out (shorter under reduce motion; it is feedback, not motion). */
+  flash() {
+    if (this._flashTween && typeof this._flashTween.remove === 'function') this._flashTween.remove();
+    this.flashT = 1;
+    this._paint();
+    this._flashTween = tweenProgress(this.scene, {
+      duration: isReducedMotion(this.scene) ? REDUCED_MS : 240,
+      ease: Ease.outQuad,
+      onUpdate: (p) => {
+        if (!this.scene) return;
+        this.flashT = 1 - p;
+        this._paint();
+      },
+      onComplete: () => { this._flashTween = null; },
+    });
+    return this;
+  }
+
   _paint() {
     const pal = this.theme.pal;
+    if (!pal || !this.g) return;
     const c = pal[this.colorKey];
     const g = this.g;
+    const { w, h } = this;
     g.clear();
-    g.fillStyle(this.hover ? c : pal.bgAlt, this.hover ? 0.25 : 0.95);
-    g.fillRect(0, 0, this.w, this.h);
-    strokeRectPx(g, 0, 0, this.w, this.h, c, this.hover ? 1 : 0.7);
-    this.label.setColorKey(this.colorKey);
+    if (this.hover && !this.disabled) {
+      // soft glow outside the box
+      glowRectPx(g, 0, 0, w, h, c, 1.5);
+    }
+    g.fillStyle(pal.bgAlt, 0.95);
+    g.fillRect(0, 0, w, h);
+    // face: a hint of the accent at rest, more on hover; a top-half sheen gives it a glass bevel
+    g.fillStyle(c, this.hover ? 0.24 : 0.07);
+    g.fillRect(1, 1, w - 2, h - 2);
+    g.fillStyle(pal.text, this.hover ? 0.1 : 0.04);
+    g.fillRect(1, 1, w - 2, Math.floor((h - 2) / 2));
+    if (this.flashT > 0) {
+      g.fillStyle(c, 0.75 * this.flashT);
+      g.fillRect(1, 1, w - 2, h - 2);
+    }
+    strokeRectPx(g, 0, 0, w, h, c, this.hover ? 1 : 0.7);
+    // bright bottom edge on hover: the "lit" key
+    if (this.hover) {
+      g.fillStyle(c, 1);
+      g.fillRect(1, h - 2, w - 2, 1);
+    }
+    this.label.setColorKey(this.flashT > 0.5 ? 'text' : this.colorKey);
   }
 
   destroy(fromScene) {
+    if (this._flashTween && typeof this._flashTween.remove === 'function') this._flashTween.remove();
+    this._flashTween = null;
     if (this._unbind) this._unbind();
     this._unbind = null;
     super.destroy(fromScene);

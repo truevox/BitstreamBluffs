@@ -6,7 +6,9 @@
  * All geometry comes from src/ui/MissionsLayout.js, which is unit-tested for overlap. Nothing here
  * computes a coordinate by hand.
  */
+import Phaser from 'phaser';
 import { NeonText } from './Neon.js';
+import { mixColor } from './MenuArt.js';
 import { Panel } from './Panel.js';
 import { missionPanelLayout, missionListLayout, ellipsize } from './MissionsLayout.js';
 // Two different ellipsize helpers exist: MissionsLayout's takes a row width at a fixed 6 px advance, PixelFont's
@@ -18,7 +20,10 @@ import { GAME_WIDTH } from '../constants.js';
 const fmt = (n) => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
 /**
- * Draw the compact mission list used on the Title screen.
+ * Draw the Title screen's mission list: the last section of the cabinet card. No panel of its own (the card
+ * is the panel); a container at the list's top-left holding, per mission, an upper-cased title over a
+ * full-width progress bar. Titles are fitted with the MEASURED font width, and the row is wide enough for
+ * the longest real title (MissionsLayout.MISSION_LIST_TITLE), so nothing is cut in practice.
  * @param {Phaser.Scene} scene
  * @param {Object} theme
  * @param {Array} rows mission view rows from REG.MISSIONS
@@ -28,38 +33,53 @@ export function buildTitleMissionList(scene, theme, rows) {
   const list = Array.isArray(rows) ? rows.slice(0, 3) : [];
   if (!list.length) return null;
   const L = missionListLayout(list.length);
-  const panel = new Panel(scene, theme, {
-    x: L.panel.x, y: L.panel.y, w: L.panel.w, h: L.panel.h,
-    color: 'magenta', fillAlpha: 0.82,
-  });
+  const box = new Phaser.GameObjects.Container(scene, L.panel.x, L.panel.y);
+  scene.add.existing(box);
+  const g = new Phaser.GameObjects.Graphics(scene);
+  box.add(g);
+  const labels = [];
   list.forEach((row, i) => {
     const r = L.rows[i];
-    const bar = L.bars[i];
     if (!r) return;
-    // Local coordinates inside the panel; ellipsized to the measured row width so a long title can
-    // never run past its own bar (the defect Luna caught in W1's reward line).
-    const local = { x: r.x - L.panel.x, y: r.y - L.panel.y, w: r.w };
-    // The bar is INLINE (to the right of the text), so the label keeps its full 8 px glyph box. Only
-    // a bar drawn underneath a label at a sub-10 px pitch can slice it — see MISSION_LIST_TITLE.
-    const label = new NeonText(scene, theme, local.x, local.y, ellipsize(row.title, local.w), {
+    const title = String(row.title || '').toUpperCase();
+    // a done row gets a tick when it fits; the lime colour and the full bar say "done" either way
+    const ticked = `✓ ${title}`;
+    const text = row.done && measureText(ticked) <= r.w ? ticked : ellipsizePx(title, r.w);
+    const label = new NeonText(scene, theme, r.x - L.panel.x, r.y - L.panel.y, text, {
       color: row.done ? 'lime' : 'text', outline: 'none',
     });
-    label.setAlpha(0.92);
-    panel.add(label);
-    const bx = bar.x - L.panel.x;
-    const by = bar.y - L.panel.y;
-    const g = scene.add.graphics();
-    g.fillStyle(0x1a2b3a, 1);
-    g.fillRect(bx, by, bar.w, bar.h);
-    const frac = Math.max(0, Math.min(1, row.fraction || 0));
-    if (frac > 0) {
-      const color = row.done ? 0x9cff57 : (theme.color('cyan'));
-      g.fillStyle(color, 1);
-      g.fillRect(bx, by, Math.max(1, Math.round(bar.w * frac)), bar.h);
-    }
-    panel.add(g);
+    label.setAlpha(row.done ? 1 : 0.9);
+    box.add(label);
+    labels.push(label);
   });
-  return panel;
+  const paint = (pal) => {
+    g.clear();
+    list.forEach((row, i) => {
+      const bar = L.bars[i];
+      if (!bar) return;
+      const bx = bar.x - L.panel.x;
+      const by = bar.y - L.panel.y;
+      const frac = Math.max(0, Math.min(1, row.fraction || 0));
+      const c = row.done ? pal.lime : pal.cyan;
+      // track: a dim groove with tick marks every quarter, so an empty bar still reads as a gauge
+      g.fillStyle(mixColor(pal.bgAlt, c, 0.28), 1);
+      g.fillRect(bx, by, bar.w, bar.h);
+      g.fillStyle(c, 0.5);
+      for (let q = 1; q < 4; q++) g.fillRect(bx + Math.round((bar.w * q) / 4), by, 1, bar.h);
+      if (frac > 0) {
+        const fw = Math.max(1, Math.round(bar.w * frac));
+        g.fillStyle(c, 0.95);
+        g.fillRect(bx, by, fw, bar.h);
+        // a bright leading pixel: the "charging" tip
+        g.fillStyle(pal.text, 0.9);
+        g.fillRect(bx + fw - 1, by, 1, bar.h);
+      }
+    });
+  };
+  const unbind = theme.bind(paint);
+  box.once('destroy', unbind);
+  box.labels = labels;
+  return box;
 }
 
 /**

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- menu panel corner ornament (top-left), white, tinted at runtime -->
+<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 9 9" shape-rendering="crispEdges">
+<path fill="#000000" d="M0 0h9v1h-9zM0 1h2v1h-2zM0 2h1v1h-1zM0 3h1v1h-1zM0 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1zM0 8h1v1h-1z"/>
+<path fill="#ffffff" d="M2 2h1v1h-1z"/>
+<path fill="#b6b6b6" d="M3 2h3v1h-3zM2 3h1v1h-1zM2 4h1v1h-1zM2 5h1v1h-1z"/>
+</svg>

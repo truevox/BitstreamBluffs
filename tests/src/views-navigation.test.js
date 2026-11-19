@@ -421,12 +421,14 @@ describe('U3: leaderboard tabs and empty state', () => {
     const t = titleHost({ [REG.SAVE_STORE]: store() });
     item(t, 'LEADERBOARD').onSelect();
     const view = t.view;
-    const hint = view.panel.list.find((o) => o.main && /SWITCH BOARD/.test(o.main.text));
+    // The hint is a keycap row (ViewChrome.Keycaps, in the title-tab line): its `summary` is the plain-text
+    // reading of the row, and `totalW` its drawn width, so the same contract is checked on the new widget.
+    const hint = view.panel.list.find((o) => typeof o.summary === 'string' && /SWITCH BOARD/.test(o.summary));
     expect(hint).toBeTruthy();
-    expect(hint.main.text).toMatch(/←/);
-    expect(hint.main.text).toMatch(/\bN\b/);
-    expect(hint.main.text).toMatch(/PAD X/);
-    const box = { x: hint.x, y: hint.y, w: measureText(hint.main.text), h: 8 };
+    expect(hint.summary).toMatch(/←/);
+    expect(hint.summary).toMatch(/\bN\b/);
+    expect(hint.summary).toMatch(/PAD X/);
+    const box = { x: hint.x, y: hint.y, w: hint.totalW, h: 11 };
     expect(box.x).toBeGreaterThanOrEqual(4);
     expect(box.x + box.w).toBeLessThanOrEqual(view.w - 4);
     for (const b of [view.tabBtn, view.back]) {
