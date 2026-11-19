@@ -1,0 +1,107 @@
+{
+  "research": "UNVERIFIED_PROVISIONAL_LISTENING_EXPERIMENT_NOT_RELEASE_SCORE",
+  "sourceManifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
+  "notes": {
+    "energyFloor": 0.024071577817201612,
+    "voicedFraction": 0.6706374205371972,
+    "rawVoicedFrames": 11710,
+    "rawPitchFrames": 17461,
+    "noteCount": 646,
+    "candidateStructuralGlides": 7,
+    "candidateTerminalScoopsRemoved": 49
+  },
+  "windows": [
+    {
+      "index": 1,
+      "originalStartSeconds": 24.0,
+      "originalEndSeconds": 48.0,
+      "commonGain": 1.0,
+      "files": [
+        {
+          "name": "window1_024-048_A_original_song_vocals.mp3",
+          "sha256": "0624b8de2e019e45fd4de7999d0529cecb1e05d55f86f90bc2f6fe81c4b7b61e",
+          "peak": 0.551
+        },
+        {
+          "name": "window1_024-048_B_piano_friendly.mp3",
+          "sha256": "b907d5e862674273eee234cda9eee057bd7b1683c97fc0902b1faea5261d9454",
+          "peak": 0.44
+        },
+        {
+          "name": "window1_024-048_C_selective_glides.mp3",
+          "sha256": "8e352ae434635fd242717a6e407ccbe66c31c723073e141906830e9f7fcc384b",
+          "peak": 0.44
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "originalStartSeconds": 60.0,
+      "originalEndSeconds": 84.0,
+      "commonGain": 1.0,
+      "files": [
+        {
+          "name": "window2_060-084_A_original_song_vocals.mp3",
+          "sha256": "19642fead2aa40a7a5fc10ab5ca96face6b22048555a71804df918f4c087f4a7",
+          "peak": 0.589
+        },
+        {
+          "name": "window2_060-084_B_piano_friendly.mp3",
+          "sha256": "a253fbd00ea23ca63808c604fe8fb414271b2195c02ed852273fded175b704e5",
+          "peak": 0.575
+        },
+        {
+          "name": "window2_060-084_C_selective_glides.mp3",
+          "sha256": "a253fbd00ea23ca63808c604fe8fb414271b2195c02ed852273fded175b704e5",
+          "peak": 0.575
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "originalStartSeconds": 108.0,
+      "originalEndSeconds": 132.0,
+      "commonGain": 1.0,
+      "files": [
+        {
+          "name": "window3_108-132_A_original_song_vocals.mp3",
+          "sha256": "59f9469e39704c48ba4ea3a44b741e84ccd315373bdc70d6bed37020a98b2bf2",
+          "peak": 0.501
+        },
+        {
+          "name": "window3_108-132_B_piano_friendly.mp3",
+          "sha256": "fc31e9b424605936ca9514e92c861f8c3c231c1860d20a7f7893cb6fd4b213b4",
+          "peak": 0.503
+        },
+        {
+          "name": "window3_108-132_C_selective_glides.mp3",
+          "sha256": "8c786168b11c38e29ccd6f66b321c5357254f04ffaaed560722b79dc2f21792b",
+          "peak": 0.503
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "originalStartSeconds": 144.0,
+      "originalEndSeconds": 168.0,
+      "commonGain": 1.0,
+      "files": [
+        {
+          "name": "window4_144-168_A_original_song_vocals.mp3",
+          "sha256": "286665ffea07f8ca2e59e8a10fd5104e8ba8c9159ba8555790682e5059ebdac2",
+          "peak": 0.658
+        },
+        {
+          "name": "window4_144-168_B_piano_friendly.mp3",
+          "sha256": "079f8445ad61e54cbf91b34c609dd730d4bfa77eacd849cfac0baca303ca8809",
+          "peak": 0.657
+        },
+        {
+          "name": "window4_144-168_C_selective_glides.mp3",
+          "sha256": "80fc129f4ef14e29f4b15860cacdd7983cdfe9515efa2c9fa99698b84b7df968",
+          "peak": 0.657
+        }
+      ]
+    }
+  ]
+}
