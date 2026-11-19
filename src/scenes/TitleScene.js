@@ -754,7 +754,7 @@ export class TitleScene extends Phaser.Scene {
     sceneTransition(this, go, { accent });
   }
 
-  /** The launch flourish: menu out left, card out right, footer and jukebox fade, logo flashes. */
+  /** The launch flourish: menu out left, card out right, footer, tagline and jukebox fade. */
   _launchFx(ms) {
     const slide = (o, dx) => {
       if (!o || !o.scene) return;
@@ -769,19 +769,13 @@ export class TitleScene extends Phaser.Scene {
     slide(this.menuPanel, -240);
     slide(this.cardPanel, 180);
     for (const o of [this.hint, this.helpButton, this.jukebox && this.jukebox.panel, this.sub]) slide(o, 0);
-    for (const w of this.logoWords || []) {
-      tweenProgress(this, {
-        duration: ms,
-        onUpdate: (p) => { if (w.glint.scene) w.glint.setVisible(true).setCrop(0, 0, w.w, w.h).setAlpha(0.6 * Math.sin(Math.PI * Math.min(1, p * 2))); },
-      });
-    }
   }
 
   update(time) {
     this.backdrop.update(time);
     const reduced = isReducedMotion(this);
     this._updateLogo(time, reduced);
-    if (!reduced && !this.attract) this.sub.setAlpha(0.78 + 0.2 * Math.sin(time * 0.004));
+    if (!reduced && !this.attract && !this.starting) this.sub.setAlpha(0.78 + 0.2 * Math.sin(time * 0.004));
     this._pollPadSelect();
     this._updateAttract(time, reduced);
   }
