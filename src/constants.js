@@ -66,6 +66,10 @@ export const REG = Object.freeze({
    * also requires the seed to be today's daily seed. Additive: absent means a practice/ordinary run.
    */
   DAILY_OFFICIAL: 'dailyOfficial',
+  /** Contest lane is CLASSIC unless explicitly selected as an official Draft Daily. */
+  DAILY_MODE: 'dailyMode',
+  /** Frozen independent editable Draft preset for the next launch. */
+  DAILY_DRAFT_RANKS: 'dailyDraftRanks',
   /**
    * @type {import('./systems/CrashReport.js').CrashReportData|null} Readable Chaos phase 3: the last run-ending crash
    * (killer, distance, hop verdict, Game Over line, death x). Registry only: never in the RunRecord or its ledger hash.

@@ -216,7 +216,8 @@ export class GameOverScene extends Phaser.Scene {
     const theme = this.theme;
     const text = this.rec.cause === 'quit' ? 'RUN ENDED' : 'CRASHED';
     // Decision 2: a run on a daily seed says whether it was the official Daily or a practice run of a date.
-    const dailyLabel = DailyPatch.dailyRunLabel(this.rec.seed, isOfficialDaily(this.rec));
+    const dailyLabel = this.rec.dailyMode==='draft'&&isOfficialDaily(this.rec)
+      ? 'DAILY DRAFT' : DailyPatch.dailyRunLabel(this.rec.seed, isOfficialDaily(this.rec));
     const hasRule = this.rec.dailyRuleId && this.rec.dailyRuleId !== 'none';
     const seedLine = dailyLabel
       ? `${dailyLabel}${hasRule ? `  ${ruleLabel(this.rec.dailyRuleId)}` : ''}`
@@ -407,7 +408,9 @@ export class GameOverScene extends Phaser.Scene {
       const daily = DailyPatch.getDailyInfo(new Date(rec.startedAt || Date.now()));
       if (daily.seed === rec.seed && isOfficialDaily(rec)) {
         // the official Daily: today's best replaces the generic seed line
-        const l = line("TODAY'S", store.getDailyStats(new Date(rec.startedAt || Date.now()), { excludeRunId: rec.id }));
+        const draft=rec.dailyMode==='draft';
+        const l = line(draft?'DRAFT':"TODAY'S", store.getDailyStats(
+          new Date(rec.startedAt || Date.now()),{excludeRunId:rec.id,mode:draft?'draft':'classic'}));
         out.seedLine = l.text;
         out.seedKey = l.key;
         const st = store.getDailyStreak(Date.now());
@@ -573,12 +576,14 @@ export class GameOverScene extends Phaser.Scene {
     // MODDED board and must never be offered clean-board initials or a seed best (CC Friday's W4 defect 4:
     // a boosted run was shown NEW TOP 10! and NEW SEED BEST, neither of which the clean board would keep).
     // The decision comes from Ranking.js, not from a flag test here.
+    const draft=rec.dailyMode==='draft';
     const modded = boardsModded(rec);
+    const when=new Date(rec.startedAt||Date.now());
     Promise.all([
-      // A boosted run is judged against the board it can actually enter. Asking the clean board would
-      // offer clean-board initials for a run the clean board will never hold.
-      safe(() => (modded ? store.qualifiesForModdedTop10(rec.score) : store.qualifiesForTop10(rec.score)), false),
-      safe(() => (modded ? store.getModdedLeaderboard(10) : store.getLeaderboard(10)), []),
+      safe(() => draft ? store.qualifiesForDailyDraftTop10(rec.score,when)
+        : (modded ? store.qualifiesForModdedTop10(rec.score) : store.qualifiesForTop10(rec.score)), false),
+      safe(() => draft ? store.getDailyDraftLeaderboard(10,when)
+        : (modded ? store.getModdedLeaderboard(10) : store.getLeaderboard(10)), []),
     ]).then(([qualifies, rows]) => {
       if (!this.alive || this.leaving) return;
       this.rows = Array.isArray(rows) ? rows : [];
@@ -601,9 +606,11 @@ export class GameOverScene extends Phaser.Scene {
    * a Head Start run's distance (audit F-LEAD-2).
    */
   _loadBest(store, rec, safe) {
+    const draft=rec.dailyMode==='draft';
     const modded = boardsModded(rec);
-    safe(() => (modded ? store.getModdedLeaderboard(1000) : store.getRecentRuns(1000)), []).then((all) => {
-      const runs = modded || !Array.isArray(all) ? all : rankableOnly(all);
+    safe(() => draft ? store.getDailyDraftLeaderboard(1000,new Date(rec.startedAt||Date.now()))
+      : (modded ? store.getModdedLeaderboard(1000) : store.getRecentRuns(1000)), []).then((all) => {
+      const runs = draft||modded||!Array.isArray(all) ? all : rankableOnly(all);
       if (!this.alive || !Array.isArray(runs) || rec.cause === 'quit' && !(rec.score > 0)) return;
       // The modded board only holds runs WITH initials, so the player's own just-finished run may not be in
       // it yet. Comparing against that board is still right: it is the list this run will actually appear on.
@@ -739,15 +746,17 @@ export class GameOverScene extends Phaser.Scene {
   async saveEntry(initials) {
     if (!this.entry || this.leaving) return;
     const modded = boardsModded(this.rec);
+    const draft=this.rec.dailyMode==='draft';
     this._leaveEntry();
-    this.right.setColorKey('cyan').setTitle(modded ? 'MODDED' : 'LEDGER');
+    this.right.setColorKey('cyan').setTitle(draft?'DAILY DRAFT':modded ? 'MODDED' : 'LEDGER');
     const ok = await this._persist(initials);
     if (!this.alive || this.leaving) return;
     let rows = this.rows;
     if (ok) {
       try {
         const store = this.registry.get(REG.SAVE_STORE);
-        rows = (await (modded ? store.getModdedLeaderboard(10) : store.getLeaderboard(10))) || [];
+        rows = (await (draft?store.getDailyDraftLeaderboard(10,new Date(this.rec.startedAt||Date.now()))
+          :modded ? store.getModdedLeaderboard(10) : store.getLeaderboard(10))) || [];
       } catch (e) {
         rows = this.rows;
       }
@@ -773,9 +782,11 @@ export class GameOverScene extends Phaser.Scene {
     this.board.setEntries(this.rows, highlightId);
     // Label the board the rows actually came from. A boosted run reading "TOP 10" over the MODDED board
     // would be a lie about which list the player is looking at.
-    const title = modded
-      ? (highlightId ? 'MODDED // YOU ARE ON THE BOARD' : 'MODDED // TOP 10')
-      : (highlightId ? 'LEDGER // YOU ARE ON THE BOARD' : 'LEDGER // TOP 10');
+    const title = this.rec?.dailyMode==='draft'
+      ? (highlightId?'DAILY DRAFT // YOU MADE IT':'DAILY DRAFT // TOP 10')
+      : modded
+        ? (highlightId ? 'MODDED // YOU ARE ON THE BOARD' : 'MODDED // TOP 10')
+        : (highlightId ? 'LEDGER // YOU ARE ON THE BOARD' : 'LEDGER // TOP 10');
     this.right.setTitle(title);
     this.modded = modded === true;
   }
@@ -1043,6 +1054,8 @@ export class GameOverScene extends Phaser.Scene {
     // BEST must count retries), and retrying a practice run stays practice. RunScene still requires the
     // seed to be TODAY's daily seed, so a retry after 00:00 UTC cannot back-fill yesterday.
     this.registry.set(REG.DAILY_OFFICIAL, this.rec.dailyOfficial === true);
+    this.registry.set(REG.DAILY_MODE,this.rec.dailyMode==='draft'?'draft':'classic');
+    this.registry.set(REG.DAILY_DRAFT_RANKS,this.rec.dailyMode==='draft'?{...(this.rec.upgradeRanks||{})}:{});
     // CC Friday: retry keeps the mask of the run being retried. Set it explicitly rather than letting the
     // previous value survive in the registry, which was correct only by accident.
     this.registry.set(REG.BIOME_MASK, Number(this.rec.biomeMask) || 0);
@@ -1058,6 +1071,8 @@ export class GameOverScene extends Phaser.Scene {
     this._commitPending();
     this.registry.set(REG.SEED, randomSeed());
     this.registry.set(REG.DAILY_OFFICIAL, false); // decision 2: a fresh seed is never the Daily
+    this.registry.set(REG.DAILY_MODE,'classic');
+    this.registry.set(REG.DAILY_DRAFT_RANKS,{});
     // A fresh seed is an ordinary run, so it uses the profile mask. Leaving the previous value behind
     // meant NEW SEED after a Daily run inherited that day's date-derived mask.
     this.registry.set(REG.BIOME_MASK, enabledBiomeMask(

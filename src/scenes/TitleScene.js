@@ -20,7 +20,7 @@ import { Backdrop } from '../ui/Backdrop.js';
 import { buildTitleMissionList } from '../ui/MissionsUi.js';
 import { TITLE_BEST_X, TITLE_BEST_Y, TITLE_BANDS, titleMenuLayout } from '../ui/MissionsLayout.js';
 import { addScanlines } from '../ui/Scanlines.js';
-import { LeaderboardView, SettingsView, SeedView, ProfileView, ShopView } from '../ui/Views.js';
+import { LeaderboardView, SettingsView, SeedView, ProfileView, ShopView, DailyModesView, DailyDraftEditorView, DailyDraftLeaderboardView } from '../ui/Views.js';
 import { titleBadgeLayout } from '../ui/ProfileLayout.js';
 import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
@@ -110,7 +110,7 @@ export class TitleScene extends Phaser.Scene {
     // shows what you own and what it looks like).
     const items = [
       { kind: 'action', label: 'START RUN', color: 'lime', onSelect: () => this.startRun(randomSeed()) },
-      { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this._startDaily() },
+      { kind: 'action', label: 'DAILY RUN', color: 'magenta', sub: ellipsize(this.daily.rule ? this.daily.rule.name.toUpperCase() : '', 80), onSelect: () => this._openDailyModes() },
       { kind: 'action', label: 'ENTER SEED', color: 'cyan', onSelect: () => this._openSeed() },
       {
         kind: 'action',
@@ -312,10 +312,25 @@ export class TitleScene extends Phaser.Scene {
    * deriving all three from the current day keeps seed, mask and rule on the same date.
    * @returns {void}
    */
-  _startDaily() {
+  _openDailyModes(){
+    const openChoices=()=>this._openView(new DailyModesView(this,this.theme,{
+      onClose:()=>this._closeView(),
+      onClassic:()=>this._startDaily('classic'),
+      onDraft:()=>this._startDaily('draft'),
+      onEdit:()=>this._openView(new DailyDraftEditorView(this,this.theme,{
+        onClose:openChoices,onPlay:()=>this._startDaily('draft'),
+      })),
+      onBoard:()=>this._openView(new DailyDraftLeaderboardView(this,this.theme,{
+        onClose:openChoices,
+      })),
+    }));
+    openChoices();
+  }
+
+  _startDaily(mode='classic') {
     const now = new Date();
     // Decision 2: this menu item is the ONLY way to start an official Daily.
-    this.startRun(DailyPatch.getDailyInfo(now).seed, DailyPatch.biomeMaskForDate(now), { official: true });
+    this.startRun(DailyPatch.getDailyInfo(now).seed, DailyPatch.biomeMaskForDate(now), { official: true,mode });
   }
 
   /**
@@ -332,6 +347,10 @@ export class TitleScene extends Phaser.Scene {
     this.registry.set(REG.SEED, parsed.seed || seed);
     // Decision 2: set on EVERY Title start, so a typed `daily-*` seed (ENTER SEED) is never official.
     this.registry.set(REG.DAILY_OFFICIAL, !!(o && o.official === true));
+    const draft=o?.official===true&&o?.mode==='draft';
+    this.registry.set(REG.DAILY_MODE,draft?'draft':'classic');
+    this.registry.set(REG.DAILY_DRAFT_RANKS,draft?
+      {...(this.registry.get(REG.PROGRESSION)?.store?.profile?.dailyDraft?.ranks||{})}:{});
     // A normal/daily start MUST clear the one-shot training flag.
     const owned = this.registry.get(REG.PROFILE)?.bsodGym?.owned === true;
     this.registry.set(REG.BSOD_GYM, !!(o && o.gym === true && owned));

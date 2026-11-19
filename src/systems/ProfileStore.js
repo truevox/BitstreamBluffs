@@ -16,6 +16,7 @@ import { COSMETIC_ITEMS } from './Cosmetics.js';
 import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
 import { sanitizeUpgradeRanks, purchaseUpgrade } from './PermanentUpgrades.js';
 import { BSOD_GYM_PRICE, sanitizeGymSetup } from './BsodGym.js';
+import {DRAFT_RULES_VERSION,DRAFT_BUDGET,validDraftRanks,sanitizeDraftRanks,draftCost} from './DailyDraft.js';
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -116,6 +117,11 @@ export function sanitizeProfile(raw, levels) {
   p.bank = nonNeg(raw.bank);
   p.upgrades = sanitizeUpgradeRanks(raw.upgrades);
   p.upgradesEnabled = raw.upgradesEnabled === true;
+  // Device-local preset for the separate ranked Daily Draft ruleset. NOT
+  // permanently owned upgrades and NEVER a drain on the shard bank.
+  const dailyDraft=raw.dailyDraft&&typeof raw.dailyDraft==='object'?raw.dailyDraft:{};
+  p.dailyDraft={version:DRAFT_RULES_VERSION,ranks:sanitizeDraftRanks(
+    dailyDraft.version===DRAFT_RULES_VERSION?dailyDraft.ranks:null)};
   const gym = raw.bsodGym && typeof raw.bsodGym === 'object' ? raw.bsodGym : {};
   p.bsodGym = { discovered: gym.discovered === true || gym.owned === true,
     owned: gym.owned === true };
@@ -669,6 +675,21 @@ export class ProfileStore {
     catch { return { unlocked: false, profile: this.profile }; }
     this.profile = next;
     return { unlocked: true, profile: this.profile };
+  }
+
+  /** Persist one deterministic Daily Draft preset. Can be rebuilt at any
+   * time, never spends shards or changes permanent purchase ranks.
+   * A failed localStorage write does not silently change the active preset.
+   */
+  setDailyDraftRanks(input){
+    if(!validDraftRanks(input))return {ok:false,reason:'invalid-or-over-budget',profile:this.profile};
+    if(!this.storage)return {ok:false,reason:'storage-unavailable',profile:this.profile};
+    const ranks=sanitizeDraftRanks(input);
+    const next=sanitizeProfile({...this.profile,dailyDraft:{version:DRAFT_RULES_VERSION,ranks}},this.levels);
+    try{this.storage.setItem(PROFILE_KEY,JSON.stringify(next));}
+    catch{return {ok:false,reason:'storage-failed',profile:this.profile};}
+    this.profile=next;
+    return {ok:true,profile:this.profile,cost:draftCost(ranks),remaining:DRAFT_BUDGET-draftCost(ranks)};
   }
 
   /** Save a bounded, forward-only launch configuration after Gym-specific

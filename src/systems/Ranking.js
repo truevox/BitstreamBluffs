@@ -21,6 +21,7 @@
  */
 import { MODDED_RUNS_RANKED } from '../constants.js';
 import { DailyPatch } from './DailyPatch.js';
+import {DRAFT_BUDGET,DRAFT_RULES_VERSION,validDraftRanks} from './DailyDraft.js';
 
 /**
  * Whether this record plays on the MODDED board rather than the clean one.
@@ -35,7 +36,7 @@ import { DailyPatch } from './DailyPatch.js';
  */
 export function boardsModded(record, o) {
   if (!record || typeof record !== 'object') return false;
-  if (record.modded !== true) return false;
+  if (record.modded !== true||record.dailyMode==='draft') return false;
   return !ranksModded(o);
 }
 
@@ -62,6 +63,7 @@ export function ranksModded(o) {
  */
 export function isRankable(record, o) {
   if (!record || typeof record !== 'object') return false;
+  if (record.dailyMode==='draft'||record.hashV===4) return false;
   if (record.modded !== true) return true;
   return ranksModded(o);
 }
@@ -78,7 +80,7 @@ export function isRankable(record, o) {
  */
 export function isModdedOnly(record, o) {
   if (!record || typeof record !== 'object') return false;
-  if (record.modded !== true) return false;
+  if (record.modded !== true||record.dailyMode==='draft'||record.hashV===4) return false;
   // When the constant is on, a modded run ranks on the CLEAN board too, so it does not also need a
   // separate listing to be discoverable.
   return !ranksModded(o);
@@ -107,6 +109,7 @@ export function rankableOnly(records, o) {
  * @returns {(r:Object) => boolean}
  */
 export function sameBoardAs(record, o) {
+  if(record?.dailyMode==='draft')return (r)=>countsForDraftDailyBest(r)&&r.seed===record.seed;
   return boardsModded(record, o) ? (r) => isModdedOnly(r, o) : (r) => isRankable(r, o);
 }
 
@@ -144,7 +147,17 @@ export function isOfficialDaily(record) {
  * @returns {boolean}
  */
 export function countsForDailyBest(record, o) {
-  return isRankable(record, o) && isOfficialDaily(record);
+  return record?.dailyMode!=='draft'&&isRankable(record,o)&&isOfficialDaily(record);
+}
+
+/** Daily Draft only: strict rules, one original day seed, fixed verified
+ * upgrade-credit budget, no bought shop boosts and version-four hashed mode.
+ */
+export function countsForDraftDailyBest(r){
+  return Boolean(r && r.hashV===4 && r.dailyMode==='draft' &&
+    r.draftRulesVersion===DRAFT_RULES_VERSION && r.draftBudget===DRAFT_BUDGET &&
+    r.modded===true && (!r.boosts||r.boosts.length===0) &&
+    validDraftRanks(r.upgradeRanks||{}) && isOfficialDaily(r));
 }
 
 /**
@@ -154,5 +167,5 @@ export function countsForDailyBest(record, o) {
  * @returns {boolean}
  */
 export function countsForStreak(record, o) {
-  return countsForDailyBest(record, o) && record.imported !== true;
+  return (countsForDailyBest(record,o)||countsForDraftDailyBest(record)) && record.imported !== true;
 }

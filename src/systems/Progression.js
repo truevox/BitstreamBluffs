@@ -191,6 +191,7 @@ export function defaultProfile() {
     // Permanent ranks persist forever; OFF by default so clean/daily competition stays unchanged.
     upgrades: emptyUpgradeRanks(),
     upgradesEnabled: false,
+    dailyDraft: {version:1,ranks:emptyUpgradeRanks()},
     bsodGym: { discovered: false, owned: false },
     missions: { counter: 0, active: [], progress: {} },
     achievements: {},

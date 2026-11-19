@@ -23,8 +23,9 @@ import {
   SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, PHYSICS, STORAGE, TIMING,
 } from '../constants.js';
 import { EVT } from '../events.js';
-import { SaveStore, LEDGER_HASH_V, UPGRADE_LEDGER_HASH_V } from '../systems/SaveStore.js';
-import { upgradeLoadoutForRun, canopyBluffRecoveryMs } from '../systems/PermanentUpgrades.js';
+import { SaveStore, LEDGER_HASH_V, UPGRADE_LEDGER_HASH_V,DRAFT_LEDGER_HASH_V } from '../systems/SaveStore.js';
+import { upgradeLoadoutForRun, upgradeEffects, canopyBluffRecoveryMs } from '../systems/PermanentUpgrades.js';
+import {DRAFT_RULES_VERSION,DRAFT_BUDGET,validDraftRanks,draftActiveRanks} from '../systems/DailyDraft.js';
 import { TerrainGenerator, biomeForSector } from '../systems/TerrainGenerator.js';
 import { detectBiomeVisits } from '../systems/BiomeDiscovery.js';
 import { ScoreManager } from '../systems/ScoreManager.js';
@@ -163,6 +164,9 @@ export class RunScene extends Phaser.Scene {
     const seedDay = DailyPatch.dateKeyFromSeed(this.seed);
     const todayKey = DailyPatch.getDailyInfo().dateKey;
     this.dailyOfficial = reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
+    // Separate ranked Daily lane. A typed seed, Gym or stale-date retry
+    // can NEVER turn itself into an official competitive Draft.
+    this.dailyMode=this.dailyOfficial&&reg.get(REG.DAILY_MODE)==='draft'?'draft':'classic';
     // daily rule (read ONCE per run). A run on a daily seed plays THAT date's rule (decision 2: a practice
     // run of a past date replays that date, FAIRNESS-2); every other run plays today's rule as before.
     const seedDayInfo = seedDay ? DailyPatch.infoForDateKey(seedDay) : null;
@@ -179,6 +183,13 @@ export class RunScene extends Phaser.Scene {
     this.unlockedBoosts = owned && typeof owned === 'object' ? { ...owned } : {};
     // Permanent upgrades are opt-in, frozen for the run, and never applied to official Dailies.
     this.upgradeRun = upgradeLoadoutForRun(prof, { daily: this.dailyOfficial });
+    if(this.dailyMode==='draft'){
+      // Draft completely disregards owned/upgraded ranks. The saved one-run
+      // snapshot comes ONLY from the free fixed-budget editor, never BANK.
+      const proposed=reg.get(REG.DAILY_DRAFT_RANKS);
+      const ranks=draftActiveRanks(validDraftRanks(proposed)?proposed:{});
+      this.upgradeRun={enabled:Object.keys(ranks).length>0,ranks,effects:upgradeEffects(ranks)};
+    }
     this.upgradeFx = this.upgradeRun.effects;
     // Player abilities and BSOD behavior are unchanged in the Gym. Only the
     // starting pose, pursuit gap/speed and post-catch retry are different.
@@ -303,7 +314,7 @@ export class RunScene extends Phaser.Scene {
     const isDaily = this.dailyOfficial;
     const boostOpts = { daily: isDaily, unlocked: this.unlockedBoosts };
     this.boostFx = boostEffects(this.loadout, boostOpts);
-    this.modded = this.boostFx.modded || this.upgradeRun.enabled;
+    this.modded = this.dailyMode==='draft'||this.boostFx.modded || this.upgradeRun.enabled;
     // The ids that actually applied, written onto the record (and so into the v2 ledger hash).
     const applied = loadoutForRun(this.loadout, boostOpts).boosts;
     this.appliedBoosts = Object.keys(applied).filter((id) => applied[id]).sort();
@@ -347,7 +358,9 @@ export class RunScene extends Phaser.Scene {
     this.bestM = 0;
     try {
       const runs = !this.bsodGym && this.saveStore && this.saveStore.runs;
-      const onBoard = sameBoardAs(this.boostFx);
+      const boardIdentity = {...this.boostFx,dailyMode:this.dailyMode,seed:this.seed};
+      boardIdentity.modded = this.modded; // input snapshot, NOT a ranking decision
+      const onBoard = sameBoardAs(boardIdentity);
       if (Array.isArray(runs)) for (const r of runs) if (r && onBoard(r) && r.distanceM > this.bestM) this.bestM = Math.floor(r.distanceM);
     } catch (e) { this.bestM = 0; }
     this.bestMarker = this.bestM >= 20
@@ -394,6 +407,7 @@ export class RunScene extends Phaser.Scene {
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
+      dailyMode:this.dailyMode,
       gym: this.bsodGym === true, // non-ranked practice must never trigger live mission-completion toasts
     });
   }
@@ -1965,7 +1979,11 @@ export class RunScene extends Phaser.Scene {
       // W4: set only when a boost was actually active. Ranking keeps it off clean boards; since decision 6
       // the v2 ledger hash covers it, with the ids of the boosts that applied.
       ...(this.modded ? { modded: true, boosts: [...(this.appliedBoosts || [])] } : {}),
-      ...(this.upgradeRun?.enabled ? { upgradeRanks: { ...this.upgradeRun.ranks } } : {}),
+      ...(this.upgradeRun?.enabled || this.dailyMode==='draft'
+        ? { upgradeRanks: { ...this.upgradeRun.ranks } } : {}),
+      ...(this.dailyMode==='draft'?{
+        dailyMode:'draft',draftRulesVersion:DRAFT_RULES_VERSION,draftBudget:DRAFT_BUDGET,
+      }:{}),
       // Decision 2: true only for the official Daily (DAILY RUN item, today's seed). Written on every
       // record so a v2 record is never mistaken for a legacy one (Ranking.isOfficialDaily).
       dailyOfficial: this.dailyOfficial === true,
@@ -1973,7 +1991,8 @@ export class RunScene extends Phaser.Scene {
       nearMisses: this.nearMissCount || 0,
       bonusPoints: Math.round(snap.bonusPoints || 0),
       // Decision 6: new records are ledger-hash v2 (every gameplay and result field).
-      hashV: this.upgradeRun?.enabled ? UPGRADE_LEDGER_HASH_V : LEDGER_HASH_V,
+      hashV: this.dailyMode==='draft'?DRAFT_LEDGER_HASH_V:
+        this.upgradeRun?.enabled ? UPGRADE_LEDGER_HASH_V : LEDGER_HASH_V,
       ledgerHash: '',
     };
     record.ledgerHash = SaveStore.computeLedgerHash(record);

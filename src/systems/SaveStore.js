@@ -17,7 +17,8 @@ import { xxHash32 } from './Rng.js';
 import { DailyPatch } from './DailyPatch.js';
 import { activeUpgradeRanks } from './PermanentUpgrades.js';
 import { DEFAULT_CONTROL_LAYOUT, normalizeControlLayout } from './ControlLayouts.js';
-import { isRankable, isModdedOnly, countsForDailyBest, countsForStreak } from './Ranking.js';
+import { isRankable, isModdedOnly, countsForDailyBest,countsForDraftDailyBest, countsForStreak } from './Ranking.js';
+import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './DailyDraft.js';
 
 /**
  * @typedef {Object} Settings
@@ -213,8 +214,13 @@ export function sanitizeRun(raw) {
   //    whether any did, `boosts` says which, so the v2 hash covers the applied effects.
   //  - `imported`: LOCAL provenance only (set by importSharecode, never by a sharecode itself). Not in
   //    any hash: it is not gameplay. Imported runs never extend the Daily streak (decision 1).
-  if (raw.hashV === LEDGER_HASH_V || raw.hashV === UPGRADE_LEDGER_HASH_V) r.hashV = raw.hashV;
-  if (raw.hashV === UPGRADE_LEDGER_HASH_V) r.upgradeRanks = activeUpgradeRanks(raw.upgradeRanks);
+  if ([LEDGER_HASH_V,UPGRADE_LEDGER_HASH_V,DRAFT_LEDGER_HASH_V].includes(raw.hashV)) r.hashV = raw.hashV;
+  if (raw.hashV === UPGRADE_LEDGER_HASH_V || raw.hashV===DRAFT_LEDGER_HASH_V) r.upgradeRanks = activeUpgradeRanks(raw.upgradeRanks);
+  if (raw.hashV===DRAFT_LEDGER_HASH_V) {
+    r.dailyMode=raw.dailyMode==='draft'?'draft':'invalid';
+    r.draftRulesVersion=Number.isSafeInteger(raw.draftRulesVersion)?raw.draftRulesVersion:0;
+    r.draftBudget=Number.isSafeInteger(raw.draftBudget)?raw.draftBudget:0;
+  }
   if (typeof raw.bestFlow === 'number' && Number.isFinite(raw.bestFlow) && raw.bestFlow >= 0) r.bestFlow = raw.bestFlow;
   if (typeof raw.dailyOfficial === 'boolean') r.dailyOfficial = raw.dailyOfficial;
   if (Array.isArray(raw.boosts)) {
@@ -232,6 +238,7 @@ export function sanitizeRun(raw) {
 /** Clean/boost runs remain on hash v2; permanent-upgrade loadouts require v3. */
 export const LEDGER_HASH_V = 2;
 export const UPGRADE_LEDGER_HASH_V = 3;
+export const DRAFT_LEDGER_HASH_V = 4;
 
 const sortedTricksOf = (r) => {
   const tricks = r.tricks && typeof r.tricks === 'object' ? r.tricks : {};
@@ -295,6 +302,18 @@ export function computeLedgerHashV3(record) {
   const applied = Object.keys(ranks).length > 0;
   const pairs = Object.keys(ranks).map(id => [id, ranks[id]]);
   return xxHash32(JSON.stringify(['v3', computeLedgerHashV2(r), applied, pairs])).toString(16).padStart(8, '0');
+}
+
+/** v4 binds the separate OFFICIAL DAILY DRAFT competitive rules. The
+ * parent v3 digest already commits active rank snapshots, mods and scoring;
+ * this outer digest additionally commits Draft identity and fixed rule version.
+ * Old clean/upgrade records retain their original bytes and hash semantics.
+ */
+export function computeLedgerHashV4(record){
+  const r=record||{};
+  return xxHash32(JSON.stringify(['v4',computeLedgerHashV3(r),
+    r.dailyMode=== 'draft'?'draft':'invalid',r.draftRulesVersion,r.draftBudget]))
+    .toString(16).padStart(8,'0');
 }
 
 /**
@@ -560,6 +579,24 @@ export class SaveStore {
     return this._board(opts).slice(0, Math.max(0, limit)).map(boardRow);
   }
 
+  /** Separate daily Draft leaderboard. Same date/seed/biome rule for every
+   * pilot, same fixed Draft budget and rules version; never mixed with clean
+   * or ordinary purchased-upgrade MODDED scores. A local on-device board.
+   */
+  async getDailyDraftLeaderboard(limit=10,when=new Date()){
+    const info=DailyPatch.getDailyInfo(toDate(when));
+    const matches=this.runs.map((r,i)=>[r,i]).filter(([r])=>r.initials&&
+      r.seed===info.seed&&countsForDraftDailyBest(r));
+    matches.sort((a,b)=>b[0].score-a[0].score||a[0].endedAt-b[0].endedAt||a[1]-b[1]);
+    return matches.slice(0,Math.max(0,limit)).map(([r])=>boardRow(r));
+  }
+
+  async qualifiesForDailyDraftTop10(score,when=new Date()){
+    const rows=await this.getDailyDraftLeaderboard(10,when);
+    return Number.isFinite(score)&&score>0&&
+      (rows.length<10||score>rows[rows.length-1].score);
+  }
+
   /**
    * The MODDED board: boosted runs only. Spec W4 gives them "their own leaderboard tab" rather than
    * simply hiding them, so a boosted run's score is still visible to the player who earned it.
@@ -624,7 +661,8 @@ export class SaveStore {
    */
   static computeLedgerHash(record) {
     const r = record || {};
-    return r.hashV === UPGRADE_LEDGER_HASH_V ? computeLedgerHashV3(r)
+    return r.hashV === DRAFT_LEDGER_HASH_V ? computeLedgerHashV4(r)
+      : r.hashV === UPGRADE_LEDGER_HASH_V ? computeLedgerHashV3(r)
       : r.hashV === LEDGER_HASH_V ? computeLedgerHashV2(r) : computeLedgerHashV1(r);
   }
 
@@ -734,7 +772,7 @@ export class SaveStore {
       if (r.seed !== info.seed || (ex !== null && r.id === ex)) continue;
       // Official runs are on the date's mask by construction; the explicit mask (and rule) filter is
       // inside Ranking.isOfficialDaily, so it is one tested check rather than two copies (decision 1).
-      if (!countsForDailyBest(r, opts)) continue;
+      if (!(opts.mode==='draft'?countsForDraftDailyBest(r, opts):countsForDailyBest(r, opts))) continue;
       attempts++;
       if (r.score > bestScore) bestScore = r.score;
       if (r.distanceM > bestDistanceM) bestDistanceM = r.distanceM;

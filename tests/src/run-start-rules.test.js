@@ -186,6 +186,11 @@ function runScene(values) {
 /** Press a Title menu item for real: build the menu, take the item, call its onSelect. */
 function pressTitle(values, label, over) {
   const t = titleCtx(values, over);
+  // The real DAILY button now opens a four-row mode picker. These older
+  // scene-physics tests specifically exercise the unchanged CLASSIC Daily
+  // seed/biome/start behavior. The new picker and Draft route are separately
+  // exercised end-to-end by tools/daily-draft-browser-smoke.mjs.
+  if (label === 'DAILY RUN') t._openDailyModes = () => TitleScene.prototype._startDaily.call(t,'classic');
   TitleScene.prototype._buildMenu.call(t);
   const item = menuItems.find((i) => i.label === label);
   if (!item) throw new Error(`no ${label} item`);

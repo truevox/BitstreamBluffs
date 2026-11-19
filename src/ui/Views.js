@@ -27,6 +27,7 @@ import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
 import { ScoreInspectorView } from './ScoreInspectorView.js';
 import { StemMixerView } from './StemMixerView.js';
 import { freshLabLevels,applyLabStemLevels,LAB_STEMS } from '../systems/music/LabStemMix.js';
+import {DRAFT_BUDGET,DRAFT_RULES_VERSION,DRAFT_UPGRADES,draftCost,changeDraftRank,sanitizeDraftRanks} from '../systems/DailyDraft.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
 import { resolveMusicAsset } from '../systems/music/MusicPack.js';
 import { validateMusicReviewQueue } from '../systems/music/MusicReviewQueue.js';
@@ -1838,5 +1839,148 @@ export class TitlesView extends View {
     for (const t of this.bankTexts || []) t.destroy();
     this.bankTexts = [];
     super.destroy();
+  }
+}
+
+/** Two official Daily lanes, deliberately separate from ordinary purchased
+ * upgrade mode. No extra entry is squeezed into the full six-row Title menu.
+ */
+export class DailyModesView extends View {
+  constructor(scene,theme,o){
+    super(scene,theme,{w:432,h:242,title:'DAILY CHALLENGE // TWO LANES',color:'magenta',onClose:o.onClose});
+    this.panel.add(new NeonText(scene,theme,14,29,'SAME DAILY SEED + RULE. SEPARATE RANKINGS.',{
+      color:'cyan',outline:'none'}));
+    this.panel.add(new NeonText(scene,theme,14,43,`DRAFT: ${DRAFT_BUDGET} FREE CREDITS, REBUILD ANYTIME`,{
+      color:'text',outline:'none'}));
+    this.menu=new MenuList(scene,theme,{x:12,y:62,w:408,rowH:31,parent:this.panel,items:[
+      {kind:'action',label:'DAILY CLASSIC',color:'lime',sub:'NO UPGRADES',onSelect:o.onClassic},
+      {kind:'action',label:'DAILY DRAFT',color:'magenta',sub:'EQUAL-BUDGET BUILDS',onSelect:o.onDraft},
+      {kind:'action',label:'BUILD / REBUILD DRAFT',color:'cyan',sub:'FREE - NO SHARDS',onSelect:o.onEdit},
+      {kind:'action',label:'DAILY DRAFT BOARD',color:'amber',sub:'TODAY ONLY',onSelect:o.onBoard},
+    ]});
+    this.menu.refresh();
+  }
+  handleAction(action){
+    if(action==='cancel'){this.close();return true;}
+    return this.menu.handleAction(action);
+  }
+}
+
+/** Seven actual game upgrades, priced by the same cumulative curve but
+ * purchased only in non-transferable Draft credits, never profile BANK.
+ * Keyboard/gamepad: Up/Down choose, Left/Right remove/add, Enter add.
+ * Pointer: independent -/+ buttons on each row.
+ */
+export class DailyDraftEditorView extends View {
+  constructor(scene,theme,o){
+    super(scene,theme,{w:440,h:248,title:'DAILY DRAFT // BUILD A SLED',color:'cyan',onClose:o.onClose,y:10});
+    this.store=scene.registry.get(REG.PROGRESSION)?.store;
+    this.onPlay=o.onPlay;
+    this.selected=0;
+    this.itemRows=[];
+    this.remaining=new NeonText(scene,theme,13,25,'',{color:'lime'});
+    this.panel.add(this.remaining);
+    this.errorText=new NeonText(scene,theme,13,36,'LEFT/RIGHT ADJUST RANKS - NO SHARDS SPENT',{
+      color:'text',outline:'none'});
+    this.panel.add(this.errorText);
+    DRAFT_UPGRADES.forEach((spec,i)=>{
+      const y=51+i*19;
+      const name=new NeonText(scene,theme,14,y,spec.label,{color:'text'});
+      const value=new NeonText(scene,theme,290,y,'',{anchor:'right',color:'cyan'});
+      const minus=new Button(scene,theme,{x:300,y:y-4,w:26,h:15,label:'-',color:'magenta',
+        onClick:()=>this._adjust(i,-1)});
+      const plus=new Button(scene,theme,{x:336,y:y-4,w:26,h:15,label:'+',color:'lime',
+        onClick:()=>this._adjust(i,1)});
+      this.panel.add(name);this.panel.add(value);this.panel.add(minus);this.panel.add(plus);
+      this.itemRows.push({name,value,minus,plus,id:spec.id});
+    });
+    this.resetBtn=new Button(scene,theme,{x:14,y:194,w:96,h:17,label:'RESET DRAFT',color:'amber',
+      onClick:()=>this._reset()});
+    this.playBtn=new Button(scene,theme,{x:134,y:194,w:108,h:17,label:'PLAY DRAFT',color:'lime',
+      onClick:()=>this.onPlay()});
+    this.panel.add(this.resetBtn);this.panel.add(this.playBtn);
+    this._paint();
+  }
+  _ranks(){return this.store?.profile?.dailyDraft?.ranks||{};}
+  _adjust(i,delta){
+    const id=this.itemRows[i]?.id;
+    if(!id)return;
+    const changed=changeDraftRank(this._ranks(),id,delta);
+    if(!changed.ok){
+      this.errorText.setText(changed.reason==='over-budget'?'DRAFT LIMIT REACHED - REMOVE A RANK FIRST':'MINIMUM RANK 0');
+      this.errorText.setColorKey('amber');return;
+    }
+    const stored=this.store?.setDailyDraftRanks(changed.ranks);
+    if(!stored?.ok){this.errorText.setText('COULD NOT SAVE DRAFT');this.errorText.setColorKey('magenta');return;}
+    this.scene.registry.set(REG.PROFILE,stored.profile);
+    this.errorText.setText('DRAFT SAVED - YOU MAY REBUILD AT ANY TIME');
+    this.errorText.setColorKey('cyan');
+    uiSfx(this.scene,'uiSelect');
+    this._paint();
+  }
+  _reset(){
+    const result=this.store?.setDailyDraftRanks(sanitizeDraftRanks({}));
+    if(!result?.ok){this.errorText.setText('COULD NOT RESET DRAFT');return;}
+    this.scene.registry.set(REG.PROFILE,result.profile);
+    this.errorText.setText('DRAFT RESET - ALL CREDITS RETURNED');
+    this._paint();
+  }
+  _paint(){
+    const ranks=this._ranks();
+    this.remaining.setText(`DRAFT ${DRAFT_BUDGET}  SPENT ${draftCost(ranks)}  LEFT ${DRAFT_BUDGET-draftCost(ranks)}`);
+    this.itemRows.forEach((row,i)=>{
+      row.name.setColorKey(i===this.selected?'lime':'text');
+      row.value.setText(`R${ranks[row.id]||0}`);
+    });
+    // Mouse and keyboard/gamepad deserve the same visible selection cue.
+    this.resetBtn.setHover(this.selected===7);
+    this.playBtn.setHover(this.selected===8);
+    this.back.setHover(this.selected===9);
+  }
+  handleAction(action){
+    if(action==='cancel'){this.close();return true;}
+    if(action==='up'||action==='down'){
+      this.selected=(this.selected+(action==='up'?-1:1)+10)%10;
+      this._paint();uiSfx(this.scene,'uiMove');return true;
+    }
+    if(this.selected<7 && (action==='left'||action==='right'||action==='confirm')){
+      this._adjust(this.selected,action==='left'?-1:1);return true;
+    }
+    if(action==='confirm'){
+      if(this.selected===7)this._reset();
+      else if(this.selected===8)this.onPlay();
+      else this.close();
+      return true;
+    }
+    return true;
+  }
+}
+
+
+/** Today's separate Daily Draft top ten. Classic and normal modded entries
+ * are explicitly excluded by the central Ranking.isOfficialDaily predicate.
+ * Players can change their Draft allocation without touching past entries.
+ */
+export class DailyDraftLeaderboardView extends View {
+  constructor(scene,theme,o){
+    super(scene,theme,{w:440,h:202,title:"DAILY DRAFT // TODAY'S TOP 10",color:'amber',onClose:o.onClose});
+    this.board=new LeaderboardTable(scene,theme,{x:12,y:25,w:416,entries:null,parent:this.panel});
+    this.panel.add(new NeonText(scene,theme,12,180,`RULES V${DRAFT_RULES_VERSION}  BUDGET ${DRAFT_BUDGET}  CLASSIC EXCLUDED`,{
+      color:'cyan',outline:'none'}));
+    this.loadToken=0;
+    this._load();
+  }
+  _load(){
+    const token=++this.loadToken;
+    const store=this.scene.registry.get(REG.SAVE_STORE);
+    Promise.resolve(store?.getDailyDraftLeaderboard?.(10,new Date())||[])
+      .then(rows=>{
+        if(!this.alive||token!==this.loadToken)return;
+        this.board.setEntries(rows||[],undefined,{
+          title:'NO DRAFT RUNS TODAY',sub:'PLAY DAILY DRAFT, THEN ENTER INITIALS',
+        });
+      }).catch(()=>{
+        if(this.alive&&token===this.loadToken)this.board.setEntries([]);
+      });
   }
 }
