@@ -1139,6 +1139,33 @@ export class AudioSynth {
     } catch { return null; }
   }
 
+  /** Read-only cosmetic signal from the ACTUALLY PLAYING original mix.
+   * Reuses the existing FFT analyser; samples at most ~25 Hz and allocates
+   * no WebAudio nodes. This is reactive energy, NOT verified beat metadata.
+   * Audio failures never change gameplay or cause synthetic visual pulses.
+   */
+  getWorldDanceSample() {
+    try {
+      const d=this._stemMusic,c=this.ctx;
+      if(this._destroyed||this._musicMode!=='run'||this._paused||
+        !this._musicWanted||!this._vinylAudible()||
+        !d?.started||d.transportPaused||!d.mixer||
+        !d.track||!d.pack||d.pack.id!==d.track.id||d._loading||
+        d.activeNodes?.size<1||d.songEnabled?.[d.track.id]===false||
+        this._vinylPauseSession||this._vinylResume||
+        this.getFatalCountInStatus().active||!Number.isFinite(c?.currentTime))
+        return null;
+      const revision=String(d._token)+':'+d.track.id+':'+d.clockStart;
+      const now=c.currentTime*1000;
+      if(this._worldDanceSample?.revision===revision&&
+        now>=this._worldDanceSample.timeMs&&
+        now-this._worldDanceSample.timeMs<40)return this._worldDanceSample;
+      const e=d.mixer.energy();
+      if(!Number.isFinite(e?.bass)||!Number.isFinite(e?.mid))return null;
+      return (this._worldDanceSample={revision,timeMs:now,bass:e.bass,mid:e.mid});
+    }catch{return null;}
+  }
+
   /** PUBLIC readonly music timing for gameplay such as the BSOD Gym.
    * Return either an imminent validated quarter-note pulse, or an immediate
    * no-wait fallback. Never creates a player, starts music, or mutates physics.

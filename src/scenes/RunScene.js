@@ -50,6 +50,7 @@ import { Hazard } from '../entities/Hazard.js';
 import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
+import { WorldDanceEnvelope, worldDanceMotionAllowed } from '../systems/WorldDance.js';
 import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
 import { BestMarker } from '../entities/BestMarker.js';
@@ -278,6 +279,12 @@ export class RunScene extends Phaser.Scene {
     // visuals / entities
     this.cameras.main.setBackgroundColor(this.palette.bg);
     this.bg = new Background(this, this.palette);
+    this.worldDance = new WorldDanceEnvelope();
+    // Retain a live MediaQueryList so an OS reduced-motion change is seen
+    // without creating a new query object every render frame.
+    try { this._worldDanceMotionQuery=typeof matchMedia==='function'
+      ?matchMedia('(prefers-reduced-motion: reduce)'):null; }
+    catch { this._worldDanceMotionQuery=null; }
     this.mesh = new TerrainMesh(this, this.palette, this.content.terrainMods);
     this.fx = new Fx(this, this.palette);
     this.trail = new TrailParticles(this, this.palette, this.look && this.look.trail);
@@ -437,6 +444,9 @@ export class RunScene extends Phaser.Scene {
     safe(this.trail);
     safe(this.fx);
     safe(this.bg);
+    this.worldDance?.reset();
+    this.worldDance = null;
+    this._worldDanceMotionQuery=null;
     safe(this.shardField);
     safe(this.bestMarker);
     safe(this.deathMarker);
@@ -1177,7 +1187,14 @@ export class RunScene extends Phaser.Scene {
     }
     this.drawStreaks(t);
     if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.heightFn);
-    this.bg.update(cam.scrollX, t, sled.speed);
+    // Visual-only world dance: no music player/beat-grid mutation, and no
+    // hidden synthetic tempo. With a muted/paused song or reduced motion the
+    // backdrop returns immediately to its original neutral geometry.
+    const danceAllowed=worldDanceMotionAllowed(this.settings,
+      this._worldDanceMotionQuery?.matches===true);
+    const sample=danceAllowed?this.registry?.get?.(REG.AUDIO)?.getWorldDanceSample?.():null;
+    const dance=this.worldDance?.update(sample,dt)||0;
+    this.bg.update(cam.scrollX, t, sled.speed,dance);
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
     this.updateBlindOverlay();
