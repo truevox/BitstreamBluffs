@@ -25,6 +25,8 @@ import { toggleBiome, biomeToggleRows, purchase, equip, unequip, isOwned, shopIt
 import { VOCALS_UNLOCK_SHARDS } from '../systems/ProfileStore.js';
 import { StemMusicDirector } from '../systems/music/StemMusicDirector.js';
 import { ScoreInspectorView } from './ScoreInspectorView.js';
+import { StemMixerView } from './StemMixerView.js';
+import { freshLabLevels,applyLabStemLevels,LAB_STEMS } from '../systems/music/LabStemMix.js';
 import { BIOME_IDS, HOME_BIOME } from '../systems/music/BiomeVoices.js';
 import { resolveMusicAsset } from '../systems/music/MusicPack.js';
 import { validateMusicReviewQueue } from '../systems/music/MusicReviewQueue.js';
@@ -408,6 +410,8 @@ export class SoundLabView extends View {
     this.songIndex=0;
     this.dynamic=false;
     this.solo='ALL';
+    this.mixLevels=freshLabLevels(); // per-lab-session only
+    this.mixerView=null;
     this.airborne=false;
     this.speed=0;
     this.lab=null;
@@ -445,23 +449,27 @@ export class SoundLabView extends View {
     // Touch/pointer buttons leave gamepad and the ten existing lab menu
     // rows untouched. The normal View BACK button already occupies x392.
     this.markButton=new Button(scene,theme,{
-      x:13,y:235,w:91,h:14,label:'MARK (M)',color:'amber',
+      x:13,y:235,w:62,h:14,label:'MARK (M)',color:'amber',
       onClick:()=>this._markIssue(),parent:this.panel,
     });
     this.inspectButton=new Button(scene,theme,{
-      x:109,y:235,w:91,h:14,label:'NOTES (N)',color:'lime',
+      x:80,y:235,w:70,h:14,label:'NOTES (N)',color:'lime',
       onClick:()=>this._openInspector(),parent:this.panel,
     }).setDisabled(true);
+    this.mixerButton=new Button(scene,theme,{
+      x:155,y:235,w:70,h:14,label:'MIXER',color:'lime',
+      onClick:()=>this._openMixer(),parent:this.panel,
+    });
     this.exportButton=new Button(scene,theme,{
-      x:205,y:235,w:100,h:14,label:'EXPORT MARKS',color:'cyan',
+      x:230,y:235,w:88,h:14,label:'EXPORT MARKS',color:'cyan',
       onClick:()=>this._exportMarks(),parent:this.panel,
     }).setDisabled(true);
     this.clearButton=new Button(scene,theme,{
-      x:310,y:235,w:73,h:14,label:'CLEAR',color:'magenta',
+      x:323,y:235,w:60,h:14,label:'CLEAR',color:'magenta',
       onClick:()=>this._clearMarks(),parent:this.panel,
     }).setDisabled(true);
     this._markKey=event=>{
-      if(!this.alive||this.inspector||event?.repeat)return;
+      if(!this.alive||this.inspector||this.mixerView||event?.repeat)return;
       if(this.lab?.pack)this._markIssue();
     };
     scene.input?.keyboard?.on('keydown-M',this._markKey);
@@ -706,7 +714,7 @@ export class SoundLabView extends View {
     this._tick();
   }
   _openInspector(){
-    if(this.inspector||!this.score||!this.lab?.pack)return;
+    if(this.inspector||this.mixerView||!this.score||!this.lab?.pack)return;
     const scoreHash=this.score.scoreHash;
     const draft=this.drafts.get(scoreHash);
     const inspector=new ScoreInspectorView(this.scene,this.theme,{
@@ -721,8 +729,29 @@ export class SoundLabView extends View {
     this.inspector=null;
     this._tick();
   }
+  _openMixer(){
+    if(this.inspector||this.mixerView||!this.lab?.ready)return;
+    this.mixerView=new StemMixerView(this.scene,this.theme,{
+      lab:this,onClose:()=>this._closeMixer(),
+    });
+  }
+  _closeMixer(){
+    this.mixerView?.destroy();
+    this.mixerView=null;
+    this._tick();
+  }
+  _setStemLevel(role,level){
+    if(!LAB_STEMS.includes(role)||![0,.35,1,1.35].includes(level))return;
+    this.mixLevels[role]=level;
+    this._applySolo();
+  }
+  _resetStemMix(){
+    this.mixLevels=freshLabLevels();
+    this._solo('ALL');
+  }
   _song(index){
     this._closeInspector();
+    this._closeMixer();
     ++this.scoreRequest;
     this.score=null;
     this.experimentalScore=null;
@@ -745,10 +774,12 @@ export class SoundLabView extends View {
   _dynamic(value){
     this.dynamic=value===true;
     this.lab?.setDynamicOrchestra(this.dynamic);
+    this._applySolo();
   }
   _air(value){
     this.airborne=value===true;
     this.lab?.setAirborne(this.airborne);
+    this._applySolo();
   }
   _speed(value){
     this.speed=Number(value)||0;
@@ -762,22 +793,11 @@ export class SoundLabView extends View {
   _applySolo(){
     const lab=this.lab;
     if(!lab?.mixer||!lab.pack)return;
-    const core=['drums','bass','guitar','piano','other'];
-    for(const role of core){
-      const on=this.solo==='ALL'||this.solo===role.toUpperCase();
-      lab.setStemGain(role,on?1:0);
-    }
-    // Keep the biome-specific melody independent from source versus
-    // replacement; don't accidentally sneak the actual vocal back in.
-    const active=lab._activeVoiceFor(lab.pack);
-    for(const name of lab.gains.keys()){
-      if(name.startsWith('voice:'))
-        lab.mixer.setGain(name,
-          name===active&&(this.solo==='ALL'||this.solo==='MELODY')?1:0,
-          {time:.07});
-    }
-    lab.setSpeed(this.speed); // restore speed automation after solo.
+    // Preserve motion/airborne automation on its separate WebAudio gain
+    // nodes while applying 6 independent ephemeral user mix levels.
+    lab.setSpeed(this.speed);
     lab.setAirborne(this.airborne);
+    applyLabStemLevels(lab,this.mixLevels,this.solo);
   }
   _jump(delta){
     const lab=this.lab;
@@ -841,8 +861,10 @@ export class SoundLabView extends View {
     }
     this.infoText.setText(ellipsize(this.markerStatus,436));
     this.inspector?.refresh();
+    this.mixerView?.refresh();
   }
   handleAction(action){
+    if(this.mixerView)return this.mixerView.handleAction(action);
     if(this.inspector)return this.inspector.handleAction(action);
     if(action==='alt'){this._openInspector();return true;}
     if(action==='cancel'){this.close();return true;}
@@ -850,6 +872,7 @@ export class SoundLabView extends View {
   }
   destroy(){
     this._closeInspector();
+    this._closeMixer();
     ++this.request;
     ++this.scoreRequest;
     this.scene.input?.keyboard?.off('keydown-M',this._markKey);
