@@ -96,12 +96,29 @@ try{
  assert.equal(reduced.reduced,true);
  assert.equal(reduced.cachedQuery,true);
  assert.equal(reduced.strength,0);
+ // The game's persisted setting is a three-way string, NOT a boolean.
+ // Explicit ON must defeat a no-reduce OS; explicit OFF must override an
+ // OS reduction request, just like the new menu/title animation does.
  await page.emulateMedia({reducedMotion:'no-preference'});
- await page.evaluate(()=>window.__bbGame.scene.getScene('RunScene').settings.worldDance=false);
+ await page.evaluate(()=>{
+  const g=window.__bbGame;
+  g.registry.get('settings').reduceMotion='on';
+  g.registry.get('settings').worldDance=true;
+ });
+ await page.waitForTimeout(160);
+ const forcedReduced=await snap();
+ assert.equal(forcedReduced.strength,0);
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.evaluate(()=>window.__bbGame.registry.get('settings').reduceMotion='off');
+ await page.waitForFunction(()=>window.__bbGame.scene.getScene('RunScene')?.worldDance?.strength>0.03,null,{timeout:6500});
+ const forceAllowed=await snap();
+ assert.ok(forceAllowed.strength>0.03);
+ await page.evaluate(()=>window.__bbGame.registry.get('settings').worldDance=false);
  await page.waitForTimeout(160);
  const disabled=await snap();
  assert.equal(disabled.strength,0);
- console.log('MUTE_OS_REDUCED_MOTION_AND_IN_GAME_OFF_GATES_PASS',JSON.stringify({muted,reduced,disabled}));
+ console.log('MUTE_REDUCED_MOTION_OVERRIDE_AND_OFF_SWITCH_GATES_PASS',
+  JSON.stringify({muted,reduced,forcedReduced,forceAllowed,disabled}));
  assert.deepEqual(errors,[]);
  console.log('WORLD_DANCE_REAL_OGG_BROWSER_PASS');
 }finally{await browser.close()}

@@ -46,6 +46,12 @@ test('revision/mute/pause/reset/reduced motion are fail-closed and never introdu
  expect(w.update({timeMs:40,revision:'song',bass:NaN,mid:1},50)).toBe(0);
  expect(worldDanceMotionAllowed({},false)).toBe(true);
  expect(worldDanceMotionAllowed({reduceMotion:true},false)).toBe(false);
+ expect(worldDanceMotionAllowed({reduceMotion:'on'},false)).toBe(false);
+ expect(worldDanceMotionAllowed({reduceMotion:'on'},true)).toBe(false);
+ expect(worldDanceMotionAllowed({reduceMotion:'off'},true)).toBe(true);
+ expect(worldDanceMotionAllowed({reduceMotion:'auto'},true)).toBe(false);
+ expect(worldDanceMotionAllowed({reduceMotion:'auto'},false)).toBe(true);
+ expect(worldDanceMotionAllowed({worldDance:false,reduceMotion:'off'},true)).toBe(false);
  expect(worldDanceMotionAllowed({worldDance:false},false)).toBe(false);
  expect(worldDanceMotionAllowed({},true)).toBe(false);
 });

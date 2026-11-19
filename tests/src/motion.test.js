@@ -40,6 +40,10 @@ describe('reduce-motion decision', () => {
     expect(sanitizeSettings({ reduceMotion: 'on' }).reduceMotion).toBe('on');
     expect(sanitizeSettings({ reduceMotion: 'off' }).reduceMotion).toBe('off');
     expect(sanitizeSettings({ reduceMotion: 'yes' }).reduceMotion).toBe('auto');
+    expect(defaultSettings().worldDance).toBe(true);
+    expect(sanitizeSettings({worldDance:false}).worldDance).toBe(false);
+    expect(sanitizeSettings({worldDance:true}).worldDance).toBe(true);
+    expect(sanitizeSettings({worldDance:'off'}).worldDance).toBe(true);
   });
 });
 

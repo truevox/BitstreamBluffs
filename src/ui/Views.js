@@ -230,13 +230,13 @@ export class LeaderboardView extends View {
 }
 
 /** Rows in the Settings list; the panel height is derived from it (see SettingsView). */
-const SETTINGS_ROWS = 13;
+const SETTINGS_ROWS = 14;
 
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
   constructor(scene, theme, o) {
-    // Height follows the row count (22 + rows * 14 + 30): the rows end at 22 + rows * 14, then a divider
-    // and the palette-swatch row. Thirteen rows is 234, which at y 28 ends at 262 of 270.
+    // Height follows the row count (22 + rows * 14 + 30): fourteen rows
+    // yield 248 px, positioned at y=14 and ending at y=262 in a 270px view.
     const h = 22 + SETTINGS_ROWS * 14 + 30;
     super(scene, theme, { w: 360, h, title: 'SETTINGS',
       color: 'amber', onClose: o.onClose, y: Math.max(8, Math.min(40, 262 - h)), backLabel: 'DONE',
@@ -256,6 +256,9 @@ export class SettingsView extends View {
       { kind:'choice',label:'REDUCE MOTION',options:[
         {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
         get:()=>settings().reduceMotion||'auto',set:v=>updateSetting(game,'reduceMotion',v) },
+      { kind:'choice',label:'WORLD DANCE',options:[
+        {value:true,label:'ON'},{value:false,label:'OFF'}],
+        get:()=>settings().worldDance!==false,set:v=>updateSetting(game,'worldDance',v) },
       {kind:'slider',label:'MASTER VOLUME',get:()=>settings().masterVolume,
         set:v=>updateSetting(game,'masterVolume',v)},
       {kind:'slider',label:'MUSIC VOLUME',get:()=>settings().musicVolume,
