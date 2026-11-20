@@ -9,6 +9,7 @@ musical accuracy or corrected note events.
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from performance_v1 import ROLES,read,sha256_file
@@ -25,13 +26,34 @@ EXPECTED_COUNTS={
 		'melody':595,'other':2004,'piano':1664},
 }
 
+YOUTUBE_VIDEO_ID=re.compile(r'[A-Za-z0-9_-]{11}\Z')
+
+def assert_catalog_compatible(current,baseline):
+	"""Permit *only* optional billboard YouTube IDs, never source/audio changes.
+
+	An older release without video references may gain them. Once a reference
+	is published, removal or silent replacement still requires explicit review.
+	All non-youtubeId catalog fields, track ordering, and manifest links must
+	match the previous release exactly.
+	"""
+	assert current.keys()==baseline.keys(), 'CATALOG_TOP_LEVEL_CHANGED'
+	assert current['format']==baseline['format'], 'CATALOG_FORMAT_CHANGED'
+	assert len(current['tracks'])==len(baseline['tracks'])==4, 'CATALOG_TRACK_COUNT_CHANGED'
+	for new,old in zip(current['tracks'],baseline['tracks']):
+		assert {k:v for k,v in new.items() if k!='youtubeId'}=={
+			k:v for k,v in old.items() if k!='youtubeId'}, 'SHIPPING_CATALOG_CONTENT_CHANGED'
+		if 'youtubeId' in new:
+			assert isinstance(new['youtubeId'],str) and YOUTUBE_VIDEO_ID.fullmatch(new['youtubeId']), 'INVALID_YOUTUBE_ID'
+		if 'youtubeId' in old:
+			assert new.get('youtubeId')==old['youtubeId'], 'PUBLISHED_YOUTUBE_ID_CHANGED'
+
+
 def run(current,baseline):
 	current=Path(current)
 	baseline=Path(baseline)
 	cat=json.loads((current/'catalog.json').read_text())
 	oldcat=json.loads((baseline/'catalog.json').read_text())
-	assert cat==oldcat
-	assert len(cat['tracks'])==4
+	assert_catalog_compatible(cat,oldcat)
 	ogg_count=0
 	review_total=0
 	scores={}

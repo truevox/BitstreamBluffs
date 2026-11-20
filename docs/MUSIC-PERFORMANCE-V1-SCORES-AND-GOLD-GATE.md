@@ -66,7 +66,7 @@ Still needed: human reviewed musical passages, confidence calibration, release/r
 
 - Python unit tests: tools/music/test_performance_v1.py and test_evaluate_performance_v1.py.
 - Browser unit tests: tests/src/performance-score.test.js and tests/src/music-pack.test.js.
-- Original-audio gate: tools/music/validate_performance_release.py verifies all **4,745 original Ogg files unchanged by SHA-256**, all four pack manifests otherwise identical to prior release, and all exact source event counts and score hashes.
+- Original-audio gate: tools/music/validate_performance_release.py verifies all **4,745 original Ogg files unchanged by SHA-256**, all four pack manifests otherwise identical to prior release, and all exact source event counts and score hashes. Catalog identity is also strict except for **new, valid 11-character `youtubeId` artwork references** (issue #54): these do not change source audio or manifest paths, and already-published IDs cannot silently change or disappear. Fixture regression: `python3 -B tools/music/test_validate_performance_catalog_compat.py`.
 - Real Chromium game lab: tools/music/smoke-performance-score-game.mjs loads all four real scores, isolates streams, seeks, marks passages, downloads four score-pinned JSON markers and checks saved game/settings unaffected.
 - Adversarial Chromium: tools/music/smoke-performance-score-races.mjs delays score A until B is loaded, rejects incorrect score hashes and confirms normal source audio plays uninterrupted.
 - All **120/120 current-game source test suites, 2,134/2,134 tests pass**. Historical broad legacy suite includes seven previously reproduced failures unrelated to sound.
