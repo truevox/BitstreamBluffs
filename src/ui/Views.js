@@ -2209,7 +2209,7 @@ export class DailyModesView extends View {
   }
 }
 
-/** Seven actual game upgrades, priced by the same cumulative curve but
+/** Every actual game upgrade (ten in rules v2), priced by the same cumulative curve but
  * purchased only in non-transferable Draft credits, never profile BANK.
  * Keyboard/gamepad: Up/Down choose, Left/Right remove/add, Enter add.
  * Pointer: independent -/+ buttons on each row.
@@ -2231,7 +2231,7 @@ export class DailyDraftEditorView extends View {
       color:'text',outline:'none'});
     this.panel.add(this.errorText);
     DRAFT_UPGRADES.forEach((spec,i)=>{
-      const y=51+i*19;
+      const y=this._rowY(i);
       const name=new NeonText(scene,theme,14,y,spec.label,{color:'text'});
       const value=new NeonText(scene,theme,290,y,'',{anchor:'right',color:'cyan'});
       const minus=new Button(scene,theme,{x:300,y:y-4,w:26,h:15,label:'-',color:'magenta',
@@ -2241,12 +2241,17 @@ export class DailyDraftEditorView extends View {
       this.panel.add(name);this.panel.add(value);this.panel.add(minus);this.panel.add(plus);
       this.itemRows.push({name,value,minus,plus,id:spec.id});
     });
-    this.resetBtn=new Button(scene,theme,{x:14,y:194,w:96,h:17,label:'RESET DRAFT',color:'amber',
+    this.resetBtn=new Button(scene,theme,{x:14,y:204,w:96,h:17,label:'RESET DRAFT',color:'amber',
       onClick:()=>this._reset()});
-    this.playBtn=new Button(scene,theme,{x:134,y:194,w:108,h:17,label:'PLAY DRAFT',color:'lime',
+    this.playBtn=new Button(scene,theme,{x:134,y:204,w:108,h:17,label:'PLAY DRAFT',color:'lime',
       onClick:()=>this.onPlay()});
     this.panel.add(this.resetBtn);this.panel.add(this.playBtn);
     this._paint();
+  }
+  /** Row baseline: 19 px apart while seven fit; tighter (>= 15 px) so ten rows end above the buttons at 204. */
+  _rowY(i){
+    const gap=Math.max(15,Math.min(19,Math.floor(135/Math.max(1,DRAFT_UPGRADES.length-1))));
+    return 51+i*gap;
   }
   _ranks(){return this.store?.profile?.dailyDraft?.ranks||{};}
   _adjust(i,delta){
@@ -2294,7 +2299,7 @@ export class DailyDraftEditorView extends View {
     const spent=draftCost(ranks);
     paintGlowBar(g,pal,{x:230,y:26,w:196,h:7},DRAFT_BUDGET>0?spent/DRAFT_BUDGET:0,spent>=DRAFT_BUDGET?'amber':'lime',{segments:10,glow:0.6});
     this.itemRows.forEach((row,i)=>{
-      const y=51+i*19;
+      const y=this._rowY(i);
       if(i===this.selected){
         g.fillStyle(pal.lime,0.1);g.fillRect(10,y-4,356,15);
         g.fillStyle(pal.lime,1);g.fillRect(10,y-4,2,15);

@@ -16,9 +16,10 @@ export const UPGRADE_CATALOG = Object.freeze([
   { id: 'airbrake', label: 'AIRBRAKE LIFT', basePrice: 30, priceScale: 4, curveK: 12, cap: .55 },
   { id: 'divebomb', label: 'DIVEBOMB POWER', basePrice: 27, priceScale: 4, curveK: 10, cap: .48 },
   { id: 'bsodGrace', label: 'BSOD HEAD START', basePrice: 48, priceScale: 7, curveK: 18, cap: .25 },
-  // Shard Magnet reach and pull speed. Not part of the Daily Draft (`draft: false`): the Draft's
-  // competitive catalogue changes only with a DRAFT_RULES_VERSION bump.
-  { id: 'magnet', label: 'MAGNET PULL', basePrice: 32, priceScale: 5, curveK: 10, cap: 1.5, draft: false },
+  // Shard Magnet (owner, 2026-11-20): pull strength, duration and how many magnets drop.
+  { id: 'magnetMagnitude', label: 'MAGNET MAGNITUDE', basePrice: 32, priceScale: 5, curveK: 10, cap: 1.5 },
+  { id: 'magnetMeasure', label: 'MAGNET MEASURE', basePrice: 30, priceScale: 5, curveK: 10, cap: 1.0 },
+  { id: 'magnetMyriad', label: 'MYRIAD MAGNETS', basePrice: 36, priceScale: 6, curveK: 12, cap: 1.0 },
 ]);
 /**
  * High-tier canopy milestone: successful BSOD Bluffing pressurizes the sail.
@@ -83,7 +84,9 @@ export function upgradeEffects(input) {
     airbrakeLiftMul: 1 + b('airbrake'),
     divebombMul: 1 + b('divebomb'),
     bsodAccelerationMul: 1 - b('bsodGrace'),
-    magnetMul: 1 + b('magnet'),
+    magnetMul: 1 + b('magnetMagnitude'),
+    magnetDurationMul: 1 + b('magnetMeasure'),
+    magnetSpawnMul: 1 + b('magnetMyriad'),
   });
 }
 

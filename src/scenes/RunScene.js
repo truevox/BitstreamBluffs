@@ -44,7 +44,7 @@ import { GhostRider } from '../entities/GhostRider.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
-import { magnetStrength, pullStep, magnetSpawn, magnetHolePos } from '../systems/ShardMagnet.js';
+import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, hazardColor, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
@@ -206,6 +206,11 @@ export class RunScene extends Phaser.Scene {
       this.upgradeRun={enabled:Object.keys(ranks).length>0,ranks,effects:upgradeEffects(ranks)};
     }
     this.upgradeFx = this.upgradeRun.effects;
+    // Shard Magnets drop from Sync Level 5, and on every Daily (equal pickups on an official board).
+    // A ghost replay restores the recorded choice (REG.GHOST_REPLAY header) so the course matches.
+    const replayTape = reg.get(REG.GHOST_REPLAY);
+    this.magnetsDrop = replayTape && typeof replayTape.magnetsDrop === 'boolean' ? replayTape.magnetsDrop
+      : magnetsDropFor({ level: prof.level, daily: this.dailyOfficial === true || this.dailyMode === 'draft' });
     // Player abilities and BSOD behavior are unchanged in the Gym. Only the
     // starting pose, pursuit gap/speed and post-catch retry are different.
     this.gymSetup = this.bsodGym ? gymSetupForProfile(prof) : null;
@@ -476,6 +481,7 @@ export class RunScene extends Phaser.Scene {
       controlLayout: this.settings?.controlLayout || 'tricksRight',
       boosts: [...(this.appliedBoosts || [])],
       upgradeRanks: this.upgradeRun?.enabled ? { ...this.upgradeRun.ranks } : null,
+      magnetsDrop: this.magnetsDrop === true,
       startPose: [b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y, b.angularVelocity],
       random: runRandomState(this.runRandom),
       startedAt: this.startedAt,
@@ -759,10 +765,11 @@ export class RunScene extends Phaser.Scene {
       pu.push(p);
     });
     // Shard Magnet: one optional extra pickup per chunk, from its own seeded stream (never in the chunk data).
+    // Drops from Sync Level 5 (always on Dailies); MYRIAD MAGNETS raises the chance.
     const magnetDef = this.content.powerups.shardMagnet;
-    if (magnetDef && !this.collectedPowerups.has(`${chunk.index}:magnet`)) {
+    if (magnetDef && this.magnetsDrop && !this.collectedPowerups.has(`${chunk.index}:magnet`)) {
       let spawn = null;
-      try { spawn = magnetSpawn(this.seed, chunk, magnetDef, (x) => this.terrain.heightAt(x), PIXELS_PER_METER); } catch (e) { /* a cosmetic-tier pickup never breaks streaming */ }
+      try { spawn = magnetSpawn(this.seed, chunk, magnetDef, (x) => this.terrain.heightAt(x), PIXELS_PER_METER, this.upgradeFx?.magnetSpawnMul); } catch (e) { /* a pickup never breaks streaming */ }
       if (spawn) {
         const p = new PowerUp(this, magnetDef, spawn, this.palette);
         p.key = `${chunk.index}:magnet`;
@@ -997,7 +1004,8 @@ export class RunScene extends Phaser.Scene {
       this.glideId = def.id;
     } else if (eff.kind === 'magnet') {
       // Shard Magnet: pulls shards in for durationMs. Strength = def x MAGNET PULL upgrade (never time).
-      durationMs = timedPowerupMs(eff);
+      // MAGNET MEASURE stretches the duration.
+      durationMs = Math.round(timedPowerupMs(eff) * (this.upgradeFx?.magnetDurationMul || 1));
       this.magnetMs = durationMs;
       this.magnetEff = eff;
       this.magnetId = def.id;

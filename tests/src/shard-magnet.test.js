@@ -1,8 +1,8 @@
 // Shard Magnet (owner request 2026-11-20): pull, upgrade softcap, placement outside the terrain output.
 import fs from 'fs';
-import { magnetStrength, pullStep, magnetSpawn } from '../../src/systems/ShardMagnet.js';
+import { magnetStrength, pullStep, magnetSpawn, magnetsDropFor, MAGNET_MIN_SYNC_LEVEL } from '../../src/systems/ShardMagnet.js';
 import { upgradeEffects, upgradeBenefit, UPGRADE_CATALOG } from '../../src/systems/PermanentUpgrades.js';
-import { DRAFT_UPGRADES, validDraftRanks, sanitizeDraftRanks, draftActiveRanks } from '../../src/systems/DailyDraft.js';
+import { DRAFT_UPGRADES, DRAFT_RULES_VERSION, validDraftRanks, draftActiveRanks } from '../../src/systems/DailyDraft.js';
 
 const def = JSON.parse(fs.readFileSync('src/data/powerups/shard-magnet.json', 'utf8'));
 const chunk = (index, extra = {}) => ({ index, startX: index * 1600, endX: index * 1600 + 1600, hazards: [], gaps: [], powerups: [], ...extra });
@@ -16,25 +16,41 @@ describe('shard magnet', () => {
     expect(pullStep(2, 0, 0, 0, 96, 360, 1000)).toEqual({ x: 0, y: 0 });
   });
 
-  test('strength comes from the MAGNET PULL upgrade with diminishing returns to a soft cap, not from time', () => {
-    const r0 = magnetStrength(def.effect, upgradeEffects({}).magnetMul);
-    const r10 = magnetStrength(def.effect, upgradeEffects({ magnet: 10 }).magnetMul);
-    const rBig = magnetStrength(def.effect, upgradeEffects({ magnet: 1e6 }).magnetMul);
-    expect(r0.radius).toBe(def.effect.pullRadiusPx);
-    expect(r10.radius).toBeGreaterThan(r0.radius);
-    expect(rBig.radius).toBeLessThan(def.effect.pullRadiusPx * 2.5);
-    expect(upgradeBenefit('magnet', 3) - upgradeBenefit('magnet', 2)).toBeLessThan(upgradeBenefit('magnet', 2) - upgradeBenefit('magnet', 1));
+  test('Magnitude, Measure and Myriad: unlimited ranks, diminishing returns, soft caps; never time on screen', () => {
+    const fx = (r) => upgradeEffects(r);
+    expect(fx({}).magnetMul).toBe(1);
+    expect(fx({}).magnetDurationMul).toBe(1);
+    expect(fx({}).magnetSpawnMul).toBe(1);
+    expect(magnetStrength(def.effect, fx({ magnetMagnitude: 10 }).magnetMul).radius).toBeGreaterThan(def.effect.pullRadiusPx);
+    expect(magnetStrength(def.effect, fx({ magnetMagnitude: 1e6 }).magnetMul).radius).toBeLessThan(def.effect.pullRadiusPx * 2.5);
+    expect(fx({ magnetMeasure: 1e6 }).magnetDurationMul).toBeLessThan(2);
+    expect(fx({ magnetMyriad: 1e6 }).magnetSpawnMul).toBeLessThan(2);
+    for (const id of ['magnetMagnitude', 'magnetMeasure', 'magnetMyriad'])
+      expect(upgradeBenefit(id, 3) - upgradeBenefit(id, 2)).toBeLessThan(upgradeBenefit(id, 2) - upgradeBenefit(id, 1));
     expect(fs.readFileSync('src/systems/ShardMagnet.js', 'utf8')).not.toMatch(/msLeft|elapsed|durationMs \*/);
   });
 
-  test('the Daily Draft catalogue is unchanged (seven upgrades); MAGNET PULL never enters it', () => {
-    expect(UPGRADE_CATALOG.map((u) => u.id)).toContain('magnet');
-    expect(DRAFT_UPGRADES.map((u) => u.id)).not.toContain('magnet');
-    expect(DRAFT_UPGRADES).toHaveLength(7);
-    expect(validDraftRanks({ magnet: 3 })).toBe(false);
-    expect(validDraftRanks({ magnet: 0, canopy: 2 })).toBe(true);
-    expect(sanitizeDraftRanks({ magnet: 9 }).magnet).toBe(0);
-    expect(draftActiveRanks({ magnet: 9, hop: 1 })).toEqual({ hop: 1 });
+  test('all three magnet upgrades are in the Daily Draft (rules v2)', () => {
+    expect(DRAFT_RULES_VERSION).toBe(2);
+    expect(DRAFT_UPGRADES.map((u) => u.id)).toEqual(UPGRADE_CATALOG.map((u) => u.id));
+    expect(DRAFT_UPGRADES.map((u) => u.id)).toEqual(expect.arrayContaining(['magnetMagnitude', 'magnetMeasure', 'magnetMyriad']));
+    expect(validDraftRanks({ magnetMagnitude: 3, magnetMyriad: 1 })).toBe(true);
+    expect(draftActiveRanks({ magnetMeasure: 2 })).toEqual({ magnetMeasure: 2 });
+  });
+
+  test('magnets drop from Sync Level 5 in ordinary runs, and on every Daily regardless of level', () => {
+    expect(MAGNET_MIN_SYNC_LEVEL).toBe(5);
+    expect(magnetsDropFor({ level: 4 })).toBe(false);
+    expect(magnetsDropFor({ level: 5 })).toBe(true);
+    expect(magnetsDropFor({ level: 1, daily: true })).toBe(true);
+    expect(magnetsDropFor({})).toBe(false);
+  });
+
+  test('MYRIAD MAGNETS raises how many chunks get a magnet, deterministically', () => {
+    const flat = () => 500;
+    const count = (mul) => Array.from({ length: 80 }, (_, i) => magnetSpawn('MYR', chunk(i + 1), def, flat, 30, mul)).filter(Boolean).length;
+    expect(count(2)).toBeGreaterThan(count(1));
+    expect(count(2)).toBe(count(2));
   });
 
   test('placement: deterministic per seed and chunk, clear of hazards and pickups, and some chunks get one', () => {

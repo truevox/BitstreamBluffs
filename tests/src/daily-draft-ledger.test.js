@@ -37,10 +37,10 @@ test('v4 Draft ledger signs every competition rule independently from old v2/v3'
   expect(verifyLedgerHash(r)).toBe(true);
   const persisted=sanitizeRun(r);
   expect(verifyLedgerHash(persisted)).toBe(true);
-  expect(persisted).toMatchObject({dailyMode:'draft',draftRulesVersion:1,
+  expect(persisted).toMatchObject({dailyMode:'draft',draftRulesVersion:2,
     draftBudget:1200,upgradeRanks:{canopy:3}});
   for(const [k,v] of Object.entries({
-    dailyMode:'classic',draftRulesVersion:2,draftBudget:1250,
+    dailyMode:'classic',draftRulesVersion:1,draftBudget:1250,
     upgradeRanks:{canopy:4},boosts:['headStart'],modded:false,
     score:777,dailyOfficial:false,seed:'daily-2030-01-01',
   })){
@@ -73,7 +73,7 @@ test('Classic and Draft are separate ranked surfaces with independent day bests'
 
 test('overbudget, wrong rules, purchased boosts, custom/practice seed cannot rank as Daily Draft',()=>{
   const overrides=[{upgradeRanks:{canopy:500}},{draftBudget:999},
-    {draftRulesVersion:2},{boosts:['headStart']},{dailyOfficial:false},
+    {draftRulesVersion:1},{boosts:['headStart']},{dailyOfficial:false},
     {seed:'test-plain'},{modded:false},{dailyMode:'classic'},
     {hashV:3},{biomeMask:info.biomeMask^1},{dailyRuleId:'fake-rule'}];
   for(const o of overrides){const r=draft(o);expect(countsForDraftDailyBest(r)).toBe(false);}

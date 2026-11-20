@@ -22,6 +22,7 @@
  */
 
 import { emptyUpgradeRanks } from "./PermanentUpgrades.js";
+import { DRAFT_RULES_VERSION } from './DailyDraft.js';
 
 /** Profile schema version, independent of STORAGE.saveVersion. */
 export const PROFILE_VERSION = 1;
@@ -191,7 +192,7 @@ export function defaultProfile() {
     // Permanent ranks persist forever; OFF by default so clean/daily competition stays unchanged.
     upgrades: emptyUpgradeRanks(),
     upgradesEnabled: false,
-    dailyDraft: {version:1,ranks:emptyUpgradeRanks()},
+    dailyDraft: {version:DRAFT_RULES_VERSION,ranks:emptyUpgradeRanks()},
     bsodGym: { discovered: false, owned: false },
     missions: { counter: 0, active: [], progress: {} },
     achievements: {},

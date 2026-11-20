@@ -8,8 +8,8 @@ const LEVELS=JSON.parse(fs.readFileSync('src/data/progression/levels.json','utf8
 const mem=()=>{const map=new Map();return {getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v),map};};
 
 test('the budget and rules version are immutable fixed competitive constants',()=>{
- expect(DRAFT_BUDGET).toBe(1200);expect(DRAFT_RULES_VERSION).toBe(1);
- expect(DRAFT_UPGRADES).toHaveLength(7);
+ expect(DRAFT_BUDGET).toBe(1200);expect(DRAFT_RULES_VERSION).toBe(2);
+ expect(DRAFT_UPGRADES).toHaveLength(10);
 });
 
 test('the Draft budget uses the same cumulative per-rank prices as the upgrade shop',()=>{

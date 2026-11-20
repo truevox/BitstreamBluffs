@@ -23,9 +23,10 @@ const MAGNET_FLOOR_FRACTION = 0.4;
  * @param {object} def the shardMagnet power-up def
  * @param {function(number):number} heightAt terrain surface y at world x
  * @param {number} ppm pixels per metre
+ * @param {number} [spawnMul] MYRIAD MAGNETS multiplier on the chance (the result is capped at 0.95)
  * @returns {{defId:string,x:number,y:number}|null}
  */
-export function magnetSpawn(seed, chunk, def, heightAt, ppm) {
+export function magnetSpawn(seed, chunk, def, heightAt, ppm, spawnMul = 1) {
   if (!def || !chunk || !Number.isFinite(chunk.startX) || !Number.isFinite(chunk.endX)) return null;
   const rng = new Rng(String(seed)).fork(`shardMagnet/${chunk.index}`);
   const span = chunk.endX - chunk.startX - 400;
@@ -35,13 +36,25 @@ export function magnetSpawn(seed, chunk, def, heightAt, ppm) {
   const sp = def.spawn || {};
   const base = Number.isFinite(sp.baseChance) ? sp.baseChance : 0.2;
   const decay = Number.isFinite(sp.distanceDecayM) ? sp.distanceDecayM : 2000;
-  const chance = Math.max(base * MAGNET_FLOOR_FRACTION, base / (1 + x / ppm / decay));
+  const mul = Number.isFinite(spawnMul) && spawnMul >= 1 ? spawnMul : 1;
+  const chance = Math.min(0.95, mul * Math.max(base * MAGNET_FLOOR_FRACTION, base / (1 + x / ppm / decay)));
   if (!rng.chance(chance) || x <= 480) return null;
   for (const h of chunk.hazards || []) if (Math.abs(h.x - x) < 90) return null;
   for (const g of chunk.gaps || []) if (x > g.x0 - 80 && x < g.x1 + 40) return null;
   for (const p of chunk.powerups || []) if (Math.abs(p.x - x) < 120) return null;
   const y = heightAt(x);
   return Number.isFinite(y) ? { defId: def.id, x, y: y - lift } : null;
+}
+
+/** Shard Magnets start dropping at this Sync Level in ordinary runs (owner, 2026-11-20). */
+export const MAGNET_MIN_SYNC_LEVEL = 5;
+
+/**
+ * Do magnets drop on this run? From Sync Level 5 in ordinary runs. Always in Daily runs (classic and
+ * Draft): an official board must give every pilot the same pickups, whatever their level.
+ */
+export function magnetsDropFor({ level, daily = false } = {}) {
+  return daily === true || (Number.isFinite(level) && level >= MAGNET_MIN_SYNC_LEVEL);
 }
 
 /** The hole hovers above and behind the rider (world px from the sled centre): visible, not hidden under the sprite. */

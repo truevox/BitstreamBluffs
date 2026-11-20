@@ -7,7 +7,8 @@
  *  - BASE: the magnet active the whole run at rank 0. Must collect more shards.
  *  - UPGRADED: MAGNET PULL near its soft cap. Must collect at least as many as BASE.
  *  - BASE again: identical result (the pull is deterministic, so ghost tapes stay exact).
- * Also counts Shard Magnet pickups streamed on the course, and screenshots the black hole.
+ * Also counts Shard Magnet pickups streamed on the course (Sync Level 5) and checks none drop at
+ * level 1, and screenshots the black hole.
  */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -19,7 +20,7 @@ const SIM_MS = 12000;
 const TAPE = { held: [{ key: 'push', from: 0, to: 1800 }, { key: 'push', from: 4200, to: 5200 }, { key: 'tuck', from: 7000, to: 8200 }],
   edges: [{ key: 'hop', at: 2600 }, { key: 'hop', at: 5900 }] };
 
-async function run(label, { magnet, magnetMul, shotAtMs }) {
+async function run(label, { magnet, magnetMul, shotAtMs, level = 5 }) {
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   try {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
@@ -27,8 +28,10 @@ async function run(label, { magnet, magnetMul, shotAtMs }) {
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
-    const out = await page.evaluate(async ({ seed, simMs, tape, magnet, magnetMul, shotAtMs }) => {
+    const out = await page.evaluate(async ({ seed, simMs, tape, magnet, magnetMul, shotAtMs, level }) => {
       const g = window.__bbGame;
+      const prof = g.registry.get('profile');
+      if (prof) prof.level = level; // magnets drop from Sync Level 5
       const run = g.scene.getScene('RunScene');
       const real = run.update;
       let hold = true;
@@ -61,7 +64,7 @@ async function run(label, { magnet, magnetMul, shotAtMs }) {
         if (shotAtMs && !shot && clock >= shotAtMs) { shot = true; window.__shotReady = true; break; }
       }
       return { shards: run.shardCount || 0, x: run.sled.x, tick: run.simClock.tick, crashed: !!run.crashed, magnets: [...magnets] };
-    }, { seed: SEED, simMs: SIM_MS, tape: TAPE, magnet, magnetMul, shotAtMs });
+    }, { seed: SEED, simMs: SIM_MS, tape: TAPE, magnet, magnetMul, shotAtMs, level });
     if (shotAtMs && shotDir) {
       await page.evaluate(() => window.__bbGame.step(performance.now(), 16.7));
       await page.screenshot({ path: `${shotDir}/shard-magnet-black-hole.png` });
@@ -84,4 +87,7 @@ console.log('MAGNET_PULL_PASS');
 console.log('MAGNET_SPAWNS_ON_COURSE', JSON.stringify(none.magnets));
 assert.ok(none.magnets.length >= 1, 'no Shard Magnet pickup streamed in 12 s of course');
 console.log('MAGNET_SPAWN_PASS');
+const low = await run('level-1', { level: 1 });
+assert.deepEqual(low.magnets, [], 'magnets dropped below Sync Level 5');
+console.log('MAGNET_LEVEL_GATE_PASS', JSON.stringify({ level1: low.magnets.length, level5: none.magnets.length }));
 if (shotDir) { await run('shot', { magnet: true, magnetMul: 1.8, shotAtMs: Number(process.env.SHOT_AT_MS || 3000) }); console.log('MAGNET_SHOT', `${shotDir}/shard-magnet-black-hole.png`); }

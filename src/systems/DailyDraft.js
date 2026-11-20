@@ -14,8 +14,9 @@
 import {UPGRADE_CATALOG, UPGRADE_IDS, emptyUpgradeRanks,
   nextUpgradePrice, activeUpgradeRanks} from './PermanentUpgrades.js';
 
-export const DRAFT_RULES_VERSION=1;
-/** Draft catalogue: the shop's upgrades except those marked `draft: false` (rules version 1 has seven). */
+// v2 (2026-11-20): the three Shard Magnet upgrades joined the catalogue. A new version is a new board.
+export const DRAFT_RULES_VERSION=2;
+/** Draft catalogue: the shop's upgrades except any marked `draft: false` (rules v2: all ten). */
 export const DRAFT_UPGRADES=UPGRADE_CATALOG.filter(u=>u.draft!==false);
 const DRAFT_IDS=DRAFT_UPGRADES.map(u=>u.id);
 export const DRAFT_BUDGET=1200;

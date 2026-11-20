@@ -14,8 +14,8 @@ const storage=()=>{
 };
 
 describe('permanent upgrade economy',()=>{
-  test('eight known tracks; ranks are validated and ordered, unknown junk ignored',()=>{
-    expect(UPGRADE_IDS).toHaveLength(8);
+  test('ten known tracks; ranks are validated and ordered, unknown junk ignored',()=>{
+    expect(UPGRADE_IDS).toHaveLength(10);
     expect(sanitizeUpgradeRanks({hop:6,speed:2,flip:-4,evil:999,canopy:'11'}))
       .toMatchObject({hop:6,speed:2,flip:0,canopy:0});
     expect(Object.keys(activeUpgradeRanks({hop:2,speed:1,evil:3}))).toEqual(['speed','hop']);
@@ -83,7 +83,7 @@ describe('permanent upgrade economy',()=>{
   test('a purchasable upgrades page fits, has no overlaps and survives rank changes',()=>{
     const p={...defaultProfile(),bank:1000};
     const layout=upgradeShopLayout({profile:p});
-    expect(layout.rows.filter(r=>r.kind==='upgradeItem')).toHaveLength(8);
+    expect(layout.rows.filter(r=>r.kind==='upgradeItem')).toHaveLength(10);
     expect(layout.rows.find(r=>r.kind==='upgradeToggle').state).toBe('OFF');
     expect(shopLayout({profile:p}).rows.some(r=>r.kind==='upgradeLink')).toBe(true);
     // Secret gameplay may not be explained or offered before discovery.
