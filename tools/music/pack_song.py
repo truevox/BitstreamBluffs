@@ -105,10 +105,14 @@ def build(root, out, slot, chunk_seconds, preview_seconds, bitrate):
 	catalog = json.loads(catalog_file.read_text()) if catalog_file.exists() else {
 		"format": "bitstream-music-catalog-v1", "tracks": []
 	}
+	previous = next((t for t in catalog["tracks"] if t["id"] == track_id), {})
 	catalog["tracks"] = [t for t in catalog["tracks"] if t["id"] != track_id]
+	# Repacking must not drop catalog-only metadata such as a confirmed youtubeId (billboard artwork, #54).
+	extra = {k: v for k, v in previous.items() if k not in ("id", "title", "manifest")}
 	catalog["tracks"].append({
 		"id": track_id,
 		"title": track["title"],
+		**extra,
 		"manifest": "packs/" + name + "/pack.json",
 	})
 	tmp = out / "catalog.json.tmp"

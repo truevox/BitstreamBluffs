@@ -1,11 +1,12 @@
 /** Cosmetic song billboard: one roadside pass per ACTUAL track identity change.
- * Original YouTube thumbnail files are bundled locally, never fetched per
- * frame. A local-only recording is explicitly labelled local, not fabricated.
+ * Artwork comes from catalog metadata via BillboardArt: the song's YouTube
+ * thumbnail when it has a confirmed ID, otherwise the generic NOW PLAYING card.
  */
 import {GAME_WIDTH,GAME_HEIGHT} from '../constants.js';
-import {FONT_KEY,ellipsize} from '../ui/PixelFont.js';
+import {FONT_KEY,ellipsize,measureText} from '../ui/PixelFont.js';
+import {GENERIC_ART_KEY,CATALOG_CACHE_KEY,billboardArtLoader,catalogTrack,trackYoutubeId,youtubeArtKey}
+  from './BillboardArt.js';
 
-const VIDEO_IDS=Object.freeze(['FEsxYVStla4','WRBGQUqD54U','FYImnz5-hXs']);
 // Sized to fit a sky lane above the rider: the rider sits near screen y = H/3,
 // so an 82 px sign had no lane there and crossed the rider's silhouette.
 export const BILLBOARD_WIDTH=80;
@@ -17,6 +18,8 @@ export const RIDER_CLEAR_PX=24;
 export const BILLBOARD_BEHIND_RIDER_ALPHA=0.22;
 export const BILLBOARD_LIFETIME_MS=14000;
 export const BILLBOARD_FADE_MS=600;
+/** Longest the sign waits off-screen for a thumbnail still loading before it goes out with the generic card. */
+export const BILLBOARD_ART_WAIT_MS=1500;
 // Phaser.Textures.FilterMode.LINEAR: the game runs pixelArt (NEAREST), which
 // makes a 320x180 photo downscaled to 72x40 crunchy.
 const LINEAR_FILTER=0;
@@ -24,12 +27,6 @@ const LINEAR_FILTER=0;
 // storing scene state on the audio object itself.
 const announced=new WeakMap();
 
-export function billboardThumbnail(trackId){
-  return VIDEO_IDS.includes(trackId)?`bb-youtube-${trackId}`:null;
-}
-export function queueBillboardThumbnails(loader){
-  for(const id of VIDEO_IDS)loader.image(`bb-youtube-${id}`,`music/thumbnails/${id}.jpg`);
-}
 /** Target screen y of the sign's centre: the sky lane above the rider, kept above ACTUAL nearby terrain. */
 export function billboardScreenY(riderScreenY,groundScreenY=Infinity){
   const half=BILLBOARD_HEIGHT*.5;
@@ -47,6 +44,23 @@ export function billboardScreenX(startX,cameraTravelPx,elapsedMs,allowAutoPass=t
 export function billboardPulseScale(dance){
   const p=Number.isFinite(dance)?Math.max(0,Math.min(1,dance)):0;
   return {x:1+0.045*p,y:1-0.035*p};
+}
+/** Sign title at 1x pixel-font scale: drop "(subtitle)" / " - part" tails first, then ellipsize to the sign. */
+export function billboardTitle(title){
+  const full=String(title||'').toUpperCase().trim();
+  const short=full.replace(/\s*\(.*$/,'').replace(/\s+-\s+.*$/,'').trim()||full;
+  return ellipsize(short,BILLBOARD_TITLE_PX);
+}
+/** Room for the title on the sign, in unscaled font px. */
+export const BILLBOARD_TITLE_PX=BILLBOARD_WIDTH-6;
+/**
+ * Marquee scroll (px) for a title `travelPx` wider than the sign: hold, scroll
+ * at 20 px/s, hold at the end, jump back. Zero when it fits.
+ */
+export function marqueeOffset(elapsedMs,travelPx){
+  if(!(travelPx>0)||!Number.isFinite(elapsedMs))return 0;
+  const hold=900,scroll=travelPx/0.02,t=Math.max(0,elapsedMs)%(hold*2+scroll);
+  return Math.round(Math.max(0,Math.min(travelPx,(t-hold)*0.02)));
 }
 /** Screen box of the sign body centred at (x, y). */
 export function billboardRect(x,y){
@@ -68,7 +82,9 @@ export class SongBillboard {
     this.startX=GAME_WIDTH+80;
     this.g=scene.add.graphics().setDepth(-11);
     this.art=scene.add.image(0,0,'__MISSING').setDepth(-10).setVisible(false);
-    this.title=scene.add.bitmapText(0,0,FONT_KEY,'',8).setOrigin(.5).setTint(0xffd36e).setDepth(-9).setVisible(false);
+    // Dynamic text so a long title can scroll inside a crop window (marquee) instead of being cut short.
+    // Origin (0,0): Phaser's crop scissor starts at the object's position, not its origin-adjusted bounds.
+    this.title=scene.add.dynamicBitmapText(0,0,FONT_KEY,'',8).setOrigin(0,0).setTint(0xffd36e).setDepth(-9).setVisible(false);
     // Additive cone over the face, so the spotlight actually lights the art.
     this.light=scene.add.graphics().setDepth(-8).setBlendMode(1/* Phaser.BlendModes.ADD */);
     this.g.setVisible(false);
@@ -91,21 +107,59 @@ export class SongBillboard {
     this.trackId=payload.id;
     this.screenY=undefined;
     this.alpha=1;
-    const key=billboardThumbnail(payload.id);
-    this.hasVideo=Boolean(key&&this.scene.textures.exists(key));
     this._hide();
-    if(this.hasVideo){
-      this.scene.textures.get(key).setFilter?.(LINEAR_FILTER);
-      this.art.setTexture(key);
+    // Title and art are both set here, before any draw: no frame can pair this
+    // title with the previous song's thumbnail.
+    this.titleFull=String(payload.title||payload.id).toUpperCase().trim();
+    this.titleShort=billboardTitle(this.titleFull);
+    this._titleMode=null;
+    this.title.setText(this.titleShort);
+    const token=this.token=(this.token||0)+1;
+    const game=this.scene.game;
+    this.youtubeId=trackYoutubeId(catalogTrack(game?.cache?.json?.get?.(CATALOG_CACHE_KEY),payload));
+    this._setArt(GENERIC_ART_KEY);
+    this.artPending=false;
+    this.artWaitMs=0;
+    if(this.youtubeId&&game?.textures){
+      const status=billboardArtLoader(game).ensure(this.youtubeId,(ok)=>{
+        // Late or stale results never repaint a sign that is already out or showing another song.
+        if(token!==this.token||!this.artPending)return;
+        this.artPending=false;
+        if(ok)this._setArt(youtubeArtKey(this.youtubeId));
+        this._reveal();
+      });
+      if(status==='ready')this._setArt(youtubeArtKey(this.youtubeId));
+      else if(status==='loading')this.artPending=true;
     }
-    this.title.setText(ellipsize(String(payload.title||payload.id).toUpperCase(),BILLBOARD_WIDTH-6));
     return true;
+  }
+  /** Use texture `key` if it exists, else no art (plain panel); never a missing-texture box. */
+  _setArt(key){
+    const tex=this.scene.textures;
+    this.artKey=tex?.exists?.(key)?key:null;
+    this.hasVideo=Boolean(this.artKey&&this.artKey!==GENERIC_ART_KEY);
+    if(this.artKey){
+      tex.get(this.artKey).setFilter?.(LINEAR_FILTER);
+      this.art.setTexture(this.artKey);
+    }
+  }
+  /** The pass starts now: camera travel is measured from here, not from when the song changed. */
+  _reveal(){
+    this.elapsedMs=0;
+    this.startCameraX=this.scene.cameras.main.scrollX;
   }
   update(dt,worldDance=0,reducedMotion=false){
     if(!this.active)return;
     const cam=this.scene.cameras.main,player=this.scene.sled;
     if(!cam||!player)return;
     const step=Number.isFinite(dt)?Math.max(0,Math.min(75,dt)):16.7;
+    if(this.artPending){
+      // Bounded wait off-screen for the thumbnail; then go out with the generic card.
+      this.artWaitMs+=step;
+      if(this.artWaitMs<BILLBOARD_ART_WAIT_MS)return;
+      this.artPending=false;
+      this._reveal();
+    }
     this.elapsedMs+=step;
     const zoom=Number.isFinite(cam.zoom)&&cam.zoom>0?cam.zoom:1;
     const riderX=(player.x-cam.scrollX-GAME_WIDTH/2)*zoom+GAME_WIDTH/2;
@@ -149,23 +203,35 @@ export class SongBillboard {
     g.fillStyle(0x08151e,.96).fillRoundedRect(-W/2,-H/2,W,H,4);
     g.lineStyle(2,0xffcc60,.95).strokeRoundedRect(-W/2,-H/2,W,H,4);
     const A=BILLBOARD_ART;
-    if(!this.hasVideo){
-      g.fillStyle(0x26394f,.9).fillRect(-A.w/2,A.y-A.h/2,A.w,A.h);
-      g.lineStyle(1,0x54c8f4,.35).lineBetween(-A.w/2,A.y-A.h/2,A.w/2,A.y+A.h/2);
-      g.lineBetween(-A.w/2,A.y+A.h/2,A.w/2,A.y-A.h/2);
-    }
+    // Only if even the bundled generic card failed to load: a plain panel, still titled.
+    if(!this.artKey)g.fillStyle(0x26394f,.9).fillRect(-A.w/2,A.y-A.h/2,A.w,A.h);
     const inv=1/zoom;
-    if(this.hasVideo){
+    if(this.artKey){
       const src=this.art.frame;
       this.art.setPosition(w.x,w.y+A.y*inv).setScale(A.w/src.width*inv,A.h/src.height*inv)
         .setAlpha(this.alpha).setVisible(true);
     }
-    this.title.setPosition(w.x,w.y+(H/2-7)*inv).setScale(inv).setAlpha(this.alpha).setVisible(true);
+    // Full title as a marquee when it is wider than the sign; with reduced motion, the shortened title, static.
+    const fullPx=measureText(this.titleFull),marquee=fullPx>BILLBOARD_TITLE_PX&&!reducedMotion;
+    const mode=marquee?'marquee':'static';
+    if(mode!==this._titleMode){
+      this._titleMode=mode;
+      const T=this.title;
+      if(marquee)T.setText(this.titleFull).setSize(BILLBOARD_TITLE_PX,10);
+      else T.setText(fullPx<=BILLBOARD_TITLE_PX?this.titleFull:this.titleShort).setSize(0,0).setScrollX(0);
+    }
+    const textPx=marquee?BILLBOARD_TITLE_PX:measureText(this.title.text);
+    if(marquee)this.title.setScrollX(marqueeOffset(this.elapsedMs,fullPx-BILLBOARD_TITLE_PX));
+    this.title.setPosition(w.x-textPx/2*inv,w.y+(H/2-11)*inv).setScale(inv).setAlpha(this.alpha).setVisible(true);
     // Spotlight: a warm additive cone from the lamp over the whole face, a touch brighter on the dance accent.
     const bright=(.1+.08*Math.max(0,Math.min(1,worldDance)))*this.alpha;
     const L=this.light;L.clear();L.setPosition(w.x,w.y).setScale(inv).setVisible(true);
     L.fillStyle(0xffe2a0,bright).fillPoints([{x:-4,y:-H/2-8},{x:4,y:-H/2-8},{x:W/2-3,y:H/2-3},{x:-W/2+3,y:H/2-3}],true);
     L.fillStyle(0xfff4d6,bright*.9).fillEllipse(0,-H/2+4,W*.55,8);
   }
-  destroy(){this.g.destroy();this.art.destroy();this.title.destroy();this.light.destroy();this.active=false;}
+  destroy(){
+    // Invalidate any thumbnail still loading: its callback must not touch a shut-down scene.
+    this.token=(this.token||0)+1;this.artPending=false;
+    this.g.destroy();this.art.destroy();this.title.destroy();this.light.destroy();this.active=false;
+  }
 }

@@ -14,7 +14,7 @@ import { createServices } from '../services.js';
 import { installFonts, FONT_KEY } from '../ui/PixelFont.js';
 import { installScanlineTexture } from '../ui/Scanlines.js';
 import { queueMenuArt } from '../ui/MenuArt.js';
-import { queueBillboardThumbnails } from '../entities/SongBillboard.js';
+import { queueBillboardArt, prewarmBillboardArt } from '../entities/BillboardArt.js';
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -24,15 +24,16 @@ export class PreloadScene extends Phaser.Scene {
   preload() {
     this.load.on('loaderror', (file) => {
       // Cosmetic: log once per file and carry on; MenuArt.hasArt() reports it missing and the menus fall back.
-      console.warn('[BitstreamBluffs] menu art failed to load:', file && file.key);
+      console.warn('[BitstreamBluffs] cosmetic art failed to load:', file && file.key);
     });
     queueMenuArt(this.load);
-    queueBillboardThumbnails(this.load);
+    queueBillboardArt(this.load);
   }
 
   create() {
     installFonts(this);
     installScanlineTexture(this);
+    prewarmBillboardArt(this.game); // one bounded load per catalog YouTube ID, never per frame
     this.cameras.main.setBackgroundColor('#05060f');
     const label = this.add.bitmapText(GAME_WIDTH / 2, GAME_HEIGHT / 2, FONT_KEY, 'BOOTING BITSTREAM...').setOrigin(0.5).setTint(0x00f0ff);
     createServices(this.game)
