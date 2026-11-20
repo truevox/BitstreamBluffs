@@ -138,7 +138,11 @@ def build_report(pack_dir,segments=DEFAULT_WINDOWS):
 			f=pack_dir/seg['sources'][role]
 			assert f.is_file(),f
 			a=decoded_mono(f)
-			if len(a)<RATE*10:raise ValueError(f'Short source segment: {f}')
+			# Last original segment is only 6.6s; preserve it as a short,
+			# lower-evidence source window instead of silently dropping it.
+			expected_seconds=seg['frames']/meta['sampleRate']
+			if len(a)<RATE*min(10.,expected_seconds-.3):
+				raise ValueError(f'Short source segment: {f}')
 			envelopes[role]=onset_energy(a,mode='drum' if role=='drums' else 'bass')
 			stems[role]={'relativePath':seg['sources'][role],
 				'sha256':hashlib.sha256(f.read_bytes()).hexdigest(),
@@ -164,7 +168,7 @@ def build_report(pack_dir,segments=DEFAULT_WINDOWS):
 		'manifestSha256':hashlib.sha256(manifest).hexdigest(),
 		'intendedGenerationBpm':160,
 		'bpmHypotheses':list(DEFAULT_BPM_HYPOTHESES),
-		'method':'Original OGG low-band drum attacks plus independently analyzed bass attacks; 4-way 4/4 meter offset ranking on local 11.5-second source segments',
+		'method':'Original OGG low-band drum attacks plus independently analyzed bass attacks; 4-way 4/4 meter offset ranking on local 11.5-second source segments' + (' (final original 6.6-second segment shorter)' if 14 in segments else ''),
 		'confidence':'NOT_ESTABLISHED: candidate evidence score is not confidence or a trust gate',
 		'limitations':['No genuine beat phase, tempo, meter or downbeat approval','Original song may have pickup or half-time feel','Source separation artifacts and inferred bass attacks','Local phase offsets can drift between source sections','4/4 is test hypothesis; 2/4, 6/8 and other meters not ruled out','The four ranked bar offsets may be musically equivalent under sparse/percussive arrangements','Human and independent musical spot checks absent','Never use to release Gym or affect gameplay/World Dance until verified'],
 		'windows':out}
@@ -174,10 +178,12 @@ def main():
 	p=argparse.ArgumentParser()
 	p.add_argument('--source-pack',type=Path,required=True)
 	p.add_argument('--out',type=Path,required=True)
+	p.add_argument('--all-windows',action='store_true',
+		help='Research all 15 original segments, including the shorter ending')
 	a=p.parse_args()
 	if a.out.exists():raise SystemExit('Refusing overwrite of existing candidate report')
 	a.out.parent.mkdir(parents=True,exist_ok=True)
-	report=build_report(a.source_pack)
+	report=build_report(a.source_pack,segments=tuple(range(15)) if a.all_windows else DEFAULT_WINDOWS)
 	a.out.write_text(json.dumps(report,indent=2)+'\n')
 	print('RESEARCH_OUTPUT',a.out,'sha256',hashlib.sha256(a.out.read_bytes()).hexdigest(),flush=True)
 

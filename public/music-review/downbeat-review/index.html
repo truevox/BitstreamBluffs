@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>One More Run — Downbeat Listening Lab (UNVERIFIED)</title>
+<style>
+:root{color-scheme:dark;font:16px system-ui,sans-serif;background:#111722;color:#e9eef5}
+body{max-width:980px;margin:auto;padding:1.4rem}
+h1{margin:.3rem 0;font-size:1.85rem}h2{font-size:1.1rem;margin:.4rem 0 .9rem}
+p{line-height:1.55;color:#c1cde0}
+.lab{padding:1.2rem;margin:1rem 0;border:1px solid #46546c;border-radius:12px;background:#1a2433}
+.warning{border-left:5px solid #e1ac51;padding:.55rem .9rem;background:#302b28;font-weight:600}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem}
+label{display:flex;flex-direction:column;gap:.4rem;font-weight:600;font-size:.91rem}
+select,textarea,button{font:inherit;border-radius:7px;border:1px solid #75839a;background:#172131;color:#fff;padding:.6rem}
+select,textarea{width:100%;box-sizing:border-box}
+button{cursor:pointer;background:#243651}button:disabled{opacity:.48;cursor:not-allowed}
+button:hover:enabled{background:#38557c}button[aria-pressed=true]{background:#386286;border-color:#d3e6ff}
+.buttons{display:flex;gap:.55rem;flex-wrap:wrap;margin:.8rem 0}
+.hint{font-size:.88rem;color:#abbad0}.mono{font-family:ui-monospace,monospace;overflow-wrap:anywhere}
+#status{min-height:1.5rem;color:#d9c786}
+#counts{font-weight:bold}textarea{min-height:6rem;resize:vertical}
+footer{padding:2rem 0;color:#9cacc3;font-size:.9rem}a{color:#a1d2ff}
+</style></head><body>
+<h1>🎶 One More Run — Downbeat Listening Lab</h1>
+<p class="warning">RESEARCH ONLY · Neither quarter-note timing nor beat-one placement has been verified. This page does not write to the game, Gym, World Dance, or release beat grids.</p>
+<p>Compare the <strong>same original source audio</strong> against rival click tracks. The higher, stronger tick means hypothetical <strong>beat one</strong>; the three softer ticks are beats 2–4. Change just the offset and replay to hear the difference.</p>
+<section class="lab"><h2>Source excerpt and hypotheses</h2>
+<div class="controls">
+<label>Original source window<select id="window" aria-label="Window"></select></label>
+<label>Tempo hypothesis (not verified)<select id="bpm" aria-label="Tempo"></select></label>
+<label>Pulse phase alternative<select id="phase" aria-label="Pulse phase"></select></label>
+<label>Original stem mix<select id="mix"><option value="full">All six original stems</option><option value="drums">Drums only</option><option value="bass">Bass only</option><option value="harmony">Guitar + piano + other</option></select></label>
+</div><h2>Where does the bar start?</h2>
+<div class="buttons" id="offsets" role="group" aria-label="Rival 4/4 beat one offsets"></div>
+<div class="buttons"><button id="play" type="button" disabled>▶ Play source + hypothesis clicks</button><button id="stop" type="button" disabled>■ Stop</button><label style="flex-direction:row;align-items:center"><input id="metronome" type="checkbox" checked> Audible click overlay</label></div>
+<p class="hint">Each replay starts at the same original timeline position. The four offset choices shift only the hypothetical measure accent, not the underlying source or quarter-pulse phase.</p>
+<p id="candidate" class="mono">Loading candidate metadata…</p><p id="status" aria-live="polite"></p>
+</section>
+<section class="lab"><h2>Listening notes — not automatic verification</h2>
+<div class="buttons" id="judgments" role="group" aria-label="Listening judgment"><button data-judgment="undecided" aria-pressed="true">Undecided</button><button data-judgment="plausible" aria-pressed="false">Sounds plausible</button><button data-judgment="wrong" aria-pressed="false">Sounds wrong</button></div>
+<label>What do you hear? (pickup, half-time feel, chorus entrance, fill, disagreement…)<textarea id="notes" placeholder="Optional listening notes; include why you preferred or rejected this bar position."></textarea></label>
+<p class="hint">Observations remain local to this open page until you download them; clicking “Sounds plausible” does NOT mark an official beat grid verified.</p>
+<div class="buttons"><button id="save">Store note in this page</button><button id="export">⬇ Download research notes JSON</button></div><p id="counts"></p>
+</section>
+<footer>Source: original 15-segment One More Run OGG pack. This source-wide research includes all 15 segments; the final segment is shorter and carries less evidence. <a href="https://github.com/truevox/BitstreamBluffs/pull/53">Draft research PR #53</a> · No original audio is uploaded or modified by this tool.</footer>
+<script type="module" src="./review.js"></script>
+</body></html>
