@@ -28,10 +28,16 @@ export function fmtMult(m) {
 
 const SEED_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-/** UI-side random seed for a fresh run (not seed-dependent logic). @returns {string} 6 readable chars */
-export function randomSeed() {
+/**
+ * Unpredictable seed for a fresh run, from the platform CSPRNG (issue #59): a new seed is the one
+ * place real entropy belongs; everything derived from it is seeded. 32 chars, so `byte & 31` is unbiased.
+ * @param {{getRandomValues:(a:Uint8Array)=>Uint8Array}} [crypto]
+ * @returns {string} 6 readable chars
+ */
+export function randomSeed(crypto = globalThis.crypto) {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
   let s = '';
-  for (let i = 0; i < 6; i++) s += SEED_CHARS[Math.floor(Math.random() * SEED_CHARS.length)];
+  for (const b of bytes) s += SEED_CHARS[b & 31];
   return s;
 }
 
