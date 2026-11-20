@@ -53,6 +53,8 @@ export const EVT = Object.freeze({
   POWERUP_EXPIRED: 'bb:powerupExpired',
   /** Emitter: RunScene. Payload: HazardHitPayload. */
   HAZARD_HIT: 'bb:hazardHit',
+  /** Issue #47 Kodiak rival: {type:'incoming'|'telegraph'|'passed'|'gone', id, name, short, from?, real?, air?, points?}. */
+  KODIAK: 'bb:kodiak',
   /** Emitter: RunScene when a timed hazard effect (slow/scramble) ends. Payload: EffectEndPayload. */
   EFFECT_END: 'bb:effectEnd',
   /** Emitter: RunScene. Payload: ZonePayload. */

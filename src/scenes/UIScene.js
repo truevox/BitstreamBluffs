@@ -208,6 +208,7 @@ export class UIScene extends Phaser.Scene {
     on(EVT.POWERUP_COLLECTED, this.onPowerCollected);
     on(EVT.POWERUP_EXPIRED, this.onPowerExpired);
     on(EVT.HAZARD_HIT, this.onHazard);
+    on(EVT.KODIAK, this.onKodiak);
     on(EVT.EFFECT_END, this.onEffectEnd);
     on(EVT.ZONE_ENTER, this.onZoneEnter);
     on(EVT.ZONE_EXIT, this.onZoneExit);
@@ -1050,6 +1051,14 @@ export class UIScene extends Phaser.Scene {
       p.text.setPosition(this.powerX + i * POWER_PITCH + 24, GAME_HEIGHT - 24);
       i++;
     }
+  }
+
+  /** Issue #47: Kodiak rival warnings and pass bonuses, through the centre popup line. */
+  onKodiak(p) {
+    if (!p) return;
+    if (p.type === 'incoming') this._popup(`!! ${p.short} KODIAK ${p.from === 'behind' ? 'BEHIND' : 'AHEAD'} !!`, 'danger');
+    else if (p.type === 'telegraph' && p.real) this._popup(p.from === 'behind' || p.id === 'bruteForceKodiak' ? 'HOP THE CHARGE!' : 'HOP IT!', 'amber');
+    else if (p.type === 'passed') this._popup(`${p.air ? 'BEAR HOP' : 'KODIAK PASSED'} +${p.points}`, 'lime');
   }
 
   onHazard(p) {
