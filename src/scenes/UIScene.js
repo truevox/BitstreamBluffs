@@ -1407,7 +1407,11 @@ export class UIScene extends Phaser.Scene {
       this._paintFlow();
     }
     this._layout(delta);
-    this.minimap?.update(delta, { keepOuts: this._minimapKeepOuts, occluders: this._minimapOccluders });
+    // A passing song billboard is a keep-out too: the minimap must not paint over the sign.
+    let sign = null;
+    try { sign = this.scene.get(SCENES.RUN)?.songBillboard?.screenRect?.() ?? null; } catch { /* run scene gone */ }
+    const keepOuts = sign ? (this._minimapKeepOuts || []).concat(sign) : this._minimapKeepOuts;
+    this.minimap?.update(delta, { keepOuts, occluders: this._minimapOccluders });
     // zone chip pulse
     if (this.zoneText.visible) this.zoneG.setAlpha(0.75 + 0.25 * Math.sin(this.nowMs * 0.008));
     // tutorial chip fallback timeout, shard chain expiry

@@ -12,8 +12,18 @@ import {GENERIC_ART_KEY,CATALOG_CACHE_KEY,billboardArtLoader,catalogTrack,trackY
 export const BILLBOARD_WIDTH=80;
 export const BILLBOARD_HEIGHT=56;
 export const BILLBOARD_ART={w:72,h:40,y:-5};
+/** Screen px from the sled's centre up to the top of the rider's head, padded. */
+export const RIDER_HEAD_PX=18;
 /** Clear gap (screen px) kept between the sign's bottom edge and the rider's head. */
-export const RIDER_CLEAR_PX=24;
+export const RIDER_CLEAR_PX=RIDER_HEAD_PX+2;
+/** Lowest the sign's centre sits when the rider is low on screen. */
+export const BILLBOARD_LANE_Y=80;
+/**
+ * Depth layers. Background: behind the terrain mesh (depth 5), so the posts
+ * vanish behind the slope the rider is on. Foreground: in front of the rider
+ * (depth 20), with posts running off the bottom of the screen.
+ */
+export const BILLBOARD_DEPTH={background:-11,foreground:24};
 /** Alpha while the sign still has to cross the rider (no clear lane at the top of the screen). */
 export const BILLBOARD_BEHIND_RIDER_ALPHA=0.22;
 export const BILLBOARD_LIFETIME_MS=14000;
@@ -26,14 +36,45 @@ const LINEAR_FILTER=0;
 // Per-AudioSynth announced track: survives scene restarts and retries without
 // storing scene state on the audio object itself.
 const announced=new WeakMap();
+// Per-AudioSynth pass count, so passes alternate background / foreground across runs.
+const passes=new WeakMap();
 
+/** Layer for the n-th pass (0-based): background first, then alternating. */
+export function billboardLayer(passIndex){
+  return (Number(passIndex)||0)%2===1?'foreground':'background';
+}
 /** Target screen y of the sign's centre: the sky lane above the rider, kept above ACTUAL nearby terrain. */
 export function billboardScreenY(riderScreenY,groundScreenY=Infinity){
   const half=BILLBOARD_HEIGHT*.5;
-  let y=74;
+  let y=BILLBOARD_LANE_Y;
   if(Number.isFinite(riderScreenY))y=Math.min(y,riderScreenY-RIDER_CLEAR_PX-half);
   if(Number.isFinite(groundScreenY))y=Math.min(y,groundScreenY-half-8);
-  return Math.max(half+3,y);
+  return Math.max(half+8,y);
+}
+/**
+ * Post length below the sign (screen px). Both layers run to past the bottom of
+ * the screen: in the background the terrain mesh hides everything below the
+ * slope; in the foreground the posts leave the frame.
+ */
+export function billboardPostLength(signScreenY){
+  return Math.max(6,GAME_HEIGHT+8-(signScreenY+BILLBOARD_HEIGHT*.5));
+}
+/**
+ * Visible slice of a title wider than the sign at scroll offset `offsetPx`:
+ * whole characters only, like an LED ticker. No crop scissor (Phaser's DBT
+ * crop clipped the top of the glyphs under the run camera).
+ */
+export function tickerWindow(text,offsetPx,maxPx=BILLBOARD_TITLE_PX){
+  const s=String(text);
+  // First start index whose tail fits: the ticker never scrolls past the end.
+  let tail=0;
+  while(tail<s.length-1&&measureText(s.slice(tail))>maxPx)tail++;
+  // Start at the first character beginning at or after the offset (x of char i = width of s[0..i) + 1 gap).
+  let i=0;
+  while(i<tail&&(i?measureText(s.slice(0,i))+1:0)<offsetPx)i++;
+  let j=i;
+  while(j<s.length&&measureText(s.slice(i,j+1))<=maxPx)j++;
+  return s.slice(i,Math.max(i+1,j));
 }
 export function billboardScreenX(startX,cameraTravelPx,elapsedMs,allowAutoPass=true){
   if(!Number.isFinite(startX))return GAME_WIDTH+80;
@@ -80,15 +121,19 @@ export class SongBillboard {
     this.elapsedMs=0;
     this.startCameraX=0;
     this.startX=GAME_WIDTH+80;
-    this.g=scene.add.graphics().setDepth(-11);
-    this.art=scene.add.image(0,0,'__MISSING').setDepth(-10).setVisible(false);
-    // Dynamic text so a long title can scroll inside a crop window (marquee) instead of being cut short.
-    // Origin (0,0): Phaser's crop scissor starts at the object's position, not its origin-adjusted bounds.
-    this.title=scene.add.dynamicBitmapText(0,0,FONT_KEY,'',8).setOrigin(0,0).setTint(0xffd36e).setDepth(-9).setVisible(false);
+    this.g=scene.add.graphics();
+    this.art=scene.add.image(0,0,'__MISSING').setVisible(false);
+    this.title=scene.add.bitmapText(0,0,FONT_KEY,'',8).setOrigin(0,0).setTint(0xffd36e).setVisible(false);
     // Additive cone over the face, so the spotlight actually lights the art.
-    this.light=scene.add.graphics().setDepth(-8).setBlendMode(1/* Phaser.BlendModes.ADD */);
+    this.light=scene.add.graphics().setBlendMode(1/* Phaser.BlendModes.ADD */);
+    this._setLayer('background');
     this.g.setVisible(false);
     this.light.setVisible(false);
+  }
+  _setLayer(layer){
+    this.layer=layer==='foreground'?'foreground':'background';
+    const d=BILLBOARD_DEPTH[this.layer];
+    this.g.setDepth(d);this.art.setDepth(d+1);this.title.setDepth(d+2);this.light.setDepth(d+3);
   }
   _hide(){
     this.g.setVisible(false);this.art.setVisible(false);this.title.setVisible(false);this.light.setVisible(false);
@@ -100,6 +145,9 @@ export class SongBillboard {
     // Same track may continue seamlessly across run transitions without repeat signs.
     if(announced.get(audio)===payload.id)return false;
     announced.set(audio,payload.id);
+    const pass=passes.get(audio)||0;
+    passes.set(audio,pass+1);
+    this._setLayer(billboardLayer(pass));
     this.active=true;
     this.elapsedMs=0;
     this.startCameraX=this.scene.cameras.main.scrollX;
@@ -112,7 +160,6 @@ export class SongBillboard {
     // title with the previous song's thumbnail.
     this.titleFull=String(payload.title||payload.id).toUpperCase().trim();
     this.titleShort=billboardTitle(this.titleFull);
-    this._titleMode=null;
     this.title.setText(this.titleShort);
     const token=this.token=(this.token||0)+1;
     const game=this.scene.game;
@@ -181,7 +228,7 @@ export class SongBillboard {
     const k=Number.isFinite(this.screenY)?1-Math.exp(-step/150):1;
     const screenY=this.screenY=Number.isFinite(this.screenY)?this.screenY+(target-this.screenY)*k:target;
     this.screenX=screenX;
-    const riderRect={x:riderX-16,y:riderY-RIDER_CLEAR_PX,w:32,h:RIDER_CLEAR_PX+10};
+    const riderRect={x:riderX-16,y:riderY-RIDER_HEAD_PX,w:32,h:RIDER_HEAD_PX+10};
     const wantAlpha=billboardAlpha(billboardRect(screenX,screenY),riderRect,this.elapsedMs);
     this.alpha+=(wantAlpha-this.alpha)*(1-Math.exp(-step/90));
     const w=cam.getWorldPoint(screenX,screenY);
@@ -190,8 +237,8 @@ export class SongBillboard {
     // Only the frame and posts squash with the dance: scaling the photo and the
     // pixel-font title by 1.045/0.965 makes them shimmer under pixelArt.
     const g=this.g;g.clear();g.setPosition(w.x,w.y).setScale(pulse.x/zoom,pulse.y/zoom).setAlpha(this.alpha).setVisible(true);
-    // Posts run down to the actual terrain (hidden behind the ground mesh), so the sign stands on the world.
-    const postLen=Number.isFinite(surface)?Math.max(6,Math.min(150,(surface-screenY-H/2+6)/pulse.y)):18;
+    // Posts run off the bottom of the screen; in the background layer the terrain mesh hides them below the slope.
+    const postLen=billboardPostLength(screenY)/pulse.y;
     g.lineStyle(2,0x59667c,.85).lineBetween(-W/2+12,H/2,-W/2+12,H/2+postLen);
     g.lineBetween(W/2-12,H/2,W/2-12,H/2+postLen);
     // Gantry arm and lamp housing centred over the sign.
@@ -211,23 +258,25 @@ export class SongBillboard {
       this.art.setPosition(w.x,w.y+A.y*inv).setScale(A.w/src.width*inv,A.h/src.height*inv)
         .setAlpha(this.alpha).setVisible(true);
     }
-    // Full title as a marquee when it is wider than the sign; with reduced motion, the shortened title, static.
-    const fullPx=measureText(this.titleFull),marquee=fullPx>BILLBOARD_TITLE_PX&&!reducedMotion;
-    const mode=marquee?'marquee':'static';
-    if(mode!==this._titleMode){
-      this._titleMode=mode;
-      const T=this.title;
-      if(marquee)T.setText(this.titleFull).setSize(BILLBOARD_TITLE_PX,10);
-      else T.setText(fullPx<=BILLBOARD_TITLE_PX?this.titleFull:this.titleShort).setSize(0,0).setScrollX(0);
-    }
-    const textPx=marquee?BILLBOARD_TITLE_PX:measureText(this.title.text);
-    if(marquee)this.title.setScrollX(marqueeOffset(this.elapsedMs,fullPx-BILLBOARD_TITLE_PX));
+    // Full title as a ticker when it is wider than the sign; with reduced motion, the shortened title, static.
+    const fullPx=measureText(this.titleFull),ticker=fullPx>BILLBOARD_TITLE_PX&&!reducedMotion;
+    const text=ticker?tickerWindow(this.titleFull,marqueeOffset(this.elapsedMs,fullPx-BILLBOARD_TITLE_PX))
+      :fullPx<=BILLBOARD_TITLE_PX?this.titleFull:this.titleShort;
+    if(this.title.text!==text)this.title.setText(text);
+    // A ticker reads from the sign's left edge; a title that fits is centred.
+    const textPx=ticker?BILLBOARD_TITLE_PX:measureText(text);
     this.title.setPosition(w.x-textPx/2*inv,w.y+(H/2-11)*inv).setScale(inv).setAlpha(this.alpha).setVisible(true);
     // Spotlight: a warm additive cone from the lamp over the whole face, a touch brighter on the dance accent.
     const bright=(.1+.08*Math.max(0,Math.min(1,worldDance)))*this.alpha;
     const L=this.light;L.clear();L.setPosition(w.x,w.y).setScale(inv).setVisible(true);
     L.fillStyle(0xffe2a0,bright).fillPoints([{x:-4,y:-H/2-8},{x:4,y:-H/2-8},{x:W/2-3,y:H/2-3},{x:-W/2+3,y:H/2-3}],true);
     L.fillStyle(0xfff4d6,bright*.9).fillEllipse(0,-H/2+4,W*.55,8);
+  }
+  /** Screen box of the sign and its lamp while on screen (a HUD keep-out), else null. */
+  screenRect(){
+    if(!this.active||this.artPending||!Number.isFinite(this.screenX)||!Number.isFinite(this.screenY))return null;
+    const r=billboardRect(this.screenX,this.screenY);
+    return {x:r.x,y:r.y-14,w:r.w,h:r.h+14};
   }
   destroy(){
     // Invalidate any thumbnail still loading: its callback must not touch a shut-down scene.

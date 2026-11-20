@@ -6,8 +6,9 @@ import {WorldDanceEnvelope} from '../../src/systems/WorldDance.js';
 import {syntheticMeterAt} from '../../src/systems/music/SyntheticMeterTiming.js';
 import {minimapCorner,minimapPlacement,minimapTerrainProfile,chooseMinimapSlot,minimapAheadPx,
  RunMinimap,MINIMAP_SWITCH_DWELL_MS} from '../../src/ui/RunMinimap.js';
-import {SongBillboard,billboardTitle,marqueeOffset,billboardScreenY,billboardScreenX,billboardPulseScale,billboardAlpha,billboardRect,
- BILLBOARD_BEHIND_RIDER_ALPHA,BILLBOARD_LIFETIME_MS} from '../../src/entities/SongBillboard.js';
+import {SongBillboard,billboardTitle,marqueeOffset,tickerWindow,billboardLayer,billboardPostLength,BILLBOARD_DEPTH,billboardScreenY,billboardScreenX,billboardPulseScale,billboardAlpha,billboardRect,
+ BILLBOARD_BEHIND_RIDER_ALPHA,BILLBOARD_LIFETIME_MS,BILLBOARD_TITLE_PX} from '../../src/entities/SongBillboard.js';
+import {measureText} from '../../src/ui/PixelFont.js';
 
 const sample=(t,level=.38,revision='take-1')=>({timeMs:t,bass:level,mid:level,revision});
 const meter=(s,revision='take-1')=>({...syntheticMeterAt(s),transportRevision:revision});
@@ -57,11 +58,11 @@ test('minimap avoids the lower-left rider and maps actual signed terrain heights
 });
 
 test('billboard passes the viewport in a sky lane above the rider, kept above actual terrain',()=>{
- expect(billboardScreenY(210)).toBe(74);           // rider low: classic lane
- expect(billboardScreenY(84)).toBe(32);            // bottom edge 60 = rider head (84-24)
- expect(billboardScreenY(84,120)).toBe(32);
+ expect(billboardScreenY(210)).toBe(80);           // rider low: classic lane
+ expect(billboardScreenY(100)).toBe(52);           // bottom edge 80 = 2 px above the rider's head (100-18)
+ expect(billboardScreenY(84,120)).toBe(36);
  expect(billboardScreenY(210,78)).toBe(42);        // never sinks into the terrain
- expect(billboardScreenY(40)).toBe(31);            // no lane left: stays on screen (and dims, below)
+ expect(billboardScreenY(40)).toBe(36);            // no lane left: stays on screen (and dims, below)
  expect(billboardScreenX(565,0,1000)).toBeCloseTo(488);
  expect(billboardScreenX(565,200,1000)).toBe(365);
  expect(billboardScreenX(565,0,1000,false)).toBe(565);
@@ -180,7 +181,7 @@ function fakeScene(tex,catalogJson){
  const textures={...tex,get:()=>({setFilter(){}})};
  return {textures,game:{textures,cache:{json:{get:k=>k===CATALOG_CACHE_KEY?catalogJson:null}}},
   cameras:{main:{scrollX:0}},
-  add:{graphics:obj,image:obj,dynamicBitmapText:obj}};
+  add:{graphics:obj,image:obj,bitmapText:obj}};
 }
 const playing={jukeboxSnapshot:()=>({state:'playing'})};
 
@@ -195,6 +196,26 @@ test('billboard titles fit the sign at 1x pixel scale',()=>{
  expect(marqueeOffset(3300,40)).toBe(40);
  expect(marqueeOffset(3850,40)).toBe(0);  // period 900+2000+900 ms
  expect(marqueeOffset(1400,0)).toBe(0);
+ // The ticker shows whole characters only, fits the sign, and ends on the title's tail.
+ const t='ONE MORE RUN (THE BALLAD OF BITSTREAM BLUFFS)',travel=measureText(t)-BILLBOARD_TITLE_PX;
+ expect(t.startsWith(tickerWindow(t,0))).toBe(true);
+ for(let px=0;px<=travel;px+=3){const w=tickerWindow(t,px);expect(t.includes(w)).toBe(true);expect(measureText(w)).toBeLessThanOrEqual(BILLBOARD_TITLE_PX);}
+ expect(t.endsWith(tickerWindow(t,travel))).toBe(true);
+ expect(tickerWindow('SHORT',0)).toBe('SHORT');
+});
+
+test('billboard posts reach past the bottom of the screen; passes alternate background / foreground',()=>{
+ for(const y of [36,52,80])expect(y+28+billboardPostLength(y)).toBeGreaterThan(270);
+ expect(billboardLayer(0)).toBe('background');
+ expect(billboardLayer(1)).toBe('foreground');
+ expect(billboardLayer(2)).toBe('background');
+ expect(BILLBOARD_DEPTH.background+3).toBeLessThan(5);    // whole sign, light included, behind the terrain mesh
+ expect(BILLBOARD_DEPTH.foreground).toBeGreaterThan(20);  // in front of the rider
+
+ // The passing sign is a minimap keep-out: top-right gives way to bottom-left.
+ const sign={x:350,y:38,w:80,h:70};
+ expect(chooseMinimapSlot(112,161,[]).corner).toBe('top-right');
+ expect(chooseMinimapSlot(112,161,[sign]).corner).toBe('bottom-left');
 });
 
 test('song change sets title and art together; late or stale thumbnails never repaint',async()=>{
