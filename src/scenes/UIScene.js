@@ -23,12 +23,13 @@ import { missionToastText, stripToastText } from '../ui/MissionsUi.js';
 import { DailyPatch } from '../systems/DailyPatch.js';
 import { Theme } from '../ui/Theme.js';
 import { NeonText, strokeRectPx } from '../ui/Neon.js';
-import { measureText, ellipsize } from '../ui/PixelFont.js';
+import { measureText } from '../ui/PixelFont.js';
 import { addScanlines } from '../ui/Scanlines.js';
 import { fmtInt, fmtMult, fmtSec, idToLabel } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { stackY, placeX, STRIP_BAND } from '../ui/HudLayout.js';
 import { killerName } from '../systems/CrashReport.js';
+import { RunMinimap } from '../ui/RunMinimap.js';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -184,6 +185,7 @@ export class UIScene extends Phaser.Scene {
     this._buildCenter();
     this._buildFooter();
     this._buildSeedInfo(this.registry.get(REG.SEED));
+    this.minimap = new RunMinimap(this);
     this.scan = addScanlines(this, 0.55);
 
     const on = (evt, fn) => {
@@ -769,11 +771,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   onMusicTrackChanged(payload) {
-    if (!payload || !payload.title) return;
-    // Existing serialized strip queue handles overlap with biome and
-    // achievement announcements. No recurring toast for every segment.
-    this._strip(ellipsize('▶ NOW PLAYING: ' + String(payload.title).toUpperCase(), GAME_WIDTH - 24),
-      'cyan', { timing: { inMs: 200, holdMs: 1850, outMs: 260 } });
+    // Song changes are announced by the actual in-world billboard owned by
+    // RunScene. Never display a second, competing central HUD toast.
   }
 
   onNewBest() {
@@ -1400,6 +1399,7 @@ export class UIScene extends Phaser.Scene {
       this._paintFlow();
     }
     this._layout(delta);
+    this.minimap?.update(delta);
     // zone chip pulse
     if (this.zoneText.visible) this.zoneG.setAlpha(0.75 + 0.25 * Math.sin(this.nowMs * 0.008));
     // tutorial chip fallback timeout, shard chain expiry

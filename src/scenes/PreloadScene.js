@@ -14,6 +14,7 @@ import { createServices } from '../services.js';
 import { installFonts, FONT_KEY } from '../ui/PixelFont.js';
 import { installScanlineTexture } from '../ui/Scanlines.js';
 import { queueMenuArt } from '../ui/MenuArt.js';
+import { queueBillboardThumbnails } from '../entities/SongBillboard.js';
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -26,6 +27,7 @@ export class PreloadScene extends Phaser.Scene {
       console.warn('[BitstreamBluffs] menu art failed to load:', file && file.key);
     });
     queueMenuArt(this.load);
+    queueBillboardThumbnails(this.load);
   }
 
   create() {

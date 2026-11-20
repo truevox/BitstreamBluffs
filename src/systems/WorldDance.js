@@ -51,6 +51,11 @@ export class WorldDanceEnvelope {
 
   reset(){
     this.pulse=0;
+    this.meterPulse=0;
+    this.mixLevel=0;
+    this.lastMeterRevision=null;
+    this.lastBeatIndex=null;
+    this.lastMeasureIndex=null;
     this.intensity=0;
     this.baseline=0;
     this.previous=0;
@@ -65,7 +70,11 @@ export class WorldDanceEnvelope {
    * No unverified grid, BPM, sound transport or time-driven oscillator.
    */
   get strength(){
-    return clamp01(this.pulse*(0.18+0.68*this.intensity));
+    // The artificial meter never becomes gameplay timing. Its visible impact
+    // is gated by the actual recorded mix: silence has no rhythmic bounce.
+    const audible=clamp01((this.mixLevel-0.025)/0.14);
+    return clamp01(this.pulse*(0.18+0.68*this.intensity)+
+      this.meterPulse*(0.07+0.19*this.intensity)*audible);
   }
 
   /**
@@ -73,7 +82,7 @@ export class WorldDanceEnvelope {
    *    transport revision (from read-only AudioSynth, or null for silence)
    * @param {number} dtMs render delta, clamped so background tabs don't pop
    */
-  update(sample,dtMs){
+  update(sample,dtMs,meter=null){
     if(!sample||!Number.isFinite(sample.timeMs)||
       typeof sample.revision!=='string'||
       !Number.isFinite(sample.bass)||!Number.isFinite(sample.mid))return this.reset();
@@ -81,9 +90,35 @@ export class WorldDanceEnvelope {
       (this.lastSampleMs!==null&&sample.timeMs<this.lastSampleMs))this.reset();
     this.revision=sample.revision;
     const dt=Number.isFinite(dtMs)?Math.max(0,Math.min(100,dtMs)):16.7;
-    this.pulse*=Math.exp(-dt/165); // natural soft spring-back, not another beat source
+    this.pulse*=Math.exp(-dt/165); // actual recording transient envelope
+    this.meterPulse*=Math.exp(-dt/140); // short, cosmetic measure/beat accent
+    // The public synthetic meter is not a real musical analysis. Check the
+    // transport revision and edge indices; NEVER repeatedly trigger while
+    // isMeasureStartBeat remains true over multiple render frames.
+    if(meter?.timingKind==='synthetic-unverified'&&meter?.use==='cosmetic-only'&&
+      meter?.trusted===false&&meter?.canAuthorizeGameplay===false&&
+      meter.transportRevision===sample.revision&&
+      Number.isSafeInteger(meter.beatIndex)&&meter.beatIndex>=0&&
+      Number.isSafeInteger(meter.measureIndex)&&meter.measureIndex>=0){
+      if(this.lastMeterRevision!==meter.transportRevision){
+        this.lastMeterRevision=meter.transportRevision;
+        this.lastBeatIndex=meter.beatIndex;
+        this.lastMeasureIndex=meter.measureIndex;
+      }else if(meter.beatIndex!==this.lastBeatIndex){
+        const changedMeasure=meter.measureIndex!==this.lastMeasureIndex &&
+          meter.beatInMeasure===1;
+        this.meterPulse=Math.max(this.meterPulse,changedMeasure?0.85:0.32);
+        this.lastBeatIndex=meter.beatIndex;
+        this.lastMeasureIndex=meter.measureIndex;
+      }
+    }else{
+      this.lastMeterRevision=null;
+      this.lastBeatIndex=null;
+      this.lastMeasureIndex=null;
+    }
     if(this.lastSampleMs===sample.timeMs)return this.strength;
     const level=clamp01(0.76*sample.bass+0.24*sample.mid);
+    this.mixLevel=level;
     if(this.lastSampleMs===null){
       this.baseline=level;
       this.previous=level;

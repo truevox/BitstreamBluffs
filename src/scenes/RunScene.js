@@ -51,6 +51,7 @@ import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
 import { WorldDanceEnvelope, worldDanceMotionAllowed } from '../systems/WorldDance.js';
+import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
 import { BestMarker } from '../entities/BestMarker.js';
@@ -280,6 +281,7 @@ export class RunScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.palette.bg);
     this.bg = new Background(this, this.palette);
     this.worldDance = new WorldDanceEnvelope();
+    this.songBillboard = new SongBillboard(this);
     // Retain a live MediaQueryList so an OS reduced-motion change is seen
     // without creating a new query object every render frame.
     try { this._worldDanceMotionQuery=typeof matchMedia==='function'
@@ -404,6 +406,9 @@ export class RunScene extends Phaser.Scene {
         this.finishGymReady();
       }
     };
+    this._onMusicTrackChange = (payload) => this.songBillboard?.showTrack(payload,
+      this.registry.get(REG.AUDIO));
+    this.game.events.on(EVT.MUSIC_TRACK_CHANGED,this._onMusicTrackChange);
     this.game.events.on(EVT.SETTINGS_CHANGED, this._onSettings);
     this.game.events.on(EVT.GAME_RESUME, this._onResume);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardown, this);
@@ -412,6 +417,11 @@ export class RunScene extends Phaser.Scene {
     GlitchPipeline.install(this);
     this.scene.stop(SCENES.UI);
     this.scene.launch(SCENES.UI);
+    // A track may already be playing from the Title jukebox. Introduce it
+    // once when entering the first run, never once per scene retry.
+    const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
+    if(playing?.state==='playing'&&playing.current)
+      this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
@@ -425,6 +435,7 @@ export class RunScene extends Phaser.Scene {
     this.gymBeatSnapshot = null;
     this.gymBeatWaitMs = 0;
     try {
+      this.game.events.off(EVT.MUSIC_TRACK_CHANGED,this._onMusicTrackChange);
       this.game.events.off(EVT.SETTINGS_CHANGED, this._onSettings);
       this.game.events.off(EVT.GAME_RESUME, this._onResume);
     } catch (e) { /* ignore */ }
@@ -444,6 +455,8 @@ export class RunScene extends Phaser.Scene {
     safe(this.trail);
     safe(this.fx);
     safe(this.bg);
+    safe(this.songBillboard);
+    this.songBillboard=null;
     this.worldDance?.reset();
     this.worldDance = null;
     this._worldDanceMotionQuery=null;
@@ -1192,9 +1205,12 @@ export class RunScene extends Phaser.Scene {
     // backdrop returns immediately to its original neutral geometry.
     const danceAllowed=worldDanceMotionAllowed(this.settings,
       this._worldDanceMotionQuery?.matches===true);
-    const sample=danceAllowed?this.registry?.get?.(REG.AUDIO)?.getWorldDanceSample?.():null;
-    const dance=this.worldDance?.update(sample,dt)||0;
+    const audio=this.registry?.get?.(REG.AUDIO);
+    const sample=danceAllowed?audio?.getWorldDanceSample?.():null;
+    const meter=danceAllowed&&sample?audio?.getSyntheticMeterTiming?.():null;
+    const dance=this.worldDance?.update(sample,dt,meter)||0;
     this.bg.update(cam.scrollX, t, sled.speed,dance);
+    this.songBillboard?.update(dt,dance,!danceAllowed);
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
     this.updateBlindOverlay();
