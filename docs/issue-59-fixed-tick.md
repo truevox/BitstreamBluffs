@@ -1,7 +1,8 @@
 # Issue #59: fixed simulation tick and seeded run randomness
 
-Status: **draft, two stacked branches, not merged.** The tick rate is a candidate. It needs
-Marvin's decision and a hands-on play session.
+Status: **stages 1 and 2 merged to `main` on 2026-11-20 at Marvin's request.** Marvin chose
+the 120 Hz tick (option A below). His hands-on play session is still pending, and the gates
+listed at the end remain open.
 
 | Stage | Branch | What it changes |
 |---|---|---|

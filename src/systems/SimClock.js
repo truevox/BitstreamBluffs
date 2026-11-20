@@ -8,7 +8,7 @@
  * Candidate tick: 120 Hz (8.333 ms). It divides 30/60/120 Hz frames exactly (4/2/1 ticks,
  * no judder without interpolation), and with the 8 ms Matter cap every tick is two 4.17 ms
  * physics steps: exactly the steps a 120 Hz display already runs on the variable-delta
- * loop. Not an owner-approved constant: see docs/issue-59-fixed-tick.md.
+ * loop. Chosen by Marvin (2026-11-20); play-test pending: see docs/issue-59-fixed-tick.md.
  */
 
 export const SIM_TICK_HZ = 120;
