@@ -6,6 +6,7 @@
  */
 import fs from 'fs';
 import { jest } from '@jest/globals';
+import { runRandomStreams } from '../../src/systems/RunRandom.js';
 
 jest.unstable_mockModule('phaser', () => ({
   default: { Physics: { Matter: { Matter: { Bodies: {}, Body: { getVelocity: () => ({ x: 0, y: 0 }) } } } } },
@@ -37,6 +38,7 @@ function drawSled(look, { palette = INTS, time = 0, pose = {}, scrambled = false
     body: { angle: 0, position: { x: 100, y: 100 } }, off: { x: 0, y: 0 },
     heliPhase: 0, heliVel: 0, squash: 0, pose: { chute: 0, phi: 10, tuck: 0, brake: 0, ...pose },
     invulnerableMs: 0, _time: time, scrambled, shield: false, msSinceContact: 0, heliInput: 0,
+    random: runRandomStreams('drone-test'),
   });
   s._draw();
   return s;
