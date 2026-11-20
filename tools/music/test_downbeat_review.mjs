@@ -11,6 +11,11 @@ const rawPack = fs.readFileSync(new URL('public/music/packs/33_local-one-more-ru
 const pack = JSON.parse(rawPack);
 const packet = JSON.parse(fs.readFileSync(
 	new URL('public/music-review/downbeat-review/candidates.json', root), 'utf8'));
+const fullSource = JSON.parse(fs.readFileSync(
+	new URL('docs/music-review/one-more-run-source-downbeat-candidates-ALL-WINDOWS-UNVERIFIED-20261120.json',root), 'utf8'));
+const harmonicBuffer = fs.readFileSync(
+	new URL('docs/music-review/one-more-run-harmonic-bar-cues-UNVERIFIED-20261120.json',root));
+const harmony = JSON.parse(harmonicBuffer);
 const digest = b => createHash('sha256').update(b).digest('hex');
 
 test('source hash and research status must never masquerade as verified', () => {
@@ -65,4 +70,24 @@ test('meter accents are exclusive, regular, and remain inside the source time wi
 		assert.ok(grids[0][beat].sourceSeconds < 80);
 	}
 	assert.throws(() => clicksForCandidate({ ...args, beatOneOffset: 4 }));
+});
+
+test('harmonic comparison remains explicitly uncertain and source-hash bound', () => {
+	assert.equal(digest(harmonicBuffer), packet.source.harmonicReportSha256);
+	assert.equal(harmony.manifestSha256, packet.source.manifestSha256);
+	assert.equal(harmony.drumBassResearchReportSha256, packet.source.candidateReportSha256);
+	assert.equal(harmony.status, 'SOURCE_HARMONIC_CUES_NOT_APPROVED_DOWNBEATS');
+	assert.equal(fullSource.windows.length, packet.windows.length);
+	for (const w of packet.windows) {
+		assert.deepEqual(Object.keys(w.originalStemHashesSha256).sort(),
+			['bass','drums','guitar','other','piano','vocals']);
+		assert.equal(Object.values(w.originalStemHashesSha256)
+			.every(hash => /^[a-f0-9]{64}$/.test(hash)), true);
+		assert.equal(w.hypotheses.length,3);
+		for (const model of w.hypotheses) for (const phase of model.phases) {
+			assert.equal(phase.harmonicRanking.length,4);
+			assert.deepEqual(phase.harmonicRanking.map(r=>r.beatOneOffset).sort(), [0,1,2,3]);
+			assert.equal(phase.harmonicRanking.every(r=>Number.isFinite(r.contrast)),true);
+		}
+	}
 });

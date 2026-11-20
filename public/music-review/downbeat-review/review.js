@@ -33,6 +33,18 @@ function refreshCandidate() {
 		+ ' · phase +' + c.phaseSeconds.toFixed(4) + 's · bar-offset ' + c.beatOneOffset
 		+ ' · arbitrary source score ' + offset.score + ' (rank ' + offset.rank + '/4)'
 		+ ' · sample bar lines: ' + offset.barStartsSeconds.slice(0, 5).join(', ') + 's';
+	const h = c.window.hypotheses[Number($('bpm').value)].phases[Number($('phase').value)].harmonicRanking;
+	const candidateHarmony = h?.find(row => row.beatOneOffset === c.beatOneOffset);
+	const harmonicRank = h?.findIndex(row => row.beatOneOffset === c.beatOneOffset) + 1;
+	const peaks = (c.window.strongHarmonicChanges ?? []).slice(0, 4)
+		.map(row => row.sourceSeconds.toFixed(2) + 's (' + row.stemRole + ')').join(', ');
+	$('harmony').textContent = candidateHarmony
+		? 'HARMONY CROSS-CHECK (UNVERIFIED): this offset ranks ' + harmonicRank
+			+ '/4 for local guitar/piano/other pitch-class changes; contrast '
+			+ candidateHarmony.contrast.toFixed(4) + ', stems with positive support '
+			+ candidateHarmony.stemSupport + '/3. Best harmony offset: '
+			+ h[0].beatOneOffset + '. Selected strongest source change cues: ' + peaks + '.'
+		: 'No source-bound harmonic cue comparison available for this phase.';
 	refreshNotes();
 }
 function refreshOffsets() {
@@ -93,6 +105,12 @@ async function originalStem(segmentIndex, role) {
 	const response = await fetch(url);
 	if (!response.ok) throw new Error('Missing original source stem: ' + role + ' (' + response.status + ')');
 	const bytes = await response.arrayBuffer();
+	const expected = packet.windows.find(w => w.segmentIndex === segmentIndex)
+		?.originalStemHashesSha256?.[role];
+	if (!expected) throw new Error('No exact source-stem fingerprint: ' + role);
+	const actual = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+		n => n.toString(16).padStart(2, '0')).join('');
+	if (actual !== expected) throw new Error('Original audio SHA-256 mismatch for ' + role);
 	const decoded = await audioContext.decodeAudioData(bytes);
 	sourceCache.set(url, decoded);
 	// Limit temporary decoded memory to two source windows.

@@ -6,12 +6,21 @@
     "sampleRate": 48000,
     "frameCount": 8380800,
     "manifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
-    "candidateReportSha256": "6696cf5e9b07089ad1cefd171110efb96fd38b228902f48b0786a416d6aa9024"
+    "candidateReportSha256": "6696cf5e9b07089ad1cefd171110efb96fd38b228902f48b0786a416d6aa9024",
+    "harmonicReportSha256": "8e922b017e7819983392227fe296b890e0b608b953fbaf7799c736ee01bf8c34"
   },
   "originalSegmentCount": 15,
   "note": "All 15 source segments analyzed; shorter 6.6-second ending has reduced evidence; all downbeats are unverified",
   "windows": [
     {
+      "originalStemHashesSha256": {
+        "drums": "0040ca6cfa771eab0a57593daedcbe72aeee40b7c858e5933bfc23bd0876416b",
+        "bass": "f7506c0bdadeda0bce72666b6506229977345c28b9fe0b884e7c1758dc78131a",
+        "guitar": "f713af2ef6da6a6ff9fcd677c94563f0155d1435ae92d3f7cb8b2b76e3e89f6b",
+        "piano": "e7d12b2bcf44c00b332077c186cb26801f1df99e4c673713023b4e8f6ee8a942",
+        "other": "58f7018cd10e641a6ac04da4b65bd2c7354385a2e41fc380fd35028cf2236004",
+        "vocals": "6fb623636afd3bc2dbd861890dea68c57f66f18adbafa66a379b85e616443acc"
+      },
       "segmentIndex": 0,
       "startSeconds": 0.0,
       "endSeconds": 12.0,
@@ -21,6 +30,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0701,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0003,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0243,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0506,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -85,6 +116,28 @@
             },
             {
               "phaseSeconds": 0.0125,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0485,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0107,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0134,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0253,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -149,6 +202,28 @@
             },
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0587,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0005,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0027,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0608,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -213,6 +288,28 @@
             },
             {
               "phaseSeconds": 0.3741,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.031,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0254,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0235,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0322,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -281,6 +378,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0998,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0657,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0061,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0256,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0506,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -345,6 +464,28 @@
             },
             {
               "phaseSeconds": 0.0624,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0475,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0113,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.012,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0251,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -409,6 +550,28 @@
             },
             {
               "phaseSeconds": 0.0249,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.018,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0151,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0017,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0299,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -473,6 +636,28 @@
             },
             {
               "phaseSeconds": 0.1372,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0586,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0073,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0097,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0616,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -542,6 +727,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0998,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.035,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0004,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.006,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0264,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -606,6 +813,28 @@
             },
             {
               "phaseSeconds": 0.1746,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0555,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0022,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0258,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0301,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -670,6 +899,28 @@
             },
             {
               "phaseSeconds": 0.1372,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0316,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0083,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0078,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0328,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -734,6 +985,28 @@
             },
             {
               "phaseSeconds": 0.0624,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0857,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0149,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.04,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0532,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -799,10 +1072,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 3.5294,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 3.9126,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 3.9474,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 4.377,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 4.3886,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 5.178,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "83df34a57c0bbe07ca7e010ec6c4cd6417831fcd26e9229ecbc9758b6a246f30",
+        "bass": "89bc022b9aa9a3d79d629ba7f40be351dde63fec45fe174c6aa9be5b17525625",
+        "guitar": "7421f013389fcda9ba69a8bc51eaa8f4baedc1af3ae4051c34d24a364ef33d11",
+        "piano": "947de7fd2dc2eb8930f48ff26e0c55bdc9f0f599e425797a03c7887d85df577e",
+        "other": "2098051300b8f0d295fc6695afe45ba14fad310740bc776ddb764e98533e15d4",
+        "vocals": "080ef45dcc1695b9e24e17cb1e4c9b4e6ed12849a2523ff3f6c980bdba80f9ec"
+      },
       "segmentIndex": 1,
       "startSeconds": 12.0,
       "endSeconds": 24.0,
@@ -812,6 +1125,28 @@
           "phases": [
             {
               "phaseSeconds": 0.2868,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1202,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0243,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0249,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0629,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -875,6 +1210,28 @@
             },
             {
               "phaseSeconds": 0.2245,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1133,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0139,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0395,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.055,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -938,6 +1295,28 @@
             },
             {
               "phaseSeconds": 0.1871,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0673,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0002,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0141,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0517,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1001,6 +1380,28 @@
             },
             {
               "phaseSeconds": 0.3243,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1057,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0065,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.021,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0709,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1069,6 +1470,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3367,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0987,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0111,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0303,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0515,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1132,6 +1555,28 @@
             },
             {
               "phaseSeconds": 0.2993,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1114,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0184,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0303,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0558,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1195,6 +1640,28 @@
             },
             {
               "phaseSeconds": 0.0,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0324,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0101,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0034,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0395,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1259,6 +1726,28 @@
             },
             {
               "phaseSeconds": 0.2619,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.093,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0103,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0378,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0402,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1327,6 +1816,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0504,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0023,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0162,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.038,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1391,6 +1902,28 @@
             },
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0311,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0125,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0122,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0325,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1456,6 +1989,28 @@
             },
             {
               "phaseSeconds": 0.0125,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0317,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0097,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0084,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.033,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1521,6 +2076,28 @@
             },
             {
               "phaseSeconds": 0.3617,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0759,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0067,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0172,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0455,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1586,10 +2163,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 14.8793,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 17.9791,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 20.0341,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 20.0805,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 20.4172,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 20.4405,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "3be96dba7b2c7db369170c4cde59d086713646c8272a21e751833125395e84d8",
+        "bass": "8e17b4c5ade45e7b701329b246a83b682c5eb69987f52691062cfac2d574c3d6",
+        "guitar": "3928233a1681e060c934ddb97e6c1d843fb74345e64a6f8a5dca6b093d878d03",
+        "piano": "17cc9224cf4251bbe60673bd2362051d2e088da7877d1d3c29e80e057bfe1a1d",
+        "other": "26b2fe3d5a1d82717614907ff0a0d91838eaa94ac8562bca59ce33cc5e1d3154",
+        "vocals": "7079941de7c6cbca6522a339dea61fe15c87aa7d0a2d25aaa388e6e2769aff61"
+      },
       "segmentIndex": 2,
       "startSeconds": 24.0,
       "endSeconds": 36.0,
@@ -1599,6 +2216,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0748,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1364,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0077,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0165,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1158,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1663,6 +2302,28 @@
             },
             {
               "phaseSeconds": 0.3367,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1388,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0025,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0403,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0844,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1726,6 +2387,28 @@
             },
             {
               "phaseSeconds": 0.0249,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1944,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0127,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.067,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0977,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1790,6 +2473,28 @@
             },
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1225,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0281,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0401,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0998,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1859,6 +2564,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1757,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0348,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0389,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0867,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1923,6 +2650,28 @@
             },
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1583,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0202,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0476,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1171,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -1987,6 +2736,28 @@
             },
             {
               "phaseSeconds": 0.0125,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1624,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0288,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.052,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0675,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2051,6 +2822,28 @@
             },
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1504,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.012,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0461,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1032,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2120,6 +2913,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1179,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0318,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0462,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0933,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2184,6 +2999,28 @@
             },
             {
               "phaseSeconds": 0.1746,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1334,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0278,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0666,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0831,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2248,6 +3085,28 @@
             },
             {
               "phaseSeconds": 0.212,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1292,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0288,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0718,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0749,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2312,6 +3171,28 @@
             },
             {
               "phaseSeconds": 0.0748,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0765,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0037,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0285,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0452,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2377,10 +3258,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 24.1858,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 24.1858,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 24.6269,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 25.6138,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 25.9737,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 26.1014,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "b08312601acbbc5cc69403a883a25067231e567d880f012ab710f3ca89c69484",
+        "bass": "157d136e5dca7b4c89e0c3d7da1204044e083093eb3ea7e4ce6a06ff3e70bfd2",
+        "guitar": "8afe08ffb978a627a6d49586887ffd34693ad57e39ed7a533fda6800cd48050d",
+        "piano": "a52e2475a999af7f1b406c1e1fe5f5ab24470918a5203b47fa9f32c2aae48542",
+        "other": "04d742de9577a9c651d27e7b1b36fecee96e12040ee1561ec7ef2badbac53187",
+        "vocals": "d0d1b6d4084171ff7b89398534c7c8da0cb809671237f8126e936855d97273ea"
+      },
       "segmentIndex": 3,
       "startSeconds": 36.0,
       "endSeconds": 48.0,
@@ -2390,6 +3311,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0249,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1523,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0427,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0399,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1514,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2454,6 +3397,28 @@
             },
             {
               "phaseSeconds": 0.3741,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.1193,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0187,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0394,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1061,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2517,6 +3482,28 @@
             },
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1342,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0194,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0535,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.063,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2581,6 +3568,28 @@
             },
             {
               "phaseSeconds": 0.237,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0999,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0039,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0248,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.077,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2649,6 +3658,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1871,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1289,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0249,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0501,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0561,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2713,6 +3744,28 @@
             },
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1416,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.001,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0638,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0787,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2777,6 +3830,28 @@
             },
             {
               "phaseSeconds": 0.0624,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1607,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0105,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0644,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1059,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2841,6 +3916,28 @@
             },
             {
               "phaseSeconds": 0.0,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1343,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0487,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0242,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1545,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2910,6 +4007,28 @@
           "phases": [
             {
               "phaseSeconds": 0.2494,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1079,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0345,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0379,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0386,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -2974,6 +4093,28 @@
             },
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1403,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0055,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0702,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.075,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3038,6 +4179,28 @@
             },
             {
               "phaseSeconds": 0.2868,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1028,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0115,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0323,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0645,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3102,6 +4265,28 @@
             },
             {
               "phaseSeconds": 0.1621,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1445,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0174,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.053,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0757,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3167,10 +4352,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 37.6718,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 37.7183,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 37.7995,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 38.055,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 38.4033,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 38.4033,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "a8a7ca42426d21f9d8dc7309b3207e20998b59c4751dd3e215077d6e4720698d",
+        "bass": "78c699bee87e8637ce258859e54e9147ee1edec15eb2b2a488a00771bcc6a46b",
+        "guitar": "6edc12d5a35edad022199cd1b46ec6ea9c80ca64f75c4b81b8816aba5d491f47",
+        "piano": "120b14bb5268c43d5acc4b05de7cccf07ebbdde905c20095c939900477a275f5",
+        "other": "2c5802577dc33688c199d43d887877c1bf8f317456e66a5b16dabe31886727d8",
+        "vocals": "96c816a122b1f1d268bfed91011e2661a2376654bdaac9dfaeafe8a1894efd1f"
+      },
       "segmentIndex": 4,
       "startSeconds": 48.0,
       "endSeconds": 60.0,
@@ -3180,6 +4405,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0685,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.009,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0216,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0434,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3243,6 +4490,28 @@
             },
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0994,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0438,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0671,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0722,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3307,6 +4576,28 @@
             },
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.1064,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0303,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0449,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0893,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3371,6 +4662,28 @@
             },
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0966,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.052,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0437,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1004,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3440,6 +4753,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1372,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0878,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.037,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0553,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0663,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3504,6 +4839,28 @@
             },
             {
               "phaseSeconds": 0.3492,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0792,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0318,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0366,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0847,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3567,6 +4924,28 @@
             },
             {
               "phaseSeconds": 0.2993,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.08,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0476,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0422,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0973,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3630,6 +5009,28 @@
             },
             {
               "phaseSeconds": 0.1746,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.1006,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0256,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0468,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0772,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3699,6 +5100,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1871,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.101,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0083,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0519,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0566,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3763,6 +5186,28 @@
             },
             {
               "phaseSeconds": 0.1497,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.1079,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0228,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0291,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0585,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3827,6 +5272,28 @@
             },
             {
               "phaseSeconds": 0.2868,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0738,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0289,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0155,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0847,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3891,6 +5358,28 @@
             },
             {
               "phaseSeconds": 0.3367,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0706,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0153,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0084,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.093,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -3956,10 +5445,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 48.5573,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 49.9737,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 51.4598,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 54.3739,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 56.7191,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 58.1587,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "2039d22ef1c626c2d1c1d279ff0afb2240329ca32ffcbe87f258c72ff2961c57",
+        "bass": "2e00c8626cf9f67cf23d3a324e8eda81797a5f34722fbe2e1edc0b85512b1ba5",
+        "guitar": "57f16a43e342b11ada6928e3f38edde7e84d7b3750864cff4e60839ee8b9d979",
+        "piano": "a336bf2a889a17262a316eaebe1a958b89661e072369d77024e9d404702aee10",
+        "other": "a3a8db00430eb440897b2a112e68adb1f3f0b12aab7114da4ac99f8dd1ab24c4",
+        "vocals": "14841fa35be262511f210f279dc2652876782c583465626eb29ecbc0e8da0532"
+      },
       "segmentIndex": 5,
       "startSeconds": 60.0,
       "endSeconds": 72.0,
@@ -3969,6 +5498,28 @@
           "phases": [
             {
               "phaseSeconds": 0.2619,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1238,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0006,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0428,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.093,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4032,6 +5583,28 @@
             },
             {
               "phaseSeconds": 0.2993,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.086,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0103,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0354,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0699,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4095,6 +5668,28 @@
             },
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0386,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0126,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0006,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0554,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4159,6 +5754,28 @@
             },
             {
               "phaseSeconds": 0.3741,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0331,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0282,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0272,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0398,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4227,6 +5844,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3492,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0461,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0256,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0129,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0654,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4290,6 +5929,28 @@
             },
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0897,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0119,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.033,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0781,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4353,6 +6014,28 @@
             },
             {
               "phaseSeconds": 0.2744,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1182,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0064,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0531,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0691,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4416,6 +6099,28 @@
             },
             {
               "phaseSeconds": 0.1746,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0547,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0058,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0035,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0701,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4485,6 +6190,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0125,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0531,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0305,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0399,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0436,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4550,6 +6277,28 @@
             },
             {
               "phaseSeconds": 0.0624,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0427,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.03,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0065,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0867,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4614,6 +6363,28 @@
             },
             {
               "phaseSeconds": 0.0998,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0431,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0395,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0202,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1127,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4678,6 +6449,28 @@
             },
             {
               "phaseSeconds": 0.3617,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0362,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0161,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0024,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0501,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4743,10 +6536,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 60.1741,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 60.9172,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 64.4582,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 64.644,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 66.6757,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 67.8948,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "8e4ac58c3c5a97f74c389d5eb63095482aee81c661f43f259eb758cbe114850b",
+        "bass": "a734fb1487761229e5f8be4bb7d1401e31b5bf2d02daf92ca1c4ca9c652cd706",
+        "guitar": "cf14a7517dc3faa2bcde0a5f356a36a8a290d888bb7a19309f260de5d2b2de9b",
+        "piano": "fd23d15c36377663eb34ae93a78a6a5c1722f77d855f9bc4283674001b15d0a3",
+        "other": "e44ce643ca8d6c87c695cbbb4fb13bb7bc6f0567612f79bd056d6a9b3a7cc1a0",
+        "vocals": "ac66f2b9a476ff74fab3443a8de66c7933919febaf0e829c5827e11ddfb364b0"
+      },
       "segmentIndex": 6,
       "startSeconds": 72.0,
       "endSeconds": 84.0,
@@ -4756,6 +6589,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0644,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0618,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0545,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0726,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4819,6 +6674,28 @@
             },
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0653,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0152,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0128,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0742,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4883,6 +6760,28 @@
             },
             {
               "phaseSeconds": 0.3741,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1024,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0137,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0431,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0704,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -4946,6 +6845,28 @@
             },
             {
               "phaseSeconds": 0.2494,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0674,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0646,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0511,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0825,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5014,6 +6935,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0374,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0553,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0434,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0406,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0636,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5078,6 +7021,28 @@
             },
             {
               "phaseSeconds": 0.2744,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0725,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0376,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0389,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0743,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5141,6 +7106,28 @@
             },
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1362,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0151,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.034,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0954,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5205,6 +7192,28 @@
             },
             {
               "phaseSeconds": 0.3367,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0771,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0453,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0541,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0675,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5273,6 +7282,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1518,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.013,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0757,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0975,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5337,6 +7368,28 @@
             },
             {
               "phaseSeconds": 0.1871,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1497,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.001,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0481,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1124,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5401,6 +7454,28 @@
             },
             {
               "phaseSeconds": 0.1497,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.153,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0009,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.06,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1029,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5465,6 +7540,28 @@
             },
             {
               "phaseSeconds": 0.0624,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0617,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0476,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0421,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0736,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5530,10 +7627,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 72.1858,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 72.1974,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 72.5108,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 75.4017,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 77.6657,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 77.9559,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "c66e7a06ca1f079c14d3253a75dd029e5b1cc0d1e0a1fba357dffaf16e5d42aa",
+        "bass": "a82a8c36ed736bef197ed7b566dcb0762df83817a6c40158e2057ede124e6743",
+        "guitar": "5fbef1a3f2e4fa9c7834f562bb40bfa5abcb95cacd0bd7ae62bc9193ca2c13a5",
+        "piano": "d7c460e5492f078cb5b21a1e71c7efa9b383629b8b63f1dbb957c5b73dbfb80d",
+        "other": "ec8bb292cc512c118eed2e112e4abd068f54dddce55446566fb68c11283d29ad",
+        "vocals": "3032f66069864cb2b5877782850dae21e7e7f3e44d0035357c3116265738bffa"
+      },
       "segmentIndex": 7,
       "startSeconds": 84.0,
       "endSeconds": 96.0,
@@ -5543,6 +7680,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1588,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0177,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0141,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1486,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5607,6 +7766,28 @@
             },
             {
               "phaseSeconds": 0.1995,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1361,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0283,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0031,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1472,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5670,6 +7851,28 @@
             },
             {
               "phaseSeconds": 0.1621,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1728,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0016,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0137,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1428,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5733,6 +7936,28 @@
             },
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1198,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0137,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0076,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1145,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5801,6 +8026,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0998,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.2127,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.031,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0311,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1321,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5865,6 +8112,28 @@
             },
             {
               "phaseSeconds": 0.3617,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1449,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0398,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0927,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5928,6 +8197,28 @@
             },
             {
               "phaseSeconds": 0.0,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.183,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0207,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0623,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.084,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -5992,6 +8283,28 @@
             },
             {
               "phaseSeconds": 0.1497,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1752,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0007,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0107,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1486,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6061,6 +8374,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1946,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0312,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0642,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0823,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6125,6 +8460,28 @@
             },
             {
               "phaseSeconds": 0.237,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1677,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0233,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0275,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1489,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6189,6 +8546,28 @@
             },
             {
               "phaseSeconds": 0.1995,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1933,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0059,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0311,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1394,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6253,6 +8632,28 @@
             },
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1512,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0299,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0351,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.073,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6319,10 +8720,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 84.5805,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 85.2887,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 86.6471,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 88.2144,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 91.1982,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 94.0891,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "b78e7621444becba0c84d035c3e88ff7f4cbdb823a42cc809c9321601e72e5c1",
+        "bass": "e4742a6b5e4eb6a76a3d9685a30bd054866d06714e58e083bd56e96e3f34d8dc",
+        "guitar": "116f180e85e0c5258770ad421fa2cbc6a0c5aa444bd44222eef89a22f73962a9",
+        "piano": "a8704cc03d8d14ca642afb5e44d9ff9fb3f14cca3462ff1105d1e7ced3db61a5",
+        "other": "a0f215e8ee5bda9cdfaf57a4872fef4eba9c6842414f885335248f12a9127366",
+        "vocals": "6a168c9d6fabad3fcf7d04b58b088a44d5c2d157034e559e2fc00322994ec98e"
+      },
       "segmentIndex": 8,
       "startSeconds": 96.0,
       "endSeconds": 108.0,
@@ -6332,6 +8773,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0983,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0101,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0061,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1254,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6396,6 +8859,28 @@
             },
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.044,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0018,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0176,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0298,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6460,6 +8945,28 @@
             },
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0665,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0229,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0214,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0746,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6524,6 +9031,28 @@
             },
             {
               "phaseSeconds": 0.1621,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1594,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0341,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0163,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1789,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6592,6 +9121,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1621,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1008,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0335,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0259,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1187,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6656,6 +9207,28 @@
             },
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0533,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0233,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0068,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0764,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6720,6 +9293,28 @@
             },
             {
               "phaseSeconds": 0.212,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1153,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0314,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0035,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1644,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6784,6 +9379,28 @@
             },
             {
               "phaseSeconds": 0.2494,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1382,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0485,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0121,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.2045,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6853,6 +9470,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.109,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0633,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0126,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.175,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6917,6 +9556,28 @@
             },
             {
               "phaseSeconds": 0.2619,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0711,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0584,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0134,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1272,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -6981,6 +9642,28 @@
             },
             {
               "phaseSeconds": 0.212,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1023,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0048,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0128,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1033,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7045,6 +9728,28 @@
             },
             {
               "phaseSeconds": 0.3492,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1117,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0454,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0176,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1915,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7110,10 +9815,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 97.0449,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 98.2872,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 101.6424,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 104.1386,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 104.1386,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 104.6959,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "4646aefeb54ec9d9e36c28c73ab06a312cf4dfcc847cd7082504d934fcbb9709",
+        "bass": "2434ddb6820898b73e0a71c2b931cab3574d977f7aca0ea49d567f4d65b73901",
+        "guitar": "6b26258e7de312cbcdc1b802ffb03ed6077db7c5a556cdb09212c504fdc6593b",
+        "piano": "ca813d9c635682b3e9325e278e5821ac1c1961df54a05414019728f193075387",
+        "other": "1ac57eb4b1bace48e1830866d5c7d9362e5d46ca224803224e9f711df674e893",
+        "vocals": "1ff794e7e4aea0b8728bcbcc54aea46a6a2ed13b415b84b32e250e724aba7800"
+      },
       "segmentIndex": 9,
       "startSeconds": 108.0,
       "endSeconds": 120.0,
@@ -7123,6 +9868,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0245,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0046,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0021,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0343,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7187,6 +9954,28 @@
             },
             {
               "phaseSeconds": 0.3492,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0663,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0646,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0612,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0694,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7250,6 +10039,28 @@
             },
             {
               "phaseSeconds": 0.1746,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0996,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0106,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0419,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0655,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7313,6 +10124,28 @@
             },
             {
               "phaseSeconds": 0.0,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0825,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0688,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0332,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.112,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7382,6 +10215,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1871,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0189,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0026,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0094,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0133,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7446,6 +10301,28 @@
             },
             {
               "phaseSeconds": 0.0998,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0583,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0272,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0376,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0456,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7510,6 +10387,28 @@
             },
             {
               "phaseSeconds": 0.1372,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0416,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0015,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0168,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0233,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7574,6 +10473,28 @@
             },
             {
               "phaseSeconds": 0.2993,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0997,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.015,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0366,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0762,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7642,6 +10563,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1497,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0706,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0408,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0486,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0567,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7706,6 +10649,28 @@
             },
             {
               "phaseSeconds": 0.237,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0457,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0231,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0131,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0537,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7770,6 +10735,28 @@
             },
             {
               "phaseSeconds": 0.1995,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0545,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0387,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0424,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.046,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7834,6 +10821,28 @@
             },
             {
               "phaseSeconds": 0.3492,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0599,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0237,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.032,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0565,
+                  "stemSupport": 1
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7899,10 +10908,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 111.5294,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 112.0287,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 112.8762,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 116.3824,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 117.1371,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 117.8685,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "0e9c06dd8a9473bf61874914b0ea3f49ed8b948021cfd52505b57fac78fc7fe9",
+        "bass": "90c71c886ebfd9e64243c9465cd574e54d5e03a33655bf74d212e9fa20fd1d61",
+        "guitar": "c00a9ad5f69c3c91c5e2d57ab74424a6e3ef09c82c6f474c4a673309f44f8a8f",
+        "piano": "7024e69551bd8c0a49c3afb91c68575c0056f1cfd6be77196603f74e60acebcc",
+        "other": "a5b778202caa93806e5d970d354b339bf71ce42c44e9770e615603d7919700a5",
+        "vocals": "a5ec09a92b5ce77e221e9d1a32675c73aa2b1b50da8102a2bd3f3b57761c9b15"
+      },
       "segmentIndex": 10,
       "startSeconds": 120.0,
       "endSeconds": 132.0,
@@ -7912,6 +10961,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1372,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0759,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0355,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0108,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1102,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -7976,6 +11047,28 @@
             },
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0681,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0017,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0006,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0757,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8039,6 +11132,28 @@
             },
             {
               "phaseSeconds": 0.2744,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0577,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0179,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0014,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0813,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8102,6 +11217,28 @@
             },
             {
               "phaseSeconds": 0.0748,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0733,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0002,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0058,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0741,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8171,6 +11308,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0125,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0709,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0208,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0025,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0894,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8235,6 +11394,28 @@
             },
             {
               "phaseSeconds": 0.3617,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.067,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0123,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0061,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0807,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8298,6 +11479,28 @@
             },
             {
               "phaseSeconds": 0.1372,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.064,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0329,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0022,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1038,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8362,6 +11565,28 @@
             },
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0744,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0077,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0201,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0637,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8431,6 +11656,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0692,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0052,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0073,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.062,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8495,6 +11742,28 @@
             },
             {
               "phaseSeconds": 0.0624,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0822,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0035,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0152,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0719,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8559,6 +11828,28 @@
             },
             {
               "phaseSeconds": 0.2494,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0567,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0495,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0126,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1026,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8623,6 +11914,28 @@
             },
             {
               "phaseSeconds": 0.2868,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0856,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0008,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0063,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0877,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8688,10 +12001,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 120.4528,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 120.4644,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 120.5921,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 121.0217,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 123.3321,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 126.1417,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "231642c281dd12911dab7d66fb5e1a4de7373d2aaa563401cf0299a86b021b1b",
+        "bass": "357b70a235e06be7465d923c20ff42f214a904d2d14b927aacad675718c7b10c",
+        "guitar": "8143630b9070ef5fe9cd969a11d650f783efa21e6b82272aa432c2cf46245722",
+        "piano": "498e024aca25b369c560624932b8bdd40a9a799a501d5db20b24a0c951203ff2",
+        "other": "f714461071e438a7e54c7b3d2c4e0bc721eb1ff22eaefd7b032e1efd58e28dbb",
+        "vocals": "fb4f20210f547dbed5e195f75736ae163fa006e18764883ab70709f3ba096fb9"
+      },
       "segmentIndex": 11,
       "startSeconds": 132.0,
       "endSeconds": 144.0,
@@ -8701,6 +12054,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3492,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1805,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0104,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0529,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1026,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8764,6 +12139,28 @@
             },
             {
               "phaseSeconds": 0.2868,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1214,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0022,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.056,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0571,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8827,6 +12224,28 @@
             },
             {
               "phaseSeconds": 0.0374,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0921,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.026,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0218,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.094,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8891,6 +12310,28 @@
             },
             {
               "phaseSeconds": 0.0,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0945,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0144,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0215,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0862,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -8960,6 +12401,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0249,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.097,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0223,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0383,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0384,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9024,6 +12487,28 @@
             },
             {
               "phaseSeconds": 0.0748,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1061,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0014,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0314,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0759,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9088,6 +12573,28 @@
             },
             {
               "phaseSeconds": 0.3617,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1456,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0172,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0468,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0707,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9151,6 +12658,28 @@
             },
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1178,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0078,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0342,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0907,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9220,6 +12749,28 @@
           "phases": [
             {
               "phaseSeconds": 0.237,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1335,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.003,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.027,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1037,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9284,6 +12835,28 @@
             },
             {
               "phaseSeconds": 0.2868,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0987,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0116,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.0031,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1123,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9348,6 +12921,28 @@
             },
             {
               "phaseSeconds": 0.1746,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1341,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0399,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0485,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0501,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9412,6 +13007,28 @@
             },
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1014,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.016,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0313,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0568,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9477,10 +13094,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 135.8545,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 136.5279,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 136.5976,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 137.8979,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 139.4304,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 139.4884,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "bb27549104eba7dfe040e835c985bdf48ead1ec109ac57c833766dfaf487eb23",
+        "bass": "5b07c43222977ab628b0fdeb26e4f8793e0362e21f350104520f8b19bb519eb9",
+        "guitar": "a26ca1a69c4b1a71c3bf6d45c8480ab6678739f7cbcb08bb39d6b5de600c8b1b",
+        "piano": "382df49bd9afb5cdab8b573b0417c81756478a808631a3211034f33707a8bdf5",
+        "other": "0f51f34a97e7ef0efe1299e6fbcde9b641095312445b1180842f8e589f19ef08",
+        "vocals": "c1b8a36073de00ad642e6c700b677c6eb30d913e78bd80dfd993316e06136a33"
+      },
       "segmentIndex": 12,
       "startSeconds": 144.0,
       "endSeconds": 156.0,
@@ -9490,6 +13147,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1746,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1001,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0408,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0531,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0838,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9553,6 +13232,28 @@
             },
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1259,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0044,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0241,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0871,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9616,6 +13317,28 @@
             },
             {
               "phaseSeconds": 0.212,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1003,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0285,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0355,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0878,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9679,6 +13402,28 @@
             },
             {
               "phaseSeconds": 0.1372,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0763,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0716,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0672,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0741,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9748,6 +13493,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1621,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1013,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0525,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0586,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0907,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9812,6 +13579,28 @@
             },
             {
               "phaseSeconds": 0.1995,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0755,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0691,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0437,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0944,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9876,6 +13665,28 @@
             },
             {
               "phaseSeconds": 0.237,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0868,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0512,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0424,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.088,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -9940,6 +13751,28 @@
             },
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1104,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0264,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0636,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0709,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10009,6 +13842,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1871,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1241,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0429,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0737,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0896,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10073,6 +13928,28 @@
             },
             {
               "phaseSeconds": 0.2245,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.1209,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0513,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0828,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0849,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10137,6 +14014,28 @@
             },
             {
               "phaseSeconds": 0.2619,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0982,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0581,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0585,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0926,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10201,6 +14100,28 @@
             },
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0895,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.053,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.0276,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1071,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10266,10 +14187,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 144.209,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 144.4063,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 145.2771,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 145.3235,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 145.4048,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 146.4149,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "2d4f6e9ed4ca9b6cb9a03975f2d7c724fba64e4ce141d9cc89e8a33d82e359da",
+        "bass": "0b00c9bdf99315f1d91e0d204b53585175800110f296a015b143390af2603409",
+        "guitar": "85b31af0ccbc7fc3c88b06e983379a531207170fc6fb21c32ccdaa44aab0599d",
+        "piano": "8e02849c50e4e3483f962c5f1c35fc7f31892303bf1e8b047d5f3833c7c1e34f",
+        "other": "3a805617a053e857e1587e514cd50b4187c7fbd2ade3a4b63be1663b08dc9d57",
+        "vocals": "7ad226d7750398e8338ab0b18927120a34931f82268439b59b9015d93f0b2062"
+      },
       "segmentIndex": 13,
       "startSeconds": 156.0,
       "endSeconds": 168.0,
@@ -10279,6 +14240,28 @@
           "phases": [
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.2077,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0198,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1067,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.119,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10343,6 +14326,28 @@
             },
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.2493,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0513,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0763,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1261,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10407,6 +14412,28 @@
             },
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.2255,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0253,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0808,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1216,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10471,6 +14498,28 @@
             },
             {
               "phaseSeconds": 0.0125,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1745,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0501,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1017,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.1184,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10540,6 +14589,28 @@
           "phases": [
             {
               "phaseSeconds": 0.1247,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.2271,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.021,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0786,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1294,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10604,6 +14675,28 @@
             },
             {
               "phaseSeconds": 0.1621,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.2488,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.044,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0738,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1348,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10668,6 +14761,28 @@
             },
             {
               "phaseSeconds": 0.0873,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1976,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0183,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0922,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1221,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10732,6 +14847,28 @@
             },
             {
               "phaseSeconds": 0.1995,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.2619,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0637,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0801,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1236,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10801,6 +14938,28 @@
           "phases": [
             {
               "phaseSeconds": 0.2619,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.2627,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0649,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0759,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1275,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10865,6 +15024,28 @@
             },
             {
               "phaseSeconds": 0.1372,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.1165,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1006,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0892,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1178,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10929,6 +15110,28 @@
             },
             {
               "phaseSeconds": 0.3118,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.262,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0563,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0908,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1198,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -10993,6 +15196,28 @@
             },
             {
               "phaseSeconds": 0.1746,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1871,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0431,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.095,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.1314,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11058,10 +15283,50 @@
           ]
         }
       ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 159.8777,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 159.8777,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 161.4102,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 162.7454,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 162.7686,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 162.7802,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        }
+      ],
       "status": "unverified",
       "reviewerStatus": "pending"
     },
     {
+      "originalStemHashesSha256": {
+        "drums": "be7d2bf56dab6d49798171a0384be93363093e4dc8091c19357b68b4492b6be0",
+        "bass": "d6a1a9301636bb6c8cfd0b932f077d0f44247df21a7411e0f6a87e783119c935",
+        "guitar": "047429e35db2e0953fce9b950e2f8e3d289147a88c664655ab454c0537e54ca7",
+        "piano": "93aefb1ebe8f066093380cebf8537dd30bf9c9e2e21d6551620d22d09ebfc314",
+        "other": "fd0cb9fc9cdefc83217288648ec995f142499fe6e1b8047247c14758ddd4b5a7",
+        "vocals": "8a54ee7dd362df37f79c50504374d89d8e709bce8e6d956215709c79c0fda779"
+      },
       "segmentIndex": 14,
       "startSeconds": 168.0,
       "endSeconds": 174.6,
@@ -11071,6 +15336,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3367,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.1015,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0728,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0267,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.1435,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11121,6 +15408,28 @@
             },
             {
               "phaseSeconds": 0.3741,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.1079,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0607,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0301,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.1339,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11171,6 +15480,28 @@
             },
             {
               "phaseSeconds": 0.0,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1391,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0062,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0412,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0985,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11222,6 +15553,28 @@
             },
             {
               "phaseSeconds": 0.2619,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.1262,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0526,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0366,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.2235,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11277,6 +15630,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3367,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0958,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0723,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0172,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.1483,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11327,6 +15702,28 @@
             },
             {
               "phaseSeconds": 0.0,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1287,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0043,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0257,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0939,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11378,6 +15775,28 @@
             },
             {
               "phaseSeconds": 0.0499,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.144,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0167,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0305,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1279,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11429,6 +15848,28 @@
             },
             {
               "phaseSeconds": 0.2744,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.1244,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.055,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0366,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.2245,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11484,6 +15925,28 @@
           "phases": [
             {
               "phaseSeconds": 0.3617,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 3,
+                  "contrast": 0.0782,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0734,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0145,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 2,
+                  "contrast": -0.1348,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11534,6 +15997,28 @@
             },
             {
               "phaseSeconds": 0.1122,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.092,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.088,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.0079,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.185,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11585,6 +16070,28 @@
             },
             {
               "phaseSeconds": 0.0,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1115,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": 0.0067,
+                  "stemSupport": 1
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": -0.0234,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.0921,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11636,6 +16143,28 @@
             },
             {
               "phaseSeconds": 0.0748,
+              "harmonicRanking": [
+                {
+                  "beatOneOffset": 2,
+                  "contrast": 0.1307,
+                  "stemSupport": 3
+                },
+                {
+                  "beatOneOffset": 0,
+                  "contrast": 0.0363,
+                  "stemSupport": 2
+                },
+                {
+                  "beatOneOffset": 1,
+                  "contrast": -0.021,
+                  "stemSupport": 0
+                },
+                {
+                  "beatOneOffset": 3,
+                  "contrast": -0.1484,
+                  "stemSupport": 0
+                }
+              ],
               "offsets": [
                 {
                   "beatOneOffset": 0,
@@ -11686,6 +16215,38 @@
               ]
             }
           ]
+        }
+      ],
+      "strongHarmonicChanges": [
+        {
+          "sourceSeconds": 168.1858,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 169.4512,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 169.4629,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 170.0201,
+          "stemRole": "guitar",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 170.2407,
+          "stemRole": "other",
+          "relativeStrength": 1.0
+        },
+        {
+          "sourceSeconds": 170.9373,
+          "stemRole": "piano",
+          "relativeStrength": 1.0
         }
       ],
       "status": "unverified",

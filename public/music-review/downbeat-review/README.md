@@ -8,6 +8,12 @@ or ship source-aligned bar metadata on the strength of this page alone.
 ## What it does
 
 - Reads the current **original** `public/music/packs/33_local-one-more-run-bitstream-bluffs/pack.json`.
+- **Checks SHA-256 of each of the six original OGG stems at audition time**;
+  a tampered or mismatched audio response fails closed before decoding.
+- Displays separate, explicitly unverified **guitar/piano/other pitch-class change**
+  rankings for the selected tempo/phase/beat-one offset, including when the
+  harmonic cues *disagree* with drum/bass accent rankings. These derived
+  Demucs stems are correlated; this is not independent human corroboration.
 - Checks the original manifest SHA-256 against the research candidate report.
 - Fetches only the original selected 12-second OGG stem segment, directly from
   the same origin, on demand; no source audio copies or generated backing tracks.
@@ -29,6 +35,12 @@ human-audited; there are no trusted beat/measure frames to ship.
 ```bash
 python3 tools/music/build_downbeat_review_data.py
 node --test tools/music/test_downbeat_review.mjs
+uv run --offline --no-project --with numpy --with scipy python -B tools/music/test_harmonic_bar_cues.py
+# To exercise real WebAudio playback from a sparse checkout without copying OGGs:
+BITSTREAM_PLAYWRIGHT_MODULE=/path/to/node_modules/playwright \
+ BITSTREAM_CHROMIUM=/usr/bin/chromium \
+ BITSTREAM_FULL_SOURCE_PACK=/path/to/existing/full/33_local-one-more-run-bitstream-bluffs \
+ node tools/music/smoke_downbeat_browser.mjs
 # In a normal checkout containing the original audio and dependencies:
 npm run dev
 # Open /music-review/downbeat-review/ on that Vite server
