@@ -32,6 +32,7 @@ import { FatalCrashCountIn } from './music/FatalCrashCountIn.js';
 import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
 import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
 import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
+import { syntheticMeterAt } from './music/SyntheticMeterTiming.js';
 
 /** SFX names playSfx() must support (callers outside the engineer's files may use these). */
 export const SFX = Object.freeze([
@@ -1163,6 +1164,44 @@ export class AudioSynth {
       const e=d.mixer.energy();
       if(!Number.isFinite(e?.bass)||!Number.isFinite(e?.mid))return null;
       return (this._worldDanceSample={revision,timeMs:now,bass:e.bass,mid:e.mid});
+    }catch{return null;}
+  }
+
+  /** Read-only, deliberately UNVERIFIED 0.5s / 4/4 meter for cosmetics.
+   * Unlike getBeatTiming(), this is NOT sound-analyzed and CANNOT release
+   * Gym, time tricks, change physics, certify downbeats or alter playback.
+   * It uses the continuously advancing ORIGINAL track transport clock;
+   * the arbitrary synthetic bar 1 starts at the recording's source t=0.
+   * Returns null when there is no currently audible original in-run music.
+   * Consumers should react to beatIndex/measureIndex transitions, not
+   * schedule setInterval or infer the first real measure from this clock.
+   */
+  getSyntheticMeterTiming(){
+    try{
+      const d=this._stemMusic,c=this.ctx;
+      if(this._destroyed||this.unavailable||this._musicMode!=='run'||
+        this._paused||!this._musicWanted||
+        !d?.started||d.transportPaused||d._loading||
+        !d.pack||!d.track||d.pack.id!==d.track.id||
+        d.clockStart===null||d.activeNodes?.size<1||
+        d.songEnabled?.[d.track.id]===false||
+        this.settings?.musicEnabledSongs?.[d.track.id]===false||
+        !this.settings?.masterVolume||!this.settings?.musicVolume||
+        !hasEnabledSongs(this.settings?.musicEnabledSongs)||
+        !c||c.state!=='running'||!Number.isFinite(c.currentTime)||
+        this._vinylPauseSession||this._vinylResume||
+        this.getFatalCountInStatus().active)return null;
+      const position=c.currentTime-d.clockStart;
+      const duration=d.pack.frameCount/d.pack.sampleRate;
+      const meter=syntheticMeterAt(position,{durationSeconds:duration});
+      if(!meter)return null;
+      const revision=String(d._token)+':'+d.track.id+':'+d.clockStart;
+      return Object.freeze({...meter,trackId:d.track.id,
+        transportRevision:revision,audioContextTime:c.currentTime,
+        beatStartAudioTime:d.clockStart+meter.beatStartSeconds,
+        measureStartAudioTime:d.clockStart+meter.measureStartSeconds,
+        nextBeatAudioTime:d.clockStart+meter.nextBeatSeconds,
+        nextMeasureStartAudioTime:d.clockStart+meter.nextMeasureStartSeconds});
     }catch{return null;}
   }
 
