@@ -19,6 +19,7 @@ Companion: [v0.2 RFC](./alphabluffs-v0.2-contract.md). A standalone non-producti
 | I03 | Brand-new imported brain with only 0–3 eligible runs | Conservative prior/confidence, no fantasy champion yield from unverifiable author claims |
 | I04 | Equipment or deployed brain changes | New offline interval rated by new appropriate frozen pilot/loadout, past settlement immutable |
 | I05 | Duplicate tabs, reload twice, clock rollback | No duplicate offline rewards or wins, no negative elapsed-credit |
+| I06 | Real-run history currently lacks immutable deployed brain hash | Versioned BrainRunEvidence (or safe migration) stores pilot, gear and rules linked to actual run ID/ledger hash without breaking historical hashes or duping payouts; no false last-X history |
 | P01 | Seeded actions in real Ride and renderless trainer | Same authoritative fixed-step physics outputs within declared cross-runtime conformance; discrepancies reported |
 | P02 | Invalid model graph, huge weights, NaN or unsupported ABI | Reject safely, no executable import, no uncontrolled resource allocation |
 | P03 | NEAT / fixed nets / PBT method sharing | Compatible inference supported; optimizer copy/fine-tune rejected if architecture incompatible; provenance honest |
