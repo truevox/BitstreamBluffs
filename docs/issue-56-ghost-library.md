@@ -1,9 +1,26 @@
 # Issue #56: ghost library and replay tapes (spec draft)
 
-Status: **specification only, no code.** The issue says no implementation is authorized yet,
-and the tape format depends on #59's fixed tick (`engine/fixed-tick-59`, not merged). Nothing
-here is a permanent storage format until #59 lands and a cross-session replay is proven.
-Items marked **[Marvin]** are owner decisions that are still open.
+Status: **slice 1 implemented** on `feature/ghost-tapes-56`, after Marvin authorized ghost
+work on 2026-11-20:
+- tapes are recorded for normal and Daily runs (never Gym);
+- the library keeps Latest and Best per course, plus Favorites in the data model;
+- ghosts are drawn visual-only from the recorded trace;
+- Settings has BEST GHOST and LATEST GHOST switches.
+
+Not built yet:
+- the Favorites UI;
+- archive capacity, because its economics are undecided;
+- the off-screen re-simulation of tapes that arrive without a trace (needed for #58 imports).
+
+The tape format is still v1 and provisional. Items marked **[Marvin]** are open owner
+decisions.
+
+**Proof:** `tools/ghost-tape-browser-smoke.mjs`, real game, three seeds, runs of 6–10 s.
+- Recording a run saves a 4–7 KB tape.
+- Replaying it from the tape alone matches every checkpoint exactly at 30 Hz and at 120 Hz,
+  and crashes on the same tick.
+- The next run on the course draws one BEST+LAST ghost.
+- With that ghost on screen, the same live inputs reproduce identical physics checkpoints.
 
 ## Owner decisions this spec follows (2026-11-20)
 

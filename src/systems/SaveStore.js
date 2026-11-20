@@ -33,6 +33,8 @@ import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './Dail
  * @property {boolean} musicShuffle     Shuffle following tracks without repeats; first launch track remains One More Run.
  * @property {boolean} dynamicOrchestra  OFF: original instrumental stems with full FX; ON: separately rendered replacement instruments.
  * @property {boolean} screenShake       false disables shake (accessibility).
+ * @property {boolean} ghostBest         show the Best ghost on its course (issue #56).
+ * @property {boolean} ghostLatest       show the Latest ghost on its course (issue #56).
  * @property {'auto'|'on'|'off'} reduceMotion  menu motion (accessibility). 'auto' follows the OS
  *           prefers-reduced-motion query; resolved by ui/Motion.js isReducedMotion().
  * @property {'default'|'colorblind'} palette
@@ -73,6 +75,7 @@ const IDB_TIMEOUT_MS = 2500;
 export function defaultSettings() {
   return {
     version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, windVolume: 1, windEnabled: true, screenShake: true,
+    ghostBest: true, ghostLatest: true,
     palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
     musicShuffle: false,
@@ -107,6 +110,8 @@ export function sanitizeSettings(raw) {
     windVolume: num(raw.windVolume, d.windVolume, 0, 1),
     windEnabled: typeof raw.windEnabled === 'boolean' ? raw.windEnabled : d.windEnabled,
     screenShake: typeof raw.screenShake === 'boolean' ? raw.screenShake : d.screenShake,
+    ghostBest: typeof raw.ghostBest === 'boolean' ? raw.ghostBest : d.ghostBest,
+    ghostLatest: typeof raw.ghostLatest === 'boolean' ? raw.ghostLatest : d.ghostLatest,
     palette: raw.palette === 'colorblind' || raw.palette === 'default' ? raw.palette : d.palette,
     controlLayout: normalizeControlLayout(raw.controlLayout),
     touchOverlay: ['auto', 'on', 'off'].includes(raw.touchOverlay) ? raw.touchOverlay : d.touchOverlay,

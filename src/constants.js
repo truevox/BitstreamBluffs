@@ -42,6 +42,12 @@ export const REG = Object.freeze({
   SETTINGS: 'settings',
   /** @type {import('./systems/SaveStore.js').SaveStore} */
   SAVE_STORE: 'saveStore',
+  /** @type {import('./systems/ghost/GhostLibrary.js').GhostLibrary} local ghost tapes per course (issue #56). Additive. */
+  GHOSTS: 'ghostLibrary',
+  /** One-shot ghost tape for RunScene to replay instead of live input (verification / replay viewer). Additive. */
+  GHOST_REPLAY: 'ghostReplay',
+  /** @type {object|null} ghost tape of the run that just ended. Additive. */
+  LAST_GHOST_TAPE: 'lastGhostTape',
   /** @type {import('./systems/InputRouter.js').InputRouter} */
   INPUT: 'inputRouter',
   /** @type {import('./systems/AudioSynth.js').AudioSynth} */

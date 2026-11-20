@@ -38,6 +38,9 @@ import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
 import { runRandomStreams } from '../systems/RunRandom.js';
 import { SimClock } from '../systems/SimClock.js';
+import { GhostRecorder, TapePlayer, quantizeTilt } from '../systems/ghost/GhostTape.js';
+import { runRandomState } from '../systems/RunRandom.js';
+import { GhostRider } from '../entities/GhostRider.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, hazardColor, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
@@ -427,12 +430,64 @@ export class RunScene extends Phaser.Scene {
     const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
     if(playing?.state==='playing'&&playing.current)
       this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    this._initGhosts();
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
       dailyOfficial: this.dailyOfficial, // additive (decision 2): lets the HUD tell the Daily from practice
       dailyMode:this.dailyMode,
       gym: this.bsodGym === true, // non-ranked practice must never trigger live mission-completion toasts
     });
+  }
+
+  /**
+   * Ghosts (issue #56). Normal and Daily runs record a tape from the first tick; Gym practice
+   * never does. Ghosts for this exact course load asynchronously and join at the current tick.
+   */
+  _initGhosts() {
+    this.ghostRiders = [];
+    const token = this._ghostToken = (this._ghostToken || 0) + 1;
+    const replay = this.registry.get(REG.GHOST_REPLAY);
+    if (replay) this.registry.remove(REG.GHOST_REPLAY);
+    this.tapePlayer = replay ? new TapePlayer(replay) : null;
+    // Ghosts are cosmetic: a recorder that cannot start must never stop the run from starting.
+    try { this.ghostRecorder = this.bsodGym || replay ? null : new GhostRecorder(this._ghostHeader()); }
+    catch (e) { this.ghostRecorder = null; }
+    const lib = this.registry.get(REG.GHOSTS);
+    if (!lib || this.bsodGym || replay) return;
+    const st = this.settings || {};
+    const show = { best: st.ghostBest !== false, latest: st.ghostLatest !== false, fav0: true, fav1: true, fav2: true };
+    lib.ghostsFor(this.seed, this.biomeMask, show).then((list) => {
+      if (token !== this._ghostToken || !this.sys?.isActive?.()) return;
+      this.ghostRiders = list.map((g) => new GhostRider(this, g, this.palette));
+    }).catch(() => { /* ghosts are cosmetic */ });
+  }
+
+  /** Everything a replay needs that the seed alone does not reconstruct. */
+  _ghostHeader() {
+    const b = this.sled.body;
+    return {
+      seed: this.seed, biomeMask: this.biomeMask || 0,
+      mode: this.bsodGym ? 'gym' : this.dailyMode === 'draft' ? 'daily-draft' : this.dailyOfficial ? 'daily' : 'normal',
+      dailyRuleId: this.dailyRuleId || null,
+      controlLayout: this.settings?.controlLayout || 'tricksRight',
+      boosts: [...(this.appliedBoosts || [])],
+      upgradeRanks: this.upgradeRun?.enabled ? { ...this.upgradeRun.ranks } : null,
+      startPose: [b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y, b.angularVelocity],
+      random: runRandomState(this.runRandom),
+      startedAt: this.startedAt,
+    };
+  }
+
+  _saveGhostTape(record) {
+    const rec = this.ghostRecorder;
+    this.ghostRecorder = null;
+    if (!rec) return;
+    try {
+      const tape = rec.finish({ runId: record.id, distanceM: record.distanceM, score: record.score, endedAt: record.endedAt });
+      this.registry.set(REG.LAST_GHOST_TAPE, tape);
+      const pr = this.registry.get(REG.GHOSTS)?.saveRun(tape);
+      if (pr && pr.catch) pr.catch(() => {});
+    } catch (e) { /* a ghost must never break the end of a run */ }
   }
 
   /** Remove every listener / pooled object / body (runs on scene shutdown). @returns {void} */
@@ -462,6 +517,9 @@ export class RunScene extends Phaser.Scene {
     safe(this.bg);
     safe(this.songBillboard);
     this.songBillboard=null;
+    (this.ghostRiders || []).forEach(safe);
+    this.ghostRiders = [];
+    this._ghostToken = (this._ghostToken || 0) + 1;
     this.worldDance?.reset();
     this.worldDance = null;
     this._worldDanceMotionQuery=null;
@@ -944,13 +1002,14 @@ export class RunScene extends Phaser.Scene {
     const pr = p.pressed || {};
     return {
       push: !!p.push,
-      tilt: Number.isFinite(p.tilt) ? p.tilt : 0,
+      tilt: quantizeTilt(p.tilt), // 1/127 steps: an analog tilt replays exactly from a ghost tape
       variableHop: (this.settings?.controlLayout || 'tricksRight') !== 'classic',
       noAutoNudge: (this.settings?.controlLayout || 'tricksRight') !== 'classic',
       divebomb: !!p.divebomb,
       corkscrew: !!p.corkscrew,
       tuck: !!p.tuck,
       brake: !!p.brake || (!!p.airBrake && !!this.sled && this.sled.grounded),
+      brakeHeld: !!p.brake, // simTick re-derives `brake` from this and the sled's grounded state each tick
       hop: !!p.hop,
       reset: !!p.reset,
       heli: p.heli > 0 ? 1 : p.heli < 0 ? -1 : 0,
@@ -1035,15 +1094,26 @@ export class RunScene extends Phaser.Scene {
     // display rate. Rendering stays once per display frame.
     if (!this.simClock) this.simClock = new SimClock();
     const ticks = this.simClock.advance(dt);
-    const pads = this.simClock.padsFor(polled, ticks);
+    // A ghost tape under replay (REG.GHOST_REPLAY) replaces live input tick by tick.
+    const pads = this.tapePlayer
+      ? Array.from({ length: ticks }, (_, i) => this.tapePlayer.padAt(this.simClock.tick + 1 + i))
+      : this.simClock.padsFor(polled, ticks);
     let pad = polled;
     for (const tickPad of pads) {
       pad = tickPad;
-      this.simClock.tick++;
+      const tick = ++this.simClock.tick;
+      // Air brake on the ground brakes: decided per tick, not per display frame.
+      tickPad.brake = !!tickPad.brakeHeld || (!!tickPad.airBrake && !!this.sled?.grounded);
+      this.ghostRecorder?.input(tick, tickPad);
       const r = this.simTick(this.simClock.tickMs, tickPad);
+      if (!this.crashed) {
+        this.ghostRecorder?.afterTick(tick, this);
+        this.tapePlayer?.check(tick, this);
+      }
       if (r === 'hold') { this.renderFrame(0); return; }
       if (this.crashed) break;
     }
+    for (const g of this.ghostRiders || []) g.update(this.simClock.tick);
     this.renderFrame(dt, pad);
   }
 
@@ -2062,6 +2132,7 @@ export class RunScene extends Phaser.Scene {
     };
     record.ledgerHash = SaveStore.computeLedgerHash(record);
     this.registry.set(REG.LAST_RECORD, record);
+    this._saveGhostTape(record);
     try {
       if (this.saveStore) {
         const pr = this.saveStore.saveRun(record);

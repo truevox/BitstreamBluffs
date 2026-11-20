@@ -256,6 +256,13 @@ export class SettingsView extends View {
       { kind:'choice',label:'REDUCE MOTION',options:[
         {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
         get:()=>settings().reduceMotion||'auto',set:v=>updateSetting(game,'reduceMotion',v) },
+      // Issue #56: each course ghost can be switched off on its own.
+      { kind:'choice',label:'BEST GHOST',options:[
+        {value:true,label:'ON'},{value:false,label:'OFF'}],
+        get:()=>settings().ghostBest!==false,set:v=>updateSetting(game,'ghostBest',v) },
+      { kind:'choice',label:'LATEST GHOST',options:[
+        {value:true,label:'ON'},{value:false,label:'OFF'}],
+        get:()=>settings().ghostLatest!==false,set:v=>updateSetting(game,'ghostLatest',v) },
       { kind:'choice',label:'WORLD DANCE',options:[
         {value:true,label:'ON'},{value:false,label:'OFF'}],
         get:()=>settings().worldDance!==false,set:v=>updateSetting(game,'worldDance',v) },

@@ -1,0 +1,169 @@
+/**
+ * OWNER: core-logic engineer. NO Phaser imports. Never throws; falls back to memory when
+ * IndexedDB is unavailable (Jest, private windows), like SaveStore.
+ *
+ * Local ghost library (issue #56). Per course (exact seed + biome mask) it keeps at most
+ * five ghost roles: Latest, Best and Favorites A/B/C. A run that holds several roles is one
+ * tape and one ghost. Tapes are deleted only when no role on any course references them.
+ *
+ * Course-archive capacity (the repeatable upgrade) is NOT enforced yet: its starting size,
+ * price and eviction rules are open owner decisions. Nothing here uploads anything; Brain
+ * Bazaar publishing (#58) will be a separate, explicit action.
+ */
+import { GHOST_TAPE_FORMAT, GHOST_TAPE_VERSION, GHOST_PHYSICS_VERSION, courseKey } from './GhostTape.js';
+import { SIM_TICK_HZ } from '../SimClock.js';
+
+export const GHOST_DB = 'bitstream-ghosts';
+export const GHOST_DB_VERSION = 1;
+export const FAVORITE_SLOTS = 3;
+export const MAX_GHOSTS_PER_COURSE = 2 + FAVORITE_SLOTS;
+const IDB_TIMEOUT_MS = 2500;
+
+const req2p = (req) => new Promise((resolve, reject) => {
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error || new Error('idb request failed'));
+});
+
+/** A tape this build can draw: right format, version, tick rate and physics. */
+export function tapeCompatible(tape) {
+  return Boolean(tape && tape.format === GHOST_TAPE_FORMAT && tape.version === GHOST_TAPE_VERSION &&
+    tape.simTickHz === SIM_TICK_HZ && tape.physicsVersion === GHOST_PHYSICS_VERSION && typeof tape.trace === 'string');
+}
+
+function emptyCourse(key, tape) {
+  return { key, seed: tape.seed, biomeMask: tape.biomeMask || 0, latest: null, best: null, bestDistanceM: -1,
+    favorites: Array(FAVORITE_SLOTS).fill(null), lastPlayedAt: 0 };
+}
+
+/** Role -> runId pairs of a course, merged per run: [{runId, roles:['best','latest']}], at most five. */
+export function courseGhostRuns(course) {
+  if (!course) return [];
+  const byRun = new Map();
+  const add = (role, runId) => { if (runId) byRun.set(runId, [...(byRun.get(runId) || []), role]); };
+  add('best', course.best);
+  add('latest', course.latest);
+  course.favorites.forEach((runId, i) => add(`fav${i}`, runId));
+  return [...byRun].map(([runId, roles]) => ({ runId, roles })).slice(0, MAX_GHOSTS_PER_COURSE);
+}
+
+export class GhostLibrary {
+  constructor() {
+    /** @type {Map<string, object>} course entries (small; always in memory) */
+    this.courses = new Map();
+    /** @type {Map<string, object>} tapes: memory backend, or a read cache over IndexedDB */
+    this.tapes = new Map();
+    this.backend = 'memory';
+    this._db = null;
+  }
+
+  /** Open IndexedDB and load course entries. Never rejects. */
+  async init() {
+    try {
+      const idb = globalThis.indexedDB;
+      if (!idb) return;
+      const db = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('idb open timeout')), IDB_TIMEOUT_MS);
+        const req = idb.open(GHOST_DB, GHOST_DB_VERSION);
+        req.onupgradeneeded = () => {
+          const d = req.result;
+          if (!d.objectStoreNames.contains('courses')) d.createObjectStore('courses', { keyPath: 'key' });
+          if (!d.objectStoreNames.contains('tapes')) d.createObjectStore('tapes', { keyPath: 'runId' });
+        };
+        req.onsuccess = () => { clearTimeout(timer); resolve(req.result); };
+        req.onerror = () => { clearTimeout(timer); reject(req.error); };
+        req.onblocked = () => { clearTimeout(timer); reject(new Error('idb blocked')); };
+      });
+      const all = await req2p(db.transaction('courses', 'readonly').objectStore('courses').getAll());
+      for (const c of all || []) if (c && typeof c.key === 'string') this.courses.set(c.key, c);
+      this._db = db;
+      this.backend = 'idb';
+    } catch {
+      this._db = null;
+      this.backend = 'memory';
+    }
+  }
+
+  course(seed, biomeMask = 0) { return this.courses.get(courseKey(seed, biomeMask)) || null; }
+
+  /**
+   * Store a finished run's tape and update its course's Latest and Best.
+   * Best is the furthest distance; a tie keeps the earlier run.
+   * @returns {Promise<object>} the updated course entry
+   */
+  async saveRun(tape) {
+    if (!tape?.runId || tape.mode === 'gym') return null;
+    const key = courseKey(tape.seed, tape.biomeMask);
+    const course = { ...(this.courses.get(key) || emptyCourse(key, tape)) };
+    course.favorites = [...course.favorites];
+    const before = new Set(courseGhostRuns(course).map((g) => g.runId));
+    course.latest = tape.runId;
+    if (tape.distanceM > course.bestDistanceM) { course.best = tape.runId; course.bestDistanceM = tape.distanceM; }
+    course.lastPlayedAt = tape.endedAt || Date.now();
+    await this._putTape(tape);
+    await this._putCourse(course);
+    const after = new Set(courseGhostRuns(course).map((g) => g.runId));
+    for (const runId of before) if (!after.has(runId)) await this._collect(runId);
+    return course;
+  }
+
+  /** Pin (or with runId null, clear) Favorite slot 0..2 of a course. */
+  async setFavorite(seed, biomeMask, slot, runId) {
+    const key = courseKey(seed, biomeMask);
+    const old = this.courses.get(key);
+    if (!old || slot < 0 || slot >= FAVORITE_SLOTS) return null;
+    if (runId && !(await this.getTape(runId))) return null;
+    const course = { ...old, favorites: [...old.favorites] };
+    const dropped = course.favorites[slot];
+    course.favorites[slot] = runId || null;
+    await this._putCourse(course);
+    if (dropped && !courseGhostRuns(course).some((g) => g.runId === dropped)) await this._collect(dropped);
+    return course;
+  }
+
+  /**
+   * Ghosts to draw on a course: deduped runs with their roles, filtered by `show`
+   * (role -> boolean; a run shows if any of its roles is shown), compatible tapes only.
+   */
+  async ghostsFor(seed, biomeMask = 0, show = {}) {
+    const out = [];
+    for (const g of courseGhostRuns(this.course(seed, biomeMask))) {
+      if (!g.roles.some((r) => show[r] !== false)) continue;
+      const tape = await this.getTape(g.runId);
+      if (tapeCompatible(tape)) out.push({ ...g, tape });
+    }
+    return out;
+  }
+
+  async getTape(runId) {
+    if (this.tapes.has(runId)) return this.tapes.get(runId);
+    if (!this._db) return null;
+    try {
+      const tape = await req2p(this._db.transaction('tapes', 'readonly').objectStore('tapes').get(runId));
+      if (tape) this.tapes.set(runId, tape);
+      return tape || null;
+    } catch { return null; }
+  }
+
+  /** Delete a tape no course still references. */
+  async _collect(runId) {
+    for (const c of this.courses.values()) if (courseGhostRuns(c).some((g) => g.runId === runId)) return;
+    this.tapes.delete(runId);
+    if (this._db) {
+      try { await req2p(this._db.transaction('tapes', 'readwrite').objectStore('tapes').delete(runId)); } catch { /* best effort */ }
+    }
+  }
+
+  async _putTape(tape) {
+    this.tapes.set(tape.runId, tape);
+    if (this._db) {
+      try { await req2p(this._db.transaction('tapes', 'readwrite').objectStore('tapes').put(tape)); } catch { /* quota: memory keeps the session */ }
+    }
+  }
+
+  async _putCourse(course) {
+    this.courses.set(course.key, course);
+    if (this._db) {
+      try { await req2p(this._db.transaction('courses', 'readwrite').objectStore('courses').put(course)); } catch { /* quota */ }
+    }
+  }
+}

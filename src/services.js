@@ -6,6 +6,7 @@ import { REG } from './constants.js';
 import { EVT } from './events.js';
 import { loadContent } from './data/index.js';
 import { SaveStore } from './systems/SaveStore.js';
+import { GhostLibrary } from './systems/ghost/GhostLibrary.js';
 import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
 import { createProgressionService } from './systems/ProgressionService.js';
@@ -21,6 +22,10 @@ export async function createServices(game) {
   if (game.registry.get(REG.SAVE_STORE)) return;
   const saveStore = new SaveStore();
   await saveStore.init();
+  // Issue #56: local ghost tapes per course (IndexedDB, memory fallback; never rejects).
+  const ghosts = new GhostLibrary();
+  await ghosts.init();
+  game.registry.set(REG.GHOSTS, ghosts);
   const settings = saveStore.loadSettings();
   game.registry.set(REG.SAVE_STORE, saveStore);
   game.registry.set(REG.SETTINGS, settings);
