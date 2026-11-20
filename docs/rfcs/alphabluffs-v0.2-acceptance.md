@@ -33,6 +33,10 @@ Companion: [v0.2 RFC](./alphabluffs-v0.2-contract.md). A standalone non-producti
 | V08 | Verified-only compatible evidence cohort (policy/bonus values configurable) | Baseline accrual plus separate positive verified-evidence bonus, applied exactly once for new settlement interval |
 | V09 | Race receives verification AFTER earlier offline interval settled | Previously paid shards not retrospectively duplicated; new intervals use new evidence snapshot/status |
 | V10 | Public verified evidence versus server-owned offline time | Peer validation checks genuine real race performance, NOT elapsed time. Future public/account shards settle from SERVER timestamps/cursor and authoritative shard bank; client-reported hours or requested credits cannot change ledger |
+| V11 | Future public shard settlement after disconnect | Server computes eligible time from SERVER timestamps and saved settlement cursor, not client-reported clock/hours; client asks for updated balance, cannot mint credits |
+| V12 | Offline-first local game without public backend | Local balance remains local/unverified, game works entirely offline, and no unverified local hours/shards silently migrate to public server wallet |
+| V13 | Player selects three spectacular genuine races and has forty recorded crashes | Chosen authentic same-brain/gear eligible runs may form Idle basis; don't reject/force an average of all history as anti-cheat; selection obeys published portfolio/balance rules |
+| V14 | Selected verified and unverified authentic races | Base Idle remains available for either; positive bonus when selected verified evidence meets published rule, settled once |
 | P01 | Seeded actions in real Ride and renderless trainer | Same authoritative fixed-step physics outputs within declared cross-runtime conformance; discrepancies reported |
 | P02 | Invalid model graph, huge weights, NaN or unsupported ABI | Reject safely, no executable import, no uncontrolled resource allocation |
 | P03 | NEAT / fixed nets / PBT method sharing | Compatible inference supported; optimizer copy/fine-tune rejected if architecture incompatible; provenance honest |
