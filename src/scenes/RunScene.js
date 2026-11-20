@@ -36,6 +36,7 @@ import { boostEffects, loadoutForRun, headStartOpening, openingSpeedMul } from '
 import { sameBoardAs } from '../systems/Ranking.js';
 import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
+import { runRandomStreams } from '../systems/RunRandom.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, hazardColor, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
@@ -150,6 +151,8 @@ export class RunScene extends Phaser.Scene {
     // sled, the trail and the drawn colours must not disagree with each other mid-run.
     this.look = this._resolveLook();
     this.seed = String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
+    // Named seeded streams for this run (issue #59). Rebuilt from the seed on every create.
+    this.runRandom = runRandomStreams(this.seed);
     // W3: resolved ONCE per run, from the registry (a daily run sets the date-derived mask). Never
     // re-read mid-run, so the terrain, the stats scope and the saved record cannot disagree.
     const maskReg = reg.get(REG.BIOME_MASK);

@@ -13,6 +13,7 @@ import { PHYSICS } from '../constants.js';
 import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyserStep } from '../systems/PhysicsTuner.js';
 import { springReboundVelocity } from '../systems/BiomeEffects.js';
 import { aerodynamicStep, canopyFuelStep, vacuumDivebombStep } from '../systems/BsodAerodynamics.js';
+import { runRandomStreams } from '../systems/RunRandom.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -45,6 +46,10 @@ export class Sled {
     // profile or the catalogue. Absent `look` (every pre-W4 caller and every test) falls straight through
     // to the palette keys below, so the default sled renders exactly as it did before W4.
     this.look = look || null;
+    // Seeded streams (issue #59): scramble torque draws from physics/scramble, the scrambled
+    // silhouette shake from visual/sled, so drawing one never moves the other. RunScene supplies
+    // the run's streams; a bare Sled (tests, tools) gets fixed ones.
+    this.random = scene.runRandom || runRandomStreams('sled');
     this.x = x;
     this.y = y;
     this.vx = 0;
@@ -390,7 +395,7 @@ export class Sled {
     } else {
       w += torqueDeg * DEG * dt;
     }
-    if (phys.scrambleJitterDegS2) w += (Math.random() * 2 - 1) * phys.scrambleJitterDegS2 * DEG * dt;
+    if (phys.scrambleJitterDegS2) w += (this.random.physicsScramble.next() * 2 - 1) * phys.scrambleJitterDegS2 * DEG * dt;
     if (!g && tilt === 0) {
       // hands off: spin bleeds off and the nose eases toward the travel direction, so a pitch-over at a lip does not tumble the sled
       w = airIdleSpin(w, b.angle, vx, vy, dt, TUNING, { etaMs: this.airEtaMs, slopeDeg: this.airSlopeDeg });
@@ -627,8 +632,8 @@ export class Sled {
     if (Math.abs(sx) < 0.12) sx = sx < 0 ? -0.12 : 0.12;
     const edgeOn = 1 - Math.abs(sx);
     const flip = sx < 0;
-    const jx = this.scrambled ? (Math.random() - 0.5) * 3 : 0;
-    const jy = this.scrambled ? (Math.random() - 0.5) * 3 : 0;
+    const jx = this.scrambled ? (this.random.visualSled.next() - 0.5) * 3 : 0;
+    const jy = this.scrambled ? (this.random.visualSled.next() - 0.5) * 3 : 0;
     const sq = this.squash || 0;
     const wx = 1 + 0.12 * sq;
     const P = (lx0, ly0) => {
