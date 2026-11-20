@@ -37,6 +37,14 @@ Companion: [v0.2 RFC](./alphabluffs-v0.2-contract.md). A standalone non-producti
 | V12 | Offline-first local game without public backend | Local balance remains local/unverified, game works entirely offline, and no unverified local hours/shards silently migrate to public server wallet |
 | V13 | Player selects three spectacular genuine races and has forty recorded crashes | Chosen authentic same-brain/gear eligible runs may form Idle basis; don't reject/force an average of all history as anti-cheat; selection obeys published portfolio/balance rules |
 | V14 | Selected verified and unverified authentic races | Base Idle remains available for either; positive bonus when selected verified evidence meets published rule, settled once |
+| G01 | Forge client profile Shards into extreme balance then buy powered upgrade and enter STOCK public competition | Authoritative fixed/zero-purchased loadout; local forged upgrade ignored/rejected |
+| G02 | Forge client local Shards, buy upgrade then enter UPGRADED public competition with physically reproducible run | Reject without server-recognized authoritative purchase receipt for EACH effective rank/boost |
+| G03 | Same valid public submission chooses FREE peer or PAID developer/server verification | Identical valid/invalid result, Verified status, qualifying board and every in-game reward; fee never grants preferable judgment |
+| G04 | Free verification queue is slow near public event cutoff | Preserve original server submittedAt and same deadline eligibility as paid validation; provisional until adjudicated |
+| G05 | Client supplies a forged public balance, verification flag, gear inventory or shard timestamp | Server ignores client authority claims and uses stored account ledger, accepted evidence, rules and validation |
+| G06 | Client buys many local Sim-Slots and trains legal open-category brain, claims restricted training budget | OPEN category may accept genuine model performance; budget-limited board needs organizer-controlled step history, not local Shard claims |
+| G07 | Local-only Shards used for full single-player equipment and lab training | Offline gameplay remains available; public competition does not auto-certify local Shard funds or gear |
+| G08 | Paid server verification returns same replay with different elapsed turnaround | Same score, proof status and rewards; paid service does NOT sell Seals, Shards or a stronger ranking |
 | P01 | Seeded actions in real Ride and renderless trainer | Same authoritative fixed-step physics outputs within declared cross-runtime conformance; discrepancies reported |
 | P02 | Invalid model graph, huge weights, NaN or unsupported ABI | Reject safely, no executable import, no uncontrolled resource allocation |
 | P03 | NEAT / fixed nets / PBT method sharing | Compatible inference supported; optimizer copy/fine-tune rejected if architecture incompatible; provenance honest |
