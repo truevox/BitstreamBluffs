@@ -20,6 +20,9 @@ Companion: [v0.2 RFC](./alphabluffs-v0.2-contract.md). A standalone non-producti
 | I04 | Equipment or deployed brain changes | New offline interval rated by new appropriate frozen pilot/loadout, past settlement immutable |
 | I05 | Duplicate tabs, reload twice, clock rollback | No duplicate offline rewards or wins, no negative elapsed-credit |
 | I06 | Real-run history currently lacks immutable deployed brain hash | Versioned BrainRunEvidence (or safe migration) stores pilot, gear and rules linked to actual run ID/ledger hash without breaking historical hashes or duping payouts; no false last-X history |
+| I07 | First release local Shard Racing, no network | Build local standings deterministically from versioned offline-modeled event records and snapshots with event/season IDs, brain/gear/rules/provenance; no account/server or upload required |
+| I08 | Future public leaderboard compatibility | Versioned event exports preserve distinct LOCAL official vs future PUBLIC verification status, offline provenance and idempotent settlement; sanitized/pseudonymous by default; no breaking retrofit of score ledger required |
+| I09 | Invalid client self-attested public result | Locally generated results remain NOT VERIFIED for a public global leaderboard even if an export/import claims verification. Unknown event versions and duplicate/conflicting IDs fail safely; future authoritative verifier required |
 | P01 | Seeded actions in real Ride and renderless trainer | Same authoritative fixed-step physics outputs within declared cross-runtime conformance; discrepancies reported |
 | P02 | Invalid model graph, huge weights, NaN or unsupported ABI | Reject safely, no executable import, no uncontrolled resource allocation |
 | P03 | NEAT / fixed nets / PBT method sharing | Compatible inference supported; optimizer copy/fine-tune rejected if architecture incompatible; provenance honest |
