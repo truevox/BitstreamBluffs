@@ -1,0 +1,3 @@
+{ "id": "shardMagnet", "shapeKey": "blackHole", "radius": 10, "placement": "own",
+  "effect": { "kind": "magnet", "durationMs": 6000, "pullRadiusPx": 96, "pullPxS": 360 },
+  "spawn": { "baseChance": 0.5, "distanceDecayM": 3000 }, "colorKey": "magenta" }

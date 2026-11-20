@@ -367,7 +367,9 @@ export class TerrainGenerator {
     this.hazardList = allHazards.filter((h) => h.placement !== 'air');
     this.airHazardList = allHazards.filter((h) => h.placement === 'air');
     const allPowerups = toList(options.powerupDefs).filter(Boolean).sort(byId);
-    this.powerupList = allPowerups.filter((p) => !p.biome);
+    // `placement: 'own'` defs (Shard Magnet) never join the base pick pool or the chunk output: adding one must leave
+    // every existing seed's chunks bit-identical (SPEC §9). RunScene places them from ShardMagnet.magnetSpawn.
+    this.powerupList = allPowerups.filter((p) => !p.biome && p.placement !== 'own');
     /** @type {Object<string, import('../data/schemas.js').HazardDef[]>} biome id -> its hazard defs (sorted by id). */
     this.biomeHazards = groupByBiome(allDefs);
     /** @type {Object<string, import('../data/schemas.js').PowerUpDef[]>} biome id -> its power-up defs (sorted by id). */

@@ -89,6 +89,19 @@ export class PowerUp {
     g.strokeCircle(0, 0, r - 3);
 
     switch (this.drawKind) {
+      case 'blackHole': {
+        // Shard Magnet: a dark core with a spinning accretion arc and an orbiting shard
+        g.fillStyle(0x020006, 0.95);
+        g.fillCircle(0, 0, 3.6);
+        g.lineStyle(1.5, pal.text, 1);
+        g.beginPath();
+        g.arc(0, 0, 5, t / 200, t / 200 + Math.PI * 1.3);
+        g.strokePath();
+        const o = t / 350;
+        g.fillStyle(pal.lime != null ? pal.lime : col, 1);
+        g.fillCircle(Math.cos(o) * 5.5, Math.sin(o) * 5.5, 1.3);
+        break;
+      }
       case 'clock': {
         g.lineStyle(1.5, pal.text, 1);
         g.lineBetween(0, 0, 0, -r * 0.55);

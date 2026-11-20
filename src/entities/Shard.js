@@ -54,6 +54,27 @@ export class ShardField {
     return out || [];
   }
 
+  /**
+   * Shard Magnet: move every shard within r px of (x, y) one pull step toward it. `step` is
+   * ShardMagnet.pullStep. Positions only; collection still happens in collect().
+   * @returns {number} how many shards moved
+   */
+  pull(x, y, r, step) {
+    let moved = 0;
+    for (const list of this.byChunk.values()) {
+      for (const s of list) {
+        if (s.x - x > r || x - s.x > r) continue;
+        const p = step(s.x, s.y, x, y);
+        if (!p) continue;
+        s.x = p.x;
+        s.y = p.y;
+        s.pulled = true;
+        moved++;
+      }
+    }
+    return moved;
+  }
+
   /** @param {number} timeMs @param {number} left @param {number} right @returns {void} */
   update(timeMs, left, right) {
     const g = this.gfx;
@@ -64,7 +85,8 @@ export class ShardField {
     for (const list of this.byChunk.values()) {
       for (const s of list) {
         if (s.x < left - 20 || s.x > right + 20) continue;
-        const bob = Math.sin(timeMs / 260 + s.x * 0.05) * 2;
+        // A pulled shard stops bobbing (its x changes every tick) and is drawn where the pull put it.
+        const bob = s.pulled ? 0 : Math.sin(timeMs / 260 + s.x * 0.05) * 2;
         const y = s.y + bob;
         const pts = [{ x: s.x, y: y - 7 }, { x: s.x + 5, y }, { x: s.x, y: y + 7 }, { x: s.x - 5, y }];
         g.fillStyle(col, 0.18 * pulse);

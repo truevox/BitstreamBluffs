@@ -16,6 +16,9 @@ export const UPGRADE_CATALOG = Object.freeze([
   { id: 'airbrake', label: 'AIRBRAKE LIFT', basePrice: 30, priceScale: 4, curveK: 12, cap: .55 },
   { id: 'divebomb', label: 'DIVEBOMB POWER', basePrice: 27, priceScale: 4, curveK: 10, cap: .48 },
   { id: 'bsodGrace', label: 'BSOD HEAD START', basePrice: 48, priceScale: 7, curveK: 18, cap: .25 },
+  // Shard Magnet reach and pull speed. Not part of the Daily Draft (`draft: false`): the Draft's
+  // competitive catalogue changes only with a DRAFT_RULES_VERSION bump.
+  { id: 'magnet', label: 'MAGNET PULL', basePrice: 32, priceScale: 5, curveK: 10, cap: 1.5, draft: false },
 ]);
 /**
  * High-tier canopy milestone: successful BSOD Bluffing pressurizes the sail.
@@ -80,6 +83,7 @@ export function upgradeEffects(input) {
     airbrakeLiftMul: 1 + b('airbrake'),
     divebombMul: 1 + b('divebomb'),
     bsodAccelerationMul: 1 - b('bsodGrace'),
+    magnetMul: 1 + b('magnet'),
   });
 }
 

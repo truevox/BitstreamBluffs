@@ -41,6 +41,9 @@ import { SimClock } from '../systems/SimClock.js';
 import { GhostRecorder, TapePlayer, quantizeTilt } from '../systems/ghost/GhostTape.js';
 import { runRandomState } from '../systems/RunRandom.js';
 import { GhostRider } from '../entities/GhostRider.js';
+import { BlackHole } from '../entities/BlackHole.js';
+import { isReducedMotion } from '../ui/Motion.js';
+import { magnetStrength, pullStep, magnetSpawn, magnetHolePos } from '../systems/ShardMagnet.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, hazardColor, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
@@ -517,6 +520,8 @@ export class RunScene extends Phaser.Scene {
     safe(this.bg);
     safe(this.songBillboard);
     this.songBillboard=null;
+    safe(this.blackHole);
+    this.blackHole = null;
     (this.ghostRiders || []).forEach(safe);
     this.ghostRiders = [];
     this._ghostToken = (this._ghostToken || 0) + 1;
@@ -752,6 +757,17 @@ export class RunScene extends Phaser.Scene {
       p.key = `${chunk.index}:${i}`;
       pu.push(p);
     });
+    // Shard Magnet: one optional extra pickup per chunk, from its own seeded stream (never in the chunk data).
+    const magnetDef = this.content.powerups.shardMagnet;
+    if (magnetDef && !this.collectedPowerups.has(`${chunk.index}:magnet`)) {
+      let spawn = null;
+      try { spawn = magnetSpawn(this.seed, chunk, magnetDef, (x) => this.terrain.heightAt(x), PIXELS_PER_METER); } catch (e) { /* a cosmetic-tier pickup never breaks streaming */ }
+      if (spawn) {
+        const p = new PowerUp(this, magnetDef, spawn, this.palette);
+        p.key = `${chunk.index}:magnet`;
+        pu.push(p);
+      }
+    }
     if (pu.length) this.powerups.set(chunk.index, pu);
     if (this.shardField) this.shardField.addChunk(chunk);
   }
@@ -978,6 +994,12 @@ export class RunScene extends Phaser.Scene {
       this.glideMs = durationMs;
       this.glideMul = glideFrictionMul(eff.frictionMul);
       this.glideId = def.id;
+    } else if (eff.kind === 'magnet') {
+      // Shard Magnet: pulls shards in for durationMs. Strength = def x MAGNET PULL upgrade (never time).
+      durationMs = timedPowerupMs(eff);
+      this.magnetMs = durationMs;
+      this.magnetEff = eff;
+      this.magnetId = def.id;
     } else if (eff.kind === 'stabilize') {
       // B0: wider landing tolerance (BiomeEffects.resolveLanding) and optional bounce damping
       durationMs = timedPowerupMs(eff);
@@ -1287,6 +1309,10 @@ export class RunScene extends Phaser.Scene {
     for (const list of this.powerups.values()) for (const p of list) p.update(t, left, right);
     this.fx.update(fxDt, this.heightFn);
     if (this.shardField) this.shardField.update(t, left, right);
+    if (this.magnetMs > 0 && !this.crashed) {
+      if (!this.blackHole) this.blackHole = new BlackHole(this, this.palette);
+      this.blackHole.update(t, magnetHolePos(sled.x, sled.y), magnetStrength(this.magnetEff, this.upgradeFx?.magnetMul), this.magnetMs, isReducedMotion(this));
+    } else this.blackHole?.update(t, null, null, 0);
     if (this.bestMarker) this.bestMarker.update(t, sled.x, this.heightFn);
     if (this.deathMarker) this.deathMarker.update(t, sled.x, this.heightFn);
     if (this.bestMarker && this.deathMarker) {
@@ -1359,6 +1385,9 @@ export class RunScene extends Phaser.Scene {
     this.blindMs = 0;
     this.blindTotalMs = 0;
     this.blindVis = 1;
+    this.magnetMs = 0;
+    this.magnetEff = null;
+    this.magnetId = null;
   }
 
   /** B0: end every biome effect now (manual reset), reporting each the way its HUD chip expects. */
@@ -1367,6 +1396,7 @@ export class RunScene extends Phaser.Scene {
     if (this.glideMs > 0) this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.glideId, reason });
     if (this.stabilizeMs > 0) this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.stabilizeId, reason });
     if (this.blindMs > 0) this.game.events.emit(EVT.EFFECT_END, { effect: 'blind' });
+    if (this.magnetMs > 0) this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.magnetId, reason });
     this._resetBiomeEffects();
     this.updateBlindOverlay();
   }
@@ -1382,6 +1412,10 @@ export class RunScene extends Phaser.Scene {
     if (this.stabilizeMs > 0) {
       this.stabilizeMs -= dt;
       if (this.stabilizeMs <= 0) { this.stabilizeMs = 0; this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.stabilizeId, reason: 'timeout' }); }
+    }
+    if (this.magnetMs > 0) {
+      this.magnetMs -= dt;
+      if (this.magnetMs <= 0) { this.magnetMs = 0; this.game.events.emit(EVT.POWERUP_EXPIRED, { id: this.magnetId, reason: 'timeout' }); }
     }
     if (this.blindMs > 0) {
       this.blindMs -= dt;
@@ -1657,7 +1691,13 @@ export class RunScene extends Phaser.Scene {
 
     // shards
     if (this.shardField) {
-      const got = this.shardField.collect(sled.x, sled.y - 6, TUNING.shardRadiusPx);
+      let got = this.shardField.collect(sled.x, sled.y - 6, TUNING.shardRadiusPx);
+      if (this.magnetMs > 0) {
+        // Shards fall into the hole (hovering over the rider) and are collected there.
+        const m = magnetStrength(this.magnetEff, this.upgradeFx?.magnetMul), h = magnetHolePos(sled.x, sled.y);
+        this.shardField.pull(h.x, h.y, m.radius, (sx, sy, x, y) => pullStep(sx, sy, x, y, m.radius, m.speed, dt));
+        got = got.concat(this.shardField.collect(h.x, h.y, TUNING.shardRadiusPx));
+      }
       for (const sh of got) {
         if (now - this.shardChainAt > TUNING.shardChainMs) this.shardChain = 0;
         this.shardChain += 1;

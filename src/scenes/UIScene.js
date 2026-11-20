@@ -62,6 +62,8 @@ const POWERUP_INFO = {
   // B4 biome pickups (both the shared stabilize kind)
   gravityStabilizer: { name: 'GRAV STABILIZER', color: 'amber' },
   stabilizerRails: { name: 'STABILIZER RAILS', color: 'lime' },
+  // Shard Magnet: the black hole that vacuums up shards
+  shardMagnet: { name: 'SHARD MAGNET', color: 'magenta' },
 };
 /** B1: a biome hazard names itself on the effect warning line instead of the generic effect label. */
 const HAZARD_LABEL = {
@@ -519,6 +521,11 @@ export class UIScene extends Phaser.Scene {
       g.strokeCircle(cx, cy, 6);
       g.fillTriangle(cx, cy - 4, cx - 3, cy + 3, cx + 3, cy + 3);
       g.fillTriangle(cx - 2, cy - 1, cx - 4, cy + 3, cx, cy + 3);
+    } else if (id === 'shardMagnet') {
+      // a black hole: dark core in a ring, with an orbiting shard
+      g.strokeCircle(cx, cy, 6);
+      g.fillCircle(cx, cy, 2.5);
+      g.fillTriangle(cx + 5, cy - 6, cx + 7, cy - 4, cx + 5, cy - 2);
     } else if (id === 'clockPulse') {
       g.strokeCircle(cx, cy, 6);
       g.lineBetween(cx, cy, cx, cy - 4);

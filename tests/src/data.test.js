@@ -141,7 +141,9 @@ describe('terrain mods', () => {
     const base = (o) => Object.keys(o).filter((id) => !o[id].biome).sort();
     const biome = (o) => Object.keys(o).filter((id) => o[id].biome).sort();
     expect(base(c.hazards)).toEqual(['garbageDataVent', 'glitchChasm', 'overflowFirewall', 'packetSpike', 'roguePacket']);
-    expect(base(c.powerups)).toEqual(['clockPulse', 'hashedBackup', 'packetBurst']);
+    // Shard Magnet (owner request, 2026-11-20) is a base pickup with its own placement, outside the terrain output.
+    expect(base(c.powerups)).toEqual(['clockPulse', 'hashedBackup', 'packetBurst', 'shardMagnet']);
+    expect(c.powerups.shardMagnet.placement).toBe('own');
     expect(biome(c.hazards)).toEqual(['ashCloud', 'chocolateRiver', 'dewDrop', 'gearGate', 'groomerCat', 'gustFront', 'meteor', 'rollingBoulder', 'seagullDive', 'seaweedTangle', 'shatterWall']);
     expect(biome(c.powerups)).toEqual(['aquaLungBubble', 'clockworkTreads', 'crystalClearGoggles', 'gravityStabilizer', 'heatShield', 'mapleWax', 'royalJellyWax', 'sandrunnerSkis', 'slickWaxSpray', 'stabilizerRails', 'sweetToothCoating']);
   });

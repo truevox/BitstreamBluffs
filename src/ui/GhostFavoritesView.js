@@ -2,7 +2,7 @@
  * replace or clear a slot, and switch each favorite ghost on or off. Opened from Game Over
  * (GHOST FAV button or G). Everything is local; nothing is uploaded.
  */
-import { View } from './Views.js';
+import { View } from './View.js';
 import { NeonText } from './Neon.js';
 import { Button } from './Button.js';
 import { uiSfx } from './Sound.js';

@@ -86,7 +86,7 @@
  * @property {string} id
  * @property {string} shapeKey
  * @property {number} radius          pickup radius px.
- * @property {{kind:'slowmo'|'speedBoost'|'shield'|'ward'|'glide'|'stabilize', durationMs?:number, timeScale?:number,
+ * @property {{kind:'slowmo'|'speedBoost'|'shield'|'ward'|'glide'|'stabilize'|'magnet', durationMs?:number, timeScale?:number,
  *             speedFactor?:number, charges?:number, mods?:string[], hazards?:string[], effects?:string[],
  *             frictionMul?:number, landingToleranceDeg?:number, bounceMul?:number}} effect
  *                                    B0 kinds (additive): 'ward' {durationMs (4-6 s), mods[], hazards[], effects[]} switches
