@@ -37,6 +37,7 @@ import { sameBoardAs } from '../systems/Ranking.js';
 import { resolveCosmetics } from '../systems/Cosmetics.js';
 import { PhysicsTuner, stepWorld, TUNING, BASE_STEP_MS, pxPerSecToStep } from '../systems/PhysicsTuner.js';
 import { runRandomStreams } from '../systems/RunRandom.js';
+import { SimClock } from '../systems/SimClock.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, hazardColor, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
@@ -153,6 +154,7 @@ export class RunScene extends Phaser.Scene {
     this.seed = String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
     // Named seeded streams for this run (issue #59). Rebuilt from the seed on every create.
     this.runRandom = runRandomStreams(this.seed);
+    this.simClock = new SimClock();
     // W3: resolved ONCE per run, from the registry (a daily run sets the date-derived mask). Never
     // re-read mid-run, so the terrain, the stats scope and the saved record cannot disagree.
     const maskReg = reg.get(REG.BIOME_MASK);
@@ -1023,11 +1025,35 @@ export class RunScene extends Phaser.Scene {
       return;
     }
 
-    const pad = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
-    if (pad.pressed.pause) {
+    const polled = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
+    if (polled.pressed.pause) {
       this.pauseRun();
       return;
     }
+    // Fixed simulation tick (issue #59): real frame time feeds an accumulator and the game
+    // advances only in whole SIM_TICK_MS ticks, so one input tape gives one run at any
+    // display rate. Rendering stays once per display frame.
+    if (!this.simClock) this.simClock = new SimClock();
+    const ticks = this.simClock.advance(dt);
+    const pads = this.simClock.padsFor(polled, ticks);
+    let pad = polled;
+    for (const tickPad of pads) {
+      pad = tickPad;
+      this.simClock.tick++;
+      const r = this.simTick(this.simClock.tickMs, tickPad);
+      if (r === 'hold') { this.renderFrame(0); return; }
+      if (this.crashed) break;
+    }
+    this.renderFrame(dt, pad);
+  }
+
+  /**
+   * One fixed simulation tick: every causal gameplay system (timers, physics, contacts,
+   * BSOD, tricks, score, pickups, hazards, streaming, glitch schedule). `dt` is always
+   * SimClock.tickMs; slow-mo, blink and hit-stop scale the physics delta inside it.
+   * @returns {'hold'|undefined} 'hold' when a Gym retry froze the new attempt.
+   */
+  simTick(dt, pad) {
     this.runTimeMs += dt;
     this._hudMs = (this._hudMs || 0) + dt;
     if (this._hudMs >= 100) {
@@ -1136,7 +1162,7 @@ export class RunScene extends Phaser.Scene {
     // crash resolution (may be negated by Hashed Backup, except the BSOD)
     if (this.pendingCrash) this.resolveCrash(fs);
     // The replacement attempt remains frozen even for this crash frame.
-    if (this.bsodGym && this.gymReadyMs > 0) { this.renderFrame(0); return; }
+    if (this.bsodGym && this.gymReadyMs > 0) return 'hold';
 
     if (!this.crashed) {
       this.updateBsodBluff();
@@ -1162,7 +1188,6 @@ export class RunScene extends Phaser.Scene {
       }
     }
 
-    this.renderFrame(dt, pad);
   }
 
   /** Visuals shared by live and crashed frames that need the sled. */

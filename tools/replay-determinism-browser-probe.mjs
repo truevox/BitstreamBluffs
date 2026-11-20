@@ -19,9 +19,21 @@ const url = process.env.GAME_URL || 'http://localhost:8293/';
 const SEED = process.env.SEED || 'RPLAY59';
 const SIM_MS = Number(process.env.SIM_MS || 9000);
 const expectParity = process.env.EXPECT_RATE_PARITY === '1';
+const SCRAMBLE = process.env.SCRAMBLE !== '0';
+// DUMP=file.json DUMP_HZ=60,120: just record those runs (handling comparisons between builds) and exit.
+const DUMP = process.env.DUMP || null;
 
-// Input tape in run-clock ms: held ranges and one-shot edges.
-const TAPE = {
+// Input tape in run-clock ms: held ranges and one-shot edges. Every time is a multiple of
+// 100 ms, i.e. a whole number of 30/60/120 Hz frames, so all rates see each change on the same tick.
+// TAPE=cruise: the same tape without the two flips (handling comparisons without bail-outs).
+const TAPE = process.env.TAPE === 'cruise' ? {
+  held: [
+    { key: 'push', from: 0, to: 1800 },
+    { key: 'push', from: 4200, to: 5200 },
+    { key: 'tuck', from: 7000, to: 8200 },
+  ],
+  edges: [{ key: 'hop', at: 2600 }, { key: 'hop', at: 5900 }],
+} : {
   held: [
     { key: 'push', from: 0, to: 1800 },
     { key: 'tilt', value: -1, from: 3000, to: 3700 },
@@ -40,7 +52,7 @@ async function runOnce(hz, label) {
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
-    const out = await page.evaluate(async ({ hz, seed, simMs, tape }) => {
+    const out = await page.evaluate(async ({ hz, seed, simMs, tape, scramble }) => {
       const g = window.__bbGame;
       const run = g.scene.getScene('RunScene');
       const realUpdate = run.update;
@@ -50,7 +62,7 @@ async function runOnce(hz, label) {
       // Let Phaser boot the scene (update is held, so no simulation time passes).
       await new Promise((res) => { const w = () => (run.sys.isActive() && run.sled ? res() : requestAnimationFrame(w)); w(); });
       g.loop.sleep();
-      run.scrambleMs = 1e9; // scramble the whole run: the RNG under test
+      if (scramble) run.scrambleMs = 1e9; // scramble the whole run: the RNG under test
       let clock = 0;
       const pending = tape.edges.map((e) => ({ ...e, fired: false }));
       run.inputRouter.poll = () => {
@@ -62,22 +74,28 @@ async function runOnce(hz, label) {
       hold = false;
       const dt = 1000 / hz;
       const samples = [];
-      let t = 0, nextSample = 0, frames = 0;
-      while (run.runTimeMs < simMs && frames < simMs / dt + 50) {
-        clock = run.runTimeMs;
+      let t = 0, nextSample = 0, frames = 0, lastTick = -1;
+      // Tape time from the integer tick count when the fixed-tick clock exists (exact at
+      // every rate); the variable-delta baseline only has runTimeMs.
+      const now = () => (run.simClock ? Math.round(run.simClock.tick * run.simClock.tickMs * 1000) / 1000 : run.runTimeMs);
+      while (now() < simMs && frames < simMs / dt + 50) {
+        clock = now();
         t += dt;
         g.step(t, dt);
         frames++;
-        if (run.runTimeMs + 1e-6 >= nextSample || run.crashed) {
+        // Fixed tick: sample every 60th tick (a frame boundary at 30, 60 and 120 Hz). Baseline: by run time.
+        const due = run.simClock ? run.simClock.tick % 60 === 0 && run.simClock.tick !== lastTick : now() + 1e-6 >= nextSample;
+        if (due || run.crashed) {
+          lastTick = run.simClock?.tick;
           const b = run.sled.body;
-          samples.push({ t: Math.round(run.runTimeMs), x: run.sled.x, y: run.sled.y, a: b.angle, vx: b.velocity.x, vy: b.velocity.y, w: b.angularVelocity,
+          samples.push({ t: Math.round(now()), tick: run.simClock?.tick ?? null, x: run.sled.x, y: run.sled.y, a: b.angle, vx: b.velocity.x, vy: b.velocity.y, w: b.angularVelocity,
             score: run.score?.getTotal?.() ?? null, crashed: !!run.crashed, scramble: run.runRandom?.physicsScramble?.state ?? null });
-          nextSample += 250;
+          nextSample += 500; // 60 ticks: a whole number of 30, 60 and 120 Hz frames
           if (run.crashed) break;
         }
       }
       return { frames, samples };
-    }, { hz, seed: SEED, simMs: SIM_MS, tape: TAPE });
+    }, { hz, seed: SEED, simMs: SIM_MS, tape: TAPE, scramble: SCRAMBLE });
     assert.deepEqual(errors, [], `${label}: page errors`);
     return out;
   } finally { await browser.close(); }
@@ -96,11 +114,19 @@ function compare(a, b) {
     end: [a.samples.at(-1), b.samples.at(-1)].map((s) => s && { t: s.t, x: +s.x.toFixed(2), y: +s.y.toFixed(2), crashed: s.crashed, score: s.score }) };
 }
 
+if (DUMP) {
+  const { writeFile } = await import('node:fs/promises');
+  const runs = {};
+  for (const hz of (process.env.DUMP_HZ || '60').split(',').map(Number)) runs[hz] = (await runOnce(hz, `dump${hz}`)).samples;
+  await writeFile(DUMP, JSON.stringify({ seed: SEED, scramble: SCRAMBLE, simMs: SIM_MS, runs }));
+  console.log('DUMPED', DUMP, Object.keys(runs).join(','));
+  process.exit(0);
+}
 const r60a = await runOnce(60, '60a');
 const r60b = await runOnce(60, '60b');
 const same = compare(r60a, r60b);
 console.log('SAME_RATE_REPEAT', JSON.stringify(same));
-assert.ok(r60a.samples.length > 10, 'probe produced too few samples');
+assert.ok(r60a.samples.length >= 5, 'probe produced too few samples');
 assert.ok(r60a.samples.at(-1).scramble !== r60a.samples[0].scramble, 'scramble stream never advanced: scramble not exercised');
 assert.equal(same.firstDivergeMs, null, 'same seed + tape + frame schedule must replay identically');
 console.log('REPLAY_SAME_RATE_PASS');
