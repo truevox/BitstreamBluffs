@@ -71,6 +71,14 @@ Let j index the jth **extra** purchased Sim-Slot, n = 3 + all currently rented b
 
 **MEASURE:** race-duration/cadence floor for rapid-crash brain, older/better brain variance, official virtual race win rules and achievements, equipment changes, highly capable Bazaar imports, absence interval claims, duplicated tabs, crashes and backwards wall-clock. Reconciliation must be idempotent, atomic with the existing shard bank and bounded in storage. Close events are unreliable, so use durable foreground heartbeats and settlement cursors; not simply browser unload.
 
+### 5.1 Existing storage inspection: calibrated brain evidence cannot use legacy RunRecord alone
+
+**SOURCE FINDING, 2026-11-20:** Current game SaveStore.js RunRecord persists seed, timestamps, duration, score, distance, tricks, cause, shard earnings and a versioned ledger hash. It DOES NOT identify the immutable deployed neural checkpoint or guarantee an equipment snapshot on every older run. SaveStore.sanitizeRun deliberately whitelists known fields; silently adding a model identity to arbitrary RunRecords is not reliable and can break old hash/dedup migration. ProfileStore credits genuine run payouts idempotently on ledgerHash.
+
+**PROPOSED engineering prerequisite:** a **separate, versioned BrainRunEvidence IndexedDB store** (or deliberately backward-compatible RunRecord migration with explicit hash-version tests), keyed by actual run ID plus live-run ledger hash, immutable deployed model hash, equipment snapshot hash and game rules version. Store genuine elapsed duration, outcome, eligible shard payout, completion and observed telemetry. Link evidence to actual scored runs but NEVER mutate existing real run records to fabricate offline races. Accelerated trainer episodes are not eligible live earning samples. When no evidence exists for an old profile, use conservative prior/calibration rather than inventing model history.
+
+**Required acceptance before offline payouts:** last-X comparable genuine same-brain runs survive reload; gear/rule changes invalidate incompatible evidence; old Classic/Draft/Modded ledger hashes validate without change; replayed/bad runs cannot add another paid or evidence receipt; Shard Racing virtual results have their own journal, never inserted into genuine physics RunRecords. See [#48](https://github.com/truevox/BitstreamBluffs/issues/48).
+
 ## 6. Simulator, ABI, real training methods and fairness
 
 **OWNER DECIDED:** Real trainer episodes MUST share the same actual seeded game physics, terrain, hazards and equipment. Required first-class training methods include NEAT, fixed-parameter ES/CEM, MAP-Elites, novelty search, Population-Based Training; optional PPO/demonstrations later. Genuine learning must be observable, checkpointed and measured, not fake scripted brain levels. Training and stock-equipment skill ratings are separate from purchased equipment strength.
