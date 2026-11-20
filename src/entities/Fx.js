@@ -4,6 +4,7 @@
  * expanding rings. A fixed-size pool means no allocation per effect and nothing to leak on restart.
  */
 import Phaser from 'phaser';
+import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 
 const POOL = 160;
 
@@ -13,6 +14,8 @@ export class Fx {
    * @param {Object<string,number>} palette
    */
   constructor(scene, palette) {
+    // Crash shards and sparks: the run's visual/fx stream (repeatable per seed), never a gameplay stream.
+    this.random = scene.runRandom?.visualFx || cosmeticRandom('visual/fx');
     this.scene = scene;
     this.palette = palette;
     this.gfx = scene.add.graphics().setDepth(30).setBlendMode(Phaser.BlendModes.ADD);
@@ -49,17 +52,17 @@ export class Fx {
     for (let i = 0; i < count; i++) {
       const it = this._take();
       if (!it) return;
-      const a = Math.random() * Math.PI * 2;
-      const sp = 60 + Math.random() * 260;
+      const a = this.random.next() * Math.PI * 2;
+      const sp = 60 + this.random.next() * 260;
       it.kind = 1;
-      it.x = x + (Math.random() - 0.5) * 14;
-      it.y = y + (Math.random() - 0.5) * 14;
+      it.x = x + (this.random.next() - 0.5) * 14;
+      it.y = y + (this.random.next() - 0.5) * 14;
       it.vx = vx * 0.5 + Math.cos(a) * sp;
       it.vy = vy * 0.5 + Math.sin(a) * sp - 80;
-      it.rot = Math.random() * 6.28;
-      it.vr = (Math.random() - 0.5) * 18;
-      it.life = it.max = 900 + Math.random() * 700;
-      it.size = 2.5 + Math.random() * 5;
+      it.rot = this.random.next() * 6.28;
+      it.vr = (this.random.next() - 0.5) * 18;
+      it.life = it.max = 900 + this.random.next() * 700;
+      it.size = 2.5 + this.random.next() * 5;
       it.color = colors[i % colors.length];
       it.grav = 650;
     }
@@ -79,15 +82,15 @@ export class Fx {
     for (let i = 0; i < count; i++) {
       const it = this._take();
       if (!it) return;
-      const a = Math.random() * Math.PI * 2;
-      const sp = speed * (0.3 + Math.random() * 0.7);
+      const a = this.random.next() * Math.PI * 2;
+      const sp = speed * (0.3 + this.random.next() * 0.7);
       it.kind = 0;
       it.x = x;
       it.y = y;
       it.vx = Math.cos(a) * sp;
       it.vy = Math.sin(a) * sp - upBias;
-      it.life = it.max = 250 + Math.random() * 350;
-      it.size = 1.5 + Math.random() * 1.5;
+      it.life = it.max = 250 + this.random.next() * 350;
+      it.size = 1.5 + this.random.next() * 1.5;
       it.color = color;
       it.grav = 300;
     }

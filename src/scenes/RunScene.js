@@ -43,6 +43,7 @@ import { runRandomState } from '../systems/RunRandom.js';
 import { GhostRider } from '../entities/GhostRider.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
+import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos } from '../systems/ShardMagnet.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
@@ -2338,8 +2339,8 @@ export class RunScene extends Phaser.Scene {
     let oy = 0;
     if (this.shakeAmp > 0.15) {
       // per-pixel RNG jitter, decaying
-      ox = Math.round((Math.random() * 2 - 1) * this.shakeAmp);
-      oy = Math.round((Math.random() * 2 - 1) * this.shakeAmp);
+      ox = Math.round(((this.runRandom?.visualCamera || cosmeticRandom('visual/camera')).next() * 2 - 1) * this.shakeAmp);
+      oy = Math.round(((this.runRandom?.visualCamera || cosmeticRandom('visual/camera')).next() * 2 - 1) * this.shakeAmp);
       this.shakeAmp *= Math.exp(-dt / 140);
     } else {
       this.shakeAmp = 0;

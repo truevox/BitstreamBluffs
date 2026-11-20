@@ -1,3 +1,4 @@
+import { cosmeticRandom } from '../CosmeticRandom.js';
 /** Four-song owner-selected rotation: One More Run first per fresh load, then sequential/shuffled. All disabled = SILENCE. */
 export const GAME_SONGS = Object.freeze([
 	{ id: 'FEsxYVStla4', label: 'POPE LEO' },
@@ -26,7 +27,7 @@ export function nextEnabledSongIndex(catalog, selection, previousIndex = -1) {
 	return indices.find(i => i > previousIndex) ?? indices[0];
 }
 /** Build a shuffled round of enabled tracks; never repeat the current one when alternatives exist. */
-export function shuffledSongRound(catalog, selection, currentIndex, random=Math.random) {
+export function shuffledSongRound(catalog, selection, currentIndex, random=()=>cosmeticRandom('audio/shuffle').next()) {
 	const enabled=enabledSongIndices(catalog,selection);
 	if(enabled.length<2)return enabled;
 	const choices=enabled.filter(index=>index!==currentIndex);

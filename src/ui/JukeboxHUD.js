@@ -12,6 +12,7 @@ import {Button} from './Button.js';
 import {NeonText} from './Neon.js';
 import {ellipsize} from './PixelFont.js';
 import {isReducedMotion} from './Motion.js';
+import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 
 /**
  * Compact cabinet variant (Title): 102x30, an animated level meter beside the song name, and four glyph
@@ -184,7 +185,7 @@ export class JukeboxHUD {
 		g.clear();
 		const still=!this.playing||isReducedMotion(this.scene);
 		for(let i=0;i<5;i++){
-			const hgt=still?(this.playing?[3,5,4,6,3][i]:1):1+Math.floor(Math.random()*7);
+			const hgt=still?(this.playing?[3,5,4,6,3][i]:1):1+Math.floor(cosmeticRandom('ui/jukebox').next()*7);
 			g.fillStyle(i<2?pal.lime:i<4?pal.cyan:pal.magenta,this.playing?.95:.45);
 			g.fillRect(3+i*2,10-hgt,1,hgt);
 		}

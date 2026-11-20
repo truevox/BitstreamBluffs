@@ -8,7 +8,7 @@ listed at the end remain open.
 |---|---|---|
 | 1 | `engine/seeded-sim-rng-59` | Scramble torque comes from a seeded `physics/scramble` stream. The scrambled-silhouette shake uses `visual/sled`. New run seeds come from `crypto.getRandomValues`. |
 | 2 | `engine/fixed-tick-59` (on top of 1) | All causal gameplay runs in fixed ticks (`SimClock`, `RunScene.simTick`). |
-| 3 | not started | Cosmetic and audio `Math.random` moves to its own streams: `Fx`, camera shake, `UIScene` flicker, `TitleScene`, `GameOverScene`, `JukeboxHUD`, `AudioSynth`. None of it affects gameplay. |
+| 3 | `feature/ghost-tapes-56` | Done. No `Math.random()` is left in `src/`, and a test enforces it. World effects (`Fx`, camera shake) use the run's `visual/fx` and `visual/camera` streams, so a replay looks the same. Menus, HUD flicker, the jukebox, audio texture and music shuffle use `CosmeticRandom`: named forks of a session root taken once from the CSPRNG. Not yet audited: `tools/` and future simulation code outside `src/`. |
 
 ## What stage 2 does
 

@@ -30,6 +30,7 @@ import { uiSfx } from '../ui/Sound.js';
 import { stackY, placeX, STRIP_BAND } from '../ui/HudLayout.js';
 import { killerName } from '../systems/CrashReport.js';
 import { RunMinimap } from '../ui/RunMinimap.js';
+import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 
 /** Optional extra event (additive): payload {speedPxS:number}. */
 export const HUD_SPEED_EVENT = 'bb:hudSpeed';
@@ -1404,7 +1405,7 @@ export class UIScene extends Phaser.Scene {
     // glitch jitter of the HUD (subtle)
     if (this.nowMs < this.glitchUntil) {
       this.hud.setPosition(Phaser.Math.Between(-this.glitchPower, this.glitchPower), 0);
-      this.hud.setAlpha(Math.random() < 0.3 ? 0.6 : 1);
+      this.hud.setAlpha(cosmeticRandom('ui/glitch').next() < 0.3 ? 0.6 : 1);
     } else if (this.hud.x !== 0 || this.hud.alpha !== 1) {
       this.hud.setPosition(0, 0).setAlpha(1);
     }

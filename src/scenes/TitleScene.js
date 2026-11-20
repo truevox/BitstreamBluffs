@@ -48,6 +48,7 @@ import { titleBadgeLayout } from '../ui/ProfileLayout.js';
 import { randomSeed, idToLabel, fmtInt } from '../ui/Format.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
+import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 
 /** Idle time before attract mode. */
 export const ATTRACT_MS = 20000;
@@ -191,22 +192,22 @@ export class TitleScene extends Phaser.Scene {
     if (!reduced) {
       if (t >= this.nextGlitch && t >= this.glitchUntil) {
         this.glitchUntil = t + 140;
-        this.nextGlitch = t + 2600 + Math.random() * 3400;
+        this.nextGlitch = t + 2600 + cosmeticRandom('title/fx').next() * 3400;
         for (const w of this.logoWords) {
           for (const s of w.slices) {
-            const sy = Math.floor(Math.random() * (w.h - 6));
-            s.glitch = { y: sy, h: 2 + Math.floor(Math.random() * 5), dx: (Math.random() < 0.5 ? -1 : 1) * (3 + Math.floor(Math.random() * 5)) };
+            const sy = Math.floor(cosmeticRandom('title/fx').next() * (w.h - 6));
+            s.glitch = { y: sy, h: 2 + Math.floor(cosmeticRandom('title/fx').next() * 5), dx: (cosmeticRandom('title/fx').next() < 0.5 ? -1 : 1) * (3 + Math.floor(cosmeticRandom('title/fx').next() * 5)) };
           }
         }
       }
       glitching = t < this.glitchUntil;
-      if (t >= this.nextGlint) this.nextGlint = t + 4200 + Math.random() * 2000;
+      if (t >= this.nextGlint) this.nextGlint = t + 4200 + cosmeticRandom('title/fx').next() * 2000;
     }
     // the glint sweeps for 700 ms after each schedule point (nextGlint - its period)
     for (const w of this.logoWords) {
       const dy = reduced ? 0 : Math.round(Math.sin(t * 0.0022 + w.phase) * 1.5);
       const split = glitching ? 3 : 1;
-      const jit = glitching ? (Math.random() < 0.5 ? -1 : 1) : 0;
+      const jit = glitching ? (cosmeticRandom('title/fx').next() < 0.5 ? -1 : 1) : 0;
       w.shadow.setPosition(w.x, w.y + 3 + dy);
       w.lineM.setPosition(w.x - split, w.y + dy + (glitching ? jit : 0));
       w.lineC.setPosition(w.x + split, w.y + dy - (glitching ? jit : 0));

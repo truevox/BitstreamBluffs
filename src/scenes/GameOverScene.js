@@ -46,6 +46,7 @@ import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { gameOverLine } from '../systems/CrashReport.js';
+import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 
 const PANEL_Y = 54;
 const PANEL_H = 160;
@@ -1271,8 +1272,8 @@ export class GameOverScene extends Phaser.Scene {
     const sp = [];
     for (let i = 0; i < count; i++) {
       sp.push({
-        a: Math.random() * Math.PI * 2, v: 35 + Math.random() * 95, life: 480 + Math.random() * 420,
-        c: cols[i % cols.length], size: Math.random() < 0.3 ? 2 : 1, ph: i,
+        a: cosmeticRandom('gameover/fx').next() * Math.PI * 2, v: 35 + cosmeticRandom('gameover/fx').next() * 95, life: 480 + cosmeticRandom('gameover/fx').next() * 420,
+        c: cols[i % cols.length], size: cosmeticRandom('gameover/fx').next() < 0.3 ? 2 : 1, ph: i,
       });
     }
     const g = this.add.graphics().setDepth(9000);
@@ -1434,7 +1435,7 @@ export class GameOverScene extends Phaser.Scene {
     if (this._slam || isReducedMotion(this)) return;
     this.ghostT -= delta;
     if (this.ghostT <= 0) {
-      const j = Math.random() < 0.25;
+      const j = cosmeticRandom('gameover/fx').next() < 0.25;
       this.ghostA.setX(GAME_WIDTH / 2 - (j ? 5 : 2));
       this.ghostB.setX(GAME_WIDTH / 2 + (j ? 5 : 2));
       this.title.setX(GAME_WIDTH / 2 + (j ? Phaser.Math.Between(-2, 2) : 0));

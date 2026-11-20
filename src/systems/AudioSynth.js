@@ -33,6 +33,7 @@ import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js
 import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
 import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
 import { syntheticMeterAt } from './music/SyntheticMeterTiming.js';
+import { cosmeticRandom } from './CosmeticRandom.js';
 
 /** SFX names playSfx() must support (callers outside the engineer's files may use these). */
 export const SFX = Object.freeze([
@@ -294,7 +295,7 @@ export class AudioSynth {
     const len = c.sampleRate * 2;
     const buf = c.createBuffer(1, len, c.sampleRate);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    for (let i = 0; i < len; i++) d[i] = cosmeticRandom('audio/sfx').next() * 2 - 1;
     n.noiseBuf = buf;
     // wind: looped noise -> bandpass -> windGain
     n.windSrc = c.createBufferSource();
@@ -431,7 +432,7 @@ export class AudioSynth {
     src.connect(f);
     f.connect(env);
     env.connect(dest);
-    src.start(t0, Math.random() * 1.5);
+    src.start(t0, cosmeticRandom('audio/sfx').next() * 1.5);
     src.stop(t0 + dur + 0.03);
   }
 
@@ -519,7 +520,7 @@ export class AudioSynth {
         this.duckMusic(250);
         break;
       case 'hazardScramble':
-        for (let i = 0; i < 9; i++) o('square', 200 + Math.random() * 1400, 200 + Math.random() * 1400, 0.05, 0.12, 0.05 * i);
+        for (let i = 0; i < 9; i++) o('square', 200 + cosmeticRandom('audio/sfx').next() * 1400, 200 + cosmeticRandom('audio/sfx').next() * 1400, 0.05, 0.12, 0.05 * i);
         nz(0.4, 0.1, 'highpass', 3000, 3000);
         break;
       case 'uiMove':

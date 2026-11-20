@@ -64,3 +64,25 @@ describe('new seeds use the CSPRNG', () => {
     expect(fs.readFileSync('src/ui/Format.js', 'utf8')).not.toMatch(/Math\.random/);
   });
 });
+
+describe('stage 3: no unseeded randomness left in the game', () => {
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : e.name.endsWith('.js') ? [`${dir}/${e.name}`] : []));
+  test('src/ has no Math.random() call (comments aside)', () => {
+    const offenders = walk('src').filter((f) => fs.readFileSync(f, 'utf8').split('\n')
+      .some((l) => /Math\.random\(\)/.test(l) && !/^\s*(\*|\/\/)/.test(l)));
+    expect(offenders).toEqual([]);
+  });
+
+  test('cosmetic streams are named forks: drawing one never moves another or a run stream', async () => {
+    const { cosmeticRandom, seedCosmeticRandom } = await import('../../src/systems/CosmeticRandom.js');
+    seedCosmeticRandom(7);
+    const a = draws(cosmeticRandom('title/fx'), 5);
+    seedCosmeticRandom(7);
+    draws(cosmeticRandom('audio/sfx'), 50);
+    expect(draws(cosmeticRandom('title/fx'), 5)).toEqual(a);
+    const run = runRandomStreams('S');
+    const before = run.physicsScramble.state;
+    draws(run.visualFx, 20); draws(run.visualCamera, 20);
+    expect(run.physicsScramble.state).toBe(before);
+  });
+});

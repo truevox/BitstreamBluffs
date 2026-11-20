@@ -16,11 +16,13 @@ export const RUN_RANDOM_VERSION = 1;
 export const RUN_STREAMS = Object.freeze({
   physicsScramble: 'physics/scramble',
   visualSled: 'visual/sled',
+  visualFx: 'visual/fx',
+  visualCamera: 'visual/camera',
 });
 
 /**
  * @param {string} seed the run seed exactly as the terrain uses it.
- * @returns {{version:number, physicsScramble:Rng, visualSled:Rng}}
+ * @returns {{version:number, physicsScramble:Rng, visualSled:Rng, visualFx:Rng, visualCamera:Rng}}
  */
 export function runRandomStreams(seed) {
   const root = new Rng(String(seed));
