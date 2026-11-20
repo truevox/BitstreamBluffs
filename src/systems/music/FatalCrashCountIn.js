@@ -9,8 +9,9 @@
  * recovery gains. Original stem and adaptive orchestra routing are intact.
  */
 import {VINYL_SCRATCH_SECONDS} from './TurntableScratch.js';
+import {SYNTHETIC_BEAT_SECONDS,SYNTHETIC_BEATS_PER_MEASURE} from './SyntheticMeterTiming.js';
 
-export const FATAL_SYNTHETIC_BEAT_SECONDS=.5;
+export const FATAL_SYNTHETIC_BEAT_SECONDS=SYNTHETIC_BEAT_SECONDS;
 export const FATAL_SILENT_BEATS=2;
 export const FATAL_DRUM_BEATS=4;
 export const FATAL_ACCENT_SECONDS=.14;
@@ -33,8 +34,19 @@ export function planFatalCountIn(startAudioTime,{
   // Never relabel an experimental proposal as a verified source grid.
   if(timingKind!=='synthetic-unverified')return null;
   const bandAt=drumsStart+FATAL_DRUM_BEATS*beatSeconds;
+  // Label the four artificial count-in beats 1..4: the count-in's first
+  // drum accent is its synthetic downbeat. This is NOT a downbeat found in
+  // the original OGG or necessarily aligned with the song-wide fake meter.
+  const beatInMeasure=Object.freeze(Array.from({length:FATAL_DRUM_BEATS},
+    (_,i)=>i%SYNTHETIC_BEATS_PER_MEASURE+1));
+  const measureStartOnsets=Object.freeze(beatOnsets.filter((_,i)=>
+    beatInMeasure[i]===1));
   return Object.freeze({startAudioTime,silenceStart,drumsStart,
     bandAt,beatOnsets,beatSeconds,silentBeats,
+    beatInMeasure,measureStartOnsets,
+    beatsPerMeasure:SYNTHETIC_BEATS_PER_MEASURE,
+    measureSeconds:SYNTHETIC_BEATS_PER_MEASURE*beatSeconds,
+    syntheticMeterOrigin:'count-in-first-drum',
     timingKind,verified:false});
 }
 
