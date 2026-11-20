@@ -32,7 +32,7 @@ Companion: [v0.2 RFC](./alphabluffs-v0.2-contract.md). A standalone non-producti
 | V07 | Baseline Idle extrapolation from eligible unverified actual races | Base eligible shards still accrue; no verification gate for ordinary Idle, no fake neural progress |
 | V08 | Verified-only compatible evidence cohort (policy/bonus values configurable) | Baseline accrual plus separate positive verified-evidence bonus, applied exactly once for new settlement interval |
 | V09 | Race receives verification AFTER earlier offline interval settled | Previously paid shards not retrospectively duplicated; new intervals use new evidence snapshot/status |
-| V10 | Public ranked performance versus local offline-hours arithmetic | Peer check verifies legitimate replay of frozen brain/equipment under fixed challenge; it does NOT attest user's claimed offline duration; global rank cannot treat claimed hours as verified |
+| V10 | Public verified evidence versus server-owned offline time | Peer validation checks genuine real race performance, NOT elapsed time. Future public/account shards settle from SERVER timestamps/cursor and authoritative shard bank; client-reported hours or requested credits cannot change ledger |
 | P01 | Seeded actions in real Ride and renderless trainer | Same authoritative fixed-step physics outputs within declared cross-runtime conformance; discrepancies reported |
 | P02 | Invalid model graph, huge weights, NaN or unsupported ABI | Reject safely, no executable import, no uncontrolled resource allocation |
 | P03 | NEAT / fixed nets / PBT method sharing | Compatible inference supported; optimizer copy/fine-tune rejected if architecture incompatible; provenance honest |
