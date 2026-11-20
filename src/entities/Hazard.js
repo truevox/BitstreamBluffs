@@ -94,7 +94,8 @@ export class Hazard {
    */
   update(timeMs, camLeft, camRight) {
     if (this.destroyed) return;
-    if (this.motion) this.stepMotion(timeMs);
+    // RunScene advances motion in its fixed simulation tick (simStepped); stand-alone callers still step here.
+    if (this.motion && !this.simStepped) this.stepMotion(timeMs);
     const vis = this.cx > camLeft - 80 && this.cx < camRight + 80;
     this.gfx.setVisible(vis);
     if (!vis) return;

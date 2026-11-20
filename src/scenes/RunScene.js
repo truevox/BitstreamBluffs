@@ -21,6 +21,7 @@
 import Phaser from 'phaser';
 import {
   SCENES, REG, GAME_WIDTH, GAME_HEIGHT, PIXELS_PER_METER, PHYSICS, STORAGE, TIMING,
+  TERRAIN,
 } from '../constants.js';
 import { EVT } from '../events.js';
 import { SaveStore, LEDGER_HASH_V, UPGRADE_LEDGER_HASH_V,DRAFT_LEDGER_HASH_V } from '../systems/SaveStore.js';
@@ -158,14 +159,19 @@ export class RunScene extends Phaser.Scene {
     // W4 cosmetics: resolved ONCE per run, from the profile, for the same reason the biome mask is: the
     // sled, the trail and the drawn colours must not disagree with each other mid-run.
     this.look = this._resolveLook();
-    this.seed = String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
+    // A ghost replay (issue #56) is driven entirely by its tape header: the recorded course, loadout and
+    // upgrades, never the current profile (which may have levelled up and enabled new biomes since).
+    this._replayTape = reg.get(REG.GHOST_REPLAY) || null;
+    if (this._replayTape) reg.remove(REG.GHOST_REPLAY);
+    const replay = this._replayTape;
+    this.seed = replay ? String(replay.seed) : String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
     // Named seeded streams for this run (issue #59). Rebuilt from the seed on every create.
     this.runRandom = runRandomStreams(this.seed);
     this.simClock = new SimClock();
     // W3: resolved ONCE per run, from the registry (a daily run sets the date-derived mask). Never
     // re-read mid-run, so the terrain, the stats scope and the saved record cannot disagree.
     const maskReg = reg.get(REG.BIOME_MASK);
-    this.biomeMask = Number.isFinite(maskReg) ? maskReg >>> 0 : 0;
+    this.biomeMask = replay ? (Number(replay.biomeMask) || 0) >>> 0 : Number.isFinite(maskReg) ? maskReg >>> 0 : 0;
     this.startedAt = Date.now();
     this.runId = `${this.startedAt}-${this.seed}`;
     // A manual pause is a distinct session, never a death or title transition.
@@ -205,11 +211,18 @@ export class RunScene extends Phaser.Scene {
       const ranks=draftActiveRanks(validDraftRanks(proposed)?proposed:{});
       this.upgradeRun={enabled:Object.keys(ranks).length>0,ranks,effects:upgradeEffects(ranks)};
     }
+    if (replay) {
+      // The recorded upgrade ranks and boosts, exactly; nothing from the live profile.
+      const ranks = replay.upgradeRanks && typeof replay.upgradeRanks === 'object' ? { ...replay.upgradeRanks } : {};
+      this.upgradeRun = { enabled: Object.keys(ranks).length > 0, ranks, effects: upgradeEffects(ranks) };
+      const boosts = Array.isArray(replay.boosts) ? replay.boosts : [];
+      this.loadout = { boosts: Object.fromEntries(boosts.map((id) => [id, true])) };
+      this.unlockedBoosts = Object.fromEntries(boosts.map((id) => [id, true]));
+    }
     this.upgradeFx = this.upgradeRun.effects;
     // Shard Magnets drop from Sync Level 5, and on every Daily (equal pickups on an official board).
-    // A ghost replay restores the recorded choice (REG.GHOST_REPLAY header) so the course matches.
-    const replayTape = reg.get(REG.GHOST_REPLAY);
-    this.magnetsDrop = replayTape && typeof replayTape.magnetsDrop === 'boolean' ? replayTape.magnetsDrop
+    // A ghost replay restores the recorded choice so the course matches.
+    this.magnetsDrop = replay && typeof replay.magnetsDrop === 'boolean' ? replay.magnetsDrop
       : magnetsDropFor({ level: prof.level, daily: this.dailyOfficial === true || this.dailyMode === 'draft' });
     // Player abilities and BSOD behavior are unchanged in the Gym. Only the
     // starting pose, pursuit gap/speed and post-catch retry are different.
@@ -321,6 +334,7 @@ export class RunScene extends Phaser.Scene {
       .setOrigin(0).setScrollFactor(0).setDepth(99).setAlpha(0);
 
     // initial terrain buffer, then the sled on the surface
+    this._chunkQueue = new Map(); // a retry re-enters create() on this instance: no stale queued chunks
     this.streamTerrain(0);
     const start = this.safeStartPosition();
     // spawn a few body-lengths in so the rear runner is over solid ground (terrain begins exactly at start.x)
@@ -455,8 +469,7 @@ export class RunScene extends Phaser.Scene {
   _initGhosts() {
     this.ghostRiders = [];
     const token = this._ghostToken = (this._ghostToken || 0) + 1;
-    const replay = this.registry.get(REG.GHOST_REPLAY);
-    if (replay) this.registry.remove(REG.GHOST_REPLAY);
+    const replay = this._replayTape;
     this.tapePlayer = replay ? new TapePlayer(replay) : null;
     // Ghosts are cosmetic: a recorder that cannot start must never stop the run from starting.
     try { this.ghostRecorder = this.bsodGym || replay ? null : new GhostRecorder(this._ghostHeader()); }
@@ -710,6 +723,7 @@ export class RunScene extends Phaser.Scene {
     this.activeZones?.clear?.();
     this._despawn?.splice?.(0);
     this.glitch = new GlitchDirector({seed:this.seed});
+    this._chunkQueue = new Map();
     this.streamTerrain(0);
   }
 
@@ -729,13 +743,23 @@ export class RunScene extends Phaser.Scene {
 
   streamTerrain(x) {
     const res = this.terrain.update(x) || {};
-    const removed = res.removed || [];
-    const added = res.added || [];
-    for (const idx of removed) this.dropChunk(idx);
-    for (const chunk of added) this.takeChunk(chunk);
+    if (!this._chunkQueue) this._chunkQueue = new Map();
+    for (const idx of res.removed || []) { this._chunkQueue.delete(idx); this.dropChunk(idx); }
+    for (const chunk of res.added || []) this._chunkQueue.set(chunk.index, chunk);
     // Defensive reconcile (first call, or a generator that only reports through getActiveChunks()).
     if (this.mesh.chunks.size === 0 && this.terrain.getActiveChunks) {
-      for (const chunk of this.terrain.getActiveChunks()) if (!this.mesh.chunks.has(chunk.index)) this.takeChunk(chunk);
+      for (const chunk of this.terrain.getActiveChunks()) if (!this.mesh.chunks.has(chunk.index)) this._chunkQueue.set(chunk.index, chunk);
+    }
+    // Issue #59: a chunk's colliders, hazards, pickups and shards join the world on the first tick the sled is
+    // within the generator's own fill-ahead bound of it, never earlier. Cosmetic terrain reads (minimap, billboard,
+    // camera) can make the generator build chunks ahead of time on any display frame; gating here keeps the tick a
+    // chunk becomes physical a function of the sled's position alone, so replays and 30/60/120 Hz runs stay exact.
+    const bound = x + TERRAIN.bufferAheadScreens * (this.terrain.screenW || GAME_WIDTH);
+    for (const idx of [...this._chunkQueue.keys()].sort((a, b) => a - b)) {
+      const chunk = this._chunkQueue.get(idx);
+      if (chunk.startX >= bound) break;
+      this._chunkQueue.delete(idx);
+      this.takeChunk(chunk);
     }
   }
 
@@ -747,6 +771,7 @@ export class RunScene extends Phaser.Scene {
       const def = this.content.hazards[spawn.defId];
       if (!def) continue;
       const h = new Hazard(this, def, spawn, this.palette);
+      h.simStepped = true; // its motion (rolls, gates) moves the sensor body: advanced in simTick, not per frame
       if (def.placement === 'air') {
         // the launch lip this air hazard belongs to (nearest lip before it): the STAY LOW telegraph stands there
         let lip = null;
@@ -1170,6 +1195,9 @@ export class RunScene extends Phaser.Scene {
     this.resetCooldownMs = Math.max(0, this.resetCooldownMs - dt);
     if (pad.pressed.reset && this.resetCooldownMs <= 0) this.manualReset();
 
+    // B3 hazard motion (rolling boulders, gates) moves sensor bodies: once per tick, before physics (issue #59).
+    for (const list of this.hazards.values()) for (const h of list) if (h.motion) h.stepMotion(this.runTimeMs);
+
     // physics context
     const zoneDefs = this.getZoneDefs(this.sled.x);
     const sled = this.sled;
@@ -1244,6 +1272,7 @@ export class RunScene extends Phaser.Scene {
     }
 
     // trick tracking (always fed; flagged crashed on the frame a crash is detected)
+    sled.stepHeli(dt);
     const fs = sled.getFrameState(this.runTimeMs, dt);
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
     const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);
@@ -2139,6 +2168,8 @@ export class RunScene extends Phaser.Scene {
     this.flashRect.setFillStyle(0xffffff, 1).setAlpha(0.55);
     this.reportCrash(c, fs);
 
+    // A replay is a re-simulation of an existing run: it never saves a record, awards progress or records a tape.
+    if (this.tapePlayer) return;
     // persist + hand off
     const snap = this.score.getSnapshot();
     const record = {

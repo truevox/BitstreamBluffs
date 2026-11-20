@@ -571,7 +571,7 @@ export class Sled {
 
   /**
    * Sync graphics to body.
-   * @param {number} [dtMs=16.7] frame time, drives pose smoothing and helicopter animation.
+   * @param {number} [dtMs=16.7] frame time, drives pose smoothing (the helicopter spin is stepHeli, per tick).
    * @returns {void}
    */
   render(dtMs = 16.7) {
@@ -587,8 +587,17 @@ export class Sled {
     pose.tuck = lerp(pose.tuck, tuck, k);
     pose.brake = lerp(pose.brake, airbrake, k);
     pose.chute = lerp(pose.chute, this.parachuteMs > 0 ? 1 : 0, 1 - Math.exp(-dtMs / 90));
+    this._draw();
+  }
 
-    // helicopter: spin up while an arrow is held in the air, ease back to the nearest full turn on the ground
+  /**
+   * Helicopter spin, advanced once per fixed simulation tick (issue #59): TrickTracker scores heliPhase, so it
+   * must not follow the display frame rate. Spins up while an arrow is held in the air and eases back to the
+   * nearest full turn on the ground.
+   * @param {number} dtMs the tick (ms)
+   * @returns {void}
+   */
+  stepHeli(dtMs) {
     if (!this.grounded && this.heliInput) {
       this.heliVel = lerp(this.heliVel, this.heliInput * TUNING.heliSpinDegS, 1 - Math.exp(-dtMs / 60));
     } else {
@@ -600,8 +609,6 @@ export class Sled {
       this.heliPhase = lerp(this.heliPhase, target, 1 - Math.exp(-dtMs / 50));
     }
     if (Math.abs(this.heliPhase) > 36000) this.heliPhase %= 360; // TrickTracker ignores the resulting jump (> 720 deg)
-
-    this._draw();
   }
 
   /**

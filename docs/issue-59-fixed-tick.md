@@ -70,13 +70,37 @@ common refresh rates, and its parity is proven above. On 144/165 Hz displays som
 no tick and the motion steps slightly. Bounded render interpolation is a follow-up if that
 shows in play.
 
-## Not yet proven (release gates)
+## Replay hardening (2026-11-20)
 
-- A hands-on feel check by Marvin. The data above can't establish feel.
-- Replay through pause/resume, background-tab suspension, Gym in-scene retries (the tick
-  counter continues across attempts, so a tape needs its attempt-start tick), Daily rules,
-  pickups and hazards along a long run, and the BSOD catch. The browser checks in the PR
-  cover these paths functionally, not tick-for-tick parity.
+`tools/ghost-tape-browser-smoke.mjs` stage 6 records one run that includes a manual reset, a real
+pause and resume through the Pause screen, and a 2-second stalled frame (a background tab coming
+back). It then replays the tape alone at 30, 60 and 120 Hz. All 12 checkpoints match exactly, and
+every replay crashes on the same tick.
+
+Three frame-rate leaks were found and fixed on the way:
+
+1. **Terrain chunks became physical on frame-dependent ticks.** Cosmetic code (the minimap's
+   look-ahead, the billboard's posts) calls `terrain.heightAt` once per display frame. That can make
+   the generator build chunks early, and their colliders, hazards and pickups then joined the world
+   on whatever tick came next, which slightly reordered Matter's contact solving. Now
+   `RunScene.streamTerrain` adds a chunk only on the first tick the sled is within the generator's
+   own fill-ahead bound of it.
+2. **Rolling boulders and gates moved their sensor bodies per display frame.** `Hazard.update`
+   ran during rendering. Motion now advances once per tick in `simTick`.
+3. **The helicopter-spin angle, which the trick tracker scores, advanced in `Sled.render`.** It is
+   now `Sled.stepHeli`, called once per tick.
+
+Replays are also now driven by the tape header alone (seed, biome mask, upgrade ranks, boosts,
+`magnetsDrop`), not the live profile, and they never save a run record, award progress or record
+a new tape.
+
+Parity is also proven on a biome course with a rolling boulder active: `SEED=RPLAY59@260
+START_X=50400`, with helicopter input in the tape, is exact at 30/60/120 Hz.
+
+## Still open
+
+- A hands-on feel check by Marvin.
+- Gym in-scene retries inside one tape (Gym runs record no tapes yet), and long runs over
+  60 seconds.
 - Cross-browser and cross-version parity. Same-build parity is not cross-version parity.
-- Official run-ledger hashes are untouched (nothing here writes a `RunRecord`). Tapes will need
-  their own versioned format (#56).
+- Official run-ledger hashes are untouched. Tapes have their own versioned format (#56).

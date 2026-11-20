@@ -20,6 +20,9 @@ const SEED = process.env.SEED || 'RPLAY59';
 const SIM_MS = Number(process.env.SIM_MS || 9000);
 const expectParity = process.env.EXPECT_RATE_PARITY === '1';
 const SCRAMBLE = process.env.SCRAMBLE !== '0';
+// START_X=50000: place the sled there before tick 1 (identically in every run) to reach biome hazards such as
+// rolling boulders and gates, whose motion is part of the simulation.
+const START_X = process.env.START_X ? Number(process.env.START_X) : null;
 // DUMP=file.json DUMP_HZ=60,120: just record those runs (handling comparisons between builds) and exit.
 const DUMP = process.env.DUMP || null;
 
@@ -36,6 +39,7 @@ const TAPE = process.env.TAPE === 'cruise' ? {
 } : {
   held: [
     { key: 'push', from: 0, to: 1800 },
+    { key: 'heli', value: 1, from: 2700, to: 2900 }, // helicopter spin in the air (scored by TrickTracker)
     { key: 'tilt', value: -1, from: 3000, to: 3700 },
     { key: 'push', from: 4200, to: 5200 },
     { key: 'tilt', value: 1, from: 6100, to: 6500 },
@@ -52,7 +56,7 @@ async function runOnce(hz, label) {
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
-    const out = await page.evaluate(async ({ hz, seed, simMs, tape, scramble }) => {
+    const out = await page.evaluate(async ({ hz, seed, simMs, tape, scramble, startX }) => {
       const g = window.__bbGame;
       const run = g.scene.getScene('RunScene');
       const realUpdate = run.update;
@@ -63,10 +67,14 @@ async function runOnce(hz, label) {
       await new Promise((res) => { const w = () => (run.sys.isActive() && run.sled ? res() : requestAnimationFrame(w)); w(); });
       g.loop.sleep();
       if (scramble) run.scrambleMs = 1e9; // scramble the whole run: the RNG under test
+      if (startX != null) {
+        run.streamTerrain(startX);
+        run.sled.setPose(startX, run.terrain.heightAt(startX) - 15, run.slopeAt(startX), 320, 0);
+      }
       let clock = 0;
       const pending = tape.edges.map((e) => ({ ...e, fired: false }));
       run.inputRouter.poll = () => {
-        const pad = { push: false, tilt: 0, tuck: false, hop: false, pressed: { hop: false, reset: false, pause: false, airBrake: false, parachute: false, confirm: false } };
+        const pad = { push: false, tilt: 0, heli: 0, tuck: false, hop: false, pressed: { hop: false, reset: false, pause: false, airBrake: false, parachute: false, confirm: false } };
         for (const h of tape.held) if (clock >= h.from && clock < h.to) pad[h.key] = h.value ?? true;
         for (const e of pending) if (!e.fired && clock >= e.at) { e.fired = true; pad.pressed[e.key] = true; pad[e.key] = true; }
         return pad;
@@ -94,8 +102,9 @@ async function runOnce(hz, label) {
           if (run.crashed) break;
         }
       }
-      return { frames, samples };
-    }, { hz, seed: SEED, simMs: SIM_MS, tape: TAPE, scramble: SCRAMBLE });
+      let motion = 0; for (const l of run.hazards.values()) for (const h of l) if (h.motion && (h.rolling || h.roll?.activeAtMs != null || h.open != null)) motion++;
+      return { frames, samples, motion };
+    }, { hz, seed: SEED, simMs: SIM_MS, tape: TAPE, scramble: SCRAMBLE, startX: START_X });
     assert.deepEqual(errors, [], `${label}: page errors`);
     return out;
   } finally { await browser.close(); }
@@ -125,9 +134,9 @@ if (DUMP) {
 const r60a = await runOnce(60, '60a');
 const r60b = await runOnce(60, '60b');
 const same = compare(r60a, r60b);
-console.log('SAME_RATE_REPEAT', JSON.stringify(same));
+console.log('SAME_RATE_REPEAT', JSON.stringify(same), 'activeMotionHazards', r60a.motion);
 assert.ok(r60a.samples.length >= 5, 'probe produced too few samples');
-assert.ok(r60a.samples.at(-1).scramble !== r60a.samples[0].scramble, 'scramble stream never advanced: scramble not exercised');
+if (SCRAMBLE) assert.ok(r60a.samples.at(-1).scramble !== r60a.samples[0].scramble, 'scramble stream never advanced: scramble not exercised');
 assert.equal(same.firstDivergeMs, null, 'same seed + tape + frame schedule must replay identically');
 console.log('REPLAY_SAME_RATE_PASS');
 

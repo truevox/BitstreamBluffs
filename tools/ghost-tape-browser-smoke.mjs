@@ -29,8 +29,8 @@ const SCRIPT = {
 };
 
 /** In-page: start a run held at tick 0, then drive frames at `hz`. */
-async function drive(page, { hz, seed, maxMs, script, tape, untilMs, shot }) {
-  return page.evaluate(async ({ hz, seed, maxMs, script, tape, untilMs }) => {
+async function drive(page, { hz, seed, maxMs, script, tape, untilMs, shot, events }) {
+  return page.evaluate(async ({ hz, seed, maxMs, script, tape, untilMs, events }) => {
     const g = window.__bbGame;
     const run = g.scene.getScene('RunScene');
     if (!run.__realUpdate) run.__realUpdate = run.update;
@@ -52,13 +52,43 @@ async function drive(page, { hz, seed, maxMs, script, tape, untilMs, shot }) {
       }
       return pad;
     };
+    const diag = [];
+    if (window.__diagOn) {
+      const st = run.simTick.bind(run);
+      run.simTick = function (d, pad) {
+        const b = this.sled.body;
+        const k = ['push', 'tilt', 'tuck', 'hop', 'reset', 'brake', 'heli', 'divebomb', 'corkscrew', 'airBrake', 'parachute', 'variableHop', 'noAutoNudge'];
+        const e = ['hop', 'reset', 'airBrake', 'parachute'];
+        const w = this.matter.world, eng = w.engine;
+        const bodies = w.localWorld.bodies;
+        let pu = 0, hz = 0; for (const l of this.powerups.values()) pu += l.length; for (const l of this.hazards.values()) hz += l.length;
+        const pairs = eng.pairs.list.filter((p) => p.isActive).map((p) => p.id).join(',');
+        diag.push([this.simClock.tick, b.position.x, b.position.y, b.velocity.x, b.angle, k.map((q) => +pad[q] || 0).join(''), e.map((q) => +!!pad.pressed?.[q]).join(''),
+          'bodies=' + bodies.length, 'ids=' + bodies.map((q) => q.id).join(','), 'pairs=' + pairs, 'pu=' + pu, 'hz=' + hz, 'slow=' + this.slowmoMs + '/' + this.hitStopMs + '/' + this.blinkMs, 'ts=' + eng.timing.timeScale + '/' + eng.timing.lastDelta].join('|'));
+        return st(d, pad);
+      };
+    }
     hold = false;
     const dt = 1000 / hz;
     let t = 0;
     const tickMs = run.simClock.tickMs;
     const stop = untilMs ?? maxMs;
+    const todo = (events || []).map((e) => ({ ...e, done: false }));
+    let paused = 0;
     while (!run.crashed && run.simClock.tick * tickMs < stop) {
       clock = Math.round(run.simClock.tick * tickMs * 1000) / 1000;
+      for (const e of todo) {
+        if (e.done || clock < e.atMs) continue;
+        e.done = true;
+        if (e.do === 'pause') { run.pauseRun(); paused = 40; }
+        if (e.do === 'stall') { t += 2000; g.step(t, 2000); } // a background tab returning: one huge frame
+        if (e.do === 'crash') run.pendingCrash = { cause: 'chasm' };
+      }
+      if (paused > 0 && --paused === 0) {
+        // Resume through the real Pause screen once it is up (after its intro).
+        const ps = g.scene.getScene('PauseScene');
+        if (ps?.sys?.isActive()) ps._doResume(); else paused = 5;
+      }
       t += dt;
       g.step(t, dt);
     }
@@ -76,12 +106,14 @@ async function drive(page, { hz, seed, maxMs, script, tape, untilMs, shot }) {
       ghosts,
       course: g.registry.get('ghostLibrary')?.course(seed, 0) || null,
       recorderCheckpoints: run.ghostRecorder?.checkpoints || null,
+      diag, mask: run.biomeMask, magnets: run.magnetsDrop, upgrades: run.upgradeRun?.ranks, boosts: run.appliedBoosts, look: run.look?.id ?? null,
     };
-  }, { hz, seed, maxMs, script, tape, untilMs });
+  }, { hz, seed, maxMs, script, tape, untilMs, events });
 }
 
 async function freshPage(ctx) {
   const page = await ctx.newPage();
+  if (process.env.DIAG === '1') await page.addInitScript(() => { window.__diagOn = true; });
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -186,6 +218,44 @@ try {
   assert.deepEqual(np.errors, []);
   console.log('GHOST_FAVORITES_PASS', JSON.stringify(favRun.ghosts));
   await np.page.close();
+
+  // 6. HARDENING: a manual reset (recorded edge), a real pause/resume through the Pause screen and a 2 s
+  //    stalled frame (background tab) during recording. Pause and stalls are not in the tape (the run
+  //    clock does not move during them), so a replay without them must still match every checkpoint.
+  const HARD = { held: [{ key: 'push', from: 0, to: 2000 }, { key: 'tuck', from: 6000, to: 7000 }],
+    edges: [{ key: 'reset', at: 3200 }, { key: 'hop', at: 4500 }, { key: 'hop', at: 8200 }] };
+  // HARD_EVENTS=pause,stall (default both) narrows the perturbations when diagnosing a desync.
+  const hardEvents = (process.env.HARD_EVENTS ?? 'pause,stall').split(',').filter(Boolean)
+    .map((d) => ({ atMs: d === 'pause' ? 2400 : 5200, do: d }));
+  const hp = await freshPage(ctx);
+  const hard = await drive(hp.page, { hz: 60, seed: 'HARDEN59', maxMs: 30000, script: HARD, events: hardEvents });
+  assert.deepEqual(hp.errors, []);
+  await hp.page.close();
+  // A run that never crashes saves no tape: end it at 30 s through the normal crash path.
+  let hardTape = hard.tape;
+  if (!hard.crashed) {
+    const ep = await freshPage(ctx);
+    const again = await drive(ep.page, { hz: 60, seed: 'HARDEN59', maxMs: 30000, script: HARD,
+      events: [...hardEvents, { atMs: 29000, do: 'crash' }] });
+    hardTape = again.tape;
+    await ep.page.close();
+  }
+  assert.ok(hardTape && hardTape.inputs.some((r) => r[1] & (1 << 13)), 'reset edge not in the tape');
+  for (const hz of (process.env.HARD_HZ || '30,120').split(',').map(Number)) {
+    const p = await freshPage(ctx);
+    const r = await drive(p.page, { hz, seed: 'HARDEN59', maxMs: 30000, tape: hardTape });
+    if (r.replay.desync && process.env.DIAG === '1') {
+            console.log('DIAG rec meta', JSON.stringify({ mask: hard.mask, magnets: hard.magnets, upgrades: hard.upgrades, boosts: hard.boosts, look: hard.look }));
+      console.log('DIAG rep meta', JSON.stringify({ mask: r.mask, magnets: r.magnets, upgrades: r.upgrades, boosts: r.boosts, look: r.look }));
+      const a = hard.diag, b = r.diag;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) { console.log('DIAG first diff', i, '\nrec', a[i], '\nrep', b[i], '\nprev rec', a[i - 1], '\nprev rep', b[i - 1]); break; }
+    }
+    assert.equal(r.replay.desync, null, `${hz} Hz hardened replay desynced: ${JSON.stringify(r.replay.desync)}`);
+    assert.equal(r.replay.checked, hardTape.checkpoints.length);
+    assert.deepEqual(p.errors, []);
+    console.log('GHOST_HARDENED_REPLAY_PASS', hz, JSON.stringify({ checked: r.replay.checked, endTick: hardTape.endTick, crashTick: r.tick }));
+    await p.page.close();
+  }
 } finally {
   await ctx.close();
   await rm(profile, { recursive: true, force: true });
