@@ -42,6 +42,7 @@ import { toastLayout } from '../ui/AchievementsLayout.js';
 import { enabledBiomeMask } from '../systems/ProfileStore.js';
 import { canAffordAnything, shopState } from '../systems/ShopPrompt.js';
 import { ShopView } from '../ui/Views.js';
+import { GhostFavoritesView } from '../ui/GhostFavoritesView.js';
 import { uiSfx } from '../ui/Sound.js';
 import { JukeboxHUD } from '../ui/JukeboxHUD.js';
 import { gameOverLine } from '../systems/CrashReport.js';
@@ -168,7 +169,7 @@ export class GameOverScene extends Phaser.Scene {
     this._onPointer = (pointer, over) => {
       // W4.1: a tap is input too, so it also cancels a pending auto-open. While the shop is up the tap
       // belongs to the shop's own rows, not to retry.
-      if (this.shopOpen) return;
+      if (this.shopOpen || this.ghostView) return;
       this.skipReveal();
       // A tap on the jukebox or its open queue is NOT a retry, even if
       // Phaser's over[] misses the translucent queue's backing Zone.
@@ -197,6 +198,7 @@ export class GameOverScene extends Phaser.Scene {
       }
       this.shopOpen = false;
       this.shopHint = null;
+      if (this.ghostView || this.ghostDim) this._closeGhosts();
       if (this.unbindBar) { this.unbindBar(); this.unbindBar = null; }
       if (this.pulse) { this.pulse.remove(); this.pulse = null; }
       if (this.toastFade) { this.toastFade.remove(); this.toastFade = null; }
@@ -317,6 +319,13 @@ export class GameOverScene extends Phaser.Scene {
       x: 182, y: 140, w: 36, h: 14, label: 'COPY', color: 'lime', onClick: () => this._copySeed(),
     });
     p.add(this.copyBtn);
+    // Issue #56: pin this run as a ghost favorite. In the panel's title row (right of the tab), the only
+    // free band of a full report; shown only when this run actually recorded a ghost tape.
+    const tape = this.registry.get(REG.LAST_GHOST_TAPE);
+    if (tape && tape.runId === rec.id && this.registry.get(REG.GHOSTS)) {
+      this.ghostBtn = new Button(this, theme, { x: 156, y: 1, w: 62, h: 12, label: 'GHOST FAV', color: 'magenta', onClick: () => this._openGhosts() });
+      p.add(this.ghostBtn);
+    }
     // The score is built at its final value; _startReveal() counts it up from zero (and shows the final
     // value at once under reduced motion or when the player skips).
     this.scoreText.setText(fmtInt(rec.score));
@@ -951,6 +960,23 @@ export class GameOverScene extends Phaser.Scene {
    * Close the shop and land back on Game Over with everything intact.
    * @returns {void}
    */
+  /** Ghost favorites over Game Over (issue #56): G, or the GHOST FAV button. */
+  _openGhosts() {
+    const tape = this.registry.get(REG.LAST_GHOST_TAPE), library = this.registry.get(REG.GHOSTS);
+    if (this.ghostView || this.shopOpen || !this.alive || this.leaving || !tape || tape.runId !== this.rec.id || !library) return;
+    if (typeof this._cancelShopAutoprompt === 'function') this._cancelShopAutoprompt();
+    if (typeof this.skipReveal === 'function') this.skipReveal();
+    this.ghostDim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setOrigin(0, 0).setDepth(400).setInteractive();
+    this.ghostView = new GhostFavoritesView(this, this.theme, { library, tape, onClose: () => this._closeGhosts() });
+  }
+
+  _closeGhosts() {
+    try { this.ghostView?.destroy(); } catch (e) { /* a failed teardown must not wedge the screen */ }
+    this.ghostView = null;
+    try { this.ghostDim?.destroy(); } catch (e) { /* already torn down */ }
+    this.ghostDim = null;
+  }
+
   _closeShop() {
     if (this.shopArmTimer) {
       try { this.shopArmTimer.remove(false); } catch (e) { /* already gone */ }
@@ -1283,9 +1309,12 @@ export class GameOverScene extends Phaser.Scene {
     // not, and during initials entry (where it saves first, like Space does there).
     if (action === 'retry') {
       if (this.shopOpen) this._closeShop();
+      if (this.ghostView) this._closeGhosts();
       this.retry();
       return;
     }
+    if (this.ghostView) { this.ghostView.handleAction(action); return; }
+    if (action === 'ghost' && !this.shopOpen && !this.entry) { this._openGhosts(); return; }
     if (this.shopOpen) {
       // Decision 7: in an ARMED shop Enter / pad A buy, equip, unequip or turn the page on the highlighted
       // row (ShopView's own rules, the same as Title -> Profile -> Shop). In an unarmed autoprompt shop

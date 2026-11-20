@@ -120,14 +120,27 @@ export class GhostLibrary {
     return course;
   }
 
+  /** Per-course on/off switch for one ghost role (used for Favorites A/B/C). */
+  async setShow(seed, biomeMask, role, on) {
+    const old = this.courses.get(courseKey(seed, biomeMask));
+    if (!old) return null;
+    const course = { ...old, show: { ...(old.show || {}), [role]: on !== false } };
+    await this._putCourse(course);
+    return course;
+  }
+
   /**
    * Ghosts to draw on a course: deduped runs with their roles, filtered by `show`
-   * (role -> boolean; a run shows if any of its roles is shown), compatible tapes only.
+   * (role -> boolean) and the course's own `show` switches; a run shows if any of its roles is shown.
+   * Compatible tapes only.
    */
   async ghostsFor(seed, biomeMask = 0, show = {}) {
     const out = [];
-    for (const g of courseGhostRuns(this.course(seed, biomeMask))) {
-      if (!g.roles.some((r) => show[r] !== false)) continue;
+    const course = this.course(seed, biomeMask);
+    // A role shows when both the player's global switch (`show`) and the course's own switch allow it.
+    const visible = (r) => show[r] !== false && course?.show?.[r] !== false;
+    for (const g of courseGhostRuns(course)) {
+      if (!g.roles.some(visible)) continue;
       const tape = await this.getTape(g.runId);
       if (tapeCompatible(tape)) out.push({ ...g, tape });
     }

@@ -95,6 +95,7 @@ const ctx = await chromium.launchPersistentContext(profile, {
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 try {
+  if (process.env.ONLY_FAVORITES !== '1') {
   // 1. RECORD
   const rec = await freshPage(ctx);
   const recorded = await drive(rec.page, { hz: 60, seed: SEED, maxMs: MAX_MS, script: SCRIPT });
@@ -149,6 +150,42 @@ try {
   assert.deepEqual(ip.errors, []);
   console.log('GHOST_ISOLATION_PASS', JSON.stringify({ checkpoints: iso.tape.checkpoints.length, crashTick: iso.tick, ghosts: iso.ghosts.length }));
   await ip.page.close();
+
+  }
+
+  // 5. FAVORITES from Game Over: G opens the menu, Enter pins this run as FAV A, Right turns it off.
+  const fp = await freshPage(ctx);
+  await fp.page.evaluate(() => window.__bbGame.scene.getScene('TitleScene').startRun('GHOSTFAV'));
+  await fp.page.waitForFunction(() => window.__bbGame.scene.getScene('RunScene')?.sled, null, { timeout: 30000 });
+  await fp.page.waitForTimeout(2500);
+  await fp.page.evaluate(() => { window.__bbGame.scene.getScene('RunScene').pendingCrash = { cause: 'chasm' }; });
+  await fp.page.waitForFunction(() => window.__bbGame.scene.getScene('GameOverScene')?.sys?.isActive() && window.__bbGame.scene.getScene('GameOverScene').ghostBtn, null, { timeout: 30000 }).catch(async () => { throw new Error('no GHOST FAV button: ' + await fp.page.evaluate(() => { const g = window.__bbGame; return JSON.stringify({ go: g.scene.getScene('GameOverScene')?.sys?.isActive(), tape: g.registry.get('lastGhostTape')?.runId, rec: g.registry.get('lastRecord')?.id }); })); });
+  await fp.page.waitForTimeout(1500);
+  await fp.page.keyboard.press('g');
+  await fp.page.waitForFunction(() => window.__bbGame.scene.getScene('GameOverScene').ghostView, null, { timeout: 5000 }).catch((e) => { throw new Error(`favorites step failed: ${e.message.split('\n')[0]}`); });
+  await fp.page.keyboard.press('Enter');
+  await fp.page.waitForFunction(() => { const g = window.__bbGame; const t = g.registry.get('lastGhostTape');
+    return g.registry.get('ghostLibrary').course('GHOSTFAV', 0)?.favorites?.[0] === t.runId; }, null, { timeout: 5000 }).catch((e) => { throw new Error(`favorites step failed: ${e.message.split('\n')[0]}`); });
+  await fp.page.waitForTimeout(300);
+  if (shotDir) await fp.page.screenshot({ path: `${shotDir}/ghost-favorites.png` });
+  await fp.page.keyboard.press('ArrowRight');
+  await fp.page.waitForFunction(() => window.__bbGame.registry.get('ghostLibrary').course('GHOSTFAV', 0)?.show?.fav0 === false, null, { timeout: 5000 }).catch((e) => { throw new Error(`favorites step failed: ${e.message.split('\n')[0]}`); });
+  await fp.page.waitForTimeout(400); // menu input debounces repeated directions
+  await fp.page.keyboard.press('ArrowRight');
+  await fp.page.waitForFunction(() => window.__bbGame.registry.get('ghostLibrary').course('GHOSTFAV', 0)?.show?.fav0 === true, null, { timeout: 5000 }).catch((e) => { throw new Error(`favorites step failed: ${e.message.split('\n')[0]}`); });
+  await fp.page.keyboard.press('Escape');
+  await fp.page.waitForFunction(() => !window.__bbGame.scene.getScene('GameOverScene').ghostView, null, { timeout: 5000 }).catch((e) => { throw new Error(`favorites step failed: ${e.message.split('\n')[0]}`); });
+  const stillOver = await fp.page.evaluate(() => window.__bbGame.scene.getScene('GameOverScene').sys.isActive());
+  assert.equal(stillOver, true, 'closing the favorites menu must stay on Game Over');
+  assert.deepEqual(fp.errors, []);
+  await fp.page.close();
+  const np = await freshPage(ctx);
+  const favRun = await drive(np.page, { hz: 60, seed: 'GHOSTFAV', maxMs: MAX_MS, untilMs: 500 });
+  assert.equal(favRun.ghosts.length, 1);
+  assert.deepEqual([...favRun.ghosts[0].roles].sort(), ['best', 'fav0', 'latest']);
+  assert.deepEqual(np.errors, []);
+  console.log('GHOST_FAVORITES_PASS', JSON.stringify(favRun.ghosts));
+  await np.page.close();
 } finally {
   await ctx.close();
   await rm(profile, { recursive: true, force: true });
