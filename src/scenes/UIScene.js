@@ -1297,6 +1297,10 @@ export class UIScene extends Phaser.Scene {
     if (this._shown(this.banner)) add(this.banner, measureText(this.banner.main.text) * this.bannerScale, 8 * this.bannerScale, SLOT.banner, 'mid');
     for (const p of this.popups) add(p, measureText(p.main.text), 8, SLOT.popup, 'top');
     const ys = stackY(slots, { cx, startY: 0, gap: 3, width: GAME_WIDTH, keepOuts: keep });
+    // The minimap dims under these instead of pushing the full-width strip down into the playfield.
+    this._minimapOccluders = slots.map((sl, i) => (sl.full
+      ? { x: 0, y: ys[i], w: GAME_WIDTH, h: sl.h }
+      : { x: cx - sl.w / 2, y: ys[i], w: sl.w, h: sl.h }));
     slots.forEach((sl, i) => {
       if (sl.kind === 'band') {
         // The container's band is drawn at local y 59..76 and its text at local y 61: shift so the BAND
@@ -1325,6 +1329,10 @@ export class UIScene extends Phaser.Scene {
     const bottom = touch.slice();
     if (n) bottom.push({ x: px, y: POWER_Y, w: rowW, h: 26 });
     if (this.seedText && this.seedText.visible) bottom.push(this._trect(this.seedText), this._trect(this.ruleText));
+    // The minimap keeps clear of everything in `bottom` so far (touch buttons, power-ups, seed lines);
+    // the tutorial chip then yields to the minimap, never the other way round (no ping-pong).
+    this._minimapKeepOuts = keep.concat(bottom);
+    if (this.minimap && this.minimap.rect) bottom.push(this.minimap.rect);
     if (this.hintChip.w) {
       const w = this.hintChip.w;
       let hx = null;
@@ -1399,7 +1407,7 @@ export class UIScene extends Phaser.Scene {
       this._paintFlow();
     }
     this._layout(delta);
-    this.minimap?.update(delta);
+    this.minimap?.update(delta, { keepOuts: this._minimapKeepOuts, occluders: this._minimapOccluders });
     // zone chip pulse
     if (this.zoneText.visible) this.zoneG.setAlpha(0.75 + 0.25 * Math.sin(this.nowMs * 0.008));
     // tutorial chip fallback timeout, shard chain expiry
