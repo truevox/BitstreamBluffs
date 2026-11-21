@@ -3,8 +3,10 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 1,
-  "attestation": "no-behavior-change: initial tripwire baseline at SIM_REVISION 1",
-  "changedFiles": [],
+  "attestation": "no-behavior-change: GhostRecorder read-only fingerprint hook at the existing checkpoint branch (#118, PR #165); capture proven non-mutating by tests",
+  "changedFiles": [
+    "src/systems/ghost/GhostTape.js"
+  ],
   "files": {
     "src/constants.js": "sha256:21fe3491017fa3f6fa55c25c5d3d3cca22fa3f1ce15a22c611113b173dc0a8e5",
     "src/entities/Hazard.js": "sha256:723c648948c2b52875c6a4cdee44f6f2d37c038d02d14fd0c3227d1b0a03673e",
@@ -32,6 +34,6 @@
     "src/systems/TerrainGenerator.js": "sha256:6b16dba03098a1d95f8fca00ba8802dbb361823cf9b3ca5719e9356f355f1e8d",
     "src/systems/TrickTracker.js": "sha256:e6fdcea5cfc0e515fb0623b7f6bb3b189d5a5ed0fcf66f15175fd508da64abcf",
     "src/systems/Wards.js": "sha256:5fa20a216fd93ef1b72f1fe969234482585f680462e64fc46c0cf45772ebc09c",
-    "src/systems/ghost/GhostTape.js": "sha256:3fc85bd8facd91602c7461beb69809d6b522cd61e86d19be85d3628d313e4a51"
+    "src/systems/ghost/GhostTape.js": "sha256:8ff7c10e971dcce55f4ee160c20bbd7383228d90f8102d961e81bb123a584e0b"
   }
 }
