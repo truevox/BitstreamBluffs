@@ -46,6 +46,8 @@ import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
+import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, KODIAK_BY_ID, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
+import { KodiakRider } from '../entities/KodiakRider.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
   gustImpulse, hazardColor, blindVisibility, blindOverlayAlpha, glideFrictionMul, stabilizeToleranceDeg, stabilizeBounceMul,
@@ -224,6 +226,14 @@ export class RunScene extends Phaser.Scene {
     // A ghost replay restores the recorded choice so the course matches.
     this.magnetsDrop = replay && typeof replay.magnetsDrop === 'boolean' ? replay.magnetsDrop
       : magnetsDropFor({ level: prof.level, daily: this.dailyOfficial === true || this.dailyMode === 'draft' });
+    // Issue #47: hostile Kodiaks from the proposed Sync Level, never on Dailies or in the Gym (no event rule yet).
+    this.kodiaksOn = replay && typeof replay.kodiaksOn === 'boolean' ? replay.kodiaksOn
+      : kodiaksEnabledFor({ level: prof.level, daily: this.dailyOfficial === true || this.dailyMode === 'draft', gym: this.bsodGym === true });
+    // Packs are one type ('same') or mixed; a Settings switch while Marvin playtests which is better.
+    this.kodiakPackMode = replay && typeof replay.kodiakPackMode === 'string' ? replay.kodiakPackMode
+      : this.settings?.kodiakPacks === 'mixed' ? 'mixed' : 'same';
+    this.kodiaks = [];
+    this.kodiakNext = 0;
     // Player abilities and BSOD behavior are unchanged in the Gym. Only the
     // starting pose, pursuit gap/speed and post-catch retry are different.
     this.gymSetup = this.bsodGym ? gymSetupForProfile(prof) : null;
@@ -495,6 +505,9 @@ export class RunScene extends Phaser.Scene {
       boosts: [...(this.appliedBoosts || [])],
       upgradeRanks: this.upgradeRun?.enabled ? { ...this.upgradeRun.ranks } : null,
       magnetsDrop: this.magnetsDrop === true,
+      kodiaksOn: this.kodiaksOn === true,
+      kodiakPackMode: this.kodiakPackMode,
+      kodiakVersion: KODIAK_VERSION,
       startPose: [b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y, b.angularVelocity],
       random: runRandomState(this.runRandom),
       startedAt: this.startedAt,
@@ -511,6 +524,54 @@ export class RunScene extends Phaser.Scene {
       const pr = this.registry.get(REG.GHOSTS)?.saveRun(tape);
       if (pr && pr.catch) pr.catch(() => {});
     } catch (e) { /* a ghost must never break the end of a run */ }
+  }
+
+  /**
+   * Issue #47: one Kodiak PACK at a time, on the seeded schedule (Kodiaks.kodiakEncounter). Runs inside the
+   * fixed tick; collision is a tick-exact box test per bear (no Matter body). A hit is a crash hazard, so
+   * shields, the respawn grace and Hashed Backup apply exactly as for any hazard; passing a bear scores.
+   */
+  updateKodiaks(dt) {
+    if (!this.kodiaksOn || this.crashed || !this.sled) return;
+    const sled = this.sled;
+    if (!this.kodiaks.length) {
+      const enc = kodiakEncounter(this.seed, this.kodiakNext, this.kodiakPackMode);
+      if ((sled.x - this.startX) / PIXELS_PER_METER < enc.atM) return;
+      this.kodiakNext++;
+      this.kodiaks = spawnKodiakPack(this.seed, enc, { x: sled.x, vx: sled.vx });
+      const sides = [...new Set(enc.members.map((m) => KODIAK_DEFS[m].from))];
+      this.emitIf(EVT.KODIAK, { type: 'incoming', mode: enc.mode, members: enc.members.map((m) => KODIAK_DEFS[m].short),
+        from: sides.length > 1 ? 'both' : sides[0] });
+    }
+    const landX = !sled.grounded && Number.isFinite(sled.airEtaMs) ? sled.x + sled.vx * sled.airEtaMs / 1000 : null;
+    const steps = stepKodiakPack(this.kodiaks, { x: sled.x, vx: sled.vx, grounded: sled.grounded, landX, etaMs: sled.airEtaMs }, dt);
+    const sledBox = { x: sled.x - 18, y: sled.y - 20, w: 36, h: 30 };
+    for (const { k, ev } of steps) {
+      const gy = this.terrain.heightAt(k.x);
+      if (Number.isFinite(gy)) k.groundY = gy; else if (!Number.isFinite(k.groundY)) k.groundY = sled.y;
+      if (ev.telegraph) {
+        this.playSfx('groundWarn', { brace: ev.telegraph === 'real' });
+        this.emitIf(EVT.KODIAK, { type: 'telegraph', id: k.def.id, short: k.def.short, real: ev.telegraph === 'real' });
+      }
+      if (!k.hit && !(sled.invulnerableMs > 0) && kodiakHits(kodiakBox(k.x, k.groundY), sledBox)) {
+        k.hit = true;
+        if (!this.pendingCrash) this.pendingCrash = { cause: 'hazard', hazardId: k.def.id };
+        this.fx.sparks(k.x, k.groundY - 14, k.def.accent, 16, 220);
+        this.shake(3);
+      }
+      // Passing a bear (it was ahead and now is behind) scores; clearing it in the air scores more.
+      const ahead = sled.x > k.x;
+      if (ahead && !k.sledAhead && !k.hit) {
+        const air = !sled.grounded, points = air ? 250 : 150;
+        this.bonus(points, 'kodiak');
+        this.emitIf(EVT.KODIAK, { type: 'passed', id: k.def.id, short: k.def.short, air, points });
+      }
+      k.sledAhead = ahead;
+    }
+    if (this.kodiaks.every((k) => k.done)) {
+      this.emitIf(EVT.KODIAK, { type: 'gone' });
+      this.kodiaks = [];
+    }
   }
 
   /** Remove every listener / pooled object / body (runs on scene shutdown). @returns {void} */
@@ -542,6 +603,9 @@ export class RunScene extends Phaser.Scene {
     this.songBillboard=null;
     safe(this.blackHole);
     this.blackHole = null;
+    safe(this.kodiakRider);
+    this.kodiakRider = null;
+    this.kodiaks = [];
     (this.ghostRiders || []).forEach(safe);
     this.ghostRiders = [];
     this._ghostToken = (this._ghostToken || 0) + 1;
@@ -1287,6 +1351,9 @@ export class RunScene extends Phaser.Scene {
     this.updateZones(sled.x);
     this.sampleSafeGround(dt, fs);
 
+    // Issue #47: the Kodiak rival (if one is out) runs, telegraphs and may hit the sled this tick.
+    this.updateKodiaks(dt);
+
     // Collision with the deletion wall always wins if any other contact/landing happened during this frame.
     if (this.bsodCaught) this.pendingCrash = { cause: "bsod" };
     // crash resolution (may be negated by Hashed Backup, except the BSOD)
@@ -1347,6 +1414,10 @@ export class RunScene extends Phaser.Scene {
     for (const list of this.powerups.values()) for (const p of list) p.update(t, left, right);
     this.fx.update(fxDt, this.heightFn);
     if (this.shardField) this.shardField.update(t, left, right);
+    if (this.kodiaks?.length || this.kodiakRider) {
+      if (!this.kodiakRider) this.kodiakRider = new KodiakRider(this, this.palette);
+      this.kodiakRider.update(this.crashed ? [] : this.kodiaks, this._view, cam.zoom, t, isReducedMotion(this));
+    }
     if (this.magnetMs > 0 && !this.crashed) {
       if (!this.blackHole) this.blackHole = new BlackHole(this, this.palette);
       this.blackHole.update(t, magnetHolePos(sled.x, sled.y), magnetStrength(this.magnetEff, this.upgradeFx?.magnetMul), this.magnetMs, isReducedMotion(this));
@@ -2237,7 +2308,7 @@ export class RunScene extends Phaser.Scene {
     const hz = this.content && this.content.hazards;
     const h = this._crashHazard;
     const ent = c.cause === 'hazard' && h && h.def && h.def.id === c.hazardId ? h : null;
-    const def = ent ? ent.def : c.hazardId && hz ? hz[c.hazardId] : null;
+    const def = ent ? ent.def : c.hazardId ? (hz && hz[c.hazardId]) || KODIAK_BY_ID[c.hazardId] || null : null;
     const arrivalMs = ent && this.teleTracker ? this.teleTracker.lastArrivalMs(ent) : null;
     this.registry.set(REG.LAST_CRASH, crashReport({
       runId: this.runId, seed: this.seed, biomeMask: this.biomeMask, cause: c.cause, def, x: fs.x, startX: this.startX,

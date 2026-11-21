@@ -35,6 +35,7 @@ import {DRAFT_BUDGET,DRAFT_RULES_VERSION,draftCost,validDraftRanks} from './Dail
  * @property {boolean} screenShake       false disables shake (accessibility).
  * @property {boolean} ghostBest         show the Best ghost on its course (issue #56).
  * @property {boolean} ghostLatest       show the Latest ghost on its course (issue #56).
+ * @property {'same'|'mixed'} kodiakPacks  Kodiak packs of one type or mixed types (issue #47 playtest switch).
  * @property {'auto'|'on'|'off'} reduceMotion  menu motion (accessibility). 'auto' follows the OS
  *           prefers-reduced-motion query; resolved by ui/Motion.js isReducedMotion().
  * @property {'default'|'colorblind'} palette
@@ -75,7 +76,7 @@ const IDB_TIMEOUT_MS = 2500;
 export function defaultSettings() {
   return {
     version: STORAGE.saveVersion, masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, windVolume: 1, windEnabled: true, screenShake: true,
-    ghostBest: true, ghostLatest: true,
+    ghostBest: true, ghostLatest: true, kodiakPacks: 'same',
     palette: 'default', controlLayout: DEFAULT_CONTROL_LAYOUT, touchOverlay: 'auto', touchRotate90: false, lastInitials: '',
     musicEnabledSongs: defaultSongSelection(),
     musicShuffle: false,
@@ -112,6 +113,7 @@ export function sanitizeSettings(raw) {
     screenShake: typeof raw.screenShake === 'boolean' ? raw.screenShake : d.screenShake,
     ghostBest: typeof raw.ghostBest === 'boolean' ? raw.ghostBest : d.ghostBest,
     ghostLatest: typeof raw.ghostLatest === 'boolean' ? raw.ghostLatest : d.ghostLatest,
+    kodiakPacks: raw.kodiakPacks === 'mixed' ? 'mixed' : d.kodiakPacks,
     palette: raw.palette === 'colorblind' || raw.palette === 'default' ? raw.palette : d.palette,
     controlLayout: normalizeControlLayout(raw.controlLayout),
     touchOverlay: ['auto', 'on', 'off'].includes(raw.touchOverlay) ? raw.touchOverlay : d.touchOverlay,
