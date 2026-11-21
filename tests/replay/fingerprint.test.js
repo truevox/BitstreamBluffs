@@ -195,3 +195,22 @@ describe('capture helpers', () => {
     expect(chunkDigestOf({ p: new Float64Array([1, 2]) })).toBe(chunkDigestOf({ p: [1, 2] }));
   });
 });
+
+describe('schema regression lock (tests/fixtures/replay/v1/fingerprint-schemas-v1.json)', () => {
+  const lock = loadFixture('fingerprint-schemas-v1.json');
+
+  test('production schemas, versions and order equal the committed lock', () => {
+    expect(lock.order).toEqual([...FP_SUBSYSTEMS]);
+    for (const n of FP_SUBSYSTEMS) {
+      expect([n, lock.schemas[n].version]).toEqual([n, FP_SCHEMAS[n].version]);
+      expect([n, lock.schemas[n].schema]).toEqual([n, FP_SCHEMAS[n].schema]);
+    }
+  });
+
+  test('the reference state fingerprints to the committed digests (a layout change must bump schemaVersion and the lock)', () => {
+    const f = fingerprintState(referenceState());
+    expect(f.subsystems).toEqual(lock.reference.subsystems);
+    expect(f.combined).toBe(lock.reference.combined);
+    expect(f.tick).toBe(lock.reference.tick);
+  });
+});
