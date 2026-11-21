@@ -46,6 +46,7 @@ import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { resolveReplaySetup } from '../systems/replay/manifest.js';
+import { saveRunEvidence } from '../systems/replay/evidenceCapture.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
 import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, KODIAK_BY_ID, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
 import { KodiakRider } from '../entities/KodiakRider.js';
@@ -531,6 +532,9 @@ export class RunScene extends Phaser.Scene {
       this.registry.set(REG.LAST_GHOST_TAPE, tape);
       const pr = this.registry.get(REG.GHOSTS)?.saveRun(tape);
       if (pr && pr.catch) pr.catch(() => {});
+      // Replay evidence (#116): async, never rejects, never blocks the ghost save; failures are logged and left on the registry.
+      saveRunEvidence(tape, rec, { registry: this.registry, content: this.registry.get(REG.CONTENT),
+        engine: { phaser: Phaser.VERSION, matter: Phaser.Physics?.Matter?.Matter?.version } });
     } catch (e) { /* a ghost must never break the end of a run */ }
   }
 
