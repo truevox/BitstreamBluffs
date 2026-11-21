@@ -51,6 +51,8 @@
     'make', 'matter', 'plugins', 'registry', 'renderer', 'scale', 'scene', 'sound', 'sys', 'textures', 'time', 'tweens',
     'inputRouter', 'saveStore', 'update', '_onCollide', '_onSettings', '_onResume', '_onMusicTrackChange', 'facebook'];
 
+  const PRESENTATION_SUBFIELDS = new Set(['palette', 'look', 'gfx', 'color']);
+
   const CLASS = new Map();
   for (const [cls, list] of Object.entries({ SIM, PRESENTATION_READ_BY_SIM, NON_SERIALIZABLE, CONFIG, METADATA, PRESENTATION, INFRA })) for (const k of list) CLASS.set(k, cls);
 
@@ -126,6 +128,7 @@
       if (t === 'function' || t === 'symbol' || t === 'bigint') { skipped.push(`${path}:${t}`); return { __skip: t }; }
       const pk = presentationKind(v);
       if (pk) { skipped.push(`${path}:${pk}`); return { __skip: pk }; }
+      if (v.type === 'dead-body') return { __deadBody: v.label };
       if (v.type === 'body' && Array.isArray(v.parts)) {
         const k = keyOfBody(v);
         if (k == null && !inWorld.has(v)) {
@@ -148,6 +151,9 @@
       if (ArrayBuffer.isView(v)) return { __id: id, __ta: v.constructor.name, data: Array.from(v) };
       const o = {};
       for (const k of Object.keys(v)) {
+        // Presentation sub-fields inside sim objects (Hazard.palette, sled.look, ...). The biome palette is
+        // re-resolved per sector, so these are derived presentation; Phase 2 schemas would simply omit them.
+        if (PRESENTATION_SUBFIELDS.has(k)) { o[k] = { __skip: 'presentation-field' }; continue; }
         const d = Object.getOwnPropertyDescriptor(v, k);
         if (d.get || d.set) { audit.push(`${path}.${k}: accessor property`); continue; }
         o[k] = enc(v[k], `${path}.${k}`);
@@ -234,7 +240,11 @@
         }
       }
       restored.set(n.__id, target);
-      for (const k of Object.keys(n.__obj)) target[k] = dec(n.__obj[k], target[k], `${path}.${k}`);
+      for (const k of Object.keys(n.__obj)) {
+        const sn = n.__obj[k];
+        if (sn && typeof sn === 'object' && sn.__skip && !(k in target)) continue; // nothing live to keep
+        target[k] = dec(sn, target[k], `${path}.${k}`);
+      }
       for (const k of Object.keys(target)) {
         if (k in n.__obj) continue;
         const v = target[k];
@@ -414,6 +424,12 @@
     if (v && typeof v === 'object') {
       // alias numbering follows traversal (= key) order; keep only the fact that it is an alias
       if ('__alias' in v) return '"<alias>"';
+      if ('__obj' in v) {
+        // keys whose value is a skip marker (scene, world, presentation) carry no state
+        const o = {};
+        for (const k of Object.keys(v.__obj)) { const x = v.__obj[k]; if (!(x && typeof x === 'object' && ('__skip' in x || '__u' in x))) o[k] = x; }
+        return `{"__c":${JSON.stringify(v.__c)},"__obj":${canon(o)}}`;
+      }
     }
     if (v && typeof v === 'object') return `{${Object.keys(v).filter((k) => k !== '__id').sort().map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}`;
     return JSON.stringify(v);

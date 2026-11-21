@@ -180,7 +180,7 @@ async function runCase(browser, fxName, level, skip = []) {
             else if (k.startsWith('matter.')) leafDiff(ca.matter[k.slice(7)], cb.matter[k.slice(7)], k, firstLeaves, firstLeaves.length + 6);
             else if (k === 'pool') leafDiff(ca.pool, cb.pool, 'pool', firstLeaves, firstLeaves.length + 6);
             else if (k.startsWith('camera')) leafDiff(ca.camera, cb.camera, 'camera', firstLeaves, firstLeaves.length + 6);
-            else leafDiff(ca.game[k], cb.game[k], k, firstLeaves, firstLeaves.length + 4);
+            else leafDiff(ca.game[k], cb.game[k], k, firstLeaves, firstLeaves.length + (c.diff.length === 1 ? 20 : 4));
           }
         }
         if (!c.sledExact && firstSled === null) firstSled = t;
