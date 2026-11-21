@@ -142,6 +142,7 @@ export function dumpState(state, opts = {}) {
  * @typedef {Object} RunTrace
  * @property {string} [causalDigest] `sha256:` of the manifest `causal` object; two runs are only comparable when equal
  * @property {string} [manifestDigest] informational
+ * @property {number} [endTick] last simulated tick of the run (`causal.input.endTick`); compared when both sides have it
  * @property {Array<{tick:number, combined:string, subsystems?:Object<string,string>}>} checkpoints ascending by tick
  * @property {(w:{fromTick:number, toTick:number}) => Promise<FingerprintResult[]>|FingerprintResult[]} [resimulate]
  *   re-simulate this side from tick 0 and return the per-tick fingerprint (with `subsystems`) of every tick in
@@ -195,11 +196,18 @@ const ownerOf = (path) => path.slice(0, path.search(/[.[]/) < 0 ? path.length : 
  */
 export async function compareRuns(a, b, opts = {}) {
   let resims = 0;
-  if (!opts.ignoreCausal && a.causalDigest && b.causalDigest && a.causalDigest !== b.causalDigest) {
-    return result({ status: 'inconclusive', note: 'causal-mismatch' });
+  if (!opts.ignoreCausal) {
+    if (!a.causalDigest || !b.causalDigest) return result({ status: 'inconclusive', note: 'no-causal-digest' });
+    if (a.causalDigest !== b.causalDigest) return result({ status: 'inconclusive', note: 'causal-mismatch' });
   }
   const ca = a.checkpoints || [];
   const cb = b.checkpoints || [];
+  if (ca.length === 0 && cb.length === 0) return result({ status: 'inconclusive', note: 'no-checkpoints' });
+  // A gap (a capture that failed, or a stripped checkpoint) must never be read as agreement or as a divergence.
+  const every = opts.everyTicks || 120;
+  for (const c of [ca, cb]) {
+    if (c.some((x, i) => x.tick !== (i + 1) * every)) return result({ status: 'inconclusive', note: 'checkpoint-gap' });
+  }
   const n = Math.min(ca.length, cb.length);
   let idx = -1;
   for (let i = 0; i < n; i++) {
@@ -213,7 +221,10 @@ export async function compareRuns(a, b, opts = {}) {
       const longer = ca.length > cb.length ? ca : cb;
       return result({ status: 'diverged', firstDivergentCheckpoint: longer[n].tick, note: 'checkpoint-count-mismatch' });
     }
-    return result({ status: 'match' });
+    if (a.endTick !== undefined && b.endTick !== undefined && a.endTick !== b.endTick) {
+      return result({ status: 'diverged', note: 'end-tick-mismatch' });
+    }
+    return result({ status: 'match', ...(a.endTick === undefined || b.endTick === undefined ? { note: 'end-tick-not-compared' } : {}) });
   }
   const t1 = ca[idx].tick;
   const t0 = idx > 0 ? ca[idx - 1].tick : 0;
@@ -243,6 +254,10 @@ export async function compareRuns(a, b, opts = {}) {
   for (let i = 0; i < want; i++) if (ra[i].combined !== rb[i].combined) { k = i; break; }
   if (k < 0) {
     return result({ ...base, status: 'inconclusive', resims, note: 'divergence-not-reproduced' });
+  }
+  // The re-simulation must reproduce what was recorded at the checkpoint, or its first divergence means nothing.
+  if (ra[want - 1].combined !== ca[idx].combined || rb[want - 1].combined !== cb[idx].combined) {
+    return result({ ...base, status: 'inconclusive', resims, note: 'resim-does-not-reproduce-checkpoint' });
   }
   const tick = ra[k].tick;
   const split = splitSubsystems(ra[k].subsystems || {}, rb[k].subsystems || {});
