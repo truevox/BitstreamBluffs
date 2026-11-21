@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { spawnSync } from 'node:child_process';
 import {
-  DEFAULT_NOISE_SEED, NOISE_PROFILES, makeHopNoise, noiseOutcome, summarizeNoise, verifyNoiseEvidence,
+  DEFAULT_NOISE_SEED, FATIGUE_RAMP, NOISE_PROFILES, fatigueAtFrame, makeHopNoise, noiseOutcome, summarizeNoise, verifyNoiseEvidence,
 } from '../../tools/sim/human-noise.js';
 
 function sample(profile, noiseSeed = DEFAULT_NOISE_SEED, courseSeed = 'sim-01') {
@@ -58,6 +58,58 @@ test('pending reactions do not stack simultaneous presses or fire twice', () => 
   expect(() => makeHopNoise('toString', 'sim-01')).toThrow(/unknown/i);
 });
 
+test('the fatigue ramp starts at 6 simulated seconds, reaches full at 18 and clamps', () => {
+  expect(FATIGUE_RAMP).toMatchObject({ frameHz: 60, startFrame: 360, fullFrame: 1080,
+    maxAddedDelayFrames: 6, maxAddedMissProbability: .16, unaffectedProfile: 'ideal' });
+  const fresh = { phase: 'preRamp', delayFrames: 0, missProbability: 0 };
+  expect(fatigueAtFrame(0)).toEqual(fresh);
+  expect(fatigueAtFrame(360)).toEqual(fresh);
+  expect(fatigueAtFrame(361)).toMatchObject({ phase: 'ramp', delayFrames: 0 });
+  expect(fatigueAtFrame(361).missProbability).toBeGreaterThan(0);
+  expect(fatigueAtFrame(720)).toEqual({ phase: 'ramp', delayFrames: 3, missProbability: .08 });
+  expect(fatigueAtFrame(1079).delayFrames).toBe(5);
+  expect(fatigueAtFrame(1080)).toEqual({ phase: 'capped', delayFrames: 6, missProbability: .16 });
+  expect(fatigueAtFrame(1800)).toEqual(fatigueAtFrame(1080));
+  expect(() => fatigueAtFrame(NaN)).toThrow(/simulated frame/);
+});
+
+function planned(profile, course, intentFrames, fatigue) {
+  const planner = makeHopNoise(profile, course, DEFAULT_NOISE_SEED, { fatigue });
+  const frames = [];
+  // Only simulated frame indices, not wall time or number of prior calls.
+  for (let frame = Math.min(...intentFrames); frame <= Math.max(...intentFrames) + 30; frame++) {
+    if (planner.step(frame, intentFrames.includes(frame))) frames.push(frame);
+  }
+  return { frames, ...planner.stats() };
+}
+
+test('early and already planned presses stay identical, and the ideal control stays unchanged at all phases', () => {
+  const base = planned('steady', 'sim-01', [359], false);
+  const { fatigue, ...early } = planned('steady', 'sim-01', [359], true);
+  expect(early).toEqual(base);
+  expect(early.frames[0]).toBeGreaterThan(FATIGUE_RAMP.startFrame); // pending press crossed the boundary
+  expect(fatigue).toEqual({ applies: true, phaseIntents: { preRamp: 1, ramp: 0, capped: 0 }, addedDelayFrames: 0 });
+  const intents = [0, 361, 720, 1080, 2000];
+  const { fatigue: control, ...ideal } = planned('ideal', 'sim-01', intents, true);
+  expect(ideal).toEqual(planned('ideal', 'sim-01', intents, false));
+  expect(ideal.frames).toEqual(intents);
+  expect(control).toEqual({ applies: false, phaseIntents: { preRamp: 0, ramp: 0, capped: 0 }, addedDelayFrames: 0 });
+});
+
+test('late noisy intents can gain delay or miss; no extra randomness or cross-run state', () => {
+  const guard = jest.spyOn(Math, 'random').mockImplementation(() => { throw new Error('No global randomness'); });
+  try {
+    const base = planned('steady', 'sim-01', [1080], false);
+    const delayed = planned('steady', 'sim-01', [1080], true);
+    expect(delayed.frames).toEqual([base.frames[0] + 6]);
+    expect(delayed.fatigue).toEqual({ applies: true, phaseIntents: { preRamp: 0, ramp: 0, capped: 1 }, addedDelayFrames: 6 });
+    expect(delayed).toEqual(planned('steady', 'sim-01', [1080], true));
+    expect(planned('steady', 'sim-11', [1080], false).sent).toBe(1);
+    expect(planned('steady', 'sim-11', [1080], true)).toMatchObject({ sent: 0, missed: 1 });
+    expect(planned('steady', 'sim-01', [0], true).frames).toEqual(base.frames.map((f) => f - 1080));
+  } finally { guard.mockRestore(); }
+});
+
 test('keeps crashes, deadlines and stalls in the denominator rather than calling them passes', () => {
   const runs = ['maxM', 'crash:hazard', 'timeout', 'stalled'].map((endReason) => ({ endReason }));
   expect(summarizeNoise(runs)).toEqual({ trials: 4, pass: 1, crash: 1, timeout: 1, stalled: 1, passRate: .25 });
@@ -90,6 +142,10 @@ test('CLI rejects unsafe or accidental unpaired panel options before browser sta
     ['--noiseProfiles', 'ideal,steady', '--maxSec', '61'],
     ['--noiseProfiles', 'ideal,steady', '--noReload'],
     ['--noiseProfiles', 'ideal,steady', '--policy', 'flip'],
+    ['--fatigue'],
+    ['--noiseProfiles', 'ideal,steady', '--fatigue=false'],
+    ['--noiseProfiles', 'ideal,steady', '--fatigue', 'false'],
+    ['--noiseProfiles', 'ideal,steady', '--fatigue', '--fatigue'],
   ];
   for (const args of failedArgs) {
     const result = spawnSync(process.execPath, ['tools/sim/run.mjs', ...args], { encoding: 'utf8' });
