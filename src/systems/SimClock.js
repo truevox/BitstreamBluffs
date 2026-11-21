@@ -11,7 +11,7 @@
  * loop. Chosen by Marvin (2026-11-20); play-test pending: see docs/issue-59-fixed-tick.md.
  */
 
-import { deriveHeld } from './VirtualPad.js';
+import { deriveHeld } from './PadDerive.js';
 
 export const SIM_TICK_HZ = 120;
 export const SIM_TICK_MS = 1000 / SIM_TICK_HZ;
@@ -83,8 +83,13 @@ export class SimClock {
   padsFor(pad, ticks, opts) {
     const timeline = opts && opts.timeline;
     if (timeline && Array.isArray(timeline.events)) return this._timedPads(pad, ticks, opts);
-    this._timeline = null;
     const pressed = { ...(pad.pressed || {}) };
+    if (this._timeline) {
+      // rises carried by a timed-path 0-tick frame (router just disabled): keep their edges
+      const h = { ...this._timeline.base };
+      for (const e of this._timeline.events) { if (e.down && !h[e.name] && EDGE_SET.has(e.name)) pressed[e.name] = true; h[e.name] = !!e.down; }
+      this._timeline = null;
+    }
     if (this._edges) for (const k of EDGE_NAMES) pressed[k] = !!(pressed[k] || this._edges[k]);
     if (ticks <= 0) { this._edges = pressed; return []; }
     this._edges = null;
@@ -109,6 +114,12 @@ export class SimClock {
       for (const n of Object.keys(tl.base || {})) if (!!end[n] !== !!tl.base[n]) bridge.push({ t: null, name: n, down: !!tl.base[n] });
       merged = { base: carried.base, events: carried.events.concat(bridge, tl.events), analog: tl.analog };
     }
+    if (this._edges) {
+      // edges carried by a legacy-path 0-tick frame (router just re-enabled): keep them as untimed rises
+      const lift = [];
+      for (const k of EDGE_NAMES) if (this._edges[k] && !merged.base[k]) lift.push({ t: null, name: k, down: true }, { t: null, name: k, down: false });
+      if (lift.length) merged = { ...merged, events: lift.concat(merged.events) };
+    }
     this._edges = null;
     if (ticks <= 0) { this._timeline = merged; return []; }
     this._timeline = null;
@@ -124,19 +135,21 @@ export class SimClock {
     };
     const held = { ...merged.base };
     const analog = Number.isFinite(merged.analog) ? merged.analog : 0;
-    const events = merged.events;
+    // Schedule every change. Order is kept PER BUTTON (the journal records aggregate changes per name):
+    // a change never lands before an earlier change of the same button, but an untimed gamepad/touch
+    // change is never pushed behind a key event on another button (it keeps the frame's first tick).
+    const buckets = Array.from({ length: ticks }, () => []);
+    const floor = {};
+    for (const ev of merged.events) {
+      const at = Math.max(floor[ev.name] || 0, tickOf(ev.t));
+      floor[ev.name] = at;
+      buckets[at].push(ev);
+    }
     const out = [];
-    let ei = 0;
-    let floor = 0;
     for (let i = 0; i < ticks; i++) {
       const rose = [];
       const pressed = { hop: false, reset: false, pause: false, airBrake: false, parachute: false, confirm: false };
-      while (ei < events.length) {
-        const ev = events[ei];
-        const at = Math.max(floor, tickOf(ev.t)); // never reorder: a change is never scheduled before an earlier one
-        if (at !== i) break;
-        floor = at;
-        ei++;
+      for (const ev of buckets[i]) {
         if (ev.down && !held[ev.name]) {
           rose.push(ev.name);
           if (EDGE_SET.has(ev.name)) pressed[ev.name] = true;

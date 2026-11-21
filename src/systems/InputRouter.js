@@ -20,6 +20,7 @@ import { VirtualPad, emptyPadState } from './VirtualPad.js';
 import { EVT } from '../events.js';
 import { getPaletteCss } from '../ui/Palette.js';
 import { layoutButton } from './ControlLayouts.js';
+import { eventTimeOnClock, perfNow } from './PadDerive.js';
 
 /** Keyboard bindings by KeyboardEvent.code: pad button name and INPUT_ACTION names. */
 const KEYMAP = {
@@ -97,7 +98,7 @@ export class InputRouter {
     this._destroyed = false;
     this._tickBound = () => this._pollGamepads();
     /** Clock that DOM event.timeStamp and Phaser's rAF time share (overridable in tests). */
-    this.now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+    this.now = perfNow;
     this._bind();
   }
 
@@ -160,10 +161,7 @@ export class InputRouter {
    * @returns {number|null}
    */
   _eventTime(e) {
-    const t = e && e.timeStamp;
-    if (!Number.isFinite(t) || t <= 0) return null;
-    const now = this.now();
-    return t <= now + 1000 && t >= now - 60000 ? t : null;
+    return eventTimeOnClock(e && e.timeStamp, this.now());
   }
 
   _onKeyDown(e) {

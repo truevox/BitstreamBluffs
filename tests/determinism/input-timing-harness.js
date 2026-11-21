@@ -41,6 +41,29 @@ export function toTickPad(raw) {
 
 export const encodeTick = (pad) => encodePad(pad).join(':');
 
+/** Touch event types the harness understands -> DOM pointer event type. */
+const TOUCH_TYPES = { touchdown: 'pointerdown', touchmove: 'pointermove', touchup: 'pointerup', touchcancel: 'pointercancel', lostcapture: 'lostpointercapture' };
+export const isTouch = (ev) => Object.prototype.hasOwnProperty.call(TOUCH_TYPES, ev.type);
+
+/**
+ * Dispatch a pointer event at the overlay button `button` (null = off every button) for finger `pointerId`,
+ * through the real TouchOverlay listeners. jsdom has no layout, so document.elementFromPoint is pointed at
+ * the button for the duration of the dispatch.
+ */
+function dispatchTouch(root, ev) {
+  const el = ev.button ? root.querySelector(`[data-btn="${ev.button}"]`) : null;
+  const target = el || root;
+  const e = new Event(TOUCH_TYPES[ev.type], { bubbles: true, cancelable: true });
+  Object.defineProperty(e, 'timeStamp', { value: ev.stamp ?? ev.t }); // `stamp` lets a test fake an off-clock stamp
+  Object.defineProperty(e, 'pointerId', { value: ev.pointerId ?? 1 });
+  Object.defineProperty(e, 'pointerType', { value: 'touch' });
+  Object.defineProperty(e, 'clientX', { value: 0 });
+  Object.defineProperty(e, 'clientY', { value: 0 });
+  const prev = document.elementFromPoint;
+  document.elementFromPoint = () => el;
+  try { target.dispatchEvent(e); } finally { document.elementFromPoint = prev; }
+}
+
 function dispatchKey(type, code, timeStamp) {
   const e = new KeyboardEvent(type, { code, bubbles: true, cancelable: true });
   // jsdom stamps events with Date.now(); real browsers use the performance.now() clock. Pin it.
@@ -65,6 +88,14 @@ export function runCadence({ hz, events, durationMs, mode = 'timed', frameDelta,
   const router = new InputRouter(game);
   let now = 0;
   router.now = () => now;
+  let touchRoot = null;
+  if (events.some(isTouch)) {
+    // classic layout keeps the PUSH/HOP/... touch buttons; overlay 'on' so it mounts without a touch device
+    router.applySettings({ touchOverlay: 'on', controlLayout: 'classic', touchRotate90: false });
+    router.pad.setOverlayContext(true); // shown during a run (InputRouter does it on RUN_START)
+    router.pad.overlay.now = () => now;
+    touchRoot = router.pad.overlay.root;
+  }
   const clock = new SimClock();
   const frameMs = 1000 / hz;
   const tape = [];
@@ -82,6 +113,7 @@ export function runCadence({ hz, events, durationMs, mode = 'timed', frameDelta,
         const ev = events[ei++];
         now = ev.t;
         if (ev.type === 'blur') window.dispatchEvent(new Event('blur'));
+        else if (isTouch(ev)) dispatchTouch(touchRoot, ev);
         else dispatchKey(ev.type, ev.code, ev.t);
       }
       now = Tk;
@@ -113,6 +145,14 @@ export function runCadence({ hz, events, durationMs, mode = 'timed', frameDelta,
 export function oracleTape(events, ticks, tickMs = SIM_TICK_MS) {
   const vp = new VirtualPad();
   const tape = [];
+  const fingers = new Map(); // pointerId -> button (the overlay counts fingers per button; VirtualPad does per source)
+  const fingerCount = new Map();
+  const touch = (name, down) => {
+    const n = (fingerCount.get(name) || 0) + (down ? 1 : -1);
+    fingerCount.set(name, Math.max(0, n));
+    if (down && n === 1) vp.setButton(name, true, 'touch');
+    if (!down && n <= 0) vp.setButton(name, false, 'touch');
+  };
   let ei = 0;
   for (let g = 1; g <= ticks; g++) {
     const end = g * tickMs;
@@ -120,6 +160,15 @@ export function oracleTape(events, ticks, tickMs = SIM_TICK_MS) {
     while (ei < events.length && events[ei].t <= end + 1e-9) {
       const ev = events[ei++];
       if (ev.type === 'blur') { vp.releaseSource('keyboard'); continue; }
+      if (isTouch(ev)) {
+        const id = ev.pointerId ?? 1;
+        const prev = fingers.get(id);
+        const next = ev.type === 'touchdown' || ev.type === 'touchmove' ? (ev.button || null) : null;
+        if (prev === next) continue;
+        if (prev) touch(prev, false);
+        if (next) { fingers.set(id, next); rose.add(next); touch(next, true); } else fingers.delete(id);
+        continue;
+      }
       for (const name of ORACLE_KEYS[ev.code] || []) {
         if (ev.type === 'keydown') rose.add(name);
         vp.setButton(name, ev.type === 'keydown', 'keyboard');

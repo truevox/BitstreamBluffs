@@ -11,7 +11,7 @@ Branch: friday/issue-115-teamb-fair-input-20261121
 - tests/determinism/** and tests/src/input-audio-glitch/**, tests/src/sim-clock.test.js
 - docs/issue-115-fair-input.md
 
-Out of scope: GhostTape format/header (Team A, #152), touch timestamping, gamepad event timing.
+Out of scope: GhostTape format/header (Team A, #152), gamepad event timing. (Touch timestamping was added to scope later, by user approval.)
 
 ## Plan
 1. Deterministic Jest harness: fixed timestamped DOM key sequence at 30/60/120/144 Hz render cadences -> per-tick pad tape.

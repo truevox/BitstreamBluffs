@@ -7,6 +7,9 @@
  * Pure DOM/logic: no Phaser import (Jest-testable under jsdom).
  */
 import { TouchOverlay } from './TouchOverlay.js';
+import { deriveHeld } from './PadDerive.js';
+
+export { deriveHeld };
 
 /** Analog dead-zone (stick / device tilt). */
 export const ANALOG_DEADZONE = 0.15;
@@ -41,26 +44,6 @@ export const HELD_NAMES = [
 
 /** Most timeline entries kept between two polls; older ones fold into the timeline base (no unbounded growth). */
 export const TIMELINE_MAX = 256;
-
-/**
- * Held fields of a VirtualPadState derived from raw button holds (issue #115: shared by the live pad and by
- * SimClock when it rebuilds a per-tick pad from a timeline).
- * @param {Object<string,boolean>} h raw held name -> down
- * @param {number} analog dead-zoned analog tilt (0 = none)
- * @returns {object}
- */
-export function deriveHeld(h, analog = 0) {
-  const back = !!h.tiltBack;
-  const fwd = !!h.tiltForward;
-  const digital = back && fwd ? 0 : fwd ? 1 : back ? -1 : 0;
-  return {
-    push: !!h.push, brake: !!h.brake, hop: !!h.hop, reset: !!h.reset, airBrake: !!h.airBrake,
-    parachute: !!h.parachute, divebomb: !!h.divebomb, corkscrew: !!h.corkscrew, pause: !!h.pause,
-    tuck: !!h.tuck || (back && fwd),
-    tilt: analog !== 0 ? analog : digital,
-    heli: /** @type {-1|0|1} */ ((h.heliRight ? 1 : 0) - (h.heliLeft ? 1 : 0)),
-  };
-}
 
 /** @returns {VirtualPadState} all-neutral state. */
 export function emptyPadState() {

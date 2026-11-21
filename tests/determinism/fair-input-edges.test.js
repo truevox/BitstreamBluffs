@@ -5,7 +5,11 @@
 import { EventEmitter } from 'events';
 import { InputRouter } from '../../src/systems/InputRouter.js';
 import { SimClock, SIM_MAX_TICKS_PER_FRAME } from '../../src/systems/SimClock.js';
-import { VirtualPad, TIMELINE_MAX } from '../../src/systems/VirtualPad.js';
+import * as VirtualPadModule from '../../src/systems/VirtualPad.js';
+
+// Namespace import: on a build without #115 this file still loads and fails on behaviour, not on a missing export.
+const { VirtualPad } = VirtualPadModule;
+const TIMELINE_MAX = VirtualPadModule.TIMELINE_MAX ?? 256;
 import { runCadence, idealTick, toTickPad } from './input-timing-harness.js';
 
 afterEach(() => {
@@ -166,5 +170,76 @@ describe('#115 keyboard semantics and edge buffering', () => {
     const s = new VirtualPad().poll();
     expect(Object.keys(s)).not.toContain('timeline');
     expect(s.timeline).toEqual({ base: expect.any(Object), events: [], analog: 0 });
+  });
+});
+
+describe('#115 review: untimed sources are never pushed behind a key event on another button', () => {
+  const frame = (setup) => {
+    const c = new SimClock();
+    const vp = new VirtualPad();
+    setup(vp);
+    const raw = vp.poll();
+    return c.padsFor(toTickPad(raw), c.advance(1000 / 30), { frameTime: 1000 / 30, timeline: raw.timeline, normalize: toTickPad });
+  };
+  const hopEdges = (pads) => pads.map((p) => p.pressed.hop);
+
+  test('key push at 30 ms + gamepad hop polled later in the same 30 Hz frame: hop on tick 1, as on main', () => {
+    const pads = frame((vp) => { vp.setButton('push', true, 'keyboard', 30); vp.setButton('hop', true, 'gamepad'); });
+    expect(hopEdges(pads)).toEqual([true, false, false, false]);
+    expect(pads.map((p) => p.hop)).toEqual([true, true, true, true]);
+    expect(pads.map((p) => p.push)).toEqual([false, false, false, true]);
+  });
+
+  test('key push at 30 ms + touch hop: hop on tick 1', () => {
+    const pads = frame((vp) => { vp.setButton('push', true, 'keyboard', 30); vp.setButton('hop', true, 'touch'); });
+    expect(hopEdges(pads)).toEqual([true, false, false, false]);
+  });
+
+  test('same button keeps arrival order: an untimed blur release never lands before its own timed press', () => {
+    const pads = frame((vp) => {
+      vp.setButton('hop', true, 'keyboard', 30);
+      vp.releaseSource('keyboard'); // blur: untimed release of the same button stays after its press
+    });
+    expect(hopEdges(pads)).toEqual([false, false, false, true]);
+    expect(pads.map((p) => p.hop)).toEqual([false, false, false, true]);
+  });
+
+  test('through the real router: keydown at 30 ms then a gamepad A press sampled by poll()', () => {
+    const buttons = Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+    navigator.getGamepads = () => [{ connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons }];
+    const game = { events: new EventEmitter(), canvas: null };
+    const router = new InputRouter(game);
+    router.now = () => 1000 / 30;
+    const e = new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true, cancelable: true });
+    Object.defineProperty(e, 'timeStamp', { value: 30 });
+    window.dispatchEvent(e);
+    buttons[0] = { pressed: true, value: 1 };
+    const raw = router.poll();
+    const c = new SimClock();
+    const pads = c.padsFor(toTickPad(raw), c.advance(1000 / 30), { frameTime: 1000 / 30, timeline: raw.timeline, normalize: toTickPad });
+    expect(hopEdges(pads)).toEqual([true, false, false, false]);
+    expect(pads.map((p) => p.push)).toEqual([false, false, false, true]);
+    router.destroy();
+  });
+});
+
+describe('#115 review: switching between the legacy and timed paths keeps carried edges', () => {
+  test('timed 0-tick frame then a disabled (legacy) poll: the hop edge still reaches a tick', () => {
+    const c = new SimClock();
+    const vp = new VirtualPad();
+    vp.setButton('hop', true, 'keyboard', 2);
+    const raw = vp.poll();
+    expect(c.padsFor(toTickPad(raw), c.advance(3), { frameTime: 3, timeline: raw.timeline, normalize: toTickPad })).toEqual([]);
+    const pads = c.padsFor(toTickPad(vp.poll()), c.advance(1000 / 60), { frameTime: 3 + 1000 / 60, timeline: null });
+    expect(pads.map((p) => p.pressed.hop)).toEqual([true, false]);
+  });
+
+  test('legacy 0-tick frame then a timed poll: the carried edge lands on the first tick', () => {
+    const c = new SimClock();
+    const legacyPad = toTickPad({ pressed: { hop: true } });
+    expect(c.padsFor(legacyPad, c.advance(3))).toEqual([]);
+    const raw = new VirtualPad().poll();
+    const pads = c.padsFor(toTickPad(raw), c.advance(1000 / 60), { frameTime: 20, timeline: raw.timeline, normalize: toTickPad });
+    expect(pads.map((p) => p.pressed.hop)).toEqual([true, false]);
   });
 });

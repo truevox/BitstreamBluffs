@@ -297,7 +297,9 @@ All additive; no existing signature or payload changed.
 
 * **VirtualPad** (#115, additive): `setButton(name, down, source, timeStamp?)` takes an optional event time on the
   `performance.now()` clock; `poll()` snapshots carry a non-enumerable `timeline` `{ base, events, analog }`; exported
-  pure `deriveHeld(held, analog)`. `InputRouter.poll()` returns `timeline: null` while disabled.
+  pure `deriveHeld(held, analog)` (implemented in the pure `systems/PadDerive.js`, with `eventTimeOnClock`).
+  `InputRouter.poll()` returns `timeline: null` while disabled. `TouchOverlay` passes pointer `timeStamp`s
+  (down / move / up / cancel / lostpointercapture) the same way keyboard does.
 * **VirtualPad**: `setTilt(value, source = 'gamepad')` has an optional 2nd arg (analog sources `'gamepad'` / `'device'`;
   largest magnitude wins; output is rescaled outside the 0.15 dead-zone). New: `releaseSource(source)`,
   `setOverlayContext(visible)`. New helper file `systems/TouchOverlay.js` (DOM only). The touch overlay is shown only

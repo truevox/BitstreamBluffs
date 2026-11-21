@@ -18,17 +18,22 @@ still reached the ticks through ONE poll per display frame:
 
 ## Fix
 
-* `InputRouter` passes each keyboard event's `event.timeStamp` (the `performance.now()` clock, the same
-  clock as the rAF time Phaser hands to `RunScene.update(time)`) to `VirtualPad.setButton(..., timeStamp)`.
-  A timestamp not on that clock (legacy epoch values, synthetic events, jsdom) is treated as untimed.
+* `InputRouter` (keyboard) and `TouchOverlay` (touch buttons: pointerdown / move / up / cancel and
+  lostpointercapture) pass each event's `event.timeStamp` (the `performance.now()` clock, the same clock
+  as the rAF time Phaser hands to `RunScene.update(time)`) to `VirtualPad.setButton(..., timeStamp)`.
+  A timestamp not on that clock (legacy epoch values, synthetic events, jsdom) is treated as untimed
+  (`PadDerive.eventTimeOnClock`). The overlay counts fingers per button, so multi-touch on one button is
+  one hold; a touch and a key on the same button are one aggregate hold (released by the last one).
 * `VirtualPad` journals every aggregate hold change since the last poll; `poll()` returns it as a
   non-enumerable `timeline` (snapshot shape unchanged; capped at 256 entries between polls).
 * `SimClock.padsFor(pad, ticks, { frameTime, timeline, normalize })` gives each change to the tick whose
   real-time window contains it. This frame's ticks end at `frameTime - accMs - (ticks-1-i) * tickMs`.
-  * Clamped into **this frame's ticks**: older than the first window (stall, untimed gamepad/touch/blur)
+  * Clamped into **this frame's ticks**: older than the first window (stall, untimed gamepad/blur)
     -> first tick (= old behaviour); newer than the last window (sub-tick remainder) -> last tick. So no
     input is ever shown a frame later than before, and no tick that already ran is rewritten.
-  * Arrival order is never changed (an untimed change never lands before an earlier timed one).
+  * Arrival order is kept **per button**: a change never lands before an earlier change of the same
+    button, but an untimed gamepad change is never pushed behind a key/touch event on another button
+    (it keeps the frame's first tick, as on main). Review finding #1, test-covered.
   * A button that went down inside a tick's window is held on that tick even if released before the
     window closed: a tap is at least one tick. Edges are rebuilt from the rises (so the hop edge tick
     always has `hop` held).
@@ -36,6 +41,9 @@ still reached the ticks through ONE poll per display frame:
     bridged with untimed changes so no hold goes stale.
   * Without a timeline (`TapePlayer` replays, probes that stub `poll`), `padsFor` is the old fan-out.
 * `RunScene.update` passes `time`, the poll's timeline and `normalizePad` (re-run per tick).
+* `deriveHeld` lives in the pure `systems/PadDerive.js`, so SimClock no longer imports VirtualPad /
+  TouchOverlay. Switching between the timed and legacy paths right after a 0-tick frame keeps the
+  carried edges.
 
 ## Measurements
 
@@ -56,13 +64,15 @@ Frame lag = render frame first showing it minus the first frame that could poll 
 | 144 Hz | #115 | 0 | -1 / -0.35 / 0 | -1 / -0.31 / 0 | 1 (0-tick frames) |
 
 **Display latency added: none.** For every press the main path delivered, the #115 path shows it in the
-same render frame (asserted per press at all four rates). Simulated-time lag goes from "up to 3 ticks
-early" to exact.
+same render frame (asserted per press at all four rates). On this steady, idealized cadence the
+simulated-time lag goes from "up to 3 ticks early" to exact.
 
 ### Real game (Chromium, built bundle, `tools/fair-input-browser-probe.mjs`)
 
-Real `KeyboardEvent`s with pinned timestamps, loop asleep, exact frame schedules, seed FAIR115, 720
-ticks, 18 key events including a 2.4 ms hop tap, a tuck tap, a brake tap and a sub-frame double tap:
+**Idealized clock** (the probe pins `event.timeStamp` and calls `game.step(T, dt)` directly, so there is
+no rAF jitter and no Phaser delta smoothing). Real `KeyboardEvent`s, loop asleep, exact frame schedules,
+seed FAIR115, 720 ticks, 18 key events including a 2.4 ms hop tap, a tuck tap, a brake tap and a
+sub-frame double tap (the touch rows of the current probe are listed after the table):
 
 | Build | 30 Hz | 60 Hz | 120 Hz | 144 Hz |
 |---|---|---|---|---|
@@ -72,6 +82,31 @@ ticks, 18 key events including a 2.4 ms hop tap, a tuck tap, a brake tap and a s
 #115: identical ghost-tape input rows and identical sled state at 30/60/120 Hz. main: three different
 tapes, three taps dropped at every rate (16 rows vs 20).
 
+Touch is now in the same probe: real `PointerEvent`s (pointerType `touch`) at the overlay buttons' centres,
+a 2.4 ms BRAKE tap, two fingers on HOP and a TUCK hold ended by `pointercancel`. With keyboard + touch
+(27 tape rows) this PR gives identical tapes and sled state at 30/60/120 Hz (`FAIR_INPUT_PASS`, end x
+2593.025); 144 Hz differs by the documented <= 1-tick-early rows.
+
+### Real rAF loop (`REAL_RAF=1`)
+
+Phaser's own requestAnimationFrame loop with real vsync times and TimeStep delta smoothing, Playwright
+`page.keyboard` (browser-stamped events), 60 W presses per run. Each press is classified against the tick
+windows of the frame that applied it (0 = its own tick, +n = n ticks early, -n = applied on the frame's
+first tick although the event predates that frame's simulated window: the frame came late and the
+backlog was dropped / smoothed away, which is not added delay since it is the first frame that could
+show it). The container is a poor stand-in for a real display: swiftshader WebGL, median frame 50-67 ms,
+stalls up to 1.2 s, so most frames run the 6-tick cap.
+
+| Build | Runs x presses | Exact tick | Early (max) | Older than window |
+|---|---|---|---|---|
+| main b51ab36 | 1 x 60 | 4 | 36 (6) | 20 |
+| #115 | 3 x 60 | 90 | 33 (6, once; otherwise <= 3) | 57 |
+
+So on a real loop the scheduler is not exact: an event stamped after the frame's vsync time but delivered
+before its callback goes to that frame's last tick. It is never late and never retroactive, and it is
+much closer to exact than main. On a healthy 60 Hz display the callback runs within a few ms of vsync, so
+the expected bound there is ~1 tick early; this container could not measure that directly.
+
 ## Limits and trade-offs
 
 * **144 Hz (any rate that does not divide 120)** cannot be exact without adding latency: an event in
@@ -80,8 +115,12 @@ tapes, three taps dropped at every rate (16 rows vs 20).
   Deferring it to its own tick would show it one display frame (6.9 ms) later. Not done; open question.
 * Phaser's `smoothStep` may make a frame's simulated time differ slightly from its wall interval; the
   mapping is per frame and clamped, so this only moves events between that frame's own ticks.
-* Gamepad and touch overlay changes are untimed (first tick of the frame, as before). Touch pointer
-  events do have timestamps; wiring them is a small follow-up.
+* **Real rAF / delta smoothing (honest bound).** Under a real loop the rAF `time` is the frame's vsync
+  time, and keydown is not rAF-aligned: a key stamped after `T` but delivered before that frame's
+  callback goes to the last tick, i.e. up to ~1 tick early at **any** rate (also 60 Hz) on a normal
+  machine, more if the callback runs long after vsync. It is never late and never retroactive.
+* Gamepad changes are untimed (first tick of the frame, as before): the Gamepad API has no per-button
+  event times. Device-orientation tilt (analog) is also untimed.
 * Edges latched before a blur or a tab suspension are still delivered on resume (unchanged).
 
 ## Replay / tape compatibility
