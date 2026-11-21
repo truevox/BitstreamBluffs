@@ -37,12 +37,13 @@
   // CONFIG: rebuilt deterministically at create() from seed + registry + profile; verified equal, never restored.
   const CONFIG = ['seed', 'biomeMask', 'dailyOfficial', 'dailyRuleId', 'dailyMode', 'dailyMods', 'bsodGym', 'loadout',
     'unlockedBoosts', 'upgradeRun', 'upgradeFx', 'magnetsDrop', 'kodiaksOn', 'kodiakPackMode', 'gymSetup', 'startX',
-    'gymStartX', 'boostFx', 'modded', 'appliedBoosts', 'opening', 'content', 'look', 'settings', 'bestM', 'tuner',
-    'palette', '_replayTape'];
+    'gymStartX', 'boostFx', 'modded', 'appliedBoosts', 'opening', 'content', 'settings', 'bestM', 'tuner',
+    '_replayTape'];
   // METADATA: wall-clock or recording state; not simulation (but a resumed run's ghost tape needs it, see doc).
   const METADATA = ['runId', 'startedAt', 'ghostRecorder', 'tapePlayer', '_ghostToken', '_bsodObserverErrorLogged'];
   // PRESENTATION: render-only objects and per-frame visual state.
-  const PRESENTATION = ['bg', 'worldDance', 'songBillboard', 'mesh', 'fx', 'trail', 'airTelegraph', 'groundTelegraph',
+  // look/palette are re-resolved when the biome sector changes (RunScene ~L2383): derived presentation, not CONFIG.
+  const PRESENTATION = ['look', 'palette', 'bg', 'worldDance', 'songBillboard', 'mesh', 'fx', 'trail', 'airTelegraph', 'groundTelegraph',
     'streaks', 'flashRect', 'blindRect', 'bsodEdge', 'windPom', 'startGate', 'bestMarker', 'deathMarker', 'ghostRiders',
     'kodiakRider', 'blackHole', '_worldDanceMotionQuery', '_frameDt', 'heightFn', 'shake'];
   // INFRA: Phaser scene systems, handlers, services.
@@ -111,6 +112,7 @@
   }
 
   function makeEncoder(run, keyOfBody) {
+    const inWorld = new Set(Matter.Composite.allBodies(run.matter.world.engine.world));
     const ids = new Map();
     const content = contentIndex(run);
     const audit = [];
@@ -126,6 +128,12 @@
       if (pk) { skipped.push(`${path}:${pk}`); return { __skip: pk }; }
       if (v.type === 'body' && Array.isArray(v.parts)) {
         const k = keyOfBody(v);
+        if (k == null && !inWorld.has(v)) {
+          // A body that has left the world (e.g. the hazard kept in _crashHazard after its chunk was dropped).
+          // Sim state still references it; it can never collide again, so it restores as a dead placeholder.
+          skipped.push(`${path}:dead-body`);
+          return { __deadBody: v.label };
+        }
         if (k == null) audit.push(`${path}: Matter body ${v.label} has no stable key`);
         return { __body: k };
       }
@@ -183,6 +191,7 @@
         if (!b) throw new Error(`restore: ${path}: no live body ${n.__body}`);
         return b;
       }
+      if ('__deadBody' in n) return { type: 'dead-body', label: n.__deadBody, parts: [], position: { x: NaN, y: NaN } };
       if ('__content' in n) return resolveContent(run, n.__content);
       if ('__alias' in n) {
         if (!restored.has(n.__alias)) throw new Error(`restore: ${path}: alias ${n.__alias} used before its target was restored`);
@@ -312,7 +321,7 @@
     const L = LV.indexOf(level);
     if (L < 0) throw new Error(`restore: unknown level ${level}`);
     if (!snap || snap.kind !== 'bb-runscene-diagnostic-snapshot' || snap.version !== 1) throw new Error('restore: bad snapshot kind/version');
-    if (opt.strict !== false && snap.audit.length) throw new Error(`restore: snapshot is incomplete: ${snap.audit.join(' | ')}`);
+    if (L > 0 && opt.strict !== false && snap.audit.length) throw new Error(`restore: snapshot is incomplete: ${snap.audit.join(' | ')}`);
     const engine = run.matter.world.engine;
     const tickMs = run.simClock.tickMs;
     if (L === 0) {
@@ -399,9 +408,19 @@
     return h.toString(16).padStart(8, '0');
   }
   /** Diagnostic per-tick digests (non-authoritative). Sub-system granular so the first divergent one is named. */
+  /** Key-order-insensitive JSON: object property insertion order is not state (array/Map/Set order is). */
+  function canon(v) {
+    if (Array.isArray(v)) return `[${v.map(canon).join(',')}]`;
+    if (v && typeof v === 'object') {
+      // alias numbering follows traversal (= key) order; keep only the fact that it is an alias
+      if ('__alias' in v) return '"<alias>"';
+    }
+    if (v && typeof v === 'object') return `{${Object.keys(v).filter((k) => k !== '__id').sort().map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}`;
+    return JSON.stringify(v);
+  }
   function digests(run, cap = capture(run)) {
     const out = {};
-    for (const k of Object.keys(cap.game)) out[k] = fnv(JSON.stringify(cap.game[k]));
+    for (const k of Object.keys(cap.game)) out[k] = fnv(canon(cap.game[k]));
     const m = cap.matter;
     const sorted = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]]));
     out['matter.bodies'] = fnv(sorted(m.bodies));

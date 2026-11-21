@@ -56,8 +56,8 @@ const TAPES = {
   },
 };
 const FIXTURES = {
-  contact: { seed: 'SAVE119', scramble: true, startX: null, kodiaks: false, K: 600, N: QUICK ? 900 : 1300 },
-  hazard: { seed: 'SAVE119H@2047', scramble: false, startX: 107000, kodiaks: true, shields: 99, K: 480, N: QUICK ? 760 : 1200 },
+  contact: { seed: 'SAVE119', scramble: true, startX: null, kodiaks: false, K: 600, N: QUICK ? 900 : 1100 },
+  hazard: { seed: 'SAVE119H@2047', scramble: false, startX: 107000, kodiaks: true, shields: 99, K: 480, N: QUICK ? 760 : 1000 },
 };
 
 async function bootPage(browser, fx, tape) {
@@ -153,9 +153,10 @@ async function runCase(browser, fxName, level, skip = []) {
       if (!r.ok) return { fixture: fxName, level, skip: skip.join('+') || '-', restoreError: r.error, snapBytes, audit };
       restoreLog = r.log || [];
     } else {
-      // control: two uninterrupted runs from tick 0, compared from tick 1 (proves the digests are deterministic)
+      // control: two uninterrupted runs, both played to K, then compared K+1..N (digest determinism baseline)
+      await Promise.all([A, B].map((P) => P.page.evaluate((K) => window.__ss.step(K), fx.K)));
     }
-    const K = level === 'control' ? 0 : fx.K;
+    const K = fx.K;
     const firstBy = {};
     let firstLeaves = null;
     let first = null, firstDiff = null, firstSled = null, maxPos = 0, crashA = null, crashB = null, endPos = 0, ticks = 0;
