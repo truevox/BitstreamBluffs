@@ -3,7 +3,7 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 1,
-  "attestation": "no-behavior-change: GhostRecorder read-only fingerprint hook at the existing checkpoint branch (#118, PR #165); capture proven non-mutating by tests",
+  "attestation": "sim-revision-bumped: NOT bumped, SIM_REVISION stays 1 (never released on main); behavior-change (sign of zero tilt only, quantizeTilt feeds the live pad); recorder row emission (C11) is recorded-tape only; RunScene replay-setup edits affect replay only",
   "changedFiles": [
     "src/systems/ghost/GhostTape.js"
   ],
@@ -34,6 +34,6 @@
     "src/systems/TerrainGenerator.js": "sha256:6b16dba03098a1d95f8fca00ba8802dbb361823cf9b3ca5719e9356f355f1e8d",
     "src/systems/TrickTracker.js": "sha256:e6fdcea5cfc0e515fb0623b7f6bb3b189d5a5ed0fcf66f15175fd508da64abcf",
     "src/systems/Wards.js": "sha256:5fa20a216fd93ef1b72f1fe969234482585f680462e64fc46c0cf45772ebc09c",
-    "src/systems/ghost/GhostTape.js": "sha256:8ff7c10e971dcce55f4ee160c20bbd7383228d90f8102d961e81bb123a584e0b"
+    "src/systems/ghost/GhostTape.js": "sha256:e93a298ae0c23e772810fb51efc096c9e47ca4573bbac741e7c5ccce956e2318"
   }
 }

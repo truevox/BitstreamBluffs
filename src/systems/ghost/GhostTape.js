@@ -35,7 +35,7 @@ const EDGE_BITS_MASK = ((1 << EDGE_FIELDS.length) - 1) << BOOL_FIELDS.length;
  * Recorder behavior for edge rows (Replay Contract C11/R-5): 'every-tick' = a row is written on every tick whose bits
  * carry an edge bit. Tapes without this header field were recorded by the older deduping recorder ('legacy').
  */
-export const GHOST_EDGE_ROWS = 'every-tick';
+const GHOST_EDGE_ROWS = 'every-tick';
 
 /** Identity of a course: the exact seed plus the selected biome mask. */
 export function courseKey(seed, biomeMask = 0) {
