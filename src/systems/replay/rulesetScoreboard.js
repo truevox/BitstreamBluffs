@@ -13,6 +13,7 @@
 import { canonicalize } from './canonicalJson.js';
 import { RULESET_ID_RE } from './ruleset.js';
 import { RulesetRegistryError } from './rulesetRegistry.js';
+import { validateOutcomeRecord } from './rulesetVerifier.js';
 
 export class RulesetMixError extends Error {
   /** @param {string} message */
@@ -39,15 +40,23 @@ export function scoreboardKey({ rulesetId, lane, biomeMask, seed = null }) {
   return canonicalize({ format: 'bb-board-key', rulesetId, lane, biomeMask, seed });
 }
 
-/** Why an outcome record may not be placed on any ruleset board, or null when it may. */
+/**
+ * Why an outcome record may not be placed on any ruleset board, or null when it may. The record is first checked with
+ * `validateOutcomeRecord`: a record with no/null verifierId, malformed digests, unknown keys or a boolean `verified` is
+ * `invalid-record` and never eligible.
+ */
 export function ineligibleReason(record) {
-  if (!record || typeof record !== 'object') return 'not-a-record';
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return 'not-a-record';
+  try {
+    validateOutcomeRecord(record);
+  } catch (e) {
+    if (e instanceof RulesetRegistryError) return 'invalid-record';
+    throw e;
+  }
   if (record.outcome === 'consistent-with' || record.outcome === 'inconclusive-legacy') return 'legacy-outcome';
   if (record.outcome === 'refused') return 'refused';
   if (record.outcome === 'diverged') return 'diverged';
-  if (record.outcome !== 'match') return 'unknown-outcome';
-  if (!isId(record.verifiedUnder)) return 'no-ruleset';
-  return null;
+  return null; // a validated `match`: verifiedUnder is a rulesetId and verifierId is named
 }
 
 /**
