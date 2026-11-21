@@ -1,0 +1,3261 @@
+{
+  "format": "bitstream-original-mp3-mix-vs-separated-source-phase-UNVERIFIED-v1",
+  "status": "ORIGINAL_MIX_MATCHED_NO_VERIFIED_SOURCE_BEAT_OR_DRIFT",
+  "sourceManifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
+  "priorReportSha256": "6696cf5e9b07089ad1cefd171110efb96fd38b228902f48b0786a416d6aa9024",
+  "harmonicReportSha256": "8e922b017e7819983392227fe296b890e0b608b953fbaf7799c736ee01bf8c34",
+  "priorGlobalSourcePhaseReportSha256": "f869ebf715abfc7c2131bde4ed35cffd0a642f69ea1712bf6f127ce8e1be886c",
+  "originalMp3Sha256": "931402316385f7a1afd302d59132b812f0ae6a312b46b8cd85826c0a63906a8e",
+  "originalMp3Format": "mp3",
+  "originalMp3MetadataTitle": "One More Run (The Ballad of Bitstream Bluffs)",
+  "originalMp3DurationSeconds": 174.624,
+  "originalStemSha256": {
+    "0": {
+      "drums": "0040ca6cfa771eab0a57593daedcbe72aeee40b7c858e5933bfc23bd0876416b",
+      "bass": "f7506c0bdadeda0bce72666b6506229977345c28b9fe0b884e7c1758dc78131a",
+      "guitar": "f713af2ef6da6a6ff9fcd677c94563f0155d1435ae92d3f7cb8b2b76e3e89f6b",
+      "piano": "e7d12b2bcf44c00b332077c186cb26801f1df99e4c673713023b4e8f6ee8a942",
+      "other": "58f7018cd10e641a6ac04da4b65bd2c7354385a2e41fc380fd35028cf2236004"
+    },
+    "1": {
+      "drums": "83df34a57c0bbe07ca7e010ec6c4cd6417831fcd26e9229ecbc9758b6a246f30",
+      "bass": "89bc022b9aa9a3d79d629ba7f40be351dde63fec45fe174c6aa9be5b17525625",
+      "guitar": "7421f013389fcda9ba69a8bc51eaa8f4baedc1af3ae4051c34d24a364ef33d11",
+      "piano": "947de7fd2dc2eb8930f48ff26e0c55bdc9f0f599e425797a03c7887d85df577e",
+      "other": "2098051300b8f0d295fc6695afe45ba14fad310740bc776ddb764e98533e15d4"
+    },
+    "2": {
+      "drums": "3be96dba7b2c7db369170c4cde59d086713646c8272a21e751833125395e84d8",
+      "bass": "8e17b4c5ade45e7b701329b246a83b682c5eb69987f52691062cfac2d574c3d6",
+      "guitar": "3928233a1681e060c934ddb97e6c1d843fb74345e64a6f8a5dca6b093d878d03",
+      "piano": "17cc9224cf4251bbe60673bd2362051d2e088da7877d1d3c29e80e057bfe1a1d",
+      "other": "26b2fe3d5a1d82717614907ff0a0d91838eaa94ac8562bca59ce33cc5e1d3154"
+    },
+    "3": {
+      "drums": "b08312601acbbc5cc69403a883a25067231e567d880f012ab710f3ca89c69484",
+      "bass": "157d136e5dca7b4c89e0c3d7da1204044e083093eb3ea7e4ce6a06ff3e70bfd2",
+      "guitar": "8afe08ffb978a627a6d49586887ffd34693ad57e39ed7a533fda6800cd48050d",
+      "piano": "a52e2475a999af7f1b406c1e1fe5f5ab24470918a5203b47fa9f32c2aae48542",
+      "other": "04d742de9577a9c651d27e7b1b36fecee96e12040ee1561ec7ef2badbac53187"
+    },
+    "4": {
+      "drums": "a8a7ca42426d21f9d8dc7309b3207e20998b59c4751dd3e215077d6e4720698d",
+      "bass": "78c699bee87e8637ce258859e54e9147ee1edec15eb2b2a488a00771bcc6a46b",
+      "guitar": "6edc12d5a35edad022199cd1b46ec6ea9c80ca64f75c4b81b8816aba5d491f47",
+      "piano": "120b14bb5268c43d5acc4b05de7cccf07ebbdde905c20095c939900477a275f5",
+      "other": "2c5802577dc33688c199d43d887877c1bf8f317456e66a5b16dabe31886727d8"
+    },
+    "5": {
+      "drums": "2039d22ef1c626c2d1c1d279ff0afb2240329ca32ffcbe87f258c72ff2961c57",
+      "bass": "2e00c8626cf9f67cf23d3a324e8eda81797a5f34722fbe2e1edc0b85512b1ba5",
+      "guitar": "57f16a43e342b11ada6928e3f38edde7e84d7b3750864cff4e60839ee8b9d979",
+      "piano": "a336bf2a889a17262a316eaebe1a958b89661e072369d77024e9d404702aee10",
+      "other": "a3a8db00430eb440897b2a112e68adb1f3f0b12aab7114da4ac99f8dd1ab24c4"
+    },
+    "6": {
+      "drums": "8e4ac58c3c5a97f74c389d5eb63095482aee81c661f43f259eb758cbe114850b",
+      "bass": "a734fb1487761229e5f8be4bb7d1401e31b5bf2d02daf92ca1c4ca9c652cd706",
+      "guitar": "cf14a7517dc3faa2bcde0a5f356a36a8a290d888bb7a19309f260de5d2b2de9b",
+      "piano": "fd23d15c36377663eb34ae93a78a6a5c1722f77d855f9bc4283674001b15d0a3",
+      "other": "e44ce643ca8d6c87c695cbbb4fb13bb7bc6f0567612f79bd056d6a9b3a7cc1a0"
+    },
+    "7": {
+      "drums": "c66e7a06ca1f079c14d3253a75dd029e5b1cc0d1e0a1fba357dffaf16e5d42aa",
+      "bass": "a82a8c36ed736bef197ed7b566dcb0762df83817a6c40158e2057ede124e6743",
+      "guitar": "5fbef1a3f2e4fa9c7834f562bb40bfa5abcb95cacd0bd7ae62bc9193ca2c13a5",
+      "piano": "d7c460e5492f078cb5b21a1e71c7efa9b383629b8b63f1dbb957c5b73dbfb80d",
+      "other": "ec8bb292cc512c118eed2e112e4abd068f54dddce55446566fb68c11283d29ad"
+    },
+    "8": {
+      "drums": "b78e7621444becba0c84d035c3e88ff7f4cbdb823a42cc809c9321601e72e5c1",
+      "bass": "e4742a6b5e4eb6a76a3d9685a30bd054866d06714e58e083bd56e96e3f34d8dc",
+      "guitar": "116f180e85e0c5258770ad421fa2cbc6a0c5aa444bd44222eef89a22f73962a9",
+      "piano": "a8704cc03d8d14ca642afb5e44d9ff9fb3f14cca3462ff1105d1e7ced3db61a5",
+      "other": "a0f215e8ee5bda9cdfaf57a4872fef4eba9c6842414f885335248f12a9127366"
+    },
+    "9": {
+      "drums": "4646aefeb54ec9d9e36c28c73ab06a312cf4dfcc847cd7082504d934fcbb9709",
+      "bass": "2434ddb6820898b73e0a71c2b931cab3574d977f7aca0ea49d567f4d65b73901",
+      "guitar": "6b26258e7de312cbcdc1b802ffb03ed6077db7c5a556cdb09212c504fdc6593b",
+      "piano": "ca813d9c635682b3e9325e278e5821ac1c1961df54a05414019728f193075387",
+      "other": "1ac57eb4b1bace48e1830866d5c7d9362e5d46ca224803224e9f711df674e893"
+    },
+    "10": {
+      "drums": "0e9c06dd8a9473bf61874914b0ea3f49ed8b948021cfd52505b57fac78fc7fe9",
+      "bass": "90c71c886ebfd9e64243c9465cd574e54d5e03a33655bf74d212e9fa20fd1d61",
+      "guitar": "c00a9ad5f69c3c91c5e2d57ab74424a6e3ef09c82c6f474c4a673309f44f8a8f",
+      "piano": "7024e69551bd8c0a49c3afb91c68575c0056f1cfd6be77196603f74e60acebcc",
+      "other": "a5b778202caa93806e5d970d354b339bf71ce42c44e9770e615603d7919700a5"
+    },
+    "11": {
+      "drums": "231642c281dd12911dab7d66fb5e1a4de7373d2aaa563401cf0299a86b021b1b",
+      "bass": "357b70a235e06be7465d923c20ff42f214a904d2d14b927aacad675718c7b10c",
+      "guitar": "8143630b9070ef5fe9cd969a11d650f783efa21e6b82272aa432c2cf46245722",
+      "piano": "498e024aca25b369c560624932b8bdd40a9a799a501d5db20b24a0c951203ff2",
+      "other": "f714461071e438a7e54c7b3d2c4e0bc721eb1ff22eaefd7b032e1efd58e28dbb"
+    },
+    "12": {
+      "drums": "bb27549104eba7dfe040e835c985bdf48ead1ec109ac57c833766dfaf487eb23",
+      "bass": "5b07c43222977ab628b0fdeb26e4f8793e0362e21f350104520f8b19bb519eb9",
+      "guitar": "a26ca1a69c4b1a71c3bf6d45c8480ab6678739f7cbcb08bb39d6b5de600c8b1b",
+      "piano": "382df49bd9afb5cdab8b573b0417c81756478a808631a3211034f33707a8bdf5",
+      "other": "0f51f34a97e7ef0efe1299e6fbcde9b641095312445b1180842f8e589f19ef08"
+    },
+    "13": {
+      "drums": "2d4f6e9ed4ca9b6cb9a03975f2d7c724fba64e4ce141d9cc89e8a33d82e359da",
+      "bass": "0b00c9bdf99315f1d91e0d204b53585175800110f296a015b143390af2603409",
+      "guitar": "85b31af0ccbc7fc3c88b06e983379a531207170fc6fb21c32ccdaa44aab0599d",
+      "piano": "8e02849c50e4e3483f962c5f1c35fc7f31892303bf1e8b047d5f3833c7c1e34f",
+      "other": "3a805617a053e857e1587e514cd50b4187c7fbd2ade3a4b63be1663b08dc9d57"
+    },
+    "14": {
+      "drums": "be7d2bf56dab6d49798171a0384be93363093e4dc8091c19357b68b4492b6be0",
+      "bass": "d6a1a9301636bb6c8cfd0b932f077d0f44247df21a7411e0f6a87e783119c935",
+      "guitar": "047429e35db2e0953fce9b950e2f8e3d289147a88c664655ab454c0537e54ca7",
+      "piano": "93aefb1ebe8f066093380cebf8537dd30bf9c9e2e21d6551620d22d09ebfc314",
+      "other": "fd0cb9fc9cdefc83217288648ec995f142499fe6e1b8047247c14758ddd4b5a7"
+    }
+  },
+  "sourceFrameCount": 8380800,
+  "originalStemSampleRate": 48000,
+  "mp3DecodeSampleRate": 11025,
+  "originalSourceSegmentReconstructionCheck": [
+    {
+      "segmentIndex": 0,
+      "sourceStartSeconds": 0.0,
+      "durationSeconds": 12.0,
+      "sourceReadOnly": true,
+      "candidateOnly": true,
+      "peakNormalizedPcmCorrelation": 0.92001,
+      "sourceLagSamplesAtAnalysisRate": 0,
+      "sourceLagMilliseconds": 0.0,
+      "analysisSamplesCompared": 132300
+    },
+    {
+      "segmentIndex": 7,
+      "sourceStartSeconds": 84.0,
+      "durationSeconds": 12.0,
+      "sourceReadOnly": true,
+      "candidateOnly": true,
+      "peakNormalizedPcmCorrelation": 0.70253,
+      "sourceLagSamplesAtAnalysisRate": 0,
+      "sourceLagMilliseconds": 0.0,
+      "analysisSamplesCompared": 132300
+    },
+    {
+      "segmentIndex": 14,
+      "sourceStartSeconds": 168.0,
+      "durationSeconds": 6.6,
+      "sourceReadOnly": true,
+      "candidateOnly": true,
+      "peakNormalizedPcmCorrelation": 0.8572,
+      "sourceLagSamplesAtAnalysisRate": 0,
+      "sourceLagMilliseconds": 0.0,
+      "analysisSamplesCompared": 72765
+    }
+  ],
+  "rhythmicReferenceBpmHypothesis": 163.8,
+  "originalMixWholeSourceRhythmicFrequency": {
+    "candidateOnly": true,
+    "status": "CANDIDATES_UNVERIFIED",
+    "best": {
+      "bpm": 163.85,
+      "relativeCoherence": 0.105246,
+      "phaseRadians": 0.73172
+    },
+    "rivalSeparatedCandidates": [
+      {
+        "bpm": 163.85,
+        "relativeCoherence": 0.105246,
+        "phaseRadians": 0.73172
+      },
+      {
+        "bpm": 172.65,
+        "relativeCoherence": 0.04116,
+        "phaseRadians": 1.435126
+      },
+      {
+        "bpm": 160.1,
+        "relativeCoherence": 0.04115,
+        "phaseRadians": 2.580636
+      },
+      {
+        "bpm": 163.35,
+        "relativeCoherence": 0.04021,
+        "phaseRadians": 2.40205
+      },
+      {
+        "bpm": 165.5,
+        "relativeCoherence": 0.037945,
+        "phaseRadians": 1.910699
+      }
+    ]
+  },
+  "originalMixToDrumPhaseEvidence": {
+    "candidateOnly": true,
+    "comparisonWindows": [
+      {
+        "sourceWindowCenterSeconds": 9.0,
+        "originalMixCoherence": 0.04554,
+        "drumStemCoherence": 0.151359,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 15.0,
+        "originalMixCoherence": 0.080207,
+        "drumStemCoherence": 0.280212,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 21.0,
+        "originalMixCoherence": 0.117697,
+        "drumStemCoherence": 0.432266,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.00637,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 27.0,
+        "originalMixCoherence": 0.221482,
+        "drumStemCoherence": 0.367768,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": -0.03494,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 33.0,
+        "originalMixCoherence": 0.226493,
+        "drumStemCoherence": 0.332444,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": -0.03937,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 39.0,
+        "originalMixCoherence": 0.193895,
+        "drumStemCoherence": 0.308944,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": -0.02925,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 45.0,
+        "originalMixCoherence": 0.052081,
+        "drumStemCoherence": 0.30904,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 51.0,
+        "originalMixCoherence": 0.067686,
+        "drumStemCoherence": 0.280343,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 57.0,
+        "originalMixCoherence": 0.121373,
+        "drumStemCoherence": 0.290507,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.00359,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 63.0,
+        "originalMixCoherence": 0.158138,
+        "drumStemCoherence": 0.306084,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.02245,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 69.0,
+        "originalMixCoherence": 0.115261,
+        "drumStemCoherence": 0.359746,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.05591,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 75.0,
+        "originalMixCoherence": 0.103661,
+        "drumStemCoherence": 0.255764,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.12179,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 81.0,
+        "originalMixCoherence": 0.122872,
+        "drumStemCoherence": 0.264441,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.09158,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 87.0,
+        "originalMixCoherence": 0.110404,
+        "drumStemCoherence": 0.209276,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.05485,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 93.0,
+        "originalMixCoherence": 0.07598,
+        "drumStemCoherence": 0.234856,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 99.0,
+        "originalMixCoherence": 0.072053,
+        "drumStemCoherence": 0.175086,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 105.0,
+        "originalMixCoherence": 0.076281,
+        "drumStemCoherence": 0.195887,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 111.0,
+        "originalMixCoherence": 0.089673,
+        "drumStemCoherence": 0.236243,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 117.0,
+        "originalMixCoherence": 0.057916,
+        "drumStemCoherence": 0.262747,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 123.0,
+        "originalMixCoherence": 0.08165,
+        "drumStemCoherence": 0.184108,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 129.0,
+        "originalMixCoherence": 0.100064,
+        "drumStemCoherence": 0.168833,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.05065,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 135.0,
+        "originalMixCoherence": 0.150945,
+        "drumStemCoherence": 0.252078,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.02172,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 141.0,
+        "originalMixCoherence": 0.14961,
+        "drumStemCoherence": 0.294078,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.05044,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 147.0,
+        "originalMixCoherence": 0.123199,
+        "drumStemCoherence": 0.262463,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.05681,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 153.0,
+        "originalMixCoherence": 0.090768,
+        "drumStemCoherence": 0.202456,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 159.0,
+        "originalMixCoherence": 0.076854,
+        "drumStemCoherence": 0.212432,
+        "passesBothSourceGates": false,
+        "originalMixMinusDrumPhaseCandidateBeats": null,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 165.0,
+        "originalMixCoherence": 0.111106,
+        "drumStemCoherence": 0.234242,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.00643,
+        "candidateOnly": true
+      },
+      {
+        "sourceWindowCenterSeconds": 168.31,
+        "originalMixCoherence": 0.152,
+        "drumStemCoherence": 0.256235,
+        "passesBothSourceGates": true,
+        "originalMixMinusDrumPhaseCandidateBeats": 0.00893,
+        "candidateOnly": true
+      }
+    ],
+    "coherentPairs": 16,
+    "phaseOffsetIsNotVerifiedDownbeat": true
+  },
+  "originalMixLocalPhaseTrace": [
+    {
+      "startSeconds": 0,
+      "endSeconds": 18,
+      "centerSeconds": 9.0,
+      "relativePhaseRadians": 0.703239,
+      "relativePhaseBeats": 0.111924,
+      "coherence": 0.04554,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 6,
+      "endSeconds": 24,
+      "centerSeconds": 15.0,
+      "relativePhaseRadians": 1.18907,
+      "relativePhaseBeats": 0.189246,
+      "coherence": 0.080207,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 12,
+      "endSeconds": 30,
+      "centerSeconds": 21.0,
+      "relativePhaseRadians": 1.310345,
+      "relativePhaseBeats": 0.208548,
+      "coherence": 0.117697,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 18,
+      "endSeconds": 36,
+      "centerSeconds": 27.0,
+      "relativePhaseRadians": 0.923661,
+      "relativePhaseBeats": 0.147005,
+      "coherence": 0.221482,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 24,
+      "endSeconds": 42,
+      "centerSeconds": 33.0,
+      "relativePhaseRadians": 0.695933,
+      "relativePhaseBeats": 0.110761,
+      "coherence": 0.226493,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 30,
+      "endSeconds": 48,
+      "centerSeconds": 39.0,
+      "relativePhaseRadians": 0.538244,
+      "relativePhaseBeats": 0.085664,
+      "coherence": 0.193895,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 36,
+      "endSeconds": 54,
+      "centerSeconds": 45.0,
+      "relativePhaseRadians": 0.181427,
+      "relativePhaseBeats": 0.028875,
+      "coherence": 0.052081,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 42,
+      "endSeconds": 60,
+      "centerSeconds": 51.0,
+      "relativePhaseRadians": 0.280916,
+      "relativePhaseBeats": 0.044709,
+      "coherence": 0.067686,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 48,
+      "endSeconds": 66,
+      "centerSeconds": 57.0,
+      "relativePhaseRadians": 0.678149,
+      "relativePhaseBeats": 0.107931,
+      "coherence": 0.121373,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 54,
+      "endSeconds": 72,
+      "centerSeconds": 63.0,
+      "relativePhaseRadians": 0.898652,
+      "relativePhaseBeats": 0.143025,
+      "coherence": 0.158138,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 60,
+      "endSeconds": 78,
+      "centerSeconds": 69.0,
+      "relativePhaseRadians": 1.263591,
+      "relativePhaseBeats": 0.201107,
+      "coherence": 0.115261,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 66,
+      "endSeconds": 84,
+      "centerSeconds": 75.0,
+      "relativePhaseRadians": 1.617416,
+      "relativePhaseBeats": 0.25742,
+      "coherence": 0.103661,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 72,
+      "endSeconds": 90,
+      "centerSeconds": 81.0,
+      "relativePhaseRadians": 1.392684,
+      "relativePhaseBeats": 0.221653,
+      "coherence": 0.122872,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 78,
+      "endSeconds": 96,
+      "centerSeconds": 87.0,
+      "relativePhaseRadians": 1.137205,
+      "relativePhaseBeats": 0.180992,
+      "coherence": 0.110404,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 84,
+      "endSeconds": 102,
+      "centerSeconds": 93.0,
+      "relativePhaseRadians": 1.103393,
+      "relativePhaseBeats": 0.17561,
+      "coherence": 0.07598,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 90,
+      "endSeconds": 108,
+      "centerSeconds": 99.0,
+      "relativePhaseRadians": 1.233433,
+      "relativePhaseBeats": 0.196307,
+      "coherence": 0.072053,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 96,
+      "endSeconds": 114,
+      "centerSeconds": 105.0,
+      "relativePhaseRadians": 1.578395,
+      "relativePhaseBeats": 0.251209,
+      "coherence": 0.076281,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 102,
+      "endSeconds": 120,
+      "centerSeconds": 111.0,
+      "relativePhaseRadians": 1.361654,
+      "relativePhaseBeats": 0.216714,
+      "coherence": 0.089673,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 108,
+      "endSeconds": 126,
+      "centerSeconds": 117.0,
+      "relativePhaseRadians": 2.185299,
+      "relativePhaseBeats": 0.347801,
+      "coherence": 0.057916,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 114,
+      "endSeconds": 132,
+      "centerSeconds": 123.0,
+      "relativePhaseRadians": 1.436909,
+      "relativePhaseBeats": 0.228691,
+      "coherence": 0.08165,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 120,
+      "endSeconds": 138,
+      "centerSeconds": 129.0,
+      "relativePhaseRadians": 1.419056,
+      "relativePhaseBeats": 0.22585,
+      "coherence": 0.100064,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 126,
+      "endSeconds": 144,
+      "centerSeconds": 135.0,
+      "relativePhaseRadians": 1.262626,
+      "relativePhaseBeats": 0.200953,
+      "coherence": 0.150945,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 132,
+      "endSeconds": 150,
+      "centerSeconds": 141.0,
+      "relativePhaseRadians": 1.675956,
+      "relativePhaseBeats": 0.266737,
+      "coherence": 0.14961,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 138,
+      "endSeconds": 156,
+      "centerSeconds": 147.0,
+      "relativePhaseRadians": 1.770134,
+      "relativePhaseBeats": 0.281726,
+      "coherence": 0.123199,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 144,
+      "endSeconds": 162,
+      "centerSeconds": 153.0,
+      "relativePhaseRadians": 1.92537,
+      "relativePhaseBeats": 0.306432,
+      "coherence": 0.090768,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 150,
+      "endSeconds": 168,
+      "centerSeconds": 159.0,
+      "relativePhaseRadians": 1.294757,
+      "relativePhaseBeats": 0.206067,
+      "coherence": 0.076854,
+      "passesCoherenceGate": false,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 156,
+      "endSeconds": 174,
+      "centerSeconds": 165.0,
+      "relativePhaseRadians": 1.450267,
+      "relativePhaseBeats": 0.230817,
+      "coherence": 0.111106,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 162,
+      "endSeconds": 174.62,
+      "centerSeconds": 168.31,
+      "relativePhaseRadians": 1.451416,
+      "relativePhaseBeats": 0.231,
+      "coherence": 0.152,
+      "passesCoherenceGate": true,
+      "candidateOnly": true
+    }
+  ],
+  "originalMixAdjacentPhaseSteps": [
+    {
+      "fromCenterSeconds": 9.0,
+      "toCenterSeconds": 15.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 15.0,
+      "toCenterSeconds": 21.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 21.0,
+      "toCenterSeconds": 27.0,
+      "phaseStepCandidateBeats": -0.06154,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 27.0,
+      "toCenterSeconds": 33.0,
+      "phaseStepCandidateBeats": -0.03624,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 33.0,
+      "toCenterSeconds": 39.0,
+      "phaseStepCandidateBeats": -0.0251,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 39.0,
+      "toCenterSeconds": 45.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 45.0,
+      "toCenterSeconds": 51.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 51.0,
+      "toCenterSeconds": 57.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 57.0,
+      "toCenterSeconds": 63.0,
+      "phaseStepCandidateBeats": 0.03509,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 63.0,
+      "toCenterSeconds": 69.0,
+      "phaseStepCandidateBeats": 0.05808,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 69.0,
+      "toCenterSeconds": 75.0,
+      "phaseStepCandidateBeats": 0.05631,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 75.0,
+      "toCenterSeconds": 81.0,
+      "phaseStepCandidateBeats": -0.03577,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 81.0,
+      "toCenterSeconds": 87.0,
+      "phaseStepCandidateBeats": -0.04066,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 87.0,
+      "toCenterSeconds": 93.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 93.0,
+      "toCenterSeconds": 99.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 99.0,
+      "toCenterSeconds": 105.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 105.0,
+      "toCenterSeconds": 111.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 111.0,
+      "toCenterSeconds": 117.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 117.0,
+      "toCenterSeconds": 123.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 123.0,
+      "toCenterSeconds": 129.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 129.0,
+      "toCenterSeconds": 135.0,
+      "phaseStepCandidateBeats": -0.0249,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 135.0,
+      "toCenterSeconds": 141.0,
+      "phaseStepCandidateBeats": 0.06578,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 141.0,
+      "toCenterSeconds": 147.0,
+      "phaseStepCandidateBeats": 0.01499,
+      "coherentPair": true,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 147.0,
+      "toCenterSeconds": 153.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 153.0,
+      "toCenterSeconds": 159.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 159.0,
+      "toCenterSeconds": 165.0,
+      "phaseStepCandidateBeats": null,
+      "coherentPair": false,
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 165.0,
+      "toCenterSeconds": 168.31,
+      "phaseStepCandidateBeats": 0.00018,
+      "coherentPair": true,
+      "candidateOnly": true
+    }
+  ],
+  "localRhythmicPeriodComparisons": [
+    {
+      "startSeconds": 0,
+      "endSeconds": 18.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.2379,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.01552,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.31823,
+            "candidateBpm": 163.2379,
+            "autocorrelation": 0.50902
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.4935
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.43913
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.39985
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.30647
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.5491,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02746,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.19777,
+            "candidateBpm": 163.5491,
+            "autocorrelation": 0.54564
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.51818
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.48224
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.41012
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.34967
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.3112,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 6,
+      "endSeconds": 24.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.1779,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.01344,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.34153,
+            "candidateBpm": 163.1779,
+            "autocorrelation": 0.57329
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.55985
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.50194
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.46768
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.36798
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.4665,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02606,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.22968,
+            "candidateBpm": 163.4665,
+            "autocorrelation": 0.67001
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.64395
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.59966
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.52968
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45586
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.2886,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 12,
+      "endSeconds": 30.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.4657,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02429,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.23001,
+            "candidateBpm": 163.4657,
+            "autocorrelation": 0.63585
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.61156
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57018
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.50592
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43492
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.5491,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03413,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.19775,
+            "candidateBpm": 163.5491,
+            "autocorrelation": 0.81494
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.78081
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.73616
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.64475
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.57011
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.0834,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 18,
+      "endSeconds": 36.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8328,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03383,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.08834,
+            "candidateBpm": 163.8328,
+            "autocorrelation": 0.62577
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.59194
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57742
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.48522
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.46333
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.5804,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03395,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.18569,
+            "candidateBpm": 163.5804,
+            "autocorrelation": 0.77355
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.7396
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.69949
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.60813
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.54149
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.2524,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 24,
+      "endSeconds": 42.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8162,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02717,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.09472,
+            "candidateBpm": 163.8162,
+            "autocorrelation": 0.55323
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.52606
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.51337
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.43733
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.42045
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6733,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03482,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.1498,
+            "candidateBpm": 163.6733,
+            "autocorrelation": 0.68974
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.65492
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.62514
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.5315
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.48167
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.1429,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 30,
+      "endSeconds": 48.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.2225,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02619,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 62.93862,
+            "candidateBpm": 164.2225,
+            "autocorrelation": 0.53633
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.51014
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.50281
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43167
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.41834
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9742,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04689,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.03391,
+            "candidateBpm": 163.9742,
+            "autocorrelation": 0.65713
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.61024
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.60342
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.47859
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.46539
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.2483,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 36,
+      "endSeconds": 54.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.0168,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03627,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.01757,
+            "candidateBpm": 164.0168,
+            "autocorrelation": 0.57609
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.53982
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.53717
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.44004
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43285
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9306,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04864,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.0507,
+            "candidateBpm": 163.9306,
+            "autocorrelation": 0.69173
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.64309
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.63211
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.5029
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.4824
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.0862,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 42,
+      "endSeconds": 60.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8056,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03763,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.09881,
+            "candidateBpm": 163.8056,
+            "autocorrelation": 0.63437
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.59674
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57821
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.47803
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.44474
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8247,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04377,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.09145,
+            "candidateBpm": 163.8247,
+            "autocorrelation": 0.67052
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.62675
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.60716
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.49143
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45669
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.0191,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 48,
+      "endSeconds": 66.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6652,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03222,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.15294,
+            "candidateBpm": 163.6652,
+            "autocorrelation": 0.63416
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.60194
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57355
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.48721
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43938
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7841,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04196,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.10708,
+            "candidateBpm": 163.7841,
+            "autocorrelation": 0.69203
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.65007
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.6272
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.51546
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47622
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.1189,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 54,
+      "endSeconds": 72.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7139,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03471,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.13414,
+            "candidateBpm": 163.7139,
+            "autocorrelation": 0.67839
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.64368
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.61823
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.52551
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.48219
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7947,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03861,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.10301,
+            "candidateBpm": 163.7947,
+            "autocorrelation": 0.6773
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.63869
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.61865
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.51613
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.48018
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.0808,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 60,
+      "endSeconds": 78.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8371,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.033,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.08667,
+            "candidateBpm": 163.8371,
+            "autocorrelation": 0.61139
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.57839
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.56455
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.4765
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45174
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7984,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03958,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.10159,
+            "candidateBpm": 163.7984,
+            "autocorrelation": 0.71501
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.67543
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.65524
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.55016
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.51333
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.0387,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 66,
+      "endSeconds": 84.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8284,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03159,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.09002,
+            "candidateBpm": 163.8284,
+            "autocorrelation": 0.59776
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.56617
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.5523
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.46758
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.44372
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6349,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03049,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.16463,
+            "candidateBpm": 163.6349,
+            "autocorrelation": 0.62283
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.59234
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.56241
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.48154
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43008
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.1935,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 72,
+      "endSeconds": 90.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6157,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.0218,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.17204,
+            "candidateBpm": 163.6157,
+            "autocorrelation": 0.50614
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.48434
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.46147
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.40185
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.36463
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.5404,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02801,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.20114,
+            "candidateBpm": 163.5404,
+            "autocorrelation": 0.57697
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.54896
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.51126
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.43792
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.37482
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.0753,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 78,
+      "endSeconds": 96.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.4192,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.01954,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.24799,
+            "candidateBpm": 163.4192,
+            "autocorrelation": 0.60772
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.58818
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.54973
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.49659
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43193
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6454,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03643,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.16059,
+            "candidateBpm": 163.6454,
+            "autocorrelation": 0.59661
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.56018
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.5257
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.43023
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.37413
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.2262,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 84,
+      "endSeconds": 102.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6336,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02696,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.16514,
+            "candidateBpm": 163.6336,
+            "autocorrelation": 0.62762
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.60066
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57407
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.50036
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45539
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8398,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04592,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.08564,
+            "candidateBpm": 163.8398,
+            "autocorrelation": 0.65009
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.60417
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.58519
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.46414
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.43224
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.2062,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 90,
+      "endSeconds": 108.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8364,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04479,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.08693,
+            "candidateBpm": 163.8364,
+            "autocorrelation": 0.71967
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.67488
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.65602
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.53745
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.50732
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8576,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04542,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.07877,
+            "candidateBpm": 163.8576,
+            "autocorrelation": 0.65341
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.60799
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.591
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.47023
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.44217
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.0212,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 96,
+      "endSeconds": 114.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.0122,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05424,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.01933,
+            "candidateBpm": 164.0122,
+            "autocorrelation": 0.74254
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.6883
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.68393
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.53907
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.53394
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8995,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04514,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.06265,
+            "candidateBpm": 163.8995,
+            "autocorrelation": 0.61632
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.57118
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.55825
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.43868
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.41745
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.1127,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 102,
+      "endSeconds": 120.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9863,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.062,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.02929,
+            "candidateBpm": 163.9863,
+            "autocorrelation": 0.83394
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.77194
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.76422
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.59841
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.58779
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8701,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05266,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.07398,
+            "candidateBpm": 163.8701,
+            "autocorrelation": 0.71896
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.6663
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.64801
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.50949
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47944
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.1162,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 108,
+      "endSeconds": 126.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.056,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05963,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.00251,
+            "candidateBpm": 164.056,
+            "autocorrelation": 0.80028
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.74065
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.74005
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.57919
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.57789
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8523,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05531,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.08083,
+            "candidateBpm": 163.8523,
+            "autocorrelation": 0.73275
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.67744
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.65611
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.51164
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47653
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.2037,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 114,
+      "endSeconds": 132.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9617,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05095,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.03872,
+            "candidateBpm": 163.9617,
+            "autocorrelation": 0.73383
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.68288
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.67433
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.5421
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.52613
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.719,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03805,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.1322,
+            "candidateBpm": 163.719,
+            "autocorrelation": 0.66284
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.62479
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.59744
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.49924
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45126
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.2427,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 120,
+      "endSeconds": 138.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6871,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.0375,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.14448,
+            "candidateBpm": 163.6871,
+            "autocorrelation": 0.71816
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.68066
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.65019
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.55472
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.50409
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6427,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03042,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.16162,
+            "candidateBpm": 163.6427,
+            "autocorrelation": 0.59027
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.55985
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.53079
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.45373
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.40177
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.0444,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 126,
+      "endSeconds": 144.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6741,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04285,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.14951,
+            "candidateBpm": 163.6741,
+            "autocorrelation": 0.80582
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.76297
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.72642
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.6155
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.55478
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6817,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03996,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.14656,
+            "candidateBpm": 163.6817,
+            "autocorrelation": 0.7019
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.66194
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.6288
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.52695
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.46997
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.0076,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 132,
+      "endSeconds": 150.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8072,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04917,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.09818,
+            "candidateBpm": 163.8072,
+            "autocorrelation": 0.77213
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.72296
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.69893
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.56965
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.52962
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9008,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.05146,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.06217,
+            "candidateBpm": 163.9008,
+            "autocorrelation": 0.6975
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.64604
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.63142
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.49775
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47363
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.0936,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 138,
+      "endSeconds": 156.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.9878,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04689,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.02871,
+            "candidateBpm": 163.9878,
+            "autocorrelation": 0.66059
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.6137
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.60799
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.48404
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47339
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.0753,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04918,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 62.99507,
+            "candidateBpm": 164.0753,
+            "autocorrelation": 0.60738
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.5582
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.55722
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.42777
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.42656
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.0875,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 144,
+      "endSeconds": 162.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.0988,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04133,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 62.98608,
+            "candidateBpm": 164.0988,
+            "autocorrelation": 0.6035
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.56217
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.55981
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.44938
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.44674
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 164.1174,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04816,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 62.97894,
+            "candidateBpm": 164.1174,
+            "autocorrelation": 0.62672
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.57856
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.57433
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.44539
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.43878
+          }
+        ]
+      },
+      "candidateDifferenceBpm": -0.0186,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 150,
+      "endSeconds": 168.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.8112,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02898,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.09664,
+            "candidateBpm": 163.8112,
+            "autocorrelation": 0.55019
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.52121
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.50732
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.42807
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.40531
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7423,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03984,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.1232,
+            "candidateBpm": 163.7423,
+            "autocorrelation": 0.65814
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.6183
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.59225
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.48547
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.44055
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.0689,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 156,
+      "endSeconds": 174.0,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.7417,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.04017,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.12343,
+            "candidateBpm": 163.7417,
+            "autocorrelation": 0.68774
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.64757
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.62124
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.51227
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47041
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6232,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.03901,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.16913,
+            "candidateBpm": 163.6232,
+            "autocorrelation": 0.72094
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.68193
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.64204
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.53736
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.47029
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.1185,
+      "candidateOnly": true
+    },
+    {
+      "startSeconds": 162,
+      "endSeconds": 174.6,
+      "originalMixSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.6811,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.0393,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.14681,
+            "candidateBpm": 163.6811,
+            "autocorrelation": 0.68917
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.64987
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.61719
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.5102
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.45965
+          }
+        ]
+      },
+      "originalDrumStemSpectralRhythm": {
+        "status": "CANDIDATES_UNVERIFIED",
+        "candidateOnly": true,
+        "preferredBpm": 163.3705,
+        "preferredLagTicks": 63,
+        "peakContrast": 0.02322,
+        "rankedPeriods": [
+          {
+            "lagTicks": 63,
+            "interpolatedLagTicks": 63.26686,
+            "candidateBpm": 163.3705,
+            "autocorrelation": 0.61502
+          },
+          {
+            "lagTicks": 64,
+            "interpolatedLagTicks": 63.5,
+            "candidateBpm": 162.7707,
+            "autocorrelation": 0.5918
+          },
+          {
+            "lagTicks": 62,
+            "interpolatedLagTicks": 62.5,
+            "candidateBpm": 165.375,
+            "autocorrelation": 0.53863
+          },
+          {
+            "lagTicks": 65,
+            "interpolatedLagTicks": 64.5,
+            "candidateBpm": 160.2471,
+            "autocorrelation": 0.4762
+          },
+          {
+            "lagTicks": 61,
+            "interpolatedLagTicks": 61.5,
+            "candidateBpm": 168.064,
+            "autocorrelation": 0.3867
+          }
+        ]
+      },
+      "candidateDifferenceBpm": 0.3106,
+      "candidateOnly": true
+    }
+  ],
+  "limitations": [
+    "Original full mix MP3 is lossy and not the separately archived original CT211 WAV master; retain exact MP3 SHA identity and do not assert lossless WAV bit identity",
+    "Six separated original stems reconstruct the MP3 strongly but not bit-perfectly; sample gain changes, Demucs artifacts and OGG/MP3 encoders differ",
+    "Mix and stems are different representations of the same musical recording, NOT independent performances or proof of meter",
+    "Frequency hypotheses use short overlapping windows, and fixed 140-180 BPM quarter-like prior may reject true half-time meter",
+    "An original spectral rhythmic frequency or fixed-reference phasor is NOT source-certified beat one or tempo drift",
+    "Phase evidence magnitude is not a calibrated musical confidence interval",
+    "No source original OGG or MP3 file was changed; no gameplay or RELEASE_BEAT_GRIDS update authorized"
+  ]
+}
