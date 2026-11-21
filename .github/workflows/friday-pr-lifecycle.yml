@@ -1,0 +1,123 @@
+# Optional repo-level GitHub Action. Copy verbatim to .github/workflows/.
+# Uses GITHUB_TOKEN and GitHub metadata only. No checkout; never executes PR code.
+name: Friday PR lifecycle
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+jobs:
+  lifecycle:
+    # We never grant issue-write rights based on a fork-supplied PR body.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const pr = context.payload.pull_request;
+            const event = context.payload.action;
+            const body = pr.body || '';
+            const marker = /<!--\s*friday-issue:\s*(\d+)\s*-->/i.exec(body);
+            if (!marker) { core.info('Not a Friday-managed PR; skip'); return; }
+            const issue_number = Number(marker[1]);
+            if (!Number.isSafeInteger(issue_number) || issue_number < 1) { core.setFailed('Invalid Friday issue marker'); return; }
+            const markerScopes = text => {
+              const m = /<!--\s*friday-scope:\s*([\s\S]*?)\s*-->/i.exec(text || '');
+              return m ? m[1].split(',').map(s => s.trim()).filter(Boolean) : [];
+            };
+            const scoped = (scope, file) => scope === file || (scope.endsWith('/**') &&
+              (file === scope.slice(0, -3) || file.startsWith(scope.slice(0, -3) + '/')));
+            const overlaps = (a, b) => scoped(a,b) || scoped(b,a);
+            const labels = {work: 'friday:in-progress', review: 'friday:in-review', done: 'friday:done', todo: 'friday:todo'};
+            for (const [key, label] of Object.entries(labels)) {
+              try {
+                await github.rest.issues.createLabel({owner, repo, name: label,
+                  color: {work:'FBCA04',review:'1D76DB',done:'0E8A16',todo:'D4C5F9'}[key],
+                  description: 'Friday orchestration lifecycle state'});
+              } catch (e) { if (e.status !== 422) throw e; }
+            }
+            const replaceState = async desired => {
+              const issue = await github.rest.issues.get({owner, repo, issue_number});
+              if (issue.data.pull_request) { core.setFailed('Marker points to a PR, not an issue'); return; }
+              const active = Object.values(labels).filter(label =>
+                (issue.data.labels || []).some(l => (typeof l === 'string' ? l : l.name) === label));
+              const remove = active.filter(label => label !== desired);
+              for (const label of remove) {
+                try { await github.rest.issues.removeLabel({owner, repo, issue_number, name: label}); }
+                catch (e) { if (e.status !== 404) throw e; }
+              }
+              if (!active.includes(desired)) await github.rest.issues.addLabels({owner, repo, issue_number, labels: [desired]});
+            };
+            if (event === 'closed') {
+              if (pr.merged) {
+                // A stacked PR merged into another feature branch is not yet landed on default.
+                const metadata = await github.rest.repos.get({owner, repo});
+                const onDefault = pr.base.ref === metadata.data.default_branch;
+                if (onDefault) {
+                  await replaceState(labels.done);
+                  // GitHub auto-closes 'Closes #N' on default; reconcile even if marker-only.
+                  await github.rest.issues.update({owner, repo, issue_number, state: 'closed'});
+                } else {
+                  await replaceState(labels.review);
+                }
+              } else {
+                // Do not free an issue owned by another still-open PR.
+                const others = await github.paginate(github.rest.pulls.list, {owner,repo,state:'open',per_page:100});
+                const hasReplacement = others.some(p => p.number !== pr.number &&
+                  new RegExp('<!--\\s*friday-issue:\\s*' + issue_number + '\\s*-->', 'i').test(p.body || ''));
+                if (!hasReplacement) await replaceState(labels.todo);
+              }
+              return;
+            }
+            if (!pr.draft) {
+              const allFiles = await github.paginate(github.rest.pulls.listFiles,
+                {owner,repo,pull_number:pr.number,per_page:100});
+              const starter = allFiles.find(f => /^\.friday\/issue-\d+-start\.md$/.test(f.filename));
+              if (starter) {
+                await replaceState(labels.work);
+                core.setFailed('Remove the temporary ' + starter.filename + ' before review');
+                return;
+              }
+            }
+            await replaceState(pr.draft ? labels.work : labels.review);
+            // Compare actual modified files and declared scopes across different issues.
+            // Ignore temporary bootstrap files and report rather than blocking unrelated work.
+            const myFiles = (await github.paginate(github.rest.pulls.listFiles,
+              {owner,repo,pull_number:pr.number,per_page:100}))
+              .map(f=>f.filename).filter(f=>!f.startsWith('.friday/'));
+            const myScopes = markerScopes(body);
+            const open = await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
+            const conflicts = [];
+            for (const other of open) {
+              if (other.number === pr.number) continue;
+              const theirs = markerScopes(other.body);
+              const fileHits = (myFiles.length || myScopes.length)
+                ? (await github.paginate(github.rest.pulls.listFiles,
+                   {owner,repo,pull_number:other.number,per_page:100})).map(f=>f.filename).filter(f=>!f.startsWith('.friday/')) : [];
+              const hits = new Set();
+              for (const f of myFiles) {
+                if (fileHits.includes(f) || theirs.some(s=>scoped(s,f))) hits.add(f);
+              }
+              for (const s of myScopes) {
+                for (const t of theirs) if (overlaps(s,t)) hits.add(s+' ↔ '+t);
+                for (const f of fileHits) if (scoped(s,f)) hits.add(s+' ↔ '+f);
+              }
+              if (hits.size) conflicts.push({number:other.number, hits:[...hits].slice(0,12)});
+            }
+            const signature = '<!-- friday-overlap-report -->';
+            const report = signature + '\n### Friday cross-PR overlap scan\n\n' +
+              (conflicts.length ? conflicts.map(c => `- PR #${c.number}: ${c.hits.map(s=>'\x60'+s+'\x60').join(', ')}`).join('\n') :
+                'No overlapping declared scopes or changed files detected among currently open PRs.') +
+              '\n\n*This is an advisory scan of declared scopes and committed PR changes, not uncommitted work. Coordinate overlapping changes before merging.*';
+            const comments = await github.paginate(github.rest.issues.listComments,
+              {owner,repo,issue_number:pr.number,per_page:100});
+            const prior = comments.find(c=>c.user?.type === 'Bot' && c.body?.includes(signature));
+            if (prior) {
+              if (prior.body !== report) await github.rest.issues.updateComment({owner,repo,comment_id:prior.id,body:report});
+            } else if (conflicts.length || myScopes.length) {
+              await github.rest.issues.createComment({owner,repo,issue_number:pr.number,body:report});
+            }
