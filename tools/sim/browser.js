@@ -285,6 +285,20 @@
     const policies = makePolicies(M);
     if (!policies[policyName]) throw new Error('unknown policy ' + policyName);
     const policy = policies[policyName](params);
+    const withNoise = o.noiseProfile !== undefined;
+    const playback = withNoise && o.noiseReplay !== undefined;
+    let ghost, noiseApi, planner, inputRecorder;
+    if (withNoise) {
+      if (policyName !== 'hop') throw new Error('Human-noise simulation only supports hop');
+      [ghost, noiseApi] = await Promise.all([
+        import('/src/systems/ghost/GhostTape.js'), import('/tools/sim/human-noise.js'),
+      ]);
+      if (!playback) planner = noiseApi.makeHopNoise(o.noiseProfile, o.seed, o.noiseSeed);
+      inputRecorder = new ghost.GhostRecorder({
+        seed: o.seed, biomeMask: o.biomeMask >>> 0, mode: 'normal',
+        boosts: [], upgradeRanks: null, magnetsDrop: false, kodiaksOn: false, kodiakPackMode: 'same',
+      });
+    }
 
     try { localStorage.clear(); } catch (e) { /* ignore */ }
     rng = mulberry32(hashStr(`${o.seed}|${policyName}|rng`));
@@ -309,12 +323,20 @@
     // W3: the mask the sim plays at. Set alongside the seed so the run, the record and the stats scope
     // all agree; 0 is base terrain and is what every pre-W3 sim call gets.
     game.registry.set(REG.BIOME_MASK, o.biomeMask >>> 0);
+    if (withNoise) {
+      // Use the ordinary replay sandbox even when generating a new bot input
+      // stream. The real RunScene will not create a saved run, tape or award.
+      game.registry.set(REG.GHOST_REPLAY, {
+        ...inputRecorder.header, inputs: o.noiseReplay ?? [], checkpoints: [],
+      });
+    }
 
     const pad = newPad();
     let curPad = pad;
     const stub = { poll() { return curPad; }, setEnabled() {} };
 
     let scene = null;
+    let frame = 0, actualFrameHop = false;
     game.events.once(EVT.RUN_START, () => {
       scene = game.scene.getScene('RunScene');
       scene.inputRouter = stub;
@@ -323,6 +345,24 @@
       const rule = o.rule && o.rule !== 'none' ? (pendingRules.find((r) => r.id === o.rule) || null) : null;
       scene.dailyMods = rule ? { ...rule.modifiers } : {};
       scene.dailyRuleId = rule ? rule.id : 'none';
+      if (withNoise) {
+        if (!scene.tapePlayer || scene.ghostRecorder) throw new Error('Bot replay isolation was not established');
+        if (!playback) {
+          scene.tapePlayer.padAt = (tick) => {
+            const normalized = scene.normalizePad(curPad);
+            // Held hop lasts this frame, but its edge belongs to the first
+            // fixed tick. Match the production decoder's shape and source.
+            if (tick !== scene.simClock.tick + 1) normalized.pressed = {};
+            return ghost.decodePad(...ghost.encodePad(normalized));
+          };
+        }
+        const step = scene.simTick;
+        scene.simTick = function (dt, pad) {
+          inputRecorder.input(this.simClock.tick, pad);
+          if (pad.pressed?.hop) { lastHopFrame = frame; actualFrameHop = true; }
+          return step.call(this, dt, pad);
+        };
+      }
       if (o.sub) installSubTrace(scene, o.sub);
       if (!keepUi) game.scene.stop('UIScene');
     });
@@ -506,7 +546,6 @@
     while (!scene && guard++ < 5) { game.headlessStep(0, DT); }
     if (!scene) throw new Error('RunScene did not start');
     // the first headlessStep already ran frame 0 inside the loop above only if RunScene was created there
-    let frame = 0;
     let stallRef = { t: 0, x: scene.sled.x };
     scanChunks();
     // NB: the loop above executed one update with an empty pad (all-zero), which is deterministic.
@@ -518,14 +557,16 @@
     while (!endReason) {
       const sled = scene.sled;
       ctx.tMs = tMs; ctx.frame = frame;
-      const out = policy(ctx) || null;
+      const out = playback ? null : policy(ctx) || null;
       const np = newPad();
+      actualFrameHop = false;
       if (out) {
         if (out.tilt != null) np.tilt = out.tilt;
         if (out.brake) np.brake = true;
         if (out.tuck) np.tuck = true;
-        if (out.hop) { np.hop = true; np.pressed.hop = true; lastHopFrame = frame; }
+        if (!withNoise && out.hop) { np.hop = true; np.pressed.hop = true; lastHopFrame = frame; }
       }
+      if (planner?.step(frame, !!out?.hop)) np.hop = np.pressed.hop = true;
       curPad = np;
 
       game.headlessStep(tMs, DT);
@@ -554,7 +595,7 @@
 
       // rolling pre-crash buffer (every 3rd frame): [tMs, distM, angle rel. to slope, angular vel deg/s, grounded, speed, slope, tilt held, hop pressed]
       if (frame % 3 === 0) {
-        lead.push([Math.round(tMs), r1(distM), r1(s.angleDeg - s.groundAngleDeg), Math.round((s.body.angularVelocity * 60) / DEG), g ? 1 : 0, Math.round(s.speed), r1(s.groundAngleDeg), np.tilt, np.pressed.hop ? 1 : 0]);
+        lead.push([Math.round(tMs), r1(distM), r1(s.angleDeg - s.groundAngleDeg), Math.round((s.body.angularVelocity * 60) / DEG), g ? 1 : 0, Math.round(s.speed), r1(s.groundAngleDeg), np.tilt, (withNoise ? actualFrameHop : np.pressed.hop) ? 1 : 0]);
         if (lead.length > 40) lead.shift();
       }
       if (g) { // grounded speed by 4-degree slope bin (cruise-speed evidence): sb[bin] = [frames, sum speed px/s]
@@ -619,6 +660,26 @@
     if (ctx.probe) R.probe = ctx.probe;
     R.bands = bandsFrom(scene, chunkRecs, PPM, scene.startX);
     R.generatedToM = r1(((scene.terrain.activeList.length ? scene.terrain.activeList[scene.terrain.activeList.length - 1].endX : 0) - scene.startX) / PPM);
+    if (withNoise) {
+      if (game.registry.get(REG.LAST_RECORD) || game.registry.get(REG.LAST_GHOST_TAPE) ||
+          (await store?.getRecentRuns(1))?.length) {
+        throw new Error('Unexpected saved record in bot replay context');
+      }
+      const body = scene.sled.body;
+      R.humanNoise = {
+        profile: o.noiseProfile, version: noiseApi.HUMAN_NOISE_VERSION,
+        frameHz: noiseApi.NOISE_FPS, stats: planner?.stats() ?? null,
+        input: {
+          format: inputRecorder.header.format, version: inputRecorder.header.version,
+          tickHz: inputRecorder.header.simTickHz, ticks: scene.simClock.tick, rows: inputRecorder.inputs,
+        },
+        final: {
+          position: [body.position.x, body.position.y], angle: body.angle,
+          velocity: [body.velocity.x, body.velocity.y], angularVelocity: body.angularVelocity,
+          score: scene.score.getTotal(), physicsRng: scene.runRandom.physicsScramble.state,
+        },
+      };
+    }
     R.wallMs = Math.round(performance.now() - wall0);
     for (const f of offs) f();
     try { game.scene.stop('RunScene'); game.scene.stop('UIScene'); game.headlessStep(tMs, DT); } catch (e) { /* ignore */ }
