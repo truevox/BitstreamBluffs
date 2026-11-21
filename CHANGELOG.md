@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.15.2 - fair input timestamps (#115) (2026-11-21)
+
+- **Keyboard input reaches the tick it happened in, at every refresh rate.** Each key event's `event.timeStamp` now picks the 120 Hz tick whose window contains it, instead of one poll per display frame being applied from the frame's first tick. At 30 Hz a press used to act up to 3 ticks (25 ms of game time) before the key went down, and a 20 ms tap was lost 36 % of the time; both are now exact. Taps of held controls (push, tuck, tilt, brake) shorter than a frame always count for at least one tick, a double tap inside one frame is two hops, and taps across a 144 Hz frame that runs no tick are no longer dropped.
+- **No added display latency** (measured per press at 30/60/120/144 Hz): input still shows in the same rendered frame; it is clamped to the ticks of the frame that polls it, never rewritten into a tick that already ran. 144 Hz keeps its existing at-most-1-tick-early edge (exact would cost a frame).
+- Gamepad and touch are unchanged (no per-button event timestamps; still the frame's first tick). Ghost tape format and versions unchanged; existing tapes replay identically. Real game probe: identical tape and sled state at 30/60/120 Hz for one timestamped key sequence (main: three different tapes). See `docs/issue-115-fair-input.md`.
+
 ## v2.15.1 - Sky Jellyfish felt spring rebound (2026-11-16)
 
 - **Sky Jellyfish springs now visibly rebound on scored landings.** The rebound returns a bounded share of impact speed, follows the ground normal, and preserves along-slope velocity (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). A rebound under 120 px/s is treated as no rebound, so at the shipped 0.2 share only impacts of 600 px/s or more are felt (800 px/s returns 160 px/s); the floor is the measured point that keeps the bounce felt within the accepted ±15% mask-128 hop survival tolerance. Stabilizer Rails damp the share to 0.05, below the floor even at an 801 px/s impact. A zero, negative or non-finite rebound request leaves `Sled.launchNormal` and its contact/snap/chute state untouched. The normal projection is checked on uniform slopes; it makes no general irregular-terrain safety claim. Bounce pads retain their existing launch behaviour.

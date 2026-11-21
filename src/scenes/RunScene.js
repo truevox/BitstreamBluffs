@@ -1204,7 +1204,8 @@ export class RunScene extends Phaser.Scene {
       return;
     }
 
-    const polled = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
+    const rawPad = this.inputRouter ? this.inputRouter.poll() : null;
+    const polled = this.normalizePad(rawPad);
     if (polled.pressed.pause) {
       this.pauseRun();
       return;
@@ -1217,7 +1218,11 @@ export class RunScene extends Phaser.Scene {
     // A ghost tape under replay (REG.GHOST_REPLAY) replaces live input tick by tick.
     const pads = this.tapePlayer
       ? Array.from({ length: ticks }, (_, i) => this.tapePlayer.padAt(this.simClock.tick + 1 + i))
-      : this.simClock.padsFor(polled, ticks);
+      // Issue #115: timestamped key changes go to the tick whose window contains them (`time` is the
+      // rAF time, the same clock as KeyboardEvent.timeStamp); see SimClock.padsFor.
+      : this.simClock.padsFor(polled, ticks, {
+        frameTime: time, timeline: rawPad && rawPad.timeline, normalize: (raw) => this.normalizePad(raw),
+      });
     let pad = polled;
     for (const tickPad of pads) {
       pad = tickPad;

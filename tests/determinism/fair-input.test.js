@@ -8,7 +8,7 @@
  */
 import { SIM_TICK_MS, SIM_MAX_TICKS_PER_FRAME } from '../../src/systems/SimClock.js';
 import { decodePad } from '../../src/systems/ghost/GhostTape.js';
-import { runCadence, oracleTape, idealTick, firstTick } from './input-timing-harness.js';
+import { runCadence, oracleTape, idealTick, firstTick, measureLatency, stats } from './input-timing-harness.js';
 
 const RATES = [30, 60, 120, 144];
 const DURATION = 1000;
@@ -50,8 +50,8 @@ describe('#115 proof: legacy per-frame poll is refresh-rate dependent (main@b51a
 
   test('(a) a press is applied on the first tick of its frame: up to 3 ticks before the tick that contains it at 30 Hz', () => {
     // ArrowUp held 700.1-760.6 ms = ticks 85..91 (the release at 760.6 falls in tick 92's window). At 30 Hz the
-    // release is only polled by the frame at 733.3 -> no, by the frame at 766.7, but the PRESS frame (700, 733.3]
-    // and the release frame (733.3, 766.7] each fan one poll over 4 ticks, so the held run is frame-quantized.
+    // release frame (733.3, 766.7] fans its single poll (already released) over ticks 89..92, so the held run is
+    // cut at the frame boundary: 85..88.
     const up = (h) => ticksWhere(legacy[h].tape, (p) => p.airBrake);
     expect(up(120)).toEqual([85, 86, 87, 88, 89, 90, 91]);
     expect(ticksWhere(ORACLE, (p) => p.airBrake)).toEqual([85, 86, 87, 88, 89, 90, 91]);
@@ -68,7 +68,7 @@ describe('#115 proof: legacy per-frame poll is refresh-rate dependent (main@b51a
   test('(b) held-only buttons tapped and released inside one frame are lost', () => {
     // push tap 210.7-213.1, tuck tap 350.2-352.0, brake tap 500.4-505.0: all inside a 30 Hz and a 60 Hz frame.
     for (const hz of [30, 60]) {
-      expect(ticksWhere(legacy[hz].tape, (p) => p.push && p.pressed && true).filter((g) => g < 300 / SIM_TICK_MS)).toEqual([]);
+      expect(ticksWhere(legacy[hz].tape, (p) => p.push).filter((g) => g < 300 / SIM_TICK_MS)).toEqual([]);
       expect(ticksWhere(legacy[hz].tape, (p) => p.tuck)).toEqual([]);
       expect(ticksWhere(legacy[hz].tape, (p) => p.brakeHeld)).toEqual([]);
     }
@@ -95,7 +95,8 @@ describe('#115 proof: legacy per-frame poll is refresh-rate dependent (main@b51a
 
   test('(d) a sub-frame Space tap delivers pressed.hop with hop held = false (variableHop sees an instant release)', () => {
     const t = idealTick(600.9);
-    const p = pad(legacy[30].tape[legacy[30].frameOfTick.indexOf(legacy[30].frameOfTick[t - 1])]);
+    const firstTickOfFrame = legacy[30].frameOfTick.indexOf(legacy[30].frameOfTick[t - 1]); // 0-based
+    const p = pad(legacy[30].tape[firstTickOfFrame]);
     expect(p.pressed.hop).toBe(true);
     expect(p.hop).toBe(false);
   });
@@ -126,19 +127,16 @@ describe('#115 fix: timestamped key events map to the tick whose window contains
     expect(timed[60].tape).toEqual(timed[120].tape);
   });
 
-  test('144 Hz: identical except events in a frame\'s sub-tick remainder, applied at most 1 tick early (never late)', () => {
-    const d = diffTicks(timed[144].tape, ORACLE);
-    // every difference is explained by one event shifted one tick earlier; the edges/held runs are otherwise equal
-    for (const g of d) {
-      const a = pad(timed[144].tape[g - 1]);
-      const b = pad(ORACLE[g - 1]);
-      const bNext = pad(ORACLE[g] || ORACLE[g - 1]);
-      const aPrev = pad(timed[144].tape[g - 2] || timed[144].tape[g - 1]);
-      // either the 144 Hz tape has the NEXT oracle tick's state early, or it is the oracle's previous state lingering
-      const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
-      expect(same(a, bNext) || same(aPrev, b) || same({ ...a, pressed: {} }, { ...bNext, pressed: {} })).toBe(true);
-    }
-    expect(d.length).toBeLessThanOrEqual(SEQ.length * 2);
+  test('144 Hz: the same sequence of pad states; each change on its own tick or at most 1 tick early (sub-tick remainder)', () => {
+    const runs = (tape) => tape.reduce((acc, e, i) => {
+      if (!acc.length || acc[acc.length - 1].e !== e) acc.push({ e, start: i + 1 });
+      return acc;
+    }, []);
+    const got = runs(timed[144].tape), want = runs(ORACLE);
+    expect(got.map((r) => r.e)).toEqual(want.map((r) => r.e));
+    const shifts = got.map((r, i) => r.start - want[i].start);
+    for (const d of shifts) expect([0, -1]).toContain(d);
+    expect(shifts.some((d) => d === 0)).toBe(true);
   });
 
   test('(b) held-only taps inside one frame are preserved as one tick at every rate', () => {
@@ -171,30 +169,37 @@ describe('#115 fix: timestamped key events map to the tick whose window contains
     expect(ticksWhere(timed[30].tape, (p) => p.pressed.hop).filter(inWindow)).toHaveLength(2);
   });
 
-  test('no added display latency: an input first shows up in the same render frame as before, never later', () => {
+  test('no added display latency: every press shows in the same render frame as before (phase sweep)', () => {
     for (const hz of RATES) {
-      const legacy = runCadence({ hz, events: SEQ, durationMs: DURATION, mode: 'legacy' });
-      for (const ev of SEQ.filter((e) => e.type === 'keydown')) {
-        const from = Math.max(1, idealTick(ev.t) - SIM_MAX_TICKS_PER_FRAME);
-        const field = { KeyW: 'push', KeyA: 'tilt', KeyD: 'tilt', KeyS: 'brakeHeld', Space: 'hop', ArrowUp: 'airBrake' }[ev.code];
-        const pred = (p) => (field === 'tilt' ? p.tilt !== 0 || p.tuck : p[field]);
-        const gl = firstTick(legacy.pads, from, pred);
-        const gt = firstTick(timed[hz].pads, from, pred);
-        expect(gt).toBeGreaterThan(0);
-        if (gl > 0) expect(timed[hz].frameOfTick[gt - 1]).toBeLessThanOrEqual(legacy.frameOfTick[gl - 1]);
-      }
+      const l = measureLatency({ hz, mode: 'legacy' });
+      const t = measureLatency({ hz, mode: 'timed' });
+      expect(t.lost).toBe(0);
+      // wherever the legacy path delivered the press at all, the timed path shows it in the same frame
+      l.perPressFrameLag.forEach((f, j) => { if (f !== null) expect(t.perPressFrameLag[j]).toBe(f); });
+      expect(Math.max(...t.frameLag)).toBe(hz === 144 ? 1 : 0); // 144 Hz: only presses polled on a 0-tick frame wait one
     }
   });
 
-  test('never retroactive: every input lands on a tick of the frame that polled it or later', () => {
+  test('never retroactive, never late: a press lands on its own tick (30/60/120 Hz) or at most 1 tick early (144 Hz)', () => {
     for (const hz of RATES) {
-      for (const ev of SEQ.filter((e) => e.type === 'keydown')) {
-        const frame = Math.ceil(ev.t / (1000 / hz) - 1e-9);
-        const field = { KeyW: 'push', KeyA: 'tilt', KeyD: 'tuck', KeyS: 'brakeHeld', Space: 'hop', ArrowUp: 'airBrake' }[ev.code];
-        const g = firstTick(timed[hz].pads, Math.max(1, idealTick(ev.t) - SIM_MAX_TICKS_PER_FRAME),
-          (p) => (field === 'tilt' ? p.tilt !== 0 || p.tuck : p[field]));
-        expect(timed[hz].frameOfTick[g - 1]).toBeGreaterThanOrEqual(frame);
+      const t = stats(measureLatency({ hz, mode: 'timed' }).tickLag);
+      expect(t.max).toBe(0);
+      expect(t.min).toBeGreaterThanOrEqual(hz === 144 ? -1 : 0);
+    }
+    // legacy: up to (ticks per frame - 1) ticks early
+    expect(stats(measureLatency({ hz: 30, mode: 'legacy' }).tickLag).min).toBe(-3);
+    expect(stats(measureLatency({ hz: 60, mode: 'legacy' }).tickLag).min).toBe(-1);
+  });
+
+  test('latency report (set INPUT_TIMING_REPORT=1 to print)', () => {
+    const rows = [];
+    for (const hz of RATES) {
+      for (const mode of ['legacy', 'timed']) {
+        const m = measureLatency({ hz, mode });
+        rows.push({ hz, mode, lost: m.lost, pressTickLag: stats(m.tickLag), releaseTickLag: stats(m.releaseTickLag), frameLag: stats(m.frameLag) });
       }
     }
+    if (process.env.INPUT_TIMING_REPORT) console.log(JSON.stringify(rows, null, 1)); // eslint-disable-line no-console
+    expect(rows).toHaveLength(8);
   });
 });

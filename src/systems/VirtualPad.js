@@ -11,8 +11,8 @@ import { TouchOverlay } from './TouchOverlay.js';
 /** Analog dead-zone (stick / device tilt). */
 export const ANALOG_DEADZONE = 0.15;
 
-const EDGE_NAMES = ['hop', 'reset', 'pause', 'airBrake', 'parachute', 'confirm'];
-const HELD_NAMES = [
+export const EDGE_NAMES = ['hop', 'reset', 'pause', 'airBrake', 'parachute', 'confirm'];
+export const HELD_NAMES = [
   'push', 'tuck', 'brake', 'hop', 'reset', 'airBrake', 'parachute', 'divebomb', 'corkscrew', 'pause', 'confirm',
   'tiltBack', 'tiltForward', 'heliLeft', 'heliRight',
 ];
@@ -39,6 +39,29 @@ const HELD_NAMES = [
  * @property {'keyboard'|'gamepad'|'touch'} lastSource  device that produced the most recent input.
  */
 
+/** Most timeline entries kept between two polls; older ones fold into the timeline base (no unbounded growth). */
+export const TIMELINE_MAX = 256;
+
+/**
+ * Held fields of a VirtualPadState derived from raw button holds (issue #115: shared by the live pad and by
+ * SimClock when it rebuilds a per-tick pad from a timeline).
+ * @param {Object<string,boolean>} h raw held name -> down
+ * @param {number} analog dead-zoned analog tilt (0 = none)
+ * @returns {object}
+ */
+export function deriveHeld(h, analog = 0) {
+  const back = !!h.tiltBack;
+  const fwd = !!h.tiltForward;
+  const digital = back && fwd ? 0 : fwd ? 1 : back ? -1 : 0;
+  return {
+    push: !!h.push, brake: !!h.brake, hop: !!h.hop, reset: !!h.reset, airBrake: !!h.airBrake,
+    parachute: !!h.parachute, divebomb: !!h.divebomb, corkscrew: !!h.corkscrew, pause: !!h.pause,
+    tuck: !!h.tuck || (back && fwd),
+    tilt: analog !== 0 ? analog : digital,
+    heli: /** @type {-1|0|1} */ ((h.heliRight ? 1 : 0) - (h.heliLeft ? 1 : 0)),
+  };
+}
+
 /** @returns {VirtualPadState} all-neutral state. */
 export function emptyPadState() {
   return {
@@ -60,6 +83,26 @@ export class VirtualPad {
     this.analog = {};
     /** @type {TouchOverlay|null} */
     this.overlay = null;
+    /** Raw holds at the last poll(), and every aggregate hold change since (issue #115 timeline). */
+    this._timelineBase = this._heldBits();
+    /** @type {{t:number|null,name:string,down:boolean}[]} */
+    this._timeline = [];
+  }
+
+  /** @private @returns {Object<string,boolean>} */
+  _heldBits() {
+    const o = {};
+    for (const n of HELD_NAMES) o[n] = this.held[n].size > 0;
+    return o;
+  }
+
+  /** @private */
+  _journal(name, down, t) {
+    this._timeline.push({ t: Number.isFinite(t) ? t : null, name, down });
+    if (this._timeline.length > TIMELINE_MAX) {
+      const old = this._timeline.shift();
+      this._timelineBase[old.name] = old.down;
+    }
   }
 
   /**
@@ -69,9 +112,11 @@ export class VirtualPad {
    * @param {string} name
    * @param {boolean} down
    * @param {'keyboard'|'gamepad'|'touch'} source
+   * @param {number} [timeStamp] when it happened, on the performance.now() clock (DOM event.timeStamp). Optional:
+   *        untimed changes (gamepad, touch, blur) are scheduled from the first tick of the frame that polls them.
    * @returns {void}
    */
-  setButton(name, down, source) {
+  setButton(name, down, source, timeStamp) {
     const set = this.held[name];
     if (!set) return;
     const src = source || 'keyboard';
@@ -81,6 +126,7 @@ export class VirtualPad {
     const now = set.size > 0;
     if (down) this.state.lastSource = src;
     if (now && !was && EDGE_NAMES.includes(name)) this.state.pressed[name] = true;
+    if (now !== was) this._journal(name, now, timeStamp);
     this._recompute();
   }
 
@@ -101,21 +147,11 @@ export class VirtualPad {
 
   /** @private */
   _recompute() {
-    const s = this.state;
-    const h = (n) => this.held[n].size > 0;
-    s.push = h('push');
-    s.brake = h('brake');
-    s.hop = h('hop');
-    s.reset = h('reset');
-    s.airBrake = h('airBrake');
-    s.parachute = h('parachute');
-    s.divebomb = h('divebomb');
-    s.corkscrew = h('corkscrew');
-    s.pause = h('pause');
-    const back = h('tiltBack');
-    const fwd = h('tiltForward');
-    s.tuck = h('tuck') || (back && fwd);
-    const digital = back && fwd ? 0 : fwd ? 1 : back ? -1 : 0;
+    Object.assign(this.state, deriveHeld(this._heldBits(), this._analogTilt()));
+  }
+
+  /** @private @returns {number} dead-zoned analog tilt from the strongest analog source, 0 if none. */
+  _analogTilt() {
     let analog = 0;
     for (const k of Object.keys(this.analog)) {
       const v = this.analog[k];
@@ -124,8 +160,7 @@ export class VirtualPad {
         analog = Math.sign(v) * Math.min(1, (Math.abs(v) - ANALOG_DEADZONE) / (1 - ANALOG_DEADZONE));
       }
     }
-    s.tilt = analog !== 0 ? analog : digital;
-    s.heli = /** @type {-1|0|1} */ ((h('heliRight') ? 1 : 0) - (h('heliLeft') ? 1 : 0));
+    return analog;
   }
 
   /**
@@ -134,7 +169,10 @@ export class VirtualPad {
    * @returns {void}
    */
   releaseSource(source) {
-    for (const n of HELD_NAMES) this.held[n].delete(source);
+    for (const n of HELD_NAMES) {
+      const set = this.held[n];
+      if (set.delete(source) && set.size === 0) this._journal(n, false, null);
+    }
     if (source === 'gamepad') delete this.analog.gamepad;
     if (source === 'touch') delete this.analog.device;
     this._recompute();
@@ -142,11 +180,20 @@ export class VirtualPad {
 
   /**
    * Snapshot current state and CLEAR the one-shot `pressed` edges.
+   * The snapshot carries a non-enumerable `timeline` (issue #115): `{ base, events, analog }` = raw holds at the
+   * previous poll, every aggregate hold change since in arrival order (`t` = event.timeStamp or null), and the
+   * current analog tilt. SimClock.padsFor uses it to give each tick the input that happened inside its window.
    * @returns {VirtualPadState} a copy (safe to keep).
    */
   poll() {
     const out = { ...this.state, pressed: { ...this.state.pressed } };
     for (const n of EDGE_NAMES) this.state.pressed[n] = false;
+    Object.defineProperty(out, 'timeline', {
+      value: { base: this._timelineBase, events: this._timeline, analog: this._analogTilt() },
+      enumerable: false,
+    });
+    this._timelineBase = this._heldBits();
+    this._timeline = [];
     return out;
   }
 
@@ -177,5 +224,7 @@ export class VirtualPad {
     for (const n of HELD_NAMES) this.held[n].clear();
     this.analog = {};
     this.state = emptyPadState();
+    this._timelineBase = this._heldBits();
+    this._timeline = [];
   }
 }

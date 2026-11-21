@@ -13,7 +13,7 @@
  */
 import { EventEmitter } from 'events';
 import { InputRouter } from '../../src/systems/InputRouter.js';
-import { SimClock, SIM_TICK_MS } from '../../src/systems/SimClock.js';
+import { SimClock, SIM_TICK_MS, SIM_MAX_TICKS_PER_FRAME } from '../../src/systems/SimClock.js';
 import { VirtualPad } from '../../src/systems/VirtualPad.js';
 import { encodePad, quantizeTilt } from '../../src/systems/ghost/GhostTape.js';
 
@@ -88,7 +88,7 @@ export function runCadence({ hz, events, durationMs, mode = 'timed', frameDelta,
       if (beforeFrame) beforeFrame(router, k, Tk);
       const raw = router.poll();
       const polled = toTickPad(raw);
-      const ticks = clock.advance(dt);
+      const ticks = clock.advance(Math.max(0, Math.min(dt, 50))); // RunScene: dt = clamp(delta, 0, 50)
       const out = mode === 'legacy'
         ? clock.padsFor(polled, ticks)
         : clock.padsFor(polled, ticks, { frameTime: Tk, timeline: raw.timeline, normalize: toTickPad });
@@ -145,4 +145,47 @@ export const idealTick = (t, tickMs = SIM_TICK_MS) => Math.max(1, Math.ceil(t / 
 export function firstTick(pads, from, pred) {
   for (let i = Math.max(0, from - 1); i < pads.length; i++) if (pred(pads[i])) return i + 1;
   return -1;
+}
+
+/**
+ * Latency sweep: `n` W presses (held `holdMs`), 100 ms apart, whose phase inside a frame sweeps
+ * evenly, so every press/frame/tick alignment is sampled. Per press:
+ *  - tickLag: tick that first holds push minus the tick whose window contains the keydown
+ *    (negative = applied to simulated time BEFORE the key was pressed);
+ *  - frameLag: render frame that first shows it minus the first frame that could poll it.
+ * @returns {{tickLag:number[], frameLag:number[], releaseTickLag:number[], lost:number}}
+ */
+export function measureLatency({ hz, mode, n = 240, holdMs = 20, code = 'KeyW', field = 'push' }) {
+  const frameMs = 1000 / hz;
+  const events = [];
+  for (let j = 0; j < n; j++) {
+    const t = 50 + 100 * j + ((j * 0.613) % 33.333) + 0.0137; // phase sweep; never exactly on a boundary
+    events.push({ t, type: 'keydown', code }, { t: t + holdMs, type: 'keyup', code });
+  }
+  const r = runCadence({ hz, events, durationMs: 100 * n + 200, mode });
+  const tickLag = [];
+  const frameLag = [];
+  const releaseTickLag = [];
+  const perPressFrameLag = []; // null where the press never reached a tick
+  let lost = 0;
+  for (let j = 0; j < n; j++) {
+    const t = events[2 * j].t;
+    const ideal = idealTick(t);
+    const from = Math.max(1, ideal - SIM_MAX_TICKS_PER_FRAME); // previous press released >= 9 ticks earlier
+    const g = firstTick(r.pads, from, (p) => !!p[field]);
+    if (g < 0 || g > idealTick(t + holdMs) + SIM_MAX_TICKS_PER_FRAME) { lost++; perPressFrameLag.push(null); continue; }
+    tickLag.push(g - ideal);
+    const fl = r.frameOfTick[g - 1] - Math.ceil(t / frameMs - 1e-9);
+    frameLag.push(fl);
+    perPressFrameLag.push(fl);
+    const gr = firstTick(r.pads, g, (p) => !p[field]);
+    releaseTickLag.push(gr - idealTick(t + holdMs));
+  }
+  return { tickLag, frameLag, releaseTickLag, perPressFrameLag, lost };
+}
+
+/** min / mean / max summary. */
+export function stats(xs) {
+  if (!xs.length) return { min: NaN, mean: NaN, max: NaN };
+  return { min: Math.min(...xs), mean: Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 1000) / 1000, max: Math.max(...xs) };
 }
