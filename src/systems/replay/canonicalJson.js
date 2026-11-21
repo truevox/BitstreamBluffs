@@ -1,40 +1,50 @@
 /**
- * BB-CJSON v1: canonical JSON for Replay Contract v1 (docs/replay/replay-contract-v1.md, section 2).
+ * BB-CJSON v1: canonical JSON for Replay Contract v1 (docs/replay/replay-contract-v1.md, section 2, with the binding
+ * amendments from the independent review).
  *
  * A strict profile of RFC 8785 (JCS): the same bytes in every implementation, so a SHA-256 over them is a stable
- * identity. Anything not representable is an error with a stable `code` and a `$`-rooted `path`, never silently
- * altered. Pure module: no Phaser, no clock, no randomness, no TextEncoder/TextDecoder (UTF-8 is done by hand so it
- * behaves identically under Node, browsers and Jest's jsdom).
+ * identity. Anything not representable is an error with a stable `code` and an RFC 6901 JSON Pointer `pointer`
+ * (root is the empty string, e.g. "/causal/bsod/syncLevel", "/pose/2"), never silently altered. Pure module: no
+ * Phaser, no clock, no randomness, no TextEncoder/TextDecoder (UTF-8 is done by hand so it behaves identically under
+ * Node, browsers and Jest's jsdom).
  *
- * Error codes (part of the contract, section 2.4): nan, infinity, negative-zero, unsafe-integer, float-out-of-range,
- * undefined, lone-surrogate, key-not-allowed, proto-key, non-plain-object, unsupported-type:<typeof>, sparse-array,
- * too-deep, duplicate-key, not-canonical. Additional codes used by this implementation (not in the 2.4 list):
- * non-plain-array, array-extra-props, symbol-key, accessor, hidden-property, string-too-long, output-too-large,
- * invalid-utf8, syntax, bad-f64.
+ * Error codes: nan, infinity, negative-zero, unsafe-integer, float-out-of-range, undefined, lone-surrogate,
+ * key-not-allowed, proto-key, non-plain-object, unsupported-type:<typeof>, sparse-array, too-deep, duplicate-key,
+ * not-canonical, invalid-utf8, bom, syntax-error, too-large (canonical bytes > 16 MiB), string-too-long (string >
+ * 1 MiB of UTF-8), f64-noncanonical. Additional codes (not named by the contract): non-plain-array, array-extra-props,
+ * symbol-key, accessor, hidden-property.
+ *
+ * parseCanonical error precedence (deterministic): UTF-8 decode -> BOM -> too-large -> syntax-error / duplicate-key
+ * (first offender in document order) -> value-level rejections (first offender in document order: depth, number,
+ * string, key rules) -> re-serialize byte equality (`not-canonical`). Token-level forms such as `1.0`, `1e2` are caught
+ * by the byte-equality step; a parsed -0 value is `negative-zero`.
  */
 
 export const MAX_DEPTH = 32;
-export const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
-export const MAX_STRING_BYTES = 1024 * 1024;
+export const MAX_OUTPUT_BYTES = 16777216; // 16 MiB
+export const MAX_STRING_BYTES = 1048576; // 1 MiB
 
 const KEY_RE = /^[A-Za-z0-9_.:$-]{1,64}$/;
 const NEEDS_ESCAPE_RE = /[\u0000-\u001f"\\]/;
-const F64_RE = /^f64:([0-9a-f]{16})$/;
+const F64_RE = /^f64:[0-9a-f]{16}$/;
 
-/** Error for every canonical-JSON failure. `code` is contract-stable; `path` is `$`-rooted (`$.a[1].b`). */
+/** Error for every canonical-JSON failure. `code` is contract-stable; `pointer` is an RFC 6901 JSON Pointer. */
 export class CJSONError extends Error {
   /**
    * @param {string} code
-   * @param {string} path
+   * @param {string} pointer RFC 6901 JSON Pointer ("" is the root)
    * @param {string} [detail]
    */
-  constructor(code, path, detail) {
-    super(`${code} at ${path}${detail ? ` (${detail})` : ''}`);
+  constructor(code, pointer, detail) {
+    super(`${code} at pointer ${JSON.stringify(pointer)}${detail ? ` (${detail})` : ''}`);
     this.name = 'CJSONError';
     this.code = code;
-    this.path = path;
+    this.pointer = pointer;
   }
 }
+
+/** RFC 6901 reference-token escaping. */
+const esc = (token) => String(token).replace(/~/g, '~0').replace(/\//g, '~1');
 
 // ---------------------------------------------------------------------------------------------------------------------
 // UTF-8 (hand-rolled so the module has no environment dependencies)
@@ -78,7 +88,7 @@ export function utf8Length(s) {
  * @returns {Uint8Array}
  */
 export function utf8Encode(s) {
-  if (!isWellFormed(s)) throw new CJSONError('lone-surrogate', '$');
+  if (!isWellFormed(s)) throw new CJSONError('lone-surrogate', '');
   const out = new Uint8Array(utf8Length(s));
   let p = 0;
   for (let i = 0; i < s.length; i++) {
@@ -110,7 +120,7 @@ export function utf8Encode(s) {
  * @throws {CJSONError} code `invalid-utf8`
  */
 export function utf8DecodeStrict(bytes) {
-  const bad = (i) => new CJSONError('invalid-utf8', '$', `byte offset ${i}`);
+  const bad = (i) => new CJSONError('invalid-utf8', '', `byte offset ${i}`);
   let out = '';
   let chunk = [];
   const n = bytes.length;
@@ -158,12 +168,26 @@ export function utf8DecodeStrict(bytes) {
 // Serializer
 // ---------------------------------------------------------------------------------------------------------------------
 
-function serString(s, path) {
-  if (!isWellFormed(s)) throw new CJSONError('lone-surrogate', path);
+/** Exact string rules: well-formed UTF-16 and at most MAX_STRING_BYTES of UTF-8. Returns an error code or null. */
+function stringViolation(s) {
+  if (!isWellFormed(s)) return 'lone-surrogate';
   // UTF-16 length <= UTF-8 length <= 3 x UTF-16 length: only compute the exact size when the cheap bounds disagree.
   if (s.length > MAX_STRING_BYTES || (s.length * 3 > MAX_STRING_BYTES && utf8Length(s) > MAX_STRING_BYTES)) {
-    throw new CJSONError('string-too-long', path);
+    return 'string-too-long';
   }
+  return null;
+}
+
+/** Key rules. Returns an error code or null. */
+function keyViolation(k) {
+  if (!KEY_RE.test(k)) return 'key-not-allowed';
+  if (k === '__proto__') return 'proto-key';
+  return null;
+}
+
+function serString(s, pointer) {
+  const bad = stringViolation(s);
+  if (bad) throw new CJSONError(bad, pointer);
   if (!NEEDS_ESCAPE_RE.test(s)) return `"${s}"`;
   let out = '"';
   for (let i = 0; i < s.length; i++) {
@@ -181,70 +205,88 @@ function serString(s, path) {
   return `${out}"`;
 }
 
-function serNumber(v, path) {
-  if (Number.isNaN(v)) throw new CJSONError('nan', path);
-  if (!Number.isFinite(v)) throw new CJSONError('infinity', path);
-  if (Object.is(v, -0)) throw new CJSONError('negative-zero', path);
+function serNumber(v, pointer) {
+  if (Number.isNaN(v)) throw new CJSONError('nan', pointer);
+  if (!Number.isFinite(v)) throw new CJSONError('infinity', pointer);
+  if (Object.is(v, -0)) throw new CJSONError('negative-zero', pointer);
   if (Number.isInteger(v)) {
-    if (!Number.isSafeInteger(v)) throw new CJSONError('unsafe-integer', path);
+    if (!Number.isSafeInteger(v)) throw new CJSONError('unsafe-integer', pointer);
     return String(v);
   }
   const s = String(v);
-  if (s.includes('e')) throw new CJSONError('float-out-of-range', path);
+  if (s.includes('e')) throw new CJSONError('float-out-of-range', pointer);
   return s;
+}
+
+const toStringTag = (v) => Object.prototype.toString.call(v);
+
+/**
+ * Cross-realm plain-object test: prototype is null, or the prototype's own prototype is null and the object's
+ * toString tag is "[object Object]" (so Object.prototype of any realm qualifies; Date, Map, typed arrays, class
+ * instances and objects with an inherited prototype chain do not).
+ */
+function isPlainObject(v) {
+  const proto = Object.getPrototypeOf(v);
+  if (proto === null) return true;
+  return Object.getPrototypeOf(proto) === null && toStringTag(v) === '[object Object]';
+}
+
+/** Plain array: Array.isArray and a prototype that is some realm's Array.prototype (chain length exactly 2). */
+function isPlainArray(v) {
+  const proto = Object.getPrototypeOf(v);
+  return proto !== null && Object.getPrototypeOf(Object.getPrototypeOf(proto)) === null && toStringTag(v) === '[object Array]';
 }
 
 /**
  * @param {*} v
- * @param {string} path
+ * @param {string} pointer JSON Pointer of `v`
  * @param {number} level number of containers enclosing `v` (0 at the root)
  * @returns {string}
  */
-function ser(v, path, level) {
+function ser(v, pointer, level) {
   if (v === null) return 'null';
   switch (typeof v) {
     case 'boolean':
       return v ? 'true' : 'false';
     case 'string':
-      return serString(v, path);
+      return serString(v, pointer);
     case 'number':
-      return serNumber(v, path);
+      return serNumber(v, pointer);
     case 'undefined':
-      throw new CJSONError('undefined', path);
+      throw new CJSONError('undefined', pointer);
     case 'object':
       break;
     default:
-      throw new CJSONError(`unsupported-type:${typeof v}`, path);
+      throw new CJSONError(`unsupported-type:${typeof v}`, pointer);
   }
   // `v` is a container: it sits at nesting level `level + 1`, which must not exceed MAX_DEPTH.
-  if (level + 1 > MAX_DEPTH) throw new CJSONError('too-deep', path);
+  if (level + 1 > MAX_DEPTH) throw new CJSONError('too-deep', pointer);
   if (Array.isArray(v)) {
-    if (Object.getPrototypeOf(v) !== Array.prototype) throw new CJSONError('non-plain-array', path);
+    if (!isPlainArray(v)) throw new CJSONError('non-plain-array', pointer);
     const parts = new Array(v.length);
     for (let i = 0; i < v.length; i++) {
-      if (!(i in v)) throw new CJSONError('sparse-array', `${path}[${i}]`);
-      parts[i] = ser(v[i], `${path}[${i}]`, level + 1);
+      if (!(i in v)) throw new CJSONError('sparse-array', `${pointer}/${i}`);
+      parts[i] = ser(v[i], `${pointer}/${i}`, level + 1);
     }
     if (Object.getOwnPropertyNames(v).length !== v.length + 1 || Object.getOwnPropertySymbols(v).length) {
-      throw new CJSONError('array-extra-props', path);
+      throw new CJSONError('array-extra-props', pointer);
     }
     return `[${parts.join(',')}]`;
   }
-  const proto = Object.getPrototypeOf(v);
-  if (proto !== Object.prototype && proto !== null) throw new CJSONError('non-plain-object', path);
-  if (Object.getOwnPropertySymbols(v).length) throw new CJSONError('symbol-key', path);
+  if (!isPlainObject(v)) throw new CJSONError('non-plain-object', pointer);
+  if (Object.getOwnPropertySymbols(v).length) throw new CJSONError('symbol-key', pointer);
   const keys = Object.keys(v);
-  if (Object.getOwnPropertyNames(v).length !== keys.length) throw new CJSONError('hidden-property', path);
+  if (Object.getOwnPropertyNames(v).length !== keys.length) throw new CJSONError('hidden-property', pointer);
   for (const k of keys) {
-    if (!KEY_RE.test(k)) throw new CJSONError('key-not-allowed', `${path}.${k}`);
-    if (k === '__proto__') throw new CJSONError('proto-key', path);
-    if (!('value' in Object.getOwnPropertyDescriptor(v, k))) throw new CJSONError('accessor', `${path}.${k}`);
+    const bad = keyViolation(k);
+    if (bad) throw new CJSONError(bad, `${pointer}/${esc(k)}`);
+    if (!('value' in Object.getOwnPropertyDescriptor(v, k))) throw new CJSONError('accessor', `${pointer}/${esc(k)}`);
   }
   keys.sort(); // UTF-16 code unit order; keys are ASCII so it equals code point and UTF-8 byte order
   let out = '{';
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];
-    out += `${i ? ',' : ''}"${k}":${ser(v[k], `${path}.${k}`, level + 1)}`;
+    out += `${i ? ',' : ''}"${k}":${ser(v[k], `${pointer}/${esc(k)}`, level + 1)}`;
   }
   return `${out}}`;
 }
@@ -256,10 +298,10 @@ function ser(v, path, level) {
  * @throws {CJSONError}
  */
 export function canonicalize(value) {
-  const text = ser(value, '$', 0);
+  const text = ser(value, '', 0);
   // UTF-16 length is a lower bound of the byte length: only measure when it could matter.
   if (text.length > MAX_OUTPUT_BYTES || (text.length * 3 > MAX_OUTPUT_BYTES && utf8Length(text) > MAX_OUTPUT_BYTES)) {
-    throw new CJSONError('output-too-large', '$');
+    throw new CJSONError('too-large', '');
   }
   return text;
 }
@@ -281,18 +323,32 @@ export function canonicalBytes(value) {
 const NUMBER_RE = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
 
 /**
- * Minimal JSON parser that (a) rejects duplicate keys, (b) builds Object.create(null) objects so `__proto__` is just
- * data, and (c) accepts the whole JSON grammar (including non-canonical spellings) so that canonical-ness is decided
- * in exactly one place: the re-serialize byte-equality check in parseCanonical.
+ * Iterative (no recursion, so absurd nesting cannot overflow the stack) JSON parser that accepts the whole JSON
+ * grammar, rejects duplicate keys, builds Object.create(null) objects, and records the FIRST value-level violation in
+ * document order without stopping, so that a later syntax error still takes precedence (see the module comment).
  */
 class Parser {
   constructor(text) {
     this.t = text;
     this.i = 0;
+    this.stack = []; // frames {arr: boolean, value, tok}
+    this.violation = null;
   }
 
-  fail(path, why) {
-    return new CJSONError('syntax', path, `${why} at offset ${this.i}`);
+  /** JSON Pointer of the current location (the value being read, or the member whose key was just read). */
+  pointer() {
+    let p = '';
+    for (const f of this.stack) p += `/${esc(f.tok)}`;
+    return p;
+  }
+
+  /** Record the first value-level violation (pointer built lazily: only the first one is ever needed). */
+  note(code) {
+    if (this.violation === null) this.violation = new CJSONError(code, this.pointer());
+  }
+
+  syntax(why) {
+    return new CJSONError('syntax-error', this.pointer(), `${why} at offset ${this.i}`);
   }
 
   ws() {
@@ -304,56 +360,21 @@ class Parser {
     }
   }
 
-  parseDocument() {
-    this.ws();
-    const v = this.value('$', 0);
-    this.ws();
-    if (this.i !== this.t.length) throw this.fail('$', 'trailing characters');
-    return v;
-  }
-
-  value(path, level) {
+  /** Read a string token (cursor on the opening quote) and return its decoded value. */
+  string() {
     const t = this.t;
-    const c = t[this.i];
-    if (c === '{') return this.object(path, level);
-    if (c === '[') return this.array(path, level);
-    if (c === '"') return this.string(path);
-    if (c === '-' || (c >= '0' && c <= '9')) {
-      NUMBER_RE.lastIndex = this.i;
-      const m = NUMBER_RE.exec(t);
-      if (!m) throw this.fail(path, 'bad number');
-      this.i += m[0].length;
-      return Number(m[0]);
-    }
-    if (t.startsWith('true', this.i)) {
-      this.i += 4;
-      return true;
-    }
-    if (t.startsWith('false', this.i)) {
-      this.i += 5;
-      return false;
-    }
-    if (t.startsWith('null', this.i)) {
-      this.i += 4;
-      return null;
-    }
-    throw this.fail(path, 'unexpected token');
-  }
-
-  string(path) {
-    const t = this.t;
-    this.i++; // opening quote
+    this.i++;
     let out = '';
     let start = this.i;
     for (;;) {
-      if (this.i >= t.length) throw this.fail(path, 'unterminated string');
+      if (this.i >= t.length) throw this.syntax('unterminated string');
       const c = t.charCodeAt(this.i);
       if (c === 0x22) {
         out += t.slice(start, this.i);
         this.i++;
         return out;
       }
-      if (c < 0x20) throw this.fail(path, 'raw control character in string');
+      if (c < 0x20) throw this.syntax('raw control character in string');
       if (c !== 0x5c) {
         this.i++;
         continue;
@@ -388,92 +409,132 @@ class Parser {
           break;
         case 'u': {
           const hex = t.slice(this.i, this.i + 4);
-          if (!/^[0-9a-fA-F]{4}$/.test(hex)) throw this.fail(path, 'bad \\u escape');
+          if (!/^[0-9a-fA-F]{4}$/.test(hex)) throw this.syntax('bad \\u escape');
           out += String.fromCharCode(parseInt(hex, 16));
           this.i += 4;
           break;
         }
         default:
-          throw this.fail(path, 'bad escape');
+          throw this.syntax('bad escape');
       }
       start = this.i;
     }
   }
 
-  array(path, level) {
-    if (level + 1 > MAX_DEPTH) throw new CJSONError('too-deep', path);
-    this.i++; // [
-    const out = [];
-    this.ws();
-    if (this.t[this.i] === ']') {
-      this.i++;
-      return out;
-    }
+  parseDocument() {
+    const t = this.t;
+    const stack = this.stack;
+    let phase = 'value';
+    let v;
     for (;;) {
-      this.ws();
-      out.push(this.value(`${path}[${out.length}]`, level + 1));
-      this.ws();
-      const c = this.t[this.i++];
-      if (c === ',') continue;
-      if (c === ']') return out;
-      this.i--;
-      throw this.fail(path, 'expected , or ]');
-    }
-  }
-
-  object(path, level) {
-    if (level + 1 > MAX_DEPTH) throw new CJSONError('too-deep', path);
-    this.i++; // {
-    const out = Object.create(null);
-    this.ws();
-    if (this.t[this.i] === '}') {
-      this.i++;
-      return out;
-    }
-    for (;;) {
-      this.ws();
-      if (this.t[this.i] !== '"') throw this.fail(path, 'expected string key');
-      const key = this.string(path);
-      if (key in out) throw new CJSONError('duplicate-key', path, `key ${JSON.stringify(key)}`);
-      this.ws();
-      if (this.t[this.i++] !== ':') {
-        this.i--;
-        throw this.fail(path, 'expected :');
+      if (phase === 'value') {
+        this.ws();
+        const top = stack[stack.length - 1];
+        if (top && top.arr) top.tok = top.value.length;
+        const c = t[this.i];
+        if (c === '{' || c === '[') {
+          if (stack.length + 1 > MAX_DEPTH) this.note('too-deep');
+          const arr = c === '[';
+          stack.push({ arr, value: arr ? [] : Object.create(null), tok: arr ? 0 : '' });
+          this.i++;
+          this.ws();
+          if (t[this.i] === (arr ? ']' : '}')) {
+            this.i++;
+            v = stack.pop().value;
+            phase = 'deliver';
+          } else phase = arr ? 'value' : 'key';
+        } else if (c === '"') {
+          const s = this.string();
+          const bad = stringViolation(s);
+          if (bad) this.note(bad);
+          v = s;
+          phase = 'deliver';
+        } else if (c === '-' || (c >= '0' && c <= '9')) {
+          NUMBER_RE.lastIndex = this.i;
+          const m = NUMBER_RE.exec(t);
+          if (!m) throw this.syntax('bad number');
+          this.i += m[0].length;
+          v = Number(m[0]);
+          try {
+            serNumber(v, '');
+          } catch (e) {
+            this.note(e.code);
+          }
+          phase = 'deliver';
+        } else if (t.startsWith('true', this.i)) {
+          this.i += 4;
+          v = true;
+          phase = 'deliver';
+        } else if (t.startsWith('false', this.i)) {
+          this.i += 5;
+          v = false;
+          phase = 'deliver';
+        } else if (t.startsWith('null', this.i)) {
+          this.i += 4;
+          v = null;
+          phase = 'deliver';
+        } else throw this.syntax('unexpected token');
+      } else if (phase === 'key') {
+        this.ws();
+        if (t[this.i] !== '"') throw this.syntax('expected string key');
+        const top = stack[stack.length - 1];
+        const key = this.string();
+        top.tok = key;
+        if (key in top.value) throw new CJSONError('duplicate-key', this.pointer(), `key ${JSON.stringify(key)}`);
+        const bad = keyViolation(key);
+        if (bad) this.note(bad);
+        this.ws();
+        if (t[this.i] !== ':') throw this.syntax('expected :');
+        this.i++;
+        phase = 'value';
+      } else {
+        // deliver `v` to the enclosing container, then expect `,` or the closer
+        const top = stack[stack.length - 1];
+        if (!top) {
+          this.ws();
+          if (this.i !== t.length) throw this.syntax('trailing characters');
+          return v;
+        }
+        if (top.arr) top.value.push(v);
+        else top.value[top.tok] = v;
+        this.ws();
+        const c = t[this.i];
+        if (c === ',') {
+          this.i++;
+          phase = top.arr ? 'value' : 'key';
+        } else if (c === (top.arr ? ']' : '}')) {
+          this.i++;
+          v = stack.pop().value;
+        } else throw this.syntax(top.arr ? 'expected , or ]' : 'expected , or }');
       }
-      this.ws();
-      out[key] = this.value(`${path}.${key}`, level + 1);
-      this.ws();
-      const c = this.t[this.i++];
-      if (c === ',') continue;
-      if (c === '}') return out;
-      this.i--;
-      throw this.fail(path, 'expected , or }');
     }
   }
 }
 
 /**
- * Parse canonical bytes (or text). Strict UTF-8 -> duplicate-key-rejecting parse -> re-serialize -> byte equality.
- * Returned objects have a null prototype.
+ * Parse canonical bytes (or text). Precedence: strict UTF-8 -> BOM -> too-large -> syntax / duplicate-key ->
+ * value-level rejections -> re-serialize byte equality. Returned objects have a null prototype.
  * @param {Uint8Array|string} input
  * @returns {*}
- * @throws {CJSONError} invalid-utf8, syntax, duplicate-key, too-deep, any serializer code, or not-canonical
+ * @throws {CJSONError}
  */
 export function parseCanonical(input) {
   let text;
-  if (typeof input === 'string') text = input;
-  else if (input instanceof Uint8Array || ArrayBuffer.isView(input)) {
-    const bytes =
-      input instanceof Uint8Array ? input : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-    if (bytes.length > MAX_OUTPUT_BYTES) throw new CJSONError('output-too-large', '$');
-    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
-      throw new CJSONError('not-canonical', '$', 'byte order mark');
-    }
+  let size;
+  if (typeof input === 'string') {
+    text = input;
+    size = -1;
+  } else if (ArrayBuffer.isView(input)) {
+    const bytes = input instanceof Uint8Array ? input : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
     text = utf8DecodeStrict(bytes);
-  } else throw new CJSONError('unsupported-type:' + typeof input, '$', 'parseCanonical takes bytes or a string');
-  if (text.length > MAX_OUTPUT_BYTES) throw new CJSONError('output-too-large', '$');
-  const value = new Parser(text).parseDocument();
-  if (canonicalize(value) !== text) throw new CJSONError('not-canonical', '$');
+    size = bytes.length;
+  } else throw new CJSONError(`unsupported-type:${typeof input}`, '', 'parseCanonical takes bytes or a string');
+  if (text.charCodeAt(0) === 0xfeff) throw new CJSONError('bom', '');
+  if (size > MAX_OUTPUT_BYTES || (size < 0 && utf8Length(text) > MAX_OUTPUT_BYTES)) throw new CJSONError('too-large', '');
+  const parser = new Parser(text);
+  const value = parser.parseDocument();
+  if (parser.violation) throw parser.violation;
+  if (canonicalize(value) !== text) throw new CJSONError('not-canonical', '');
   return value;
 }
 
@@ -489,9 +550,10 @@ const f64View = new DataView(new ArrayBuffer(8));
  * Preserves -0 and +-Infinity; every NaN becomes `f64:7ff8000000000000`.
  * @param {number} v
  * @returns {string}
+ * @throws {TypeError} when `v` is not a number
  */
 export function f64Encode(v) {
-  if (typeof v !== 'number') throw new CJSONError('bad-f64', '$', `expected number, got ${typeof v}`);
+  if (typeof v !== 'number') throw new TypeError(`f64Encode expects a number, got ${typeof v}`);
   if (Number.isNaN(v)) return 'f64:7ff8000000000000';
   f64View.setFloat64(0, v, false);
   let s = 'f64:';
@@ -503,13 +565,18 @@ export function f64Encode(v) {
 }
 
 /**
- * Inverse of f64Encode. Accepts only the exact canonical spelling.
+ * Inverse of f64Encode. Decodes, re-encodes and compares: any non-canonical form (uppercase hex, wrong length, missing
+ * prefix, a NaN payload other than 7ff8000000000000, non-strings) throws `f64-noncanonical`.
  * @param {string} s
  * @returns {number}
+ * @throws {CJSONError} code `f64-noncanonical`
  */
 export function f64Decode(s) {
-  const m = typeof s === 'string' ? F64_RE.exec(s) : null;
-  if (!m) throw new CJSONError('bad-f64', '$', 'expected "f64:" + 16 lowercase hex digits');
-  for (let i = 0; i < 8; i++) f64View.setUint8(i, parseInt(m[1].substr(2 * i, 2), 16));
-  return f64View.getFloat64(0, false);
+  if (typeof s !== 'string' || !F64_RE.test(s)) {
+    throw new CJSONError('f64-noncanonical', '', 'expected "f64:" + 16 lowercase hex digits');
+  }
+  for (let i = 0; i < 8; i++) f64View.setUint8(i, parseInt(s.substr(4 + 2 * i, 2), 16));
+  const v = f64View.getFloat64(0, false);
+  if (f64Encode(v) !== s) throw new CJSONError('f64-noncanonical', '', 'does not re-encode to the same string');
+  return v;
 }

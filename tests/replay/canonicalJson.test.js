@@ -1,4 +1,5 @@
 // Replay Contract v1, section 2: BB-CJSON v1 canonical JSON (vectors, rejections, parse-level checks, properties).
+import vm from 'node:vm';
 import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from 'node:util';
 import {
   CJSONError,
@@ -50,7 +51,7 @@ function expectCJSON(fn, code, path) {
   const e = thrown(fn);
   expect(e).toBeInstanceOf(CJSONError);
   expect(e.code).toBe(code);
-  if (path !== undefined) expect(e.path).toBe(path);
+  if (path !== undefined) expect(e.pointer).toBe(path);
   return e;
 }
 
@@ -77,14 +78,27 @@ describe('cjson-valid vectors (spec 2.4, cj-*)', () => {
 
   test.each(vectors.map((v) => [v.id, v]))('%s: text, bytes, parse round trip', (_id, v) => {
     const input = resolveInput(v.input);
-    expect(canonicalize(input)).toBe(v.text);
+    const text = utf8DecodeStrict(fromHex(v.hex)); // hex is authoritative; text (when present) is a readable copy
+    if ('text' in v) expect(v.text).toBe(text);
+    expect(canonicalize(input)).toBe(text);
     const bytes = canonicalBytes(input);
     expect(toHex(bytes)).toBe(v.hex);
-    expect(toHex(utf8Encode(v.text))).toBe(v.hex);
-    expect(toHex(enc.encode(v.text))).toBe(v.hex);
+    expect(toHex(utf8Encode(text))).toBe(v.hex);
+    expect(toHex(enc.encode(text))).toBe(v.hex);
     const parsed = parseCanonical(bytes);
-    expect(canonicalize(parsed)).toBe(v.text);
-    expect(parseCanonical(v.text)).toEqual(parsed);
+    expect(canonicalize(parsed)).toBe(text);
+    expect(parseCanonical(text)).toEqual(parsed);
+  });
+
+  test('vectors with invisible or non-ASCII content give inputs as escaped JS descriptors and omit `text`', () => {
+    for (const v of vectors) {
+      if ('text' in v) expect(v.text).toMatch(/^[\x20-\x7e]*$/);
+      else expect(v.input).toHaveProperty('$js');
+    }
+    expect(vectors.filter((v) => !('text' in v)).map((v) => v.id)).toEqual([
+      'cj-005-string-escapes',
+      'cj-009-unicode-value-no-normalization',
+    ]);
   });
 
   test('cj-005 emits U+007F and U+2028 literally and lowercase \\u00xx for other controls', () => {
@@ -95,8 +109,11 @@ describe('cjson-valid vectors (spec 2.4, cj-*)', () => {
 
   test('cj-009 does not normalize: NFC and NFD differ', () => {
     const v = vectors.find((x) => x.id.startsWith('cj-009'));
-    expect(v.hex).toContain('c3a9');
-    expect(v.hex).toContain('65cc81');
+    expect(v.hex).toContain('c3a9'); // nfc: U+00E9
+    expect(v.hex).toContain('65cc81'); // nfd: 'e' + U+0301
+    const input = resolveInput(v.input);
+    expect(input.nfd).toBe('e\u0301');
+    expect(input.nfd).not.toBe(input.nfc);
   });
 
   test('cj-011: 32 nested containers are accepted', () => {
@@ -105,16 +122,16 @@ describe('cjson-valid vectors (spec 2.4, cj-*)', () => {
   });
 });
 
-describe('cjson-reject vectors (spec 2.4 "Required rejections", rj-*)', () => {
+describe('cjson-reject vectors (spec 2.4 "Required rejections", rj-*, plus amendment vectors)', () => {
   const vectors = loadFixture('cjson-reject.json');
 
-  test('ids cover rj-001..rj-026', () => {
+  test('ids are unique and cover rj-001..rj-043 in order', () => {
     expect(vectors.map((v) => v.id.slice(0, 6))).toEqual(
-      Array.from({ length: 26 }, (_, i) => `rj-${String(i + 1).padStart(3, '0')}`),
+      Array.from({ length: 43 }, (_, i) => `rj-${String(i + 1).padStart(3, '0')}`),
     );
   });
 
-  test('every code named in the spec is exercised', () => {
+  test('every code in the contract is exercised', () => {
     const want = [
       'nan',
       'infinity',
@@ -131,6 +148,11 @@ describe('cjson-reject vectors (spec 2.4 "Required rejections", rj-*)', () => {
       'too-deep',
       'duplicate-key',
       'not-canonical',
+      'invalid-utf8',
+      'bom',
+      'syntax-error',
+      'too-large',
+      'string-too-long',
     ];
     expect(new Set(vectors.map((v) => v.code))).toEqual(new Set(want));
   });
@@ -142,16 +164,137 @@ describe('cjson-reject vectors (spec 2.4 "Required rejections", rj-*)', () => {
     expect(Object.keys(JS_INPUTS).sort()).toEqual([...used].sort());
   });
 
-  test.each(vectors.map((v) => [v.id, v]))('%s fails with its code and path', (_id, v) => {
+  test('pointers are RFC 6901 (root is the empty string)', () => {
+    for (const v of vectors) {
+      const ptr = 'pointerHex' in v ? utf8DecodeStrict(fromHex(v.pointerHex)) : v.pointer;
+      if (ptr !== undefined) expect(ptr === '' || ptr.startsWith('/')).toBe(true);
+    }
+  });
+
+  const pointerOf = (v) => ('pointerHex' in v ? utf8DecodeStrict(fromHex(v.pointerHex)) : v.pointer);
+
+  test.each(vectors.map((v) => [v.id, v]))('%s fails with its code and pointer', (_id, v) => {
+    const ptr = pointerOf(v);
     if (v.via === 'canonicalize') {
       const input = resolveInput(v.input);
-      expectCJSON(() => canonicalize(input), v.code, v.path);
-      expectCJSON(() => canonicalBytes(input), v.code, v.path);
+      expectCJSON(() => canonicalize(input), v.code, ptr);
+      expectCJSON(() => canonicalBytes(input), v.code, ptr);
     } else {
       expect(v.via).toBe('parse');
-      expectCJSON(() => parseCanonical(v.input), v.code, v.path);
-      expectCJSON(() => parseCanonical(enc.encode(v.input)), v.code, v.path);
+      const bytes = 'inputHex' in v ? fromHex(v.inputHex) : resolveInput(v.input);
+      if (typeof v.input === 'string') {
+        expect(toHex(enc.encode(v.input))).toBe(v.inputHex); // text and bytes forms agree
+        expectCJSON(() => parseCanonical(v.input), v.code, ptr);
+      }
+      expectCJSON(() => parseCanonical(bytes), v.code, ptr);
     }
+  });
+});
+
+describe('fixture index', () => {
+  const index = loadFixture('index.json').files;
+  const idsOf = (rows) => rows.map((r) => r.id);
+
+  test('lists every shipped vector id exactly once', () => {
+    const hv = loadFixture('hash-vectors.json');
+    const fp = loadFixture('fingerprint-vectors.json');
+    expect(index['cjson-valid.json']).toEqual(idsOf(loadFixture('cjson-valid.json')));
+    expect(index['cjson-reject.json']).toEqual(idsOf(loadFixture('cjson-reject.json')));
+    expect(index['hash-vectors.json']).toEqual({
+      sha256: idsOf(hv.sha256),
+      xxh32: idsOf(hv.xxh32),
+      xxh32x2: idsOf(hv.xxh32x2),
+      f64: idsOf(hv.f64),
+      f64Reject: idsOf(hv.f64Reject),
+    });
+    expect(index['fingerprint-vectors.json']).toEqual([...Object.keys(fp.subsystems).sort(), 'combined', 'bsodOnlyMutation']);
+    const all = [
+      ...index['cjson-valid.json'],
+      ...index['cjson-reject.json'],
+      ...Object.values(index['hash-vectors.json']).flat(),
+      ...index['fingerprint-vectors.json'],
+    ];
+    expect(new Set(all).size).toBe(all.length);
+  });
+});
+
+describe('parseCanonical error precedence', () => {
+  const t = (s) => () => parseCanonical(s);
+
+  test('utf8 > bom > too-large > syntax/duplicate > value-level (document order) > not-canonical', () => {
+    expectCJSON(() => parseCanonical(fromHex('efbbbfff')), 'invalid-utf8');
+    expectCJSON(() => parseCanonical(fromHex('efbbbf5b')), 'bom');
+    const huge = new Uint8Array(16777217).fill(0x20);
+    expectCJSON(() => parseCanonical(huge), 'too-large');
+    huge[0] = 0xff; // invalid UTF-8 outranks size
+    expectCJSON(() => parseCanonical(huge), 'invalid-utf8');
+    expectCJSON(t('{"a":-0,"b":}'), 'syntax-error');
+    expectCJSON(t('{"a":-0,"a":1}'), 'duplicate-key', '/a');
+    expectCJSON(t('{"a":1,"a":-0}'), 'duplicate-key', '/a');
+    expectCJSON(t('{"b":-0,"a":1e400}'), 'negative-zero', '/b'); // document order, not key-sorted order
+    expectCJSON(t('{"b":1e400,"a":-0}'), 'infinity', '/b');
+    expectCJSON(t('{"z":-0,"\\u00e9":1}'.replace('\\\\', '\\')), 'negative-zero', '/z');
+    expectCJSON(t('{"\\u00e9":1,"z":-0}'.replace('\\\\', '\\')), 'key-not-allowed');
+    expectCJSON(t('[1e400,{"__proto__":1}]'), 'infinity', '/0');
+    expectCJSON(t('[{"__proto__":1},1e400]'), 'proto-key', '/0/__proto__');
+    expectCJSON(t('["\\ud800",1e400]'), 'lone-surrogate', '/0');
+    expectCJSON(t('{"b":1,"a":2}'), 'not-canonical');
+  });
+
+  test('integer-like keys keep document order for error reporting (JS would reorder them in the object)', () => {
+    expectCJSON(t('{"b":-0,"1":1e400}'), 'negative-zero', '/b');
+    expectCJSON(t('{"2":-0,"1":1e400}'), 'negative-zero', '/2');
+  });
+
+  test('token-level spellings are caught by byte equality, except -0 values', () => {
+    for (const s of ['1.0', '1e2', '[1E2]', '[1.50]', '[10e-1]']) expectCJSON(t(s), 'not-canonical', '');
+    expectCJSON(t('-0'), 'negative-zero', '');
+    expectCJSON(t('-0.0'), 'negative-zero', '');
+  });
+});
+
+describe('JSON Pointer paths (RFC 6901)', () => {
+  test('keys containing "." are unambiguous; "/" and "~" are escaped', () => {
+    expectCJSON(() => canonicalize({ 'a.b': [0, -0] }), 'negative-zero', '/a.b/1');
+    expectCJSON(() => canonicalize({ 'a/b': 1 }), 'key-not-allowed', '/a~1b');
+    expectCJSON(() => canonicalize({ 'a~b': 1 }), 'key-not-allowed', '/a~0b');
+    expectCJSON(() => canonicalize({ 'a~/b': 1 }), 'key-not-allowed', '/a~0~1b');
+    expectCJSON(() => canonicalize({ causal: { bsod: { syncLevel: NaN } } }), 'nan', '/causal/bsod/syncLevel');
+    expectCJSON(() => canonicalize({ pose: [1, 2, Infinity] }), 'infinity', '/pose/2');
+  });
+
+  test('error object exposes `pointer` (no `path`)', () => {
+    const e = thrown(() => canonicalize({ a: NaN }));
+    expect(e.pointer).toBe('/a');
+    expect(e).not.toHaveProperty('path');
+    expect(e.message).toContain('nan');
+  });
+});
+
+describe('cross-realm plain objects', () => {
+  test('objects and arrays from another vm realm canonicalize identically', () => {
+    const foreign = vm.runInNewContext('({ b: [1, { z: null, y: "x" }], a: true, n: Object.create(null) })');
+    expect(foreign.constructor).not.toBe(Object);
+    expect(Object.getPrototypeOf(foreign)).not.toBe(Object.prototype);
+    expect(canonicalize(foreign)).toBe('{"a":true,"b":[1,{"y":"x","z":null}],"n":{}}');
+    expect(canonicalize(foreign)).toBe(canonicalize({ b: [1, { z: null, y: 'x' }], a: true, n: {} }));
+  });
+
+  test('foreign non-plain values are still rejected', () => {
+    expectCJSON(() => canonicalize(vm.runInNewContext('new Date(0)')), 'non-plain-object', '');
+    expectCJSON(() => canonicalize(vm.runInNewContext('new Map()')), 'non-plain-object', '');
+    expectCJSON(() => canonicalize(vm.runInNewContext('new Uint8Array(2)')), 'non-plain-object', '');
+    expectCJSON(() => canonicalize(vm.runInNewContext('new (class A { constructor() { this.a = 1; } })()')), 'non-plain-object', '');
+    expectCJSON(() => canonicalize(vm.runInNewContext('new (class B extends Array {})()')), 'non-plain-array', '');
+    expectCJSON(() => canonicalize(vm.runInNewContext('Object.create({ inherited: 1 })')), 'non-plain-object', '');
+  });
+
+  test('toString tag must be "[object Object]" for objects with a prototype', () => {
+    const tagged = Object.create(Object.create(null), { [Symbol.toStringTag]: { value: 'Foo' } });
+    expectCJSON(() => canonicalize(tagged), 'non-plain-object', ''); // tag is "[object Foo]"
+    const proto = Object.create(null);
+    proto[Symbol.toStringTag] = 'Foo';
+    expectCJSON(() => canonicalize(Object.create(proto)), 'non-plain-object', '');
   });
 });
 
@@ -165,9 +308,9 @@ describe('serializer details', () => {
 
   test('integer-valued floats are integers; -0 and unsafe integers are errors at the right path', () => {
     expect(canonicalize([3.0, 1e3, 2 ** 40, -5e0, 1e20 / 1e19])).toBe('[3,1000,1099511627776,-5,10]');
-    expectCJSON(() => canonicalize({ a: [0, -0] }), 'negative-zero', '$.a[1]');
-    expectCJSON(() => canonicalize([2 ** 53]), 'unsafe-integer', '$[0]');
-    expectCJSON(() => canonicalize(-(2 ** 53)), 'unsafe-integer', '$');
+    expectCJSON(() => canonicalize({ a: [0, -0] }), 'negative-zero', '/a/1');
+    expectCJSON(() => canonicalize([2 ** 53]), 'unsafe-integer', '/0');
+    expectCJSON(() => canonicalize(-(2 ** 53)), 'unsafe-integer', '');
     expect(canonicalize(Number.MAX_SAFE_INTEGER)).toBe('9007199254740991');
     expect(canonicalize(Number.MIN_SAFE_INTEGER)).toBe('-9007199254740991');
   });
@@ -175,11 +318,11 @@ describe('serializer details', () => {
   test('non-integer band: 1e-6 <= |x| < 1e21, exponent text is rejected', () => {
     expect(canonicalize(0.000001)).toBe('0.000001');
     expect(canonicalize(-0.000001)).toBe('-0.000001');
-    expectCJSON(() => canonicalize(0.0000001), 'float-out-of-range', '$');
-    expectCJSON(() => canonicalize(5e-324), 'float-out-of-range', '$');
-    expectCJSON(() => canonicalize(1.5e-10), 'float-out-of-range', '$');
-    expectCJSON(() => canonicalize(Number.MAX_VALUE), 'unsafe-integer', '$');
-    expectCJSON(() => canonicalize(-Infinity), 'infinity', '$');
+    expectCJSON(() => canonicalize(0.0000001), 'float-out-of-range', '');
+    expectCJSON(() => canonicalize(5e-324), 'float-out-of-range', '');
+    expectCJSON(() => canonicalize(1.5e-10), 'float-out-of-range', '');
+    expectCJSON(() => canonicalize(Number.MAX_VALUE), 'unsafe-integer', '');
+    expectCJSON(() => canonicalize(-Infinity), 'infinity', '');
   });
 
   test('string escapes: all C0 controls, quotes, backslash; everything else literal', () => {
@@ -203,61 +346,61 @@ describe('serializer details', () => {
 
   test('lone surrogates (high, low, reversed pair, trailing) are errors with a path', () => {
     for (const s of ['\ud800', '\udc00', '\udc00\ud800', 'x\ud83d', '\ud83dx']) {
-      expectCJSON(() => canonicalize({ a: [s] }), 'lone-surrogate', '$.a[0]');
+      expectCJSON(() => canonicalize({ a: [s] }), 'lone-surrogate', '/a/0');
     }
   });
 
   test('key alphabet: length 1..64, A-Za-z0-9_.:$-, __proto__ rejected', () => {
     expect(canonicalize({ [`a${'b'.repeat(63)}`]: 1 })).toBe(`{"a${'b'.repeat(63)}":1}`);
     expectCJSON(() => canonicalize({ [`a${'b'.repeat(64)}`]: 1 }), 'key-not-allowed');
-    expectCJSON(() => canonicalize({ '': 1 }), 'key-not-allowed', '$.');
-    expectCJSON(() => canonicalize({ 'a b': 1 }), 'key-not-allowed', '$.a b');
+    expectCJSON(() => canonicalize({ '': 1 }), 'key-not-allowed', '/');
+    expectCJSON(() => canonicalize({ 'a b': 1 }), 'key-not-allowed', '/a b');
     expectCJSON(() => canonicalize({ 'a"b': 1 }), 'key-not-allowed');
     expectCJSON(() => canonicalize({ 'a/b': 1 }), 'key-not-allowed');
     expectCJSON(() => canonicalize({ 'a\u0000': 1 }), 'key-not-allowed');
     expect(canonicalize({ 'A.b:c$d-e_f9': 1 })).toBe('{"A.b:c$d-e_f9":1}');
-    expectCJSON(() => canonicalize(JSON.parse('{"x":{"__proto__":1}}')), 'proto-key', '$.x');
+    expectCJSON(() => canonicalize(JSON.parse('{"x":{"__proto__":1}}')), 'proto-key', '/x/__proto__');
   });
 
   test('absent is not null: undefined anywhere is an error', () => {
-    expectCJSON(() => canonicalize(undefined), 'undefined', '$');
-    expectCJSON(() => canonicalize({ a: { b: [1, undefined] } }), 'undefined', '$.a.b[1]');
+    expectCJSON(() => canonicalize(undefined), 'undefined', '');
+    expectCJSON(() => canonicalize({ a: { b: [1, undefined] } }), 'undefined', '/a/b/1');
   });
 
   test('unsupported and non-plain values', () => {
-    expectCJSON(() => canonicalize(() => 1), 'unsupported-type:function', '$');
-    expectCJSON(() => canonicalize(Symbol('s')), 'unsupported-type:symbol', '$');
-    expectCJSON(() => canonicalize(BigInt(2)), 'unsupported-type:bigint', '$');
-    expectCJSON(() => canonicalize(new Set()), 'non-plain-object', '$');
-    expectCJSON(() => canonicalize(new ArrayBuffer(1)), 'non-plain-object', '$');
-    expectCJSON(() => canonicalize(new Float64Array(1)), 'non-plain-object', '$');
-    expectCJSON(() => canonicalize(/x/), 'non-plain-object', '$');
-    expectCJSON(() => canonicalize({ d: new Date(0) }), 'non-plain-object', '$.d');
-    expectCJSON(() => canonicalize(new (class A extends Array {})()), 'non-plain-array', '$');
-    expectCJSON(() => canonicalize(Object.create({ inherited: 1 })), 'non-plain-object', '$');
+    expectCJSON(() => canonicalize(() => 1), 'unsupported-type:function', '');
+    expectCJSON(() => canonicalize(Symbol('s')), 'unsupported-type:symbol', '');
+    expectCJSON(() => canonicalize(BigInt(2)), 'unsupported-type:bigint', '');
+    expectCJSON(() => canonicalize(new Set()), 'non-plain-object', '');
+    expectCJSON(() => canonicalize(new ArrayBuffer(1)), 'non-plain-object', '');
+    expectCJSON(() => canonicalize(new Float64Array(1)), 'non-plain-object', '');
+    expectCJSON(() => canonicalize(/x/), 'non-plain-object', '');
+    expectCJSON(() => canonicalize({ d: new Date(0) }), 'non-plain-object', '/d');
+    expectCJSON(() => canonicalize(new (class A extends Array {})()), 'non-plain-array', '');
+    expectCJSON(() => canonicalize(Object.create({ inherited: 1 })), 'non-plain-object', '');
     expect(canonicalize(Object.create(null))).toBe('{}');
   });
 
   test('accessors, symbol keys, hidden properties and array extras', () => {
-    expectCJSON(() => canonicalize({ get a() { return 1; } }), 'accessor', '$.a'); // prettier-ignore
-    expectCJSON(() => canonicalize({ [Symbol('k')]: 1 }), 'symbol-key', '$');
+    expectCJSON(() => canonicalize({ get a() { return 1; } }), 'accessor', '/a'); // prettier-ignore
+    expectCJSON(() => canonicalize({ [Symbol('k')]: 1 }), 'symbol-key', '');
     const hidden = {};
     Object.defineProperty(hidden, 'h', { value: 1, enumerable: false });
-    expectCJSON(() => canonicalize(hidden), 'hidden-property', '$');
+    expectCJSON(() => canonicalize(hidden), 'hidden-property', '');
     const extra = [1, 2];
     extra.note = 'x';
-    expectCJSON(() => canonicalize(extra), 'array-extra-props', '$');
+    expectCJSON(() => canonicalize(extra), 'array-extra-props', '');
     const symArr = [1];
     symArr[Symbol('s')] = 1;
-    expectCJSON(() => canonicalize(symArr), 'array-extra-props', '$');
-    expectCJSON(() => canonicalize(new Array(3)), 'sparse-array', '$[0]');
+    expectCJSON(() => canonicalize(symArr), 'array-extra-props', '');
+    expectCJSON(() => canonicalize(new Array(3)), 'sparse-array', '/0');
   });
 
   test('depth: 32 nested containers accepted, 33 rejected (arrays and objects), path is the 33rd container', () => {
     expect(() => canonicalize(nested(32))).not.toThrow();
     expect(() => canonicalize(nestedObj(32))).not.toThrow();
-    expectCJSON(() => canonicalize(nested(33)), 'too-deep', `$${'[0]'.repeat(32)}`);
-    expectCJSON(() => canonicalize(nestedObj(33)), 'too-deep', `$${'.k'.repeat(32)}`);
+    expectCJSON(() => canonicalize(nested(33)), 'too-deep', '/0'.repeat(32));
+    expectCJSON(() => canonicalize(nestedObj(33)), 'too-deep', '/k'.repeat(32));
     // The limit counts containers, so an empty innermost container at level 33 is also too deep.
     expectCJSON(() => canonicalize(nested(32, [])), 'too-deep');
     expect(MAX_DEPTH).toBe(32);
@@ -266,11 +409,11 @@ describe('serializer details', () => {
   test('size limits: string <= 1 MiB (UTF-8 bytes), output <= 16 MiB', () => {
     const mib = 1024 * 1024;
     expect(canonicalize('a'.repeat(mib)).length).toBe(mib + 2);
-    expectCJSON(() => canonicalize('a'.repeat(mib + 1)), 'string-too-long', '$');
+    expectCJSON(() => canonicalize('a'.repeat(mib + 1)), 'string-too-long', '');
     expect(() => canonicalize('é'.repeat(mib / 2))).not.toThrow(); // exactly 1 MiB of UTF-8
-    expectCJSON(() => canonicalize({ k: ['é'.repeat(mib / 2 + 1)] }), 'string-too-long', '$.k[0]');
+    expectCJSON(() => canonicalize({ k: ['é'.repeat(mib / 2 + 1)] }), 'string-too-long', '/k/0');
     const big = 'a'.repeat(mib);
-    expectCJSON(() => canonicalize(Array.from({ length: 17 }, () => big)), 'output-too-large', '$');
+    expectCJSON(() => canonicalize(Array.from({ length: 17 }, () => big)), 'too-large', '');
     expect(() => canonicalize(Array.from({ length: 15 }, () => big))).not.toThrow();
   });
 });
@@ -307,14 +450,21 @@ describe('F64 hex helpers (spec 2.2/2.4)', () => {
       '3ff8000000000000',
       'F64:3ff8000000000000',
       'f64:3ff800000000000g',
+      'f64:7ff8000000000001', // NaN with a payload
+      'f64:fff8000000000000', // negative quiet NaN
+      'f64:7ff0000000000001', // signalling NaN
       ' f64:3ff8000000000000',
       '',
       null,
       1.5,
     ]) {
-      expectCJSON(() => f64Decode(bad), 'bad-f64');
+      expectCJSON(() => f64Decode(bad), 'f64-noncanonical');
     }
-    expectCJSON(() => f64Encode('1.5'), 'bad-f64');
+    expect(() => f64Encode('1.5')).toThrow(TypeError);
+  });
+
+  test.each(loadFixture('hash-vectors.json').f64Reject.map((v) => [v.id, v]))('reject vector %s', (_id, v) => {
+    expectCJSON(() => f64Decode(v.input), v.code, '');
   });
 
   test('seeded random bit patterns round trip (bit-exact except NaN payloads)', () => {
@@ -338,9 +488,9 @@ describe('parseCanonical: parse-level rejections', () => {
   const t = (s) => () => parseCanonical(s);
 
   test('spec examples', () => {
-    expectCJSON(t('{"a":1,"a":2}'), 'duplicate-key', '$');
+    expectCJSON(t('{"a":1,"a":2}'), 'duplicate-key', '/a');
     for (const s of ['{ "a": 1 }', '{"b":1,"a":2}', '{"a":1}\n', '{"a":"\\/"}', '{"a":1e2}', '{"a":"\\u0041"}']) {
-      expectCJSON(t(s), 'not-canonical', '$');
+      expectCJSON(t(s), 'not-canonical', '');
     }
   });
 
@@ -348,7 +498,7 @@ describe('parseCanonical: parse-level rejections', () => {
     for (const s of ['1.0', '[1.50]', '[1E2]', '{"a":1} ', ' {"a":1}', '[1, 2]', '{"a":"\\u007f"}', '"\\u00e9"', '[1e0]', '[-1.0]']) {
       const e = thrown(t(s));
       expect(e).toBeInstanceOf(CJSONError);
-      expect(['not-canonical', 'syntax']).toContain(e.code);
+      expect(['not-canonical', 'syntax-error']).toContain(e.code);
     }
     expectCJSON(t('1.0'), 'not-canonical');
     expectCJSON(t('"\\u00e9"'), 'not-canonical');
@@ -357,22 +507,22 @@ describe('parseCanonical: parse-level rejections', () => {
   });
 
   test('duplicate keys are found at any depth, including after escapes decode to the same key', () => {
-    expectCJSON(t('{"a":{"b":1,"b":2}}'), 'duplicate-key', '$.a');
-    expectCJSON(t('[{"x":1,"y":2,"x":3}]'), 'duplicate-key', '$[0]');
-    expectCJSON(t('{"a":1,"\\u0061":2}'), 'duplicate-key', '$');
+    expectCJSON(t('{"a":{"b":1,"b":2}}'), 'duplicate-key', '/a/b');
+    expectCJSON(t('[{"x":1,"y":2,"x":3}]'), 'duplicate-key', '/0/x');
+    expectCJSON(t('{"a":1,"\\u0061":2}'), 'duplicate-key', '/a');
     expect(() => parseCanonical('{"a":{"a":1},"b":{"a":2}}')).not.toThrow(); // same key in different objects is fine
   });
 
   test('values that fail serializer rules surface the serializer code', () => {
-    expectCJSON(t('-0'), 'negative-zero', '$');
-    expectCJSON(t('[0,-0]'), 'negative-zero', '$[1]');
-    expectCJSON(t('1e400'), 'infinity', '$');
-    expectCJSON(t('[9007199254740993]'), 'unsafe-integer', '$[0]');
-    expectCJSON(t('[1e-7]'), 'float-out-of-range', '$[0]');
+    expectCJSON(t('-0'), 'negative-zero', '');
+    expectCJSON(t('[0,-0]'), 'negative-zero', '/1');
+    expectCJSON(t('1e400'), 'infinity', '');
+    expectCJSON(t('[9007199254740993]'), 'unsafe-integer', '/0');
+    expectCJSON(t('[1e-7]'), 'float-out-of-range', '/0');
     expectCJSON(t('{"é":1}'), 'key-not-allowed');
-    expectCJSON(t('{"__proto__":1}'), 'proto-key', '$');
-    expectCJSON(t('{"a":"\\ud800"}'), 'lone-surrogate', '$.a');
-    expectCJSON(t('{"a":"\\udc00x"}'), 'lone-surrogate', '$.a');
+    expectCJSON(t('{"__proto__":1}'), 'proto-key', '/__proto__');
+    expectCJSON(t('{"a":"\\ud800"}'), 'lone-surrogate', '/a');
+    expectCJSON(t('{"a":"\\udc00x"}'), 'lone-surrogate', '/a');
   });
 
   test('syntax errors', () => {
@@ -412,17 +562,18 @@ describe('parseCanonical: parse-level rejections', () => {
       '// c\n1',
       '[undefined]',
     ]) {
-      expectCJSON(t(s), 'syntax');
+      expectCJSON(t(s), 'syntax-error');
     }
-    expectCJSON(t('01'), 'syntax');
+    expectCJSON(t('01'), 'syntax-error');
     expectCJSON(t('[1,\n2]'), 'not-canonical');
   });
 
   test('depth: 32 nested containers parse, 33 are too-deep (no stack overflow on absurd nesting)', () => {
     expect(parseCanonical(`${'['.repeat(32)}0${']'.repeat(32)}`)).toEqual(nested(32));
-    expectCJSON(t(`${'['.repeat(33)}0${']'.repeat(33)}`), 'too-deep', `$${'[0]'.repeat(32)}`);
+    expectCJSON(t(`${'['.repeat(33)}0${']'.repeat(33)}`), 'too-deep', '/0'.repeat(32));
     expectCJSON(t(`${'{"k":'.repeat(33)}0${'}'.repeat(33)}`), 'too-deep');
-    expectCJSON(t('['.repeat(100000)), 'too-deep');
+    expectCJSON(t('['.repeat(100000) + ']'.repeat(100000)), 'too-deep', '/0'.repeat(32));
+    expectCJSON(t('['.repeat(100000)), 'syntax-error'); // a syntax error outranks the earlier depth violation
   });
 
   test('invalid UTF-8 is rejected before parsing', () => {
@@ -451,8 +602,8 @@ describe('parseCanonical: parse-level rejections', () => {
   });
 
   test('UTF-8 byte order mark is not canonical', () => {
-    expectCJSON(() => parseCanonical(new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0x7d])), 'not-canonical', '$');
-    expectCJSON(t('﻿{}'), 'syntax');
+    expectCJSON(() => parseCanonical(new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0x7d])), 'bom', '');
+    expectCJSON(t('\ufeff{}'), 'bom', '');
   });
 
   test('accepts bytes, views with offsets, and strings; returns null-prototype objects', () => {
@@ -478,7 +629,7 @@ describe('parseCanonical: parse-level rejections', () => {
   });
 
   test('output-too-large input is rejected up front', () => {
-    expectCJSON(() => parseCanonical(new Uint8Array(16 * 1024 * 1024 + 1)), 'output-too-large', '$');
+    expectCJSON(() => parseCanonical(new Uint8Array(16 * 1024 * 1024 + 1)), 'too-large', '');
   });
 });
 
