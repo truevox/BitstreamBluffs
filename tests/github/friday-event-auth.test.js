@@ -37,7 +37,7 @@ test('read-only resolver authorizes only a trusted exact-head matching issue com
   const p={pr_number:174,event_name:'issue_comment',action:'created',comment_id:77};
   const good={issue_url:'https://api.github.com/repos/truevox/BitstreamBluffs/issues/174',
     body:signal(),author_association:'OWNER',user:{login:'truevox'}};
-  expect(await resolve(p,{comment:good})).toEqual({key:'issue-79',pr_number:'174',origin_event:'issue_comment',origin_action:'created'});
+  expect(await resolve(p,{comment:good})).toEqual({key:'issue-79',pr_number:'174',origin_event:'issue_comment'});
   expect(await resolve(p,{comment:{...good,author_association:'CONTRIBUTOR'}})).toEqual({});
   expect(await resolve(p,{comment:good,permission:'read'})).toEqual({});
   expect(await resolve(p,{comment:{...good,issue_url:'https://api.github.com/repos/truevox/BitstreamBluffs/issues/999'}})).toEqual({});
@@ -48,7 +48,7 @@ test('read-only resolver authorizes only a trusted exact-head matching issue com
 test('read-only resolver binds actual current-head commented review and rejects unrelated or untrusted reviews',async()=>{
   const p={pr_number:174,event_name:'pull_request_review',action:'submitted',review_id:88};
   const good={state:'COMMENTED',body:signal('PASSED'),commit_id:sha,author_association:'OWNER',user:{login:'truevox'}};
-  expect(await resolve(p,{review:good})).toEqual({key:'issue-79',pr_number:'174',origin_event:'pull_request_review',origin_action:'submitted'});
+  expect(await resolve(p,{review:good})).toEqual({key:'issue-79',pr_number:'174',origin_event:'pull_request_review'});
   expect(await resolve(p,{review:{...good,state:'COMMENTED',body:'arbitrary review'}})).toEqual({});
   expect(await resolve(p,{review:{...good,commit_id:'b'.repeat(40)}})).toEqual({});
   expect(await resolve(p,{review:good,permission:'read'})).toEqual({});
@@ -56,7 +56,7 @@ test('read-only resolver binds actual current-head commented review and rejects 
 
 test('origin run must contain PR number, preventing an untrusted artifact picking a different PR',async()=>{
   const p={pr_number:174,event_name:'pull_request',action:'closed'};
-  expect(await resolve(p,{associated:[174]})).toEqual({key:'issue-79',pr_number:'174',origin_event:'pull_request',origin_action:'closed'});
+  expect(await resolve(p,{associated:[174]})).toEqual({key:'issue-79',pr_number:'174',origin_event:'pull_request'});
   expect(await resolve(p,{associated:[177]})).toEqual({});
   expect(await resolve(p,{associated:[]})).toEqual({});
   expect(await resolve({...p,pr_number:0},{associated:[174]})).toEqual({});

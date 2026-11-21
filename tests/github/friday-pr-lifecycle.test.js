@@ -23,6 +23,7 @@ function api(initial,mode={}){
    listFiles:async({pull_number})=>({data:data.files[pull_number]||[]}),
    listReviews:async({pull_number})=>({data:data.reviews[pull_number]||[]}),
   },
+  git:{getTree:async({tree_sha})=>({data:mode.headTrees?.[tree_sha]||{truncated:false,tree:[]}})},
   issues:{
    get:async({issue_number})=>({data:data.issues.get(issue_number)}),
    createLabel:async()=>({data:{}}),
@@ -75,6 +76,8 @@ describe('Friday issue linking and exact-head review parsing',()=>{
     'Text with `code\nCloses #79\ninside` and no directive',
     '`example`Closes #79',
     'Closes <!-- example -->#79',
+    'Closes <code>example</code>#79',
+    'Cl<pre>example</pre>oses #79',
   ];
   for(const example of examples){
     const x=pr(500,80,{body:`${example}\nRefs #80`,title:'Issue #80'});
@@ -137,6 +140,18 @@ describe('GitHub-native issue and PR label reconciliation',()=>{
    expect(labels(x.data.issues.get(117))).toEqual(['friday:in-progress']);
   }
  });
+ test('unchanged HEAD-tree starter is not allowed to enter review when absent from changed-files list',async()=>{
+  const p=pr(158,117,{body:'Closes #117'}),c=comment(1,msg('REQUEST'));
+  const headTrees={
+    [sha1]:{truncated:false,tree:[{path:'.friday',type:'tree',sha:'starter-folder'}]},
+    'starter-folder':{truncated:false,tree:[{path:'issue-117-start.md',type:'blob'}]},
+  };
+  const x=api({prs:[p],issues:[{number:117,state:'open'}],comments:{158:[c]},files:{158:[]}},
+    {headTrees});
+  await x.fire('issue_comment',notify(158,c));
+  expect(labels(x.data.prs.get(158))).toEqual(['friday:in-progress']);
+  expect(labels(x.data.issues.get(117))).toEqual(['friday:in-progress']);
+ });
  test('a deleted starter marker is NOT present at HEAD; an added/renamed-into marker is present',async()=>{
   for(const [status,expected] of [['removed','friday:in-review'],['added','friday:in-progress'],['renamed','friday:in-progress']]){
     const p=pr(158,117,{body:'<!-- friday-issue: 117 -->',draft:false});
@@ -170,12 +185,14 @@ describe('GitHub-native issue and PR label reconciliation',()=>{
   expect(labels(x.data.issues.get(79))).toEqual(['friday:in-progress']);
   expect(x.data.issues.get(79).state).toBe('open');
  });
- test('explicit full Closes merge to default marks issue done, but stacked branch does not',async()=>{
-  for(const [base,expected] of [['main','closed'],['feature-branch','open']]){
-   const p=pr(158,117,{body:'Closes #117',state:'closed',merged:true,base});const x=api({prs:[p],issues:[{number:117,state:'open'}]});
+ test('Closes merge cannot close issue; GitHub-native closed state may be reflected as done label',async()=>{
+  for(const [issueState,expectedLabel] of [['open','friday:in-progress'],['closed','friday:done']]){
+   const p=pr(158,117,{body:'Closes #117',state:'closed',merged:true});
+   const x=api({prs:[p],issues:[{number:117,state:issueState}]});
    await x.fire('pull_request_target',{action:'closed',pull_request:p});
-   expect(x.data.issues.get(117).state).toBe(expected);
-   expect(labels(x.data.issues.get(117))).toEqual([base==='main'?'friday:done':'friday:in-progress']);
+   expect(x.data.issues.get(117).state).toBe(issueState);
+   expect(labels(x.data.issues.get(117))).toEqual([expectedLabel]);
+   expect(x.data.writes.some(w=>w[0]==='state')).toBe(false);
   }
  });
  test('untrusted chatter or review-origin workflow_run cannot re-close an intentionally reopened issue',async()=>{
@@ -188,12 +205,14 @@ describe('GitHub-native issue and PR label reconciliation',()=>{
     expect(x.data.writes.some(w=>w[0]==='state'&&w[2]==='closed')).toBe(false);
   }
  });
- test('source PR CLOSED event still finalizes explicit full-scope merger',async()=>{
+ test('PR CLOSED event sets merged PR done but never directly closes parent issue',async()=>{
   const merged=pr(158,117,{body:'Closes #117',state:'closed',merged:true});
   const x=api({prs:[merged],issues:[{number:117,state:'open'}]});
   await x.fire('workflow_run',{workflow_run:{event:'pull_request',conclusion:'success'}},'issue-117',
     {prNumber:158,originEvent:'pull_request',originAction:'closed'});
-  expect(x.data.issues.get(117).state).toBe('closed');
+  expect(x.data.issues.get(117).state).toBe('open');
+  expect(labels(x.data.prs.get(158))).toEqual(['friday:done']);
+  expect(x.data.writes.some(w=>w[0]==='state')).toBe(false);
  });
  test('a sibling opened midway through a merge-reconciliation prevents closing the parent',async()=>{
   const merged=pr(158,117,{body:'Closes #117',state:'closed',merged:true});

@@ -14,7 +14,7 @@ const TRUSTED_ASSOCIATIONS = new Set(['OWNER','MEMBER','COLLABORATOR']);
  * code fences, HTML comments, indented code or raw HTML code/pre blocks. */
 function bodyDirectives(body) {
   const markers=[], refs=[];
-  const cleaned=String(body||'').replace(/<(pre|code|script)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, v=>'\n'.repeat((v.match(/\n/g)||[]).length));
+  const cleaned=String(body||'').replace(/<(pre|code|script)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, v=>' [EXCLUDED_HTML] '+'\n'.repeat((v.match(/\n/g)||[]).length)+' [EXCLUDED_HTML] ');
   let fence=null, inComment=false, inlineCode=null;
   for(let line of cleaned.split(/\r?\n/)){
     const delimiter=/^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
@@ -102,13 +102,12 @@ function scoped(scope,file){return scope===file||(scope.endsWith('/**')&&(file==
 function overlaps(a,b){return scoped(a,b)||scoped(b,a);}
 const isActiveStarter=(f)=>f.status!=='removed'&&/^\.friday\/issue-\d+-start\.md$/.test(f.filename);
 
-async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumber=null,originEvent=null,originAction=null}) {
+async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumber=null,originEvent=null}) {
   const {owner,repo}=context.repo;
   const event=context.eventName;
   // The privileged workflow_run carries only a previously validated numeric
   // pointer from an unprivileged workflow. It NEVER executes its artifact.
   const source=originEvent||event;
-  const sourceAction=originAction||context.payload?.action||'';
   const prEvent=source==='pull_request_target'||source==='pull_request';
   const payload=context.payload||{};
   const prNumber=Number.isSafeInteger(resolvedPrNumber)&&resolvedPrNumber>0
@@ -168,7 +167,23 @@ async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumb
     if(desired&&!active.includes(desired))await github.rest.issues.addLabels({owner,repo,issue_number:number,labels:[desired]});
   }
 
-  const commentCache=new Map(),reviewCache=new Map(),fileCache=new Map();
+  const commentCache=new Map(),reviewCache=new Map(),fileCache=new Map(),starterCache=new Map();
+  async function headContainsStarter(p){
+    const sha=p.head?.sha;
+    if(!SHA.test(sha))return true; // refuse to queue a PR with unverified HEAD
+    if(starterCache.has(sha))return starterCache.get(sha);
+    const root=(await github.rest.git.getTree({owner,repo,tree_sha:sha})).data;
+    if(root.truncated||!Array.isArray(root.tree))return true;
+    const directory=root.tree.find(entry=>entry.type==='tree'&&entry.path==='.friday');
+    let present=false;
+    if(directory){
+      const sub=(await github.rest.git.getTree({owner,repo,tree_sha:directory.sha})).data;
+      if(sub.truncated||!Array.isArray(sub.tree))return true;
+      present=sub.tree.some(entry=>entry.type==='blob'&&/^issue-\d+-start\.md$/.test(entry.path));
+    }
+    starterCache.set(sha,present);
+    return present;
+  }
   async function files(p){
     if(!fileCache.has(p.number)) fileCache.set(p.number,await github.paginate(github.rest.pulls.listFiles,
       {owner,repo,pull_number:p.number,per_page:100}));
@@ -177,8 +192,8 @@ async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumb
   async function reviewState(p){
     if(p.draft)return STATES.progress;
     const changes=await files(p);
-    if(changes.some(isActiveStarter)){
-      core.info(`PR #${p.number} still has a starter marker`);return STATES.progress;
+    if(changes.some(isActiveStarter)||await headContainsStarter(p)){
+      core.info(`PR #${p.number} still has a starter marker in its changed files or actual HEAD`);return STATES.progress;
     }
     if(!commentCache.has(p.number))commentCache.set(p.number,await github.paginate(github.rest.issues.listComments,
       {owner,repo,issue_number:p.number,per_page:100}));
@@ -245,20 +260,12 @@ async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumb
   const targetIssueState=states.includes(STATES.review)?STATES.review
     : states.length?STATES.progress
     : pr.state==='closed'&&pr.merged?STATES.progress:STATES.todo;
-  const onDefault=pr.base.ref===(await github.rest.repos.get({owner,repo})).data.default_branch;
-  const complete=pr.state==='closed'&&pr.merged&&onDefault&&prEvent&&sourceAction==='closed'&&explicitlyCloses(pr,issueNumber);
-  // A new sibling might appear while we process a closed PR. Revalidate
-  // immediately before allowing a completed-issue state transition.
-  const closureSiblings=complete?linked(await listOpen()):latestSiblings;
   const issueNow=(await github.rest.issues.get({owner,repo,issue_number:issueNumber})).data;
-  if(complete&&!closureSiblings.length){
-    await setState(issueNumber,issueNow,STATES.done);
-    if(issueNow.state!=='closed')await github.rest.issues.update({owner,repo,issue_number:issueNumber,state:'closed'});
-  }else{
-    if(issueNow.state==='open')await setState(issueNumber,issueNow,
-      closureSiblings.length&&!latestSiblings.length?STATES.progress:targetIssueState);
-    else core.info(`Issue #${issueNumber} is closed; do not reopen it`);
-  }
+  // NEVER close or reopen issues from a workflow_run artifact. GitHub itself
+  // handles Closes/Fixes/Resolves on legitimate default-branch merges; a
+  // human may intentionally reopen one. Our only authority is LABEL state.
+  if(issueNow.state==='open')await setState(issueNumber,issueNow,targetIssueState);
+  else await setState(issueNumber,issueNow,STATES.done);
 
   // Preserve original #153 cross-PR scope overlap advisory on PR transitions.
   // No comment event should cause a full overlap scan or trigger a PR build.
@@ -291,12 +298,13 @@ async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumb
   }
   // Preserve the original lifecycle gate: a PR containing its temporary
   // starter marker cannot be accepted for review, even when someone flips the
-  // GitHub draft switch manually. Labels are reconciled before failing CI.
+  // GitHub draft switch manually. Read-only PR-head CI is enforced by the
+  // collector; this check is only a label-coordination backstop.
   if(prEvent&&pr.state==='open'&&!pr.draft){
     const starter=(await files(pr)).find(isActiveStarter);
     if(starter){core.setFailed('Remove temporary '+starter.filename+' before review');return;}
   }
-  core.info(`#${pr.number} → #${issueNumber}: PR ${pr.state==='open'?currentState:pr.merged?STATES.done:'closed'}, issue ${complete?'complete':targetIssueState}`);
+  core.info(`#${pr.number} → #${issueNumber}: PR ${pr.state==='open'?currentState:pr.merged?STATES.done:'closed'}, issue ${issueNow.state==='closed'?STATES.done:targetIssueState}`);
 }
 
 module.exports={run,getIssueReference,explicitlyCloses,parseReviewSignal};

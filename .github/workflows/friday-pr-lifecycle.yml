@@ -29,7 +29,6 @@ jobs:
       key: ${{ steps.resolve.outputs.key }}
       pr_number: ${{ steps.resolve.outputs.pr_number }}
       origin_event: ${{ steps.resolve.outputs.origin_event }}
-      origin_action: ${{ steps.resolve.outputs.origin_action }}
     steps:
       - name: Check out trusted default-branch routing code only
         uses: actions/checkout@v4
@@ -130,7 +129,6 @@ jobs:
             core.setOutput('key',issue?`issue-${issue}`:`pr-${n}`);
             core.setOutput('pr_number',String(n));
             core.setOutput('origin_event',pointer.event_name);
-            core.setOutput('origin_action',String(pointer.action||''));
   lifecycle:
     needs: resolve_parent
     if: needs.resolve_parent.outputs.key != ''
@@ -167,13 +165,11 @@ jobs:
           EXPECTED_ISSUE_KEY: ${{ needs.resolve_parent.outputs.key }}
           POINTER_PR_NUMBER: ${{ needs.resolve_parent.outputs.pr_number }}
           ORIGINAL_EVENT: ${{ needs.resolve_parent.outputs.origin_event }}
-          ORIGINAL_ACTION: ${{ needs.resolve_parent.outputs.origin_action }}
         with:
           script: |
             await require('./.github/scripts/friday-pr-lifecycle.cjs').run({
               github,context,core,
               expectedKey:process.env.EXPECTED_ISSUE_KEY,
               prNumber:Number(process.env.POINTER_PR_NUMBER),
-              originEvent:process.env.ORIGINAL_EVENT,
-              originAction:process.env.ORIGINAL_ACTION
+              originEvent:process.env.ORIGINAL_EVENT
             });

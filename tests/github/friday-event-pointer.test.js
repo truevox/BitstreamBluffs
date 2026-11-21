@@ -29,13 +29,13 @@ function runSignal(eventName, payload) {
 test('unprivileged collector passes exactly a numeric PR pointer and bounded source event',()=>{
   expect(snippet).toMatch(/Number\.isSafeInteger/);
   expect(runSignal('pull_request',{action:'synchronize',pull_request:{number:174}})).toEqual({
-    pointer:{pr_number:174,event_name:'pull_request',action:'synchronize'},ready:true,
+    pointer:{pr_number:174,event_name:'pull_request'},ready:true,
   });
   expect(runSignal('pull_request_review',{action:'submitted',pull_request:{number:174},review:{id:234,state:'APPROVED'}})).toEqual({
-    pointer:{pr_number:174,event_name:'pull_request_review',action:'submitted',review_id:234},ready:true,
+    pointer:{pr_number:174,event_name:'pull_request_review',review_id:234},ready:true,
   });
   expect(runSignal('issue_comment',{action:'created',issue:{number:174,pull_request:{url:'...'}},comment:{id:456,body:'[GAL FRIDAY REVIEW REQUEST] HEAD '+'a'.repeat(40)}})).toEqual({
-    pointer:{pr_number:174,event_name:'issue_comment',action:'created',comment_id:456},ready:true,
+    pointer:{pr_number:174,event_name:'issue_comment',comment_id:456},ready:true,
   });
 });
 

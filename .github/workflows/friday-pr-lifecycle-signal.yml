@@ -43,7 +43,7 @@ jobs:
             : event.pull_request?.number;
           const number=Number(raw);
           if(!Number.isSafeInteger(number)||number<1||number>999999999)process.exit(0);
-          const pointer={pr_number:number,event_name:kind,action:String(event.action||'')};
+          const pointer={pr_number:number,event_name:kind};
           if(kind==='issue_comment'){
             if(!/^\s*\[GAL FRIDAY REVIEW (?:REQUEST|PASSED|CHANGES REQUESTED)\]/i.test(String(event.comment?.body||'')))process.exit(0);
             const id=Number(event.comment?.id);
