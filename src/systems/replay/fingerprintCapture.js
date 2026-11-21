@@ -127,7 +127,7 @@ function captureSled(sled) {
   const lastPad = sled._lastPad ? padIdentity(sled._lastPad) : null;
   return {
     body: bodyRecord(b),
-    parts: b.parts.filter((p) => p !== b).map(partRecord),
+    parts: b.parts.filter((p) => p.id !== b.id).map(partRecord),
     ctl: {
       msSinceContact: sled.msSinceContact, groundAngleDeg: sled.groundAngleDeg, airtimeMs: sled.airtimeMs,
       hopBufferMs: sled.hopBufferMs, playerHopElapsedMs: sled._playerHopElapsedMs, pushCooldownMs: sled.pushCooldownMs,
@@ -156,9 +156,9 @@ function captureMatter(scene) {
   const bodies = [];
   const staticOrder = [];
   for (const b of engine.detector.bodies) {
-    if (b === sledBody) continue;
+    if (b.id === sledBody.id) continue; // compare by Matter id (stable within one engine), not by object identity
     if (b.isStatic) staticOrder.push({ label: String(b.label), minX: b.bounds.min.x, minY: b.bounds.min.y });
-    else bodies.push({ label: String(b.label), sensor: !!b.isSensor, ...bodyRecord(b), parts: b.parts.filter((q) => q !== b).map(partRecord) });
+    else bodies.push({ label: String(b.label), sensor: !!b.isSensor, ...bodyRecord(b), parts: b.parts.filter((q) => q.id !== b.id).map(partRecord) });
   }
   const pairs = [];
   for (const p of engine.pairs.list) {
