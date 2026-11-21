@@ -1,0 +1,21 @@
+{
+  "id": "bsod-attack",
+  "description": "BSOD chase and catch: hold the brake from tick 0 so the sled stalls near the start and the deletion wall closes and catches it.",
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "startX": 0,
+  "hz": 30,
+  "durationMs": 60000,
+  "input": {
+    "held": [
+      {
+        "key": "brakeHeld",
+        "from": 0,
+        "to": 60000
+      }
+    ],
+    "edges": [],
+    "events": []
+  },
+  "notes": "Verified 2026-11-21 (recorded twice, byte-identical). Braking from tick 0 stalls the sled and the deletion wall closes on it: feature.bsodCaughtTick=6891, minBsodGapPx=1.27 (from ~11345 px), result.crashed=true, cause=\"bsod\", crashTick=6891, endTick=6891, score=45, distance=48 m, xReached=959. A real wall catch from the wall's own gapPx crossing zero, not a scripted crash."
+}

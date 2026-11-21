@@ -1,0 +1,280 @@
+{
+  "id": "long-airborne",
+  "simVersion": {
+    "simTickHz": 120,
+    "runRandomVersion": 1,
+    "ghostTapeFormat": "bb-ghost-tape",
+    "ghostTapeVersion": 1,
+    "ghostPhysicsVersion": 1
+  },
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "hz": 120,
+  "startX": 17900,
+  "durationMs": 5600,
+  "checkpoints": [
+    [
+      0,
+      17899.29829401928,
+      6391.504672292976,
+      0.4113025908114473,
+      5.333333333332121,
+      0,
+      0
+    ],
+    [
+      1000,
+      18251.764191706374,
+      6548.292034851491,
+      0.41188599467073816,
+      6.990798892627936,
+      3.049251823940722,
+      18
+    ],
+    [
+      2000,
+      18625.883520898664,
+      6618.349009918227,
+      0.9773422539921733,
+      5.157807360985316,
+      4.0002357885859965,
+      52
+    ],
+    [
+      3000,
+      18880.76429518006,
+      6800.296129457811,
+      0.9506228688535721,
+      3.3632880196528276,
+      1.347046552793472,
+      189
+    ],
+    [
+      4000,
+      19052.013209380908,
+      7021.673798669289,
+      0.8780117177810549,
+      6.383537563538994,
+      6.402967662470473,
+      521
+    ],
+    [
+      5000,
+      19635.367529309537,
+      7437.514468485265,
+      0.38047691716549925,
+      13.264098361018114,
+      5.353133797605551,
+      550
+    ]
+  ],
+  "result": {
+    "crashed": false,
+    "crashTick": null,
+    "cause": null,
+    "hazardId": null,
+    "score": 774,
+    "distance": 111,
+    "endTick": 672
+  },
+  "stats": {
+    "inputChanges": 8,
+    "airborneTicks": 326,
+    "timeToFirstInputMs": 8.333,
+    "pausedMs": 0,
+    "stallCount": 0,
+    "stallDeltaMs": 0,
+    "ticks": 672,
+    "totalSimMs": 5600,
+    "scoreMean": 221.66666666666666,
+    "scoreMin": 0,
+    "scoreMax": 550,
+    "droppedMs": 0
+  },
+  "origin": {
+    "x": 17900,
+    "y": 6391.5,
+    "ppm": 20
+  },
+  "verification": {
+    "xReached": 20121,
+    "xMinTick": 17902,
+    "yReached": 7542,
+    "frames": 672,
+    "paused": false,
+    "stalled": false
+  },
+  "feature": {
+    "landings": [
+      {
+        "tick": 45,
+        "t": 375,
+        "x": 18014.417061013537,
+        "quality": "good",
+        "airtimeMs": 374.99999999999983,
+        "angleDeg": 14.325322039197573,
+        "impactSpeedPxS": 114.38967857369661,
+        "detail": {
+          "quality": "good",
+          "angleDeg": 14.325322039197573,
+          "impactSpeedPxS": 114.38967857369661,
+          "airtimeMs": 374.99999999999983,
+          "bonusPoints": 0,
+          "bankedPoints": 0,
+          "hard": false,
+          "x": 18014.417061013537,
+          "y": 6440.58403264592,
+          "comboName": "",
+          "comboMult": 1,
+          "flowUsed": 1,
+          "midSpin": false
+        }
+      },
+      {
+        "tick": 478,
+        "t": 3983.333,
+        "x": 19045.616806506063,
+        "quality": "good",
+        "airtimeMs": 2358.333333333365,
+        "angleDeg": 14.167136625219996,
+        "impactSpeedPxS": 289.37221888336285,
+        "detail": {
+          "quality": "good",
+          "angleDeg": 14.167136625219996,
+          "impactSpeedPxS": 289.37221888336285,
+          "airtimeMs": 2358.333333333365,
+          "bonusPoints": 0,
+          "bankedPoints": 323,
+          "hard": false,
+          "x": 19045.616806506063,
+          "y": 7015.350969319039,
+          "comboName": "HELI + AIR BRAKE + PARACHUTE",
+          "comboMult": 1.25,
+          "flowUsed": 1.15,
+          "midSpin": false
+        }
+      }
+    ],
+    "tricks": [
+      {
+        "tick": 276,
+        "t": 2300,
+        "type": "parachute",
+        "count": 1,
+        "value": 51,
+        "airtimeMs": 675.0000000000009
+      },
+      {
+        "tick": 313,
+        "t": 2608.333,
+        "type": "helicopterCW",
+        "count": 1,
+        "value": 111,
+        "airtimeMs": 983.3333333333399
+      },
+      {
+        "tick": 366,
+        "t": 3050,
+        "type": "airBrake",
+        "count": 1,
+        "value": 63,
+        "airtimeMs": 1425.0000000000146
+      }
+    ],
+    "hazardHits": [],
+    "pads": [],
+    "zones": [],
+    "bsodBluffs": [],
+    "airborneEpisodes": [
+      {
+        "startTick": 1,
+        "endTick": 45,
+        "startT": 8.333,
+        "x": 17901.961113309586,
+        "durationMs": 366.667,
+        "airtimeMs": 0
+      },
+      {
+        "startTick": 196,
+        "endTick": 478,
+        "startT": 1633.333,
+        "x": 18507.220765733528,
+        "durationMs": 2350,
+        "airtimeMs": 0
+      }
+    ],
+    "airborneTotalMs": 2716.667,
+    "maxAirtimeMs": 2346,
+    "maxAirtimeTick": 477,
+    "minBsodGapPx": 25457.52,
+    "bsodCaughtTick": null,
+    "startChunk": {
+      "index": 10,
+      "biome": null,
+      "sector": 2,
+      "breather": false,
+      "startX": 17360,
+      "endX": 20112
+    },
+    "lips": [
+      {
+        "x": 1024,
+        "y": 384,
+        "angleDeg": 12,
+        "airS": 0.57,
+        "chunk": 0
+      },
+      {
+        "x": 4464,
+        "y": 1586,
+        "angleDeg": 12,
+        "airS": 0.66,
+        "chunk": 2
+      },
+      {
+        "x": 8704,
+        "y": 3119,
+        "angleDeg": 12,
+        "airS": 0.78,
+        "chunk": 4
+      },
+      {
+        "x": 12560,
+        "y": 4576,
+        "angleDeg": 12,
+        "airS": 0.9,
+        "chunk": 6
+      },
+      {
+        "x": 18464,
+        "y": 6595,
+        "angleDeg": 12,
+        "airS": 1.02,
+        "chunk": 10
+      }
+    ],
+    "lipCrossings": [
+      {
+        "lipX": 18464,
+        "lipAngleDeg": 12,
+        "startTick": 196,
+        "endTick": 478,
+        "x": 18507,
+        "durationMs": 2350,
+        "landX": 19046
+      }
+    ],
+    "slopeKicks": [],
+    "biomeCrossings": [
+      {
+        "tick": 1,
+        "t": 8.333,
+        "x": 17902,
+        "biome": null,
+        "sector": 2,
+        "chunk": 10
+      }
+    ],
+    "_lastBiomeKey": "base"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "stall",
+  "description": "Stalled frame (a background tab returning) mid-run: two 2500 ms display frames, whose backlog the fixed SimClock caps instead of fast-forwarding.",
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "startX": 0,
+  "hz": 60,
+  "durationMs": 5000,
+  "input": {
+    "held": [
+      {
+        "key": "push",
+        "from": 0,
+        "to": 1400
+      }
+    ],
+    "edges": [],
+    "events": [
+      {
+        "atMs": 1500,
+        "do": "stall"
+      },
+      {
+        "atMs": 3500,
+        "do": "stall"
+      }
+    ]
+  },
+  "notes": "Verified 2026-11-21. Two 2500 ms display frames mid-run: stats.stallCount=2, stallDeltaMs=5000, droppedMs=0. The zero is the point - SimClock caps the backlog instead of fast-forwarding, so the fixed-tick sequence is unchanged and the run continues past the lip at x=1024 (landing tick 421, x=1590) to endTick 600 with score=122, distance=125 m, xReached=2490, no crash. A change that made stalls fast-forward would show up here as extra ticks/score."
+}

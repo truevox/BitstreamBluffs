@@ -1,0 +1,21 @@
+{
+  "id": "bump",
+  "description": "Bump / kicker-lip contact: ride into the generated launch lip at x=4688 with no hop and take the natural bump-and-land over it.",
+  "seed": "BUMP0",
+  "biomeMask": 0,
+  "startX": 4400,
+  "hz": 60,
+  "durationMs": 2600,
+  "input": {
+    "held": [
+      {
+        "key": "push",
+        "from": 0,
+        "to": 400
+      }
+    ],
+    "edges": [],
+    "events": []
+  },
+  "notes": "Verified 2026-11-21. Rides into the real generator launch lip at x=4688 and crosses it: feature.lipCrossings=[{lipX:4688, startTick:186, endTick:200, durationMs:116.7, landX:4752}], then lands \"perfect\" at tick 200 (x=4752, impact angle 5.9 deg). No hop input, so the airtime is the terrain's own bump. No crash; score=234, distance=34 m, xReached=5077, endTick=312."
+}

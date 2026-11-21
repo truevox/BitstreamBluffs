@@ -1,0 +1,32 @@
+{
+  "id": "flip-edge",
+  "description": "Borderline flip at touchdown: ride the generated launch lip at x=18464 and hold one front flip so the release sits right on the land/bail-out boundary.",
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "startX": 17600,
+  "hz": 120,
+  "durationMs": 3600,
+  "input": {
+    "held": [
+      {
+        "key": "push",
+        "from": 0,
+        "to": 600
+      },
+      {
+        "key": "tuck",
+        "from": 1200,
+        "to": 2100
+      },
+      {
+        "key": "tilt",
+        "value": 1,
+        "from": 2400,
+        "to": 3100
+      }
+    ],
+    "edges": [],
+    "events": []
+  },
+  "notes": "Verified 2026-11-21 as a genuine land/bail boundary, by sweep rather than assertion. The tape releases one frontflip (frontflip@tick 357) off the lip at x=18464 (lip crossing startTick 268) and lands \"good\" at tick 382 (x=18848, impact angle 24.4 deg, air 958 ms); releasing the same flip one 100 ms input step later lands \"sloppy\" at 69 deg instead. So this canary sits one input step from the bail-out side, which is what makes a small handling change observable. Do not \"fix\" this tape toward a clean landing - the boundary IS the fixture. No crash; score=312, distance=74 m, xReached=19085, endTick=432."
+}

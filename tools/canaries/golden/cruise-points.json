@@ -1,0 +1,296 @@
+{
+  "id": "cruise-points",
+  "simVersion": {
+    "simTickHz": 120,
+    "runRandomVersion": 1,
+    "ghostTapeFormat": "bb-ghost-tape",
+    "ghostTapeVersion": 1,
+    "ghostPhysicsVersion": 1
+  },
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "hz": 60,
+  "startX": 0,
+  "durationMs": 9000,
+  "checkpoints": [
+    [
+      0,
+      -1.2562237372374199,
+      -17.12663300595716,
+      0.16580627893946132,
+      5.333333333333334,
+      0,
+      0
+    ],
+    [
+      1000,
+      352.64011950384514,
+      131.21861033487593,
+      0.41922451276670136,
+      6.9562814168969,
+      3.0971360298811987,
+      15
+    ],
+    [
+      2000,
+      879.1437589273501,
+      365.6331335680646,
+      0.41922449434333287,
+      10.294073065947941,
+      4.583216617622156,
+      41
+    ],
+    [
+      3000,
+      1372.0132833526122,
+      277.8350821013446,
+      0.8843985310318794,
+      6.647041038651878,
+      -1.4143843824322175,
+      66
+    ],
+    [
+      4000,
+      1727.890047528619,
+      536.2451693522048,
+      6.912482525724834,
+      5.201404689358242,
+      9.468147802686872,
+      84
+    ],
+    [
+      5000,
+      2134.4999146423343,
+      938.3778881396231,
+      6.440947951528251,
+      9.988417978694997,
+      1.58200999128303,
+      383
+    ],
+    [
+      6000,
+      2694.2416185765537,
+      1029.6663982722082,
+      6.339765660822225,
+      8.484208975274669,
+      0.5423003162832174,
+      411
+    ],
+    [
+      7000,
+      3172.12766131296,
+      1120.9306905801584,
+      6.429514942076066,
+      7.412687265583372,
+      1.098166488910465,
+      435
+    ],
+    [
+      8000,
+      3607.301106173771,
+      1263.050024503874,
+      6.690356272380022,
+      7.61475157231871,
+      3.274265302488857,
+      457
+    ],
+    [
+      9000,
+      4100.44203941318,
+      1475.0955820234105,
+      6.690356526432972,
+      8.716934058844345,
+      3.7481925000311094,
+      481
+    ]
+  ],
+  "result": {
+    "crashed": false,
+    "crashTick": null,
+    "cause": null,
+    "hazardId": null,
+    "score": 481,
+    "distance": 205,
+    "endTick": 1080
+  },
+  "stats": {
+    "inputChanges": 7,
+    "airborneTicks": 297,
+    "timeToFirstInputMs": 8.333,
+    "pausedMs": 0,
+    "stallCount": 0,
+    "stallDeltaMs": 0,
+    "ticks": 1080,
+    "totalSimMs": 9000,
+    "scoreMean": 237.3,
+    "scoreMin": 0,
+    "scoreMax": 481,
+    "droppedMs": 0
+  },
+  "origin": {
+    "x": 0,
+    "y": -17.13,
+    "ppm": 20
+  },
+  "verification": {
+    "xReached": 4100,
+    "xMinTick": 1,
+    "yReached": 1475,
+    "frames": 540,
+    "paused": false,
+    "stalled": false
+  },
+  "feature": {
+    "landings": [
+      {
+        "tick": 26,
+        "t": 216.667,
+        "x": 66.38763853768222,
+        "quality": "good",
+        "airtimeMs": 216.66666666666674,
+        "angleDeg": 14.673288675290053,
+        "impactSpeedPxS": 12.757026361708725,
+        "detail": {
+          "quality": "good",
+          "angleDeg": 14.673288675290053,
+          "impactSpeedPxS": 12.757026361708725,
+          "airtimeMs": 216.66666666666674,
+          "bonusPoints": 0,
+          "bankedPoints": 0,
+          "hard": false,
+          "x": 66.38763853768222,
+          "y": -0.3021356210708785,
+          "comboName": "",
+          "comboMult": 1,
+          "flowUsed": 1,
+          "midSpin": false
+        }
+      },
+      {
+        "tick": 540,
+        "t": 4500,
+        "x": 1873.1424424225127,
+        "quality": "good",
+        "airtimeMs": 2166.6666666666843,
+        "angleDeg": 14.171991520322308,
+        "impactSpeedPxS": 694.7925648906133,
+        "detail": {
+          "quality": "good",
+          "angleDeg": 14.171991520322308,
+          "impactSpeedPxS": 694.7925648906133,
+          "airtimeMs": 2166.6666666666843,
+          "bonusPoints": 0,
+          "bankedPoints": 279,
+          "hard": true,
+          "x": 1873.1424424225127,
+          "y": 880.9227173864666,
+          "comboName": "FRONTFLIP + AIR BRAKE",
+          "comboMult": 1.25,
+          "flowUsed": 1.15,
+          "midSpin": false
+        }
+      }
+    ],
+    "tricks": [
+      {
+        "tick": 318,
+        "t": 2650,
+        "type": "airBrake",
+        "count": 1,
+        "value": 45,
+        "airtimeMs": 316.6666666666724
+      },
+      {
+        "tick": 427,
+        "t": 3558.333,
+        "type": "frontflip",
+        "count": 1,
+        "value": 149,
+        "airtimeMs": 1225.0000000000223
+      }
+    ],
+    "hazardHits": [],
+    "pads": [],
+    "zones": [
+      {
+        "tick": 708,
+        "t": 5900,
+        "modId": "highBandwidth",
+        "x0": 2639,
+        "x1": 3229
+      }
+    ],
+    "bsodBluffs": [],
+    "airborneEpisodes": [
+      {
+        "startTick": 1,
+        "endTick": 26,
+        "startT": 8.333,
+        "x": 1.4065955530674235,
+        "durationMs": 208.334,
+        "airtimeMs": 0
+      },
+      {
+        "startTick": 281,
+        "endTick": 540,
+        "startT": 2341.667,
+        "x": 1075.4690924182669,
+        "durationMs": 2158.333,
+        "airtimeMs": 0
+      },
+      {
+        "startTick": 672,
+        "endTick": 685,
+        "startT": 5600,
+        "x": 2491.2071996923055,
+        "durationMs": 108.333,
+        "airtimeMs": 0
+      }
+    ],
+    "airborneTotalMs": 2475,
+    "maxAirtimeMs": 2154,
+    "maxAirtimeTick": 539,
+    "minBsodGapPx": 7557.65,
+    "bsodCaughtTick": null,
+    "startChunk": {
+      "index": 0,
+      "biome": null,
+      "sector": 1,
+      "breather": false,
+      "startX": 0,
+      "endX": 2272
+    },
+    "lips": [
+      {
+        "x": 1024,
+        "y": 384,
+        "angleDeg": 12,
+        "airS": 0.57,
+        "chunk": 0
+      }
+    ],
+    "lipCrossings": [
+      {
+        "lipX": 1024,
+        "lipAngleDeg": 12,
+        "startTick": 281,
+        "endTick": 540,
+        "x": 1075,
+        "durationMs": 2158.333,
+        "landX": 1873
+      }
+    ],
+    "slopeKicks": [],
+    "biomeCrossings": [
+      {
+        "tick": 1,
+        "t": 8.333,
+        "x": 1,
+        "biome": null,
+        "sector": 1,
+        "chunk": 0
+      }
+    ],
+    "_lastBiomeKey": "base"
+  }
+}
