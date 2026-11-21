@@ -70,6 +70,9 @@ const isInt = (v) => Number.isSafeInteger(v);
 const isU32 = (v) => isInt(v) && v >= 0 && v <= 0xffffffff;
 const isStr = (v) => typeof v === 'string';
 const nz = (v) => (v === 0 ? 0 : v); // -0 -> 0 (C4)
+/** Refusal detail for ANY value (a null-prototype object cannot be stringified by a template literal). */
+const show = (v) => (typeof v === 'string' ? JSON.stringify(v.length > 40 ? `${v.slice(0, 40)}...` : v)
+  : typeof v === 'number' || typeof v === 'boolean' ? String(v) : v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
 
 function needObj(v, ptr) { if (!isObj(v)) bad(ptr, 'expected object'); return v; }
 function needInt(v, ptr, min = -Infinity) { if (!isInt(v) || v < min) bad(ptr, `expected integer >= ${min}`); return v; }
@@ -219,7 +222,7 @@ function validateCausal(c, isLegacy) {
   const inp = strict(c.input, '/causal/input',
     ['protocol', 'protocolVersion', 'tickHz', 'tiltScale', 'bits', 'endTick', 'edgeRows', 'tapeDigest']);
   if (inp.protocol !== 'bb-pad' || inp.protocolVersion !== 1) {
-    fail('unsupported-input-protocol', '/causal/input/protocol', `${inp.protocol} v${inp.protocolVersion}`);
+    fail('unsupported-input-protocol', '/causal/input/protocol', `${show(inp.protocol)} v${show(inp.protocolVersion)}`);
   }
   needInt(inp.tickHz, '/causal/input/tickHz', 1);
   if (inp.tiltScale !== 127) bad('/causal/input/tiltScale', 'must be 127');
@@ -408,7 +411,7 @@ const f64Pose = (pose, ptr) => {
 };
 
 function laneOf(mode) {
-  if (!LANE_MODES.includes(mode)) fail('evidence-ineligible', '/info/lane/mode', String(mode));
+  if (!LANE_MODES.includes(mode)) fail('evidence-ineligible', '/info/lane/mode', show(mode));
   return { mode, dailyOfficial: mode !== 'normal', dailyMode: mode === 'daily-draft' ? 'draft' : 'classic' };
 }
 
@@ -491,7 +494,7 @@ export function buildManifest(runContext) {
  */
 export function legacyManifestFromTape(tape) {
   if (!isObj(tape) || tape.format !== 'bb-ghost-tape') bad('/format', 'not a bb-ghost-tape');
-  if (tape.version !== 1) fail('unsupported-format-version', '/version', String(tape.version));
+  if (tape.version !== 1) fail('unsupported-format-version', '/version', show(tape.version));
   if (!Array.isArray(tape.inputs)) bad('/inputs', 'missing');
   if (!isInt(tape.endTick) || tape.endTick < 0) bad('/endTick', 'expected integer >= 0');
   const lane = laneOf(tape.mode === undefined ? 'normal' : tape.mode);
@@ -630,13 +633,18 @@ export function validateEvidenceBundle(input, rulesetResolver = null, opts = {})
 
 /**
  * What a replay uses instead of the clock, the live profile and the live registry flags. `source` is a manifest or a
- * tape (new header, or an older tape). `opts.rules` is the daily rule table of the ruleset in use (array of
- * `{id, modifiers}`).
+ * tape (new header, or an older tape). `opts.rules` is the daily rule table in use (array of `{id, modifiers}`).
  *
- * Defaults for values an older tape never recorded (deterministic, never live): `syncLevel` -> 1, `magnetsDrop` -> false
- * (tapes without the field predate magnets), absent Kodiak fields -> bears off, `dailyRuleId` null -> no rule.
+ * Values an older tape never recorded get a deterministic default that is NEVER read from the live profile, and the
+ * name of each is listed in `defaulted` so strict verification / #117 can report reduced guarantees:
+ *  - `magnetsDrop` absent -> true. Ghost tapes (da8935a) predate the Sync Level 5 magnet gate (3b6b961, which added the
+ *    header field); until then magnets always dropped, so a tape without the field was recorded with magnets ON;
+ *  - kodiak fields absent -> bears off (Kodiaks, 44e291c, postdate every such tape): listed as `kodiak` for legacy sources;
+ *  - `syncLevel` absent -> 1 (not recorded before this contract; the true level is unknowable): `syncLevel`;
+ *  - `dailyRuleId` absent/null -> no rule: `dailyRule`.
  * @returns {{dailyRuleId:string, dailyRule:object|null, syncLevel:number, magnetsDrop:boolean, kodiaksOn:boolean,
- *   kodiakPackMode:string, upgradeRanks:object, boosts:string[], bsodGym:false, dailyOfficial:false, dailyMode:'classic'}}
+ *   kodiakPackMode:string, upgradeRanks:object, boosts:string[], bsodGym:false, dailyOfficial:false, dailyMode:'classic',
+ *   defaulted:string[]}}
  * @throws {ManifestError} unknown-daily-rule (R-1: an id the rule table lacks)
  */
 export function resolveReplaySetup(source, opts = {}) {
@@ -645,8 +653,9 @@ export function resolveReplaySetup(source, opts = {}) {
   let f;
   if (source.format === MANIFEST_FORMAT) {
     const c = source.causal;
+    const legacy = Boolean(source.info && source.info.provenance === 'legacy-derived');
     f = { dailyRuleId: c.course.dailyRuleId, syncLevel: c.bsod.syncLevel, magnetsDrop: c.loadout.magnetsDrop,
-      kodiak: c.kodiak ? { enabled: c.kodiak.enabled, packMode: c.kodiak.packMode } : null,
+      kodiak: c.kodiak ? { enabled: c.kodiak.enabled, packMode: c.kodiak.packMode } : null, kodiakAbsentIsDefault: legacy,
       upgradeRanks: c.loadout.upgradeRanks, boosts: c.loadout.boosts };
   } else {
     // A tape (new header or older): read it directly; replay must keep working for tapes the evidence rules would refuse.
@@ -656,22 +665,29 @@ export function resolveReplaySetup(source, opts = {}) {
       magnetsDrop: typeof t.magnetsDrop === 'boolean' ? t.magnetsDrop : null,
       kodiak: typeof t.kodiaksOn === 'boolean'
         ? { enabled: t.kodiaksOn, packMode: t.kodiakPackMode === 'mixed' ? 'mixed' : 'same' } : null,
+      kodiakAbsentIsDefault: true,
       upgradeRanks: t.upgradeRanks && typeof t.upgradeRanks === 'object' ? t.upgradeRanks : {},
       boosts: Array.isArray(t.boosts) ? t.boosts : [] };
   }
+  const defaulted = [];
+  if (f.dailyRuleId === null) defaulted.push('dailyRule');
   const id = f.dailyRuleId === null ? 'none' : f.dailyRuleId;
   let rule = null;
   if (id !== 'none') {
     rule = rules.find((r) => r && r.id === id) || null;
-    if (!rule) fail('unknown-daily-rule', '/causal/course/dailyRuleId', id);
+    if (!rule) fail('unknown-daily-rule', '/causal/course/dailyRuleId', show(id));
   }
+  if (f.syncLevel === null) defaulted.push('syncLevel');
+  if (f.magnetsDrop === null) defaulted.push('magnetsDrop');
+  if (!f.kodiak && f.kodiakAbsentIsDefault) defaulted.push('kodiak');
   return {
     dailyRuleId: id, dailyRule: rule,
     syncLevel: f.syncLevel === null ? 1 : f.syncLevel,
-    magnetsDrop: f.magnetsDrop === true,
+    magnetsDrop: f.magnetsDrop === null ? true : f.magnetsDrop === true,
     kodiaksOn: f.kodiak ? f.kodiak.enabled === true : false,
     kodiakPackMode: f.kodiak ? f.kodiak.packMode : 'same',
     upgradeRanks: { ...f.upgradeRanks }, boosts: [...f.boosts],
     bsodGym: false, dailyOfficial: false, dailyMode: 'classic',
+    defaulted,
   };
 }
