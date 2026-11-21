@@ -89,6 +89,7 @@ const HAZARD_MOTION_NUMERIC = [
 /**
  * One entry per causal source module. `exports`: name -> `{at: path | path[], omit?: string[]}` (include; `omit` keys are
  * removed at any depth) or `{exclude: reason}`. `statics`: the same for non-function static members of an exported class.
+ * `excludePatterns`: `{pattern: RegExp, reason}` exclusions by name pattern (each must match at least one export).
  * `at` paths are dotted, relative to the ruleset document root; two entries may never share a path.
  */
 export const RULESET_SOURCES = Object.freeze([
@@ -108,13 +109,16 @@ export const RULESET_SOURCES = Object.freeze([
       TARGET_FPS: exc('display frame-rate target; the simulation steps at SIM_TICK_HZ independent of frames (#59)'),
       GLITCH: exc('visual glitch-effect timing (GlitchDirector), presentation only'),
       TIMING: exc('informational UX budgets (crash to Game Over, boot time); not trajectory-relevant'),
-      MODDED_RUNS_RANKED: exc('ranking policy read only through Ranking.js; eligibility is a scoreboard concern, never replay'),
       PALETTE_KEYS: exc('palette vocabulary, presentation'),
       PALETTE_NAMES: exc('palette vocabulary, presentation'),
       SCENES: exc('scene keys, application plumbing'),
       REG: exc('registry keys, application plumbing'),
       STORAGE: exc('persistence names, application plumbing'),
     },
+    // Matched by pattern, not by name: tests/src/modded-ranking.test.js forbids naming the ranking constant outside Ranking.js.
+    excludePatterns: [
+      { pattern: /^MODDED_RUNS_/, reason: 'ranking policy read only through Ranking.js; eligibility is a scoreboard concern, never replay' },
+    ],
   },
   {
     id: 'physicsTuner',
@@ -289,6 +293,7 @@ const isData = (v) => typeof v !== 'function' && typeof v !== 'symbol' && typeof
 export function classifyExports(source, ns) {
   const unregistered = [];
   const seen = new Set();
+  const patterns = source.excludePatterns || [];
   for (const name of Object.keys(ns)) {
     const v = ns[name];
     if (typeof v === 'function') {
@@ -303,9 +308,10 @@ export function classifyExports(source, ns) {
     }
     if (!isData(v)) continue;
     seen.add(name);
-    if (!(name in source.exports)) unregistered.push(name);
+    if (!(name in source.exports) && !patterns.some((p) => p.pattern.test(name))) unregistered.push(name);
   }
   const stale = [];
+  for (const p of patterns) if (!Object.keys(ns).some((n) => typeof ns[n] !== 'function' && p.pattern.test(n))) stale.push(String(p.pattern));
   for (const name of Object.keys(source.exports)) if (!(name in ns) || typeof ns[name] === 'function') stale.push(name);
   for (const [cls, members] of Object.entries(source.statics || {})) {
     for (const m of Object.keys(members)) if (!seen.has(`${cls}.${m}`)) stale.push(`${cls}.${m}`);
