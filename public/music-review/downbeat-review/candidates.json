@@ -7,7 +7,9 @@
     "frameCount": 8380800,
     "manifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
     "candidateReportSha256": "6696cf5e9b07089ad1cefd171110efb96fd38b228902f48b0786a416d6aa9024",
-    "harmonicReportSha256": "8e922b017e7819983392227fe296b890e0b608b953fbaf7799c736ee01bf8c34"
+    "harmonicReportSha256": "8e922b017e7819983392227fe296b890e0b608b953fbaf7799c736ee01bf8c34",
+    "globalPhaseReportSha256": "f869ebf715abfc7c2131bde4ed35cffd0a642f69ea1712bf6f127ce8e1be886c",
+    "phaseMotionReportSha256": "6f98cc4dd8dfc4b2833b779a3b7348e0e49886bd0fb65ae7f2ea903d3b5fa9dc"
   },
   "originalSegmentCount": 15,
   "note": "All 15 source segments analyzed; shorter 6.6-second ending has reduced evidence; all downbeats are unverified",
@@ -20,6 +22,14 @@
         "piano": "e7d12b2bcf44c00b332077c186cb26801f1df99e4c673713023b4e8f6ee8a942",
         "other": "58f7018cd10e641a6ac04da4b65bd2c7354385a2e41fc380fd35028cf2236004",
         "vocals": "6fb623636afd3bc2dbd861890dea68c57f66f18adbafa66a379b85e616443acc"
+      },
+      "phaseReview": {
+        "uncertainTransitionCount": 0,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 0,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
       },
       "segmentIndex": 0,
       "startSeconds": 0.0,
@@ -1116,6 +1126,14 @@
         "other": "2098051300b8f0d295fc6695afe45ba14fad310740bc776ddb764e98533e15d4",
         "vocals": "080ef45dcc1695b9e24e17cb1e4c9b4e6ed12849a2523ff3f6c980bdba80f9ec"
       },
+      "phaseReview": {
+        "uncertainTransitionCount": 1,
+        "stableCandidateCount": 1,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
+      },
       "segmentIndex": 1,
       "startSeconds": 12.0,
       "endSeconds": 24.0,
@@ -2206,6 +2224,14 @@
         "piano": "17cc9224cf4251bbe60673bd2362051d2e088da7877d1d3c29e80e057bfe1a1d",
         "other": "26b2fe3d5a1d82717614907ff0a0d91838eaa94ac8562bca59ce33cc5e1d3154",
         "vocals": "7079941de7c6cbca6522a339dea61fe15c87aa7d0a2d25aaa388e6e2769aff61"
+      },
+      "phaseReview": {
+        "uncertainTransitionCount": 1,
+        "stableCandidateCount": 1,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
       },
       "segmentIndex": 2,
       "startSeconds": 24.0,
@@ -3302,6 +3328,14 @@
         "other": "04d742de9577a9c651d27e7b1b36fecee96e12040ee1561ec7ef2badbac53187",
         "vocals": "d0d1b6d4084171ff7b89398534c7c8da0cb809671237f8126e936855d97273ea"
       },
+      "phaseReview": {
+        "uncertainTransitionCount": 2,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
+      },
       "segmentIndex": 3,
       "startSeconds": 36.0,
       "endSeconds": 48.0,
@@ -4396,6 +4430,14 @@
         "other": "2c5802577dc33688c199d43d887877c1bf8f317456e66a5b16dabe31886727d8",
         "vocals": "96c816a122b1f1d268bfed91011e2661a2376654bdaac9dfaeafe8a1894efd1f"
       },
+      "phaseReview": {
+        "uncertainTransitionCount": 2,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
+      },
       "segmentIndex": 4,
       "startSeconds": 48.0,
       "endSeconds": 60.0,
@@ -5489,6 +5531,14 @@
         "other": "a3a8db00430eb440897b2a112e68adb1f3f0b12aab7114da4ac99f8dd1ab24c4",
         "vocals": "14841fa35be262511f210f279dc2652876782c583465626eb29ecbc0e8da0532"
       },
+      "phaseReview": {
+        "uncertainTransitionCount": 2,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
+      },
       "segmentIndex": 5,
       "startSeconds": 60.0,
       "endSeconds": 72.0,
@@ -6580,6 +6630,14 @@
         "other": "e44ce643ca8d6c87c695cbbb4fb13bb7bc6f0567612f79bd056d6a9b3a7cc1a0",
         "vocals": "ac66f2b9a476ff74fab3443a8de66c7933919febaf0e829c5827e11ddfb364b0"
       },
+      "phaseReview": {
+        "uncertainTransitionCount": 1,
+        "stableCandidateCount": 1,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
+      },
       "segmentIndex": 6,
       "startSeconds": 72.0,
       "endSeconds": 84.0,
@@ -7670,6 +7728,14 @@
         "piano": "d7c460e5492f078cb5b21a1e71c7efa9b383629b8b63f1dbb957c5b73dbfb80d",
         "other": "ec8bb292cc512c118eed2e112e4abd068f54dddce55446566fb68c11283d29ad",
         "vocals": "3032f66069864cb2b5877782850dae21e7e7f3e44d0035357c3116265738bffa"
+      },
+      "phaseReview": {
+        "uncertainTransitionCount": 2,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
       },
       "segmentIndex": 7,
       "startSeconds": 84.0,
@@ -8763,6 +8829,14 @@
         "piano": "a8704cc03d8d14ca642afb5e44d9ff9fb3f14cca3462ff1105d1e7ced3db61a5",
         "other": "a0f215e8ee5bda9cdfaf57a4872fef4eba9c6842414f885335248f12a9127366",
         "vocals": "6a168c9d6fabad3fcf7d04b58b088a44d5c2d157034e559e2fc00322994ec98e"
+      },
+      "phaseReview": {
+        "uncertainTransitionCount": 2,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
       },
       "segmentIndex": 8,
       "startSeconds": 96.0,
@@ -9859,6 +9933,14 @@
         "other": "1ac57eb4b1bace48e1830866d5c7d9362e5d46ca224803224e9f711df674e893",
         "vocals": "1ff794e7e4aea0b8728bcbcc54aea46a6a2ed13b415b84b32e250e724aba7800"
       },
+      "phaseReview": {
+        "uncertainTransitionCount": 2,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
+      },
       "segmentIndex": 9,
       "startSeconds": 108.0,
       "endSeconds": 120.0,
@@ -10951,6 +11033,14 @@
         "piano": "7024e69551bd8c0a49c3afb91c68575c0056f1cfd6be77196603f74e60acebcc",
         "other": "a5b778202caa93806e5d970d354b339bf71ce42c44e9770e615603d7919700a5",
         "vocals": "a5ec09a92b5ce77e221e9d1a32675c73aa2b1b50da8102a2bd3f3b57761c9b15"
+      },
+      "phaseReview": {
+        "uncertainTransitionCount": 2,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
       },
       "segmentIndex": 10,
       "startSeconds": 120.0,
@@ -12045,6 +12135,14 @@
         "other": "f714461071e438a7e54c7b3d2c4e0bc721eb1ff22eaefd7b032e1efd58e28dbb",
         "vocals": "fb4f20210f547dbed5e195f75736ae163fa006e18764883ab70709f3ba096fb9"
       },
+      "phaseReview": {
+        "uncertainTransitionCount": 1,
+        "stableCandidateCount": 1,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
+      },
       "segmentIndex": 11,
       "startSeconds": 132.0,
       "endSeconds": 144.0,
@@ -13138,6 +13236,14 @@
         "other": "0f51f34a97e7ef0efe1299e6fbcde9b641095312445b1180842f8e589f19ef08",
         "vocals": "c1b8a36073de00ad642e6c700b677c6eb30d913e78bd80dfd993316e06136a33"
       },
+      "phaseReview": {
+        "uncertainTransitionCount": 1,
+        "stableCandidateCount": 1,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
+      },
       "segmentIndex": 12,
       "startSeconds": 144.0,
       "endSeconds": 156.0,
@@ -14230,6 +14336,14 @@
         "piano": "8e02849c50e4e3483f962c5f1c35fc7f31892303bf1e8b047d5f3833c7c1e34f",
         "other": "3a805617a053e857e1587e514cd50b4187c7fbd2ade3a4b63be1663b08dc9d57",
         "vocals": "7ad226d7750398e8338ab0b18927120a34931f82268439b59b9015d93f0b2062"
+      },
+      "phaseReview": {
+        "uncertainTransitionCount": 2,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 2,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
       },
       "segmentIndex": 13,
       "startSeconds": 156.0,
@@ -15326,6 +15440,14 @@
         "piano": "93aefb1ebe8f066093380cebf8537dd30bf9c9e2e21d6551620d22d09ebfc314",
         "other": "fd0cb9fc9cdefc83217288648ec995f142499fe6e1b8047247c14758ddd4b5a7",
         "vocals": "8a54ee7dd362df37f79c50504374d89d8e709bce8e6d956215709c79c0fda779"
+      },
+      "phaseReview": {
+        "uncertainTransitionCount": 1,
+        "stableCandidateCount": 0,
+        "motionCandidateCount": 0,
+        "transitionsCovered": 1,
+        "candidateOnly": true,
+        "phraseOrMeterVerified": false
       },
       "segmentIndex": 14,
       "startSeconds": 168.0,

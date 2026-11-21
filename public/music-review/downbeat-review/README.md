@@ -10,6 +10,7 @@ or ship source-aligned bar metadata on the strength of this page alone.
 - Reads the current **original** `public/music/packs/33_local-one-more-run-bitstream-bluffs/pack.json`.
 - **Checks SHA-256 of each of the six original OGG stems at audition time**;
   a tampered or mismatched audio response fails closed before decoding.
+- Also shows source-bound **rhythmic phase-continuity uncertainty** per segment. The new analysis found 22/27 transitions without sufficient multi-stem corroboration, five with stable candidate phase, and zero with a corroborated shared change. This is a failure to *prove* drift, **not proof of steady tempo**. Every phase summary is tied to original-pack, baseline, harmonic, and whole-source research SHA-256 fingerprints.
 - Displays separate, explicitly unverified **guitar/piano/other pitch-class change**
   rankings for the selected tempo/phase/beat-one offset, including when the
   harmonic cues *disagree* with drum/bass accent rankings. These derived

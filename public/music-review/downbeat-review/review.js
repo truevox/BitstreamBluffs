@@ -45,6 +45,14 @@ function refreshCandidate() {
 			+ candidateHarmony.stemSupport + '/3. Best harmony offset: '
 			+ h[0].beatOneOffset + '. Selected strongest source change cues: ' + peaks + '.'
 		: 'No source-bound harmonic cue comparison available for this phase.';
+	const phase = c.window.phaseReview;
+	$('phaseEvidence').textContent = phase && phase.candidateOnly && !phase.phraseOrMeterVerified
+		? 'SOURCE PHASE CONTINUITY (UNVERIFIED): ' + phase.transitionsCovered
+			+ ' nearby analysis transitions; ' + phase.uncertainTransitionCount
+			+ ' insufficient multi-stem evidence, ' + phase.stableCandidateCount
+			+ ' locally stable candidates and ' + phase.motionCandidateCount
+			+ ' possible common-motion candidates. These are not verified musical beats, tempo drift or bar positions.'
+		: 'No source-verified phase continuity analysis available; do not assume fixed tempo or approved beat one.';
 	refreshNotes();
 }
 function refreshOffsets() {

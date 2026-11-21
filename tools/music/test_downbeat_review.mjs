@@ -72,6 +72,36 @@ test('meter accents are exclusive, regular, and remain inside the source time wi
 	assert.throws(() => clicksForCandidate({ ...args, beatOneOffset: 4 }));
 });
 
+test('review carries phase uncertainty without promoting candidate source rhythm', () => {
+	const phaseFile = fs.readFileSync(new URL(
+		'docs/music-review/one-more-run-source-phase-motion-UNVERIFIED-20261121.json',root));
+	const globalFile = fs.readFileSync(new URL(
+		'docs/music-review/one-more-run-global-pulse-coherence-UNVERIFIED-20261121.json',root));
+	const phase = JSON.parse(phaseFile), global = JSON.parse(globalFile);
+	assert.equal(digest(phaseFile),packet.source.phaseMotionReportSha256);
+	assert.equal(digest(globalFile),packet.source.globalPhaseReportSha256);
+	assert.equal(phase.globalRhythmReportSha256,digest(globalFile));
+	assert.equal(phase.status,'RESEARCH_ONLY_PHASE_MOTION_NO_SOURCE_BEAT_APPROVAL');
+	assert.equal(global.status,'NO_VERIFIED_MUSICAL_BEATS_OR_TEMPO_DRIFT');
+	assert.equal(phase.sourceManifestSha256,packet.source.manifestSha256);
+	assert.equal(phase.priorReportSha256,packet.source.candidateReportSha256);
+	assert.equal(phase.harmonicReportSha256,packet.source.harmonicReportSha256);
+	const counts = packet.windows.reduce((tot,w) => {
+		const p=w.phaseReview;
+		assert.equal(p.candidateOnly,true);
+		assert.equal(p.phraseOrMeterVerified,false);
+		assert.equal(p.transitionsCovered,
+			p.uncertainTransitionCount+p.stableCandidateCount+p.motionCandidateCount);
+		return {
+			uncertain:tot.uncertain+p.uncertainTransitionCount,
+			stable:tot.stable+p.stableCandidateCount,
+			motion:tot.motion+p.motionCandidateCount,
+			coverage:tot.coverage+p.transitionsCovered
+		};
+	},{uncertain:0,stable:0,motion:0,coverage:0});
+	assert.deepEqual(counts,{uncertain:22,stable:5,motion:0,coverage:27});
+});
+
 test('harmonic comparison remains explicitly uncertain and source-hash bound', () => {
 	assert.equal(digest(harmonicBuffer), packet.source.harmonicReportSha256);
 	assert.equal(harmony.manifestSha256, packet.source.manifestSha256);

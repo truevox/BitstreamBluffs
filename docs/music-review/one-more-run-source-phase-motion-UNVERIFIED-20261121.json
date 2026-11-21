@@ -1,0 +1,3030 @@
+{
+  "format": "bitstream-original-stems-phase-motion-UNVERIFIED-v1",
+  "status": "RESEARCH_ONLY_PHASE_MOTION_NO_SOURCE_BEAT_APPROVAL",
+  "sourceId": "local-one-more-run-bitstream-bluffs",
+  "sourceManifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
+  "priorReportSha256": "6696cf5e9b07089ad1cefd171110efb96fd38b228902f48b0786a416d6aa9024",
+  "harmonicReportSha256": "8e922b017e7819983392227fe296b890e0b608b953fbaf7799c736ee01bf8c34",
+  "globalRhythmReportSha256": "f869ebf715abfc7c2131bde4ed35cffd0a642f69ea1712bf6f127ce8e1be886c",
+  "originalStemSha256": {
+    "0": {
+      "drums": "0040ca6cfa771eab0a57593daedcbe72aeee40b7c858e5933bfc23bd0876416b",
+      "bass": "f7506c0bdadeda0bce72666b6506229977345c28b9fe0b884e7c1758dc78131a",
+      "guitar": "f713af2ef6da6a6ff9fcd677c94563f0155d1435ae92d3f7cb8b2b76e3e89f6b",
+      "piano": "e7d12b2bcf44c00b332077c186cb26801f1df99e4c673713023b4e8f6ee8a942",
+      "other": "58f7018cd10e641a6ac04da4b65bd2c7354385a2e41fc380fd35028cf2236004"
+    },
+    "1": {
+      "drums": "83df34a57c0bbe07ca7e010ec6c4cd6417831fcd26e9229ecbc9758b6a246f30",
+      "bass": "89bc022b9aa9a3d79d629ba7f40be351dde63fec45fe174c6aa9be5b17525625",
+      "guitar": "7421f013389fcda9ba69a8bc51eaa8f4baedc1af3ae4051c34d24a364ef33d11",
+      "piano": "947de7fd2dc2eb8930f48ff26e0c55bdc9f0f599e425797a03c7887d85df577e",
+      "other": "2098051300b8f0d295fc6695afe45ba14fad310740bc776ddb764e98533e15d4"
+    },
+    "2": {
+      "drums": "3be96dba7b2c7db369170c4cde59d086713646c8272a21e751833125395e84d8",
+      "bass": "8e17b4c5ade45e7b701329b246a83b682c5eb69987f52691062cfac2d574c3d6",
+      "guitar": "3928233a1681e060c934ddb97e6c1d843fb74345e64a6f8a5dca6b093d878d03",
+      "piano": "17cc9224cf4251bbe60673bd2362051d2e088da7877d1d3c29e80e057bfe1a1d",
+      "other": "26b2fe3d5a1d82717614907ff0a0d91838eaa94ac8562bca59ce33cc5e1d3154"
+    },
+    "3": {
+      "drums": "b08312601acbbc5cc69403a883a25067231e567d880f012ab710f3ca89c69484",
+      "bass": "157d136e5dca7b4c89e0c3d7da1204044e083093eb3ea7e4ce6a06ff3e70bfd2",
+      "guitar": "8afe08ffb978a627a6d49586887ffd34693ad57e39ed7a533fda6800cd48050d",
+      "piano": "a52e2475a999af7f1b406c1e1fe5f5ab24470918a5203b47fa9f32c2aae48542",
+      "other": "04d742de9577a9c651d27e7b1b36fecee96e12040ee1561ec7ef2badbac53187"
+    },
+    "4": {
+      "drums": "a8a7ca42426d21f9d8dc7309b3207e20998b59c4751dd3e215077d6e4720698d",
+      "bass": "78c699bee87e8637ce258859e54e9147ee1edec15eb2b2a488a00771bcc6a46b",
+      "guitar": "6edc12d5a35edad022199cd1b46ec6ea9c80ca64f75c4b81b8816aba5d491f47",
+      "piano": "120b14bb5268c43d5acc4b05de7cccf07ebbdde905c20095c939900477a275f5",
+      "other": "2c5802577dc33688c199d43d887877c1bf8f317456e66a5b16dabe31886727d8"
+    },
+    "5": {
+      "drums": "2039d22ef1c626c2d1c1d279ff0afb2240329ca32ffcbe87f258c72ff2961c57",
+      "bass": "2e00c8626cf9f67cf23d3a324e8eda81797a5f34722fbe2e1edc0b85512b1ba5",
+      "guitar": "57f16a43e342b11ada6928e3f38edde7e84d7b3750864cff4e60839ee8b9d979",
+      "piano": "a336bf2a889a17262a316eaebe1a958b89661e072369d77024e9d404702aee10",
+      "other": "a3a8db00430eb440897b2a112e68adb1f3f0b12aab7114da4ac99f8dd1ab24c4"
+    },
+    "6": {
+      "drums": "8e4ac58c3c5a97f74c389d5eb63095482aee81c661f43f259eb758cbe114850b",
+      "bass": "a734fb1487761229e5f8be4bb7d1401e31b5bf2d02daf92ca1c4ca9c652cd706",
+      "guitar": "cf14a7517dc3faa2bcde0a5f356a36a8a290d888bb7a19309f260de5d2b2de9b",
+      "piano": "fd23d15c36377663eb34ae93a78a6a5c1722f77d855f9bc4283674001b15d0a3",
+      "other": "e44ce643ca8d6c87c695cbbb4fb13bb7bc6f0567612f79bd056d6a9b3a7cc1a0"
+    },
+    "7": {
+      "drums": "c66e7a06ca1f079c14d3253a75dd029e5b1cc0d1e0a1fba357dffaf16e5d42aa",
+      "bass": "a82a8c36ed736bef197ed7b566dcb0762df83817a6c40158e2057ede124e6743",
+      "guitar": "5fbef1a3f2e4fa9c7834f562bb40bfa5abcb95cacd0bd7ae62bc9193ca2c13a5",
+      "piano": "d7c460e5492f078cb5b21a1e71c7efa9b383629b8b63f1dbb957c5b73dbfb80d",
+      "other": "ec8bb292cc512c118eed2e112e4abd068f54dddce55446566fb68c11283d29ad"
+    },
+    "8": {
+      "drums": "b78e7621444becba0c84d035c3e88ff7f4cbdb823a42cc809c9321601e72e5c1",
+      "bass": "e4742a6b5e4eb6a76a3d9685a30bd054866d06714e58e083bd56e96e3f34d8dc",
+      "guitar": "116f180e85e0c5258770ad421fa2cbc6a0c5aa444bd44222eef89a22f73962a9",
+      "piano": "a8704cc03d8d14ca642afb5e44d9ff9fb3f14cca3462ff1105d1e7ced3db61a5",
+      "other": "a0f215e8ee5bda9cdfaf57a4872fef4eba9c6842414f885335248f12a9127366"
+    },
+    "9": {
+      "drums": "4646aefeb54ec9d9e36c28c73ab06a312cf4dfcc847cd7082504d934fcbb9709",
+      "bass": "2434ddb6820898b73e0a71c2b931cab3574d977f7aca0ea49d567f4d65b73901",
+      "guitar": "6b26258e7de312cbcdc1b802ffb03ed6077db7c5a556cdb09212c504fdc6593b",
+      "piano": "ca813d9c635682b3e9325e278e5821ac1c1961df54a05414019728f193075387",
+      "other": "1ac57eb4b1bace48e1830866d5c7d9362e5d46ca224803224e9f711df674e893"
+    },
+    "10": {
+      "drums": "0e9c06dd8a9473bf61874914b0ea3f49ed8b948021cfd52505b57fac78fc7fe9",
+      "bass": "90c71c886ebfd9e64243c9465cd574e54d5e03a33655bf74d212e9fa20fd1d61",
+      "guitar": "c00a9ad5f69c3c91c5e2d57ab74424a6e3ef09c82c6f474c4a673309f44f8a8f",
+      "piano": "7024e69551bd8c0a49c3afb91c68575c0056f1cfd6be77196603f74e60acebcc",
+      "other": "a5b778202caa93806e5d970d354b339bf71ce42c44e9770e615603d7919700a5"
+    },
+    "11": {
+      "drums": "231642c281dd12911dab7d66fb5e1a4de7373d2aaa563401cf0299a86b021b1b",
+      "bass": "357b70a235e06be7465d923c20ff42f214a904d2d14b927aacad675718c7b10c",
+      "guitar": "8143630b9070ef5fe9cd969a11d650f783efa21e6b82272aa432c2cf46245722",
+      "piano": "498e024aca25b369c560624932b8bdd40a9a799a501d5db20b24a0c951203ff2",
+      "other": "f714461071e438a7e54c7b3d2c4e0bc721eb1ff22eaefd7b032e1efd58e28dbb"
+    },
+    "12": {
+      "drums": "bb27549104eba7dfe040e835c985bdf48ead1ec109ac57c833766dfaf487eb23",
+      "bass": "5b07c43222977ab628b0fdeb26e4f8793e0362e21f350104520f8b19bb519eb9",
+      "guitar": "a26ca1a69c4b1a71c3bf6d45c8480ab6678739f7cbcb08bb39d6b5de600c8b1b",
+      "piano": "382df49bd9afb5cdab8b573b0417c81756478a808631a3211034f33707a8bdf5",
+      "other": "0f51f34a97e7ef0efe1299e6fbcde9b641095312445b1180842f8e589f19ef08"
+    },
+    "13": {
+      "drums": "2d4f6e9ed4ca9b6cb9a03975f2d7c724fba64e4ce141d9cc89e8a33d82e359da",
+      "bass": "0b00c9bdf99315f1d91e0d204b53585175800110f296a015b143390af2603409",
+      "guitar": "85b31af0ccbc7fc3c88b06e983379a531207170fc6fb21c32ccdaa44aab0599d",
+      "piano": "8e02849c50e4e3483f962c5f1c35fc7f31892303bf1e8b047d5f3833c7c1e34f",
+      "other": "3a805617a053e857e1587e514cd50b4187c7fbd2ade3a4b63be1663b08dc9d57"
+    },
+    "14": {
+      "drums": "be7d2bf56dab6d49798171a0384be93363093e4dc8091c19357b68b4492b6be0",
+      "bass": "d6a1a9301636bb6c8cfd0b932f077d0f44247df21a7411e0f6a87e783119c935",
+      "guitar": "047429e35db2e0953fce9b950e2f8e3d289147a88c664655ab454c0537e54ca7",
+      "piano": "93aefb1ebe8f066093380cebf8537dd30bf9c9e2e21d6551620d22d09ebfc314",
+      "other": "fd0cb9fc9cdefc83217288648ec995f142499fe6e1b8047247c14758ddd4b5a7"
+    }
+  },
+  "sourceFrameCount": 8380800,
+  "sampleRate": 48000,
+  "rhythmicReferenceBpmHypothesis": 163.8,
+  "sourceTimeWindowSeconds": 18,
+  "sourceTimeHopSeconds": 6,
+  "minimumPerSourcePhaseCoherence": 0.1,
+  "perStemSourcePhase": {
+    "drums": [
+      {
+        "startSeconds": 0,
+        "endSeconds": 18,
+        "centerSeconds": 9.0,
+        "relativePhaseRadians": 1.586721,
+        "relativePhaseBeats": 0.252534,
+        "coherence": 0.151359,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 6,
+        "endSeconds": 24,
+        "centerSeconds": 15.0,
+        "relativePhaseRadians": 1.362795,
+        "relativePhaseBeats": 0.216896,
+        "coherence": 0.280212,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 12,
+        "endSeconds": 30,
+        "centerSeconds": 21.0,
+        "relativePhaseRadians": 1.270305,
+        "relativePhaseBeats": 0.202175,
+        "coherence": 0.432266,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 18,
+        "endSeconds": 36,
+        "centerSeconds": 27.0,
+        "relativePhaseRadians": 1.143168,
+        "relativePhaseBeats": 0.181941,
+        "coherence": 0.367768,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 24,
+        "endSeconds": 42,
+        "centerSeconds": 33.0,
+        "relativePhaseRadians": 0.943287,
+        "relativePhaseBeats": 0.150129,
+        "coherence": 0.332444,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 30,
+        "endSeconds": 48,
+        "centerSeconds": 39.0,
+        "relativePhaseRadians": 0.722021,
+        "relativePhaseBeats": 0.114913,
+        "coherence": 0.308944,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 36,
+        "endSeconds": 54,
+        "centerSeconds": 45.0,
+        "relativePhaseRadians": 0.631303,
+        "relativePhaseBeats": 0.100475,
+        "coherence": 0.30904,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 42,
+        "endSeconds": 60,
+        "centerSeconds": 51.0,
+        "relativePhaseRadians": 0.504903,
+        "relativePhaseBeats": 0.080358,
+        "coherence": 0.280343,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 48,
+        "endSeconds": 66,
+        "centerSeconds": 57.0,
+        "relativePhaseRadians": 0.655612,
+        "relativePhaseBeats": 0.104344,
+        "coherence": 0.290507,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 54,
+        "endSeconds": 72,
+        "centerSeconds": 63.0,
+        "relativePhaseRadians": 0.75759,
+        "relativePhaseBeats": 0.120574,
+        "coherence": 0.306084,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 60,
+        "endSeconds": 78,
+        "centerSeconds": 69.0,
+        "relativePhaseRadians": 0.912295,
+        "relativePhaseBeats": 0.145196,
+        "coherence": 0.359746,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 66,
+        "endSeconds": 84,
+        "centerSeconds": 75.0,
+        "relativePhaseRadians": 0.852163,
+        "relativePhaseBeats": 0.135626,
+        "coherence": 0.255764,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 72,
+        "endSeconds": 90,
+        "centerSeconds": 81.0,
+        "relativePhaseRadians": 0.817261,
+        "relativePhaseBeats": 0.130071,
+        "coherence": 0.264441,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 78,
+        "endSeconds": 96,
+        "centerSeconds": 87.0,
+        "relativePhaseRadians": 0.792575,
+        "relativePhaseBeats": 0.126142,
+        "coherence": 0.209276,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 84,
+        "endSeconds": 102,
+        "centerSeconds": 93.0,
+        "relativePhaseRadians": 0.960793,
+        "relativePhaseBeats": 0.152915,
+        "coherence": 0.234856,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 90,
+        "endSeconds": 108,
+        "centerSeconds": 99.0,
+        "relativePhaseRadians": 0.800555,
+        "relativePhaseBeats": 0.127412,
+        "coherence": 0.175086,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 96,
+        "endSeconds": 114,
+        "centerSeconds": 105.0,
+        "relativePhaseRadians": 0.880819,
+        "relativePhaseBeats": 0.140187,
+        "coherence": 0.195887,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 102,
+        "endSeconds": 120,
+        "centerSeconds": 111.0,
+        "relativePhaseRadians": 0.904632,
+        "relativePhaseBeats": 0.143977,
+        "coherence": 0.236243,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 108,
+        "endSeconds": 126,
+        "centerSeconds": 117.0,
+        "relativePhaseRadians": 1.044053,
+        "relativePhaseBeats": 0.166166,
+        "coherence": 0.262747,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 114,
+        "endSeconds": 132,
+        "centerSeconds": 123.0,
+        "relativePhaseRadians": 0.986351,
+        "relativePhaseBeats": 0.156983,
+        "coherence": 0.184108,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 120,
+        "endSeconds": 138,
+        "centerSeconds": 129.0,
+        "relativePhaseRadians": 1.100791,
+        "relativePhaseBeats": 0.175196,
+        "coherence": 0.168833,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 126,
+        "endSeconds": 144,
+        "centerSeconds": 135.0,
+        "relativePhaseRadians": 1.126182,
+        "relativePhaseBeats": 0.179237,
+        "coherence": 0.252078,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 132,
+        "endSeconds": 150,
+        "centerSeconds": 141.0,
+        "relativePhaseRadians": 1.359042,
+        "relativePhaseBeats": 0.216298,
+        "coherence": 0.294078,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 138,
+        "endSeconds": 156,
+        "centerSeconds": 147.0,
+        "relativePhaseRadians": 1.413207,
+        "relativePhaseBeats": 0.224919,
+        "coherence": 0.262463,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 144,
+        "endSeconds": 162,
+        "centerSeconds": 153.0,
+        "relativePhaseRadians": 1.654375,
+        "relativePhaseBeats": 0.263302,
+        "coherence": 0.202456,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 150,
+        "endSeconds": 168,
+        "centerSeconds": 159.0,
+        "relativePhaseRadians": 1.456648,
+        "relativePhaseBeats": 0.231833,
+        "coherence": 0.212432,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 156,
+        "endSeconds": 174,
+        "centerSeconds": 165.0,
+        "relativePhaseRadians": 1.409853,
+        "relativePhaseBeats": 0.224385,
+        "coherence": 0.234242,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 162,
+        "endSeconds": 174.62,
+        "centerSeconds": 168.31,
+        "relativePhaseRadians": 1.395318,
+        "relativePhaseBeats": 0.222072,
+        "coherence": 0.256235,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      }
+    ],
+    "bass": [
+      {
+        "startSeconds": 0,
+        "endSeconds": 18,
+        "centerSeconds": 9.0,
+        "relativePhaseRadians": -0.793642,
+        "relativePhaseBeats": -0.126312,
+        "coherence": 0.062354,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 6,
+        "endSeconds": 24,
+        "centerSeconds": 15.0,
+        "relativePhaseRadians": -1.989372,
+        "relativePhaseBeats": -0.316618,
+        "coherence": 0.104519,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 12,
+        "endSeconds": 30,
+        "centerSeconds": 21.0,
+        "relativePhaseRadians": -2.579812,
+        "relativePhaseBeats": -0.41059,
+        "coherence": 0.163083,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 18,
+        "endSeconds": 36,
+        "centerSeconds": 27.0,
+        "relativePhaseRadians": -2.956629,
+        "relativePhaseBeats": -0.470562,
+        "coherence": 0.076488,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 24,
+        "endSeconds": 42,
+        "centerSeconds": 33.0,
+        "relativePhaseRadians": 2.268477,
+        "relativePhaseBeats": 0.361039,
+        "coherence": 0.080765,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 30,
+        "endSeconds": 48,
+        "centerSeconds": 39.0,
+        "relativePhaseRadians": 1.918123,
+        "relativePhaseBeats": 0.305279,
+        "coherence": 0.046824,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 36,
+        "endSeconds": 54,
+        "centerSeconds": 45.0,
+        "relativePhaseRadians": -2.955558,
+        "relativePhaseBeats": -0.470392,
+        "coherence": 0.065543,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 42,
+        "endSeconds": 60,
+        "centerSeconds": 51.0,
+        "relativePhaseRadians": -0.074557,
+        "relativePhaseBeats": -0.011866,
+        "coherence": 0.078363,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 48,
+        "endSeconds": 66,
+        "centerSeconds": 57.0,
+        "relativePhaseRadians": -1.455677,
+        "relativePhaseBeats": -0.231678,
+        "coherence": 0.009647,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 54,
+        "endSeconds": 72,
+        "centerSeconds": 63.0,
+        "relativePhaseRadians": 2.764287,
+        "relativePhaseBeats": 0.43995,
+        "coherence": 0.030534,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 60,
+        "endSeconds": 78,
+        "centerSeconds": 69.0,
+        "relativePhaseRadians": 3.128972,
+        "relativePhaseBeats": 0.497991,
+        "coherence": 0.17905,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 66,
+        "endSeconds": 84,
+        "centerSeconds": 75.0,
+        "relativePhaseRadians": 3.11113,
+        "relativePhaseBeats": 0.495152,
+        "coherence": 0.157062,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 72,
+        "endSeconds": 90,
+        "centerSeconds": 81.0,
+        "relativePhaseRadians": -3.04265,
+        "relativePhaseBeats": -0.484253,
+        "coherence": 0.117045,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 78,
+        "endSeconds": 96,
+        "centerSeconds": 87.0,
+        "relativePhaseRadians": 2.926735,
+        "relativePhaseBeats": 0.465804,
+        "coherence": 0.065968,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 84,
+        "endSeconds": 102,
+        "centerSeconds": 93.0,
+        "relativePhaseRadians": 2.710405,
+        "relativePhaseBeats": 0.431374,
+        "coherence": 0.04978,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 90,
+        "endSeconds": 108,
+        "centerSeconds": 99.0,
+        "relativePhaseRadians": 2.177978,
+        "relativePhaseBeats": 0.346636,
+        "coherence": 0.041838,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 96,
+        "endSeconds": 114,
+        "centerSeconds": 105.0,
+        "relativePhaseRadians": 2.706232,
+        "relativePhaseBeats": 0.43071,
+        "coherence": 0.04711,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 102,
+        "endSeconds": 120,
+        "centerSeconds": 111.0,
+        "relativePhaseRadians": 2.934561,
+        "relativePhaseBeats": 0.46705,
+        "coherence": 0.023129,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 108,
+        "endSeconds": 126,
+        "centerSeconds": 117.0,
+        "relativePhaseRadians": -3.061539,
+        "relativePhaseBeats": -0.487259,
+        "coherence": 0.103219,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 114,
+        "endSeconds": 132,
+        "centerSeconds": 123.0,
+        "relativePhaseRadians": -2.322246,
+        "relativePhaseBeats": -0.369597,
+        "coherence": 0.07204,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 120,
+        "endSeconds": 138,
+        "centerSeconds": 129.0,
+        "relativePhaseRadians": -2.497018,
+        "relativePhaseBeats": -0.397413,
+        "coherence": 0.195658,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 126,
+        "endSeconds": 144,
+        "centerSeconds": 135.0,
+        "relativePhaseRadians": -2.094786,
+        "relativePhaseBeats": -0.333396,
+        "coherence": 0.13197,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 132,
+        "endSeconds": 150,
+        "centerSeconds": 141.0,
+        "relativePhaseRadians": -2.76904,
+        "relativePhaseBeats": -0.440706,
+        "coherence": 0.128403,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 138,
+        "endSeconds": 156,
+        "centerSeconds": 147.0,
+        "relativePhaseRadians": -3.085451,
+        "relativePhaseBeats": -0.491065,
+        "coherence": 0.105912,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 144,
+        "endSeconds": 162,
+        "centerSeconds": 153.0,
+        "relativePhaseRadians": 2.834718,
+        "relativePhaseBeats": 0.451159,
+        "coherence": 0.10348,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 150,
+        "endSeconds": 168,
+        "centerSeconds": 159.0,
+        "relativePhaseRadians": 2.399826,
+        "relativePhaseBeats": 0.381944,
+        "coherence": 0.046974,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 156,
+        "endSeconds": 174,
+        "centerSeconds": 165.0,
+        "relativePhaseRadians": 2.620305,
+        "relativePhaseBeats": 0.417034,
+        "coherence": 0.082677,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 162,
+        "endSeconds": 174.62,
+        "centerSeconds": 168.31,
+        "relativePhaseRadians": 2.720308,
+        "relativePhaseBeats": 0.43295,
+        "coherence": 0.114256,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      }
+    ],
+    "guitar": [
+      {
+        "startSeconds": 0,
+        "endSeconds": 18,
+        "centerSeconds": 9.0,
+        "relativePhaseRadians": 0.132716,
+        "relativePhaseBeats": 0.021122,
+        "coherence": 0.103879,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 6,
+        "endSeconds": 24,
+        "centerSeconds": 15.0,
+        "relativePhaseRadians": -2.691403,
+        "relativePhaseBeats": -0.42835,
+        "coherence": 0.027635,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 12,
+        "endSeconds": 30,
+        "centerSeconds": 21.0,
+        "relativePhaseRadians": -2.63885,
+        "relativePhaseBeats": -0.419986,
+        "coherence": 0.106725,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 18,
+        "endSeconds": 36,
+        "centerSeconds": 27.0,
+        "relativePhaseRadians": -2.752766,
+        "relativePhaseBeats": -0.438116,
+        "coherence": 0.099246,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 24,
+        "endSeconds": 42,
+        "centerSeconds": 33.0,
+        "relativePhaseRadians": -3.037476,
+        "relativePhaseBeats": -0.483429,
+        "coherence": 0.116551,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 30,
+        "endSeconds": 48,
+        "centerSeconds": 39.0,
+        "relativePhaseRadians": -3.058359,
+        "relativePhaseBeats": -0.486753,
+        "coherence": 0.113783,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 36,
+        "endSeconds": 54,
+        "centerSeconds": 45.0,
+        "relativePhaseRadians": -2.944287,
+        "relativePhaseBeats": -0.468598,
+        "coherence": 0.089073,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 42,
+        "endSeconds": 60,
+        "centerSeconds": 51.0,
+        "relativePhaseRadians": -2.843438,
+        "relativePhaseBeats": -0.452547,
+        "coherence": 0.053527,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 48,
+        "endSeconds": 66,
+        "centerSeconds": 57.0,
+        "relativePhaseRadians": -2.979531,
+        "relativePhaseBeats": -0.474207,
+        "coherence": 0.051534,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 54,
+        "endSeconds": 72,
+        "centerSeconds": 63.0,
+        "relativePhaseRadians": -2.759505,
+        "relativePhaseBeats": -0.439189,
+        "coherence": 0.176976,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 60,
+        "endSeconds": 78,
+        "centerSeconds": 69.0,
+        "relativePhaseRadians": -2.547863,
+        "relativePhaseBeats": -0.405505,
+        "coherence": 0.210996,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 66,
+        "endSeconds": 84,
+        "centerSeconds": 75.0,
+        "relativePhaseRadians": -2.437101,
+        "relativePhaseBeats": -0.387877,
+        "coherence": 0.143355,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 72,
+        "endSeconds": 90,
+        "centerSeconds": 81.0,
+        "relativePhaseRadians": -2.474325,
+        "relativePhaseBeats": -0.393801,
+        "coherence": 0.091036,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 78,
+        "endSeconds": 96,
+        "centerSeconds": 87.0,
+        "relativePhaseRadians": -2.764015,
+        "relativePhaseBeats": -0.439907,
+        "coherence": 0.06699,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 84,
+        "endSeconds": 102,
+        "centerSeconds": 93.0,
+        "relativePhaseRadians": -3.098867,
+        "relativePhaseBeats": -0.4932,
+        "coherence": 0.059229,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 90,
+        "endSeconds": 108,
+        "centerSeconds": 99.0,
+        "relativePhaseRadians": 3.025993,
+        "relativePhaseBeats": 0.481602,
+        "coherence": 0.055884,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 96,
+        "endSeconds": 114,
+        "centerSeconds": 105.0,
+        "relativePhaseRadians": 2.83058,
+        "relativePhaseBeats": 0.450501,
+        "coherence": 0.050152,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 102,
+        "endSeconds": 120,
+        "centerSeconds": 111.0,
+        "relativePhaseRadians": 2.199674,
+        "relativePhaseBeats": 0.350089,
+        "coherence": 0.051523,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 108,
+        "endSeconds": 126,
+        "centerSeconds": 117.0,
+        "relativePhaseRadians": 3.021029,
+        "relativePhaseBeats": 0.480812,
+        "coherence": 0.070925,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 114,
+        "endSeconds": 132,
+        "centerSeconds": 123.0,
+        "relativePhaseRadians": 3.055863,
+        "relativePhaseBeats": 0.486356,
+        "coherence": 0.068147,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 120,
+        "endSeconds": 138,
+        "centerSeconds": 129.0,
+        "relativePhaseRadians": -1.113193,
+        "relativePhaseBeats": -0.17717,
+        "coherence": 0.077191,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 126,
+        "endSeconds": 144,
+        "centerSeconds": 135.0,
+        "relativePhaseRadians": -0.595276,
+        "relativePhaseBeats": -0.094741,
+        "coherence": 0.046304,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 132,
+        "endSeconds": 150,
+        "centerSeconds": 141.0,
+        "relativePhaseRadians": -0.85258,
+        "relativePhaseBeats": -0.135692,
+        "coherence": 0.029313,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 138,
+        "endSeconds": 156,
+        "centerSeconds": 147.0,
+        "relativePhaseRadians": -0.596834,
+        "relativePhaseBeats": -0.094989,
+        "coherence": 0.025776,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 144,
+        "endSeconds": 162,
+        "centerSeconds": 153.0,
+        "relativePhaseRadians": -1.014009,
+        "relativePhaseBeats": -0.161385,
+        "coherence": 0.042869,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 150,
+        "endSeconds": 168,
+        "centerSeconds": 159.0,
+        "relativePhaseRadians": -1.290757,
+        "relativePhaseBeats": -0.20543,
+        "coherence": 0.02275,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 156,
+        "endSeconds": 174,
+        "centerSeconds": 165.0,
+        "relativePhaseRadians": -2.47842,
+        "relativePhaseBeats": -0.394453,
+        "coherence": 0.042767,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 162,
+        "endSeconds": 174.62,
+        "centerSeconds": 168.31,
+        "relativePhaseRadians": 3.01518,
+        "relativePhaseBeats": 0.479881,
+        "coherence": 0.06837,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      }
+    ],
+    "piano": [
+      {
+        "startSeconds": 0,
+        "endSeconds": 18,
+        "centerSeconds": 9.0,
+        "relativePhaseRadians": -1.636941,
+        "relativePhaseBeats": -0.260527,
+        "coherence": 0.123983,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 6,
+        "endSeconds": 24,
+        "centerSeconds": 15.0,
+        "relativePhaseRadians": -1.940712,
+        "relativePhaseBeats": -0.308874,
+        "coherence": 0.366508,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 12,
+        "endSeconds": 30,
+        "centerSeconds": 21.0,
+        "relativePhaseRadians": -1.993621,
+        "relativePhaseBeats": -0.317295,
+        "coherence": 0.777289,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 18,
+        "endSeconds": 36,
+        "centerSeconds": 27.0,
+        "relativePhaseRadians": -2.058683,
+        "relativePhaseBeats": -0.32765,
+        "coherence": 0.547853,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 24,
+        "endSeconds": 42,
+        "centerSeconds": 33.0,
+        "relativePhaseRadians": -2.663266,
+        "relativePhaseBeats": -0.423872,
+        "coherence": 0.145805,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 30,
+        "endSeconds": 48,
+        "centerSeconds": 39.0,
+        "relativePhaseRadians": 2.760751,
+        "relativePhaseBeats": 0.439387,
+        "coherence": 0.072307,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 36,
+        "endSeconds": 54,
+        "centerSeconds": 45.0,
+        "relativePhaseRadians": 2.804129,
+        "relativePhaseBeats": 0.446291,
+        "coherence": 0.066243,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 42,
+        "endSeconds": 60,
+        "centerSeconds": 51.0,
+        "relativePhaseRadians": 0.066201,
+        "relativePhaseBeats": 0.010536,
+        "coherence": 0.049361,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 48,
+        "endSeconds": 66,
+        "centerSeconds": 57.0,
+        "relativePhaseRadians": 2.219563,
+        "relativePhaseBeats": 0.353254,
+        "coherence": 0.037255,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 54,
+        "endSeconds": 72,
+        "centerSeconds": 63.0,
+        "relativePhaseRadians": 2.262849,
+        "relativePhaseBeats": 0.360144,
+        "coherence": 0.054333,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 60,
+        "endSeconds": 78,
+        "centerSeconds": 69.0,
+        "relativePhaseRadians": 2.745255,
+        "relativePhaseBeats": 0.436921,
+        "coherence": 0.151861,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 66,
+        "endSeconds": 84,
+        "centerSeconds": 75.0,
+        "relativePhaseRadians": 2.778242,
+        "relativePhaseBeats": 0.442171,
+        "coherence": 0.086424,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 72,
+        "endSeconds": 90,
+        "centerSeconds": 81.0,
+        "relativePhaseRadians": 2.712089,
+        "relativePhaseBeats": 0.431642,
+        "coherence": 0.064953,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 78,
+        "endSeconds": 96,
+        "centerSeconds": 87.0,
+        "relativePhaseRadians": 1.558754,
+        "relativePhaseBeats": 0.248083,
+        "coherence": 0.02398,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 84,
+        "endSeconds": 102,
+        "centerSeconds": 93.0,
+        "relativePhaseRadians": 1.191901,
+        "relativePhaseBeats": 0.189697,
+        "coherence": 0.061507,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 90,
+        "endSeconds": 108,
+        "centerSeconds": 99.0,
+        "relativePhaseRadians": 1.14323,
+        "relativePhaseBeats": 0.181951,
+        "coherence": 0.068269,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 96,
+        "endSeconds": 114,
+        "centerSeconds": 105.0,
+        "relativePhaseRadians": 1.175427,
+        "relativePhaseBeats": 0.187075,
+        "coherence": 0.066968,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 102,
+        "endSeconds": 120,
+        "centerSeconds": 111.0,
+        "relativePhaseRadians": 1.321145,
+        "relativePhaseBeats": 0.210267,
+        "coherence": 0.05931,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 108,
+        "endSeconds": 126,
+        "centerSeconds": 117.0,
+        "relativePhaseRadians": 1.707444,
+        "relativePhaseBeats": 0.271748,
+        "coherence": 0.061352,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 114,
+        "endSeconds": 132,
+        "centerSeconds": 123.0,
+        "relativePhaseRadians": 1.373012,
+        "relativePhaseBeats": 0.218522,
+        "coherence": 0.069097,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 120,
+        "endSeconds": 138,
+        "centerSeconds": 129.0,
+        "relativePhaseRadians": -2.734772,
+        "relativePhaseBeats": -0.435252,
+        "coherence": 0.049939,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 126,
+        "endSeconds": 144,
+        "centerSeconds": 135.0,
+        "relativePhaseRadians": -2.311223,
+        "relativePhaseBeats": -0.367843,
+        "coherence": 0.163039,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 132,
+        "endSeconds": 150,
+        "centerSeconds": 141.0,
+        "relativePhaseRadians": -2.593207,
+        "relativePhaseBeats": -0.412722,
+        "coherence": 0.182945,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 138,
+        "endSeconds": 156,
+        "centerSeconds": 147.0,
+        "relativePhaseRadians": -2.782331,
+        "relativePhaseBeats": -0.442822,
+        "coherence": 0.15644,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 144,
+        "endSeconds": 162,
+        "centerSeconds": 153.0,
+        "relativePhaseRadians": 3.129268,
+        "relativePhaseBeats": 0.498038,
+        "coherence": 0.097386,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 150,
+        "endSeconds": 168,
+        "centerSeconds": 159.0,
+        "relativePhaseRadians": 1.246266,
+        "relativePhaseBeats": 0.198349,
+        "coherence": 0.0858,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 156,
+        "endSeconds": 174,
+        "centerSeconds": 165.0,
+        "relativePhaseRadians": 1.414883,
+        "relativePhaseBeats": 0.225186,
+        "coherence": 0.053353,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 162,
+        "endSeconds": 174.62,
+        "centerSeconds": 168.31,
+        "relativePhaseRadians": 1.739418,
+        "relativePhaseBeats": 0.276837,
+        "coherence": 0.060867,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      }
+    ],
+    "other": [
+      {
+        "startSeconds": 0,
+        "endSeconds": 18,
+        "centerSeconds": 9.0,
+        "relativePhaseRadians": -1.896289,
+        "relativePhaseBeats": -0.301804,
+        "coherence": 0.089669,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 6,
+        "endSeconds": 24,
+        "centerSeconds": 15.0,
+        "relativePhaseRadians": -2.084755,
+        "relativePhaseBeats": -0.331799,
+        "coherence": 0.289057,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 12,
+        "endSeconds": 30,
+        "centerSeconds": 21.0,
+        "relativePhaseRadians": -2.17824,
+        "relativePhaseBeats": -0.346678,
+        "coherence": 0.401317,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 18,
+        "endSeconds": 36,
+        "centerSeconds": 27.0,
+        "relativePhaseRadians": -2.399019,
+        "relativePhaseBeats": -0.381816,
+        "coherence": 0.17288,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 24,
+        "endSeconds": 42,
+        "centerSeconds": 33.0,
+        "relativePhaseRadians": 2.813094,
+        "relativePhaseBeats": 0.447718,
+        "coherence": 0.07287,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 30,
+        "endSeconds": 48,
+        "centerSeconds": 39.0,
+        "relativePhaseRadians": 1.824042,
+        "relativePhaseBeats": 0.290305,
+        "coherence": 0.075106,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 36,
+        "endSeconds": 54,
+        "centerSeconds": 45.0,
+        "relativePhaseRadians": 1.935069,
+        "relativePhaseBeats": 0.307976,
+        "coherence": 0.062649,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 42,
+        "endSeconds": 60,
+        "centerSeconds": 51.0,
+        "relativePhaseRadians": 0.632652,
+        "relativePhaseBeats": 0.10069,
+        "coherence": 0.119322,
+        "passesCoherenceGate": true,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 48,
+        "endSeconds": 66,
+        "centerSeconds": 57.0,
+        "relativePhaseRadians": 0.828896,
+        "relativePhaseBeats": 0.131923,
+        "coherence": 0.087744,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 54,
+        "endSeconds": 72,
+        "centerSeconds": 63.0,
+        "relativePhaseRadians": 1.215962,
+        "relativePhaseBeats": 0.193526,
+        "coherence": 0.098005,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 60,
+        "endSeconds": 78,
+        "centerSeconds": 69.0,
+        "relativePhaseRadians": 1.958512,
+        "relativePhaseBeats": 0.311707,
+        "coherence": 0.090911,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 66,
+        "endSeconds": 84,
+        "centerSeconds": 75.0,
+        "relativePhaseRadians": 1.979948,
+        "relativePhaseBeats": 0.315119,
+        "coherence": 0.044437,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 72,
+        "endSeconds": 90,
+        "centerSeconds": 81.0,
+        "relativePhaseRadians": 2.630972,
+        "relativePhaseBeats": 0.418732,
+        "coherence": 0.014846,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 78,
+        "endSeconds": 96,
+        "centerSeconds": 87.0,
+        "relativePhaseRadians": 0.617358,
+        "relativePhaseBeats": 0.098256,
+        "coherence": 0.012076,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 84,
+        "endSeconds": 102,
+        "centerSeconds": 93.0,
+        "relativePhaseRadians": -0.119482,
+        "relativePhaseBeats": -0.019016,
+        "coherence": 0.015652,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 90,
+        "endSeconds": 108,
+        "centerSeconds": 99.0,
+        "relativePhaseRadians": 0.22471,
+        "relativePhaseBeats": 0.035764,
+        "coherence": 0.061169,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 96,
+        "endSeconds": 114,
+        "centerSeconds": 105.0,
+        "relativePhaseRadians": 0.611015,
+        "relativePhaseBeats": 0.097246,
+        "coherence": 0.054323,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 102,
+        "endSeconds": 120,
+        "centerSeconds": 111.0,
+        "relativePhaseRadians": 0.9242,
+        "relativePhaseBeats": 0.147091,
+        "coherence": 0.03793,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 108,
+        "endSeconds": 126,
+        "centerSeconds": 117.0,
+        "relativePhaseRadians": 2.867344,
+        "relativePhaseBeats": 0.456352,
+        "coherence": 0.038227,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 114,
+        "endSeconds": 132,
+        "centerSeconds": 123.0,
+        "relativePhaseRadians": -2.022369,
+        "relativePhaseBeats": -0.32187,
+        "coherence": 0.019456,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 120,
+        "endSeconds": 138,
+        "centerSeconds": 129.0,
+        "relativePhaseRadians": 0.336982,
+        "relativePhaseBeats": 0.053632,
+        "coherence": 0.019868,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 126,
+        "endSeconds": 144,
+        "centerSeconds": 135.0,
+        "relativePhaseRadians": 0.397826,
+        "relativePhaseBeats": 0.063316,
+        "coherence": 0.029098,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 132,
+        "endSeconds": 150,
+        "centerSeconds": 141.0,
+        "relativePhaseRadians": 2.905828,
+        "relativePhaseBeats": 0.462477,
+        "coherence": 0.054047,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 138,
+        "endSeconds": 156,
+        "centerSeconds": 147.0,
+        "relativePhaseRadians": 2.883652,
+        "relativePhaseBeats": 0.458947,
+        "coherence": 0.099571,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 144,
+        "endSeconds": 162,
+        "centerSeconds": 153.0,
+        "relativePhaseRadians": 2.680857,
+        "relativePhaseBeats": 0.426672,
+        "coherence": 0.065459,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 150,
+        "endSeconds": 168,
+        "centerSeconds": 159.0,
+        "relativePhaseRadians": 0.239372,
+        "relativePhaseBeats": 0.038097,
+        "coherence": 0.088397,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 156,
+        "endSeconds": 174,
+        "centerSeconds": 165.0,
+        "relativePhaseRadians": 0.208008,
+        "relativePhaseBeats": 0.033105,
+        "coherence": 0.077157,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      },
+      {
+        "startSeconds": 162,
+        "endSeconds": 174.62,
+        "centerSeconds": 168.31,
+        "relativePhaseRadians": 0.480232,
+        "relativePhaseBeats": 0.076431,
+        "coherence": 0.057142,
+        "passesCoherenceGate": false,
+        "candidateOnly": true
+      }
+    ]
+  },
+  "perStemAdjacentSteps": {
+    "drums": [
+      {
+        "fromCenterSeconds": 9.0,
+        "toCenterSeconds": 15.0,
+        "phaseStepCandidateBeats": -0.03564,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 15.0,
+        "toCenterSeconds": 21.0,
+        "phaseStepCandidateBeats": -0.01472,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 21.0,
+        "toCenterSeconds": 27.0,
+        "phaseStepCandidateBeats": -0.02023,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 27.0,
+        "toCenterSeconds": 33.0,
+        "phaseStepCandidateBeats": -0.03181,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 33.0,
+        "toCenterSeconds": 39.0,
+        "phaseStepCandidateBeats": -0.03522,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 39.0,
+        "toCenterSeconds": 45.0,
+        "phaseStepCandidateBeats": -0.01444,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 45.0,
+        "toCenterSeconds": 51.0,
+        "phaseStepCandidateBeats": -0.02012,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 51.0,
+        "toCenterSeconds": 57.0,
+        "phaseStepCandidateBeats": 0.02399,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 57.0,
+        "toCenterSeconds": 63.0,
+        "phaseStepCandidateBeats": 0.01623,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 63.0,
+        "toCenterSeconds": 69.0,
+        "phaseStepCandidateBeats": 0.02462,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 69.0,
+        "toCenterSeconds": 75.0,
+        "phaseStepCandidateBeats": -0.00957,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 75.0,
+        "toCenterSeconds": 81.0,
+        "phaseStepCandidateBeats": -0.00555,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 81.0,
+        "toCenterSeconds": 87.0,
+        "phaseStepCandidateBeats": -0.00393,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 87.0,
+        "toCenterSeconds": 93.0,
+        "phaseStepCandidateBeats": 0.02677,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 93.0,
+        "toCenterSeconds": 99.0,
+        "phaseStepCandidateBeats": -0.0255,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 99.0,
+        "toCenterSeconds": 105.0,
+        "phaseStepCandidateBeats": 0.01277,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 105.0,
+        "toCenterSeconds": 111.0,
+        "phaseStepCandidateBeats": 0.00379,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 111.0,
+        "toCenterSeconds": 117.0,
+        "phaseStepCandidateBeats": 0.02219,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 117.0,
+        "toCenterSeconds": 123.0,
+        "phaseStepCandidateBeats": -0.00918,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 123.0,
+        "toCenterSeconds": 129.0,
+        "phaseStepCandidateBeats": 0.01821,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 129.0,
+        "toCenterSeconds": 135.0,
+        "phaseStepCandidateBeats": 0.00404,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 135.0,
+        "toCenterSeconds": 141.0,
+        "phaseStepCandidateBeats": 0.03706,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 141.0,
+        "toCenterSeconds": 147.0,
+        "phaseStepCandidateBeats": 0.00862,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 147.0,
+        "toCenterSeconds": 153.0,
+        "phaseStepCandidateBeats": 0.03838,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 153.0,
+        "toCenterSeconds": 159.0,
+        "phaseStepCandidateBeats": -0.03147,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 159.0,
+        "toCenterSeconds": 165.0,
+        "phaseStepCandidateBeats": -0.00745,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 165.0,
+        "toCenterSeconds": 168.31,
+        "phaseStepCandidateBeats": -0.00231,
+        "coherentPair": true,
+        "candidateOnly": true
+      }
+    ],
+    "bass": [
+      {
+        "fromCenterSeconds": 9.0,
+        "toCenterSeconds": 15.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 15.0,
+        "toCenterSeconds": 21.0,
+        "phaseStepCandidateBeats": -0.09397,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 21.0,
+        "toCenterSeconds": 27.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 27.0,
+        "toCenterSeconds": 33.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 33.0,
+        "toCenterSeconds": 39.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 39.0,
+        "toCenterSeconds": 45.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 45.0,
+        "toCenterSeconds": 51.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 51.0,
+        "toCenterSeconds": 57.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 57.0,
+        "toCenterSeconds": 63.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 63.0,
+        "toCenterSeconds": 69.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 69.0,
+        "toCenterSeconds": 75.0,
+        "phaseStepCandidateBeats": -0.00284,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 75.0,
+        "toCenterSeconds": 81.0,
+        "phaseStepCandidateBeats": 0.0206,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 81.0,
+        "toCenterSeconds": 87.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 87.0,
+        "toCenterSeconds": 93.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 93.0,
+        "toCenterSeconds": 99.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 99.0,
+        "toCenterSeconds": 105.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 105.0,
+        "toCenterSeconds": 111.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 111.0,
+        "toCenterSeconds": 117.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 117.0,
+        "toCenterSeconds": 123.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 123.0,
+        "toCenterSeconds": 129.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 129.0,
+        "toCenterSeconds": 135.0,
+        "phaseStepCandidateBeats": 0.06402,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 135.0,
+        "toCenterSeconds": 141.0,
+        "phaseStepCandidateBeats": -0.10731,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 141.0,
+        "toCenterSeconds": 147.0,
+        "phaseStepCandidateBeats": -0.05036,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 147.0,
+        "toCenterSeconds": 153.0,
+        "phaseStepCandidateBeats": -0.05778,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 153.0,
+        "toCenterSeconds": 159.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 159.0,
+        "toCenterSeconds": 165.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 165.0,
+        "toCenterSeconds": 168.31,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      }
+    ],
+    "guitar": [
+      {
+        "fromCenterSeconds": 9.0,
+        "toCenterSeconds": 15.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 15.0,
+        "toCenterSeconds": 21.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 21.0,
+        "toCenterSeconds": 27.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 27.0,
+        "toCenterSeconds": 33.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 33.0,
+        "toCenterSeconds": 39.0,
+        "phaseStepCandidateBeats": -0.00332,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 39.0,
+        "toCenterSeconds": 45.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 45.0,
+        "toCenterSeconds": 51.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 51.0,
+        "toCenterSeconds": 57.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 57.0,
+        "toCenterSeconds": 63.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 63.0,
+        "toCenterSeconds": 69.0,
+        "phaseStepCandidateBeats": 0.03368,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 69.0,
+        "toCenterSeconds": 75.0,
+        "phaseStepCandidateBeats": 0.01763,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 75.0,
+        "toCenterSeconds": 81.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 81.0,
+        "toCenterSeconds": 87.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 87.0,
+        "toCenterSeconds": 93.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 93.0,
+        "toCenterSeconds": 99.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 99.0,
+        "toCenterSeconds": 105.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 105.0,
+        "toCenterSeconds": 111.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 111.0,
+        "toCenterSeconds": 117.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 117.0,
+        "toCenterSeconds": 123.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 123.0,
+        "toCenterSeconds": 129.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 129.0,
+        "toCenterSeconds": 135.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 135.0,
+        "toCenterSeconds": 141.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 141.0,
+        "toCenterSeconds": 147.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 147.0,
+        "toCenterSeconds": 153.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 153.0,
+        "toCenterSeconds": 159.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 159.0,
+        "toCenterSeconds": 165.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 165.0,
+        "toCenterSeconds": 168.31,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      }
+    ],
+    "piano": [
+      {
+        "fromCenterSeconds": 9.0,
+        "toCenterSeconds": 15.0,
+        "phaseStepCandidateBeats": -0.04835,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 15.0,
+        "toCenterSeconds": 21.0,
+        "phaseStepCandidateBeats": -0.00842,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 21.0,
+        "toCenterSeconds": 27.0,
+        "phaseStepCandidateBeats": -0.01035,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 27.0,
+        "toCenterSeconds": 33.0,
+        "phaseStepCandidateBeats": -0.09622,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 33.0,
+        "toCenterSeconds": 39.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 39.0,
+        "toCenterSeconds": 45.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 45.0,
+        "toCenterSeconds": 51.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 51.0,
+        "toCenterSeconds": 57.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 57.0,
+        "toCenterSeconds": 63.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 63.0,
+        "toCenterSeconds": 69.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 69.0,
+        "toCenterSeconds": 75.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 75.0,
+        "toCenterSeconds": 81.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 81.0,
+        "toCenterSeconds": 87.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 87.0,
+        "toCenterSeconds": 93.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 93.0,
+        "toCenterSeconds": 99.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 99.0,
+        "toCenterSeconds": 105.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 105.0,
+        "toCenterSeconds": 111.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 111.0,
+        "toCenterSeconds": 117.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 117.0,
+        "toCenterSeconds": 123.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 123.0,
+        "toCenterSeconds": 129.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 129.0,
+        "toCenterSeconds": 135.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 135.0,
+        "toCenterSeconds": 141.0,
+        "phaseStepCandidateBeats": -0.04488,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 141.0,
+        "toCenterSeconds": 147.0,
+        "phaseStepCandidateBeats": -0.0301,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 147.0,
+        "toCenterSeconds": 153.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 153.0,
+        "toCenterSeconds": 159.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 159.0,
+        "toCenterSeconds": 165.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 165.0,
+        "toCenterSeconds": 168.31,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      }
+    ],
+    "other": [
+      {
+        "fromCenterSeconds": 9.0,
+        "toCenterSeconds": 15.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 15.0,
+        "toCenterSeconds": 21.0,
+        "phaseStepCandidateBeats": -0.01488,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 21.0,
+        "toCenterSeconds": 27.0,
+        "phaseStepCandidateBeats": -0.03514,
+        "coherentPair": true,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 27.0,
+        "toCenterSeconds": 33.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 33.0,
+        "toCenterSeconds": 39.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 39.0,
+        "toCenterSeconds": 45.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 45.0,
+        "toCenterSeconds": 51.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 51.0,
+        "toCenterSeconds": 57.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 57.0,
+        "toCenterSeconds": 63.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 63.0,
+        "toCenterSeconds": 69.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 69.0,
+        "toCenterSeconds": 75.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 75.0,
+        "toCenterSeconds": 81.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 81.0,
+        "toCenterSeconds": 87.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 87.0,
+        "toCenterSeconds": 93.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 93.0,
+        "toCenterSeconds": 99.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 99.0,
+        "toCenterSeconds": 105.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 105.0,
+        "toCenterSeconds": 111.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 111.0,
+        "toCenterSeconds": 117.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 117.0,
+        "toCenterSeconds": 123.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 123.0,
+        "toCenterSeconds": 129.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 129.0,
+        "toCenterSeconds": 135.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 135.0,
+        "toCenterSeconds": 141.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 141.0,
+        "toCenterSeconds": 147.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 147.0,
+        "toCenterSeconds": 153.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 153.0,
+        "toCenterSeconds": 159.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 159.0,
+        "toCenterSeconds": 165.0,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      },
+      {
+        "fromCenterSeconds": 165.0,
+        "toCenterSeconds": 168.31,
+        "phaseStepCandidateBeats": null,
+        "coherentPair": false,
+        "candidateOnly": true
+      }
+    ]
+  },
+  "crossStemCommonMotionCandidates": [
+    {
+      "fromCenterSeconds": 9.0,
+      "toCenterSeconds": 15.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.03564,
+        "piano": -0.04835
+      },
+      "medianCandidateChangeBeats": -0.04199,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "piano"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 15.0,
+      "toCenterSeconds": 21.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.01472,
+        "bass": -0.09397,
+        "piano": -0.00842,
+        "other": -0.01488
+      },
+      "medianCandidateChangeBeats": -0.0148,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "bass",
+        "piano",
+        "other"
+      ],
+      "candidateCommonChange": false,
+      "gate": "MULTIROLE_PHASE_STABLE_CANDIDATE_NOT_VERIFIED",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 21.0,
+      "toCenterSeconds": 27.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.02023,
+        "piano": -0.01035,
+        "other": -0.03514
+      },
+      "medianCandidateChangeBeats": -0.02023,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "piano",
+        "other"
+      ],
+      "candidateCommonChange": false,
+      "gate": "MULTIROLE_PHASE_STABLE_CANDIDATE_NOT_VERIFIED",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 27.0,
+      "toCenterSeconds": 33.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.03181,
+        "piano": -0.09622
+      },
+      "medianCandidateChangeBeats": -0.06402,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "piano"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 33.0,
+      "toCenterSeconds": 39.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.03522,
+        "guitar": -0.00332
+      },
+      "medianCandidateChangeBeats": -0.01927,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "guitar"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 39.0,
+      "toCenterSeconds": 45.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.01444
+      },
+      "medianCandidateChangeBeats": -0.01444,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 45.0,
+      "toCenterSeconds": 51.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.02012
+      },
+      "medianCandidateChangeBeats": -0.02012,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 51.0,
+      "toCenterSeconds": 57.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.02399
+      },
+      "medianCandidateChangeBeats": 0.02399,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 57.0,
+      "toCenterSeconds": 63.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.01623
+      },
+      "medianCandidateChangeBeats": 0.01623,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 63.0,
+      "toCenterSeconds": 69.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.02462,
+        "guitar": 0.03368
+      },
+      "medianCandidateChangeBeats": 0.02915,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "guitar"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 69.0,
+      "toCenterSeconds": 75.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.00957,
+        "bass": -0.00284,
+        "guitar": 0.01763
+      },
+      "medianCandidateChangeBeats": -0.00284,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "bass",
+        "guitar"
+      ],
+      "candidateCommonChange": false,
+      "gate": "MULTIROLE_PHASE_STABLE_CANDIDATE_NOT_VERIFIED",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 75.0,
+      "toCenterSeconds": 81.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.00555,
+        "bass": 0.0206
+      },
+      "medianCandidateChangeBeats": 0.00753,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "bass"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 81.0,
+      "toCenterSeconds": 87.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.00393
+      },
+      "medianCandidateChangeBeats": -0.00393,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 87.0,
+      "toCenterSeconds": 93.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.02677
+      },
+      "medianCandidateChangeBeats": 0.02677,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 93.0,
+      "toCenterSeconds": 99.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.0255
+      },
+      "medianCandidateChangeBeats": -0.0255,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 99.0,
+      "toCenterSeconds": 105.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.01277
+      },
+      "medianCandidateChangeBeats": 0.01277,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 105.0,
+      "toCenterSeconds": 111.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.00379
+      },
+      "medianCandidateChangeBeats": 0.00379,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 111.0,
+      "toCenterSeconds": 117.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.02219
+      },
+      "medianCandidateChangeBeats": 0.02219,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 117.0,
+      "toCenterSeconds": 123.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.00918
+      },
+      "medianCandidateChangeBeats": -0.00918,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 123.0,
+      "toCenterSeconds": 129.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.01821
+      },
+      "medianCandidateChangeBeats": 0.01821,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 129.0,
+      "toCenterSeconds": 135.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.00404,
+        "bass": 0.06402
+      },
+      "medianCandidateChangeBeats": 0.03403,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "bass"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 135.0,
+      "toCenterSeconds": 141.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.03706,
+        "bass": -0.10731,
+        "piano": -0.04488
+      },
+      "medianCandidateChangeBeats": -0.04488,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "bass",
+        "piano"
+      ],
+      "candidateCommonChange": false,
+      "gate": "MULTIROLE_PHASE_STABLE_CANDIDATE_NOT_VERIFIED",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 141.0,
+      "toCenterSeconds": 147.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.00862,
+        "bass": -0.05036,
+        "piano": -0.0301
+      },
+      "medianCandidateChangeBeats": -0.0301,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "bass",
+        "piano"
+      ],
+      "candidateCommonChange": false,
+      "gate": "MULTIROLE_PHASE_STABLE_CANDIDATE_NOT_VERIFIED",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 147.0,
+      "toCenterSeconds": 153.0,
+      "coherentSourceRoleSteps": {
+        "drums": 0.03838,
+        "bass": -0.05778
+      },
+      "medianCandidateChangeBeats": -0.0097,
+      "rolesSupportingMedianChange": [
+        "drums",
+        "bass"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 153.0,
+      "toCenterSeconds": 159.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.03147
+      },
+      "medianCandidateChangeBeats": -0.03147,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 159.0,
+      "toCenterSeconds": 165.0,
+      "coherentSourceRoleSteps": {
+        "drums": -0.00745
+      },
+      "medianCandidateChangeBeats": -0.00745,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    },
+    {
+      "fromCenterSeconds": 165.0,
+      "toCenterSeconds": 168.31,
+      "coherentSourceRoleSteps": {
+        "drums": -0.00231
+      },
+      "medianCandidateChangeBeats": -0.00231,
+      "rolesSupportingMedianChange": [
+        "drums"
+      ],
+      "candidateCommonChange": false,
+      "gate": "INSUFFICIENT_MULTIROLE_EVIDENCE",
+      "candidateOnly": true
+    }
+  ],
+  "highPriorityUncertainTransitions": [
+    {
+      "sourceWindowCenterSeconds": 15.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 33.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 39.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 45.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 51.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 57.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 63.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 69.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 81.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 87.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 93.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 99.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 105.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 111.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 117.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 123.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 129.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 135.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 153.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 159.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 165.0,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    },
+    {
+      "sourceWindowCenterSeconds": 168.31,
+      "candidateReviewReason": "too few coherent or concordant independent-role changes",
+      "candidateOnly": true
+    }
+  ],
+  "limitations": [
+    "All source phase values are relative to an unverified 163.8-style rhythmic reference, not quarter-note or meter phase",
+    "Circular phase is ambiguous modulo a rhythmic pulse; a strong half-pulse shifted source may be instrumentation, not tempo drift",
+    "Correlated Demucs separation stems are not independent musical ground truth",
+    "Only adjacent coherent-window steps are compared; gap windows intentionally prevent confident unwrapping through silence",
+    "High common-mode phase motion can be caused by a section-wide synced rhythm or arrangement accent shift, not tempo drift",
+    "Three-stem gates and 0.1-beat support threshold are descriptive exploration settings, not calibrated false-positive rates",
+    "18s windows overlap every 6s and are correlated, not independent measurements",
+    "No real musical beat-one, phrase/downbeat, meter or half-time bridge boundaries were validated by ear",
+    "No source timing release/gameplay/RELEASE_BEAT_GRIDS changes authorized"
+  ]
+}

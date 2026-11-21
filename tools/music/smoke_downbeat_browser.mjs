@@ -65,6 +65,8 @@ try {
 	await page.waitForFunction(()=>document.querySelector('#status')?.textContent.startsWith('Ready:'));
 	assert.match(await page.locator('#status').innerText(),/15 original-source research windows/);
 	assert.match(await page.locator('#harmony').innerText(),/HARMONY CROSS-CHECK/);
+	assert.match(await page.locator('#phaseEvidence').innerText(),/SOURCE PHASE CONTINUITY \(UNVERIFIED\)/);
+	assert.match(await page.locator('#phaseEvidence').innerText(),/not verified musical beats/);
 	await page.selectOption('#mix','drums');
 	await page.locator('#play').click();
 	await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('Playing original drums'));
