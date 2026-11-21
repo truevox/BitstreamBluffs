@@ -1,0 +1,38 @@
+K=300 N=900; non-sensor pairs created after K in the reference run: 74
+level      history   statics  skip             firstDivTick  (+ticks)  maxPosErr(px)  endPosErr(px)  first field
+pose       same      false    -                301           1         339.979681     339.277396     pile:00[1] ref=282.66933345487655 got=260
+kinematic  same      false    -                301           1         159.589842     159.589842     pile:00[1] ref=282.66933345487655 got=282.67088246370355
+contacts   same      false    -                null          null      0              0              -
+full       same      false    -                null          null      0              0              -
+pose       shuffled  false    -                301           1         339.979681     339.277396     pile:00[1] ref=282.66933345487655 got=260
+kinematic  shuffled  false    -                301           1         159.589842     159.589842     pile:00[1] ref=282.66933345487655 got=282.67088246370355
+contacts   shuffled  false    -                null          null      0              0              -
+full       shuffled  false    -                null          null      0              0              -
+pose       permuted  false    -                301           1         380.559474     368.748202     pile:00[1] ref=282.66933345487655 got=260
+kinematic  permuted  false    -                301           1         194.659814     149.702214     pile:00[1] ref=282.66933345487655 got=282.67088246370355
+contacts   permuted  false    -                343           43        65.717477      65.717477      pile:05[4] ref=0.08794453192444962 got=0.07364204450186662
+full       permuted  false    -                null          null      0              0              -
+pose       pooled    false    -                301           1         289.361997     240.301143     pile:00[1] ref=282.66933345487655 got=260
+kinematic  pooled    false    -                301           1         114.78506      84.294365      pile:00[1] ref=282.66933345487655 got=282.67088246370355
+contacts   pooled    false    -                305           5         87.139596      66.251593      pile:05[1] ref=447.5989233965364 got=447.59892339653646
+full       pooled    false    -                305           5         87.139596      66.251593      pile:05[1] ref=447.5989233965364 got=447.59892339653646
+full       pooled    true     -                null          null      0              0              -
+contacts   permuted  true     -                343           43        65.717477      65.717477      pile:05[4] ref=0.08794453192444962 got=0.07364204450186662
+full       same      false    impulses         301           1         400.540454     400.540454     pile:00[1] ref=282.66933345487655 got=282.67086399893594
+full       same      false    staleSupport     301           1         783.56576      783.56576      pile:00[4] ref=0.0013629075610879227 got=0.0008132908476454759
+full       same      false    detectorOrder    null          null      0              0              -
+full       same      false    worldOrder       null          null      0              0              -
+full       same      false    timing           301           1         46.50073       3.709798       pile:05[1] ref=444.7891632606304 got=444.77680600444535
+full       same      false    positionImpulse  301           1         71.280315      71.280315      pile:11[1] ref=490.23202759967086 got=490.2319889180589
+full       same      false    deltaTime        301           1         123.429674     122.750843     pile:00[1] ref=282.66933345487655 got=282.6695628887259
+full       same      false    rawGeometry      301           1         909.497213     909.497213     pile:00[1] ref=282.66933345487655 got=282.66933345487683
+static geometry vs fresh build: [{"history":"shuffled","staticBodiesWithDifferentBits":0,"maxVertexErr":0},{"history":"pooled","staticBodiesWithDifferentBits":39,"maxVertexErr":1.1368683772161603e-13}]
+incomplete snapshot checks: {
+ "missingBody": "threw: restore: world body set differs (missing , extra pile:03)",
+ "wrongVersion": "threw: restore: snapshot version 99 != 1",
+ "unknownPairPart": "threw: restore: pair references unknown part ghost#0/pile:03#0",
+ "uncapturedField": "threw: restore: snapshot audit found uncaptured body state: sled: newMatterField",
+ "liveAudit": [
+  "sled: myNewState"
+ ]
+}

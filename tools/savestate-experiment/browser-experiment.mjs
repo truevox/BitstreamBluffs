@@ -20,7 +20,7 @@
  *   hazard   seed SAVE119H@2047 (all biomes), sled placed at x=107000 before tick 1 (a Gear Gate cluster: timed
  *            moving hazards), Kodiaks forced on (two packs spawn), 99 shield charges so hits are absorbed, not fatal.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -204,7 +204,14 @@ async function runCase(browser, fxName, level, skip = []) {
 }
 
 const browser = await chromium.launch({ headless: true, executablePath: EXE, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
-const results = [];
+// Resumable: every finished case is written to the results file as it completes; a rerun with the same file skips
+// cases already present (harness errors are retried).
+const caseKey = (r) => `${r.fixture}:${r.level}${r.skip && r.skip !== '-' ? `-${r.skip}` : ''}`;
+let results = [];
+if (jsonOut && existsSync(jsonOut)) {
+  try { results = JSON.parse(readFileSync(jsonOut, 'utf8')).filter((r) => !r.harnessError); } catch { results = []; }
+}
+const done = new Set(results.map(caseKey));
 const plan = [];
 for (const fx of ['contact', 'hazard']) {
   plan.push([fx, 'control'], [fx, 'ghost'], [fx, 'game'], [fx, 'kinematic'], [fx, 'contacts'], [fx, 'full']);
@@ -215,6 +222,7 @@ try {
   for (const [fx, level, skip] of plan) {
     const key = `${fx}:${level}${skip ? `-${skip.join('+')}` : ''}`;
     if (ONLY && !ONLY.some((o) => key.startsWith(o))) continue;
+    if (done.has(key)) { console.log(`${key.padEnd(30)} (cached in ${jsonOut})`); continue; }
     const t0 = Date.now();
     let r;
     try { r = await runCase(browser, fx, level, skip || []); } catch (e) { r = { fixture: fx, level, skip: (skip || []).join('+') || '-', harnessError: String(e.message || e).slice(0, 300) }; }
