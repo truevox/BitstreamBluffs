@@ -3,6 +3,7 @@
  *   npm run build && npx vite preview --port 8412 &
  *   GAME_URL=http://localhost:8412/ xvfb-run -a node tools/conformance/cross-engine.mjs record            # (re)record fixture tapes (Chromium)
  *   GAME_URL=http://localhost:8412/ xvfb-run -a node tools/conformance/cross-engine.mjs matrix            # replay everywhere, write results
+ *   ... cross-engine.mjs matrix --resume    # continue an interrupted matrix: finished sessions are read from the journal
  *   node tools/conformance/cross-engine.mjs scout [fixtureId]                                             # explore autopilot outcomes
  *
  * Env: ENGINES (comma list; default all), HZ (default 30,60,120,144), SESSIONS (fresh browser contexts per engine/cadence, default 2),
@@ -11,7 +12,7 @@
  * Playwright WebKit is NOT iPhone Safari (different OS, GPU, JIT/libm); a pass here says nothing about real Safari/iOS.
  */
 import { chromium, firefox, webkit } from 'playwright';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, appendFile } from 'node:fs/promises';
 import { existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import os from 'node:os';
@@ -28,6 +29,27 @@ const TAPE_DIR = path.join(here, 'fixtures', 'cross-engine');
 const OUT = process.env.OUT || path.join(here, '..', '..', 'docs', 'determinism', 'results', 'cross-engine-results.json');
 const fixtureFilter = process.env.FIXTURES ? process.env.FIXTURES.split(',') : null;
 const fixtures = FIXTURES.filter((f) => !fixtureFilter || fixtureFilter.includes(f.id));
+const RESUME = process.argv.includes('--resume') || process.env.RESUME === '1';
+// Journal: every finished cell (engine x fixture x cadence x session x run) is appended as one JSON line the moment it completes.
+// With --resume, sessions already fully journaled are skipped (a session is the unit of replay state: a half-finished session is re-run from
+// run 1, because a run's result can depend on the runs before it in the same page). Math diagnoses are journaled too.
+const JOURNAL = process.env.JOURNAL || path.join(here, '.cache', 'cross-engine.journal.jsonl');
+async function jwrite(obj) { await appendFile(JOURNAL, JSON.stringify(obj) + '\n'); }
+async function jload() {
+  const out = { rows: [], done: new Set(), envs: {}, diag: {} };
+  if (!RESUME || !existsSync(JOURNAL)) return out;
+  const pending = new Map();
+  for (const line of (await readFile(JOURNAL, 'utf8')).split('\n')) {
+    if (!line.trim()) continue;
+    let o; try { o = JSON.parse(line); } catch { continue; }
+    const sk = `${o.engine}|${o.hz}|${o.session}`;
+    if (o.k === 'row') { const a = pending.get(sk) || []; a.push(o.row); pending.set(sk, a); }
+    else if (o.k === 'sessionDone') { out.done.add(sk); out.rows.push(...(pending.get(sk) || [])); pending.delete(sk); }
+    else if (o.k === 'env') out.envs[o.name] = o.env;
+    else if (o.k === 'diag') out.diag[o.key] = o.value;
+  }
+  return out;
+}
 const REF = { engine: 'chromium-headless-shell', hz: 120 };
 
 const SWIFT = ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'];
@@ -212,8 +234,12 @@ async function matrix() {
     if (!existsSync(tapePath(f))) throw new Error(`missing tape ${tapePath(f)}; run the record command first`);
     tapes[f.id] = await loadTape(f);
   }
-  const envs = {};
-  const rows = [];
+  await mkdir(path.dirname(JOURNAL), { recursive: true });
+  const J = await jload();
+  if (!RESUME) await writeFile(JOURNAL, '');
+  else console.log(`RESUME: ${J.done.size} finished sessions, ${J.rows.length} rows, ${Object.keys(J.diag).length} diagnoses restored from ${JOURNAL}`);
+  const envs = { ...J.envs };
+  const rows = [...J.rows];
   const refs = {}; // fixture id -> { digests, raw, outcome }
   // Reference = each fixture replayed in its OWN fresh context (run #1 of a fresh session) on chromium-headless-shell at 120 Hz.
   // Every later run, at any session position, is compared against it, so state leaking between runs of one session shows up as a divergence.
@@ -230,23 +256,27 @@ async function matrix() {
   }
   const names = [REF.engine, ...engineNames.filter((n) => n !== REF.engine)];
   for (const name of names) {
+    const hzList = name === REF.engine ? [REF.hz, ...HZ.filter((h) => h !== REF.hz)] : HZ;
+    if (envs[name] && (envs[name].unavailable || hzList.every((hz) => Array.from({ length: SESSIONS }, (_, i) => J.done.has(`${name}|${hz}|${i + 1}`)).every(Boolean)))) { console.log(name, 'already complete (resume)'); continue; }
     let L;
     try { L = await launch(name); } catch (e) {
       envs[name] = { unavailable: true, reason: String(e.message).split('\n')[0] };
+      await jwrite({ k: 'env', name, env: envs[name] });
       console.log(name, 'UNAVAILABLE', envs[name].reason);
       continue;
     }
     const { browser, cfg } = L;
     envs[name] = { engine: name, browserType: cfg.type.name(), version: browser.version(), headless: cfg.headlessLabel, os: `${os.type()} ${os.release()}`, arch: os.arch(), platform: process.platform, node: process.version, raster: RASTER };
-    for (const hz of (name === REF.engine ? [REF.hz, ...HZ.filter((h) => h !== REF.hz)] : HZ)) {
+    for (const hz of hzList) {
       for (let session = 1; session <= SESSIONS; session++) {
+        if (J.done.has(`${name}|${hz}|${session}`)) { console.log(name, hz, `s${session}`, 'skipped (resume)'); continue; }
         let page, ctx, errors;
         try { ({ page, ctx, errors } = await freshPage(browser)); } catch (e) {
           rows.push({ engine: name, hz, session, error: 'session start failed: ' + String(e.message).split('\n')[0] });
           console.log(name, hz, session, 'SESSION FAILED', e.message.split('\n')[0]);
           continue;
         }
-        if (!envs[name].page) envs[name].page = await page.evaluate(() => window.__ce.env());
+        if (!envs[name].page) { envs[name].page = await page.evaluate(() => window.__ce.env()); await jwrite({ k: 'env', name, env: envs[name] }); }
         // order: all fixtures, then the first fixture again (contamination check)
         const order = [...fixtures, { ...fixtures[0], again: true }];
         let runNo = 0;
@@ -255,7 +285,7 @@ async function matrix() {
           const t0 = Date.now();
           let r;
           try { r = await play(page, { seed: f.seed, hz, tape: tapes[f.id], level: levelOf(f) }); } catch (e) {
-            rows.push({ engine: name, hz, session, run: runNo, fixture: f.id, error: String(e.message).split('\n')[0] });
+            const er = { engine: name, hz, session, run: runNo, fixture: f.id, error: String(e.message).split('\n')[0] }; rows.push(er); await jwrite({ k: 'row', engine: name, hz, session, row: er });
             console.log(name, hz, session, runNo, f.id, 'ERROR', e.message.split('\n')[0]);
             break;
           }
@@ -273,16 +303,18 @@ async function matrix() {
           };
           if (cmp.first && ref) row.sledDeltaAtFirstTick = rawDelta(ref.raw, r.raw, cmp.first.tick);
           rows.push(row);
+          await jwrite({ k: 'row', engine: name, hz, session, row });
           console.log(name, hz, `s${session}`, `#${runNo}`, row.fixture, row.firstDivergentTick ?? 'ok', row.outcome.ticks, row.outcome.distanceM + 'm', `${row.wallMs}ms`);
         }
         if (errors.length) envs[name].pageErrors = [...(envs[name].pageErrors || []), ...errors];
         await ctx.close();
+        await jwrite({ k: 'sessionDone', engine: name, hz, session });
       }
     }
     await browser.close();
   }
   // Math-op isolation for the first divergence per (engine, fixture).
-  const diagnosed = {};
+  const diagnosed = { ...J.diag };
   for (const row of rows) {
     if (!row.firstDivergentTick || row.engine === REF.engine && false) continue;
     const key = `${row.engine}|${row.fixture.replace(/ \(.*/, '')}`;
@@ -293,6 +325,7 @@ async function matrix() {
       const fns = Object.keys(diagnosed[key].implementationDiffs || {});
       if (fns.length && process.env.COUNTERFACTUAL !== '0') diagnosed[key].counterfactual = await counterfactual(REF.engine, row.engine, f, tapes[f.id], row.hz, fns);
     } catch (e) { diagnosed[key] = { error: String(e.message).split('\n')[0] }; }
+    await jwrite({ k: 'diag', key, value: diagnosed[key] });
     console.log('MATH', key, JSON.stringify(diagnosed[key]).slice(0, 400));
   }
   const result = { issue: 120, diagnostic: true, authoritative: false, note: 'Diagnostic digests only; to be replaced by the #152 contract when published. Playwright WebKit != iPhone Safari.',
@@ -307,4 +340,4 @@ const cmd = process.argv[2];
 if (cmd === 'record') await record();
 else if (cmd === 'matrix') await matrix();
 else if (cmd === 'scout') await scout();
-else { console.log('usage: cross-engine.mjs record|matrix|scout'); process.exit(2); }
+else { console.log('usage: cross-engine.mjs record|matrix|scout  (matrix --resume continues from the journal)'); process.exit(2); }
