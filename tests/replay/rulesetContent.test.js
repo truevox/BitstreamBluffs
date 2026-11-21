@@ -4,7 +4,8 @@ import { utf8Encode } from '../../src/systems/replay/canonicalJson.js';
 import { sha256Hex } from '../../src/systems/replay/canonicalSha256.js';
 import { CONTENT_GROUPS, EXTRA_NON_SIM_KEYS, NON_SIM_KEYS, RULESET_SOURCES, countKeys, keyPaths, omitKeysFor, projectData } from '../../src/systems/replay/rulesetRegistry.js';
 import { TerrainGenerator } from '../../src/systems/TerrainGenerator.js';
-import { assembleFromDisk, loadContentFromDisk, repoRoot } from '../../tools/ruleset/lib.mjs';
+import { DEFAULT_SOURCES, assembleRuleset, rulesetIdOf } from '../../src/systems/replay/ruleset.js';
+import { assembleFromDisk, loadContentFromDisk, readEngineVersions, repoRoot } from '../../tools/ruleset/lib.mjs';
 import { BOOST_DEFS } from '../../src/systems/Boosts.js';
 import { UPGRADE_CATALOG } from '../../src/systems/PermanentUpgrades.js';
 import { DailyPatch } from '../../src/systems/DailyPatch.js';
@@ -33,28 +34,34 @@ describe('denylist entries are real (none dead) and everything else stays includ
     upgradeCatalog: UPGRADE_CATALOG,
     kodiakDefs: KODIAK_DEFS,
   };
-  test('each contract key matches at least one real key somewhere in content or tables', () => {
-    const all = { ...full, ...tableSources };
-    for (const key of Object.keys(NON_SIM_KEYS)) {
-      const n = Object.values(all).reduce((s, v) => s + countKeys(v, [key])[key], 0);
-      expect([key, n > 0]).toEqual([key, true]);
+  test('every scoped non-sim key matches at least one real key in its own scope (none dead)', () => {
+    const scopes = { ...Object.fromEntries(CONTENT_GROUPS.map((g) => [g, full[g]])), ...tableSources };
+    for (const table of [NON_SIM_KEYS, EXTRA_NON_SIM_KEYS]) {
+      for (const [scope, keys] of Object.entries(table)) {
+        for (const k of Object.keys(keys)) expect([scope, k, countKeys(scopes[scope], [k])[k] > 0]).toEqual([scope, k, true]);
+      }
     }
   });
-  test('each group-scoped extra key matches at least one real key in its group', () => {
-    for (const [group, keys] of Object.entries(EXTRA_NON_SIM_KEYS)) {
-      const data = full[group] || tableSources[group];
-      for (const k of Object.keys(keys)) expect([group, k, countKeys(data, [k])[k] > 0]).toEqual([group, k, true]);
+  test('economy keys are NOT denylisted anywhere: basePrice/priceScale feed Draft legality (draftCost)', () => {
+    for (const table of [NON_SIM_KEYS, EXTRA_NON_SIM_KEYS]) {
+      for (const keys of Object.values(table)) expect(Object.keys(keys)).not.toEqual(expect.arrayContaining(['basePrice']));
+    }
+    expect(keyPaths(doc.tables.upgradeCatalog)).toEqual(expect.arrayContaining(['[].basePrice', '[].priceScale']));
+  });
+  test('scoping: a denylisted name in one scope cannot hide the same key in another', () => {
+    expect(omitKeysFor('upgradeCatalog')).not.toContain('name');
+    expect(omitKeysFor('chunks')).toEqual([]);
+    expect(omitKeysFor('powerups')).not.toContain('name');
+  });
+  test('no denylisted key survives in its own scope of the document', () => {
+    const scopeData = { ...Object.fromEntries(CONTENT_GROUPS.map((g) => [g, doc.content[g]])), dailyRules: doc.tables.dailyRules, boostDefs: doc.tables.boostDefs, upgradeCatalog: doc.tables.upgradeCatalog, kodiakDefs: doc.constants.kodiak.KODIAK_DEFS };
+    for (const [scope, data] of Object.entries(scopeData)) {
+      const present = countKeys(data, [...omitKeysFor(scope)]);
+      expect([scope, Object.values(present).reduce((a, b) => a + b, 0)]).toEqual([scope, 0]);
     }
   });
-  test('no denylisted key survives anywhere in the document', () => {
-    const bad = new Set(Object.keys(NON_SIM_KEYS));
-    for (const g of CONTENT_GROUPS) for (const k of Object.keys(EXTRA_NON_SIM_KEYS[g] || {})) bad.add(k);
-    for (const k of Object.keys(EXTRA_NON_SIM_KEYS.kodiakDefs)) bad.add(k);
-    const surviving = keyPaths({ content: doc.content, tables: doc.tables, kodiak: doc.constants.kodiak }).filter((p) => bad.has(p.split('.').pop().replace('[]', '')));
-    expect(surviving).toEqual([]);
-  });
-  test('tables keep exactly the causal columns (curveK/cap stay; label/price columns go)', () => {
-    expect(keyPaths(doc.tables.upgradeCatalog)).toEqual(['[].cap', '[].curveK', '[].id']);
+  test('tables keep exactly the causal columns (curveK/cap and the price columns stay; only the label goes)', () => {
+    expect(keyPaths(doc.tables.upgradeCatalog)).toEqual(['[].basePrice', '[].cap', '[].curveK', '[].id', '[].priceScale']);
     expect(keyPaths(doc.tables.dailyRules)).toEqual(expect.arrayContaining(['[].id']));
     expect(keyPaths(doc.tables.dailyRules).some((p) => /name|description/.test(p))).toBe(false);
     expect(Object.keys(doc.tables.boostDefs.headStart).sort()).toEqual(['id', 'openingFadeMs', 'openingMs', 'openingSpeedMul', 'speedFactor']);
@@ -152,10 +159,26 @@ describe('denylist entries are real (none dead) and everything else stays includ
       ],
     });
   });
+  test('changing an UPGRADE_CATALOG basePrice or priceScale changes the rulesetId (Draft legality is competition identity)', () => {
+    const content = loadContentFromDisk(root);
+    const engineVersions = readEngineVersions(root);
+    const base = rulesetIdOf(assembleRuleset({ content, engineVersions }));
+    expect(base).toBe(rulesetIdOf(doc));
+    for (const field of ['basePrice', 'priceScale']) {
+      const bumped = UPGRADE_CATALOG.map((u, i) => (i === 0 ? { ...u, [field]: u[field] + 1 } : u));
+      const sources = { ...DEFAULT_SOURCES, permanentUpgrades: { ...DEFAULT_SOURCES.permanentUpgrades, UPGRADE_CATALOG: bumped } };
+      expect(rulesetIdOf(assembleRuleset({ content, engineVersions }, sources))).not.toBe(base);
+    }
+    // label stays cosmetic
+    const relabelled = UPGRADE_CATALOG.map((u, i) => (i === 0 ? { ...u, label: 'RENAMED' } : u));
+    const same = { ...DEFAULT_SOURCES, permanentUpgrades: { ...DEFAULT_SOURCES.permanentUpgrades, UPGRADE_CATALOG: relabelled } };
+    expect(rulesetIdOf(assembleRuleset({ content, engineVersions }, same))).toBe(base);
+  });
   test('registry omit lists are derived from the same sets', () => {
     const omitted = RULESET_SOURCES.flatMap((s) => [...Object.values(s.exports), ...Object.values(s.statics || {}).flatMap((m) => Object.values(m))]).filter((d) => d.omit);
-    for (const d of omitted) expect(d.omit.every((k) => k in NON_SIM_KEYS || k in EXTRA_NON_SIM_KEYS.kodiakDefs)).toBe(true);
+    for (const d of omitted) expect(d.omit.length).toBeGreaterThan(0);
     expect(omitKeysFor('hazards')).toEqual(expect.arrayContaining(['shapeKey', 'colorKey', 'name']));
+    expect(omitKeysFor('upgradeCatalog')).toEqual(['label']);
   });
 });
 

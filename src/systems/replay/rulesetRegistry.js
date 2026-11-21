@@ -19,25 +19,43 @@ const exc = (reason) => ({ exclude: reason });
 const bucket = (prefix, names) => Object.fromEntries(names.map((n) => [n, inc(`${prefix}.${n}`)]));
 
 /**
- * Non-sim keys removed RECURSIVELY (at any depth) from `content.*` and `tables.*` (contract 7.1): display text, UI gating
- * and shop economy. Each was checked against its readers. Everything not listed is INCLUDED.
+ * Non-sim keys removed RECURSIVELY (at any depth) but only WITHIN one scope: a content group (`hazards`, `biomes`, ...)
+ * or a table (`dailyRules`, `boostDefs`, `upgradeCatalog`, `kodiakDefs`). Scoping means a key that one reader treats as
+ * display text can never hide a same-named key that another table reads for legality or simulation. Each entry was
+ * checked against its readers. Everything not listed is INCLUDED.
+ *
+ * NOT listed on purpose: `basePrice` / `priceScale`. `draftCost` prices Daily Draft loadouts with them, so Draft legality
+ * (part of competition identity) depends on them: a price edit must change the rulesetId.
  */
 export const NON_SIM_KEYS = Object.freeze({
-  name: 'player-facing name (CrashReport.killerName, shop/loadout labels, Daily banner, biome name); no simulation reader',
-  lore: 'biome flavour text',
-  background: 'background motif id: RunScene -> Background.setMotif (draw-only)',
-  palettes: 'biome palette tint overrides (draw-only)',
-  unlockLevel: 'profile progression gate (ProfileStore/shop); the run records the resulting biomeMask in the manifest, the generator never reads it',
-  description: 'one-line UI text (Daily rules); the simulation reads `modifiers` only',
-  label: 'shop label (UPGRADE_CATALOG)',
-  basePrice: 'economy only: read solely by nextUpgradePrice (shop price; Draft legality via draftCost is an eligibility rule covered by draft.rulesVersion)',
-  priceScale: 'economy only: same as basePrice',
+  hazards: Object.freeze({
+    name: 'player-facing name: CrashReport.killerName only (crash banner / Game Over text)',
+  }),
+  biomes: Object.freeze({
+    name: 'player-facing biome name',
+    lore: 'flavour text',
+    background: 'background motif id: RunScene -> Background.setMotif (draw-only)',
+    palettes: 'palette tint overrides (draw-only)',
+    unlockLevel: 'profile progression gate (ProfileStore/shop); the run records the resulting biomeMask in the manifest, the generator never reads it',
+  }),
+  dailyRules: Object.freeze({
+    name: 'Daily banner display name; the simulation reads `modifiers` only',
+    description: 'one-line UI text; never read by the simulation',
+  }),
+  boostDefs: Object.freeze({
+    name: 'shop/loadout label; Boosts.js effect math reads shieldCharges, speedFactor, openingSpeedMul, openingMs, openingFadeMs',
+  }),
+  upgradeCatalog: Object.freeze({
+    label: 'shop label',
+  }),
+  kodiakDefs: Object.freeze({
+    name: 'display name: CrashReport.killerName only',
+  }),
 });
 
 /**
  * EXTENSION beyond the contract's 7.1 list (reported as a spec amendment): keys verified draw-only by reading every
- * reader, so a recolour or new sprite does not mint a new rulesetId. Scoped to one group each (not global) so a future
- * causal key that happens to share the name elsewhere is still included.
+ * reader, so a recolour or new sprite does not mint a new rulesetId. Same scoping as NON_SIM_KEYS.
  */
 export const EXTRA_NON_SIM_KEYS = Object.freeze({
   hazards: Object.freeze({
@@ -59,8 +77,8 @@ export const EXTRA_NON_SIM_KEYS = Object.freeze({
   }),
 });
 
-/** Keys removed (any depth) for one scope: a content group, or `tables` / `kodiakDefs`. */
-export const omitKeysFor = (scope) => Object.freeze([...Object.keys(NON_SIM_KEYS), ...Object.keys(EXTRA_NON_SIM_KEYS[scope] || {})]);
+/** Keys removed (any depth) for one scope. */
+export const omitKeysFor = (scope) => Object.freeze([...Object.keys(NON_SIM_KEYS[scope] || {}), ...Object.keys(EXTRA_NON_SIM_KEYS[scope] || {})]);
 
 export const CONTENT_GROUPS = Object.freeze(['chunks', 'hazards', 'powerups', 'terrainMods', 'biomes']);
 
@@ -173,7 +191,7 @@ export const RULESET_SOURCES = Object.freeze([
     id: 'permanentUpgrades',
     file: 'src/systems/PermanentUpgrades.js',
     exports: {
-      UPGRADE_CATALOG: inc('tables.upgradeCatalog', { omit: omitKeysFor('tables') }),
+      UPGRADE_CATALOG: inc('tables.upgradeCatalog', { omit: omitKeysFor('upgradeCatalog') }),
       CANOPY_BLUFF_RECOVERY_RANK: inc('constants.permanentUpgrades.CANOPY_BLUFF_RECOVERY_RANK'),
       UPGRADE_IDS: exc('derived: ids of UPGRADE_CATALOG'),
     },
@@ -182,7 +200,7 @@ export const RULESET_SOURCES = Object.freeze([
     id: 'boosts',
     file: 'src/systems/Boosts.js',
     exports: {
-      BOOST_DEFS: inc('tables.boostDefs', { omit: omitKeysFor('tables') }),
+      BOOST_DEFS: inc('tables.boostDefs', { omit: omitKeysFor('boostDefs') }),
       BOOSTS: exc('loadout order of the BOOST_DEFS ids (membership asserted equal to the BOOST_DEFS keys in tests)'),
     },
   },
@@ -220,7 +238,7 @@ export const RULESET_SOURCES = Object.freeze([
     exports: {},
     statics: {
       DailyPatch: {
-        RULES: inc('tables.dailyRules', { omit: omitKeysFor('tables') }),
+        RULES: inc('tables.dailyRules', { omit: omitKeysFor('dailyRules') }),
       },
     },
   },
