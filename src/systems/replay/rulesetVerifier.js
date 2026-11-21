@@ -46,8 +46,8 @@ function loadRuleset(entry) {
  * @param {Array<{ruleset:(Object|Uint8Array), verifierId?:(string|null)}>} [o.archive] older rulesets. `verifierId` is
  *        the digest of the publisher-built historical verifier bundle that can reproduce it, or null when only the
  *        ruleset document itself is archived (preservation without a runnable verifier).
- * @param {string[]} [o.verifierAllowlist] digests of publisher-built bundles that are present and hash-allowlisted.
- *        A digest naming a bundle that is not on this list is NEVER selected.
+ * @param {string[]} [o.verifierAllowlist] digests of publisher-built bundles the publisher has allowlisted (the registry
+ *        holds digests only, never bundle bytes). A digest naming a bundle that is not on this list is NEVER selected.
  * @returns {Readonly<{currentId:string, get:function(string):(Object|null), ids:function():string[], isAllowlisted:function(string):boolean}>}
  * @throws {RulesetRegistryError}
  */
@@ -113,11 +113,15 @@ export function resolveVerifier(manifest, registry) {
   const entry = registry.get(id);
   if (!entry) return refusal(REFUSAL.UNKNOWN_RULESET, id, { detail: 'no ruleset with this id is registered; the current ruleset is never tried instead' });
 
-  // Consistency copies a manifest carries (4.3): a disagreement with the ruleset it names is a refusal, not a mismatch.
+  // Consistency copies (4.3: required whenever rulesetId is non-null; null only on legacy-derived manifests). A missing one
+  // is a malformed manifest; a disagreement with the ruleset it names is a refusal, not a mismatch.
   const doc = entry.ruleset;
-  if (sim.simRevision != null && sim.simRevision !== entry.simRevision) return refusal(REFUSAL.RULESET_FIELD_MISMATCH, id, { field: 'simRevision' });
-  if (sim.tickHz != null && sim.tickHz !== doc.versions.tickHz) return refusal(REFUSAL.RULESET_FIELD_MISMATCH, id, { field: 'tickHz' });
-  if (sim.engine != null && !sameEngine(sim.engine, doc.engine)) return refusal(REFUSAL.RULESET_FIELD_MISMATCH, id, { field: 'engine' });
+  if (!Number.isSafeInteger(sim.simRevision)) return refusal(REFUSAL.MALFORMED_MANIFEST, id, { field: 'simRevision', detail: 'causal.sim.simRevision is required with a non-null rulesetId' });
+  if (!Number.isSafeInteger(sim.tickHz)) return refusal(REFUSAL.MALFORMED_MANIFEST, id, { field: 'tickHz', detail: 'causal.sim.tickHz is required with a non-null rulesetId' });
+  if (!sim.engine || typeof sim.engine !== 'object') return refusal(REFUSAL.MALFORMED_MANIFEST, id, { field: 'engine', detail: 'causal.sim.engine is required with a non-null rulesetId' });
+  if (sim.simRevision !== entry.simRevision) return refusal(REFUSAL.RULESET_FIELD_MISMATCH, id, { field: 'simRevision' });
+  if (sim.tickHz !== doc.versions.tickHz) return refusal(REFUSAL.RULESET_FIELD_MISMATCH, id, { field: 'tickHz' });
+  if (!sameEngine(sim.engine, doc.engine)) return refusal(REFUSAL.RULESET_FIELD_MISMATCH, id, { field: 'engine' });
 
   if (entry.current) {
     return Object.freeze({ status: 'run', rulesetId: id, simRevision: entry.simRevision, verifierId: IN_GAME_VERIFIER, historical: false });

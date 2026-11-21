@@ -1,7 +1,10 @@
-// Issue #123 acceptance / Contract 7.5: the two-version proof. One current ruleset plus one deliberately altered variant
-// (test-only SIM_REVISION and constant edits). A tape verifies only under its own ruleset; a current scoreboard never lists
-// the old one. The "verifiers" here are test-local pure functions standing in for bundles; the module under test only
-// SELECTS (it never runs anything), exactly as production does.
+// Issue #123 acceptance / Contract 7.5: the two-version proof, STATED HONESTLY: it proves the SELECTION and PARTITION logic
+// with a toy simulation. It does NOT run the real game under two rulesets: the live sim reads module globals, so a ruleset
+// cannot yet parameterize it, and tests/replay/headlessRun.js has no constant/content seam (it builds content itself).
+// The "verifiers" are test-local pure functions standing in for bundles, and the "old tape" claims come from the same toy.
+// What is genuinely exercised: resolveVerifier picks the verifier named by the manifest's ruleset (never the current one
+// as a fallback), refuses unknown/relabelled/un-allowlisted cases, outcome records name ruleset + verifier, and the
+// scoreboard helpers never mix rulesetIds. These modules are library-only: nothing in gameplay imports them yet.
 import { digestOfBytes, digestOf } from '../../src/systems/replay/canonicalSha256.js';
 import { utf8Encode } from '../../src/systems/replay/canonicalJson.js';
 import { rulesetIdOf } from '../../src/systems/replay/ruleset.js';

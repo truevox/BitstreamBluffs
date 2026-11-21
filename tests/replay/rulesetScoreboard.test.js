@@ -8,7 +8,7 @@ import {
 const id = (t) => digestOfBytes(utf8Encode(t));
 const A = id('ruleset A');
 const B = id('ruleset B');
-const rec = (outcome, verifiedUnder) => ({ outcome, verifiedUnder, verifierId: 'in-game', tapeDigest: id('t'), manifestDigest: id('m') });
+const rec = (outcome, verifiedUnder) => ({ outcome, verifiedUnder, verifierId: outcome === 'refused' ? null : 'in-game', tapeDigest: id('t'), manifestDigest: id('m'), ...(outcome === 'refused' ? { reason: 'unknown-ruleset' } : {}) });
 const entry = (name, outcome, under) => ({ name, record: rec(outcome, under) });
 
 describe('scoreboardKey', () => {
@@ -52,8 +52,26 @@ describe('partitioning', () => {
   });
   test('legacy outcomes are never eligible; a match without a ruleset is not either', () => {
     expect(ineligibleReason(rec('consistent-with', A))).toBe('legacy-outcome');
-    expect(ineligibleReason(rec('match', null))).toBe('no-ruleset');
+    expect(ineligibleReason(rec('match', null))).toBe('invalid-record');
     expect(ineligibleReason(rec('match', A))).toBeNull();
+  });
+  test('records are validated: no/null verifierId, a boolean `verified`, unknown keys or bad digests are never eligible', () => {
+    const good = rec('match', A);
+    expect(ineligibleReason(good)).toBeNull();
+    const { verifierId, ...noVerifier } = good;
+    void verifierId;
+    for (const bad of [
+      noVerifier,
+      { ...good, verifierId: null },
+      { ...good, verified: true },
+      { ...good, verified: false },
+      { outcome: 'match', verifiedUnder: A },
+      { ...good, tapeDigest: 'nope' },
+      { ...good, extra: 1 },
+    ]) expect(ineligibleReason(bad)).toBe('invalid-record');
+    expect(partitionByRuleset([{ record: { ...good, verified: true } }]).boards.size).toBe(0);
+    expect(() => assertSingleRuleset([{ record: { ...good, verifierId: null } }])).toThrow(/invalid-record/);
+    expect(boardEntries([{ record: { ...good, verified: true } }], A)).toEqual([]);
   });
 });
 

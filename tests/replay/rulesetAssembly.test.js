@@ -8,7 +8,7 @@ import {
 } from '../../src/systems/replay/ruleset.js';
 import { RULESET_SOURCES, RulesetRegistryError, classifyExports } from '../../src/systems/replay/rulesetRegistry.js';
 import { BOOSTS, BOOST_DEFS } from '../../src/systems/Boosts.js';
-import { assembleFromDisk, checkPins, loadContentFromDisk, readEngineVersions, repoRoot } from '../../tools/ruleset/lib.mjs';
+import { assembleFromDisk, checkPins, loadContentFromDisk, readEngineVersions, readSourceTexts, repoRoot } from '../../tools/ruleset/lib.mjs';
 
 const root = repoRoot();
 const built = assembleFromDisk(root);
@@ -31,13 +31,35 @@ describe('ruleset assembly', () => {
   test('assembly is deterministic and independent of content key insertion order', () => {
     const content = loadContentFromDisk(root);
     const engineVersions = readEngineVersions(root);
+    const sourceTexts = readSourceTexts(root);
     const reversed = {};
     for (const g of Object.keys(content).reverse()) {
       reversed[g] = {};
       for (const id of Object.keys(content[g]).reverse()) reversed[g][id] = content[g][id];
     }
-    expect(rulesetIdOf(assembleRuleset({ content, engineVersions }))).toBe(built.rulesetId);
-    expect(rulesetIdOf(assembleRuleset({ content: reversed, engineVersions }))).toBe(built.rulesetId);
+    expect(rulesetIdOf(assembleRuleset({ content, engineVersions, sourceTexts }))).toBe(built.rulesetId);
+    expect(rulesetIdOf(assembleRuleset({ content: reversed, engineVersions, sourceTexts }))).toBe(built.rulesetId);
+  });
+
+  test('the simRevision seam: an explicit simRevision changes only that field and the id; invalid values throw', () => {
+    const content = loadContentFromDisk(root);
+    const engineVersions = readEngineVersions(root);
+    const sourceTexts = readSourceTexts(root);
+    const bumped = assembleRuleset({ content, engineVersions, sourceTexts, simRevision: SIM_REVISION + 1 });
+    expect(bumped.simRevision).toBe(SIM_REVISION + 1);
+    expect({ ...bumped, simRevision: SIM_REVISION }).toEqual(built.doc);
+    expect(rulesetIdOf(bumped)).not.toBe(built.rulesetId);
+    for (const bad of [0, -1, 1.5, '2', NaN]) expect(() => assembleRuleset({ content, engineVersions, sourceTexts, simRevision: bad })).toThrow(/bad-sim-revision/);
+  });
+
+  test('content ids that could pollute prototypes are rejected (the loader and the assembler)', () => {
+    const content = loadContentFromDisk(root);
+    const engineVersions = readEngineVersions(root);
+    const sourceTexts = readSourceTexts(root);
+    for (const bad of ['__proto__', 'constructor', 'prototype', 'toString']) {
+      const hostile = { ...content, hazards: JSON.parse(`{"${bad}": {"id": "x"}}`) };
+      expect(() => assembleRuleset({ content: hostile, engineVersions, sourceTexts })).toThrow(/bad-content-id/);
+    }
   });
 
   test('engine block carries the Matter setup including gravity.x/scale, timeScale and constraintIterations', () => {
@@ -92,8 +114,9 @@ describe('export registry (new numeric export without registration fails)', () =
   test.each(['terrainGenerator', 'hazardMotion', 'kodiaks'])('an unregistered new numeric export of %s fails assembly', (id) => {
     const content = loadContentFromDisk(root);
     const engineVersions = readEngineVersions(root);
+    const sourceTexts = readSourceTexts(root);
     const withNew = { ...DEFAULT_SOURCES, [id]: { ...DEFAULT_SOURCES[id], BRAND_NEW_TUNING_PX: 123 } };
-    expect(() => assembleRuleset({ content, engineVersions }, withNew)).toThrow(/unregistered-export.*BRAND_NEW_TUNING_PX/);
+    expect(() => assembleRuleset({ content, engineVersions, sourceTexts }, withNew)).toThrow(/unregistered-export.*BRAND_NEW_TUNING_PX/);
     const src = RULESET_SOURCES.find((s) => s.id === id);
     expect(classifyExports(src, withNew[id]).unregistered).toEqual(['BRAND_NEW_TUNING_PX']);
   });
@@ -101,27 +124,30 @@ describe('export registry (new numeric export without registration fails)', () =
   test('a new numeric ARRAY export and a new static on DailyPatch also fail', () => {
     const content = loadContentFromDisk(root);
     const engineVersions = readEngineVersions(root);
+    const sourceTexts = readSourceTexts(root);
     const arr = { ...DEFAULT_SOURCES, terrainGenerator: { ...DEFAULT_SOURCES.terrainGenerator, NEW_BANDS: [1, 2] } };
-    expect(() => assembleRuleset({ content, engineVersions }, arr)).toThrow(/unregistered-export/);
+    expect(() => assembleRuleset({ content, engineVersions, sourceTexts }, arr)).toThrow(/unregistered-export/);
     class Patched extends DEFAULT_SOURCES.dailyPatch.DailyPatch {}
     Patched.EXTRA = [1];
     const patched = { ...DEFAULT_SOURCES, dailyPatch: { DailyPatch: Patched } };
-    expect(() => assembleRuleset({ content, engineVersions }, patched)).toThrow(/unregistered-export.*DailyPatch\.EXTRA/);
+    expect(() => assembleRuleset({ content, engineVersions, sourceTexts }, patched)).toThrow(/unregistered-export.*DailyPatch\.EXTRA/);
   });
 
   test('a registered name the module stopped exporting is a stale entry and fails', () => {
     const content = loadContentFromDisk(root);
     const engineVersions = readEngineVersions(root);
+    const sourceTexts = readSourceTexts(root);
     const { SECTOR_M, ...rest } = DEFAULT_SOURCES.terrainGenerator;
     void SECTOR_M;
-    expect(() => assembleRuleset({ content, engineVersions }, { ...DEFAULT_SOURCES, terrainGenerator: rest })).toThrow(/stale-registry-entry.*SECTOR_M/);
+    expect(() => assembleRuleset({ content, engineVersions, sourceTexts }, { ...DEFAULT_SOURCES, terrainGenerator: rest })).toThrow(/stale-registry-entry.*SECTOR_M/);
   });
 
   test('a function or non-finite value hiding in a table cannot slip into the identity', () => {
     const content = loadContentFromDisk(root);
     const engineVersions = readEngineVersions(root);
+    const sourceTexts = readSourceTexts(root);
     const bad = { ...DEFAULT_SOURCES, hazardMotion: { ...DEFAULT_SOURCES.hazardMotion, ROLL_STEP_MS: Infinity } };
-    expect(() => assembleRuleset({ content, engineVersions }, bad)).toThrow(RulesetRegistryError);
+    expect(() => assembleRuleset({ content, engineVersions, sourceTexts }, bad)).toThrow(RulesetRegistryError);
   });
 
   test('every exclusion carries a reason', () => {

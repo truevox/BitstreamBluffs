@@ -233,6 +233,49 @@ export const RULESET_SOURCES = Object.freeze([
     },
   },
   {
+    id: 'trickTracker',
+    file: 'src/systems/TrickTracker.js',
+    exports: bucket('constants.trickTracker', [
+      'AIR_BRAKE_MIN_MS', 'CRASH_IMPACT_PX_S', 'DEFAULT_MIN_AIRTIME_MS', 'FLIP_TOLERANCE_DEG', 'GOOD_ANGLE_DEG',
+      'HARD_IMPACT_PX_S', 'MID_SPIN_MIN_DEG', 'PARACHUTE_MIN_MS', 'PERFECT_ANGLE_DEG', 'PERFECT_MAX_IMPACT_PX_S',
+      'SLOPPY_ANGLE_DEG',
+    ]),
+  },
+  {
+    id: 'biomeEffects',
+    file: 'src/systems/BiomeEffects.js',
+    exports: {
+      ...bucket('constants.biomeEffects', [
+        'BLIND_DEFAULT_MS', 'BLIND_DEFAULT_VISIBILITY', 'BLIND_FADE_IN_MS', 'BLIND_FADE_OUT_MS', 'BLIND_MIN_VISIBILITY',
+        'GLIDE_DEFAULT_FRICTION_MUL', 'GLIDE_MIN_FRICTION_MUL', 'GUST_MAX_PX_S', 'SHIELD_DEFAULT_SOURCE',
+        'SPRING_REBOUND_MAX_PX_S', 'SPRING_REBOUND_MAX_SHARE', 'SPRING_REBOUND_MIN_PX_S', 'STABILIZE_MAX_DEG',
+        'TIMED_POWERUP_DEFAULT_MS',
+      ]),
+      HAZARD_SHAPES: exc('list of shapeKeys with a draw routine (entities/Hazard.js); draw-only'),
+      POWERUP_SHAPES: exc('list of shapeKeys with a glyph (entities/PowerUp.js); draw-only'),
+    },
+  },
+  {
+    id: 'wards',
+    file: 'src/systems/Wards.js',
+    exports: bucket('constants.wards', ['WARD_MAX_MS', 'WARD_MAX_SPEED_FACTOR', 'WARD_MIN_MS']),
+  },
+  {
+    id: 'bsodBluffTracker',
+    file: 'src/systems/BsodBluffTracker.js',
+    exports: { BLUFF: inc('constants.bsodBluff.BLUFF') },
+  },
+  {
+    id: 'shardMagnet',
+    file: 'src/systems/ShardMagnet.js',
+    exports: bucket('constants.shardMagnet', ['MAGNET_HOLE_OFFSET', 'MAGNET_MIN_SYNC_LEVEL']),
+  },
+  // Causal modules that export no data today: registered empty so a NEW data export fails until it is classified.
+  { id: 'bsodAerodynamics', file: 'src/systems/BsodAerodynamics.js', exports: {} },
+  { id: 'rng', file: 'src/systems/Rng.js', exports: {} },
+  { id: 'scoreManager', file: 'src/systems/ScoreManager.js', exports: {} },
+  { id: 'terrainContact', file: 'src/systems/TerrainContact.js', exports: {} },
+  {
     id: 'dailyPatch',
     file: 'src/systems/DailyPatch.js',
     exports: {},
@@ -242,6 +285,78 @@ export const RULESET_SOURCES = Object.freeze([
       },
     },
   },
+]);
+
+/**
+ * Modules that cannot be imported in node (they pull in Phaser) but hold causal top-level numeric constants. Their
+ * constants are read by SOURCE EXTRACTION: a column-0 `const NAME = <numeric literal | numeric array | frozen object of
+ * numbers>;` line parsed by `scanNumericConsts` (no eval, no import). Every such constant in the file must be classified;
+ * constants computed from other expressions (e.g. `Math.min(950, TIMING...)`, `Math.PI / 180`) are invisible to the scan
+ * (documented gap: the tripwire and SIM_REVISION cover them). Pure data; the caller supplies the file text.
+ */
+export const SOURCE_EXTRACTS = Object.freeze([
+  {
+    id: 'runScene',
+    file: 'src/scenes/RunScene.js',
+    consts: {
+      SAFE_SAMPLE_EVERY_MS: inc('constants.runScene.SAFE_SAMPLE_EVERY_MS'),
+      SAFE_HISTORY_MS: inc('constants.runScene.SAFE_HISTORY_MS'),
+      SLOWMO_CAP_MS: inc('constants.runScene.SLOWMO_CAP_MS'),
+      SPAWN_RUNIN_PX: inc('constants.runScene.SPAWN_RUNIN_PX'),
+      HOP_HINT_LEAD_S: exc('first-run tutorial hint trigger (HintScheduler): presentation'),
+      HOP_HINT_MIN_PX: exc('first-run tutorial hint trigger: presentation'),
+      HOP_HINT_MAX_PX: exc('first-run tutorial hint trigger: presentation'),
+      HOP_DANGER_S: exc('first-run tutorial hint gating: presentation'),
+      FLIP_APPROACH_S: exc('first-run tutorial hint trigger: presentation'),
+      FLIP_APPROACH_MIN_PX: exc('first-run tutorial hint trigger: presentation'),
+      FLIP_AIR_MS: exc('first-run tutorial hint trigger (`wants.flip`): presentation'),
+      BOOST_HINT_MS: exc('first-run tutorial hint window (`wants.boost`): presentation'),
+      TUCK_HINT_MIN_RUN_MS: exc('first-run tutorial hint gating: presentation'),
+      LOOK_FAR_EXTRA_PX: exc('camera look-ahead: presentation'),
+      LOOK_ULTRA_EXTRA_PX: exc('camera look-ahead: presentation'),
+      RIDER_MIN_SCREEN_X: exc('camera framing: presentation'),
+    },
+  },
+  { id: 'shard', file: 'src/entities/Shard.js', consts: {} },
+  {
+    id: 'sled',
+    file: 'src/entities/Sled.js',
+    consts: { CAT: inc('constants.sled.CAT') },
+  },
+  {
+    id: 'terrainMesh',
+    file: 'src/entities/TerrainMesh.js',
+    consts: {
+      COLLIDER_DEPTH: inc('constants.terrainMesh.COLLIDER_DEPTH'),
+      FILL_DEPTH: exc('visual fill polygon depth (draw-only; the collider uses COLLIDER_DEPTH)'),
+    },
+  },
+]);
+
+/**
+ * Modules under src/systems and src/entities that sim code imports and that export constants but are deliberately NOT
+ * part of the ruleset. Each needs a reason; tests/replay/rulesetCoverage.test.js fails for any other reachable module
+ * that exports a constant.
+ */
+export const NON_CAUSAL_MODULES = Object.freeze([
+  { file: 'src/entities/Background.js', reason: 'background motifs: draw-only' },
+  { file: 'src/entities/BillboardArt.js', reason: 'billboard artwork catalogue/URLs: draw-only' },
+  { file: 'src/entities/GhostRider.js', reason: 'ghost sprite alpha/depth: draw-only' },
+  { file: 'src/entities/GroundTelegraph.js', reason: 'hazard warning badge layout: draw-only' },
+  { file: 'src/entities/KodiakRider.js', reason: 'sprite depth: draw-only' },
+  { file: 'src/entities/SongBillboard.js', reason: 'music billboard layout and artwork: draw-only' },
+  { file: 'src/systems/BiomeDiscovery.js', reason: 'profile progression bookkeeping (which biomes were seen); the run records the resulting biomeMask' },
+  { file: 'src/systems/BsodGym.js', reason: 'Gym mode setup and pricing; gym runs are never evidence-eligible (contract 4.3 info.lane)' },
+  { file: 'src/systems/CameraZoom.js', reason: 'camera zoom stages: presentation (any sim read of camera view is #140/#155 territory)' },
+  { file: 'src/systems/ControlLayouts.js', reason: 'input binding layouts; the recorded pad bits are the protocol (bb-pad)' },
+  { file: 'src/systems/Cosmetics.js', reason: 'cosmetic catalogue' },
+  { file: 'src/systems/CrashReport.js', reason: 'Game Over text timing/beat labels: presentation' },
+  { file: 'src/systems/HazardTelegraph.js', reason: 'ground warning timing: presentation' },
+  { file: 'src/systems/HintScheduler.js', reason: 'first-run hint definitions: presentation' },
+  { file: 'src/systems/MarkerLayout.js', reason: 'minimap/marker label layout: presentation' },
+  { file: 'src/systems/MicroBees.js', reason: 'decor particles: presentation' },
+  { file: 'src/systems/SaveStore.js', reason: 'local ledger and sharecode formats (V1-V4 hashes are not simulation; never rehashed)' },
+  { file: 'src/systems/music/MusicPlaylist.js', reason: 'audio playlist: presentation' },
 ]);
 
 /**
@@ -335,6 +450,67 @@ export function classifyExports(source, ns) {
     for (const m of Object.keys(members)) if (!seen.has(`${cls}.${m}`)) stale.push(`${cls}.${m}`);
   }
   return { unregistered: unregistered.sort(), stale: stale.sort() };
+}
+
+const NUM_RE = /^-?(?:0x[0-9a-fA-F]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?)$/;
+const parseNum = (t) => (NUM_RE.test(t.trim()) ? Number(t.trim()) : null);
+const stripFreeze = (rhs) => {
+  const m = /^Object\.freeze\((.*)\)$/.exec(rhs.trim());
+  return m ? m[1].trim() : rhs.trim();
+};
+
+/** Parse a numeric literal, a flat numeric array, or a flat `{key: number}` object. No eval. Null when not such a literal. */
+function parseLiteral(rhs) {
+  const t = stripFreeze(rhs);
+  const n = parseNum(t);
+  if (n !== null) return n;
+  if (t.startsWith('[') && t.endsWith(']')) {
+    const parts = t.slice(1, -1).split(',').map((x) => x.trim()).filter((x) => x.length);
+    const vals = parts.map(parseNum);
+    return vals.length && vals.every((v) => v !== null) ? vals : null;
+  }
+  if (t.startsWith('{') && t.endsWith('}')) {
+    const out = {};
+    const parts = t.slice(1, -1).split(',').map((x) => x.trim()).filter((x) => x.length);
+    if (!parts.length) return null;
+    for (const part of parts) {
+      const m = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+)$/.exec(part);
+      const v = m ? parseNum(m[2]) : null;
+      if (v === null) return null;
+      out[m[1]] = v;
+    }
+    return out;
+  }
+  return null;
+}
+
+/**
+ * Column-0 single-line `[export ]const NAME = <literal>;` declarations whose value is a numeric literal, a flat numeric
+ * array or a flat object of numbers (optionally `Object.freeze`d). Returns `{NAME: value}`. Anything else (computed
+ * values, multi-line literals, strings) is not reported: that is the documented extraction gap.
+ * @param {string} text
+ * @returns {Object<string, (number|number[]|Object)>}
+ */
+export function scanNumericConsts(text) {
+  const out = {};
+  for (const line of text.split('\n')) {
+    const m = /^(?:export )?const ([A-Za-z_][A-Za-z0-9_]*) = (.+?);\s*(?:\/\/.*)?$/.exec(line);
+    if (!m) continue;
+    const v = parseLiteral(m[2]);
+    if (v !== null) out[m[1]] = v;
+  }
+  return out;
+}
+
+/**
+ * Compare a file's scanned constants with its SOURCE_EXTRACTS entry.
+ * @returns {{unregistered:string[], stale:string[]}}
+ */
+export function classifyExtract(extract, text) {
+  const found = scanNumericConsts(text);
+  const unregistered = Object.keys(found).filter((n) => !(n in extract.consts)).sort();
+  const stale = Object.keys(extract.consts).filter((n) => !(n in found)).sort();
+  return { unregistered, stale };
 }
 
 /**

@@ -2,6 +2,10 @@
 
 Status: implements Replay Contract v1 section 7 (`docs/replay/replay-contract-v1.md`). Nothing here changes physics, `RunRecord`, `SaveStore` ledger hashes (V1-V4) or `sanitizeRun`.
 
+## Status: library-only
+
+Nothing in gameplay, `RunRecord`, the SaveStore or any scoreboard imports these modules yet. The acceptance bullet "current scoreboard cannot silently mix versions" is delivered as a tested, pure helper (`rulesetScoreboard.js`), not as shipped behavior. The two-version proof (`tests/replay/rulesetTwoVersion.test.js`) covers selection and partition logic with a toy simulation; it does not run the real game under two rulesets, because the live simulation reads module globals and a ruleset cannot yet parameterize it.
+
 ## What exists
 
 | Piece | Where |
@@ -30,8 +34,13 @@ Everything here is computed by the client over client-supplied data. A player ca
 
 - Changed a constant, content JSON or `SIM_REVISION`: the `rulesetId` changes; run `node tools/ruleset/build-ruleset.mjs --write` and commit the new archive file (old files stay).
 - Changed causal code behavior (even a bug fix, even with no constant touched): **bump `SIM_REVISION` in the same PR**, then `--write` and `--attest "sim-revision-bumped: <what>"`.
-- Edited a tripwire file without a behavior change: `--attest "no-behavior-change: <why>"`. The tripwire digest is not part of `rulesetId` (a refactor must not change identity) and is not a proof; it forces a human decision. `RunScene.js` is not on the allowlist (mostly presentation); its engine literals are pinned instead (`HIDDEN_LITERALS`).
-- A new exported constant in a causal module must be classified in `rulesetRegistry.js` (included at a path, or excluded with a reason) or assembly and tests fail. Literals inside function bodies (Sled geometry, `expectedSpeedPxS` ramps, the `x > 480` start margin, Kodiak body box) are invisible to the id: `SIM_REVISION`, canaries (#117) and the tripwire are their only guard.
+- Edited a tripwire file without a behavior change: `--attest "no-behavior-change: <why>"`. The tripwire digest is not part of `rulesetId` (a refactor must not change identity) and is not a proof; it forces a human decision.
+- A new exported constant in a causal module must be classified in `rulesetRegistry.js` (included at a path, or excluded with a reason) or assembly and tests fail. This now covers TerrainGenerator, HazardMotion, Kodiaks, PhysicsTuner, TrickTracker, BiomeEffects, Wards, BsodBluffTracker, ShardMagnet and the other registered modules. `tests/replay/rulesetCoverage.test.js` also walks the import graph from `RunScene.js`: every `src/systems` / `src/entities` module that exports a constant must be registered, extracted, or on `NON_CAUSAL_MODULES` with a reason.
+- Modules that cannot be imported in node (`RunScene.js`, `Sled.js`, `TerrainMesh.js`, `Shard.js`) have their column-0 numeric constants read by source extraction (`SOURCE_EXTRACTS`: literal numbers, numeric arrays and flat number objects only; no eval, no import). `RunScene.js` is on the tripwire allowlist. Remaining gap, precisely: values that are computed (`Math.min(950, TIMING.crashToGameOverMs)`, `Math.PI / 180`), multi-line literals, and literals inside function bodies (Sled geometry and density, `expectedSpeedPxS` ramps, the `x > 480` start margin, Kodiak body box, RunScene's `sledBox` 36x30 and similar) are invisible to the id. `SIM_REVISION`, canaries (#117) and the tripwire are their only guard.
+- Tripwire attestations have three categories, all with a mandatory free-text reason (`--attest "<category>: <reason>"`):
+  - `no-behavior-change: <why>` for refactors and presentation edits.
+  - `sim-revision-bumped: <what>`: accepted only if `SIM_REVISION` actually exceeds the previously committed artifact's.
+  - `behavior-change-unreleased: <why>`: causal behavior changed inside a revision that has not been released. Valid only while `SIM_REVISION > LAST_RELEASED_SIM_REVISION` (in `ruleset.js`, today 0: no ruleset has shipped on main, so revision 1 may still change). The PR that releases a ruleset sets `LAST_RELEASED_SIM_REVISION = SIM_REVISION`; from then on a behavior change needs a real bump and this category is rejected.
 
 ## Owner decisions (not adopted here)
 

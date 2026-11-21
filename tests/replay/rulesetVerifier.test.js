@@ -20,11 +20,15 @@ const sha = (t) => digestOfBytes(utf8Encode(t));
 const tapeDigest = sha('tape');
 const manifestDigest = sha('manifest');
 
-const manifest = (rulesetId, extra = {}) => ({
-  format: 'bb-replay-manifest',
-  causal: { sim: { rulesetId, simRevision: null, tickHz: null, engine: null, ...extra } },
-  info: { provenance: rulesetId === null ? 'legacy-derived' : 'live-recording' },
-});
+const docs = { [currentId]: current, [oldId]: old, [unknownId]: unknownDoc };
+// Contract 4.3: simRevision/tickHz/engine are required with a non-null rulesetId (null only on legacy-derived manifests).
+const manifest = (rulesetId, extra = {}) => {
+  const d = docs[rulesetId] || current;
+  const sim = rulesetId === null
+    ? { rulesetId, simRevision: null, tickHz: null, engine: null }
+    : { rulesetId, simRevision: d.simRevision, tickHz: d.versions.tickHz, engine: { phaser: d.engine.phaser, matter: d.engine.matter } };
+  return { format: 'bb-replay-manifest', causal: { sim: { ...sim, ...extra } }, info: { provenance: rulesetId === null ? 'legacy-derived' : 'live-recording' } };
+};
 
 describe('createRulesetRegistry', () => {
   test('recomputes ids from the document; a duplicate ruleset or a malformed verifier digest is rejected', () => {
@@ -90,7 +94,20 @@ describe('resolveVerifier (7.3)', () => {
     expect(resolveVerifier(manifest(currentId, { simRevision: current.simRevision + 5 }), reg)).toMatchObject({ reason: REFUSAL.RULESET_FIELD_MISMATCH, field: 'simRevision' });
     expect(resolveVerifier(manifest(currentId, { tickHz: 60 }), reg)).toMatchObject({ reason: REFUSAL.RULESET_FIELD_MISMATCH, field: 'tickHz' });
     expect(resolveVerifier(manifest(currentId, { engine: { phaser: '3.90.0', matter: '9.9.9' } }), reg)).toMatchObject({ field: 'engine' });
-    expect(resolveVerifier(manifest(currentId, { simRevision: current.simRevision, tickHz: 120, engine: { phaser: '3.90.0', matter: '0.20.0' } }), reg).status).toBe('run');
+    expect(resolveVerifier(manifest(currentId), reg).status).toBe('run');
+  });
+
+  test('simRevision, tickHz and engine are REQUIRED with a non-null rulesetId (contract 4.3), not optional copies', () => {
+    for (const field of ['simRevision', 'tickHz', 'engine']) {
+      for (const bad of [null, undefined]) {
+        const m = manifest(currentId);
+        m.causal.sim[field] = bad;
+        expect(resolveVerifier(m, reg)).toMatchObject({ status: 'refused', reason: REFUSAL.MALFORMED_MANIFEST, field });
+      }
+    }
+    const m = manifest(currentId);
+    delete m.causal.sim.engine;
+    expect(resolveVerifier(m, reg).reason).toBe(REFUSAL.MALFORMED_MANIFEST);
   });
 
   test('resolutions are frozen', () => {
