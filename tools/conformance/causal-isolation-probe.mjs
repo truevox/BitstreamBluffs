@@ -6,6 +6,8 @@
  *
  * Env: FIXTURES=tricks,hazards,kodiak,bsod  CASES=baseline-repeat,cadence-144,...  OUT=matrix.json
  *      PARALLEL=3  EXPECT_ISOLATION=1 (exit 1 on an unexpected leak)
+ *      RESULTS=cells.json: every finished cell is written there as soon as it completes, keyed by build
+ *      (the hashed entry script of the served page) + fixture + case; a rerun skips finished cells.
  *
  * Every run gets a fresh Chromium page, RunScene.update is held until the scene exists, the
  * game loop is put to sleep and frames are stepped with game.step(t, dt). Input comes from a
@@ -333,13 +335,35 @@ const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const fixtures = (process.env.FIXTURES || Object.keys(FIXTURES).join(',')).split(',').filter(Boolean);
   const onlyCases = process.env.CASES ? process.env.CASES.split(',') : null;
+  const RESULTS = process.env.RESULTS || null;
+  const html = await (await fetch(url)).text();
+  const build = (html.match(/assets\/[^"']+\.js/) || ['unknown'])[0];
+  let cells = {};
+  if (RESULTS && existsSync(RESULTS)) { try { cells = JSON.parse(await readFile(RESULTS, 'utf8')); } catch (e) { cells = {}; } }
+  const cellKey = (f, c) => `${build}|${f}|${c}`;
+  let saving = Promise.resolve();
+  const saveCell = (r) => {
+    if (!RESULTS) return;
+    const { states, digests, ...slim } = r;
+    cells[cellKey(r.fixture, r.case)] = slim;
+    saving = saving.then(() => writeFile(RESULTS, JSON.stringify(cells)));
+  };
+  console.log('BUILD', build);
   const report = { kind: 'bb-causal-isolation-matrix/diagnostic', url, generatedAt: new Date().toISOString(), fixtures: {}, rows: [] };
   for (const f of fixtures) {
+    const planned = PLAN[f].filter((c) => !onlyCases || onlyCases.includes(c));
+    const todo = planned.filter((c) => !cells[cellKey(f, c)] || cells[cellKey(f, c)].error);
+    if (!todo.length) {
+      console.log('SKIP_FIXTURE (all cells cached)', f);
+      for (const c of planned) { const r = cells[cellKey(f, c)]; console.log(fmtRow(r)); report.rows.push(r); }
+      continue;
+    }
     const base = await runCase(f, 'baseline-repeat', null);
     if (base.errors.length) console.log('BASELINE_PAGE_ERRORS', f, base.errors);
     report.fixtures[f] = { baseline: base.meta, tape: FIXTURES[f].tape, ticks: FIXTURES[f].ticks };
     console.log('BASELINE', f, JSON.stringify(base.meta));
-    const cases = PLAN[f].filter((c) => !onlyCases || onlyCases.includes(c));
+    const cases = todo;
+    for (const c of planned) if (!todo.includes(c)) report.rows.push(cells[cellKey(f, c)]);
     const extra = {};
     for (const b of new Set(cases.map((c) => CASES[c].baseline).filter(Boolean))) {
       extra[b] = await runCase(f, b, null);
@@ -347,8 +371,11 @@ if (isMain) {
     }
     const rows = await pool(cases, PARALLEL, async (c) => {
       const against = CASES[c].baseline ? extra[CASES[c].baseline] : base;
-      try { return { ...(await runCase(f, c, against)), against: CASES[c].baseline || 'baseline-repeat' }; }
-      catch (e) { return { fixture: f, case: c, error: String(e && e.stack || e) }; }
+      let r;
+      try { r = { ...(await runCase(f, c, against)), against: CASES[c].baseline || 'baseline-repeat' }; }
+      catch (e) { r = { fixture: f, case: c, error: String(e && e.stack || e) }; }
+      saveCell(r);
+      return r;
     });
     for (const r of rows) {
       console.log(fmtRow(r));
@@ -358,6 +385,7 @@ if (isMain) {
       report.rows.push(r);
     }
   }
+  await saving;
   if (process.env.OUT) await writeFile(process.env.OUT, JSON.stringify(report, null, 1));
   const unexpected = report.rows.filter((r) => !r.diff || (r.diff.verdict === 'causal-leak' && !(r.tag || '').includes('#115') && r.tag !== 'positive control')
     || (r.tag === 'positive control' && r.diff.verdict !== 'causal-leak'));
