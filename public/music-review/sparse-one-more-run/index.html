@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>One More Run · Sparse MIDI Audition · Bitstream Bluffs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="intro">
+      <div class="eyebrow"><span class="glyph">◆</span> BITSTREAM BLUFFS <span class="slash">/</span> MUSIC LAB</div>
+      <h1>One More <em>Run.</em></h1>
+      <p class="subtitle">How much music can we remove before the groove disappears?</p>
+      <p class="caption">A synchronized, same-excerpt audition. The original vocal recording stays in every option.</p>
+    </header>
+    <section class="transport" aria-label="Playback">
+      <div class="transport-top">
+        <div class="disc" aria-hidden="true"><div class="disc-center"></div></div>
+        <div class="track-title">
+          <div class="overline">NOW AUDITIONING</div>
+          <strong id="current-name">Loading audio…</strong>
+          <span id="current-description">One More Run (The Ballad of Bitstream Bluffs)</span>
+        </div>
+        <button type="button" id="play" class="play-btn" disabled>▶ <span>Play</span></button>
+      </div>
+      <canvas id="waveform" width="900" height="90" aria-hidden="true"></canvas>
+      <div class="seek-row">
+        <span id="elapsed">00:36</span>
+        <input type="range" id="seek" min="0" max="48" step="0.02" value="0" aria-label="Seek within audition">
+        <span id="remaining">01:24</span>
+      </div>
+      <div class="transport-bottom">
+        <div class="status"><span class="status-light"></span><span id="status">Loading six aligned audio renders…</span></div>
+        <label class="volume-label">Volume <input type="range" id="volume" min="0" max="100" value="75" aria-label="Volume"></label>
+      </div>
+    </section>
+    <section class="options" aria-labelledby="options-title">
+      <div class="section-heading">
+        <div><div class="overline">THE EXPERIMENT</div><h2 id="options-title">Swap while listening.</h2></div>
+        <label class="blind-toggle"><input type="checkbox" id="blind"> <span>Blind audition</span></label>
+      </div>
+      <div class="choices" id="choices">
+        <p>Preparing choices…</p>
+      </div>
+      <p class="help">Tap any version mid-song for a 40 ms crossfade at the same playback position. Keyboard: <kbd>1</kbd>–<kbd>6</kbd> for variants, <kbd>Space</kbd> to play/pause.</p>
+    </section>
+    <section class="context">
+      <article>
+        <div class="overline">WHAT IS FIXED</div>
+        <h3>Same vocals. Same excerpt.</h3>
+        <p>Each candidate covers 00:36–01:24 of the same track. MIDI options use the captured source-event performance score. No live browser synthesizer is used.</p>
+      </article>
+      <article>
+        <div class="overline">HOW TO INTERPRET</div>
+        <h3>Dense is the control.</h3>
+        <p>Compare <b>Dense synth</b> to the sparse synth options to isolate note density. <b>Recorded</b> uses the existing game MIDI-derived audio, so its instrument timbres differ. <b>Hybrid</b> mixes source stems with sparse accents.</p>
+      </article>
+      <article>
+        <div class="overline">EXPERIMENTAL CAVEAT</div>
+        <h3>Timing still needs ears.</h3>
+        <p>The beat candidates are <strong>unverified</strong>; this is not an approved tempo map. Source pitch extraction is also provisional. Nothing here replaces the game mix or masters.</p>
+      </article>
+    </section>
+    <footer>PRIVATE LISTENING TEST <span>·</span> NOT A RELEASE MASTER <span>·</span> ORIGINAL STEREO RECORDINGS PRESERVED</footer>
+  </main>
+  <script src="app.js" defer></script>
+</body>
+</html>
