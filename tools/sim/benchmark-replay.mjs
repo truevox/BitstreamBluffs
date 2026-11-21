@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { REG, SCENES } from '../../src/constants.js';
+import { EVT } from '../../src/events.js';
 import { RUN_RANDOM_VERSION } from '../../src/systems/RunRandom.js';
 import { SIM_TICK_HZ } from '../../src/systems/SimClock.js';
 import { tapeCompatible } from '../../src/systems/ghost/GhostLibrary.js';
@@ -18,6 +19,7 @@ import { GhostRecorder } from '../../src/systems/ghost/GhostTape.js';
 import {
   MAX_AIRTIME_FILE_BYTES, airtimeBuildPin, assertAirtimeMatch, summarizeAirtime, validateAirtimeTape,
 } from './replay-airtime.js';
+import { CrashBriefError, checkFatalObservation, crashBriefBuildPin, crashBriefReport } from './replay-crash-brief.js';
 
 const fixedTime = Date.UTC(2026, 0, 5, 12);
 const viewport = { width: 960, height: 540 };
@@ -64,12 +66,23 @@ export function summarize(samples) {
 
 // Serialized into the page by Playwright, so the function only uses its arguments
 // and browser globals. The optional game and clock parameters are test seams.
-export function replayFrames({ tickLimit, measure, keys, observeGrounded = false }, game = globalThis.__bbGame, now = () => performance.now()) {
+export function replayFrames({ tickLimit, measure, keys, observeGrounded = false, crashEvent }, game = globalThis.__bbGame, now = () => performance.now()) {
   const run = game.scene.getScene(keys.run);
   const dt = run.simClock.tickMs;
   const originalTick = run.simTick;
   const hadOwnTick = Object.hasOwn(run, 'simTick');
   const tickTimes = [], frameTimes = [], overheadTimes = [], states = [], grounded = [];
+  let fatalCount = 0, fatalEvent;
+  const observeFatal = (event) => {
+    if (event?.fatal !== true) return;
+    fatalCount++;
+    if (fatalCount === 1 && event.runId === run.runId && event.negated === false) {
+      // Private comparison only, without the event's run identity.
+      fatalEvent = { tick: run.simClock.tick, cause: event.cause, hazardId: event.hazardId,
+        x: event.x, y: event.y, speedPxS: event.speedPxS };
+    }
+  };
+  if (crashEvent) game.events.on(crashEvent, observeFatal);
   if (measure) {
     run.simTick = function (...args) {
       const start = now();
@@ -110,17 +123,21 @@ export function replayFrames({ tickLimit, measure, keys, observeGrounded = false
       dailyRuleId: run.dailyRuleId, checked: run.tapePlayer.checked, desync: run.tapePlayer.desync,
       savedRecord: Boolean(game.registry.get(keys.record) || game.registry.get(keys.latestTape)),
       tickTimes, frameTimes, overheadTimes, ...(observeGrounded ? { grounded } : {}),
+      ...(crashEvent ? { fatalCount, fatalEvent } : {}),
     };
   } finally {
+    if (crashEvent) game.events.off(crashEvent, observeFatal);
     if (measure && hadOwnTick) run.simTick = originalTick;
     else if (measure) delete run.simTick;
   }
 }
 
-async function browserReplay(browser, url, tape, tickLimit, measure, airtime = false) {
+async function browserReplay(browser, url, tape, tickLimit, measure, airtime = false, crashBrief = false) {
+  const strict = airtime || crashBrief;
   const setupStart = performance.now();
   // An empty, throwaway context cannot see a player's profile, reports or ghosts.
   const context = await browser.newContext({ viewport, serviceWorkers: 'block' }).catch((error) => {
+    if (crashBrief) throw new CrashBriefError('Could not open a local Chromium context for crash brief');
     if (!airtime) throw error;
     throw new Error('Could not open a local Chromium context for airtime');
   });
@@ -136,7 +153,8 @@ async function browserReplay(browser, url, tape, tickLimit, measure, airtime = f
   try {
     await context.route('**/*', async (route) => {
       try {
-        if (new URL(route.request().url()).origin !== url.origin) {
+        const request = route.request();
+        if (new URL(request.url()).origin !== url.origin || (crashBrief && !['GET', 'HEAD'].includes(request.method()))) {
           await route.abort();
           return;
         }
@@ -159,13 +177,13 @@ async function browserReplay(browser, url, tape, tickLimit, measure, airtime = f
     await page.clock.setFixedTime(new Date(tape.startedAt ?? fixedTime));
     await page.goto(url.href, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction((title) => window.__bbGame?.scene.getScene(title)?.sys.isActive(), replayKeys.title);
-    await page.evaluate(({ keys, tape, airtime, settingsKey }) => {
+    await page.evaluate(({ keys, tape, strict, settingsKey }) => {
       const game = window.__bbGame;
       const run = game.scene.getScene(keys.run);
       // Stop the rAF clock before starting the replay. Drive scene creation
       // with a zero-delta frame; the normal fixed clock owes no tick yet.
       game.loop.sleep();
-      if (airtime) {
+      if (strict) {
         // Restore the declared layout only in this disposable context. Do not
         // call the settings writer or read from a player's environment.
         const defaults = game.registry.get(settingsKey);
@@ -179,7 +197,7 @@ async function browserReplay(browser, url, tape, tickLimit, measure, airtime = f
       if (!run.sys.isActive() || !run.tapePlayer || run.simClock.tick !== 0) {
         throw new Error('Replay did not initialize at tick zero');
       }
-      if (airtime) {
+      if (strict) {
         const b = run.sled.body;
         const start = [b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y, b.angularVelocity];
         const ranks = run.upgradeRun?.ranks ?? {};
@@ -200,16 +218,18 @@ async function browserReplay(browser, url, tape, tickLimit, measure, airtime = f
           throw new Error('Airtime replay did not reconstruct the recorded normal-run options');
         }
       }
-    }, { keys: replayKeys, tape, airtime, settingsKey: REG.SETTINGS });
+    }, { keys: replayKeys, tape, strict, settingsKey: REG.SETTINGS });
     const setupMs = performance.now() - setupStart;
-    const result = await page.evaluate(replayFrames, { tickLimit, measure, keys: replayKeys, observeGrounded: airtime });
-    if (airtime) {
+    const result = await page.evaluate(replayFrames, { tickLimit, measure, keys: replayKeys, observeGrounded: airtime,
+      ...(crashBrief ? { crashEvent: EVT.CRASH } : {}) });
+    if (strict) {
       const noStoredRuns = await page.evaluate(async ({ saveStore, ghosts }) => {
         const registry = window.__bbGame.registry;
         const store = registry.get(saveStore), library = registry.get(ghosts);
         return (await store?.getRecentRuns(1))?.length === 0 &&
           library?.courses?.size === 0 && library?.tapes?.size === 0;
       }, { saveStore: REG.SAVE_STORE, ghosts: REG.GHOSTS });
+      if (!noStoredRuns && crashBrief) throw new CrashBriefError('Crash brief playback must not store runs or ghost tapes');
       assert.ok(noStoredRuns, 'Airtime playback must not store runs or ghost tapes');
     }
     const pageInfo = await page.evaluate(() => {
@@ -225,6 +245,10 @@ async function browserReplay(browser, url, tape, tickLimit, measure, airtime = f
     });
     output = { ...result, setupMs, pageInfo };
   } catch (error) {
+    if (crashBrief) {
+      if (error instanceof CrashBriefError) throw error;
+      throw new CrashBriefError('Crash brief browser replay failed before checks could complete');
+    }
     if (!airtime) throw error;
     // Do not surface Playwright call locations, the supplied local paths or
     // interpolated page text from an untrusted failed replay.
@@ -239,11 +263,14 @@ async function browserReplay(browser, url, tape, tickLimit, measure, airtime = f
   } finally {
     closing = true;
     await context.close().catch((error) => {
+      if (crashBrief) throw new CrashBriefError('Crash brief browser context did not close cleanly');
       if (!airtime) throw error;
       throw new Error('Airtime browser context did not close cleanly');
     });
   }
-  if (airtime) assert.ok(errors.length === 0, 'Airtime browser or route errors');
+  if (crashBrief) {
+    if (errors.length) throw new CrashBriefError('Crash brief browser or route errors');
+  } else if (airtime) assert.ok(errors.length === 0, 'Airtime browser or route errors');
   else assert.deepEqual(errors, [], 'Browser or route errors');
   return output;
 }
@@ -330,28 +357,89 @@ async function runAirtime(browser, url, tape, repeats, build) {
   };
 }
 
+export function assertPrivateCrashBriefChecks(result, tape, reference, trial) {
+  const fatalTick = tape.endTick + 1;
+  checkFatalObservation(result, fatalTick, reference);
+  try {
+    // A fatal tick has no completed checkpoint. The strict tape reader has
+    // already required every checkpoint through the last completed tick.
+    assertReplay(result, tape, fatalTick, false);
+    assert.ok(result.states.length === fatalTick && Array.from(result.states).every((state, i) =>
+      Array.isArray(state) && state.length === 10 && state[0] === i + 1 &&
+      state.slice(1, 9).every(Number.isFinite) && state[9] === (i + 1 === fatalTick)));
+  } catch {
+    throw new CrashBriefError('Crash brief replay did not pass the checkpoint and isolation checks');
+  }
+  if (reference) {
+    try {
+      assertSameReplay(result, reference, trial);
+      assert.deepEqual(result.pageInfo, reference.pageInfo);
+    } catch {
+      throw new CrashBriefError('Crash brief observations differed between fresh replays');
+    }
+  }
+}
+
+async function runCrashBrief(browser, url, tape, repeats) {
+  let reference;
+  for (let trial = 1; trial <= repeats; trial++) {
+    let timer;
+    try {
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new CrashBriefError('Crash brief trial exceeded its 60-second wall limit')), 60000);
+      });
+      const result = await Promise.race([browserReplay(browser, url, tape, tape.endTick + 1, false, false, true), timeout]);
+      assertPrivateCrashBriefChecks(result, tape, reference, trial);
+      reference ??= result;
+    } finally { clearTimeout(timer); }
+  }
+  return crashBriefReport(reference.fatalEvent, repeats, reference.checked);
+}
+
 async function main() {
   const { values: options } = parseArgs({
     options: {
       url: { type: 'string', default: 'http://127.0.0.1:8293/' },
       tape: { type: 'string' }, ticks: { type: 'string' },
       repeats: { type: 'string', default: '3' },
-      'airtime-build': { type: 'string' }, 'native-gpu': { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
+      'airtime-build': { type: 'string' }, 'crash-brief-build': { type: 'string' },
+      'native-gpu': { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
     },
   });
   if (options.help) {
     console.log('Usage: node tools/sim/benchmark-replay.mjs [--url URL] [--tape saved-tape.json] [--ticks N] [--repeats N] [--native-gpu]');
     console.log('Airtime: add --airtime-build FULL_GIT_COMMIT and --tape FILE, omit --ticks, set --repeats 2–5');
+    console.log('Crash brief: add --crash-brief-build FULL_GIT_COMMIT and --tape FILE, omit --airtime-build and --ticks, set --repeats 2–5');
     return;
   }
-  const url = localUrl(options.url);
+  const crashBrief = options['crash-brief-build'] !== undefined;
+  if (crashBrief && options['airtime-build'] !== undefined) {
+    throw new CrashBriefError('Choose either crash brief or airtime, not both');
+  }
+  let url;
+  try { url = localUrl(options.url); }
+  catch (error) {
+    if (crashBrief) throw new CrashBriefError('Crash brief needs an HTTP loopback game URL');
+    throw error;
+  }
   const airtime = options['airtime-build'] === undefined ? null : airtimeBuildPin(options['airtime-build']);
   const repeats = Number(options.repeats);
+  if (crashBrief) {
+    crashBriefBuildPin(options['crash-brief-build']);
+    if (!options.tape || options.ticks !== undefined) {
+      throw new CrashBriefError('Crash brief needs an explicit saved --tape and does not accept --ticks');
+    }
+    if (!Number.isSafeInteger(repeats) || repeats < 2 || repeats > 5) {
+      throw new CrashBriefError('Crash brief needs 2–5 fresh runs');
+    }
+  }
   if (airtime) {
     assert.ok(options.tape && options.ticks === undefined, 'Airtime needs an explicit saved --tape and does not accept --ticks');
     assert.ok(Number.isSafeInteger(repeats) && repeats >= 2 && repeats <= 5, 'Airtime needs 2–5 fresh runs');
   }
-  const tape = airtime ? await readAirtimeTape(options.tape) : options.tape ? JSON.parse(await readFile(options.tape, 'utf8')) : defaultTape();
+  const tape = crashBrief ? await readAirtimeTape(options.tape).catch(() => {
+    throw new CrashBriefError('Crash brief needs a readable, bounded, complete compatible normal-run tape');
+  }) : airtime ? await readAirtimeTape(options.tape) : options.tape ? JSON.parse(await readFile(options.tape, 'utf8')) : defaultTape();
   assert.ok(tapeCompatible(tape) && tape.runRandomVersion === RUN_RANDOM_VERSION &&
     tape.mode === 'normal' && typeof tape.seed === 'string' && tape.seed.length &&
     Array.isArray(tape.inputs) && Array.isArray(tape.checkpoints) &&
@@ -367,9 +455,19 @@ async function main() {
   if (!options['native-gpu']) args.push('--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader');
   const executablePath = process.env.CHROMIUM_EXECUTABLE;
   const browser = await chromium.launch({ headless: true, executablePath, args }).catch((error) => {
+    if (crashBrief) throw new CrashBriefError('Could not launch local Chromium for crash brief');
     if (!airtime) throw error;
     throw new Error('Could not launch local Chromium for airtime');
   });
+  if (crashBrief) {
+    let report;
+    try { report = await runCrashBrief(browser, url, tape, repeats); }
+    finally {
+      await browser.close().catch(() => { throw new CrashBriefError('Crash brief browser did not close cleanly'); });
+    }
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
   try {
     if (airtime) {
       console.log(JSON.stringify(await runAirtime(browser, url, tape, repeats, airtime), null, 2));
@@ -426,5 +524,11 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch((error) => { console.error(error.message); process.exitCode = 1; });
+  const crashBrief = process.argv.slice(2).some((arg) => arg === '--crash-brief-build' || arg.startsWith('--crash-brief-build='));
+  main().catch((error) => {
+    // Parsing, file IO, browser paths and assertion details can all contain
+    // user strings. Only a tool-authored diagnostic may leave this mode.
+    console.error(crashBrief && !(error instanceof CrashBriefError) ? 'Crash brief failed before verification' : error.message);
+    process.exitCode = 1;
+  });
 }
