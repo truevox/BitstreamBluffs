@@ -150,8 +150,9 @@ describe('fingerprintState', () => {
     expect(fingerprintState(z).subsystems.sled).not.toBe(fingerprintState(nz).subsystems.sled);
   });
 
-  test('every schema declares a positive integer schemaVersion starting at 1', () => {
-    for (const n of FP_SUBSYSTEMS) expect(FP_SCHEMAS[n].version).toBe(1);
+  test('every schema declares a positive integer schemaVersion (bumped only by a reviewed layout change)', () => {
+    const expected = { sled: 2, matter: 2 }; // v2: sled flags.shield removed; matter staticOrder.padLast added (#165 review)
+    for (const n of FP_SUBSYSTEMS) expect([n, FP_SCHEMAS[n].version]).toEqual([n, expected[n] || 1]);
   });
 });
 
