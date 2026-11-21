@@ -11,6 +11,10 @@ const resPath = process.argv[2] || path.join(here, '..', '..', 'docs', 'determin
 const docPath = process.argv[3] || path.join(here, '..', '..', 'docs', 'determinism', 'cross-engine-matrix.md');
 const R = JSON.parse(await readFile(resPath, 'utf8'));
 const out = [];
+// Harness-native digest groups -> Replay Contract v1.0 (#152) FP_SUBSYSTEMS names. Where one native group spans several contract
+// subsystems the mapping lists all of them (this digest is coarser than the contract's 13-way split).
+const CONTRACT = { rng: 'rng', timers: 'clock', terrain: 'terrain/hazards/pickups', kodiaks: 'kodiak', bsod: 'bsod', sled: 'sled', world: 'matter', score: 'score/tricks', telegraph: 'presentation (not hashed in the contract)' };
+const cn = (list) => (list || []).map((n) => CONTRACT[n] || n).join('+');
 const w = (s = '') => out.push(s);
 
 const engines = Object.keys(R.environments);
@@ -58,13 +62,15 @@ for (const fx of fixtureIds) {
       if (ticks.length === 1 && ticks[0] === 'ok') return `ok (${rs.length})`;
       const bad = rs.filter((r) => r.firstDivergentTick);
       const first = bad.reduce((a, b) => (a.firstDivergentTick <= b.firstDivergentTick ? a : b));
-      return `${first.firstDivergentTick} ${first.subsystem.join('+')}${ticks.length > 1 ? '*' : ''} (${bad.length}/${rs.length})`;
+      return `${first.firstDivergentTick} ${cn(first.subsystem)}${ticks.length > 1 ? '*' : ''} (${bad.length}/${rs.length})`;
     });
     w(`| ${e} | ${cells.join(' | ')} |`);
   }
   w();
 }
 
+w('Subsystem names are the Replay Contract v1.0 names (`clock, rng, sled, matter, terrain, hazards, pickups, effects, bsod, kodiak, score, tricks, recovery`). This harness digest is coarser: its `terrain` group also covers hazard/pickup counts, `score` also covers trick counters, `world` is the whole Matter world (`matter`), `timers` is `clock`. Native names stay in the raw JSON.');
+w();
 w('### Telegraph (presentation-derived, issue #155) differences');
 w();
 const tele = rows.filter((r) => r.telegraphFirstDiffTick && !r.firstDivergentTick);
@@ -114,7 +120,7 @@ for (const m of R.mathDiagnosis || []) {
   w(`- **${m.engine} / ${m.fixture} / ${m.hz} Hz**: first state divergence at tick ${m.divergentTick}. Ops that returned different results for identical arguments (vs chromium-headless-shell): ${impl}. At the divergent tick: ${m.suspectAtDivergentTick?.length ? m.suspectAtDivergentTick.join(', ') : 'none identified'}. ${ex.length ? 'Examples: ' + ex.join('; ') + '.' : ''}`);
   if (m.counterfactual) {
     const c = m.counterfactual;
-    w(`  - Counterfactual (those ops replaced by a pure-JS +,-,*,/,sqrt implementation in BOTH engines): ${c.firstDivergentTick ? `still diverges at tick ${c.firstDivergentTick} (${c.subsystem.join('+')})` : 'NO divergence over the whole run (digests identical)'}; final outcome ${c.badOutcome.ticks} ticks / ${c.badOutcome.distanceM} m / score ${c.badOutcome.score}.`);
+    w(`  - Counterfactual (those ops replaced by a pure-JS +,-,*,/,sqrt implementation in BOTH engines): ${c.firstDivergentTick ? `still diverges at tick ${c.firstDivergentTick} (${cn(c.subsystem)})` : 'NO divergence over the whole run (digests identical)'}; final outcome ${c.badOutcome.ticks} ticks / ${c.badOutcome.distanceM} m / score ${c.badOutcome.score}.`);
   }
 }
 if (!(R.mathDiagnosis || []).length) w('No divergence, so no isolation pass was needed.');
@@ -126,7 +132,7 @@ const byRun = new Map();
 for (const r of rows) { const k = `${r.engine}|${r.hz}|${r.fixture.replace(/ \(.*/, '')}`; const a = byRun.get(k) || new Set(); a.add(r.digestRoll); byRun.set(k, a); }
 const unstable = [...byRun].filter(([, s]) => s.size > 1);
 const posDiv = rows.filter((r) => r.engine.startsWith('chromium') && r.firstDivergentTick);
-if (posDiv.length) w(`**Session-position leak on Chromium**: ${posDiv.length} Chromium runs diverged from their fresh-context reference although engine and cadence were identical. Examples: ${[...new Set(posDiv.map((r) => `${r.fixture} as run #${r.run} @tick ${r.firstDivergentTick} (${r.subsystem.join('+')})`))].slice(0, 8).join('; ')}.`);
+if (posDiv.length) w(`**Session-position leak on Chromium**: ${posDiv.length} Chromium runs diverged from their fresh-context reference although engine and cadence were identical. Examples: ${[...new Set(posDiv.map((r) => `${r.fixture} as run #${r.run} @tick ${r.firstDivergentTick} (${cn(r.subsystem)})`))].slice(0, 8).join('; ')}.`);
 w(unstable.length ? `Cells whose digest differed between runs/sessions on the same engine and cadence (position-in-session or session-to-session instability): ${unstable.map(([k]) => k).join('; ')}.` : 'For every engine, cadence and fixture, all runs gave one identical digest roll regardless of position in the session (runs 1-10) and across the two fresh contexts, including the repeat of run 1 at the end of each session.');
 w();
 if (errs.length) { w('### Errors'); w(); for (const e of errs) w(`- ${e.engine} ${e.hz} Hz s${e.session}${e.run ? ' #' + e.run : ''} ${e.fixture || ''}: ${e.error}`); w(); }
