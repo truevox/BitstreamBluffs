@@ -1,7 +1,7 @@
 // Issue #47: hostile racing Kodiaks. Pure behaviour; the game wiring is covered by tools/kodiak-browser-smoke.mjs.
 import fs from 'fs';
 import { KODIAK_DEFS, KODIAK_KINDS, KODIAK_BY_ID, KODIAK_MIN_SYNC_LEVEL, KODIAK_FIRST_M, kodiaksEnabledFor, kodiakEncounter,
-  spawnKodiak, stepKodiak, kodiakBox, kodiakHits } from '../../src/systems/Kodiaks.js';
+  spawnKodiak, stepKodiak, kodiakBox, kodiakHits, spawnKodiakPack, stepKodiakPack, kodiakThreatening, KODIAK_CLEAR_PX } from '../../src/systems/Kodiaks.js';
 import { killerName } from '../../src/systems/CrashReport.js';
 
 /** Run a bear against a sled at constant speed on flat ground; record its phase changes. */
@@ -84,4 +84,48 @@ describe('Kodiaks', () => {
   test('every bear leaves within its lifetime (no perpetual bear combat)', () => {
     for (const kind of KODIAK_KINDS) expect(race(kind, { ms: 20000 }).k.done).toBe(true);
   });
+
+  test('race bears come in packs of 2-3: one type in SAME mode, at least two types in MIXED mode', () => {
+    for (let n = 0; n < 30; n++) {
+      const same = kodiakEncounter('PACKS', n, 'same'), mixed = kodiakEncounter('PACKS', n, 'mixed');
+      expect(same.members.length).toBeGreaterThanOrEqual(2);
+      expect(same.members.length).toBeLessThanOrEqual(3);
+      expect(new Set(same.members).size).toBe(1);
+      expect(new Set(mixed.members).size).toBe(mixed.members.length);
+      expect(mixed.members[0]).toBe(same.kind); // same schedule and lead type in both modes
+      expect(same.atM).toBe(mixed.atM);
+    }
+    expect(kodiakEncounter('PACKS', 0, 'same').members.length).toBe(2); // the first pack of a run is 2
+  });
+
+  test('a pack attacks one bear at a time, and never while another bear is close enough to need hopping', () => {
+    for (const mode of ['same', 'mixed']) for (let n = 0; n < 6; n++) {
+      const sled = { x: 20000, vx: 520, grounded: true, landX: null };
+      const bears = spawnKodiakPack('ONEATATIME', kodiakEncounter('ONEATATIME', n, mode), sled);
+      for (let t = 0; t < 12000; t += 1000 / 120) {
+        sled.x += sled.vx / 120;
+        // Judge each start of an attack against the pack as it stood when that bear decided (members step in order).
+        const before = bears.map((b) => b.phase);
+        const blocks = (o) => kodiakThreatening(o) || (!o.done && !o.hit && Math.abs(o.x - sled.x) < KODIAK_CLEAR_PX);
+        const pre = bears.map(blocks);
+        stepKodiakPack(bears, sled, 1000 / 120);
+        const post = bears.map(blocks);
+        expect(bears.filter(kodiakThreatening).length).toBeLessThanOrEqual(1);
+        // Bear i saw members j < i after their step this tick, and members j > i before theirs.
+        bears.forEach((b, i) => {
+          if (before[i] === 'approach' && b.phase === 'tele') expect(bears.some((o, j) => j !== i && (j < i ? post[j] : pre[j]))).toBe(false);
+        });
+      }
+    }
+  });
+
+  test('a bear you must pass on the ground is much slower than you (a hop clears it at real closing speed)', () => {
+    const r = race('bruteForce', { ms: 6000 });
+    expect(r.phases).toContain('recover');
+    const k = spawnKodiak('SLOW', { n: 0, kind: 'bruteForce' }, { x: 0, vx: 500 });
+    k.phase = 'recover'; k.phaseMs = 0; k.x = 400; k.speed = 600;
+    for (let i = 0; i < 120; i++) stepKodiak(k, { x: 0, vx: 500, grounded: true, landX: null }, 1000 / 120);
+    expect(k.speed).toBeLessThan(500 * 0.5);
+  });
 });
+

@@ -14,22 +14,35 @@ export class KodiakRider {
     this.scene = scene;
     this.palette = palette;
     this.gfx = scene.add.graphics().setDepth(KODIAK_DEPTH);
-    this.label = scene.add.bitmapText(0, 0, FONT_KEY, '', 8).setOrigin(0.5, 1).setDepth(KODIAK_DEPTH);
-    this.label.setVisible(false);
+    this.labels = [];
+  }
+
+  /** The i-th name tag (a small pool: one per pack member). */
+  _label(i) {
+    while (this.labels.length <= i) {
+      this.labels.push(this.scene.add.bitmapText(0, 0, FONT_KEY, '', 8).setOrigin(0.5, 1).setDepth(KODIAK_DEPTH).setVisible(false));
+    }
+    return this.labels[i];
   }
 
   /**
-   * @param {object|null} k RunScene.kodiak
+   * @param {object[]} bears RunScene.kodiaks (the live pack)
    * @param {{left:number,right:number,top:number,bottom:number}|null} view camera world view
    * @param {number} zoom camera zoom
    * @param {number} timeMs run time
    * @param {boolean} reducedMotion
    */
-  update(k, view, zoom, timeMs, reducedMotion) {
+  update(bears, view, zoom, timeMs, reducedMotion) {
+    this.gfx.clear();
+    for (const l of this.labels) l.setVisible(false);
+    if (!view) return;
+    // Off-screen chevrons stack per side so a pack shows as a pack.
+    const edge = { left: 0, right: 0 };
+    (bears || []).forEach((k, i) => { if (!k.done && Number.isFinite(k.groundY)) this._drawBear(k, this._label(i), view, zoom, timeMs, reducedMotion, edge); });
+  }
+
+  _drawBear(k, label, view, zoom, timeMs, reducedMotion, edge) {
     const g = this.gfx;
-    g.clear();
-    this.label.setVisible(false);
-    if (!k || !view || !Number.isFinite(k.groundY)) return;
     const def = k.def, red = this.palette.danger ?? 0xff4060, amber = this.palette.amber ?? 0xffb347;
     const inv = 1 / (zoom > 0 ? zoom : 1);
     const onScreen = k.x > view.left - 30 && k.x < view.right + 30;
@@ -37,11 +50,13 @@ export class KodiakRider {
       // Edge chevron in the bear's colours, with its short name: which bear, and from which side.
       const left = k.x < view.left;
       const ex = left ? view.left + 10 * inv : view.right - 10 * inv;
-      const ey = Math.max(view.top + 30 * inv, Math.min(view.bottom - 30 * inv, k.groundY - 20));
+      const stack = edge[left ? 'left' : 'right']++ * 18 * inv;
+      // Kept below the score block and above the bottom HUD row.
+      const ey = Math.max(view.top + 80 * inv, Math.min(view.bottom - 40 * inv, k.groundY - 20 - stack));
       const d = (left ? 1 : -1) * 7 * inv;
       g.fillStyle(def.accent, 0.95).fillTriangle(ex - d, ey - 7 * inv, ex - d, ey + 7 * inv, ex + d * 0.6, ey);
       g.lineStyle(1.5 * inv, def.color === 0x15151b ? def.accent : def.color, 1).strokeTriangle(ex - d, ey - 7 * inv, ex - d, ey + 7 * inv, ex + d * 0.6, ey);
-      this.label.setText(def.short).setTint(def.accent).setScale(inv).setOrigin(left ? 0 : 1, 0.5)
+      label.setText(def.short).setTint(def.accent).setScale(inv).setOrigin(left ? 0 : 1, 0.5)
         .setPosition(ex + (left ? 12 : -12) * inv, ey).setVisible(true);
       return;
     }
@@ -66,7 +81,8 @@ export class KodiakRider {
       g.lineStyle(1.5, red, 0.6);
       for (let i = 0; i < 3; i++) g.lineBetween(X(-40 - i * 8), y - 10 - i * 6, X(-22 - i * 8), y - 10 - i * 6);
     }
-    const body = def.color, rim = def.accent;
+    // Outline in a lighter tone of the bear's own colour (never the accent), so brown reads brown.
+    const body = def.color, rim = def.rim ?? def.accent;
     g.fillStyle(body, 1);
     g.lineStyle(1.5, rim, 0.9);
     if (k.kind === 'bruteForce') {
@@ -96,14 +112,14 @@ export class KodiakRider {
     for (const [lx, ph] of [[-14, 1], [-6, -1], [8, 1], [15, -1]]) g.fillRect(X(lx) - 2.5, y - 6 + ph * run * 0.3, 5, 6 - ph * run * 0.3);
     // name tag while it is a threat
     if (k.phase === 'tele' || k.phase === 'lunge') {
-      this.label.setText(def.short).setTint(rim).setScale(inv).setOrigin(0.5, 1).setPosition(X(0), y - 62).setVisible(true);
+      label.setText(def.short).setTint(def.accent).setScale(inv).setOrigin(0.5, 1).setPosition(X(0), y - 62).setVisible(true);
     }
   }
 
   destroy() {
     this.gfx?.destroy();
-    this.label?.destroy();
+    for (const l of this.labels) l.destroy();
     this.gfx = null;
-    this.label = null;
+    this.labels = [];
   }
 }

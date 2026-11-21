@@ -1053,12 +1053,17 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  /** Issue #47: Kodiak rival warnings and pass bonuses, through the centre popup line. */
+  /**
+   * Issue #47: one warning per pack and the pass bonuses, through the centre popup line. Attack telegraphs are
+   * drawn on the bear itself (ring, "!" and name tag), so they never stack popups on top of banners.
+   */
   onKodiak(p) {
     if (!p) return;
-    if (p.type === 'incoming') this._popup(`!! ${p.short} KODIAK ${p.from === 'behind' ? 'BEHIND' : 'AHEAD'} !!`, 'danger');
-    else if (p.type === 'telegraph' && p.real) this._popup(p.from === 'behind' || p.id === 'bruteForceKodiak' ? 'HOP THE CHARGE!' : 'HOP IT!', 'amber');
-    else if (p.type === 'passed') this._popup(`${p.air ? 'BEAR HOP' : 'KODIAK PASSED'} +${p.points}`, 'lime');
+    if (p.type === 'incoming') {
+      const side = p.from === 'both' ? 'BOTH SIDES' : p.from === 'behind' ? 'BEHIND' : 'AHEAD';
+      const who = p.mode === 'mixed' ? 'MIXED KODIAK PACK' : `${p.members?.[0] || ''} PACK`;
+      this._popup(`!! ${who} ${side} !!`, 'danger');
+    } else if (p.type === 'passed') this._popup(`${p.air ? 'BEAR HOP' : 'KODIAK PASSED'} +${p.points}`, 'lime');
   }
 
   onHazard(p) {

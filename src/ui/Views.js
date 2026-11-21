@@ -158,14 +158,16 @@ export class LeaderboardView extends View {
 }
 
 /** Rows in the Settings list; the panel height is derived from it (see SettingsView). */
-const SETTINGS_ROWS = 14;
+const SETTINGS_ROWS = 16;
+/** Row pitch: 14 px up to fourteen rows; 12 px beyond, so sixteen rows still end above the 270 px floor. */
+const SETTINGS_ROW_H = SETTINGS_ROWS > 14 ? 12 : 14;
 
 /** Settings: palette, screen shake, volumes, tilt controls (persisted via updateSetting). */
 export class SettingsView extends View {
   constructor(scene, theme, o) {
-    // Height follows the row count (22 + rows * 14 + 30): fourteen rows
-    // yield 248 px, positioned at y=14 and ending at y=262 in a 270px view.
-    const h = 22 + SETTINGS_ROWS * 14 + 30;
+    // Height follows the row count (22 + rows * pitch + 30): sixteen 12 px rows
+    // yield 244 px, positioned at y=18 and ending at y=262 in a 270px view.
+    const h = 22 + SETTINGS_ROWS * SETTINGS_ROW_H + 30;
     super(scene, theme, { w: 360, h, title: 'SETTINGS',
       color: 'amber', onClose: o.onClose, y: Math.max(8, Math.min(40, 262 - h)), backLabel: 'DONE',
       hints: [{ keys: ['↑', '↓'], label: 'SELECT' }, { keys: ['←', '→'], label: 'CHANGE' }] });
@@ -184,13 +186,15 @@ export class SettingsView extends View {
       { kind:'choice',label:'REDUCE MOTION',options:[
         {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
         get:()=>settings().reduceMotion||'auto',set:v=>updateSetting(game,'reduceMotion',v) },
-      // Issue #56: each course ghost can be switched off on its own.
-      { kind:'choice',label:'BEST GHOST',options:[
-        {value:true,label:'ON'},{value:false,label:'OFF'}],
-        get:()=>settings().ghostBest!==false,set:v=>updateSetting(game,'ghostBest',v) },
-      { kind:'choice',label:'LATEST GHOST',options:[
-        {value:true,label:'ON'},{value:false,label:'OFF'}],
-        get:()=>settings().ghostLatest!==false,set:v=>updateSetting(game,'ghostLatest',v) },
+      // Issue #56: the Best and Latest ghosts switch independently (favorites are per course, from Game Over).
+      { kind:'choice',label:'GHOSTS',options:[
+        {value:'both',label:'BEST+LATEST'},{value:'best',label:'BEST'},{value:'latest',label:'LATEST'},{value:'off',label:'OFF'}],
+        get:()=>{const st=settings(),b=st.ghostBest!==false,l=st.ghostLatest!==false;return b&&l?'both':b?'best':l?'latest':'off';},
+        set:v=>{updateSetting(game,'ghostBest',v==='both'||v==='best');updateSetting(game,'ghostLatest',v==='both'||v==='latest');} },
+      // Issue #47 playtest: Kodiak packs of one type, or mixed types.
+      { kind:'choice',label:'KODIAK PACKS',options:[
+        {value:'same',label:'SAME TYPE'},{value:'mixed',label:'MIXED'}],
+        get:()=>settings().kodiakPacks==='mixed'?'mixed':'same',set:v=>updateSetting(game,'kodiakPacks',v) },
       { kind:'choice',label:'WORLD DANCE',options:[
         {value:true,label:'ON'},{value:false,label:'OFF'}],
         get:()=>settings().worldDance!==false,set:v=>updateSetting(game,'worldDance',v) },
@@ -222,7 +226,7 @@ export class SettingsView extends View {
         {value:'auto',label:'AUTO'},{value:'on',label:'ON'},{value:'off',label:'OFF'}],
         get:()=>settings().touchOverlay||'auto',set:v=>updateSetting(game,'touchOverlay',v)},
     ];
-    this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:14,
+    this.menu=new MenuList(scene,theme,{x:10,y:22,w:340,rowH:SETTINGS_ROW_H,
       items,color:'amber',parent:this.panel});
     staggerMenuRows(scene,this.menu);
     this.swatch=scene.add.graphics();
