@@ -23,11 +23,13 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       pull-requests: read
     outputs:
       key: ${{ steps.resolve.outputs.key }}
       pr_number: ${{ steps.resolve.outputs.pr_number }}
       origin_event: ${{ steps.resolve.outputs.origin_event }}
+      origin_action: ${{ steps.resolve.outputs.origin_action }}
     steps:
       - name: Check out trusted default-branch routing code only
         uses: actions/checkout@v4
@@ -70,19 +72,65 @@ jobs:
               if(raw.length>1024)throw Error('Oversized event pointer');
               pointer=JSON.parse(raw);
             }
+            const kinds=['pull_request','issue_comment','pull_request_review','workflow_dispatch'];
             if(!pointer||!Number.isSafeInteger(pointer.pr_number)||
               pointer.pr_number<1||pointer.pr_number>999999999||
-              !['pull_request','issue_comment','pull_request_review','workflow_dispatch'].includes(pointer.event_name)){
+              !kinds.includes(pointer.event_name)){
               core.info('Invalid event pointer; skip');return;
             }
             const n=pointer.pr_number;
+            const origin=context.payload.workflow_run;
+            if(context.eventName==='workflow_run'&&pointer.event_name!==origin?.event){
+              core.warning('Artifact event does not match originating workflow run');return;
+            }
             const pr=(await github.rest.pulls.get({owner,repo,pull_number:n})).data;
             if(pr.head?.repo?.full_name!==`${owner}/${repo}`){core.info('Fork or inaccessible PR');return;}
             const script='./.github/scripts/friday-pr-lifecycle.cjs';
-            const issue=require('fs').existsSync(script)?require(script).getIssueReference(pr):null;
+            const helper=require('fs').existsSync(script)?require(script):null;
+            if(context.eventName==='workflow_run'&&pointer.event_name==='pull_request'){
+              // The PR pointer must belong to THIS recorded workflow run,
+              // not a number a branch-supplied artifact chose arbitrarily.
+              if(!origin.pull_requests?.some(x=>x.number===n)){
+                core.warning('Artifact PR number is not in triggering run');return;
+              }
+            }
+            if(context.eventName==='workflow_run'&&
+              ['issue_comment','pull_request_review'].includes(pointer.event_name)){
+              const id=pointer.event_name==='issue_comment'?pointer.comment_id:pointer.review_id;
+              if(!Number.isSafeInteger(id)||id<1){core.info('Missing source comment/review ID');return;}
+              let record;
+              if(pointer.event_name==='issue_comment'){
+                record=(await github.rest.issues.getComment({owner,repo,comment_id:id})).data;
+                if(!record.issue_url?.endsWith(`/issues/${n}`)||
+                  !helper?.parseReviewSignal(record.body)||
+                  helper.parseReviewSignal(record.body).sha!==pr.head.sha.toLowerCase()){
+                  core.info('Unrelated or stale review handoff comment');return;
+                }
+              }else{
+                record=(await github.rest.pulls.getReview({owner,repo,pull_number:n,review_id:id})).data;
+                const signal=helper?.parseReviewSignal(record.body);
+                if(record.commit_id?.toLowerCase()!==pr.head.sha.toLowerCase()||
+                  (record.state==='COMMENTED'&&
+                    (!signal||signal.sha!==pr.head.sha.toLowerCase()||signal.kind==='request'))||
+                  !['APPROVED','CHANGES_REQUESTED','COMMENTED','DISMISSED'].includes(record.state)){
+                  core.info('Unrelated or stale PR review');return;
+                }
+              }
+              if(!['OWNER','MEMBER','COLLABORATOR'].includes(record.author_association)){
+                core.info('Review actor association not trusted');return;
+              }
+              const login=record.user?.login;
+              if(!login){core.info('Review actor missing');return;}
+              const perm=(await github.rest.repos.getCollaboratorPermissionLevel({owner,repo,username:login})).data.permission;
+              if(!['admin','maintain','write'].includes(perm)){
+                core.info('Review actor lacks repository write authority');return;
+              }
+            }
+            const issue=helper?.getIssueReference(pr)||null;
             core.setOutput('key',issue?`issue-${issue}`:`pr-${n}`);
             core.setOutput('pr_number',String(n));
             core.setOutput('origin_event',pointer.event_name);
+            core.setOutput('origin_action',String(pointer.action||''));
   lifecycle:
     needs: resolve_parent
     if: needs.resolve_parent.outputs.key != ''
@@ -119,11 +167,13 @@ jobs:
           EXPECTED_ISSUE_KEY: ${{ needs.resolve_parent.outputs.key }}
           POINTER_PR_NUMBER: ${{ needs.resolve_parent.outputs.pr_number }}
           ORIGINAL_EVENT: ${{ needs.resolve_parent.outputs.origin_event }}
+          ORIGINAL_ACTION: ${{ needs.resolve_parent.outputs.origin_action }}
         with:
           script: |
             await require('./.github/scripts/friday-pr-lifecycle.cjs').run({
               github,context,core,
               expectedKey:process.env.EXPECTED_ISSUE_KEY,
               prNumber:Number(process.env.POINTER_PR_NUMBER),
-              originEvent:process.env.ORIGINAL_EVENT
+              originEvent:process.env.ORIGINAL_EVENT,
+              originAction:process.env.ORIGINAL_ACTION
             });

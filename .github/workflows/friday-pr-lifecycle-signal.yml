@@ -10,11 +10,25 @@ on:
     types: [submitted, dismissed]
 permissions:
   contents: read
+  pull-requests: read
 jobs:
   signal:
     if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     runs-on: ubuntu-latest
     steps:
+      - name: Enforce removal of starter file from the actual PR HEAD
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const pr=context.payload.pull_request;
+            if(!pr||pr.head?.repo?.full_name!==`${owner}/${repo}`)return;
+            const tree=await github.rest.git.getTree({owner,repo,tree_sha:pr.head.sha,recursive:1});
+            if(tree.data.truncated){core.setFailed('Cannot verify entire PR-head tree; starter check unsafe');return;}
+            const marker=tree.data.tree.find(entry=>entry.type==='blob'&&
+              /^\.friday\/issue-\d+-start\.md$/.test(entry.path));
+            if(marker)core.setFailed('Remove temporary '+marker.path+' before marking this PR ready');
       - name: Emit validated issue/PR pointer only
         id: pointer
         shell: bash
@@ -29,7 +43,22 @@ jobs:
             : event.pull_request?.number;
           const number=Number(raw);
           if(!Number.isSafeInteger(number)||number<1||number>999999999)process.exit(0);
-          fs.writeFileSync('friday-event-pointer.json',JSON.stringify({pr_number:number,event_name:kind})+'\n');
+          const pointer={pr_number:number,event_name:kind,action:String(event.action||'')};
+          if(kind==='issue_comment'){
+            if(!/^\s*\[GAL FRIDAY REVIEW (?:REQUEST|PASSED|CHANGES REQUESTED)\]/i.test(String(event.comment?.body||'')))process.exit(0);
+            const id=Number(event.comment?.id);
+            if(!Number.isSafeInteger(id)||id<1)process.exit(0);
+            pointer.comment_id=id;
+          }
+          if(kind==='pull_request_review'){
+            const state=String(event.review?.state||'').toUpperCase();
+            if(!['APPROVED','CHANGES_REQUESTED','DISMISSED'].includes(state)&&
+              !/^\s*\[GAL FRIDAY REVIEW (?:PASSED|CHANGES REQUESTED)\]/i.test(String(event.review?.body||'')))process.exit(0);
+            const id=Number(event.review?.id);
+            if(!Number.isSafeInteger(id)||id<1)process.exit(0);
+            pointer.review_id=id;
+          }
+          fs.writeFileSync('friday-event-pointer.json',JSON.stringify(pointer)+'\n');
           fs.appendFileSync(process.env.GITHUB_OUTPUT,`ready=true\n`);
           NODE
       - name: Publish small untrusted pointer (NOT executable code)

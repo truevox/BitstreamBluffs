@@ -28,20 +28,22 @@ function runSignal(eventName, payload) {
 
 test('unprivileged collector passes exactly a numeric PR pointer and bounded source event',()=>{
   expect(snippet).toMatch(/Number\.isSafeInteger/);
-  expect(runSignal('pull_request',{pull_request:{number:174}})).toEqual({
-    pointer:{pr_number:174,event_name:'pull_request'},ready:true,
+  expect(runSignal('pull_request',{action:'synchronize',pull_request:{number:174}})).toEqual({
+    pointer:{pr_number:174,event_name:'pull_request',action:'synchronize'},ready:true,
   });
-  expect(runSignal('pull_request_review',{pull_request:{number:174},review:{id:234}})).toEqual({
-    pointer:{pr_number:174,event_name:'pull_request_review'},ready:true,
+  expect(runSignal('pull_request_review',{action:'submitted',pull_request:{number:174},review:{id:234,state:'APPROVED'}})).toEqual({
+    pointer:{pr_number:174,event_name:'pull_request_review',action:'submitted',review_id:234},ready:true,
   });
-  expect(runSignal('issue_comment',{issue:{number:174,pull_request:{url:'...'}}})).toEqual({
-    pointer:{pr_number:174,event_name:'issue_comment'},ready:true,
+  expect(runSignal('issue_comment',{action:'created',issue:{number:174,pull_request:{url:'...'}},comment:{id:456,body:'[GAL FRIDAY REVIEW REQUEST] HEAD '+'a'.repeat(40)}})).toEqual({
+    pointer:{pr_number:174,event_name:'issue_comment',action:'created',comment_id:456},ready:true,
   });
 });
 
 test('non-PR, malformed, zero and oversized issue pointers are not emitted',()=>{
   for(const [kind,event] of [
     ['issue_comment',{issue:{number:174}}],
+    ['issue_comment',{action:'created',issue:{number:174,pull_request:{}},comment:{id:456,body:'Random discussion'}}],
+    ['pull_request_review',{action:'submitted',pull_request:{number:174},review:{id:123,state:'COMMENTED',body:'Other feedback'}}],
     ['pull_request',{pull_request:{number:0}}],
     ['pull_request',{pull_request:{number:'abc'}}],
     ['pull_request_review',{pull_request:{number:1000000000}}],
@@ -62,4 +64,33 @@ test('unprivileged source has no label writes or checkout; privileged writer sta
   expect(privileged).toContain('actions/download-artifact@v4');
   expect(privileged).toContain('github.event.repository.default_branch');
   expect(privileged).toContain('queue: max');
+});
+
+test('PR-head starter check runs with read-only GitHub API and fails the PR check when marker exists',async()=>{
+  const block=signal.split('      - name: Enforce removal of starter file from the actual PR HEAD\n')[1]
+    .split('      - name: Emit validated issue/PR pointer only\n')[0];
+  const script=block.split('          script: |\n')[1]?.replace(/^ {12}/gm,'');
+  expect(script).toContain('github.rest.git.getTree');
+  const AsyncFunction=Object.getPrototypeOf(async()=>{}).constructor;
+  const run=new AsyncFunction('github','context','core',script);
+  const context={repo:{owner:'truevox',repo:'BitstreamBluffs'},
+    payload:{pull_request:{head:{sha:'a'.repeat(40),repo:{full_name:'truevox/BitstreamBluffs'}}}}};
+  const call=async(data)=>{
+    const fail=[];
+    const github={rest:{git:{getTree:async()=>({data})}}};
+    await run(github,context,{setFailed:(msg)=>fail.push(msg)});
+    return fail;
+  };
+  expect(await call({truncated:false,tree:[{path:'.friday/issue-117-start.md',type:'blob'}]}))
+    .toEqual(['Remove temporary .friday/issue-117-start.md before marking this PR ready']);
+  expect(await call({truncated:false,tree:[{path:'src/game.js',type:'blob'}]})).toEqual([]);
+  expect(await call({truncated:true,tree:[]})).toEqual(['Cannot verify entire PR-head tree; starter check unsafe']);
+});
+
+test('starter gate remains a PR-head workflow check rather than only a downstream label-writer failure',()=>{
+  expect(signal).toContain("if: github.event_name == 'pull_request'");
+  expect(signal).toContain('tree_sha:pr.head.sha');
+  expect(signal).toContain('pull-requests: read');
+  expect(signal).not.toContain('issues: write');
+  expect(privileged).toContain('workflow_run:');
 });

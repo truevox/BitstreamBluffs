@@ -73,6 +73,8 @@ describe('Friday issue linking and exact-head review parsing',()=>{
     '`Example instruction:\nCloses #79\nnot a real directive`',
     '``Inline example:\nCloses #79\nnot a real directive``',
     'Text with `code\nCloses #79\ninside` and no directive',
+    '`example`Closes #79',
+    'Closes <!-- example -->#79',
   ];
   for(const example of examples){
     const x=pr(500,80,{body:`${example}\nRefs #80`,title:'Issue #80'});
@@ -80,6 +82,8 @@ describe('Friday issue linking and exact-head review parsing',()=>{
     expect(explicitlyCloses(x,79)).toBe(false);
     expect(explicitlyCloses(x,80)).toBe(false);
   }
+  const hiddenMachineMarker=pr(500,80,{body:'`example\n<!-- friday-issue: 79 -->\nnot real`\nRefs #80',title:'no issue'});
+  expect(getIssueReference(hiddenMachineMarker)).toBe(80);
   const pureExample=pr(500,80,{body:'```md\n<!-- friday-issue: 79 -->\nRefs #79\n```',title:'no issue'});
   expect(getIssueReference(pureExample)).toBe(null);
   const full=pr(501,80,{body:'<!-- friday-issue: 80 -->\nCloses #80',title:'[#80] Fix'});
@@ -173,6 +177,23 @@ describe('GitHub-native issue and PR label reconciliation',()=>{
    expect(x.data.issues.get(117).state).toBe(expected);
    expect(labels(x.data.issues.get(117))).toEqual([base==='main'?'friday:done':'friday:in-progress']);
   }
+ });
+ test('untrusted chatter or review-origin workflow_run cannot re-close an intentionally reopened issue',async()=>{
+  const merged=pr(158,117,{body:'Closes #117',state:'closed',merged:true});
+  for(const origin of ['issue_comment','pull_request_review','workflow_dispatch']){
+    const x=api({prs:[merged],issues:[{number:117,state:'open'}]});
+    await x.fire('workflow_run',{workflow_run:{event:origin,conclusion:'success'}},'issue-117',
+      {prNumber:158,originEvent:origin,originAction:origin==='issue_comment'?'created':'submitted'});
+    expect(x.data.issues.get(117).state).toBe('open');
+    expect(x.data.writes.some(w=>w[0]==='state'&&w[2]==='closed')).toBe(false);
+  }
+ });
+ test('source PR CLOSED event still finalizes explicit full-scope merger',async()=>{
+  const merged=pr(158,117,{body:'Closes #117',state:'closed',merged:true});
+  const x=api({prs:[merged],issues:[{number:117,state:'open'}]});
+  await x.fire('workflow_run',{workflow_run:{event:'pull_request',conclusion:'success'}},'issue-117',
+    {prNumber:158,originEvent:'pull_request',originAction:'closed'});
+  expect(x.data.issues.get(117).state).toBe('closed');
  });
  test('a sibling opened midway through a merge-reconciliation prevents closing the parent',async()=>{
   const merged=pr(158,117,{body:'Closes #117',state:'closed',merged:true});

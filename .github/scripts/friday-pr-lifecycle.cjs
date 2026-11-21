@@ -27,7 +27,8 @@ function bodyDirectives(body) {
     // A Friday machine marker is a whole standalone HTML comment line, not
     // an example buried inside another multiline HTML comment.
     const marker=/^\s*<!--\s*friday-issue:\s*(\d+)\s*-->\s*$/i.exec(line);
-    if(marker&&!inComment){markers.push(Number(marker[1]));continue;}
+    if(marker&&!inComment&&inlineCode===null){markers.push(Number(marker[1]));continue;}
+    const rawLine=line, startedInsideComment=inComment;
     let prose='';
     while(line.length){
       if(inComment){
@@ -43,7 +44,7 @@ function bodyDirectives(body) {
     // CommonMark code spans may cross line boundaries. A backtick-delimited
     // example must NEVER be a real issue instruction even if its interior
     // line begins with an otherwise valid `Closes #N`.
-    let visible='';
+    const startedInsideCode=inlineCode!==null;
     for(let at=0;at<prose.length;){
       if(prose[at]==='`' && (at===0||prose[at-1]!=='\\')){
         let next=at+1;
@@ -54,10 +55,9 @@ function bodyDirectives(body) {
         at=next;
         continue;
       }
-      if(inlineCode===null)visible+=prose[at];
       at++;
     }
-    const ref=/^\s*(?:\*\*)?(refs?|closes?|fixes?|resolves?)\s+#(\d+)\b/i.exec(visible);
+    const ref=(startedInsideCode||startedInsideComment)?null:/^\s*(?:\*\*)?(refs?|closes?|fixes?|resolves?)\s+#(\d+)\b/i.exec(rawLine);
     if(ref)refs.push({verb:ref[1].toLowerCase(),number:Number(ref[2])});
   }
   return {markers,refs};
@@ -102,12 +102,13 @@ function scoped(scope,file){return scope===file||(scope.endsWith('/**')&&(file==
 function overlaps(a,b){return scoped(a,b)||scoped(b,a);}
 const isActiveStarter=(f)=>f.status!=='removed'&&/^\.friday\/issue-\d+-start\.md$/.test(f.filename);
 
-async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumber=null,originEvent=null}) {
+async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumber=null,originEvent=null,originAction=null}) {
   const {owner,repo}=context.repo;
   const event=context.eventName;
   // The privileged workflow_run carries only a previously validated numeric
   // pointer from an unprivileged workflow. It NEVER executes its artifact.
   const source=originEvent||event;
+  const sourceAction=originAction||context.payload?.action||'';
   const prEvent=source==='pull_request_target'||source==='pull_request';
   const payload=context.payload||{};
   const prNumber=Number.isSafeInteger(resolvedPrNumber)&&resolvedPrNumber>0
@@ -245,7 +246,7 @@ async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumb
     : states.length?STATES.progress
     : pr.state==='closed'&&pr.merged?STATES.progress:STATES.todo;
   const onDefault=pr.base.ref===(await github.rest.repos.get({owner,repo})).data.default_branch;
-  const complete=pr.state==='closed'&&pr.merged&&onDefault&&explicitlyCloses(pr,issueNumber);
+  const complete=pr.state==='closed'&&pr.merged&&onDefault&&prEvent&&sourceAction==='closed'&&explicitlyCloses(pr,issueNumber);
   // A new sibling might appear while we process a closed PR. Revalidate
   // immediately before allowing a completed-issue state transition.
   const closureSiblings=complete?linked(await listOpen()):latestSiblings;
