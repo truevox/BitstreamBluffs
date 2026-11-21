@@ -2349,7 +2349,8 @@ export class RunScene extends Phaser.Scene {
 
   onSettingsChanged(payload) {
     if (payload && payload.settings) this.settings = payload.settings;
-    if (payload && payload.key === 'palette' && this.sled) this.refreshPalette();
+    // A palette toggle (Pause > Settings) is presentation: repaint only, never rebuild colliders (issue #140).
+    if (payload && payload.key === 'palette' && this.sled) this.refreshPalette({ keepColliders: true });
   }
 
   /**
@@ -2367,7 +2368,14 @@ export class RunScene extends Phaser.Scene {
     });
   }
 
-  refreshPalette() {
+  /**
+   * Repaint the world in the current palette (+ the active sector's biome tint).
+   * @param {{keepColliders?: boolean}} [opts] keepColliders: repaint terrain graphics only (TerrainMesh.redrawChunk),
+   *   used by the palette SETTING so a presentation change cannot touch physics (issue #140). The biome-entry
+   *   repaint still rebuilds the chunk colliders as before: it happens at a sim-determined tick, and changing it
+   *   would change the physics of existing biome-mask replays (docs/determinism/causal-isolation.md).
+   */
+  refreshPalette({ keepColliders = false } = {}) {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
     const biomeDef = this._biomeDefForSector(this._biomeSector);
@@ -2390,7 +2398,8 @@ export class RunScene extends Phaser.Scene {
     this.mesh.setPalette(this.palette);
     for (const chunk of this.terrain.getActiveChunks()) {
       if (!this.mesh.chunks.has(chunk.index)) continue;
-      this.mesh.addChunk(chunk); // redraws (removes + re-adds)
+      if (keepColliders) this.mesh.redrawChunk(chunk);
+      else this.mesh.addChunk(chunk); // redraws (removes + re-adds its colliders)
       const hz = this.hazards.get(chunk.index);
       if (hz) hz.forEach((h) => { h.palette = this.palette; h.color = hazardColor(h.def, this.palette); });
       const pu = this.powerups.get(chunk.index);
