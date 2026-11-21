@@ -7,7 +7,7 @@ import { digestOfBytes } from '../../src/systems/replay/canonicalSha256.js';
 import { parseRuleset, SIM_REVISION } from '../../src/systems/replay/ruleset.js';
 import { parseCanonical } from '../../src/systems/replay/canonicalJson.js';
 import {
-  ARCHIVE_DIR, ATTESTATION_RE, CURRENT_PATH, TRIPWIRE_FILES, assembleFromDisk, currentPointer, hexOf, readArchive, readTripwire, repoRoot, tripwireDigests,
+  ARCHIVE_DIR, ATTESTATION_RE, attestationProblem, CURRENT_PATH, TRIPWIRE_FILES, assembleFromDisk, currentPointer, hexOf, readArchive, readTripwire, repoRoot, tripwireDigests,
 } from '../../tools/ruleset/lib.mjs';
 
 const root = repoRoot();
@@ -52,7 +52,9 @@ describe('source tripwire (not part of rulesetId)', () => {
 
   test('carries a well-formed attestation; a sim-revision-bumped attestation must match the current SIM_REVISION', () => {
     expect(committed.attestation).toMatch(ATTESTATION_RE);
-    if (committed.attestation.startsWith('sim-revision-bumped')) expect(committed.simRevision).toBe(SIM_REVISION);
+    expect(committed.simRevision).toBe(SIM_REVISION);
+    // the committed attestation must be valid for the current revision state (a released revision cannot carry an "unreleased" attestation)
+    expect(attestationProblem(committed.attestation, { prevSimRevision: null })).toBeNull();
   });
 
   test('is not part of the ruleset document', () => {

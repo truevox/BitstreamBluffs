@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalBytes, utf8Encode } from '../../src/systems/replay/canonicalJson.js';
 import { digestOfBytes } from '../../src/systems/replay/canonicalSha256.js';
-import { assembleRuleset, rulesetIdOf, SIM_REVISION } from '../../src/systems/replay/ruleset.js';
+import { assembleRuleset, rulesetIdOf, LAST_RELEASED_SIM_REVISION, SIM_REVISION } from '../../src/systems/replay/ruleset.js';
 import { CONTENT_GROUPS, HIDDEN_LITERALS, GRAVITY_Y_PIN, SOURCE_EXTRACTS } from '../../src/systems/replay/rulesetRegistry.js';
 
 export const repoRoot = () => path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -148,7 +148,27 @@ export function tripwireDigests(root = repoRoot(), files = TRIPWIRE_FILES) {
   return out;
 }
 
-export const ATTESTATION_RE = /^(no-behavior-change|sim-revision-bumped): .{8,}$/;
+export const ATTESTATION_RE = /^(no-behavior-change|sim-revision-bumped|behavior-change-unreleased): .{8,}$/;
+
+/**
+ * Check an attestation against the revision state. Returns null when acceptable, else the reason.
+ * - `no-behavior-change: <why>`: always format-checked only.
+ * - `sim-revision-bumped: <what>`: SIM_REVISION must have increased relative to the previously committed artifact.
+ * - `behavior-change-unreleased: <why>`: causal behavior changed inside a revision that has not been released
+ *   (SIM_REVISION > LAST_RELEASED_SIM_REVISION). Once a ruleset is released the revision is frozen: bump instead.
+ */
+export function attestationProblem(attestation, { simRevision = SIM_REVISION, prevSimRevision = null, lastReleased = LAST_RELEASED_SIM_REVISION } = {}) {
+  if (typeof attestation !== 'string' || !ATTESTATION_RE.test(attestation)) {
+    return 'attestation required, format: "no-behavior-change: <why>", "sim-revision-bumped: <what>" or "behavior-change-unreleased: <why>" (>= 8 chars of reason)';
+  }
+  if (attestation.startsWith('sim-revision-bumped') && prevSimRevision !== null && !(simRevision > prevSimRevision)) {
+    return `"sim-revision-bumped" needs SIM_REVISION (${simRevision}) to exceed the previously committed one (${prevSimRevision}); use "no-behavior-change" or, for an unreleased revision, "behavior-change-unreleased"`;
+  }
+  if (attestation.startsWith('behavior-change-unreleased') && !(simRevision > lastReleased)) {
+    return `"behavior-change-unreleased" is only valid while SIM_REVISION (${simRevision}) is above the last released revision (${lastReleased}); bump SIM_REVISION and use "sim-revision-bumped"`;
+  }
+  return null;
+}
 
 export function readTripwire(root = repoRoot()) {
   return JSON.parse(readText(root, TRIPWIRE_PATH));
@@ -163,12 +183,8 @@ export function writeTripwire(root, attestation, files = TRIPWIRE_FILES) {
   } catch { /* first run */ }
   const changed = prev ? Object.keys({ ...prev.files, ...digests }).filter((f) => (prev.files || {})[f] !== digests[f]).sort() : Object.keys(digests);
   if (prev && changed.length === 0) return { changed, wrote: false };
-  if (!ATTESTATION_RE.test(attestation || '')) {
-    throw new Error('attestation required, format: "no-behavior-change: <why>" or "sim-revision-bumped: <what>" (>= 8 chars of reason)');
-  }
-  if (prev && attestation.startsWith('sim-revision-bumped') && !(SIM_REVISION > prev.simRevision)) {
-    throw new Error(`"sim-revision-bumped" needs SIM_REVISION (${SIM_REVISION}) to exceed the committed tripwire's (${prev.simRevision}); otherwise use "no-behavior-change"`);
-  }
+  const problem = attestationProblem(attestation, { prevSimRevision: prev ? prev.simRevision : null });
+  if (problem) throw new Error(problem);
   const doc = {
     format: 'bb-source-tripwire',
     formatVersion: 1,

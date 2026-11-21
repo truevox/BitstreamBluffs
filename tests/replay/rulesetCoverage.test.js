@@ -7,8 +7,8 @@ import { DEFAULT_SOURCES, assembleRuleset, rulesetIdOf } from '../../src/systems
 import {
   NON_CAUSAL_MODULES, RULESET_SOURCES, SOURCE_EXTRACTS, classifyExtract, scanNumericConsts,
 } from '../../src/systems/replay/rulesetRegistry.js';
-import { loadContentFromDisk, readEngineVersions, readSourceTexts, repoRoot, writeTripwire, readTripwire, TRIPWIRE_PATH } from '../../tools/ruleset/lib.mjs';
-import { SIM_REVISION } from '../../src/systems/replay/ruleset.js';
+import { ATTESTATION_RE, attestationProblem, loadContentFromDisk, readEngineVersions, readSourceTexts, repoRoot, writeTripwire, readTripwire, TRIPWIRE_PATH } from '../../tools/ruleset/lib.mjs';
+import { LAST_RELEASED_SIM_REVISION, SIM_REVISION } from '../../src/systems/replay/ruleset.js';
 
 const root = repoRoot();
 const content = loadContentFromDisk(root);
@@ -137,7 +137,7 @@ describe('guard: no sim-imported module under src/systems or src/entities export
   });
 });
 
-describe('N2: a sim-revision-bumped attestation needs an actual SIM_REVISION increase', () => {
+describe('tripwire attestation categories', () => {
   const mk = (tripSim) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-'));
     fs.mkdirSync(path.join(dir, 'tools/ruleset'), { recursive: true });
@@ -145,12 +145,32 @@ describe('N2: a sim-revision-bumped attestation needs an actual SIM_REVISION inc
     fs.writeFileSync(path.join(dir, TRIPWIRE_PATH), JSON.stringify({ simRevision: tripSim, files: { 'a.js': 'sha256:' + '0'.repeat(64) } }));
     return dir;
   };
-  test('rejected when SIM_REVISION did not increase; allowed with no-behavior-change or an actual increase', () => {
-    const same = mk(SIM_REVISION);
-    expect(() => writeTripwire(same, 'sim-revision-bumped: did a thing here', ['a.js'])).toThrow(/needs SIM_REVISION/);
-    expect(writeTripwire(same, 'no-behavior-change: harmless refactor', ['a.js']).wrote).toBe(true);
-    expect(readTripwire(same).attestation).toMatch(/^no-behavior-change/);
-    const lower = mk(SIM_REVISION - 1);
-    expect(writeTripwire(lower, 'sim-revision-bumped: behavior changed', ['a.js']).wrote).toBe(true);
+  test('there are exactly three categories and each needs a reason', () => {
+    for (const ok of ['no-behavior-change: harmless refactor', 'sim-revision-bumped: tuck drag changed', 'behavior-change-unreleased: -0 tilt normalized (sign of zero only)']) expect(ATTESTATION_RE.test(ok)).toBe(true);
+    for (const bad of ['no-behavior-change:', 'no-behavior-change: short', 'bumped: long enough reason', 'behavior-change-unreleased:x', 'sim-revision-bumped: NOT']) expect(ATTESTATION_RE.test(bad)).toBe(false);
+  });
+  test('no-behavior-change: accepted whatever the revisions', () => {
+    expect(attestationProblem('no-behavior-change: harmless refactor', { simRevision: 3, prevSimRevision: 3, lastReleased: 3 })).toBeNull();
+    const dir = mk(SIM_REVISION);
+    expect(writeTripwire(dir, 'no-behavior-change: harmless refactor', ['a.js']).wrote).toBe(true);
+  });
+  test('sim-revision-bumped: SIM_REVISION must actually exceed the previously committed artifact', () => {
+    expect(attestationProblem('sim-revision-bumped: tuck drag changed', { simRevision: 2, prevSimRevision: 1 })).toBeNull();
+    expect(attestationProblem('sim-revision-bumped: tuck drag changed', { simRevision: 2, prevSimRevision: 2 })).toMatch(/needs SIM_REVISION/);
+    expect(attestationProblem('sim-revision-bumped: tuck drag changed', { simRevision: 1, prevSimRevision: 2 })).toMatch(/needs SIM_REVISION/);
+    expect(() => writeTripwire(mk(SIM_REVISION), 'sim-revision-bumped: did a thing here', ['a.js'])).toThrow(/needs SIM_REVISION/);
+    expect(writeTripwire(mk(SIM_REVISION - 1), 'sim-revision-bumped: behavior changed', ['a.js']).wrote).toBe(true);
+  });
+  test('behavior-change-unreleased: valid only while SIM_REVISION is above the last released revision', () => {
+    const msg = 'behavior-change-unreleased: -0 tilt normalized (sign of zero only)';
+    expect(LAST_RELEASED_SIM_REVISION).toBe(0); // no ruleset has been released on main yet
+    expect(SIM_REVISION).toBeGreaterThan(LAST_RELEASED_SIM_REVISION);
+    expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 0 })).toBeNull();
+    expect(attestationProblem(msg, { simRevision: 2, prevSimRevision: 1, lastReleased: 1 })).toBeNull();
+    expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 1 })).toMatch(/only valid while/);
+    expect(writeTripwire(mk(SIM_REVISION), msg, ['a.js']).wrote).toBe(true);
+  });
+  test('the repository state accepts the unreleased category today', () => {
+    expect(attestationProblem('behavior-change-unreleased: reason text here', { prevSimRevision: SIM_REVISION })).toBeNull();
   });
 });

@@ -48,6 +48,14 @@ import * as terrainContactNs from '../TerrainContact.js';
  */
 export const SIM_REVISION = 1;
 
+/**
+ * `SIM_REVISION` of the last ruleset RELEASED on main (0 = none released yet). While the current SIM_REVISION is above
+ * this value it is still unreleased, so causal behavior may change inside it without a bump and the source tripwire
+ * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
+ * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
+ */
+export const LAST_RELEASED_SIM_REVISION = 0;
+
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;
 /** `bb-pad` input protocol v1 (contract 4.4). Defined by the contract, not (yet) by a source module. */
