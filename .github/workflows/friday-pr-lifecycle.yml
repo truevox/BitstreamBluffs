@@ -1,7 +1,7 @@
-# Friday GitHub-native lifecycle. Never checks out or executes PR-supplied code.
+# Friday GitHub-native lifecycle. NEVER checkout/execute PR-supplied code.
 name: Friday PR lifecycle
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
   issue_comment:
     types: [created, edited]
@@ -18,21 +18,55 @@ permissions:
   issues: write
   pull-requests: write
 jobs:
-  lifecycle:
-    # Issue comments and manual runs are validated inside the script; no PR code execution.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+  resolve_parent:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    concurrency:
-      group: friday-lifecycle-${{ github.repository }}-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}
-      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      key: ${{ steps.resolve.outputs.key }}
     steps:
-      - name: Check out the reviewed default-branch automation code only
+      - name: Check out trusted default-branch routing code only
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      # On the feature PR that introduces this script, the default branch does
-      # not have it yet. Never fall back to running unreviewed PR-head code.
+      - name: Resolve stable parent for per-issue concurrency
+        id: resolve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const event = context.eventName, payload = context.payload;
+            const n = event === 'issue_comment' ? payload.issue?.pull_request && payload.issue.number
+              : event === 'workflow_dispatch' ? Number(payload.inputs?.pr_number)
+              : payload.pull_request?.number;
+            if (!Number.isSafeInteger(n) || n < 1) return;
+            const pr = (await github.rest.pulls.get({owner, repo, pull_number:n})).data;
+            if (pr.head?.repo?.full_name !== `${owner}/${repo}`) return;
+            const script = './.github/scripts/friday-pr-lifecycle.cjs';
+            const issue = require('fs').existsSync(script) ? require(script).getIssueReference(pr) : null;
+            // Only one writer per parent issue, including stacked/overlapping PRs.
+            core.setOutput('key', issue ? `issue-${issue}` : `pr-${n}`);
+  lifecycle:
+    needs: resolve_parent
+    if: needs.resolve_parent.outputs.key != ''
+    runs-on: ubuntu-latest
+    concurrency:
+      # Per-PARENT serialization: multiple PRs touching the same issue cannot
+      # race its labels/closure. A coalesced pending event still recalculates
+      # ALL sibling PR labels and the current parent state.
+      group: friday-lifecycle-${{ github.repository }}-${{ needs.resolve_parent.outputs.key }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Check out reviewed default-branch automation code only
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      # This Action's own PR cannot execute the as-yet-unmerged helper.
       - name: Check installed default-branch script
         id: installed
         shell: bash
@@ -41,11 +75,15 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo 'Friday review synchronizer not landed on default branch yet.'
+            echo 'Friday synchronizer not landed on default branch yet.'
           fi
       - name: Reconcile exact-head handoffs and Friday labels
         if: steps.installed.outputs.ready == 'true'
         uses: actions/github-script@v7
+        env:
+          EXPECTED_ISSUE_KEY: ${{ needs.resolve_parent.outputs.key }}
         with:
           script: |
-            await require('./.github/scripts/friday-pr-lifecycle.cjs').run({github, context, core});
+            await require('./.github/scripts/friday-pr-lifecycle.cjs').run({
+              github, context, core, expectedKey: process.env.EXPECTED_ISSUE_KEY
+            });

@@ -10,24 +10,57 @@ const SHA = /^[0-9a-f]{40}$/i;
 const REVIEW_MESSAGE = /^\s*\[(GAL FRIDAY REVIEW (?:REQUEST|PASSED|CHANGES REQUESTED))\]/i;
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER','MEMBER','COLLABORATOR']);
 
+/** Extract only top-level issue directives: never read "Closes" examples from
+ * code fences, HTML comments, indented code or raw HTML code/pre blocks. */
+function bodyDirectives(body) {
+  const markers=[], refs=[];
+  const cleaned=String(body||'').replace(/<(pre|code|script)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, v=>'\n'.repeat((v.match(/\n/g)||[]).length));
+  let fence=null, inComment=false;
+  for(let line of cleaned.split(/\r?\n/)){
+    const delimiter=/^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if(fence){
+      if(delimiter&&delimiter[1][0]===fence.char&&delimiter[1].length>=fence.length&&/^\s*$/.test(delimiter[2]))fence=null;
+      continue;
+    }
+    if(delimiter){fence={char:delimiter[1][0],length:delimiter[1].length};continue;}
+    if(/^ {4,}|^\t/.test(line))continue;
+    // A Friday machine marker is a whole standalone HTML comment line, not
+    // an example buried inside another multiline HTML comment.
+    const marker=/^\s*<!--\s*friday-issue:\s*(\d+)\s*-->\s*$/i.exec(line);
+    if(marker&&!inComment){markers.push(Number(marker[1]));continue;}
+    let prose='';
+    while(line.length){
+      if(inComment){
+        const end=line.indexOf('-->');
+        if(end<0){line='';break;}
+        line=line.slice(end+3);inComment=false;
+      }else{
+        const start=line.indexOf('<!--');
+        if(start<0){prose+=line;break;}
+        prose+=line.slice(0,start);line=line.slice(start+4);inComment=true;
+      }
+    }
+    const ref=/^\s*(?:\*\*)?(refs?|closes?|fixes?|resolves?)\s+#(\d+)\b/i.exec(prose);
+    if(ref)refs.push({verb:ref[1].toLowerCase(),number:Number(ref[2])});
+  }
+  return {markers,refs};
+}
+
 function getIssueReference(pr) {
-  const body=String(pr.body || ''), title=String(pr.title || '');
-  const marker=[...body.matchAll(/<!--\s*friday-issue:\s*(\d+)\s*-->/gi)].map(x=>Number(x[1]));
-  const refs=[...body.matchAll(/^\s*(?:\*\*)?(?:refs?|closes?|fixes?|resolves?)\s+#(\d+)\b/gmi)].map(x=>Number(x[1]));
-  const titles=[...title.matchAll(/\[#(\d+)\]/g)].map(x=>Number(x[1]));
-  // Explicit marker > top-level Ref/Close > bracketed title. Conflicts must not
-  // let a PR unexpectedly manipulate an unrelated issue.
-  const picks=marker.length ? marker : refs.length ? refs : titles;
+  const {markers,refs}=bodyDirectives(pr.body);
+  const titles=[...String(pr.title||'').matchAll(/\[#(\d+)\]/g)].map(x=>Number(x[1]));
+  const referenced=refs.map(x=>x.number);
+  const picks=markers.length?markers:referenced.length?referenced:titles;
   const unique=[...new Set(picks)];
-  if (unique.length !== 1 || !Number.isSafeInteger(unique[0]) || unique[0] < 1) return null;
-  if (marker.length && refs.length && refs.some(n=>n!==unique[0])) return null;
-  if (titles.length && titles.some(n=>n!==unique[0])) return null;
+  if(unique.length!==1||!Number.isSafeInteger(unique[0])||unique[0]<1)return null;
+  if(markers.length&&referenced.some(n=>n!==unique[0]))return null;
+  if(titles.some(n=>n!==unique[0]))return null;
   return unique[0];
 }
 
-function explicitlyCloses(pr, issueNumber) {
-  const lines=[...String(pr.body||'').matchAll(/^\s*(?:\*\*)?(?:closes?|fixes?|resolves?)\s+#(\d+)\b/gmi)];
-  return lines.some(x=>Number(x[1])===issueNumber);
+function explicitlyCloses(pr,issueNumber){
+  return bodyDirectives(pr.body).refs.some(x=>x.number===issueNumber&&
+    /^(?:closes?|fixes?|resolves?)$/.test(x.verb));
 }
 
 function parseReviewSignal(body) {
@@ -50,10 +83,12 @@ function hasLabel(item,name){return (item.labels||[]).some(l=>matchingLabel(l,na
 function scopes(body){const m=/<!--\s*friday-scope:\s*([\s\S]*?)\s*-->/i.exec(body||'');return m?m[1].split(',').map(s=>s.trim()).filter(Boolean):[];}
 function scoped(scope,file){return scope===file||(scope.endsWith('/**')&&(file===scope.slice(0,-3)||file.startsWith(scope.slice(0,-3)+'/')));}
 function overlaps(a,b){return scoped(a,b)||scoped(b,a);}
+const isActiveStarter=(f)=>f.status!=='removed'&&/^\.friday\/issue-\d+-start\.md$/.test(f.filename);
 
-async function run({github,context,core}) {
+async function run({github,context,core,expectedKey=null}) {
   const {owner,repo}=context.repo;
   const event=context.eventName;
+  const prEvent=event==='pull_request_target'||event==='pull_request';
   const payload=context.payload||{};
   const prNumber=event==='issue_comment' ? payload.issue?.pull_request && payload.issue.number
     : event==='workflow_dispatch' ? Number(payload.inputs?.pr_number)
@@ -88,6 +123,7 @@ async function run({github,context,core}) {
   if(pr.head?.repo?.full_name!==`${owner}/${repo}`){core.info('Fork or untrusted PR head; skip');return;}
   const issueNumber=getIssueReference(pr);
   if(!issueNumber){core.info('Not a uniquely linked Friday PR; skip');return;}
+  if(expectedKey&&expectedKey!==`issue-${issueNumber}`){core.warning('PR parent changed after queue routing; wait for edited event');return;}
   const issueResponse=await github.rest.issues.get({owner,repo,issue_number:issueNumber});
   if(issueResponse.data.pull_request){core.warning('Linked number points to a PR; skip');return;}
 
@@ -118,7 +154,7 @@ async function run({github,context,core}) {
   async function reviewState(p){
     if(p.draft)return STATES.progress;
     const changes=await files(p);
-    if(changes.some(f=>/^\.friday\/issue-\d+-start\.md$/.test(f.filename))){
+    if(changes.some(isActiveStarter)){
       core.info(`PR #${p.number} still has a starter marker`);return STATES.progress;
     }
     if(!commentCache.has(p.number))commentCache.set(p.number,await github.paginate(github.rest.issues.listComments,
@@ -150,33 +186,60 @@ async function run({github,context,core}) {
     return events.at(-1)?.kind==='request'?STATES.review:STATES.progress;
   }
 
-  // A shared parent may have multiple open PRs (e.g. #172). Derive its state
-  // from ALL linked open PRs, not merely whichever event happened to arrive.
-  const open=await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
-  const siblings=open.filter(p=>getIssueReference(p)===issueNumber&&p.head?.repo?.full_name===`${owner}/${repo}`);
+  // Compute each CURRENT sibling's state from the authenticated GitHub record.
+  // Every event for this parent reconciles every linked open PR; that is
+  // important because GitHub's job concurrency may coalesce queued events.
+  const listOpen=()=>github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
+  const linked=(all)=>all.filter(p=>getIssueReference(p)===issueNumber&&
+    p.head?.repo?.full_name===`${owner}/${repo}`);
+  const open=await listOpen();
+  const siblings=linked(open);
+  const seen=new Map();
+  for(const p of siblings){
+    const status=await reviewState(p);
+    seen.set(p.number,{status,sha:p.head.sha,draft:p.draft});
+    await setState(p.number,p,status);
+  }
+  const currentState=pr.state==='open'?await reviewState(pr):null;
+  if(pr.state==='closed')await setState(pr.number,pr,pr.merged?STATES.done:null);
+  else if(!seen.has(pr.number))await setState(pr.number,pr,currentState);
+
+  // Read current open PRs and current issue labels again just before writing
+  // the shared parent; the original event payload and early issue snapshot
+  // can be stale. All instances for this parent have been serialized by the
+  // workflow's parent-issue concurrency key.
+  const latestOpen=await listOpen();
+  const latestSiblings=linked(latestOpen);
   const states=[];
-  for(const p of siblings)states.push(await reviewState(p));
-  const currentState=pr.state==='open' ? await reviewState(pr) : null;
+  for(const p of latestSiblings){
+    // A handoff or new commit may have arrived while we checked siblings.
+    // Re-read actual comments/reviews for the final shared-issue decision.
+    commentCache.delete(p.number);reviewCache.delete(p.number);fileCache.delete(p.number);
+    const status=await reviewState(p);
+    await setState(p.number,p,status);
+    states.push(status);
+  }
   const targetIssueState=states.includes(STATES.review)?STATES.review
     : states.length?STATES.progress
     : pr.state==='closed'&&pr.merged?STATES.progress:STATES.todo;
-  // A merged PR is done as a PR. A partial Ref-only merge is not a done ISSUE.
-  await setState(pr.number,pr,pr.state==='open'?currentState:pr.merged?STATES.done:null);
   const onDefault=pr.base.ref===(await github.rest.repos.get({owner,repo})).data.default_branch;
   const complete=pr.state==='closed'&&pr.merged&&onDefault&&explicitlyCloses(pr,issueNumber);
-  if(complete&&!siblings.length){
-    await setState(issueNumber,issueResponse.data,STATES.done);
-    if(issueResponse.data.state!=='closed')await github.rest.issues.update({owner,repo,issue_number:issueNumber,state:'closed'});
+  // A new sibling might appear while we process a closed PR. Revalidate
+  // immediately before allowing a completed-issue state transition.
+  const closureSiblings=complete?linked(await listOpen()):latestSiblings;
+  const issueNow=(await github.rest.issues.get({owner,repo,issue_number:issueNumber})).data;
+  if(complete&&!closureSiblings.length){
+    await setState(issueNumber,issueNow,STATES.done);
+    if(issueNow.state!=='closed')await github.rest.issues.update({owner,repo,issue_number:issueNumber,state:'closed'});
   }else{
-    // Preserve a completed/closed issue unless an unfinished open PR really is
-    // continuing work; no accidental reopen of externally closed issues.
-    if(issueResponse.data.state==='open')await setState(issueNumber,issueResponse.data,targetIssueState);
+    if(issueNow.state==='open')await setState(issueNumber,issueNow,
+      closureSiblings.length&&!latestSiblings.length?STATES.progress:targetIssueState);
     else core.info(`Issue #${issueNumber} is closed; do not reopen it`);
   }
 
   // Preserve original #153 cross-PR scope overlap advisory on PR transitions.
   // No comment event should cause a full overlap scan or trigger a PR build.
-  if(event==='pull_request'&&pr.state==='open'&&/<!--\s*friday-issue:\s*\d+\s*-->/i.test(pr.body||'')){
+  if(prEvent&&pr.state==='open'&&bodyDirectives(pr.body).markers.length>0){
     const myFiles=(await files(pr)).map(f=>f.filename).filter(f=>!f.startsWith('.friday/'));
     const myScopes=scopes(pr.body),conflicts=[];
     for(const other of open){
@@ -206,8 +269,8 @@ async function run({github,context,core}) {
   // Preserve the original lifecycle gate: a PR containing its temporary
   // starter marker cannot be accepted for review, even when someone flips the
   // GitHub draft switch manually. Labels are reconciled before failing CI.
-  if(event==='pull_request'&&pr.state==='open'&&!pr.draft){
-    const starter=(await files(pr)).find(f=>/^\.friday\/issue-\d+-start\.md$/.test(f.filename));
+  if(prEvent&&pr.state==='open'&&!pr.draft){
+    const starter=(await files(pr)).find(isActiveStarter);
     if(starter){core.setFailed('Remove temporary '+starter.filename+' before review');return;}
   }
   core.info(`#${pr.number} → #${issueNumber}: PR ${pr.state==='open'?currentState:pr.merged?STATES.done:'closed'}, issue ${complete?'complete':targetIssueState}`);
