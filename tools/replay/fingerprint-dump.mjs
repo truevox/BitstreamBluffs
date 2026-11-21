@@ -82,10 +82,10 @@ async function runOnce(hz, label) {
         }
       }
       const rec = run.ghostRecorder;
-      return { frames, endTick: run.simClock.tick, crashed: !!run.crashed, fingerprints: rec.fingerprints, errors: rec.fingerprintErrors, perTick };
+      return { frames, endTick: run.simClock.tick, crashed: !!run.crashed, fingerprints: rec.fingerprints, errors: rec.fingerprintErrors, errorCount: rec.fingerprintErrorCount, perTick };
     }, { hz, seed: SEED, simMs: SIM_MS, tape: TAPE, from: FROM, to: TO });
     assert.deepEqual(errors, [], `${label}: page errors`);
-    assert.deepEqual(out.errors, [], `${label}: fingerprint capture errors`);
+    assert.equal(out.errorCount, 0, `${label}: fingerprint capture errors ${JSON.stringify(out.errors)}`);
     return out;
   } finally { await browser.close(); }
 }

@@ -4,7 +4,9 @@ import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from '
 import {
   CJSONError,
   MAX_DEPTH,
+  asUint8Array,
   canonicalBytes,
+  canonicalSelfTest,
   canonicalize,
   f64Decode,
   f64Encode,
@@ -295,6 +297,119 @@ describe('cross-realm plain objects', () => {
     const proto = Object.create(null);
     proto[Symbol.toStringTag] = 'Foo';
     expectCJSON(() => canonicalize(Object.create(proto)), 'non-plain-object', '');
+  });
+});
+
+describe('array elements are inspected by descriptor (getters never run)', () => {
+  test('accessor element -> accessor at /i, getter not invoked', () => {
+    let calls = 0;
+    const a = [1, 2];
+    Object.defineProperty(a, 1, {
+      get() {
+        calls++;
+        return 5;
+      },
+      enumerable: true,
+      configurable: true,
+    });
+    expectCJSON(() => canonicalize(a), 'accessor', '/1');
+    expectCJSON(() => canonicalize({ k: [[], a] }), 'accessor', '/k/1/1');
+    expect(calls).toBe(0);
+  });
+
+  test('non-enumerable accessor element is still an accessor; non-enumerable data element is hidden-property', () => {
+    const a = [1, 2, 3];
+    Object.defineProperty(a, 0, { get: () => 1, enumerable: false, configurable: true });
+    expectCJSON(() => canonicalize(a), 'accessor', '/0');
+    const b = [1, 2, 3];
+    Object.defineProperty(b, 2, { value: 3, enumerable: false, writable: true, configurable: true });
+    expectCJSON(() => canonicalize(b), 'hidden-property', '/2');
+  });
+
+  test('sparse arrays and normal arrays are unchanged', () => {
+    expectCJSON(() => canonicalize([1, , 3]), 'sparse-array', '/1'); // eslint-disable-line no-sparse-arrays
+    expect(canonicalize([1, [2, [3]], { a: [] }])).toBe('[1,[2,[3]],{"a":[]}]');
+  });
+});
+
+describe('null-prototype lookalikes are not plain objects', () => {
+  test('stripped typed arrays, DataViews, Date, Map, Set, ArrayBuffer', () => {
+    const strip = (x) => Object.setPrototypeOf(x, null);
+    for (const make of [
+      () => new Uint8Array(3),
+      () => new DataView(new ArrayBuffer(2)),
+      () => new Date(0),
+      () => new Map(),
+      () => new Set(),
+      () => new WeakMap(),
+      () => new ArrayBuffer(4),
+    ]) {
+      expectCJSON(() => canonicalize({ x: strip(make()) }), 'non-plain-object', '/x');
+    }
+    expect(canonicalize({ x: Object.create(null) })).toBe('{"x":{}}');
+    const withData = Object.create(null);
+    withData.a = 1;
+    expect(canonicalize(withData)).toBe('{"a":1}');
+  });
+});
+
+describe('hostile nesting is bounded in time and memory', () => {
+  test('16 MiB of "[" fails with syntax-error quickly and without gigabytes of allocation', () => {
+    const text = '['.repeat(16 * 1024 * 1024);
+    const before = process.memoryUsage().rss;
+    const t0 = Date.now();
+    const e = thrown(() => parseCanonical(text));
+    const ms = Date.now() - t0;
+    const grownMB = (process.memoryUsage().rss - before) / 1e6;
+    expect(e).toBeInstanceOf(CJSONError);
+    expect(e.code).toBe('syntax-error');
+    // Reference machine: ~1.1 s and ~100 MB (was 11.4 s and 2.7 GB). Generous bounds for slow CI.
+    expect(ms).toBeLessThan(10000);
+    expect(grownMB).toBeLessThan(700);
+  });
+
+  test('the same input as bytes behaves the same', () => {
+    const bytes = new Uint8Array(4 * 1024 * 1024).fill(0x5b);
+    const e = thrown(() => parseCanonical(bytes));
+    expect(e && e.code).toBe('syntax-error');
+    expect(e.message.length).toBeLessThan(400); // the message truncates the (multi-megabyte) pointer, the property does not
+    expect(e.pointer.length).toBe(2 * bytes.length);
+  });
+
+  test('past depth 32 syntax errors, duplicate keys and pointers are still exact', () => {
+    const deepArr = '['.repeat(40);
+    expectCJSON(() => parseCanonical(`${deepArr}{"a":1,"a":2}${']'.repeat(40)}`), 'duplicate-key', `${'/0'.repeat(40)}/a`);
+    expectCJSON(() => parseCanonical(`${'{"k":'.repeat(40)}{"a":1,"b":2,"c":3,"b":4}${'}'.repeat(40)}`), 'duplicate-key', `${'/k'.repeat(40)}/b`);
+    expectCJSON(() => parseCanonical(`${'{"k":'.repeat(40)}{"a":1,"a":2}${'}'.repeat(40)}`), 'duplicate-key', `${'/k'.repeat(40)}/a`);
+    expectCJSON(() => parseCanonical(`${'['.repeat(33)}1,1,x`), 'syntax-error', `${'/0'.repeat(32)}/2`);
+    expectCJSON(() => parseCanonical(`${'['.repeat(40)}0${']'.repeat(39)}`), 'syntax-error');
+    expectCJSON(() => parseCanonical(`${'['.repeat(40)}0${']'.repeat(40)}`), 'too-deep', '/0'.repeat(32));
+    expectCJSON(() => parseCanonical(`[-0,${'['.repeat(40)}0${']'.repeat(40)}]`), 'negative-zero', '/0');
+    // sibling deep objects with the same key are not duplicates of each other
+    const deepObj = (k) => `${'['.repeat(33)}{"${k}":1}${']'.repeat(33)}`;
+    expectCJSON(() => parseCanonical(`[${deepObj('a')},${deepObj('a')}]`), 'too-deep');
+  });
+});
+
+describe('canonicalSelfTest', () => {
+  test('passes on this engine', () => {
+    expect(canonicalSelfTest()).toBe(true);
+  });
+});
+
+describe('asUint8Array', () => {
+  test('accepts Uint8Array, Buffer, ArrayBuffer and foreign-realm Uint8Array without copying views', () => {
+    const u = new Uint8Array([1, 2, 3]);
+    expect(asUint8Array(u)).toBe(u);
+    expect(toHex(asUint8Array(Buffer.from([1, 2, 3])))).toBe('010203');
+    expect(toHex(asUint8Array(u.buffer))).toBe('010203');
+    expect(toHex(asUint8Array(vm.runInNewContext('new Uint8Array([9, 8])')))).toBe('0908');
+  });
+
+  test('rejects every other view and non-bytes with TypeError', () => {
+    for (const bad of [new Int8Array(2), new Uint8ClampedArray(2), new Uint16Array(1), new Float32Array(1), new DataView(new ArrayBuffer(2)), 'abc', [1], null, undefined, 5, {}, { buffer: new ArrayBuffer(1) }]) {
+      expect(() => asUint8Array(bad)).toThrow(TypeError);
+    }
   });
 });
 
@@ -612,11 +727,14 @@ describe('parseCanonical: parse-level rejections', () => {
     const padded = new Uint8Array(bytes.length + 8);
     padded.set(bytes, 4);
     const view = padded.subarray(4, 4 + bytes.length);
-    for (const input of [text, bytes, view, new DataView(padded.buffer, 4, bytes.length)]) {
+    for (const input of [text, bytes, view, Buffer.from(bytes), bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length)]) {
       const v = parseCanonical(input);
       expect(canonicalize(v)).toBe(text);
       expect(Object.getPrototypeOf(v)).toBeNull();
       expect(Object.getPrototypeOf(v.a[1])).toBeNull();
+    }
+    for (const bad of [new DataView(padded.buffer), new Int8Array(2), new Uint8ClampedArray(2), new Uint16Array(2), [1, 2]]) {
+      expectCJSON(() => parseCanonical(bad), 'unsupported-type:object');
     }
     expectCJSON(() => parseCanonical(42), 'unsupported-type:number');
     expectCJSON(() => parseCanonical(null), 'unsupported-type:object');

@@ -24,14 +24,14 @@ export function referenceState() {
       },
       flags: {
         contactFlag: false, playerHopActive: false, chuteUsed: false, tucked: false, airBrakeActive: false,
-        corkscrewActive: false, shield: false, scrambled: false, nudging: false, inWorld: true, destroyed: false,
+        corkscrewActive: false, scrambled: false, nudging: false, inWorld: true, destroyed: false,
       },
       lastPad: { bits: 5, tilt127: 0 },
     },
     matter: {
       timestamp: 1000.0000000000017, lastDelta: 4.166666666666667, gravity: { x: 0, y: 1.5, scale: 0.001 },
       bodies: [{ label: 'crate', sensor: false, ...body(3), parts: [part(9)] }],
-      staticOrder: [{ label: 'Body', minX: 0, minY: 5 }, { label: 'hazard', minX: 40, minY: -2 }],
+      staticOrder: [{ label: 'Body', minX: 0, minY: 5, padLast: null }, { label: 'pad', minX: 40, minY: -2, padLast: 812.5 }],
       pairs: [{
         aLabel: 'skid', bLabel: 'Body', aMinX: 1190, bMinX: 1180, active: true, separation: 0.01, contactCount: 1,
         contacts: [{ normalImpulse: 0.5, tangentImpulse: -0.1 }, { normalImpulse: 0, tangentImpulse: 0 }],

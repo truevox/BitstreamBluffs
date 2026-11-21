@@ -95,12 +95,15 @@ describe('GhostRecorder hook', () => {
   });
 
   test('a capture failure is recorded, never thrown (a fingerprint must not break a run)', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => { });
     const rec = new GhostRecorder({ seed: 'S' });
     const fake = { sled: { body: { position: { x: 1, y: 2 }, angle: 0, velocity: { x: 0, y: 0 }, angularVelocity: 0 } }, score: { getTotal: () => 0 } };
     expect(() => { for (let i = 1; i <= 240; i++) rec.afterTick(i, fake); }).not.toThrow();
     expect(rec.checkpoints).toHaveLength(2);
     expect(rec.fingerprints).toHaveLength(0);
     expect(rec.fingerprintErrors).toHaveLength(2);
+    expect(rec.fingerprintErrorCount).toBe(2);
+    warn.mockRestore();
   });
 
   test('it captures only at checkpoint ticks, never per tick', () => {

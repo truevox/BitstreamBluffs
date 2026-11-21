@@ -45,7 +45,7 @@ export const FP_SCHEMAS = Object.freeze({
   rng: { version: 1, schema: rec(['version', 'u32'], ['physicsScramble', 'u32']) },
 
   sled: {
-    version: 1,
+    version: 2, // v2: `flags.shield` removed (render-time mirror of effects.shieldCharges; cadence-dependent)
     schema: rec(
       ['body', rec(...BODY_FIELDS)],
       ['parts', list(rec(...PART_FIELDS))], // the 5 collision parts (the compound root, parts[0], is `body`)
@@ -60,24 +60,27 @@ export const FP_SCHEMAS = Object.freeze({
       )],
       ['flags', rec(
         ['contactFlag', 'bool'], ['playerHopActive', 'bool'], ['chuteUsed', 'bool'], ['tucked', 'bool'],
-        ['airBrakeActive', 'bool'], ['corkscrewActive', 'bool'], ['shield', 'bool'], ['scrambled', 'bool'],
+        ['airBrakeActive', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
         ['nudging', 'bool'], ['inWorld', 'bool'], ['destroyed', 'bool'],
       )],
-      ['lastPad', opt(rec(['bits', 'u32'], ['tilt127', 'i32']))], // identity of the last pad, as bb-pad v1 bits
+      // Bit identity of the last pad. The sim only uses `pad !== _lastPad` (object identity; each tick gets a fresh pad), so this
+      // is a diagnostic mirror, not state to rely on (review N3).
+      ['lastPad', opt(rec(['bits', 'u32'], ['tilt127', 'i32']))],
     ),
   },
 
   matter: {
-    version: 1,
+    version: 2, // v2: staticOrder entries carry `padLast` (bounce-pad cooldown, RunScene.onPad)
     schema: rec(
       ['timestamp', 'f64'], ['lastDelta', 'f64'],
       ['gravity', rec(['x', 'f64'], ['y', 'f64'], ['scale', 'f64'])],
       // Every non-static, non-sled body in detector order. In this game that is normally empty (the sled is the only
       // dynamic body, and its state is the `sled` subsystem); listed for completeness and future dynamic bodies.
       ['bodies', list(rec(['label', 'str'], ['sensor', 'bool'], ...BODY_FIELDS, ['parts', list(rec(...PART_FIELDS))]))],
-      // Every static body (terrain colliders, hazard and pickup sensors) in detector order. Position only: statics
-      // are immutable except hazard sensors that a roll moves with Body.setPosition, whose bounds change.
-      ['staticOrder', list(rec(['label', 'str'], ['minX', 'f64'], ['minY', 'f64']))],
+      // Every static body (terrain colliders, hazard and pickup sensors, bounce pads) in detector order. Position only,
+      // except `padLast`: the bounce-pad cooldown stamp RunScene.onPad keeps on `body.bbPad._last` (run ms of the last
+      // launch, null when the body is not a pad or has never fired). Hazard sensors that a roll moves have changing bounds.
+      ['staticOrder', list(rec(['label', 'str'], ['minX', 'f64'], ['minY', 'f64'], ['padLast', opt('f64')]))],
       // The pair table in pairs.list order. Both warm-start contact slots are included (stale slots seed a later contact).
       ['pairs', list(rec(
         ['aLabel', 'str'], ['bLabel', 'str'], ['aMinX', 'f64'], ['bMinX', 'f64'], ['active', 'bool'],
@@ -235,7 +238,7 @@ export const FIELD_SOURCES = Object.freeze({
     touchdownVx: 'sled.ctl.touchdownVx', touchdownVy: 'sled.ctl.touchdownVy', heliInput: 'sled.ctl.heliInput',
     _contactFlag: 'sled.flags.contactFlag', _playerHopActive: 'sled.flags.playerHopActive', chuteUsed: 'sled.flags.chuteUsed',
     tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive', corkscrewActive: 'sled.flags.corkscrewActive',
-    shield: 'sled.flags.shield', scrambled: 'sled.flags.scrambled', _nudging: 'sled.flags.nudging',
+    scrambled: 'sled.flags.scrambled', _nudging: 'sled.flags.nudging',
     inWorld: 'sled.flags.inWorld', destroyed: 'sled.flags.destroyed', _lastPad: 'sled.lastPad',
   }),
   ScoreManager: Object.freeze({
@@ -270,6 +273,15 @@ export const FIELD_SOURCES = Object.freeze({
     _side: 'hazards.chunks.items.side', phase: 'hazards.chunks.items.phase',
     roll: 'hazards.chunks.items.roll',
   }),
+  // Objects the simulation mutates at contact time, outside the eight owner classes (review of #165, B1).
+  BouncePad: Object.freeze({ _last: 'matter.staticOrder.padLast' }), // the `body.bbPad` record built by TerrainMesh.addChunk
+  TerrainMesh: Object.freeze({ chunks: 'terrain.joined' }),
+  MeshChunk: Object.freeze({}),
+  PowerUp: Object.freeze({}),
+  HintScheduler: Object.freeze({}),
+  GlitchDirector: Object.freeze({}),
+  ShardField: Object.freeze({ byChunk: 'pickups.liveShards', collected: 'pickups.shardCollected' }),
+  Shard: Object.freeze({ id: 'pickups.liveShards.shards.id', x: 'pickups.liveShards.shards.x', y: 'pickups.liveShards.shards.y' }),
   KodiakBear: Object.freeze({
     kind: 'kodiak.bears.kind', n: 'kodiak.bears.n', member: 'kodiak.bears.member', x: 'kodiak.bears.x',
     speed: 'kodiak.bears.speed', phase: 'kodiak.bears.phase', phaseMs: 'kodiak.bears.phaseMs', ageMs: 'kodiak.bears.ageMs',
@@ -319,6 +331,7 @@ export const NON_CAUSAL = Object.freeze({
     x: 'alias of body.position.x refreshed by _sync(); derived (spec 6.3)', y: 'alias of body.position.y; derived',
     vx: 'px/s alias of body velocity refreshed by _sync(); derived', vy: 'px/s alias of body velocity; derived',
     palette: PRESENTATION, look: PRESENTATION, gfx: PRESENTATION, pose: PRESENTATION + ' (rider drawing pose lerp)',
+    shield: 'render-time mirror of effects.shieldCharges, written in RunScene.renderFrame once per display frame and read only by Sled._draw (hashing it would make digests display-cadence dependent)',
     squash: PRESENTATION + ' (landing squash)', hidden: PRESENTATION + ' (set with inWorld=false by vanish())',
     hopPulse: 'cleared by RunScene.simTick before afterTick, so always 0 at a checkpoint; read only for SFX/hints',
     pushPulse: 'cleared by RunScene.simTick before afterTick, so always 0 at a checkpoint; read only for SFX/hints',
@@ -358,6 +371,38 @@ export const NON_CAUSAL = Object.freeze({
     _lastDraw: PRESENTATION + ' (redraw throttle)',
     lip: DERIVED_STATIC + ' (launch lip assigned in takeChunk; read only by the telegraph)',
     simStepped: 'marker set in takeChunk: a run constant that only selects who calls stepMotion',
+  }),
+  BouncePad: Object.freeze({
+    x: DERIVED_STATIC + ' (bouncePads of the chunk)', y: DERIVED_STATIC, width: DERIVED_STATIC, boost: DERIVED_STATIC,
+  }),
+  TerrainMesh: Object.freeze({
+    scene: 'back-reference to the scene', world: 'back-reference to the Matter world', palette: PRESENTATION,
+    modDefs: RUN_CONSTANT + ' (content defs: ruleset)',
+    _gfxPool: PRESENTATION, stats: 'diagnostic counters',
+    _bodyPool: 'recycled collider bodies; reuse changes only absolute Matter ids (non-causal, spec 6.2); resulting detector order is matter.staticOrder',
+  }),
+  MeshChunk: Object.freeze({
+    gfx: PRESENTATION, bodies: 'collider bodies: positions and detector order are matter.staticOrder',
+    pads: 'pad sensor bodies: positions and cooldown are matter.staticOrder (padLast)',
+    startX: DERIVED_STATIC, endX: DERIVED_STATIC,
+  }),
+  ShardField: Object.freeze({ scene: 'back-reference to the scene', palette: PRESENTATION, gfx: PRESENTATION }),
+  Shard: Object.freeze({ pulled: PRESENTATION + ' (draw flag set by pull())' }),
+  PowerUp: Object.freeze({
+    scene: 'back-reference to the scene', world: 'back-reference to the Matter world', def: DERIVED_STATIC, spawn: DERIVED_STATIC,
+    palette: PRESENTATION, color: PRESENTATION, radius: DERIVED_STATIC, drawKind: PRESENTATION,
+    body: 'static sensor: bounds are matter.staticOrder', gfx: PRESENTATION, _lastDraw: PRESENTATION + ' (redraw throttle)',
+    collected: 'set and drained (flushDespawn) inside the tick that collects it, so always false for a live entity at a checkpoint; the persistent fact is pickups.collectedPowerups',
+    destroyed: 'set by destroy() when the chunk is dropped or the pickup is despawned; a live entity at a checkpoint is never destroyed',
+    key: 'chunk:index key assigned in takeChunk; immutable, identity of pickups.collectedPowerups entries',
+  }),
+  HintScheduler: Object.freeze({
+    cur: PRESENTATION + ' (tutorial hint)', defs: PRESENTATION, done: PRESENTATION, gapMs: PRESENTATION, lastHideAt: PRESENTATION,
+    latched: PRESENTATION, shows: PRESENTATION, startMs: PRESENTATION,
+  }),
+  GlitchDirector: Object.freeze({
+    active: PRESENTATION + ' (GLITCH_START/END events feed shader, audio and HUD only)', _count: PRESENTATION,
+    next: PRESENTATION, rng: 'seeded stream of the director; presentation only (not a sim stream, spec 6.3 rng)', seed: PRESENTATION,
   }),
   KodiakBear: Object.freeze({
     def: 'frozen KODIAK_DEFS entry selected by `kind` (a ruleset constant)',
@@ -418,5 +463,13 @@ export const OWNER_SOURCES = Object.freeze({
   BsodBluffTracker: 'src/systems/BsodBluffTracker.js',
   Hazard: 'src/entities/Hazard.js',
   KodiakBear: 'src/systems/Kodiaks.js',
+  BouncePad: 'src/entities/TerrainMesh.js',
+  TerrainMesh: 'src/entities/TerrainMesh.js',
+  MeshChunk: 'src/entities/TerrainMesh.js',
+  ShardField: 'src/entities/Shard.js',
+  Shard: 'src/entities/Shard.js',
+  PowerUp: 'src/entities/PowerUp.js',
+  HintScheduler: 'src/systems/HintScheduler.js',
+  GlitchDirector: 'src/systems/GlitchDirector.js',
   RunScene: 'src/scenes/RunScene.js',
 });

@@ -9,6 +9,7 @@ const { installPhaserStub, createRun, stepRun } = await import('./headlessRun.js
 installPhaserStub(jest);
 const { RunScene } = await import('../../src/scenes/RunScene.js');
 const { Hazard } = await import('../../src/entities/Hazard.js');
+const { PowerUp } = await import('../../src/entities/PowerUp.js');
 const { ScoreManager } = await import('../../src/systems/ScoreManager.js');
 const { TrickTracker } = await import('../../src/systems/TrickTracker.js');
 const { BsodPursuit } = await import('../../src/systems/BsodPursuit.js');
@@ -30,6 +31,9 @@ const varProps = (src, v) => new Set([...src.matchAll(new RegExp(`\\b${v}\\.([A-
 let scene;
 let hazard;
 let bear;
+let pad;
+let powerup;
+let shard;
 
 beforeAll(() => {
   scene = createRun(RunScene, REG, { seed: 'RPLAY118', level: 6 });
@@ -44,12 +48,30 @@ beforeAll(() => {
   for (let i = 0; i < 400 && bear.real === undefined; i++) stepKodiak(bear, { x: bear.x - 100, vx: 200, grounded: true, landX: null, etaMs: 0 }, 8.33);
   scene.kodiaks = pack;
   scene.kodiaksOn = true;
+  // A bounce pad built by the REAL TerrainMesh.addChunk (pads only occur in bridge chunks, so a default run never has one).
+  const x = 90000;
+  scene.mesh.addChunk({
+    index: 777, startX: x, endX: x + 100, points: [{ x, y: 500 }, { x: x + 100, y: 500 }],
+    bouncePads: [{ x: x + 50, y: 480, width: 48, boost: 500 }],
+  });
+  pad = scene.mesh.chunks.get(777).pads[0].bbPad;
+  pad._last = 1; // as RunScene.onPad leaves it after a launch
+  stepRun(scene, 2, () => ({ push: true, tilt: 0, variableHop: true, noAutoNudge: true, pressed: {} })); // the detector picks new bodies up on the next step
+  const pdef = Object.values(scene.content.powerups)[0];
+  powerup = new PowerUp(scene, pdef, { x: 6000, y: 300 }, scene.palette);
+  powerup.key = '99:0';
+  scene.powerups.set(99, [powerup]);
+  scene.shardField.addChunk({ index: 99, shards: [{ id: 'z1', x: 7000, y: 300 }] });
+  shard = scene.shardField.byChunk.get(99)[0];
+  shard.pulled = true;
 });
 
 function instances() {
   return {
     Sled: scene.sled, ScoreManager: scene.score, TrickTracker: scene.tricks, BsodPursuit: scene.bsod,
     BsodBluffTracker: scene.bsodBluffs, Hazard: hazard, KodiakBear: bear,
+    BouncePad: pad, TerrainMesh: scene.mesh, MeshChunk: scene.mesh.chunks.get(777), ShardField: scene.shardField, Shard: shard,
+    PowerUp: powerup, HintScheduler: scene.hints, GlitchDirector: scene.glitch,
   };
 }
 
@@ -58,6 +80,17 @@ function staticProps(cls) {
   const out = thisProps(src);
   if (cls === 'Hazard') for (const p of varProps(read(OWNER_SOURCES.RunScene), 'h')) out.add(p);
   if (cls === 'KodiakBear') for (const p of varProps(src, 'k')) out.add(p);
+  if (cls === 'BouncePad') {
+    out.clear();
+    for (const m of src.matchAll(/body\.bbPad = \{([^}]*)\}/g)) for (const k of m[1].matchAll(/(\w+)\s*:/g)) out.add(k[1]);
+    for (const p of varProps(read(OWNER_SOURCES.RunScene), 'pad')) out.add(p);
+  }
+  if (cls === 'MeshChunk') {
+    out.clear();
+    for (const m of src.matchAll(/const rec = \{([^}]*)\}/g)) for (const k of m[1].matchAll(/(\w+)\s*[:,}]/g)) out.add(k[1]);
+  }
+  if (cls === 'Shard') { out.clear(); for (const p of varProps(src, 's')) out.add(p); ['id', 'x', 'y'].forEach((k) => out.add(k)); }
+  if (cls === 'PowerUp') for (const p of varProps(read(OWNER_SOURCES.RunScene), 'p')) out.add(p);
   if (cls === 'KodiakBear') for (const p of Object.keys(bear)) out.add(p);
   return out;
 }
@@ -70,7 +103,7 @@ describe('every owner-class property is classified exactly once', () => {
     }
   });
 
-  test.each(['Sled', 'ScoreManager', 'TrickTracker', 'BsodPursuit', 'BsodBluffTracker', 'Hazard', 'KodiakBear'])(
+  test.each(Object.keys(OWNER_SOURCES).filter((c) => c !== 'RunScene'))(
     '%s: own properties of a real instance and of the source are all classified; no stale entries', (cls) => {
       const inst = instances()[cls];
       const names = new Set([...Object.keys(inst), ...staticProps(cls)]);
@@ -145,6 +178,11 @@ const CUSTOM = {
   Hazard: {
     roll: (h) => { const o = h.roll; h.roll = { ...o, simV: o.simV + 1 }; return () => { h.roll = o; }; },
   },
+  TerrainMesh: { chunks: (m) => { m.chunks.set(99999, {}); return () => { m.chunks.delete(99999); }; } },
+  ShardField: {
+    byChunk: (f) => { f.byChunk.set(99999, []); return () => { f.byChunk.delete(99999); }; },
+    collected: (f) => { f.collected.add('zz'); return () => { f.collected.delete('zz'); }; },
+  },
   KodiakBear: {
     rng: (k) => { k.rng.state ^= 1; return () => { k.rng.state ^= 1; }; },
   },
@@ -152,7 +190,7 @@ const CUSTOM = {
 
 describe('each FIELD_SOURCES claim is proven by perturbing the real property', () => {
   const cases = [];
-  for (const cls of ['Sled', 'ScoreManager', 'TrickTracker', 'BsodPursuit', 'BsodBluffTracker', 'Hazard', 'KodiakBear']) {
+  for (const cls of Object.keys(OWNER_SOURCES).filter((c) => c !== 'RunScene')) {
     for (const [prop, target] of Object.entries(FIELD_SOURCES[cls])) cases.push([cls, prop, target.split('.')[0]]);
   }
   test.each(cases)('%s.%s moves only subsystem "%s"', (cls, prop, sub) => {

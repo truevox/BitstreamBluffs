@@ -143,7 +143,7 @@ function captureSled(sled) {
     flags: {
       contactFlag: !!sled._contactFlag, playerHopActive: !!sled._playerHopActive, chuteUsed: !!sled.chuteUsed,
       tucked: !!sled.tucked, airBrakeActive: !!sled.airBrakeActive, corkscrewActive: !!sled.corkscrewActive,
-      shield: !!sled.shield, scrambled: !!sled.scrambled, nudging: !!sled._nudging, inWorld: !!sled.inWorld,
+      scrambled: !!sled.scrambled, nudging: !!sled._nudging, inWorld: !!sled.inWorld,
       destroyed: !!sled.destroyed,
     },
     lastPad,
@@ -157,7 +157,7 @@ function captureMatter(scene) {
   const staticOrder = [];
   for (const b of engine.detector.bodies) {
     if (b.id === sledBody.id) continue; // compare by Matter id (stable within one engine), not by object identity
-    if (b.isStatic) staticOrder.push({ label: String(b.label), minX: b.bounds.min.x, minY: b.bounds.min.y });
+    if (b.isStatic) staticOrder.push({ label: String(b.label), minX: b.bounds.min.x, minY: b.bounds.min.y, padLast: b.bbPad ? opt(b.bbPad._last) : null });
     else bodies.push({ label: String(b.label), sensor: !!b.isSensor, ...bodyRecord(b), parts: b.parts.filter((q) => q.id !== b.id).map(partRecord) });
   }
   const pairs = [];
