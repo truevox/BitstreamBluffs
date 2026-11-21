@@ -61,9 +61,19 @@ describe('sha256Hex', () => {
   });
 
   test('rejects non-byte input', () => {
-    for (const bad of ['abc', [1, 2, 3], null, undefined, new Uint16Array(2), 5, {}]) {
+    for (const bad of ['abc', [1, 2, 3], null, undefined, new Uint16Array(2), 5, {}, new Int8Array(1)]) {
       expect(() => sha256Hex(bad)).toThrow(TypeError);
     }
+  });
+
+  test('only Uint8Array / Buffer / ArrayBuffer: other typed arrays throw instead of hashing wrongly', () => {
+    const base = Uint8Array.from([0, 1, 2, 3, 250, 255, 128, 127]);
+    for (const bad of [new Int8Array(base.buffer), new Uint8ClampedArray(base.buffer), new DataView(base.buffer), new Uint32Array(2), new Float64Array(1)]) {
+      expect(() => sha256Hex(bad)).toThrow(TypeError);
+      expect(() => digestOfBytes(bad)).toThrow(TypeError);
+    }
+    expect(sha256Hex(base.buffer)).toBe(nodeSha(base)); // ArrayBuffer is normalized to a view
+    expect(sha256Hex(Buffer.from(base))).toBe(nodeSha(base));
   });
 
   test('self-test passes (short vectors and the NIST million-a vector)', () => {
