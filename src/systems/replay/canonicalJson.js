@@ -18,6 +18,12 @@
  * (first offender in document order) -> value-level rejections (first offender in document order: depth, number,
  * string, key rules) -> re-serialize byte equality (`not-canonical`). Token-level forms such as `1.0`, `1e2` are caught
  * by the byte-equality step; a parsed -0 value is `negative-zero`.
+ *
+ * Notes: (1) canonicalize() validates all keys of an object (and symbols / hidden properties) before descending into
+ * values, so for `{a: undefined, '\u00e9': 1}` it reports `key-not-allowed`; the document-order rule above applies to
+ * parseCanonical only. (2) parseCanonical(string) cannot see UTF-8, so a lone surrogate in a string input is reported
+ * as the value-level `lone-surrogate`, not `invalid-utf8`. (3) Proxy objects cannot be detected from JS and are
+ * serialized as whatever their traps present; do not pass untrusted Proxies.
  */
 
 export const MAX_DEPTH = 32;
@@ -36,7 +42,9 @@ export class CJSONError extends Error {
    * @param {string} [detail]
    */
   constructor(code, pointer, detail) {
-    super(`${code} at pointer ${JSON.stringify(pointer)}${detail ? ` (${detail})` : ''}`);
+    // The pointer property is always complete; only the message is truncated (a 16M-level pointer is 32 MB).
+    const shown = pointer.length > 200 ? `${pointer.slice(0, 200)}...` : pointer;
+    super(`${code} at pointer ${JSON.stringify(shown)}${detail ? ` (${detail})` : ''}`);
     this.name = 'CJSONError';
     this.code = code;
     this.pointer = pointer;
@@ -44,7 +52,10 @@ export class CJSONError extends Error {
 }
 
 /** RFC 6901 reference-token escaping. */
-const esc = (token) => String(token).replace(/~/g, '~0').replace(/\//g, '~1');
+const esc = (token) => {
+  const s = String(token);
+  return s.indexOf('~') < 0 && s.indexOf('/') < 0 ? s : s.replace(/~/g, '~0').replace(/\//g, '~1');
+};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // UTF-8 (hand-rolled so the module has no environment dependencies)
@@ -164,6 +175,29 @@ export function utf8DecodeStrict(bytes) {
   return out;
 }
 
+/**
+ * Normalize a byte input to a Uint8Array view (no copy): accepts Uint8Array (including node Buffer and Uint8Arrays from
+ * another realm, which fail `instanceof` under Jest's jsdom) and ArrayBuffer. Everything else, including Int8Array,
+ * Uint8ClampedArray, other typed arrays, DataView, strings and arrays, throws TypeError: hashing the wrong view type
+ * would silently produce a wrong digest.
+ * @param {*} x
+ * @param {string} [who] caller name for the error message
+ * @returns {Uint8Array}
+ */
+export function asUint8Array(x, who = 'bytes') {
+  if (x instanceof Uint8Array) return x;
+  const tag = Object.prototype.toString.call(x);
+  if (tag === '[object Uint8Array]' && ArrayBuffer.isView(x)) return x;
+  if (x instanceof ArrayBuffer || tag === '[object ArrayBuffer]') {
+    try {
+      return new Uint8Array(x);
+    } catch {
+      /* not a real ArrayBuffer (spoofed tag) */
+    }
+  }
+  throw new TypeError(`${who} expects a Uint8Array or ArrayBuffer`);
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Serializer
 // ---------------------------------------------------------------------------------------------------------------------
@@ -220,15 +254,39 @@ function serNumber(v, pointer) {
 
 const toStringTag = (v) => Object.prototype.toString.call(v);
 
+/** Brand checks (throw on a wrong receiver, in any realm). Only used for the rare null-prototype path. */
+function hasBrand(v) {
+  const probes = [
+    () => Map.prototype.has.call(v, 0),
+    () => Set.prototype.has.call(v, 0),
+    () => WeakMap.prototype.has.call(v, {}),
+    () => WeakSet.prototype.has.call(v, {}),
+    () => Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get.call(v),
+  ];
+  for (const probe of probes) {
+    try {
+      probe();
+      return true;
+    } catch {
+      /* not that brand */
+    }
+  }
+  return false;
+}
+
 /**
- * Cross-realm plain-object test: prototype is null, or the prototype's own prototype is null and the object's
- * toString tag is "[object Object]" (so Object.prototype of any realm qualifies; Date, Map, typed arrays, class
- * instances and objects with an inherited prototype chain do not).
+ * Cross-realm plain-object test: the toString tag is "[object Object]" and the prototype is null, or the prototype's
+ * own prototype is null (so Object.prototype of any realm qualifies; Date, Map, typed arrays, class instances and
+ * objects with an inherited prototype chain do not). A null-prototype object is additionally refused if it is really
+ * a typed array / DataView or a Map/Set/WeakMap/WeakSet whose prototype was stripped (their toString tag is lost with
+ * the prototype). Proxy objects are NOT reliably detectable from JS and are accepted as whatever they present
+ * through their traps; never pass untrusted Proxies to canonicalize.
  */
 function isPlainObject(v) {
+  if (toStringTag(v) !== '[object Object]') return false;
   const proto = Object.getPrototypeOf(v);
-  if (proto === null) return true;
-  return Object.getPrototypeOf(proto) === null && toStringTag(v) === '[object Object]';
+  if (proto === null) return !ArrayBuffer.isView(v) && !hasBrand(v);
+  return Object.getPrototypeOf(proto) === null;
 }
 
 /** Plain array: Array.isArray and a prototype that is some realm's Array.prototype (chain length exactly 2). */
@@ -265,8 +323,12 @@ function ser(v, pointer, level) {
     if (!isPlainArray(v)) throw new CJSONError('non-plain-array', pointer);
     const parts = new Array(v.length);
     for (let i = 0; i < v.length; i++) {
-      if (!(i in v)) throw new CJSONError('sparse-array', `${pointer}/${i}`);
-      parts[i] = ser(v[i], `${pointer}/${i}`, level + 1);
+      // Descriptors, never v[i] on an unchecked slot: an accessor element must not have its getter invoked.
+      const d = Object.getOwnPropertyDescriptor(v, i);
+      if (d === undefined) throw new CJSONError('sparse-array', `${pointer}/${i}`);
+      if (!('value' in d)) throw new CJSONError('accessor', `${pointer}/${i}`);
+      if (!d.enumerable) throw new CJSONError('hidden-property', `${pointer}/${i}`);
+      parts[i] = ser(d.value, `${pointer}/${i}`, level + 1);
     }
     if (Object.getOwnPropertyNames(v).length !== v.length + 1 || Object.getOwnPropertySymbols(v).length) {
       throw new CJSONError('array-extra-props', pointer);
@@ -326,19 +388,43 @@ const NUMBER_RE = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
  * Iterative (no recursion, so absurd nesting cannot overflow the stack) JSON parser that accepts the whole JSON
  * grammar, rejects duplicate keys, builds Object.create(null) objects, and records the FIRST value-level violation in
  * document order without stopping, so that a later syntax error still takes precedence (see the module comment).
+ *
+ * Memory is bounded for hostile nesting: values are only built for the first MAX_DEPTH levels. Deeper levels (which
+ * are already a `too-deep` violation) keep one byte of type per level in a growable Uint8Array, plus map entries only
+ * for levels that actually carry an array count or an object key, so `'[' x 16 MiB` costs ~16-32 MiB, not gigabytes.
+ * Syntax and duplicate-key checking continue through the deep region, preserving the precedence rules.
  */
 class Parser {
   constructor(text) {
     this.t = text;
     this.i = 0;
-    this.stack = []; // frames {arr: boolean, value, tok}
+    this.depth = 0; // number of open containers
+    this.types = new Uint8Array(64); // per level: 1 = array, 2 = object
+    this.frames = new Array(MAX_DEPTH); // built containers, levels < MAX_DEPTH only
+    this.tok = new Array(MAX_DEPTH); // current pointer token per shallow level (array: index, object: key)
+    this.deepTok = new Map(); // same, for levels >= MAX_DEPTH, only when not the default (0 / no key yet)
+    this.deepSeen = new Map(); // level -> Set of keys, created lazily once a deep object has 2 keys
     this.violation = null;
+  }
+
+  getTok(L) {
+    if (L < MAX_DEPTH) return this.tok[L];
+    const v = this.deepTok.get(L);
+    return v === undefined ? (this.types[L] === 1 ? 0 : '') : v;
   }
 
   /** JSON Pointer of the current location (the value being read, or the member whose key was just read). */
   pointer() {
     let p = '';
-    for (const f of this.stack) p += `/${esc(f.tok)}`;
+    for (let L = 0; L < this.depth; L++) {
+      if (L >= MAX_DEPTH && this.types[L] === 1 && !this.deepTok.has(L)) {
+        // run of untouched deep arrays (token 0): emit in one go instead of one concatenation per level
+        let end = L + 1;
+        while (end < this.depth && this.types[end] === 1 && !this.deepTok.has(end)) end++;
+        p += '/0'.repeat(end - L);
+        L = end - 1;
+      } else p += `/${esc(this.getTok(L))}`;
+    }
     return p;
   }
 
@@ -358,6 +444,66 @@ class Parser {
       if (c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d) this.i++;
       else return;
     }
+  }
+
+  push(arr) {
+    const L = this.depth;
+    if (L >= this.types.length) {
+      const next = new Uint8Array(this.types.length * 2);
+      next.set(this.types);
+      this.types = next;
+    }
+    this.types[L] = arr ? 1 : 2;
+    if (L < MAX_DEPTH) {
+      this.frames[L] = arr ? [] : Object.create(null);
+      this.tok[L] = arr ? 0 : '';
+    }
+    this.depth = L + 1;
+  }
+
+  /** Close the top level and return its built value (undefined for deep levels, which are discarded). */
+  pop() {
+    const L = --this.depth;
+    if (L < MAX_DEPTH) return this.frames[L];
+    this.deepTok.delete(L);
+    this.deepSeen.delete(L);
+    return undefined;
+  }
+
+  /** A key was read for the top (object) level: update the token, reject duplicates. */
+  key(k) {
+    const L = this.depth - 1;
+    if (L < MAX_DEPTH) {
+      const dup = k in this.frames[L];
+      this.tok[L] = k;
+      if (dup) throw new CJSONError('duplicate-key', this.pointer(), `key ${JSON.stringify(k)}`);
+      return;
+    }
+    const prev = this.deepTok.get(L); // last key read for this object, if any
+    this.deepTok.set(L, k);
+    let seen = this.deepSeen.get(L);
+    let dup = false;
+    if (seen) {
+      dup = seen.has(k);
+      seen.add(k);
+    } else if (prev !== undefined) {
+      dup = prev === k;
+      seen = new Set([prev, k]);
+      this.deepSeen.set(L, seen);
+    }
+    if (dup) throw new CJSONError('duplicate-key', this.pointer(), `key ${JSON.stringify(k)}`);
+  }
+
+  /** Hand a finished value to the enclosing container. */
+  deliver(v) {
+    const L = this.depth - 1;
+    const arr = this.types[L] === 1;
+    if (L < MAX_DEPTH) {
+      if (arr) {
+        this.frames[L].push(v);
+        this.tok[L] = this.frames[L].length;
+      } else this.frames[L][this.tok[L]] = v;
+    } else if (arr) this.deepTok.set(L, (this.deepTok.get(L) || 0) + 1);
   }
 
   /** Read a string token (cursor on the opening quote) and return its decoded value. */
@@ -423,24 +569,21 @@ class Parser {
 
   parseDocument() {
     const t = this.t;
-    const stack = this.stack;
     let phase = 'value';
     let v;
     for (;;) {
       if (phase === 'value') {
         this.ws();
-        const top = stack[stack.length - 1];
-        if (top && top.arr) top.tok = top.value.length;
         const c = t[this.i];
         if (c === '{' || c === '[') {
-          if (stack.length + 1 > MAX_DEPTH) this.note('too-deep');
+          if (this.depth + 1 > MAX_DEPTH) this.note('too-deep');
           const arr = c === '[';
-          stack.push({ arr, value: arr ? [] : Object.create(null), tok: arr ? 0 : '' });
+          this.push(arr);
           this.i++;
           this.ws();
           if (t[this.i] === (arr ? ']' : '}')) {
             this.i++;
-            v = stack.pop().value;
+            v = this.pop();
             phase = 'deliver';
           } else phase = arr ? 'value' : 'key';
         } else if (c === '"') {
@@ -477,10 +620,8 @@ class Parser {
       } else if (phase === 'key') {
         this.ws();
         if (t[this.i] !== '"') throw this.syntax('expected string key');
-        const top = stack[stack.length - 1];
         const key = this.string();
-        top.tok = key;
-        if (key in top.value) throw new CJSONError('duplicate-key', this.pointer(), `key ${JSON.stringify(key)}`);
+        this.key(key);
         const bad = keyViolation(key);
         if (bad) this.note(bad);
         this.ws();
@@ -489,23 +630,22 @@ class Parser {
         phase = 'value';
       } else {
         // deliver `v` to the enclosing container, then expect `,` or the closer
-        const top = stack[stack.length - 1];
-        if (!top) {
+        if (this.depth === 0) {
           this.ws();
           if (this.i !== t.length) throw this.syntax('trailing characters');
           return v;
         }
-        if (top.arr) top.value.push(v);
-        else top.value[top.tok] = v;
+        this.deliver(v);
+        const arr = this.types[this.depth - 1] === 1;
         this.ws();
         const c = t[this.i];
         if (c === ',') {
           this.i++;
-          phase = top.arr ? 'value' : 'key';
-        } else if (c === (top.arr ? ']' : '}')) {
+          phase = arr ? 'value' : 'key';
+        } else if (c === (arr ? ']' : '}')) {
           this.i++;
-          v = stack.pop().value;
-        } else throw this.syntax(top.arr ? 'expected , or ]' : 'expected , or }');
+          v = this.pop();
+        } else throw this.syntax(arr ? 'expected , or ]' : 'expected , or }');
       }
     }
   }
@@ -524,8 +664,13 @@ export function parseCanonical(input) {
   if (typeof input === 'string') {
     text = input;
     size = -1;
-  } else if (ArrayBuffer.isView(input)) {
-    const bytes = input instanceof Uint8Array ? input : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  } else if (input !== null && typeof input === 'object') {
+    let bytes;
+    try {
+      bytes = asUint8Array(input, 'parseCanonical');
+    } catch {
+      throw new CJSONError('unsupported-type:object', '', 'parseCanonical takes a Uint8Array, an ArrayBuffer or a string');
+    }
     text = utf8DecodeStrict(bytes);
     size = bytes.length;
   } else throw new CJSONError(`unsupported-type:${typeof input}`, '', 'parseCanonical takes bytes or a string');
@@ -575,8 +720,54 @@ export function f64Decode(s) {
   if (typeof s !== 'string' || !F64_RE.test(s)) {
     throw new CJSONError('f64-noncanonical', '', 'expected "f64:" + 16 lowercase hex digits');
   }
-  for (let i = 0; i < 8; i++) f64View.setUint8(i, parseInt(s.substr(4 + 2 * i, 2), 16));
+  for (let i = 0; i < 8; i++) f64View.setUint8(i, parseInt(s.slice(4 + 2 * i, 6 + 2 * i), 16));
   const v = f64View.getFloat64(0, false);
   if (f64Encode(v) !== s) throw new CJSONError('f64-noncanonical', '', 'does not re-encode to the same string');
   return v;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Boot self-test (section 2.2: every implementation MUST run the vector self-test at verifier start)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Check this engine's `Number::toString`, integer rules and F64 helpers against the section 2 vectors. Verifiers call
+ * it once at start; an engine whose number formatting differs fails loudly instead of producing different identities.
+ * @returns {true}
+ * @throws {Error} on the first mismatch
+ */
+export function canonicalSelfTest() {
+  const expect = (what, got, want) => {
+    if (got !== want) throw new Error(`BB-CJSON self-test failed: ${what}: got ${got}, want ${want}`);
+  };
+  const reject = (what, fn, code) => {
+    let got = 'no error';
+    try {
+      fn();
+    } catch (e) {
+      got = e && e.code;
+    }
+    expect(`${what} rejection`, got, code);
+  };
+  expect(
+    'cj-007 floats',
+    canonicalize([0.1, 0.30000000000000004, 1.15, 0.15, 0.000001, 123456.789, 0.5, -2.5, 1.7, 4.35, 0.0003, 0.1 + 0.7]),
+    '[0.1,0.30000000000000004,1.15,0.15,0.000001,123456.789,0.5,-2.5,1.7,4.35,0.0003,0.7999999999999999]',
+  );
+  expect('cj-008 integer-valued floats', canonicalize([3.0, 1e3, 2 ** 40]), '[3,1000,1099511627776]');
+  expect('cj-006 integers', canonicalize([0, -1, 1, 9007199254740991, -9007199254740991, 120, 127, -127]), '[0,-1,1,9007199254740991,-9007199254740991,120,127,-127]');
+  expect('exponent-free band', canonicalize([0.000001, 123456789012345.6, 0.0005]), '[0.000001,123456789012345.6,0.0005]');
+  expect('cj-003 key order', canonicalize({ b: 1, a: 2, B: 3, _: 4, 10: 5, 9: 6, aa: 7, 'a.b': 8, 'a-b': 9 }), '{"10":5,"9":6,"B":3,"_":4,"a":2,"a-b":9,"a.b":8,"aa":7,"b":1}');
+  reject('1e-7', () => canonicalize(1e-7), 'float-out-of-range');
+  reject('9.99e-7', () => canonicalize(9.99e-7), 'float-out-of-range');
+  reject('1e21', () => canonicalize(1e21), 'unsafe-integer');
+  reject('2^53', () => canonicalize(9007199254740992), 'unsafe-integer');
+  reject('-0', () => canonicalize(-0), 'negative-zero');
+  reject('NaN', () => canonicalize(NaN), 'nan');
+  const f = [[0, 'f64:0000000000000000'], [-0, 'f64:8000000000000000'], [0.1, 'f64:3fb999999999999a'], [4.35, 'f64:4011666666666666'], [5e-324, 'f64:0000000000000001'], [-Infinity, 'f64:fff0000000000000'], [NaN, 'f64:7ff8000000000000']];
+  for (const [x, want] of f) {
+    expect(`f64Encode(${x})`, f64Encode(x), want);
+    expect(`f64Decode(${want})`, Object.is(f64Decode(want), Number.isNaN(x) ? NaN : x), true);
+  }
+  return true;
 }

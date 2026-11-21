@@ -93,6 +93,10 @@ export class GhostRecorder {
     // never inside it, so the tape format and the exact sled checkpoints above are unchanged. A capture failure is
     // recorded here, never thrown: a fingerprint is a diagnostic and must not break a run.
     this.fingerprints = [];
+    /** Uncapped count of failed captures. The evidence path (#164) MUST treat a recorder with a non-zero count as having
+     *  incomplete fingerprints (a gap in `fingerprints`), never as a clean run. */
+    this.fingerprintErrorCount = 0;
+    /** The first few failures (tick, message), for diagnosis. */
     this.fingerprintErrors = [];
     this._last = null;
     this._lastTick = 0;
@@ -125,7 +129,11 @@ export class GhostRecorder {
       const f = fingerprintState(captureCausalState(scene));
       this.fingerprints.push({ tick, combined: f.combined, subsystems: f.subsystems });
     } catch (e) {
-      if (this.fingerprintErrors.length < 8) this.fingerprintErrors.push({ tick, message: String(e && e.message) });
+      const message = String(e && e.message);
+      if (this.fingerprintErrorCount++ === 0 && typeof console !== 'undefined') {
+        console.warn(`GhostRecorder: frame fingerprint capture failed at tick ${tick} (${message}); further failures are only counted`);
+      }
+      if (this.fingerprintErrors.length < 8) this.fingerprintErrors.push({ tick, message });
     }
   }
 

@@ -9,7 +9,7 @@
  * Fingerprints are drift detectors, never proofs: XXH32 is not collision resistant against an adversary.
  * Pure module: no Phaser, no clock, no randomness.
  */
-import { utf8Encode } from './canonicalJson.js';
+import { asUint8Array, utf8Encode } from './canonicalJson.js';
 
 const P1 = 2654435761;
 const P2 = 2246822519;
@@ -24,17 +24,17 @@ export const FP_SEED_B = 0x9e3779b9;
 export const FP_PREFIX = 'xxh32x2:';
 const FP_DIGEST_RE = /^xxh32x2:[0-9a-f]{16}$/;
 
-const isBytes = (b) => ArrayBuffer.isView(b) && b.BYTES_PER_ELEMENT === 1;
 const hex8 = (n) => (n >>> 0).toString(16).padStart(8, '0');
 
 /**
  * XXH32 of raw bytes.
- * @param {Uint8Array} b
+ * @param {Uint8Array|ArrayBuffer} input
  * @param {number} [seed=0] 32-bit seed
  * @returns {number} unsigned 32-bit
+ * @throws {TypeError} for anything that is not a Uint8Array/ArrayBuffer
  */
-export function xxh32Bytes(b, seed = 0) {
-  if (!isBytes(b)) throw new TypeError('xxh32Bytes expects a Uint8Array');
+export function xxh32Bytes(input, seed = 0) {
+  const b = asUint8Array(input, 'xxh32Bytes'); // Uint8Array/Buffer/ArrayBuffer only; other views would hash wrongly
   const len = b.length;
   seed >>>= 0;
   const lane = (i) => (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0;
@@ -97,6 +97,9 @@ export function fingerprintOf(bytes) {
 /**
  * BB-FP v1 binary encoder (section 6.5). Little-endian, schema-driven (field names are not encoded), no padding, no
  * tags. Callers write `u32 schemaVersion` first, then fields in schema order. Growable; reusable via reset().
+ * Atomic per call: every method validates before writing, and opt()/list() roll back everything they wrote if the
+ * element callback throws, so a throw never leaves a partial field behind (a caller that has already written earlier
+ * fields of a record should still reset() and discard that record).
  */
 export class FpWriter {
   /** @param {number} [capacity=256] initial buffer size in bytes */
@@ -177,7 +180,12 @@ export class FpWriter {
   /** `u32` UTF-8 byte length + bytes. Lone surrogates throw. @param {string} s @returns {this} */
   str(s) {
     if (typeof s !== 'string') throw new TypeError(`FpWriter.str: expected string, got ${typeof s}`);
-    const b = utf8Encode(s);
+    let b;
+    try {
+      b = utf8Encode(s);
+    } catch {
+      throw new RangeError('FpWriter.str: string contains a lone surrogate'); // same error family as the other writers
+    }
     this.u32(b.length);
     this._need(b.length);
     this.buf.set(b, this.len);
@@ -194,11 +202,17 @@ export class FpWriter {
   opt(v, writeFn) {
     if (v === undefined) throw new TypeError('FpWriter.opt: undefined is not a valid optional (use null)');
     this._need(1);
+    const start = this.len;
     if (v === null) {
       this.buf[this.len++] = 0;
     } else {
       this.buf[this.len++] = 1;
-      writeFn(this, v);
+      try {
+        writeFn(this, v);
+      } catch (e) {
+        this.len = start; // no partial record after a throw
+        throw e;
+      }
     }
     return this;
   }
@@ -210,8 +224,14 @@ export class FpWriter {
    * @returns {this}
    */
   list(arr, writeFn) {
-    this.u32(arr.length);
-    for (let i = 0; i < arr.length; i++) writeFn(this, arr[i], i);
+    const start = this.len;
+    try {
+      this.u32(arr.length);
+      for (let i = 0; i < arr.length; i++) writeFn(this, arr[i], i);
+    } catch (e) {
+      this.len = start; // no partial record after a throw
+      throw e;
+    }
     return this;
   }
 
@@ -226,7 +246,7 @@ function digestBytes(d, name) {
     throw new TypeError(`combineFingerprints: digest for "${name}" is not "xxh32x2:" + 16 lowercase hex`);
   }
   const out = new Uint8Array(8);
-  for (let i = 0; i < 8; i++) out[i] = parseInt(d.substr(FP_PREFIX.length + 2 * i, 2), 16);
+  for (let i = 0; i < 8; i++) out[i] = parseInt(d.slice(FP_PREFIX.length + 2 * i, FP_PREFIX.length + 2 * i + 2), 16);
   return out;
 }
 

@@ -28,7 +28,7 @@ function trace(endTick, mutation, { full = true, counters = { resims: 0, dumps: 
     const f = fingerprintState(stateAt(t, mutation));
     checkpoints.push(full ? { tick: t, combined: f.combined, subsystems: f.subsystems } : { tick: t, combined: f.combined });
   }
-  const run = { causalDigest, checkpoints };
+  const run = { causalDigest, checkpoints, endTick };
   if (resim) {
     run.resimulate = ({ fromTick, toTick }) => {
       counters.resims++;
@@ -131,7 +131,28 @@ describe('compareRuns', () => {
     const a = trace(360, null);
     const b = trace(360, null);
     b.checkpoints[1] = { ...b.checkpoints[1], tick: 241 };
-    expect(await compareRuns(a, b)).toMatchObject({ status: 'diverged', note: 'checkpoint-tick-mismatch' });
+    expect(await compareRuns(a, b)).toMatchObject({ status: 'inconclusive', note: 'checkpoint-gap' });
+  });
+
+  test('no evidence is never a match: empty lists, missing causal digest, endTick, checkpoint gaps', async () => {
+    expect(await compareRuns({ causalDigest: 'x', checkpoints: [] }, { causalDigest: 'x', checkpoints: [] })).toMatchObject({ status: 'inconclusive', note: 'no-checkpoints' });
+    const a = trace(360, null);
+    expect(await compareRuns({ ...a, causalDigest: undefined }, a)).toMatchObject({ status: 'inconclusive', note: 'no-causal-digest' });
+    expect(await compareRuns(a, { ...trace(360, null), causalDigest: undefined })).toMatchObject({ status: 'inconclusive', note: 'no-causal-digest' });
+    expect((await compareRuns({ ...a, causalDigest: undefined }, { ...a, causalDigest: undefined }, { ignoreCausal: true })).status).toBe('match');
+    expect(await compareRuns({ ...a, endTick: 365 }, { ...trace(360, null), endTick: 400 })).toMatchObject({ status: 'diverged', note: 'end-tick-mismatch' });
+    expect((await compareRuns({ ...a, endTick: undefined }, a)).note).toBe('end-tick-not-compared');
+    const gap = trace(360, null);
+    gap.checkpoints.splice(1, 1); // ticks 120, 360
+    expect(await compareRuns(a, gap)).toMatchObject({ status: 'inconclusive', note: 'checkpoint-gap' });
+    expect(await compareRuns(gap, gap)).toMatchObject({ status: 'inconclusive', note: 'checkpoint-gap' });
+  });
+
+  test('a re-simulation that does not reproduce the stored checkpoint is inconclusive, not a confident tick', async () => {
+    const a = trace(360, null);
+    const b = trace(360, bsodWall);
+    b.checkpoints[2] = { ...b.checkpoints[2], combined: 'xxh32x2:0000000000000000' }; // recording from another build
+    expect(await compareRuns(a, b)).toMatchObject({ status: 'inconclusive', note: 'resim-does-not-reproduce-checkpoint', firstDivergentCheckpoint: 360 });
   });
 
   test('stored checkpoints that disagree while both re-simulations agree are inconclusive (nondeterminism or build skew)', async () => {

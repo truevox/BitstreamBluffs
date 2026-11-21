@@ -57,6 +57,31 @@ describe('xxh32Bytes', () => {
   test('rejects non-byte input', () => {
     for (const bad of ['abc', [1], null, undefined, new Uint16Array(1)]) expect(() => xxh32Bytes(bad)).toThrow(TypeError);
   });
+
+  test('only Uint8Array / Buffer / ArrayBuffer: Int8Array, Uint8ClampedArray and friends throw TypeError', () => {
+    const base = Uint8Array.from([0, 1, 2, 3, 250, 255, 128, 127]);
+    for (const bad of [new Int8Array(base.buffer), new Uint8ClampedArray(base.buffer), new DataView(base.buffer), new Uint32Array(2)]) {
+      expect(() => xxh32Bytes(bad)).toThrow(TypeError);
+      expect(() => xxh32x2(bad)).toThrow(TypeError);
+      expect(() => fingerprintOf(bad)).toThrow(TypeError);
+    }
+    expect(xxh32Bytes(base.buffer, 7)).toBe(xxh32Bytes(base, 7)); // ArrayBuffer is normalized to a view
+  });
+
+  test('FpWriter never leaves partial writes after a throw', () => {
+    const w = new FpWriter().u32(1);
+    expect(() => w.opt(5, (ww) => ww.u32(1).u32(-1))).toThrow(RangeError);
+    expect(w.length).toBe(4);
+    expect(() => w.list([1, 2, 3], (ww, v) => (v === 3 ? ww.f64('x') : ww.u32(v)))).toThrow(TypeError);
+    expect(w.length).toBe(4);
+    expect(() => w.str('\udc00')).toThrow(RangeError);
+    expect(w.length).toBe(4);
+    expect(() => w.opt(undefined, () => {})).toThrow(TypeError);
+    expect(w.length).toBe(4);
+    expect(toHex(w.bytes())).toBe('01000000');
+    w.opt(7, (ww, v) => ww.u32(v));
+    expect(toHex(w.bytes())).toBe('01000000' + '01' + '07000000');
+  });
 });
 
 describe('xxh32Bytes(utf8(s), seed) === Rng.js xxHash32(s, seed) (Rng.js is untouched)', () => {
@@ -188,7 +213,8 @@ describe('FpWriter (BB-FP v1, little-endian)', () => {
     expect(toHex(new FpWriter().str('').bytes())).toBe('00000000');
     expect(toHex(new FpWriter().str('abc').bytes())).toBe('03000000616263');
     expect(toHex(new FpWriter().str('é😀').bytes())).toBe('06000000c3a9f09f9880');
-    expect(() => new FpWriter().str('\ud800')).toThrow(CJSONError);
+    expect(() => new FpWriter().str('\ud800')).toThrow(RangeError);
+    expect(() => new FpWriter().str('\ud800')).not.toThrow(CJSONError);
     expect(() => new FpWriter().str(5)).toThrow(TypeError);
   });
 

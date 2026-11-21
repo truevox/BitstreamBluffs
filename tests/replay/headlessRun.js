@@ -127,11 +127,14 @@ export function createRun(RunScene, REG, o = {}) {
     input: inert(), sound: inert(), tweens: inert(), time: inert(), textures: inert(), scale: inert(), sys: { isActive: () => true, settings: {} },
     make: inert(), load: inert(), anims: inert(), plugins: inert(),
   });
-  // Rendering is a presentation layer; the simulation never reads from it (the #140 contract). Stub it out.
-  scene.renderFrame = () => { };
-  scene.refreshPalette = () => { };
-  scene.updateCamera = () => { };
-  scene.snapCamera = () => { };
+  // By default the REAL renderFrame / refreshPalette / camera code runs against inert scene-graph objects: they write sim-adjacent
+  // state (Sled.shield in renderFrame, collider rebuilds in refreshPalette) that a stub would hide (review of #165, B1/S1).
+  if (o.stubRender) {
+    scene.renderFrame = () => { };
+    scene.refreshPalette = () => { };
+    scene.updateCamera = () => { };
+    scene.snapCamera = () => { };
+  }
   Object.defineProperty(scene, '_palette_stub', { value: PALETTE });
   scene.create();
   return scene;
