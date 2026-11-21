@@ -3,8 +3,9 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 1,
-  "attestation": "no-behavior-change: #118 review fixes (read-only fingerprint capture, compareRuns, capture error counting); no simulation code path changed",
+  "attestation": "no-behavior-change: C11 recorder rows; -0 tilt normalization unobservable because Sled.js:384 reads pad.tilt || fallback; RunScene edits are replay-setup-gated plus a deferred post-run evidence call",
   "changedFiles": [
+    "src/scenes/RunScene.js",
     "src/systems/ghost/GhostTape.js"
   ],
   "files": {
@@ -14,7 +15,7 @@
     "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
     "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
     "src/entities/TerrainMesh.js": "sha256:a88f6a99aab6298034ef99d6c9d90489f1cf0a7f0f305c526b7e358b6bc59003",
-    "src/scenes/RunScene.js": "sha256:9722e2d7749c7f330c9dba376e969dd156061079835d48016ce56a0d4c2032b7",
+    "src/scenes/RunScene.js": "sha256:6b0cc8263af13aa5b254c80e894aa4849ac50d1ed7f9de5cfd48133b1f797bc9",
     "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:dbe861d0a1fb6e73f94d467583ea9190ec88cc986fa39982b28687d75ca18397",
@@ -35,6 +36,6 @@
     "src/systems/TerrainGenerator.js": "sha256:6b16dba03098a1d95f8fca00ba8802dbb361823cf9b3ca5719e9356f355f1e8d",
     "src/systems/TrickTracker.js": "sha256:e6fdcea5cfc0e515fb0623b7f6bb3b189d5a5ed0fcf66f15175fd508da64abcf",
     "src/systems/Wards.js": "sha256:5fa20a216fd93ef1b72f1fe969234482585f680462e64fc46c0cf45772ebc09c",
-    "src/systems/ghost/GhostTape.js": "sha256:4267bc083714d388d70c6ddd95e8695d4943dda2f8203faf7153fe419d1ef530"
+    "src/systems/ghost/GhostTape.js": "sha256:44fa5d1788e81cf5965b6d22b0729d632b58ae2745ecfb8e891b01d52992085d"
   }
 }
