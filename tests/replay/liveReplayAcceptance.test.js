@@ -3,6 +3,7 @@
 // settings and hostile live registry flags. Fingerprints must be identical and compareRuns must say `match`. Negative
 // controls: mutants of RunScene with R-1 / R-2 / R-3 removed, and a tampered manifest. Also the end-to-end evidence path.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { jest } from '@jest/globals';
 
@@ -17,14 +18,22 @@ const { fingerprintState, compareRuns } = await import('../../src/systems/replay
 const { FP_PREFIX } = await import('../../src/systems/replay/canonicalBinary.js');
 const { EvidenceStore } = await import('../../src/systems/replay/evidenceStore.js');
 const { GhostLibrary } = await import('../../src/systems/ghost/GhostLibrary.js');
-const { EVIDENCE_STATUS_KEY, EVIDENCE_STORE_KEY, currentRuleset } = await import('../../src/systems/replay/evidenceCapture.js');
+const { EVIDENCE_STATUS_KEY, EVIDENCE_STORE_KEY, RULESET_KEY, buildRunEvidence } = await import('../../src/systems/replay/evidenceCapture.js');
+const { FP_SCHEMAS, FP_SUBSYSTEMS } = await import('../../src/systems/replay/fingerprintSchemas.js');
 const { validateEvidenceBundle, bundleDigest, resolveReplaySetup } = await import('../../src/systems/replay/manifest.js');
+const { TapePlayer } = await import('../../src/systems/ghost/GhostTape.js');
 const { canonicalBytes, parseCanonical } = await import('../../src/systems/replay/canonicalJson.js');
 const { digestOf } = await import('../../src/systems/replay/canonicalSha256.js');
-const { makeContent } = await import('./headlessRun.js');
 const { fakeIdb } = await import('./fakeIdb.js');
 
+// The game loads the committed ruleset (tools/ruleset/current.json + archive) at boot and puts it on the registry.
+const CURRENT = JSON.parse(fs.readFileSync('tools/ruleset/current.json', 'utf8'));
+const RULESET = { rulesetId: CURRENT.rulesetId, doc: JSON.parse(fs.readFileSync(CURRENT.archivePath, 'utf8')) };
+const resolveRuleset = (id) => (id === RULESET.rulesetId ? RULESET.doc : null);
+const waitFor = async (get, ms = 3000) => { const t0 = Date.now(); let v; while ((v = get()) === undefined && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 5)); return v; };
+
 const SEED = 'RPLAY164';
+const REC_SETTINGS = { kodiakPacks: 'mixed' }; // the recording used mixed packs; replays run under other live settings
 const END = 600;
 const REC_LEVEL = 8; // >= 6 (Kodiaks) and >= 5 (magnets): the recording had bears and magnets on
 const padFor = (tick) => ({
@@ -53,7 +62,8 @@ const tick = (scene) => scene.update(0, scene.simClock.tickMs);
 /** A live recording at DAY_REC: returns the scene (not yet ended). */
 function liveScene(SceneClass = RunScene, over = {}) {
   setDay(DAY_REC);
-  const scene = createRun(SceneClass, REG, { seed: SEED, level: REC_LEVEL, ...over });
+  const scene = createRun(SceneClass, REG, { seed: SEED, level: REC_LEVEL, settings: REC_SETTINGS, ...over });
+  scene.registry.set(RULESET_KEY, RULESET);
   scene.inputRouter = { poll: () => padFor(scene.simClock.tick + 1), setEnabled() {} };
   return scene;
 }
@@ -70,7 +80,7 @@ function replayScene(SceneClass, tape, { day, level, settings, gym = true } = {}
       super.create();
     }
   }
-  return createRun(Replay, REG, { seed: 'NOT-THE-RECORDED-SEED', level, settings, profile: { bsodGym: { owned: true } } });
+  return createRun(Replay, REG, { seed: 'NOT-THE-RECORDED-SEED', level, settings, profile: { bsodGym: { owned: true }, boosts: { errorCorrection: true }, unlocked: { boosts: { errorCorrection: true } } } });
 }
 
 /** RunTrace for compareRuns. `make()` builds a fresh scene; `reference` supplies the recorded checkpoints (else sampled). */
@@ -112,7 +122,6 @@ beforeAll(async () => {
   const store = new EvidenceStore({ idb: null, storage: null });
   await store.init();
   scene.registry.set(EVIDENCE_STORE_KEY, store);
-  scene.registry.set(REG.CONTENT, makeContent()); // already set by the harness; explicit for clarity
   while (scene.simClock.tick < END) tick(scene);
   expect(scene.crashed).toBe(false);
   expect(scene.kodiaksOn).toBe(true);
@@ -121,10 +130,10 @@ beforeAll(async () => {
   const tapeHolder = {};
   scene.registry.set(REG.GHOSTS, { saveRun: (t) => { tapeHolder.saved = t; return Promise.resolve(); } });
   scene._saveGhostTape({ id: 'rec-1', distanceM: Math.floor(scene.score.distanceM), score: Math.round(scene.score.getTotal()), endedAt: 1 });
-  await new Promise((r) => setTimeout(r, 0));
-  const status = scene.registry.get(EVIDENCE_STATUS_KEY);
+  const syncStatus = scene.registry.get(EVIDENCE_STATUS_KEY); // S3: nothing may have been built on the run-end frame
+  const status = await waitFor(() => scene.registry.get(EVIDENCE_STATUS_KEY));
   const tape = scene.registry.get(REG.LAST_GHOST_TAPE);
-  rec = { tape, status, store, recorder, scene, ghostSaved: tapeHolder.saved,
+  rec = { tape, status, syncStatus, store, recorder, scene, ghostSaved: tapeHolder.saved,
     bytes: status.ok ? await store.get(status.digest) : null };
   jest.useRealTimers();
 }, 60000);
@@ -141,9 +150,14 @@ describe('the live run produced evidence', () => {
     expect(rec.tape.syncLevel).toBe(REC_LEVEL);
   });
 
+  test('S3: nothing is built on the run-end frame: no status right after _saveGhostTape, the ghost save is synchronous', () => {
+    expect(rec.syncStatus).toBeUndefined();
+    expect(rec.ghostSaved).toBeDefined();
+  });
+
   test('the bundle verifies: digest = sha256 of its bytes, manifest valid under the in-build ruleset, fingerprints are stored', () => {
-    const { doc, rulesetId } = currentRuleset(makeContent(), { phaser: '3.90.0', matter: '0.20.0' });
-    const v = validateEvidenceBundle(rec.bytes, (id) => (id === rulesetId ? doc : null));
+    const { rulesetId } = RULESET;
+    const v = validateEvidenceBundle(rec.bytes, resolveRuleset);
     expect(v).toMatchObject({ ok: true, outcome: 'valid', reasons: [] });
     expect(bundleDigest(rec.bytes)).toBe(rec.status.digest);
     expect(v.manifest.causal.sim.rulesetId).toBe(rulesetId);
@@ -154,14 +168,28 @@ describe('the live run produced evidence', () => {
     expect(v.manifest.causal.kodiak.enabled).toBe(true);
     expect(v.manifest.causal.bsod.syncLevel).toBe(REC_LEVEL);
     expect(v.manifest.causal.course.dailyRuleId).toBe('featherweight');
+    expect(v.manifest.causal.kodiak.packMode).toBe('mixed');
+    // per-subsystem schema versions come from FP_SCHEMAS (#165), not constants; the capture error count is recorded
+    expect(v.manifest.causal.checkpoints.schemas).toEqual(Object.fromEntries(FP_SUBSYSTEMS.map((n) => [n, FP_SCHEMAS[n].version])));
+    expect(v.manifest.info.capture).toEqual({ errorCount: 0 });
     // the bundle carries no wall-clock or identity data
     const text = Buffer.from(rec.bytes).toString('utf8');
     for (const k of ['startedAt', 'endedAt', 'runId', 'controlLayout', 'rec-1']) expect(text).not.toContain(k);
   });
 
-  test('the in-build ruleset id equals the committed artifact (tools/ruleset/current.json)', () => {
-    const committed = JSON.parse(fs.readFileSync('tools/ruleset/current.json', 'utf8')).rulesetId;
-    expect(currentRuleset(makeContent(), { phaser: '3.90.0', matter: '0.20.0' }).rulesetId).toBe(committed);
+  test('the manifest binds the committed ruleset of this build (tools/ruleset/current.json)', () => {
+    expect(parseCanonical(rec.bytes).manifest.causal.sim.rulesetId).toBe(CURRENT.rulesetId);
+  });
+
+  test('capture errors: a non-zero count is recorded, drops the fingerprints and validates as inconclusive, never a pass', () => {
+    const fake = { fingerprints: rec.recorder.fingerprints, fingerprintErrorCount: 2, fingerprintErrors: [] };
+    const { bundle, detail, errorCount } = buildRunEvidence({ tape: rec.tape, recorder: fake, ruleset: RULESET });
+    expect([detail, errorCount]).toEqual(['none', 2]);
+    expect(bundle.manifest.info.capture).toEqual({ errorCount: 2 });
+    expect(bundle.checkpoints).toEqual([]);
+    const v = validateEvidenceBundle(canonicalBytes(bundle), resolveRuleset);
+    expect(v).toMatchObject({ ok: true, outcome: 'inconclusive' });
+    expect(v.reasons).toEqual([{ outcome: 'inconclusive', reason: 'fingerprint-capture-errors', pointer: '/info/capture/errorCount', expected: 0, actual: 2 }]);
   });
 
   test('BSOD initial values recorded by _ghostHeader equal the real constructor (no inconclusive outcome)', () => {
@@ -202,17 +230,15 @@ describe('the live run produced evidence', () => {
     const warn = console.warn;
     warn.mockClear();
     expect(() => scene._saveGhostTape({ id: 'x', distanceM: 1, score: 1, endedAt: 1 })).not.toThrow();
-    await new Promise((r) => setTimeout(r, 0));
     expect(saved).toHaveLength(1);
-    expect(scene.registry.get(EVIDENCE_STATUS_KEY)).toMatchObject({ ok: false, code: 'quota-exceeded' });
+    expect(await waitFor(() => scene.registry.get(EVIDENCE_STATUS_KEY))).toMatchObject({ ok: false, code: 'quota-exceeded' });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('quota-exceeded'));
-    // a scene with no content at all: still no throw
+    // a build with no ruleset at all: still no throw
     const s2 = liveScene();
-    s2.registry.set(REG.CONTENT, undefined);
+    s2.registry.set(RULESET_KEY, undefined);
     while (s2.simClock.tick < 120) tick(s2);
     expect(() => s2._saveGhostTape({ id: 'y', distanceM: 1, score: 1, endedAt: 1 })).not.toThrow();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(s2.registry.get(EVIDENCE_STATUS_KEY).ok).toBe(false);
+    expect(await waitFor(() => s2.registry.get(EVIDENCE_STATUS_KEY))).toMatchObject({ ok: false, code: 'no-ruleset' });
   });
 });
 
@@ -222,7 +248,7 @@ describe('same tape, hostile replay conditions: identical fingerprints (acceptan
 
   const conditions = [
     ['a different UTC day (heavyPackets), Sync Level 1, bears/magnets off in the live profile, hostile Gym/Daily registry flags',
-      { day: DAY_OTHER, level: 1, settings: { kodiakPacks: 'mixed' } }],
+      { day: DAY_OTHER, level: 1, settings: { kodiakPacks: 'same' } }],
     ['another UTC day (slickLines) and a far higher Sync Level', { day: DAY_THIRD, level: 40, settings: {} }],
   ];
 
@@ -233,7 +259,9 @@ describe('same tape, hostile replay conditions: identical fingerprints (acceptan
     expect(probe.dailyRuleId).toBe('featherweight');
     expect(probe.kodiaksOn).toBe(true);
     expect(probe.magnetsDrop).toBe(true);
-    expect(probe.kodiakPackMode).toBe('same');
+    expect(probe.kodiakPackMode).toBe('mixed'); // recorded value, not the live setting
+    expect(probe.appliedBoosts).toEqual([]); // the live profile's boosts/upgrades are ignored
+    expect(probe.upgradeRun.enabled).toBe(false);
     expect(probe.bsodGym).toBe(false);
     expect(probe.dailyOfficial).toBe(false);
     expect(probe.dailyMode).toBe('classic');
@@ -264,25 +292,32 @@ describe('same tape, hostile replay conditions: identical fingerprints (acceptan
 
 describe('negative controls: remove a rule, or tamper, and it diverges or refuses', () => {
   const SRC = 'src/scenes/RunScene.js';
-  const made = [];
+  // Mutants live in a private temp dir OUTSIDE the repo (nothing for git, jest-watch or sibling suites to trip over); their
+  // relative imports are rewritten to absolute paths so they still resolve to the very same modules as the real scene.
+  let dir = null;
   let Mutants = {};
 
   beforeAll(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-mutants-'));
     const src = fs.readFileSync(SRC, 'utf8');
+    const abs = src.replace(/from '(\.{1,2}\/[^']+)'/g, (_m, rel) => `from '${path.resolve(path.dirname(SRC), rel)}'`);
     const mutate = (name, from, to) => {
       expect(src).toContain(from);
-      const file = path.resolve(`src/scenes/__mutant_${name}.js`);
-      fs.writeFileSync(file, src.replace(from, to));
-      made.push(file);
-      return import(`../../src/scenes/__mutant_${name}.js`);
+      const file = path.join(dir, `mutant_${name}.mjs`);
+      fs.writeFileSync(file, abs.replace(from, to));
+      return import(file);
     };
     Mutants = {
       noR1: (await mutate('R1', 'const daily = rp ? { rule: rp.dailyRule } : seedDayInfo ?', 'const daily = seedDayInfo ?')).RunScene,
       noR2: (await mutate('R2', 'level: rp ? rp.syncLevel : prof.level,', 'level: prof.level,')).RunScene,
-      noR3: (await mutate('R3', 'this.kodiaksOn = rp ? rp.kodiaksOn', 'this.kodiaksOn = false ? 0')).RunScene,
+      noR3k: (await mutate('R3k', 'this.kodiaksOn = rp ? rp.kodiaksOn', 'this.kodiaksOn = false ? 0')).RunScene,
+      noR3m: (await mutate('R3m', 'this.magnetsDrop = rp ? rp.magnetsDrop', 'this.magnetsDrop = false ? 0')).RunScene,
+      noR3p: (await mutate('R3p', 'this.kodiakPackMode = rp ? rp.kodiakPackMode', 'this.kodiakPackMode = false ? 0')).RunScene,
+      noR4: (await mutate('R4', 'this.dailyOfficial = !replay && reg.get(REG.DAILY_OFFICIAL)', 'this.dailyOfficial = reg.get(REG.DAILY_OFFICIAL)')).RunScene,
     };
   });
-  afterAll(() => { for (const f of made) { try { fs.unlinkSync(f); } catch { /* already gone */ } } });
+  // tolerates a killed worker: a leftover dir is in the OS temp dir, never in the repo
+  afterAll(() => { try { if (dir) fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ } });
 
   const env = { day: DAY_OTHER, level: 1, settings: {} };
   const reference = () => rec.recorder.fingerprints.map((f) => ({ tick: f.tick, combined: f.combined, subsystems: f.subsystems }));
@@ -304,9 +339,43 @@ describe('negative controls: remove a rule, or tamper, and it diverges or refuse
     expect(r.differingSubsystems).toContain('bsod');
   });
 
-  test('R-3 removed (Kodiak flag from the live profile): the replay resolves different inputs', () => {
-    expect(replayScene(Mutants.noR3, rec.tape, env).kodiaksOn).toBe(false);
-    expect(replayScene(RunScene, rec.tape, env).kodiaksOn).toBe(true);
+  test('R-3 removed (Kodiak flag, magnet flag, pack mode from the live profile/settings): the replay resolves different inputs', () => {
+    const real = replayScene(RunScene, rec.tape, env);
+    expect([real.kodiaksOn, real.magnetsDrop, real.kodiakPackMode]).toEqual([true, true, 'mixed']);
+    expect(replayScene(Mutants.noR3k, rec.tape, env).kodiaksOn).toBe(false);
+    expect(replayScene(Mutants.noR3m, rec.tape, env).magnetsDrop).toBe(false);
+    expect(replayScene(Mutants.noR3p, rec.tape, env).kodiakPackMode).not.toBe('mixed');
+  });
+
+  test('R-4 (official Daily flags): a recorded official Daily replays with stale DAILY_OFFICIAL/DAILY_MODE ignored; the mutant honors them', async () => {
+    const dayKey = DAY_REC.toISOString().slice(0, 10);
+    setDay(DAY_REC);
+    class Official extends RunScene { create() { this.registry.set(REG.DAILY_OFFICIAL, true); super.create(); } }
+    const dailyLive = () => {
+      setDay(DAY_REC);
+      const sc = createRun(Official, REG, { seed: `daily-${dayKey}`, level: 3 });
+      sc.registry.set(RULESET_KEY, RULESET);
+      sc.inputRouter = { poll: () => padFor(sc.simClock.tick + 1), setEnabled() {} };
+      return sc;
+    };
+    const live = dailyLive();
+    expect(live.dailyOfficial).toBe(true);
+    while (live.simClock.tick < END) tick(live);
+    const tape = live.ghostRecorder.finish({ runId: 'd1', distanceM: 1, score: 1, endedAt: 1 });
+    expect(tape.mode).toBe('daily');
+    expect(tape.dailyRuleSource).toBe('seed-date');
+    const refDaily = live.ghostRecorder.fingerprints.map((f) => ({ tick: f.tick, combined: f.combined, subsystems: f.subsystems }));
+    // same UTC day, stale official/draft flags in the registry: the replay is not an official Daily
+    const real = replayScene(RunScene, tape, { day: DAY_REC, level: 1, settings: {} });
+    expect([real.dailyOfficial, real.dailyMode, real.bsodGym]).toEqual([false, 'classic', false]);
+    const mutant = replayScene(Mutants.noR4, tape, { day: DAY_REC, level: 1, settings: {} });
+    expect(mutant.dailyOfficial).toBe(true); // without R-4 the replay is gated by the live flag
+    expect(mutant.dailyMode).toBe('draft');
+    const r = await compareRuns(trace(() => dailyLive(), { reference: refDaily }), trace(() => replayScene(RunScene, tape, { day: DAY_REC, level: 1, settings: {} })));
+    expect(r.status).toBe('match');
+    const v = validateEvidenceBundle(canonicalBytes(buildRunEvidence({ tape, recorder: live.ghostRecorder, ruleset: RULESET }).bundle), resolveRuleset);
+    expect(v).toMatchObject({ ok: true, outcome: 'valid' });
+    expect(v.manifest.info.lane).toMatchObject({ mode: 'daily', dailyOfficial: true });
   });
 
   test('tampered manifest: the bundle is refused, and a re-hashed manifest has another causalDigest so compareRuns refuses', async () => {
@@ -333,5 +402,51 @@ describe('negative controls: remove a rule, or tamper, and it diverges or refuse
     const good = parseCanonical(rec.bytes);
     const tapeDigest = digestOf({ format: 'bb-input-tape', formatVersion: 1, protocol: { id: 'bb-pad', version: 1 }, tickHz: 120, endTick: bad.endTick, inputs: bad.inputs });
     expect(tapeDigest).not.toBe(good.manifest.causal.input.tapeDigest);
+  });
+});
+
+describe('S2: a tape from before the magnet gate (magnets always dropped) replays without a desync', () => {
+  const PRE_FIELDS = ['magnetsDrop', 'kodiaksOn', 'kodiakPackMode', 'kodiakVersion', 'syncLevel', 'bsod', 'dailyRuleSource', 'edgeRows'];
+  /** What the recorder wrote between da8935a (ghost tapes) and 3b6b961 (Sync Level 5 magnet gate + magnetsDrop field). */
+  const preGateTape = (tape) => { const t = roundTrip(tape); for (const k of PRE_FIELDS) delete t[k]; return t; };
+  let tape;
+
+  beforeAll(() => {
+    // Sync Level 5: magnets drop (>= 5), bears do not (< 6) -- the world a pre-gate tape was recorded in
+    // seed S5 was found by search: with magnets off its replay desyncs at tick 480 (shards the magnet would have pulled)
+    setDay(DAY_REC);
+    const scene = createRun(RunScene, REG, { seed: 'S5', level: 5 });
+    const pad = (t) => ({ push: t < 300, tilt: 0, variableHop: true, noAutoNudge: true, tuck: t > 500 && t < 540, pressed: {} });
+    scene.inputRouter = { poll: () => pad(scene.simClock.tick + 1), setEnabled() {} };
+    while (scene.simClock.tick < END) tick(scene);
+    expect(scene.magnetsDrop).toBe(true);
+    expect(scene.kodiaksOn).toBe(false);
+    tape = scene.ghostRecorder.finish({ runId: 's2', distanceM: 1, score: 1, endedAt: 1 });
+    jest.useRealTimers();
+  });
+
+  const replayDesync = (t, level) => {
+    const sc = replayScene(RunScene, t, { day: DAY_OTHER, level, settings: {}, gym: false });
+    while (sc.simClock.tick < END) tick(sc);
+    return { desync: sc.tapePlayer.desync, checked: sc.tapePlayer.checked, scene: sc };
+  };
+
+  test('absent magnetsDrop defaults to ON: no desync at any profile level, and the defaults are reported', () => {
+    const t = preGateTape(tape);
+    expect(resolveReplaySetup(t).defaulted.sort()).toEqual(['kodiak', 'magnetsDrop', 'syncLevel']);
+    for (const level of [1, 8, 40]) {
+      const r = replayDesync(t, level);
+      expect(r.scene.magnetsDrop).toBe(true);
+      expect(r.scene.kodiaksOn).toBe(false);
+      expect(r.desync).toBeNull();
+      expect(r.checked).toBe(5);
+    }
+  });
+
+  test('control: the same tape with magnets forced off (the old wrong default) does desync, so the test has teeth', () => {
+    const t = { ...preGateTape(tape), magnetsDrop: false };
+    const r = replayDesync(t, 8);
+    expect(r.desync).not.toBeNull();
+    expect(r.desync.tick).toBe(480);
   });
 });
