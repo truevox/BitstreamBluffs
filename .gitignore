@@ -27,3 +27,6 @@ config.txt
 /coverage
 /tools/sim/.pacing
 /tools/sim/__pycache__
+
+# Issue #76 exploit-factory working output (regenerable; the committed report is markdown)
+/tools/exploits/out/
