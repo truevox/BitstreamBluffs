@@ -6,7 +6,7 @@
  * and hashed outside the sim loop, so speed is irrelevant. A boot self-test against NIST vectors runs when the module
  * loads and throws if the implementation is wrong. Pure module: no Phaser, no clock, no randomness.
  */
-import { canonicalBytes } from './canonicalJson.js';
+import { asUint8Array, canonicalBytes } from './canonicalJson.js';
 
 const K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01,
@@ -69,12 +69,12 @@ function block(h, buf, off, w) {
 
 /**
  * SHA-256 of `bytes` as 64 lowercase hex digits.
- * @param {Uint8Array} bytes
+ * @param {Uint8Array|ArrayBuffer} input
  * @returns {string}
+ * @throws {TypeError} for anything that is not a Uint8Array/ArrayBuffer
  */
-export function sha256Hex(bytes) {
-  // ArrayBuffer.isView, not instanceof: Jest's jsdom realm makes node Buffers fail `instanceof Uint8Array`.
-  if (!ArrayBuffer.isView(bytes) || bytes.BYTES_PER_ELEMENT !== 1) throw new TypeError('sha256Hex expects a Uint8Array');
+export function sha256Hex(input) {
+  const bytes = asUint8Array(input, 'sha256Hex'); // Uint8Array/Buffer/ArrayBuffer only; other views would hash wrongly
   const h = new Uint32Array([
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
   ]);
