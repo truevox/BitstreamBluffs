@@ -287,13 +287,14 @@
     const policy = policies[policyName](params);
     const withNoise = o.noiseProfile !== undefined;
     const playback = withNoise && o.noiseReplay !== undefined;
+    const fatigue = withNoise && o.noiseFatigue === true;
     let ghost, noiseApi, planner, inputRecorder;
     if (withNoise) {
       if (policyName !== 'hop') throw new Error('Human-noise simulation only supports hop');
       [ghost, noiseApi] = await Promise.all([
         import('/src/systems/ghost/GhostTape.js'), import('/tools/sim/human-noise.js'),
       ]);
-      if (!playback) planner = noiseApi.makeHopNoise(o.noiseProfile, o.seed, o.noiseSeed);
+      if (!playback) planner = noiseApi.makeHopNoise(o.noiseProfile, o.seed, o.noiseSeed, { fatigue });
       inputRecorder = new ghost.GhostRecorder({
         seed: o.seed, biomeMask: o.biomeMask >>> 0, mode: 'normal',
         boosts: [], upgradeRanks: null, magnetsDrop: false, kodiaksOn: false, kodiakPackMode: 'same',
@@ -667,7 +668,7 @@
       }
       const body = scene.sled.body;
       R.humanNoise = {
-        profile: o.noiseProfile, version: noiseApi.HUMAN_NOISE_VERSION,
+        profile: o.noiseProfile, version: fatigue ? noiseApi.HUMAN_NOISE_FATIGUE_VERSION : noiseApi.HUMAN_NOISE_VERSION,
         frameHz: noiseApi.NOISE_FPS, stats: planner?.stats() ?? null,
         input: {
           format: inputRecorder.header.format, version: inputRecorder.header.version,
