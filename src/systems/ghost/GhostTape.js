@@ -13,6 +13,8 @@
  */
 import { SIM_TICK_HZ } from '../SimClock.js';
 import { RUN_RANDOM_VERSION } from '../RunRandom.js';
+import { captureCausalState } from '../replay/fingerprintCapture.js';
+import { fingerprintState } from '../replay/fingerprint.js';
 
 export const GHOST_TAPE_FORMAT = 'bb-ghost-tape';
 /** Bump when the header, input bits or trace layout change. */
@@ -87,6 +89,11 @@ export class GhostRecorder {
     this.inputs = []; // [tickDelta, bits, tilt127] on change
     this.checkpoints = []; // [tick, ...sledState]
     this.trace = []; // x, y, angle every TRACE_EVERY ticks from tick TRACE_EVERY
+    // Replay Contract v1 (#118): one fingerprint per checkpoint tick, `{tick, combined, subsystems}`. Kept beside the tape,
+    // never inside it, so the tape format and the exact sled checkpoints above are unchanged. A capture failure is
+    // recorded here, never thrown: a fingerprint is a diagnostic and must not break a run.
+    this.fingerprints = [];
+    this.fingerprintErrors = [];
     this._last = null;
     this._lastTick = 0;
     this.lastTick = 0;
@@ -106,7 +113,20 @@ export class GhostRecorder {
       const b = scene.sled.body;
       this.trace.push(b.position.x, b.position.y, b.angle);
     }
-    if (tick % CHECKPOINT_EVERY === 0) this.checkpoints.push([tick, ...sledState(scene)]);
+    if (tick % CHECKPOINT_EVERY === 0) {
+      this.checkpoints.push([tick, ...sledState(scene)]);
+      this._fingerprint(tick, scene);
+    }
+  }
+
+  /** Subsystem frame fingerprint at a checkpoint tick (read-only capture; runs once per CHECKPOINT_EVERY ticks). */
+  _fingerprint(tick, scene) {
+    try {
+      const f = fingerprintState(captureCausalState(scene));
+      this.fingerprints.push({ tick, combined: f.combined, subsystems: f.subsystems });
+    } catch (e) {
+      if (this.fingerprintErrors.length < 8) this.fingerprintErrors.push({ tick, message: String(e && e.message) });
+    }
   }
 
   /** @param {{runId:string, distanceM:number, score:number, cause?:string, endedAt?:number}} result */
