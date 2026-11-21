@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { canonicalBytes, utf8Encode } from '../../src/systems/replay/canonicalJson.js';
 import { digestOfBytes } from '../../src/systems/replay/canonicalSha256.js';
 import { assembleRuleset, rulesetIdOf, SIM_REVISION } from '../../src/systems/replay/ruleset.js';
-import { CONTENT_GROUPS, HIDDEN_LITERALS, GRAVITY_Y_PIN } from '../../src/systems/replay/rulesetRegistry.js';
+import { CONTENT_GROUPS, HIDDEN_LITERALS, GRAVITY_Y_PIN, SOURCE_EXTRACTS } from '../../src/systems/replay/rulesetRegistry.js';
 
 export const repoRoot = () => path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -20,8 +20,8 @@ export const TRIPWIRE_PATH = 'tools/ruleset/source-digest.json';
 
 /**
  * Allowlisted causal source files for the tripwire (section 7.2). Whole files: a refactor of one of them needs a
- * one-line human attestation, which is the point. RunScene.js is deliberately NOT here (see docs/replay/time-capsules.md:
- * it is mostly presentation, so a file-level tripwire would be noise; its three engine literals are pinned instead).
+ * one-line human attestation, which is the point. RunScene.js is here too (update order, slowmo, spawn, engine setup);
+ * it cannot be imported in node, so its top-level numeric constants are read by source extraction (SOURCE_EXTRACTS).
  */
 export const TRIPWIRE_FILES = Object.freeze([
   'src/constants.js',
@@ -30,6 +30,7 @@ export const TRIPWIRE_FILES = Object.freeze([
   'src/entities/Shard.js',
   'src/entities/Sled.js',
   'src/entities/TerrainMesh.js',
+  'src/scenes/RunScene.js',
   'src/systems/BiomeEffects.js',
   'src/systems/Boosts.js',
   'src/systems/BsodAerodynamics.js',
@@ -65,6 +66,7 @@ export function loadContentFromDisk(root = repoRoot()) {
     for (const f of files) {
       const def = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
       if (typeof def.id !== 'string') throw new Error(`${group}/${f}: missing string id`);
+      if (['__proto__', 'constructor', 'prototype'].includes(def.id)) throw new Error(`${group}/${f}: forbidden id ${def.id}`);
       if (Object.prototype.hasOwnProperty.call(out[group], def.id)) throw new Error(`${group}/${f}: duplicate id ${def.id}`);
       out[group][def.id] = def;
     }
@@ -85,8 +87,13 @@ export function readEngineVersions(root = repoRoot()) {
 }
 
 /** Assemble the current ruleset from disk. `opts.simRevision` is the two-version-proof seam. */
+/** Text of every SOURCE_EXTRACTS file (modules that cannot be imported in node). */
+export function readSourceTexts(root = repoRoot()) {
+  return Object.fromEntries(SOURCE_EXTRACTS.map((e) => [e.file, readText(root, e.file)]));
+}
+
 export function assembleFromDisk(root = repoRoot(), opts = {}) {
-  const doc = assembleRuleset({ content: loadContentFromDisk(root), engineVersions: readEngineVersions(root), ...opts });
+  const doc = assembleRuleset({ content: loadContentFromDisk(root), engineVersions: readEngineVersions(root), sourceTexts: readSourceTexts(root), ...opts });
   const bytes = canonicalBytes(doc);
   return { doc, bytes, rulesetId: rulesetIdOf(doc) };
 }
@@ -148,8 +155,8 @@ export function readTripwire(root = repoRoot()) {
 }
 
 /** Rewrite the tripwire file. Requires an attestation when any digest differs from the committed one. */
-export function writeTripwire(root, attestation) {
-  const digests = tripwireDigests(root);
+export function writeTripwire(root, attestation, files = TRIPWIRE_FILES) {
+  const digests = tripwireDigests(root, files);
   let prev = null;
   try {
     prev = readTripwire(root);
@@ -158,6 +165,9 @@ export function writeTripwire(root, attestation) {
   if (prev && changed.length === 0) return { changed, wrote: false };
   if (!ATTESTATION_RE.test(attestation || '')) {
     throw new Error('attestation required, format: "no-behavior-change: <why>" or "sim-revision-bumped: <what>" (>= 8 chars of reason)');
+  }
+  if (prev && attestation.startsWith('sim-revision-bumped') && !(SIM_REVISION > prev.simRevision)) {
+    throw new Error(`"sim-revision-bumped" needs SIM_REVISION (${SIM_REVISION}) to exceed the committed tripwire's (${prev.simRevision}); otherwise use "no-behavior-change"`);
   }
   const doc = {
     format: 'bb-source-tripwire',

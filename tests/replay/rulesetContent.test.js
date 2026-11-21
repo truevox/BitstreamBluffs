@@ -5,7 +5,7 @@ import { sha256Hex } from '../../src/systems/replay/canonicalSha256.js';
 import { CONTENT_GROUPS, EXTRA_NON_SIM_KEYS, NON_SIM_KEYS, RULESET_SOURCES, countKeys, keyPaths, omitKeysFor, projectData } from '../../src/systems/replay/rulesetRegistry.js';
 import { TerrainGenerator } from '../../src/systems/TerrainGenerator.js';
 import { DEFAULT_SOURCES, assembleRuleset, rulesetIdOf } from '../../src/systems/replay/ruleset.js';
-import { assembleFromDisk, loadContentFromDisk, readEngineVersions, repoRoot } from '../../tools/ruleset/lib.mjs';
+import { assembleFromDisk, loadContentFromDisk, readEngineVersions, readSourceTexts, repoRoot } from '../../tools/ruleset/lib.mjs';
 import { BOOST_DEFS } from '../../src/systems/Boosts.js';
 import { UPGRADE_CATALOG } from '../../src/systems/PermanentUpgrades.js';
 import { DailyPatch } from '../../src/systems/DailyPatch.js';
@@ -162,17 +162,18 @@ describe('denylist entries are real (none dead) and everything else stays includ
   test('changing an UPGRADE_CATALOG basePrice or priceScale changes the rulesetId (Draft legality is competition identity)', () => {
     const content = loadContentFromDisk(root);
     const engineVersions = readEngineVersions(root);
-    const base = rulesetIdOf(assembleRuleset({ content, engineVersions }));
+    const sourceTexts = readSourceTexts(root);
+    const base = rulesetIdOf(assembleRuleset({ content, engineVersions, sourceTexts }));
     expect(base).toBe(rulesetIdOf(doc));
     for (const field of ['basePrice', 'priceScale']) {
       const bumped = UPGRADE_CATALOG.map((u, i) => (i === 0 ? { ...u, [field]: u[field] + 1 } : u));
       const sources = { ...DEFAULT_SOURCES, permanentUpgrades: { ...DEFAULT_SOURCES.permanentUpgrades, UPGRADE_CATALOG: bumped } };
-      expect(rulesetIdOf(assembleRuleset({ content, engineVersions }, sources))).not.toBe(base);
+      expect(rulesetIdOf(assembleRuleset({ content, engineVersions, sourceTexts }, sources))).not.toBe(base);
     }
     // label stays cosmetic
     const relabelled = UPGRADE_CATALOG.map((u, i) => (i === 0 ? { ...u, label: 'RENAMED' } : u));
     const same = { ...DEFAULT_SOURCES, permanentUpgrades: { ...DEFAULT_SOURCES.permanentUpgrades, UPGRADE_CATALOG: relabelled } };
-    expect(rulesetIdOf(assembleRuleset({ content, engineVersions }, same))).toBe(base);
+    expect(rulesetIdOf(assembleRuleset({ content, engineVersions, sourceTexts }, same))).toBe(base);
   });
   test('registry omit lists are derived from the same sets', () => {
     const omitted = RULESET_SOURCES.flatMap((s) => [...Object.values(s.exports), ...Object.values(s.statics || {}).flatMap((m) => Object.values(m))]).filter((d) => d.omit);

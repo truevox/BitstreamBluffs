@@ -14,8 +14,8 @@
 import { canonicalBytes, parseCanonical } from './canonicalJson.js';
 import { digestOf } from './canonicalSha256.js';
 import {
-  CONTENT_GROUPS, HIDDEN_LITERALS, omitKeysFor, RULESET_SOURCES, RulesetRegistryError,
-  classifyExports, projectData,
+  CONTENT_GROUPS, HIDDEN_LITERALS, SOURCE_EXTRACTS, omitKeysFor, RULESET_SOURCES, RulesetRegistryError,
+  classifyExports, classifyExtract, projectData, scanNumericConsts,
 } from './rulesetRegistry.js';
 
 import * as constantsNs from '../../constants.js';
@@ -31,6 +31,15 @@ import * as dailyDraftNs from '../DailyDraft.js';
 import * as runRandomNs from '../RunRandom.js';
 import * as ghostTapeNs from '../ghost/GhostTape.js';
 import * as dailyPatchNs from '../DailyPatch.js';
+import * as trickTrackerNs from '../TrickTracker.js';
+import * as biomeEffectsNs from '../BiomeEffects.js';
+import * as wardsNs from '../Wards.js';
+import * as bsodBluffTrackerNs from '../BsodBluffTracker.js';
+import * as shardMagnetNs from '../ShardMagnet.js';
+import * as bsodAerodynamicsNs from '../BsodAerodynamics.js';
+import * as rngNs from '../Rng.js';
+import * as scoreManagerNs from '../ScoreManager.js';
+import * as terrainContactNs from '../TerrainContact.js';
 
 /**
  * Hand-bumped simulation revision, integer >= 1, part of the ruleset document (and so of the id). Bump it, in the
@@ -61,9 +70,19 @@ export const DEFAULT_SOURCES = Object.freeze({
   runRandom: runRandomNs,
   ghostTape: ghostTapeNs,
   dailyPatch: dailyPatchNs,
+  trickTracker: trickTrackerNs,
+  biomeEffects: biomeEffectsNs,
+  wards: wardsNs,
+  bsodBluffTracker: bsodBluffTrackerNs,
+  shardMagnet: shardMagnetNs,
+  bsodAerodynamics: bsodAerodynamicsNs,
+  rng: rngNs,
+  scoreManager: scoreManagerNs,
+  terrainContact: terrainContactNs,
 });
 
 const KEY_OK = /^[A-Za-z0-9_.:$-]{1,64}$/;
+const PROTO_IDS = new Set(['__proto__', 'constructor', 'prototype', 'toString', 'valueOf', 'hasOwnProperty']);
 
 function setPath(doc, path, value) {
   const parts = path.split('.');
@@ -97,6 +116,12 @@ export function assertRegistryShape() {
       for (const p of Array.isArray(d.at) ? d.at : [d.at]) note(p);
     }
   }
+  for (const ex of SOURCE_EXTRACTS) {
+    for (const d of Object.values(ex.consts)) {
+      if (d.exclude === undefined) for (const p of [].concat(d.at)) note(p);
+      else if (typeof d.exclude !== 'string' || d.exclude.length < 8) throw new RulesetRegistryError('missing-reason', ex.id);
+    }
+  }
   for (const h of HIDDEN_LITERALS) note(h.at);
 }
 
@@ -107,6 +132,8 @@ export function assertRegistryShape() {
  * @param {Object} inputs.content   `{chunks, hazards, powerups, terrainMods, biomes}`: each an object keyed by def id
  *                                  holding the FULL JSON def (cosmetic keys are removed here, by NON_SIM_KEYS + EXTRA_NON_SIM_KEYS).
  * @param {{phaser:string, matter:string}} inputs.engineVersions resolved versions (package-lock phaser; bundled Matter).
+ * @param {Object<string,string>} inputs.sourceTexts text of every SOURCE_EXTRACTS file by repo path (modules that cannot be
+ *                                  imported in node; their numeric constants are scanned, never executed).
  * @param {number} [inputs.simRevision=SIM_REVISION] test seam for two-version proofs; production never overrides it.
  * @param {Object} [sources=DEFAULT_SOURCES] module namespaces by registry id (test seam; a namespace with an
  *                                  unregistered export makes this throw `unregistered-export`).
@@ -150,6 +177,19 @@ export function assembleRuleset(inputs, sources = DEFAULT_SOURCES) {
     }
   }
 
+  for (const ex of SOURCE_EXTRACTS) {
+    const text = inputs.sourceTexts && inputs.sourceTexts[ex.file];
+    if (typeof text !== 'string') throw new RulesetRegistryError('missing-source-text', ex.file);
+    const { unregistered, stale } = classifyExtract(ex, text);
+    if (unregistered.length) throw new RulesetRegistryError('unregistered-export', `${ex.file}: ${unregistered.join(', ')}`);
+    if (stale.length) throw new RulesetRegistryError('stale-registry-entry', `${ex.file}: ${stale.join(', ')}`);
+    const found = scanNumericConsts(text);
+    for (const [name, d] of Object.entries(ex.consts)) {
+      if (d.exclude !== undefined) continue;
+      for (const at of [].concat(d.at)) setPath(doc, at, projectData(found[name], d.omit || [], `${ex.id}.${name}`));
+    }
+  }
+
   for (const h of HIDDEN_LITERALS) setPath(doc, h.at, h.value);
 
   // Derived values (formulas mirrored from RunScene; the pin test asserts the formula text is still there).
@@ -163,7 +203,7 @@ export function assembleRuleset(inputs, sources = DEFAULT_SOURCES) {
     if (!defs || typeof defs !== 'object' || Array.isArray(defs)) throw new RulesetRegistryError('bad-content', `${group} must be an object keyed by id`);
     const out = {};
     for (const id of Object.keys(defs)) {
-      if (!KEY_OK.test(id)) throw new RulesetRegistryError('bad-content-id', `${group}.${id}`);
+      if (!KEY_OK.test(id) || PROTO_IDS.has(id)) throw new RulesetRegistryError('bad-content-id', `${group}.${id}`);
       out[id] = projectData(defs[id], omitKeysFor(group), `content.${group}.${id}`);
     }
     doc.content[group] = out;
