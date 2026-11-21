@@ -58,6 +58,9 @@ One known camera read is detected and left to its own issue:
 
 ## Matrix (head build, after both fixes)
 
+Game code at `71836d8`, 74 cells: **56 isolated, 11 cue leaks (all K1 telegraph `onScreen`), 7 causal = the 4 positive
+controls + 3 frame-polled input cases (#115)**. No presentation perturbation changed any authoritative subsystem.
+
 Cells give the verdict against the fixture's 60 Hz per-tick baseline; `tele@N` means a cue leak in `telegraph` first
 at tick N (K1, #155). Fixtures other than `tricks` run the core set (`-` = not run).
 
