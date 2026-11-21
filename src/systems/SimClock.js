@@ -14,6 +14,11 @@
 import { deriveHeld } from './PadDerive.js';
 
 export const SIM_TICK_HZ = 120;
+/**
+ * Recorder-side input capture policy (Replay Contract v1 `info.inputCapture.edgeAssignment`, #152):
+ * live input is assigned to ticks by event timestamp window (issue #115). Informational; replays ignore it.
+ */
+export const INPUT_EDGE_ASSIGNMENT = 'timestamp-window';
 export const SIM_TICK_MS = 1000 / SIM_TICK_HZ;
 /** Same ceiling as the old 50 ms frame clamp: never more than this many ticks per frame. */
 export const SIM_MAX_TICKS_PER_FRAME = Math.ceil(50 / SIM_TICK_MS - 1e-9);

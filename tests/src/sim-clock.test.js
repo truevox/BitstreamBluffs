@@ -97,3 +97,8 @@ describe('SimClock.padsFor with an input timeline', () => {
     expect(src).toMatch(/this\.simClock\.padsFor\(polled, ticks, \{\s*frameTime: time, timeline: rawPad && rawPad\.timeline, normalize: \(raw\) => this\.normalizePad\(raw\),/);
   });
 });
+
+test('SimClock names its capture policy for the Replay Contract v1 manifest (#152)', async () => {
+  const m = await import('../../src/systems/SimClock.js');
+  expect(m.INPUT_EDGE_ASSIGNMENT).toBe('timestamp-window');
+});

@@ -122,8 +122,21 @@ the expected bound there is ~1 tick early; this container could not measure that
 * Gamepad changes are untimed (first tick of the frame, as before): the Gamepad API has no per-button
   event times. Device-orientation tilt (analog) is also untimed.
 * Edges latched before a blur or a tab suspension are still delivered on resume (unchanged).
+* **Cross-source mixing inside one frame.** The two sources of one button are a single aggregate hold, and
+  only the timed source is placed inside the frame. If a key on a button is released mid-frame (timed, say
+  tick 3) and the gamepad reports the same button pressed at poll time (untimed, tick 1), the per-button
+  order puts the gamepad press at tick 1 and the key release after it, so the aggregate stays held; but a
+  *different* gamepad control read at poll time (for example the opposite tilt direction) lands on tick 1
+  while the key is still held until tick 3, so ticks 1-2 can briefly combine both (tilt back + forward =
+  tuck, tilt 0). This needs an opposite-direction switch from keyboard to gamepad inside one frame (at most
+  3 ticks at 30 Hz, 1 at 60 Hz); it ends by the frame's last tick and never affects stored tapes.
 
 ## Replay / tape compatibility
+
+* Replay Contract v1.0 (#152, Team A) classifies this change as a recorder-side capture policy: tapes stay
+  `bb-pad` v1, and the manifest field `info.inputCapture.edgeAssignment` is `frame-first-tick` on main and
+  `timestamp-window` under #115. `SimClock.js` exports `INPUT_EDGE_ASSIGNMENT = 'timestamp-window'` for the
+  #164 manifest writer to read; nothing here writes manifests. No new recorded quantity, so no protocol bump.
 
 * Ghost tape format, header, `GHOST_TAPE_VERSION` and `GHOST_PHYSICS_VERSION` unchanged; `GhostTape.js`
   untouched. Existing tapes replay tick-for-tick identically (`TapePlayer` does not use `padsFor`).
