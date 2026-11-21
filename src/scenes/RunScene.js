@@ -45,6 +45,7 @@ import { GhostRider } from '../entities/GhostRider.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
+import { resolveReplaySetup } from '../systems/replay/manifest.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
 import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, KODIAK_BY_ID, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
 import { KodiakRider } from '../entities/KodiakRider.js';
@@ -166,6 +167,9 @@ export class RunScene extends Phaser.Scene {
     this._replayTape = reg.get(REG.GHOST_REPLAY) || null;
     if (this._replayTape) reg.remove(REG.GHOST_REPLAY);
     const replay = this._replayTape;
+    // Replay Contract R-1..R-4: a replay resolves daily rule, Sync Level and Kodiak/magnet flags from the recorded
+    // tape/manifest, never from the clock, the live profile or the live registry flags.
+    const rp = replay ? resolveReplaySetup(replay, { rules: DailyPatch.RULES }) : null;
     this.seed = replay ? String(replay.seed) : String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
     // Named seeded streams for this run (issue #59). Rebuilt from the seed on every create.
     this.runRandom = runRandomStreams(this.seed);
@@ -186,21 +190,21 @@ export class RunScene extends Phaser.Scene {
     // The today check means a retry or a pause-restart after 00:00 UTC cannot back-fill yesterday.
     const seedDay = DailyPatch.dateKeyFromSeed(this.seed);
     const todayKey = DailyPatch.getDailyInfo().dateKey;
-    this.dailyOfficial = reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
+    this.dailyOfficial = !replay && reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
     // Separate ranked Daily lane. A typed seed, Gym or stale-date retry
     // can NEVER turn itself into an official competitive Draft.
     this.dailyMode=this.dailyOfficial&&reg.get(REG.DAILY_MODE)==='draft'?'draft':'classic';
     // daily rule (read ONCE per run). A run on a daily seed plays THAT date's rule (decision 2: a practice
     // run of a past date replays that date, FAIRNESS-2); every other run plays today's rule as before.
     const seedDayInfo = seedDay ? DailyPatch.infoForDateKey(seedDay) : null;
-    const daily = seedDayInfo ? { rule: seedDayInfo.rule } : DailyPatch.getDailyInfo();
+    const daily = rp ? { rule: rp.dailyRule } : seedDayInfo ? { rule: seedDayInfo.rule } : DailyPatch.getDailyInfo();
     this.dailyRuleId = (daily && daily.rule && daily.rule.id) || 'none';
     // W4 loadout: the boosts the player switched on, read from the profile. Absent profile or absent
     // boosts means a clean run, which is the default-off rule.
     // The owned set (`unlocked.boosts`, granted at Sync Level 8 / 15) gates them: a toggle switched on
     // before the boost is unlocked does nothing and does not mark the run modded (Boosts.boostEffects).
     const prof = this.registry.get(REG.PROFILE) || {};
-    this.bsodGym = reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
+    this.bsodGym = !replay && reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
     this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
     const owned = prof && prof.unlocked && typeof prof.unlocked === 'object' ? prof.unlocked.boosts : null;
     this.unlockedBoosts = owned && typeof owned === 'object' ? { ...owned } : {};
@@ -224,13 +228,13 @@ export class RunScene extends Phaser.Scene {
     this.upgradeFx = this.upgradeRun.effects;
     // Shard Magnets drop from Sync Level 5, and on every Daily (equal pickups on an official board).
     // A ghost replay restores the recorded choice so the course matches.
-    this.magnetsDrop = replay && typeof replay.magnetsDrop === 'boolean' ? replay.magnetsDrop
+    this.magnetsDrop = rp ? rp.magnetsDrop
       : magnetsDropFor({ level: prof.level, daily: this.dailyOfficial === true || this.dailyMode === 'draft' });
     // Issue #47: hostile Kodiaks from the proposed Sync Level, never on Dailies or in the Gym (no event rule yet).
-    this.kodiaksOn = replay && typeof replay.kodiaksOn === 'boolean' ? replay.kodiaksOn
+    this.kodiaksOn = rp ? rp.kodiaksOn
       : kodiaksEnabledFor({ level: prof.level, daily: this.dailyOfficial === true || this.dailyMode === 'draft', gym: this.bsodGym === true });
     // Packs are one type ('same') or mixed; a Settings switch while Marvin playtests which is better.
-    this.kodiakPackMode = replay && typeof replay.kodiakPackMode === 'string' ? replay.kodiakPackMode
+    this.kodiakPackMode = rp ? rp.kodiakPackMode
       : this.settings?.kodiakPacks === 'mixed' ? 'mixed' : 'same';
     this.kodiaks = [];
     this.kodiakNext = 0;
@@ -390,7 +394,7 @@ export class RunScene extends Phaser.Scene {
     this.sled.parachuteFuelMs = this.sled.canopyFuelFullMs;
     this.bsod = new BsodPursuit({
       sledLeftEdgeX: sledLeftCollisionEdge(this.sled),
-      level: prof.level,
+      level: rp ? rp.syncLevel : prof.level,
       config: { ...BSOD_DEFAULTS,
         accelerationPxS2: BSOD_DEFAULTS.accelerationPxS2 * this.upgradeFx.bsodAccelerationMul },
     });
@@ -501,6 +505,10 @@ export class RunScene extends Phaser.Scene {
       seed: this.seed, biomeMask: this.biomeMask || 0,
       mode: this.bsodGym ? 'gym' : this.dailyMode === 'draft' ? 'daily-draft' : this.dailyOfficial ? 'daily' : 'normal',
       dailyRuleId: this.dailyRuleId || null,
+      dailyRuleSource: DailyPatch.dateKeyFromSeed(this.seed) ? 'seed-date' : 'clock-at-start',
+      syncLevel: Number.isFinite(this.registry.get(REG.PROFILE)?.level) ? Math.max(1, this.registry.get(REG.PROFILE).level) : 1,
+      bsod: { leftEdgeX: sledLeftCollisionEdge(this.sled),
+        initial: { wallX: this.bsod.wallX, wallSpeedPxS: this.bsod.wallSpeedPxS, accelerationPxS2: this.bsod.accelerationPxS2 } },
       controlLayout: this.settings?.controlLayout || 'tricksRight',
       boosts: [...(this.appliedBoosts || [])],
       upgradeRanks: this.upgradeRun?.enabled ? { ...this.upgradeRun.ranks } : null,
