@@ -19,3 +19,8 @@ The files are canonical BB-CJSON bytes (no trailing newline) and are verified by
 once by an independent scratch reference implementation plus `node:crypto`, not by the code under test. They are
 **never auto-regenerated**: a test that rewrites them is forbidden, and changing a committed vector is a breaking
 change to the contract (section 9). Edit them only deliberately, in a reviewed change that says why.
+
+- `fingerprint-schemas-v1.json` (added by #118): a **regression lock** for the production BB-FP schemas of the 13
+  subsystems (field lists, `schemaVersion`) and the digests of a fully populated synthetic reference state
+  (`tests/replay/fingerprintReference.js`). Unlike the vectors above it was produced by the #118 implementation itself, so
+  it pins accidental drift, it does not independently prove the layout. Not listed in `index.json` (it holds no vector ids).
