@@ -80,10 +80,11 @@ export const FIXTURES = {
       edges: [{ key: 'hop', at: T(3) }, { key: 'hop', at: T(7.5) }, { key: 'hop', at: T(9) }],
     },
   },
-  // BSOD catch: the rider brakes and idles; the deletion wall catches it (cause 'bsod').
+  // BSOD catch: the deletion wall starts 260 px behind the sled's left collision edge (set identically before
+  // tick 1 in every run, like startX); the rider pushes briefly, then brakes and the wall catches it (cause 'bsod').
   bsod: {
-    seed: 'BSOD140', ticks: T(14),
-    tape: { held: [{ key: 'brakeHeld', from: T(0.5), to: T(14) }], edges: [] },
+    seed: 'BSOD140', ticks: T(12), bsodGapPx: 260,
+    tape: { held: [{ key: 'push', from: 0, to: T(1) }, { key: 'brakeHeld', from: T(2), to: T(12) }], edges: [{ key: 'hop', at: T(1.5) }] },
   },
 };
 
@@ -100,8 +101,13 @@ export const CASES = {
   'cadence-120': { hz: 120, tag: 'cadence' },
   'cadence-144': { hz: 144, tag: 'cadence' },
   'cadence-jitter': { schedule: 'jitter', tag: 'cadence' },
-  'cadence-30-polled': { hz: 30, polled: true, tag: 'input-sampling (#115, report only)' },
-  'cadence-60-polled': { hz: 60, polled: true, tag: 'input-sampling (#115, reference)' },
+  // Frame-granular input (#115 territory, report only). The *-polled cases are compared with the 60 Hz POLLED run,
+  // so they isolate what the display rate does to input sampling; cadence-60-polled itself is compared with the
+  // per-tick tape baseline (frame sampling holds a one-tick edge for the whole frame).
+  'cadence-60-polled': { hz: 60, polled: true, tag: 'input-sampling (#115, report only)' },
+  'cadence-30-polled': { hz: 30, polled: true, baseline: 'cadence-60-polled', tag: 'input-sampling (#115, report only)' },
+  'cadence-144-polled': { hz: 144, polled: true, baseline: 'cadence-60-polled', tag: 'input-sampling (#115, report only)' },
+  'cadence-jitter-polled': { schedule: 'jitter', polled: true, baseline: 'cadence-60-polled', tag: 'input-sampling (#115, report only)' },
   'camera-zoom-0.5': { hz: 60, postStart: ZOOM_WRAP(0.5) },
   'camera-zoom-2': { hz: 60, postStart: ZOOM_WRAP(2) },
   'camera-scroll': { hz: 60, postStart: 'const real = run.updateCamera; run.updateCamera = function (dt) { real.call(this, dt); this.cameras.main.scrollX += 700; this.cameras.main.scrollY -= 250; };' },
@@ -111,7 +117,8 @@ export const CASES = {
   'fx-storm': { hz: 60, perFrame: 'for (let i = 0; i < 6; i++) run.fx.sparks(run.sled.x, run.sled.y, 0xffffff, 40, 400, 120); run.fx.ring(run.sled.x, run.sled.y, 0xff00ff, 90, 500);' },
   'audio-muted': { hz: 60, preStart: 'const s = g.registry.get("settings"); Object.assign(s, { masterVolume: 0, musicVolume: 0, sfxVolume: 0, windVolume: 0 }); g.registry.get("audioSynth")?.applySettings?.(s);' },
   'audio-none': { hz: 60, preStart: 'g.registry.set("audioSynth", null);' },
-  'audio-throwing': { hz: 60, preStart: 'g.registry.set("audioSynth", new Proxy({}, { get: (t, k) => (k === "then" ? undefined : () => { throw new Error("audio down " + String(k)); }) }));' },
+  // Installed after the run has started: every audio call the sim makes (playSfx, setSpeed, setAirborne) throws.
+  'audio-throwing': { hz: 60, postStart: 'g.registry.set("audioSynth", new Proxy({}, { get: (t, k) => (k === "then" ? undefined : () => { throw new Error("audio down " + String(k)); }) }));' },
   'no-audiocontext': { hz: 60, noAudioContext: true },
   'viewport-1920x1080': { hz: 60, viewport: { width: 1920, height: 1080 } },
   'viewport-390x844-dpr3': { hz: 60, viewport: { width: 390, height: 844 }, dsf: 3 },
@@ -134,7 +141,7 @@ export const CASES = {
 
 // Which perturbations each fixture runs (full matrix on `tricks`; the core set elsewhere).
 const CORE = ['baseline-repeat', 'cadence-30', 'cadence-144', 'cadence-jitter', 'camera-zoom-0.5', 'camera-zoom-2',
-  'camera-shake', 'fx-storm', 'audio-none', 'viewport-resize-midrun', 'hud-off', 'settings-palette-midrun', 'combo-all-presentation',
+  'camera-shake', 'fx-storm', 'audio-none', 'audio-throwing', 'viewport-resize-midrun', 'hud-off', 'settings-palette-midrun', 'combo-all-presentation',
   'control-physics-nudge'];
 const PLAN = {
   tricks: Object.keys(CASES),
@@ -159,7 +166,12 @@ async function pageSetup({ fx, pt }) {
   let hold = true;
   run.update = function (t, d) { if (!hold) return realUpdate.call(this, t, d); };
   g.scene.getScene('TitleScene').startRun(fx.seed);
-  await new Promise((res) => { const w = () => (run.sys.isActive() && run.sled ? res() : requestAnimationFrame(w)); w(); });
+  const t0 = performance.now();
+  await new Promise((res, rej) => {
+    const w = () => (run.sys.isActive() && run.sled ? res() : performance.now() - t0 > 20000
+      ? rej(new Error('RunScene did not start within 20 s')) : requestAnimationFrame(w));
+    w();
+  });
   g.loop.sleep();
   if (fx.scramble) run.scrambleMs = 1e9;
   if (fx.startX != null) {
@@ -167,6 +179,7 @@ async function pageSetup({ fx, pt }) {
     run.sled.setPose(fx.startX, run.terrain.heightAt(fx.startX) - 15, run.slopeAt(fx.startX), 320, 0);
   }
   if (fx.creditM != null) run.startX = run.sled.x - fx.creditM * 30 - 1;
+  if (fx.bsodGapPx != null && run.bsod) run.bsod.wallX = run.sled.body.bounds.min.x - fx.bsodGapPx;
 
   const EDGE_KEYS = ['hop', 'reset', 'pause', 'airBrake', 'parachute', 'confirm'];
   const padForTick = (tick) => {
@@ -212,15 +225,20 @@ function pageDrive(target) {
   const run = g.scene.getScene('RunScene');
   const ctx = window.__probe;
   let guard = 0;
-  while (run.simClock && run.simClock.tick < target && !ctx.endedAt && guard++ < 20000) {
+  let stall = 0;
+  let lastTick = run.simClock ? run.simClock.tick : 0;
+  while (run.simClock && run.simClock.tick < target && !ctx.endedAt && guard++ < 20000 && stall < 600) {
     for (const a of ctx.atTick) if (!a.done && run.simClock.tick + 1 >= a.tick) { a.done = true; a.run(g, run, ctx); }
     ctx.perFrame?.(g, run, ctx);
     const dt = ctx.nextDt();
     ctx.t += dt;
     g.step(ctx.t, dt);
     ctx.frames++;
+    stall = run.simClock.tick === lastTick ? stall + 1 : 0;
+    lastTick = run.simClock.tick;
     if (run.crashed) ctx.endedAt = run.simClock.tick;
   }
+  if (stall >= 600) ctx.stalled = run.simClock.tick;
   return { tick: run.simClock ? run.simClock.tick : null, frames: ctx.frames, crashed: !!run.crashed };
 }
 
@@ -260,11 +278,13 @@ async function runCase(fixtureName, caseName, baseline) {
       if (rs) { await page.setViewportSize({ width: rs.w, height: rs.h }); await page.waitForTimeout(150); }
       if (last.crashed) break;
     }
-    const digests = await page.evaluate(() => window.__probe.digests);
+    // A frame can run several ticks: drop the ones past the fixture length so every case compares the same span.
+    const digests = await page.evaluate((n) => window.__probe.digests.filter((d) => d.tick <= n), fx.ticks);
     const meta = await page.evaluate(() => {
       const g = window.__bbGame; const run = g.scene.getScene('RunScene'); const p = window.__probe;
       const s = p.states.at(-1) || {};
-      return { frames: p.frames, ticks: run.simClock?.tick, crashed: !!run.crashed, cause: s.crash?.pending || null,
+      const lc = g.registry.get('lastCrash');
+      return { frames: p.frames, stalled: p.stalled ?? null, ticks: run.simClock?.tick, crashed: !!run.crashed, cause: run.crashed ? lc?.cause ?? null : null, crashTick: p.endedAt ?? null,
         score: s.score?.total ?? null, scramble: s.rng?.physicsScramble ?? null, scrambleStart: p.states[0]?.rng?.physicsScramble ?? null,
         bodies: s.world?.count ?? null, hazardsSeen: new Set(p.states.flatMap((x) => x.hazards.map((h) => `${h[0]}:${h[1]}`))).size,
         hazardHits: Math.max(0, ...p.states.map((x) => x.hazards.filter((h) => h[4]).length)),
@@ -303,10 +323,10 @@ async function pool(items, n, fnc) {
 
 function fmtRow(r) {
   const d = r.diff;
-  if (!d) return `${r.case}: ERROR ${r.error}`;
+  if (!d) return `${r.fixture.padEnd(8)} ${r.case.padEnd(26)} ERROR ${String(r.error).split('\n')[0]}`;
   const per = Object.entries(d.perSubsystem).filter(([, t]) => t != null).map(([k, t]) => `${k}@${t}`).join(' ');
   return `${r.fixture.padEnd(8)} ${r.case.padEnd(26)} ${d.verdict.padEnd(12)} first=${d.first ? `${d.first.tick}:${d.first.subsystems.join('+')}` : '-'} `
-    + `auth=${d.firstAuthoritative ? `${d.firstAuthoritative.tick}:${d.firstAuthoritative.subsystems.join('+')}` : '-'} ticks=${r.meta.ticks} frames=${r.meta.frames}${per ? ` [${per}]` : ''}`;
+    + `auth=${d.firstAuthoritative ? `${d.firstAuthoritative.tick}:${d.firstAuthoritative.subsystems.join('+')}` : '-'} ticks=${r.meta.ticks} frames=${r.meta.frames}${r.against !== 'baseline-repeat' ? ` vs=${r.against}` : ''}${r.meta.stalled != null ? ` STALLED@${r.meta.stalled}` : ''}${per ? ` [${per}]` : ''}`;
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;
@@ -320,8 +340,15 @@ if (isMain) {
     report.fixtures[f] = { baseline: base.meta, tape: FIXTURES[f].tape, ticks: FIXTURES[f].ticks };
     console.log('BASELINE', f, JSON.stringify(base.meta));
     const cases = PLAN[f].filter((c) => !onlyCases || onlyCases.includes(c));
+    const extra = {};
+    for (const b of new Set(cases.map((c) => CASES[c].baseline).filter(Boolean))) {
+      extra[b] = await runCase(f, b, null);
+      console.log('REFERENCE', f, b, JSON.stringify(extra[b].meta));
+    }
     const rows = await pool(cases, PARALLEL, async (c) => {
-      try { return await runCase(f, c, base); } catch (e) { return { fixture: f, case: c, error: String(e && e.stack || e) }; }
+      const against = CASES[c].baseline ? extra[CASES[c].baseline] : base;
+      try { return { ...(await runCase(f, c, against)), against: CASES[c].baseline || 'baseline-repeat' }; }
+      catch (e) { return { fixture: f, case: c, error: String(e && e.stack || e) }; }
     });
     for (const r of rows) {
       console.log(fmtRow(r));

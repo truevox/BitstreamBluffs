@@ -3,8 +3,11 @@
  *
  * This is a test/tooling probe, not a replay format and not a canonical state hash. It exists to
  * prove that presentation (camera, particles, render cadence, audio, viewport, HUD) cannot reach
- * the simulation. When the shared replay contract of issue #152 publishes versioned subsystem
- * hashes, this module should be replaced by that contract. Nothing in src/ imports it.
+ * the simulation. Replay Contract v1.0 (#152, section 6.6) defines `captureCausalState` /
+ * `fingerprintState` with 13 named subsystems; once #165 lands them on main this module should be
+ * replaced by that implementation (docs/determinism/causal-isolation.md maps the names). It is
+ * deliberately STRICTER than the contract in one place: it hashes absolute Matter body ids and
+ * world order, which the contract excludes. Nothing in src/ imports it.
  *
  * Self-contained on purpose: no imports, and every function below `captureCausalState` is
  * written so the browser probe can ship it into the page as source text (Function#toString).
@@ -24,8 +27,10 @@ export const DIGEST_VERSION = 1;
 
 export const SUBSYSTEMS = Object.freeze({
   authoritative: ['sled', 'rng', 'world', 'contacts', 'terrain', 'hazards', 'powerups', 'shards', 'kodiaks',
-    'score', 'bsod', 'crash', 'timers', 'glitch'],
-  cue: ['telegraph', 'sfx', 'events', 'crashReport'],
+    'score', 'bsod', 'crash', 'timers'],
+  // `glitch`: the GlitchDirector schedule is presentation under Replay Contract v1 section 6.1 (#152); it is still
+  // captured so a dependency in either direction shows up.
+  cue: ['telegraph', 'sfx', 'events', 'crashReport', 'glitch'],
   cache: ['terrainCache'],
 });
 

@@ -62,7 +62,7 @@ import { Hazard } from '../entities/Hazard.js';
 import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
-import { WorldDanceEnvelope, worldDanceMotionAllowed } from '../systems/WorldDance.js';
+import { WorldDanceEnvelope, worldDanceMotionAllowed, readWorldDanceAudio } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
@@ -1439,8 +1439,8 @@ export class RunScene extends Phaser.Scene {
     const danceAllowed=worldDanceMotionAllowed(this.settings,
       this._worldDanceMotionQuery?.matches===true);
     const audio=this.registry?.get?.(REG.AUDIO);
-    const sample=danceAllowed?audio?.getWorldDanceSample?.():null;
-    const meter=danceAllowed&&sample?audio?.getSyntheticMeterTiming?.():null;
+    // Never throws: a failing audio engine must not stop the frame (and with it Phaser's loop), issue #140.
+    const {sample,meter}=readWorldDanceAudio(audio,danceAllowed);
     const dance=this.worldDance?.update(sample,dt,meter)||0;
     this.bg.update(cam.scrollX, t, sled.speed,dance);
     this.songBillboard?.update(dt,dance,!danceAllowed);
