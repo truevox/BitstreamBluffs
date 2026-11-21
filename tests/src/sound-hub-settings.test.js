@@ -31,6 +31,18 @@ describe('Sound hub: original vocals entitlement and dedicated wind mixer settin
 		expect(sanitizeSettings({windVolume:4,vocalGain:2,melodyWithVocalsGain:-2}))
 			.toMatchObject({windVolume:1,vocalGain:1,melodyWithVocalsGain:0});
 	});
+	test('three-way music quality is persisted without changing song selections or SFX volume',()=>{
+		const defaults=defaultSettings();
+		expect(defaults.musicQuality).toBe('high');
+		for(const mode of ['high','saver','off']){
+			const copy=sanitizeSettings({...defaults,musicQuality:mode});
+			expect(copy.musicQuality).toBe(mode);
+			expect(copy.musicEnabledSongs).toEqual(defaults.musicEnabledSongs);
+			expect(copy.sfxVolume).toBe(defaults.sfxVolume);
+		}
+		expect(sanitizeSettings({...defaults,musicQuality:'auto'}).musicQuality).toBe('high');
+	});
+
 	test('the provisional shard price is explicit and cannot be debited twice',()=>{
 		expect(VOCALS_UNLOCK_SHARDS).toBe(200);
 		const profile={...defaultProfile(),bank:220};

@@ -7,15 +7,29 @@ function assertSong(song) {
       !Array.isArray(song.entries) || song.entries.length === 0 || song.entries.length > 15000) {
     throw new TypeError('Invalid offline song inventory');
   }
-  const seen = new Set();
+  const seen = new Set(), logical = new Set();
+  const quality = song.quality;
+  if (quality !== undefined &&
+      (!['lite','full'].includes(quality) || song.id !== `${song.originalId}:${quality}` ||
+       typeof song.songId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(song.songId))) {
+    throw new TypeError('Unrecognized tiered group');
+  }
   for (const entry of song.entries) {
-    if (!entry || typeof entry.url !== 'string' || !entry.url.startsWith('/music/packs/') ||
-        entry.url.includes('..') || entry.url.includes('?') || entry.url.includes('#') ||
-        !Number.isSafeInteger(entry.bytes) || entry.bytes < 1 ||
-        !/^[a-f0-9]{64}$/.test(entry.sha256) || seen.has(entry.url)) {
+    const actual=entry?.url,original=entry?.logicalUrl??actual;
+    if (typeof actual !== 'string' || typeof original !== 'string' ||
+        !/^\/music\/packs\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_./-]+$/.test(original) ||
+        original.includes('..') || actual.includes('..') || actual.includes('?') ||
+        actual.includes('#') || !Number.isSafeInteger(entry.bytes) || entry.bytes < 1 ||
+        !/^[a-f0-9]{64}$/.test(entry.sha256) || seen.has(actual) || logical.has(original)) {
       throw new TypeError('Invalid or duplicate song asset');
     }
-    seen.add(entry.url);
+    if (quality === undefined ? actual !== original :
+        original.endsWith('.ogg')
+          ? actual !== `/music-variants/${quality}${original.slice('/music'.length)}`
+          : actual !== original) {
+      throw new TypeError('Tiered recording has unexpected physical URL');
+    }
+    seen.add(actual);logical.add(original);
   }
 }
 
@@ -125,6 +139,7 @@ export async function downloadRealSong(song, {
   // marker, so the test-only worker can verify complete groups atomically.
   await cache.put(integrityUrl(song, origin), new Response(JSON.stringify({
     id:song.id,version:song.version,entries:song.entries,
+    ...(song.quality ? {quality:song.quality,songId:song.songId,originalId:song.originalId} : {}),
   }),{ status:200, headers:{'Content-Type':'application/json','Cache-Control':'no-store'} }));
   await cache.put(completionUrl(song, origin), new Response(`${song.id}:${song.version}`, {
     status: 200, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },

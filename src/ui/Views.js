@@ -288,7 +288,7 @@ export class SettingsView extends View {
  */
 export class SoundManagerView extends View {
   constructor(scene,theme,o){
-    super(scene,theme,{w:448,h:238,title:'MANAGE SOUND',
+    super(scene,theme,{w:448,h:256,title:'MANAGE SOUND',
       color:'cyan',onClose:o.onClose,y:15,
       hints:[{keys:['↑','↓'],label:'SELECT'},{keys:['←','→'],label:'CHANGE'}]});
     this.labView=null;
@@ -311,6 +311,15 @@ export class SoundManagerView extends View {
           ...(settings().musicEnabledSongs||{}),[song.id]:v,
         }),
       })),
+      // #172: persisted preference independent of per-track enable/unlocks.
+      // The quality-tier downloader and manual worker registration are still
+      // experimental; do not imply an automatic PWA download is installed.
+      {kind:'choice',label:'MUSIC QUALITY',badge:'EXPERIMENT',badgeColor:'amber',options:[
+          {value:'high',label:'HIGH / UPGRADE'},
+          {value:'saver',label:'SPACE SAVER'},
+          {value:'off',label:'NO MUSIC'}],
+        get:()=>settings().musicQuality||'high',
+        set:v=>updateSetting(game,'musicQuality',v)},
       {kind:'choice',label:'SHUFFLE SONGS',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>settings().musicShuffle===true,

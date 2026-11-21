@@ -36,6 +36,8 @@ test('ffmpeg encodes real individual mono Opus and preserves 48k clock',()=>{
   const args=ffmpegMonoArgs('/private/original.ogg','/tmp/private-variant.ogg',16);
   expect(args).toContain('0:a:0');
   expect(args).toContain('libopus');
+  expect(args).toContain('-n');
+  expect(args).not.toContain('-y');
   expect(args.at(-1)).toBe('/tmp/private-variant.ogg');
   expect(args.slice(args.indexOf('-ac'),args.indexOf('-ac')+2)).toEqual(['-ac','1']);
   expect(args.slice(args.indexOf('-ar'),args.indexOf('-ar')+2)).toEqual(['-ar','48000']);

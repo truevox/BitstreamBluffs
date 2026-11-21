@@ -49,7 +49,9 @@ export function variantSourceUrl(url,quality) {
 
 export function ffmpegMonoArgs(input,output,rate) {
   if(!Number.isSafeInteger(rate)||rate<6||rate>128)throw new RangeError('Invalid bitrate');
-  return ['-hide_banner','-nostdin','-v','error','-y','-i',input,'-map','0:a:0',
+  // Never overwrite ANY existing file, even if an output path were a
+  // malicious hardlink to an original master. Variants are immutable assets.
+  return ['-hide_banner','-nostdin','-v','error','-n','-i',input,'-map','0:a:0',
     '-vn','-sn','-dn','-map_metadata','-1','-ar','48000','-ac','1',
     '-c:a','libopus','-application','audio','-b:a',rate+'k','-vbr','on',
     '-compression_level','10',output];
@@ -121,8 +123,10 @@ export async function encodeMonoVariants({urls,quality,sourceRoot,outputRoot,ove
     await mkdir(dirname(dest),{recursive:true});
     if(!(await realpath(dirname(dest))).startsWith(realOutput+sep))
       throw new Error('Derivative output folder escaped its root');
-    try{const existing=await lstat(dest);if(existing.isSymbolicLink())
-      throw new Error('Refusing to overwrite a derivative symlink');}
+    // Never replace pre-existing outputs: even a regular-looking output may
+    // be a hardlink pointing at an original elsewhere on this filesystem.
+    // Any intentional new variant build must use a new, distinct output root.
+    try{await lstat(dest);throw new Error('Refusing to overwrite any existing recording: '+dest);}
     catch(e){if(e.code!=='ENOENT')throw e;}
     await runProgram(ffmpeg,ffmpegMonoArgs(from,dest,kbps));
     const out=await probe(dest,ffprobe);
