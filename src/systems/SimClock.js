@@ -11,6 +11,8 @@
  * loop. Chosen by Marvin (2026-11-20); play-test pending: see docs/issue-59-fixed-tick.md.
  */
 
+import { deriveHeld } from './VirtualPad.js';
+
 export const SIM_TICK_HZ = 120;
 export const SIM_TICK_MS = 1000 / SIM_TICK_HZ;
 /** Same ceiling as the old 50 ms frame clamp: never more than this many ticks per frame. */
@@ -18,6 +20,7 @@ export const SIM_MAX_TICKS_PER_FRAME = Math.ceil(50 / SIM_TICK_MS - 1e-9);
 // Float slack so 3 x 33.333.. ms frames are exactly 12 ticks, never 11 then 13.
 const EPS = 1e-6;
 const EDGE_NAMES = ['hop', 'reset', 'pause', 'airBrake', 'parachute', 'confirm'];
+const EDGE_SET = new Set(EDGE_NAMES);
 
 export class SimClock {
   /** @param {number} [tickMs] @param {number} [maxTicks] */
@@ -31,6 +34,8 @@ export class SimClock {
     /** Real ms discarded because a frame needed more than maxTicks (slow device). */
     this.droppedMs = 0;
     this._edges = null;
+    /** Timeline carried over 0-tick frames (issue #115). */
+    this._timeline = null;
   }
 
   /**
@@ -52,14 +57,33 @@ export class SimClock {
   }
 
   /**
-   * Pads for this frame's ticks. Held controls come from the latest poll on every tick.
-   * One-shot `pressed` edges reach exactly one tick: the first one. If the frame runs no
-   * tick (display faster than the tick), they wait for the next frame that does.
+   * Pads for this frame's ticks. Called right after advance(), with this frame's polled pad.
+   *
+   * Without `opts.timeline` (tape replay tools, probes, legacy callers): held controls come from the
+   * latest poll on every tick; one-shot `pressed` edges reach exactly one tick, the first one; if the
+   * frame runs no tick they wait for the next frame that does.
+   *
+   * With `opts.timeline` and `opts.frameTime` (issue #115, live play): every timestamped input change
+   * is given to the tick whose real-time window contains it. This frame's ticks cover the windows
+   * ending at `frameTime - accMs - (ticks-1-i) * tickMs`. A change is clamped into THIS frame's ticks:
+   * older than the first window (stall, dropped backlog, untimed gamepad/touch/blur) -> first tick, as
+   * before; newer than the last window (the sub-tick remainder) -> last tick, so nothing is ever shown
+   * a frame later than before and no tick that already ran is rewritten. Changes keep arrival order.
+   * A button that went down inside a tick's window is held on that tick even if it was released
+   * before the window closed (a tap is at least one tick). Edges are rebuilt from the rises.
+   * A 0-tick frame carries its timeline forward intact (held taps included).
+   *
    * @param {object} pad normalized pad polled this frame (its `pressed` edges already consumed from the router)
    * @param {number} ticks result of advance()
+   * @param {{frameTime?:number, timeline?:{base:Object<string,boolean>,events:{t:number|null,name:string,down:boolean}[],analog:number}|null,
+   *   normalize?:(raw:object)=>object}} [opts] frameTime = rAF time of this frame on the event.timeStamp clock;
+   *   timeline = InputRouter.poll().timeline; normalize = raw VirtualPadState -> tick pad (RunScene.normalizePad)
    * @returns {object[]} one pad per tick
    */
-  padsFor(pad, ticks) {
+  padsFor(pad, ticks, opts) {
+    const timeline = opts && opts.timeline;
+    if (timeline && Array.isArray(timeline.events)) return this._timedPads(pad, ticks, opts);
+    this._timeline = null;
     const pressed = { ...(pad.pressed || {}) };
     if (this._edges) for (const k of EDGE_NAMES) pressed[k] = !!(pressed[k] || this._edges[k]);
     if (ticks <= 0) { this._edges = pressed; return []; }
@@ -68,6 +92,62 @@ export class SimClock {
     for (const k of Object.keys(pressed)) quiet[k] = false;
     const out = [];
     for (let i = 0; i < ticks; i++) out.push(i === 0 ? { ...pad, pressed } : { ...pad, pressed: quiet });
+    return out;
+  }
+
+  /** @private issue #115 scheduler; see padsFor. */
+  _timedPads(pad, ticks, opts) {
+    const tl = opts.timeline;
+    const carried = this._timeline;
+    let merged = tl;
+    if (carried) {
+      // A poll consumed between the two (e.g. a pause frame) must not leave stale holds: bridge any
+      // difference between the carried end state and this poll's base with untimed changes.
+      const end = { ...carried.base };
+      for (const e of carried.events) end[e.name] = !!e.down;
+      const bridge = [];
+      for (const n of Object.keys(tl.base || {})) if (!!end[n] !== !!tl.base[n]) bridge.push({ t: null, name: n, down: !!tl.base[n] });
+      merged = { base: carried.base, events: carried.events.concat(bridge, tl.events), analog: tl.analog };
+    }
+    this._edges = null;
+    if (ticks <= 0) { this._timeline = merged; return []; }
+    this._timeline = null;
+    const normalize = typeof opts.normalize === 'function' ? opts.normalize : (raw) => raw;
+    const T = Number(opts.frameTime);
+    const timed = Number.isFinite(T);
+    const lastEnd = T - this.accMs;
+    const tickOf = (t) => {
+      if (!timed || t == null) return 0;
+      // smallest i with t <= end_i, end_i = lastEnd - (ticks - 1 - i) * tickMs
+      const i = Math.ceil((t - lastEnd) / this.tickMs - EPS) + ticks - 1;
+      return i < 0 ? 0 : i >= ticks ? ticks - 1 : i;
+    };
+    const held = { ...merged.base };
+    const analog = Number.isFinite(merged.analog) ? merged.analog : 0;
+    const events = merged.events;
+    const out = [];
+    let ei = 0;
+    let floor = 0;
+    for (let i = 0; i < ticks; i++) {
+      const rose = [];
+      const pressed = { hop: false, reset: false, pause: false, airBrake: false, parachute: false, confirm: false };
+      while (ei < events.length) {
+        const ev = events[ei];
+        const at = Math.max(floor, tickOf(ev.t)); // never reorder: a change is never scheduled before an earlier one
+        if (at !== i) break;
+        floor = at;
+        ei++;
+        if (ev.down && !held[ev.name]) {
+          rose.push(ev.name);
+          if (EDGE_SET.has(ev.name)) pressed[ev.name] = true;
+        }
+        held[ev.name] = !!ev.down;
+      }
+      let view = held;
+      if (rose.length) { view = { ...held }; for (const n of rose) view[n] = true; }
+      const raw = { ...deriveHeld(view, analog), pressed, lastSource: pad.lastSource };
+      out.push(normalize(raw));
+    }
     return out;
   }
 }

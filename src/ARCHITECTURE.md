@@ -221,6 +221,9 @@ only gameplay emitter.
 | `INPUT_ACTION` | InputRouter | Title/Pause/GameOver scenes (menus), AudioSynth (unlock on first) |
 
 Gameplay input is **polled**: `inputRouter.poll()` once per frame in `RunScene.update` (it consumes one-shot edges).
+Since #115 the poll result also carries a non-enumerable `timeline` (timestamped hold changes since the last poll);
+`SimClock.padsFor(pad, ticks, { frameTime, timeline, normalize })` uses it to give each fixed tick the keyboard input
+whose `event.timeStamp` falls in that tick's window (see `docs/issue-115-fair-input.md`).
 Menu scenes use `INPUT_ACTION` (or Phaser keyboard, since menus are simple) - but menus must work with gamepad + touch
 too, so prefer `INPUT_ACTION`.
 
@@ -292,6 +295,9 @@ delta in ms. Conversions (helpers in `PhysicsTuner.js`, gameplay may fix them bu
 
 All additive; no existing signature or payload changed.
 
+* **VirtualPad** (#115, additive): `setButton(name, down, source, timeStamp?)` takes an optional event time on the
+  `performance.now()` clock; `poll()` snapshots carry a non-enumerable `timeline` `{ base, events, analog }`; exported
+  pure `deriveHeld(held, analog)`. `InputRouter.poll()` returns `timeline: null` while disabled.
 * **VirtualPad**: `setTilt(value, source = 'gamepad')` has an optional 2nd arg (analog sources `'gamepad'` / `'device'`;
   largest magnitude wins; output is rescaled outside the 0.15 dead-zone). New: `releaseSource(source)`,
   `setOverlayContext(visible)`. New helper file `systems/TouchOverlay.js` (DOM only). The touch overlay is shown only
