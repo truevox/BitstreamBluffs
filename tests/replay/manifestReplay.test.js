@@ -127,12 +127,31 @@ describe('R-1..R-4: replay setup never reads the clock, the profile level or the
     expect(resolveReplaySetup(legacyTape(), { rules }).syncLevel).toBe(1);
   });
 
-  test('Kodiak and magnet flags: recorded values; absent values default off, never live-derived (R-3)', () => {
-    expect(resolveReplaySetup(legacyTape(), { rules })).toMatchObject({ kodiaksOn: false, magnetsDrop: false });
-    const pre = legacyTape(); for (const k of ['kodiaksOn', 'kodiakPackMode', 'kodiakVersion', 'magnetsDrop']) delete pre[k];
-    expect(resolveReplaySetup(pre, { rules })).toMatchObject({ kodiaksOn: false, kodiakPackMode: 'same', magnetsDrop: false });
+  test('Kodiak and magnet flags: recorded values win; absent values use the historical default and are listed as defaulted (R-3)', () => {
+    // a tape with every recorded field: only the Sync Level was never recorded
+    expect(resolveReplaySetup(legacyTape(), { rules })).toMatchObject({ kodiaksOn: false, magnetsDrop: false, defaulted: ['syncLevel'] });
     expect(resolveReplaySetup({ ...legacyTape(), kodiaksOn: true, kodiakPackMode: 'mixed', magnetsDrop: true }, { rules }))
       .toMatchObject({ kodiaksOn: true, kodiakPackMode: 'mixed', magnetsDrop: true });
+    expect(resolveReplaySetup(liveTape(), { rules }).defaulted).toEqual([]);
+    // a tape from before the Sync Level 5 magnet gate (3b6b961) and before Kodiaks (44e291c): magnets always dropped, no bears
+    const pre = legacyTape(); for (const k of ['kodiaksOn', 'kodiakPackMode', 'kodiakVersion', 'magnetsDrop']) delete pre[k];
+    const r = resolveReplaySetup(pre, { rules });
+    expect(r).toMatchObject({ kodiaksOn: false, kodiakPackMode: 'same', magnetsDrop: true });
+    expect([...r.defaulted].sort()).toEqual(['kodiak', 'magnetsDrop', 'syncLevel']);
+    expect(resolveReplaySetup({ ...legacyTape(), dailyRuleId: undefined }, { rules }).defaulted).toContain('dailyRule');
+  });
+
+  test('a legacy manifest keeps null/absentFields (section 5) while replay setup reports what it defaulted', () => {
+    const pre = legacyTape(); for (const k of ['kodiaksOn', 'kodiakPackMode', 'kodiakVersion', 'magnetsDrop']) delete pre[k];
+    const m = legacyManifestFromTape(pre);
+    expect(m.causal.loadout.magnetsDrop).toBeNull();
+    expect(m.info.legacy.absentFields).toEqual(['magnetsDrop']);
+    expect(m.info.provenance).toBe('legacy-derived');
+    const viaManifest = resolveReplaySetup(m, { rules });
+    expect(viaManifest).toMatchObject({ magnetsDrop: true, kodiaksOn: false });
+    expect([...viaManifest.defaulted].sort()).toEqual(['kodiak', 'magnetsDrop', 'syncLevel']);
+    expect(resolveReplaySetup(liveManifest(), { rules }).defaulted).toEqual([]);
+    expect(viaManifest).toEqual(resolveReplaySetup(pre, { rules }));
   });
 
   test('replay forces Gym off, official Daily off and classic mode (R-4)', () => {
