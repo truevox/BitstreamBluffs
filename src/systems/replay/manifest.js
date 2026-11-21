@@ -151,6 +151,10 @@ function validateInfo(info, legacy) {
     const r = needObj(info.rngVisual, '/info/rngVisual');
     for (const k of ['visualSled', 'visualFx', 'visualCamera']) needU32(r[k], `/info/rngVisual/${k}`);
   }
+  if (info.capture !== undefined) {
+    const cap = needObj(info.capture, '/info/capture');
+    needInt(cap.errorCount, '/info/capture/errorCount', 0);
+  }
   if (info.legacy !== undefined) {
     const l = needObj(info.legacy, '/info/legacy');
     if (l.absentFields !== undefined && (!Array.isArray(l.absentFields) || !l.absentFields.every(isStr))) {
@@ -379,6 +383,11 @@ export function checkManifest(m, rulesetResolver, opts = {}, bytes = null) {
     if (digestOf(rs) !== id) fail('ruleset-digest-mismatch', '/causal/sim/rulesetId', id);
   } else if (id !== null) warnings.push('ruleset-checks-skipped');
   crossChecks(m, rs, reasons);
+  if (m.info.capture && m.info.capture.errorCount > 0) {
+    // fingerprint capture failed during the run: the checkpoint evidence cannot be trusted to be complete
+    reasons.push({ outcome: 'inconclusive', reason: 'fingerprint-capture-errors', pointer: '/info/capture/errorCount',
+      expected: 0, actual: m.info.capture.errorCount });
+  }
 
   const nan = [];
   collectNaNF64(m.causal, '/causal', nan);
@@ -446,7 +455,7 @@ const sortedBoosts = (tape) => [...(Array.isArray(tape.boosts) ? tape.boosts : [
  * @throws {ManifestError} evidence-ineligible (gym, lone-surrogate seed) | invalid-run-context
  */
 export function buildManifest(runContext) {
-  const { tape, ruleset, checkpoints, gameVersion, provenance = 'live-recording', ext = {}, critical = [] } = runContext || {};
+  const { tape, ruleset, checkpoints, gameVersion, provenance = 'live-recording', ext = {}, critical = [], capture } = runContext || {};
   const ctx = (detail) => fail('invalid-run-context', '', detail);
   if (!tape || tape.format !== 'bb-ghost-tape') ctx('tape required');
   if (tape.mode === 'gym') fail('evidence-ineligible', '/info/lane/mode', 'gym');
@@ -481,6 +490,7 @@ export function buildManifest(runContext) {
     info: {
       ...(gameVersion ? { gameVersion } : {}), provenance, lane,
       inputCapture: { edgeAssignment: 'frame-first-tick' },
+      ...(capture ? { capture: { errorCount: capture.errorCount } } : {}),
       ...(rv ? { rngVisual: rv } : {}),
     },
     ext: { ...ext },

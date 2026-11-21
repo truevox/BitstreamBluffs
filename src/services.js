@@ -11,6 +11,8 @@ import { InputRouter } from './systems/InputRouter.js';
 import { AudioSynth } from './systems/AudioSynth.js';
 import { createProgressionService } from './systems/ProgressionService.js';
 import { createMissionsService } from './systems/MissionsService.js';
+import { loadCurrentRuleset } from './systems/replay/runtimeRuleset.js';
+import { RULESET_KEY } from './systems/replay/evidenceCapture.js';
 
 /**
  * Instantiate SaveStore, load settings, create InputRouter + AudioSynth, load content, set a default seed.
@@ -30,6 +32,8 @@ export async function createServices(game) {
   game.registry.set(REG.SAVE_STORE, saveStore);
   game.registry.set(REG.SETTINGS, settings);
   game.registry.set(REG.CONTENT, loadContent());
+  // Replay evidence (#116): the committed ruleset of this build. Non-blocking; without it runs simply produce no evidence.
+  loadCurrentRuleset().then((r) => game.registry.set(RULESET_KEY, r)).catch((e) => console.warn(`[replay-evidence] ruleset unavailable: ${e && e.message}`));
   game.registry.set(REG.INPUT, new InputRouter(game));
   game.registry.set(REG.AUDIO, new AudioSynth(game));
   if (!game.registry.get(REG.SEED)) game.registry.set(REG.SEED, String(Date.now()));
