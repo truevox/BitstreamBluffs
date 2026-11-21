@@ -1,0 +1,1206 @@
+{
+  "format": "bitstream-source-global-pulse-coherence-UNVERIFIED-v1",
+  "status": "NO_VERIFIED_MUSICAL_BEATS_OR_TEMPO_DRIFT",
+  "originalSourceManifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
+  "priorReportSha256": "6696cf5e9b07089ad1cefd171110efb96fd38b228902f48b0786a416d6aa9024",
+  "harmonicReportSha256": "8e922b017e7819983392227fe296b890e0b608b953fbaf7799c736ee01bf8c34",
+  "originalSourceStemSha256": {
+    "0": {
+      "drums": "0040ca6cfa771eab0a57593daedcbe72aeee40b7c858e5933bfc23bd0876416b",
+      "bass": "f7506c0bdadeda0bce72666b6506229977345c28b9fe0b884e7c1758dc78131a",
+      "guitar": "f713af2ef6da6a6ff9fcd677c94563f0155d1435ae92d3f7cb8b2b76e3e89f6b",
+      "piano": "e7d12b2bcf44c00b332077c186cb26801f1df99e4c673713023b4e8f6ee8a942",
+      "other": "58f7018cd10e641a6ac04da4b65bd2c7354385a2e41fc380fd35028cf2236004"
+    },
+    "1": {
+      "drums": "83df34a57c0bbe07ca7e010ec6c4cd6417831fcd26e9229ecbc9758b6a246f30",
+      "bass": "89bc022b9aa9a3d79d629ba7f40be351dde63fec45fe174c6aa9be5b17525625",
+      "guitar": "7421f013389fcda9ba69a8bc51eaa8f4baedc1af3ae4051c34d24a364ef33d11",
+      "piano": "947de7fd2dc2eb8930f48ff26e0c55bdc9f0f599e425797a03c7887d85df577e",
+      "other": "2098051300b8f0d295fc6695afe45ba14fad310740bc776ddb764e98533e15d4"
+    },
+    "2": {
+      "drums": "3be96dba7b2c7db369170c4cde59d086713646c8272a21e751833125395e84d8",
+      "bass": "8e17b4c5ade45e7b701329b246a83b682c5eb69987f52691062cfac2d574c3d6",
+      "guitar": "3928233a1681e060c934ddb97e6c1d843fb74345e64a6f8a5dca6b093d878d03",
+      "piano": "17cc9224cf4251bbe60673bd2362051d2e088da7877d1d3c29e80e057bfe1a1d",
+      "other": "26b2fe3d5a1d82717614907ff0a0d91838eaa94ac8562bca59ce33cc5e1d3154"
+    },
+    "3": {
+      "drums": "b08312601acbbc5cc69403a883a25067231e567d880f012ab710f3ca89c69484",
+      "bass": "157d136e5dca7b4c89e0c3d7da1204044e083093eb3ea7e4ce6a06ff3e70bfd2",
+      "guitar": "8afe08ffb978a627a6d49586887ffd34693ad57e39ed7a533fda6800cd48050d",
+      "piano": "a52e2475a999af7f1b406c1e1fe5f5ab24470918a5203b47fa9f32c2aae48542",
+      "other": "04d742de9577a9c651d27e7b1b36fecee96e12040ee1561ec7ef2badbac53187"
+    },
+    "4": {
+      "drums": "a8a7ca42426d21f9d8dc7309b3207e20998b59c4751dd3e215077d6e4720698d",
+      "bass": "78c699bee87e8637ce258859e54e9147ee1edec15eb2b2a488a00771bcc6a46b",
+      "guitar": "6edc12d5a35edad022199cd1b46ec6ea9c80ca64f75c4b81b8816aba5d491f47",
+      "piano": "120b14bb5268c43d5acc4b05de7cccf07ebbdde905c20095c939900477a275f5",
+      "other": "2c5802577dc33688c199d43d887877c1bf8f317456e66a5b16dabe31886727d8"
+    },
+    "5": {
+      "drums": "2039d22ef1c626c2d1c1d279ff0afb2240329ca32ffcbe87f258c72ff2961c57",
+      "bass": "2e00c8626cf9f67cf23d3a324e8eda81797a5f34722fbe2e1edc0b85512b1ba5",
+      "guitar": "57f16a43e342b11ada6928e3f38edde7e84d7b3750864cff4e60839ee8b9d979",
+      "piano": "a336bf2a889a17262a316eaebe1a958b89661e072369d77024e9d404702aee10",
+      "other": "a3a8db00430eb440897b2a112e68adb1f3f0b12aab7114da4ac99f8dd1ab24c4"
+    },
+    "6": {
+      "drums": "8e4ac58c3c5a97f74c389d5eb63095482aee81c661f43f259eb758cbe114850b",
+      "bass": "a734fb1487761229e5f8be4bb7d1401e31b5bf2d02daf92ca1c4ca9c652cd706",
+      "guitar": "cf14a7517dc3faa2bcde0a5f356a36a8a290d888bb7a19309f260de5d2b2de9b",
+      "piano": "fd23d15c36377663eb34ae93a78a6a5c1722f77d855f9bc4283674001b15d0a3",
+      "other": "e44ce643ca8d6c87c695cbbb4fb13bb7bc6f0567612f79bd056d6a9b3a7cc1a0"
+    },
+    "7": {
+      "drums": "c66e7a06ca1f079c14d3253a75dd029e5b1cc0d1e0a1fba357dffaf16e5d42aa",
+      "bass": "a82a8c36ed736bef197ed7b566dcb0762df83817a6c40158e2057ede124e6743",
+      "guitar": "5fbef1a3f2e4fa9c7834f562bb40bfa5abcb95cacd0bd7ae62bc9193ca2c13a5",
+      "piano": "d7c460e5492f078cb5b21a1e71c7efa9b383629b8b63f1dbb957c5b73dbfb80d",
+      "other": "ec8bb292cc512c118eed2e112e4abd068f54dddce55446566fb68c11283d29ad"
+    },
+    "8": {
+      "drums": "b78e7621444becba0c84d035c3e88ff7f4cbdb823a42cc809c9321601e72e5c1",
+      "bass": "e4742a6b5e4eb6a76a3d9685a30bd054866d06714e58e083bd56e96e3f34d8dc",
+      "guitar": "116f180e85e0c5258770ad421fa2cbc6a0c5aa444bd44222eef89a22f73962a9",
+      "piano": "a8704cc03d8d14ca642afb5e44d9ff9fb3f14cca3462ff1105d1e7ced3db61a5",
+      "other": "a0f215e8ee5bda9cdfaf57a4872fef4eba9c6842414f885335248f12a9127366"
+    },
+    "9": {
+      "drums": "4646aefeb54ec9d9e36c28c73ab06a312cf4dfcc847cd7082504d934fcbb9709",
+      "bass": "2434ddb6820898b73e0a71c2b931cab3574d977f7aca0ea49d567f4d65b73901",
+      "guitar": "6b26258e7de312cbcdc1b802ffb03ed6077db7c5a556cdb09212c504fdc6593b",
+      "piano": "ca813d9c635682b3e9325e278e5821ac1c1961df54a05414019728f193075387",
+      "other": "1ac57eb4b1bace48e1830866d5c7d9362e5d46ca224803224e9f711df674e893"
+    },
+    "10": {
+      "drums": "0e9c06dd8a9473bf61874914b0ea3f49ed8b948021cfd52505b57fac78fc7fe9",
+      "bass": "90c71c886ebfd9e64243c9465cd574e54d5e03a33655bf74d212e9fa20fd1d61",
+      "guitar": "c00a9ad5f69c3c91c5e2d57ab74424a6e3ef09c82c6f474c4a673309f44f8a8f",
+      "piano": "7024e69551bd8c0a49c3afb91c68575c0056f1cfd6be77196603f74e60acebcc",
+      "other": "a5b778202caa93806e5d970d354b339bf71ce42c44e9770e615603d7919700a5"
+    },
+    "11": {
+      "drums": "231642c281dd12911dab7d66fb5e1a4de7373d2aaa563401cf0299a86b021b1b",
+      "bass": "357b70a235e06be7465d923c20ff42f214a904d2d14b927aacad675718c7b10c",
+      "guitar": "8143630b9070ef5fe9cd969a11d650f783efa21e6b82272aa432c2cf46245722",
+      "piano": "498e024aca25b369c560624932b8bdd40a9a799a501d5db20b24a0c951203ff2",
+      "other": "f714461071e438a7e54c7b3d2c4e0bc721eb1ff22eaefd7b032e1efd58e28dbb"
+    },
+    "12": {
+      "drums": "bb27549104eba7dfe040e835c985bdf48ead1ec109ac57c833766dfaf487eb23",
+      "bass": "5b07c43222977ab628b0fdeb26e4f8793e0362e21f350104520f8b19bb519eb9",
+      "guitar": "a26ca1a69c4b1a71c3bf6d45c8480ab6678739f7cbcb08bb39d6b5de600c8b1b",
+      "piano": "382df49bd9afb5cdab8b573b0417c81756478a808631a3211034f33707a8bdf5",
+      "other": "0f51f34a97e7ef0efe1299e6fbcde9b641095312445b1180842f8e589f19ef08"
+    },
+    "13": {
+      "drums": "2d4f6e9ed4ca9b6cb9a03975f2d7c724fba64e4ce141d9cc89e8a33d82e359da",
+      "bass": "0b00c9bdf99315f1d91e0d204b53585175800110f296a015b143390af2603409",
+      "guitar": "85b31af0ccbc7fc3c88b06e983379a531207170fc6fb21c32ccdaa44aab0599d",
+      "piano": "8e02849c50e4e3483f962c5f1c35fc7f31892303bf1e8b047d5f3833c7c1e34f",
+      "other": "3a805617a053e857e1587e514cd50b4187c7fbd2ade3a4b63be1663b08dc9d57"
+    },
+    "14": {
+      "drums": "be7d2bf56dab6d49798171a0384be93363093e4dc8091c19357b68b4492b6be0",
+      "bass": "d6a1a9301636bb6c8cfd0b932f077d0f44247df21a7411e0f6a87e783119c935",
+      "guitar": "047429e35db2e0953fce9b950e2f8e3d289147a88c664655ab454c0537e54ca7",
+      "piano": "93aefb1ebe8f066093380cebf8537dd30bf9c9e2e21d6551620d22d09ebfc314",
+      "other": "fd0cb9fc9cdefc83217288648ec995f142499fe6e1b8047247c14758ddd4b5a7"
+    }
+  },
+  "frameCount": 8380800,
+  "sampleRate": 48000,
+  "method": "Whole-song complex Fourier phasor scanning 155-173 BPM on original high-band onset spectral flux; first/second half phase checks, not a downbeat detector",
+  "candidateSourcePulseReferenceBpm": 163.8,
+  "roles": {
+    "drums": {
+      "firstHalf": {
+        "candidateOnly": true,
+        "status": "CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.7,
+          "relativeCoherence": 0.274548,
+          "phaseRadians": 1.416152
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.7,
+            "relativeCoherence": 0.274548,
+            "phaseRadians": 1.416152
+          },
+          {
+            "bpm": 164.2,
+            "relativeCoherence": 0.125045,
+            "phaseRadians": -1.253799
+          },
+          {
+            "bpm": 163.2,
+            "relativeCoherence": 0.108449,
+            "phaseRadians": -2.649378
+          },
+          {
+            "bpm": 162.6,
+            "relativeCoherence": 0.09019,
+            "phaseRadians": -2.099576
+          },
+          {
+            "bpm": 164.8,
+            "relativeCoherence": 0.075012,
+            "phaseRadians": -0.407008
+          }
+        ]
+      },
+      "secondHalf": {
+        "candidateOnly": true,
+        "status": "CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.9,
+          "relativeCoherence": 0.223909,
+          "phaseRadians": -0.198172
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.9,
+            "relativeCoherence": 0.223909,
+            "phaseRadians": -0.198172
+          },
+          {
+            "bpm": 163.4,
+            "relativeCoherence": 0.083669,
+            "phaseRadians": 0.597681
+          },
+          {
+            "bpm": 164.4,
+            "relativeCoherence": 0.079372,
+            "phaseRadians": -1.006504
+          },
+          {
+            "bpm": 166.15,
+            "relativeCoherence": 0.068398,
+            "phaseRadians": -1.899169
+          },
+          {
+            "bpm": 162.9,
+            "relativeCoherence": 0.058635,
+            "phaseRadians": -2.502464
+          }
+        ]
+      },
+      "full": {
+        "candidateOnly": true,
+        "status": "CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.8,
+          "relativeCoherence": 0.240907,
+          "phaseRadians": 1.045157
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.8,
+            "relativeCoherence": 0.240907,
+            "phaseRadians": 1.045157
+          },
+          {
+            "bpm": 163.3,
+            "relativeCoherence": 0.090274,
+            "phaseRadians": 3.060199
+          },
+          {
+            "bpm": 166.3,
+            "relativeCoherence": 0.044866,
+            "phaseRadians": 2.352851
+          },
+          {
+            "bpm": 158.85,
+            "relativeCoherence": 0.044853,
+            "phaseRadians": -2.641072
+          },
+          {
+            "bpm": 160.6,
+            "relativeCoherence": 0.04397,
+            "phaseRadians": 2.280575
+          }
+        ]
+      },
+      "fullSongBestPhaseOffsetWindows": [
+        {
+          "sourceStartSeconds": 0,
+          "sourceEndSeconds": 24.0,
+          "coherence": 0.22115,
+          "phaseOffsetRadiansToWholeSong": 0.39048,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 12,
+          "sourceEndSeconds": 36.0,
+          "coherence": 0.38386,
+          "phaseOffsetRadiansToWholeSong": 0.18838,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 24,
+          "sourceEndSeconds": 48.0,
+          "coherence": 0.33669,
+          "phaseOffsetRadiansToWholeSong": -0.21024,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 36,
+          "sourceEndSeconds": 60.0,
+          "coherence": 0.28972,
+          "phaseOffsetRadiansToWholeSong": -0.47554,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 48,
+          "sourceEndSeconds": 72.0,
+          "coherence": 0.28896,
+          "phaseOffsetRadiansToWholeSong": -0.31877,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 60,
+          "sourceEndSeconds": 84.0,
+          "coherence": 0.29244,
+          "phaseOffsetRadiansToWholeSong": -0.19205,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 72,
+          "sourceEndSeconds": 96.0,
+          "coherence": 0.24557,
+          "phaseOffsetRadiansToWholeSong": -0.20015,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 84,
+          "sourceEndSeconds": 108.0,
+          "coherence": 0.20619,
+          "phaseOffsetRadiansToWholeSong": -0.22668,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 96,
+          "sourceEndSeconds": 120.0,
+          "coherence": 0.22822,
+          "phaseOffsetRadiansToWholeSong": -0.09958,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 108,
+          "sourceEndSeconds": 132.0,
+          "coherence": 0.20589,
+          "phaseOffsetRadiansToWholeSong": -0.01725,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 120,
+          "sourceEndSeconds": 144.0,
+          "coherence": 0.2354,
+          "phaseOffsetRadiansToWholeSong": 0.06338,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 132,
+          "sourceEndSeconds": 156.0,
+          "coherence": 0.26543,
+          "phaseOffsetRadiansToWholeSong": 0.31415,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 144,
+          "sourceEndSeconds": 168.0,
+          "coherence": 0.21862,
+          "phaseOffsetRadiansToWholeSong": 0.56431,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 156,
+          "sourceEndSeconds": 174.6,
+          "coherence": 0.23535,
+          "phaseOffsetRadiansToWholeSong": 0.37881,
+          "candidateOnly": true
+        }
+      ],
+      "firstVsSecondHalfBestBpmDifference": 0.2
+    },
+    "bass": {
+      "firstHalf": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 162.6,
+          "relativeCoherence": 0.072877,
+          "phaseRadians": -0.004052
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 162.6,
+            "relativeCoherence": 0.072877,
+            "phaseRadians": -0.004052
+          },
+          {
+            "bpm": 166.05,
+            "relativeCoherence": 0.069989,
+            "phaseRadians": -0.853721
+          },
+          {
+            "bpm": 168.6,
+            "relativeCoherence": 0.057849,
+            "phaseRadians": 2.73514
+          },
+          {
+            "bpm": 163.65,
+            "relativeCoherence": 0.057778,
+            "phaseRadians": -2.097239
+          },
+          {
+            "bpm": 170.65,
+            "relativeCoherence": 0.056316,
+            "phaseRadians": 1.406934
+          }
+        ]
+      },
+      "secondHalf": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.8,
+          "relativeCoherence": 0.073207,
+          "phaseRadians": 3.080462
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.8,
+            "relativeCoherence": 0.073207,
+            "phaseRadians": 3.080462
+          },
+          {
+            "bpm": 161.45,
+            "relativeCoherence": 0.065474,
+            "phaseRadians": 0.771734
+          },
+          {
+            "bpm": 171.0,
+            "relativeCoherence": 0.057291,
+            "phaseRadians": 1.051011
+          },
+          {
+            "bpm": 163.0,
+            "relativeCoherence": 0.05052,
+            "phaseRadians": -2.874229
+          },
+          {
+            "bpm": 156.65,
+            "relativeCoherence": 0.050171,
+            "phaseRadians": -1.205897
+          }
+        ]
+      },
+      "full": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.75,
+          "relativeCoherence": 0.063786,
+          "phaseRadians": -2.547679
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.75,
+            "relativeCoherence": 0.063786,
+            "phaseRadians": -2.547679
+          },
+          {
+            "bpm": 161.35,
+            "relativeCoherence": 0.055228,
+            "phaseRadians": 2.378706
+          },
+          {
+            "bpm": 166.15,
+            "relativeCoherence": 0.051113,
+            "phaseRadians": -1.284014
+          },
+          {
+            "bpm": 171.05,
+            "relativeCoherence": 0.0511,
+            "phaseRadians": 0.359859
+          },
+          {
+            "bpm": 162.85,
+            "relativeCoherence": 0.049992,
+            "phaseRadians": -0.944625
+          }
+        ]
+      },
+      "fullSongBestPhaseOffsetWindows": [
+        {
+          "sourceStartSeconds": 0,
+          "sourceEndSeconds": 24.0,
+          "coherence": 0.12365,
+          "phaseOffsetRadiansToWholeSong": 0.65829,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 12,
+          "sourceEndSeconds": 36.0,
+          "coherence": 0.07012,
+          "phaseOffsetRadiansToWholeSong": -0.21018,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 24,
+          "sourceEndSeconds": 48.0,
+          "coherence": 0.05638,
+          "phaseOffsetRadiansToWholeSong": -1.26773,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 36,
+          "sourceEndSeconds": 60.0,
+          "coherence": 0.02139,
+          "phaseOffsetRadiansToWholeSong": 2.97181,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 48,
+          "sourceEndSeconds": 72.0,
+          "coherence": 0.02655,
+          "phaseOffsetRadiansToWholeSong": -0.26832,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 60,
+          "sourceEndSeconds": 84.0,
+          "coherence": 0.16646,
+          "phaseOffsetRadiansToWholeSong": -0.19888,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 72,
+          "sourceEndSeconds": 96.0,
+          "coherence": 0.09287,
+          "phaseOffsetRadiansToWholeSong": -0.25883,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 84,
+          "sourceEndSeconds": 108.0,
+          "coherence": 0.04087,
+          "phaseOffsetRadiansToWholeSong": -0.86278,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 96,
+          "sourceEndSeconds": 120.0,
+          "coherence": 0.02549,
+          "phaseOffsetRadiansToWholeSong": -0.22951,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 108,
+          "sourceEndSeconds": 132.0,
+          "coherence": 0.09901,
+          "phaseOffsetRadiansToWholeSong": 0.45234,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 120,
+          "sourceEndSeconds": 144.0,
+          "coherence": 0.13111,
+          "phaseOffsetRadiansToWholeSong": 0.88802,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 132,
+          "sourceEndSeconds": 156.0,
+          "coherence": 0.1171,
+          "phaseOffsetRadiansToWholeSong": 0.41595,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 144,
+          "sourceEndSeconds": 168.0,
+          "coherence": 0.0947,
+          "phaseOffsetRadiansToWholeSong": -0.15436,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 156,
+          "sourceEndSeconds": 174.6,
+          "coherence": 0.08136,
+          "phaseOffsetRadiansToWholeSong": -0.23071,
+          "candidateOnly": true
+        }
+      ],
+      "firstVsSecondHalfBestBpmDifference": 1.2
+    },
+    "guitar": {
+      "firstHalf": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.85,
+          "relativeCoherence": 0.074064,
+          "phaseRadians": -2.990207
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.85,
+            "relativeCoherence": 0.074064,
+            "phaseRadians": -2.990207
+          },
+          {
+            "bpm": 164.35,
+            "relativeCoherence": 0.058186,
+            "phaseRadians": 0.389349
+          },
+          {
+            "bpm": 162.55,
+            "relativeCoherence": 0.05404,
+            "phaseRadians": 0.983456
+          },
+          {
+            "bpm": 166.1,
+            "relativeCoherence": 0.0533,
+            "phaseRadians": -1.246632
+          },
+          {
+            "bpm": 163.35,
+            "relativeCoherence": 0.049838,
+            "phaseRadians": -0.438797
+          }
+        ]
+      },
+      "secondHalf": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 157.65,
+          "relativeCoherence": 0.050562,
+          "phaseRadians": -0.152758
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 157.65,
+            "relativeCoherence": 0.050562,
+            "phaseRadians": -0.152758
+          },
+          {
+            "bpm": 160.3,
+            "relativeCoherence": 0.050033,
+            "phaseRadians": -0.331908
+          },
+          {
+            "bpm": 161.4,
+            "relativeCoherence": 0.043849,
+            "phaseRadians": 1.524451
+          },
+          {
+            "bpm": 163.0,
+            "relativeCoherence": 0.042951,
+            "phaseRadians": -1.193165
+          },
+          {
+            "bpm": 169.9,
+            "relativeCoherence": 0.034657,
+            "phaseRadians": 2.181659
+          }
+        ]
+      },
+      "full": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.85,
+          "relativeCoherence": 0.049809,
+          "phaseRadians": -3.116323
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.85,
+            "relativeCoherence": 0.049809,
+            "phaseRadians": -3.116323
+          },
+          {
+            "bpm": 160.35,
+            "relativeCoherence": 0.035847,
+            "phaseRadians": -0.959123
+          },
+          {
+            "bpm": 162.9,
+            "relativeCoherence": 0.035551,
+            "phaseRadians": -0.049258
+          },
+          {
+            "bpm": 166.15,
+            "relativeCoherence": 0.033753,
+            "phaseRadians": -1.377994
+          },
+          {
+            "bpm": 161.3,
+            "relativeCoherence": 0.031512,
+            "phaseRadians": -3.133535
+          }
+        ]
+      },
+      "fullSongBestPhaseOffsetWindows": [
+        {
+          "sourceStartSeconds": 0,
+          "sourceEndSeconds": 24.0,
+          "coherence": 0.03067,
+          "phaseOffsetRadiansToWholeSong": 2.00672,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 12,
+          "sourceEndSeconds": 36.0,
+          "coherence": 0.07816,
+          "phaseOffsetRadiansToWholeSong": 0.23188,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 24,
+          "sourceEndSeconds": 48.0,
+          "coherence": 0.11367,
+          "phaseOffsetRadiansToWholeSong": -0.05278,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 36,
+          "sourceEndSeconds": 60.0,
+          "coherence": 0.08744,
+          "phaseOffsetRadiansToWholeSong": -0.06338,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 48,
+          "sourceEndSeconds": 72.0,
+          "coherence": 0.07955,
+          "phaseOffsetRadiansToWholeSong": -0.00425,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 60,
+          "sourceEndSeconds": 84.0,
+          "coherence": 0.15327,
+          "phaseOffsetRadiansToWholeSong": 0.24,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 72,
+          "sourceEndSeconds": 96.0,
+          "coherence": 0.09704,
+          "phaseOffsetRadiansToWholeSong": 0.10134,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 84,
+          "sourceEndSeconds": 108.0,
+          "coherence": 0.05261,
+          "phaseOffsetRadiansToWholeSong": -0.58751,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 96,
+          "sourceEndSeconds": 120.0,
+          "coherence": 0.04364,
+          "phaseOffsetRadiansToWholeSong": -1.16305,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 108,
+          "sourceEndSeconds": 132.0,
+          "coherence": 0.07102,
+          "phaseOffsetRadiansToWholeSong": -0.74434,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 120,
+          "sourceEndSeconds": 144.0,
+          "coherence": 0.04358,
+          "phaseOffsetRadiansToWholeSong": 1.14081,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 132,
+          "sourceEndSeconds": 156.0,
+          "coherence": 0.05155,
+          "phaseOffsetRadiansToWholeSong": 1.92949,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 144,
+          "sourceEndSeconds": 168.0,
+          "coherence": 0.02009,
+          "phaseOffsetRadiansToWholeSong": 0.32504,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 156,
+          "sourceEndSeconds": 174.6,
+          "coherence": 0.04554,
+          "phaseOffsetRadiansToWholeSong": -0.44414,
+          "candidateOnly": true
+        }
+      ],
+      "firstVsSecondHalfBestBpmDifference": -6.2
+    },
+    "piano": {
+      "firstHalf": {
+        "candidateOnly": true,
+        "status": "CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.45,
+          "relativeCoherence": 0.131415,
+          "phaseRadians": -1.256006
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.45,
+            "relativeCoherence": 0.131415,
+            "phaseRadians": -1.256006
+          },
+          {
+            "bpm": 162.4,
+            "relativeCoherence": 0.124116,
+            "phaseRadians": 0.970586
+          },
+          {
+            "bpm": 165.95,
+            "relativeCoherence": 0.103479,
+            "phaseRadians": -0.104009
+          },
+          {
+            "bpm": 164.65,
+            "relativeCoherence": 0.098483,
+            "phaseRadians": 2.502554
+          },
+          {
+            "bpm": 162.95,
+            "relativeCoherence": 0.090378,
+            "phaseRadians": -0.105932
+          }
+        ]
+      },
+      "secondHalf": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 162.95,
+          "relativeCoherence": 0.065424,
+          "phaseRadians": -2.437208
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 162.95,
+            "relativeCoherence": 0.065424,
+            "phaseRadians": -2.437208
+          },
+          {
+            "bpm": 161.75,
+            "relativeCoherence": 0.056595,
+            "phaseRadians": 2.795621
+          },
+          {
+            "bpm": 164.65,
+            "relativeCoherence": 0.050506,
+            "phaseRadians": -1.990884
+          },
+          {
+            "bpm": 164.05,
+            "relativeCoherence": 0.045055,
+            "phaseRadians": -0.968508
+          },
+          {
+            "bpm": 165.5,
+            "relativeCoherence": 0.044149,
+            "phaseRadians": -2.913298
+          }
+        ]
+      },
+      "full": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.25,
+          "relativeCoherence": 0.082291,
+          "phaseRadians": -0.59748
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.25,
+            "relativeCoherence": 0.082291,
+            "phaseRadians": -0.59748
+          },
+          {
+            "bpm": 162.3,
+            "relativeCoherence": 0.080056,
+            "phaseRadians": 1.265501
+          },
+          {
+            "bpm": 164.8,
+            "relativeCoherence": 0.069262,
+            "phaseRadians": 2.048145
+          },
+          {
+            "bpm": 165.7,
+            "relativeCoherence": 0.062796,
+            "phaseRadians": 0.614777
+          },
+          {
+            "bpm": 163.75,
+            "relativeCoherence": 0.062646,
+            "phaseRadians": -2.467376
+          }
+        ]
+      },
+      "fullSongBestPhaseOffsetWindows": [
+        {
+          "sourceStartSeconds": 0,
+          "sourceEndSeconds": 24.0,
+          "coherence": 0.30127,
+          "phaseOffsetRadiansToWholeSong": -0.20556,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 12,
+          "sourceEndSeconds": 36.0,
+          "coherence": 0.57932,
+          "phaseOffsetRadiansToWholeSong": -0.24907,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 24,
+          "sourceEndSeconds": 48.0,
+          "coherence": 0.15512,
+          "phaseOffsetRadiansToWholeSong": -0.33191,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 36,
+          "sourceEndSeconds": 60.0,
+          "coherence": 0.05901,
+          "phaseOffsetRadiansToWholeSong": -1.50335,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 48,
+          "sourceEndSeconds": 72.0,
+          "coherence": 0.03828,
+          "phaseOffsetRadiansToWholeSong": 0.67483,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 60,
+          "sourceEndSeconds": 84.0,
+          "coherence": 0.12292,
+          "phaseOffsetRadiansToWholeSong": 1.03832,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 72,
+          "sourceEndSeconds": 96.0,
+          "coherence": 0.06318,
+          "phaseOffsetRadiansToWholeSong": 1.33177,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 84,
+          "sourceEndSeconds": 108.0,
+          "coherence": 0.06784,
+          "phaseOffsetRadiansToWholeSong": 1.08674,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 96,
+          "sourceEndSeconds": 120.0,
+          "coherence": 0.05337,
+          "phaseOffsetRadiansToWholeSong": 1.57713,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 108,
+          "sourceEndSeconds": 132.0,
+          "coherence": 0.06488,
+          "phaseOffsetRadiansToWholeSong": 2.8279,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 120,
+          "sourceEndSeconds": 144.0,
+          "coherence": 0.08306,
+          "phaseOffsetRadiansToWholeSong": 0.03435,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 132,
+          "sourceEndSeconds": 156.0,
+          "coherence": 0.16727,
+          "phaseOffsetRadiansToWholeSong": -0.1554,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 144,
+          "sourceEndSeconds": 168.0,
+          "coherence": 0.11254,
+          "phaseOffsetRadiansToWholeSong": -0.69714,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 156,
+          "sourceEndSeconds": 174.6,
+          "coherence": 0.04892,
+          "phaseOffsetRadiansToWholeSong": -0.84149,
+          "candidateOnly": true
+        }
+      ],
+      "firstVsSecondHalfBestBpmDifference": -0.5
+    },
+    "other": {
+      "firstHalf": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 163.1,
+          "relativeCoherence": 0.096331,
+          "phaseRadians": -0.869789
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 163.1,
+            "relativeCoherence": 0.096331,
+            "phaseRadians": -0.869789
+          },
+          {
+            "bpm": 162.6,
+            "relativeCoherence": 0.082221,
+            "phaseRadians": 0.489311
+          },
+          {
+            "bpm": 165.95,
+            "relativeCoherence": 0.074197,
+            "phaseRadians": -0.186785
+          },
+          {
+            "bpm": 162.1,
+            "relativeCoherence": 0.065668,
+            "phaseRadians": 1.766019
+          },
+          {
+            "bpm": 164.55,
+            "relativeCoherence": 0.064709,
+            "phaseRadians": 2.748275
+          }
+        ]
+      },
+      "secondHalf": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 165.8,
+          "relativeCoherence": 0.062469,
+          "phaseRadians": -2.612345
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 165.8,
+            "relativeCoherence": 0.062469,
+            "phaseRadians": -2.612345
+          },
+          {
+            "bpm": 167.55,
+            "relativeCoherence": 0.045967,
+            "phaseRadians": -2.627396
+          },
+          {
+            "bpm": 161.8,
+            "relativeCoherence": 0.043204,
+            "phaseRadians": 2.267345
+          },
+          {
+            "bpm": 161.0,
+            "relativeCoherence": 0.042759,
+            "phaseRadians": 2.460418
+          },
+          {
+            "bpm": 169.2,
+            "relativeCoherence": 0.038216,
+            "phaseRadians": -2.400226
+          }
+        ]
+      },
+      "full": {
+        "candidateOnly": true,
+        "status": "WEAK_CANDIDATES_UNVERIFIED",
+        "best": {
+          "bpm": 162.75,
+          "relativeCoherence": 0.056129,
+          "phaseRadians": -0.018379
+        },
+        "rivalSeparatedCandidates": [
+          {
+            "bpm": 162.75,
+            "relativeCoherence": 0.056129,
+            "phaseRadians": -0.018379
+          },
+          {
+            "bpm": 166.05,
+            "relativeCoherence": 0.055769,
+            "phaseRadians": -0.283057
+          },
+          {
+            "bpm": 163.25,
+            "relativeCoherence": 0.052699,
+            "phaseRadians": -1.340215
+          },
+          {
+            "bpm": 165.55,
+            "relativeCoherence": 0.051422,
+            "phaseRadians": 1.230847
+          },
+          {
+            "bpm": 162.25,
+            "relativeCoherence": 0.045967,
+            "phaseRadians": 1.456598
+          }
+        ]
+      },
+      "fullSongBestPhaseOffsetWindows": [
+        {
+          "sourceStartSeconds": 0,
+          "sourceEndSeconds": 24.0,
+          "coherence": 0.20848,
+          "phaseOffsetRadiansToWholeSong": -0.01661,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 12,
+          "sourceEndSeconds": 36.0,
+          "coherence": 0.2405,
+          "phaseOffsetRadiansToWholeSong": 0.01313,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 24,
+          "sourceEndSeconds": 48.0,
+          "coherence": 0.09794,
+          "phaseOffsetRadiansToWholeSong": 0.07918,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 36,
+          "sourceEndSeconds": 60.0,
+          "coherence": 0.09909,
+          "phaseOffsetRadiansToWholeSong": 0.34934,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 48,
+          "sourceEndSeconds": 72.0,
+          "coherence": 0.0373,
+          "phaseOffsetRadiansToWholeSong": 1.51445,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 60,
+          "sourceEndSeconds": 84.0,
+          "coherence": 0.04247,
+          "phaseOffsetRadiansToWholeSong": 2.95991,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 72,
+          "sourceEndSeconds": 96.0,
+          "coherence": 0.01544,
+          "phaseOffsetRadiansToWholeSong": -1.08884,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 84,
+          "sourceEndSeconds": 108.0,
+          "coherence": 0.04672,
+          "phaseOffsetRadiansToWholeSong": -0.94259,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 96,
+          "sourceEndSeconds": 120.0,
+          "coherence": 0.01856,
+          "phaseOffsetRadiansToWholeSong": -0.31951,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 108,
+          "sourceEndSeconds": 132.0,
+          "coherence": 0.01614,
+          "phaseOffsetRadiansToWholeSong": 1.90881,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 120,
+          "sourceEndSeconds": 144.0,
+          "coherence": 0.02772,
+          "phaseOffsetRadiansToWholeSong": -3.00218,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 132,
+          "sourceEndSeconds": 156.0,
+          "coherence": 0.05793,
+          "phaseOffsetRadiansToWholeSong": 0.28899,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 144,
+          "sourceEndSeconds": 168.0,
+          "coherence": 0.11394,
+          "phaseOffsetRadiansToWholeSong": -0.34153,
+          "candidateOnly": true
+        },
+        {
+          "sourceStartSeconds": 156,
+          "sourceEndSeconds": 174.6,
+          "coherence": 0.04307,
+          "phaseOffsetRadiansToWholeSong": -1.0147,
+          "candidateOnly": true
+        }
+      ],
+      "firstVsSecondHalfBestBpmDifference": 2.7
+    }
+  },
+  "heldOutAtDrumSelectedBpm": {
+    "drums": {
+      "relativeCoherenceAtDrumChosenBpm": 0.240907,
+      "candidateOnly": true
+    },
+    "bass": {
+      "relativeCoherenceAtDrumChosenBpm": 0.062079,
+      "candidateOnly": true
+    },
+    "guitar": {
+      "relativeCoherenceAtDrumChosenBpm": 0.049599,
+      "candidateOnly": true
+    },
+    "piano": {
+      "relativeCoherenceAtDrumChosenBpm": 0.0513,
+      "candidateOnly": true
+    },
+    "other": {
+      "relativeCoherenceAtDrumChosenBpm": 0.013153,
+      "candidateOnly": true
+    }
+  },
+  "limitations": [
+    "Onset periodicity phase is NOT musical beat-one, actual quarter note, local tempo or musical meter",
+    "Full-song coherent pulse can arise from repeated drum-machine-like beat patterns, rather than constant underlying composition tempo",
+    "Variable musical timing, phrasing, instrumentation offsets and source separation artifacts can reduce phasor magnitude",
+    "Scan grid is oversampled relative to short-segment frequency resolution; do not interpret 0.05 BPM steps as measurement accuracy",
+    "Five original separated stems come from the same mix, not independent recording sources",
+    "Strong whole-song phasor alone cannot prove there is no drift or locate the bridge/downbeat",
+    "No production timing, RELEASE_BEAT_GRIDS or gameplay usage may follow from algorithmic candidates"
+  ]
+}
