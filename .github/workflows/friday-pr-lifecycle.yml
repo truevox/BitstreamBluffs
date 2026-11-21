@@ -1,12 +1,10 @@
-# Friday GitHub-native lifecycle. NEVER checkout/execute PR-supplied code.
+# The PRIVILEGED label writer is a workflow_run controlled by default branch.
+# Never execute PR branch code. All artifact contents are untrusted input.
 name: Friday PR lifecycle
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
-  issue_comment:
-    types: [created, edited]
-  pull_request_review:
-    types: [submitted, dismissed]
+  workflow_run:
+    workflows: [Friday PR lifecycle signal]
+    types: [completed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -15,48 +13,86 @@ on:
         type: number
 permissions:
   contents: read
+  actions: read
   issues: write
   pull-requests: write
 jobs:
   resolve_parent:
-    if: github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'Friday PR lifecycle signal')
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
       pull-requests: read
     outputs:
       key: ${{ steps.resolve.outputs.key }}
+      pr_number: ${{ steps.resolve.outputs.pr_number }}
+      origin_event: ${{ steps.resolve.outputs.origin_event }}
     steps:
       - name: Check out trusted default-branch routing code only
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - name: Resolve stable parent for per-issue concurrency
-        id: resolve
+      - name: Verify untrusted artifact size before download
+        if: github.event_name == 'workflow_run'
         uses: actions/github-script@v7
         with:
           script: |
-            const {owner, repo} = context.repo;
-            const event = context.eventName, payload = context.payload;
-            const n = event === 'issue_comment' ? payload.issue?.pull_request && payload.issue.number
-              : event === 'workflow_dispatch' ? Number(payload.inputs?.pr_number)
-              : payload.pull_request?.number;
-            if (!Number.isSafeInteger(n) || n < 1) return;
-            const pr = (await github.rest.pulls.get({owner, repo, pull_number:n})).data;
-            if (pr.head?.repo?.full_name !== `${owner}/${repo}`) return;
-            const script = './.github/scripts/friday-pr-lifecycle.cjs';
-            const issue = require('fs').existsSync(script) ? require(script).getIssueReference(pr) : null;
-            // Only one writer per parent issue, including stacked/overlapping PRs.
-            core.setOutput('key', issue ? `issue-${issue}` : `pr-${n}`);
+            const {owner,repo}=context.repo;
+            const run_id=context.payload.workflow_run.id;
+            const items=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,{owner,repo,run_id,per_page:100});
+            const matches=items.filter(x=>x.name==='friday-event-pointer'&&!x.expired);
+            if(matches.length!==1||matches[0].size_in_bytes>4096)core.setFailed('Expected one small review-event pointer artifact');
+      - name: Download untrusted pointer only
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: friday-event-pointer
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .friday-signal
+      - name: Resolve stable parent issue for serialized label writes
+        id: resolve
+        uses: actions/github-script@v7
+        env:
+          DIRECT_PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            let pointer;
+            if(context.eventName==='workflow_dispatch'){
+              pointer={pr_number:Number(process.env.DIRECT_PR_NUMBER),event_name:'workflow_dispatch'};
+            }else{
+              const fs=require('node:fs');
+              const file='.friday-signal/friday-event-pointer.json';
+              const raw=fs.readFileSync(file,'utf8');
+              if(raw.length>1024)throw Error('Oversized event pointer');
+              pointer=JSON.parse(raw);
+            }
+            if(!pointer||!Number.isSafeInteger(pointer.pr_number)||
+              pointer.pr_number<1||pointer.pr_number>999999999||
+              !['pull_request','issue_comment','pull_request_review','workflow_dispatch'].includes(pointer.event_name)){
+              core.info('Invalid event pointer; skip');return;
+            }
+            const n=pointer.pr_number;
+            const pr=(await github.rest.pulls.get({owner,repo,pull_number:n})).data;
+            if(pr.head?.repo?.full_name!==`${owner}/${repo}`){core.info('Fork or inaccessible PR');return;}
+            const script='./.github/scripts/friday-pr-lifecycle.cjs';
+            const issue=require('fs').existsSync(script)?require(script).getIssueReference(pr):null;
+            core.setOutput('key',issue?`issue-${issue}`:`pr-${n}`);
+            core.setOutput('pr_number',String(n));
+            core.setOutput('origin_event',pointer.event_name);
   lifecycle:
     needs: resolve_parent
     if: needs.resolve_parent.outputs.key != ''
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     concurrency:
-      # Per-PARENT serialization: multiple PRs touching the same issue cannot
-      # race its labels/closure. A coalesced pending event still recalculates
-      # ALL sibling PR labels and the current parent state.
+      # Multiple PRs to the same issue cannot race on shared labels or closure.
       group: friday-lifecycle-${{ github.repository }}-${{ needs.resolve_parent.outputs.key }}
       cancel-in-progress: false
       queue: max
@@ -66,7 +102,6 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      # This Action's own PR cannot execute the as-yet-unmerged helper.
       - name: Check installed default-branch script
         id: installed
         shell: bash
@@ -82,8 +117,13 @@ jobs:
         uses: actions/github-script@v7
         env:
           EXPECTED_ISSUE_KEY: ${{ needs.resolve_parent.outputs.key }}
+          POINTER_PR_NUMBER: ${{ needs.resolve_parent.outputs.pr_number }}
+          ORIGINAL_EVENT: ${{ needs.resolve_parent.outputs.origin_event }}
         with:
           script: |
             await require('./.github/scripts/friday-pr-lifecycle.cjs').run({
-              github, context, core, expectedKey: process.env.EXPECTED_ISSUE_KEY
+              github,context,core,
+              expectedKey:process.env.EXPECTED_ISSUE_KEY,
+              prNumber:Number(process.env.POINTER_PR_NUMBER),
+              originEvent:process.env.ORIGINAL_EVENT
             });

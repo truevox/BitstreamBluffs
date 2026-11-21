@@ -15,7 +15,7 @@ const TRUSTED_ASSOCIATIONS = new Set(['OWNER','MEMBER','COLLABORATOR']);
 function bodyDirectives(body) {
   const markers=[], refs=[];
   const cleaned=String(body||'').replace(/<(pre|code|script)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, v=>'\n'.repeat((v.match(/\n/g)||[]).length));
-  let fence=null, inComment=false;
+  let fence=null, inComment=false, inlineCode=null;
   for(let line of cleaned.split(/\r?\n/)){
     const delimiter=/^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
     if(fence){
@@ -40,7 +40,24 @@ function bodyDirectives(body) {
         prose+=line.slice(0,start);line=line.slice(start+4);inComment=true;
       }
     }
-    const ref=/^\s*(?:\*\*)?(refs?|closes?|fixes?|resolves?)\s+#(\d+)\b/i.exec(prose);
+    // CommonMark code spans may cross line boundaries. A backtick-delimited
+    // example must NEVER be a real issue instruction even if its interior
+    // line begins with an otherwise valid `Closes #N`.
+    let visible='';
+    for(let at=0;at<prose.length;){
+      if(prose[at]==='`' && (at===0||prose[at-1]!=='\\')){
+        let next=at+1;
+        while(next<prose.length&&prose[next]==='`')next++;
+        const count=next-at;
+        if(inlineCode===null)inlineCode=count;
+        else if(inlineCode===count)inlineCode=null;
+        at=next;
+        continue;
+      }
+      if(inlineCode===null)visible+=prose[at];
+      at++;
+    }
+    const ref=/^\s*(?:\*\*)?(refs?|closes?|fixes?|resolves?)\s+#(\d+)\b/i.exec(visible);
     if(ref)refs.push({verb:ref[1].toLowerCase(),number:Number(ref[2])});
   }
   return {markers,refs};
@@ -85,12 +102,17 @@ function scoped(scope,file){return scope===file||(scope.endsWith('/**')&&(file==
 function overlaps(a,b){return scoped(a,b)||scoped(b,a);}
 const isActiveStarter=(f)=>f.status!=='removed'&&/^\.friday\/issue-\d+-start\.md$/.test(f.filename);
 
-async function run({github,context,core,expectedKey=null}) {
+async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumber=null,originEvent=null}) {
   const {owner,repo}=context.repo;
   const event=context.eventName;
-  const prEvent=event==='pull_request_target'||event==='pull_request';
+  // The privileged workflow_run carries only a previously validated numeric
+  // pointer from an unprivileged workflow. It NEVER executes its artifact.
+  const source=originEvent||event;
+  const prEvent=source==='pull_request_target'||source==='pull_request';
   const payload=context.payload||{};
-  const prNumber=event==='issue_comment' ? payload.issue?.pull_request && payload.issue.number
+  const prNumber=Number.isSafeInteger(resolvedPrNumber)&&resolvedPrNumber>0
+    ? resolvedPrNumber
+    : event==='issue_comment' ? payload.issue?.pull_request && payload.issue.number
     : event==='workflow_dispatch' ? Number(payload.inputs?.pr_number)
     : payload.pull_request?.number;
   if(!Number.isSafeInteger(prNumber)||prNumber<1){core.info('No PR in event; skip');return;}

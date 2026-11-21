@@ -40,7 +40,7 @@ function api(initial,mode={}){
  }};
  gh.paginate=async(fn,args)=>(await fn(args)).data;
  const core={log:[],info(s){this.log.push(s);},warning(s){this.log.push(s);},setFailed(s){throw new Error(s);}};
- async function fire(eventName,payload,expectedKey=null){await run({github:gh,context:{repo:{owner:'truevox',repo:'BitstreamBluffs'},eventName,payload},core,expectedKey});}
+ async function fire(eventName,payload,expectedKey=null,options={}){await run({github:gh,context:{repo:{owner:'truevox',repo:'BitstreamBluffs'},eventName,payload},core,expectedKey,...options});}
  return {data,gh,core,fire};
 }
 const labels=(obj)=>obj.labels.map(l=>typeof l==='string'?l:l.name).filter(l=>l.startsWith('friday:'));
@@ -70,6 +70,9 @@ describe('Friday issue linking and exact-head review parsing',()=>{
     '<pre>\nCloses #79\n</pre>',
     '    Closes #79',
     '> Closes #79',
+    '`Example instruction:\nCloses #79\nnot a real directive`',
+    '``Inline example:\nCloses #79\nnot a real directive``',
+    'Text with `code\nCloses #79\ninside` and no directive',
   ];
   for(const example of examples){
     const x=pr(500,80,{body:`${example}\nRefs #80`,title:'Issue #80'});
@@ -238,6 +241,23 @@ describe('GitHub-native issue and PR label reconciliation',()=>{
   expect(x.data.writes).toContainEqual(['createComment',162]);
   expect(labels(x.data.issues.get(115))).toEqual(['friday:in-progress']);
   expect(labels(x.data.issues.get(152))).toEqual([]); // unrelated issue untouched
+ });
+ test('default-branch workflow_run accepts validated numeric pointer and reconciles exact HEAD',async()=>{
+  const p=pr(174,79),c=comment(1,msg('REQUEST'));
+  const x=api({prs:[p],issues:[{number:79,state:'open'}],comments:{174:[c]}});
+  await x.fire('workflow_run',{workflow_run:{conclusion:'success'}},'issue-79',
+    {prNumber:174,originEvent:'issue_comment'});
+  expect(labels(x.data.issues.get(79))).toEqual(['friday:in-review']);
+  expect(labels(x.data.prs.get(174))).toEqual(['friday:in-review']);
+ });
+ test('default-branch workflow_run preserves cross-PR overlap advisory for PR source event',async()=>{
+  const mine=pr(162,115,{body:'<!-- friday-issue: 115 -->\n<!-- friday-scope: src/systems/** -->'});
+  const other=pr(163,152,{body:'<!-- friday-issue: 152 -->\n<!-- friday-scope: src/systems/** -->'});
+  const x=api({prs:[mine,other],issues:[{number:115,state:'open'},{number:152,state:'open'}],
+    files:{162:[{filename:'src/systems/SimClock.js',status:'modified'}],163:[{filename:'src/systems/SimClock.js',status:'modified'}]}});
+  await x.fire('workflow_run',{workflow_run:{conclusion:'success'}},'issue-115',
+    {prNumber:162,originEvent:'pull_request'});
+  expect(x.data.writes).toContainEqual(['createComment',162]);
  });
  test('manual PR-number reconciliation can recover previous missed exact-head handoff',async()=>{
   const c=comment(1,msg('REQUEST')),p=pr(174,79);
