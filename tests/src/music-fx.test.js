@@ -11,7 +11,7 @@ class Param {
 class AudioNodeMock {
 	constructor(type) {
 		this.type = type; this.connections = []; this.closed = false;
-		for (const key of ['gain', 'frequency', 'Q', 'pan', 'delayTime']) this[key] = new Param();
+		for (const key of ['gain', 'frequency', 'Q', 'pan', 'delayTime', 'threshold', 'ratio', 'knee', 'attack', 'release']) this[key] = new Param();
 		this.fftSize = 512;
 	}
 	connect(node) { this.connections.push(node); return node; }
@@ -21,7 +21,7 @@ class AudioNodeMock {
 	getByteFrequencyData(array) { array.fill(51); }
 }
 function fakeContext() {
-	const names = ['Gain','BiquadFilter','StereoPanner','WaveShaper','Delay','Oscillator','Convolver','Analyser'];
+	const names = ['Gain','BiquadFilter','StereoPanner','WaveShaper','Delay','Oscillator','Convolver','Analyser','DynamicsCompressor'];
 	const ctx = { sampleRate: 48000, currentTime: 10 };
 	for (const name of names) ctx['create' + name] = () => new AudioNodeMock(name);
 	ctx.createBuffer = (channels,length) => {
@@ -54,6 +54,19 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(chain.find('effect7').refs.impulse).toBeDefined();
 		chain.dispose();
 	});
+	test('Snowpack depth smoothly reshapes the original without altering transport', () => {
+		const ctx = fakeContext();
+		const chain = buildMusicChain(ctx, [{id:'snow',type:'snowpack',depth:0.95}], ctx.createGain());
+		const snow = chain.find('snow');
+		expect(snow).toBeDefined();
+		expect(snow.refs.depth).toBeDefined();
+		expect(snow.set('depth',0.25,ctx.currentTime)).toBe(true);
+		expect(snow.set('depth',-5,ctx.currentTime)).toBe(true);
+		expect(snow.set('depth',Infinity,ctx.currentTime)).toBe(true);
+		expect(snow.set('unapproved',0.5,ctx.currentTime)).toBe(false);
+		chain.dispose();
+	});
+
 	test('rejects unknown processors and duplicate stable ids', () => {
 		const ctx = fakeContext();
 		expect(() => buildMusicChain(ctx,[{type:'unsafeScript',id:'bad'}],ctx.createGain())).toThrow();
