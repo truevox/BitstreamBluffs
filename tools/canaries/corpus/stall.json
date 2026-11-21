@@ -1,6 +1,6 @@
 {
   "id": "stall",
-  "description": "Stalled frame (a background tab returning) mid-run: two 2500 ms display frames, whose backlog the fixed SimClock caps instead of fast-forwarding.",
+  "description": "Stalled display frame (a background tab returning) mid-run: two 2500 ms frames. RunScene clamps each frame delta to 50 ms before SimClock sees it, so the stalls buy no simulation time.",
   "seed": "CANARY117",
   "biomeMask": 0,
   "startX": 0,
@@ -26,5 +26,5 @@
       }
     ]
   },
-  "notes": "Verified 2026-11-21. Two 2500 ms display frames mid-run: stats.stallCount=2, stallDeltaMs=5000, droppedMs=0. The zero is the point - SimClock caps the backlog instead of fast-forwarding, so the fixed-tick sequence is unchanged and the run continues past the lip at x=1024 (landing tick 421, x=1590) to endTick 600 with score=122, distance=125 m, xReached=2490, no crash. A change that made stalls fast-forward would show up here as extra ticks/score."
+  "notes": "VERIFIED 2026-11-21. Two 2500 ms display frames mid-run; stats.stallCount=2, droppedMs=0, and the run still ends at endTick=600 (exactly 5000 ms of SIM time for a 5000 ms tape). So a stalled frame contributes no simulation time: the run cannot fast-forward. NOTE the mechanism: RunScene.update() clamps the frame delta to 50 ms (src/scenes/RunScene.js:1167) BEFORE SimClock.advance() sees it, so 50 ms / 8.333 ms never exceeds SIM_MAX_TICKS_PER_FRAME and SimClock's own backlog drop (droppedMs) is NOT exercised here. This canary covers the clamp, not the cap; a future canary that stubs delta past the clamp would be needed to cover the cap itself."
 }

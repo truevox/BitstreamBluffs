@@ -33,5 +33,5 @@
     "edges": [],
     "events": []
   },
-  "notes": "Verified 2026-11-21. Genuinely long airtime with canopy control off the real lip at x=18464: lip crossing startTick 196 with 2350 ms airborne (landing tick 478 at x=19046, air 2358 ms), and three control tricks register from the tape's own input - parachute@tick 276, helicopterCW@tick 313, airBrake@tick 366. 326/672 airborne ticks. No crash; score=774, distance=111 m, xReached=20121, endTick=672."
+  "notes": "VERIFIED 2026-11-21. Genuinely long airtime with canopy control off the real lip at x=18464: 2350 ms airborne, and three control tricks register from the tape's own input - parachute@276, helicopterCW@313, airBrake@366 - before a 'good' landing at tick 478 (air 2358 ms). No crash; score 774."
 }

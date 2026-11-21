@@ -33,5 +33,5 @@
     "edges": [],
     "events": []
   },
-  "notes": "Verified 2026-11-21. Accrues real trick points without crashing: airBrake@tick 318, frontflip@tick 427, one airborne episode over the lip at x=1024 (lip crossing startTick 281, 2158 ms of air, landing x=1873 at tick 540), and a highBandwidth zone at x=2639..3229 (tick 708). Score rises 0 -> 481, distance=205 m, xReached=4100, no crash, endTick=1080."
+  "notes": "VERIFIED 2026-11-21 (re-verified after re-baseline). Accrues real trick points without crashing: airBrake@tick 318 and frontflip@tick 427 both register from the tape's own input. One long airborne episode crosses the lip at x=1024 (startTick 281, durationMs 2158.3, lands x=1873 at tick 540); the other two airborne episodes are the 208 ms start drop (ticks 1-26) and a 108 ms hop at tick 672, so only ONE episode is the lip jump. A highBandwidth zone runs x=2639..3229 (tick 708). Score rises 0 -> 481; no crash, distance 205 m, endTick 1080."
 }

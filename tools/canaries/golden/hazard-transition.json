@@ -12,6 +12,14 @@
   "hz": 60,
   "startX": 50000,
   "durationMs": 6500,
+  "dailyRule": {
+    "asOfDate": "2026-11-21",
+    "id": "featherweight",
+    "modifiers": {
+      "gravityMul": 0.8,
+      "airControlMul": 0.9
+    }
+  },
   "checkpoints": [
     [
       0,
@@ -57,6 +65,15 @@
       6.543713886087062,
       0.7662821872509085,
       589
+    ],
+    [
+      4833.333,
+      52001.31177913233,
+      18839.269660296955,
+      0.06941140802819548,
+      5.859386986150639,
+      0.40240975603228435,
+      600
     ]
   ],
   "result": {
@@ -77,9 +94,9 @@
     "stallDeltaMs": 0,
     "ticks": 580,
     "totalSimMs": 4833.333333333334,
-    "scoreMean": 443.2,
+    "scoreMean": 469.3333333333333,
     "scoreMin": 0,
-    "scoreMax": 589,
+    "scoreMax": 600,
     "droppedMs": 0
   },
   "origin": {
@@ -93,7 +110,8 @@
     "yReached": 18839,
     "frames": 290,
     "paused": false,
-    "stalled": false
+    "stalled": false,
+    "stallChecks": []
   },
   "feature": {
     "landings": [

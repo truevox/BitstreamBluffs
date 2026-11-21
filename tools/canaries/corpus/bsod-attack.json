@@ -17,5 +17,5 @@
     "edges": [],
     "events": []
   },
-  "notes": "Verified 2026-11-21 (recorded twice, byte-identical). Braking from tick 0 stalls the sled and the deletion wall closes on it: feature.bsodCaughtTick=6891, minBsodGapPx=1.27 (from ~11345 px), result.crashed=true, cause=\"bsod\", crashTick=6891, endTick=6891, score=45, distance=48 m, xReached=959. A real wall catch from the wall's own gapPx crossing zero, not a scripted crash."
+  "notes": "VERIFIED 2026-11-21 (re-verified after re-baseline, recorded twice byte-identical). Braking from the start stalls the sled and the deletion wall catches it: feature.minBsodGapPx=1.27, feature.bsodCaughtTick=6891, result.crashed=true, cause='bsod', crashTick=6891, endTick=6891, score=45, distance 48 m. A real wall catch, not a scripted one - the pursuit's own gapPx closes to ~1 px on its own. The record stores only the minimum gap, so the STARTING gap is not asserted here."
 }

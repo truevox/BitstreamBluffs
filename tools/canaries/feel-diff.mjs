@@ -32,6 +32,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const compare = require('./lib/compare.cjs');
+const { checkStallAdvance } = require('./lib/stall.cjs');
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
@@ -76,7 +77,13 @@ async function loadEpsilon() {
 async function canaryIds() {
   const names = (await readdir(CANARY_DIR)).filter((n) => n.endsWith('.json')).sort();
   const ids = names.map((n) => n.replace(/\.json$/, ''));
-  return ONLY.size ? ids.filter((id) => ONLY.has(id)) : ids;
+  if (!ids.length) throw new Error(`no canaries in ${CANARY_DIR}`);
+  if (!ONLY.size) return ids;
+  // A typo in ONLY must not silently shrink the run to the canaries that happen to match: that is a green
+  // gate over an empty/partial corpus. Refuse unknown ids instead.
+  const unknown = [...ONLY].filter((id) => !ids.includes(id));
+  if (unknown.length) throw new Error(`ONLY named unknown canaries: ${unknown.join(', ')} (known: ${ids.join(', ')})`);
+  return ids.filter((id) => ONLY.has(id));
 }
 
 /** Re-record the corpus through the real runner (browser) unless --use-out says to trust out/. */
@@ -159,6 +166,22 @@ async function main() {
   if (!USE_OUT) runRecorder(ids);
   if (RECORD_GOLDEN && USE_OUT) throw new Error('--record-golden needs a fresh recording; drop --use-out');
 
+  // A golden with no corpus entry is dead weight that can hide a deleted canary, and a corpus entry with no
+  // golden is a canary nobody is guarding. Both are reported, loudly, rather than passed over.
+  const goldenNames = existsSync(GOLDEN_DIR)
+    ? (await readdir(GOLDEN_DIR)).filter((n) => n.endsWith('.json')).map((n) => n.replace(/\.json$/, '')).sort()
+    : [];
+  const orphanGoldens = goldenNames.filter((id) => !ids.includes(id));
+  // The reverse direction matters more: a corpus canary with no golden would be recorded and then compared
+  // against nothing. classifyRun would report MISSING_BASELINE (exit 2), but say so up front with the cause.
+  const unguarded = RECORD_GOLDEN ? [] : ids.filter((id) => !goldenNames.includes(id));
+  if (unguarded.length) {
+    console.error(`WARNING: canar${unguarded.length === 1 ? 'y' : 'ies'} with no golden: ${unguarded.join(', ')} — record with --record-golden after review`);
+  }
+  if (!RECORD_GOLDEN && orphanGoldens.length) {
+    console.error(`WARNING: golden(s) with no corpus entry: ${orphanGoldens.join(', ')} — deleted canary or stale baseline?`);
+  }
+
   const results = [];
   for (const id of ids) {
     const currentPath = path.join(OUT_DIR, `${id}.json`);
@@ -177,8 +200,27 @@ async function main() {
     const result = compare.classifyRun({ baseline, current, expected, epsilon });
     result.hz = current.hz ?? baseline?.hz ?? null;
     result.simTickHz = current?.simVersion?.simTickHz ?? baseline?.simVersion?.simTickHz ?? null;
-    // compareOutcome covers crashed/crashTick/cause/score/distance/endTick; surface the crash hazardId too.
+    // compareOutcome covers crashed/crashTick/cause/hazardId/score/distance/endTick; surface both sides.
     result.hazardId = { baseline: baseline?.result?.hazardId ?? null, current: current?.result?.hazardId ?? null };
+    // A canary that declares stall events must prove its own claim: per-stall evidence, not just a total.
+    // The verdict is computed here with the shared rule (lib/stall.cjs), never read out of the record, so a
+    // hand-edited or stale record cannot declare itself fine.
+    const declaredStalls = (current?.stats?.stallCount ?? 0);
+    const rawChecks = current?.verification?.stallChecks ?? [];
+    const checks = rawChecks.map((c) => ({ atTick: c.atTick, frameMs: c.frameMs, ...checkStallAdvance(c) }));
+    // The corpus is the declaration of intent: if the tape asks for a stall, a record with zero stalls means
+    // the recorder never injected one, which must not read as "nothing to check".
+    const corpusPath = path.join(CANARY_DIR, `${id}.json`);
+    const wantedStalls = existsSync(corpusPath)
+      ? (await readJSON(corpusPath)).input?.events?.filter((e) => e.do === 'stall').length ?? 0
+      : 0;
+    result.stallEvidence = {
+      declared: declaredStalls,
+      wanted: wantedStalls,
+      checks: checks.length,
+      ok: wantedStalls === declaredStalls && declaredStalls === checks.length && checks.every((c) => c.ok),
+      detail: checks,
+    };
     result.spread = { baselinePath: baseline ? path.relative(ROOT, goldenPath) : null, expectedPath: expected ? path.relative(ROOT, expectedPath) : null };
     results.push(result);
   }
@@ -193,6 +235,13 @@ async function main() {
       console.log(`  crash hazardId:   ${JSON.stringify(r.hazardId.baseline)} -> ${JSON.stringify(r.hazardId.current)}`);
     }
     console.log(`  handling stats:   ${statsLine(r.stats)}`);
+    if (r.stallEvidence.declared) {
+      console.log(`  stall evidence:   ${r.stallEvidence.checks}/${r.stallEvidence.wanted} stalled frames measured${r.stallEvidence.ok ? '' : ' — INSUFFICIENT'}`);
+      for (const c of r.stallEvidence.detail) {
+        const sim = Number.isFinite(c.simAdvancedMs) ? c.simAdvancedMs.toFixed(3) : '?';
+        console.log(`    @tick ${String(c.atTick).padStart(5)} frame=${c.frameMs}ms -> +${c.ticksAdvanced} ticks (${sim}ms sim, clamp ${c.clampMs}ms)${c.ok ? '' : ` — ${c.reason}`}`);
+      }
+    }
     if (r.simVersion && r.simVersion.changed) {
       console.log(`  !!! SIM VERSION CHANGED !!! baseline=${JSON.stringify(r.simVersion.baseline)} current=${JSON.stringify(r.simVersion.current)}`);
       console.log('      Comparing across a physics/format bump is meaningless; re-record goldens after review.');
@@ -229,6 +278,7 @@ async function main() {
       stats: r.stats,
       simVersion: r.simVersion,
       expected: r.expected ? { reviewer: r.expected.reviewer, reviewedAt: r.expected.reviewedAt, reason: r.expected.reason, allowed: r.expected.allowed } : null,
+      stallEvidence: { declared: r.stallEvidence.declared, checks: r.stallEvidence.checks, ok: r.stallEvidence.ok },
     })),
   };
   await mkdir(path.dirname(SUMMARY_JSON), { recursive: true });
@@ -241,7 +291,12 @@ async function main() {
   }
 
   const failed = results.filter((r) => r.status === compare.STATUS.DIVERGED || r.status === compare.STATUS.MISSING_BASELINE);
-  process.exitCode = failed.length ? 2 : 0;
+  // A canary whose declared stall invariant has no per-stall evidence cannot pass on outcome alone.
+  const unevidenced = results.filter((r) => !r.stallEvidence.ok);
+  for (const r of unevidenced) {
+    console.error(`STALL EVIDENCE MISSING ${r.id}: ${r.stallEvidence.wanted} stall(s) in the tape, ${r.stallEvidence.declared} declared by the record, ${r.stallEvidence.checks} measured — the canary has not exercised its claim`);
+  }
+  process.exitCode = (failed.length || unevidenced.length) ? 2 : 0;
 }
 
 main().catch((e) => {

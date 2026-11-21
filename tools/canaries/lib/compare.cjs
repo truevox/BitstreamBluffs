@@ -75,6 +75,14 @@ function compareCheckpoints(baseline, current, epsilon = DEFAULT_EPSILON) {
   for (let i = 0; i < n; i++) {
     const p = normalizeCheckpoint(a[i]);
     const q = normalizeCheckpoint(b[i]);
+    // Checkpoints are paired by index only because index 0 is t=0 and every run samples one per simulated
+    // second. If the two sides disagree on the time axis the pairing is meaningless, so report it as the
+    // divergence rather than comparing unrelated samples.
+    if (p.tickMs !== q.tickMs) {
+      const d = { tickMs: p.tickMs, field: 'tickMs', baseline: p.tickMs, current: q.tickMs, delta: null, absDelta: null, rawAbsDelta: null };
+      if (!first) first = d;
+      continue;
+    }
     for (const field of NUMERIC_FIELDS) {
       const tol = finiteOrNull(epsilon && epsilon[field]) ?? 0;
       const pv = p[field];
@@ -107,16 +115,23 @@ function allCheckpointDivergences(baseline, current, epsilon = DEFAULT_EPSILON) 
   for (let i = 0; i < n; i++) {
     const p = normalizeCheckpoint(a[i]);
     const q = normalizeCheckpoint(b[i]);
+    if (p.tickMs !== q.tickMs) {
+      out.push({ tickMs: p.tickMs, field: 'tickMs', baseline: p.tickMs, current: q.tickMs, delta: null, absDelta: null, rawAbsDelta: null });
+      continue;
+    }
     for (const field of NUMERIC_FIELDS) {
       const tol = finiteOrNull(epsilon && epsilon[field]) ?? 0;
       const pv = p[field];
       const qv = q[field];
       if (!Number.isFinite(pv) || !Number.isFinite(qv)) {
-        if (pv !== qv) out.push({ tickMs: p.tickMs, field, baseline: pv, current: qv, delta: null, absDelta: null });
+        if (pv !== qv) out.push({ tickMs: p.tickMs, field, baseline: pv, current: qv, delta: null, absDelta: null, rawAbsDelta: null });
         continue;
       }
+      // Tolerance is applied to the RAW delta. `absDelta`/`delta` are rounded for display only; `rawAbsDelta`
+      // is what an expected-difference declaration is checked against, so rounding can never approve a delta
+      // that is larger than the declared bound.
       const absDelta = Math.abs(qv - pv);
-      if (absDelta > tol) out.push({ tickMs: p.tickMs, field, baseline: pv, current: qv, delta: r6(qv - pv), absDelta: r6(absDelta) });
+      if (absDelta > tol) out.push({ tickMs: p.tickMs, field, baseline: pv, current: qv, delta: r6(qv - pv), absDelta: r6(absDelta), rawAbsDelta: absDelta });
     }
   }
   if (a.length !== b.length) {
@@ -132,18 +147,17 @@ function allCheckpointDivergences(baseline, current, epsilon = DEFAULT_EPSILON) 
 function compareOutcome(baseline, current) {
   const a = baseline || {};
   const b = current || {};
-  const fields = ['crashed', 'crashTick', 'cause', 'score', 'distance', 'endTick'];
+  const fields = ['crashed', 'crashTick', 'cause', 'hazardId', 'score', 'distance', 'endTick'];
   const deltas = {};
+  // Compare RAW values; round only for display. Rounding first would report a sub-microscopic change as
+  // "unchanged" and could let an expected-difference declaration cover it.
   for (const f of fields) {
     const av = a[f];
     const bv = b[f];
     if (typeof av === 'number' && typeof bv === 'number') deltas[f] = r6(bv - av);
     else deltas[f] = av === bv ? 0 : { baseline: av == null ? null : av, current: bv == null ? null : bv };
   }
-  const changed = fields.filter((f) => {
-    const d = deltas[f];
-    return typeof d === 'number' ? d !== 0 : true;
-  });
+  const changed = fields.filter((f) => a[f] !== b[f]);
   return { baseline: a, current: b, deltas, changed };
 }
 
@@ -173,11 +187,25 @@ function normalizeStats(record, checkpoints) {
  */
 function partsOf(record) {
   if (!record || typeof record !== 'object') throw new TypeError('record must be an object');
-  const checkpoints = Array.isArray(record.checkpoints) ? record.checkpoints : [];
+  if (typeof record.id !== 'string' || !record.id) throw new TypeError('record is missing a string id');
+  if (!record.result || typeof record.result !== 'object') throw new TypeError(`record ${record.id} is missing result`);
+  if (!Array.isArray(record.checkpoints) || record.checkpoints.length === 0) {
+    throw new TypeError(`record ${record.id} has no checkpoints`);
+  }
+  const checkpoints = record.checkpoints.map((cp, i) => {
+    const n = normalizeCheckpoint(cp);
+    if (!Number.isFinite(n.tickMs)) throw new TypeError(`record ${record.id} checkpoint[${i}] has no numeric tickMs`);
+    if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) throw new TypeError(`record ${record.id} checkpoint[${i}] has no numeric x/y`);
+    if (i > 0) {
+      const prev = normalizeCheckpoint(record.checkpoints[i - 1]);
+      if (!(n.tickMs > prev.tickMs)) throw new TypeError(`record ${record.id} checkpoint[${i}] tickMs is not increasing (${prev.tickMs} -> ${n.tickMs})`);
+    }
+    return cp;
+  });
   return {
     id: record.id,
     checkpoints,
-    result: record.result || {},
+    result: record.result,
     stats: normalizeStats(record, checkpoints),
     simVersion: record.simVersion || null,
   };
@@ -199,9 +227,12 @@ function validateExpected(exp, id = '?') {
   const norm = allowed.map((a, i) => {
     if (!a || typeof a !== 'object') throw new Error(`expected/${id}.json: allowed[${i}] is not an object`);
     if (typeof a.field !== 'string' || !a.field) throw new Error(`expected/${id}.json: allowed[${i}].field missing`);
-    const maxAbs = Number(a.maxAbs);
-    if (!Number.isFinite(maxAbs) || maxAbs < 0) throw new Error(`expected/${id}.json: allowed[${i}].maxAbs must be a non-negative number`);
-    return { field: a.field, maxAbs };
+    // A bound must be a real finite number, not something Number() will happily coerce: `null` -> 0,
+    // `""` -> 0, `true` -> 1 and `[]` -> 0 would each silently become a bound nobody wrote.
+    if (typeof a.maxAbs !== 'number' || !Number.isFinite(a.maxAbs) || a.maxAbs < 0) {
+      throw new Error(`expected/${id}.json: allowed[${i}].maxAbs must be a finite non-negative number`);
+    }
+    return { field: a.field, maxAbs: a.maxAbs };
   });
   if (exp.id != null && exp.id !== id) throw new Error(`expected/${id}.json: id "${exp.id}" does not match canary "${id}"`);
   const reviewedAt = typeof exp.reviewedAt === 'string' && exp.reviewedAt.trim() ? exp.reviewedAt : null;
@@ -233,7 +264,10 @@ function classifyRun({ baseline, current, expected = null, epsilon = DEFAULT_EPS
   if (expected) {
     expectedNorm = validateExpected(expected, id);
     for (const d of divergences) {
-      const hit = expectedNorm.allowed.find((a) => a.field === d.field && d.absDelta != null && d.absDelta <= a.maxAbs);
+      // Match on the RAW delta, never the display-rounded one: `absDelta` can round a real difference down
+      // to 0 and would then satisfy a `maxAbs: 0` bound it actually exceeds.
+      const raw = d.rawAbsDelta;
+      const hit = expectedNorm.allowed.find((a) => a.field === d.field && raw != null && raw <= a.maxAbs);
       if (!hit) { covered = false; break; }
     }
     if (covered) {

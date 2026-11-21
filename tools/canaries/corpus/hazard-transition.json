@@ -22,5 +22,5 @@
     "edges": [],
     "events": []
   },
-  "notes": "Verified 2026-11-21. Crosses a real biome boundary and meets a real hazard: chunk biome goes null sector 5 (x=50003) -> \"pyramid-peak\" sector 6 (x=50944, tick 260), enters a thermalUpdraft zone (x=51951..52627, tick 547), then dies to the glitch-chasm hazard at tick 580 (x~52045): feature.hazardHits=[{hazardId:\"glitchChasm\", tick:580}], result.crashed=true, cause=\"hazard\", hazardId=\"glitchChasm\", score=600, distance=100 m, endTick=580."
+  "notes": "VERIFIED 2026-11-21. Crosses a real biome boundary and meets a real hazard: chunk biome goes null sector 5 (x=50003) -> 'pyramid-peak' sector 6 (x=50944, tick 260), enters a thermalUpdraft zone (x=51951..52627), then dies to glitch-chasm at tick 580: result.crashed=true, cause='hazard', hazardId='glitchChasm', score 600."
 }

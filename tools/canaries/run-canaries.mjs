@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 import { SIM_TICK_HZ, SIM_TICK_MS } from '../../src/systems/SimClock.js';
+import { checkStallAdvance } from './lib/stall.cjs';
 import { RUN_RANDOM_VERSION } from '../../src/systems/RunRandom.js';
 import {
   GHOST_TAPE_FORMAT, GHOST_TAPE_VERSION, GHOST_PHYSICS_VERSION,
@@ -41,6 +42,24 @@ const OUT_DIR = path.resolve(ROOT, process.env.OUT_DIR || 'tools/canaries/out');
 const GOLDEN_DIR = path.resolve(ROOT, 'tools/canaries/golden');
 const RECORD_GOLDEN = process.env.RECORD_GOLDEN === '1' || process.argv.includes('--record-golden');
 const ONLY = new Set((process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean));
+
+/**
+ * The wall-clock date the game believes it is running on, as `YYYY-MM-DD` (noon UTC).
+ *
+ * This is load-bearing, not cosmetic. `RunScene` resolves a daily rule for EVERY run: a `daily-YYYY-MM-DD`
+ * seed plays that date's rule, and every other seed plays `DailyPatch.getDailyInfo()` — i.e. TODAY's rule,
+ * which rotates through gravity/friction/air-control modifiers. Those modifiers reach `PhysicsTuner`
+ * (`RunScene.physicsContext()` -> `daily`). An unfrozen clock would therefore make a record taken today
+ * legitimately diverge tomorrow, and the gate would cry wolf on a schedule.
+ *
+ * Freezing to a fixed date makes the corpus a function of the code only. Override with CANARY_DATE if a
+ * reviewer deliberately wants a different rule, but then the goldens must be re-recorded for that date.
+ */
+const CANARY_DATE = process.env.CANARY_DATE || '2026-11-21';
+assert(/^\d{4}-\d{2}-\d{2}$/.test(CANARY_DATE), `CANARY_DATE must be YYYY-MM-DD, got "${CANARY_DATE}"`);
+const CANARY_DATE_MS = Date.parse(`${CANARY_DATE}T12:00:00.000Z`);
+assert(Number.isFinite(CANARY_DATE_MS), `CANARY_DATE "${CANARY_DATE}" is not a real date`);
+
 
 /** Keys a tape may name, and the router-pad field each one writes. */
 const TAPE_KEYS = Object.freeze({
@@ -239,6 +258,9 @@ async function runInPage(spec) {
     inputChanges: 0, airborneTicks: 0, timeToFirstInputMs: null,
     pausedMs: 0, stallCount: 0, stallDeltaMs: 0, ticks: 0, totalSimMs: 0,
   };
+  // One entry per injected stall, measured immediately around the stalled frame. This is the evidence the
+  // `stall` canary's claim rests on; the final endTick proves nothing on its own (see lib/stall.cjs).
+  const stallChecks = [];
   let lastSig = null;
   let airEpisode = null;
   let crashTick = null;
@@ -349,6 +371,7 @@ async function runInPage(spec) {
   let t = 0;
   let frames = 0;
   let stalledThisFrame = false;
+  let stallPending = false;
   hold = false;
 
   const stepScene = (delta) => { t += delta; frames++; g.step(t, delta); };
@@ -367,7 +390,10 @@ async function runInPage(spec) {
     for (const ev of events) {
       if (ev.done || clock < ev.atMs) continue;
       ev.done = true;
-      if (ev.do === 'stall') { stalledThisFrame = true; delta = spec.stallFrameMs; stats.stallCount++; stats.stallDeltaMs += spec.stallFrameMs; }
+      if (ev.do === 'stall') {
+        stalledThisFrame = true; delta = spec.stallFrameMs; stats.stallCount++; stats.stallDeltaMs += spec.stallFrameMs;
+        stallPending = true;
+      }
       else if (ev.do === 'crash') { expectCrash = true; } // declared outcome; the run must reach it naturally
       else if (ev.do === 'pause') {
         // Ask for a pause through the game's own one-shot edge, let the scene manager honour it, hold for a few
@@ -393,11 +419,20 @@ async function runInPage(spec) {
       }
     }
 
+    const tickBefore = run.simClock.tick;
     stepScene(delta);
+    if (stallPending) {
+      // Record the measurement only; the invariant itself is asserted by the shared rule in lib/stall.cjs on
+      // the Node side, so the browser copy and the unit tests can never drift apart.
+      stallChecks.push({ atTick: tickBefore, tickBefore, tickAfter: run.simClock.tick, tickMs, frameMs: spec.stallFrameMs });
+      stallPending = false;
+    }
     if (run.simClock.tick >= nextCheckpointTick) { sample(); nextCheckpointTick = run.simClock.tick + Math.round(1000 / tickMs); }
   }
-  // Last sample so the final pose/score is always in the record (an extra column, not a scheduled second).
-  if (!checkpoints.length) sample();
+  // Final pose: record the end state unless the last scheduled second already landed on this exact tick, so a
+  // regression after the last full second cannot hide behind unchanged rounded score/distance/endTick.
+  const finalNow = simNow();
+  if (!checkpoints.length || checkpoints[checkpoints.length - 1][0] !== finalNow) sample();
 
   stats.ticks = run.simClock.tick;
   stats.totalSimMs = run.simClock.tick * tickMs;
@@ -431,6 +466,13 @@ async function runInPage(spec) {
     hz: spec.hz,
     startX: spec.startX ?? null,
     durationMs: spec.durationMs,
+    // The daily rule this run actually played (RunScene resolves one for every run, not just dailies).
+    // Recorded so a reader can tell a rule change from a code change; the clock is frozen by the recorder.
+    dailyRule: {
+      asOfDate: spec.canaryDate ?? null,
+      id: run.dailyRuleId ?? 'none',
+      modifiers: run.dailyMods || {},
+    },
     checkpoints,
     result,
     stats,
@@ -442,6 +484,9 @@ async function runInPage(spec) {
       frames,
       paused: stats.pausedMs > 0,
       stalled: stats.stallCount > 0,
+      // Per-stall evidence: what each injected stall actually did to the sim clock. Empty for canaries with
+      // no stall events; a `stall` canary with no entries has not exercised its claim.
+      stallChecks,
     },
     feature,
   };
@@ -488,6 +533,9 @@ async function main() {
       const pageErrors = [];
       page.on('pageerror', (e) => pageErrors.push(String(e)));
       try {
+        // Freeze wall-clock time BEFORE the bundle initialises, so `DailyPatch.getDailyInfo()` (called once
+        // per run in RunScene) resolves the same rule every day. See CANARY_DATE above.
+        await page.clock.install({ time: CANARY_DATE_MS });
         await page.goto(GAME_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
         const spec = {
@@ -500,12 +548,24 @@ async function main() {
           controlLayout: canary.controlLayout || null,
           input: canary.input,
           simVersion: SIM_VERSION,
+          canaryDate: CANARY_DATE,
           stallFrameMs: STALL_FRAME_MS,
         };
         const rec = await page.evaluate(runInPage, spec);
         assert(pageErrors.length === 0, `${canary.id}: page errors: ${pageErrors.slice(0, 3).join(' | ')}`);
         assert(rec && rec.id === canary.id, `${canary.id}: record id mismatch`);
         assert(Array.isArray(rec.checkpoints) && rec.checkpoints.length > 0, `${canary.id}: no checkpoints recorded`);
+        // The `stall` claim, checked with the shared rule (unit-tested in tests/canaries/stall.test.js): one
+        // measurement per declared stall, each proving the clamped frame bought no free sim time.
+        const measured = rec.verification?.stallChecks ?? [];
+        assert(
+          measured.length === rec.stats.stallCount,
+          `${canary.id}: ${rec.stats.stallCount} stall(s) declared but ${measured.length} measured`,
+        );
+        for (const c of measured) {
+          const check = checkStallAdvance(c);
+          assert(check.ok, `${canary.id}: stall invariant failed at tick ${c.atTick}: ${check.reason}`);
+        }
         if (rec.result.expectedCrash && !rec.result.crashed) {
           rec.harnessWarning = 'declared a crash event but the run never crashed';
         }

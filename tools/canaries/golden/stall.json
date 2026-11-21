@@ -12,6 +12,14 @@
   "hz": 60,
   "startX": 0,
   "durationMs": 5000,
+  "dailyRule": {
+    "asOfDate": "2026-11-21",
+    "id": "featherweight",
+    "modifiers": {
+      "gravityMul": 0.8,
+      "airControlMul": 0.9
+    }
+  },
   "checkpoints": [
     [
       0,
@@ -102,7 +110,23 @@
     "yReached": 967,
     "frames": 292,
     "paused": false,
-    "stalled": true
+    "stalled": true,
+    "stallChecks": [
+      {
+        "atTick": 180,
+        "tickBefore": 180,
+        "tickAfter": 186,
+        "tickMs": 8.333333333333334,
+        "frameMs": 2500
+      },
+      {
+        "atTick": 420,
+        "tickBefore": 420,
+        "tickAfter": 426,
+        "tickMs": 8.333333333333334,
+        "frameMs": 2500
+      }
+    ]
   },
   "feature": {
     "landings": [

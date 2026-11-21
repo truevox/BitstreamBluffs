@@ -17,5 +17,5 @@
     "edges": [],
     "events": []
   },
-  "notes": "Verified 2026-11-21. Rides into the real generator launch lip at x=4688 and crosses it: feature.lipCrossings=[{lipX:4688, startTick:186, endTick:200, durationMs:116.7, landX:4752}], then lands \"perfect\" at tick 200 (x=4752, impact angle 5.9 deg). No hop input, so the airtime is the terrain's own bump. No crash; score=234, distance=34 m, xReached=5077, endTick=312."
+  "notes": "VERIFIED 2026-11-21 (re-verified after re-baseline). Rides into the real generator launch lip at x=4688 and crosses it: feature.lipCrossings=[{lipX:4688, startTick:186, durationMs:116.7, landX:4752}], then lands 'perfect' at tick 200 (x=4752, impact angle 5.9 deg). No hop input is used (the tape only holds `push` 0-400 ms), so the airtime is the terrain's own bump. The tick-64 landing at x=4510 (good, 15.2 deg) is the start drop, not the bump. No crash; score 234, distance 34 m, endTick 312."
 }

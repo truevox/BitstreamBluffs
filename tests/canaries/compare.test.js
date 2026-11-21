@@ -6,8 +6,11 @@
  * here. Synthetic records are small hand-written fixtures; the shape matches what
  * tools/canaries/run-canaries.mjs writes.
  */
-'use strict';
+// The package is ESM (`"type": "module"`), so a bare `require` is not defined here even for a `.cjs` target.
+// `createRequire` gives a real CommonJS loader, so this test exercises the same module the differ loads.
+import { createRequire } from 'node:module';
 
+const require = createRequire(import.meta.url);
 const compare = require('../../tools/canaries/lib/compare.cjs');
 
 const { STATUS } = compare;
@@ -257,5 +260,95 @@ describe('sim-version stamping', () => {
     expect(verdict.simVersion.baseline.ghostPhysicsVersion).toBe(1);
     expect(verdict.simVersion.current.ghostPhysicsVersion).toBe(2);
     expect(compare.sameSimVersion(baseline.simVersion, bumped.simVersion)).toBe(false);
+  });
+});
+
+// Regression tests for defects found in independent review. Each one failed before the fix.
+describe('review regressions: rounding must never approve a real difference', () => {
+  test('a sub-6-decimal delta does not satisfy maxAbs: 0', () => {
+    const baseline = makeRecord();
+    const current = makeRecord();
+    // 1e-7 in x: rounds to absDelta 0 at 6 dp, but it IS a difference and Is NOT within 0.
+    current.checkpoints[1][1] = 100 + 1e-7;
+
+    const verdict = compare.classifyRun({
+      baseline,
+      current,
+      expected: expectedFor('fixture', [['x', 0]]),
+    });
+
+    // The divergence is real; the declaration says "zero movement allowed"; so it must NOT be covered.
+    expect(verdict.divergences).toHaveLength(1);
+    expect(verdict.divergences[0].absDelta).toBe(0); // display rounding, as documented
+    expect(verdict.divergences[0].rawAbsDelta).toBeGreaterThan(0);
+    expect(verdict.status).toBe(STATUS.DIVERGED);
+  });
+
+  test('a raw delta just inside the bound is still EXPECTED_DIFF', () => {
+    const baseline = makeRecord();
+    const current = makeRecord();
+    current.checkpoints[1][1] = 100 + 1.5;
+
+    const verdict = compare.classifyRun({ baseline, current, expected: expectedFor('fixture', [['x', 2]]) });
+    expect(verdict.status).toBe(STATUS.EXPECTED_DIFF);
+  });
+
+  test('a sub-6-decimal OUTCOME change is still reported as changed', () => {
+    const baseline = makeRecord({ score: 100 });
+    const current = makeRecord({ score: 100 + 1e-7 });
+
+    const verdict = compare.classifyRun({ baseline, current });
+    expect(verdict.outcome.changed).toContain('score');
+    expect(verdict.status).toBe(STATUS.DIVERGED);
+  });
+
+  test('a non-numeric maxAbs is rejected instead of being coerced', () => {
+    for (const bad of [null, '', true, [], '2', undefined]) {
+      expect(() => compare.validateExpected({
+        id: 'fixture', allowed: [{ field: 'x', maxAbs: bad }], reason: 'r', reviewer: 'v', reviewedAt: 'z',
+      }, 'fixture')).toThrow(/finite non-negative number/);
+    }
+  });
+});
+
+describe('review regressions: checkpoints must be paired on a real time axis', () => {
+  test('a record whose timestamps all shift is a divergence, not a silent pass', () => {
+    const baseline = makeRecord();
+    const shifted = makeRecord({
+      checkpoints: [
+        [500, 0, 0, 0, 10, 0, 0],
+        [1500, 100, 10, 0.1, 10, 1, 40],
+        [2500, 210, 22, 0.2, 10, 2, 100],
+      ],
+    });
+
+    const verdict = compare.classifyRun({ baseline, current: shifted });
+    expect(verdict.status).toBe(STATUS.DIVERGED);
+    expect(verdict.firstDivergence.field).toBe('tickMs');
+    expect(verdict.firstDivergence).toMatchObject({ baseline: 0, current: 500 });
+  });
+
+  test('a malformed record is a hard error, never an equal-to-itself pass', () => {
+    expect(() => compare.partsOf({})).toThrow(/id/);
+    expect(() => compare.partsOf({ id: 'x' })).toThrow(/result/);
+    expect(() => compare.partsOf({ id: 'x', result: {} })).toThrow(/no checkpoints/);
+    expect(() => compare.partsOf({ id: 'x', result: {}, checkpoints: [{ tickMs: 0 }] })).toThrow(/x\/y/);
+  });
+
+  test('non-monotonic timestamps are rejected', () => {
+    expect(() => compare.partsOf({
+      id: 'x',
+      result: {},
+      checkpoints: [[1000, 0, 0, 0, 0, 0, 0], [1000, 1, 1, 0, 0, 0, 0]],
+    })).toThrow(/not increasing/);
+  });
+
+  test('a hazardId change alone is an outcome divergence', () => {
+    const baseline = makeRecord({ crashTick: 60, cause: 'hazard', hazardId: 'glitchChasm' });
+    const current = makeRecord({ crashTick: 60, cause: 'hazard', hazardId: 'meteor' });
+
+    const verdict = compare.classifyRun({ baseline, current });
+    expect(verdict.status).toBe(STATUS.DIVERGED);
+    expect(verdict.outcome.changed).toEqual(['hazardId']);
   });
 });

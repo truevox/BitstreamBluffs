@@ -12,6 +12,14 @@
   "hz": 60,
   "startX": 0,
   "durationMs": 9000,
+  "dailyRule": {
+    "asOfDate": "2026-11-21",
+    "id": "featherweight",
+    "modifiers": {
+      "gravityMul": 0.8,
+      "airControlMul": 0.9
+    }
+  },
   "checkpoints": [
     [
       0,
@@ -138,7 +146,8 @@
     "yReached": 1475,
     "frames": 540,
     "paused": false,
-    "stalled": false
+    "stalled": false,
+    "stallChecks": []
   },
   "feature": {
     "landings": [
