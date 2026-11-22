@@ -24,4 +24,22 @@ export const FIXTURES = [
   { id: 'daily-practice-rule', seed: 'daily-2026-11-14', style: 'cruise', params: {}, maxTicks: 2400,
     covers: ['Daily rule + biome mask derived from a past date seed (practice run; official Daily needs today\'s date)'] },
 ];
+// Broader corpus added for #121 Phase B (not part of #120): other seeds, biome masks, styles and longer runs. Recorded with the portable-math build.
+export const BROAD = [
+  { id: 'broad-cruise-a', seed: 'PM121-A1', style: 'cruise', params: {}, maxTicks: 7000, covers: ['long cruise, default biomes'] },
+  { id: 'broad-cruise-b', seed: 'PM121-A2', style: 'cruise', params: { tuck: true, vmax: 650 }, maxTicks: 8000, covers: ['long tucked cruise'] },
+  { id: 'broad-cruise-c', seed: 'PM121-A3@1', style: 'cruise', params: { hopEvery: 500 }, maxTicks: 5000, covers: ['single-biome mask 1'] },
+  { id: 'broad-cruise-d', seed: 'PM121-A4@2', style: 'cruise', params: { hopEvery: 350 }, maxTicks: 5000, covers: ['single-biome mask 2'] },
+  { id: 'broad-cruise-e', seed: 'PM121-A5@64', style: 'cruise', params: {}, maxTicks: 5000, covers: ['single-biome mask 64'] },
+  { id: 'broad-allbiomes', seed: 'PM121-A6@2047', style: 'cruise', params: { tuck: true }, maxTicks: 9000, covers: ['all biomes, long'] },
+  { id: 'broad-reckless-a', seed: 'PM121-B1', style: 'reckless', params: { hopEvery: 300 }, maxTicks: 4000, rngSeed: 3, covers: ['hard contacts'] },
+  { id: 'broad-reckless-b', seed: 'PM121-B2@4', style: 'reckless', params: { hopEvery: 450 }, maxTicks: 4000, rngSeed: 5, covers: ['hard contacts, biome mask 4'] },
+  { id: 'broad-tricks-a', seed: 'PM121-C1', style: 'tricks', params: { hopEvery: 200 }, maxTicks: 5000, covers: ['heli/corkscrew/divebomb'] },
+  { id: 'broad-tricks-b', seed: 'PM121-C2@8', style: 'tricks', params: { hopEvery: 260 }, maxTicks: 5000, covers: ['tricks, mask 8'] },
+  { id: 'broad-chute-a', seed: 'PM121-D1', style: 'chute', params: { hopEvery: 200 }, maxTicks: 5000, covers: ['parachute and air brake'] },
+  { id: 'broad-chute-b', seed: 'PM121-D2@16', style: 'chute', params: { hopEvery: 280 }, maxTicks: 5000, covers: ['parachute, mask 16'] },
+  { id: 'broad-bsod-a', seed: 'PM121-E1', style: 'bsod', params: { brakeAt: 250, resetEvery: 120 }, maxTicks: 9000, covers: ['BSOD pursuit'] },
+  { id: 'broad-kodiaks-a', seed: 'PM121-F1', style: 'cruise', params: { tuck: true }, maxTicks: 6000, kodiaks: true, covers: ['Kodiaks on'] },
+  { id: 'broad-daily', seed: 'daily-2026-11-18', style: 'cruise', params: { hopEvery: 400 }, maxTicks: 5000, covers: ['daily rule from a past date seed'] },
+];
 // Gym (BSOD Gym) is NOT tape-covered: RunScene never creates a GhostRecorder in the Gym, so no replay fixture exists for it.

@@ -10,7 +10,9 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FIXTURES } from './fixtures.mjs';
+import { FIXTURES as CORE, BROAD } from './fixtures.mjs';
+const FIXTURES = process.env.CORPUS === 'core' ? CORE : [...CORE, ...BROAD];
+const FIXTURES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const url = process.env.GAME_URL || 'http://localhost:8442/';
@@ -49,7 +51,7 @@ const pageJs = await readFile(path.join(here, 'page.js'), 'utf8');
 import { pmathScript } from './load-pmath.mjs';
 const pmJs = pmathScript();
 const levelOf = (f) => (f.kodiaks ? 8 : 1);
-const tapes = {}; for (const f of FIXTURES) tapes[f.id] = JSON.parse(await readFile(path.join(here, 'fixtures', `${f.id}.tape.json`), 'utf8'));
+const tapes = {}; for (const f of FIXTURES) { const tp = path.join(here, 'fixtures', `${f.id}.tape.json`); if (existsSync(tp)) tapes[f.id] = JSON.parse(await readFile(tp, 'utf8')); }
 
 async function freshPage(browser, patch) {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
@@ -87,6 +89,26 @@ async function runEngine(cfgNames, eng) {
   try { for (const cfg of cfgNames) for (const f of fixtures) await runCell(browser, cfg, eng, f); } finally { await browser.close(); }
 }
 const cmd = process.argv[2];
+// ---------------------------------------------------------------- record (Chromium, live autopilot -> committed tape); re-verifies in a fresh context
+if (cmd === 'record') {
+  const only = process.argv.slice(3); const c = ENG.chromium(); const browser = await c.type.launch(c.opts); const meta = [];
+  try {
+    for (const f of FIXTURES.filter((x) => !only.length || only.includes(x.id))) {
+      const { ctx, page } = await freshPage(browser, { ops: [], mode: 'global' });
+      for (let i = 0; i < (f.preRuns || 0); i++) await page.evaluate((x) => window.__ce.play(x), { seed: `${f.seed}-PRE${i + 1}`, hz: 120, style: 'cruise', maxTicks: 700, rngSeed: i + 1 });
+      const rec = await page.evaluate((x) => window.__ce.play(x), { seed: f.seed, hz: 120, style: f.style, params: f.params, maxTicks: f.maxTicks, kodiaks: !!f.kodiaks, rngSeed: f.rngSeed || 1 });
+      await ctx.close();
+      if (!rec.tape) throw new Error(`${f.id}: no tape produced`);
+      const v = await freshPage(browser, { ops: [], mode: 'global' });
+      const rep = await v.page.evaluate((x) => window.__ce.play(x), { seed: f.seed, hz: 120, tape: rec.tape, level: levelOf(f), raster: false });
+      await v.ctx.close();
+      await writeFile(path.join(FIXTURES_DIR, `${f.id}.tape.json`), JSON.stringify(rec.tape));
+      meta.push({ id: f.id, recorded: rec.outcome, replay: rep.outcome, desync: rep.tapeCheck.desync, endTick: rec.tape.endTick, inputs: rec.tape.inputs.length, checkpoints: rec.tape.checkpoints.length });
+      console.log(f.id, JSON.stringify({ ticks: rec.outcome.ticks, crashed: rec.outcome.crashed, cause: rec.outcome.cause, m: rec.outcome.distanceM, score: rec.outcome.score, desync: rep.tapeCheck.desync }));
+    }
+  } finally { await browser.close(); }
+  await writeFile(path.join(FIXTURES_DIR, only.length ? `record-meta-${Date.now()}.json` : 'record-meta.json'), JSON.stringify({ build: 'portable-math (SIM_REVISION 4)', fixtures: meta }, null, 1));
+}
 if (cmd === 'run') {
   const cfgs = process.argv.slice(3);
   for (const c of cfgs) cfgOf(c);
