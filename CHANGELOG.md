@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.16.4 — developer stock Packet Spike traversal check (#202 / #127) (2026-11-22)
+
+- **Pinned stock hazard traversal diagnostic.** A developer-only Chromium script probes one naturally generated Packet Spike across three normal-input cases (no hop, a timed hop, and a late hop), each repeated twice in fresh contexts, without injecting terrain or collision outcomes. It checks that the same hazard and early power-up are encountered, validates actual input, clearance and fatal/landing events, and refuses a mismatched compiled game. The fixture is pinned to one older compiled build; this is not a general fairness verdict, cross-version compatibility proof, or active gameplay change. No player data is transferred or retained.
+
 ## v2.16.3 — Exploit Factory: complete adversarial policy evidence (#187 / #76) (2026-11-22)
 
 - **`--reuse` no longer accepts an incomplete run record just because the record's own `failures[]` is empty.**
