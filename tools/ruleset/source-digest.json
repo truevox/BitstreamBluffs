@@ -3,9 +3,8 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 2,
-  "attestation": "sim-revision-bumped: 2 for #140 (PR #160): biome-sector entry and the palette setting repaint terrain via TerrainMesh.redrawChunk instead of rebuilding colliders (owner-approved tick-outcome change for biome-mask runs); renderFrame audio read guarded (presentation only)",
+  "attestation": "no-behavior-change: #140 review fixes in RunScene only guard presentation audio reads (jukeboxSnapshot/showTrack in create and the track-change handler); SIM_REVISION 2 already covers the biome repaint change",
   "changedFiles": [
-    "src/entities/TerrainMesh.js",
     "src/scenes/RunScene.js"
   ],
   "files": {
@@ -15,7 +14,7 @@
     "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
     "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
     "src/entities/TerrainMesh.js": "sha256:47d06d99ef107a17faa64a684436550966e480203a26c466506e87367da05c01",
-    "src/scenes/RunScene.js": "sha256:2e7b4cd54aebb86bb487ae96735df45d48adf6cffdbb8b7dd7f5f55ace2ba072",
+    "src/scenes/RunScene.js": "sha256:57e4beb8b9687527eb7044c8f680b5ebcb11072f11b93be6c97a2394174d512f",
     "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:dbe861d0a1fb6e73f94d467583ea9190ec88cc986fa39982b28687d75ca18397",
