@@ -27,6 +27,14 @@ import { DRAFT_RULES_VERSION } from './DailyDraft.js';
 /** Profile schema version, independent of STORAGE.saveVersion. */
 export const PROFILE_VERSION = 1;
 
+/**
+ * The base biome (issue #65): Debutmont is the normal run's terrain from the very first run. It is always
+ * unlocked and can never be switched off, so it has no toggle row and its mask bit is never part of a
+ * profile's enabled mask (the terrain generator treats the home bit as a no-op, and keeping it out keeps
+ * masks canonical so leaderboard cohorts do not split on a meaningless bit).
+ */
+export const BASE_BIOME_ID = 'debutmont';
+
 /** XP weights. Kept here (not in JSON) because they are arithmetic, not content. */
 export const XP = Object.freeze({
   per10m: 1,
@@ -184,7 +192,10 @@ export function defaultProfile() {
     // reloaded one have the identical shape — a missing key would make the two disagree on first save.
     unlocked: { biomes: [], cosmetics: [], titles: [], boosts: {}, musicVocals: false },
     equipped: { trail: 'default', glow: 'default', rider: 'default', theme: 'default', title: 'default' },
-    biomeMask: 0,
+    // Issue #65: unlocked biomes default ON, so the profile stores only the player's explicit OFF choices (one
+    // bit per biome, the biome table's `bit`). The old opt-in `biomeMask` field is gone: it is no longer
+    // written and an old save's value is ignored, which migrates every existing profile to all-ON.
+    biomeOff: 0,
     // W4 loadout: which boosts are switched ON for the next run. Separate from `unlocked.boosts`, which
     // records what the player owns. Additive, default-off, and safe on an old save by omission - which is
     // why it needs no saveVersion bump.

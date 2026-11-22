@@ -26,9 +26,9 @@ const DEFS = {
   pyramid: { id: 'pyramid', bit: 4 },
 };
 
-/** A capped profile with every batch-1 signature enabled. */
+/** A capped profile with every batch-1 signature unlocked and none switched OFF (the default, issue #65). */
 const capped = (over = {}) => ({
-  v: 1, biomeMask: 7, level: 30,
+  v: 1, biomeOff: 0, level: 30,
   pendingBiomes: ['debutmont', 'glacier', 'pyramid'],
   unlocked: { biomes: [], cosmetics: [], boosts: {} },
   ...over,
@@ -56,7 +56,7 @@ describe('RETRY keeps the mask of the run being retried', () => {
   test('a mask-16 run retries at mask 16, not at the profile mask', () => {
     // The run's own mask wins over the profile: the player picked this world (or the Daily did) and
     // asked to try it again, not to change it.
-    const { ctx, values } = scene({ mask: 16, profile: capped({ biomeMask: 1 }), rec: { seed: 'alpha', id: 'r1', biomeMask: 16 } });
+    const { ctx, values } = scene({ mask: 16, profile: capped({ biomeOff: 2 }), rec: { seed: 'alpha', id: 'r1', biomeMask: 16 } });
     GameOverScene.prototype.retry.call(ctx);
     expect(values.get(REG.BIOME_MASK)).toBe(16);
     expect(values.get(REG.SEED)).toBe('alpha');
@@ -66,7 +66,7 @@ describe('RETRY keeps the mask of the run being retried', () => {
   test('retry sets the mask explicitly, so it does not depend on registry leftovers', () => {
     // Start with NO mask in the registry at all: nothing to accidentally inherit. A run whose record
     // says mask 2 must still retry at mask 2.
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7 }), rec: { seed: 'alpha', id: 'r1', biomeMask: 2 } });
+    const { ctx, values } = scene({ profile: capped(), rec: { seed: 'alpha', id: 'r1', biomeMask: 2 } });
     GameOverScene.prototype.retry.call(ctx);
     expect(values.get(REG.BIOME_MASK)).toBe(2);
   });
@@ -74,13 +74,13 @@ describe('RETRY keeps the mask of the run being retried', () => {
   test('a mask-0 run retries at 0 even when the profile has signatures enabled', () => {
     // The inverse mistake: falling back to the profile mask would silently switch a clean run into a
     // biome run, so the retry would not be the same run.
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7 }), rec: { seed: 'alpha', id: 'r1', biomeMask: 0 } });
+    const { ctx, values } = scene({ profile: capped(), rec: { seed: 'alpha', id: 'r1', biomeMask: 0 } });
     GameOverScene.prototype.retry.call(ctx);
     expect(values.get(REG.BIOME_MASK)).toBe(0);
   });
 
   test('a pre-W3 record with no mask retries at 0', () => {
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7 }), rec: { seed: 'alpha', id: 'r1' } });
+    const { ctx, values } = scene({ profile: capped(), rec: { seed: 'alpha', id: 'r1' } });
     GameOverScene.prototype.retry.call(ctx);
     expect(values.get(REG.BIOME_MASK)).toBe(0);
   });
@@ -90,21 +90,22 @@ describe('NEW SEED drops the previous run mask', () => {
   test('NEW SEED after a Daily run does not inherit the Daily mask', () => {
     // The bug this pins: newSeed() set only REG.SEED, so the Daily's date-derived mask stayed in the
     // registry and an ordinary new-seed run was played in it.
-    const { ctx, values } = scene({ mask: 8, profile: capped({ biomeMask: 7 }) });
+    const { ctx, values } = scene({ mask: 8, profile: capped() });
     GameOverScene.prototype.newSeed.call(ctx);
-    expect(values.get(REG.BIOME_MASK)).toBe(7);
+    // The new default: every unlocked biome ON (glacier|pyramid), the base bit left out.
+    expect(values.get(REG.BIOME_MASK)).toBe(6);
   });
 
-  test('NEW SEED with nothing enabled runs at mask 0', () => {
-    const { ctx, values } = scene({ mask: 8, profile: capped({ biomeMask: 0 }) });
+  test('NEW SEED with every biome explicitly OFF runs at mask 0', () => {
+    const { ctx, values } = scene({ mask: 8, profile: capped({ biomeOff: 6 }) });
     GameOverScene.prototype.newSeed.call(ctx);
     expect(values.get(REG.BIOME_MASK)).toBe(0);
   });
 
-  test('NEW SEED strips bits for biomes the profile has not unlocked', () => {
+  test('NEW SEED never turns on biomes the profile has not unlocked', () => {
     const { ctx, values } = scene({ mask: 8, profile: capped({ biomeMask: 7, pendingBiomes: ['debutmont'] }) });
     GameOverScene.prototype.newSeed.call(ctx);
-    expect(values.get(REG.BIOME_MASK)).toBe(1);
+    expect(values.get(REG.BIOME_MASK)).toBe(0);
   });
 });
 

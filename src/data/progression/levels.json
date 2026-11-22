@@ -1,12 +1,12 @@
 {
-  "_doc": "Sync Level thresholds and rewards. Data-driven (W1). xpMin is the cumulative XP needed to REACH that level. Cap is the last entry. Biomes unlock in this order; W1 only lists them (W3/W6 make them playable).",
+  "_doc": "Sync Level thresholds and rewards. Data-driven (W1). xpMin is the cumulative XP needed to REACH that level. Cap is the last entry. Biomes unlock in this order; W1 only lists them (W3/W6 make them playable). Debutmont is the base biome (issue #65): granted at level 1, so it is unlocked from the first run.",
   "cap": 30,
   "levels": [
     {
       "level": 1,
       "xpMin": 0,
       "title": "Signal Virgin",
-      "biome": null,
+      "biome": "debutmont",
       "cosmetic": null,
       "boost": null
     },
@@ -30,7 +30,7 @@
       "level": 4,
       "xpMin": 3750,
       "title": "Frame Pusher",
-      "biome": "debutmont",
+      "biome": null,
       "cosmetic": null,
       "boost": null
     },
