@@ -28,9 +28,9 @@ input[type=range]{width:100%;accent-color:#f0bc71}
 a{color:#f8cc86}
 footer{font-size:.86rem;color:#acb8ce;line-height:1.5}
 </style>
-  <script type="module" crossorigin src="./assets/scrapheap-audition-BbUBZzHL.js"></script>
-  <link rel="modulepreload" crossorigin href="./assets/MusicFXGraph-BsWvas1r.js">
-  <link rel="modulepreload" crossorigin href="./assets/MusicPhysicsSignals-DzhiBrPL.js">
+  <script type="module" crossorigin src="./assets/scrapheap-audition-LXTsR7gU.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/MusicFXGraph-D3JTHrIf.js">
+  <link rel="modulepreload" crossorigin href="./assets/MusicPhysicsSignals-BNN-1ZeE.js">
 </head>
 <body><main>
 <div class="kicker">Bitstream Bluffs / Physics Audio Lab</div>
@@ -41,8 +41,10 @@ footer{font-size:.86rem;color:#acb8ce;line-height:1.5}
 <button id="load" class="primary">🎵 Load song sample</button>
 <button id="play" disabled>▶ Play</button>
 <button id="bypass" disabled aria-pressed="false">Compare dry</button>
+<button id="solo" disabled aria-pressed="false">Solo drums</button>
 </div>
 <label for="speed">Ground speed: <span id="speed-value">700 px/s</span></label>
+<p class="hint">Ground-contact rattle: <strong id="contact-value">55%</strong> (airborne: 0%)</p>
 <input id="speed" type="range" min="0" max="1400" step="20" value="700">
 <div class="row">
 <button id="takeoff" disabled>🏂 Take off</button>
@@ -50,7 +52,7 @@ footer{font-size:.86rem;color:#acb8ce;line-height:1.5}
 <button id="hard" disabled>💥 Hard landing</button>
 </div>
 <p id="status" role="status" aria-live="polite">Load the sample, then press Play.</p>
-<p class="hint">Try a fast ground run, take off, land hard, and compare dry vs processed. The same song keeps playing; no stem restarts when the physics changes.</p>
+<p class="hint">For an unmistakable comparison: press <strong>Solo drums</strong>, slide speed to maximum, then toggle <strong>Compare dry</strong>. With the original mix playing, press Take off then Hard landing for a separate physical clang. Music playback never restarts.</p>
 </section>
 <p><strong>What you're hearing:</strong> 20 seconds of the original separated drum, bass, guitar, piano and Other recordings from <em>Pope Leo Wants the AI Root Password</em>. Only the drum stem receives Scrapheap DSP. Vocal MIDI-derived leads already exist in the game, but are deliberately left out of this effect-isolation test.</p>
 <footer>This is a draft sound-design experiment stacked on the Snowpack PR, not a finalized production mix. It uses the same native Web Audio Scrapheap processor as the game integration. <a href="https://deploy-preview-194--bitstream-bluffs.netlify.app/tools/music/snowpack-audition.html">Listen to Debumont Snowpack too.</a> All original masters remain untouched. <a href="../2026-11-21-stem-fx/">Return to the four-way comparison.</a> Implementation: <a href="https://github.com/truevox/BitstreamBluffs/pull/221">PR #221</a>.</footer>
