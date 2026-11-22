@@ -2,6 +2,10 @@
 // create() does not reset leaks the previous run's outcome into the next run. Diagnostic, non-authoritative: the
 // per-tick comparison below is test-side evidence, not the #152 fingerprint.
 //
+// After #160 (refreshPalette repaints graphics only) the collider/pose symptom is gone, but the first-tick biome repaint
+// (palette, background motif, BIOME_ENTER) still depended on the previous run: the refresh-count assertion below is the
+// surviving symptom, and the field assertions pin the invariant itself.
+//
 // Root cause pinned here: `_biomeSector` (and `_lastBiome`) were never reset in create(). The first tick of a mask != 0
 // run compares the sled's sector with it: a fresh page (undefined) sees a "change" and runs refreshPalette(), which
 // removes and re-adds every collider (world order, ids and warm-start state change); a later run whose previous run
