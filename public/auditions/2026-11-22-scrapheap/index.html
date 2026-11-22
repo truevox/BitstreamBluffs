@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Bitstream Bluffs — Scrapheap Physics Audio Lab</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#f0f4f6;background:#0d131b}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 50% 0,#433629 0%,#19212b 48%,#0c1118 100%);min-height:100vh}
+main{max-width:770px;margin:auto;padding:clamp(20px,5vw,60px) 20px 80px}
+h1{font-size:clamp(2rem,5vw,3.4rem);line-height:1.1;letter-spacing:-.035em;margin:10px 0 18px}
+p{color:#c2cddd;line-height:1.55}
+.kicker{letter-spacing:.14em;text-transform:uppercase;color:#f6d390;font-weight:700;font-size:.76rem}
+.panel{padding:clamp(20px,4vw,34px);border:1px solid #566274;border-radius:22px;background:#192330da;box-shadow:0 20px 45px #080b1450;margin:23px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+button{font:inherit;font-weight:650;color:#f3f7ff;background:#39445a;border:1px solid #8a98ae;border-radius:11px;padding:12px 17px;cursor:pointer;min-width:115px}
+button:hover:not(:disabled){background:#526482}
+button:focus-visible,input:focus-visible{outline:3px solid #f2ce90;outline-offset:3px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:#e0b76d;color:#14181f;border-color:#f1d49e}
+button.primary:hover:not(:disabled){background:#f1ca86}
+button[aria-pressed=true]{border-color:#f9d899;box-shadow:0 0 0 2px #caa35d}
+label{font-weight:650;display:block;margin:20px 0 10px}
+input[type=range]{width:100%;accent-color:#f0bc71}
+#status{min-height:1.4rem;font-size:.93rem;color:#add8f1}
+.hint{font-size:.89rem;color:#aebacc}
+a{color:#f8cc86}
+footer{font-size:.86rem;color:#acb8ce;line-height:1.5}
+</style>
+  <script type="module" crossorigin src="./assets/scrapheap-audition-C8lpHoSV.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/MusicFXGraph-BqjxJ4ko.js">
+  <link rel="modulepreload" crossorigin href="./assets/MusicPhysicsSignals-Ahd5eyAV.js">
+</head>
+<body><main>
+<div class="kicker">Bitstream Bluffs / Physics Audio Lab</div>
+<h1>🛠️ Garbage Dump Glacier</h1>
+<p><strong>One original recording, five real stems, live physics-driven effects.</strong> The original drum performance stays intact. A parallel, inharmonic metal-rattle path grows as the sled races on the ground, drops away in flight, and surges during hard landings.</p>
+<section class="panel" aria-label="Audio controls">
+<div class="row">
+<button id="load" class="primary">🎵 Load song sample</button>
+<button id="play" disabled>▶ Play</button>
+<button id="bypass" disabled aria-pressed="false">Compare dry</button>
+</div>
+<label for="speed">Ground speed: <span id="speed-value">700 px/s</span></label>
+<input id="speed" type="range" min="0" max="1400" step="20" value="700">
+<div class="row">
+<button id="takeoff" disabled>🏂 Take off</button>
+<button id="soft" disabled>🛬 Soft landing</button>
+<button id="hard" disabled>💥 Hard landing</button>
+</div>
+<p id="status" role="status" aria-live="polite">Load the sample, then press Play.</p>
+<p class="hint">Try a fast ground run, take off, land hard, and compare dry vs processed. The same song keeps playing; no stem restarts when the physics changes.</p>
+</section>
+<p><strong>What you're hearing:</strong> 20 seconds of the original separated drum, bass, guitar, piano and Other recordings from <em>Pope Leo Wants the AI Root Password</em>. Only the drum stem receives Scrapheap DSP. Vocal MIDI-derived leads already exist in the game, but are deliberately left out of this effect-isolation test.</p>
+<footer>This is a draft sound-design experiment stacked on the Snowpack PR, not a finalized production mix. It uses the same native Web Audio Scrapheap processor as the game integration. <a href="https://deploy-preview-194--bitstream-bluffs.netlify.app/tools/music/snowpack-audition.html">Listen to Debumont Snowpack too.</a> All original masters remain untouched. <a href="../2026-11-21-stem-fx/">Return to the four-way comparison.</a> Implementation: <a href="https://github.com/truevox/BitstreamBluffs/pull/221">PR #221</a>.</footer>
+</main>
+</body></html>
