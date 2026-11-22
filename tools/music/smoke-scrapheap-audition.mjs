@@ -41,8 +41,15 @@ try {
 	await page.click('#solo');
 	assert.equal(await page.$eval('#solo', e=>e.getAttribute('aria-pressed')),'false');
 	await page.$eval('#speed', e=> { e.value='1120';e.dispatchEvent(new Event('input',{bubbles:true})); });
+	// Scrolling between the upper mixer controls and lower landing buttons
+	// can race Puppeteer's synthesized clicks (human clicks are much slower).
+	// Center the physical controls and assert their actual state transitions.
+	await page.$eval('#takeoff', e => e.scrollIntoView({block:'center',behavior:'instant'}));
+	await new Promise(resolve=>setTimeout(resolve,150));
 	await page.click('#takeoff');
+	assert.equal(await page.$eval('#soft', e=>e.disabled),false);
 	await page.click('#soft');
+	assert.equal(await page.$eval('#soft', e=>e.disabled),true);
 	assert.match(await page.$eval('#status', e=>e.textContent),/Soft landing/);
 	assert.deepEqual(errors,[]);
 	console.log('SCRAPHEAP_LIVE_BROWSER_SMOKE_PASS',url);
