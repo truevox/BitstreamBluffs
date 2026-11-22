@@ -249,7 +249,7 @@ describe('ACH-6: the real AchievementsView shows encountered / target', () => {
   });
 
   test('three encountered biomes read 3/5 and 3/11', () => {
-    const all = gridTexts({ ...defaultProfile(), ...prog(['debumont', 'pyramid-peak', 'vertigo-vents']) });
+    const all = gridTexts({ ...defaultProfile(), ...prog(['debutmont', 'pyramid-peak', 'vertigo-vents']) });
     expect(all).toEqual(expect.arrayContaining(['2/2', '3/5', '3/11']));
   });
 });
@@ -260,7 +260,7 @@ describe('decision 3: ProfileView labels each unlocked biome with its state', ()
     const t = titleHost({ [REG.PROFILE]: p });
     const prof = openProfile(t);
     const labels = prof.sigMenu.items.map((i) => i.label);
-    expect(labels).toEqual(['DEBUMONT NEW', 'GARBAGE DUMP GLACIER SEEN', 'PYRAMID PEAK DONE']);
+    expect(labels).toEqual(['DEBUTMONT NEW', 'GARBAGE DUMP GLACIER SEEN', 'PYRAMID PEAK DONE']);
     expect(prof.sigMenu.items.map((i) => i.color)).toEqual(['text', 'cyan', 'lime']);
     const all = texts(prof.panel);
     expect(all).toContain('UNDERWATER MOUNTAIN');

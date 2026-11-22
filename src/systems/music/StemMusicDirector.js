@@ -8,6 +8,7 @@ import { CORE_STEMS, normalizeCatalog, normalizePack, resolveMusicAsset } from '
 import { StemFXMixer } from './MusicFXGraph.js';
 import { AdaptiveBiomeRouter } from './AdaptiveBiomeRouter.js';
 import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
+import { canonicalBiomeId } from '../../data/biomeAliases.js';
 import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.js';
 import { FIRST_SONG_ID, defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices, shuffledSongRound } from './MusicPlaylist.js';
 import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
@@ -160,7 +161,7 @@ export class StemMusicDirector {
 		this._nextPromise = null;
 	}
 
-	/** Preserve the song clock while menus use unprocessed originals and Debumont lead. */
+	/** Preserve the song clock while menus use unprocessed originals and Debutmont lead. */
 	setMenuMode(on) {
 		const next = on === true;
 		if (this.menuMode === next) return;
@@ -203,7 +204,7 @@ export class StemMusicDirector {
 		if (lead) sourceNames.push(lead);
 		for (const name of sourceNames) {
 			if (!this.gains.has(name)) continue;
-			const effects = name===lead ? melodyPreset(this.menuMode ? 'debumont' : this.biome) :
+			const effects = name===lead ? melodyPreset(this.menuMode ? 'debutmont' : this.biome) :
 				this.menuMode ? [] : orchestraPreset(this.biome,name);
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
@@ -251,7 +252,7 @@ export class StemMusicDirector {
 	}
 
 	setBiome(id) {
-		this.biome = typeof id === 'string' && id ? id : HOME_BIOME;
+		this.biome = typeof id === 'string' && id ? canonicalBiomeId(id) : HOME_BIOME;
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
@@ -260,7 +261,7 @@ export class StemMusicDirector {
 	}
 
 	_activeVoiceFor(pack) {
-		const desired = voiceSourceForBiome(this.menuMode ? 'debumont' : this.biome);
+		const desired = voiceSourceForBiome(this.menuMode ? 'debutmont' : this.biome);
 		if (pack?.sourceNames?.includes(desired)) return desired;
 		// Until all mountain instruments are rendered, keep the home melody audible.
 		const home = voiceSourceForBiome(HOME_BIOME);

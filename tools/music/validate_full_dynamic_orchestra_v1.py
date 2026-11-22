@@ -96,7 +96,7 @@ def validate(music,baseline):
 		for idx in sorted({0,n//2,n-1}):
 			seg=pack['segments'][idx]
 			required=seg['frames']/48000
-			for biome in ('debumont','crystal-cavern','vertigo-vents'):
+			for biome in ('debutmont','crystal-cavern','vertigo-vents'):
 				for role in ('melody','featured','bass','drums')+tuple(r for r in ('guitar','piano','other') if r!=FEATURED[track['id']]):
 					name=(seg['sources']['voice:'+biome] if role=='melody' else
 						pack['adaptive']['variants'][role][biome][idx])

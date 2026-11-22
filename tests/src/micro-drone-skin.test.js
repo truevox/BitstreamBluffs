@@ -52,7 +52,7 @@ describe('Neon Sled Drone: ownership', () => {
   });
 
   test('completing another biome is not enough', () => {
-    expect(isOwned(v1({ biomeProgress: { encountered: ['debumont'], completed: ['debumont'] } }), DRONE)).toBe(false);
+    expect(isOwned(v1({ biomeProgress: { encountered: ['debutmont'], completed: ['debutmont'] } }), DRONE)).toBe(false);
   });
 
   test('owned once Micro Mountain is completed (decision 3), at any level', () => {

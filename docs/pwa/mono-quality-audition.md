@@ -15,7 +15,7 @@ Marvin's requirement: retain every original song performance as an independently
 
 ## Measured real-source sample (CT223, 2026-11-21)
 
-Generated 24 original recorded stems from *One More Run*, spanning segments `0000`, `0006`, and `0012`. Each set contains vocals, drums, bass, guitar, piano, Other, home voice and Debumont melody. No source track was copied into source directories or changed.
+Generated 24 original recorded stems from *One More Run*, spanning segments `0000`, `0006`, and `0012`. Each set contains vocals, drums, bass, guitar, piano, Other, home voice and Debutmont melody. No source track was copied into source directories or changed.
 
 | Tier candidate | Original bytes | Encoded bytes | Result |
 |---|---:|---:|---|

@@ -23,7 +23,7 @@
  *   --flipTargetDeg N     flip: the ideal release is the first frame from which a release gives >= N deg of net rotation and a clean landing (default 340; 700 = double flip)
  *   --hopLeadMs N         hop: hop when the next ground crash hazard is N ms away (default 380)
  *   --seedPrefix P        with --seeds N: names become P-01..P-NN instead of sim-01.. (a second, independent seed set)
- *   --biomeMask M         W3: biome bitmask for the run (1 Debumont, 2 Garbage Dump Glacier, 4 Pyramid Peak,
+ *   --biomeMask M         W3: biome bitmask for the run (1 Debutmont, 2 Garbage Dump Glacier, 4 Pyramid Peak,
  *                         8 Underwater Mountain, 16 Crystal Cavern; combined by OR). Default 0 = base terrain.
  *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
  *   --rule ID             run under that DailyPatch rule's real modifiers (default: none/neutralised)

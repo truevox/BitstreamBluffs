@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.19.13 — Debutmont spelling and legacy alias (#65 / #199) (2026-11-22)
+
+- **The first biome is now spelled "Debutmont"** (Marvin confirmed the spelling; issue #65, part 1 of 3). The biome id, name, hazards (Groomer Cat), power-up (Maple Wax), mission (`t4-biome-debutmont`, "1500 m in Debutmont"), Sync Level reward, music voice (`voice:debutmont`), the per-pack `adaptive/debutmont/` OGG directories (git renames, bytes unchanged), tools, tests and docs all use the new spelling. No gameplay, terrain, unlock level or profile default changes.
+- **Legacy alias, nothing lost.** `src/data/biomeAliases.js` maps `debumont` to `debutmont`. Profile sanitize applies it to `biomeProgress`, `unlocked.biomes` and the active mission list and mission progress (both spellings merge; the larger progress count wins), and the music pack loader, voice lookup and adaptive router read a stale `debumont` key or path as `debutmont`, so older saves and music branches written before the rename keep working.
+- **Historical entries below keep the old spelling** where they describe releases that shipped under it.
+- Tests: `biome-debutmont-alias.test.js` covers the save migration, the music lookups and a guard that no tracked text file outside the alias layer and this changelog spells the old name.
+
 ## v2.19.12 — portable deterministic math: same simulation in every browser (#121 / #209) (2026-11-22)
 
 - **The authoritative simulation no longer depends on the browser's math library.** Firefox and WebKit returned different last bits than Chromium for `hypot`, `exp`, `cos`, `atan2` and others, so the same inputs could drift apart and, on a knife-edge hazard contact, end differently (a Firefox run survived a hazard that Chromium crashed on). Every simulation file now takes `sin/cos/tan/asin/acos/atan/atan2/exp/expm1/log/log1p/log2/log10/pow/hypot/tanh/sinh/cosh/cbrt` from `src/systems/pmath.js`, a facade over the exactly pinned, Apache-2.0 `@stdlib/math-base-special-*` packages (pure IEEE arithmetic, identical bits in Chromium, Firefox and WebKit), and the nine trig/pow/acos functions inside Phaser's bundled Matter are replaced the same way (`src/systems/MatterPortable.js`, no fork; `phaser` is now pinned exactly to 3.90.0). Presentation code (backgrounds, audio, UI, particles) keeps the native `Math`, and a test fails if a new native call appears in a simulation file.

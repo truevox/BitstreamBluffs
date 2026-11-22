@@ -24,11 +24,11 @@ const prog = (encountered, completed = []) => ({ biomeProgress: { encountered, c
 
 describe('biomeToggleRows carries the decision 3 state', () => {
   test('locked / unlocked / encountered / completed, plus a locked biome entered in a Daily', () => {
-    // level 10: debumont, garbage, pyramid unlocked. Pyramid completed, garbage encountered, debumont never
+    // level 10: debutmont, garbage, pyramid unlocked. Pyramid completed, garbage encountered, debutmont never
     // entered; underwater (locked, LVL 13) was entered on a Daily mask.
     const p = atLevel(10, prog(['garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain'], ['pyramid-peak']));
     const by = Object.fromEntries(biomeToggleRows(p, DEFS).map((r) => [r.id, r]));
-    expect(by.debumont).toMatchObject({ unlocked: true, encountered: false, completed: false, state: 'unlocked' });
+    expect(by.debutmont).toMatchObject({ unlocked: true, encountered: false, completed: false, state: 'unlocked' });
     expect(by['garbage-dump-glacier']).toMatchObject({ unlocked: true, encountered: true, completed: false, state: 'encountered' });
     expect(by['pyramid-peak']).toMatchObject({ unlocked: true, encountered: true, completed: true, state: 'completed' });
     expect(by['underwater-mountain']).toMatchObject({ unlocked: false, encountered: true, state: 'encountered' });
@@ -39,10 +39,10 @@ describe('biomeToggleRows carries the decision 3 state', () => {
 describe('toggleLabel: the unlocked row says NEW / SEEN / DONE', () => {
   test('one tag per state, and a different colour for each', () => {
     expect(BIOME_STATE_TAGS).toEqual({ unlocked: 'NEW', encountered: 'SEEN', completed: 'DONE' });
-    const row = (state) => ({ name: 'Debumont', state });
-    expect(toggleLabel(row('unlocked')).text).toBe('DEBUMONT NEW');
-    expect(toggleLabel(row('encountered')).text).toBe('DEBUMONT SEEN');
-    expect(toggleLabel(row('completed')).text).toBe('DEBUMONT DONE');
+    const row = (state) => ({ name: 'Debutmont', state });
+    expect(toggleLabel(row('unlocked')).text).toBe('DEBUTMONT NEW');
+    expect(toggleLabel(row('encountered')).text).toBe('DEBUTMONT SEEN');
+    expect(toggleLabel(row('completed')).text).toBe('DEBUTMONT DONE');
     const colors = ['unlocked', 'encountered', 'completed'].map((s) => toggleLabel(row(s)).color);
     expect(new Set(colors).size).toBe(3);
   });
@@ -106,7 +106,7 @@ describe('achievementsLayout: biome rows show encountered / target (ACH-6)', () 
   });
 
   test('three encountered biomes show 2/2, 3/5, 3/11', () => {
-    const r = rowsOf({ ...defaultProfile(), ...prog(['debumont', 'pyramid-peak', 'vertigo-vents']) });
+    const r = rowsOf({ ...defaultProfile(), ...prog(['debutmont', 'pyramid-peak', 'vertigo-vents']) });
     expect([r['biomes-2'], r['biomes-5'], r['biomes-11']]).toEqual(['2/2', '3/5', '3/11']);
   });
 });

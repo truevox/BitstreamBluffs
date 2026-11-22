@@ -14,6 +14,7 @@ import { ACHIEVEMENTS, metricsFrom, newlyUnlocked, stampNew } from './Achievemen
 import { isOfficialDaily } from './Ranking.js';
 import { COSMETIC_ITEMS } from './Cosmetics.js';
 import { sanitizeBiomeProgress, mergeBiomeVisits } from './BiomeDiscovery.js';
+import { canonicalBiomeId, canonicalLegacyId } from '../data/biomeAliases.js';
 import { sanitizeUpgradeRanks, purchaseUpgrade } from './PermanentUpgrades.js';
 import { BSOD_GYM_PRICE, sanitizeGymSetup } from './BsodGym.js';
 import {DRAFT_RULES_VERSION,DRAFT_BUDGET,validDraftRanks,sanitizeDraftRanks,draftCost} from './DailyDraft.js';
@@ -60,6 +61,25 @@ const nonNeg = (v) => Math.max(0, int(v, 0));
 const nonNegFloat = (v, d = 0) => (isNum(v) ? Math.max(0, v) : d);
 const str = (v) => (typeof v === 'string' ? v : '');
 const strArr = (v) => (Array.isArray(v) ? Array.from(new Set(v.filter((s) => typeof s === 'string' && s))) : []);
+
+/**
+ * Mission progress keyed by mission id, with legacy ids (issue #65) moved to their canonical key. When both
+ * the old and the new key exist the larger count wins, so a rename never loses progress or lowers it.
+ * @param {*} raw
+ * @returns {Object<string,*>}
+ */
+function canonicalMissionProgress(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [k, v] of Object.entries(raw)) {
+    const id = canonicalLegacyId(k);
+    // Own-key writes only: a crafted "__proto__" key must not reach the prototype setter.
+    if (id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
+    const prev = Object.hasOwn(out, id) ? out[id] : undefined;
+    out[id] = typeof prev === 'number' && typeof v === 'number' ? Math.max(prev, v) : (id === k || prev === undefined ? v : prev);
+  }
+  return out;
+}
 
 /** @param {*} raw @returns {{runs:number,distanceM:number,playMs:number,score:number,tricks:Object<string,number>,shards:number,nearMisses:number,bestScore:number,bestDistanceM:number,bestCombo:number,maxAirtimeMs:number}} */
 function sanitizeLifetime(raw) {
@@ -135,7 +155,7 @@ export function sanitizeProfile(raw, levels) {
   p.lifetime = sanitizeLifetime(raw.lifetime);
   const u = raw.unlocked && typeof raw.unlocked === 'object' ? raw.unlocked : {};
   p.unlocked = {
-    biomes: strArr(u.biomes),
+    biomes: strArr(strArr(u.biomes).map(canonicalBiomeId)), // legacy ids (issue #65) follow the rename
     cosmetics: strArr(u.cosmetics),
     // W5: achievement title rewards land here. Without this line the sanitizer would drop them on the
     // very next load, so a player would win OMNISCIENT and lose it at the next boot.
@@ -160,8 +180,8 @@ export function sanitizeProfile(raw, levels) {
     counter: nonNeg(m.counter),
     // Deduped before the cap: a hand-edited ['a','a','a'] would otherwise fill all three slots with one
     // mission and pay it three times on a single run.
-    active: strArr(m.active).slice(0, 3),
-    progress: m.progress && typeof m.progress === 'object' ? { ...m.progress } : {},
+    active: strArr(strArr(m.active).map(canonicalLegacyId)).slice(0, 3),
+    progress: canonicalMissionProgress(m.progress),
   };
   // W5: {id: unlockMs}. Only finite timestamps survive: a NaN or a string would sort unpredictably in the
   // Profile grid, and a junk key would render as a nameless row.

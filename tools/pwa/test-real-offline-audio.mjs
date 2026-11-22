@@ -21,7 +21,7 @@ const plan=await buildRealMusicGroupManifest(media,catalog,packs,{
 	selection,unlockedBiomeIds:[],enabledBiomeIds:[],dynamicOrchestra:false,prefetchNextBiome:false,
 });
 if(plan.groups.length!==2||plan.groups.some(g=>g.priority!=='required'))
-	throw Error('Expected one base and one real Debumont lead group');
+	throw Error('Expected one base and one real Debutmont lead group');
 await generateOfflineWorker(dist);
 console.log('TEST PLAN',JSON.stringify({song:chosen.title,
 	groups:plan.groups.map(g=>({id:g.id,files:g.entries.length,MiB:(g.totalBytes/1048576).toFixed(2)})),
@@ -106,7 +106,7 @@ try{
 	if(live.track!==chosen.id||live.ctxState!=='running'||live.decodedStemCount<7||
 		live.proceduralTimerActive)throw Error('Game did not run real stem engine offline');
 	const stem=plan.groups.find(g=>g.kind==='base').entries.find(e=>e.url.endsWith('0000-drums.ogg'));
-	const lead=plan.groups.find(g=>g.kind==='lead').entries.find(e=>e.url.includes('debumont'));
+	const lead=plan.groups.find(g=>g.kind==='lead').entries.find(e=>e.url.includes('debutmont'));
 	if(!stem||!lead)throw Error('Real drum stem or biome melody not present');
 	const disabledTrack=catalog.tracks.find(x=>x.id!==chosen.id);
 	const disabled='/music/'+disabledTrack.manifest.replace('pack.json','0000-drums.ogg');

@@ -4,7 +4,7 @@ import { BIOME_IDS, HOME_BIOME } from '../../src/systems/music/BiomeVoices.js';
 import { normalizeCatalog, normalizePack, resolveMusicAsset } from '../../src/systems/music/MusicPack.js';
 import { plannedTrackIds } from './music-download-plan.mjs';
 
-const MENU_BIOME = 'debumont';
+const MENU_BIOME = 'debutmont';
 const ALL_BIOMES = new Set(BIOME_IDS.filter(id => id !== HOME_BIOME));
 
 function validateBiomeIds(ids) {
@@ -16,7 +16,7 @@ function validateBiomeIds(ids) {
 export function currentlyNeededBiomes({ unlockedBiomeIds = [], enabledBiomeIds = [] } = {}) {
   const owned = validateBiomeIds(unlockedBiomeIds);
   const enabled = validateBiomeIds(enabledBiomeIds);
-  // Debumont is used by menus before its gameplay unlock.
+  // Debutmont is used by menus before its gameplay unlock.
   return [MENU_BIOME, ...[...ALL_BIOMES].filter(id => id !== MENU_BIOME && owned.has(id) && enabled.has(id))];
 }
 

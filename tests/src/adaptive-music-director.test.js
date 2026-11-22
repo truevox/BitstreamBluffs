@@ -12,8 +12,8 @@ function bareDirector(featuredStem = 'guitar') {
 		selectBiome: jest.fn(),
 	};
 	director.pack = { adaptive: { featuredStem }, sourceNames: [
-		...CORE_STEMS, 'voice:debumont' ], layers: {} };
-	director.biome = 'debumont';
+		...CORE_STEMS, 'voice:debutmont' ], layers: {} };
+	director.biome = 'debutmont';
 	director.airborne = false;
 	director.started = false;
 	director.adaptive = {
@@ -29,7 +29,7 @@ describe('StemMusicDirector optional adaptive integration', () => {
 		expect(wanted).toEqual(expect.arrayContaining(CORE_STEMS));
 		expect(wanted).toContain('piano');
 		expect(wanted).toContain('other');
-		expect(wanted).toContain('voice:debumont');
+		expect(wanted).toContain('voice:debutmont');
 		expect(wanted.filter(name => name.startsWith('adaptive:'))).toHaveLength(0);
 	});
 	test('original and adaptive stem faders stay synchronized for selected sources', () => {

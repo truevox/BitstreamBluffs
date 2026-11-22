@@ -289,14 +289,14 @@ describe('Hazard.js / PowerUp.js: biome defs with a new shapeKey still draw, cra
   });
 
   test('an unknown hazard shapeKey draws the visible generic box', () => {
-    const h = new Hazard(scene(), { id: 'groomer', biome: 'debumont', shapeKey: 'groomerCat', size: { w: 30, h: 20 }, onHit: { effect: 'slow' }, placement: 'ground', colorKey: 'lime' }, { x: 100, y: 50, rotationDeg: 0 }, PAL);
+    const h = new Hazard(scene(), { id: 'groomer', biome: 'debutmont', shapeKey: 'groomerCat', size: { w: 30, h: 20 }, onHit: { effect: 'slow' }, placement: 'ground', colorKey: 'lime' }, { x: 100, y: 50, rotationDeg: 0 }, PAL);
     expect(h.drawKind).toBe('generic');
     const ops = fills(h.gfx);
     expect(ops.some(([k, , , w, ht]) => k === 'fillRect' && w === 30 && ht === 20)).toBe(true);
   });
 
   test('an unknown power-up shapeKey draws a filled glyph, not just the ring', () => {
-    const p = new PowerUp(scene(), { id: 'mapleWax', biome: 'debumont', shapeKey: 'mapleWax', radius: 10, effect: { kind: 'speedBoost' }, colorKey: 'amber' }, { x: 100, y: 50 }, PAL);
+    const p = new PowerUp(scene(), { id: 'mapleWax', biome: 'debutmont', shapeKey: 'mapleWax', radius: 10, effect: { kind: 'speedBoost' }, colorKey: 'amber' }, { x: 100, y: 50 }, PAL);
     expect(p.drawKind).toBe('generic');
     expect(p.gfx.ops.some(([k, pts]) => k === 'fillPoints' && Array.isArray(pts) && pts.length === 4)).toBe(true);
   });

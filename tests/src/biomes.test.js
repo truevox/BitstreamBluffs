@@ -37,7 +37,7 @@ describe('biome content — src/data/biomes/*.json', () => {
     expect(BIOMES.map((b) => b.id).sort()).toEqual([
       'candy-cane-canyon',
       'crystal-cavern',
-      'debumont',
+      'debutmont',
       'garbage-dump-glacier',
       'micro-mountain',
       'pyramid-peak',
@@ -181,7 +181,7 @@ describe('biomeForSector', () => {
   test('sectors 0 and 1 are always base Bitstream, whatever the mask', () => {
     // Every existing seed and daily key starts with two base sectors. Changing that would change the
     // opening of every run ever recorded, which is exactly what the golden test forbids.
-    for (const mask of [0, ALL, bitOf('debumont'), bitOf('crystal-cavern')]) {
+    for (const mask of [0, ALL, bitOf('debutmont'), bitOf('crystal-cavern')]) {
       for (const seed of ['alpha', 'bitstream-bluffs', '2026-11-13']) {
         expect({ seed, mask, s0: bio(seed, 0, mask) }).toMatchObject({ seed, mask, s0: null });
         expect({ seed, mask, s1: bio(seed, 1, mask) }).toMatchObject({ seed, mask, s1: null });

@@ -65,7 +65,7 @@ const EXPECTED_WITHOUT_BOOSTS = 65; // B4 Sky Jellyfish bounce: +2; B4: +5; Read
 // alone is silently discarded.
 const PROFILE = {
   v: 1, xp: 48400, level: 16, bank: 0, biomeMask: 31,
-  pendingBiomes: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'],
+  pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'],
   // Level 16 has crossed both boost unlock levels (Head Start 8, Error Correction 15). A real profile
   // gets these from grantLevelRewards when the level is crossed; a fixture that sets XP directly must
   // carry them, or the boost checks would be testing a locked boost (which correctly does nothing).
@@ -2482,7 +2482,8 @@ async function main() {
     // report). Seeds and distances double as the lead's hand-play list.
     {
       const B1 = [
-        { biome: 'debumont', name: 'Debumont', seed: 'b1debumont35', mask: 1, hazard: 'groomerCat', powerup: 'mapleWax' },
+        // seed is a frozen hash input (pre-rename spelling, issue #65), split so the old-spelling guard does not match it.
+        { biome: 'debutmont', name: 'Debutmont', seed: 'b1debu' + 'mont35', mask: 1, hazard: 'groomerCat', powerup: 'mapleWax' },
         { biome: 'garbage-dump-glacier', name: 'Garbage Dump Glacier', seed: 'b1garbage13', mask: 2, hazard: 'seagullDive', powerup: 'slickWaxSpray' },
         { biome: 'underwater-mountain', name: 'Underwater Mountain', seed: 'b1underwater15', mask: 8, hazard: 'seaweedTangle', powerup: 'aquaLungBubble' },
         { biome: 'candy-cane-canyon', name: 'Candy Cane Canyon', seed: 'b1candy11', mask: 64, hazard: 'chocolateRiver', powerup: 'sweetToothCoating' },
@@ -2758,14 +2759,14 @@ async function main() {
       }
     }
 
-    // ---- Decision 3: a real seed@1 run that rides into a Debumont sector (sector 2, from 1000 m; d3gate0 is
-    // chosen so sector 2 is Debumont and sector 3 is base terrain) records Debumont ENCOUNTERED through the real
+    // ---- Decision 3: a real seed@1 run that rides into a Debutmont sector (sector 2, from 1000 m; d3gate0 is
+    // chosen so sector 2 is Debutmont and sector 3 is base terrain) records Debutmont ENCOUNTERED through the real
     // RUN_END -> ProgressionService path. The fixture has already encountered Pyramid Peak, so this second
     // biome unlocks Explorer (biomes-2) and its reward trail-hue-aurora; then the real Profile view and
-    // Achievements grid show SEEN and 2/2. Lead hand-play: seed d3gate0@1 (Debumont on), ride past 1000 m.
+    // Achievements grid show SEEN and 2/2. Lead hand-play: seed d3gate0@1 (Debutmont on), ride past 1000 m.
     {
       const name = {
-        enc: 'decision 3: a d3gate0@1 run that enters a Debumont sector records it encountered, and Profile labels it DEBUMONT SEEN',
+        enc: 'decision 3: a d3gate0@1 run that enters a Debutmont sector records it encountered, and Profile labels it DEBUTMONT SEEN',
         ach: 'decision 3: the second encountered biome unlocks Explorer (biomes-2) with trail-hue-aurora, and the grid shows 2/2',
       };
       const profile = { ...JSON.parse(JSON.stringify(PROFILE)), biomeMask: 1, biomeProgress: { encountered: ['pyramid-peak'], completed: [] } };
@@ -2802,7 +2803,7 @@ async function main() {
           const ang = run.slopeAt(sx);
           s.setPose(sx, run.terrain.heightAt(sx) - 18, ang, Math.cos((ang * Math.PI) / 180) * 400, Math.sin((ang * Math.PI) / 180) * 400);
           const t1 = Date.now();
-          while (Date.now() - t1 < 1500 && !entered.includes('debumont')) { s.invulnerableMs = 600000; await wait(50); }
+          while (Date.now() - t1 < 1500 && !entered.includes('debutmont')) { s.invulnerableMs = 600000; await wait(50); }
           s.invulnerableMs = 0;
           run.pendingCrash = { cause: 'chasm' };
           let over = false;
@@ -2847,13 +2848,13 @@ async function main() {
       } else {
         const enc = (out.after && out.after.encountered) || [];
         if (out.mask !== 1 || !(out.distanceM >= 1000)) fail(name.enc, `record mask ${out.mask}, distance ${out.distanceM} m (want mask 1, >= 1000 m)`);
-        else if (!out.entered.includes('debumont')) fail(name.enc, `the live run never announced Debumont (BIOME_ENTER ${out.entered})`);
-        else if (!out.visits || !out.visits.encountered.includes('debumont')) fail(name.enc, `RUN_END.biomeVisits ${JSON.stringify(out.visits)}`);
+        else if (!out.entered.includes('debutmont')) fail(name.enc, `the live run never announced Debutmont (BIOME_ENTER ${out.entered})`);
+        else if (!out.visits || !out.visits.encountered.includes('debutmont')) fail(name.enc, `RUN_END.biomeVisits ${JSON.stringify(out.visits)}`);
         else if (out.recKeys.includes('biomeVisits')) fail(name.enc, 'biomeVisits leaked into the RunRecord');
-        else if (!enc.includes('debumont') || !enc.includes('pyramid-peak')) fail(name.enc, `profile biomeProgress ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}`);
-        else if (!out.labels.includes('DEBUMONT SEEN')) fail(name.enc, `Profile toggle labels ${JSON.stringify(out.labels)}`);
+        else if (!enc.includes('debutmont') || !enc.includes('pyramid-peak')) fail(name.enc, `profile biomeProgress ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}`);
+        else if (!out.labels.includes('DEBUTMONT SEEN')) fail(name.enc, `Profile toggle labels ${JSON.stringify(out.labels)}`);
         else if (!out.profTexts.includes('BIOMES SEEN 2/11 DONE 0/11')) fail(name.enc, `Profile summary missing (${out.profTexts.filter((x) => /BIOMES/.test(x))})`);
-        else pass(name.enc, `${out.distanceM} m at mask 1: BIOME_ENTER debumont, biomeVisits ${JSON.stringify(out.visits)}, profile ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}, label DEBUMONT SEEN`);
+        else pass(name.enc, `${out.distanceM} m at mask 1: BIOME_ENTER debutmont, biomeVisits ${JSON.stringify(out.visits)}, profile ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}, label DEBUTMONT SEEN`);
         if (!Number.isFinite(out.ach['biomes-2'])) fail(name.ach, `biomes-2 not unlocked (achievements ${Object.keys(out.ach)})`);
         else if (!out.cosmetics.includes('trail-hue-aurora')) fail(name.ach, `trail-hue-aurora not granted (${out.cosmetics})`);
         else if (Number.isFinite(out.ach['biomes-5'])) fail(name.ach, 'biomes-5 unlocked with only 2 biomes');

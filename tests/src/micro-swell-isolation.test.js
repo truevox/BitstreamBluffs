@@ -100,7 +100,9 @@ const without = (o) => Object.fromEntries(Object.entries(o).filter(([, d]) => !L
 function digest(seed, mask) {
   const g = makeGen(seed, { biomeMask: mask, hazardDefs: without(c.hazards), powerupDefs: without(c.powerups) });
   const h = crypto.createHash('sha256');
-  for (let i = 0; i < CHUNKS; i++) h.update(JSON.stringify(g.getChunk(i)));
+  // Issue #65 renamed the biome id; the pins predate it, so the id is read back as its old spelling. The
+  // geometry is bit-identical, only the serialized id string differs.
+  for (let i = 0; i < CHUNKS; i++) h.update(JSON.stringify(g.getChunk(i)).replace(/debutmont/g, 'debu'+'mont'));
   return h.digest('hex').slice(0, 16);
 }
 

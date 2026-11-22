@@ -58,10 +58,10 @@ function pack(extra = {}) {
 		adaptive: {
 			featuredStem: 'guitar',
 			variants: {
-				bass: { debumont: ['bass1.ogg', 'bass2.ogg'],
+				bass: { debutmont: ['bass1.ogg', 'bass2.ogg'],
 					'candy-cane-canyon': ['candybass1.ogg', 'candybass2.ogg'] },
-				drums: { debumont: ['drum1.ogg', 'drum2.ogg'] },
-				featured: { debumont: ['guitar1.ogg', 'guitar2.ogg'],
+				drums: { debutmont: ['drum1.ogg', 'drum2.ogg'] },
+				featured: { debutmont: ['guitar1.ogg', 'guitar2.ogg'],
 					'candy-cane-canyon': ['candyfeat1.ogg', 'candyfeat2.ogg'] },
 			},
 		},
@@ -80,13 +80,13 @@ describe('Independent 4x12 adaptive source manifest', () => {
 		const normalized = normalizePack(raw);
 		expect(normalized.sourceNames).toHaveLength(6);
 		expect(normalized.adaptive.featuredStem).toBe('guitar');
-		expect(normalized.adaptive.variants.bass.debumont).toHaveLength(2);
+		expect(normalized.adaptive.variants.bass.debutmont).toHaveLength(2);
 		expect(Object.keys(normalized.segments[0].sources)).toEqual(expect.arrayContaining(CORE_STEMS));
 	});
 	test('all 33 biome candidates in three roles coexist with 12 lead keys', () => {
 		const raw = pack();
 		for (const seg of raw.segments) {
-			for (const id of ['bitstream-bluffs', 'debumont', 'garbage-dump-glacier',
+			for (const id of ['bitstream-bluffs', 'debutmont', 'garbage-dump-glacier',
 				'pyramid-peak', 'underwater-mountain', 'crystal-cavern',
 				'space-mountain', 'candy-cane-canyon', 'sky-jellyfish-mountain',
 				'steampunk-slopes', 'micro-mountain', 'vertigo-vents']) {
@@ -123,9 +123,9 @@ describe('Independent 4x12 adaptive source manifest', () => {
 		expect(normalizePack(raw).sourceNames).toHaveLength(42);
 	});
 	test('rejects path traversal, partial segments, unknown biomes and bad featured labels', () => {
-		const x = pack(); x.adaptive.variants.bass.debumont[0] = '../leak.wav';
+		const x = pack(); x.adaptive.variants.bass.debutmont[0] = '../leak.wav';
 		expect(() => normalizePack(x)).toThrow(/Invalid biome/);
-		const y = pack(); y.adaptive.variants.drums.debumont = ['short.ogg'];
+		const y = pack(); y.adaptive.variants.drums.debutmont = ['short.ogg'];
 		expect(() => normalizePack(y)).toThrow(/Invalid biome/);
 		const z = pack(); z.adaptive.variants.featured.nowhere = ['0.ogg','1.ogg'];
 		expect(() => normalizePack(z)).toThrow(/Invalid biome/);
@@ -162,12 +162,12 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 	test('full ON replaces all FIVE original instrumental stems; OFF restores sources', async () => {
 		const raw=pack();
 		// Featured source=Guitar, with Piano and Other independently re-synthesized.
-		raw.adaptive.variants.piano={debumont:['piano1.ogg','piano2.ogg']};
-		raw.adaptive.variants.other={debumont:['other1.ogg','other2.ogg']};
+		raw.adaptive.variants.piano={debutmont:['piano1.ogg','piano2.ogg']};
+		raw.adaptive.variants.other={debutmont:['other1.ogg','other2.ogg']};
 		const {ctx,mixer}=mocks();
 		const router=new AdaptiveBiomeRouter(ctx,mixer,async ()=>({duration:1}));
 		router.setEnabled(true);
-		router.configure(normalizePack(raw),0,{biome:'debumont',airborne:true});
+		router.configure(normalizePack(raw),0,{biome:'debutmont',airborne:true});
 		await tick(router);
 		for(const source of ['guitar','piano','other','bass','drums']) {
 			expect(mixer.levels[source]).toBe(0);
@@ -193,7 +193,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 		const { ctx, mixer } = mocks();
 		const loader = jest.fn(async () => ({ duration: 1 }));
 		const router = new AdaptiveBiomeRouter(ctx,mixer,loader);
-		router.configure(normalizePack(pack()), 0, { biome: 'debumont' });
+		router.configure(normalizePack(pack()), 0, { biome: 'debutmont' });
 		await tick(router);
 		expect(mixer.sources.size).toBe(12);
 		expect(loader).toHaveBeenCalledTimes(4);
@@ -211,7 +211,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 	test('drums are original on ground, biome kit airborne, original on landing', async () => {
 		const { ctx, mixer } = mocks();
 		const router = new AdaptiveBiomeRouter(ctx,mixer,async () => ({ duration: 1 }));
-		router.configure(normalizePack(pack()), 0, { biome: 'debumont' });
+		router.configure(normalizePack(pack()), 0, { biome: 'debutmont' });
 		await tick(router);
 		expect(mixer.levels.drums).toBe(1);
 		router.setAirborne(true);
@@ -225,7 +225,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 	test('switching biomes preserves six sources and returns to originals at home', async () => {
 		const { ctx, mixer } = mocks();
 		const router = new AdaptiveBiomeRouter(ctx,mixer,async () => ({ duration: 1 }));
-		router.configure(normalizePack(pack()), 0, { biome: 'debumont', airborne: true });
+		router.configure(normalizePack(pack()), 0, { biome: 'debutmont', airborne: true });
 		await tick(router);
 		router.setBiome('candy-cane-canyon');
 		await tick(router);
@@ -242,7 +242,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 		const { ctx, mixer } = mocks();
 		const loader = async () => { throw new Error('missing optional instrument'); };
 		const router = new AdaptiveBiomeRouter(ctx,mixer,loader);
-		router.configure(normalizePack(pack()),0,{biome:'debumont',airborne:true});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont',airborne:true});
 		await tick(router);
 		expect(mixer.levels.bass).toBe(1);
 		expect(mixer.levels.guitar).toBe(1);
@@ -256,7 +256,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 		const deferred = [];
 		const router = new AdaptiveBiomeRouter(ctx,mixer,
 			() => new Promise(resolve => deferred.push(resolve)));
-		router.configure(normalizePack(pack()),0,{biome:'debumont'});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont'});
 		await tick(router);
 		expect(deferred.length).toBe(4);
 		router.setBiome('candy-cane-canyon');
@@ -277,7 +277,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 		const { ctx, mixer } = mocks();
 		ctx.currentTime = 0.35;
 		const router = new AdaptiveBiomeRouter(ctx,mixer,async () => ({duration:1}));
-		router.configure(normalizePack(pack()),0,{biome:'debumont'});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont'});
 		await tick(router);
 		const current = router.channels.get('featured').current;
 		const nodes = [...current.nodes].map(node => node.started);
@@ -298,7 +298,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 			return { duration:1 };
 		});
 		const router = new AdaptiveBiomeRouter(ctx,mixer,loader);
-		router.configure(normalizePack(pack()),0,{biome:'debumont'});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont'});
 		await tick(router);
 		expect(mixer.levels.guitar).toBe(0);
 		router.setBiome('candy-cane-canyon');
@@ -314,7 +314,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 	test('restoration fade is not cancelled by repeated audio pump ticks', async () => {
 		const { ctx, mixer } = mocks();
 		const router = new AdaptiveBiomeRouter(ctx,mixer,async () => ({duration:1}));
-		router.configure(normalizePack(pack()),0,{biome:'debumont',airborne:true});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont',airborne:true});
 		await tick(router);
 		router.setBiome('bitstream-bluffs');
 		const restores = mixer.calls.filter(call =>
@@ -329,7 +329,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 		const { ctx, mixer } = mocks();
 		const router = new AdaptiveBiomeRouter(ctx, mixer,
 			async (index) => index === 0 ? null : {duration:1});
-		router.configure(normalizePack(pack()),0,{biome:'debumont'});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont'});
 		await tick(router);
 		expect(router.channels.get('featured').pending?.scheduled.has(1)).toBe(true);
 		expect(mixer.levels.guitar).toBe(1);
@@ -338,7 +338,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 		expect(mixer.levels.guitar).toBe(1);
 		ctx.currentTime=.96;
 		router.pump();
-		expect(router.channels.get('featured').current?.biome).toBe('debumont');
+		expect(router.channels.get('featured').current?.biome).toBe('debutmont');
 		expect(mixer.levels.guitar).toBe(0);
 		router.destroy();
 	});
@@ -350,10 +350,10 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 			return {duration:1};
 		});
 		const router=new AdaptiveBiomeRouter(ctx,mixer,loader);
-		router.configure(normalizePack(pack()),0,{biome:'debumont'});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont'});
 		await tick(router);
 		expect(mixer.levels.guitar).toBe(0);
-		expect(router.channels.get('featured').current?.biome).toBe('debumont');
+		expect(router.channels.get('featured').current?.biome).toBe('debutmont');
 		const count=loader.mock.calls.length;
 		for(let i=0;i<20;i++) await tick(router);
 		expect(loader.mock.calls.length).toBe(count);
@@ -361,7 +361,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 		ctx.currentTime=.99;
 		await tick(router);
 		expect(mixer.levels.guitar).toBe(1);
-		expect(router.channels.get('featured').pending?.biome).toBe('debumont');
+		expect(router.channels.get('featured').pending?.biome).toBe('debutmont');
 		const after=loader.mock.calls.length;
 		for(let i=0;i<20;i++) await tick(router);
 		expect(loader.mock.calls.length).toBe(after);
@@ -371,7 +371,7 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 	test('wrong-duration variant never replaces its full original source', async () => {
 		const {ctx,mixer}=mocks();
 		const router=new AdaptiveBiomeRouter(ctx,mixer,async () => ({duration:.15}));
-		router.configure(normalizePack(pack()),0,{biome:'debumont',airborne:true});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont',airborne:true});
 		await tick(router);
 		expect(mixer.levels.bass).toBe(1);
 		expect(mixer.levels.drums).toBe(1);
@@ -383,10 +383,10 @@ describe('Fail-safe, source-preserving adaptive mix routing', () => {
 	test('rapid biome changes never allocate per-biome mixer buses', async () => {
 		const { ctx, mixer } = mocks();
 		const router = new AdaptiveBiomeRouter(ctx,mixer,async () => ({duration:1}));
-		router.configure(normalizePack(pack()),0,{biome:'debumont',airborne:true});
+		router.configure(normalizePack(pack()),0,{biome:'debutmont',airborne:true});
 		await tick(router);
 		for (let k=0;k<15;k++) {
-			router.setBiome(k%2 ? 'candy-cane-canyon' : 'debumont');
+			router.setBiome(k%2 ? 'candy-cane-canyon' : 'debutmont');
 			await tick(router);
 		}
 		expect(mixer.sources.size).toBe(12);

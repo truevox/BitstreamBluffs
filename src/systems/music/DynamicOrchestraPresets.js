@@ -13,7 +13,7 @@ const delay = (time, wet) => ({ type:'delay', id:'echo', time, wet, feedback:0.1
 
 export function melodyPreset(biome) {
 	switch (biome) {
-		case 'debumont': return [filter('warm','lowpass',3200),tremolo(3.6,.12)];
+		case 'debutmont': return [filter('warm','lowpass',3200),tremolo(3.6,.12)];
 		case 'garbage-dump-glacier': return [distortion(.31),filter('edge','highpass',420),tremolo(11,.24)];
 		case 'pyramid-peak': return [distortion(.12),filter('brass','lowpass',4100,1.1)];
 		case 'underwater-mountain': return [filter('submerged','lowpass',1400),delay(.22,.23)];
@@ -34,7 +34,7 @@ export function orchestraPreset(biome, stem) {
 		throw new Error('Cannot apply orchestra effects to an unknown stem');
 	if (!BIOME_IDS.includes(biome)) return [];
 	const edge = {
-		'debumont': 4200,'garbage-dump-glacier':6200,
+		'debutmont': 4200,'garbage-dump-glacier':6200,
 		'pyramid-peak': 5100,'underwater-mountain':1800,
 		'crystal-cavern':6800,'space-mountain':5700,
 		'candy-cane-canyon':6900,'sky-jellyfish-mountain':3200,

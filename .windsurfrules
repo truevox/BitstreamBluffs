@@ -9,7 +9,7 @@ Assume dev uses Ubuntu 24.04 LTS with `venv`.
 - Commits follow **Gitmoji-style**, e.g.:
 
   ```
-  ✨ Feature: Add cryptid scanner to Debumont
+  ✨ Feature: Add cryptid scanner to Debutmont
   ```
 
   With body:

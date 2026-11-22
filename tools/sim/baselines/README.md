@@ -31,7 +31,7 @@ Read these limits before you use the numbers:
 | policy | mask | survived | meanDistM | meanSpeedPxS | E7: survived | E7: meanDistM | E7: meanSpeedPxS |
 |---|---|---|---|---|---|---|---|
 | hop | 0 base (mask 0) | 19/48 | 3096.6 | 527.7 | 19 -> 19 | 0% | 0% |
-| hop | 1 debumont | 24/48 | 3271.2 | 523.4 | 25 -> 24 | -0.7% | -0.1% |
+| hop | 1 debutmont | 24/48 | 3271.2 | 523.4 | 25 -> 24 | -0.7% | -0.1% |
 | hop | 2 garbage-dump-glacier | 19/48 | 3173.3 | 526.3 | 17 -> 19 | 2.6% | -0.2% |
 | hop | 4 pyramid-peak | 18/48 | 3158.1 | 521.5 | 19 -> 18 | -0.2% | -0.1% |
 | hop | 8 underwater-mountain | 23/48 | 3341.1 | 524.9 | 21 -> 23 | 3.1% | 0.1% |
@@ -43,7 +43,7 @@ Read these limits before you use the numbers:
 | hop | 512 micro-mountain | 20/48 | 3272.5 | 524.2 | 20 -> 20 | 1.7% | -0.4% |
 | hop | 1024 vertigo-vents | 18/48 | 2962.5 | 512.6 | 16 -> 18 | 1.1% | -0.5% |
 | flip | 0 base (mask 0) | 0/24 | 1608.4 | 574.2 | 0 -> 0 | 0% | 0% |
-| flip | 1 debumont | 2/24 | 1844.3 | 572 | 1 -> 2 | 4.9% | -0.4% |
+| flip | 1 debutmont | 2/24 | 1844.3 | 572 | 1 -> 2 | 4.9% | -0.4% |
 | flip | 2 garbage-dump-glacier | 1/24 | 1797.8 | 571.8 | 0 -> 1 | 8.2% | 0.3% |
 | flip | 4 pyramid-peak | 1/24 | 1778 | 565.3 | 2 -> 1 | -5.8% | -0.2% |
 | flip | 8 underwater-mountain | 2/24 | 1822.1 | 572.3 | 1 -> 2 | 6.6% | 0.3% |

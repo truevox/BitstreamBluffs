@@ -158,10 +158,10 @@ The check that actually holds is **cross-biome comparison at one fixed palette**
 | default | **5 / 5** | distinct worlds |
 | colorblind | **5 / 5** | distinct worlds |
 
-`crystal-cavern #220f34`, `debumont #0b0f21`, `garbage-dump-glacier #0e251e`, `pyramid-peak #311d0d`,
+`crystal-cavern #220f34`, `debutmont #0b0f21`, `garbage-dump-glacier #0e251e`, `pyramid-peak #311d0d`,
 `underwater-mountain #08263f`. Five biomes, five different worlds, in both palettes. As a secondary
 signal each dominant is nearer its own biome's declared colours than the base palette's for 4 of 5;
-`debumont`'s `bg` (`#070a18`) is simply close to base `bgAlt` (`#0c1024`) by design — it is the
+`debutmont`'s `bg` (`#070a18`) is simply close to base `bgAlt` (`#0c1024`) by design — it is the
 original slope, and its frame is still clearly distinct from the other four.
 
 ### Per-biome sim table — **now re-derived by me**
@@ -180,7 +180,7 @@ node tools/sim/run.mjs --seeds 8 --policy hop --maxM 2500 --biomeMask {0,31}
 Reproduces the published −5.7 % exactly, against the stated 15 % tolerance. Two limits I confirm
 independently and that should stay in the PR body: with `--policy handsOff` at `--biomeMask 31` all
 three seeds die at **311–398 m**, before biome terrain begins at 1000 m, so `hop` is the only policy
-that exercises a biome at all; and Debumont's effect stays within noise on a hop run because its mod
+that exercises a biome at all; and Debutmont's effect stays within noise on a hop run because its mod
 is ground drag and a hopping sled is mostly airborne. That is a harness limit, not evidence the biome
 is cosmetic — its multipliers are separately proven to reach `PhysicsTuner`.
 

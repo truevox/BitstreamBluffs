@@ -7,7 +7,7 @@ Prefer tab‑width 4 in Python snippets; two‑space indent in JS/TS.
 - Commits follow **Gitmoji-style**, e.g.:
 
   ```
-  ✨ Feature: Add cryptid scanner to Debumont
+  ✨ Feature: Add cryptid scanner to Debutmont
   ```
 
   With body:

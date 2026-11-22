@@ -3,13 +3,13 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 5,
-  "attestation": "no-behavior-change: merge of released v2.19.11 stable hazard-id bookkeeping (RunScene h.hid/forgetChunk/telegraph snapshot/restore) into the already-rev5 portable-math source; delta adds identity keys and JSON snapshot hooks only, no change to live warning times, cues, top-level causal constants or physics",
+  "attestation": "no-behavior-change: #65 part 1 rename of the first biome id to Debutmont; Hazard.js is a comment-only edit. Biome ids appear as content.biomes keys and in hazard and powerup biome fields, so rulesetId changes by spelling only; seed and hash inputs stay frozen and terrain output is byte-identical (SIM_REVISION stays 5)",
   "changedFiles": [
-    "src/scenes/RunScene.js"
+    "src/entities/Hazard.js"
   ],
   "files": {
     "src/constants.js": "sha256:21fe3491017fa3f6fa55c25c5d3d3cca22fa3f1ce15a22c611113b173dc0a8e5",
-    "src/entities/Hazard.js": "sha256:a5e3bc1ad89e0ed982f2c27b162d2280e46ded526ad7a6630ce080f531658c0b",
+    "src/entities/Hazard.js": "sha256:95ec763127d49b4dcbdd260695f8cd6136ca70b1e1204bda48d0a008a31fa5a8",
     "src/entities/PowerUp.js": "sha256:9c3965f9c7fe074bfe4fba4abaf80139c637755487fa885195b6ded208a61752",
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:41cfcf576e47aa63014b54bd86ea2d3ffd90fe7f7e7eef5851e2d04ea5a3946f",

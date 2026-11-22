@@ -10,8 +10,8 @@ test('all six stem families retain independent source paths and instrumental rat
   for(const [file,category] of Object.entries({
     '0000-vocals.ogg':'vocals','0000-drums.ogg':'drums','0000-bass.ogg':'bass',
     '0000-guitar.ogg':'guitar','0000-piano.ogg':'piano','0000-other.ogg':'other',
-    '0000-voice-home.ogg':'lead','adaptive/debumont/melody-0000.ogg':'lead',
-    'adaptive/debumont/featured-0000.ogg':'adaptive',
+    '0000-voice-home.ogg':'lead','adaptive/debutmont/melody-0000.ogg':'lead',
+    'adaptive/debutmont/featured-0000.ogg':'adaptive',
   })){
     expect(stemCategory(sample(file))).toBe(category);
     expect(targetKbps(sample(file),'lite')).toBe(MONO_PRESETS.lite[category]);

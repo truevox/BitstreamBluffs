@@ -27,7 +27,7 @@ const state=()=>page.evaluate(()=>{
 		clockStart:d.clockStart,shuffle:d.shuffleEnabled,
 		audioState:a.ctx?.state||'not-created',
 		musicShuffling:g.registry.get('settings')?.musicShuffle===true,
-		melodyStemGain:d.mixer?.sources.get('voice:debumont')?.input?.gain?.value,
+		melodyStemGain:d.mixer?.sources.get('voice:debutmont')?.input?.gain?.value,
 	};
 });
 try{
@@ -56,10 +56,10 @@ try{
 			a.ctx?.state==='running';
 	},null,{timeout:45000});
 	const playing=await state();
-	assert.equal(playing.voice,'voice:debumont');
+	assert.equal(playing.voice,'voice:debutmont');
 	assert.equal(playing.menuMode,true);
 	assert.equal(playing.now,'local-one-more-run-bitstream-bluffs');
-	console.log('ONE_MORE_RUN_PLAYING_DEBUMONT_MENU_PASS',playing);
+	console.log('ONE_MORE_RUN_PLAYING_DEBUTMONT_MENU_PASS',playing);
 
 	// Real game event listeners, not separate music director.
 	await page.evaluate(()=>{
@@ -79,7 +79,7 @@ try{
 	assert.equal(afterCrash.clockStart,playing.clockStart);
 	assert.equal(afterCrash.now,playing.now);
 	assert.equal(afterCrash.menuMode,true);
-	assert.equal(afterCrash.voice,'voice:debumont');
+	assert.equal(afterCrash.voice,'voice:debutmont');
 	await page.waitForTimeout(650);
 	const continuing=await state();
 	assert.ok(continuing.position>afterCrash.position+0.35);

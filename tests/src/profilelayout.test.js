@@ -94,11 +94,11 @@ describe('ProfileLayout.profileLayout — no overlap, nothing clipped', () => {
   });
 
   test('reached signatures are highlighted and the rest stay readable', () => {
-    // Level 5: only Debumont (level 4) is reached, so this checks both the reached and locked styles.
+    // Level 5: only Debutmont (level 4) is reached, so this checks both the reached and locked styles.
     const layout = profileLayout({ profile: atXp(4000), levels });
     const byText = (t) => layout.items.find((i) => i.key.startsWith('sig-') && i.text === t);
-    expect(byText('DEBUMONT').color).toBe('amber');
-    expect(byText('DEBUMONT').alpha).toBe(1);
+    expect(byText('DEBUTMONT').color).toBe('amber');
+    expect(byText('DEBUTMONT').alpha).toBe(1);
     expect(byText('VERTIGO VENTS').color).toBe('text');
     expect(byText('VERTIGO VENTS').alpha).toBeGreaterThanOrEqual(0.55); // 0.45 dropped contrast below 4.5:1
   });
@@ -108,7 +108,7 @@ describe('ProfileLayout.profileLayout — no overlap, nothing clipped', () => {
     // with zero runs), so the label now says what it counts.
     const head = (xp) => profileLayout({ profile: atXp(xp), levels }).items.find((i) => i.key === 'sig-head').text;
     expect(head(0)).toBe('SIGNATURES UNLOCKED 0/11');
-    expect(head(4000)).toBe('SIGNATURES UNLOCKED 1/11'); // Debumont at level 4
+    expect(head(4000)).toBe('SIGNATURES UNLOCKED 1/11'); // Debutmont at level 4
     expect(head(148700)).toBe('SIGNATURES UNLOCKED 11/11'); // level 29 clears every biome reward (last at level 28)
   });
 });
@@ -384,10 +384,10 @@ describe('the signature toggle menu cannot cover the biome names', () => {
   });
 
   test('a signature is listed exactly once: either as a pending name or as a toggle', () => {
-    const layout = profileLayout({ profile: withBiomes(12), levels, playableBiomeIds: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'] });
+    const layout = profileLayout({ profile: withBiomes(12), levels, playableBiomeIds: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'] });
     const plain = layout.items.filter((it) => /^sig-/.test(it.key) && it.key !== 'sig-head' && it.key !== 'sig-note').map((it) => it.text);
     // Playable biomes belong in the toggle menu, so none of them should also have a plain name row.
-    for (const t of ['DEBUMONT', 'GARBAGE DUMP GLACIER', 'PYRAMID PEAK']) {
+    for (const t of ['DEBUTMONT', 'GARBAGE DUMP GLACIER', 'PYRAMID PEAK']) {
       expect({ t, listed: plain.includes(t) }).toMatchObject({ t, listed: false });
     }
     // Still-pending ones keep their name so the player can see what is coming.

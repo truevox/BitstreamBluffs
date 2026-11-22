@@ -51,11 +51,11 @@ describe('SHOP-3: a way back to DEFAULT', () => {
 describe('F11: Profile lists locked biomes', () => {
   test('F11: with the production inputs a level-1 player can still see the locked biomes', () => {
     const texts = prodLayout(v1()).items.map((i) => i.text);
-    expect(texts).toContain('DEBUMONT');
+    expect(texts).toContain('DEBUTMONT');
   });
 
   test('F11: a locked biome shows its unlock level beside its name', () => {
-    const items = prodLayout(atLevel(5)).items; // Debumont (level 4) unlocked, Garbage Dump Glacier (7) not
+    const items = prodLayout(atLevel(5)).items; // Debutmont (level 4) unlocked, Garbage Dump Glacier (7) not
     const lock = (id) => items.find((i) => i.key === `lock-${id}`);
     expect(lock('garbage-dump-glacier').text).toBe('LVL 7');
     expect(lock('vertigo-vents').text).toBe('LVL 28');
@@ -63,8 +63,8 @@ describe('F11: Profile lists locked biomes', () => {
     expect(lock('garbage-dump-glacier').x).toBeGreaterThan(name.x + name.w);
     expect(lock('garbage-dump-glacier').y).toBe(name.y);
     // Unlocked: no lock tag and no plain name row - it is a toggle row in the menu below.
-    expect(lock('debumont')).toBeUndefined();
-    expect(items.some((i) => i.text === 'DEBUMONT')).toBe(false);
+    expect(lock('debutmont')).toBeUndefined();
+    expect(items.some((i) => i.text === 'DEBUTMONT')).toBe(false);
   });
 
   test('F11: at every level 1-30 each biome is listed once (name if locked, toggle if unlocked) and nothing overlaps', () => {

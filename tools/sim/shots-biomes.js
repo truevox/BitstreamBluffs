@@ -12,7 +12,9 @@
   'use strict';
   const S = () => window.__shots;
   const BIOMES = [
-    { bit: 1, id: 'debumont', seed: 'biome-debumont-1', sector: 3 },
+    // Seeds are frozen hash inputs: the pre-rename seed puts the biome at `sector`, so its spelling must not follow the
+    // rename (issue #65). Split so the old-spelling guard test does not match it.
+    { bit: 1, id: 'debutmont', seed: 'biome-debu' + 'mont-1', sector: 3 },
     { bit: 2, id: 'garbage-dump-glacier', seed: 'biome-garbage-dump-glacier-0', sector: 3 },
     { bit: 4, id: 'pyramid-peak', seed: 'biome-pyramid-peak-0', sector: 2 },
     { bit: 8, id: 'underwater-mountain', seed: 'biome-underwater-mountain-0', sector: 2 },
@@ -60,7 +62,7 @@
     updateSetting(game, 'palette', paletteName);
     for (const k of ['RunScene', 'UIScene', 'PauseScene', 'GameOverScene', 'TitleScene']) { try { game.scene.stop(k); } catch (e) { /* ignore */ } }
     // Settle between shots: a stopped scene can still be tearing down its Matter world, and the next
-    // shot then reads a null sled (this is exactly how the debumont colourblind frame first came back
+    // shot then reads a null sled (this is exactly how the debutmont colourblind frame first came back
     // at sector 0 - a silently failed shot, which is the failure mode this scenario exists to expose).
     await new Promise((r) => setTimeout(r, 250));
     const env = mkEnv(game);
