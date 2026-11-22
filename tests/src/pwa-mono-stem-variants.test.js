@@ -1,3 +1,6 @@
+import {mkdtempSync,writeFileSync,mkdirSync,linkSync,readFileSync,chmodSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join,dirname} from 'node:path';
 import {stemCategory,variantSourceUrl,canonicalStemUrl,MONO_PRESETS,
   targetKbps,ffmpegMonoArgs,encodeMonoVariants} from '../../tools/pwa/mono-stem-variants.mjs';
 
@@ -36,6 +39,8 @@ test('ffmpeg encodes real individual mono Opus and preserves 48k clock',()=>{
   const args=ffmpegMonoArgs('/private/original.ogg','/tmp/private-variant.ogg',16);
   expect(args).toContain('0:a:0');
   expect(args).toContain('libopus');
+  expect(args).toContain('-n'); // Never overwrite a preexisting derivative/hardlink.
+  expect(args).not.toContain('-y');
   expect(args.at(-1)).toBe('/tmp/private-variant.ogg');
   expect(args.slice(args.indexOf('-ac'),args.indexOf('-ac')+2)).toEqual(['-ac','1']);
   expect(args.slice(args.indexOf('-ar'),args.indexOf('-ar')+2)).toEqual(['-ar','48000']);
@@ -48,4 +53,27 @@ test('source masters can never share a tree with derivative outputs',async()=>{
     await expect(encodeMonoVariants({urls:[u],quality:'lite',sourceRoot:'/media/source',outputRoot}))
       .rejects.toThrow('must be disjoint');
   }
+});
+
+
+test('a hardlinked derivative never overwrites or truncates its source file',async()=>{
+  const temp=mkdtempSync(join(tmpdir(),'bb-mono-no-overwrite-'));
+  const sourceRoot=join(temp,'source'),outRoot=join(temp,'output');
+  const original=join(sourceRoot,'music/packs/33_local-one-more-run-bitstream-bluffs/0000-bass.ogg');
+  const derivative=join(outRoot,'music-variants/lite/packs/33_local-one-more-run-bitstream-bluffs/0000-bass.ogg');
+  const probeScript=join(temp,'fake-ffprobe');
+  const encodeScript=join(temp,'fake-ffmpeg');
+  try{
+    mkdirSync(dirname(original),{recursive:true});mkdirSync(dirname(derivative),{recursive:true});
+    writeFileSync(original,'SENTINEL ORIGINAL STEREO MASTER DO NOT TOUCH');
+    linkSync(original,derivative); // different directories, SAME inode, worst case.
+    writeFileSync(probeScript,'#!/usr/bin/env node\nconsole.log(JSON.stringify({streams:[{codec_name:"opus",channels:2,sample_rate:"48000"}],format:{duration:"12"}}))\n');
+    writeFileSync(encodeScript,'#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.argv.at(-1),"CORRUPTED")\n');
+    chmodSync(probeScript,0o755);chmodSync(encodeScript,0o755);
+    await expect(encodeMonoVariants({urls:[sample('0000-bass.ogg')],quality:'lite',
+      sourceRoot,outputRoot:outRoot,ffmpeg:encodeScript,ffprobe:probeScript}))
+      .rejects.toThrow('Refusing to overwrite existing derivative');
+    expect(readFileSync(original,'utf8')).toBe('SENTINEL ORIGINAL STEREO MASTER DO NOT TOUCH');
+    expect(readFileSync(derivative,'utf8')).toBe('SENTINEL ORIGINAL STEREO MASTER DO NOT TOUCH');
+  } finally {rmSync(temp,{recursive:true,force:true});}
 });

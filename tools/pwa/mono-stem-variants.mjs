@@ -49,7 +49,7 @@ export function variantSourceUrl(url,quality) {
 
 export function ffmpegMonoArgs(input,output,rate) {
   if(!Number.isSafeInteger(rate)||rate<6||rate>128)throw new RangeError('Invalid bitrate');
-  return ['-hide_banner','-nostdin','-v','error','-y','-i',input,'-map','0:a:0',
+  return ['-hide_banner','-nostdin','-v','error','-n','-i',input,'-map','0:a:0',
     '-vn','-sn','-dn','-map_metadata','-1','-ar','48000','-ac','1',
     '-c:a','libopus','-application','audio','-b:a',rate+'k','-vbr','on',
     '-compression_level','10',output];
@@ -94,8 +94,8 @@ async function probe(file,binary='ffprobe'){
 }
 
 /** Build actual Ogg/Opus mono assets from a bounded, explicit recording list.
- * sourceRoot and outputRoot must differ. An existing output isn't trusted: its
- * SHA-256 is always read back into the emitted manifest. A source fingerprint
+ * sourceRoot and outputRoot must differ. Existing output paths are NEVER overwritten, including
+ * hardlinks to original masters; output and source SHA-256 are read into the manifest. A source fingerprint
  * accompanies each derivative, allowing provenance checks on rebuild. */
 export async function encodeMonoVariants({urls,quality,sourceRoot,outputRoot,overrides={},ffmpeg='ffmpeg',ffprobe='ffprobe',onProgress=()=>{}}){
   if(!Object.hasOwn(MONO_PRESETS,quality)||!Array.isArray(urls)||!urls.length||urls.length>5000)
@@ -121,8 +121,10 @@ export async function encodeMonoVariants({urls,quality,sourceRoot,outputRoot,ove
     await mkdir(dirname(dest),{recursive:true});
     if(!(await realpath(dirname(dest))).startsWith(realOutput+sep))
       throw new Error('Derivative output folder escaped its root');
-    try{const existing=await lstat(dest);if(existing.isSymbolicLink())
-      throw new Error('Refusing to overwrite a derivative symlink');}
+    // Never replace ANY existing output, including hardlinks to source masters.
+    // The lstat precheck supplies a readable error, and ffmpeg -n also guards
+    // against races where the destination appears after the check.
+    try { await lstat(dest); throw new Error('Refusing to overwrite existing derivative'); }
     catch(e){if(e.code!=='ENOENT')throw e;}
     await runProgram(ffmpeg,ffmpegMonoArgs(from,dest,kbps));
     const out=await probe(dest,ffprobe);
