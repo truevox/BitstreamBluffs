@@ -7,7 +7,13 @@ import {
 } from '../../src/systems/TerrainGenerator.js';
 import { SLOW_HAZARD_MIN_DEG, SLOW_HAZARD_CLEAR_PX, RUNOUT_TURN_DEG } from '../../src/systems/TerrainGenerator.js';
 import { TERRAIN, PIXELS_PER_METER } from '../../src/constants.js';
-import { makeGen, loadContent, segAngle, inGap, rollSim, findLaunches } from './_helpers.js';
+import { makeGen as makeGenWithBiomes, loadContent, segAngle, inGap, rollSim, findLaunches } from './_helpers.js';
+
+// These tests pin the core terrain machinery (shape, spacing, hazard and launch frequencies, digests). Since #65 the
+// home biome (Debutmont) is the base, so a generator built WITH biome content flavours even mask-0 terrain. The core
+// rules here are asserted without biome content, as before; biome terrain has its own tests (biomes.test.js,
+// biome-bridges.test.js and the per-biome suites).
+const makeGen = (seed, overrides = {}) => makeGenWithBiomes(seed, { biomeDefs: [], ...overrides });
 
 const snap = (c) => JSON.parse(JSON.stringify(c));
 const isAirDef = (defs, h) => defs[h.defId].placement === 'air';

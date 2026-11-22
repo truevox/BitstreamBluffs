@@ -3,13 +3,13 @@
  *
  * `biomeForSector` is the whole of W3's terrain-side change. Everything else is data. That makes it
  * the one function where a mistake silently rewrites terrain, so the tests here are weighted towards
- * the properties that would break existing players: mask 0 must behave exactly as it does today, the
+ * the properties that would break existing players: mask 0 must be the home biome everywhere, the
  * choice must not depend on call order or on how much terrain has been generated, and sectors 0-1
- * stay base Bitstream so every existing seed's opening is unchanged.
+ * stay the home biome (Debutmont is the base since #65) so every seed opens the same way.
  */
 import fs from 'fs';
 import path from 'path';
-import { TerrainGenerator, biomeForSector } from '../../src/systems/TerrainGenerator.js';
+import { TerrainGenerator, biomeForSector, HOME_BIOME_ID } from '../../src/systems/TerrainGenerator.js';
 import { SECTOR_M } from '../../src/systems/TerrainGenerator.js';
 import { makeGen, loadContent, readDir } from './_helpers.js';
 import { PALETTE_KEYS, PALETTE_NAMES } from '../../src/constants.js';
@@ -178,22 +178,21 @@ const ALL_MASK = BIOMES.reduce((m, b) => m | b.bit, 0);
 describe('biomeForSector', () => {
   const ALL = ALL_MASK;
 
-  test('sectors 0 and 1 are always base Bitstream, whatever the mask', () => {
-    // Every existing seed and daily key starts with two base sectors. Changing that would change the
-    // opening of every run ever recorded, which is exactly what the golden test forbids.
+  test('sectors 0 and 1 are always the home biome, whatever the mask', () => {
+    // Every seed and daily key starts with two home (Debutmont) sectors, so every run opens the same way.
     for (const mask of [0, ALL, bitOf('debumont'), bitOf('crystal-cavern')]) {
       for (const seed of ['alpha', 'bitstream-bluffs', '2026-11-13']) {
-        expect({ seed, mask, s0: bio(seed, 0, mask) }).toMatchObject({ seed, mask, s0: null });
-        expect({ seed, mask, s1: bio(seed, 1, mask) }).toMatchObject({ seed, mask, s1: null });
+        expect({ seed, mask, s0: bio(seed, 0, mask) }).toMatchObject({ seed, mask, s0: HOME_BIOME_ID });
+        expect({ seed, mask, s1: bio(seed, 1, mask) }).toMatchObject({ seed, mask, s1: HOME_BIOME_ID });
       }
     }
   });
 
-  test('mask 0 is base everywhere, for thousands of sectors', () => {
-    // The whole point of the mask: a player who has unlocked nothing sees the terrain that shipped.
+  test('mask 0 is the home biome everywhere, for thousands of sectors', () => {
+    // The whole point of the mask: a player who has enabled nothing plays pure Debutmont.
     for (const seed of ['alpha', 'bitstream-bluffs', '42']) {
       for (let s = 0; s < 2000; s++) {
-        expect({ seed, s, biome: bio(seed, s, 0) }).toMatchObject({ seed, s, biome: null });
+        expect({ seed, s, biome: bio(seed, s, 0) }).toMatchObject({ seed, s, biome: HOME_BIOME_ID });
       }
     }
   });
@@ -226,24 +225,25 @@ describe('biomeForSector', () => {
       const mask = b.bit;
       for (let s = 0; s < 600; s++) {
         const got = bio('locked', s, mask);
-        expect({ s, got, ok: got === null || got === b.id }).toMatchObject({ s, got, ok: true });
+        expect({ s, got, ok: got === HOME_BIOME_ID || got === b.id }).toMatchObject({ s, got, ok: true });
       }
     }
   });
 
   test('each enabled biome actually appears, and base sectors still occur', () => {
-    // A mask where one biome never wins its share is a biome the player cannot reach. "Base" must
-    // also survive, or the game would be biome soup with no Bitstream left.
+    // A mask where one biome never wins its share is a biome the player cannot reach. The home
+    // biome must also survive, or the game would be biome soup with no Debutmont left.
     const seen = new Map();
     for (let s = 2; s < 2000; s++) {
-      const got = bio('variety', s, ALL) || '(base)';
+      const got = bio('variety', s, ALL);
       seen.set(got, (seen.get(got) || 0) + 1);
     }
     for (const b of BIOMES) expect({ id: b.id, n: seen.get(b.id) || 0 }).toMatchObject({
       id: b.id, n: expect.any(Number),
     });
     for (const b of BIOMES) expect(seen.get(b.id) || 0).toBeGreaterThan(50);
-    expect(seen.get('(base)') || 0).toBeGreaterThan(200);
+    // The home biome is the base draw (it is never in the eligible pool), so it dominates its own share.
+    expect(seen.get(HOME_BIOME_ID) || 0).toBeGreaterThan(200);
   });
 
   test('the choice draws from its own stream and does not consume the terrain stream', () => {
