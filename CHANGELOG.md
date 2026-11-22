@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.18 — Strict savestate V1 envelope foundation (Issue #230 / PR #227) (2026-11-22)
+
+- **Pure versioned input boundary:** add BB-CJSON V1 savestate envelope writer/inspector and deterministic registered-layout hash, requiring caller-provided exact build ID, game version, SIM_REVISION, ruleset ID, Matter version and savestate layout ID. Invalid, tampered, noncanonical, oversized, unsupported or wrong-build snapshots fail closed. The digest is error detection, **not** an authentication/leaderboard credential. Trusted section validators operate on a recursively frozen parsed envelope, preventing mutation after checksum admission.
+- **Independent safety validation:** adversarial tests cover roundtrip F64, missing/unknown fields, schema and revision/build conflicts, duplicate keys, malformed bytes, mutation by validators, and legacy-layout refusal. These are *format-admission tests only*, not a game restore. No production savestate layout is registered by default.
+- **Not a completed save/load feature:** No live Matter/RunScene snapshot capture or restore, persistence, single-use suspend consumption, UI, GhostRecorder tape continuity or ranking changes. **Parent #119 remains open** for these tasks; only Phase 3A child #230 is completed by this release. No physics/simulation revision bump (SIM_REVISION 6 remains authoritative).
+
 ## v2.19.17 — Exploit Factory observed trick activity (Issue #214 leaf / PR #229) (2026-11-22)
 
 - **Developer-only evidence:** show per-policy observed trick occurrences, distinct trick names/counts, and missing-data coverage in the Exploit Factory report. Records without valid trick data remain **unknown**, never misreported as zero tricks; failed or unplanned policy arms are excluded from comparison and tables rather than silently treated as successes.

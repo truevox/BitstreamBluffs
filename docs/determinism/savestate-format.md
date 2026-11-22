@@ -16,8 +16,8 @@
   "version": 1,
   "purpose": "suspend" | "practice",
   "build": {
-    "gameVersion": "2.19.12", "buildId": "sha256:<64 lowercase hex>",
-    "physicsIdentity": { "rulesetId": "sha256:<64 lowercase hex>", "simRevision": 5 },
+    "gameVersion": "2.19.18", "buildId": "sha256:<64 lowercase hex>",
+    "physicsIdentity": { "rulesetId": "sha256:<64 lowercase hex>", "simRevision": 6 },
     "matterVersion": "0.20.0", "savestateLayoutId": "sha256:<64 lowercase hex>"
   },
   "runId": "local-run-123", "tick": 420,

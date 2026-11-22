@@ -22,8 +22,8 @@ const layout = Object.freeze({
   },
 });
 const runtime = () => ({
-  gameVersion:'2.19.12', buildId:H('a'),
-  physicsIdentity:{ rulesetId:H('b'), simRevision:5 },
+  gameVersion:'2.19.18', buildId:H('a'),
+  physicsIdentity:{ rulesetId:H('b'), simRevision:6 },
   matterVersion:'0.20.0', savestateLayoutId:savestateLayoutIdOf(descriptor),
 });
 const unsigned = (overrides = {}) => ({
@@ -80,7 +80,7 @@ describe('savestate cache V1 envelope — format validation only', () => {
   });
 
   test.each([
-    ['build version', {gameVersion:'2.19.13'}, 'build-mismatch'],
+    ['build version', {gameVersion:'2.19.17'}, 'build-mismatch'],
     ['build stamp even when game/ruleset unchanged', {buildId:H('c')}, 'build-mismatch'],
     ['matter runtime', {matterVersion:'0.21.0'}, 'matter-mismatch'],
     ['layout', {savestateLayoutId:H('d')}, 'layout-mismatch'],
