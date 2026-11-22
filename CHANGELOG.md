@@ -1,5 +1,80 @@
 # Changelog
 
+## v2.17.0 — local course ghost lineup (#178 / #81) (2026-11-22)
+
+- **Choose which ghosts appear on your next run.** Open Course Ghosts from Game Over with **G** or **Ghost Fav**. Set local Best and Latest visibility for that course, and pin, replace or clear Favorites A–C. Global Best and Latest settings still take precedence, and a tape shared by several roles draws only once. The lineup stays on this device; replay formats, scoring and online sharing are unchanged.
+
+## v2.16.4 — developer stock Packet Spike traversal check (#202 / #127) (2026-11-22)
+
+- **Pinned stock hazard traversal diagnostic.** A developer-only Chromium script probes one naturally generated Packet Spike across three normal-input cases (no hop, a timed hop, and a late hop), each repeated twice in fresh contexts, without injecting terrain or collision outcomes. It checks that the same hazard and early power-up are encountered, validates actual input, clearance and fatal/landing events, and refuses a mismatched compiled game. The fixture is pinned to one older compiled build; this is not a general fairness verdict, cross-version compatibility proof, or active gameplay change. No player data is transferred or retained.
+
+## v2.16.3 — Exploit Factory: complete adversarial policy evidence (#187 / #76) (2026-11-22)
+
+- **`--reuse` no longer accepts an incomplete run record just because the record's own `failures[]` is empty.**
+  Completeness is re-derived from the record's data by new pure `tools/exploits/lib/record-audit.cjs`: every arm the
+  record claims to have run must carry exactly the planned seed identities, once each. Four shapes re-reported as
+  complete measurements (exit 0, full metrics table, rendered verdicts) and now exit 2 with the arm named as
+  *unmeasured*: an arm missing entirely, every arm cut to half the planned seeds, a duplicated seed inside one arm,
+  and a seed nobody planned. A duplicated-seed arm previously surfaced as exit 1 with a **usage** banner.
+- **A record whose counts cannot be attributed is rejected outright**, not partially compared: a run attributed to no
+  arm, an unnamed or duplicated `policySpec`, a plan that lists one seed twice. The report prints the reasons under
+  `RECORD REJECTED — no comparison is offered`.
+- **The exit code and the report now come from the same audit** on both the fresh and `--reuse` paths, so the status
+  cannot disagree with what was printed. The runner also merges audit findings into `failures` before writing, so the
+  record on disk always agrees with itself.
+- **Older records keep their guarantees.** A record without `args.seedList` has its plan recovered from the numeric
+  `args.seeds` count (expanded exactly as the simulator expands it), or from a comma-list `args.seeds`. Only a record
+  with neither is rejected outright, because there is then no plan to verify the arms against.
+- **A reused record must now be self-sufficient beyond its run list.** It must name a `baseline` that actually has an
+  arm — otherwise there is nothing to pair a candidate against — and it must carry a recoverable seed plan
+  (`args.seedList`, a numeric `args.seeds` count, or a comma-list `args.seeds`). A record with neither is rejected
+  instead of being accepted on "the arms agree", which is exactly what a uniformly truncated record looks like. A
+  comma-list `args.seeds` is now treated as exact identities rather than as an unverifiable fallback.
+- `tools/exploits/repro-reuse-incomplete.mjs` reproduces the twelve defective shapes through the real CLI, with two
+  positive cases (a full record and a genuinely dominant one) so it fails if the guard ever decays into "always
+  refuse". Run against the previously reviewed head `645a5c6` it reports 11 of 12 accepted as clean; at this head, 0.
+- Harness tooling only: no gameplay, physics, balance or player-visible change. `tools/sim/**` untouched.
+
+
+## v2.16.2 — canonical replay development check (#205 / #129) (2026-11-22)
+
+- **Same-build replay check for developers.** The local tool records one synthetic stock run in a pinned Chromium build, verifies its native canonical evidence, and compares every completed tick across two fresh replays plus the separate fatal event. It does not compare historical builds or change gameplay, scoring, or the replay format.
+
+## v2.16.1 — keep ground hop cues visible (#208 / #155) (2026-11-21)
+
+- **Ground hop cues stay visible at the edge.** Fixed-tick warning and sound timing no longer reads the rendered camera. The renderer uses the current view: if the hop arrow is clipped, the edge badge carries the cue. The badge only reads already-streamed terrain. No physics, score, replay ruleset or Pulp camera change.
+
+
+## v2.16.0 — reconcile post-v2.15.3 merged capabilities and release policy (2026-11-21)
+
+This corrective release recognizes already-merged replay and developer tooling plus the project-wide rule that every `main` merge is a release. Previous merges (#163, #165, #166, #203, #164, #173, #175, #179, #182, #158, #204, #206) were not each versioned at merge time; this is a catch-up release, not a claim they were individually tagged. Experimental/offline-only tooling is not an activated production feature.
+
+- **Replay contract and canonical serialization (#163 / #152).** Versioned replay contract, canonical JSON/binary encoding, deterministic hashes and cross-implementation fixtures. No live physics change.
+- **Subsystem fingerprints (#165 / #118).** Read-only checkpoint hashes cover sled/contact, terrain, hazards, BSOD, timers, scoring, equipment and RNG, with first-divergence and field-level comparison. Fingerprints detect divergence but are not anti-cheat.
+- **Physics ruleset time capsules (#166 / #123), with compatibility repair (#203).** Content-addressed ruleset archives, source attestation and version-aware replay verification; uploaded code is not executed.
+- **Self-contained replay manifests and local evidence (#164 / #116).** Capture seed, biome mask, daily rule, level/loadout, active boosts, BSOD, RNG and ruleset; fail-closed validation and exportable local `.bbreplay` evidence. IndexedDB evidence is local, not permanent cloud storage; cross-browser parity is not yet established.
+- **Golden replay canaries (#158 / #117).** Seven recorded scenarios and offline/manual comparator tooling for first-divergence and handling diagnostics. This does not yet constitute an automatically enforced cross-browser CI quality gate.
+- **PWA offline-shell experiments (#175 / #172).** Integrity inventory, test-only service-worker implementation, opt-in original-music selection/prefetch planning. No production service-worker registration and no claim that the shipped game runs offline.
+- **Real-original-music offline bridge experiments (#179 / #172).** Verified original-Opus music groups and development/test routes, with incomplete offline groups refused rather than silently replaced. Not an activated production offline download feature.
+- **Source-preserving music-variant tooling (#182 / #172, #180).** Developer-only mono Lite/Full per-stem derivative generation and provenance checks. Original stereo recordings remain untouched; quality presets require listening approval and are not a shipped player preference.
+
+**Verification snapshot:** On `main` at `e181f9f` (before #158 merged), replay tests passed 741/741 across 20 suites, ruleset integrity check passed, and the full test suite reported 3,561 passing / 9 failing (seven suites), consistent in count with the previously documented baseline. On the integrated #158 tree, canary unit tests passed 32/32. This is not a full-suite green claim.
+
+- **Release-policy correction (#204, #206 and this release).** Reconciled the missing changelog entries and codified `main` as the release boundary. The two documentation PRs should have received patch bumps; their omission is acknowledged rather than rewriting historical merges.
+
+## v2.15.3 - PWA install metadata and original icons (#172) (2026-11-21)
+
+- **Installable shell metadata, not an offline game.** A first-party Web App Manifest and generated original Bitstream Bluffs icons (192px, 512px, maskable, Apple touch) add supported-browser home-screen installation metadata, landscape/standalone preference and theme colors. The main application boot, gameplay simulation, ghost/replay format and scoring are unchanged.
+- **Correct hosted manifest MIME type.** Netlify serves `/manifest.webmanifest` with `Content-Type: application/manifest+json` on a path-specific rule, without changing headers for game bundles, saves or audio. Tested on the real deploy preview; some browsers may still choose not to expose installation.
+- **Explicit limitation:** no production service worker, offline shell, automatic media download, cache migration or upgrade UI ships in this slice. Those remain unmerged experimental work behind issue #172; the game still needs network access and original stereo music masters are untouched.
+
+
+## v2.15.2 - fair input timestamps (#115) (2026-11-21)
+
+- **Keyboard and touch input reach the tick they happened in.** Each key event's and touch-button pointer event's `event.timeStamp` now picks the 120 Hz tick whose window contains it, instead of one poll per display frame being applied from the frame's first tick. On a steady frame cadence (30/60/120 Hz) the harness and the built game give the exact tick and identical tapes; at 30 Hz a press used to act up to 3 ticks (25 ms of game time) before the key went down, and a 20 ms tap was lost 36 % of the time. Taps of held controls (push, tuck, tilt, brake) shorter than a frame always count for at least one tick, a double tap inside one frame is two hops, and taps across a 144 Hz frame that runs no tick are no longer dropped. Multi-touch, pointercancel and lost pointer capture release on their own tick; a touch and a key holding the same button stay held until the last one lets go.
+- **The bound, honestly:** an input is never shown later than before (same rendered frame, measured per press at 30/60/120/144 Hz) and never rewrites a tick that already ran. It can still land up to about 1 tick early at rates that do not divide 120 (144 Hz, as before), and at any rate under real rAF jitter or Phaser delta smoothing: a key stamped after a frame's vsync time but delivered before its callback goes to that frame's last tick. How early is bounded by how late the frame's callback runs after its vsync time: in a heavily loaded headless browser (~15-20 fps, stalls up to 1 s) the real-rAF probe put 90 of 180 presses on their exact tick (main: 4 of 60) and 33 early, by up to 6 ticks once and otherwise at most 3 (main: 36 of 60 early, up to 6).
+- Gamepad is unchanged (no per-button event timestamps; still the frame's first tick), and an untimed gamepad change is never pushed behind a key or touch event on another button. Ghost tape format and versions unchanged; existing tapes replay identically. See `docs/issue-115-fair-input.md`.
+
 ## v2.15.1 - Sky Jellyfish felt spring rebound (2026-11-16)
 
 - **Sky Jellyfish springs now visibly rebound on scored landings.** The rebound returns a bounded share of impact speed, follows the ground normal, and preserves along-slope velocity (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). A rebound under 120 px/s is treated as no rebound, so at the shipped 0.2 share only impacts of 600 px/s or more are felt (800 px/s returns 160 px/s); the floor is the measured point that keeps the bounce felt within the accepted ±15% mask-128 hop survival tolerance. Stabilizer Rails damp the share to 0.05, below the floor even at an 801 px/s impact. A zero, negative or non-finite rebound request leaves `Sled.launchNormal` and its contact/snap/chute state untouched. The normal projection is checked on uniform slopes; it makes no general irregular-terrain safety claim. Bounce pads retain their existing launch behaviour.

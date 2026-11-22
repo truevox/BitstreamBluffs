@@ -1,0 +1,251 @@
+{
+  "id": "stall",
+  "simVersion": {
+    "simTickHz": 120,
+    "runRandomVersion": 1,
+    "ghostTapeFormat": "bb-ghost-tape",
+    "ghostTapeVersion": 1,
+    "ghostPhysicsVersion": 1
+  },
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "hz": 60,
+  "startX": 0,
+  "durationMs": 5000,
+  "dailyRule": {
+    "asOfDate": "2026-11-21",
+    "id": "featherweight",
+    "modifiers": {
+      "gravityMul": 0.8,
+      "airControlMul": 0.9
+    }
+  },
+  "checkpoints": [
+    [
+      0,
+      -1.2562237372374199,
+      -17.12663300595716,
+      0.16580627893946132,
+      5.333333333333334,
+      0,
+      0
+    ],
+    [
+      1000,
+      352.64011950384514,
+      131.21861033487593,
+      0.41922451276670136,
+      6.9562814168969,
+      3.0971360298811987,
+      15
+    ],
+    [
+      2000,
+      879.1437589273501,
+      365.6331335680646,
+      0.41922449434333287,
+      10.294073065947941,
+      4.583216617622156,
+      41
+    ],
+    [
+      3000,
+      1384.2819746511693,
+      473.93539510719995,
+      0.8402242509354036,
+      7.204789106678618,
+      6.4030026578245725,
+      67
+    ],
+    [
+      4000,
+      1891.523890097748,
+      890.4138890060934,
+      0.29161268098483595,
+      10.942515494783038,
+      3.1944238169853634,
+      92
+    ],
+    [
+      5000,
+      2490.199719787247,
+      966.6821966965923,
+      0.27779778240211234,
+      8.177631740642028,
+      1.157735078917085,
+      122
+    ]
+  ],
+  "result": {
+    "crashed": false,
+    "crashTick": null,
+    "cause": null,
+    "hazardId": null,
+    "score": 122,
+    "distance": 125,
+    "endTick": 600
+  },
+  "stats": {
+    "inputChanges": 2,
+    "airborneTicks": 166,
+    "timeToFirstInputMs": 8.333,
+    "pausedMs": 0,
+    "stallCount": 2,
+    "stallDeltaMs": 5000,
+    "ticks": 600,
+    "totalSimMs": 5000,
+    "scoreMean": 56.166666666666664,
+    "scoreMin": 0,
+    "scoreMax": 122,
+    "droppedMs": 0
+  },
+  "origin": {
+    "x": 0,
+    "y": -17.13,
+    "ppm": 20
+  },
+  "verification": {
+    "xReached": 2490,
+    "xMinTick": 1,
+    "yReached": 967,
+    "frames": 292,
+    "paused": false,
+    "stalled": true,
+    "stallChecks": [
+      {
+        "atTick": 180,
+        "tickBefore": 180,
+        "tickAfter": 186,
+        "tickMs": 8.333333333333334,
+        "frameMs": 2500
+      },
+      {
+        "atTick": 420,
+        "tickBefore": 420,
+        "tickAfter": 426,
+        "tickMs": 8.333333333333334,
+        "frameMs": 2500
+      }
+    ]
+  },
+  "feature": {
+    "landings": [
+      {
+        "tick": 26,
+        "t": 216.667,
+        "x": 66.38763853768222,
+        "quality": "good",
+        "airtimeMs": 216.66666666666674,
+        "angleDeg": 14.673288675290053,
+        "impactSpeedPxS": 12.757026361708725,
+        "detail": {
+          "quality": "good",
+          "angleDeg": 14.673288675290053,
+          "impactSpeedPxS": 12.757026361708725,
+          "airtimeMs": 216.66666666666674,
+          "bonusPoints": 0,
+          "bankedPoints": 0,
+          "hard": false,
+          "x": 66.38763853768222,
+          "y": -0.3021356210708785,
+          "comboName": "",
+          "comboMult": 1,
+          "flowUsed": 1,
+          "midSpin": false
+        }
+      },
+      {
+        "tick": 421,
+        "t": 3508.333,
+        "x": 1589.5807352255679,
+        "quality": "good",
+        "airtimeMs": 1175.0000000000214,
+        "angleDeg": 14.175096176172872,
+        "impactSpeedPxS": 350.3116082824607,
+        "detail": {
+          "quality": "good",
+          "angleDeg": 14.175096176172872,
+          "impactSpeedPxS": 350.3116082824607,
+          "airtimeMs": 1175.0000000000214,
+          "bonusPoints": 0,
+          "bankedPoints": 0,
+          "hard": false,
+          "x": 1589.5807352255679,
+          "y": 742.2985706141858,
+          "comboName": "",
+          "comboMult": 1,
+          "flowUsed": 1,
+          "midSpin": false
+        }
+      }
+    ],
+    "tricks": [],
+    "hazardHits": [],
+    "pads": [],
+    "zones": [],
+    "bsodBluffs": [],
+    "airborneEpisodes": [
+      {
+        "startTick": 1,
+        "endTick": 26,
+        "startT": 8.333,
+        "x": 1.4065955530674235,
+        "durationMs": 208.334,
+        "airtimeMs": 0
+      },
+      {
+        "startTick": 281,
+        "endTick": 421,
+        "startT": 2341.667,
+        "x": 1073.8198546598449,
+        "durationMs": 1166.666,
+        "airtimeMs": 0
+      }
+    ],
+    "airborneTotalMs": 1375,
+    "maxAirtimeMs": 1162,
+    "maxAirtimeTick": 420,
+    "minBsodGapPx": 7557.65,
+    "bsodCaughtTick": null,
+    "startChunk": {
+      "index": 0,
+      "biome": null,
+      "sector": 1,
+      "breather": false,
+      "startX": 0,
+      "endX": 2272
+    },
+    "lips": [
+      {
+        "x": 1024,
+        "y": 384,
+        "angleDeg": 12,
+        "airS": 0.57,
+        "chunk": 0
+      }
+    ],
+    "lipCrossings": [
+      {
+        "lipX": 1024,
+        "lipAngleDeg": 12,
+        "startTick": 281,
+        "endTick": 421,
+        "x": 1074,
+        "durationMs": 1166.666,
+        "landX": 1590
+      }
+    ],
+    "slopeKicks": [],
+    "biomeCrossings": [
+      {
+        "tick": 1,
+        "t": 8.333,
+        "x": 1,
+        "biome": null,
+        "sector": 1,
+        "chunk": 0
+      }
+    ],
+    "_lastBiomeKey": "base"
+  }
+}

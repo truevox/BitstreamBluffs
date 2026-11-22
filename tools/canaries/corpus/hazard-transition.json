@@ -1,0 +1,26 @@
+{
+  "id": "hazard-transition",
+  "description": "Biome / hazard transition: start in base sector 5, cross into Pyramid Peak (sector 6, biome chunk) and ride into its glitch-chasm hazard.",
+  "seed": "CANARY117",
+  "biomeMask": 4,
+  "startX": 50000,
+  "hz": 60,
+  "durationMs": 6500,
+  "input": {
+    "held": [
+      {
+        "key": "push",
+        "from": 0,
+        "to": 2000
+      },
+      {
+        "key": "tuck",
+        "from": 1200,
+        "to": 3000
+      }
+    ],
+    "edges": [],
+    "events": []
+  },
+  "notes": "VERIFIED 2026-11-21. Crosses a real biome boundary and meets a real hazard: chunk biome goes null sector 5 (x=50003) -> 'pyramid-peak' sector 6 (x=50944, tick 260), enters a thermalUpdraft zone (x=51951..52627), then dies to glitch-chasm at tick 580: result.crashed=true, cause='hazard', hazardId='glitchChasm', score 600."
+}

@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "sourceCommit": "8dd230bfc7db8f3eed7e73bb0a0b0fb92bfa982b",
+  "entry": "/assets/index-CCcOfMwf.js",
+  "entrySha256": "39ab0e5c7022a59e6114af3b7d60bffbbd2c0206722401fd5b2f1dd9f895d36e",
+  "seed": "sim-11",
+  "biomeMask": 0,
+  "fixedUtc": "2026-01-05T12:00:00.000Z",
+  "rule": "featherweight",
+  "tickHz": 120,
+  "endTick": 920,
+  "edges": [
+    [1, "Space", true],
+    [1, "ArrowLeft", true],
+    [1, "KeyW", true],
+    [1, "KeyA", true],
+    [37, "KeyA", false],
+    [105, "KeyW", false],
+    [175, "ArrowDown", true],
+    [233, "ArrowLeft", false],
+    [233, "ArrowDown", false],
+    [247, "Space", false],
+    [274, "Space", true],
+    [275, "ArrowLeft", true],
+    [275, "KeyW", true],
+    [275, "KeyA", true],
+    [311, "KeyA", false],
+    [379, "KeyW", false],
+    [449, "ArrowDown", true],
+    [506, "ArrowLeft", false],
+    [506, "ArrowDown", false],
+    [609, "Space", false],
+    [636, "Space", true],
+    [637, "ArrowLeft", true],
+    [637, "KeyW", true],
+    [637, "KeyA", true],
+    [673, "KeyA", false],
+    [741, "KeyW", false],
+    [811, "ArrowDown", true],
+    [868, "ArrowLeft", false],
+    [868, "ArrowDown", false]
+  ],
+  "expected": {
+    "landings": [
+      {
+        "tick": 246,
+        "quality": "perfect",
+        "banked": 3680,
+        "bonus": 20,
+        "airtimeMs": 2050,
+        "deployed": [
+          231,
+          103,
+          35
+        ],
+        "tricks": [
+          [31, "airBrake", 1, 44],
+          [37, "parachute", 1, 45],
+          [62, "corkscrew", 1, 163],
+          [119, "corkscrew", 2, 403],
+          [175, "corkscrew", 3, 930],
+          [232, "corkscrew", 4, 2095]
+        ]
+      },
+      {
+        "tick": 608,
+        "quality": "good",
+        "banked": 3680,
+        "bonus": 0,
+        "airtimeMs": 2792,
+        "deployed": [
+          231,
+          104,
+          36
+        ],
+        "tricks": [
+          [304, "airBrake", 1, 44],
+          [310, "parachute", 1, 45],
+          [335, "corkscrew", 1, 163],
+          [392, "corkscrew", 2, 403],
+          [449, "corkscrew", 3, 933],
+          [505, "corkscrew", 4, 2092]
+        ]
+      },
+      {
+        "tick": 920,
+        "quality": "good",
+        "banked": 3680,
+        "bonus": 0,
+        "airtimeMs": 2375,
+        "deployed": [
+          231,
+          104,
+          36
+        ],
+        "tricks": [
+          [666, "airBrake", 1, 44],
+          [672, "parachute", 1, 45],
+          [697, "corkscrew", 1, 163],
+          [754, "corkscrew", 2, 403],
+          [811, "corkscrew", 3, 933],
+          [867, "corkscrew", 4, 2092]
+        ]
+      }
+    ],
+    "trickPoints": 11060
+  }
+}
