@@ -398,12 +398,13 @@
       "target": 100
     },
     {
-      "id": "t4-biome-debutmont",
+      "id": "t4-pickup-maple-wax",
       "type": "singleRun",
       "tier": 4,
-      "title": "1500 m in Debutmont",
-      "metric": "distanceM",
-      "target": 1500,
+      "title": "Grab 3 Maple Wax in a run",
+      "metric": "pickups",
+      "pickup": "mapleWax",
+      "target": 3,
       "biome": "debutmont"
     },
     {

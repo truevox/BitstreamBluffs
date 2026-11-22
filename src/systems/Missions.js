@@ -36,6 +36,9 @@ const RECORD_METRICS = new Set([
   // #65: arcade bridges the sled entered this run. Not stored in the RunRecord (and so not in any ledger hash):
   // MissionsService counts BIOME_ENTER `{id:null}` events and hands the total to the roll beside the record.
   'bridges',
+  // #65: power-ups collected this run, by power-up id (`{mapleWax: 2}`); a template names the one it wants in `pickup`.
+  // Same route as `bridges`: counted live from POWERUP_COLLECTED, never stored in the RunRecord.
+  'pickups',
 ]);
 
 /**
@@ -87,6 +90,11 @@ function runValue(t, ctx) {
   const metric = t && t.metric;
   if (!metric) return 0;
   if (metric === 'runs') return 1;
+  if (metric === 'pickups') {
+    const byId = (live && live.pickups) || record.pickups;
+    const n = byId && typeof byId === 'object' && typeof t.pickup === 'string' && Object.hasOwn(byId, t.pickup) ? byId[t.pickup] : 0;
+    return isNum(n) ? Math.max(0, n) : 0;
+  }
   // Live counters (mid-run toasts) win when present: they are strictly fresher than the record.
   if (live && isNum(live[metric])) return Math.max(0, live[metric]);
   if (isNum(record[metric])) return Math.max(0, record[metric]);

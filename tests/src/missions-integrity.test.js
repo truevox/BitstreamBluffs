@@ -116,17 +116,18 @@ describe('MS-1: published cumulative progress is what is banked', () => {
 });
 
 describe('MS-2: a biome mission completes only on a run with that biome switched on (the base biome is always on)', () => {
-  const t = MISSIONS.templates.find((x) => x.id === 't4-biome-debutmont');
+  const t = MISSIONS.templates.find((x) => x.id === 't4-pickup-maple-wax');
   const deb = BIOME_DEFS.find((d) => d.id === 'debutmont');
   const other = BIOME_DEFS.find((d) => d.id !== 'debutmont');
   const prof = () => v1({ xp: MAX_XP, missions: { counter: 1, active: [t.id], progress: {} } });
-  const roll = (mask, defs = BIOME_DEFS) => rollSet(prof(), [t], rec({ distanceM: 1600, ...(mask === undefined ? {} : { biomeMask: mask }) }), MISSIONS.templates, { biomeDefs: defs })
+  const roll = (mask, defs = BIOME_DEFS) => rollSet(prof(), [t], rec({ pickups: { mapleWax: 3 }, ...(mask === undefined ? {} : { biomeMask: mask }) }), MISSIONS.templates, { biomeDefs: defs })
     .completed.map((c) => c.id);
 
   // Issue #65: Debutmont is the base biome, the terrain of every run whatever its mask (Daily mask 0, a
   // Gym, `seed@mask`), and its bit is never in a normal run's mask. The mission is therefore completable
-  // on any run; it must not hang on a no-op bit.
-  test('"1500 m in Debutmont" is completed by a run whatever its mask, the base bit being a no-op', () => {
+  // on any run; it must not hang on a no-op bit. (#65: the trivial "1500 m in Debutmont" became "Grab 3 Maple Wax in a
+  // run", still a Debutmont mission.)
+  test('"Grab 3 Maple Wax in a run" is completed by a run whatever its mask, the base bit being a no-op', () => {
     expect(roll(0)).toEqual([t.id]);
     expect(roll(undefined)).toEqual([t.id]);
     expect(roll(other.bit)).toEqual([t.id]);
@@ -143,7 +144,7 @@ describe('MS-2: a biome mission completes only on a run with that biome switched
     expect(run(gl.bit)).toEqual([g.id]);
   });
 
-  test('a 1600 m run with the Debutmont bit on completes it', () => {
+  test('a run with three Maple Wax and the Debutmont bit on completes it', () => {
     expect(roll(deb.bit)).toEqual([t.id]);
     expect(roll(deb.bit | other.bit)).toEqual([t.id]);
   });
@@ -161,16 +162,18 @@ describe('MS-2: a biome mission completes only on a run with that biome switched
     game.events.on(EVT.MISSION_COMPLETED, (p) => got.push(p.id));
     game.registry.set(REG.BIOME_MASK, mask);
     game.events.emit(EVT.RUN_START, { runId: 'r', seed: 's' });
-    game.events.emit(EVT.DISTANCE_CHANGED, { meters: 1600 });
+    for (let i = 0; i < 3; i++) game.events.emit(EVT.POWERUP_COLLECTED, { id: 'mapleWax', durationMs: 2000, charges: 0 });
     missions.destroy();
     return got;
   }
 
   test('stateFor (live mission state) applies the same gate', async () => {
     const { missions } = await boot(memStorage());
-    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: 0 } }).done).toBe(true);
-    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: other.bit } }).done).toBe(true);
-    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: deb.bit } }).done).toBe(true);
+    const live = (biomeMask, n = 3) => ({ live: { pickups: { mapleWax: n }, biomeMask } });
+    expect(missions.stateFor(t, live(0)).done).toBe(true);
+    expect(missions.stateFor(t, live(other.bit)).done).toBe(true);
+    expect(missions.stateFor(t, live(deb.bit)).done).toBe(true);
+    expect(missions.stateFor(t, live(0, 2)).done).toBe(false);
     const gl = MISSIONS.templates.find((x) => x.id === 't4-biome-glacier');
     expect(missions.stateFor(gl, { live: { distanceM: 2100, biomeMask: 0 } }).done).toBe(false);
   });
@@ -308,5 +311,81 @@ describe('MS-4 (#65): "Ride 3 arcade bridges"', () => {
     const p = v1({ xp: xpAt(4), missions: { counter: 1, active: [t.id], progress: {} } });
     const out = rollSet(p, [t], rec({ ledgerHash: 'flat', biomeMask: 0 }), MISSIONS.templates, { biomeDefs: BIOME_DEFS });
     expect(out.completed).toEqual([]);
+  });
+});
+
+describe('MS-5 (#65): "Grab 3 Maple Wax in a run"', () => {
+  const t = MISSIONS.templates.find((x) => x.id === 't4-pickup-maple-wax');
+  const wax = { id: 'mapleWax', durationMs: 2000, charges: 0 };
+  const start = (game) => game.events.emit(EVT.RUN_START, {});
+
+  async function bootWith() {
+    const b = await boot(memStorage());
+    b.store.applyMissions({ active: [t.id], counter: 5, progress: {}, xp: 0, shards: 0 });
+    const done = [];
+    b.game.events.on(EVT.MISSION_COMPLETED, (p) => done.push(p.id));
+    return { ...b, done };
+  }
+
+  test('the template is a tier 4 singleRun on the per-id `pickups` counter, for the Debutmont power-up', () => {
+    expect(t).toMatchObject({ type: 'singleRun', tier: 4, metric: 'pickups', pickup: 'mapleWax', target: 3, biome: 'debutmont' });
+    expect(MISSIONS.templates.find((x) => x.id === 't4-biome-debutmont')).toBeUndefined();
+    const def = JSON.parse(fs.readFileSync('src/data/powerups/maple-wax.json', 'utf8'));
+    expect(def.id).toBe(t.pickup);
+  });
+
+  test('the counter moves once per Maple Wax pickup, and only for Maple Wax', async () => {
+    const { game, missions } = await bootWith();
+    start(game);
+    game.events.emit(EVT.POWERUP_COLLECTED, { id: 'packetBurst', durationMs: 1000, charges: 0 });
+    game.events.emit(EVT.POWERUP_COLLECTED, { id: 'hashedBackup', durationMs: 0, charges: 1 });
+    expect(missions.live.pickups.mapleWax).toBeUndefined();
+    game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    expect(missions.live.pickups).toMatchObject({ mapleWax: 1, packetBurst: 1, hashedBackup: 1 });
+    game.events.emit(EVT.DISTANCE_CHANGED, { meters: 800 }); // frames and other events never move it
+    expect(missions.live.pickups.mapleWax).toBe(1);
+  });
+
+  test('it completes on the third pickup, live, exactly once, and a junk id cannot poison the map', async () => {
+    const { game, missions, done } = await bootWith();
+    start(game);
+    game.events.emit(EVT.POWERUP_COLLECTED, { id: '__proto__' });
+    game.events.emit(EVT.POWERUP_COLLECTED, { id: 5 });
+    game.events.emit(EVT.POWERUP_COLLECTED, undefined);
+    expect(Object.keys(missions.live.pickups)).toEqual([]);
+    expect({}.polluted).toBeUndefined();
+    game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    expect(done).toEqual([]);
+    game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    expect(done).toEqual([t.id]);
+    game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    expect(done).toEqual([t.id]);
+  });
+
+  test('the payout at RUN_END reads the same counter, and the counter resets with each run (RUN_START from create())', async () => {
+    const a = await bootWith();
+    start(a.game);
+    for (let i = 0; i < 2; i++) a.game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    expect(a.missions.onRunCredited(rec({ ledgerHash: 'two' })).completed.map((c) => c.id)).toEqual([]);
+
+    const b = await bootWith();
+    start(b.game);
+    for (let i = 0; i < 3; i++) b.game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    expect(b.missions.onRunCredited(rec({ ledgerHash: 'three' })).completed.map((c) => c.id)).toEqual([t.id]);
+
+    const c = await bootWith();
+    start(c.game);
+    for (let i = 0; i < 2; i++) c.game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    start(c.game);
+    expect(c.missions.live.pickups).toEqual({});
+    c.game.events.emit(EVT.POWERUP_COLLECTED, wax);
+    expect(c.missions.onRunCredited(rec({ ledgerHash: 'next' })).completed).toEqual([]);
+  });
+
+  test('a pickups field smuggled into a RunRecord does not pay: the service replaces it with its own live count', async () => {
+    const { game, missions } = await bootWith();
+    start(game);
+    expect(missions.onRunCredited(rec({ ledgerHash: 'smuggled', pickups: { mapleWax: 9 } })).completed).toEqual([]);
   });
 });

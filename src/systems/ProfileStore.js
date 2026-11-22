@@ -65,6 +65,17 @@ const str = (v) => (typeof v === 'string' ? v : '');
 const strArr = (v) => (Array.isArray(v) ? Array.from(new Set(v.filter((s) => typeof s === 'string' && s))) : []);
 
 /**
+ * Missions retired by a data change, mapped to their replacement (#65: "1500 m in Debutmont" was trivial, every run
+ * starts in Debutmont). An active or in-progress old id keeps its slot as the replacement. A retired singleRun mission
+ * banks no progress worth keeping, so its progress entry is dropped. Applied after the legacy-biome rename.
+ */
+export const RETIRED_MISSIONS = Object.freeze({ 't4-biome-debutmont': 't4-pickup-maple-wax' });
+const migrateMissionId = (id) => {
+  const c = canonicalLegacyId(id);
+  return typeof c === 'string' && Object.hasOwn(RETIRED_MISSIONS, c) ? RETIRED_MISSIONS[c] : c;
+};
+
+/**
  * Mission progress keyed by mission id, with legacy ids (issue #65) moved to their canonical key. When both
  * the old and the new key exist the larger count wins, so a rename never loses progress or lowers it.
  * @param {*} raw
@@ -75,6 +86,7 @@ function canonicalMissionProgress(raw) {
   if (!raw || typeof raw !== 'object') return out;
   for (const [k, v] of Object.entries(raw)) {
     const id = canonicalLegacyId(k);
+    if (Object.hasOwn(RETIRED_MISSIONS, id)) continue;
     // Own-key writes only: a crafted "__proto__" key must not reach the prototype setter.
     if (id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
     const prev = Object.hasOwn(out, id) ? out[id] : undefined;
@@ -186,7 +198,7 @@ export function sanitizeProfile(raw, levels) {
     counter: nonNeg(m.counter),
     // Deduped before the cap: a hand-edited ['a','a','a'] would otherwise fill all three slots with one
     // mission and pay it three times on a single run.
-    active: strArr(strArr(m.active).map(canonicalLegacyId)).slice(0, 3),
+    active: strArr(strArr(m.active).map(migrateMissionId)).slice(0, 3),
     progress: canonicalMissionProgress(m.progress),
   };
   // W5: {id: unlockMs}. Only finite timestamps survive: a NaN or a string would sort unpredictably in the
