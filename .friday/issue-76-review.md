@@ -18,10 +18,10 @@ Every number below came from a command run in this worktree on 2026-11-21. The c
 | Policy-matrix runner | `tools/exploits/run-exploits.mjs` | runs 5 named policies through the real sim; exit 0/2/1 |
 | Judgement rules (pure) | `tools/exploits/lib/exploit-stats.cjs` | 27 unit tests |
 | Seed plan + record validation (pure) | `tools/exploits/lib/seed-plan.cjs` | 29 unit tests; added to fix the PR #187 blocker (§9) |
-| Harness docs | `tools/exploits/README.md` | policies, thresholds, `--seeds` contract, honest limits |
+| Harness docs | `tools/exploits/README.md` | policies, thresholds, `--seeds` contract, unmeasured-arm rule, honest limits |
 | Generated comparison report | `docs/exploit-factory-2026-11-21.md` | real 8-seed run, committed (regenerated through the fixed path, §9) |
-| Unit tests | `tests/exploits/exploit-stats.test.js`, `tests/exploits/seed-plan.test.js` | `node --experimental-vm-modules node_modules/jest/bin/jest.js tests/exploits` → **64 passed** |
-| End-to-end CLI wiring tests | `tests/exploits/runner-cli.test.js` | real CLI against a stub sim in a temp root; 8 tests |
+| Unit tests | `tests/exploits/exploit-stats.test.js`, `tests/exploits/seed-plan.test.js` | `node --experimental-vm-modules node_modules/jest/bin/jest.js tests/exploits` → **73 passed** |
+| End-to-end CLI wiring tests | `tests/exploits/runner-cli.test.js` | real CLI against a stub sim in a temp root; 17 tests |
 
 **Scope:** `tools/exploits/**`, `tests/exploits/**`, `docs/exploit-factory-*.md`, `.gitignore` (one entry for the
 regenerable `tools/exploits/out/`). **No** `src/**`, `js/**`, `public/**`, `package.json` or workflow changes.
@@ -151,7 +151,7 @@ all matching the committed report. Its corrections to my prose (§3 items 1 and 
 **Reviewer limitation, stated honestly:** it could not execute commands (`approval policy is never`), so it ran
 neither Jest nor `git diff`. Its test-count and scope claims are therefore unverified by it — I ran both myself
 (27 passed at that head, scope confirmed clean) and they are reported in §1 and §6. The current count at this head
-is 64 across three suites (§9).
+is 73 across three suites (§9, §10).
 
 ## 8. Residual risk / open items
 
@@ -239,7 +239,62 @@ pins the **before** comparison itself (`2 !== 'sim-01,sim-02'` is `true`) so the
 (`#190`, `#195`, `#196`) all ship without one — there is no gameplay or player-visible change here. Flagging it
 explicitly rather than deciding it quietly: if Gal Friday wants a `v2.15.2` tooling entry, say so and I will add it.
 
-## 10. Ask
+## 10. Second pass: three more ways a failed arm could be read as a result (FIXED)
+
+Gal Friday's fix request ended with *"ensure partial/failed arms can never be called valid/dominant."* The §9 work
+made the *record gate* fail closed, but the report layer still had three ways to present an unmeasured arm as a
+measurement. All three reproduced first, then fixed.
+
+| # | defect | how it was reproduced | fail-open? |
+| --- | --- | --- | --- |
+| 1 | `--reuse` exited **0** on an incomplete record | re-reported a record with a dropped `flip` arm: `EXIT=0`, report said "incomplete" only in prose | Yes — `&&` chains, CI steps and scripts saw success |
+| 2 | FAILURES printed `exited incomplete: \`undefined\`` | validation failures carry `detail`, but the template read only `f.stderr` | Not a false pass, but it made the failure unactionable — a report that names a failure and cannot say why |
+| 3 | a failed arm got a **statistical verdict** ("Not dominant. only 0 paired seed(s)") instead of being called unmeasured | re-used a record with a failed `flip` arm | Yes — reads as *no exploit found* when nothing was measured |
+
+Defect 3 was the substantive one. "Not dominant" is a claim about a completed comparison; an arm with no record has
+not been compared at all. A failed **baseline** was worse: every candidate still received a "Not dominant" verdict
+rendered against an absent baseline — a statistical statement about nothing.
+
+**Fix:**
+
+- `--reuse` sets `exitCode = 2` when the record it reads already carries failed arms, and says so on stderr. A
+  re-reported partial run is still partial.
+- The FAILURES block prefers `detail`, falls back to `stderr`, and prints `no reason recorded` rather than
+  `undefined` when neither is present.
+- A failed arm gets **no verdict, no metrics-table row and no engagement line** — only an *Unmeasured* block naming
+  which side was missing (the arm, or the baseline). `baselineRuns.length === 0` counts as a failed baseline even
+  without an explicit failure entry, so a truncated record cannot slip through.
+- The `_No candidate policies were run; only the baseline._` note now only appears when that is actually true,
+  instead of contradicting the Unmeasured block above it.
+
+**Evidence at this head:**
+
+```
+$ node tools/exploits/run-exploits.mjs --reuse <clean record>          -> EXIT=0
+$ node tools/exploits/run-exploits.mjs --reuse <record with 1 failed arm>
+                                                                       -> EXIT=2
+   re-reported record carries 1 failed arm(s); this report is incomplete
+
+## FAILURES
+- `flip` failed (incomplete): `expected 4 run(s), record has 2`
+
+### `flip` vs `handsOff`
+**Unmeasured — the arm did not produce a usable record.** No dominance verdict is offered: a missing
+measurement is not evidence of absence. See FAILURES below.
+```
+
+Metrics table in that run lists `handsOff` only — the failed `flip` arm has no row, instead of `| flip | 0 | n/a |`.
+
+`jest tests/exploits`: **73 passed** (27 + 29 + 17). Nine new tests cover the three defects through the real
+`--reuse` CLI path, including a positive case (`DOMINANT on score` still appears for a genuinely dominant
+candidate) so the guard cannot degrade into "always say unmeasured".
+
+**Self-inflicted error worth recording:** my first attempt at the metrics-table guard declared `failedPolicies`
+twice in the same function scope, and a follow-up patch deleted the `if (baselineFailed) {` opener while keeping its
+body. Both were caught by `node --check` and the test suite before commit — but they are why the suite is run at the
+end of each edit round rather than once at the end.
+
+## 11. Ask
 
 Marvin: please have **Gal Friday** review PR #187. Left at the review gate — no merge from my side. On approval I
 merge, verify the landed diff and confirm #76's acceptance criteria are met (a repeatable seed suite and a
