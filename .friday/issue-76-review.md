@@ -162,7 +162,72 @@ neither Jest nor `git diff`. Its test-count and scope claims are therefore unver
 4. **`node_modules` in this worktree is a symlink** to the #117 worktree's install (disk is at 89%, 16 G free). It is
    gitignored and not part of the diff, but a fresh clone needs `npm install` before the harness runs.
 
-## 9. Ask
+## 9. PR #187 blocker: `--seeds a,b` marked valid runs incomplete (FIXED)
+
+Gal Friday's review found the runner's own seed handling reproduced wrongly. Reproduced first, then fixed.
+
+```
+$ node tools/exploits/run-exploits.mjs --seeds sim-01,sim-02 --policies handsOff --maxM 100 --maxSec 5 --workers 1
+=== handsOff (policy handsOff)
+  FAILED (expected sim-01,sim-02 run(s), record has 2)
+...
+| handsOff | 0 | n/a | n/a | n/a | n/a |
+EXIT=2
+```
+
+**Root cause:** one line —
+
+```js
+const seeds = a.seeds && String(a.seeds).includes(',') ? String(a.seeds) : intArg(...);
+...
+if (got.length !== seeds) { /* "incomplete" */ }
+```
+
+For a list, `seeds` stayed the raw CLI **string**, so `2 !== 'sim-01,sim-02'` was always true. Two good runs were
+thrown away, the arm contributed nothing, and the harness exited 2 on a valid command. The same line also silently
+lost every identity check: the count was the only thing compared, so a record with the right number of runs and the
+wrong seeds passed.
+
+**Fix** — new pure `tools/exploits/lib/seed-plan.cjs`:
+
+- `planSeeds(raw)` resolves the value **once**, before anything runs: `--seeds 8` → `sim-01..sim-08` (the sim's own
+  naming, pinned by a test that extracts `expandSeeds` out of `tools/sim/run.mjs` and compares), `--seeds a,b` →
+  exactly `['a','b']`. The runner then always passes the sim an **explicit list**, so the two expansions cannot
+  drift apart.
+- `validateRecord(rec, {seeds, policy})` requires **exactly** the planned identities, once each, from the requested
+  policy. Count, membership, duplication and provenance are all checked.
+- Fail-closed usage errors (exit 1, before a browser starts): duplicate seeds, empty entries (`a,,b`, `a,`, `,a`),
+  bare `--seeds` (which parses as the string `true`), non-integer counts, and names that would break the report
+  table or the quoting round trip.
+
+`tools/sim/run.mjs` is **not modified** — the fix is entirely on the calling side, which matters because three other
+PRs are editing that directory.
+
+**Evidence (all commands run in this worktree):**
+
+| check | result |
+| --- | --- |
+| reviewer's exact command, after | `EXIT=0`, `2 run(s)`, report table `handsOff \| 2 \| 100 [100-100] \| 100.2 …` |
+| `--seeds 2` (numeric, unchanged behaviour) | `EXIT=0`, `args.seedList = ['sim-01','sim-02']` |
+| `sim-01,sim-01` / `sim-01,,sim-02` / `sim-01,` / `true` / `0` / `8.5` | each `EXIT=1` with a named reason, no subprocess, no record |
+| real headless 4-seed list, 2 policies (`sim-01,sim-03,sim-05,sim-07`, 600 m/40 s) | `EXIT=0`, 8 runs, `failures: []`, pairs on sim-01/03/05/07 only |
+| regenerated 8-seed committed report | **byte-identical** to the committed one except the header line |
+| `jest tests/exploits` | **64 passed** (was 27): 27 existing + 29 `seed-plan` + 8 `runner-cli` |
+| `npm run test` | 2672 passed, 9 failed — the same 7 suites / 9 tests fail with my changes stashed (pre-existing) |
+| `npm run build` | ✓ built (217 modules) |
+
+`tests/exploits/runner-cli.test.js` is the wiring proof, not just a rule proof: it copies the real CLI into a temp
+root with a **stub** `tools/sim/run.mjs`, so the full path (parse → plan → subprocess → validate → exit code) runs
+with no browser and no game physics, and it drives records the real sim should never produce — short, duplicated,
+substituted, `no results[]` — each asserted to be a failed arm with exit 2 and zero runs counted. The unit file also
+pins the **before** comparison itself (`2 !== 'sim-01,sim-02'` is `true`) so the defect cannot return as a
+"simplification".
+
+**Versioning note:** no `CHANGELOG`/`package.json` bump. This branch and the tooling-only PRs already merged
+(`#190`, `#195`, `#196`) all ship without one — there is no gameplay or player-visible change here. Flagging it
+explicitly rather than deciding it quietly: if Gal Friday wants a `v2.15.2` tooling entry, say so and I will add it.
+
+## 10. Ask
 
 Marvin: please have **Gal Friday** review PR #187. Left at the review gate — no merge from my side. On approval I
 merge, verify the landed diff and confirm #76's acceptance criteria are met (a repeatable seed suite and a
