@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.18.0 — canopy, airbrake and flip exploit research policies (#214 / #215) (2026-11-22)
+
+- **Developer Exploit Factory can now actually test the playtested canopy + airbrake + flip combination.** Adds two deterministic scripted candidates: `canopyHop` (airbrake/canopy without intentional flips) and `canopyFlip` (flip first, canopy after steering release, airbrake on descent while maintaining forward motion), against unchanged hands-off and flip controls. Simulator pad now routes real held/pressed canopy and airbrake signals; the result records observed active control times rather than assuming a named policy acted.
+- **24-seed matched comparison and pursuer distance diagnostics.** The report tracks the active BSOD's smallest observed 60 Hz gap to the rider, actual airborne/trick activity, score, distance, terminal cause and timeout censoring. These are headless diagnostics, not a claim of infinite airtime, an anti-cheat proof, or an approved balance change. No authoritative gameplay, collision, replay format or music code changes.
+
 ## v2.17.0 — local course ghost lineup (#178 / #81) (2026-11-22)
 
 - **Choose which ghosts appear on your next run.** Open Course Ghosts from Game Over with **G** or **Ghost Fav**. Set local Best and Latest visibility for that course, and pin, replace or clear Favorites A–C. Global Best and Latest settings still take precedence, and a tape shared by several roles draws only once. The lineup stays on this device; replay formats, scoring and online sharing are unchanged.

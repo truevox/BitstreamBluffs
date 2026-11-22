@@ -390,6 +390,7 @@
       bands: {}, generatedToM: 0, openingGraces: 0, trace: [],
       shards: 0, nearMisses: 0, score: 0, scoreAt: 0, tricks: {}, maxAirtimeMs: 0, bestCombo: 1,
       inputActivity: { airborneFrames: 0, tiltFrames: 0, airBrakeHeldFrames: 0, airBrakeActiveFrames: 0, parachuteHeldFrames: 0, parachuteActiveFrames: 0, overlapHeldFrames: 0, overlapActiveFrames: 0 },
+      minBsodGapPx: null, finalBsodGapPx: null, bsodActiveFrames: 0,
     };
     let tMs = 0; // run clock as the harness sees it (frames * DT)
     let lastLanding = null;
@@ -600,6 +601,15 @@
       // ---- observe
       const s = scene.sled;
       const distM = distOf(s.x);
+      // This reads the authoritative pursuit snapshot AFTER the game tick; it
+      // never moves the BSOD or changes gameplay. At 60 Hz, this is a sampled
+      // minimum, not a guarantee about the unsampled 120 Hz substep.
+      const pursuit = scene.bsodState;
+      if (pursuit?.active && Number.isFinite(pursuit.gapPx)) {
+        R.bsodActiveFrames++;
+        R.finalBsodGapPx = pursuit.gapPx;
+        R.minBsodGapPx = R.minBsodGapPx === null ? pursuit.gapPx : Math.min(R.minBsodGapPx, pursuit.gapPx);
+      }
       if (s.speed > R.maxSpeed) { R.maxSpeed = s.speed; R.maxSpeedAtM = distM; R.zoomAtMaxSpeed = scene.cameras.main.zoom; }
       const z = scene.cameras.main.zoom;
       if (z < R.minZoom) { R.minZoom = z; R.minZoomAtM = distM; }
