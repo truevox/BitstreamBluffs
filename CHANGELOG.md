@@ -1,9 +1,42 @@
 # Changelog
 
-## v2.19.2 — portable deterministic math: same simulation in every browser (#121 / #209) (2026-11-22)
+## v2.19.6 — portable deterministic math: same simulation in every browser (#121 / #209) (2026-11-22)
 
 - **The authoritative simulation no longer depends on the browser's math library.** Firefox and WebKit returned different last bits than Chromium for `hypot`, `exp`, `cos`, `atan2` and others, so the same inputs could drift apart and, on a knife-edge hazard contact, end differently (a Firefox run survived a hazard that Chromium crashed on). Every simulation file now takes `sin/cos/tan/asin/acos/atan/atan2/exp/expm1/log/log1p/log2/log10/pow/hypot/tanh/sinh/cosh/cbrt` from `src/systems/pmath.js`, a facade over the exactly pinned, Apache-2.0 `@stdlib/math-base-special-*` packages (pure IEEE arithmetic, identical bits in Chromium, Firefox and WebKit), and the nine trig/pow/acos functions inside Phaser's bundled Matter are replaced the same way (`src/systems/MatterPortable.js`, no fork; `phaser` is now pinned exactly to 3.90.0). Presentation code (backgrounds, audio, UI, particles) keeps the native `Math`, and a test fails if a new native call appears in a simulation file.
 - **Physics-breaking, pre-release (`SIM_REVISION` 4).** Results differ from the native math in the last bit for about 1% of `sin`/`cos` calls, so older tapes and the terrain digests pinned in three tests change (terrain geometry differs by at most 8.7e-11 px, no structural change). No new gameplay rules and no player-visible tuning change.
+## v2.19.5 — developer reaction-seed sensitivity comparison (#218 / #126) (2026-11-22)
+
+- **Compare matched synthetic hop-noise runs across reaction seeds.** The local CLI accepts two to eight complete classic panels with the same settings and per-course ideal control evidence. It reports pass counts and the courses that flip, with source file hashes and a caller-asserted build pin. It does not expose raw trials, select a Daily, estimate human fairness, or change game behavior.
+
+- **Integration:** developer-only comparison tool was validated on current v2.19.4 release (SIM_REVISION 3); original Morgan implementation unchanged. No gameplay, published Daily selection, human-skill model or replay verifier modified.
+
+## v2.19.4 — cross-engine replay conformance matrix (#161 / #120) (2026-11-22)
+
+- **Developer-only conformance harness and evidence; no game, replay-format or gameplay changes.** `tools/conformance/cross-engine*.mjs` replays nine committed fixture tapes through the real built game on Chromium, Firefox and Playwright WebKit at 30/60/120/144 Hz stepping, compares diagnostic (non-authoritative) per-tick digests split into causal state and derived reads, reports the first divergent tick and subsystem, TapePlayer checkpoint desyncs and final outcomes, and isolates `Math.*` differences with a pure-JS counterfactual (evidence for #121). Results and reproduction are in `docs/determinism/cross-engine-matrix.md`. Playwright WebKit is not iPhone Safari; real Safari/iOS, ARM and hardware GPUs were not tested.
+
+- **Historical measurement, current diagnostic tools:** The 400 sequential and 45 fresh-context rows were collected against v2.18.1 (main `7d5780f`), before v2.19.0 Kodiak shoves, v2.19.1 causal isolation and v2.19.3 prior-run-state reset. They are retained as provenance and demonstrate the earlier cross-engine math differences; **they are not a new verification of v2.19.3**. The #219 session leak is now fixed, while exact portable math parity remains open under #121. No gameplay or trusted replay-verifier code changes.
+
+## v2.19.3 — every run starts from identical sim state (#120) (2026-11-22)
+
+<!-- friday-issue: 120 -->
+- **A run no longer depends on what ran before it in the same page session.** `RunScene` is one instance for the whole session and `create()` did not reset `_biomeSector`, `_lastBiome` (and the tutorial latches `_hopped`/`_pushed`). With a biome mask, tick 1 compares the sled's sector with `_biomeSector`: a fresh page saw a "change" and called `refreshPalette`, which previously (before #160) rebuilt colliders; a later run could skip its initial biome repaint and cue. The same tape ran differently by session position (found by the #120 matrix: `chunk-biome-boundaries` as run #4 after a terrain crash survived 815 m instead of crashing at 835 m). `create()` now resets these fields so every run starts like run #1. Tests: `tests/replay/sessionIsolation.test.js`; diagnostic browser probe `tools/determinism/session-isolation-probe.mjs`.
+- **Replay and the calendar date was already fixed on main** by the replay-manifest work (Replay Contract R-1: daily rule, Sync Level and Kodiak/magnet flags come from the tape header). No change here.
+
+- **Integration:** #140 (v2.19.1, SIM_REVISION 3) already removed biome repaint as a cause of physics divergence, so these create-time field resets now address previous-run **presentation/cue and state hygiene**, not a new physics fix. The released SIM_REVISION remains 3 and the source tripwire is attested as non-causal. Historical browser evidence is preserved as original; a fresh run on the current combined source is part of integration verification.
+
+## v2.19.2 — savestate feasibility study, Phase 1 research (#119 / #159) (2026-11-22)
+
+- **Research only: no savestates ship, and no gameplay, physics, replay format or `src/` change.** Adds `docs/determinism/savestate-feasibility.md`.
+  - It inventories the complete Matter and game state that a tick-boundary save/restore needs.
+  - It shows that restoring a GhostTape checkpoint diverges on the next tick.
+  - It shows that a full diagnostic snapshot, restored into a fresh scene and world in the built game, replays bit-identically. The fixtures are contact-heavy and hazard-heavy, and were compared over 500 and 520 ticks.
+  - It proposes a build-bound savestate contract with completeness checks, and gives a conditional GO for Phase 2.
+- **Experimental harnesses:**
+  - `tools/savestate-experiment/` (pure-Matter and Chromium experiments, with results).
+  - `tests/determinism/savestate-matter.test.js` (16 tests).
+  - Their digests are diagnostic and non-authoritative; Replay Contract #152 owns canonical fingerprints.
+
+- **Post-integration context:** #155 camera read was already fixed by v2.16.1 and #140 causal isolation merged in v2.19.1 (simulation revision 3, preserving Kodiak shove revision 2). Canonical collider construction and stable-key TelegraphTracker remain separate Phase 2 prerequisites. The old Chromium snapshot measurements are archived as research evidence, not retested on the new physics; no production savestate code ships.
 
 ## v2.19.1 — simulation/presentation causal isolation (#160 / #140) (2026-11-22)
 
