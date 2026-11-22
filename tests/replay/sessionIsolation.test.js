@@ -85,3 +85,15 @@ describe('no instance field survives from the previous run', () => {
     expect(leaked).toEqual([]);
   });
 });
+
+describe('create() returns every per-run field to its initial value', () => {
+  // Mutant check: removing any one reset line in RunScene.create makes the matching case fail (verified by hand, see PR #219).
+  const DIRTY = { _biomeSector: 3, _lastBiome: true, lastBoost: { amountPxS: 99, t: 1234 }, boostId: 'mapleWax', _hopped: true, _pushed: true };
+  const INITIAL = { _biomeSector: undefined, _lastBiome: undefined, lastBoost: null, boostId: null, _hopped: false, _pushed: false };
+  test.each(Object.keys(DIRTY))('%s', (field) => {
+    const scene = createRun(RunScene, REG, { seed: 'ISO-RESET', biomeMask: MASK });
+    scene[field] = DIRTY[field];
+    restart(scene);
+    expect(scene[field]).toEqual(INITIAL[field]);
+  });
+});

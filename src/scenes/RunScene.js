@@ -355,7 +355,10 @@ export class RunScene extends Phaser.Scene {
     // run changed the first tick of this one by session position (issue #120). Every run starts as run #1 does.
     this._biomeSector = undefined;
     this._lastBiome = undefined;
-    // Same reason: the previous run's tutorial pulse latches.
+    // Presentation state of the previous run (a stale boost hint at run start, a stale POWERUP_EXPIRED id):
+    this.lastBoost = null;
+    this.boostId = null;
+    // Defensive: update() rewrites these every frame, so today they carry nothing over.
     this._hopped = false;
     this._pushed = false;
     this.streamTerrain(0);

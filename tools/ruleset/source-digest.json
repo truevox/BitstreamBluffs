@@ -3,7 +3,7 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 1,
-  "attestation": "behavior-change-unreleased: #120 RunScene.create resets _biomeSector/_lastBiome/_hopped/_pushed so the mask != 0 first-tick biome repaint (collider rebuild before #160) no longer depends on the previous run in the session; ruleset unreleased (SIM_REVISION 1 > LAST_RELEASED 0)",
+  "attestation": "behavior-change-unreleased: #120 RunScene.create resets _biomeSector/_lastBiome/lastBoost/boostId (+ defensive _hopped/_pushed) so a run no longer inherits the previous run's first-tick biome repaint and boost hint; ruleset unreleased (SIM_REVISION 1 > LAST_RELEASED 0)",
   "changedFiles": [
     "src/scenes/RunScene.js"
   ],
@@ -14,7 +14,7 @@
     "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
     "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
     "src/entities/TerrainMesh.js": "sha256:a88f6a99aab6298034ef99d6c9d90489f1cf0a7f0f305c526b7e358b6bc59003",
-    "src/scenes/RunScene.js": "sha256:65082d28330fe9cd7198c7c2096e38b4d480811d2b2767484c318b274293cf22",
+    "src/scenes/RunScene.js": "sha256:0bbfedbeae66cfa1047e44ee19777a8cd4247b07390d44276024375fd75e53ba",
     "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:dbe861d0a1fb6e73f94d467583ea9190ec88cc986fa39982b28687d75ca18397",
