@@ -118,8 +118,8 @@ Classes:
 - **R\***: presentation state the tick reads today. Required until the read is removed.
 
 The RunScene column is machine-checked. `game-state-kit.js` classifies every own property of RunScene, and
-capture fails on an unclassified one. At tick K the counts were SIM 88, CONFIG 28, PRESENTATION 20,
-PRESENTATION_READ_BY_SIM 7, NON_SERIALIZABLE 1, METADATA 5, INFRA 30, unclassified **0**.
+capture fails on an unclassified one. At tick K (hazard fixture) the counts were SIM 89, CONFIG 26,
+PRESENTATION 23, PRESENTATION_READ_BY_SIM 7, NON_SERIALIZABLE 1, METADATA 5, INFRA 30, unclassified **0**.
 
 ### 4.1 Matter engine and world
 
@@ -172,7 +172,9 @@ PRESENTATION_READ_BY_SIM 7, NON_SERIALIZABLE 1, METADATA 5, INFRA 30, unclassifi
 | `TelegraphTracker` (`teleTracker`) | **not serializable** | `WeakMap`/`WeakSet` keyed by Hazard identity. Drives audio cues and `h.teleAtMs` (crash-report metadata), not physics or score. Must be re-keyed by stable hazard ids before Phase 2 |
 | `_teleMarks` | R (derived each tick) | |
 | `_view`, `_camX`, `_camY`, `_zoom`, `_zoomKick`, `shakeAmp`, `_landingShake`, `cameras.main` scroll/zoom | **R\*** | `updateGroundTelegraph` reads `this._view.right` (#155). `updateCamera` lerps from history with **frame** dt. E2 `-camera` diverges at K+1 |
-| seed, biomeMask, daily*, loadout, upgrades, boostFx, magnetsDrop, kodiaksOn, kodiakPackMode, startX, content, tuner, settings, palette, look, bestM | D | verified equal on restore (`snap.config`; mismatch throws) |
+| seed, biomeMask, daily*, loadout, upgrades, boostFx, magnetsDrop, kodiaksOn, kodiakPackMode, startX, content, tuner, settings, bestM | D | verified equal on restore (`snap.config`; mismatch throws) |
+| `look`, `palette` (and copies inside Hazard, ShardField and Sled) | P | re-resolved when the biome sector changes (RunScene ~L2383). The experiment first had them as CONFIG, and the config check caught it |
+| references to despawned entities (`_crashHazard` and its removed body) | R (as dead refs) | crash-report data; the body can never collide again |
 | `runId`, `startedAt` (wall clock), `ghostRecorder`, `tapePlayer` | metadata | a resumed run's ghost tape needs the recorder's inputs and checkpoints (see section 9) |
 | Phaser timers/tweens that feed the sim | **none** | `run.time` active 0, tweens 0; no `this.time`/`delayedCall` in RunScene or its sim systems. `setTimeout` exists only in AudioSynth and SaveStore |
 | cross-scene writes into RunScene | none found | UIScene `RunMinimap` and the billboard only **read** RunScene, but a generator read can mutate its cache (see TerrainGenerator) |
@@ -225,7 +227,108 @@ All of these are pinned in `tests/determinism/savestate-matter.test.js` (12 test
 
 ## 6. E2: real game results
 
-<!-- BROWSER_RESULTS -->
+Fixtures (tick-indexed input tapes, one tick per frame):
+
+- **contact**: seed `SAVE119`, with scramble forced on for the whole run so the physics RNG stream is
+  exercised. The tape pushes, hops (×3), tilts, spins and tucks on terrain. K=600 and N=1100 (500 compared
+  ticks). At K the world has 220 bodies and 3 active sled/terrain pairs; score is 135.
+- **hazard**: seed `SAVE119H@2047` (all biomes). The sled is placed at x=107000 before tick 1, in a Gear Gate
+  cluster, with Kodiaks forced on and 99 shield charges, so hits are absorbed instead of ending the run.
+  K=480 and N=1000 (520 compared ticks). At K there are 3 hazards (2 moving gates), 2 Kodiaks out (`kodiakNext=1`),
+  276 world bodies, 6506 pooled terrain colliders, a `_crashHazard` that points at a despawned hazard, and score 11045.
+
+Levels:
+
+| Level | What it restores |
+| --- | --- |
+| `ghost` | The GhostTape checkpoint only: sled pose and velocity, plus tick and run clock. Terrain is streamed to the sled. |
+| `game` | All RunScene SIM state and the world rebuild. Matter is restored by pose only. |
+| `kinematic` | Adds raw sled integrator state. |
+| `contacts` | Adds pairs, timing, detector order, and the raw geometry of every body, statics included. |
+| `full` | Adds ids, world order, `_nextId`, the collider pool, and the camera and view (#155). |
+
+"Left out" rows remove one item from `full`. `control` compares two uninterrupted runs: the digest baseline.
+"Max sled pos err" is rounded to 4 decimals, so `0` means below 0.0001 px. Those divergences still change
+gameplay state within ticks: in `contact/game` the **score** digest diverges at tick 612 (K+12), and in
+`hazard/game` at 482 (K+2).
+
+| Fixture | Level | Left out | First divergent tick (after K) | First sled divergence | Max sled pos err (px) | Subsystems differing at the first divergent tick |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact | control | - | **exact** (500 ticks) | exact | exact |  |
+| contact | ghost | - | 601 (+1) | 601 | 5.0636 | runRandom, shardField, sled, runTimeMs, _hudMs, maxAirtimeMs, lastTotal, scrambleMs, openingGraces, safeSamples, shardChain, shardChainAt, shardTotal, shardCoun… |
+| contact | game | - | 601 (+1) | 601 | 0 | sled, tricks, bsodState, bsodBluffs, matter.bodies, matter.worldOrder, matter.pairs, matter.ids, matter.timing, camera(#155) |
+| contact | kinematic | - | 601 (+1) | 601 | 0 | sled, tricks, bsodState, matter.bodies, matter.worldOrder, matter.pairs, matter.ids, matter.timing, camera(#155) |
+| contact | contacts | - | 601 (+1) | exact | exact | matter.worldOrder, matter.ids, camera(#155) |
+| contact | full | - | **exact** (500 ticks) | exact | exact |  |
+| contact | full | camera | 601 (+1) | exact | exact | camera(#155) |
+| contact | full | ids | 601 (+1) | exact | exact | matter.worldOrder, matter.ids |
+| contact | full | runRandom | 601 (+1) | 601 | 5.0499 | runRandom, sled, tricks, bsodState, bsodBluffs, matter.bodies, matter.pairs, camera(#155) |
+| contact | full | impulses | 601 (+1) | 601 | 0 | sled, tricks, bsodState, matter.bodies, matter.pairs, camera(#155) |
+| contact | full | staleSupport | **exact** (500 ticks) | exact | exact |  |
+| contact | full | timing | 601 (+1) | 601 | 45.1217 | sled, tricks, bsodState, bsodBluffs, matter.bodies, matter.pairs, matter.timing, camera(#155) |
+| contact | full | positionImpulse | **exact** (500 ticks) | exact | exact |  |
+| contact | full | rawGeometry | 601 (+1) | 601 | 0 | sled, bsodState, bsodBluffs, matter.bodies, matter.pairs, camera(#155) |
+| hazard | control | - | **exact** (520 ticks) | exact | exact |  |
+| hazard | ghost | - | 481 (+1) | 481 | 7.6916 | runRandom, terrain, hazards, shardField, sled, runTimeMs, _hudMs, _crashHazard, maxAirtimeMs, lastTotal, shieldCharges, safeSamples, blinkMs, shardChain, shardC… |
+| hazard | game | - | 481 (+1) | 481 | 0 | sled, tricks, bsodState, bsodBluffs, kodiaks, _teleMarks, matter.bodies, matter.worldOrder, matter.pairs, matter.ids, matter.timing, camera(#155), pool |
+| hazard | kinematic | - | 481 (+1) | 481 | 0 | sled, tricks, bsodState, kodiaks, _teleMarks, matter.bodies, matter.worldOrder, matter.pairs, matter.ids, matter.timing, camera(#155), pool |
+| hazard | contacts | - | 481 (+1) | exact | exact | matter.worldOrder, matter.ids, camera(#155), pool |
+| hazard | full | - | **exact** (520 ticks) | exact | exact |  |
+| hazard | full | camera | 481 (+1) | exact | exact | camera(#155) |
+| hazard | full | ids | 481 (+1) | exact | exact | matter.worldOrder, matter.ids, pool |
+| hazard | full | runRandom | 481 (+1) | exact | exact | runRandom |
+| hazard | full | impulses | 481 (+1) | 481 | 0 | sled, tricks, bsodState, kodiaks, _teleMarks, matter.bodies, matter.pairs, camera(#155) |
+| hazard | full | staleSupport | **exact** (520 ticks) | exact | exact |  |
+| hazard | full | timing | 481 (+1) | exact | exact | matter.pairs, matter.timing |
+| hazard | full | positionImpulse | **exact** (520 ticks) | exact | exact |  |
+| hazard | full | rawGeometry | 481 (+1) | 481 | 0 | sled, bsodState, bsodBluffs, matter.bodies, matter.pairs |
+| hazard | full | kodiaks | 481 (+1) | exact | exact | kodiaks |
+| hazard | full | bsod | 481 (+1) | exact | exact | bsod, bsodState, bsodBluffs |
+| hazard | full | hazardHit | **exact** (520 ticks) | exact | exact |  |
+| hazard | full | pool | 481 (+1) | exact | exact | pool |
+
+Reading the table:
+
+- **GhostTape checkpoint restore (`ghost`) diverges at K+1 in both fixtures.** In `hazard/ghost`, these
+  subsystems all differ at K+1: run clock, RNG streams, terrain generator, hazards, Kodiaks, BSOD, score,
+  shields and tricks. Sled position error reaches 5.1 px (contact) and 7.7 px (hazard).
+- **All game state with Matter restored by pose (`game`) still diverges at K+1**, in the sled's
+  low bits (`positionPrev`/`anglePrev`, raw geometry, warm-start impulses). Score diverges at K+12 (contact)
+  and K+2 (hazard).
+- **`contacts` keeps the sled, score, Kodiaks and hazards exact for every compared tick.** Only ids and world
+  order, the camera and the pool differ. In `hazard/contacts`, a hazard's `teleAtMs` diverges at 510 through
+  the camera.
+- **`full` is exact in every subsystem digest, every tick (500 and 520 ticks).** This covers Matter bodies,
+  pairs, ids, timing, world and detector order, the pool, the camera, every RunScene SIM field, the generator,
+  hazards, Kodiaks and RNG.
+- **Ablations.**
+  - In the game these break the sled at K+1: cached impulses, `engine.timing` (contact only, 45 px by the end),
+    raw geometry, RNG (contact, because scramble is on).
+  - The camera (#155) changes `h.teleAtMs` on hazards from tick 510. It is crash-report metadata, but it is
+    stored on a sim object.
+  - Kodiaks and BSOD left out diverge only in their own subsystems within the window. The sled never reached
+    them, but they are clearly causal (a Kodiak hit is a crash hazard).
+  - With only one dynamic body in the game, `staleSupport`, `positionImpulse`, ids, world order and the pool
+    did not change the sled inside these windows. E1 shows each of them is real state that breaks exactness
+    once multi-body contacts, new pairs or new pooled colliders occur.
+- **Game-level completeness checks fired for real:**
+  - `_crashHazard.body: Matter body hazard has no stable key`: sim state referenced a despawned body. It is
+    now encoded as an explicit dead reference.
+  - `CONFIG look differs`: `look`/`palette` are re-resolved per biome sector, so they are presentation, not
+    config.
+  - Per-bear Kodiak `Rng` instances had to be **materialized with their prototype**, because the fresh scene
+    has no live Kodiaks.
+  - `TelegraphTracker`'s WeakMaps were flagged as non-serializable.
+- **Size.** The JSON snapshot was 216 KB (contact) and **5.7 MB** (hazard). The hazard size comes from the
+  6506 pooled colliders that teleporting to x=107000 left behind; TerrainMesh's `_bodyPool` never shrinks.
+- **Digest hygiene.** An early control run differed only in **object key insertion order** inside the terrain
+  generator (identical values) at tick 1141 of two uninterrupted runs. Generator object history is not
+  identical even between identical runs (recycled chunk objects). The digests were made key-order-insensitive.
+  Array, Map and Set order is still compared.
+
+Raw results: `tools/savestate-experiment/results/{contact,hazard}.json` (per case: fixture stats, first
+divergent tick, the subsystems and leaf fields at that tick, the first divergent tick of every subsystem,
+restore log, field classification). Render with `node tools/savestate-experiment/results-table.mjs <files>`.
 
 ## 7. Findings worth knowing even without savestates
 
@@ -243,7 +346,12 @@ All of these are pinned in `tests/determinism/savestate-matter.test.js` (12 test
 5. **The terrain generator's cache is mutated by cosmetic reads**, including from UIScene's minimap on its own
    110 ms cadence. Physics is protected by #59's gate, but generator state is not a function of the tick.
 6. **TelegraphTracker keys state by object identity** (WeakMap/WeakSet), so it cannot be serialized.
-7. **`Common._nextId` is page-global.** Any Matter body created by another scene, or by a ghost or preview,
+7. **The TerrainMesh `_bodyPool` is never trimmed.** After a jump, such as the fixture's teleport or a Gym
+   reset, it can hold thousands of bodies (6506 here). Every pooled body is snapshot state while pooling
+   changes collider bits.
+8. **Sim objects hold references to despawned entities** (`_crashHazard` and its removed body). A serializer
+   needs an explicit "dead reference" form.
+9. **`Common._nextId` is page-global.** Any Matter body created by another scene, or by a ghost or preview,
    shifts every later id. The relative order of interacting bodies then matters for new pairs.
 
 ## 8. Serialization contract proposal (Phase 2 input, not a format decision)
@@ -311,6 +419,22 @@ SavestateV1 {
   a canonical state hash, a savestate could embed it as `expectedStateHashAtTick` so a restore can be checked
   against the authoritative replay. That is optional and does not define the hash. No GhostTape or TapePlayer
   interface was changed.
+- **Replay Contract v1.1** (#152, published 2026-11-22, canonical file at `dafb5ca`). It states that its
+  fingerprint field lists are by design a **subset** of what a restorable snapshot needs. It asks #159 to send
+  hidden causal variables through #152 change control, so fingerprints and savestates share one inventory.
+  Its classifications agree with this study:
+  - generator internals are non-causal (section 7.5);
+  - telegraph and camera state are presentation (the camera only reached `Hazard.teleAtMs`, never physics or
+    score, in E2);
+  - relative id order and detector order are causal.
+
+  This study adds candidates for a future subsystem schema bump, posted to #152:
+  - the stale `collision.supports[1]` slot and the contact-slot vertex identity;
+  - raw static collider bits (pool history);
+  - pair `timeUpdated` relative to `engine.timing.timestamp`.
+
+  None of these breaks v1.1; they matter for restore, not for detecting divergence. Savestates must reuse the
+  contract's subsystem names and field ownership for the shared parts.
 - **#56 GhostTape.** A run resumed from a savestate cannot produce a valid ghost tape unless the snapshot also
   carries the recorder (inputs and checkpoints so far). Heavy Mode should mark resumed runs as tool-assisted:
   local-first, and distinguishing human, AI and tool-assisted outcomes per the issue.
@@ -326,7 +450,7 @@ SavestateV1 {
 | Game code adds state without updating a schema table | silent divergence | capture-time audit (unclassified field = error), schemaHash |
 | Presentation-to-sim leaks (#155, generator cosmetic reads, minimap) | snapshot must carry presentation | fix the leaks; until then capture camera and view |
 | Pool and id history | exactness needs raw statics, the pool and ids | canonicalize collider construction (physicsVersion event) |
-| Snapshot size (about 213 KB JSON at tick 600; dominated by generator chunk points and static colliders) | storage and perf for frequent saves | store chunk data by index plus a generator hash, binary encoding, delta vs a base |
+| Snapshot size (216 KB JSON in the contact fixture; 5.7 MB in the hazard fixture, which carries 6506 pooled colliders because `_bodyPool` never shrinks) | storage and perf for frequent saves | store chunk data by index plus a generator hash, binary encoding, delta vs a base |
 | Slow divergences not caught by a one-tick self-test | false "trusted" | set checks plus longer verify on idle |
 | Over-claiming trust | misuse as proof of a run | section 9: savestates are not manifests |
 
