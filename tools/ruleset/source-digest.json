@@ -3,7 +3,7 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 1,
-  "attestation": "behavior-change-unreleased: #120 RunScene.create resets _biomeSector/_lastBiome/_view/_hopped/_pushed so a mask != 0 run's tick-1 collider rebuild no longer depends on the previous run in the session; only tapes recorded mid-session whose previous sector matched change; ruleset unreleased (SIM_REVISION 1 > LAST_RELEASED 0)",
+  "attestation": "no-behavior-change: ground telegraph warn and hop timing/arrival unchanged; remove prior camera state from cue planning and choose draw placement on already-streamed terrain without camera-driven generation",
   "changedFiles": [
     "src/scenes/RunScene.js"
   ],
@@ -14,7 +14,7 @@
     "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
     "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
     "src/entities/TerrainMesh.js": "sha256:a88f6a99aab6298034ef99d6c9d90489f1cf0a7f0f305c526b7e358b6bc59003",
-    "src/scenes/RunScene.js": "sha256:73d86daca15dececacd29072bf5f69283b3253d21c3b4698a76105b961493269",
+    "src/scenes/RunScene.js": "sha256:6ba948919e99c322bb87039aefcf39a14257c48bb21949ce8160422c35315c46",
     "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:dbe861d0a1fb6e73f94d467583ea9190ec88cc986fa39982b28687d75ca18397",

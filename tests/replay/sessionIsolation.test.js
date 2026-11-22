@@ -74,8 +74,9 @@ describe('no instance field survives from the previous run', () => {
     const used = createRun(RunScene, REG, { seed: 'ISO-KEYS', biomeMask: MASK });
     stepRun(used, 400);
     restart(used);
+    // `_view` (camera view) is rewritten by the first renderFrame and no sim code reads it since #155.
     // A key that exists only as null/undefined/false (teardown() nulls its objects) carries nothing into the next run.
-    const leaked = Object.keys(used).filter((k) => !freshKeys.has(k) && used[k] != null && used[k] !== false).sort();
+    const leaked = Object.keys(used).filter((k) => !freshKeys.has(k) && used[k] != null && used[k] !== false && k !== '_view').sort();
     // Lists the keys so a new leak names itself. Fields that only exist after the first tick of a run must be reset in create().
     expect(leaked).toEqual([]);
   });
