@@ -208,7 +208,6 @@ export function incompleteChecks(Matter, kit) {
     missingBody: (s) => { delete s.ids['pile:03']; delete s.bodies['pile:03']; },
     wrongVersion: (s) => { s.version = 99; },
     unknownPairPart: (s) => { if (s.pairs[0]) s.pairs[0].a = 'ghost#0'; },
-    uncapturedField: (s) => { s.audit = ['sled: newMatterField']; },
   };
   const out = {};
   for (const [name, mutate] of Object.entries(cases)) {
@@ -218,10 +217,30 @@ export function incompleteChecks(Matter, kit) {
     const B = buildWorld(Matter, 'same');
     try { kit.restore(B.engine, s, B.keyOf, 'full'); out[name] = 'NOT DETECTED'; } catch (e) { out[name] = `threw: ${e.message.slice(0, 90)}`; }
   }
-  // and the live audit: a field Matter does not know about is reported at capture time
-  A.sled.myNewState = 1;
-  out.liveAudit = kit.capture(A.engine, A.keyOf).audit;
-  delete A.sled.myNewState;
+  // Live audit: state that a Matter upgrade (or game code) might add, injected into each structural object. Each
+  // must show up in the capture audit, and a strict restore of that snapshot must refuse.
+  const injections = {
+    rootBody: [() => A.sled, 'myNewState'],
+    pair: [() => A.engine.pairs.list.find((p) => !p.isSensor), 'newPairState'],
+    collision: [() => A.engine.pairs.list.find((p) => !p.isSensor).collision, 'newCollisionState'],
+    contact: [() => A.engine.pairs.list.find((p) => !p.isSensor).contacts[0], 'cachedBias'],
+    engine: [() => A.engine, 'newSolverState'],
+    timing: [() => A.engine.timing, 'newClock'],
+    detector: [() => A.engine.detector, 'grid2'],
+    resolverStatic: [() => Matter.Resolver, '_newWarming'],
+  };
+  out.liveAudit = {};
+  for (const [name, [get, key]] of Object.entries(injections)) {
+    const obj = get();
+    obj[key] = 1;
+    const snap = JSON.parse(JSON.stringify(kit.capture(A.engine, A.keyOf)));
+    delete obj[key];
+    Common0(Matter);
+    const B = buildWorld(Matter, 'same');
+    let restore;
+    try { kit.restore(B.engine, snap, B.keyOf, 'full'); restore = 'NOT DETECTED'; } catch (e) { restore = 'threw'; }
+    out.liveAudit[name] = { audit: snap.audit, restore };
+  }
   return out;
 }
 
@@ -234,17 +253,20 @@ async function main() {
   results.push(runCase(Matter, kit, { level: 'full', history: 'pooled', captureStatics: true }));
   results.push(runCase(Matter, kit, { level: 'contacts', history: 'permuted', captureStatics: true }));
   // Ablations: the exact 'full' restore minus one item, in the friendliest fresh world ('same').
-  for (const s of ['impulses', 'staleSupport', 'detectorOrder', 'worldOrder', 'timing', 'positionImpulse', 'deltaTime', 'rawGeometry']) {
-    results.push(runCase(Matter, kit, { level: 'full', history: 'same', skip: [s] }));
+  // Repeated at a second snapshot tick: some items matter only in some states (K-dependent), see the doc.
+  for (const K of [300, 450]) {
+    for (const s of ['impulses', 'staleSupport', 'detectorOrder', 'worldOrder', 'timing', 'positionImpulse', 'deltaTime', 'rawGeometry']) {
+      results.push(runCase(Matter, kit, { level: 'full', history: 'same', skip: [s], K, N: K + 300 }));
+    }
   }
   // uninterrupted repeat (A vs A): the baseline is itself deterministic
   const geo = ['shuffled', 'pooled'].map((h) => staticGeometryDiff(Matter, h));
   const inc = incompleteChecks(Matter, kit);
   if (process.argv.includes('--json')) { console.log(JSON.stringify({ results, geo, inc }, null, 2)); return; }
   console.log(`K=${results[0].K} N=${results[0].N}; non-sensor pairs created after K in the reference run: ${results[0].newPairsAfterK}`);
-  console.log('level      history   statics  skip             firstDivTick  (+ticks)  maxPosErr(px)  endPosErr(px)  first field');
+  console.log('K    level      history   statics  skip             firstDivTick  (+ticks)  maxPosErr(px)  endPosErr(px)  first field');
   for (const r of results) {
-    console.log(`${r.level.padEnd(10)} ${r.history.padEnd(9)} ${String(r.captureStatics).padEnd(8)} ${r.skip.padEnd(16)} ${String(r.firstDivergentTick).padEnd(13)} ${String(r.ticksAfterRestore).padEnd(9)} ${String(r.maxPosErr).padEnd(14)} ${String(r.endPosErr).padEnd(14)} ${r.field || '-'}`);
+    console.log(`${String(r.K).padEnd(4)} ${r.level.padEnd(10)} ${r.history.padEnd(9)} ${String(r.captureStatics).padEnd(8)} ${r.skip.padEnd(16)} ${String(r.firstDivergentTick).padEnd(13)} ${String(r.ticksAfterRestore).padEnd(9)} ${String(r.maxPosErr).padEnd(14)} ${String(r.endPosErr).padEnd(14)} ${r.field || '-'}`);
   }
   console.log('static geometry vs fresh build:', JSON.stringify(geo));
   console.log('incomplete snapshot checks:', JSON.stringify(inc, null, 1));

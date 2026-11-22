@@ -41,14 +41,28 @@ describe('savestate feasibility: pure Matter round trip (contact-heavy fixture)'
     expect(runCase(Matter, kit, { level: 'full', history: 'pooled', K, N, captureStatics: true }).firstDivergentTick).toBeNull();
   });
 
-  test.each(['impulses', 'staleSupport', 'timing', 'positionImpulse', 'deltaTime', 'rawGeometry'])('leaving out %s breaks exactness', (skip) => {
-    const r = runCase(Matter, kit, { level: 'full', history: 'same', K, N, skip: [skip] });
-    expect(r.firstDivergentTick).toBe(K + 1);
+  // Items needed in EVERY tested state: removing any one breaks exactness on the first tick, at both K.
+  test.each([
+    [300, 'impulses'], [300, 'staleSupport'], [300, 'deltaTime'], [300, 'rawGeometry'],
+    [450, 'impulses'], [450, 'staleSupport'], [450, 'deltaTime'], [450, 'rawGeometry'],
+  ])('K=%i: leaving out %s breaks exactness at K+1', (k, skip) => {
+    const r = runCase(Matter, kit, { level: 'full', history: 'same', K: k, N: k + 300, skip: [skip] });
+    expect(r.firstDivergentTick).toBe(k + 1);
   });
 
-  test('incomplete snapshots fail visibly', () => {
+  // State-dependent items: needed at K=300, not needed in the K=450 window. "Not needed in one window" is not
+  // evidence of "not needed"; the doc keeps both as required.
+  test.each(['timing', 'positionImpulse'])('%s is state-dependent: K+1 at K=300, exact at K=450', (skip) => {
+    expect(runCase(Matter, kit, { level: 'full', history: 'same', K: 300, N: 600, skip: [skip] }).firstDivergentTick).toBe(301);
+    expect(runCase(Matter, kit, { level: 'full', history: 'same', K: 450, N: 750, skip: [skip] }).firstDivergentTick).toBeNull();
+  });
+
+  test('incomplete snapshots fail visibly (set checks, version, and a live key-set audit of every Matter object)', () => {
     const out = incompleteChecks(Matter, kit);
-    for (const k of ['missingBody', 'wrongVersion', 'unknownPairPart', 'uncapturedField']) expect(out[k]).toMatch(/^threw: /);
-    expect(out.liveAudit).toEqual(['sled: myNewState']);
+    for (const k of ['missingBody', 'wrongVersion', 'unknownPairPart']) expect(out[k]).toMatch(/^threw: /);
+    for (const [name, r] of Object.entries(out.liveAudit)) {
+      expect({ name, auditEntries: r.audit.length, restore: r.restore }).toEqual({ name, auditEntries: 1, restore: 'threw' });
+    }
+    expect(Object.keys(out.liveAudit)).toEqual(['rootBody', 'pair', 'collision', 'contact', 'engine', 'timing', 'detector', 'resolverStatic']);
   });
 });

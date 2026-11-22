@@ -1,0 +1,148 @@
+[
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "-",
+  "K": 480,
+  "N": 760,
+  "ticksCompared": 280,
+  "snapBytes": 5675341,
+  "fixtureStats": {
+   "tick": 480,
+   "sledX": 109564.43368981202,
+   "hazards": 3,
+   "movingHazards": 2,
+   "hazardsHit": 0,
+   "kodiaksOut": 2,
+   "kodiakNext": 1,
+   "pairs": 2,
+   "activePairs": 2,
+   "worldBodies": 276,
+   "pool": 6506,
+   "chunks": 3,
+   "score": 11026,
+   "crashed": false,
+   "nextId": 6904
+  },
+  "firstDivergentTick": 481,
+  "ticksAfterRestore": 1,
+  "subsystemsAtFirst": [
+   "hazards"
+  ],
+  "firstSledDivergentTick": null,
+  "firstLeaves": [
+   "hazards.__map.1.1.__arr.0.__obj.teleAtMs: A=3825.000000000025 B=4008.3333333333617"
+  ],
+  "firstDivergenceBySubsystem": {
+   "hazards": 481
+  },
+  "maxSledPosErrPx": 0,
+  "endSledPosErrPx": 0,
+  "crashTickA": null,
+  "crashTickB": null,
+  "restoreLog": [
+   "materialized Fl at _crashHazard",
+   "materialized _t at kodiaks[0].rng",
+   "materialized _t at kodiaks[1].rng"
+  ],
+  "restoreLogCount": 3,
+  "audit": [],
+  "classes": {
+   "unclassified": 0,
+   "INFRA": 30,
+   "CONFIG": 26,
+   "PRESENTATION": 23,
+   "SIM": 89,
+   "METADATA": 5,
+   "PRESENTATION_READ_BY_SIM": 7,
+   "NON_SERIALIZABLE": 1
+  },
+  "unclassified": [],
+  "pageErrors": [],
+  "wallMs": 91867
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "camera",
+  "harnessError": "page.waitForFunction: Target page, context or browser has been closed",
+  "wallMs": 2960
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "ids",
+  "harnessError": "browser.newContext: Protocol error (Target.createBrowserContext): Failed to create browser context.",
+  "wallMs": 9
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "runRandom",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 0
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "impulses",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 0
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "staleSupport",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 0
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "timing",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 0
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "positionImpulse",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 1
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "rawGeometry",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 1
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "kodiaks",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 0
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "bsod",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 0
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "hazardHit",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 1
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "pool",
+  "harnessError": "browser.newContext: Target page, context or browser has been closed",
+  "wallMs": 0
+ }
+]

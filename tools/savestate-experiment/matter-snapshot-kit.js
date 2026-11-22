@@ -42,6 +42,37 @@ const ROOT_CONFIG = ['id', 'type', 'label', 'parts', 'plugin', 'attractors', 'wr
   'sleepThreshold', 'isChamfered', 'setOnCollide', 'bbHazard', 'bbPowerUp', 'bbPad', 'constraintImpulse',
   'collisionFilterOriginal', 'hasOwnFriction', 'gravityScale'];
 
+// Structural key-set audit (beyond root bodies): every own non-function key of these Matter objects must be
+// captured or declared config/derived. A Matter upgrade that adds state to any of them fails at capture.
+const KEYSETS = {
+  engine: ['positionIterations', 'velocityIterations', 'constraintIterations', 'enableSleeping', 'events', 'plugin', 'gravity',
+    'timing', 'autoUpdate', 'debug', 'world', 'pairs', 'detector', 'grid', 'broadphase', 'metrics'],
+  timing: ['timestamp', 'timeScale', 'lastDelta', 'lastElapsed', 'lastUpdatesPerFrame'],
+  world: ['id', 'type', 'parent', 'isModified', 'bodies', 'constraints', 'composites', 'label', 'plugin', 'wrapBounds', 'cache', 'gravity', 'events'],
+  detector: ['bodies', 'collisions', 'pairs'],
+  pairs: ['table', 'list', 'collisionStart', 'collisionActive', 'collisionEnd'],
+  pair: ['id', 'bodyA', 'bodyB', 'collision', 'contacts', 'contactCount', 'separation', 'isActive', 'isSensor', 'timeCreated',
+    'timeUpdated', 'inverseMass', 'friction', 'frictionStatic', 'restitution', 'slop'],
+  collision: ['pair', 'collided', 'bodyA', 'bodyB', 'parentA', 'parentB', 'depth', 'normal', 'tangent', 'penetration', 'supports', 'supportCount'],
+  contact: ['vertex', 'normalImpulse', 'tangentImpulse'],
+};
+// Module-level statics: values captured (and restored at 'contacts'+), unknown keys audited.
+const MODULE_STATICS = {
+  Common: ['_baseDelta', '_seed'],
+  Body: ['_timeCorrection', '_inertiaScale', '_nextCollidingGroupId', '_nextNonCollidingGroupId', '_nextCategory', '_baseDelta'],
+  Engine: ['_deltaMax'],
+  Resolver: ['_restingThresh', '_restingThreshTangent', '_positionDampen', '_positionWarming', '_frictionNormalMultiplier', '_frictionMaxStatic'],
+  Sleeping: ['_motionWakeThreshold', '_motionSleepThreshold', '_minBias'],
+  Constraint: ['_warming', '_torqueDampen', '_minLength'],
+  Pairs: [], Pair: [], Detector: [], Collision: [], Composite: [],
+};
+const MODULE_IGNORED = { Common: ['_nextId', '_nowStartTime', '_warnedOnce', '_decomp', 'logLevel'] }; // _nextId is captured separately
+
+function unknownKeys(obj, allowed) {
+  const a = new Set(allowed);
+  return obj ? Object.keys(obj).filter((k) => !a.has(k) && typeof obj[k] !== 'function') : [];
+}
+
 function vec(v) { return v ? [v.x, v.y] : null; }
 function setVec(t, a) { if (t && a) { t.x = a[0]; t.y = a[1]; } }
 
@@ -159,6 +190,21 @@ export function createMatterSnapshotKit(Matter) {
       const u = auditBody(b);
       if (u.length) audit.push(`${k}: ${u.join(',')}`);
     }
+    const kaudit = (label, obj, set) => { const u = unknownKeys(obj, KEYSETS[set]); if (u.length) audit.push(`${label}: ${u.join(',')}`); };
+    kaudit('engine', engine, 'engine'); kaudit('engine.timing', engine.timing, 'timing'); kaudit('engine.world', engine.world, 'world');
+    kaudit('engine.detector', engine.detector, 'detector'); kaudit('engine.pairs', engine.pairs, 'pairs');
+    engine.pairs.list.forEach((pr, i) => {
+      kaudit(`pair[${i}]`, pr, 'pair'); kaudit(`pair[${i}].collision`, pr.collision, 'collision');
+      pr.contacts.forEach((c, j) => kaudit(`pair[${i}].contacts[${j}]`, c, 'contact'));
+    });
+    const statics = {};
+    for (const [mod, keys] of Object.entries(MODULE_STATICS)) {
+      const m = Matter[mod];
+      if (!m) continue;
+      statics[mod] = Object.fromEntries(keys.map((k) => [k, m[k]]));
+      const u = unknownKeys(m, [...keys, ...(MODULE_IGNORED[mod] || [])]);
+      if (u.length) audit.push(`Matter.${mod} statics: ${u.join(',')}`);
+    }
     // A body removed from the world after the last Engine.update (hazard despawn, chunk drop) still has its pairs in
     // pairs.list until the next update ends them (collisionEnd only; they are never solved). Such "orphan" pairs are
     // recorded by count and dropped on restore: their only effect is a collisionEnd event (RunScene ignores it).
@@ -197,6 +243,7 @@ export function createMatterSnapshotKit(Matter) {
       worldOrder: Composite.allBodies(engine.world).map((b) => keyOf(b)),
       worldModified: !!engine.world.isModified,
       audit,
+      statics,
     };
   }
 
@@ -215,7 +262,7 @@ export function createMatterSnapshotKit(Matter) {
     if (!snap || snap.kind !== SNAPSHOT_KIND) throw new Error('restore: not a diagnostic Matter snapshot');
     if (snap.version !== SNAPSHOT_VERSION) throw new Error(`restore: snapshot version ${snap.version} != ${SNAPSHOT_VERSION}`);
     if (snap.matterVersion !== Matter.version) throw new Error(`restore: Matter ${snap.matterVersion} != ${Matter.version}`);
-    if (strict && snap.audit && snap.audit.length) throw new Error(`restore: snapshot audit found uncaptured body state: ${snap.audit.join('; ')}`);
+    if (strict && snap.audit && snap.audit.length) throw new Error(`restore: snapshot audit found uncaptured Matter state: ${snap.audit.join('; ')}`);
     let ix = indexWorld(engine, keyOf);
     if (strict) {
       const live = [...ix.byKey.keys()].sort();
@@ -275,6 +322,8 @@ export function createMatterSnapshotKit(Matter) {
         engine.pairs.list.push(pr);
       }
       if (!skip.has("timing")) engine.timing.timestamp = snap.timing.timestamp;
+      // module statics (Common._seed drives Common.random; group/category counters feed future bodies)
+      for (const [mod, vals] of Object.entries(snap.statics || {})) if (Matter[mod]) Object.assign(Matter[mod], vals);
       engine.timing.timeScale = snap.timing.timeScale;
       engine.timing.lastDelta = snap.timing.lastDelta;
       // Detector: bodies array is sorted in place by bounds.min.x every step (stable sort), so the previous

@@ -16,6 +16,9 @@ body ids, the world order and the RNG streams. The fixtures are a contact-heavy 
 Gear Gates, two Kodiak packs and absorbed hazard hits. The pure-Matter experiment shows the same: exact after a
 restore into worlds built with a different id history.
 
+One caveat: a rerun on 2026-11-22 found one non-physics field, `Hazard.teleAtMs`, re-stamped after restore. The
+cause is the non-serializable TelegraphTracker (section 6).
+
 **Restoring only the GhostTape checkpoint (sled pose, velocity and score) does not work.** It diverges on the
 first tick after restore in every fixture. Restoring all game state while restoring Matter by pose alone also
 diverges on the first tick. Section 6 shows which items close each gap.
@@ -31,7 +34,8 @@ Exactness costs much more than a pose. A trusted snapshot of today's game must c
 
 All of this was found and closed in the experiment. None of it is cheap or stable across a Matter upgrade.
 
-**Recommendation: GO for Phase 2, scoped and gated** (section 11). Three items should land before any savestate
+**Recommendation: GO for Phase 2, scoped and gated** (section 11). The owner has since approved the collider
+canonicalization (item 2 below) and set the savestate product contract (section 11); #155 ownership is pending. Three items should land before any savestate
 counts as "trusted":
 
 1. #155 removes the camera read from the tick.
@@ -130,7 +134,7 @@ PRESENTATION 23, PRESENTATION_READ_BY_SIM 7, NON_SERIALIZABLE 1, METADATA 5, INF
 | `velocity`, `angularVelocity`, `speed`, `angularSpeed` | D | re-derived each step. Read by game code between ticks, so restore them consistently |
 | `body.deltaTime` | R | `_timeCorrection` (E1 ablation: K+1) |
 | `force`, `torque` | R (zero at a tick boundary today) | cleared by `_bodiesClearForces`; capture anyway |
-| `positionImpulse` | R | position warming (E1 ablation: K+1) |
+| `positionImpulse` | R (state-dependent) | position warming (E1 ablation: K+1 at K=300 and K=600, exact at K=450) |
 | `constraintImpulse` | R (zero today, no constraints) | |
 | raw `vertices`, `axes`, part `position`, `bounds` of dynamic bodies | R | incremental integration (E1 ablation `rawGeometry`: K+1) |
 | raw geometry of **static** colliders | R today | the TerrainMesh pool makes vertex bits history-dependent (E1 `pooled`: 39 of 120 quads differ by up to 1.1e-13 px; diverges at K+5 unless captured) |
@@ -138,11 +142,12 @@ PRESENTATION 23, PRESENTATION_READ_BY_SIM 7, NON_SERIALIZABLE 1, METADATA 5, INF
 | `pairs.list` order and `pairs.table` | R | Gauss-Seidel order and warm-start lookup |
 | per pair: `contacts[i].vertex` (identity), `normalImpulse`, `tangentImpulse`, `contactCount`, `separation`, `isActive`, `isSensor`, `timeCreated`, `timeUpdated`, `inverseMass`, `friction`, `frictionStatic`, `restitution`, `slop` | R | E1 ablation `impulses`: K+1 |
 | per collision record: `bodyA`/`bodyB` order, `normal`, `tangent`, `penetration`, `depth`, `supportCount`, **both** `supports` slots | R | E1 ablation `staleSupport`: K+1 |
-| `engine.timing.timestamp`, `lastDelta`, `timeScale` | R | ends pairs (E1 ablation `timing`: K+1) |
+| `engine.timing.timestamp`, `lastDelta`, `timeScale` | R (state-dependent) | ends pairs (E1 ablation `timing`: K+1 at K=300, exact at K=450) |
 | body and part **ids**, `Common._nextId` | R | new-pair orientation (E1 `permuted`: K+43). Future bodies take ids from `_nextId` |
-| world body order (`world.bodies` and `cache.allBodies`) | R (tie-break) | broadphase ties after the next world change. No effect seen in these fixtures, cheap |
-| detector sort order | R (tie-break) | same |
+| world body order (`world.bodies` and `cache.allBodies`) | R (tie-break; **source reading only**) | broadphase ties after the next world change. Untested: no fixture with bounds ties. Cheap to keep |
+| detector sort order | R (tie-break; **source reading only**) | same |
 | orphan pairs | D (drop) | event-only |
+| Matter module statics (`Common._seed` for `Common.random`, `Body` group/category counters, `Resolver`/`Sleeping`/`Constraint`/`Engine` constants) | R (`_seed`, counters) / D (constants) | captured and key-audited (`MODULE_STATICS`); restored at `contacts`+ |
 | `enableSleeping`, iterations, gravity, `_timeCorrection`, `Resolver._*` constants, `installTerrainContactFix` | D | config/code; verify in the snapshot header |
 | TerrainMesh `_bodyPool`: order, raw geometry and ids of pooled bodies | R today | a pooled body's next shape depends on its previous position (`Body.setVertices` then `setPosition`) |
 
@@ -202,28 +207,43 @@ Fresh-world histories:
 | `full` (+ ids, world order) | **exact** | **exact** | **exact** | K+5 |
 | `full` + static geometry | | | | **exact** |
 
-Ablations: each removes one item from `full` in the `same` world. Every row is the first divergent tick, then
-the maximum position error over 600 ticks.
+Ablations: each removes one item from `full` in the `same` world. The snapshot is taken at two ticks, K=300 and
+K=450, and the suffix is 300 ticks long (N=K+300). Each cell is the first divergent tick, then the maximum
+position error in that window. `npm test -- tests/determinism` pins both columns.
 
-| Left out | First divergent tick | Max position error (px) |
-| --- | --- | --- |
-| cached contact impulses | K+1 | 400.5 |
-| stale `supports[1]` slot | K+1 | 783.6 |
-| `engine.timing` | K+1 | 46.5 |
-| `positionImpulse` | K+1 | 71.3 |
-| `body.deltaTime` | K+1 | 123.4 |
-| raw geometry (rebuilt from pose) | K+1 | 909.5 |
-| detector order / world order | exact (no ties in this fixture) | 0 |
+| Left out | K=300 | K=450 | Reading |
+| --- | --- | --- | --- |
+| cached contact impulses | K+1 (122 px) | K+1 (42 px) | needed in every tested state |
+| stale `supports[1]` slot | K+1 (269 px) | K+1 (149 px) | needed in every tested state |
+| `body.deltaTime` | K+1 (91 px) | K+1 (144 px) | needed in every tested state |
+| raw geometry (rebuilt from pose) | K+1 (146 px) | K+1 (36 px) | needed in every tested state |
+| `engine.timing` | K+1 (35 px) | **exact** | state-dependent |
+| `positionImpulse` | K+1 (8.5 px) | **exact** | state-dependent (K+1 again at K=600) |
+| detector order / world order | exact | exact | untested as a requirement (no bounds ties in this fixture) |
 
-Incomplete snapshots fail visibly (`incompleteChecks`):
+**State-dependent items.** `timing` and `positionImpulse` matter only when the snapshot tick falls in a state
+that uses them: a pair ending during the suffix, or non-zero position warming. "Exact in one window" is
+**not** evidence of "not needed". Both stay **R**: a Phase 2 implementer must not drop an item because a test
+at a convenient tick passed.
 
-- A missing body throws "world body set differs".
-- A wrong version throws.
-- A pair that references an unknown part throws.
-- An uncaptured Matter field throws: the audit lists every own property of every body that is neither
-  captured nor declared config. Adding `sled.myNewState` shows up at capture.
+**Detector and world order.** These are rated causal from **source reading only**: stable-sort ties, and
+`Detector.setBodies` copying `allBodies`. No fixture here has bounds ties, so they are R by caution, not by
+experiment. A fixture with ties is needed before treating them as proven.
 
-All of these are pinned in `tests/determinism/savestate-matter.test.js` (12 tests).
+**Incomplete snapshots fail visibly** (`incompleteChecks`; pinned in `tests/determinism/savestate-matter.test.js`,
+16 tests):
+
+- Set checks: a missing body throws "world body set differs". A pair that references an unknown part throws.
+- A wrong snapshot version or Matter version throws.
+- **Live key-set audit.** A new own key is injected, one at a time, into a root body, a pair, a collision record,
+  a contact, the engine, `engine.timing`, the detector, and a `Matter.Resolver` static. Each injection appears in
+  the capture audit, and a strict restore of that snapshot refuses. The audit is a generic key-set diff against
+  per-object whitelists (`KEYSETS`, `MODULE_STATICS`).
+  - Its limits: it sees **own enumerable keys** only, at **capture time**, on the objects it walks. It cannot
+    see new state held in closures (for example `Collision`'s module-scoped scratch arrays), in a new kind of
+    object, or a change in the **meaning** of an existing field.
+  - The real guard for a Matter upgrade is therefore the **`matterVersion` equality check** in restore. The audit
+    is a second line that catches additive changes.
 
 ## 6. E2: real game results
 
@@ -306,11 +326,23 @@ Reading the table:
     raw geometry, RNG (contact, because scramble is on).
   - The camera (#155) changes `h.teleAtMs` on hazards from tick 510. It is crash-report metadata, but it is
     stored on a sim object.
-  - Kodiaks and BSOD left out diverge only in their own subsystems within the window. The sled never reached
-    them, but they are clearly causal (a Kodiak hit is a crash hazard).
+  - Some ablations diverge **only in the digest of the field that was left out**: `ids`, `camera`, `pool`,
+    `kodiaks`, `bsod`, and `runRandom` in hazard. That shows the skip took effect, **not** that the item is
+    causal. Their causality rests on elsewhere: source reading (Kodiak hits are crash hazards; the BSOD can
+    catch the sled), E1 (ids K+43, pooled statics K+5), and the contact fixture (RNG through scramble, 5 px).
   - With only one dynamic body in the game, `staleSupport`, `positionImpulse`, ids, world order and the pool
     did not change the sled inside these windows. E1 shows each of them is real state that breaks exactness
     once multi-body contacts, new pairs or new pooled colliders occur.
+- **Rerun on 2026-11-22 (after the review fixes): `hazard/full` is no longer exact on every digest.** It
+  differs at K+1 in exactly one field: `Hazard.teleAtMs` on one hazard (A=3825 ms, B=4008 ms). The sled, score,
+  Kodiaks, Matter state and every other subsystem stay exact for all 280 compared ticks. Rerunning with the
+  previously committed Matter kit gives the same result, so the review fixes did not cause it.
+  - Mechanism: the restored scene's `TelegraphTracker` is fresh, because its WeakMaps are not serialized. It
+    re-warns a hazard that A had already warned, and stamps `teleAtMs` again.
+  - Why the 2026-11-21 run did not hit this is **not yet explained**.
+  - `teleAtMs` is crash-report and measurement metadata ("nothing in the game depends on it"), plus a repeated
+    warning sound.
+  - This is the TelegraphTracker prerequisite in section 11 showing up for real, not a new class of problem.
 - **Game-level completeness checks fired for real:**
   - `_crashHazard.body: Matter body hazard has no stable key`: sim state referenced a despawned body. It is
     now encoded as an explicit dead reference.
@@ -364,9 +396,9 @@ Design rules:
 - **Fail closed.** Restore throws on anything it cannot account for.
 
 ```
-SavestateV1 {
-  kind: "bb-savestate", version: 1,
-  build: { gameVersion, physicsVersion, matterVersion: "0.20.0", schemaHash },  // schemaHash = hash of the field tables below
+BbSavestateCacheV1 {   // working name; deliberately unlike any #152 manifest/fingerprint identifier
+  kind: "bb-savestate-cache", version: 1,
+  build: { gameVersion, physicsIdentity /* as defined by #152 v1.1 */, matterVersion: "0.20.0", savestateLayoutId },  // layout id = hash of the field tables below; NOT a state hash or fingerprint
   header: { seed, biomeMask, mode, loadout, upgrades, kodiaks, ... },           // CONFIG; restore rebuilds from it and verifies
   tick, runTimeMs,                                                              // tick boundary only (never mid-tick)
   rng: { [stream]: uint32 },                                                    // RunRandom + generator + glitch + per-Kodiak
@@ -391,15 +423,24 @@ SavestateV1 {
     `powerup:<key>`, `pool:<i>`), never by Matter id. Ids are data.
   - Object aliases (for example `sled.random === scene.runRandom`) are written once and referenced.
   - WeakMap state is forbidden in the snapshot domain.
-- **Versioning.** `version` bumps on any schema change. `schemaHash` is a hash of the per-class field tables, so
-  a code change that adds state without updating a table changes it. Restore refuses on any mismatch of
-  version, physicsVersion, matterVersion or schemaHash. There are no migrations: a savestate is a cache.
+- **Versioning.** `version` bumps on any schema change. `savestateLayoutId` is a hash of the per-class field
+  tables, never of state. It is named so it cannot be mistaken for a #152 fingerprint or `causalDigest`. Changing a
+  table changes it. Adding state without updating a table is caught by the capture-time audit instead. Restore
+  refuses on any mismatch of
+  version, physics identity, matterVersion or savestateLayoutId. There are no migrations: a savestate is a cache.
 
 ### Completeness checks: incomplete snapshots must fail visibly
 
 1. **Capture-time audit.** Every own property of every snapshotted object must be listed in its class table as
-   SIM, CONFIG, PRESENTATION or INFRA. An unlisted property throws. The experiment does this for RunScene
-   (0 unclassified) and for Matter bodies.
+   SIM, CONFIG, PRESENTATION or INFRA, and an unlisted property throws. The experiment does this for RunScene
+   (0 unclassified) and for every Matter object (section 5). Known blind spots of the experiment's version,
+   which Phase 2's explicit schemas should close:
+   - It runs **once, at capture time**, over `Object.keys`. A field created lazily after the capture point is
+     not seen until the next capture.
+   - Classification is **by name only**. Fields classed INFRA, PRESENTATION or CONFIG are trusted, not checked.
+     `content` and `tuner` are excluded from the CONFIG equality check.
+   - The generic encoder **skips by name at every depth**: sub-fields named `palette`, `look`, `gfx` or `color`,
+     plus every function and Phaser object. A sim field with one of those names would be invisible.
 2. **Restore-time set checks.** The live world's body-key set must equal the snapshot's. Every pair must
    resolve to live parts. Every SIM field present in the fresh scene must be either in the snapshot or deleted
    with a log entry. CONFIG must match the header.
@@ -436,8 +477,9 @@ SavestateV1 {
   None of these breaks v1.1; they matter for restore, not for detecting divergence. Savestates must reuse the
   contract's subsystem names and field ownership for the shared parts.
 - **#56 GhostTape.** A run resumed from a savestate cannot produce a valid ghost tape unless the snapshot also
-  carries the recorder (inputs and checkpoints so far). Heavy Mode should mark resumed runs as tool-assisted:
-  local-first, and distinguishing human, AI and tool-assisted outcomes per the issue.
+  carries the recorder (inputs and checkpoints so far). Per the owner's product contract (section 11):
+  - a tier (a) suspend/resume keeps the tape from tick 0 and stays eligible;
+  - a tier (b) reload marks the run tool-assisted.
 - **#59 fixed tick.** Savestates are only defined at tick boundaries. `SimClock.accMs` and `_edges` are needed
   only for live resume.
 - **#155.** Blocker for dropping camera state from the snapshot (section 7.4).
@@ -447,7 +489,7 @@ SavestateV1 {
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Matter upgrade adds or renames private state | silent divergence | matterVersion pin, field audit, one-tick self-test |
-| Game code adds state without updating a schema table | silent divergence | capture-time audit (unclassified field = error), schemaHash |
+| Game code adds state without updating a schema table | silent divergence | capture-time audit (unclassified field = error), savestateLayoutId |
 | Presentation-to-sim leaks (#155, generator cosmetic reads, minimap) | snapshot must carry presentation | fix the leaks; until then capture camera and view |
 | Pool and id history | exactness needs raw statics, the pool and ids | canonicalize collider construction (physicsVersion event) |
 | Snapshot size (216 KB JSON in the contact fixture; 5.7 MB in the hazard fixture, which carries 6506 pooled colliders because `_bodyPool` never shrinks) | storage and perf for frequent saves | store chunk data by index plus a generator hash, binary encoding, delta vs a base |
@@ -476,17 +518,61 @@ These cut the snapshot's R\* and "R today" rows and make the contract stable.
 | Heavy Mode UX (save slot, resume, tool-assisted marking, ghost-tape continuation) | 3-5 days |
 | **Total** | **about 3-4 engineer-weeks**, after the three prerequisites (#155 already assigned; canonical colliders about 1 day plus a tape migration decision; telegraph re-key about 1 day) |
 
+**Coverage gaps in this study** (Phase 2 test suite must add them):
+
+- **Gym and audio-timed paths are not exercised by any fixture.** `gymBeatSnapshot`, `gymReadyMs` and
+  `gymBeatWaitMs` are in the SIM list, but a beat suggestion reads `AudioContext.currentTime`, so a Gym resume
+  depends on audio state the snapshot cannot hold.
+- **Mid-step events.** Snapshots exist only at tick boundaries, where `_contactQueue` is empty and
+  `pendingCrash` is resolved. Collision callbacks inside a sub-step are covered only by that invariant, not by
+  a snapshot taken inside a tick.
+- **Frame-dt-dependent state** (the camera lerp) stays in the snapshot until #155 lands.
+- **Slow-mo, hit-stop, crash beat, Gym retry, BSOD catch, and 30/120 Hz frame schedules** were not restored
+  across.
+
+**Phase 2 product contract** (owner decision, 2026-11-22)
+
+- **Two tiers.**
+  - **(a) Suspend/resume.** A suspend snapshot is single-use and is deleted on resume. The run stays
+    leaderboard-eligible: the full input tape from tick 0 remains the proof, and verification never trusts the
+    snapshot. A verifier replays the tape from tick 0, as #152 specifies.
+  - **(b) Heavy Mode / practice save-load.** Players can save and reload at will. Any run that reloaded is
+    marked **tool-assisted** and excluded from normal boards.
+- **Build-bound.** A snapshot from a different build is rejected with "can't resume after update". There is no
+  cross-version migration (consistent with section 8's version, physics identity, `matterVersion` and
+  `savestateLayoutId` checks).
+- **Future versioned runtimes, not now.** The owner plans to bundle earlier physics versions eventually, so old
+  suspends and replays can resume on their original rules. That is explicitly **after the first release**. The
+  first release has **no legacy physics, compatibility shims or migration code**. The only requirement now is not
+  to preclude it: the snapshot header keeps the build and physics identity (`build.gameVersion`,
+  `build.physicsIdentity`, `build.matterVersion`) so a future versioned-runtime loader can route a snapshot to
+  the right rules.
+- **Known gap, accepted pre-release.** Copying browser storage to retry a suspend is not defended. The future
+  option is to record suspend events in the tape or manifest, so they are visible to verification.
+- Implications for Phase 2:
+  - The ghost recorder (inputs and checkpoints so far) must be part of the tier (a) snapshot, so the resumed
+    run's tape is complete from tick 0.
+  - The resume path must restore the recorder before the first resumed tick.
+
+**Owner decisions**
+
+| Decision | Status |
+| --- | --- |
+| Canonical terrain collider construction as a physics-identity-breaking change | **Decided YES** (owner, 2026-11-22: "pre-release, fewer than 3 players; now is the time for all breaking changes"). Started as a separate small draft PR under #119. Ideally it shares one physics-identity bump with #140's biome repaint change (#160); otherwise it bumps once more. Canaries in #158 need re-baselining. |
+| Savestate purpose | **Decided** (owner, 2026-11-22): see "Phase 2 product contract" above |
+| #155 ownership (removing the camera read from the tick) | **Pending** (assigned to issue #155; implementer not named) |
+
 **No-go triggers:**
 
-- The owner rejects a physicsVersion bump for canonical colliders. Savestates must then carry and replay the
-  pool forever.
+- ~~The owner rejects a physicsVersion bump for canonical colliders.~~ Resolved: the owner approved it on
+  2026-11-22.
 - #152 requires savestates to be authoritative evidence. That is out of scope by design.
 
 ## 12. Reproduce
 
 ```
 node tools/savestate-experiment/matter-node-experiment.mjs        # E1 table (about 1 s)
-npm test -- tests/determinism                                       # E1 pinned (12 tests)
+npm test -- tests/determinism                                       # E1 pinned (16 tests)
 npm run build && npx vite preview --port 8414 --strictPort &
 GAME_URL=http://localhost:8414/ node tools/savestate-experiment/browser-experiment.mjs --json out.json   # E2 (about 30-40 min)
 ONLY=contact:full node tools/savestate-experiment/browser-experiment.mjs --quick                         # one case
