@@ -731,8 +731,28 @@ Debutmont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal C
 `(seed, sector, mask)` alone - never from how much terrain has been generated or in what order -
 so a chunk built late by streaming is identical to one built early. It draws from
 `Rng.fork('biome')`, an independent stream, so *asking* the question never advances the terrain,
-hazard or shard streams. Sectors 0-1 are always base Bitstream so every run opens the same way;
-from sector 2 a sector is base or one enabled biome, weighted 2.2:1 toward base.
+hazard or shard streams. Since #65 **Debutmont is the base biome** (`HOME_BIOME_ID`, one constant so the
+`debumont` -> `debutmont` rename is a one-line flip): sectors 0-1, mask 0, a mask with no eligible biome and
+the base-weight draw (2.2:1) all answer Debutmont, never `null`. The home biome is left out of the eligible
+pool, so its mask bit is a no-op and it is never double-weighted. The draw count and order are unchanged,
+so every non-home pick for a seed and mask is what it was.
+
+**Arcade is the bridge between biomes (#65).** `biomeAtX(seed, xM, mask, defs)` is the biome at a position:
+the sector's biome, except the first `arcadeBridgeLengthM(sectorStart)` metres of a sector whose biome differs
+from the previous sector's, which are arcade (`null`). Length is 1/6 of `SECTOR_M` (~83 m) at the run start,
+rising linearly with the sector's start distance to 1/4 (125 m) at 5000 m, then capped
+(`ARCADE_BRIDGE_MIN_FRAC`, `ARCADE_BRIDGE_MAX_FRAC`, `ARCADE_BRIDGE_RAMP_M`). It depends on distance only, never on
+progression, input or BSOD, and draws nothing new, so the same seed and mask give everyone the same course
+(leaderboards, Daily, ghosts). **Chunk snapping:** the generator assigns a chunk by its start x, so a bridge is
+whole chunks: a chunk is arcade when it starts inside the window, and the first chunk of a changing sector (its
+breather) is always arcade, so every biome change has at least one bridge chunk. The measured arcade run is
+about 105 m median (58-300 m, set by the chunk lengths around the window). Bridge terrain is exactly the old
+arcade (null-biome) generation: no biome preference, zone or spawns; physics is unchanged. Every consumer asks
+the generator (`TerrainGenerator.biomeAtX(xPx)`, the chunk containing x) rather than computing a sector biome:
+`RunScene` palette, motif, `BIOME_ENTER` (fires on entering Debutmont at the start, each bridge as
+`{id:null, entering:false}`, and each biome after it) and `bsodAtmosphere`. `detectBiomeVisits` uses the
+unsnapped window (within one chunk of the generator). `tools/sim/biome-layout.mjs` prints the layout.
+`GHOST_PHYSICS_VERSION` is 2 because terrain for a given seed and mask changed.
 
 **A biome's chunk templates are a preference, not a filter.** If its templates are not eligible
 at that distance the sector still gets ordinary terrain, so a biome can never leave a hole in
@@ -1147,7 +1167,7 @@ outside this change's files. The fix is to use `DailyPatch.dailyRunLabel(seed, p
 Decision 3: "Biome discovery means actually encountering the biome; track unlocked, encountered, and completed separately."
 
 - **Unlocked** is unchanged: the Sync Level unlock (`ProfileStore.unlockedBiomeIds`, from `pendingBiomes`).
-- **Encountered:** the sled's x reached a sector `s` with `biomeForSector(seed, s, mask) === id`. The sector rule is the generator's own (`floor(x / ppm / SECTOR_M)`, the same as `_sectorOf` and BIOME_ENTER).
+- **Encountered:** the sled's x reached a sector `s` with `biomeForSector(seed, s, mask) === id`, past the arcade bridge that opens it when the previous sector differs (#65). The sector rule is the generator's own (`floor(x / ppm / SECTOR_M)`, the same as `_sectorOf`). Debutmont is the base, so it is encountered from sector 0 at any mask (there is no mask-0 early return); arcade is never recorded.
 - **Completed:** the sled rode one of that biome's sectors from its start to its end (`SECTOR_M`, 500 m), and the run's crash is not inside that sector. Only the run-ending crash counts. A crash absorbed by a Hashed Backup, or an opening-grace recovery, does not void completion, because the run went on. Completed implies encountered.
 
 **Detection** is the pure `BiomeDiscovery.detectBiomeVisits({seed, biomeMask, biomeDefs, furthestX, crashX, pxPerMeter})`, which returns `{encountered, completed}` in canonical `BIOME_IDS` order.
