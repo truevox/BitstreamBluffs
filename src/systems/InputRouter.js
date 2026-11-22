@@ -91,6 +91,8 @@ export class InputRouter {
     this._activeKeyBindings = new Map();
     /** @type {Object<string,boolean>} previous gamepad binding states. */
     this.gpPrev = {};
+    /** @type {Object<string,boolean>} previous aggregate pad states (all aliases of a pad button). */
+    this.gpPadPrev = {};
     this.gpConnected = false;
     this._listeners = [];
     this._gameListeners = [];
@@ -280,6 +282,7 @@ export class InputRouter {
   _onGamepadGone() {
     this.gpConnected = false;
     this.gpPrev = {};
+    this.gpPadPrev = {};
     this.pad.releaseSource('gamepad');
   }
 
@@ -294,14 +297,25 @@ export class InputRouter {
       return;
     }
     this.gpActive = true;
+    // Several physical inputs may bind the same pad button (LB/RSLeft -> heliLeft, RB/RSRight ->
+    // heliRight). Aggregate them BEFORE writing the pad so releasing one alias cannot cancel another
+    // that is still held; every aggregate still writes the single 'gamepad' source.
+    const padNext = {};
     for (const b of GP_BINDINGS) {
       const down = !!b.test(g);
-      if (down === !!this.gpPrev[b.id]) continue;
+      const changed = down !== !!this.gpPrev[b.id];
       this.gpPrev[b.id] = down;
-      if (b.pad) this.pad.setButton(b.pad, down, 'gamepad');
-      if (b.confirm) this.pad.setButton('confirm', down, 'gamepad');
+      const target = b.pad;
+      if (target) padNext[target] = !!padNext[target] || down;
+      if (b.confirm) padNext.confirm = !!padNext.confirm || down;
+      if (!changed) continue;
       for (const a of b.actions) this._emit(a, down, 'gamepad');
       if (down) this._emit('anyKey', true, 'gamepad');
+    }
+    for (const [name, down] of Object.entries(padNext)) {
+      if (down === !!this.gpPadPrev[name]) continue;
+      this.gpPadPrev[name] = down;
+      this.pad.setButton(name, down, 'gamepad');
     }
     this.pad.setTilt(ax(g, 0), 'gamepad');
   }
