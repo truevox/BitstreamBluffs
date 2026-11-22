@@ -28,5 +28,8 @@ config.txt
 /tools/sim/.pacing
 /tools/sim/__pycache__
 
-# Issue #76 exploit-factory working output (regenerable; the committed report is markdown)
+# Issue #117 canary working output (regenerable by feel-diff; golden/ + corpus/ + expected/ stay committed)
+/tools/canaries/out/
+
+# Exploit Factory generated output (reproducible; do not commit raw runs)
 /tools/exploits/out/

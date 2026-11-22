@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.15.4 - exploit factory: completeness is derived, not self-reported (2026-11-21)
+## v2.16.3 — Exploit Factory: complete adversarial policy evidence (#187 / #76) (2026-11-22)
 
 - **`--reuse` no longer accepts an incomplete run record just because the record's own `failures[]` is empty.**
   Completeness is re-derived from the record's data by new pure `tools/exploits/lib/record-audit.cjs`: every arm the
@@ -26,6 +26,33 @@
   positive cases (a full record and a genuinely dominant one) so it fails if the guard ever decays into "always
   refuse". Run against the previously reviewed head `645a5c6` it reports 11 of 12 accepted as clean; at this head, 0.
 - Harness tooling only: no gameplay, physics, balance or player-visible change. `tools/sim/**` untouched.
+
+
+## v2.16.2 — canonical replay development check (#205 / #129) (2026-11-22)
+
+- **Same-build replay check for developers.** The local tool records one synthetic stock run in a pinned Chromium build, verifies its native canonical evidence, and compares every completed tick across two fresh replays plus the separate fatal event. It does not compare historical builds or change gameplay, scoring, or the replay format.
+
+## v2.16.1 — keep ground hop cues visible (#208 / #155) (2026-11-21)
+
+- **Ground hop cues stay visible at the edge.** Fixed-tick warning and sound timing no longer reads the rendered camera. The renderer uses the current view: if the hop arrow is clipped, the edge badge carries the cue. The badge only reads already-streamed terrain. No physics, score, replay ruleset or Pulp camera change.
+
+
+## v2.16.0 — reconcile post-v2.15.3 merged capabilities and release policy (2026-11-21)
+
+This corrective release recognizes already-merged replay and developer tooling plus the project-wide rule that every `main` merge is a release. Previous merges (#163, #165, #166, #203, #164, #173, #175, #179, #182, #158, #204, #206) were not each versioned at merge time; this is a catch-up release, not a claim they were individually tagged. Experimental/offline-only tooling is not an activated production feature.
+
+- **Replay contract and canonical serialization (#163 / #152).** Versioned replay contract, canonical JSON/binary encoding, deterministic hashes and cross-implementation fixtures. No live physics change.
+- **Subsystem fingerprints (#165 / #118).** Read-only checkpoint hashes cover sled/contact, terrain, hazards, BSOD, timers, scoring, equipment and RNG, with first-divergence and field-level comparison. Fingerprints detect divergence but are not anti-cheat.
+- **Physics ruleset time capsules (#166 / #123), with compatibility repair (#203).** Content-addressed ruleset archives, source attestation and version-aware replay verification; uploaded code is not executed.
+- **Self-contained replay manifests and local evidence (#164 / #116).** Capture seed, biome mask, daily rule, level/loadout, active boosts, BSOD, RNG and ruleset; fail-closed validation and exportable local `.bbreplay` evidence. IndexedDB evidence is local, not permanent cloud storage; cross-browser parity is not yet established.
+- **Golden replay canaries (#158 / #117).** Seven recorded scenarios and offline/manual comparator tooling for first-divergence and handling diagnostics. This does not yet constitute an automatically enforced cross-browser CI quality gate.
+- **PWA offline-shell experiments (#175 / #172).** Integrity inventory, test-only service-worker implementation, opt-in original-music selection/prefetch planning. No production service-worker registration and no claim that the shipped game runs offline.
+- **Real-original-music offline bridge experiments (#179 / #172).** Verified original-Opus music groups and development/test routes, with incomplete offline groups refused rather than silently replaced. Not an activated production offline download feature.
+- **Source-preserving music-variant tooling (#182 / #172, #180).** Developer-only mono Lite/Full per-stem derivative generation and provenance checks. Original stereo recordings remain untouched; quality presets require listening approval and are not a shipped player preference.
+
+**Verification snapshot:** On `main` at `e181f9f` (before #158 merged), replay tests passed 741/741 across 20 suites, ruleset integrity check passed, and the full test suite reported 3,561 passing / 9 failing (seven suites), consistent in count with the previously documented baseline. On the integrated #158 tree, canary unit tests passed 32/32. This is not a full-suite green claim.
+
+- **Release-policy correction (#204, #206 and this release).** Reconciled the missing changelog entries and codified `main` as the release boundary. The two documentation PRs should have received patch bumps; their omission is acknowledged rather than rewriting historical merges.
 
 ## v2.15.3 - PWA install metadata and original icons (#172) (2026-11-21)
 
