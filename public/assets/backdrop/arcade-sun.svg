@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- arcade sun: stepped half disc, greyscale, tinted at runtime -->
+<svg xmlns="http://www.w3.org/2000/svg" width="112" height="60" viewBox="0 0 28 15" shape-rendering="crispEdges">
+<path fill="#ffffff" d="M9 1h10v1h-10zM7 2h14v1h-14zM5 3h18v1h-18zM4 4h20v1h-20z"/>
+<path fill="#e0e0e0" d="M3 5h22v1h-22zM3 6h22v1h-22zM2 7h24v1h-24z"/>
+<path fill="#b8b8b8" d="M1 9h26v1h-26zM0 11h28v1h-28zM0 13h28v1h-28zM0 14h28v1h-28z"/>
+</svg>

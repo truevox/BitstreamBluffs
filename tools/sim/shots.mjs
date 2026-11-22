@@ -4,6 +4,7 @@
  *   node tools/sim/shots.mjs hints  <outDir>     tutorial hints: keyboard (natural run), push (stall), touch / gamepad labels
  *   node tools/sim/shots.mjs zoom   <outDir>     speed-zoom views and warning-time table (scenario in shots-zoom.js)
  *   node tools/sim/shots.mjs hud   <outDir>     HUD layout stress: banners, fixed rows, hint chip, touch controls (scenarios in shots-hud.js)
+ *   node tools/sim/shots.mjs bridge <outDir> '<json>'  #65 presentation: Debutmont, an arcade bridge at fractions of its length, Garbage Dump Glacier (shots-bridge.js)
  * Scenarios live page-side in shots-page.js; they await window.__shot(name, meta) which saves <outDir>/<name>.png.
  */
 import { spawn } from 'node:child_process';
@@ -39,6 +40,7 @@ try {
   await page.addInitScript({ path: path.join(here, 'shots-missions.js') });
   await page.addInitScript({ path: path.join(here, 'shots-probe-profile.js') });
   await page.addInitScript({ path: path.join(here, 'shots-biomes.js') });
+  await page.addInitScript({ path: path.join(here, 'shots-bridge.js') });
   const shots = [];
   await page.exposeFunction('__shot', async (name, meta) => {
     const file = path.join(outDir, `${name}.png`);
@@ -74,6 +76,8 @@ try {
     result.progression = await page.evaluate((o) => window.__shotsProgression.run(o), opts);
   } else if (mode === 'biomes') {
     result.biomes = await page.evaluate((o) => window.__shotsBiomes.run(o), opts);
+  } else if (mode === 'bridge') {
+    result.bridge = await page.evaluate((o) => window.__shotsBridge.run(o), opts);
   } else if (mode === 'missions') {
     result.missions = await page.evaluate((o) => window.__shotsMissions.run(o), opts);
   } else throw new Error('mode: hints | zoom | hud | progression | missions');

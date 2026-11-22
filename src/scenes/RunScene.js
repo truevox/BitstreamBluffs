@@ -65,6 +65,8 @@ import { Hazard } from '../entities/Hazard.js';
 import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
+import { BiomeFx } from '../entities/BiomeFx.js';
+import { bridgeLook } from '../systems/BiomeTransition.js';
 import { WorldDanceEnvelope, worldDanceMotionAllowed, readWorldDanceAudio } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
@@ -166,6 +168,7 @@ export class RunScene extends Phaser.Scene {
     // RunScene is one instance across runs and the palette above is the base one: forget the previous run's biome, or a
     // retry that ends where it began (Debutmont) would skip its opening repaint, motif and BIOME_ENTER (#65).
     this._biomeId = undefined;
+    this._lookId = undefined; // #65 presentation: the look follows the same reset
     // W4 cosmetics: resolved ONCE per run, from the profile, for the same reason the biome mask is: the
     // sled, the trail and the drawn colours must not disagree with each other mid-run.
     this.look = this._resolveLook();
@@ -333,6 +336,12 @@ export class RunScene extends Phaser.Scene {
     // visuals / entities
     this.cameras.main.setBackgroundColor(this.palette.bg);
     this.bg = new Background(this, this.palette);
+    // #65 presentation: the biome glitch sets and the arcade bridge look. Render-only (BiomeFx reads the camera and the
+    // run clock; nothing it does reaches terrain, physics, hazards or score).
+    this._veil = 0;
+    this._bridgeSpan = null;
+    this._lookScratch = { veil: 0, lookId: null, t: -1 }; // bridgeLook's result, reused every frame
+    this.biomeFx = new BiomeFx(this, this.palette, getPalette(this.game, null), this.bg);
     this.worldDance = new WorldDanceEnvelope();
     this.songBillboard = new SongBillboard(this);
     // Retain a live MediaQueryList so an OS reduced-motion change is seen
@@ -648,6 +657,8 @@ export class RunScene extends Phaser.Scene {
     safe(this.trail);
     safe(this.fx);
     safe(this.bg);
+    safe(this.biomeFx);
+    this.biomeFx = null;
     safe(this.songBillboard);
     this.songBillboard=null;
     safe(this.blackHole);
@@ -855,6 +866,38 @@ export class RunScene extends Phaser.Scene {
 
   _biomeDefById(id) {
     return id ? (this.content.biomes || {})[id] || null : null;
+  }
+
+  /**
+   * #65 presentation: the biome whose look (palette, motif, glitch set) the world wears. Equals the generator's biome
+   * except across an arcade bridge, where the outgoing look holds through the dissolve and the incoming look is on
+   * before the bridge ends (BiomeTransition.bridgeLook). Reduced motion is the hard cut: the generator's answer.
+   * @returns {string|null|undefined}
+   */
+  _lookBiomeId() {
+    return this._lookId !== undefined ? this._lookId : this._biomeId;
+  }
+
+  /**
+   * Recompute the look and the dissolve veil from the sled's x and repaint when the look changes. Presentation only:
+   * the generator's own biome (BIOME_ENTER, discovery, music) is untouched. A bridge's span is cached while the sled
+   * is inside it, so the generator is asked once per bridge, not once per frame.
+   * @param {string|null} biomeNow terrain.biomeAtX(sled.x)
+   * @param {boolean} paletteOwed the generator's biome changed and a repaint was owed (entering a biome, or leaving one)
+   */
+  _updateLook(biomeNow, paletteOwed) {
+    const x = this.sled.x;
+    let span = null;
+    if (biomeNow === null && this.terrain.bridgeSpanAt && this.terrain.biomeDefs && this.terrain.biomeDefs.length) {
+      span = this._bridgeSpan;
+      if (!span || x < span.startX || x >= span.endX) span = this._bridgeSpan = this.terrain.bridgeSpanAt(x);
+    } else this._bridgeSpan = null;
+    const look = bridgeLook(span, x, biomeNow, !isReducedMotion(this), this._lookScratch || (this._lookScratch = { veil: 0, lookId: null, t: -1 }));
+    this._veil = look.veil;
+    const lookChanged = look.lookId !== this._lookId;
+    const firstLook = this._lookId === undefined;
+    this._lookId = look.lookId;
+    if (paletteOwed || (lookChanged && (this._biomeDefById(look.lookId) || !firstLook))) this.refreshPalette();
   }
 
   streamTerrain(x) {
@@ -1504,6 +1547,7 @@ export class RunScene extends Phaser.Scene {
     const {sample,meter}=readWorldDanceAudio(audio,danceAllowed);
     const dance=this.worldDance?.update(sample,dt,meter)||0;
     this.bg.update(cam.scrollX, t, sled.speed,dance);
+    if (this.biomeFx) this.biomeFx.update(cam.scrollX, t, this._veil || 0, isReducedMotion(this));
     this.songBillboard?.update(dt,dance,!danceAllowed);
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
@@ -1937,19 +1981,23 @@ export class RunScene extends Phaser.Scene {
     // generator's own answer at the sled's x, so an arcade bridge (null) is its own stretch: entering it and
     // entering the next biome each fire once, and a run opens in the home biome.
     const biomeNow = this.terrain.biomeAtX(this.sled.x);
-    if (this._biomeId !== biomeNow) {
-      const first = this._biomeId === undefined;
+    const biomeChanged = this._biomeId !== biomeNow;
+    let def = null;
+    let first = false;
+    if (biomeChanged) {
+      first = this._biomeId === undefined;
       this._biomeId = biomeNow;
-      const def = this._biomeDefById(biomeNow);
+      def = this._biomeDefById(biomeNow);
       const sectorNow = this.terrain._sectorOf(this.sled.x);
       if (def) this.emitIf(EVT.BIOME_ENTER, { id: def.id, name: def.name, sector: sectorNow, entering: true });
       else if (!first) this.emitIf(EVT.BIOME_ENTER, { id: null, name: 'Bitstream', sector: sectorNow, entering: false });
-      // The biome's palette only takes effect if something applies it. Repaint on entry AND on exit
-      // back to arcade terrain, or the tint would persist past the biome that owns it. refreshPalette
-      // rebuilds every collider, so it runs only when the biome changed and a palette was actually owed:
-      // a run with no biome content never repaints beyond a palette setting change.
-      if (def || !first) this.refreshPalette();
     }
+    // The biome's palette only takes effect if something applies it. Repaint on entry AND on exit
+    // back to arcade terrain, or the tint would persist past the biome that owns it. refreshPalette repaints graphics
+    // only (#140: colliders are never touched), so it runs when the generator's biome changed and a repaint was actually
+    // owed: a run with no biome content never repaints beyond a palette setting change. #65 presentation: the look
+    // (what the world is painted as) can change at other x than that (inside an arcade bridge) and repaints the same way.
+    this._updateLook(biomeNow, biomeChanged && (def !== null || !first));
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;
       this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });
@@ -2441,7 +2489,7 @@ export class RunScene extends Phaser.Scene {
     const reg = this.registry;
     const profile = reg.get(REG.PROFILE) || null;
     const settings = reg.get(REG.SETTINGS) || {};
-    const hex = getPaletteCss(this.game, this._biomeDefById(this._biomeId));
+    const hex = getPaletteCss(this.game, this._biomeDefById(this._lookBiomeId()));
     return resolveCosmetics(profile, this.palette, hex, {
       colorblind: settings.palette === 'colorblind',
     });
@@ -2458,7 +2506,7 @@ export class RunScene extends Phaser.Scene {
   refreshPalette() {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
-    const biomeDef = this._biomeDefById(this._biomeId);
+    const biomeDef = this._biomeDefById(this._lookBiomeId());
     this.palette = getPalette(this.game, biomeDef);
     // W3: the biome's `background` motif, and back to the base backdrop when the sector has no biome.
     // setMotif(null) is the exit case: a motif must not outlive the sector that owns it.
@@ -2472,6 +2520,10 @@ export class RunScene extends Phaser.Scene {
     if (this.sled) this.sled.look = this.look;
     if (this.trail) { this.trail.setPalette(this.palette); this.trail.setStops(this.look && this.look.trail); }
     this.bg.setPalette(this.palette);
+    if (this.biomeFx) {
+      this.biomeFx.setPalettes(this.palette, getPalette(this.game, null));
+      this.biomeFx.setLook(biomeDef ? biomeDef.id : null);
+    }
     this.fx.palette = this.palette;
     if (this.airTelegraph) this.airTelegraph.setPalette(this.palette);
     if (this.groundTelegraph) this.groundTelegraph.setPalette(this.palette);
@@ -2511,6 +2563,7 @@ export class RunScene extends Phaser.Scene {
     const px = (GAME_WIDTH * (z - 1)) / (2 * z);
     const py = (GAME_HEIGHT * (z - 1)) / (2 * z);
     if (this.bg && this.bg.gfx) this.bg.gfx.setScale(k).setPosition(px, py);
+    if (this.biomeFx) this.biomeFx.applyZoomCompensation(k, px, py);
     if (this.flashRect) this.flashRect.setScale(k).setPosition(px, py);
     if (this.blindRect) this.blindRect.setScale(k).setPosition(px, py);
   }
