@@ -179,6 +179,24 @@ describe('savestate cache V1 envelope — format validation only', () => {
     expect(() => snapshotEnvelopeBytes(unsigned({payload:{sections:{huge:'x'.repeat(1_048_580)}}}))).toThrow();
   });
 
+  test('trusted schema validator cannot mutate parsed snapshot after digest verification', () => {
+    const bytes = snapshotEnvelopeBytes(unsigned());
+    const malicious = { descriptor, validateSections(sections) {
+      // In strict-mode ESM a frozen object rejects these writes. A buggy
+      // future schema must not change a checked value and then claim success.
+      sections.sim.counter = 7;
+      return true;
+    } };
+    rejected(bytes, 'invalid-section', '/payload/sections', runtime(), malicious);
+    const result = inspectSnapshotEnvelope(bytes, runtime(), layout);
+    expect(result.ok).toBe(true);
+    expect(Object.isFrozen(result.envelope)).toBe(true);
+    expect(Object.isFrozen(result.envelope.payload.sections.sim)).toBe(true);
+    expect(result.envelope.payload.sections.sim.counter).toBe(42);
+    expect(() => { result.envelope.tick = 999; }).toThrow();
+    expect(() => { result.envelope.payload.sections.sim.counter = 999; }).toThrow();
+  });
+
   test('does not mutate caller state, trusted runtime identity or registered layout', () => {
     const e = unsigned();
     const r = runtime();

@@ -69,6 +69,26 @@ function shape(e, hasIntegrity) {
   if (hasIntegrity) text(e.integrity, '/integrity', HASH);
 }
 
+/**
+ * ParseCanonical gives us a bounded (32 levels) acyclic tree of plain objects
+ * and arrays. Freeze it before calling a trusted-but-possibly-buggy validator:
+ * its verdict must not describe different bytes than the checksum covered.
+ * The caller also receives this immutable snapshot, so admission cannot later
+ * be mistaken for validation of a modified envelope.
+ */
+function freezeParsedTree(root) {
+  const nodes = [root];
+  while (nodes.length) {
+    const node = nodes.pop();
+    if (node === null || typeof node !== 'object' || Object.isFrozen(node)) continue;
+    for (const value of Object.values(node)) {
+      if (value !== null && typeof value === 'object') nodes.push(value);
+    }
+    Object.freeze(node);
+  }
+  return root;
+}
+
 function verifyExpected(expected) {
   if (!plain(expected)) fail('missing-runtime-identity');
   identity(expected, '/expectedIdentity');
@@ -120,6 +140,10 @@ export function inspectSnapshotEnvelope(bytes, expectedIdentity, registeredLayou
     if (!inspectLayoutRegistration(registeredLayout, expectedIdentity.savestateLayoutId)) {
       fail('unsupported-layout', '/build/savestateLayoutId');
     }
+    // Preserve the exact reviewed snapshot bytes through validation and handoff.
+    // Any accidental in-place transformation by a future class validator must
+    // fail rather than silently changing what was digest-verified.
+    freezeParsedTree(envelope);
     // This function is supplied by trusted shipped code, never snapshot data.
     // A future production schema registry must audit every SIM field and every
     // reference; a truthy-but-not-true return is deliberately not admission.
