@@ -1,0 +1,1002 @@
+{
+  "format": "bsb-original-ogg-crystal-graph-offline-measured-audio-v1",
+  "status": "RESEARCH_MEASURED_NOT_APPROVED_SOUND_OR_TRUE_PEAK",
+  "originalSourceManifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
+  "sourceHarmonySidecarSha256": "4abe19d6b77645be13939b0406c7c4433be294cd0b7ce8be4eac1832bd714303",
+  "sharedAudioGraphSha256": "ebe48b3c2d64d7630532aaebfa89ec73f898d081cf35f6cdd8dd19084752a194",
+  "originalStemSha256Count": 90,
+  "analysisWindowCount": 12,
+  "offlineRenderCount": 48,
+  "method": "The EXACT shared createCrystalGraph + synthesizeLanding as in WebAudio lab; original SHA-verified six OGG stems decoded by Chromium; stereo offline 48000Hz, source-clock slice across OGG segments, 1.5s effect tail, 3 render variants per passage",
+  "channelCount": 2,
+  "sampleRate": 48000,
+  "reportedMetricResolutionFullScale": 0.0001,
+  "variants": [
+    "original dry wet=0",
+    "original + normal research shimmer wet=.20",
+    "original + max allowed shimmer wet=.55 and one impact=1 manually requested bell; if harmony weak, no actual bell notes emitted",
+    "wet=.0 to .20 at 2s, then .20 to .0 at 5s, 45ms target smoothing as in live shimmer toggle"
+  ],
+  "limitations": [
+    "Sample peak not true peak; no intersample oversampling/limiter guarantee",
+    "Overall unweighted RMS level difference is not LUFS or perceptual loudness",
+    "Small sample-to-sample wet delta is a click heuristic, not human auditory verification",
+    "Offline browser render wall-clock on CT223 is not mobile runtime CPU or memory benchmark",
+    "No game source transport, player impacts or biome crossfades exercised",
+    "No formal owner ear review or verified harmonic chords/beat grid"
+  ],
+  "passages": [
+    {
+      "range": [
+        85.5,
+        94.5
+      ],
+      "dry": {
+        "peak": 0.2443,
+        "rms": 0.0301,
+        "maxAdjacentSampleDelta": 0.1047,
+        "clippedFrames": 0,
+        "monoRms": 0.0281,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 85.5,
+        "originalSourceEnd": 94.5,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 28
+      },
+      "normal": {
+        "peak": 0.2453,
+        "rms": 0.0302,
+        "maxAdjacentSampleDelta": 0.1048,
+        "clippedFrames": 0,
+        "monoRms": 0.0282,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 85.5,
+        "originalSourceEnd": 94.5,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 28
+      },
+      "maxLanding": {
+        "peak": 0.2469,
+        "rms": 0.0311,
+        "maxAdjacentSampleDelta": 0.105,
+        "clippedFrames": 0,
+        "monoRms": 0.029,
+        "channelCount": 2,
+        "landingNotesScheduled": 3,
+        "toggle": false,
+        "originalSourceStart": 85.5,
+        "originalSourceEnd": 94.5,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 28
+      },
+      "toggle": {
+        "peak": 0.2453,
+        "rms": 0.0301,
+        "maxAdjacentSampleDelta": 0.1047,
+        "clippedFrames": 0,
+        "monoRms": 0.0281,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 85.5,
+        "originalSourceEnd": 94.5,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 28
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0021,
+        "wetDifferencePeak": 0.0171,
+        "wetResidualMaxAdjacentDelta": 0.0018
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0077,
+        "wetDifferencePeak": 0.1375,
+        "wetResidualMaxAdjacentDelta": 0.017
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0014,
+        "wetDifferencePeak": 0.0171,
+        "wetResidualMaxAdjacentDelta": 0.0017
+      }
+    },
+    {
+      "range": [
+        121.5,
+        130.5
+      ],
+      "dry": {
+        "peak": 0.2097,
+        "rms": 0.0163,
+        "maxAdjacentSampleDelta": 0.0856,
+        "clippedFrames": 0,
+        "monoRms": 0.0161,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 121.5,
+        "originalSourceEnd": 130.5,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 3
+      },
+      "normal": {
+        "peak": 0.2097,
+        "rms": 0.0162,
+        "maxAdjacentSampleDelta": 0.0856,
+        "clippedFrames": 0,
+        "monoRms": 0.0161,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 121.5,
+        "originalSourceEnd": 130.5,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 3
+      },
+      "maxLanding": {
+        "peak": 0.2097,
+        "rms": 0.0162,
+        "maxAdjacentSampleDelta": 0.0856,
+        "clippedFrames": 0,
+        "monoRms": 0.0161,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 121.5,
+        "originalSourceEnd": 130.5,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 3
+      },
+      "toggle": {
+        "peak": 0.2097,
+        "rms": 0.0163,
+        "maxAdjacentSampleDelta": 0.0856,
+        "clippedFrames": 0,
+        "monoRms": 0.0161,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 121.5,
+        "originalSourceEnd": 130.5,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 3
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0003,
+        "wetDifferencePeak": 0.0033,
+        "wetResidualMaxAdjacentDelta": 0.0003
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0009,
+        "wetDifferencePeak": 0.009,
+        "wetResidualMaxAdjacentDelta": 0.0009
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0,
+        "wetDifferencePeak": 0,
+        "wetResidualMaxAdjacentDelta": 0
+      }
+    },
+    {
+      "range": [
+        162.626,
+        171.626
+      ],
+      "dry": {
+        "peak": 0.253,
+        "rms": 0.0345,
+        "maxAdjacentSampleDelta": 0.099,
+        "clippedFrames": 0,
+        "monoRms": 0.0318,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 162.626,
+        "originalSourceEnd": 171.626,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 28
+      },
+      "normal": {
+        "peak": 0.2573,
+        "rms": 0.0352,
+        "maxAdjacentSampleDelta": 0.0991,
+        "clippedFrames": 0,
+        "monoRms": 0.0325,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 162.626,
+        "originalSourceEnd": 171.626,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 28
+      },
+      "maxLanding": {
+        "peak": 0.2647,
+        "rms": 0.0403,
+        "maxAdjacentSampleDelta": 0.0993,
+        "clippedFrames": 0,
+        "monoRms": 0.0375,
+        "channelCount": 2,
+        "landingNotesScheduled": 3,
+        "toggle": false,
+        "originalSourceStart": 162.626,
+        "originalSourceEnd": 171.626,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 28
+      },
+      "toggle": {
+        "peak": 0.253,
+        "rms": 0.0345,
+        "maxAdjacentSampleDelta": 0.099,
+        "clippedFrames": 0,
+        "monoRms": 0.0318,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 162.626,
+        "originalSourceEnd": 171.626,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 28
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0074,
+        "wetDifferencePeak": 0.0505,
+        "wetResidualMaxAdjacentDelta": 0.0064
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.021,
+        "wetDifferencePeak": 0.1487,
+        "wetResidualMaxAdjacentDelta": 0.0177
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0015,
+        "wetDifferencePeak": 0.0277,
+        "wetResidualMaxAdjacentDelta": 0.0026
+      }
+    },
+    {
+      "range": [
+        41.232,
+        50.232
+      ],
+      "dry": {
+        "peak": 0.2302,
+        "rms": 0.0253,
+        "maxAdjacentSampleDelta": 0.0828,
+        "clippedFrames": 0,
+        "monoRms": 0.0236,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 41.232,
+        "originalSourceEnd": 50.232,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 22
+      },
+      "normal": {
+        "peak": 0.2274,
+        "rms": 0.0253,
+        "maxAdjacentSampleDelta": 0.0828,
+        "clippedFrames": 0,
+        "monoRms": 0.0236,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 41.232,
+        "originalSourceEnd": 50.232,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 22
+      },
+      "maxLanding": {
+        "peak": 0.2223,
+        "rms": 0.0254,
+        "maxAdjacentSampleDelta": 0.0828,
+        "clippedFrames": 0,
+        "monoRms": 0.0237,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 41.232,
+        "originalSourceEnd": 50.232,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 22
+      },
+      "toggle": {
+        "peak": 0.2302,
+        "rms": 0.0253,
+        "maxAdjacentSampleDelta": 0.0828,
+        "clippedFrames": 0,
+        "monoRms": 0.0236,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 41.232,
+        "originalSourceEnd": 50.232,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 22
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0011,
+        "wetDifferencePeak": 0.0095,
+        "wetResidualMaxAdjacentDelta": 0.001
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.003,
+        "wetDifferencePeak": 0.0262,
+        "wetResidualMaxAdjacentDelta": 0.0028
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0005,
+        "wetDifferencePeak": 0.0062,
+        "wetResidualMaxAdjacentDelta": 0.0007
+      }
+    },
+    {
+      "range": [
+        167.734,
+        174.6
+      ],
+      "dry": {
+        "peak": 0.2906,
+        "rms": 0.0346,
+        "maxAdjacentSampleDelta": 0.1242,
+        "clippedFrames": 0,
+        "monoRms": 0.0335,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 167.734,
+        "originalSourceEnd": 174.6,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 24
+      },
+      "normal": {
+        "peak": 0.2881,
+        "rms": 0.0354,
+        "maxAdjacentSampleDelta": 0.1239,
+        "clippedFrames": 0,
+        "monoRms": 0.0344,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 167.734,
+        "originalSourceEnd": 174.6,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 24
+      },
+      "maxLanding": {
+        "peak": 0.2901,
+        "rms": 0.0412,
+        "maxAdjacentSampleDelta": 0.1232,
+        "clippedFrames": 0,
+        "monoRms": 0.04,
+        "channelCount": 2,
+        "landingNotesScheduled": 3,
+        "toggle": false,
+        "originalSourceStart": 167.734,
+        "originalSourceEnd": 174.6,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 24
+      },
+      "toggle": {
+        "peak": 0.2881,
+        "rms": 0.0349,
+        "maxAdjacentSampleDelta": 0.1239,
+        "clippedFrames": 0,
+        "monoRms": 0.0338,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 167.734,
+        "originalSourceEnd": 174.6,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 24
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.008,
+        "wetDifferencePeak": 0.0505,
+        "wetResidualMaxAdjacentDelta": 0.0059
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0228,
+        "wetDifferencePeak": 0.1634,
+        "wetResidualMaxAdjacentDelta": 0.0171
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0051,
+        "wetDifferencePeak": 0.0505,
+        "wetResidualMaxAdjacentDelta": 0.0044
+      }
+    },
+    {
+      "range": [
+        142.285,
+        151.285
+      ],
+      "dry": {
+        "peak": 0.275,
+        "rms": 0.0334,
+        "maxAdjacentSampleDelta": 0.1176,
+        "clippedFrames": 0,
+        "monoRms": 0.0314,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 142.285,
+        "originalSourceEnd": 151.285,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 26
+      },
+      "normal": {
+        "peak": 0.2738,
+        "rms": 0.0336,
+        "maxAdjacentSampleDelta": 0.1176,
+        "clippedFrames": 0,
+        "monoRms": 0.0317,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 142.285,
+        "originalSourceEnd": 151.285,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 26
+      },
+      "maxLanding": {
+        "peak": 0.2717,
+        "rms": 0.035,
+        "maxAdjacentSampleDelta": 0.1176,
+        "clippedFrames": 0,
+        "monoRms": 0.033,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 142.285,
+        "originalSourceEnd": 151.285,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 26
+      },
+      "toggle": {
+        "peak": 0.2738,
+        "rms": 0.0333,
+        "maxAdjacentSampleDelta": 0.1176,
+        "clippedFrames": 0,
+        "monoRms": 0.0314,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 142.285,
+        "originalSourceEnd": 151.285,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 26
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0038,
+        "wetDifferencePeak": 0.0395,
+        "wetResidualMaxAdjacentDelta": 0.0047
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0103,
+        "wetDifferencePeak": 0.1087,
+        "wetResidualMaxAdjacentDelta": 0.013
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0011,
+        "wetDifferencePeak": 0.0144,
+        "wetResidualMaxAdjacentDelta": 0.002
+      }
+    },
+    {
+      "range": [
+        11.94,
+        20.94
+      ],
+      "dry": {
+        "peak": 0.2179,
+        "rms": 0.0165,
+        "maxAdjacentSampleDelta": 0.074,
+        "clippedFrames": 0,
+        "monoRms": 0.0162,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 11.94,
+        "originalSourceEnd": 20.94,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 28
+      },
+      "normal": {
+        "peak": 0.2178,
+        "rms": 0.0164,
+        "maxAdjacentSampleDelta": 0.074,
+        "clippedFrames": 0,
+        "monoRms": 0.0162,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 11.94,
+        "originalSourceEnd": 20.94,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 28
+      },
+      "maxLanding": {
+        "peak": 0.2178,
+        "rms": 0.018,
+        "maxAdjacentSampleDelta": 0.074,
+        "clippedFrames": 0,
+        "monoRms": 0.0178,
+        "channelCount": 2,
+        "landingNotesScheduled": 3,
+        "toggle": false,
+        "originalSourceStart": 11.94,
+        "originalSourceEnd": 20.94,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 28
+      },
+      "toggle": {
+        "peak": 0.2179,
+        "rms": 0.0165,
+        "maxAdjacentSampleDelta": 0.074,
+        "clippedFrames": 0,
+        "monoRms": 0.0163,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 11.94,
+        "originalSourceEnd": 20.94,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 28
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0028,
+        "wetDifferencePeak": 0.0318,
+        "wetResidualMaxAdjacentDelta": 0.0038
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.009,
+        "wetDifferencePeak": 0.1437,
+        "wetResidualMaxAdjacentDelta": 0.0169
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0009,
+        "wetDifferencePeak": 0.0217,
+        "wetResidualMaxAdjacentDelta": 0.0027
+      }
+    },
+    {
+      "range": [
+        149.03,
+        158.03
+      ],
+      "dry": {
+        "peak": 0.2143,
+        "rms": 0.0291,
+        "maxAdjacentSampleDelta": 0.0853,
+        "clippedFrames": 0,
+        "monoRms": 0.0276,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 149.03,
+        "originalSourceEnd": 158.03,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 23
+      },
+      "normal": {
+        "peak": 0.2143,
+        "rms": 0.0291,
+        "maxAdjacentSampleDelta": 0.0853,
+        "clippedFrames": 0,
+        "monoRms": 0.0276,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 149.03,
+        "originalSourceEnd": 158.03,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 23
+      },
+      "maxLanding": {
+        "peak": 0.2143,
+        "rms": 0.0291,
+        "maxAdjacentSampleDelta": 0.0853,
+        "clippedFrames": 0,
+        "monoRms": 0.0276,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 149.03,
+        "originalSourceEnd": 158.03,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 23
+      },
+      "toggle": {
+        "peak": 0.2143,
+        "rms": 0.0291,
+        "maxAdjacentSampleDelta": 0.0853,
+        "clippedFrames": 0,
+        "monoRms": 0.0276,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 149.03,
+        "originalSourceEnd": 158.03,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 23
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0004,
+        "wetDifferencePeak": 0.0036,
+        "wetResidualMaxAdjacentDelta": 0.0006
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0011,
+        "wetDifferencePeak": 0.01,
+        "wetResidualMaxAdjacentDelta": 0.0016
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0002,
+        "wetDifferencePeak": 0.0023,
+        "wetResidualMaxAdjacentDelta": 0.0004
+      }
+    },
+    {
+      "range": [
+        129.537,
+        138.537
+      ],
+      "dry": {
+        "peak": 0.2703,
+        "rms": 0.0323,
+        "maxAdjacentSampleDelta": 0.1087,
+        "clippedFrames": 0,
+        "monoRms": 0.0302,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 129.537,
+        "originalSourceEnd": 138.537,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 20
+      },
+      "normal": {
+        "peak": 0.2669,
+        "rms": 0.0325,
+        "maxAdjacentSampleDelta": 0.1089,
+        "clippedFrames": 0,
+        "monoRms": 0.0303,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 129.537,
+        "originalSourceEnd": 138.537,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 20
+      },
+      "maxLanding": {
+        "peak": 0.2611,
+        "rms": 0.034,
+        "maxAdjacentSampleDelta": 0.1093,
+        "clippedFrames": 0,
+        "monoRms": 0.0314,
+        "channelCount": 2,
+        "landingNotesScheduled": 3,
+        "toggle": false,
+        "originalSourceStart": 129.537,
+        "originalSourceEnd": 138.537,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 20
+      },
+      "toggle": {
+        "peak": 0.2703,
+        "rms": 0.0323,
+        "maxAdjacentSampleDelta": 0.1087,
+        "clippedFrames": 0,
+        "monoRms": 0.0302,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 129.537,
+        "originalSourceEnd": 138.537,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 20
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0033,
+        "wetDifferencePeak": 0.0281,
+        "wetResidualMaxAdjacentDelta": 0.0034
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0104,
+        "wetDifferencePeak": 0.1331,
+        "wetResidualMaxAdjacentDelta": 0.0159
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0001,
+        "wetDifferencePeak": 0.0043,
+        "wetResidualMaxAdjacentDelta": 0.0005
+      }
+    },
+    {
+      "range": [
+        97.47,
+        106.47
+      ],
+      "dry": {
+        "peak": 0.3008,
+        "rms": 0.0311,
+        "maxAdjacentSampleDelta": 0.161,
+        "clippedFrames": 0,
+        "monoRms": 0.0288,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 97.47,
+        "originalSourceEnd": 106.47,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 30
+      },
+      "normal": {
+        "peak": 0.3041,
+        "rms": 0.0315,
+        "maxAdjacentSampleDelta": 0.1608,
+        "clippedFrames": 0,
+        "monoRms": 0.0292,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 97.47,
+        "originalSourceEnd": 106.47,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 30
+      },
+      "maxLanding": {
+        "peak": 0.3097,
+        "rms": 0.0345,
+        "maxAdjacentSampleDelta": 0.1605,
+        "clippedFrames": 0,
+        "monoRms": 0.0322,
+        "channelCount": 2,
+        "landingNotesScheduled": 3,
+        "toggle": false,
+        "originalSourceStart": 97.47,
+        "originalSourceEnd": 106.47,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 30
+      },
+      "toggle": {
+        "peak": 0.3041,
+        "rms": 0.0311,
+        "maxAdjacentSampleDelta": 0.161,
+        "clippedFrames": 0,
+        "monoRms": 0.0288,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 97.47,
+        "originalSourceEnd": 106.47,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 30
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0053,
+        "wetDifferencePeak": 0.0379,
+        "wetResidualMaxAdjacentDelta": 0.0065
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0154,
+        "wetDifferencePeak": 0.15,
+        "wetResidualMaxAdjacentDelta": 0.0179
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0013,
+        "wetDifferencePeak": 0.0142,
+        "wetResidualMaxAdjacentDelta": 0.0022
+      }
+    },
+    {
+      "range": [
+        34.428,
+        43.428
+      ],
+      "dry": {
+        "peak": 0.2302,
+        "rms": 0.0325,
+        "maxAdjacentSampleDelta": 0.1009,
+        "clippedFrames": 0,
+        "monoRms": 0.0294,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 34.428,
+        "originalSourceEnd": 43.428,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 29
+      },
+      "normal": {
+        "peak": 0.2274,
+        "rms": 0.0325,
+        "maxAdjacentSampleDelta": 0.1009,
+        "clippedFrames": 0,
+        "monoRms": 0.0294,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 34.428,
+        "originalSourceEnd": 43.428,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 29
+      },
+      "maxLanding": {
+        "peak": 0.2294,
+        "rms": 0.0331,
+        "maxAdjacentSampleDelta": 0.1009,
+        "clippedFrames": 0,
+        "monoRms": 0.0299,
+        "channelCount": 2,
+        "landingNotesScheduled": 3,
+        "toggle": false,
+        "originalSourceStart": 34.428,
+        "originalSourceEnd": 43.428,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 29
+      },
+      "toggle": {
+        "peak": 0.2302,
+        "rms": 0.0325,
+        "maxAdjacentSampleDelta": 0.1009,
+        "clippedFrames": 0,
+        "monoRms": 0.0294,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 34.428,
+        "originalSourceEnd": 43.428,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 29
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0013,
+        "wetDifferencePeak": 0.0095,
+        "wetResidualMaxAdjacentDelta": 0.0013
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0061,
+        "wetDifferencePeak": 0.1476,
+        "wetResidualMaxAdjacentDelta": 0.0174
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0007,
+        "wetDifferencePeak": 0.0088,
+        "wetResidualMaxAdjacentDelta": 0.0013
+      }
+    },
+    {
+      "range": [
+        46.584,
+        55.584
+      ],
+      "dry": {
+        "peak": 0.1999,
+        "rms": 0.0275,
+        "maxAdjacentSampleDelta": 0.0995,
+        "clippedFrames": 0,
+        "monoRms": 0.0252,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 46.584,
+        "originalSourceEnd": 55.584,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 23
+      },
+      "normal": {
+        "peak": 0.1984,
+        "rms": 0.0275,
+        "maxAdjacentSampleDelta": 0.0995,
+        "clippedFrames": 0,
+        "monoRms": 0.0252,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": false,
+        "originalSourceStart": 46.584,
+        "originalSourceEnd": 55.584,
+        "wet": 0.2,
+        "landing": false,
+        "changeCount": 23
+      },
+      "maxLanding": {
+        "peak": 0.1959,
+        "rms": 0.028,
+        "maxAdjacentSampleDelta": 0.0995,
+        "clippedFrames": 0,
+        "monoRms": 0.0256,
+        "channelCount": 2,
+        "landingNotesScheduled": 3,
+        "toggle": false,
+        "originalSourceStart": 46.584,
+        "originalSourceEnd": 55.584,
+        "wet": 0.55,
+        "landing": true,
+        "changeCount": 23
+      },
+      "toggle": {
+        "peak": 0.1999,
+        "rms": 0.0275,
+        "maxAdjacentSampleDelta": 0.0995,
+        "clippedFrames": 0,
+        "monoRms": 0.0252,
+        "channelCount": 2,
+        "landingNotesScheduled": 0,
+        "toggle": true,
+        "originalSourceStart": 46.584,
+        "originalSourceEnd": 55.584,
+        "wet": 0,
+        "landing": false,
+        "changeCount": 23
+      },
+      "compareNormal": {
+        "wetDifferenceRms": 0.0011,
+        "wetDifferencePeak": 0.01,
+        "wetResidualMaxAdjacentDelta": 0.0015
+      },
+      "compareMax": {
+        "wetDifferenceRms": 0.0057,
+        "wetDifferencePeak": 0.1443,
+        "wetResidualMaxAdjacentDelta": 0.0159
+      },
+      "compareToggle": {
+        "wetDifferenceRms": 0.0005,
+        "wetDifferencePeak": 0.0078,
+        "wetResidualMaxAdjacentDelta": 0.0006
+      }
+    }
+  ]
+}
