@@ -70,11 +70,11 @@ export const SECTOR_M = 500;
 
 /**
  * Issue #65: Debutmont is the base biome. This is the id every "base" answer resolves to (sectors before
- * BASE_SECTORS, mask 0, the base-weight draw). It is the profile's BASE_BIOME_ID, one constant defined in
- * data/biomeAliases.js. Arcade (`null`) is no longer a base: it is only the bridge between two
- * different biomes (see biomeAtX).
+ * BASE_SECTORS, mask 0, the base-weight draw). One constant, shared with the profile and defined in
+ * data/biomeAliases.js; re-exported here. Arcade (`null`) is no longer a base: it is only the bridge between two
+ * different biomes (see biomeAtPosition).
  */
-export const HOME_BIOME_ID = BASE_BIOME_ID;
+export { BASE_BIOME_ID };
 
 /**
  * Sectors whose content is always the home biome, whatever the mask (spec W3: "Sectors 0 and 1 are always
@@ -337,12 +337,12 @@ function vnoise(x, seed) {
  */
 
 /**
- * Which biome a sector is drawn as, BEFORE arcade bridges (see biomeAtX). Pure and seed-deterministic: the
+ * Which biome a sector is drawn as, BEFORE arcade bridges (see biomeAtPosition). Pure and seed-deterministic: the
  * answer depends only on (seed, sector, mask), never on call order or on how much terrain has been generated,
  * so a chunk built late by streaming is identical to one built early.
  *
  * Draws from `Rng.fork('biome')`, an independent stream, so asking this question never advances the
- * terrain, hazard or shard streams. Debutmont (HOME_BIOME_ID) is the base: it answers wherever the old model
+ * terrain, hazard or shard streams. Debutmont (BASE_BIOME_ID) is the base: it answers wherever the old model
  * answered arcade (sectors before BASE_SECTORS, mask 0, no eligible defs, the base-weight draw). The home
  * biome is left out of the eligible pool, so its mask bit is a no-op and it is never double-weighted. The draw
  * count and order are the same as before, so a non-home pick for a given seed and mask is unchanged.
@@ -354,20 +354,20 @@ function vnoise(x, seed) {
  * @returns {string} biome id (never null; the home biome is the base).
  */
 export function biomeForSector(seed, sector, biomeMask, biomeDefs) {
-  if (!(sector >= BASE_SECTORS)) return HOME_BIOME_ID;
+  if (!(sector >= BASE_SECTORS)) return BASE_BIOME_ID;
   const mask = biomeMask >>> 0;
-  if (!mask) return HOME_BIOME_ID;
+  if (!mask) return BASE_BIOME_ID;
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   // Eligible = the biome is in the mask AND we actually have its definition (a mask bit with no content
   // would otherwise be a sector with no palette and no chunks). The home biome is the base, not a candidate.
-  const eligible = defs.filter((d) => d && d.bit && d.id !== HOME_BIOME_ID && (mask & d.bit) !== 0);
-  if (!eligible.length) return HOME_BIOME_ID;
+  const eligible = defs.filter((d) => d && d.bit && d.id !== BASE_BIOME_ID && (mask & d.bit) !== 0);
+  if (!eligible.length) return BASE_BIOME_ID;
   const rng = new Rng(xxHash32(`biome:${sector}`, new Rng(seed).baseSeed));
   const pick = rng.weighted(
     eligible.concat([{ id: null, weight: BIOME_BASE_WEIGHT }]),
     (d) => d.weight || 1,
   );
-  return pick && pick.id ? pick.id : HOME_BIOME_ID;
+  return pick && pick.id ? pick.id : BASE_BIOME_ID;
 }
 
 /**
@@ -423,7 +423,7 @@ export function arcadeBridgeCapM(startM) {
  *   means `{ first: true }`); omit for a plain position query.
  * @returns {string|null} biome id, or null for an arcade bridge.
  */
-export function biomeAtX(seed, xM, biomeMask, biomeDefs, chunk) {
+export function biomeAtPosition(seed, xM, biomeMask, biomeDefs, chunk) {
   const sector = Math.max(0, Math.floor(xM / SECTOR_M));
   const biome = biomeForSector(seed, sector, biomeMask, biomeDefs);
   if (sector < 1 || biomeForSector(seed, sector - 1, biomeMask, biomeDefs) === biome) return biome;
@@ -822,7 +822,7 @@ export class TerrainGenerator {
   /**
    * Biome of a chunk, or null for arcade (a bridge, or content-free). A chunk is assigned by its START, which
    * keeps the assignment a pure function of the chunk's own start position (and of facts about its own sector's
-   * chunks, which are themselves a function of the seed): see biomeAtX for the bridge rule. A chunk starting
+   * chunks, which are themselves a function of the seed): see biomeAtPosition for the bridge rule. A chunk starting
    * inside a bridge window is built as arcade first (`_arcadeEndPx`) to learn whether it would overrun the cap.
    * A biome id with no definition in `biomeDefs` is treated as arcade, so a generator built without biome
    * content is unchanged.
@@ -834,12 +834,12 @@ export class TerrainGenerator {
     if (!this.biomeDefs.length) return null;
     const startM = b.startX / this.ppm;
     const first = this._isBreather(index, b);
-    let id = biomeAtX(this.seed, startM, this.biomeMask, this.biomeDefs, first);
+    let id = biomeAtPosition(this.seed, startM, this.biomeMask, this.biomeDefs, first);
     if (id === null && !first) {
       // inside the window of a bridging sector: arcade only if this chunk keeps the bridge under its cap
       let j = index;
       while (j > 0 && !this._isBreather(j, this.bounds[j])) j--;
-      id = biomeAtX(this.seed, startM, this.biomeMask, this.biomeDefs, {
+      id = biomeAtPosition(this.seed, startM, this.biomeMask, this.biomeDefs, {
         runStartM: this.bounds[j].startX / this.ppm, endM: this._arcadeEndPx(b, index) / this.ppm,
       });
     }

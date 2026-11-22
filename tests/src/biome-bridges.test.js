@@ -1,11 +1,11 @@
 /**
  * #65 terrain: Debutmont is the base biome and arcade is the bridge at every biome change.
  *
- * The pure pieces (biomeForSector, arcadeBridgeLengthM, biomeAtX) are tested against the shipped content, and the
+ * The pure pieces (biomeForSector, arcadeBridgeLengthM, biomeAtPosition) are tested against the shipped content, and the
  * real generator is checked against them chunk by chunk so terrain and every consumer agree on one answer.
  */
 import {
-  TerrainGenerator, biomeForSector, biomeAtX, arcadeBridgeLengthM, sectorHasBridge, HOME_BIOME_ID, SECTOR_M, BASE_SECTORS,
+  TerrainGenerator, biomeForSector, biomeAtPosition, arcadeBridgeLengthM, sectorHasBridge, BASE_BIOME_ID, SECTOR_M, BASE_SECTORS,
   BIOME_BASE_WEIGHT, ARCADE_BRIDGE_MIN_FRAC, ARCADE_BRIDGE_MAX_FRAC, ARCADE_BRIDGE_RAMP_M, ARCADE_BRIDGE_CAP_MUL,
   arcadeBridgeCapM,
 } from '../../src/systems/TerrainGenerator.js';
@@ -16,7 +16,7 @@ import { layout } from '../../tools/sim/biome-layout.mjs';
 
 const DEFS = readDir('biomes');
 const ALL = DEFS.reduce((m, d) => m | d.bit, 0);
-const HOME_BIT = DEFS.find((d) => d.id === HOME_BIOME_ID).bit;
+const HOME_BIT = DEFS.find((d) => d.id === BASE_BIOME_ID).bit;
 const SEEDS = ['alpha', 'bitstream-bluffs', '42', 'seed@mask0', '2026-11-13'];
 const MASKS = [0, 2, 6, ALL];
 const PPM = 20;
@@ -34,28 +34,28 @@ function oldBiomeForSector(seed, sector, biomeMask, biomeDefs) {
 }
 
 describe('home biome is the base', () => {
-  test('HOME_BIOME_ID is a shipped biome', () => {
-    expect(DEFS.map((d) => d.id)).toContain(HOME_BIOME_ID);
+  test('BASE_BIOME_ID is a shipped biome', () => {
+    expect(DEFS.map((d) => d.id)).toContain(BASE_BIOME_ID);
   });
 
   test('sectors 0 and 1 are home at any mask', () => {
     for (const seed of SEEDS) for (const mask of [0, ...MASKS, 1, 16, ALL]) {
-      expect(biomeForSector(seed, 0, mask, DEFS)).toBe(HOME_BIOME_ID);
-      expect(biomeForSector(seed, 1, mask, DEFS)).toBe(HOME_BIOME_ID);
+      expect(biomeForSector(seed, 0, mask, DEFS)).toBe(BASE_BIOME_ID);
+      expect(biomeForSector(seed, 1, mask, DEFS)).toBe(BASE_BIOME_ID);
     }
   });
 
   test('mask 0 is home in every sector, and never has a bridge', () => {
     for (const seed of SEEDS) for (let s = 0; s < 300; s++) {
-      expect(biomeForSector(seed, s, 0, DEFS)).toBe(HOME_BIOME_ID);
+      expect(biomeForSector(seed, s, 0, DEFS)).toBe(BASE_BIOME_ID);
       expect(sectorHasBridge(seed, s, 0, DEFS)).toBe(false);
     }
   });
 
   test('no defs, or defs without the mask bits: home (never null)', () => {
-    expect(biomeForSector('alpha', 7, ALL, [])).toBe(HOME_BIOME_ID);
-    expect(biomeForSector('alpha', 7, ALL, undefined)).toBe(HOME_BIOME_ID);
-    expect(biomeForSector('alpha', 7, 1 << 20, DEFS)).toBe(HOME_BIOME_ID);
+    expect(biomeForSector('alpha', 7, ALL, [])).toBe(BASE_BIOME_ID);
+    expect(biomeForSector('alpha', 7, ALL, undefined)).toBe(BASE_BIOME_ID);
+    expect(biomeForSector('alpha', 7, 1 << 20, DEFS)).toBe(BASE_BIOME_ID);
   });
 
   test('the home bit in the mask is a no-op: never double-weighted', () => {
@@ -67,13 +67,13 @@ describe('home biome is the base', () => {
   test('same stream, same draws: every non-home pick equals the old pick, and old null is now home', () => {
     for (const seed of SEEDS) for (const mask of [0, 2, 6, 18, ALL & ~HOME_BIT]) for (let s = 0; s < 400; s++) {
       const old = oldBiomeForSector(seed, s, mask, DEFS);
-      expect(biomeForSector(seed, s, mask, DEFS)).toBe(old === null ? HOME_BIOME_ID : old);
+      expect(biomeForSector(seed, s, mask, DEFS)).toBe(old === null ? BASE_BIOME_ID : old);
     }
   });
 
   test('never returns a biome whose bit is not in the mask (home excepted)', () => {
     for (const d of DEFS) for (let s = 0; s < 400; s++) {
-      expect([d.id, HOME_BIOME_ID]).toContain(biomeForSector('locked', s, d.bit, DEFS));
+      expect([d.id, BASE_BIOME_ID]).toContain(biomeForSector('locked', s, d.bit, DEFS));
     }
   });
 });
@@ -107,7 +107,7 @@ describe('bridge length curve', () => {
     expect(arcadeBridgeCapM(30000)).toBeCloseTo(187.5, 9);
   });
 
-  test('biomeAtX at chunk level: the first chunk is always arcade; a later chunk only while it ends under the cap', () => {
+  test('biomeAtPosition at chunk level: the first chunk is always arcade; a later chunk only while it ends under the cap', () => {
     let checked = 0;
     for (const seed of SEEDS) for (let s = 1; s < 80; s++) {
       if (!sectorHasBridge(seed, s, ALL, DEFS)) continue;
@@ -115,12 +115,12 @@ describe('bridge length curve', () => {
       const biome = biomeForSector(seed, s, ALL, DEFS);
       const run = start + 30; // a bridge whose first chunk started 30 m into the sector
       const cap = arcadeBridgeCapM(start);
-      expect(biomeAtX(seed, run, ALL, DEFS, true)).toBeNull();
-      expect(biomeAtX(seed, run, ALL, DEFS, { first: true, endM: run + 1e6 })).toBeNull(); // however long the first chunk is
-      expect(biomeAtX(seed, start + 10, ALL, DEFS, { runStartM: run, endM: run + cap })).toBeNull();
-      expect(biomeAtX(seed, start + 10, ALL, DEFS, { runStartM: run, endM: run + cap + 0.01 })).toBe(biome);
+      expect(biomeAtPosition(seed, run, ALL, DEFS, true)).toBeNull();
+      expect(biomeAtPosition(seed, run, ALL, DEFS, { first: true, endM: run + 1e6 })).toBeNull(); // however long the first chunk is
+      expect(biomeAtPosition(seed, start + 10, ALL, DEFS, { runStartM: run, endM: run + cap })).toBeNull();
+      expect(biomeAtPosition(seed, start + 10, ALL, DEFS, { runStartM: run, endM: run + cap + 0.01 })).toBe(biome);
       // past the window the biome takes it, whatever its end
-      expect(biomeAtX(seed, start + arcadeBridgeLengthM(start) + 0.01, ALL, DEFS, { runStartM: run, endM: run + 1 })).toBe(biome);
+      expect(biomeAtPosition(seed, start + arcadeBridgeLengthM(start) + 0.01, ALL, DEFS, { runStartM: run, endM: run + 1 })).toBe(biome);
       checked++;
     }
     expect(checked).toBeGreaterThan(30);
@@ -133,12 +133,12 @@ describe('bridge length curve', () => {
       const start = s * SECTOR_M;
       const len = arcadeBridgeLengthM(start);
       const biome = biomeForSector(seed, s, ALL, DEFS);
-      expect(biomeAtX(seed, start, ALL, DEFS)).toBeNull();
-      expect(biomeAtX(seed, start + len - 0.01, ALL, DEFS)).toBeNull();
-      expect(biomeAtX(seed, start + len + 0.01, ALL, DEFS)).toBe(biome);
-      expect(biomeAtX(seed, start + SECTOR_M - 0.01, ALL, DEFS)).toBe(biome);
+      expect(biomeAtPosition(seed, start, ALL, DEFS)).toBeNull();
+      expect(biomeAtPosition(seed, start + len - 0.01, ALL, DEFS)).toBeNull();
+      expect(biomeAtPosition(seed, start + len + 0.01, ALL, DEFS)).toBe(biome);
+      expect(biomeAtPosition(seed, start + SECTOR_M - 0.01, ALL, DEFS)).toBe(biome);
       // the sector before the boundary is the previous biome, with no bridge at its end
-      expect(biomeAtX(seed, start - 0.01, ALL, DEFS)).toBe(biomeForSector(seed, s - 1, ALL, DEFS));
+      expect(biomeAtPosition(seed, start - 0.01, ALL, DEFS)).toBe(biomeForSector(seed, s - 1, ALL, DEFS));
       checked++;
     }
     expect(checked).toBeGreaterThan(30);
@@ -146,13 +146,13 @@ describe('bridge length curve', () => {
 
   test('no bridge between consecutive sectors of the same biome, and none at the run start', () => {
     for (const seed of SEEDS) {
-      expect(biomeAtX(seed, 0, ALL, DEFS)).toBe(HOME_BIOME_ID);
+      expect(biomeAtPosition(seed, 0, ALL, DEFS)).toBe(BASE_BIOME_ID);
       for (let s = 1; s < 120; s++) {
         const same = biomeForSector(seed, s, ALL, DEFS) === biomeForSector(seed, s - 1, ALL, DEFS);
         expect(sectorHasBridge(seed, s, ALL, DEFS)).toBe(!same);
         if (same) {
           const b = biomeForSector(seed, s, ALL, DEFS);
-          for (const dx of [0, 1, 40, 100, 200, 499]) expect(biomeAtX(seed, s * SECTOR_M + dx, ALL, DEFS)).toBe(b);
+          for (const dx of [0, 1, 40, 100, 200, 499]) expect(biomeAtPosition(seed, s * SECTOR_M + dx, ALL, DEFS)).toBe(b);
         }
       }
     }
@@ -188,7 +188,7 @@ describe('the real generator follows the model, chunk-aligned', () => {
       // generator's arcade replay is (and for a chunk that does come out arcade it is the real end).
       const arcadeEndM = gen._arcadeEndPx(gen.bounds[chunks[k].i], chunks[k].i) / PPM;
       if (biome === null) expect(arcadeEndM).toBeCloseTo(chunks[k].endM, 6);
-      expect(biome).toBe(biomeAtX(seed, startM, ALL, DEFS, { first, runStartM: chunks[j].startM, endM: arcadeEndM }));
+      expect(biome).toBe(biomeAtPosition(seed, startM, ALL, DEFS, { first, runStartM: chunks[j].startM, endM: arcadeEndM }));
       expect(gen.biomeAtX(c.startX)).toBe(biome);
       expect(gen.biomeAtX(c.endX - 1)).toBe(biome);
       if (biome === null) arcadeSectors.add(sector);
@@ -259,7 +259,7 @@ describe('the real generator follows the model, chunk-aligned', () => {
 
   test('mask 0 is pure Debutmont: no arcade chunk anywhere past the opening jump, every chunk tagged home', () => {
     for (const seed of SEEDS) {
-      for (const q of walk(makeGen(seed, { biomeMask: 0 }), 6000)) expect(q.biome).toBe(HOME_BIOME_ID);
+      for (const q of walk(makeGen(seed, { biomeMask: 0 }), 6000)) expect(q.biome).toBe(BASE_BIOME_ID);
     }
   });
 
@@ -295,7 +295,7 @@ describe('layout is deterministic', () => {
           expect(a[k + 1].biome).not.toBe(a[k - 1].biome);
         }
       }
-      if (mask === 0) expect(a.map((r) => r.biome)).toEqual([HOME_BIOME_ID]);
+      if (mask === 0) expect(a.map((r) => r.biome)).toEqual([BASE_BIOME_ID]);
     }
   });
 });

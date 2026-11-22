@@ -162,6 +162,9 @@ export class RunScene extends Phaser.Scene {
     // stale `pressed.pause` paused the run on its first frame. Drop them before the run starts.
     try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
     this.palette = getPalette(this.game);
+    // RunScene is one instance across runs and the palette above is the base one: forget the previous run's biome, or a
+    // retry that ends where it began (Debutmont) would skip its opening repaint, motif and BIOME_ENTER (#65).
+    this._biomeId = undefined;
     // W4 cosmetics: resolved ONCE per run, from the profile, for the same reason the biome mask is: the
     // sled, the trail and the drawn colours must not disagree with each other mid-run.
     this.look = this._resolveLook();
@@ -2359,7 +2362,7 @@ export class RunScene extends Phaser.Scene {
     // Decision 3: which biomes this run entered / rode through (pure, BiomeDiscovery). Beside the record, never
     // in it, so the RunRecord and its ledger hash are unchanged. Furthest x = the ScoreManager's furthest metres.
     const biomeVisits = detectBiomeVisits({
-      seed: this.seed, biomeMask: this.biomeMask, biomeDefs: Object.values(this.content.biomes || {}),
+      biomeAt: (x) => this.terrain.biomeAtX(x),
       furthestX: Math.max(fs.x, this.startX + (snap.distanceM || 0) * PIXELS_PER_METER), crashX: fs.x, pxPerMeter: PIXELS_PER_METER,
     });
     this.game.events.emit(EVT.RUN_END, { record, biomeVisits });

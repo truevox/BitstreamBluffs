@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { TerrainGenerator, SECTOR_M, HOME_BIOME_ID } from '../../src/systems/TerrainGenerator.js';
+import { TerrainGenerator, SECTOR_M, BASE_BIOME_ID } from '../../src/systems/TerrainGenerator.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const readDir = (sub) => {
@@ -51,7 +51,7 @@ export function layout(seed, mask, uptoM = upto) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  console.log(`# home biome ${HOME_BIOME_ID}, sector ${SECTOR_M} m, up to ${upto} m`);
+  console.log(`# home biome ${BASE_BIOME_ID}, sector ${SECTOR_M} m, up to ${upto} m`);
   for (const seed of seeds) {
     for (const mask of masks) {
       for (const r of layout(seed, mask)) {

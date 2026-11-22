@@ -190,7 +190,7 @@ function pressTitle(values, label, over) {
 
 
 const { PIXELS_PER_METER } = await import('../../src/constants.js');
-const { biomeForSector, HOME_BIOME_ID, SECTOR_M } = await import('../../src/systems/TerrainGenerator.js');
+const { biomeForSector, BASE_BIOME_ID, SECTOR_M } = await import('../../src/systems/TerrainGenerator.js');
 const { ProgressionService } = await import('../../src/systems/ProgressionService.js');
 const { ProfileStore } = await import('../../src/systems/ProfileStore.js');
 const fs = await import('fs');
@@ -202,7 +202,7 @@ const SECTOR_PX = SECTOR_M * PIXELS_PER_METER;
 function seedFor(id, bit) {
   for (let i = 0; i < 2000; i++) {
     const seed = `d3rs-${i}`;
-    if (biomeForSector(seed, 2, bit, DEFS) === id && biomeForSector(seed, 3, bit, DEFS) === HOME_BIOME_ID) return seed;
+    if (biomeForSector(seed, 2, bit, DEFS) === id && biomeForSector(seed, 3, bit, DEFS) === BASE_BIOME_ID) return seed;
   }
   throw new Error('no seed');
 }
@@ -222,7 +222,7 @@ function rideAndCrash(seed, mask, furthestX, crashX = furthestX) {
 describe('decision 3: RunScene reports the biomes a run actually entered', () => {
   // Debutmont is the base (sectors 0-1), then an arcade bridge opens Crystal Cavern at sector 2 (#65).
   const seed = seedFor('crystal-cavern', 16);
-  const HOME = HOME_BIOME_ID;
+  const HOME = BASE_BIOME_ID;
 
   test('a run that crashes inside the biome sector reports it encountered, not completed', () => {
     const { payload } = rideAndCrash(seed, 16, 2 * SECTOR_PX + SECTOR_PX / 2);
@@ -288,8 +288,33 @@ describe('#65: RunScene announces biomes from the generator\'s own answer at the
       if (b !== prev) { prev = b; owed++; }
       s.updateFun(16, {}, Math.max(0, (x - s.startX) / 10));
     }
-    expect(events.map((e) => [e.id, e.entering])).toEqual([[HOME_BIOME_ID, true], [null, false], ['crystal-cavern', true]]);
+    expect(events.map((e) => [e.id, e.entering])).toEqual([[BASE_BIOME_ID, true], [null, false], ['crystal-cavern', true]]);
     expect(s.refreshPalette).toHaveBeenCalledTimes(owed);
     expect(owed).toBe(3);
+  });
+
+  test('a retry on the same RunScene instance announces and repaints the opening biome again', () => {
+    // RunScene is one instance across runs; create() starts on the base palette, so it must forget the last run's biome.
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SEED, 'retry-seed'], [REG.BIOME_MASK, 0], [REG.SAVE_STORE, memStore()]]);
+    const s = runScene(values);
+    const events = [];
+    s.emitIf = (name, payload) => { if (name === EVT.BIOME_ENTER) events.push(payload); };
+    s.refreshPalette = jest.fn();
+    const tick = () => {
+      s.sled.x = s.startX + 200;
+      s.sled.y = s.terrain.heightAt(s.sled.x);
+      s.sled.grounded = true;
+      s.updateFun(16, {}, 20);
+    };
+    tick();
+    expect(events.map((e) => [e.id, e.entering])).toEqual([[BASE_BIOME_ID, true]]);
+    expect(s.refreshPalette).toHaveBeenCalledTimes(1);
+    // The first run ended in Debutmont; the retry starts in Debutmont again.
+    s.create();
+    s.emitIf = (name, payload) => { if (name === EVT.BIOME_ENTER) events.push(payload); };
+    s.refreshPalette = jest.fn();
+    tick();
+    expect(events.map((e) => [e.id, e.entering])).toEqual([[BASE_BIOME_ID, true], [BASE_BIOME_ID, true]]);
+    expect(s.refreshPalette).toHaveBeenCalledTimes(1);
   });
 });

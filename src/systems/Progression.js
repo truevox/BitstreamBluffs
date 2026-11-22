@@ -33,7 +33,7 @@ export const PROFILE_VERSION = 1;
  * unlocked and can never be switched off, so it has no toggle row and its mask bit is never part of a
  * profile's enabled mask (the terrain generator treats the home bit as a no-op, and keeping it out keeps
  * masks canonical so leaderboard cohorts do not split on a meaningless bit). Defined once in data/biomeAliases.js
- * (shared with the terrain generator's HOME_BIOME_ID); re-exported here.
+ * (shared with the terrain generator's BASE_BIOME_ID); re-exported here.
  */
 export { BASE_BIOME_ID };
 

@@ -63,8 +63,12 @@ const EXPECTED_WITHOUT_BOOSTS = 65; // B4 Sky Jellyfish bounce: +2; B4: +5; Read
 // the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
 // load, and derives `pendingBiomes` from the level table on top of that, so a hand-set level or mask
 // alone is silently discarded.
+// The mask a normal run of PROFILE starts with, computed here and not read back from the profile: the four earned biomes'
+// bits (Garbage Dump Glacier 2, Pyramid Peak 4, Underwater Mountain 8, Crystal Cavern 16). Debutmont's bit (1) is the base
+// biome and is never in a mask (#65).
+const PROFILE_RUN_MASK = 2 | 4 | 8 | 16;
 const PROFILE = {
-  v: 1, xp: 48400, level: 16, bank: 0, biomeMask: 30, // the four earned biomes' bits; Debutmont's (1) is the base and never in a mask (#65)
+  v: 1, xp: 48400, level: 16, bank: 0, biomeOff: 0, // unlocked biomes default ON (#65); the legacy `biomeMask` is ignored by the game
   pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'],
   // Level 16 has crossed both boost unlock levels (Head Start 8, Error Correction 15). A real profile
   // gets these from grantLevelRewards when the level is crossed; a fixture that sets XP directly must
@@ -592,9 +596,9 @@ async function main() {
           return { mask: g.registry.get('biomeMask'), seed: String(g.registry.get('seed') || '') };
         }).catch((e) => ({ fatal: String(e) }));
         if (res.fatal) fail('NEW SEED resets to the profile mask', res.fatal);
-        else if (res.mask !== PROFILE.biomeMask) fail('NEW SEED resets to the profile mask', `saw ${res.mask}, expected ${PROFILE.biomeMask}`);
+        else if (res.mask !== PROFILE_RUN_MASK) fail('NEW SEED resets to the profile mask', `saw ${res.mask}, expected ${PROFILE_RUN_MASK}`);
         else if (/^daily-/.test(res.seed)) fail('NEW SEED is not a daily seed', res.seed);
-        else pass('NEW SEED resets to the profile mask', `mask ${PROFILE.biomeMask}, seed ${res.seed}`);
+        else pass('NEW SEED resets to the profile mask', `mask ${PROFILE_RUN_MASK}, seed ${res.seed}`);
         }
       } finally { await page.close(); }
     }
@@ -1413,7 +1417,7 @@ async function main() {
         else if (out.factor !== 1) fail('daily refuses Head Start', `speedFactor ${out.factor}`);
         // The fixture profile's mask is 30; the date cycle never produces 30, so 30 here means the
         // run took the profile mask instead of the Daily's shared one.
-        else if (out.mask === PROFILE.biomeMask || out.mask !== out.regMask) fail('daily uses the date mask, not the profile mask', `run mask ${out.mask}, registry ${out.regMask}`);
+        else if (out.mask === PROFILE_RUN_MASK || out.mask !== out.regMask) fail('daily uses the date mask, not the profile mask', `run mask ${out.mask}, registry ${out.regMask}`);
         else pass('daily run (real DAILY RUN item) refuses both boosts and uses the date mask', `shield 0, factor 1, not modded, mask ${out.mask}`);
       } finally { await page.close(); }
     }
@@ -2771,7 +2775,7 @@ async function main() {
         enc: 'decision 3: a d3gate0@2 run that enters a Garbage Dump Glacier sector records it encountered with the home biome, and Profile labels it GARBAGE DUMP GLACIER SEEN',
         ach: 'decision 3: the second encountered biome unlocks Explorer (biomes-2) with trail-hue-aurora, and the grid shows 2/2',
       };
-      const profile = { ...JSON.parse(JSON.stringify(PROFILE)), biomeMask: 2, biomeProgress: { encountered: ['pyramid-peak'], completed: [] } };
+      const profile = { ...JSON.parse(JSON.stringify(PROFILE)), biomeProgress: { encountered: ['pyramid-peak'], completed: [] } };
       const { page, errors } = await bootWithProfile(browser, port, profile);
       let out;
       try {

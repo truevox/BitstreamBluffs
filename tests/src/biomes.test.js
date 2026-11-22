@@ -9,7 +9,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { TerrainGenerator, biomeForSector, HOME_BIOME_ID } from '../../src/systems/TerrainGenerator.js';
+import { TerrainGenerator, biomeForSector, BASE_BIOME_ID } from '../../src/systems/TerrainGenerator.js';
 import { SECTOR_M } from '../../src/systems/TerrainGenerator.js';
 import { makeGen, loadContent, readDir } from './_helpers.js';
 import { PALETTE_KEYS, PALETTE_NAMES } from '../../src/constants.js';
@@ -182,8 +182,8 @@ describe('biomeForSector', () => {
     // Every seed and daily key starts with two home (Debutmont) sectors, so every run opens the same way.
     for (const mask of [0, ALL, bitOf('debutmont'), bitOf('crystal-cavern')]) {
       for (const seed of ['alpha', 'bitstream-bluffs', '2026-11-13']) {
-        expect({ seed, mask, s0: bio(seed, 0, mask) }).toMatchObject({ seed, mask, s0: HOME_BIOME_ID });
-        expect({ seed, mask, s1: bio(seed, 1, mask) }).toMatchObject({ seed, mask, s1: HOME_BIOME_ID });
+        expect({ seed, mask, s0: bio(seed, 0, mask) }).toMatchObject({ seed, mask, s0: BASE_BIOME_ID });
+        expect({ seed, mask, s1: bio(seed, 1, mask) }).toMatchObject({ seed, mask, s1: BASE_BIOME_ID });
       }
     }
   });
@@ -192,7 +192,7 @@ describe('biomeForSector', () => {
     // The whole point of the mask: a player who has enabled nothing plays pure Debutmont.
     for (const seed of ['alpha', 'bitstream-bluffs', '42']) {
       for (let s = 0; s < 2000; s++) {
-        expect({ seed, s, biome: bio(seed, s, 0) }).toMatchObject({ seed, s, biome: HOME_BIOME_ID });
+        expect({ seed, s, biome: bio(seed, s, 0) }).toMatchObject({ seed, s, biome: BASE_BIOME_ID });
       }
     }
   });
@@ -225,7 +225,7 @@ describe('biomeForSector', () => {
       const mask = b.bit;
       for (let s = 0; s < 600; s++) {
         const got = bio('locked', s, mask);
-        expect({ s, got, ok: got === HOME_BIOME_ID || got === b.id }).toMatchObject({ s, got, ok: true });
+        expect({ s, got, ok: got === BASE_BIOME_ID || got === b.id }).toMatchObject({ s, got, ok: true });
       }
     }
   });
@@ -243,7 +243,7 @@ describe('biomeForSector', () => {
     });
     for (const b of BIOMES) expect(seen.get(b.id) || 0).toBeGreaterThan(50);
     // The home biome is the base draw (it is never in the eligible pool), so it dominates its own share.
-    expect(seen.get(HOME_BIOME_ID) || 0).toBeGreaterThan(200);
+    expect(seen.get(BASE_BIOME_ID) || 0).toBeGreaterThan(200);
   });
 
   test('the choice draws from its own stream and does not consume the terrain stream', () => {
