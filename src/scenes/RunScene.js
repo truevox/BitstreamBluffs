@@ -168,6 +168,7 @@ export class RunScene extends Phaser.Scene {
     // RunScene is one instance across runs and the palette above is the base one: forget the previous run's biome, or a
     // retry that ends where it began (Debutmont) would skip its opening repaint, motif and BIOME_ENTER (#65).
     this._biomeId = undefined;
+    this._lookId = undefined; // #65 presentation: the look follows the same reset
     // W4 cosmetics: resolved ONCE per run, from the profile, for the same reason the biome mask is: the
     // sled, the trail and the drawn colours must not disagree with each other mid-run.
     this.look = this._resolveLook();

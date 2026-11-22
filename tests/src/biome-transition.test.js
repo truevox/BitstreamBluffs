@@ -6,7 +6,7 @@ import fs from 'fs';
 import {
   DISSOLVE_FRAC, REBUILD_FRAC, VEIL_CELL_PX, BAYER8, bridgeProgress, bridgeLook, veilCovers, hash01,
 } from '../../src/systems/BiomeTransition.js';
-import { HOME_BIOME_ID } from '../../src/systems/TerrainGenerator.js';
+import { BASE_BIOME_ID } from '../../src/data/biomeAliases.js';
 import { makeGen, readDir } from './_helpers.js';
 
 const SPAN = { startX: 1000, endX: 2000, fromId: 'debutmont', toId: 'garbage-dump-glacier' };
@@ -148,7 +148,7 @@ describe('TerrainGenerator.bridgeSpanAt agrees with the terrain', () => {
     const gen = makeGen('shots65-d', { biomeMask: 2 });
     const span = gen.bridgeSpanAt(1100 * 20);
     expect(span).not.toBeNull();
-    expect([HOME_BIOME_ID, 'garbage-dump-glacier']).toContain(span.fromId);
+    expect([BASE_BIOME_ID, 'garbage-dump-glacier']).toContain(span.fromId);
     expect(span.endX - span.startX).toBeGreaterThan(40 * 20);
     expect(span.endX - span.startX).toBeLessThan(200 * 20);
   });
