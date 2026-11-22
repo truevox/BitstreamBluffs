@@ -43,7 +43,7 @@ So before the fix 18 of 24 runs differ somewhere in causal state on at least one
 
 ## B4. Cost in real runs (before / after, same fixtures, interleaved fresh contexts, 5 reps each)
 
-Median `RunScene.simTick` ms per 120 Hz tick, main `b5b969dc` vs this PR (`docs/determinism/results/portable-math-perf-*.json`):
+Median `RunScene.simTick` ms per 120 Hz tick, main `97ba4f5c` (v2.19.1, measured before the last merge) vs this PR (`docs/determinism/results/portable-math-perf-*.json`):
 
 | Engine | cruise-baseline | airborne-tricks | broad-allbiomes (7,123 ticks) |
 |---|---|---|---|
