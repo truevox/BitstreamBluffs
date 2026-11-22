@@ -11,7 +11,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: './index.html', // Main HTML moved to public/
+      input: ['./index.html', './tools/music/snowpack-audition.html'], // Game + isolated Snowpack DSP audition
     },
   },
   server: {

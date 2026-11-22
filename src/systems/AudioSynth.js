@@ -218,6 +218,7 @@ export class AudioSynth {
 
   _onLanding(p) {
     if (!p || p.quality === 'crash') return;
+    if (this._musicMode === 'run') this._stemMusic?.onLanding?.(p);
     if (p.quality === 'perfect') this.playSfx('landPerfect');
     else if (p.hard) this.playSfx('landHard');
     else this.playSfx('land', { pitch: p.quality === 'sloppy' ? 0.8 : 1 });

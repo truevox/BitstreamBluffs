@@ -8,7 +8,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack',
 ]);
 
 function saturatorCurve(amount) {
@@ -129,6 +129,60 @@ function allocateEffect(ctx, raw) {
 			refs.impulse = { set: (buffer) => { conv.buffer = buffer || null; } };
 			break;
 		}
+		case 'snowpack': {
+			// Acoustic snow blanket: soften attacks, absorb highs, keep the low end.
+			// Original samples and their timing remain completely untouched.
+			const dry = node(ctx.createGain()), wet = node(ctx.createGain());
+			const lowA = node(ctx.createBiquadFilter()), lowB = node(ctx.createBiquadFilter());
+			const shelf = node(ctx.createBiquadFilter());
+			const comp = node(ctx.createDynamicsCompressor());
+			for (const filter of [lowA, lowB]) { filter.type = 'lowpass'; filter.Q.value = 0.707; }
+			shelf.type = 'highshelf'; shelf.frequency.value = 1800; shelf.gain.value = -5;
+			comp.threshold.value = -25; comp.ratio.value = 4;
+			comp.knee.value = 9; comp.attack.value = 0.004; comp.release.value = 0.18;
+			input.connect(dry); dry.connect(output);
+			input.connect(lowA); lowA.connect(lowB); lowB.connect(shelf);
+			shelf.connect(comp); comp.connect(wet); wet.connect(output);
+			let previousDepth = clamp(raw.depth, 0, 1, 0);
+			const depthTargets = depth => {
+				const ceiling = Math.max(300, Math.min(14000, ctx.sampleRate / 2 - 20));
+				const cutoff = Math.max(250, Math.min(ceiling, 10500 * Math.pow(0.085, depth)));
+				return [[dry.gain, 1 - depth], [wet.gain, depth * 0.95],
+					[lowA.frequency, cutoff], [lowB.frequency, cutoff * 1.12]];
+			};
+			const setDepth = (value, at, immediate = false) => {
+				const depth = clamp(value, 0, 1, 0);
+				// Leaving the snow clears quickly; ground-level snow settles slowly.
+				const smoothing = depth < previousDepth ? 0.035 : 0.13;
+				previousDepth = depth;
+				for (const [target, targetValue] of depthTargets(depth)) {
+					if (immediate) target.value = targetValue;
+					else numericParam(target, targetValue, at, smoothing);
+				}
+				return true;
+			};
+			const landImpact = (value, at) => {
+				const impact = clamp(value, 0, 1, 0);
+				if (impact <= 0 || previousDepth <= 0) return false;
+				// Touchdown abruptly buries the notes; the same effect then
+				// returns toward its original ground setting. No timer or
+				// new audio graph is created and a new jump cancels the tail.
+				const peak = Math.min(1, previousDepth + (1 - previousDepth) * impact * 0.95);
+				const baseline = depthTargets(previousDepth);
+				const buried = depthTargets(peak);
+				for (let i = 0; i < baseline.length; i++) {
+					const target = baseline[i][0];
+					target.cancelScheduledValues(at);
+					target.setTargetAtTime(buried[i][1], at, 0.018);
+					target.setTargetAtTime(baseline[i][1], at + 0.12, 0.24);
+				}
+				return true;
+			};
+			refs.depth = { set: (value, at) => setDepth(value, at) };
+			refs.impact = { set: (value, at) => landImpact(value, at) };
+			setDepth(raw.depth, ctx.currentTime, true);
+			break;
+		}
 		case 'analyser': {
 			const analyser = node(ctx.createAnalyser());
 			analyser.fftSize = 2 ** Math.round(Math.log2(clamp(raw.fftSize, 256, 2048, 512)));
@@ -145,7 +199,9 @@ function allocateEffect(ctx, raw) {
 		input, output, refs,
 		set(key, value, at) {
 			const ref = refs[key];
-			if (!ref || !ref.target) return false;
+			if (!ref) return false;
+			if (ref.set) return ref.set(value, at);
+			if (!ref.target) return false;
 			numericParam(ref.target, clamp(value, ref.lo, ref.hi), at);
 			return true;
 		},

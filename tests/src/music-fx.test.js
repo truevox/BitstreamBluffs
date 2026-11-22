@@ -2,16 +2,16 @@ import { jest } from '@jest/globals';
 import { buildMusicChain, StemFXMixer, MUSIC_PROCESSORS } from '../../src/systems/music/MusicFXGraph.js';
 
 class Param {
-	constructor() { this.value = 0; }
-	cancelScheduledValues() { return this; }
+	constructor() { this.value = 0; this.events = []; }
+	cancelScheduledValues(at) { this.events.push(['cancel', at]); return this; }
 	setValueAtTime(v) { this.value = v; return this; }
 	linearRampToValueAtTime(v) { this.value = v; return this; }
-	setTargetAtTime(v) { this.value = v; return this; }
+	setTargetAtTime(v,at,smoothing) { this.value = v; this.events.push(['target',v,at,smoothing]); return this; }
 }
 class AudioNodeMock {
 	constructor(type) {
 		this.type = type; this.connections = []; this.closed = false;
-		for (const key of ['gain', 'frequency', 'Q', 'pan', 'delayTime']) this[key] = new Param();
+		for (const key of ['gain', 'frequency', 'Q', 'pan', 'delayTime', 'threshold', 'ratio', 'knee', 'attack', 'release']) this[key] = new Param();
 		this.fftSize = 512;
 	}
 	connect(node) { this.connections.push(node); return node; }
@@ -21,7 +21,7 @@ class AudioNodeMock {
 	getByteFrequencyData(array) { array.fill(51); }
 }
 function fakeContext() {
-	const names = ['Gain','BiquadFilter','StereoPanner','WaveShaper','Delay','Oscillator','Convolver','Analyser'];
+	const names = ['Gain','BiquadFilter','StereoPanner','WaveShaper','Delay','Oscillator','Convolver','Analyser','DynamicsCompressor'];
 	const ctx = { sampleRate: 48000, currentTime: 10 };
 	for (const name of names) ctx['create' + name] = () => new AudioNodeMock(name);
 	ctx.createBuffer = (channels,length) => {
@@ -52,6 +52,42 @@ describe('Modular cheap Web Audio processors', () => {
 		const buffer = ctx.createBuffer(2,500);
 		expect(chain.find('effect7').setImpulse(buffer)).toBeUndefined();
 		expect(chain.find('effect7').refs.impulse).toBeDefined();
+		chain.dispose();
+	});
+	test('Snowpack depth smoothly reshapes the original without altering transport', () => {
+		const ctx = fakeContext();
+		const chain = buildMusicChain(ctx, [{id:'snow',type:'snowpack',depth:0.95}], ctx.createGain());
+		const snow = chain.find('snow');
+		expect(snow).toBeDefined();
+		expect(snow.refs.depth).toBeDefined();
+		expect(snow.refs.impact).toBeDefined();
+		expect(snow.set('depth',0.25,ctx.currentTime)).toBe(true);
+		expect(snow.set('impact',0.8,ctx.currentTime)).toBe(true);
+		expect(snow.set('impact',0,ctx.currentTime)).toBe(false);
+		expect(snow.set('depth',-5,ctx.currentTime)).toBe(true);
+		expect(snow.set('depth',Infinity,ctx.currentTime)).toBe(true);
+		expect(snow.set('unapproved',0.5,ctx.currentTime)).toBe(false);
+		chain.dispose();
+	});
+
+	test('Snowpack impact schedules bounded, two-stage burial and is cancelled by takeoff', () => {
+		const ctx = fakeContext();
+		const gains = [];
+		const createGain = ctx.createGain;
+		ctx.createGain = () => { const gain=createGain(); gains.push(gain); return gain; };
+		const chain = buildMusicChain(ctx,[{id:'snow',type:'snowpack',depth:.72}],ctx.createGain());
+		const snow = chain.find('snow');
+		expect(snow.set('impact',1.5,ctx.currentTime)).toBe(true);
+		const all = gains.flatMap(g=>g.gain.events);
+		const attack = all.filter(e=>e[0]==='target' && e[2]===ctx.currentTime);
+		const recovery = all.filter(e=>e[0]==='target' && e[2]===ctx.currentTime+.12);
+		expect(attack).toHaveLength(2); // dry gain and wet gain, each bounded.
+		expect(recovery).toHaveLength(2);
+		for (const event of [...attack,...recovery]) expect(Number.isFinite(event[1])).toBe(true);
+		const count = recovery.length;
+		snow.set('depth',0,ctx.currentTime+.06); // Jump interrupts scheduled settling.
+		expect(snow.set('impact',.8,ctx.currentTime+.07)).toBe(false);
+		expect(recovery).toHaveLength(count);
 		chain.dispose();
 	});
 	test('rejects unknown processors and duplicate stable ids', () => {
