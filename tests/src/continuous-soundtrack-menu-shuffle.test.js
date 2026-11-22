@@ -22,7 +22,7 @@ function audioFixture(){
 	audio._stemMusic.ready=true;
 	audio._stemMusic.trackIndex=1;
 	audio._stemMusic.clockStart=80;
-	audio._stemMusic.pack={sourceNames:['voice:debumont','voice:bitstream-bluffs']};
+	audio._stemMusic.pack={sourceNames:['voice:debutmont','voice:bitstream-bluffs']};
 	audio._stemMusic.mixer=null;
 	audio._musicWanted=true;
 	audio.startMusic=jest.fn();
@@ -89,11 +89,11 @@ describe('continuous soundtrack and saved shuffle',()=>{
 		expect(seen.size).toBe(3);
 		expect(d._nextEnabledIndex(current)).not.toBe(current);
 	});
-	test('menu uses Debumont voice and dry original stems with no gameplay motion',()=>{
+	test('menu uses Debutmont voice and dry original stems with no gameplay motion',()=>{
 		const d=Object.create(StemMusicDirector.prototype);
 		d.menuMode=false;d.biome='crystal-cavern';d.speedPxS=930;
 		d.airborne=true;d.dynamicOrchestra=true;d.vocals=false;d.started=true;
-		d.pack={sourceNames:['voice:debumont','voice:crystal-cavern','voice:bitstream-bluffs']};
+		d.pack={sourceNames:['voice:debutmont','voice:crystal-cavern','voice:bitstream-bluffs']};
 		d.gains=new Map([...['bass','drums','guitar','piano','other',...d.pack.sourceNames]
 			.map(s=>[s,{}])]);
 		d._timbreSignatures=new Map();
@@ -102,7 +102,7 @@ describe('continuous soundtrack and saved shuffle',()=>{
 		d.adaptive={setAirborne:jest.fn(),setBiome:jest.fn(),setEnabled:jest.fn(),
 			setSpeed:jest.fn()};
 		d.setMenuMode(true);
-		expect(d._activeVoiceFor(d.pack)).toBe('voice:debumont');
+		expect(d._activeVoiceFor(d.pack)).toBe('voice:debutmont');
 		expect(d.mixer.replaceEffects).toHaveBeenCalledWith('bass',[],0.18);
 		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('drums',0);
 		expect(d.adaptive.setEnabled).toHaveBeenCalledWith(false);
@@ -164,7 +164,7 @@ describe('continuous soundtrack and saved shuffle',()=>{
 		d.ctx=audio.ctx;
 		d.ctx.currentTime=900;
 		d.clockStart=800;
-		d.pack={sourceNames:['voice:debumont','voice:bitstream-bluffs'],duration:180,segments:[]};
+		d.pack={sourceNames:['voice:debutmont','voice:bitstream-bluffs'],duration:180,segments:[]};
 		d.started=true;
 		d.disposed=false;
 		d.shuffleEnabled=false;

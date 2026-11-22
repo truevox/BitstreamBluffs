@@ -6,7 +6,7 @@ Always explain *why* in comments, respect project ESLint rules, and never introd
 - Commits follow **Gitmoji-style**, e.g.:
 
   ```
-  ✨ Feature: Add cryptid scanner to Debumont
+  ✨ Feature: Add cryptid scanner to Debutmont
   ```
 
   With body:

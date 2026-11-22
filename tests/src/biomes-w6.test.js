@@ -71,7 +71,7 @@ describe('the six batch-2 biomes exist and point at their own mod', () => {
   test('every batch-2 biome is ordered after batch 1 in levels.json', () => {
     // D4's order is not cosmetic: the unlock ladder must hand out the cheap mechanics before these.
     const order = LEVELS.biomeOrder;
-    const batch1 = ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'];
+    const batch1 = ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'];
     const lastBatch1 = Math.max(...batch1.map((id) => order.indexOf(id)));
     for (const id of Object.keys(BIOMES).length ? ['space-mountain', 'candy-cane-canyon', 'sky-jellyfish-mountain', 'steampunk-slopes', 'micro-mountain', 'vertigo-vents'] : []) {
       expect({ id, afterBatch1: order.indexOf(id) > lastBatch1 }).toMatchObject({ id, afterBatch1: true });

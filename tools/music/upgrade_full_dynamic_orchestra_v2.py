@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 BIOMES=(
-	'debumont','garbage-dump-glacier','pyramid-peak','underwater-mountain',
+	'debutmont','garbage-dump-glacier','pyramid-peak','underwater-mountain',
 	'crystal-cavern','space-mountain','candy-cane-canyon',
 	'sky-jellyfish-mountain','steampunk-slopes','micro-mountain','vertigo-vents',
 )

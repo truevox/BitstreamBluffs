@@ -8,7 +8,7 @@ index e899241..e57a221 100644
 +## v2.4.0 - unreleased (W3 Biomes batch 1)
 +
 +### ✨ Added
-+- **Biomes (batch 1).** Debumont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal
++- **Biomes (batch 1).** Debutmont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal
 +  Cavern. A biome is a masked sector of ordinary terrain rather than a separate generator:
 +  `biomeForSector(seed, sector, biomeMask)` forks `Rng` under `biome`, so no existing random stream is
 +  disturbed and sectors 0-1 stay base Bitstream. Each biome carries one signature mechanic expressed as
@@ -212,10 +212,10 @@ index 0000000..4b875b1
 +| default | **5 / 5** | distinct worlds |
 +| colorblind | **5 / 5** | distinct worlds |
 +
-+`crystal-cavern #220f34`, `debumont #0b0f21`, `garbage-dump-glacier #0e251e`, `pyramid-peak #311d0d`,
++`crystal-cavern #220f34`, `debutmont #0b0f21`, `garbage-dump-glacier #0e251e`, `pyramid-peak #311d0d`,
 +`underwater-mountain #08263f`. Five biomes, five different worlds, in both palettes. As a secondary
 +signal each dominant is nearer its own biome's declared colours than the base palette's for 4 of 5;
-+`debumont`'s `bg` (`#070a18`) is simply close to base `bgAlt` (`#0c1024`) by design — it is the
++`debutmont`'s `bg` (`#070a18`) is simply close to base `bgAlt` (`#0c1024`) by design — it is the
 +original slope, and its frame is still clearly distinct from the other four.
 +
 +### Per-biome sim table — **now re-derived by me**
@@ -234,7 +234,7 @@ index 0000000..4b875b1
 +Reproduces the published −5.7 % exactly, against the stated 15 % tolerance. Two limits I confirm
 +independently and that should stay in the PR body: with `--policy handsOff` at `--biomeMask 31` all
 +three seeds die at **311–398 m**, before biome terrain begins at 1000 m, so `hop` is the only policy
-+that exercises a biome at all; and Debumont's effect stays within noise on a hop run because its mod
++that exercises a biome at all; and Debutmont's effect stays within noise on a hop run because its mod
 +is ground drag and a hopping sled is mostly airborne. That is a harness limit, not evidence the biome
 +is cosmetic — its multipliers are separately proven to reach `PhysicsTuner`.
 +
@@ -643,10 +643,10 @@ index 461b386..1d564b0 100644
 +| default | **5 / 5** | distinct worlds |
 +| colorblind | **5 / 5** | distinct worlds |
 +
-+`crystal-cavern #220f34`, `debumont #0b0f21`, `garbage-dump-glacier #0e251e`, `pyramid-peak #311d0d`,
++`crystal-cavern #220f34`, `debutmont #0b0f21`, `garbage-dump-glacier #0e251e`, `pyramid-peak #311d0d`,
 +`underwater-mountain #08263f`. Five biomes, five different worlds, in both palettes. As a secondary
 +signal each dominant is nearer its own biome's declared colours than the base palette's for 4 of 5;
-+`debumont`'s `bg` (`#070a18`) is simply close to base `bgAlt` (`#0c1024`) by design — it is the
++`debutmont`'s `bg` (`#070a18`) is simply close to base `bgAlt` (`#0c1024`) by design — it is the
 +original slope, and its frame is still clearly distinct from the other four.
 +
 +### Per-biome sim table — **now re-derived by me**
@@ -665,7 +665,7 @@ index 461b386..1d564b0 100644
 +Reproduces the published −5.7 % exactly, against the stated 15 % tolerance. Two limits I confirm
 +independently and that should stay in the PR body: with `--policy handsOff` at `--biomeMask 31` all
 +three seeds die at **311–398 m**, before biome terrain begins at 1000 m, so `hop` is the only policy
-+that exercises a biome at all; and Debumont's effect stays within noise on a hop run because its mod
++that exercises a biome at all; and Debutmont's effect stays within noise on a hop run because its mod
 +is ground drag and a hopping sled is mostly airborne. That is a harness limit, not evidence the biome
 +is cosmetic — its multipliers are separately proven to reach `PhysicsTuner`.
 +
@@ -959,7 +959,7 @@ index 0000000..f2c94f2
 +const line = (s) => out.push(s);
 +
 +const DEFS = [
-+  { id: 'debumont', bit: 1, unlockLevel: 1 },
++  { id: 'debutmont', bit: 1, unlockLevel: 1 },
 +  { id: 'garbage-dump-glacier', bit: 2, unlockLevel: 4 },
 +  { id: 'pyramid-peak', bit: 4, unlockLevel: 7 },
 +  { id: 'underwater-mountain', bit: 8, unlockLevel: 13 },
@@ -1176,7 +1176,7 @@ index 0000000..4b8b5b0
 +  return { ix, iy, hit: ix > 1 && iy > 1 };
 +}
 +
-+const BIOMES = ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'];
++const BIOMES = ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'];
 +const BIOME_ORDER = [
 +  ...BIOMES, 'space-mountain', 'candy-cane-canyon', 'sky-jellyfish-mountain',
 +  'steampunk-slopes', 'micro-mountain', 'vertigo-vents',
@@ -1289,7 +1289,7 @@ index 0000000..d70bfba
 +// The shipped unlock levels. Crystal Cavern is L16 and Underwater Mountain L13, NOT 12 — getting this
 +// wrong is what made my round-1 note claim a level-12 pilot could enable all five bits.
 +const DEFS = [
-+  { id: 'debumont', bit: 1, unlockLevel: 1 },
++  { id: 'debutmont', bit: 1, unlockLevel: 1 },
 +  { id: 'garbage-dump-glacier', bit: 2, unlockLevel: 4 },
 +  { id: 'pyramid-peak', bit: 4, unlockLevel: 7 },
 +  { id: 'underwater-mountain', bit: 8, unlockLevel: 13 },
@@ -1395,7 +1395,7 @@ index 0000000..d70bfba
 +check('biomeToggleRows: only earned biomes are toggleable', () => {
 +  const rows = biomeToggleRows(prof(7), DEFS);
 +  const on = rows.filter((r) => r.unlocked).map((r) => r.id);
-+  assert.deepEqual(on, ['debumont', 'garbage-dump-glacier', 'pyramid-peak'], `unlocked ${on.join(', ')}`);
++  assert.deepEqual(on, ['debutmont', 'garbage-dump-glacier', 'pyramid-peak'], `unlocked ${on.join(', ')}`);
 +  return `${on.length}/5 toggleable at L7`;
 +});
 +check('sanitizeProfile keeps biomeMask', () => {
@@ -1618,7 +1618,7 @@ index dc19dcf..12fa876 100644
 +  const playable = BIOME_DEFS.map((b) => b.id);
    const withBiomes = (level) => ({
      v: 1, xp: 0, level, bank: 0, biomeMask: 31,
--    pendingBiomes: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'].slice(0, level >= 12 ? 5 : 3),
+-    pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'].slice(0, level >= 12 ? 5 : 3),
 +    pendingBiomes: BIOME_DEFS.filter((d) => d.unlockLevel <= level).map((d) => d.id),
      unlocked: { biomes: [], cosmetics: [], boosts: {} },
      missions: { counter: 0, active: [], progress: {} }, achievements: {}, credited: [],
@@ -1645,5 +1645,5 @@ index dc19dcf..12fa876 100644
 +  });
 +
    test('a signature is listed exactly once: either as a pending name or as a toggle', () => {
-     const layout = profileLayout({ profile: withBiomes(12), levels, playableBiomeIds: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'] });
+     const layout = profileLayout({ profile: withBiomes(12), levels, playableBiomeIds: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'] });
      const plain = layout.items.filter((it) => /^sig-/.test(it.key) && it.key !== 'sig-head' && it.key !== 'sig-note').map((it) => it.text);

@@ -38,18 +38,18 @@ describe('profile shape: biomeProgress is additive', () => {
   });
 
   test('the sanitizer keeps known ids only and forces completed into encountered', () => {
-    const p = v1({ biomeProgress: { encountered: ['debumont', 'atlantis', 'debumont'], completed: ['pyramid-peak', 'x'] } });
-    expect(p.biomeProgress).toEqual({ encountered: ['debumont', 'pyramid-peak'], completed: ['pyramid-peak'] });
+    const p = v1({ biomeProgress: { encountered: ['debutmont', 'atlantis', 'debutmont'], completed: ['pyramid-peak', 'x'] } });
+    expect(p.biomeProgress).toEqual({ encountered: ['debutmont', 'pyramid-peak'], completed: ['pyramid-peak'] });
   });
 
   test('persistence: a save and a reload through ProfileStore keep both sets', () => {
     const storage = memStorage();
     const a = new ProfileStore({ storage, levels: LEVELS });
     a.load();
-    a.save({ ...a.profile, biomeProgress: { encountered: ['debumont', 'crystal-cavern'], completed: ['debumont'] } });
+    a.save({ ...a.profile, biomeProgress: { encountered: ['debutmont', 'crystal-cavern'], completed: ['debutmont'] } });
     const b = new ProfileStore({ storage, levels: LEVELS });
     b.load();
-    expect(b.profile.biomeProgress).toEqual({ encountered: ['debumont', 'crystal-cavern'], completed: ['debumont'] });
+    expect(b.profile.biomeProgress).toEqual({ encountered: ['debutmont', 'crystal-cavern'], completed: ['debutmont'] });
     expect(JSON.parse(storage.getItem(PROFILE_KEY)).v).toBe(1);
   });
 
@@ -63,36 +63,36 @@ describe('profile shape: biomeProgress is additive', () => {
 
 describe('creditRun records the run\'s biome visits', () => {
   test('visits handed in extra.biomeVisits merge into the profile', () => {
-    const res = creditRun(v1(), rec(), LEVELS, { biomeVisits: { encountered: ['debumont', 'pyramid-peak'], completed: ['debumont'] } });
-    expect(res.profile.biomeProgress).toEqual({ encountered: ['debumont', 'pyramid-peak'], completed: ['debumont'] });
+    const res = creditRun(v1(), rec(), LEVELS, { biomeVisits: { encountered: ['debutmont', 'pyramid-peak'], completed: ['debutmont'] } });
+    expect(res.profile.biomeProgress).toEqual({ encountered: ['debutmont', 'pyramid-peak'], completed: ['debutmont'] });
   });
 
   test('the input profile is not mutated', () => {
-    const p = v1({ biomeProgress: { encountered: ['debumont'], completed: [] } });
+    const p = v1({ biomeProgress: { encountered: ['debutmont'], completed: [] } });
     creditRun(p, rec(), LEVELS, { biomeVisits: { encountered: ['pyramid-peak'], completed: ['pyramid-peak'] } });
-    expect(p.biomeProgress).toEqual({ encountered: ['debumont'], completed: [] });
+    expect(p.biomeProgress).toEqual({ encountered: ['debutmont'], completed: [] });
   });
 
   test('a replayed (already credited) run changes nothing', () => {
     const r = rec();
-    const first = creditRun(v1(), r, LEVELS, { biomeVisits: { encountered: ['debumont'], completed: [] } }).profile;
+    const first = creditRun(v1(), r, LEVELS, { biomeVisits: { encountered: ['debutmont'], completed: [] } }).profile;
     expect(creditRun(first, r, LEVELS, { biomeVisits: { encountered: ['vertigo-vents'], completed: [] } })).toBeNull();
   });
 
   test('no visits: the sets stay as they were', () => {
-    const res = creditRun(v1({ biomeProgress: { encountered: ['debumont'], completed: [] } }), rec(), LEVELS);
-    expect(res.profile.biomeProgress).toEqual({ encountered: ['debumont'], completed: [] });
+    const res = creditRun(v1({ biomeProgress: { encountered: ['debutmont'], completed: [] } }), rec(), LEVELS);
+    expect(res.profile.biomeProgress).toEqual({ encountered: ['debutmont'], completed: [] });
   });
 });
 
 describe('achievement feed: biomesDiscovered = encountered count (ACH-3)', () => {
   test('metricsFrom reads the profile\'s encountered set', () => {
-    const p = v1({ biomeProgress: { encountered: ['debumont', 'pyramid-peak', 'crystal-cavern'], completed: [] } });
+    const p = v1({ biomeProgress: { encountered: ['debutmont', 'pyramid-peak', 'crystal-cavern'], completed: [] } });
     expect(metricsFrom(p, null).biomesDiscovered).toBe(3);
   });
 
   test('a second encountered biome unlocks Explorer and grants trail-hue-aurora in the same credit', () => {
-    const p = v1({ biomeProgress: { encountered: ['debumont'], completed: [] } });
+    const p = v1({ biomeProgress: { encountered: ['debutmont'], completed: [] } });
     const res = creditRun(p, rec(), LEVELS, { biomeVisits: { encountered: ['pyramid-peak'], completed: [] } });
     expect(res.awards.achievements.map((a) => a.id)).toContain('biomes-2');
     expect(res.profile.unlocked.cosmetics).toContain('trail-hue-aurora');
@@ -100,7 +100,7 @@ describe('achievement feed: biomesDiscovered = encountered count (ACH-3)', () =>
 
   test('crossing 2 and 5 in one run grants both together, in canonical order, with CARTOGRAPHER', () => {
     const res = creditRun(v1(), rec(), LEVELS, {
-      biomeVisits: { encountered: ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'], completed: [] },
+      biomeVisits: { encountered: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'], completed: [] },
     });
     const ids = res.awards.achievements.map((a) => a.id).filter((id) => id.startsWith('biomes-'));
     expect(ids).toEqual(['biomes-2', 'biomes-5']);
@@ -109,7 +109,7 @@ describe('achievement feed: biomesDiscovered = encountered count (ACH-3)', () =>
   });
 
   test('all eleven grant Every Mountain and OMNISCIENT', () => {
-    const all = ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern', 'space-mountain',
+    const all = ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern', 'space-mountain',
       'candy-cane-canyon', 'sky-jellyfish-mountain', 'steampunk-slopes', 'micro-mountain', 'vertigo-vents'];
     const res = creditRun(v1(), rec(), LEVELS, { biomeVisits: { encountered: all, completed: [] } });
     expect(res.profile.achievements['biomes-11']).toBeDefined();

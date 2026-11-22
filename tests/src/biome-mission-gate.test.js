@@ -15,7 +15,7 @@ import { isOfferable } from '../../src/systems/Missions.js';
 import { earnedBiomeIds } from '../../src/systems/ProfileStore.js';
 
 const BIOME_DEFS = [
-  { id: 'debumont', bit: 1, unlockLevel: 1 },
+  { id: 'debutmont', bit: 1, unlockLevel: 1 },
   { id: 'garbage-dump-glacier', bit: 2, unlockLevel: 3 },
   { id: 'pyramid-peak', bit: 4, unlockLevel: 6 },
   { id: 'underwater-mountain', bit: 8, unlockLevel: 10 },
@@ -38,7 +38,7 @@ describe('biome missions reach a real profile', () => {
     // The two reads that must agree. `unlocked.biomes` being empty is exactly why the old gate failed.
     expect(p.unlocked.biomes).toEqual([]);
     expect(earnedBiomeIds(p, BIOME_DEFS)).toEqual([
-      'debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern',
+      'debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern',
     ]);
   });
 
@@ -51,7 +51,7 @@ describe('biome missions reach a real profile', () => {
     // Unlock is earned, not merely enabled: a level-3 profile cannot be offered a level-12 biome.
     const p = credited(3, 31);
     expect(isOfferable(missionFor('crystal-cavern'), p, 'r1', BIOME_DEFS)).toBe(false);
-    expect(isOfferable(missionFor('debumont'), p, 'r1', BIOME_DEFS)).toBe(true);
+    expect(isOfferable(missionFor('debutmont'), p, 'r1', BIOME_DEFS)).toBe(true);
   });
 
   test('a mission for a switched-OFF signature is refused', () => {
@@ -83,7 +83,7 @@ describe('biome missions reach a real profile', () => {
   });
 
   test('an excluded rule still wins over a biome mission', () => {
-    const t = { ...missionFor('debumont'), excludedRuleIds: ['r1'] };
+    const t = { ...missionFor('debutmont'), excludedRuleIds: ['r1'] };
     expect(isOfferable(t, credited(12, 31), 'r1', BIOME_DEFS)).toBe(false);
   });
 });

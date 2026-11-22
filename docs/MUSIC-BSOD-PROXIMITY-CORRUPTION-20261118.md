@@ -44,7 +44,7 @@ No claim is made that the effects sound musically good yet.
   source stems and all 4,745 Ogg clips are untouched.
 - When the player escapes, source attack integrity and clean original mix
   return using a smoothed fade. In Title/Pause/GameOver, danger is forced
-  to zero, even if stale BSOD events arrive, and Debumont's menu melody
+  to zero, even if stale BSOD events arrive, and Debutmont's menu melody
   with neutral accompaniment resumes on the **same song clock**. This
   honors the session rule: One More Run once at page load, never on death.
 - Dynamic Orchestra OFF still means *original recordings with normal DSP*.
@@ -62,7 +62,7 @@ No claim is made that the effects sound musically good yet.
   tests One More Run opening and original-source processors, authoritative
   event with **wind at zero while danger 0.97 corrupts music**, clean
   escape despite wind sound, vacuum with danger but no wind sound,
-  crash returning to Debumont and uncorrupted accompaniments, and no
+  crash returning to Debutmont and uncorrupted accompaniments, and no
   page exceptions or missing music assets. This is functional DSP testing,
   **not human-approved sound quality**.
 - Research branch `feature/music-bsod-corruption-20261118`, built on

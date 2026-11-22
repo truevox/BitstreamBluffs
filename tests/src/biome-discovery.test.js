@@ -46,7 +46,7 @@ describe('sectorOfX: the same 0-based sector rule as TerrainGenerator._sectorOf'
 });
 
 describe('detectBiomeVisits', () => {
-  const seed = seedWithSector2('debumont', 1);
+  const seed = seedWithSector2('debutmont', 1);
   const base = { seed, biomeMask: 1, biomeDefs: DEFS, pxPerMeter: PPM };
 
   test('a run that never reaches sector 2 encounters nothing', () => {
@@ -56,21 +56,21 @@ describe('detectBiomeVisits', () => {
 
   test('reaching the biome sector encounters it; crashing inside it does not complete it', () => {
     const v = detectBiomeVisits({ ...base, furthestX: 2 * SECTOR_PX + 10, crashX: 2 * SECTOR_PX + 10 });
-    expect(v).toEqual({ encountered: ['debumont'], completed: [] });
+    expect(v).toEqual({ encountered: ['debutmont'], completed: [] });
   });
 
   test('riding the whole sector through to its end completes it', () => {
     const x = 3 * SECTOR_PX + 10;
     const v = detectBiomeVisits({ ...base, furthestX: x, crashX: x });
-    expect(v.encountered).toContain('debumont');
-    expect(v.completed).toContain('debumont');
+    expect(v.encountered).toContain('debutmont');
+    expect(v.completed).toContain('debutmont');
   });
 
   test('a run-ending crash back inside an earlier biome sector voids that sector (respawned behind)', () => {
     // The sled reached sector 3 before, but its fatal crash is in sector 2.
     const v = detectBiomeVisits({ ...base, furthestX: 3 * SECTOR_PX + 10, crashX: 2 * SECTOR_PX + 50 });
-    expect(v.encountered).toContain('debumont');
-    expect(v.completed).not.toContain('debumont');
+    expect(v.encountered).toContain('debutmont');
+    expect(v.completed).not.toContain('debutmont');
   });
 
   test('every sector up to the furthest x is checked, matching biomeForSector one by one', () => {
@@ -110,8 +110,8 @@ describe('detectBiomeVisits', () => {
 
 describe('sanitizeBiomeProgress / mergeBiomeVisits', () => {
   test('keeps only known ids, dedupes, canonical order, completed is a subset of encountered', () => {
-    const p = sanitizeBiomeProgress({ encountered: ['pyramid-peak', 'nope', 'debumont', 'debumont', 7], completed: ['vertigo-vents', 'bogus'] });
-    expect(p).toEqual({ encountered: ['debumont', 'pyramid-peak', 'vertigo-vents'], completed: ['vertigo-vents'] });
+    const p = sanitizeBiomeProgress({ encountered: ['pyramid-peak', 'nope', 'debutmont', 'debutmont', 7], completed: ['vertigo-vents', 'bogus'] });
+    expect(p).toEqual({ encountered: ['debutmont', 'pyramid-peak', 'vertigo-vents'], completed: ['vertigo-vents'] });
   });
 
   test('anything that is not an object reads as empty sets', () => {
@@ -119,9 +119,9 @@ describe('sanitizeBiomeProgress / mergeBiomeVisits', () => {
   });
 
   test('merge is a union and never removes what was already recorded', () => {
-    const a = { encountered: ['debumont'], completed: ['debumont'] };
+    const a = { encountered: ['debutmont'], completed: ['debutmont'] };
     const m = mergeBiomeVisits(a, { encountered: ['pyramid-peak'], completed: [] });
-    expect(m).toEqual({ encountered: ['debumont', 'pyramid-peak'], completed: ['debumont'] });
-    expect(a).toEqual({ encountered: ['debumont'], completed: ['debumont'] }); // input untouched
+    expect(m).toEqual({ encountered: ['debutmont', 'pyramid-peak'], completed: ['debutmont'] });
+    expect(a).toEqual({ encountered: ['debutmont'], completed: ['debutmont'] }); // input untouched
   });
 });
