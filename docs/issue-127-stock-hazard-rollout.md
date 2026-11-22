@@ -13,7 +13,7 @@ node tools/qa/stock-hazard-rollout.mjs --url http://127.0.0.1:8293/
 
 The script checks the served module bytes, not the provenance of the whole build or asset set. All arms start from tick zero on `sim-11`, mask 0, frozen UTC `2026-01-05T12:00:00Z` (Featherweight), default Trick Deck Right, normal non-Official play and no loadout. The preview uses normal fixed ticks (120 Hz), real keyboard events through the game's input router, and normal Chromium rendering. Only the title transition animation is skipped. It does not inject terrain, pose, velocity, hazard state, gear or collision outcomes.
 
-The target is Packet Spike in chunk 5, generated spawn x=10,363 px. The script matches the same exact spawn and live sensor in all trials. The matching pre-input states, real hop pulse, and fatal-event entity identity are checked. Shield protection, invulnerability, pickup, respawn, negated crash, missed ticks, and per-arm repetition differences cause failure.
+The target is Packet Spike in chunk 5, generated spawn x=10,363 px. The script matches the same exact spawn and live sensor in all trials. The matching pre-input states, real hop pulse, and fatal-event entity identity are checked. All three arms collect the same natural Packet Burst speed pickup at tick 1425; its three-second effect expires before either scheduled input. The check requires that shared pickup and expiry, no other pickups, and no active speed burst at the approach. Shield protection, invulnerability, respawn, negated crash, missed ticks, and per-arm repetition differences cause failure.
 
 | Arm | Space input | Observed outcome |
 | --- | --- | --- |

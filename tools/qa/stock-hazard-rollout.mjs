@@ -68,8 +68,8 @@ async function trial(browser, pressTick) {
           Object.keys(run.upgradeRun.ranks).length === 0 && !run.magnetsDrop && !run.kodiaksOn,
         'Trial did not start in the pinned normal stock game');
         const inspect = () => ({ tick: run.simClock.tick, x: sled.x, y: sled.y, vx: sled.vx, vy: sled.vy,
-          angle: sled.body.angle, grounded: sled.grounded, shield: run.shieldCharges, invulnerableMs: sled.invulnerableMs });
-        const initial = inspect(), hops = [], targetHits = [], landings = [], fatal = [];
+          angle: sled.body.angle, grounded: sled.grounded, shield: run.shieldCharges, invulnerableMs: sled.invulnerableMs, speedBoostMs: run.boostMs });
+        const initial = inspect(), hops = [], targetHits = [], landings = [], fatal = [], pickups = [], expirations = [];
         let target, targetInfo, clearance = null, earlyState, lateState, protectedTicks = 0, interference = 0, down = false;
         const targetIsLive = () => target && !target.destroyed && run.hazards.get(p.target.chunk)?.includes(target);
         const key = (on) => {
@@ -87,8 +87,10 @@ async function trial(browser, pressTick) {
           if (clearance && quality !== 'crash') landings.push({ tick: run.simClock.tick, quality });
         };
         const interrupt = () => { interference++; };
+        const pickup = ({ id, durationMs, charges }) => pickups.push({ tick: run.simClock.tick, id, durationMs, charges });
+        const expire = ({ id, reason }) => expirations.push({ tick: run.simClock.tick, id, reason });
         const listeners = [[evt.HAZARD_HIT, onHit], [evt.CRASH, onCrash], [evt.LANDING, onLanding],
-          [evt.RESPAWN, interrupt], [evt.POWERUP_COLLECTED, interrupt]];
+          [evt.RESPAWN, interrupt], [evt.POWERUP_COLLECTED, pickup], [evt.POWERUP_EXPIRED, expire]];
         for (const [name, receive] of listeners) game.events.on(name, receive);
         try {
           const dt = 1000 / p.tickHz;
@@ -99,7 +101,7 @@ async function trial(browser, pressTick) {
               if (target) targetInfo = { center: [target.cx, target.cy], right: target.body.bounds.max.x };
             }
             if (tick === p.hopTick || tick === p.lateTick && pressTick !== p.hopTick) {
-              require(targetIsLive() && target.hit === false && !run.shieldCharges && sled.invulnerableMs === 0,
+              require(targetIsLive() && target.hit === false && !run.shieldCharges && sled.invulnerableMs === 0 && run.boostMs === 0,
                 'Exact unhit target or unprotected approach missing');
               if (tick === p.hopTick) earlyState = inspect(); else lateState = inspect();
             }
@@ -115,9 +117,9 @@ async function trial(browser, pressTick) {
             }
           }
           require(target && earlyState && run.simClock.droppedMs === 0 && protectedTicks === 0 && interference === 0,
-            'Run had protection, pickup, respawn, negated crash or missing fixed-tick evidence');
+            'Run had protection, respawn, negated crash or missing fixed-tick evidence');
           return { initial, earlyState, lateState: lateState ?? null, target: targetInfo, targetHit: target.hit,
-            targetHits, hops, clearance, landings, fatal, end: { tick: run.simClock.tick, crashed: run.crashed, x: sled.x, y: sled.y } };
+            targetHits, hops, clearance, landings, fatal, pickups, expirations, end: { tick: run.simClock.tick, crashed: run.crashed, x: sled.x, y: sled.y } };
         } finally {
           if (down) key(false);
           for (const [name, receive] of listeners) game.events.off(name, receive);
@@ -135,6 +137,15 @@ async function trial(browser, pressTick) {
 
 function validate(cases) {
   const [neutral, timed, late] = cases.map(({ result }) => result);
+  // Same naturally collected early speed burst in all arms. No changed pickup
+  // or active boost can explain the comparison at the target.
+  for (const result of [neutral, timed, late]) {
+    assert.deepEqual(result.pickups, [{ tick: 1425, id: 'packetBurst', durationMs: 3000, charges: 0 }]);
+    assert.deepEqual(result.expirations, neutral.expirations, 'Pickup expiration differed between arms');
+    assert.ok(result.expirations.length === 1 && result.expirations[0].id === 'packetBurst' &&
+      result.expirations[0].reason === 'timeout' && result.expirations[0].tick > 1425 && result.expirations[0].tick < preset.hopTick,
+    'Shared Packet Burst did not expire before either input');
+  }
   for (const result of [timed, late]) {
     assert.deepEqual(result.initial, neutral.initial, 'Trials did not have the same stock start');
     assert.deepEqual(result.earlyState, neutral.earlyState, 'Trials diverged before the first input');
