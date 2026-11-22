@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.19.3 — every run starts from identical sim state (#120) (2026-11-22)
+
+<!-- friday-issue: 120 -->
+- **A run no longer depends on what ran before it in the same page session.** `RunScene` is one instance for the whole session and `create()` did not reset `_biomeSector`, `_lastBiome` (and the tutorial latches `_hopped`/`_pushed`). With a biome mask, tick 1 compares the sled's sector with `_biomeSector`: a fresh page saw a "change" and called `refreshPalette`, which previously (before #160) rebuilt colliders; a later run could skip its initial biome repaint and cue. The same tape ran differently by session position (found by the #120 matrix: `chunk-biome-boundaries` as run #4 after a terrain crash survived 815 m instead of crashing at 835 m). `create()` now resets these fields so every run starts like run #1. Tests: `tests/replay/sessionIsolation.test.js`; diagnostic browser probe `tools/determinism/session-isolation-probe.mjs`.
+- **Replay and the calendar date was already fixed on main** by the replay-manifest work (Replay Contract R-1: daily rule, Sync Level and Kodiak/magnet flags come from the tape header). No change here.
+
+- **Integration:** #140 (v2.19.1, SIM_REVISION 3) already removed biome repaint as a cause of physics divergence, so these create-time field resets now address previous-run **presentation/cue and state hygiene**, not a new physics fix. The released SIM_REVISION remains 3 and the source tripwire is attested as non-causal. Historical browser evidence is preserved as original; a fresh run on the current combined source is part of integration verification.
+
 ## v2.19.2 — savestate feasibility study, Phase 1 research (#119 / #159) (2026-11-22)
 
 - **Research only: no savestates ship, and no gameplay, physics, replay format or `src/` change.** Adds `docs/determinism/savestate-feasibility.md`.
