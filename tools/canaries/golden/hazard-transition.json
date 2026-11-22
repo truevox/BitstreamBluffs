@@ -1,0 +1,302 @@
+{
+  "id": "hazard-transition",
+  "simVersion": {
+    "simTickHz": 120,
+    "runRandomVersion": 1,
+    "ghostTapeFormat": "bb-ghost-tape",
+    "ghostTapeVersion": 1,
+    "ghostPhysicsVersion": 1
+  },
+  "seed": "CANARY117",
+  "biomeMask": 4,
+  "hz": 60,
+  "startX": 50000,
+  "durationMs": 6500,
+  "dailyRule": {
+    "asOfDate": "2026-11-21",
+    "id": "featherweight",
+    "modifiers": {
+      "gravityMul": 0.8,
+      "airControlMul": 0.9
+    }
+  },
+  "checkpoints": [
+    [
+      0,
+      50000.08315072718,
+      18280.182702596292,
+      0.7330382858376125,
+      5.333333333335759,
+      0,
+      0
+    ],
+    [
+      1000,
+      50330.75012463499,
+      18539.942565868972,
+      0.5168019346997379,
+      7.881235527631361,
+      4.452238990139449,
+      517
+    ],
+    [
+      2000,
+      50858.51260593732,
+      18694.682547243752,
+      0.15773990823937145,
+      8.672113571723457,
+      1.3735278544918401,
+      543
+    ],
+    [
+      3000,
+      51343.774786618975,
+      18763.109297063675,
+      0.13502170706845953,
+      7.547202397807268,
+      1.0260897725529503,
+      567
+    ],
+    [
+      4000,
+      51764.79289899543,
+      18817.64444261248,
+      0.1169519809612222,
+      6.543713886087062,
+      0.7662821872509085,
+      589
+    ],
+    [
+      4833.333,
+      52001.31177913233,
+      18839.269660296955,
+      0.06941140802819548,
+      5.859386986150639,
+      0.40240975603228435,
+      600
+    ]
+  ],
+  "result": {
+    "crashed": true,
+    "crashTick": 580,
+    "cause": "hazard",
+    "hazardId": "glitchChasm",
+    "score": 600,
+    "distance": 100,
+    "endTick": 580
+  },
+  "stats": {
+    "inputChanges": 4,
+    "airborneTicks": 86,
+    "timeToFirstInputMs": 8.333,
+    "pausedMs": 0,
+    "stallCount": 0,
+    "stallDeltaMs": 0,
+    "ticks": 580,
+    "totalSimMs": 4833.333333333334,
+    "scoreMean": 469.3333333333333,
+    "scoreMin": 0,
+    "scoreMax": 600,
+    "droppedMs": 0
+  },
+  "origin": {
+    "x": 50000,
+    "y": 18280.18,
+    "ppm": 20
+  },
+  "verification": {
+    "xReached": 52001,
+    "xMinTick": 50003,
+    "yReached": 18839,
+    "frames": 290,
+    "paused": false,
+    "stalled": false,
+    "stallChecks": []
+  },
+  "feature": {
+    "landings": [
+      {
+        "tick": 87,
+        "t": 725,
+        "x": 50213.10929309058,
+        "quality": "good",
+        "airtimeMs": 725.0000000000005,
+        "angleDeg": 15.005907676472646,
+        "impactSpeedPxS": 228.02215312507224,
+        "detail": {
+          "quality": "good",
+          "angleDeg": 15.005907676472646,
+          "impactSpeedPxS": 228.02215312507224,
+          "airtimeMs": 725.0000000000005,
+          "bonusPoints": 0,
+          "bankedPoints": 0,
+          "hard": false,
+          "x": 50213.10929309058,
+          "y": 18458.851597050005,
+          "comboName": "",
+          "comboMult": 1,
+          "flowUsed": 1,
+          "midSpin": false
+        }
+      }
+    ],
+    "tricks": [],
+    "hazardHits": [
+      {
+        "tick": 580,
+        "t": 4833.333,
+        "hazardId": "glitchChasm",
+        "effect": "crash",
+        "x": 52045.307082693405
+      }
+    ],
+    "pads": [],
+    "zones": [
+      {
+        "tick": 547,
+        "t": 4558.333,
+        "modId": "thermalUpdraft",
+        "x0": 51951,
+        "x1": 52627
+      }
+    ],
+    "bsodBluffs": [],
+    "airborneEpisodes": [
+      {
+        "startTick": 1,
+        "endTick": 87,
+        "startT": 8.333,
+        "x": 50002.74597001749,
+        "durationMs": 716.667,
+        "airtimeMs": 0
+      }
+    ],
+    "airborneTotalMs": 716.667,
+    "maxAirtimeMs": 717,
+    "maxAirtimeTick": 86,
+    "minBsodGapPx": 57558.26,
+    "bsodCaughtTick": null,
+    "startChunk": {
+      "index": 25,
+      "biome": null,
+      "sector": 5,
+      "breather": false,
+      "startX": 47888,
+      "endX": 50944
+    },
+    "lips": [
+      {
+        "x": 1024,
+        "y": 384,
+        "angleDeg": 12,
+        "airS": 0.57,
+        "chunk": 0
+      },
+      {
+        "x": 4464,
+        "y": 1586,
+        "angleDeg": 12,
+        "airS": 0.66,
+        "chunk": 2
+      },
+      {
+        "x": 8704,
+        "y": 3119,
+        "angleDeg": 12,
+        "airS": 0.78,
+        "chunk": 4
+      },
+      {
+        "x": 12560,
+        "y": 4576,
+        "angleDeg": 12,
+        "airS": 0.9,
+        "chunk": 6
+      },
+      {
+        "x": 18464,
+        "y": 6595,
+        "angleDeg": 12,
+        "airS": 1.02,
+        "chunk": 10
+      },
+      {
+        "x": 23104,
+        "y": 8328,
+        "angleDeg": 12,
+        "airS": 1.05,
+        "chunk": 12
+      },
+      {
+        "x": 26880,
+        "y": 9979,
+        "angleDeg": 12,
+        "airS": 1.05,
+        "chunk": 14
+      },
+      {
+        "x": 33088,
+        "y": 12071,
+        "angleDeg": 12,
+        "airS": 1.08,
+        "chunk": 17
+      },
+      {
+        "x": 37440,
+        "y": 14103,
+        "angleDeg": 12,
+        "airS": 1.08,
+        "chunk": 19
+      },
+      {
+        "x": 43056,
+        "y": 15973,
+        "angleDeg": -13.8,
+        "airS": 1.6,
+        "chunk": 21
+      },
+      {
+        "x": 45840,
+        "y": 16573,
+        "angleDeg": -3.6,
+        "airS": 1.6,
+        "chunk": 23
+      },
+      {
+        "x": 47120,
+        "y": 16731,
+        "angleDeg": -7,
+        "airS": 0.6,
+        "chunk": 24
+      },
+      {
+        "x": 48928,
+        "y": 17375,
+        "angleDeg": 12,
+        "airS": 1.08,
+        "chunk": 25
+      }
+    ],
+    "lipCrossings": [],
+    "slopeKicks": [],
+    "biomeCrossings": [
+      {
+        "tick": 1,
+        "t": 8.333,
+        "x": 50003,
+        "biome": null,
+        "sector": 5,
+        "chunk": 25
+      },
+      {
+        "tick": 260,
+        "t": 2166.667,
+        "x": 50944,
+        "biome": "pyramid-peak",
+        "sector": 6,
+        "chunk": 26
+      }
+    ],
+    "_lastBiomeKey": "pyramid-peak"
+  }
+}
