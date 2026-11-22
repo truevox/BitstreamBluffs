@@ -29,6 +29,13 @@ const BOOL_FIELDS = ['push', 'variableHop', 'noAutoNudge', 'divebomb', 'corkscre
   'hop', 'reset', 'airBrake', 'parachute', 'pause'];
 const EDGE_FIELDS = ['hop', 'reset', 'pause', 'airBrake', 'parachute', 'confirm'];
 const HELI_SHIFT = BOOL_FIELDS.length + EDGE_FIELDS.length; // 2 bits: 0 none, 1 = +1, 2 = -1
+/** Mask of the one-shot edge bits (12-17) in a row's bits. */
+const EDGE_BITS_MASK = ((1 << EDGE_FIELDS.length) - 1) << BOOL_FIELDS.length;
+/**
+ * Recorder behavior for edge rows (Replay Contract C11/R-5): 'every-tick' = a row is written on every tick whose bits
+ * carry an edge bit. Tapes without this header field were recorded by the older deduping recorder ('legacy').
+ */
+const GHOST_EDGE_ROWS = 'every-tick';
 
 /** Identity of a course: the exact seed plus the selected biome mask. */
 export function courseKey(seed, biomeMask = 0) {
@@ -38,7 +45,8 @@ export function courseKey(seed, biomeMask = 0) {
 /** Analog tilt rounded to 1/127 so it survives storage exactly (keyboard -1/0/1 is unchanged). */
 export function quantizeTilt(tilt) {
   const t = Number.isFinite(tilt) ? Math.max(-1, Math.min(1, tilt)) : 0;
-  return Math.round(t * 127) / 127;
+  const q = Math.round(t * 127) / 127;
+  return q === 0 ? 0 : q; // Replay Contract C4: never store -0 (JSON writes it as 0, structured clone keeps it)
 }
 
 /** Pack a normalized tick pad into [bits, tilt127]. */
@@ -47,7 +55,8 @@ export function encodePad(pad) {
   BOOL_FIELDS.forEach((k, i) => { if (pad[k]) bits |= 1 << i; });
   EDGE_FIELDS.forEach((k, i) => { if (pad.pressed?.[k]) bits |= 1 << (BOOL_FIELDS.length + i); });
   if (pad.heli > 0) bits |= 1 << HELI_SHIFT; else if (pad.heli < 0) bits |= 2 << HELI_SHIFT;
-  return [bits >>> 0, Math.round(quantizeTilt(pad.tilt) * 127)];
+  const tilt127 = Math.round(quantizeTilt(pad.tilt) * 127);
+  return [bits >>> 0, tilt127 === 0 ? 0 : tilt127];
 }
 
 /** Inverse of encodePad. `brake` is re-derived per tick by RunScene from brakeHeld/airBrake. */
@@ -85,7 +94,7 @@ export class GhostRecorder {
   /** @param {object} header everything but versions; see RunScene._ghostHeader() */
   constructor(header) {
     this.header = { format: GHOST_TAPE_FORMAT, version: GHOST_TAPE_VERSION, physicsVersion: GHOST_PHYSICS_VERSION,
-      simTickHz: SIM_TICK_HZ, runRandomVersion: RUN_RANDOM_VERSION, ...header };
+      simTickHz: SIM_TICK_HZ, runRandomVersion: RUN_RANDOM_VERSION, edgeRows: GHOST_EDGE_ROWS, ...header };
     this.inputs = []; // [tickDelta, bits, tilt127] on change
     this.checkpoints = []; // [tick, ...sledState]
     this.trace = []; // x, y, angle every TRACE_EVERY ticks from tick TRACE_EVERY
@@ -105,7 +114,8 @@ export class GhostRecorder {
 
   input(tick, pad) {
     const [bits, tilt] = encodePad(pad);
-    if (this._last && this._last[0] === bits && this._last[1] === tilt) return;
+    // An edge applies only on its exact tick on replay, so a repeated edge row must still be written (C11).
+    if (this._last && this._last[0] === bits && this._last[1] === tilt && !(bits & EDGE_BITS_MASK)) return;
     this.inputs.push([tick - this._lastTick, bits, tilt]);
     this._lastTick = tick;
     this._last = [bits, tilt];
