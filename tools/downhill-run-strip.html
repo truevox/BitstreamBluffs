@@ -32,6 +32,7 @@
     .frame { border:1px solid var(--line); border-radius:.85rem; overflow:hidden; margin:1rem 0 0; }
     .frame img { display:block; width:100%; height:auto; }
     .frame figcaption { padding:.55rem .85rem; color:var(--muted); }
+    .art-frame { max-width:44rem; }
     .metric { margin:.2rem 0; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
     .accent { color:#0a1728; background:#98edf0; border-color:#98edf0; font-weight:700; }
     .accent:hover { background:#c0faff; }
@@ -81,6 +82,14 @@
       <section class="panel" aria-label="Static export">
         <button type="button" id="download" class="accent">Download section SVG</button>
         <p class="output muted">The SVG includes the displayed path and sample range, not your tape or its metadata. The depicted path can still be recognizable.</p>
+      </section>
+      <section class="panel" aria-labelledby="run-art-title">
+        <h2 id="run-art-title">Run DNA preview</h2>
+        <p class="muted">Local / Unverified. Artwork from the full recorded path, independent of the strip zoom. Preview only.</p>
+        <figure class="frame art-frame" id="run-art-frame" hidden>
+          <img id="run-art" width="960" height="620" alt="Abstract neon artwork of the full recorded sled path">
+        </figure>
+        <p id="art-unavailable" class="output muted" hidden>Artwork preview is unavailable for this trace.</p>
       </section>
     </div>
     <noscript><p>This local inspector needs JavaScript to read the selected file.</p></noscript>
