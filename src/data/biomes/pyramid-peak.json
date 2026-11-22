@@ -2,7 +2,7 @@
   "id": "pyramid-peak",
   "bit": 4,
   "name": "Pyramid Peak",
-  "unlockLevel": 10,
+  "unlockLevel": 7,
   "lore": "Thermals climb the terraces faster than you can fall. Ride them and the air holds you up.",
   "background": "terraces",
   "mod": "thermalUpdraft",

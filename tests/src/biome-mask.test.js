@@ -178,35 +178,41 @@ describe('seed@mask entry (W3)', () => {
   });
 });
 
-describe('profile biome toggles (W3)', () => {
+describe('profile biome toggles (W3, default ON since issue #65)', () => {
   const DEFS = [
-    { id: 'debumont', bit: 1, name: 'Debumont', unlockLevel: 4 },
+    { id: 'debutmont', bit: 1, name: 'Debutmont', unlockLevel: 1 },
+    { id: 'garbage-dump-glacier', bit: 2, name: 'Garbage Dump Glacier', unlockLevel: 7 },
     { id: 'pyramid-peak', bit: 4, name: 'Pyramid Peak', unlockLevel: 10 },
   ];
   const prof = (over = {}) => ({
-    v: 1, xp: 0, level: 1, bank: 0, biomeMask: 0,
-    pendingBiomes: ['debumont'],
+    v: 1, xp: 0, level: 7, bank: 0, biomeOff: 0,
+    pendingBiomes: ['debutmont', 'garbage-dump-glacier'],
     unlocked: { biomes: [], cosmetics: [], boosts: {} },
     ...over,
   });
 
-  test('toggles an unlocked biome on and off', () => {
-    const a = toggleBiome(prof(), 'debumont', DEFS);
-    expect(a.biomeMask).toBe(1);
-    expect(toggleBiome(a, 'debumont', DEFS).biomeMask).toBe(0);
+  test('toggles an unlocked biome OFF and back ON through biomeOff', () => {
+    const a = toggleBiome(prof(), 'garbage-dump-glacier', DEFS);
+    expect(a.biomeOff).toBe(2);
+    expect(toggleBiome(a, 'garbage-dump-glacier', DEFS).biomeOff).toBe(0);
   });
 
   test('refuses a biome the player has not unlocked', () => {
-    // A toggle that honoured a locked bit would hand a level-1 profile terrain it never earned.
+    // A toggle that honoured a locked bit would hand a low-level profile terrain it never earned.
     const p = prof();
     expect(toggleBiome(p, 'pyramid-peak', DEFS)).toBe(p);
-    expect(toggleBiome(p, 'pyramid-peak', DEFS).biomeMask).toBe(0);
+    expect(toggleBiome(p, 'pyramid-peak', DEFS).biomeOff).toBe(0);
+  });
+
+  test('refuses the base biome: Debutmont cannot be turned off', () => {
+    const p = prof();
+    expect(toggleBiome(p, 'debutmont', DEFS)).toBe(p);
   });
 
   test('is pure and never mutates the profile it was given', () => {
     const p = prof();
     const before = JSON.stringify(p);
-    toggleBiome(p, 'debumont', DEFS);
+    toggleBiome(p, 'garbage-dump-glacier', DEFS);
     expect(JSON.stringify(p)).toBe(before);
   });
 
@@ -218,30 +224,27 @@ describe('profile biome toggles (W3)', () => {
   });
 
   test('toggling one biome leaves the others alone', () => {
-    // Start with ONLY Debumont enabled (mask 1).
-    const p = prof({ biomeMask: 1, pendingBiomes: ['debumont', 'pyramid-peak'],
-      unlocked: { biomes: [], cosmetics: [], boosts: {} } });
-    // Enabling Pyramid Peak adds bit 4 and leaves Debumont's bit alone.
-    expect(toggleBiome(p, 'pyramid-peak', DEFS).biomeMask).toBe(5);
-    // Disabling the only enabled biome clears the mask; it must NOT resurrect some other biome's bit.
-    expect(toggleBiome(p, 'debumont', DEFS).biomeMask).toBe(0);
+    // Pyramid Peak unlocked and already explicitly OFF (bit 4).
+    const p = prof({ biomeOff: 4, pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak'] });
+    // Turning the glacier OFF adds bit 2 and leaves Pyramid Peak's OFF bit alone.
+    expect(toggleBiome(p, 'garbage-dump-glacier', DEFS).biomeOff).toBe(6);
+    // Turning Pyramid Peak back ON clears only its own bit.
+    expect(toggleBiome(p, 'pyramid-peak', DEFS).biomeOff).toBe(0);
   });
 
-  test('rows list every biome in unlock order with its state', () => {
+  test('rows list every switchable biome in unlock order with its state, and omit the base biome', () => {
     const rows = biomeToggleRows(
-      prof({ biomeMask: 1, pendingBiomes: ['debumont', 'pyramid-peak'],
-      unlocked: { biomes: [], cosmetics: [], boosts: {} } }),
+      prof({ biomeOff: 4, pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak'] }),
       DEFS.slice().reverse(), // input order must not leak into display order
     );
-    expect(rows.map((r) => r.id)).toEqual(['debumont', 'pyramid-peak']);
+    expect(rows.map((r) => r.id)).toEqual(['garbage-dump-glacier', 'pyramid-peak']);
     expect(rows[0]).toMatchObject({ unlocked: true, enabled: true });
     expect(rows[1]).toMatchObject({ unlocked: true, enabled: false });
   });
 
   test('a locked biome never shows as enabled, even if its bit is set', () => {
-    // Defence in depth: a corrupt profile could carry a bit for a biome it has not unlocked. The view
-    // must not render that as "on".
-    const rows = biomeToggleRows(prof({ biomeMask: 4, pendingBiomes: [], unlocked: { biomes: [], cosmetics: [], boosts: {} } }), DEFS);
+    // Defence in depth: a locked biome is never "on", whatever the profile carries.
+    const rows = biomeToggleRows(prof({ biomeOff: 0, level: 1, pendingBiomes: ['debutmont'] }), DEFS);
     expect(rows.find((r) => r.id === 'pyramid-peak')).toMatchObject({ unlocked: false, enabled: false });
   });
 });

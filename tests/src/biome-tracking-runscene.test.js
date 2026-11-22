@@ -190,7 +190,7 @@ function pressTitle(values, label, over) {
 
 
 const { PIXELS_PER_METER } = await import('../../src/constants.js');
-const { biomeForSector, SECTOR_M } = await import('../../src/systems/TerrainGenerator.js');
+const { biomeForSector, BASE_BIOME_ID, SECTOR_M } = await import('../../src/systems/TerrainGenerator.js');
 const { ProgressionService } = await import('../../src/systems/ProgressionService.js');
 const { ProfileStore } = await import('../../src/systems/ProfileStore.js');
 const fs = await import('fs');
@@ -198,11 +198,11 @@ const LEVELS = JSON.parse(fs.readFileSync('src/data/progression/levels.json', 'u
 const DEFS = Object.values(CONTENT.biomes);
 const SECTOR_PX = SECTOR_M * PIXELS_PER_METER;
 
-/** A seed whose 0-based sector 2 is `id` at mask `bit` and sector 3 is base terrain. */
+/** A seed whose 0-based sector 2 is `id` at mask `bit` and sector 3 is the home biome (so sector 2 opens with an arcade bridge). */
 function seedFor(id, bit) {
   for (let i = 0; i < 2000; i++) {
     const seed = `d3rs-${i}`;
-    if (biomeForSector(seed, 2, bit, DEFS) === id && biomeForSector(seed, 3, bit, DEFS) === null) return seed;
+    if (biomeForSector(seed, 2, bit, DEFS) === id && biomeForSector(seed, 3, bit, DEFS) === BASE_BIOME_ID) return seed;
   }
   throw new Error('no seed');
 }
@@ -220,45 +220,103 @@ function rideAndCrash(seed, mask, furthestX, crashX = furthestX) {
 }
 
 describe('decision 3: RunScene reports the biomes a run actually entered', () => {
-  const seed = seedFor('debumont', 1);
+  // Debutmont is the base (sectors 0-1), then an arcade bridge opens Crystal Cavern at sector 2 (#65).
+  const seed = seedFor('crystal-cavern', 16);
+  const HOME = BASE_BIOME_ID;
 
   test('a run that crashes inside the biome sector reports it encountered, not completed', () => {
-    const { payload } = rideAndCrash(seed, 1, 2 * SECTOR_PX + 200);
-    expect(payload.biomeVisits).toEqual({ encountered: ['debumont'], completed: [] });
+    const { payload } = rideAndCrash(seed, 16, 2 * SECTOR_PX + SECTOR_PX / 2);
+    expect(payload.biomeVisits).toEqual({ encountered: [HOME, 'crystal-cavern'], completed: [HOME] });
+  });
+
+  test('a crash still inside the arcade bridge has not entered the biome yet', () => {
+    const { payload } = rideAndCrash(seed, 16, 2 * SECTOR_PX + 200);
+    expect(payload.biomeVisits).toEqual({ encountered: [HOME], completed: [HOME] });
   });
 
   test('a run that rides the sector to its end and crashes beyond reports it completed', () => {
-    const { payload } = rideAndCrash(seed, 1, 3 * SECTOR_PX + 200);
-    expect(payload.biomeVisits).toEqual({ encountered: ['debumont'], completed: ['debumont'] });
+    const { payload } = rideAndCrash(seed, 16, 3 * SECTOR_PX + 200);
+    expect(payload.biomeVisits).toEqual({ encountered: [HOME, 'crystal-cavern'], completed: [HOME, 'crystal-cavern'] });
   });
 
-  test('a run that stops before sector 2 reports nothing (control)', () => {
-    const { payload } = rideAndCrash(seed, 1, 2 * SECTOR_PX - 400);
-    expect(payload.biomeVisits).toEqual({ encountered: [], completed: [] });
+  test('a run that stops before sector 2 reports only the home biome (control)', () => {
+    const { payload } = rideAndCrash(seed, 16, 2 * SECTOR_PX - 400);
+    expect(payload.biomeVisits).toEqual({ encountered: [HOME], completed: [HOME] });
   });
 
-  test('mask 0 reports nothing, and the record carries no biome fields', () => {
+  test('mask 0 plays pure Debutmont, and the record carries no biome fields', () => {
     const { payload } = rideAndCrash(seed, 0, 6 * SECTOR_PX);
-    expect(payload.biomeVisits).toEqual({ encountered: [], completed: [] });
+    expect(payload.biomeVisits).toEqual({ encountered: [HOME], completed: [HOME] });
     expect(Object.keys(payload.record).filter((k) => /biome(?!Mask)/i.test(k))).toEqual([]);
   });
 
   test('the visits travel beside the record, never inside it (the ledger hash is untouched)', () => {
-    const { payload, values } = rideAndCrash(seed, 1, 3 * SECTOR_PX + 200);
+    const { payload, values } = rideAndCrash(seed, 16, 3 * SECTOR_PX + 200);
     expect(payload.record).toBe(values.get(REG.LAST_RECORD));
     expect(payload.record.biomeVisits).toBeUndefined();
     expect(payload.record.ledgerHash).toBe(SaveStore.computeLedgerHash(payload.record));
   });
 
   test('end to end: the real ProgressionService credits RUN_END.biomeVisits into the profile', () => {
-    const { payload } = rideAndCrash(seed, 1, 3 * SECTOR_PX + 200);
+    const { payload } = rideAndCrash(seed, 16, 3 * SECTOR_PX + 200);
     const reg = new Map();
     const game = { registry: { get: (k) => reg.get(k), set: (k, v) => reg.set(k, v) }, events: { on() {}, off() {}, once() {} } };
     const store = new ProfileStore({ storage: null, levels: LEVELS });
     store.load();
     const svc = new ProgressionService(game, { levels: LEVELS, store });
     svc.onRunEnd(payload);
-    expect(store.profile.biomeProgress).toEqual({ encountered: ['debumont'], completed: ['debumont'] });
-    expect(reg.get(REG.PROFILE).biomeProgress.encountered).toEqual(['debumont']);
+    expect(store.profile.biomeProgress).toEqual({ encountered: [HOME, 'crystal-cavern'], completed: [HOME, 'crystal-cavern'] });
+    expect(reg.get(REG.PROFILE).biomeProgress.encountered).toEqual([HOME, 'crystal-cavern']);
+  });
+});
+
+describe('#65: RunScene announces biomes from the generator\'s own answer at the sled (bridges included)', () => {
+  test('home on entry, then the arcade bridge, then the biome: one BIOME_ENTER each, palette repainted per change', () => {
+    const seed = seedFor('crystal-cavern', 16);
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SEED, seed], [REG.BIOME_MASK, 16], [REG.SAVE_STORE, memStore()]]);
+    const s = runScene(values);
+    const events = [];
+    s.emitIf = (name, payload) => { if (name === EVT.BIOME_ENTER) events.push(payload); };
+    s.refreshPalette = jest.fn();
+    let owed = 0;
+    let prev;
+    for (let x = s.startX; x < 3 * SECTOR_PX; x += 200) {
+      s.sled.x = x;
+      s.sled.y = s.terrain.heightAt(x);
+      s.sled.grounded = true;
+      const b = s.terrain.biomeAtX(x);
+      if (b !== prev) { prev = b; owed++; }
+      s.updateFun(16, {}, Math.max(0, (x - s.startX) / 10));
+    }
+    expect(events.map((e) => [e.id, e.entering])).toEqual([[BASE_BIOME_ID, true], [null, false], ['crystal-cavern', true]]);
+    // one repaint per change of the generator's biome; the bridge dissolve adds two more (graphics only: since #140 no
+    // repaint touches a collider) inside the bridge
+    expect(owed).toBe(3);
+    expect(s.refreshPalette.mock.calls).toHaveLength(owed + 2);
+  });
+
+  test('a retry on the same RunScene instance announces and repaints the opening biome again', () => {
+    // RunScene is one instance across runs; create() starts on the base palette, so it must forget the last run's biome.
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.SEED, 'retry-seed'], [REG.BIOME_MASK, 0], [REG.SAVE_STORE, memStore()]]);
+    const s = runScene(values);
+    const events = [];
+    s.emitIf = (name, payload) => { if (name === EVT.BIOME_ENTER) events.push(payload); };
+    s.refreshPalette = jest.fn();
+    const tick = () => {
+      s.sled.x = s.startX + 200;
+      s.sled.y = s.terrain.heightAt(s.sled.x);
+      s.sled.grounded = true;
+      s.updateFun(16, {}, 20);
+    };
+    tick();
+    expect(events.map((e) => [e.id, e.entering])).toEqual([[BASE_BIOME_ID, true]]);
+    expect(s.refreshPalette).toHaveBeenCalledTimes(1);
+    // The first run ended in Debutmont; the retry starts in Debutmont again.
+    s.create();
+    s.emitIf = (name, payload) => { if (name === EVT.BIOME_ENTER) events.push(payload); };
+    s.refreshPalette = jest.fn();
+    tick();
+    expect(events.map((e) => [e.id, e.entering])).toEqual([[BASE_BIOME_ID, true], [BASE_BIOME_ID, true]]);
+    expect(s.refreshPalette).toHaveBeenCalledTimes(1);
   });
 });

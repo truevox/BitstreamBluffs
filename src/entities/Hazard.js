@@ -393,7 +393,7 @@ export class Hazard {
     }
   }
 
-  // B1 Debumont: Groomer Cat, a little tracked snow groomer facing the sled, its blade out front (left) and a puffing stack
+  // B1 Debutmont: Groomer Cat, a little tracked snow groomer facing the sled, its blade out front (left) and a puffing stack
   _groomer(g, t, frame, col, pal) {
     const w = this.w;
     const h = this.h;

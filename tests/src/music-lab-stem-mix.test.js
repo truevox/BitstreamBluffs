@@ -5,11 +5,11 @@ import {
 } from '../../src/systems/music/LabStemMix.js';
 
 function sandbox(){
-  const sources=new Map(['voice:debumont','voice:crystal-cavern','voice:bitstream-bluffs']
+  const sources=new Map(['voice:debutmont','voice:crystal-cavern','voice:bitstream-bluffs']
     .map(name=>[name,{}]));
   const d={pack:{id:'song',sourceNames:[...sources.keys()]},
     gains:sources,mixer:{setGain:jest.fn()},
-    setStemGain:jest.fn(),_activeVoiceFor:()=> 'voice:debumont'};
+    setStemGain:jest.fn(),_activeVoiceFor:()=> 'voice:debutmont'};
   return d;
 }
 
@@ -45,7 +45,7 @@ describe('Music Lab per-stem independent sandbox mixer',()=>{
     expect(applyLabStemLevels(d,l)).toBe(true);
     expect(d.setStemGain).toHaveBeenCalledWith('bass',.35);
     expect(d.setStemGain).toHaveBeenCalledWith('piano',1.35);
-    expect(d.mixer.setGain).toHaveBeenCalledWith('voice:debumont',0,{time:.07});
+    expect(d.mixer.setGain).toHaveBeenCalledWith('voice:debutmont',0,{time:.07});
     expect(d.mixer.setGain).toHaveBeenCalledWith('voice:crystal-cavern',0,{time:.07});
     expect(d.mixer.setGain).toHaveBeenCalledWith('voice:bitstream-bluffs',0,{time:.07});
     expect(d.setStemGain).toHaveBeenCalledTimes(5);
@@ -54,7 +54,7 @@ describe('Music Lab per-stem independent sandbox mixer',()=>{
     const d=sandbox(),l=freshLabLevels();l.bass=1.35;
     applyLabStemLevels(d,l,'MELODY');
     expect(d.setStemGain).toHaveBeenCalledWith('bass',0);
-    expect(d.mixer.setGain).toHaveBeenCalledWith('voice:debumont',1,{time:.07});
+    expect(d.mixer.setGain).toHaveBeenCalledWith('voice:debutmont',1,{time:.07});
     d.setStemGain.mockClear();
     applyLabStemLevels(d,l,'ALL');
     expect(d.setStemGain).toHaveBeenCalledWith('bass',1.35);

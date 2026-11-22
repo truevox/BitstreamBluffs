@@ -1,5 +1,5 @@
 /**
- * B1 "Wards" content (spec §4 table and bounds): the biome hazard and power-up of Debumont, Garbage Dump Glacier,
+ * B1 "Wards" content (spec §4 table and bounds): the biome hazard and power-up of Debutmont, Garbage Dump Glacier,
  * Underwater Mountain and Candy Cane Canyon. Loader + schema check for the new JSON, the values the spec names, and the
  * pairing rule (each ward switches off something its own biome has).
  */
@@ -15,7 +15,7 @@ const biomePu = readDir('powerups').filter((d) => d.biome);
 
 /** Spec §4 B1 rows. */
 const B1 = {
-  debumont: { hazard: 'groomerCat', powerup: 'mapleWax' },
+  debutmont: { hazard: 'groomerCat', powerup: 'mapleWax' },
   'garbage-dump-glacier': { hazard: 'seagullDive', powerup: 'slickWaxSpray' },
   'underwater-mountain': { hazard: 'seaweedTangle', powerup: 'aquaLungBubble' },
   'candy-cane-canyon': { hazard: 'chocolateRiver', powerup: 'sweetToothCoating' },
@@ -76,7 +76,7 @@ describe('B1 content: loader and schema', () => {
 });
 
 describe('B1 content: the spec §4 values', () => {
-  test('Debumont: Groomer Cat slow 0.7 x 900 ms on the ground; Maple Wax speedBoost 1.2 x 2 s', () => {
+  test('Debutmont: Groomer Cat slow 0.7 x 900 ms on the ground; Maple Wax speedBoost 1.2 x 2 s', () => {
     expect(c.hazards.groomerCat).toMatchObject({ placement: 'ground', onHit: { effect: 'slow', speedFactor: 0.7, durationMs: 900 } });
     expect(c.hazards.groomerCat.motion).toBeUndefined(); // static in B1; motion kinds land in B3
     expect(c.powerups.mapleWax.effect).toEqual({ kind: 'speedBoost', speedFactor: 1.2, durationMs: 2000 });
@@ -155,7 +155,7 @@ describe('B1 content: measured presence in biome chunks (slot rule, spec §4 ame
   // groomerCat 42.5 %, seagullDive 33.5 %, seaweedTangle 44.2 %, chocolateRiver 27.3 %; the early-terrain target and its
   // open items live in biome-b1-presence.test.js. These floors stay as a second, long-range regression pin.
   const ROWS = [
-    [1, 'debumont', 'groomerCat', 'mapleWax', 0.08],
+    [1, 'debutmont', 'groomerCat', 'mapleWax', 0.08],
     [2, 'garbage-dump-glacier', 'seagullDive', 'slickWaxSpray', 0.12],
     [8, 'underwater-mountain', 'seaweedTangle', 'aquaLungBubble', 0.06],
     [64, 'candy-cane-canyon', 'chocolateRiver', 'sweetToothCoating', 0.05],

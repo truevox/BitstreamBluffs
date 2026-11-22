@@ -35,11 +35,11 @@ try{
 	await page.locator('#play').click();
 	await page.waitForFunction(()=>document.querySelector('#status')?.textContent
 		?.startsWith('Playing 6 original stems'),null,{timeout:40000});
-	await page.locator('#melody').selectOption('voice:debumont');
+	await page.locator('#melody').selectOption('voice:debutmont');
 	await page.locator('#play').click();
 	await page.waitForFunction(()=>document.querySelector('#status')?.textContent
 		?.startsWith('Playing 6 original stems'),null,{timeout:40000});
-	console.log('AUDITION_LATE_PASSAGE_AND_DEBUMONT_SOURCE_PASS');
+	console.log('AUDITION_LATE_PASSAGE_AND_DEBUTMONT_SOURCE_PASS');
 
 	await page.locator('#song').selectOption('WRBGQUqD54U');
 	await page.waitForFunction(()=>document.querySelector('#status')?.textContent

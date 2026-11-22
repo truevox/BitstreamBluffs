@@ -25,7 +25,7 @@ const state=()=>page.evaluate(()=>{
 		danger:a._bsodDanger01,wind:a.nodes?.windGain?.gain.value,
 		guitar:stem('guitar'),piano:stem('piano'),other:stem('other'),
 		bass:stem('bass'),drums:stem('drums'),
-		melody:stem('voice:debumont'),audio:d.ctx?.state};
+		melody:stem('voice:debutmont'),audio:d.ctx?.state};
 });
 try{
 	await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
@@ -38,7 +38,7 @@ try{
 	const menu=await state();
 	assert.equal(menu.song,'local-one-more-run-bitstream-bluffs');
 	assert.equal(menu.menu,true);
-	assert.equal(menu.voice,'voice:debumont');
+	assert.equal(menu.voice,'voice:debutmont');
 	for(const name of ['guitar','piano','other']){
 		assert.equal(menu[name].threat,true);
 		assert.equal(menu[name].wet,0);
@@ -122,7 +122,7 @@ try{
 	assert.equal(after.clock,menu.clock);
 	assert.equal(after.song,menu.song);
 	assert.equal(after.menu,true);
-	assert.equal(after.voice,'voice:debumont');
+	assert.equal(after.voice,'voice:debutmont');
 	assert.equal(after.danger,0);
 	assert.ok(after.wind<.01);
 	for(const name of ['guitar','piano','other']){

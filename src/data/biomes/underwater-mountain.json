@@ -2,7 +2,7 @@
   "id": "underwater-mountain",
   "bit": 8,
   "name": "Underwater Mountain",
-  "unlockLevel": 13,
+  "unlockLevel": 10,
   "lore": "The mountain kept its original latency. Everything here arrives a little later than you sent it.",
   "background": "currents",
   "mod": "slowMotion",

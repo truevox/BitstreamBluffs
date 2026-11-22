@@ -62,7 +62,9 @@ import * as matterPortableNs from '../MatterPortable.js';
 //    native Math, and Phaser's bundled Matter has its nine trig/pow/acos functions replaced (src/systems/MatterPortable.js), so
 //    Chromium, Firefox and WebKit produce identical authoritative state. Last-bit differences from the native-Math revision 3
 //    (about 1% of sin/cos results differ from V8) change tick-level outcomes of every older tape.
-export const SIM_REVISION = 5;
+// 6: #65 (gameplay): Debutmont is the base biome (owns every sector the mask does not select) and
+//    arcade bridges (null biome) separate biomes, so tick outcomes change for a given seed and mask.
+export const SIM_REVISION = 6;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above
@@ -70,7 +72,7 @@ export const SIM_REVISION = 5;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-export const LAST_RELEASED_SIM_REVISION = 5;
+export const LAST_RELEASED_SIM_REVISION = 6;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;

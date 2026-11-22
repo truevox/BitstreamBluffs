@@ -121,7 +121,8 @@ function withTail(head, tail, maxPx) {
   if (!tail) return ellipsize(head, maxPx);
   const full = `${head} / ${tail}`;
   if (measureText(full) <= maxPx) return full;
-  const room = maxPx - measureText(`${head} / `);
+  // measureText drops the trailing 1px gap of each string, so the joined line is 1px wider than the parts' sum.
+  const room = maxPx - measureText(`${head} / `) - 1;
   return room >= 40 ? `${head} / ${ellipsize(tail, room)}` : ellipsize(head, maxPx);
 }
 

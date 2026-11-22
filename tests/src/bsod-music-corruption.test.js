@@ -123,7 +123,7 @@ describe('real BSOD proximity: original accompaniment corruption only',()=>{
 		d.clockStart=19.75;d.trackIndex=2;d.started=false;
 		d.gains=new Map(['guitar','piano','other'].map(s=>[s,{}]));
 		d._timbreSignatures=new Map();
-		d.pack={sourceNames:['voice:debumont','voice:crystal-cavern']};
+		d.pack={sourceNames:['voice:debutmont','voice:crystal-cavern']};
 		d.mixer={setThreatLevel:jest.fn(),setGain:jest.fn(),
 			replaceEffects:jest.fn(),setRoomSend:jest.fn(),selectBiome:jest.fn(),
 			setEffectParam:jest.fn()};
@@ -140,7 +140,7 @@ describe('real BSOD proximity: original accompaniment corruption only',()=>{
 			expect(d.mixer.setThreatLevel).toHaveBeenCalledWith(stem,0);
 		expect(d.clockStart).toBe(19.75);
 		expect(d.trackIndex).toBe(2);
-		expect(d._activeVoiceFor(d.pack)).toBe('voice:debumont');
+		expect(d._activeVoiceFor(d.pack)).toBe('voice:debutmont');
 		d.setBsodDanger(.95);
 		expect(d.bsodDanger).toBe(0);
 		d.setMenuMode(false);

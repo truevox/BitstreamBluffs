@@ -151,7 +151,7 @@ try{
 	const menuSample=await sample(menuState.song,0);
 	assert.ok(menuSample.music.peak>0&&menuSample.master.peak>0);
 	assert.ok(menuSample.master.peak<=1.0);
-	console.log('DEBUMONT_MENU_MIX_PEAK_DBFS',menuSample.master.peakDbfs.toFixed(2));
+	console.log('DEBUTMONT_MENU_MIX_PEAK_DBFS',menuSample.master.peakDbfs.toFixed(2));
 	assert.deepEqual(errors,[]);assert.deepEqual(failedHttp,[]);
 	const report={format:'bitstream-real-web-audio-master-sampled-headroom-v1',
 		status:'sampling-only-not-full-mix-peak-proof-or-sonic-approval',

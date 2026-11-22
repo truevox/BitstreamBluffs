@@ -2,7 +2,7 @@
   "id": "garbage-dump-glacier",
   "bit": 2,
   "name": "Garbage Dump Glacier",
-  "unlockLevel": 7,
+  "unlockLevel": 4,
   "lore": "A century of discarded packets, compressed into ice that grabs your skis and keeps them.",
   "background": "drift",
   "mod": "stickyPatch",

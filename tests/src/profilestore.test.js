@@ -222,7 +222,7 @@ describe('sanitizeProfile', () => {
     const reloaded = new ProfileStore({ levels: levels() }).load();
     expect(JSON.stringify(reloaded)).toBe(JSON.stringify(fresh));
     expect(Object.keys(reloaded).sort()).toEqual(Object.keys(fresh).sort());
-    expect(fresh.pendingBiomes).toEqual([]);
+    expect(fresh.pendingBiomes).toEqual(['debutmont']); // the base biome (level 1)
     expect(sanitizeProfile(defaultProfile(), levels())).toEqual(fresh);
   });
 
@@ -337,7 +337,7 @@ describe('biome rewards in W1 are listed but locked', () => {
     const s = new ProfileStore({ levels: T });
     s.load();
     // Enough XP to reach the first biome's level, whatever the current curve is.
-    const firstBiome = T.levels.find((l) => l.biome);
+    const firstBiome = T.levels.find((l) => l.biome && l.level > 1); // the base biome is level 1
     const need = firstBiome.xpMin;
     let total = 0;
     for (let i = 0; i < 40 && total < need; i++) {

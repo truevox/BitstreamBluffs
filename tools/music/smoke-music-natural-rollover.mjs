@@ -106,10 +106,10 @@ try{
 	await page.evaluate(()=>window.__bbGame.events.emit('bb:runEnd',{cause:'crash'}));
 	const died=await info();
 	assert.equal(died.menuMode,true);
-	assert.equal(died.voice,'voice:debumont');
+	assert.equal(died.voice,'voice:debutmont');
 	assert.equal(died.clock,runRollover.next.clock);
 	assert.equal(died.id,runRollover.next.id);
-	console.log('RUN_ROLLOVER_AND_CRASH_DEBUMONT_WITHOUT_RESTART_PASS',JSON.stringify(died));
+	console.log('RUN_ROLLOVER_AND_CRASH_DEBUTMONT_WITHOUT_RESTART_PASS',JSON.stringify(died));
 	assert.deepEqual(errors,[]);
 	assert.deepEqual(http,[]);
 	console.log('REAL_CHROMIUM_NATURAL_END_SOUNDTRACK_GATE_PASS');

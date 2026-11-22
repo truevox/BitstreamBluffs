@@ -139,6 +139,15 @@
       "target": 25
     },
     {
+      "id": "t2-bridges-3",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "Ride 3 arcade bridges",
+      "metric": "bridges",
+      "target": 3,
+      "needsBridges": true
+    },
+    {
       "id": "t2-airtime-1100",
       "type": "singleRun",
       "tier": 2,
@@ -389,13 +398,14 @@
       "target": 100
     },
     {
-      "id": "t4-biome-debumont",
+      "id": "t4-pickup-maple-wax",
       "type": "singleRun",
       "tier": 4,
-      "title": "1500 m in Debumont",
-      "metric": "distanceM",
-      "target": 1500,
-      "biome": "debumont"
+      "title": "Grab 3 Maple Wax in a run",
+      "metric": "pickups",
+      "pickup": "mapleWax",
+      "target": 3,
+      "biome": "debutmont"
     },
     {
       "id": "t4-biome-glacier",

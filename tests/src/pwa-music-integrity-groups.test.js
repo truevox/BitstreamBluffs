@@ -13,15 +13,15 @@ const pack=(id)=>({format:'bitstream-music-pack-v1',id,frameCount:48000,sampleRa
 	segments:[{startFrame:0,frames:48000,sources:{
 		vocals:'a-vocals.ogg',drums:'a-drums.ogg',bass:'a-bass.ogg',
 		guitar:'a-guitar.ogg',piano:'a-piano.ogg',other:'a-other.ogg',
-		'voice:bitstream-bluffs':'a-home.ogg','voice:debumont':'a-debumont.ogg',
+		'voice:bitstream-bluffs':'a-home.ogg','voice:debutmont':'a-debutmont.ogg',
 		'voice:garbage-dump-glacier':'a-garbage.ogg',
 	}}],
-	adaptive:{featuredStem:'guitar',variants:{featured:{debumont:['adaptive/debumont/featured-0.ogg'],
+	adaptive:{featuredStem:'guitar',variants:{featured:{debutmont:['adaptive/debutmont/featured-0.ogg'],
 		'garbage-dump-glacier':['adaptive/garbage/featured-0.ogg']}}},
 	captions:'captions.json'});
 const packs={song1:pack('song1'),song2:pack('song2')};
 const opts={selection:{song1:true,song2:false},unlockedBiomeIds:[],enabledBiomeIds:[],
-	currentLevel:5,biomeDefs:[{id:'debumont',unlockLevel:4},{id:'garbage-dump-glacier',unlockLevel:7}],
+	currentLevel:5,biomeDefs:[{id:'debutmont',unlockLevel:4},{id:'garbage-dump-glacier',unlockLevel:7}],
 	prefetchNextBiome:true,dynamicOrchestra:false};
 test('only required real audio groups plus next-unlock bonus; every hash pins actual bytes',async()=>{
 	const publicRoot=mkdtempSync(join(tmpdir(),'bsb-pwa-real-groups-'));
@@ -40,7 +40,7 @@ test('only required real audio groups plus next-unlock bonus; every hash pins ac
 		expect(a).toEqual(b);
 		expect(a.groups.map(x=>[x.id,x.priority])).toEqual([
 			['song1:base','required'],
-			['song1:lead:debumont','required'],
+			['song1:lead:debutmont','required'],
 			['song1:lead:garbage-dump-glacier','bonus'],
 		]);
 		expect(a.groups.flatMap(x=>x.entries).every(x=>/^[a-f0-9]{64}$/.test(x.sha256))).toBe(true);
