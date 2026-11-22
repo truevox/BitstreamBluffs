@@ -356,6 +356,8 @@ export const NON_CAUSAL_MODULES = Object.freeze([
   { file: 'src/systems/ControlLayouts.js', reason: 'input binding layouts; the recorded pad bits are the protocol (bb-pad)' },
   { file: 'src/systems/Cosmetics.js', reason: 'cosmetic catalogue' },
   { file: 'src/systems/CrashReport.js', reason: 'Game Over text timing/beat labels: presentation' },
+  { file: 'src/systems/MatterPortable.js', reason: 'portable-math patch of Matter (#121): code, not data; its exports are identifiers (patched function names, Phaser pin). Covered by SIM_REVISION, the source tripwire and tests/determinism/matter-portable.test.js' },
+  { file: 'src/systems/pmath.js', reason: 'portable math facade over the pinned @stdlib packages (#121): code, not data. Covered by SIM_REVISION, the source tripwire, the exact package pins and the golden-hash test (tests/determinism/pmath.test.js)' },
   { file: 'src/systems/HazardTelegraph.js', reason: 'ground warning timing: presentation' },
   { file: 'src/systems/HintScheduler.js', reason: 'first-run hint definitions: presentation' },
   { file: 'src/systems/MarkerLayout.js', reason: 'minimap/marker label layout: presentation' },

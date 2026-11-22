@@ -12,62 +12,64 @@
 import crypto from 'crypto';
 import { makeGen, loadContent } from './_helpers.js';
 
+// #121 (portable math): digests re-pinned once. Terrain generation now uses pmath (tan/atan2/hypot/cos), which differs from native V8 Math in the last bits
+// of about 10% of the numbers (max 8.7e-11 px, 6e-16 relative; zero structural differences over 20 seed/mask pairs x 300 chunks, tools/determinism/portable-math/terrain-delta.mjs).
 const CHUNKS = 300;
 const PINNED = {
   '0': {
-    'alpha': '928ba72be1f0d66f',
-    'beta': 'da26983b9cf8204b',
-    'swell': '3b62e6072c4acddb'
+    'alpha': 'a02af9e4d56273c8',
+    'beta': '7fbbbeb590fce060',
+    'swell': 'b3717ba9fd1b0647'
   },
   '1': {
-    'alpha': '278595375a32f556',
-    'beta': 'f8b2422926785ef7',
-    'swell': 'e0f53979265a9921'
+    'alpha': '32d58dd8f362f924',
+    'beta': 'b20ebff2d719d23a',
+    'swell': '35c5415b08ce016b'
   },
   '2': {
-    'alpha': 'b45429063aa529df',
-    'beta': '23a14a2d16b8ceb1',
-    'swell': '01c405444ce29d3f'
+    'alpha': 'dd7dde8b607ed7ad',
+    'beta': '55114419899d1e08',
+    'swell': '46f7867ddabab199'
   },
   '4': {
-    'alpha': '647c5467907ed31a',
-    'beta': '4cbaae1962df564c',
-    'swell': '68fa00cd462a2a5e'
+    'alpha': '6075257a767a800c',
+    'beta': '3ca54022e98a1de4',
+    'swell': 'bda8a94c3f608510'
   },
   '8': {
-    'alpha': '0012d6c77a06f5d8',
-    'beta': '4fe4d11f63813848',
-    'swell': 'c3325aa50de3d5af'
+    'alpha': 'dbb1e39c19e38857',
+    'beta': 'adee253636195873',
+    'swell': '31b2b00a6acca365'
   },
   '16': {
-    'alpha': 'c1eff14d27e75184',
-    'beta': 'c2b561512d6cd5a6',
-    'swell': 'f295c4fea164960d'
+    'alpha': '8cb8d5dab0b21137',
+    'beta': '7735c9a3cfa91469',
+    'swell': '73133a4cd6c4b275'
   },
   '32': {
-    'alpha': '4a10c2876215a4f0',
-    'beta': '5b66df3e4027f456',
-    'swell': 'db96e88c331e25fa'
+    'alpha': '947264f11bc668a4',
+    'beta': '306105700ab0eebf',
+    'swell': 'd729a0aff52faef1'
   },
   '64': {
-    'alpha': 'f03fb6333ad6cc0f',
-    'beta': '423598b7b134483e',
-    'swell': '86f27de590c16d0f'
+    'alpha': '0b7704b772ed7977',
+    'beta': 'a3010169fa3781d2',
+    'swell': '631e52c8be4904fd'
   },
   '128': {
-    'alpha': '0ff4025ea50160a4',
-    'beta': '35f36874cca50845',
-    'swell': 'd751c69b6a0004e4'
+    'alpha': 'e8f9f66592a5711d',
+    'beta': 'efda9348aaced421',
+    'swell': '36d3b75d4e2118f7'
   },
   '256': {
-    'alpha': 'd6168ac49ae115ff',
-    'beta': '0bd1869c2f626847',
-    'swell': '2b7bd9060d07b065'
+    'alpha': '6f2d152ca9c14458',
+    'beta': '0dd1ede1c4e96b71',
+    'swell': '055a2716fe288d90'
   },
   '1024': {
-    'alpha': 'ec87892f2d89a6f5',
-    'beta': '6390062ecf09675c',
-    'swell': '1fd6dafeecebb98d'
+    'alpha': '78ed32962ead990b',
+    'beta': '9e483afe1335d274',
+    'swell': '1baa7f4cb7dea24f'
   }
 };
 

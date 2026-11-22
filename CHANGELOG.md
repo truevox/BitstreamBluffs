@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.19.2 — portable deterministic math: same simulation in every browser (#121 / #209) (2026-11-22)
+
+- **The authoritative simulation no longer depends on the browser's math library.** Firefox and WebKit returned different last bits than Chromium for `hypot`, `exp`, `cos`, `atan2` and others, so the same inputs could drift apart and, on a knife-edge hazard contact, end differently (a Firefox run survived a hazard that Chromium crashed on). Every simulation file now takes `sin/cos/tan/asin/acos/atan/atan2/exp/expm1/log/log1p/log2/log10/pow/hypot/tanh/sinh/cosh/cbrt` from `src/systems/pmath.js`, a facade over the exactly pinned, Apache-2.0 `@stdlib/math-base-special-*` packages (pure IEEE arithmetic, identical bits in Chromium, Firefox and WebKit), and the nine trig/pow/acos functions inside Phaser's bundled Matter are replaced the same way (`src/systems/MatterPortable.js`, no fork; `phaser` is now pinned exactly to 3.90.0). Presentation code (backgrounds, audio, UI, particles) keeps the native `Math`, and a test fails if a new native call appears in a simulation file.
+- **Physics-breaking, pre-release (`SIM_REVISION` 4).** Results differ from the native math in the last bit for about 1% of `sin`/`cos` calls, so older tapes and the terrain digests pinned in three tests change (terrain geometry differs by at most 8.7e-11 px, no structural change). No new gameplay rules and no player-visible tuning change.
+
 ## v2.19.1 — simulation/presentation causal isolation (#160 / #140) (2026-11-22)
 
 - **Palette toggle mid-run no longer touches physics.** A colour-blind palette switch (Pause > Settings) repainted the terrain through `TerrainMesh.addChunk`, which removed and re-added every live collider: segments came back as other pooled bodies (new ids, new Matter world order), pad sensors were rebuilt and the contact pairs under the sled lost their warm-start impulses. In the built game a toggle at tick 300 forked the sled pose at tick 301. New `TerrainMesh.redrawChunk` repaints graphics only; `addChunk` builds the same bodies in the same order as before.

@@ -37,12 +37,14 @@ const baseGen = (seed, mask = FX_MASK) => makeGen(seed, { biomeMask: mask, hazar
 const chunksOf = (g, n) => Array.from({ length: n }, (_, i) => snap(g.getChunk(i)));
 
 const SEEDS = ['slot-alpha', 'slot-beta', 'slot-gamma', 'slot-delta'];
+// #121 (portable math): digests re-pinned once. Terrain generation now uses pmath (tan/atan2/hypot/cos), which differs from native V8 Math in the last bits
+// of about 10% of the numbers (max 8.7e-11 px, 6e-16 relative; zero structural differences over 20 seed/mask pairs x 300 chunks, tools/determinism/portable-math/terrain-delta.mjs).
 const N = 300;
 
 describe('slot rule: base streams untouched', () => {
   test('with biome defs absent, nothing changes at ANY mask (digests pinned at 00978f6, before the slot rule)', () => {
     // Recorded on 00978f6 (v2.5.0, B0) with the same projection: 2 seeds x 200 chunks of JSON.stringify(getChunk(i)).
-    const PINNED = { 1: 'ba7a764bc87f8a44', 2: '3abca580d8e3b709', 8: 'b9d8da9bde0a6517', 64: '3b2af138f1ac87ae', [ALL]: 'd65be5a81a4903b4' };
+    const PINNED = { 1: '9d9b47c3435771cc', 2: '5317419c83dc1a1f', 8: '62320ca478c92339', 64: 'c62a9e0dee94f9d7', [ALL]: '71d0b7d415d2e2ff' };
     // Audit T2 (v2.6.x) moved Micro Mountain's dew swell INTO the chunk points on purpose, so the ALL mask (it contains
     // Micro, bit 512) now has other bytes. To keep this pin about the slot rule, the masks are hashed with the swell
     // stripped from content: that reproduces the 00978f6 bytes exactly, so nothing else moved. The shipped-content
@@ -63,7 +65,7 @@ describe('slot rule: base streams untouched', () => {
     // Masks without Micro are byte-identical with the shipped content too (the swell only touches dewSwell zones)...
     for (const mask of [1, 2, 8, 64]) expect(digestOf(mask, content.terrainMods)).toBe(PINNED[mask]);
     // ...and the ALL mask with the shipped (swelled) content, recorded after audit T2.
-    expect(digestOf(ALL, content.terrainMods)).toBe('c07cd7bed3b3716f');
+    expect(digestOf(ALL, content.terrainMods)).toBe('6ac21be2168107b8');
   });
 
   test('the slot keeps a fixed draw count: BIOME_SLOT_DRAWS is still 5', () => {
