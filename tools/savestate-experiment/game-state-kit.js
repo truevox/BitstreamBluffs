@@ -27,13 +27,14 @@
     'stabilizeId', 'blindMs', 'blindTotalMs', 'blindVis', 'magnetMs', 'magnetEff', 'magnetId', '_hopped', '_pushed',
     '_lastHopMs', '_despawn', '_biomeSector', '_lastBiome', 'gymAttemptStartTimeMs', 'gymAttemptStartX', 'gymReadyMs',
     'gymBeatWaitMs', 'gymBeatSnapshot', '_manualPausePending', '_manualPauseSeq', '_leaving', '_teleMarks',
-    'respawnGraceMs', 'hashedBackupUsed', '_lastLanding', '_flow'];
+    'respawnGraceMs', 'hashedBackupUsed', '_lastLanding', '_flow', 'kodiakShoveCdMs', 'lastBoost'];
   // PRESENTATION_READ_BY_SIM: presentation state the tick reads today (issue #155: updateGroundTelegraph reads
   // this._view.right, built from the camera in renderFrame). Required for exact equivalence until #155 lands.
   const PRESENTATION_READ_BY_SIM = ['_view', '_camX', '_camY', '_zoom', '_zoomKick', 'shakeAmp', '_landingShake'];
-  // NON_ENUMERABLE: state that cannot be serialized as is (WeakMap/WeakSet keyed by object identity).
-  // TelegraphTracker drives audio cues and h.teleAtMs (crash-report metadata), not physics or score.
-  const NON_SERIALIZABLE = ['teleTracker'];
+  // SERIALIZED_BY_HOOK: TelegraphTracker is plain data keyed by stable hazard ids (Hazard.hid) since #119 Phase 2, with its
+  // own snapshot()/restore() (RunScene.snapshotTelegraph/restoreTelegraph). It drives audio cues and h.teleAtMs.
+  // Ablation 'telegraph' skips it (the pre-Phase-2 behavior: a fresh tracker re-warns and re-stamps teleAtMs).
+  const SERIALIZED_BY_HOOK = ['teleTracker'];
   // CONFIG: rebuilt deterministically at create() from seed + registry + profile; verified equal, never restored.
   const CONFIG = ['seed', 'biomeMask', 'dailyOfficial', 'dailyRuleId', 'dailyMode', 'dailyMods', 'bsodGym', 'loadout',
     'unlockedBoosts', 'upgradeRun', 'upgradeFx', 'magnetsDrop', 'kodiaksOn', 'kodiakPackMode', 'gymSetup', 'startX',
@@ -54,7 +55,7 @@
   const PRESENTATION_SUBFIELDS = new Set(['palette', 'look', 'gfx', 'color']);
 
   const CLASS = new Map();
-  for (const [cls, list] of Object.entries({ SIM, PRESENTATION_READ_BY_SIM, NON_SERIALIZABLE, CONFIG, METADATA, PRESENTATION, INFRA })) for (const k of list) CLASS.set(k, cls);
+  for (const [cls, list] of Object.entries({ SIM, PRESENTATION_READ_BY_SIM, SERIALIZED_BY_HOOK, CONFIG, METADATA, PRESENTATION, INFRA })) for (const k of list) CLASS.set(k, cls);
 
   function classifyScene(run) {
     const out = { unclassified: [] };
@@ -302,7 +303,7 @@
     if (matter.audit.length) audit.push(...matter.audit.map((a) => `matter ${a}`));
     const out = {
       kind: 'bb-runscene-diagnostic-snapshot', version: 1, diagnosticOnly: true,
-      ghost, game: fields, matter, camera: captureCamera(run),
+      ghost, game: fields, telegraph: run.snapshotTelegraph ? run.snapshotTelegraph() : null, matter, camera: captureCamera(run),
       meshOrder: [...run.mesh.chunks.keys()],
       pool: poolState(run, ix.keyOf),
       config: opt.withConfig ? Object.fromEntries(CONFIG.filter((k) => k in run && k !== 'content' && k !== 'tuner').map((k) => [k, JSON.stringify(run[k])])) : undefined,
@@ -375,6 +376,7 @@
       for (const [k, v] of Object.entries(snap.config)) if (JSON.stringify(run[k]) !== v) throw new Error(`restore: CONFIG ${k} differs from the snapshot (fresh scene built with different config)`);
     }
     for (const k of order) if (!early.includes(k)) run[k] = dcd.dec(snap.game[k], run[k], k);
+    if (snap.telegraph && !skip.has('telegraph')) run.restoreTelegraph(snap.telegraph);
     if (skip.has('runRandom')) for (const [k, st] of Object.entries(fresh.rng)) if (run.runRandom[k]) run.runRandom[k].state = st;
     if (skip.has('kodiaks')) { run.kodiaks = []; run.kodiakNext = 0; }
     if (skip.has('bsod')) { Object.assign(run.bsod, fresh.bsod); run.bsodCaught = false; }
@@ -395,6 +397,14 @@
   }
 
   function restorePool(run, pool, withIds) {
+    // Canonical collider construction (#222) retired the body pool. A snapshot
+    // containing retired pooled bodies is incompatible, not silently discarded.
+    if (!run.mesh._bodyPool) {
+      if (!Array.isArray(pool) || pool.length) {
+        throw new Error('restore: legacy collider pool cannot be restored into canonical geometry');
+      }
+      return;
+    }
     const B = Matter.Bodies;
     const fresh = pool.map((p) => {
       const sq = [{ x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 16 }, { x: 0, y: 16 }].slice(0, p.verts);

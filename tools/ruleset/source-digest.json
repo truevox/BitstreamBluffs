@@ -3,9 +3,9 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 4,
-  "attestation": "sim-revision-bumped: #119 canonical terrain colliders (TerrainMesh body pool removed); SIM_REVISION 3 -> 4",
+  "attestation": "no-behavior-change: stable hazard-id bookkeeping and scene telegraph snapshot restore; no change to live warning times, cues or physics under released SIM_REVISION 4",
   "changedFiles": [
-    "src/entities/TerrainMesh.js"
+    "src/scenes/RunScene.js"
   ],
   "files": {
     "src/constants.js": "sha256:21fe3491017fa3f6fa55c25c5d3d3cca22fa3f1ce15a22c611113b173dc0a8e5",
@@ -14,7 +14,7 @@
     "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
     "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
     "src/entities/TerrainMesh.js": "sha256:b1ddf987355858f13b552d83c5d0f6a8afefb1a9950c2090a25bfbe4ade75e50",
-    "src/scenes/RunScene.js": "sha256:094403363c429991d7fae4d68179655444fc6fed5e4836dfc11196e04d9f62ea",
+    "src/scenes/RunScene.js": "sha256:dd2f5ba0abd0c6c2d7a0714a6314bf5a8364373c3efa259a908c83e2a56f4648",
     "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:dbe861d0a1fb6e73f94d467583ea9190ec88cc986fa39982b28687d75ca18397",

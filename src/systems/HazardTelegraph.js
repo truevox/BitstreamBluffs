@@ -213,19 +213,36 @@ export function planTelegraph(hazards, sled, viewRight, opts = {}, t = GROUND_WA
   }));
 }
 
+/** Version of the TelegraphTracker snapshot layout. */
+export const TRACKER_SNAPSHOT_VERSION = 1;
+
 /**
  * Remembers which hazards were already announced so each sound plays once. One per run.
+ *
+ * State is plain data keyed by the stable hazard id (`Hazard.hid`, `${chunk.index}:${spawn ordinal}`, assigned in
+ * RunScene.takeChunk), never by object identity, so snapshot()/restore() carry it across a savestate and a restored game
+ * (hazards rebuilt from chunk data) neither re-warns nor re-stamps. Issue #119 Phase 2.
  */
 export class TelegraphTracker {
   /** @param {typeof GROUND_WARN} [t] */
   constructor(t = GROUND_WARN) {
     this.t = t;
-    /** @type {WeakMap<Object, number>} hazard -> run time (ms) of its first non-clear mark. */
-    this._warned = new WeakMap();
-    this._cued = new WeakSet();
-    /** @type {WeakMap<Object, number>} hazard -> latest finite planned arrival (run time, ms). */
-    this._arrival = new WeakMap();
+    /** @type {Map<string, {warned:number|null, cued:boolean, arrival:number|null}>} hazard id -> state. */
+    this._h = new Map();
     this._lastWarnSoundMs = -1e9;
+  }
+
+  /** @param {Object|string} ref hazard (or its id). @returns {string} */
+  static idOf(ref) {
+    const id = typeof ref === 'string' ? ref : ref && ref.hid;
+    if (typeof id !== 'string' || !id) throw new Error('TelegraphTracker: hazard has no stable id (hid)');
+    return id;
+  }
+
+  _entry(id) {
+    let e = this._h.get(id);
+    if (!e) { e = { warned: null, cued: false, arrival: null }; this._h.set(id, e); }
+    return e;
   }
 
   /**
@@ -237,16 +254,18 @@ export class TelegraphTracker {
   update(nowMs, marks) {
     const events = [];
     for (const m of marks) {
-      if (Number.isFinite(m.arrivalMs)) this._arrival.set(m.ref, m.arrivalMs);
+      const id = TelegraphTracker.idOf(m.ref);
+      if (Number.isFinite(m.arrivalMs)) this._entry(id).arrival = m.arrivalMs;
       if (m.clear || m.state === 'open') continue;
-      if (!this._warned.has(m.ref)) {
-        this._warned.set(m.ref, nowMs);
+      const e = this._entry(id);
+      if (e.warned === null) {
+        e.warned = nowMs;
         const sound = nowMs - this._lastWarnSoundMs >= this.t.warnGapMs;
         if (sound) this._lastWarnSoundMs = nowMs;
         events.push({ type: 'warn', kind: m.kind, ref: m.ref, sound });
       }
-      if (m.state === 'go' && !this._cued.has(m.ref)) {
-        this._cued.add(m.ref);
+      if (m.state === 'go' && !e.cued) {
+        e.cued = true;
         events.push({ type: 'go', kind: m.kind, ref: m.ref, sound: true });
       }
     }
@@ -255,16 +274,58 @@ export class TelegraphTracker {
 
   /**
    * The latest planned arrival for a hazard (crash report: the ideal-hop window of the hazard that killed).
-   * @param {Object} ref hazard. @returns {number|null} run time (ms), or null if it was never planned with a run time.
+   * @param {Object|string} ref hazard. @returns {number|null} run time (ms), or null if it was never planned with a run time.
    */
   lastArrivalMs(ref) {
-    const v = this._arrival.get(ref);
-    return v == null ? null : v;
+    const e = this._h.get(TelegraphTracker.idOf(ref));
+    return e && e.arrival !== null ? e.arrival : null;
   }
 
-  /** @param {Object} ref hazard. @returns {number|null} run time (ms) it was first announced, or null. */
+  /** @param {Object|string} ref hazard. @returns {number|null} run time (ms) it was first announced, or null. */
   firstWarnMs(ref) {
-    const v = this._warned.get(ref);
-    return v == null ? null : v;
+    const e = this._h.get(TelegraphTracker.idOf(ref));
+    return e && e.warned !== null ? e.warned : null;
+  }
+
+  /** Forget a dropped chunk's hazards (ids `${chunkIndex}:*`), so the state stays bounded like the old WeakMaps were. */
+  forgetChunk(chunkIndex) {
+    const prefix = `${chunkIndex}:`;
+    for (const id of [...this._h.keys()]) if (id.startsWith(prefix)) this._h.delete(id);
+  }
+
+  /** @returns {{v:number, lastWarnSoundMs:number, hazards:Array<[string, number|null, boolean, number|null]>}} plain JSON data, id-sorted. */
+  snapshot() {
+    const hazards = [...this._h].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      .map(([id, e]) => [id, e.warned, e.cued, e.arrival]);
+    return { v: TRACKER_SNAPSHOT_VERSION, lastWarnSoundMs: this._lastWarnSoundMs, hazards };
+  }
+
+  /**
+   * Replace state only after validating the complete snapshot. Rejected/corrupt
+   * data must not leave a partially restored game (or silently erase warnings).
+   * @param {ReturnType<TelegraphTracker['snapshot']>} snap
+   */
+  restore(snap) {
+    if (!snap || snap.v !== TRACKER_SNAPSHOT_VERSION || !Array.isArray(snap.hazards) ||
+        !Number.isFinite(snap.lastWarnSoundMs)) {
+      throw new Error('TelegraphTracker.restore: unsupported or invalid snapshot');
+    }
+    const next = new Map();
+    for (const record of snap.hazards) {
+      if (!Array.isArray(record) || record.length !== 4) {
+        throw new Error('TelegraphTracker.restore: invalid hazard snapshot entry');
+      }
+      const [id, warned, cued, arrival] = record;
+      if (typeof id !== 'string' || !id ||
+          (warned !== null && !Number.isFinite(warned)) ||
+          typeof cued !== 'boolean' ||
+          (arrival !== null && !Number.isFinite(arrival))) {
+        throw new Error('TelegraphTracker.restore: invalid hazard snapshot entry');
+      }
+      if (next.has(id)) throw new Error('TelegraphTracker.restore: duplicate hazard id');
+      next.set(id, { warned, cued, arrival });
+    }
+    this._h = next;
+    this._lastWarnSoundMs = snap.lastWarnSoundMs;
   }
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.11 — saveable stable-id hazard warnings (#119 / #224) (2026-11-22)
+
+- **Stable per-spawn hazard identity:** Each live hazard receives a deterministic `chunk:spawn-ordinal` ID on its single production creation path. Hazard warning/cue/arrival bookkeeping now keys on the ID instead of WeakMap/WeakSet object identity, and exposes JSON-safe `snapshot()`/`restore()`. Rebuilt hazard objects recover warning timestamps without replaying announcements. A hazard without a stable ID fails explicitly rather than creating an untracked, silently unsaveable state. Restoring malformed, duplicate-ID or non-finite warning records rejects atomically without corrupting previously live tracker state.
+- **Canonical collider integration:** The diagnostic save/restore harness now supports the pool-free terrain representation released in v2.19.7. It reports a zero-length pool when the pool is absent and **rejects** legacy nonempty pool snapshots instead of fabricating old collision bodies. These are experimental tools, not a production save format or cross-release migration. The harness now also permits selecting a single exact browser case with `EXACT_ONLY=hazard:full`, avoiding unnecessary ablations.
+- **Verification scope:** The existing deterministic physics and replay ruleset remains **SIM_REVISION 4**; no intentional change to authoritative physics, scoring, tape encoding or play controls. The developer browser restore experiment on the combined canonical-collider and stable-ID source reproduced the hazard fixture exactly for 520 post-save ticks (480→1000) in Chromium. This proves one exact restore fixture, not complete or secure production savestates. #119 remains open.
+
 ## v2.19.10 — measure actual World Dance visibility (#212 / #225) (2026-11-22)
 
 - **Developer regression diagnostic:** Added a source-bound measurement suite tracing synthetic instrument energy through `AudioSynth.getWorldDanceSample()`, unverified meter timing, `WorldDanceEnvelope`, `sunDanceGeometry()` and real `motifDecor()` displacement. It measures steady-state and transient behavior using uniform frame cadence, tests invalid/silent meter rejection and distinguishes observed pixels from theoretical maxima.
