@@ -86,7 +86,7 @@ describe('ruleset assembly', () => {
       const decisions = [...Object.values(s.exports), ...Object.values(s.statics || {}).flatMap((m) => Object.values(m))];
       for (const d of decisions) for (const at of d.exclude === undefined ? [].concat(d.at) : []) expect([at, get(at)]).not.toEqual([at, undefined]);
     }
-    expect(built.doc.versions).toMatchObject({ ghostPhysics: 1, runRandom: 1, kodiak: 2, draftRules: 2, tickHz: 120, inputProtocol: INPUT_PROTOCOL, ghostTapeFormat: { id: 'bb-ghost-tape', version: 1 } });
+    expect(built.doc.versions).toMatchObject({ ghostPhysics: 1, runRandom: 1, kodiak: 3, draftRules: 2, tickHz: 120, inputProtocol: INPUT_PROTOCOL, ghostTapeFormat: { id: 'bb-ghost-tape', version: 1 } });
     expect(built.doc.tables.draft).toEqual({ budget: 1200, rulesVersion: 2 });
   });
 

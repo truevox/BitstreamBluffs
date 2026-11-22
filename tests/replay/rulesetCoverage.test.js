@@ -163,14 +163,14 @@ describe('tripwire attestation categories', () => {
   });
   test('behavior-change-unreleased: valid only while SIM_REVISION is above the last released revision', () => {
     const msg = 'behavior-change-unreleased: -0 tilt normalized (sign of zero only)';
-    expect(LAST_RELEASED_SIM_REVISION).toBe(0); // no ruleset has been released on main yet
-    expect(SIM_REVISION).toBeGreaterThan(LAST_RELEASED_SIM_REVISION);
+    expect(LAST_RELEASED_SIM_REVISION).toBe(3); // #47 revision 2, then #140 revision 3 are released
+    expect(SIM_REVISION).toBe(LAST_RELEASED_SIM_REVISION);
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 0 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 2, prevSimRevision: 1, lastReleased: 1 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 1 })).toMatch(/only valid while/);
-    expect(writeTripwire(mk(SIM_REVISION), msg, ['a.js']).wrote).toBe(true);
+    expect(() => writeTripwire(mk(SIM_REVISION), msg, ['a.js'])).toThrow(/only valid while/);
   });
-  test('the repository state accepts the unreleased category today', () => {
-    expect(attestationProblem('behavior-change-unreleased: reason text here', { prevSimRevision: SIM_REVISION })).toBeNull();
+  test('released revision does not accept behavior-change-unreleased', () => {
+    expect(attestationProblem('behavior-change-unreleased: reason text here', { prevSimRevision: SIM_REVISION })).toMatch(/only valid while/);
   });
 });
