@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.5 — developer reaction-seed sensitivity comparison (#218 / #126) (2026-11-22)
+
+- **Compare matched synthetic hop-noise runs across reaction seeds.** The local CLI accepts two to eight complete classic panels with the same settings and per-course ideal control evidence. It reports pass counts and the courses that flip, with source file hashes and a caller-asserted build pin. It does not expose raw trials, select a Daily, estimate human fairness, or change game behavior.
+
+- **Integration:** developer-only comparison tool was validated on current v2.19.4 release (SIM_REVISION 3); original Morgan implementation unchanged. No gameplay, published Daily selection, human-skill model or replay verifier modified.
+
 ## v2.19.4 — cross-engine replay conformance matrix (#161 / #120) (2026-11-22)
 
 - **Developer-only conformance harness and evidence; no game, replay-format or gameplay changes.** `tools/conformance/cross-engine*.mjs` replays nine committed fixture tapes through the real built game on Chromium, Firefox and Playwright WebKit at 30/60/120/144 Hz stepping, compares diagnostic (non-authoritative) per-tick digests split into causal state and derived reads, reports the first divergent tick and subsystem, TapePlayer checkpoint desyncs and final outcomes, and isolates `Math.*` differences with a pure-JS counterfactual (evidence for #121). Results and reproduction are in `docs/determinism/cross-engine-matrix.md`. Playwright WebKit is not iPhone Safari; real Safari/iOS, ARM and hardware GPUs were not tested.
