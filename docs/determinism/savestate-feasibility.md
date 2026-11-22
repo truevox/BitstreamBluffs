@@ -40,7 +40,7 @@ All of this was found and closed in the experiment. None of it is cheap or stabl
 contract (section 11). This study named three items that should land before any savestate counts as "trusted":
 
 1. ~~#155 removes the camera read from the tick.~~ **Done**: fixed on main in v2.16.1 (#208 / #155).
-2. ~~The terrain collider pool stops changing collider bits.~~ **Done**: v2.19.6 / SIM_REVISION 4 (#119, PR #222).
+2. ~~The terrain collider pool stops changing collider bits.~~ **Done**: v2.19.7 / SIM_REVISION 4 (#119, PR #222).
 3. Telegraph state stops being keyed by object identity. **Remaining.**
 
 The experiments in this study ran before items 1 and 2 landed. Their numbers describe the old physics.
@@ -372,7 +372,7 @@ restore log, field classification). Render with `node tools/savestate-experiment
 2. **Matter private state is load-bearing**: the stale support slot, `positionImpulse` and `deltaTime`. A
    Matter upgrade can add state that a field-list serializer would silently miss; the audit catches that.
 3. **The TerrainMesh collider pool made static geometry history-dependent** at the ULP level. **Resolved in
-   v2.19.6 / SIM_REVISION 4:** colliders are now always built fresh and the pool is removed.
+   v2.19.7 / SIM_REVISION 4:** colliders are now always built fresh and the pool is removed.
    - Before the fix, any scheme that rebuilds terrain had to carry raw collider bits or replay the pool history.
      That includes savestate, seek, rewind, and a server verifier rebuilding from chunk data.
    - The fix makes colliders a pure function of chunk data.
@@ -506,7 +506,7 @@ BbSavestateCacheV1 {   // working name; deliberately unlike any #152 manifest/fi
 not feasibility. The prerequisites for the production format:
 
 1. ~~**#155** removes the `_view` read from the tick.~~ **Done** in v2.16.1 (#208).
-2. ~~A **canonical terrain collider construction** lands as a physics-identity event.~~ **Done** in v2.19.6
+2. ~~A **canonical terrain collider construction** lands as a physics-identity event.~~ **Done** in v2.19.7
    (SIM_REVISION 4, PR #222).
 3. **TelegraphTracker** is re-keyed by stable hazard ids. **This is the remaining prerequisite.**
 
@@ -562,7 +562,7 @@ These cut the snapshot's R\* and "R today" rows and make the contract stable.
 
 | Decision | Status |
 | --- | --- |
-| Canonical terrain collider construction as a physics-identity-breaking change | **Decided YES** (owner, 2026-11-22: "pre-release, fewer than 3 players; now is the time for all breaking changes"). **Implemented in PR #222** (v2.19.6, SIM_REVISION 4; #140 had already shipped revision 3). All 7 golden canaries pass exactly, so none needs re-baselining. |
+| Canonical terrain collider construction as a physics-identity-breaking change | **Decided YES** (owner, 2026-11-22: "pre-release, fewer than 3 players; now is the time for all breaking changes"). **Implemented in PR #222** (v2.19.7, SIM_REVISION 4; #140 had already shipped revision 3). All 7 golden canaries pass exactly, so none needs re-baselining. |
 | Savestate purpose | **Decided** (owner, 2026-11-22): see "Phase 2 product contract" above |
 | #155 (removing the camera read from the tick) | **Fixed on main** in v2.16.1 (#208 / #155) |
 

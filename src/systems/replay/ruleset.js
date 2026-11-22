@@ -50,7 +50,7 @@ import * as terrainContactNs from '../TerrainContact.js';
 //    This exact shipped ruleset is archived as sha256:b57634769e7337327e81c011cc0837e5b3422b1665a276ed3ae70dbe01048877.
 // 3: #140, release v2.19.1: biome-sector entry redraws graphics without rebuilding
 //    live colliders, changing authoritative outcomes on biome-mask crossings.
-// 4: #119, release v2.19.6 (owner-approved 2026-11-22): terrain colliders are always built fresh from the chunk's
+// 4: #119, release v2.19.7 (owner-approved 2026-11-22): terrain colliders are always built fresh from the chunk's
 //    points; the recycled body pool (whose vertex bits depended on the body's previous position) is removed, so tick
 //    outcomes change wherever a recycled collider was touched. #121 (portable math) also claims 4: whichever merges
 //    second takes the next revision.
