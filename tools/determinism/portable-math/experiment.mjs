@@ -109,7 +109,7 @@ if (cmd === 'record') {
       console.log(f.id, JSON.stringify({ ticks: rec.outcome.ticks, crashed: rec.outcome.crashed, cause: rec.outcome.cause, m: rec.outcome.distanceM, score: rec.outcome.score, desync: rep.tapeCheck.desync }));
     }
   } finally { await browser.close(); }
-  await writeFile(path.join(FIXTURES_DIR, only.length ? `record-meta-${Date.now()}.json` : 'record-meta.json'), JSON.stringify({ build: 'portable-math (SIM_REVISION 4)', fixtures: meta }, null, 1));
+  await writeFile(path.join(FIXTURES_DIR, only.length ? `record-meta-${Date.now()}.json` : 'record-meta.json'), JSON.stringify({ build: 'portable-math (SIM_REVISION 5)', fixtures: meta }, null, 1));
 }
 if (cmd === 'run') {
   const cfgs = process.argv.slice(3);
