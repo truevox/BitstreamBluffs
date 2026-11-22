@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.19.7 — canonical terrain colliders, SIM_REVISION 4 (#119 / #222) (2026-11-22), SIM_REVISION 4 (#119) (2026-11-22)
+
+- **Terrain colliders no longer depend on what was streamed before them.** `TerrainMesh` used to recycle collider bodies from a pool, reshaping them with `Body.setVertices` + `Body.setPosition`. That left vertex bits that depended on the body's *previous* position. Now every segment collider is built fresh from the chunk's points, and the pool is removed.
+- **Physics identity:** this is an owner-approved break. `SIM_REVISION` moves 3 → 4, with an archived ruleset `sha256:89e2cdab…`. Tick outcomes change only where a recycled collider was touched. In a 2149-tick run, the sled ends 1.4e-5 px away, with the same crash tick and the same score. No visible terrain change: graphics are drawn from chunk points, not colliders.
+- **Memory:** removed colliders are now garbage-collected instead of held forever. After teleporting to x=107000, 6454 pooled bodies → 0, collider geometry 845 KB → 41 KB, and JS heap 70.4 → 56.1 MB.
+- **Canaries:** all 7 golden canaries PASS exactly against the new build, so none needs re-baselining.
+- **Coordination:** #121 (portable math, PR #209) must integrate after this release with SIM_REVISION 5+; never reuse this shipped revision 4 identity.
+
+- **Release integration:** Morgan’s separate developer-only stock neutral panel shipped first as v2.19.6. Its unchanged tooling and release notes are preserved here; the collider geometry/source ruleset remains identical to the reviewed #222 head.
+
 ## v2.19.6 — developer stock hands-off panel (#220 / #77) (2026-11-22)
 
 - **Find reproducible 500 m hands-off candidates within a fixed local panel.** The tool checks 12 built-in courses in the pinned v2.18.1 Chromium preview. A candidate must reach the distance on a completed tick and then reproduce its natural finish, native checkpoints and cadence fingerprints in a fresh replay without saving. Short finishes and capped runs are reported separately. The tool does not verify newer builds or change gameplay, Daily selection, scores, or sharing.
