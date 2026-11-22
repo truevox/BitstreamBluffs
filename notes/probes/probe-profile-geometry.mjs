@@ -21,7 +21,7 @@ function overlaps(a, b) {
   return { ix, iy, hit: ix > 1 && iy > 1 };
 }
 
-const BIOMES = ['debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'];
+const BIOMES = ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'];
 const BIOME_ORDER = [
   ...BIOMES, 'space-mountain', 'candy-cane-canyon', 'sky-jellyfish-mountain',
   'steampunk-slopes', 'micro-mountain', 'vertigo-vents',

@@ -220,16 +220,16 @@ function rideAndCrash(seed, mask, furthestX, crashX = furthestX) {
 }
 
 describe('decision 3: RunScene reports the biomes a run actually entered', () => {
-  const seed = seedFor('debumont', 1);
+  const seed = seedFor('debutmont', 1);
 
   test('a run that crashes inside the biome sector reports it encountered, not completed', () => {
     const { payload } = rideAndCrash(seed, 1, 2 * SECTOR_PX + 200);
-    expect(payload.biomeVisits).toEqual({ encountered: ['debumont'], completed: [] });
+    expect(payload.biomeVisits).toEqual({ encountered: ['debutmont'], completed: [] });
   });
 
   test('a run that rides the sector to its end and crashes beyond reports it completed', () => {
     const { payload } = rideAndCrash(seed, 1, 3 * SECTOR_PX + 200);
-    expect(payload.biomeVisits).toEqual({ encountered: ['debumont'], completed: ['debumont'] });
+    expect(payload.biomeVisits).toEqual({ encountered: ['debutmont'], completed: ['debutmont'] });
   });
 
   test('a run that stops before sector 2 reports nothing (control)', () => {
@@ -258,7 +258,7 @@ describe('decision 3: RunScene reports the biomes a run actually entered', () =>
     store.load();
     const svc = new ProgressionService(game, { levels: LEVELS, store });
     svc.onRunEnd(payload);
-    expect(store.profile.biomeProgress).toEqual({ encountered: ['debumont'], completed: ['debumont'] });
-    expect(reg.get(REG.PROFILE).biomeProgress.encountered).toEqual(['debumont']);
+    expect(store.profile.biomeProgress).toEqual({ encountered: ['debutmont'], completed: ['debutmont'] });
+    expect(reg.get(REG.PROFILE).biomeProgress.encountered).toEqual(['debutmont']);
   });
 });

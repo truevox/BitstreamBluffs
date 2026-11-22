@@ -389,13 +389,13 @@
       "target": 100
     },
     {
-      "id": "t4-biome-debumont",
+      "id": "t4-biome-debutmont",
       "type": "singleRun",
       "tier": 4,
-      "title": "1500 m in Debumont",
+      "title": "1500 m in Debutmont",
       "metric": "distanceM",
       "target": 1500,
-      "biome": "debumont"
+      "biome": "debutmont"
     },
     {
       "id": "t4-biome-glacier",

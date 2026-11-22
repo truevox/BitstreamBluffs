@@ -30,7 +30,7 @@
       "level": 4,
       "xpMin": 3750,
       "title": "Frame Pusher",
-      "biome": "debumont",
+      "biome": "debutmont",
       "cosmetic": null,
       "boost": null
     },
@@ -244,7 +244,7 @@
     }
   ],
   "biomeOrder": [
-    "debumont",
+    "debutmont",
     "garbage-dump-glacier",
     "pyramid-peak",
     "underwater-mountain",

@@ -18,7 +18,7 @@ const { TitleScene } = await import('../../src/scenes/TitleScene.js');
 const { REG, SCENES } = await import('../../src/constants.js');
 
 const DEFS = {
-  debumont: { id: 'debumont', bit: 1 },
+  debutmont: { id: 'debutmont', bit: 1 },
   glacier: { id: 'glacier', bit: 2 },
   pyramid: { id: 'pyramid', bit: 4 },
 };
@@ -42,7 +42,7 @@ function scene(o = {}) {
 /** A profile at cap with every batch-1 bit enabled, i.e. the state CC Friday tested. */
 const capped = (over = {}) => ({
   v: 1, biomeMask: 7, level: 30,
-  pendingBiomes: ['debumont', 'glacier', 'pyramid'],
+  pendingBiomes: ['debutmont', 'glacier', 'pyramid'],
   unlocked: { biomes: [], cosmetics: [], boosts: {} },
   ...over,
 });
@@ -70,9 +70,9 @@ describe('START RUN / bare seed use the profile mask', () => {
   });
 
   test('a bit for a biome the profile has NOT unlocked is stripped', () => {
-    // The profile says 1|2|4 but only Debumont is unlocked (level 4). Honouring the glacier/pyramid
+    // The profile says 1|2|4 but only Debutmont is unlocked (level 4). Honouring the glacier/pyramid
     // bits would hand a low-level player terrain they never earned — the same rule toggleBiome enforces.
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7, pendingBiomes: ['debumont'] }) });
+    const { ctx, values } = scene({ profile: capped({ biomeMask: 7, pendingBiomes: ['debutmont'] }) });
     TitleScene.prototype.startRun.call(ctx, 'alpha');
     expect(values.get(REG.BIOME_MASK)).toBe(1);
   });

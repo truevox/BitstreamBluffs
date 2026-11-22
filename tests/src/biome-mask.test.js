@@ -180,20 +180,20 @@ describe('seed@mask entry (W3)', () => {
 
 describe('profile biome toggles (W3)', () => {
   const DEFS = [
-    { id: 'debumont', bit: 1, name: 'Debumont', unlockLevel: 4 },
+    { id: 'debutmont', bit: 1, name: 'Debutmont', unlockLevel: 4 },
     { id: 'pyramid-peak', bit: 4, name: 'Pyramid Peak', unlockLevel: 10 },
   ];
   const prof = (over = {}) => ({
     v: 1, xp: 0, level: 1, bank: 0, biomeMask: 0,
-    pendingBiomes: ['debumont'],
+    pendingBiomes: ['debutmont'],
     unlocked: { biomes: [], cosmetics: [], boosts: {} },
     ...over,
   });
 
   test('toggles an unlocked biome on and off', () => {
-    const a = toggleBiome(prof(), 'debumont', DEFS);
+    const a = toggleBiome(prof(), 'debutmont', DEFS);
     expect(a.biomeMask).toBe(1);
-    expect(toggleBiome(a, 'debumont', DEFS).biomeMask).toBe(0);
+    expect(toggleBiome(a, 'debutmont', DEFS).biomeMask).toBe(0);
   });
 
   test('refuses a biome the player has not unlocked', () => {
@@ -206,7 +206,7 @@ describe('profile biome toggles (W3)', () => {
   test('is pure and never mutates the profile it was given', () => {
     const p = prof();
     const before = JSON.stringify(p);
-    toggleBiome(p, 'debumont', DEFS);
+    toggleBiome(p, 'debutmont', DEFS);
     expect(JSON.stringify(p)).toBe(before);
   });
 
@@ -218,22 +218,22 @@ describe('profile biome toggles (W3)', () => {
   });
 
   test('toggling one biome leaves the others alone', () => {
-    // Start with ONLY Debumont enabled (mask 1).
-    const p = prof({ biomeMask: 1, pendingBiomes: ['debumont', 'pyramid-peak'],
+    // Start with ONLY Debutmont enabled (mask 1).
+    const p = prof({ biomeMask: 1, pendingBiomes: ['debutmont', 'pyramid-peak'],
       unlocked: { biomes: [], cosmetics: [], boosts: {} } });
-    // Enabling Pyramid Peak adds bit 4 and leaves Debumont's bit alone.
+    // Enabling Pyramid Peak adds bit 4 and leaves Debutmont's bit alone.
     expect(toggleBiome(p, 'pyramid-peak', DEFS).biomeMask).toBe(5);
     // Disabling the only enabled biome clears the mask; it must NOT resurrect some other biome's bit.
-    expect(toggleBiome(p, 'debumont', DEFS).biomeMask).toBe(0);
+    expect(toggleBiome(p, 'debutmont', DEFS).biomeMask).toBe(0);
   });
 
   test('rows list every biome in unlock order with its state', () => {
     const rows = biomeToggleRows(
-      prof({ biomeMask: 1, pendingBiomes: ['debumont', 'pyramid-peak'],
+      prof({ biomeMask: 1, pendingBiomes: ['debutmont', 'pyramid-peak'],
       unlocked: { biomes: [], cosmetics: [], boosts: {} } }),
       DEFS.slice().reverse(), // input order must not leak into display order
     );
-    expect(rows.map((r) => r.id)).toEqual(['debumont', 'pyramid-peak']);
+    expect(rows.map((r) => r.id)).toEqual(['debutmont', 'pyramid-peak']);
     expect(rows[0]).toMatchObject({ unlocked: true, enabled: true });
     expect(rows[1]).toMatchObject({ unlocked: true, enabled: false });
   });

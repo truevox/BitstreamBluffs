@@ -287,7 +287,7 @@ describe('the Title BEST line shows clean runs only', () => {
 
 describe('DAILY RUN takes its seed and its mask from the same UTC day', () => {
   test('DAILY RUN sets the date seed and the date mask (override), not the profile mask', () => {
-    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, { ...BOOSTED_PROFILE, biomeMask: 1, pendingBiomes: ['debumont'] }]]);
+    const values = new Map([[REG.CONTENT, CONTENT], [REG.PROFILE, { ...BOOSTED_PROFILE, biomeMask: 1, pendingBiomes: ['debutmont'] }]]);
     pressTitle(values, 'DAILY RUN');
     expect(values.get(REG.SEED)).toBe(TODAY_SEED);
     expect(DailyPatch.biomeMaskForDate()).toBe(8);

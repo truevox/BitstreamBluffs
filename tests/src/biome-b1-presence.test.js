@@ -16,7 +16,7 @@ import {
 
 const c = loadContent();
 const ROWS = [
-  [1, 'debumont', 'groomerCat'],
+  [1, 'debutmont', 'groomerCat'],
   [2, 'garbage-dump-glacier', 'seagullDive'],
   [8, 'underwater-mountain', 'seaweedTangle'],
   [64, 'candy-cane-canyon', 'chocolateRiver'],
@@ -54,7 +54,7 @@ const ROB = Array.from({ length: 32 }, (_, k) => `rob${k + 1}`);
 describe('B1 presence: the biome hazard is felt in early terrain (chunks 0-44, single biome bit)', () => {
   // Target (lead): 35-55 % of eligible chunks on 8 seeds, and >= 1 per 2 km of biome terrain on every seed. The 8-seed
   // sample is small (17-28 eligible chunks), so the band is also asserted on 32 independent seeds.
-  test.each([[1, 'debumont', 'groomerCat'], [8, 'underwater-mountain', 'seaweedTangle']])(
+  test.each([[1, 'debutmont', 'groomerCat'], [8, 'underwater-mountain', 'seaweedTangle']])(
     'mask %p (%s): %s meets the full target (band on 8 and 32 seeds, 1 per 2 km on every seed)', (mask, biome, id) => {
       const a = presence(mask, biome, id, SEEDS);
       expect(a.elig).toBeGreaterThanOrEqual(15);

@@ -38,14 +38,14 @@ GAME_URL=http://100.115.120.66:8205/ REPORT_OUT=/home/hermes/experiments/bsod-he
 npm test -- --runInBand --silent tests/src/bsod-music-corruption.test.js tests/src/audio-bsod-wind-contract.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js tests/src/music-fx.test.js
 ```
 
-Sound contracts are unchanged: authoritative physical BSOD proximity corrupts **original guitar/piano/Other only**; relative airflow drives wind independently; bass/drums/melody/vocals/SFX are not run through this processor. Menus restore the clean Debumont arrangement while preserving the current song clock. The existing GBrain design [[projects/truevox-bitstreambluffs/audio-stem-graph/reactive-accompaniment]] remains the owner-approved intent; the exact calibrated DSP values and measurement thresholds are engineering proposals.
+Sound contracts are unchanged: authoritative physical BSOD proximity corrupts **original guitar/piano/Other only**; relative airflow drives wind independently; bass/drums/melody/vocals/SFX are not run through this processor. Menus restore the clean Debutmont arrangement while preserving the current song clock. The existing GBrain design [[projects/truevox-bitstreambluffs/audio-stem-graph/reactive-accompaniment]] remains the owner-approved intent; the exact calibrated DSP values and measurement thresholds are engineering proposals.
 
 
 ## Supplementary *live combined music mix* sampling
 
 A second, independent Chromium regression, `tools/music/audit-bsod-mixed-program-headroom.mjs`, attaches **non-audible analyser taps** to the actual game's `musicBus` and **post-master-compressor** nodes while the real `StemMusicDirector` plays all four released songs. It does **not** rebuild the audio in a stand-in mixer; the same game source/stems, tempo, effects and one shared playback clock are active. It never alters persistent settings, song assets, user profile, game code or the original playback graph; analyser outputs connect only to zero-gain sinks and are disconnected afterward.
 
-Conditions for this **limited sampled check**, selected for potential worst-case music gain: `masterVolume=1`, `musicVolume=1`, `sfxVolume=0`, wind disabled, vocals disabled, Dynamic Orchestra disabled, run-mode Crystal Cavern melody, sled speed 850 px/s and authoritative BSOD danger 0 versus 0.97 with silent relative wind. For each song, the test seeks to source time 14 seconds, waits for the WebAudio smoothing/streaming graph to settle, then samples 48 blocks of 2,048 output samples at approximately 25 ms intervals. It checks **both clean and high-danger** master peaks and confirms a real nonzero audio signal. It also checks Debumont menu music after a run-end transition without restarting the track.
+Conditions for this **limited sampled check**, selected for potential worst-case music gain: `masterVolume=1`, `musicVolume=1`, `sfxVolume=0`, wind disabled, vocals disabled, Dynamic Orchestra disabled, run-mode Crystal Cavern melody, sled speed 850 px/s and authoritative BSOD danger 0 versus 0.97 with silent relative wind. For each song, the test seeks to source time 14 seconds, waits for the WebAudio smoothing/streaming graph to settle, then samples 48 blocks of 2,048 output samples at approximately 25 ms intervals. It checks **both clean and high-danger** master peaks and confirms a real nonzero audio signal. It also checks Debutmont menu music after a run-end transition without restarting the track.
 
 **Observed sampled peaks (final post-compressor output, near-danger):**
 
@@ -55,7 +55,7 @@ Conditions for this **limited sampled check**, selected for potential worst-case
 | Runs Out of Code | −19.85 dBFS |
 | Varmont | −11.57 dBFS |
 | Pope | −15.68 dBFS |
-| Debumont menu after run-end | −9.16 dBFS |
+| Debutmont menu after run-end | −9.16 dBFS |
 
 **PASS:** None of those sampled clean/danger/menu output peaks approached 0 dBFS clipping. The measurement includes the live combined music stems, normal game gain structure and main compressor. This is a *short-window sample of four songs*, not a full-length sample-perfect proof of unclipped music under all volume/voice/SFX/wind combinations or a human listening test. The non-sampled portions and full program with environmental SFX enabled remain unverified.
 
@@ -81,7 +81,7 @@ Physical BSOD events are *injected with the agreed event payload for
 audio QA*; the tool does **not** simulate pursuit or prove gameplay
 dynamics. SFX, wind, replacement orchestra and vocals are disabled;
 music and master sliders are at 100%, with run-mode Crystal Cavern
-melody, sled speed 850 px/s, and a separate Debumont menu reading.
+melody, sled speed 850 px/s, and a separate Debutmont menu reading.
 
 **Result:** All 4 songs × 5 positions × 3 threat states = **60 sampled
 measurements (20 distinct source positions)** completed with nonzero
@@ -92,7 +92,7 @@ audio and no detected output clipping or browser asset errors.
 | Safe danger=0 | **−7.94 dBFS** |
 | Intermediate danger=0.50 | **−6.93 dBFS** |
 | Near wall danger=0.97 | **−8.44 dBFS** |
-| Additional Debumont menu sample | **−7.97 dBFS** |
+| Additional Debutmont menu sample | **−7.97 dBFS** |
 
 The clean vs danger values are measured **sequentially**, rather than
 sample-aligned buffers. Musical passage variation can affect their RMS
@@ -112,7 +112,7 @@ The tool refuses overwrite of existing evidence files.
 
 A separate, intentionally limited **sound-design-only** page exists
 at `tools/music/bsod-threat-audition.html`. It loads source Ogg guitar,
-piano, Other, bass, drums and a selectable Debumont or Crystal Cavern
+piano, Other, bass, drums and a selectable Debutmont or Crystal Cavern
 melody directly from the shipped 4-song packs, and imports the **exact
 checked-in** `BsodThreatProcessor.js`. A and B buttons set danger
 to 0 versus 97%; the slider allows continuous interpolation, with
@@ -139,7 +139,7 @@ The Chromium UI regression
 `tools/music/smoke-bsod-threat-audition.mjs` passed: initial
 One More Run selection, all six original source stems decoding and
 playing, live A/B and slider interactions, late song passage,
-Debumont choice, another song selection, stop, and no HTTP/page errors.
+Debutmont choice, another song selection, stop, and no HTTP/page errors.
 
 ### Repeatable checks
 

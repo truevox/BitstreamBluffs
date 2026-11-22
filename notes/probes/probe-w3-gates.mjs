@@ -27,7 +27,7 @@ const check = (name, fn) => {
 // The shipped unlock levels. Crystal Cavern is L16 and Underwater Mountain L13, NOT 12 — getting this
 // wrong is what made my round-1 note claim a level-12 pilot could enable all five bits.
 const DEFS = [
-  { id: 'debumont', bit: 1, unlockLevel: 1 },
+  { id: 'debutmont', bit: 1, unlockLevel: 1 },
   { id: 'garbage-dump-glacier', bit: 2, unlockLevel: 4 },
   { id: 'pyramid-peak', bit: 4, unlockLevel: 7 },
   { id: 'underwater-mountain', bit: 8, unlockLevel: 13 },
@@ -133,7 +133,7 @@ line('\n== Gate: toggles reflect earned bits, and a stale mask cannot smuggle on
 check('biomeToggleRows: only earned biomes are toggleable', () => {
   const rows = biomeToggleRows(prof(7), DEFS);
   const on = rows.filter((r) => r.unlocked).map((r) => r.id);
-  assert.deepEqual(on, ['debumont', 'garbage-dump-glacier', 'pyramid-peak'], `unlocked ${on.join(', ')}`);
+  assert.deepEqual(on, ['debutmont', 'garbage-dump-glacier', 'pyramid-peak'], `unlocked ${on.join(', ')}`);
   return `${on.length}/5 toggleable at L7`;
 });
 check('sanitizeProfile keeps biomeMask', () => {

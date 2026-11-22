@@ -151,7 +151,7 @@ function comboRequirement(t) {
  */
 export function satisfies(t, ctx) {
   if (!t || typeof t !== 'object') return false;
-  // A biome mission ("1500 m in Debumont") is met only on a run that had that biome switched on. The mask
+  // A biome mission ("1500 m in Debutmont") is met only on a run that had that biome switched on. The mask
   // is the run's (record.biomeMask, or the live counters' copy mid-run); the bit is resolved exactly as the
   // draw gate resolves it, so a mission can never be offered under one rule and completed under another.
   if (t.biome) {

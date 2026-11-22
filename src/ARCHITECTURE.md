@@ -209,7 +209,7 @@ only gameplay emitter.
 | Event | Emitter | Listeners |
 |---|---|---|
 | `RUN_START` | RunScene | AudioSynth (switch music to biome-aware run DSP without restarting the current song), UIScene (reset HUD), GlitchPipeline |
-| `RUN_END` | RunScene | AudioSynth (neutral menu audio and Debumont lead; current song continues), UIScene |
+| `RUN_END` | RunScene | AudioSynth (neutral menu audio and Debutmont lead; current song continues), UIScene |
 | `RUN_ABORT` | PauseScene | AudioSynth (return to menu music without restarting) |
 | `CRASH`, `RESPAWN`, `LANDING`, `TRICK`, `HAZARD_HIT`, `POWERUP_COLLECTED`, `POWERUP_EXPIRED`, `EFFECT_END` | RunScene | AudioSynth (SFX), UIScene (popups/indicators) |
 | `COMBO_CHANGED`, `SCORE_CHANGED`, `DISTANCE_CHANGED` | RunScene (from ScoreManager results) | UIScene |
@@ -309,7 +309,7 @@ All additive; no existing signature or payload changed.
 * **AudioSynth** additive methods: `setSpeed(pxPerSec)` (music speed/intensity only; RunScene calls it every frame; BSOD event exclusively drives environmental wind),
   `setIntensity(0..1)`, and `startMenuMusic()` (called once by Title, requests immediate One More Run, browser user gesture permitting).
   The same playback clock runs through Title, gameplay, death, pause and menus; only mix/melody/biome DSP changes.
-  Menu uses unprocessed original accompaniment with Debumont melody and no speed/jump/BSOD DSP.
+  Menu uses unprocessed original accompaniment with Debutmont melody and no speed/jump/BSOD DSP.
   Settings `musicShuffle` persists through SaveStore; ON shuffles following enabled songs in non-repeating rounds,
   not the fresh-load One More Run opener. All songs OFF remains music silence.
   Music intensity also follows `DISTANCE_CHANGED` during runs only.
@@ -717,7 +717,7 @@ Biome rewards are playable from W3 for the batch-1 biomes (see the W3 addendum b
 ## Addendum: biomes (W3, terrain + meta; additive)
 
 Five batch-1 biomes, each a sector of ordinary terrain with one signature mechanic:
-Debumont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal Cavern.
+Debutmont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal Cavern.
 
 **Selection is pure and cheap.** `biomeForSector(seed, sector, mask, defs)` answers from
 `(seed, sector, mask)` alone - never from how much terrain has been generated or in what order -
@@ -989,13 +989,13 @@ Closing restores the footer text and depth. With the shop closed nothing changed
 
 ## Addendum: biome full treatment, B1 "Wards" (content + slot rule; additive)
 
-B1 ships the first biome content: one hazard and one power-up for each of Debumont, Garbage Dump Glacier, Underwater
+B1 ships the first biome content: one hazard and one power-up for each of Debutmont, Garbage Dump Glacier, Underwater
 Mountain and Candy Cane Canyon (spec §4). Mask 0 is byte-identical (golden `shape` / `full` / `complete` unchanged): every
 def below carries a `biome` field, so the B0 constructor filter keeps it out of the base lists.
 
 | Biome (bit) | Hazard (file) | Hazard effect | Power-up (file) | Power-up effect |
 |---|---|---|---|---|
-| Debumont (1) | `groomerCat` (`groomer-cat.json`), ground 24x20, shape `groomer`, amber | `slow` 0.7 x 900 ms | `mapleWax` (`maple-wax.json`), shape `maple` | `speedBoost` 1.2 x 2 s |
+| Debutmont (1) | `groomerCat` (`groomer-cat.json`), ground 24x20, shape `groomer`, amber | `slow` 0.7 x 900 ms | `mapleWax` (`maple-wax.json`), shape `maple` | `speedBoost` 1.2 x 2 s |
 | Garbage Dump Glacier (2) | `seagullDive` (`seagull-dive.json`), air 40x24 in jump arcs, shape `seagull`, `danger`, >= 1000 m | `crash` | `slickWaxSpray` (`slick-wax-spray.json`), shape `waxSpray` | `ward` mods `['stickyPatch']` 4 s + `speedFactor` 1.1 |
 | Underwater Mountain (8) | `seaweedTangle` (`seaweed-tangle.json`), ground 22x30, shape `seaweed`, lime | `slow` 0.6 x 1.2 s | `aquaLungBubble` (`aqua-lung-bubble.json`), shape `bubble` | `ward` mods `['slowMotion']` 4 s |
 | Candy Cane Canyon (64) | `chocolateRiver` (`chocolate-river.json`), ground strip 24x8, shape `chocoRiver`, amber | `slow` 0.5 x 1.5 s | `sweetToothCoating` (`sweet-tooth-coating.json`), shape `candyCoat` | `ward` effects `['slow']` 5 s (wards off the Chocolate River) |

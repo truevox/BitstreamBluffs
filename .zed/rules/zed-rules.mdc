@@ -6,7 +6,7 @@ Optimise for readability first, performance second; supply full files; annotate 
 - Commits follow **Gitmoji-style**, e.g.:
 
   ```
-  ✨ Feature: Add cryptid scanner to Debumont
+  ✨ Feature: Add cryptid scanner to Debutmont
   ```
 
   With body:

@@ -32,7 +32,7 @@ describe('B2 content: loader and schema', () => {
     expect(byBiome(biomePu)).toEqual(Object.fromEntries(Object.entries(B2).map(([b, r]) => [b, [r.powerup]])));
     // B3 adds Pyramid Peak, Steampunk Slopes and Micro Mountain defs; the B1 + B2 biomes still hold exactly 6 + 6 (the
     // 9 + 9 total is pinned in biome-b3-content.test.js)
-    const B1B2 = new Set([...Object.keys(B2), 'debumont', 'garbage-dump-glacier', 'underwater-mountain', 'candy-cane-canyon']);
+    const B1B2 = new Set([...Object.keys(B2), 'debutmont', 'garbage-dump-glacier', 'underwater-mountain', 'candy-cane-canyon']);
     expect(biomeHaz.filter((d) => B1B2.has(d.biome)).length).toBe(6);
     expect(biomePu.filter((d) => B1B2.has(d.biome)).length).toBe(6);
     for (const r of Object.values(B2)) {

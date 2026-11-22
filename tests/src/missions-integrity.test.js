@@ -116,14 +116,14 @@ describe('MS-1: published cumulative progress is what is banked', () => {
 });
 
 describe('MS-2: a biome mission completes only on a run with that biome switched on', () => {
-  const t = MISSIONS.templates.find((x) => x.id === 't4-biome-debumont');
-  const deb = BIOME_DEFS.find((d) => d.id === 'debumont');
-  const other = BIOME_DEFS.find((d) => d.id !== 'debumont');
+  const t = MISSIONS.templates.find((x) => x.id === 't4-biome-debutmont');
+  const deb = BIOME_DEFS.find((d) => d.id === 'debutmont');
+  const other = BIOME_DEFS.find((d) => d.id !== 'debutmont');
   const prof = () => v1({ xp: MAX_XP, biomeMask: deb.bit, missions: { counter: 1, active: [t.id], progress: {} } });
   const roll = (mask, defs = BIOME_DEFS) => rollSet(prof(), [t], rec({ distanceM: 1600, ...(mask === undefined ? {} : { biomeMask: mask }) }), MISSIONS.templates, { biomeDefs: defs })
     .completed.map((c) => c.id);
 
-  test('"1500 m in Debumont" is not completed by a run with no biome on', () => {
+  test('"1500 m in Debutmont" is not completed by a run with no biome on', () => {
     expect(roll(0)).toEqual([]);
     expect(roll(undefined)).toEqual([]);
   });
@@ -132,7 +132,7 @@ describe('MS-2: a biome mission completes only on a run with that biome switched
     expect(roll(other.bit)).toEqual([]);
   });
 
-  test('a 1600 m run with the Debumont bit on completes it', () => {
+  test('a 1600 m run with the Debutmont bit on completes it', () => {
     expect(roll(deb.bit)).toEqual([t.id]);
     expect(roll(deb.bit | other.bit)).toEqual([t.id]);
   });

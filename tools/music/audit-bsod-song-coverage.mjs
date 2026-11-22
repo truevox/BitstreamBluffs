@@ -1,6 +1,6 @@
 /** Repeatable, sparse whole-song *coverage* audit on real game WebAudio graph.
  * Samples five distinct segments of each of four songs at 0/.5/.97 danger,
- * plus a Debumont-menu passage. No new music engine, source changes, or saves.
+ * plus a Debutmont-menu passage. No new music engine, source changes, or saves.
  * Do not mistake selected-window sampling for full-duration peak verification.
  */
 import assert from 'node:assert/strict';
@@ -190,7 +190,7 @@ try{
 		return {id:d.track.id,clock:d.clockStart,voice:d._activeVoiceFor(d.pack)};
 	});
 	assert.equal(beforeMenu.id,afterMenu.id);
-	assert.equal(afterMenu.voice,'voice:debumont');
+	assert.equal(afterMenu.voice,'voice:debutmont');
 	assert.ok(menuState.master.peak>0);
 	// Seek explicitly updates clock anchors. Menu transition alone must not;
 	// this audit tests that separately through the shipping scene smoke.
@@ -225,7 +225,7 @@ try{
 	console.log('SAMPLED_EXTREMES',JSON.stringify(extremes));
 	console.log('SAMPLED_NEAR_MINUS_CLEAN_RMS_DB',
 		JSON.stringify(report.deltaRmsDb));
-	console.log('MENU_DEBUMONT_HEADROOM_PASS',
+	console.log('MENU_DEBUTMONT_HEADROOM_PASS',
 		menuState.master.peakDbfs.toFixed(2));
 	console.log('EVIDENCE',dest,'OBJECT_SHA256',digest);
 }finally{await browser.close();}

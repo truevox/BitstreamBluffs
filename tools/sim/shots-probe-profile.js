@@ -108,7 +108,7 @@
       runs: 42, distanceM: 98500, playMs: 4.2 * 3600 * 1000, score: 512000, tricks: { backflip: 120, spin360: 64 },
       shards: 310, nearMisses: 88, bestScore: 48210, bestDistanceM: 7310, bestCombo: 3.5, maxAirtimeMs: 4120,
     };
-    p.pendingBiomes = ['debumont', 'garbage-dump-glacier'];
+    p.pendingBiomes = ['debutmont', 'garbage-dump-glacier'];
     game.registry.set('profile', p);
     return p;
   }

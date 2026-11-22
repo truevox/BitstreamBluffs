@@ -21,7 +21,7 @@ const { GameOverScene } = await import('../../src/scenes/GameOverScene.js');
 const { REG, SCENES } = await import('../../src/constants.js');
 
 const DEFS = {
-  debumont: { id: 'debumont', bit: 1 },
+  debutmont: { id: 'debutmont', bit: 1 },
   glacier: { id: 'glacier', bit: 2 },
   pyramid: { id: 'pyramid', bit: 4 },
 };
@@ -29,7 +29,7 @@ const DEFS = {
 /** A capped profile with every batch-1 signature enabled. */
 const capped = (over = {}) => ({
   v: 1, biomeMask: 7, level: 30,
-  pendingBiomes: ['debumont', 'glacier', 'pyramid'],
+  pendingBiomes: ['debutmont', 'glacier', 'pyramid'],
   unlocked: { biomes: [], cosmetics: [], boosts: {} },
   ...over,
 });
@@ -102,7 +102,7 @@ describe('NEW SEED drops the previous run mask', () => {
   });
 
   test('NEW SEED strips bits for biomes the profile has not unlocked', () => {
-    const { ctx, values } = scene({ mask: 8, profile: capped({ biomeMask: 7, pendingBiomes: ['debumont'] }) });
+    const { ctx, values } = scene({ mask: 8, profile: capped({ biomeMask: 7, pendingBiomes: ['debutmont'] }) });
     GameOverScene.prototype.newSeed.call(ctx);
     expect(values.get(REG.BIOME_MASK)).toBe(1);
   });

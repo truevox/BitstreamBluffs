@@ -8,7 +8,7 @@ import { AdaptiveBiomeRouter } from '../../src/systems/music/AdaptiveBiomeRouter
 const home='voice:bitstream-bluffs';
 function fakeDirector() {
 	const d=Object.create(StemMusicDirector.prototype);
-	d.biome='debumont';
+	d.biome='debutmont';
 	d.gains=new Map(['bass','drums','guitar','piano','other',home].map(s=>[s,{}]));
 	d.pack={sourceNames:['vocals','drums','bass','guitar','piano','other',home]};
 	d.dynamicOrchestra=false;
@@ -39,9 +39,9 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 		const d=fakeDirector();
 		d._applyMusicTimbres();
 		const map=new Map(d.mixer.replaceEffects.mock.calls.map(x=>[x[0],x[1]]));
-		expect(map.get(home)).toEqual(melodyPreset('debumont'));
+		expect(map.get(home)).toEqual(melodyPreset('debutmont'));
 		for(const stem of ['bass','drums','guitar','piano','other']){
-			expect(map.get(stem)).toEqual(orchestraPreset('debumont',stem));
+			expect(map.get(stem)).toEqual(orchestraPreset('debutmont',stem));
 			expect(map.get(stem).length).toBeGreaterThan(0);
 			// NULL resets each input's standard biome space send. OFF must
 			// never force zero or bypass its source effects.
@@ -99,19 +99,19 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 	test('future physical note-replacements remain gated OFF, ON enables them',()=>{
 		const r=Object.create(AdaptiveBiomeRouter.prototype);
 		r.pack={adaptive:{featuredStem:'other',variants:{
-			featured:{debumont:['first.ogg']},bass:{},drums:{debumont:['drums.ogg']}}}};
-		r.biome='debumont';
+			featured:{debutmont:['first.ogg']},bass:{},drums:{debutmont:['drums.ogg']}}}};
+		r.biome='debutmont';
 		r.airborne=true;
 		r.enabled=false;
 		expect(r._variant('featured')).toBeNull();
 		expect(r._variant('drums')).toBeNull();
 		r.enabled=true;
-		expect(r._variant('featured')).toBe('debumont');
-		expect(r._variant('drums')).toBe('debumont');
+		expect(r._variant('featured')).toBe('debutmont');
+		expect(r._variant('drums')).toBe('debutmont');
 	});
 	test('source stem presets cannot address vocals or unknown busses',()=>{
-		expect(()=>orchestraPreset('debumont','vocals')).toThrow();
-		expect(orchestraPreset('debumont','bass').length).toBeGreaterThan(0);
+		expect(()=>orchestraPreset('debutmont','vocals')).toThrow();
+		expect(orchestraPreset('debutmont','bass').length).toBeGreaterThan(0);
 		expect(orchestraPreset('no-such-biome','guitar')).toEqual([]);
 	});
 });

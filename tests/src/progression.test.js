@@ -197,7 +197,7 @@ describe('rewardsForLevel', () => {
   test('returns title plus the biome/cosmetic/boost that level grants', () => {
     const l4 = rewardsForLevel(4, TABLE);
     expect(l4.title).toBe('Frame Pusher');
-    expect(l4.biome).toBe('debumont');
+    expect(l4.biome).toBe('debutmont');
     const l1 = rewardsForLevel(1, TABLE);
     expect(l1.biome).toBe(null);
   });

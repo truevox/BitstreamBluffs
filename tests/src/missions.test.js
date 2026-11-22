@@ -372,7 +372,7 @@ describe('D7 — the fill guarantee cannot leak a high tier', () => {
 
 describe('biome gating', () => {
   test('a biome-tied mission only appears when that biome is unlocked and enabled', () => {
-    const biome = 'debumont';
+    const biome = 'debutmont';
     // Locked: never offered, across many counters.
     for (let c = 0; c < 40; c++) {
       const p = prof({ missions: { counter: c }, unlocked: { biomes: [], cosmetics: [], boosts: {} }, biomeMask: 0 });
