@@ -43,13 +43,17 @@ footer{font-size:.86rem;color:#acb8ce;line-height:1.5}
 <label for="speed">Ground speed: <span id="speed-value">700 px/s</span></label>
 <p class="hint">Ground-contact rattle: <strong id="contact-value">55%</strong> (airborne: 0%)</p>
 <input id="speed" type="range" min="0" max="1400" step="20" value="700">
+<label for="splock">Splock weight: <output id="splock-value">120%</output></label>
+<input id="splock" type="range" min="60" max="160" step="5" value="120">
+<p class="hint">This adjusts only the chunky landing strike and falling scrap, not the original drum recording or continuous rattle.</p>
 <div class="row">
 <button id="takeoff" disabled>🏂 Take off</button>
 <button id="soft" disabled>🛬 Soft landing</button>
 <button id="hard" disabled>💥 Hard landing</button>
+<button id="splock-hit" disabled>🔊 Test splock</button>
 </div>
 <p id="status" role="status" aria-live="polite">Load the sample, then press Play.</p>
-<p class="hint">For an unmistakable comparison: press <strong>Solo drums</strong>, slide speed to maximum, then toggle <strong>Compare dry</strong>. With the original mix playing, press Take off then Hard landing for a separate physical clang. Music playback never restarts.</p>
+<p class="hint">For an unmistakable comparison: press <strong>Solo drums</strong>, try <strong>Test splock</strong>, and adjust the Splock weight. Turn off Solo drums to check how it sits in the full mix. Use <strong>Compare dry</strong> for the untouched recording. Music playback never restarts.</p>
 </section>
 <p><strong>What you're hearing:</strong> 20 seconds of the original separated drum, bass, guitar, piano and Other recordings from <em>Pope Leo Wants the AI Root Password</em>. Only the drum stem receives Scrapheap DSP. Vocal MIDI-derived leads already exist in the game, but are deliberately left out of this effect-isolation test.</p>
 <footer>This is a draft sound-design experiment stacked on the Snowpack PR, not a finalized production mix. It uses the same native Web Audio Scrapheap processor as the game integration. <a href="https://deploy-preview-194--bitstream-bluffs.netlify.app/tools/music/snowpack-audition.html">Listen to Debumont Snowpack too.</a> All original masters remain untouched.</footer>

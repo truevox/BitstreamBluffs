@@ -31,6 +31,10 @@ try {
 	assert.equal(await page.$eval('#hard', e=>e.disabled),false);
 	await page.click('#hard');
 	assert.match(await page.$eval('#status', e=>e.textContent),/Hard landing/);
+	await page.$eval('#splock', e=> { e.value='155'; e.dispatchEvent(new Event('input',{bubbles:true})); });
+	assert.equal(await page.$eval('#splock-value',e=>e.textContent),'155%');
+	await page.click('#splock-hit');
+	assert.match(await page.$eval('#status', e=>e.textContent),/SPLORP/);
 	await page.click('#bypass');
 	assert.equal(await page.$eval('#bypass',e=>e.getAttribute('aria-pressed')),'true');
 	await page.click('#bypass');

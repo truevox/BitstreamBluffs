@@ -162,6 +162,9 @@ function allocateEffect(ctx, raw) {
 			}
 			wet.connect(output);
 			let contact = clamp(raw.contact, 0, 1, 0);
+			// Owner-approved extra weight on the physical impact only; contact-bed
+			// loudness and the original drum recording remain unchanged.
+			let splock = clamp(raw.splock, 0, 1.6, 1.2);
 			let burstEnd = -Infinity;
 			// Stationary and airborne have genuinely zero metallic contact;
 			// a fast ground run makes the inharmonic layer audible but bounded.
@@ -180,13 +183,32 @@ function allocateEffect(ctx, raw) {
 			for (let i = 0; i < strikeLength; i++) {
 				const t = i / ctx.sampleRate;
 				seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-				const noise = (seed / 2147483648 - 1) * Math.exp(-t * 52);
+				const white = seed / 2147483648 - 1;
+				const noise = white * Math.exp(-t * 52);
 				const metal = .42 * Math.sin(2 * Math.PI * 379 * t) * Math.exp(-t * 12)
 					+ .34 * Math.sin(2 * Math.PI * 743 * t) * Math.exp(-t * 18)
 					+ .21 * Math.sin(2 * Math.PI * 1327 * t) * Math.exp(-t * 25)
 					+ .12 * Math.sin(2 * Math.PI * 1919 * t) * Math.exp(-t * 30);
-				const thunk = .20 * Math.sin(2 * Math.PI * 119 * t) * Math.exp(-t * 38);
-				samples[i] = Math.tanh((noise * .50 + metal + thunk) * .85);
+				// Thick, slightly descending hollow knock: the 'splock' under
+				// the metal. Small delayed clacks suggest loose scrap scattering.
+				const thunk = .35 * Math.sin(2 * Math.PI * (148 * t - 95 * t * t)) * Math.exp(-t * 31);
+				const hollow = .30 * Math.sin(2 * Math.PI * (235 * t - 160 * t * t)) * Math.exp(-t * 24);
+				// A sticky suction that gathers before it breaks free: fast upward
+				// formant-like pitch glide, a rounded lip-pop, then small wet bits.
+				// This is synthetic impact texture, NOT music or an extra song stem.
+				const sip = Math.sin(2 * Math.PI * (94 * t + 520 * t * t - 350 * t * t * t));
+				const sipEnvelope = Math.max(0, Math.min(1, t / .014)) * Math.exp(-t * 18);
+				const suction = .33 * sip * sipEnvelope;
+				const lip = .28 * Math.sin(2 * Math.PI * 173 * Math.max(0,t-.060))
+					* (t >= .060 ? Math.exp(-(t-.060)*61) : 0);
+				let debris = 0;
+				for (const lag of [.042, .097, .151]) {
+					if (t < lag) continue;
+					const since = t - lag;
+					debris += (.19 * white + .13 * Math.sin(2 * Math.PI * 870 * since))
+						* Math.exp(-since * 105) * (1 - lag * 2.5);
+				}
+				samples[i] = Math.tanh((noise * .50 + metal * .85 + thunk + hollow + suction + lip + debris) * .85);
 			}
 			const activeStrikes = new Set();
 			const strikeOnce = (strength, at) => {
@@ -198,7 +220,7 @@ function allocateEffect(ctx, raw) {
 				const source = ctx.createBufferSource();
 				const gain = ctx.createGain();
 				source.buffer = strike;
-				gain.gain.value = .25 + strength * .80;
+				gain.gain.value = (.25 + strength * .80) * splock;
 				source.connect(gain); gain.connect(output);
 				const entry = {
 					source,
@@ -219,6 +241,10 @@ function allocateEffect(ctx, raw) {
 				}
 			});
 
+			refs.splock = { set: value => {
+				splock = clamp(value, 0, 1.6, 1.2);
+				return true;
+			} };
 			refs.contact = { set: (value, at) => {
 				contact = clamp(value, 0, 1, 0);
 				// Takeoff silences contact immediately and cancels impact tails.

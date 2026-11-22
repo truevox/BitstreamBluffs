@@ -32,3 +32,11 @@ Real Chromium 4-second offline render using all five *original* recorded instrum
 - Dry full-mix peak: 0.1731, processed full-mix with landing peak: 0.2557 (sampled peaks, not true-peak analysis).
 - During the 1.2–1.6s impact window, the metal strike with **no drum audio or any other stem connected** had RMS 0.03250 and sampled peak 0.2538.
 - No page errors or non-finite samples in tested excerpt. This demonstrates a real source-independent landing sound and a substantially larger signal change; it does **not** establish a human-audibility guarantee on every speaker, full-song true-peak compliance, or mobile CPU/headroom certification. Human listening still gates release.
+
+## Owner listening feedback — sticky puddle “splock” (2026-11-22)
+
+Marvin confirmed that the corrected effect is audible and that he **loves** it, but requested a little more “splock” and described the texture as **lifting a foot out of a wet, sticky garbage puddle**. Treat this as sound-direction feedback, **not** as approval of any specific technical implementation. The proposed response is to emphasize the rubbery suction-release sound and hollow pop, not merely boost metallic harshness.
+
+Added a new physical-impact **Splock** coefficient (default 120%, adjustable 60–160% in the audition) to the source-independent deterministic impact, without increasing the always-on ground-rattle bed or changing source playback. The 420 ms precomputed hit now includes a short rising suction chirp, a delayed rubbery lip-pop and a few scattered clacks over the prior inharmonic knock. Added a repeatable **Test splock** trigger independent of waiting for a gameplay landing; the audition keeps normal hard/soft landing controls. Any final setting depends on Marvin listening to the updated build.
+
+**Chromium measured headroom, 4 sec actual five-stem mix:** three hard physical hits at 0.7/1.7/2.7 seconds, using the same input and normal demo master gain: 60% Splock peak 0.2184 / impact-window RMS 0.0243; 120% peak 0.3259 / RMS 0.0467; 160% peak 0.4130 / RMS 0.0619. No non-finite samples, all tested sampled peaks under 1.0. **This is a short excerpt only, not a full-game loudness/true-peak/mobile/perceptual acceptance report.** No original audio masters or derived biome melodies changed.

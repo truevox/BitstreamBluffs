@@ -10,6 +10,11 @@ let playing = false, airborne = false, bypassed = false, drumOnly = false;
 const say = message => { $('status').textContent = message; };
 const effect = () => chain?.find('scrapheap');
 const speed = () => Number($('speed').value);
+const splock = () => Number($('splock').value)/100;
+const setSplock = () => {
+	$('splock-value').textContent = Math.round(splock()*100)+'%';
+	if (ctx) effect()?.set('splock', splock(), ctx.currentTime);
+};
 const setContact = () => {
 	const value = contactFromMotion(speed(),!airborne);
 	$('contact-value').textContent = Math.round(value*100)+'%';
@@ -17,11 +22,12 @@ const setContact = () => {
 };
 const controlState = () => {
 	$('play').disabled = !buffers;
-	$('bypass').disabled = !buffers;
-	$('solo').disabled = !buffers;
-	$('takeoff').disabled = !buffers || airborne;
-	$('soft').disabled = !buffers || !airborne;
-	$('hard').disabled = !buffers || !airborne;
+	$('bypass').disabled = !playing;
+	$('solo').disabled = !playing;
+	$('takeoff').disabled = !playing || airborne;
+	$('soft').disabled = !playing || !airborne;
+	$('hard').disabled = !playing || !airborne;
+	$('splock-hit').disabled = !playing || bypassed;
 	$('play').textContent = playing ? '■ Stop' : '▶ Play';
 	$('bypass').textContent = bypassed ? 'Hear processed' : 'Compare dry';
 	$('bypass').setAttribute('aria-pressed',String(bypassed));
@@ -88,6 +94,7 @@ async function play() {
 	chain = buildMusicChain(ctx,orchestraPreset('garbage-dump-glacier','drums'),processedGain);
 	airborne = false;
 	setContact();
+	setSplock();
 	const when=ctx.currentTime+.10;
 	for (const role of STEMS) {
 		const source=ctx.createBufferSource();
@@ -112,6 +119,7 @@ async function play() {
 }
 $('load').addEventListener('click', loadSample);
 $('play').addEventListener('click', play);
+$('splock').addEventListener('input', setSplock);
 $('speed').addEventListener('input', () => {
 	$('speed-value').textContent = speed()+' px/s';
 	setContact();
@@ -148,11 +156,16 @@ function land(strength) {
 	setContact();
 	effect()?.set('impact',strength,ctx.currentTime);
 	controlState();
-	say(strength>.6 ? 'Hard landing: drum-driven metal rattle surges, then dies away.' :
-		'Soft landing: a brief, quieter metal-rattle response.');
+	say(strength>.6 ? 'Hard landing: thick sticky glorp—PLOCK with little scrap clatters.' :
+		'Soft landing: brief rubbery squelch and restrained plock.');
 }
 $('soft').addEventListener('click',()=>land(.3));
 $('hard').addEventListener('click',()=>land(.9));
+$('splock-hit').addEventListener('click', () => {
+	if (!playing || bypassed || !ctx) return;
+	effect()?.set('impact', .9, ctx.currentTime);
+	say('SPLORP—PLOCK! Adjustable sticky impact, with the same song continuing.');
+});
 window.addEventListener('pagehide',()=>{
 	stop();
 	ctx?.close();
