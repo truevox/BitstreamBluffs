@@ -272,7 +272,10 @@ describe('World Dance diagnostic: producer, unverified meter, envelope and pixel
     });
   });
 
-  test('transient onset peaks above settled and then decays toward it', () => {
+  // Name this for what it proves: a bounded decay from the onset peak. It does NOT prove
+  // convergence to `settled`, because this sequence sustains a different level (0.52/0.25)
+  // than settledLevel() (0.30/0.30), so the post-decay plateau is a different equilibrium.
+  test('transient onset peaks above settled then decays monotonically from the peak', () => {
     const transient = cadence(20, i => (
       i === 0 ? { bass: 0.1, mid: 0.08 } : { bass: 0.52, mid: 0.25 }
     ));
@@ -282,8 +285,8 @@ describe('World Dance diagnostic: producer, unverified meter, envelope and pixel
 
     expect(onsetPeak).toBeGreaterThan(settled);
 
-    // At least three post-onset frames must decay monotonically toward the
-    // settled level rather than staying pinned at the peak.
+    // At least three post-onset frames must decay monotonically, and the peak must fall
+    // appreciably rather than staying pinned. This is a decay bound, not a convergence test.
     const afterOnset = strengths.slice(1);
     expect(afterOnset.length).toBeGreaterThanOrEqual(4);
     for (let i = 1; i < 4; i++) {
