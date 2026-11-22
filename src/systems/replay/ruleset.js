@@ -50,7 +50,11 @@ import * as terrainContactNs from '../TerrainContact.js';
 //    This exact shipped ruleset is archived as sha256:b57634769e7337327e81c011cc0837e5b3422b1665a276ed3ae70dbe01048877.
 // 3: #140, release v2.19.1: biome-sector entry redraws graphics without rebuilding
 //    live colliders, changing authoritative outcomes on biome-mask crossings.
-export const SIM_REVISION = 3;
+// 4: #119, release v2.19.7 (owner-approved 2026-11-22): terrain colliders are always built fresh from the chunk's
+//    points; the recycled body pool (whose vertex bits depended on the body's previous position) is removed, so tick
+//    outcomes change wherever a recycled collider was touched. #121 (portable math) also claims 4: whichever merges
+//    second takes the next revision.
+export const SIM_REVISION = 4;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above
@@ -58,7 +62,7 @@ export const SIM_REVISION = 3;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-export const LAST_RELEASED_SIM_REVISION = 3;
+export const LAST_RELEASED_SIM_REVISION = 4;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;

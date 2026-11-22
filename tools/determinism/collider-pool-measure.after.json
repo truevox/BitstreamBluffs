@@ -1,0 +1,50 @@
+{
+ "label": "after-canonical",
+ "long": {
+  "ticks": 2149,
+  "crashed": true,
+  "msPerTickMedian": 16.456,
+  "msPerTickBlocks": [
+   12.401,
+   20.493,
+   17.061,
+   16.456,
+   8.196
+  ],
+  "matterIdsConsumed": 604,
+  "bodiesCreatedByMesh": 742,
+  "pooledBodies": 0,
+  "worldBodies": 293,
+  "chunks": 3,
+  "colliderGeometryJsonBytes": 35516,
+  "heapMB": 37.2,
+  "sledEnd": {
+   "x": 10283.709456535838,
+   "y": 3961.3118659755874,
+   "angle": 0.2227470469917318
+  },
+  "score": 651
+ },
+ "jump": {
+  "ticks": 1000,
+  "crashed": false,
+  "msPerTickMedian": 17.342,
+  "msPerTickBlocks": [
+   17.342,
+   11.667
+  ],
+  "matterIdsConsumed": 7161,
+  "bodiesCreatedByMesh": 7190,
+  "pooledBodies": 0,
+  "worldBodies": 324,
+  "chunks": 2,
+  "colliderGeometryJsonBytes": 41110,
+  "heapMB": 56.1,
+  "sledEnd": {
+   "x": 112863.43447739232,
+   "y": 40432.5654232186,
+   "angle": 0.40466366495087175
+  },
+  "score": 12240
+ }
+}
