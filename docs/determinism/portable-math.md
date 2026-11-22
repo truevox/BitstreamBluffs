@@ -37,13 +37,13 @@ Side effect that matters: because stdlib is bit-identical to V8 for 8 functions 
 |---|---|---|---|---|---|
 | this PR, run 1 (`native`) | **24 / 24** | 24 / 24 | 0 | 0 | 0 |
 | this PR, run 2 (`native-rep2`, new contexts) | **24 / 24** | 24 / 24 | 0 | 0 | 0 |
-| main `97ba4f5c` (native Math), same 24 tapes | 6 / 24 (Firefox diverges in 12, WebKit in 15) | 24 / 24 | n/a (tapes are from this build) | see json | 10.8 px (chunk-biome, WebKit); others below 1e-3 px |
+| main `b5b969dc` (native Math), same 24 tapes | 6 / 24 (Firefox diverges in 12, WebKit in 15) | 24 / 24 | 30 of 72 cells (the tapes were recorded on the portable build, so native-math checkpoints drift) | 42 of 48 Firefox/WebKit cells | 10.8 px (chunk-biome, WebKit); others below 1e-3 px |
 
 So before the fix 18 of 24 runs differ somewhere in causal state on at least one engine (mostly last-bit noise that never changes the outcome on these tapes; the one recorded real outcome fork in Phase A was Firefox `chunk-biome-boundaries`), and after it none do, over 466,000 engine-ticks. Claims stay corpus-level: no real Safari/iOS, no ARM, one Chromium major, 120 Hz stepping only. `tools/determinism/portable-math/fixtures/` holds the tapes, `docs/determinism/results/portable-math-results.json` the per-fixture rows.
 
 ## B4. Cost in real runs (before / after, same fixtures, interleaved fresh contexts, 5 reps each)
 
-Median `RunScene.simTick` ms per 120 Hz tick, main `97ba4f5c` vs this PR (`docs/determinism/results/portable-math-perf-*.json`):
+Median `RunScene.simTick` ms per 120 Hz tick, main `b5b969dc` vs this PR (`docs/determinism/results/portable-math-perf-*.json`):
 
 | Engine | cruise-baseline | airborne-tricks | broad-allbiomes (7,123 ticks) |
 |---|---|---|---|
@@ -55,7 +55,7 @@ Chromium is flat (differences inside run-to-run range), WebKit about +0.01 to +0
 
 ## B5. Tests
 
-Full `npm test`: 224 suites pass, 7 fail (9 tests: `env-detection`, `memory-usage`, `terrain-interaction`, `multi-chunk-terrain`, `input-playback`, `combo-scoring`, `start-scene`), the same 7 that fail on main. New suites: `tests/determinism/pmath.test.js` (ulp bounds, special values, large arguments, golden hashes), `matter-portable.test.js`, `sim-math-boundary.test.js`.
+Full `npm test` (after merging main v2.19.5): 227 suites pass, 7 fail (9 tests: `env-detection`, `memory-usage`, `terrain-interaction`, `multi-chunk-terrain`, `input-playback`, `combo-scoring`, `start-scene`), the same 7 that fail on main. New suites: `tests/determinism/pmath.test.js` (ulp bounds, special values, large arguments, golden hashes), `matter-portable.test.js`, `sim-math-boundary.test.js`.
 
 ---
 
