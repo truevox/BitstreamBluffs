@@ -293,7 +293,7 @@ gameplay state within ticks: in `contact/game` the **score** digest diverges at 
 | hazard | game | - | 481 (+1) | 481 | 0 | sled, tricks, bsodState, bsodBluffs, kodiaks, _teleMarks, matter.bodies, matter.worldOrder, matter.pairs, matter.ids, matter.timing, camera(#155), pool |
 | hazard | kinematic | - | 481 (+1) | 481 | 0 | sled, tricks, bsodState, kodiaks, _teleMarks, matter.bodies, matter.worldOrder, matter.pairs, matter.ids, matter.timing, camera(#155), pool |
 | hazard | contacts | - | 481 (+1) | exact | exact | matter.worldOrder, matter.ids, camera(#155), pool |
-| hazard | full | - | **exact** (520 ticks) | exact | exact |  |
+| hazard | full | - | **exact** (520 ticks) | exact | exact | Rerun 2026-11-22: `Hazard.teleAtMs` differs from K+1 (TelegraphTracker not serialized); all else exact, 280 ticks (see below) |
 | hazard | full | camera | 481 (+1) | exact | exact | camera(#155) |
 | hazard | full | ids | 481 (+1) | exact | exact | matter.worldOrder, matter.ids, pool |
 | hazard | full | runRandom | 481 (+1) | exact | exact | runRandom |

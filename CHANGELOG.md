@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.18.2 — savestate feasibility study, Phase 1 research (#119 / #159) (2026-11-22)
+
+- **Research only: no savestates ship, and no gameplay, physics, replay format or `src/` change.** Adds `docs/determinism/savestate-feasibility.md`.
+  - It inventories the complete Matter and game state that a tick-boundary save/restore needs.
+  - It shows that restoring a GhostTape checkpoint diverges on the next tick.
+  - It shows that a full diagnostic snapshot, restored into a fresh scene and world in the built game, replays bit-identically. The fixtures are contact-heavy and hazard-heavy, and were compared over 500 and 520 ticks.
+  - It proposes a build-bound savestate contract with completeness checks, and gives a conditional GO for Phase 2.
+- **Experimental harnesses:**
+  - `tools/savestate-experiment/` (pure-Matter and Chromium experiments, with results).
+  - `tests/determinism/savestate-matter.test.js` (16 tests).
+  - Their digests are diagnostic and non-authoritative; Replay Contract #152 owns canonical fingerprints.
+
 ## v2.18.1 — developer Run DNA preview in local inspector (#213 / #87) (2026-11-22)
 
 - **Local, unverified Run DNA artwork preview.** The developer Downhill Run Strip inspector can now display abstract artwork from the full decoded trace loaded through the existing local file chooser. It clears stale previews on another selection or error; earlier asynchronous reads cannot replace a newer choice. The preview uses an SVG blob as an image, never injected markup. Section zoom and existing SVG download remain unchanged. No player-facing feature, replay, scoreboard, network, or gameplay changes.
