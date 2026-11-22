@@ -350,6 +350,15 @@ export class RunScene extends Phaser.Scene {
 
     // initial terrain buffer, then the sled on the surface
     this._chunkQueue = new Map(); // a retry re-enters create() on this instance: no stale queued chunks
+    // The scene instance outlives the run (scene.start re-enters create()). The biome announcement compares the sled's
+    // sector with the last one it saw, and a mask != 0 repaint rebuilds every collider, so a value left by the previous
+    // run changed the first tick of this one by session position (issue #120). Every run starts as run #1 does.
+    this._biomeSector = undefined;
+    this._lastBiome = undefined;
+    // Same reason: the previous run's last camera view (read by the ground telegraph on tick 1) and tutorial pulse latches.
+    this._view = null;
+    this._hopped = false;
+    this._pushed = false;
     this.streamTerrain(0);
     const start = this.safeStartPosition();
     // spawn a few body-lengths in so the rear runner is over solid ground (terrain begins exactly at start.x)
