@@ -17,7 +17,7 @@ const url = process.env.GAME_URL || 'http://localhost:8442/';
 const HZ = Number(process.env.HZ || 120);
 const CACHE = process.env.CACHE || path.join(here, '.cache');
 const PIN_DATE = '2026-11-21T12:00:00Z'; // replays depend on the calendar date (#120 finding), so the page clock is pinned
-const ALL_OPS = ['sin', 'cos', 'tan', 'atan', 'atan2', 'exp', 'log', 'log1p', 'pow', 'tanh', 'hypot'];
+const ALL_OPS = ['sin', 'cos', 'tan', 'atan', 'atan2', 'asin', 'acos', 'exp', 'log', 'log1p', 'pow', 'tanh', 'hypot'];
 export const CONFIGS = {
   native: { ops: [], mode: 'global' },
   all: { ops: ALL_OPS, mode: 'global' },
@@ -55,7 +55,7 @@ async function freshPage(browser, patch) {
   const page = await ctx.newPage();
   await page.addInitScript(`(() => { const R = Date, base = R.parse(${JSON.stringify(PIN_DATE)}), t0 = R.now(); const now = () => base + (R.now() - t0);
     function D(...a) { return a.length ? new R(...a) : new R(now()); } D.prototype = R.prototype; D.now = now; D.parse = R.parse; D.UTC = R.UTC; window.Date = D; })();`);
-  await page.addInitScript(`window.__cePatch = ${JSON.stringify(patch)};`);
+  await page.addInitScript(`window.__cePatch = ${JSON.stringify(patch)}; window.__ceNoProbe = ${process.env.NOPROBE === '1'};`);
   await page.addInitScript(pmJs);
   await page.addInitScript(pageJs);
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });

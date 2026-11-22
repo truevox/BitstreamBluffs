@@ -2,7 +2,7 @@
 
 Owner: Team B. Date: 2026-11-22. Base: b51bee72 (origin/main at start).
 
-Scope: tools/determinism/portable-math/** (experiment tooling, diagnostic), docs/determinism/portable-math.md,
+Scope: tools/determinism/portable-math/** (experiment tooling, diagnostic), tests/determinism/portable-math.test.js, docs/determinism/portable-math.md,
 docs/determinism/results/portable-math-*.json. No runtime/gameplay change in Phase A; no `src/` edit.
 
 Plan (Phase A only, then STOP for owner confirmation): (1) inventory transcendental Math calls on the sim path incl.

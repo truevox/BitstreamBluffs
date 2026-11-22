@@ -84,7 +84,7 @@
     for (const l of run.powerups.values()) pu += l.length;
     const al = run.terrain.activeList || [];
     const lastChunk = al.length ? al[al.length - 1] : null;
-    out[2] = hashNums([al.length, lastChunk ? lastChunk.endX : 0, lastChunk ? lastChunk.index : 0, hz, pu, run.terrain.heightAt(s.x), run.slopeAt(s.x)]);
+    out[2] = hashNums([al.length, lastChunk ? lastChunk.endX : 0, lastChunk ? lastChunk.index : 0, hz, pu, window.__ceNoProbe ? 0 : run.terrain.heightAt(s.x), window.__ceNoProbe ? 0 : run.slopeAt(s.x)]);
     const kd = [run.kodiakNext || 0, (run.kodiaks || []).length];
     for (const k of run.kodiaks || []) for (const v of Object.values(k)) if (typeof v === 'number' || typeof v === 'boolean') kd.push(v);
     out[3] = hashNums(kd);

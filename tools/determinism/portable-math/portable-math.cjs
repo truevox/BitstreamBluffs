@@ -29,7 +29,7 @@
     return a - (hz - (z * r - x * y));
   }
   // Returns quadrant n (mod 4) and sets RY0/RY1 (reduced argument as head + tail). |x| < 2^20*pi/2 uses the 3-part Cody-Waite
-  // reduction; larger arguments use a slower but still deterministic multi-pass reduction (less accurate, documented).
+  // reduction; larger arguments use a slower but still deterministic multi-pass reduction (degraded, see the huge-argument branch).
   let RY0 = 0, RY1 = 0;
   function reduce(x) {
     if (abs(x) <= 0.7853981633974483) { RY0 = x; RY1 = 0; return 0; }
@@ -40,7 +40,7 @@
       t = r; w = n * pio2_3; r = t - w; w = n * pio2_3t - ((t - r) - w); // pass 3
       const y0 = r - w;
       RY0 = y0; RY1 = (r - y0) - w;
-    } else { // huge: deterministic two-stage reduction (~1e-10 relative accuracy beyond 1.6e6 rad; unused by the game)
+    } else { // huge: deterministic but DEGRADED two-stage reduction, no true Payne-Hanek: measured relative error sin(1e7) 2.8e-9, sin(1e9) 2.4e-8, sin(1e15) ~1e-2, sin(1e22) returns 0. Identical in every engine; the game never gets near it (corpus max |body.angle| 3.4 rad; 1.6e6 rad is hours of continuous spin)
       const twopi = 2 * PI; let r = ax - floor(ax / twopi) * twopi;
       n = floor(r * invpio2 + 0.5); r = r - n * PIO2; RY0 = r; RY1 = 0;
     }
@@ -176,7 +176,10 @@
     let s = 0; for (let i = 0; i < arguments.length; i++) { const v = arguments[i] * sc; s += v * v; }
     return sqrt(s) * inv;
   }
-  const PM = { sin, cos, tan, atan, atan2, exp, expm1, log, log1p, pow, tanh, hypot };
+  // acos/asin via atan2 of exactly-computed sqrt factors (used by Matter's Vertices.chamfer at body construction). |x| > 1 -> NaN.
+  function acos(x) { if (x !== x || x > 1 || x < -1) return NaN; if (x === 1) return 0; if (x === -1) return PI; return 2 * atan2(sqrt(1 - x), sqrt(1 + x)); }
+  function asin(x) { if (x !== x || x > 1 || x < -1) return NaN; if (x === 1) return PIO2; if (x === -1) return -PIO2; return atan2(x, sqrt((1 - x) * (1 + x))); }
+  const PM = { sin, cos, tan, atan, atan2, asin, acos, exp, expm1, log, log1p, pow, tanh, hypot };
   root.__PM = PM;
   if (typeof module !== 'undefined' && module.exports) module.exports = PM;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

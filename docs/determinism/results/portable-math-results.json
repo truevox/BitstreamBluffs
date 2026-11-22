@@ -1157,9 +1157,9 @@
    "identicalAcrossEngines": 9,
    "fixturesCompared": 9,
    "simMsPerTick": {
-    "chromium": 0.6164,
-    "firefox": 0.7973,
-    "webkit": 0.5419
+    "chromium": 0.8297,
+    "firefox": 2.2147,
+    "webkit": 1.0665
    },
    "outcomeEqual": 9
   },
@@ -1448,9 +1448,9 @@
    "identicalAcrossEngines": 9,
    "fixturesCompared": 9,
    "simMsPerTick": {
-    "chromium": 0.5275,
-    "firefox": 0.473,
-    "webkit": 0.5003
+    "chromium": 0.8093,
+    "firefox": 0.7163,
+    "webkit": 0.7417
    },
    "outcomeEqual": 9
   },
@@ -1819,9 +1819,9 @@
    "identicalAcrossEngines": 9,
    "fixturesCompared": 9,
    "simMsPerTick": {
-    "chromium": 0.5787,
-    "firefox": 0.5239,
-    "webkit": 0.4659
+    "chromium": 0.4583,
+    "firefox": 0.3788,
+    "webkit": 0.5192
    },
    "outcomeEqual": 9
   },
@@ -2262,9 +2262,9 @@
    "identicalAcrossEngines": 0,
    "fixturesCompared": 9,
    "simMsPerTick": {
-    "chromium": 0.5392,
-    "firefox": 0.6115,
-    "webkit": 0.489
+    "chromium": 0.5433,
+    "firefox": 0.7851,
+    "webkit": 0.5127
    },
    "outcomeEqual": 9
   },
@@ -2564,9 +2564,9 @@
    "identicalAcrossEngines": 8,
    "fixturesCompared": 9,
    "simMsPerTick": {
-    "chromium": 0.3216,
-    "firefox": 0.4088,
-    "webkit": 0.3216
+    "chromium": 0.557,
+    "firefox": 0.5982,
+    "webkit": 0.5672
    },
    "outcomeEqual": 9
   },
