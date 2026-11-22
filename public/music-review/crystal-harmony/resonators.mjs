@@ -5,7 +5,7 @@ export const PITCH_CLASS_NAMES = Object.freeze(['C','C#','D','D#','E','F','F#','
 export const HARMONY_STATUS = 'SOURCE_TIME_HARMONY_DSP_RESEARCH_NOT_MUSICAL_TRANSCRIPTION';
 export const MASTER_SHA256 = '636bbd42f7ece1c085b4768f25fb0e65d7f29963a22a948e0b6e697ef0284721';
 export const SOURCE_MANIFEST_SHA256 = 'e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a';
-export const HARMONY_SHA256 = '5db2571eba7cb1121a87247e5154010ece3ace7ae3473cbc814e1fe244bc7b76';
+export const HARMONY_SHA256 = '4abe19d6b77645be13939b0406c7c4433be294cd0b7ce8be4eac1832bd714303';
 export const MAX_RESONATOR_Q = 16;
 
 export function validateHarmonyData(data, manifest, candidatePacket) {

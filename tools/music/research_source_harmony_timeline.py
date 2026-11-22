@@ -196,6 +196,21 @@ def analyze(pack:Path,prior:Path,harmonic:Path)->dict:
 			'Never promote these harmonic research estimates as gold source labels or mutate original OGGs/RELEASE_BEAT_GRIDS/gameplay automatically']}
 
 
+
+def source_harmony_json(result:dict)->str:
+	"""Stable reviewable JSON: metadata pretty, one complete source bin per line.
+
+	This reduces the 699-bin diff by ~20,000 lines without making a whole
+	song opaque in one huge line or changing any source analysis values.
+	"""
+	head={k:v for k,v in result.items() if k!='timeline'}
+	prefix=json.dumps(head,indent=2,ensure_ascii=False)
+	assert prefix.endswith('\n}')
+	frames=',\n'.join('    '+json.dumps(item,separators=(',',':'),ensure_ascii=False)
+		for item in result['timeline'])
+	return prefix[:-2]+',\n  "timeline": [\n'+frames+'\n  ]\n}\n'
+
+
 def main():
 	p=argparse.ArgumentParser()
 	p.add_argument('--source-pack',required=True,type=Path)
@@ -206,7 +221,7 @@ def main():
 	if a.out.exists():raise SystemExit('Refusing overwrite of original research evidence')
 	report=analyze(a.source_pack,a.prior_report,a.harmonic_report)
 	a.out.parent.mkdir(parents=True,exist_ok=True)
-	a.out.write_text(json.dumps(report,indent=2)+'\n')
+	a.out.write_text(source_harmony_json(report))
 	print('SHA256',hashlib.sha256(a.out.read_bytes()).hexdigest(),flush=True)
 	print('BINS',len(report['timeline']),'VALID',sum(r['status']=='UNVERIFIED_WEIGHTED_PITCH_CLASSES' for r in report['timeline']),flush=True)
 	print('TUNING',report['tuning'],flush=True)
