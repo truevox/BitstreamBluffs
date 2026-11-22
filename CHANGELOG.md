@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.19.8 — developer matched-build replay check (#129 / #226) (2026-11-22)
+
+- **Compare one matched normal-run fixture across the adjacent v2.19.6 and v2.19.7 builds.** Each build records and verifies only its own native tape. The local tool compares the same encoded neutral input and stock starting fields, then summarizes observed divergence and natural finish. No game, replay compatibility, ranking or scoring changes.
+
 ## v2.19.7 — canonical terrain colliders, SIM_REVISION 4 (#119 / #222) (2026-11-22), SIM_REVISION 4 (#119) (2026-11-22)
 
 - **Terrain colliders no longer depend on what was streamed before them.** `TerrainMesh` used to recycle collider bodies from a pool, reshaping them with `Body.setVertices` + `Body.setPosition`. That left vertex bits that depended on the body's *previous* position. Now every segment collider is built fresh from the chunk's points, and the pool is removed.
