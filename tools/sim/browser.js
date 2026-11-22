@@ -45,13 +45,14 @@
   let mods = null;
   async function loadMods() {
     if (mods) return mods;
-    const [ev, con, tun] = await Promise.all([
+    const [ev, con, tun, combo] = await Promise.all([
       import('/src/events.js'), import('/src/constants.js'), import('/src/systems/PhysicsTuner.js'),
+      import('/tools/sim/canopy-combo.js'),
     ]);
     const dyn = await import('/src/systems/DailyPatch.js');
     mods = {
       EVT: ev.EVT, REG: con.REG, PPM: con.PIXELS_PER_METER, TUNING: tun.TUNING, airIdleSpin: tun.airIdleSpin,
-      DAILY_RULES: dyn.DailyPatch.RULES,
+      DAILY_RULES: dyn.DailyPatch.RULES, canopyBrakeDescent: combo.canopyBrakeDescent,
     };
     return mods;
   }
@@ -79,7 +80,7 @@
   }
 
   function makePolicies(M) {
-    const { TUNING, PPM, airIdleSpin } = M;
+    const { TUNING, PPM, airIdleSpin, canopyBrakeDescent } = M;
     let policies_hop = null;
     const policies = {
       /** No input at all. */
@@ -215,6 +216,18 @@
         };
       },
 
+      /** Controlled ablation: same hazard-aware hops, then airbrake and canopy during descent. */
+      canopyHop(p) {
+        const hops = policies.hop(p);
+        return (c) => canopyBrakeDescent(c.sled, hops(c));
+      },
+
+      /** Issue #214: a staged flip + canopy + airbrake script, not an optimized player. */
+      canopyFlip(p) {
+        const flips = policies.flip(p);
+        return (c) => canopyBrakeDescent(c.sled, flips(c));
+      },
+
       /**
        * Brake to a dead stop on gentle ground, release, watch the stall nudge. Records into c.probe.
        * --probeKind picks WHERE the stop happens: the brake is held to a dead stop only while the ground slope (deg, + = downhill) is inside the
@@ -285,6 +298,21 @@
     const policies = makePolicies(M);
     if (!policies[policyName]) throw new Error('unknown policy ' + policyName);
     const policy = policies[policyName](params);
+    const withNoise = o.noiseProfile !== undefined;
+    const playback = withNoise && o.noiseReplay !== undefined;
+    const fatigue = withNoise && o.noiseFatigue === true;
+    let ghost, noiseApi, planner, inputRecorder;
+    if (withNoise) {
+      if (policyName !== 'hop') throw new Error('Human-noise simulation only supports hop');
+      [ghost, noiseApi] = await Promise.all([
+        import('/src/systems/ghost/GhostTape.js'), import('/tools/sim/human-noise.js'),
+      ]);
+      if (!playback) planner = noiseApi.makeHopNoise(o.noiseProfile, o.seed, o.noiseSeed, { fatigue });
+      inputRecorder = new ghost.GhostRecorder({
+        seed: o.seed, biomeMask: o.biomeMask >>> 0, mode: 'normal',
+        boosts: [], upgradeRanks: null, magnetsDrop: false, kodiaksOn: false, kodiakPackMode: 'same',
+      });
+    }
 
     try { localStorage.clear(); } catch (e) { /* ignore */ }
     rng = mulberry32(hashStr(`${o.seed}|${policyName}|rng`));
@@ -309,12 +337,20 @@
     // W3: the mask the sim plays at. Set alongside the seed so the run, the record and the stats scope
     // all agree; 0 is base terrain and is what every pre-W3 sim call gets.
     game.registry.set(REG.BIOME_MASK, o.biomeMask >>> 0);
+    if (withNoise) {
+      // Use the ordinary replay sandbox even when generating a new bot input
+      // stream. The real RunScene will not create a saved run, tape or award.
+      game.registry.set(REG.GHOST_REPLAY, {
+        ...inputRecorder.header, inputs: o.noiseReplay ?? [], checkpoints: [],
+      });
+    }
 
     const pad = newPad();
     let curPad = pad;
     const stub = { poll() { return curPad; }, setEnabled() {} };
 
     let scene = null;
+    let frame = 0, actualFrameHop = false;
     game.events.once(EVT.RUN_START, () => {
       scene = game.scene.getScene('RunScene');
       scene.inputRouter = stub;
@@ -323,6 +359,24 @@
       const rule = o.rule && o.rule !== 'none' ? (pendingRules.find((r) => r.id === o.rule) || null) : null;
       scene.dailyMods = rule ? { ...rule.modifiers } : {};
       scene.dailyRuleId = rule ? rule.id : 'none';
+      if (withNoise) {
+        if (!scene.tapePlayer || scene.ghostRecorder) throw new Error('Bot replay isolation was not established');
+        if (!playback) {
+          scene.tapePlayer.padAt = (tick) => {
+            const normalized = scene.normalizePad(curPad);
+            // Held hop lasts this frame, but its edge belongs to the first
+            // fixed tick. Match the production decoder's shape and source.
+            if (tick !== scene.simClock.tick + 1) normalized.pressed = {};
+            return ghost.decodePad(...ghost.encodePad(normalized));
+          };
+        }
+        const step = scene.simTick;
+        scene.simTick = function (dt, pad) {
+          inputRecorder.input(this.simClock.tick, pad);
+          if (pad.pressed?.hop) { lastHopFrame = frame; actualFrameHop = true; }
+          return step.call(this, dt, pad);
+        };
+      }
       if (o.sub) installSubTrace(scene, o.sub);
       if (!keepUi) game.scene.stop('UIScene');
     });
@@ -335,6 +389,8 @@
       maxSpeed: 0, maxSpeedAtM: 0, minZoom: 99, minZoomAtM: 0, zoomAtMaxSpeed: 0,
       bands: {}, generatedToM: 0, openingGraces: 0, trace: [],
       shards: 0, nearMisses: 0, score: 0, scoreAt: 0, tricks: {}, maxAirtimeMs: 0, bestCombo: 1,
+      inputActivity: { airborneFrames: 0, tiltFrames: 0, airBrakeHeldFrames: 0, airBrakeActiveFrames: 0, parachuteHeldFrames: 0, parachuteActiveFrames: 0, overlapHeldFrames: 0, overlapActiveFrames: 0 },
+      minBsodGapPx: null, finalBsodGapPx: null, bsodActiveFrames: 0,
     };
     let tMs = 0; // run clock as the harness sees it (frames * DT)
     let lastLanding = null;
@@ -342,6 +398,8 @@
     let lastAir = null; // last finished air phase
     let air = null;
     let prevGrounded = true;
+    let prevAirBrakeHeld = false;
+    let prevParachuteHeld = false;
     let lastHopFrame = -1e9;
     let prevGraces = 0;
     let prevNudging = false;
@@ -506,7 +564,6 @@
     while (!scene && guard++ < 5) { game.headlessStep(0, DT); }
     if (!scene) throw new Error('RunScene did not start');
     // the first headlessStep already ran frame 0 inside the loop above only if RunScene was created there
-    let frame = 0;
     let stallRef = { t: 0, x: scene.sled.x };
     scanChunks();
     // NB: the loop above executed one update with an empty pad (all-zero), which is deterministic.
@@ -518,14 +575,22 @@
     while (!endReason) {
       const sled = scene.sled;
       ctx.tMs = tMs; ctx.frame = frame;
-      const out = policy(ctx) || null;
+      const out = playback ? null : policy(ctx) || null;
       const np = newPad();
+      actualFrameHop = false;
       if (out) {
         if (out.tilt != null) np.tilt = out.tilt;
         if (out.brake) np.brake = true;
         if (out.tuck) np.tuck = true;
-        if (out.hop) { np.hop = true; np.pressed.hop = true; lastHopFrame = frame; }
+        if (out.airBrake) np.airBrake = true;
+        if (out.parachute) np.parachute = true;
+        if (!withNoise && out.hop) { np.hop = true; np.pressed.hop = true; lastHopFrame = frame; }
       }
+      if (planner?.step(frame, !!out?.hop)) np.hop = np.pressed.hop = true;
+      np.pressed.airBrake = np.airBrake && !prevAirBrakeHeld;
+      np.pressed.parachute = np.parachute && !prevParachuteHeld;
+      prevAirBrakeHeld = np.airBrake;
+      prevParachuteHeld = np.parachute;
       curPad = np;
 
       game.headlessStep(tMs, DT);
@@ -536,11 +601,34 @@
       // ---- observe
       const s = scene.sled;
       const distM = distOf(s.x);
+      // This reads the authoritative pursuit snapshot AFTER the game tick; it
+      // never moves the BSOD or changes gameplay. At 60 Hz, this is a sampled
+      // minimum, not a guarantee about the unsampled 120 Hz substep.
+      const pursuit = scene.bsodState;
+      if (pursuit?.active && Number.isFinite(pursuit.gapPx)) {
+        R.bsodActiveFrames++;
+        R.finalBsodGapPx = pursuit.gapPx;
+        R.minBsodGapPx = R.minBsodGapPx === null ? pursuit.gapPx : Math.min(R.minBsodGapPx, pursuit.gapPx);
+      }
       if (s.speed > R.maxSpeed) { R.maxSpeed = s.speed; R.maxSpeedAtM = distM; R.zoomAtMaxSpeed = scene.cameras.main.zoom; }
       const z = scene.cameras.main.zoom;
       if (z < R.minZoom) { R.minZoom = z; R.minZoomAtM = distM; }
       scanChunks();
 
+      // Observed controls in real simulator steps. A policy name is not evidence
+      // that its canopy, brake or trick actually engaged. These are 60 Hz
+      // *frame samples*, not falsely precise 120 Hz substep durations.
+      if (!s.grounded) {
+        const a = R.inputActivity;
+        a.airborneFrames++;
+        if (np.tilt) a.tiltFrames++;
+        if (np.airBrake) a.airBrakeHeldFrames++;
+        if (s.airBrakeActive) a.airBrakeActiveFrames++;
+        if (np.parachute) a.parachuteHeldFrames++;
+        if (s.parachuteMs > 0) a.parachuteActiveFrames++;
+        if (np.airBrake && np.parachute) a.overlapHeldFrames++;
+        if (s.airBrakeActive && s.parachuteMs > 0) a.overlapActiveFrames++;
+      }
       const g = s.grounded;
       if (!g && prevGrounded) {
         air = { ang0: s.angleDeg, lastAng: s.angleDeg, startM: distM, speed0: s.speed, vy0: s.vy, airMs: 0, hop: frame - lastHopFrame <= 15, cls: classifyStart(s.x), startFrame: frame };
@@ -554,7 +642,7 @@
 
       // rolling pre-crash buffer (every 3rd frame): [tMs, distM, angle rel. to slope, angular vel deg/s, grounded, speed, slope, tilt held, hop pressed]
       if (frame % 3 === 0) {
-        lead.push([Math.round(tMs), r1(distM), r1(s.angleDeg - s.groundAngleDeg), Math.round((s.body.angularVelocity * 60) / DEG), g ? 1 : 0, Math.round(s.speed), r1(s.groundAngleDeg), np.tilt, np.pressed.hop ? 1 : 0]);
+        lead.push([Math.round(tMs), r1(distM), r1(s.angleDeg - s.groundAngleDeg), Math.round((s.body.angularVelocity * 60) / DEG), g ? 1 : 0, Math.round(s.speed), r1(s.groundAngleDeg), np.tilt, (withNoise ? actualFrameHop : np.pressed.hop) ? 1 : 0]);
         if (lead.length > 40) lead.shift();
       }
       if (g) { // grounded speed by 4-degree slope bin (cruise-speed evidence): sb[bin] = [frames, sum speed px/s]
@@ -619,6 +707,26 @@
     if (ctx.probe) R.probe = ctx.probe;
     R.bands = bandsFrom(scene, chunkRecs, PPM, scene.startX);
     R.generatedToM = r1(((scene.terrain.activeList.length ? scene.terrain.activeList[scene.terrain.activeList.length - 1].endX : 0) - scene.startX) / PPM);
+    if (withNoise) {
+      if (game.registry.get(REG.LAST_RECORD) || game.registry.get(REG.LAST_GHOST_TAPE) ||
+          (await store?.getRecentRuns(1))?.length) {
+        throw new Error('Unexpected saved record in bot replay context');
+      }
+      const body = scene.sled.body;
+      R.humanNoise = {
+        profile: o.noiseProfile, version: fatigue ? noiseApi.HUMAN_NOISE_FATIGUE_VERSION : noiseApi.HUMAN_NOISE_VERSION,
+        frameHz: noiseApi.NOISE_FPS, stats: planner?.stats() ?? null,
+        input: {
+          format: inputRecorder.header.format, version: inputRecorder.header.version,
+          tickHz: inputRecorder.header.simTickHz, ticks: scene.simClock.tick, rows: inputRecorder.inputs,
+        },
+        final: {
+          position: [body.position.x, body.position.y], angle: body.angle,
+          velocity: [body.velocity.x, body.velocity.y], angularVelocity: body.angularVelocity,
+          score: scene.score.getTotal(), physicsRng: scene.runRandom.physicsScramble.state,
+        },
+      };
+    }
     R.wallMs = Math.round(performance.now() - wall0);
     for (const f of offs) f();
     try { game.scene.stop('RunScene'); game.scene.stop('UIScene'); game.headlessStep(tMs, DT); } catch (e) { /* ignore */ }

@@ -27,3 +27,9 @@ config.txt
 /coverage
 /tools/sim/.pacing
 /tools/sim/__pycache__
+
+# Issue #117 canary working output (regenerable by feel-diff; golden/ + corpus/ + expected/ stay committed)
+/tools/canaries/out/
+
+# Exploit Factory generated output (reproducible; do not commit raw runs)
+/tools/exploits/out/

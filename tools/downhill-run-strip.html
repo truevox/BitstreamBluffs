@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Downhill Run Strip · Bitstream Bluffs</title>
+  <style>
+    :root { color-scheme: dark; --ink:#f0f5ff; --muted:#b8c7e1; --accent:#78eafa; --panel:#101a2d; --line:#465877; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#090f1c; color:var(--ink); font:1rem/1.55 system-ui,sans-serif; }
+    main { max-width:76rem; padding:clamp(1rem,4vw,3rem); margin:auto; }
+    h1,h2,p { margin:0; }
+    h1 { font-size:clamp(2rem,6vw,3.5rem); line-height:1.1; margin:.2rem 0 .7rem; }
+    h2 { font-size:1.13rem; margin-bottom:.55rem; }
+    p { max-width:65ch; }
+    .eyebrow { color:var(--accent); text-transform:uppercase; font-weight:750; letter-spacing:.16em; font-size:.75rem; }
+    .muted, small { color:var(--muted); }
+    .panel { padding:1rem; border:1px solid var(--line); border-radius:.85rem; background:var(--panel); margin-top:1rem; }
+    .actions { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:.65rem; align-items:end; }
+    label.stack { display:flex; flex-direction:column; gap:.25rem; }
+    button, input::file-selector-button, input[type=number] { color:var(--ink); background:#25334e; border:1px solid #667c9f; border-radius:.45rem; padding:.45rem .7rem; font:inherit; min-height:2.55rem; }
+    button, input::file-selector-button { cursor:pointer; }
+    button:hover { background:#324569; }
+    button:disabled { opacity:.52; cursor:default; }
+    :focus-visible { outline:3px solid #ffc977; outline-offset:3px; }
+    input[type=file] { max-width:100%; }
+    input[type=number] { width:7.7rem; }
+    input[type=range] { width:100%; min-height:2.5rem; accent-color:#8cecf4; }
+    .output { margin-top:.65rem; min-height:1.6em; }
+    .error { color:#ffc1da; }
+    .frame { border:1px solid var(--line); border-radius:.85rem; overflow:hidden; margin:1rem 0 0; }
+    .frame img { display:block; width:100%; height:auto; }
+    .frame figcaption { padding:.55rem .85rem; color:var(--muted); }
+    .art-frame { max-width:44rem; }
+    .metric { margin:.2rem 0; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+    .accent { color:#0a1728; background:#98edf0; border-color:#98edf0; font-weight:700; }
+    .accent:hover { background:#c0faff; }
+  </style>
+  <script type="module" src="./downhill-run-strip.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Bitstream Bluffs · Local / Unverified</p>
+      <h1>Downhill Run Strip</h1>
+      <p class="muted">Inspect the recorded sled path, zoom into a range of poses, and save a static SVG of that section. This is not a terrain profile or a replay.</p>
+    </header>
+    <section class="panel" aria-label="Open a local tape">
+      <label for="tape"><strong>Open a local GhostTape v1 JSON file</strong></label>
+      <div class="actions"><input type="file" id="tape" accept=".json,application/json" aria-describedby="tape-hint"></div>
+      <small id="tape-hint">Up to 2 MiB. The tape stays open only in this page; nothing is uploaded.</small>
+      <p id="load-status" class="output" role="status"></p>
+    </section>
+    <div id="inspector" hidden>
+      <figure class="frame">
+        <img id="strip" alt="Recorded sled path">
+        <figcaption id="window-status" role="status"></figcaption>
+      </figure>
+      <section class="panel" aria-labelledby="section-title">
+        <h2 id="section-title">Open a section</h2>
+        <nav id="sections" class="actions" aria-label="Evenly spaced recorded sections"></nav>
+        <form id="section-form" class="actions">
+          <label class="stack" for="start">First sample<input id="start" type="number" min="1" step="1" required></label>
+          <label class="stack" for="end">Last sample<input id="end" type="number" min="2" step="1" required></label>
+          <button type="submit">Show section</button>
+          <button type="button" id="all">Show full trace</button>
+        </form>
+        <p id="section-error" class="error" role="alert"></p>
+      </section>
+      <section class="panel" aria-labelledby="sample-title">
+        <h2 id="sample-title">Inspect a recorded pose</h2>
+        <label for="sample">Selected sample <span class="muted">(arrow keys move one sample)</span></label>
+        <input id="sample" type="range" min="1" step="1" aria-describedby="sample-units">
+        <p id="pose" class="metric" role="status"></p>
+        <p id="sample-units"><small>X/Y use game-world units, not distance or elevation. Timing is nominal simulation time; the recorded trace begins at tick 4.</small></p>
+        <div class="actions">
+          <button type="button" id="zoom-in">Zoom in around sample</button>
+          <button type="button" id="zoom-out">Zoom out around sample</button>
+        </div>
+      </section>
+      <section class="panel" aria-label="Static export">
+        <button type="button" id="download" class="accent">Download section SVG</button>
+        <p class="output muted">The SVG includes the displayed path and sample range, not your tape or its metadata. The depicted path can still be recognizable.</p>
+      </section>
+      <section class="panel" aria-labelledby="run-art-title">
+        <h2 id="run-art-title">Run DNA preview</h2>
+        <p class="muted">Local / Unverified. Artwork from the full recorded path, independent of the strip zoom. Preview only.</p>
+        <figure class="frame art-frame" id="run-art-frame" hidden>
+          <img id="run-art" width="960" height="620" alt="Abstract neon artwork of the full recorded sled path">
+        </figure>
+        <p id="art-unavailable" class="output muted" hidden>Artwork preview is unavailable for this trace.</p>
+      </section>
+    </div>
+    <noscript><p>This local inspector needs JavaScript to read the selected file.</p></noscript>
+  </main>
+</body>
+</html>

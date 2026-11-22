@@ -158,20 +158,18 @@ export function gateVerdict(h, arrivalMs, t = GROUND_WARN) {
  * @property {number|null} arrivalMs run time of the predicted arrival (null without opts.nowMs).
  * @property {'open'|'closed'|null} gate Gear Gate verdict at arrival (gateVerdict); null for anything else.
  * @property {number} urgency 0 at the warn distance .. 1 at the box.
- * @property {boolean} onScreen the box has entered the view (the marker leaves the screen edge and stands on the hazard).
  */
 
 /**
- * Plan this frame's marks.
+ * Plan this frame's semantic marks without a viewport. The current camera decides where to draw them later.
  * @param {Iterable<{def:Object, cx:number, w:number, hit?:boolean}>} hazards live hazards (Hazard entities or plain objects).
  * @param {{x:number, vx:number, speed:number, grounded:boolean, landX?:number|null}} sled landX = ballistic touchdown x while airborne.
- * @param {number} viewRight world x of the right screen edge.
  * @param {{isMuted?:(h:Object)=>boolean, nowMs?:number}} [opts] isMuted: hazards that currently do nothing (warded) are
  *   skipped. nowMs: run time, needed to time moving hazards (predictX) and judge gates; without it all are static.
  * @param {typeof GROUND_WARN} [t]
  * @returns {TelegraphMark[]} nearest first, at most t.maxMarks.
  */
-export function planTelegraph(hazards, sled, viewRight, opts = {}, t = GROUND_WARN) {
+export function planTelegraphMarks(hazards, sled, opts = {}, t = GROUND_WARN) {
   const warn = warnDistancePx(sled.speed, t);
   const vx = Math.max(sled.vx, t.minVxPxS);
   const flying = !sled.grounded && Number.isFinite(sled.landX);
@@ -201,12 +199,18 @@ export function planTelegraph(hazards, sled, viewRight, opts = {}, t = GROUND_WA
       arrivalMs,
       gate,
       urgency: clamp(1 - dx / warn, 0, 1),
-      onScreen: h.cx - half < viewRight,
     });
   }
   marks.sort((a, b) => a.dx - b.dx);
   if (marks.length > t.maxMarks) marks.length = t.maxMarks;
   return marks;
+}
+
+/** Keep the former explicit-horizon hint for historical diagnostics. Live planning and rendering do not use it. */
+export function planTelegraph(hazards, sled, viewRight, opts = {}, t = GROUND_WARN) {
+  return planTelegraphMarks(hazards, sled, opts, t).map((mark) => ({
+    ...mark, onScreen: mark.ref.cx - (mark.ref.w || 0) / 2 < viewRight,
+  }));
 }
 
 /**

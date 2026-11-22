@@ -1,0 +1,40 @@
+{
+  "format": "bb-source-tripwire",
+  "formatVersion": 1,
+  "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
+  "simRevision": 1,
+  "attestation": "no-behavior-change: ground telegraph warn and hop timing/arrival unchanged; remove prior camera state from cue planning and choose draw placement on already-streamed terrain without camera-driven generation",
+  "changedFiles": [
+    "src/scenes/RunScene.js"
+  ],
+  "files": {
+    "src/constants.js": "sha256:21fe3491017fa3f6fa55c25c5d3d3cca22fa3f1ce15a22c611113b173dc0a8e5",
+    "src/entities/Hazard.js": "sha256:723c648948c2b52875c6a4cdee44f6f2d37c038d02d14fd0c3227d1b0a03673e",
+    "src/entities/PowerUp.js": "sha256:b1a0a99f6a4433bde2146ec205be8d623bb6751fc075125a8b31b16f535e0dbc",
+    "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
+    "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
+    "src/entities/TerrainMesh.js": "sha256:a88f6a99aab6298034ef99d6c9d90489f1cf0a7f0f305c526b7e358b6bc59003",
+    "src/scenes/RunScene.js": "sha256:6ba948919e99c322bb87039aefcf39a14257c48bb21949ce8160422c35315c46",
+    "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
+    "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
+    "src/systems/BsodAerodynamics.js": "sha256:dbe861d0a1fb6e73f94d467583ea9190ec88cc986fa39982b28687d75ca18397",
+    "src/systems/BsodBluffTracker.js": "sha256:bebe7b4dc218272b9e0e7d6621e5bb0d9c4602c5bd77e2d80b60685bd8513f08",
+    "src/systems/BsodPursuit.js": "sha256:467a38f8110869e6c71d4e4f10fa44f24d0ef692b97b0a65a69d0985c20c2402",
+    "src/systems/DailyDraft.js": "sha256:01f594995d8d100e290f51b91e7fd49b768a1f943b60bf8493f6e05efcd6e207",
+    "src/systems/DailyPatch.js": "sha256:220a6e1f227988bcb8ea87bc0ce683d6b5a034c1beb14dd8f8f26a268d3a1e1c",
+    "src/systems/HazardMotion.js": "sha256:448d21f50a945d2130f61637b448ad2b4e6ec24186454ed205a218a82cb9ad71",
+    "src/systems/Kodiaks.js": "sha256:f0ad097ffebab7994c0ecc02c53ae382c15d11780c21aca1d0b798543f50f333",
+    "src/systems/PermanentUpgrades.js": "sha256:c51661c29ee2b887f11234bebbd25fd34b1501c48b84a060cc3e6dccf2e05cd7",
+    "src/systems/PhysicsTuner.js": "sha256:c80e9ad47b3f30b0c1e8cb6880e637ff26d99f7cca59cf244c8d4ff1dcd0be98",
+    "src/systems/Rng.js": "sha256:950df8048d13be4d5e46d2084e84d6838a73053bdf3eda49b8e6ac380ffcbfd0",
+    "src/systems/RunRandom.js": "sha256:d2042cd6ad49f44708f2fcee50aeadcbe9323f8b217d8715aaf443344db2bd68",
+    "src/systems/ScoreManager.js": "sha256:af93538b98eeab4a01a9b2c248dbd95d4eab76862e263c56e781b36d2330174b",
+    "src/systems/ShardMagnet.js": "sha256:f57b36e40e1254660feb0215db18fbf3cb4d5611f18559439702b148a287d6c1",
+    "src/systems/SimClock.js": "sha256:8881e9cd4d271ca9c991b1ca1cd66c683c36f9d41586b71da7d2086717db569e",
+    "src/systems/TerrainContact.js": "sha256:b5f8705d9caaf788e68a9a777c8fd4f11d1e9ec8bc8771e451d7fcda432661ba",
+    "src/systems/TerrainGenerator.js": "sha256:6b16dba03098a1d95f8fca00ba8802dbb361823cf9b3ca5719e9356f355f1e8d",
+    "src/systems/TrickTracker.js": "sha256:e6fdcea5cfc0e515fb0623b7f6bb3b189d5a5ed0fcf66f15175fd508da64abcf",
+    "src/systems/Wards.js": "sha256:5fa20a216fd93ef1b72f1fe969234482585f680462e64fc46c0cf45772ebc09c",
+    "src/systems/ghost/GhostTape.js": "sha256:44fa5d1788e81cf5965b6d22b0729d632b58ae2745ecfb8e891b01d52992085d"
+  }
+}

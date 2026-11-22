@@ -221,6 +221,9 @@ only gameplay emitter.
 | `INPUT_ACTION` | InputRouter | Title/Pause/GameOver scenes (menus), AudioSynth (unlock on first) |
 
 Gameplay input is **polled**: `inputRouter.poll()` once per frame in `RunScene.update` (it consumes one-shot edges).
+Since #115 the poll result also carries a non-enumerable `timeline` (timestamped hold changes since the last poll);
+`SimClock.padsFor(pad, ticks, { frameTime, timeline, normalize })` uses it to give each fixed tick the keyboard input
+whose `event.timeStamp` falls in that tick's window (see `docs/issue-115-fair-input.md`).
 Menu scenes use `INPUT_ACTION` (or Phaser keyboard, since menus are simple) - but menus must work with gamepad + touch
 too, so prefer `INPUT_ACTION`.
 
@@ -292,6 +295,11 @@ delta in ms. Conversions (helpers in `PhysicsTuner.js`, gameplay may fix them bu
 
 All additive; no existing signature or payload changed.
 
+* **VirtualPad** (#115, additive): `setButton(name, down, source, timeStamp?)` takes an optional event time on the
+  `performance.now()` clock; `poll()` snapshots carry a non-enumerable `timeline` `{ base, events, analog }`; exported
+  pure `deriveHeld(held, analog)` (implemented in the pure `systems/PadDerive.js`, with `eventTimeOnClock`).
+  `InputRouter.poll()` returns `timeline: null` while disabled. `TouchOverlay` passes pointer `timeStamp`s
+  (down / move / up / cancel / lostpointercapture) the same way keyboard does.
 * **VirtualPad**: `setTilt(value, source = 'gamepad')` has an optional 2nd arg (analog sources `'gamepad'` / `'device'`;
   largest magnitude wins; output is rescaled outside the 0.15 dead-zone). New: `releaseSource(source)`,
   `setOverlayContext(visible)`. New helper file `systems/TouchOverlay.js` (DOM only). The touch overlay is shown only
@@ -1322,17 +1330,21 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
   * `hazardResponse(def)` -> `'hop'` (crash, or no `onHit`) | `'brace'` (any other effect) | `null` (air: not ours).
   * `warnDistancePx(speedPxS)` -> `clamp(speed x leadS, minPx, maxPx)`.
   * `inHopWindow(dx, vx)`: the oracle's rule, `hopLeadMs - hopWindowMs < dx / max(vx, 60) x 1000 <= hopLeadMs`.
-  * `planTelegraph(hazards, sled, viewRight, {isMuted}?)` -> `TelegraphMark[]`, nearest first, at most `maxMarks`:
-    `{ref, kind, state: 'warn'|'go'|'clear', color: 'danger'|'amber'|'lime', clear, dx, etaS, urgency, onScreen}`. Skips hit,
+  * `planTelegraphMarks(hazards, sled, {isMuted}?)` -> `TelegraphMark[]`, nearest first, at most `maxMarks`:
+    `{ref, kind, state: 'warn'|'go'|'clear', color: 'danger'|'amber'|'lime', clear, dx, etaS, urgency}`. Skips hit,
     passed, air and muted hazards. `go` (lime) only for a grounded sled inside the hop window. `clear` when airborne and
-    the ballistic touchdown (`sled.landX`) is more than `clearMarginPx` past the box.
+    the ballistic touchdown (`sled.landX`) is more than `clearMarginPx` past the box. The former explicit-right-edge
+    `planTelegraph` adapter still supplies an `onScreen` hint to historical diagnostics, but live code doesn't use it.
   * `TelegraphTracker.update(nowMs, marks)` -> events `{type: 'warn'|'go', kind, ref, sound}`: `warn` once per hazard at its
     first non-clear mark (`sound` false when another warn sounded under `warnGapMs` ago), `go` once when it first turns lime.
     `firstWarnMs(ref)`.
-* **`entities/GroundTelegraph.js`** (drawing only; does not import Phaser): `update(timeMs, marks, view, zoom, heightAt)`,
-  `setPalette`, `destroy`. Off-screen mark: a badge at `view.right - EDGE_INSET_PX / zoom` on the terrain line (glyph by
+* **`entities/GroundTelegraph.js`** (drawing only; does not import Phaser): `update(timeMs, marks, view, zoom, activeChunks)`,
+  `setPalette`, `destroy`. If the arrow footprint would clip in the current view, draw a badge at
+  `view.right - EDGE_INSET_PX / zoom` on the terrain line (glyph by
   `BiomeEffects.hazardDrawKind`, marching chevrons, proximity bar, response cue), stacked upward, at most `EDGE_MAX_STACK` (3).
-  On-screen mark: a light column on the box (shortened to stay inside the view) with the cue on top. Cue shapes repeat the
+  The stem reads already-streamed polyline points or falls back to mid-view, never asking the generator to stream from a camera position.
+  The nearest clipped hop-now cue gets the first (response-bearing) slot, even among earlier warnings.
+  Otherwise, draw a light column on the box (shortened to stay inside the view) with the cue on top. Cue shapes repeat the
   colour: open up-chevrons = hop, filled up-arrow = hop now, two bars = brace. Every size is game px (480 x 270) / zoom.
 * **`RunScene`**: `updateGroundTelegraph(now)` is called from `updateFun` (live frames only) right after the air telegraph:
   it plans the marks (muting warded hazards via `Wards.isWarded` by id and by effect; `landX` from `sled.airEtaMs`), plays
@@ -1356,7 +1368,7 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
 * `inHopWindowMs(etaMs)`: the oracle's window in time. `gateVerdict(h, arrivalMs)` -> `'open'` when `isPassable` holds at
   `arrivalMs - gateMarginMs` and `gateNextChangeMs` there exceeds `2 x gateMarginMs`, else `'closed'`; `null` without the
   gate API (or when `gateNextChangeMs` returns null).
-* `planTelegraph(..., {isMuted, nowMs})`: marks gain `arrivalMs` (null without `nowMs`) and `gate`; `etaS` and the lime
+* `planTelegraphMarks(..., {isMuted, nowMs})`: marks gain `arrivalMs` (null without `nowMs`) and `gate`; `etaS` and the lime
   window come from `predictArrival`; `clear` compares `landX` with `cxAtArrival`; new state `'open'` (gate open at
   arrival: drawn dim with still chevrons, silent in `TelegraphTracker`, never lime). `RunScene.updateGroundTelegraph`
   passes `nowMs: runTimeMs` (the time base of `Hazard.stepMotion`).

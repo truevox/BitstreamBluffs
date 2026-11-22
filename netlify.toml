@@ -11,3 +11,11 @@
 
   [plugins.inputs]
   paths = ["node_modules", "package-lock.json"]
+
+# Netlify's default static-asset MIME lookup serves `.webmanifest` as
+# application/octet-stream on previews. Explicitly advertise the registered
+# Web App Manifest media type for standards-compliant PWA installation.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
