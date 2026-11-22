@@ -162,7 +162,9 @@ function allocateEffect(ctx, raw) {
 			wet.connect(output);
 			let contact = clamp(raw.contact, 0, 1, 0);
 			let burstEnd = -Infinity;
-			const bed = () => .012 + contact * .22;
+			// Stationary and airborne have genuinely zero metallic contact;
+			// a fast ground run makes the inharmonic layer audible but bounded.
+			const bed = () => contact * .50;
 			wet.gain.value = bed();
 			refs.contact = { set: (value, at) => {
 				contact = clamp(value, 0, 1, 0);
@@ -180,7 +182,7 @@ function allocateEffect(ctx, raw) {
 			refs.impact = { set: (value, at) => {
 				const impulse = clamp(value, 0, 1, 0);
 				if (impulse <= 0) return false;
-				const peak = Math.min(.68, bed() + .52 * impulse);
+				const peak = Math.min(1.15, bed() + .75 * impulse);
 				burstEnd = at + .13;
 				wet.gain.cancelScheduledValues(at);
 				wet.gain.setTargetAtTime(peak, at, .018);

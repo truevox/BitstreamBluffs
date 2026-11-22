@@ -19,3 +19,7 @@ The absolute mix and true peak on long-form songs, phone listening, cross-biome 
 ## Technical verification
 
 Focused unit tests check invalid input fallback, speed/contact policy, airborne suppression, landing timing, no effect graph replacement, non-Snowpack policy isolation, audio param bounding, and stable song clock. Browser smoke covers decoding and playing the actual five instrument stems and changing physical inputs without page errors. Vite builds the standalone audition as a separate entry, with no game-menu wiring.
+
+## Recorded browser DSP probe (one excerpt, not a release-wide loudness claim)
+
+A representative 4-second original drum excerpt was rendered in actual Chromium `OfflineAudioContext` with grounded contact at maximum, a strong landing pulse at 1.15 s, and takeoff at 2.4 s. Compared against the **same decoded original audio**, the unprocessed RMS was approximately 0.08878, processed RMS 0.08891, difference RMS 0.00432, sampled peak magnitude 0.606, and processed mono-downmix RMS 0.08799. No non-finite samples. This verifies nonzero, bounded DSP response and mono output on that one excerpt, **not** full-song true peak, subjective quality, or audio CPU compliance.
