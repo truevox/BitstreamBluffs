@@ -1,5 +1,5 @@
 /**
- * re-pinned for #65: Debutmont base + arcade bridges. Every digest below was re-recorded at that change, which
+ * re-pinned for #65 (on the #121 portable-math build): Debutmont base + arcade bridges. Every digest below was re-recorded at that change, which
  * deliberately moved every mask's terrain: Debutmont is now the base biome (mask 0 is pure Debutmont, so mask 1 hashes
  * the same as mask 0), and each biome change is bridged by arcade chunks. The isolation claim below still holds and is
  * still what these pins prove: a later change that reaches terrain outside Micro (512) moves a digest.
@@ -20,59 +20,59 @@ import { makeGen, loadContent } from './_helpers.js';
 const CHUNKS = 300;
 const PINNED = {
   '0': {
-    'alpha': 'b69e7cfc83cf5ef7',
-    'beta': 'c7d4c1f03c7285b9',
-    'swell': '7196c3a64d0e3ab1'
+    'alpha': '14a3e138ca0e0b5c',
+    'beta': 'c3b5c86bad2a1efb',
+    'swell': '8133b77519002d2b'
   },
   '1': {
-    'alpha': 'b69e7cfc83cf5ef7',
-    'beta': 'c7d4c1f03c7285b9',
-    'swell': '7196c3a64d0e3ab1'
+    'alpha': '14a3e138ca0e0b5c',
+    'beta': 'c3b5c86bad2a1efb',
+    'swell': '8133b77519002d2b'
   },
   '2': {
-    'alpha': 'd4ce3ad76b2f340d',
-    'beta': '3b7d5570395bd44b',
-    'swell': '2613280caea597a6'
+    'alpha': '84668b85ff02f3a5',
+    'beta': '11d4045a6d608bab',
+    'swell': '60193eee0278b474'
   },
   '4': {
-    'alpha': 'eea683f5b7ed9d74',
-    'beta': 'a1211f7aebe266af',
-    'swell': '5acb41dcf35b3e65'
+    'alpha': '348ca2deb497a397',
+    'beta': 'a62db1db2c6c3866',
+    'swell': '8b7c608b20200ee7'
   },
   '8': {
-    'alpha': '67d4cca06dda418a',
-    'beta': '33285a293ccd0d5e',
-    'swell': 'f994b4adb9685a23'
+    'alpha': '4aaa9cad784a014b',
+    'beta': '003edfb3c875c463',
+    'swell': '792a77ca25d9a040'
   },
   '16': {
-    'alpha': 'b0bfe33a941bfb97',
-    'beta': '1d7029654c8a3c6b',
-    'swell': 'ac0d7362ad5558b1'
+    'alpha': 'b403d967b5c526eb',
+    'beta': '93668c3469bf40b4',
+    'swell': '5f062e3d7e384b84'
   },
   '32': {
-    'alpha': 'b73e14927cecf07c',
-    'beta': 'bafe740e1aa1dcea',
-    'swell': '27e3c7d0bcf7a3e3'
+    'alpha': '10a0e5f762871e85',
+    'beta': '9f12f4012acc8820',
+    'swell': 'be3622d778a7d48e'
   },
   '64': {
-    'alpha': '9e0d5fd715ce2bf0',
-    'beta': '1e9ebb6f7c0b9f36',
-    'swell': 'ef647241e89a1ee6'
+    'alpha': 'a6583c39eb6e53c1',
+    'beta': '02e3f030e38e6255',
+    'swell': '4a19ba8ee75a3f04'
   },
   '128': {
-    'alpha': '2fdb3461bee95811',
-    'beta': 'c8e6b2c929a8dcf2',
-    'swell': '91645a6b071d48ae'
+    'alpha': '932a3ca67f207c57',
+    'beta': 'f0aa1876f450ab8a',
+    'swell': '9974f37333c9c4e1'
   },
   '256': {
-    'alpha': '88d308622a08dd5f',
-    'beta': '2d0bfae077f04b4f',
-    'swell': 'c8a4c650bb766b82'
+    'alpha': 'e1243e73476e9a20',
+    'beta': '978ee95dfbdee619',
+    'swell': '3d87988802424226'
   },
   '1024': {
-    'alpha': 'dc2df3000b93d9e2',
-    'beta': '3d391b63e37c2378',
-    'swell': '8e0f4963a76fcec6'
+    'alpha': '9538114f294f7869',
+    'beta': 'f517660e997c6131',
+    'swell': '15c886c6c2158e18'
   }
 };
 

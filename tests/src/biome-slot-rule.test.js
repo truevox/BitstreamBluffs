@@ -45,9 +45,9 @@ const N = 300;
 describe('slot rule: base streams untouched', () => {
   test('with biome defs absent, nothing changes at ANY mask (digests pinned at 00978f6, before the slot rule)', () => {
     // First recorded on 00978f6 (v2.5.0, B0) with the same projection: 2 seeds x 200 chunks of JSON.stringify(getChunk(i)).
-    // re-pinned for #65: Debutmont base + arcade bridges (all five digests moved: base terrain is now Debutmont, and
+    // re-pinned for #65 on the #121 (portable math) build: Debutmont base + arcade bridges (all five digests moved: base terrain is now Debutmont, and
     // biome changes are bridged). Mask 1 is the home bit, so it is the same terrain as mask 0.
-    const PINNED = { 1: '98a6a72af602b4f8', 2: '91cd16fdf6fb97f4', 8: '21be597d0b2b92b1', 64: 'e1a848d14d944bb8', [ALL]: 'b17f3f4c2f875aa9' };
+    const PINNED = { 1: '2af6aff54f97d978', 2: 'f6f6494742aa0b4a', 8: '8dd6019a1fa4c387', 64: '938d3837e2932a36', [ALL]: 'f29bc0ae347569af' };
     // Audit T2 (v2.6.x) moved Micro Mountain's dew swell INTO the chunk points on purpose, so the ALL mask (it contains
     // Micro, bit 512) now has other bytes. To keep this pin about the slot rule, the masks are hashed with the swell
     // stripped from content: that reproduces the 00978f6 bytes exactly, so nothing else moved. The shipped-content
@@ -68,7 +68,7 @@ describe('slot rule: base streams untouched', () => {
     // Masks without Micro are byte-identical with the shipped content too (the swell only touches dewSwell zones)...
     for (const mask of [1, 2, 8, 64]) expect(digestOf(mask, content.terrainMods)).toBe(PINNED[mask]);
     // ...and the ALL mask with the shipped (swelled) content, recorded after audit T2.
-    expect(digestOf(ALL, content.terrainMods)).toBe('5792016422064074'); // re-pinned for #65: Debutmont base + arcade bridges
+    expect(digestOf(ALL, content.terrainMods)).toBe('6ed38294c7a8466d'); // re-pinned for #65: Debutmont base + arcade bridges (on the #121 pmath build)
   });
 
   test('the slot keeps a fixed draw count: BIOME_SLOT_DRAWS is still 5', () => {
