@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.16.1 — keep ground hop cues visible (#208 / #155) (2026-11-21)
+
+- **Ground hop cues stay visible at the edge.** Fixed-tick warning and sound timing no longer reads the rendered camera. The renderer uses the current view: if the hop arrow is clipped, the edge badge carries the cue. The badge only reads already-streamed terrain. No physics, score, replay ruleset or Pulp camera change.
+
 
 ## v2.16.0 — reconcile post-v2.15.3 merged capabilities and release policy (2026-11-21)
 
