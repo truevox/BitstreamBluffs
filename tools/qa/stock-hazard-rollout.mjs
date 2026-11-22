@@ -107,7 +107,8 @@ async function trial(browser, pressTick) {
             }
             if (tick === pressTick) { require(sled.grounded, 'Scheduled hop did not start grounded'); key(true); }
             if (down && tick === pressTick + p.holdTicks) key(false);
-            game.step(tick * dt, dt);
+            // Use Phaser’s normal scene/simulation update without drawing each frame.
+            game.headlessStep(tick * dt, dt);
             require(run.simClock.tick === tick, 'Fixed-tick schedule stalled or diverged');
             if (run.shieldCharges > 0 || sled.invulnerableMs > 0) protectedTicks++;
             if (run._hopped) hops.push({ tick, atMs: run._lastHopMs, airborne: !sled.grounded, vy: sled.vy });
@@ -183,4 +184,4 @@ try {
   validate(cases);
 } finally { await browser.close(); }
 console.log(JSON.stringify({ kind: 'local-stock-hazard-rollout', sourceCommit, bundleSha256, browserVersion,
-  freshTrialsPerArm: 2, preset, evidenceSha256: sha(JSON.stringify(cases)), cases }, null, 2));
+  stepping: 'Phaser headlessStep at 120 Hz; no per-tick rendering', freshTrialsPerArm: 2, preset, evidenceSha256: sha(JSON.stringify(cases)), cases }, null, 2));
