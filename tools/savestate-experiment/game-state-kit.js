@@ -397,6 +397,14 @@
   }
 
   function restorePool(run, pool, withIds) {
+    // Canonical collider construction (#222) retired the body pool. A snapshot
+    // containing retired pooled bodies is incompatible, not silently discarded.
+    if (!run.mesh._bodyPool) {
+      if (!Array.isArray(pool) || pool.length) {
+        throw new Error('restore: legacy collider pool cannot be restored into canonical geometry');
+      }
+      return;
+    }
     const B = Matter.Bodies;
     const fresh = pool.map((p) => {
       const sq = [{ x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 16 }, { x: 0, y: 16 }].slice(0, p.verts);

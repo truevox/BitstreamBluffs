@@ -107,6 +107,31 @@ describe('TelegraphTracker as plain data', () => {
     expect(tr2.snapshot()).toEqual(snap);
     expect(tr2.firstWarnMs(hs[0])).toBe(tr.firstWarnMs(hs[0]));
   });
+  test('malformed restore data fails closed and does not corrupt existing tracker state', () => {
+    const tr = new TelegraphTracker();
+    const hs = buildHazards();
+    tr.update(1000, planTelegraph(hs, { x: 1000, vx: 650, speed: 650, grounded: true, landX: null }, 1e9, { nowMs: 1000 }));
+    const original = tr.snapshot();
+    const pair = ['0:0', 125, true, 780];
+    const broken = [
+      { ...original, lastWarnSoundMs: 'not a number' },
+      { ...original, lastWarnSoundMs: Infinity },
+      { ...original, hazards: [pair, pair] },
+      { ...original, hazards: [[null, 125, true, 780]] },
+      { ...original, hazards: [['', 125, true, 780]] },
+      { ...original, hazards: [['0:0', NaN, true, 780]] },
+      { ...original, hazards: [['0:0', 125, 'yes', 780]] },
+      { ...original, hazards: [['0:0', 125, true, Infinity]] },
+      { ...original, hazards: [['0:0', 125, true]] },
+      { ...original, hazards: [null] },
+      { ...original, hazards: {} },
+    ];
+    for (const snapshot of broken) {
+      expect(() => tr.restore(snapshot)).toThrow(/snapshot|invalid|duplicate/i);
+      expect(tr.snapshot()).toEqual(original); // Failed restore is atomic.
+    }
+  });
+
   test('a hazard without a stable id is an error, never silently tracked by identity', () => {
     const tr = new TelegraphTracker();
     const h = { def: DEFS.packetSpike, cx: 1500, cy: 0, w: 10, h: 10, hit: false };

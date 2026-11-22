@@ -300,10 +300,32 @@ export class TelegraphTracker {
     return { v: TRACKER_SNAPSHOT_VERSION, lastWarnSoundMs: this._lastWarnSoundMs, hazards };
   }
 
-  /** @param {ReturnType<TelegraphTracker['snapshot']>} snap replaces all state. Throws on an unknown version. */
+  /**
+   * Replace state only after validating the complete snapshot. Rejected/corrupt
+   * data must not leave a partially restored game (or silently erase warnings).
+   * @param {ReturnType<TelegraphTracker['snapshot']>} snap
+   */
   restore(snap) {
-    if (!snap || snap.v !== TRACKER_SNAPSHOT_VERSION || !Array.isArray(snap.hazards)) throw new Error('TelegraphTracker.restore: unsupported snapshot');
-    this._h = new Map(snap.hazards.map(([id, warned, cued, arrival]) => [id, { warned, cued, arrival }]));
+    if (!snap || snap.v !== TRACKER_SNAPSHOT_VERSION || !Array.isArray(snap.hazards) ||
+        !Number.isFinite(snap.lastWarnSoundMs)) {
+      throw new Error('TelegraphTracker.restore: unsupported or invalid snapshot');
+    }
+    const next = new Map();
+    for (const record of snap.hazards) {
+      if (!Array.isArray(record) || record.length !== 4) {
+        throw new Error('TelegraphTracker.restore: invalid hazard snapshot entry');
+      }
+      const [id, warned, cued, arrival] = record;
+      if (typeof id !== 'string' || !id ||
+          (warned !== null && !Number.isFinite(warned)) ||
+          typeof cued !== 'boolean' ||
+          (arrival !== null && !Number.isFinite(arrival))) {
+        throw new Error('TelegraphTracker.restore: invalid hazard snapshot entry');
+      }
+      if (next.has(id)) throw new Error('TelegraphTracker.restore: duplicate hazard id');
+      next.set(id, { warned, cued, arrival });
+    }
+    this._h = next;
     this._lastWarnSoundMs = snap.lastWarnSoundMs;
   }
 }

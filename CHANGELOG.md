@@ -1,5 +1,41 @@
 # Changelog
 
+## v2.19.11 — saveable stable-id hazard warnings (#119 / #224) (2026-11-22)
+
+- **Stable per-spawn hazard identity:** Each live hazard receives a deterministic `chunk:spawn-ordinal` ID on its single production creation path. Hazard warning/cue/arrival bookkeeping now keys on the ID instead of WeakMap/WeakSet object identity, and exposes JSON-safe `snapshot()`/`restore()`. Rebuilt hazard objects recover warning timestamps without replaying announcements. A hazard without a stable ID fails explicitly rather than creating an untracked, silently unsaveable state. Restoring malformed, duplicate-ID or non-finite warning records rejects atomically without corrupting previously live tracker state.
+- **Canonical collider integration:** The diagnostic save/restore harness now supports the pool-free terrain representation released in v2.19.7. It reports a zero-length pool when the pool is absent and **rejects** legacy nonempty pool snapshots instead of fabricating old collision bodies. These are experimental tools, not a production save format or cross-release migration. The harness now also permits selecting a single exact browser case with `EXACT_ONLY=hazard:full`, avoiding unnecessary ablations.
+- **Verification scope:** The existing deterministic physics and replay ruleset remains **SIM_REVISION 4**; no intentional change to authoritative physics, scoring, tape encoding or play controls. The developer browser restore experiment on the combined canonical-collider and stable-ID source reproduced the hazard fixture exactly for 520 post-save ticks (480→1000) in Chromium. This proves one exact restore fixture, not complete or secure production savestates. #119 remains open.
+
+## v2.19.10 — measure actual World Dance visibility (#212 / #225) (2026-11-22)
+
+- **Developer regression diagnostic:** Added a source-bound measurement suite tracing synthetic instrument energy through `AudioSynth.getWorldDanceSample()`, unverified meter timing, `WorldDanceEnvelope`, `sunDanceGeometry()` and real `motifDecor()` displacement. It measures steady-state and transient behavior using uniform frame cadence, tests invalid/silent meter rejection and distinguishes observed pixels from theoretical maxima.
+- **Observed issue, not yet fixed:** Steady-state music-driven backdrop movement is sub-pixel for supported motifs and **zero** for motifs that do not consume horizon-dance signals. The fixture intentionally stubs live audio nodes and is not evidence of audible real-world audio or human-perceptible scenery animation. Actual stronger gameplay-visible World Dance requires separate approved production art/animation work; leave #212 open.
+- **No gameplay change:** This PR adds tests only, with no production source, shader, physics, score, replay or simulation revision changes. Previous 2.19.9 input fix and ruleset v4 remain intact.
+
+## v2.19.9 — preserve overlapping gamepad button aliases (#211 / #223) (2026-11-22)
+
+- **Gamepad alias correctness:** Holding a shoulder button and the corresponding right-stick direction now keeps its helicopter control engaged until *both* inputs are released, instead of the first release incorrectly cancelling the shared gamepad source. Aggregate pad state is written before per-binding action events, matching the keyboard event-observation contract. Controller-disconnect bookkeeping clears both per-binding and aggregated states.
+- **Tests and documentation:** Added revert-sensitive tests for overlapping bindings and for action listeners seeing the updated pad state, plus a control-accessibility matrix covering touch/keyboard/gamepad behavior and precise analog thresholds. The wider #211 controls-parity effort remains open; this release is the bounded alias fix, not full parity certification.
+- **Replay scope:** No authoritative physics, score formulas, recorded input/tape schema or simulation revision changed. The existing v2.19.7 SIM_REVISION 4 ruleset and the v2.19.8 developer replay comparison remain unchanged.
+
+## v2.19.8 — developer matched-build replay check (#129 / #226) (2026-11-22)
+
+- **Compare one matched normal-run fixture across the adjacent v2.19.6 and v2.19.7 builds.** Each build records and verifies only its own native tape. The local tool compares the same encoded neutral input and stock starting fields, then summarizes observed divergence and natural finish. No game, replay compatibility, ranking or scoring changes.
+
+## v2.19.7 — canonical terrain colliders, SIM_REVISION 4 (#119 / #222) (2026-11-22), SIM_REVISION 4 (#119) (2026-11-22)
+
+- **Terrain colliders no longer depend on what was streamed before them.** `TerrainMesh` used to recycle collider bodies from a pool, reshaping them with `Body.setVertices` + `Body.setPosition`. That left vertex bits that depended on the body's *previous* position. Now every segment collider is built fresh from the chunk's points, and the pool is removed.
+- **Physics identity:** this is an owner-approved break. `SIM_REVISION` moves 3 → 4, with an archived ruleset `sha256:89e2cdab…`. Tick outcomes change only where a recycled collider was touched. In a 2149-tick run, the sled ends 1.4e-5 px away, with the same crash tick and the same score. No visible terrain change: graphics are drawn from chunk points, not colliders.
+- **Memory:** removed colliders are now garbage-collected instead of held forever. After teleporting to x=107000, 6454 pooled bodies → 0, collider geometry 845 KB → 41 KB, and JS heap 70.4 → 56.1 MB.
+- **Canaries:** all 7 golden canaries PASS exactly against the new build, so none needs re-baselining.
+- **Coordination:** #121 (portable math, PR #209) must integrate after this release with SIM_REVISION 5+; never reuse this shipped revision 4 identity.
+
+- **Release integration:** Morgan’s separate developer-only stock neutral panel shipped first as v2.19.6. Its unchanged tooling and release notes are preserved here; the collider geometry/source ruleset remains identical to the reviewed #222 head.
+
+## v2.19.6 — developer stock hands-off panel (#220 / #77) (2026-11-22)
+
+- **Find reproducible 500 m hands-off candidates within a fixed local panel.** The tool checks 12 built-in courses in the pinned v2.18.1 Chromium preview. A candidate must reach the distance on a completed tick and then reproduce its natural finish, native checkpoints and cadence fingerprints in a fresh replay without saving. Short finishes and capped runs are reported separately. The tool does not verify newer builds or change gameplay, Daily selection, scores, or sharing.
+
 ## v2.19.5 — developer reaction-seed sensitivity comparison (#218 / #126) (2026-11-22)
 
 - **Compare matched synthetic hop-noise runs across reaction seeds.** The local CLI accepts two to eight complete classic panels with the same settings and per-course ideal control evidence. It reports pass counts and the courses that flip, with source file hashes and a caller-asserted build pin. It does not expose raw trials, select a Daily, estimate human fairness, or change game behavior.

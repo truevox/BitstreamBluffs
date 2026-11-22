@@ -35,6 +35,8 @@ const argv = process.argv.slice(2);
 const QUICK = argv.includes('--quick');
 const jsonOut = argv.includes('--json') ? argv[argv.indexOf('--json') + 1] : null;
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
+// For a single expensive browser case, use exact selection instead of matching every ablation.
+const EXACT_ONLY = process.env.EXACT_ONLY ? process.env.EXACT_ONLY.split(',') : null;
 
 const matterKitSrc = readFileSync(path.join(here, 'matter-snapshot-kit.js'), 'utf8').replace(/^export /gm, '')
   + '\nwindow.__ssMatterKit = createMatterSnapshotKit(Phaser.Physics.Matter.Matter);\n';
@@ -140,7 +142,7 @@ async function runCase(browser, fxName, level, skip = []) {
         for (const l of run.hazards.values()) for (const h of l) { hz++; if (h.motion) moving++; if (h.hit) hit++; }
         const e = run.matter.world.engine;
         return { tick: run.simClock.tick, sledX: run.sled.x, hazards: hz, movingHazards: moving, hazardsHit: hit, kodiaksOut: run.kodiaks.length, kodiakNext: run.kodiakNext,
-          pairs: e.pairs.list.length, activePairs: e.pairs.list.filter((p) => p.isActive && !p.isSensor).length, worldBodies: e.world.bodies.length, pool: run.mesh._bodyPool.length,
+          pairs: e.pairs.list.length, activePairs: e.pairs.list.filter((p) => p.isActive && !p.isSensor).length, worldBodies: e.world.bodies.length, pool: run.mesh._bodyPool?.length ?? 0,
           chunks: run.mesh.chunks.size, score: run.score.getTotal(), crashed: run.crashed, nextId: Phaser.Physics.Matter.Matter.Common._nextId };
       });
       const json = await A.page.evaluate(() => JSON.stringify(window.__ssGameKit.capture(window.__ss.run, { withConfig: true })));
@@ -222,6 +224,7 @@ try {
   for (const [fx, level, skip] of plan) {
     const key = `${fx}:${level}${skip ? `-${skip.join('+')}` : ''}`;
     if (ONLY && !ONLY.some((o) => key.startsWith(o))) continue;
+    if (EXACT_ONLY && !EXACT_ONLY.includes(key)) continue;
     if (done.has(key)) { console.log(`${key.padEnd(30)} (cached in ${jsonOut})`); continue; }
     const t0 = Date.now();
     let r;

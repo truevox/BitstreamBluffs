@@ -2,8 +2,8 @@
   "format": "bb-source-tripwire",
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
-  "simRevision": 3,
-  "attestation": "no-behavior-change: TelegraphTracker keyed by stable hazard ids instead of object identity; same warnings, cues and timings (before/after causal digests identical)",
+  "simRevision": 4,
+  "attestation": "no-behavior-change: stable hazard-id bookkeeping and scene telegraph snapshot restore; no change to live warning times, cues or physics under released SIM_REVISION 4",
   "changedFiles": [
     "src/scenes/RunScene.js"
   ],
@@ -13,7 +13,7 @@
     "src/entities/PowerUp.js": "sha256:b1a0a99f6a4433bde2146ec205be8d623bb6751fc075125a8b31b16f535e0dbc",
     "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
     "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
-    "src/entities/TerrainMesh.js": "sha256:47d06d99ef107a17faa64a684436550966e480203a26c466506e87367da05c01",
+    "src/entities/TerrainMesh.js": "sha256:b1ddf987355858f13b552d83c5d0f6a8afefb1a9950c2090a25bfbe4ade75e50",
     "src/scenes/RunScene.js": "sha256:dd2f5ba0abd0c6c2d7a0714a6314bf5a8364373c3efa259a908c83e2a56f4648",
     "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
