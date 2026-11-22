@@ -46,7 +46,8 @@ const ENG = {
   webkit: () => ({ type: webkit, opts: { headless: true } }),
 };
 const pageJs = await readFile(path.join(here, 'page.js'), 'utf8');
-const pmJs = await readFile(path.join(here, 'portable-math.cjs'), 'utf8');
+import { pmathScript } from './load-pmath.mjs';
+const pmJs = pmathScript();
 const levelOf = (f) => (f.kodiaks ? 8 : 1);
 const tapes = {}; for (const f of FIXTURES) tapes[f.id] = JSON.parse(await readFile(path.join(here, 'fixtures', `${f.id}.tape.json`), 'utf8'));
 

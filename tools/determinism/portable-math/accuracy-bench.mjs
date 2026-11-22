@@ -1,8 +1,8 @@
 // Accuracy (ulp vs the host's native Math, which is itself <= ~1 ulp from the true value) and speed of the portable candidates.
 // Run: node tools/determinism/portable-math/accuracy-bench.mjs [--json out.json]. DIAGNOSTIC; Node/V8 only.
-import { createRequire } from 'node:module';
+
 import { writeFileSync } from 'node:fs';
-const PM = createRequire(import.meta.url)('./portable-math.cjs');
+import PM from '../../../src/systems/pmath.js';
 const f = new Float64Array(2), u = new BigInt64Array(f.buffer);
 const ulp = (a, b) => { if (a === b) return 0; if (a !== a || b !== b) return (a !== a && b !== b) ? 0 : Infinity; f[0] = a; f[1] = b; if ((a < 0) !== (b < 0)) return Infinity; const d = u[0] - u[1]; return Number(d < 0n ? -d : d); };
 let seed = 12345; const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; return (seed >>> 0) / 4294967296; };

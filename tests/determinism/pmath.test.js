@@ -1,11 +1,10 @@
-// Issue #121 Phase A: unit test for the portable-math PROTOTYPE (tools/determinism/portable-math/portable-math.cjs). DIAGNOSTIC; the prototype is
-// not wired into the game. Accuracy bounds are measured against the host Math (V8 under Jest) and are deliberately a little looser than the
+// Issue #121: unit test for pmath (src/systems/pmath.js), the portable math every authoritative simulation file uses. Accuracy bounds are measured against the host Math (V8 under Jest) and are deliberately a little looser than the
 // measured maxima so a different V8 libm does not make the test flaky; the engine-independence claim is the golden hash, which engines.mjs
 // also checks in chromium, firefox and webkit.
 import fs from 'fs';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const PM = require('../../tools/determinism/portable-math/portable-math.cjs');
+import PM from '../../src/systems/pmath.js';
 const golden = require('../../tools/determinism/portable-math/golden.cjs');
 const expected = JSON.parse(fs.readFileSync(new URL('../../docs/determinism/results/portable-math-golden.json', import.meta.url), 'utf8'));
 
@@ -15,11 +14,11 @@ let seed = 777;
 const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; return (seed >>> 0) / 4294967296; };
 function maxUlp(gen, nat, pm, arity = 1, n = 20000) { let m = 0; for (let i = 0; i < n; i++) { const a = Array.from({ length: arity }, gen); m = Math.max(m, ulp(nat(...a), pm(...a))); } return m; }
 
-describe('portable math prototype: accuracy vs host Math (ulp)', () => {
+describe('pmath: accuracy vs host Math (ulp)', () => {
   const R = (s) => () => (rnd() - 0.5) * s;
   test.each([
     ['sin', R(80), 1], ['cos', R(80), 1], ['sin small args', R(2e5), 2], ['cos small args', R(2e5), 2], ['tan', R(20), 4], ['atan', R(40), 1], ['asin', () => rnd() * 2 - 1, 3], ['acos', () => rnd() * 2 - 1, 3],
-    ['exp', R(40), 1], ['expm1', R(4), 6], ['log', () => Math.exp((rnd() - 0.5) * 40), 1], ['log1p', () => rnd() * 30, 3], ['tanh', R(8), 6],
+    ['exp', R(40), 1], ['expm1', R(4), 6], ['sinh', R(10), 6], ['cosh', R(10), 4], ['cbrt', R(2000), 3], ['log2', () => Math.exp((rnd() - 0.5) * 40), 3], ['log10', () => Math.exp((rnd() - 0.5) * 40), 3], ['log', () => Math.exp((rnd() - 0.5) * 40), 1], ['log1p', () => rnd() * 30, 3], ['tanh', R(8), 6],
   ])('%s', (name, gen, bound) => { const fn = name.split(' ')[0]; expect(maxUlp(gen, Math[fn], PM[fn])).toBeLessThanOrEqual(bound); });
   test('atan2, hypot', () => {
     expect(maxUlp(R(200), Math.atan2, PM.atan2, 2)).toBeLessThanOrEqual(1);
@@ -33,7 +32,7 @@ describe('portable math prototype: accuracy vs host Math (ulp)', () => {
   });
 });
 
-describe('portable math prototype: special values and range limits', () => {
+describe('pmath: special values and range limits', () => {
   test('signs, zeros, infinities, NaN', () => {
     expect(Object.is(PM.sin(-0), -0)).toBe(true);
     expect(PM.sin(Infinity)).toBeNaN(); expect(PM.cos(NaN)).toBeNaN(); expect(PM.atan2(NaN, 1)).toBeNaN();
@@ -55,6 +54,6 @@ describe('portable math prototype: special values and range limits', () => {
   });
 });
 
-describe('portable math prototype: golden hashes (engine-independence check, also run by engines.mjs in chromium/firefox/webkit)', () => {
+describe('pmath: golden hashes (engine-independence check, also run by engines.mjs in chromium/firefox/webkit)', () => {
   test('fixed-input hashes equal the committed values', () => { expect(golden(PM)).toEqual(expected); });
 });

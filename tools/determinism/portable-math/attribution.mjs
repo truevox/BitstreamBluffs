@@ -13,7 +13,8 @@ const url = process.env.GAME_URL || 'http://localhost:8443/';
 const ids = process.argv.slice(2).length ? process.argv.slice(2) : ['collision-heavy', 'kodiaks-on'];
 const root = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
 const exe = readdirSync(root).filter((d) => /^chromium_headless_shell-\d/.test(d)).sort().reverse().map((d) => path.join(root, d, 'chrome-headless-shell-linux64', 'chrome-headless-shell')).find(existsSync);
-const pageJs = await readFile(path.join(here, 'page.js'), 'utf8'), pmJs = await readFile(path.join(here, 'portable-math.cjs'), 'utf8');
+import { pmathScript } from './load-pmath.mjs';
+const pageJs = await readFile(path.join(here, 'page.js'), 'utf8'), pmJs = pmathScript();
 const browser = await chromium.launch({ headless: true, executablePath: exe, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
 const agg = {};
 for (const id of ids) {

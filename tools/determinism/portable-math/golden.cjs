@@ -1,5 +1,5 @@
 /* Fixed-input golden hashes for the portable math prototype (issue #121). Pure JS, no Node APIs, so the same text runs in Node and in all three
- * browser engines (engines.mjs injects it). Inputs come from an integer LCG and exact power-of-two scaling, outputs are hashed over their IEEE bits (FNV-1a),
+ * browser engines (engines.mjs injects it). Takes the pmath object (src/systems/pmath.js). Inputs come from an integer LCG and exact power-of-two scaling, outputs are hashed over their IEEE bits (FNV-1a),
  * so any engine-dependent last-bit difference changes the hash. DIAGNOSTIC; not the #152 contract. */
 (function (root) {
   'use strict';
@@ -19,10 +19,12 @@
     run('log', (i) => [(next() + 1) * p2((i % 61) - 30)], PM.log); run('log1p', (i) => [(next() + 1) * p2((i % 31) - 20)], PM.log1p);
     const EXPS = [0.32, 0.45, 1.5, 2, 3, -2.5, 7.3, 4, 0.5];
     run('pow', (i) => [(next() + 1) * 25 + 0.01, EXPS[i % 9]], PM.pow);
-    run('tanh', () => [next() * 10], PM.tanh); run('hypot', (i) => [next() * p2((i % 20) - 6), next() * p2(((i * 3) % 20) - 6)], PM.hypot);
+    run('tanh', () => [next() * 10], PM.tanh);
+    run('sinh', (i) => [next() * (i % 4 === 0 ? 700 : 6)], PM.sinh); run('cosh', (i) => [next() * (i % 4 === 0 ? 700 : 6)], PM.cosh);
+    run('cbrt', (i) => [next() * p2((i % 80) - 40)], PM.cbrt); run('log2', (i) => [(next() + 1) * p2((i % 61) - 30)], PM.log2); run('log10', (i) => [(next() + 1) * p2((i % 61) - 30)], PM.log10); run('hypot', (i) => [next() * p2((i % 20) - 6), next() * p2(((i * 3) % 20) - 6)], PM.hypot);
     const SPECIAL = [0, -0, 1, -1, 0.5, Infinity, -Infinity, NaN, 1e-300, 5e-324, 1e300, 710, -746, 1e22, 1e7, 3.14159, -3.14159];
     let h = 0x811c9dc5 | 0;
-    for (const op of ['sin', 'cos', 'tan', 'atan', 'asin', 'acos', 'exp', 'expm1', 'log', 'log1p', 'tanh']) for (const x of SPECIAL) h = fnv(h, PM[op](x));
+    for (const op of ['sin', 'cos', 'tan', 'atan', 'asin', 'acos', 'exp', 'expm1', 'log', 'log1p', 'tanh', 'sinh', 'cosh', 'cbrt', 'log2', 'log10']) for (const x of SPECIAL) h = fnv(h, PM[op](x));
     for (const a of SPECIAL) for (const b of SPECIAL) { h = fnv(h, PM.atan2(a, b)); h = fnv(h, PM.hypot(a, b)); h = fnv(h, PM.pow(a, b)); }
     out.special = (h >>> 0).toString(16).padStart(8, '0');
     return out;
