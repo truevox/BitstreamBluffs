@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.19.6 — canonical terrain colliders, SIM_REVISION 4 (#119) (2026-11-22)
+
+- **Terrain colliders no longer depend on what was streamed before them.** `TerrainMesh` used to recycle collider bodies from a pool, reshaping them with `Body.setVertices` + `Body.setPosition`. That left vertex bits that depended on the body's *previous* position. Now every segment collider is built fresh from the chunk's points, and the pool is removed.
+- **Physics identity:** this is an owner-approved break. `SIM_REVISION` moves 3 → 4, with an archived ruleset `sha256:89e2cdab…`. Tick outcomes change only where a recycled collider was touched. In a 2149-tick run, the sled ends 1.4e-5 px away, with the same crash tick and the same score. No visible terrain change: graphics are drawn from chunk points, not colliders.
+- **Memory:** removed colliders are now garbage-collected instead of held forever. After teleporting to x=107000, 6454 pooled bodies → 0, collider geometry 845 KB → 41 KB, and JS heap 70.4 → 56.1 MB.
+- **Canaries:** all 7 golden canaries PASS exactly against the new build, so none needs re-baselining.
+- **Coordination:** #121 (portable math) also claims revision 4. Whichever merges second takes the next revision.
+
 ## v2.19.5 — developer reaction-seed sensitivity comparison (#218 / #126) (2026-11-22)
 
 - **Compare matched synthetic hop-noise runs across reaction seeds.** The local CLI accepts two to eight complete classic panels with the same settings and per-course ideal control evidence. It reports pass counts and the courses that flip, with source file hashes and a caller-asserted build pin. It does not expose raw trials, select a Daily, estimate human fairness, or change game behavior.

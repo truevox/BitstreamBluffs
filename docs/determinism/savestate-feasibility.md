@@ -370,7 +370,7 @@ restore log, field classification). Render with `node tools/savestate-experiment
    their job. They hold a sled pose and a rounded score, and resuming from one diverges on the next tick.
 2. **Matter private state is load-bearing**: the stale support slot, `positionImpulse` and `deltaTime`. A
    Matter upgrade can add state that a field-list serializer would silently miss; the audit catches that.
-3. **The TerrainMesh collider pool makes static geometry history-dependent** at the ULP level. Any scheme that
+3. **(Resolved in v2.19.6 / SIM_REVISION 4: colliders are now always built fresh and the pool is removed.)** **The TerrainMesh collider pool makes static geometry history-dependent** at the ULP level. Any scheme that
    rebuilds terrain (savestate, seek, rewind, a server verifier rebuilding from chunk data) must carry raw
    collider bits or replay the pool history. A one-line canonicalization fix (build each collider from
    absolute vertices, never translate a recycled body) would make colliders a pure function of chunk data. It

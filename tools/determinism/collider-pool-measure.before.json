@@ -1,15 +1,15 @@
 {
- "label": "before",
+ "label": "before-main-v2.19.5",
  "long": {
   "ticks": 2149,
   "crashed": true,
-  "msPerTickMedian": 50.424,
+  "msPerTickMedian": 18.595,
   "msPerTickBlocks": [
-   17.472,
-   50.424,
-   62.521,
-   55.097,
-   22.25
+   18.595,
+   30.728,
+   21.551,
+   14.544,
+   5.845
   ],
   "matterIdsConsumed": 260,
   "bodiesCreatedByMesh": 398,
@@ -17,7 +17,7 @@
   "worldBodies": 293,
   "chunks": 3,
   "colliderGeometryJsonBytes": 48414,
-  "heapMB": 42.9,
+  "heapMB": 35.9,
   "sledEnd": {
    "x": 10283.709442229585,
    "y": 3961.311862917827,
@@ -28,22 +28,22 @@
  "jump": {
   "ticks": 1000,
   "crashed": false,
-  "msPerTickMedian": 124.556,
+  "msPerTickMedian": 22.801,
   "msPerTickBlocks": [
-   79.003,
-   124.556
+   22.801,
+   17.086
   ],
-  "matterIdsConsumed": 6750,
+  "matterIdsConsumed": 6746,
   "bodiesCreatedByMesh": 6775,
   "pooledBodies": 6454,
   "worldBodies": 324,
   "chunks": 2,
-  "colliderGeometryJsonBytes": 845407,
-  "heapMB": 65.5,
+  "colliderGeometryJsonBytes": 844890,
+  "heapMB": 70.4,
   "sledEnd": {
-   "x": 112863.43447739868,
-   "y": 40432.56542322155,
-   "angle": 0.40466366485311694
+   "x": 112863.43447739232,
+   "y": 40432.5654232186,
+   "angle": 0.40466366495087175
   },
   "score": 12240
  }
