@@ -6,6 +6,7 @@
  * (e.g. tilt back -> tilt forward). Layout: steering cluster bottom-left, action cluster bottom-right, pause/reset
  * top-centre (HUD owns the top corners); the rider sits in the upper-left/middle of the screen so thumbs never cover it.
  */
+import { eventTimeOnClock, perfNow } from './PadDerive.js';
 
 /** @typedef {{name:string, label:string, icon:string, color:string, grid:string, big?:boolean}} OverlayButton */
 
@@ -73,10 +74,12 @@ const DEFAULT_COLORS = { cyan: '#00f0ff', magenta: '#ff2bd6', lime: '#9dff3a', a
 
 export class TouchOverlay {
   /**
-   * @param {{setButton:(name:string, down:boolean, source:string)=>void}} pad
+   * @param {{setButton:(name:string, down:boolean, source:string, timeStamp?:number|null)=>void}} pad
    */
   constructor(pad) {
     this.pad = pad;
+    /** Clock shared by PointerEvent.timeStamp and Phaser's rAF time (issue #115; overridable in tests). */
+    this.now = perfNow;
     this.controlLayout = 'classic';
     /** @type {HTMLElement|null} */
     this.root = null;
@@ -231,6 +234,8 @@ export class TouchOverlay {
     on('pointermove', (e) => this._onMove(e));
     on('pointerup', (e) => this._onUp(e));
     on('pointercancel', (e) => this._onUp(e));
+    // capture lost without a pointerup (element hidden/removed, OS gesture): release that finger
+    on('lostpointercapture', (e) => this._assign(e.pointerId, null, this._time(e)));
     on('contextmenu', (e) => e.preventDefault());
     this.root = root;
     parent.appendChild(root);
@@ -243,20 +248,25 @@ export class TouchOverlay {
     return b ? b.dataset.btn : null;
   }
 
-  _press(name) {
+  /** @param {Event} e @returns {number|null} event time on the rAF clock, or null (issue #115). */
+  _time(e) {
+    return eventTimeOnClock(e && e.timeStamp, this.now());
+  }
+
+  _press(name, t = null) {
     const n = (this.counts.get(name) || 0) + 1;
     this.counts.set(name, n);
     if (n === 1) {
-      this.pad.setButton(name, true, 'touch');
+      this.pad.setButton(name, true, 'touch', t);
       this._paint(name, true);
     }
   }
 
-  _release(name) {
+  _release(name, t = null) {
     const n = (this.counts.get(name) || 0) - 1;
     if (n <= 0) {
       this.counts.delete(name);
-      this.pad.setButton(name, false, 'touch');
+      this.pad.setButton(name, false, 'touch', t);
       this._paint(name, false);
     } else this.counts.set(name, n);
   }
@@ -267,13 +277,13 @@ export class TouchOverlay {
     if (el) el.classList.toggle('bb-on', on);
   }
 
-  _assign(id, name) {
+  _assign(id, name, t = null) {
     const prev = this.pointers.get(id);
     if (prev === name) return;
-    if (prev) this._release(prev);
+    if (prev) this._release(prev, t);
     if (name) {
       this.pointers.set(id, name);
-      this._press(name);
+      this._press(name, t);
     } else this.pointers.delete(id);
   }
 
@@ -281,18 +291,18 @@ export class TouchOverlay {
     e.preventDefault();
     try { e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     if (this.onGesture) this.onGesture(e);
-    this._assign(e.pointerId, this._hit(e));
+    this._assign(e.pointerId, this._hit(e), this._time(e));
   }
 
   _onMove(e) {
     if (!this.pointers.has(e.pointerId)) return;
     e.preventDefault();
-    this._assign(e.pointerId, this._hit(e));
+    this._assign(e.pointerId, this._hit(e), this._time(e));
   }
 
   _onUp(e) {
     e.preventDefault();
-    this._assign(e.pointerId, null);
+    this._assign(e.pointerId, null, this._time(e));
   }
 
   /** Release every held button (hidden, blur, destroy). */
