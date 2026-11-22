@@ -98,6 +98,8 @@ export const ARCADE_BRIDGE_RAMP_M = 5000;
  * ARCADE_BRIDGE_CAP_MUL x target, measured from the bridge's own first chunk, takes the sector's biome instead.
  */
 export const ARCADE_BRIDGE_CAP_MUL = 1.5;
+/** bridgeSpanAt never walks more chunks than this either way (a bridge is a handful; this only bounds a bug). */
+const BRIDGE_SCAN_MAX_CHUNKS = 64;
 /** Hazard gentleness: no hazards before HAZARD_SOFT_PX (80 m); only non-crash hazards before HAZARD_SAFE_PX (150 m). */
 export const HAZARD_SOFT_PX = 1600;
 export const HAZARD_SAFE_PX = 3000;
@@ -882,6 +884,31 @@ export class TerrainGenerator {
   biomeAtX(x) {
     const i = this._indexForX(Math.max(0, x));
     return this._biomeForChunk(this.bounds[i], i);
+  }
+
+  /**
+   * The arcade bridge that contains world x, as the generator built it (whole chunks: the same answer biomeAtX gives),
+   * or null when x is not on a bridge. Read-only and scratch only (builds chunk bounds as needed), so the presentation
+   * layer (#65 dissolve / reconstruct) can key a look to the sled's x without touching generation. `fromId` is the
+   * biome the bridge leaves and `toId` the one it enters (null only where no biome borders it).
+   * @param {number} x world px.
+   * @returns {{startX:number, endX:number, fromId:string|null, toId:string|null}|null}
+   */
+  bridgeSpanAt(x) {
+    if (!this.biomeDefs.length) return null;
+    const idAt = (i) => this._biomeForChunk(this._boundAt(i), i);
+    const at = this._indexForX(Math.max(0, x));
+    if (idAt(at) !== null) return null;
+    let a = at;
+    for (let guard = 0; a > 0 && guard < BRIDGE_SCAN_MAX_CHUNKS && idAt(a - 1) === null; guard++) a--;
+    let z = at;
+    for (let guard = 0; guard < BRIDGE_SCAN_MAX_CHUNKS && idAt(z + 1) === null; guard++) z++;
+    return {
+      startX: this._boundAt(a).startX,
+      endX: this._boundAt(z + 1).startX,
+      fromId: a > 0 ? idAt(a - 1) : null,
+      toId: idAt(z + 1),
+    };
   }
 
   /** The first chunk that starts inside a new sector is a calm "breather". */
