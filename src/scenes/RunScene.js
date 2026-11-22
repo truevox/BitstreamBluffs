@@ -64,7 +64,7 @@ import { Hazard } from '../entities/Hazard.js';
 import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
-import { WorldDanceEnvelope, worldDanceMotionAllowed } from '../systems/WorldDance.js';
+import { WorldDanceEnvelope, worldDanceMotionAllowed, readWorldDanceAudio } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
@@ -453,8 +453,10 @@ export class RunScene extends Phaser.Scene {
         this.finishGymReady();
       }
     };
-    this._onMusicTrackChange = (payload) => this.songBillboard?.showTrack(payload,
-      this.registry.get(REG.AUDIO));
+    // Audio is presentation: a failing engine must never break run start or the emitter (issue #140).
+    this._onMusicTrackChange = (payload) => {
+      try { this.songBillboard?.showTrack(payload, this.registry.get(REG.AUDIO)); } catch { /* no billboard */ }
+    };
     this.game.events.on(EVT.MUSIC_TRACK_CHANGED,this._onMusicTrackChange);
     this.game.events.on(EVT.SETTINGS_CHANGED, this._onSettings);
     this.game.events.on(EVT.GAME_RESUME, this._onResume);
@@ -466,9 +468,11 @@ export class RunScene extends Phaser.Scene {
     this.scene.launch(SCENES.UI);
     // A track may already be playing from the Title jukebox. Introduce it
     // once when entering the first run, never once per scene retry.
-    const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
-    if(playing?.state==='playing'&&playing.current)
-      this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    try {
+      const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
+      if(playing?.state==='playing'&&playing.current)
+        this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    } catch { /* a throwing audio engine must not stop the run from starting (issue #140) */ }
     this._initGhosts();
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
@@ -1462,8 +1466,8 @@ export class RunScene extends Phaser.Scene {
     const danceAllowed=worldDanceMotionAllowed(this.settings,
       this._worldDanceMotionQuery?.matches===true);
     const audio=this.registry?.get?.(REG.AUDIO);
-    const sample=danceAllowed?audio?.getWorldDanceSample?.():null;
-    const meter=danceAllowed&&sample?audio?.getSyntheticMeterTiming?.():null;
+    // Never throws: a failing audio engine must not stop the frame (and with it Phaser's loop), issue #140.
+    const {sample,meter}=readWorldDanceAudio(audio,danceAllowed);
     const dance=this.worldDance?.update(sample,dt,meter)||0;
     this.bg.update(cam.scrollX, t, sled.speed,dance);
     this.songBillboard?.update(dt,dance,!danceAllowed);
@@ -2372,6 +2376,7 @@ export class RunScene extends Phaser.Scene {
 
   onSettingsChanged(payload) {
     if (payload && payload.settings) this.settings = payload.settings;
+    // A palette toggle (Pause > Settings) is presentation: repaint only, never rebuild colliders (issue #140).
     if (payload && payload.key === 'palette' && this.sled) this.refreshPalette();
   }
 
@@ -2390,6 +2395,14 @@ export class RunScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Repaint the world in the current palette (+ the active sector's biome tint). Graphics only: terrain chunks are
+   * repainted with TerrainMesh.redrawChunk and their colliders are never touched (issue #140). Used by the palette
+   * setting AND on entering / leaving a biome sector. A biome's gameplay (zone mods, hazards, pickups) is chunk data
+   * read by the sim (getZoneDefs, takeChunk); collider material is fixed (TerrainMesh._takeBody), so rebuilding the
+   * colliders here only reshuffled body ids/order and dropped contact warm-start state. Owner-approved physics change
+   * (SIM_REVISION 2).
+   */
   refreshPalette() {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
@@ -2413,7 +2426,7 @@ export class RunScene extends Phaser.Scene {
     this.mesh.setPalette(this.palette);
     for (const chunk of this.terrain.getActiveChunks()) {
       if (!this.mesh.chunks.has(chunk.index)) continue;
-      this.mesh.addChunk(chunk); // redraws (removes + re-adds)
+      this.mesh.redrawChunk(chunk); // graphics only; colliders stay
       const hz = this.hazards.get(chunk.index);
       if (hz) hz.forEach((h) => { h.palette = this.palette; h.color = hazardColor(h.def, this.palette); });
       const pu = this.powerups.get(chunk.index);
