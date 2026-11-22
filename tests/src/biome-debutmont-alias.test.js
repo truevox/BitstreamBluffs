@@ -148,14 +148,18 @@ describe('guard: the misspelling stays out of the tree', () => {
     'src/data/biomeAliases.js',
     'tests/src/biome-debutmont-alias.test.js',
     'CHANGELOG.md',
+    // Frozen artifacts: the ruleset archive is content-addressed and immutable (each file hashes to its own name, and a
+    // ruleset is never edited), and the illustrative ruleset fixture is pinned by the manifest examples' digests.
+    'tests/fixtures/replay/v1/ruleset-illustrative.json',
   ]);
+  const FROZEN_PREFIXES = ['tools/ruleset/archive/'];
   test('no tracked text file outside the allowlist contains it (case-insensitive)', () => {
     // `-t` tags each path: "S" = skip-worktree (a sparse checkout without the OGG media), "H" = normal.
     const tracked = execFileSync('git', ['ls-files', '-t', '-z'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
       .split('\0').filter(Boolean).map((e) => ({ sparse: e[0] === 'S', path: e.slice(2) }));
     const offenders = [];
     for (const { sparse, path: f } of tracked) {
-      if (ALLOWED.has(f)) continue;
+      if (ALLOWED.has(f) || FROZEN_PREFIXES.some((p) => f.startsWith(p))) continue;
       // The path check comes first so a re-added adaptive/<legacy>/*.ogg fails even though its bytes are skipped.
       if (f.toLowerCase().includes(LEGACY)) { offenders.push(f + ' (path)'); continue; }
       if (f.endsWith('.ogg')) continue;
