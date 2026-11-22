@@ -46,7 +46,7 @@ import * as terrainContactNs from '../TerrainContact.js';
  * same PR, for ANY change to causal code behavior; see the module comment. It is independent of package.json's version
  * and of GHOST_PHYSICS_VERSION (kept only for legacy tape mapping, not bumped further).
  */
-export const SIM_REVISION = 1;
+export const SIM_REVISION = 2;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main (0 = none released yet). While the current SIM_REVISION is above

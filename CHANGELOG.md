@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.18.0 — race bears: playful Kodiak rivals (#47) (2026-11-22)
+
+- **Racing bears from Sync Level 6.** Three snow-racing rivals now come in packs of two or three on ordinary runs: a white polar **Kernel-Panic** that feints and then stops dead in your line, a brown grizzly **Brute-Force** that rears up and charges from behind, and a black **Black-Ice** that slides under your predicted landing. The first pack of a run is always two. They never appear on Dailies, Draft runs or the Gym.
+- **Same-type or mixed packs.** Settings has a new **KODIAK PACKS** switch: SAME TYPE (default) or MIXED. Both use the same schedule for a seed, so you can compare them on one course.
+- **Bears shove, they don't crash.** Contact pushes the sled back and up by a bounded amount, then the race goes on. Each bear shoves once per encounter, with a one-second pause between shoves. A shoved bear earns no pass bonus, and touching a bear never scores. A shoved sled can still lose the race through terrain, a chasm or the BSOD.
+- **Telegraphs and passes.** Each attack has a visible warning. Clearing a bear in the air scores as a bear hop; passing it on the ground scores as a clean pass.
+- **Replays and ghosts.** Kodiak runs are part of the replay, and they replay exactly at 30 and 120 Hz. Ghost tapes recorded before this release are not offered for Kodiak runs, since they predate the shove rule.
+- **Still being tuned.** Encounter spacing, pack sizes, telegraph timings and shove strength are playtest values, not final balance.
+
 ## v2.17.0 — local course ghost lineup (#178 / #81) (2026-11-22)
 
 - **Choose which ghosts appear on your next run.** Open Course Ghosts from Game Over with **G** or **Ghost Fav**. Set local Best and Latest visibility for that course, and pin, replace or clear Favorites A–C. Global Best and Latest settings still take precedence, and a tape shared by several roles draws only once. The lineup stays on this device; replay formats, scoring and online sharing are unchanged.
