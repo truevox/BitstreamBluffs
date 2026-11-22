@@ -14,7 +14,7 @@ import Phaser from 'phaser';
 import { CAT } from './Sled.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
-const { Bodies, Body, Vertices } = Matter;
+const { Bodies, Vertices } = Matter;
 
 /** Vertical extrusion of each collider quad, px (perpendicular thickness >= 24 px up to 55 deg slopes). */
 export const COLLIDER_DEPTH = 64;
@@ -35,7 +35,6 @@ export class TerrainMesh {
     /** @type {Map<number, {gfx: Phaser.GameObjects.Graphics, bodies: any[], pads: any[], startX:number, endX:number}>} */
     this.chunks = new Map();
     this._gfxPool = [];
-    this._bodyPool = [];
     this.stats = { bodiesCreated: 0, gfxCreated: 0 };
   }
 
@@ -62,22 +61,20 @@ export class TerrainMesh {
     return g;
   }
 
+  /**
+   * A fresh static collider for one segment quad. Always built from scratch, never recycled (issue #119): reshaping a
+   * pooled body (Body.setVertices + Body.setPosition) left vertex bits that depended on the body's PREVIOUS position, so
+   * the same chunk could collide differently depending on what was streamed before it. A fresh body is a pure function
+   * of `verts`, which keeps terrain physics independent of history (savestates, seeks, verifiers that rebuild terrain).
+   */
   _takeBody(verts) {
     const centre = Vertices.centre(verts);
-    let b = this._bodyPool.pop();
-    if (!b) {
-      b = Bodies.fromVertices(centre.x, centre.y, [verts], {
-        isStatic: true,
-        label: 'terrain',
-        collisionFilter: { group: 0, category: CAT.TERRAIN, mask: CAT.SLED },
-      }, false);
-      this.stats.bodiesCreated++;
-    } else {
-      Body.setStatic(b, false);
-      Body.setVertices(b, verts);
-      Body.setPosition(b, centre);
-      Body.setStatic(b, true);
-    }
+    const b = Bodies.fromVertices(centre.x, centre.y, [verts], {
+      isStatic: true,
+      label: 'terrain',
+      collisionFilter: { group: 0, category: CAT.TERRAIN, mask: CAT.SLED },
+    }, false);
+    this.stats.bodiesCreated++;
     // Matter combines friction with min() but frictionStatic with max(): zero it here or the sled sticks to the ground.
     b.friction = 1;
     b.frictionStatic = 0;
@@ -289,15 +286,12 @@ export class TerrainMesh {
 
   /**
    * @param {number} chunkIndex
-   * @returns {void} returns graphics + bodies to the pool.
+   * @returns {void} returns graphics to the pool; colliders are discarded (never recycled, see _takeBody).
    */
   removeChunk(chunkIndex) {
     const rec = this.chunks.get(chunkIndex);
     if (!rec) return;
-    for (const b of rec.bodies) {
-      this.world.remove(b);
-      this._bodyPool.push(b);
-    }
+    for (const b of rec.bodies) this.world.remove(b);
     for (const p of rec.pads) this.world.remove(p);
     rec.gfx.clear();
     rec.gfx.setVisible(false).setActive(false);
@@ -310,6 +304,5 @@ export class TerrainMesh {
     for (const idx of [...this.chunks.keys()]) this.removeChunk(idx);
     for (const g of this._gfxPool) g.destroy();
     this._gfxPool.length = 0;
-    this._bodyPool.length = 0;
   }
 }

@@ -379,7 +379,6 @@ export const NON_CAUSAL = Object.freeze({
     scene: 'back-reference to the scene', world: 'back-reference to the Matter world', palette: PRESENTATION,
     modDefs: RUN_CONSTANT + ' (content defs: ruleset)',
     _gfxPool: PRESENTATION, stats: 'diagnostic counters',
-    _bodyPool: 'recycled collider bodies; reuse changes only absolute Matter ids (non-causal, spec 6.2); resulting detector order is matter.staticOrder',
   }),
   MeshChunk: Object.freeze({
     gfx: PRESENTATION, bodies: 'collider bodies: positions and detector order are matter.staticOrder',

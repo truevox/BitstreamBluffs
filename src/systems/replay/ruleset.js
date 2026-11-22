@@ -46,7 +46,11 @@ import * as terrainContactNs from '../TerrainContact.js';
  * same PR, for ANY change to causal code behavior; see the module comment. It is independent of package.json's version
  * and of GHOST_PHYSICS_VERSION (kept only for legacy tape mapping, not bumped further).
  */
-export const SIM_REVISION = 1;
+// 2: #119 (owner-approved 2026-11-22): terrain colliders are always built fresh from the chunk's points; the recycled
+//    body pool (whose vertex bits depended on the body's previous position) is gone, so tick outcomes change at the
+//    ULP level wherever a recycled collider was touched. NOTE: #140 / PR #160 also bumps to 2; whichever PR merges
+//    second rebases its bump onto the other (one more increment) and merges these comments.
+export const SIM_REVISION = 2;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main (0 = none released yet). While the current SIM_REVISION is above
