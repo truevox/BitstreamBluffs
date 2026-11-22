@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.18.0 — race bears: playful Kodiak rivals (#47) (2026-11-22)
+## v2.19.0 — race bears: playful Kodiak rivals (#47) (2026-11-22)
 
 - **Racing bears from Sync Level 6.** Three snow-racing rivals now come in packs of two or three on ordinary runs: a white polar **Kernel-Panic** that feints and then stops dead in your line, a brown grizzly **Brute-Force** that rears up and charges from behind, and a black **Black-Ice** that slides under your predicted landing. The first pack of a run is always two. They never appear on Dailies, Draft runs or the Gym.
 - **Same-type or mixed packs.** Settings has a new **KODIAK PACKS** switch: SAME TYPE (default) or MIXED. Both use the same schedule for a seed, so you can compare them on one course.
@@ -8,6 +8,15 @@
 - **Telegraphs and passes.** Each attack has a visible warning. Clearing a bear in the air scores as a bear hop; passing it on the ground scores as a clean pass.
 - **Replays and ghosts.** Kodiak runs are part of the replay, and they replay exactly at 30 and 120 Hz. Ghost tapes recorded before this release are not offered for Kodiak runs, since they predate the shove rule.
 - **Still being tuned.** Encounter spacing, pack sizes, telegraph timings and shove strength are playtest values, not final balance.
+
+## v2.18.1 — developer Run DNA preview in local inspector (#213 / #87) (2026-11-22)
+
+- **Local, unverified Run DNA artwork preview.** The developer Downhill Run Strip inspector can now display abstract artwork from the full decoded trace loaded through the existing local file chooser. It clears stale previews on another selection or error; earlier asynchronous reads cannot replace a newer choice. The preview uses an SVG blob as an image, never injected markup. Section zoom and existing SVG download remain unchanged. No player-facing feature, replay, scoreboard, network, or gameplay changes.
+
+## v2.18.0 — canopy, airbrake and flip exploit research policies (#214 / #215) (2026-11-22)
+
+- **Developer Exploit Factory can now actually test the playtested canopy + airbrake + flip combination.** Adds two deterministic scripted candidates: `canopyHop` (airbrake/canopy without intentional flips) and `canopyFlip` (flip first, canopy after steering release, airbrake on descent while maintaining forward motion), against unchanged hands-off and flip controls. Simulator pad now routes real held/pressed canopy and airbrake signals; the result records observed active control times rather than assuming a named policy acted.
+- **24-seed matched comparison and pursuer distance diagnostics.** The report tracks the active BSOD's smallest observed 60 Hz gap to the rider, actual airborne/trick activity, score, distance, terminal cause and timeout censoring. These are headless diagnostics, not a claim of infinite airtime, an anti-cheat proof, or an approved balance change. No authoritative gameplay, collision, replay format or music code changes.
 
 ## v2.17.0 — local course ghost lineup (#178 / #81) (2026-11-22)
 
