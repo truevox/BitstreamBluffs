@@ -46,17 +46,20 @@ export function bridgeProgress(span, x) {
  * @param {number} x world px (the sled's)
  * @param {string|null} plainId the generator's own biome at x (biomeAtX): what the look is outside any bridge
  * @param {boolean} enabled false = hard cut
+ * @param {{veil:number, lookId:string|null, t:number}} [out] a scratch result to fill and return (the per-frame caller
+ *   passes one, so the hot path allocates nothing); omitted = a fresh object
  * @returns {{veil:number, lookId:string|null, t:number}} veil 0..1 (share of blocks covered), lookId (null = arcade), t progress (-1 off a bridge)
  */
-export function bridgeLook(span, x, plainId, enabled) {
-  if (!span) return { veil: 0, lookId: plainId, t: -1 };
+export function bridgeLook(span, x, plainId, enabled, out) {
+  const r = out || { veil: 0, lookId: null, t: -1 };
+  if (!span) { r.veil = 0; r.lookId = plainId; r.t = -1; return r; }
   const t = bridgeProgress(span, x);
-  if (!enabled) return { veil: 1, lookId: plainId, t };
-  const dissolveEnd = DISSOLVE_FRAC;
-  const rebuildStart = 1 - REBUILD_FRAC;
-  if (t < dissolveEnd) return { veil: clamp01(t / DISSOLVE_FRAC), lookId: span.fromId, t };
-  if (t > rebuildStart) return { veil: clamp01((1 - t) / REBUILD_FRAC), lookId: span.toId, t };
-  return { veil: 1, lookId: null, t };
+  r.t = t;
+  if (!enabled) { r.veil = 1; r.lookId = plainId; return r; }
+  if (t < DISSOLVE_FRAC) { r.veil = clamp01(t / DISSOLVE_FRAC); r.lookId = span.fromId; return r; }
+  if (t > 1 - REBUILD_FRAC) { r.veil = clamp01((1 - t) / REBUILD_FRAC); r.lookId = span.toId; return r; }
+  r.veil = 1; r.lookId = null;
+  return r;
 }
 
 // ------------------------------------------------------------------------------------------------ dither

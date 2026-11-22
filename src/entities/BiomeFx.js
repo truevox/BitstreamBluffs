@@ -58,10 +58,11 @@ export class BiomeFx {
     this.arc = arcadePalette;
     this.lookId = null;
     this.veil = 0;
+    this._veilDrawn = -1; // veil level the block layer was last drawn at (-1 = stale)
+    this._gridKey = -1;
     this.debut = false;
     this.gdg = false;
     this.hasDebutArt = hasBackdropArt(scene, 'debutmontSky') && hasBackdropArt(scene, 'debutmontRidgeFar') && hasBackdropArt(scene, 'debutmontRidgeNear');
-    this.hasArcadeArt = hasBackdropArt(scene, 'arcadeSky') && hasBackdropArt(scene, 'arcadeSun') && hasBackdropArt(scene, 'arcadeSkyline');
     this.shimNext = 0; // run-clock ms of the next shimmer pass (0 = not scheduled yet)
     this.shimStart = -1;
     this._rng = cosmeticRandom('biomefx');
@@ -178,6 +179,8 @@ export class BiomeFx {
     // deep blue / near black checker for the veil blocks, derived from the palette so colour-blind mode applies
     this.veilA = a.bg;
     this.veilB = mixColor(a.bgAlt, a.cyan, 0.1);
+    this._veilDrawn = -1; // the blocks and the grid are palette-coloured: redraw
+    this._gridKey = -1;
   }
 
   /**
@@ -188,8 +191,13 @@ export class BiomeFx {
    */
   setLook(lookId) {
     this.lookId = lookId;
-    this.debut = lookId === 'debutmont' && this.hasDebutArt;
-    this.gdg = lookId === 'garbage-dump-glacier';
+    const debut = lookId === 'debutmont' && this.hasDebutArt;
+    const gdg = lookId === 'garbage-dump-glacier';
+    // leaving a set drops what it last drew, so nothing stale shows if the set comes back later
+    if (this.debut && !debut) { this.snowG.clear(); this.shimStart = -1; this.shimNext = 0; }
+    if (this.gdg && !gdg) { this.debrisG.clear(); this.debrisAdd.clear(); }
+    this.debut = debut;
+    this.gdg = gdg;
     if (this.bg && typeof this.bg.setSkin === 'function') this.bg.setSkin(this.debut ? 'pixel' : null);
   }
 
@@ -200,6 +208,7 @@ export class BiomeFx {
 
   _applyVisibility(veil) {
     const arc = veil > 0;
+    if (!arc) { this._veilDrawn = -1; this._gridKey = -1; } // hidden: the next showing redraws
     const sky = this.debut && veil < 1;
     if (this.debutSky) this.debutSky.setVisible(sky);
     if (this.ridgeFar) this.ridgeFar.setVisible(sky);
@@ -313,7 +322,8 @@ export class BiomeFx {
 
   // ------------------------------------------------------------------ arcade bridge
 
-  _drawArcade(scrollX, veil) {
+  /** Redraw the veil blocks and their neon block grid at this coverage. */
+  _drawVeilBlocks(veil) {
     const g = this.veilG;
     const a = this.arc;
     g.clear();
@@ -341,6 +351,16 @@ export class BiomeFx {
     g.lineStyle(1, a.cyan, 0.1 + 0.2 * veil);
     for (let x = 0; x <= GAME_WIDTH; x += VEIL_CELL_PX) g.lineBetween(x, 0, x, GAME_HEIGHT);
     for (let y = 0; y <= GAME_HEIGHT; y += VEIL_CELL_PX) g.lineBetween(0, y, GAME_WIDTH, y);
+  }
+
+  _drawArcade(scrollX, veil) {
+    const a = this.arc;
+    // The block layer depends only on the veil level (and the palette), so it is drawn when the level changes and
+    // left alone otherwise: the whole pure-arcade stretch of a bridge costs no redraw.
+    if (veil !== this._veilDrawn) {
+      this._veilDrawn = veil;
+      this._drawVeilBlocks(veil);
+    }
 
     // ---- the arcade scene fades in over the last stretch of the dissolve (under near-full coverage, so no pop)
     const a1 = clamp01((veil - 0.6) / 0.4);
@@ -352,8 +372,12 @@ export class BiomeFx {
     }
     if (this.crt) this.crt.setAlpha(veil);
     const gg = this.gridG;
+    if (veil < 0.5) { if (this._gridKey !== 0) { gg.clear(); this._gridKey = 0; } return; }
+    // the grid is a function of the camera and the fade only: unchanged inputs keep last frame's drawing
+    const key = Math.round(scrollX) * 1000 + Math.round(a1 * 100) + 1;
+    if (key === this._gridKey) return;
+    this._gridKey = key;
     gg.clear();
-    if (veil < 0.5) return;
     // perspective grid under the horizon: lanes converge on the vanishing point and slide with the camera; rows
     // advance toward the viewer. Both are pure functions of scrollX.
     const vx = GAME_WIDTH / 2;

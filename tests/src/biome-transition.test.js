@@ -69,6 +69,19 @@ describe('bridge look: dissolve, arcade, reconstruct', () => {
     expect(bridgeLook(SPAN, 1100, null, false).lookId).toBeNull();
   });
 
+  test('an `out` scratch is filled and returned (no allocation), with the same values as a fresh result', () => {
+    const out = { veil: -1, lookId: 'x', t: -9 };
+    for (const t of [0, 0.1, 0.5, 0.9, 1]) {
+      const x = SPAN.startX + t * (SPAN.endX - SPAN.startX);
+      for (const enabled of [true, false]) {
+        expect(bridgeLook(SPAN, x, null, enabled, out)).toBe(out);
+        expect(out).toEqual(bridgeLook(SPAN, x, null, enabled));
+      }
+    }
+    expect(bridgeLook(null, 5, 'debutmont', true, out)).toBe(out);
+    expect(out).toEqual({ veil: 0, lookId: 'debutmont', t: -1 });
+  });
+
   test('pure: the same inputs give the same answer in any order (no time, no accumulated state)', () => {
     const ts = [0.9, 0.1, 0.5, 0.3, 0.8, 0.1, 0.9];
     const first = ts.map((t) => at(t));

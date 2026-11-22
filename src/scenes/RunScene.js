@@ -338,9 +338,9 @@ export class RunScene extends Phaser.Scene {
     this.bg = new Background(this, this.palette);
     // #65 presentation: the biome glitch sets and the arcade bridge look. Render-only (BiomeFx reads the camera and the
     // run clock; nothing it does reaches terrain, physics, hazards or score).
-    this._lookId = undefined;
     this._veil = 0;
     this._bridgeSpan = null;
+    this._lookScratch = { veil: 0, lookId: null, t: -1 }; // bridgeLook's result, reused every frame
     this.biomeFx = new BiomeFx(this, this.palette, getPalette(this.game, null), this.bg);
     this.worldDance = new WorldDanceEnvelope();
     this.songBillboard = new SongBillboard(this);
@@ -892,7 +892,7 @@ export class RunScene extends Phaser.Scene {
       span = this._bridgeSpan;
       if (!span || x < span.startX || x >= span.endX) span = this._bridgeSpan = this.terrain.bridgeSpanAt(x);
     } else this._bridgeSpan = null;
-    const look = bridgeLook(span, x, biomeNow, !isReducedMotion(this));
+    const look = bridgeLook(span, x, biomeNow, !isReducedMotion(this), this._lookScratch || (this._lookScratch = { veil: 0, lookId: null, t: -1 }));
     this._veil = look.veil;
     const lookChanged = look.lookId !== this._lookId;
     const firstLook = this._lookId === undefined;
