@@ -1,0 +1,319 @@
+{
+ "gitSha": "26eb0b0a5937ad4fb1a51cc318fd9b4d08ace137",
+ "generatedAt": "2026-11-22T14:12:56.807Z",
+ "engine": "chromium-headless-shell",
+ "hz": 120,
+ "path": "Title.startRun after force-stopping scenes (NOT the GameOver/retry flow)",
+ "results": [
+  {
+   "sequence": [
+    "cruise-baseline",
+    "cruise-baseline"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "no crash (tick limit)",
+   "run2FirstCausalDivergentTick": null,
+   "run2Subsystems": null,
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 2401,
+    "cause": null,
+    "distanceM": 591,
+    "score": 876
+   },
+   "fresh": {
+    "ticks": 2401,
+    "cause": null,
+    "distanceM": 591,
+    "score": 876
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "fifth-run-in-session",
+    "fifth-run-in-session"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "no crash (tick limit)",
+   "run2FirstCausalDivergentTick": null,
+   "run2Subsystems": null,
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 1801,
+    "cause": null,
+    "distanceM": 472,
+    "score": 717
+   },
+   "fresh": {
+    "ticks": 1801,
+    "cause": null,
+    "distanceM": 472,
+    "score": 717
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "collision-heavy",
+    "collision-heavy"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "terrain",
+   "run2FirstCausalDivergentTick": null,
+   "run2Subsystems": null,
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 1669,
+    "cause": "terrain",
+    "distanceM": 289,
+    "score": 399
+   },
+   "fresh": {
+    "ticks": 1669,
+    "cause": "terrain",
+    "distanceM": 289,
+    "score": 399
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "chunk-biome-boundaries",
+    "chunk-biome-boundaries"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "hazard",
+   "run2FirstCausalDivergentTick": null,
+   "run2Subsystems": null,
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 3431,
+    "cause": "hazard",
+    "distanceM": 835,
+    "score": 1175
+   },
+   "fresh": {
+    "ticks": 3431,
+    "cause": "hazard",
+    "distanceM": 835,
+    "score": 1175
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "bsod-pursuit-catch",
+    "bsod-pursuit-catch"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "bsod",
+   "run2FirstCausalDivergentTick": 7003,
+   "run2Subsystems": [
+    "terrain"
+   ],
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 12150,
+    "cause": "bsod",
+    "distanceM": 437,
+    "score": 0
+   },
+   "fresh": {
+    "ticks": 12150,
+    "cause": "bsod",
+    "distanceM": 437,
+    "score": 0
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "airborne-tricks",
+    "airborne-tricks"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "hazard",
+   "run2FirstCausalDivergentTick": 1728,
+   "run2Subsystems": [
+    "terrain"
+   ],
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 2224,
+    "cause": "hazard",
+    "distanceM": 513,
+    "score": 2428
+   },
+   "fresh": {
+    "ticks": 2224,
+    "cause": "hazard",
+    "distanceM": 513,
+    "score": 2428
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "parachute-airbrake",
+    "parachute-airbrake"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "hazard",
+   "run2FirstCausalDivergentTick": 968,
+   "run2Subsystems": [
+    "terrain"
+   ],
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 2146,
+    "cause": "hazard",
+    "distanceM": 332,
+    "score": 790
+   },
+   "fresh": {
+    "ticks": 2146,
+    "cause": "hazard",
+    "distanceM": 332,
+    "score": 790
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "kodiaks-on",
+    "kodiaks-on"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "hazard",
+   "run2FirstCausalDivergentTick": 2150,
+   "run2Subsystems": [
+    "terrain"
+   ],
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 2637,
+    "cause": "hazard",
+    "distanceM": 606,
+    "score": 991
+   },
+   "fresh": {
+    "ticks": 2637,
+    "cause": "hazard",
+    "distanceM": 606,
+    "score": 991
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "daily-practice-rule",
+    "daily-practice-rule"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "no crash (tick limit)",
+   "run2FirstCausalDivergentTick": null,
+   "run2Subsystems": null,
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 2401,
+    "cause": null,
+    "distanceM": 724,
+    "score": 1399
+   },
+   "fresh": {
+    "ticks": 2401,
+    "cause": null,
+    "distanceM": 724,
+    "score": 1399
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "cruise-baseline",
+    "chunk-biome-boundaries"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "no crash (tick limit)",
+   "run2FirstCausalDivergentTick": null,
+   "run2Subsystems": null,
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 3431,
+    "cause": "hazard",
+    "distanceM": 835,
+    "score": 1175
+   },
+   "fresh": {
+    "ticks": 3431,
+    "cause": "hazard",
+    "distanceM": 835,
+    "score": 1175
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "collision-heavy",
+    "chunk-biome-boundaries"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "terrain",
+   "run2FirstCausalDivergentTick": 1,
+   "run2Subsystems": [
+    "world"
+   ],
+   "run2TapeDesync": 120,
+   "run2OutcomeEqualsFresh": false,
+   "run2": {
+    "ticks": 3431,
+    "cause": null,
+    "distanceM": 815,
+    "score": 1115
+   },
+   "fresh": {
+    "ticks": 3431,
+    "cause": "hazard",
+    "distanceM": 835,
+    "score": 1175
+   },
+   "run1Clean": true
+  },
+  {
+   "sequence": [
+    "airborne-tricks",
+    "chunk-biome-boundaries"
+   ],
+   "hz": 120,
+   "run1CauseOrEnd": "hazard",
+   "run2FirstCausalDivergentTick": null,
+   "run2Subsystems": null,
+   "run2TapeDesync": null,
+   "run2OutcomeEqualsFresh": true,
+   "run2": {
+    "ticks": 3431,
+    "cause": "hazard",
+    "distanceM": 835,
+    "score": 1175
+   },
+   "fresh": {
+    "ticks": 3431,
+    "cause": "hazard",
+    "distanceM": 835,
+    "score": 1175
+   },
+   "run1Clean": true
+  }
+ ]
+}

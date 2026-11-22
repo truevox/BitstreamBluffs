@@ -157,9 +157,9 @@ export const FP_SCHEMAS = Object.freeze({
   },
 
   kodiak: {
-    version: 1,
+    version: 2,
     schema: rec(
-      ['next', 'u32'], ['on', 'bool'],
+      ['next', 'u32'], ['on', 'bool'], ['shoveCdMs', 'f64'],
       ['bears', list(rec(
         ['kind', 'str'], ['n', 'u32'], ['member', 'u32'], ['x', 'f64'], ['speed', 'f64'], ['phase', 'str'],
         ['phaseMs', 'f64'], ['ageMs', 'f64'], ['rngState', 'u32'], ['feints', 'u32'], ['targetX', opt('f64')],
@@ -294,7 +294,7 @@ export const FIELD_SOURCES = Object.freeze({
     runTimeMs: 'clock.runTimeMs', crashed: 'clock.crashed', simClock: 'clock.tick', runRandom: 'rng.physicsScramble',
     // sled / bsod / kodiak / tricks / score / recovery
     sled: 'sled', bsod: 'bsod', bsodCaught: 'bsod.caught', bsodBluffs: 'bsod.bluff', kodiaks: 'kodiak.bears',
-    kodiakNext: 'kodiak.next', kodiaksOn: 'kodiak.on', tricks: 'tricks.tracker', _airTricks: 'tricks.airTricks',
+    kodiakNext: 'kodiak.next', kodiaksOn: 'kodiak.on', kodiakShoveCdMs: 'kodiak.shoveCdMs', tricks: 'tricks.tracker', _airTricks: 'tricks.airTricks',
     score: 'score.mgr', shardChain: 'score.run.shardChain', shardChainAt: 'score.run.shardChainAt',
     shardTotal: 'score.run.shardTotal', shardCount: 'score.run.shardCount', nearMissCount: 'score.run.nearMissCount',
     maxAirtimeMs: 'score.run.maxAirtimeMs', bestCombo: 'score.run.bestCombo', lastTotal: 'score.run.lastTotal',

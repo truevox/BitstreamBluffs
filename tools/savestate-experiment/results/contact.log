@@ -1,0 +1,14 @@
+contact:control                firstDiv=null  (+-) sledDiv=null  maxPos=0 end=0 crash=null/null ticks=500 at=null
+contact:ghost                  firstDiv=601   (+1) sledDiv=601   maxPos=5.0636 end=0.1976 crash=null/null ticks=500 at=["runRandom","shardField","sled","runTimeMs","_hudMs","maxAirtimeMs","lastTotal","scrambleMs","openingGraces","safeSamples","shardChain","shardChainAt","shardTotal","shardCount","_steepMs","_landings","hints","score","tricks","bsod","bsodState","bsodBluffs","currentPhys","_lastHopMs","matter.bodies","matter.pairs","matter.timing","camera(#155)"]
+contact:game                   firstDiv=601   (+1) sledDiv=601   maxPos=0 end=0 crash=null/null ticks=500 at=["sled","tricks","bsodState","bsodBluffs","matter.bodies","matter.worldOrder","matter.pairs","matter.ids","matter.timing","camera(#155)"]
+contact:kinematic              firstDiv=601   (+1) sledDiv=601   maxPos=0 end=0 crash=null/null ticks=500 at=["sled","tricks","bsodState","matter.bodies","matter.worldOrder","matter.pairs","matter.ids","matter.timing","camera(#155)"]
+contact:contacts               firstDiv=601   (+1) sledDiv=null  maxPos=0 end=0 crash=null/null ticks=500 at=["matter.worldOrder","matter.ids","camera(#155)"]
+contact:full                   firstDiv=null  (+-) sledDiv=null  maxPos=0 end=0 crash=null/null ticks=500 at=null
+contact:full-camera            firstDiv=601   (+1) sledDiv=null  maxPos=0 end=0 crash=null/null ticks=500 at=["camera(#155)"]
+contact:full-ids               firstDiv=601   (+1) sledDiv=null  maxPos=0 end=0 crash=null/null ticks=500 at=["matter.worldOrder","matter.ids"]
+contact:full-runRandom         firstDiv=601   (+1) sledDiv=601   maxPos=5.0499 end=0.3636 crash=null/null ticks=500 at=["runRandom","sled","tricks","bsodState","bsodBluffs","matter.bodies","matter.pairs","camera(#155)"]
+contact:full-impulses          firstDiv=601   (+1) sledDiv=601   maxPos=0 end=0 crash=null/null ticks=500 at=["sled","tricks","bsodState","matter.bodies","matter.pairs","camera(#155)"]
+contact:full-staleSupport      firstDiv=null  (+-) sledDiv=null  maxPos=0 end=0 crash=null/null ticks=500 at=null
+contact:full-timing            firstDiv=601   (+1) sledDiv=601   maxPos=45.1217 end=45.1217 crash=null/null ticks=500 at=["sled","tricks","bsodState","bsodBluffs","matter.bodies","matter.pairs","matter.timing","camera(#155)"]
+contact:full-positionImpulse   firstDiv=null  (+-) sledDiv=null  maxPos=0 end=0 crash=null/null ticks=500 at=null
+contact:full-rawGeometry       firstDiv=601   (+1) sledDiv=601   maxPos=0 end=0 crash=null/null ticks=500 at=["sled","bsodState","bsodBluffs","matter.bodies","matter.pairs","camera(#155)"]

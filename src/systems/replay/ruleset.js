@@ -46,19 +46,23 @@ import * as terrainContactNs from '../TerrainContact.js';
  * same PR, for ANY change to causal code behavior; see the module comment. It is independent of package.json's version
  * and of GHOST_PHYSICS_VERSION (kept only for legacy tape mapping, not bumped further).
  */
-// 2: #119 (owner-approved 2026-11-22): terrain colliders are always built fresh from the chunk's points; the recycled
-//    body pool (whose vertex bits depended on the body's previous position) is gone, so tick outcomes change at the
-//    ULP level wherever a recycled collider was touched. NOTE: #140 / PR #160 also bumps to 2; whichever PR merges
-//    second rebases its bump onto the other (one more increment) and merges these comments.
-export const SIM_REVISION = 2;
+// 2: #47, release v2.19.0: Kodiak collisions become deterministic nonlethal shoves.
+//    This exact shipped ruleset is archived as sha256:b57634769e7337327e81c011cc0837e5b3422b1665a276ed3ae70dbe01048877.
+// 3: #140, release v2.19.1: biome-sector entry redraws graphics without rebuilding
+//    live colliders, changing authoritative outcomes on biome-mask crossings.
+// 4: #119, release v2.19.6 (owner-approved 2026-11-22): terrain colliders are always built fresh from the chunk's
+//    points; the recycled body pool (whose vertex bits depended on the body's previous position) is removed, so tick
+//    outcomes change wherever a recycled collider was touched. #121 (portable math) also claims 4: whichever merges
+//    second takes the next revision.
+export const SIM_REVISION = 4;
 
 /**
- * `SIM_REVISION` of the last ruleset RELEASED on main (0 = none released yet). While the current SIM_REVISION is above
+ * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above
  * this value it is still unreleased, so causal behavior may change inside it without a bump and the source tripwire
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-export const LAST_RELEASED_SIM_REVISION = 0;
+export const LAST_RELEASED_SIM_REVISION = 4;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;

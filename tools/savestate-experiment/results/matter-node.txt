@@ -1,0 +1,92 @@
+K=300 N=900; non-sensor pairs created after K in the reference run: 74
+K    level      history   statics  skip             firstDivTick  (+ticks)  maxPosErr(px)  endPosErr(px)  first field
+300  pose       same      false    -                301           1         339.979681     339.277396     pile:00[1] ref=282.66933345487655 got=260
+300  kinematic  same      false    -                301           1         159.589842     159.589842     pile:00[1] ref=282.66933345487655 got=282.67088246370355
+300  contacts   same      false    -                null          null      0              0              -
+300  full       same      false    -                null          null      0              0              -
+300  pose       shuffled  false    -                301           1         339.979681     339.277396     pile:00[1] ref=282.66933345487655 got=260
+300  kinematic  shuffled  false    -                301           1         159.589842     159.589842     pile:00[1] ref=282.66933345487655 got=282.67088246370355
+300  contacts   shuffled  false    -                null          null      0              0              -
+300  full       shuffled  false    -                null          null      0              0              -
+300  pose       permuted  false    -                301           1         380.559474     368.748202     pile:00[1] ref=282.66933345487655 got=260
+300  kinematic  permuted  false    -                301           1         194.659814     149.702214     pile:00[1] ref=282.66933345487655 got=282.67088246370355
+300  contacts   permuted  false    -                343           43        65.717477      65.717477      pile:05[4] ref=0.08794453192444962 got=0.07364204450186662
+300  full       permuted  false    -                null          null      0              0              -
+300  pose       pooled    false    -                301           1         289.361997     240.301143     pile:00[1] ref=282.66933345487655 got=260
+300  kinematic  pooled    false    -                301           1         114.78506      84.294365      pile:00[1] ref=282.66933345487655 got=282.67088246370355
+300  contacts   pooled    false    -                305           5         87.139596      66.251593      pile:05[1] ref=447.5989233965364 got=447.59892339653646
+300  full       pooled    false    -                305           5         87.139596      66.251593      pile:05[1] ref=447.5989233965364 got=447.59892339653646
+300  full       pooled    true     -                null          null      0              0              -
+300  contacts   permuted  true     -                343           43        65.717477      65.717477      pile:05[4] ref=0.08794453192444962 got=0.07364204450186662
+300  full       same      false    impulses         301           1         122.110682     91.220931      pile:00[1] ref=282.66933345487655 got=282.67086399893594
+300  full       same      false    staleSupport     301           1         268.873578     268.873578     pile:00[4] ref=0.0013629075610879227 got=0.0008132908476454759
+300  full       same      false    detectorOrder    null          null      0              0              -
+300  full       same      false    worldOrder       null          null      0              0              -
+300  full       same      false    timing           301           1         35.394519      35.394519      pile:05[1] ref=444.7891632606304 got=444.77680600444535
+300  full       same      false    positionImpulse  301           1         8.511857       8.511857       pile:11[1] ref=490.23202759967086 got=490.2319889180589
+300  full       same      false    deltaTime        301           1         91.238292      91.238292      pile:00[1] ref=282.66933345487655 got=282.6695628887259
+300  full       same      false    rawGeometry      301           1         146.47513      146.47513      pile:00[1] ref=282.66933345487655 got=282.66933345487683
+450  full       same      false    impulses         451           1         41.799794      16.129662      pile:00[1] ref=282.72983891611386 got=282.72909936893177
+450  full       same      false    staleSupport     451           1         148.796185     146.216038     pile:00[4] ref=0.000014426316965909791 got=0.00002108264743583277
+450  full       same      false    detectorOrder    null          null      0              0              -
+450  full       same      false    worldOrder       null          null      0              0              -
+450  full       same      false    timing           null          null      0              0              -
+450  full       same      false    positionImpulse  null          null      0              0              -
+450  full       same      false    deltaTime        451           1         143.910665     134.171289     pile:00[1] ref=282.72983891611386 got=282.72983955113455
+450  full       same      false    rawGeometry      451           1         36.055622      33.875353      pile:00[1] ref=282.72983891611386 got=282.72983891611415
+static geometry vs fresh build: [{"history":"shuffled","staticBodiesWithDifferentBits":0,"maxVertexErr":0},{"history":"pooled","staticBodiesWithDifferentBits":39,"maxVertexErr":1.1368683772161603e-13}]
+incomplete snapshot checks: {
+ "missingBody": "threw: restore: world body set differs (missing , extra pile:03)",
+ "wrongVersion": "threw: restore: snapshot version 99 != 1",
+ "unknownPairPart": "threw: restore: pair references unknown part ghost#0/pile:03#0",
+ "liveAudit": {
+  "rootBody": {
+   "audit": [
+    "sled: myNewState"
+   ],
+   "restore": "threw"
+  },
+  "pair": {
+   "audit": [
+    "pair[0]: newPairState"
+   ],
+   "restore": "threw"
+  },
+  "collision": {
+   "audit": [
+    "pair[0].collision: newCollisionState"
+   ],
+   "restore": "threw"
+  },
+  "contact": {
+   "audit": [
+    "pair[0].contacts[0]: cachedBias"
+   ],
+   "restore": "threw"
+  },
+  "engine": {
+   "audit": [
+    "engine: newSolverState"
+   ],
+   "restore": "threw"
+  },
+  "timing": {
+   "audit": [
+    "engine.timing: newClock"
+   ],
+   "restore": "threw"
+  },
+  "detector": {
+   "audit": [
+    "engine.detector: grid2"
+   ],
+   "restore": "threw"
+  },
+  "resolverStatic": {
+   "audit": [
+    "Matter.Resolver statics: _newWarming"
+   ],
+   "restore": "threw"
+  }
+ }
+}

@@ -1,5 +1,6 @@
 /** #79: offline inspection of stored GhostTape v1 poses, not a replay or event log. */
 import { decodeTrace, GHOST_TAPE_FORMAT } from './ghost/GhostTape.js';
+import { renderRunTraceArt } from './run-trace-art.js';
 
 export const MAX_STRIP_FILE_BYTES = 2 * 1024 * 1024;
 export const MAX_STRIP_POSES = 32_768;
@@ -135,6 +136,10 @@ export function openDownhillRunTrace(json) {
   const valid = (index) => Number.isInteger(index) && index >= 0 && index < count;
   return Object.freeze({
     count,
+    // The artwork uses the full validated path, never the current strip window or the tape header.
+    renderArt() {
+      return renderRunTraceArt(poses);
+    },
     sample(index) {
       if (!valid(index)) throw new RangeError('Choose a recorded sample');
       const tick = (index + 1) * TICKS_PER_SAMPLE;
