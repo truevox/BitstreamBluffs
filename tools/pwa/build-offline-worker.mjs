@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderMusicRouteWorker } from './music-route-worker.mjs';
 
 export const CACHE_PREFIX = 'bitstream-shell-v1-';
 export const MAX_PRECACHE_BYTES = 8 * 1024 * 1024;
@@ -68,6 +69,7 @@ export function renderOfflineWorker(inventory) {
 `const CACHE_PREFIX = ${JSON.stringify(CACHE_PREFIX)};\n` +
 `const EXPECTED = new Map(${JSON.stringify(paths)});\n` +
 `const ROOT = '/index.html';\n` +
+renderMusicRouteWorker() +
 `function hex(bytes) { return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join(''); }\n` +
 `self.addEventListener('install', event => {\n` +
 `  event.waitUntil((async () => {\n` +
@@ -96,7 +98,17 @@ export function renderOfflineWorker(inventory) {
 `  const url = new URL(request.url);\n` +
 `  if (url.origin !== self.location.origin) return;\n` +
 `  const path = url.pathname === '/' ? ROOT : url.pathname;\n` +
-`  if (!EXPECTED.has(path)) return; // No runtime caching of music, user data or third-party assets.\n` +
+`  if (path.startsWith('/music/packs/')) {\n` +
+`    event.respondWith((async()=> {\n` +
+`      const stored=await realMusicFromCache(path);\n` +
+`      if(stored)return stored;\n` +
+`      try { return await fetch(request); } catch {\n` +
+`        return new Response('Original music download required when online.',{status:503,headers:{'Content-Type':'text/plain','Cache-Control':'no-store'}});\n` +
+`      }\n` +
+`    })());\n` +
+`    return;\n` +
+`  }\n` +
+`  if (!EXPECTED.has(path)) return; // No runtime caching of user data or third-party assets.\n` +
 `  event.respondWith((async () => {\n` +
 `    const cache = await caches.open(CACHE_NAME);\n` +
 `    const cached = await cache.match(new URL(path, self.location.origin));\n` +

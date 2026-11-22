@@ -24,6 +24,10 @@ export function songCacheName(song) {
   return `${SONG_CACHE_PREFIX}${song.id}-${song.version}`;
 }
 
+function integrityUrl(song, origin) {
+  return new URL(`/.bitstream/offline-music-integrity/${encodeURIComponent(song.id)}/${song.version}`, origin).href;
+}
+
 function completionUrl(song, origin) {
   return new URL(`/.bitstream/offline-music-complete/${encodeURIComponent(song.id)}/${song.version}`, origin).href;
 }
@@ -45,6 +49,15 @@ export async function isRealSongDownloaded(song, { storage, origin, subtle }) {
   const cache = await storage.open(songCacheName(song));
   const marker = await cache.match(completionUrl(song, origin));
   if (!marker?.ok || await marker.text() !== `${song.id}:${song.version}`) return false;
+  // The router needs this manifest as well as the marker and audio bytes.
+  // CacheStorage can evict individual entries; don't advertise 'ready' unless
+  // both control records and every SHA-256-validated stem are present.
+  const inventory = await cache.match(integrityUrl(song, origin));
+  if (!inventory?.ok) return false;
+  let manifest;
+  try { manifest = await inventory.json(); } catch { return false; }
+  if (manifest?.id !== song.id || manifest?.version !== song.version ||
+      JSON.stringify(manifest.entries) !== JSON.stringify(song.entries)) return false;
   for (const entry of song.entries) {
     if (!await validStored(cache, entry, origin, subtle)) return false;
   }
@@ -108,6 +121,11 @@ export async function downloadRealSong(song, {
   if (firstFailure) throw firstFailure;
   // A ready marker is the *last* write. A failed write or quota rejection means
   // the player is NOT offline-ready, but previous validated files can resume.
+  // Store the exact checksummed inventory before writing the final ready
+  // marker, so the test-only worker can verify complete groups atomically.
+  await cache.put(integrityUrl(song, origin), new Response(JSON.stringify({
+    id:song.id,version:song.version,entries:song.entries,
+  }),{ status:200, headers:{'Content-Type':'application/json','Cache-Control':'no-store'} }));
   await cache.put(completionUrl(song, origin), new Response(`${song.id}:${song.version}`, {
     status: 200, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
   }));

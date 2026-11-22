@@ -16,6 +16,7 @@ class MemoryResponse {
   clone() { return new MemoryResponse(this.buffer, { status: this.status, headers: this.headers }); }
   async arrayBuffer() { const x = Uint8Array.from(this.buffer); return x.buffer; }
   async text() { return this.buffer.toString('utf8'); }
+  async json() { return JSON.parse(await this.text()); }
 }
 beforeAll(() => { globalThis.Response = MemoryResponse; });
 afterAll(() => { globalThis.Response = savedResponse; });
@@ -82,6 +83,17 @@ test('corrupt or redirected audio never marks a song ready', async () => {
     Object.defineProperty(response,'url',{value:'https://evil.example/somewhere'});
     return response;
   }))).rejects.toThrow(/redirected/);
+});
+
+test('evicting the integrity manifest invalidates music-ready status and repairs on retry', async () => {
+  const storage = new FakeStorage(), counter = {}, song = songFrom(['a','b']);
+  const args = capabilities(storage, fakeFetch({counter}));
+  await downloadRealSong(song, args);
+  const cache = await storage.open(`bb-real-music-v1-${song.id}-${song.version}`);
+  cache.data.delete(`${origin}/.bitstream/offline-music-integrity/${song.id}/${song.version}`);
+  expect(await isRealSongDownloaded(song, args)).toBe(false);
+  expect((await downloadRealSong(song, args)).reused).toBe(2);
+  expect(await isRealSongDownloaded(song, args)).toBe(true);
 });
 
 test('incomplete cache cannot masquerade as ready after eviction', async () => {
