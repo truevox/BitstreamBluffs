@@ -749,7 +749,7 @@ has at least one bridge chunk, and a later chunk is arcade when it starts inside
 `ARCADE_BRIDGE_CAP_MUL` (1.5) x the target length of the bridge's own first chunk (~125 m at the start, 187.5 m
 from 5000 m). A chunk that would overrun the cap is built as the sector's biome instead (the generator replays the
 chunk's own def pick and length draw as arcade to ask: `_arcadeEndPx`), which ends the bridge. Measured over
-3770 bridges at the full mask: min 46 m, median 98 m, p95 130 m, max 187 m (before the cap: median 106 m, max 308 m). The sector
+13648 bridges (400 seeds, 20 km, full mask): min 46 m, median 98 m, p95 131 m, max 187 m (before the cap: median 107 m, p95 258 m, max 320 m). The sector
 biome picks (`biome:${sector}`) are untouched by the cap. Bridge terrain is exactly the old
 arcade (null-biome) generation: no biome preference, zone or spawns; physics is unchanged. Every consumer asks
 the generator (`TerrainGenerator.biomeAtX(xPx)`, the chunk containing x) rather than computing a sector biome:
