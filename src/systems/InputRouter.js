@@ -301,6 +301,7 @@ export class InputRouter {
     // heliRight). Aggregate them BEFORE writing the pad so releasing one alias cannot cancel another
     // that is still held; every aggregate still writes the single 'gamepad' source.
     const padNext = {};
+    const pending = [];
     for (const b of GP_BINDINGS) {
       const down = !!b.test(g);
       const changed = down !== !!this.gpPrev[b.id];
@@ -309,14 +310,17 @@ export class InputRouter {
       if (target) padNext[target] = !!padNext[target] || down;
       if (b.confirm) padNext.confirm = !!padNext.confirm || down;
       if (!changed) continue;
-      for (const a of b.actions) this._emit(a, down, 'gamepad');
-      if (down) this._emit('anyKey', true, 'gamepad');
+      for (const a of b.actions) pending.push([a, down]);
+      if (down) pending.push(['anyKey', true]);
     }
+    // Pad writes are applied before emitting so action listeners observe the current pad state,
+    // matching the keyboard path.
     for (const [name, down] of Object.entries(padNext)) {
       if (down === !!this.gpPadPrev[name]) continue;
       this.gpPadPrev[name] = down;
       this.pad.setButton(name, down, 'gamepad');
     }
+    for (const [a, d] of pending) this._emit(a, d, 'gamepad');
     this.pad.setTilt(ax(g, 0), 'gamepad');
   }
 

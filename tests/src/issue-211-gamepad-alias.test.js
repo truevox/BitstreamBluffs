@@ -182,6 +182,28 @@ describe('issue #211: LB and RSLeft share pad heliLeft', () => {
     router.destroy();
   });
 
+  test('gamepad writes pad state before emitting INPUT_ACTION (listener sees fresh state)', () => {
+    const g = game();
+    const router = new InputRouter(g);
+    const observed = [];
+    g.events.on(EVT.INPUT_ACTION, (p) => {
+      if (p.action === 'hop') observed.push({ pressed: p.pressed, hop: router.pad.state.hop });
+    });
+    router.applySettings({ ...defaultSettings(), controlLayout: 'classic' });
+    g.events.emit(EVT.RUN_START);
+    const gp = gamepad();
+    navigator.getGamepads = () => [gp];
+
+    hold(gp, 0); // A -> hop + confirm
+    router.poll();
+    expect(observed).toContainEqual({ pressed: true, hop: true });
+
+    hold(gp, 0, false);
+    router.poll();
+    expect(observed).toContainEqual({ pressed: false, hop: false });
+    router.destroy();
+  });
+
   test('gamepad INPUT_ACTION events keep source "gamepad"', () => {
     const { router, actions } = setup();
     const gp = gamepad();

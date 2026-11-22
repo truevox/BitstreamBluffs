@@ -28,9 +28,9 @@ same touch swap: `touchButtonFor` treats any non-classic layout as `trickDeck`,
 
 | Action (pad field) | Tricks Right keyboard | Tricks Left keyboard | Classic keyboard | Touch Classic | Touch Trick Deck | Standard gamepad |
 |---|---|---|---|---|---|---|
-| push | NOT mapped | NOT mapped | `KeyW` → push (`InputRouter.js:27`) | PUSH button (`TouchOverlay.js:45`) | NOT mapped (push→divebomb, `TouchOverlay.js:68`) | RT button 7 (`InputRouter.js:60`) |
-| brake | NOT mapped | NOT mapped | `KeyS` → brake (`InputRouter.js:30`) | BRAKE (`TouchOverlay.js:36`) | NOT mapped | B button 1 (`InputRouter.js:54`) |
-| tuck | `KeyD` → tuck (`ControlLayouts.js:20`) | `ArrowRight` → tuck (`ControlLayouts.js:30`) | A+D together (derive, `PadDerive.js:23`) | TUCK (`TouchOverlay.js:37`) | TUCK (`TouchOverlay.js:37`) | LT button 6 ≥0.4 (`InputRouter.js:59`) |
+| push | NOT mapped | NOT mapped | `KeyW` → push (`InputRouter.js:27`) | PUSH button (`TouchOverlay.js:45`) | NOT mapped (push→divebomb, `TouchOverlay.js:68`) | RT button 7 value > 0.25 (`InputRouter.js:60,48`) |
+| brake | NOT mapped | NOT mapped | `KeyS` → brake (`InputRouter.js:30`) | BRAKE (`TouchOverlay.js:36`) | BRAKE still present (`TouchOverlay.js:36`, pass-through `TouchOverlay.js:70`) | B button 1 (`InputRouter.js:54`) |
+| tuck | `KeyD` → tuck (`ControlLayouts.js:20`) | `ArrowRight` → tuck (`ControlLayouts.js:30`) | A+D together (derive, `PadDerive.js:23`) | TUCK (`TouchOverlay.js:37`) | TUCK (`TouchOverlay.js:37`) | LT button 6 value > 0.4 (`InputRouter.js:59,48`) |
 | tiltBack | `ArrowDown` (`ControlLayouts.js:14`) | `KeyS` (`ControlLayouts.js:24`) | `KeyA` (`InputRouter.js:28`) | TILT BACK (`TouchOverlay.js:38`) | TILT BACK | D-pad left btn 14 (`InputRouter.js:65`) |
 | tiltForward | `ArrowUp` (`ControlLayouts.js:13`) | `KeyW` (`ControlLayouts.js:23`) | `KeyD` (`InputRouter.js:29`) | TILT FWD (`TouchOverlay.js:39`) | TILT FWD | D-pad right btn 15 (`InputRouter.js:66`) |
 | heliLeft | NOT mapped | NOT mapped | `ArrowLeft` (`InputRouter.js:34`) | SPIN CCW (`TouchOverlay.js:42`) | NOT mapped (heliLeft→corkscrew, `TouchOverlay.js:69`) | LB btn 4 **and** RS axis2 < −0.5 (`InputRouter.js:57,71`) |
@@ -44,6 +44,9 @@ same touch swap: `touchButtonFor` treats any non-classic layout as `trickDeck`,
 | pause | Escape (`InputRouter.js:38`) | Escape | Escape | PAUSE (`TouchOverlay.js:51`) | PAUSE | Start btn 9 (`InputRouter.js:62`) |
 | confirm (edge) | Space/Enter (`InputRouter.js:31,39`) | Space/Enter | Space/Enter | **NOT mapped** (`confirm` not in TOUCH_CLUSTERS) | NOT mapped | A btn 0 (`InputRouter.js:53`) |
 | Menu directions up/down/left/right | — | — | Arrow keys; W/S also emit up/down | — | — | D-pad 12/13 + left stick axes 0/1 (`InputRouter.js:63-70`) |
+
+Note: D-pad left/right (buttons 14/15) are also read directly by `MenuInput._pollPad()` as menu
+left/right (`src/ui/MenuInput.js:167-170`), which the per-action columns above do not express.
 
 ## Plain findings
 
