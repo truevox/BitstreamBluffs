@@ -59,8 +59,8 @@ const WITH_BOOSTS = process.argv.includes('--with-boosts');
 const EXPECTED_WITH_BOOSTS = 77; // B4 Sky Jellyfish bounce: +2 (the bouncySpring rebound is felt on the real sled - same pose, three arms: plain ground, spring zone, spring + Rails - and it does not pogo); B4: +5 (meteor crash + killer named, meteor air-telegraphed + dodged hands-off, gust impulse on the real sled and never the killer, each stabilizer saves a real landing; Rails damp the bouncySpring); Readable Chaos 3: +4 (real crash named / slowed / on Game Over, late hop verdict, absorbed hit is no crash, DIED HERE on retry); B3 tuning: +2 (each rolling hazard never catches a moving sled and overtakes a stopped one slowly, in view); Micro glow-up: +6 (bees on Micro, none on mask 0, drone locked in the shop, granted + toast, equip, drawn next run); Readable Chaos: +3 (ground telegraph off-screen, camera at 1200 px/s, B3 predicted arrival / gate verdict); B3: +6 (each moving hazard moves and crashes, each glide on the real sled, Treads vs the conveyor); B2: +4 (blind per Sight hazard, Goggles ward, Heat Shield); B1: +8 (hazard and power-up per Wards biome); decisions 1/2/4/6: +4; T2: +1 (the real sled rides the Micro dew swell); decision 3: +2
 const EXPECTED_WITHOUT_BOOSTS = 65; // B4 Sky Jellyfish bounce: +2; B4: +5; Readable Chaos 3: +4; B3 tuning: +2; Micro glow-up: +6; Readable Chaos: +3; B3: +6; B2: +4; B1: +8; decisions 1/2/6: +3 (Head Start needs --with-boosts); T2: +1; decision 3: +2
 
-// xpMin 48400 is level 16, the threshold that unlocks all five W3 biomes (13 underwater, 16 crystal), so
-// the fixture's mask 31 is reachable. Set XP, not `level`: ProfileStore derives level from XP on every
+// xpMin 42975 is level 15: it has unlocked all five W3 biomes (10 underwater, 13 crystal; the #65 ladder is one slot lower)
+// and Error Correction (15), but not Space Mountain (16), so the fixture's mask 31 is reachable and no sixth biome sneaks in. Set XP, not `level`: ProfileStore derives level from XP on every
 // load, and derives `pendingBiomes` from the level table on top of that, so a hand-set level or mask
 // alone is silently discarded.
 // The mask a normal run of PROFILE starts with, computed here and not read back from the profile: the four earned biomes'
@@ -68,9 +68,9 @@ const EXPECTED_WITHOUT_BOOSTS = 65; // B4 Sky Jellyfish bounce: +2; B4: +5; Read
 // biome and is never in a mask (#65).
 const PROFILE_RUN_MASK = 2 | 4 | 8 | 16;
 const PROFILE = {
-  v: 1, xp: 48400, level: 16, bank: 0, biomeOff: 0, // unlocked biomes default ON (#65); the legacy `biomeMask` is ignored by the game
+  v: 1, xp: 42975, level: 15, bank: 0, biomeOff: 0, // unlocked biomes default ON (#65); the legacy `biomeMask` is ignored by the game
   pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'],
-  // Level 16 has crossed both boost unlock levels (Head Start 8, Error Correction 15). A real profile
+  // Level 15 has crossed both boost unlock levels (Head Start 8, Error Correction 15). A real profile
   // gets these from grantLevelRewards when the level is crossed; a fixture that sets XP directly must
   // carry them, or the boost checks would be testing a locked boost (which correctly does nothing).
   unlocked: { biomes: [], cosmetics: [], boosts: { headStart: 8, errorCorrection: 15 } },

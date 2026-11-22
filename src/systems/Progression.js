@@ -12,9 +12,9 @@
  *   nearMisses  2 XP per near miss
  *   airtime     1 XP per full 2 s of the run's best single airtime
  * Pacing is anchored on MEASURED play, not on a hypothetical good run: an untrained player who only
- * steers (tools/sim/pacing.mjs --policy handsOff) earns ~38 XP per run, so Sync Level 2 is set at
- * 100 XP and lands on the third run — the "level 2 within the first 3 runs" target. The first biome
- * (level 4) is 3 750 XP and lands at 20.3 measured minutes. Both are asserted in
+ * steers (tools/sim/pacing.mjs --policy handsOff) earns ~33-44 XP per run (Debutmont base terrain, #65), so Sync Level 2
+ * is set at 80 XP and lands on the third run — the "level 2 within the first 3 runs" target. The first earned biome
+ * (Garbage Dump Glacier, level 4) is 3 750 XP, asserted to land within 14-28 measured minutes. Both are asserted in
  * tests/src/progression.test.js against a committed real-sim fixture (D-C numbers).
  *
  * The default profile shape is created ONCE by `defaultProfile()` with every field the later
@@ -52,7 +52,7 @@ const FALLBACK_TABLE = Object.freeze({
   cap: 3,
   levels: Object.freeze([
     Object.freeze({ level: 1, xpMin: 0, title: 'Signal Virgin', biome: null, cosmetic: null, boost: null }),
-    Object.freeze({ level: 2, xpMin: 100, title: 'Bit Runner', biome: null, cosmetic: 'trail-cyan', boost: null }),
+    Object.freeze({ level: 2, xpMin: 80, title: 'Bit Runner', biome: null, cosmetic: 'trail-cyan', boost: null }),
     Object.freeze({ level: 3, xpMin: 1200, title: 'Packet Jockey', biome: null, cosmetic: null, boost: null }),
   ]),
   biomeOrder: Object.freeze([]),

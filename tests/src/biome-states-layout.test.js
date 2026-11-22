@@ -24,9 +24,9 @@ const prog = (encountered, completed = []) => ({ biomeProgress: { encountered, c
 
 describe('biomeToggleRows carries the decision 3 state', () => {
   test('locked / unlocked / encountered / completed, plus a locked biome entered in a Daily', () => {
-    // level 10: debutmont (base, no row), garbage, pyramid unlocked. Pyramid completed, garbage encountered;
-    // underwater (locked, LVL 13) was entered on a Daily mask.
-    const p = atLevel(10, prog(['garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain'], ['pyramid-peak']));
+    // level 7: debutmont (base, no row), garbage, pyramid unlocked. Pyramid completed, garbage encountered;
+    // underwater (locked, LVL 10) was entered on a Daily mask.
+    const p = atLevel(7, prog(['garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain'], ['pyramid-peak']));
     const by = Object.fromEntries(biomeToggleRows(p, DEFS).map((r) => [r.id, r]));
     expect(by.debutmont).toBeUndefined(); // the base biome cannot be turned off, so it has no toggle row
     expect(by['garbage-dump-glacier']).toMatchObject({ unlocked: true, encountered: true, completed: false, state: 'encountered' });
@@ -61,17 +61,17 @@ describe('toggleLabel: the unlocked row says NEW / SEEN / DONE', () => {
 
 describe('profileLayout shows biome states', () => {
   test('locked names keep LVL n; a locked biome entered on a Daily also says SEEN', () => {
-    const p = atLevel(10, prog(['underwater-mountain']));
+    const p = atLevel(7, prog(['underwater-mountain']));
     const items = profileLayout({ profile: p, levels, playableBiomeIds: DEFS.map((d) => d.id) }).items;
     const texts = items.map((i) => i.text);
     expect(texts).toContain('UNDERWATER MOUNTAIN');
-    expect(texts).toContain('LVL 13');
+    expect(texts).toContain('LVL 10');
     expect(items.find((i) => i.key === 'state-underwater-mountain').text).toBe('SEEN');
     expect(items.find((i) => i.key === 'state-crystal-cavern')).toBeUndefined();
   });
 
   test('a biome progress summary reads SEEN n/11 DONE m/11', () => {
-    const p = atLevel(10, prog(['garbage-dump-glacier', 'pyramid-peak'], ['pyramid-peak']));
+    const p = atLevel(7, prog(['garbage-dump-glacier', 'pyramid-peak'], ['pyramid-peak']));
     const it = profileLayout({ profile: p, levels, playableBiomeIds: DEFS.map((d) => d.id) }).items.find((i) => i.key === 'biome-progress');
     expect(it.text).toBe('BIOMES SEEN 2/11 DONE 1/11');
   });
@@ -82,7 +82,7 @@ describe('profileLayout shows biome states', () => {
       atLevel(1, prog(all, all)), // every biome locked yet seen and done (Daily masks): every tag drawn
       atLevel(24, prog(all, all)),
       atLevel(30, prog(all, all)),
-      atLevel(10, prog([])),
+      atLevel(7, prog([])),
     ];
     for (const p of cases) {
       const layout = profileLayout({ profile: p, levels, playableBiomeIds: DEFS.map((d) => d.id), achievementTotal: 29 });
@@ -127,7 +127,7 @@ describe('the new state boxes and labels clear 4.5:1 in every palette', () => {
   test.each(Object.keys(palettes))('%s', (name) => {
     const pal = palettes[name];
     const all = levels.biomeOrder;
-    const items = profileLayout({ profile: atLevel(10, prog(all, all.slice(0, 5))), levels, playableBiomeIds: DEFS.map((d) => d.id) }).items
+    const items = profileLayout({ profile: atLevel(7, prog(all, all.slice(0, 5))), levels, playableBiomeIds: DEFS.map((d) => d.id) }).items
       .filter((i) => i.key.startsWith('state-') || i.key === 'biome-progress');
     expect(items.length).toBeGreaterThan(1);
     const labels = ['unlocked', 'encountered', 'completed'].map((state) => ({ ...toggleLabel({ name: 'X', state }), alpha: 1 }));

@@ -108,7 +108,7 @@ describe('ProfileLayout.profileLayout — no overlap, nothing clipped', () => {
     // with zero runs), so the label now says what it counts.
     const head = (xp) => profileLayout({ profile: atXp(xp), levels }).items.find((i) => i.key === 'sig-head').text;
     expect(head(0)).toBe('SIGNATURES UNLOCKED 1/11'); // the base biome, Debutmont, from the first run
-    expect(head(10600)).toBe('SIGNATURES UNLOCKED 2/11'); // Garbage Dump Glacier at level 7
+    expect(head(3800)).toBe('SIGNATURES UNLOCKED 2/11'); // Garbage Dump Glacier at level 4 (3,750 XP)
     expect(head(148700)).toBe('SIGNATURES UNLOCKED 11/11'); // level 29 clears every biome reward (last at level 28)
   });
 });

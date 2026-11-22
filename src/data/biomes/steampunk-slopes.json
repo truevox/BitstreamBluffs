@@ -2,7 +2,7 @@
   "id": "steampunk-slopes",
   "bit": 256,
   "name": "Steampunk Slopes",
-  "unlockLevel": 26,
+  "unlockLevel": 25,
   "lore": "Somebody bolted a belt to the mountain. It is going the wrong way on purpose.",
   "background": "brass-pipes",
   "mod": "conveyorBelt",

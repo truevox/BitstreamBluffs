@@ -2,7 +2,7 @@
   "id": "micro-mountain",
   "bit": 512,
   "name": "Micro Mountain",
-  "unlockLevel": 27,
+  "unlockLevel": 26,
   "lore": "Six centimetres of mountain, swelling under you like a held breath.",
   "background": "dew-drops",
   "mod": "dewSwell",

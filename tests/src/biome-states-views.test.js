@@ -256,7 +256,7 @@ describe('ACH-6: the real AchievementsView shows encountered / target', () => {
 
 describe('decision 3: ProfileView labels each unlocked biome with its state', () => {
   test('NEW / SEEN / DONE on the real toggle rows; locked names still drawn with LVL n', () => {
-    const p = atLevel(10, prog(['garbage-dump-glacier', 'pyramid-peak'], ['pyramid-peak']));
+    const p = atLevel(7, prog(['garbage-dump-glacier', 'pyramid-peak'], ['pyramid-peak']));
     const t = titleHost({ [REG.PROFILE]: p });
     const prof = openProfile(t);
     const labels = prof.sigMenu.items.map((i) => i.label);
@@ -265,7 +265,7 @@ describe('decision 3: ProfileView labels each unlocked biome with its state', ()
     expect(prof.sigMenu.items.map((i) => i.color)).toEqual(['cyan', 'lime']);
     const all = texts(prof.panel);
     expect(all).toContain('UNDERWATER MOUNTAIN');
-    expect(all).toContain('LVL 13');
+    expect(all).toContain('LVL 10');
     expect(all).toContain('BIOMES SEEN 2/11 DONE 1/11');
   });
 });

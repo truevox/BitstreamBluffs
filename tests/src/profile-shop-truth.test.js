@@ -55,10 +55,10 @@ describe('F11: Profile lists locked biomes', () => {
   });
 
   test('F11: a locked biome shows its unlock level beside its name', () => {
-    const items = prodLayout(atLevel(5)).items; // Debutmont (the base biome) unlocked, Garbage Dump Glacier (7) not
+    const items = prodLayout(atLevel(3)).items; // Debutmont (the base biome) unlocked, Garbage Dump Glacier (4) not
     const lock = (id) => items.find((i) => i.key === `lock-${id}`);
-    expect(lock('garbage-dump-glacier').text).toBe('LVL 7');
-    expect(lock('vertigo-vents').text).toBe('LVL 28');
+    expect(lock('garbage-dump-glacier').text).toBe('LVL 4');
+    expect(lock('vertigo-vents').text).toBe('LVL 27');
     const name = items.find((i) => i.text === 'GARBAGE DUMP GLACIER');
     expect(lock('garbage-dump-glacier').x).toBeGreaterThan(name.x + name.w);
     expect(lock('garbage-dump-glacier').y).toBe(name.y);
@@ -108,8 +108,8 @@ describe('F11: Profile labels say what they count', () => {
   test('F11: the biome header counts unlocked signatures and says so', () => {
     const head = (p) => prodLayout(p).items.find((i) => i.key === 'sig-head').text;
     expect(head(v1())).toBe('SIGNATURES UNLOCKED 1/11'); // the base biome, from the first run
-    expect(head(atLevel(5))).toBe('SIGNATURES UNLOCKED 1/11');
-    expect(head(atLevel(8))).toBe('SIGNATURES UNLOCKED 2/11'); // + Garbage Dump Glacier (level 7)
+    expect(head(atLevel(3))).toBe('SIGNATURES UNLOCKED 1/11');
+    expect(head(atLevel(5))).toBe('SIGNATURES UNLOCKED 2/11'); // + Garbage Dump Glacier (level 4)
     expect(head(v1({ xp: MAX_XP }))).toBe('SIGNATURES UNLOCKED 11/11');
   });
 });
