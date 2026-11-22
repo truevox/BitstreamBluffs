@@ -1,0 +1,652 @@
+{
+  "generatedAt": "2026-11-22T15:32:30.038Z",
+  "baselineDir": "tools/canaries/golden",
+  "outDir": "../../../../tmp/claude-0/-home-user-BitstreamBluffs/85082992-6705-5e76-939a-7be9a0df8284/scratchpad/ss/canary/out",
+  "epsilon": {
+    "x": 0,
+    "y": 0,
+    "angle": 0,
+    "vx": 0,
+    "vy": 0,
+    "score": 0,
+    "crashTick": 0,
+    "distance": 0,
+    "endTick": 0
+  },
+  "epsilonSource": "default (all zero)",
+  "tally": {
+    "PASS": 7
+  },
+  "canaries": [
+    {
+      "id": "bsod-attack",
+      "hz": 30,
+      "simTickHz": 120,
+      "status": "PASS",
+      "firstDivergence": null,
+      "divergenceCount": 0,
+      "outcome": {
+        "baseline": {
+          "crashed": true,
+          "crashTick": 6891,
+          "cause": "bsod",
+          "hazardId": null,
+          "score": 45,
+          "distance": 48,
+          "endTick": 6891
+        },
+        "current": {
+          "crashed": true,
+          "crashTick": 6891,
+          "cause": "bsod",
+          "hazardId": null,
+          "score": 45,
+          "distance": 48,
+          "endTick": 6891
+        },
+        "deltas": {
+          "crashed": 0,
+          "crashTick": 0,
+          "cause": 0,
+          "hazardId": 0,
+          "score": 0,
+          "distance": 0,
+          "endTick": 0
+        },
+        "changed": []
+      },
+      "stats": {
+        "baseline": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 1,
+          "airborneTicks": 26,
+          "ticks": 6891,
+          "totalSimMs": 57425.00000000001,
+          "scoreMean": 41.898305084745765,
+          "scoreMin": 0,
+          "scoreMax": 45
+        },
+        "current": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 1,
+          "airborneTicks": 26,
+          "ticks": 6891,
+          "totalSimMs": 57425.00000000001,
+          "scoreMean": 41.898305084745765,
+          "scoreMin": 0,
+          "scoreMax": 45
+        },
+        "scoreMeanDelta": 0,
+        "scoreMinDelta": 0,
+        "scoreMaxDelta": 0,
+        "inputChangesDelta": 0,
+        "airborneTicksDelta": 0,
+        "ticksDelta": 0,
+        "timeToFirstInputDeltaMs": 0
+      },
+      "simVersion": {
+        "baseline": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "current": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "changed": false
+      },
+      "expected": null,
+      "stallEvidence": {
+        "declared": 0,
+        "checks": 0,
+        "ok": true
+      }
+    },
+    {
+      "id": "bump",
+      "hz": 60,
+      "simTickHz": 120,
+      "status": "PASS",
+      "firstDivergence": null,
+      "divergenceCount": 0,
+      "outcome": {
+        "baseline": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 234,
+          "distance": 34,
+          "endTick": 312
+        },
+        "current": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 234,
+          "distance": 34,
+          "endTick": 312
+        },
+        "deltas": {
+          "crashed": 0,
+          "crashTick": 0,
+          "cause": 0,
+          "hazardId": 0,
+          "score": 0,
+          "distance": 0,
+          "endTick": 0
+        },
+        "changed": []
+      },
+      "stats": {
+        "baseline": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 2,
+          "airborneTicks": 77,
+          "ticks": 312,
+          "totalSimMs": 2600,
+          "scoreMean": 90.25,
+          "scoreMin": 0,
+          "scoreMax": 234
+        },
+        "current": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 2,
+          "airborneTicks": 77,
+          "ticks": 312,
+          "totalSimMs": 2600,
+          "scoreMean": 90.25,
+          "scoreMin": 0,
+          "scoreMax": 234
+        },
+        "scoreMeanDelta": 0,
+        "scoreMinDelta": 0,
+        "scoreMaxDelta": 0,
+        "inputChangesDelta": 0,
+        "airborneTicksDelta": 0,
+        "ticksDelta": 0,
+        "timeToFirstInputDeltaMs": 0
+      },
+      "simVersion": {
+        "baseline": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "current": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "changed": false
+      },
+      "expected": null,
+      "stallEvidence": {
+        "declared": 0,
+        "checks": 0,
+        "ok": true
+      }
+    },
+    {
+      "id": "cruise-points",
+      "hz": 60,
+      "simTickHz": 120,
+      "status": "PASS",
+      "firstDivergence": null,
+      "divergenceCount": 0,
+      "outcome": {
+        "baseline": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 481,
+          "distance": 205,
+          "endTick": 1080
+        },
+        "current": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 481,
+          "distance": 205,
+          "endTick": 1080
+        },
+        "deltas": {
+          "crashed": 0,
+          "crashTick": 0,
+          "cause": 0,
+          "hazardId": 0,
+          "score": 0,
+          "distance": 0,
+          "endTick": 0
+        },
+        "changed": []
+      },
+      "stats": {
+        "baseline": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 7,
+          "airborneTicks": 297,
+          "ticks": 1080,
+          "totalSimMs": 9000,
+          "scoreMean": 237.3,
+          "scoreMin": 0,
+          "scoreMax": 481
+        },
+        "current": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 7,
+          "airborneTicks": 297,
+          "ticks": 1080,
+          "totalSimMs": 9000,
+          "scoreMean": 237.3,
+          "scoreMin": 0,
+          "scoreMax": 481
+        },
+        "scoreMeanDelta": 0,
+        "scoreMinDelta": 0,
+        "scoreMaxDelta": 0,
+        "inputChangesDelta": 0,
+        "airborneTicksDelta": 0,
+        "ticksDelta": 0,
+        "timeToFirstInputDeltaMs": 0
+      },
+      "simVersion": {
+        "baseline": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "current": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "changed": false
+      },
+      "expected": null,
+      "stallEvidence": {
+        "declared": 0,
+        "checks": 0,
+        "ok": true
+      }
+    },
+    {
+      "id": "flip-edge",
+      "hz": 120,
+      "simTickHz": 120,
+      "status": "PASS",
+      "firstDivergence": null,
+      "divergenceCount": 0,
+      "outcome": {
+        "baseline": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 312,
+          "distance": 74,
+          "endTick": 432
+        },
+        "current": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 312,
+          "distance": 74,
+          "endTick": 432
+        },
+        "deltas": {
+          "crashed": 0,
+          "crashTick": 0,
+          "cause": 0,
+          "hazardId": 0,
+          "score": 0,
+          "distance": 0,
+          "endTick": 0
+        },
+        "changed": []
+      },
+      "stats": {
+        "baseline": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 6,
+          "airborneTicks": 158,
+          "ticks": 432,
+          "totalSimMs": 3600.0000000000005,
+          "scoreMean": 96.2,
+          "scoreMin": 0,
+          "scoreMax": 312
+        },
+        "current": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 6,
+          "airborneTicks": 158,
+          "ticks": 432,
+          "totalSimMs": 3600.0000000000005,
+          "scoreMean": 96.2,
+          "scoreMin": 0,
+          "scoreMax": 312
+        },
+        "scoreMeanDelta": 0,
+        "scoreMinDelta": 0,
+        "scoreMaxDelta": 0,
+        "inputChangesDelta": 0,
+        "airborneTicksDelta": 0,
+        "ticksDelta": 0,
+        "timeToFirstInputDeltaMs": 0
+      },
+      "simVersion": {
+        "baseline": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "current": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "changed": false
+      },
+      "expected": null,
+      "stallEvidence": {
+        "declared": 0,
+        "checks": 0,
+        "ok": true
+      }
+    },
+    {
+      "id": "hazard-transition",
+      "hz": 60,
+      "simTickHz": 120,
+      "status": "PASS",
+      "firstDivergence": null,
+      "divergenceCount": 0,
+      "outcome": {
+        "baseline": {
+          "crashed": true,
+          "crashTick": 580,
+          "cause": "hazard",
+          "hazardId": "glitchChasm",
+          "score": 600,
+          "distance": 100,
+          "endTick": 580
+        },
+        "current": {
+          "crashed": true,
+          "crashTick": 580,
+          "cause": "hazard",
+          "hazardId": "glitchChasm",
+          "score": 600,
+          "distance": 100,
+          "endTick": 580
+        },
+        "deltas": {
+          "crashed": 0,
+          "crashTick": 0,
+          "cause": 0,
+          "hazardId": 0,
+          "score": 0,
+          "distance": 0,
+          "endTick": 0
+        },
+        "changed": []
+      },
+      "stats": {
+        "baseline": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 4,
+          "airborneTicks": 86,
+          "ticks": 580,
+          "totalSimMs": 4833.333333333334,
+          "scoreMean": 469.3333333333333,
+          "scoreMin": 0,
+          "scoreMax": 600
+        },
+        "current": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 4,
+          "airborneTicks": 86,
+          "ticks": 580,
+          "totalSimMs": 4833.333333333334,
+          "scoreMean": 469.3333333333333,
+          "scoreMin": 0,
+          "scoreMax": 600
+        },
+        "scoreMeanDelta": 0,
+        "scoreMinDelta": 0,
+        "scoreMaxDelta": 0,
+        "inputChangesDelta": 0,
+        "airborneTicksDelta": 0,
+        "ticksDelta": 0,
+        "timeToFirstInputDeltaMs": 0
+      },
+      "simVersion": {
+        "baseline": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "current": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "changed": false
+      },
+      "expected": null,
+      "stallEvidence": {
+        "declared": 0,
+        "checks": 0,
+        "ok": true
+      }
+    },
+    {
+      "id": "long-airborne",
+      "hz": 120,
+      "simTickHz": 120,
+      "status": "PASS",
+      "firstDivergence": null,
+      "divergenceCount": 0,
+      "outcome": {
+        "baseline": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 774,
+          "distance": 111,
+          "endTick": 672
+        },
+        "current": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 774,
+          "distance": 111,
+          "endTick": 672
+        },
+        "deltas": {
+          "crashed": 0,
+          "crashTick": 0,
+          "cause": 0,
+          "hazardId": 0,
+          "score": 0,
+          "distance": 0,
+          "endTick": 0
+        },
+        "changed": []
+      },
+      "stats": {
+        "baseline": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 8,
+          "airborneTicks": 326,
+          "ticks": 672,
+          "totalSimMs": 5600,
+          "scoreMean": 300.57142857142856,
+          "scoreMin": 0,
+          "scoreMax": 774
+        },
+        "current": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 8,
+          "airborneTicks": 326,
+          "ticks": 672,
+          "totalSimMs": 5600,
+          "scoreMean": 300.57142857142856,
+          "scoreMin": 0,
+          "scoreMax": 774
+        },
+        "scoreMeanDelta": 0,
+        "scoreMinDelta": 0,
+        "scoreMaxDelta": 0,
+        "inputChangesDelta": 0,
+        "airborneTicksDelta": 0,
+        "ticksDelta": 0,
+        "timeToFirstInputDeltaMs": 0
+      },
+      "simVersion": {
+        "baseline": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "current": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "changed": false
+      },
+      "expected": null,
+      "stallEvidence": {
+        "declared": 0,
+        "checks": 0,
+        "ok": true
+      }
+    },
+    {
+      "id": "stall",
+      "hz": 60,
+      "simTickHz": 120,
+      "status": "PASS",
+      "firstDivergence": null,
+      "divergenceCount": 0,
+      "outcome": {
+        "baseline": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 122,
+          "distance": 125,
+          "endTick": 600
+        },
+        "current": {
+          "crashed": false,
+          "crashTick": null,
+          "cause": null,
+          "hazardId": null,
+          "score": 122,
+          "distance": 125,
+          "endTick": 600
+        },
+        "deltas": {
+          "crashed": 0,
+          "crashTick": 0,
+          "cause": 0,
+          "hazardId": 0,
+          "score": 0,
+          "distance": 0,
+          "endTick": 0
+        },
+        "changed": []
+      },
+      "stats": {
+        "baseline": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 2,
+          "airborneTicks": 166,
+          "ticks": 600,
+          "totalSimMs": 5000,
+          "scoreMean": 56.166666666666664,
+          "scoreMin": 0,
+          "scoreMax": 122
+        },
+        "current": {
+          "timeToFirstInputMs": 8.333,
+          "inputChanges": 2,
+          "airborneTicks": 166,
+          "ticks": 600,
+          "totalSimMs": 5000,
+          "scoreMean": 56.166666666666664,
+          "scoreMin": 0,
+          "scoreMax": 122
+        },
+        "scoreMeanDelta": 0,
+        "scoreMinDelta": 0,
+        "scoreMaxDelta": 0,
+        "inputChangesDelta": 0,
+        "airborneTicksDelta": 0,
+        "ticksDelta": 0,
+        "timeToFirstInputDeltaMs": 0
+      },
+      "simVersion": {
+        "baseline": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "current": {
+          "simTickHz": 120,
+          "runRandomVersion": 1,
+          "ghostTapeFormat": "bb-ghost-tape",
+          "ghostTapeVersion": 1,
+          "ghostPhysicsVersion": 1
+        },
+        "changed": false
+      },
+      "expected": null,
+      "stallEvidence": {
+        "declared": 2,
+        "checks": 2,
+        "ok": true
+      }
+    }
+  ]
+}
