@@ -16,7 +16,7 @@
  *   combo       the same run must contain every trick in `require`
  */
 import { Rng } from './Rng.js';
-import { earnedBiomeIds, unlockedBiomeIds } from './ProfileStore.js';
+import { earnedBiomeIds, unlockedBiomeIds, enabledBiomeMask, BASE_BIOME_ID } from './ProfileStore.js';
 
 /** How many missions are active at once (spec §5 W2). */
 export const SLOTS = 3;
@@ -250,18 +250,18 @@ export function isOfferable(t, profile, ruleId, biomeDefs) {
     // behaviour; the run-start and draw paths always pass the table.
     const unlocked = defs.length ? earnedBiomeIds(profile, defs) : unlockedBiomeIds(profile);
     if (!unlocked.includes(t.biome)) return false;
-    // A disabled signature must not spawn missions for terrain the player will never see. The bit comes
-    // from the biome table, because `profile.biomeOrder` is never set - gating on it meant the mask was
-    // never consulted at all.
-    const mask = profile && isNum(profile.biomeMask) ? profile.biomeMask : 0;
-    if (!maskCoversBiome(mask, t.biome, defs)) return false;
+    // A disabled signature must not spawn missions for terrain the player will never see. Unlocked biomes
+    // default ON (issue #65), so what is OFF is the profile's explicit `biomeOff`; the enabled mask resolves
+    // that against the biome table. The base biome has no bit in it and is always eligible. With no table
+    // (a legacy caller) an OFF choice cannot be resolved to a biome, so the unlocked check above decides.
+    if (defs.length && !maskCoversBiome(enabledBiomeMask(profile, defs), t.biome, defs)) return false;
   }
   return true;
 }
 
 /**
- * Does a biome mask include this biome? Shared by the draw gate (the profile's mask) and the completion gate
- * (the run's mask) so the two can never drift.
+ * Does a biome mask include this biome? Shared by the draw gate (the profile's enabled mask) and the completion
+ * gate (the run's mask) so the two can never drift. The base biome is always covered.
  *
  * With no table to resolve the id against (a legacy caller), the only decidable case is "everything off",
  * so that fails closed and any non-zero mask passes; with a table, the biome's own bit must be set.
@@ -271,6 +271,9 @@ export function isOfferable(t, profile, ruleId, biomeDefs) {
  * @returns {boolean}
  */
 function maskCoversBiome(mask, biomeId, biomeDefs) {
+  // The base biome is the terrain of every run, whatever its mask (Daily, seed@mask, Gym), so a mission for
+  // it is always eligible and completable ("1500 m in Debutmont" must not depend on a no-op bit).
+  if (biomeId === BASE_BIOME_ID) return true;
   const m = isNum(mask) ? mask >>> 0 : 0;
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   const def = defs.find((d) => d && d.id === biomeId);

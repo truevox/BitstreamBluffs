@@ -372,17 +372,20 @@ describe('D7 — the fill guarantee cannot leak a high tier', () => {
 
 describe('biome gating', () => {
   test('a biome-tied mission only appears when that biome is unlocked and enabled', () => {
-    const biome = 'debutmont';
+    // Debutmont is the base biome and always unlocked (issue #65), so the locked case uses another biome.
+    const biome = 'garbage-dump-glacier';
     // Locked: never offered, across many counters.
     for (let c = 0; c < 40; c++) {
-      const p = prof({ missions: { counter: c }, unlocked: { biomes: [], cosmetics: [], boosts: {} }, biomeMask: 0 });
+      const p = prof({ missions: { counter: c }, unlocked: { biomes: [], cosmetics: [], boosts: {} } });
       const drawn = drawMissions(p, TEMPLATES, 3);
       expect(drawn.some((m) => m.biome === biome)).toBe(false);
     }
   });
 
   test('a locked biome mission is not offered even at a high counter', () => {
-    const p = prof({ unlocked: { biomes: [], cosmetics: [], boosts: {} }, biomeMask: 0 });
+    // A fresh profile has only the base biome, whose missions are tier 4 (gated by Sync Level), so no
+    // biome mission can be drawn yet.
+    const p = prof({ unlocked: { biomes: [], cosmetics: [], boosts: {} } });
     expect(drawMissions(p, TEMPLATES, 3).every((m) => !m.biome)).toBe(true);
   });
 });
