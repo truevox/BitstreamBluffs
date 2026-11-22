@@ -1,5 +1,33 @@
 # Changelog
 
+## v2.16.3 — Exploit Factory: complete adversarial policy evidence (#187 / #76) (2026-11-22)
+
+- **`--reuse` no longer accepts an incomplete run record just because the record's own `failures[]` is empty.**
+  Completeness is re-derived from the record's data by new pure `tools/exploits/lib/record-audit.cjs`: every arm the
+  record claims to have run must carry exactly the planned seed identities, once each. Four shapes re-reported as
+  complete measurements (exit 0, full metrics table, rendered verdicts) and now exit 2 with the arm named as
+  *unmeasured*: an arm missing entirely, every arm cut to half the planned seeds, a duplicated seed inside one arm,
+  and a seed nobody planned. A duplicated-seed arm previously surfaced as exit 1 with a **usage** banner.
+- **A record whose counts cannot be attributed is rejected outright**, not partially compared: a run attributed to no
+  arm, an unnamed or duplicated `policySpec`, a plan that lists one seed twice. The report prints the reasons under
+  `RECORD REJECTED — no comparison is offered`.
+- **The exit code and the report now come from the same audit** on both the fresh and `--reuse` paths, so the status
+  cannot disagree with what was printed. The runner also merges audit findings into `failures` before writing, so the
+  record on disk always agrees with itself.
+- **Older records keep their guarantees.** A record without `args.seedList` has its plan recovered from the numeric
+  `args.seeds` count (expanded exactly as the simulator expands it), or from a comma-list `args.seeds`. Only a record
+  with neither is rejected outright, because there is then no plan to verify the arms against.
+- **A reused record must now be self-sufficient beyond its run list.** It must name a `baseline` that actually has an
+  arm — otherwise there is nothing to pair a candidate against — and it must carry a recoverable seed plan
+  (`args.seedList`, a numeric `args.seeds` count, or a comma-list `args.seeds`). A record with neither is rejected
+  instead of being accepted on "the arms agree", which is exactly what a uniformly truncated record looks like. A
+  comma-list `args.seeds` is now treated as exact identities rather than as an unverifiable fallback.
+- `tools/exploits/repro-reuse-incomplete.mjs` reproduces the twelve defective shapes through the real CLI, with two
+  positive cases (a full record and a genuinely dominant one) so it fails if the guard ever decays into "always
+  refuse". Run against the previously reviewed head `645a5c6` it reports 11 of 12 accepted as clean; at this head, 0.
+- Harness tooling only: no gameplay, physics, balance or player-visible change. `tools/sim/**` untouched.
+
+
 ## v2.16.2 — canonical replay development check (#205 / #129) (2026-11-22)
 
 - **Same-build replay check for developers.** The local tool records one synthetic stock run in a pinned Chromium build, verifies its native canonical evidence, and compares every completed tick across two fresh replays plus the separate fatal event. It does not compare historical builds or change gameplay, scoring, or the replay format.
