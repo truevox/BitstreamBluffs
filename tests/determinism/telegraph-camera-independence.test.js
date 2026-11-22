@@ -5,10 +5,13 @@
  * camera's right edge, rebuilt in renderFrame, one display frame stale) to planTelegraph as its horizon.
  * The owner assigned the fix to issue #155. This file DETECTS it without fixing it:
  *  - an expected failure (test.failing) that turns into an unexpected pass, and so fails the suite, once #155
- *    makes the plan camera-independent (then flip it to a plain test);
+ *    fixes the call site (source check of the planTelegraph(...) arguments) or makes the plan camera-independent
+ *    (then flip it to a plain test, and drop the "today the call site passes" pin);
  *  - plain tests that pin today's blast radius: only the `onScreen` flag of a mark follows the camera; the
  *    sounds/cues (TelegraphTracker) and every other mark field are camera-independent.
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { planTelegraph, TelegraphTracker } from '../../src/systems/HazardTelegraph.js';
 
 const crashDef = { id: 'firewall', onHit: { effect: 'crash' } };
@@ -24,13 +27,50 @@ const VIEW_RIGHT_ZOOM_OUT = 1000 + 960 / 0.6 / 2 + 300;
 const VIEW_RIGHT_ZOOM_IN = 1000 + 960 / 1.2 / 2;
 const strip = (marks) => marks.map(({ ref, ...m }) => ({ id: ref.def.id, cx: ref.cx, ...m }));
 
+/**
+ * The arguments of the planTelegraph(...) call inside RunScene.updateGroundTelegraph, read from the source text.
+ * Balanced-paren scan, so a multi-line call works. Throws when the method or the call is gone, so a refactor cannot
+ * silently retire the call-site check (the plain test below fails loudly instead).
+ */
+function telegraphCallSiteArgs() {
+  const src = readFileSync(fileURLToPath(new URL('../../src/scenes/RunScene.js', import.meta.url)), 'utf8');
+  const m = /\n  updateGroundTelegraph\([^)]*\) \{/.exec(src);
+  if (!m) throw new Error('RunScene.updateGroundTelegraph not found');
+  const body = src.slice(m.index, src.indexOf('\n  }\n', m.index));
+  const at = body.indexOf('planTelegraph(');
+  if (at < 0) throw new Error('planTelegraph( call not found in updateGroundTelegraph');
+  let depth = 0;
+  for (let i = at + 'planTelegraph'.length; i < body.length; i++) {
+    if (body[i] === '(') depth++;
+    else if (body[i] === ')' && --depth === 0) return body.slice(at + 'planTelegraph('.length, i);
+  }
+  throw new Error('unbalanced planTelegraph( call');
+}
+const CAMERA_RE = /_view|cameras|\bcam\b|scrollX|zoom/;
+
 describe('ground telegraph vs the rendered camera (#155 detector)', () => {
-  // Expected to FAIL until issue #155 lands: the plan still depends on the camera. When this starts to pass,
-  // Jest reports it as an error; change test.failing to test.
-  test.failing('the planned marks do not depend on the rendered camera (fixed by #155)', () => {
-    const a = planTelegraph(hazards, sled, VIEW_RIGHT_ZOOM_OUT, { nowMs: 5000 });
-    const b = planTelegraph(hazards, sled, VIEW_RIGHT_ZOOM_IN, { nowMs: 5000 });
-    expect(strip(b)).toEqual(strip(a));
+  test('the call-site check can find the planTelegraph call in RunScene.updateGroundTelegraph', () => {
+    expect(() => telegraphCallSiteArgs()).not.toThrow();
+  });
+
+  // Expected to FAIL until issue #155 lands. It turns into an unexpected pass (which Jest reports as an error, so flip
+  // test.failing to test) as soon as EITHER the RunScene call site stops passing a camera-derived horizon OR
+  // planTelegraph's plan stops depending on that argument. A changed planTelegraph signature that makes the call throw
+  // also counts as "changed" and surfaces here, rather than being swallowed as an expected failure.
+  test.failing('the telegraph plan does not depend on the rendered camera (fixed by #155)', () => {
+    let callSiteClean;
+    try { callSiteClean = !CAMERA_RE.test(telegraphCallSiteArgs()); } catch (e) { callSiteClean = true; }
+    let planClean;
+    try {
+      const a = planTelegraph(hazards, sled, VIEW_RIGHT_ZOOM_OUT, { nowMs: 5000 });
+      const b = planTelegraph(hazards, sled, VIEW_RIGHT_ZOOM_IN, { nowMs: 5000 });
+      planClean = JSON.stringify(strip(a)) === JSON.stringify(strip(b));
+    } catch (e) { planClean = true; }
+    expect(callSiteClean || planClean).toBe(true);
+  });
+
+  test('today the call site passes the rendered camera edge (pins what #155 must change)', () => {
+    expect(telegraphCallSiteArgs()).toMatch(/this\._view/);
   });
 
   test('today only `onScreen` follows the camera: every other mark field is camera-independent', () => {

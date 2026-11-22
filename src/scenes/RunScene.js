@@ -452,8 +452,10 @@ export class RunScene extends Phaser.Scene {
         this.finishGymReady();
       }
     };
-    this._onMusicTrackChange = (payload) => this.songBillboard?.showTrack(payload,
-      this.registry.get(REG.AUDIO));
+    // Audio is presentation: a failing engine must never break run start or the emitter (issue #140).
+    this._onMusicTrackChange = (payload) => {
+      try { this.songBillboard?.showTrack(payload, this.registry.get(REG.AUDIO)); } catch { /* no billboard */ }
+    };
     this.game.events.on(EVT.MUSIC_TRACK_CHANGED,this._onMusicTrackChange);
     this.game.events.on(EVT.SETTINGS_CHANGED, this._onSettings);
     this.game.events.on(EVT.GAME_RESUME, this._onResume);
@@ -465,9 +467,11 @@ export class RunScene extends Phaser.Scene {
     this.scene.launch(SCENES.UI);
     // A track may already be playing from the Title jukebox. Introduce it
     // once when entering the first run, never once per scene retry.
-    const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
-    if(playing?.state==='playing'&&playing.current)
-      this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    try {
+      const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
+      if(playing?.state==='playing'&&playing.current)
+        this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    } catch { /* a throwing audio engine must not stop the run from starting (issue #140) */ }
     this._initGhosts();
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,

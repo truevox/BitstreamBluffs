@@ -36,6 +36,11 @@ export function readWorldDanceAudio(audio, allowed) {
     const meter = sample ? audio.getSyntheticMeterTiming?.() ?? null : null;
     return { sample, meter };
   } catch (e) {
+    // Log once so a real audio-engine bug stays visible; every later failure is silent "no dance".
+    if (!readWorldDanceAudio.warned) {
+      readWorldDanceAudio.warned = true;
+      try { console.warn('[WorldDance] audio read failed; scenery dance disabled for this failure', e); } catch { /* no console */ }
+    }
     return { sample: null, meter: null };
   }
 }

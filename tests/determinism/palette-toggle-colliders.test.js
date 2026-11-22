@@ -74,11 +74,13 @@ function fakeWorld() {
 }
 function graphics() {
   const calls = [];
+  const log = [];
   const g = new Proxy({}, {
     get(t, k) {
       if (k === 'then') return undefined;
       if (k === 'calls') return calls;
-      return (...a) => { calls.push(k); return g; };
+      if (k === 'log') return log;
+      return (...a) => { calls.push(k); g.log.push([k, JSON.stringify(a)]); return g; };
     },
   });
   return g;
@@ -118,6 +120,23 @@ describe('TerrainMesh: repaint vs rebuild', () => {
     world.bodies.forEach((body, i) => expect(body).toBe(before.bodies[i]));
     expect(gfx).toHaveLength(2); // no new Graphics either
     expect(gfx[0].calls.length).toBeGreaterThan(drawn); // it did redraw
+  });
+
+  test('redrawChunk draws exactly what addChunk drew: same Graphics calls, same arguments, same order', () => {
+    const palette = new Proxy({}, { get: () => 0x123456 });
+    const fresh = mesh();
+    fresh.m.setPalette(palette);
+    fresh.m.addChunk(chunk(3));
+    const viaAdd = fresh.gfx[0].log.filter(([k]) => !['clear', 'setVisible', 'setActive', 'setDepth'].includes(k));
+    const re = mesh();
+    re.m.addChunk(chunk(3));
+    re.m.setPalette(palette);
+    const g = re.gfx[0];
+    g.log.length = 0;
+    re.m.redrawChunk(chunk(3));
+    expect(g.log[0][0]).toBe('clear');
+    expect(g.log.slice(1)).toEqual(viaAdd);
+    expect(viaAdd.length).toBeGreaterThan(20);
   });
 
   test('redrawChunk on a chunk that is not live is a no-op', () => {

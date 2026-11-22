@@ -4,14 +4,20 @@
  * the exception escaped game.step, and Phaser's RAF step only reschedules itself after the frame callback returns,
  * so the loop (and the simulation) never ran again. The read now goes through readWorldDanceAudio, which never throws.
  */
+import { jest } from '@jest/globals';
 import { readWorldDanceAudio } from '../../src/systems/WorldDance.js';
 
 const throwing = new Proxy({}, { get: (t, k) => (k === 'then' ? undefined : () => { throw new Error(`audio down ${String(k)}`); }) });
 
 describe('readWorldDanceAudio', () => {
-  test('a throwing audio engine gives no dance instead of an exception', () => {
+  test('a throwing audio engine gives no dance instead of an exception, and warns exactly once', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    readWorldDanceAudio.warned = false;
     expect(() => readWorldDanceAudio(throwing, true)).not.toThrow();
     expect(readWorldDanceAudio(throwing, true)).toEqual({ sample: null, meter: null });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('WorldDance');
+    warn.mockRestore();
   });
 
   test('missing audio, or dance not allowed, reads nothing', () => {

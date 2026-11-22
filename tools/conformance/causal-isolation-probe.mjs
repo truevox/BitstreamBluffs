@@ -38,6 +38,7 @@ const ARGS = ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--en
 const FALLBACK_SHELL = '/opt/pw-browsers/chromium_headless_shell';
 const executablePath = process.env.CHROMIUM_PATH
   || (!existsSync(chromium.executablePath()) && existsSync(FALLBACK_SHELL) ? FALLBACK_SHELL : undefined);
+const FIXED_DATE = process.env.FIXED_DATE || '2026-11-21T12:00:00Z';
 const PARALLEL = Math.max(1, Number(process.env.PARALLEL || 3));
 const PAGE_SRC = [captureCausalState, safeJson, fnv1a, digestState, instrumentRun].map(String).join('\n')
   + '\nwindow.__cd = { captureCausalState, safeJson, fnv1a, digestState, instrumentRun };';
@@ -294,6 +295,18 @@ async function runCase(fixtureName, caseName, baseline) {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
+    // Non-daily runs play TODAY's daily rule (DailyPatch.getDailyInfo() reads the clock), so pin the wall clock: the
+    // fixtures must not change physics at midnight UTC. Date is SHIFTED (it still advances, so timeouts work) to start at
+    // FIXED_DATE; rAF, timers and performance stay real.
+    await page.addInitScript((iso) => {
+      const RealDate = Date;
+      const offset = RealDate.parse(iso) - RealDate.now();
+      class ShiftedDate extends RealDate {
+        constructor(...a) { super(...(a.length ? a : [RealDate.now() + offset])); }
+        static now() { return RealDate.now() + offset; }
+      }
+      window.Date = ShiftedDate;
+    }, FIXED_DATE);
     if (pt.noAudioContext) await page.addInitScript(() => { delete window.AudioContext; delete window.webkitAudioContext; });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
@@ -359,6 +372,35 @@ function fmtRow(r) {
     + `auth=${d.firstAuthoritative ? `${d.firstAuthoritative.tick}:${d.firstAuthoritative.subsystems.join('+')}` : '-'} ticks=${r.meta.ticks} frames=${r.meta.frames}${r.against !== 'baseline-repeat' ? ` vs=${r.against}` : ''}${r.meta.stalled != null ? ` STALLED@${r.meta.stalled}` : ''}${per ? ` [${per}]` : ''}`;
 }
 
+/**
+ * Why a matrix cell fails the EXPECT_ISOLATION gate (empty = passes).
+ *  - no result, page errors, a stalled loop, a run that stopped short of the fixture length without crashing;
+ *  - a length mismatch with its baseline (one side ran or recorded fewer ticks);
+ *  - a causal leak, except the #115 input-sampling cases (report only) and the positive control;
+ *  - the positive control NOT caught;
+ *  - a cue leak in anything but `telegraph` (the known #155 read, K1).
+ */
+export function gateProblems(r) {
+  const why = [];
+  if (!r || r.error || !r.diff) return [`no result${r && r.error ? `: ${String(r.error).split('\n')[0]}` : ''}`];
+  const m = r.meta || {};
+  const fx = FIXTURES[r.fixture];
+  if (r.errors && r.errors.length) why.push(`page errors: ${r.errors.slice(0, 2).join(' | ')}`);
+  if (m.stalled != null) why.push(`stalled at tick ${m.stalled}`);
+  if (fx && !m.crashed && Number.isFinite(m.ticks) && m.ticks < fx.ticks) why.push(`stopped at tick ${m.ticks} of ${fx.ticks} without crashing`);
+  if (r.diff.lengthMismatch || r.diff.verdict === 'length-mismatch') why.push('length mismatch with the baseline');
+  const isControl = r.tag === 'positive control';
+  const isInput = (r.tag || '').includes('#115');
+  if (isControl && r.diff.verdict !== 'causal-leak') why.push('positive control not caught');
+  if (!isControl && !isInput && r.diff.verdict === 'causal-leak') why.push(`causal leak at ${r.diff.firstAuthoritative?.tick}: ${r.diff.firstAuthoritative?.subsystems.join('+')}`);
+  if (!isControl && !isInput) {
+    const cues = Object.entries(r.diff.perSubsystem || {}).filter(([k, t]) => t != null && subsystemClass(k) === 'cue').map(([k]) => k);
+    const unknown = cues.filter((k) => k !== 'telegraph');
+    if (unknown.length) why.push(`cue leak outside the K1 allow-list: ${unknown.join('+')}`);
+  }
+  return why;
+}
+
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const fixtures = (process.env.FIXTURES || Object.keys(FIXTURES).join(',')).split(',').filter(Boolean);
@@ -368,7 +410,7 @@ if (isMain) {
   const build = (html.match(/assets\/[^"']+\.js/) || ['unknown'])[0];
   let cells = {};
   if (RESULTS && existsSync(RESULTS)) { try { cells = JSON.parse(await readFile(RESULTS, 'utf8')); } catch (e) { cells = {}; } }
-  const cellKey = (f, c) => `${build}|${f}|${c}`;
+  const cellKey = (f, c) => `${build}|${FIXED_DATE}|${f}|${c}`;
   let saving = Promise.resolve();
   const saveCell = (r) => {
     if (!RESULTS) return;
@@ -415,11 +457,11 @@ if (isMain) {
   }
   await saving;
   if (process.env.OUT) await writeFile(process.env.OUT, JSON.stringify(report, null, 1));
-  const unexpected = report.rows.filter((r) => !r.diff || (r.diff.verdict === 'causal-leak' && !(r.tag || '').includes('#115') && r.tag !== 'positive control')
-    || (r.tag === 'positive control' && r.diff.verdict !== 'causal-leak'));
+  const problems = report.rows.map((r) => ({ r, why: gateProblems(r) })).filter((x) => x.why.length);
   console.log('SUMMARY', JSON.stringify(report.rows.reduce((m, r) => { const v = r.diff?.verdict || 'error'; m[v] = (m[v] || 0) + 1; return m; }, {})));
-  if (process.env.EXPECT_ISOLATION === '1' && unexpected.length) {
-    console.log('UNEXPECTED_LEAKS', unexpected.map((r) => `${r.fixture}/${r.case}`).join(', '));
+  for (const { r, why } of problems) console.log('GATE', `${r.fixture}/${r.case}`, why.join('; '));
+  if (process.env.EXPECT_ISOLATION === '1' && problems.length) {
+    console.log('UNEXPECTED_LEAKS', problems.map(({ r }) => `${r.fixture}/${r.case}`).join(', '));
     process.exit(1);
   }
 }
