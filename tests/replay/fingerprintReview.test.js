@@ -56,29 +56,34 @@ describe('B1: bounce-pad cooldown is hashed (the reviewer repro)', () => {
   });
 });
 
-describe('refreshPalette (real, unstubbed) rebuilds colliders: what changes is covered', () => {
-  test('it resets pad cooldowns (visible in the matter digest) and the rebuild is deterministic', () => {
+// #140 (PR #160, SIM_REVISION 2, owner-approved): refreshPalette repaints terrain graphics only (TerrainMesh.redrawChunk).
+// These two tests used to pin the old collider rebuild (fresh pad records, reordered static bodies); they now pin that the
+// repaint leaves every collider, its cooldown state and every digest exactly as they were.
+describe('refreshPalette (real, unstubbed) repaints without touching colliders', () => {
+  test('pad cooldowns survive the repaint, the digest is unchanged, and it is deterministic', () => {
     const once = () => {
       const s = mk({ biomeMask: 0 });
       run(s, 240);
       const chunk = { index: 5000, startX: 90000, endX: 90100, points: [{ x: 90000, y: 0 }, { x: 90100, y: 0 }], bouncePads: [{ x: 90050, y: 0, width: 48, boost: 500 }] };
       s.mesh.addChunk(chunk);
       tick(s);
-      s.mesh.chunks.get(5000).pads[0].bbPad._last = s.runTimeMs - 10;
+      const pad = s.mesh.chunks.get(5000).pads[0];
+      pad.bbPad._last = s.runTimeMs - 10;
       const real = s.terrain.getActiveChunks.bind(s.terrain);
-      s.terrain.getActiveChunks = () => [...real(), chunk]; // refreshPalette rebuilds every active+joined chunk
+      s.terrain.getActiveChunks = () => [...real(), chunk]; // refreshPalette repaints every active+joined chunk
       const before = fpOf(s);
       s.refreshPalette();
       s.terrain.getActiveChunks = real;
-      return { s, before, after: fpOf(s) };
+      return { s, pad, before, after: fpOf(s) };
     };
     const r = once();
-    expect(r.s.mesh.chunks.get(5000).pads[0].bbPad._last).toBeUndefined(); // a fresh pad record: the cooldown is gone
-    expect(differing(r.before, r.after)).toContain('matter');
+    expect(r.s.mesh.chunks.get(5000).pads[0]).toBe(r.pad); // the same sensor body
+    expect(r.pad.bbPad._last).toBe(r.s.runTimeMs - 10); // its cooldown is intact
+    expect(differing(r.before, r.after)).toEqual([]);
     expect(once().after.combined).toBe(r.after.combined);
   });
 
-  test('on a plain real run the rebuild reorders the static bodies and the digest sees it', () => {
+  test('on a plain real run the repaint keeps the static order, and the run stays equal to a twin that never repainted', () => {
     const s = mk({ biomeMask: 0 });
     run(s, 240);
     tick(s);
@@ -86,13 +91,11 @@ describe('refreshPalette (real, unstubbed) rebuilds colliders: what changes is c
     s.refreshPalette();
     run(s, 1);
     const after = captureCausalState(s).matter.staticOrder.map((b) => `${b.label}:${b.minX}`);
-    // The rebuild re-adds every collider: the detector's static order changes, and a twin that did not repaint differs in
-    // the matter digest only. Real physics consequence, covered by staticOrder (and padLast for pads).
-    expect(JSON.stringify(before)).not.toBe(JSON.stringify(after));
+    expect(JSON.stringify(after)).toBe(JSON.stringify(before));
     const twin = mk({ biomeMask: 0 });
     run(twin, 242);
-    // and it is real physics, not cosmetics: the repainted run's sled, score and tricks digests diverge from the twin's as well
-    expect(differing(fpOf(s), fpOf(twin))).toEqual(expect.arrayContaining(['matter']));
+    expect(differing(fpOf(s), fpOf(twin))).toEqual([]);
+    expect(fpOf(s).combined).toBe(fpOf(twin).combined);
   });
 
   test('a biome run (refreshPalette fires on sector entry) is deterministic and error-free', () => {

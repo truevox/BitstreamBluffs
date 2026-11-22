@@ -2366,7 +2366,7 @@ export class RunScene extends Phaser.Scene {
   onSettingsChanged(payload) {
     if (payload && payload.settings) this.settings = payload.settings;
     // A palette toggle (Pause > Settings) is presentation: repaint only, never rebuild colliders (issue #140).
-    if (payload && payload.key === 'palette' && this.sled) this.refreshPalette({ keepColliders: true });
+    if (payload && payload.key === 'palette' && this.sled) this.refreshPalette();
   }
 
   /**
@@ -2385,13 +2385,14 @@ export class RunScene extends Phaser.Scene {
   }
 
   /**
-   * Repaint the world in the current palette (+ the active sector's biome tint).
-   * @param {{keepColliders?: boolean}} [opts] keepColliders: repaint terrain graphics only (TerrainMesh.redrawChunk),
-   *   used by the palette SETTING so a presentation change cannot touch physics (issue #140). The biome-entry
-   *   repaint still rebuilds the chunk colliders as before: it happens at a sim-determined tick, and changing it
-   *   would change the physics of existing biome-mask replays (docs/determinism/causal-isolation.md).
+   * Repaint the world in the current palette (+ the active sector's biome tint). Graphics only: terrain chunks are
+   * repainted with TerrainMesh.redrawChunk and their colliders are never touched (issue #140). Used by the palette
+   * setting AND on entering / leaving a biome sector. A biome's gameplay (zone mods, hazards, pickups) is chunk data
+   * read by the sim (getZoneDefs, takeChunk); collider material is fixed (TerrainMesh._takeBody), so rebuilding the
+   * colliders here only reshuffled body ids/order and dropped contact warm-start state. Owner-approved physics change
+   * (SIM_REVISION 2).
    */
-  refreshPalette({ keepColliders = false } = {}) {
+  refreshPalette() {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
     const biomeDef = this._biomeDefForSector(this._biomeSector);
@@ -2414,8 +2415,7 @@ export class RunScene extends Phaser.Scene {
     this.mesh.setPalette(this.palette);
     for (const chunk of this.terrain.getActiveChunks()) {
       if (!this.mesh.chunks.has(chunk.index)) continue;
-      if (keepColliders) this.mesh.redrawChunk(chunk);
-      else this.mesh.addChunk(chunk); // redraws (removes + re-adds its colliders)
+      this.mesh.redrawChunk(chunk); // graphics only; colliders stay
       const hz = this.hazards.get(chunk.index);
       if (hz) hz.forEach((h) => { h.palette = this.palette; h.color = hazardColor(h.def, this.palette); });
       const pu = this.powerups.get(chunk.index);

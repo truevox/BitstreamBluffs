@@ -46,7 +46,10 @@ import * as terrainContactNs from '../TerrainContact.js';
  * same PR, for ANY change to causal code behavior; see the module comment. It is independent of package.json's version
  * and of GHOST_PHYSICS_VERSION (kept only for legacy tape mapping, not bumped further).
  */
-export const SIM_REVISION = 1;
+// 2: #140 (PR #160): biome-sector entry and the palette setting repaint terrain without rebuilding its colliders, so
+//    tick outcomes of biome-mask runs change; owner-approved. Manifests recorded under revision 1 now resolve to the
+//    archived revision-1 ruleset (refused as historical-verifier-required) instead of diverging silently.
+export const SIM_REVISION = 2;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main (0 = none released yet). While the current SIM_REVISION is above

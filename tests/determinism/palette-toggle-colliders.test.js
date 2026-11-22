@@ -186,3 +186,35 @@ describe('RunScene: a palette setting change repaints without rebuilding collide
     expect(calls).toEqual([]);
   });
 });
+
+describe('RunScene: the biome-entry repaint keeps the colliders too (owner decision, #140)', () => {
+  test('refreshPalette() as called on a biome sector change repaints via redrawChunk, never addChunk/removeChunk', () => {
+    const calls = [];
+    const live = [chunk(1), chunk(2)];
+    const target = {
+      sled: {}, biomeMask: 0, _biomeSector: 3,
+      registry: { get: () => null }, game: deep(), cameras: { main: { setBackgroundColor() {} } },
+      terrain: { getActiveChunks: () => live.slice() },
+      mesh: {
+        chunks: new Map(live.map((c) => [c.index, {}])),
+        setPalette() {},
+        addChunk(c) { calls.push(['addChunk', c.index]); },
+        removeChunk(i) { calls.push(['removeChunk', i]); },
+        redrawChunk(c) { calls.push(['redrawChunk', c.index]); return true; },
+      },
+      hazards: new Map(), powerups: new Map(),
+    };
+    const scene = new Proxy(target, {
+      get(t, k) {
+        if (k in t) return t[k];
+        const proto = RunScene.prototype[k];
+        if (typeof proto === 'function') return proto;
+        if (k === 'then' || typeof k === 'symbol') return undefined;
+        return deep();
+      },
+      set(t, k, v) { t[k] = v; return true; },
+    });
+    scene.refreshPalette(); // updateFun's call on entering / leaving a biome sector passes no options
+    expect(calls).toEqual([['redrawChunk', 1], ['redrawChunk', 2]]);
+  });
+});
