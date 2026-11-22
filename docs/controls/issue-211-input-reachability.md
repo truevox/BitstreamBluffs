@@ -46,7 +46,7 @@ same touch swap: `touchButtonFor` treats any non-classic layout as `trickDeck`,
 | Menu directions up/down/left/right | — | — | Arrow keys; W/S also emit up/down | — | — | D-pad 12/13 + left stick axes 0/1 (`InputRouter.js:63-70`) |
 
 Note: D-pad left/right (buttons 14/15) are also read directly by `MenuInput._pollPad()` as menu
-left/right (`src/ui/MenuInput.js:167-170`), which the per-action columns above do not express.
+left/right (`src/ui/MenuInput.js:174-175`), which the per-action columns above do not express.
 
 ## Plain findings
 
