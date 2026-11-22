@@ -228,8 +228,12 @@ async function load() {
 		status('Cannot initialize source-verified research packet: ' + error.message);
 	}
 }
-$('window').addEventListener('change', () => { stop(); activePassage = null; refreshBpm(); });
-$('loadReview').addEventListener('click', () => {
+$('window').addEventListener('change', () => {
+	stop(); activePassage = null; refreshBpm();
+	$('reviewSource').textContent = 'Manual original source window selected (not the suggested master WAV passage above). '
+		+ 'Playback uses SHA-checked original OGG stems; select a suggested passage above to load it automatically.';
+});
+function applyReviewPassage() {
 	if (!packet) return;
 	stop();
 	const passage = packet.suggestedSourcePassages[Number($('reviewPassage').value)];
@@ -240,9 +244,19 @@ $('loadReview').addEventListener('click', () => {
 	activePassage = passage;
 	$('window').value = String(index);
 	refreshBpm();
-	status('Selected UNVERIFIED source review passage ' + passage.centerSeconds.toFixed(2)
+	$('reviewSource').textContent = 'Loaded UNVERIFIED ' + passage.centerSeconds.toFixed(1)
+		+ 's passage (actual source ' + passage.suggestedListenRangeSeconds[0].toFixed(2)
+		+ '–' + passage.suggestedListenRangeSeconds[1].toFixed(2)
+		+ 's). Original WAV master hash ' + packet.source.originalMasterWavSha256.slice(0,16)
+		+ '…; playback uses original SHA-checked OGG stems. Select a different passage to load it automatically.';
+	status('Loaded UNVERIFIED source review passage ' + passage.centerSeconds.toFixed(2)
 		+ 's: ' + passage.reviewReason + '. Press Play to hear original OGG stems across segment seams.');
-});
+}
+// Selecting a passage must NOT leave the previous passage playing or the
+// source-window selector pointing at an older source region. Keep explicit
+// Load as an accessible repeat action as well as automatic selection.
+$('reviewPassage').addEventListener('change', applyReviewPassage);
+$('loadReview').addEventListener('click', applyReviewPassage);
 $('bpm').addEventListener('change', () => { stop(); refreshPhases(); });
 $('phase').addEventListener('change', () => { stop(); refreshOffsets(); });
 $('mix').addEventListener('change', stop);

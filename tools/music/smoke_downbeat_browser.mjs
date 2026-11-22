@@ -86,10 +86,10 @@ try {
 	await page.locator('#stop').click();
 	// Lossless-master sourced priority review must play authentic, checked OGG
 	// excerpts across the original 12s split, with no music export or edits.
-	assert.match(await page.locator('#reviewSource').innerText(),/Lossless WAV master hash verified/);
+	assert.match(await page.locator('#reviewSource').innerText(),/Manual original source window selected/);
 	await page.selectOption('#reviewPassage','3'); // ~45.7s master harmonic novelty
 	await page.locator('#loadReview').click();
-	assert.match(await page.locator('#status').innerText(),/Selected UNVERIFIED source review passage/);
+	assert.match(await page.locator('#status').innerText(),/Loaded UNVERIFIED source review passage/);
 	assert.equal(await page.locator('#window').inputValue(),'3');
 	await page.selectOption('#mix','drums');
 	await page.locator('#play').click();
@@ -102,6 +102,25 @@ try {
 	assert.equal(oggRequests.some(s=>s.endsWith('/0003-drums.ogg')),true);
 	assert.equal(oggRequests.some(s=>s.endsWith('/0004-drums.ogg')),true);
 	await page.locator('#stop').click();
+	// Screenshot regression: merely selecting 16.4s previously left 156–168s
+	// loaded/playing. The selector must atomically load the correct 12–24s
+	// segment, visibly state its actual excerpt, and stop earlier playback.
+	const originalSelected = await page.locator('#reviewPassage').inputValue();
+	assert.equal(originalSelected,'3');
+	await page.selectOption('#reviewPassage','6'); // 16.4s source master cue
+	assert.match(await page.locator('#status').innerText(),/Loaded UNVERIFIED source review passage 16.44s/);
+	assert.match(await page.locator('#reviewSource').innerText(),/actual source 11.94–20.94s/);
+	assert.equal(await page.locator('#window').inputValue(),'1');
+	await page.locator('#play').click();
+	await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('Playing original drums stems at source'));
+	assert.equal(oggRequests.some(s=>s.endsWith('/0001-drums.ogg')),true);
+	assert.equal(oggRequests.some(s=>s.endsWith('/0000-drums.ogg')),true);
+	await page.selectOption('#reviewPassage','1'); // 126.0s while prior audio playing
+	assert.equal(await page.locator('#window').inputValue(),'10');
+	assert.match(await page.locator('#reviewSource').innerText(),/Loaded UNVERIFIED 126.0s passage/);
+	assert.equal(await page.locator('#stop').isDisabled(),true);
+	// Changing the selected WAV passage has already stopped previous audio;
+	// a disabled Stop is expected and must not be clicked by the test.
 	// Always fail closed on an actual OGG that differs from the source fingerprint.
 	tamperNextSource = true;
 	await page.selectOption('#window','9');

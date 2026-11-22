@@ -1,0 +1,113 @@
+{
+  "format": "bitstream-one-more-run-owner-listening-preferences-UNVERIFIED-v1",
+  "date": "2026-11-21",
+  "source": "Marvin supplied four browser screenshots and wrote \"I don’t know if it helps, but this sounds pretty good\"; then explicitly clarified \"those selections were my preferences\"",
+  "feedbackAuthorship": "Marvin actual subjective selection/preferences; source/audio interpretation and non-verification caveats authored by Music Friday",
+  "originalWavMasterSha256": "636bbd42f7ece1c085b4768f25fb0e65d7f29963a22a948e0b6e697ef0284721",
+  "sourceOggManifestSha256": "e7d5b95ecb258c86551fd242ceb9696427c1655dc91d11b95b60dd6ef0647d6a",
+  "listeningPacketSha256": "99f745b88d5c9c355dd696cc8daeef860aa3587b468d02eee5be84ae2925aad7",
+  "status": "HUMAN_PREFERRED_CANDIDATES_CORRECTED_AUDIO_WINDOW_NOT_VERIFIED_MUSICAL_BEAT_LABELS",
+  "interpretation": "Marvin explicitly confirmed four preferred controls and supplied a corrective screenshot for the fourth. Actual loaded source segment 1, 12–24s, with playback 11.94–20.94s is independently corroborated by the connected browser’s current tab state. All four preferred settings were source-lab selections, NOT certified true quarter notes/meter.",
+  "screenCaptureMismatch": "Earlier fourth screenshot showed proposed passage 16.4s in the dropdown while still playing source Segment 13, 156–168s. Marvin supplied a correction; current source tab shows passage 16.4s loaded as Segment 1, source 11.94–20.94s and settings 163.84 BPM phase 4 shift +3 rank 1. Prior fourth screenshot association is superseded.",
+  "humanPreferences": [
+    {
+      "displayedSuggestedPassageCenterSeconds": 90.0,
+      "loadedPassageCenterSecondsFromPreviousSelector": 90.0,
+      "displayedSourceSegmentIndex": 7,
+      "displayedSourceWindowSeconds": [
+        84.0,
+        96.0
+      ],
+      "bpmHypothesis": 163.84,
+      "pulsePhaseOneBased": 3,
+      "phaseOffsetSeconds": 0.1995,
+      "beatOneShiftBeats": 0,
+      "algorithmRankWithinFour": 3,
+      "sourceMix": "all_six_original_stems",
+      "audibleClickOverlaySelected": true,
+      "userConfirmedThisWasAPreferredSelection": true,
+      "userFeedback": "These displayed selections were my preferences; this sounds pretty good.",
+      "actualDisplayedSuggestedPassageHeardConfirmed": true,
+      "sourceAssociationCaveat": "selected-passages match: source segment 7, 84–96s",
+      "musicalBeatOneVerified": false,
+      "originalRecordingTempoVerified": false,
+      "candidateOnly": true
+    },
+    {
+      "displayedSuggestedPassageCenterSeconds": 126.0,
+      "loadedPassageCenterSecondsFromPreviousSelector": 126.0,
+      "displayedSourceSegmentIndex": 10,
+      "displayedSourceWindowSeconds": [
+        120.0,
+        132.0
+      ],
+      "bpmHypothesis": 161.5,
+      "pulsePhaseOneBased": 2,
+      "phaseOffsetSeconds": 0.3617,
+      "beatOneShiftBeats": 0,
+      "algorithmRankWithinFour": 1,
+      "sourceMix": "all_six_original_stems",
+      "audibleClickOverlaySelected": true,
+      "userConfirmedThisWasAPreferredSelection": true,
+      "userFeedback": "These displayed selections were my preferences; this sounds pretty good.",
+      "actualDisplayedSuggestedPassageHeardConfirmed": true,
+      "sourceAssociationCaveat": "selected-passages match: source segment 10, 120–132s",
+      "musicalBeatOneVerified": false,
+      "originalRecordingTempoVerified": false,
+      "candidateOnly": true
+    },
+    {
+      "displayedSuggestedPassageCenterSeconds": 167.126,
+      "loadedPassageCenterSecondsFromPreviousSelector": 167.126,
+      "displayedSourceSegmentIndex": 13,
+      "displayedSourceWindowSeconds": [
+        156.0,
+        168.0
+      ],
+      "bpmHypothesis": 163.84,
+      "pulsePhaseOneBased": 3,
+      "phaseOffsetSeconds": 0.3118,
+      "beatOneShiftBeats": 2,
+      "algorithmRankWithinFour": 1,
+      "sourceMix": "all_six_original_stems",
+      "audibleClickOverlaySelected": true,
+      "userConfirmedThisWasAPreferredSelection": true,
+      "userFeedback": "These displayed selections were my preferences; this sounds pretty good.",
+      "actualDisplayedSuggestedPassageHeardConfirmed": true,
+      "sourceAssociationCaveat": "selected-passages match: source segment 13, 156–168s",
+      "musicalBeatOneVerified": false,
+      "originalRecordingTempoVerified": false,
+      "candidateOnly": true
+    },
+    {
+      "displayedSuggestedPassageCenterSeconds": 16.44,
+      "loadedPassageCenterSecondsFromPreviousSelector": 16.44,
+      "displayedSourceSegmentIndex": 1,
+      "displayedSourceWindowSeconds": [
+        12.0,
+        24.0
+      ],
+      "bpmHypothesis": 163.84,
+      "pulsePhaseOneBased": 4,
+      "phaseOffsetSeconds": 0.3617,
+      "beatOneShiftBeats": 3,
+      "algorithmRankWithinFour": 1,
+      "sourceMix": "all_six_original_stems",
+      "audibleClickOverlaySelected": true,
+      "userConfirmedThisWasAPreferredSelection": true,
+      "userFeedback": "These displayed selections were my preferences; this sounds pretty good.",
+      "actualDisplayedSuggestedPassageHeardConfirmed": true,
+      "sourceAssociationCaveat": "Corrective screenshot after the stale-dropdown mismatch: suggested 16.4s, selected source segment 1 (12–24s); Browser reading of the user’s listening lab shows Playing original full stems at source 11.94–20.94s, with phase 4 and beat-one shift +3. The earlier screenshot’s Segment 13 settings are preserved in historical screenshot note but superseded for 16.4s.",
+      "musicalBeatOneVerified": false,
+      "originalRecordingTempoVerified": false,
+      "candidateOnly": true
+    }
+  ],
+  "releaseEligible": false,
+  "unknowns": [
+    "User has not explicitly certified actual bar boundaries/meter; these remain preferred audition candidates rather than formally verified downbeats.",
+    "No A/B confidence rating, timing tolerance or proof that each selected choice outperformed every possible other alternative was stated.",
+    "The original fourth screenshot had a stale suggested-passage dropdown, now superseded by the corrected screenshot plus observed browser state.",
+    "No owner authorization to change production music timing or original files."
+  ]
+}
