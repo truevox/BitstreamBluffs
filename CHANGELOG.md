@@ -1,9 +1,9 @@
 # Changelog
 
 
-## Unreleased — merged work after v2.15.3 (2026-11-21)
+## v2.16.0 — reconcile post-v2.15.3 merged capabilities and release policy (2026-11-21)
 
-These changes are merged into `main` but do **not** constitute a new numbered release. Experimental/offline-only tooling must not be mistaken for an activated production feature.
+This corrective release recognizes already-merged replay and developer tooling plus the project-wide rule that every `main` merge is a release. Previous merges (#163, #165, #166, #203, #164, #173, #175, #179, #182, #158, #204, #206) were not each versioned at merge time; this is a catch-up release, not a claim they were individually tagged. Experimental/offline-only tooling is not an activated production feature.
 
 - **Replay contract and canonical serialization (#163 / #152).** Versioned replay contract, canonical JSON/binary encoding, deterministic hashes and cross-implementation fixtures. No live physics change.
 - **Subsystem fingerprints (#165 / #118).** Read-only checkpoint hashes cover sled/contact, terrain, hazards, BSOD, timers, scoring, equipment and RNG, with first-divergence and field-level comparison. Fingerprints detect divergence but are not anti-cheat.
@@ -14,7 +14,9 @@ These changes are merged into `main` but do **not** constitute a new numbered re
 - **Real-original-music offline bridge experiments (#179 / #172).** Verified original-Opus music groups and development/test routes, with incomplete offline groups refused rather than silently replaced. Not an activated production offline download feature.
 - **Source-preserving music-variant tooling (#182 / #172, #180).** Developer-only mono Lite/Full per-stem derivative generation and provenance checks. Original stereo recordings remain untouched; quality presets require listening approval and are not a shipped player preference.
 
-**Verification snapshot:** On current `main` at `e181f9f` (before #158 merged), replay tests passed 741/741 across 20 suites, ruleset integrity check passed, and the full test suite reported 3,561 passing / 9 failing (seven suites), consistent in count with the previously documented baseline. On the integrated #158 tree, canary unit tests passed 32/32. This is not a full-suite green claim.
+**Verification snapshot:** On `main` at `e181f9f` (before #158 merged), replay tests passed 741/741 across 20 suites, ruleset integrity check passed, and the full test suite reported 3,561 passing / 9 failing (seven suites), consistent in count with the previously documented baseline. On the integrated #158 tree, canary unit tests passed 32/32. This is not a full-suite green claim.
+
+- **Release-policy correction (#204, #206 and this release).** Reconciled the missing changelog entries and codified `main` as the release boundary. The two documentation PRs should have received patch bumps; their omission is acknowledged rather than rewriting historical merges.
 
 ## v2.15.3 - PWA install metadata and original icons (#172) (2026-11-21)
 
