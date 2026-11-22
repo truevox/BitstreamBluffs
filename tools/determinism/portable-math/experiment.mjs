@@ -32,6 +32,7 @@ export const CONFIGS = {
 };
 for (const op of ALL_OPS) { CONFIGS[`only-${op}`] = { ops: [op], mode: 'global' }; CONFIGS[`loo-${op}`] = { ops: ALL_OPS.filter((o) => o !== op), mode: 'global' }; }
 function cfgOf(name) {
+  name = name.replace('@main', '');
   if (CONFIGS[name]) return CONFIGS[name];
   const m = {}; for (const kv of name.split(';')) { const [k, v] = kv.split('='); m[k] = v; }
   if (!m.ops && !m.mode) throw new Error('unknown config ' + name);
@@ -53,7 +54,7 @@ const pmJs = pmathScript();
 const levelOf = (f) => (f.kodiaks ? 8 : 1);
 const tapes = {}; for (const f of FIXTURES) { const tp = path.join(here, 'fixtures', `${f.id}.tape.json`); if (existsSync(tp)) tapes[f.id] = JSON.parse(await readFile(tp, 'utf8')); }
 
-async function freshPage(browser, patch) {
+async function freshPage(browser, patch, urlOverride) {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
   const page = await ctx.newPage();
   await page.addInitScript(`(() => { const R = Date, base = R.parse(${JSON.stringify(PIN_DATE)}), t0 = R.now(); const now = () => base + (R.now() - t0);
@@ -61,7 +62,7 @@ async function freshPage(browser, patch) {
   await page.addInitScript(`window.__cePatch = ${JSON.stringify(patch)}; window.__ceNoProbe = ${process.env.NOPROBE === '1'};`);
   await page.addInitScript(pmJs);
   await page.addInitScript(pageJs);
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(urlOverride || url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive() && window.__ce, null, { timeout: 60000 });
   return { ctx, page };
 }
@@ -70,7 +71,8 @@ const cellPath = (cfg, eng, fx) => path.join(CACHE, cfg.replace(/[^\w.=,-]/g, '_
 async function runCell(browser, cfgName, eng, f) {
   const p = cellPath(cfgName, eng, f.id);
   if (existsSync(p)) return;
-  const { ctx, page } = await freshPage(browser, cfgOf(cfgName));
+  const isMain = cfgName.endsWith('@main');
+  const { ctx, page } = await freshPage(browser, cfgOf(cfgName.replace('@main', '')), isMain ? process.env.GAME_URL_MAIN : undefined);
   try {
     const r = await page.evaluate((x) => window.__ce.play(x), { seed: f.seed, hz: HZ, tape: tapes[f.id], level: levelOf(f), raster: false });
     const n = r.digests.length, buf = new Int32Array(n * 8);
@@ -163,7 +165,7 @@ if (cmd === 'perf') {
   const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
   try {
     for (const f of fixtures) for (let rep = 0; rep < reps; rep++) for (const cfg of cfgs) {
-      const { ctx, page } = await freshPage(browser, cfgOf(cfg));
+      const isMain = cfg.endsWith('@main'); const { ctx, page } = await freshPage(browser, cfgOf(cfg.replace('@main', '')), isMain ? process.env.GAME_URL_MAIN : undefined);
       const r = await page.evaluate((x) => window.__ce.play(x), { seed: f.seed, hz: HZ, tape: tapes[f.id], level: levelOf(f), raster: false });
       await ctx.close();
       const k = `${cfg}|${f.id}`; (res[k] = res[k] || { sim: [], loop: [], ticks: r.digests.length }); res[k].sim.push(r.simMs / r.digests.length); res[k].loop.push(r.loopMs / r.digests.length);

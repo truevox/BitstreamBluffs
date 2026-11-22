@@ -2,7 +2,7 @@
  "generatedFrom": "tools/determinism/portable-math/.cache",
  "hz": 120,
  "configs": {
-  "native": {
+  "native@main": {
    "perFixture": {
     "cruise-baseline": {
      "ticks": 2401,
@@ -101,7 +101,9 @@
       "distanceM": 289,
       "score": 399
      },
-     "chromiumDesync": null,
+     "chromiumDesync": {
+      "tick": 960
+     },
      "firefox": null,
      "firefoxTerrain": {
       "tick": 580,
@@ -109,7 +111,9 @@
        "terrain"
       ]
      },
-     "firefoxDesync": null,
+     "firefoxDesync": {
+      "tick": 960
+     },
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
       "maxPosPx": 0,
@@ -123,7 +127,9 @@
       ]
      },
      "webkitTerrain": null,
-     "webkitDesync": null,
+     "webkitDesync": {
+      "tick": 960
+     },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
       "maxPosPx": 1.1368683772161603e-13,
@@ -131,9 +137,9 @@
      }
     },
     "chunk-biome-boundaries": {
-     "ticks": 3431,
+     "ticks": 3434,
      "outcome": {
-      "ticks": 3431,
+      "ticks": 3434,
       "crashed": true,
       "cause": "hazard",
       "distanceM": 835,
@@ -155,31 +161,30 @@
      "firefoxDesync": {
       "tick": 840
      },
-     "firefoxOutcomeEqual": false,
+     "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
-      "maxPosPx": 392.77248269062875,
-      "maxVelPxPerTick": 7.436246034179931
+      "maxPosPx": 0.000013069013220956549,
+      "maxVelPxPerTick": 0.000004320805601309985
      },
      "webkit": {
-      "tick": 19,
+      "tick": 373,
       "subsystems": [
-       "sled",
        "world"
       ]
      },
      "webkitTerrain": {
-      "tick": 24,
+      "tick": 807,
       "subsystems": [
        "terrain"
       ]
      },
      "webkitDesync": {
-      "tick": 120
+      "tick": 840
      },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
-      "maxPosPx": 8.892620826372877e-7,
-      "maxVelPxPerTick": 2.1933374227955937e-8
+      "maxPosPx": 10.839585653136055,
+      "maxVelPxPerTick": 5.805869146552141
      }
     },
     "bsod-pursuit-catch": {
@@ -191,7 +196,9 @@
       "distanceM": 437,
       "score": 0
      },
-     "chromiumDesync": null,
+     "chromiumDesync": {
+      "tick": 840
+     },
      "firefox": {
       "tick": 764,
       "subsystems": [
@@ -206,7 +213,7 @@
       ]
      },
      "firefoxDesync": {
-      "tick": 840
+      "tick": 9120
      },
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
@@ -323,15 +330,17 @@
      }
     },
     "kodiaks-on": {
-     "ticks": 2637,
+     "ticks": 4801,
      "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
+      "ticks": 4801,
+      "crashed": false,
+      "cause": null,
+      "distanceM": 1027,
+      "score": 1947
      },
-     "chromiumDesync": null,
+     "chromiumDesync": {
+      "tick": 1560
+     },
      "firefox": {
       "tick": 1698,
       "subsystems": [
@@ -346,12 +355,12 @@
       ]
      },
      "firefoxDesync": {
-      "tick": 1920
+      "tick": 1560
      },
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
-      "maxPosPx": 2.331944415345788e-9,
-      "maxVelPxPerTick": 5.093170329928398e-11
+      "maxPosPx": 1.8083301256410778e-7,
+      "maxVelPxPerTick": 4.583853296935558e-9
      },
      "webkit": {
       "tick": 796,
@@ -367,12 +376,12 @@
       ]
      },
      "webkitDesync": {
-      "tick": 2520
+      "tick": 1560
      },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
-      "maxPosPx": 9.094947017729282e-13,
-      "maxVelPxPerTick": 0
+      "maxPosPx": 6.72953319735825e-8,
+      "maxVelPxPerTick": 1.6334524843841791e-9
      }
     },
     "daily-practice-rule": {
@@ -397,59 +406,43 @@
        "terrain"
       ]
      },
-     "firefoxDesync": {
-      "tick": 1320
-     },
+     "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
-      "maxPosPx": 7.035851012915373e-9,
-      "maxVelPxPerTick": 1.964508555829525e-10
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
      },
-     "webkit": {
-      "tick": 19,
+     "webkit": null,
+     "webkitTerrain": {
+      "tick": 1060,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-cruise-a": {
+     "ticks": 3476,
+     "outcome": {
+      "ticks": 3476,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 843,
+      "score": 1951
+     },
+     "chromiumDesync": null,
+     "firefox": {
+      "tick": 3425,
       "subsystems": [
        "sled",
        "world"
       ]
      },
-     "webkitTerrain": {
-      "tick": 19,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 120
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 1.5679688658565283e-8,
-      "maxVelPxPerTick": 4.247340257279575e-9
-     }
-    }
-   },
-   "identicalAcrossEngines": 0,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.5257,
-    "firefox": 1.0493,
-    "webkit": 0.4952
-   },
-   "outcomeEqual": 8
-  },
-  "native-rep2": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": null,
-     "firefox": null,
      "firefoxTerrain": {
       "tick": 554,
       "subsystems": [
@@ -463,40 +456,40 @@
       "maxVelPxPerTick": 0
      },
      "webkit": {
-      "tick": 971,
+      "tick": 655,
       "subsystems": [
        "sled",
        "world"
       ]
      },
      "webkitTerrain": {
-      "tick": 972,
+      "tick": 715,
       "subsystems": [
        "terrain"
       ]
      },
      "webkitDesync": {
-      "tick": 1080
+      "tick": 2400
      },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
-      "maxPosPx": 1.0204530553892255e-8,
-      "maxVelPxPerTick": 4.092726157978177e-10
+      "maxPosPx": 3.154127625748515e-8,
+      "maxVelPxPerTick": 1.1677911970764399e-9
      }
     },
-    "fifth-run-in-session": {
-     "ticks": 1801,
+    "broad-cruise-b": {
+     "ticks": 1508,
      "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
+      "ticks": 1508,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 325,
+      "score": 405
      },
      "chromiumDesync": null,
      "firefox": null,
      "firefoxTerrain": {
-      "tick": 489,
+      "tick": 575,
       "subsystems": [
        "terrain"
       ]
@@ -507,15 +500,9 @@
       "maxPosPx": 0,
       "maxVelPxPerTick": 0
      },
-     "webkit": {
-      "tick": 829,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
+     "webkit": null,
      "webkitTerrain": {
-      "tick": 714,
+      "tick": 1326,
       "subsystems": [
        "terrain"
       ]
@@ -523,402 +510,27 @@
      "webkitDesync": null,
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
-      "maxPosPx": 2.2737367544323206e-13,
+      "maxPosPx": 0,
       "maxVelPxPerTick": 0
      }
     },
-    "collision-heavy": {
-     "ticks": 1669,
+    "broad-cruise-c": {
+     "ticks": 1770,
      "outcome": {
-      "ticks": 1669,
+      "ticks": 1770,
       "crashed": true,
       "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
+      "distanceM": 409,
+      "score": 529
      },
      "chromiumDesync": null,
      "firefox": null,
      "firefoxTerrain": {
-      "tick": 580,
+      "tick": 543,
       "subsystems": [
        "terrain"
       ]
      },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 732,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 1.1368683772161603e-13,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 835,
-      "score": 1175
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 373,
-      "subsystems": [
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 594,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": false,
-     "firefoxMaxDelta": {
-      "maxPosPx": 392.77248269062875,
-      "maxVelPxPerTick": 7.436246034179931
-     },
-     "webkit": {
-      "tick": 19,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 24,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 120
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 8.892620826372877e-7,
-      "maxVelPxPerTick": 2.1933374227955937e-8
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 764,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 765,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 4.631147021427751e-9,
-      "maxVelPxPerTick": 1.3096723705530167e-10
-     },
-     "webkit": {
-      "tick": 508,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 522,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 600
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0.000008281983355118427,
-      "maxVelPxPerTick": 9.793093340704218e-7
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 255,
-      "subsystems": [
-       "sled"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 597,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 2054,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 523,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 696,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 709,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 1.521584636066109e-9,
-      "maxVelPxPerTick": 3.2741809263825417e-11
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 1698,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 586,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 2.331944415345788e-9,
-      "maxVelPxPerTick": 5.093170329928398e-11
-     },
-     "webkit": {
-      "tick": 796,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 877,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 2520
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 9.094947017729282e-13,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 1087,
-      "subsystems": [
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 484,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 1320
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 7.035851012915373e-9,
-      "maxVelPxPerTick": 1.964508555829525e-10
-     },
-     "webkit": {
-      "tick": 19,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 19,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 120
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 1.5679688658565283e-8,
-      "maxVelPxPerTick": 4.247340257279575e-9
-     }
-    }
-   },
-   "identicalAcrossEngines": 0,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.4881,
-    "firefox": 0.4207,
-    "webkit": 0.5637
-   },
-   "outcomeEqual": 8
-  },
-  "all": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
      "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
@@ -934,920 +546,27 @@
       "maxVelPxPerTick": 0
      }
     },
-    "collision-heavy": {
-     "ticks": 1669,
+    "broad-cruise-d": {
+     "ticks": 1755,
      "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
+      "ticks": 1755,
       "crashed": true,
       "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
+      "distanceM": 401,
+      "score": 501
      },
      "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.8297,
-    "firefox": 2.2147,
-    "webkit": 1.0665
-   },
-   "outcomeEqual": 9
-  },
-  "all-rep2": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.8093,
-    "firefox": 0.7163,
-    "webkit": 0.7417
-   },
-   "outcomeEqual": 9
-  },
-  "all-scoped": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
+      "tick": 1680
      },
      "firefox": null,
      "firefoxTerrain": {
-      "tick": 554,
+      "tick": 578,
       "subsystems": [
        "terrain"
       ]
      },
      "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 489,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 714,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 580,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 594,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 2548,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 1224,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 2146,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 597,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 2054,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 523,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 771,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 586,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 877,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 484,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 720,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.4583,
-    "firefox": 0.3788,
-    "webkit": 0.5192
-   },
-   "outcomeEqual": 9
-  },
-  "matter-only": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 554,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 480
+      "tick": 1680
      },
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
@@ -1855,2888 +574,15 @@
       "maxVelPxPerTick": 0
      },
      "webkit": {
-      "tick": 736,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 741,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 2.9753209673799574e-8,
-      "maxVelPxPerTick": 1.3515091268345714e-9
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 489,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 829,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 714,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 2.2737367544323206e-13,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 580,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 732,
+      "tick": 1683,
       "subsystems": [
        "sled",
        "world"
       ]
      },
      "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 1.1368683772161603e-13,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 1200
-     },
-     "firefox": {
-      "tick": 373,
-      "subsystems": [
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 594,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 4.888261173618957e-7,
-      "maxVelPxPerTick": 6.0472302720882e-9
-     },
-     "webkit": {
-      "tick": 19,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 24,
-      "subsystems": [
-       "terrain"
-      ]
-     },
      "webkitDesync": {
-      "tick": 120
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 4.832581907976419e-7,
-      "maxVelPxPerTick": 6.074515113141388e-9
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": {
-      "tick": 5734,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 1224,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 3.4415279515087605e-9,
-      "maxVelPxPerTick": 9.640643838793039e-11
-     },
-     "webkit": {
-      "tick": 507,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 507,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0.0000082817900874943,
-      "maxVelPxPerTick": 9.792984201340005e-7
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 255,
-      "subsystems": [
-       "sled"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 597,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 2054,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 523,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 696,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 709,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 1.521584636066109e-9,
-      "maxVelPxPerTick": 3.2741809263825417e-11
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 1698,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 586,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 2.331944415345788e-9,
-      "maxVelPxPerTick": 5.093170329928398e-11
-     },
-     "webkit": {
-      "tick": 796,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 877,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 2520
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 9.094947017729282e-13,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 1087,
-      "subsystems": [
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 484,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 1320
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 7.035851012915373e-9,
-      "maxVelPxPerTick": 1.964508555829525e-10
-     },
-     "webkit": {
-      "tick": 19,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 19,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 120
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 1.5679688658565283e-8,
-      "maxVelPxPerTick": 4.247340257279575e-9
-     }
-    }
-   },
-   "identicalAcrossEngines": 0,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.5433,
-    "firefox": 0.7851,
-    "webkit": 0.5127
-   },
-   "outcomeEqual": 9
-  },
-  "src-only": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 8760
-     },
-     "firefox": {
-      "tick": 764,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 765,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 3.2869138522073627e-9,
-      "maxVelPxPerTick": 1.4551915228366852e-10
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 8760
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 8,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.557,
-    "firefox": 0.5982,
-    "webkit": 0.5672
-   },
-   "outcomeEqual": 9
-  },
-  "loo-sin": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.2542,
-    "firefox": 0.3436,
-    "webkit": 0.2954
-   },
-   "outcomeEqual": 9
-  },
-  "loo-cos": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 8760
-     },
-     "firefox": {
-      "tick": 764,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 765,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 3.2869138522073627e-9,
-      "maxVelPxPerTick": 1.4551915228366852e-10
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 8760
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 8,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.2574,
-    "firefox": 0.3738,
-    "webkit": 0.2896
-   },
-   "outcomeEqual": 9
-  },
-  "loo-tan": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 1320
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1320
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1320
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.2741,
-    "firefox": 0.3467,
-    "webkit": 0.2855
-   },
-   "outcomeEqual": 9
-  },
-  "loo-atan2": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 554,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 489,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 714,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 580,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 1200
-     },
-     "firefox": {
-      "tick": 373,
-      "subsystems": [
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 594,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 4.971971065970138e-7,
-      "maxVelPxPerTick": 6.060872692614794e-9
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 2548,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 1200
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 1224,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 9090,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 2146,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 597,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 2054,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": {
-      "tick": 523,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 771,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": {
-      "tick": 2319,
-      "subsystems": [
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 586,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 877,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": {
-      "tick": 1087,
-      "subsystems": [
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 484,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 9.14405973162502e-9,
-      "maxVelPxPerTick": 2.473825588822365e-10
-     },
-     "webkit": null,
-     "webkitTerrain": {
-      "tick": 720,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 5,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.2703,
-    "firefox": 0.3465,
-    "webkit": 0.2891
-   },
-   "outcomeEqual": 9
-  },
-  "loo-pow": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.2857,
-    "firefox": 0.3658,
-    "webkit": 0.3024
-   },
-   "outcomeEqual": 9
-  },
-  "loo-exp": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": {
-      "tick": 255,
-      "subsystems": [
-       "sled"
-      ]
-     },
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 8,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.2544,
-    "firefox": 0.3698,
-    "webkit": 0.319
-   },
-   "outcomeEqual": 9
-  },
-  "loo-hypot": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 971,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 971,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 9.182258509099483e-9,
-      "maxVelPxPerTick": 5.366018740460277e-10
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 829,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 2.2737367544323206e-13,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 19,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 24,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 120
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 2.586966729722917e-8,
-      "maxVelPxPerTick": 8.803908713161945e-10
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": {
-      "tick": 5734,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "firefoxTerrain": {
-      "tick": 5734,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 3.496097633615136e-9,
-      "maxVelPxPerTick": 1.2369127944111824e-10
-     },
-     "webkit": {
-      "tick": 507,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 507,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0.000008281888312922092,
-      "maxVelPxPerTick": 9.793056960916147e-7
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 696,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": {
-      "tick": 709,
-      "subsystems": [
-       "terrain"
-      ]
-     },
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 1.521584636066109e-9,
-      "maxVelPxPerTick": 3.2741809263825417e-11
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": {
-      "tick": 796,
-      "subsystems": [
-       "sled",
-       "world"
-      ]
-     },
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
+      "tick": 1680
      },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
@@ -4744,233 +590,119 @@
       "maxVelPxPerTick": 0
      }
     },
-    "daily-practice-rule": {
-     "ticks": 2401,
+    "broad-cruise-e": {
+     "ticks": 874,
      "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
+      "ticks": 874,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 170,
+      "score": 235
      },
-     "chromiumDesync": {
-      "tick": 720
-     },
+     "chromiumDesync": null,
      "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
+     "firefoxTerrain": {
+      "tick": 554,
+      "subsystems": [
+       "terrain"
+      ]
      },
+     "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
       "maxPosPx": 0,
       "maxVelPxPerTick": 0
      },
      "webkit": {
-      "tick": 19,
+      "tick": 662,
       "subsystems": [
        "sled",
        "world"
       ]
      },
      "webkitTerrain": {
-      "tick": 19,
+      "tick": 683,
       "subsystems": [
        "terrain"
       ]
      },
      "webkitDesync": {
-      "tick": 120
+      "tick": 720
      },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
-      "maxPosPx": 1.5223122318275273e-8,
-      "maxVelPxPerTick": 5.838955985382199e-10
-     }
-    }
-   },
-   "identicalAcrossEngines": 2,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.2687,
-    "firefox": 0.6089,
-    "webkit": 0.2891
-   },
-   "outcomeEqual": 9
-  },
-  "loo-log": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
+      "maxPosPx": 1.1823431123048067e-11,
+      "maxVelPxPerTick": 3.637978807091713e-12
      }
     },
-    "fifth-run-in-session": {
-     "ticks": 1801,
+    "broad-allbiomes": {
+     "ticks": 7123,
      "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
+      "ticks": 7123,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 1906,
+      "score": 3441
      },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
+     "chromiumDesync": {
+      "tick": 2520
+     },
+     "firefox": {
+      "tick": 1350,
+      "subsystems": [
+       "world"
+      ]
+     },
+     "firefoxTerrain": {
+      "tick": 575,
+      "subsystems": [
+       "terrain"
+      ]
+     },
      "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
+      "maxPosPx": 2.228771336376667e-7,
+      "maxVelPxPerTick": 1.1059455573558807e-8
      },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
+     "webkit": {
+      "tick": 779,
+      "subsystems": [
+       "sled"
+      ]
+     },
+     "webkitTerrain": {
+      "tick": 784,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "webkitDesync": {
+      "tick": 840
+     },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
+      "maxPosPx": 3.298555384390056e-7,
+      "maxVelPxPerTick": 1.641456037759781e-8
      }
     },
-    "collision-heavy": {
-     "ticks": 1669,
+    "broad-reckless-a": {
+     "ticks": 1086,
      "outcome": {
-      "ticks": 1669,
+      "ticks": 1086,
       "crashed": true,
       "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
+      "distanceM": 137,
+      "score": 202
      },
      "chromiumDesync": null,
      "firefox": null,
-     "firefoxTerrain": null,
+     "firefoxTerrain": {
+      "tick": 649,
+      "subsystems": [
+       "terrain"
+      ]
+     },
      "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
@@ -4978,7 +710,12 @@
       "maxVelPxPerTick": 0
      },
      "webkit": null,
-     "webkitTerrain": null,
+     "webkitTerrain": {
+      "tick": 837,
+      "subsystems": [
+       "terrain"
+      ]
+     },
      "webkitDesync": null,
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
@@ -4986,282 +723,65 @@
       "maxVelPxPerTick": 0
      }
     },
-    "parachute-airbrake": {
-     "ticks": 2146,
+    "broad-reckless-b": {
+     "ticks": 1077,
      "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.2655,
-    "firefox": 0.8373,
-    "webkit": 0.3028
-   },
-   "outcomeEqual": 9
-  },
-  "loo-log1p": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
+      "ticks": 1077,
       "crashed": true,
       "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
+      "distanceM": 157,
+      "score": 157
      },
      "chromiumDesync": null,
      "firefox": null,
-     "firefoxTerrain": null,
+     "firefoxTerrain": {
+      "tick": 712,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": {
+      "tick": 938,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-tricks-a": {
+     "ticks": 1861,
+     "outcome": {
+      "ticks": 1861,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 394,
+      "score": 816
+     },
+     "chromiumDesync": null,
+     "firefox": {
+      "tick": 215,
+      "subsystems": [
+       "sled"
+      ]
+     },
+     "firefoxTerrain": {
+      "tick": 551,
+      "subsystems": [
+       "terrain"
+      ]
+     },
      "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
@@ -5277,282 +797,237 @@
       "maxVelPxPerTick": 0
      }
     },
-    "parachute-airbrake": {
-     "ticks": 2146,
+    "broad-tricks-b": {
+     "ticks": 3008,
      "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.3282,
-    "firefox": 0.6417,
-    "webkit": 0.4647
-   },
-   "outcomeEqual": 9
-  },
-  "loo-tanh": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
+      "ticks": 3008,
       "crashed": true,
       "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
+      "distanceM": 654,
+      "score": 1424
      },
      "chromiumDesync": {
-      "tick": 840
+      "tick": 1920
      },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
+     "firefox": {
+      "tick": 275,
+      "subsystems": [
+       "sled"
+      ]
      },
+     "firefoxTerrain": {
+      "tick": 548,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
+      "maxPosPx": 1.6421836335211992e-8,
+      "maxVelPxPerTick": 7.421476766467094e-10
      },
-     "webkit": null,
-     "webkitTerrain": null,
+     "webkit": {
+      "tick": 1173,
+      "subsystems": [
+       "sled",
+       "world"
+      ]
+     },
+     "webkitTerrain": {
+      "tick": 872,
+      "subsystems": [
+       "terrain"
+      ]
+     },
      "webkitDesync": {
-      "tick": 840
+      "tick": 1200
      },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
+      "maxPosPx": 1.847365638241172e-8,
+      "maxVelPxPerTick": 5.893525667488575e-10
      }
     },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
+    "broad-chute-a": {
+     "ticks": 5001,
      "outcome": {
-      "ticks": 3431,
+      "ticks": 5001,
       "crashed": false,
       "cause": null,
-      "distanceM": 815,
-      "score": 1115
+      "distanceM": 818,
+      "score": 1644
      },
      "chromiumDesync": {
-      "tick": 840
+      "tick": 2280
      },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
+     "firefox": {
+      "tick": 2268,
+      "subsystems": [
+       "sled",
+       "world"
+      ]
      },
+     "firefoxTerrain": {
+      "tick": 573,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
+      "maxPosPx": 1.5195837477222085e-8,
+      "maxVelPxPerTick": 3.965396899729967e-10
      },
-     "webkit": null,
-     "webkitTerrain": null,
+     "webkit": {
+      "tick": 2329,
+      "subsystems": [
+       "sled",
+       "world"
+      ]
+     },
+     "webkitTerrain": {
+      "tick": 734,
+      "subsystems": [
+       "terrain"
+      ]
+     },
      "webkitDesync": {
-      "tick": 840
+      "tick": 2280
      },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
+      "maxPosPx": 3.188324626535177e-8,
+      "maxVelPxPerTick": 4.547473508864641e-10
      }
     },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
+    "broad-chute-b": {
+     "ticks": 4570,
      "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
+      "ticks": 4570,
       "crashed": true,
       "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
+      "distanceM": 753,
+      "score": 1568
+     },
+     "chromiumDesync": {
+      "tick": 3720
+     },
+     "firefox": {
+      "tick": 1961,
+      "subsystems": [
+       "world"
+      ]
+     },
+     "firefoxTerrain": {
+      "tick": 540,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "firefoxDesync": {
+      "tick": 3120
+     },
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 8.78026185091585e-9,
+      "maxVelPxPerTick": 1.964508555829525e-10
+     },
+     "webkit": {
+      "tick": 642,
+      "subsystems": [
+       "sled",
+       "world"
+      ]
+     },
+     "webkitTerrain": {
+      "tick": 691,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "webkitDesync": {
+      "tick": 720
+     },
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 1.6689227777533233e-8,
+      "maxVelPxPerTick": 3.637978807091713e-10
+     }
+    },
+    "broad-bsod-a": {
+     "ticks": 9001,
+     "outcome": {
+      "ticks": 9001,
+      "crashed": false,
+      "cause": null,
+      "distanceM": 586,
+      "score": 16
+     },
+     "chromiumDesync": {
+      "tick": 960
+     },
+     "firefox": {
+      "tick": 960,
+      "subsystems": [
+       "sled",
+       "world"
+      ]
+     },
+     "firefoxTerrain": {
+      "tick": 911,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "firefoxDesync": {
+      "tick": 1800
+     },
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0.000007772523076710058,
+      "maxVelPxPerTick": 0.000002535258317948319
+     },
+     "webkit": {
+      "tick": 1356,
+      "subsystems": [
+       "sled",
+       "world"
+      ]
+     },
+     "webkitTerrain": {
+      "tick": 1850,
+      "subsystems": [
+       "terrain"
+      ]
+     },
+     "webkitDesync": {
+      "tick": 960
+     },
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 4.293724487069994e-9,
+      "maxVelPxPerTick": 1.673470251262188e-10
+     }
+    },
+    "broad-kodiaks-a": {
+     "ticks": 1759,
+     "outcome": {
+      "ticks": 1759,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 401,
+      "score": 686
      },
      "chromiumDesync": null,
      "firefox": null,
-     "firefoxTerrain": null,
+     "firefoxTerrain": {
+      "tick": 575,
+      "subsystems": [
+       "terrain"
+      ]
+     },
      "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
@@ -5568,183 +1043,23 @@
       "maxVelPxPerTick": 0
      }
     },
-    "parachute-airbrake": {
-     "ticks": 2146,
+    "broad-daily": {
+     "ticks": 866,
      "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.4029,
-    "firefox": 0.6278,
-    "webkit": 0.5708
-   },
-   "outcomeEqual": 9
-  },
-  "ops=hypot,atan2,exp,cos;mode=global": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
+      "ticks": 866,
       "crashed": true,
       "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
+      "distanceM": 219,
+      "score": 239
      },
      "chromiumDesync": null,
      "firefox": null,
-     "firefoxTerrain": null,
+     "firefoxTerrain": {
+      "tick": 464,
+      "subsystems": [
+       "terrain"
+      ]
+     },
      "firefoxDesync": null,
      "firefoxOutcomeEqual": true,
      "firefoxMaxDelta": {
@@ -5754,192 +1069,6 @@
      "webkit": null,
      "webkitTerrain": null,
      "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 1320
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1320
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1320
-     },
      "webkitOutcomeEqual": true,
      "webkitMaxDelta": {
       "maxPosPx": 0,
@@ -5947,460 +1076,15 @@
      }
     }
    },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
+   "identicalAcrossEngines": 6,
+   "fixturesCompared": 24,
    "simMsPerTick": {
-    "chromium": 0.5186,
-    "firefox": 0.7401,
-    "webkit": 0.66
+    "chromium": 0.3163,
+    "firefox": 0.3841,
+    "webkit": 0.3766
    },
-   "outcomeEqual": 9
-  },
-  "ops=hypot,atan2,exp,cos,sin,tan;mode=global": {
-   "perFixture": {
-    "cruise-baseline": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 591,
-      "score": 876
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "fifth-run-in-session": {
-     "ticks": 1801,
-     "outcome": {
-      "ticks": 1801,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 472,
-      "score": 717
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "collision-heavy": {
-     "ticks": 1669,
-     "outcome": {
-      "ticks": 1669,
-      "crashed": true,
-      "cause": "terrain",
-      "distanceM": 289,
-      "score": 399
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "chunk-biome-boundaries": {
-     "ticks": 3431,
-     "outcome": {
-      "ticks": 3431,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 815,
-      "score": 1115
-     },
-     "chromiumDesync": {
-      "tick": 840
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 840
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 840
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "bsod-pursuit-catch": {
-     "ticks": 12150,
-     "outcome": {
-      "ticks": 12150,
-      "crashed": true,
-      "cause": "bsod",
-      "distanceM": 437,
-      "score": 0
-     },
-     "chromiumDesync": {
-      "tick": 480
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 480
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 480
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "airborne-tricks": {
-     "ticks": 2224,
-     "outcome": {
-      "ticks": 2224,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 513,
-      "score": 2428
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "parachute-airbrake": {
-     "ticks": 2146,
-     "outcome": {
-      "ticks": 2146,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 332,
-      "score": 790
-     },
-     "chromiumDesync": null,
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": null,
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": null,
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "kodiaks-on": {
-     "ticks": 2637,
-     "outcome": {
-      "ticks": 2637,
-      "crashed": true,
-      "cause": "hazard",
-      "distanceM": 606,
-      "score": 991
-     },
-     "chromiumDesync": {
-      "tick": 1920
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 1920
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 1920
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    },
-    "daily-practice-rule": {
-     "ticks": 2401,
-     "outcome": {
-      "ticks": 2401,
-      "crashed": false,
-      "cause": null,
-      "distanceM": 724,
-      "score": 1399
-     },
-     "chromiumDesync": {
-      "tick": 720
-     },
-     "firefox": null,
-     "firefoxTerrain": null,
-     "firefoxDesync": {
-      "tick": 720
-     },
-     "firefoxOutcomeEqual": true,
-     "firefoxMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     },
-     "webkit": null,
-     "webkitTerrain": null,
-     "webkitDesync": {
-      "tick": 720
-     },
-     "webkitOutcomeEqual": true,
-     "webkitMaxDelta": {
-      "maxPosPx": 0,
-      "maxVelPxPerTick": 0
-     }
-    }
-   },
-   "identicalAcrossEngines": 9,
-   "fixturesCompared": 9,
-   "simMsPerTick": {
-    "chromium": 0.5522,
-    "firefox": 0.8505,
-    "webkit": 0.5455
-   },
-   "outcomeEqual": 9
+   "outcomeEqual": 24
   }
  },
- "portableVsNativeOnChromium": {
-  "cruise-baseline": {
-   "firstDivergentTick": 326,
-   "nativeOutcome": {
-    "ticks": 2401,
-    "crashed": false,
-    "cause": null,
-    "distanceM": 591,
-    "score": 876
-   },
-   "portableOutcome": {
-    "ticks": 2401,
-    "crashed": false,
-    "cause": null,
-    "distanceM": 591,
-    "score": 876
-   }
-  },
-  "fifth-run-in-session": {
-   "firstDivergentTick": null,
-   "nativeOutcome": {
-    "ticks": 1801,
-    "crashed": false,
-    "cause": null,
-    "distanceM": 472,
-    "score": 717
-   },
-   "portableOutcome": {
-    "ticks": 1801,
-    "crashed": false,
-    "cause": null,
-    "distanceM": 472,
-    "score": 717
-   }
-  },
-  "collision-heavy": {
-   "firstDivergentTick": 340,
-   "nativeOutcome": {
-    "ticks": 1669,
-    "crashed": true,
-    "cause": "terrain",
-    "distanceM": 289,
-    "score": 399
-   },
-   "portableOutcome": {
-    "ticks": 1669,
-    "crashed": true,
-    "cause": "terrain",
-    "distanceM": 289,
-    "score": 399
-   }
-  },
-  "chunk-biome-boundaries": {
-   "firstDivergentTick": 373,
-   "nativeOutcome": {
-    "ticks": 3431,
-    "crashed": true,
-    "cause": "hazard",
-    "distanceM": 835,
-    "score": 1175
-   },
-   "portableOutcome": {
-    "ticks": 3431,
-    "crashed": false,
-    "cause": null,
-    "distanceM": 815,
-    "score": 1115
-   }
-  },
-  "bsod-pursuit-catch": {
-   "firstDivergentTick": 383,
-   "nativeOutcome": {
-    "ticks": 12150,
-    "crashed": true,
-    "cause": "bsod",
-    "distanceM": 437,
-    "score": 0
-   },
-   "portableOutcome": {
-    "ticks": 12150,
-    "crashed": true,
-    "cause": "bsod",
-    "distanceM": 437,
-    "score": 0
-   }
-  },
-  "airborne-tricks": {
-   "firstDivergentTick": 255,
-   "nativeOutcome": {
-    "ticks": 2224,
-    "crashed": true,
-    "cause": "hazard",
-    "distanceM": 513,
-    "score": 2428
-   },
-   "portableOutcome": {
-    "ticks": 2224,
-    "crashed": true,
-    "cause": "hazard",
-    "distanceM": 513,
-    "score": 2428
-   }
-  },
-  "parachute-airbrake": {
-   "firstDivergentTick": 316,
-   "nativeOutcome": {
-    "ticks": 2146,
-    "crashed": true,
-    "cause": "hazard",
-    "distanceM": 332,
-    "score": 790
-   },
-   "portableOutcome": {
-    "ticks": 2146,
-    "crashed": true,
-    "cause": "hazard",
-    "distanceM": 332,
-    "score": 790
-   }
-  },
-  "kodiaks-on": {
-   "firstDivergentTick": 1360,
-   "nativeOutcome": {
-    "ticks": 2637,
-    "crashed": true,
-    "cause": "hazard",
-    "distanceM": 606,
-    "score": 991
-   },
-   "portableOutcome": {
-    "ticks": 2637,
-    "crashed": true,
-    "cause": "hazard",
-    "distanceM": 606,
-    "score": 991
-   }
-  },
-  "daily-practice-rule": {
-   "firstDivergentTick": 286,
-   "nativeOutcome": {
-    "ticks": 2401,
-    "crashed": false,
-    "cause": null,
-    "distanceM": 724,
-    "score": 1399
-   },
-   "portableOutcome": {
-    "ticks": 2401,
-    "crashed": false,
-    "cause": null,
-    "distanceM": 724,
-    "score": 1399
-   }
-  }
- }
+ "portableVsNativeOnChromium": {}
 }

@@ -1,53 +1,53 @@
 {
  "engine": "webkit",
- "reps": 4,
+ "reps": 5,
  "hz": 120,
  "note": "ms per 120 Hz sim tick; simTick = RunScene.simTick wall time (incl. physics, excl. digest hook); loop = whole frame loop incl. renderFrame + digest hook",
  "summary": {
+  "native@main": {
+   "cruise-baseline": {
+    "ticks": 2401,
+    "simMsPerTickMedian": 0.217,
+    "loopMsPerTickMedian": 0.4773,
+    "simMin": 0.2057,
+    "simMax": 0.2324
+   },
+   "airborne-tricks": {
+    "ticks": 2224,
+    "simMsPerTickMedian": 0.2626,
+    "loopMsPerTickMedian": 0.6075,
+    "simMin": 0.2037,
+    "simMax": 0.3129
+   },
+   "broad-allbiomes": {
+    "ticks": 7123,
+    "simMsPerTickMedian": 0.1982,
+    "loopMsPerTickMedian": 0.4237,
+    "simMin": 0.1908,
+    "simMax": 0.2458
+   }
+  },
   "native": {
    "cruise-baseline": {
     "ticks": 2401,
-    "simMsPerTickMedian": 0.7289,
-    "loopMsPerTickMedian": 1.7784,
-    "simMin": 0.5373,
-    "simMax": 0.8284
+    "simMsPerTickMedian": 0.2432,
+    "loopMsPerTickMedian": 0.5398,
+    "simMin": 0.2132,
+    "simMax": 0.2657
    },
-   "collision-heavy": {
-    "ticks": 1669,
-    "simMsPerTickMedian": 0.6603,
-    "loopMsPerTickMedian": 1.2996,
-    "simMin": 0.4056,
-    "simMax": 1.1061
+   "airborne-tricks": {
+    "ticks": 2224,
+    "simMsPerTickMedian": 0.2783,
+    "loopMsPerTickMedian": 0.6466,
+    "simMin": 0.25,
+    "simMax": 0.2914
    },
-   "kodiaks-on": {
-    "ticks": 2637,
-    "simMsPerTickMedian": 0.5317,
-    "loopMsPerTickMedian": 1.2556,
-    "simMin": 0.4733,
-    "simMax": 0.6231
-   }
-  },
-  "all": {
-   "cruise-baseline": {
-    "ticks": 2401,
-    "simMsPerTickMedian": 0.6472,
-    "loopMsPerTickMedian": 1.6739,
-    "simMin": 0.5389,
-    "simMax": 1.5594
-   },
-   "collision-heavy": {
-    "ticks": 1669,
-    "simMsPerTickMedian": 0.5117,
-    "loopMsPerTickMedian": 1.1216,
-    "simMin": 0.4548,
-    "simMax": 0.9898
-   },
-   "kodiaks-on": {
-    "ticks": 2637,
-    "simMsPerTickMedian": 0.6378,
-    "loopMsPerTickMedian": 1.3659,
-    "simMin": 0.4733,
-    "simMax": 0.8286
+   "broad-allbiomes": {
+    "ticks": 7123,
+    "simMsPerTickMedian": 0.2071,
+    "loopMsPerTickMedian": 0.4462,
+    "simMin": 0.1956,
+    "simMax": 0.2323
    }
   }
  }
