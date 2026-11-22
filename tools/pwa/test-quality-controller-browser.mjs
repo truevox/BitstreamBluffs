@@ -95,7 +95,7 @@ try{
   if(result.modeBefore!=='lite'||result.groupsReady.some(g=>!g.lite||!g.full))
     throw Error('Controller failed completeness gate');
   await context.setOffline(true);
-  const offline=await page.evaluate(async({source,chosen,groups})=>{
+  const offline=await page.evaluate(async({source,chosen,groups,songIds})=>{
     const verify=async expected=>{
       const response=await fetch(source.logicalUrl,{cache:'no-store'});
       if(response.status!==200)return {status:response.status};
@@ -107,14 +107,45 @@ try{
     const current=await verify(source.sha256);
     const manager=window.__qualityManager;
     if(manager.mode!=='high')throw Error('Controller lost its in-memory high-quality policy');
+    const audio=window.__bbGame.registry.get('audioSynth');
+    if(!audio)throw Error('Actual game AudioSynth missing');
+    // Only switch while the current music engine is fully STOPPED. The
+    // production event/handoff into this boundary is still unimplemented.
+    audio.applySettings({...audio.settings,musicQuality:'off'});
+    if(audio._stemMusic.started)throw Error('Stopped transport still owns recorded sources');
+    const selection=Object.fromEntries(songIds.map(id=>[id,id===chosen.id]));
+    const playAndInspect=async quality=>{
+      audio.applySettings({...audio.settings,musicQuality:quality,musicEnabledSongs:selection,dynamicOrchestra:false});
+      if(!audio.jukeboxPlay())throw Error('The actual shared music engine did not start');
+      const deadline=Date.now()+25000;
+      while(Date.now()<deadline){
+        const p=audio._stemMusic;
+        if(p?.track?.id===chosen.id&&p?.clockStart!==null&&p?.cache?.size>=7){
+          const playback={state:p.transportSnapshot().state,decoded:p.cache.size,
+            channels:[...new Set([...p.cache.values()].map(x=>x.numberOfChannels))],
+            proceduralTimer:!!audio._musicTimer};
+          if(playback.state!=='playing'||playback.channels.some(x=>x!==1)||playback.proceduralTimer)
+            throw Error('The game did not decode and play actual mono music');
+          return playback;
+        }
+        await new Promise(ok=>setTimeout(ok,100));
+      }
+      throw Error('Actual stem player did not decode recorded music in time');
+    };
     const flags={
       readyBeforePromotion:current,
       promoted:await manager.atVerifiedBoundary(chosen.id),
     };
     const full=groups=>groups[0].full.entries.find(x=>x.logicalUrl===source.logicalUrl).sha256;
     flags.full=await verify(full(groups));
+    flags.fullPlayback=await playAndInspect('high');
+    audio.applySettings({...audio.settings,musicQuality:'off'});
+    if(audio._stemMusic.started)throw Error('Full music did not stop for quality change');
     await manager.setMode('saver');await manager.whenIdle();
     flags.saver=await verify(source.sha256);
+    flags.saverPlayback=await playAndInspect('saver');
+    audio.applySettings({...audio.settings,musicQuality:'off'});
+    if(audio._stemMusic.started)throw Error('Saver music did not stop');
     await manager.setMode('off');await manager.whenIdle();
     flags.off=(await fetch(source.logicalUrl,{cache:'no-store'})).status;
     const {isRealSongDownloaded}=await import('/tools/pwa/music-cache-prototype.mjs');
@@ -124,10 +155,11 @@ try{
       flags.retained.push(await isRealSongDownloaded(g.lite,o),await isRealSongDownloaded(g.full,o));
     }
     return flags;
-  },{source,chosen,groups:required});
+  },{source,chosen,groups:required,songIds:catalog.tracks.map(t=>t.id)});
   console.log('REAL CONTROLLER OFFLINE',JSON.stringify(offline));
   if(!offline.readyBeforePromotion.match||!offline.promoted||!offline.full.match||
-    !offline.saver.match||offline.off!==503||!offline.retained.every(Boolean))
+    !offline.saver.match||offline.off!==503||!offline.retained.every(Boolean)||
+    offline.fullPlayback?.state!=='playing'||offline.saverPlayback?.state!=='playing')
     throw Error('Real offline manager failed one of its quality modes');
   if(errors.length)throw Error('Unexpected browser page errors: '+errors.join('; '));
   await page.reload({waitUntil:'domcontentloaded'});await titleReady();
