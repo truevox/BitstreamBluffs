@@ -82,6 +82,15 @@ export const FIXTURES = {
       edges: [{ key: 'hop', at: T(3) }, { key: 'hop', at: T(7.5) }, { key: 'hop', at: T(9) }],
     },
   },
+  // Biome-sector entry (all biome bits): the sled starts 1500 px before the first sector boundary that enters a biome
+  // (found in the page from the run's own sector map), so the biome repaint runs mid-ride, under the sled.
+  biome: {
+    seed: 'BIOME140@4294967295', ticks: T(10), biomeEntry: true,
+    tape: {
+      held: [{ key: 'push', from: 0, to: T(2) }, { key: 'tuck', from: T(4), to: T(6) }],
+      edges: [{ key: 'hop', at: T(3) }, { key: 'hop', at: T(7) }],
+    },
+  },
   // BSOD catch: the deletion wall starts 260 px behind the sled's left collision edge (set identically before
   // tick 1 in every run, like startX); the rider pushes briefly, then brakes and the wall catches it (cause 'bsod').
   bsod: {
@@ -129,6 +138,9 @@ export const CASES = {
   'ui-pause-resume': { hz: 60, atTick: [{ tick: 400, code: 'run.scene.pause(); for (let i = 0; i < 30; i++) { ctx.t += 16.667; g.step(ctx.t, 16.667); } run.scene.resume(); g.events.emit("bb:gameResume", {});' }] },
   'settings-motion-midrun': { hz: 60, atTick: [{ tick: 300, code: 'const s = g.registry.get("settings"); s.screenShake = false; s.reducedMotion = true; g.events.emit("bb:settingsChanged", { key: "screenShake", value: false, settings: s });' }] },
   'settings-palette-midrun': { hz: 60, atTick: [{ tick: 300, code: 'const s = g.registry.get("settings"); s.palette = s.palette === "colorblind" ? "default" : "colorblind"; g.events.emit("bb:settingsChanged", { key: "palette", value: s.palette, settings: s });' }] },
+  // Biome visuals never change (refreshPalette stubbed out). Before the fix the biome repaint rebuilt the live
+  // colliders, so this differed from the baseline at the sector-entry tick.
+  'biome-visuals-frozen': { hz: 60, postStart: 'run.refreshPalette = () => {};' },
   // Positive control: a 1e-9 px/step velocity nudge at tick 300 MUST be reported as a causal leak, proving the
   // digest can see a sub-visible physics change.
   'control-physics-nudge': { hz: 60, tag: 'positive control', atTick: [{ tick: 300, code: 'const b = run.sled.body; run.matter.body.setVelocity(b, { x: b.velocity.x + 1e-9, y: b.velocity.y });' }] },
@@ -150,6 +162,7 @@ const PLAN = {
   hazards: CORE,
   kodiak: CORE,
   bsod: CORE,
+  biome: [...CORE, 'biome-visuals-frozen'],
 };
 
 // ------------------------------------------------------------------ page side
@@ -176,6 +189,20 @@ async function pageSetup({ fx, pt }) {
   });
   g.loop.sleep();
   if (fx.scramble) run.scrambleMs = 1e9;
+  if (fx.biomeEntry) {
+    const ppm = run.terrain.ppm;
+    let entry = null;
+    for (let sec = 3; sec < 60 && entry == null; sec++) {
+      if (run._biomeDefForSector(sec) && !run._biomeDefForSector(sec - 1)) entry = (sec - 1) * 500 * ppm;
+    }
+    if (entry == null) throw new Error('no biome entry found for ' + fx.seed);
+    ctx.biomeEntryX = entry;
+    const x0 = entry - 1500;
+    run.streamTerrain(x0);
+    run.sled.setPose(x0, run.terrain.heightAt(x0) - 15, run.slopeAt(x0), 320, 0);
+    // The start sector counts as already announced, so the only biome change is the real mid-ride entry.
+    run._biomeSector = run.terrain._sectorOf(x0);
+  }
   if (fx.startX != null) {
     run.streamTerrain(fx.startX);
     run.sled.setPose(fx.startX, run.terrain.heightAt(fx.startX) - 15, run.slopeAt(fx.startX), 320, 0);
@@ -292,7 +319,8 @@ async function runCase(fixtureName, caseName, baseline) {
         hazardHits: Math.max(0, ...p.states.map((x) => x.hazards.filter((h) => h[4]).length)),
         nearMisses: s.score?.nearMisses ?? 0, kodiakEvents: p.states.flatMap((x) => x.events).filter((e) => e[0] === 'bb:kodiak').length,
         sfx: [...new Set(p.states.flatMap((x) => x.sfx.map((q) => q[0])))], airTicks: p.states.filter((x) => x.sled && !x.sled.grounded).length,
-        bsodCaught: !!s.bsod?.caught, viewport: [innerWidth, innerHeight, devicePixelRatio], audio: !!g.registry.get('audioSynth') };
+        bsodCaught: !!s.bsod?.caught, biomeEntryX: p.biomeEntryX ?? null,
+        biomeEntryTick: p.biomeEntryX == null ? null : (p.states.find((x) => x.sled && x.sled.parts[0][2] >= p.biomeEntryX)?.tick ?? null), viewport: [innerWidth, innerHeight, devicePixelRatio], audio: !!g.registry.get('audioSynth') };
     });
     const res = { fixture: fixtureName, case: caseName, tag: pt.tag || null, meta, errors };
     if (!baseline) { res.digests = digests; res.states = await page.evaluate(() => window.__probe.states); return res; }

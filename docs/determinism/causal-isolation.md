@@ -123,10 +123,10 @@ This is the frame-to-tick fan-out (`SimClock.padsFor`), which belongs to #115. W
    presentation leak. But it is the same mechanism as L1: body ids and order reshuffle and warm-start impulses are
    dropped. Switching it to `redrawChunk` would change the physics of existing biome-mask ghost tapes, so it needs
    an owner decision and a `GHOST_PHYSICS_VERSION` / ruleset note (#123). It is left untouched.
-2. **BSOD Gym READY can wait up to 300 ms for a music beat** (`gymBeatSuggestion`, `RunScene.update`). This is an
-   intentional audio-to-sim timing path. It is Gym only (unranked, never taped) and was not exercised by this matrix.
-3. **`settings.controlLayout` mid-run** changes `normalizePad` (`variableHop`, `noAutoNudge`). It is input
-   semantics, not presentation, and the tape records it in the pad bits, so replays are unaffected.
+2. **BSOD Gym READY can wait up to 300 ms for a music beat** (`gymBeatSuggestion`, `RunScene.update`). **Owner decision
+   (2026-11-21): intended and accepted** as a deliberate audio-to-sim path. It is Gym only (unranked, never taped).
+3. **`settings.controlLayout` mid-run** changes `normalizePad` (`variableHop`, `noAutoNudge`). **Owner decision
+   (2026-11-21): a gameplay setting recorded in tapes (pad bits), not a presentation leak; nothing to fix.**
 4. **Cosmetic terrain reads** (minimap, Fx ground tests, hazard drawing) can build generator chunks early.
    `streamTerrain` gates their physical insertion (#59). The `terrainCache` class allows this, and no matrix cell
    showed it.
