@@ -74,7 +74,7 @@ import { crashReport, crashBeat, deathMarkerX } from '../systems/CrashReport.js'
 import { layoutMarkerLabels } from '../systems/MarkerLayout.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
-import { planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
+import { planTelegraphMarks as planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
@@ -1448,7 +1448,7 @@ export class RunScene extends Phaser.Scene {
       this.deathMarker.setPlacement(L.death);
     }
     this.drawStreaks(t);
-    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.heightFn);
+    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.terrain?.activeList);
     // Visual-only world dance: no music player/beat-grid mutation, and no
     // hidden synthetic tempo. With a muted/paused song or reduced motion the
     // backdrop returns immediately to its original neutral geometry.
@@ -1936,7 +1936,7 @@ export class RunScene extends Phaser.Scene {
 
   /**
    * Ground-hazard telegraph (systems/HazardTelegraph.js): plan this frame's marks (drawn by entities/GroundTelegraph.js in
-   * renderFrame) and play each hazard's warn / hop cue once. Reads state only; never touches physics, score or the record.
+   * renderFrame) and play each hazard's warn / hop cue once. The speed-based horizon never reads the camera.
    * @param {number} now run time (ms).
    */
   updateGroundTelegraph(now) {
@@ -1945,7 +1945,7 @@ export class RunScene extends Phaser.Scene {
     for (const list of this.hazards.values()) for (const h of list) live.push(h);
     const landX = !sled.grounded && Number.isFinite(sled.airEtaMs) ? sled.x + sled.vx * sled.airEtaMs / 1000 : null;
     const isMuted = (h) => isWarded(this.wards, { hazardId: h.def.id }) || isWarded(this.wards, { effect: h.def.onHit ? h.def.onHit.effect : 'crash' });
-    const marks = planTelegraph(live, { x: sled.x, vx: sled.vx, speed: sled.speed, grounded: sled.grounded, landX }, this._view ? this._view.right : sled.x + GAME_WIDTH, { isMuted, nowMs: now });
+    const marks = planTelegraph(live, { x: sled.x, vx: sled.vx, speed: sled.speed, grounded: sled.grounded, landX }, { isMuted, nowMs: now });
     for (const e of this.teleTracker.update(now, marks)) {
       if (e.type === 'warn') {
         e.ref.teleAtMs = now; // read by the measurement harness and the gate; nothing in the game depends on it
