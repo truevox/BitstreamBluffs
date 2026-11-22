@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.4 — cross-engine replay conformance matrix (#161 / #120) (2026-11-22)
+
+- **Developer-only conformance harness and evidence; no game, replay-format or gameplay changes.** `tools/conformance/cross-engine*.mjs` replays nine committed fixture tapes through the real built game on Chromium, Firefox and Playwright WebKit at 30/60/120/144 Hz stepping, compares diagnostic (non-authoritative) per-tick digests split into causal state and derived reads, reports the first divergent tick and subsystem, TapePlayer checkpoint desyncs and final outcomes, and isolates `Math.*` differences with a pure-JS counterfactual (evidence for #121). Results and reproduction are in `docs/determinism/cross-engine-matrix.md`. Playwright WebKit is not iPhone Safari; real Safari/iOS, ARM and hardware GPUs were not tested.
+
+- **Historical measurement, current diagnostic tools:** The 400 sequential and 45 fresh-context rows were collected against v2.18.1 (main `7d5780f`), before v2.19.0 Kodiak shoves, v2.19.1 causal isolation and v2.19.3 prior-run-state reset. They are retained as provenance and demonstrate the earlier cross-engine math differences; **they are not a new verification of v2.19.3**. The #219 session leak is now fixed, while exact portable math parity remains open under #121. No gameplay or trusted replay-verifier code changes.
+
 ## v2.19.3 — every run starts from identical sim state (#120) (2026-11-22)
 
 <!-- friday-issue: 120 -->
