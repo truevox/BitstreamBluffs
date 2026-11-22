@@ -10,6 +10,9 @@
  * The subtle half is the mask check. Luna's `biomeOrder` bypass meant that with no order the mask was
  * never consulted at all, so a profile that had switched every signature OFF could still be offered
  * biome missions for terrain it would never see. Both halves are pinned here.
+ *
+ * Issue #65: unlocked biomes default ON, so the profile carries explicit OFF choices (`biomeOff`) rather than
+ * an opt-in mask, and the base biome (Debutmont) has no bit in play: it is always eligible.
  */
 import { isOfferable } from '../../src/systems/Missions.js';
 import { earnedBiomeIds } from '../../src/systems/ProfileStore.js';
@@ -23,8 +26,8 @@ const BIOME_DEFS = [
 ];
 
 /** A credited profile as the game actually stores one: pendingBiomes derived, unlocked.biomes empty. */
-const credited = (level, mask) => ({
-  v: 1, xp: 0, level, bank: 0, biomeMask: mask,
+const credited = (level, off = 0) => ({
+  v: 1, xp: 0, level, bank: 0, biomeOff: off,
   pendingBiomes: BIOME_DEFS.filter((d) => d.unlockLevel <= level).map((d) => d.id),
   unlocked: { biomes: [], cosmetics: [], boosts: {} },
   missions: { counter: 0, active: [], progress: {} }, achievements: {}, credited: [],
@@ -34,7 +37,7 @@ const missionFor = (biome) => ({ id: `m-${biome}`, biome, tier: 2, metric: 'dist
 
 describe('biome missions reach a real profile', () => {
   test("a credited profile's earned biomes are not an empty list", () => {
-    const p = credited(12, 31);
+    const p = credited(12);
     // The two reads that must agree. `unlocked.biomes` being empty is exactly why the old gate failed.
     expect(p.unlocked.biomes).toEqual([]);
     expect(earnedBiomeIds(p, BIOME_DEFS)).toEqual([
@@ -43,47 +46,55 @@ describe('biome missions reach a real profile', () => {
   });
 
   test('a mission for an earned biome is offerable', () => {
-    const p = credited(12, 31);
+    const p = credited(12);
     expect(isOfferable(missionFor('crystal-cavern'), p, 'r1', BIOME_DEFS)).toBe(true);
   });
 
   test('a mission for a biome above the level is still refused', () => {
     // Unlock is earned, not merely enabled: a level-3 profile cannot be offered a level-12 biome.
-    const p = credited(3, 31);
+    const p = credited(3);
     expect(isOfferable(missionFor('crystal-cavern'), p, 'r1', BIOME_DEFS)).toBe(false);
     expect(isOfferable(missionFor('debutmont'), p, 'r1', BIOME_DEFS)).toBe(true);
   });
 
   test('a mission for a switched-OFF signature is refused', () => {
     // Luna's biomeOrder bypass: with no order array the mask was never consulted, so this passed.
-    const p = credited(12, 31 & ~16); // crystal-cavern off, everything else on
+    const p = credited(12, 16); // crystal-cavern explicitly OFF, everything else on
     expect(isOfferable(missionFor('crystal-cavern'), p, 'r1', BIOME_DEFS)).toBe(false);
     expect(isOfferable(missionFor('pyramid-peak'), p, 'r1', BIOME_DEFS)).toBe(true);
   });
 
-  test('mask 0 offers no biome missions at all', () => {
-    const p = credited(12, 0);
+  test('every switchable biome OFF offers no missions for them, but the base biome stays eligible', () => {
+    const p = credited(12, 2 | 4 | 8 | 16);
     for (const d of BIOME_DEFS) {
       expect({ id: d.id, offerable: isOfferable(missionFor(d.id), p, 'r1', BIOME_DEFS) })
-        .toMatchObject({ id: d.id, offerable: false });
+        .toMatchObject({ id: d.id, offerable: d.id === 'debutmont' });
+    }
+  });
+
+  test('a fresh default-ON profile is offered missions for every unlocked biome', () => {
+    const p = credited(12);
+    for (const d of BIOME_DEFS) {
+      expect({ id: d.id, offerable: isOfferable(missionFor(d.id), p, 'r1', BIOME_DEFS) })
+        .toMatchObject({ id: d.id, offerable: true });
     }
   });
 
   test('backwards compatibility: the old two-argument call keeps working', () => {
     // Every existing caller and test passes no defs. Without them the mask cannot be resolved to ids,
     // so the gate must still fail closed for a biome the profile demonstrably has not earned.
-    const p = credited(12, 31);
+    const p = credited(12);
     expect(isOfferable(missionFor('crystal-cavern'), p, 'r1')).toBe(true);
-    expect(isOfferable(missionFor('crystal-cavern'), credited(1, 31), 'r1')).toBe(false);
+    expect(isOfferable(missionFor('crystal-cavern'), credited(1), 'r1')).toBe(false);
   });
 
   test('non-biome missions are unaffected', () => {
     const plain = { id: 'm-plain', tier: 1, metric: 'distance', target: 100, xp: 10 };
-    expect(isOfferable(plain, credited(1, 0), 'r1', BIOME_DEFS)).toBe(true);
+    expect(isOfferable(plain, credited(1), 'r1', BIOME_DEFS)).toBe(true);
   });
 
   test('an excluded rule still wins over a biome mission', () => {
     const t = { ...missionFor('debutmont'), excludedRuleIds: ['r1'] };
-    expect(isOfferable(t, credited(12, 31), 'r1', BIOME_DEFS)).toBe(false);
+    expect(isOfferable(t, credited(12), 'r1', BIOME_DEFS)).toBe(false);
   });
 });

@@ -115,21 +115,32 @@ describe('MS-1: published cumulative progress is what is banked', () => {
   });
 });
 
-describe('MS-2: a biome mission completes only on a run with that biome switched on', () => {
+describe('MS-2: a biome mission completes only on a run with that biome switched on (the base biome is always on)', () => {
   const t = MISSIONS.templates.find((x) => x.id === 't4-biome-debutmont');
   const deb = BIOME_DEFS.find((d) => d.id === 'debutmont');
   const other = BIOME_DEFS.find((d) => d.id !== 'debutmont');
-  const prof = () => v1({ xp: MAX_XP, biomeMask: deb.bit, missions: { counter: 1, active: [t.id], progress: {} } });
+  const prof = () => v1({ xp: MAX_XP, missions: { counter: 1, active: [t.id], progress: {} } });
   const roll = (mask, defs = BIOME_DEFS) => rollSet(prof(), [t], rec({ distanceM: 1600, ...(mask === undefined ? {} : { biomeMask: mask }) }), MISSIONS.templates, { biomeDefs: defs })
     .completed.map((c) => c.id);
 
-  test('"1500 m in Debutmont" is not completed by a run with no biome on', () => {
-    expect(roll(0)).toEqual([]);
-    expect(roll(undefined)).toEqual([]);
+  // Issue #65: Debutmont is the base biome, the terrain of every run whatever its mask (Daily mask 0, a
+  // Gym, `seed@mask`), and its bit is never in a normal run's mask. The mission is therefore completable
+  // on any run; it must not hang on a no-op bit.
+  test('"1500 m in Debutmont" is completed by a run whatever its mask, the base bit being a no-op', () => {
+    expect(roll(0)).toEqual([t.id]);
+    expect(roll(undefined)).toEqual([t.id]);
+    expect(roll(other.bit)).toEqual([t.id]);
   });
 
-  test('nor by a run whose mask has only other biomes', () => {
-    expect(roll(other.bit)).toEqual([]);
+  test('a biome mission for a NON-base biome still needs that biome on in the run mask', () => {
+    const g = MISSIONS.templates.find((x) => x.id === 't4-biome-glacier');
+    const gl = BIOME_DEFS.find((d) => d.id === 'garbage-dump-glacier');
+    const p = v1({ xp: MAX_XP, missions: { counter: 1, active: [g.id], progress: {} } });
+    const run = (mask) => rollSet(p, [g], rec({ distanceM: 2100, biomeMask: mask }), MISSIONS.templates, { biomeDefs: BIOME_DEFS })
+      .completed.map((c) => c.id);
+    expect(run(0)).toEqual([]);
+    expect(run(deb.bit)).toEqual([]);
+    expect(run(gl.bit)).toEqual([g.id]);
   });
 
   test('a 1600 m run with the Debutmont bit on completes it', () => {
@@ -137,15 +148,15 @@ describe('MS-2: a biome mission completes only on a run with that biome switched
     expect(roll(deb.bit | other.bit)).toEqual([t.id]);
   });
 
-  test('without a biome table the gate still needs some biome on (legacy fallback)', () => {
-    expect(roll(0, undefined)).toEqual([]);
+  test('without a biome table the base biome is still always eligible (legacy fallback)', () => {
+    expect(roll(0, undefined)).toEqual([t.id]);
     expect(roll(deb.bit, undefined)).toEqual([t.id]);
   });
 
   async function liveToasts(mask) {
     const { game, store, missions } = await boot(memStorage());
     store.applyMissions({ active: [t.id], counter: 5, progress: {}, xp: 0, shards: 0 });
-    store.save({ ...store.profile, xp: MAX_XP, biomeMask: deb.bit });
+    store.save({ ...store.profile, xp: MAX_XP });
     const got = [];
     game.events.on(EVT.MISSION_COMPLETED, (p) => got.push(p.id));
     game.registry.set(REG.BIOME_MASK, mask);
@@ -157,13 +168,15 @@ describe('MS-2: a biome mission completes only on a run with that biome switched
 
   test('stateFor (live mission state) applies the same gate', async () => {
     const { missions } = await boot(memStorage());
-    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: 0 } }).done).toBe(false);
-    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: other.bit } }).done).toBe(false);
+    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: 0 } }).done).toBe(true);
+    expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: other.bit } }).done).toBe(true);
     expect(missions.stateFor(t, { live: { distanceM: 1600, biomeMask: deb.bit } }).done).toBe(true);
+    const gl = MISSIONS.templates.find((x) => x.id === 't4-biome-glacier');
+    expect(missions.stateFor(gl, { live: { distanceM: 2100, biomeMask: 0 } }).done).toBe(false);
   });
 
   test('the live toast follows the same rule as the payout', async () => {
-    expect(await liveToasts(0)).toEqual([]);
+    expect(await liveToasts(0)).toEqual([t.id]);
     expect(await liveToasts(deb.bit)).toEqual([t.id]);
   });
 });
