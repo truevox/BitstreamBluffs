@@ -13,6 +13,10 @@ not yet supply a player-facing tape JSON export or an in-game strip button.
 4. Use **Download section SVG** to save the displayed interval. The SVG can
    be viewed and shared without the inspector. It is static and does not
    include the preview cursor or a way to reopen the source tape.
+5. **Run DNA preview** shows local, unverified artwork from the full accepted
+   path. Zooming never changes this artwork or the strip export. The preview
+   is not exported by the inspector, and choosing or clearing a file removes
+   the old artwork immediately. See [the Run DNA notes](issue-87-run-trace-art.md).
 
 The plotted line joins recorded X/Y samples in their original order, including
 backtracking. It fits the chosen section with the **same unit scale on both
