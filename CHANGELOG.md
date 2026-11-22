@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.15 — Arcade bridge dissolve, biome FX and pixel backdrops (#65 / #217) (2026-11-22)
+
+- **Cosmetic biome transition:** a readable neon-grid arcade bridge dissolves the outgoing biome to retro pixel geometry and reconstructs the incoming look as riding distance changes. The handoff is presentation-only: it never creates terrain, changes physics, draws authoritative random numbers or rebuilds colliders. Reduced-motion users retain the simple static transition.
+- **Visual differentiation:** Debutmont's blocky pixel snow and dithered sky, arcade CRT/wireframe art, and garbage biome glitch debris are drawn with SVG backdrops and deterministic cosmetic effects; music/biome sampling uses the existing game state without changing the seeded terrain route.
+- **Safety and tests:** cosmetic-separation and transition tests verify identical authoritative terrain, collider and sled outcomes regardless of visual layers. The same **SIM_REVISION 6** and content-addressed ruleset `sha256:03c7d7c9…` from v2.19.14 remain current; no new physics or gameplay revision.
+
 ## v2.19.14 — Debutmont home, arcade bridges and revision-safe ghosts (#65 / #216) (2026-11-22)
 
 - **Debutmont becomes the base biome from the first run.** Unlocked biomes default to ON, but a player's explicit OFF remains authoritative. Arcade segments bridge other biomes with distance-driven lengths that increase from roughly one-sixth to one-quarter of a sector (at most 1.5x), without changing arcade physics. The existing seed/mask remains authoritative; this is **SIM_REVISION 6**, since terrain and biome-entry outcomes change.
