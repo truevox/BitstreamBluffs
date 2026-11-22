@@ -3092,7 +3092,7 @@ async function main() {
       }
     }
 
-    // Seeds re-found for #65 (b3pyramid4, b3steam3, b3micro1): the terrain a seed builds changed (Debutmont base, arcade bridges), so
+    // Seeds re-found for #65 (b3pyramid5 here, b3pyramid6 for the tuning block, b3steam3, b3micro1): the terrain a seed builds changed (Debutmont base, arcade bridges), so
     // the old seeds' first hazard instances no longer suited these probes.
     // ---- B3 (biome full treatment, "Motion"): per biome, a real seed@<bit> run of the built game. The moving hazard's real
     // entity is driven by the live frame loop (run.update -> renderFrame -> Hazard.update -> HazardMotion) with the real
@@ -3102,7 +3102,7 @@ async function main() {
     // without it. The Clockwork Treads are measured against a real Steampunk conveyor zone of the run.
     {
       const B3 = [
-        { biome: 'pyramid-peak', name: 'Pyramid Peak', seed: 'b3pyramid4', mask: 4, hazard: 'rollingBoulder', powerup: 'sandrunnerSkis' },
+        { biome: 'pyramid-peak', name: 'Pyramid Peak', seed: 'b3pyramid5', mask: 4, hazard: 'rollingBoulder', powerup: 'sandrunnerSkis' },
         { biome: 'steampunk-slopes', name: 'Steampunk Slopes', seed: 'b3steam3', mask: 256, hazard: 'gearGate', powerup: 'clockworkTreads' },
         { biome: 'micro-mountain', name: 'Micro Mountain', seed: 'b3micro1', mask: 512, hazard: 'dewDrop', powerup: 'royalJellyWax' },
       ];
@@ -3427,7 +3427,7 @@ async function main() {
     {
       const { ROLL_ACTIVATE_PX, rollParams } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
       const ROLLERS = [
-        { name: 'Pyramid Peak', seed: 'b3pyramid4', mask: 4, hazard: 'rollingBoulder' },
+        { name: 'Pyramid Peak', seed: 'b3pyramid6', mask: 4, hazard: 'rollingBoulder' },
         { name: 'Micro Mountain', seed: 'b3micro1', mask: 512, hazard: 'dewDrop' },
       ];
       for (const R of ROLLERS) {
