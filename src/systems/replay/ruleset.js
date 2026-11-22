@@ -50,7 +50,12 @@ import * as terrainContactNs from '../TerrainContact.js';
 //    This exact shipped ruleset is archived as sha256:b57634769e7337327e81c011cc0837e5b3422b1665a276ed3ae70dbe01048877.
 // 3: #140, release v2.19.1: biome-sector entry redraws graphics without rebuilding
 //    live colliders, changing authoritative outcomes on biome-mask crossings.
-export const SIM_REVISION = 3;
+// 4: #121, release v2.19.2: every authoritative transcendental (sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log1p,
+//    log2, log10, pow, hypot, tanh, sinh, cosh, cbrt) comes from the pinned @stdlib-backed src/systems/pmath.js instead of the
+//    native Math, and Phaser's bundled Matter has its nine trig/pow/acos functions replaced (src/systems/MatterPortable.js), so
+//    Chromium, Firefox and WebKit produce identical authoritative state. Last-bit differences from the native-Math revision 3
+//    (about 1% of sin/cos results differ from V8) change tick-level outcomes of every older tape.
+export const SIM_REVISION = 4;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above
@@ -58,7 +63,7 @@ export const SIM_REVISION = 3;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-export const LAST_RELEASED_SIM_REVISION = 3;
+export const LAST_RELEASED_SIM_REVISION = 4;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;
