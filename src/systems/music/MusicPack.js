@@ -6,7 +6,7 @@ const safePath = (s) => typeof s === 'string' && s.length < 300 &&
   !s.startsWith('/') && !s.includes('..') && !s.includes('\\') &&
   /^[a-zA-Z0-9_.\/-]+$/.test(s);
 const whole = (v) => Number.isSafeInteger(v) && v >= 0;
-const effectTypes = new Set(['gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser']);
+const effectTypes = new Set(['gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap']);
 
 const ADAPTIVE_FAMILIES = Object.freeze(['bass', 'drums', 'featured', 'guitar', 'piano', 'other']);
 const FEATURE_STEMS = Object.freeze(['guitar', 'piano', 'other']);
