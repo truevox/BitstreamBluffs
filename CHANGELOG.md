@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.16.1 - every run starts from identical sim state (2026-11-22)
+
+<!-- friday-issue: 120 -->
+- **A run no longer depends on what ran before it in the same page session.** `RunScene` is one instance for the whole session and `create()` did not reset `_biomeSector` or `_lastBiome` (nor the last camera `_view` and the tutorial latches `_hopped`/`_pushed`). With a biome mask, tick 1 compares the sled's sector with `_biomeSector`: a fresh page saw a "change" and called `refreshPalette`, which removes and re-adds every collider (world order, body ids, warm-start state); a later run whose previous run ended in the same sector did not. The same tape therefore ran differently by session position (found by the #120 matrix: `chunk-biome-boundaries` as run #4 after a terrain crash survived 815 m instead of crashing at 835 m). `create()` now resets those fields, so every run behaves like run #1, which is also what every existing fresh-page recording did. Tapes recorded mid-session with a biome mask whose previous sector matched are the only ones whose tick-1 behaviour changes. Tests: `tests/replay/sessionIsolation.test.js`; browser probe `tools/determinism/session-isolation-probe.mjs` (diagnostic, non-authoritative).
+- **Replay and the calendar date (the other #120 finding) was already fixed on main** by the replay-manifest work (Replay Contract R-1: the replay's daily rule, Sync Level and Kodiak/magnet flags come from the tape header, not the clock). No change here.
+
 
 ## v2.16.0 — reconcile post-v2.15.3 merged capabilities and release policy (2026-11-21)
 

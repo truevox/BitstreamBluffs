@@ -54,15 +54,29 @@ const PAGE = `(() => {
     S.hold = true;
     g.loop.wake();
     const title = g.scene.getScene('TitleScene');
-    if (!title.sys.isActive() || run.sys.isActive()) {
+    const over = g.scene.getScene('GameOverScene');
+    if (o.viaRetry && S.crashedBefore) {
+      // REAL player path: the crash opened GameOver on its own; the player presses RETRY (scene.start('RunScene') on the same instance).
+      console.log('waiting GameOver', run.crashed, g.scene.getScenes(true).map((x) => x.sys.settings.key).join());
+      S.hold = false;
+      g.loop.wake();
+      await new Promise((res) => { const w = () => (over.sys.isActive() && !over.leaving ? res() : setTimeout(w, 50)); w(); });
+      await new Promise((r) => setTimeout(r, 700));
+      g.registry.set('ghostReplay', o.tape);
+      console.log('retry now');
+      S.hold = true;
+      over.retry();
+    } else if (!title.sys.isActive() || run.sys.isActive()) {
       for (const sc of g.scene.getScenes(true)) if (sc.sys.settings.key !== 'TitleScene') g.scene.stop(sc.sys.settings.key);
       if (!title.sys.isActive()) g.scene.start('TitleScene');
       await new Promise((res) => { const w = () => (title.sys.isActive() ? res() : requestAnimationFrame(w)); w(); });
       await new Promise((r) => setTimeout(r, 150));
     }
-    title.starting = false;
-    g.registry.set('ghostReplay', o.tape);
-    title.startRun(o.tape.seed);
+    if (!(o.viaRetry && S.crashedBefore)) {
+      title.starting = false;
+      g.registry.set('ghostReplay', o.tape);
+      title.startRun(o.tape.seed);
+    }
     await new Promise((res) => { const w = () => (run.sys.isActive() && run.sled && run.simClock && run.simClock.tick === 0 && !run.crashed ? res() : requestAnimationFrame(w)); w(); });
     await new Promise((r) => setTimeout(r, 120));
     g.loop.sleep();
@@ -74,6 +88,8 @@ const PAGE = `(() => {
     let t = 0, f = 0;
     while (!run.crashed && run.simClock.tick < end && f < end * 2 + 600) { t += 1000 / 120; f++; g.step(t, 1000 / 120); }
     S.hold = true;
+    S.crashedBefore = !!run.crashed;
+    if (run.crashed && o.viaRetry) { S.hold = false; g.loop.wake(); }
     const snap = run.score.getSnapshot();
     const out = { ...S.cur, pre, ticks: run.simClock.tick, crashed: !!run.crashed, distanceM: Math.floor(snap.distanceM), desync: run.tapePlayer ? (run.tapePlayer.desync || null) : null };
     S.cur = null;
@@ -86,11 +102,13 @@ async function fresh(browser) {
   const page = await ctx.newPage();
   await page.addInitScript(PAGE);
   page.on('pageerror', (e) => console.error('pageerror', String(e).slice(0, 200)));
+  page.on('console', (m) => process.env.DBG && console.log('page:', m.text()));
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive() && window.__iso, null, { timeout: 60000 });
   return { ctx, page };
 }
-const play = (page, t, o) => page.evaluate((x) => window.__iso.play(x), { tape: t, max: TICKS, ...o });
+const VIA = process.env.RETRY === '1';
+const play = (page, t, o) => page.evaluate((x) => window.__iso.play(x), { tape: t, max: TICKS, viaRetry: VIA, ...o });
 
 const browser = await chromium.launch({ headless: true, executablePath: shell(), args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
 const result = { pre: PRE, target: TARGET, ticks: TICKS };
