@@ -6,6 +6,13 @@
 export const LEGACY_BIOME_ALIASES = Object.freeze({ debumont: 'debutmont' });
 
 /**
+ * The base biome's canonical id (issue #65): Debutmont is every normal run's terrain from the first run. The one
+ * source of truth: TerrainGenerator re-exports it as HOME_BIOME_ID and Progression as BASE_BIOME_ID. It lives here
+ * because this module imports nothing, so terrain and profile code can share it without an import cycle.
+ */
+export const BASE_BIOME_ID = 'debutmont';
+
+/**
  * The canonical biome id for `id`: a legacy alias resolves to its new id, anything else comes back unchanged.
  * @param {*} id
  * @returns {*}

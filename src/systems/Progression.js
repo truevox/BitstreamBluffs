@@ -23,6 +23,7 @@
 
 import { emptyUpgradeRanks } from "./PermanentUpgrades.js";
 import { DRAFT_RULES_VERSION } from './DailyDraft.js';
+import { BASE_BIOME_ID } from '../data/biomeAliases.js';
 
 /** Profile schema version, independent of STORAGE.saveVersion. */
 export const PROFILE_VERSION = 1;
@@ -31,9 +32,10 @@ export const PROFILE_VERSION = 1;
  * The base biome (issue #65): Debutmont is the normal run's terrain from the very first run. It is always
  * unlocked and can never be switched off, so it has no toggle row and its mask bit is never part of a
  * profile's enabled mask (the terrain generator treats the home bit as a no-op, and keeping it out keeps
- * masks canonical so leaderboard cohorts do not split on a meaningless bit).
+ * masks canonical so leaderboard cohorts do not split on a meaningless bit). Defined once in data/biomeAliases.js
+ * (shared with the terrain generator's HOME_BIOME_ID); re-exported here.
  */
-export const BASE_BIOME_ID = 'debutmont';
+export { BASE_BIOME_ID };
 
 /** XP weights. Kept here (not in JSON) because they are arithmetic, not content. */
 export const XP = Object.freeze({

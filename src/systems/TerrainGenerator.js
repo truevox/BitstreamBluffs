@@ -31,6 +31,7 @@ import { Rng, xxHash32, hashInts } from './Rng.js';
 import { rollSweep } from './HazardMotion.js';
 import { TERRAIN } from '../constants.js';
 import pmath from './pmath.js';
+import { BASE_BIOME_ID } from '../data/biomeAliases.js';
 
 /** Horizontal distance between consecutive polyline points (px). */
 export const SPACING_PX = 16;
@@ -69,11 +70,11 @@ export const SECTOR_M = 500;
 
 /**
  * Issue #65: Debutmont is the base biome. This is the id every "base" answer resolves to (sectors before
- * BASE_SECTORS, mask 0, the base-weight draw). It is one constant so the id rename (`debumont` ->
- * `debutmont`) is a one-line flip. Arcade (`null`) is no longer a base: it is only the bridge between two
+ * BASE_SECTORS, mask 0, the base-weight draw). It is the profile's BASE_BIOME_ID, one constant defined in
+ * data/biomeAliases.js. Arcade (`null`) is no longer a base: it is only the bridge between two
  * different biomes (see biomeAtX).
  */
-export const HOME_BIOME_ID = 'debumont';
+export const HOME_BIOME_ID = BASE_BIOME_ID;
 
 /**
  * Sectors whose content is always the home biome, whatever the mask (spec W3: "Sectors 0 and 1 are always

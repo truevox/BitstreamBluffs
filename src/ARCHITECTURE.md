@@ -731,8 +731,8 @@ Debutmont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal C
 `(seed, sector, mask)` alone - never from how much terrain has been generated or in what order -
 so a chunk built late by streaming is identical to one built early. It draws from
 `Rng.fork('biome')`, an independent stream, so *asking* the question never advances the terrain,
-hazard or shard streams. Since #65 **Debutmont is the base biome** (`HOME_BIOME_ID`, one constant so the
-`debumont` -> `debutmont` rename is a one-line flip): sectors 0-1, mask 0, a mask with no eligible biome and
+hazard or shard streams. Since #65 **Debutmont is the base biome** (`HOME_BIOME_ID`, the same constant as
+the profile's `BASE_BIOME_ID`, defined once in `data/biomeAliases.js`): sectors 0-1, mask 0, a mask with no eligible biome and
 the base-weight draw (2.2:1) all answer Debutmont, never `null`. The home biome is left out of the eligible
 pool, so its mask bit is a no-op and it is never double-weighted. The draw count and order are unchanged,
 so every non-home pick for a seed and mask is what it was.
