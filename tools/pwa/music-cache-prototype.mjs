@@ -133,6 +133,7 @@ export async function downloadRealSong(song, {
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, song.entries.length) }, () => worker()));
   if (firstFailure) throw firstFailure;
+  if (signal?.aborted) throw new Error('Song download aborted before ready marker');
   // A ready marker is the *last* write. A failed write or quota rejection means
   // the player is NOT offline-ready, but previous validated files can resume.
   // Store the exact checksummed inventory before writing the final ready
@@ -141,8 +142,13 @@ export async function downloadRealSong(song, {
     id:song.id,version:song.version,entries:song.entries,
     ...(song.quality ? {quality:song.quality,songId:song.songId,originalId:song.originalId} : {}),
   }),{ status:200, headers:{'Content-Type':'application/json','Cache-Control':'no-store'} }));
+  if (signal?.aborted) throw new Error('Song download aborted before completion marker');
   await cache.put(completionUrl(song, origin), new Response(`${song.id}:${song.version}`, {
     status: 200, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
   }));
+  if (signal?.aborted) {
+    await cache.delete(completionUrl(song, origin));
+    throw new Error('Song download aborted after completion marker');
+  }
   return { status: 'ready', id: song.id, count: completed, totalBytes, reused };
 }
