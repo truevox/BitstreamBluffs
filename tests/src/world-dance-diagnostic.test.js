@@ -1,6 +1,20 @@
 import { AudioSynth } from '../../src/systems/AudioSynth.js';
-import { sunDanceGeometry, WorldDanceEnvelope } from '../../src/systems/WorldDance.js';
+import { motifDecor } from '../../src/entities/Background.js';
+import { biomeDanceStyle, sunDanceGeometry, WorldDanceEnvelope } from '../../src/systems/WorldDance.js';
 
+/**
+ * A deliberately partial AudioSynth: this is a UNIT SEAM, not a synth.
+ * It proves the sample *shape* and the downstream contract, never that a real
+ * synth is audible. Two seams are stubbed for that reason:
+ *   - `_vinylAudible()` in production also requires `this.nodes`
+ *     (AudioSynth.js:713-718); this fixture omits `nodes`, so without the stub
+ *     `getWorldDanceSample()` would return null. The stub is the seam.
+ *   - `getFatalCountInStatus()` is stubbed to a permanent idle state so the
+ *     fixture does not depend on the count-in state machine or its timers.
+ * `track.id: 'diagnostic'` is NOT a catalog song. `hasEnabledSongs()` succeeds
+ * only because `sanitizeSongSelection()` defaults the real catalog songs to
+ * enabled (MusicPlaylist.js:11-17,43-44) — it says nothing about 'diagnostic'.
+ */
 function audioFixture() {
   const synth = Object.create(AudioSynth.prototype);
   synth.ctx = { currentTime: 0, state: 'running' };
@@ -20,9 +34,41 @@ function audioFixture() {
   synth._paused = false;
   synth._musicWanted = true;
   synth.settings = { masterVolume: 1, musicVolume: 1, musicEnabledSongs: { diagnostic: true } };
-  synth._vinylAudible = () => true;
-  synth.getFatalCountInStatus = () => ({ active: false });
+  synth._vinylAudible = () => true; // unit seam: the fixture has no `nodes` (see above)
+  synth.getFatalCountInStatus = () => ({ active: false }); // unit seam: keep recovery idle (see above)
   return synth;
+}
+
+const CADENCE_MS = 50;
+const BEAT_MS = 500;
+
+/**
+ * Drive the real producer (`getWorldDanceSample`/`getSyntheticMeterTiming`)
+ * into the real envelope on a uniform render cadence. Every frame advances the
+ * audio clock by exactly `CADENCE_MS` and passes the same `dt`, so intensity
+ * smoothing and pulse decay see the same interval — no synthetic gaps.
+ */
+function cadence(frames, energyAt) {
+  const synth = audioFixture();
+  const envelope = new WorldDanceEnvelope();
+  const series = [];
+  for (let i = 0; i < frames; i++) {
+    const timeMs = i * CADENCE_MS;
+    synth.ctx.currentTime = timeMs / 1000;
+    const { bass, mid } = energyAt(i);
+    synth._stemMusic.mixer.energy = () => ({ bass, mid, treble: 0 });
+    const sample = synth.getWorldDanceSample();
+    const timing = synth.getSyntheticMeterTiming();
+    series.push({ timeMs, strength: envelope.update(sample, CADENCE_MS, timing) });
+  }
+  return series;
+}
+
+/** The settled ordinary-beat level of a uniform 0.30/0.30 cadence: the peak of
+ * the last full beat window after several measures of adaptation. */
+function settledLevel() {
+  const strengths = cadence(120, () => ({ bass: 0.3, mid: 0.3 })).map(f => f.strength);
+  return Math.max(...strengths.slice(-BEAT_MS / CADENCE_MS));
 }
 
 const meter = (revision, beatIndex, measureIndex = 0, overrides = {}) => ({
@@ -37,15 +83,53 @@ const meter = (revision, beatIndex, measureIndex = 0, overrides = {}) => ({
   ...overrides,
 });
 
-function pixels(strength) {
+/**
+ * Sun geometry from the real `sunDanceGeometry()`. These are RADIUS deltas:
+ * the drawn sun's width/height changes by twice each delta (+4.8p/-3.6p px at
+ * radius 40 mean a +9.6p/-7.2p px full width/height change). Do not read a
+ * radius delta as a diameter change.
+ */
+function sunPixels(strength) {
   const sun = sunDanceGeometry(strength, 40);
-  const ridgeHorizonOffset = 1.7 * strength * 0.7;
   return {
     strength,
-    widthDeltaPx: sun.widthRadius - 40,
-    heightDeltaPx: sun.heightRadius - 40,
-    ridgeHorizonOffsetPx: ridgeHorizonOffset,
+    widthRadiusDeltaPx: sun.widthRadius - 40,
+    heightRadiusDeltaPx: sun.heightRadius - 40,
   };
+}
+
+/**
+ * MEASURED decor displacement, not a formula. Drive the production
+ * `motifDecor()` twice at a fixed (motif, scrollX, timeMs, seed): once with no
+ * horizon dance, once with the motif's real horizon dance value for this
+ * strength (`biomeDanceStyle`, the same value Background passes at
+ * Background.js:777-779). Return the observed max |Δy| across every primitive's
+ * `pts[].y` and `y`.
+ *
+ * The theoretical ceiling is 1.7 × horizonDance (|sin| ≤ 1), which for these
+ * motifs stays at or below 1.19 × strength; `sin` attenuates the observed value
+ * below that, so assertions use a loose bound and never an exact float.
+ * Motif dependence is real: stars, jellyfish and brass-pipes never feed
+ * `horizonDanceOffset()` into a primitive and measure exactly 0.
+ */
+function measureDecorDisplacement(motif, strength, at = { scrollX: 400, timeMs: 1234, seed: 0 }) {
+  const { horizon } = biomeDanceStyle(motif, strength);
+  const still = motifDecor(motif, at.scrollX, at.timeMs, at.seed, { horizonDance: 0, bees: false });
+  const dancing = motifDecor(motif, at.scrollX, at.timeMs, at.seed, { horizonDance: horizon, bees: false });
+  expect(dancing).toHaveLength(still.length);
+  let maxAbsDeltaY = 0;
+  for (let i = 0; i < still.length; i++) {
+    const before = still[i].pts || [];
+    const after = dancing[i].pts || [];
+    expect(after).toHaveLength(before.length);
+    for (let j = 0; j < before.length; j++) {
+      maxAbsDeltaY = Math.max(maxAbsDeltaY, Math.abs(before[j].y - after[j].y));
+    }
+    if (typeof still[i].y === 'number' && typeof dancing[i].y === 'number') {
+      maxAbsDeltaY = Math.max(maxAbsDeltaY, Math.abs(still[i].y - dancing[i].y));
+    }
+  }
+  return { motif, strength, horizonDance: horizon, maxAbsDeltaY };
 }
 
 describe('World Dance diagnostic: producer, unverified meter, envelope and pixels', () => {
@@ -138,55 +222,91 @@ describe('World Dance diagnostic: producer, unverified meter, envelope and pixel
     expect(strength).toBeLessThanOrEqual(1e-12);
   });
 
-  test('realistic sample sequence quantifies settled and transient pixel response', () => {
-    const synth = audioFixture();
-    const envelope = new WorldDanceEnvelope();
-    const sequence = [
-      { timeMs: 0, bass: 0.3, mid: 0.3 },
-      { timeMs: 50, bass: 0.3, mid: 0.3 },
-      { timeMs: 500, bass: 0.3, mid: 0.3 },
-      { timeMs: 550, bass: 0.3, mid: 0.3 },
-    ];
-    const settled = [];
-    for (const frame of sequence) {
-      synth.ctx.currentTime = frame.timeMs / 1000;
-      synth._stemMusic.mixer.energy = () => ({ bass: frame.bass, mid: frame.mid, treble: 0 });
-      const sample = synth.getWorldDanceSample();
-      const timing = synth.getSyntheticMeterTiming();
-      settled.push(envelope.update(sample, 50, timing));
-    }
-    const settledPeak = Math.max(...settled);
-    const settledPixels = pixels(settledPeak);
-    expect(settledPeak).toBeGreaterThan(0);
-    expect(settledPeak).toBeLessThanOrEqual(1);
-    // Radius 40 gives +4.8p/-3.6p px; ridge offset is 1.7p*0.7 = 1.19p px.
-    expect(settledPixels.widthDeltaPx).toBeCloseTo(4.8 * settledPeak, 10);
-    expect(settledPixels.heightDeltaPx).toBeCloseTo(-3.6 * settledPeak, 10);
-    expect(settledPixels.ridgeHorizonOffsetPx).toBeCloseTo(1.19 * settledPeak, 10);
-    console.log('World Dance settled strength → pixels', settledPixels);
+  test('uniform cadence reaches a steady state across several beats', () => {
+    // 120 frames × 50 ms = 6000 ms = 12 synthetic beats (500 ms each), so the
+    // startup adaptation is long past and we can compare whole beat windows.
+    const series = cadence(120, () => ({ bass: 0.3, mid: 0.3 }));
+    const strengths = series.map(f => f.strength);
+    const perBeat = BEAT_MS / CADENCE_MS;
+    const settled = Math.max(...strengths.slice(-perBeat));
+    const earlier = Math.max(...strengths.slice(-2 * perBeat, -perBeat));
 
-    const transientEnvelope = new WorldDanceEnvelope();
-    const transient = [
-      { timeMs: 0, bass: 0.1, mid: 0.08 },
-      { timeMs: 50, bass: 0.52, mid: 0.25 },
-    ];
-    let transientPeak = 0;
-    for (const frame of transient) {
-      synth.ctx.currentTime = frame.timeMs / 1000;
-      synth._stemMusic.mixer.energy = () => ({ bass: frame.bass, mid: frame.mid, treble: 0 });
-      const sample = synth.getWorldDanceSample();
-      const timing = synth.getSyntheticMeterTiming();
-      transientPeak = Math.max(transientPeak, transientEnvelope.update(sample, 50, timing));
+    // Bounded, and genuinely steady: every frame of the last two beat windows
+    // agrees with the same phase of the previous 500 ms beat.
+    expect(settled).toBeGreaterThan(0);
+    expect(settled).toBeLessThanOrEqual(1);
+    expect(Math.abs(settled - earlier)).toBeLessThan(1e-6);
+    for (let i = strengths.length - 2 * perBeat; i < strengths.length - perBeat; i++) {
+      expect(strengths[i + perBeat]).toBeCloseTo(strengths[i], 6);
     }
-    const transientPixels = pixels(transientPeak);
-    // Sun deltas are exactly 4.8p/-3.6p px and the ridge offset is 1.19p px.
-    expect(transientPeak).toBeGreaterThan(settledPeak);
-    expect(transientPixels.widthDeltaPx).toBeCloseTo(40 * 0.12 * transientPeak, 10);
-    expect(transientPixels.heightDeltaPx).toBeCloseTo(-40 * 0.09 * transientPeak, 10);
-    expect(transientPixels.ridgeHorizonOffsetPx).toBeCloseTo(1.7 * transientPeak * 0.7, 10);
-    console.log('World Dance transient strength → pixels', transientPixels);
+
+    const settledPixels = sunPixels(settled);
+    // Radius deltas from the real sunDanceGeometry(): +4.8p / -3.6p px at r=40.
+    expect(settledPixels.widthRadiusDeltaPx).toBeCloseTo(4.8 * settled, 10);
+    expect(settledPixels.heightRadiusDeltaPx).toBeCloseTo(-3.6 * settled, 10);
+
+    // Measured decor displacement at this settled strength (not a formula).
+    const motifs = ['candy-stripes', 'stars', 'vents', 'dew-drops', 'jellyfish', 'brass-pipes'];
+    const decor = motifs.map(m => measureDecorDisplacement(m, settled));
+    const byMotif = Object.fromEntries(decor.map(d => [d.motif, d]));
+    for (const d of decor) {
+      // Theoretical ceiling: |1.7·horizonDance·sin(...)| ≤ 1.7·horizonDance,
+      // and horizonDance ≤ 0.7·strength, hence ≤ 1.19·strength. Loose, never exact.
+      expect(d.maxAbsDeltaY).toBeLessThanOrEqual(1.19 * settled);
+    }
+    // These motifs do route horizonDance into decor roots: real, non-zero motion.
+    expect(byMotif['candy-stripes'].maxAbsDeltaY).toBeGreaterThan(0.5 * 1.7 * byMotif['candy-stripes'].horizonDance);
+    expect(byMotif.vents.maxAbsDeltaY).toBeGreaterThan(0);
+    expect(byMotif['dew-drops'].maxAbsDeltaY).toBeGreaterThan(0);
+    // These never feed horizonDanceOffset() into a primitive: exactly zero,
+    // not "a small number we never measured".
+    expect(byMotif.stars.maxAbsDeltaY).toBe(0);
+    expect(byMotif.jellyfish.maxAbsDeltaY).toBe(0);
+    expect(byMotif['brass-pipes'].maxAbsDeltaY).toBe(0);
+
+    console.log('World Dance settled level (ordinary beat, measured)', {
+      settledStrength: settled,
+      sun: settledPixels,
+      decorDisplacementsPx: decor,
+      theoreticalCeilingPx: 1.19 * settled,
+    });
+  });
+
+  test('transient onset peaks above settled and then decays toward it', () => {
+    const transient = cadence(20, i => (
+      i === 0 ? { bass: 0.1, mid: 0.08 } : { bass: 0.52, mid: 0.25 }
+    ));
+    const strengths = transient.map(f => f.strength);
+    const onsetPeak = Math.max(...strengths);
+    const settled = settledLevel();
+
+    expect(onsetPeak).toBeGreaterThan(settled);
+
+    // At least three post-onset frames must decay monotonically toward the
+    // settled level rather than staying pinned at the peak.
+    const afterOnset = strengths.slice(1);
+    expect(afterOnset.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < 4; i++) {
+      expect(afterOnset[i]).toBeLessThan(afterOnset[i - 1]);
+    }
+    expect(afterOnset[3]).toBeLessThan(onsetPeak * 0.75);
+
+    const transientPixels = sunPixels(onsetPeak);
+    // Sun deltas are radius deltas; a rendered sun's full width/height changes
+    // by twice these values (+9.6p / -7.2p px full extent at r=40).
+    expect(transientPixels.widthRadiusDeltaPx).toBeCloseTo(4.8 * onsetPeak, 10);
+    expect(transientPixels.heightRadiusDeltaPx).toBeCloseTo(-3.6 * onsetPeak, 10);
+
+    console.log('World Dance transient onset peak vs settled level (measured)', {
+      onsetPeakStrength: onsetPeak,
+      settledStrength: settled,
+      sun: transientPixels,
+    });
   });
 });
 
 // The meter is an arbitrary 0.5 s source-zero-origin 4/4 clock, explicitly unverified; source-verified analysis is #50.
-// TODO(live verification): a real browser run with real audio is required to establish actual live sample cadence and rendered scenery. Pixel magnitude is measured here; visibility to a player is an owner judgment.
+// Sun numbers are radius deltas from the real sunDanceGeometry(); decor numbers are MEASURED max |Δy| from the real
+// motifDecor() at a fixed frame, not the 1.7·dance·sin formula. 1.19 × strength is only a theoretical ceiling.
+// TODO(live verification): a real browser run with real audio is required to establish actual live sample cadence and
+// rendered scenery. These displacements are measured here; visibility to a player is an owner judgment.
