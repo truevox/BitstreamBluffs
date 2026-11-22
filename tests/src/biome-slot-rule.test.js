@@ -42,8 +42,10 @@ const SEEDS = ['slot-alpha', 'slot-beta', 'slot-gamma', 'slot-delta'];
 const N = 300;
 
 describe('slot rule: base streams untouched', () => {
-  test('with biome defs absent, nothing changes at ANY mask (digests pinned at 00978f6, before the slot rule)', () => {
-    // Recorded on 00978f6 (v2.5.0, B0) with the same projection: 2 seeds x 200 chunks of JSON.stringify(getChunk(i)).
+  test('with biome defs absent, nothing changes at ANY mask (digests pinned at 00978f6, re-pinned once at #121 for the last bits of pmath terrain math)', () => {
+    // First recorded on 00978f6 (v2.5.0, B0) with the same projection: 2 seeds x 200 chunks of JSON.stringify(getChunk(i)). RE-PINNED ONCE at #121
+    // (portable math, SIM_REVISION 4): terrain generation now calls pmath, which moves the last bits of about 10% of the numbers (max 8.7e-11 px, no
+    // structural difference over 20 seed/mask pairs x 300 chunks; see tests/src/micro-swell-isolation.test.js for the tolerance comparison that justifies it).
     const PINNED = { 1: '9d9b47c3435771cc', 2: '5317419c83dc1a1f', 8: '62320ca478c92339', 64: 'c62a9e0dee94f9d7', [ALL]: '71d0b7d415d2e2ff' };
     // Audit T2 (v2.6.x) moved Micro Mountain's dew swell INTO the chunk points on purpose, so the ALL mask (it contains
     // Micro, bit 512) now has other bytes. To keep this pin about the slot rule, the masks are hashed with the swell

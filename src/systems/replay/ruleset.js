@@ -40,6 +40,8 @@ import * as bsodAerodynamicsNs from '../BsodAerodynamics.js';
 import * as rngNs from '../Rng.js';
 import * as scoreManagerNs from '../ScoreManager.js';
 import * as terrainContactNs from '../TerrainContact.js';
+import * as pmathNs from '../pmath.js';
+import * as matterPortableNs from '../MatterPortable.js';
 
 /**
  * Hand-bumped simulation revision, integer >= 1, part of the ruleset document (and so of the id). Bump it, in the
@@ -50,7 +52,7 @@ import * as terrainContactNs from '../TerrainContact.js';
 //    This exact shipped ruleset is archived as sha256:b57634769e7337327e81c011cc0837e5b3422b1665a276ed3ae70dbe01048877.
 // 3: #140, release v2.19.1: biome-sector entry redraws graphics without rebuilding
 //    live colliders, changing authoritative outcomes on biome-mask crossings.
-// 4: #121, release v2.19.2: every authoritative transcendental (sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log1p,
+// 4: #121, release v2.19.6: every authoritative transcendental (sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log1p,
 //    log2, log10, pow, hypot, tanh, sinh, cosh, cbrt) comes from the pinned @stdlib-backed src/systems/pmath.js instead of the
 //    native Math, and Phaser's bundled Matter has its nine trig/pow/acos functions replaced (src/systems/MatterPortable.js), so
 //    Chromium, Firefox and WebKit produce identical authoritative state. Last-bit differences from the native-Math revision 3
@@ -96,6 +98,8 @@ export const DEFAULT_SOURCES = Object.freeze({
   rng: rngNs,
   scoreManager: scoreManagerNs,
   terrainContact: terrainContactNs,
+  pmath: pmathNs,
+  matterPortable: matterPortableNs,
 });
 
 const KEY_OK = /^[A-Za-z0-9_.:$-]{1,64}$/;

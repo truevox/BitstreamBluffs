@@ -1,13 +1,17 @@
 /**
  * T2 isolation pin: the Micro Mountain swell fix (audit T2) may change ONLY biomeMask 512 terrain.
  *
- * Every digest below was recorded at main @ e080803 (v2.6.0), before the swell was moved into the chunk
- * points. Each one hashes JSON.stringify of chunks 0..299 (points, zones, hazards, power-ups, shards, pads,
- * launches) for one seed and one single-biome mask. Mask 512 is left out on purpose: it is the one mask the
- * fix is meant to change. Mask 0 is also pinned by terrain-golden-mask0.test.js; it is repeated here so this
- * file alone proves the claim 'nothing but Micro moved'.
+ * Chain of trust. Each digest hashes JSON.stringify of chunks 0..299 (points, zones, hazards, power-ups, shards, pads, launches) for one seed and
+ * one single-biome mask. They were first recorded at main @ e080803 (v2.6.0), before the swell moved into the chunk points, and were RE-PINNED ONCE
+ * at #121 (portable math, SIM_REVISION 4): terrain generation now calls pmath instead of the native Math, which changes the last bits of about
+ * 10% of the numbers. The re-pin is justified by a tolerance comparison, not by trusting the new hashes: with the same seeds and masks, native-Math
+ * (main 97ba4f5c) versus pmath terrain differs by at most 8.7e-11 px (6e-16 relative) with ZERO structural differences (same keys, lengths, ids,
+ * kinds, hazards, power-ups) over 20 seed/mask pairs x 300 chunks (tools/determinism/portable-math/terrain-delta.mjs; an independent run over
+ * 13 masks x 8 seeds found a max of 1.2e-10 px and no structural difference). Mask 512 is left out on purpose: it is the one mask the fix is
+ * meant to change. Mask 0 is also pinned by terrain-golden-mask0.test.js; it is repeated here so this file alone proves 'nothing but Micro moved'.
  *
- * WHEN THIS FAILS, do not re-pin. A change outside Micro reached terrain that has no business changing.
+ * WHEN THIS FAILS, do not re-pin without redoing that tolerance comparison: a failure outside Micro means a change reached terrain that has no business
+ * changing. (Only changes to pmath, or to the @stdlib pins that feed it, may legitimately move these digests.)
  */
 import crypto from 'crypto';
 import { makeGen, loadContent } from './_helpers.js';

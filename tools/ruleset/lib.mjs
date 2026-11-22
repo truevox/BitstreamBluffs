@@ -44,6 +44,7 @@ export const TRIPWIRE_FILES = Object.freeze([
   'src/systems/PermanentUpgrades.js',
   'src/systems/PhysicsTuner.js',
   'src/systems/Rng.js',
+  'src/systems/pmath-stdlib-lock.json',
   'src/systems/pmath.js',
   'src/systems/RunRandom.js',
   'src/systems/ScoreManager.js',

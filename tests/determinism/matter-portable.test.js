@@ -29,15 +29,22 @@ describe('Phaser pin', () => {
   });
 });
 
-describe('source scan: every transcendental call in Phaser\'s Matter is covered', () => {
-  const lib = path.join(root, 'node_modules', 'phaser', 'src', 'physics', 'matter-js', 'lib');
+describe('source scan: every transcendental call in Phaser\'s Matter folder is covered or proven unused', () => {
+  const dir = path.join(root, 'node_modules', 'phaser', 'src', 'physics', 'matter-js');
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.js') ? [path.join(d, e.name)] : []));
   const re = /\bMath\.(sin|cos|tan|asin|acos|atan|atan2|exp|expm1|log|log1p|log2|log10|pow|hypot|tanh|sinh|cosh|cbrt)\(/g;
-  test('exact call-site counts per file (Render.js is debug drawing only)', () => {
+  test('exact call-site counts per file across lib/, poly-decomp/, components/ and MatterPhysics.js', () => {
     const counts = {};
-    for (const f of walk(lib)) { const n = (fs.readFileSync(f, 'utf8').match(re) || []).length; if (n) counts[path.relative(lib, f).replace(/\\/g, '/')] = n; }
+    for (const f of walk(dir)) { const n = (fs.readFileSync(f, 'utf8').match(re) || []).length; if (n) counts[path.relative(dir, f).replace(/\\/g, '/')] = n; }
     expect(counts).toEqual({
-      'body/Body.js': 2, 'body/Composite.js': 2, 'factory/Bodies.js': 2, 'geometry/Axes.js': 2, 'geometry/Vector.js': 5, 'geometry/Vertices.js': 5, 'render/Render.js': 1,
+      // patched by MatterPortable.js (9 functions)
+      'lib/body/Body.js': 2, 'lib/body/Composite.js': 2, 'lib/factory/Bodies.js': 2, 'lib/geometry/Axes.js': 2, 'lib/geometry/Vector.js': 5, 'lib/geometry/Vertices.js': 5,
+      // debug drawing only
+      'lib/render/Render.js': 1,
+      // poly-decomp collinear() acos: only reached by Bodies.fromVertices on a CONCAVE shape; the sim only builds convex trapezoids (sim-math-boundary.test.js)
+      'poly-decomp/index.js': 1,
+      // Phaser's force/thrust helpers; never called by the game (sim-math-boundary.test.js scans for them)
+      'components/Force.js': 8, 'MatterPhysics.js': 4,
     });
   });
 });
