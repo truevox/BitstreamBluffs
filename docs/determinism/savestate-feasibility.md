@@ -176,7 +176,7 @@ PRESENTATION 23, PRESENTATION_READ_BY_SIM 7, NON_SERIALIZABLE 1, METADATA 5, INF
 | `HintScheduler` (`cur`, `latched`, `shows`, `lastHideAt`, `startMs`), `tutShown`, `tutTimers`, `tutDone`, `tuckShows` | R | `tutDone`/`tuckShows` are loaded from storage at create and can change during the run |
 | `BsodPursuit` (`active`, `wallX`, `wallSpeedPxS`), `bsodState`, `BsodBluffTracker` (`previousGapPx`, `chain`, `armed`, …) | R | |
 | Kodiaks: `kodiaks[]` (`x`, `speed`, `phase`, `phaseMs`, `ageMs`, `feints`, `real`, `targetX`, `done`, `hit`, `sledAhead`, `groundY`, `def`, **per-bear `rng`** (Rng instance)), `kodiakNext` | R | the per-bear Rng is a class instance, so the restore must materialize it with its prototype |
-| `currentPhys`, `_hopped`, `_pushed`, `_biomeSector`, `_lastBiome`, `gym*`, `_manual*`, `_leaving` | R | |
+| `currentPhys`, `_hopped`, `_pushed`, `_biomeId`, `gym*`, `_manual*`, `_leaving` | R | |
 | `TelegraphTracker` (`teleTracker`) | **not serializable** | `WeakMap`/`WeakSet` keyed by Hazard identity. Drives audio cues and `h.teleAtMs` (crash-report metadata), not physics or score. Must be re-keyed by stable hazard ids before Phase 2 |
 | `_teleMarks` | R (derived each tick) | |
 | `_view`, `_camX`, `_camY`, `_zoom`, `_zoomKick`, `shakeAmp`, `_landingShake`, `cameras.main` scroll/zoom | **R\*** | `updateGroundTelegraph` reads `this._view.right` (#155). `updateCamera` lerps from history with **frame** dt. E2 `-camera` diverges at K+1 |

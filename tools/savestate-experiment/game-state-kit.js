@@ -25,7 +25,7 @@
     'hints', 'score', 'tricks', 'glitch', 'bsod', 'bsodState', 'bsodCaught', 'bsodBluffs', 'kodiaks', 'kodiakNext',
     'currentPhys', 'wards', 'glideMs', 'glideMul', 'glideId', 'stabilizeMs', 'stabilizeDeg', 'stabilizeBounce',
     'stabilizeId', 'blindMs', 'blindTotalMs', 'blindVis', 'magnetMs', 'magnetEff', 'magnetId', '_hopped', '_pushed',
-    '_lastHopMs', '_despawn', '_biomeSector', '_lastBiome', 'gymAttemptStartTimeMs', 'gymAttemptStartX', 'gymReadyMs',
+    '_lastHopMs', '_despawn', '_biomeId', 'gymAttemptStartTimeMs', 'gymAttemptStartX', 'gymReadyMs',
     'gymBeatWaitMs', 'gymBeatSnapshot', '_manualPausePending', '_manualPauseSeq', '_leaving', '_teleMarks',
     'respawnGraceMs', 'hashedBackupUsed', '_lastLanding', '_flow', 'kodiakShoveCdMs', 'lastBoost'];
   // PRESENTATION_READ_BY_SIM: presentation state the tick reads today (issue #155: updateGroundTelegraph reads

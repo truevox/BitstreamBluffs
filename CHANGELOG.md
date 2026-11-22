@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.19.14 — Debutmont home, arcade bridges and revision-safe ghosts (#65 / #216) (2026-11-22)
+
+- **Debutmont becomes the base biome from the first run.** Unlocked biomes default to ON, but a player's explicit OFF remains authoritative. Arcade segments bridge other biomes with distance-driven lengths that increase from roughly one-sixth to one-quarter of a sector (at most 1.5x), without changing arcade physics. The existing seed/mask remains authoritative; this is **SIM_REVISION 6**, since terrain and biome-entry outcomes change.
+- **Owner-approved progression changes:** Level 2 needs 80 XP, Garbage Dump Glacier first unlocks at level 4, subsequent biome awards shift down one level through Vertigo Vents at level 27, and level 28 has no biome. Replaced the low-value 1,500 m Debutmont mission with "Grab 3 Maple Wax in a run" (tier 4), and added "Ride 3 arcade bridges" (tier 2) only after earning a second biome. Existing mission progress migrates safely.
+- **Display-safe historical ghosts:** new tapes carry the build's simulation revision; ghosts from missing/different revisions do **not** overlay changed terrain, avoiding floating/clipping old traces. Old tapes remain readable by the direct replay/manifest tools; `tapeCompatible` and old replay contracts are unchanged. A fresh current-revision run may replace a stale previous-revision Best even when its distance is shorter. Displaced legacy recordings remain available for historical replay. No scoring or physics changes from the display-only ghost guard.
+- **Conformance probe repair:** the biome-entry search scans the actual terrain in small distance increments instead of assuming every transition happens at a sector boundary. `LAST_RELEASED_SIM_REVISION` advances to 6 on this release. The older revision-4 and revision-5 ruleset archives are preserved.
+- **Known follow-up:** cross-engine and old deterministic replay fixture tapes must be rerecorded against revision 6 using the browser harness. Current canaries remain separately gated; this release does not claim historical tape compatibility with the new terrain.
+
 ## v2.19.13 — Debutmont spelling and legacy alias (#65 / #199) (2026-11-22)
 
 - **The first biome is now spelled "Debutmont"** (Marvin confirmed the spelling; issue #65, part 1 of 3). The biome id, name, hazards (Groomer Cat), power-up (Maple Wax), mission (`t4-biome-debutmont`, "1500 m in Debutmont"), Sync Level reward, music voice (`voice:debutmont`), the per-pack `adaptive/debutmont/` OGG directories (git renames, bytes unchanged), tools, tests and docs all use the new spelling. No gameplay, terrain, unlock level or profile default changes.

@@ -1,79 +1,78 @@
 /**
+ * re-pinned for #65 (on the #121 portable-math build): Debutmont base + arcade bridges. Every digest below was re-recorded at that change, which
+ * deliberately moved every mask's terrain: Debutmont is now the base biome (mask 0 is pure Debutmont, so mask 1 hashes
+ * the same as mask 0), and each biome change is bridged by arcade chunks. The isolation claim below still holds and is
+ * still what these pins prove: a later change that reaches terrain outside Micro (512) moves a digest.
+ *
  * T2 isolation pin: the Micro Mountain swell fix (audit T2) may change ONLY biomeMask 512 terrain.
  *
- * Chain of trust. Each digest hashes JSON.stringify of chunks 0..299 (points, zones, hazards, power-ups, shards, pads, launches) for one seed and
- * one single-biome mask. They were first recorded at main @ e080803 (v2.6.0), before the swell moved into the chunk points, and were RE-PINNED ONCE
- * at #121 (portable math, SIM_REVISION 4): terrain generation now calls pmath instead of the native Math, which changes the last bits of about
- * 10% of the numbers. The re-pin is justified by a tolerance comparison, not by trusting the new hashes: with the same seeds and masks, native-Math
- * (main 97ba4f5c) versus pmath terrain differs by at most 8.7e-11 px (6e-16 relative) with ZERO structural differences (same keys, lengths, ids,
- * kinds, hazards, power-ups) over 20 seed/mask pairs x 300 chunks (tools/determinism/portable-math/terrain-delta.mjs; an independent run over
- * 13 masks x 8 seeds found a max of 1.2e-10 px and no structural difference). Mask 512 is left out on purpose: it is the one mask the fix is
- * meant to change. Mask 0 is also pinned by terrain-golden-mask0.test.js; it is repeated here so this file alone proves 'nothing but Micro moved'.
+ * Every digest below was first recorded at main @ e080803 (v2.6.0), before the swell was moved into the chunk
+ * points. Each one hashes JSON.stringify of chunks 0..299 (points, zones, hazards, power-ups, shards, pads,
+ * launches) for one seed and one single-biome mask. Mask 512 is left out on purpose: it is the one mask the
+ * fix is meant to change. Mask 0 is also pinned by terrain-golden-mask0.test.js; it is repeated here so this
+ * file alone proves the claim 'nothing but Micro moved'.
  *
- * WHEN THIS FAILS, do not re-pin without redoing that tolerance comparison: a failure outside Micro means a change reached terrain that has no business
- * changing. (Only changes to pmath, or to the @stdlib pins that feed it, may legitimately move these digests.)
+ * WHEN THIS FAILS, do not re-pin. A change outside Micro reached terrain that has no business changing.
  */
 import crypto from 'crypto';
 import { makeGen, loadContent } from './_helpers.js';
 
-// #121 (portable math): digests re-pinned once. Terrain generation now uses pmath (tan/atan2/hypot/cos), which differs from native V8 Math in the last bits
-// of about 10% of the numbers (max 8.7e-11 px, 6e-16 relative; zero structural differences over 20 seed/mask pairs x 300 chunks, tools/determinism/portable-math/terrain-delta.mjs).
 const CHUNKS = 300;
 const PINNED = {
   '0': {
-    'alpha': 'a02af9e4d56273c8',
-    'beta': '7fbbbeb590fce060',
-    'swell': 'b3717ba9fd1b0647'
+    'alpha': '14a3e138ca0e0b5c',
+    'beta': 'c3b5c86bad2a1efb',
+    'swell': '8133b77519002d2b'
   },
   '1': {
-    'alpha': '32d58dd8f362f924',
-    'beta': 'b20ebff2d719d23a',
-    'swell': '35c5415b08ce016b'
+    'alpha': '14a3e138ca0e0b5c',
+    'beta': 'c3b5c86bad2a1efb',
+    'swell': '8133b77519002d2b'
   },
   '2': {
-    'alpha': 'dd7dde8b607ed7ad',
-    'beta': '55114419899d1e08',
-    'swell': '46f7867ddabab199'
+    'alpha': '84668b85ff02f3a5',
+    'beta': '11d4045a6d608bab',
+    'swell': '60193eee0278b474'
   },
   '4': {
-    'alpha': '6075257a767a800c',
-    'beta': '3ca54022e98a1de4',
-    'swell': 'bda8a94c3f608510'
+    'alpha': '348ca2deb497a397',
+    'beta': 'a62db1db2c6c3866',
+    'swell': '8b7c608b20200ee7'
   },
   '8': {
-    'alpha': 'dbb1e39c19e38857',
-    'beta': 'adee253636195873',
-    'swell': '31b2b00a6acca365'
+    'alpha': '4aaa9cad784a014b',
+    'beta': '003edfb3c875c463',
+    'swell': '792a77ca25d9a040'
   },
   '16': {
-    'alpha': '8cb8d5dab0b21137',
-    'beta': '7735c9a3cfa91469',
-    'swell': '73133a4cd6c4b275'
+    'alpha': 'b403d967b5c526eb',
+    'beta': '93668c3469bf40b4',
+    'swell': '5f062e3d7e384b84'
   },
   '32': {
-    'alpha': '947264f11bc668a4',
-    'beta': '306105700ab0eebf',
-    'swell': 'd729a0aff52faef1'
+    'alpha': '10a0e5f762871e85',
+    'beta': '9f12f4012acc8820',
+    'swell': 'be3622d778a7d48e'
   },
   '64': {
-    'alpha': '0b7704b772ed7977',
-    'beta': 'a3010169fa3781d2',
-    'swell': '631e52c8be4904fd'
+    'alpha': 'a6583c39eb6e53c1',
+    'beta': '02e3f030e38e6255',
+    'swell': '4a19ba8ee75a3f04'
   },
   '128': {
-    'alpha': 'e8f9f66592a5711d',
-    'beta': 'efda9348aaced421',
-    'swell': '36d3b75d4e2118f7'
+    'alpha': '932a3ca67f207c57',
+    'beta': 'f0aa1876f450ab8a',
+    'swell': '9974f37333c9c4e1'
   },
   '256': {
-    'alpha': '6f2d152ca9c14458',
-    'beta': '0dd1ede1c4e96b71',
-    'swell': '055a2716fe288d90'
+    'alpha': 'e1243e73476e9a20',
+    'beta': '978ee95dfbdee619',
+    'swell': '3d87988802424226'
   },
   '1024': {
-    'alpha': '78ed32962ead990b',
-    'beta': '9e483afe1335d274',
-    'swell': '1baa7f4cb7dea24f'
+    'alpha': '9538114f294f7869',
+    'beta': 'f517660e997c6131',
+    'swell': '15c886c6c2158e18'
   }
 };
 
@@ -100,9 +99,7 @@ const without = (o) => Object.fromEntries(Object.entries(o).filter(([, d]) => !L
 function digest(seed, mask) {
   const g = makeGen(seed, { biomeMask: mask, hazardDefs: without(c.hazards), powerupDefs: without(c.powerups) });
   const h = crypto.createHash('sha256');
-  // Issue #65 renamed the biome id; the pins predate it, so the id is read back as its old spelling. The
-  // geometry is bit-identical, only the serialized id string differs.
-  for (let i = 0; i < CHUNKS; i++) h.update(JSON.stringify(g.getChunk(i)).replace(/debutmont/g, 'debu'+'mont'));
+  for (let i = 0; i < CHUNKS; i++) h.update(JSON.stringify(g.getChunk(i)));
   return h.digest('hex').slice(0, 16);
 }
 

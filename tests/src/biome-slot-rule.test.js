@@ -36,17 +36,18 @@ function gen(seed, hazards = [FX_GROUND_HAZARD, FX_AIR_HAZARD], mask = FX_MASK) 
 const baseGen = (seed, mask = FX_MASK) => makeGen(seed, { biomeMask: mask, hazardDefs: BASE_H, powerupDefs: BASE_P });
 const chunksOf = (g, n) => Array.from({ length: n }, (_, i) => snap(g.getChunk(i)));
 
-const SEEDS = ['slot-alpha', 'slot-beta', 'slot-gamma', 'slot-delta'];
-// #121 (portable math): digests re-pinned once. Terrain generation now uses pmath (tan/atan2/hypot/cos), which differs from native V8 Math in the last bits
-// of about 10% of the numbers (max 8.7e-11 px, 6e-16 relative; zero structural differences over 20 seed/mask pairs x 300 chunks, tools/determinism/portable-math/terrain-delta.mjs).
+// re-pinned for #65: Debutmont base + arcade bridges. Two more seeds: every biome sector now opens with an arcade
+// bridge (about a fifth of its chunks), so four seeds no longer yield the >150 ground-eligible / >10 slow-hazard
+// samples the share and fairness tests below need. The tests' bands are unchanged; only the sample grew.
+const SEEDS = ['slot-alpha', 'slot-beta', 'slot-gamma', 'slot-delta', 'slot-epsilon', 'slot-zeta'];
 const N = 300;
 
 describe('slot rule: base streams untouched', () => {
-  test('with biome defs absent, nothing changes at ANY mask (digests pinned at 00978f6, re-pinned once at #121 for the last bits of pmath terrain math)', () => {
-    // First recorded on 00978f6 (v2.5.0, B0) with the same projection: 2 seeds x 200 chunks of JSON.stringify(getChunk(i)). RE-PINNED ONCE at #121
-    // (portable math, SIM_REVISION 4): terrain generation now calls pmath, which moves the last bits of about 10% of the numbers (max 8.7e-11 px, no
-    // structural difference over 20 seed/mask pairs x 300 chunks; see tests/src/micro-swell-isolation.test.js for the tolerance comparison that justifies it).
-    const PINNED = { 1: '9d9b47c3435771cc', 2: '5317419c83dc1a1f', 8: '62320ca478c92339', 64: 'c62a9e0dee94f9d7', [ALL]: '71d0b7d415d2e2ff' };
+  test('with biome defs absent, nothing changes at ANY mask (digests pinned at 00978f6, before the slot rule)', () => {
+    // First recorded on 00978f6 (v2.5.0, B0) with the same projection: 2 seeds x 200 chunks of JSON.stringify(getChunk(i)).
+    // re-pinned for #65 on the #121 (portable math) build: Debutmont base + arcade bridges (all five digests moved: base terrain is now Debutmont, and
+    // biome changes are bridged). Mask 1 is the home bit, so it is the same terrain as mask 0.
+    const PINNED = { 1: '2af6aff54f97d978', 2: 'f6f6494742aa0b4a', 8: '8dd6019a1fa4c387', 64: '938d3837e2932a36', [ALL]: 'f29bc0ae347569af' };
     // Audit T2 (v2.6.x) moved Micro Mountain's dew swell INTO the chunk points on purpose, so the ALL mask (it contains
     // Micro, bit 512) now has other bytes. To keep this pin about the slot rule, the masks are hashed with the swell
     // stripped from content: that reproduces the 00978f6 bytes exactly, so nothing else moved. The shipped-content
@@ -57,9 +58,7 @@ describe('slot rule: base streams untouched', () => {
       const parts = [];
       for (const seed of ['slot-a', 'slot-b']) {
         const g = makeGen(seed, { biomeMask: mask, hazardDefs: BASE_H, powerupDefs: BASE_P, modDefs });
-        // Issue #65 renamed the biome id; the pins predate it, so the id is read back as its old spelling. The
-        // geometry is bit-identical, only the serialized id string differs.
-        for (let i = 0; i < 200; i++) parts.push(JSON.stringify(g.getChunk(i)).replace(/debutmont/g, 'debu'+'mont'));
+        for (let i = 0; i < 200; i++) parts.push(JSON.stringify(g.getChunk(i)));
       }
       return crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
     };
@@ -69,7 +68,7 @@ describe('slot rule: base streams untouched', () => {
     // Masks without Micro are byte-identical with the shipped content too (the swell only touches dewSwell zones)...
     for (const mask of [1, 2, 8, 64]) expect(digestOf(mask, content.terrainMods)).toBe(PINNED[mask]);
     // ...and the ALL mask with the shipped (swelled) content, recorded after audit T2.
-    expect(digestOf(ALL, content.terrainMods)).toBe('6ac21be2168107b8');
+    expect(digestOf(ALL, content.terrainMods)).toBe('6ed38294c7a8466d'); // re-pinned for #65: Debutmont base + arcade bridges (on the #121 pmath build)
   });
 
   test('the slot keeps a fixed draw count: BIOME_SLOT_DRAWS is still 5', () => {

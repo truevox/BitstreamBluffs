@@ -27,6 +27,7 @@
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { witnessedBiomeTransition } from './biome-entry-proof.mjs';
 import {
   captureCausalState, safeJson, fnv1a, digestState, instrumentRun, diffDigests, verdict, subsystemClass,
 } from './causal-digest.mjs';
@@ -193,16 +194,28 @@ async function pageSetup({ fx, pt }) {
   if (fx.biomeEntry) {
     const ppm = run.terrain.ppm;
     let entry = null;
-    for (let sec = 3; sec < 60 && entry == null; sec++) {
-      if (run._biomeDefForSector(sec) && !run._biomeDefForSector(sec - 1)) entry = (sec - 1) * 500 * ppm;
+    // #65: entries can begin *inside* a sector after an arcade bridge;
+    // checking only sector starts misses every bridge->biome transition.
+    // Probe in 10px steps and only count a *witnessed arcade bridge
+    // (null) -> playable biome* transition, never a different sector or
+    // an unproved base-biome transition.
+    const first = 2 * 500 * ppm, last = 60 * 500 * ppm;
+    let previous = run.terrain.biomeAtX(first - 1);
+    for (let x = first; x < last && entry == null; x += 10) {
+      const here = run.terrain.biomeAtX(x);
+      if (previous === null && here != null) {
+        entry = x;
+        ctx.biomeEntryFromBridge = true;
+      }
+      previous = here;
     }
     if (entry == null) throw new Error('no biome entry found for ' + fx.seed);
     ctx.biomeEntryX = entry;
     const x0 = entry - 1500;
     run.streamTerrain(x0);
     run.sled.setPose(x0, run.terrain.heightAt(x0) - 15, run.slopeAt(x0), 320, 0);
-    // The start sector counts as already announced, so the only biome change is the real mid-ride entry.
-    run._biomeSector = run.terrain._sectorOf(x0);
+    // The start biome counts as already announced, so the only biome change is the real mid-ride entry.
+    run._biomeId = run.terrain.biomeAtX(x0);
   }
   if (fx.startX != null) {
     run.streamTerrain(fx.startX);
@@ -333,9 +346,12 @@ async function runCase(fixtureName, caseName, baseline) {
         nearMisses: s.score?.nearMisses ?? 0, kodiakEvents: p.states.flatMap((x) => x.events).filter((e) => e[0] === 'bb:kodiak').length,
         sfx: [...new Set(p.states.flatMap((x) => x.sfx.map((q) => q[0])))], airTicks: p.states.filter((x) => x.sled && !x.sled.grounded).length,
         bsodCaught: !!s.bsod?.caught, biomeEntryX: p.biomeEntryX ?? null,
+        biomeEntryFromBridge: p.biomeEntryFromBridge === true,
         biomeEntryTick: p.biomeEntryX == null ? null : (p.states.find((x) => x.sled && x.sled.parts[0][2] >= p.biomeEntryX)?.tick ?? null), viewport: [innerWidth, innerHeight, devicePixelRatio], audio: !!g.registry.get('audioSynth') };
     });
-    const res = { fixture: fixtureName, case: caseName, tag: pt.tag || null, meta, errors };
+    const res = { fixture: fixtureName, case: caseName, tag: pt.tag || null, meta, errors,
+      baselineBiomeEntryTick: baseline?.meta?.biomeEntryTick ?? null,
+      baselineBiomeEntryFromBridge: baseline?.meta?.biomeEntryFromBridge === true };
     if (!baseline) { res.digests = digests; res.states = await page.evaluate(() => window.__probe.states); return res; }
     const diff = diffDigests(baseline.digests, digests);
     res.diff = { ...diff, verdict: verdict(diff) };
@@ -387,6 +403,9 @@ export function gateProblems(r) {
   const fx = FIXTURES[r.fixture];
   if (r.errors && r.errors.length) why.push(`page errors: ${r.errors.slice(0, 2).join(' | ')}`);
   if (m.stalled != null) why.push(`stalled at tick ${m.stalled}`);
+  if (r.fixture === 'biome' && !witnessedBiomeTransition(r)) {
+    why.push('no witnessed arcade-bridge-to-biome entry crossed in baseline and comparison');
+  }
   if (fx && !m.crashed && Number.isFinite(m.ticks) && m.ticks < fx.ticks) why.push(`stopped at tick ${m.ticks} of ${fx.ticks} without crashing`);
   if (r.diff.lengthMismatch || r.diff.verdict === 'length-mismatch') why.push('length mismatch with the baseline');
   const isControl = r.tag === 'positive control';
@@ -422,7 +441,12 @@ if (isMain) {
   const report = { kind: 'bb-causal-isolation-matrix/diagnostic', url, generatedAt: new Date().toISOString(), fixtures: {}, rows: [] };
   for (const f of fixtures) {
     const planned = PLAN[f].filter((c) => !onlyCases || onlyCases.includes(c));
-    const todo = planned.filter((c) => !cells[cellKey(f, c)] || cells[cellKey(f, c)].error);
+    const todo = planned.filter((c) => {
+      const saved = cells[cellKey(f, c)];
+      // Invalidate old success receipts that predate the witnessed bridge gate.
+      return !saved || saved.error || (f === 'biome' && (!saved.meta?.biomeEntryFromBridge ||
+        saved.meta?.biomeEntryTick == null || !saved.baselineBiomeEntryFromBridge || saved.baselineBiomeEntryTick == null));
+    });
     if (!todo.length) {
       console.log('SKIP_FIXTURE (all cells cached)', f);
       for (const c of planned) { const r = cells[cellKey(f, c)]; console.log(fmtRow(r)); report.rows.push(r); }

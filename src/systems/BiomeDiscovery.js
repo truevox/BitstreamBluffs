@@ -5,20 +5,26 @@
  * unlocked, encountered, and completed separately."
  *
  *  - UNLOCKED   is the existing Sync Level unlock (ProfileStore.unlockedBiomeIds). Not stored here.
- *  - ENCOUNTERED: the sled's x reached a sector whose `biomeForSector(seed, sector, mask)` is that biome.
+ *  - ENCOUNTERED: the sled's x reached a stretch the generator answers with that biome (`terrain.biomeAtX`), i.e.
+ *                 past the arcade bridge that opens its sector when the previous sector was a different biome (#65).
  *  - COMPLETED:   the sled rode one of that biome's sectors from its start to its end (SECTOR_M, 500 m) and
  *                 the run's crash is not inside that sector.
  *
- * Detection is a pure function of what a run saw: its seed and mask, the furthest x the sled reached and the
- * x of the run-ending crash. The sled only moves forward through sectors (a respawn never skips one), so
+ * Arcade (a bridge) is glue, never a biome: it is not tracked. The home biome (Debutmont) is the base, so it is
+ * encountered from sector 0 whatever the mask, and the mask-0 early return is gone. Completion stays
+ * sector-based (the whole sector ridden, bridge included), so a sector that opens with a bridge still completes
+ * its biome at the sector's end.
+ *
+ * Detection is a pure function of what a run saw: the terrain's own biome answer, the furthest x the sled reached
+ * and the x of the run-ending crash. The sled only moves forward through sectors (a respawn never skips one), so
  * every sector from 0 to the furthest one was entered; "crossed the end of sector s" is "the furthest
- * sector is past s". The sector rule is TerrainGenerator's own (`_sectorOf`, BIOME_ENTER), so detection and
- * the drawn terrain can never disagree.
+ * sector is past s". Asking the generator (the same answer RunScene's BIOME_ENTER and palette use) means detection
+ * and the drawn terrain can never disagree, bridge edges included.
  *
  * Only the run-ending crash voids a sector. A crash a Hashed Backup absorbs, or an opening-grace recovery,
  * does not: the run went on and the sled still rode the sector to its end. (Documented in ARCHITECTURE.)
  */
-import { biomeForSector, SECTOR_M } from './TerrainGenerator.js';
+import { SECTOR_M } from './TerrainGenerator.js';
 import { canonicalBiomeId } from '../data/biomeAliases.js';
 
 /**
@@ -57,24 +63,30 @@ export function sectorOfX(x, pxPerMeter = 20) {
 
 /**
  * What one run encountered and completed.
- * @param {{seed:string|number, biomeMask:number, biomeDefs:Array<{id:string,bit:number,weight?:number}>,
- *   furthestX:number, crashX?:number|null, pxPerMeter?:number}} [o]
+ *
+ * The biome at a position is the generator's own answer (`biomeAt`, normally `terrain.biomeAtX`), not arithmetic on
+ * sectors: the generator rounds an arcade bridge to whole chunks and caps it, so any other rule disagrees with the
+ * drawn terrain and BIOME_ENTER by up to a chunk. Each sector 0..furthest is probed once: at its last pixel for a
+ * sector the sled rode through (a chunk straddling the next boundary is still that sector's biome there), at the
+ * furthest x for the sector the sled ended in. A bridge answers null, so a run that ended inside one has not
+ * entered the biome it leads to.
+ * @param {{biomeAt:(xPx:number)=>(string|null), furthestX:number, crashX?:number|null, pxPerMeter?:number}} [o]
+ *   biomeAt: the run's terrain answer at a world x, a biome id or null for an arcade bridge.
  *   furthestX: the furthest world x the sled reached. crashX: world x of the run-ending crash (null/absent:
  *   the run did not end in a crash inside the ridden ground).
  * @returns {{encountered:string[], completed:string[]}} canonical order; completed is a subset of encountered.
  */
 export function detectBiomeVisits(o = {}) {
   const opts = o && typeof o === 'object' ? o : {};
-  const mask = Number(opts.biomeMask) >>> 0;
-  if (!mask || !Number.isFinite(opts.furthestX)) return EMPTY();
-  const defs = Array.isArray(opts.biomeDefs) ? opts.biomeDefs : [];
-  const ppm = opts.pxPerMeter;
+  if (!Number.isFinite(opts.furthestX) || typeof opts.biomeAt !== 'function') return EMPTY();
+  const ppm = Number(opts.pxPerMeter) > 0 ? Number(opts.pxPerMeter) : 20;
   const last = sectorOfX(opts.furthestX, ppm);
   const crashSector = Number.isFinite(opts.crashX) ? sectorOfX(opts.crashX, ppm) : -1;
   const encountered = [];
   const completed = [];
   for (let s = 0; s <= last; s++) {
-    const id = biomeForSector(opts.seed, s, mask, defs);
+    const probeX = s === last ? Math.max(0, opts.furthestX) : (s + 1) * SECTOR_M * ppm - 1;
+    const id = opts.biomeAt(probeX);
     if (!id) continue;
     encountered.push(id);
     if (s < last && s !== crashSector) completed.push(id);

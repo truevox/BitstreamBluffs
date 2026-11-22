@@ -11,6 +11,11 @@ import {
 const c = loadContent();
 const SEEDS = ['pres1', 'pres2', 'pres3', 'pres4', 'pres5', 'pres6', 'pres7', 'pres8'];
 const ROB = Array.from({ length: 32 }, (_, k) => `rob${k + 1}`);
+// re-pinned for #65: Debutmont base + arcade bridges. Same re-assessment as biome-b1-presence.test.js: the generator's hazard
+// rates are unchanged (400 seeds, +/-0.02), the sample is ~25 % smaller because each biome sector opens with an arcade bridge,
+// so the band is asserted on BIG (150 seeds) and the per-seed 1-per-2-km rule on seeds with >= SHORT_KM of the biome.
+const BIG = Array.from({ length: 150 }, (_, k) => `big${k + 1}`);
+const SHORT_KM = 1;
 /** Chunks the generator can place the def in: air hazards only in generated jumps (isJump), ground never in a bridge or jump. */
 const eligibleFor = (def, ch) => (def.placement === 'air' ? ch.defId === 'gen-jump' : ch.kind !== 'bridge' && ch.defId !== 'gen-jump');
 const isCrash = (id) => { const d = c.hazards[id]; return !d.onHit || d.onHit.effect === 'crash'; };
@@ -32,7 +37,7 @@ function presence(mask, biome, id, seeds) {
       if (here) n++;
       if (eligibleFor(def, ch)) { elig++; if (here) has++; }
     }
-    perSeed.push({ seed, n, km: +km.toFixed(2), ok: n * 2 >= km });
+    perSeed.push({ seed, n, km: +km.toFixed(2), ok: km < SHORT_KM || n * 2 >= km });
   }
   const share = has / elig;
   console.log(`${id} (${seeds.length} seeds): ${has}/${elig} eligible = ${(100 * share).toFixed(1)} %; per seed ${perSeed.map((p) => `${p.n}/${p.km}km`).join(' ')}`);
@@ -40,29 +45,27 @@ function presence(mask, biome, id, seeds) {
 }
 
 describe('B2 presence: the biome hazard is felt in early terrain (chunks 0-44, single biome bit)', () => {
-  test('mask 16 (crystal-cavern): shatterWall meets the full target (band on 8 and 32 seeds, 1 per 2 km on every seed)', () => {
+  test('mask 16 (crystal-cavern): shatterWall meets the full target (band on 150 seeds, 1 per 2 km on every seed with >= 1 km of biome)', () => {
     const a = presence(16, 'crystal-cavern', 'shatterWall', SEEDS);
     expect(a.elig).toBeGreaterThanOrEqual(15);
-    expect(a.share).toBeGreaterThanOrEqual(0.35);
-    expect(a.share).toBeLessThanOrEqual(0.55);
     for (const p of a.perSeed) expect(p).toMatchObject({ ok: true });
     const b = presence(16, 'crystal-cavern', 'shatterWall', ROB);
-    expect(b.share).toBeGreaterThanOrEqual(0.35);
-    expect(b.share).toBeLessThanOrEqual(0.55);
-    expect(b.fails).toBeLessThanOrEqual(2); // measured 2/30: seeds with < 1 km of Crystal terrain in chunks 0-44
+    expect(b.fails).toBeLessThanOrEqual(2); // measured 0 at #65, among seeds with >= 1 km of Crystal terrain in chunks 0-44
+    const big = presence(16, 'crystal-cavern', 'shatterWall', BIG);
+    expect(big.share).toBeGreaterThanOrEqual(0.35);
+    expect(big.share).toBeLessThanOrEqual(0.55);
   });
 
-  test('mask 1024 (vertigo-vents): ashCloud meets the band; OPEN for the lead (as B1 seagullDive): the 1-per-2-km rule fails on some seeds', () => {
+  test('mask 1024 (vertigo-vents): ashCloud meets the band (150 seeds); OPEN for the lead (as B1 seagullDive): the 1-per-2-km rule fails on some seeds', () => {
     // An air hazard sits only in a generated jump of a Vertigo sector, above the no-hop arc (the existing air pass; the
     // spec's "air zone" uses it, as "no new mechanism" for Vertigo requires). Chance is at the 0.75 cap already.
     const a = presence(1024, 'vertigo-vents', 'ashCloud', SEEDS);
-    expect(a.share).toBeGreaterThanOrEqual(0.35);
-    expect(a.share).toBeLessThanOrEqual(0.55);
-    expect(a.fails).toBeLessThanOrEqual(2); // measured 2 of the 6 seeds with Vertigo terrain
+    expect(a.fails).toBeLessThanOrEqual(2); // measured 0 of the seeds with >= 1 km of Vertigo terrain at #65
     const b = presence(1024, 'vertigo-vents', 'ashCloud', ROB);
-    expect(b.share).toBeGreaterThanOrEqual(0.35);
-    expect(b.share).toBeLessThanOrEqual(0.55);
-    expect(b.fails).toBeLessThanOrEqual(5); // measured 4/30
+    expect(b.fails).toBeLessThanOrEqual(5); // measured 2 of 22 seeds with >= 1 km at #65 (an air hazard needs a generated jump)
+    const big = presence(1024, 'vertigo-vents', 'ashCloud', BIG);
+    expect(big.share).toBeGreaterThanOrEqual(0.35);
+    expect(big.share).toBeLessThanOrEqual(0.55);
   });
 });
 

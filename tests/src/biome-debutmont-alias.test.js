@@ -59,34 +59,48 @@ describe('an old save migrates losslessly', () => {
     expect(p.unlocked.biomes).toEqual(['debutmont']);
   });
   test('mission ids and their progress follow the rename; the larger count wins on a collision', () => {
+    // Any mission id that embeds the legacy spelling follows the rename (shipped data has none left, hence the made-up id).
+    const OLD = `x-biome-${LEGACY}`;
     const p = sanitizeProfile({
       v: 1,
       missions: {
         counter: 3,
-        active: [`t4-biome-${LEGACY}`, 'other-mission'],
-        progress: { [`t4-biome-${LEGACY}`]: 900, 'other-mission': 2 },
+        active: [OLD, 'other-mission'],
+        progress: { [OLD]: 900, 'other-mission': 2 },
       },
     }, LEVELS);
-    expect(p.missions.active).toEqual(['t4-biome-debutmont', 'other-mission']);
-    expect(p.missions.progress).toEqual({ 't4-biome-debutmont': 900, 'other-mission': 2 });
+    expect(p.missions.active).toEqual(['x-biome-debutmont', 'other-mission']);
+    expect(p.missions.progress).toEqual({ 'x-biome-debutmont': 900, 'other-mission': 2 });
 
     const both = sanitizeProfile({
       v: 1,
-      missions: { progress: { [`t4-biome-${LEGACY}`]: 900, 't4-biome-debutmont': 400 } },
+      missions: { progress: { [OLD]: 900, 'x-biome-debutmont': 400 } },
     }, LEVELS);
-    expect(both.missions.progress).toEqual({ 't4-biome-debutmont': 900 });
+    expect(both.missions.progress).toEqual({ 'x-biome-debutmont': 900 });
     const bothRev = sanitizeProfile({
       v: 1,
-      missions: { progress: { 't4-biome-debutmont': 1200, [`t4-biome-${LEGACY}`]: 900 } },
+      missions: { progress: { 'x-biome-debutmont': 1200, [OLD]: 900 } },
     }, LEVELS);
-    expect(bothRev.missions.progress).toEqual({ 't4-biome-debutmont': 1200 });
+    expect(bothRev.missions.progress).toEqual({ 'x-biome-debutmont': 1200 });
+  });
+  test('the retired "1500 m in Debutmont" mission (either spelling) keeps its slot as the Maple Wax mission, with no stale progress', () => {
+    for (const id of [`t4-biome-${LEGACY}`, 't4-biome-debutmont']) {
+      const p = sanitizeProfile({
+        v: 1,
+        missions: { counter: 3, active: [id, 'other-mission'], progress: { [id]: 900, 'other-mission': 2 } },
+      }, LEVELS);
+      expect(p.missions.active).toEqual(['t4-pickup-maple-wax', 'other-mission']);
+      expect(p.missions.progress).toEqual({ 'other-mission': 2 });
+    }
+    const dup = sanitizeProfile({ v: 1, missions: { active: ['t4-biome-debutmont', 't4-pickup-maple-wax'] } }, LEVELS);
+    expect(dup.missions.active).toEqual(['t4-pickup-maple-wax']); // never two copies of one mission
   });
   test('a crafted __proto__ / constructor mission progress key cannot poison the result', () => {
-    const raw = JSON.parse('{"v":1,"missions":{"progress":{"__proto__":{"polluted":1},"constructor":5,"t4-biome-debutmont":7}}}');
+    const raw = JSON.parse('{"v":1,"missions":{"progress":{"__proto__":{"polluted":1},"constructor":5,"x-biome-debutmont":7}}}');
     const p = sanitizeProfile(raw, LEVELS);
     expect(Object.getPrototypeOf(p.missions.progress)).toBe(Object.prototype);
     expect(p.missions.progress.polluted).toBeUndefined();
-    expect(Object.keys(p.missions.progress)).toEqual(['t4-biome-debutmont']);
+    expect(Object.keys(p.missions.progress)).toEqual(['x-biome-debutmont']);
     expect({}.polluted).toBeUndefined();
   });
   test('run visits recorded under the legacy id merge into the canonical set', () => {

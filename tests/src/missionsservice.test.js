@@ -288,7 +288,7 @@ describe('mission XP crossing a level threshold', () => {
     const easy = { id: 'zzz-level', type: 'singleRun', tier: 1, title: 'Reach 10 m', metric: 'distanceM', target: 10 };
     const store = new ProfileStore({ levels, storage: memStorage() });
     store.load();
-    store.profile = { ...store.profile, xp: 90 }; // level 2 threshold is 100 XP
+    store.profile = { ...store.profile, xp: 70 }; // level 2 threshold is 80 XP
     const missions = new MissionsService(game, { templates: [...TEMPLATES, easy], store });
     await missions.init();
     store.profile.missions.active = [easy.id];
@@ -296,7 +296,7 @@ describe('mission XP crossing a level threshold', () => {
     expect(store.profile.level).toBe(1);
     missions.onRunCredited(rec({ ledgerHash: 'level-1', distanceM: 500 }));
 
-    expect(store.profile.xp).toBeGreaterThanOrEqual(100);
+    expect(store.profile.xp).toBeGreaterThanOrEqual(80);
     expect(store.profile.level).toBe(2);
     expect(store.profile.unlocked.cosmetics).toContain('trail-cyan');
   });

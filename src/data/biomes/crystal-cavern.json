@@ -2,7 +2,7 @@
   "id": "crystal-cavern",
   "bit": 16,
   "name": "Crystal Cavern",
-  "unlockLevel": 16,
+  "unlockLevel": 13,
   "lore": "Every landing rings twice. The second ring is where the score lives.",
   "background": "facets",
   "mod": "echoZone",

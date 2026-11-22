@@ -130,7 +130,8 @@ describe('the ruleset really parameterizes real simulation data: altered content
   };
   test('a chunk weight change gives a different rulesetId and different terrain for the same seed; the old content reproduces', () => {
     const altered = clone(realDoc);
-    altered.content.chunks['whoops'].weight = 9;
+    // A template the base biome (Debutmont, #65) prefers: since #65 mask 0 draws from the home biome's templates first.
+    altered.content.chunks['gentle-roller'].weight = 9;
     expect(rulesetIdOf(altered)).not.toBe(realId);
     expect(terrain(altered.content, 'alpha')).not.toBe(terrain(realDoc.content, 'alpha'));
     expect(terrain(clone(realDoc).content, 'alpha')).toBe(terrain(realDoc.content, 'alpha'));

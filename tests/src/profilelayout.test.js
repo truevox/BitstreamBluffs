@@ -94,7 +94,7 @@ describe('ProfileLayout.profileLayout — no overlap, nothing clipped', () => {
   });
 
   test('reached signatures are highlighted and the rest stay readable', () => {
-    // Level 5: only Debutmont (level 4) is reached, so this checks both the reached and locked styles.
+    // Level 5: only Debutmont (the base biome, level 1) is reached, so this checks both the reached and locked styles.
     const layout = profileLayout({ profile: atXp(4000), levels });
     const byText = (t) => layout.items.find((i) => i.key.startsWith('sig-') && i.text === t);
     expect(byText('DEBUTMONT').color).toBe('amber');
@@ -107,8 +107,8 @@ describe('ProfileLayout.profileLayout — no overlap, nothing clipped', () => {
     // Was "BIOMES REACHED n/11": audit F11 found the count is biomes UNLOCKED by level (a player has them
     // with zero runs), so the label now says what it counts.
     const head = (xp) => profileLayout({ profile: atXp(xp), levels }).items.find((i) => i.key === 'sig-head').text;
-    expect(head(0)).toBe('SIGNATURES UNLOCKED 0/11');
-    expect(head(4000)).toBe('SIGNATURES UNLOCKED 1/11'); // Debutmont at level 4
+    expect(head(0)).toBe('SIGNATURES UNLOCKED 1/11'); // the base biome, Debutmont, from the first run
+    expect(head(3800)).toBe('SIGNATURES UNLOCKED 2/11'); // Garbage Dump Glacier at level 4 (3,750 XP)
     expect(head(148700)).toBe('SIGNATURES UNLOCKED 11/11'); // level 29 clears every biome reward (last at level 28)
   });
 });
@@ -293,10 +293,10 @@ describe('ProfileLayout — signature status reflects what W3 actually ships', (
     expect(note.text).toBe(`${playable.length} SIGNATURES ONLINE`);
   });
 
-  test('a profile that has reached nothing still says nothing is online', () => {
+  test('a profile that has earned nothing still has the base biome online (issue #65)', () => {
     const layout = profileLayout({ profile: defaultProfile(), levels, playableBiomeIds: playable });
     const note = layout.items.find((i) => i.key === 'sig-note');
-    expect(note.text).toBe('0 SIGNATURES ONLINE');
+    expect(note.text).toBe('1 SIGNATURE ONLINE');
   });
 
   test('with no shipped biome content at all, it keeps the original wording', () => {
@@ -386,10 +386,12 @@ describe('the signature toggle menu cannot cover the biome names', () => {
   test('a signature is listed exactly once: either as a pending name or as a toggle', () => {
     const layout = profileLayout({ profile: withBiomes(12), levels, playableBiomeIds: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'] });
     const plain = layout.items.filter((it) => /^sig-/.test(it.key) && it.key !== 'sig-head' && it.key !== 'sig-note').map((it) => it.text);
-    // Playable biomes belong in the toggle menu, so none of them should also have a plain name row.
-    for (const t of ['DEBUTMONT', 'GARBAGE DUMP GLACIER', 'PYRAMID PEAK']) {
+    // Switchable playable biomes belong in the toggle menu, so none of them should also have a plain name row.
+    for (const t of ['GARBAGE DUMP GLACIER', 'PYRAMID PEAK']) {
       expect({ t, listed: plain.includes(t) }).toMatchObject({ t, listed: false });
     }
+    // The base biome has no toggle (it cannot be turned off), so it is listed by name, once.
+    expect(plain.filter((t) => t === 'DEBUTMONT')).toHaveLength(1);
     // Still-pending ones keep their name so the player can see what is coming.
     expect(plain.length).toBeGreaterThan(0);
   });

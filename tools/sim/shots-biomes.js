@@ -12,9 +12,8 @@
   'use strict';
   const S = () => window.__shots;
   const BIOMES = [
-    // Seeds are frozen hash inputs: the pre-rename seed puts the biome at `sector`, so its spelling must not follow the
-    // rename (issue #65). Split so the old-spelling guard test does not match it.
-    { bit: 1, id: 'debutmont', seed: 'biome-debu' + 'mont-1', sector: 3 },
+    // Debutmont is the base biome (#65): every sector of every mask is Debutmont, so any seed and sector shows it.
+    { bit: 1, id: 'debutmont', seed: 'biome-debutmont-1', sector: 3 },
     { bit: 2, id: 'garbage-dump-glacier', seed: 'biome-garbage-dump-glacier-0', sector: 3 },
     { bit: 4, id: 'pyramid-peak', seed: 'biome-pyramid-peak-0', sector: 2 },
     { bit: 8, id: 'underwater-mountain', seed: 'biome-underwater-mountain-0', sector: 2 },
@@ -78,14 +77,13 @@
     const tg = await import('/src/systems/TerrainGenerator.js');
     let sector = 0;
     let biome = null;
-    // Read the same two things the scene itself reads (terrain._sectorOf(sled.x) and biomeForSector),
+    // Read the same two things the scene itself reads (terrain._sectorOf(sled.x) and terrain.biomeAtX(sled.x)),
     // so this cannot report a biome the scene would disagree about.
     const read = () => {
       try {
         if (!scene || !scene.sled || !scene.terrain) return;
         sector = scene.terrain._sectorOf(scene.sled.x);
-        const defs = Object.values((scene.content && scene.content.biomes) || {});
-        biome = scene.biomeMask ? tg.biomeForSector(scene.seed, sector - 1, scene.biomeMask, defs) : null;
+        biome = scene.terrain.biomeAtX(scene.sled.x);
       } catch (e) { /* scene not ready yet */ }
     };
     // A run cannot reach sector 2 (~1 km) inside a screenshot budget, so place the sled at the START of
@@ -102,7 +100,8 @@
     // (the probe caught it being dragged back to x=145). Pin it every frame instead, and move startX
     // with it so distance/sector accounting follows the sled rather than reporting 0 m.
     const { PIXELS_PER_METER: PPM } = await import('/src/constants.js');
-    const targetX = (b.sector + 0.25) * SECTOR_M * PPM;
+    // 0.6, not the sector start: the first ~0.45 of a sector can be the arcade bridge into it (#65).
+    const targetX = (b.sector + 0.6) * SECTOR_M * PPM;
     const pin = () => {
       try {
         if (!scene || !scene.sled || !scene.terrain) return;
