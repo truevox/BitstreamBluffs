@@ -1,6 +1,6 @@
 {
- "gitSha": "69147497002eee747fe64b3877acd89e8a7ed87e",
- "generatedAt": "2026-11-22T13:39:49.994Z",
+ "gitSha": "26eb0b0a5937ad4fb1a51cc318fd9b4d08ace137",
+ "generatedAt": "2026-11-22T14:12:56.807Z",
  "engine": "chromium-headless-shell",
  "hz": 120,
  "path": "Title.startRun after force-stopping scenes (NOT the GameOver/retry flow)",

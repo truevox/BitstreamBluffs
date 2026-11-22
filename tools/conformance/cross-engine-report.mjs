@@ -60,7 +60,7 @@ if (FRESH) {
 if (POS) {
   w('### Session-position probe (Chromium headless shell, ' + POS.hz + ' Hz, harness path: ' + POS.path + ')');
   w();
-  w('Each sequence replays tape A then tape B in one page; B is compared with B as run #1 of a fresh context. **The harness does not use the real GameOver/retry flow (it force-stops scenes and calls `TitleScene.startRun`), so this is not yet proven to be a game bug.**');
+  w('Each sequence replays tape A then tape B in one page; B is compared with B as run #1 of a fresh context. The harness does not use the real GameOver/retry flow (it force-stops scenes and calls `TitleScene.startRun`). The tick-1 `matter` divergence is the `_biomeSector`/`_lastBiome` leak fixed in PR #219 (biome-mask runs only); the later `terrain`-structure differences of repeated crash fixtures are unexplained and showed no sim or outcome effect (#219 could not reproduce airborne-tricks tick 1728 on main via the real retry path).');
   w();
   w('| Sequence (run 1 -> run 2) | Run 1 ended | Run 2 first causal divergence | Run 2 TapePlayer desync | Run 2 outcome == fresh |');
   w('|---|---|---|---|---|');
