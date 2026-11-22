@@ -39,7 +39,7 @@ Chromium is the reference; two independent fresh-context sessions per engine (`n
 | final outcome (ticks, crash cause, distance, score) equal | 8 / 9 | 9 / 9 |
 | max sled position delta over the run | 0 to 7e-9 px in 8 / 9 | 0 to 8e-6 px in 9 / 9 |
 
-* Divergence is last-bit noise that mostly never amplifies: in 16 of the 18 cells the largest sled position error over the whole run is below 1e-5 px and the outcome is identical.
+* Divergence is last-bit noise that mostly never amplifies: in 17 of the 18 cells the largest sled position error over the whole run is below 1e-5 px and the outcome is identical.
 * **One real fork**: `chunk-biome-boundaries` on Firefox diverges causally at tick 373 (`world`), reaches a 393 px position error and a different outcome (survives, 815 m / 1115; Chromium and WebKit crash on a hazard at 835 m / 1175). That is a knife-edge hazard contact, not systematic drift.
 * In #161 the "first divergence" in many cells was the `terrain` group alone (probe reads); here those are excluded: `terrain` first-diverges at ticks 484 to 597 in cells with no causal difference.
 * So today the impact is: strict bit-level replay equality fails across engines (a *verification* problem), while gameplay outcomes differ in about 1 of 18 engine-fixture cells (a *rare* but real fairness problem for shared ghosts/leaderboards).
@@ -60,7 +60,7 @@ Chromium is the reference; two independent fresh-context sessions per engine (`n
 | **{hypot, atan2, exp, cos}** (minimal set) | **9 / 9** | 9 / 9 |
 | {hypot, atan2, exp, cos, sin, tan} | 9 / 9 | 9 / 9 |
 
-Caveats: this is a corpus statement. `sin`, `cos`, `tan`, `tanh` differences are intermittent (a given argument may differ, most do not); `sin`/`tan`/`tanh`/`pow`/`log` simply did not hit a differing argument that mattered in these nine tapes, so the *safe* policy is to replace every transcendental on the authoritative path, not just the minimal set. Tapes were recorded on native Chromium, so the substituted sim leaves the recorded checkpoints (TapePlayer desync at tick 480 to 1920 in 5 / 9 fixtures; one outcome changes, `chunk-biome` survives like native Firefox): legacy tapes stop verifying, which is the accepted pre-release cost (physics-breaking, needs `SIM_REVISION`/`physicsVersion` bump and re-recorded fixtures).
+Caveats: this is a corpus statement. `sin`, `cos`, `tan`, `tanh` differences are intermittent (a given argument may differ, most do not); `sin`/`tan`/`tanh`/`pow`/`log` simply did not hit a differing argument that mattered in these nine tapes, so the *safe* policy is to replace every transcendental on the authoritative path, not just the minimal set. Tapes were recorded on native Chromium, so the substituted sim leaves the recorded checkpoints (TapePlayer desync at tick 480 to 1920 in 6 / 9 fixtures; one outcome changes, `chunk-biome` survives like native Firefox): legacy tapes stop verifying, which is the accepted pre-release cost (physics-breaking, needs `SIM_REVISION`/`physicsVersion` bump and re-recorded fixtures).
 
 Where the substitution must reach (Matter vs `src/`):
 
