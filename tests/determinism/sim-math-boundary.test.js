@@ -108,6 +108,18 @@ export function mathViolations(src, { markersExempt = false, approvedExemptions 
     // Global-object aliases make the native Math property invisible to a naive
     // member-expression detector. Fail closed on introducing those aliases in
     // causal modules; existing code uses only direct known global properties.
+    // Passing globalThis as a first-class argument can smuggle native Math to
+    // an arbitrary callback. window is also used legitimately as an event target
+    // (and as a local numerical variable); reject *inline* window callbacks,
+    // not every occurrence of the identifier in application UI code.
+    if (node.type === 'CallExpression' && node.arguments?.some(a => a?.type === 'Identifier' && a.name === 'globalThis')) {
+      emit(node, 'globalThis passed as a first-class value');
+    }
+    if (node.type === 'CallExpression' &&
+        ['ArrowFunctionExpression', 'FunctionExpression'].includes(node.callee?.type) &&
+        node.arguments?.some(a => a?.type === 'Identifier' && a.name === 'window')) {
+      emit(node, 'window passed into an inline aliasing callback');
+    }
     if (node.type === 'VariableDeclarator' && isGlobal(node.init)) emit(node, 'global-object alias may hide native Math');
     if (node.type === 'AssignmentExpression' && isGlobal(node.right)) emit(node, 'assignment aliases the global object');
     if (node.type === 'Identifier' && node.name === 'Math') {
@@ -156,6 +168,9 @@ describe('the scanner itself: every bypass is caught, legitimate code passes', (
     'computed dynamic global': 'const x = globalThis[key](t);',
     'aliased global object': "const g = globalThis; const y = g['Math'].sin(t);",
     'aliased window': "let g; g = window; const y = g['Math'].sin(t);",
+    'global passed to callback': "((g) => g['Math'].sin(t))(globalThis);",
+    'globalThis passed to helper': 'const result = helper(globalThis);',
+    'window passed to inline lambda': "((g) => g['Math'].sin(t))(window);",
     'through window': 'const y = window.Math.sin(x);',
     'through Phaser': 'const y = Phaser.Math.Between(1, 2);',
     'passed as a value': 'doIt(Math);',

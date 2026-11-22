@@ -117,6 +117,18 @@ export function makeProvenance(parts = {}) {
 
 const isProvenance = (p) => p && typeof p === 'object' && p.format === PROVENANCE_FORMAT && p.formatVersion === PROVENANCE_FORMAT_VERSION;
 
+/** Shared strict provenance verifier: both cache reuse AND reports must use it. */
+export function provenanceProblem(record) {
+  if (!isProvenance(record)) return 'unsupported-provenance-version';
+  if (!record.proven || !record.identity || !record.environmentId || !record.buildId) return 'unproven-provenance';
+  let expected;
+  try { expected = makeProvenance(record.parts); } catch { return 'invalid-provenance-input'; }
+  if (!expected.proven || expected.identity !== record.identity ||
+      expected.environmentId !== record.environmentId || expected.buildId !== record.buildId) return 'invalid-provenance-identity';
+  return null;
+}
+
+
 /** Base64 is canonical; Node's permissive decoder must not accept truncated or junk results. */
 const decodedCanonicalBytes = (encoded) => {
   if (typeof encoded !== 'string' || !encoded || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) return null;

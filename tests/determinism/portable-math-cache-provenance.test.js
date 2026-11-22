@@ -22,6 +22,7 @@ import {
   stampCell,
   cellPayloadProblem,
   cellCoordinatesProblem,
+  provenanceProblem,
 } from '../../tools/determinism/portable-math/cache-provenance.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -206,6 +207,18 @@ describe('cache acceptance is fail-closed', () => {
       { tapeSha: digest('new-tape') }, { fixtureSha: digest('new-fixture') },
       { configKey: 'all' }, { noprobe: true },
     ]) expect(cellCoordinatesProblem(cell, { ...expected, ...patch })).toMatch(/mismatch/);
+  });
+
+  test('strict report provenance refuses missing or forged format and version even when hash matches', () => {
+    const p = makeProvenance(baseParts());
+    expect(provenanceProblem(p)).toBeNull();
+    for (const malformed of [
+      { ...p, format: 'other' },
+      { ...p, formatVersion: 999 },
+      { ...p, formatVersion: undefined },
+      { ...p, proven: false },
+      { ...p, parts: { ...p.parts, tapeSha: digest('changed') } },
+    ]) expect(provenanceProblem(malformed)).not.toBeNull();
   });
 
   test('a valid same-identity resume is the only reuse path', () => {

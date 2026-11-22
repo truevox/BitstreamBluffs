@@ -10,7 +10,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { makeProvenance, classifyCell, sha256, extractAssetRefs, buildServedIdentity, stampCell, cellPayloadProblem, cellCoordinatesProblem } from './cache-provenance.mjs';
+import { makeProvenance, classifyCell, sha256, extractAssetRefs, buildServedIdentity, stampCell, cellPayloadProblem, cellCoordinatesProblem, provenanceProblem } from './cache-provenance.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FIXTURES as CORE, BROAD } from './fixtures.mjs';
@@ -112,7 +112,24 @@ const hashInputs = files => {
   return hash.digest('hex');
 };
 
+// Bind the bytes loaded into the executable browser harness to the disk snapshot.
+// Otherwise a mutation between import and measurement could stamp old in-memory
+// page code with a newer file hash and create false parity evidence.
+const bootPageSha = sha256(pageJs);
+const bootPmathScriptSha = sha256(pmJs);
+const bootHarnessSha = hashInputs(harnessPaths);
+if (!bootHarnessSha || fileDigest(path.join(root, 'tools/determinism/portable-math/page.js')) !== bootPageSha) {
+  throw new Error('Cannot bind loaded browser harness to source snapshot');
+}
+
 function currentBuildIdentity() {
+  // Loaded pageJs and pmJs are immutable in this process. Reject if their
+  // source files changed after module startup, even before the first cell.
+  if (hashInputs(harnessPaths) !== bootHarnessSha ||
+      fileDigest(path.join(root, 'tools/determinism/portable-math/page.js')) !== bootPageSha ||
+      sha256(pmJs) !== bootPmathScriptSha) {
+    throw new Error('Executable browser harness changed after loading; refusing evidence');
+  }
   const current = JSON.parse(readFileSync(path.join(root, 'tools/ruleset/current.json'), 'utf8'));
   return {
     sourceCommit: git('rev-parse', 'HEAD'),
@@ -123,7 +140,7 @@ function currentBuildIdentity() {
     rulesetCurrentSha: fileDigest(path.join(root, 'tools/ruleset/current.json')),
     mathLockDigest: hashInputs(['package-lock.json', 'src/systems/pmath-stdlib-lock.json']),
     pmathSha: fileDigest(path.join(root, 'src/systems/pmath.js')),
-    harnessSha: hashInputs(harnessPaths),
+    harnessSha: bootHarnessSha,
   };
 }
 
@@ -285,7 +302,8 @@ if (cmd === 'report') {
     const invalidPayload = cellPayloadProblem(j);
     if (invalidPayload) throw new Error(`Refusing malformed experiment cell (${invalidPayload}): ${p}`);
     const recorded = j.provenance;
-    if (!recorded?.proven || !recorded.environmentId || !recorded.identity) throw new Error(`Unverified cached experiment cell: ${p}`);
+    const provenanceError = provenanceProblem(recorded);
+    if (provenanceError) throw new Error(`Refusing ${provenanceError}: ${p}`);
     const recalculated = makeProvenance(recorded.parts);
     if (!recalculated.proven || recalculated.identity !== recorded.identity ||
         recalculated.environmentId !== recorded.environmentId || recalculated.buildId !== recorded.buildId) {
@@ -343,7 +361,12 @@ if (cmd === 'report') {
   }
   // how far the portable physics departs from native on Chromium (first divergent tick of 'all' vs 'native', per fixture)
   const dep = {};
-  for (const f of FIXTURES) { const a = load('native', 'chromium', f.id), b = load('all', 'chromium', f.id); if (a && b) dep[f.id] = { firstDivergentTick: first(a, b)?.tick ?? null, nativeOutcome: a.outcome, portableOutcome: b.outcome }; }
+  for (const f of FIXTURES) {
+    const a = load('native', 'chromium', f.id), b = load('all', 'chromium', f.id);
+    checkCell(a, `native/chromium/${f.id}`);
+    checkCell(b, `all/chromium/${f.id}`);
+    if (a && b) dep[f.id] = { firstDivergentTick: first(a, b)?.tick ?? null, nativeOutcome: a.outcome, portableOutcome: b.outcome };
+  }
   out.portableVsNativeOnChromium = dep;
   const o = process.env.OUT || path.join(here, '..', '..', '..', 'docs', 'determinism', 'results', 'portable-math-results.json');
   await mkdir(path.dirname(o), { recursive: true }); await writeFile(o, JSON.stringify(out, null, 1));
