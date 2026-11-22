@@ -118,8 +118,14 @@ const hashInputs = files => {
 const bootPageSha = sha256(pageJs);
 const bootPmathScriptSha = sha256(pmJs);
 const bootHarnessSha = hashInputs(harnessPaths);
-if (!bootHarnessSha || fileDigest(path.join(root, 'tools/determinism/portable-math/page.js')) !== bootPageSha) {
-  throw new Error('Cannot bind loaded browser harness to source snapshot');
+// Bundle the *current* source/stdlib dependency closure again. Matching only
+// sha256(pmJs) to itself is a tautology: it cannot detect edits after loading.
+// An in-memory pmath bundle must stay identical to a fresh esbuild of the
+// on-disk source and pinned transitive package code at every evidence gate.
+const diskPmathScriptSha = () => sha256(pmathScript());
+if (!bootHarnessSha || fileDigest(path.join(root, 'tools/determinism/portable-math/page.js')) !== bootPageSha ||
+    diskPmathScriptSha() !== bootPmathScriptSha) {
+  throw new Error('Cannot bind loaded browser harness/math bundle to source snapshot');
 }
 
 function currentBuildIdentity() {
@@ -127,8 +133,8 @@ function currentBuildIdentity() {
   // source files changed after module startup, even before the first cell.
   if (hashInputs(harnessPaths) !== bootHarnessSha ||
       fileDigest(path.join(root, 'tools/determinism/portable-math/page.js')) !== bootPageSha ||
-      sha256(pmJs) !== bootPmathScriptSha) {
-    throw new Error('Executable browser harness changed after loading; refusing evidence');
+      diskPmathScriptSha() !== bootPmathScriptSha) {
+    throw new Error('Executable browser harness or bundled pmath changed after loading; refusing evidence');
   }
   const current = JSON.parse(readFileSync(path.join(root, 'tools/ruleset/current.json'), 'utf8'));
   return {

@@ -272,6 +272,12 @@ describe('served game content identity', () => {
 });
 
 describe('the runner actually uses the provenance gate (revert-sensitive)', () => {
+  test('loaded portable math bundle is checked against fresh on-disk executable closure', () => {
+    expect(experimentSource).toContain('const diskPmathScriptSha = () => sha256(pmathScript())');
+    expect(experimentSource).toMatch(/diskPmathScriptSha\(\) !== bootPmathScriptSha/g);
+    expect((experimentSource.match(/diskPmathScriptSha\(\) !== bootPmathScriptSha/g) || []).length).toBeGreaterThanOrEqual(2);
+  });
+
   test('experiment.mjs imports the helper and classifies a preexisting cell before reuse', () => {
     expect(experimentSource).toMatch(/from\s+'\.\/cache-provenance\.mjs'/);
     expect(experimentSource).toContain('classifyCell(');
