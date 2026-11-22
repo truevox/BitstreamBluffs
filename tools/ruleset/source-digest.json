@@ -2,9 +2,10 @@
   "format": "bb-source-tripwire",
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
-  "simRevision": 1,
-  "attestation": "no-behavior-change: ground telegraph warn and hop timing/arrival unchanged; remove prior camera state from cue planning and choose draw placement on already-streamed terrain without camera-driven generation",
+  "simRevision": 3,
+  "attestation": "sim-revision-bumped: v2.19.1 combines shipped Kodiak shove revision 2 with biome-entry collider redraw fix; authoritative biome-mask tick outcomes change under revision 3",
   "changedFiles": [
+    "src/entities/TerrainMesh.js",
     "src/scenes/RunScene.js"
   ],
   "files": {
@@ -13,8 +14,8 @@
     "src/entities/PowerUp.js": "sha256:b1a0a99f6a4433bde2146ec205be8d623bb6751fc075125a8b31b16f535e0dbc",
     "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
     "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
-    "src/entities/TerrainMesh.js": "sha256:a88f6a99aab6298034ef99d6c9d90489f1cf0a7f0f305c526b7e358b6bc59003",
-    "src/scenes/RunScene.js": "sha256:6ba948919e99c322bb87039aefcf39a14257c48bb21949ce8160422c35315c46",
+    "src/entities/TerrainMesh.js": "sha256:47d06d99ef107a17faa64a684436550966e480203a26c466506e87367da05c01",
+    "src/scenes/RunScene.js": "sha256:502f04ae79ef846d75f34ef02f4801c757cd183bfa4bd916037ba30ecfe89aa1",
     "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:dbe861d0a1fb6e73f94d467583ea9190ec88cc986fa39982b28687d75ca18397",
@@ -23,7 +24,7 @@
     "src/systems/DailyDraft.js": "sha256:01f594995d8d100e290f51b91e7fd49b768a1f943b60bf8493f6e05efcd6e207",
     "src/systems/DailyPatch.js": "sha256:220a6e1f227988bcb8ea87bc0ce683d6b5a034c1beb14dd8f8f26a268d3a1e1c",
     "src/systems/HazardMotion.js": "sha256:448d21f50a945d2130f61637b448ad2b4e6ec24186454ed205a218a82cb9ad71",
-    "src/systems/Kodiaks.js": "sha256:f0ad097ffebab7994c0ecc02c53ae382c15d11780c21aca1d0b798543f50f333",
+    "src/systems/Kodiaks.js": "sha256:fa7cce50cea0eeaa8c5ae4b4950aa9a5c2f599d9829937ccb887a2aa3618f134",
     "src/systems/PermanentUpgrades.js": "sha256:c51661c29ee2b887f11234bebbd25fd34b1501c48b84a060cc3e6dccf2e05cd7",
     "src/systems/PhysicsTuner.js": "sha256:c80e9ad47b3f30b0c1e8cb6880e637ff26d99f7cca59cf244c8d4ff1dcd0be98",
     "src/systems/Rng.js": "sha256:950df8048d13be4d5e46d2084e84d6838a73053bdf3eda49b8e6ac380ffcbfd0",

@@ -1,3 +1,5 @@
+> **Release addendum (2026-11-22, v2.19.2):** This document preserves the E1/E2 experiment results from the pre-v2.19.1 source as historical research evidence. Since the tests, camera-dependent warning planning was fixed in #155 (v2.16.1), and #140 (v2.19.1 / SIM_REVISION 3) removed cosmetic palette/biome collider rebuilds; Team A separately released Kodiak shove physics as SIM_REVISION 2 in v2.19.0. These fixes reduce causal coupling but **do not** establish production-grade savestates or exact snapshot restore in the new ruleset. The independent **canonical static collider geometry** change and stable-id TelegraphTracker serialization are still pending Phase 2 work; do not conflate #140's redraw fix with canonical collider reconstruction. The project still needs fresh browser tests on current source. This is a conditional **GO for Phase 2 experiments**, not acceptance of the end-to-end feature.
+
 # Trusted savestates: Phase 1 feasibility study (issue #119)
 
 Status: **research, Phase 1 only.** Nothing here ships a savestate. No `src/` file changed. Owner: Team B.

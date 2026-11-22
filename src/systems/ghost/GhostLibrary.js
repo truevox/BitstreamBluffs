@@ -11,6 +11,7 @@
  * Bazaar publishing (#58) will be a separate, explicit action.
  */
 import { GHOST_TAPE_FORMAT, GHOST_TAPE_VERSION, GHOST_PHYSICS_VERSION, courseKey } from './GhostTape.js';
+import { KODIAK_VERSION } from '../Kodiaks.js';
 import { SIM_TICK_HZ } from '../SimClock.js';
 
 export const GHOST_DB = 'bitstream-ghosts';
@@ -24,10 +25,11 @@ const req2p = (req) => new Promise((resolve, reject) => {
   req.onerror = () => reject(req.error || new Error('idb request failed'));
 });
 
-/** A tape this build can draw: right format, version, tick rate and physics. */
+/** A tape this build can draw: right format, version, tick rate and physics. A Kodiak run from another bear ruleset (contact crashed before v3) would not replay. */
 export function tapeCompatible(tape) {
   return Boolean(tape && tape.format === GHOST_TAPE_FORMAT && tape.version === GHOST_TAPE_VERSION &&
-    tape.simTickHz === SIM_TICK_HZ && tape.physicsVersion === GHOST_PHYSICS_VERSION && typeof tape.trace === 'string');
+    tape.simTickHz === SIM_TICK_HZ && tape.physicsVersion === GHOST_PHYSICS_VERSION && typeof tape.trace === 'string' &&
+    (tape.kodiaksOn !== true || tape.kodiakVersion === KODIAK_VERSION));
 }
 
 function emptyCourse(key, tape) {

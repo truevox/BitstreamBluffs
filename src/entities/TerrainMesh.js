@@ -97,25 +97,16 @@ export class TerrainMesh {
     if (!chunk || !chunk.points || chunk.points.length < 2) return;
     if (this.chunks.has(chunk.index)) this.removeChunk(chunk.index);
     const pts = chunk.points;
-    const pal = this.palette;
-    const gaps = chunk.gaps || [];
-    const zones = chunk.zones || [];
-    const isGap = (a, b) => gaps.some((g) => g.x0 <= a.x + 0.5 && g.x1 >= b.x - 0.5);
-    const zoneAt = (x) => {
-      for (const z of zones) if (x >= z.x0 && x <= z.x1) return z.modId;
-      return null;
-    };
+    const isGap = this._gapTest(chunk);
 
     const gfx = this._takeGfx();
     const rec = { gfx, bodies: [], pads: [], startX: chunk.startX, endX: chunk.endX };
 
-    // ---------- colliders + fill + edge, per solid segment ----------
-    const segs = [];
+    // ---------- colliders, per solid segment ----------
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i];
       const b = pts[i + 1];
       if (isGap(a, b)) continue;
-      segs.push(i);
       const verts = [
         { x: a.x, y: a.y },
         { x: b.x, y: b.y },
@@ -127,6 +118,63 @@ export class TerrainMesh {
       rec.bodies.push(body);
     }
 
+    // bounce pads: sensors
+    for (const pad of chunk.bouncePads || []) {
+      const w = Math.max(16, pad.width || 40);
+      const body = Bodies.rectangle(pad.x, pad.y - 6, w, 14, {
+        isStatic: true,
+        isSensor: true,
+        label: 'pad',
+        collisionFilter: { group: 0, category: CAT.SENSOR, mask: CAT.SLED },
+      });
+      body.bbPad = { x: pad.x, y: pad.y, width: w, boost: pad.boost || 500 };
+      this.world.add(body);
+      rec.pads.push(body);
+    }
+
+    this._drawChunk(gfx, chunk);
+    this.chunks.set(chunk.index, rec);
+  }
+
+  /**
+   * Repaint a live chunk with the current palette WITHOUT touching its colliders (issue #140). A palette or
+   * colour-blind toggle is presentation: removing and re-adding the static bodies would hand each segment a
+   * different pooled body (new ids, new world order) and drop Matter's cached contact pairs under the sled,
+   * which changes the physics of the next ticks. Returns false when the chunk is not live.
+   * @param {import('../data/schemas.js').TerrainChunk} chunk
+   * @returns {boolean}
+   */
+  redrawChunk(chunk) {
+    const rec = chunk && this.chunks.get(chunk.index);
+    if (!rec) return false;
+    rec.gfx.clear();
+    this._drawChunk(rec.gfx, chunk);
+    return true;
+  }
+
+  /** @param {import('../data/schemas.js').TerrainChunk} chunk @returns {(a:{x:number}, b:{x:number}) => boolean} */
+  _gapTest(chunk) {
+    const gaps = chunk.gaps || [];
+    return (a, b) => gaps.some((g) => g.x0 <= a.x + 0.5 && g.x1 >= b.x - 0.5);
+  }
+
+  /**
+   * Draw a chunk (fill, zone tints, contours, edge, markers, gaps, bounce-pad plates) into `gfx`. Graphics only.
+   * @param {Phaser.GameObjects.Graphics} gfx
+   * @param {import('../data/schemas.js').TerrainChunk} chunk
+   */
+  _drawChunk(gfx, chunk) {
+    const pts = chunk.points;
+    const pal = this.palette;
+    const gaps = chunk.gaps || [];
+    const zones = chunk.zones || [];
+    const isGap = this._gapTest(chunk);
+    const zoneAt = (x) => {
+      for (const z of zones) if (x >= z.x0 && x <= z.x1) return z.modId;
+      return null;
+    };
+    const segs = [];
+    for (let i = 0; i < pts.length - 1; i++) if (!isGap(pts[i], pts[i + 1])) segs.push(i);
     // dark body fill
     gfx.fillStyle(pal.bgAlt, 1);
     for (const i of segs) {
@@ -239,18 +287,9 @@ export class TerrainMesh {
       gfx.lineBetween(b.x + 8, b.y - 18, b.x, b.y - 10);
     }
 
-    // bounce pads: sensor + neon chevron plate
+    // bounce pads: neon chevron plate (the sensor body is built in addChunk)
     for (const pad of chunk.bouncePads || []) {
       const w = Math.max(16, pad.width || 40);
-      const body = Bodies.rectangle(pad.x, pad.y - 6, w, 14, {
-        isStatic: true,
-        isSensor: true,
-        label: 'pad',
-        collisionFilter: { group: 0, category: CAT.SENSOR, mask: CAT.SLED },
-      });
-      body.bbPad = { x: pad.x, y: pad.y, width: w, boost: pad.boost || 500 };
-      this.world.add(body);
-      rec.pads.push(body);
       const col = this._colour('wirelessBridge');
       gfx.fillStyle(col, 0.35);
       gfx.fillRect(pad.x - w / 2, pad.y - 5, w, 5);
@@ -262,8 +301,6 @@ export class TerrainMesh {
         gfx.strokePoints([{ x: cx - 4, y: pad.y - 8 }, { x: cx, y: pad.y - 13 }, { x: cx + 4, y: pad.y - 8 }], false, false);
       }
     }
-
-    this.chunks.set(chunk.index, rec);
   }
 
   _surfaceY(pts, x) {
