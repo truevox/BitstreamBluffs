@@ -131,3 +131,24 @@ if (cmd === 'report') {
     console.log(c.padEnd(14), `causal-identical ${r.identicalAcrossEngines}/${r.fixturesCompared}, outcome-equal ${r.outcomeEqual || 0}`.padEnd(40), cols.join(' ').padEnd(80), JSON.stringify(r.simMsPerTick));
   }
 }
+
+// ---------------------------------------------------------------- perf (run on an otherwise idle machine, one engine at a time)
+//   node experiment.mjs perf chromium 5 [cfg...]   -> alternates configs, REPS fresh-context runs each, prints median ms/tick of simTick and of the whole frame loop
+if (cmd === 'perf') {
+  const eng = process.argv[3] || 'chromium', reps = Number(process.argv[4] || 5), cfgs = process.argv.slice(5).length ? process.argv.slice(5) : ['native', 'all'];
+  const c = ENG[eng](); const browser = await c.type.launch(c.opts); const res = {};
+  const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  try {
+    for (const f of fixtures) for (let rep = 0; rep < reps; rep++) for (const cfg of cfgs) {
+      const { ctx, page } = await freshPage(browser, cfgOf(cfg));
+      const r = await page.evaluate((x) => window.__ce.play(x), { seed: f.seed, hz: HZ, tape: tapes[f.id], level: levelOf(f), raster: false });
+      await ctx.close();
+      const k = `${cfg}|${f.id}`; (res[k] = res[k] || { sim: [], loop: [], ticks: r.digests.length }); res[k].sim.push(r.simMs / r.digests.length); res[k].loop.push(r.loopMs / r.digests.length);
+    }
+  } finally { await browser.close(); }
+  const summary = {};
+  for (const [k, v] of Object.entries(res)) { const [cfg, fx] = k.split('|'); (summary[cfg] = summary[cfg] || {})[fx] = { ticks: v.ticks, simMsPerTickMedian: +med(v.sim).toFixed(4), loopMsPerTickMedian: +med(v.loop).toFixed(4), simMin: +Math.min(...v.sim).toFixed(4), simMax: +Math.max(...v.sim).toFixed(4) }; }
+  const outp = process.env.OUT || path.join(here, '..', '..', '..', 'docs', 'determinism', 'results', `portable-math-perf-${eng}.json`);
+  await mkdir(path.dirname(outp), { recursive: true }); await writeFile(outp, JSON.stringify({ engine: eng, reps, hz: HZ, note: 'ms per 120 Hz sim tick; simTick = RunScene.simTick wall time (incl. physics, excl. digest hook); loop = whole frame loop incl. renderFrame + digest hook', summary }, null, 1));
+  console.log(JSON.stringify(summary, null, 1));
+}

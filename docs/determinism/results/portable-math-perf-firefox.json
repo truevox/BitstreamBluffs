@@ -1,0 +1,54 @@
+{
+ "engine": "firefox",
+ "reps": 4,
+ "hz": 120,
+ "note": "ms per 120 Hz sim tick; simTick = RunScene.simTick wall time (incl. physics, excl. digest hook); loop = whole frame loop incl. renderFrame + digest hook",
+ "summary": {
+  "native": {
+   "cruise-baseline": {
+    "ticks": 2401,
+    "simMsPerTickMedian": 0.6918,
+    "loopMsPerTickMedian": 1.8047,
+    "simMin": 0.4523,
+    "simMax": 0.9771
+   },
+   "collision-heavy": {
+    "ticks": 1669,
+    "simMsPerTickMedian": 2.0084,
+    "loopMsPerTickMedian": 3.4266,
+    "simMin": 1.2283,
+    "simMax": 3.0473
+   },
+   "kodiaks-on": {
+    "ticks": 2637,
+    "simMsPerTickMedian": 1.1172,
+    "loopMsPerTickMedian": 3.449,
+    "simMin": 0.6743,
+    "simMax": 1.38
+   }
+  },
+  "all": {
+   "cruise-baseline": {
+    "ticks": 2401,
+    "simMsPerTickMedian": 0.6443,
+    "loopMsPerTickMedian": 1.4969,
+    "simMin": 0.429,
+    "simMax": 1.2936
+   },
+   "collision-heavy": {
+    "ticks": 1669,
+    "simMsPerTickMedian": 1.308,
+    "loopMsPerTickMedian": 2.6465,
+    "simMin": 0.6669,
+    "simMax": 1.6339
+   },
+   "kodiaks-on": {
+    "ticks": 2637,
+    "simMsPerTickMedian": 1.3531,
+    "loopMsPerTickMedian": 3.9215,
+    "simMin": 0.6519,
+    "simMax": 1.4471
+   }
+  }
+ }
+}
