@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.19.6 — developer stock hands-off panel (#220 / #77) (2026-11-22)
+
+- **Find reproducible 500 m hands-off candidates within a fixed local panel.** The tool checks 12 built-in courses in the pinned v2.18.1 Chromium preview. A candidate must reach the distance on a completed tick and then reproduce its natural finish, native checkpoints and cadence fingerprints in a fresh replay without saving. Short finishes and capped runs are reported separately. The tool does not verify newer builds or change gameplay, Daily selection, scores, or sharing.
+
 ## v2.19.5 — developer reaction-seed sensitivity comparison (#218 / #126) (2026-11-22)
 
 - **Compare matched synthetic hop-noise runs across reaction seeds.** The local CLI accepts two to eight complete classic panels with the same settings and per-course ideal control evidence. It reports pass counts and the courses that flip, with source file hashes and a caller-asserted build pin. It does not expose raw trials, select a Daily, estimate human fairness, or change game behavior.
