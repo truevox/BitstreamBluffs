@@ -9,7 +9,7 @@
  * Crediting is idempotent on `record.ledgerHash` (falling back to `record.id`): a run is banked at
  * most once, so a replayed RUN_END or a double-scene start cannot double-award.
  */
-import { defaultProfile, loadLevelTable, levelForXp, rewardsForLevel, xpForRun, PROFILE_VERSION } from './Progression.js';
+import { defaultProfile, loadLevelTable, levelForXp, rewardsForLevel, xpForRun, PROFILE_VERSION, BASE_BIOME_ID } from './Progression.js';
 import { ACHIEVEMENTS, metricsFrom, newlyUnlocked, stampNew } from './Achievements.js';
 import { isOfficialDaily } from './Ranking.js';
 import { COSMETIC_ITEMS } from './Cosmetics.js';
@@ -18,6 +18,8 @@ import { canonicalBiomeId, canonicalLegacyId } from '../data/biomeAliases.js';
 import { sanitizeUpgradeRanks, purchaseUpgrade } from './PermanentUpgrades.js';
 import { BSOD_GYM_PRICE, sanitizeGymSetup } from './BsodGym.js';
 import {DRAFT_RULES_VERSION,DRAFT_BUDGET,validDraftRanks,sanitizeDraftRanks,draftCost} from './DailyDraft.js';
+
+export { BASE_BIOME_ID };
 
 /** localStorage key for the player profile. Deliberately NOT STORAGE.settingsKey. */
 export const PROFILE_KEY = 'bb.profile';
@@ -165,7 +167,11 @@ export function sanitizeProfile(raw, levels) {
   for (const k of ['trail', 'glow', 'rider', 'theme', 'title']) {
     p.equipped[k] = typeof e[k] === 'string' && e[k] ? e[k] : 'default';
   }
-  p.biomeMask = nonNeg(raw.biomeMask);
+  // Issue #65: explicit OFF choices only. `raw.biomeMask` (the old opt-in mask) is deliberately never read,
+  // so an old save migrates to all-unlocked-ON with no PROFILE_VERSION bump. Only the biome table knows which
+  // bits are real, so stray bits are not stripped here; `enabledBiomeMask` and `toggleBiome` intersect with
+  // the unlocked bits, which makes a stale bit inert (and `toggleBiome` refuses locked biomes, so none arise).
+  p.biomeOff = nonNeg(raw.biomeOff) >>> 0;
   // W4 loadout. Anything that is not an explicit `true` is off: a hand-edited save, a string "true", or a
   // boost id that no longer ships must never silently start a run modded.
   const b = raw.boosts && typeof raw.boosts === 'object' ? raw.boosts : {};
@@ -248,7 +254,8 @@ export function unlockedBiomeIds(profile) {
   if (!profile || typeof profile !== 'object') return [];
   const pending = Array.isArray(profile.pendingBiomes) ? profile.pendingBiomes : [];
   const listed = (profile.unlocked && Array.isArray(profile.unlocked.biomes)) ? profile.unlocked.biomes : [];
-  return [...new Set([...pending, ...listed])];
+  // The base biome is always unlocked, even for a profile built without the level table.
+  return [...new Set([BASE_BIOME_ID, ...pending, ...listed])];
 }
 
 /**
@@ -273,12 +280,15 @@ export function earnedBiomeIds(profile, biomeDefs) {
 }
 
 /**
- * Toggle one unlocked biome signature on or off in a profile's mask (W3). Pure: returns a new profile,
- * never mutates the input, so a caller can decide whether to save.
+ * Toggle one unlocked biome signature on or off (W3). Pure: returns a new profile, never mutates the
+ * input, so a caller can decide whether to save.
+ *
+ * Unlocked biomes default ON (issue #65), so the toggle flips the biome's bit in `biomeOff`, the player's
+ * explicit OFF choices. An OFF bit is authoritative: it survives later level-ups and saves.
  *
  * Refuses a biome the player has not unlocked: a toggle that honoured a locked bit would let a profile
- * see terrain it never earned. An unknown id is likewise a no-op rather than an error, because this is
- * driven by UI ids and must never throw.
+ * see terrain it never earned. The base biome is refused too, it cannot be turned off. An unknown id is
+ * likewise a no-op rather than an error, because this is driven by UI ids and must never throw.
  *
  * @param {Object} profile
  * @param {string} biomeId
@@ -291,21 +301,24 @@ export function toggleBiome(profile, biomeId, biomeDefs) {
   const def = defs.find((d) => d && d.id === biomeId);
   if (!def || !Number.isFinite(def.bit)) return profile;
   const unlocked = unlockedBiomeIds(profile);
-  if (!unlocked.includes(biomeId)) return profile;
-  const mask = (profile.biomeMask >>> 0) || 0;
-  const next = (mask & def.bit) ? (mask & ~def.bit) >>> 0 : (mask | def.bit) >>> 0;
-  if (next === mask) return profile;
-  return { ...profile, biomeMask: next };
+  if (biomeId === BASE_BIOME_ID || !unlocked.includes(biomeId)) return profile;
+  const off = (profile.biomeOff >>> 0) || 0;
+  const next = (off & def.bit) ? (off & ~def.bit) >>> 0 : (off | def.bit) >>> 0;
+  if (next === off) return profile;
+  return { ...profile, biomeOff: next };
 }
 
 /**
- * The mask a normal run should start with: the profile's enabled bits, restricted to biomes the player
- * has actually unlocked. Pure.
+ * The mask a normal run should start with: every unlocked biome except the player's explicit OFFs
+ * (`biomeOff`), minus the base biome. Pure.
  *
- * The restriction is the point. A profile can carry a bit for a biome it has not reached (an older
- * save, a hand-edited blob, a level table that moved), and honouring it would hand a low-level player
- * terrain they never earned. `toggleBiome` refuses the same thing on the toggle path; this is the same
- * rule at the run-start path, so the two cannot drift.
+ * Unlocked is the whole point of the restriction. A hand-edited `biomeOff` (or the legacy `biomeMask`,
+ * which is ignored) can never enable a biome the player has not reached, because only unlocked bits are
+ * ever in the result. `toggleBiome` refuses the same thing on the toggle path; this is the same rule at the
+ * run-start path, so the two cannot drift. A biome unlocked later is ON unless its OFF bit was set.
+ *
+ * The base biome's bit is excluded: Debutmont is the terrain of every run, so its bit is a no-op, and
+ * leaving it out keeps masks canonical (a fresh profile starts at mask 0, as before).
  *
  * @param {Object} profile
  * @param {Array<{id:string,bit:number}>} biomeDefs
@@ -314,19 +327,19 @@ export function toggleBiome(profile, biomeId, biomeDefs) {
 export function enabledBiomeMask(profile, biomeDefs) {
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   if (!profile || typeof profile !== 'object') return 0;
-  const mask = (profile.biomeMask >>> 0) || 0;
-  if (!mask) return 0;
+  const off = (profile.biomeOff >>> 0) || 0;
   const unlocked = unlockedBiomeIds(profile);
   let allowed = 0;
   for (const def of defs) {
-    if (def && Number.isFinite(def.bit) && unlocked.includes(def.id)) allowed |= def.bit;
+    if (def && Number.isFinite(def.bit) && def.id !== BASE_BIOME_ID && unlocked.includes(def.id)) allowed |= def.bit;
   }
-  return (mask & allowed) >>> 0;
+  return (allowed & ~off) >>> 0;
 }
 
 /**
- * The biome toggle rows a Profile view should show: every biome in unlock order, with the player's
- * current state. Pure, so the view stays a renderer and this stays testable.
+ * The biome toggle rows a Profile view should show: every switchable biome in unlock order, with the
+ * player's current state. The base biome has no row, it cannot be turned off. Pure, so the view stays a
+ * renderer and this stays testable.
  * @param {Object} profile
  * @param {Array<{id:string,bit:number,name:string,unlockLevel:number}>} biomeDefs
  * @returns {Array<{id:string,name:string,bit:number,unlockLevel:number,unlocked:boolean,enabled:boolean,
@@ -335,7 +348,7 @@ export function enabledBiomeMask(profile, biomeDefs) {
 export function biomeToggleRows(profile, biomeDefs) {
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   const unlocked = unlockedBiomeIds(profile);
-  const mask = (profile && profile.biomeMask) >>> 0 || 0;
+  const off = (profile && profile.biomeOff) >>> 0 || 0;
   // Decision 3: encountered / completed are separate from unlocked. A Daily plays the date's mask whatever
   // the player has unlocked, so a LOCKED biome can be encountered too; `state` reports the strongest fact.
   const prog = sanitizeBiomeProgress(profile && profile.biomeProgress);
@@ -345,7 +358,7 @@ export function biomeToggleRows(profile, biomeDefs) {
     return unlocked.includes(id) ? 'unlocked' : 'locked';
   };
   return defs
-    .filter((d) => d && d.id && Number.isFinite(d.bit))
+    .filter((d) => d && d.id && d.id !== BASE_BIOME_ID && Number.isFinite(d.bit))
     .slice()
     .sort((a, b) => (a.unlockLevel || 0) - (b.unlockLevel || 0) || a.id.localeCompare(b.id))
     .map((d) => ({
@@ -354,7 +367,7 @@ export function biomeToggleRows(profile, biomeDefs) {
       bit: d.bit,
       unlockLevel: d.unlockLevel || 1,
       unlocked: unlocked.includes(d.id),
-      enabled: unlocked.includes(d.id) && (mask & d.bit) !== 0,
+      enabled: unlocked.includes(d.id) && (off & d.bit) === 0,
       encountered: prog.encountered.includes(d.id),
       completed: prog.completed.includes(d.id),
       state: stateOf(d.id),

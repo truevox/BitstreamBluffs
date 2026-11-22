@@ -2,7 +2,7 @@
   "id": "debutmont",
   "bit": 1,
   "name": "Debutmont",
-  "unlockLevel": 4,
+  "unlockLevel": 1,
   "lore": "The original slope, before the protocol got ambitious. Powder that remembers being analogue.",
   "background": "ridges",
   "mod": "powderFlurry",
