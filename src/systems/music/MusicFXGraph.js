@@ -33,6 +33,7 @@ function allocateEffect(ctx, raw) {
 	}
 	const owned = [];
 	const lfos = [];
+	const disposers = [];
 	const refs = {};
 	const node = (n) => { owned.push(n); return n; };
 	const input = node(ctx.createGain());
@@ -144,7 +145,7 @@ function allocateEffect(ctx, raw) {
 			input.connect(highpass); highpass.connect(grit);
 			const pitches = [379, 743, 1327]; // intentionally inharmonic, not Crystal chords
 			const delays = [.017, .043, .071];
-			const weights = [.41, .29, .24];
+			const weights = [1.14, .82, .64];
 			for (let i = 0; i < pitches.length; i++) {
 				const resonator = node(ctx.createBiquadFilter());
 				resonator.type = 'bandpass';
@@ -164,8 +165,60 @@ function allocateEffect(ctx, raw) {
 			let burstEnd = -Infinity;
 			// Stationary and airborne have genuinely zero metallic contact;
 			// a fast ground run makes the inharmonic layer audible but bounded.
-			const bed = () => contact * .50;
+			const bed = () => contact * .80;
 			wet.gain.value = bed();
+
+			// A collision must sound like a collision EVEN BETWEEN drum hits.
+			// The previous version merely amplified resonances already being
+			// excited by the recording, which could be effectively silent.
+			// One deterministic struck-metal sample is generated per graph,
+			// then reused as a small, bounded, physical Foley one-shot.
+			const strikeLength = Math.ceil(ctx.sampleRate * .42);
+			const strike = ctx.createBuffer(1, strikeLength, ctx.sampleRate);
+			const samples = strike.getChannelData(0);
+			let seed = 0x5A17C0DE;
+			for (let i = 0; i < strikeLength; i++) {
+				const t = i / ctx.sampleRate;
+				seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+				const noise = (seed / 2147483648 - 1) * Math.exp(-t * 52);
+				const metal = .42 * Math.sin(2 * Math.PI * 379 * t) * Math.exp(-t * 12)
+					+ .34 * Math.sin(2 * Math.PI * 743 * t) * Math.exp(-t * 18)
+					+ .21 * Math.sin(2 * Math.PI * 1327 * t) * Math.exp(-t * 25)
+					+ .12 * Math.sin(2 * Math.PI * 1919 * t) * Math.exp(-t * 30);
+				const thunk = .20 * Math.sin(2 * Math.PI * 119 * t) * Math.exp(-t * 38);
+				samples[i] = Math.tanh((noise * .50 + metal + thunk) * .85);
+			}
+			const activeStrikes = new Set();
+			const strikeOnce = (strength, at) => {
+				if (activeStrikes.size >= 4) {
+					const oldest = activeStrikes.values().next().value;
+					try { oldest.source.stop(); } catch {}
+					oldest.cleanup();
+				}
+				const source = ctx.createBufferSource();
+				const gain = ctx.createGain();
+				source.buffer = strike;
+				gain.gain.value = .25 + strength * .80;
+				source.connect(gain); gain.connect(output);
+				const entry = {
+					source,
+					cleanup() {
+						try { source.disconnect(); } catch {}
+						try { gain.disconnect(); } catch {}
+						activeStrikes.delete(entry);
+					},
+				};
+				activeStrikes.add(entry);
+				source.onended = () => entry.cleanup();
+				source.start(Math.max(at, ctx.currentTime));
+			};
+			disposers.push(() => {
+				for (const entry of activeStrikes) {
+					try { entry.source.stop(); } catch {}
+					entry.cleanup();
+				}
+			});
+
 			refs.contact = { set: (value, at) => {
 				contact = clamp(value, 0, 1, 0);
 				// Takeoff silences contact immediately and cancels impact tails.
@@ -182,11 +235,12 @@ function allocateEffect(ctx, raw) {
 			refs.impact = { set: (value, at) => {
 				const impulse = clamp(value, 0, 1, 0);
 				if (impulse <= 0) return false;
-				const peak = Math.min(1.15, bed() + .75 * impulse);
+				const peak = Math.min(1.65, bed() + .82 * impulse);
 				burstEnd = at + .13;
 				wet.gain.cancelScheduledValues(at);
 				wet.gain.setTargetAtTime(peak, at, .018);
 				wet.gain.setTargetAtTime(bed(), burstEnd, .22);
+				strikeOnce(impulse, at);
 				return true;
 			} };
 			break;
@@ -269,6 +323,7 @@ function allocateEffect(ctx, raw) {
 		},
 		setImpulse(buffer) { return refs.impulse?.set(buffer); },
 		dispose() {
+			for (const stop of disposers) { try { stop(); } catch {} }
 			for (const osc of lfos) { try { osc.stop(); } catch {} }
 			for (const n of owned) { try { n.disconnect(); } catch {} }
 		},

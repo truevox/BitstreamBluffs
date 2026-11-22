@@ -5,21 +5,28 @@ import { contactFromMotion } from '../../src/systems/music/MusicPhysicsSignals.j
 const $ = id => document.getElementById(id);
 const STEMS = ['drums','bass','guitar','piano','other'];
 let ctx = null, buffers = null, chain = null, master = null;
-let rawGain = null, processedGain = null, sources = [];
-let playing = false, airborne = false, bypassed = false;
+let rawGain = null, processedGain = null, sources = [], accompaniment = [];
+let playing = false, airborne = false, bypassed = false, drumOnly = false;
 const say = message => { $('status').textContent = message; };
 const effect = () => chain?.find('scrapheap');
 const speed = () => Number($('speed').value);
-const setContact = () => effect()?.set('contact',contactFromMotion(speed(),!airborne),ctx.currentTime);
+const setContact = () => {
+	const value = contactFromMotion(speed(),!airborne);
+	$('contact-value').textContent = Math.round(value*100)+'%';
+	if (ctx) effect()?.set('contact',value,ctx.currentTime);
+};
 const controlState = () => {
 	$('play').disabled = !buffers;
 	$('bypass').disabled = !buffers;
+	$('solo').disabled = !buffers;
 	$('takeoff').disabled = !buffers || airborne;
 	$('soft').disabled = !buffers || !airborne;
 	$('hard').disabled = !buffers || !airborne;
 	$('play').textContent = playing ? '■ Stop' : '▶ Play';
 	$('bypass').textContent = bypassed ? 'Hear processed' : 'Compare dry';
 	$('bypass').setAttribute('aria-pressed',String(bypassed));
+	$('solo').textContent = drumOnly ? 'Restore full mix' : 'Solo drums';
+	$('solo').setAttribute('aria-pressed',String(drumOnly));
 };
 async function readyAudio() {
 	if (!ctx) ctx = new AudioContext({latencyHint:'interactive'});
@@ -52,6 +59,7 @@ function stop() {
 		try { source.disconnect(); } catch {}
 	}
 	sources = [];
+	accompaniment = [];
 	chain?.dispose(); chain = null;
 	for (const node of [rawGain,processedGain,master]) {
 		try { node?.disconnect(); } catch {}
@@ -60,6 +68,8 @@ function stop() {
 	playing = false;
 	airborne = false;
 	bypassed = false;
+	drumOnly = false;
+	setContact();
 	controlState();
 }
 async function play() {
@@ -91,6 +101,7 @@ async function play() {
 			level.connect(chain.input);
 		} else {
 			level.connect(master);
+			accompaniment.push({gain:level.gain,full:level.gain.value});
 		}
 		source.start(when);
 		sources.push(source);
@@ -115,6 +126,14 @@ $('bypass').addEventListener('click', () => {
 	controlState();
 	say(bypassed ? 'Dry reference: the same original drum recording, no Scrapheap effect.' :
 		'Processed: back to the original drums plus physical metal response.');
+});
+$('solo').addEventListener('click', () => {
+	drumOnly = !drumOnly;
+	if (ctx) for (const {gain,full} of accompaniment)
+		gain.setTargetAtTime(drumOnly ? 0 : full,ctx.currentTime,.03);
+	controlState();
+	say(drumOnly ? 'Only the original drums + metal layer: move speed and compare dry.' :
+		'Full instrumental mix restored, without restarting the song.');
 });
 $('takeoff').addEventListener('click', () => {
 	if (!buffers || airborne) return;

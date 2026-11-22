@@ -25,6 +25,8 @@ try {
 	await page.waitForFunction(() => document.querySelector('#status').textContent.includes('loaded.'), {timeout:15000});
 	await page.click('#play');
 	assert.match(await page.$eval('#play', e=>e.textContent), /Stop/);
+	await page.click('#solo');
+	assert.equal(await page.$eval('#solo', e=>e.getAttribute('aria-pressed')),'true');
 	await page.click('#takeoff');
 	assert.equal(await page.$eval('#hard', e=>e.disabled),false);
 	await page.click('#hard');
@@ -32,6 +34,8 @@ try {
 	await page.click('#bypass');
 	assert.equal(await page.$eval('#bypass',e=>e.getAttribute('aria-pressed')),'true');
 	await page.click('#bypass');
+	await page.click('#solo');
+	assert.equal(await page.$eval('#solo', e=>e.getAttribute('aria-pressed')),'false');
 	await page.$eval('#speed', e=> { e.value='1120';e.dispatchEvent(new Event('input',{bubbles:true})); });
 	await page.click('#takeoff');
 	await page.click('#soft');

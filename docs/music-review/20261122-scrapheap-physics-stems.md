@@ -20,6 +20,15 @@ The absolute mix and true peak on long-form songs, phone listening, cross-biome 
 
 Focused unit tests check invalid input fallback, speed/contact policy, airborne suppression, landing timing, no effect graph replacement, non-Snowpack policy isolation, audio param bounding, and stable song clock. Browser smoke covers decoding and playing the actual five instrument stems and changing physical inputs without page errors. Vite builds the standalone audition as a separate entry, with no game-menu wiring.
 
-## Recorded browser DSP probe (one excerpt, not a release-wide loudness claim)
+## Audibility regression and correction (2026-11-22)
 
-A representative 4-second original drum excerpt was rendered in actual Chromium `OfflineAudioContext` with grounded contact at maximum, a strong landing pulse at 1.15 s, and takeoff at 2.4 s. Compared against the **same decoded original audio**, the unprocessed RMS was approximately 0.08878, processed RMS 0.08891, difference RMS 0.00432, sampled peak magnitude 0.606, and processed mono-downmix RMS 0.08799. No non-finite samples. This verifies nonzero, bounded DSP response and mono output on that one excerpt, **not** full-song true peak, subjective quality, or audio CPU compliance.
+Marvin reported that speed/jump/landing button changes were inaudible. That was supported by a measured **original drum-only difference RMS of only 0.00432 against original RMS 0.08878**, before the other instrument stems masked it. The earlier Chromium smoke exercised UI controls but never asserted audible effect strength. The original impact behavior also only modulated existing drum signal: a landing between hits could be silent. The first prototype was therefore not accepted.
+
+Changes: (1) strengthen the source-excited inharmonic rattle bed while keeping an untouched dry drum path; (2) synthesize a short **deterministic physical scrap-metal strike per authoritative landing event**, even between drum notes. This is physics Foley, NOT a melody, beat-synced MIDI replacement, or new original recording. One reusable deterministic buffer per processor (about 20,160 mono samples at 48kHz); a maximum of four overlapping strike voices, and cleanup on effect disposal; (3) add a **Solo drums** button to the audition so testers can isolate processing instead of listening through four other instruments.
+
+Real Chromium 4-second offline render using all five *original* recorded instrument previews, at maximum contact, a hard landing at 1.2s, and normal five-stem mixing gains:
+
+- Original full-mix RMS: 0.026979; full-mix maximum-contact *difference* RMS: **0.007096 (~26.3% of original full mix RMS)**.
+- Dry full-mix peak: 0.1731, processed full-mix with landing peak: 0.2557 (sampled peaks, not true-peak analysis).
+- During the 1.2–1.6s impact window, the metal strike with **no drum audio or any other stem connected** had RMS 0.03250 and sampled peak 0.2538.
+- No page errors or non-finite samples in tested excerpt. This demonstrates a real source-independent landing sound and a substantially larger signal change; it does **not** establish a human-audibility guarantee on every speaker, full-song true-peak compliance, or mobile CPU/headroom certification. Human listening still gates release.

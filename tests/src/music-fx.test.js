@@ -28,6 +28,12 @@ function fakeContext() {
 		const data = Array.from({length:channels},()=>new Float32Array(length));
 		return {length, getChannelData(ch) {return data[ch];}};
 	};
+	ctx._bufferSources = [];
+	ctx.createBufferSource = () => {
+		const src = new AudioNodeMock('BufferSource');
+		ctx._bufferSources.push(src);
+		return src;
+	};
 	ctx.createAnalyser = () => {
 		const n = new AudioNodeMock('Analyser');
 		n.frequencyBinCount = 512;
@@ -100,12 +106,19 @@ describe('Modular cheap Web Audio processors', () => {
 		source.connect(chain.input);
 		expect(scrap.set('contact',0.7,ctx.currentTime)).toBe(true);
 		expect(scrap.set('impact',0.9,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(1);
+		expect(ctx._bufferSources[0].started).toBe(true);
+		expect(ctx._bufferSources[0].buffer.length).toBeGreaterThan(10000);
 		expect(scrap.set('impact',-15,ctx.currentTime)).toBe(false);
+		expect(ctx._bufferSources).toHaveLength(1);
 		expect(scrap.set('impact',NaN,ctx.currentTime)).toBe(false);
 		expect(scrap.set('impact',9e9,ctx.currentTime)).toBe(true);
 		expect(scrap.set('contact',0,ctx.currentTime+.04)).toBe(true);
 		expect(scrap.set('contact',Infinity,ctx.currentTime+.08)).toBe(true);
+		for (let i = 0; i < 7; i++) scrap.set('impact',.7,ctx.currentTime+i*.02);
+		expect(ctx._bufferSources).toHaveLength(9);
 		chain.dispose();
+		expect(ctx._bufferSources.at(-1).stopped).toBe(true);
 	});
 	test('rejects unknown processors and duplicate stable ids', () => {
 		const ctx = fakeContext();
