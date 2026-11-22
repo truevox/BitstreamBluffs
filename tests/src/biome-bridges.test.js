@@ -302,8 +302,9 @@ describe('layout is deterministic', () => {
 });
 
 describe('replay identity', () => {
-  test('SIM_REVISION was bumped past the released ruleset when terrain for a given seed and mask changed', () => {
-    expect(SIM_REVISION).toBeGreaterThan(LAST_RELEASED_SIM_REVISION);
+  test('v2.19.14 releases the revised terrain as SIM_REVISION 6, freezing it for future causal changes', () => {
+    expect(SIM_REVISION).toBe(6);
+    expect(LAST_RELEASED_SIM_REVISION).toBe(SIM_REVISION);
   });
   test('GHOST_PHYSICS_VERSION stays 1: it only maps legacy tapes (Replay Contract v1 section 7.2)', () => {
     expect(GHOST_PHYSICS_VERSION).toBe(1);

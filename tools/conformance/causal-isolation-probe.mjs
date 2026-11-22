@@ -193,11 +193,15 @@ async function pageSetup({ fx, pt }) {
   if (fx.biomeEntry) {
     const ppm = run.terrain.ppm;
     let entry = null;
-    for (let sec = 3; sec < 60 && entry == null; sec++) {
-      // #65: the base biome (Debutmont) owns the opening, so an entry is the first sector start whose biome differs from the previous one's.
-      const x = (sec - 1) * 500 * ppm;
-      const here = run._biomeDefAt(x);
-      if (here && here.id !== run.terrain.biomeAtX(x - 1)) entry = x;
+    // #65: entries can begin *inside* a sector after an arcade bridge;
+    // checking only sector starts misses every bridge->biome transition.
+    // Probe in 10px steps, then keep the first actual non-null biome entry.
+    const first = 2 * 500 * ppm, last = 60 * 500 * ppm;
+    let previous = run.terrain.biomeAtX(first - 1);
+    for (let x = first; x < last && entry == null; x += 10) {
+      const here = run.terrain.biomeAtX(x);
+      if (here != null && here !== previous) entry = x;
+      previous = here;
     }
     if (entry == null) throw new Error('no biome entry found for ' + fx.seed);
     ctx.biomeEntryX = entry;

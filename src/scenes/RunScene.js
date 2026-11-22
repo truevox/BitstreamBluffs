@@ -47,6 +47,7 @@ import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { resolveReplaySetup } from '../systems/replay/manifest.js';
 import { scheduleRunEvidence, RULESET_KEY } from '../systems/replay/evidenceCapture.js';
+import { SIM_REVISION } from '../systems/replay/ruleset.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
 import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, kodiakKnockback, KODIAK_KNOCK, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
 import { KodiakRider } from '../entities/KodiakRider.js';
@@ -514,7 +515,12 @@ export class RunScene extends Phaser.Scene {
     if (!lib || this.bsodGym || replay) return;
     const st = this.settings || {};
     const show = { best: st.ghostBest !== false, latest: st.ghostLatest !== false, fav0: true, fav1: true, fav2: true };
-    lib.ghostsFor(this.seed, this.biomeMask, show).then((list) => {
+    // A missing/older simRevision is never a current-terrain display ghost.
+    // The source revision is available synchronously even if the validated
+    // runtime ruleset's asynchronous loader has not completed at run start.
+    const loadedRevision = this.registry.get(RULESET_KEY)?.doc?.simRevision;
+    const simRevision = loadedRevision === SIM_REVISION ? loadedRevision : SIM_REVISION;
+    lib.ghostsFor(this.seed, this.biomeMask, show, { simRevision }).then((list) => {
       if (token !== this._ghostToken || !this.sys?.isActive?.()) return;
       this.ghostRiders = list.map((g) => new GhostRider(this, g, this.palette));
     }).catch(() => { /* ghosts are cosmetic */ });
@@ -525,6 +531,11 @@ export class RunScene extends Phaser.Scene {
     const b = this.sled.body;
     return {
       seed: this.seed, biomeMask: this.biomeMask || 0,
+      // Use the registered, verified ruleset when present. A run can begin
+      // before the nonblocking ruleset-loader finishes; the same build's
+      // compile-time SIM_REVISION is the safe fallback, not legacy physicsVersion.
+      simRevision: this.registry.get(RULESET_KEY)?.doc?.simRevision === SIM_REVISION
+        ? this.registry.get(RULESET_KEY).doc.simRevision : SIM_REVISION,
       mode: this.bsodGym ? 'gym' : this.dailyMode === 'draft' ? 'daily-draft' : this.dailyOfficial ? 'daily' : 'normal',
       dailyRuleId: this.dailyRuleId || null,
       dailyRuleSource: DailyPatch.dateKeyFromSeed(this.seed) ? 'seed-date' : 'clock-at-start',

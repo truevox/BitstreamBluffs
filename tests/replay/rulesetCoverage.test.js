@@ -163,8 +163,8 @@ describe('tripwire attestation categories', () => {
   });
   test('behavior-change-unreleased: valid only while SIM_REVISION is above the last released revision', () => {
     const msg = 'behavior-change-unreleased: -0 tilt normalized (sign of zero only)';
-    expect(LAST_RELEASED_SIM_REVISION).toBe(5); // #47 revision 2, #140 revision 3, #119 canonical colliders revision 4, #121 portable math revision 5 are released
-    expect(SIM_REVISION).toBeGreaterThanOrEqual(LAST_RELEASED_SIM_REVISION); // 6 while #65 (Debutmont base biome) is unreleased
+    expect(LAST_RELEASED_SIM_REVISION).toBe(6); // #65 Debutmont home + arcade bridges release SIM_REVISION 6 in v2.19.14
+    expect(SIM_REVISION).toBe(LAST_RELEASED_SIM_REVISION); // revision 6 is now frozen; future causal changes must bump
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 0 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 2, prevSimRevision: 1, lastReleased: 1 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 1 })).toMatch(/only valid while/);

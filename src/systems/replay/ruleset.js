@@ -72,7 +72,7 @@ export const SIM_REVISION = 6;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-export const LAST_RELEASED_SIM_REVISION = 5;
+export const LAST_RELEASED_SIM_REVISION = 6;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;

@@ -118,6 +118,59 @@ describe('ghost library', () => {
     expect((await lib.ghostsFor('S1', 0)).map((g) => g.runId)).toEqual(['run-2']);
   });
 
+  test('other-revision or unstamped legacy ghosts are hidden only from current-terrain display', async () => {
+    const lib = new GhostLibrary();
+    const old = recordTape(120, () => pad(), { id: 'old', simRevision: 5, distanceM: 350 });
+    const current = recordTape(120, () => pad(), { id: 'current', simRevision: 6, distanceM: 75 });
+    const legacy = recordTape(120, () => pad(), { id: 'legacy', distanceM: 5 });
+    await lib.saveRun(old);
+    await lib.setFavorite('S1', 0, 0, old.runId);
+    await lib.saveRun(current);
+    await lib.saveRun(legacy);
+    await lib.setFavorite('S1', 0, 1, legacy.runId);
+    // Direct tape/replay APIs stay backward compatible: no blanket rejection
+    // of historical tape input, no mutated headers or deleted stored inputs.
+    expect(tapeCompatible(old)).toBe(true);
+    expect(tapeCompatible(legacy)).toBe(true);
+    expect((await lib.getTape(old.runId)).inputs).toEqual(old.inputs);
+    expect(new TapePlayer(old).padAt(1)).toEqual(new TapePlayer(current).padAt(1));
+    const display6 = await lib.ghostsFor('S1', 0, {}, { simRevision: 6 });
+    expect(display6.map(({runId}) => runId)).toEqual([current.runId]);
+    const display5 = await lib.ghostsFor('S1', 0, {}, { simRevision: 5 });
+    expect(display5.map(({runId}) => runId)).toEqual([old.runId]);
+    expect((await lib.ghostsFor('S1', 0, {}, { simRevision: 0 })).length).toBe(0);
+    // Existing tools that omit the fourth display-context argument retain
+    // their legacy compatibility behavior.
+    expect((await lib.ghostsFor('S1', 0)).map(({runId}) => runId)).toContain(legacy.runId);
+  });
+
+  test('a fresh shorter revision-6 run becomes Best over stale v5; legacy tape survives for replay', async () => {
+    const lib = new GhostLibrary();
+    const oldBest = recordTape(120, () => pad(), { id: 'oldbest', simRevision: 5, distanceM: 9000 });
+    const oldLatest = recordTape(120, () => pad(), { id: 'oldlatest', simRevision: 5, distanceM: 1 });
+    const fresh = recordTape(120, () => pad(), { id: 'new', simRevision: 6, distanceM: 15 });
+    await lib.saveRun(oldBest);
+    await lib.saveRun(oldLatest);
+    await lib.saveRun(fresh);
+    expect(lib.course('S1',0)).toMatchObject({best:fresh.runId,latest:fresh.runId,bestDistanceM:15});
+    expect((await lib.ghostsFor('S1',0,{}, {simRevision:6})).map(({runId}) => runId)).toEqual([fresh.runId]);
+    // Displaced legacy tapes are retained, even if no current course role
+    // refers to them. Player-initiated historical replay remains possible.
+    expect((await lib.getTape(oldBest.runId)).inputs).toEqual(oldBest.inputs);
+    expect((await lib.getTape(oldLatest.runId)).inputs).toEqual(oldLatest.inputs);
+    const betterCurrent = recordTape(120, () => pad(), { id: 'betternew', simRevision: 6, distanceM: 20 });
+    await lib.saveRun(betterCurrent);
+    expect(lib.course('S1',0).best).toBe(betterCurrent.runId);
+    expect(await lib.getTape(fresh.runId)).toBeNull(); // old same-revision GC still works
+  });
+
+  test('RunScene obtains the revision from RULESET_KEY, stamps new tape headers, and gates display', () => {
+    const run = fs.readFileSync('src/scenes/RunScene.js','utf8');
+    expect(run).toMatch(/simRevision:\s*this\.registry\.get\(RULESET_KEY\)/);
+    expect(run).toMatch(/lib\.ghostsFor\(this\.seed, this\.biomeMask, show, \{ simRevision \}\)/);
+    expect(run).toMatch(/loadedRevision === SIM_REVISION/);
+  });
+
   test('ghost tags: best leads, merged roles read BEST+LAST', () => {
     expect(ghostTag(['latest', 'best'])).toEqual({ text: 'BEST+LAST', color: 'amber' });
     expect(ghostTag(['fav1'])).toEqual({ text: 'FAV B', color: 'magenta' });
