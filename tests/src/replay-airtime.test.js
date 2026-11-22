@@ -15,7 +15,7 @@ function savedTape() {
   const body = { position: { x: 2, y: 3 }, angle: 0, velocity: { x: 2, y: 1 }, angularVelocity: 0 };
   const recorder = new GhostRecorder({
     seed, biomeMask: 16, mode: 'normal', startedAt, dailyRuleId: 'featherweight', controlLayout: 'tricksLeft',
-    boosts: [], upgradeRanks: null, magnetsDrop: false, kodiaksOn: false, kodiakPackMode: 'same', kodiakVersion: 2,
+    boosts: [], upgradeRanks: null, magnetsDrop: false, kodiaksOn: false, kodiakPackMode: 'same', kodiakVersion: 3,
     startPose: [2, 3, 0, 2, 1, 0], random: runRandomState(runRandomStreams(seed)),
   });
   const scene = { sled: { body }, score: { getTotal: () => 1 } };

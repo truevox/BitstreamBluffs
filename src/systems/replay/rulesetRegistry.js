@@ -189,7 +189,7 @@ export const RULESET_SOURCES = Object.freeze([
       KODIAK_PACK_MODES: inc('constants.kodiak.KODIAK_PACK_MODES'),
       KODIAK_DEFS: inc('constants.kodiak.KODIAK_DEFS', { omit: omitKeysFor('kodiakDefs') }),
       KODIAK_KINDS: exc('derived: Object.keys(KODIAK_DEFS)'),
-      KODIAK_BY_ID: exc('derived: KODIAK_DEFS re-keyed by id (crash-cause lookup for CrashReport)'),
+      KODIAK_KNOCK: inc('constants.kodiak.KODIAK_KNOCK'),
     },
   },
   {

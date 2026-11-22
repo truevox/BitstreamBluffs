@@ -8,8 +8,8 @@
 //
 // Root cause pinned here: `_biomeSector` (and `_lastBiome`) were never reset in create(). The first tick of a mask != 0
 // run compares the sled's sector with it: a fresh page (undefined) sees a "change" and runs refreshPalette(), which
-// removes and re-adds every collider (world order, ids and warm-start state change); a later run whose previous run
-// ended in the same sector sees no change and does not. Same tape, different physics by session position.
+// formerly rebuilt colliders (#140 changed this to visual-only); a later run whose previous run
+// ended in the same sector saw no change. After #140 it is a presentation/cue difference, not divergent physics.
 import { jest } from '@jest/globals';
 
 const { installPhaserStub, createRun, stepRun } = await import('./headlessRun.js');

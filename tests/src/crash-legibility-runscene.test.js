@@ -310,7 +310,7 @@ describe('palette switch recolours hazards exactly like a fresh spawn', () => {
     const biomeHz = { def: { biome: 'space-mountain', onHit: { effect: 'crash' }, colorKey: 'amber' }, color: -1 };
     const baseHz = { def: { colorKey: 'magenta' }, color: -1 };
     s.terrain = { getActiveChunks: () => [{ index: 7 }] };
-    s.mesh = { chunks: new Map([[7, true]]), setPalette() {}, addChunk() {} };
+    s.mesh = { chunks: new Map([[7, true]]), setPalette() {}, addChunk() {}, redrawChunk() {} }; // #140: refreshPalette repaints via redrawChunk
     s.hazards = new Map([[7, [biomeHz, baseHz]]]);
     s.powerups = new Map();
     s.refreshPalette();

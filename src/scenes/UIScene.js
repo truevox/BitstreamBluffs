@@ -1064,6 +1064,7 @@ export class UIScene extends Phaser.Scene {
       const who = p.mode === 'mixed' ? 'MIXED KODIAK PACK' : `${p.members?.[0] || ''} PACK`;
       this._popup(`!! ${who} ${side} !!`, 'danger');
     } else if (p.type === 'passed') this._popup(`${p.air ? 'BEAR HOP' : 'KODIAK PASSED'} +${p.points}`, 'lime');
+    else if (p.type === 'shove') this._popup(`BUMPED BY ${p.short}`, 'amber');
   }
 
   onHazard(p) {

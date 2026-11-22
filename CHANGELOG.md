@@ -1,10 +1,45 @@
 # Changelog
 
-## v2.18.3 — every run starts from identical sim state (#120) (2026-11-22)
+## v2.19.3 — every run starts from identical sim state (#120) (2026-11-22)
 
 <!-- friday-issue: 120 -->
-- **A run no longer depends on what ran before it in the same page session.** `RunScene` is one instance for the whole session and `create()` did not reset `_biomeSector`, `_lastBiome` (and the tutorial latches `_hopped`/`_pushed`). With a biome mask, tick 1 compares the sled's sector with `_biomeSector`: a fresh page saw a "change" and called `refreshPalette`, which (before #160) removed and re-added every collider; a later run whose previous run ended in the same sector did not. The same tape ran differently by session position (found by the #120 matrix: `chunk-biome-boundaries` as run #4 after a terrain crash survived 815 m instead of crashing at 835 m). `create()` now resets these fields so every run starts like run #1. Tests: `tests/replay/sessionIsolation.test.js`; diagnostic browser probe `tools/determinism/session-isolation-probe.mjs`.
+- **A run no longer depends on what ran before it in the same page session.** `RunScene` is one instance for the whole session and `create()` did not reset `_biomeSector`, `_lastBiome` (and the tutorial latches `_hopped`/`_pushed`). With a biome mask, tick 1 compares the sled's sector with `_biomeSector`: a fresh page saw a "change" and called `refreshPalette`, which previously (before #160) rebuilt colliders; a later run could skip its initial biome repaint and cue. The same tape ran differently by session position (found by the #120 matrix: `chunk-biome-boundaries` as run #4 after a terrain crash survived 815 m instead of crashing at 835 m). `create()` now resets these fields so every run starts like run #1. Tests: `tests/replay/sessionIsolation.test.js`; diagnostic browser probe `tools/determinism/session-isolation-probe.mjs`.
 - **Replay and the calendar date was already fixed on main** by the replay-manifest work (Replay Contract R-1: daily rule, Sync Level and Kodiak/magnet flags come from the tape header). No change here.
+
+- **Integration:** #140 (v2.19.1, SIM_REVISION 3) already removed biome repaint as a cause of physics divergence, so these create-time field resets now address previous-run **presentation/cue and state hygiene**, not a new physics fix. The released SIM_REVISION remains 3 and the source tripwire is attested as non-causal. Historical browser evidence is preserved as original; a fresh run on the current combined source is part of integration verification.
+
+## v2.19.2 — savestate feasibility study, Phase 1 research (#119 / #159) (2026-11-22)
+
+- **Research only: no savestates ship, and no gameplay, physics, replay format or `src/` change.** Adds `docs/determinism/savestate-feasibility.md`.
+  - It inventories the complete Matter and game state that a tick-boundary save/restore needs.
+  - It shows that restoring a GhostTape checkpoint diverges on the next tick.
+  - It shows that a full diagnostic snapshot, restored into a fresh scene and world in the built game, replays bit-identically. The fixtures are contact-heavy and hazard-heavy, and were compared over 500 and 520 ticks.
+  - It proposes a build-bound savestate contract with completeness checks, and gives a conditional GO for Phase 2.
+- **Experimental harnesses:**
+  - `tools/savestate-experiment/` (pure-Matter and Chromium experiments, with results).
+  - `tests/determinism/savestate-matter.test.js` (16 tests).
+  - Their digests are diagnostic and non-authoritative; Replay Contract #152 owns canonical fingerprints.
+
+- **Post-integration context:** #155 camera read was already fixed by v2.16.1 and #140 causal isolation merged in v2.19.1 (simulation revision 3, preserving Kodiak shove revision 2). Canonical collider construction and stable-key TelegraphTracker remain separate Phase 2 prerequisites. The old Chromium snapshot measurements are archived as research evidence, not retested on the new physics; no production savestate code ships.
+
+## v2.19.1 — simulation/presentation causal isolation (#160 / #140) (2026-11-22)
+
+- **Palette toggle mid-run no longer touches physics.** A colour-blind palette switch (Pause > Settings) repainted the terrain through `TerrainMesh.addChunk`, which removed and re-added every live collider: segments came back as other pooled bodies (new ids, new Matter world order), pad sensors were rebuilt and the contact pairs under the sled lost their warm-start impulses. In the built game a toggle at tick 300 forked the sled pose at tick 301. New `TerrainMesh.redrawChunk` repaints graphics only; `addChunk` builds the same bodies in the same order as before.
+- **A failing audio engine can no longer freeze the game.** `RunScene.renderFrame` read `audio.getWorldDanceSample()` unguarded; an exception escaped the frame and Phaser's RAF step never rescheduled, stopping the loop and the simulation. The read now goes through `WorldDance.readWorldDanceAudio`, which returns "no dance" on failure. Dance visuals with working audio are unchanged.
+- **Biome-sector entry no longer rebuilds terrain colliders; physics change for biome-mask runs (owner-approved, `SIM_REVISION` 3).** Entering or leaving a biome sector repainted the world through the same collider rebuild as the palette toggle, which reshuffled body ids/order and dropped the contact warm-start state (and bounce-pad cooldowns) under the sled at that tick. It was deterministic but a presentation path feeding physics; it now repaints with `TerrainMesh.redrawChunk`. Biome gameplay (zone mods, hazards, pickups) is chunk data read by the sim and is unchanged. Tick outcomes of runs that cross a biome boundary change, so `SIM_REVISION` is 3 (new archived ruleset for the combined Kodiak-shove and collider-isolation source); manifests from prior revisions 1 and 2 resolve to their archived rulesets and are refused as `historical-verifier-required` rather than diverging silently, and legacy ghost tapes get the contract's `inconclusive-legacy` outcome (`GHOST_PHYSICS_VERSION` stays 1 per Replay Contract v1 §7.2). Existing `hazard-transition` and `bump` canaries were checked on Team B’s earlier base; a new independent integration run is required with the newly released Kodiak shove rules; the other five canaries are mask 0 and never repaint mid-run, so no golden changes.
+- **Sim/presentation isolation tooling, diagnostic only.** `tools/conformance/causal-digest.mjs` (per-tick causal-state digest, non-authoritative; the contract's fingerprints are authoritative) and `tools/conformance/causal-isolation-probe.mjs` (built-game differential matrix: camera, Fx, render cadence, audio, viewport, HUD, settings). Manual, not a CI gate; `EXPECT_ISOLATION=1` fails on any causal or cue leak, page error, stall or short run. With #155 merged, the ground-telegraph camera read is gone and its detector is now a plain regression test.
+- **Verification.** Built-game differential matrix (5 fixtures, 91 cells, Chromium): for a fixed per-tick input tape, render cadence (30/60/120/144 Hz, jitter), camera zoom/scroll/shake, Fx, audio (muted, absent, no AudioContext, throwing), viewport/DPR/resize, HUD, pause and settings leave every authoritative subsystem bit-identical on every tick; positive controls are caught at the next tick. Details in `docs/determinism/causal-isolation.md`.
+
+- **Release lineage:** Team A shipped a different `SIM_REVISION` 2 as v2.19.0 (Kodiak shoves, ruleset `sha256:b5763476…`). This patch preserves that immutable archive and publishes the combined physics as **revision 3**, explicitly marking revision 3 as the last released revision. The unshipped v2.18.2 candidate ruleset is not represented as a second released revision 2.
+
+## v2.19.0 — race bears: playful Kodiak rivals (#47) (2026-11-22)
+
+- **Racing bears from Sync Level 6.** Three snow-racing rivals now come in packs of two or three on ordinary runs: a white polar **Kernel-Panic** that feints and then stops dead in your line, a brown grizzly **Brute-Force** that rears up and charges from behind, and a black **Black-Ice** that slides under your predicted landing. The first pack of a run is always two. They never appear on Dailies, Draft runs or the Gym.
+- **Same-type or mixed packs.** Settings has a new **KODIAK PACKS** switch: SAME TYPE (default) or MIXED. Both use the same schedule for a seed, so you can compare them on one course.
+- **Bears shove, they don't crash.** Contact pushes the sled back and up by a bounded amount, then the race goes on. Each bear shoves once per encounter, with a one-second pause between shoves. A shoved bear earns no pass bonus, and touching a bear never scores. A shoved sled can still lose the race through terrain, a chasm or the BSOD.
+- **Telegraphs and passes.** Each attack has a visible warning. Clearing a bear in the air scores as a bear hop; passing it on the ground scores as a clean pass.
+- **Replays and ghosts.** Kodiak runs are part of the replay, and they replay exactly at 30 and 120 Hz. Ghost tapes recorded before this release are not offered for Kodiak runs, since they predate the shove rule.
+- **Still being tuned.** Encounter spacing, pack sizes, telegraph timings and shove strength are playtest values, not final balance.
 
 ## v2.18.1 — developer Run DNA preview in local inspector (#213 / #87) (2026-11-22)
 
