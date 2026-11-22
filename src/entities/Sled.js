@@ -14,6 +14,7 @@ import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyser
 import { springReboundVelocity } from '../systems/BiomeEffects.js';
 import { aerodynamicStep, canopyFuelStep, vacuumDivebombStep } from '../systems/BsodAerodynamics.js';
 import { runRandomStreams } from '../systems/RunRandom.js';
+import pmath from '../systems/pmath.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -144,7 +145,7 @@ export class Sled {
 
   /** Speed magnitude in px/s. @returns {number} */
   get speed() {
-    return Math.hypot(this.vx, this.vy);
+    return pmath.hypot(this.vx, this.vy);
   }
 
   /** @returns {number} body angle in degrees, continuous (never wrapped). */
@@ -236,12 +237,12 @@ export class Sled {
     // ---- velocity-space forces (px/s) ----
     let vx = toPxS(Body.getVelocity(b).x);
     let vy = toPxS(Body.getVelocity(b).y);
-    let speed = Math.hypot(vx, vy);
+    let speed = pmath.hypot(vx, vy);
     const slopeRad = this.groundAngleDeg * DEG;
-    const tx = Math.cos(slopeRad);
-    const ty = Math.sin(slopeRad);
-    const nx = Math.sin(slopeRad);
-    const ny = -Math.cos(slopeRad);
+    const tx = pmath.cos(slopeRad);
+    const ty = pmath.sin(slopeRad);
+    const nx = pmath.sin(slopeRad);
+    const ny = -pmath.cos(slopeRad);
 
     // soft terminal velocity
     if (phys.quadDrag && speed > 1) {
@@ -251,18 +252,18 @@ export class Sled {
     }
     // runner resistance on the ground (lower inside High Bandwidth zones, much higher while braking)
     if (grounded && phys.groundResist) {
-      const f = Math.exp(-phys.groundResist * boostK * dt);
+      const f = pmath.exp(-phys.groundResist * boostK * dt);
       vx *= f;
       vy *= f;
     }
     // air brake (Up): -25 % horizontal speed over airBrakeSpanMs, reduced descent
     if (this.airBrakeActive) {
       const density = atmosphere ? atmosphere.atmosphereDensity : 1;
-      vx *= Math.exp((Math.log(1 - PHYSICS.airBrakeDecel) * stepMs * density) / TUNING.airBrakeSpanMs);
-      if (vy > 0) vy *= Math.exp(-TUNING.airBrakeDescentDamp * dt * density);
+      vx *= pmath.exp((pmath.log(1 - PHYSICS.airBrakeDecel) * stepMs * density) / TUNING.airBrakeSpanMs);
+      if (vy > 0) vy *= pmath.exp(-TUNING.airBrakeDescentDamp * dt * density);
     }
     // parachute stall: float
-    if (chute && vy > 0 && (!atmosphere || atmosphere.atmosphereDensity > 0)) vy *= Math.exp(-1.6 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1));
+    if (chute && vy > 0 && (!atmosphere || atmosphere.atmosphereDensity > 0)) vy *= pmath.exp(-1.6 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1));
     // Normal divebomb drops without killing horizontal momentum. In zero-atmo
     // Space Mountain the small board thruster instead trades flight height/time
     // for modest forward purchase; no false atmospheric wind is generated.
@@ -289,7 +290,7 @@ export class Sled {
     }
 
     // push (W): only when nearly stopped on flat / uphill ground
-    speed = Math.hypot(vx, vy);
+    speed = pmath.hypot(vx, vy);
     if (pad && pad.push && grounded && speed < PHYSICS.pushMaxSpeedPxS && this.groundAngleDeg >= PHYSICS.pushMinSlopeDeg
       && this.pushCooldownMs <= 0) {
       const kick = TUNING.pushKickPxS * (phys.pushForceMul || 1);
@@ -339,7 +340,7 @@ export class Sled {
     // ground snap / crest smoothing: kill the small upward drift off convex crests (see TUNING.snap*)
     if (this._sinceLaunchMs > TUNING.snapQuietMs && this._groundRunMs >= TUNING.snapMinGroundMs
       && this.msSinceContact < TUNING.snapWindowMs && this.dropAheadDeg < TUNING.snapMaxDropDeg
-      && Math.hypot(vx, vy) > TUNING.snapMinSpeedPxS && !chute && !this.airBrakeActive) {
+      && pmath.hypot(vx, vy) > TUNING.snapMinSpeedPxS && !chute && !this.airBrakeActive) {
       const vn2 = vx * nx + vy * ny;
       if (vn2 > TUNING.snapKeepVnPxS && vn2 < TUNING.snapMaxVnPxS) {
         const cut = vn2 - TUNING.snapKeepVnPxS;
@@ -400,8 +401,8 @@ export class Sled {
       // hands off: spin bleeds off and the nose eases toward the travel direction, so a pitch-over at a lip does not tumble the sled
       w = airIdleSpin(w, b.angle, vx, vy, dt, TUNING, { etaMs: this.airEtaMs, slopeDeg: this.airSlopeDeg });
     }
-    if (pad && pad.brake && !g) w *= Math.exp(-TUNING.airBrakeAngularDamp * dt);
-    if (chute) w *= Math.exp(-2.5 * dt);
+    if (pad && pad.brake && !g) w *= pmath.exp(-TUNING.airBrakeAngularDamp * dt);
+    if (chute) w *= pmath.exp(-2.5 * dt);
     const wMax = TUNING.maxAngularVelDegS * (phys.flipMul || 1) * DEG;
     w = clamp(w, -wMax, wMax);
     Body.setAngularVelocity(b, (w * BASE_STEP_MS) / 1000);
@@ -470,10 +471,10 @@ export class Sled {
     const v = Body.getVelocity(this.body);
     let vx = toPxS(v.x);
     let vy = toPxS(v.y);
-    const sp = Math.hypot(vx, vy);
+    const sp = pmath.hypot(vx, vy);
     let dx;
     let dy;
-    if (sp > 30) { dx = vx / sp; dy = vy / sp; } else { dx = Math.cos(this.groundAngleDeg * DEG); dy = Math.sin(this.groundAngleDeg * DEG); }
+    if (sp > 30) { dx = vx / sp; dy = vy / sp; } else { dx = pmath.cos(this.groundAngleDeg * DEG); dy = pmath.sin(this.groundAngleDeg * DEG); }
     vx += dx * pxS;
     vy += dy * pxS;
     Body.setVelocity(this.body, { x: fromPxS(vx), y: fromPxS(vy) });
@@ -505,8 +506,8 @@ export class Sled {
     Body.setAngle(b, angleDeg * DEG);
     Body.setAngularVelocity(b, 0);
     // place the origin at (x, y): COM = origin + R * off
-    const c = Math.cos(b.angle);
-    const s = Math.sin(b.angle);
+    const c = pmath.cos(b.angle);
+    const s = pmath.sin(b.angle);
     Body.setPosition(b, { x: x + c * this.off.x - s * this.off.y, y: y + s * this.off.x + c * this.off.y });
     Body.setVelocity(b, { x: fromPxS(vxPxS), y: fromPxS(vyPxS) });
     this.msSinceContact = 999;
@@ -576,7 +577,7 @@ export class Sled {
    */
   render(dtMs = 16.7) {
     if (this.destroyed || this.hidden || !this.gfx) return;
-    const k = 1 - Math.exp(-dtMs / 70);
+    const k = 1 - pmath.exp(-dtMs / 70);
     this.squash = Math.max(0, (this.squash || 0) - dtMs / 160);
     const pose = this.pose;
     const tiltN = this._lastTilt || 0;
@@ -586,7 +587,7 @@ export class Sled {
     pose.phi = lerp(pose.phi, targetPhi, k);
     pose.tuck = lerp(pose.tuck, tuck, k);
     pose.brake = lerp(pose.brake, airbrake, k);
-    pose.chute = lerp(pose.chute, this.parachuteMs > 0 ? 1 : 0, 1 - Math.exp(-dtMs / 90));
+    pose.chute = lerp(pose.chute, this.parachuteMs > 0 ? 1 : 0, 1 - pmath.exp(-dtMs / 90));
     this._draw();
   }
 
@@ -599,14 +600,14 @@ export class Sled {
    */
   stepHeli(dtMs) {
     if (!this.grounded && this.heliInput) {
-      this.heliVel = lerp(this.heliVel, this.heliInput * TUNING.heliSpinDegS, 1 - Math.exp(-dtMs / 60));
+      this.heliVel = lerp(this.heliVel, this.heliInput * TUNING.heliSpinDegS, 1 - pmath.exp(-dtMs / 60));
     } else {
-      this.heliVel = lerp(this.heliVel, 0, 1 - Math.exp(-dtMs / 60));
+      this.heliVel = lerp(this.heliVel, 0, 1 - pmath.exp(-dtMs / 60));
     }
     this.heliPhase += (this.heliVel * dtMs) / 1000;
     if (this.grounded && Math.abs(this.heliVel) < 120) {
       const target = Math.round(this.heliPhase / 360) * 360;
-      this.heliPhase = lerp(this.heliPhase, target, 1 - Math.exp(-dtMs / 50));
+      this.heliPhase = lerp(this.heliPhase, target, 1 - pmath.exp(-dtMs / 50));
     }
     if (Math.abs(this.heliPhase) > 36000) this.heliPhase %= 360; // TrickTracker ignores the resulting jump (> 720 deg)
   }
@@ -630,11 +631,11 @@ export class Sled {
     this._sync();
 
     const ang = b.angle;
-    const c = Math.cos(ang);
-    const s = Math.sin(ang);
+    const c = pmath.cos(ang);
+    const s = pmath.sin(ang);
     const ox = b.position.x - (c * this.off.x - s * this.off.y);
     const oy = b.position.y - (s * this.off.x + c * this.off.y);
-    let sx = Math.cos(this.heliPhase * DEG);
+    let sx = pmath.cos(this.heliPhase * DEG);
     // keep a hair of width so the edge-on silhouette stays visible
     if (Math.abs(sx) < 0.12) sx = sx < 0 ? -0.12 : 0.12;
     const edgeOn = 1 - Math.abs(sx);
@@ -717,7 +718,7 @@ export class Sled {
     // shield (Hashed Backup)
     if (this.shield) {
       const p0 = P(0, -6);
-      const pulse = 0.55 + 0.25 * Math.sin(this._time / 90);
+      const pulse = 0.55 + 0.25 * pmath.sin(this._time / 90);
       g.lineStyle(1.5, pal.amber, pulse);
       g.strokeCircle(p0.x, p0.y, 30);
       g.fillStyle(pal.amber, 0.08);
@@ -731,10 +732,10 @@ export class Sled {
     const pose = this.pose;
     const phi = pose.phi * DEG;
     const hip = [-6, 0];
-    const sh = [hip[0] + Math.sin(phi) * 13, hip[1] - Math.cos(phi) * 13];
-    const head = [sh[0] + Math.sin(phi) * 6.5, sh[1] - Math.cos(phi) * 6.5];
-    const nxp = Math.cos(phi);
-    const nyp = Math.sin(phi);
+    const sh = [hip[0] + pmath.sin(phi) * 13, hip[1] - pmath.cos(phi) * 13];
+    const head = [sh[0] + pmath.sin(phi) * 6.5, sh[1] - pmath.cos(phi) * 6.5];
+    const nxp = pmath.cos(phi);
+    const nyp = pmath.sin(phi);
     const torso = [
       [hip[0] - nxp * 4.2, hip[1] - nyp * 4.2],
       [sh[0] - nxp * 3.6, sh[1] - nyp * 3.6],
@@ -756,7 +757,7 @@ export class Sled {
     const hp = P(head[0], head[1]);
     // Wind pom-pom must share the EXACT helmet pose transform: COM coordinates
     // and a fixed world-space Y offset drift away during flips and helicopter spins.
-    this.windPomAnchor = P(head[0] + Math.sin(phi) * 5.5, head[1] - Math.cos(phi) * 5.5);
+    this.windPomAnchor = P(head[0] + pmath.sin(phi) * 5.5, head[1] - pmath.cos(phi) * 5.5);
     g.fillStyle(pal.bg, 1);
     g.fillCircle(hp.x, hp.y, 5.8);
     g.fillStyle(pal.amber, 0.9 * aMul);
@@ -812,14 +813,14 @@ export class Sled {
       const ring = [];
       for (let k = 0; k < 10; k++) {
         const a = (k / 10) * Math.PI * 2;
-        ring.push(P(tip[0] + Math.cos(a) * 8, tip[1] - 1.2 + Math.sin(a) * 1.6));
+        ring.push(P(tip[0] + pmath.cos(a) * 8, tip[1] - 1.2 + pmath.sin(a) * 1.6));
       }
       g.fillStyle(pal.text, 0.14 * aMul);
       g.fillPoints(ring, true);
       g.lineStyle(1, pal.cyan, 0.65 * aMul);
       g.strokePoints(ring, true, true);
       const spin = t / 22 + i * 1.7;
-      const bx = Math.cos(spin) * 8;
+      const bx = pmath.cos(spin) * 8;
       const blade = [P(tip[0] - bx, tip[1] - 1.2), P(tip[0] + bx, tip[1] - 1.2)];
       g.lineStyle(1.2, pal.text, 0.8 * aMul);
       g.lineBetween(blade[0].x, blade[0].y, blade[1].x, blade[1].y);
@@ -844,12 +845,12 @@ export class Sled {
     const w = 30 * t;
     const h = 20 * t;
     const cx = ox;
-    const cy = oy - 40 - 12 * t + Math.sin(this._time / 120) * 1.5;
+    const cy = oy - 40 - 12 * t + pmath.sin(this._time / 120) * 1.5;
     const n = 8;
     const pts = [];
     for (let i = 0; i <= n; i++) {
       const a = Math.PI + (Math.PI * i) / n;
-      pts.push({ x: cx + Math.cos(a) * w, y: cy + Math.sin(a) * h });
+      pts.push({ x: cx + pmath.cos(a) * w, y: cy + pmath.sin(a) * h });
     }
     // alternating stripes
     for (let i = 0; i < n; i++) {

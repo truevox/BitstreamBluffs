@@ -68,10 +68,10 @@ export class PowerUp {
     const pal = this.palette;
     const r = this.radius;
     g.clear();
-    const bob = Math.sin(t / 260 + this.spawn.x * 0.01) * 2.5;
+    const bob = Math.sin(t / 260 + this.spawn.x * 0.01) * 2.5; // pmath-exempt: draw-only
     g.y = this.spawn.y + bob;
     // glow
-    const pulse = 0.5 + 0.5 * Math.sin(t / 200);
+    const pulse = 0.5 + 0.5 * Math.sin(t / 200); // pmath-exempt: draw-only
     g.fillStyle(col, 0.1 + 0.08 * pulse);
     g.fillCircle(0, 0, r + 6);
     g.fillStyle(pal.bg, 0.85);
@@ -99,14 +99,14 @@ export class PowerUp {
         g.strokePath();
         const o = t / 350;
         g.fillStyle(pal.lime != null ? pal.lime : col, 1);
-        g.fillCircle(Math.cos(o) * 5.5, Math.sin(o) * 5.5, 1.3);
+        g.fillCircle(Math.cos(o) * 5.5, Math.sin(o) * 5.5, 1.3); // pmath-exempt: draw-only
         break;
       }
       case 'clock': {
         g.lineStyle(1.5, pal.text, 1);
         g.lineBetween(0, 0, 0, -r * 0.55);
         const a = t / 300;
-        g.lineBetween(0, 0, Math.sin(a) * r * 0.45, -Math.cos(a) * r * 0.45);
+        g.lineBetween(0, 0, Math.sin(a) * r * 0.45, -Math.cos(a) * r * 0.45); // pmath-exempt: draw-only
         g.fillStyle(col, 1);
         g.fillCircle(0, 0, 1.4);
         break;
@@ -149,7 +149,7 @@ export class PowerUp {
       }
       case 'bubble': {
         // B1 Aqua-Lung Bubble: a breathing bubble with a glint and a small one rising
-        const breathe = 1 + 0.12 * Math.sin(t / 250);
+        const breathe = 1 + 0.12 * Math.sin(t / 250); // pmath-exempt: draw-only
         g.lineStyle(1.5, pal.text, 1);
         g.strokeCircle(-0.5, 1, 4.5 * breathe);
         g.fillStyle(pal.text, 0.9);
@@ -184,7 +184,7 @@ export class PowerUp {
         // B2 Heat Shield: a round shield with a flickering flame
         g.lineStyle(1.5, pal.text, 1);
         g.strokeCircle(0, 0, 5);
-        const fl = 1 + 0.15 * Math.sin(t / 90);
+        const fl = 1 + 0.15 * Math.sin(t / 90); // pmath-exempt: draw-only
         g.fillStyle(col, 1);
         g.fillTriangle(0, -4 * fl, -2.6, 3, 2.6, 3);
         g.fillStyle(pal.text, 0.9);
@@ -207,10 +207,10 @@ export class PowerUp {
         // B3 Royal Jelly Wax: a honeycomb cell with a glossy drop of jelly
         g.lineStyle(1.5, pal.text, 1);
         const hx = [];
-        for (let k = 0; k < 6; k++) hx.push({ x: Math.cos((k * Math.PI) / 3) * 5.5, y: Math.sin((k * Math.PI) / 3) * 5.5 });
+        for (let k = 0; k < 6; k++) hx.push({ x: Math.cos((k * Math.PI) / 3) * 5.5, y: Math.sin((k * Math.PI) / 3) * 5.5 }); // pmath-exempt: draw-only
         g.strokePoints(hx, true, true);
         g.fillStyle(col, 1);
-        g.fillCircle(0, 0.8 + Math.sin(t / 300) * 0.6, 2.6);
+        g.fillCircle(0, 0.8 + Math.sin(t / 300) * 0.6, 2.6); // pmath-exempt: draw-only
         g.fillStyle(pal.text, 0.9);
         g.fillCircle(-0.8, 0, 0.8);
         break;
@@ -228,9 +228,9 @@ export class PowerUp {
       }
       case 'gravStabilizer': {
         // B4 Gravity Stabilizer: a gyroscope, a level bar held flat inside a ring that tilts back and forth
-        const tilt = Math.sin(t / 260) * 0.5;
+        const tilt = Math.sin(t / 260) * 0.5; // pmath-exempt: draw-only
         g.lineStyle(1.5, pal.text, 1);
-        g.strokeEllipse(0, 0, 12, 12 * (0.55 + 0.35 * Math.abs(Math.cos(tilt))));
+        g.strokeEllipse(0, 0, 12, 12 * (0.55 + 0.35 * Math.abs(Math.cos(tilt)))); // pmath-exempt: draw-only
         g.lineStyle(2, col, 1);
         g.lineBetween(-5.5, 0, 5.5, 0);
         g.fillStyle(col, 1);
@@ -244,7 +244,7 @@ export class PowerUp {
         g.lineBetween(-6, 4.5, 6, 4.5);
         g.lineStyle(1, col, 1);
         for (let k = -4; k <= 4; k += 4) g.lineBetween(k, 0.5, k, 5.5);
-        const sq = 1 + 0.4 * Math.abs(Math.sin(t / 220));
+        const sq = 1 + 0.4 * Math.abs(Math.sin(t / 220)); // pmath-exempt: draw-only
         g.lineStyle(1.3, col, 1);
         g.strokePoints([{ x: -4, y: -1 }, { x: -2, y: -1 - 2 * sq }, { x: 0, y: -1 }, { x: 2, y: -1 - 2 * sq }, { x: 4, y: -1 }], false, false);
         break;

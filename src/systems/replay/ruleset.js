@@ -40,6 +40,8 @@ import * as bsodAerodynamicsNs from '../BsodAerodynamics.js';
 import * as rngNs from '../Rng.js';
 import * as scoreManagerNs from '../ScoreManager.js';
 import * as terrainContactNs from '../TerrainContact.js';
+import * as pmathNs from '../pmath.js';
+import * as matterPortableNs from '../MatterPortable.js';
 
 /**
  * Hand-bumped simulation revision, integer >= 1, part of the ruleset document (and so of the id). Bump it, in the
@@ -54,7 +56,13 @@ import * as terrainContactNs from '../TerrainContact.js';
 //    points; the recycled body pool (whose vertex bits depended on the body's previous position) is removed, so tick
 //    outcomes change wherever a recycled collider was touched. #121 (portable math) also claims 4: whichever merges
 //    second takes the next revision.
-export const SIM_REVISION = 4;
+// 5: #121, release v2.19.12 (this identity's revision was first cut as v2.19.8 before the v2.19.11 stable-id merge): every
+//    authoritative transcendental (sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log1p,
+//    log2, log10, pow, hypot, tanh, sinh, cosh, cbrt) comes from the pinned @stdlib-backed src/systems/pmath.js instead of the
+//    native Math, and Phaser's bundled Matter has its nine trig/pow/acos functions replaced (src/systems/MatterPortable.js), so
+//    Chromium, Firefox and WebKit produce identical authoritative state. Last-bit differences from the native-Math revision 3
+//    (about 1% of sin/cos results differ from V8) change tick-level outcomes of every older tape.
+export const SIM_REVISION = 5;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above
@@ -62,7 +70,7 @@ export const SIM_REVISION = 4;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-export const LAST_RELEASED_SIM_REVISION = 4;
+export const LAST_RELEASED_SIM_REVISION = 5;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;
@@ -95,6 +103,8 @@ export const DEFAULT_SOURCES = Object.freeze({
   rng: rngNs,
   scoreManager: scoreManagerNs,
   terrainContact: terrainContactNs,
+  pmath: pmathNs,
+  matterPortable: matterPortableNs,
 });
 
 const KEY_OK = /^[A-Za-z0-9_.:$-]{1,64}$/;

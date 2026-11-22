@@ -280,6 +280,22 @@ export const RULESET_SOURCES = Object.freeze([
   { id: 'rng', file: 'src/systems/Rng.js', exports: {} },
   { id: 'scoreManager', file: 'src/systems/ScoreManager.js', exports: {} },
   { id: 'terrainContact', file: 'src/systems/TerrainContact.js', exports: {} },
+  // #121 portable math: causal CODE with no data (like terrainContact). pmath is a facade over the pinned @stdlib packages (their identity is the tripwire file
+  // src/systems/pmath-stdlib-lock.json, derived from the lockfile); MatterPortable replaces nine Matter functions. Their exports are functions or identifiers.
+  {
+    id: 'pmath',
+    file: 'src/systems/pmath.js',
+    exports: {},
+    excludePatterns: [{ pattern: /^(pmath|default)$/, reason: 'the table of math functions itself (code); the library identity is pinned by the lockfile closure in src/systems/pmath-stdlib-lock.json (tripwire file)' }],
+  },
+  {
+    id: 'matterPortable',
+    file: 'src/systems/MatterPortable.js',
+    exports: {},
+    excludePatterns: [
+      { pattern: /^(EXPECTED_PHASER_VERSION|PATCHED_FUNCTIONS|PORTABLE_FLAG)$/, reason: 'identifiers of the patch itself (Phaser pin asserted by tests, patched function names, install flag): not tunable data' },
+    ],
+  },
   {
     id: 'dailyPatch',
     file: 'src/systems/DailyPatch.js',

@@ -79,14 +79,14 @@ export class ShardField {
   update(timeMs, left, right) {
     const g = this.gfx;
     g.clear();
-    const pulse = 0.75 + 0.25 * Math.sin(timeMs / 140);
+    const pulse = 0.75 + 0.25 * Math.sin(timeMs / 140); // pmath-exempt: draw-only
     const col = this.palette.lime != null ? this.palette.lime : 0xffffff;
     const hi = this.palette.text != null ? this.palette.text : 0xffffff;
     for (const list of this.byChunk.values()) {
       for (const s of list) {
         if (s.x < left - 20 || s.x > right + 20) continue;
         // A pulled shard stops bobbing (its x changes every tick) and is drawn where the pull put it.
-        const bob = s.pulled ? 0 : Math.sin(timeMs / 260 + s.x * 0.05) * 2;
+        const bob = s.pulled ? 0 : Math.sin(timeMs / 260 + s.x * 0.05) * 2; // pmath-exempt: draw-only
         const y = s.y + bob;
         const pts = [{ x: s.x, y: y - 7 }, { x: s.x + 5, y }, { x: s.x, y: y + 7 }, { x: s.x - 5, y }];
         g.fillStyle(col, 0.18 * pulse);

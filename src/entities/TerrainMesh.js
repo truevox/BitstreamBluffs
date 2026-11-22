@@ -12,6 +12,7 @@
  */
 import Phaser from 'phaser';
 import { CAT } from './Sled.js';
+import pmath from '../systems/pmath.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Vertices } = Matter;
@@ -268,7 +269,7 @@ export class TerrainMesh {
       const b = pts.find((p) => Math.abs(p.x - gp.x1) < 0.6);
       if (!a || !b) continue;
       const col = this._colour('wirelessBridge');
-      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const len = pmath.hypot(b.x - a.x, b.y - a.y);
       const n = Math.max(2, Math.floor(len / 10));
       gfx.lineStyle(1.5, col, 0.55);
       for (let k = 0; k < n; k += 2) {

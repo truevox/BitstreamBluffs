@@ -1,0 +1,54 @@
+{
+ "engine": "chromium",
+ "reps": 5,
+ "hz": 120,
+ "note": "ms per 120 Hz sim tick; simTick = RunScene.simTick wall time (incl. physics, excl. digest hook); loop = whole frame loop incl. renderFrame + digest hook",
+ "summary": {
+  "native@main": {
+   "cruise-baseline": {
+    "ticks": 2401,
+    "simMsPerTickMedian": 0.2369,
+    "loopMsPerTickMedian": 0.5839,
+    "simMin": 0.2257,
+    "simMax": 0.2549
+   },
+   "airborne-tricks": {
+    "ticks": 2224,
+    "simMsPerTickMedian": 0.2338,
+    "loopMsPerTickMedian": 0.5626,
+    "simMin": 0.1868,
+    "simMax": 0.2576
+   },
+   "broad-allbiomes": {
+    "ticks": 7123,
+    "simMsPerTickMedian": 0.164,
+    "loopMsPerTickMedian": 0.3949,
+    "simMin": 0.1457,
+    "simMax": 0.17
+   }
+  },
+  "native": {
+   "cruise-baseline": {
+    "ticks": 2401,
+    "simMsPerTickMedian": 0.2184,
+    "loopMsPerTickMedian": 0.5428,
+    "simMin": 0.1715,
+    "simMax": 0.2491
+   },
+   "airborne-tricks": {
+    "ticks": 2224,
+    "simMsPerTickMedian": 0.2401,
+    "loopMsPerTickMedian": 0.617,
+    "simMin": 0.1986,
+    "simMax": 0.2598
+   },
+   "broad-allbiomes": {
+    "ticks": 7123,
+    "simMsPerTickMedian": 0.1571,
+    "loopMsPerTickMedian": 0.3784,
+    "simMin": 0.1478,
+    "simMax": 0.1838
+   }
+  }
+ }
+}

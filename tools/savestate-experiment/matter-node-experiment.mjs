@@ -34,6 +34,9 @@ export async function loadDeps() {
   const { installTerrainContactFix } = await import(pathToFileURL(path.join(root, 'src/systems/TerrainContact.js')).href);
   const { createMatterSnapshotKit } = await import(pathToFileURL(path.join(here, 'matter-snapshot-kit.js')).href);
   installTerrainContactFix(Matter);
+  // #121: deliberately NOT installing installPortableMatter here. This study measures what a Matter snapshot must restore, with the committed results and
+  // tests/replay savestate tests pinning exact state-dependent outcomes (e.g. positionImpulse 'K+1 at K=300, exact at K=450'); the portable-math patch
+  // moves last bits and shifts those thresholds. It uses native Math and is not part of the authoritative simulation.
   return { Matter, kit: createMatterSnapshotKit(Matter) };
 }
 

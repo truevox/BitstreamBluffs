@@ -12,6 +12,7 @@
 import { PHYSICS } from '../constants.js';
 import { classifyLanding } from './TrickTracker.js';
 import { TUNING } from './PhysicsTuner.js';
+import pmath from './pmath.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -30,7 +31,7 @@ export function gustImpulse(impulsePxS) {
   if (!Array.isArray(impulsePxS)) return { dvx: 0, dvy: 0 };
   const x = Number.isFinite(impulsePxS[0]) ? impulsePxS[0] : 0;
   const y = Number.isFinite(impulsePxS[1]) ? impulsePxS[1] : 0;
-  const m = Math.hypot(x, y);
+  const m = pmath.hypot(x, y);
   const k = m > GUST_MAX_PX_S ? GUST_MAX_PX_S / m : 1;
   return { dvx: x * k, dvy: y * k };
 }
@@ -183,8 +184,8 @@ export function springReboundVelocity(vx, vy, groundAngleDeg, upPxS) {
   const want = Number.isFinite(upPxS) && upPxS > 0 ? upPxS : 0;
   if (want === 0) return { vx: x, vy: y };
   const a = ((Number.isFinite(groundAngleDeg) ? groundAngleDeg : 0) * Math.PI) / 180;
-  const cos = Math.cos(a);
-  const sin = Math.sin(a);
+  const cos = pmath.cos(a);
+  const sin = pmath.sin(a);
   const along = x * cos + y * sin;
   const outward = x * sin - y * cos;
   const n = Math.max(outward, want);
