@@ -26,12 +26,14 @@ const completeOf = (v) =>
         ? round(v)
         : v;
 
-describe('isolation: biome-tagged defs change NOTHING at mask 0', () => {
-  test('300 chunks x 3 seeds: the full-chunk projection is identical with and without the biome defs', () => {
+// #65: Debutmont is the base biome, so at mask 0 its own biome-tagged defs are live. Defs tagged to any OTHER biome still
+// change nothing there, which is what the fixtures (tagged garbage-dump-glacier / space-mountain) prove.
+describe('isolation: biome-tagged defs of other biomes change NOTHING at mask 0', () => {
+  test('300 chunks x 3 seeds: the full-chunk projection is identical with and without the other biomes\' defs', () => {
     const fx = withBiomeFixtures(content);
     for (const seed of ['iso-alpha', 'iso-beta', '2026-11-14']) {
       const withDefs = makeGen(seed, { biomeMask: 0, ...fx });
-      const without = makeGen(seed, { biomeMask: 0 });
+      const without = makeGen(seed, { biomeMask: 0, hazardDefs: baseOnly(content.hazards), powerupDefs: baseOnly(content.powerups) });
       for (let i = 0; i < 300; i++) {
         expect(completeOf(withDefs.getChunk(i))).toEqual(completeOf(without.getChunk(i)));
       }
