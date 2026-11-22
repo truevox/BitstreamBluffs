@@ -56,7 +56,8 @@ import * as matterPortableNs from '../MatterPortable.js';
 //    points; the recycled body pool (whose vertex bits depended on the body's previous position) is removed, so tick
 //    outcomes change wherever a recycled collider was touched. #121 (portable math) also claims 4: whichever merges
 //    second takes the next revision.
-// 5: #121, release v2.19.8: every authoritative transcendental (sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log1p,
+// 5: #121, release v2.19.12 (this identity's revision was first cut as v2.19.8 before the v2.19.11 stable-id merge): every
+//    authoritative transcendental (sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log1p,
 //    log2, log10, pow, hypot, tanh, sinh, cosh, cbrt) comes from the pinned @stdlib-backed src/systems/pmath.js instead of the
 //    native Math, and Phaser's bundled Matter has its nine trig/pow/acos functions replaced (src/systems/MatterPortable.js), so
 //    Chromium, Firefox and WebKit produce identical authoritative state. Last-bit differences from the native-Math revision 3
