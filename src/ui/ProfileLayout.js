@@ -9,7 +9,7 @@
  * renderer can draw with `anchor: 'left'` at (x, y) and a test can intersect the boxes directly.
  */
 import { measureText } from './PixelFont.js';
-import { loadLevelTable, levelForXp } from '../systems/Progression.js';
+import { loadLevelTable, levelForXp, BASE_BIOME_ID } from '../systems/Progression.js';
 import { fmtInt, fmtSec, fmtClock, idToLabel } from './Format.js';
 import { equippedTitle } from '../systems/Cosmetics.js';
 import { sanitizeBiomeProgress, BIOME_IDS } from '../systems/BiomeDiscovery.js';
@@ -180,10 +180,14 @@ export function profileLayout(o = {}) {
   // many are still pending W6, which stays honest as W6 adds the rest.
   // Hyphen, not an em dash: the 5x7 font has no U+2014 and would draw '?'. 
   const order = Array.isArray(table.biomeOrder) ? table.biomeOrder : [];
-  const reached = new Set(Array.isArray(p.pendingBiomes) ? p.pendingBiomes : []);
+  // The base biome is unlocked from the first run (issue #65), whatever the profile's list says.
+  const reached = new Set([BASE_BIOME_ID, ...(Array.isArray(p.pendingBiomes) ? p.pendingBiomes : [])]);
   const reachedCount = order.filter((id) => reached.has(id)).length;
   const sigIds = new Set(Array.isArray(o.playableBiomeIds) ? o.playableBiomeIds : []);
   const sigCount = order.filter((id) => reached.has(id) && sigIds.has(id)).length;
+  // The base biome is online but has no ON/OFF toggle (it cannot be turned off), so it is a plain name row.
+  const isToggle = (id) => id !== BASE_BIOME_ID && reached.has(id) && sigIds.has(id);
+  const toggleCount = order.filter(isToggle).length;
   // SIGNATURES UNLOCKED, not BIOMES REACHED: the count is biomes unlocked by Sync Level (pendingBiomes),
   // which a player has with zero runs played, so "reached" claimed something that never happened.
   items.push(box('sig-head', `SIGNATURES UNLOCKED ${reachedCount}/${order.length}`, PAD, 132, 'magenta'));
@@ -215,7 +219,7 @@ export function profileLayout(o = {}) {
     return e ? e.level : null;
   };
   const prog = sanitizeBiomeProgress(p.biomeProgress);
-  const namedOnly = order.filter((id) => !(reached.has(id) && sigIds.has(id)));
+  const namedOnly = order.filter((id) => !isToggle(id));
   namedOnly.forEach((id, i) => {
     const x = NAME_COL_X[i % NAME_COLS];
     const y = NAME_TOP + Math.floor(i / NAME_COLS) * NAME_PITCH;
@@ -252,7 +256,7 @@ export function profileLayout(o = {}) {
   // reach the ACHIEVEMENTS line at y 206. Balanced, names plus toggles never exceed six rows in total.
   const TOGGLE_MAX_ROWS = 6;
   const TOGGLE_COLS = order.length > TOGGLE_MAX_ROWS ? 2 : 1;
-  const TOGGLE_ROWS_PER_COL = Math.max(1, Math.min(TOGGLE_MAX_ROWS, Math.ceil(sigCount / TOGGLE_COLS)));
+  const TOGGLE_ROWS_PER_COL = Math.max(1, Math.min(TOGGLE_MAX_ROWS, Math.ceil(toggleCount / TOGGLE_COLS)));
   const toggleMenu = {
     x: PAD + 2,
     y: lastNameBottom + 2,
@@ -287,10 +291,10 @@ export function profileLayout(o = {}) {
 
   // Physical rows the menu occupies: with two columns that is the taller column, not the row count, which
   // is what the overlap test has to measure.
-  const togglePhysicalRows = sigCount ? TOGGLE_ROWS_PER_COL : 0;
+  const togglePhysicalRows = toggleCount ? TOGGLE_ROWS_PER_COL : 0;
   return {
     w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu,
-    toggleRowCount: sigCount, togglePhysicalRows, achButton, achUnlocked, achTotal, shopButton, titlesButton,
+    toggleRowCount: toggleCount, togglePhysicalRows, achButton, achUnlocked, achTotal, shopButton, titlesButton,
   };
 }
 

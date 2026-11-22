@@ -260,8 +260,9 @@ describe('decision 3: ProfileView labels each unlocked biome with its state', ()
     const t = titleHost({ [REG.PROFILE]: p });
     const prof = openProfile(t);
     const labels = prof.sigMenu.items.map((i) => i.label);
-    expect(labels).toEqual(['DEBUTMONT NEW', 'GARBAGE DUMP GLACIER SEEN', 'PYRAMID PEAK DONE']);
-    expect(prof.sigMenu.items.map((i) => i.color)).toEqual(['text', 'cyan', 'lime']);
+    // Debutmont is the base biome (issue #65): always on, so it has no toggle row.
+    expect(labels).toEqual(['GARBAGE DUMP GLACIER SEEN', 'PYRAMID PEAK DONE']);
+    expect(prof.sigMenu.items.map((i) => i.color)).toEqual(['cyan', 'lime']);
     const all = texts(prof.panel);
     expect(all).toContain('UNDERWATER MOUNTAIN');
     expect(all).toContain('LVL 13');

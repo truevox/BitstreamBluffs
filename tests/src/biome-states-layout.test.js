@@ -24,11 +24,11 @@ const prog = (encountered, completed = []) => ({ biomeProgress: { encountered, c
 
 describe('biomeToggleRows carries the decision 3 state', () => {
   test('locked / unlocked / encountered / completed, plus a locked biome entered in a Daily', () => {
-    // level 10: debutmont, garbage, pyramid unlocked. Pyramid completed, garbage encountered, debutmont never
-    // entered; underwater (locked, LVL 13) was entered on a Daily mask.
+    // level 10: debutmont (base, no row), garbage, pyramid unlocked. Pyramid completed, garbage encountered;
+    // underwater (locked, LVL 13) was entered on a Daily mask.
     const p = atLevel(10, prog(['garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain'], ['pyramid-peak']));
     const by = Object.fromEntries(biomeToggleRows(p, DEFS).map((r) => [r.id, r]));
-    expect(by.debutmont).toMatchObject({ unlocked: true, encountered: false, completed: false, state: 'unlocked' });
+    expect(by.debutmont).toBeUndefined(); // the base biome cannot be turned off, so it has no toggle row
     expect(by['garbage-dump-glacier']).toMatchObject({ unlocked: true, encountered: true, completed: false, state: 'encountered' });
     expect(by['pyramid-peak']).toMatchObject({ unlocked: true, encountered: true, completed: true, state: 'completed' });
     expect(by['underwater-mountain']).toMatchObject({ unlocked: false, encountered: true, state: 'encountered' });
