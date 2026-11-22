@@ -7,7 +7,7 @@ import { HOME_BIOME } from './BiomeVoices.js';
 
 export const ROOM_PRESETS = Object.freeze({
 	'bitstream-bluffs':       { seconds: 0.72, decay: 0.27, damping: 0.26, echoMs: 48, glitch: true },
-	'debutmont':               { seconds: 0.48, decay: 0.18, damping: 0.15, echoMs: 32 },
+	'debutmont':              { seconds: 0.48, decay: 0.18, damping: 0.15, echoMs: 32 },
 	'garbage-dump-glacier':   { seconds: 1.45, decay: 0.55, damping: 0.65, echoMs: 113 },
 	'pyramid-peak':          { seconds: 2.2, decay: 0.85, damping: 0.29, echoMs: 170 },
 	'underwater-mountain':   { seconds: 1.4, decay: 0.52, damping: 0.93, echoMs: 95 },

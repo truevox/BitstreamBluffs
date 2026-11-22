@@ -73,8 +73,10 @@ function canonicalMissionProgress(raw) {
   if (!raw || typeof raw !== 'object') return out;
   for (const [k, v] of Object.entries(raw)) {
     const id = canonicalLegacyId(k);
-    const prev = out[id];
-    out[id] = typeof prev === 'number' && typeof v === 'number' ? Math.max(prev, v) : (id === k || !(id in out) ? v : prev);
+    // Own-key writes only: a crafted "__proto__" key must not reach the prototype setter.
+    if (id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
+    const prev = Object.hasOwn(out, id) ? out[id] : undefined;
+    out[id] = typeof prev === 'number' && typeof v === 'number' ? Math.max(prev, v) : (id === k || prev === undefined ? v : prev);
   }
   return out;
 }

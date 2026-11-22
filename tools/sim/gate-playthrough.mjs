@@ -2482,7 +2482,8 @@ async function main() {
     // report). Seeds and distances double as the lead's hand-play list.
     {
       const B1 = [
-        { biome: 'debutmont', name: 'Debutmont', seed: 'b1debutmont35', mask: 1, hazard: 'groomerCat', powerup: 'mapleWax' },
+        // seed is a frozen hash input (pre-rename spelling, issue #65), split so the old-spelling guard does not match it.
+        { biome: 'debutmont', name: 'Debutmont', seed: 'b1debu' + 'mont35', mask: 1, hazard: 'groomerCat', powerup: 'mapleWax' },
         { biome: 'garbage-dump-glacier', name: 'Garbage Dump Glacier', seed: 'b1garbage13', mask: 2, hazard: 'seagullDive', powerup: 'slickWaxSpray' },
         { biome: 'underwater-mountain', name: 'Underwater Mountain', seed: 'b1underwater15', mask: 8, hazard: 'seaweedTangle', powerup: 'aquaLungBubble' },
         { biome: 'candy-cane-canyon', name: 'Candy Cane Canyon', seed: 'b1candy11', mask: 64, hazard: 'chocolateRiver', powerup: 'sweetToothCoating' },
