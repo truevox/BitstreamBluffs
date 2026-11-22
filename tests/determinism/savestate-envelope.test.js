@@ -90,7 +90,7 @@ describe('savestate cache V1 envelope — format validation only', () => {
   });
   test.each([
     ['ruleset ID', {rulesetId:H('e')}],
-    ['simulation revision', {simRevision:6}],
+    ['simulation revision', {simRevision:7}],
   ])('rejects %s physics mismatch', (_,changed) => {
     const build = runtime();
     build.physicsIdentity = {...build.physicsIdentity,...changed};
