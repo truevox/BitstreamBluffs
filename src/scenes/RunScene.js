@@ -46,7 +46,7 @@ import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
-import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, KODIAK_BY_ID, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
+import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, kodiakKnockback, KODIAK_KNOCK, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
 import { KodiakRider } from '../entities/KodiakRider.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
@@ -234,6 +234,7 @@ export class RunScene extends Phaser.Scene {
       : this.settings?.kodiakPacks === 'mixed' ? 'mixed' : 'same';
     this.kodiaks = [];
     this.kodiakNext = 0;
+    this.kodiakShoveCdMs = 0; // immunity window after a bear shove (sim ms)
     // Player abilities and BSOD behavior are unchanged in the Gym. Only the
     // starting pose, pursuit gap/speed and post-catch retry are different.
     this.gymSetup = this.bsodGym ? gymSetupForProfile(prof) : null;
@@ -528,12 +529,14 @@ export class RunScene extends Phaser.Scene {
 
   /**
    * Issue #47: one Kodiak PACK at a time, on the seeded schedule (Kodiaks.kodiakEncounter). Runs inside the
-   * fixed tick; collision is a tick-exact box test per bear (no Matter body). A hit is a crash hazard, so
-   * shields, the respawn grace and Hashed Backup apply exactly as for any hazard; passing a bear scores.
+   * fixed tick; collision is a tick-exact box test per bear (no Matter body). Contact is never a crash: the bear
+   * shoves the sled back and up (Kodiaks.kodiakKnockback), once per bear, with a shared immunity window so a pack
+   * cannot chain shoves. A shoved bear earns no pass bonus; a clean pass scores.
    */
   updateKodiaks(dt) {
     if (!this.kodiaksOn || this.crashed || !this.sled) return;
     const sled = this.sled;
+    if (this.kodiakShoveCdMs > 0) this.kodiakShoveCdMs = Math.max(0, this.kodiakShoveCdMs - dt);
     if (!this.kodiaks.length) {
       const enc = kodiakEncounter(this.seed, this.kodiakNext, this.kodiakPackMode);
       if ((sled.x - this.startX) / PIXELS_PER_METER < enc.atM) return;
@@ -553,11 +556,15 @@ export class RunScene extends Phaser.Scene {
         this.playSfx('groundWarn', { brace: ev.telegraph === 'real' });
         this.emitIf(EVT.KODIAK, { type: 'telegraph', id: k.def.id, short: k.def.short, real: ev.telegraph === 'real' });
       }
-      if (!k.hit && !(sled.invulnerableMs > 0) && kodiakHits(kodiakBox(k.x, k.groundY), sledBox)) {
+      if (!k.hit && this.kodiakShoveCdMs <= 0 && !(sled.invulnerableMs > 0) && kodiakHits(kodiakBox(k.x, k.groundY), sledBox)) {
         k.hit = true;
-        if (!this.pendingCrash) this.pendingCrash = { cause: 'hazard', hazardId: k.def.id };
+        const shove = kodiakKnockback(k, sled);
+        this._addSledVelocity(shove.dvx, shove.dvy);
+        this.kodiakShoveCdMs = KODIAK_KNOCK.immunityMs;
         this.fx.sparks(k.x, k.groundY - 14, k.def.accent, 16, 220);
         this.shake(3);
+        this.playSfx('push');
+        this.emitIf(EVT.KODIAK, { type: 'shove', id: k.def.id, short: k.def.short, n: k.n, member: k.member, dvx: shove.dvx, dvy: shove.dvy });
       }
       // Passing a bear (it was ahead and now is behind) scores; clearing it in the air scores more.
       const ahead = sled.x > k.x;
@@ -1351,7 +1358,7 @@ export class RunScene extends Phaser.Scene {
     this.updateZones(sled.x);
     this.sampleSafeGround(dt, fs);
 
-    // Issue #47: the Kodiak rival (if one is out) runs, telegraphs and may hit the sled this tick.
+    // Issue #47: the Kodiak rival (if one is out) runs, telegraphs and may shove the sled this tick.
     this.updateKodiaks(dt);
 
     // Collision with the deletion wall always wins if any other contact/landing happened during this frame.
@@ -2308,7 +2315,7 @@ export class RunScene extends Phaser.Scene {
     const hz = this.content && this.content.hazards;
     const h = this._crashHazard;
     const ent = c.cause === 'hazard' && h && h.def && h.def.id === c.hazardId ? h : null;
-    const def = ent ? ent.def : c.hazardId ? (hz && hz[c.hazardId]) || KODIAK_BY_ID[c.hazardId] || null : null;
+    const def = ent ? ent.def : c.hazardId ? (hz && hz[c.hazardId]) || null : null;
     const arrivalMs = ent && this.teleTracker ? this.teleTracker.lastArrivalMs(ent) : null;
     this.registry.set(REG.LAST_CRASH, crashReport({
       runId: this.runId, seed: this.seed, biomeMask: this.biomeMask, cause: c.cause, def, x: fs.x, startX: this.startX,
