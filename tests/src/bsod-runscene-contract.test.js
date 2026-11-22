@@ -68,14 +68,14 @@ describe('BSOD RunScene contract', () => {
   test('vacuum is biome-specific and does not disable the pursuing wall', () => {
     const r = Object.create(RunScene.prototype);
     r.biomeMask = 32;
-    r.terrain = { _sectorOf: () => 2 };
+    r.terrain = {};
     r.sled = { x: 200 };
-    r._biomeDefForSector = () => ({ id: 'space-mountain' });
+    r._biomeDefAt = () => ({ id: 'space-mountain' });
     expect(r.bsodAtmosphere()).toBe(0);
     r.bsod = new BsodPursuit({ sledLeftEdgeX: 200 });
     expect(r.bsod.state(201, 400, r.bsodAtmosphere()).worldTailwindPxS).toBe(0);
     expect(r.bsod.active).toBe(true);
-    r._biomeDefForSector = () => ({ id: 'forest' });
+    r._biomeDefAt = () => ({ id: 'forest' });
     expect(r.bsodAtmosphere()).toBe(1);
   });
 });
