@@ -289,8 +289,12 @@ describe('#65: RunScene announces biomes from the generator\'s own answer at the
       s.updateFun(16, {}, Math.max(0, (x - s.startX) / 10));
     }
     expect(events.map((e) => [e.id, e.entering])).toEqual([[BASE_BIOME_ID, true], [null, false], ['crystal-cavern', true]]);
-    expect(s.refreshPalette).toHaveBeenCalledTimes(owed);
+    // full refreshes (they rebuild colliders) happen once per change of the generator's biome; the bridge dissolve adds
+    // graphics-only repaints (refreshPalette(true)) inside the bridge, which touch no collider
+    const full = s.refreshPalette.mock.calls.filter((c) => !c[0]);
+    expect(full).toHaveLength(owed);
     expect(owed).toBe(3);
+    expect(s.refreshPalette.mock.calls.filter((c) => c[0])).toHaveLength(2);
   });
 
   test('a retry on the same RunScene instance announces and repaints the opening biome again', () => {
