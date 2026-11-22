@@ -361,9 +361,77 @@ fix: `node tools/exploits/repro-reuse-incomplete.mjs` → all 4 shapes exit 2, r
 Version: `v2.15.2` (`CHANGELOG.md` + `package.json`). Behaviour-changing by the repo's own rule because it changes the
 harness's documented exit-code contract; no gameplay, physics or balance change, `tools/sim/**` untouched.
 
-## 12. Ask
+## 12. Fourth pass: the review's exact shape, and three neighbours (FIXED)
 
-Marvin: please have **Gal Friday** review PR #187, including §11 (it changes the exit-code contract for `--reuse`,
-which she reproduced against). Left at the review gate — no merge from my side. On approval I merge, verify the landed
-diff and confirm #76's acceptance criteria are met (a repeatable seed suite and a cross-policy metrics report, with no
-recommendation attached).
+Gal Friday's `645a5c6` finding was correct and is fixed here. Her shape — `args.policies: ['handsOff','flip']`,
+`seedList: ['sim-01','sim-02']`, both `policySpecs`, `runs` carrying only the two `handsOff` records, `failures: []` —
+exited 0 at `645a5c6` with a fabricated `| flip | 0 |` metrics row and an *Unmeasured* note but no failure entry and no
+nonzero status. At this head it exits 2, prints no `flip` row, renders no verdict, and names the arm in FAILURES.
+
+Rather than fix only the reported shape, I drove twelve defective records through the real CLI at both heads. Eleven of
+the twelve failed open at `645a5c6`; all twelve are refused here:
+
+| # | shape | `645a5c6` | this head |
+| --- | --- | --- | --- |
+| 1 | an arm missing, no failure entry | exit 0 | exit 2 |
+| 2 | every arm cut to 3 of 6 seeds | exit 0, verdict rendered | exit 2 |
+| 3 | duplicated seed inside an arm | exit 1 + usage banner | exit 2 |
+| 4 | seed nobody planned | exit 0, arm compared | exit 2 |
+| 5 | **the review's exact shape** | exit 0, fake `\| flip \| 0 \|` row | exit 2, no row, no verdict |
+| 6 | same, `failures` key absent entirely | exit 0 | exit 2 |
+| 7 | **the BASELINE arm missing** | exit 0, candidates unpaired | exit 2, no verdicts |
+| 8 | candidate right name, too few seeds | exit 0, verdict rendered | exit 2 |
+| 9 | candidate right COUNT, wrong identities | exit 0, verdict rendered | exit 2 |
+| 10 | run attributed to no `policySpec` | exit 0, verdict rendered | exit 2, record rejected |
+| 11 | **record names no baseline at all** | exit 0, verdict rendered | exit 2, record rejected |
+| 12 | **legacy record with no recoverable plan** | exit 0, verdict rendered | exit 2, record rejected |
+
+Rows 7, 11 and 12 are the ones the first audit pass still let through, and they are the substantive additions here:
+
+- **Baseline presence is now a whole-record rule.** A record with no `args.baseline`, or whose baseline has no
+  `policySpec`, is rejected: this harness exists to answer "does a candidate beat the baseline", so a record that names
+  none cannot support any comparison. Previously it produced candidate rows with nothing to pair them against.
+- **A record must carry a recoverable seed plan.** `args.seedList`, a numeric `args.seeds`, or a comma-list
+  `args.seeds` — all three are exact identities. A record with none is now **rejected** rather than cross-checked
+  arm-against-arm. That fallback was the last fail-open: every arm agreeing on a short seed set is precisely what a
+  uniformly truncated record looks like, so "the arms agree" is not evidence and is no longer accepted as such. This
+  removes the residual limit §11 disclosed instead of documenting it a second time.
+- **A comma-list `args.seeds` is now a plan, not a hint.** It is treated as exact identities (with duplicate
+  detection), so older records written with `--seeds sim-01,sim-03,...` are fully verified rather than downgraded.
+
+The two branch-only tests that pinned the old `union` behaviour were rewritten to pin the rejection instead.
+
+**Evidence at this head** (`node tools/exploits/repro-reuse-incomplete.mjs`, committed):
+
+```
+12 defective shapes  -> every one exits 2, 0 statistical verdicts
+POSITIVE full valid record                  -> exit 0, table, verdict
+POSITIVE genuinely dominant record          -> exit 0, "DOMINANT on score"
+same script at 645a5c6                      -> "11 case(s) behaved wrongly", exit 1
+```
+
+The positive cases are there so the guard cannot quietly become "always say incomplete": a full record still exits 0
+and a genuinely dominant candidate still renders `DOMINANT on score`.
+
+Real CLI, non-reuse, both seed forms (the dispatch's "preserve numeric and comma-list" requirement):
+
+```
+--seeds sim-01,sim-02 --policies handsOff,flip  -> EXIT 0, 2 arms × 2 seeds, record written
+--seeds 3            --policies handsOff,flip  -> EXIT 0, seedList [sim-01..sim-03], 6 runs, 0 failures
+all 7 committed tools/exploits/out/run-*.json  -> unchanged behaviour (6× exit 0; the one pre-existing
+                                                  failed-arm record still exit 2)
+```
+
+`npm test -- --runInBand tests/exploits`: **115 passed**, 4/4 suites. `npm run build`: ✓. Reproducer: exit 0.
+
+Rebased onto `origin/main` (`v2.15.3`, the PWA slice) before handoff: the branch had a `CHANGELOG.md`/`package.json`
+conflict in the version line only. The two exploit-factory commits are consolidated under a single **`v2.15.4`**
+entry; no file outside `tools/exploits/**`, `tests/exploits/**`, `CHANGELOG.md`, `package.json` and
+`.friday/issue-76-review.md` is touched, and `CHANGELOG.md`/`package.json` are edited only to add that entry.
+
+## 13. Ask
+
+Marvin: please have **Gal Friday** review PR #187 at the new SHA, including §12. Left at the review gate — no merge
+from my side, and I am not claiming her review passed. On her approval I merge, verify the landed diff and confirm
+#76's acceptance criteria (a repeatable seed suite and a cross-policy metrics report, with no recommendation attached).
+

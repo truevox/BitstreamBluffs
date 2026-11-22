@@ -15,11 +15,16 @@
   cannot disagree with what was printed. The runner also merges audit findings into `failures` before writing, so the
   record on disk always agrees with itself.
 - **Older records keep their guarantees.** A record without `args.seedList` has its plan recovered from the numeric
-  `args.seeds` count (expanded exactly as the simulator expands it), so a truncated older record is still caught. Only
-  a record with neither a `seedList` nor a numeric count falls back to arm-against-arm checking, and that weaker
-  guarantee is stated in the report's limits.
-- `tools/exploits/repro-reuse-incomplete.mjs` reproduces the four shapes through the real CLI and exits 1 if any is
-  accepted as clean (3/4 fail-open before this change, 0/4 after).
+  `args.seeds` count (expanded exactly as the simulator expands it), or from a comma-list `args.seeds`. Only a record
+  with neither is rejected outright, because there is then no plan to verify the arms against.
+- **A reused record must now be self-sufficient beyond its run list.** It must name a `baseline` that actually has an
+  arm — otherwise there is nothing to pair a candidate against — and it must carry a recoverable seed plan
+  (`args.seedList`, a numeric `args.seeds` count, or a comma-list `args.seeds`). A record with neither is rejected
+  instead of being accepted on "the arms agree", which is exactly what a uniformly truncated record looks like. A
+  comma-list `args.seeds` is now treated as exact identities rather than as an unverifiable fallback.
+- `tools/exploits/repro-reuse-incomplete.mjs` reproduces the twelve defective shapes through the real CLI, with two
+  positive cases (a full record and a genuinely dominant one) so it fails if the guard ever decays into "always
+  refuse". Run against the previously reviewed head `645a5c6` it reports 11 of 12 accepted as clean; at this head, 0.
 - Harness tooling only: no gameplay, physics, balance or player-visible change. `tools/sim/**` untouched.
 
 ## v2.15.3 - PWA install metadata and original icons (#172) (2026-11-21)
