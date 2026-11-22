@@ -1,9 +1,23 @@
 # Changelog
 
-## v2.19.6 — portable deterministic math: same simulation in every browser (#121 / #209) (2026-11-22)
+## v2.19.8 — portable deterministic math: same simulation in every browser (#121 / #209) (2026-11-22)
 
 - **The authoritative simulation no longer depends on the browser's math library.** Firefox and WebKit returned different last bits than Chromium for `hypot`, `exp`, `cos`, `atan2` and others, so the same inputs could drift apart and, on a knife-edge hazard contact, end differently (a Firefox run survived a hazard that Chromium crashed on). Every simulation file now takes `sin/cos/tan/asin/acos/atan/atan2/exp/expm1/log/log1p/log2/log10/pow/hypot/tanh/sinh/cosh/cbrt` from `src/systems/pmath.js`, a facade over the exactly pinned, Apache-2.0 `@stdlib/math-base-special-*` packages (pure IEEE arithmetic, identical bits in Chromium, Firefox and WebKit), and the nine trig/pow/acos functions inside Phaser's bundled Matter are replaced the same way (`src/systems/MatterPortable.js`, no fork; `phaser` is now pinned exactly to 3.90.0). Presentation code (backgrounds, audio, UI, particles) keeps the native `Math`, and a test fails if a new native call appears in a simulation file.
-- **Physics-breaking, pre-release (`SIM_REVISION` 4).** Results differ from the native math in the last bit for about 1% of `sin`/`cos` calls, so older tapes and the terrain digests pinned in three tests change (terrain geometry differs by at most 8.7e-11 px, no structural change). No new gameplay rules and no player-visible tuning change.
+- **Physics-breaking, pre-release (`SIM_REVISION` 5).** Results differ from the native math in the last bit for about 1% of `sin`/`cos` calls, so older tapes and the terrain digests pinned in three tests change (terrain geometry differs by at most 8.7e-11 px, no structural change). No new gameplay rules and no player-visible tuning change.
+## v2.19.7 — canonical terrain colliders, SIM_REVISION 4 (#119 / #222) (2026-11-22), SIM_REVISION 4 (#119) (2026-11-22)
+
+- **Terrain colliders no longer depend on what was streamed before them.** `TerrainMesh` used to recycle collider bodies from a pool, reshaping them with `Body.setVertices` + `Body.setPosition`. That left vertex bits that depended on the body's *previous* position. Now every segment collider is built fresh from the chunk's points, and the pool is removed.
+- **Physics identity:** this is an owner-approved break. `SIM_REVISION` moves 3 → 4, with an archived ruleset `sha256:89e2cdab…`. Tick outcomes change only where a recycled collider was touched. In a 2149-tick run, the sled ends 1.4e-5 px away, with the same crash tick and the same score. No visible terrain change: graphics are drawn from chunk points, not colliders.
+- **Memory:** removed colliders are now garbage-collected instead of held forever. After teleporting to x=107000, 6454 pooled bodies → 0, collider geometry 845 KB → 41 KB, and JS heap 70.4 → 56.1 MB.
+- **Canaries:** all 7 golden canaries PASS exactly against the new build, so none needs re-baselining.
+- **Coordination:** #121 (portable math, PR #209) must integrate after this release with SIM_REVISION 5+; never reuse this shipped revision 4 identity.
+
+- **Release integration:** Morgan’s separate developer-only stock neutral panel shipped first as v2.19.6. Its unchanged tooling and release notes are preserved here; the collider geometry/source ruleset remains identical to the reviewed #222 head.
+
+## v2.19.6 — developer stock hands-off panel (#220 / #77) (2026-11-22)
+
+- **Find reproducible 500 m hands-off candidates within a fixed local panel.** The tool checks 12 built-in courses in the pinned v2.18.1 Chromium preview. A candidate must reach the distance on a completed tick and then reproduce its natural finish, native checkpoints and cadence fingerprints in a fresh replay without saving. Short finishes and capped runs are reported separately. The tool does not verify newer builds or change gameplay, Daily selection, scores, or sharing.
+
 ## v2.19.5 — developer reaction-seed sensitivity comparison (#218 / #126) (2026-11-22)
 
 - **Compare matched synthetic hop-noise runs across reaction seeds.** The local CLI accepts two to eight complete classic panels with the same settings and per-course ideal control evidence. It reports pass counts and the courses that flip, with source file hashes and a caller-asserted build pin. It does not expose raw trials, select a Daily, estimate human fairness, or change game behavior.
