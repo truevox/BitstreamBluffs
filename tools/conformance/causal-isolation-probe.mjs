@@ -378,7 +378,7 @@ function fmtRow(r) {
  *  - a length mismatch with its baseline (one side ran or recorded fewer ticks);
  *  - a causal leak, except the #115 input-sampling cases (report only) and the positive control;
  *  - the positive control NOT caught;
- *  - a cue leak in anything but `telegraph` (the known #155 read, K1).
+ *  - any cue leak (the old K1 telegraph allow-list was removed when #155 landed).
  */
 export function gateProblems(r) {
   const why = [];
@@ -395,8 +395,8 @@ export function gateProblems(r) {
   if (!isControl && !isInput && r.diff.verdict === 'causal-leak') why.push(`causal leak at ${r.diff.firstAuthoritative?.tick}: ${r.diff.firstAuthoritative?.subsystems.join('+')}`);
   if (!isControl && !isInput) {
     const cues = Object.entries(r.diff.perSubsystem || {}).filter(([k, t]) => t != null && subsystemClass(k) === 'cue').map(([k]) => k);
-    const unknown = cues.filter((k) => k !== 'telegraph');
-    if (unknown.length) why.push(`cue leak outside the K1 allow-list: ${unknown.join('+')}`);
+    // No allow-list since #155 landed: the telegraph camera read (K1) is gone, so every cue leak fails the gate.
+    if (cues.length) why.push(`cue leak: ${cues.join('+')}`);
   }
   return why;
 }

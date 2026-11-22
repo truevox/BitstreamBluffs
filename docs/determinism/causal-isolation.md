@@ -1,6 +1,6 @@
 # Simulation / presentation causal isolation (issue #140)
 
-Status: diagnostic evidence, Team B, 2026-11-21/22, base `b51ab36`, merged with `origin/main` at `9c928ee`. The digest used
+Status: diagnostic evidence, Team B, 2026-11-21/22, base `b51ab36`, merged with `origin/main` at `7d5780f` (v2.18.1, includes #155); released as v2.18.2. The digest used
 here is a **test tool and is non-authoritative**. Replay Contract v1.0 (#152) and the `fingerprintState` of #165 (now on
 main) are authoritative. Nothing in `src/` imports the digest.
 
@@ -22,11 +22,11 @@ The matrix found three real problems and all three are fixed:
 | L2 | **A throwing audio engine** froze the game | `renderFrame` read `audio.getWorldDanceSample()` unguarded. Phaser's RAF step reschedules only after the frame callback returns, so one throw stopped the loop and the simulation | `WorldDance.readWorldDanceAudio` never throws (warns once); the jukebox/billboard reads in `create` and the track-change handler are guarded too |
 | L3 | **Biome-sector entry** repainted through the same collider rebuild as L1 (deterministic, but a repaint feeding physics) | `biome` fixture: a twin with the biome repaint stubbed out diverged at the **entry tick 398** (world order, terrain colliders; contacts from 496) | **Owner-approved physics change**: `refreshPalette` always uses `redrawChunk`; `SIM_REVISION` 1 → 2 (below) |
 
-One known camera read is detected and left to its own issue:
+One known camera read was detected here and fixed by its own issue (#155, now merged):
 
 | # | Read | Effect today | Owner |
 |---|---|---|---|
-| K1 | `updateGroundTelegraph` passes `this._view.right` (the rendered camera, one frame stale) to `planTelegraph` | **Only** the `onScreen` flag of telegraph marks differs, and only the renderer reads it. Warn/hop SFX, `teleAtMs`, crash-report arrival and all physics are camera-independent. Seen in 11 matrix cells (zoom, shake, 30 Hz, jitter) | #155 (not fixed here); `tests/determinism/telegraph-camera-independence.test.js` holds an expected failure that flips when #155 lands |
+| K1 | `updateGroundTelegraph` passes `this._view.right` (the rendered camera, one frame stale) to `planTelegraph` | **Only** the `onScreen` flag of telegraph marks differs, and only the renderer reads it. Warn/hop SFX, `teleAtMs`, crash-report arrival and all physics are camera-independent. Seen in 11 matrix cells (zoom, shake, 30 Hz, jitter) | **Fixed by #155** (merged): the sim plans with `planTelegraphMarks` (no camera input); only the renderer adds `onScreen`. `tests/determinism/telegraph-camera-independence.test.js` is now a plain regression test (call site and planner), and the 11 former cue cells are isolated |
 
 ## Method
 
@@ -65,25 +65,25 @@ manifests record `dailyRuleId`), not a presentation leak.
 
 ## Matrix (head build, after all fixes)
 
-Game code at `bf84bd4` (after the merge with main and the L3 fix), 91 cells, `EXPECT_ISOLATION=1` gate passes (exit 0):
-**72 isolated, 11 cue leaks (all K1 telegraph `onScreen`, allow-listed), 8 causal = the 5 positive controls + 3
-frame-polled input cases (#115)**. No presentation perturbation changed any authoritative subsystem. The other four
-fixtures gave exactly the same cells as the first head run at `71836d8`.
+Merged tree (game code at `71909a1`, i.e. `origin/main` `7d5780f` with #155 plus this branch), 91 cells, `EXPECT_ISOLATION=1`
+gate passes (exit 0) **with no cue allow-list**: **83 isolated, 0 cue leaks, 8 causal = the 5 positive controls + 3
+frame-polled input cases (#115)**. The 11 cells that showed K1 (`onScreen`) before #155 are now isolated. No
+presentation perturbation changed any authoritative subsystem or gameplay cue.
 
-Cells give the verdict against the fixture's 60 Hz per-tick baseline; `tele@N` means a cue leak in `telegraph` first
-at tick N (K1, #155). Fixtures other than `tricks` run the core set (`-` = not run).
+Cells give the verdict against the fixture's 60 Hz per-tick baseline. Before #155 merged, the cells marked
+`isolated*` showed a `telegraph` cue leak (K1, only `onScreen`) at the tick in brackets. Fixtures other than `tricks` run the core set (`-` = not run).
 
 | Perturbation | tricks | hazards | kodiak | bsod | biome |
 |---|---|---|---|---|---|
 | baseline repeat | isolated | isolated | isolated | isolated | isolated |
-| cadence 30 Hz | isolated | isolated | tele@739 | isolated | isolated |
+| cadence 30 Hz | isolated | isolated | isolated* (739) | isolated | isolated |
 | cadence 120 Hz | isolated | - | - | - | - |
 | cadence 144 Hz | isolated | isolated | isolated | isolated | isolated |
-| cadence jitter 4-45 ms | isolated | tele@443 | tele@739 | isolated | isolated |
-| camera zoom 0.5 | isolated | tele@401 | tele@697 | isolated | isolated |
-| camera zoom 2 | isolated | tele@445 | tele@739 | isolated | isolated |
+| cadence jitter 4-45 ms | isolated | isolated* (443) | isolated* (739) | isolated | isolated |
+| camera zoom 0.5 | isolated | isolated* (401) | isolated* (697) | isolated | isolated |
+| camera zoom 2 | isolated | isolated* (445) | isolated* (739) | isolated | isolated |
 | camera scroll +700/-250 | isolated | - | - | - | - |
-| camera shake every frame | isolated | tele@439 | tele@737 | isolated | isolated |
+| camera shake every frame | isolated | isolated* (439) | isolated* (737) | isolated | isolated |
 | screen shake off | isolated | - | - | - | - |
 | Fx off (fx + trail) | isolated | - | - | - | - |
 | Fx storm (extra `visual/fx` draws) | isolated | isolated | isolated | isolated | isolated |
@@ -98,7 +98,7 @@ at tick N (K1, #155). Fixtures other than `tricks` run the core set (`-` = not r
 | pause + 30 frames + resume | isolated | - | - | - | - |
 | reduced motion / shake off mid-run | isolated | - | - | - | - |
 | palette toggle mid-run | isolated | isolated | isolated | isolated | isolated |
-| combo (jitter + 390x844 DPR 2 + zoom 0.6 + shake + Fx + no audio + no HUD + resize) | isolated | tele@422 | tele@715 | isolated | isolated |
+| combo (jitter + 390x844 DPR 2 + zoom 0.6 + shake + Fx + no audio + no HUD + resize) | isolated | isolated* (422) | isolated* (715) | isolated | isolated |
 | positive control (1e-9 nudge) | **causal@301** | **causal@301** | **causal@301** | **causal@301** | **causal@301** |
 | biome visuals frozen (repaint stubbed; L3 check) | - | - | - | - | isolated (was causal@398) |
 
@@ -142,7 +142,7 @@ This is the frame-to-tick fan-out (`SimClock.padsFor`), which belongs to #115. W
   keeping colliders: the same pad sensor with its cooldown intact, an unchanged `staticOrder`, and fingerprints equal to a
   twin that never repainted.
 - Golden canaries (#117): `hazard-transition` (mask 4, crosses a biome boundary) and `bump` were re-recorded on the new
-  build. Both are exact PASS against the committed goldens (`feel-diff --use-out`). The other five are mask 0 and never repaint.
+  build, and again on the merged v2.18.2 tree. Both are exact PASS against the committed goldens (`feel-diff --use-out`). The other five are mask 0 and never repaint.
 - Biome gameplay is data and is unchanged. Zone mods come from `getZoneDefs` → `PhysicsTuner`, hazards and pickups from
   `takeChunk`, and collider material is fixed in `TerrainMesh._takeBody`. A repaint only ever changed body identity and order.
 
@@ -156,8 +156,8 @@ This is the frame-to-tick fan-out (`SimClock.padsFor`), which belongs to #115. W
 4. **Cosmetic terrain reads** (minimap, Fx ground tests, hazard drawing) can build generator chunks early.
    `streamTerrain` gates their physical insertion (#59). The `terrainCache` class allows this, and no matrix cell
    showed it.
-5. **Guardrail audit (owner comment, 3D readiness).** All camera reads in the sim path were checked. Only K1 reads
-   the rendered camera inside `simTick`. `renderFrame`'s hazard, pickup, shard and mesh culling and `KodiakRider`
+5. **Guardrail audit (owner comment, 3D readiness).** All camera reads in the sim path were checked. Before #155 only K1 read
+   the rendered camera inside `simTick`; after #155 nothing does. `renderFrame`'s hazard, pickup, shard and mesh culling and `KodiakRider`
    use `_view` for visibility only, and the matrix confirms that.
 
 ## Mapping to Replay Contract v1 subsystems
@@ -199,7 +199,7 @@ npx vite preview --port 8411 --strictPort &
 GAME_URL=http://localhost:8411/ RESULTS=cells.json node tools/conformance/causal-isolation-probe.mjs
 # options: FIXTURES=tricks,bsod  CASES=camera-zoom-2,cadence-144  OUT=matrix.json  PARALLEL=3
 #          EXPECT_ISOLATION=1  (exit 1 on: no result, page errors, a stalled or short run, a length mismatch, a causal leak
-#                               outside the #115 cases, a missed positive control, or a cue leak other than K1 telegraph)
+#                               outside the #115 cases, a missed positive control, or any cue leak)
 #          FIXED_DATE=2026-11-21T12:00:00Z  (the wall-clock day the pages see)
 #          RESULTS=cells.json  (each finished cell is saved at once, keyed by build; reruns skip finished cells)
 #          CHROMIUM_PATH=...  (defaults to the image's headless shell when Playwright's build is missing)
