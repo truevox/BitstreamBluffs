@@ -14,9 +14,13 @@ Always explain *why* in comments, respect project ESLint rules, and never introd
   - Why it was added
   - How it works (briefly)
 - Target audience: senior devs and LLMs.
-- All behavior-changing commits must:
-  - Update `CHANGELOG.md`
-  - Bump the **semantic version number** (e.g. `v1.4.1 → v1.5.0`)
+- Version numbers follow the project owner's semantic release policy: `X.Y.Z`:
+  - **X (major):** overhaul or breaking compatibility change.
+  - **Y (minor):** user-facing feature or newly shipping capability, with X unchanged and Z reset to 0.
+  - **Z (patch):** fixes, chores, maintenance and documentation-only release housekeeping, with X/Y unchanged.
+- Record all merged work in `CHANGELOG.md` under **Unreleased** until it is intentionally published; never reuse a released version.
+- On an intentional release, move the relevant Unreleased entries into the chosen version heading and update `package.json` and `package-lock.json` together. Do not bump release metadata on every experimental branch or PR; avoid colliding parallel version bumps.
+- Distinguish experimental/test-only tooling from shipped production features; do not claim an offline game or installed service worker unless activated and verified.
 
 ## 🤖 AI & Human Automation Notes
 - Do **not** change existing logic unless explicitly asked.

@@ -1,0 +1,21 @@
+{
+  "id": "bsod-attack",
+  "description": "BSOD chase and catch: hold the brake from tick 0 so the sled stalls near the start and the deletion wall closes and catches it.",
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "startX": 0,
+  "hz": 30,
+  "durationMs": 60000,
+  "input": {
+    "held": [
+      {
+        "key": "brakeHeld",
+        "from": 0,
+        "to": 60000
+      }
+    ],
+    "edges": [],
+    "events": []
+  },
+  "notes": "VERIFIED 2026-11-21 (re-verified after re-baseline, recorded twice byte-identical). Braking from the start stalls the sled and the deletion wall catches it: feature.minBsodGapPx=1.27, feature.bsodCaughtTick=6891, result.crashed=true, cause='bsod', crashTick=6891, endTick=6891, score=45, distance 48 m. A real wall catch, not a scripted one - the pursuit's own gapPx closes to ~1 px on its own. The record stores only the minimum gap, so the STARTING gap is not asserted here."
+}

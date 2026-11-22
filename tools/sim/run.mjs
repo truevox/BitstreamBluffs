@@ -30,6 +30,9 @@
  *   --workers N           parallel pages (default 4)           --out FILE   write JSON
  *   --verify              determinism check (traces every 60 frames compared exactly, twice per seed, fresh pages)
  *   --keepUi              leave UIScene running (slower)       --quiet      no per-run lines
+ *   --noiseProfiles ideal,steady,distracted   isolated developer hop-noise panel (see docs/issue-126-human-noise-bots.md)
+ *   --noiseSeed LABEL     salt for the independent reaction RNG (noise panels only)
+ *   --fatigue             opt-in simulated-time ramp (see docs/issue-126-optional-fatigue.md)
  *
  * Policies (details in browser.js): flip's "ideal" release = the first frame from which a release (a forward model of Sled's own air rules) gives
  * >= 340 deg of net rotation and a landing within --flipCleanDeg (default 28, the 'good' band) of the slope; releaseLateMs delays it (negative = earlier). Attempts for which the model
@@ -45,6 +48,11 @@ import { createServer } from 'node:net';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DailyPatch } from '../../src/systems/DailyPatch.js';
+import {
+  DEFAULT_NOISE_SEED, FATIGUE_RAMP, MAX_NOISE_SEC, MAX_NOISE_SEEDS, NOISE_PROFILES,
+  noiseOutcome, summarizeNoise, verifyNoiseEvidence,
+} from './human-noise.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
@@ -57,13 +65,14 @@ function parseArgs(argv) {
     const k = argv[i];
     if (!k.startsWith('--')) continue;
     const name = k.slice(2);
-    if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop'].includes(name)) { a[name] = true; continue; }
+    if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop', 'fatigue'].includes(name)) { a[name] = true; continue; }
     a[name] = argv[++i];
   }
   for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM']) if (a[n] != null) a[n] = Number(a[n]);
   return a;
 }
-const args = parseArgs(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = parseArgs(argv);
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('see the header comment of tools/sim/run.mjs');
   process.exit(0);
@@ -72,8 +81,51 @@ function expandSeeds(s) {
   if (/^\d+$/.test(s)) return Array.from({ length: Number(s) }, (_, i) => `sim-${String(i + 1).padStart(2, '0')}`);
   return s.split(',').map((x) => x.trim()).filter(Boolean);
 }
+let noiseProfiles = null;
+if (argv.includes('--noiseProfiles')) {
+  noiseProfiles = String(args.noiseProfiles ?? '').split(',').map((p) => p.trim());
+  if (noiseProfiles.length < 2 || new Set(noiseProfiles).size !== noiseProfiles.length ||
+      noiseProfiles.some((p) => !Object.hasOwn(NOISE_PROFILES, p))) {
+    throw new TypeError('Select at least two distinct noise profiles: ideal,steady,distracted');
+  }
+  if (argv.includes('--policy') && args.policy !== 'hop') throw new TypeError('Noise profiles only support --policy hop');
+  if (['--noReload', '--keepUi', '--workers', '--sub', '--traceEvery', '--noHop'].some((flag) => argv.includes(flag))) {
+    throw new TypeError('Noise panels use serial fresh pages, no UI, and fixed diagnostic sampling');
+  }
+  args.policy = 'hop';
+  if (!argv.includes('--seeds')) args.seeds = '3';
+  if (!argv.includes('--maxM')) args.maxM = 500;
+  if (!argv.includes('--maxSec')) args.maxSec = 25;
+  if (typeof args.seeds !== 'string' || args.seeds.startsWith('--') || args.noiseSeed?.startsWith('--') ||
+      (argv.includes('--noiseSeed') && args.noiseSeed === undefined)) {
+    throw new TypeError('Provide explicit values for --seeds and --noiseSeed');
+  }
+  if (/^\d+$/.test(args.seeds) && (Number(args.seeds) < 1 || Number(args.seeds) > MAX_NOISE_SEEDS)) {
+    throw new RangeError(`Noise panels need 1–${MAX_NOISE_SEEDS} course seeds`);
+  }
+  if (!Number.isFinite(args.maxM) || args.maxM <= 0 || args.maxM > 5000 ||
+      !Number.isFinite(args.maxSec) || args.maxSec <= 0 || args.maxSec > MAX_NOISE_SEC) {
+    throw new RangeError(`Noise panel limits: positive --maxM up to 5000, positive --maxSec up to ${MAX_NOISE_SEC}`);
+  }
+  if ((args.biomeMask != null && (!Number.isInteger(Number(args.biomeMask)) || Number(args.biomeMask) < 0 || Number(args.biomeMask) > 0xffffffff)) ||
+      (args.hopLeadMs != null && (!Number.isFinite(args.hopLeadMs) || args.hopLeadMs <= 0 || args.hopLeadMs > 1000)) ||
+      (args.rule && args.rule !== 'none' && !DailyPatch.RULES.some((rule) => rule.id === args.rule))) {
+    throw new TypeError('Invalid noise panel mask, hop lead, or movement rule');
+  }
+  args.noiseSeed ??= DEFAULT_NOISE_SEED;
+  if (!args.noiseSeed.trim() || args.noiseSeed.length > 64) throw new TypeError('Provide a nonempty noise seed label of up to 64 characters');
+}
+const fatigueFlag = argv.indexOf('--fatigue');
+if (argv.some((value) => value.startsWith('--fatigue=')) || (fatigueFlag !== -1 &&
+    (!noiseProfiles || args.fatigue !== true || argv.lastIndexOf('--fatigue') !== fatigueFlag ||
+      (argv[fatigueFlag + 1] != null && !argv[fatigueFlag + 1].startsWith('--'))))) {
+  throw new TypeError('Use the single --fatigue switch without a value and only with --noiseProfiles');
+}
 const seeds = expandSeeds(String(args.seeds));
 if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
+if (noiseProfiles && (!seeds.length || seeds.length > MAX_NOISE_SEEDS || new Set(seeds).size !== seeds.length || seeds.some((s) => s.length > 64))) {
+  throw new RangeError(`Noise panels need 1–${MAX_NOISE_SEEDS} distinct course seeds of up to 64 characters`);
+}
 const params = {};
 for (const n of ['releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'probeMinM', 'biomeMask']) if (args[n] != null) params[n] = args[n];
 if (args.probeKind) params.probeKind = String(args.probeKind);
@@ -107,13 +159,44 @@ async function startVite(port) {
 const { chromium } = require('playwright');
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--mute-audio'];
 
-async function openPage(browser, url) {
-  const page = await browser.newPage();
-  page.on('pageerror', (e) => console.error('[pageerror]', e.message));
-  await page.addInitScript({ path: path.join(here, 'browser.js') });
-  await page.goto(url);
-  await page.waitForFunction(() => window.__bbGame && window.__bbGame.scene.isActive('TitleScene'), null, { timeout: 60000 });
-  return page;
+async function openPage(browser, url, isolate = false) {
+  const page = isolate ? await browser.newPage({ serviceWorkers: 'block' }) : await browser.newPage();
+  try {
+    page.__errors = [];
+    page.on('pageerror', (e) => { page.__errors.push(e.message); console.error('[pageerror]', e.message); });
+    if (isolate) {
+      const origin = new URL(url).origin;
+      const context = page.context();
+      const routeError = (error) => {
+        if (page.__closing && /disposed|has been closed|cancelled|canceled/i.test(String(error))) return;
+        page.__errors.push(String(error));
+      };
+      await context.route('**/*', async (route) => {
+        try {
+          if (new URL(route.request().url()).origin !== origin) { await route.abort(); return; }
+          // Never follow a redirect from an otherwise allowed loopback URL.
+          const response = await route.fetch({ maxRedirects: 0 });
+          if (page.__closing) return;
+          if (response.status() >= 300 && response.status() < 400) await route.abort();
+          else await route.fulfill({ response });
+        } catch (error) {
+          routeError(error);
+          if (!page.__closing) await route.abort().catch(routeError);
+        }
+      });
+      await context.routeWebSocket('**/*', async (socket) => {
+        try { await socket.close(); } catch (error) { routeError(error); }
+      });
+    }
+    await page.addInitScript({ path: path.join(here, 'browser.js') });
+    await page.goto(url);
+    await page.waitForFunction(() => window.__bbGame && window.__bbGame.scene.isActive('TitleScene'), null, { timeout: 60000 });
+    return page;
+  } catch (error) {
+    page.__closing = true;
+    await page.close();
+    throw error;
+  }
 }
 
 // ------------------------------------------------------------------ stats helpers
@@ -165,6 +248,60 @@ function printTable(results, summary) {
   console.log(`wall ms/run: median ${summary.wallMs.median} max ${summary.wallMs.max}`);
 }
 
+async function runNoisePanel(browser, url, runJob) {
+  async function isolatedRun(job) {
+    const page = await openPage(browser, url, true);
+    let timer, result;
+    try {
+      result = await Promise.race([
+        runJob(page, job), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Noise trial timed out')), 180000); }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+      page.__closing = true;
+      await page.close();
+    }
+    if (page.__errors.length) throw new Error(`Noise browser errors: ${page.__errors.join('; ')}`);
+    return result;
+  }
+
+  const results = [];
+  const summary = {};
+  for (const profile of noiseProfiles) {
+    const group = [];
+    for (const seed of seeds) {
+      const job = { seed, profile };
+      const original = await isolatedRun(job);
+      let verification = null;
+      if (args.verify) {
+        const repeated = await isolatedRun(job);
+        const replayed = await isolatedRun({ ...job, playback: original.humanNoise.input.rows });
+        verification = {
+          seededRepeat: verifyNoiseEvidence(original, repeated),
+          inputPlayback: verifyNoiseEvidence(original, replayed, { playback: true }),
+        };
+      }
+      const { endReason, distM, simSec, frames, score, humanNoise, trace } = original;
+      group.push({ seed, endReason, outcome: noiseOutcome(endReason), distM, simSec, frames, score, humanNoise, trace, verification });
+      if (!args.quiet) console.log(`BOT ${profile} ${seed} ${endReason} ${distM}m ${verification ? JSON.stringify(verification) : ''}`);
+    }
+    summary[profile] = summarizeNoise(group);
+    results.push(...group);
+  }
+  const verify = args.verify ? results.every((r) => r.verification.seededRepeat && r.verification.inputPlayback) : null;
+  const settings = {
+    noiseSeed: args.noiseSeed, seeds, policy: args.policy, passDistanceM: args.maxM, maxSec: args.maxSec,
+    biomeMask: Number(args.biomeMask ?? 0) >>> 0, rule: args.rule || 'none', hopLeadMs: args.hopLeadMs ?? 380,
+    profiles: Object.fromEntries(noiseProfiles.map((name) => [name, NOISE_PROFILES[name]])),
+    ...(args.fatigue ? { fatigue: FATIGUE_RAMP } : {}),
+  };
+  const kind = args.fatigue ? 'local-tool-assisted-fatigue-bot-panel' : 'local-tool-assisted-bot-panel';
+  const label = args.fatigue ? 'FATIGUE BOT PANEL' : 'HUMAN-NOISE BOT PANEL';
+  console.log(`${label}, LOCAL QA ONLY: ${JSON.stringify({ settings, summary, verify })}`);
+  if (args.out) writeFileSync(args.out, JSON.stringify({ kind, settings, summary, verify, results }, null, 1));
+  if (verify === false) throw new Error('Noise input or result did not reproduce');
+}
+
 // ------------------------------------------------------------------ main
 async function main() {
   const port = await freePort();
@@ -177,7 +314,7 @@ async function main() {
   };
   process.on('SIGINT', async () => { await cleanup(); process.exit(130); });
   try {
-    browser = await chromium.launch({ args: LAUNCH_ARGS });
+    browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE, args: LAUNCH_ARGS });
     const jobs = [];
     if (args.verify) {
       for (const s of seeds) for (const rep of [0, 1]) jobs.push({ seed: s, rep });
@@ -191,13 +328,16 @@ async function main() {
         // W3: the biome mask must ride on the options, not only in `params` - the page reads o.biomeMask to
         // set REG.BIOME_MASK before RunScene builds its generator.
         biomeMask: args.biomeMask != null ? Number(args.biomeMask) >>> 0 : 0,
-        traceEvery: args.traceEvery || (args.verify ? 60 : 0), sub: args.sub || 0,
+        traceEvery: args.traceEvery || (args.verify || job.profile ? 60 : 0), sub: args.sub || 0,
         // Daily rule to measure under; 'none' (the default) neutralises modifiers for pacing runs.
         rule: args.rule ? String(args.rule) : 'none',
+        ...(job.profile ? { noiseProfile: job.profile, noiseSeed: args.noiseSeed, noiseReplay: job.playback } : {}),
+        ...(args.fatigue ? { noiseFatigue: true } : {}),
       };
       if (args.policy === 'terrain') return page.evaluate((o) => window.__sim.genTerrain(o), opts);
       return page.evaluate((o) => window.__sim.run(o), opts);
     };
+    if (noiseProfiles) return await runNoisePanel(browser, url, runJob);
     const worker = async () => {
       let page = await openPage(browser, url);
       for (;;) {
