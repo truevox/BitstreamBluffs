@@ -207,7 +207,11 @@ export class StemMusicDirector {
 				this.menuMode ? [] : orchestraPreset(this.biome,name);
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
-				this.mixer.replaceEffects(name,effects,.18);
+				// A rider entering Debumont while airborne is above the powder already.
+				// Keep the cached signature based on GROUND effects so jumps don't rebuild FX graphs.
+				const initial = this.airborne && !this.menuMode && this.biome === 'debumont'
+					? effects.map(e => e.type === 'snowpack' ? { ...e, depth: 0 } : e) : effects;
+				this.mixer.replaceEffects(name,initial,.18);
 				this._timbreSignatures.set(name,key);
 			}
 			// Restore each source's normal biome room send in either
@@ -283,6 +287,14 @@ export class StemMusicDirector {
 		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
 		this.airborne = next;
+		// As the rider clears the snow, the original instruments open up; landing
+		// restores Powdery without changing playback, beat timing or the music clock.
+		if (this.biome === 'debumont') {
+			for (const stem of ['bass','drums','guitar','piano','other']) {
+				const depth = next ? 0 : orchestraPreset('debumont',stem)[0].depth;
+				this.mixer?.setEffectParam(stem,'snowpack','depth',depth);
+			}
+		}
 		// New adaptive packs crossfade full original drums with an actual
 		// airborne kit. The legacy 0.58 airborne duck remains unchanged.
 		// Airborne ducking applies to the ORIGINAL stem regardless

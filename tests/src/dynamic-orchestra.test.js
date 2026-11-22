@@ -109,6 +109,44 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 		expect(r._variant('featured')).toBe('debumont');
 		expect(r._variant('drums')).toBe('debumont');
 	});
+	test('Debumont powder lifts on jump and settles on landing without rebuilding FX',()=> {
+		const d=fakeDirector();
+		d.clockStart=12.78;
+		d._applyMusicTimbres();
+		d.mixer.replaceEffects.mockClear();
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		const stems=['bass','drums','guitar','piano','other'];
+		for (const stem of stems)
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'snowpack','depth',0);
+		expect(d.mixer.replaceEffects).not.toHaveBeenCalled();
+		expect(d.clockStart).toBe(12.78);
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(false);
+		for (const stem of stems)
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'snowpack','depth',
+				orchestraPreset('debumont',stem)[0].depth);
+		expect(d.mixer.replaceEffects).not.toHaveBeenCalled();
+		expect(d.clockStart).toBe(12.78);
+	});
+	test('entering Debumont midair starts dry; other biomes are unchanged',()=> {
+		const d=fakeDirector();
+		d.airborne=true;
+		d._applyMusicTimbres();
+		const chainMap=new Map(d.mixer.replaceEffects.mock.calls.map(c=>[c[0],c[1]]));
+		for (const stem of ['bass','drums','guitar','piano','other'])
+			expect(chainMap.get(stem)).toEqual([{type:'snowpack',id:'snowpack',depth:0}]);
+		d.mixer.replaceEffects.mockClear();
+		d._applyMusicTimbres();
+		expect(d.mixer.replaceEffects).not.toHaveBeenCalled();
+		d.biome='vertigo-vents';
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+		d._applyMusicTimbres();
+		expect(d.mixer.replaceEffects).toHaveBeenCalled();
+	});
+
 	test('source stem presets cannot address vocals or unknown busses',()=>{
 		expect(()=>orchestraPreset('debumont','vocals')).toThrow();
 		expect(orchestraPreset('debumont','bass').length).toBeGreaterThan(0);

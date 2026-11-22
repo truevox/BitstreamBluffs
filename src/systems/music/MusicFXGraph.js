@@ -143,15 +143,19 @@ function allocateEffect(ctx, raw) {
 			input.connect(dry); dry.connect(output);
 			input.connect(lowA); lowA.connect(lowB); lowB.connect(shelf);
 			shelf.connect(comp); comp.connect(wet); wet.connect(output);
+			let previousDepth = clamp(raw.depth, 0, 1, 0);
 			const setDepth = (value, at, immediate = false) => {
 				const depth = clamp(value, 0, 1, 0);
+				// Leaving the snow clears quickly; landing lets the blanket settle.
+				const smoothing = depth < previousDepth ? 0.035 : 0.13;
+				previousDepth = depth;
 				const ceiling = Math.max(300, Math.min(14000, ctx.sampleRate / 2 - 20));
 				const cutoff = Math.max(250, Math.min(ceiling, 10500 * Math.pow(0.085, depth)));
 				const targets = [[dry.gain, 1 - depth], [wet.gain, depth * 0.95],
 					[lowA.frequency, cutoff], [lowB.frequency, cutoff * 1.12]];
 				for (const [target, targetValue] of targets) {
 					if (immediate) target.value = targetValue;
-					else numericParam(target, targetValue, at, 0.075);
+					else numericParam(target, targetValue, at, smoothing);
 				}
 				return true;
 			};

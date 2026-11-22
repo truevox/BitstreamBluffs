@@ -33,9 +33,10 @@ export function orchestraPreset(biome, stem) {
 	if (!['bass','drums','guitar','piano','other'].includes(stem))
 		throw new Error('Cannot apply orchestra effects to an unknown stem');
 	if (!BIOME_IDS.includes(biome)) return [];
-	// Deep snow muffles attacks and highs without re-timing the source performance.
+	// Powdery snow muffles the original performance without changing its notes or timing.
+	// Bass retains some warmth; jumping temporarily removes this effect in the director.
 	if (biome === 'debumont') return [{ type:'snowpack', id:'snowpack',
-		depth: stem === 'bass' ? .72 : stem === 'drums' ? .91 : .95 }];
+		depth: stem === 'bass' ? .56 : .72 }];
 	const edge = {
 		'debumont': 4200,'garbage-dump-glacier':6200,
 		'pyramid-peak': 5100,'underwater-mountain':1800,

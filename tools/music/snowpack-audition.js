@@ -1,19 +1,22 @@
 import { buildMusicChain } from '../../src/systems/music/MusicFXGraph.js';
 
 const $ = id => document.getElementById(id);
-let ctx = null, chain = null, buffer = null, source = null, running = false, burstTimer = null;
+let ctx = null, chain = null, buffer = null, source = null, running = false, airborne = false;
 const status = message => { $('status').textContent = message; };
 const setDepth = (amount, updateSlider = true) => {
 	const depth = Math.max(0, Math.min(1, Number(amount) || 0));
 	if (updateSlider) $('depth').value = String(depth);
 	$('readout').textContent = Math.round(depth * 100) + '%';
-	chain?.find('snow')?.set('depth', depth, ctx.currentTime);
+	chain?.find('snow')?.set('depth', airborne ? 0 : depth, ctx.currentTime);
 };
 const stop = () => {
 	if (!source) return;
 	try { source.stop(); source.disconnect(); } catch {}
 	source = null; running = false;
 	$('play').textContent = '▶ Play / pause';
+	airborne = false;
+	$('burst').textContent = '🏂 Jump — leave powder';
+	if (ctx) setDepth($('depth').value, false);
 };
 const ensureContext = async () => {
 	if (!ctx) {
@@ -53,16 +56,11 @@ $('depth').addEventListener('input', event => {
 $('preset').addEventListener('change', event => setDepth(event.target.value));
 $('burst').addEventListener('click', () => {
 	if (!buffer) return;
-	if (burstTimer) clearTimeout(burstTimer);
-	const normal = Number($('depth').value);
-	// A trick or landing can momentarily punch a hole in the acoustic snow.
-	chain?.find('snow')?.set('depth', Math.min(.16, normal), ctx.currentTime);
-	burstTimer = setTimeout(() => {
-		chain?.find('snow')?.set('depth', Number($('depth').value), ctx.currentTime);
-		burstTimer = null;
-	}, 270);
+	airborne = !airborne;
+	$('burst').textContent = airborne ? '🛬 Land — back into powder' : '🏂 Jump — leave powder';
+	setDepth($('depth').value, false);
+	status(airborne ? 'Airborne: original recording opens up above the snow.' : 'Landing: powder settles around the original recording.');
 });
 window.addEventListener('pagehide', () => {
-	if (burstTimer) clearTimeout(burstTimer);
 	stop(); chain?.dispose(); ctx?.close();
 });
