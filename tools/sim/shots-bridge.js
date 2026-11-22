@@ -96,7 +96,21 @@
       await window.__shot(`${o.tag || 'shot'}-${sh.name}`, { ...info });
       shots.push(info);
     }
-    return { meta, shots };
+    // optional: CPU cost of BiomeFx.update (JS side only; the GPU is software here) in each state, ms per call
+    let perf = null;
+    if (o.perf && scene.biomeFx) {
+      const fx = scene.biomeFx;
+      const time = (label, look, veil) => {
+        fx.setLook(look);
+        for (let i = 0; i < 60; i++) fx.update(i * 10, i * 16, veil, false);
+        const t0 = performance.now();
+        const N = 600;
+        for (let i = 0; i < N; i++) fx.update(i * 10, 4000 + i * 16, veil, false);
+        return [label, +((performance.now() - t0) / N).toFixed(4)];
+      };
+      perf = Object.fromEntries([time('debutmont', 'debutmont', 0), time('glacier', 'garbage-dump-glacier', 0), time('veil-half', 'debutmont', 0.5), time('veil-full', null, 1), time('other-biome', 'pyramid-peak', 0)]);
+    }
+    return { meta, shots, perf };
   }
   window.__shotsBridge = { run };
 })();
