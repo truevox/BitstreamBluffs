@@ -5,9 +5,15 @@
  * unlocked, encountered, and completed separately."
  *
  *  - UNLOCKED   is the existing Sync Level unlock (ProfileStore.unlockedBiomeIds). Not stored here.
- *  - ENCOUNTERED: the sled's x reached a sector whose `biomeForSector(seed, sector, mask)` is that biome.
+ *  - ENCOUNTERED: the sled's x reached a sector whose `biomeForSector(seed, sector, mask)` is that biome, past
+ *                 the arcade bridge that opens it when the previous sector was a different biome (#65).
  *  - COMPLETED:   the sled rode one of that biome's sectors from its start to its end (SECTOR_M, 500 m) and
  *                 the run's crash is not inside that sector.
+ *
+ * Arcade (a bridge) is glue, never a biome: it is not tracked. The home biome (Debutmont) is the base, so it is
+ * encountered from sector 0 whatever the mask, and the mask-0 early return is gone. Completion stays
+ * sector-based (the whole sector ridden, bridge included), so a sector that opens with a bridge still completes
+ * its biome at the sector's end.
  *
  * Detection is a pure function of what a run saw: its seed and mask, the furthest x the sled reached and the
  * x of the run-ending crash. The sled only moves forward through sectors (a respawn never skips one), so
@@ -18,7 +24,7 @@
  * Only the run-ending crash voids a sector. A crash a Hashed Backup absorbs, or an opening-grace recovery,
  * does not: the run went on and the sled still rode the sector to its end. (Documented in ARCHITECTURE.)
  */
-import { biomeForSector, SECTOR_M } from './TerrainGenerator.js';
+import { biomeForSector, arcadeBridgeLengthM, sectorHasBridge, SECTOR_M } from './TerrainGenerator.js';
 import { canonicalBiomeId } from '../data/biomeAliases.js';
 
 /**
@@ -66,16 +72,20 @@ export function sectorOfX(x, pxPerMeter = 20) {
 export function detectBiomeVisits(o = {}) {
   const opts = o && typeof o === 'object' ? o : {};
   const mask = Number(opts.biomeMask) >>> 0;
-  if (!mask || !Number.isFinite(opts.furthestX)) return EMPTY();
+  if (!Number.isFinite(opts.furthestX)) return EMPTY();
   const defs = Array.isArray(opts.biomeDefs) ? opts.biomeDefs : [];
   const ppm = opts.pxPerMeter;
   const last = sectorOfX(opts.furthestX, ppm);
   const crashSector = Number.isFinite(opts.crashX) ? sectorOfX(opts.crashX, ppm) : -1;
   const encountered = [];
   const completed = [];
+  const furthestM = Math.max(0, opts.furthestX) / (Number(ppm) > 0 ? Number(ppm) : 20);
   for (let s = 0; s <= last; s++) {
     const id = biomeForSector(opts.seed, s, mask, defs);
     if (!id) continue;
+    // Still inside the bridge that opens this sector: the sled has not entered the biome yet. The window is the
+    // unsnapped one (the generator rounds it out to whole chunks), so the edge can differ by under one chunk.
+    if (s === last && sectorHasBridge(opts.seed, s, mask, defs) && furthestM < s * SECTOR_M + arcadeBridgeLengthM(s * SECTOR_M)) continue;
     encountered.push(id);
     if (s < last && s !== crashSector) completed.push(id);
   }
