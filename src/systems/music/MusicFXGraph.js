@@ -8,7 +8,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap',
 ]);
 
 function saturatorCurve(amount) {
@@ -127,6 +127,66 @@ function allocateEffect(ctx, raw) {
 			input.connect(conv); conv.connect(wet); wet.connect(output);
 			// IR buffer arrives asynchronously. Missing IR = dry-only sound.
 			refs.impulse = { set: (buffer) => { conv.buffer = buffer || null; } };
+			break;
+		}
+		case 'scrapheap': {
+			// Inharmonic, source-excited junk-metal resonators on ORIGINAL drum audio.
+			// No independently timed notes or invented beat grid: the recording
+			// remains audible on the untouched dry path.
+			const dry = node(ctx.createGain()), wet = node(ctx.createGain());
+			const highpass = node(ctx.createBiquadFilter());
+			highpass.type = 'highpass'; highpass.frequency.value = 185;
+			const grit = node(ctx.createWaveShaper());
+			grit.curve = saturatorCurve(0.16);
+			grit.oversample = '2x';
+			dry.gain.value = 1;
+			input.connect(dry); dry.connect(output);
+			input.connect(highpass); highpass.connect(grit);
+			const pitches = [379, 743, 1327]; // intentionally inharmonic, not Crystal chords
+			const delays = [.017, .043, .071];
+			const weights = [.41, .29, .24];
+			for (let i = 0; i < pitches.length; i++) {
+				const resonator = node(ctx.createBiquadFilter());
+				resonator.type = 'bandpass';
+				resonator.frequency.value = pitches[i];
+				resonator.Q.value = 5.2 + i * 1.5;
+				const shortEcho = node(ctx.createDelay(.2));
+				shortEcho.delayTime.value = delays[i];
+				const voice = node(ctx.createGain());
+				voice.gain.value = weights[i];
+				grit.connect(resonator);
+				resonator.connect(shortEcho);
+				shortEcho.connect(voice);
+				voice.connect(wet);
+			}
+			wet.connect(output);
+			let contact = clamp(raw.contact, 0, 1, 0);
+			let burstEnd = -Infinity;
+			const bed = () => .012 + contact * .22;
+			wet.gain.value = bed();
+			refs.contact = { set: (value, at) => {
+				contact = clamp(value, 0, 1, 0);
+				// Takeoff silences contact immediately and cancels impact tails.
+				if (contact === 0) {
+					burstEnd = -Infinity;
+					numericParam(wet.gain, bed(), at, 0.035);
+				} else {
+					// Ground-speed updates adjust the recovery without an abrupt click.
+					const when = Math.max(at, burstEnd);
+					numericParam(wet.gain, bed(), when, 0.11);
+				}
+				return true;
+			} };
+			refs.impact = { set: (value, at) => {
+				const impulse = clamp(value, 0, 1, 0);
+				if (impulse <= 0) return false;
+				const peak = Math.min(.68, bed() + .52 * impulse);
+				burstEnd = at + .13;
+				wet.gain.cancelScheduledValues(at);
+				wet.gain.setTargetAtTime(peak, at, .018);
+				wet.gain.setTargetAtTime(bed(), burstEnd, .22);
+				return true;
+			} };
 			break;
 		}
 		case 'snowpack': {

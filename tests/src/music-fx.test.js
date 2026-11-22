@@ -90,6 +90,23 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(recovery).toHaveLength(count);
 		chain.dispose();
 	});
+	test('Scrapheap native graph reacts to contact and landing without replacing original audio', () => {
+		const ctx = fakeContext();
+		const source = ctx.createGain();
+		const chain = buildMusicChain(ctx, [{id:'scrapheap',type:'scrapheap',contact:0.4}], ctx.createGain());
+		const scrap = chain.find('scrapheap');
+		expect(scrap.refs.contact).toBeDefined();
+		expect(scrap.refs.impact).toBeDefined();
+		source.connect(chain.input);
+		expect(scrap.set('contact',0.7,ctx.currentTime)).toBe(true);
+		expect(scrap.set('impact',0.9,ctx.currentTime)).toBe(true);
+		expect(scrap.set('impact',-15,ctx.currentTime)).toBe(false);
+		expect(scrap.set('impact',NaN,ctx.currentTime)).toBe(false);
+		expect(scrap.set('impact',9e9,ctx.currentTime)).toBe(true);
+		expect(scrap.set('contact',0,ctx.currentTime+.04)).toBe(true);
+		expect(scrap.set('contact',Infinity,ctx.currentTime+.08)).toBe(true);
+		chain.dispose();
+	});
 	test('rejects unknown processors and duplicate stable ids', () => {
 		const ctx = fakeContext();
 		expect(() => buildMusicChain(ctx,[{type:'unsafeScript',id:'bad'}],ctx.createGain())).toThrow();

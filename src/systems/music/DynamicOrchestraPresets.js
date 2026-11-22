@@ -51,6 +51,7 @@ export function orchestraPreset(biome, stem) {
 	}
 	if (stem==='drums') {
 		return [filter('drum-color','lowpass',edge),
+			...(biome==='garbage-dump-glacier'?[{type:'scrapheap',id:'scrapheap',contact:0}]:[]),
 			...(biome==='steampunk-slopes'||biome==='micro-mountain'?[tremolo(6,.17)]:[])];
 	}
 	// Never replace, retrigger, rescore or move source note attacks here.

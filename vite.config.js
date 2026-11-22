@@ -11,7 +11,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: ['./index.html', './tools/music/snowpack-audition.html'], // Game + isolated Snowpack DSP audition
+      input: ['./index.html', './tools/music/snowpack-audition.html', './tools/music/scrapheap-audition.html'], // Game + isolated biome DSP auditions
     },
   },
   server: {
