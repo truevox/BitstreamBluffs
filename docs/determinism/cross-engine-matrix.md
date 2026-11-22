@@ -6,7 +6,7 @@
 
 ## What was run
 
-Real built game (`vite build` of main b51bee72 plus nothing, Phaser 3.90 + Matter, `window.__bbGame`), stepped frame by frame with `game.step(t, dt)` (loop asleep, `RunScene.update` held), so display cadence reaches `SimClock` exactly as in play. Only the final WebGL draw call is skipped (`RASTER=1` restores it); all JS paths including `renderFrame`, camera and telegraph run.
+Real built game (`vite build` of the merge with main b51bee72, no src changes, Phaser 3.90 + Matter, `window.__bbGame`), stepped frame by frame with `game.step(t, dt)` (loop asleep, `RunScene.update` held), so display cadence reaches `SimClock` exactly as in play. Only the final WebGL draw call is skipped (`RASTER=1` restores it); all JS paths including `renderFrame`, camera and telegraph run.
 
 * 9 fixtures, recorded **once** in Chromium with the game's own `GhostRecorder` on the merged build (so headers carry `syncLevel` and `dailyRuleSource`, Replay Contract v1.1 / PR #164), committed as `tools/conformance/fixtures/cross-engine/*.tape.json` and replayed through `TapePlayer`.
 * 5 engine configs: `chromium-headless-shell` 157 (SwiftShader), `chromium-full-headless` 153 (headless=new), `chromium-shell-defaultgl` 157, Firefox 159 (**headed under Xvfb**: headless Firefox cannot create WebGL here), Playwright WebKit 27.2. Linux x64, 4 vCPU.
