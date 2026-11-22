@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Debumont renamed Debutmont (2026-11-21)
+## v2.19.13 — Debutmont spelling and legacy alias (#65 / #199) (2026-11-22)
 
 - **The first biome is now spelled "Debutmont"** (Marvin confirmed the spelling; issue #65, part 1 of 3). The biome id, name, hazards (Groomer Cat), power-up (Maple Wax), mission (`t4-biome-debutmont`, "1500 m in Debutmont"), Sync Level reward, music voice (`voice:debutmont`), the per-pack `adaptive/debutmont/` OGG directories (git renames, bytes unchanged), tools, tests and docs all use the new spelling. No gameplay, terrain, unlock level or profile default changes.
 - **Legacy alias, nothing lost.** `src/data/biomeAliases.js` maps `debumont` to `debutmont`. Profile sanitize applies it to `biomeProgress`, `unlocked.biomes` and the active mission list and mission progress (both spellings merge; the larger progress count wins), and the music pack loader, voice lookup and adaptive router read a stale `debumont` key or path as `debutmont`, so older saves and music branches written before the rename keep working.
