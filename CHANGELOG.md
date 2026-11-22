@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.19.2 — savestate feasibility study, Phase 1 research (#119 / #159) (2026-11-22)
+
+- **Research only: no savestates ship, and no gameplay, physics, replay format or `src/` change.** Adds `docs/determinism/savestate-feasibility.md`.
+  - It inventories the complete Matter and game state that a tick-boundary save/restore needs.
+  - It shows that restoring a GhostTape checkpoint diverges on the next tick.
+  - It shows that a full diagnostic snapshot, restored into a fresh scene and world in the built game, replays bit-identically. The fixtures are contact-heavy and hazard-heavy, and were compared over 500 and 520 ticks.
+  - It proposes a build-bound savestate contract with completeness checks, and gives a conditional GO for Phase 2.
+- **Experimental harnesses:**
+  - `tools/savestate-experiment/` (pure-Matter and Chromium experiments, with results).
+  - `tests/determinism/savestate-matter.test.js` (16 tests).
+  - Their digests are diagnostic and non-authoritative; Replay Contract #152 owns canonical fingerprints.
+
+- **Post-integration context:** #155 camera read was already fixed by v2.16.1 and #140 causal isolation merged in v2.19.1 (simulation revision 3, preserving Kodiak shove revision 2). Canonical collider construction and stable-key TelegraphTracker remain separate Phase 2 prerequisites. The old Chromium snapshot measurements are archived as research evidence, not retested on the new physics; no production savestate code ships.
+
 ## v2.19.1 — simulation/presentation causal isolation (#160 / #140) (2026-11-22)
 
 - **Palette toggle mid-run no longer touches physics.** A colour-blind palette switch (Pause > Settings) repainted the terrain through `TerrainMesh.addChunk`, which removed and re-added every live collider: segments came back as other pooled bodies (new ids, new Matter world order), pad sensors were rebuilt and the contact pairs under the sled lost their warm-start impulses. In the built game a toggle at tick 300 forked the sled pose at tick 301. New `TerrainMesh.redrawChunk` repaints graphics only; `addChunk` builds the same bodies in the same order as before.
