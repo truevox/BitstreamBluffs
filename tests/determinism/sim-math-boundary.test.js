@@ -14,6 +14,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { TRIPWIRE_FILES } from '../../tools/ruleset/lib.mjs';
 import { makeGen } from '../src/_helpers.js';
+import { parse } from '@babel/parser';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -37,29 +38,100 @@ export const PMATH_USERS = [
   'src/systems/ScoreManager.js', 'src/systems/ShardMagnet.js', 'src/systems/TrickTracker.js', 'src/systems/BiomeEffects.js', 'src/systems/MatterPortable.js',
 ];
 
+// Reviewed, *exact* draw statements; moving native Math into a physics write cannot
+// be excused by merely appending the string "pmath-exempt: draw-only". New graphics
+// calls must be inspected and explicitly added here rather than silently accepted.
+export const APPROVED_DRAW_ONLY_LINES = Object.freeze({
+  "src/entities/PowerUp.js": [
+    "const bob = Math.sin(t / 260 + this.spawn.x * 0.01) * 2.5;",
+    "const pulse = 0.5 + 0.5 * Math.sin(t / 200);",
+    "g.fillCircle(Math.cos(o) * 5.5, Math.sin(o) * 5.5, 1.3);",
+    "g.lineBetween(0, 0, Math.sin(a) * r * 0.45, -Math.cos(a) * r * 0.45);",
+    "const breathe = 1 + 0.12 * Math.sin(t / 250);",
+    "const fl = 1 + 0.15 * Math.sin(t / 90);",
+    "for (let k = 0; k < 6; k++) hx.push({ x: Math.cos((k * Math.PI) / 3) * 5.5, y: Math.sin((k * Math.PI) / 3) * 5.5 });",
+    "g.fillCircle(0, 0.8 + Math.sin(t / 300) * 0.6, 2.6);",
+    "const tilt = Math.sin(t / 260) * 0.5;",
+    "g.strokeEllipse(0, 0, 12, 12 * (0.55 + 0.35 * Math.abs(Math.cos(tilt))));",
+    "const sq = 1 + 0.4 * Math.abs(Math.sin(t / 220));"
+  ],
+  "src/entities/Shard.js": [
+    "const pulse = 0.75 + 0.25 * Math.sin(timeMs / 140);",
+    "const bob = s.pulled ? 0 : Math.sin(timeMs / 260 + s.x * 0.05) * 2;"
+  ]
+});
+
 /**
  * @param {string} src file text
- * @param {{markersExempt?: boolean}} [opt] honour `pmath-exempt: draw-only` line markers
+ * @param {{markersExempt?: boolean, approvedExemptions?:Set<string>}} [opt] reviewed draw-only statements
  * @returns {{line:number, why:string, text:string}[]} violations
  */
-export function mathViolations(src, { markersExempt = false } = {}) {
+export function mathViolations(src, { markersExempt = false, approvedExemptions = new Set() } = {}) {
+  // Parse JavaScript instead of regex-stripping comments: a string containing "/*" must
+  // never hide a later Math.sin() from the simulation boundary check.
+  const lines = src.split('\n');
+  let ast;
+  try {
+    ast = parse(src, { sourceType: 'unambiguous', plugins: ['jsx', 'importAttributes'] });
+  } catch (e) {
+    return [{ line: e.loc?.line || 1, why: `cannot parse for native-Math boundary: ${e.message}`, text: lines[(e.loc?.line || 1) - 1] || '' }];
+  }
+  const permittedComments = new Set((ast.comments || [])
+    .filter(c => c.type === 'CommentLine' && c.value.includes(EXEMPT_MARK))
+    .map(c => c.loc.start.line));
   const out = [];
-  const noBlock = src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
-  noBlock.split('\n').forEach((raw, i) => {
-    if (markersExempt && raw.includes(EXEMPT_MARK)) return;
-    const code = raw.replace(/(^|[^:'"`\\])\/\/.*$/, '$1');
-    for (const m of code.matchAll(/\bMath\b/g)) {
-      const before = code.slice(0, m.index), after = code.slice(m.index + 4);
-      if (/\.\s*$/.test(before) || /\?\.\s*$/.test(before)) { out.push({ line: i + 1, why: 'Math reached through another object', text: code.trim() }); continue; }
-      const member = /^\s*\.\s*([A-Za-z0-9_$]+)/.exec(after);
-      if (!member) out.push({ line: i + 1, why: 'Math used other than as Math.<member> (alias, destructuring, bracket or optional access)', text: code.trim() });
-      else if (!ALLOWED_MATH.has(member[1])) out.push({ line: i + 1, why: `Math.${member[1]} is not on the allowlist`, text: code.trim() });
+  const emit = (node, why) => {
+    const line = node.loc?.start.line || 1;
+    if (markersExempt && permittedComments.has(line) &&
+        approvedExemptions.has((lines[line - 1] || '').split('// pmath-exempt: draw-only')[0].trim())) return;
+    out.push({ line, why, text: (lines[line - 1] || '').trim() });
+  };
+  const staticString = n => {
+    if (!n) return null;
+    if (n.type === 'StringLiteral') return n.value;
+    if (n.type === 'TemplateLiteral' && n.expressions.length === 0) return n.quasis[0].value.cooked;
+    if (n.type === 'BinaryExpression' && n.operator === '+') {
+      const a = staticString(n.left), b = staticString(n.right);
+      return a !== null && b !== null ? a + b : null;
     }
-    for (const m of code.matchAll(/\*\*/g)) {
-      const before = code.slice(0, m.index), after = code.slice(m.index + 2);
-      if (!(/\b\d+\s*$/.test(before) && /^\s*\d+\b(?![.\d])/.test(after))) out.push({ line: i + 1, why: '** is only allowed between two integer literals', text: code.trim() });
+    return null;
+  };
+  const memberKey = node => {
+    if (!node.computed) return node.property?.name || null;
+    return staticString(node.property);
+  };
+  const member = n => n && (n.type === 'MemberExpression' || n.type === 'OptionalMemberExpression');
+  const isGlobal = n => n && n.type === 'Identifier' && (n.name === 'globalThis' || n.name === 'window');
+  const walk = (node, parent = null) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { for (const child of node) walk(child, parent); return; }
+    // Global-object aliases make the native Math property invisible to a naive
+    // member-expression detector. Fail closed on introducing those aliases in
+    // causal modules; existing code uses only direct known global properties.
+    if (node.type === 'VariableDeclarator' && isGlobal(node.init)) emit(node, 'global-object alias may hide native Math');
+    if (node.type === 'AssignmentExpression' && isGlobal(node.right)) emit(node, 'assignment aliases the global object');
+    if (node.type === 'Identifier' && node.name === 'Math') {
+      const direct = member(parent) && parent.object === node && !parent.computed && !parent.optional && ALLOWED_MATH.has(parent.property?.name);
+      if (!direct) emit(node, 'Math used outside an allowed direct Math.<member>');
     }
-  });
+    if (member(node) && isGlobal(node.object)) {
+      const name = memberKey(node);
+      if (name === 'Math' || (node.computed && name === null)) {
+        emit(node, 'global computed/member access may reach native Math');
+      }
+    }
+    if (node.type === 'BinaryExpression' && node.operator === '**') {
+      const a = node.left, b = node.right;
+      if (!(a.type === 'NumericLiteral' && b.type === 'NumericLiteral' && Number.isInteger(a.value) && Number.isInteger(b.value))) {
+        emit(node, '** is only allowed between integer literals');
+      }
+    }
+    for (const [k, value] of Object.entries(node)) {
+      if (k === 'loc' || k === 'start' || k === 'end' || k === 'extra' || k === 'comments' || k === 'tokens' || k === 'leadingComments' || k === 'trailingComments' || k === 'innerComments') continue;
+      if (value && typeof value === 'object') walk(value, node);
+    }
+  };
+  walk(ast.program);
   return out;
 }
 
@@ -79,6 +151,11 @@ describe('the scanner itself: every bypass is caught, legitimate code passes', (
     'optional chaining': 'const y = Math?.atan2(x, 1);',
     'optional chaining on a member': 'const y = Math?.pow(x, 2);',
     'through globalThis': 'const y = globalThis.Math.cos(x);',
+    'string-delimited fake block comment': 'const a = "/*"; const y = Math.sin(x); const b = "*/";',
+    'computed global Math': "const x = globalThis['Ma' + 'th'].sin(t);",
+    'computed dynamic global': 'const x = globalThis[key](t);',
+    'aliased global object': "const g = globalThis; const y = g['Math'].sin(t);",
+    'aliased window': "let g; g = window; const y = g['Math'].sin(t);",
     'through window': 'const y = window.Math.sin(x);',
     'through Phaser': 'const y = Phaser.Math.Between(1, 2);',
     'passed as a value': 'doIt(Math);',
@@ -104,7 +181,7 @@ describe('the scanner itself: every bypass is caught, legitimate code passes', (
   test('a draw-only marker exempts one line only when markers are honoured', () => {
     const src = `const a = Math.sin(t); // ${EXEMPT_MARK}\nconst b = Math.cos(t);`;
     expect(mathViolations(src).length).toBe(2);
-    expect(mathViolations(src, { markersExempt: true }).map((v) => v.line)).toEqual([2]);
+    expect(mathViolations(src, { markersExempt: true, approvedExemptions: new Set(['const a = Math.sin(t);']) }).map((v) => v.line)).toEqual([2]);
   });
 });
 
@@ -114,7 +191,17 @@ describe('every src file is on the allowlist, except explicit presentation files
     for (const f of PRESENTATION_FILES) expect(allSrc).toContain(f);
     expect(scanned.length).toBeGreaterThan(100);
   });
-  test.each(scanned)('%s', (f) => { expect(mathViolations(read(f), { markersExempt: tripwire.has(f) })).toEqual([]); });
+  test.each(scanned)('%s', (f) => { expect(mathViolations(read(f), { markersExempt: ['src/entities/PowerUp.js', 'src/entities/Shard.js'].includes(f), approvedExemptions: new Set(APPROVED_DRAW_ONLY_LINES[f] || []) })).toEqual([]); });
+  test('draw-only marker cannot hide new causal writes even within a mixed-purpose entity', () => {
+    const malicious = 'this.body.position.x = Math.sin(t); // pmath-exempt: draw-only';
+    for (const f of Object.keys(APPROVED_DRAW_ONLY_LINES)) {
+      expect(mathViolations(malicious, { markersExempt: true, approvedExemptions: new Set(APPROVED_DRAW_ONLY_LINES[f]) }).length).toBeGreaterThan(0);
+    }
+    for (const [f, lines] of Object.entries(APPROVED_DRAW_ONLY_LINES)) {
+      const source = read(f);
+      for (const line of lines) expect(source).toContain(line);
+    }
+  });
   test('a presentation file is not exempt as a whole when it is a causal tripwire file', () => {
     const both = PRESENTATION_FILES.filter((f) => tripwire.has(f));
     expect(both.sort()).toEqual(['src/entities/PowerUp.js', 'src/entities/Shard.js']); // changing this list means re-reading why they are causal
