@@ -20,6 +20,31 @@ export function worldDanceMotionAllowed(settings, prefersReducedMotion = false) 
     !resolveReduceMotion(settings?.reduceMotion, prefersReducedMotion);
 }
 
+/**
+ * Read the audio engine's world-dance sample and synthetic meter for one render frame (issue #140).
+ * Audio is presentation: a missing, muted or failing engine must give "no dance", never an exception.
+ * An exception here escaped RunScene.renderFrame, and Phaser's RAF step reschedules itself only AFTER the
+ * frame callback returns, so one throw stopped the game loop (and the simulation) for good.
+ * @param {object|null|undefined} audio REG.AUDIO engine
+ * @param {boolean} allowed worldDanceMotionAllowed(...)
+ * @returns {{sample: any, meter: any}} nulls when not allowed, unavailable or failing
+ */
+export function readWorldDanceAudio(audio, allowed) {
+  if (!allowed || !audio) return { sample: null, meter: null };
+  try {
+    const sample = audio.getWorldDanceSample?.() ?? null;
+    const meter = sample ? audio.getSyntheticMeterTiming?.() ?? null : null;
+    return { sample, meter };
+  } catch (e) {
+    // Log once so a real audio-engine bug stays visible; every later failure is silent "no dance".
+    if (!readWorldDanceAudio.warned) {
+      readWorldDanceAudio.warned = true;
+      try { console.warn('[WorldDance] audio read failed; scenery dance disabled for this failure', e); } catch { /* no console */ }
+    }
+    return { sample: null, meter: null };
+  }
+}
+
 /** Each biome interprets the same musical accents in its own visual voice.
  * These are cosmetic multipliers; the intensity never leaks to physics.
  */

@@ -66,7 +66,7 @@ describe('denylist entries are real (none dead) and everything else stays includ
     expect(keyPaths(doc.tables.dailyRules).some((p) => /name|description/.test(p))).toBe(false);
     expect(Object.keys(doc.tables.boostDefs.headStart).sort()).toEqual(['id', 'openingFadeMs', 'openingMs', 'openingSpeedMul', 'speedFactor']);
     expect(Object.keys(doc.tables.boostDefs.errorCorrection).sort()).toEqual(['id', 'shieldCharges']);
-    expect(Object.keys(doc.constants.kodiak.KODIAK_DEFS.blackIce).sort()).toEqual(['from', 'id', 'kind', 'onHit']);
+    expect(Object.keys(doc.constants.kodiak.KODIAK_DEFS.blackIce).sort()).toEqual(['from', 'id', 'kind']);
   });
   test('inventory of included content key paths (a new key shows up here: classify it causal, or add a denylist entry)', () => {
     const inv = Object.fromEntries(CONTENT_GROUPS.map((g) => [g, keyPaths(Object.values(doc.content[g]))]));

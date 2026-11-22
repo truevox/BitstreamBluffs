@@ -1,0 +1,547 @@
+{
+  "results": [
+    {
+      "level": "pose",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=260",
+      "maxPosErr": 339.979681,
+      "endPosErr": 339.277396
+    },
+    {
+      "level": "kinematic",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=282.67088246370355",
+      "maxPosErr": 159.589842,
+      "endPosErr": 159.589842
+    },
+    {
+      "level": "contacts",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "pose",
+      "history": "shuffled",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=260",
+      "maxPosErr": 339.979681,
+      "endPosErr": 339.277396
+    },
+    {
+      "level": "kinematic",
+      "history": "shuffled",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=282.67088246370355",
+      "maxPosErr": 159.589842,
+      "endPosErr": 159.589842
+    },
+    {
+      "level": "contacts",
+      "history": "shuffled",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "full",
+      "history": "shuffled",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "pose",
+      "history": "permuted",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=260",
+      "maxPosErr": 380.559474,
+      "endPosErr": 368.748202
+    },
+    {
+      "level": "kinematic",
+      "history": "permuted",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=282.67088246370355",
+      "maxPosErr": 194.659814,
+      "endPosErr": 149.702214
+    },
+    {
+      "level": "contacts",
+      "history": "permuted",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 343,
+      "ticksAfterRestore": 43,
+      "field": "pile:05[4] ref=0.08794453192444962 got=0.07364204450186662",
+      "maxPosErr": 65.717477,
+      "endPosErr": 65.717477
+    },
+    {
+      "level": "full",
+      "history": "permuted",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "pose",
+      "history": "pooled",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=260",
+      "maxPosErr": 289.361997,
+      "endPosErr": 240.301143
+    },
+    {
+      "level": "kinematic",
+      "history": "pooled",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=282.67088246370355",
+      "maxPosErr": 114.78506,
+      "endPosErr": 84.294365
+    },
+    {
+      "level": "contacts",
+      "history": "pooled",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 305,
+      "ticksAfterRestore": 5,
+      "field": "pile:05[1] ref=447.5989233965364 got=447.59892339653646",
+      "maxPosErr": 87.139596,
+      "endPosErr": 66.251593
+    },
+    {
+      "level": "full",
+      "history": "pooled",
+      "captureStatics": false,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 305,
+      "ticksAfterRestore": 5,
+      "field": "pile:05[1] ref=447.5989233965364 got=447.59892339653646",
+      "maxPosErr": 87.139596,
+      "endPosErr": 66.251593
+    },
+    {
+      "level": "full",
+      "history": "pooled",
+      "captureStatics": true,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "contacts",
+      "history": "permuted",
+      "captureStatics": true,
+      "skip": "-",
+      "newPairsAfterK": 74,
+      "K": 300,
+      "N": 900,
+      "firstDivergentTick": 343,
+      "ticksAfterRestore": 43,
+      "field": "pile:05[4] ref=0.08794453192444962 got=0.07364204450186662",
+      "maxPosErr": 65.717477,
+      "endPosErr": 65.717477
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "impulses",
+      "newPairsAfterK": 55,
+      "K": 300,
+      "N": 600,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=282.67086399893594",
+      "maxPosErr": 122.110682,
+      "endPosErr": 91.220931
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "staleSupport",
+      "newPairsAfterK": 55,
+      "K": 300,
+      "N": 600,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[4] ref=0.0013629075610879227 got=0.0008132908476454759",
+      "maxPosErr": 268.873578,
+      "endPosErr": 268.873578
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "detectorOrder",
+      "newPairsAfterK": 55,
+      "K": 300,
+      "N": 600,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "worldOrder",
+      "newPairsAfterK": 55,
+      "K": 300,
+      "N": 600,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "timing",
+      "newPairsAfterK": 55,
+      "K": 300,
+      "N": 600,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:05[1] ref=444.7891632606304 got=444.77680600444535",
+      "maxPosErr": 35.394519,
+      "endPosErr": 35.394519
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "positionImpulse",
+      "newPairsAfterK": 55,
+      "K": 300,
+      "N": 600,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:11[1] ref=490.23202759967086 got=490.2319889180589",
+      "maxPosErr": 8.511857,
+      "endPosErr": 8.511857
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "deltaTime",
+      "newPairsAfterK": 55,
+      "K": 300,
+      "N": 600,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=282.6695628887259",
+      "maxPosErr": 91.238292,
+      "endPosErr": 91.238292
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "rawGeometry",
+      "newPairsAfterK": 55,
+      "K": 300,
+      "N": 600,
+      "firstDivergentTick": 301,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.66933345487655 got=282.66933345487683",
+      "maxPosErr": 146.47513,
+      "endPosErr": 146.47513
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "impulses",
+      "newPairsAfterK": 53,
+      "K": 450,
+      "N": 750,
+      "firstDivergentTick": 451,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.72983891611386 got=282.72909936893177",
+      "maxPosErr": 41.799794,
+      "endPosErr": 16.129662
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "staleSupport",
+      "newPairsAfterK": 53,
+      "K": 450,
+      "N": 750,
+      "firstDivergentTick": 451,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[4] ref=0.000014426316965909791 got=0.00002108264743583277",
+      "maxPosErr": 148.796185,
+      "endPosErr": 146.216038
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "detectorOrder",
+      "newPairsAfterK": 53,
+      "K": 450,
+      "N": 750,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "worldOrder",
+      "newPairsAfterK": 53,
+      "K": 450,
+      "N": 750,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "timing",
+      "newPairsAfterK": 53,
+      "K": 450,
+      "N": 750,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "positionImpulse",
+      "newPairsAfterK": 53,
+      "K": 450,
+      "N": 750,
+      "firstDivergentTick": null,
+      "ticksAfterRestore": null,
+      "field": null,
+      "maxPosErr": 0,
+      "endPosErr": 0
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "deltaTime",
+      "newPairsAfterK": 53,
+      "K": 450,
+      "N": 750,
+      "firstDivergentTick": 451,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.72983891611386 got=282.72983955113455",
+      "maxPosErr": 143.910665,
+      "endPosErr": 134.171289
+    },
+    {
+      "level": "full",
+      "history": "same",
+      "captureStatics": false,
+      "skip": "rawGeometry",
+      "newPairsAfterK": 53,
+      "K": 450,
+      "N": 750,
+      "firstDivergentTick": 451,
+      "ticksAfterRestore": 1,
+      "field": "pile:00[1] ref=282.72983891611386 got=282.72983891611415",
+      "maxPosErr": 36.055622,
+      "endPosErr": 33.875353
+    }
+  ],
+  "geo": [
+    {
+      "history": "shuffled",
+      "staticBodiesWithDifferentBits": 0,
+      "maxVertexErr": 0
+    },
+    {
+      "history": "pooled",
+      "staticBodiesWithDifferentBits": 39,
+      "maxVertexErr": 1.1368683772161603e-13
+    }
+  ],
+  "inc": {
+    "missingBody": "threw: restore: world body set differs (missing , extra pile:03)",
+    "wrongVersion": "threw: restore: snapshot version 99 != 1",
+    "unknownPairPart": "threw: restore: pair references unknown part ghost#0/pile:03#0",
+    "liveAudit": {
+      "rootBody": {
+        "audit": [
+          "sled: myNewState"
+        ],
+        "restore": "threw"
+      },
+      "pair": {
+        "audit": [
+          "pair[0]: newPairState"
+        ],
+        "restore": "threw"
+      },
+      "collision": {
+        "audit": [
+          "pair[0].collision: newCollisionState"
+        ],
+        "restore": "threw"
+      },
+      "contact": {
+        "audit": [
+          "pair[0].contacts[0]: cachedBias"
+        ],
+        "restore": "threw"
+      },
+      "engine": {
+        "audit": [
+          "engine: newSolverState"
+        ],
+        "restore": "threw"
+      },
+      "timing": {
+        "audit": [
+          "engine.timing: newClock"
+        ],
+        "restore": "threw"
+      },
+      "detector": {
+        "audit": [
+          "engine.detector: grid2"
+        ],
+        "restore": "threw"
+      },
+      "resolverStatic": {
+        "audit": [
+          "Matter.Resolver statics: _newWarming"
+        ],
+        "restore": "threw"
+      }
+    }
+  }
+}
