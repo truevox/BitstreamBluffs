@@ -60,3 +60,11 @@ test('every declared asset uses first-party paths and the source menu artwork ex
     expect(existsSync(resolve(root, 'public/assets/menu', name))).toBe(true);
   }
 });
+
+
+test('Netlify advertises the registered manifest MIME type on the precise manifest route', () => {
+  const config = text('netlify.toml');
+  // A path-specific rule avoids changing content types for JS, JSON, media,
+  // or the entire site. The PWA still does not register a service worker.
+  expect(config).toMatch(/\[\[headers\]\]\s*for\s*=\s*"\/manifest\.webmanifest"\s*\[headers\.values\]\s*Content-Type\s*=\s*"application\/manifest\+json"/);
+});
