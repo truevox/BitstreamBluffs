@@ -299,7 +299,7 @@ function assertSameReplay(actual, expected, trial) {
   }
 }
 
-async function readAirtimeTape(path) {
+export async function readAirtimeTape(path) {
   const file = await open(path, constants.O_RDONLY | constants.O_NONBLOCK)
     .catch(() => { throw new Error('Could not open the local airtime tape'); });
   try {
@@ -380,7 +380,7 @@ export function assertPrivateCrashBriefChecks(result, tape, reference, trial) {
   }
 }
 
-async function runCrashBrief(browser, url, tape, repeats) {
+export async function runCrashBrief(browser, url, tape, repeats) {
   let reference;
   for (let trial = 1; trial <= repeats; trial++) {
     let timer;
