@@ -193,7 +193,7 @@ function arcadeSkyline() {
 }
 // Debutmont sky: 480x160, eight 20 px strips from sparse (top) to dense (towards the horizon).
 write('debutmont-sky.svg', ditherSky({
-  w: 480, h: 160, stripH: 20, cell: 2, densities: [0, 1, 2, 4, 6, 8, 10, 12],
+  w: 480, h: 160, stripH: 20, cell: 2, densities: [0, 1, 2, 3, 5, 6, 8, 10],
   comment: 'Debutmont sky: ordered-dither gradient (Bayer 4x4, 2 px cells), white on transparent, tinted at runtime',
 }));
 // Arcade sky: 480x120, eight 15 px strips, denser overall (a hotter horizon).

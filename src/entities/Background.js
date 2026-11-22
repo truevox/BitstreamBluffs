@@ -589,6 +589,7 @@ export class Background {
     this.scene = scene;
     this.palette = palette;
     this.motif = null; // null = base backdrop ('ridges'), so pre-W3 runs are unchanged
+    this.skin = null; // #65: 'pixel' = BiomeFx draws the sky and ridgelines (Debutmont's SVG art); null = drawn here
     this.decorSeed = 0; // layout seed for motifDecor; fixed so a biome's backdrop looks the same every run
     this.bees = true; // Micro glow-up: draw the dew-drops bees (false = the perf comparison baseline)
     this.beeCount = 0; // bees drawn in the last frame (the built-game gate reads it)
@@ -603,6 +604,16 @@ export class Background {
   /** @param {Object<string,number>} palette @returns {void} */
   setPalette(palette) {
     this.palette = palette;
+  }
+
+  /**
+   * #65: hand the sky bands and the ridgelines to the pixel-art layers (BiomeFx) or take them back. Stars, sun and the
+   * data grid stay here either way.
+   * @param {string|null} skin 'pixel' | null
+   * @returns {void}
+   */
+  setSkin(skin) {
+    this.skin = skin === 'pixel' ? 'pixel' : null;
   }
 
   /**
@@ -734,7 +745,8 @@ export class Background {
     const dance = biomeDanceStyle(this.motif,danceStrength);
     g.clear();
     // sky gradient (banded)
-    const bands = 8;
+    const pixel = this.skin === 'pixel';
+    const bands = pixel ? 0 : 8;
     for (let i = 0; i < bands; i++) {
       const t = i / bands;
       g.fillStyle(p.magenta, 0.015 + 0.075 * t * t);
@@ -765,10 +777,15 @@ export class Background {
       if (Math.abs(dy) >= ry) continue;
       const hw = rx * Math.sqrt(1 - (dy * dy) / (ry * ry));
       g.fillStyle(i < 4 ? p.amber : p.magenta, 0.2 + i * 0.012);
-      g.fillRect(sunX - hw, y0, hw * 2, Math.max(1, y1 - y0));
+      // pixel skin: stripes on whole pixels with stepped edges, and no smooth outline
+      if (pixel) {
+        const sw = Math.round(hw / 4) * 4;
+        g.fillRect(Math.round(sunX) - sw, Math.round(y0), sw * 2, Math.max(1, Math.round(y1 - y0)));
+      } else g.fillRect(sunX - hw, y0, hw * 2, Math.max(1, y1 - y0));
     }
     g.lineStyle(1, p.amber, 0.35);
-    if(dance.sun > 0.001) g.strokeEllipse(sunX, sunY, rx * 2, ry * 2);
+    if (pixel) { /* stepped stripes only */ }
+    else if(dance.sun > 0.001) g.strokeEllipse(sunX, sunY, rx * 2, ry * 2);
     else g.strokeCircle(sunX, sunY, R);
     // ridges / biome motif
     const geom = motifGeometry(this.motif, scrollX);
@@ -783,7 +800,7 @@ export class Background {
     for (; beeMask; beeMask &= beeMask - 1) bees += 1;
     this.beeCount = bees;
     if (decor.length) this._decor(g, decor, -1, p);
-    for (let i = 0; i < geom.layers.length; i++) {
+    for (let i = 0; i < (pixel ? 0 : geom.layers.length); i++) {
       this._layer(g, scrollX, geom.layers[i], p, geom.shape, dance.horizon);
       if (decor.length) this._decor(g, decor, i, p);
     }
