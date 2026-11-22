@@ -31,6 +31,8 @@ Side effect that matters: because stdlib is bit-identical to V8 for 8 functions 
 
 ## B3. Cross-engine evidence (the fix)
 
+**Final run on the merged build (main after #222, SIM_REVISION 5, v2.19.8):** the 24 tapes were re-recorded on that build and replayed in fresh contexts on Chromium, Firefox and WebKit: causal digests identical in **24/24**, outcomes equal 24/24, 0 TapePlayer desync, max position delta 0, 77,553 ticks per engine (`docs/determinism/results/portable-math-results-merged-v2.19.8.json`; a 3-fixture spot check on the merged build before the re-record was also 3/3 identical). The detailed tables below are from the pre-#222 build (two runs plus the main comparison), where the tapes had 77,762 ticks per engine.
+
 24 fixture tapes (the 9 #120 fixtures plus 15 broader ones: other seeds, single-biome masks 1/2/4/8/16/64, all-biome mask, reckless, tricks, parachute, BSOD, Kodiaks, a daily seed; up to 9,000 ticks), re-recorded in Chromium with this build (`experiment.mjs record`; live recording equals fresh-context replay with no TapePlayer desync), then replayed in a fresh context per cell on Chromium, Firefox 159 (headed under Xvfb) and Playwright WebKit 27.2 (not Safari): 77,762 ticks per engine, 18 of 24 runs end in a crash, the rest at the tick cap.
 
 | Build | fixtures with identical causal digests on all 3 engines | outcomes equal | TapePlayer desync | `terrain` group divergence | max sled position delta |

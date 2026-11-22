@@ -1,0 +1,667 @@
+{
+ "generatedFrom": "tools/determinism/portable-math/.cache",
+ "hz": 120,
+ "configs": {
+  "native": {
+   "perFixture": {
+    "cruise-baseline": {
+     "ticks": 2401,
+     "outcome": {
+      "ticks": 2401,
+      "crashed": false,
+      "cause": null,
+      "distanceM": 594,
+      "score": 879
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "fifth-run-in-session": {
+     "ticks": 1801,
+     "outcome": {
+      "ticks": 1801,
+      "crashed": false,
+      "cause": null,
+      "distanceM": 472,
+      "score": 717
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "collision-heavy": {
+     "ticks": 1669,
+     "outcome": {
+      "ticks": 1669,
+      "crashed": true,
+      "cause": "terrain",
+      "distanceM": 289,
+      "score": 399
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "chunk-biome-boundaries": {
+     "ticks": 3410,
+     "outcome": {
+      "ticks": 3410,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 834,
+      "score": 1174
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "bsod-pursuit-catch": {
+     "ticks": 12150,
+     "outcome": {
+      "ticks": 12150,
+      "crashed": true,
+      "cause": "bsod",
+      "distanceM": 437,
+      "score": 0
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "airborne-tricks": {
+     "ticks": 2224,
+     "outcome": {
+      "ticks": 2224,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 513,
+      "score": 2428
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "parachute-airbrake": {
+     "ticks": 2146,
+     "outcome": {
+      "ticks": 2146,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 332,
+      "score": 790
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "kodiaks-on": {
+     "ticks": 4801,
+     "outcome": {
+      "ticks": 4801,
+      "crashed": false,
+      "cause": null,
+      "distanceM": 1036,
+      "score": 1956
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "daily-practice-rule": {
+     "ticks": 2401,
+     "outcome": {
+      "ticks": 2401,
+      "crashed": false,
+      "cause": null,
+      "distanceM": 724,
+      "score": 1399
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-cruise-a": {
+     "ticks": 3472,
+     "outcome": {
+      "ticks": 3472,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 843,
+      "score": 1951
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-cruise-b": {
+     "ticks": 1508,
+     "outcome": {
+      "ticks": 1508,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 325,
+      "score": 405
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-cruise-c": {
+     "ticks": 1770,
+     "outcome": {
+      "ticks": 1770,
+      "crashed": true,
+      "cause": "terrain",
+      "distanceM": 409,
+      "score": 529
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-cruise-d": {
+     "ticks": 1755,
+     "outcome": {
+      "ticks": 1755,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 401,
+      "score": 501
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-cruise-e": {
+     "ticks": 874,
+     "outcome": {
+      "ticks": 874,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 170,
+      "score": 235
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-allbiomes": {
+     "ticks": 6925,
+     "outcome": {
+      "ticks": 6925,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 1850,
+      "score": 3280
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-reckless-a": {
+     "ticks": 1086,
+     "outcome": {
+      "ticks": 1086,
+      "crashed": true,
+      "cause": "terrain",
+      "distanceM": 137,
+      "score": 202
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-reckless-b": {
+     "ticks": 1077,
+     "outcome": {
+      "ticks": 1077,
+      "crashed": true,
+      "cause": "terrain",
+      "distanceM": 157,
+      "score": 157
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-tricks-a": {
+     "ticks": 1861,
+     "outcome": {
+      "ticks": 1861,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 394,
+      "score": 816
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-tricks-b": {
+     "ticks": 3008,
+     "outcome": {
+      "ticks": 3008,
+      "crashed": true,
+      "cause": "terrain",
+      "distanceM": 655,
+      "score": 1425
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-chute-a": {
+     "ticks": 5001,
+     "outcome": {
+      "ticks": 5001,
+      "crashed": false,
+      "cause": null,
+      "distanceM": 794,
+      "score": 1566
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-chute-b": {
+     "ticks": 4587,
+     "outcome": {
+      "ticks": 4587,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 752,
+      "score": 1566
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-bsod-a": {
+     "ticks": 9001,
+     "outcome": {
+      "ticks": 9001,
+      "crashed": false,
+      "cause": null,
+      "distanceM": 586,
+      "score": 26
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-kodiaks-a": {
+     "ticks": 1759,
+     "outcome": {
+      "ticks": 1759,
+      "crashed": true,
+      "cause": "hazard",
+      "distanceM": 401,
+      "score": 686
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    },
+    "broad-daily": {
+     "ticks": 866,
+     "outcome": {
+      "ticks": 866,
+      "crashed": true,
+      "cause": "terrain",
+      "distanceM": 219,
+      "score": 239
+     },
+     "chromiumDesync": null,
+     "firefox": null,
+     "firefoxTerrain": null,
+     "firefoxDesync": null,
+     "firefoxOutcomeEqual": true,
+     "firefoxMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     },
+     "webkit": null,
+     "webkitTerrain": null,
+     "webkitDesync": null,
+     "webkitOutcomeEqual": true,
+     "webkitMaxDelta": {
+      "maxPosPx": 0,
+      "maxVelPxPerTick": 0
+     }
+    }
+   },
+   "identicalAcrossEngines": 24,
+   "fixturesCompared": 24,
+   "simMsPerTick": {
+    "chromium": 0.3333,
+    "firefox": 0.4186,
+    "webkit": 0.3693
+   },
+   "outcomeEqual": 24
+  }
+ },
+ "portableVsNativeOnChromium": {}
+}
