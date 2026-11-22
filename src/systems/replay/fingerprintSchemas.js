@@ -429,6 +429,8 @@ export const NON_CAUSAL = Object.freeze({
     _crashHazard: PRESENTATION + ' (crash-report telegraph arrival)',
     newBestDone: PRESENTATION, bestM: 'ranking display marker (best-distance gate); not a simulation input',
     _biomeId: PRESENTATION + ' (biome announcement and palette)',
+    _lookId: PRESENTATION + ' (bridge dissolve look)', _veil: PRESENTATION + ' (bridge dissolve veil)', _bridgeSpan: PRESENTATION + ' (cached bridge span)',
+    _lookScratch: PRESENTATION + ' (reused look result)', biomeFx: PRESENTATION + ' (biome glitch layers)',
     boostId: 'identity of the boost for the POWERUP_EXPIRED event; not read by the simulation',
     glideId: 'event identity only', stabilizeId: 'event identity only', magnetId: 'event identity only',
     blindMs: 'overlay only (verified: blind only drives RunScene.updateBlindOverlay and its timer)',

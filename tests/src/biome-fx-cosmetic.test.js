@@ -8,8 +8,9 @@
  *     interleaved with generation, in either effects mode (dissolve on, or the reduced-motion hard cut);
  *  2. a streamed "run" (the scene's own generator.update(x) calls) adds and removes the same chunks in the same order,
  *     and the rolling-sled outcome over that terrain is identical;
- *  3. the real RunScene._updateLook rebuilds colliders (a full refresh) at exactly the same x in both modes, repaints
- *     graphics only (never colliders) at the extra points the dissolve adds, and asks the generator nothing but reads.
+ *  3. the real RunScene._updateLook repaints at exactly the generator-owed x in the hard-cut mode, never skips one with the
+ *     dissolve on, adds graphics-only repaints inside bridges (since #140 no repaint touches a collider), and asks the
+ *     generator nothing but reads.
  * The built game is checked the same way end to end with `npm run sim` on the two builds (see the PR).
  */
 import { jest } from '@jest/globals';
@@ -105,12 +106,13 @@ describe('a streamed run and its simulated outcome are identical with the effect
   }
 });
 
-describe('RunScene._updateLook: the same collider rebuilds, extra repaints are graphics-only', () => {
+describe('RunScene._updateLook: the generator-owed repaints are unchanged, the dissolve only adds graphics repaints', () => {
   const content = loadContent();
 
   function walk(seed, mask, reduced) {
     const gen = makeGen(seed, { biomeMask: mask });
     const calls = [];
+    const owed = []; // x of every generator biome change that owes a repaint (what the world did before the dissolve existed)
     const touched = new Set();
     const terrain = new Proxy(gen, {
       get(t, k) {
@@ -124,7 +126,8 @@ describe('RunScene._updateLook: the same collider rebuilds, extra repaints are g
       terrain, sled: { x: 0 }, content: { biomes: content.biomes },
       registry: { get: (k) => (k === REG.SETTINGS ? { reduceMotion: reduced ? 'on' : 'off' } : null) },
     });
-    s.refreshPalette = function refresh(visualOnly) { calls.push({ x: this.sled.x, visualOnly: !!visualOnly, look: this._lookId }); };
+    // Since #140 refreshPalette repaints graphics only (colliders are never touched), so a call is always collider-safe.
+    s.refreshPalette = function refresh() { calls.push({ x: this.sled.x, look: this._lookId }); };
     const veils = [];
     for (let x = 0; x < 2800 * 20; x += 20) {
       s.sled.x = x;
@@ -133,21 +136,22 @@ describe('RunScene._updateLook: the same collider rebuilds, extra repaints are g
       const first = s._biomeId === undefined;
       if (changed) s._biomeId = biomeNow;
       const def = s._biomeDefById(biomeNow);
+      if (changed && (def !== null || !first)) owed.push(x);
       s._updateLook(biomeNow, changed && (def !== null || !first));
       veils.push(s._veil);
     }
-    return { calls, touched, veils, gen };
+    return { calls, owed, touched, veils, gen };
   }
 
   for (const [seed, mask] of [['shots65-d', 2], ['alpha', ALL], ['bitstream-bluffs', ALL]]) {
     test(`seed ${seed} mask ${mask}`, () => {
       const on = walk(seed, mask, false);
       const off = walk(seed, mask, true);
-      const full = (w) => w.calls.filter((c) => !c.visualOnly).map((c) => c.x);
-      expect(full(on).length).toBeGreaterThan(2);
-      expect(full(on)).toEqual(full(off)); // colliders are rebuilt at the generator's biome changes, whatever the setting
-      expect(off.calls.every((c) => !c.visualOnly)).toBe(true); // the hard cut adds nothing
-      expect(on.calls.filter((c) => c.visualOnly).length).toBeGreaterThan(0); // the dissolve repaints inside bridges
+      expect(on.owed.length).toBeGreaterThan(2);
+      expect(on.owed).toEqual(off.owed); // the generator's biome changes do not depend on the effects setting
+      expect(off.calls.map((c) => c.x)).toEqual(off.owed); // the hard cut repaints exactly where the world always did
+      for (const x of on.owed) expect(on.calls.map((c) => c.x)).toContain(x); // the dissolve never skips one
+      expect(on.calls.length).toBeGreaterThan(on.owed.length); // and repaints (graphics only) inside bridges as well
       // the generator is only ever read
       for (const name of on.touched) expect(['biomeAtX', 'bridgeSpanAt']).toContain(name);
       // reduced motion: the veil is on for exactly the bridge, never partial

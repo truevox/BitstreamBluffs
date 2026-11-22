@@ -371,6 +371,7 @@ export const NON_CAUSAL_MODULES = Object.freeze([
   { file: 'src/entities/GroundTelegraph.js', reason: 'hazard warning badge layout: draw-only' },
   { file: 'src/entities/KodiakRider.js', reason: 'sprite depth: draw-only' },
   { file: 'src/entities/SongBillboard.js', reason: 'music billboard layout and artwork: draw-only' },
+  { file: 'src/systems/BiomeTransition.js', reason: 'arcade bridge dissolve look model (#65): a pure function of the sled x that only drives the veil and palette; nothing here reaches terrain, physics, hazards or score' },
   { file: 'src/systems/BiomeDiscovery.js', reason: 'profile progression bookkeeping (which biomes were seen); the run records the resulting biomeMask' },
   { file: 'src/systems/BsodGym.js', reason: 'Gym mode setup and pricing; gym runs are never evidence-eligible (contract 4.3 info.lane)' },
   { file: 'src/systems/CameraZoom.js', reason: 'camera zoom stages: presentation (any sim read of camera view is #140/#155 territory)' },

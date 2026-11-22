@@ -764,9 +764,9 @@ within that span into a look: over the first 25 % of the bridge the outgoing bio
 0 -> 1, an 8x8 Bayer ordered dither of 16 px blocks), the middle is pure arcade, over the last 25 % the incoming biome is revealed
 (veil 1 -> 0); the look (palette / motif / glitch set) only changes while the veil is full. Reduced motion (`ui/Motion.isReducedMotion`)
 is the hard cut: the veil is on for the whole bridge and the look is the generator's. `RunScene._updateLook` applies it;
-`BIOME_ENTER`, discovery, music and every gameplay consumer keep asking the generator. A look change inside a bridge repaints the
-terrain graphics only (`TerrainMesh.addChunk(chunk, { visualOnly: true })`); the full `refreshPalette()` (which rebuilds colliders) still
-runs only at the generator's own biome changes, so collider rebuilds are the same whatever the effects setting.
+`BIOME_ENTER`, discovery, music and every gameplay consumer keep asking the generator. A look change inside a bridge calls
+`refreshPalette()`, which repaints the terrain graphics only (`TerrainMesh.redrawChunk`; since #140 no repaint touches a collider),
+so the dissolve cannot affect the simulation whatever the effects setting.
 `entities/BiomeFx.js` draws behind the play layer (one screen-space container at depth -99): Debutmont (dithered-sky and ridgeline SVGs,
 blocky pixel snow, an occasional scanline shimmer; `Background` skips its own sky bands and ridges via `setSkin('pixel')`), Garbage Dump
 Glacier (trash blocks and colour-channel-offset fragments), and the arcade bridge (veil blocks, dithered sky, sun, skyline, neon
