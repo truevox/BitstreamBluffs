@@ -1,5 +1,5 @@
 {
- "about": "B0 sim baseline for the biome full treatment (spec §6 B0.5): the +/-15 % tolerance reference for B1-B4. `reference` is the B0 branch after E7 (no biome content yet); `beforeE7` is 8db8dee (v2.4.1).",
+ "about": "Sim baseline for the biome full treatment: the +/-15 % tolerance reference for B1-B4, refreshed for #65 (Debutmont base biome + arcade bridges). `reference` is the sim on the #65 gameplay branch. `beforeIssue65` is the same commands on the #65 rename head (abf738c, terrain identical to main 0c8c6c1), and `issue65Delta` is reference vs beforeIssue65. `b0Reference` (the B0 branch after E7, no biome content), `beforeE7` (8db8dee) and `e7Delta` are the original B0 numbers, kept for history; they predate B1-B4 tuning and the later hazard changes, so `beforeIssue65`, not `b0Reference`, is the like-for-like comparison.",
  "commands": {
   "hop": "node tools/sim/run.mjs --seeds 48 --policy hop --maxM 5000 --maxSec 300 --biomeMask <M> --workers 8 --quiet --out hop-m<M>.json",
   "flip": "node tools/sim/run.mjs --seeds 24 --policy flip --maxM 5000 --maxSec 300 --biomeMask <M> --workers 8 --quiet --out flip-m<M>.json",
@@ -13,8 +13,8 @@
   "medianMaxSpeedPxS": "summary.maxSpeed.median from run.mjs"
  },
  "biomes": {
-  "0": "base (mask 0)",
-  "1": "debutmont",
+  "0": "base (mask 0): Debutmont since #65 (mask 0 and mask 1 are the same terrain)",
+  "1": "debutmont (the base biome since #65: same terrain as mask 0)",
   "2": "garbage-dump-glacier",
   "4": "pyramid-peak",
   "8": "underwater-mountain",
@@ -27,6 +27,791 @@
   "1024": "vertigo-vents"
  },
  "reference": {
+  "hop": {
+   "0": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1182.6,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 515.5,
+    "medianMaxSpeedPxS": 998.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "1": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1182.6,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 515.5,
+    "medianMaxSpeedPxS": 998.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "2": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1253.8,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 516.4,
+    "medianMaxSpeedPxS": 996.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "4": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1212.0,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 516.9,
+    "medianMaxSpeedPxS": 1014.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "8": {
+    "runs": 48,
+    "survived": 1,
+    "survivalRate": 0.0208,
+    "meanDistM": 1384.8,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 511.5,
+    "medianMaxSpeedPxS": 996.5,
+    "crashCauses": {
+     "hazard": 47
+    }
+   },
+   "16": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1240.7,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 514.6,
+    "medianMaxSpeedPxS": 992,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "32": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1247.6,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 515.4,
+    "medianMaxSpeedPxS": 1010.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "64": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1240.4,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 514.5,
+    "medianMaxSpeedPxS": 999.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "128": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1244.3,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 518.1,
+    "medianMaxSpeedPxS": 1010.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "256": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1282.7,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 518.3,
+    "medianMaxSpeedPxS": 1010.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "512": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1208.1,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 516.8,
+    "medianMaxSpeedPxS": 1003,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "1024": {
+    "runs": 48,
+    "survived": 1,
+    "survivalRate": 0.0208,
+    "meanDistM": 1309.1,
+    "medianDistM": 813.8,
+    "meanSpeedPxS": 502.7,
+    "medianMaxSpeedPxS": 1014.5,
+    "crashCauses": {
+     "hazard": 44
+    }
+   }
+  },
+  "flip": {
+   "0": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 962.1,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 525.1,
+    "medianMaxSpeedPxS": 1001,
+    "crashCauses": {
+     "hazard": 18,
+     "terrain": 1,
+     "badLanding": 5
+    }
+   },
+   "1": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 962.1,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 525.1,
+    "medianMaxSpeedPxS": 1001,
+    "crashCauses": {
+     "hazard": 18,
+     "terrain": 1,
+     "badLanding": 5
+    }
+   },
+   "2": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 990.0,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 523.7,
+    "medianMaxSpeedPxS": 1001,
+    "crashCauses": {
+     "hazard": 20,
+     "terrain": 1,
+     "badLanding": 3
+    }
+   },
+   "4": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 957.3,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 523.7,
+    "medianMaxSpeedPxS": 1001,
+    "crashCauses": {
+     "hazard": 20,
+     "terrain": 1,
+     "badLanding": 3
+    }
+   },
+   "8": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 986.5,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 522.4,
+    "medianMaxSpeedPxS": 1001,
+    "crashCauses": {
+     "hazard": 19,
+     "badLanding": 4,
+     "terrain": 1
+    }
+   },
+   "16": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 989.6,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 523.1,
+    "medianMaxSpeedPxS": 994,
+    "crashCauses": {
+     "hazard": 19,
+     "terrain": 1,
+     "badLanding": 4
+    }
+   },
+   "32": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 951.7,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 522.1,
+    "medianMaxSpeedPxS": 994,
+    "crashCauses": {
+     "hazard": 19,
+     "terrain": 1,
+     "badLanding": 4
+    }
+   },
+   "64": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 988.4,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 523.3,
+    "medianMaxSpeedPxS": 1001,
+    "crashCauses": {
+     "hazard": 20,
+     "terrain": 1,
+     "badLanding": 3
+    }
+   },
+   "128": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 988.8,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 522.8,
+    "medianMaxSpeedPxS": 994,
+    "crashCauses": {
+     "hazard": 19,
+     "terrain": 1,
+     "badLanding": 4
+    }
+   },
+   "256": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 970.0,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 524.8,
+    "medianMaxSpeedPxS": 1001,
+    "crashCauses": {
+     "hazard": 20,
+     "terrain": 1,
+     "badLanding": 3
+    }
+   },
+   "512": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 974.7,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 525.3,
+    "medianMaxSpeedPxS": 994,
+    "crashCauses": {
+     "hazard": 20,
+     "terrain": 1,
+     "badLanding": 3
+    }
+   },
+   "1024": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1023.2,
+    "medianDistM": 754.0,
+    "meanSpeedPxS": 521.1,
+    "medianMaxSpeedPxS": 1001,
+    "crashCauses": {
+     "hazard": 20,
+     "terrain": 1,
+     "badLanding": 3
+    }
+   }
+  },
+  "handsOff": {
+   "0": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 374.5,
+    "medianDistM": 333.4,
+    "meanSpeedPxS": 494.1,
+    "medianMaxSpeedPxS": 842.5,
+    "crashCauses": {
+     "hazard": 24
+    }
+   }
+  }
+ },
+ "beforeIssue65": {
+  "hop": {
+   "0": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1331.6,
+    "medianDistM": 1000.2,
+    "meanSpeedPxS": 530.7,
+    "medianMaxSpeedPxS": 965.5,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "1": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1402.5,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 529.1,
+    "medianMaxSpeedPxS": 979,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "2": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1440.3,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 530.8,
+    "medianMaxSpeedPxS": 975,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "4": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1424.5,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 530.0,
+    "medianMaxSpeedPxS": 975,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "8": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1509.2,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 524.9,
+    "medianMaxSpeedPxS": 979,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "16": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1427.4,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 528.3,
+    "medianMaxSpeedPxS": 979,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "32": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1377.5,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 529.1,
+    "medianMaxSpeedPxS": 975,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "64": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1427.2,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 528.2,
+    "medianMaxSpeedPxS": 975,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "128": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1331.6,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 529.6,
+    "medianMaxSpeedPxS": 974,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "256": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1437.4,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 538.9,
+    "medianMaxSpeedPxS": 1006,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "512": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1384.0,
+    "medianDistM": 1122.3,
+    "meanSpeedPxS": 531.2,
+    "medianMaxSpeedPxS": 979,
+    "crashCauses": {
+     "hazard": 48
+    }
+   },
+   "1024": {
+    "runs": 48,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 1453.0,
+    "medianDistM": 1064.8,
+    "meanSpeedPxS": 520.0,
+    "medianMaxSpeedPxS": 991.5,
+    "crashCauses": {
+     "hazard": 46
+    }
+   }
+  },
+  "flip": {
+   "0": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 878.7,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 550.3,
+    "medianMaxSpeedPxS": 1049,
+    "crashCauses": {
+     "badLanding": 7,
+     "hazard": 17
+    }
+   },
+   "1": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 912.7,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 551.1,
+    "medianMaxSpeedPxS": 1049,
+    "crashCauses": {
+     "badLanding": 6,
+     "hazard": 18
+    }
+   },
+   "2": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 912.6,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 550.5,
+    "medianMaxSpeedPxS": 1020.5,
+    "crashCauses": {
+     "badLanding": 6,
+     "hazard": 18
+    }
+   },
+   "4": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 921.8,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 551.1,
+    "medianMaxSpeedPxS": 1020.5,
+    "crashCauses": {
+     "badLanding": 7,
+     "hazard": 17
+    }
+   },
+   "8": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 916.4,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 550.1,
+    "medianMaxSpeedPxS": 1049,
+    "crashCauses": {
+     "badLanding": 8,
+     "hazard": 16
+    }
+   },
+   "16": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 914.5,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 551.6,
+    "medianMaxSpeedPxS": 1049,
+    "crashCauses": {
+     "badLanding": 6,
+     "hazard": 18
+    }
+   },
+   "32": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 935.6,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 551.3,
+    "medianMaxSpeedPxS": 1020.5,
+    "crashCauses": {
+     "badLanding": 7,
+     "hazard": 17
+    }
+   },
+   "64": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 937.7,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 550.7,
+    "medianMaxSpeedPxS": 1020.5,
+    "crashCauses": {
+     "badLanding": 7,
+     "hazard": 17
+    }
+   },
+   "128": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 912.5,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 551.2,
+    "medianMaxSpeedPxS": 1049,
+    "crashCauses": {
+     "badLanding": 6,
+     "hazard": 18
+    }
+   },
+   "256": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 947.0,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 552.6,
+    "medianMaxSpeedPxS": 1049,
+    "crashCauses": {
+     "badLanding": 6,
+     "hazard": 18
+    }
+   },
+   "512": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 912.4,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 551.8,
+    "medianMaxSpeedPxS": 1049,
+    "crashCauses": {
+     "badLanding": 6,
+     "hazard": 18
+    }
+   },
+   "1024": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 944.0,
+    "medianDistM": 797.1,
+    "meanSpeedPxS": 552.6,
+    "medianMaxSpeedPxS": 1049,
+    "crashCauses": {
+     "badLanding": 6,
+     "hazard": 18
+    }
+   }
+  },
+  "handsOff": {
+   "0": {
+    "runs": 24,
+    "survived": 0,
+    "survivalRate": 0.0,
+    "meanDistM": 438.2,
+    "medianDistM": 326.0,
+    "meanSpeedPxS": 515.4,
+    "medianMaxSpeedPxS": 839.5,
+    "crashCauses": {
+     "hazard": 24
+    }
+   }
+  }
+ },
+ "issue65Delta": {
+  "hop": {
+   "0": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -11.2,
+    "meanSpeedPxSPct": -2.9
+   },
+   "1": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -15.7,
+    "meanSpeedPxSPct": -2.6
+   },
+   "2": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -12.9,
+    "meanSpeedPxSPct": -2.7
+   },
+   "4": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -14.9,
+    "meanSpeedPxSPct": -2.5
+   },
+   "8": {
+    "survived": "0 -> 1",
+    "meanDistMPct": -8.2,
+    "meanSpeedPxSPct": -2.6
+   },
+   "16": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -13.1,
+    "meanSpeedPxSPct": -2.6
+   },
+   "32": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -9.4,
+    "meanSpeedPxSPct": -2.6
+   },
+   "64": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -13.1,
+    "meanSpeedPxSPct": -2.6
+   },
+   "128": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -6.6,
+    "meanSpeedPxSPct": -2.2
+   },
+   "256": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -10.8,
+    "meanSpeedPxSPct": -3.8
+   },
+   "512": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -12.7,
+    "meanSpeedPxSPct": -2.7
+   },
+   "1024": {
+    "survived": "0 -> 1",
+    "meanDistMPct": -9.9,
+    "meanSpeedPxSPct": -3.3
+   }
+  },
+  "flip": {
+   "0": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 9.5,
+    "meanSpeedPxSPct": -4.6
+   },
+   "1": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 5.4,
+    "meanSpeedPxSPct": -4.7
+   },
+   "2": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 8.5,
+    "meanSpeedPxSPct": -4.9
+   },
+   "4": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 3.9,
+    "meanSpeedPxSPct": -5.0
+   },
+   "8": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 7.6,
+    "meanSpeedPxSPct": -5.0
+   },
+   "16": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 8.2,
+    "meanSpeedPxSPct": -5.2
+   },
+   "32": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 1.7,
+    "meanSpeedPxSPct": -5.3
+   },
+   "64": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 5.4,
+    "meanSpeedPxSPct": -5.0
+   },
+   "128": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 8.4,
+    "meanSpeedPxSPct": -5.2
+   },
+   "256": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 2.4,
+    "meanSpeedPxSPct": -5.0
+   },
+   "512": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 6.8,
+    "meanSpeedPxSPct": -4.8
+   },
+   "1024": {
+    "survived": "0 -> 0",
+    "meanDistMPct": 8.4,
+    "meanSpeedPxSPct": -5.7
+   }
+  },
+  "handsOff": {
+   "0": {
+    "survived": "0 -> 0",
+    "meanDistMPct": -14.5,
+    "meanSpeedPxSPct": -4.1
+   }
+  }
+ },
+ "b0Reference": {
   "hop": {
    "0": {
     "runs": 48,
