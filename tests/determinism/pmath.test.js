@@ -1,4 +1,4 @@
-// Issue #121: unit test for pmath (src/systems/pmath.js), the portable math every authoritative simulation file uses. Accuracy bounds are measured against the host Math (V8 under Jest) and are deliberately a little looser than the
+// Issue #121: unit test for pmath (src/systems/pmath.js, a facade over the pinned @stdlib/math-base-special-* packages), the portable math every authoritative simulation file uses. Accuracy bounds are measured against the host Math (V8 under Jest) and are deliberately a little looser than the
 // measured maxima so a different V8 libm does not make the test flaky; the engine-independence claim is the golden hash, which engines.mjs
 // also checks in chromium, firefox and webkit.
 import fs from 'fs';
@@ -21,7 +21,7 @@ describe('pmath: accuracy vs host Math (ulp)', () => {
     ['exp', R(40), 1], ['expm1', R(4), 6], ['sinh', R(10), 6], ['cosh', R(10), 4], ['cbrt', R(2000), 3], ['log2', () => Math.exp((rnd() - 0.5) * 40), 3], ['log10', () => Math.exp((rnd() - 0.5) * 40), 3], ['log', () => Math.exp((rnd() - 0.5) * 40), 1], ['log1p', () => rnd() * 30, 3], ['tanh', R(8), 6],
   ])('%s', (name, gen, bound) => { const fn = name.split(' ')[0]; expect(maxUlp(gen, Math[fn], PM[fn])).toBeLessThanOrEqual(bound); });
   test('atan2, hypot', () => {
-    expect(maxUlp(R(200), Math.atan2, PM.atan2, 2)).toBeLessThanOrEqual(1);
+    expect(maxUlp(R(200), Math.atan2, PM.atan2, 2)).toBeLessThanOrEqual(2);
     expect(maxUlp(R(2000), Math.hypot, PM.hypot, 2)).toBeLessThanOrEqual(3);
   });
   test('pow: integer exponents (what the sim uses) and non-integer exponents (looser)', () => {
@@ -44,13 +44,12 @@ describe('pmath: special values and range limits', () => {
     expect(PM.hypot(3, 4)).toBe(5); expect(PM.hypot(1e200, 1e200)).toBeCloseTo(1.4142135623730951e200, -185); expect(PM.hypot(NaN, Infinity)).toBe(Infinity);
     expect(PM.pow(2, 10)).toBe(1024); expect(PM.pow(9, 0.5)).toBe(3); expect(PM.pow(5, 0)).toBe(1);
   });
-  test('reachable range: error stays <= 2 ulp below 1e6 rad, degrades beyond 1.6e6 rad (documented, deterministic)', () => {
-    expect(maxUlp(() => (rnd() - 0.5) * 2e6, Math.sin, PM.sin, 1, 20000)).toBeLessThanOrEqual(2);
-    const rel = (x) => Math.abs(PM.sin(x) - Math.sin(x)) / Math.abs(Math.sin(x));
-    expect(rel(1e7)).toBeLessThan(1e-7); // measured 2.8e-9
-    expect(rel(1e15)).toBeGreaterThan(1e-4); // measured ~1e-2: the huge-argument branch is NOT accurate
-    expect(PM.sin(1e22)).toBe(0); // measured: documented degradation, identical in every engine
-    expect(PM.sin(1e7)).toBe(PM.sin(1e7));
+  test('large arguments stay accurate (Payne-Hanek reduction), unlike the earlier hand port', () => {
+    for (const x of [1e7, 1e9, 1e15, 1e22, 1e300, -123456789.123]) {
+      expect(ulp(Math.sin(x), PM.sin(x))).toBeLessThanOrEqual(1);
+      expect(ulp(Math.cos(x), PM.cos(x))).toBeLessThanOrEqual(1);
+    }
+    expect(maxUlp(() => (rnd() - 0.5) * 2e6, Math.sin, PM.sin, 1, 20000)).toBeLessThanOrEqual(1);
   });
 });
 

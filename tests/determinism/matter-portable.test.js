@@ -22,10 +22,10 @@ describe('Phaser pin', () => {
     expect(EXPECTED_PHASER_VERSION).toBe('3.90.0');
     expect(Phaser.VERSION).toBe('3.90.0');
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    expect(pkg.dependencies.phaser).toBe('3.90.0'); // no ^ or ~: the patched Matter bodies are copies of this exact version
+    expect(pkg.devDependencies.phaser).toBe('3.90.0'); // no ^ or ~: the patched Matter bodies are copies of this exact version
     const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
     expect(lock.packages['node_modules/phaser'].version).toBe('3.90.0');
-    expect(lock.packages[''].dependencies.phaser).toBe('3.90.0');
+    expect(lock.packages[''].devDependencies.phaser).toBe('3.90.0');
   });
 });
 
