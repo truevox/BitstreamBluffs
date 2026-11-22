@@ -1,12 +1,15 @@
 /**
  * OWNER: gameplay. NO Phaser imports. Pure and deterministic.
  *
- * Hostile racing Kodiaks (issue #47). Three rivals Marvin named and coloured:
+ * Playful snow-racing Kodiaks (issue #47; owner override 2026-11-21: rivals, not killers). Three bears
+ * Marvin named and coloured:
  *  - KERNEL-PANIC KODIAK (white, polar): rides ahead, glitchy telegraphed feints, then a real
- *    stop-dead block you must hop over or ride past before it lands.
+ *    stop-dead block in your line. Hop it, or it shoves you back.
  *  - BRUTE-FORCE KODIAK (brown, grizzly): charges from behind and rams; hop over the lunge.
  *  - BLACK-ICE KODIAK (black, Vermont black bear): rides ahead and slides under your predicted
  *    landing; change the landing (tilt, airbrake, divebomb) or out-ride it.
+ * Contact never crashes the sled: a bear shoves it back and up by a bounded amount (kodiakKnockback),
+ * then the race goes on.
  *
  * A bear is a kinematic racer on the terrain surface, advanced once per fixed simulation tick
  * (#59). It has no Matter body: collision is a tick-exact box test against the sled, so bears
@@ -17,7 +20,7 @@
 import { Rng } from './Rng.js';
 
 /** Bump when spawn cadence, behaviour or collision changes (old ghost tapes would replay differently). */
-export const KODIAK_VERSION = 2; // v2: packs
+export const KODIAK_VERSION = 3; // v3: contact shoves the sled back, no crash; v2: packs
 /** Proposal, not an owner value: Kodiaks start appearing at this Sync Level in ordinary runs. */
 export const KODIAK_MIN_SYNC_LEVEL = 6;
 /** No bear before this distance into a run, then one encounter every GAP metres. */
@@ -28,15 +31,21 @@ const BODY = { w: 42, h: 26 };
 
 export const KODIAK_DEFS = Object.freeze({
   kernelPanic: Object.freeze({ kind: 'kernelPanic', id: 'kernelPanicKodiak', name: 'KERNEL-PANIC KODIAK', short: 'KERNEL-PANIC',
-    from: 'ahead', color: 0xeaf4ff, rim: 0x9fdcff, accent: 0x2ccde5, onHit: { effect: 'crash' } }),
+    from: 'ahead', color: 0xeaf4ff, rim: 0x9fdcff, accent: 0x2ccde5 }),
   bruteForce: Object.freeze({ kind: 'bruteForce', id: 'bruteForceKodiak', name: 'BRUTE-FORCE KODIAK', short: 'BRUTE-FORCE',
-    from: 'behind', color: 0x8a5a2b, rim: 0xc49060, accent: 0xffb347, onHit: { effect: 'crash' } }),
+    from: 'behind', color: 0x8a5a2b, rim: 0xc49060, accent: 0xffb347 }),
   blackIce: Object.freeze({ kind: 'blackIce', id: 'blackIceKodiak', name: 'BLACK-ICE KODIAK', short: 'BLACK-ICE',
-    from: 'ahead', color: 0x15151b, rim: 0x7fb8d8, accent: 0x9fe8ff, onHit: { effect: 'crash' } }),
+    from: 'ahead', color: 0x15151b, rim: 0x7fb8d8, accent: 0x9fe8ff }),
 });
 export const KODIAK_KINDS = Object.freeze(Object.keys(KODIAK_DEFS));
-/** Crash-cause def by hazard id (CrashReport.killerName reads `name` and `onHit`). */
-export const KODIAK_BY_ID = Object.freeze(Object.fromEntries(Object.values(KODIAK_DEFS).map((d) => [d.id, d])));
+/**
+ * Contact shove (issue #47 owner override: racing rivals, never instant death). A bear that touches the sled
+ * pushes it BACKWARD, against its travel, by a bounded amount that grows with how fast the two were closing,
+ * and lifts it. Velocities in px/s. All three bears share one envelope until playtests say otherwise (the owner
+ * has not chosen per-bear values). Each bear shoves once per encounter; after any shove no bear shoves again for
+ * `immunityMs`, so a pack cannot chain shoves.
+ */
+export const KODIAK_KNOCK = Object.freeze({ basePx: 80, perClosingPx: 0.35, maxPx: 220, upPx: 200, immunityMs: 1000 });
 
 /**
  * Do Kodiaks appear on this run? From KODIAK_MIN_SYNC_LEVEL in ordinary runs. Never on Dailies or
@@ -226,4 +235,18 @@ export function stepKodiakPack(bears, sled, dtMs) {
 export function kodiakHits(bearBox, sledBox) {
   return sledBox.x < bearBox.x + bearBox.w && bearBox.x < sledBox.x + sledBox.w &&
     sledBox.y + sledBox.h > bearBox.y + 8 && sledBox.y < bearBox.y + bearBox.h;
+}
+
+/**
+ * The sled's velocity change (px/s) for a bear contact: backward (dvx < 0) and up (dvy < 0, y grows down). The
+ * backward push grows with how fast the two were closing and is capped at KODIAK_KNOCK.maxPx. Pure: the same
+ * bear and sled give the same shove.
+ * @param {{speed:number}} k the bear that touched the sled
+ * @param {{vx:number}} sled
+ * @returns {{dvx:number, dvy:number}}
+ */
+export function kodiakKnockback(k, sled) {
+  const closing = Math.abs(k.speed - Math.max(0, sled.vx));
+  const back = Math.min(KODIAK_KNOCK.maxPx, KODIAK_KNOCK.basePx + KODIAK_KNOCK.perClosingPx * closing);
+  return { dvx: -back, dvy: -KODIAK_KNOCK.upPx };
 }

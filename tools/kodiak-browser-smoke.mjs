@@ -1,14 +1,15 @@
-/** Issue #47: hostile Kodiaks in the REAL game (minified build).
+/** Issue #47: racing Kodiaks in the REAL game (minified build). Bears shove the sled; they never crash it
+ * (owner override 2026-11-21: playful snow-racing rivals).
  *
  *   GAME_URL=http://localhost:8293/ SHOT_DIR=/tmp/shots node tools/kodiak-browser-smoke.mjs
  *
- * For each of the three bear TYPES (seeds whose first encounter is that type), at Sync Level 6:
- *  - the bear spawns on the seeded schedule (the run starts 450 m in so the first encounter is
- *    immediate), warns, telegraphs, and either hits (named crash) or is passed (bonus);
+ * For each of the three bear TYPES (seeds whose first encounter is that type), at Sync Level 6, in SAME and MIXED packs:
+ *  - a rider that does nothing meets the pack: a bear that reaches the sled SHOVES it backward and up. Every shove is
+ *    bounded, one per bear, and the sled keeps moving forward; no bear crashes the run;
+ *  - a skilled rider (hops just before contact, divebombs off bear landings) is never crashed by a bear;
  *  - a screenshot of the bear on screen for review.
- * Counterplay: a rider that hops just before contact and divebombs off landings that would come down on a
- * bear survives every pack (same-type and mixed). Also: at Sync Level 1 no bear ever appears; a Kodiak run replays exactly from its ghost tape at
- * 30 and 120 Hz (bears live in the fixed tick).
+ * Also: at Sync Level 1 no bear ever appears; a Kodiak run replays exactly from its ghost tape at 30 and 120 Hz
+ * (the shoves live in the fixed tick).
  */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -17,6 +18,7 @@ const url = process.env.GAME_URL || 'http://localhost:8293/';
 const shotDir = process.env.SHOT_DIR || null;
 const SEEDS = { kernelPanic: 'BEAR0', bruteForce: 'BEAR5', blackIce: 'BEAR4' };
 const ARGS = ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'];
+const MAX_SHOVE_PX = 220; // KODIAK_KNOCK.maxPx: the backward shove bound (px/s)
 
 /** Start a run held at tick 0 with the sled already 450 m in, then step frames at `hz`. */
 async function drive(page, { seed, level = 6, hz = 60, maxMs = 14000, shotWhen = null, hopOnTele = false, tape = null, mode = 'same' }) {
@@ -37,7 +39,7 @@ async function drive(page, { seed, level = 6, hz = 60, maxMs = 14000, shotWhen =
     // 450 m of credit before tick 1 (identically in every run): the first encounter is due at once.
     run.startX = run.sled.x - 450 * 30 - 1;
     const events = [];
-    const onK = (p) => events.push({ ...p, tick: run.simClock.tick });
+    const onK = (p) => events.push({ ...p, tick: run.simClock.tick, vxAfter: run.sled.vx });
     g.events.on('bb:kodiak', onK);
     // Counterplay probe, like a skilled player: hop (held for a full-height hop) just before a bear would
     // reach the sled; against a Black-Ice sliding under the landing, divebomb so the sled lands short of it.
@@ -83,8 +85,10 @@ async function drive(page, { seed, level = 6, hz = 60, maxMs = 14000, shotWhen =
     if (run.crashed) await new Promise((r) => setTimeout(r, 400));
     g.events.off('bb:kodiak', onK);
     const crash = g.registry.get('lastCrash');
+    const firstShove = events.find((e) => e.type === 'shove');
     return { events, crashed: !!run.crashed, killer: crash?.name || null, crashLine: crash?.line || null, crashCause: crash?.cause || null,
       tape: g.registry.get('lastGhostTape') || null, shot, kodiaksOn: run.kodiaksOn,
+      ticksAfterShove: firstShove ? run.simClock.tick - firstShove.tick : null,
       replay: run.tapePlayer ? { desync: run.tapePlayer.desync, checked: run.tapePlayer.checked } : null, tick: run.simClock.tick };
   }, { seed, level, hz, maxMs, shotWhen, hopOnTele, tape, mode });
 }
@@ -99,30 +103,41 @@ async function page(browser) {
 }
 
 const browser = await chromium.launch({ headless: true, args: ARGS });
-const survived = [];
+const summary = [];
 try {
   for (const mode of ['same', 'mixed']) {
     for (const [kind, seed] of Object.entries(SEEDS)) {
-      // Passive: every pack must warn, then hit (named crash), be passed, or leave.
+      // Passive: a rider that does nothing. The pack warns; a bear that reaches the sled shoves it, and no bear crashes it.
       const a = await page(browser);
       const r = await drive(a.p, { seed, mode });
+      const shoves = r.events.filter((e) => e.type === 'shove');
       const types = r.events.map((e) => e.type);
       assert.equal(r.events[0]?.type, 'incoming', `${mode}/${kind}: no incoming warning`);
       assert.equal(r.events[0].mode, mode);
       assert.equal(r.events[0].members.length >= 2, true, `${mode}/${kind}: not a pack`);
       if (mode === 'same') assert.equal(new Set(r.events[0].members).size, 1, 'same-type pack mixed types');
       else assert.ok(new Set(r.events[0].members).size >= 2, 'mixed pack has one type');
-      const hit = r.crashed && /KODIAK/.test(String(r.killer || ''));
-      assert.ok(hit || types.includes('passed') || types.includes('gone'), `${mode}/${kind}: pack neither hit, was passed, nor left`);
+      assert.doesNotMatch(String(r.killer || ''), /KODIAK/, `${mode}/${kind}: a bear crashed the sled (${r.killer})`);
+      assert.ok(shoves.length > 0 || types.includes('passed') || types.includes('gone'), `${mode}/${kind}: the pack did nothing`);
+      if (kind !== 'blackIce') assert.ok(shoves.length > 0, `${mode}/${kind}: a rider that does nothing was never shoved`);
+      for (const e of shoves) {
+        assert.ok(e.dvx < 0 && e.dvy < 0, `${mode}/${kind}: a shove is not backward and up (${e.dvx}, ${e.dvy})`);
+        assert.ok(-e.dvx <= MAX_SHOVE_PX, `${mode}/${kind}: a shove exceeds the bound (${-e.dvx} px/s)`);
+        assert.ok(e.vxAfter > 0, `${mode}/${kind}: a shove stopped the sled dead`);
+      }
+      const keys = shoves.map((e) => `${e.n}/${e.member}`);
+      assert.equal(new Set(keys).size, keys.length, `${mode}/${kind}: a bear shoved twice (${keys})`);
+      if (shoves.length) console.log('KODIAK_SHOVE', mode, kind, JSON.stringify({ shoves: shoves.length, ticksAfterShove: r.ticksAfterShove, crashed: r.crashed, killer: r.killer }));
       assert.deepEqual(a.errors, []);
       await a.p.close();
-      // Counterplay: hop on every telegraph.
+      // Counterplay: hop on every telegraph; a skilled rider is never crashed by a bear.
       const c = await page(browser);
       const cr = await drive(c.p, { seed, mode, hopOnTele: true });
-      const killedByBear = cr.crashed && /KODIAK/.test(String(cr.killer || ''));
-      survived.push({ mode, lead: kind, members: r.events[0].members, passive: hit ? r.killer : 'survived',
-        hopping: killedByBear ? cr.killer : cr.crashed ? `crashed: ${cr.killer}` : 'survived', passes: cr.events.filter((e) => e.type === 'passed').length });
-      assert.equal(killedByBear, false, `${mode}/${kind}: a skilled rider (hop just before contact, divebomb off bear landings) was still wrecked by ${cr.killer}`);
+      const crashedByBear = cr.crashed && /KODIAK/.test(String(cr.killer || ''));
+      summary.push({ mode, lead: kind, members: r.events[0].members, passive: shoves.length ? `shoved x${shoves.length}` : 'not shoved',
+        skilled: cr.crashed ? `crashed: ${cr.killer}` : 'not crashed', skilledShoves: cr.events.filter((e) => e.type === 'shove').length,
+        passes: cr.events.filter((e) => e.type === 'passed').length });
+      assert.equal(crashedByBear, false, `${mode}/${kind}: a skilled rider was crashed by ${cr.killer}`);
       await c.p.close();
       if (shotDir && (mode === 'same' || kind === 'bruteForce')) {
         const sp = await page(browser);
@@ -135,7 +150,7 @@ try {
       }
     }
   }
-  console.log('KODIAK_COUNTERPLAY', JSON.stringify(survived, null, 1));
+  console.log('KODIAK_COUNTERPLAY', JSON.stringify(summary, null, 1));
   // Level gate
   const low = await page(browser);
   const lr = await drive(low.p, { seed: SEEDS.bruteForce, level: 1, maxMs: 6000 });
@@ -143,7 +158,7 @@ try {
   assert.deepEqual(lr.events, [], 'a bear appeared below the Sync Level gate');
   console.log('KODIAK_LEVEL_GATE_PASS');
   await low.p.close();
-  // Determinism: a pack run that ends on a bear replays exactly from its tape at 30 and 120 Hz.
+  // Determinism: a pack run with shoves replays exactly from its tape at 30 and 120 Hz.
   const rec = await page(browser);
   const recorded = await drive(rec.p, { seed: SEEDS.bruteForce, mode: 'mixed' });
   await rec.p.close();
