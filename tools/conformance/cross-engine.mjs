@@ -218,7 +218,8 @@ async function mathDiagnose(refEngine, badEngine, f, tape, hz, divTick) {
     }
   }
   const atDiv = examples.filter((e) => e.tick === divTick);
-  return { divergentTick: divTick, implementationDiffs: impl, firstMathDiffTick, examples, suspectAtDivergentTick: atDiv.map((e) => e.fn),
+  const fresh = compareDigests(a.digests, b.digests); // both runs are run #1 of fresh contexts: free of session-position effects
+  return { divergentTick: divTick, freshContextFirstDivergentTick: fresh.first ? fresh.first.tick : null, freshContextSubsystems: fresh.first ? fresh.first.subs.map((k) => SUBNAMES[k]) : null, implementationDiffs: impl, firstMathDiffTick, examples, suspectAtDivergentTick: atDiv.map((e) => e.fn),
     note: atDiv.length ? 'Math.* calls with identical arguments but different results occur on the first divergent tick.' : 'No Math.* call with identical arguments differed on the first divergent tick: cause may be a non-libm float effect (e.g. FMA/op ordering) or a differing Math call whose arguments already differed.' };
 }
 
