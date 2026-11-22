@@ -3,20 +3,43 @@ import { MAX_STRIP_FILE_BYTES, openDownhillRunTrace } from '../src/systems/downh
 const byId = (id) => document.getElementById(id);
 const tapeFile = byId('tape'), loadStatus = byId('load-status');
 const inspector = byId('inspector'), preview = byId('strip');
+const artFrame = byId('run-art-frame'), art = byId('run-art'), artUnavailable = byId('art-unavailable');
 const startField = byId('start'), endField = byId('end'), sampleField = byId('sample');
 const zoomIn = byId('zoom-in'), zoomOut = byId('zoom-out');
 let trace = null, loadGeneration = 0;
 let start = 0, end = 1, selected = 0;
-let previewUrl, downloadUrl;
+let previewUrl, downloadUrl, artUrl;
 
 function releaseUrls() {
   URL.revokeObjectURL(previewUrl);
   URL.revokeObjectURL(downloadUrl);
-  previewUrl = downloadUrl = undefined;
+  URL.revokeObjectURL(artUrl);
+  previewUrl = downloadUrl = artUrl = undefined;
 }
 
 function svgUrl(svg) {
   return URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+}
+
+function clearInspector() {
+  trace = null;
+  inspector.hidden = true;
+  preview.removeAttribute('src');
+  art.removeAttribute('src');
+  artFrame.hidden = artUnavailable.hidden = true;
+  releaseUrls();
+}
+
+function showArt() {
+  try {
+    // Use SVG only as an image, never as HTML/SVG markup in the inspector.
+    artUrl = svgUrl(trace.renderArt());
+    art.src = artUrl;
+    artFrame.hidden = false;
+  } catch {
+    // The optional artwork must not disable inspection or the existing export.
+    artUnavailable.hidden = false;
+  }
 }
 
 function updateSample() {
@@ -76,10 +99,7 @@ async function readTape(file) {
 tapeFile.addEventListener('change', async () => {
   const generation = ++loadGeneration;
   const file = tapeFile.files[0];
-  trace = null;
-  inspector.hidden = true;
-  preview.removeAttribute('src');
-  releaseUrls();
+  clearInspector();
   loadStatus.classList.remove('error');
   loadStatus.textContent = file ? 'Reading local file…' : '';
   if (!file) return;
@@ -92,11 +112,12 @@ tapeFile.addEventListener('change', async () => {
     endField.max = String(trace.count);
     showSections();
     openSection(0, trace.count - 1);
+    showArt();
     inspector.hidden = false;
     loadStatus.textContent = `Opened ${trace.count} recorded poses. No verification was performed.`;
   } catch (error) {
     if (generation !== loadGeneration) return;
-    trace = null;
+    clearInspector();
     loadStatus.classList.add('error');
     loadStatus.textContent = error.message;
   }

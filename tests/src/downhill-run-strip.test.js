@@ -1,9 +1,13 @@
-import { TextEncoder } from 'node:util';
+import { readFileSync } from 'node:fs';
+import { TextDecoder, TextEncoder } from 'node:util';
+import { jest } from '@jest/globals';
 import {
   MAX_STRIP_FILE_BYTES, MAX_STRIP_POINTS, MAX_STRIP_POSES, MAX_STRIP_SVG_BYTES, openDownhillRunTrace,
 } from '../../src/systems/downhill-run-strip.js';
+import { renderRunTraceArt } from '../../src/systems/run-trace-art.js';
 
 globalThis.TextEncoder ??= TextEncoder;
+globalThis.TextDecoder ??= TextDecoder;
 
 function tape(samples, fields = {}) {
   return JSON.stringify({
@@ -85,6 +89,18 @@ describe('Downhill Run Strip', () => {
     expect(modified).not.toContain(JSON.parse(tape(points)).trace);
   });
 
+  test('art preview uses the exact full decoded poses, not section or input metadata', () => {
+    const noisy = tape(points, { seed: 'private-seed', runId: '<script>bad</script>', inputs: ['raw-input'], score: 1234567 });
+    const trace = openDownhillRunTrace(noisy);
+    const svg = renderRunTraceArt(new Float32Array(points.flat()));
+    expect(trace.renderArt()).toBe(svg);
+    expect(trace.renderArt()).not.toMatch(/private-seed|<script|raw-input|1234567/);
+    expect(trace.renderArt()).toContain('LOCAL / UNVERIFIED');
+    const section = trace.render({ start: 1, end: 2 });
+    expect(section).toBe(openDownhillRunTrace(tape(points)).render({ start: 1, end: 2 }));
+    expect(trace.renderArt()).toBe(svg);
+  });
+
   test.each([
     'invalid JSON',
     '{}',
@@ -112,4 +128,70 @@ describe('Downhill Run Strip', () => {
     }
     expect(() => trace.sample(1.1)).toThrow(/Choose a recorded sample/);
   });
+});
+
+test('file changes clear artwork immediately; stale reads cannot replace the current preview', async () => {
+  const html = readFileSync(new URL('../../tools/downhill-run-strip.html', import.meta.url), 'utf8');
+  document.body.replaceChildren(...new DOMParser().parseFromString(html, 'text/html').body.childNodes);
+  const image = document.getElementById('run-art'), frame = document.getElementById('run-art-frame');
+  const input = document.getElementById('tape'), status = document.getElementById('load-status');
+  const methods = ['createObjectURL', 'revokeObjectURL'];
+  const saved = methods.map((name) => Object.getOwnPropertyDescriptor(URL, name));
+  let sequence = 0;
+  const createObjectURL = jest.fn(() => `blob:http://localhost/${++sequence}`);
+  const revokeObjectURL = jest.fn();
+  Object.defineProperties(URL, {
+    createObjectURL: { configurable: true, value: createObjectURL },
+    revokeObjectURL: { configurable: true, value: revokeObjectURL },
+  });
+  const buffer = (text) => new TextEncoder().encode(text).buffer;
+  const file = (text) => ({ size: text.length, arrayBuffer: async () => buffer(text) });
+  const select = (value) => {
+    Object.defineProperty(input, 'files', { configurable: true, value: value ? [value] : [] });
+    input.dispatchEvent(new Event('change'));
+  };
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  try {
+    await import('../../tools/downhill-run-strip.js');
+    select(file(tape(points)));
+    await settle();
+    const first = image.getAttribute('src');
+    expect(first).toMatch(/^blob:/);
+    expect(frame.hidden).toBe(false);
+    expect(document.querySelector('svg')).toBeNull();
+    expect(createObjectURL.mock.calls.at(-1)[0].type).toBe('image/svg+xml');
+    document.getElementById('zoom-in').click();
+    expect(image.getAttribute('src')).toBe(first);
+
+    let finishSlow;
+    select({ size: 1, arrayBuffer: () => new Promise((resolve) => { finishSlow = resolve; }) });
+    expect(frame.hidden).toBe(true);
+    expect(image.hasAttribute('src')).toBe(false);
+    expect(revokeObjectURL).toHaveBeenCalledWith(first);
+    select(file(tape(points.slice(0, 2))));
+    await settle();
+    const second = image.getAttribute('src');
+    expect(second).toMatch(/^blob:/);
+    expect(second).not.toBe(first);
+    finishSlow(buffer(tape(points)));
+    await settle();
+    expect(image.getAttribute('src')).toBe(second);
+    expect(status.textContent).toContain('Opened 2 recorded poses');
+
+    select(file('not valid JSON'));
+    await settle();
+    expect(status.textContent).toBe('Could not read GhostTape JSON');
+    expect(image.hasAttribute('src')).toBe(false);
+    expect(frame.hidden).toBe(true);
+    expect(revokeObjectURL).toHaveBeenCalledWith(second);
+    select(null);
+    expect(status.textContent).toBe('');
+    expect(image.hasAttribute('src')).toBe(false);
+  } finally {
+    for (const [i, name] of methods.entries()) {
+      if (saved[i]) Object.defineProperty(URL, name, saved[i]);
+      else delete URL[name];
+    }
+    document.body.replaceChildren();
+  }
 });

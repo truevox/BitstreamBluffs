@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.18.1 — developer Run DNA preview in local inspector (#213 / #87) (2026-11-22)
+
+- **Local, unverified Run DNA artwork preview.** The developer Downhill Run Strip inspector can now display abstract artwork from the full decoded trace loaded through the existing local file chooser. It clears stale previews on another selection or error; earlier asynchronous reads cannot replace a newer choice. The preview uses an SVG blob as an image, never injected markup. Section zoom and existing SVG download remain unchanged. No player-facing feature, replay, scoreboard, network, or gameplay changes.
+
 ## v2.18.0 — canopy, airbrake and flip exploit research policies (#214 / #215) (2026-11-22)
 
 - **Developer Exploit Factory can now actually test the playtested canopy + airbrake + flip combination.** Adds two deterministic scripted candidates: `canopyHop` (airbrake/canopy without intentional flips) and `canopyFlip` (flip first, canopy after steering release, airbrake on descent while maintaining forward motion), against unchanged hands-off and flip controls. Simulator pad now routes real held/pressed canopy and airbrake signals; the result records observed active control times rather than assuming a named policy acted.
