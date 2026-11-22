@@ -10,7 +10,7 @@ import {
 } from '../../src/systems/ProfileStore.js';
 import { ProgressionService } from '../../src/systems/ProgressionService.js';
 import { MissionsService } from '../../src/systems/MissionsService.js';
-import { rollSet } from '../../src/systems/Missions.js';
+import { rollSet, isOfferable } from '../../src/systems/Missions.js';
 import { REG } from '../../src/constants.js';
 import { EVT } from '../../src/events.js';
 
@@ -212,5 +212,101 @@ describe('BOOT-1: the published profile after boot is the store profile', () => 
     const published = game.registry.get(REG.PROFILE);
     store.save({ ...published, boosts: { ...published.boosts, headStart: true } });
     expect(store.profile.missions.active).toEqual(drawn);
+  });
+});
+
+describe('MS-4 (#65): "Ride 3 arcade bridges"', () => {
+  const t = MISSIONS.templates.find((x) => x.id === 't2-bridges-3');
+  const xpAt = (level) => LEVELS.levels.find((l) => l.level === level).xpMin;
+  const bit = (id) => BIOME_DEFS.find((d) => d.id === id).bit;
+  const offered = (p) => isOfferable(t, p, null, BIOME_DEFS);
+
+  test('the template is a plain singleRun on the run-scoped `bridges` counter', () => {
+    expect(t).toMatchObject({ type: 'singleRun', tier: 2, metric: 'bridges', target: 3, needsBridges: true });
+  });
+
+  test('it is not offered at L1-L3, when only the base biome is earned', () => {
+    for (const level of [1, 2, 3]) expect(offered(v1({ xp: xpAt(level) }))).toBe(false);
+  });
+
+  test('it is offered at L4 with Garbage Dump Glacier ON (the default), and stays offered with more biomes', () => {
+    const p = v1({ xp: xpAt(4) });
+    expect(p.level).toBe(4);
+    expect(offered(p)).toBe(true);
+    expect(offered(v1({ xp: xpAt(10) }))).toBe(true);
+  });
+
+  test('it is not offered when every earned biome is explicitly OFF (no bridge can exist)', () => {
+    expect(offered(v1({ xp: xpAt(4), biomeOff: bit('garbage-dump-glacier') }))).toBe(false);
+    expect(offered(v1({ xp: xpAt(7), biomeOff: bit('garbage-dump-glacier') | bit('pyramid-peak') }))).toBe(false);
+    expect(offered(v1({ xp: xpAt(7), biomeOff: bit('garbage-dump-glacier') }))).toBe(true); // one earned biome still ON
+  });
+
+  const bridge = { id: null, name: 'Bitstream', sector: 3, entering: false };
+  const start = (game) => game.events.emit(EVT.RUN_START, {});
+
+  async function bootWith(active) {
+    const b = await boot(memStorage());
+    b.store.applyMissions({ active, counter: 5, progress: {}, xp: 0, shards: 0 });
+    const done = [];
+    b.game.events.on(EVT.MISSION_COMPLETED, (p) => done.push(p.id));
+    return { ...b, done };
+  }
+
+  test('the counter counts bridge entries only: not the opening Debutmont enter, not a biome enter', async () => {
+    const { game, missions } = await bootWith([t.id]);
+    start(game);
+    game.events.emit(EVT.BIOME_ENTER, { id: 'debutmont', name: 'Debutmont', sector: 1, entering: true });
+    expect(missions.live.bridges).toBe(0);
+    game.events.emit(EVT.BIOME_ENTER, bridge);
+    expect(missions.live.bridges).toBe(1);
+    game.events.emit(EVT.BIOME_ENTER, { id: 'garbage-dump-glacier', name: 'Garbage Dump Glacier', sector: 4, entering: true });
+    expect(missions.live.bridges).toBe(1);
+    // an unrelated event (a frame's worth of distance or score) never moves it
+    game.events.emit(EVT.DISTANCE_CHANGED, { meters: 900 });
+    game.events.emit(EVT.SCORE_CHANGED, { total: 900 });
+    expect(missions.live.bridges).toBe(1);
+  });
+
+  test('it completes on the third bridge, live, exactly once', async () => {
+    const { game, missions, done } = await bootWith([t.id]);
+    start(game);
+    game.events.emit(EVT.BIOME_ENTER, bridge);
+    game.events.emit(EVT.BIOME_ENTER, bridge);
+    expect(done).toEqual([]);
+    game.events.emit(EVT.BIOME_ENTER, bridge);
+    expect(done).toEqual([t.id]);
+    game.events.emit(EVT.BIOME_ENTER, bridge);
+    expect(done).toEqual([t.id]);
+    expect(missions.live.bridges).toBe(4);
+  });
+
+  test('the payout at RUN_END reads the same counter: paid after three bridges, not after two', async () => {
+    const a = await bootWith([t.id]);
+    start(a.game);
+    for (let i = 0; i < 2; i++) a.game.events.emit(EVT.BIOME_ENTER, bridge);
+    expect(a.missions.onRunCredited(rec({ ledgerHash: 'two' })).completed.map((c) => c.id)).toEqual([]);
+
+    const b = await bootWith([t.id]);
+    start(b.game);
+    for (let i = 0; i < 3; i++) b.game.events.emit(EVT.BIOME_ENTER, bridge);
+    expect(b.missions.onRunCredited(rec({ ledgerHash: 'three' })).completed.map((c) => c.id)).toEqual([t.id]);
+  });
+
+  test('the counter resets with each run (RunScene is one instance and emits RUN_START from create())', async () => {
+    const { game, missions } = await bootWith([t.id]);
+    start(game);
+    for (let i = 0; i < 2; i++) game.events.emit(EVT.BIOME_ENTER, bridge);
+    expect(missions.live.bridges).toBe(2);
+    start(game);
+    expect(missions.live.bridges).toBe(0);
+    game.events.emit(EVT.BIOME_ENTER, bridge);
+    expect(missions.onRunCredited(rec({ ledgerHash: 'next' })).completed).toEqual([]);
+  });
+
+  test('a run that never left the base biome (mask 0) cannot complete it', () => {
+    const p = v1({ xp: xpAt(4), missions: { counter: 1, active: [t.id], progress: {} } });
+    const out = rollSet(p, [t], rec({ ledgerHash: 'flat', biomeMask: 0 }), MISSIONS.templates, { biomeDefs: BIOME_DEFS });
+    expect(out.completed).toEqual([]);
   });
 });

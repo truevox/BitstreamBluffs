@@ -139,6 +139,15 @@
       "target": 25
     },
     {
+      "id": "t2-bridges-3",
+      "type": "singleRun",
+      "tier": 2,
+      "title": "Ride 3 arcade bridges",
+      "metric": "bridges",
+      "target": 3,
+      "needsBridges": true
+    },
+    {
       "id": "t2-airtime-1100",
       "type": "singleRun",
       "tier": 2,

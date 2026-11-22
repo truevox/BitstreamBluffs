@@ -33,6 +33,9 @@ const TIER_MULT = [0, 1, 1.6, 2.4, 3.5];
 /** RunRecord fields that can feed a singleRun/cumulative metric. */
 const RECORD_METRICS = new Set([
   'distanceM', 'score', 'shards', 'nearMisses', 'maxAirtimeMs', 'bestCombo', 'tricks',
+  // #65: arcade bridges the sled entered this run. Not stored in the RunRecord (and so not in any ledger hash):
+  // MissionsService counts BIOME_ENTER `{id:null}` events and hands the total to the roll beside the record.
+  'bridges',
 ]);
 
 /**
@@ -243,6 +246,14 @@ export function isOfferable(t, profile, ruleId, biomeDefs) {
   if (!t || typeof t !== 'object') return false;
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   if (Array.isArray(t.excludedRuleIds) && ruleId && t.excludedRuleIds.includes(ruleId)) return false;
+  if (t.needsBridges) {
+    // #65: a bridge only exists between two biomes, so the player needs an earned biome besides the base one, and
+    // not all of them switched OFF (the enabled mask has no bit for the base biome, so a zero mask means no bridges).
+    // With no table (a legacy caller) an OFF choice cannot be resolved, so the earned check alone decides.
+    const earned = (defs.length ? earnedBiomeIds(profile, defs) : unlockedBiomeIds(profile)).filter((id) => id !== BASE_BIOME_ID);
+    if (!earned.length) return false;
+    if (defs.length && enabledBiomeMask(profile, defs) === 0) return false;
+  }
   if (t.biome) {
     // Earned, not merely listed: `profile.unlocked.biomes` is part of the profile shape but nothing
     // populates it, so reading it alone made every biome mission unofferable to a real profile.

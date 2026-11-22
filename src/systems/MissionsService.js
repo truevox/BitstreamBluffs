@@ -103,6 +103,13 @@ export class MissionsService {
     on(EVT.SCORE_CHANGED, (p) => { this.live.score = (p && p.total) || 0; this._checkLive(); });
     on(EVT.SHARD_COLLECTED, () => { this.live.shards += 1; this._checkLive(); });
     on(EVT.NEAR_MISS, () => { this.live.nearMisses += 1; this._checkLive(); });
+    // #65: RunScene announces an arcade bridge as BIOME_ENTER `{id:null, entering:false}`, once per entry (the opening
+    // Debutmont enter has an id and does not count). Meta only: nothing here reaches the simulation.
+    on(EVT.BIOME_ENTER, (p) => {
+      if (!p || p.id !== null || p.entering !== false) return;
+      this.live.bridges += 1;
+      this._checkLive();
+    });
     on(EVT.COMBO_CHANGED, (p) => {
       this.live.bestCombo = Math.max(this.live.bestCombo, (p && p.multiplier) || 1);
       // Real combo membership (RunScene publishes snap.comboTricks), so a combo mission is judged on
@@ -124,7 +131,7 @@ export class MissionsService {
 
   /** Zero the live counters for a fresh run. */
   resetLive() {
-    this.live = { distanceM: 0, score: 0, shards: 0, nearMisses: 0, bestCombo: 1, maxAirtimeMs: 0, tricks: {}, combo: [] };
+    this.live = { distanceM: 0, score: 0, shards: 0, nearMisses: 0, bridges: 0, bestCombo: 1, maxAirtimeMs: 0, tricks: {}, combo: [] };
     if (!this._completedThisRun) this._completedThisRun = new Set();
   }
 
@@ -182,7 +189,9 @@ export class MissionsService {
     const p = this.profile;
     if (!p || !this.store) return null;
     const active = activeTemplates(p, this.templates);
-    const out = rollSet(p, active, record || {}, this.templates, {
+    // `bridges` is a per-run count the RunRecord does not carry; the roll reads it from this copy (never stored).
+    const rolled = { ...(record || {}), bridges: this.live.bridges };
+    const out = rollSet(p, active, rolled, this.templates, {
       tierUnlock: this.tierUnlock || undefined,
       biomeDefs: this.biomeDefs,
       completedComboIds: this._completedThisRun,
