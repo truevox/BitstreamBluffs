@@ -1,5 +1,49 @@
 # Changelog
 
+## v2.17.0 — local course ghost lineup (#178 / #81) (2026-11-22)
+
+- **Choose which ghosts appear on your next run.** Open Course Ghosts from Game Over with **G** or **Ghost Fav**. Set local Best and Latest visibility for that course, and pin, replace or clear Favorites A–C. Global Best and Latest settings still take precedence, and a tape shared by several roles draws only once. The lineup stays on this device; replay formats, scoring and online sharing are unchanged.
+
+## v2.16.4 — developer stock Packet Spike traversal check (#202 / #127) (2026-11-22)
+
+- **Pinned stock hazard traversal diagnostic.** A developer-only Chromium script probes one naturally generated Packet Spike across three normal-input cases (no hop, a timed hop, and a late hop), each repeated twice in fresh contexts, without injecting terrain or collision outcomes. It checks that the same hazard and early power-up are encountered, validates actual input, clearance and fatal/landing events, and refuses a mismatched compiled game. The fixture is pinned to one older compiled build; this is not a general fairness verdict, cross-version compatibility proof, or active gameplay change. No player data is transferred or retained.
+
+## v2.16.3 — Exploit Factory: complete adversarial policy evidence (#187 / #76) (2026-11-22)
+
+- **`--reuse` no longer accepts an incomplete run record just because the record's own `failures[]` is empty.**
+  Completeness is re-derived from the record's data by new pure `tools/exploits/lib/record-audit.cjs`: every arm the
+  record claims to have run must carry exactly the planned seed identities, once each. Four shapes re-reported as
+  complete measurements (exit 0, full metrics table, rendered verdicts) and now exit 2 with the arm named as
+  *unmeasured*: an arm missing entirely, every arm cut to half the planned seeds, a duplicated seed inside one arm,
+  and a seed nobody planned. A duplicated-seed arm previously surfaced as exit 1 with a **usage** banner.
+- **A record whose counts cannot be attributed is rejected outright**, not partially compared: a run attributed to no
+  arm, an unnamed or duplicated `policySpec`, a plan that lists one seed twice. The report prints the reasons under
+  `RECORD REJECTED — no comparison is offered`.
+- **The exit code and the report now come from the same audit** on both the fresh and `--reuse` paths, so the status
+  cannot disagree with what was printed. The runner also merges audit findings into `failures` before writing, so the
+  record on disk always agrees with itself.
+- **Older records keep their guarantees.** A record without `args.seedList` has its plan recovered from the numeric
+  `args.seeds` count (expanded exactly as the simulator expands it), or from a comma-list `args.seeds`. Only a record
+  with neither is rejected outright, because there is then no plan to verify the arms against.
+- **A reused record must now be self-sufficient beyond its run list.** It must name a `baseline` that actually has an
+  arm — otherwise there is nothing to pair a candidate against — and it must carry a recoverable seed plan
+  (`args.seedList`, a numeric `args.seeds` count, or a comma-list `args.seeds`). A record with neither is rejected
+  instead of being accepted on "the arms agree", which is exactly what a uniformly truncated record looks like. A
+  comma-list `args.seeds` is now treated as exact identities rather than as an unverifiable fallback.
+- `tools/exploits/repro-reuse-incomplete.mjs` reproduces the twelve defective shapes through the real CLI, with two
+  positive cases (a full record and a genuinely dominant one) so it fails if the guard ever decays into "always
+  refuse". Run against the previously reviewed head `645a5c6` it reports 11 of 12 accepted as clean; at this head, 0.
+- Harness tooling only: no gameplay, physics, balance or player-visible change. `tools/sim/**` untouched.
+
+
+## v2.16.2 — canonical replay development check (#205 / #129) (2026-11-22)
+
+- **Same-build replay check for developers.** The local tool records one synthetic stock run in a pinned Chromium build, verifies its native canonical evidence, and compares every completed tick across two fresh replays plus the separate fatal event. It does not compare historical builds or change gameplay, scoring, or the replay format.
+
+## v2.16.1 — keep ground hop cues visible (#208 / #155) (2026-11-21)
+
+- **Ground hop cues stay visible at the edge.** Fixed-tick warning and sound timing no longer reads the rendered camera. The renderer uses the current view: if the hop arrow is clipped, the edge badge carries the cue. The badge only reads already-streamed terrain. No physics, score, replay ruleset or Pulp camera change.
+
 
 ## v2.16.0 — reconcile post-v2.15.3 merged capabilities and release policy (2026-11-21)
 
