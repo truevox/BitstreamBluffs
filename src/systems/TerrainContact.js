@@ -11,6 +11,7 @@
  * top-face normal removes it and leaves everything else (gaps, walls, head and deck contacts) untouched.
  */
 import { TUNING } from './PhysicsTuner.js';
+import pmath from './pmath.js';
 
 const SNAP_FLAG = '__bbTerrainNormalSnap';
 
@@ -34,7 +35,7 @@ export function terrainTopNormal(body) {
   let dx = b.x - a.x;
   let dy = b.y - a.y;
   if (dx < 0) { dx = -dx; dy = -dy; }
-  const len = Math.hypot(dx, dy);
+  const len = pmath.hypot(dx, dy);
   if (len < 1e-6) return null;
   const nx = dy / len;
   const ny = -dx / len; // (dy,-dx): points up for a left-to-right edge
@@ -63,7 +64,7 @@ export function snapTerrainNormal(collision, opt = {}) {
   // Matter orients the collision normal so that it points from bodyB towards bodyA
   const sign = terrain === B ? 1 : -1;
   const dot = (n.x * tn.x + n.y * tn.y) * sign;
-  const minDev = Math.cos(((opt.minDevDeg != null ? opt.minDevDeg : 0.5) * Math.PI) / 180);
+  const minDev = pmath.cos(((opt.minDevDeg != null ? opt.minDevDeg : 0.5) * Math.PI) / 180);
   if (dot >= minDev) return false;
   // overlap along the face normal: quad's top plane minus the runner's lowest point along it
   let low = Infinity;

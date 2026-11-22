@@ -4,6 +4,7 @@
  * Sled left edge is Matter compound body.bounds.min.x, not its center.
  * The model never schedules an automatic death or artificially caps player speed.
  */
+import pmath from './pmath.js';
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const positive = (v, fallback) => Number.isFinite(v) && v > 0 ? v : fallback;
 
@@ -66,11 +67,11 @@ export class BsodPursuit {
     this.config = { ...BSOD_DEFAULTS, ...config };
     const lvl = Number.isFinite(level) ? Math.max(1, level) : 1;
     // Growth in player capability extends the opening grace without special death timers.
-    const headStart = 900 * Math.log1p(lvl - 1);
+    const headStart = 900 * pmath.log1p(lvl - 1);
     this.wallX = sledLeftEdgeX - positive(this.config.initialGapPx, BSOD_DEFAULTS.initialGapPx) - headStart;
     this.wallSpeedPxS = positive(this.config.initialSpeedPxS, BSOD_DEFAULTS.initialSpeedPxS);
     this.accelerationPxS2 = positive(this.config.accelerationPxS2, BSOD_DEFAULTS.accelerationPxS2)
-      / (1 + Math.log1p(lvl - 1) * 0.17);
+      / (1 + pmath.log1p(lvl - 1) * 0.17);
     this.active = true;
   }
 

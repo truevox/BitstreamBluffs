@@ -77,11 +77,13 @@ import { GroundTelegraph } from '../entities/GroundTelegraph.js';
 import { planTelegraphMarks as planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
+import { installPortableMatter } from '../systems/MatterPortable.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
 import { bsodWindVisualStrength } from '../systems/BsodWindVisual.js';
 import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, advanceGymReadyMs, gymBeatSuggestion } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
+import pmath from '../systems/pmath.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -321,6 +323,7 @@ export class RunScene extends Phaser.Scene {
     world.engine.velocityIterations = 6;
     world.engine.gravity.y = PHYSICS.gravityPxS2 / 1000;
     installTerrainContactFix(Phaser.Physics.Matter.Matter);
+    installPortableMatter(Phaser.Physics.Matter.Matter); // #121: Matter's trig/pow/acos through pmath, before any body is built
 
     // visuals / entities
     this.cameras.main.setBackgroundColor(this.palette.bg);
@@ -361,7 +364,7 @@ export class RunScene extends Phaser.Scene {
     this.gymAttemptStartX = spawnX;
     this.gymStartX = spawnX;
     this.sled = new Sled(this, spawnX, spawnY - 14, this.palette, this.look);
-    this.sled.setPose(spawnX, spawnY - 15, spawnAng, 50 * Math.cos(spawnAng * DEG), 50 * Math.sin(spawnAng * DEG));
+    this.sled.setPose(spawnX, spawnY - 15, spawnAng, 50 * pmath.cos(spawnAng * DEG), 50 * pmath.sin(spawnAng * DEG));
     // W4 boosts. Applied at spawn from the loadout chosen before the run: the shield reuses the Hashed
     // Backup charge counter the pickup already feeds, and Head Start scales the launch velocity through
     // the same method the speed-boost pickup uses. No physics constant is touched.
@@ -1412,8 +1415,8 @@ export class RunScene extends Phaser.Scene {
       sled.render(dt);
       // trail anchored at the rear runner
       const a = sled.body.angle;
-      const c = Math.cos(a);
-      const s = Math.sin(a);
+      const c = pmath.cos(a);
+      const s = pmath.sin(a);
       this.trail.update(sled.x + c * -16 - s * 6, sled.y + s * -16 + c * 6, sled.speed);
     }
     // the crash beat (CrashReport.crashBeat): hit-stop, then 400 ms of FX at 0.25x; visual only, the run clock is stopped
@@ -2048,10 +2051,10 @@ export class RunScene extends Phaser.Scene {
       x = s.x; y = this.terrain.heightAt(s.x) - 16; ang = this.slopeAt(s.x);
       vx = s.vx; vy = 0;
     }
-    const sp = Math.hypot(vx, vy);
+    const sp = pmath.hypot(vx, vy);
     const keep = sp > 1 ? Math.min(1, 380 / sp) * speedKeep : 0;
-    const dirx = Math.cos(ang * DEG);
-    const diry = Math.sin(ang * DEG);
+    const dirx = pmath.cos(ang * DEG);
+    const diry = pmath.sin(ang * DEG);
     const along = Math.max(minAlong, sp * keep);
     s.setPose(x, y - 4, ang, dirx * along, diry * along);
     s.invulnerableMs = TUNING.invulnerableMs;
@@ -2101,7 +2104,7 @@ export class RunScene extends Phaser.Scene {
   resolveCrash(fs) {
     const c = this.pendingCrash;
     this.pendingCrash = null;
-    const speed = Math.hypot(fs.vx, fs.vy);
+    const speed = pmath.hypot(fs.vx, fs.vy);
     // The advancing deletion wall overrides even shield, respawn grace and opening grace.
     if (c.cause === 'bsod') { this.doCrash(c, fs, speed); return; }
     if (this.sled.invulnerableMs > 0 && c.cause !== 'chasm') return; // brief grace after a respawn / backup
@@ -2452,9 +2455,9 @@ export class RunScene extends Phaser.Scene {
       - 225 * smooth01((this.bsodState && this.bsodState.proximity01) || 0);
     const tx = s.x + look - GAME_WIDTH * 0.38;
     const ty = s.y - GAME_HEIGHT / 3 - clamp(s.vy * 0.05, -26, 34);
-    const kx = 1 - Math.exp((-TUNING.cameraLerpX * dt) / 1000);
+    const kx = 1 - pmath.exp((-TUNING.cameraLerpX * dt) / 1000);
     // follow faster the quicker the sled moves vertically (bounce pads / big drops must never push it off screen)
-    const ky = 1 - Math.exp((-(TUNING.cameraLerpY + clamp(Math.abs(s.vy) / 90, 0, 7)) * dt) / 1000);
+    const ky = 1 - pmath.exp((-(TUNING.cameraLerpY + clamp(Math.abs(s.vy) / 90, 0, 7)) * dt) / 1000);
     this._camX += (tx - this._camX) * kx;
     this._camY += (ty - this._camY) * ky;
     // hard guarantee: keep the rider inside the visible band
@@ -2467,7 +2470,7 @@ export class RunScene extends Phaser.Scene {
       // per-pixel RNG jitter, decaying
       ox = Math.round(((this.runRandom?.visualCamera || cosmeticRandom('visual/camera')).next() * 2 - 1) * this.shakeAmp);
       oy = Math.round(((this.runRandom?.visualCamera || cosmeticRandom('visual/camera')).next() * 2 - 1) * this.shakeAmp);
-      this.shakeAmp *= Math.exp(-dt / 140);
+      this.shakeAmp *= pmath.exp(-dt / 140);
     } else {
       this.shakeAmp = 0;
     }
@@ -2483,7 +2486,7 @@ export class RunScene extends Phaser.Scene {
     // speed zoom: 1.0 at rest -> zoomMin at zoomSpeedHi, smoothed, with a brief extra pull-out on boosts. Stepped to 0.005
     // so the vector terrain does not shimmer from continuous sub-pixel scale changes.
     const zt = speedZoom(s.speed);
-    this._zoom += (zt - this._zoom) * (1 - Math.exp((-TUNING.zoomLerp * dt) / 1000));
+    this._zoom += (zt - this._zoom) * (1 - pmath.exp((-TUNING.zoomLerp * dt) / 1000));
     this._zoomKick = Math.max(0, this._zoomKick - dt / 260 * 0.05);
     const crashZoom = this.crashed ? crashBeat(this.crashTimerMs, TUNING.hitStopCrashMs).zoomMul : 1; // crash beat zoom-in
     const z = Math.round(clamp((this._zoom - this._zoomKick) * crashZoom, ZOOM_FLOOR, 1.2) * 200) / 200;

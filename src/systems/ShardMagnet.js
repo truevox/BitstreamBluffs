@@ -11,6 +11,7 @@
  * at most one extra pickup per chunk, from its own seeded stream.
  */
 import { Rng } from './Rng.js';
+import pmath from './pmath.js';
 
 /** Never below this share of the def's base chance, however far down the mountain (as for base pickups). */
 const MAGNET_FLOOR_FRACTION = 0.4;
@@ -80,7 +81,7 @@ export function magnetStrength(eff = {}, magnetMul = 1) {
  */
 export function pullStep(sx, sy, x, y, radius, speedPxS, dtMs) {
   const dx = x - sx, dy = y - sy;
-  const d = Math.hypot(dx, dy);
+  const d = pmath.hypot(dx, dy);
   if (!(d <= radius) || d === 0) return null;
   const step = Math.min(d, speedPxS * (1 + 2 * (1 - d / radius)) * (dtMs / 1000));
   return { x: sx + (dx / d) * step, y: sy + (dy / d) * step };

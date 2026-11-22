@@ -3,12 +3,13 @@
  * Forces act on the player, not on the wall. World wind can grow forever while airfoil
  * efficiency, finite fuel, terrain and player choices determine escape viability.
  */
+import pmath from './pmath.js';
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /** Treat low-speed riders as a sail, fast riders as a glider. */
 export function canopySailFactor(vx) {
   const speed = Math.abs(Number(vx) || 0);
-  return 0.30 + 0.70 / (1 + Math.pow(speed / 520, 2));
+  return 0.30 + 0.70 / (1 + pmath.pow(speed / 520, 2));
 }
 
 /** Proposed first-playtest aerodynamic forces (velocity change in px/s). */
@@ -28,10 +29,10 @@ export function aerodynamicStep({
     // accelerate a rider when airflow matches their velocity. Racing riders
     // extract less thrust than a slow rider presenting the entire sail.
     const near = clamp(Number.isFinite(proximity01) ? proximity01 : 0, 0, 1);
-    const sailAccel = (180 + 2800 * Math.pow(near, 4))
-      * Math.tanh(flow / 420) * canopySailFactor(vx);
+    const sailAccel = (180 + 2800 * pmath.pow(near, 4))
+      * pmath.tanh(flow / 420) * canopySailFactor(vx);
     dvx += sailAccel * density * dt;
-    dvy -= (65 + 45 * Math.tanh(Math.abs(flow) / 600)) * density * dt;
+    dvy -= (65 + 45 * pmath.tanh(Math.abs(flow) / 600)) * density * dt;
   }
   if (airBrake) {
     // Braking buys altitude by converting available forward speed to lift.
@@ -41,7 +42,7 @@ export function aerodynamicStep({
     // Convert that spent momentum into meaningful, speed-dependent upward lift:
     // above ~400px/s it can briefly overcome gravity; as the rider slows the
     // lift collapses, preventing stationary hovering or free infinite flight.
-    const aero = 1250 * Math.tanh(flowSpeed / 450) * density;
+    const aero = 1250 * pmath.tanh(flowSpeed / 450) * density;
     dvy -= aero * Math.max(1, Number.isFinite(airbrakeLiftMul) ? airbrakeLiftMul : 1) * dt;
   }
   return { dvx, dvy };

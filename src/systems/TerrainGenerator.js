@@ -30,6 +30,7 @@
 import { Rng, xxHash32, hashInts } from './Rng.js';
 import { rollSweep } from './HazardMotion.js';
 import { TERRAIN } from '../constants.js';
+import pmath from './pmath.js';
 
 /** Horizontal distance between consecutive polyline points (px). */
 export const SPACING_PX = 16;
@@ -42,7 +43,7 @@ export const MAX_NOISE_UP_DEG = 26;
 export const MAX_TURN_DEG = 10;
 export const MAX_NOISE_TURN_DEG = 17;
 /** Every chunk descends at least this much overall (tan of angle). */
-const MIN_NET_TAN = Math.tan((9 * Math.PI) / 180);
+const MIN_NET_TAN = pmath.tan((9 * Math.PI) / 180);
 /** Hazard fairness: hazards keep this far from chunk ends / each other / the start of the run. */
 export const HAZARD_END_MARGIN_PX = 240;
 export const HAZARD_MIN_SPACING_PX = 480;
@@ -54,7 +55,7 @@ export const HAZARD_MIN_X_PX = 700;
  */
 export const RISE_LINE_DEG = 7;
 export const RISE_MAX_PX = 30;
-const RISE_LINE_TAN = Math.tan((RISE_LINE_DEG * Math.PI) / 180);
+const RISE_LINE_TAN = pmath.tan((RISE_LINE_DEG * Math.PI) / 180);
 /**
  * Crest rounding (fun pass): the slope angle may INCREASE (convex crest = ground falling away) by at most this per 16 px
  * segment on ordinary terrain, so a sled above ~450 px/s no longer micro-hops. Deliberate launch templates (SHARP_TAGS)
@@ -493,7 +494,7 @@ export class TerrainGenerator {
    * @returns {number} y world px (down positive).
    */
   heightAt(x) {
-    if (x < 0) return Math.tan(this.bounds[0].startAngDeg * RAD) * x;
+    if (x < 0) return pmath.tan(this.bounds[0].startAngDeg * RAD) * x;
     const c = this._chunkAt(x);
     const p = c.points;
     const i = this._segIndex(c, x);
@@ -533,8 +534,8 @@ export class TerrainGenerator {
       if (!sw || !Number.isFinite(sw.amplitudePx) || !Number.isFinite(sw.periodPx) || sw.periodPx <= 0) continue;
       const taper = Math.min(Number.isFinite(sw.taperPx) && sw.taperPx > 0 ? sw.taperPx : 0, (z.x1 - z.x0) / 2);
       const t = Math.min(x - z.x0, z.x1 - x);
-      const w = taper > 0 && t < taper ? 0.5 - 0.5 * Math.cos((Math.PI * t) / taper) : 1;
-      sum += Math.sin(((x - z.x0) / sw.periodPx) * Math.PI * 2) * sw.amplitudePx * w;
+      const w = taper > 0 && t < taper ? 0.5 - 0.5 * pmath.cos((Math.PI * t) / taper) : 1;
+      sum += pmath.sin(((x - z.x0) / sw.periodPx) * Math.PI * 2) * sw.amplitudePx * w;
     }
     return sum;
   }
@@ -570,7 +571,7 @@ export class TerrainGenerator {
     const c = this._chunkAt(x);
     const p = c.points;
     const i = this._segIndex(c, x);
-    return Math.atan2(p[i + 1].y - p[i].y, p[i + 1].x - p[i].x) * DEG;
+    return pmath.atan2(p[i + 1].y - p[i].y, p[i + 1].x - p[i].x) * DEG;
   }
 
   /**
@@ -820,7 +821,7 @@ export class TerrainGenerator {
       this._ensureScratch(n + 2);
       const jy = this._ys;
       jy[0] = b.startY;
-      for (let i = 0; i < n; i++) jy[i + 1] = jy[i] + Math.tan(ja[i] * RAD) * SPACING_PX;
+      for (let i = 0; i < n; i++) jy[i + 1] = jy[i] + pmath.tan(ja[i] * RAD) * SPACING_PX;
       endAng = ja[n - 1];
       ys = jy;
     } else if (kind === 'noise') {
@@ -903,7 +904,7 @@ export class TerrainGenerator {
     let landEnd = 0;
     for (const l of lips) {
       if (!l.pad) {
-        target.launches.push({ x: l.x, y: l.y, angleDeg: -Math.atan2(l.vy, l.vx) * DEG, airS: l.airS, landX: l.landX });
+        target.launches.push({ x: l.x, y: l.y, angleDeg: -pmath.atan2(l.vy, l.vx) * DEG, airS: l.airS, landX: l.landX });
       }
       landEnd = Math.max(landEnd, l.zoneEnd);
     }
@@ -980,9 +981,9 @@ export class TerrainGenerator {
     move(beta, LIP_TURN_DEG, LIP_TURN_DEG); // sharp fall-away: ground drops clear of the trajectory at once
     // landing ramp long enough for the fastest plausible launch (1.2 x expected) to touch down on it
     const vmax = first ? 470 : Math.max(JUMP_LAUNCH_SPEED_PX_S * 1.25, vExp * 1.1);
-    const ca = Math.cos(alpha * RAD);
+    const ca = pmath.cos(alpha * RAD);
     const k = GRAV / (2 * vmax * vmax * ca * ca);
-    const xHit = (Math.tan(beta * RAD) + Math.tan(alpha * RAD)) / k;
+    const xHit = (pmath.tan(beta * RAD) + pmath.tan(alpha * RAD)) / k;
     hold(Math.min(first ? 560 : 1300, xHit * 0.9 + 64));
     move(9, 0, RUNOUT_TURN_DEG); // long smooth concave runout
     hold(JUMP_RUNOUT_PX);
@@ -1009,7 +1010,7 @@ export class TerrainGenerator {
   _findLips(pts, vExp, endX) {
     const lips = [];
     const n = pts.length;
-    const ang = (k) => Math.atan2(pts[k + 1].y - pts[k].y, pts[k + 1].x - pts[k].x) * DEG;
+    const ang = (k) => pmath.atan2(pts[k + 1].y - pts[k].y, pts[k + 1].x - pts[k].x) * DEG;
     let skipTo = -Infinity;
     for (let i = 3; i < n - 2; i++) {
       if (pts[i].x <= skipTo) continue;
@@ -1017,8 +1018,8 @@ export class TerrainGenerator {
       const a1 = (ang(i) + ang(i + 1)) / 2;
       if (a1 - a0 < 7) continue;
       const inc = ang(i - 1);
-      const vx = vExp * Math.cos(inc * RAD);
-      const vy = vExp * Math.sin(inc * RAD);
+      const vx = vExp * pmath.cos(inc * RAD);
+      const vy = vExp * pmath.sin(inc * RAD);
       const f = this._flight(pts, pts[i].x, pts[i].y, vx, vy);
       const air = f ? f.t : 1.6;
       if (air < LIP_MIN_AIR_S) continue;
@@ -1160,7 +1161,7 @@ export class TerrainGenerator {
     const seed = (shape.next() * 4294967296) >>> 0;
     const amp = nz.amplitudePx * Math.min(variance, 1.6);
     const octaves = clamp(Math.floor(nz.octaves || 2), 1, 5);
-    const mean = Math.tan(clamp(nz.meanSlopeDeg || 12, 4, 30) * RAD);
+    const mean = pmath.tan(clamp(nz.meanSlopeDeg || 12, 4, 30) * RAD);
     const fade = Math.min(160, L * 0.3);
     const raw = this._raw;
     for (let i = 0; i <= n; i++) {
@@ -1203,7 +1204,7 @@ export class TerrainGenerator {
     let min = v0;
     for (let i = 0; i < n; i++) {
       const dy = ys[i + 1] - ys[i];
-      const len = Math.hypot(SPACING_PX, dy);
+      const len = pmath.hypot(SPACING_PX, dy);
       const sin = dy / len;
       const dt = len / Math.max(v, 25);
       v += (585 * sin - 0.3 * v - 0.0004 * v * v) * dt;
@@ -1224,7 +1225,7 @@ export class TerrainGenerator {
     out[i0] = startY;
     if (segs <= 0) return prevAngDeg;
     const rawStart = (raw[i0 + 1] - raw[i0]) / SPACING_PX;
-    const delta = Math.tan(prevAngDeg * RAD) - rawStart;
+    const delta = pmath.tan(prevAngDeg * RAD) - rawStart;
     const B = Math.min(220, Lseg * 0.5);
     const net = raw[i1] - raw[i0];
     const need = Lseg * MIN_NET_TAN;
@@ -1244,7 +1245,7 @@ export class TerrainGenerator {
       for (let i = i0 + 1; i <= i1; i++) {
         const x = (i - i0) * SPACING_PX;
         const rel = raw[i] - raw[i0] + corr(x) + (lift * x) / Lseg;
-        let ang = Math.atan2(rel - lastRel, SPACING_PX) * DEG;
+        let ang = pmath.atan2(rel - lastRel, SPACING_PX) * DEG;
         lastRel = rel;
         if (ang > hi) ang = hi;
         else if (ang < lo) ang = lo;
@@ -1254,7 +1255,7 @@ export class TerrainGenerator {
         const down = first ? Math.min(limits.turn, MAX_TURN_DEG) : limits.turn;
         if (ang > prev + up) ang = prev + up;
         else if (ang < prev - down) ang = prev - down;
-        y += Math.tan(ang * RAD) * SPACING_PX;
+        y += pmath.tan(ang * RAD) * SPACING_PX;
         out[i] = y;
         prev = ang;
       }
@@ -1333,7 +1334,7 @@ export class TerrainGenerator {
         const def = rng.weighted(this.hazardList, (h) => ((h.minDistanceM || 0) <= dM && (crashOk || !h.onHit || h.onHit.effect !== 'crash') ? h.weight || 1 : 0));
         if (def) {
           const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
-          const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
+          const slope = pmath.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
           const w = (def.size && def.size.w) || 24;
           const flatEnough = slope > -12 && slope < 28 && this._flatAround(pts, i);
           const slowOk = !def.onHit || def.onHit.effect !== 'slow' || this._descentAhead(pts, i, chunk.endX);
@@ -1404,7 +1405,7 @@ export class TerrainGenerator {
 
   /** Launch-speed multiple whose arc bounds every no-hop flight (see AIR_SPEED_HI_MUL). */
   _airHiMul(lip, distM) {
-    return Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(distM) / Math.hypot(lip.vx, lip.vy));
+    return Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(distM) / pmath.hypot(lip.vx, lip.vy));
   }
 
   /**
@@ -1534,7 +1535,7 @@ export class TerrainGenerator {
     }
     const pts = chunk.points;
     const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
-    const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
+    const slope = pmath.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
     if (!(slope > -12 && slope < 28) || !this._flatAround(pts, i)) return null;
     if (def.onHit && def.onHit.effect === 'slow') {
       const f = Number.isFinite(def.onHit.speedFactor) ? def.onHit.speedFactor : 0.5;
@@ -1694,7 +1695,7 @@ export class TerrainGenerator {
       for (let t = 0.01; t < 2.4 && list.length < SHARD_GROUP[1]; t += 0.01) {
         const x = l.x + l.vx * t;
         const y = l.y + l.vy * t + 0.5 * GRAV * t * t;
-        acc += Math.hypot(x - px, y - py);
+        acc += pmath.hypot(x - px, y - py);
         px = x;
         py = y;
         if (x >= chunk.endX - 8) break;
@@ -1752,7 +1753,7 @@ export class TerrainGenerator {
           for (let k = 0; k < cnt && good; k++) {
             const x = Math.round(x0 + k * sp);
             const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
-            const a = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
+            const a = pmath.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
             const y = Math.round(this._yAtLocal(pts, x) - 14);
             if (a < 8 || a > 38 || chunk.gaps.some((q) => x > q.x0 - 20 && x < q.x1 + 20) || !ok(x, y)) good = false;
             g.push({ x, y });
@@ -1780,7 +1781,7 @@ export class TerrainGenerator {
     if (pts[i].x + SLOW_HAZARD_CLEAR_PX > endX) return false;
     const k1 = Math.min(pts.length - 2, i + Math.ceil(SLOW_HAZARD_CLEAR_PX / SPACING_PX));
     for (let k = i; k <= k1; k++) {
-      if (Math.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG < SLOW_HAZARD_MIN_DEG) return false;
+      if (pmath.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG < SLOW_HAZARD_MIN_DEG) return false;
     }
     return true;
   }
@@ -1791,7 +1792,7 @@ export class TerrainGenerator {
     let lo = Infinity;
     let hi = -Infinity;
     for (let k = a0; k <= a1; k++) {
-      const a = Math.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG;
+      const a = pmath.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG;
       if (a < lo) lo = a;
       if (a > hi) hi = a;
     }

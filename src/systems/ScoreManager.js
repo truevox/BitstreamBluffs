@@ -25,6 +25,7 @@
  *   reset        Shift: pending combo dropped, SCORING.resetPenaltyPoints deducted (total floored at 0).
  */
 import { SCORING } from '../constants.js';
+import pmath from './pmath.js';
 
 /**
  * @param {number} count completed rotations (>=1)
@@ -32,7 +33,7 @@ import { SCORING } from '../constants.js';
  */
 export function rotationFactor(count) {
   const n = Math.max(1, Math.min(8, Math.floor(count) || 1));
-  return Math.pow(2, n) - 1;
+  return pmath.pow(2, n) - 1;
 }
 
 /**
