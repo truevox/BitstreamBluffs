@@ -1,8 +1,13 @@
 # Changelog
 
-## v2.17.1 — local Run DNA developer preview (#213 / #87) (2026-11-22)
+## v2.18.1 — developer Run DNA preview in local inspector (#213 / #87) (2026-11-22)
 
-- **Run DNA artwork in the developer inspector.** Downhill Run Strip previews local, unverified artwork from the full recorded pose trace. Choosing or clearing a tape removes the previous artwork. Section zoom and SVG export are unchanged. The preview is not part of the production game and adds no uploads, sharing, or saved history.
+- **Local, unverified Run DNA artwork preview.** The developer Downhill Run Strip inspector can now display abstract artwork from the full decoded trace loaded through the existing local file chooser. It clears stale previews on another selection or error; earlier asynchronous reads cannot replace a newer choice. The preview uses an SVG blob as an image, never injected markup. Section zoom and existing SVG download remain unchanged. No player-facing feature, replay, scoreboard, network, or gameplay changes.
+
+## v2.18.0 — canopy, airbrake and flip exploit research policies (#214 / #215) (2026-11-22)
+
+- **Developer Exploit Factory can now actually test the playtested canopy + airbrake + flip combination.** Adds two deterministic scripted candidates: `canopyHop` (airbrake/canopy without intentional flips) and `canopyFlip` (flip first, canopy after steering release, airbrake on descent while maintaining forward motion), against unchanged hands-off and flip controls. Simulator pad now routes real held/pressed canopy and airbrake signals; the result records observed active control times rather than assuming a named policy acted.
+- **24-seed matched comparison and pursuer distance diagnostics.** The report tracks the active BSOD's smallest observed 60 Hz gap to the rider, actual airborne/trick activity, score, distance, terminal cause and timeout censoring. These are headless diagnostics, not a claim of infinite airtime, an anti-cheat proof, or an approved balance change. No authoritative gameplay, collision, replay format or music code changes.
 
 ## v2.17.0 — local course ghost lineup (#178 / #81) (2026-11-22)
 
