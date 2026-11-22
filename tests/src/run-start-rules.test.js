@@ -420,32 +420,42 @@ describe('permanent upgrade loadout is snapshot at the start, forbidden in offic
   });
 });
 
-// ================================================================ TERRAIN-2: no palette rebuilds at mask 0
+// ================================================================ TERRAIN-2: palette rebuilds only on a biome change
 
-describe('the biome palette repaint runs only when a biome mask is set', () => {
-  /** Create the run at `mask`, then drive updateFun on the first frame and across two sector boundaries. */
-  const repaintsOver = (mask) => {
+describe('the biome palette repaint runs only when the biome at the sled changes', () => {
+  /**
+   * Create the run at `mask`, then drive updateFun along the course. Returns the repaints it made and the repaints
+   * owed: one for the opening biome (the scene starts on the base palette) plus one per later change of biome,
+   * arcade bridges counting as a change each way (#65: Debutmont is the base, so even mask 0 owes the first one).
+   */
+  const repaintsOver = (mask, sectorCount) => {
     const values = new Map([[REG.CONTENT, CONTENT], [REG.SEED, 'alpha'], [REG.BIOME_MASK, mask], [REG.SAVE_STORE, memStore()]]);
     const s = runScene(values);
     s.refreshPalette = jest.fn();
     s.emitIf = () => {};
     const sectors = new Set();
-    for (let x = s.startX; sectors.size < 3; x += 200) {
+    let owed = 0;
+    let prev = null;
+    for (let x = s.startX; sectors.size < sectorCount; x += 200) {
       s.sled.x = x;
       s.sled.y = s.terrain.heightAt(x);
       s.sled.grounded = true;
       sectors.add(s.terrain._sectorOf(x));
+      const biome = s.terrain.biomeAtX(x);
+      if (biome !== prev) { owed++; prev = biome; }
       s.updateFun(16, {}, Math.max(0, (x - s.startX) / 10));
     }
-    return s.refreshPalette.mock.calls.length;
+    return { repaints: s.refreshPalette.mock.calls.length, owed };
   };
 
-  test('at mask 0 neither the first frame nor a sector crossing rebuilds the palette', () => {
-    expect(repaintsOver(0)).toBe(0);
+  test('at mask 0 the run is pure Debutmont: one repaint on the first frame, none across sector crossings', () => {
+    expect(repaintsOver(0, 3)).toEqual({ repaints: 1, owed: 1 });
   });
 
-  test('at a non-zero mask the first frame and each crossing still repaint (control)', () => {
-    expect(repaintsOver(8)).toBe(3);
+  test('at a non-zero mask each change of biome, bridges included, repaints once (control)', () => {
+    const { repaints, owed } = repaintsOver(8, 8);
+    expect(owed).toBeGreaterThanOrEqual(3); // the walk really crosses into and out of a biome
+    expect(repaints).toBe(owed);
   });
 });
 

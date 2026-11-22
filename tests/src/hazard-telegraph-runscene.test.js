@@ -111,8 +111,8 @@ describe('RunScene.updateGroundTelegraph', () => {
     const h = hz('packetSpike', 2200);
     const s = makeRun([h]);
     Object.assign(s, {
-      shardField: null, airTelegraph: null, bestMarker: null, bestM: 0, newBestDone: true, biomeMask: 0, _biomeSector: 1,
-      score: { checkMilestones: () => [] }, terrain: { _sectorOf: () => 1 },
+      shardField: null, airTelegraph: null, bestMarker: null, bestM: 0, newBestDone: true, biomeMask: 0, _biomeId: null,
+      score: { checkMilestones: () => [] }, terrain: { _sectorOf: () => 1, biomeAtX: () => null },
       tutTimers: { stall: 0 }, tutDone: new Set(['hop', 'flip', 'push', 'tuck']), tutShown: new Set(), _steepMs: 0, _landings: 0, tuckShows: 9,
       hints: { update: () => [] }, lastBoost: null, _airTricks: 0,
     });

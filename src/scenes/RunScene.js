@@ -27,7 +27,7 @@ import { EVT } from '../events.js';
 import { SaveStore, LEDGER_HASH_V, UPGRADE_LEDGER_HASH_V,DRAFT_LEDGER_HASH_V } from '../systems/SaveStore.js';
 import { upgradeLoadoutForRun, upgradeEffects, canopyBluffRecoveryMs } from '../systems/PermanentUpgrades.js';
 import {DRAFT_RULES_VERSION,DRAFT_BUDGET,validDraftRanks,draftActiveRanks} from '../systems/DailyDraft.js';
-import { TerrainGenerator, biomeForSector } from '../systems/TerrainGenerator.js';
+import { TerrainGenerator } from '../systems/TerrainGenerator.js';
 import { detectBiomeVisits } from '../systems/BiomeDiscovery.js';
 import { ScoreManager } from '../systems/ScoreManager.js';
 import { TrickTracker } from '../systems/TrickTracker.js';
@@ -639,8 +639,7 @@ export class RunScene extends Phaser.Scene {
   /** Active Space Mountain has no atmosphere, even though the BSOD still chases. */
   bsodAtmosphere() {
     if (!this.terrain || !this.sled || !this.biomeMask) return 1;
-    const sector = this.terrain._sectorOf(this.sled.x);
-    const biome = this._biomeDefForSector(sector);
+    const biome = this._biomeDefAt(this.sled.x);
     return biome && biome.id === 'space-mountain' ? 0 : 1;
   }
 
@@ -795,13 +794,17 @@ export class RunScene extends Phaser.Scene {
 
   /** Ask the generator to stream around x and mirror its adds/removals into mesh, hazards and power-ups. */
   /**
-   * The biome definition owning a sector, or null for base terrain / no mask. Pure w.r.t. game state.
-   * @param {number} sectorNow 1-based sector index as the HUD uses it
+   * The biome definition at world x, or null for an arcade bridge / no content. Asks the generator, so the
+   * palette, the BIOME_ENTER announcement and the terrain itself (arcade bridges included) cannot disagree.
+   * Pure w.r.t. game state.
+   * @param {number} x world px
    * @returns {Object|null}
    */
-  _biomeDefForSector(sectorNow) {
-    if (!this.biomeMask) return null;
-    const id = biomeForSector(this.seed, sectorNow - 1, this.biomeMask, Object.values(this.content.biomes || {}));
+  _biomeDefAt(x) {
+    return this._biomeDefById(this.terrain.biomeAtX(x));
+  }
+
+  _biomeDefById(id) {
     return id ? (this.content.biomes || {})[id] || null : null;
   }
 
@@ -1872,20 +1875,22 @@ export class RunScene extends Phaser.Scene {
       this.fx.sparks(sled.x, sled.y - 6, this.palette.cyan, 14, 240, 40);
     }
     // W3: announce the biome we are in, when it changes. Driven by the sled's current position rather
-    // than by chunk callbacks so it cannot fire out of order or twice for one crossing.
-    const sectorNow = this.terrain._sectorOf(sled.x);
-    if (this._biomeSector !== sectorNow) {
-      this._biomeSector = sectorNow;
-      const biomeId = this.biomeMask ? biomeForSector(this.seed, sectorNow - 1, this.biomeMask, Object.values(this.content.biomes || {})) : null;
-      const def = biomeId ? (this.content.biomes || {})[biomeId] : null;
+    // than by chunk callbacks so it cannot fire out of order or twice for one crossing. #65: the biome is the
+    // generator's own answer at the sled's x, so an arcade bridge (null) is its own stretch: entering it and
+    // entering the next biome each fire once, and a run opens in the home biome.
+    const biomeNow = this.terrain.biomeAtX(this.sled.x);
+    if (this._biomeId !== biomeNow) {
+      const first = this._biomeId === undefined;
+      this._biomeId = biomeNow;
+      const def = this._biomeDefById(biomeNow);
+      const sectorNow = this.terrain._sectorOf(this.sled.x);
       if (def) this.emitIf(EVT.BIOME_ENTER, { id: def.id, name: def.name, sector: sectorNow, entering: true });
-      else if (this._lastBiome) this.emitIf(EVT.BIOME_ENTER, { id: null, name: 'Bitstream', sector: sectorNow, entering: false });
+      else if (!first) this.emitIf(EVT.BIOME_ENTER, { id: null, name: 'Bitstream', sector: sectorNow, entering: false });
       // The biome's palette only takes effect if something applies it. Repaint on entry AND on exit
-      // back to base terrain, or the tint would persist past the biome that owns it.
-      // Never at mask 0: no sector can carry a biome there, and refreshPalette rebuilds every collider,
-      // so a mask-0 run repaints only on a palette setting change, exactly as it did before W3.
-      if (this.biomeMask) this.refreshPalette();
-      this._lastBiome = Boolean(def);
+      // back to arcade terrain, or the tint would persist past the biome that owns it. refreshPalette
+      // rebuilds every collider, so it runs only when the biome changed and a palette was actually owed:
+      // a run with no biome content never repaints beyond a palette setting change.
+      if (def || !first) this.refreshPalette();
     }
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;
@@ -2361,7 +2366,7 @@ export class RunScene extends Phaser.Scene {
     const reg = this.registry;
     const profile = reg.get(REG.PROFILE) || null;
     const settings = reg.get(REG.SETTINGS) || {};
-    const hex = getPaletteCss(this.game, this._biomeDefForSector(this._biomeSector));
+    const hex = getPaletteCss(this.game, this._biomeDefById(this._biomeId));
     return resolveCosmetics(profile, this.palette, hex, {
       colorblind: settings.palette === 'colorblind',
     });
@@ -2370,7 +2375,7 @@ export class RunScene extends Phaser.Scene {
   refreshPalette() {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
-    const biomeDef = this._biomeDefForSector(this._biomeSector);
+    const biomeDef = this._biomeDefById(this._biomeId);
     this.palette = getPalette(this.game, biomeDef);
     // W3: the biome's `background` motif, and back to the base backdrop when the sector has no biome.
     // setMotif(null) is the exit case: a motif must not outlive the sector that owns it.
