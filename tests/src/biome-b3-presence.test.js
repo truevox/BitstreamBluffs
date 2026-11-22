@@ -18,6 +18,11 @@ import { PHYSICS } from '../../src/constants.js';
 const c = loadContent();
 const SEEDS = ['pres1', 'pres2', 'pres3', 'pres4', 'pres5', 'pres6', 'pres7', 'pres8'];
 const ROB = Array.from({ length: 32 }, (_, k) => `rob${k + 1}`);
+// re-pinned for #65: Debutmont base + arcade bridges. Same re-assessment as biome-b1-presence.test.js: the generator's hazard
+// rates are unchanged (400 seeds, +/-0.02), the sample is ~25 % smaller because each biome sector opens with an arcade bridge,
+// so the band is asserted on BIG (150 seeds) and the per-seed 1-per-2-km rule on seeds with >= SHORT_KM of the biome.
+const BIG = Array.from({ length: 150 }, (_, k) => `big${k + 1}`);
+const SHORT_KM = 1;
 const eligibleFor = (def, ch) => ch.kind !== 'bridge' && ch.defId !== 'gen-jump';
 const B3 = [
   [4, 'pyramid-peak', 'rollingBoulder', 'sandrunnerSkis'],
@@ -42,7 +47,7 @@ function presence(mask, biome, id, seeds) {
       if (here) n++;
       if (eligibleFor(def, ch)) { elig++; if (here) has++; }
     }
-    perSeed.push({ seed, n, km: +km.toFixed(2), ok: n * 2 >= km });
+    perSeed.push({ seed, n, km: +km.toFixed(2), ok: km < SHORT_KM || n * 2 >= km });
   }
   const share = has / elig;
   console.log(`${id} (${seeds.length} seeds): ${has}/${elig} eligible = ${(100 * share).toFixed(1)} %; per seed ${perSeed.map((p) => `${p.n}/${p.km}km`).join(' ')}`);
@@ -147,26 +152,26 @@ describe('B3 presence: the biome hazard is felt in early terrain (chunks 0-44, s
   test.each(B3)('mask %p (%s): %s share of eligible chunks and 1 per 2 km', (mask, biome, id) => {
     const a = presence(mask, biome, id, SEEDS);
     const b = presence(mask, biome, id, ROB);
+    const big = presence(mask, biome, id, BIG);
     expect(a.elig).toBeGreaterThanOrEqual(15);
     // pinned at the measured values below (see ARCHITECTURE B3 addendum)
-    expect(a.share).toBeGreaterThanOrEqual(PRESENCE[id].lo);
-    expect(b.share).toBeGreaterThanOrEqual(PRESENCE[id].lo);
-    expect(a.share).toBeLessThanOrEqual(PRESENCE[id].hi8);
-    expect(b.share).toBeLessThanOrEqual(0.55);
+    expect(big.share).toBeGreaterThanOrEqual(PRESENCE[id].lo);
+    expect(big.share).toBeLessThanOrEqual(PRESENCE[id].hi);
     expect(b.fails).toBeLessThanOrEqual(PRESENCE[id].robFails);
   });
 });
 
 /**
- * Measured (chunks 0-44): rollingBoulder 41.9 % (8 seeds) / 35.4 % (32; chance 0.45), dewDrop 44.4 % / 37.2 %, gearGate 55.6 % / 39.5 %.
- * The 8-seed Gear Gate share is 15 of 27 eligible chunks, one placement above the 55 % band edge (14.85); its 32-seed share
- * sits inside the band, so hi8 is 0.56 for it only. robFails: seeds with biome terrain that miss 1 per 2 km (those with
- * < 0.7 km of the biome in chunks 0-44, or 0 km).
+ * Measured (chunks 0-44), re-pinned for #65: Debutmont base + arcade bridges, on BIG (150 seeds): rollingBoulder 37.4 %
+ * (chance 0.45), gearGate 42.3 %, dewDrop 41.4 %. Before #65 the 8/32-seed samples read 41.9 % / 35.4 % (rolling),
+ * 55.6 % / 39.5 % (gear gate), 44.4 % / 37.2 % (dew drop); 400 seeds read 37.0 / 41.3 / 39.7 % before and 37.1 / 42.3 / 40.4 %
+ * after, so the rates did not move (see the note at BIG). robFails: seeds with >= 1 km of the biome in chunks 0-44 that miss
+ * 1 per 2 km (0 of ~21 per hazard at #65).
  */
 const PRESENCE = {
-  rollingBoulder: { lo: 0.35, hi8: 0.55, robFails: 2 },
-  gearGate: { lo: 0.35, hi8: 0.56, robFails: 2 },
-  dewDrop: { lo: 0.35, hi8: 0.55, robFails: 2 },
+  rollingBoulder: { lo: 0.35, hi: 0.55, robFails: 2 },
+  gearGate: { lo: 0.35, hi: 0.55, robFails: 2 },
+  dewDrop: { lo: 0.35, hi: 0.55, robFails: 2 },
 };
 
 describe('B3 presence: long range (4 seeds x 300 chunks), hazard floor and power-up band', () => {

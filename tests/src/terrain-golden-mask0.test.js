@@ -1,6 +1,12 @@
 /**
  * GOLDEN TERRAIN — mask 0.
  *
+ * re-pinned for #65: Debutmont base + arcade bridges. Marvin's owner decision (issue #65, pre-alpha) made Debutmont
+ * the base biome, so mask 0 is no longer plain arcade terrain: every chunk is a Debutmont chunk (its own zones and
+ * spawns, tagged `biome`), and mask 0 plays pure Debutmont. Every digest below was re-recorded at that change (all
+ * 15 pins moved; the prose that follows describes the original pin and still describes the test's purpose). Existing
+ * mask-0 leaderboard and Daily records were set on the old arcade terrain; #65 flags that consequence.
+ *
  * This is the campaign's "nothing changed" proof (SPEC §9). Every value in `GOLDEN` below was
  * recorded from `main` at `06e79f5`, the commit W3 branches from, with `biomeMask = 0`.
  *
@@ -52,24 +58,24 @@ const SEEDS = ['alpha', 'bitstream-bluffs', '42', 'seed@mask0', '2026-11-13'];
  */
 const GOLDEN = {
   alpha: {
-    shape: 'dfaf9f891a4290e22ff09da9acaa94ed',
-    full: 'dbacfea9a57f6f85dd92d4fe78669c40',
+    shape: 'f562dc6bea3bbe921528423818504d72',
+    full: '49d76d04b66e6ad732a11b9baefa590d',
   },
   'bitstream-bluffs': {
-    shape: 'b3343e353f066c7be8d87cdd2f2370bc',
-    full: '87de6b9d7c239bb8dab2290617bf9033',
+    shape: '81e2ac207bbcb23ce1e7447c3d344e05',
+    full: 'c4d0afbe5291e1484d197902ae85f228',
   },
   42: {
-    shape: '148ed741521a290ccd074e81442cd3eb',
-    full: 'b9e60952604aec26279d9eae035662fc',
+    shape: 'acb168d64667adf2794a582f25e77fd1',
+    full: '0ba820a0940256c8c6da9a3112d5e4cf',
   },
   'seed@mask0': {
-    shape: 'f443cef44dd1e3014275602592107506',
-    full: '838f9f5d9a888d39038ce5d57abd64cc',
+    shape: '6dae8ae9045446ea0fd3915b1b733c60',
+    full: 'f50efa6c10aaf97d6ffa89425bb15c63',
   },
   '2026-11-13': {
-    shape: '6c54d47267e071fcdfc0e05bdaa86624',
-    full: 'ea23952e1e8189e443eb08ca18a88b69',
+    shape: '6f9d1a090f2bd54e32cf0419a6c8e12a',
+    full: 'de6a60d7084ab6e1b0ab77ae37848f5f',
   },
 };
 
@@ -83,11 +89,11 @@ const GOLDEN = {
  * `shape` and `full` stay as they were so their history and failure-layer diagnosis still hold.
  */
 const COMPLETE = {
-  alpha: 'e18f051a5ad2f594bc39f748e61403f6',
-  'bitstream-bluffs': 'a11305dc97011fed89c4f69817b55d68',
-  42: '4ea6be7e07ea665a31f2a4ac380b7367',
-  'seed@mask0': '195bb43cdec549f317ffd43063d2b047',
-  '2026-11-13': '8a4a990ba2d5de392c78bd532bd40d37',
+  alpha: '89b27d5e315159a45daa1454e4fc30c6',
+  'bitstream-bluffs': '98a0ff45aedb2ba622157a96f3703436',
+  42: '8ce76450881e0516408f70c877afcdbd',
+  'seed@mask0': 'b204706f8fb22f0ee5c10a614d76b984',
+  '2026-11-13': '68555f37f29225fc06df702915ba8dd2',
 };
 
 /** Every field, keys sorted, numbers rounded like `round` below. */

@@ -14,10 +14,15 @@ const wallTo = (result, x, id) => result.findings.find(({ source, target }) => s
 
 const runCLI = (...args) => spawnSync(process.execPath, ['tools/sim/terrain-preflight.mjs', ...args], { encoding: 'utf8' });
 
+// re-pinned for #65: Debutmont base + arcade bridges. The seeds' terrain moved (new base biome, bridged biome changes), so
+// the cases were re-found with the same scan (mask 16, chunks 0-255) and keep their intent: a window found past the origin
+// crop, one hazard pair inside the nominal blind window and one outside it, and a two-chunk lookahead. fair15 and fair4 kept
+// their seeds. terrain-lint-417 no longer has a two-chunk case, so that row is terrain-lint-1 (also two chunks ahead,
+// just outside the nominal window).
 test.each([
-  ['fair15', 22, 43193, 23, 43819, 'packetSpike', 626, 1287, true],
-  ['fair4', 65, 144710, 66, 145300, 'glitchChasm', 590, 1428, true],
-  ['terrain-lint-417', 86, 182292, 88, 183720, 'packetSpike', 1428, 1428, false],
+  ['fair15', 28, 57021, 29, 57548, 'packetSpike', 527, 1312, true],
+  ['fair4', 119, 267176, 120, 267814, 'packetSpike', 638, 1428, true],
+  ['terrain-lint-1', 95, 207609, 97, 209032, 'packetSpike', 1423, 1428, false],
 ])('production geometry: %s detects exact window past the origin crop', (seed, i, x, j, next, hazardId, gap, clearance, nominal) => {
   const result = scan(seed, i);
   expect(result).toMatchObject({ seed, biomeMask: 16, pixelsPerMeter: 20, originWindow: { fromChunk: i, endChunkExclusive: i + 1 } });
@@ -35,9 +40,9 @@ test.each([
 });
 
 test('preserves every pair in stable downstream order rather than reporting only the closest', () => {
-  expect(scan('fair4', 65).findings.map(({ target, separationPx, withinNominalBlind }) =>
+  expect(scan('fair4', 119).findings.map(({ target, separationPx, withinNominalBlind }) =>
     [target.worldXPx, separationPx, withinNominalBlind])).toEqual([
-    [145300, 590, true], [145780, 1070, false],
+    [267814, 638, true], [268534, 1358, false],
   ]);
 });
 
@@ -76,7 +81,7 @@ test('rejects a malformed range or failed lookahead rather than returning a fals
 });
 
 test('CLI emits stable JSON with fingerprinted loaded sources and no output on invalid input', () => {
-  const args = ['--seed', 'fair15', '--mask', '16', '--from-chunk', '22', '--chunks', '1'];
+  const args = ['--seed', 'fair15', '--mask', '16', '--from-chunk', '28', '--chunks', '1'];
   const one = runCLI(...args), two = runCLI(...args);
   expect(one).toMatchObject({ status: 0, stderr: '' });
   expect(two.stdout).toBe(one.stdout);
