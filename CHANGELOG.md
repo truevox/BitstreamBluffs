@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.15.3 - PWA install metadata and original icons (#172) (2026-11-21)
+
+- **Installable shell metadata, not an offline game.** A first-party Web App Manifest and generated original Bitstream Bluffs icons (192px, 512px, maskable, Apple touch) add supported-browser home-screen installation metadata, landscape/standalone preference and theme colors. The main application boot, gameplay simulation, ghost/replay format and scoring are unchanged.
+- **Correct hosted manifest MIME type.** Netlify serves `/manifest.webmanifest` with `Content-Type: application/manifest+json` on a path-specific rule, without changing headers for game bundles, saves or audio. Tested on the real deploy preview; some browsers may still choose not to expose installation.
+- **Explicit limitation:** no production service worker, offline shell, automatic media download, cache migration or upgrade UI ships in this slice. Those remain unmerged experimental work behind issue #172; the game still needs network access and original stereo music masters are untouched.
+
+
 ## v2.15.2 - fair input timestamps (#115) (2026-11-21)
 
 - **Keyboard and touch input reach the tick they happened in.** Each key event's and touch-button pointer event's `event.timeStamp` now picks the 120 Hz tick whose window contains it, instead of one poll per display frame being applied from the frame's first tick. On a steady frame cadence (30/60/120 Hz) the harness and the built game give the exact tick and identical tapes; at 30 Hz a press used to act up to 3 ticks (25 ms of game time) before the key went down, and a 20 ms tap was lost 36 % of the time. Taps of held controls (push, tuck, tilt, brake) shorter than a frame always count for at least one tick, a double tap inside one frame is two hops, and taps across a 144 Hz frame that runs no tick are no longer dropped. Multi-touch, pointercancel and lost pointer capture release on their own tick; a touch and a key holding the same button stay held until the last one lets go.
