@@ -16,9 +16,9 @@ import { planTelegraph, planTelegraphMarks, TelegraphTracker } from '../../src/s
 const crashDef = { id: 'firewall', onHit: { effect: 'crash' } };
 const slowDef = { id: 'lagSpike', onHit: { effect: 'slow' } };
 const hazards = [
-  { def: crashDef, cx: 1500, w: 40 },
-  { def: slowDef, cx: 1900, w: 30 },
-  { def: crashDef, cx: 2200, w: 40 },
+  { hid: '0:0', def: crashDef, cx: 1500, w: 40 },
+  { hid: '0:1', def: slowDef, cx: 1900, w: 30 },
+  { hid: '0:2', def: crashDef, cx: 2200, w: 40 },
 ];
 const sled = { x: 1000, vx: 420, speed: 430, grounded: true, landX: null };
 // What a zoomed-out (0.6) and a zoomed-in (1.2) camera put at the right edge for the same sled, the same tick.

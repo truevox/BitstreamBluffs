@@ -1337,7 +1337,10 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
     `planTelegraph` adapter still supplies an `onScreen` hint to historical diagnostics, but live code doesn't use it.
   * `TelegraphTracker.update(nowMs, marks)` -> events `{type: 'warn'|'go', kind, ref, sound}`: `warn` once per hazard at its
     first non-clear mark (`sound` false when another warn sounded under `warnGapMs` ago), `go` once when it first turns lime.
-    `firstWarnMs(ref)`.
+    `firstWarnMs(ref)`. State is plain data keyed by the stable hazard id `Hazard.hid` (`${chunk.index}:${spawn ordinal}`, set in
+    `RunScene.takeChunk`; a hazard without one throws), never by object identity: `snapshot()` / `restore(snap)` (JSON-safe,
+    versioned) and `forgetChunk(index)` (called from `dropChunk`). `RunScene.snapshotTelegraph()` / `restoreTelegraph(snap)` wrap them and
+    re-stamp `teleAtMs` on the rebuilt hazards (#119 Phase 2).
 * **`entities/GroundTelegraph.js`** (drawing only; does not import Phaser): `update(timeMs, marks, view, zoom, activeChunks)`,
   `setPalette`, `destroy`. If the arrow footprint would clip in the current view, draw a badge at
   `view.right - EDGE_INSET_PX / zoom` on the terrain line (glyph by

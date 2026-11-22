@@ -370,6 +370,8 @@ export const NON_CAUSAL = Object.freeze({
     warned: PRESENTATION + ' (telegraph one-shot, set by RunScene.updateFun; #155 may reclassify)',
     _lastDraw: PRESENTATION + ' (redraw throttle)',
     lip: DERIVED_STATIC + ' (launch lip assigned in takeChunk; read only by the telegraph)',
+    teleAtMs: PRESENTATION + ' (first-warn stamp from RunScene.updateGroundTelegraph / restoreTelegraph; the tracker owns the value)',
+    hid: DERIVED_STATIC + ' (stable id `chunk.index:spawn ordinal` assigned in takeChunk; keys TelegraphTracker)',
     simStepped: 'marker set in takeChunk: a run constant that only selects who calls stepMotion',
   }),
   BouncePad: Object.freeze({

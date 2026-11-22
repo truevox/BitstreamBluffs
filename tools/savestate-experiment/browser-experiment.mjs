@@ -216,7 +216,7 @@ const plan = [];
 for (const fx of ['contact', 'hazard']) {
   plan.push([fx, 'control'], [fx, 'ghost'], [fx, 'game'], [fx, 'kinematic'], [fx, 'contacts'], [fx, 'full']);
   for (const s of ['camera', 'ids', 'runRandom', 'impulses', 'staleSupport', 'timing', 'positionImpulse', 'rawGeometry']) plan.push([fx, 'full', [s]]);
-  if (fx === 'hazard') for (const s of ['kodiaks', 'bsod', 'hazardHit', 'pool']) plan.push([fx, 'full', [s]]);
+  if (fx === 'hazard') for (const s of ['kodiaks', 'bsod', 'hazardHit', 'pool', 'telegraph']) plan.push([fx, 'full', [s]]);
 }
 try {
   for (const [fx, level, skip] of plan) {

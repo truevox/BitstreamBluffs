@@ -14,7 +14,7 @@ import { loadContent } from './_helpers.js';
 const DEFS = loadContent().hazards;
 const FAR = 1e9;
 const sled = (x, speed, extra = {}) => ({ x, vx: speed, speed, grounded: true, landX: null, ...extra });
-const base = (id, cx, extra = {}) => ({ def: DEFS[id], cx, cy: 0, w: DEFS[id].size.w, h: DEFS[id].size.h, hit: false, ...extra });
+const base = (id, cx, extra = {}) => ({ hid: `${id}@${cx}`, def: DEFS[id], cx, cy: 0, w: DEFS[id].size.w, h: DEFS[id].size.h, hit: false, ...extra });
 /**
  * A moving hazard stub: ground x moves at `v` px/s (signed; + is away from the sled) from run time t0, for at most `range`
  * px (from t0, default nowMs). cx carries a +3 px box offset (a sloped box centre is not the ground x) to prove the prediction is used as a delta.
