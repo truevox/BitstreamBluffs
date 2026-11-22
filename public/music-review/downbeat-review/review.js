@@ -1,7 +1,7 @@
-import { clicksForCandidate, sourceStemURL, candidateGroup, PACK_ROOT } from './clock.mjs';
+import { clicksForCandidate, clicksForSourceClip, sourceClipSlices, sourceStemURL, candidateGroup, PACK_ROOT } from './clock.mjs';
 
 const $ = id => document.getElementById(id);
-let pack, packet, audioContext, playing = [], activeRequest = 0, currentOffset = 0;
+let pack, packet, audioContext, playing = [], activeRequest = 0, currentOffset = 0, activePassage = null;
 const notes = new Map();
 const sourceCache = new Map();
 const roles = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
@@ -12,7 +12,7 @@ function selected() {
 	return { window: w, ...candidateGroup(w, Number($('bpm').value), Number($('phase').value), currentOffset) };
 }
 function key() {
-	return [Number($('window').value), Number($('bpm').value), Number($('phase').value), currentOffset].join(':');
+	return [activePassage?.centerSeconds ?? 'segment', Number($('window').value), Number($('bpm').value), Number($('phase').value), currentOffset].join(':');
 }
 function refreshNotes() {
 	const entry = notes.get(key());
@@ -147,37 +147,44 @@ async function play() {
 	const mix = $('mix').value;
 	const selectedRoles = mix === 'full' ? roles : mix === 'harmony'
 		? ['guitar', 'piano', 'other'] : [mix];
+	const clipStart = activePassage?.suggestedListenRangeSeconds[0] ?? c.window.startSeconds;
+	const clipEnd = activePassage?.suggestedListenRangeSeconds[1]
+		?? Math.min(c.window.startSeconds + 9.5, c.window.endSeconds - 0.15);
 	$('play').disabled = true;
 	status('Loading real, unchanged OGG stems…');
 	try {
 		audioContext ??= new AudioContext();
 		await audioContext.resume();
-		const buffers = await Promise.all(selectedRoles.map(role =>
-			originalStem(c.window.segmentIndex, role)));
+		const slices = sourceClipSlices(pack, clipStart, clipEnd);
+		const clips = await Promise.all(slices.flatMap(slice => selectedRoles.map(async role =>
+			({ slice, role, buffer: await originalStem(slice.segmentIndex, role) }))));
 		if (request !== activeRequest) return;
-		const length = Math.min(9.5, c.window.endSeconds - c.window.startSeconds - 0.15,
-			...buffers.map(b => b.duration - 0.15));
+		const length = clipEnd - clipStart;
 		if (length < 3) throw new Error('Source window unexpectedly short');
 		const start = audioContext.currentTime + 0.16;
 		const gainNode = audioContext.createGain();
 		gainNode.gain.value = mix === 'full' ? 0.30 : mix === 'harmony' ? 0.45 : 0.9;
 		gainNode.connect(audioContext.destination);
 		playing.push(gainNode); // stop() also disconnects the shared mix node
-		for (const buffer of buffers) {
+		for (const { slice, role, buffer } of clips) {
+			if (slice.bufferOffsetSeconds + slice.durationSeconds > buffer.duration + 0.03)
+				throw new Error('Original OGG source slice shorter than source manifest: ' + role);
 			const source = audioContext.createBufferSource();
 			source.buffer = buffer;
 			source.connect(gainNode);
-			source.start(start, 0, length);
+			source.start(start + slice.clipOffsetSeconds, slice.bufferOffsetSeconds,
+				Math.min(slice.durationSeconds, buffer.duration - slice.bufferOffsetSeconds));
 			playing.push(source);
 		}
 		if ($('metronome').checked) {
-			for (const tick of clicksForCandidate({
+			for (const tick of clicksForSourceClip({
 				bpm: c.bpm, phaseSeconds: c.phaseSeconds,
-				beatOneOffset: c.beatOneOffset,
-				startSeconds: c.window.startSeconds, durationSeconds: length
+				beatOneOffset: c.beatOneOffset, windowStartSeconds: c.window.startSeconds,
+				clipStartSeconds: clipStart, durationSeconds: length
 			})) click(start + tick.localSeconds, tick.beatOne);
 		}
-		status('Playing original ' + mix + ' stems + ' + ($('metronome').checked
+		status('Playing original ' + mix + ' stems at source ' + clipStart.toFixed(2)
+			+ '–' + clipEnd.toFixed(2) + 's + ' + ($('metronome').checked
 			? 'UNVERIFIED accent hypothesis' : 'no click overlay') + '.');
 		$('stop').disabled = false;
 	} catch (error) {
@@ -200,10 +207,19 @@ async function load() {
 			|| packet.source.manifestSha256 !== await digest(packText)) {
 			throw new Error('Research/source pack identity mismatch: refusing to play misleading clicks.');
 		}
+		if (packet.source.originalMasterWavSha256 !== '636bbd42f7ece1c085b4768f25fb0e65d7f29963a22a948e0b6e697ef0284721'
+			|| !Array.isArray(packet.suggestedSourcePassages) || !packet.suggestedSourcePassages.length
+			|| packet.suggestedSourcePassages.some(p => !p.candidateOnly || p.humanVerified !== false))
+			throw new Error('Original master source review candidates not safely unverified.');
 		$('window').replaceChildren(...packet.windows.map((w, i) => new Option(
 			'Segment ' + w.segmentIndex + ' · ' + w.startSeconds.toFixed(0)
 			+ '–' + w.endSeconds.toFixed(1) + 's', String(i))));
 		$('window').value = '0';
+		$('reviewPassage').replaceChildren(...packet.suggestedSourcePassages.map((p, i) =>
+			new Option(p.centerSeconds.toFixed(1) + 's · ' + p.reviewReason, String(i))));
+		$('loadReview').disabled = false;
+		$('reviewSource').textContent = 'Lossless WAV master hash verified in source research: '
+			+ packet.source.originalMasterWavSha256.slice(0, 16) + '… · player uses six original SHA-checked OGG stems, not WAV';
 		refreshBpm();
 		$('play').disabled = false;
 		status('Ready: ' + packet.windows.length + ' original-source research windows. No downbeats approved.');
@@ -212,7 +228,21 @@ async function load() {
 		status('Cannot initialize source-verified research packet: ' + error.message);
 	}
 }
-$('window').addEventListener('change', () => { stop(); refreshBpm(); });
+$('window').addEventListener('change', () => { stop(); activePassage = null; refreshBpm(); });
+$('loadReview').addEventListener('click', () => {
+	if (!packet) return;
+	stop();
+	const passage = packet.suggestedSourcePassages[Number($('reviewPassage').value)];
+	if (!passage || !passage.candidateOnly || passage.humanVerified) return;
+	const index = packet.windows.findIndex(w =>
+		w.startSeconds <= passage.centerSeconds && w.endSeconds > passage.centerSeconds);
+	if (index < 0) return;
+	activePassage = passage;
+	$('window').value = String(index);
+	refreshBpm();
+	status('Selected UNVERIFIED source review passage ' + passage.centerSeconds.toFixed(2)
+		+ 's: ' + passage.reviewReason + '. Press Play to hear original OGG stems across segment seams.');
+});
 $('bpm').addEventListener('change', () => { stop(); refreshPhases(); });
 $('phase').addEventListener('change', () => { stop(); refreshOffsets(); });
 $('mix').addEventListener('change', stop);
@@ -225,6 +255,7 @@ $('save').addEventListener('click', () => {
 	const c = selected();
 	const judgment = document.querySelector('[data-judgment][aria-pressed=true]').dataset.judgment;
 	notes.set(key(), { segmentIndex: c.window.segmentIndex, sourceStartSeconds: c.window.startSeconds,
+		reviewPassageCenterSeconds: activePassage?.centerSeconds ?? null,
 		bpmHypothesis: c.bpm, phaseSeconds: c.phaseSeconds,
 		beatOneOffset: c.beatOneOffset, judgment, notes: $('notes').value });
 	status('Observation held in this browser tab. Download JSON to retain it.');

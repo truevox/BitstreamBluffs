@@ -69,3 +69,25 @@ Do **not** copy OGGs into the sparse worktree just to run this reviewer.
 
 The exported `bitstream-unverified-listening-notes-v1` format deliberately
 has no `verified` status or release-data fields.
+
+### 2026-11-21 lossless master WAV verification / targeted review queue
+
+Source SHA256 for the actual **CT211 original lossless WAV master** is
+`636bbd42f7ece1c085b4768f25fb0e65d7f29963a22a948e0b6e697ef0284721`.
+The master was verified on CT211 and decoded through an SSH read-only audio
+stream for analysis—**never uploaded, copied to the repo, served by this page,
+or modified**. The derived [original-master research](../../../docs/music-review/20261121-wav-master-rhythm-and-structural-cues.md)
+is tied to the previously verified original full-mix MP3 by 0-sample-lag PCM
+correlation of >0.998 for opening, middle and ending excerpts. The high-band
+rhythmic periodicities agree within 0.03 BPM in all overlapping windows;
+**no verified real beat-one or bridge/chorus annotation follows**.
+
+The player now accepts optional **source-verified master-derived review passage
+ranges** (12 unapproved suggestions) to help focus human listening. Each range
+is played using its **existing unchanged SHA-verified original OGG stems**;
+a range crossing a 12-second original segment boundary schedules appropriate
+source-time exact portions of both adjoining OGGs. The hypotheses' synthetic
+click positions and bar offsets remain absolute-source aligned after seeking.
+Only a human's explicitly downloaded notes record their impressions; nothing
+is written back into production gameplay or musical reference timing. This
+page never plays the original WAV master itself and no master data is shipped.

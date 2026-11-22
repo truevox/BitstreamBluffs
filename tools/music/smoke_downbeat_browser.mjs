@@ -84,6 +84,24 @@ try {
 	await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('Playing original full'),null,{timeout:25000});
 	assert.equal(oggRequests.filter(s=>s.includes('/0014-')).length,6);
 	await page.locator('#stop').click();
+	// Lossless-master sourced priority review must play authentic, checked OGG
+	// excerpts across the original 12s split, with no music export or edits.
+	assert.match(await page.locator('#reviewSource').innerText(),/Lossless WAV master hash verified/);
+	await page.selectOption('#reviewPassage','3'); // ~45.7s master harmonic novelty
+	await page.locator('#loadReview').click();
+	assert.match(await page.locator('#status').innerText(),/Selected UNVERIFIED source review passage/);
+	assert.equal(await page.locator('#window').inputValue(),'3');
+	await page.selectOption('#mix','drums');
+	await page.locator('#play').click();
+	try {
+		await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('Playing original drums stems at source'),null,{timeout:12000});
+	} catch(error) {
+		console.log('REVIEW_SMOKE_DIAGNOSTIC_STATUS',await page.locator('#status').innerText());
+		throw error;
+	}
+	assert.equal(oggRequests.some(s=>s.endsWith('/0003-drums.ogg')),true);
+	assert.equal(oggRequests.some(s=>s.endsWith('/0004-drums.ogg')),true);
+	await page.locator('#stop').click();
 	// Always fail closed on an actual OGG that differs from the source fingerprint.
 	tamperNextSource = true;
 	await page.selectOption('#window','9');
@@ -92,7 +110,7 @@ try {
 	await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('SHA-256 mismatch'),null,{timeout:20000});
 	assert.match(await page.locator('#status').innerText(),/Playback unavailable: Original audio SHA-256 mismatch/);
 	assert.deepEqual(jsErrors,[]);
-	console.log('BROWSER_PASS real OGG decoded for opening, 120s and short ending; all six source stems; four-offset switch; exact source SHA tamper rejected; no JS errors');
+	console.log('BROWSER_PASS original OGG playback including 45.7s WAV-master suggested two-segment excerpt, all six stems, four-offset switch, exact source SHA tamper rejection; no JS errors');
 	console.log('ORIGINAL_OGG_REQUESTS',oggRequests.length);
 } finally {
 	if (browser) await browser.close();

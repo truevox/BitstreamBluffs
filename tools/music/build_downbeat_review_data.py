@@ -14,11 +14,14 @@ SOURCE = ROOT / 'docs/music-review/one-more-run-source-downbeat-candidates-ALL-W
 HARMONY_SOURCE = ROOT / 'docs/music-review/one-more-run-harmonic-bar-cues-UNVERIFIED-20261120.json'
 GLOBAL_SOURCE = ROOT / 'docs/music-review/one-more-run-global-pulse-coherence-UNVERIFIED-20261121.json'
 PHASE_SOURCE = ROOT / 'docs/music-review/one-more-run-source-phase-motion-UNVERIFIED-20261121.json'
+ORIGINAL_MP3_SOURCE = ROOT / 'docs/music-review/one-more-run-original-mp3-mix-phase-UNVERIFIED-20261121.json'
+ORIGINAL_WAV_SOURCE = ROOT / 'docs/music-review/one-more-run-verified-wav-master-structure-UNVERIFIED-20261121.json'
 PACK = ROOT / 'public/music/packs/33_local-one-more-run-bitstream-bluffs/pack.json'
 DEST = ROOT / 'public/music-review/downbeat-review/candidates.json'
 
 def build_packet(report: dict, pack: dict, report_hash: str, harmony: dict, harmony_hash: str,
-		global_report:dict, global_hash:str, phase_report:dict, phase_hash:str) -> dict:
+		global_report:dict, global_hash:str, phase_report:dict, phase_hash:str,
+		original_mp3:dict, mp3_hash:str, original_wav:dict, wav_hash:str) -> dict:
 	if report['status'] != 'UNVERIFIED_NO_BEAT_OR_DOWNBEAT_APPROVAL':
 		raise ValueError('Research report is not explicitly unverified')
 	if report['trackId'] != pack['id'] or report['sourceFrameCount'] != pack['frameCount']:
@@ -44,6 +47,27 @@ def build_packet(report: dict, pack: dict, report_hash: str, harmony: dict, harm
 		raise ValueError('Phase motion report does not match source evidence chain')
 	if phase_report.get('sourceFrameCount') != pack['frameCount']:
 		raise ValueError('Phase report source frame count mismatch')
+	if (original_mp3.get('status')!='ORIGINAL_MIX_MATCHED_NO_VERIFIED_SOURCE_BEAT_OR_DRIFT'
+		or original_mp3.get('sourceManifestSha256')!=report['manifestSha256']
+		or original_mp3.get('sourceFrameCount')!=pack['frameCount']
+		or original_mp3.get('priorGlobalSourcePhaseReportSha256')!=global_hash):
+		raise ValueError('Original MP3 source comparison report identity mismatch')
+	master=original_wav.get('master',{})
+	if (original_wav.get('status')!='MASTER_VERIFIED_RHYTHM_AND_PHRASE_CANDIDATES_ONLY'
+		or original_wav.get('originalMp3PriorReportSha256')!=mp3_hash
+		or original_wav.get('originalMp3Sha256')!=original_mp3['originalMp3Sha256']
+		or master.get('masterSha256')!='636bbd42f7ece1c085b4768f25fb0e65d7f29963a22a948e0b6e697ef0284721'
+		or master.get('sourceFrameCount')!=pack['frameCount']
+		or master.get('remoteReadOnly') is not True
+		or master.get('noPersistentAudioCopy') is not True):
+		raise ValueError('Master WAV source review does not match archived source evidence')
+	master_passages=original_wav['suggestedShortHumanListeningReview']
+	if not master_passages or any(p.get('candidateOnly') is not True or
+		p.get('humanVerified') is not False or len(p.get('suggestedListenRangeSeconds',[]))!=2 or
+		not (0<=p['suggestedListenRangeSeconds'][0]<p['centerSeconds']<
+			p['suggestedListenRangeSeconds'][1]<=pack['frameCount']/pack['sampleRate']+.0001)
+		for p in master_passages):
+		raise ValueError('Invalid or accidentally promoted master WAV phrase candidate')
 	phase_rows = phase_report['crossStemCommonMotionCandidates']
 	if len(phase_rows) != 27 or any(row.get('candidateOnly') is not True for row in phase_rows):
 		raise ValueError('Unverified source phase transition coverage incomplete')
@@ -114,8 +138,11 @@ def build_packet(report: dict, pack: dict, report_hash: str, harmony: dict, harm
 		'source': {'trackId': pack['id'], 'sampleRate': pack['sampleRate'],
 			'frameCount': pack['frameCount'], 'manifestSha256': report['manifestSha256'],
 			'candidateReportSha256': report_hash, 'harmonicReportSha256': harmony_hash,
-			'globalPhaseReportSha256': global_hash, 'phaseMotionReportSha256': phase_hash},
+			'globalPhaseReportSha256': global_hash, 'phaseMotionReportSha256': phase_hash,
+			'originalMp3MixReportSha256': mp3_hash, 'originalWavMasterStructureReportSha256': wav_hash,
+			'originalMasterWavSha256': master['masterSha256']},
 		'originalSegmentCount': len(pack['segments']),
+		'suggestedSourcePassages': master_passages,
 		'note': 'All 15 source segments analyzed; shorter 6.6-second ending has reduced evidence; all downbeats are unverified',
 		'windows': out
 	}
@@ -129,10 +156,14 @@ def main() -> None:
 	harmonic_bytes = HARMONY_SOURCE.read_bytes()
 	global_bytes = GLOBAL_SOURCE.read_bytes()
 	phase_bytes = PHASE_SOURCE.read_bytes()
+	mp3_bytes = ORIGINAL_MP3_SOURCE.read_bytes()
+	wav_bytes = ORIGINAL_WAV_SOURCE.read_bytes()
 	payload = build_packet(report, json.loads(pack_bytes), hashlib.sha256(report_bytes).hexdigest(),
 		json.loads(harmonic_bytes), hashlib.sha256(harmonic_bytes).hexdigest(),
 		json.loads(global_bytes), hashlib.sha256(global_bytes).hexdigest(),
-		json.loads(phase_bytes), hashlib.sha256(phase_bytes).hexdigest())
+		json.loads(phase_bytes), hashlib.sha256(phase_bytes).hexdigest(),
+		json.loads(mp3_bytes), hashlib.sha256(mp3_bytes).hexdigest(),
+		json.loads(wav_bytes), hashlib.sha256(wav_bytes).hexdigest())
 	DEST.parent.mkdir(parents=True, exist_ok=True)
 	DEST.write_text(json.dumps(payload, indent=2) + '\n')
 	print('REVIEW_PACKET', DEST.relative_to(ROOT), 'windows', len(payload['windows']),

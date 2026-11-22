@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { test } from 'node:test';
-import { clicksForCandidate, candidateGroup, sourceStemURL } from
+import { clicksForCandidate, clicksForSourceClip, sourceClipSlices, candidateGroup, sourceStemURL } from
 	'../../public/music-review/downbeat-review/clock.mjs';
 
 const root = new URL('../../', import.meta.url);
@@ -26,6 +26,60 @@ test('source hash and research status must never masquerade as verified', () => 
 	assert.equal(packet.windows.length, 15);
 	assert.equal(packet.windows.every(w => w.status === 'unverified'), true);
 	assert.equal(packet.windows.every(w => w.reviewerStatus === 'pending'), true);
+});
+
+test('original WAV research is source-linked and every suggested passage stays unapproved', () => {
+	const wavBytes = fs.readFileSync(new URL(
+		'docs/music-review/one-more-run-verified-wav-master-structure-UNVERIFIED-20261121.json',root));
+	const mp3Bytes = fs.readFileSync(new URL(
+		'docs/music-review/one-more-run-original-mp3-mix-phase-UNVERIFIED-20261121.json',root));
+	const wav = JSON.parse(wavBytes), mp3 = JSON.parse(mp3Bytes);
+	assert.equal(digest(wavBytes),packet.source.originalWavMasterStructureReportSha256);
+	assert.equal(digest(mp3Bytes),packet.source.originalMp3MixReportSha256);
+	assert.equal(wav.originalMp3PriorReportSha256,packet.source.originalMp3MixReportSha256);
+	assert.equal(wav.master.masterSha256,packet.source.originalMasterWavSha256);
+	assert.equal(wav.master.sourceFrameCount,packet.source.frameCount);
+	assert.equal(mp3.sourceManifestSha256,packet.source.manifestSha256);
+	assert.equal(wav.status,'MASTER_VERIFIED_RHYTHM_AND_PHRASE_CANDIDATES_ONLY');
+	assert.equal(wav.master.noPersistentAudioCopy,true);
+	assert.equal(wav.master.remoteReadOnly,true);
+	assert.equal(packet.suggestedSourcePassages.length,12);
+	assert.ok(packet.suggestedSourcePassages.some(p=>Math.abs(p.centerSeconds-45.732)<.01));
+	for (const p of packet.suggestedSourcePassages) {
+		assert.equal(p.candidateOnly,true);
+		assert.equal(p.humanVerified,false);
+		assert.ok(p.suggestedListenRangeSeconds[0]<p.centerSeconds);
+		assert.ok(p.centerSeconds<p.suggestedListenRangeSeconds[1]);
+		assert.ok(p.suggestedListenRangeSeconds[1]<=pack.frameCount/pack.sampleRate);
+	}
+});
+
+test('original OGG slices cover a suggested review passage across 12-second cuts', () => {
+	const slices = sourceClipSlices(pack,41.232,50.232);
+	assert.deepEqual(slices.map(s=>s.segmentIndex),[3,4]);
+	assert.ok(Math.abs(slices[0].durationSeconds-6.768)<.00002);
+	assert.ok(Math.abs(slices[1].durationSeconds-2.232)<.00002);
+	assert.ok(Math.abs(slices[0].clipOffsetSeconds)<1e-6);
+	assert.ok(Math.abs(slices[1].clipOffsetSeconds-6.768)<.00002);
+	assert.deepEqual(sourceClipSlices(pack,168,174.6).map(s=>s.segmentIndex),[14]);
+	assert.throws(()=>sourceClipSlices(pack,175,180));
+	assert.throws(()=>sourceClipSlices(pack,-1,2));
+	const broken = {...pack, segments:pack.segments.filter((_,i)=>i!==4)};
+	assert.throws(()=>sourceClipSlices(broken,41.232,50.232),/missing audio segment|not completely covered/);
+});
+
+test('source-seek click shifts preserve four rival absolute measure accents', () => {
+	const args={bpm:163.84,phaseSeconds:.11,beatOneOffset:3,windowStartSeconds:36,
+		clipStartSeconds:41.232,durationSeconds:9};
+	const actual=clicksForSourceClip(args);
+	const continuous=clicksForCandidate({bpm:args.bpm,phaseSeconds:args.phaseSeconds,
+		beatOneOffset:args.beatOneOffset,startSeconds:36,durationSeconds:18})
+		.filter(x=>x.sourceSeconds>=args.clipStartSeconds-1e-5&&x.sourceSeconds<args.clipStartSeconds+9-1e-5);
+	assert.equal(actual.length,continuous.length);
+	for (let i=0;i<actual.length;i++) {
+		assert.ok(Math.abs(actual[i].sourceSeconds-continuous[i].sourceSeconds)<1e-5);
+		assert.equal(actual[i].beatOne,continuous[i].beatOne);
+	}
 });
 
 test('original audio URLs are source-owned and never route to generated adaptive variants', () => {

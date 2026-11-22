@@ -9,9 +9,146 @@
     "candidateReportSha256": "6696cf5e9b07089ad1cefd171110efb96fd38b228902f48b0786a416d6aa9024",
     "harmonicReportSha256": "8e922b017e7819983392227fe296b890e0b608b953fbaf7799c736ee01bf8c34",
     "globalPhaseReportSha256": "f869ebf715abfc7c2131bde4ed35cffd0a642f69ea1712bf6f127ce8e1be886c",
-    "phaseMotionReportSha256": "6f98cc4dd8dfc4b2833b779a3b7348e0e49886bd0fb65ae7f2ea903d3b5fa9dc"
+    "phaseMotionReportSha256": "6f98cc4dd8dfc4b2833b779a3b7348e0e49886bd0fb65ae7f2ea903d3b5fa9dc",
+    "originalMp3MixReportSha256": "2a61b050c639e975edab27a06075ec664ce3363d1d0d821797519b94330d8622",
+    "originalWavMasterStructureReportSha256": "2e41e73287bc2bb01b3d6c7dd1c15af9d841583da143a45c19ffcb7eaaaf225f",
+    "originalMasterWavSha256": "636bbd42f7ece1c085b4768f25fb0e65d7f29963a22a948e0b6e697ef0284721"
   },
   "originalSegmentCount": 15,
+  "suggestedSourcePassages": [
+    {
+      "centerSeconds": 90.0,
+      "suggestedListenRangeSeconds": [
+        85.5,
+        94.5
+      ],
+      "reviewReason": "prior low-band bass outlier 78\u2013102s; high-band detector did NOT replicate",
+      "noveltyScore": null,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 126.0,
+      "suggestedListenRangeSeconds": [
+        121.5,
+        130.5
+      ],
+      "reviewReason": "previously weak/harmonically ambiguous 120\u2013132s region",
+      "noveltyScore": null,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 167.126,
+      "suggestedListenRangeSeconds": [
+        162.626,
+        171.626
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.92381,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 45.732,
+      "suggestedListenRangeSeconds": [
+        41.232,
+        50.232
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.91205,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 172.234,
+      "suggestedListenRangeSeconds": [
+        167.734,
+        174.6
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.89881,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 146.785,
+      "suggestedListenRangeSeconds": [
+        142.285,
+        151.285
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.88496,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 16.44,
+      "suggestedListenRangeSeconds": [
+        11.94,
+        20.94
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.87352,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 153.53,
+      "suggestedListenRangeSeconds": [
+        149.03,
+        158.03
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.87223,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 134.037,
+      "suggestedListenRangeSeconds": [
+        129.537,
+        138.537
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.87016,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 101.97,
+      "suggestedListenRangeSeconds": [
+        97.47,
+        106.47
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.86952,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 38.928,
+      "suggestedListenRangeSeconds": [
+        34.428,
+        43.428
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.86164,
+      "candidateOnly": true,
+      "humanVerified": false
+    },
+    {
+      "centerSeconds": 51.084,
+      "suggestedListenRangeSeconds": [
+        46.584,
+        55.584
+      ],
+      "reviewReason": "original WAV full-mix chroma/energy shift, NOT verified phrase entrance",
+      "noveltyScore": 0.85984,
+      "candidateOnly": true,
+      "humanVerified": false
+    }
+  ],
   "note": "All 15 source segments analyzed; shorter 6.6-second ending has reduced evidence; all downbeats are unverified",
   "windows": [
     {
