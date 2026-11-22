@@ -17,9 +17,11 @@ Every number below came from a command run in this worktree on 2026-11-21. The c
 | --- | --- | --- |
 | Policy-matrix runner | `tools/exploits/run-exploits.mjs` | runs 5 named policies through the real sim; exit 0/2/1 |
 | Judgement rules (pure) | `tools/exploits/lib/exploit-stats.cjs` | 27 unit tests |
-| Harness docs | `tools/exploits/README.md` | policies, thresholds, honest limits |
-| Generated comparison report | `docs/exploit-factory-2026-11-21.md` | real 8-seed run, committed |
-| Unit tests | `tests/exploits/exploit-stats.test.js` | `node --experimental-vm-modules node_modules/jest/bin/jest.js tests/exploits` → 27 passed |
+| Seed plan + record validation (pure) | `tools/exploits/lib/seed-plan.cjs` | 29 unit tests; added to fix the PR #187 blocker (§9) |
+| Harness docs | `tools/exploits/README.md` | policies, thresholds, `--seeds` contract, honest limits |
+| Generated comparison report | `docs/exploit-factory-2026-11-21.md` | real 8-seed run, committed (regenerated through the fixed path, §9) |
+| Unit tests | `tests/exploits/exploit-stats.test.js`, `tests/exploits/seed-plan.test.js` | `node --experimental-vm-modules node_modules/jest/bin/jest.js tests/exploits` → **64 passed** |
+| End-to-end CLI wiring tests | `tests/exploits/runner-cli.test.js` | real CLI against a stub sim in a temp root; 8 tests |
 
 **Scope:** `tools/exploits/**`, `tests/exploits/**`, `docs/exploit-factory-*.md`, `.gitignore` (one entry for the
 regenerable `tools/exploits/out/`). **No** `src/**`, `js/**`, `public/**`, `package.json` or workflow changes.
@@ -86,7 +88,9 @@ Thresholds are conservative on purpose. An early draft used a 3-seed minimum and
 `flip` "DOMINANT" off 4 paired seeds (3 wins, 1 tie). That is too thin to be called a reproduction, so the
 minimum was raised to 6 before anything was committed.
 
-Negative controls, each asserted in `tests/exploits/exploit-stats.test.js` (27 tests, all passing):
+Negative controls, each asserted in `tests/exploits/exploit-stats.test.js` (27 tests, all passing). Seed identity and
+record-completeness controls live beside them in `tests/exploits/seed-plan.test.js` (29 tests) and
+`tests/exploits/runner-cli.test.js` (8 tests, real CLI path) — see §9:
 
 | control | asserted |
 | --- | --- |
@@ -146,7 +150,8 @@ all matching the committed report. Its corrections to my prose (§3 items 1 and 
 
 **Reviewer limitation, stated honestly:** it could not execute commands (`approval policy is never`), so it ran
 neither Jest nor `git diff`. Its test-count and scope claims are therefore unverified by it — I ran both myself
-(27 passed; scope confirmed clean) and they are reported in §1 and §6.
+(27 passed at that head, scope confirmed clean) and they are reported in §1 and §6. The current count at this head
+is 64 across three suites (§9).
 
 ## 8. Residual risk / open items
 
@@ -159,8 +164,15 @@ neither Jest nor `git diff`. Its test-count and scope claims are therefore unver
 3. **`minBsodGapPx` is in `METRICS` but the sim does not emit it** (it is a canary-harness field), so its column is
    always `n/a`. Left in deliberately so the metric can be wired when the sim reports it; worth confirming a
    reviewer prefers that to removing it.
-4. **`node_modules` in this worktree is a symlink** to the #117 worktree's install (disk is at 89%, 16 G free). It is
-   gitignored and not part of the diff, but a fresh clone needs `npm install` before the harness runs.
+4. **`node_modules` in this worktree is a symlink** to the #117 worktree's install (disk was at 93% when re-checked,
+   9.5 G free). It is gitignored and not part of the diff, but a fresh clone needs `npm install` before the harness
+   runs.
+5. **`tools/sim/browser.js` gained an optional fatigue path on `origin/main` after this branch's base** (`8657962`):
+   `makeHopNoise(..., { fatigue })` and a version string, both reachable only when `o.noiseProfile !== undefined`.
+   The exploit runner never passes `--noiseProfile` (verified in `run-exploits.mjs`: it passes `--seeds`, `--policy`,
+   `--maxM`, `--maxSec`, `--workers`, `--out`, `--biomeMask` and per-policy args only), so there is no semantic
+   conflict. But the 8-seed report was generated against the base, not against current `main` — re-running it on a
+   rebased head would be a fresh measurement, not a reproduction of the committed one.
 
 ## 9. PR #187 blocker: `--seeds a,b` marked valid runs incomplete (FIXED)
 
