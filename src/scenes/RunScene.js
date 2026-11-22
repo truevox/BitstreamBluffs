@@ -867,10 +867,13 @@ export class RunScene extends Phaser.Scene {
     if (!chunk || this.mesh.chunks.has(chunk.index)) return;
     this.mesh.addChunk(chunk);
     const hz = [];
-    for (const spawn of chunk.hazards || []) {
+    const spawns = chunk.hazards || [];
+    for (let hazardOrdinal = 0; hazardOrdinal < spawns.length; hazardOrdinal++) {
+      const spawn = spawns[hazardOrdinal];
       const def = this.content.hazards[spawn.defId];
       if (!def) continue;
       const h = new Hazard(this, def, spawn, this.palette);
+      h.hid = `${chunk.index}:${hazardOrdinal}`; // stable id (chunk + spawn ordinal): keys TelegraphTracker, serializable
       h.simStepped = true; // its motion (rolls, gates) moves the sensor body: advanced in simTick, not per frame
       if (def.placement === 'air') {
         // the launch lip this air hazard belongs to (nearest lip before it): the STAY LOW telegraph stands there
@@ -911,6 +914,7 @@ export class RunScene extends Phaser.Scene {
     const hz = this.hazards.get(idx);
     if (hz) hz.forEach((h) => h.destroy());
     this.hazards.delete(idx);
+    if (this.teleTracker) this.teleTracker.forgetChunk(idx);
     const pu = this.powerups.get(idx);
     if (pu) pu.forEach((p) => p.destroy());
     this.powerups.delete(idx);
@@ -1978,6 +1982,22 @@ export class RunScene extends Phaser.Scene {
       } else this.playSfx('hopCue');
     }
     this._teleMarks = marks;
+  }
+
+  /** Savestate hook (#119): the telegraph tracker's plain-data state. */
+  snapshotTelegraph() { return this.teleTracker.snapshot(); }
+
+  /**
+   * Savestate hook (#119): restore the tracker, then re-stamp `teleAtMs` on the (freshly built) live hazards from it, so
+   * nothing re-warns and the crash-report/harness timestamp matches the uninterrupted run.
+   * @param {ReturnType<TelegraphTracker['snapshot']>} snap
+   */
+  restoreTelegraph(snap) {
+    this.teleTracker.restore(snap);
+    for (const list of this.hazards.values()) for (const h of list) {
+      const w = this.teleTracker.firstWarnMs(h);
+      if (w !== null) h.teleAtMs = w;
+    }
   }
 
   /** Distance (px) from x to the next generated launch lip ahead, or Infinity. */

@@ -8,7 +8,7 @@ import {
 import { loadContent } from './_helpers.js';
 
 const DEFS = loadContent().hazards;
-const hz = (id, cx, extra = {}) => ({ def: DEFS[id], cx, cy: 0, w: DEFS[id].size.w, h: DEFS[id].size.h, hit: false, ...extra });
+const hz = (id, cx, extra = {}) => ({ hid: `${id}@${cx}`, def: DEFS[id], cx, cy: 0, w: DEFS[id].size.w, h: DEFS[id].size.h, hit: false, ...extra });
 const sled = (x, speed, extra = {}) => ({ x, vx: speed, speed, grounded: true, landX: null, ...extra });
 const FAR = 1e9;
 

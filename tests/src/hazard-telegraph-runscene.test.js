@@ -24,7 +24,7 @@ const { SFX, AudioSynth } = await import('../../src/systems/AudioSynth.js');
 const { loadContent } = await import('./_helpers.js');
 
 const DEFS = loadContent().hazards;
-const hz = (id, cx, extra = {}) => ({ def: DEFS[id], cx, cy: 300 - DEFS[id].size.h / 2, w: DEFS[id].size.w, h: DEFS[id].size.h, hit: false, ...extra });
+const hz = (id, cx, extra = {}) => ({ hid: `${id}@${cx}`, def: DEFS[id], cx, cy: 300 - DEFS[id].size.h / 2, w: DEFS[id].size.w, h: DEFS[id].size.h, hit: false, ...extra });
 const PAL = { danger: 0xff0000, amber: 0xffaa00, lime: 0x00ff00, bg: 0x000011, text: 0xffffff, cyan: 0x00ffff };
 
 function makeRun(hazards, sledOver = {}) {
