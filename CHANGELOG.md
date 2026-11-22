@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.15.4 - exploit factory: completeness is derived, not self-reported (2026-11-21)
+
+- **`--reuse` no longer accepts an incomplete run record just because the record's own `failures[]` is empty.**
+  Completeness is re-derived from the record's data by new pure `tools/exploits/lib/record-audit.cjs`: every arm the
+  record claims to have run must carry exactly the planned seed identities, once each. Four shapes re-reported as
+  complete measurements (exit 0, full metrics table, rendered verdicts) and now exit 2 with the arm named as
+  *unmeasured*: an arm missing entirely, every arm cut to half the planned seeds, a duplicated seed inside one arm,
+  and a seed nobody planned. A duplicated-seed arm previously surfaced as exit 1 with a **usage** banner.
+- **A record whose counts cannot be attributed is rejected outright**, not partially compared: a run attributed to no
+  arm, an unnamed or duplicated `policySpec`, a plan that lists one seed twice. The report prints the reasons under
+  `RECORD REJECTED — no comparison is offered`.
+- **The exit code and the report now come from the same audit** on both the fresh and `--reuse` paths, so the status
+  cannot disagree with what was printed. The runner also merges audit findings into `failures` before writing, so the
+  record on disk always agrees with itself.
+- **Older records keep their guarantees.** A record without `args.seedList` has its plan recovered from the numeric
+  `args.seeds` count (expanded exactly as the simulator expands it), so a truncated older record is still caught. Only
+  a record with neither a `seedList` nor a numeric count falls back to arm-against-arm checking, and that weaker
+  guarantee is stated in the report's limits.
+- `tools/exploits/repro-reuse-incomplete.mjs` reproduces the four shapes through the real CLI and exits 1 if any is
+  accepted as clean (3/4 fail-open before this change, 0/4 after).
+- Harness tooling only: no gameplay, physics, balance or player-visible change. `tools/sim/**` untouched.
+
 ## v2.15.3 - PWA install metadata and original icons (#172) (2026-11-21)
 
 - **Installable shell metadata, not an offline game.** A first-party Web App Manifest and generated original Bitstream Bluffs icons (192px, 512px, maskable, Apple touch) add supported-browser home-screen installation metadata, landscape/standalone preference and theme colors. The main application boot, gameplay simulation, ghost/replay format and scoring are unchanged.

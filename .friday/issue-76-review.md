@@ -18,10 +18,11 @@ Every number below came from a command run in this worktree on 2026-11-21. The c
 | Policy-matrix runner | `tools/exploits/run-exploits.mjs` | runs 5 named policies through the real sim; exit 0/2/1 |
 | Judgement rules (pure) | `tools/exploits/lib/exploit-stats.cjs` | 27 unit tests |
 | Seed plan + record validation (pure) | `tools/exploits/lib/seed-plan.cjs` | 29 unit tests; added to fix the PR #187 blocker (§9) |
-| Harness docs | `tools/exploits/README.md` | policies, thresholds, `--seeds` contract, unmeasured-arm rule, honest limits |
+| Record completeness audit (pure) | `tools/exploits/lib/record-audit.cjs` | 26 unit tests; added because completeness used to be self-reported (§11) |
+| Harness docs | `tools/exploits/README.md` | policies, thresholds, `--seeds` contract, unmeasured-arm rule, completeness rule, honest limits |
 | Generated comparison report | `docs/exploit-factory-2026-11-21.md` | real 8-seed run, committed (regenerated through the fixed path, §9) |
-| Unit tests | `tests/exploits/exploit-stats.test.js`, `tests/exploits/seed-plan.test.js` | `node --experimental-vm-modules node_modules/jest/bin/jest.js tests/exploits` → **73 passed** |
-| End-to-end CLI wiring tests | `tests/exploits/runner-cli.test.js` | real CLI against a stub sim in a temp root; 17 tests |
+| Unit tests | `tests/exploits/exploit-stats.test.js`, `tests/exploits/seed-plan.test.js`, `tests/exploits/record-audit.test.js` | `node --experimental-vm-modules node_modules/jest/bin/jest.js tests/exploits` → **109 passed** |
+| End-to-end CLI wiring tests | `tests/exploits/runner-cli.test.js` | real CLI against a stub sim in a temp root; 27 tests |
 
 **Scope:** `tools/exploits/**`, `tests/exploits/**`, `docs/exploit-factory-*.md`, `.gitignore` (one entry for the
 regenerable `tools/exploits/out/`). **No** `src/**`, `js/**`, `public/**`, `package.json` or workflow changes.
@@ -235,9 +236,10 @@ substituted, `no results[]` — each asserted to be a failed arm with exit 2 and
 pins the **before** comparison itself (`2 !== 'sim-01,sim-02'` is `true`) so the defect cannot return as a
 "simplification".
 
-**Versioning note:** no `CHANGELOG`/`package.json` bump. This branch and the tooling-only PRs already merged
-(`#190`, `#195`, `#196`) all ship without one — there is no gameplay or player-visible change here. Flagging it
-explicitly rather than deciding it quietly: if Gal Friday wants a `v2.15.2` tooling entry, say so and I will add it.
+**Versioning note:** this is the first commit on this branch with a `CHANGELOG` and `package.json` entry — `v2.15.2`.
+Earlier commits here and the tooling-only PRs (`#190`, `#195`, `#196`) shipped without one because they changed no
+player-visible behaviour; §11 changes the documented exit-code contract of the harness, which the repo's commit rules
+count as behaviour-changing, so it gets an entry rather than another open question.
 
 ## 10. Second pass: three more ways a failed arm could be read as a result (FIXED)
 
@@ -294,8 +296,74 @@ twice in the same function scope, and a follow-up patch deleted the `if (baselin
 body. Both were caught by `node --check` and the test suite before commit — but they are why the suite is run at the
 end of each edit round rather than once at the end.
 
-## 11. Ask
+## 11. Third pass: incompleteness was self-reported (FIXED)
 
-Marvin: please have **Gal Friday** review PR #187. Left at the review gate — no merge from my side. On approval I
-merge, verify the landed diff and confirm #76's acceptance criteria are met (a repeatable seed suite and a
-cross-policy metrics report, with no recommendation attached).
+The §10 work made a record's *stated* failures fail closed. It still trusted the record to state them. Four
+incomplete records re-reported through `--reuse` as complete measurements (exit 0, full table, verdicts rendered)
+because `failures[]` was empty:
+
+| # | shape | reproduced (evidence) | old behaviour |
+| --- | --- | --- | --- |
+| 1 | an arm missing entirely, no failure entry | `24 runs, failures=0` from the 32-run record with `flip` dropped | exit 0, full table, `flip` silently absent |
+| 2 | every arm cut to 4 of the 8 planned seeds | `16 runs, failures=0`, `seedList` still claiming 8 | exit 0, 4-run medians in an "8-seed" table |
+| 3 | a duplicated seed inside one arm | `32 runs`, `flip` runs on sim-01 twice | `exit 1` + a **usage** banner (it threw inside `aggregate`) |
+| 4 | a seed nobody planned inside one arm | `32 runs`, `hop` on sim-99 | exit 0, that arm compared anyway |
+
+The reproducer is reproduced verbatim below; it clones the committed 32-run record and re-reports each variant.
+
+**Root cause:** completeness was read from `record.failures`, which is the record's *self-report*. Before the audit,
+the only thing that ever populated that list was the fresh run path; `--reuse` never re-derived anything.
+
+**Fix** — new pure `tools/exploits/lib/record-audit.cjs`:
+
+- `auditRecord(record)` derives completeness from the data. Every arm the record claims to have run must carry
+  **exactly the planned seed identities, once each**. A missing arm, a shrunken arm, a duplicated seed and an
+  unplanned seed are all per-arm findings, so the report can call that arm *unmeasured* and keep the rest.
+- Defects that make every count ambiguous **reject the whole record**: a run attributed to no arm, an unnamed or
+  duplicated `policySpec`, a plan that lists one seed twice, a numeric count outside the runner's 1–64 range, no
+  `runs[]`. The report then prints `## RECORD REJECTED — no comparison is offered` with the reasons and no table.
+- The exit code and the verdicts now come from the same audit, on both the fresh and `--reuse` paths, so the status
+  cannot disagree with the printed report.
+- The plan is recovered strongest-first: `args.seedList` (exact), then a numeric `args.seeds` expanded exactly as the
+  sim expands it, then — only if neither exists — the union of what the arms ran, flagged `unverifiableSeeds` and
+  stated in the report's limits. **A numeric-count legacy record is therefore fully verifiable**, which is most of
+  the pre-`seedList` files. A uniformly-truncated record with *neither* a `seedList` nor a count can still pass;
+  that is stated in the README and by the report, not hidden.
+- `mergeAuditFailures` folds the audit into `failures` before the record is written, so the file on disk always
+  agrees with itself. The fresh path refuses to write a record whose data is internally inconsistent.
+
+**Evidence at this head:**
+
+```
+full arm dropped, no failure entry       24 runs, failures=0  ->  EXIT=2
+every arm truncated to 4 of 8 seeds      16 runs, failures=0  ->  EXIT=2
+one arm has a duplicated seed            32 runs, failures=0  ->  EXIT=2  (was exit 1 + usage banner)
+one arm carries an unplanned seed        32 runs, failures=0  ->  EXIT=2
+committed 32-run clean record (--reuse)                        ->  EXIT=0, report identical to the committed file
+legacy 8-seed record, no seedList, count=8 (--reuse)           ->  EXIT=0, plan recovered from the count
+same legacy record truncated to 4 seeds (--reuse)              ->  EXIT=2, all four arms named
+```
+
+`jest tests/exploits`: **109 passed** (27 + 29 + 17 + 26 new audit tests + 10 new CLI tests). The clean-case tests
+exist specifically so the guard cannot decay into "always say incomplete": a full record still exits 0, still
+renders `DOMINANT on score` for a genuinely dominant candidate, and the committed report is byte-identical.
+
+**A fixture bug this caught:** the four older `fabricatedRecord` fixtures claimed `seeds: 8` while carrying two runs.
+They were only ever meant to exercise a failed-arm path, but they were themselves the inconsistency the audit now
+rejects — so the audit was right to flag them and the fixture was wrong. It now derives the plan from the runs.
+
+`npm run test`: 2718 passed, 8 failed in the same 7 suites that fail with these changes stashed (`env-detection`,
+`memory-usage`, `multi-chunk-terrain`, `terrain-interaction`, `input-playback`, `combo-scoring`, `start-scene` —
+pre-existing, none in `tools/exploits/**` or `tests/exploits/**`). `npm run build`: ✓ built. Reproducer after the
+fix: `node tools/exploits/repro-reuse-incomplete.mjs` → all 4 shapes exit 2, reproducer exit 0; the same script at
+`HEAD` before this change → `3/4 … CLEAN — fail-open`, exit 1.
+
+Version: `v2.15.2` (`CHANGELOG.md` + `package.json`). Behaviour-changing by the repo's own rule because it changes the
+harness's documented exit-code contract; no gameplay, physics or balance change, `tools/sim/**` untouched.
+
+## 12. Ask
+
+Marvin: please have **Gal Friday** review PR #187, including §11 (it changes the exit-code contract for `--reuse`,
+which she reproduced against). Left at the review gate — no merge from my side. On approval I merge, verify the landed
+diff and confirm #76's acceptance criteria are met (a repeatable seed suite and a cross-policy metrics report, with no
+recommendation attached).
