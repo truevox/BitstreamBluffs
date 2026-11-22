@@ -11,6 +11,7 @@ import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
 import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.js';
 import { FIRST_SONG_ID, defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices, shuffledSongRound } from './MusicPlaylist.js';
 import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
+import { snowpackImpactFromLanding } from './SnowpackImpact.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
@@ -49,6 +50,7 @@ export class StemMusicDirector {
 		this.musicCaptions = false;
 		this.captionWords = [];
 		this.airborne = false;
+		this._pendingSnowImpact = 0;
 		this._timer = null;
 		this._token = 0;
 		this._nextPromise = null;
@@ -165,6 +167,7 @@ export class StemMusicDirector {
 		const next = on === true;
 		if (this.menuMode === next) return;
 		this.menuMode = next;
+		if (next) this._pendingSnowImpact = 0;
 		if (next) {
 			// Menus restore all three original accompaniments to clean DSP.
 			this.setBsodDanger(0);
@@ -256,6 +259,7 @@ export class StemMusicDirector {
 
 	setBiome(id) {
 		this.biome = typeof id === 'string' && id ? id : HOME_BIOME;
+		if (this.biome !== 'debumont') this._pendingSnowImpact = 0;
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
@@ -283,6 +287,23 @@ export class StemMusicDirector {
 		}
 	}
 
+	/** Landing pulses may arrive either side of the per-frame grounded update. */
+	onLanding(landing) {
+		if (this.menuMode || this.biome !== 'debumont') return;
+		const impulse = snowpackImpactFromLanding(landing);
+		if (impulse <= 0) return;
+		this._pendingSnowImpact = Math.max(this._pendingSnowImpact || 0, impulse);
+		if (!this.airborne) this._applySnowImpact();
+	}
+
+	_applySnowImpact() {
+		const impulse = this._pendingSnowImpact || 0;
+		this._pendingSnowImpact = 0;
+		if (impulse <= 0 || this.menuMode || this.biome !== 'debumont') return;
+		for (const stem of ['bass','drums','guitar','piano','other'])
+			this.mixer?.setEffectParam(stem,'snowpack','impact',impulse);
+	}
+
 	setAirborne(airborne) {
 		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
@@ -294,6 +315,7 @@ export class StemMusicDirector {
 				const depth = next ? 0 : orchestraPreset('debumont',stem)[0].depth;
 				this.mixer?.setEffectParam(stem,'snowpack','depth',depth);
 			}
+			if (!next) this._applySnowImpact();
 		}
 		// New adaptive packs crossfade full original drums with an actual
 		// airborne kit. The legacy 0.58 airborne duck remains unchanged.

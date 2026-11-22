@@ -5,7 +5,8 @@ Owner direction (2026-11-21): keep original instrumental stems instead of re-per
 ## What is implemented
 - New `snowpack` low-cost Web Audio processor: two low-pass stages, dark high-shelf, dynamics compressor, and dry/wet paths. Continuous normalized `depth` parameter (0–1) with asymmetric smoothing (quick airborne clearance, slower powder settling).
 - Preset on Debumont original bass, drums, guitar, piano and Other; **Powdery** is the ground default (0.72; bass 0.56). On takeoff the Snowpack depth smoothly opens to 0 (dry original stem), on landing returns to the previous powder depth. An airborne entry into Debumont starts unsnowed. No modification to sample starts, playback rate, source beats, vocal MIDI, or original files.
-- Standalone audition page `tools/music/snowpack-audition.html` with local audio file picker, three presets, ground-depth slider, and a repeatable **Jump / Land** switch to simulate the game state. No uploads.
+- Standalone audition page `tools/music/snowpack-audition.html` with local audio file picker, one-click bundled 20-second **original instrumental stem** demo (Pope Leo), three presets, ground-depth slider, and repeatable **Jump / soft Land / hard Land** controls. No uploads.
+- NEW: a physical touchdown now drives a **bounded temporary Snowpack burial pulse** proportional to `EVT.LANDING.impactSpeedPxS` (using the game's established hard-land threshold). The pulse briefly deepens the filtering, then smoothly returns to the chosen ground depth. AudioSynth forwards the existing landing event; source playback, scores, physics and music clock are unchanged. Missing/invalid impact or crash grades never synthesize an impulse. Handles either event order (landing pulse before or after grounded-state transition), and new takeoffs cancel the previous burial envelope.
 - The audition page is a Vite HTML entry and is included in production builds, without adding it to game menus.
 
 ## How to audition
@@ -13,7 +14,7 @@ Owner direction (2026-11-21): keep original instrumental stems instead of re-per
 npm run dev
 # Open http://localhost:5173/tools/music/snowpack-audition.html
 ```
-Pick a local original recording or an individual stem (Ogg, WAV, MP3 supported by your browser), press Play, choose Powdery (default), and click **Jump — leave powder** to hear the unfiltered original while airborne. Click **Land — back into powder** to reapply the chosen ground depth. The ground-depth slider remains adjustable midair.
+Click **Load 20-second original instrumental sample** (ships with this preview) or choose your own local original recording/stem (Ogg, WAV, MP3). Press Play, choose Powdery, and click **Jump — leave powder** to hear the unfiltered recording in the air. Click **Land — back into powder** for a soft touchdown, or **Hard land** for a stronger burial pulse. The ground-depth slider remains adjustable in the air. The supplied sample recombines the five original instrument stems with no lead vocal; it demonstrates the processor but does not replace independent per-stem in-game routing.
 
 ## Verification
 - Jest: `npm test -- --runInBand tests/src/music-fx.test.js tests/src/dynamic-orchestra.test.js`

@@ -16,6 +16,7 @@ const stop = () => {
 	$('play').textContent = '▶ Play / pause';
 	airborne = false;
 	$('burst').textContent = '🏂 Jump — leave powder';
+	$('hard').disabled = true;
 	if (ctx) setDepth($('depth').value, false);
 };
 const ensureContext = async () => {
@@ -25,20 +26,30 @@ const ensureContext = async () => {
 	}
 	await ctx.resume();
 };
-$('file').addEventListener('change', async () => {
+async function loadAudio(data, label) {
 	stop();
-	const file = $('file').files?.[0];
-	if (!file) return;
-	$('play').disabled = true; $('burst').disabled = true;
+	$('play').disabled = true; $('burst').disabled = true; $('hard').disabled = true;
 	try {
 		await ensureContext();
-		buffer = await ctx.decodeAudioData(await file.arrayBuffer());
+		buffer = await ctx.decodeAudioData(data);
 		$('play').disabled = false; $('burst').disabled = false;
-		status(file.name + ' • ' + buffer.duration.toFixed(1) + ' seconds • ready to audition');
+		status(label + ' • ' + buffer.duration.toFixed(1) + ' seconds • ready to audition');
 	} catch (error) {
 		buffer = null;
-		status('Could not decode that file: ' + String(error.message || error));
+		status('Could not decode that recording: ' + String(error.message || error));
 	}
+}
+$('file').addEventListener('change', async () => {
+	const file = $('file').files?.[0];
+	if (file) await loadAudio(await file.arrayBuffer(), file.name);
+});
+$('demo').addEventListener('click', async () => {
+	status('Loading original instrument sample…');
+	try {
+		const response = await fetch('/snowpack-audition/pope-leo-original-instruments-20s.mp3');
+		if (!response.ok) throw new Error('Sample unavailable');
+		await loadAudio(await response.arrayBuffer(), 'Pope Leo / original instrumental stems');
+	} catch (error) { status('Sample unavailable: ' + String(error.message || error)); }
 });
 $('play').addEventListener('click', async () => {
 	if (running) { stop(); status('Stopped. Press Play to restart from the beginning.'); return; }
@@ -58,8 +69,19 @@ $('burst').addEventListener('click', () => {
 	if (!buffer) return;
 	airborne = !airborne;
 	$('burst').textContent = airborne ? '🛬 Land — back into powder' : '🏂 Jump — leave powder';
+	$('hard').disabled = !airborne;
 	setDepth($('depth').value, false);
-	status(airborne ? 'Airborne: original recording opens up above the snow.' : 'Landing: powder settles around the original recording.');
+	if (!airborne) chain?.find('snow')?.set('impact', 0.25, ctx.currentTime);
+	status(airborne ? 'Airborne: original recording opens up above the snow.' : 'Soft landing: quick extra burial, then a slow return to powder.');
+});
+$('hard').addEventListener('click', () => {
+	if (!buffer || !airborne) return;
+	airborne = false;
+	$('hard').disabled = true;
+	$('burst').textContent = '🏂 Jump — leave powder';
+	setDepth($('depth').value, false);
+	chain?.find('snow')?.set('impact', 0.85, ctx.currentTime);
+	status('Hard landing: deeper snow burial pulse, then gradual resettling.');
 });
 window.addEventListener('pagehide', () => {
 	stop(); chain?.dispose(); ctx?.close();
