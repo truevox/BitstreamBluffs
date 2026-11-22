@@ -22,6 +22,10 @@ export const CONFIGS = {
   native: { ops: [], mode: 'global' },
   all: { ops: ALL_OPS, mode: 'global' },
   'all-scoped': { ops: ALL_OPS, mode: 'scoped' },
+  'matter-only': { ops: ALL_OPS, mode: 'matter' },
+  'src-only': { ops: ALL_OPS, mode: 'nomatter' },
+  'native-rep2': { ops: [], mode: 'global' },
+  'all-rep2': { ops: ALL_OPS, mode: 'global' },
   count: { ops: [], mode: 'count' },
 };
 for (const op of ALL_OPS) { CONFIGS[`only-${op}`] = { ops: [op], mode: 'global' }; CONFIGS[`loo-${op}`] = { ops: ALL_OPS.filter((o) => o !== op), mode: 'global' }; }
@@ -70,6 +74,7 @@ async function runCell(browser, cfgName, eng, f) {
     for (let i = 0; i < n; i++) for (let k = 0; k < 8; k++) buf[i * 8 + k] = r.digests[i][k];
     const cell = { cfg: cfgName, engine: eng, fixture: f.id, hz: HZ, ticks: n, outcome: { ticks: r.outcome.ticks, crashed: r.outcome.crashed, cause: r.outcome.cause, distanceM: r.outcome.distanceM, score: r.outcome.score },
       tapeDesync: r.tapeCheck.desync ? { tick: r.tapeCheck.desync.tick } : null, simMs: r.simMs, loopMs: r.loopMs, counts: r.counts,
+      raw: Buffer.from(new Float64Array(r.raw.flat()).buffer).toString('base64'),
       digests: Buffer.from(buf.buffer).toString('base64') };
     await mkdir(path.dirname(p), { recursive: true });
     await writeFile(p, JSON.stringify(cell));
@@ -91,8 +96,12 @@ if (cmd === 'run') {
 if (cmd === 'report') {
   const { readdirSync: ls } = await import('node:fs');
   const SUB = ['rng', 'timers', 'terrain', 'kodiaks', 'bsod', 'sled', 'world', 'score'];
-  const load = (c, e, f) => { const p = cellPath(c, e, f); if (!existsSync(p)) return null; const j = JSON.parse(readFileSync(p, 'utf8')); j.d = new Int32Array(Uint8Array.from(Buffer.from(j.digests, 'base64')).buffer); delete j.digests; return j; };
-  const first = (a, b) => { const n = Math.min(a.ticks, b.ticks); for (let i = 0; i < n; i++) { const s = []; for (let k = 0; k < 8; k++) if (a.d[i * 8 + k] !== b.d[i * 8 + k]) s.push(SUB[k]); if (s.length) return { tick: i + 1, subsystems: s }; } return a.ticks !== b.ticks ? { tick: n + 1, subsystems: ['length'] } : null; };
+  const load = (c, e, f) => { const p = cellPath(c, e, f); if (!existsSync(p)) return null; const j = JSON.parse(readFileSync(p, 'utf8')); j.d = new Int32Array(Uint8Array.from(Buffer.from(j.digests, 'base64')).buffer); j.r = j.raw ? new Float64Array(Uint8Array.from(Buffer.from(j.raw, 'base64')).buffer) : null; delete j.digests; delete j.raw; return j; };
+  // CAUSAL = every digest group except 'terrain' (derived heightAt/slopeAt probe reads, #161 review). 'terrain' is reported separately.
+  const CAUSAL = SUB.filter((s) => s !== 'terrain');
+  const first = (a, b, only = CAUSAL) => { const n = Math.min(a.ticks, b.ticks); for (let i = 0; i < n; i++) { const s = []; for (let k = 0; k < 8; k++) if (only.includes(SUB[k]) && a.d[i * 8 + k] !== b.d[i * 8 + k]) s.push(SUB[k]); if (s.length) return { tick: i + 1, subsystems: s }; } return a.ticks !== b.ticks ? { tick: n + 1, subsystems: ['length'] } : null; };
+  const maxDelta = (a, b) => { if (!a.r || !b.r) return null; const n = Math.min(a.ticks, b.ticks); let mx = 0, mv = 0; for (let i = 0; i < n; i++) { mx = Math.max(mx, Math.abs(a.r[i * 6] - b.r[i * 6]), Math.abs(a.r[i * 6 + 1] - b.r[i * 6 + 1])); mv = Math.max(mv, Math.abs(a.r[i * 6 + 3] - b.r[i * 6 + 3]), Math.abs(a.r[i * 6 + 4] - b.r[i * 6 + 4])); } return { maxPosPx: mx, maxVelPxPerTick: mv }; };
+  const same = (x, y) => x.ticks === y.ticks && ['ticks', 'crashed', 'cause', 'distanceM', 'score'].every((k) => x.outcome[k] === y.outcome[k]);
   const cfgs = ls(CACHE).filter((d) => d !== 'count');
   const out = { generatedFrom: 'tools/determinism/portable-math/.cache', hz: HZ, configs: {} };
   const want = process.argv.slice(3);
@@ -102,9 +111,10 @@ if (cmd === 'report') {
       const cells = Object.fromEntries(['chromium', 'firefox', 'webkit'].map((e) => [e, load(c, e, f.id)]));
       if (!cells.chromium) continue;
       const r = { ticks: cells.chromium.ticks, outcome: cells.chromium.outcome };
-      for (const e of ['firefox', 'webkit']) if (cells[e]) r[e] = first(cells.chromium, cells[e]);
+      r.chromiumDesync = cells.chromium.tapeDesync;
+      for (const e of ['firefox', 'webkit']) if (cells[e]) { r[e] = first(cells.chromium, cells[e]); r[e + 'Terrain'] = first(cells.chromium, cells[e], ['terrain']); r[e + 'Desync'] = cells[e].tapeDesync; r[e + 'OutcomeEqual'] = same(cells.chromium, cells[e]); r[e + 'MaxDelta'] = maxDelta(cells.chromium, cells[e]); }
       row.perFixture[f.id] = r;
-      if (cells.firefox && cells.webkit) { row.fixturesCompared++; if (!r.firefox && !r.webkit) row.identicalAcrossEngines++; }
+      if (cells.firefox && cells.webkit) { row.fixturesCompared++; if (!r.firefox && !r.webkit) row.identicalAcrossEngines++; if (r.firefoxOutcomeEqual && r.webkitOutcomeEqual) row.outcomeEqual = (row.outcomeEqual || 0) + 1; }
       for (const e of Object.keys(cells)) if (cells[e]) { const m = (row.simMsPerTick[e] = row.simMsPerTick[e] || { ms: 0, ticks: 0 }); m.ms += cells[e].simMs; m.ticks += cells[e].ticks; }
     }
     for (const e of Object.keys(row.simMsPerTick)) row.simMsPerTick[e] = +(row.simMsPerTick[e].ms / row.simMsPerTick[e].ticks).toFixed(4);
@@ -118,6 +128,6 @@ if (cmd === 'report') {
   await mkdir(path.dirname(o), { recursive: true }); await writeFile(o, JSON.stringify(out, null, 1));
   for (const [c, r] of Object.entries(out.configs)) {
     const cols = FIXTURES.map((f) => { const x = r.perFixture[f.id]; if (!x) return '-'; const t = [x.firefox?.tick, x.webkit?.tick].map((v) => v ?? 'ok'); return `${t[0]}/${t[1]}`; });
-    console.log(c.padEnd(14), `${r.identicalAcrossEngines}/${r.fixturesCompared}`.padEnd(6), cols.join(' ').padEnd(80), JSON.stringify(r.simMsPerTick));
+    console.log(c.padEnd(14), `causal-identical ${r.identicalAcrossEngines}/${r.fixturesCompared}, outcome-equal ${r.outcomeEqual || 0}`.padEnd(40), cols.join(' ').padEnd(80), JSON.stringify(r.simMsPerTick));
   }
 }

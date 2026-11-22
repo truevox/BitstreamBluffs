@@ -47,6 +47,23 @@
       Math[n] = function () { if (COUNT.depth > 0) COUNT.in[n]++; else COUNT.out[n]++; return real.apply(Math, arguments); };
     }
   }
+  // Matter-internal call sites (the only transcendental users inside Phaser's bundled matter-js): wrapped, not forked.
+  //   'matter'   : Math ops swapped to PM only while one of these Matter functions runs (src/ keeps native Math).
+  //   'nomatter' : Math ops are PM everywhere EXCEPT while one of these Matter functions runs (Matter keeps native Math).
+  let matterDepth = 0, matterInstalled = false;
+  function installMatterPatch() {
+    if (matterInstalled || (PATCH.mode !== 'matter' && PATCH.mode !== 'nomatter')) return; matterInstalled = true;
+    const M = window.Phaser.Physics.Matter.Matter;
+    const targets = [['Axes', 'rotate'], ['Vertices', 'rotate'], ['Vertices', 'chamfer'], ['Vector', 'rotate'], ['Vector', 'rotateAbout'], ['Vector', 'angle'], ['Bodies', 'polygon'], ['Body', 'rotate'], ['Composite', 'rotate']];
+    for (const [mod, fn] of targets) {
+      const real = M[mod][fn];
+      M[mod][fn] = function () {
+        if (matterDepth++ === 0) { if (PATCH.mode === 'matter') swapIn(); else swapOut(); }
+        try { return real.apply(this, arguments); } finally { if (--matterDepth === 0) { if (PATCH.mode === 'matter') swapOut(); else swapIn(); } }
+      };
+    }
+    if (PATCH.mode === 'nomatter') swapIn();
+  }
   window.__PMX = { PATCH, COUNT, NATIVE, swapIn, swapOut };
 
   const S = (window.__ce = { SUBSYSTEMS, hold: true, current: null, math: null });
@@ -161,6 +178,7 @@
     const run = g.scene.getScene('RunScene');
     ensureHooks(run);
     S.hold = true;
+    installMatterPatch();
     if (!S.rasterReal) S.rasterReal = g.renderer.render;
     g.renderer.render = o.raster ? S.rasterReal : function () {};
     g.loop.wake();
