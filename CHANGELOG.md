@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.19.13 — developer historical replay airtime check (#131 / #228) (2026-11-22)
+
+- **Measure airtime from one opt-in historical QA tape.** The fixed synthetic recording plays only in its pinned original v2.16.0 runtime. Two local native replays confirm the saved checkpoints and the sampled grounded state; the tool reports aggregate airtime, not the tape or player data. No gameplay, scoring, replay compatibility or production change.
+
 ## v2.19.12 — portable deterministic math: same simulation in every browser (#121 / #209) (2026-11-22)
 
 - **The authoritative simulation no longer depends on the browser's math library.** Firefox and WebKit returned different last bits than Chromium for `hypot`, `exp`, `cos`, `atan2` and others, so the same inputs could drift apart and, on a knife-edge hazard contact, end differently (a Firefox run survived a hazard that Chromium crashed on). Every simulation file now takes `sin/cos/tan/asin/acos/atan/atan2/exp/expm1/log/log1p/log2/log10/pow/hypot/tanh/sinh/cosh/cbrt` from `src/systems/pmath.js`, a facade over the exactly pinned, Apache-2.0 `@stdlib/math-base-special-*` packages (pure IEEE arithmetic, identical bits in Chromium, Firefox and WebKit), and the nine trig/pow/acos functions inside Phaser's bundled Matter are replaced the same way (`src/systems/MatterPortable.js`, no fork; `phaser` is now pinned exactly to 3.90.0). Presentation code (backgrounds, audio, UI, particles) keeps the native `Math`, and a test fails if a new native call appears in a simulation file.
