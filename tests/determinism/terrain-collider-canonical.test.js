@@ -29,12 +29,18 @@ function chunk(index, x0, n = 40, phase = 0) {
     const x = x0 + i * 16;
     points.push({ x, y: 300 + 0.31 * x + 17.3 * Math.sin(x / 61.7 + phase) + 5.1 * Math.sin(x / 13.9) });
   }
-  return { index, points, startX: x0, endX: x0 + n * 16, gaps: [], zones: [], bouncePads: [] };
+  // one bounce pad per chunk, so the pad sensor path is covered too
+  return { index, points, startX: x0, endX: x0 + n * 16, gaps: [], zones: [], bouncePads: [{ x: x0 + 200.5, y: points[12].y, width: 40, boost: 520 }] };
 }
 
 /** Every geometry bit of a chunk's colliders, as exact doubles. */
-function geometry(mesh, index) {
-  return mesh.chunks.get(index).bodies.map((b) => ({
+function bodyBits(b) {
+  return {
+    label: b.label,
+    isSensor: b.isSensor,
+    collisionFilter: { ...b.collisionFilter },
+    slop: b.slop,
+    restitution: b.restitution,
     position: [b.position.x, b.position.y],
     vertices: b.vertices.map((v) => [v.x, v.y]),
     axes: b.axes.map((a) => [a.x, a.y]),
@@ -43,7 +49,12 @@ function geometry(mesh, index) {
     isStatic: b.isStatic,
     friction: b.friction,
     frictionStatic: b.frictionStatic,
-  }));
+    bbPad: b.bbPad ? { ...b.bbPad } : null,
+  };
+}
+function geometry(mesh, index) {
+  const rec = mesh.chunks.get(index);
+  return { bodies: rec.bodies.map(bodyBits), pads: rec.pads.map(bodyBits) };
 }
 
 describe('terrain colliders are canonical (history-independent)', () => {
@@ -59,15 +70,45 @@ describe('terrain colliders are canonical (history-independent)', () => {
     used.mesh.addChunk(chunk(5, -200));
     const got = geometry(used.mesh, 5);
 
-    expect(got.length).toBe(want.length);
-    const differing = got.filter((g, i) => JSON.stringify(g) !== JSON.stringify(want[i])).length;
-    expect({ differing, of: want.length }).toEqual({ differing: 0, of: want.length });
+    expect(got.bodies.length).toBe(want.bodies.length);
+    expect(got.pads.length).toBe(1);
+    const differing = got.bodies.filter((g, i) => JSON.stringify(g) !== JSON.stringify(want.bodies[i])).length;
+    expect({ differing, of: want.bodies.length }).toEqual({ differing: 0, of: want.bodies.length });
+    expect(got.pads).toEqual(want.pads);
   });
 
-  test('dropping chunks does not keep removed colliders alive (no unbounded pool)', () => {
-    const { mesh } = makeMesh();
+  test('dropping chunks removes every collider and pad from the world and retains none on the mesh', () => {
+    const { mesh, engine } = makeMesh();
+    const baseline = engine.world.bodies.length;
+    const removed = new Set();
     for (let i = 0; i < 6; i++) mesh.addChunk(chunk(i, 700 * i));
+    for (let i = 0; i < 6; i++) { const rec = mesh.chunks.get(i); for (const b of [...rec.bodies, ...rec.pads]) removed.add(b); }
     for (let i = 0; i < 6; i++) mesh.removeChunk(i);
-    expect(mesh._bodyPool ? mesh._bodyPool.length : 0).toBe(0);
+    expect(engine.world.bodies.length).toBe(baseline);
+    expect(mesh.chunks.size).toBe(0);
+    // No removed body may be held anywhere on the mesh (a pool by any name).
+    const retained = [];
+    const seen = new Set();
+    const walk = (v, path, depth) => {
+      if (!v || typeof v !== 'object' || seen.has(v) || depth > 4) return;
+      seen.add(v);
+      if (removed.has(v)) { retained.push(path); return; }
+      for (const k of Object.keys(v)) if (k !== 'scene' && k !== 'world') walk(v[k], `${path}.${k}`, depth + 1);
+    };
+    walk(mesh, 'mesh', 0);
+    expect(retained).toEqual([]);
+  });
+
+  test('a rebuilt chunk gets new bodies in insertion order with increasing ids (no reuse)', () => {
+    const { mesh } = makeMesh();
+    mesh.addChunk(chunk(1, 0));
+    const first = mesh.chunks.get(1).bodies.slice();
+    mesh.removeChunk(1);
+    mesh.addChunk(chunk(1, 0));
+    const second = mesh.chunks.get(1).bodies;
+    expect(second.some((b) => first.includes(b))).toBe(false);
+    const ids = second.map((b) => b.id);
+    expect(ids.every((id, i) => i === 0 || id > ids[i - 1])).toBe(true);
+    expect(Math.min(...ids)).toBeGreaterThan(Math.max(...first.map((b) => b.id)));
   });
 });
