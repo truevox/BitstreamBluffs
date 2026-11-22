@@ -164,13 +164,18 @@ describe('tripwire attestation categories', () => {
   test('behavior-change-unreleased: valid only while SIM_REVISION is above the last released revision', () => {
     const msg = 'behavior-change-unreleased: -0 tilt normalized (sign of zero only)';
     expect(LAST_RELEASED_SIM_REVISION).toBe(5); // #47 revision 2, #140 revision 3, #119 canonical colliders revision 4, #121 portable math revision 5 are released
-    expect(SIM_REVISION).toBe(LAST_RELEASED_SIM_REVISION);
+    expect(SIM_REVISION).toBeGreaterThanOrEqual(LAST_RELEASED_SIM_REVISION); // 6 while #65 (Debutmont base biome) is unreleased
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 0 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 2, prevSimRevision: 1, lastReleased: 1 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 1 })).toMatch(/only valid while/);
-    expect(() => writeTripwire(mk(SIM_REVISION), msg, ['a.js'])).toThrow(/only valid while/);
+    // writeTripwire judges against the live SIM_REVISION: rejected once it equals the released one, accepted while above it.
+    const attempt = () => writeTripwire(mk(SIM_REVISION), msg, ['a.js']);
+    if (SIM_REVISION > LAST_RELEASED_SIM_REVISION) expect(attempt().wrote).toBe(true);
+    else expect(attempt).toThrow(/only valid while/);
   });
   test('released revision does not accept behavior-change-unreleased', () => {
-    expect(attestationProblem('behavior-change-unreleased: reason text here', { prevSimRevision: SIM_REVISION })).toMatch(/only valid while/);
+    expect(attestationProblem('behavior-change-unreleased: reason text here', {
+      simRevision: LAST_RELEASED_SIM_REVISION, prevSimRevision: LAST_RELEASED_SIM_REVISION, lastReleased: LAST_RELEASED_SIM_REVISION,
+    })).toMatch(/only valid while/);
   });
 });

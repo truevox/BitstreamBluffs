@@ -165,7 +165,7 @@ describe('RunScene: a palette setting change repaints without rebuilding collide
     const calls = [];
     const live = [chunk(1), chunk(2)];
     const target = {
-      sled: {}, biomeMask: 0, _biomeSector: 1,
+      sled: {}, biomeMask: 0, _biomeId: null,
       registry: { get: () => null },
       game: deep(),
       cameras: { main: { setBackgroundColor() {} } },
@@ -211,7 +211,7 @@ describe('RunScene: the biome-entry repaint keeps the colliders too (owner decis
     const calls = [];
     const live = [chunk(1), chunk(2)];
     const target = {
-      sled: {}, biomeMask: 0, _biomeSector: 3,
+      sled: {}, biomeMask: 0, _biomeId: null,
       registry: { get: () => null }, game: deep(), cameras: { main: { setBackgroundColor() {} } },
       terrain: { getActiveChunks: () => live.slice() },
       mesh: {

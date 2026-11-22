@@ -84,7 +84,8 @@ export const CONTENT_GROUPS = Object.freeze(['chunks', 'hazards', 'powerups', 't
 
 const TERRAIN_GENERATOR_NUMERIC = [
   'AIR_CHANCE_END', 'AIR_CHANCE_FULL_M', 'AIR_CHANCE_START', 'AIR_CLEARANCE_PX', 'AIR_HAZARD_MIN_M', 'AIR_MIN_DX_PX',
-  'AIR_NEAR_MISS_BELOW_PX', 'AIR_SPEED_HI_MUL', 'AIR_SPEED_LO_MUL', 'AIR_U_MAX', 'AIR_U_MIN', 'BASE_SECTORS',
+  'AIR_NEAR_MISS_BELOW_PX', 'AIR_SPEED_HI_MUL', 'AIR_SPEED_LO_MUL', 'AIR_U_MAX', 'AIR_U_MIN',
+  'ARCADE_BRIDGE_CAP_MUL', 'ARCADE_BRIDGE_MAX_FRAC', 'ARCADE_BRIDGE_MIN_FRAC', 'ARCADE_BRIDGE_RAMP_M', 'BASE_SECTORS',
   'BIOME_BASE_WEIGHT', 'BIOME_BLIND_REACT_MS', 'BIOME_BLIND_SPEED_MUL', 'BIOME_EDGE_MARGIN_PX', 'BIOME_GENTLE_SLOW_FACTOR',
   'BIOME_HAZARD_CLEARANCE_PX', 'BIOME_HAZARD_MAX_CHANCE', 'BIOME_REPLACE_SLACK_PX', 'BIOME_SLOT_DRAWS',
   'BIOME_SPAWN_DEFAULT_CHANCE', 'BIOME_SPAWN_MAX_CHANCE', 'BREATHER_CALM_PX', 'CREST_TURN_DEG', 'HAZARD_DENSITY_CAP_M',
@@ -168,7 +169,11 @@ export const RULESET_SOURCES = Object.freeze([
   {
     id: 'terrainGenerator',
     file: 'src/systems/TerrainGenerator.js',
-    exports: bucket('constants.terrainGenerator', TERRAIN_GENERATOR_NUMERIC),
+    exports: {
+      ...bucket('constants.terrainGenerator', TERRAIN_GENERATOR_NUMERIC),
+      // #65: the id of the biome that owns every sector the mask does not select (the generator answers it by default).
+      BASE_BIOME_ID: inc('constants.terrainGenerator.BASE_BIOME_ID'),
+    },
   },
   {
     id: 'hazardMotion',

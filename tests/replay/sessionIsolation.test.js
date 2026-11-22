@@ -6,10 +6,11 @@
 // (palette, background motif, BIOME_ENTER) still depended on the previous run: the refresh-count assertion below is the
 // surviving symptom, and the field assertions pin the invariant itself.
 //
-// Root cause pinned here: `_biomeSector` (and `_lastBiome`) were never reset in create(). The first tick of a mask != 0
-// run compares the sled's sector with it: a fresh page (undefined) sees a "change" and runs refreshPalette(), which
-// formerly rebuilt colliders (#140 changed this to visual-only); a later run whose previous run
-// ended in the same sector saw no change. After #140 it is a presentation/cue difference, not divergent physics.
+// Root cause pinned here: the biome announcement's memory (`_biomeSector` and `_lastBiome`, now the single `_biomeId`
+// since #65) was never reset in create(). The first tick of a mask != 0 run compares the sled's biome with it: a fresh
+// page (undefined) sees a "change" and runs refreshPalette(), which formerly rebuilt colliders (#140 changed this to
+// visual-only); a later run whose previous run ended in the same biome saw no change. After #140 it is a
+// presentation/cue difference, not divergent physics.
 import { jest } from '@jest/globals';
 
 const { installPhaserStub, createRun, stepRun } = await import('./headlessRun.js');
@@ -63,11 +64,10 @@ describe('a run starts from identical sim state whatever ran before it in the pa
   test('the biome-announcement fields are reset by create()', () => {
     const scene = createRun(RunScene, REG, { seed: 'ISO-FIELDS', biomeMask: MASK });
     stepRun(scene, 5);
-    expect(scene._biomeSector).toBe(1);
-    scene._lastBiome = true;
+    expect(scene._biomeId).toBe('debutmont'); // #65: a run opens in the home biome
+    scene._biomeId = 'pyramid-peak';
     restart(scene);
-    expect(scene._biomeSector).toBeUndefined();
-    expect(scene._lastBiome).toBeUndefined();
+    expect(scene._biomeId).toBeUndefined();
   });
 });
 
@@ -88,8 +88,8 @@ describe('no instance field survives from the previous run', () => {
 
 describe('create() returns every per-run field to its initial value', () => {
   // Mutant check: removing any one reset line in RunScene.create makes the matching case fail (verified by hand, see PR #219).
-  const DIRTY = { _biomeSector: 3, _lastBiome: true, lastBoost: { amountPxS: 99, t: 1234 }, boostId: 'mapleWax', _hopped: true, _pushed: true };
-  const INITIAL = { _biomeSector: undefined, _lastBiome: undefined, lastBoost: null, boostId: null, _hopped: false, _pushed: false };
+  const DIRTY = { _biomeId: 'pyramid-peak', lastBoost: { amountPxS: 99, t: 1234 }, boostId: 'mapleWax', _hopped: true, _pushed: true };
+  const INITIAL = { _biomeId: undefined, lastBoost: null, boostId: null, _hopped: false, _pushed: false };
   test.each(Object.keys(DIRTY))('%s', (field) => {
     const scene = createRun(RunScene, REG, { seed: 'ISO-RESET', biomeMask: MASK });
     scene[field] = DIRTY[field];

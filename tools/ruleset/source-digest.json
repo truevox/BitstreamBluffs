@@ -2,10 +2,11 @@
   "format": "bb-source-tripwire",
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
-  "simRevision": 5,
-  "attestation": "no-behavior-change: #65 part 1 rename of the first biome id to Debutmont; Hazard.js is a comment-only edit. Biome ids appear as content.biomes keys and in hazard and powerup biome fields, so rulesetId changes by spelling only; seed and hash inputs stay frozen and terrain output is byte-identical (SIM_REVISION stays 5)",
+  "simRevision": 6,
+  "attestation": "sim-revision-bumped: #65 gameplay: Debutmont is the base biome and arcade bridges separate biomes (TerrainGenerator, RunScene biome-at-sled); SIM_REVISION 5 -> 6",
   "changedFiles": [
-    "src/entities/Hazard.js"
+    "src/scenes/RunScene.js",
+    "src/systems/TerrainGenerator.js"
   ],
   "files": {
     "src/constants.js": "sha256:21fe3491017fa3f6fa55c25c5d3d3cca22fa3f1ce15a22c611113b173dc0a8e5",
@@ -14,7 +15,7 @@
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:41cfcf576e47aa63014b54bd86ea2d3ffd90fe7f7e7eef5851e2d04ea5a3946f",
     "src/entities/TerrainMesh.js": "sha256:da3148ca8ba96289a17e5347017bc5bd5696d1635b8349298fcd102f3bff39a0",
-    "src/scenes/RunScene.js": "sha256:070fd8973f80b570ba743a60ce53e85855077376fe6a38e40a55f86be04fde56",
+    "src/scenes/RunScene.js": "sha256:2834c1d9ad041bae4c2b3b52c3bfa1d11b5ff61902d8ec43b50a9a859aafa600",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:2b71d75b335addfee743ee5b172893c5eed8cef522a957c133fb3a7749f03f89",
@@ -35,7 +36,7 @@
     "src/systems/ShardMagnet.js": "sha256:f3e3ec4414933a523a6c8ab77b57d6bf69b0d6efa3827b066d95676afbdf2d4c",
     "src/systems/SimClock.js": "sha256:8881e9cd4d271ca9c991b1ca1cd66c683c36f9d41586b71da7d2086717db569e",
     "src/systems/TerrainContact.js": "sha256:65c28824f55b42e613945f51d351bfa92f5d20076d37e8034998a9cd2c464568",
-    "src/systems/TerrainGenerator.js": "sha256:db5e820fb67d667ddc279b3e6986935ae5ada9f4f816be801e39ea9b336179e0",
+    "src/systems/TerrainGenerator.js": "sha256:b506d75ef2946842d33b00b30014d5c7a36a88801cb89bcde9ed8aa4003a6a5e",
     "src/systems/TrickTracker.js": "sha256:a0c2c8d204da86ffbc2972a039ae6906053c415299b16a35c02946363d769f38",
     "src/systems/Wards.js": "sha256:5fa20a216fd93ef1b72f1fe969234482585f680462e64fc46c0cf45772ebc09c",
     "src/systems/ghost/GhostTape.js": "sha256:44fa5d1788e81cf5965b6d22b0729d632b58ae2745ecfb8e891b01d52992085d"

@@ -756,7 +756,7 @@ the generator (`TerrainGenerator.biomeAtX(xPx)`, the chunk containing x) rather 
 `RunScene` palette, motif, `BIOME_ENTER` (fires on entering Debutmont at the start, each bridge as
 `{id:null, entering:false}`, and each biome after it) and `bsodAtmosphere`. `detectBiomeVisits` asks the same
 generator answer (`biomeAt: (x) => terrain.biomeAtX(x)`), so discovery and the drawn terrain agree at bridge edges. `tools/sim/biome-layout.mjs` prints the layout.
-`GHOST_PHYSICS_VERSION` is 2 because terrain for a given seed and mask changed.
+Terrain for a given seed and mask changed, so `SIM_REVISION` is 5 (the ruleset time capsule, `src/systems/replay/ruleset.js`); `GHOST_PHYSICS_VERSION` stays 1 (Replay Contract v1 section 7.2: it is kept only for legacy tape mapping).
 
 **A biome's chunk templates are a preference, not a filter.** If its templates are not eligible
 at that distance the sector still gets ordinary terrain, so a biome can never leave a hole in

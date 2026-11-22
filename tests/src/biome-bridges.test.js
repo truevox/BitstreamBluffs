@@ -11,6 +11,7 @@ import {
 } from '../../src/systems/TerrainGenerator.js';
 import { Rng, xxHash32 } from '../../src/systems/Rng.js';
 import { GHOST_PHYSICS_VERSION } from '../../src/systems/ghost/GhostTape.js';
+import { SIM_REVISION, LAST_RELEASED_SIM_REVISION } from '../../src/systems/replay/ruleset.js';
 import { makeGen, readDir } from './_helpers.js';
 import { layout } from '../../tools/sim/biome-layout.mjs';
 
@@ -300,8 +301,11 @@ describe('layout is deterministic', () => {
   });
 });
 
-describe('ghost tapes', () => {
-  test('GHOST_PHYSICS_VERSION was bumped when terrain for a given seed and mask changed', () => {
-    expect(GHOST_PHYSICS_VERSION).toBeGreaterThanOrEqual(2);
+describe('replay identity', () => {
+  test('SIM_REVISION was bumped past the released ruleset when terrain for a given seed and mask changed', () => {
+    expect(SIM_REVISION).toBeGreaterThan(LAST_RELEASED_SIM_REVISION);
+  });
+  test('GHOST_PHYSICS_VERSION stays 1: it only maps legacy tapes (Replay Contract v1 section 7.2)', () => {
+    expect(GHOST_PHYSICS_VERSION).toBe(1);
   });
 });

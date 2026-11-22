@@ -358,10 +358,9 @@ export class RunScene extends Phaser.Scene {
     // initial terrain buffer, then the sled on the surface
     this._chunkQueue = new Map(); // a retry re-enters create() on this instance: no stale queued chunks
     // The scene instance outlives the run (scene.start re-enters create()). The biome announcement compares the sled's
-    // sector with the last one it saw. Before #140 the palette repaint also rebuilt terrain colliders, so this
-    // affected physics by session position; since #140 it is a presentation/cue reset. Keep every run like run #1.
-    this._biomeSector = undefined;
-    this._lastBiome = undefined;
+    // biome with the last one it saw (`_biomeId`, reset above, before the look reads it). Before #140 the palette
+    // repaint also rebuilt terrain colliders, so this affected physics by session position; since #140 it is a
+    // presentation/cue reset. Keep every run like run #1.
     // Presentation state of the previous run (a stale boost hint at run start, a stale POWERUP_EXPIRED id):
     this.lastBoost = null;
     this.boostId = null;

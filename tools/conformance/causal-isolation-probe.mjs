@@ -194,15 +194,18 @@ async function pageSetup({ fx, pt }) {
     const ppm = run.terrain.ppm;
     let entry = null;
     for (let sec = 3; sec < 60 && entry == null; sec++) {
-      if (run._biomeDefForSector(sec) && !run._biomeDefForSector(sec - 1)) entry = (sec - 1) * 500 * ppm;
+      // #65: the base biome (Debutmont) owns the opening, so an entry is the first sector start whose biome differs from the previous one's.
+      const x = (sec - 1) * 500 * ppm;
+      const here = run._biomeDefAt(x);
+      if (here && here.id !== run.terrain.biomeAtX(x - 1)) entry = x;
     }
     if (entry == null) throw new Error('no biome entry found for ' + fx.seed);
     ctx.biomeEntryX = entry;
     const x0 = entry - 1500;
     run.streamTerrain(x0);
     run.sled.setPose(x0, run.terrain.heightAt(x0) - 15, run.slopeAt(x0), 320, 0);
-    // The start sector counts as already announced, so the only biome change is the real mid-ride entry.
-    run._biomeSector = run.terrain._sectorOf(x0);
+    // The start biome counts as already announced, so the only biome change is the real mid-ride entry.
+    run._biomeId = run.terrain.biomeAtX(x0);
   }
   if (fx.startX != null) {
     run.streamTerrain(fx.startX);

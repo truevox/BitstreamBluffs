@@ -20,8 +20,7 @@ export const GHOST_TAPE_FORMAT = 'bb-ghost-tape';
 /** Bump when the header, input bits or trace layout change. */
 export const GHOST_TAPE_VERSION = 1;
 /** Bump when a physics/tuning change would make old input tapes replay differently. */
-// 2: #65 terrain for a given seed+mask changed (Debutmont is the base biome, arcade bridges between biomes).
-export const GHOST_PHYSICS_VERSION = 2;
+export const GHOST_PHYSICS_VERSION = 1;
 export const CHECKPOINT_EVERY = 120; // ticks: 1 s at 120 Hz
 export const TRACE_EVERY = 4; // ticks: 30 Hz, a whole number of 30/60/120 Hz frames
 
