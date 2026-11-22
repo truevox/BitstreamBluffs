@@ -3,7 +3,7 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 1,
-  "attestation": "no-behavior-change: C11 recorder rows; -0 tilt normalization unobservable because Sled.js:384 reads pad.tilt || fallback; RunScene edits are replay-setup-gated plus a deferred post-run evidence call",
+  "attestation": "behavior-change-unreleased: #115 input-timing capture already attested; #164 replay-only setup, recorder metadata and deferred post-run evidence are not yet a released ruleset; replay identity stays bound to recorded pads",
   "changedFiles": [
     "src/scenes/RunScene.js",
     "src/systems/ghost/GhostTape.js"
@@ -15,7 +15,7 @@
     "src/entities/Shard.js": "sha256:bbd1c9e4654dd039c3822dbc695f227d2bdfc8a733586399a92526607afc773c",
     "src/entities/Sled.js": "sha256:d5ba5d62f5e31c7e9ffbfa273ceac7d4ea39b16b58dd5d9da792f9f56a59f6ac",
     "src/entities/TerrainMesh.js": "sha256:a88f6a99aab6298034ef99d6c9d90489f1cf0a7f0f305c526b7e358b6bc59003",
-    "src/scenes/RunScene.js": "sha256:6b0cc8263af13aa5b254c80e894aa4849ac50d1ed7f9de5cfd48133b1f797bc9",
+    "src/scenes/RunScene.js": "sha256:bebbc2958249fbb6f5121f294a5bed471a1a10dfec4c8a1f5421296bdc2c3d69",
     "src/systems/BiomeEffects.js": "sha256:d84329b6836876f76bad2a5c6b91f842d61e6926d2018976f7387496f04f1e7c",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:dbe861d0a1fb6e73f94d467583ea9190ec88cc986fa39982b28687d75ca18397",
@@ -31,7 +31,7 @@
     "src/systems/RunRandom.js": "sha256:d2042cd6ad49f44708f2fcee50aeadcbe9323f8b217d8715aaf443344db2bd68",
     "src/systems/ScoreManager.js": "sha256:af93538b98eeab4a01a9b2c248dbd95d4eab76862e263c56e781b36d2330174b",
     "src/systems/ShardMagnet.js": "sha256:f57b36e40e1254660feb0215db18fbf3cb4d5611f18559439702b148a287d6c1",
-    "src/systems/SimClock.js": "sha256:895f4d805dc43790d197d4526373cc4cd8b1be92d6c08c9e44145709547f2d7d",
+    "src/systems/SimClock.js": "sha256:8881e9cd4d271ca9c991b1ca1cd66c683c36f9d41586b71da7d2086717db569e",
     "src/systems/TerrainContact.js": "sha256:b5f8705d9caaf788e68a9a777c8fd4f11d1e9ec8bc8771e451d7fcda432661ba",
     "src/systems/TerrainGenerator.js": "sha256:6b16dba03098a1d95f8fca00ba8802dbb361823cf9b3ca5719e9356f355f1e8d",
     "src/systems/TrickTracker.js": "sha256:e6fdcea5cfc0e515fb0623b7f6bb3b189d5a5ed0fcf66f15175fd508da64abcf",

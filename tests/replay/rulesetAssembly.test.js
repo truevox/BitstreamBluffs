@@ -90,6 +90,14 @@ describe('ruleset assembly', () => {
     expect(built.doc.tables.draft).toEqual({ budget: 1200, rulesVersion: 2 });
   });
 
+  test('live input edge-assignment metadata is explicit replay provenance, not a causal ruleset field', () => {
+    const simClock = RULESET_SOURCES.find((s) => s.id === 'simClock');
+    expect(simClock.exports.INPUT_EDGE_ASSIGNMENT).toMatchObject({ exclude: expect.stringContaining('manifest') });
+    expect(classifyExports(simClock, DEFAULT_SOURCES.simClock)).toEqual({ unregistered: [], stale: [] });
+    expect(built.doc.versions).not.toHaveProperty('inputEdgeAssignment');
+    expect(built.doc.constants.simClock).not.toHaveProperty('INPUT_EDGE_ASSIGNMENT');
+  });
+
   test('BOOSTS list mirrors BOOST_DEFS keys (justifies excluding BOOSTS)', () => {
     expect([...BOOSTS].sort()).toEqual(Object.keys(BOOST_DEFS).sort());
   });
