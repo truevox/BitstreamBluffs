@@ -29,6 +29,9 @@ const TAPE_DIR = path.join(here, 'fixtures', 'cross-engine');
 const OUT = process.env.OUT || path.join(here, '..', '..', 'docs', 'determinism', 'results', 'cross-engine-results.json');
 const fixtureFilter = process.env.FIXTURES ? process.env.FIXTURES.split(',') : null;
 const fixtures = FIXTURES.filter((f) => !fixtureFilter || fixtureFilter.includes(f.id));
+// The game derives the Daily rule for ordinary seeds from the wall-clock DATE (RunScene: getDailyInfo()), and the tape header does not pin it, so the same
+// tape replays differently on a different calendar day (finding, see docs). The harness therefore pins the page clock to the day the fixtures were recorded.
+const PIN_DATE = process.env.CE_DATE || '2026-11-21T12:00:00Z';
 const RESUME = process.argv.includes('--resume') || process.env.RESUME === '1';
 // Journal: every finished cell (engine x fixture x cadence x session x run) is appended as one JSON line the moment it completes.
 // With --resume, sessions already fully journaled are skipped (a session is the unit of replay state: a half-finished session is re-run from
@@ -85,6 +88,10 @@ async function launch(name) {
 async function freshPage(browser, patch = null) {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
   const page = await ctx.newPage();
+  await page.addInitScript(`(() => { const R = Date, base = R.parse(${JSON.stringify(PIN_DATE)}), t0 = R.now();
+    const now = () => base + (R.now() - t0);
+    function D(...a) { return a.length ? new R(...a) : new R(now()); }
+    D.prototype = R.prototype; D.now = now; D.parse = R.parse; D.UTC = R.UTC; window.Date = D; })();`);
   if (patch) await page.addInitScript(`window.__cePatch = ${JSON.stringify(patch)};`);
   await page.addInitScript(pageJs);
   const errors = [];
