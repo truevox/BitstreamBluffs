@@ -1,0 +1,32 @@
+{
+  "id": "flip-edge",
+  "description": "Borderline flip at touchdown: ride the generated launch lip at x=18464 and hold one front flip so the release sits right on the land/bail-out boundary.",
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "startX": 17600,
+  "hz": 120,
+  "durationMs": 3600,
+  "input": {
+    "held": [
+      {
+        "key": "push",
+        "from": 0,
+        "to": 600
+      },
+      {
+        "key": "tuck",
+        "from": 1200,
+        "to": 2100
+      },
+      {
+        "key": "tilt",
+        "value": 1,
+        "from": 2400,
+        "to": 3100
+      }
+    ],
+    "edges": [],
+    "events": []
+  },
+  "notes": "VERIFIED 2026-11-21 as a landing-GRADE boundary (not a crash boundary - both variants still land). Established by sweep, not assertion: releasing the front flip at 3100 ms lands 'good' at tick 382 (impact 24.4 deg, air 958 ms); releasing the same flip one 100 ms step later at 3200 ms lands 'sloppy' at 69 deg. So a small handling change flips this canary's landing grade, which is the sensitivity the gate needs. Do not retune toward a clean landing - the boundary IS the fixture."
+}
