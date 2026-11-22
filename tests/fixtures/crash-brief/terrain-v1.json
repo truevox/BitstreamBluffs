@@ -1,0 +1,18 @@
+{
+  "kind": "local-replay-crash-brief",
+  "reportVersion": 1,
+  "scope": "local unverified replay reproduction; not proof of the original crash",
+  "build": {
+    "sameBuildAsserted": true,
+    "independentlyVerified": false
+  },
+  "replay": {
+    "freshRuns": 2,
+    "checkpointsCheckedPerRun": 13,
+    "matchedStateAndFatalEvent": true,
+    "savedRunsOrTapes": false
+  },
+  "crash": {
+    "category": "terrain"
+  }
+}
