@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.10 — measure actual World Dance visibility (#212 / #225) (2026-11-22)
+
+- **Developer regression diagnostic:** Added a source-bound measurement suite tracing synthetic instrument energy through `AudioSynth.getWorldDanceSample()`, unverified meter timing, `WorldDanceEnvelope`, `sunDanceGeometry()` and real `motifDecor()` displacement. It measures steady-state and transient behavior using uniform frame cadence, tests invalid/silent meter rejection and distinguishes observed pixels from theoretical maxima.
+- **Observed issue, not yet fixed:** Steady-state music-driven backdrop movement is sub-pixel for supported motifs and **zero** for motifs that do not consume horizon-dance signals. The fixture intentionally stubs live audio nodes and is not evidence of audible real-world audio or human-perceptible scenery animation. Actual stronger gameplay-visible World Dance requires separate approved production art/animation work; leave #212 open.
+- **No gameplay change:** This PR adds tests only, with no production source, shader, physics, score, replay or simulation revision changes. Previous 2.19.9 input fix and ruleset v4 remain intact.
+
 ## v2.19.9 — preserve overlapping gamepad button aliases (#211 / #223) (2026-11-22)
 
 - **Gamepad alias correctness:** Holding a shoulder button and the corresponding right-stick direction now keeps its helicopter control engaged until *both* inputs are released, instead of the first release incorrectly cancelling the shared gamepad source. Aggregate pad state is written before per-binding action events, matching the keyboard event-observation contract. Controller-disconnect bookkeeping clears both per-binding and aggregated states.
