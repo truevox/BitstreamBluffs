@@ -1,8 +1,7 @@
 // Issue #47: hostile racing Kodiaks. Pure behaviour; the game wiring is covered by tools/kodiak-browser-smoke.mjs.
 import fs from 'fs';
-import { KODIAK_DEFS, KODIAK_KINDS, KODIAK_BY_ID, KODIAK_MIN_SYNC_LEVEL, KODIAK_FIRST_M, kodiaksEnabledFor, kodiakEncounter,
-  spawnKodiak, stepKodiak, kodiakBox, kodiakHits, spawnKodiakPack, stepKodiakPack, kodiakThreatening, KODIAK_CLEAR_PX } from '../../src/systems/Kodiaks.js';
-import { killerName } from '../../src/systems/CrashReport.js';
+import { KODIAK_DEFS, KODIAK_KINDS, KODIAK_MIN_SYNC_LEVEL, KODIAK_FIRST_M, KODIAK_KNOCK, kodiaksEnabledFor, kodiakEncounter,
+  spawnKodiak, stepKodiak, kodiakBox, kodiakHits, kodiakKnockback, spawnKodiakPack, stepKodiakPack, kodiakThreatening, KODIAK_CLEAR_PX } from '../../src/systems/Kodiaks.js';
 
 /** Run a bear against a sled at constant speed on flat ground; record its phase changes. */
 function race(kind, { sledVx = 500, ms = 8000, grounded = () => true, landX = () => null } = {}) {
@@ -28,7 +27,7 @@ describe('Kodiaks', () => {
     expect(KODIAK_DEFS.blackIce.name).toBe('BLACK-ICE KODIAK');
     expect(KODIAK_DEFS.kernelPanic.color).toBeGreaterThan(0xd00000); // white
     expect(KODIAK_DEFS.blackIce.color).toBeLessThan(0x303030); // black
-    expect(killerName('hazard', KODIAK_BY_ID.bruteForceKodiak)).toBe('BRUTE-FORCE KODIAK');
+    for (const d of Object.values(KODIAK_DEFS)) expect(d.onHit).toBeUndefined(); // contact never crashes the sled
     const art = fs.readFileSync('src/entities/KodiakRider.js', 'utf8');
     for (const cue of ['shoulder hump', 'long neck', 'tall rounded ears']) expect(art).toContain(cue);
   });
@@ -79,6 +78,20 @@ describe('Kodiaks', () => {
     expect(kodiakHits(bear, { x: 90, y: 480, w: 36, h: 30 })).toBe(true);
     expect(kodiakHits(bear, { x: 90, y: 440, w: 36, h: 30 })).toBe(false); // bottom 470 < back 474 + 4 margin
     expect(kodiakHits(bear, { x: 300, y: 480, w: 36, h: 30 })).toBe(false);
+  });
+
+  test('contact shoves the sled backward and up, bounded, and harder the faster the two were closing', () => {
+    const still = kodiakKnockback({ speed: 500 }, { vx: 500 }), closing = kodiakKnockback({ speed: 0 }, { vx: 600 });
+    expect(still.dvx).toBe(-KODIAK_KNOCK.basePx); // no closing speed: the base push only
+    expect(closing.dvx).toBeLessThan(still.dvx); // backward (negative x), and harder when closing
+    expect(Math.abs(closing.dvx)).toBeLessThanOrEqual(KODIAK_KNOCK.maxPx); // bounded
+    expect(closing.dvy).toBe(-KODIAK_KNOCK.upPx); // up (y grows downward)
+    expect(kodiakKnockback({ speed: 120 }, { vx: 520 })).toEqual(kodiakKnockback({ speed: 120 }, { vx: 520 })); // pure
+  });
+
+  test('the shove window is set and the push stays well under cruising speed, so a shoved sled keeps moving forward', () => {
+    expect(KODIAK_KNOCK.immunityMs).toBeGreaterThan(0);
+    expect(KODIAK_KNOCK.maxPx).toBeLessThan(600); // well under a sled's cruising speed: it keeps moving forward
   });
 
   test('every bear leaves within its lifetime (no perpetual bear combat)', () => {

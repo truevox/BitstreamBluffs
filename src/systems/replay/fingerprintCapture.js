@@ -261,6 +261,7 @@ function captureKodiak(scene) {
   return {
     next: scene.kodiakNext >>> 0,
     on: !!scene.kodiaksOn,
+    shoveCdMs: scene.kodiakShoveCdMs,
     bears: (scene.kodiaks || []).map((k) => ({
       kind: String(k.kind), n: k.n >>> 0, member: k.member >>> 0, x: k.x, speed: k.speed, phase: String(k.phase),
       phaseMs: k.phaseMs, ageMs: k.ageMs, rngState: k.rng.state >>> 0, feints: k.feints >>> 0, targetX: opt(k.targetX),

@@ -1,6 +1,6 @@
 # Simulation / presentation causal isolation (issue #140)
 
-Status: diagnostic evidence, Team B, 2026-11-21/22, base `b51ab36`, merged with `origin/main` at `7d5780f` (v2.18.1, includes #155); released as v2.18.2. The digest used
+Status: diagnostic evidence, Team B, 2026-11-21/22, base `b51ab36`, merged with `origin/main` at `14e9c95` (v2.19.0, including #155 and the released Kodiak shoves); integrated for v2.19.1 with the Kodiak shove release v2.19.0. The digest used
 here is a **test tool and is non-authoritative**. Replay Contract v1.0 (#152) and the `fingerprintState` of #165 (now on
 main) are authoritative. Nothing in `src/` imports the digest.
 
@@ -20,7 +20,7 @@ The matrix found three real problems and all three are fixed:
 |---|---|---|---|
 | L1 | **Palette / colour-blind toggle mid-run** (Pause > Settings) rebuilt every live terrain collider | Sled pose, Matter world order and contact pairs diverged from the next tick (301 after a toggle at 300) on all 4 fixtures. Kodiak and score state followed | `TerrainMesh.redrawChunk` repaints graphics only; the palette setting uses it |
 | L2 | **A throwing audio engine** froze the game | `renderFrame` read `audio.getWorldDanceSample()` unguarded. Phaser's RAF step reschedules only after the frame callback returns, so one throw stopped the loop and the simulation | `WorldDance.readWorldDanceAudio` never throws (warns once); the jukebox/billboard reads in `create` and the track-change handler are guarded too |
-| L3 | **Biome-sector entry** repainted through the same collider rebuild as L1 (deterministic, but a repaint feeding physics) | `biome` fixture: a twin with the biome repaint stubbed out diverged at the **entry tick 398** (world order, terrain colliders; contacts from 496) | **Owner-approved physics change**: `refreshPalette` always uses `redrawChunk`; `SIM_REVISION` 1 → 2 (below) |
+| L3 | **Biome-sector entry** repainted through the same collider rebuild as L1 (deterministic, but a repaint feeding physics) | `biome` fixture: a twin with the biome repaint stubbed out diverged at the **entry tick 398** (world order, terrain colliders; contacts from 496) | **Owner-approved physics change**: `refreshPalette` always uses `redrawChunk`; `SIM_REVISION` 2 → 3 (below) |
 
 One known camera read was detected here and fixed by its own issue (#155, now merged):
 
@@ -129,7 +129,7 @@ This is the frame-to-tick fan-out (`SimClock.padsFor`), which belongs to #115. W
 
 ## Version handling for L3 (Replay Contract v1 §7.2)
 
-- `SIM_REVISION` 1 → 2 (`src/systems/replay/ruleset.js`). `LAST_RELEASED_SIM_REVISION` is still 0, so the contract
+- `SIM_REVISION` 2 → 3 (`src/systems/replay/ruleset.js`). `LAST_RELEASED_SIM_REVISION` is now 3, so the contract
   would also have allowed a `behavior-change-unreleased:` attestation without a bump. The owner asked that old
   recordings fail visibly rather than desync silently, so the revision is bumped.
 - New ruleset archived: `sha256:477b227b38f0221439af2fec4b26a30bcb7050ec99c0832e08a023813bfe6e55`
@@ -142,7 +142,7 @@ This is the frame-to-tick fan-out (`SimClock.padsFor`), which belongs to #115. W
   keeping colliders: the same pad sensor with its cooldown intact, an unchanged `staticOrder`, and fingerprints equal to a
   twin that never repainted.
 - Golden canaries (#117): `hazard-transition` (mask 4, crosses a biome boundary) and `bump` were re-recorded on the new
-  build, and again on the merged v2.18.2 tree. Both are exact PASS against the committed goldens (`feel-diff --use-out`). The other five are mask 0 and never repaint.
+  build, and again on the earlier Team B v2.18.2 candidate tree. Both are exact PASS against the committed goldens (`feel-diff --use-out`). The other five are mask 0 and never repaint.
 - Biome gameplay is data and is unchanged. Zone mods come from `getZoneDefs` → `PhysicsTuner`, hazards and pickups from
   `takeChunk`, and collider material is fixed in `TerrainMesh._takeBody`. A repaint only ever changed body identity and order.
 
@@ -207,3 +207,7 @@ npm test -- tests/determinism
 ```
 
 A full run is about 95 browser runs, roughly 45 minutes on a loaded 4-way container.
+
+### Integration after Team A Kodiak release (2026-11-22)
+
+Team A's v2.19.0 shipped Kodiak shove mechanics and ruleset revision 2 (`sha256:b5763476…`) before this PR. The pre-release candidate of this PR also used revision 2, but with different physics. In the actual integration, Kodiak shove code and its fingerprint schema are preserved; this PR now publishes **revision 3** with the collider redraw fix, retaining both released historical rulesets. Earlier matrix evidence on the v2.18.1 candidate must not be misrepresented as newly collected on v2.19.0: verification against the final combined source is tracked in the review.

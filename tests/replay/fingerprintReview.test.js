@@ -56,7 +56,7 @@ describe('B1: bounce-pad cooldown is hashed (the reviewer repro)', () => {
   });
 });
 
-// #140 (PR #160, SIM_REVISION 2, owner-approved): refreshPalette repaints terrain graphics only (TerrainMesh.redrawChunk).
+// #140 (PR #160, SIM_REVISION 3, owner-approved): refreshPalette repaints terrain graphics only (TerrainMesh.redrawChunk).
 // These two tests used to pin the old collider rebuild (fresh pad records, reordered static bodies); they now pin that the
 // repaint leaves every collider, its cooldown state and every digest exactly as they were.
 describe('refreshPalette (real, unstubbed) repaints without touching colliders', () => {
