@@ -10,8 +10,10 @@
  */
 (() => {
   // Order = causal order inside RunScene.simTick as far as it matters for "first divergent subsystem".
-  // 'telegraph' is derived from the camera view (presentation, issue #155): reported, but not causal state.
-  const SUBSYSTEMS = ['rng', 'timers', 'terrain', 'kodiaks', 'bsod', 'sled', 'world', 'score', 'telegraph'];
+  // Indices 0-7 are CAUSAL state. 'telegraph' (8) is derived from the camera view (presentation, issue #155) and 'derived' (9) is
+  // read-only probe reads of the terrain functions (heightAt/slopeAt at the sled x; atan2 inside): neither is simulation state, and
+  // neither counts as a divergence; they are reported in their own columns.
+  const SUBSYSTEMS = ['rng', 'timers', 'terrain', 'kodiaks', 'bsod', 'sled', 'world', 'score', 'telegraph', 'derived'];
 
   const f64 = new Float64Array(1);
   const u32 = new Uint32Array(f64.buffer);
@@ -77,8 +79,11 @@
     if (x <= 0) return NaN;
     return detExp(y * detLog(x));
   };
+  const detTanh = (x) => { if (x !== x) return NaN; if (x > 20) return 1; if (x < -20) return -1; const e = detExp(2 * x); return (e - 1) / (e + 1); };
   const detHypot = (...a) => { let s = 0; for (const v of a) s += v * v; return Math.sqrt(s); };
   const DET = { sin: detSin, cos: detCos, tan: (x) => detSin(x) / detCos(x), atan: detAtan, atan2: detAtan2, exp: detExp, log: detLog, pow: detPow, hypot: detHypot,
+    tanh: detTanh, sinh: (x) => (detExp(x) - detExp(-x)) / 2, cosh: (x) => (detExp(x) + detExp(-x)) / 2, expm1: (x) => detExp(x) - 1, log1p: (x) => detLog(1 + x),
+    log2: (x) => detLog(x) / LN2, log10: (x) => detLog(x) / 2.302585092994046,
     asin: (x) => detAtan2(x, Math.sqrt(1 - x * x)), acos: (x) => detAtan2(Math.sqrt(1 - x * x), x) };
   if (Array.isArray(window.__cePatch)) for (const n of window.__cePatch) if (DET[n]) Math[n] = DET[n];
 
@@ -100,7 +105,8 @@
     for (const l of run.powerups.values()) pu += l.length;
     const al = run.terrain.activeList || [];
     const lastChunk = al.length ? al[al.length - 1] : null;
-    out[2] = hashNums([al.length, lastChunk ? lastChunk.endX : 0, lastChunk ? lastChunk.index : 0, hz, pu, run.terrain.heightAt(s.x), run.slopeAt(s.x)]);
+    out[2] = hashNums([al.length, lastChunk ? lastChunk.endX : 0, lastChunk ? lastChunk.index : 0, hz, pu]);
+    out[9] = hashNums([run.terrain.heightAt(s.x), run.slopeAt(s.x)]);
     const kd = [run.kodiakNext || 0, (run.kodiaks || []).length];
     for (const k of run.kodiaks || []) for (const v of Object.values(k)) if (typeof v === 'number' || typeof v === 'boolean') kd.push(v);
     out[3] = hashNums(kd);
@@ -335,6 +341,7 @@
     return out;
   };
 
+  S.detNames = () => Object.keys(DET);
   S.env = () => ({ ua: navigator.userAgent, platform: navigator.platform, hw: navigator.hardwareConcurrency, dpr: window.devicePixelRatio,
     renderType: window.__bbGame.config.renderType,
     gl: (() => { try { const c = document.createElement('canvas'); const gl = c.getContext('webgl2') || c.getContext('webgl'); if (!gl) return null; const e = gl.getExtension('WEBGL_debug_renderer_info');

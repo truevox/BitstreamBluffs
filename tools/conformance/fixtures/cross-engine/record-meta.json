@@ -1,6 +1,6 @@
 {
- "gitSha": "aba63e0e56417192fe937a78b80c30f42a144bd0",
- "recordedAt": "2026-11-21T18:16:46.193Z",
+ "gitSha": "1e0e52469a7574893349b3f9afa8f0c90ccebe31",
+ "recordedAt": "2026-11-22T04:20:20.846Z",
  "fixtures": [
   {
    "id": "cruise-baseline",
@@ -35,7 +35,18 @@
    "tapeInputs": 694,
    "checkpoints": 20,
    "endTick": 2400,
-   "level": 1,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2401,
+     "distanceM": 591,
+     "score": 876
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
@@ -82,7 +93,18 @@
    "tapeInputs": 521,
    "checkpoints": 15,
    "endTick": 1800,
-   "level": 1,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 1801,
+     "distanceM": 472,
+     "score": 717
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
@@ -129,7 +151,18 @@
    "tapeInputs": 19,
    "checkpoints": 13,
    "endTick": 1668,
-   "level": 1,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 1669,
+     "distanceM": 289,
+     "score": 399
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
@@ -176,7 +209,18 @@
    "tapeInputs": 789,
    "checkpoints": 28,
    "endTick": 3430,
-   "level": 1,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 3431,
+     "distanceM": 835,
+     "score": 1175
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
@@ -223,7 +267,18 @@
    "tapeInputs": 2254,
    "checkpoints": 101,
    "endTick": 12149,
-   "level": 1,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 12150,
+     "distanceM": 437,
+     "score": 0
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
@@ -273,7 +328,18 @@
    "tapeInputs": 576,
    "checkpoints": 18,
    "endTick": 2223,
-   "level": 1,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2224,
+     "distanceM": 513,
+     "score": 2428
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
@@ -323,7 +389,18 @@
    "tapeInputs": 1055,
    "checkpoints": 17,
    "endTick": 2145,
-   "level": 1,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2146,
+     "distanceM": 332,
+     "score": 790
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
@@ -370,7 +447,18 @@
    "tapeInputs": 715,
    "checkpoints": 21,
    "endTick": 2636,
-   "level": 8,
+   "recordLevel": 8,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2637,
+     "distanceM": 606,
+     "score": 991
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
@@ -384,12 +472,7 @@
    "levelSensitivity": {
     "recordedLevel": 8,
     "replayLevel": 1,
-    "first": {
-     "tick": 1,
-     "subsystems": [
-      "bsod"
-     ]
-    },
+    "first": null,
     "desync": null,
     "outcome": {
      "ticks": 2637,
@@ -434,7 +517,18 @@
    "tapeInputs": 727,
    "checkpoints": 20,
    "endTick": 2400,
-   "level": 1,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2401,
+     "distanceM": 724,
+     "score": 1399
+    }
+   },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,

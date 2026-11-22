@@ -16,6 +16,7 @@ import { readFile, writeFile, mkdir, appendFile } from 'node:fs/promises';
 import { existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import os from 'node:os';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FIXTURES } from './cross-engine-fixtures.mjs';
@@ -38,11 +39,16 @@ const RESUME = process.argv.includes('--resume') || process.env.RESUME === '1';
 // run 1, because a run's result can depend on the runs before it in the same page). Math diagnoses are journaled too.
 const JOURNAL = process.env.JOURNAL || path.join(here, '.cache', 'cross-engine.journal.jsonl');
 async function jwrite(obj) { await appendFile(JOURNAL, JSON.stringify(obj) + '\n'); }
-async function jload() {
-  const out = { rows: [], done: new Set(), envs: {}, diag: {} };
+async function jload(fp) {
+  const out = { rows: [], done: new Set(), envs: {}, diag: {}, stale: false };
   if (!RESUME || !existsSync(JOURNAL)) return out;
   const pending = new Map();
-  for (const line of (await readFile(JOURNAL, 'utf8')).split('\n')) {
+  const lines = (await readFile(JOURNAL, 'utf8')).split('\n');
+  // The journal is only reusable for the SAME build, URL, page clock, harness code and fixture tapes; otherwise every cell is stale.
+  const head = lines.find((l) => l.includes('"k":"fingerprint"'));
+  const jf = head ? JSON.parse(head).fp : null;
+  if (!jf || JSON.stringify(jf) !== JSON.stringify(fp)) { out.stale = true; return out; }
+  for (const line of lines) {
     if (!line.trim()) continue;
     let o; try { o = JSON.parse(line); } catch { continue; }
     const sk = `${o.engine}|${o.hz}|${o.session}`;
@@ -85,10 +91,10 @@ async function launch(name) {
   const browser = await cfg.type.launch(cfg.opts);
   return { browser, cfg };
 }
-async function freshPage(browser, patch = null) {
+async function freshPage(browser, patch = null, date = PIN_DATE) {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
   const page = await ctx.newPage();
-  await page.addInitScript(`(() => { const R = Date, base = R.parse(${JSON.stringify(PIN_DATE)}), t0 = R.now();
+  await page.addInitScript(`(() => { const R = Date, base = R.parse(${JSON.stringify(date)}), t0 = R.now();
     const now = () => base + (R.now() - t0);
     function D(...a) { return a.length ? new R(...a) : new R(now()); }
     D.prototype = R.prototype; D.now = now; D.parse = R.parse; D.UTC = R.UTC; window.Date = D; })();`);
@@ -102,24 +108,29 @@ async function freshPage(browser, patch = null) {
 }
 const play = (page, o) => page.evaluate((x) => window.__ce.play(x), { raster: RASTER, ...o });
 
-const SUBNAMES = ['rng', 'timers', 'terrain', 'kodiaks', 'bsod', 'sled', 'world', 'score', 'telegraph'];
+const SUBNAMES = ['rng', 'timers', 'terrain', 'kodiaks', 'bsod', 'sled', 'world', 'score', 'telegraph', 'derived'];
 // The recorded profile Sync Level. BsodPursuit and Kodiak gating read the LIVE profile level, which the tape header does not carry.
-const levelOf = (f) => (f.kodiaks ? 8 : 1);
+// Recording uses Sync Level 8 for the Kodiak fixture. Replays now use a profile at level 1 on purpose: since the Replay Contract v1.1 header fields
+// (syncLevel, dailyRuleSource) the tape must govern, so a mismatching profile or clock must NOT change the replay (checked in `record`).
+const recordLevelOf = (f) => (f.kodiaks ? 8 : 1);
+const levelOf = () => 1;
 const tapePath = (f) => path.join(TAPE_DIR, `${f.id}.tape.json`);
 async function loadTape(f) { return JSON.parse(await readFile(tapePath(f), 'utf8')); }
 
 // ---------------------------------------------------------------- comparison
 function compareDigests(ref, got) {
+  // Causal state = digest groups 0-7. Group 8 (telegraph, camera-derived) and 9 (heightAt/slopeAt probe reads) are reported separately and never count as divergence.
   const n = Math.min(ref.length, got.length);
-  let first = null, tele = null;
+  let first = null, tele = null, derived = null;
   for (let i = 0; i < n; i++) {
     const subs = [];
     for (let k = 0; k < 8; k++) if (ref[i][k] !== got[i][k]) subs.push(k);
     if (subs.length && first === null) first = { tick: i + 1, subs };
     if (ref[i][8] !== got[i][8] && tele === null) tele = i + 1;
-    if (first && tele) break;
+    if (ref[i][9] !== got[i][9] && derived === null) derived = i + 1;
+    if (first && tele && derived) break;
   }
-  return { first, telegraphTick: tele, lengthMismatch: ref.length !== got.length ? [ref.length, got.length] : null };
+  return { first, telegraphTick: tele, derivedTick: derived, lengthMismatch: ref.length !== got.length ? [ref.length, got.length] : null };
 }
 function ulpDiff(a, b) { const f = new Float64Array(2); const u = new BigInt64Array(f.buffer); f[0] = a; f[1] = b; const d = u[0] - u[1]; return Number(d < 0n ? -d : d); }
 function rawDelta(refRaw, gotRaw, tick) {
@@ -149,17 +160,24 @@ async function record() {
       const cmp = compareDigests(rec.digests, rep.digests);
       // Live runs stop at maxTicks; replay runs one tick past the tape end (a crash lands on endTick + 1), so lengths may differ by 1.
       const ok = !cmp.first && (!cmp.lengthMismatch || Math.abs(cmp.lengthMismatch[0] - cmp.lengthMismatch[1]) <= 1) && !rep.tapeCheck.desync;
+      // Date independence: same tape, page clock moved to another day. Must be identical now that the header carries dailyRuleSource.
+      let dateIndependence;
+      { const w = await freshPage(browser, null, '2026-12-25T12:00:00Z');
+        const alt = await play(w.page, { seed: f.seed, hz: 120, tape: rec.tape, level: 1 });
+        await w.ctx.close();
+        const c3 = compareDigests(rec.digests, alt.digests);
+        dateIndependence = { altDate: '2026-12-25', ok: !c3.first && !alt.tapeCheck.desync, first: c3.first && { tick: c3.first.tick, subsystems: c3.first.subs.map((k) => SUBNAMES[k]) }, desync: alt.tapeCheck.desync && { tick: alt.tapeCheck.desync.tick }, outcome: { ticks: alt.outcome.ticks, distanceM: alt.outcome.distanceM, score: alt.outcome.score } }; }
       let levelSensitivity = null;
-      if (levelOf(f) !== 1) {
+      if (recordLevelOf(f) !== 1) {
         // Same tape, same engine, same cadence, but a fresh profile at Sync Level 1: does the replay still match?
         const w = await freshPage(browser);
         const alt = await play(w.page, { seed: f.seed, hz: 120, tape: rec.tape, level: 1 });
         await w.ctx.close();
         const c2 = compareDigests(rec.digests, alt.digests);
-        levelSensitivity = { recordedLevel: levelOf(f), replayLevel: 1, first: c2.first && { tick: c2.first.tick, subsystems: c2.first.subs.map((k) => SUBNAMES[k]) }, desync: alt.tapeCheck.desync && { tick: alt.tapeCheck.desync.tick }, outcome: { ticks: alt.outcome.ticks, crashed: alt.outcome.crashed, cause: alt.outcome.cause, distanceM: alt.outcome.distanceM, score: alt.outcome.score } };
+        levelSensitivity = { recordedLevel: recordLevelOf(f), replayLevel: 1, first: c2.first && { tick: c2.first.tick, subsystems: c2.first.subs.map((k) => SUBNAMES[k]) }, desync: alt.tapeCheck.desync && { tick: alt.tapeCheck.desync.tick }, outcome: { ticks: alt.outcome.ticks, crashed: alt.outcome.crashed, cause: alt.outcome.cause, distanceM: alt.outcome.distanceM, score: alt.outcome.score } };
       }
       const entry = { id: f.id, preRuns: f.preRuns || 0, covers: f.covers, outcome: rec.outcome, tapeInputs: rec.tape.inputs.length, checkpoints: rec.tape.checkpoints.length,
-        endTick: rec.tape.endTick, level: levelOf(f), liveVsFreshContextReplay: { ok, first: cmp.first && { tick: cmp.first.tick, subsystems: cmp.first.subs.map((k) => SUBNAMES[k]) }, lengths: [rec.digests.length, rep.digests.length], desync: rep.tapeCheck.desync && { tick: rep.tapeCheck.desync.tick }, checked: rep.tapeCheck.checked }, levelSensitivity, pageErrors: [...errors, ...v.errors] };
+        endTick: rec.tape.endTick, recordLevel: recordLevelOf(f), dateIndependence, liveVsFreshContextReplay: { ok, first: cmp.first && { tick: cmp.first.tick, subsystems: cmp.first.subs.map((k) => SUBNAMES[k]) }, lengths: [rec.digests.length, rep.digests.length], desync: rep.tapeCheck.desync && { tick: rep.tapeCheck.desync.tick }, checked: rep.tapeCheck.checked }, levelSensitivity, pageErrors: [...errors, ...v.errors] };
       meta.push(entry);
       await writeFile(tapePath(f), JSON.stringify(rec.tape));
       console.log(f.id, JSON.stringify({ ticks: rec.outcome.ticks, crashed: rec.outcome.crashed, cause: rec.outcome.cause, distanceM: rec.outcome.distanceM, score: rec.outcome.score, stats: rec.outcome.stats, liveVsReplayOk: ok }));
@@ -231,7 +249,8 @@ async function counterfactual(refEngine, badEngine, f, tape, hz, fns) {
   };
   const a = await run(refEngine, REF.hz), b = await run(badEngine, hz);
   const cmp = compareDigests(a.digests, b.digests);
-  return { patchedFns: fns, firstDivergentTick: cmp.first ? cmp.first.tick : null, subsystem: cmp.first ? cmp.first.subs.map((k) => SUBNAMES[k]) : null, tapeDesyncBad: b.tapeCheck.desync && { tick: b.tapeCheck.desync.tick },
+  const det = await (async () => { const { browser } = await launch(REF.engine); try { const { page } = await freshPage(browser); return await page.evaluate(() => window.__ce.detNames()); } finally { await browser.close(); } })();
+  return { patchedFns: fns, unreplacedFns: fns.filter((x) => !det.includes(x)), scope: `${hz} Hz stepping, run #1 of one fresh context per engine, reference side chromium-headless-shell at ${REF.hz} Hz`, note: 'patched A == patched B; the patched sim is NOT the recorded sim, so TapePlayer desyncs from the recording (tapeDesyncBad)', firstDivergentTick: cmp.first ? cmp.first.tick : null, subsystem: cmp.first ? cmp.first.subs.map((k) => SUBNAMES[k]) : null, tapeDesyncBad: b.tapeCheck.desync && { tick: b.tapeCheck.desync.tick },
     refOutcome: a.outcome && { ticks: a.outcome.ticks, crashed: a.outcome.crashed, cause: a.outcome.cause, distanceM: a.outcome.distanceM, score: a.outcome.score },
     badOutcome: { ticks: b.outcome.ticks, crashed: b.outcome.crashed, cause: b.outcome.cause, distanceM: b.outcome.distanceM, score: b.outcome.score } };
 }
@@ -243,8 +262,13 @@ async function matrix() {
     tapes[f.id] = await loadTape(f);
   }
   await mkdir(path.dirname(JOURNAL), { recursive: true });
-  const J = await jload();
-  if (!RESUME) await writeFile(JOURNAL, '');
+  const sha = (x) => createHash('sha256').update(x).digest('hex').slice(0, 16);
+  const indexHtml = await (await fetch(url)).text();
+  const fp = { buildIndexSha: sha(indexHtml), url, ceDate: PIN_DATE, raster: RASTER, pageJs: sha(pageJs), fixturesFile: sha(await readFile(path.join(here, 'cross-engine-fixtures.mjs'), 'utf8')),
+    tapes: Object.fromEntries(Object.entries(tapes).map(([k, t]) => [k, sha(JSON.stringify(t))])) };
+  const J = await jload(fp);
+  if (J.stale) console.log('RESUME: journal fingerprint differs (build/url/CE_DATE/harness/tapes changed); ignoring stale journal and starting fresh');
+  if (!RESUME || J.stale || !existsSync(JOURNAL)) { await writeFile(JOURNAL, ''); await jwrite({ k: 'fingerprint', fp }); }
   else console.log(`RESUME: ${J.done.size} finished sessions, ${J.rows.length} rows, ${Object.keys(J.diag).length} diagnoses restored from ${JOURNAL}`);
   const envs = { ...J.envs };
   const rows = [...J.rows];
@@ -302,8 +326,9 @@ async function matrix() {
           const row = {
             engine: name, hz, session, run: runNo, fixture: f.id + (f.again ? ' (repeat of run 1)' : ''),
             firstDivergentTick: cmp.first ? cmp.first.tick : null,
-            subsystem: cmp.first ? cmp.first.subs.map((k) => ['rng', 'timers', 'terrain', 'kodiaks', 'bsod', 'sled', 'world', 'score', 'telegraph'][k]) : null,
-            telegraphFirstDiffTick: cmp.telegraphTick,
+            subsystem: cmp.first ? cmp.first.subs.map((k) => SUBNAMES[k]) : null,
+            telegraphFirstDiffTick: cmp.telegraphTick, derivedFirstDiffTick: cmp.derivedTick,
+            outcomeMatchesRef: !!ref && JSON.stringify([r.outcome.ticks, r.outcome.crashed, r.outcome.cause, r.outcome.distanceM, r.outcome.score]) === JSON.stringify([ref.outcome.ticks, ref.outcome.crashed, ref.outcome.cause, ref.outcome.distanceM, ref.outcome.score]),
             lengthMismatch: cmp.lengthMismatch,
             tapeDesync: r.tapeCheck.desync ? { tick: r.tapeCheck.desync.tick } : null, checkpointsChecked: r.tapeCheck.checked,
             outcome: { ticks: r.outcome.ticks, crashed: r.outcome.crashed, cause: r.outcome.cause, distanceM: r.outcome.distanceM, score: r.outcome.score },
@@ -337,15 +362,52 @@ async function matrix() {
     console.log('MATH', key, JSON.stringify(diagnosed[key]).slice(0, 400));
   }
   const result = { issue: 120, diagnostic: true, authoritative: false, note: 'Diagnostic digests only; to be replaced by the #152 contract when published. Playwright WebKit != iPhone Safari.',
-    gitSha, generatedAt: new Date().toISOString(), reference: { ...REF, freshContextPerFixture: true }, cadencesHz: HZ, sessionsPerCell: SESSIONS, gameUrl: url,
+    gitSha, fingerprint: fp, generatedAt: new Date().toISOString(), reference: { ...REF, freshContextPerFixture: true }, cadencesHz: HZ, sessionsPerCell: SESSIONS, gameUrl: url,
     environments: envs, fixtures: fixtures.map((f) => ({ id: f.id, seed: f.seed, covers: f.covers, tapeEndTick: tapes[f.id].endTick, refOutcome: refs[f.id]?.outcome })), rows, mathDiagnosis: Object.values(diagnosed) };
   await mkdir(path.dirname(OUT), { recursive: true });
   await writeFile(OUT, JSON.stringify(result));
   console.log('WROTE', OUT, rows.length, 'rows');
 }
 
+// ---------------------------------------------------------------- position probe
+/** Session-position leak probe: tapes replayed as run #2 of a session after another run, vs the same tape as run #1 of a fresh context.
+ *  NOTE: the harness starts each run through Title.startRun after force-stopping scenes (bootRun); it does NOT go through the real GameOver/retry path. */
+async function positions() {
+  const OUTP = process.env.OUT || path.join(here, '..', '..', 'docs', 'determinism', 'results', 'position-probe.json');
+  const tapes = {};
+  for (const f of FIXTURES) tapes[f.id] = await loadTape(f);
+  const by = Object.fromEntries(FIXTURES.map((f) => [f.id, f]));
+  const hz = Number(process.env.POS_HZ || 120);
+  const { browser } = await launch(REF.engine);
+  const results = [];
+  try {
+    const ref = {};
+    for (const f of fixtures) { const p = await freshPage(browser); const r = await play(p.page, { seed: f.seed, hz, tape: tapes[f.id], level: 1 }); ref[f.id] = r; await p.ctx.close(); }
+    const cases = [...fixtures.map((f) => [f.id, f.id])];
+    for (const prior of ['cruise-baseline', 'collision-heavy', 'airborne-tricks']) cases.push([prior, 'chunk-biome-boundaries']);
+    for (const [a, b] of cases) {
+      const p = await freshPage(browser);
+      const ra = await play(p.page, { seed: by[a].seed, hz, tape: tapes[a], level: 1 });
+      const rb = await play(p.page, { seed: by[b].seed, hz, tape: tapes[b], level: 1 });
+      await p.ctx.close();
+      if (!ref[b]) { const q = await freshPage(browser); ref[b] = await play(q.page, { seed: by[b].seed, hz, tape: tapes[b], level: 1 }); await q.ctx.close(); }
+      const cmpA = compareDigests(ref[a]?.digests || ra.digests, ra.digests), cmp = compareDigests(ref[b].digests, rb.digests);
+      const o = rb.outcome, ro = ref[b].outcome;
+      const row = { sequence: [a, b], hz, run1CauseOrEnd: ra.outcome.crashed ? ra.outcome.cause : 'no crash (tick limit)', run2FirstCausalDivergentTick: cmp.first ? cmp.first.tick : null, run2Subsystems: cmp.first ? cmp.first.subs.map((k) => SUBNAMES[k]) : null,
+        run2TapeDesync: rb.tapeCheck.desync ? rb.tapeCheck.desync.tick : null, run2OutcomeEqualsFresh: JSON.stringify([o.ticks, o.crashed, o.cause, o.distanceM, o.score]) === JSON.stringify([ro.ticks, ro.crashed, ro.cause, ro.distanceM, ro.score]),
+        run2: { ticks: o.ticks, cause: o.cause, distanceM: o.distanceM, score: o.score }, fresh: { ticks: ro.ticks, cause: ro.cause, distanceM: ro.distanceM, score: ro.score }, run1Clean: !cmpA.first };
+      results.push(row);
+      console.log(a, '->', b, row.run2FirstCausalDivergentTick ?? 'clean', row.run1CauseOrEnd);
+    }
+  } finally { await browser.close(); }
+  await mkdir(path.dirname(OUTP), { recursive: true });
+  await writeFile(OUTP, JSON.stringify({ gitSha, generatedAt: new Date().toISOString(), engine: REF.engine, hz, path: 'Title.startRun after force-stopping scenes (NOT the GameOver/retry flow)', results }, null, 1));
+  console.log('WROTE', OUTP);
+}
+
 const cmd = process.argv[2];
 if (cmd === 'record') await record();
 else if (cmd === 'matrix') await matrix();
 else if (cmd === 'scout') await scout();
-else { console.log('usage: cross-engine.mjs record|matrix|scout  (matrix --resume continues from the journal)'); process.exit(2); }
+else if (cmd === 'positions') await positions();
+else { console.log('usage: cross-engine.mjs record|matrix|positions|scout  (matrix --resume continues from the journal)'); process.exit(2); }
