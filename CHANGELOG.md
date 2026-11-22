@@ -1,5 +1,21 @@
 # Changelog
 
+
+## Unreleased — merged work after v2.15.3 (2026-11-21)
+
+These changes are merged into `main` but do **not** constitute a new numbered release. Experimental/offline-only tooling must not be mistaken for an activated production feature.
+
+- **Replay contract and canonical serialization (#163 / #152).** Versioned replay contract, canonical JSON/binary encoding, deterministic hashes and cross-implementation fixtures. No live physics change.
+- **Subsystem fingerprints (#165 / #118).** Read-only checkpoint hashes cover sled/contact, terrain, hazards, BSOD, timers, scoring, equipment and RNG, with first-divergence and field-level comparison. Fingerprints detect divergence but are not anti-cheat.
+- **Physics ruleset time capsules (#166 / #123), with compatibility repair (#203).** Content-addressed ruleset archives, source attestation and version-aware replay verification; uploaded code is not executed.
+- **Self-contained replay manifests and local evidence (#164 / #116).** Capture seed, biome mask, daily rule, level/loadout, active boosts, BSOD, RNG and ruleset; fail-closed validation and exportable local `.bbreplay` evidence. IndexedDB evidence is local, not permanent cloud storage; cross-browser parity is not yet established.
+- **Golden replay canaries (#158 / #117).** Seven recorded scenarios and offline/manual comparator tooling for first-divergence and handling diagnostics. This does not yet constitute an automatically enforced cross-browser CI quality gate.
+- **PWA offline-shell experiments (#175 / #172).** Integrity inventory, test-only service-worker implementation, opt-in original-music selection/prefetch planning. No production service-worker registration and no claim that the shipped game runs offline.
+- **Real-original-music offline bridge experiments (#179 / #172).** Verified original-Opus music groups and development/test routes, with incomplete offline groups refused rather than silently replaced. Not an activated production offline download feature.
+- **Source-preserving music-variant tooling (#182 / #172, #180).** Developer-only mono Lite/Full per-stem derivative generation and provenance checks. Original stereo recordings remain untouched; quality presets require listening approval and are not a shipped player preference.
+
+**Verification snapshot:** On current `main` at `e181f9f` (before #158 merged), replay tests passed 741/741 across 20 suites, ruleset integrity check passed, and the full test suite reported 3,561 passing / 9 failing (seven suites), consistent in count with the previously documented baseline. On the integrated #158 tree, canary unit tests passed 32/32. This is not a full-suite green claim.
+
 ## v2.15.3 - PWA install metadata and original icons (#172) (2026-11-21)
 
 - **Installable shell metadata, not an offline game.** A first-party Web App Manifest and generated original Bitstream Bluffs icons (192px, 512px, maskable, Apple touch) add supported-browser home-screen installation metadata, landscape/standalone preference and theme colors. The main application boot, gameplay simulation, ghost/replay format and scoring are unchanged.
