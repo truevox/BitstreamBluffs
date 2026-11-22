@@ -50,8 +50,11 @@ export function orchestraPreset(biome, stem) {
 			...(biome==='garbage-dump-glacier'||biome==='vertigo-vents'?[distortion(.18)]:[])];
 	}
 	if (stem==='drums') {
+		// Garbage retains a genuinely unfiltered original drum path; metal
+		// coloration happens only in Scrapheap's parallel resonant wet send.
+		if (biome==='garbage-dump-glacier')
+			return [{type:'scrapheap',id:'scrapheap',contact:0}];
 		return [filter('drum-color','lowpass',edge),
-			...(biome==='garbage-dump-glacier'?[{type:'scrapheap',id:'scrapheap',contact:0}]:[]),
 			...(biome==='steampunk-slopes'||biome==='micro-mountain'?[tremolo(6,.17)]:[])];
 	}
 	// Never replace, retrigger, rescore or move source note attacks here.
