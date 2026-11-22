@@ -369,6 +369,55 @@ async function matrix() {
   console.log('WROTE', OUT, rows.length, 'rows');
 }
 
+// ---------------------------------------------------------------- fresh-context rows (position-free)
+/** Every engine x fixture as run #1 of its OWN fresh context (no earlier run in the page), at FRESH_HZ (default 120). These are the numbers the headline uses,
+ *  free of the session-position leak. Journaled per cell; --resume skips finished cells (same fingerprint rules as the matrix). */
+async function fresh() {
+  const OUTF = process.env.OUT || path.join(here, '..', '..', 'docs', 'determinism', 'results', 'cross-engine-fresh.json');
+  const J2 = process.env.JOURNAL || path.join(here, '.cache', 'cross-engine-fresh.journal.jsonl');
+  const hzs = (process.env.FRESH_HZ || '120').split(',').map(Number);
+  const tapes = {};
+  for (const f of fixtures) tapes[f.id] = await loadTape(f);
+  const sha = (x) => createHash('sha256').update(x).digest('hex').slice(0, 16);
+  const fp = { buildIndexSha: sha(await (await fetch(url)).text()), url, ceDate: PIN_DATE, raster: RASTER, pageJs: sha(pageJs), tapes: Object.fromEntries(Object.entries(tapes).map(([k, t]) => [k, sha(JSON.stringify(t))])) };
+  await mkdir(path.dirname(J2), { recursive: true });
+  const done = new Map();
+  let ok = false;
+  if (RESUME && existsSync(J2)) {
+    const lines = (await readFile(J2, 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    ok = lines[0] && lines[0].k === 'fingerprint' && JSON.stringify(lines[0].fp) === JSON.stringify(fp);
+    if (ok) for (const o of lines) if (o.k === 'row') done.set(`${o.row.engine}|${o.row.hz}|${o.row.fixture}`, o.row);
+  }
+  if (!ok) await writeFile(J2, JSON.stringify({ k: 'fingerprint', fp }) + '\n');
+  const refs = {};
+  { const { browser } = await launch(REF.engine);
+    for (const f of fixtures) { const p = await freshPage(browser); refs[f.id] = await play(p.page, { seed: f.seed, hz: REF.hz, tape: tapes[f.id], level: 1 }); await p.ctx.close(); }
+    await browser.close(); }
+  const rows = [];
+  for (const name of engineNames) {
+    let L; try { L = await launch(name); } catch (e) { console.log(name, 'UNAVAILABLE'); continue; }
+    for (const hz of hzs) for (const f of fixtures) {
+      const key = `${name}|${hz}|${f.id}`;
+      if (done.has(key)) { rows.push(done.get(key)); console.log(key, 'skipped (resume)'); continue; }
+      const p = await freshPage(L.browser);
+      const r = await play(p.page, { seed: f.seed, hz, tape: tapes[f.id], level: 1 });
+      await p.ctx.close();
+      const ref = refs[f.id], cmp = compareDigests(ref.digests, r.digests), o = r.outcome, ro = ref.outcome;
+      const row = { engine: name, hz, fixture: f.id, firstCausalDivergentTick: cmp.first ? cmp.first.tick : null, subsystem: cmp.first ? cmp.first.subs.map((k) => SUBNAMES[k]) : null,
+        derivedFirstDiffTick: cmp.derivedTick, telegraphFirstDiffTick: cmp.telegraphTick, sledDeltaAtFirstTick: cmp.first ? rawDelta(ref.raw, r.raw, cmp.first.tick) : null,
+        tapeDesyncTick: r.tapeCheck.desync ? r.tapeCheck.desync.tick : null, checkpointsChecked: r.tapeCheck.checked,
+        outcome: { ticks: o.ticks, crashed: o.crashed, cause: o.cause, distanceM: o.distanceM, score: o.score },
+        outcomeEqualsReference: JSON.stringify([o.ticks, o.crashed, o.cause, o.distanceM, o.score]) === JSON.stringify([ro.ticks, ro.crashed, ro.cause, ro.distanceM, ro.score]) };
+      rows.push(row);
+      await appendFile(J2, JSON.stringify({ k: 'row', row }) + '\n');
+      console.log(key, row.firstCausalDivergentTick ?? 'ok', 'derived', row.derivedFirstDiffTick ?? '-', 'cp', row.tapeDesyncTick ?? '-', row.outcomeEqualsReference ? '=ref' : 'OUTCOME DIFFERS');
+    }
+    await L.browser.close();
+  }
+  await writeFile(OUTF, JSON.stringify({ gitSha, fingerprint: fp, generatedAt: new Date().toISOString(), note: 'each row = run #1 of a fresh browser context, compared to chromium-headless-shell/120 Hz fresh reference; causal digest groups only decide firstCausalDivergentTick', rows }));
+  console.log('WROTE', OUTF, rows.length);
+}
+
 // ---------------------------------------------------------------- position probe
 /** Session-position leak probe: tapes replayed as run #2 of a session after another run, vs the same tape as run #1 of a fresh context.
  *  NOTE: the harness starts each run through Title.startRun after force-stopping scenes (bootRun); it does NOT go through the real GameOver/retry path. */
@@ -410,4 +459,5 @@ if (cmd === 'record') await record();
 else if (cmd === 'matrix') await matrix();
 else if (cmd === 'scout') await scout();
 else if (cmd === 'positions') await positions();
+else if (cmd === 'fresh') await fresh();
 else { console.log('usage: cross-engine.mjs record|matrix|positions|scout  (matrix --resume continues from the journal)'); process.exit(2); }
