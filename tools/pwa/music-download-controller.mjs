@@ -90,10 +90,22 @@ export class MusicDownloadController {
     const prior=this.setting.catch(()=>{});
     const setting=prior.then(async()=>{
       if(epoch!==this.generation)return false;
+      const previousMode=this.mode,previousActive={...this.active};
       this.mode=mode;
       if(mode!=='high')this.active={};
       this.lastError=null;
-      await this.postPolicy(this.policy);
+      try{await this.postPolicy(this.policy)}
+      catch(error){
+        // The SW may still hold the earlier policy. Don't claim a new
+        // preference as active until its CacheStorage ACK actually succeeds.
+        // A newer setMode call has its own generation and must not be undone.
+        if(epoch===this.generation){
+          this.mode=previousMode;this.active=previousActive;
+          this.lastError=error;
+          this._notify('policy-failed',{error:String(error)});
+        }
+        throw error;
+      }
       if(epoch!==this.generation)return false;
       this._notify(mode==='off'?'disabled':'policy-stored');
       if(mode!=='off'){

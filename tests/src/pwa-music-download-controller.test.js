@@ -164,3 +164,22 @@ test('an in-flight Full policy update cannot overtake a later No Music choice',a
   expect(controller.mode).toBe('off');
   expect(await controller.atVerifiedBoundary(catalogId)).toBe(false);
 });
+
+
+test('failed No Music persistence leaves previous verified preference effective',async()=>{
+  const {controller,posted}=setup();
+  await controller.setMode('high');await controller.whenIdle();
+  expect(await controller.atVerifiedBoundary(catalogId)).toBe(true);
+  const oldPolicy=controller.policy;
+  const original=controller.postPolicy;
+  controller.postPolicy=async policy=>{
+    if(policy.mode==='off')throw new Error('SW preference storage full');
+    return original(policy);
+  };
+  await expect(controller.setMode('off')).rejects.toThrow('SW preference storage full');
+  expect(controller.mode).toBe('high');
+  expect(controller.active[catalogId]).toBe('full');
+  expect(controller.policy).toEqual(oldPolicy);
+  expectPolicy(posted.at(-1),'high','full');
+  expect(controller.lastError.message).toContain('SW preference storage full');
+});
