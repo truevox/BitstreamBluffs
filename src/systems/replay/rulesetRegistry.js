@@ -156,6 +156,11 @@ export const RULESET_SOURCES = Object.freeze([
     file: 'src/systems/SimClock.js',
     exports: {
       SIM_TICK_HZ: inc('versions.tickHz'),
+      // #115 changed how LIVE keyboard/touch events become recorded pads.
+      // It is not replay simulation physics: the already-normalized tape
+      // carries the per-tick input, and the manifest records this capture
+      // provenance separately as info.inputCapture.edgeAssignment (#164).
+      INPUT_EDGE_ASSIGNMENT: exc('live recorder provenance only: replay consumes already-normalized per-tick pads; the manifest records info.inputCapture.edgeAssignment'),
       SIM_TICK_MS: exc('derived: 1000 / SIM_TICK_HZ'),
       SIM_MAX_TICKS_PER_FRAME: inc('constants.simClock.SIM_MAX_TICKS_PER_FRAME'),
     },
