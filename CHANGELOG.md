@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.9 — preserve overlapping gamepad button aliases (#211 / #223) (2026-11-22)
+
+- **Gamepad alias correctness:** Holding a shoulder button and the corresponding right-stick direction now keeps its helicopter control engaged until *both* inputs are released, instead of the first release incorrectly cancelling the shared gamepad source. Aggregate pad state is written before per-binding action events, matching the keyboard event-observation contract. Controller-disconnect bookkeeping clears both per-binding and aggregated states.
+- **Tests and documentation:** Added revert-sensitive tests for overlapping bindings and for action listeners seeing the updated pad state, plus a control-accessibility matrix covering touch/keyboard/gamepad behavior and precise analog thresholds. The wider #211 controls-parity effort remains open; this release is the bounded alias fix, not full parity certification.
+- **Replay scope:** No authoritative physics, score formulas, recorded input/tape schema or simulation revision changed. The existing v2.19.7 SIM_REVISION 4 ruleset and the v2.19.8 developer replay comparison remain unchanged.
+
 ## v2.19.8 — developer matched-build replay check (#129 / #226) (2026-11-22)
 
 - **Compare one matched normal-run fixture across the adjacent v2.19.6 and v2.19.7 builds.** Each build records and verifies only its own native tape. The local tool compares the same encoded neutral input and stock starting fields, then summarizes observed divergence and natural finish. No game, replay compatibility, ranking or scoring changes.
