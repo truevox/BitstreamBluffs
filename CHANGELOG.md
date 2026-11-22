@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.17 — Exploit Factory observed trick activity (Issue #214 leaf / PR #229) (2026-11-22)
+
+- **Developer-only evidence:** show per-policy observed trick occurrences, distinct trick names/counts, and missing-data coverage in the Exploit Factory report. Records without valid trick data remain **unknown**, never misreported as zero tricks; failed or unplanned policy arms are excluded from comparison and tables rather than silently treated as successes.
+- **CLI and test hardening:** make the report function independently importable without accidentally running its CLI; resolve the actual script path so symlinked invocations still work. Regression tests cover rejected-seed audit outputs, unknown/trick-free data, policy failures, exact output creation and symlink entrypoints.
+- **Scope limit:** This does **not** complete the full #214 24+-seed parachute/airbrake/flip comparative investigation, prove an exploit, change game physics, rebalance BSOD pursuit, or alter leaderboard and replay trust. The umbrella issue remains open for the actual paired-seed study. No simulation revision bump: this release modifies only developer diagnostics and tests.
+
 ## v2.19.16 — developer historical replay airtime check (#131 / #228) (2026-11-22)
 
 - **Measure airtime from one opt-in historical QA tape.** The fixed synthetic recording plays only in its pinned original v2.16.0 runtime. Two local native replays confirm the saved checkpoints and the sampled grounded state; the tool reports aggregate airtime, not the tape or player data. No gameplay, scoring, replay compatibility or production change.
