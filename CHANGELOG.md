@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.19.19 — compare redacted local crash briefs (#78 / #237) (2026-11-22)
+
+- **Compare two existing redacted developer crash briefs.** The local CLI validates the original v1 JSON and reports whether its allowlisted crash signatures match, differ, or are inconclusive because a hazard ID is missing. It never reads an input tape, launches a replay, authenticates either report, or shares player data. No gameplay, scoring, replay compatibility or production change.
+
+## v2.19.18 — Strict savestate V1 envelope foundation (Issue #230 / PR #227) (2026-11-22)
+
+- **Pure versioned input boundary:** add BB-CJSON V1 savestate envelope writer/inspector and deterministic registered-layout hash, requiring caller-provided exact build ID, game version, SIM_REVISION, ruleset ID, Matter version and savestate layout ID. Invalid, tampered, noncanonical, oversized, unsupported or wrong-build snapshots fail closed. The digest is error detection, **not** an authentication/leaderboard credential. Trusted section validators operate on a recursively frozen parsed envelope, preventing mutation after checksum admission.
+- **Independent safety validation:** adversarial tests cover roundtrip F64, missing/unknown fields, schema and revision/build conflicts, duplicate keys, malformed bytes, mutation by validators, and legacy-layout refusal. These are *format-admission tests only*, not a game restore. No production savestate layout is registered by default.
+- **Not a completed save/load feature:** No live Matter/RunScene snapshot capture or restore, persistence, single-use suspend consumption, UI, GhostRecorder tape continuity or ranking changes. **Parent #119 remains open** for these tasks; only Phase 3A child #230 is completed by this release. No physics/simulation revision bump (SIM_REVISION 6 remains authoritative).
+
+## v2.19.17 — Exploit Factory observed trick activity (Issue #214 leaf / PR #229) (2026-11-22)
+
+- **Developer-only evidence:** show per-policy observed trick occurrences, distinct trick names/counts, and missing-data coverage in the Exploit Factory report. Records without valid trick data remain **unknown**, never misreported as zero tricks; failed or unplanned policy arms are excluded from comparison and tables rather than silently treated as successes.
+- **CLI and test hardening:** make the report function independently importable without accidentally running its CLI; resolve the actual script path so symlinked invocations still work. Regression tests cover rejected-seed audit outputs, unknown/trick-free data, policy failures, exact output creation and symlink entrypoints.
+- **Scope limit:** This does **not** complete the full #214 24+-seed parachute/airbrake/flip comparative investigation, prove an exploit, change game physics, rebalance BSOD pursuit, or alter leaderboard and replay trust. The umbrella issue remains open for the actual paired-seed study. No simulation revision bump: this release modifies only developer diagnostics and tests.
+
+## v2.19.16 — developer historical replay airtime check (#131 / #228) (2026-11-22)
+
+- **Measure airtime from one opt-in historical QA tape.** The fixed synthetic recording plays only in its pinned original v2.16.0 runtime. Two local native replays confirm the saved checkpoints and the sampled grounded state; the tool reports aggregate airtime, not the tape or player data. No gameplay, scoring, replay compatibility or production change.
+
 ## v2.19.15 — Arcade bridge dissolve, biome FX and pixel backdrops (#65 / #217) (2026-11-22)
 
 - **Cosmetic biome transition:** a readable neon-grid arcade bridge dissolves the outgoing biome to retro pixel geometry and reconstructs the incoming look as riding distance changes. The handoff is presentation-only: it never creates terrain, changes physics, draws authoritative random numbers or rebuilds colliders. Reduced-motion users retain the simple static transition.
