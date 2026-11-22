@@ -743,10 +743,14 @@ from the previous sector's, which are arcade (`null`). Length is 1/6 of `SECTOR_
 rising linearly with the sector's start distance to 1/4 (125 m) at 5000 m, then capped
 (`ARCADE_BRIDGE_MIN_FRAC`, `ARCADE_BRIDGE_MAX_FRAC`, `ARCADE_BRIDGE_RAMP_M`). It depends on distance only, never on
 progression, input or BSOD, and draws nothing new, so the same seed and mask give everyone the same course
-(leaderboards, Daily, ghosts). **Chunk snapping:** the generator assigns a chunk by its start x, so a bridge is
-whole chunks: a chunk is arcade when it starts inside the window, and the first chunk of a changing sector (its
-breather) is always arcade, so every biome change has at least one bridge chunk. The measured arcade run is
-about 105 m median (58-300 m, set by the chunk lengths around the window). Bridge terrain is exactly the old
+(leaderboards, Daily, ghosts). **Chunk snapping and the cap:** the generator assigns a chunk by its start x, so a
+bridge is whole chunks: the first chunk of a changing sector (its breather) is always arcade, so every biome change
+has at least one bridge chunk, and a later chunk is arcade when it starts inside the window **and** ends within
+`ARCADE_BRIDGE_CAP_MUL` (1.5) x the target length of the bridge's own first chunk (~125 m at the start, 187.5 m
+from 5000 m). A chunk that would overrun the cap is built as the sector's biome instead (the generator replays the
+chunk's own def pick and length draw as arcade to ask: `_arcadeEndPx`), which ends the bridge. Measured over
+3770 bridges at the full mask: min 46 m, median 98 m, p95 130 m, max 187 m (before the cap: median 106 m, max 308 m). The sector
+biome picks (`biome:${sector}`) are untouched by the cap. Bridge terrain is exactly the old
 arcade (null-biome) generation: no biome preference, zone or spawns; physics is unchanged. Every consumer asks
 the generator (`TerrainGenerator.biomeAtX(xPx)`, the chunk containing x) rather than computing a sector biome:
 `RunScene` palette, motif, `BIOME_ENTER` (fires on entering Debutmont at the start, each bridge as

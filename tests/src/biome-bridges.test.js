@@ -6,7 +6,8 @@
  */
 import {
   TerrainGenerator, biomeForSector, biomeAtX, arcadeBridgeLengthM, sectorHasBridge, HOME_BIOME_ID, SECTOR_M, BASE_SECTORS,
-  BIOME_BASE_WEIGHT, ARCADE_BRIDGE_MIN_FRAC, ARCADE_BRIDGE_MAX_FRAC, ARCADE_BRIDGE_RAMP_M,
+  BIOME_BASE_WEIGHT, ARCADE_BRIDGE_MIN_FRAC, ARCADE_BRIDGE_MAX_FRAC, ARCADE_BRIDGE_RAMP_M, ARCADE_BRIDGE_CAP_MUL,
+  arcadeBridgeCapM,
 } from '../../src/systems/TerrainGenerator.js';
 import { Rng, xxHash32 } from '../../src/systems/Rng.js';
 import { GHOST_PHYSICS_VERSION } from '../../src/systems/ghost/GhostTape.js';
@@ -99,6 +100,32 @@ describe('bridge length curve', () => {
     }
   });
 
+  test('the cap is 1.5 x the target length: about 125 m at the start, 187.5 m from 5000 m', () => {
+    expect(ARCADE_BRIDGE_CAP_MUL).toBe(1.5);
+    expect(arcadeBridgeCapM(0)).toBeCloseTo(125, 9);
+    expect(arcadeBridgeCapM(ARCADE_BRIDGE_RAMP_M)).toBeCloseTo(187.5, 9);
+    expect(arcadeBridgeCapM(30000)).toBeCloseTo(187.5, 9);
+  });
+
+  test('biomeAtX at chunk level: the first chunk is always arcade; a later chunk only while it ends under the cap', () => {
+    let checked = 0;
+    for (const seed of SEEDS) for (let s = 1; s < 80; s++) {
+      if (!sectorHasBridge(seed, s, ALL, DEFS)) continue;
+      const start = s * SECTOR_M;
+      const biome = biomeForSector(seed, s, ALL, DEFS);
+      const run = start + 30; // a bridge whose first chunk started 30 m into the sector
+      const cap = arcadeBridgeCapM(start);
+      expect(biomeAtX(seed, run, ALL, DEFS, true)).toBeNull();
+      expect(biomeAtX(seed, run, ALL, DEFS, { first: true, endM: run + 1e6 })).toBeNull(); // however long the first chunk is
+      expect(biomeAtX(seed, start + 10, ALL, DEFS, { runStartM: run, endM: run + cap })).toBeNull();
+      expect(biomeAtX(seed, start + 10, ALL, DEFS, { runStartM: run, endM: run + cap + 0.01 })).toBe(biome);
+      // past the window the biome takes it, whatever its end
+      expect(biomeAtX(seed, start + arcadeBridgeLengthM(start) + 0.01, ALL, DEFS, { runStartM: run, endM: run + 1 })).toBe(biome);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(30);
+  });
+
   test('biomeAtX: bridge is the first `length` metres of a changing sector, exactly', () => {
     let checked = 0;
     for (const seed of SEEDS) for (let s = 1; s < 80; s++) {
@@ -155,7 +182,13 @@ describe('the real generator follows the model, chunk-aligned', () => {
       const { c, startM, biome } = chunks[k];
       const sector = Math.floor(startM / SECTOR_M);
       const first = k > 0 && sector > Math.floor(chunks[k - 1].startM / SECTOR_M);
-      expect(biome).toBe(biomeAtX(seed, startM, ALL, DEFS, first));
+      let j = k;
+      while (j > 0 && Math.floor(chunks[j - 1].startM / SECTOR_M) === sector) j--;
+      // A chunk the cap refuses is built as the sector's biome, so its real end is not the end the cap judged: the
+      // generator's arcade replay is (and for a chunk that does come out arcade it is the real end).
+      const arcadeEndM = gen._arcadeEndPx(gen.bounds[chunks[k].i], chunks[k].i) / PPM;
+      if (biome === null) expect(arcadeEndM).toBeCloseTo(chunks[k].endM, 6);
+      expect(biome).toBe(biomeAtX(seed, startM, ALL, DEFS, { first, runStartM: chunks[j].startM, endM: arcadeEndM }));
       expect(gen.biomeAtX(c.startX)).toBe(biome);
       expect(gen.biomeAtX(c.endX - 1)).toBe(biome);
       if (biome === null) arcadeSectors.add(sector);
@@ -168,7 +201,7 @@ describe('the real generator follows the model, chunk-aligned', () => {
     expect(expected.size).toBeGreaterThan(3);
   });
 
-  test('every bridge is whole chunks: first chunk of the sector, then chunks starting inside the window', () => {
+  test('every bridge is whole chunks: first chunk of the sector, then chunks starting inside the window that fit the cap', () => {
     for (const seed of SEEDS) {
       const gen = makeGen(seed, { biomeMask: ALL });
       const chunks = walk(gen, UPTO);
@@ -183,14 +216,32 @@ describe('the real generator follows the model, chunk-aligned', () => {
         // the arcade chunks are contiguous from the sector's first chunk
         expect(arcade.map((q) => q.i)).toEqual(inSector.slice(0, arcade.length).map((q) => q.i));
         for (const q of arcade.slice(1)) expect(q.startM).toBeLessThan(win);
-        const next = inSector[arcade.length];
-        expect(next.biome).toBe(biomeForSector(seed, s, ALL, DEFS));
-        expect(next.startM).toBeGreaterThanOrEqual(win);
-        // the last bridge chunk starts inside the window (or is the sector's first chunk, when that starts past it)
+        // the whole bridge stays under the cap, measured from its own first chunk
         const last = arcade[arcade.length - 1];
-        expect(last.startM).toBeLessThan(Math.max(win, inSector[0].startM + 1e-9));
+        expect(last.endM - arcade[0].startM).toBeLessThanOrEqual(arcadeBridgeCapM(start) + 1e-9);
+        // the chunk after the bridge belongs to the sector's biome
+        expect(inSector[arcade.length].biome).toBe(biomeForSector(seed, s, ALL, DEFS));
       }
     }
+  });
+
+  test('bridge length distribution: a few thousand bridges, none over the cap, median near the target', () => {
+    const lens = [];
+    let worstOverCap = -Infinity;
+    for (let n = 0; n < 60; n++) {
+      for (const r of layout(`dist-${n}`, ALL, 12000)) {
+        if (r.biome !== 'ARCADE') continue;
+        lens.push(r.endM - r.startM);
+        worstOverCap = Math.max(worstOverCap, r.endM - r.startM - arcadeBridgeCapM(r.sector * SECTOR_M));
+      }
+    }
+    lens.sort((a, b) => a - b);
+    expect(lens.length).toBeGreaterThan(1000);
+    expect(worstOverCap).toBeLessThanOrEqual(1e-9);
+    expect(Math.max(...lens)).toBeLessThanOrEqual(ARCADE_BRIDGE_CAP_MUL * SECTOR_M * ARCADE_BRIDGE_MAX_FRAC + 1e-9);
+    const median = lens[Math.floor(lens.length / 2)];
+    expect(median).toBeGreaterThan(75);
+    expect(median).toBeLessThan(125);
   });
 
   test('bridge terrain is exactly today\'s arcade (null-biome) terrain generation', () => {

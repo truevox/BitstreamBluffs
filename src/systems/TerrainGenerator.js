@@ -92,6 +92,12 @@ export const BIOME_BASE_WEIGHT = 2.2;
 export const ARCADE_BRIDGE_MIN_FRAC = 1 / 6;
 export const ARCADE_BRIDGE_MAX_FRAC = 1 / 4;
 export const ARCADE_BRIDGE_RAMP_M = 5000;
+/**
+ * Hard cap on a bridge, as a multiple of its target length (whole chunks make a bridge overshoot the target, and a
+ * long carve starting just inside the window used to stretch it to 300 m). A chunk that would carry the bridge past
+ * ARCADE_BRIDGE_CAP_MUL x target, measured from the bridge's own first chunk, takes the sector's biome instead.
+ */
+export const ARCADE_BRIDGE_CAP_MUL = 1.5;
 /** Hazard gentleness: no hazards before HAZARD_SOFT_PX (80 m); only non-crash hazards before HAZARD_SAFE_PX (150 m). */
 export const HAZARD_SOFT_PX = 1600;
 export const HAZARD_SAFE_PX = 3000;
@@ -387,29 +393,46 @@ export function sectorHasBridge(seed, sector, biomeMask, biomeDefs) {
 }
 
 /**
+ * Longest a bridge opening a sector starting at `startM` may run, in metres: ARCADE_BRIDGE_CAP_MUL x its target
+ * length (about 125 m at the start, 187.5 m from 5000 m).
+ * @param {number} startM distance of the sector's start, metres.
+ * @returns {number} metres.
+ */
+export function arcadeBridgeCapM(startM) {
+  return ARCADE_BRIDGE_CAP_MUL * arcadeBridgeLengthM(startM);
+}
+
+/**
  * The biome at a position: the sector's biome, except the first arcade-bridge length of a sector that changes
  * biome, which is arcade (`null`). Pure in (seed, x, mask, defs): no RNG draws beyond biomeForSector's, no
  * dependence on input, progression or BSOD, so every player sees the same course (leaderboards, Daily, ghosts).
  *
- * Chunk snapping: the generator assigns a chunk by its START x, so a bridge is a run of whole chunks. A chunk
- * is arcade when it starts inside the bridge window, and the first chunk that starts in a bridging sector is
- * always arcade (`firstChunk`), so every biome change has at least one chunk of bridge however long the chunk
- * straddling the boundary was. The effective bridge is therefore the window plus less than one chunk. The
- * generator passes firstChunk for the breather; a plain position query leaves it false (the unsnapped window).
+ * Chunk snapping: the generator assigns a chunk by its START x, so a bridge is a run of whole chunks. A plain
+ * position query (no `chunk`) answers the unsnapped window. A chunk-level query passes the chunk's facts:
+ *   - `first`: the first chunk that starts in a bridging sector is always arcade, so every biome change has at
+ *     least one chunk of bridge however long the chunk straddling the boundary was;
+ *   - otherwise a chunk is arcade when it starts inside the window AND ends within the cap of the bridge's own
+ *     start (`runStartM` = start of the sector's first chunk, `endM` = this chunk's end), so a long chunk starting
+ *     just inside the window can no longer stretch the bridge: the sector's biome takes it instead.
  *
  * @param {string|number} seed
  * @param {number} xM position, metres (>= 0).
  * @param {number} biomeMask
  * @param {Array<{id:string,bit:number,weight?:number}>} [biomeDefs]
- * @param {boolean} [firstChunk=false] x is the start of the first chunk in its sector (chunk-level query).
+ * @param {{first?:boolean, runStartM?:number, endM?:number}|boolean} [chunk] chunk-level facts (a bare `true`
+ *   means `{ first: true }`); omit for a plain position query.
  * @returns {string|null} biome id, or null for an arcade bridge.
  */
-export function biomeAtX(seed, xM, biomeMask, biomeDefs, firstChunk = false) {
+export function biomeAtX(seed, xM, biomeMask, biomeDefs, chunk) {
   const sector = Math.max(0, Math.floor(xM / SECTOR_M));
   const biome = biomeForSector(seed, sector, biomeMask, biomeDefs);
   if (sector < 1 || biomeForSector(seed, sector - 1, biomeMask, biomeDefs) === biome) return biome;
   const startM = sector * SECTOR_M;
-  return firstChunk || xM - startM < arcadeBridgeLengthM(startM) ? null : biome;
+  const c = chunk === true ? { first: true } : chunk || {};
+  if (c.first) return null;
+  if (xM - startM >= arcadeBridgeLengthM(startM)) return biome;
+  const fits = !Number.isFinite(c.endM) || c.endM <= (Number.isFinite(c.runStartM) ? c.runStartM : startM) + arcadeBridgeCapM(startM);
+  return fits ? null : biome;
 }
 
 export class TerrainGenerator {
@@ -798,17 +821,56 @@ export class TerrainGenerator {
 
   /**
    * Biome of a chunk, or null for arcade (a bridge, or content-free). A chunk is assigned by its START, which
-   * keeps the assignment a pure function of the chunk's own start position (and of whether it is the first chunk
-   * of its sector, which is itself a function of the seed): see biomeAtX for the bridge rule. A biome id with no
-   * definition in `biomeDefs` is treated as arcade, so a generator built without biome content is unchanged.
+   * keeps the assignment a pure function of the chunk's own start position (and of facts about its own sector's
+   * chunks, which are themselves a function of the seed): see biomeAtX for the bridge rule. A chunk starting
+   * inside a bridge window is built as arcade first (`_arcadeEndPx`) to learn whether it would overrun the cap.
+   * A biome id with no definition in `biomeDefs` is treated as arcade, so a generator built without biome
+   * content is unchanged.
    * @param {{startX:number}} b
    * @param {number} index chunk index.
    * @returns {string|null}
    */
   _biomeForChunk(b, index) {
     if (!this.biomeDefs.length) return null;
-    const id = biomeAtX(this.seed, b.startX / this.ppm, this.biomeMask, this.biomeDefs, this._isBreather(index, b));
+    const startM = b.startX / this.ppm;
+    const first = this._isBreather(index, b);
+    let id = biomeAtX(this.seed, startM, this.biomeMask, this.biomeDefs, first);
+    if (id === null && !first) {
+      // inside the window of a bridging sector: arcade only if this chunk keeps the bridge under its cap
+      let j = index;
+      while (j > 0 && !this._isBreather(j, this.bounds[j])) j--;
+      id = biomeAtX(this.seed, startM, this.biomeMask, this.biomeDefs, {
+        runStartM: this.bounds[j].startX / this.ppm, endM: this._arcadeEndPx(b, index) / this.ppm,
+      });
+    }
     return id && this.biomeDefs.some((d) => d.id === id) ? id : null;
+  }
+
+  /**
+   * Where chunk `index` would end if it were built as arcade (no biome preference): the def pick and the length
+   * draw replayed on their own forks of the chunk's seed, exactly as `_build` makes them, so it is the real end
+   * of the chunk whenever the chunk does come out arcade. Scratch only: touches no generator state.
+   * @returns {number} world px.
+   */
+  _arcadeEndPx(b, index) {
+    const distM = b.startX / this.ppm;
+    const crng = new Rng(hashInts(this.seedState, index + 1));
+    const def = this._pickDef(index, b, distM, this.difficultyAt(distM), crng.fork('plan'), null);
+    const kind = def.kind === 'noise' || def.kind === 'bridge' ? def.kind : 'spline';
+    const shape = crng.fork('shape');
+    const n = this._segmentCount(def, kind, index, b, shape);
+    return b.startX + (def === JUMP_DEF ? this._jumpAngles(index, b, distM, shape).length : n) * SPACING_PX;
+  }
+
+  /**
+   * Segment count of a non-jump chunk of `def`: the length jitter is drawn from `shape` first (always, as it was
+   * before the bridge rule needed it separately), then the length follows from the def, the pack's growth and it.
+   */
+  _segmentCount(def, kind, index, b, shape) {
+    const scale = kind === 'spline' ? Math.min(1.6, 1 + 0.08 * b.packNo) : 1;
+    const jitterLen = index === 0 ? 1 : shape.range(0.8, 1.2);
+    if (kind === 'bridge') return Math.max(30, Math.round(def.lengthPx / SPACING_PX));
+    return Math.max(10, Math.round((def.lengthPx * scale * jitterLen) / SPACING_PX));
   }
 
   /**
@@ -878,11 +940,7 @@ export class TerrainGenerator {
     const breather = this._isBreather(index, b);
     const sharp = isJump || (def.tags && def.tags.some((t) => SHARP_TAGS.includes(t)));
 
-    let scale = 1;
-    if (kind === 'spline') scale = Math.min(1.6, 1 + 0.08 * b.packNo);
-    const jitterLen = index === 0 ? 1 : shape.range(0.8, 1.2);
-    let n = Math.max(10, Math.round((def.lengthPx * scale * jitterLen) / SPACING_PX));
-    if (kind === 'bridge') n = Math.max(30, Math.round(def.lengthPx / SPACING_PX));
+    let n = this._segmentCount(def, kind, index, b, shape);
     this._ensureScratch(n + 2);
     let L = n * SPACING_PX;
     const raw = this._raw;
