@@ -1,8 +1,12 @@
 # Changelog
 
-## v2.16.1 — canonical replay QA control (#205 / #129) (2026-11-21)
+## v2.16.2 — canonical replay development check (#205 / #129) (2026-11-22)
 
-- **Developer-only verification.** Add one fresh canonical stock capture and two local same-build playbacks with all expected fingerprint channels at every completed tick, matching the separately observed fatal event. This is not historical A/B, a game feature, or a gameplay change.
+- **Same-build replay check for developers.** The local tool records one synthetic stock run in a pinned Chromium build, verifies its native canonical evidence, and compares every completed tick across two fresh replays plus the separate fatal event. It does not compare historical builds or change gameplay, scoring, or the replay format.
+
+## v2.16.1 — keep ground hop cues visible (#208 / #155) (2026-11-21)
+
+- **Ground hop cues stay visible at the edge.** Fixed-tick warning and sound timing no longer reads the rendered camera. The renderer uses the current view: if the hop arrow is clipped, the edge badge carries the cue. The badge only reads already-streamed terrain. No physics, score, replay ruleset or Pulp camera change.
 
 
 ## v2.16.0 — reconcile post-v2.15.3 merged capabilities and release policy (2026-11-21)
