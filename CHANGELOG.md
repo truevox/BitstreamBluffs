@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.19.16 — developer historical replay airtime check (#131 / #228) (2026-11-22)
+
+- **Measure airtime from one opt-in historical QA tape.** The fixed synthetic recording plays only in its pinned original v2.16.0 runtime. Two local native replays confirm the saved checkpoints and the sampled grounded state; the tool reports aggregate airtime, not the tape or player data. No gameplay, scoring, replay compatibility or production change.
+
 ## v2.19.15 — Arcade bridge dissolve, biome FX and pixel backdrops (#65 / #217) (2026-11-22)
 
 - **Cosmetic biome transition:** a readable neon-grid arcade bridge dissolves the outgoing biome to retro pixel geometry and reconstructs the incoming look as riding distance changes. The handoff is presentation-only: it never creates terrain, changes physics, draws authoritative random numbers or rebuilds colliders. Reduced-motion users retain the simple static transition.
