@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.18.4 — cross-engine replay conformance matrix (#161 / #120) (2026-11-22)
+
+- **Developer-only conformance harness and evidence; no game, replay-format or gameplay changes.** `tools/conformance/cross-engine*.mjs` replays nine committed fixture tapes through the real built game on Chromium, Firefox and Playwright WebKit at 30/60/120/144 Hz stepping, compares diagnostic (non-authoritative) per-tick digests split into causal state and derived reads, reports the first divergent tick and subsystem, TapePlayer checkpoint desyncs and final outcomes, and isolates `Math.*` differences with a pure-JS counterfactual (evidence for #121). Results and reproduction are in `docs/determinism/cross-engine-matrix.md`. Playwright WebKit is not iPhone Safari; real Safari/iOS, ARM and hardware GPUs were not tested.
+
 ## v2.18.1 — developer Run DNA preview in local inspector (#213 / #87) (2026-11-22)
 
 - **Local, unverified Run DNA artwork preview.** The developer Downhill Run Strip inspector can now display abstract artwork from the full decoded trace loaded through the existing local file chooser. It clears stale previews on another selection or error; earlier asynchronous reads cannot replace a newer choice. The preview uses an SVG blob as an image, never injected markup. Section zoom and existing SVG download remain unchanged. No player-facing feature, replay, scoreboard, network, or gameplay changes.
