@@ -64,7 +64,7 @@ const EXPECTED_WITHOUT_BOOSTS = 65; // B4 Sky Jellyfish bounce: +2; B4: +5; Read
 // load, and derives `pendingBiomes` from the level table on top of that, so a hand-set level or mask
 // alone is silently discarded.
 const PROFILE = {
-  v: 1, xp: 48400, level: 16, bank: 0, biomeMask: 31,
+  v: 1, xp: 48400, level: 16, bank: 0, biomeMask: 30, // the four earned biomes' bits; Debutmont's (1) is the base and never in a mask (#65)
   pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern'],
   // Level 16 has crossed both boost unlock levels (Head Start 8, Error Correction 15). A real profile
   // gets these from grantLevelRewards when the level is crossed; a fixture that sets XP directly must
@@ -592,9 +592,9 @@ async function main() {
           return { mask: g.registry.get('biomeMask'), seed: String(g.registry.get('seed') || '') };
         }).catch((e) => ({ fatal: String(e) }));
         if (res.fatal) fail('NEW SEED resets to the profile mask', res.fatal);
-        else if (res.mask !== 31) fail('NEW SEED resets to the profile mask', `saw ${res.mask}, expected 31`);
+        else if (res.mask !== PROFILE.biomeMask) fail('NEW SEED resets to the profile mask', `saw ${res.mask}, expected ${PROFILE.biomeMask}`);
         else if (/^daily-/.test(res.seed)) fail('NEW SEED is not a daily seed', res.seed);
-        else pass('NEW SEED resets to the profile mask', `mask 31, seed ${res.seed}`);
+        else pass('NEW SEED resets to the profile mask', `mask ${PROFILE.biomeMask}, seed ${res.seed}`);
         }
       } finally { await page.close(); }
     }
@@ -1411,7 +1411,7 @@ async function main() {
         else if (out.shield !== 0) fail('daily refuses the shield boost', `shieldCharges ${out.shield}`);
         else if (out.modded) fail('daily run is not marked modded', 'modded true');
         else if (out.factor !== 1) fail('daily refuses Head Start', `speedFactor ${out.factor}`);
-        // The fixture profile's mask is 31; the date cycle never produces 31, so 31 here means the
+        // The fixture profile's mask is 30; the date cycle never produces 30, so 30 here means the
         // run took the profile mask instead of the Daily's shared one.
         else if (out.mask === PROFILE.biomeMask || out.mask !== out.regMask) fail('daily uses the date mask, not the profile mask', `run mask ${out.mask}, registry ${out.regMask}`);
         else pass('daily run (real DAILY RUN item) refuses both boosts and uses the date mask', `shield 0, factor 1, not modded, mask ${out.mask}`);
@@ -2482,8 +2482,8 @@ async function main() {
     // report). Seeds and distances double as the lead's hand-play list.
     {
       const B1 = [
-        // seed is a frozen hash input (pre-rename spelling, issue #65), split so the old-spelling guard does not match it.
-        { biome: 'debutmont', name: 'Debutmont', seed: 'b1debu' + 'mont35', mask: 1, hazard: 'groomerCat', powerup: 'mapleWax' },
+        // Debutmont is the base biome (#65): the seed picks no biome, any seed spawns its hazard in the first 200 chunks.
+        { biome: 'debutmont', name: 'Debutmont', seed: 'b1debutmont35', mask: 1, hazard: 'groomerCat', powerup: 'mapleWax' },
         { biome: 'garbage-dump-glacier', name: 'Garbage Dump Glacier', seed: 'b1garbage13', mask: 2, hazard: 'seagullDive', powerup: 'slickWaxSpray' },
         { biome: 'underwater-mountain', name: 'Underwater Mountain', seed: 'b1underwater15', mask: 8, hazard: 'seaweedTangle', powerup: 'aquaLungBubble' },
         { biome: 'candy-cane-canyon', name: 'Candy Cane Canyon', seed: 'b1candy11', mask: 64, hazard: 'chocolateRiver', powerup: 'sweetToothCoating' },
@@ -2759,17 +2759,19 @@ async function main() {
       }
     }
 
-    // ---- Decision 3: a real seed@1 run that rides into a Debutmont sector (sector 2, from 1000 m; d3gate0 is
-    // chosen so sector 2 is Debutmont and sector 3 is base terrain) records Debutmont ENCOUNTERED through the real
-    // RUN_END -> ProgressionService path. The fixture has already encountered Pyramid Peak, so this second
-    // biome unlocks Explorer (biomes-2) and its reward trail-hue-aurora; then the real Profile view and
-    // Achievements grid show SEEN and 2/2. Lead hand-play: seed d3gate0@1 (Debutmont on), ride past 1000 m.
+    // ---- Decision 3 (#65 model): Debutmont is the base biome, so every run starts in it and it is encountered from
+    // sector 0. A real seed@2 run that rides into a Garbage Dump Glacier sector (sector 2, from 1000 m; d3gate0 is chosen
+    // so sector 2 is Garbage Dump Glacier behind an arcade bridge (about 1122-1193 m) and sector 3 is Debutmont again)
+    // records Garbage Dump Glacier ENCOUNTERED through the real RUN_END -> ProgressionService path, alongside the home
+    // biome. The fixture has already encountered Pyramid Peak, so the run ends with 3 biomes seen (home + Pyramid +
+    // Glacier): Explorer (biomes-2) and its reward trail-hue-aurora unlock; then the real Profile view and Achievements
+    // grid show SEEN. Lead hand-play: seed d3gate0@2, ride past 1200 m.
     {
       const name = {
-        enc: 'decision 3: a d3gate0@1 run that enters a Debutmont sector records it encountered, and Profile labels it DEBUTMONT SEEN',
+        enc: 'decision 3: a d3gate0@2 run that enters a Garbage Dump Glacier sector records it encountered with the home biome, and Profile labels it GARBAGE DUMP GLACIER SEEN',
         ach: 'decision 3: the second encountered biome unlocks Explorer (biomes-2) with trail-hue-aurora, and the grid shows 2/2',
       };
-      const profile = { ...JSON.parse(JSON.stringify(PROFILE)), biomeMask: 1, biomeProgress: { encountered: ['pyramid-peak'], completed: [] } };
+      const profile = { ...JSON.parse(JSON.stringify(PROFILE)), biomeMask: 2, biomeProgress: { encountered: ['pyramid-peak'], completed: [] } };
       const { page, errors } = await bootWithProfile(browser, port, profile);
       let out;
       try {
@@ -2780,7 +2782,7 @@ async function main() {
           await wait(900);
           const t = g.scene.getScene('TitleScene');
           t.starting = false;
-          t.startRun('d3gate0@1');
+          t.startRun('d3gate0@2');
           let run = null;
           const t0 = Date.now();
           while (Date.now() - t0 < 15000) {
@@ -2796,14 +2798,14 @@ async function main() {
           let visits = null;
           const onEnd = (p) => { visits = p && p.biomeVisits; };
           g.events.on('bb:runEnd', onEnd);
-          // Put the real sled 60 m into sector 2 and let the live loop ride it (BIOME_ENTER, furthest distance).
+          // Put the real sled 100 m past the arcade bridge into sector 2 and let the live loop ride it (BIOME_ENTER, furthest distance).
           const s = run.sled;
-          const sx = 1060 * 20;
+          const sx = 1300 * 20;
           run.streamTerrain(sx);
           const ang = run.slopeAt(sx);
           s.setPose(sx, run.terrain.heightAt(sx) - 18, ang, Math.cos((ang * Math.PI) / 180) * 400, Math.sin((ang * Math.PI) / 180) * 400);
           const t1 = Date.now();
-          while (Date.now() - t1 < 1500 && !entered.includes('debutmont')) { s.invulnerableMs = 600000; await wait(50); }
+          while (Date.now() - t1 < 1500 && !entered.includes('garbage-dump-glacier')) { s.invulnerableMs = 600000; await wait(50); }
           s.invulnerableMs = 0;
           run.pendingCrash = { cause: 'chasm' };
           let over = false;
@@ -2847,19 +2849,19 @@ async function main() {
         fail(name.ach, out.fatal || `page errors: ${errors.join(' | ')}`);
       } else {
         const enc = (out.after && out.after.encountered) || [];
-        if (out.mask !== 1 || !(out.distanceM >= 1000)) fail(name.enc, `record mask ${out.mask}, distance ${out.distanceM} m (want mask 1, >= 1000 m)`);
-        else if (!out.entered.includes('debutmont')) fail(name.enc, `the live run never announced Debutmont (BIOME_ENTER ${out.entered})`);
-        else if (!out.visits || !out.visits.encountered.includes('debutmont')) fail(name.enc, `RUN_END.biomeVisits ${JSON.stringify(out.visits)}`);
+        if (out.mask !== 2 || !(out.distanceM >= 1000)) fail(name.enc, `record mask ${out.mask}, distance ${out.distanceM} m (want mask 2, >= 1000 m)`);
+        else if (!out.entered.includes('garbage-dump-glacier')) fail(name.enc, `the live run never announced Garbage Dump Glacier (BIOME_ENTER ${out.entered})`);
+        else if (!out.visits || !out.visits.encountered.includes('garbage-dump-glacier') || !out.visits.encountered.includes('debutmont')) fail(name.enc, `RUN_END.biomeVisits ${JSON.stringify(out.visits)}`);
         else if (out.recKeys.includes('biomeVisits')) fail(name.enc, 'biomeVisits leaked into the RunRecord');
-        else if (!enc.includes('debutmont') || !enc.includes('pyramid-peak')) fail(name.enc, `profile biomeProgress ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}`);
-        else if (!out.labels.includes('DEBUTMONT SEEN')) fail(name.enc, `Profile toggle labels ${JSON.stringify(out.labels)}`);
-        else if (!out.profTexts.includes('BIOMES SEEN 2/11 DONE 0/11')) fail(name.enc, `Profile summary missing (${out.profTexts.filter((x) => /BIOMES/.test(x))})`);
-        else pass(name.enc, `${out.distanceM} m at mask 1: BIOME_ENTER debutmont, biomeVisits ${JSON.stringify(out.visits)}, profile ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}, label DEBUTMONT SEEN`);
+        else if (!enc.includes('debutmont') || !enc.includes('garbage-dump-glacier') || !enc.includes('pyramid-peak')) fail(name.enc, `profile biomeProgress ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}`);
+        else if (!out.labels.includes('GARBAGE DUMP GLACIER SEEN')) fail(name.enc, `Profile toggle labels ${JSON.stringify(out.labels)}`);
+        else if (!out.profTexts.includes('BIOMES SEEN 3/11 DONE 1/11')) fail(name.enc, `Profile summary missing (${out.profTexts.filter((x) => /BIOMES/.test(x))})`);
+        else pass(name.enc, `${out.distanceM} m at mask 2: BIOME_ENTER garbage-dump-glacier, biomeVisits ${JSON.stringify(out.visits)}, profile ${JSON.stringify(out.before)} -> ${JSON.stringify(out.after)}, label GARBAGE DUMP GLACIER SEEN`);
         if (!Number.isFinite(out.ach['biomes-2'])) fail(name.ach, `biomes-2 not unlocked (achievements ${Object.keys(out.ach)})`);
         else if (!out.cosmetics.includes('trail-hue-aurora')) fail(name.ach, `trail-hue-aurora not granted (${out.cosmetics})`);
-        else if (Number.isFinite(out.ach['biomes-5'])) fail(name.ach, 'biomes-5 unlocked with only 2 biomes');
-        else if (!out.gridTexts.includes('2/2') || !out.gridTexts.includes('2/5') || !out.gridTexts.includes('2/11')) fail(name.ach, `grid biome progress missing (has 2/2 ${out.gridTexts.includes('2/2')}, 2/5 ${out.gridTexts.includes('2/5')}, 2/11 ${out.gridTexts.includes('2/11')})`);
-        else pass(name.ach, 'biomes-2 stamped, trail-hue-aurora owned, biomes-5 still locked; grid 2/2, 2/5, 2/11');
+        else if (Number.isFinite(out.ach['biomes-5'])) fail(name.ach, 'biomes-5 unlocked with only 3 biomes');
+        else if (!out.gridTexts.includes('2/2') || !out.gridTexts.includes('3/5') || !out.gridTexts.includes('3/11')) fail(name.ach, `grid biome progress missing (has 2/2 ${out.gridTexts.includes('2/2')}, 3/5 ${out.gridTexts.includes('3/5')}, 3/11 ${out.gridTexts.includes('3/11')})`);
+        else pass(name.ach, 'biomes-2 stamped, trail-hue-aurora owned, biomes-5 still locked; grid 2/2, 3/5, 3/11');
       }
     }
 
@@ -3090,6 +3092,8 @@ async function main() {
       }
     }
 
+    // Seeds re-found for #65 (b3pyramid4, b3steam3, b3micro1): the terrain a seed builds changed (Debutmont base, arcade bridges), so
+    // the old seeds' first hazard instances no longer suited these probes.
     // ---- B3 (biome full treatment, "Motion"): per biome, a real seed@<bit> run of the built game. The moving hazard's real
     // entity is driven by the live frame loop (run.update -> renderFrame -> Hazard.update -> HazardMotion) with the real
     // sled riding toward it: a roll must wait, start while on screen, roll toward the sled at its speed along the ground
@@ -3098,9 +3102,9 @@ async function main() {
     // without it. The Clockwork Treads are measured against a real Steampunk conveyor zone of the run.
     {
       const B3 = [
-        { biome: 'pyramid-peak', name: 'Pyramid Peak', seed: 'b3pyramid54', mask: 4, hazard: 'rollingBoulder', powerup: 'sandrunnerSkis' },
-        { biome: 'steampunk-slopes', name: 'Steampunk Slopes', seed: 'b3steam63', mask: 256, hazard: 'gearGate', powerup: 'clockworkTreads' },
-        { biome: 'micro-mountain', name: 'Micro Mountain', seed: 'b3micro26', mask: 512, hazard: 'dewDrop', powerup: 'royalJellyWax' },
+        { biome: 'pyramid-peak', name: 'Pyramid Peak', seed: 'b3pyramid4', mask: 4, hazard: 'rollingBoulder', powerup: 'sandrunnerSkis' },
+        { biome: 'steampunk-slopes', name: 'Steampunk Slopes', seed: 'b3steam3', mask: 256, hazard: 'gearGate', powerup: 'clockworkTreads' },
+        { biome: 'micro-mountain', name: 'Micro Mountain', seed: 'b3micro1', mask: 512, hazard: 'dewDrop', powerup: 'royalJellyWax' },
       ];
       const { ROLL_ACTIVATE_PX, gateTiming, rollParams, rollOffsetAt } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
       const { glideDrag, glideFrictionMul } = await import(path.join(ROOT, 'src/systems/BiomeEffects.js'));
@@ -3423,8 +3427,8 @@ async function main() {
     {
       const { ROLL_ACTIVATE_PX, rollParams } = await import(path.join(ROOT, 'src/systems/HazardMotion.js'));
       const ROLLERS = [
-        { name: 'Pyramid Peak', seed: 'b3pyramid54', mask: 4, hazard: 'rollingBoulder' },
-        { name: 'Micro Mountain', seed: 'b3micro26', mask: 512, hazard: 'dewDrop' },
+        { name: 'Pyramid Peak', seed: 'b3pyramid4', mask: 4, hazard: 'rollingBoulder' },
+        { name: 'Micro Mountain', seed: 'b3micro1', mask: 512, hazard: 'dewDrop' },
       ];
       for (const R of ROLLERS) {
         const hd = HAZ_DEFS[R.hazard];
@@ -3557,7 +3561,7 @@ async function main() {
         else pass(name, `${run}: at ${o.m} m; moving sled (200 px/s): never caught, closest ${moving.gapMin} px ahead; stopped sled ${stopped.startGap} px ahead of the start: reached after ${stopped.hitMs} ms at <= ${stopped.maxV} px/s, on screen the whole approach (${stopped.behindPx} px of ground on screen behind the sled), ${stopped.hits}`);
       }
     }
-    // ---- Micro Mountain glow-up. (1) HUGE bees: a real beegate0@512 run (sector 2, 1000-1500 m, is Micro Mountain,
+    // ---- Micro Mountain glow-up. (1) HUGE bees: a real beegate0@512 run (sector 2, 1000-1500 m, is Micro Mountain after an arcade bridge, 1086-1585 m,
     // sector 3 is base terrain) rides the live loop into Micro; the backdrop draws bees (Background.beeCount, sampled
     // over 3 s since a bee drifts on and off screen), and the backdrop Graphics is below the terrain, hazard,
     // pickup and sled depths. A mask-0 run draws none. (2) The Neon Sled Drone: the real Shard Shop lists it locked
@@ -3617,7 +3621,7 @@ async function main() {
             let run = await startAt(g, 'beegate0@512');
             if (!run) return { fatal: 'RunScene never produced a live sled (micro)' };
             const s = run.sled;
-            const sx = 1060 * 20;
+            const sx = 1300 * 20; // inside the Micro stretch (1086-1585 m): sector 2 opens with an arcade bridge (#65)
             run.streamTerrain(sx);
             const ang = run.slopeAt(sx);
             s.setPose(sx, run.terrain.heightAt(sx) - 18, ang, Math.cos((ang * Math.PI) / 180) * 300, Math.sin((ang * Math.PI) / 180) * 300);

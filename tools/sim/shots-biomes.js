@@ -12,9 +12,8 @@
   'use strict';
   const S = () => window.__shots;
   const BIOMES = [
-    // Seeds are frozen hash inputs: the pre-rename seed puts the biome at `sector`, so its spelling must not follow the
-    // rename (issue #65). Split so the old-spelling guard test does not match it.
-    { bit: 1, id: 'debutmont', seed: 'biome-debu' + 'mont-1', sector: 3 },
+    // Debutmont is the base biome (#65): every sector of every mask is Debutmont, so any seed and sector shows it.
+    { bit: 1, id: 'debutmont', seed: 'biome-debutmont-1', sector: 3 },
     { bit: 2, id: 'garbage-dump-glacier', seed: 'biome-garbage-dump-glacier-0', sector: 3 },
     { bit: 4, id: 'pyramid-peak', seed: 'biome-pyramid-peak-0', sector: 2 },
     { bit: 8, id: 'underwater-mountain', seed: 'biome-underwater-mountain-0', sector: 2 },
