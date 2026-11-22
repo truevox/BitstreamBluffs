@@ -5,10 +5,12 @@
  *
  * These art-direction presets are proposals, not hard-coded sound synthesis.
  */
+import { canonicalBiomeId } from '../../data/biomeAliases.js';
+
 export const HOME_BIOME = 'bitstream-bluffs';
 export const BIOME_VOICES = Object.freeze({
 	'bitstream-bluffs': { instrument: 'glitch-chip vocoder', environment: 'virtual-arcade', family: 'speech-synth' },
-	'debumont': { instrument: 'warm SNES woodwind', environment: 'winter-cabin', family: 'sampled-wavetable' },
+	'debutmont': { instrument: 'warm SNES woodwind', environment: 'winter-cabin', family: 'sampled-wavetable' },
 	'garbage-dump-glacier': { instrument: 'corrupt speech chip', environment: 'drain-tunnel', family: 'glitch-vocoder' },
 	'pyramid-peak': { instrument: 'FM brass', environment: 'stone-chamber', family: 'fm' },
 	'underwater-mountain': { instrument: 'liquid glass harmonica', environment: 'submerged', family: 'formant' },
@@ -22,7 +24,8 @@ export const BIOME_VOICES = Object.freeze({
 });
 
 export const BIOME_IDS = Object.freeze(Object.keys(BIOME_VOICES));
-export function voiceSourceForBiome(id) {
+export function voiceSourceForBiome(rawId) {
+	const id = canonicalBiomeId(rawId); // a stale legacy-id request (issue #65) resolves to its canonical id
 	const selected = Object.prototype.hasOwnProperty.call(BIOME_VOICES, id) ? id : HOME_BIOME;
 	return 'voice:' + selected;
 }

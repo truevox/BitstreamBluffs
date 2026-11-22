@@ -1,5 +1,6 @@
 /** Validated, versioned music-pack data. No Phaser, DOM or I/O. */
 import { BIOME_IDS, HOME_BIOME } from './BiomeVoices.js';
+import { canonicalBiomeId, canonicalLegacyId } from '../../data/biomeAliases.js';
 export const CORE_STEMS = Object.freeze(['vocals', 'drums', 'bass', 'guitar', 'piano', 'other']);
 const validId = (s) => typeof s === 'string' && /^[a-zA-Z0-9:_-]{1,100}$/.test(s);
 const safePath = (s) => typeof s === 'string' && s.length < 300 &&
@@ -34,7 +35,10 @@ function normalizeAdaptive(raw, count) {
 		if (!biomeFiles || typeof biomeFiles !== 'object' ||
 			Array.isArray(biomeFiles)) throw new Error('Invalid adaptive variants');
 		const mapping = Object.create(null);
-		for (const [biome, files] of Object.entries(biomeFiles)) {
+		for (const [legacyBiome, legacyFiles] of Object.entries(biomeFiles)) {
+			// A pack still written with the legacy id (issue #65) loads under the canonical one, paths included.
+			const biome = canonicalBiomeId(legacyBiome);
+			const files = Array.isArray(legacyFiles) ? legacyFiles.map(canonicalLegacyId) : legacyFiles;
 			if (biome === HOME_BIOME || !BIOME_IDS.includes(biome) ||
 				!Array.isArray(files) || files.length !== count ||
 				!files.every(safePath)) {
@@ -70,7 +74,8 @@ export function normalizePack(raw) {
 		throw new Error('Invalid music pack');
 	}
 	let cursor = 0;
-	const baselineNames = Object.keys(raw.segments[0]?.sources || {}).sort();
+	// Source keys and paths may carry a legacy biome id (issue #65, e.g. a legacy voice key); read them as canonical.
+	const baselineNames = Object.keys(raw.segments[0]?.sources || {}).map(canonicalLegacyId).sort();
 	if (baselineNames.length < CORE_STEMS.length ||
 		baselineNames.length > (raw.adaptive === undefined ? 48 : 42)) {
 		// Adaptive packs reserve SIX reusable mixer buses (featured, bass, drums, plus individual source guitar/piano/other).
@@ -81,12 +86,13 @@ export function normalizePack(raw) {
 			!seg.sources || typeof seg.sources !== 'object') {
 			throw new Error('Noncontiguous music segment');
 		}
-		if (Object.keys(seg.sources).sort().join('|') !== baselineNames.join('|')) throw new Error('Stem names change between segments');
+		const segSources = Object.fromEntries(Object.entries(seg.sources).map(([k, v]) => [canonicalLegacyId(k), canonicalLegacyId(v)]));
+		if (Object.keys(segSources).sort().join('|') !== baselineNames.join('|')) throw new Error('Stem names change between segments');
 		for (const name of CORE_STEMS) {
-			if (!safePath(seg.sources[name])) throw new Error('Missing or unsafe stem: ' + name);
+			if (!safePath(segSources[name])) throw new Error('Missing or unsafe stem: ' + name);
 		}
 		const sources = {};
-		for (const [name, path] of Object.entries(seg.sources)) {
+		for (const [name, path] of Object.entries(segSources)) {
 			if (!validId(name) || !safePath(path)) throw new Error('Unsafe music source');
 			sources[name] = path;
 		}
@@ -97,7 +103,7 @@ export function normalizePack(raw) {
 	const effects = Object.create(null);
 	if (raw.effects !== undefined) {
 		if (!raw.effects || typeof raw.effects !== 'object' || Array.isArray(raw.effects)) throw new Error('Invalid effects map');
-		for (const [name, stages] of Object.entries(raw.effects)) {
+		for (const [name, stages] of Object.entries(raw.effects).map(([k, v]) => [canonicalLegacyId(k), v])) {
 			if (!baselineNames.includes(name) || !Array.isArray(stages) || stages.length > 16) {
 				throw new Error('Invalid source FX preset');
 			}
@@ -114,7 +120,7 @@ export function normalizePack(raw) {
 	if (raw.roomSends !== undefined) {
 		if (!raw.roomSends || typeof raw.roomSends !== 'object' ||
 			Array.isArray(raw.roomSends)) throw new Error('Invalid room sends');
-		for (const [name, value] of Object.entries(raw.roomSends)) {
+		for (const [name, value] of Object.entries(raw.roomSends).map(([k, v]) => [canonicalLegacyId(k), v])) {
 			if (!baselineNames.includes(name) || !Number.isFinite(value) ||
 				value < 0 || value > 1) throw new Error('Invalid room send level');
 			roomSends[name] = value;
@@ -126,7 +132,7 @@ export function normalizePack(raw) {
 		if (!raw.layers || typeof raw.layers !== 'object' || Array.isArray(raw.layers)) {
 			throw new Error('Invalid derived layer map');
 		}
-		for (const [name, level] of Object.entries(raw.layers)) {
+		for (const [name, level] of Object.entries(raw.layers).map(([k, v]) => [canonicalLegacyId(k), v])) {
 			if (!baselineNames.includes(name) || CORE_STEMS.includes(name) ||
 				name.startsWith('voice:') || !Number.isFinite(level) || level < 0 || level > 1.5) {
 				throw new Error('Invalid derived layer');

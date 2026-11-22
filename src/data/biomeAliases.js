@@ -13,3 +13,17 @@ export const LEGACY_BIOME_ALIASES = Object.freeze({ debumont: 'debutmont' });
 export function canonicalBiomeId(id) {
   return typeof id === 'string' && Object.hasOwn(LEGACY_BIOME_ALIASES, id) ? LEGACY_BIOME_ALIASES[id] : id;
 }
+
+/**
+ * A string with any legacy biome id inside it rewritten ("t4-biome-debumont" -> "t4-biome-debutmont",
+ * "voice:debumont" -> "voice:debutmont", "adaptive/debumont/bass-0000.ogg" -> "adaptive/debutmont/..."). Mission
+ * ids, music source keys and asset paths all embed the biome id, so saves and stale packs follow the rename.
+ * @param {*} id
+ * @returns {*}
+ */
+export function canonicalLegacyId(id) {
+  if (typeof id !== 'string') return id;
+  let out = id;
+  for (const [legacy, canon] of Object.entries(LEGACY_BIOME_ALIASES)) out = out.split(legacy).join(canon);
+  return out;
+}

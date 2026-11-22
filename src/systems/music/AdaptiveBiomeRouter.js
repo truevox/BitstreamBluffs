@@ -10,6 +10,7 @@
  * A failed or slow variant fetch never mutes its original source.
  */
 import { HOME_BIOME } from './BiomeVoices.js';
+import { canonicalBiomeId } from '../../data/biomeAliases.js';
 
 export const ADAPTIVE_FAMILIES = Object.freeze(['bass', 'drums', 'featured', 'guitar', 'piano', 'other']);
 const FADE_SECONDS = 0.20;
@@ -48,7 +49,7 @@ export class AdaptiveBiomeRouter {
 		this.reset();
 		this.pack = pack?.adaptive ? pack : null;
 		this.clockStart = Number.isFinite(clockStart) ? clockStart : null;
-		this.biome = biome;
+		this.biome = canonicalBiomeId(biome);
 		this.airborne = !!airborne;
 		if (!this.pack) return;
 		this._attach();
@@ -65,7 +66,7 @@ export class AdaptiveBiomeRouter {
 	}
 
 	setBiome(id) {
-		this.biome = id || HOME_BIOME;
+		this.biome = canonicalBiomeId(id) || HOME_BIOME;
 		this._reconcile();
 	}
 

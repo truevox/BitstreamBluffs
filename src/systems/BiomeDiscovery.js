@@ -19,6 +19,7 @@
  * does not: the run went on and the sled still rode the sector to its end. (Documented in ARCHITECTURE.)
  */
 import { biomeForSector, SECTOR_M } from './TerrainGenerator.js';
+import { canonicalBiomeId } from '../data/biomeAliases.js';
 
 /**
  * Every biome id the profile may record, in the level table's biomeOrder. A static list on purpose: the
@@ -27,7 +28,7 @@ import { biomeForSector, SECTOR_M } from './TerrainGenerator.js';
  * list to src/data/biomes and to levels.json biomeOrder, so it cannot drift from the content.
  */
 export const BIOME_IDS = Object.freeze([
-  'debumont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern',
+  'debutmont', 'garbage-dump-glacier', 'pyramid-peak', 'underwater-mountain', 'crystal-cavern',
   'space-mountain', 'candy-cane-canyon', 'sky-jellyfish-mountain', 'steampunk-slopes', 'micro-mountain',
   'vertigo-vents',
 ]);
@@ -89,7 +90,8 @@ export function detectBiomeVisits(o = {}) {
  */
 export function sanitizeBiomeProgress(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return EMPTY();
-  const known = (v) => (Array.isArray(v) ? v.filter((id) => typeof id === 'string' && BIOME_IDS.includes(id)) : []);
+  // A legacy id (issue #65) is read as its canonical id; `canonical` below dedupes if both spellings were saved.
+  const known = (v) => (Array.isArray(v) ? v.map(canonicalBiomeId).filter((id) => typeof id === 'string' && BIOME_IDS.includes(id)) : []);
   const completed = canonical(known(raw.completed));
   const encountered = canonical([...known(raw.encountered), ...completed]);
   return { encountered, completed };

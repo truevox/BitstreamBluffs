@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased - Debumont renamed Debutmont (2026-11-21)
+
+- **The first biome is now spelled "Debutmont"** (Marvin confirmed the spelling; issue #65, part 1 of 3). The biome id, name, hazards (Groomer Cat), power-up (Maple Wax), mission (`t4-biome-debutmont`, "1500 m in Debutmont"), Sync Level reward, music voice (`voice:debutmont`), the per-pack `adaptive/debutmont/` OGG directories (git renames, bytes unchanged), tools, tests and docs all use the new spelling. No gameplay, terrain, unlock level or profile default changes.
+- **Legacy alias, nothing lost.** `src/data/biomeAliases.js` maps `debumont` to `debutmont`. Profile sanitize applies it to `biomeProgress`, `unlocked.biomes` and the active mission list and mission progress (both spellings merge; the larger progress count wins), and the music pack loader, voice lookup and adaptive router read a stale `debumont` key or path as `debutmont`, so older saves and music branches written before the rename keep working.
+- **Historical entries below keep the old spelling** where they describe releases that shipped under it.
+- Tests: `biome-debutmont-alias.test.js` covers the save migration, the music lookups and a guard that no tracked text file outside the alias layer and this changelog spells the old name.
+
 ## v2.15.1 - Sky Jellyfish felt spring rebound (2026-11-16)
 
 - **Sky Jellyfish springs now visibly rebound on scored landings.** The rebound returns a bounded share of impact speed, follows the ground normal, and preserves along-slope velocity (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). A rebound under 120 px/s is treated as no rebound, so at the shipped 0.2 share only impacts of 600 px/s or more are felt (800 px/s returns 160 px/s); the floor is the measured point that keeps the bounce felt within the accepted ±15% mask-128 hop survival tolerance. Stabilizer Rails damp the share to 0.05, below the floor even at an 801 px/s impact. A zero, negative or non-finite rebound request leaves `Sled.launchNormal` and its contact/snap/chute state untouched. The normal projection is checked on uniform slopes; it makes no general irregular-terrain safety claim. Bounce pads retain their existing launch behaviour.
