@@ -65,7 +65,7 @@ export function referenceState() {
       bluff: { armed: false, usedCanopy: false, usedAirbrake: false, closestGapPx: null, previousGapPx: null, chain: 0, lastAwardX: -Infinity, lastAwardTimeMs: -Infinity },
     },
     kodiak: {
-      next: 1, on: true,
+      next: 1, on: true, shoveCdMs: 412.5,
       bears: [{
         kind: 'kernelPanic', n: 0, member: 0, x: 2000, speed: 150, phase: 'tele', phaseMs: 100, ageMs: 900, rngState: 12345,
         feints: 1, targetX: null, groundY: NaN, sledAhead: false, real: true, hit: false, done: false,

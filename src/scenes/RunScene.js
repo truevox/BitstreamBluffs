@@ -48,7 +48,7 @@ import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { resolveReplaySetup } from '../systems/replay/manifest.js';
 import { scheduleRunEvidence, RULESET_KEY } from '../systems/replay/evidenceCapture.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
-import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, KODIAK_BY_ID, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
+import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, kodiakKnockback, KODIAK_KNOCK, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
 import { KodiakRider } from '../entities/KodiakRider.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
@@ -64,7 +64,7 @@ import { Hazard } from '../entities/Hazard.js';
 import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
-import { WorldDanceEnvelope, worldDanceMotionAllowed } from '../systems/WorldDance.js';
+import { WorldDanceEnvelope, worldDanceMotionAllowed, readWorldDanceAudio } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
@@ -239,6 +239,7 @@ export class RunScene extends Phaser.Scene {
       : this.settings?.kodiakPacks === 'mixed' ? 'mixed' : 'same';
     this.kodiaks = [];
     this.kodiakNext = 0;
+    this.kodiakShoveCdMs = 0; // immunity window after a bear shove (sim ms)
     // Player abilities and BSOD behavior are unchanged in the Gym. Only the
     // starting pose, pursuit gap/speed and post-catch retry are different.
     this.gymSetup = this.bsodGym ? gymSetupForProfile(prof) : null;
@@ -350,6 +351,17 @@ export class RunScene extends Phaser.Scene {
 
     // initial terrain buffer, then the sled on the surface
     this._chunkQueue = new Map(); // a retry re-enters create() on this instance: no stale queued chunks
+    // The scene instance outlives the run (scene.start re-enters create()). The biome announcement compares the sled's
+    // sector with the last one it saw. Before #140 the palette repaint also rebuilt terrain colliders, so this
+    // affected physics by session position; since #140 it is a presentation/cue reset. Keep every run like run #1.
+    this._biomeSector = undefined;
+    this._lastBiome = undefined;
+    // Presentation state of the previous run (a stale boost hint at run start, a stale POWERUP_EXPIRED id):
+    this.lastBoost = null;
+    this.boostId = null;
+    // Defensive: update() rewrites these every frame, so today they carry nothing over.
+    this._hopped = false;
+    this._pushed = false;
     this.streamTerrain(0);
     const start = this.safeStartPosition();
     // spawn a few body-lengths in so the rear runner is over solid ground (terrain begins exactly at start.x)
@@ -452,8 +464,10 @@ export class RunScene extends Phaser.Scene {
         this.finishGymReady();
       }
     };
-    this._onMusicTrackChange = (payload) => this.songBillboard?.showTrack(payload,
-      this.registry.get(REG.AUDIO));
+    // Audio is presentation: a failing engine must never break run start or the emitter (issue #140).
+    this._onMusicTrackChange = (payload) => {
+      try { this.songBillboard?.showTrack(payload, this.registry.get(REG.AUDIO)); } catch { /* no billboard */ }
+    };
     this.game.events.on(EVT.MUSIC_TRACK_CHANGED,this._onMusicTrackChange);
     this.game.events.on(EVT.SETTINGS_CHANGED, this._onSettings);
     this.game.events.on(EVT.GAME_RESUME, this._onResume);
@@ -465,9 +479,11 @@ export class RunScene extends Phaser.Scene {
     this.scene.launch(SCENES.UI);
     // A track may already be playing from the Title jukebox. Introduce it
     // once when entering the first run, never once per scene retry.
-    const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
-    if(playing?.state==='playing'&&playing.current)
-      this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    try {
+      const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
+      if(playing?.state==='playing'&&playing.current)
+        this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    } catch { /* a throwing audio engine must not stop the run from starting (issue #140) */ }
     this._initGhosts();
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
@@ -539,12 +555,14 @@ export class RunScene extends Phaser.Scene {
 
   /**
    * Issue #47: one Kodiak PACK at a time, on the seeded schedule (Kodiaks.kodiakEncounter). Runs inside the
-   * fixed tick; collision is a tick-exact box test per bear (no Matter body). A hit is a crash hazard, so
-   * shields, the respawn grace and Hashed Backup apply exactly as for any hazard; passing a bear scores.
+   * fixed tick; collision is a tick-exact box test per bear (no Matter body). Contact is never a crash: the bear
+   * shoves the sled back and up (Kodiaks.kodiakKnockback), once per bear, with a shared immunity window so a pack
+   * cannot chain shoves. A shoved bear earns no pass bonus; a clean pass scores.
    */
   updateKodiaks(dt) {
     if (!this.kodiaksOn || this.crashed || !this.sled) return;
     const sled = this.sled;
+    if (this.kodiakShoveCdMs > 0) this.kodiakShoveCdMs = Math.max(0, this.kodiakShoveCdMs - dt);
     if (!this.kodiaks.length) {
       const enc = kodiakEncounter(this.seed, this.kodiakNext, this.kodiakPackMode);
       if ((sled.x - this.startX) / PIXELS_PER_METER < enc.atM) return;
@@ -564,11 +582,15 @@ export class RunScene extends Phaser.Scene {
         this.playSfx('groundWarn', { brace: ev.telegraph === 'real' });
         this.emitIf(EVT.KODIAK, { type: 'telegraph', id: k.def.id, short: k.def.short, real: ev.telegraph === 'real' });
       }
-      if (!k.hit && !(sled.invulnerableMs > 0) && kodiakHits(kodiakBox(k.x, k.groundY), sledBox)) {
+      if (!k.hit && this.kodiakShoveCdMs <= 0 && !(sled.invulnerableMs > 0) && kodiakHits(kodiakBox(k.x, k.groundY), sledBox)) {
         k.hit = true;
-        if (!this.pendingCrash) this.pendingCrash = { cause: 'hazard', hazardId: k.def.id };
+        const shove = kodiakKnockback(k, sled);
+        this._addSledVelocity(shove.dvx, shove.dvy);
+        this.kodiakShoveCdMs = KODIAK_KNOCK.immunityMs;
         this.fx.sparks(k.x, k.groundY - 14, k.def.accent, 16, 220);
         this.shake(3);
+        this.playSfx('push');
+        this.emitIf(EVT.KODIAK, { type: 'shove', id: k.def.id, short: k.def.short, n: k.n, member: k.member, dvx: shove.dvx, dvy: shove.dvy });
       }
       // Passing a bear (it was ahead and now is behind) scores; clearing it in the air scores more.
       const ahead = sled.x > k.x;
@@ -1367,7 +1389,7 @@ export class RunScene extends Phaser.Scene {
     this.updateZones(sled.x);
     this.sampleSafeGround(dt, fs);
 
-    // Issue #47: the Kodiak rival (if one is out) runs, telegraphs and may hit the sled this tick.
+    // Issue #47: the Kodiak rival (if one is out) runs, telegraphs and may shove the sled this tick.
     this.updateKodiaks(dt);
 
     // Collision with the deletion wall always wins if any other contact/landing happened during this frame.
@@ -1455,8 +1477,8 @@ export class RunScene extends Phaser.Scene {
     const danceAllowed=worldDanceMotionAllowed(this.settings,
       this._worldDanceMotionQuery?.matches===true);
     const audio=this.registry?.get?.(REG.AUDIO);
-    const sample=danceAllowed?audio?.getWorldDanceSample?.():null;
-    const meter=danceAllowed&&sample?audio?.getSyntheticMeterTiming?.():null;
+    // Never throws: a failing audio engine must not stop the frame (and with it Phaser's loop), issue #140.
+    const {sample,meter}=readWorldDanceAudio(audio,danceAllowed);
     const dance=this.worldDance?.update(sample,dt,meter)||0;
     this.bg.update(cam.scrollX, t, sled.speed,dance);
     this.songBillboard?.update(dt,dance,!danceAllowed);
@@ -2324,7 +2346,7 @@ export class RunScene extends Phaser.Scene {
     const hz = this.content && this.content.hazards;
     const h = this._crashHazard;
     const ent = c.cause === 'hazard' && h && h.def && h.def.id === c.hazardId ? h : null;
-    const def = ent ? ent.def : c.hazardId ? (hz && hz[c.hazardId]) || KODIAK_BY_ID[c.hazardId] || null : null;
+    const def = ent ? ent.def : c.hazardId ? (hz && hz[c.hazardId]) || null : null;
     const arrivalMs = ent && this.teleTracker ? this.teleTracker.lastArrivalMs(ent) : null;
     this.registry.set(REG.LAST_CRASH, crashReport({
       runId: this.runId, seed: this.seed, biomeMask: this.biomeMask, cause: c.cause, def, x: fs.x, startX: this.startX,
@@ -2365,6 +2387,7 @@ export class RunScene extends Phaser.Scene {
 
   onSettingsChanged(payload) {
     if (payload && payload.settings) this.settings = payload.settings;
+    // A palette toggle (Pause > Settings) is presentation: repaint only, never rebuild colliders (issue #140).
     if (payload && payload.key === 'palette' && this.sled) this.refreshPalette();
   }
 
@@ -2383,6 +2406,14 @@ export class RunScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Repaint the world in the current palette (+ the active sector's biome tint). Graphics only: terrain chunks are
+   * repainted with TerrainMesh.redrawChunk and their colliders are never touched (issue #140). Used by the palette
+   * setting AND on entering / leaving a biome sector. A biome's gameplay (zone mods, hazards, pickups) is chunk data
+   * read by the sim (getZoneDefs, takeChunk); collider material is fixed (TerrainMesh._takeBody), so rebuilding the
+   * colliders here only reshuffled body ids/order and dropped contact warm-start state. Owner-approved physics change
+   * (SIM_REVISION 2).
+   */
   refreshPalette() {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
@@ -2406,7 +2437,7 @@ export class RunScene extends Phaser.Scene {
     this.mesh.setPalette(this.palette);
     for (const chunk of this.terrain.getActiveChunks()) {
       if (!this.mesh.chunks.has(chunk.index)) continue;
-      this.mesh.addChunk(chunk); // redraws (removes + re-adds)
+      this.mesh.redrawChunk(chunk); // graphics only; colliders stay
       const hz = this.hazards.get(chunk.index);
       if (hz) hz.forEach((h) => { h.palette = this.palette; h.color = hazardColor(h.def, this.palette); });
       const pu = this.powerups.get(chunk.index);
