@@ -1,12 +1,13 @@
 /* Cross-engine replay conformance matrix (issue #120). DIAGNOSTIC, NON-AUTHORITATIVE: see docs/determinism/cross-engine-matrix.md.
  *
  *   npm run build && npx vite preview --port 8412 &
- *   GAME_URL=http://localhost:8412/ xvfb-run -a node tools/conformance/cross-engine.mjs record            # (re)record fixture tapes (Chromium)
+ *   CE_TAPE_DIR=/tmp/bsb-ce-sim6-NEW GAME_URL=http://localhost:8412/ xvfb-run -a node tools/conformance/cross-engine.mjs record  # new folder only
  *   GAME_URL=http://localhost:8412/ xvfb-run -a node tools/conformance/cross-engine.mjs matrix            # replay everywhere, write results
  *   ... cross-engine.mjs matrix --resume    # continue an interrupted matrix: finished sessions are read from the journal
  *   node tools/conformance/cross-engine.mjs scout [fixtureId]                                             # explore autopilot outcomes
  *
- * Env: ENGINES (comma list; default all), HZ (default 30,60,120,144), SESSIONS (fresh browser contexts per engine/cadence, default 2),
+ * Env: CE_TAPE_DIR (required NEW absolute output for record; optional replay input for matrix/fresh/positions),
+ *      ENGINES (comma list; default all), HZ (default 30,60,120,144), SESSIONS (fresh browser contexts per engine/cadence, default 2),
  *      FIXTURES (comma ids), OUT (results json), RASTER=1 (really rasterise WebGL frames; default skips only the GPU draw call).
  * Firefox has no usable headless WebGL here, so it runs headed: wrap the command in xvfb-run (Mesa llvmpipe).
  * Playwright WebKit is NOT iPhone Safari (different OS, GPU, JIT/libm); a pass here says nothing about real Safari/iOS.
@@ -20,13 +21,16 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FIXTURES } from './cross-engine-fixtures.mjs';
+import { selectTapeDirectory, prepareRecordingDirectory } from './cross-engine-paths.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const url = process.env.GAME_URL || 'http://localhost:8412/';
 const HZ = (process.env.HZ || '30,60,120,144').split(',').map(Number);
 const SESSIONS = Number(process.env.SESSIONS || 2);
 const RASTER = process.env.RASTER === '1';
-const TAPE_DIR = path.join(here, 'fixtures', 'cross-engine');
+const historicalTapeDir = path.join(here, 'fixtures', 'cross-engine');
+const cmd = process.argv[2];
+const TAPE_DIR = selectTapeDirectory({ mode: cmd, explicit: process.env.CE_TAPE_DIR, historical: historicalTapeDir });
 const OUT = process.env.OUT || path.join(here, '..', '..', 'docs', 'determinism', 'results', 'cross-engine-results.json');
 const fixtureFilter = process.env.FIXTURES ? process.env.FIXTURES.split(',') : null;
 const fixtures = FIXTURES.filter((f) => !fixtureFilter || fixtureFilter.includes(f.id));
@@ -143,7 +147,7 @@ function roll(d) { let h = 0x811c9dc5; for (const r of d) for (const v of r) { h
 
 // ---------------------------------------------------------------- record
 async function record() {
-  await mkdir(TAPE_DIR, { recursive: true });
+  await prepareRecordingDirectory(TAPE_DIR, historicalTapeDir);
   const { browser, cfg } = await launch('chromium-headless-shell');
   const meta = [];
   try {
@@ -179,11 +183,11 @@ async function record() {
       const entry = { id: f.id, preRuns: f.preRuns || 0, covers: f.covers, outcome: rec.outcome, tapeInputs: rec.tape.inputs.length, checkpoints: rec.tape.checkpoints.length,
         endTick: rec.tape.endTick, recordLevel: recordLevelOf(f), dateIndependence, liveVsFreshContextReplay: { ok, first: cmp.first && { tick: cmp.first.tick, subsystems: cmp.first.subs.map((k) => SUBNAMES[k]) }, lengths: [rec.digests.length, rep.digests.length], desync: rep.tapeCheck.desync && { tick: rep.tapeCheck.desync.tick }, checked: rep.tapeCheck.checked }, levelSensitivity, pageErrors: [...errors, ...v.errors] };
       meta.push(entry);
-      await writeFile(tapePath(f), JSON.stringify(rec.tape));
+      await writeFile(tapePath(f), JSON.stringify(rec.tape), { flag: 'wx' });
       console.log(f.id, JSON.stringify({ ticks: rec.outcome.ticks, crashed: rec.outcome.crashed, cause: rec.outcome.cause, distanceM: rec.outcome.distanceM, score: rec.outcome.score, stats: rec.outcome.stats, liveVsReplayOk: ok }));
     }
   } finally { await browser.close(); }
-  await writeFile(path.join(TAPE_DIR, 'record-meta.json'), JSON.stringify({ gitSha, recordedAt: new Date().toISOString(), fixtures: meta }, null, 1));
+  await writeFile(path.join(TAPE_DIR, 'record-meta.json'), JSON.stringify({ gitSha, recordedAt: new Date().toISOString(), fixtures: meta }, null, 1), { flag: 'wx' });
 }
 
 // ---------------------------------------------------------------- scout
@@ -454,7 +458,6 @@ async function positions() {
   console.log('WROTE', OUTP);
 }
 
-const cmd = process.argv[2];
 if (cmd === 'record') await record();
 else if (cmd === 'matrix') await matrix();
 else if (cmd === 'scout') await scout();

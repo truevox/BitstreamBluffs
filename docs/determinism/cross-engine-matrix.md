@@ -39,13 +39,16 @@ Coverage: fifth-run-in-session (recorded as the 5th run of one page, verified in
 ```
 npm run build && npx vite preview --port 8412 &
 export GAME_URL=http://localhost:8412/
-xvfb-run -a node tools/conformance/cross-engine.mjs record               # (re)record tapes in Chromium; verifies live vs fresh replay, date and level independence
+export CE_TAPE_DIR=/tmp/bsb-ce-sim6-NEW                 # MUST be a NEW, nonexistent directory; choose a new one on every recording
+xvfb-run -a node tools/conformance/cross-engine.mjs record               # creates only CE_TAPE_DIR; never overwrites old tapes
 xvfb-run -a node tools/conformance/cross-engine.mjs matrix --resume      # 400-row matrix (all engines, 4 cadences, 2 sessions)
 xvfb-run -a node tools/conformance/cross-engine.mjs fresh --resume       # fresh-context cells (the headline)
 node tools/conformance/cross-engine.mjs positions                        # session-position probe
 node tools/conformance/cross-engine-report.mjs                           # regenerate the tables below
 # narrow: ENGINES=webkit HZ=120 SESSIONS=1 FIXTURES=cruise-baseline OUT=/tmp/x.json ...
 ```
+
+**Historical evidence protection (#236):** recording without `CE_TAPE_DIR` now fails *before launching any browser*. The path must be absolute, must not overlap the committed `tools/conformance/fixtures/cross-engine/` tree (including through symlinks), and must name a directory that does not already exist. The command atomically creates a fresh directory and uses exclusive-create writes for all tapes and `record-meta.json`; reruns must use another path. `matrix`, `fresh` and `positions` read the supplied `CE_TAPE_DIR` if set, or the immutable historical directory otherwise. This is a safe recording-path foundation, **not** evidence that any revision-6 fixture has yet been re-recorded or passed a browser comparison. Do not replace old tapes merely to obtain green results.
 
 `--resume` reads `tools/conformance/.cache/*.journal.jsonl` (git-ignored). The journal is keyed by a fingerprint (build index hash, URL, `CE_DATE`, harness code, fixtures and every tape hash); any mismatch discards it and starts fresh, so stale cells are never reused. A session is the unit of replay state, so an interrupted session restarts from its first run.
 
