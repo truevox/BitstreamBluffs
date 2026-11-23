@@ -5,7 +5,7 @@
 import {buildMusicChain} from '../../src/systems/music/MusicFXGraph.js';
 import {orchestraPreset,melodyPreset} from '../../src/systems/music/DynamicOrchestraPresets.js';
 const ROLES=['drums','bass','guitar','piano','other'];
-const BIOMES=[
+export const BIOMES=[
 	'debutmont','garbage-dump-glacier','underwater-mountain',
 	'micro-mountain','crystal-cavern','steampunk-slopes',
 	'sky-jellyfish-mountain','vertigo-vents','candy-cane-canyon',
@@ -18,14 +18,14 @@ const sourceGain=role=>role==='drums'?.9:role==='bass'?.75:.65;
 const TEST_MASTER=.55,TEST_LEAD=.75;
 const SECONDS=2.5,SAMPLE_RATE=48000;
 
-async function load(pack){
+export async function load(pack){
 	if(!/^[a-zA-Z0-9_-]+$/.test(pack))throw Error('Invalid test pack id');
 	const manifestResponse=await fetch('/music/packs/'+pack+'/pack.json');
 	if(!manifestResponse.ok)throw Error('No original source pack '+pack);
 	const manifest=await manifestResponse.json();
 	const sourceTable=manifest.segments?.[0]?.sources;
 	if(!sourceTable)throw Error('Missing first segment sources '+pack);
-	const keys=new Set([...ROLES,...BIOMES.map(b=>'voice:'+b)]);
+	const keys=new Set([...ROLES,'vocals',...BIOMES.map(b=>'voice:'+b)]);
 	const ctx=new AudioContext();
 	try{
 		const decoded=new Map();
