@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 20:36 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
+Last verified: 2026-11-23 20:49 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -24,6 +24,17 @@ going” means resume this queue, not take over other lanes or merge a draft.
    #75/#100/#74 need trusted restore or equivalent causal replay prefix.
    #243 remains a starter, not a restore. Do not take over #155 full Pulp
    or change #157 scoring coefficients.
+
+4. #70 bounded follow-up: at SIM6 `eb281d8`, neutral rule, mask 0,
+   verified classic sim-01/02/03 panel at 500 m and matched terrain-only
+   Chromium repeats. Compare only band 0 [0,500) from the 44 px origin;
+   later bins are streamed lookahead. Crash placements/total/generated
+   jumps: sim-01 1/3/3 (ideal and steady pass), sim-02 and 03 both 2/4/2
+   (neither reaches threshold). Placement is not contact, causation or
+   fairness. No product, scoring, shortlist or #288 head change.
+   Reproduce via existing classic panel and two fresh
+   `--policy terrain --seeds sim-01,sim-02,sim-03 --biomeMask 0 --maxM 500`
+   invocations; do not use terrain with the trace-specific `--verify`.
 
 ## Active branches and ownership
 
