@@ -1,6 +1,7 @@
 /** Injected ONLY by tools/bsod-qa/serve.mjs, never by the game's index.html. */
 import { parseBsodQaQuery, BSOD_QA_PRESETS } from './presets.mjs';
 import { EVT } from '../../src/events.js';
+import { REG } from '../../src/constants.js';
 
 const qa = parseBsodQaQuery(location.search);
 if (qa) {
@@ -30,6 +31,7 @@ if (qa) {
     // persistence. Keep the in-memory record for the Game Over screen.
     if (scene.saveStore) scene.saveStore = { ...scene.saveStore, saveRun: () => Promise.resolve() };
     scene._saveGhostTape = () => {};
+    game.registry.set(REG.LAST_AWARDS, null); // Do not display awards left over from an earlier run.
     // The progression service awards XP on RUN_END; no QA run may award it.
     game.events.removeAllListeners(EVT.RUN_END);
     window.__bsodQaEvidence = { preset: qa.name, seed: qa.seed, initialGapPx: gap,
