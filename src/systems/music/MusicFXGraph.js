@@ -9,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks',
 ]);
 
 function saturatorCurve(amount) {
@@ -573,6 +573,153 @@ function allocateEffect(ctx, raw) {
 			}};
 			disposers.push(()=>{for(const entry of active){
 				try{entry.source.stop();}catch{}disposeTone(entry);
+			}});
+			break;
+		}
+		case 'steamworks': {
+			// Steampunk Slopes: the ORIGINAL recorded waveform drives every
+			// rolling gear and piston pulse, never a new MIDI/percussion grid.
+			// A separate short physical steam vent / landing gear clash may
+			// sound between recorded attacks, but only on real motion edges.
+			const dry=node(ctx.createGain()); dry.gain.value=1;
+			input.connect(dry); dry.connect(output);
+			const band=node(ctx.createBiquadFilter());band.type='bandpass';
+			band.frequency.value=540;band.Q.value=.7;
+			const color=node(ctx.createWaveShaper());
+			color.curve=saturatorCurve(.075);color.oversample='2x';
+			const wet=node(ctx.createGain());
+			input.connect(band);band.connect(color);color.connect(wet);wet.connect(output);
+			const motor=node(ctx.createOscillator());motor.type='sine';
+			const pulse=node(ctx.createGain());
+			motor.connect(pulse);pulse.connect(wet.gain);
+			motor.start();lfos.push(motor);
+			const roleWeight=clamp(raw.weight,.1,1.2,.7);
+			let speed=clamp(raw.speed,0,1,0),airborne=raw.airborne===true;
+			let intensity=clamp(raw.intensity,0,2,1);
+			let steam=clamp(raw.steam,0,2,1);
+			let impactWeight=clamp(raw.impactWeight,0,2,1);
+			let accentWeight=clamp(raw.accentWeight,0,2,1);
+			const apply=(at,instant=false)=>{
+				// Chuff frequency follows actual sled speed, NOT the beat grid.
+				// Flight disengages the drive belt but preserves the dry music.
+				const coupling=airborne?.07:1;
+				const amount=roleWeight*intensity*coupling*(.10+.68*speed);
+				const values=[[motor.frequency,1.5+8.4*speed],
+					[wet.gain,amount],[pulse.gain,amount*.42],
+					[band.frequency,400+390*speed+(airborne?450:0)]];
+				for(const [target,value] of values){
+					if(instant)target.value=value;
+					else numericParam(target,value,at,.065);
+				}
+			};
+			apply(ctx.currentTime,true);
+			refs.speed={set:(v,at)=>{if(!Number.isFinite(v))return false;
+				speed=clamp(v,0,1,0);apply(at);return true;}};
+			refs.airborne={set:(v,at)=>{if(typeof v!=='boolean'&&v!==0&&v!==1)return false;
+				airborne=!!v;apply(at);return true;}};
+			refs.intensity={set:(v,at)=>{if(!Number.isFinite(v))return false;
+				intensity=clamp(v,0,2,1);apply(at);return true;}};
+			refs.steam={set:v=>{if(!Number.isFinite(v))return false;
+				steam=clamp(v,0,2,1);return true;}};
+			refs.impactWeight={set:v=>{if(!Number.isFinite(v))return false;
+				impactWeight=clamp(v,0,2,1);return true;}};
+			refs.accentWeight={set:v=>{if(!Number.isFinite(v))return false;
+				accentWeight=clamp(v,0,2,1);return true;}};
+
+			// Precompute bounded source-independent mechanical Foley only once
+			// per graph. Deterministic samples, no oscillators/timers per frame.
+			const makeBuffer=(seconds,kind)=>{
+				const frames=Math.ceil(ctx.sampleRate*seconds);
+				const buffer=ctx.createBuffer(1,frames,ctx.sampleRate);
+				const data=buffer.getChannelData(0);
+				let seed=kind==='vent'?0x5EA5C113:0x6EA2C014;
+				let low=0;
+				for(let i=0;i<frames;i++){
+					const t=i/ctx.sampleRate;
+					seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+					const white=seed/2147483648-1;
+					let sound=0;
+					if(kind==='vent'){
+						// Rising steam pressure jets from a narrow valve, ending
+						// with a crisp pressure release. Not a tonal glissando.
+						low=.91*low+.09*white;
+						const hiss=(white-low)*.55+low*.65;
+						const open=Math.min(1,t/.016);
+						const decay=Math.exp(-t*8.5);
+						const lip=.18*Math.sin(2*Math.PI*255*(t-.11))*(t>=.11?Math.exp(-(t-.11)*48):0);
+						sound=hiss*open*decay*.85+lip;
+					} else {
+						// Gear teeth bite, big bell-metal cavity, short uneven
+						// sprocket rattle: mechanically inharmonic, not a song note.
+						const clang=.46*Math.sin(2*Math.PI*310*t)*Math.exp(-t*16)
+							+.27*Math.sin(2*Math.PI*681*t)*Math.exp(-t*22)
+							+.15*Math.sin(2*Math.PI*1139*t)*Math.exp(-t*36);
+						const thunk=.36*Math.sin(2*Math.PI*(155*t-125*t*t))*Math.exp(-t*29);
+						let clicks=0;
+						for(const offset of [0,.039,.083,.148]){
+							const dt=t-offset;if(dt<0)continue;
+							clicks+=(.19*white+.12*Math.sin(2*Math.PI*1430*dt))*Math.exp(-dt*108);
+						}
+						sound=clang+thunk+clicks;
+					}
+					data[i]=Math.tanh(sound*.88);
+				}
+				return buffer;
+			};
+			const vent=makeBuffer(.42,'vent'),clash=makeBuffer(.36,'clash');
+			// Tiny actual-recording-accent sprocket tooth. Unlike the landing
+			// clash this is a short dry tick (not a note or unverified metronome).
+			// Nothing is scheduled unless real original-mix energy rises enough
+			// to trip the same WorldDance visual accent envelope.
+			const tooth=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.092),ctx.sampleRate);
+			const teeth=tooth.getChannelData(0);
+			let toothSeed=0x7E371A11;
+			for(let i=0;i<teeth.length;i++){
+				const t=i/ctx.sampleRate;
+				toothSeed=(Math.imul(toothSeed,1664525)+1013904223)>>>0;
+				const noise=toothSeed/2147483648-1;
+				teeth[i]=Math.tanh((.52*Math.sin(2*Math.PI*1020*t)
+					+.25*Math.sin(2*Math.PI*1930*t)+.26*noise)*Math.exp(-t*91));
+			}
+			const active=new Set();
+			const cleanup=item=>{
+				try{item.source.disconnect();}catch{}
+				try{item.gain.disconnect();}catch{}
+				active.delete(item);
+			};
+			const fire=(kind,strength,at)=>{
+				if(!Number.isFinite(strength)||strength<=0)return false;
+				const factor=kind==='vent'?steam:impactWeight;
+				if(factor<=0)return false;
+				if(active.size>=3){const oldest=active.values().next().value;
+					try{oldest.source.stop();}catch{}cleanup(oldest);}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=kind==='vent'?vent:clash;
+				gain.gain.value=Math.min(1.7,(kind==='vent'?.21+.33*clamp(strength,0,1,0):
+					.26+.44*clamp(strength,0,1,0))*factor);
+				source.connect(gain);gain.connect(output);
+				const item={source,gain};active.add(item);
+				source.onended=()=>cleanup(item);
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			};
+			refs.release={set:(value,at)=>fire('vent',value,at)};
+			refs.impact={set:(value,at)=>fire('clash',value,at)};
+			refs.musicAccent={set:(value,at)=>{
+				if(!Number.isFinite(value)||value<=0||accentWeight<=0||airborne||speed<.08)return false;
+				if(active.size>=3){const old=active.values().next().value;
+					try{old.source.stop();}catch{}cleanup(old);}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=tooth;
+				gain.gain.value=Math.min(.55,(.06+.19*clamp(value,0,1,0))*accentWeight);
+				source.connect(gain);gain.connect(output);
+				const item={source,gain};active.add(item);
+				source.onended=()=>cleanup(item);
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			}};
+			disposers.push(()=>{for(const item of active){
+				try{item.source.stop();}catch{}cleanup(item);
 			}});
 			break;
 		}

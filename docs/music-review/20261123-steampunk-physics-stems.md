@@ -1,0 +1,56 @@
+# Steampunk Slopes — speed-driven original-stem gearwork and real steam valves
+
+**Experimental, unmerged draft — Marvin has not listened or approved this new biome.** Implementation, provisional settings and testing by Gal Friday on November 23, 2026. User's explicit request: continue building new biome experiments for a combined listening session tonight. Issue [#262](https://github.com/truevox/BitstreamBluffs/issues/262). Based on the existing 11-biome music design and fully tested five-biome integration draft #261. No original recordings, pre-existing MIDI-lead melodies, mix masters, gameplay physics, sim revision, scoring, replay or music transport changed.
+
+## Sound design: NOT a recycled Garbage clang or arbitrary MIDI rhythm
+
+**Steampunk needs to sound like a little steam-driven factory attached to the sled:** a warm metal-and-brass **rolling piston chuff** travels WITH the actual velocity of the sled. As speed rises, the gear-pulse frequency rises smoothly from 1.5 to 9.9 cycles/second, rather than aligning with the song's beat, inventing notes, or retriggering any recorded percussion. All five existing source instrument streams feed the new wet network, weighted most strongly on the audible **original drums and bass**, without altering their dry stereo waveform. The processor uses band-pass/resonant coloring, bounded parallel saturation, and one oscillator per source (the oscillator modulates the WET SOURCE AMPLITUDE, not a synthetic melody); there is no new interval/timer or state change in the simulation.
+
+**Physical transitions** are distinct from persistent rhythmic music processing:
+- Valid **grounded→airborne** edge: machinery disengages to 7% coupling and one short deterministic 420ms wet steam-valve release plays on the original drum bus. The user can adjust its volume independently. Subsequent consecutive airborne signals do NOT retrigger steam. The dry original music continues, unchanged.
+- Valid **airborne→grounded** edge after a real non-crash landing: the gears re-engage, with one short deterministic 360ms **KLA-CHUNK** sound: low mechanical thunk, inharmonic metal cavity, staggered sprocket click/rattle. This is a physical collision, not a pitched musical note. Invalid or crash landing data cannot trigger it.
+- A landing pulse received before the grounded flag becomes authoritative is stored and fired only after that grounded transition. Menu mode, wrong biome or confirmed biome exit discards pending effects. An entrant already airborne begins with an uncoupled gear FX graph, not a 200ms burst of grounded chug.
+- Rolling chug rate and intensity follow existing `StemMusicDirector.setSpeed(speedPxS)` with a cheap 0..1 control signal (speed/1600). Only updates when speed has changed by at least 2.5% of the control scale to avoid excessive Web Audio scheduling.
+
+## Distinguishing the existing biomes
+
+Garbage/Scrapheap deliberately has wet sticky SPLORP and random source-pitch junk-metal clanks; Crystal is source-harmonic glass with modal resonance; Micro is enclosed mini-speaker and visual bees; Underwater remembers cumulative pressure. **Steampunk** instead has persistent **speed-proportional reciprocating machinery** with a hiss on transition and sprocket tooth collision on landing. It retains the separate established musical lead timbre preset (mechanical calliope), doesn't clone its MIDI, and doesn't rewrite the source song tempo.
+
+## Proposed first-listen values (Friday proposal, not owner approval)
+
+- Piston intensity **125%**; mechanical weighting drums 100%, bass 85%, other harmonic stems 48%.
+- Takeoff steam **150%** (independent volume).
+- Landing gear clash **135%** (independent volume).
+- Suggested initial speed **900 px/s**, then 1500 px/s to hear speed-driven cycling. These values are adjustable *live* in the audition and NOT yet a locked shipping mix.
+- A/B dry comparison and Solo Drums share original source buffers, never start a second unsynced recording. Five original OGG clips fetched from existing `/music/packs/33_local-one-more-run-bitstream-bluffs/0000-ROLE.ogg` release media; the page needs no copied MP3 media.
+
+## Resource, determinism, failure-safety contracts
+
+- Only 5 short processor oscillators for source-fed amplitude modulation (one per original instrumental stem), no new `setInterval`, tempo detector, or additional note generator. 2 small deterministic sample buffers per processor, used only by the drums for real physical Foley; max three overlapping one-shots in the factory; all stopped/disconnected during FX disposal.
+- The game engine's existing mixer bounds retired graphs during rapid biome changes. `steamworks` uses the existing validator registry and `setEffectParam`, no unknown raw graph node execution. All transitions are read-only observations of existing authoritative sled signals.
+- The original source dry path remains connected at unity within the processor; sound design may add the parallel wet color and event-only short Foley. The global music bus and owner mix controls still determine final level.
+
+## Objective non-listening tests
+
+- All three new sound/physics unit scenarios cover source-only wet modulation, real speed changes, initial airborne state, single-shot takeoff valve, delayed real touchdown, wrong biome / crash / menu rejection, preserved song clock and 3-voice FIFO cleanup.
+- The standalone audition is Vite-built and hosted at `/tools/music/steamworks-audition.html` on the Steampunk PR Netlify preview. It uses real first-segment stereo OGGs and controls for speed, gear intensity, steam hiss, metal clash, Solo Drums and Compare Dry.
+- A headless Chromium `OfflineAudioContext` analyzed **the actual original released drums** (first 3 seconds) with the same DSP: slow gears at 18% speed differ from the dry recording by **24.24% dry drum RMS**, high speed 94% differs by **65.41%**, disengaged airborne high-speed by **4.50%**, and entire five-stem high-speed mix by **57.67% dry mix RMS**. These are measured signal changes, NOT a subjective listening or true-peak assertion; human acceptance is pending. Maximum observed full-mix processed peak from this 3s offline probe is ~0.692 on one rendered channel. The sample is NOT a loudness-normalized production whole-song measurement.
+- `tools/music/probe-steamworks-audibility.mjs` only enables the extra test utility on explicit `?qa=1`; normal audition has no test hooks. No original recordings are rewritten.
+
+**Open listening questions for Marvin:** Does the source-fed chuff read as a mechanical piston rather than a robotic tremolo? Is the steam vent convincing rather than noise? Does landing sound like gear teeth properly biting? Should ground speed sound more like a spinning ratchet or a weighty reciprocating engine? Tune controls first; do not merge until he confirms.
+
+## Real-source musical accents and existing visible gear animation — owner question correction
+
+**Owner asked:** “The gears turn on the beat there, don't they? Do they make a noise when they do? Is it musical?” The factual answer BEFORE this revision: background brass-pipe gears rotate continuously with **scene time** (`Background.js` `rot` term) and receive a small world-dance bump; GearGate hazards independently rotate to their motion cycle; neither was verified beat-synced. The new audio DSP initially modulated original-stem wet audio only from **actual sled speed**, not confirmed song rhythm; landing gears and steam valves had physical one-shots but visible background gears had no per-accent click.
+
+**Revision for tonight's listening:** The shared **WorldDanceEnvelope** already detects *actual rising-energy transients* in the live ORIGINAL music (`getWorldDanceSample`), separately from an explicitly **synthetic-unverified 500ms beat grid**. When a new real transient is detected, the game's cosmetic render layer now calls `AudioSynth.onSteampunkRecordedAccent(sample)` with the **exact current recorded source sample**. The audio engine verifies that same object identity; `StemMusicDirector.onSteampunkMusicAccent` further checks the current song revision/clock, current biome, actual transport, grounded state, and minimum 165ms interval. A tiny bounded percussive `musicAccent` one-shot (dry metal tooth click) plays on the original drum DSP graph, while decorative `brass-pipes` background gears visually **lurch** more clearly by the existing `dance` factor. The hazard gate's causal timing is unchanged. This does NOT claim an official song beat/downbeat; observed recorded transients may legitimately be syncopated.
+
+The audition uses a matching `WorldDanceEnvelope` driven from the original five OGG sources through a tiny read-only analyser tap, not an artificial metronome. It offers **recorded-gear-click intensity 0–200%, auto accents ON/OFF, test manual one-tooth click**, and real observed detected/click count. In live Chromium, the original One More Run 20s OGG excerpt produced at least one genuine automatic detected accent and a corresponding gear click before any manual buttons were pressed; no page errors. A separate synthetic beat cannot trigger it. The speed-driven continuous chuff remains its own adjustable independent layer. The material change is described as source-accent-synchronized mechanical percussion, not key-validated tonal music.
+
+**Important:** Owner has NOT listened to this revised candidate yet. Separate official timing-grid validation still remains open; this design deliberately does not promote any unverified grid into gameplay or fake confidence.
+
+## Final integration and automated QA before owner hearing
+
+- **269/269 music/physics/WorldDance focused tests across 27 suites** passed (includes no fake beat from synthetic meter, current-recording-object identity, real song revision, genuine single takeoff, landing only on valid contact, all earlier five-biome contracts). **483/483 determinism tests across 18 suites** passed following the supported source-tripwire attestation. Build identity and ruleset checks are current; the new RunScene callback is explicitly attested **no causal gameplay change** and preserves original physics/replay/input/hazard timing.
+- **Real standalone browser audition** loaded five existing original OGG instrumental files from the archived first segment, toggled dry A/B, manual musical tooth click, wet gear intensity, steam and landing; actual source transient created a corresponding *automatic* gear click with zero page errors. Headless Chromium `OfflineAudioContext` test measured physically speed-sensitive original-source waveform changes, finite samples and no clipping in the limited 3-second tested excerpt.
+- **Real complete game Chromium boot on compiled Vite build**: loaded actual One More Run original OGGs via read-only local test symlinks in disposable ignored `dist`; correctly recovered one old-physical-path `debumont` melody 404, started original song and cached eight source buffers. Programmatically cycled **six live Web Audio biome processors** in real `RunScene`, preserved song clock, rendered WorldDance+BiomeFx, and retired temporary crossfade FX chains to zero. This tests processor integration but is **not a physical terrain run, owner listening or full-song headroom certification**.

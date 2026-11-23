@@ -483,7 +483,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(gr.x0, sx, 0.06);
       if (x === null) continue;
       const teeth = Math.max(6, Math.round(gr.r / 2.4));
-      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * 0.055 * gr.dir;
+      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * 0.24 * gr.dir;
       const pts = [];
       for (let i = 0; i < teeth; i++) {
         const a = rot + (i / teeth) * Math.PI * 2;

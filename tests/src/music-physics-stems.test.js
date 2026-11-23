@@ -42,6 +42,75 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(impactFromLanding({impactSpeedPxS:900,hard:true,quality:'good'})).toBeGreaterThan(.55);
 		expect(impactFromLanding({impactSpeedPxS:5000,hard:true})).toBe(1);
 	});
+	test('Steampunk chug follows actual speed; one real takeoff vents, one landing clangs, no song rescore',()=>{
+		const d=director();d.biome='steampunk-slopes';d._pendingSteamImpact=0;d._steamLastSent=NaN;
+		const preset=orchestraPreset('steampunk-slopes','drums');
+		expect(preset).toEqual([{type:'steamworks',id:'steamworks',weight:1,
+			speed:0,airborne:false,intensity:1.25,steam:1.5,impactWeight:1.35,accentWeight:1.0}]);
+		d._applyMusicTimbres();
+		for(const stem of ROLES)expect(d.mixer.replaceEffects).toHaveBeenCalledWith(
+			stem,orchestraPreset('steampunk-slopes',stem),.18);
+		d.mixer.setEffectParam.mockClear();
+		d.setSpeed(800);
+		for(const stem of ROLES)expect(d.mixer.setEffectParam)
+			.toHaveBeenCalledWith(stem,'steamworks','speed',.5);
+		d.mixer.setEffectParam.mockClear();d.setSpeed(817);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='steamworks')).toBe(false);
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','steamworks','release',expect.any(Number));
+		const released=d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='release').length;
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='release')).toHaveLength(released);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:700});
+		expect(d._pendingSteamImpact).toBeGreaterThan(0);
+		const before=d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='impact').length;
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='impact')).toHaveLength(before+1);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','steamworks','impact',expect.any(Number));
+		expect(d.clockStart).toBe(23.5);
+		d.setBiome('debutmont');
+		expect(d._pendingSteamImpact).toBe(0);
+		d.mixer.setEffectParam.mockClear();d.setSpeed(1200);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='steamworks')).toBe(false);
+	});
+	test('Steampunk ignores crash landings and menu events, airborne entry begins disengaged',()=>{
+		const d=director();d.biome='steampunk-slopes';d._pendingSteamImpact=0;
+		d._steamLastSent=NaN;d.airborne=true;
+		d._applyMusicTimbres();
+		for(const stem of ROLES){
+			const fx=d.mixer.replaceEffects.mock.calls.find(c=>c[0]===stem)?.[1][0];
+			expect(fx.airborne).toBe(true);
+		}
+		d.onLanding({quality:'crash',hard:true,impactSpeedPxS:1400});
+		expect(d._pendingSteamImpact).toBe(0);
+		d.menuMode=true;d.mixer.setEffectParam.mockClear();
+		d.setAirborne(false);d.setAirborne(true);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:900});
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='steamworks')).toBe(false);
+			expect(d._pendingSteamImpact).toBe(0);
+	});
+	test('Steampunk music gear click requires genuine revision-matched recorded source accent',()=>{
+		const d=director();d.biome='steampunk-slopes';d._lastSteamMusicAccentMs=-Infinity;
+		d.started=true;d._token=14;d.track={id:'one-more-run'};
+		d.clockStart=10;
+		const genuine={timeMs:20000,revision:'14:one-more-run:10',bass:.75,mid:.35};
+		expect(d.onSteampunkMusicAccent(genuine)).toBe(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','steamworks','musicAccent',
+			expect.any(Number));
+		d.mixer.setEffectParam.mockClear();
+		expect(d.onSteampunkMusicAccent(genuine)).toBe(false);
+		expect(d.onSteampunkMusicAccent({...genuine,timeMs:20100})).toBe(false);
+		expect(d.onSteampunkMusicAccent({...genuine,timeMs:20400,revision:'fake-song'})).toBe(false);
+		expect(d.onSteampunkMusicAccent({...genuine,timeMs:20400,bass:NaN})).toBe(false);
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+		for (const condition of [{airborne:true},{airborne:false,menuMode:true},
+			{menuMode:false,biome:'garbage-dump-glacier'},{biome:'steampunk-slopes',transportPaused:true}]){
+			Object.assign(d,condition);
+			expect(d.onSteampunkMusicAccent({...genuine,timeMs:20500})).toBe(false);
+		}
+		d.transportPaused=false;d.biome='steampunk-slopes';d.menuMode=false;d.airborne=false;
+		expect(d.onSteampunkMusicAccent({...genuine,timeMs:20600})).toBe(true);
+	});
 	test('Garbage drum preset adds source-excited inharmonic Scrapheap, no MIDI re-performance',()=>{
 		const d=director();d._applyMusicTimbres();
 		const drum=d.mixer.replaceEffects.mock.calls.find(args=>args[0]==='drums');

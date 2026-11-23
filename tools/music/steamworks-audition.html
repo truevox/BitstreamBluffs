@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bitstream Bluffs · Steampunk Slopes Steamworks Audition</title>
+<style>
+:root{color-scheme:dark;font:16px system-ui,sans-serif;color:#f5e8cf;background:#121c24}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 70% 0,#624735,#15232b 62%);min-height:100vh;padding:20px}main{max-width:910px;margin:0 auto}.kicker{text-transform:uppercase;letter-spacing:.14em;font-size:.84rem;color:#ffca84;font-weight:700}h1{font-size:clamp(2rem,5vw,3.25rem);margin-bottom:7px}p{line-height:1.6}.panel{border:1px solid #806245;border-radius:18px;background:#202c35e8;padding:24px;box-shadow:0 15px 40px #0007}.row{display:flex;flex-wrap:wrap;gap:11px;margin:16px 0}button{font:inherit;background:#56412c;color:#fff1d6;border:1px solid #b88d56;padding:12px 16px;border-radius:11px;cursor:pointer}button.primary{background:#a46c37;color:#fff}button:disabled{opacity:.45;cursor:not-allowed}button[aria-pressed=true]{background:#266e73;border-color:#74d9cd}label{display:block;margin:18px 0 6px;font-weight:700}input[type=range]{width:100%;accent-color:#e4ab64}output{color:#ffcf88}.help{font-size:.91rem;color:#b9c9ca}.readout{display:flex;flex-wrap:wrap;gap:12px}.readout span{background:#203e46;border:1px solid #3a6e71;padding:9px 12px;border-radius:9px;color:#c2f1e9}.note{background:#223941;border-left:3px solid #e3b375;border-radius:7px;padding:13px}a{color:#bdf1f1}#status{min-height:2.8rem;color:#f7d7a9}
+</style></head><body><main><div class="kicker">Bitstream Bluffs / physics-driven original stems</div><h1>⚙️ Steampunk Slopes</h1>
+<p><strong>Put the original song through a living factory.</strong> Mechanical pistons chuff at a rate driven by the sled's <em>actual speed</em>, not the song's beat. Getting airborne disengages the gears and releases a short steam hiss; landing slams a sprocket back into gear. The dry recordings remain untouched underneath.</p>
+<section class="panel">
+<div class="row"><button id="load" class="primary">🎵 Load original OGG stems</button><button id="play" disabled>▶ Play</button><button id="dry" disabled aria-pressed="false">Compare dry</button><button id="solo" disabled aria-pressed="false">Solo drums</button></div>
+<div class="readout"><span id="phase">Grounded — gears engaged</span><span>Gear cycle: <strong id="cycle">—</strong></span></div>
+<label for="speed">Actual sled speed (no beat-grid sync): <output id="speed-value">900 px/s</output></label>
+<input id="speed" type="range" min="0" max="1800" step="50" value="900">
+<label for="weight">Rolling gear / piston intensity: <output id="weight-value">125%</output></label>
+<input id="weight" type="range" min="0" max="200" step="5" value="125">
+<p class="help">Chuffing is a moving color effect on the <em>original audio</em>. The dry signal is always preserved, so the music can't vanish when the gears disengage.</p>
+<label for="accent">Real recorded-music gear clicks: <output id="accent-value">100%</output></label>
+<input id="accent" type="range" min="0" max="200" step="5" value="100">
+<div class="row"><button id="auto-accent" aria-pressed="true">Recorded accent clicks: ON</button><button id="accent-hit" disabled>⚙️ Test one gear tooth</button></div>
+<div class="readout"><span id="gear-visual" aria-hidden="true" style="font-size:2rem;display:inline-block;transform-origin:center">⚙️</span><span id="accent-status" aria-live="polite">Waiting for actual musical transients…</span></div>
+<p class="help">Decorative gears get a visible kick and short metallic tooth-click when the <em>original recorded music</em> produces a real detected accent. These may include offbeats; they are <strong>not</strong> from the game's unverified beat grid. Gear-gate hazards are unaffected.</p>
+<label for="steam">Takeoff steam valve: <output id="steam-value">150%</output></label>
+<input id="steam" type="range" min="0" max="200" step="5" value="150">
+<label for="metal">Landing gear clash: <output id="metal-value">135%</output></label>
+<input id="metal" type="range" min="0" max="200" step="5" value="135">
+<div class="row"><button id="takeoff" disabled>⬆️ Take off — PSSHHHT</button><button id="land" disabled>⚙️ Land — KLA-CHUNK</button><button id="ground" disabled>🚂 Return to ground</button></div>
+<div class="row"><button id="vent" disabled>💨 Test steam valve alone</button><button id="impact" disabled>🔧 Test gear clash alone</button></div>
+<div class="note">Suggested sequence: <strong>Load → Play → speed 1,500 → Solo drums → Take off → Land → Compare dry</strong>. Drag each intensity slider until it feels physically convincing. Steam and landing Foley are short, bounded and occur only on their respective motion events in the game.</div>
+<p id="status" aria-live="polite" role="status">Load the original five stems to begin.</p>
+</section>
+<p class="help">Source: the existing first segment of <em>One More Run</em> (five stereo OGG instrumental stems, not copies). This audition loops the sample only for convenience. Separate biome melodies/MIDI, gameplay simulation, pitch and transport remain untouched. <strong>Experimental, pending your listening approval.</strong></p>
+</main><script type="module" src="./steamworks-audition.js"></script></body></html>

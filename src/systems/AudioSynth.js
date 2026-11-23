@@ -1186,6 +1186,20 @@ export class AudioSynth {
     }catch{return null;}
   }
 
+  /**
+   * Audio-only cosmetic gear tick on a real WorldDance detected recording
+   * transient. The caller passes the EXACT current read-only source sample.
+   * Synthetic meter events are never passed into this method.
+   */
+  onSteampunkRecordedAccent(sample){
+    try{
+      if(this._destroyed||this._musicMode!=='run'||this._paused||
+        !this._musicWanted||!this._vinylAudible()||
+        !sample||sample!==this._worldDanceSample)return false;
+      return this._stemMusic?.onSteampunkMusicAccent?.(sample)===true;
+    }catch{return false;}
+  }
+
   /** Read-only, deliberately UNVERIFIED 0.5s / 4/4 meter for cosmetics.
    * Unlike getBeatTiming(), this is NOT sound-analyzed and CANNOT release
    * Gym, time tricks, change physics, certify downbeats or alter playback.

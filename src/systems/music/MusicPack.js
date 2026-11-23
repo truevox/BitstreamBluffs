@@ -7,7 +7,7 @@ const safePath = (s) => typeof s === 'string' && s.length < 300 &&
   !s.startsWith('/') && !s.includes('..') && !s.includes('\\') &&
   /^[a-zA-Z0-9_.\/-]+$/.test(s);
 const whole = (v) => Number.isSafeInteger(v) && v >= 0;
-const effectTypes = new Set(['gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe']);
+const effectTypes = new Set(['gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks']);
 
 /**
  * An object's entries with legacy biome ids (issue #65) read as canonical. A map carrying BOTH spellings of one key
