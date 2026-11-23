@@ -1,5 +1,15 @@
 # SIM_REVISION 7 conformance preflight — issue #249
 
+## LATEST 2026-11-23 — stronger brake, same upward impulse (NEW source candidate)
+
+After trying the first two-instant-kick draft (`fed8552`), **Marvin explicitly confirmed the upward pop feels about right but asked for MORE horizontal deceleration**. In response, draft PR #248 HEAD `4e0cff1ea9a6ea28c950d9a472ae4e53a8c6d448` now proposes **60%** instantaneous horizontal speed loss (previously **40%**) while the upward impulse is **exactly the same for an identical incoming vx/vy, density, and AirBrake Lift upgrade**. The upward speed budget remains pinned to the previous **40%** speed-loss amount; extra braking never buys more lift. No AirBrake float, no gravity damp, no multiple kicks per airtime, no changed parachute behavior. These numbers are Gal Friday's proposed coefficients, **not values selected or finally approved by Marvin**.
+
+**Important source invalidation:** every previous "33/33" (11-fixture × Chromium/Firefox/WebKit), "120/120" cadence/session, recorded 11-fixture set, 24-seed score report and tick trace shown below in this document is evidence of an **older, superseded source**, not the newly strengthened brake. In particular, the previous two-kick evidence is for physics commit `fed8552` / QA source `c1270b7`, ruleset `sha256:30774199ce6c8240e28ea4441bf520b3b2ee0f7f9191baef0c33f8e60f48875b`. Keep its old raw receipts, hashes and outcomes intact, but do **not** pass them as current-source evidence. The **new** proposed unreleased SIM_REVISION 7 ruleset is `sha256:131414117cbbb5e4fa8a3933e431c62cee7557ab3b39a0a70e2f2223f7db7350`, build ID `sha256:365588bceafa28af492c4d2e95308c43ded8158b365f6b0d729eb111a539b64f`. SIM6 and older provisional SIM7 archives are untouched.
+
+**New executed source evidence so far:** production build PASS; 49/49 replay/determinism/conformance/exploit-focused suites with **1,542/1,542 tests PASS**; ruleset/build identity checks PASS. A live Chromium 120Hz actual browser trace at tick 252 on the same deterministic course recorded vx **530.693→211.779 px/s** (prior after-kick **317.645 px/s**) and vy **−75.415→−386.909 px/s** (prior **−386.881 px/s**, negative = upward), with no page errors, and next actual terrain-contact rearm at tick 323. This is a **provisional local browser diagnostic**, not a cross-engine golden set. Raw trace `airbrake-decel60-same-up-live-20261123.json` outside the repository under CT223 `/srv/friday-audio/bsb-qa-v7-preliminary/`. Source tests explicitly check unchanged vertical output over speeds, atmospheres, and upgrade states. **Full current-source 11-fixture re-recording, three-engine cross-browser runs and final goldens must be repeated AFTER numeric feel approval.** PR #248 and stacked #251 remain DRAFT.
+
+---
+
 ## CURRENT SOURCE RESET 2026-11-23 — owner demands two kicks, NO float
 
 **The previous experimental browser results on this page were all recorded BEFORE the owner rejected the first SIM7 held/speed-paid-lift physics.** Their exact source hashes, SHA-256 reports, and earlier findings are preserved as HISTORICAL evidence only. They **do not certify** the new owner-retuned AirBrake code.
