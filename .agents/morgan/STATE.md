@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 22:54 UTC. Main: `b848b03fbef9d0db6c1b3df6883e1540ef238f63` (v2.19.21).
+Last verified: 2026-11-23 23:50 UTC. Main: `5a7e3bec8b87f447aa5b61c27fc368622b7fa956` (SIM7, package/lock/changelog v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -15,10 +15,15 @@ going” means resume this queue, not take over other lanes or merge a draft.
    found no blocker. Fix actual feedback first. No merge of drafts.
    For later integration, prioritize the verified user-facing #290 fix
    when the required review and release slot are clear. Obey the
-   numbered release rule (#207); #248 reserves v2.19.22. Main #292 added
-   a Vite entry for opt-in BSOD QA without changing the version. No changed
+   numbered release rule (#207). Main #294 shipped SIM7 Fast Approach /
+   Soft Finish without updating the package, lock or changelog. The public
+   normal entry bundle matches #294 byte-for-byte. Have the release owner
+   reconcile the numbering and confirm the next slot before any Morgan
+   merge; do not claim #248's previously proposed v2.19.22. #295 is still
+   a draft: no required independent Gal check or branch protection enabled.
+   Main #292 added a Vite entry for opt-in BSOD QA without changing the version. No #292
    file overlaps the nine drafts. Applying #278's exact source delta to
-   current main passed 30 focused tests and same-path 4,844-file build parity.
+   570fc88 passed 30 focused tests and same-path 4,844-file build parity.
    This is integration QA, not a new draft head or review verdict.
    On 570fc88, exact #281/#282/#283/#286/#287/#290 deltas also apply
    together in scratch: 229 focused tests across 11 suites, ruleset and
@@ -31,7 +36,11 @@ going” means resume this queue, not take over other lanes or merge a draft.
    Main then added #293, opt-in BSOD QA files only (no overlap). Exact
    combined #290 and #293 focused checks pass 13 tests; the heavier browser
    and artifact results above remain pinned to 570fc88. No draft heads
-   changed. Keep #248's reservation.
+   changed. Recheck #294 base on any release candidate. #288 on exact
+   landed SIM7 main plus its unchanged patch passes 47 focused tests and
+   18/18 fresh Chromium repeat/playbacks: same classic output, verified
+   fatigue fails closed with no output and better diagnostics. This does
+   not imply SIM6 tape playback compatibility.
 2. #127 fair1153 (mask 16) on exact SIM6: Shatter Wall `17:2` x37680 →
    Packet Spike `18:0` x38301, 621 px. Fresh native 320 ms policy hits
    tick 9073 with 8.33 ms blind fade left; 300 ms policy hits same sensor
@@ -39,18 +48,16 @@ going” means resume this queue, not take over other lanes or merge a draft.
    This proves timing, not causation/unfairness. #286 includes exact
    stock commands. Preserve separate historical #202; no new speculative
    tuning. Full branch/route model remains gated on #57/#60.
-3. #81/#290 same-origin persistent Chromium upgrade A/B passed: exact
-   SIM6 main b848b03 recorded genuine sim-02 185 m; each reopened the
-   same on-disk profile on exact draft SIM7 #248 (4e0cff1), with and
-   without exact #290 bd43a5a. Forced early crash on the real SIM7 save
-   path kept the first run shorter (28 m); it becomes Best/Latest. Old
-   pinned/unstamped tape bytes and direct reads survive before replacement,
-   with no old rider. Baseline mislabels stale slots as 185 M; patch says
-   INCOMPATIBLE; keyboard replace/clear works and retry draws one current
-   ghost. 24 focused tests, three builds, no outbound/page errors. This
-   is provisional draft integration, not AirBrake playtesting, old-tape
-   replay support or release authority. Rerun on final SIM7 release head
-   if it changes. Friend exchange still requires #58.
+3. #81/#290 same-origin on-disk Chromium A/B passed on exact landed
+   SIM7 main 5a7e3be with and without exact #290 bd43a5a. Genuine SIM6
+   b848b03 sim-02 tape (185 m) stayed readable across a fresh process and
+   unrendered; a controlled shorter SIM7 run (28 m) became Best/Latest.
+   Baseline shows stale distances/false Shared Run, patch says
+   INCOMPATIBLE. Replace, clear and retry work; only the current ghost
+   draws. 24 focused tests, ruleset/identity and builds pass, no outbound
+   or page errors. This is the local UI/upgrade fix, not old replay or
+   sharing support. Previous #248-draft A/B remains separate evidence.
+   Friend exchange still requires #58.
    #82 storage lifecycle needs separately scoped save-system review;
    #85 still needs authentic footage; #84/#83 and product #70/#71 need #60;
    #75/#100/#74 need trusted restore or equivalent causal replay prefix.
@@ -139,8 +146,13 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - #273 Seeking/Gal pilot: Luna posted exact-head delta source approval at
   `0fd1400` after the earlier retry timed out. It is still a draft and #130
   remains open; leave release and broader work in their lane.
-  #248 AirBrake remains Gal/Home-owned; latest feel freeze and fresh SIM7
-  receipts are separate from historical SIM1–6. #266 preserves future
+  #248 AirBrake remains Gal/Home-owned and draft at 4e0cff1, a different
+  SIM7 ruleset (13141411...) from landed #294 (f6efe964...). Its same
+  revision is indistinguishable to cosmetic ghost admission if tapes are
+  placed in one store; synthetic control reproduced this, not player data.
+  Normal separate preview origins do not share IndexedDB. Rebase causal
+  AirBrake on current main and apply the post-release revision bump rule
+  (or clearly preserve it as draft evidence). #266 preserves future
   version/identity seams, not a prerelease old-tape support requirement.
 - Main stays release-controlled. Keep synthetic developer evidence out of
   gameplay, saved formats, scoring and ranked eligibility unless authorized.
