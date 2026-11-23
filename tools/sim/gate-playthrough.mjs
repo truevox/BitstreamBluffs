@@ -200,9 +200,18 @@ async function playToGameOver(browser, port, mask, { boosts = null, seed = 'gate
     const title = g.scene.getScene('TitleScene');
     title.starting = false;
     title.startRun(seed, mask);
-    await wait(1600);
-    const run = g.scene.getScene('RunScene');
-    if (!run) return { fatal: 'RunScene did not start' };
+    // #241: fixed 1600ms can be too early under load or too late after a
+    // natural crash. Poll for an actually active, in-World sled and queue the
+    // intended test crash while that *same* run is genuinely alive.
+    const startedDeadline = Date.now() + 12000;
+    let run = null;
+    while (Date.now() < startedDeadline) {
+      const r = g.scene.getScene('RunScene');
+      if (r && r.scene && r.scene.isActive() && r.sled &&
+          !r.sled.destroyed && r.sled.inWorld && !r.crashed) { run = r; break; }
+      await wait(50);
+    }
+    if (!run) return { fatal: 'RunScene never produced a live sled before the 12s startup deadline' };
     const startedMask = g.registry.get('biomeMask');
     const shieldAtStart = run.shieldCharges || 0;
     run.runTimeMs = 5000;
@@ -300,12 +309,29 @@ async function dailyOutcome(browser, port, { viaMenu }) {
         const item = t.menu && t.menu.items.find((i) => i.label === 'DAILY RUN');
         if (!item) return { fatal: 'no DAILY RUN menu item' };
         item.onSelect();
+        // #241: DAILY RUN now opens the two-mode chooser. Launch via the
+        // actual DAILY CLASSIC menu action, not the private _startDaily API.
+        // Otherwise the test silently examines the preceding RunScene, and
+        // ledger v2 never runs because no official daily started.
+        const modeItem = t.view && t.view.menu && t.view.menu.items
+          .find((i) => i.label === 'DAILY CLASSIC');
+        if (!modeItem) return { fatal: 'DAILY RUN did not open DAILY CLASSIC chooser' };
+        modeItem.onSelect();
       } else {
         t.startRun(seed);
       }
-      await wait(1600);
-      const run = g.scene.getScene('RunScene');
-      if (!run || !run.sled) return { fatal: 'run did not start' };
+      // #241: after selecting DAILY CLASSIC, wait for the actual active
+      // RunScene rather than reading it at an arbitrary wall-time delay.
+      // This is still the menu-selected daily, not a simulated/private launch.
+      let run = null;
+      const startedDeadline = Date.now() + 12000;
+      while (Date.now() < startedDeadline) {
+        const r = g.scene.getScene('RunScene');
+        if (r && r.scene && r.scene.isActive() && r.sled &&
+            !r.sled.destroyed && r.sled.inWorld && !r.crashed) { run = r; break; }
+        await wait(50);
+      }
+      if (!run) return { fatal: 'daily run never produced a live sled before the 12s startup deadline' };
       const official = run.dailyOfficial === true;
       run.runTimeMs = 5000;
       run.pendingCrash = { cause: 'chasm' };
@@ -702,6 +728,13 @@ async function main() {
 
             const over1 = g.scene.getScene('GameOverScene');
             if (!over1) return { fatal: 'no GameOverScene' };
+            // #241: Game Over deliberately reveals its labels in stages.
+            // The previous fixed 350ms read sampled only 10-20 glyphs before
+            // the panels and tallies existed, then mistook the animation for a
+            // broken UI. Verify the FULLY RENDERED scene without skipping it.
+            const revealDeadline = Date.now() + 6000;
+            while (!over1.revealDone && Date.now() < revealDeadline) await wait(50);
+            if (!over1.revealDone) return { fatal: 'Game Over reveal never finished (modded board)' };
             const boardOnly = inspectScene(over1);
 
             // Also exercise a qualifying modded run (score >= 200) -> NEW MODDED TOP 10! -> saveEntry('MRV') -> MODDED // YOU ARE ON THE BOARD.
@@ -719,6 +752,9 @@ async function main() {
             await wait(900);
             const over2 = g.scene.getScene('GameOverScene');
             if (!over2) return { fatal: 'no qualifying GameOverScene' };
+            const entryDeadline = Date.now() + 6000;
+            while (!over2.revealDone && Date.now() < entryDeadline) await wait(50);
+            if (!over2.revealDone) return { fatal: 'Game Over reveal never finished (initials entry)' };
             const entryState = inspectScene(over2);
             const hadEntry = Boolean(over2.entry);
             if (over2.entry) {
@@ -767,7 +803,18 @@ async function main() {
     {
       const { page, errors, out } = await playToGameOver(browser, port, 0);
       try {
+        // The Game Over reveal deliberately starts sparse; a toast measured
+        // against the half-hidden backdrop falsely reports only 8-18 glyphs.
+        // Wait for the player's actual final screen before auditing overlays.
+        const settled = await page.evaluate(async () => {
+          const scene = window.__bbGame.scene.getScene('GameOverScene');
+          const deadline = Date.now() + 6000;
+          while (scene && !scene.revealDone && Date.now() < deadline)
+            await new Promise((r) => setTimeout(r, 50));
+          return Boolean(scene && scene.revealDone);
+        });
         if (out.fatal) fail('W5: run reaches Game Over', out.fatal);
+        else if (!settled) fail('W5: Game Over reveal completes for toast audit', 'timed out before the actual UI was fully revealed');
         else if (errors.length) fail('W5: no page errors', errors.join(' | '));
         else if (!out.active) fail('W5: GameOverScene active', 'scene not active');
         else {
@@ -938,13 +985,20 @@ async function main() {
                   if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.inkH && b.y < a.y + a.inkH) bad.push(`${a.text} <-> ${b.text}`);
                 }
               }
-              const panel = v && v.panel ? { x: v.panel.x, y: v.panel.y, w: v.panel.w, h: v.panel.h } : null;
+              // #241: frameWidth is the stable layout dimension; `w` is a
+              // Phaser transform coordinate overwritten by setPosition() on
+              // every modal transition. Never treat transform w as box width.
+              const panel = v && v.panel ? { x: v.panel.x, y: v.panel.y,
+                w: v.panel.frameWidth, h: v.panel.h } : null;
               const outside = panel
                 ? rects.filter((r) => r.x < panel.x || r.y < panel.y || r.x + r.w > panel.x + panel.w || r.y + r.inkH > panel.y + panel.h)
                 : [];
               return {
                 count: rects.length,
                 bad,
+                // Catch a collapsed UI frame rather than masking its glyphs.
+                panelWidth: panel ? panel.w : null,
+                layoutWidth: v.w,
                 outside: outside.map((r) => `${r.text}@${r.x.toFixed(0)},${r.y.toFixed(0)}`),
                 minInkH: rects.length ? Math.min(...rects.map((r) => r.inkH)) : 0,
               };
@@ -989,6 +1043,8 @@ async function main() {
           else if (!grid.page1HasHeader) fail('W5 grid: shows group headers', JSON.stringify(grid.page1Text));
           else if (!grid.hasPageLabel) fail('W5 grid: shows a page indicator', JSON.stringify(grid.page1Text));
           else if (grid.pages > 1 && !grid.diff) fail('W5 grid: paging changes the rows', `pages=${grid.pages} page2=${grid.page2Num}`);
+          else if (grid.audits.some((a) => !Number.isFinite(a.panelWidth) || a.panelWidth <= 0 || a.panelWidth !== a.layoutWidth))
+            fail('W5 grid: panel width survives open and pagination', `widths ${JSON.stringify(grid.audits.map((a) => [a.panelWidth, a.layoutWidth]))}`);
           else if (grid.audits.some((a) => a.count < 8)) fail('W5 grid: the probe actually measured the screen', `glyph counts ${JSON.stringify(grid.audits.map((a) => a.count))}`);
           else if (grid.audits.some((a) => a.minInkH < 7.9)) fail('W5 grid: every glyph keeps a full ink height', `min ${Math.min(...grid.audits.map((a) => a.minInkH))}`);
           else if (grid.audits.some((a) => a.bad.length)) {
@@ -1397,9 +1453,19 @@ async function main() {
           const item = t.menu && t.menu.items.find((i) => i.label === 'DAILY RUN');
           if (!item) return { fatal: 'no DAILY RUN menu item' };
           item.onSelect();
-          await wait(1600);
-          const run = g.scene.getScene('RunScene');
-          if (!run) return { fatal: 'daily run did not start' };
+          const modeItem = t.view && t.view.menu && t.view.menu.items
+            .find((i) => i.label === 'DAILY CLASSIC');
+          if (!modeItem) return { fatal: 'DAILY RUN did not open DAILY CLASSIC chooser' };
+          modeItem.onSelect();
+          let run = null;
+          const startedDeadline = Date.now() + 12000;
+          while (Date.now() < startedDeadline) {
+            const r = g.scene.getScene('RunScene');
+            if (r && r.scene && r.scene.isActive() && r.sled &&
+                !r.sled.destroyed && r.sled.inWorld && !r.crashed) { run = r; break; }
+            await wait(50);
+          }
+          if (!run) return { fatal: 'daily run did not produce a live sled before 12s startup deadline' };
           return {
             seed: run.seed,
             mask: run.biomeMask,
@@ -1503,9 +1569,19 @@ async function main() {
             const t = g.scene.getScene('TitleScene');
             t.starting = false;
             t.startRun('look-cb', 0);
-            await wait(1600);
-            const run = g.scene.getScene('RunScene');
-            if (!run) return { fatal: 'RunScene did not start' };
+            // #241: wait for a LIVE sled rather than blindly sleeping 1600ms.
+            // Some slower runs have already crashed and destroyed their sled
+            // by then; reading _cosmetic on undefined did not test colourblind
+            // mode. Preserve the real live-run requirement, fail closed.
+            const deadline = Date.now() + 10000;
+            let run = null;
+            while (Date.now() < deadline) {
+              const r = g.scene.getScene('RunScene');
+              if (r && r.scene && r.scene.isActive() && r.sled &&
+                  !r.sled.destroyed && r.sled.inWorld) { run = r; break; }
+              await wait(50);
+            }
+            if (!run) return { fatal: 'No live RunScene sled for colourblind test' };
             const pal = run.palette;
             return {
               overridden: !!(run.look && run.look.overridden),
@@ -3278,14 +3354,27 @@ async function main() {
                   let maxV = 0;
                   let minV = Infinity;
                   let lastX = h.gfx.x;
+                  let lastTick = run.simClock.tick;
                   hits.length = 0;
                   for (let i = 0; i < 400; i++) {
                     if (liveFrom === null) keepAlive();
                     step(1);
                     if (h.destroyed) break;
-                    const fv = (h.gfx.x - lastX) / 0.016;
+                    // #241: run.update(clock, 16) is a *render* frame, not one
+                    // 16ms physics step. The fixed 120Hz SimClock can advance
+                    // 1 or 2 authoritative ticks each call. Dividing a 2-tick
+                    // displacement by 16ms falsely reports 83.3px/s for an
+                    // 80px/s-capped boulder. Use the EXACT elapsed sim ticks;
+                    // keep the real <=80px/s collision/motion assertions.
+                    const elapsedTicks = run.simClock.tick - lastTick;
+                    const fv = elapsedTicks > 0
+                      ? (h.gfx.x - lastX) * 1000 / (elapsedTicks * run.simClock.tickMs)
+                      : 0;
                     lastX = h.gfx.x;
-                    if (h.roll.activeAtMs !== null && h.rolling) { maxV = Math.max(maxV, fv); minV = Math.min(minV, fv); }
+                    lastTick = run.simClock.tick;
+                    if (elapsedTicks > 0 && h.roll.activeAtMs !== null && h.rolling) {
+                      maxV = Math.max(maxV, fv); minV = Math.min(minV, fv);
+                    }
                     groundErr = Math.max(groundErr, Math.abs(h.gfx.y - run.terrain.heightAt(h.gfx.x)));
                     if (h.roll.activeAtMs === null) { if (h.cx !== cx0) movedEarly++; continue; }
                     if (actT === null) {
