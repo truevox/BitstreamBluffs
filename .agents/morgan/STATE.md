@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 19:35 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
+Last verified: 2026-11-23 19:47 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -11,11 +11,15 @@ going” means resume this queue, not take over other lanes or merge a draft.
    and changed base/overlap. If Gal has approved the exact head, coordinate
    integration against fresh main and the numbered release rule (#207).
    #248 currently reserves v2.19.22; don't preempt it. No blanket merge.
-2. If those reviews are pending, inspect #127’s existing geometry preflight
-   and stock Packet Spike rollout for a second deterministic, same-source
-   developer case. Check overlapping QA/engine scope first; keep it offline
-   and do not claim course-wide reachability or fairness. #126 dispatch
-   boundary is now covered in draft #283; no shared runner changes.
+2. If reviews are pending, #127: pin the old geometry examples as historical
+   and add current source-stamped examples with no reachability claim.
+   On main, the three documented origin windows now have no blind spawn.
+   Current fair15/mask 16 is c28→29, 527 px; two policies died upstream.
+   The shorter fair171/mask 16 is Shatter Wall c12 → Glitch Chasm c13,
+   649 px. Native hop-policy repeats reached beyond them with no blind
+   event and an earlier negated crash. A real blind-to-sensor witness
+   still needs exact identity, live timer, and an unprotected approach.
+   sim-02 is an early Glitch Chasm, not the blind pair. Keep #202 intact.
 3. #82 connection cleanup needs a separately scoped save-system review;
    use the local experiment as evidence, not authority to patch SaveStore.
    Keep #85 awaiting authentic footage; current reconstruction is not archival.
