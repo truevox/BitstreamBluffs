@@ -212,32 +212,63 @@ function allocateEffect(ctx, raw) {
 				}
 				samples[i] = Math.tanh((noise * .50 + metal * .85 + thunk + hollow + suction + lip + debris) * .85);
 			}
-			// Shorter, lighter suction on takeoff: rubbery adhesion pulls,
-			// stretches and releases. This is entirely separate from the
-			// owner-approved chunky SPLORP/PLOCK on landing.
-			const suctionLength = Math.ceil(ctx.sampleRate * .34);
-			const suctionBuffer = ctx.createBuffer(1, suctionLength, ctx.sampleRate);
-			const suctionSamples = suctionBuffer.getChannelData(0);
-			let suctionSeed = 0x14DDB337, wetNoise = 0;
-			for (let i = 0; i < suctionLength; i++) {
-				const t = i / ctx.sampleRate;
-				// A long audible rubber stretch rising through vocal midrange,
-				// with filtered wet suction, a tacky release and a little pop.
-				// Deliberately mid-forward so the 5-stem music won't bury it.
-				const stretch = Math.min(1, t / .028) * Math.exp(-t * 8.5);
-				const phase = 2 * Math.PI * (145*t + 870*t*t - 195*t*t*t);
-				const wobbly = .72*Math.sin(phase) + .32*Math.sin(phase*1.67);
-				suctionSeed = (Math.imul(suctionSeed,1664525) + 1013904223) >>> 0;
-				wetNoise = wetNoise*.75 + (suctionSeed/2147483648-1)*.25;
-				const wet = wetNoise * .38 * stretch;
-				const snapT = t - .135;
-				const plip = snapT >= 0 ? .39*Math.sin(2*Math.PI*325*snapT)
-					* Math.exp(-snapT*63) : 0;
-				const secondT = t - .202;
-				const bubble = secondT >= 0 ? .21*Math.sin(2*Math.PI*450*secondT)
-					* Math.exp(-secondT*78) : 0;
-				suctionSamples[i] = Math.tanh((wobbly*stretch + wet + plip + bubble)*.90);
+			// Audition two materially different procedural suction textures.
+			// The previous takeoff was mostly a pitched electronic glissando:
+			// louder, but not convincingly wet. Here *filtered aspirated noise*
+			// leads; tiny gurgles and a lip break are supporting details.
+			// Everything is deterministic, precomputed and voice-capped.
+			const suctionLength = Math.ceil(ctx.sampleRate * .43);
+			const suctionBuffers = [];
+			for (let style = 0; style < 2; style++) {
+				const buffer = ctx.createBuffer(1, suctionLength, ctx.sampleRate);
+				const data = buffer.getChannelData(0);
+				let seed = style === 0 ? 0x14DDB337 : 0x7B00B1E5;
+				let low = 0, mid = 0, sub = 0;
+				for (let i = 0; i < suctionLength; i++) {
+					const t = i / ctx.sampleRate;
+					seed = (Math.imul(seed,1664525) + 1013904223) >>> 0;
+					const white = seed / 2147483648 - 1;
+					const progress = Math.min(1,t/.32);
+					const opening = Math.min(1,t/.032);
+					const release = Math.max(0,Math.min(1,(.40-t)/.13));
+					const envelope = opening * release;
+					// Simulated pressure change: noisy seal → narrow resonant
+					// wet hiss → sudden break. Distinct cutoffs produce a
+					// genuine timbral sweep, not just a louder sine wave.
+					const base = style === 0 ? 300 : 165;
+					const target = style === 0 ? 2350 : 1100;
+					const cutoff = base + (target-base)*progress*progress;
+					const lpf = 1 - Math.exp(-2*Math.PI*cutoff/ctx.sampleRate);
+					const midf = 1 - Math.exp(-2*Math.PI*(cutoff*2.1)/ctx.sampleRate);
+					const subf = 1 - Math.exp(-2*Math.PI*125/ctx.sampleRate);
+					low += lpf*(white-low);
+					mid += midf*(white-mid);
+					sub += subf*(white-sub);
+					const squish = (mid-low*.92)*1.65 + (low-sub)*.42;
+					const flutter = style === 0 ?
+						(.85 + .15*Math.sin(2*Math.PI*32*t)) :
+						(.72 + .28*Math.sin(2*Math.PI*(19*t + 14*t*t)));
+					let gulp = 0;
+					if (style === 1) {
+						// Several falling sticky bubble voids, not one musical note.
+						for (const lag of [.070,.154,.235]) {
+							const dt = t-lag;
+							if (dt < 0) continue;
+							gulp += .28*Math.sin(2*Math.PI*(205*dt-590*dt*dt))
+								*Math.exp(-dt*39);
+						}
+					}
+					const sealT = t-(style === 0 ? .265 : .315);
+					// Rapid pressure release, with short low thop and moist tick.
+					const breakPop = sealT < 0 ? 0 :
+						(.42*Math.sin(2*Math.PI*(205*sealT-260*sealT*sealT))
+						+ .35*white)*Math.exp(-sealT*65);
+					const wet = squish*flutter*envelope*(style === 0 ? 1.15 : .98);
+					data[i] = Math.tanh((wet + gulp + breakPop)*1.5);
+				}
+				suctionBuffers.push(buffer);
 			}
+			let suctionStyle = clamp(raw.suctionStyle,0,1,0) >= .5 ? 1 : 0;
 			const activeStrikes = new Set();
 			const playPhysical = (buffer, gainValue, at) => {
 				if (activeStrikes.size >= 4) {
@@ -265,7 +296,7 @@ function allocateEffect(ctx, raw) {
 			const strikeOnce = (strength, at) =>
 				playPhysical(strike, (.25 + strength * .80) * splock, at);
 			const takeoffOnce = (strength, at) =>
-				playPhysical(suctionBuffer, (.28 + strength * .34) * suction, at);
+				playPhysical(suctionBuffers[suctionStyle], (.28 + strength * .34) * suction * (suctionStyle === 0 ? .68 : 1), at);
 			disposers.push(() => {
 				for (const entry of activeStrikes) {
 					try { entry.source.stop(); } catch {}
@@ -279,6 +310,11 @@ function allocateEffect(ctx, raw) {
 			} };
 			refs.suction = { set: value => {
 				suction = clamp(value, 0, 2.4, 1.8);
+				return true;
+			} };
+			refs.suctionStyle = { set: value => {
+				if (!Number.isFinite(Number(value))) return false;
+				suctionStyle = clamp(value,0,1,0) >= .5 ? 1 : 0;
 				return true;
 			} };
 			refs.takeoff = { set: (value, at) => {

@@ -12,6 +12,12 @@ const effect = () => chain?.find('scrapheap');
 const speed = () => Number($('speed').value);
 const splock = () => Number($('splock').value)/100;
 const suction = () => Number($('suction').value)/100;
+const suctionTexture = () => Number($('suction-texture').value);
+const setSuctionTexture = () => {
+	if (ctx) effect()?.set('suctionStyle',suctionTexture(),ctx.currentTime);
+	if (playing) say(suctionTexture()===0 ? 'Texture A: peeling a tacky seal with a wet pop.' :
+		'Texture B: wet vacuum gulp, with little separating bubbles.');
+};
 const setSuction = () => {
 	$('suction-value').textContent = Math.round(suction()*100)+'%';
 	if (ctx) effect()?.set('suction',suction(),ctx.currentTime);
@@ -102,6 +108,7 @@ async function play() {
 	setContact();
 	setSplock();
 	setSuction();
+	setSuctionTexture();
 	const when=ctx.currentTime+.10;
 	for (const role of STEMS) {
 		const source=ctx.createBufferSource();
@@ -128,6 +135,7 @@ $('load').addEventListener('click', loadSample);
 $('play').addEventListener('click', play);
 $('splock').addEventListener('input', setSplock);
 $('suction').addEventListener('input', setSuction);
+$('suction-texture').addEventListener('change', setSuctionTexture);
 $('speed').addEventListener('input', () => {
 	$('speed-value').textContent = speed()+' px/s';
 	setContact();

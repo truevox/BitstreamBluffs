@@ -17,23 +17,38 @@ const base=process.env.SCHLORP_SOURCE_URL || 'http://127.0.0.1:5173';
    const ctx=new OfflineAudioContext(2,N,sr),master=ctx.createGain();master.gain.value=.32;master.connect(ctx.destination);
    const chain=buildMusicChain(ctx,[{type:'scrapheap',id:'scrapheap',contact:0.55}],master);
    for(const name of roles){const source=ctx.createBufferSource(),vol=ctx.createGain();source.buffer=buffers[name];vol.gain.value=name==='drums'?.9:name==='bass'?.75:.65;source.connect(vol);vol.connect(name==='drums'?chain.input:master);source.start(0);}
-   if(mode==='takeoff'){chain.find('scrapheap').set('takeoff',.55,1.2);chain.find('scrapheap').set('contact',0,1.2);}
+      if(mode==='takeoffA'||mode==='takeoffB'){
+    chain.find('scrapheap').set('suctionStyle',mode==='takeoffB'?1:0,ctx.currentTime);
+    chain.find('scrapheap').set('takeoff',.55,1.2);
+    chain.find('scrapheap').set('contact',0,1.2);
+   }
    if(mode==='noContact')chain.find('scrapheap').set('contact',0,1.2);
    if(mode==='landing')chain.find('scrapheap').set('impact',.9,1.2);
    return ctx.startRendering();
   }
-  const [baseline,control,takeoff,landing]=await Promise.all(['baseline','noContact','takeoff','landing'].map(render));
+  const [baseline,control,peel,gulp,landing]=await Promise.all(['baseline','noContact','takeoffA','takeoffB','landing'].map(render));
   function rms(buffer,a,b){const start=Math.floor(a*sr),stop=Math.floor(b*sr);let sum=0;for(let ch=0;ch<2;ch++){const samples=buffer.getChannelData(ch);for(let i=start;i<stop;i++){const v=samples[i];sum+=v*v;}}return Math.sqrt(sum/(2*(stop-start)));}
   function diff(a,b,x,y){const start=Math.floor(x*sr),stop=Math.floor(y*sr);let sum=0;for(let ch=0;ch<2;ch++){const aa=a.getChannelData(ch),bb=b.getChannelData(ch);for(let i=start;i<stop;i++){sum+=(aa[i]-bb[i])**2;}}return Math.sqrt(sum/(2*(stop-start)));}
   function peak(buffer){let p=0,finite=true;for(let c=0;c<2;c++){const vals=buffer.getChannelData(c);for(let i=0;i<N;i++){const v=vals[i];p=Math.max(p,Math.abs(v));if(!Number.isFinite(v))finite=false;}}return {peak:p,finite};}
-  return {baselineRMS:rms(control,1.2,1.55),takeoffDifferenceRMS:diff(takeoff,control,1.2,1.55),takeoffRatio:diff(takeoff,control,1.2,1.55)/rms(control,1.2,1.55),landingDifferenceRMS:diff(landing,baseline,1.2,1.55),takeoffPeak:peak(takeoff),landingPeak:peak(landing)};
+  return {
+   baselineRMS:rms(control,1.2,1.55),
+   peelDifferenceRMS:diff(peel,control,1.2,1.55),
+   gulpDifferenceRMS:diff(gulp,control,1.2,1.55),
+   peelPeak:peak(peel), gulpPeak:peak(gulp), landingPeak:peak(landing),
+   landingDifferenceRMS:diff(landing,baseline,1.2,1.55),
+   differentTexturesRMS:diff(peel,gulp,1.2,1.55),
+  };
  },base);
  console.log('SCHLORP_AUDIBILITY_PROBE',JSON.stringify({base,result,errors}));
  assert.deepEqual(errors,[]);
- assert.equal(result.takeoffPeak.finite,true);
+ for(const style of ['peel','gulp']) {
+  assert.equal(result[style+'Peak'].finite,true);
+  assert(result[style+'Peak'].peak < .95,style+' peak unexpectedly high');
+  assert(result[style+'DifferenceRMS'] > .025,style+' is buried in the original mix');
+  assert(result[style+'DifferenceRMS'] < result.landingDifferenceRMS*.96,
+   style+' should remain smaller than the owner-approved landing');
+ }
  assert.equal(result.landingPeak.finite,true);
- assert(result.takeoffPeak.peak < .95,'Schlorp peak unexpectedly high');
- assert(result.takeoffDifferenceRMS > .025,'Takeoff is again buried in the full original-stem mix');
- assert(result.takeoffDifferenceRMS < result.landingDifferenceRMS*.96,'Takeoff should remain quieter than the owner-approved landing');
+ assert(result.differentTexturesRMS > .012,'The two textures need genuinely different output');
  await browser.close();
 })().catch(e=>{console.error(e.stack);process.exitCode=1});
