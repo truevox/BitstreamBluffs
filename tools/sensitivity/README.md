@@ -25,11 +25,18 @@ policy re-derivation, no second simulator, no copied physics.
 One command, from the repo root:
 
 ```sh
-node tools/sensitivity/run-sensitivity.mjs --seeds 12 --field hopPress --offsets -2,-1,0,1,2
+node tools/sensitivity/run-sensitivity.mjs --seeds 12 --field hopPress --offsets -2,-1,0,1,2 \
+  --maxM 5000 --maxSec 180 --workers 2 \
+  --out tools/sensitivity/results/hopPress-12seeds.json
 ```
 
-The source-pinned measurement in `results/hopPress-12seeds.json` is generated separately **after** the
-instrumentation has been committed, against a clean exact-source checkout. Add `--out FILE`
+The source-pinned measurement in `results/hopPress-12seeds.json` was generated **after** the
+instrumentation was committed at Git SHA `66d8b0a67f0f6caa21a64ee3d1a7bfbb5e8a276b`, against its
+clean checkout. The report's `build.sourceSha` therefore identifies that **executable implementation**;
+the subsequent evidence-only commit containing this JSON is not a different simulation build. At the
+original 90-second capture horizon `sim-06` correctly refused to emit a stale tape; extending capture
+up to 180 seconds allowed its own real `crash:hazard` event at tick 12282 and yielded 12/12 valid
+control captures, 60/60 complete offset arms, and one right-censored perturbed run. Add `--out FILE`
 to write the machine record, `--quiet` to suppress per-run lines. The earlier Seeking scratch result is
 preserved in recovery snapshots but is **not evidence for this recovered source**: its ruleset and SIM
 identity were self-attested from environment variables and were inconsistent with the canonical artifacts.
@@ -91,6 +98,9 @@ shipped `encodePad`/`decodePad` (identity at offset 0, one field moved and nothi
 `tests/sensitivity/source-identity.test.js` pins the canonical source-identity contract. The fixtures in
 `tests/sensitivity/fixtures/` are real tapes captured from the shipped sim by this same tool, so a format
 change that would break the tool fails a test instead of silently perturbing a different control.
+Raw external copy and provenance on CT223: `/srv/friday-audio/bsb-130-recovery-provenance-20261123/hopPress-12seed-180s-complete.json`
+(SHA256 `388720c85d612e258fb5b3272c4a373cbc7acc829c875f4f7e1381414ff32a84`). The
+12-seed sample is still small and the measured effects are not a universal gameplay fairness claim.
 
 ## Why capture runs under the tape's own rule
 
