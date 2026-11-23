@@ -3,6 +3,7 @@ import { StemMusicDirector } from '../../src/systems/music/StemMusicDirector.js'
 import { contactFromMotion, impactFromLanding } from '../../src/systems/music/MusicPhysicsSignals.js';
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
 import { HydrostaticPressure } from '../../src/systems/music/HydrostaticPressure.js';
+import {ScrapPitchCadence} from '../../src/systems/music/ScrapPitchCadence.js';
 
 const ROLES=['bass','drums','guitar','piano','other'];
 function director() {
@@ -47,6 +48,26 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(drum[1]).toEqual(orchestraPreset('garbage-dump-glacier','drums'));
 		expect(drum[1].some(fx=>fx.id==='scrapheap'&&fx.type==='scrapheap')).toBe(true);
 		expect(orchestraPreset('debumont','drums').some(fx=>fx.type==='scrapheap')).toBe(false);
+	});
+	test('Garbage pitch scan only on irregular grounded events, never in air/menu or on no evidence',()=>{
+		const d=director();d.scrapPitch=new ScrapPitchCadence();d.started=true;
+		d.speedPxS=850;
+		d.mixer.readEffect=jest.fn(()=>[{midi:69,hz:440,confidence:.35}]);
+		expect(d._maybeScrapPitchClang(1)).toBe(false);
+		const due=d.scrapPitch.nextAt;
+		expect(d._maybeScrapPitchClang(due-.01)).toBe(false);
+		expect(d.mixer.readEffect).not.toHaveBeenCalled();
+		expect(d._maybeScrapPitchClang(due)).toBe(true);
+		expect(d.mixer.readEffect).toHaveBeenCalledWith('bass','scrapPitchProbe','notes');
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','scrapheap','pitchedClang',
+			{midi:69,hz:440,confidence:.35,strength:expect.any(Number)});
+		d.mixer.setEffectParam.mockClear();d.airborne=true;
+		expect(d._maybeScrapPitchClang(100)).toBe(false);
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+		d.airborne=false;d.menuMode=true;
+		expect(d._maybeScrapPitchClang(102)).toBe(false);
+		d.menuMode=false;d.biome='debumont';
+		expect(d._maybeScrapPitchClang(104)).toBe(false);
 	});
 	test('ground speed changes update only contact, not effects graph or song clock',()=>{
 		const d=director();

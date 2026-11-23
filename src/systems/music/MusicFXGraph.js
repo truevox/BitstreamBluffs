@@ -9,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe',
 ]);
 
 function saturatorCurve(amount) {
@@ -131,6 +131,24 @@ function allocateEffect(ctx, raw) {
 			refs.impulse = { set: (buffer) => { conv.buffer = buffer || null; } };
 			break;
 		}
+		case 'scrapPitchProbe': {
+			// Non-destructive view of the EXISTING original bass stem. A small
+			// inaudible analyser tap gives safe real-source spectral candidates
+			// when the grounded Scrapheap scheduler requests one. No timers.
+			input.connect(output);
+			const analyser=node(ctx.createAnalyser());analyser.fftSize=4096;
+			analyser.smoothingTimeConstant=.52;
+			const monitor=node(ctx.createGain());monitor.gain.value=1e-7;
+			input.connect(analyser);analyser.connect(monitor);monitor.connect(output);
+			const spectrum=new Float32Array(analyser.frequencyBinCount);
+			refs.notes={read:()=>{
+				if(typeof analyser.getFloatFrequencyData!=='function')return [];
+				analyser.getFloatFrequencyData(spectrum);
+				return confidentCrystalNotes(spectrum,{sampleRate:ctx.sampleRate,
+					fftSize:analyser.fftSize,maxNotes:2});
+			}};
+			break;
+		}
 		case 'scrapheap': {
 			// Inharmonic, source-excited junk-metal resonators on ORIGINAL drum audio.
 			// No independently timed notes or invented beat grid: the recording
@@ -213,6 +231,62 @@ function allocateEffect(ctx, raw) {
 				}
 				samples[i] = Math.tanh((noise * .50 + metal * .85 + thunk + hollow + suction + lip + debris) * .85);
 			}
+			// Separate pitched junk-metal clang. Its FUNDAMENTAL comes from
+			// confidently measured original bass frequencies, never a guessed
+			// song key. Detuned/inharmonic UPPER PARTIALS preserve junkyard
+			// identity rather than copying Crystal's pure glass bell sound.
+			const clangBaseHz=440, clangLength=Math.ceil(ctx.sampleRate*.62);
+			const clangBuffer=ctx.createBuffer(1,clangLength,ctx.sampleRate);
+			const clangData=clangBuffer.getChannelData(0);
+			let clangNoiseSeed=0xC1A90617;
+			for(let i=0;i<clangLength;i++){
+				const t=i/ctx.sampleRate;
+				clangNoiseSeed=(Math.imul(clangNoiseSeed,1664525)+1013904223)>>>0;
+				const noise=clangNoiseSeed/2147483648-1;
+				const metal=.56*Math.sin(2*Math.PI*clangBaseHz*t)*Math.exp(-t*11)
+					+.30*Math.sin(2*Math.PI*clangBaseHz*2.67*t)*Math.exp(-t*19)
+					+.19*Math.sin(2*Math.PI*clangBaseHz*4.15*t)*Math.exp(-t*30);
+				const ragged=noise*.13*Math.exp(-t*38);
+				const chitter=t>.09?.12*Math.sin(2*Math.PI*1760*(t-.09))*Math.exp(-(t-.09)*64):0;
+				clangData[i]=Math.tanh((metal+ragged+chitter)*1.1);
+			}
+			let clangLevel=clamp(raw.clangLevel,0,2,1.0);
+			const activeClangs=new Set();
+			const cleanClang=entry=>{
+				try{entry.source.disconnect();}catch{}
+				try{entry.gain.disconnect();}catch{}
+				activeClangs.delete(entry);
+			};
+			const pitchClang=(candidate,at)=>{
+				if(!candidate||!Number.isInteger(candidate.midi)||
+					candidate.midi<CRYSTAL_MIDI_LOW||candidate.midi>CRYSTAL_MIDI_HIGH||
+					!Number.isFinite(candidate.hz)||
+					Math.abs(candidate.hz-crystalHz(candidate.midi))>.001||
+					!Number.isFinite(candidate.confidence)||candidate.confidence<0||
+					!Number.isFinite(candidate.strength)||candidate.strength<=0||
+					contact<=.12||clangLevel<=0)return false;
+				if(activeClangs.size>=3){const old=activeClangs.values().next().value;
+					try{old.source.stop();}catch{}cleanClang(old);}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=clangBuffer;
+				source.playbackRate.value=candidate.hz/clangBaseHz;
+				const strength=clamp(candidate.strength,0,1,0);
+				gain.gain.value=(.23+.24*strength)*clangLevel;
+				source.connect(gain);gain.connect(output);
+				const entry={source,gain};activeClangs.add(entry);
+				source.onended=()=>cleanClang(entry);
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			};
+			refs.pitchedClang={set:(value,at)=>pitchClang(value,at)};
+			refs.clangLevel={set:value=>{
+				if(!Number.isFinite(value))return false;
+				clangLevel=clamp(value,0,2,1.0);return true;
+			}};
+			disposers.push(()=>{for(const entry of activeClangs){
+				try{entry.source.stop();}catch{}cleanClang(entry);
+			}});
+
 			// Audition two materially different procedural suction textures.
 			// The previous takeoff was mostly a pitched electronic glissando:
 			// louder, but not convincingly wet. Here *filtered aspirated noise*
@@ -946,6 +1020,12 @@ export class StemFXMixer {
 	setEffectParam(id, effectId, key, value) {
 		const effect = this.sources.get(id)?.chain?.find(effectId);
 		return effect ? effect.set(key, value, this.ctx.currentTime) : false;
+	}
+
+	/** Read an ANALYSER readout only on explicit scheduled physical event. */
+	readEffect(id,effectId,key){
+		const ref=this.sources.get(id)?.chain?.find(effectId)?.refs?.[key];
+		return typeof ref?.read==='function'?ref.read():null;
 	}
 
 	setImpulse(id, effectId, buffer) {

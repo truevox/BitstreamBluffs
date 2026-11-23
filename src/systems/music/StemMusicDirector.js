@@ -14,6 +14,7 @@ import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
 import { snowpackImpactFromLanding } from './SnowpackImpact.js';
 import { contactFromMotion, impactFromLanding } from './MusicPhysicsSignals.js';
 import { HydrostaticPressure } from './HydrostaticPressure.js';
+import { ScrapPitchCadence } from './ScrapPitchCadence.js';
 import { MicroBeeAudio } from './MicroBeeAudio.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -62,6 +63,7 @@ export class StemMusicDirector {
 		this.hydrostatic = new HydrostaticPressure();
 		this._hydroLastSent = NaN;
 		this._scrapContactLast = NaN;
+		this.scrapPitch = new ScrapPitchCadence();
 		this._timer = null;
 		this._token = 0;
 		this._nextPromise = null;
@@ -182,6 +184,7 @@ export class StemMusicDirector {
 		if (next) {
 			this._pendingSnowImpact = 0;
 			this._pendingScrapImpact = 0;
+			this.scrapPitch?.resetTiming();
 			this._pendingMicroImpact = 0;
 		this._pendingCrystalImpact = 0;
 			this.microBees?.dispose();
@@ -291,16 +294,21 @@ export class StemMusicDirector {
 			this._hydroLastSent = NaN;
 			this._pendingHydroImpact = 0;
 		}
+		if (next !== this.biome &&
+			(next === 'garbage-dump-glacier' || this.biome === 'garbage-dump-glacier'))
+			this.scrapPitch?.reset();
 		this.biome = next;
 		if (this.biome !== 'debumont') this._pendingSnowImpact = 0;
 		if (this.biome !== 'crystal-cavern') this._pendingCrystalImpact = 0;
 		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
+		if (this.biome !== 'garbage-dump-glacier') this.scrapPitch?.resetTiming();
 		if (this.biome !== 'micro-mountain') {
 			this._pendingMicroImpact=0;
 			this.microBees?.dispose();
 			this.microBees=null;
 		}
 		this._scrapContactLast = NaN;
+		this.scrapPitch?.resetTiming();
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
@@ -374,6 +382,23 @@ export class StemMusicDirector {
 			Math.abs(contact - this._scrapContactLast) < .04) return;
 		this._scrapContactLast = contact;
 		this.mixer?.setEffectParam('drums', 'scrapheap', 'contact', contact);
+	}
+
+	/**
+	 * Seeded irregular source-consonant junk clangs. Called by the EXISTING
+	 * music pump; no new timer, guessed song key or off-grid scoring changes.
+	 * The bass analyser is only read at a due time, not each 75ms tick.
+	 */
+	_maybeScrapPitchClang(now){
+		if(!Number.isFinite(now)||!this.started||this.transportPaused||
+			this.menuMode||this.biome!=='garbage-dump-glacier'||this.airborne)
+			return false;
+		const contact=contactFromMotion(this.speedPxS,true);
+		if(contact<.16)return false;
+		const candidate=this.scrapPitch?.next(now,contact,
+			()=>this.mixer?.readEffect?.('bass','scrapPitchProbe','notes'));
+		if(!candidate)return false;
+		return this.mixer?.setEffectParam('drums','scrapheap','pitchedClang',candidate)===true;
 	}
 
 	_applyScrapImpact() {
@@ -452,6 +477,7 @@ export class StemMusicDirector {
 			if (!next) this._applySnowImpact();
 		}
 		this._applyScrapContact(true);
+		if(next&&this.biome==='garbage-dump-glacier')this.scrapPitch?.resetTiming();
 		if (!next) {
 			this._applyScrapImpact();
 			this._applyHydroImpact();
@@ -784,6 +810,7 @@ export class StemMusicDirector {
 		if (!this.started || !this.pack || !this.ctx || this.ctx.state !== 'running' ||
 			this.clockStart === null) return;
 		const now = this.ctx.currentTime;
+		this._maybeScrapPitchClang(now);
 		const elapsed = now - this.clockStart;
 		const duration = this.pack.duration;
 		if (elapsed > duration - 15 && !this._nextPromise) {
