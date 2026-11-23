@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 20:29 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
+Last verified: 2026-11-23 20:32 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -11,7 +11,16 @@ going” means resume this queue, not take over other lanes or merge a draft.
    #287/#288) for exact-head Gal feedback and current checks/base/overlap.
    Fix actual feedback before expansion. No merge of drafts. If cleared,
    obey the numbered release rule (#207); #248 reserves v2.19.22.
-2. #127's docs are reviewable; no live blind-to-sensor witness yet.
+2. #81: UI-only compatibility regression delegated for isolated tests.
+   Game Over rows can look available for a stale/unstamped tape that
+   RunScene excludes under its existing SIM_REVISION check. Keep sharing,
+   SaveStore, tape format and gameplay out of scope.
+3. #127's docs are reviewable; live candidate fair1153 is being checked.
+   Exact main stock hop 320ms repeats produce a blind event followed by a
+   fatal Packet Spike without earlier negated crashes; exact live IDs,
+   timer overlap, shield state and attribution need observer confirmation.
+   
+   Prior negative control:
    Extended corpus: mask 16 fair1139 Shatter Wall `12:2` (x26675) →
    Packet Spike `13:0` (x27254), 579 px. Native Chromium hop 320/380ms
    repeats hit the exact wall, but the sampled timer expires about 140–150 px
@@ -21,7 +30,7 @@ going” means resume this queue, not take over other lanes or merge a draft.
    New positive evidence would need live timer, exact sensor contact,
    matched controls, and protection checks; do not re-test this failed pair
    unchanged.
-3. Revisit blocked work only when its evidence or prerequisites move:
+4. Revisit blocked work only when its evidence or prerequisites move:
    #82 storage lifecycle needs a separately scoped save-system review;
    #85 needs authentic footage; #84/#83 and product #70/#71 need #60;
    #81 friend exchange needs #58; #75/#100/#74 need trusted restore or
@@ -61,6 +70,8 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 
 - Gal: source-review requests posted on each of the eight exact draft heads.
   None is a merge request, approval, or release reservation. Preserve #207.
+- Isolated helpers are preparing #81 and observing #127 fair1153; root
+  owns review and any publication. No other lanes were reassigned.
 - Internal helpers finished #157 and #70 test/evidence preparation. Root
   reviewed and published both. Instrumented #127 browser work is local,
   uses observation only and adds no code to shared runner/PR heads.
