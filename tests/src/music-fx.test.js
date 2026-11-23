@@ -185,6 +185,7 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(hydro.refs.impact).toBeDefined();
 		expect(hydro.refs.contrast).toBeDefined();
 		expect(hydro.refs.waveStrength).toBeDefined();
+		// Provisional owner-liked audition setting: 60% wave while pressure remains 190%.
 		expect(hydro.set('contrast',2.2,ctx.currentTime)).toBe(true);
 		expect(hydro.set('contrast',NaN,ctx.currentTime)).toBe(false);
 		expect(hydro.set('contrast',1.45,ctx.currentTime)).toBe(true);
@@ -195,7 +196,8 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(hydro.set('impact',NaN,ctx.currentTime)).toBe(false);
 		expect(hydro.set('impact',.8,ctx.currentTime)).toBe(true);
 		expect(ctx._bufferSources).toHaveLength(1);
-		expect(ctx._bufferSources[0].connections[0].gain.value).toBeGreaterThan(.9);
+		expect(ctx._bufferSources[0].connections[0].gain.value).toBeGreaterThan(.35);
+		expect(ctx._bufferSources[0].connections[0].gain.value).toBeLessThan(.5);
 		const waveform=ctx._bufferSources[0].buffer.getChannelData(0);
 		expect(waveform.every(Number.isFinite)).toBe(true);
 		expect(waveform.every(v=>Math.abs(v)<=1)).toBe(true);

@@ -363,7 +363,7 @@ function allocateEffect(ctx, raw) {
 			warmth.connect(wet); wet.connect(output);
 			const sensitivity = clamp(raw.sensitivity, .3, 1, 1);
 			let contrast = clamp(raw.contrast, .6, 2.2, 1.9);
-			let waveStrength = clamp(raw.waveStrength, 0, 2.4, 1.5);
+			let waveStrength = clamp(raw.waveStrength, 0, 2.4, .6);
 			let currentPressure = clamp(raw.pressure, 0, 1, 0);
 			const apply = (p,at,immediate=false) => {
 				currentPressure = clamp(p,0,1,0);
@@ -397,7 +397,7 @@ function allocateEffect(ctx, raw) {
 			}};
 			refs.waveStrength={set:value=>{
 				if (!Number.isFinite(value)) return false;
-				waveStrength=clamp(value,0,2.4,1.5);
+				waveStrength=clamp(value,0,2.4,.6);
 				return true;
 			}};
 			// Physically motivated pressure shock: low-mid water-hammer thump,
