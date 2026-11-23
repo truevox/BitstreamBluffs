@@ -1,0 +1,34 @@
+# This gate executes repository code in a disposable, read-only-token runner.
+# It is independent of Friday's metadata-only PR lifecycle workflow.
+name: Build identity and determinism gate
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: build-identity-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify committed ruleset and causal tripwire
+        run: node tools/ruleset/build-ruleset.mjs --check
+      - name: Verify exact build identity against fresh source
+        run: node tools/ruleset/build-ruleset.mjs --check-identity
+      - name: Verify full determinism suite including identity negatives
+        run: npm test -- --runInBand tests/determinism
+      - name: Verify production build
+        run: npm run build

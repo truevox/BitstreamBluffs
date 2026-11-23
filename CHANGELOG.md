@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.19.20 — deterministic exact build identity and safe artifact verification (#238 / #239) (2026-11-22)
+
+- **Deterministic read-only build identity:** compose an exact `buildId` from game version, archived ruleset ID / simulation revision, bundled Matter version, declared savestate-layout schema, and the causal source-tripwire digest. The runtime can expose an envelope-shaped descriptor without writing save data or registering any restorable layout.
+- **Fail-closed identity verification:** `build-ruleset.mjs --identity` and `--check-identity` verify committed artifacts against current source. An alternate `--root` is restricted to an artifact overlay that shares this checkout's actual `src` and `node_modules`, preventing a cross-checkout false-positive from comparing one tree's artifacts using another tree's imported code and schema.
+- **Adversarial regression coverage:** exact-identity, envelope rejection, no-partial-identity and negative tests, including changed layout and alternate dependency trees, with independent review and deterministic reproducibility. Explicitly document the causal-source allowlist's limits.
+- **Actual CI gate:** add separate pull-request/main GitHub Actions checks for the source ruleset, exact build identity, full determinism suite, and production build; preserve the metadata-only Friday lifecycle workflow unchanged.
+- **Scope boundary:** No production savestate capture or restoration, persistence, ranking or gameplay/physics change. SIM_REVISION stays 6. Parent #119 remains open; only leaf #238 is completed here. Every production merge is a release.
+
 ## v2.19.19 — compare redacted local crash briefs (#78 / #237) (2026-11-22)
 
 - **Compare two existing redacted developer crash briefs.** The local CLI validates the original v1 JSON and reports whether its allowlisted crash signatures match, differ, or are inconclusive because a hazard ID is missing. It never reads an input tape, launches a replay, authenticates either report, or shares player data. No gameplay, scoring, replay compatibility or production change.

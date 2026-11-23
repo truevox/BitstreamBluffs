@@ -8,6 +8,13 @@
 - **Heavy Mode/practice:** saves and reloads may be repeated, but a reloaded run is tagged tool-assisted and excluded from normal competitive boards.
 - **Exact-build binding:** same game version alone is insufficient; a hash-like `buildId`, ruleset ID and simulation revision, bundled Matter version, and schema layout ID must all match. V1 refuses old versions; no migration or legacy physics runtime. A robust runtime `buildId` generator does not ship in PR #227, and callers **must supply it**. Copying browser storage to retry a consumed suspend remains an explicitly accepted prelaunch risk.
 
+## Build identity source (#238)
+
+`buildId` is now produced deterministically from artifacts the repository already commits, in `src/systems/savestate/buildIdentity.js`. Its closure is `gameVersion` (`package.json`), `physicsIdentity` (`tools/ruleset/current.json`), `matterVersion` (the archived ruleset's `engine.matter`), `savestateLayoutId` (the declared schema in `layoutDeclaration.js`), and a digest-of-digests over the causal-source tripwire (`tools/ruleset/source-digest.json`). Any missing or malformed part throws a coded `BuildIdentityError`; nothing is hashed by default. The running build reports it read-only via `src/systems/savestate/runtimeIdentity.js` (`loadCurrentBuildIdentity()`), and CI proves the committed artifacts with `node tools/ruleset/build-ruleset.mjs --check-identity`. Because the tripwire is in the closure, a patch-version bump or change to a **tripwire-allowlisted** causal-source file yields a different `buildId`; changes to other behavior-affecting files are NOT automatically detected and must be classified and added to that allowlist where appropriate. A docs-only change does not. This is still not a live savestate or a trust claim.
+
+
+The CLI's `--root` option supports **artifact overlays only**: the supplied directory must reuse the running tool's exact `src` and `node_modules` directories (e.g. via symlinks), while overriding JSON artifacts for read-only negative tests. A separate physical source checkout must invoke **its own** verifier, not another checkout's `--root`, because module constants and the declared savestate schema are imported from the verifier's checkout. An alternate code tree fails closed rather than reporting an incorrect identity.
+
 ## Format
 
 ```
@@ -16,7 +23,7 @@
   "version": 1,
   "purpose": "suspend" | "practice",
   "build": {
-    "gameVersion": "2.19.18", "buildId": "sha256:<64 lowercase hex>",
+    "gameVersion": "2.19.20", "buildId": "sha256:<64 lowercase hex>",
     "physicsIdentity": { "rulesetId": "sha256:<64 lowercase hex>", "simRevision": 6 },
     "matterVersion": "0.20.0", "savestateLayoutId": "sha256:<64 lowercase hex>"
   },

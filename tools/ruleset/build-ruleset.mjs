@@ -5,9 +5,16 @@
  *   node tools/ruleset/build-ruleset.mjs                 print the current rulesetId and canonical byte length
  *   node tools/ruleset/build-ruleset.mjs --write         archive the current ruleset (content-addressed) + update current.json
  *   node tools/ruleset/build-ruleset.mjs --check         exit 1 unless committed artifacts equal a fresh assembly and pins hold
+ *   node tools/ruleset/build-ruleset.mjs --identity      print the current build identity (human-readable + raw buildId); read-only
+ *   node tools/ruleset/build-ruleset.mjs --check-identity
+ *                                                        exit 1 unless the committed artifacts compose a provable build identity
+ *                                                        that matches a fresh source assembly; read-only, never rewrites artifacts
  *   node tools/ruleset/build-ruleset.mjs --attest "no-behavior-change: <why>"
  *   node tools/ruleset/build-ruleset.mjs --attest "sim-revision-bumped: <what>"
  *                                                        rewrite tools/ruleset/source-digest.json (the source tripwire)
+ *   node tools/ruleset/build-ruleset.mjs --root <dir>    inspect an artifact overlay on this checkout's code and deps
+ *                                                        (read-only modes only: --identity, --check-identity;
+ *                                                         independent code trees fail closed)
  *
  * Reads files under the repo only. No network. Does not execute anything it reads.
  */
@@ -16,11 +23,19 @@ import path from 'node:path';
 import { canonicalBytes } from '../../src/systems/replay/canonicalJson.js';
 import { digestOfBytes } from '../../src/systems/replay/canonicalSha256.js';
 import {
-  ARCHIVE_DIR, CURRENT_PATH, assembleFromDisk, checkPins, currentPointer, hexOf, repoRoot, readTripwire, tripwireDigests, writeArtifacts, writeTripwire,
+  ARCHIVE_DIR, CURRENT_PATH, assembleFromDisk, checkBuildIdentity, checkPins, currentBuildIdentity, currentPointer, hexOf,
+  repoRoot, readTripwire, tripwireDigests, writeArtifacts, writeTripwire,
 } from './lib.mjs';
 
-const root = repoRoot();
 const args = process.argv.slice(2);
+const rootIx = args.indexOf('--root');
+const root = rootIx >= 0 ? path.resolve(args[rootIx + 1] || '') : repoRoot();
+if (rootIx >= 0 && (!args[rootIx + 1] || args[rootIx + 1].startsWith('--') ||
+    !(args.includes('--identity') || args.includes('--check-identity')) ||
+    args.includes('--write') || args.includes('--check') || args.indexOf('--attest') >= 0)) {
+  console.error('FAIL --root needs a directory and supports only --identity or --check-identity; no writes');
+  process.exit(2);
+}
 
 function check() {
   const problems = [...checkPins(root)];
@@ -40,6 +55,16 @@ function check() {
   return problems;
 }
 
+function reportIdentity() {
+  const { record } = currentBuildIdentity(root);
+  console.log(record.buildId);
+  console.log(`  gameVersion:        ${record.gameVersion}`);
+  console.log(`  physicsIdentity:    ${record.physicsIdentity.rulesetId} (simRevision ${record.physicsIdentity.simRevision})`);
+  console.log(`  matterVersion:      ${record.matterVersion}`);
+  console.log(`  savestateLayoutId:  ${record.savestateLayoutId}`);
+  console.log(`  sourceTripwireId:   ${record.sourceTripwireId}`);
+}
+
 const attestIx = args.indexOf('--attest');
 if (attestIx >= 0) {
   const r = writeTripwire(root, args[attestIx + 1]);
@@ -54,6 +79,20 @@ if (attestIx >= 0) {
     process.exit(1);
   }
   console.log('ruleset artifacts and source tripwire are current');
+} else if (args.includes('--check-identity')) {
+  const problems = checkBuildIdentity(root);
+  if (problems.length) {
+    for (const p of problems) console.error(`FAIL ${p}`);
+    process.exit(1);
+  }
+  console.log(`build identity is provable and current: ${currentBuildIdentity(root).record.buildId}`);
+} else if (args.includes('--identity')) {
+  try {
+    reportIdentity();
+  } catch (error) {
+    console.error(`FAIL cannot compose the build identity: ${error && error.message ? error.message : error}`);
+    process.exit(1);
+  }
 } else {
   const b = assembleFromDisk(root);
   console.log(`${b.rulesetId} (${b.bytes.length} canonical bytes, simRevision ${b.doc.simRevision})`);

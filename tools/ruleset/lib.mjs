@@ -7,9 +7,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { canonicalBytes, utf8Encode } from '../../src/systems/replay/canonicalJson.js';
+import { canonicalBytes } from '../../src/systems/replay/canonicalJson.js';
 import { digestOfBytes } from '../../src/systems/replay/canonicalSha256.js';
 import { assembleRuleset, rulesetIdOf, LAST_RELEASED_SIM_REVISION, SIM_REVISION } from '../../src/systems/replay/ruleset.js';
+import { composeBuildIdentity, sourceTextDigest, sourceTripwireIdOf } from '../../src/systems/savestate/buildIdentity.js';
+import { SAVESTATE_LAYOUT_DESCRIPTOR } from '../../src/systems/savestate/layoutDeclaration.js';
 import { CONTENT_GROUPS, HIDDEN_LITERALS, GRAVITY_Y_PIN, SOURCE_EXTRACTS } from '../../src/systems/replay/rulesetRegistry.js';
 
 export const repoRoot = () => path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -147,7 +149,7 @@ export function checkPins(root = repoRoot()) {
 /** SHA-256 identity digest of each tripwire file, line endings normalized (CRLF -> LF) so autocrlf cannot trip it. */
 export function tripwireDigests(root = repoRoot(), files = TRIPWIRE_FILES) {
   const out = {};
-  for (const f of files) out[f] = digestOfBytes(utf8Encode(readText(root, f).replace(/\r\n/g, '\n')));
+  for (const f of files) out[f] = sourceTextDigest(readText(root, f));
   return out;
 }
 
@@ -219,4 +221,95 @@ export function writeArtifacts(root = repoRoot()) {
   } else fs.writeFileSync(file, built.bytes);
   fs.writeFileSync(path.join(root, CURRENT_PATH), canonicalBytes(currentPointer(built)));
   return built;
+}
+
+/** The committed ruleset of this tree: the pointer plus the archive file re-hashed against its name. Read-only. */
+export function readCurrentRuleset(root = repoRoot()) {
+  const pointer = JSON.parse(readText(root, CURRENT_PATH));
+  if (!pointer || typeof pointer.rulesetId !== 'string') throw new Error(`${CURRENT_PATH} has no rulesetId`);
+  const file = path.join(root, ARCHIVE_DIR, `${hexOf(pointer.rulesetId)}.json`);
+  if (!fs.existsSync(file)) throw new Error(`no archive file for ${pointer.rulesetId}: cannot prove the committed ruleset`);
+  const bytes = new Uint8Array(fs.readFileSync(file));
+  const doc = JSON.parse(Buffer.from(bytes).toString('utf8'));
+  if (digestOfBytes(bytes) !== pointer.rulesetId || rulesetIdOf(doc) !== pointer.rulesetId) {
+    throw new Error(`ruleset archive ${hexOf(pointer.rulesetId)} does not hash to its name`);
+  }
+  return { doc, rulesetId: pointer.rulesetId };
+}
+
+/**
+ * `--root` is a read-only ARTIFACT OVERLAY, not a second executable checkout.
+ * Imported ruleset constants, source registry, and savestate-layout declaration
+ * come from this running CLI's checkout. Verifying a different physical `src`
+ * tree would silently substitute the wrong declaration (and might certify a
+ * different build as identical). A distinct root is therefore allowed only
+ * when its `src` and `node_modules` resolve to the same directories as ours.
+ * This fail-closed boundary is deliberately stronger than comparing hashes of
+ * a hand-picked subset of imports, which could omit a new transitive module.
+ */
+export function assertArtifactOverlayRoot(root = repoRoot()) {
+  let sameRoot = false;
+  try { sameRoot = fs.realpathSync(root) === fs.realpathSync(repoRoot()); } catch { /* fail closed below */ }
+  if (sameRoot) return;
+  for (const directory of ['src', 'node_modules']) {
+    let same = false;
+    try {
+      same = fs.realpathSync(path.join(root, directory)) === fs.realpathSync(path.join(repoRoot(), directory));
+    } catch { /* missing path: not the same code/dependencies */ }
+    if (!same) throw new Error(`--root must be an artifact overlay reusing this checkout's ${directory}; independent source trees cannot be certified by this process`);
+  }
+}
+
+/**
+ * Compose the build identity implied by the COMMITTED artifacts only. Read-only: never writes
+ * `current.json` or the tripwire. An alternate root must share our source and dependencies.
+ * @returns {{record:object, parts:object, built:{doc:object,rulesetId:string}}}
+ */
+export function currentBuildIdentity(root = repoRoot()) {
+  assertArtifactOverlayRoot(root);
+  const pkg = JSON.parse(readText(root, 'package.json'));
+  const { doc, rulesetId } = readCurrentRuleset(root);
+  const parts = {
+    gameVersion: pkg.version,
+    physicsIdentity: { rulesetId, simRevision: doc.simRevision },
+    matterVersion: doc.engine.matter,
+    layoutDescriptor: SAVESTATE_LAYOUT_DESCRIPTOR,
+    sourceTripwire: readTripwire(root),
+  };
+  return { record: composeBuildIdentity(parts), parts, built: { doc, rulesetId } };
+}
+
+/**
+ * Read-only consistency check of the build identity against committed artifacts AND a fresh source
+ * assembly. Returns problems (empty means the identity is current and provable).
+ */
+export function checkBuildIdentity(root = repoRoot()) {
+  const problems = [];
+  let committed;
+  try { committed = currentBuildIdentity(root); } catch (error) { return [`cannot compose the committed build identity: ${error && error.message ? error.message : error}`]; }
+
+  let fresh;
+  try { fresh = assembleFromDisk(root); } catch (error) { problems.push(`cannot assemble the ruleset for the build identity: ${error && error.message ? error.message : error}`); }
+  if (fresh) {
+    if (fresh.rulesetId !== committed.record.physicsIdentity.rulesetId) {
+      problems.push(`build identity ruleset ${committed.record.physicsIdentity.rulesetId} != fresh assembly ${fresh.rulesetId}; run --write (and attest/bump if code behavior changed)`);
+    } else if (fresh.doc.simRevision !== committed.record.physicsIdentity.simRevision) {
+      problems.push(`build identity simRevision ${committed.record.physicsIdentity.simRevision} != fresh assembly ${fresh.doc.simRevision}`);
+    } else if (fresh.doc.engine.matter !== committed.record.matterVersion) {
+      problems.push(`build identity matterVersion ${committed.record.matterVersion} != fresh assembly ${fresh.doc.engine.matter}`);
+    }
+  }
+
+  // The identity's sourceTripwireId is a digest of the COMMITTED digests, so the only meaningful
+  // freshness proof is that those digests still equal the working tree's causal source. (Re-deriving
+  // the id from fresh digests would be tautological once these are equal.)
+  const committedFiles = readTripwire(root).files || {};
+  let freshDigests;
+  try { freshDigests = tripwireDigests(root); } catch (error) { problems.push(`cannot digest causal sources: ${error && error.message ? error.message : error}`); }
+  if (freshDigests) {
+    for (const f of Object.keys({ ...committedFiles, ...freshDigests })) {
+      if (committedFiles[f] !== freshDigests[f]) problems.push(`source tripwire: ${f} changed; run --attest (the build identity would change)`);
+    }
+  }
+  return problems;
 }
