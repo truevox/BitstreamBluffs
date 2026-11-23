@@ -42,8 +42,9 @@ going” means resume this queue, not take over other lanes or merge a draft.
    two native Chromium reproductions of collision-heavy match seven
    checkpoints and the stored poses. Last pose tick 936; reproduced
    terrain fatal tick 937 ~2.623 px away. Raw cruise-baseline fails strict
-   intake; a synthetic identity/time-only control passes intake and
-   repeats without a fatal event. Never annotate from the header, last
+   intake; two isolated replays of the exact cutoff bytes emit no fatal.
+   A separate synthetic identity/time-only control passes CLI intake but
+   emits no report after the fatal-event check. Never annotate from the header, last
    pose or redacted #78 brief. A local prototype must bind the exact tape
    and supported build, check stored f32 poses against the replay, and
    fail closed. The original strip/SVG, #78 JSON and #278 head are unchanged.
