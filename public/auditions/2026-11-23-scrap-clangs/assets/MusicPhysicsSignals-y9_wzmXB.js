@@ -1,0 +1,2 @@
+function e(t,r){return r!==!0||typeof t!="number"||!Number.isFinite(t)?0:Math.max(0,Math.min(1,(Math.abs(t)-100)/1100))}function i(t){if(!t||t.quality==="crash")return 0;const r=t.impactSpeedPxS;if(typeof r!="number"||!Number.isFinite(r)||r<=0)return 0;const a=Math.max(0,Math.min(1,(r-80)/920));return t.hard===!0?Math.max(.55,a):a}export{e as c,i};
+//# sourceMappingURL=MusicPhysicsSignals-y9_wzmXB.js.map
