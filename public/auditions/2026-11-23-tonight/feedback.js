@@ -4,6 +4,7 @@
   'use strict';
   const STORAGE='bsb-audio-review-2026-11-23-v1';
   const labs=[
+    ['candy','Candy Cane Canyon'],
     ['vertigo','Vertigo Vents'],
     ['jellyfish','Sky Jellyfish Mountain'],
     ['steampunk','Steampunk Slopes'],
@@ -81,7 +82,7 @@
     }
   });
   $('clear-review').addEventListener('click',()=>{
-    if(!confirm('Clear all nine locally saved sound-lab notes?'))return;
+    if(!confirm('Clear all ten locally saved sound-lab notes?'))return;
     for(const [id] of labs){
       state[id]={verdict:'untried',note:''};
       $('review-verdict-'+id).value='untried';
