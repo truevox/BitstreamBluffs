@@ -354,6 +354,25 @@
     game.events.once(EVT.RUN_START, () => {
       scene = game.scene.getScene('RunScene');
       scene.inputRouter = stub;
+      // Developer-only counterfactual: the production game has already built the
+      // real BsodPursuit; alter only this headless instance before the first tick.
+      // Position is expressed relative to the ACTUAL collision edge, not sled center.
+      const ov = o.pursuitOverrides || {};
+      const bounds = { pursuitGapPx: [100, 20000], pursuitSpeedPxS: [1, 3000], pursuitAccelPxS2: [0.01, 100] };
+      for (const [k, v] of Object.entries(ov)) {
+        if (!Object.hasOwn(bounds, k) || typeof v !== 'number' || !Number.isFinite(v) ||
+            v < bounds[k][0] || v > bounds[k][1]) throw new RangeError(`invalid pursuit override ${k}`);
+      }
+      const originalSledEdge = scene.bsod.wallX + scene.bsodState.gapPx;
+      if (Object.hasOwn(ov, 'pursuitGapPx')) {
+        // Preserve run-level extra grace as an explicitly documented limitation:
+        // this applies an absolute measured initial gap to the spawned wall.
+        scene.bsod.wallX = originalSledEdge - ov.pursuitGapPx;
+      }
+      if (Object.hasOwn(ov, 'pursuitSpeedPxS')) scene.bsod.wallSpeedPxS = ov.pursuitSpeedPxS;
+      if (Object.hasOwn(ov, 'pursuitAccelPxS2')) scene.bsod.accelerationPxS2 = ov.pursuitAccelPxS2;
+      if (Object.keys(ov).length) scene.bsodState = scene.bsod.state(originalSledEdge, scene.sled.vx, 1);
+
       // A --rule run keeps that rule's real modifiers so mission targets can be measured under the
       // rule they ship with; the default stays neutralised for the pacing curve.
       const rule = o.rule && o.rule !== 'none' ? (pendingRules.find((r) => r.id === o.rule) || null) : null;
