@@ -112,7 +112,7 @@ export const PHYSICS = Object.freeze({
   tuckDragMul: 0.5, // "reduces drag" (doc gives no number; tunable)
   pushMaxSpeedPxS: 10, // W only works below this speed...
   pushMinSlopeDeg: -5, // ...and when slope >= -5 degrees
-  airBrakeDecel: 0.40, // #247: -40% horizontal speed after a short 480ms hold at full air density
+  airBrakeDecel: 0.40, // #247 owner retune: one immediate -40% horizontal speed impulse per actual airborne interval
   parachuteGravityMul: 0.5, // down arrow
   parachuteDurationMs: 880, // +10%; hold-to-spend shared reservoir each jump
   slowFactor: 0.5, // 'slow' hazard default speed multiplier

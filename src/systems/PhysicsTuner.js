@@ -113,11 +113,9 @@ export const TUNING = Object.freeze({
   hopBufferMs: 110,
   /** Ground contact hysteresis (ms) before the sled counts as airborne. */
   groundedGraceMs: 45,
-  /** #247: fast, costly speed-for-lift air brake: front-loaded lift paid by horizontal momentum, not perpetual thrust. */
-  airBrakeSpanMs: 480,
-  airBrakeDescentDamp: 0.65,
-  airBrakeGravityMul: 0.94,
-  airBrakePaidLiftRatio: 1.40, // each px/s of actual horizontal speed spent buys 1.4 px/s upward; no free tap refill
+  /** #247 owner retune: one vertical kick paid from one horizontal speed kick. No floating/drag/gravity change. */
+  airBrakeKickUpRatio: 1.5,
+  airBrakeKickUpCapPxS: 420,
   /** Seconds-based helicopter spin rate of the visual (deg/s). */
   heliSpinDegS: 760,
   /** Hazard / power-up defaults. */
@@ -475,8 +473,6 @@ export class PhysicsTuner {
     if (ctx.parachute && airDensity > 0) {
       gravityMul *= 1 - (1 - b.parachuteGravityMul) * airDensity;
       steerMul = 0;
-    } else if (ctx.airBrake && airDensity > 0) {
-      gravityMul *= 1 - (1 - t.airBrakeGravityMul) * airDensity;
     }
 
     let tiltSign = 1;

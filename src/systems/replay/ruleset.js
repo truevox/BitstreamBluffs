@@ -64,8 +64,9 @@ import * as matterPortableNs from '../MatterPortable.js';
 //    (about 1% of sin/cos results differ from V8) change tick-level outcomes of every older tape.
 // 6: #65 (gameplay): Debutmont is the base biome (owns every sector the mask does not select) and
 //    arcade bridges (null biome) separate biomes, so tick outcomes change for a given seed and mask.
-// 7: #247, fast speed-paid AirBrake: greater horizontal braking, a shorter weaker lift,
-//    and a prompt fall instead of indefinite speed-independent upward aerodynamic thrust.
+// 7: #247, AirBrake speed/lift tradeoff; owner retune now demands exactly two
+//    one-shot airborne kicks: immediate vx deceleration and visible vy impulse.
+//    No AirBrake float/gravity modification. #253 visual marker stream fix.
 export const SIM_REVISION = 7;
 
 /**

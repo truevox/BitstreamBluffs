@@ -6,18 +6,32 @@
 import pmath from './pmath.js';
 
 /**
- * Speed explicitly paid for airborne braking at each deterministic physics substep.
- * Releasing/repressing cannot mint free lift: the momentum must actually disappear.
+ * #247 owner retune: AirBrake is exactly TWO IMMEDIATE impulses on first press
+ * each airtime: decelerate vx and kick vy upward. NO drag-over-time, gravity
+ * reduction, ongoing lift, or descent damp. The parachute is its own action.
+ * One use per actual touchdown, so tapping cannot create endless flight.
+ *
+ * `maxUpPxS` caps extra upward energy but never slows an already fast ascent.
+ * Lift scales with forward momentum actually paid; no free stationary launch.
  */
-export function airBrakeSpeedStep(vx, stepMs, density, decel, spanMs) {
-  const dtMs = Number.isFinite(stepMs) ? Math.max(0, stepMs) : 0;
-  const air = Number.isFinite(density) ? Math.max(0, Math.min(1, density)) : 0;
-  if (!dtMs || !air || !Number.isFinite(vx) || !Number.isFinite(decel) ||
-      decel <= 0 || decel >= 1 || !Number.isFinite(spanMs) || spanMs <= 0) {
-    return { vx, spentSpeedPxS: 0 };
-  }
-  const after = vx * pmath.exp(pmath.log(1 - decel) * dtMs * air / spanMs);
-  return { vx: after, spentSpeedPxS: Math.max(0, Math.abs(vx) - Math.abs(after)) };
+export function airBrakeKickStep({ vx = 0, vy = 0, atmosphereDensity = 1,
+  decelFraction = .40, upwardRatio = 1.5, liftMul = 1, maxUpPxS = 420 } = {}) {
+  if (!Number.isFinite(vx) || !Number.isFinite(vy)) return { vx, vy, spentSpeedPxS: 0 };
+  const density = Number.isFinite(atmosphereDensity) ? Math.max(0, Math.min(1, atmosphereDensity)) : 0;
+  const fraction = Number.isFinite(decelFraction) ? Math.max(0, Math.min(.95, decelFraction)) * density : 0;
+  if (!fraction) return { vx, vy, spentSpeedPxS: 0 };
+  const afterVx = vx * (1 - fraction);
+  const spentSpeedPxS = Math.max(0, Math.abs(vx) - Math.abs(afterVx));
+  // Prevent tiny-speed presses from resetting a fast downward plunge for free.
+  if (spentSpeedPxS < 25) return { vx: afterVx, vy, spentSpeedPxS };
+  const mul = Number.isFinite(liftMul) ? Math.max(1, Math.min(1.6, liftMul)) : 1;
+  const ratio = Number.isFinite(upwardRatio) ? Math.max(0, upwardRatio) : 0;
+  const up = spentSpeedPxS * ratio * mul;
+  const limit = Number.isFinite(maxUpPxS) ? Math.max(0, maxUpPxS) : 0;
+  // A visible upward kick even if already descending; no continuing force.
+  // Never clip an already more-negative (faster upward) vertical velocity.
+  const targetVy = Math.max(-limit, Math.min(vy, 0) - up);
+  return { vx: afterVx, vy: Math.min(vy, targetVy), spentSpeedPxS };
 }
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -30,12 +44,11 @@ export function canopySailFactor(vx) {
 /** Proposed first-playtest aerodynamic forces (velocity change in px/s). */
 export function aerodynamicStep({
   vx = 0, vy = 0, relativeAirX = 0, atmosphereDensity = 1,
-  parachute = false, airBrake = false, airbrakeLiftMul = 1,
-  airBrakeSpentSpeedPxS = 0, airBrakePaidLiftRatio = 1.40, proximity01 = 0, stepMs = 8,
+  parachute = false, proximity01 = 0, stepMs = 8,
 } = {}) {
   const dt = Number.isFinite(stepMs) ? clamp(stepMs, 0, 50) / 1000 : 0;
   const density = clamp(Number.isFinite(atmosphereDensity) ? atmosphereDensity : 0, 0, 1);
-  if (!dt || !density || (!parachute && !airBrake)) return { dvx: 0, dvy: 0 };
+  if (!dt || !density || !parachute) return { dvx: 0, dvy: 0 };
   const flow = Number.isFinite(relativeAirX) ? relativeAirX : 0;
   let dvx = 0, dvy = 0;
   if (parachute) {
@@ -49,17 +62,6 @@ export function aerodynamicStep({
       * pmath.tanh(flow / 420) * canopySailFactor(vx);
     dvx += sailAccel * density * dt;
     dvy -= (65 + 45 * pmath.tanh(Math.abs(flow) / 600)) * density * dt;
-  }
-  if (airBrake) {
-    // #247: the lift is a prompt, physically paid bump, not a continuous wing.
-    // Only horizontal speed actually LOST by the brake this same substep earns
-    // upward impulse. It fades rapidly as braking bleeds forward momentum; no
-    // extra lift from button tapping, staying still or atmospheric wind alone.
-    const paid = Number.isFinite(airBrakeSpentSpeedPxS) ? Math.max(0, airBrakeSpentSpeedPxS) : 0;
-    const ratio = Number.isFinite(airBrakePaidLiftRatio) ? Math.max(0, airBrakePaidLiftRatio) : 0;
-    // The Sled's brake payment is already scaled by local air density. Vacuum
-    // is also guarded at function entry, so don't count density twice.
-    dvy -= paid * ratio * Math.max(1, Number.isFinite(airbrakeLiftMul) ? airbrakeLiftMul : 1);
   }
   return { dvx, dvy };
 }

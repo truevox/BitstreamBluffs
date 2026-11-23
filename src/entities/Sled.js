@@ -12,7 +12,7 @@ import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
 import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyserStep } from '../systems/PhysicsTuner.js';
 import { springReboundVelocity } from '../systems/BiomeEffects.js';
-import { aerodynamicStep, canopyFuelStep, vacuumDivebombStep, airBrakeSpeedStep } from '../systems/BsodAerodynamics.js';
+import { aerodynamicStep, canopyFuelStep, vacuumDivebombStep, airBrakeKickStep } from '../systems/BsodAerodynamics.js';
 import { runRandomStreams } from '../systems/RunRandom.js';
 import pmath from '../systems/pmath.js';
 
@@ -72,6 +72,7 @@ export class Sled {
     this.chuteUsed = false;
     this.tucked = false;
     this.airBrakeActive = false;
+    this.airBrakeKickUsed = false; // #247 one-shot per actual airborne interval; rearm on genuine touchdown
     this.heliInput = 0;
     this.corkscrewActive = false;
     this.heliPhase = 0; // degrees, visual only
@@ -165,6 +166,7 @@ export class Sled {
    */
   endStep(stepMs) {
     if (this._contactFlag) {
+      this.airBrakeKickUsed = false; // actual Matter contact rearms, never a button release
       if (this.msSinceContact >= TUNING.groundedGraceMs) {
         this.chuteUsed = false; // freshly landed
         this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
@@ -256,15 +258,19 @@ export class Sled {
       vx *= f;
       vy *= f;
     }
-    // #247: accelerate the brake's bite, then let the rider fall sooner.
-    // AirBrake's lift is earned from this exact substep's horizontal speed loss.
-    let airBrakeSpentSpeedPxS = 0;
-    if (this.airBrakeActive) {
-      const density = atmosphere ? atmosphere.atmosphereDensity : 1;
-      const spent = airBrakeSpeedStep(vx, stepMs, density, PHYSICS.airBrakeDecel, TUNING.airBrakeSpanMs);
-      vx = spent.vx;
-      airBrakeSpentSpeedPxS = spent.spentSpeedPxS;
-      if (vy > 0) vy *= pmath.exp(-TUNING.airBrakeDescentDamp * dt * density);
+    // Two instantaneous AirBrake kicks; neither holding nor re-tapping buys
+    // extra lift until actual terrain contact. Normal gravity acts thereafter.
+    if (this.airBrakeActive && !this.airBrakeKickUsed) {
+      this.airBrakeKickUsed = true;
+      const kicked = airBrakeKickStep({ vx, vy,
+        atmosphereDensity: atmosphere ? atmosphere.atmosphereDensity : 1,
+        decelFraction: PHYSICS.airBrakeDecel,
+        upwardRatio: TUNING.airBrakeKickUpRatio,
+        maxUpPxS: TUNING.airBrakeKickUpCapPxS,
+        liftMul: phys.airbrakeLiftMul || 1,
+      });
+      vx = kicked.vx;
+      vy = kicked.vy;
     }
     // parachute stall: float
     if (chute && vy > 0 && (!atmosphere || atmosphere.atmosphereDensity > 0)) vy *= pmath.exp(-1.6 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1));
@@ -288,8 +294,7 @@ export class Sled {
     if (!grounded && atmosphere) {
       const wind = aerodynamicStep({ vx, vy, relativeAirX: atmosphere.relativeAirX,
         atmosphereDensity: atmosphere.atmosphereDensity, proximity01: atmosphere.proximity01, parachute: chute,
-        airBrake: this.airBrakeActive, airbrakeLiftMul: phys.airbrakeLiftMul || 1,
-        airBrakeSpentSpeedPxS, airBrakePaidLiftRatio: TUNING.airBrakePaidLiftRatio, stepMs });
+        stepMs });
       vx += wind.dvx;
       vy += wind.dvy;
     }

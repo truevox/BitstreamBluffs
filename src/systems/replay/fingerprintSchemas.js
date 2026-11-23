@@ -45,7 +45,7 @@ export const FP_SCHEMAS = Object.freeze({
   rng: { version: 1, schema: rec(['version', 'u32'], ['physicsScramble', 'u32']) },
 
   sled: {
-    version: 2, // v2: `flags.shield` removed (render-time mirror of effects.shieldCharges; cadence-dependent)
+    version: 3, // v3: `flags.airBrakeKickUsed` is causal one-shot state (owner SIM7 retune)
     schema: rec(
       ['body', rec(...BODY_FIELDS)],
       ['parts', list(rec(...PART_FIELDS))], // the 5 collision parts (the compound root, parts[0], is `body`)
@@ -60,7 +60,7 @@ export const FP_SCHEMAS = Object.freeze({
       )],
       ['flags', rec(
         ['contactFlag', 'bool'], ['playerHopActive', 'bool'], ['chuteUsed', 'bool'], ['tucked', 'bool'],
-        ['airBrakeActive', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
+        ['airBrakeActive', 'bool'], ['airBrakeKickUsed', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
         ['nudging', 'bool'], ['inWorld', 'bool'], ['destroyed', 'bool'],
       )],
       // Bit identity of the last pad. The sim only uses `pad !== _lastPad` (object identity; each tick gets a fresh pad), so this
@@ -237,7 +237,8 @@ export const FIELD_SOURCES = Object.freeze({
     _lastTilt: 'sled.ctl.lastTilt', _preVx: 'sled.ctl.preVx', _preVy: 'sled.ctl.preVy',
     touchdownVx: 'sled.ctl.touchdownVx', touchdownVy: 'sled.ctl.touchdownVy', heliInput: 'sled.ctl.heliInput',
     _contactFlag: 'sled.flags.contactFlag', _playerHopActive: 'sled.flags.playerHopActive', chuteUsed: 'sled.flags.chuteUsed',
-    tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive', corkscrewActive: 'sled.flags.corkscrewActive',
+    tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive',
+    airBrakeKickUsed: 'sled.flags.airBrakeKickUsed', corkscrewActive: 'sled.flags.corkscrewActive',
     scrambled: 'sled.flags.scrambled', _nudging: 'sled.flags.nudging',
     inWorld: 'sled.flags.inWorld', destroyed: 'sled.flags.destroyed', _lastPad: 'sled.lastPad',
   }),
@@ -416,7 +417,7 @@ export const NON_CAUSAL = Object.freeze({
     trail: PRESENTATION, airTelegraph: PRESENTATION, groundTelegraph: PRESENTATION, teleTracker: PRESENTATION,
     _teleMarks: PRESENTATION, streaks: PRESENTATION, flashRect: PRESENTATION, blindRect: PRESENTATION,
     bsodEdge: PRESENTATION, windPom: PRESENTATION, startGate: PRESENTATION, bestMarker: PRESENTATION,
-    deathMarker: PRESENTATION, kodiakRider: PRESENTATION, blackHole: PRESENTATION, ghostRiders: PRESENTATION,
+    deathMarker: PRESENTATION, markerHeightFn: PRESENTATION + ' (pure marker height gate; reads only physically joined terrain, not simulation state)', kodiakRider: PRESENTATION, blackHole: PRESENTATION, ghostRiders: PRESENTATION,
     _camX: PRESENTATION, _camY: PRESENTATION, _zoom: PRESENTATION, _zoomKick: PRESENTATION, shakeAmp: PRESENTATION,
     _landingShake: PRESENTATION, _frameDt: PRESENTATION, _hudMs: PRESENTATION + ' (HUD refresh throttle)',
     glitch: PRESENTATION + ' (GlitchDirector: visual events and shader only; its seeded rng is not a sim stream)',
