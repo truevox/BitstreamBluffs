@@ -7,10 +7,20 @@ const browser = await chromium.launch({headless:true,args:['--no-sandbox','--use
 try {
   for (const [preset, speed, accel] of [['moderate',250,3],['buffered',300,4]]) {
     const page = await browser.newPage();
+    // Regression: recreate the user-reported race by putting the QA module
+    // BEFORE the app script. The explicit ESM dependency must still boot it.
+    await page.route('**/?bsodQa=*', async (route) => {
+      const response = await route.fetch();
+      const body = await response.text();
+      const appTag = '<script type="module" src="/src/main.js"></script>';
+      const qaTag = '<script type="module" src="/tools/bsod-qa/client.js"></script>';
+      assert(body.includes(appTag) && body.includes(qaTag), 'QA boot scripts missing');
+      await route.fulfill({ response, body: body.replace(appTag, '').replace(qaTag, `${qaTag}\n${appTag}`) });
+    });
     const errors=[];
     page.on('pageerror', (e)=>errors.push(String(e)));
     try {
-      const res=await page.goto(`${base}/?bsodQa=${preset}&qaSeed=bsod-ab-01`);
+      const res=await page.goto(`${base}/?bsodQa=${preset}&qaSeed=bsod-ab-01&utm_source=chatgpt.com`);
       assert.equal(res.status(),200);
       await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&document.getElementById('bsod-qa-toolbar'),null,{timeout:60000});
       await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('discard-this-seed'));

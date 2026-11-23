@@ -2,11 +2,14 @@
 import { parseBsodQaQuery, BSOD_QA_PRESETS } from './presets.mjs';
 import { EVT } from '../../src/events.js';
 import { REG } from '../../src/constants.js';
+// Make module evaluation order explicit: the injected QA module can otherwise
+// execute before the separate <script type=module src=/src/main.js> completes.
+import { game } from '../../src/main.js';
 
 const qa = parseBsodQaQuery(location.search);
 if (qa) {
-  const game = window.__bbGame;
-  if (!game) throw new Error('QA launcher must load after game boot');
+  // Imported from the identical ESM URL as the page: one Phaser instance,
+  // regardless of script fetch/evaluation order.
   // The Title's normal entry controls remain playable, but the scenario seed,
   // mask and unranked flag are enforced for BOTH candidates, including retries.
   const installTitleOverride = () => {
