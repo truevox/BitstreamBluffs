@@ -333,6 +333,15 @@
     game.registry.set(REG.AUDIO, null);
     const store = game.registry.get(REG.SAVE_STORE);
     if (store && Array.isArray(store.runs)) store.runs.length = 0;
+    // Opt-in isolated progression-level scenario, created in the headless registry.
+    // Do not modify the SaveStore profile or issue a persistent unlock.
+    if (o.pursuitProfileLevel != null) {
+      if (!Number.isInteger(o.pursuitProfileLevel) || o.pursuitProfileLevel < 1 || o.pursuitProfileLevel > 50) {
+        throw new RangeError('invalid pursuitProfileLevel');
+      }
+      const currentProfile = game.registry.get(REG.PROFILE) || {};
+      game.registry.set(REG.PROFILE, { ...currentProfile, level: o.pursuitProfileLevel });
+    }
     game.registry.set(REG.SEED, o.seed);
     // W3: the mask the sim plays at. Set alongside the seed so the run, the record and the stats scope
     // all agree; 0 is base terrain and is what every pre-W3 sim call gets.
@@ -402,7 +411,7 @@
 
     // ---- recorders
     const R = {
-      seed: o.seed, policy: policyName, params,
+      seed: o.seed, policy: policyName, params, pursuitProfileLevel: o.pursuitProfileLevel ?? null,
       endReason: null, distM: 0, simSec: 0, frames: 0,
       crash: null, negatedCrashes: [], airPhases: [], landings: [], respawns: [], nudges: [], hints: [], hazardHits: [],
       maxSpeed: 0, maxSpeedAtM: 0, minZoom: 99, minZoomAtM: 0, zoomAtMaxSpeed: 0,
@@ -587,6 +596,15 @@
     }
 
     // ---- start: first headlessStep processes the queue, creates RunScene (RUN_START hook installs the stub)
+    // Opt-in isolated progression-level scenario, created in the headless registry.
+    // Do not modify the SaveStore profile or issue a persistent unlock.
+    if (o.pursuitProfileLevel != null) {
+      if (!Number.isInteger(o.pursuitProfileLevel) || o.pursuitProfileLevel < 1 || o.pursuitProfileLevel > 50) {
+        throw new RangeError('invalid pursuitProfileLevel');
+      }
+      const currentProfile = game.registry.get(REG.PROFILE) || {};
+      game.registry.set(REG.PROFILE, { ...currentProfile, level: o.pursuitProfileLevel });
+    }
     game.registry.set(REG.SEED, o.seed);
     game.registry.set(REG.BIOME_MASK, o.biomeMask >>> 0);
     game.scene.start('RunScene');
