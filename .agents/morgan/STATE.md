@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 22:40 UTC. Main: `b848b03fbef9d0db6c1b3df6883e1540ef238f63` (v2.19.21).
+Last verified: 2026-11-23 22:54 UTC. Main: `b848b03fbef9d0db6c1b3df6883e1540ef238f63` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -39,7 +39,18 @@ going” means resume this queue, not take over other lanes or merge a draft.
    This proves timing, not causation/unfairness. #286 includes exact
    stock commands. Preserve separate historical #202; no new speculative
    tuning. Full branch/route model remains gated on #57/#60.
-3. #81 local UI fix is in #290. Friend exchange still requires #58.
+3. #81/#290 same-origin persistent Chromium upgrade A/B passed: exact
+   SIM6 main b848b03 recorded genuine sim-02 185 m; each reopened the
+   same on-disk profile on exact draft SIM7 #248 (4e0cff1), with and
+   without exact #290 bd43a5a. Forced early crash on the real SIM7 save
+   path kept the first run shorter (28 m); it becomes Best/Latest. Old
+   pinned/unstamped tape bytes and direct reads survive before replacement,
+   with no old rider. Baseline mislabels stale slots as 185 M; patch says
+   INCOMPATIBLE; keyboard replace/clear works and retry draws one current
+   ghost. 24 focused tests, three builds, no outbound/page errors. This
+   is provisional draft integration, not AirBrake playtesting, old-tape
+   replay support or release authority. Rerun on final SIM7 release head
+   if it changes. Friend exchange still requires #58.
    #82 storage lifecycle needs separately scoped save-system review;
    #85 still needs authentic footage; #84/#83 and product #70/#71 need #60;
    #75/#100/#74 need trusted restore or equivalent causal replay prefix.
