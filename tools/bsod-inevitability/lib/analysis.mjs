@@ -35,8 +35,10 @@ export function analyzeRun(run, { sampleMs }) {
   }
   const samples = probe.samples;
   if (!samples.length || !validFinite(probe.firstActive.gapPx)) throw new Error(`${run.seed}: no active sampled BSOD gap`);
-  if (!validFinite(run.minBsodGapPx) || !validFinite(run.finalBsodGapPx) || !validFinite(run.bsodActiveFrames)) {
-    throw new Error(`${run.seed}: no actual BSOD state or sampled minimum/final gap`);
+  if (!validFinite(run.minBsodGapPx) || !validFinite(run.finalBsodGapPx) ||
+      !validFinite(probe.maxSampledGapPx) || !Number.isInteger(run.bsodActiveFrames) ||
+      run.bsodActiveFrames < 1 || run.bsodActiveFrames > run.frames) {
+    throw new Error(`${run.seed}: invalid BSOD state, frame count or min/max/final pursuit gaps`);
   }
   let prev = -1;
   for (const sample of samples) {
@@ -49,6 +51,18 @@ export function analyzeRun(run, { sampleMs }) {
   if (samples[0].tMs !== probe.firstActive.tMs || samples[0].gapPx !== probe.firstActive.gapPx ||
       samples.at(-1).tMs !== probe.lastObserved?.tMs) {
     throw new Error(`${run.seed}: first/last pursuit observation mismatch`);
+  }
+  // The periodic timeline uses 0.001px rounding, but the authoritative 60Hz
+  // full-frame extremes and terminal gap retain native precision. Do not let
+  // a conflicting set of fields become a plausible-looking science report.
+  const tolerancePx = 0.0011;
+  if (!validFinite(probe.lastObserved?.gapPx) ||
+      Math.abs(samples.at(-1).gapPx - probe.lastObserved.gapPx) > tolerancePx ||
+      Math.abs(run.finalBsodGapPx - probe.lastObserved.gapPx) > tolerancePx ||
+      run.minBsodGapPx > probe.maxSampledGapPx + tolerancePx ||
+      samples.some((v) => v.gapPx < run.minBsodGapPx - tolerancePx ||
+        v.gapPx > probe.maxSampledGapPx + tolerancePx)) {
+    throw new Error(`${run.seed}: contradictory BSOD pursuit minimum/maximum/terminal observations`);
   }
   if (!run.inputActivity || !Number.isInteger(run.inputActivity.airborneFrames) ||
       run.inputActivity.airborneFrames < 0 || run.inputActivity.airborneFrames > run.frames) {

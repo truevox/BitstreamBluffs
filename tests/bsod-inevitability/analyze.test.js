@@ -55,7 +55,7 @@ describe('actual post-tick gap sampling', () => {
     expect(x.gapSamples).toHaveLength(4);
   });
   test('unchanged or contracting pursuit is not growing', () => {
-    const r = sample(); r.finalBsodGapPx = 50; r.pursuitProbe.lastObserved.gapPx = 50;
+    const r = sample(); r.finalBsodGapPx = 50; r.minBsodGapPx = 50; r.pursuitProbe.lastObserved.gapPx = 50;
     r.pursuitProbe.samples.at(-1).gapPx = 50;
     expect(analyzeRun(r, { sampleMs: 5000 }).sampledGapGrewOverall).toBe(false);
   });
@@ -79,6 +79,23 @@ describe('actual post-tick gap sampling', () => {
   test('invalid airborne count is rejected', () => {
     const r = sample(); r.inputActivity.airborneFrames = r.frames + 1;
     expect(() => analyzeRun(r, { sampleMs: 5000 })).toThrow(/airborne/);
+  });
+  test.each([
+    ['missing max gap', (r) => { delete r.pursuitProbe.maxSampledGapPx; }],
+    ['negative artificial maximum', (r) => { r.pursuitProbe.maxSampledGapPx = -100000; }],
+    ['timeline point greater than source maximum', (r) => { r.pursuitProbe.samples[1].gapPx = 990000; }],
+    ['timeline point below source minimum', (r) => { r.pursuitProbe.samples[1].gapPx = -100; }],
+    ['terminal sample mismatched from final gap', (r) => { r.finalBsodGapPx = 1; }],
+    ['terminal snapshot mismatched from timeline', (r) => { r.pursuitProbe.lastObserved.gapPx = -500; }],
+    ['negative active frame count', (r) => { r.bsodActiveFrames = -8; }],
+    ['active frame count exceeds all frames', (r) => { r.bsodActiveFrames = r.frames + 1; }],
+  ])('reject impossible pursuit evidence: %s', (_name, corrupt) => {
+    const r = sample(); corrupt(r);
+    expect(() => analyzeRun(r, { sampleMs: 5000 })).toThrow(/BSOD|pursuit/);
+  });
+  test('rounded telemetry is allowed to differ from full-precision final value by at most 0.001px', () => {
+    const r = sample(); r.finalBsodGapPx = 900.00049; r.pursuitProbe.maxSampledGapPx = 930.00049;
+    expect(analyzeRun(r, { sampleMs: 5000 }).finalGapPx).toBe(900.00049);
   });
 });
 
