@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.19.21 — source-stamped SIM6 replay fixture isolation and browser QA (#236 / #240) (2026-11-22)
+
+- **Immutable historical evidence:** cross-engine Chromium recordings now require a clean committed source, an explicit new output directory outside all checked-in fixture trees, and exclusive-create writes. The game URL must serve the local production build index. Existing historical tapes and original recording metadata remain untouched.
+- **Explicit SIM_REVISION 6 fixture set:** select `CE_FIXTURE_SET=sim6` with a separate source-stamped tape directory. The original nine fixture definitions remain unchanged for historical replay; a revision-6-specific Kodiak seed reaches actual seeded packs instead of crashing before the first encounter. Matrix/fresh/positions refuse source-unverified or wrong-build SIM6 input rather than silently mixing it with older tapes.
+- **Diagnostic cross-engine evidence:** Chromium, Firefox and containerized Playwright WebKit 27.2 replay the new fixtures. Both the recording and the browser matrix carry exact source, ruleset, simulator and build provenance; regressions check tape byte hashes, recording safety and replay semantics. Playwright WebKit is **not** real Safari/iOS.
+- **Bounded scope:** QA fixture harness, immutable fixture data, tests, documentation and workflow only. No gameplay or physics change; SIM_REVISION 6 remains. Parent #236 closes only after final exact-head execution review; no leaderboard or ghost trust changes.
+
 ## v2.19.20 — deterministic exact build identity and safe artifact verification (#238 / #239) (2026-11-22)
 
 - **Deterministic read-only build identity:** compose an exact `buildId` from game version, archived ruleset ID / simulation revision, bundled Matter version, declared savestate-layout schema, and the causal source-tripwire digest. The runtime can expose an envelope-shaped descriptor without writing save data or registering any restorable layout.
