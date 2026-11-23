@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 22:39 UTC. Main: `570fc88cc9ef241778045a5cea9787a98bb48f14` (v2.19.21).
+Last verified: 2026-11-23 22:40 UTC. Main: `b848b03fbef9d0db6c1b3df6883e1540ef238f63` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -28,7 +28,10 @@ going” means resume this queue, not take over other lanes or merge a draft.
    V2 outputs and 4,844-file artifact parity. #288 passes 47 tests, plus
    18 fresh current-source browser repeat/playbacks; classic output stays
    byte-identical, fatigue fails closed with the corrected diagnostic.
-   No branch heads were changed. Keep #248's reservation.
+   Main then added #293, opt-in BSOD QA files only (no overlap). Exact
+   combined #290 and #293 focused checks pass 13 tests; the heavier browser
+   and artifact results above remain pinned to 570fc88. No draft heads
+   changed. Keep #248's reservation.
 2. #127 fair1153 (mask 16) on exact SIM6: Shatter Wall `17:2` x37680 →
    Packet Spike `18:0` x38301, 621 px. Fresh native 320 ms policy hits
    tick 9073 with 8.33 ms blind fade left; 300 ms policy hits same sensor
