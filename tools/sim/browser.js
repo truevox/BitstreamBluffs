@@ -333,6 +333,27 @@
     game.registry.set(REG.AUDIO, null);
     const store = game.registry.get(REG.SAVE_STORE);
     if (store && Array.isArray(store.runs)) store.runs.length = 0;
+    // Opt-in isolated progression-level scenario, created in the headless registry.
+    // Do not modify the SaveStore profile or issue a persistent unlock.
+    if (o.pursuitUpgradeRanks != null) {
+      const allowed = new Set(['speed','hop','flip','canopy','airbrake','divebomb','bsodGrace','magnetMagnitude','magnetMeasure','magnetMyriad']);
+      if (typeof o.pursuitUpgradeRanks !== 'object' || Array.isArray(o.pursuitUpgradeRanks) ||
+          !Object.keys(o.pursuitUpgradeRanks).length ||
+          Object.entries(o.pursuitUpgradeRanks).some(([id, n]) => !allowed.has(id) || !Number.isInteger(n) || n < 1 || n > 50)) {
+        throw new RangeError('invalid disposable pursuit upgrade loadout');
+      }
+      const profile = game.registry.get(REG.PROFILE) || {};
+      game.registry.set(REG.PROFILE, {
+        ...profile, upgrades: { ...o.pursuitUpgradeRanks }, upgradesEnabled: true,
+      });
+    }
+    if (o.pursuitProfileLevel != null) {
+      if (!Number.isInteger(o.pursuitProfileLevel) || o.pursuitProfileLevel < 1 || o.pursuitProfileLevel > 50) {
+        throw new RangeError('invalid pursuitProfileLevel');
+      }
+      const currentProfile = game.registry.get(REG.PROFILE) || {};
+      game.registry.set(REG.PROFILE, { ...currentProfile, level: o.pursuitProfileLevel });
+    }
     game.registry.set(REG.SEED, o.seed);
     // W3: the mask the sim plays at. Set alongside the seed so the run, the record and the stats scope
     // all agree; 0 is base terrain and is what every pre-W3 sim call gets.
@@ -354,6 +375,35 @@
     game.events.once(EVT.RUN_START, () => {
       scene = game.scene.getScene('RunScene');
       scene.inputRouter = stub;
+      // Developer-only counterfactual: the production game has already built the
+      // real BsodPursuit; alter only this headless instance before the first tick.
+      // Position is expressed relative to the ACTUAL collision edge, not sled center.
+      const ov = o.pursuitOverrides || {};
+      const bounds = { pursuitGapPx: [100, 20000], pursuitSpeedPxS: [1, 3000], pursuitAccelPxS2: [0.01, 100], pursuitGapOffsetPx: [-7000, 20000], pursuitAccelFactor: [0.1, 30] };
+      for (const [k, v] of Object.entries(ov)) {
+        if (!Object.hasOwn(bounds, k) || typeof v !== 'number' || !Number.isFinite(v) ||
+            v < bounds[k][0] || v > bounds[k][1]) throw new RangeError(`invalid pursuit override ${k}`);
+      }
+      if ((Object.hasOwn(ov, 'pursuitGapPx') && Object.hasOwn(ov, 'pursuitGapOffsetPx')) ||
+          (Object.hasOwn(ov, 'pursuitAccelPxS2') && Object.hasOwn(ov, 'pursuitAccelFactor'))) {
+        throw new RangeError('cannot mix absolute and relative pursuit overrides');
+      }
+      const originalSledEdge = scene.bsod.wallX + scene.bsodState.gapPx;
+      if (Object.hasOwn(ov, 'pursuitGapPx')) {
+        // Preserve run-level extra grace as an explicitly documented limitation:
+        // this applies an absolute measured initial gap to the spawned wall.
+        scene.bsod.wallX = originalSledEdge - ov.pursuitGapPx;
+      }
+      if (Object.hasOwn(ov, 'pursuitGapOffsetPx')) {
+        const resultingGap = scene.bsodState.gapPx + ov.pursuitGapOffsetPx;
+        if (resultingGap <= 0) throw new RangeError('pursuitGapOffsetPx would spawn overlapping the rider');
+        scene.bsod.wallX = originalSledEdge - resultingGap;
+      }
+      if (Object.hasOwn(ov, 'pursuitAccelFactor')) scene.bsod.accelerationPxS2 *= ov.pursuitAccelFactor;
+      if (Object.hasOwn(ov, 'pursuitSpeedPxS')) scene.bsod.wallSpeedPxS = ov.pursuitSpeedPxS;
+      if (Object.hasOwn(ov, 'pursuitAccelPxS2')) scene.bsod.accelerationPxS2 = ov.pursuitAccelPxS2;
+      if (Object.keys(ov).length) scene.bsodState = scene.bsod.state(originalSledEdge, scene.sled.vx, 1);
+
       // A --rule run keeps that rule's real modifiers so mission targets can be measured under the
       // rule they ship with; the default stays neutralised for the pacing curve.
       const rule = o.rule && o.rule !== 'none' ? (pendingRules.find((r) => r.id === o.rule) || null) : null;
@@ -383,7 +433,7 @@
 
     // ---- recorders
     const R = {
-      seed: o.seed, policy: policyName, params,
+      seed: o.seed, policy: policyName, params, pursuitProfileLevel: o.pursuitProfileLevel ?? null, pursuitUpgradeRanks: o.pursuitUpgradeRanks ?? null,
       endReason: null, distM: 0, simSec: 0, frames: 0,
       crash: null, negatedCrashes: [], airPhases: [], landings: [], respawns: [], nudges: [], hints: [], hazardHits: [],
       maxSpeed: 0, maxSpeedAtM: 0, minZoom: 99, minZoomAtM: 0, zoomAtMaxSpeed: 0,
@@ -391,6 +441,18 @@
       shards: 0, nearMisses: 0, score: 0, scoreAt: 0, tricks: {}, maxAirtimeMs: 0, bestCombo: 1,
       inputActivity: { airborneFrames: 0, tiltFrames: 0, airBrakeHeldFrames: 0, airBrakeActiveFrames: 0, parachuteHeldFrames: 0, parachuteActiveFrames: 0, overlapHeldFrames: 0, overlapActiveFrames: 0 },
       minBsodGapPx: null, finalBsodGapPx: null, bsodActiveFrames: 0,
+    };
+    // Optional developer-only pursuit sampler: observe the authoritative
+    // post-tick BSOD state, never touch pursuer position, speed, or scheduling.
+    // 60Hz samples are NOT the exact 120Hz substep minimum.
+    const pursuitSampleMs = o.pursuitSampleMs == null ? 0 : Number(o.pursuitSampleMs);
+    if (!Number.isInteger(pursuitSampleMs) || pursuitSampleMs < 0 ||
+        (pursuitSampleMs > 0 && (pursuitSampleMs < 500 || pursuitSampleMs > 60000))) {
+      throw new RangeError('pursuitSampleMs must be 0 or a 500–60000ms integer');
+    }
+    if (pursuitSampleMs) R.pursuitProbe = {
+      intervalMs: pursuitSampleMs, firstActive: null, maxSampledGapPx: null,
+      samples: [], sampleResolution: 'post-tick 60Hz browser observations',
     };
     let tMs = 0; // run clock as the harness sees it (frames * DT)
     let lastLanding = null;
@@ -556,6 +618,27 @@
     }
 
     // ---- start: first headlessStep processes the queue, creates RunScene (RUN_START hook installs the stub)
+    // Opt-in isolated progression-level scenario, created in the headless registry.
+    // Do not modify the SaveStore profile or issue a persistent unlock.
+    if (o.pursuitUpgradeRanks != null) {
+      const allowed = new Set(['speed','hop','flip','canopy','airbrake','divebomb','bsodGrace','magnetMagnitude','magnetMeasure','magnetMyriad']);
+      if (typeof o.pursuitUpgradeRanks !== 'object' || Array.isArray(o.pursuitUpgradeRanks) ||
+          !Object.keys(o.pursuitUpgradeRanks).length ||
+          Object.entries(o.pursuitUpgradeRanks).some(([id, n]) => !allowed.has(id) || !Number.isInteger(n) || n < 1 || n > 50)) {
+        throw new RangeError('invalid disposable pursuit upgrade loadout');
+      }
+      const profile = game.registry.get(REG.PROFILE) || {};
+      game.registry.set(REG.PROFILE, {
+        ...profile, upgrades: { ...o.pursuitUpgradeRanks }, upgradesEnabled: true,
+      });
+    }
+    if (o.pursuitProfileLevel != null) {
+      if (!Number.isInteger(o.pursuitProfileLevel) || o.pursuitProfileLevel < 1 || o.pursuitProfileLevel > 50) {
+        throw new RangeError('invalid pursuitProfileLevel');
+      }
+      const currentProfile = game.registry.get(REG.PROFILE) || {};
+      game.registry.set(REG.PROFILE, { ...currentProfile, level: o.pursuitProfileLevel });
+    }
     game.registry.set(REG.SEED, o.seed);
     game.registry.set(REG.BIOME_MASK, o.biomeMask >>> 0);
     game.scene.start('RunScene');
@@ -609,6 +692,20 @@
         R.bsodActiveFrames++;
         R.finalBsodGapPx = pursuit.gapPx;
         R.minBsodGapPx = R.minBsodGapPx === null ? pursuit.gapPx : Math.min(R.minBsodGapPx, pursuit.gapPx);
+        const probe = R.pursuitProbe;
+        if (probe) {
+          const snapshot = {
+            tMs: Math.round(tMs), gapPx: Math.round(pursuit.gapPx * 1000) / 1000,
+            distM: Math.round(distM * 10) / 10, airborne: !s.grounded,
+          };
+          if (!probe.firstActive) probe.firstActive = snapshot;
+          probe.maxSampledGapPx = probe.maxSampledGapPx == null
+            ? pursuit.gapPx : Math.max(probe.maxSampledGapPx, pursuit.gapPx);
+          if (!probe.samples.length || tMs - probe.samples[probe.samples.length - 1].tMs >= pursuitSampleMs) {
+            probe.samples.push(snapshot);
+          }
+          probe.lastObserved = snapshot;
+        }
       }
       if (s.speed > R.maxSpeed) { R.maxSpeed = s.speed; R.maxSpeedAtM = distM; R.zoomAtMaxSpeed = scene.cameras.main.zoom; }
       const z = scene.cameras.main.zoom;
@@ -689,6 +786,12 @@
     // ---- finalise
     closeAir(false);
     R.endReason = endReason;
+    // Keep the terminal observation even if it is between regular intervals;
+    // it was captured on the same post-tick path as the other snapshots.
+    if (R.pursuitProbe?.lastObserved) {
+      const probe = R.pursuitProbe;
+      if (probe.samples.at(-1)?.tMs !== probe.lastObserved.tMs) probe.samples.push(probe.lastObserved);
+    }
     R.distM = r1(distOf(scene.sled.x));
     // The run's own score is authoritative; the shard-chain bonus is the only thing ScoreManager adds
     // that no score event carries, so fall back to it when no SCORE_CHANGED arrived.

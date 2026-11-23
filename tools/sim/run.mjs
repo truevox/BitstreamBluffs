@@ -25,6 +25,11 @@
  *   --seedPrefix P        with --seeds N: names become P-01..P-NN instead of sim-01.. (a second, independent seed set)
  *   --biomeMask M         W3: biome bitmask for the run (1 Debutmont, 2 Garbage Dump Glacier, 4 Pyramid Peak,
  *                         8 Underwater Mountain, 16 Crystal Cavern; combined by OR). Default 0 = base terrain.
+ *   --pursuitSampleMs N   developer-only authoritative post-tick BSOD gap timeline every N ms (500–60000)
+ *   --pursuitGapPx N / --pursuitSpeedPxS N / --pursuitAccelPxS2 N   local counterfactual ONLY
+ *   --pursuitProfileLevel N   local, disposable progression-level simulation (1–50)
+ *   --pursuitGapOffsetPx N / --pursuitAccelFactor N   preserve built-in level scaling
+ *   --pursuitUpgradeRanks canopy:12,bsodGrace:12   disposable, explicitly enabled upgraded loadout
  *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
  *   --rule ID             run under that DailyPatch rule's real modifiers (default: none/neutralised)
  *   --workers N           parallel pages (default 4)           --out FILE   write JSON
@@ -68,7 +73,7 @@ function parseArgs(argv) {
     if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop', 'fatigue'].includes(name)) { a[name] = true; continue; }
     a[name] = argv[++i];
   }
-  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM']) if (a[n] != null) a[n] = Number(a[n]);
+  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM', 'pursuitSampleMs', 'pursuitGapPx', 'pursuitSpeedPxS', 'pursuitAccelPxS2', 'pursuitProfileLevel', 'pursuitGapOffsetPx', 'pursuitAccelFactor']) if (a[n] != null) a[n] = Number(a[n]);
   return a;
 }
 const argv = process.argv.slice(2);
@@ -120,6 +125,36 @@ if (argv.some((value) => value.startsWith('--fatigue=')) || (fatigueFlag !== -1 
     (!noiseProfiles || args.fatigue !== true || argv.lastIndexOf('--fatigue') !== fatigueFlag ||
       (argv[fatigueFlag + 1] != null && !argv[fatigueFlag + 1].startsWith('--'))))) {
   throw new TypeError('Use the single --fatigue switch without a value and only with --noiseProfiles');
+}
+if (args.pursuitSampleMs != null && (!Number.isInteger(args.pursuitSampleMs) ||
+    args.pursuitSampleMs < 500 || args.pursuitSampleMs > 60000)) {
+  throw new RangeError('Developer-only --pursuitSampleMs must be an integer in [500,60000]');
+}
+// Counterfactual overrides are opt-in per run, confined to the browser harness.
+// No production pursuer constants, ruleset, save/tape schema or default settings change.
+for (const [name, lo, hi] of [['pursuitGapPx', 100, 20000], ['pursuitSpeedPxS', 1, 3000], ['pursuitAccelPxS2', 0.01, 100], ['pursuitGapOffsetPx', -7000, 20000], ['pursuitAccelFactor', 0.1, 30]]) {
+  if (args[name] != null && (!Number.isFinite(args[name]) || args[name] < lo || args[name] > hi)) {
+    throw new RangeError(`--${name} must be in [${lo}, ${hi}]`);
+  }
+}
+if ((args.pursuitGapPx != null && args.pursuitGapOffsetPx != null) || (args.pursuitAccelPxS2 != null && args.pursuitAccelFactor != null)) {
+  throw new RangeError('absolute and relative BSOD overrides may not be combined per parameter');
+}
+if (args.pursuitProfileLevel != null && (!Number.isInteger(args.pursuitProfileLevel) || args.pursuitProfileLevel < 1 || args.pursuitProfileLevel > 50)) {
+  throw new RangeError('--pursuitProfileLevel must be an integer in [1,50]');
+}
+// Only the known upgrade catalogue can appear in synthetic scenarios.
+const allowedUpgradeIds = new Set(['speed','hop','flip','canopy','airbrake','divebomb','bsodGrace','magnetMagnitude','magnetMeasure','magnetMyriad']);
+let pursuitUpgradeRanks = null;
+if (args.pursuitUpgradeRanks != null) {
+  pursuitUpgradeRanks = {};
+  for (const part of String(args.pursuitUpgradeRanks).split(',')) {
+    const m = /^([A-Za-z]+):(\d+)$/.exec(part);
+    if (!m || !allowedUpgradeIds.has(m[1]) || Object.hasOwn(pursuitUpgradeRanks, m[1]) || Number(m[2]) < 1 || Number(m[2]) > 50) {
+      throw new RangeError('pursuitUpgradeRanks must be unique knownId:rank entries, 1–50');
+    }
+    pursuitUpgradeRanks[m[1]] = Number(m[2]);
+  }
 }
 const seeds = expandSeeds(String(args.seeds));
 if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
@@ -329,6 +364,10 @@ async function main() {
         // set REG.BIOME_MASK before RunScene builds its generator.
         biomeMask: args.biomeMask != null ? Number(args.biomeMask) >>> 0 : 0,
         traceEvery: args.traceEvery || (args.verify || job.profile ? 60 : 0), sub: args.sub || 0,
+        pursuitSampleMs: args.pursuitSampleMs || 0,
+        pursuitProfileLevel: args.pursuitProfileLevel || null,
+        pursuitUpgradeRanks,
+        pursuitOverrides: Object.fromEntries(['pursuitGapPx','pursuitSpeedPxS','pursuitAccelPxS2','pursuitGapOffsetPx','pursuitAccelFactor'].filter(k => args[k] != null).map(k => [k, args[k]])),
         // Daily rule to measure under; 'none' (the default) neutralises modifiers for pacing runs.
         rule: args.rule ? String(args.rule) : 'none',
         ...(job.profile ? { noiseProfile: job.profile, noiseSeed: args.noiseSeed, noiseReplay: job.playback } : {}),
