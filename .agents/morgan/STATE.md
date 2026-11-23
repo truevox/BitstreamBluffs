@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 23:50 UTC. Main: `5a7e3bec8b87f447aa5b61c27fc368622b7fa956` (SIM7, package/lock/changelog v2.19.21).
+Last verified: 2026-11-23 23:55 UTC. Main: `5a7e3bec8b87f447aa5b61c27fc368622b7fa956` (SIM7, package/lock/changelog v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -12,7 +12,9 @@ going” means resume this queue, not take over other lanes or merge a draft.
    Eight (#278/#281/#282/#283/#286/#287/#288/#290) have new COMMENTED
    source reviews with no blocking findings, no inline threads, and no
    APPROVED review. #269 lacks a GitHub review; separate exact source QA
-   found no blocker. Fix actual feedback first. No merge of drafts.
+   found no blocker on landed SIM7. All nine exact heads show successful
+   Netlify, lifecycle and build-identity checks. Fix actual feedback
+   first; these are not approval. No merge of drafts.
    For later integration, prioritize the verified user-facing #290 fix
    when the required review and release slot are clear. Obey the
    numbered release rule (#207). Main #294 shipped SIM7 Fast Approach /
@@ -28,9 +30,12 @@ going” means resume this queue, not take over other lanes or merge a draft.
    On 570fc88, exact #281/#282/#283/#286/#287/#290 deltas also apply
    together in scratch: 229 focused tests across 11 suites, ruleset and
    identity checks, and production build pass. #290 repeats real Chromium
-   Game Over A/B with no errors/outbound requests. #269 independent
-   integration passes 42 tests, nine identical V1 comparisons/repeated
-   V2 outputs and 4,844-file artifact parity. #288 passes 47 tests, plus
+   Game Over A/B with no errors/outbound requests. #269 exact delta reapplies on
+   landed SIM7 5a7e3be: 42 tests and all 4,846 production files unchanged.
+   A genuine SIM7 QA tape from two identical native 185 m runs and nine
+   historical fixtures retain V1 bytes; opt-in V2 CLI/Chromium SVG bytes
+   match across all ten. No errors or outbound requests; not replay/score
+   verification or an independent Gal approval. #288 passes 47 tests, plus
    18 fresh current-source browser repeat/playbacks; classic output stays
    byte-identical, fatigue fails closed with the corrected diagnostic.
    Main then added #293, opt-in BSOD QA files only (no overlap). Exact
