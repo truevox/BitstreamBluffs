@@ -7,7 +7,25 @@ const controller=new HydrostaticPressure();
 let ctx=null,buffers=null,master=null,rawGain=null,processedGain=null;
 let sources=[],chains=[],playing=false,bypassed=false,phase='ground';
 let terrainY=0;
+const contrast=()=>Number($('contrast').value)/100;
+const waveStrength=()=>Number($('wave').value)/100;
 const status=message=>{$('status').textContent=message;};
+function setContrast(){
+	$('contrast-value').textContent=Math.round(contrast()*100)+'%';
+	if(playing&&ctx)for(const chain of chains)
+		chain.find('hydrostatic')?.set('contrast',contrast(),ctx.currentTime);
+}
+function setWaveStrength(){
+	$('wave-value').textContent=Math.round(waveStrength()*100)+'%';
+	if(playing&&ctx)chains[0]?.find('hydrostatic')?.set('waveStrength',waveStrength(),ctx.currentTime);
+}
+function triggerWave(strength=.85){
+	if(!playing||!ctx||bypassed){
+		status('Press Play and turn off Compare dry to hear the physical pressure wave.');
+		return false;
+	}
+	return chains[0]?.find('hydrostatic')?.set('impact',strength,ctx.currentTime)===true;
+}
 const percent=x=>Math.round(x*100)+'%';
 const control=()=>{
 	$('play').disabled=!buffers;
@@ -15,7 +33,7 @@ const control=()=>{
 	$('bypass').disabled=!playing;
 	$('bypass').textContent=bypassed?'Hear processed':'Compare dry';
 	$('bypass').setAttribute('aria-pressed',String(bypassed));
-	for(const id of ['jump','apex','fall','land','exit'])$(''+id).disabled=!playing;
+	for(const id of ['jump','apex','fall','land','wave-hit','exit'])$(''+id).disabled=!playing;
 };
 function applyMotion(grounded,riderY,vy){
 	const state=controller.update({terrainY,riderY,vy,grounded});
@@ -64,7 +82,8 @@ async function play(){
 		source.connect(gain);gain.connect(rawGain);gain.connect(chain.input);
 		source.start(ctx.currentTime+.10);sources.push(source);chains.push(chain);
 	}
-	playing=true;control();applyMotion(true,terrainY,0);
+	playing=true;control();
+	setContrast();setWaveStrength();applyMotion(true,terrainY,0);
 	status('Music is continuous. Slide terrain deeper: stored pressure rises; moving uphill cannot lower it.');
 }
 $('load').addEventListener('click',load);$('play').addEventListener('click',play);
@@ -75,6 +94,8 @@ $('bypass').addEventListener('click',()=>{
 	processedGain.gain.setTargetAtTime(bypassed?0:1,now,.02);
 	control();status(bypassed?'Dry original five-stem recording.':'Back to hydrostatic DSP on original stems.');
 });
+$('contrast').addEventListener('input',setContrast);
+$('wave').addEventListener('input',setWaveStrength);
 $('terrain').addEventListener('input',()=>{
 	terrainY=Number($('terrain').value);$('terrain-value').textContent=terrainY+' px';
 	const state=applyMotion(phase==='ground',phase==='ground'?terrainY:
@@ -97,9 +118,13 @@ $('fall').addEventListener('click',()=>{
 });
 $('land').addEventListener('click',()=>{
 	phase='ground';applyMotion(true,terrainY,0);
-	if(playing&&ctx)chains.find(chain=>chain.find('hydrostatic'))
-		?.find('hydrostatic')?.set('impact',.8,ctx.currentTime);
-	status('Landed: full remembered pressure reimposed, with a brief physical pressure wave.');
+	if(triggerWave(.8))
+		status('Landed: full remembered pressure restored, with water-hammer thump and bubbling release.');
+	else if(!playing) status('Landed: full stored pressure restored. Play to hear the water-hammer wave.');
+});
+$('wave-hit').addEventListener('click',()=>{
+	if(triggerWave(.85))
+		status('WWHUMP—blublublup! A physical pressure wave independent of song beats.');
 });
 $('exit').addEventListener('click',()=>{
 	controller.reset();phase='ground';terrainY=0;

@@ -37,15 +37,30 @@ try {
 					gain.connect(chain.input);
 					const fx=chain.find('hydrostatic');
 					if(mode!=='zero')fx.set('pressure',1,.40);
-					if(mode==='relief')fx.set('pressure',.24,1.15);
+					if(mode==='relief')fx.set('pressure',.14,1.15);
+					if(mode==='strongContrast')fx.set('contrast',2.2,.42);
+					if(mode==='landingOff'&&role==='drums') {
+						fx.set('waveStrength',0,.7);fx.set('impact',.85,1.5);
+					}
 					if(mode==='landing'&&role==='drums')fx.set('impact',.85,1.5);
+					if(mode==='waveMaximum'&&role==='drums'){
+						fx.set('waveStrength',2.4,.7);
+						fx.set('impact',1,1.5);
+					}
+					if(mode==='waveStack'&&role==='drums'){
+						fx.set('waveStrength',2.4,.7);
+						for(const t of [1.5,1.56,1.62]) fx.set('impact',1,t);
+					}
 				}
 				src.start(0);
 			}
 			return ctx.startRendering();
 		}
-		const [dry,zero,deep,relief,landing]=await Promise.all([
-			'dry','zero','deep','relief','landing'].map(render));
+		const modes=['dry','zero','deep','relief','landing','landingOff',
+			'strongContrast','waveMaximum','waveStack'];
+		const renders=await Promise.all(modes.map(render));
+		const byMode=Object.fromEntries(modes.map((name,i)=>[name,renders[i]]));
+		const {dry,zero,deep,relief,landing,landingOff,strongContrast,waveMaximum,waveStack}=byMode;
 		const info=(buffer)=>{
 			let sum=0,peak=0,finite=true;
 			for(let ch=0;ch<2;ch++){
@@ -67,22 +82,27 @@ try {
 			return Math.sqrt(sum/(2*(last-first)));
 		};
 		return {
-			dry:info(dry),zero:info(zero),deep:info(deep),
-			relief:info(relief),landing:info(landing),
+			...Object.fromEntries(modes.map(name=>[name,info(byMode[name])])),
 			dryBypassDifference:diff(dry,zero),
 			pressureDifference:diff(dry,deep),
+			contrastDifference:diff(deep,strongContrast),
 			reliefDifference:diff(deep,relief),
-			impactDifference:diff(landing,deep,1.5,1.85),
+			impactDifference:diff(landing,deep,1.5,2.08),
+			impactOffDifference:diff(landingOff,deep,1.5,2.08),
+			maxImpactDifference:diff(waveMaximum,deep,1.5,2.08),
 		};
 	});
 	console.log('HYDROSTATIC_FIVE_STEM_CHROMIUM',JSON.stringify(result));
 	assert.deepEqual(errors,[]);
-	for(const mode of ['dry','zero','deep','relief','landing']){
+	for(const mode of ['dry','zero','deep','relief','landing','landingOff','strongContrast','waveMaximum','waveStack']){
 		assert(result[mode].finite,mode+' samples should be finite');
 		assert(result[mode].peak<.92,mode+' unexpected sampled peak');
 	}
 	assert(result.dryBypassDifference<.001,'zero pressure should be nearly dry-identical');
-	assert(result.pressureDifference>.006,'stored pressure must be distinctly audible');
-	assert(result.reliefDifference>.005,'jump relief must restore audible higher frequencies');
-	assert(result.impactDifference>.002,'landing wave must be real, not simply a status label');
+	assert(result.pressureDifference>.015,'deep pressure must be clearly distinct from dry');
+	assert(result.reliefDifference>.015,'rising jump relief must clearly open the filtered sound');
+	assert(result.contrastDifference>.001,'depth contrast slider must change the actual waveform');
+	assert(result.impactDifference>.019,'landing pressure wave must cut through full original mix');
+	assert(result.maxImpactDifference>result.impactDifference*1.2,'more wave strength should be audible');
+	assert(result.impactOffDifference<.00001,'muted pressure wave must not secretly play');
 } finally {await browser.close();}

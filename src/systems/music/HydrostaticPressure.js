@@ -7,7 +7,7 @@ const bounded = (x,lo,hi) => Math.min(hi,Math.max(lo,x));
 const finite = x => typeof x === 'number' && Number.isFinite(x);
 
 export class HydrostaticPressure {
-	constructor({depthScalePx=460,reliefDepth=.78}={}) {
+	constructor({depthScalePx=460,reliefDepth=.90}={}) {
 		this.depthScalePx = finite(depthScalePx) && depthScalePx > 0 ? depthScalePx : 460;
 		this.reliefDepth = finite(reliefDepth) ? bounded(reliefDepth,0,.95) : .78;
 		this.reset();

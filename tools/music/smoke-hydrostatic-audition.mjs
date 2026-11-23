@@ -16,6 +16,16 @@ try {
 	await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('Ready.'),{timeout:15000});
 	await page.click('#play');
 	assert.match(await page.$eval('#play',e=>e.textContent),/Stop/);
+	assert.equal(await page.$eval('#contrast-value',e=>e.textContent),'190%');
+	assert.equal(await page.$eval('#wave-value',e=>e.textContent),'150%');
+	await page.$eval('#contrast',e=>{e.value='195';e.dispatchEvent(new Event('input',{bubbles:true}));});
+	assert.equal(await page.$eval('#contrast-value',e=>e.textContent),'195%');
+	await page.$eval('#wave',e=>{e.value='210';e.dispatchEvent(new Event('input',{bubbles:true}));});
+	assert.equal(await page.$eval('#wave-value',e=>e.textContent),'210%');
+	await page.click('#wave-hit');
+	assert.match(await page.$eval('#status',e=>e.textContent),/WWHUMP/);
+	await page.$eval('#contrast',e=>{e.value='190';e.dispatchEvent(new Event('input',{bubbles:true}));});
+	await page.$eval('#wave',e=>{e.value='150';e.dispatchEvent(new Event('input',{bubbles:true}));});
 	const terrain=async value=>page.$eval('#terrain',(e,value)=>{
 		e.value=String(value);e.dispatchEvent(new Event('input',{bubbles:true}));
 	},value);
