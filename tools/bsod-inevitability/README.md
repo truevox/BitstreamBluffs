@@ -36,6 +36,16 @@ existing wall's initial speed **for an explicitly counterfactual research run**.
 start gap 50–20,000px and initial wall speed 25–3,000px/s. Without these flags, the
 simulator follows the unchanged stock start position/speed.
 
+An auditable **six-seed, four-policy, three-speed source-pinned** preliminary comparison is
+preserved as `results/near-threat-gap500-six-seeds-20261123.json`: all 72 compact
+seed/policy outcomes, original executable commit, exact SHA256 receipts and CT223 raw
+report locations. Its `default` speed means the unchanged normal 115px/s initial wall
+speed **with** a counterfactual 500px initial gap (not default gameplay); 500/1000
+are additional counterfactual initial speeds. All three runs used the same six
+course seeds and 60-second finite horizon; early collisions on identical course
+openings are not six independent demonstrations of balance. The original full raw
+reports remain outside Git under `/srv/friday-audio/bsb-128-near-threat-source-pinned-20261123/`.
+
 Counterfactual runs always carry an `intervention` notice in their JSON config and Markdown,
 and each arm carries **prior, requested and observed** gap/speed, the real danger threshold,
 and `noCanonicalPlayerTape:true`. The browser explicitly disables `ghostRecorder` for this
