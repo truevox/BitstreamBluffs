@@ -9,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge', 'sugarfizz', 'orbitfield', 'sunstone',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge', 'sugarfizz', 'orbitfield', 'sunstone', 'arcadeglue',
 ]);
 
 function saturatorCurve(amount) {
@@ -574,6 +574,92 @@ function allocateEffect(ctx, raw) {
 			disposers.push(()=>{for(const entry of active){
 				try{entry.source.stop();}catch{}disposeTone(entry);
 			}});
+			break;
+		}
+		case 'arcadeglue': {
+			// Arcade may be a short bridge OR a future destination biome.
+			// One shared audible identity; the REAL terrain-bridge geometry
+			// shapes only source-wet arcade processing, never dry music or
+			// the source clock. Arcade has its own voice:bitstream-bluffs lead.
+			const dry=node(ctx.createGain());dry.gain.value=1;
+			input.connect(dry);dry.connect(output);
+			const pre=node(ctx.createBiquadFilter());pre.type='highpass';
+			pre.frequency.value=430;pre.Q.value=.65;
+			const chip=node(ctx.createWaveShaper());
+			// Deterministic stepped quantization of RECORDED audio (not
+			// synthesized notes): equal levels, symmetric zero, finite.
+			const curve=new Float32Array(2049);
+			for(let i=0;i<curve.length;i++){
+				const x=2*i/(curve.length-1)-1;
+				curve[i]=Math.round(x*18)/18;
+			}
+			chip.curve=curve;chip.oversample='none';
+			const pulse=node(ctx.createGain());
+			const lfo=node(ctx.createOscillator());lfo.type='square';
+			const modulation=node(ctx.createGain());
+			lfo.connect(modulation);modulation.connect(pulse.gain);
+			lfo.start();lfos.push(lfo);
+			const crunch=node(ctx.createGain());
+			input.connect(pre);pre.connect(chip);chip.connect(pulse);
+			pulse.connect(crunch);crunch.connect(output);
+			// Cross-panned 8-bit echoes of the same original notes.
+			const l=node(ctx.createDelay(.45)),r=node(ctx.createDelay(.45));
+			l.delayTime.value=.074;r.delayTime.value=.113;
+			const stereo=node(ctx.createGain());
+			pulse.connect(l);pulse.connect(r);
+			if(ctx.createStereoPanner){
+				const lp=node(ctx.createStereoPanner());
+				const rp=node(ctx.createStereoPanner());
+				lp.pan.value=-.72;rp.pan.value=.72;
+				l.connect(lp);r.connect(rp);lp.connect(stereo);rp.connect(stereo);
+			}else{l.connect(stereo);r.connect(stereo);}
+			stereo.connect(output);
+			let bridge=raw.bridge===true;
+			let progress=clamp(raw.progress,0,1,0);
+			let intensity=clamp(raw.intensity,0,2,1.25);
+			let chop=clamp(raw.chop,0,2,1.2);
+			const arc=(p)=>{
+				// Match actual #65 visual dissolve (first .25), full
+				// arcade corridor, and incoming rebuild (last .25).
+				if(p<.25)return .07+.93*p/.25;
+				if(p>.75)return .07+.93*(1-p)/.25;
+				return 1;
+			};
+			const apply=(at,instant=false)=>{
+				const presence=bridge?arc(progress):1;
+				const wet=Math.max(0,Math.min(1.6,presence*intensity/1.25));
+				const controls=[
+					[crunch.gain,.47*wet],
+					[stereo.gain,.22*wet],
+					[pulse.gain,.93-.15*Math.min(1,wet)],
+					[modulation.gain,.25*wet*Math.min(1,chop)],
+					[lfo.frequency,2.2+6.4*chop*presence],
+					[pre.frequency,310+1050*presence],
+					[l.delayTime,.064+.020*presence],
+					[r.delayTime,.095+.036*presence]
+				];
+				for(const [param,value] of controls){
+					if(instant)param.value=value;
+					else numericParam(param,value,at,.055);
+				}
+			};
+			apply(ctx.currentTime,true);
+			refs.bridge={set:(v,at)=>{
+				if(typeof v!=='boolean')return false;
+				bridge=v;apply(at);return true;
+			}};
+			refs.progress={set:(v,at)=>{
+				if(!Number.isFinite(v))return false;
+				progress=clamp(v,0,1,0);apply(at);return true;
+			}};
+			refs.intensity={set:(v,at)=>{
+				if(!Number.isFinite(v))return false;
+				intensity=clamp(v,0,2,1.25);apply(at);return true;
+			}};
+			refs.chop={set:(v,at)=>{
+				if(!Number.isFinite(v))return false;
+				chop=clamp(v,0,2,1.2);apply(at);return true;
+			}};
 			break;
 		}
 		case 'sunstone': {

@@ -44,6 +44,72 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(impactFromLanding({impactSpeedPxS:900,hard:true,quality:'good'})).toBeGreaterThan(.55);
 		expect(impactFromLanding({impactSpeedPxS:5000,hard:true})).toBe(1);
 	});
+	test('Arcade bridge progress follows real generator geometry; standalone uses same chain',()=>{
+		const d=director();d.biome='bitstream-bluffs';d.started=true;
+		d._arcadeLastBridge=null;d._arcadeLastProgress=NaN;
+		d._applyMusicTimbres();
+		for(const stem of ROLES)expect(d.mixer.replaceEffects).toHaveBeenCalledWith(
+			stem,orchestraPreset('bitstream-bluffs',stem),.18);
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setArcadeTransition({bridge:true,progress:0})).toBe(true);
+		for(const stem of ROLES){
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'arcadeglue','bridge',true);
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'arcadeglue','progress',0);
+		}
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setArcadeTransition({bridge:true,progress:.005})).toBe(true);
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+		for(const progress of [.25,.5,.75,1])
+			expect(d.setArcadeTransition({bridge:true,progress})).toBe(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums',
+			'arcadeglue','progress',1);
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setArcadeTransition({bridge:false,progress:0})).toBe(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('other','arcadeglue','bridge',false);
+		// As a genuine destination, Arcade remains rich even without a bridge.
+		expect(d.biome).toBe('bitstream-bluffs');
+		expect(d.clockStart).toBe(23.5);
+		d.setBiome('debutmont');d.mixer.setEffectParam.mockClear();
+		expect(d.setArcadeTransition({bridge:true,progress:.5})).toBe(false);
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+	});
+	test('Arcade rejects invalid, menu/paused and future-standalone malformed bridge data',()=>{
+		const d=director();d.biome='bitstream-bluffs';d.started=true;
+		d._arcadeLastBridge=null;d._arcadeLastProgress=NaN;
+		for(const bad of [{bridge:'true',progress:.5},{bridge:true,progress:NaN},
+			{bridge:true,progress:-.01},{bridge:true,progress:1.01},
+			{bridge:true,progress:Infinity},{}])
+			expect(d.setArcadeTransition(bad)).toBe(false);
+		const good={bridge:true,progress:.5};
+		d.menuMode=true;expect(d.setArcadeTransition(good)).toBe(false);
+		d.menuMode=false;d.transportPaused=true;
+		expect(d.setArcadeTransition(good)).toBe(false);
+		d.transportPaused=false;d.started=false;
+		expect(d.setArcadeTransition(good)).toBe(false);
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+		const synth=Object.create(AudioSynth.prototype);
+		synth._musicMode='run';synth._paused=false;
+		synth._stemMusic={setArcadeTransition:jest.fn(()=>true)};
+		expect(synth.setArcadeTransition(good)).toBe(true);
+		synth._paused=true;expect(synth.setArcadeTransition(good)).toBe(false);
+		synth._musicMode='menu';synth._paused=false;
+		expect(synth.setArcadeTransition(good)).toBe(false);
+		expect(synth._stemMusic.setArcadeTransition).toHaveBeenCalledTimes(1);
+	});
+	test('every run starts with Debutmont melody, not the Arcade bridge or its lead',()=>{
+		const audio=Object.create(AudioSynth.prototype);
+		audio._stemMusic={setMenuMode:jest.fn(),setBiome:jest.fn(),started:true,
+			transportPaused:false};
+		audio._onBsodState=jest.fn();
+		audio._setPaused=jest.fn();
+		audio.startMusic=jest.fn();
+		audio._enterRunMusic('seed');
+		expect(audio._musicMode).toBe('run');
+		expect(audio._stemMusic.setBiome).toHaveBeenCalledWith('debutmont');
+		expect(audio._stemMusic.setBiome).not.toHaveBeenCalledWith('bitstream-bluffs');
+		expect(audio.startMusic).not.toHaveBeenCalled(); // no track restart
+	});
+
 	test('Pyramid real unwarded thermal zone controls source resonance and a single true gust',()=>{
 		const d=director();d.biome='pyramid-peak';d.started=true;
 		d._thermalLastLoft=NaN;d._thermalWasActive=false;d._pendingPyramidImpact=0;

@@ -947,6 +947,14 @@ export class AudioSynth {
     this._stemMusic?.setMicroBees?.(bees,playerScreenX);
   }
 
+  /** True arcade bridge geometry, read-only from terrain; standalone
+   * Arcade uses this exact same native original-source processor.
+   */
+  setArcadeTransition(sample) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setArcadeTransition?.(sample) === true;
+  }
+
   /** Verified physical thermal zone and actual gravity; one-way music only. */
   setThermalMotion(snapshot) {
     if (this._musicMode !== 'run' || this._paused) return false;
@@ -1015,7 +1023,9 @@ export class AudioSynth {
     this._musicMode = 'run';
     this._jukeboxMode = false;
     this._stemMusic?.setMenuMode(false);
-    this._stemMusic?.setBiome('bitstream-bluffs');
+    // #65: every run begins in REAL Debutmont, never in an Arcade bridge.
+    // The menu may use the Arcade identity, but the first run note is Debutmont.
+    this._stemMusic?.setBiome('debutmont');
     this._onBsodState(null);
     this._setPaused(false);
     // Respect an explicit manual pause in the jukebox.
