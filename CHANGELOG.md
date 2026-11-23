@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.19.19 — compare redacted local crash briefs (#78 / #237) (2026-11-22)
+
+- **Compare two existing redacted developer crash briefs.** The local CLI validates the original v1 JSON and reports whether its allowlisted crash signatures match, differ, or are inconclusive because a hazard ID is missing. It never reads an input tape, launches a replay, authenticates either report, or shares player data. No gameplay, scoring, replay compatibility or production change.
+
 ## v2.19.18 — Strict savestate V1 envelope foundation (Issue #230 / PR #227) (2026-11-22)
 
 - **Pure versioned input boundary:** add BB-CJSON V1 savestate envelope writer/inspector and deterministic registered-layout hash, requiring caller-provided exact build ID, game version, SIM_REVISION, ruleset ID, Matter version and savestate layout ID. Invalid, tampered, noncanonical, oversized, unsupported or wrong-build snapshots fail closed. The digest is error detection, **not** an authentication/leaderboard credential. Trusted section validators operate on a recursively frozen parsed envelope, preventing mutation after checksum admission.
