@@ -23,6 +23,7 @@ try {
       const res=await page.goto(`${base}/?bsodQa=${preset}&qaSeed=bsod-ab-01&utm_source=chatgpt.com`);
       assert.equal(res.status(),200);
       await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene')&&document.getElementById('bsod-qa-toolbar'),null,{timeout:60000});
+      await page.waitForFunction(()=>document.getElementById('bsod-qa-boot-status')?.textContent?.includes('Active scene: TitleScene'),null,{timeout:15000});
       await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('discard-this-seed'));
       await page.waitForFunction(()=>window.__bsodQaEvidence?.preset,null,{timeout:30000});
       const data=await page.evaluate(()=>({e:window.__bsodQaEvidence,seed:window.__bbGame.scene.getScene('RunScene').seed,storeIsWrapped:window.__bbGame.scene.getScene('RunScene').saveStore !== window.__bbGame.registry.get('saveStore'),title:document.getElementById('bsod-qa-toolbar').textContent}));
@@ -35,6 +36,7 @@ try {
       assert.equal(data.e.noSave,true);
       assert.equal(data.storeIsWrapped,true);
       assert(data.title.includes(preset==='buffered'?'BUFFERED STRONG':'MODERATE'));
+      assert.equal(await page.locator('#bsod-qa-boot-status').count(),1);
       console.log(`PASS ${preset}: same seed, authoritative 4500px gap, ${speed}px/s, ${accel}px/s², save isolation`);
     } finally { await page.close(); }
   }

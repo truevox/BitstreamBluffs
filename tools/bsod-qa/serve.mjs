@@ -14,7 +14,14 @@ const server = await createServer({
   plugins: [{
     name: 'bsod-qa-local-injection', apply: 'serve',
     transformIndexHtml(html) {
-      return html.replace('</body>', '<script type="module" src="/tools/bsod-qa/client.js"></script>\n</body>');
+      return html.replace('</body>', '<script src="/tools/bsod-qa/boot-status.js"></script>\n<script type="module" src="/tools/bsod-qa/client.js"></script>\n</body>');
+    },
+    configureServer(devServer) {
+      devServer.middlewares.use((req, res, next) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        next();
+      });
     },
   }],
 });
