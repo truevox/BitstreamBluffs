@@ -55,7 +55,11 @@ export function orchestraPreset(biome, stem) {
 		'vertigo-vents':3700,
 	}[biome] || 5000;
 	if (stem==='bass') {
-		return [filter('shaped-bass','lowpass',Math.min(3000,edge*.55)),
+		return [
+			// The original bass is analysed BEFORE its existing FX. The
+			// analyser is read only when an irregular on-pitch clang is due.
+			...(biome==='garbage-dump-glacier'?[{type:'scrapPitchProbe',id:'scrapPitchProbe'}]:[]),
+			filter('shaped-bass','lowpass',Math.min(3000,edge*.55)),
 			...(biome==='garbage-dump-glacier'||biome==='vertigo-vents'?[distortion(.18)]:[])];
 	}
 	if (stem==='drums') {

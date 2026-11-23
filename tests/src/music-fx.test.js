@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { buildMusicChain, StemFXMixer, MUSIC_PROCESSORS } from '../../src/systems/music/MusicFXGraph.js';
+import {orchestraPreset} from '../../src/systems/music/DynamicOrchestraPresets.js';
 
 class Param {
 	constructor() { this.value = 0; this.events = []; }
@@ -11,7 +12,7 @@ class Param {
 class AudioNodeMock {
 	constructor(type) {
 		this.type = type; this.connections = []; this.closed = false;
-		for (const key of ['gain', 'frequency', 'Q', 'pan', 'delayTime', 'threshold', 'ratio', 'knee', 'attack', 'release']) this[key] = new Param();
+		for (const key of ['gain', 'frequency', 'Q', 'pan', 'delayTime', 'playbackRate', 'threshold', 'ratio', 'knee', 'attack', 'release']) this[key] = new Param();
 		this.fftSize = 512;
 	}
 	connect(node) { this.connections.push(node); return node; }
@@ -95,6 +96,48 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(snow.set('impact',.8,ctx.currentTime+.07)).toBe(false);
 		expect(recovery).toHaveLength(count);
 		chain.dispose();
+	});
+	test('Original bass pitch probe monitors original audio without guessing or altering dry path',()=>{
+		const ctx=fakeContext();
+		const old=ctx.createAnalyser;
+		ctx.createAnalyser=()=>{
+			const analyser=old();analyser.fftSize=4096;analyser.frequencyBinCount=2048;
+			analyser.getFloatFrequencyData=data=>{
+				data.fill(-95);const bin=Math.round(440*4096/ctx.sampleRate);
+				data[bin-1]=-30;data[bin]=-18;data[bin+1]=-29;
+			};return analyser;
+		};
+		const mixer=new StemFXMixer(ctx,ctx.createGain());
+		mixer.addSource('bass',{effects:orchestraPreset('garbage-dump-glacier','bass')});
+		const notes=mixer.readEffect('bass','scrapPitchProbe','notes');
+		expect(notes.map(n=>n.midi)).toContain(69);
+		expect(mixer.readEffect('bass','scrapPitchProbe','missing')).toBe(null);
+		mixer.destroy();
+	});
+	test('Metal clang requires verified current source pitch, keeps inharmonic partials and caps voices',()=>{
+		const ctx=fakeContext();
+		const fx=buildMusicChain(ctx,[{id:'scrapheap',type:'scrapheap',contact:.65}],ctx.createGain());
+		const scrap=fx.find('scrapheap');
+		expect(scrap.refs.pitchedClang).toBeDefined();
+		expect(scrap.refs.clangLevel).toBeDefined();
+		const valid={midi:69,hz:440,confidence:.3,strength:.72};
+		expect(scrap.set('pitchedClang',{...valid,hz:446},ctx.currentTime)).toBe(false);
+		expect(scrap.set('pitchedClang',{...valid,midi:200},ctx.currentTime)).toBe(false);
+		expect(scrap.set('pitchedClang',null,ctx.currentTime)).toBe(false);
+		expect(ctx._bufferSources).toHaveLength(0);
+		expect(scrap.set('pitchedClang',valid,ctx.currentTime)).toBe(true);
+		const first=ctx._bufferSources[0];
+		expect(first.playbackRate.value).toBeCloseTo(1);
+		const samples=first.buffer.getChannelData(0);
+		expect(samples.every(Number.isFinite)).toBe(true);
+		expect(samples.some(x=>Math.abs(x)>.1)).toBe(true);
+		expect(scrap.set('clangLevel',2,ctx.currentTime)).toBe(true);
+		for(let i=0;i<8;i++)scrap.set('pitchedClang',valid,ctx.currentTime+i*.03);
+		expect(ctx._bufferSources.filter(x=>!x.stopped)).toHaveLength(3);
+		expect(scrap.set('contact',0,ctx.currentTime)).toBe(true);
+		expect(scrap.set('pitchedClang',valid,ctx.currentTime)).toBe(false);
+		fx.dispose();
+		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
 	});
 	test('Scrapheap native graph reacts to contact and landing without replacing original audio', () => {
 		const ctx = fakeContext();
