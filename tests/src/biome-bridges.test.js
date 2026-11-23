@@ -302,8 +302,8 @@ describe('layout is deterministic', () => {
 });
 
 describe('replay identity', () => {
-  test('v2.19.14 releases the revised terrain as SIM_REVISION 6, freezing it for future causal changes', () => {
-    expect(SIM_REVISION).toBe(6);
+  test('SIM_REVISION 7 releases the owner-approved BSOD chase after SIM6 terrain', () => {
+    expect(SIM_REVISION).toBe(7);
     expect(LAST_RELEASED_SIM_REVISION).toBe(SIM_REVISION);
   });
   test('GHOST_PHYSICS_VERSION stays 1: it only maps legacy tapes (Replay Contract v1 section 7.2)', () => {
