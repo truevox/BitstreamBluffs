@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 21:47 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
+Last verified: 2026-11-23 22:25 UTC. Main: `570fc88cc9ef241778045a5cea9787a98bb48f14` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -10,7 +10,11 @@ going” means resume this queue, not take over other lanes or merge a draft.
 1. Check the nine source-review handoffs (#269/#278/#281/#282/#283/#286/
    #287/#288/#290) for exact-head Gal feedback and current checks/base/overlap.
    Fix actual feedback first. No merge of drafts. If cleared, obey the
-   numbered release rule (#207); #248 reserves v2.19.22.
+   numbered release rule (#207); #248 reserves v2.19.22. Main #292 added
+   a Vite entry for opt-in BSOD QA without changing the version. No changed
+   file overlaps the nine drafts. Applying #278's exact source delta to
+   current main passed 30 focused tests and same-path 4,844-file build parity.
+   This is integration QA, not a new draft head or review verdict.
 2. #127 fair1153 (mask 16) on exact SIM6: Shatter Wall `17:2` x37680 →
    Packet Spike `18:0` x38301, 621 px. Fresh native 320 ms policy hits
    tick 9073 with 8.33 ms blind fade left; 300 ms policy hits same sensor
@@ -47,7 +51,13 @@ going” means resume this queue, not take over other lanes or merge a draft.
    emits no report after the fatal-event check. Never annotate from the header, last
    pose or redacted #78 brief. A local prototype must bind the exact tape
    and supported build, check stored f32 poses against the replay, and
-   fail closed. The original strip/SVG, #78 JSON and #278 head are unchanged.
+   fail closed. Repeated both cases on current main's exact normal browser
+   entry (after #292): same tick outcomes, all stored poses match, and
+   public #78 cutoffs still produce no output. Current normal served index
+   SHA-256 starts a1319ec7, separate QA starts dcabd1df, old normal
+   starts 8d904f4c. Build ID alone does not distinguish these; require
+   exact standard index/assets, no QA path, query or redirect. No changes
+   to original strip/SVG, #78 JSON or #278 head.
 
 ## Active branches and ownership
 
