@@ -37,10 +37,12 @@ export function selectTapeDirectory({ mode, explicit, historical }) {
   }
   const selected = path.resolve(explicit || historical);
   if (mode === 'record') {
-    const original = realpathSync(historical);
+    // The ENTIRE committed fixtures collection is immutable: historical tapes
+    // and source-stamped revision-specific sets, including future additions.
+    const protectedRoot = realpathSync(path.dirname(historical));
     const destination = canonicalFuturePath(selected);
-    if (within(destination, original) || within(original, destination)) {
-      throw new Error('record destination overlaps the protected historical cross-engine fixture tree');
+    if (within(destination, protectedRoot) || within(protectedRoot, destination)) {
+      throw new Error('record destination overlaps the protected historical or versioned fixture tree');
     }
   }
   return selected;

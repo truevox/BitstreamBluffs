@@ -24,4 +24,19 @@ export const FIXTURES = [
   { id: 'daily-practice-rule', seed: 'daily-2026-11-14', style: 'cruise', params: {}, maxTicks: 2400,
     covers: ['Daily rule + biome mask derived from a past date seed (practice run; official Daily needs today\'s date)'] },
 ];
+/**
+ * #236: source-anchored revision-6 recording definitions. Historical tapes MUST
+ * continue to use FIXTURES unchanged. In revision 6 the original Kodiak route
+ * dies at 432 m, before the first pack spawns at 450 m. A QA seed sweep found
+ * CE120-KODIAK-B reaches 1,192 m and yields 1,292 active-bear ticks; use that
+ * route only for CE_FIXTURE_SET=sim6, preserving the historical original seed.
+ */
+export const FIXTURES_SIM6 = Object.freeze(FIXTURES.map((fixture) =>
+  fixture.id === 'kodiaks-on'
+    ? { ...fixture, seed: 'CE120-KODIAK-B', covers: [
+      'SIM_REVISION 6 actual Kodiak pack activity (>= 1,000 active-bear ticks)',
+      'at least one 450 m encounter, rider continues beyond 1,000 m',
+    ] }
+    : fixture));
+
 // Gym (BSOD Gym) is NOT tape-covered: RunScene never creates a GhostRecorder in the Gym, so no replay fixture exists for it.

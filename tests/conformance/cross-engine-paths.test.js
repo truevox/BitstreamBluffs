@@ -13,9 +13,9 @@ let sandbox;
 let originals;
 beforeEach(() => {
   sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-ce-immutable-'));
-  fs.mkdirSync(path.join(sandbox, 'legacy'));
-  fs.writeFileSync(path.join(sandbox, 'legacy', 'record-meta.json'), 'historical evidence');
-  originals = path.join(sandbox, 'legacy');
+  fs.mkdirSync(path.join(sandbox, 'fixtures', 'legacy'), { recursive: true });
+  originals = path.join(sandbox, 'fixtures', 'legacy');
+  fs.writeFileSync(path.join(originals, 'record-meta.json'), 'historical evidence');
 });
 afterEach(() => fs.rmSync(sandbox, { recursive: true, force: true }));
 
@@ -26,6 +26,7 @@ test('record requires explicit absolute NEW output; no historical default', () =
   expect(() => select('record', 'relative/path', originals)).toThrow(/absolute directory path/);
   expect(() => select('record', originals, originals)).toThrow(/protected historical/);
   expect(() => select('record', path.join(originals, 'rev6'), originals)).toThrow(/protected historical/);
+  expect(() => select('record', path.join(sandbox, 'fixtures', 'revision-six'), originals)).toThrow(/protected historical/);
   expect(() => select('record', sandbox, originals)).toThrow(/protected historical/);
 });
 

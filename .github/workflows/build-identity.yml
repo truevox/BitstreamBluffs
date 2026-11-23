@@ -31,6 +31,6 @@ jobs:
       - name: Verify full determinism suite including identity negatives
         run: npm test -- --runInBand tests/determinism
       - name: Reject accidental historical replay fixture overwrite
-        run: npm test -- --runInBand tests/conformance/cross-engine-paths.test.js
+        run: npm test -- --runInBand tests/conformance
       - name: Verify production build
         run: npm run build
