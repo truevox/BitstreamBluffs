@@ -23,9 +23,9 @@ Given those same bytes and the same commit, it writes byte-identical JSON.
 The reader runs offline and opens no browser, network connection, or save.
 It takes one regular UTF-8 JSON file up to 4 MiB, and writes only to stdout
 (or a destination chosen through shell redirection). It requires the
-successful #126 `--verify` report, ideal plus at least one noisy profile,
-1–12 distinct seeds, and exactly one result per seed/profile pair under the
-panel's settings. It checks the two runner-reported verification flags in
+successful classic (noise model v1) #126 `--verify` report, ideal plus at
+least one noisy profile, 1–12 distinct seeds, and exactly one result per
+seed/profile pair under the panel's settings. It checks the two runner-reported verification flags in
 every cell, the profile summaries, and basic structure and consistency of
 the original trial's input encoding, frame/tick counts, pose samples, planner
 counters and terminal fields. Failed checks exit nonzero rather than counting as
@@ -34,6 +34,11 @@ physics from the input. The report does **not** carry the alternate
 repeat/playback runs, so the reader cannot recompute those comparisons
 without running the harness again. The hash identifies source bytes; it does
 not prove who wrote them.
+
+The runner's optional `--fatigue` mode produces a separate noise-model-v2
+panel, which this shortlist does not interpret. Even if that panel verified
+successfully, generate a classic panel with `--verify` and without
+`--fatigue` for this reader. Do not relabel or combine the two panel formats.
 
 ## Reading the shortlist
 

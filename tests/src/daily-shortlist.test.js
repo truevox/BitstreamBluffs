@@ -141,6 +141,21 @@ test('CLI hashes the exact file bytes, writes JSON only on success, and bounds r
     expect(two.stdout).toBe(one.stdout);
     expect(JSON.parse(one.stdout).source.sha256).toBe(createHash('sha256').update(raw).digest('hex'));
     expect(cli('--panel', file).stdout).toBe('');
+    const fatigue = panel();
+    fatigue.kind = 'local-tool-assisted-fatigue-bot-panel';
+    fatigue.results.forEach((cell) => { cell.humanNoise.version = 2; });
+    writeFileSync(file, JSON.stringify(fatigue));
+    expect(run()).toMatchObject({
+      status: 1, stdout: '',
+      stderr: 'Shortlist: Fatigue panels (noise model v2) are not supported by the classic-only shortlist. ' +
+        'Rerun the #126 bot panel with --verify and without --fatigue.\n',
+    });
+    const unverifiedClassic = panel();
+    unverifiedClassic.verify = false;
+    writeFileSync(file, JSON.stringify(unverifiedClassic));
+    expect(run()).toMatchObject({
+      status: 1, stdout: '', stderr: 'Shortlist: Use a local #126 bot panel produced with successful --verify\n',
+    });
     expect(run(tmp)).toMatchObject({ status: 1, stdout: '', stderr: expect.stringContaining('regular local panel file') });
     writeFileSync(file, Buffer.from([255]));
     expect(run()).toMatchObject({ status: 1, stdout: '', stderr: expect.stringContaining('UTF-8 JSON') });
