@@ -103,6 +103,10 @@ function evidenceFor(cell, settings, index) {
 export function createDailyShortlist(panel, { sourceSha256, buildCommit } = {}) {
   requireValue(typeof buildCommit === 'string' && /^[a-f\d]{40}$/i.test(buildCommit), 'Provide a full 40-hex Git commit for the producing build');
   requireValue(typeof sourceSha256 === 'string' && /^[a-f\d]{64}$/i.test(sourceSha256), 'Invalid report SHA-256 digest');
+  if (object(panel) && panel.kind === 'local-tool-assisted-fatigue-bot-panel') {
+    throw new TypeError('Fatigue panels (noise model v2) are not supported by the classic-only shortlist. ' +
+      'Rerun the #126 bot panel with --verify and without --fatigue.');
+  }
   requireValue(object(panel) && panel.kind === 'local-tool-assisted-bot-panel' && panel.verify === true,
     'Use a local #126 bot panel produced with successful --verify');
   const settings = readSettings(panel.settings);
