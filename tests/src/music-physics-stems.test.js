@@ -44,6 +44,81 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(impactFromLanding({impactSpeedPxS:900,hard:true,quality:'good'})).toBeGreaterThan(.55);
 		expect(impactFromLanding({impactSpeedPxS:5000,hard:true})).toBe(1);
 	});
+	test('Pyramid real unwarded thermal zone controls source resonance and a single true gust',()=>{
+		const d=director();d.biome='pyramid-peak';d.started=true;
+		d._thermalLastLoft=NaN;d._thermalWasActive=false;d._pendingPyramidImpact=0;
+		const preset=orchestraPreset('pyramid-peak','drums');
+		expect(preset).toEqual([{type:'sunstone',id:'sunstone',loft:0,
+			resonance:1.25,drift:1,gustLevel:1.2,stoneLevel:1.15}]);
+		d._applyMusicTimbres();
+		for(const stem of ROLES)expect(d.mixer.replaceEffects).toHaveBeenCalledWith(
+			stem,orchestraPreset('pyramid-peak',stem),.18);
+		d.mixer.setEffectParam.mockClear();
+		const noThermal={active:false,gravityPxS2:600,vy:-650,grounded:false};
+		expect(d.setThermalMotion(noThermal)).toBe(false);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[2]==='gust')).toBe(false);
+		// Merely standing on thermal ground does not invent airborne gust.
+		expect(d.setThermalMotion({active:true,gravityPxS2:738,vy:0,grounded:true})).toBe(false);
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		const rising={active:true,gravityPxS2:738,vy:-880,grounded:false};
+		expect(d.setThermalMotion(rising)).toBe(true);
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			stem,'sunstone','loft',expect.any(Number));
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('other','sunstone','gust',expect.any(Number));
+		const gusts=d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='gust').length;
+		expect(gusts).toBe(1);
+		expect(d.setThermalMotion(rising)).toBe(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='gust')).toHaveLength(1);
+		d.setBiome('pyramid-peak'); // same biome reapplication must not invent a thermal entrance
+		expect(d.setThermalMotion(rising)).toBe(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='gust')).toHaveLength(1);
+		// Exit active thermal then reenter => ONE new authentic gust.
+		expect(d.setThermalMotion({...rising,active:false})).toBe(false);
+		expect(d.setThermalMotion(rising)).toBe(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='gust')).toHaveLength(2);
+		// Real valid landing queues until confirmed grounded, then stone.
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:800});
+		expect(d._pendingPyramidImpact).toBeGreaterThan(0);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[2]==='stone')).toBe(false);
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			'drums','sunstone','stone',expect.any(Number));
+		expect(d._pendingPyramidImpact).toBe(0);
+		expect(d.clockStart).toBe(23.5);
+		d.setBiome('debutmont');d.mixer.setEffectParam.mockClear();
+		expect(d.setThermalMotion(rising)).toBe(false);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='sunstone')).toBe(false);
+	});
+	test('Pyramid invalid gravity, crash, wrong zone, menu and pause cannot create thermal gust',()=>{
+		const d=director();d.biome='pyramid-peak';d.started=true;
+		d._thermalLastLoft=NaN;d._thermalWasActive=false;d._pendingPyramidImpact=0;
+		const yes={active:true,gravityPxS2:738,vy:-670,grounded:false};
+		for(const bad of [{...yes,active:'true'},{...yes,grounded:1},
+			{...yes,vy:NaN},{...yes,gravityPxS2:0},{...yes,gravityPxS2:Infinity}])
+			expect(d.setThermalMotion(bad)).toBe(false);
+		d.onLanding({quality:'crash',hard:true,impactSpeedPxS:1000});
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:Infinity});
+		expect(d._pendingPyramidImpact).toBe(0);
+		d.menuMode=true;d.mixer.setEffectParam.mockClear();
+		expect(d.setThermalMotion(yes)).toBe(false);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:900});
+		d.setAirborne(true);
+		expect(d._pendingPyramidImpact).toBe(0);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='sunstone')).toBe(false);
+		d.menuMode=false;d.transportPaused=true;d.airborne=false;
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:900});
+		expect(d.setThermalMotion(yes)).toBe(false);
+		expect(d._pendingPyramidImpact).toBe(0);
+		const synth=Object.create(AudioSynth.prototype);
+		synth._musicMode='run';synth._paused=false;
+		synth._stemMusic={setThermalMotion:jest.fn(()=>true)};
+		expect(synth.setThermalMotion(yes)).toBe(true);
+		synth._paused=true;expect(synth.setThermalMotion(yes)).toBe(false);
+		synth._musicMode='menu';synth._paused=false;expect(synth.setThermalMotion(yes)).toBe(false);
+		expect(synth._stemMusic.setThermalMotion).toHaveBeenCalledTimes(1);
+	});
+
 	test('Space Mountain reads actual low gravity and terrain altitude without moving source song clock',()=>{
 		const d=director();d.biome='space-mountain';d.started=true;
 		d._pendingSpaceImpact=0;d._spaceLastField=NaN;d._spaceLastGravity=NaN;
@@ -566,7 +641,7 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		d.onLanding({quality:'crash',impactSpeedPxS:950,hard:true});
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
 	});
-	test('post-grounded landing works, missing and wrong biome signals never leak',()=>{
+	test('post-grounded impacts stay biome-scoped: Scrapheap and Pyramid each play their physical sound; crash/menu stay silent',()=>{
 		const d=director();d.mixer.setEffectParam.mockClear();
 		d.onLanding({quality:'perfect',impactSpeedPxS:300,hard:false});
 		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','scrapheap','impact',expect.any(Number));
@@ -575,7 +650,9 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
 		d.biome='pyramid-peak';
 		d.onLanding({quality:'good',impactSpeedPxS:900,hard:true});
-		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','sunstone',
+			'stone',expect.any(Number));
+		d.mixer.setEffectParam.mockClear();
 		d.biome='garbage-dump-glacier';d.menuMode=true;
 		d.onLanding({quality:'good',impactSpeedPxS:900,hard:true});
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();

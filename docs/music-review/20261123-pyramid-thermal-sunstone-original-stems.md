@@ -1,0 +1,33 @@
+# Pyramid Peak: physical thermal sandstone resonance and ceramic impact
+
+Draft by Gal Friday on November 23, 2026. Issue #276, **owner has not listened or approved this mix**. The user requested continued development of independent biome sound previews. This is the eleventh and final existing game biome to receive a native original-stem effect. Implementation is stacked on Space #275, Candy #271, Vertigo #268, Jellyfish #265, Steampunk #263 and the consolidated five-biome integration #261. Listening snapshot is separate main-based draft #201; don't double-merge overlapping branch histories.
+
+## The actual terrain and music source contract
+
+The existing Pyramid Peak has stepped terrace visuals and physical thermalUpdraft mod with gravityMul=0.82. **There is no true geyser launch or upward acceleration; the mechanic reduces gravity 18% and prolongs airtime.** A new optional read-only post-stepWorld RunScene observation detects the actual terrain zone DEF under the rider, checks that the existing Wards system has not suppressed it, and supplies active/actual EffectivePhysics gravity, actual vy and actual grounded to AudioSynth. No zone detection is inferred from beat timing, backdrop animation, jump age, desired sound or a fabricated timer. An ordinary jump, even with low gravity from a parachute, does NOT trigger a Pyramid thermal gust if the actual eligible thermal zone is absent or warded. The audio never mutates physical speed, gravity, controls, steering, hazards, scores, replay, collisions or the original song clock.
+
+The original five synced stereo recordings (drums, bass, guitar, piano, other) stay exactly on dry unity paths. A new native sunstone Web Audio processor adds a bounded, source-driven warm sandstone bandpass (~480–790Hz), a higher airy source-fed bandpass (~1250–2350Hz), small 63/113ms source smears, and a very slow source shimmer. The source-wet harmonics grow with authentic thermal reduced gravity and air rise. There is NO invented source note, substituted MIDI melody or synthetic soundtrack; source recordings keep their original rhythm and transport.
+
+On the genuine transition into an **active/unwarded thermal while airborne**, exactly one short deterministic WHOOO–oooh wind-through-stone event occurs on the other effects channel. A repeated same-biome set call or ordinary jump cannot retrigger it. Exiting the thermal or landing resets the eligibility, so a genuinely new entry can sound. A valid noncrash landing emits a warm physical ceramic TOK–KRRR plus short grit on the drum effects graph; a landing verdict arriving before the authoritative grounded edge is queued/consumed once. Menu, wrong biome, stopped/paused transport, crashes, malformed/NaN values refuse the sound. Physical one-shot buffers are rendered once per graph, at most 3 active voices, all stopped/disconnected on disposal. No gameplay timers added.
+
+## Proposed, non-owner-approved first listen
+
+- Warm sandstone resonators 125%.
+- Air drift 100%.
+- True thermal entry gust 120%.
+- Valid terrace impact 115%.
+- Standalone demonstration: real physical zone checkbox enabled, effective gravity 738 px/s² (0.82x 900 baseline), upward speed 600 px/s; a second test with thermal unchecked MUST NOT play wind from a normal jump.
+- Standalone original dry A/B, solo drums, independent wind and stone physical tests.
+
+## Engineering evidence and limits
+
+- Full focused original-stem music, physics and biome test suite **310/310 across 30 suites PASS**. Native processor checks all parameters/nonfinite values/physical sample buffers; actual physics director tests legitimate thermals, non-thermal low gravity, true entry once, same-biome reapplication with no fake gust, exit/reentry once, valid touchdown, invalid/crash/menu/paused and scene-to-audio adapter. Existing prior wrong-biome test was updated to include Pyramid's new legitimate stone impact without weakening crash/menu protections.
+- Native Vite production build **534 modules PASS**. The supported source tripwire attested the added one-way cosmetic observation from RunScene as no-behavior-change, strict ruleset identity passes. Original physics objects and terrain mod data were not changed.
+- Actual built-game Chromium Title→RunScene with original One More Run release OGG stems loads the real source mixer and exercises **ALL 11 game-biome native source-stem processors**. The original song clock stays unchanged across switches, 25 old crossfade chains retire to ZERO and no unhandled browser errors occur. Native director method inputs were programmatically tested at real audio boundaries, NOT a claim that an actual rider manually traversed a thermal.
+- Desktop standalone Chromium real original One More Run OGG source player loads five original stems, raw A/B, solo, real-zone checkbox, gravity/ascent controls, thermal gust and ceramic landing with zero page errors.
+- Real 48kHz Chromium OfflineAudioContext using first 3.5 seconds of original One More Run five-stem stereo: dry source RMS .081398, sample peak .7300. Ground original-source delta **2.04%** of dry RMS; realistic active thermal source delta **17.87%**; maximally open thermal **25.43%**, with full-source sample peaks **.7535 and .8016** respectively in measured excerpt. True physical ceramic impact adds **14.01%** RMS difference versus grounded; valid thermal entry gust **15.60%**. With ALL music stems disconnected, physical wind RMS .01419 peak .1672; ceramic landing RMS .01275 peak .3017. These are short-window waveform differences/sample peaks; NOT loudness approval, mobile speakers certification, full-track clipping/true-peak guarantees or a human listening substitute.
+- No original OGG, MP3, WAV, audio masters, separate MIDI leads or vocal media were copied/rewritten/committed. Original OGG testing uses ONLY read-only symlinks inside ignored, disposable build dist. The separate main-based STATIC browser listening snapshot reuses unchanged five synchronized ~20s Pope MP3 review excerpts by existing relative URL. The measured One More Run OGG data MUST NOT be attributed to that different Pope excerpt.
+
+## Independent review and owner acceptance
+
+Listen for warm, physically heated air and stepped hollow sandstone, not Crystal's glass, Space's vast echo, Underwater's pressure, or Steampunk's beat gears. Verify an ordinary jump with no eligible thermal cannot emit wind, and warded actual thermal zones are silent. Check one-way correct zone/ward physics snapshot, false-positive conditions from gravity reduction outside zone, preserving original performance and double-merge hazards in the stack. **Marvin's ears and independent engineering review gate release; none of these branches are production-approved.**

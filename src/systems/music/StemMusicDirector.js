@@ -68,10 +68,13 @@ export class StemMusicDirector {
 		this._pendingVentCrust = 0;
 		this._pendingCandyImpact = 0;
 		this._pendingSpaceImpact = 0;
+		this._pendingPyramidImpact = 0;
 		this._steamLastSent = NaN;
 		this._candyLastSpeed = NaN;
 		this._spaceLastField = NaN;
 		this._spaceLastGravity = NaN;
+		this._thermalLastLoft = NaN;
+		this._thermalWasActive = false;
 		this.microBees = null;
 		this.hydrostatic = new HydrostaticPressure();
 		this._hydroLastSent = NaN;
@@ -206,6 +209,7 @@ export class StemMusicDirector {
 		this._pendingVentCrust = 0;
 		this._pendingCandyImpact = 0;
 		this._pendingSpaceImpact = 0;
+		this._pendingPyramidImpact = 0;
 			this._steamLastSent = NaN;
 			this.microBees?.dispose();
 			this.microBees=null;
@@ -314,6 +318,7 @@ export class StemMusicDirector {
 
 	setBiome(id) {
 		const next = typeof id === 'string' && id ? canonicalBiomeId(id) : HOME_BIOME;
+		const previous=this.biome;
 		// Reset only on confirmed boundaries; aliases resolve BEFORE comparing.
 		if (next !== this.biome &&
 			(next === 'underwater-mountain' || this.biome === 'underwater-mountain')) {
@@ -334,6 +339,11 @@ export class StemMusicDirector {
 		if (this.biome !== 'vertigo-vents') this._pendingVentCrust=0;
 		if (this.biome !== 'candy-cane-canyon') this._pendingCandyImpact=0;
 		if (this.biome !== 'space-mountain') this._pendingSpaceImpact=0;
+		if (this.biome !== 'pyramid-peak') this._pendingPyramidImpact=0;
+		if(previous!==next){
+			this._thermalLastLoft=NaN;
+			this._thermalWasActive=false;
+		}
 		this._spaceLastField=NaN;
 		this._spaceLastGravity=NaN;
 		this._candyLastSpeed=NaN;
@@ -407,6 +417,12 @@ export class StemMusicDirector {
 			if(impulse<=0)return;
 			this._pendingSteamImpact=Math.max(this._pendingSteamImpact||0,impulse);
 			if(!this.airborne)this._applySteamImpact();
+		} else if (this.biome === 'pyramid-peak') {
+			if(this.transportPaused)return;
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingPyramidImpact=Math.max(this._pendingPyramidImpact||0,impulse);
+			if(!this.airborne)this._applyPyramidImpact();
 		} else if (this.biome === 'space-mountain') {
 			if(this.transportPaused)return;
 			const impulse=impactFromLanding(landing);
@@ -461,6 +477,39 @@ export class StemMusicDirector {
 		this._pendingVentCrust=0;
 		if(impulse>0&&!this.menuMode&&this.biome==='vertigo-vents')
 			this.mixer?.setEffectParam('drums','ventforge','crustImpact',impulse);
+	}
+
+	/** A genuine, unwarded thermalUpdraft zone plus EffectivePhysics
+	 * reduced gravity creates source-fed sandstone resonance. The zone
+	 * is confirmed in RunScene from actual physicsContext zoneDefs:
+	 * parachuting outside a thermal is NOT a thermal musical event.
+	 */
+	setThermalMotion({active,gravityPxS2,vy,grounded}={}){
+		if(!this.started||this.menuMode||this.transportPaused||
+			this.biome!=='pyramid-peak'||typeof active!=='boolean'||
+			typeof grounded!=='boolean'||
+			![gravityPxS2,vy].every(Number.isFinite)||gravityPxS2<=0)return false;
+		const thermal=active&&!grounded&&gravityPxS2<900;
+		const reduction=Math.max(0,Math.min(1,(900-gravityPxS2)/350));
+		const rising=Math.max(0,Math.min(1,-vy/1100));
+		const loft=thermal?Math.max(0,Math.min(1,.16+.60*reduction+.24*rising)):0;
+		if(!Number.isFinite(this._thermalLastLoft)||
+			Math.abs(loft-this._thermalLastLoft)>.025){
+			this._thermalLastLoft=loft;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'sunstone','loft',loft);
+		}
+		if(thermal&&!this._thermalWasActive)
+			this.mixer?.setEffectParam('other','sunstone','gust',
+				Math.max(.45,loft));
+		this._thermalWasActive=thermal;
+		return thermal;
+	}
+	_applyPyramidImpact(){
+		const impulse=this._pendingPyramidImpact||0;
+		this._pendingPyramidImpact=0;
+		if(impulse>0&&!this.menuMode&&!this.transportPaused&&this.biome==='pyramid-peak')
+			this.mixer?.setEffectParam('drums','sunstone','stone',impulse);
 	}
 
 	/** Read-only actual physics and rider/ground geometry for Space Mountain.
@@ -674,6 +723,12 @@ export class StemMusicDirector {
 		if(next&&!this.menuMode&&this.biome==='sky-jellyfish-mountain')
 			this.mixer?.setEffectParam('other','jellybloom','lift',.80);
 		this.airborne = next;
+		if(this.biome==='pyramid-peak'&&!this.menuMode&&!next){
+			this._thermalLastLoft=0;
+			this._thermalWasActive=false;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'sunstone','loft',0);
+		}
 		if(this.biome==='space-mountain'&&!this.menuMode&&!next){
 			this._spaceLastField=0;
 			for(const stem of ['bass','drums','guitar','piano','other'])
@@ -709,6 +764,7 @@ export class StemMusicDirector {
 			this._applyVentCrust();
 			this._applyCandyImpact();
 			this._applySpaceImpact();
+			this._applyPyramidImpact();
 		}
 		if(this.biome==='crystal-cavern'&&!this.menuMode){
 			for(const stem of ['bass','guitar','piano','other'])
