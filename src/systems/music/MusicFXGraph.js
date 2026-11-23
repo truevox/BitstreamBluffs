@@ -9,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge',
 ]);
 
 function saturatorCurve(amount) {
@@ -573,6 +573,108 @@ function allocateEffect(ctx, raw) {
 			}};
 			disposers.push(()=>{for(const entry of active){
 				try{entry.source.stop();}catch{}disposeTone(entry);
+			}});
+			break;
+		}
+		case 'ventforge': {
+			// Original recording stays on a unity dry path. Geothermal
+			// rumble and rising hot-air shimmer are source-excited.
+			const dry=node(ctx.createGain());dry.gain.value=1;
+			input.connect(dry);dry.connect(output);
+			const low=node(ctx.createBiquadFilter());low.type='lowpass';low.frequency.value=480;
+			const grit=node(ctx.createWaveShaper());grit.curve=saturatorCurve(.14);grit.oversample='2x';
+			const ground=node(ctx.createGain());
+			input.connect(low);low.connect(grit);grit.connect(ground);ground.connect(output);
+			const air=node(ctx.createBiquadFilter());air.type='bandpass';
+			air.frequency.value=1300;air.Q.value=.75;
+			const hot=node(ctx.createGain());
+			input.connect(air);air.connect(hot);hot.connect(output);
+			const lfo=node(ctx.createOscillator());lfo.type='sine';lfo.frequency.value=7.3;
+			const depth=node(ctx.createGain());depth.gain.value=.10;
+			lfo.connect(depth);depth.connect(hot.gain);lfo.start();lfos.push(lfo);
+			let rumble=clamp(raw.rumble,0,2,1.25);
+			let shimmer=clamp(raw.shimmer,0,2,1.25);
+			let blast=clamp(raw.blast,0,2,1.3);
+			let crust=clamp(raw.crust,0,2,.8);
+			let updraft=clamp(raw.updraft,0,1,0);
+			const apply=(at,instant=false)=>{
+				for(const [target,value] of [
+					[ground.gain,.10*rumble],
+					[low.frequency,480+300*updraft],
+					[hot.gain,shimmer*(.1+.32*updraft)],
+					[depth.gain,.04+.07*shimmer],
+					[air.frequency,1100+2200*updraft]]){
+					if(instant)target.value=value;
+					else numericParam(target,value,at,.085);
+				}
+			};
+			apply(ctx.currentTime,true);
+			const control=(key,lo,hi,fallback,setter)=>{
+				refs[key]={set:(v,at)=>{if(!Number.isFinite(v))return false;
+					setter(clamp(v,lo,hi,fallback));apply(at);return true;}};
+			};
+			control('rumble',0,2,1.25,v=>rumble=v);
+			control('shimmer',0,2,1.25,v=>shimmer=v);
+			control('updraft',0,1,0,v=>updraft=v);
+			refs.blast={set:v=>{if(!Number.isFinite(v))return false;blast=clamp(v,0,2,1.3);return true;}};
+			refs.crust={set:v=>{if(!Number.isFinite(v))return false;crust=clamp(v,0,2,.8);return true;}};
+			// Physical geyser eruption and real touchdown: short deterministic
+			// reusable buffers, no song notes, RNG or separate beat grid.
+			const makeEvent=kind=>{
+				const frames=Math.ceil(ctx.sampleRate*(kind==='eruption'?.86:.34));
+				const buffer=ctx.createBuffer(1,frames,ctx.sampleRate);
+				const data=buffer.getChannelData(0);
+				let seed=kind==='eruption'?0xE123A517:0xC2A57117,filtered=0;
+				for(let i=0;i<frames;i++){
+					const t=i/ctx.sampleRate;
+					seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+					const white=seed/2147483648-1;
+					filtered=.95*filtered+.05*white;
+					let sample=0;
+					if(kind==='eruption'){
+						const envelope=(1-Math.exp(-t*65))*Math.exp(-t*4.5);
+						const sub=Math.sin(2*Math.PI*(95*t-32*t*t))*Math.exp(-t*7);
+						const whistle=Math.sin(2*Math.PI*(320*t+245*t*t))*Math.exp(-t*9);
+						sample=.51*sub+envelope*(.53*white+.62*filtered+.14*whistle);
+					}else{
+						sample=.34*Math.sin(2*Math.PI*(155*t-105*t*t))*Math.exp(-t*27);
+						for(const lag of [0,.029,.066,.119]){
+							if(t<lag)continue;
+							const dt=t-lag;
+							sample+=(.18*white+.07*Math.sin(2*Math.PI*730*dt))*Math.exp(-dt*92);
+						}
+					}
+					data[i]=Math.tanh(sample*.84);
+				}
+				return buffer;
+			};
+			const erupt=makeEvent('eruption'),rocks=makeEvent('rocks');
+			const voices=new Set();
+			const cleanup=item=>{
+				if(!voices.delete(item))return;
+				try{item.source.disconnect();}catch{}
+				try{item.gain.disconnect();}catch{}
+			};
+			const fire=(kind,strength,at)=>{
+				if(!Number.isFinite(strength)||strength<=0)return false;
+				const weight=kind==='eruption'?blast:crust;
+				if(weight<=0)return false;
+				if(voices.size>=3){const old=voices.values().next().value;
+					try{old.source.stop();}catch{}cleanup(old);}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=kind==='eruption'?erupt:rocks;
+				gain.gain.value=Math.min(1.4,(kind==='eruption'?.55:.72)*weight*
+					(.25+.75*clamp(strength,0,1,0)));
+				source.connect(gain);gain.connect(output);
+				const item={source,gain};voices.add(item);
+				source.onended=()=>cleanup(item);
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			};
+			refs.eruption={set:(v,at)=>fire('eruption',v,at)};
+			refs.crustImpact={set:(v,at)=>fire('rocks',v,at)};
+			disposers.push(()=>{for(const voice of [...voices]){
+				try{voice.source.stop();}catch{}cleanup(voice);
 			}});
 			break;
 		}

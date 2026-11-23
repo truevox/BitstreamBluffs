@@ -65,10 +65,12 @@ export class StemMusicDirector {
 		this._pendingCrystalImpact = 0;
 		this._pendingSteamImpact = 0;
 		this._pendingJellyImpact = 0;
+		this._pendingVentCrust = 0;
 		this._steamLastSent = NaN;
 		this.microBees = null;
 		this.hydrostatic = new HydrostaticPressure();
 		this._hydroLastSent = NaN;
+		this._ventLastLift=NaN;
 		this._scrapContactLast = NaN;
 		this.scrapPitch = new ScrapPitchCadence();
 		this._timer = null;
@@ -196,6 +198,7 @@ export class StemMusicDirector {
 			this._pendingCrystalImpact = 0;
 			this._pendingSteamImpact = 0;
 		this._pendingJellyImpact = 0;
+		this._pendingVentCrust = 0;
 			this._steamLastSent = NaN;
 			this.microBees?.dispose();
 			this.microBees=null;
@@ -318,6 +321,8 @@ export class StemMusicDirector {
 		if (this.biome !== 'garbage-dump-glacier') this.scrapPitch?.resetTiming();
 		if (this.biome !== 'steampunk-slopes') this._pendingSteamImpact=0;
 		if (this.biome !== 'sky-jellyfish-mountain') this._pendingJellyImpact=0;
+		if (this.biome !== 'vertigo-vents') this._pendingVentCrust=0;
+		this._ventLastLift=NaN;
 		this._steamLastSent=NaN;
 		if(this.biome!=='steampunk-slopes')this._lastSteamMusicAccentMs=-Infinity;
 		if (this.biome !== 'micro-mountain') {
@@ -387,12 +392,48 @@ export class StemMusicDirector {
 			if(impulse<=0)return;
 			this._pendingSteamImpact=Math.max(this._pendingSteamImpact||0,impulse);
 			if(!this.airborne)this._applySteamImpact();
+		} else if (this.biome === 'vertigo-vents') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingVentCrust=Math.max(this._pendingVentCrust||0,impulse);
+			if(!this.airborne)this._applyVentCrust();
 		} else if (this.biome === 'sky-jellyfish-mountain') {
 			const impulse=impactFromLanding(landing);
 			if(impulse<=0)return;
 			this._pendingJellyImpact=Math.max(this._pendingJellyImpact||0,impulse);
 			if(!this.airborne)this._applyJellyImpact();
 		}
+	}
+
+	/** Read actual physics cooldown before and after SAME SIM TICK.
+	 * The geyser engine sets this cooldown only when the vent really fires.
+	 * Airborne alone is never sufficient to create an eruption.
+	 * The values are read-only after authoritative stepWorld, not inferred
+	 * from the synthetic beat or a timer.
+	 */
+	setGeyserMotion(snapshot){
+		if(!this.started||this.menuMode||this.transportPaused||this.biome!=='vertigo-vents'||
+			!snapshot||typeof snapshot!=='object')return false;
+		const {beforeCooldownMs:before,afterCooldownMs:after,vy,launchAvailable}=snapshot;
+		if(!Number.isFinite(before)||!Number.isFinite(after)||before<0||after<0||
+			!Number.isFinite(vy)||typeof launchAvailable!=='boolean')return false;
+		const rise=Math.max(0,Math.min(1,-vy/1600));
+		if(!Number.isFinite(this._ventLastLift)||
+			Math.abs(rise-this._ventLastLift)>.035){
+			this._ventLastLift=rise;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'ventforge','updraft',rise);
+		}
+		const fired=launchAvailable&&after>before+80&&after>200;
+		if(fired)this.mixer?.setEffectParam('drums','ventforge','eruption',
+			Math.max(.55,rise));
+		return fired;
+	}
+	_applyVentCrust(){
+		const impulse=this._pendingVentCrust||0;
+		this._pendingVentCrust=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='vertigo-vents')
+			this.mixer?.setEffectParam('drums','ventforge','crustImpact',impulse);
 	}
 
 	/** Jelly elastic impacts only trigger for actual noncrash touchdown.
@@ -568,6 +609,7 @@ export class StemMusicDirector {
 			this._applyCrystalImpact();
 			this._applySteamImpact();
 			this._applyJellyImpact();
+			this._applyVentCrust();
 		}
 		if(this.biome==='crystal-cavern'&&!this.menuMode){
 			for(const stem of ['bass','guitar','piano','other'])
