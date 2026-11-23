@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 22:25 UTC. Main: `570fc88cc9ef241778045a5cea9787a98bb48f14` (v2.19.21).
+Last verified: 2026-11-23 22:39 UTC. Main: `570fc88cc9ef241778045a5cea9787a98bb48f14` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -9,12 +9,26 @@ going” means resume this queue, not take over other lanes or merge a draft.
 
 1. Check the nine source-review handoffs (#269/#278/#281/#282/#283/#286/
    #287/#288/#290) for exact-head Gal feedback and current checks/base/overlap.
-   Fix actual feedback first. No merge of drafts. If cleared, obey the
+   Eight (#278/#281/#282/#283/#286/#287/#288/#290) have new COMMENTED
+   source reviews with no blocking findings, no inline threads, and no
+   APPROVED review. #269 lacks a GitHub review; separate exact source QA
+   found no blocker. Fix actual feedback first. No merge of drafts.
+   For later integration, prioritize the verified user-facing #290 fix
+   when the required review and release slot are clear. Obey the
    numbered release rule (#207); #248 reserves v2.19.22. Main #292 added
    a Vite entry for opt-in BSOD QA without changing the version. No changed
    file overlaps the nine drafts. Applying #278's exact source delta to
    current main passed 30 focused tests and same-path 4,844-file build parity.
    This is integration QA, not a new draft head or review verdict.
+   On 570fc88, exact #281/#282/#283/#286/#287/#290 deltas also apply
+   together in scratch: 229 focused tests across 11 suites, ruleset and
+   identity checks, and production build pass. #290 repeats real Chromium
+   Game Over A/B with no errors/outbound requests. #269 independent
+   integration passes 42 tests, nine identical V1 comparisons/repeated
+   V2 outputs and 4,844-file artifact parity. #288 passes 47 tests, plus
+   18 fresh current-source browser repeat/playbacks; classic output stays
+   byte-identical, fatigue fails closed with the corrected diagnostic.
+   No branch heads were changed. Keep #248's reservation.
 2. #127 fair1153 (mask 16) on exact SIM6: Shatter Wall `17:2` x37680 →
    Packet Spike `18:0` x38301, 621 px. Fresh native 320 ms policy hits
    tick 9073 with 8.33 ms blind fade left; 300 ms policy hits same sensor
