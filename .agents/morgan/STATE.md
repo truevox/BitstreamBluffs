@@ -1,22 +1,21 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 19:22 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
+Last verified: 2026-11-23 19:35 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
 
 ## Next actions, in order
 
-1. Check #269 / #278 / #281 for exact-head independent review, identity,
+1. Check #269 / #278 / #281 / #283 for exact-head independent review, identity,
    and changed base/overlap. If Gal has approved the exact head, coordinate
    integration against fresh main and the numbered release rule (#207).
    #248 currently reserves v2.19.22; don't preempt it. No blanket merge.
-2. If those reviews are pending, continue #126 in isolation: test that an
-   intent arriving on the exact dispatch frame coalesces without drawing
-   another random value or shifting later reactions. Do not edit the shared
-   simulator files staked by #272. Last paired Chromium check: 3 seeds ×
-   3 profiles per arm, all 18 trials repeated and played back; one steady
-   pair had changed inputs, both reached 500 m. No human/fairness inference.
+2. If those reviews are pending, inspect #127’s existing geometry preflight
+   and stock Packet Spike rollout for a second deterministic, same-source
+   developer case. Check overlapping QA/engine scope first; keep it offline
+   and do not claim course-wide reachability or fairness. #126 dispatch
+   boundary is now covered in draft #283; no shared runner changes.
 3. #82 connection cleanup needs a separately scoped save-system review;
    use the local experiment as evidence, not authority to patch SaveStore.
    Keep #85 awaiting authentic footage; current reconstruction is not archival.
@@ -28,9 +27,10 @@ going” means resume this queue, not take over other lanes or merge a draft.
 | #87 / #269 | `morgan/issue-87-art-v2` @ `00d47d12fa154ebcb35040a2bca0792d657390f0` | Draft, opt-in local art; 534 focused tests; pending exact-head review. |
 | #79 / #278 | `morgan/issue-79-keep-selected-pose` @ `49bb37e4591228e319d88e5ceb8688fc4440be14` | Draft, cursor fix verified in Chromium; 528 focused tests; same SVG export and production build. |
 | #78 / #281 | `morgan/issue-78-require-crash-match` @ `cb29f1952471b6743073dd891c43f43858a28b3e` | Draft, opt-in shell decision codes; 1,263 focused tests; same default JSON and production build. |
+| #126 / #283 | `morgan/issue-126-dispatch-frame-test` @ `d402a868d505d608c4b0d3e9205c78b5880e8b7f` | Draft, test-only coalescing at frame 363; classic/fatigue, 554 focused tests and negative mutation control. |
 
 All required work can be reconstructed from remote refs; no disposable worktree
-or local patch is required for the three drafts. Local-only #82 browser
+or local patch is required for the drafts. Local-only #82 browser
 prototype is not pushed and must not be mistaken for a PR.
 
 ## Original handed queue: all 21 issues
