@@ -8,6 +8,21 @@ After trying the first two-instant-kick draft (`fed8552`), **Marvin explicitly c
 
 **New executed source evidence so far:** production build PASS; 49/49 replay/determinism/conformance/exploit-focused suites with **1,542/1,542 tests PASS**; ruleset/build identity checks PASS. A live Chromium 120Hz actual browser trace at tick 252 on the same deterministic course recorded vx **530.693→211.779 px/s** (prior after-kick **317.645 px/s**) and vy **−75.415→−386.909 px/s** (prior **−386.881 px/s**, negative = upward), with no page errors, and next actual terrain-contact rearm at tick 323. This is a **provisional local browser diagnostic**, not a cross-engine golden set. Raw trace `airbrake-decel60-same-up-live-20261123.json` outside the repository under CT223 `/srv/friday-audio/bsb-qa-v7-preliminary/`. Source tests explicitly check unchanged vertical output over speeds, atmospheres, and upgrade states. **Full current-source 11-fixture re-recording, three-engine cross-browser runs and final goldens must be repeated AFTER numeric feel approval.** PR #248 and stacked #251 remain DRAFT.
 
+### New 60%-deceleration source: actual 24-seed scripted balance experiment
+
+A second **96-run (24 matched seeds × 4 policies), zero harness-failure** headless Exploit Factory run was executed directly on committed physics `4e0cff1` with identical parameters and seeds as the earlier `fed8552` 40% candidate. No scoring, BSOD pursuit or upgrade formulas were adjusted; the only gameplay difference is 60% vs 40% *instant* horizontal braking with the old 40%-budget upward kick **unchanged**.
+
+| Policy (24 trials each) | Old 40% median score | New 60% median score | Old 40% max-airtime median | New 60% max-airtime median | Old→new 90s timeouts |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HandsOff | 332.5 | **332.5** | 0.921s | **0.921s** | 0→0 |
+| Flip-only | 1,272 | **1,272** | 1.113s | **1.113s** | 0→0 |
+| CanopyHop | 5,035 | **3,842** | 2.675s | **2.221s** | 20→15 |
+| CanopyFlip | 7,247.5 | **4,181** | 2.454s | **2.113s** | 14→9 |
+
+The new brake measurably reduces long canopy-heavy airtime and scores without changing baseline/no-AirBrake runs. **15/24 CanopyHop and 9/24 CanopyFlip trials still reached 90 seconds:** outcomes are right-censored, and these scripted heuristics do not prove the absence of other exploits. Separate trick-flow and BSOD-chase balance issues still open; do not stealth-rebalance them. Raw SHA256 `f6c46eb62b71cb5b0f8b2d2f5ffad13501a7e733aa020f3f8c00c2fbb19db405` for external CT223 `/srv/friday-audio/bsb-qa-v7-preliminary/exploit-24seed-decel60-upheld-4e0cff1-20261123.json`. Executed command: `node tools/exploits/run-exploits.mjs --seeds 24 --policies handsOff,flip,canopyHop,canopyFlip --baseline flip --maxM 3000 --maxSec 90 --workers 4 --biomeMask 0` from clean source HEAD `4e0cff1`.
+
+**Cross-build safety:** The *old* 40%-deceleration live input corpus `record-two-kicks-c1270b7-20261123` was intentionally presented to the **new** source's SIM7 verifier. It failed with `tape metadata identifies a DIFFERENT game build` before starting a browser. This is the correct result, not a replay regression. Full source-current 11-fixture replay certification remains pending owner tuning acceptance.
+
 ---
 
 ## CURRENT SOURCE RESET 2026-11-23 — owner demands two kicks, NO float
