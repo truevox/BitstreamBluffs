@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  MAX_ART_POSES, MAX_ART_SVG_BYTES, RUN_TRACE_ART_VERSION, renderRunTraceArt,
+  MAX_ART_POSES, MAX_ART_SVG_BYTES, RUN_TRACE_ART_VERSION, renderRunTraceArt, renderRunTraceOrientationStudy,
 } from '../../src/systems/run-trace-art.js';
 import { GhostRecorder, TRACE_EVERY, decodeTrace } from '../../src/systems/ghost/GhostTape.js';
 
@@ -56,24 +57,25 @@ test('loses world origin and scale, and resamples an equivalent shape consistent
   expect(parseSvg(art(flat)).querySelector('#ion').getAttribute('gradientUnits')).toBe('userSpaceOnUse');
 });
 
-test('emits only inert SVG markup and local paint references, within its ASCII byte cap', () => {
-  const svg = art(curve);
-  expect(Buffer.byteLength(svg)).toBeLessThanOrEqual(MAX_ART_SVG_BYTES);
-  const doc = parseSvg(svg);
-  const allowed = ['svg', 'title', 'desc', 'defs', 'linearGradient', 'radialGradient', 'stop',
-    'rect', 'ellipse', 'path', 'g', 'circle', 'text'];
-  for (const el of doc.querySelectorAll('*')) {
-    expect(allowed).toContain(el.localName);
-    for (const attr of el.attributes) {
-      expect(attr.name).not.toMatch(/^(?:on|href|src|style)/i);
-      if (attr.name !== 'xmlns' && attr.value.includes('url(')) {
-        expect(attr.value).toMatch(/^url\(#[a-z]+\)$/);
+test.each([['V1', renderRunTraceArt], ['V2', renderRunTraceOrientationStudy]])(
+  '%s emits only inert SVG markup and local paint references, within its ASCII byte cap', (_version, render) => {
+    const svg = render(poses(curve));
+    expect(Buffer.byteLength(svg)).toBeLessThanOrEqual(MAX_ART_SVG_BYTES);
+    const doc = parseSvg(svg);
+    const allowed = ['svg', 'title', 'desc', 'defs', 'linearGradient', 'radialGradient', 'stop',
+      'rect', 'ellipse', 'path', 'g', 'circle', 'text'];
+    for (const el of doc.querySelectorAll('*')) {
+      expect(allowed).toContain(el.localName);
+      for (const attr of el.attributes) {
+        expect(attr.name).not.toMatch(/^(?:on|href|src|style)/i);
+        if (attr.name !== 'xmlns' && attr.value.includes('url(')) {
+          expect(attr.value).toMatch(/^url\(#[a-z]+\)$/);
+        }
+        if (attr.name !== 'xmlns') expect(attr.value).not.toMatch(/https?:|javascript:|data:/i);
       }
-      if (attr.name !== 'xmlns') expect(attr.value).not.toMatch(/https?:|javascript:|data:/i);
     }
-  }
-  expect(svg).not.toMatch(/<!DOCTYPE|<\?xml-stylesheet/i);
-});
+    expect(svg).not.toMatch(/<!DOCTYPE|<\?xml-stylesheet/i);
+  });
 
 test('validates all finite complete triples, including points skipped by rendering, and bounds work', () => {
   expect(() => renderRunTraceArt([0, 1, 2, 3, 4, 5])).toThrow(/Float32/);
@@ -93,13 +95,17 @@ function runCli(files, test) {
   const dir = mkdtempSync(join(tmpdir(), 'bb-trace-art-'));
   try {
     for (const [name, data] of Object.entries(files)) writeFileSync(join(dir, name), data);
-    test((name) => spawnSync(process.execPath, ['tools/run-trace-art.mjs', join(dir, name)], { encoding: 'utf8' }));
+    test((name, ...options) => spawnSync(process.execPath,
+      ['tools/run-trace-art.mjs', ...options, join(dir, name)], { encoding: 'utf8', timeout: 5000 }));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-test('CLI writes the same SVG for the real recorder payload and for hostile metadata', () => {
+test.each([
+  ['V1', renderRunTraceArt, []],
+  ['V2', renderRunTraceOrientationStudy, ['--art-v2']],
+])('%s CLI writes the same SVG for the real recorder payload and for hostile metadata', (_version, render, options) => {
   const tape = tapeOf(curve, { seed: 'RAW-SEED', initials: 'PLAYER-X', account: '<script>metadata()</script>' });
   const hostile = {
     ...tape, seed: 'malicious.example/other-seed', runId: 'OTHER-RUN-ID',
@@ -108,33 +114,92 @@ test('CLI writes the same SVG for the real recorder payload and for hostile meta
     physicsVersion: 999, simTickHz: 1, endTick: 999999,
   };
   runCli({ 'raw.json': JSON.stringify(tape), 'hostile.json': JSON.stringify(hostile) }, (run) => {
-    const raw = run('raw.json'), attack = run('hostile.json');
+    const raw = run('raw.json', ...options), attack = run('hostile.json', ...options);
     expect(raw.status).toBe(0);
     expect(attack.status).toBe(0);
     expect(raw.stderr).toBe('');
-    expect(raw.stdout).toBe(art(curve));
+    expect(raw.stdout).toBe(render(poses(curve)));
     expect(attack.stdout).toBe(raw.stdout);
     expect(raw.stdout).not.toMatch(/RAW-SEED|PLAYER-X|PRIVATE-RUN-ID|812345|987654|1795284763551|143599|732109|malicious\.example|private@example\.com|<script|href=/);
     expect(raw.stdout).not.toContain(tape.trace);
   });
 });
 
-test('CLI rejects partial or invalid encoding, unsupported versions and oversized JSON without SVG output', () => {
-  const tape = tapeOf(curve);
-  const file = (updates) => JSON.stringify({ ...tape, ...updates });
-  runCli({
-    'version.json': file({ version: 2 }),
-    'partial.json': file({ trace: Buffer.concat([Buffer.from(tape.trace, 'base64'), Buffer.from([0])]).toString('base64') }),
-    'invalid.json': file({ trace: '?' + tape.trace.slice(1) }),
-    'nonfinite.json': JSON.stringify(tapeOf([[0, 0, 0], [NaN, 10, 0]])),
-    'too-many-poses.json': file({ trace: 'A'.repeat((MAX_ART_POSES + 1) * 16) }),
-    'huge.json': Buffer.alloc(2 * 1024 * 1024 + 1),
-  }, (run) => {
-    for (const name of ['version.json', 'partial.json', 'invalid.json', 'nonfinite.json', 'too-many-poses.json', 'huge.json']) {
-      const result = run(name);
-      expect(result.status).toBe(1);
-      expect(result.stdout).toBe('');
-      expect(result.stderr).toMatch(/^Trace art:/);
-    }
+test.each([['V1', []], ['V2', ['--art-v2']]])(
+  '%s CLI rejects partial or invalid encoding, unsupported versions and oversized JSON without SVG output', (_version, options) => {
+    const tape = tapeOf(curve);
+    const file = (updates) => JSON.stringify({ ...tape, ...updates });
+    runCli({
+      'version.json': file({ version: 2 }),
+      'partial.json': file({ trace: Buffer.concat([Buffer.from(tape.trace, 'base64'), Buffer.from([0])]).toString('base64') }),
+      'invalid.json': file({ trace: '?' + tape.trace.slice(1) }),
+      'nonfinite.json': JSON.stringify(tapeOf([[0, 0, 0], [NaN, 10, 0]])),
+      'too-many-poses.json': file({ trace: 'A'.repeat((MAX_ART_POSES + 1) * 16) }),
+      'huge.json': Buffer.alloc(2 * 1024 * 1024 + 1),
+    }, (run) => {
+      for (const name of ['version.json', 'partial.json', 'invalid.json', 'nonfinite.json', 'too-many-poses.json', 'huge.json']) {
+        const result = run(name, ...options);
+        expect(result.status).toBe(1);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toMatch(/^Trace art:/);
+      }
+    });
   });
+
+
+test('defaults to the frozen V1 bytes and ignores orientation unless V2 is explicitly requested', () => {
+  const still = curve.map(([x, y]) => [x, y, 0]);
+  expect(art(still)).toBe(art(curve));
+  expect(createHash('sha256').update(art(curve)).digest('hex'))
+    .toBe('ea4554f7982c30c079c6d1da3e17d354e5e08ae5182ca84002bb0bde3fae1fed');
+  const render = (rows) => renderRunTraceOrientationStudy(poses(rows));
+  const svg = render(curve);
+  expect(svg).toBe(render(curve));
+  expect(svg).not.toBe(render(still));
+  expect(svg).toContain('ART V2');
+  expect(svg).toContain('LOCAL / UNVERIFIED');
+  expect(svg).toContain('NO ATTESTATION');
+  const path = (markup) => parseSvg(markup).querySelector('path[stroke-width="4"]').getAttribute('d');
+  expect(path(svg)).toBe(path(art(curve)));
+});
+
+test('V2 projects only fixed-size, unsigned wrapped orientation tiers', () => {
+  const marks = (rows) => {
+    const svg = renderRunTraceOrientationStudy(poses(rows));
+    return [...parseSvg(svg).querySelectorAll('g[aria-label="Coarse sampled sled orientation changes"] circle')]
+      .map((el) => Number(el.getAttribute('r')));
+  };
+  const sample = (angle) => [[7, 8, 0], [7, 8, angle]];
+  const still = Array(16).fill(2);
+  expect(marks(sample(0))).toEqual(still);
+  expect(marks([[7, 8, Math.PI - 0.01], [7, 8, -Math.PI + 0.01]])).toEqual(still);
+  for (const [angle, radius] of [[0.05, 3], [0.13, 4], [1, 5]]) {
+    const expected = [...still];
+    expected[8] = radius;
+    expect(marks(sample(angle))).toEqual(expected);
+    expect(marks(sample(-angle))).toEqual(expected);
+  }
+  expect(marks([[0, 0, -1e9], [0, 0, 1e9]])).toHaveLength(16);
+});
+
+test('V2 validates before quantizing, even for off-path pose components', () => {
+  const max = new Float32Array(MAX_ART_POSES * 3);
+  expect(Buffer.byteLength(renderRunTraceOrientationStudy(max))).toBeLessThanOrEqual(MAX_ART_SVG_BYTES);
+  max[20] = NaN;
+  expect(() => renderRunTraceOrientationStudy(max)).toThrow(/finite and within/);
+  expect(() => renderRunTraceOrientationStudy(new Float32Array((MAX_ART_POSES + 1) * 3))).toThrow(/2 to/);
+});
+
+test('CLI documents V2 and emits no SVG for invalid opt-in arguments or a directory', () => {
+  const cli = (...args) => spawnSync(process.execPath, ['tools/run-trace-art.mjs', ...args],
+    { encoding: 'utf8', timeout: 5000 });
+  const help = cli('--help');
+  expect(help.status).toBe(0);
+  expect(help.stdout).toMatch(/run-trace-art\.mjs --art-v2 /);
+  for (const args of [['--art-v2'], ['--art-v2', '--help'], ['--art-v2', './file', './extra'], ['--art-v2', '.']]) {
+    const result = cli(...args);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toMatch(/^Trace art:/);
+  }
 });
