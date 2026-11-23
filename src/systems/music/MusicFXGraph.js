@@ -892,6 +892,9 @@ export class StemFXMixer {
 		this.sources = new Map();
 		this.maxSources = 48;
 		this.timers = new Set();
+		// Graphs being crossfaded out must remain owned even if the mixer
+		// is destroyed before the delayed cleanup callback executes.
+		this.retiringEffects = new Set();
 		this.analyser = ctx.createAnalyser();
 		this.analyser.fftSize = 1024;
 		this.analyser.smoothingTimeConstant = 0.65;
@@ -1053,13 +1056,23 @@ export class StemFXMixer {
 		previous.output.gain.linearRampToValueAtTime(0, t + fade);
 		output.gain.setValueAtTime(0, t);
 		output.gain.linearRampToValueAtTime(1, t + fade);
-		const timer = setTimeout(() => {
-			this.timers.delete(timer);
-			try { src.mix.disconnect(previous.chain.input); } catch {}
-			previous.chain.dispose();
-			try { previous.output.disconnect(); } catch {}
-		}, (fade + 0.15) * 1000);
-		this.timers.add(timer);
+		const retired = { src, ...previous, timer: null };
+		const cleanup = () => {
+			if (!this.retiringEffects.delete(retired)) return;
+			clearTimeout(retired.timer);
+			this.timers.delete(retired.timer);
+			try { retired.src.mix.disconnect(retired.chain.input); } catch {}
+			retired.chain.dispose();
+			try { retired.output.disconnect(); } catch {}
+		};
+		retired.cleanup = cleanup;
+		this.retiringEffects.add(retired);
+		retired.timer = setTimeout(cleanup, (fade + 0.15) * 1000);
+		this.timers.add(retired.timer);
+		// Rapid repeated switching must not leave unbounded overlapping
+		// chains alive while their fades wait for a future wall-clock tick.
+		const sourceRetiring = [...this.retiringEffects].filter(entry => entry.src === src);
+		for (const old of sourceRetiring.slice(0, -3)) old.cleanup();
 		return true;
 	}
 
@@ -1078,6 +1091,9 @@ export class StemFXMixer {
 	}
 
 	destroy() {
+		// Clearing timers alone would strand previous fading effect graphs,
+		// including any short oscillator/sample voices. Dispose them now.
+		for (const retired of [...this.retiringEffects]) retired.cleanup();
 		for (const timer of this.timers) clearTimeout(timer);
 		this.timers.clear();
 		for (const src of this.sources.values()) {

@@ -330,6 +330,34 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(() => buildMusicChain(ctx,[{type:'unsafeScript',id:'bad'}],ctx.createGain())).toThrow();
 		expect(() => buildMusicChain(ctx,[{type:'gain',id:'same'},{type:'pan',id:'same'}],ctx.createGain())).toThrow();
 	});
+	test('rapid biome crossfades cap retired graphs and destroy cleans pending voices without timers',()=>{
+		jest.useFakeTimers();
+		try {
+			const ctx=fakeContext(),mixer=new StemFXMixer(ctx,ctx.createGain());
+			mixer.addSource('drums',{effects:[{id:'old',type:'gain',gain:1}]});
+			const oldest=mixer.sources.get('drums').chain;
+			const originalDispose=jest.spyOn(oldest,'dispose');
+			mixer.replaceEffects('drums',[{id:'garbage',type:'scrapheap',contact:.5}],.18);
+			const garbage=mixer.sources.get('drums').chain;
+			const garbageDispose=jest.spyOn(garbage,'dispose');
+			mixer.replaceEffects('drums',[{id:'snow',type:'snowpack',depth:.72}],.18);
+			mixer.replaceEffects('drums',[{id:'water',type:'hydrostatic',pressure:.6}],.18);
+			mixer.replaceEffects('drums',[{id:'micro',type:'microbox',openness:0}],.18);
+			mixer.replaceEffects('drums',[{id:'crystal',type:'crystallattice',strength:1.5}],.18);
+			expect(mixer.retiringEffects.size).toBeLessThanOrEqual(3);
+			expect(originalDispose).toHaveBeenCalledTimes(1);
+			expect(garbageDispose).toHaveBeenCalledTimes(1);
+			const waiting=[...mixer.retiringEffects];
+			const waitingDisposals=waiting.map(entry=>jest.spyOn(entry.chain,'dispose'));
+			mixer.destroy();
+			expect(mixer.retiringEffects.size).toBe(0);
+			expect(mixer.timers.size).toBe(0);
+			for (const dispose of waitingDisposals)expect(dispose).toHaveBeenCalledTimes(1);
+			// No old timer can disconnect twice or perform deferred audio work.
+			jest.runOnlyPendingTimers();
+			for (const dispose of waitingDisposals)expect(dispose).toHaveBeenCalledTimes(1);
+		} finally {jest.useRealTimers();}
+	});
 	test('source-level gain, ducking, independent send, biome and chain replacement', () => {
 		jest.useFakeTimers();
 		try {

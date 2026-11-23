@@ -1,0 +1,35 @@
+# Five source-stem musical biomes — mainline integration gate
+
+**REVIEW ONLY. NOT MERGED. LISTENING APPROVAL PENDING.** Created by Gal Friday on 2026-11-23. Source parents: reviewed main/Snowpack bridge 0b94300 and top-of-stack Garbage pitch clangs c1244bf; main baseline eb281d8. Existing PRs #194, #221, #252, #255, #257, #259 and audition #201 remain distinct drafts.
+
+## Owner-reported settings (do not silently change)
+
+- Snowpack/Debutmont: owner-liked snow muffling and actual physical landing.
+- Scrapheap/Garbage: owner-liked landing SPLORP at 160% and takeoff Sticky Seal Peel A at 80%, untouched. New irregular clangs require a real live bass frequency candidate; no confident pitch means no clang.
+- Hydrostatic/Underwater: memory of downward pressure and physical landing wave, not resets on moving uphill.
+- Micro: 135% original-stem tiny enclosure, 150% actual visual-bee stereo buzz, 100% box impact.
+- Crystal: 150% owner-liked grounded resonance; proposed 160% source-fed airborne shimmer is *not yet owner approved*. Latest Garbage random-pitched clangs are also *not yet owner approved*.
+
+No source master recordings or separated original stems were altered or duplicated. No scored MIDI leads, gameplay physics, ranking or playback clock changed.
+
+## Integration conflict fixes
+
+Exactly two source files conflicted against main: RunScene.js and StemMusicDirector.js. RunScene preserves new main BiomeFx/bridgeLook/WorldDance rendering while retaining the audio branch's on-screen visual-bee coordinates. Director preserves canonicalBiomeId with the current canonical base spelling debutmont and old-save alias debumont, while retaining all five different physical event and effect policies. Updated orchestral presets preserve canonical Snowpack and accept the alias.
+
+## Further non-listening fixes
+
+1. **Retiring Web Audio graphs:** StemFXMixer.replaceEffects formerly relied solely on delayed timers for retiring old source FX graphs; destroying the mixer during a pending fade canceled the timers without disposing those chains. This integration candidate owns all retired chains until cleanup, caps them at 3 per source under rapid changes, and disposes them synchronously on shutdown. Synthetic rapid-replacement regressions verify all disposal callbacks, no double cleanup and no pending timers.
+2. **Actual archived source filenames:** Current music-pack manifest normalization turns logical debumont keys and file paths into debutmont, but the real One More Run OGG files in the authorized local static library remain physically in adaptive/debumont/. An actual Chromium game boot showed canonical adaptive/debutmont/melody-0000.ogg returning HTTP 404. The new narrow fetchMusicAssetResponse helper tries only that old folder on a canonical-path HTTP 404, remembers the old-folder layout per pack to prevent repeated misses, supports mixed-layout packs, and never retries auth/server failures or unsafe paths. NO original archives, manifests, disk folders or recordings were rewritten.
+
+## Objective test evidence
+
+- Vite production build against main: **PASS**, 516 modules transformed.
+- Cross-boundary focused regression: **257 passing tests in 26 suites** (music, audio, physical signals, Snowpack, Garbage, Hydrostatic, Micro, Crystal, WorldDance, graphics/biome visuals, audio failure containment).
+- New integrated all-five test: **6/6 pass**, including old alias to canonical Snowpack, correct original-stem processors, real-airborne/real-landing transitions, pressure persistence/reset, no clock mutation and correct midair initial source graph. New old-file-path fallback test: 404 retry and reverse mixed-pack compatibility, 403 nonretry and rejected unsafe paths (30 focused adjacent tests passing). New fade-retirement graph test passes.
+- **Actual integrated game boot in Chromium with original source recordings:** 146 read-only symlinks from the authorized local static music library were placed ONLY in the ignored, disposable dist/ directory for the first two song segments. There were no copies or source/media changes and this is not a deployment mechanism. The real WebGL game reached Title and RunScene, loaded One More Run, decoded/cached eight OGG sources and reported no audio error or JS exception. The canonical adaptive Debutmont request returned 404, was correctly retried from the physical legacy folder with HTTP 200, and the pack started successfully.
+- **Live Web Audio integration smoke:** On the real game object with original OGG recordings already playing, test harness switched among Snowpack, Garbage, Underwater, Micro and Crystal, invoked takeoff/valid-landing events and verified the correct audio effects were instantiated. Legacy debumont canonicalized to debutmont. Music clock was unchanged. Retiring effect chains reached zero after their real fades. The test harness invoked artificial event transitions; this is NOT a claim that actual terrain gameplay was playtested or human audio accepted.
+- **Known full-suite baseline:** 7 unrelated gameplay, terrain, environment and UI Jest suites fail on the old branch AND the exact same 7 also fail on a clean current main checkout. They were not introduced by this audio integration; do not report the entire repository as green. Full-length peak headroom, phone speaker quality, audio CPU performance and listener acceptance remain open gates.
+
+## Before any production merge
+
+Seek independent review of both conflict resolutions, exact legacy audio fallback, retired graph teardown, actual visual-bee coordinates, authoritatively sourced music pitch and resource budgets. Decide whether to integrate via this consolidated branch or to rebase each older stacked PR, not both. Marvin has explicitly deferred listening, so do not infer approval or merge the sound changes automatically.

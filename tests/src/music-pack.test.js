@@ -1,4 +1,4 @@
-import { normalizeCatalog, normalizePack, resolveMusicAsset } from '../../src/systems/music/MusicPack.js';
+import { normalizeCatalog, normalizePack, resolveMusicAsset, fetchMusicAssetResponse, legacyDebutmontAssetPath } from '../../src/systems/music/MusicPack.js';
 import { BIOME_IDS, BIOME_VOICES, HOME_BIOME, voiceSourceForBiome } from '../../src/systems/music/BiomeVoices.js';
 import { normalizeCaptions, captionAt, nextBeatTime } from '../../src/systems/music/CaptionSequencer.js';
 import { ROOM_PRESETS, createBiomeImpulse, ImpulseBank } from '../../src/systems/music/ImpulseBank.js';
@@ -11,6 +11,48 @@ const pack = () => ({
 		{ startFrame: 0, frames: 48000, sources: sourceFiles() },
 		{ startFrame: 48000, frames: 48000, sources: sourceFiles() },
 	],
+});
+
+describe('Legacy stored Debumont OGG paths without rewriting originals',()=>{
+	const base=new URL('https://example.test/music/packs/33_local-one-more-run/pack.json');
+	test('canonical visible ID and path remains canonical if its actual file exists',async()=>{
+		const seen=[],fetcher=async url=>{seen.push(url);return {ok:true,status:200};};
+		const response=await fetchMusicAssetResponse(base,'adaptive/debutmont/melody-0000.ogg',{fetcher});
+		expect(response).toMatchObject({usedLegacy:false,response:{ok:true}});
+		expect(seen).toEqual(['https://example.test/music/packs/33_local-one-more-run/adaptive/debutmont/melody-0000.ogg']);
+	});
+	test('404 canonical original melody retries ONLY corresponding physical legacy folder',async()=>{
+		const seen=[],fetcher=async url=>{
+			seen.push(url);return {ok:url.includes('/debumont/'),status:url.includes('/debumont/')?200:404};
+		};
+		const path='adaptive/debutmont/melody-0000.ogg';
+		const first=await fetchMusicAssetResponse(base,path,{fetcher});
+		expect(first.usedLegacy).toBe(true);
+		expect(seen).toEqual([
+			'https://example.test/music/packs/33_local-one-more-run/adaptive/debutmont/melody-0000.ogg',
+			'https://example.test/music/packs/33_local-one-more-run/adaptive/debumont/melody-0000.ogg',
+		]);
+		seen.length=0;
+		const second=await fetchMusicAssetResponse(base,path,{fetcher,preferLegacy:true});
+		expect(second.usedLegacy).toBe(true);
+		expect(seen).toEqual(['https://example.test/music/packs/33_local-one-more-run/adaptive/debumont/melody-0000.ogg']);
+	});
+	test('mixed pack checks canonical after legacy 404; rejects unsafe path and other failures',async()=>{
+		const seen=[],fetcher=async url=>{
+			seen.push(url);return {ok:url.includes('/debutmont/'),status:url.includes('/debutmont/')?200:404};
+		};
+		const got=await fetchMusicAssetResponse(base,'adaptive/debutmont/featured-0001.ogg',{
+			fetcher,preferLegacy:true});
+		expect(got.usedLegacy).toBe(false);
+		expect(seen).toHaveLength(2);
+		expect(legacyDebutmontAssetPath('adaptive/garbage-dump-glacier/melody-0000.ogg')).toBe(null);
+		expect(()=>legacyDebutmontAssetPath('../evil.ogg')).toThrow(/Unsafe/);
+		seen.length=0;
+		const forbidden=await fetchMusicAssetResponse(base,'adaptive/debutmont/melody-0000.ogg',{
+			fetcher:async url=>{seen.push(url);return {ok:false,status:403};}});
+		expect(forbidden.response.status).toBe(403);
+		expect(seen).toHaveLength(1); // auth failures are not old-filename fallbacks
+	});
 });
 
 describe('Bitstream Music Pack v1', () => {

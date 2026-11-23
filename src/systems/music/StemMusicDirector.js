@@ -4,7 +4,7 @@
  * Derived source keys (for example "voice:bitstream-bluffs") are allowed in packs.
  * Optional 'voice:<biome>' sources are mixed in dynamically when a pack provides them.
  */
-import { CORE_STEMS, normalizeCatalog, normalizePack, resolveMusicAsset } from './MusicPack.js';
+import { CORE_STEMS, normalizeCatalog, normalizePack, resolveMusicAsset, fetchMusicAssetResponse } from './MusicPack.js';
 import { StemFXMixer } from './MusicFXGraph.js';
 import { AdaptiveBiomeRouter } from './AdaptiveBiomeRouter.js';
 import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
@@ -48,6 +48,9 @@ export class StemMusicDirector {
 		this._effectSignatures = new Map();
 		this.activeNodes = new Set();
 		this.cache = new Map();
+		// Physical Debumont folder may still use the legacy spelling in
+		// original archived music packs even though the logical ID is canonical.
+		this._legacyDebutmontPacks = new Set();
 		this.scheduled = new Set();
 		this.inflight = new Map();
 		this.biome = HOME_BIOME;
@@ -585,6 +588,15 @@ export class StemMusicDirector {
 		if (!this._timer) this._timer = setInterval(() => { this._pump(); }, 75);
 	}
 
+	async _fetchOriginalMusicResponse(packBase,relative){
+		const key=String(packBase);
+		const {response,usedLegacy}=await fetchMusicAssetResponse(packBase,relative,{
+			preferLegacy:this._legacyDebutmontPacks?.has(key)===true,
+		});
+		if(usedLegacy)this._legacyDebutmontPacks?.add(key);
+		return response;
+	}
+
 	async _getTrack(index) {
 		const track = this.catalog[index % this.catalog.length];
 		const catalogBase = new URL(this.catalogUrl, window.location.href);
@@ -601,7 +613,7 @@ export class StemMusicDirector {
 		const buffers = new Map();
 		await Promise.all(this._wantedNames(info.pack).map(async (name) => {
 			const relative = info.pack.segments[0].sources[name];
-			const response = await fetch(resolveMusicAsset(info.base, relative));
+			const response = await this._fetchOriginalMusicResponse(info.base,relative);
 			if (!response.ok) throw new Error('Missing first segment: ' + name);
 			const buffer = await this.ctx.decodeAudioData(await response.arrayBuffer());
 			buffers.set('0/' + name, buffer);
@@ -617,7 +629,7 @@ export class StemMusicDirector {
 		if (this.cache.has(key)) return this.cache.get(key);
 		if (this.inflight.has(key)) return this.inflight.get(key);
 		const promise = (async () => {
-			const response = await fetch(resolveMusicAsset(info.base, relative));
+			const response = await this._fetchOriginalMusicResponse(info.base,relative);
 			if (!response.ok) throw new Error('Missing stem ' + sourceName + ' in ' + info.track.id);
 			const compressed = await response.arrayBuffer();
 			const buffer = await this.ctx.decodeAudioData(compressed);
@@ -651,7 +663,7 @@ export class StemMusicDirector {
 		if (this.cache.has(key)) return this.cache.get(key);
 		if (this.inflight.has(key)) return this.inflight.get(key);
 		const promise = (async () => {
-			const response = await fetch(resolveMusicAsset(this.packBase, path));
+			const response = await this._fetchOriginalMusicResponse(this.packBase,path);
 			if (!response.ok) throw new Error('Missing optional adaptive source');
 			const buffer = await this.ctx.decodeAudioData(await response.arrayBuffer());
 			if (token === this._token && !this.disposed) this.cache.set(key, buffer);

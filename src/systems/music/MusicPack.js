@@ -221,3 +221,35 @@ export function resolveMusicAsset(baseUrl, safeRelativePath) {
 	if (!safePath(safeRelativePath)) throw new Error('Unsafe music asset path');
 	return new URL(safeRelativePath, baseUrl).href;
 }
+
+/**
+ * Only the canonical 2026-11-23 base-biome folder has an older physical
+ * spelling in some archived music packs. Existing manifests normalize the
+ * *logical* keys to `debutmont`, while the original OGG recordings remain
+ * stored in `adaptive/debumont/`. Try canonical first, then that exact old
+ * path on 404. Do not mutate/duplicate source media or rewrite other biomes.
+ */
+export function legacyDebutmontAssetPath(path) {
+	if (!safePath(path)) throw new Error('Unsafe music asset path');
+	if (!path.startsWith('adaptive/debutmont/')) return null;
+	return 'adaptive/debumont/' + path.slice('adaptive/debutmont/'.length);
+}
+
+/**
+ * Optional `preferLegacy` avoids repeated 404s once a pack has proved it
+ * stores original Debumont recordings at the old physical path. A mixed pack
+ * still works: a 404 on either spelling tries the other. Never retry an
+ * auth, server, timeout or decode error as though it were an old filename.
+ */
+export async function fetchMusicAssetResponse(baseUrl, path, {
+	fetcher=fetch, preferLegacy=false,
+}={}) {
+	const legacy=legacyDebutmontAssetPath(path);
+	const paths=legacy ? (preferLegacy?[legacy,path]:[path,legacy]) : [path];
+	for (const [index,candidate] of paths.entries()) {
+		const response=await fetcher(resolveMusicAsset(baseUrl,candidate));
+		if (response.ok || response.status!==404 || index===paths.length-1)
+			return {response,usedLegacy:response.ok && !!legacy && candidate===legacy};
+	}
+	throw new Error('Unreachable audio asset fallback');
+}
