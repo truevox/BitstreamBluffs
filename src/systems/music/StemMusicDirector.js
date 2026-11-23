@@ -57,6 +57,7 @@ export class StemMusicDirector {
 		this._pendingScrapImpact = 0;
 		this._pendingHydroImpact = 0;
 		this._pendingMicroImpact = 0;
+		this._pendingCrystalImpact = 0;
 		this.microBees = null;
 		this.hydrostatic = new HydrostaticPressure();
 		this._hydroLastSent = NaN;
@@ -182,6 +183,7 @@ export class StemMusicDirector {
 			this._pendingSnowImpact = 0;
 			this._pendingScrapImpact = 0;
 			this._pendingMicroImpact = 0;
+		this._pendingCrystalImpact = 0;
 			this.microBees?.dispose();
 			this.microBees=null;
 		}
@@ -230,9 +232,11 @@ export class StemMusicDirector {
 				// A rider entering Debumont while airborne is above the powder already.
 				// Keep the cached signature based on GROUND effects so jumps don't rebuild FX graphs.
 				const initial = this.airborne && !this.menuMode &&
-					(this.biome === 'debumont' || this.biome==='micro-mountain')
+					(this.biome === 'debumont' || this.biome==='micro-mountain' ||
+					this.biome==='crystal-cavern')
 					? effects.map(e => e.type==='snowpack' ? {...e,depth:0} :
-						e.type==='microbox' ? {...e,openness:1} : e) : effects;
+						e.type==='microbox' || e.type==='crystallattice' ? {...e,openness:1} :
+						e.id==='crystalPercussion' ? {...e,gain:.48} : e) : effects;
 				this.mixer.replaceEffects(name,initial,.18);
 				this._timbreSignatures.set(name,key);
 			}
@@ -289,6 +293,7 @@ export class StemMusicDirector {
 		}
 		this.biome = next;
 		if (this.biome !== 'debumont') this._pendingSnowImpact = 0;
+		if (this.biome !== 'crystal-cavern') this._pendingCrystalImpact = 0;
 		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
 		if (this.biome !== 'micro-mountain') {
 			this._pendingMicroImpact=0;
@@ -336,6 +341,11 @@ export class StemMusicDirector {
 			if (impulse <= 0) return;
 			this._pendingScrapImpact = Math.max(this._pendingScrapImpact || 0, impulse);
 			if (!this.airborne) this._applyScrapImpact();
+		} else if (this.biome === 'crystal-cavern') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingCrystalImpact=Math.max(this._pendingCrystalImpact||0,impulse);
+			if(!this.airborne)this._applyCrystalImpact();
 		} else if (this.biome === 'micro-mountain') {
 			const impulse=impactFromLanding(landing);
 			if(impulse<=0)return;
@@ -406,6 +416,13 @@ export class StemMusicDirector {
 		return this.microBees?.setPositions(bees,{enabled:true,playerScreenX})||false;
 	}
 
+	_applyCrystalImpact(){
+		const impulse=this._pendingCrystalImpact||0;
+		this._pendingCrystalImpact=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='crystal-cavern')
+			this.mixer?.setEffectParam('bass','crystallattice','impact',impulse);
+	}
+
 	_applyMicroImpact(){
 		const impulse=this._pendingMicroImpact||0;
 		this._pendingMicroImpact=0;
@@ -439,6 +456,12 @@ export class StemMusicDirector {
 			this._applyScrapImpact();
 			this._applyHydroImpact();
 			this._applyMicroImpact();
+			this._applyCrystalImpact();
+		}
+		if(this.biome==='crystal-cavern'&&!this.menuMode){
+			for(const stem of ['bass','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'crystallattice','openness',next?1:0);
+			this.mixer?.setEffectParam('drums','crystalPercussion','gain',next?.48:1);
 		}
 		if(this.biome==='micro-mountain'&&!this.menuMode)
 			for(const stem of ['bass','drums','guitar','piano','other'])

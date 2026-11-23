@@ -198,6 +198,51 @@ describe('Modular cheap Web Audio processors', () => {
 		fx.dispose();
 		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
 	});
+	test('Crystal Lattice uses original-source modal bank, never pitches notes without current chroma',()=>{
+		const ctx=fakeContext(),osc=[];
+		const original=ctx.createOscillator;
+		ctx.createOscillator=()=>{const node=original();osc.push(node);return node;};
+		const source=ctx.createGain();
+		const fx=buildMusicChain(ctx,[{id:'crystal',type:'crystallattice',detectChroma:true}],ctx.createGain());
+		const crystal=fx.find('crystal');source.connect(fx.input);
+		expect(crystal.refs.openness).toBeDefined();
+		expect(crystal.refs.strength).toBeDefined();
+		expect(crystal.refs.chroma).toBeDefined();
+		expect(crystal.set('openness',1,ctx.currentTime)).toBe(true);
+		expect(crystal.set('openness',NaN,ctx.currentTime)).toBe(false);
+		expect(crystal.set('strength',.8,ctx.currentTime)).toBe(true);
+		expect(crystal.set('impact',0,ctx.currentTime)).toBe(false);
+		// The fake analyser lacks real measured source notes: never fake one.
+		expect(crystal.set('impact',.9,ctx.currentTime)).toBe(true);
+		expect(osc).toHaveLength(0);
+		fx.dispose();
+	});
+	test('Crystal Lattice emits only confident current analyser pitch and disposes all cascade voices',()=>{
+		const ctx=fakeContext(),osc=[];
+		const original=ctx.createOscillator,originalAnalyser=ctx.createAnalyser;
+		ctx.createOscillator=()=>{const node=original();osc.push(node);return node;};
+		ctx.createAnalyser=()=>{
+			const node=originalAnalyser();node.frequencyBinCount=2048;
+			node.getFloatFrequencyData=db=>{
+				db.fill(-98);
+				const target=Math.round(440*4096/ctx.sampleRate);
+				db[target]=-22;db[target-1]=-33;db[target+1]=-31;
+			};
+			return node;
+		};
+		const fx=buildMusicChain(ctx,[{id:'crystal',type:'crystallattice',detectChroma:true}],ctx.createGain());
+		const c=fx.find('crystal');
+		expect(c.refs.chroma.read().map(n=>n.midi)).toEqual([69]);
+		expect(c.set('impact',.95,ctx.currentTime)).toBe(true);
+		expect(osc).toHaveLength(1);
+		expect(osc[0].frequency.value).toBeCloseTo(440);
+		expect(osc[0].started).toBe(true);
+		expect(osc[0].stopped).toBe(true);
+		for(let n=0;n<8;n++)c.set('impact',1,ctx.currentTime+n*.05);
+		expect(osc.filter(x=>x.connections.length)).toHaveLength(4);
+		fx.dispose();
+		expect(osc.every(x=>x.stopped&&!x.connections.length)).toBe(true);
+	});
 	test('Hydrostatic native DSP has bounded pressure automation, real landing pulse and cleanup',()=>{
 
 		const ctx=fakeContext();
