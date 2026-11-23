@@ -24,10 +24,16 @@ contains only the two bounded crash signatures and the decision:
 
 Matching labels do not mean the same crash, position, run, build, player,
 cause of a defect, or legitimate leaderboard result. Replay and checkpoint
-counts are not compared. Valid comparisons write one JSON result to stdout
-and exit 0, including a mismatch. Invalid input exits 1 with a fixed stderr
-diagnostic and no stdout. Neither output includes input file paths, seeds,
-coordinates, raw observations or full receipt payloads.
+counts are not compared. By default, valid comparisons write one JSON result
+to stdout and exit 0, including a mismatch. Invalid input exits 1 with a fixed
+stderr diagnostic and no stdout. Neither output includes input file paths,
+seeds, coordinates, raw observations or full receipt payloads.
+
+For a local script that needs to branch on the decision, add
+`--require-match`. Stdout is the same JSON for every valid result, and the
+exit status is 0 for a signature match, 2 for a mismatch, or 3 for an
+inconclusive comparison. Usage and input errors still exit 1. This checks
+only the redacted signature, not replay verification or authenticity.
 
 ## Synthetic controls
 
