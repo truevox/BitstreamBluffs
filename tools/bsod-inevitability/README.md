@@ -16,7 +16,46 @@ node tools/bsod-inevitability/run.mjs --seeds 12 --maxSec 180 \
 # Independent determinism rerun (two page instances per seed)
 node tools/sim/run.mjs --seeds sim-01,sim-02 --policy canopyFlip \
   --maxSec 30 --maxM 100000 --pursuitSampleMs 5000 --verify --workers 2
+
+# DIAGNOSTIC ONLY: explicitly counterfactual BSOD pressure, NEVER default game/replay
+node tools/bsod-inevitability/run.mjs --seeds 12 --policies handsOff,flip,canopyHop,canopyFlip \
+  --maxSec 60 --workers 3 --startGapPx 500 --startSpeedPxS 1000 \
+  --outDir /tmp/bsb-128-counterfactual-speed
 ```
+
+## Opt-in near-threat counterfactual (not a player setting)
+
+The stock first-slice experiment starts the wall **7,600px** behind the rider, well outside
+`BSOD_DEFAULTS.dangerRangePx = 3,400`. To test whether pursuit collision works inside real danger,
+`--startGapPx N` translates the *existing game's* actual BSOD wall leading edge relative to the
+**Matter compound sled body's left bound** at `RunScene` `RUN_START`, after the real
+`BsodPursuit` is constructed and before the first ordinary fixed-physics tick. It does **not**
+patch production `src/` physics constants, edit `BsodPursuit`, change the acceleration schedule,
+or construct a second simulator. `--startSpeedPxS N` (only with `--startGapPx`) can also set the
+existing wall's initial speed **for an explicitly counterfactual research run**. Valid ranges:
+start gap 50–20,000px and initial wall speed 25–3,000px/s. Without these flags, the
+simulator follows the unchanged stock start position/speed.
+
+An auditable **six-seed, four-policy, three-speed source-pinned** preliminary comparison is
+preserved as `results/near-threat-gap500-six-seeds-20261123.json`: all 72 compact
+seed/policy outcomes, original executable commit, exact SHA256 receipts and CT223 raw
+report locations. Its `default` speed means the unchanged normal 115px/s initial wall
+speed **with** a counterfactual 500px initial gap (not default gameplay); 500/1000
+are additional counterfactual initial speeds. All three runs used the same six
+course seeds and 60-second finite horizon; early collisions on identical course
+openings are not six independent demonstrations of balance. The original full raw
+reports remain outside Git under `/srv/friday-audio/bsb-128-near-threat-source-pinned-20261123/`.
+
+Counterfactual runs always carry an `intervention` notice in their JSON config and Markdown,
+and each arm carries **prior, requested and observed** gap/speed, the real danger threshold,
+and `noCanonicalPlayerTape:true`. The browser explicitly disables `ghostRecorder` for this
+counterfactual: no player run/tape generated under a lying original-wall header is admissible.
+The report **fails closed** if an intervened arm is mixed into a nominal dataset, or an
+injected initial gap/speed is missing, mislabeled, or not verified. Read these as
+controlled experiments with different initial conditions, NOT evidence that the unchanged
+shipped BSOD is already threatening players. Non-catches at finite horizons do not establish
+infinite escape; early `crash:bsod` must arise from the authoritative game's physics/collision.
+
 
 ## How it works
 

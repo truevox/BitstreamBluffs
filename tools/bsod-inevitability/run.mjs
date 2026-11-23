@@ -13,7 +13,7 @@ const ALL_POLICIES = ['handsOff', 'flip', 'canopyHop', 'canopyFlip'];
 const sha256 = (bytes) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 
 function options(argv) {
-  const vals = { seeds: '12', policies: ALL_POLICIES.join(','), maxSec: '180', maxM: '100000', workers: '3', sampleMs: '5000' };
+  const vals = { seeds: '12', policies: ALL_POLICIES.join(','), maxSec: '180', maxM: '100000', workers: '3', sampleMs: '5000', startGapPx: 'default', startSpeedPxS: 'default' };
   const valid = new Set([...Object.keys(vals), 'outDir']);
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i], eq = arg.indexOf('=');
@@ -43,12 +43,15 @@ function options(argv) {
   const maxM = integer('maxM', 50, 100000);
   const workers = integer('workers', 1, 8);
   const sampleMs = integer('sampleMs', 500, 60000);
-  return { seedList, policies, maxSec, maxM, workers, sampleMs, outDir: vals.outDir };
+  const startGapPx = vals.startGapPx === 'default' ? null : integer('startGapPx', 50, 20000);
+  const startSpeedPxS = vals.startSpeedPxS === 'default' ? null : integer('startSpeedPxS', 25, 3000);
+  if (startSpeedPxS !== null && startGapPx === null) throw new Error('--startSpeedPxS requires --startGapPx');
+  return { seedList, policies, maxSec, maxM, workers, sampleMs, startGapPx, startSpeedPxS, outDir: vals.outDir };
 }
 
 async function run() {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.log('node tools/bsod-inevitability/run.mjs [--seeds 12|a,b,c] [--policies handsOff,flip,canopyHop,canopyFlip] [--maxSec 180] [--maxM 100000] [--sampleMs 5000] [--workers 3] [--outDir /path/to/new-output]');
+    console.log('node tools/bsod-inevitability/run.mjs [--seeds 12|a,b,c] [--policies handsOff,flip,canopyHop,canopyFlip] [--maxSec 180] [--maxM 100000] [--sampleMs 5000] [--workers 3] [--startGapPx default|50..20000] [--startSpeedPxS default|25..3000] [--outDir /path/to/new-output]');
     return;
   }
   const config = options(process.argv.slice(2));
@@ -69,6 +72,8 @@ async function run() {
     const args = ['tools/sim/run.mjs', '--seeds', seedsArg, '--policy', policy,
       '--maxSec', String(config.maxSec), '--maxM', String(config.maxM),
       '--pursuitSampleMs', String(config.sampleMs), '--workers', String(config.workers),
+      ...(config.startGapPx === null ? [] : ['--pursuitStartGapPx', String(config.startGapPx)]),
+      ...(config.startSpeedPxS === null ? [] : ['--pursuitStartSpeedPxS', String(config.startSpeedPxS)]),
       '--out', rawPath, '--quiet'];
     process.stderr.write(`running ${policy} (${config.seedList.length} matched seeds)\n`);
     const res = spawnSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 });
@@ -79,7 +84,9 @@ async function run() {
     const raw = await readFile(rawPath);
     const rec = JSON.parse(raw.toString('utf8'));
     if (!rec.args || rec.args.maxSec !== config.maxSec || rec.args.maxM !== config.maxM ||
-        rec.args.pursuitSampleMs !== config.sampleMs || rec.args.seeds !== config.seedList.length) {
+        rec.args.pursuitSampleMs !== config.sampleMs || rec.args.seeds !== config.seedList.length ||
+        (rec.args.pursuitStartGapPx ?? null) !== config.startGapPx ||
+        (rec.args.pursuitStartSpeedPxS ?? null) !== config.startSpeedPxS) {
       throw new Error(`${policy}: simulator returned different settings`);
     }
     byPolicy[policy] = rec;
@@ -91,12 +98,16 @@ async function run() {
     format: 'bsb-bsod-inevitability-evidence', formatVersion: 1, generatedAt: new Date().toISOString(),
     source, config: { seedList: config.seedList, policies: config.policies, maxSec: config.maxSec,
       maxM: config.maxM, workers: config.workers, sampleMs: config.sampleMs, biomeMask: 0,
+      ...(config.startGapPx === null ? {} : { startGapPx: config.startGapPx,
+        ...(config.startSpeedPxS === null ? {} : { startSpeedPxS: config.startSpeedPxS }),
+        intervention: 'DEVELOPER-ONLY counterfactual starting wall gap/speed at RUN_START; NOT live gameplay or a replay tape' }),
       assumption: 'default profile, no explicitly purchased boost/upgrade; neutral Daily; scripted bot policies' },
     rawFiles, summary, rows,
     limitations: [
       'All experiments are finite. Horizon survivors are right-censored, NOT proof of infinite survival.',
       'All BSOD gap values are post-tick 60Hz sampled observations, not 120Hz substep extrema.',
       'Policies are scripts, not measurements of human play; no conclusion about all possible strategies.',
+      ...(config.startGapPx === null ? [] : ['Injected initial wall gap/speed is an explicit counterfactual and is NOT evidence about unchanged default pursuit or a canonical replay tape.']),
       'No gameplay physics, BSOD pursuit tuning, scoring, replay schemas, or historical tapes are changed.',
     ],
   };

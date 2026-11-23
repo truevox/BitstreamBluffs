@@ -349,10 +349,55 @@
     let curPad = pad;
     const stub = { poll() { return curPad; }, setEnabled() {} };
 
+    // Counterfactual near-threat intervention for source-stamped developer research ONLY.
+    // Never expose this as a player option or mutate production BsodPursuit defaults.
+    const pursuitStartGapPx = o.pursuitStartGapPx == null ? null : Number(o.pursuitStartGapPx);
+    if (pursuitStartGapPx !== null && (!Number.isInteger(pursuitStartGapPx) ||
+      pursuitStartGapPx < 50 || pursuitStartGapPx > 20000 || withNoise)) {
+      throw new RangeError('pursuitStartGapPx requires a 50–20000px integer and a stock scripted policy');
+    }
+    const pursuitStartSpeedPxS = o.pursuitStartSpeedPxS == null ? null : Number(o.pursuitStartSpeedPxS);
+    if (pursuitStartSpeedPxS !== null && (pursuitStartGapPx === null ||
+      !Number.isInteger(pursuitStartSpeedPxS) || pursuitStartSpeedPxS < 25 || pursuitStartSpeedPxS > 3000)) {
+      throw new RangeError('pursuitStartSpeedPxS requires start gap and a 25–3000px/s integer');
+    }
     let scene = null;
     let frame = 0, actualFrameHop = false;
     game.events.once(EVT.RUN_START, () => {
       scene = game.scene.getScene('RunScene');
+      if (pursuitStartGapPx !== null) {
+        // RUN_START fires after real RunScene created BsodPursuit, before the
+        // first normal physics tick. Translate ONLY the existing wall edge.
+        const initialState = scene.bsodState;
+        if (!scene.bsod?.active || !initialState?.active || !Number.isFinite(initialState.gapPx)) {
+          throw new Error('counterfactual pursuit start requires active authoritative BSOD state');
+        }
+        const physicalSledLeftEdge = scene.bsod.wallX + initialState.gapPx;
+        const priorGapPx = initialState.gapPx;
+        const priorWallSpeedPxS = scene.bsod.wallSpeedPxS;
+        scene.bsod.wallX = physicalSledLeftEdge - pursuitStartGapPx;
+        if (pursuitStartSpeedPxS !== null) scene.bsod.wallSpeedPxS = pursuitStartSpeedPxS;
+        scene.bsodState = scene.bsod.state(physicalSledLeftEdge, scene.sled.vx, scene.bsodAtmosphere());
+        if (Math.abs(scene.bsodState.gapPx - pursuitStartGapPx) > 0.001) {
+          throw new Error('the counterfactual initial BSOD gap did not apply exactly');
+        }
+        if (pursuitStartSpeedPxS !== null && scene.bsodState.wallSpeedPxS !== pursuitStartSpeedPxS) {
+          throw new Error('the counterfactual initial BSOD wall speed did not apply exactly');
+        }
+        // Never leave a replay recording whose header names the ORIGINAL wall
+        // start although this developer-only experiment changed the initial state.
+        scene.ghostRecorder = null;
+        R.pursuitIntervention = {
+          kind: 'developer-counterfactual-initial-bsod-state',
+          priorGapPx, requestedGapPx: pursuitStartGapPx,
+          observedGapPx: scene.bsodState.gapPx,
+          priorWallSpeedPxS, requestedWallSpeedPxS: pursuitStartSpeedPxS,
+          observedWallSpeedPxS: scene.bsodState.wallSpeedPxS,
+          dangerRangePx: scene.bsod.config.dangerRangePx,
+          phase: 'RUN_START before first regular physics tick',
+          noCanonicalPlayerTape: scene.ghostRecorder === null,
+        };
+      }
       scene.inputRouter = stub;
       // A --rule run keeps that rule's real modifiers so mission targets can be measured under the
       // rule they ship with; the default stays neutralised for the pacing curve.
