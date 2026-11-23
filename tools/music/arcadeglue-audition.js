@@ -6,14 +6,17 @@ const PACK='/music/packs/33_local-one-more-run-bitstream-bluffs/';
 const g=role=>role==='drums'?.9:role==='bass'?.75:.65;
 const v=id=>Number($(id).value);
 const say=s=>{$('status').textContent=s;};
-let ctx=null,buffers=null,master=null,rawBus=null,processedBus=null,playing=false,dry=false,solo=false;
+let ctx=null,buffers=null,master=null,rawBus=null,processedBus=null,playing=false,dry=false,solo=false,menu=false;
 let sources={},chains={};
 const fx=role=>chains[role]?.find('arcadeglue');
 const each=fn=>{for(const role of STEMS)if(fx(role))fn(fx(role),role);};
 function controls(){
 	$('play').disabled=!buffers;
 	$('play').textContent=playing?'■ Stop':'▶ Play';
-	for(const id of ['dry','solo'])$(id).disabled=!playing;
+	for(const id of ['dry','solo','menu'])$(id).disabled=!playing;
+	$('dry').disabled=!playing||menu;
+	$('menu').textContent=menu?'▶ Return to gameplay (750ms)':'☰ Enter clean menu (750ms)';
+	$('menu').setAttribute('aria-pressed',String(menu));
 	$('dry').textContent=dry?'Hear Arcade':'Compare dry';
 	$('dry').setAttribute('aria-pressed',String(dry));
 	$('solo').textContent=solo?'Hear all five':'Solo drums';
@@ -49,6 +52,19 @@ function chop(){
 	$('chop-value').textContent=v('chop')+'%';
 	if(playing)each(stage=>stage.set('chop',v('chop')/100,ctx.currentTime));
 }
+function setMenuMix(){
+	if(!playing||!ctx)return;
+	// Mirrors the live director's 750ms menu/run crossfade. A/B Compare
+	// Dry stays fast for critical listening; this control demonstrates
+	// the actual leisurely scene transition instead.
+	const t=ctx.currentTime;
+	for(const [bus,gain] of [[rawBus,menu?1:0],[processedBus,menu?0:1]]){
+		const param=bus.gain;
+		param.cancelScheduledValues(t);
+		param.setValueAtTime(param.value,t);
+		param.linearRampToValueAtTime(gain,t+.75);
+	}
+}
 function mixLevels(){
 	if(!playing||!ctx)return;
 	for(const role of STEMS)sources[role]?.gain.gain.setTargetAtTime(
@@ -81,7 +97,7 @@ function stop(){
 	}
 	for(const chain of Object.values(chains))chain.dispose();
 	for(const bus of [master,rawBus,processedBus])try{bus?.disconnect();}catch{}
-	sources={};chains={};master=rawBus=processedBus=null;playing=dry=solo=false;controls();
+	sources={};chains={};master=rawBus=processedBus=null;playing=dry=solo=menu=false;controls();
 }
 async function play(){
 	if(playing){stop();say('Stopped. The original stems remain untouched.');return;}
@@ -99,7 +115,7 @@ async function play(){
 		source.connect(gain);gain.connect(rawBus);gain.connect(chain.input);
 		source.start(at);sources[role]={source,gain};chains[role]=chain;
 	}
-	playing=true;dry=solo=false;intensity();chop();applyMode();controls();
+	playing=true;dry=solo=menu=false;intensity();chop();applyMode();controls();
 	say('Arcade chip coloration is source-fed. Choose bridge or standalone; no invented notes.');
 }
 $('load').addEventListener('click',load);
@@ -108,8 +124,17 @@ $('mode').addEventListener('change',applyMode);
 $('progress').addEventListener('input',applyMode);
 $('intensity').addEventListener('input',intensity);
 $('chop').addEventListener('input',chop);
+$('menu').addEventListener('click',()=>{
+	if(!playing)return;
+	if(dry)dry=false;
+	menu=!menu;
+	setMenuMix();
+	controls();
+	say(menu?'Entering clean original-recording menu over 750ms; no biome processing.' :
+		'Returning to Arcade gameplay processing over 750ms, without seeking or restarting.');
+});
 $('dry').addEventListener('click',()=>{
-	if(!playing)return;dry=!dry;
+	if(!playing||menu)return;dry=!dry;
 	rawBus.gain.setTargetAtTime(dry?1:0,ctx.currentTime,.02);
 	processedBus.gain.setTargetAtTime(dry?0:1,ctx.currentTime,.02);
 	controls();say(dry?'Dry ORIGINAL synchronized instrumental music.':

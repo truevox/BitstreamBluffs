@@ -1003,7 +1003,9 @@ export class AudioSynth {
         ]) {
           if (!node?.gain) continue;
           node.gain.cancelScheduledValues(t);
-          node.gain.setTargetAtTime(gain, t, 0.025);
+          // ~95% settled at 0.6s, virtually complete by 0.75s,
+          // matching the native original-stem menu transition.
+          node.gain.setTargetAtTime(gain, t, 0.20);
         }
       }
     } catch { /* headless audio and unsupported nodes remain harmless */ }
@@ -1022,10 +1024,12 @@ export class AudioSynth {
   _enterRunMusic(seed) {
     this._musicMode = 'run';
     this._jukeboxMode = false;
-    this._stemMusic?.setMenuMode(false);
-    // #65: every run begins in REAL Debutmont, never in an Arcade bridge.
-    // The menu may use the Arcade identity, but the first run note is Debutmont.
+    // #65: choose actual Debutmont WHILE still using the clean menu
+    // arrangement; only then crossfade into its gameplay processing.
+    // Reversing this order would replace the 750ms menu fade with the
+    // ordinary 180ms biome fade, as caught by real Chromium Web Audio.
     this._stemMusic?.setBiome('debutmont');
+    this._stemMusic?.setMenuMode(false);
     this._onBsodState(null);
     this._setPaused(false);
     // Respect an explicit manual pause in the jukebox.

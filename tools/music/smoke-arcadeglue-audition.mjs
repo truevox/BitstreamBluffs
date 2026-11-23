@@ -30,6 +30,14 @@ try{
 	await page.$eval('#chop',e=>{e.value='165';
 		e.dispatchEvent(new Event('input',{bubbles:true}));});
 	assert.equal(await page.$eval('#chop-value',e=>e.textContent),'165%');
+	await page.$eval('#menu',e=>e.click());
+	assert.equal(await page.$eval('#menu',e=>e.getAttribute('aria-pressed')),'true');
+	assert.equal(await page.$eval('#dry',e=>e.disabled),true);
+	assert.match(await page.$eval('#status',e=>e.textContent),/750ms/);
+	await page.$eval('#menu',e=>e.click());
+	assert.equal(await page.$eval('#menu',e=>e.getAttribute('aria-pressed')),'false');
+	assert.equal(await page.$eval('#dry',e=>e.disabled),false);
+	assert.match(await page.$eval('#status',e=>e.textContent),/750ms/);
 	await page.click('#dry');
 	assert.equal(await page.$eval('#dry',e=>e.getAttribute('aria-pressed')),'true');
 	await page.click('#dry');

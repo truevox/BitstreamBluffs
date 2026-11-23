@@ -89,11 +89,12 @@ describe('continuous soundtrack and saved shuffle',()=>{
 		expect(seen.size).toBe(3);
 		expect(d._nextEnabledIndex(current)).not.toBe(current);
 	});
-	test('menu uses Debutmont voice and dry original stems with no gameplay motion',()=>{
+	test('menu crossfades all six original sources clean in 750ms and restores biome DSP on resume',()=>{
 		const d=Object.create(StemMusicDirector.prototype);
 		d.menuMode=false;d.biome='crystal-cavern';d.speedPxS=930;
 		d.airborne=true;d.dynamicOrchestra=true;d.vocals=false;d.started=true;
 		d.pack={sourceNames:['voice:debutmont','voice:crystal-cavern','voice:bitstream-bluffs']};
+		d.clockStart=41.25;d.trackIndex=2;
 		d.gains=new Map([...['bass','drums','guitar','piano','other',...d.pack.sourceNames]
 			.map(s=>[s,{}])]);
 		d._timbreSignatures=new Map();
@@ -103,8 +104,17 @@ describe('continuous soundtrack and saved shuffle',()=>{
 			setSpeed:jest.fn()};
 		d.setMenuMode(true);
 		expect(d._activeVoiceFor(d.pack)).toBe('voice:debutmont');
-		expect(d.mixer.replaceEffects).toHaveBeenCalledWith('bass',[],0.18);
+		// Menu original recordings are completely unprocessed, INCLUDING
+		// the active Debutmont melody/lead source. Previous code left
+		// Debutmont's lowpass+tremolo on the lead.
+		for(const source of ['bass','drums','guitar','piano','other',
+			'voice:debutmont','voice:crystal-cavern','voice:bitstream-bluffs'])
+			expect(d.mixer.replaceEffects).toHaveBeenCalledWith(source,[],.75);
 		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('drums',0);
+		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('voice:crystal-cavern',0);
+		expect(d._timbreSignatures.get('voice:debutmont')).toBe('[]');
+		expect(d.clockStart).toBe(41.25);
+		expect(d.trackIndex).toBe(2);
 		expect(d.adaptive.setEnabled).toHaveBeenCalledWith(false);
 		expect(d.mixer.setGain).toHaveBeenCalledWith('bass',1,
 			{motion:true,time:.16});
@@ -114,9 +124,17 @@ describe('continuous soundtrack and saved shuffle',()=>{
 		d.setAirborne(true);
 		expect(d.speedPxS).toBe(0);
 		expect(d.airborne).toBe(false);
+		d.mixer.replaceEffects.mockClear();
 		d.setMenuMode(false);
 		expect(d._activeVoiceFor(d.pack)).toBe('voice:crystal-cavern');
+		for(const name of ['bass','drums','guitar','piano','other','voice:crystal-cavern']){
+			const call=d.mixer.replaceEffects.mock.calls.find(c=>c[0]===name);
+			expect(call?.[2]).toBe(.75);
+			expect(call?.[1].length).toBeGreaterThan(0);
+		}
 		expect(d.adaptive.setEnabled).toHaveBeenLastCalledWith(true);
+		expect(d.clockStart).toBe(41.25);
+		expect(d.trackIndex).toBe(2);
 	});
 	test('RUN_END, abort, title and pause retain song position and reset wind/motion',()=>{
 		const {audio,events}=audioFixture();
@@ -131,6 +149,14 @@ describe('continuous soundtrack and saved shuffle',()=>{
 		expect(audio._windActive).toBe(true);
 		events.emit(EVT.RUN_END,{});
 		expect(audio._musicMode).toBe('menu');
+		expect(audio.nodes.wet.gain.setTargetAtTime)
+			.toHaveBeenLastCalledWith(0,100,.20);
+		expect(audio.nodes.dry.gain.setTargetAtTime)
+			.toHaveBeenLastCalledWith(1,100,.20);
+		expect(audio.nodes.gate.gain.setTargetAtTime)
+			.toHaveBeenLastCalledWith(1,100,.20);
+		expect(audio.nodes.staticGain.gain.setTargetAtTime)
+			.toHaveBeenLastCalledWith(0,100,.20);
 		expect(audio._windActive).toBe(false);
 		expect(audio._bsodDanger01).toBe(0);
 		expect(d.menuMode).toBe(true);

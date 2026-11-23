@@ -227,7 +227,10 @@ export class StemMusicDirector {
 		this.mixer?.selectBiome(next ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(next ? HOME_BIOME : this.biome);
 		this.adaptive?.setEnabled(this.dynamicOrchestra && !next);
-		this._applyMusicTimbres(true);
+		// Menu↔run is a musical mix change, not a biome jump: give it
+		// a deliberate three-quarter-second crossfade without seeking,
+		// restarting, or changing the original source clock.
+		this._applyMusicTimbres(true, .75);
 	}
 
 	/** The real physical BSOD proximity drives only accompaniment corruption.
@@ -247,15 +250,23 @@ export class StemMusicDirector {
 	 * an original instrumental source with its re-performed alternative.
 	 * The separately synthesized biome melody stays active in BOTH modes.
 	 */
-	_applyMusicTimbres(force=false) {
+	_applyMusicTimbres(force=false, fadeSeconds=.18) {
 		if (!this.mixer || !this.gains) return;
 		const lead = this._activeVoiceFor(this.pack);
 		const sourceNames = ['bass','drums','guitar','piano','other'];
-		if (lead) sourceNames.push(lead);
+		if (this.menuMode) {
+			// Don't leave dormant melodic leads or a vocal room-send wet
+			// behind in Title, Game Over or the pause-screen jukebox.
+			for (const name of this.gains.keys())
+				if (name.startsWith('voice:') || name === 'vocals')
+					sourceNames.push(name);
+		} else if (lead) sourceNames.push(lead);
 		for (const name of sourceNames) {
 			if (!this.gains.has(name)) continue;
-			const effects = name===lead ? melodyPreset(this.menuMode ? 'debutmont' : this.biome) :
-				this.menuMode ? [] : orchestraPreset(this.biome,name);
+			// In menus EVERY original source is raw, including the selected
+			// Debutmont melody lead. Gameplay alone gets DSP/biome FX.
+			const effects = this.menuMode ? [] :
+				name===lead ? melodyPreset(this.biome) : orchestraPreset(this.biome,name);
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
 				// A rider entering Debumont while airborne is above the powder already.
@@ -270,7 +281,7 @@ export class StemMusicDirector {
 						e.type==='jellybloom' ? {...e,airborne:true} :
 						e.type==='sugarfizz' ? {...e,airborne:true} :
 						e.id==='crystalPercussion' ? {...e,gain:.48} : e) : effects;
-				this.mixer.replaceEffects(name,initial,.18);
+				this.mixer.replaceEffects(name,initial,fadeSeconds);
 				this._timbreSignatures.set(name,key);
 			}
 			// Restore each source's normal biome room send in either
