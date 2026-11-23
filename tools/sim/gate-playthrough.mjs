@@ -442,15 +442,28 @@ async function main() {
           return await page.evaluate(async ({ pressRetry, shards }) => {
             const g = window.__bbGame;
             const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            // Do not force a TitleScene transition while Boot/Preload is still
+            // bringing in CONTENT. Under browser load it may exist as an object
+            // before its real menu and registry are initialized. Start through
+            // the actual ready menu path, and insist the requested run is live.
+            let title = null;
+            const titleDeadline = Date.now() + 15000;
+            while (Date.now() < titleDeadline) {
+              const t = g.scene.getScene('TitleScene');
+              if (t?.scene?.isActive() && t.menu?.items?.length && !t.starting) { title = t; break; }
+              await wait(100);
+            }
+            if (!title) return { fatal: 'TitleScene was not ready for the shop probe' };
             g.registry.set('biomeMask', 0);
-            g.scene.start('TitleScene');
-            await wait(900);
-            const title = g.scene.getScene('TitleScene');
-            title.starting = false;
             title.startRun('shop-seed', 0);
-            await wait(1600);
-            const run = g.scene.getScene('RunScene');
-            if (!run) return { fatal: 'RunScene did not start' };
+            let run = null;
+            const runDeadline = Date.now() + 15000;
+            while (Date.now() < runDeadline) {
+              const r = g.scene.getScene('RunScene');
+              if (r?.scene?.isActive() && r.sled?.inWorld && !r.sled.destroyed && !r.crashed && r.seed === 'shop-seed') { run = r; break; }
+              await wait(100);
+            }
+            if (!run) return { fatal: 'requested shop-seed RunScene did not become active with a live sled' };
             // Give the run shards so the credit moves the bank by a known amount. `shards` in the record is
             // `shardCount` (a count, 1 shard each), so that is what a real run would have incremented per
             // pickup; setting it here is the same value the collect loop would have produced.
@@ -1955,15 +1968,27 @@ async function main() {
         const o = await page.evaluate(async () => {
           const g = window.__bbGame;
           const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          // A registered game object is not yet a ready Title screen. Wait for
+          // actual built UI/content instead of imposing 900+1400ms sleeps;
+          // under a concurrent browser workload the preload can take longer.
+          let title = null;
+          const titleDeadline = Date.now() + 15000;
+          while (Date.now() < titleDeadline) {
+            const t = g.scene.getScene('TitleScene');
+            if (t?.scene?.isActive() && t.menu?.items?.length && !t.starting) { title = t; break; }
+            await wait(100);
+          }
+          if (!title) return { fatal: 'TitleScene was not ready for high-speed camera probe' };
           g.registry.set('biomeMask', 0);
-          g.scene.start('TitleScene');
-          await wait(900);
-          const title = g.scene.getScene('TitleScene');
-          title.starting = false;
           title.startRun('gate-seed', 0);
-          await wait(1400);
-          const run = g.scene.getScene('RunScene');
-          if (!run || !run.sled) return { fatal: 'RunScene did not start' };
+          let run = null;
+          const runDeadline = Date.now() + 15000;
+          while (Date.now() < runDeadline) {
+            const r = g.scene.getScene('RunScene');
+            if (r?.scene?.isActive() && r.sled?.inWorld && !r.sled.destroyed && !r.crashed && r.seed === 'gate-seed') { run = r; break; }
+            await wait(100);
+          }
+          if (!run) return { fatal: 'requested gate-seed RunScene did not become active with a live sled' };
           g.loop.sleep();
           const real = run.sled;
           const V = 1200;
