@@ -64,7 +64,10 @@ import * as matterPortableNs from '../MatterPortable.js';
 //    (about 1% of sin/cos results differ from V8) change tick-level outcomes of every older tape.
 // 6: #65 (gameplay): Debutmont is the base biome (owns every sector the mask does not select) and
 //    arcade bridges (null biome) separate biomes, so tick outcomes change for a given seed and mask.
-export const SIM_REVISION = 6;
+// 7: #128 (owner-approved 2026-11-23): buffered-strong opening with physical
+//    soft finish replaces the default BSOD chase; nominal wall speed stays
+//    fingerprinted, and the actual wall slows smoothly in the final 3000px.
+export const SIM_REVISION = 7;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above
@@ -72,7 +75,7 @@ export const SIM_REVISION = 6;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-export const LAST_RELEASED_SIM_REVISION = 6;
+export const LAST_RELEASED_SIM_REVISION = 7;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;

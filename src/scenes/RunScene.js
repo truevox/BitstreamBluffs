@@ -1393,7 +1393,7 @@ export class RunScene extends Phaser.Scene {
         // The BSOD advances with the SAME capped physics substeps as the sled. A fast wall cannot
         // jump over the rider between render frames. Do not depend on audio or animation timers.
         if (this.bsod && !this.bsodCaught) {
-          this.bsod.advance(stepMs);
+          this.bsod.advance(stepMs, sledLeftCollisionEdge(sled));
           const s = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
           if (s.gapPx <= 0) {
             this.bsodCaught = true;
