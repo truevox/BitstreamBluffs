@@ -70,6 +70,35 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(chains[0].find('effect7').refs.impulse).toBeDefined();
 		for(const chain of chains)chain.dispose();
 	});
+	test('Space Mountain source-fed orbital fields and physical reentry samples cap and clean up',()=>{
+		const ctx=fakeContext(),target=ctx.createGain();
+		const chain=buildMusicChain(ctx,[{type:'orbitfield',id:'orbitfield',
+			spread:1.15,drift:1,weightless:0,lowGravity:0,reentryLevel:1.25,ejectLevel:.8}],target);
+		const fx=chain.find('orbitfield');expect(fx).toBeDefined();
+		for(const key of ['spread','drift','weightless','lowGravity','reentryLevel',
+			'ejectLevel','reentry','eject'])expect(fx.refs[key]).toBeDefined();
+		expect(fx.set('spread',1.7,ctx.currentTime)).toBe(true);
+		expect(fx.set('drift',1.8,ctx.currentTime)).toBe(true);
+		expect(fx.set('weightless',.9,ctx.currentTime)).toBe(true);
+		expect(fx.set('lowGravity',.3,ctx.currentTime)).toBe(true);
+		expect(fx.set('weightless',NaN,ctx.currentTime)).toBe(false);
+		expect(fx.set('ejectLevel',1.2,ctx.currentTime)).toBe(true);
+		expect(fx.set('reentryLevel',1.6,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(0); // no continuous replacement song
+		expect(fx.set('reentry',0,ctx.currentTime)).toBe(false);
+		expect(fx.set('eject',Infinity,ctx.currentTime)).toBe(false);
+		expect(fx.set('reentry',.9,ctx.currentTime)).toBe(true);
+		expect(fx.set('eject',.9,ctx.currentTime)).toBe(true);
+		for(const source of ctx._bufferSources){
+			expect(source.started).toBe(true);
+			expect(source.buffer.getChannelData(0).every(Number.isFinite)).toBe(true);
+			expect(source.buffer.getChannelData(0).some(x=>Math.abs(x)>.04)).toBe(true);
+		}
+		for(let i=0;i<12;i++)fx.set('reentry',1,ctx.currentTime+i*.016);
+		expect(ctx._bufferSources.filter(x=>!x.stopped)).toHaveLength(3);
+		chain.dispose();expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
+	});
+
 	test('Candy Cane source-fed sugar fizz tracks real speed and makes bounded physical Pop Rocks',()=>{
 		const ctx=fakeContext(),output=ctx.createGain();
 		const chain=buildMusicChain(ctx,[{type:'sugarfizz',id:'sugarfizz',

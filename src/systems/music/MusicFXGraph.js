@@ -9,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge', 'sugarfizz',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge', 'sugarfizz', 'orbitfield',
 ]);
 
 function saturatorCurve(amount) {
@@ -573,6 +573,127 @@ function allocateEffect(ctx, raw) {
 			}};
 			disposers.push(()=>{for(const entry of active){
 				try{entry.source.stop();}catch{}disposeTone(entry);
+			}});
+			break;
+		}
+		case 'orbitfield': {
+			// Space Mountain: original music remains exact dry stereo. A
+			// long, source-fed stereo field opens only with real low gravity
+			// and height above terrain. No space-note synth or fake beat.
+			const dry=node(ctx.createGain());dry.gain.value=1;
+			input.connect(dry);dry.connect(output);
+			const highs=node(ctx.createBiquadFilter());highs.type='highpass';
+			highs.frequency.value=190;highs.Q.value=.65;
+			const spaceFilter=node(ctx.createBiquadFilter());spaceFilter.type='lowpass';
+			spaceFilter.frequency.value=6800;spaceFilter.Q.value=.7;
+			input.connect(highs);highs.connect(spaceFilter);
+			const floatLfo=node(ctx.createOscillator());floatLfo.type='sine';
+			floatLfo.frequency.value=.19;floatLfo.start();lfos.push(floatLfo);
+			const pulses=node(ctx.createGain());pulses.gain.value=.011;
+			const tail=node(ctx.createGain());
+			floatLfo.connect(pulses);pulses.connect(tail.gain);
+			let spread=clamp(raw.spread,0,2,1.15);
+			let drift=clamp(raw.drift,.25,2,1);
+			let weightless=clamp(raw.weightless,0,1,0);
+			let lowGravity=clamp(raw.lowGravity,0,1,0);
+			let reentryLevel=clamp(raw.reentryLevel,0,2,1.25);
+			let ejectLevel=clamp(raw.ejectLevel,0,2,.8);
+			const delayPath=[];
+			for(let i=0;i<2;i++){
+				const delay=node(ctx.createDelay(1.2));
+				delay.delayTime.value=i?.262:.143;
+				const feedback=node(ctx.createGain());feedback.gain.value=.10;
+				const filter=node(ctx.createBiquadFilter());filter.type='lowpass';
+				filter.frequency.value=4100;
+				spaceFilter.connect(delay);delay.connect(filter);filter.connect(feedback);
+				feedback.connect(delay);
+				const pan=ctx.createStereoPanner?node(ctx.createStereoPanner()):null;
+				if(pan){pan.pan.value=i?.75:-.75;filter.connect(pan);pan.connect(tail);}
+				else filter.connect(tail);
+				delayPath.push({delay,feedback,filter});
+			}
+			tail.connect(output);
+			const apply=(at,instant=false)=>{
+				const openness=Math.min(1,weightless*.88+lowGravity*.19);
+				// Small wet field at low altitude, a huge stereo field in
+				// flight. Never alter dry source playback/notes or game physics.
+				const levels=[[tail.gain,spread*(.035+.255*openness)],
+					[highs.frequency,165+110*openness],
+					[spaceFilter.frequency,4200+7600*openness],
+					[floatLfo.frequency,.18+.16*drift],
+					[pulses.gain,.008+.025*openness],
+					[delayPath[0].delay.delayTime,.143+.045*openness],
+					[delayPath[1].delay.delayTime,.262+.085*openness]];
+				for(const [param,value] of levels){
+					if(instant)param.value=value;
+					else numericParam(param,value,at,.09);
+				}
+			};
+			apply(ctx.currentTime,true);
+			const control=(key,min,max,fallback,setter)=>{
+				refs[key]={set:(v,at)=>{if(!Number.isFinite(v))return false;
+					setter(clamp(v,min,max,fallback));apply(at);return true;}};
+			};
+			control('spread',0,2,1.15,v=>spread=v);
+			control('drift',.25,2,1,v=>drift=v);
+			control('weightless',0,1,0,v=>weightless=v);
+			control('lowGravity',0,1,0,v=>lowGravity=v);
+			refs.reentryLevel={set:v=>{if(!Number.isFinite(v))return false;reentryLevel=clamp(v,0,2,1.25);return true;}};
+			refs.ejectLevel={set:v=>{if(!Number.isFinite(v))return false;ejectLevel=clamp(v,0,2,.8);return true;}};
+			// Simple transient physical air displacement and reentry shock.
+			// These one-shots do not synthesize musical tones or beats.
+			const makeEvent=kind=>{
+				const frames=Math.ceil(ctx.sampleRate*(kind==='reentry'?.66:.33));
+				const buffer=ctx.createBuffer(1,frames,ctx.sampleRate);
+				const data=buffer.getChannelData(0);
+				let seed=kind==='reentry'?0xC05A71A1:0xA1906C13,low=0;
+				for(let i=0;i<frames;i++){
+					const t=i/ctx.sampleRate;
+					seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+					const noise=seed/2147483648-1;
+					low=.965*low+.035*noise;
+					let sample;
+					if(kind==='reentry'){
+						const shock=.58*Math.sin(2*Math.PI*(118*t-61*t*t))*Math.exp(-t*11);
+						const atmosphere=.46*(noise*.3+low)*Math.exp(-t*6.5);
+						const trailing=.16*Math.sin(2*Math.PI*53*t)*Math.exp(-t*5);
+						sample=shock+atmosphere+trailing;
+					}else{
+						const seal=(noise-low)*.42*Math.exp(-t*22);
+						const unweight=.14*Math.sin(2*Math.PI*(310*t-100*t*t))*Math.exp(-t*19);
+						sample=seal+unweight;
+					}
+					data[i]=Math.tanh(sample*.85);
+				}
+				return buffer;
+			};
+			const reentry=makeEvent('reentry'),eject=makeEvent('eject');
+			const voices=new Set();
+			const release=item=>{
+				if(!voices.delete(item))return;
+				try{item.source.disconnect();}catch{}
+				try{item.gain.disconnect();}catch{}
+			};
+			const fire=(kind,v,at)=>{
+				if(!Number.isFinite(v)||v<=0)return false;
+				const weight=kind==='reentry'?reentryLevel:ejectLevel;
+				if(weight<=0)return false;
+				if(voices.size>=3){const oldest=voices.values().next().value;
+					try{oldest.source.stop();}catch{}release(oldest);}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=kind==='reentry'?reentry:eject;
+				gain.gain.value=Math.min(1.4,(kind==='reentry'?.48:.27)*weight*
+					(.28+.72*clamp(v,0,1,0)));
+				source.connect(gain);gain.connect(output);
+				const voice={source,gain};voices.add(voice);
+				source.onended=()=>release(voice);
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			};
+			refs.reentry={set:(v,at)=>fire('reentry',v,at)};
+			refs.eject={set:(v,at)=>fire('eject',v,at)};
+			disposers.push(()=>{for(const voice of [...voices]){
+				try{voice.source.stop();}catch{}release(voice);
 			}});
 			break;
 		}

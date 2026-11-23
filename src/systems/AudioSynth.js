@@ -947,6 +947,12 @@ export class AudioSynth {
     this._stemMusic?.setMicroBees?.(bees,playerScreenX);
   }
 
+  /** Actual low-gravity and rider altitude for Space Mountain source field. */
+  setSpaceMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setSpaceMotion?.(snapshot) === true;
+  }
+
   /** Read-only same-tick physics snapshots prove real geyser eruptions.
    * A simple airborne edge is deliberately NOT a valid geyser trigger.
    */

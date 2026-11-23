@@ -67,8 +67,11 @@ export class StemMusicDirector {
 		this._pendingJellyImpact = 0;
 		this._pendingVentCrust = 0;
 		this._pendingCandyImpact = 0;
+		this._pendingSpaceImpact = 0;
 		this._steamLastSent = NaN;
 		this._candyLastSpeed = NaN;
+		this._spaceLastField = NaN;
+		this._spaceLastGravity = NaN;
 		this.microBees = null;
 		this.hydrostatic = new HydrostaticPressure();
 		this._hydroLastSent = NaN;
@@ -202,6 +205,7 @@ export class StemMusicDirector {
 		this._pendingJellyImpact = 0;
 		this._pendingVentCrust = 0;
 		this._pendingCandyImpact = 0;
+		this._pendingSpaceImpact = 0;
 			this._steamLastSent = NaN;
 			this.microBees?.dispose();
 			this.microBees=null;
@@ -329,6 +333,9 @@ export class StemMusicDirector {
 		if (this.biome !== 'sky-jellyfish-mountain') this._pendingJellyImpact=0;
 		if (this.biome !== 'vertigo-vents') this._pendingVentCrust=0;
 		if (this.biome !== 'candy-cane-canyon') this._pendingCandyImpact=0;
+		if (this.biome !== 'space-mountain') this._pendingSpaceImpact=0;
+		this._spaceLastField=NaN;
+		this._spaceLastGravity=NaN;
 		this._candyLastSpeed=NaN;
 		this._ventLastLift=NaN;
 		this._steamLastSent=NaN;
@@ -400,6 +407,12 @@ export class StemMusicDirector {
 			if(impulse<=0)return;
 			this._pendingSteamImpact=Math.max(this._pendingSteamImpact||0,impulse);
 			if(!this.airborne)this._applySteamImpact();
+		} else if (this.biome === 'space-mountain') {
+			if(this.transportPaused)return;
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingSpaceImpact=Math.max(this._pendingSpaceImpact||0,impulse);
+			if(!this.airborne)this._applySpaceImpact();
 		} else if (this.biome === 'candy-cane-canyon') {
 			if(this.transportPaused)return;
 			const impulse=impactFromLanding(landing);
@@ -448,6 +461,43 @@ export class StemMusicDirector {
 		this._pendingVentCrust=0;
 		if(impulse>0&&!this.menuMode&&this.biome==='vertigo-vents')
 			this.mixer?.setEffectParam('drums','ventforge','crustImpact',impulse);
+	}
+
+	/** Read-only actual physics and rider/ground geometry for Space Mountain.
+	 * Low-gravity 0.7x zone is real in EffectivePhysics; grounded height is
+	 * exactly zero, and airborne altitude comes from actual terrain/sled y.
+	 */
+	setSpaceMotion({gravityPxS2,terrainY,riderY,vy,grounded}={}){
+		if(!this.started||this.menuMode||this.transportPaused||
+			this.biome!=='space-mountain'||typeof grounded!=='boolean'||
+			![gravityPxS2,terrainY,riderY,vy].every(Number.isFinite)||
+			gravityPxS2<=0)return false;
+		const altitude=grounded?0:Math.max(0,terrainY-riderY);
+		const distance=Math.max(0,Math.min(1,altitude/700));
+		const gravity=Math.max(0,Math.min(1,(900-gravityPxS2)/900));
+		// No guessed jump clock. Actual distance and gravity shape only the
+		// long source-fed field. Grounded must never make false altitude.
+		const openness=grounded?0:Math.max(0,Math.min(1,
+			distance*.82+gravity*.35));
+		if(!Number.isFinite(this._spaceLastField)||
+			Math.abs(openness-this._spaceLastField)>.025){
+			this._spaceLastField=openness;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'orbitfield','weightless',openness);
+		}
+		if(!Number.isFinite(this._spaceLastGravity)||
+			Math.abs(gravity-this._spaceLastGravity)>.025){
+			this._spaceLastGravity=gravity;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'orbitfield','lowGravity',gravity);
+		}
+		return true;
+	}
+	_applySpaceImpact(){
+		const impulse=this._pendingSpaceImpact||0;
+		this._pendingSpaceImpact=0;
+		if(impulse>0&&!this.menuMode&&!this.transportPaused&&this.biome==='space-mountain')
+			this.mixer?.setEffectParam('drums','orbitfield','reentry',impulse);
 	}
 
 	/** Real original-stem Candy Cane sugar fizz follows actual rider speed.
@@ -615,12 +665,20 @@ export class StemMusicDirector {
 		if(next&&!this.menuMode&&this.biome==='steampunk-slopes')
 			this.mixer?.setEffectParam('drums','steamworks','release',
 				Math.max(.18,clamp(this.speedPxS/1600,0,1)));
+		if(next&&!this.menuMode&&!this.transportPaused&&this.biome==='space-mountain')
+			this.mixer?.setEffectParam('other','orbitfield','eject',
+				Math.max(.25,Math.min(1,this.speedPxS/1800)));
 		if(next&&!this.menuMode&&!this.transportPaused&&this.biome==='candy-cane-canyon')
 			this.mixer?.setEffectParam('other','sugarfizz','wrapper',
 				Math.max(.2,Math.min(1,this.speedPxS/1800)));
 		if(next&&!this.menuMode&&this.biome==='sky-jellyfish-mountain')
 			this.mixer?.setEffectParam('other','jellybloom','lift',.80);
 		this.airborne = next;
+		if(this.biome==='space-mountain'&&!this.menuMode&&!next){
+			this._spaceLastField=0;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'orbitfield','weightless',0);
+		}
 		if(this.biome==='candy-cane-canyon'&&!this.menuMode)
 			for(const stem of ['bass','drums','guitar','piano','other'])
 				this.mixer?.setEffectParam(stem,'sugarfizz','airborne',next);
@@ -650,6 +708,7 @@ export class StemMusicDirector {
 			this._applyJellyImpact();
 			this._applyVentCrust();
 			this._applyCandyImpact();
+			this._applySpaceImpact();
 		}
 		if(this.biome==='crystal-cavern'&&!this.menuMode){
 			for(const stem of ['bass','guitar','piano','other'])

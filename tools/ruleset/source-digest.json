@@ -3,7 +3,7 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 6,
-  "attestation": "no-behavior-change: same-physics-tick geyser cooldown read-only audio observer; RunScene physics, input, collision, score, replay and hazard launch unchanged",
+  "attestation": "no-behavior-change: read-only Space Mountain actual gravity and terrain/rider altitude passed from RunScene after authoritative physics tick into cosmetic original-stem Web Audio; controls, physics, replay, scoring and clock unchanged",
   "changedFiles": [
     "src/scenes/RunScene.js"
   ],
@@ -14,7 +14,7 @@
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:41cfcf576e47aa63014b54bd86ea2d3ffd90fe7f7e7eef5851e2d04ea5a3946f",
     "src/entities/TerrainMesh.js": "sha256:da3148ca8ba96289a17e5347017bc5bd5696d1635b8349298fcd102f3bff39a0",
-    "src/scenes/RunScene.js": "sha256:2e7e1dba359b2f402ca5c73ce5edbd0a10603aae297b807d61643c0f23566b2a",
+    "src/scenes/RunScene.js": "sha256:f93d590249ca7df704751d4ed35235373a52dbd874a0dd93034eec363e0f2035",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:2b71d75b335addfee743ee5b172893c5eed8cef522a957c133fb3a7749f03f89",
