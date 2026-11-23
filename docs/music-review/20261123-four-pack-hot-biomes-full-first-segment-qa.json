@@ -1,0 +1,200 @@
+{
+  "format": "bbs-original-ogg-game-music-bus-v1",
+  "source": "Original OGG first segment, 2.5s, each original biome voice lead",
+  "sampleRate": 48000,
+  "sampleSeconds": 12,
+  "maxVocalsOnly": true,
+  "limitations": "Real StemFXMixer source, source FX, impulse room, music lowpass, default/master music volumes, and compressor (-10dB/6:1). Excludes gameplay SFX/wind/static, physical event transients, adaptive re-performances, full-song peak and inter-sample true peak.",
+  "scenarios": [
+    {
+      "id": "default-instrumental",
+      "master": 0.8,
+      "music": 0.6,
+      "vocals": false
+    },
+    {
+      "id": "maximum-music-with-vocals",
+      "master": 1,
+      "music": 1,
+      "vocals": true
+    }
+  ],
+  "results": [
+    {
+      "pack": "01_FEsxYVStla4",
+      "trackId": "FEsxYVStla4",
+      "biome": "garbage-dump-glacier",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.08701235926782193,
+      "samplePeak": 0.5533214211463928,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "01_FEsxYVStla4",
+      "trackId": "FEsxYVStla4",
+      "biome": "vertigo-vents",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.11302128742309411,
+      "samplePeak": 0.46830785274505615,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "01_FEsxYVStla4",
+      "trackId": "FEsxYVStla4",
+      "biome": "crystal-cavern",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.05787026774566184,
+      "samplePeak": 0.3550243675708771,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "01_FEsxYVStla4",
+      "trackId": "FEsxYVStla4",
+      "biome": "bitstream-bluffs",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.053373693983578406,
+      "samplePeak": 0.3291899859905243,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "03_WRBGQUqD54U",
+      "trackId": "WRBGQUqD54U",
+      "biome": "garbage-dump-glacier",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.12482812535842391,
+      "samplePeak": 0.6958901286125183,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "03_WRBGQUqD54U",
+      "trackId": "WRBGQUqD54U",
+      "biome": "vertigo-vents",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.09450594757139409,
+      "samplePeak": 0.5436280965805054,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "03_WRBGQUqD54U",
+      "trackId": "WRBGQUqD54U",
+      "biome": "crystal-cavern",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.08956371075019715,
+      "samplePeak": 0.5685171484947205,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "03_WRBGQUqD54U",
+      "trackId": "WRBGQUqD54U",
+      "biome": "bitstream-bluffs",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.05559901500314234,
+      "samplePeak": 0.47797083854675293,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "31_FYImnz5-hXs",
+      "trackId": "FYImnz5-hXs",
+      "biome": "garbage-dump-glacier",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.1013875489896281,
+      "samplePeak": 0.6550708413124084,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "31_FYImnz5-hXs",
+      "trackId": "FYImnz5-hXs",
+      "biome": "vertigo-vents",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.10874536777157476,
+      "samplePeak": 0.5661352872848511,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "31_FYImnz5-hXs",
+      "trackId": "FYImnz5-hXs",
+      "biome": "crystal-cavern",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.057839018632634576,
+      "samplePeak": 0.46776267886161804,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "31_FYImnz5-hXs",
+      "trackId": "FYImnz5-hXs",
+      "biome": "bitstream-bluffs",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.0495755483713173,
+      "samplePeak": 0.423985093832016,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "33_local-one-more-run-bitstream-bluffs",
+      "trackId": "local-one-more-run-bitstream-bluffs",
+      "biome": "garbage-dump-glacier",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.17738553147540004,
+      "samplePeak": 1.4388947486877441,
+      "overUnitySamples": 92,
+      "nearUnitySamples": 118,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "33_local-one-more-run-bitstream-bluffs",
+      "trackId": "local-one-more-run-bitstream-bluffs",
+      "biome": "vertigo-vents",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.08345940724107669,
+      "samplePeak": 0.6498963236808777,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "33_local-one-more-run-bitstream-bluffs",
+      "trackId": "local-one-more-run-bitstream-bluffs",
+      "biome": "crystal-cavern",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.22806639043357566,
+      "samplePeak": 1.0796033143997192,
+      "overUnitySamples": 42,
+      "nearUnitySamples": 58,
+      "nonfiniteSamples": 0
+    },
+    {
+      "pack": "33_local-one-more-run-bitstream-bluffs",
+      "trackId": "local-one-more-run-bitstream-bluffs",
+      "biome": "bitstream-bluffs",
+      "scenario": "maximum-music-with-vocals",
+      "rms": 0.062356311965073685,
+      "samplePeak": 0.5788365602493286,
+      "overUnitySamples": 0,
+      "nearUnitySamples": 0,
+      "nonfiniteSamples": 0
+    }
+  ]
+}

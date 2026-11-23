@@ -54,6 +54,8 @@ export class StemMusicDirector {
 		this.scheduled = new Set();
 		this.inflight = new Map();
 		this.biome = HOME_BIOME;
+		this._arcadeLastBridge=null;
+		this._arcadeLastProgress=NaN;
 		this.vocals = false;
 		this.musicCaptions = false;
 		this.captionWords = [];
@@ -225,7 +227,13 @@ export class StemMusicDirector {
 		this.mixer?.selectBiome(next ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(next ? HOME_BIOME : this.biome);
 		this.adaptive?.setEnabled(this.dynamicOrchestra && !next);
-		this._applyMusicTimbres(true);
+		// Menu↔run is a musical mix change, not a biome jump: give it
+		// a deliberate three-quarter-second crossfade without seeking,
+		// restarting, or changing the original source clock.
+		this._applyMusicTimbres(true, .75);
+		// The shared convolution tail is not controlled by per-source
+		// DSP replacement. Make it follow the same 750ms clean mix gate.
+		this.mixer?.setRoomWetEnabled?.(!next,.75);
 	}
 
 	/** The real physical BSOD proximity drives only accompaniment corruption.
@@ -245,15 +253,23 @@ export class StemMusicDirector {
 	 * an original instrumental source with its re-performed alternative.
 	 * The separately synthesized biome melody stays active in BOTH modes.
 	 */
-	_applyMusicTimbres(force=false) {
+	_applyMusicTimbres(force=false, fadeSeconds=.18) {
 		if (!this.mixer || !this.gains) return;
 		const lead = this._activeVoiceFor(this.pack);
 		const sourceNames = ['bass','drums','guitar','piano','other'];
-		if (lead) sourceNames.push(lead);
+		if (this.menuMode) {
+			// Don't leave dormant melodic leads or a vocal room-send wet
+			// behind in Title, Game Over or the pause-screen jukebox.
+			for (const name of this.gains.keys())
+				if (name.startsWith('voice:') || name === 'vocals')
+					sourceNames.push(name);
+		} else if (lead) sourceNames.push(lead);
 		for (const name of sourceNames) {
 			if (!this.gains.has(name)) continue;
-			const effects = name===lead ? melodyPreset(this.menuMode ? 'debutmont' : this.biome) :
-				this.menuMode ? [] : orchestraPreset(this.biome,name);
+			// In menus EVERY original source is raw, including the selected
+			// Debutmont melody lead. Gameplay alone gets DSP/biome FX.
+			const effects = this.menuMode ? [] :
+				name===lead ? melodyPreset(this.biome) : orchestraPreset(this.biome,name);
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
 				// A rider entering Debumont while airborne is above the powder already.
@@ -268,7 +284,7 @@ export class StemMusicDirector {
 						e.type==='jellybloom' ? {...e,airborne:true} :
 						e.type==='sugarfizz' ? {...e,airborne:true} :
 						e.id==='crystalPercussion' ? {...e,gain:.48} : e) : effects;
-				this.mixer.replaceEffects(name,initial,.18);
+				this.mixer.replaceEffects(name,initial,fadeSeconds);
 				this._timbreSignatures.set(name,key);
 			}
 			// Restore each source's normal biome room send in either
@@ -330,6 +346,7 @@ export class StemMusicDirector {
 			(next === 'garbage-dump-glacier' || this.biome === 'garbage-dump-glacier'))
 			this.scrapPitch?.reset();
 		this.biome = next;
+		if(previous!==next){this._arcadeLastBridge=null;this._arcadeLastProgress=NaN;}
 		if (this.biome !== 'debutmont') this._pendingSnowImpact = 0;
 		if (this.biome !== 'crystal-cavern') this._pendingCrystalImpact = 0;
 		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
@@ -477,6 +494,33 @@ export class StemMusicDirector {
 		this._pendingVentCrust=0;
 		if(impulse>0&&!this.menuMode&&this.biome==='vertigo-vents')
 			this.mixer?.setEffectParam('drums','ventforge','crustImpact',impulse);
+	}
+
+	/** Arcade is both a standalone soundscape and the true transition
+	 * corridor between biome identities. The generator alone chooses
+	 * whether this is a bridge; its x geometry drives the exact phase.
+	 * No source restart, no beat inference, no gameplay writeback.
+	 */
+	setArcadeTransition({bridge,progress}={}){
+		if(!this.started||this.menuMode||this.transportPaused||
+			this.biome!==HOME_BIOME||typeof bridge!=='boolean'||
+			!Number.isFinite(progress)||progress<0||progress>1)return false;
+		const changed=this._arcadeLastBridge!==bridge;
+		const progressChanged=changed||!Number.isFinite(this._arcadeLastProgress)||
+			(progress!==this._arcadeLastProgress && (
+			Math.abs(progress-this._arcadeLastProgress)>=.018||
+			progress===0||progress===1));
+		if(changed){
+			this._arcadeLastBridge=bridge;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'arcadeglue','bridge',bridge);
+		}
+		if(progressChanged){
+			this._arcadeLastProgress=progress;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'arcadeglue','progress',progress);
+		}
+		return true;
 	}
 
 	/** A genuine, unwarded thermalUpdraft zone plus EffectivePhysics

@@ -70,6 +70,30 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(chains[0].find('effect7').refs.impulse).toBeDefined();
 		for(const chain of chains)chain.dispose();
 	});
+	test('Arcade uses ONE source-fed chip processor for standalone and terrain-driven bridge',()=>{
+		const ctx=fakeContext(),output=ctx.createGain();
+		const preset=orchestraPreset('bitstream-bluffs','drums');
+		expect(preset).toEqual([{type:'arcadeglue',id:'arcadeglue',bridge:false,
+			progress:0,intensity:1.25,chop:1.2}]);
+		const chain=buildMusicChain(ctx,preset,output);
+		const arcade=chain.find('arcadeglue');expect(arcade).toBeDefined();
+		for(const key of ['bridge','progress','intensity','chop'])
+			expect(arcade.refs[key]).toBeDefined();
+		// No invented musical note source or on-beat physical SFX.
+		expect(ctx._bufferSources).toHaveLength(0);
+		expect(arcade.set('bridge','true',ctx.currentTime)).toBe(false);
+		expect(arcade.set('progress',NaN,ctx.currentTime)).toBe(false);
+		expect(arcade.set('bridge',true,ctx.currentTime)).toBe(true);
+		for(const progress of [0,.12,.25,.5,.75,.92,1])
+			expect(arcade.set('progress',progress,ctx.currentTime)).toBe(true);
+		expect(arcade.set('intensity',1.55,ctx.currentTime)).toBe(true);
+		expect(arcade.set('chop',1.6,ctx.currentTime)).toBe(true);
+		expect(arcade.set('bridge',false,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(0);
+		chain.dispose();
+		expect(ctx._bufferSources).toHaveLength(0);
+	});
+
 	test('Pyramid source-fed sandstone resonators and true thermal sound release bounded',()=>{
 		const ctx=fakeContext();
 		const chain=buildMusicChain(ctx,[{type:'sunstone',id:'sunstone',loft:0,
@@ -560,6 +584,34 @@ describe('Modular cheap Web Audio processors', () => {
 			jest.runOnlyPendingTimers();
 			for (const dispose of waitingDisposals)expect(dispose).toHaveBeenCalledTimes(1);
 		} finally {jest.useRealTimers();}
+	});
+	test('clean-menu output gate silences lingering convolution tails in the same 750ms',()=>{
+		jest.useFakeTimers();
+		try{
+			const ctx=fakeContext(),mix=new StemFXMixer(ctx,ctx.createGain());
+			const room=mix.space;
+			expect(room.wetEnabled).toBe(true);
+			expect(room.outputGate.gain.value).toBe(1);
+			expect(room.active.gain.connections).toContain(room.outputGate);
+			expect(mix.setRoomWetEnabled('false',.75)).toBe(false);
+			expect(mix.setRoomWetEnabled(false,.75)).toBe(true);
+			expect(room.outputGate.gain.value).toBe(0);
+			expect(room.wetEnabled).toBe(false);
+			expect(mix.setRoomWetEnabled(false,.75)).toBe(false);
+			// Rapid resume reverses only the room master gate, without
+			// reallocating convolvers or re-enabling old source sends.
+			ctx.currentTime+=.11;
+			const previousPaths=room.paths.size;
+			expect(mix.setRoomWetEnabled(true,.75)).toBe(true);
+			expect(room.outputGate.gain.value).toBe(1);
+			expect(room.paths.size).toBe(previousPaths);
+			expect(mix.setRoomWetEnabled(true,.75)).toBe(false);
+			expect(mix.setRoomWetEnabled(false,NaN)).toBe(true);
+			expect(room.outputGate.gain.value).toBe(0);
+			const gate=room.outputGate;
+			mix.destroy();
+			expect(gate.connections).toHaveLength(0);
+		}finally{jest.useRealTimers();}
 	});
 	test('source-level gain, ducking, independent send, biome and chain replacement', () => {
 		jest.useFakeTimers();

@@ -11,7 +11,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: ['./index.html', './tools/music/snowpack-audition.html', './tools/music/scrapheap-audition.html', './tools/music/hydrostatic-audition.html', './tools/music/microbox-audition.html', './tools/music/crystallattice-audition.html', './tools/music/scrap-clangs-audition.html', './tools/music/steamworks-audition.html', './tools/music/jellybloom-audition.html', './tools/music/ventforge-audition.html', './tools/music/sugarfizz-audition.html', './tools/music/orbitfield-audition.html', './tools/music/sunstone-audition.html'], // Game + isolated biome DSP auditions
+      input: ['./index.html', './tools/music/snowpack-audition.html', './tools/music/scrapheap-audition.html', './tools/music/hydrostatic-audition.html', './tools/music/microbox-audition.html', './tools/music/crystallattice-audition.html', './tools/music/scrap-clangs-audition.html', './tools/music/steamworks-audition.html', './tools/music/jellybloom-audition.html', './tools/music/ventforge-audition.html', './tools/music/sugarfizz-audition.html', './tools/music/orbitfield-audition.html', './tools/music/sunstone-audition.html', './tools/music/arcadeglue-audition.html', './tools/music/cross-pack-original-stem-audit.html', './tools/music/final-game-music-bus-audit.html'], // Game + isolated biome DSP auditions
     },
   },
   server: {

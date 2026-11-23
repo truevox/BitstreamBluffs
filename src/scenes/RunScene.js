@@ -66,7 +66,7 @@ import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
 import { BiomeFx } from '../entities/BiomeFx.js';
-import { bridgeLook } from '../systems/BiomeTransition.js';
+import { bridgeLook, bridgeProgress } from '../systems/BiomeTransition.js';
 import { beesAt } from '../systems/MicroBees.js';
 import { WorldDanceEnvelope, worldDanceMotionAllowed, readWorldDanceAudio } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
@@ -2042,6 +2042,18 @@ export class RunScene extends Phaser.Scene {
     // owed: a run with no biome content never repaints beyond a palette setting change. #65 presentation: the look
     // (what the world is painted as) can change at other x than that (inside an arcade bridge) and repaints the same way.
     this._updateLook(biomeNow, biomeChanged && (def !== null || !first));
+    // The canonical terrain generator, NOT the visual dissolve or a
+    // synthetic timer, owns Arcade corridor progress. The optional
+    // audio-only sample preserves original six-stem song timing.
+    // A future stand-alone Arcade sector is supported explicitly.
+    if (biomeNow === null || biomeNow === 'bitstream-bluffs') {
+      const span = biomeNow === null ? this._bridgeSpan : null;
+      this.registry?.get?.(REG.AUDIO)?.setArcadeTransition?.({
+        bridge: !!span,
+        progress: span ? Math.max(0,Math.min(1,bridgeProgress(span,this.sled.x))) : 0
+      });
+    }
+
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;
       this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });

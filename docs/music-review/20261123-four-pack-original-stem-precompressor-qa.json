@@ -1,0 +1,805 @@
+{
+  "format": "bbs-original-stem-precompressor-headroom-audit-v1",
+  "sampleSeconds": 2.5,
+  "source": "original archived OGG segment 0000",
+  "notes": "Dry and processed cases for each biome use the SAME original melodic lead. Browser OfflineAudioContext at 48k stereo with fixed TEST gains and NO final real-game compressor, room/SFX or mobile output.",
+  "renderedDryAndProcessedCases": 96,
+  "results": [
+    {
+      "pack": "01_FEsxYVStla4",
+      "trackId": "FEsxYVStla4",
+      "test": {
+        "durationSeconds": 2.5,
+        "sampleRate": 48000,
+        "master": 0.55,
+        "voiceLead": 0.75,
+        "roleGains": {
+          "drums": 0.9,
+          "bass": 0.75,
+          "guitar": 0.65,
+          "piano": 0.65,
+          "other": 0.65
+        }
+      },
+      "cases": [
+        {
+          "biome": "debutmont",
+          "dry": {
+            "rms": 0.02037080995133489,
+            "samplePeak": 0.13569355010986328,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.019659241303106388,
+          "samplePeak": 0.11254633218050003,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.8294154887198228,
+          "rmsRelativeDry": 0.9650692019645555
+        },
+        {
+          "biome": "garbage-dump-glacier",
+          "dry": {
+            "rms": 0.04345583867716726,
+            "samplePeak": 0.1741209626197815,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.16386669205477233,
+          "samplePeak": 0.760285496711731,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 4.366421396210203,
+          "rmsRelativeDry": 3.7708785986650812
+        },
+        {
+          "biome": "underwater-mountain",
+          "dry": {
+            "rms": 0.04215419764736237,
+            "samplePeak": 0.1621328443288803,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.04356099583116818,
+          "samplePeak": 0.1658749133348465,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.0230802649608461,
+          "rmsRelativeDry": 1.0333726713428226
+        },
+        {
+          "biome": "micro-mountain",
+          "dry": {
+            "rms": 0.0268701034612547,
+            "samplePeak": 0.17566858232021332,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.011337992546527014,
+          "samplePeak": 0.11809002608060837,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.6722319069288711,
+          "rmsRelativeDry": 0.4219556713979838
+        },
+        {
+          "biome": "crystal-cavern",
+          "dry": {
+            "rms": 0.05779744158790202,
+            "samplePeak": 0.22950199246406555,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.023997773269957626,
+          "samplePeak": 0.1304038017988205,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.5682033536995919,
+          "rmsRelativeDry": 0.41520476703904424
+        },
+        {
+          "biome": "steampunk-slopes",
+          "dry": {
+            "rms": 0.018145490185574657,
+            "samplePeak": 0.1287529170513153,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.06264169967653796,
+          "samplePeak": 0.34674546122550964,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 2.6931076139215704,
+          "rmsRelativeDry": 3.4521910973965864
+        },
+        {
+          "biome": "sky-jellyfish-mountain",
+          "dry": {
+            "rms": 0.0338791071211931,
+            "samplePeak": 0.15934821963310242,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.030655594826288265,
+          "samplePeak": 0.1580437421798706,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.9918136678512295,
+          "rmsRelativeDry": 0.9048525014731463
+        },
+        {
+          "biome": "vertigo-vents",
+          "dry": {
+            "rms": 0.04584113764767829,
+            "samplePeak": 0.19054250419139862,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.30260289193244794,
+          "samplePeak": 0.5879057049751282,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 3.0854307676390196,
+          "rmsRelativeDry": 6.601120902761318
+        },
+        {
+          "biome": "candy-cane-canyon",
+          "dry": {
+            "rms": 0.0382341471210929,
+            "samplePeak": 0.15066790580749512,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.13881587257805544,
+          "samplePeak": 0.4078989624977112,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 2.707271733230793,
+          "rmsRelativeDry": 3.6306778895421967
+        },
+        {
+          "biome": "space-mountain",
+          "dry": {
+            "rms": 0.02606517956633089,
+            "samplePeak": 0.16915501654148102,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.024936261324854513,
+          "samplePeak": 0.16222329437732697,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.9590214803800736,
+          "rmsRelativeDry": 0.9566886451480798
+        },
+        {
+          "biome": "pyramid-peak",
+          "dry": {
+            "rms": 0.0213017440093422,
+            "samplePeak": 0.190962016582489,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.06913947762289217,
+          "samplePeak": 0.46311861276626587,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 2.425187066278254,
+          "rmsRelativeDry": 3.245719110724925
+        },
+        {
+          "biome": "bitstream-bluffs",
+          "dry": {
+            "rms": 0.034084299803720325,
+            "samplePeak": 0.16969455778598785,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.03229555572264607,
+          "samplePeak": 0.19739972054958344,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.16326488677696,
+          "rmsRelativeDry": 0.9475199991968439
+        }
+      ]
+    },
+    {
+      "pack": "03_WRBGQUqD54U",
+      "trackId": "WRBGQUqD54U",
+      "test": {
+        "durationSeconds": 2.5,
+        "sampleRate": 48000,
+        "master": 0.55,
+        "voiceLead": 0.75,
+        "roleGains": {
+          "drums": 0.9,
+          "bass": 0.75,
+          "guitar": 0.65,
+          "piano": 0.65,
+          "other": 0.65
+        }
+      },
+      "cases": [
+        {
+          "biome": "debutmont",
+          "dry": {
+            "rms": 0.019562785078714638,
+            "samplePeak": 0.13366180658340454,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.01853967783684604,
+          "samplePeak": 0.1234593316912651,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.9236694823081482,
+          "rmsRelativeDry": 0.9477013504083428
+        },
+        {
+          "biome": "garbage-dump-glacier",
+          "dry": {
+            "rms": 0.041034019644858026,
+            "samplePeak": 0.14782622456550598,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.12359889434878606,
+          "samplePeak": 0.6667097806930542,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 4.510091376903265,
+          "rmsRelativeDry": 3.012107890440956
+        },
+        {
+          "biome": "underwater-mountain",
+          "dry": {
+            "rms": 0.0393112370859751,
+            "samplePeak": 0.15631075203418732,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.04092078568266698,
+          "samplePeak": 0.16704513132572174,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.0686733263824786,
+          "rmsRelativeDry": 1.040943727951673
+        },
+        {
+          "biome": "micro-mountain",
+          "dry": {
+            "rms": 0.024827065967593504,
+            "samplePeak": 0.11134278774261475,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.011013391870358578,
+          "samplePeak": 0.05706906318664551,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.5125528500199676,
+          "rmsRelativeDry": 0.44360424565408724
+        },
+        {
+          "biome": "crystal-cavern",
+          "dry": {
+            "rms": 0.05756411700277919,
+            "samplePeak": 0.23489026725292206,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.02163421588991082,
+          "samplePeak": 0.11730634421110153,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.49940913083806043,
+          "rmsRelativeDry": 0.3758281550443364
+        },
+        {
+          "biome": "steampunk-slopes",
+          "dry": {
+            "rms": 0.017051357373680676,
+            "samplePeak": 0.13102680444717407,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.05936958676850377,
+          "samplePeak": 0.3865302801132202,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 2.9500092118102232,
+          "rmsRelativeDry": 3.4818100088701827
+        },
+        {
+          "biome": "sky-jellyfish-mountain",
+          "dry": {
+            "rms": 0.03358430820321437,
+            "samplePeak": 0.15593722462654114,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.03028284737933942,
+          "samplePeak": 0.15357905626296997,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.9848774507227583,
+          "rmsRelativeDry": 0.9016963278237494
+        },
+        {
+          "biome": "vertigo-vents",
+          "dry": {
+            "rms": 0.042283522053132384,
+            "samplePeak": 0.18094809353351593,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.27657002693556865,
+          "samplePeak": 0.5497446060180664,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 3.038134280846902,
+          "rmsRelativeDry": 6.540846493062661
+        },
+        {
+          "biome": "candy-cane-canyon",
+          "dry": {
+            "rms": 0.03668115013520547,
+            "samplePeak": 0.11782196164131165,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.13390316921917753,
+          "samplePeak": 0.40180516242980957,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 3.4102739152572856,
+          "rmsRelativeDry": 3.650462668853485
+        },
+        {
+          "biome": "space-mountain",
+          "dry": {
+            "rms": 0.02391461216456113,
+            "samplePeak": 0.09826231002807617,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.02328737426990476,
+          "samplePeak": 0.11309985816478729,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.150999382494383,
+          "rmsRelativeDry": 0.9737717722394902
+        },
+        {
+          "biome": "pyramid-peak",
+          "dry": {
+            "rms": 0.019553295201435308,
+            "samplePeak": 0.16090746223926544,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.06453048187415092,
+          "samplePeak": 0.3992645740509033,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 2.48133037768756,
+          "rmsRelativeDry": 3.3002356487419093
+        },
+        {
+          "biome": "bitstream-bluffs",
+          "dry": {
+            "rms": 0.031960344263077804,
+            "samplePeak": 0.0769408568739891,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.030409397240242674,
+          "samplePeak": 0.07546749711036682,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.980850749218516,
+          "rmsRelativeDry": 0.951472768563796
+        }
+      ]
+    },
+    {
+      "pack": "31_FYImnz5-hXs",
+      "trackId": "FYImnz5-hXs",
+      "test": {
+        "durationSeconds": 2.5,
+        "sampleRate": 48000,
+        "master": 0.55,
+        "voiceLead": 0.75,
+        "roleGains": {
+          "drums": 0.9,
+          "bass": 0.75,
+          "guitar": 0.65,
+          "piano": 0.65,
+          "other": 0.65
+        }
+      },
+      "cases": [
+        {
+          "biome": "debutmont",
+          "dry": {
+            "rms": 0.019758201196029234,
+            "samplePeak": 0.11641477793455124,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.03038102565721408,
+          "samplePeak": 0.18846070766448975,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.6188727153733262,
+          "rmsRelativeDry": 1.537641273909069
+        },
+        {
+          "biome": "garbage-dump-glacier",
+          "dry": {
+            "rms": 0.041090061072080804,
+            "samplePeak": 0.14199626445770264,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.17394263859420897,
+          "samplePeak": 0.7873294353485107,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 5.544719351282919,
+          "rmsRelativeDry": 4.233204674217354
+        },
+        {
+          "biome": "underwater-mountain",
+          "dry": {
+            "rms": 0.03912794150936878,
+            "samplePeak": 0.1415451318025589,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.04243038958508774,
+          "samplePeak": 0.16572141647338867,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.170802657519534,
+          "rmsRelativeDry": 1.0844012730628372
+        },
+        {
+          "biome": "micro-mountain",
+          "dry": {
+            "rms": 0.025734938083217106,
+            "samplePeak": 0.11866771429777145,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.015822248212309504,
+          "samplePeak": 0.0951368659734726,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.8017080849366224,
+          "rmsRelativeDry": 0.6148158647651029
+        },
+        {
+          "biome": "crystal-cavern",
+          "dry": {
+            "rms": 0.053081564925237044,
+            "samplePeak": 0.19768904149532318,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.03345900917071855,
+          "samplePeak": 0.1842341423034668,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.9319390741637306,
+          "rmsRelativeDry": 0.6303320035466933
+        },
+        {
+          "biome": "steampunk-slopes",
+          "dry": {
+            "rms": 0.017028887477436933,
+            "samplePeak": 0.12992599606513977,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.050051765886785976,
+          "samplePeak": 0.40101274847984314,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 3.0864704572192863,
+          "rmsRelativeDry": 2.93922700194619
+        },
+        {
+          "biome": "sky-jellyfish-mountain",
+          "dry": {
+            "rms": 0.033574453245753484,
+            "samplePeak": 0.13802793622016907,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.031742452548416275,
+          "samplePeak": 0.13887353241443634,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.0061262684745098,
+          "rmsRelativeDry": 0.9454346826163454
+        },
+        {
+          "biome": "vertigo-vents",
+          "dry": {
+            "rms": 0.04246137921626984,
+            "samplePeak": 0.15870994329452515,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.28354491893790684,
+          "samplePeak": 0.5866349935531616,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 3.696271206300646,
+          "rmsRelativeDry": 6.677713352025586
+        },
+        {
+          "biome": "candy-cane-canyon",
+          "dry": {
+            "rms": 0.036619702317356936,
+            "samplePeak": 0.13146008551120758,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.13066910358849693,
+          "samplePeak": 0.38868191838264465,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 2.95665347296239,
+          "rmsRelativeDry": 3.5682732332469738
+        },
+        {
+          "biome": "space-mountain",
+          "dry": {
+            "rms": 0.024286226742643777,
+            "samplePeak": 0.10820609331130981,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.023212110724928087,
+          "samplePeak": 0.11288661509752274,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.043255621222245,
+          "rmsRelativeDry": 0.955772626637399
+        },
+        {
+          "biome": "pyramid-peak",
+          "dry": {
+            "rms": 0.017668283933073285,
+            "samplePeak": 0.1138172522187233,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.049787991442580504,
+          "samplePeak": 0.311705082654953,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 2.7386452983063365,
+          "rmsRelativeDry": 2.81793023200076
+        },
+        {
+          "biome": "bitstream-bluffs",
+          "dry": {
+            "rms": 0.034670350016172524,
+            "samplePeak": 0.12809938192367554,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.03273281811150812,
+          "samplePeak": 0.12231411784887314,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.9548376893945563,
+          "rmsRelativeDry": 0.9441155943403914
+        }
+      ]
+    },
+    {
+      "pack": "33_local-one-more-run-bitstream-bluffs",
+      "trackId": "local-one-more-run-bitstream-bluffs",
+      "test": {
+        "durationSeconds": 2.5,
+        "sampleRate": 48000,
+        "master": 0.55,
+        "voiceLead": 0.75,
+        "roleGains": {
+          "drums": 0.9,
+          "bass": 0.75,
+          "guitar": 0.65,
+          "piano": 0.65,
+          "other": 0.65
+        }
+      },
+      "cases": [
+        {
+          "biome": "debutmont",
+          "dry": {
+            "rms": 0.04217967537801424,
+            "samplePeak": 0.36302095651626587,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.07071859628791656,
+          "samplePeak": 0.4122117757797241,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.1355040759506516,
+          "rmsRelativeDry": 1.676603616650354
+        },
+        {
+          "biome": "garbage-dump-glacier",
+          "dry": {
+            "rms": 0.05432519339482105,
+            "samplePeak": 0.3538534939289093,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.17099331768029763,
+          "samplePeak": 0.7733352184295654,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 2.1854672391193963,
+          "rmsRelativeDry": 3.1475878316265473
+        },
+        {
+          "biome": "underwater-mountain",
+          "dry": {
+            "rms": 0.05281901170685457,
+            "samplePeak": 0.32810577750205994,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.05933092851835317,
+          "samplePeak": 0.2933090627193451,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.8939466563264148,
+          "rmsRelativeDry": 1.1232873656864262
+        },
+        {
+          "biome": "micro-mountain",
+          "dry": {
+            "rms": 0.045713862631156635,
+            "samplePeak": 0.3631756901741028,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.036519814880182244,
+          "samplePeak": 0.355426162481308,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 0.9786617664605256,
+          "rmsRelativeDry": 0.7988783440778834
+        },
+        {
+          "biome": "crystal-cavern",
+          "dry": {
+            "rms": 0.06491343340572486,
+            "samplePeak": 0.37451276183128357,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.09750478427005146,
+          "samplePeak": 0.6696616411209106,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.7880876417839946,
+          "rmsRelativeDry": 1.5020740570079336
+        },
+        {
+          "biome": "steampunk-slopes",
+          "dry": {
+            "rms": 0.041899318550713584,
+            "samplePeak": 0.3620685636997223,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.06602990371537558,
+          "samplePeak": 0.4024031162261963,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.1114003163222008,
+          "rmsRelativeDry": 1.5759183203768603
+        },
+        {
+          "biome": "sky-jellyfish-mountain",
+          "dry": {
+            "rms": 0.04901635731110252,
+            "samplePeak": 0.3493921160697937,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.05211472740246375,
+          "samplePeak": 0.35454830527305603,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.014757600318126,
+          "rmsRelativeDry": 1.0632109414352466
+        },
+        {
+          "biome": "vertigo-vents",
+          "dry": {
+            "rms": 0.0562805638773276,
+            "samplePeak": 0.34953829646110535,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.2754428621515157,
+          "samplePeak": 0.6644236445426941,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.9008607962836697,
+          "rmsRelativeDry": 4.894102744810572
+        },
+        {
+          "biome": "candy-cane-canyon",
+          "dry": {
+            "rms": 0.05113038073377427,
+            "samplePeak": 0.3549572229385376,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.12957378221828467,
+          "samplePeak": 0.6161422729492188,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.7358212007870777,
+          "rmsRelativeDry": 2.5341837936421716
+        },
+        {
+          "biome": "space-mountain",
+          "dry": {
+            "rms": 0.04504939326588792,
+            "samplePeak": 0.3480820953845978,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.04552654477548925,
+          "samplePeak": 0.34906747937202454,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.002830895356275,
+          "rmsRelativeDry": 1.0105917410870577
+        },
+        {
+          "biome": "pyramid-peak",
+          "dry": {
+            "rms": 0.042450287572755825,
+            "samplePeak": 0.3566341996192932,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.0673351581373705,
+          "samplePeak": 0.45119786262512207,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.2651559023413221,
+          "rmsRelativeDry": 1.586212060918653
+        },
+        {
+          "biome": "bitstream-bluffs",
+          "dry": {
+            "rms": 0.04821063756911042,
+            "samplePeak": 0.3626564145088196,
+            "overUnitySampleCount": 0,
+            "finite": true
+          },
+          "rms": 0.04817658404749106,
+          "samplePeak": 0.4338928461074829,
+          "overUnitySampleCount": 0,
+          "finite": true,
+          "peakRelativeDry": 1.1964295370182427,
+          "rmsRelativeDry": 0.9992936512907439
+        }
+      ]
+    }
+  ]
+}

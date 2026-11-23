@@ -16,7 +16,7 @@
  *
  * Signal graph:
  *   music voices -> musicSrc -> musicFilter -> duck -> musicBus -+
- *   sfx voices  -----------------------------------> sfxBus ----+-> mix -> dry --------+-> gate -> master -> comp -> out
+ *   sfx voices  -----------------------------------> sfxBus ----+-> mix -> dry --------+-> gate -> master -> comp -> peakGuard -> out
  *   wind noise ------------------------------------> windGain --+      -> crusher -> wet +
  *   static noise -> staticGain ---------------------------------------------------------> master
  * The "glitch bus" is the dry/wet crusher + gate + static section: bit-crush (staircase WaveShaper), stutter
@@ -34,6 +34,7 @@ import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
 import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
 import { syntheticMeterAt } from './music/SyntheticMeterTiming.js';
 import { cosmeticRandom } from './CosmeticRandom.js';
+import { createOutputPeakGuard } from './music/OutputPeakGuard.js';
 
 /** SFX names playSfx() must support (callers outside the engineer's files may use these). */
 export const SFX = Object.freeze([
@@ -261,7 +262,12 @@ export class AudioSynth {
     n.comp.threshold.value = -10;
     n.comp.ratio.value = 6;
     n.master.connect(n.comp);
-    n.comp.connect(c.destination);
+    // Compressor can still overshoot 0 dBFS on short mixed transients.
+    // This post-compressor soft ceiling stays linear below 0.86 and
+    // protects the entire output, including SFX and wind/static.
+    n.peakGuard = createOutputPeakGuard(c);
+    n.comp.connect(n.peakGuard);
+    n.peakGuard.connect(c.destination);
     n.gate = g(1);
     n.gate.connect(n.master);
     n.mix = g(1);
@@ -947,6 +953,14 @@ export class AudioSynth {
     this._stemMusic?.setMicroBees?.(bees,playerScreenX);
   }
 
+  /** True arcade bridge geometry, read-only from terrain; standalone
+   * Arcade uses this exact same native original-source processor.
+   */
+  setArcadeTransition(sample) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setArcadeTransition?.(sample) === true;
+  }
+
   /** Verified physical thermal zone and actual gravity; one-way music only. */
   setThermalMotion(snapshot) {
     if (this._musicMode !== 'run' || this._paused) return false;
@@ -995,7 +1009,9 @@ export class AudioSynth {
         ]) {
           if (!node?.gain) continue;
           node.gain.cancelScheduledValues(t);
-          node.gain.setTargetAtTime(gain, t, 0.025);
+          // ~95% settled at 0.6s, virtually complete by 0.75s,
+          // matching the native original-stem menu transition.
+          node.gain.setTargetAtTime(gain, t, 0.20);
         }
       }
     } catch { /* headless audio and unsupported nodes remain harmless */ }
@@ -1014,8 +1030,12 @@ export class AudioSynth {
   _enterRunMusic(seed) {
     this._musicMode = 'run';
     this._jukeboxMode = false;
+    // #65: choose actual Debutmont WHILE still using the clean menu
+    // arrangement; only then crossfade into its gameplay processing.
+    // Reversing this order would replace the 750ms menu fade with the
+    // ordinary 180ms biome fade, as caught by real Chromium Web Audio.
+    this._stemMusic?.setBiome('debutmont');
     this._stemMusic?.setMenuMode(false);
-    this._stemMusic?.setBiome('bitstream-bluffs');
     this._onBsodState(null);
     this._setPaused(false);
     // Respect an explicit manual pause in the jukebox.

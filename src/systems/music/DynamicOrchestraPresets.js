@@ -25,7 +25,7 @@ export function melodyPreset(biome) {
 		case 'steampunk-slopes': return [distortion(.17),tremolo(8.5,.23)];
 		case 'micro-mountain': return [filter('tiny','highpass',1000),tremolo(10.5,.18)];
 		case 'vertigo-vents': return [distortion(.44),filter('volcanic','lowpass',2900)];
-		case HOME_BIOME: return [filter('arcade','lowpass',7000)];
+		case HOME_BIOME: return [filter('arcade','lowpass',7000),tremolo(5.6,.11)];
 		default: return [filter('arcade','lowpass',7000)];
 	}
 }
@@ -37,6 +37,8 @@ export function orchestraPreset(biome, stem) {
 	if (!BIOME_IDS.includes(biome)) return [];
 	// Powdery snow muffles the original performance without changing its notes or timing.
 	// Bass retains some warmth; jumping temporarily removes this effect in the director.
+	if (biome === HOME_BIOME) return [{type:'arcadeglue',id:'arcadeglue',
+		bridge:false,progress:0,intensity:1.25,chop:1.2}];
 	if (biome === 'debutmont') return [{ type:'snowpack', id:'snowpack',
 		depth: stem === 'bass' ? .56 : .72 }];
 	if (biome === 'pyramid-peak') return [{type:'sunstone',id:'sunstone',
