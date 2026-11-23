@@ -49,6 +49,18 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(drum[1].some(fx=>fx.id==='scrapheap'&&fx.type==='scrapheap')).toBe(true);
 		expect(orchestraPreset('debumont','drums').some(fx=>fx.type==='scrapheap')).toBe(false);
 	});
+	test('Repeated same Garbage biome preserves pending seeded clang opportunity',()=>{
+		const d=director();d.scrapPitch=new ScrapPitchCadence();
+		d.scrapPitch.next(25,.7,()=>[]);
+		const next=d.scrapPitch.nextAt,seed=d.scrapPitch.seed;
+		d.setBiome('garbage-dump-glacier');
+		expect(d.scrapPitch.nextAt).toBe(next);
+		expect(d.scrapPitch.seed).toBe(seed);
+		d.setBiome('debumont');
+		expect(Number.isNaN(d.scrapPitch.nextAt)).toBe(true);
+		d.setBiome('garbage-dump-glacier');
+		expect(d.scrapPitch.seed).toBe(d.scrapPitch.initialSeed);
+	});
 	test('Garbage pitch scan only on irregular grounded events, never in air/menu or on no evidence',()=>{
 		const d=director();d.scrapPitch=new ScrapPitchCadence();d.started=true;
 		d.speedPxS=850;

@@ -308,7 +308,8 @@ export class StemMusicDirector {
 			this.microBees=null;
 		}
 		this._scrapContactLast = NaN;
-		this.scrapPitch?.resetTiming();
+		// Confirmed biome changes are handled above. Reapplying the same
+		// biome must NOT postpone the next musical clang.
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
