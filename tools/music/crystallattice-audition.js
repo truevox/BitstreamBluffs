@@ -18,6 +18,12 @@ function setStrength(){
 	for(const role of ['bass','guitar','piano','other'])
 		chains[role]?.find('crystallattice')?.set('strength',value('strength')/100,ctx.currentTime);
 }
+function setAirBloom(){
+	$('air-bloom-value').textContent=value('air-bloom')+'%';
+	if(!playing||!ctx)return;
+	for(const role of ['bass','guitar','piano','other'])
+		chains[role]?.find('crystallattice')?.set('airBloom',value('air-bloom')/100,ctx.currentTime);
+}
 function setOpenness(){
 	const open=value('open')/100;
 	$('open-value').textContent=value('open')+'% '+(open?'(airborne/open)':'(grounded)');
@@ -78,7 +84,7 @@ async function play(){
 		source.connect(gain);gain.connect(chain.input);gain.connect(dryGain);
 		source.start(ctx.currentTime+.1);sources.push(source);chains[role]=chain;
 	}
-	playing=true;setStrength();setOpenness();controls();
+	playing=true;setStrength();setAirBloom();setOpenness();controls();
 	say('Playing original stems with source-excited crystal modes. Compare dry and take off.');
 }
 $('load').addEventListener('click',load);$('play').addEventListener('click',play);
@@ -98,5 +104,6 @@ $('land').addEventListener('click',()=>{
 $('impact').addEventListener('click',impact);
 $('scan').addEventListener('click',()=>{notes();say('Current original-bass spectral evidence refreshed.');});
 $('strength').addEventListener('input',setStrength);$('open').addEventListener('input',setOpenness);
+$('air-bloom').addEventListener('input',setAirBloom);
 window.addEventListener('pagehide',()=>{stop();ctx?.close();});
-controls();setStrength();setOpenness();
+controls();setStrength();setAirBloom();setOpenness();

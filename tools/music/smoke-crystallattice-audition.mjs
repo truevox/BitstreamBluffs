@@ -18,6 +18,10 @@ try {
 	await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('Ready.'),{timeout:17000});
 	await page.click('#play');
 	assert.match(await page.$eval('#play',e=>e.textContent),/Stop/);
+	assert.equal(await page.$eval('#strength-value',e=>e.textContent),'150%');
+	assert.equal(await page.$eval('#air-bloom-value',e=>e.textContent),'160%');
+	await page.$eval('#air-bloom',e=>{e.value='210';e.dispatchEvent(new Event('input',{bubbles:true}));});
+	assert.equal(await page.$eval('#air-bloom-value',e=>e.textContent),'210%');
 	await page.$eval('#strength',e=>{e.value='170';e.dispatchEvent(new Event('input',{bubbles:true}));});
 	assert.equal(await page.$eval('#strength-value',e=>e.textContent),'170%');
 	await page.click('#takeoff');

@@ -389,6 +389,19 @@ function allocateEffect(ctx, raw) {
 			const bloom=node(ctx.createGain());bloom.gain.value=1;
 			modalMix.connect(bloom);
 			const wet=node(ctx.createGain());bloom.connect(wet);
+			// A distinctly airborne *bright crystal shimmer*, not just drums
+			// disappearing or the entire song becoming louder. Only the
+			// source-fed modal wet path excites these upper harmonics.
+			const airyDrive=node(ctx.createGain());airyDrive.gain.value=2.0;
+			const sparkle=node(ctx.createWaveShaper());
+			sparkle.curve=saturatorCurve(.035);sparkle.oversample='2x';
+			const sparkleHi=node(ctx.createBiquadFilter());
+			sparkleHi.type='highpass';sparkleHi.frequency.value=950;
+			const sparkleDelay=node(ctx.createDelay(.35));sparkleDelay.delayTime.value=.173;
+			const sparkleGain=node(ctx.createGain());sparkleGain.gain.value=0;
+			modalMix.connect(airyDrive);airyDrive.connect(sparkle);
+			sparkle.connect(sparkleHi);sparkleHi.connect(sparkleDelay);
+			sparkleDelay.connect(sparkleGain);sparkleGain.connect(wet);
 			// Limiter ONLY on newly generated crystal wash, never on the
 			// protected dry instrument path or song clock.
 			const wetLimiter=node(ctx.createDynamicsCompressor());
@@ -396,11 +409,18 @@ function allocateEffect(ctx, raw) {
 			wetLimiter.ratio.value=4;wetLimiter.attack.value=.008;
 			wetLimiter.release.value=.19;
 			wet.connect(wetLimiter);wetLimiter.connect(output);
-			let strength=clamp(raw.strength,0,2,1);
+			let strength=clamp(raw.strength,0,2,1.5);
 			let openness=clamp(raw.openness,0,1,0);
+			let airBloom=clamp(raw.airBloom,0,2.5,1.6);
 			const apply=(at,immediate=false)=>{
-				const level=(.55+.80*openness)*strength;
-				const pairs=[[wet.gain,level],[dry.gain,1-.075*openness]];
+				// Ground remains exactly the owner-liked 150%-resonance mix.
+				// Takeoff opens wet tail, increases bright harmonics and makes
+				// sustained modes ring longer even if drums are left unchanged.
+				const level=(.55+1.08*openness)*strength;
+				const pairs=[[wet.gain,level],[dry.gain,1],
+					[sparkleGain.gain,openness*airBloom*.85],
+					[feedback.gain,.60+.18*openness],
+					[damping.frequency,4800+2100*openness]];
 				for(const [target,value] of pairs){
 					if(immediate)target.value=value;
 					else numericParam(target,value,at,.12);
@@ -413,7 +433,11 @@ function allocateEffect(ctx, raw) {
 			}};
 			refs.strength={set:(value,at)=>{
 				if(!Number.isFinite(value))return false;
-				strength=clamp(value,0,2,1);apply(at);return true;
+				strength=clamp(value,0,2,1.5);apply(at);return true;
+			}};
+			refs.airBloom={set:(value,at)=>{
+				if(!Number.isFinite(value))return false;
+				airBloom=clamp(value,0,2.5,1.6);apply(at);return true;
 			}};
 			// Spectral monitoring only on the source bass stem. It is sampled
 			// during genuine landing events, not per frame. Without confident

@@ -42,7 +42,7 @@ export function orchestraPreset(biome, stem) {
 	if (biome === 'micro-mountain') return [{type:'microbox',id:'microbox',
 		openness:0,boxiness:1.35,impactWeight:1}];
 	if (biome === 'crystal-cavern' && ['bass','guitar','piano','other'].includes(stem))
-		return [{type:'crystallattice',id:'crystallattice',strength:1,openness:0,
+		return [{type:'crystallattice',id:'crystallattice',strength:1.5,openness:0,airBloom:1.6,
 			detectChroma:stem==='bass',bassFeed:stem==='bass'}];
 	if (biome === 'crystal-cavern' && stem==='drums')
 		return [{type:'gain',id:'crystalPercussion',gain:1}];

@@ -32,13 +32,17 @@ try {
 				else{
 					const fx=buildMusicChain(ctx,orchestraPreset('crystal-cavern',role),master);
 					vol.connect(fx.input);
-					if(mode==='airborne'||mode==='maxBloom'){
-						if(role==='drums')fx.find('crystalPercussion').set('gain',.48,.2);
+					if(['airborne','maxBloom','bloomOnly','airborneWithoutShimmer'].includes(mode)){
+						if(role==='drums'&&['airborne','maxBloom'].includes(mode))fx.find('crystalPercussion').set('gain',.48,.2);
 						else if(['bass','guitar','piano','other'].includes(role))
 							fx.find('crystallattice').set('openness',1,.2);
 					}
-					if(mode==='maxBloom'&&['bass','guitar','piano','other'].includes(role))
-						fx.find('crystallattice').set('strength',2,.25);
+					if(mode==='maxBloom'&&['bass','guitar','piano','other'].includes(role)){
+						const crystal=fx.find('crystallattice');
+						crystal.set('strength',2,.25);crystal.set('airBloom',2.5,.25);
+					}
+					if(mode==='airborneWithoutShimmer'&&['bass','guitar','piano','other'].includes(role))
+						fx.find('crystallattice').set('airBloom',0,.25);
 					if(mode==='impact'&&role==='bass')fx.find('crystallattice').set('impact',.9,3.2);
 					if(mode==='silentLattice'&&['bass','guitar','piano','other'].includes(role))
 						fx.find('crystallattice').set('strength',0,.2);
@@ -47,7 +51,7 @@ try {
 			}
 			return ctx.startRendering();
 		}
-		const modes=['dry','silentLattice','ground','airborne','impact','maxBloom'];
+		const modes=['dry','silentLattice','ground','airborne','impact','maxBloom','bloomOnly','airborneWithoutShimmer'];
 		const buffers=await Promise.all(modes.map(render));
 		const out=Object.fromEntries(modes.map((mode,i)=>[mode,buffers[i]]));
 		const stats=buffer=>{let energy=0,peak=0,finite=true;for(let c=0;c<2;c++){
@@ -66,15 +70,19 @@ try {
 			resonanceVsSilent:diff('ground','silentLattice'),
 			groundVsDry:diff('ground','dry'),
 			flightVsGround:diff('airborne','ground'),
+			airBloomWithoutDrumDuck:diff('bloomOnly','ground'),
+			sparkleDifference:diff('bloomOnly','airborneWithoutShimmer'),
 			landingSourceSwelling:diff('impact','ground',3.2,3.85)};
 	});
 	console.log('CRYSTALLATTICE_REAL_FIVE_STEMS_CHROMIUM',JSON.stringify(result));
 	assert.deepEqual(errors,[]);
-	for(const mode of ['dry','silentLattice','ground','airborne','impact','maxBloom']){
+	for(const mode of ['dry','silentLattice','ground','airborne','impact','maxBloom','bloomOnly','airborneWithoutShimmer']){
 		assert(result[mode].finite,mode+' contains NaN/Inf');
 		assert(result[mode].peak<.92,mode+' unexpected peak');
 	}
 	assert(result.resonanceVsSilent>.001,'original harmonic stems do not excite lattice audibly');
 	assert(result.flightVsGround>.004,'flight must open lattice and change drums');
+	assert(result.airBloomWithoutDrumDuck>.008,'air bloom must be audible with unchanged drums');
+	assert(result.sparkleDifference>.003,'new upper shimmer must be distinct independently of wet loudness');
 	assert(result.landingSourceSwelling>.001,'landing must excite the source-fed modes');
 } finally {await browser.close();}

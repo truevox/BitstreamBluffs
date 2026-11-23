@@ -106,7 +106,7 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 	test('Crystal grounded originals ring consonantly; flight opens lattice, drums duck, landing triggers only measured-piano response',()=>{
 		for(const stem of ['bass','guitar','piano','other'])
 			expect(orchestraPreset('crystal-cavern',stem)).toEqual([
-				{type:'crystallattice',id:'crystallattice',strength:1,openness:0,
+				{type:'crystallattice',id:'crystallattice',strength:1.5,openness:0,airBloom:1.6,
 				 detectChroma:stem==='bass',bassFeed:stem==='bass'}]);
 		expect(orchestraPreset('crystal-cavern','drums')).toEqual([{type:'gain',id:'crystalPercussion',gain:1}]);
 		const d=director();d.biome='crystal-cavern';
