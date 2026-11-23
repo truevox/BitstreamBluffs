@@ -4,6 +4,7 @@
   'use strict';
   const STORAGE='bsb-audio-review-2026-11-23-v1';
   const labs=[
+    ['arcade','Arcade — BOTH bridge glue and standalone'],
     ['pyramid','Pyramid Peak'],
     ['space','Space Mountain'],
     ['candy','Candy Cane Canyon'],
@@ -84,7 +85,7 @@
     }
   });
   $('clear-review').addEventListener('click',()=>{
-    if(!confirm('Clear all twelve locally saved sound-lab notes?'))return;
+    if(!confirm('Clear all thirteen locally saved sound-lab notes?'))return;
     for(const [id] of labs){
       state[id]={verdict:'untried',note:''};
       $('review-verdict-'+id).value='untried';
