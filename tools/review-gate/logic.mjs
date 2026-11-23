@@ -63,3 +63,63 @@ export function reviewBody(evidence) {
 	];
 	return out.join('\n').slice(0, 30000);
 }
+
+// A green check certifies one specific review, not merely a matching SHA.
+export function reviewCheckIsCurrent(check, pr, reviews, bot) {
+	if (!check || !pr || pr.state !== 'open' || !pr.head?.sha || !Array.isArray(reviews) || !bot ||
+		check.name !== CHECK_NAME || check.status !== 'completed' || check.conclusion !== 'success' ||
+		check.head_sha?.toLowerCase() !== pr.head.sha.toLowerCase()) return false;
+	const botReviews = reviews.filter(r => r.user?.login === bot && r.state !== 'PENDING');
+	if (!botReviews.length || botReviews.some(r => !Number.isInteger(r.id) || !Number.isFinite(Date.parse(r.submitted_at)))) return false;
+	botReviews.sort((a, b) => Date.parse(a.submitted_at) - Date.parse(b.submitted_at) || a.id - b.id);
+	const latest = botReviews.at(-1);
+	return latest.state === 'APPROVED' && latest.commit_id?.toLowerCase() === pr.head.sha.toLowerCase() &&
+		check.external_id === `pr-${pr.number}-review-${latest.id}`;
+}
+
+export async function reconcileChecks({ pr, reviews, checks, bot, appId, invalidate }) {
+	if (!Number.isInteger(pr?.number) || !Array.isArray(reviews) || !Array.isArray(checks) ||
+		!Number.isInteger(appId) || typeof bot !== 'string' || typeof invalidate !== 'function')
+		throw new Error('Invalid reconciliation input');
+	const invalidated = [];
+	for (const check of checks) {
+		if (check.app?.id !== appId || check.name !== CHECK_NAME || check.status !== 'completed' ||
+			check.conclusion !== 'success') continue;
+		const associated = /^pr-(\d+)-review-(\d+)$/.exec(check.external_id || '');
+		if (associated && Number(associated[1]) !== pr.number) continue;
+		if (!reviewCheckIsCurrent(check, pr, reviews, bot)) {
+			await invalidate(check.id);
+			invalidated.push(check.id);
+		}
+	}
+	return invalidated;
+}
+
+export async function reconcilePullRequest({ number, bot, appId, api }) {
+	if (!Number.isInteger(number) || number < 1 || typeof api !== 'function') throw new Error('Invalid PR or API');
+	const base = '/repos/truevox/BitstreamBluffs';
+	const pr = await api(`${base}/pulls/${number}`);
+	if (pr.number !== number || pr.state !== 'open' || !SHA.test(pr.head?.sha || '')) throw new Error('PR is not open or has invalid head');
+	async function allPages(path, field) {
+		const items = [];
+		for (let page = 1; page <= 100; page++) {
+			const response = await api(`${path}?per_page=100&page=${page}`);
+			const batch = field ? response?.[field] : response;
+			if (!Array.isArray(batch)) throw new Error('Unexpected paginated GitHub response');
+			items.push(...batch);
+			if (batch.length < 100) return items;
+		}
+		throw new Error('GitHub pagination limit reached');
+	}
+	const reviews = await allPages(`${base}/pulls/${number}/reviews`);
+	const checks = await allPages(`${base}/commits/${pr.head.sha}/check-runs`, 'check_runs');
+	return reconcileChecks({ pr, reviews, checks, bot, appId, invalidate: id => api(`${base}/check-runs/${id}`, 'PATCH', {
+		conclusion: 'failure', output: { title: 'Independent review invalidated', summary: 'The exact approval is no longer the latest valid review for this pull request.' },
+	}) });
+}
+
+export function assertInstallationIdentity(installation, appId, slug) {
+	if (!Number.isInteger(appId) || installation?.app_id !== appId || installation.app_slug !== slug || installation.account?.login !== 'truevox')
+		throw new Error('Unexpected GitHub App installation identity or owner');
+	return true;
+}

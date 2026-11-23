@@ -40,13 +40,19 @@ node tools/review-gate/publish.mjs --evidence /private/review-42.json
 
 The script requests a short-lived, single-repo App installation token, checks the App identity, verifies the PR's **exact live head**, submits a formal review, verifies GitHub identified its author as the expected `slug[bot]` on the exact commit, rechecks the live head, then posts an App-owned `friday-independent-review` check run **on that same SHA**. A head change or bad credentials fail closed; a new push lacks the old SHA's passing check. The repo has no webhook/service trigger yet, so running the script is a separate deliberate act.
 
+## Review-state reconciliation (staged)
+
+`node tools/review-gate/reconcile.mjs --dry-run 42` checks whether successful app-owned checks for PR 42 still point to the latest non-pending bot approval for its current head. It reports stale checks without changing GitHub. `--apply` marks those stale checks as failures. Both commands require the same environment variables and separately protected key as the publisher. They validate the App and installation identity and page through reviews and checks.
+
+This command is not an automatic service. It has not been tested against a live dismissed approval, nor provisioned in an isolated runtime. Even when periodically scheduled or triggered by an event, a delay or outage can leave a stale success temporarily green; enforcement requires a proven failure-closed architecture that handles missed events, outages, and the interval before reconciliation. Do not enable a required gate on the basis of this command alone.
+
 ## Activate enforcement only after an end-to-end trial
 
 After isolation, integration tests, at least one **real review** and check, and verification that the owner’s requested activation remains safe:
 
 1. Open a harmless test PR, review it from the isolated App, verify `APPROVED` by the App and `friday-independent-review` **success** on its exact head. Request changes on another and verify a failure check. Push a new commit and verify the old green status does not satisfy it.
 2. Add a GitHub branch protection rule/ruleset for `main`, requiring PRs and the exact `friday-independent-review` check **from the expected GitHub App**, plus the desired existing CI gates. The App check is the enforcement contract even if its formal bot approval is shown as read-only and does not count toward GitHub's normal approval quota. Do not require an arbitrary count of formal approvals until verified with this App on the actual repository.
-3. **Before enforcement, implement and prove invalidation/reconciliation for GitHub review dismissal and change-of-verdict events** (trusted App webhook or independently scheduled review-state reconciliation). A previously successful SHA-scoped check does *not* automatically become failing if an approval is dismissed on the same SHA. Verify a dismissed approval cannot leave a stale green gate. New pushes inherently need a new head check, but dismissal is a different case.
+3. **Before enforcement, deploy and prove automatic invalidation/reconciliation for GitHub review dismissal and change-of-verdict events** (trusted App webhook or independently scheduled review-state reconciliation). A previously successful SHA-scoped check does *not* automatically become failing if an approval is dismissed on the same SHA. Verify a dismissed approval cannot leave a stale green gate. New pushes inherently need a new head check, but dismissal is a different case.
 4. Protect `main` against force-push/deletion, choose explicit admin-bypass policy, and verify existing workflows and emergency recovery procedure. Do not enable enforcement while the review App is missing, unavailable, or unable to invalidate a dismissed verdict.
 5. Require fresh successful status for every change (review the new SHA); never recycle an old review, PR comment, or self-authored green marker. Record manual human approval for product/audio taste, launch decisions, security-sensitive infrastructure, and other owner-designated gates.
 

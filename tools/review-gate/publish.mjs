@@ -8,7 +8,7 @@
  */
 import { createSign } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
-import { validateEvidence, assertPrHead, reviewEvent, checkConclusion, reviewBody, CHECK_NAME, installationPermissions } from './logic.mjs';
+import { validateEvidence, assertPrHead, reviewEvent, checkConclusion, reviewBody, CHECK_NAME, installationPermissions, assertInstallationIdentity } from './logic.mjs';
 
 const BASE = 'https://api.github.com';
 const repo = process.env.FRIDAY_REVIEW_REPO || 'truevox/BitstreamBluffs';
@@ -49,7 +49,9 @@ async function installationToken() {
 	const details = await stat(keyPath);
 	if (!details.isFile() || (details.mode & 0o077)) throw new Error('App private key must be a regular owner-only file (mode 0600)');
 	const pem = await readFile(keyPath, 'utf8');
-	const token = await api(`/app/installations/${installationId}/access_tokens`, jwt(appId, pem), 'POST', {
+	const appJwt = jwt(appId, pem);
+	assertInstallationIdentity(await api(`/app/installations/${installationId}`, appJwt), Number(appId), slug);
+	const token = await api(`/app/installations/${installationId}/access_tokens`, appJwt, 'POST', {
 		repositories: ['BitstreamBluffs'], permissions: installationPermissions(),
 	});
 	if (!token.token) throw new Error('No App installation token returned');
@@ -64,9 +66,6 @@ async function main() {
 	if (!evidenceStat.isFile() || evidenceStat.size > 35000) throw new Error('Evidence must be a regular file <= 35 KB');
 	const evidence = validateEvidence(JSON.parse(await readFile(evidencePath, 'utf8')));
 	const token = await installationToken();
-	const installation = await api('/installation', token);
-	if (installation.app_slug !== slug || installation.account?.login !== 'truevox')
-		throw new Error('Unexpected GitHub App installation identity or owner');
 	const base = `/repos/${repo}`;
 	assertPrHead(await api(`${base}/pulls/${evidence.pr}`, token), evidence);
 	const posted = await api(`${base}/pulls/${evidence.pr}/reviews`, token, 'POST', {
