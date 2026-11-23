@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 20:25 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
+Last verified: 2026-11-23 20:29 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -11,10 +11,16 @@ going” means resume this queue, not take over other lanes or merge a draft.
    #287/#288) for exact-head Gal feedback and current checks/base/overlap.
    Fix actual feedback before expansion. No merge of drafts. If cleared,
    obey the numbered release rule (#207); #248 reserves v2.19.22.
-2. #127's docs are reviewable; a live blind witness is still unproven.
-   fair171 native hop reached beyond the candidate with no blind event and
-   an earlier negated crash. Use exact live identity, post-tick timer and
-   an unprotected approach for any new witness. Preserve shipped #202.
+2. #127's docs are reviewable; no live blind-to-sensor witness yet.
+   Extended corpus: mask 16 fair1139 Shatter Wall `12:2` (x26675) →
+   Packet Spike `13:0` (x27254), 579 px. Native Chromium hop 320/380ms
+   repeats hit the exact wall, but the sampled timer expires about 140–150 px
+   before target center, and the live target sensor receives no contact.
+   Stock pickup shield was held; not an unprotected run. Nominal geometry
+   is not a gameplay verdict. Preserve separate #202 historical evidence.
+   New positive evidence would need live timer, exact sensor contact,
+   matched controls, and protection checks; do not re-test this failed pair
+   unchanged.
 3. Revisit blocked work only when its evidence or prerequisites move:
    #82 storage lifecycle needs a separately scoped save-system review;
    #85 needs authentic footage; #84/#83 and product #70/#71 need #60;
@@ -56,7 +62,8 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Gal: source-review requests posted on each of the eight exact draft heads.
   None is a merge request, approval, or release reservation. Preserve #207.
 - Internal helpers finished #157 and #70 test/evidence preparation. Root
-  reviewed and published both; no unfinished helper handoff.
+  reviewed and published both. Instrumented #127 browser work is local,
+  uses observation only and adds no code to shared runner/PR heads.
 - Tracker #168 now lists all seven feature drafts and the remaining gates.
   Four of the original issues are closed; 17 are open.
 - Home: #117/#68/#76 upstream work; Team A #152/#116/#118/#123; Team B
