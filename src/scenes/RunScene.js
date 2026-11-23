@@ -1552,6 +1552,13 @@ export class RunScene extends Phaser.Scene {
     // Never throws: a failing audio engine must not stop the frame (and with it Phaser's loop), issue #140.
     const {sample,meter}=readWorldDanceAudio(audio,danceAllowed);
     const dance=this.worldDance?.update(sample,dt,meter)||0;
+    // WorldDance.lastAccentMs updates ONLY for a genuine rising recorded-mix
+    // transient, never for the cosmetic unverified 0.5s meter. That same
+    // visual gear kick may sound one short musical sprocket click.
+    // This is presentation-only and MUST never affect physics, scoring or replay.
+    if(sample&&this.worldDance?.lastAccentMs===sample.timeMs){
+      try{audio?.onSteampunkRecordedAccent?.(sample);}catch{}
+    }
     this.bg.update(cam.scrollX, t, sled.speed,dance);
     if (this.biomeFx) this.biomeFx.update(cam.scrollX, t, this._veil || 0, isReducedMotion(this));
     // Follow the same decorative bees as Background; don't spawn audio bees.

@@ -63,6 +63,8 @@ export class StemMusicDirector {
 		this._pendingHydroImpact = 0;
 		this._pendingMicroImpact = 0;
 		this._pendingCrystalImpact = 0;
+		this._pendingSteamImpact = 0;
+		this._steamLastSent = NaN;
 		this.microBees = null;
 		this.hydrostatic = new HydrostaticPressure();
 		this._hydroLastSent = NaN;
@@ -190,7 +192,9 @@ export class StemMusicDirector {
 			this._pendingScrapImpact = 0;
 			this.scrapPitch?.resetTiming();
 			this._pendingMicroImpact = 0;
-		this._pendingCrystalImpact = 0;
+			this._pendingCrystalImpact = 0;
+			this._pendingSteamImpact = 0;
+			this._steamLastSent = NaN;
 			this.microBees?.dispose();
 			this.microBees=null;
 		}
@@ -240,9 +244,10 @@ export class StemMusicDirector {
 				// Keep the cached signature based on GROUND effects so jumps don't rebuild FX graphs.
 				const initial = this.airborne && !this.menuMode &&
 					(this.biome === 'debutmont' || this.biome === 'micro-mountain' ||
-					this.biome === 'crystal-cavern')
+					this.biome === 'crystal-cavern' || this.biome === 'steampunk-slopes')
 					? effects.map(e => e.type==='snowpack' ? {...e,depth:0} :
 						e.type==='microbox' || e.type==='crystallattice' ? {...e,openness:1} :
+						e.type==='steamworks' ? {...e,airborne:true} :
 						e.id==='crystalPercussion' ? {...e,gain:.48} : e) : effects;
 				this.mixer.replaceEffects(name,initial,.18);
 				this._timbreSignatures.set(name,key);
@@ -253,6 +258,8 @@ export class StemMusicDirector {
 			this.mixer.setRoomSend(name,this.menuMode ? 0 : null);
 		}
 		this._applyScrapContact(true);
+		this._steamLastSent = NaN;
+		this._applySteamSpeed(true);
 	}
 
 	_nextEnabledIndex(previous = -1) {
@@ -305,6 +312,9 @@ export class StemMusicDirector {
 		if (this.biome !== 'crystal-cavern') this._pendingCrystalImpact = 0;
 		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
 		if (this.biome !== 'garbage-dump-glacier') this.scrapPitch?.resetTiming();
+		if (this.biome !== 'steampunk-slopes') this._pendingSteamImpact=0;
+		this._steamLastSent=NaN;
+		if(this.biome!=='steampunk-slopes')this._lastSteamMusicAccentMs=-Infinity;
 		if (this.biome !== 'micro-mountain') {
 			this._pendingMicroImpact=0;
 			this.microBees?.dispose();
@@ -367,7 +377,47 @@ export class StemMusicDirector {
 			if (impulse <= 0) return;
 			this._pendingHydroImpact = Math.max(this._pendingHydroImpact || 0,impulse);
 			if (!this.airborne) this._applyHydroImpact();
+		} else if (this.biome === 'steampunk-slopes') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingSteamImpact=Math.max(this._pendingSteamImpact||0,impulse);
+			if(!this.airborne)this._applySteamImpact();
 		}
+	}
+
+	/**
+	 * A real original-mix transient detected by the WorldDance presentation
+	 * envelope may make the same decorative gear audibly tick. This NEVER
+	 * consumes the synthetic/unverified meter and never authorizes gameplay.
+	 * Only the live audio engine's own revision-matched sample qualifies.
+	 */
+	onSteampunkMusicAccent(sample){
+		if(!this.started||this.transportPaused||this.menuMode||this.airborne||
+			this.biome!=='steampunk-slopes'||!sample||
+			!Number.isFinite(sample.timeMs)||
+			!Number.isFinite(sample.bass)||!Number.isFinite(sample.mid)||
+			!this.track||sample.revision!==String(this._token)+':'+this.track.id+':'+this.clockStart||
+			sample.timeMs-this._lastSteamMusicAccentMs<165)return false;
+		this._lastSteamMusicAccentMs=sample.timeMs;
+		const strength=Math.max(.18,Math.min(1,.76*sample.bass+.24*sample.mid));
+		return this.mixer?.setEffectParam('drums','steamworks','musicAccent',strength)===true;
+	}
+
+	_applySteamSpeed(force=false){
+		if(this.menuMode||this.biome!=='steampunk-slopes')return;
+		const speed=clamp(this.speedPxS/1600,0,1);
+		if(!force&&Number.isFinite(this._steamLastSent)&&
+			Math.abs(speed-this._steamLastSent)<.025)return;
+		this._steamLastSent=speed;
+		for(const stem of ['bass','drums','guitar','piano','other'])
+			this.mixer?.setEffectParam(stem,'steamworks','speed',speed);
+	}
+
+	_applySteamImpact(){
+		const impulse=this._pendingSteamImpact||0;
+		this._pendingSteamImpact=0;
+		if(impulse<=0||this.menuMode||this.biome!=='steampunk-slopes')return;
+		this.mixer?.setEffectParam('drums','steamworks','impact',impulse);
 	}
 
 	_applySnowImpact() {
@@ -469,7 +519,13 @@ export class StemMusicDirector {
 			this.mixer?.setEffectParam('drums','scrapheap','takeoff',
 				Math.max(.18,speedContact));
 		}
+		if(next&&!this.menuMode&&this.biome==='steampunk-slopes')
+			this.mixer?.setEffectParam('drums','steamworks','release',
+				Math.max(.18,clamp(this.speedPxS/1600,0,1)));
 		this.airborne = next;
+		if(this.biome==='steampunk-slopes'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'steamworks','airborne',next);
 		// As the rider clears the snow, the original instruments open up; landing
 		// restores Powdery without changing playback, beat timing or the music clock.
 		if (this.biome === 'debutmont') {
@@ -486,6 +542,7 @@ export class StemMusicDirector {
 			this._applyHydroImpact();
 			this._applyMicroImpact();
 			this._applyCrystalImpact();
+			this._applySteamImpact();
 		}
 		if(this.biome==='crystal-cavern'&&!this.menuMode){
 			for(const stem of ['bass','guitar','piano','other'])
@@ -516,6 +573,7 @@ export class StemMusicDirector {
 		this.mixer?.setEffectParam('other', 'speed-filter', 'frequency', 400 + normalized * 15000);
 		this.speedPxS = Math.max(0, Number(speedPxS)||0);
 		this._applyScrapContact();
+		this._applySteamSpeed();
 		const speedGain = this.menuMode ? 1 : clamp(.2+this.speedPxS/850,.2,1.18);
 		this.mixer?.setGain('bass',speedGain,{motion:true,time:.16});
 		this.mixer?.setGain('adaptive:bass',speedGain,{motion:true,time:.16});

@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import {WorldDanceEnvelope,worldDanceMotionAllowed,sunDanceGeometry,biomeDanceStyle}
  from '../../src/systems/WorldDance.js';
 import {Background,motifDecor} from '../../src/entities/Background.js';
@@ -15,6 +16,37 @@ function gfxScene(){
  }});
  return {scene:{add:{graphics:()=>gfx}},calls};
 }
+
+test('Steampunk cosmetic click only accepts the exact original live recording sample, not a fake meter',()=>{
+ const source={revision:'song:1',timeMs:1200,bass:.6,mid:.2};
+ const player={onSteampunkMusicAccent:jest.fn(()=>true)};
+ const synth=Object.create(AudioSynth.prototype);
+ synth._musicMode='run';synth._paused=false;synth._musicWanted=true;
+ synth._vinylAudible=()=>true;
+ synth._worldDanceSample=source;synth._stemMusic=player;
+ expect(synth.onSteampunkRecordedAccent(source)).toBe(true);
+ expect(player.onSteampunkMusicAccent).toHaveBeenCalledWith(source);
+ expect(synth.onSteampunkRecordedAccent({...source})).toBe(false);
+ expect(synth.onSteampunkRecordedAccent({timingKind:'synthetic-unverified',beatIndex:7})).toBe(false);
+ synth._paused=true;
+ expect(synth.onSteampunkRecordedAccent(source)).toBe(false);
+ expect(player.onSteampunkMusicAccent).toHaveBeenCalledTimes(1);
+});
+
+test('true WorldDance source accent is distinct from unverified decorative meter pulses',()=>{
+ const w=new WorldDanceEnvelope();
+ const meter={timingKind:'synthetic-unverified',use:'cosmetic-only',trusted:false,
+  canAuthorizeGameplay:false,transportRevision:'song1:1',beatIndex:1,measureIndex:0,
+  beatInMeasure:2};
+ w.update(audio(0,.15),40,{...meter,beatIndex:0,beatInMeasure:1});
+ w.update(audio(50,.15),50,meter);
+ expect(w.lastAccentMs).toBe(-Infinity);
+ const rising=audio(100,.72,.43);
+ w.update(rising,50,{...meter,beatIndex:2,beatInMeasure:3});
+ expect(w.lastAccentMs).toBe(rising.timeMs);
+ w.update(audio(150,.72,.43),50,{...meter,beatIndex:3,beatInMeasure:4});
+ expect(w.lastAccentMs).toBe(rising.timeMs); // artificial beat can't create audio clicks
+});
 
 test('actual positive music transient makes a bounded pulse, then decays; steady music does not retrigger',()=>{
  const w=new WorldDanceEnvelope();

@@ -325,6 +325,45 @@ describe('Modular cheap Web Audio processors', () => {
 		fx.dispose();
 		expect(ctx._bufferSources.every(source=>source.stopped)).toBe(true);
 	});
+	test('Steampunk mechanical wet pulse tracks real speed, source dry remains routed; Foley is bounded',()=>{
+		const ctx=fakeContext();
+		const chain=buildMusicChain(ctx,[{id:'factory',type:'steamworks',speed:.48,
+			weight:1,intensity:1.25,steam:1.5,impactWeight:1.35}],ctx.createGain());
+		const fx=chain.find('factory');
+		expect(fx).toBeDefined();
+		expect(fx.refs.speed).toBeDefined();
+		expect(fx.refs.airborne).toBeDefined();
+		expect(fx.refs.release).toBeDefined();
+		expect(fx.refs.musicAccent).toBeDefined();
+		expect(fx.refs.accentWeight).toBeDefined();
+		expect(fx.refs.impact).toBeDefined();
+		expect(fx.set('speed',.83,ctx.currentTime)).toBe(true);
+		expect(fx.set('speed',Infinity,ctx.currentTime)).toBe(false);
+		expect(fx.set('airborne',true,ctx.currentTime)).toBe(true);
+		expect(fx.set('airborne','true',ctx.currentTime)).toBe(false);
+		expect(fx.set('musicAccent',.75,ctx.currentTime)).toBe(false); // airborne
+		expect(fx.set('release',0,ctx.currentTime)).toBe(false);
+		expect(fx.set('impact',NaN,ctx.currentTime)).toBe(false);
+		expect(ctx._bufferSources).toHaveLength(0);
+		expect(fx.set('release',.8,ctx.currentTime)).toBe(true);
+		expect(fx.set('impact',.9,ctx.currentTime)).toBe(true);
+		for (const voice of ctx._bufferSources){
+			expect(voice.buffer.getChannelData(0).every(Number.isFinite)).toBe(true);
+			expect(voice.buffer.getChannelData(0).some(x=>Math.abs(x)>.02)).toBe(true);
+		}
+		for(let i=0;i<9;i++)fx.set('impact',1,ctx.currentTime+i*.012);
+		expect(ctx._bufferSources.filter(x=>!x.stopped).length).toBeLessThanOrEqual(3);
+		expect(fx.set('airborne',false,ctx.currentTime)).toBe(true);
+		expect(fx.set('musicAccent',.7,ctx.currentTime)).toBe(true);
+		const last=ctx._bufferSources.at(-1);
+		expect(last.buffer.getChannelData(0).some(x=>Math.abs(x)>.05)).toBe(true);
+		expect(fx.set('accentWeight',0,ctx.currentTime)).toBe(true);
+		expect(fx.set('musicAccent',.8,ctx.currentTime)).toBe(false);
+		expect(fx.set('steam',0,ctx.currentTime)).toBe(true);
+		expect(fx.set('release',1,ctx.currentTime)).toBe(false);
+		chain.dispose();
+		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
+	});
 	test('rejects unknown processors and duplicate stable ids', () => {
 		const ctx = fakeContext();
 		expect(() => buildMusicChain(ctx,[{type:'unsafeScript',id:'bad'}],ctx.createGain())).toThrow();
