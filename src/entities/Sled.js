@@ -12,7 +12,7 @@ import Phaser from 'phaser';
 import { PHYSICS } from '../constants.js';
 import { TUNING, BASE_STEP_MS, stallNudgeStep, airIdleSpin, conveyorStep, geyserStep } from '../systems/PhysicsTuner.js';
 import { springReboundVelocity } from '../systems/BiomeEffects.js';
-import { aerodynamicStep, canopyFuelStep, vacuumDivebombStep } from '../systems/BsodAerodynamics.js';
+import { aerodynamicStep, canopyFuelStep, vacuumDivebombStep, airBrakeSpeedStep } from '../systems/BsodAerodynamics.js';
 import { runRandomStreams } from '../systems/RunRandom.js';
 import pmath from '../systems/pmath.js';
 
@@ -256,10 +256,14 @@ export class Sled {
       vx *= f;
       vy *= f;
     }
-    // air brake (Up): -25 % horizontal speed over airBrakeSpanMs, reduced descent
+    // #247: accelerate the brake's bite, then let the rider fall sooner.
+    // AirBrake's lift is earned from this exact substep's horizontal speed loss.
+    let airBrakeSpentSpeedPxS = 0;
     if (this.airBrakeActive) {
       const density = atmosphere ? atmosphere.atmosphereDensity : 1;
-      vx *= pmath.exp((pmath.log(1 - PHYSICS.airBrakeDecel) * stepMs * density) / TUNING.airBrakeSpanMs);
+      const spent = airBrakeSpeedStep(vx, stepMs, density, PHYSICS.airBrakeDecel, TUNING.airBrakeSpanMs);
+      vx = spent.vx;
+      airBrakeSpentSpeedPxS = spent.spentSpeedPxS;
       if (vy > 0) vy *= pmath.exp(-TUNING.airBrakeDescentDamp * dt * density);
     }
     // parachute stall: float
@@ -284,7 +288,8 @@ export class Sled {
     if (!grounded && atmosphere) {
       const wind = aerodynamicStep({ vx, vy, relativeAirX: atmosphere.relativeAirX,
         atmosphereDensity: atmosphere.atmosphereDensity, proximity01: atmosphere.proximity01, parachute: chute,
-        airBrake: this.airBrakeActive, airbrakeLiftMul: phys.airbrakeLiftMul || 1, stepMs });
+        airBrake: this.airBrakeActive, airbrakeLiftMul: phys.airbrakeLiftMul || 1,
+        airBrakeSpentSpeedPxS, airBrakePaidLiftRatio: TUNING.airBrakePaidLiftRatio, stepMs });
       vx += wind.dvx;
       vy += wind.dvy;
     }

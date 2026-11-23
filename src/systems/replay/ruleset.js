@@ -64,7 +64,9 @@ import * as matterPortableNs from '../MatterPortable.js';
 //    (about 1% of sin/cos results differ from V8) change tick-level outcomes of every older tape.
 // 6: #65 (gameplay): Debutmont is the base biome (owns every sector the mask does not select) and
 //    arcade bridges (null biome) separate biomes, so tick outcomes change for a given seed and mask.
-export const SIM_REVISION = 6;
+// 7: #247, fast speed-paid AirBrake: greater horizontal braking, a shorter weaker lift,
+//    and a prompt fall instead of indefinite speed-independent upward aerodynamic thrust.
+export const SIM_REVISION = 7;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above

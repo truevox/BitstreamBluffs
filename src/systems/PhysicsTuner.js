@@ -113,10 +113,11 @@ export const TUNING = Object.freeze({
   hopBufferMs: 110,
   /** Ground contact hysteresis (ms) before the sled counts as airborne. */
   groundedGraceMs: 45,
-  /** Air brake (Up): horizontal speed removed over airBrakeSpanMs at 100 % hold, descent damping, gravity mul. */
-  airBrakeSpanMs: 800,
-  airBrakeDescentDamp: 2.4,
-  airBrakeGravityMul: 0.8,
+  /** #247: fast, costly speed-for-lift air brake: front-loaded lift paid by horizontal momentum, not perpetual thrust. */
+  airBrakeSpanMs: 480,
+  airBrakeDescentDamp: 0.65,
+  airBrakeGravityMul: 0.94,
+  airBrakePaidLiftRatio: 1.40, // each px/s of actual horizontal speed spent buys 1.4 px/s upward; no free tap refill
   /** Seconds-based helicopter spin rate of the visual (deg/s). */
   heliSpinDegS: 760,
   /** Hazard / power-up defaults. */

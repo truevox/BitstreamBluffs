@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.19.22 — candidate fast speed-paid AirBrake (issue #247; DRAFT, 2026-11-22)
+
+- **Owner-approved feel direction:** AirBrake now bites significantly faster (40% vx loss over 480 ms vs 25% over 800 ms), has shorter/less vertical lift (paid only by speed spent per physics step, not continuous free force), and drops back toward full gravity with much less descent damping. No free lift from press/repress while still, no added controls or altered canopy fuel.
+- **Replay compatibility:** physics changed, so this proposal is **SIM_REVISION 7** with a new immutable ruleset archive and causal-source attestation. All SIM6 historical tapes remain immutable and must be verified under their correct old verifier. Existing GhostTape format, RNG, tick, input, per-course ghost UI, and ranked eligibility unchanged.
+- **Proof and limitations:** focused step-invariance and non-free-lift tests, ruleset and build identity, A/B seed-matched exploit observations documented in `docs/determinism/airbrake-247.md`. Based on now-merged #240 v2.19.21; proposed v2.19.22 is **conditional on** separate independent review, new SIM7 browser replay evidence, and a player-feel trial; this draft is not a live release or verified cure for every airborne exploit.
 ## v2.19.21 — source-stamped SIM6 replay fixture isolation and browser QA (#236 / #240) (2026-11-22)
 
 - **Immutable historical evidence:** cross-engine Chromium recordings now require a clean committed source, an explicit new output directory outside all checked-in fixture trees, and exclusive-create writes. The game URL must serve the local production build index. Existing historical tapes and original recording metadata remain untouched.
