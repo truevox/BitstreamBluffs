@@ -2,6 +2,8 @@
 /**
  * Run only from the independently controlled reviewer environment.
  * Do NOT give the App key/installation token to coding agents.
+ * Install/run ONLY from an independently controlled, trusted code copy, never
+ * from a checked-out developer PR. Do not trust author-provided evidence.
  * All writes use the GitHub App identity and an exact-commit check run.
  */
 import { createSign } from 'node:crypto';
