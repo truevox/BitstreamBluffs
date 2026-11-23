@@ -392,6 +392,18 @@
       inputActivity: { airborneFrames: 0, tiltFrames: 0, airBrakeHeldFrames: 0, airBrakeActiveFrames: 0, parachuteHeldFrames: 0, parachuteActiveFrames: 0, overlapHeldFrames: 0, overlapActiveFrames: 0 },
       minBsodGapPx: null, finalBsodGapPx: null, bsodActiveFrames: 0,
     };
+    // Optional developer-only pursuit sampler: observe the authoritative
+    // post-tick BSOD state, never touch pursuer position, speed, or scheduling.
+    // 60Hz samples are NOT the exact 120Hz substep minimum.
+    const pursuitSampleMs = o.pursuitSampleMs == null ? 0 : Number(o.pursuitSampleMs);
+    if (!Number.isInteger(pursuitSampleMs) || pursuitSampleMs < 0 ||
+        (pursuitSampleMs > 0 && (pursuitSampleMs < 500 || pursuitSampleMs > 60000))) {
+      throw new RangeError('pursuitSampleMs must be 0 or a 500–60000ms integer');
+    }
+    if (pursuitSampleMs) R.pursuitProbe = {
+      intervalMs: pursuitSampleMs, firstActive: null, maxSampledGapPx: null,
+      samples: [], sampleResolution: 'post-tick 60Hz browser observations',
+    };
     let tMs = 0; // run clock as the harness sees it (frames * DT)
     let lastLanding = null;
     let pendingLand = null;
@@ -609,6 +621,20 @@
         R.bsodActiveFrames++;
         R.finalBsodGapPx = pursuit.gapPx;
         R.minBsodGapPx = R.minBsodGapPx === null ? pursuit.gapPx : Math.min(R.minBsodGapPx, pursuit.gapPx);
+        const probe = R.pursuitProbe;
+        if (probe) {
+          const snapshot = {
+            tMs: Math.round(tMs), gapPx: Math.round(pursuit.gapPx * 1000) / 1000,
+            distM: Math.round(distM * 10) / 10, airborne: !s.grounded,
+          };
+          if (!probe.firstActive) probe.firstActive = snapshot;
+          probe.maxSampledGapPx = probe.maxSampledGapPx == null
+            ? pursuit.gapPx : Math.max(probe.maxSampledGapPx, pursuit.gapPx);
+          if (!probe.samples.length || tMs - probe.samples[probe.samples.length - 1].tMs >= pursuitSampleMs) {
+            probe.samples.push(snapshot);
+          }
+          probe.lastObserved = snapshot;
+        }
       }
       if (s.speed > R.maxSpeed) { R.maxSpeed = s.speed; R.maxSpeedAtM = distM; R.zoomAtMaxSpeed = scene.cameras.main.zoom; }
       const z = scene.cameras.main.zoom;
@@ -689,6 +715,12 @@
     // ---- finalise
     closeAir(false);
     R.endReason = endReason;
+    // Keep the terminal observation even if it is between regular intervals;
+    // it was captured on the same post-tick path as the other snapshots.
+    if (R.pursuitProbe?.lastObserved) {
+      const probe = R.pursuitProbe;
+      if (probe.samples.at(-1)?.tMs !== probe.lastObserved.tMs) probe.samples.push(probe.lastObserved);
+    }
     R.distM = r1(distOf(scene.sled.x));
     // The run's own score is authoritative; the shard-chain bonus is the only thing ScoreManager adds
     // that no score event carries, so fall back to it when no SCORE_CHANGED arrived.

@@ -33,3 +33,6 @@ config.txt
 
 # Exploit Factory generated output (reproducible; do not commit raw runs)
 /tools/exploits/out/
+
+# Developer-only bounded pursuit experiments
+tools/bsod-inevitability/out/
