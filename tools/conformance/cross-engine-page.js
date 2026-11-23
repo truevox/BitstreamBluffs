@@ -176,6 +176,7 @@
         if (!this.sled.grounded) cur.airTicks++;
         if ((this.sled.parachuteMs || 0) > 0) cur.chuteTicks++;
         if (this.sled.airBrakeActive) cur.airBrakeTicks++;
+        if (this.sled.airBrakeActive && (this.sled.parachuteMs || 0) > 0) cur.airBrakeCanopyOverlapTicks++;
         if (this.bsodState && this.bsodState.active) cur.bsodActiveTicks++;
         if (this.bsodCaught) cur.bsodCaught = true;
         if (this.kodiaks && this.kodiaks.length) cur.kodiakTicks++;
@@ -219,7 +220,7 @@
   }
 
   function newCur() {
-    return { done: false, digests: [], raw: [], contactTicks: 0, maxPairs: 0, airTicks: 0, chuteTicks: 0, airBrakeTicks: 0, bsodActiveTicks: 0, bsodCaught: false,
+    return { done: false, digests: [], raw: [], contactTicks: 0, maxPairs: 0, airTicks: 0, chuteTicks: 0, airBrakeTicks: 0, airBrakeCanopyOverlapTicks: 0, bsodActiveTicks: 0, bsodCaught: false,
       kodiakTicks: 0, maxChunk: 0, maxSector: 0, tricks: {} };
   }
 
@@ -235,7 +236,7 @@
 
   function controller(run, style, params, rand) {
     const P = { tiltSign: 1, ...params };
-    let mode = 0, lastHop = -999;
+    let mode = 0, lastHop = -999, lastBrake = false, lastChute = false;
     return () => {
       const s = run.sled, tk = run.simClock.tick + 1, pad = makePad();
       const grounded = s.grounded;
@@ -282,9 +283,26 @@
         } else if (style === 'chute') {
           if (!late && air > 350 && air < 1500) { pad.parachute = true; if (!s.chuteUsed) pad.pressed.parachute = true; }
           if (!late && air > 1500) { pad.airBrake = true; if (tk % 90 === 0) pad.pressed.airBrake = true; }
+        } else if (style === 'airbrakePulse') {
+          // #249: shorten tap/hold and let the sled fall between pulses. Input
+          // edges reflect actual release/repress, not an arbitrary timer ping.
+          const cycle = P.brakeCycleMs || 520, hold = P.brakeHoldMs || 200;
+          pad.airBrake = air > 100 && (air - 100) % cycle < hold;
+        } else if (style === 'airbrakeOverlap') {
+          // #249: intentionally overlap finite-fuel canopy with active airborne
+          // braking. Original 'chute' style used mutually exclusive windows.
+          pad.airBrake = air > 120 && air < 1150;
+          pad.parachute = air > 150 && air < 1100;
         }
-        if (late || style === 'cruise' || style === 'chute') align();
+        if (style === 'airbrakePulse' || style === 'airbrakeOverlap') {
+          pad.pressed.airBrake = pad.airBrake && !lastBrake;
+          pad.pressed.parachute = pad.parachute && !lastChute;
+          lastBrake = pad.airBrake;
+          lastChute = pad.parachute;
+        }
+        if (late || style === 'cruise' || style === 'chute' || style === 'airbrakePulse' || style === 'airbrakeOverlap') align();
       } else if (style === 'chute' && tk % 360 === 0) { pad.pressed.airBrake = pad.airBrake = true; pad.brakeHeld = true; }
+      else if (style === 'airbrakePulse' || style === 'airbrakeOverlap') { lastBrake = false; lastChute = false; }
       return pad;
     };
   }
@@ -307,7 +325,7 @@
     const snap = run.score.getSnapshot();
     return { ticks: run.simClock.tick, crashed: !!run.crashed, cause: run.crashed ? (cur.cause || 'unknown') : null,
       distanceM: Math.floor(snap.distanceM), score: Math.max(0, Math.round(snap.total)), x: run.sled.x, y: run.sled.y,
-      stats: { contactTicks: cur.contactTicks, maxPairs: cur.maxPairs, airTicks: cur.airTicks, chuteTicks: cur.chuteTicks, airBrakeTicks: cur.airBrakeTicks,
+      stats: { contactTicks: cur.contactTicks, maxPairs: cur.maxPairs, airTicks: cur.airTicks, chuteTicks: cur.chuteTicks, airBrakeTicks: cur.airBrakeTicks, airBrakeCanopyOverlapTicks: cur.airBrakeCanopyOverlapTicks,
         bsodActiveTicks: cur.bsodActiveTicks, bsodCaught: cur.bsodCaught, kodiakTicks: cur.kodiakTicks, maxChunk: cur.maxChunk, maxSector: cur.maxSector, tricks: cur.tricks,
         kodiaksOn: !!run.kodiaksOn, biomeMask: run.biomeMask >>> 0 } };
   }

@@ -40,3 +40,20 @@ export const FIXTURES_SIM6 = Object.freeze(FIXTURES.map((fixture) =>
     : fixture));
 
 // Gym (BSOD Gym) is NOT tape-covered: RunScene never creates a GhostRecorder in the Gym, so no replay fixture exists for it.
+
+
+/**
+ * #249: candidate SIM_REVISION 7 gets its OWN recording set. Older definitions
+ * are immutable. Same seed for the two new AirBrake trajectories is intentional:
+ * two input patterns on matched deterministic terrain, not a claim of broad
+ * biome coverage. Re-record only once the owner signs off on physics tuning.
+ */
+export const FIXTURES_SIM7 = Object.freeze([
+  ...FIXTURES_SIM6,
+  { id: 'airbrake-pulse', seed: 'CE120-CHUTE', style: 'airbrakePulse',
+    params: { hopEvery: 240, brakeHoldMs: 200, brakeCycleMs: 520 }, maxTicks: 3600,
+    covers: ['SIM7: airborne AirBrake quick tap/hold/release produces real active brake ticks'] },
+  { id: 'airbrake-canopy-overlap', seed: 'CE120-CHUTE', style: 'airbrakeOverlap',
+    params: { hopEvery: 240 }, maxTicks: 3600,
+    covers: ['SIM7: AirBrake and finite-fuel parachute simultaneously active in actual 120Hz game ticks'] },
+]);
