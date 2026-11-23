@@ -166,11 +166,11 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(ctx._bufferSources.at(-1).connections[0].gain.value).toBeCloseTo(originalTakeoffGain);
 		expect(fx.set('suction',2.4,ctx.currentTime)).toBe(true);
 		expect(fx.set('takeoff',.65,ctx.currentTime)).toBe(true);
-		expect(ctx._bufferSources.at(-1).connections[0].gain.value).toBeCloseTo(originalTakeoffGain*2.4/1.8);
+		expect(ctx._bufferSources.at(-1).connections[0].gain.value).toBeCloseTo(originalTakeoffGain*2.4/.8);
 		expect(fx.set('suction',0,ctx.currentTime)).toBe(true);
 		expect(fx.set('takeoff',.65,ctx.currentTime)).toBe(true);
 		expect(ctx._bufferSources.at(-1).connections[0].gain.value).toBe(0);
-		expect(fx.set('suction',1.8,ctx.currentTime)).toBe(true);
+		expect(fx.set('suction',.8,ctx.currentTime)).toBe(true);
 		expect(fx.set('splock',1.6,ctx.currentTime)).toBe(true);
 		for(let i=0;i<8;i++) fx.set('takeoff',1,ctx.currentTime+i*.02);
 		expect(ctx._bufferSources.filter(x=>!x.stopped).length).toBeLessThanOrEqual(4);

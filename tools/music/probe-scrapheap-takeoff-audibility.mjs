@@ -44,7 +44,7 @@ const base=process.env.SCHLORP_SOURCE_URL || 'http://127.0.0.1:5173';
  for(const style of ['peel','gulp']) {
   assert.equal(result[style+'Peak'].finite,true);
   assert(result[style+'Peak'].peak < .95,style+' peak unexpectedly high');
-  assert(result[style+'DifferenceRMS'] > .025,style+' is buried in the original mix');
+  assert(result[style+'DifferenceRMS'] > .018,style+' is below owner-liked 80% audition audibility floor');
   assert(result[style+'DifferenceRMS'] < result.landingDifferenceRMS*.96,
    style+' should remain smaller than the owner-approved landing');
  }

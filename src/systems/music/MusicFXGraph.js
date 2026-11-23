@@ -166,7 +166,7 @@ function allocateEffect(ctx, raw) {
 			// loudness and the original drum recording remain unchanged.
 			let splock = clamp(raw.splock, 0, 1.6, 1.6);
 			// Takeoff volume is independent of the already-owner-approved landing.
-			let suction = clamp(raw.suction, 0, 2.4, 1.8);
+			let suction = clamp(raw.suction, 0, 2.4, .8);
 			let burstEnd = -Infinity;
 			// Stationary and airborne have genuinely zero metallic contact;
 			// a fast ground run makes the inharmonic layer audible but bounded.
@@ -309,7 +309,7 @@ function allocateEffect(ctx, raw) {
 				return true;
 			} };
 			refs.suction = { set: value => {
-				suction = clamp(value, 0, 2.4, 1.8);
+				suction = clamp(value, 0, 2.4, .8);
 				return true;
 			} };
 			refs.suctionStyle = { set: value => {
