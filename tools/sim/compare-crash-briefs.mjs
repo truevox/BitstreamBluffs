@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs, TextDecoder, types } from 'node:util';
 import { crashBriefReport } from './replay-crash-brief.js';
 
-const USAGE = 'Usage: node tools/sim/compare-crash-briefs.mjs --observed FILE --reference FILE';
+const USAGE = 'Usage: node tools/sim/compare-crash-briefs.mjs --observed FILE --reference FILE [--require-match]';
 const INVALID = 'Expected unchanged #190 v1 crash-brief JSON.';
 const MAX_BRIEF_BYTES = 4 * 1024;
 // #190 v1: 2–5 replays, 1–180 whole 120-tick checkpoints (a 180-second cap).
@@ -80,12 +80,26 @@ async function main(args) {
   }
   let parsed;
   try {
-    parsed = parseArgs({ args, options: { observed: { type: 'string' }, reference: { type: 'string' } }, tokens: true });
+    parsed = parseArgs({
+      args,
+      options: {
+        observed: { type: 'string' },
+        reference: { type: 'string' },
+        'require-match': { type: 'boolean' },
+      },
+      tokens: true,
+    });
   } catch { throw new BriefInputError(USAGE); }
   const { observed, reference } = parsed.values;
-  if (parsed.tokens.length !== 2 || !observed || !reference) throw new BriefInputError(USAGE);
+  const requireMatch = parsed.values['require-match'] === true;
+  if (parsed.tokens.length !== (requireMatch ? 3 : 2) || !observed || !reference) {
+    throw new BriefInputError(USAGE);
+  }
   const result = compareCrashBriefs(await readBrief(observed, 'Observed'), await readBrief(reference, 'Reference'));
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  if (requireMatch && result.status !== 'match') {
+    process.exitCode = result.status === 'mismatch' ? 2 : 3;
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
