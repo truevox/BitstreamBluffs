@@ -31,7 +31,7 @@ node tools/sensitivity/run-sensitivity.mjs --seeds 12 --field hopPress --offsets
 ```
 
 The source-pinned measurement in `results/hopPress-12seeds.json` was generated **after** the
-instrumentation was committed at Git SHA `66d8b0a67f0f6caa21a64ee3d1a7bfbb5e8a276b`, against its
+fixed executable implementation was committed at Git SHA `5f5a9549beb30c189b42bba66128acd7d3a263f4`, against its
 clean checkout. The report's `build.sourceSha` therefore identifies that **executable implementation**;
 the subsequent evidence-only commit containing this JSON is not a different simulation build. At the
 original 90-second capture horizon `sim-06` correctly refused to emit a stale tape; extending capture
@@ -101,9 +101,17 @@ shipped `encodePad`/`decodePad` (identity at offset 0, one field moved and nothi
 `tests/sensitivity/source-identity.test.js` pins the canonical source-identity contract. The fixtures in
 `tests/sensitivity/fixtures/` are real tapes captured from the shipped sim by this same tool, so a format
 change that would break the tool fails a test instead of silently perturbing a different control.
-Raw external copy and provenance on CT223: `/srv/friday-audio/bsb-130-recovery-provenance-20261123/hopPress-12seed-180s-complete.json`
-(SHA256 `388720c85d612e258fb5b3272c4a373cbc7acc829c875f4f7e1381414ff32a84`). The
-12-seed sample is still small and the measured effects are not a universal gameplay fairness claim.
+The **corrected** source-stamped external copy on CT223 is
+`/srv/friday-audio/bsb-130-recovery-provenance-20261123/hopPress-12seed-180s-replay-window-fixed.json`
+(SHA256 `470ba07825a215033eccf6f23a856f589955aa765c43d5dfe291e0d7d111a24e`).
+The **earlier, preserved** pre-correction report from executable SHA `66d8b0a` remains external as
+`/srv/friday-audio/bsb-130-recovery-provenance-20261123/hopPress-12seed-180s-complete.json`
+(SHA256 `388720c85d612e258fb5b3272c4a373cbc7acc829c875f4f7e1381414ff32a84`): Luna
+correctly found it mislabeled an internal `replay-window` cutoff as `maxM`. That historical evidence
+remains in Git history and externally, not retroactively rewritten. The new artifact labels the one
+censored arm `sim-03/+2` as `endReason: replay-window`, with both `endTick` and `replayMaxTicks`
+equal to `3348`; actual distance was 628.976m, so this was **not** a 5000m cutoff.
+The 12-seed sample remains small; measured effects are not a universal fairness claim.
 
 ## Why capture runs under the tape's own rule
 
