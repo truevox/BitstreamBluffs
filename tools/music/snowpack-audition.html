@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BsB • Snowpack DSP Lab</title>
+<style>
+body{font:16px system-ui,sans-serif;background:#101827;color:#f3f6fc;max-width:760px;margin:3rem auto;padding:0 1rem;line-height:1.5}
+h1{font-size:2rem;margin-bottom:.4rem}p{color:#bdc9da}.panel{background:#192638;padding:1.4rem;border-radius:1rem;margin:1.2rem 0}
+button,select,input{font:inherit}button,select{background:#2d4264;color:white;border:1px solid #6887ad;padding:.65rem 1rem;border-radius:.6rem;margin:.3rem}
+button:disabled{opacity:.45}button:hover:not(:disabled){background:#3c5e89}
+input[type=range]{width:100%;accent-color:#9cd8ff}label{display:block;margin:.7rem 0}
+strong{color:#b9e4ff}#status{min-height:1.5rem}small{color:#acc0d4}
+</style>
+</head><body>
+<h1>❄️ Snowpack DSP Lab</h1>
+<p>One original recording. No MIDI re-performance. Hear what happens when a biome wraps the audio in a heavy blanket of snow.</p>
+<section class="panel">
+<label>Choose a local recording or stem (WAV, Ogg, MP3, etc.): <input id="file" type="file" accept="audio/*"></label>
+<small>Your recording stays in your browser; this audition doesn't upload it.</small>
+<div><button id="demo">🎵 Load 20-second original instrumental sample</button></div>
+<div><button id="play" disabled>▶ Play / pause</button><button id="burst" disabled>🏂 Jump — leave powder</button><button id="hard" disabled>💥 Hard land</button></div>
+<label>Preset <select id="preset"><option value="0.72">Powdery</option><option value="0.95">Buried in Debumont</option><option value="0">Original dry signal</option></select></label>
+<label>Ground snow depth: <strong id="readout">72%</strong><input id="depth" type="range" min="0" max="1" step="0.01" value="0.72"></label>
+<p id="status" role="status">Choose a sound file to begin.</p>
+</section>
+<p><small>Uses BsB's live <code>snowpack</code> processor. Jump exposes the original recording; soft and hard landings briefly bury it deeper in the snow, then settle back to your selected depth. Song timing is unchanged. The supplied instrumental demo is a five-stem mix from Pope Leo (no vocals); in-game each instrument has its own Snowpack chain. <a href="https://deploy-preview-201--bitstream-bluffs.netlify.app/auditions/2026-11-21-stem-fx/">Compare the approved pre-rendered biome mixes here.</a></small></p>
+<script type="module" src="./snowpack-audition.js"></script>
+</body></html>

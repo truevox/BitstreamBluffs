@@ -218,6 +218,7 @@ export class AudioSynth {
 
   _onLanding(p) {
     if (!p || p.quality === 'crash') return;
+    if (this._musicMode === 'run') this._stemMusic?.onLanding?.(p);
     if (p.quality === 'perfect') this.playSfx('landPerfect');
     else if (p.hard) this.playSfx('landHard');
     else this.playSfx('land', { pitch: p.quality === 'sloppy' ? 0.8 : 1 });
@@ -683,6 +684,8 @@ export class AudioSynth {
 
   _setPaused(paused) {
     this._paused = paused;
+    // Pauses may stop frame updates instantly: proactively silence bee Foley.
+    if (paused) try { this._stemMusic?.setMicroBees?.([],0); } catch {}
     try {
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
@@ -933,6 +936,21 @@ export class AudioSynth {
   /** Stem phase follows the actual sled state, independently of tempo. */
   setAirborne(value) {
     this._stemMusic?.setAirborne(this._musicMode === 'menu' ? false : value);
+  }
+
+  /** Read-only screen positions from the existing Micro Mountain bee backdrop. */
+  setMicroBees(bees,playerScreenX) {
+    if (this._musicMode !== 'run' || this._paused) {
+      this._stemMusic?.setMicroBees?.([],0);
+      return;
+    }
+    this._stemMusic?.setMicroBees?.(bees,playerScreenX);
+  }
+
+  /** Read-only authoritative terrain/rider sample for hydrostatic musical physics. */
+  setHydrostaticMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return;
+    this._stemMusic?.setHydrostaticMotion?.(snapshot);
   }
 
   // ----------------------------------------------------------------------------------------------------------- music

@@ -67,6 +67,7 @@ import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
 import { BiomeFx } from '../entities/BiomeFx.js';
 import { bridgeLook } from '../systems/BiomeTransition.js';
+import { beesAt } from '../systems/MicroBees.js';
 import { WorldDanceEnvelope, worldDanceMotionAllowed, readWorldDanceAudio } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
@@ -1420,6 +1421,11 @@ export class RunScene extends Phaser.Scene {
         if (sled.pushPulse) audio.playSfx('push');
         if (audio.setSpeed) audio.setSpeed(sled.speed);
         if (audio.setAirborne) audio.setAirborne(!sled.grounded);
+        // Read-only post-physics terrain/rider snapshot for Underwater sound.
+        // Terrain Y (positive down), not rider altitude, owns depth memory.
+        if (audio.setHydrostaticMotion && this.terrain)
+          audio.setHydrostaticMotion({terrainY:this.terrain.heightAt(sled.x),
+            riderY:sled.y, vy:sled.vy, grounded:!!sled.grounded});
       } catch (e) { /* audio must never break the loop */ }
     }
     if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict
@@ -1548,6 +1554,13 @@ export class RunScene extends Phaser.Scene {
     const dance=this.worldDance?.update(sample,dt,meter)||0;
     this.bg.update(cam.scrollX, t, sled.speed,dance);
     if (this.biomeFx) this.biomeFx.update(cam.scrollX, t, this._veil || 0, isReducedMotion(this));
+    // Follow the same decorative bees as Background; don't spawn audio bees.
+    if (audio?.setMicroBees) {
+      const visible=this.bg.motif==='dew-drops'&&this.bg.bees===true&&!this.crashed;
+      const positions=visible?beesAt(cam.scrollX,t,this.bg.decorSeed):[];
+      const riderScreenX=GAME_WIDTH/2+(sled.x-(cam.scrollX+GAME_WIDTH/2))*cam.zoom;
+      audio.setMicroBees(positions,riderScreenX);
+    }
     this.songBillboard?.update(dt,dance,!danceAllowed);
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
