@@ -11,3 +11,7 @@ The first deployed audition was too subtle. This snapshot is from implementation
 ## Sticky puddle splock refinement (Nov 22, 2026)
 
 Owner described the current audible impact as pulling a foot from a wet sticky garbage puddle, and wanted a little more of that quality. Updated from code PR #221 commit `e5b838d`: short synthetic rising suction chirp, hollow lip pop and debris, adjustable Splock impact weight 60–160% (default 120%), repeatable Test splock control; original stems, mixer, and vocal lead pipeline preserved. Offline four-second sample at three hard hits had sampled peaks 0.2184 / 0.3259 / 0.4130 at weights .6 / 1.2 / 1.6 with no invalid values. Not a full release loudness evaluation; owner re-listening outstanding.
+
+## Owner-favorite SPLORP + suction takeoff pair
+
+Compiled static snapshot from **implementation PR #221 commit `579b566`**. Splock default is now 160% (owner-preferred maximum), and the game now triggers a shorter, lower-volume deterministic suction-release on a real Garbage grounded-to-airborne edge. Added separate **Test suction** button to the standalone demo and labelled **Take off (suction)** so users can compare the two moments; existing source stems and melody pipe are not modified. The underlying native DSP remains in PR #221, not this audition-only PR. 133 focused tests and the representative multi-event five-second offline headroom probe passed. Human listening review remains necessary.
