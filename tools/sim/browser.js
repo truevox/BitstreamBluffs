@@ -367,10 +367,14 @@
       // real BsodPursuit; alter only this headless instance before the first tick.
       // Position is expressed relative to the ACTUAL collision edge, not sled center.
       const ov = o.pursuitOverrides || {};
-      const bounds = { pursuitGapPx: [100, 20000], pursuitSpeedPxS: [1, 3000], pursuitAccelPxS2: [0.01, 100] };
+      const bounds = { pursuitGapPx: [100, 20000], pursuitSpeedPxS: [1, 3000], pursuitAccelPxS2: [0.01, 100], pursuitGapOffsetPx: [-7000, 20000], pursuitAccelFactor: [0.1, 30] };
       for (const [k, v] of Object.entries(ov)) {
         if (!Object.hasOwn(bounds, k) || typeof v !== 'number' || !Number.isFinite(v) ||
             v < bounds[k][0] || v > bounds[k][1]) throw new RangeError(`invalid pursuit override ${k}`);
+      }
+      if ((Object.hasOwn(ov, 'pursuitGapPx') && Object.hasOwn(ov, 'pursuitGapOffsetPx')) ||
+          (Object.hasOwn(ov, 'pursuitAccelPxS2') && Object.hasOwn(ov, 'pursuitAccelFactor'))) {
+        throw new RangeError('cannot mix absolute and relative pursuit overrides');
       }
       const originalSledEdge = scene.bsod.wallX + scene.bsodState.gapPx;
       if (Object.hasOwn(ov, 'pursuitGapPx')) {
@@ -378,6 +382,12 @@
         // this applies an absolute measured initial gap to the spawned wall.
         scene.bsod.wallX = originalSledEdge - ov.pursuitGapPx;
       }
+      if (Object.hasOwn(ov, 'pursuitGapOffsetPx')) {
+        const resultingGap = scene.bsodState.gapPx + ov.pursuitGapOffsetPx;
+        if (resultingGap <= 0) throw new RangeError('pursuitGapOffsetPx would spawn overlapping the rider');
+        scene.bsod.wallX = originalSledEdge - resultingGap;
+      }
+      if (Object.hasOwn(ov, 'pursuitAccelFactor')) scene.bsod.accelerationPxS2 *= ov.pursuitAccelFactor;
       if (Object.hasOwn(ov, 'pursuitSpeedPxS')) scene.bsod.wallSpeedPxS = ov.pursuitSpeedPxS;
       if (Object.hasOwn(ov, 'pursuitAccelPxS2')) scene.bsod.accelerationPxS2 = ov.pursuitAccelPxS2;
       if (Object.keys(ov).length) scene.bsodState = scene.bsod.state(originalSledEdge, scene.sled.vx, 1);
