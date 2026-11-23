@@ -1760,6 +1760,13 @@ export class StemFXMixer {
 
 	selectBiome(id) { return this.space.selectBiome(id); }
 
+	/** Preserve per-source room sends but guarantee zero residual
+	 * convolution output once clean-menu fade finishes.
+	 */
+	setRoomWetEnabled(enabled, fadeSeconds=.75){
+		return this.space.setWetEnabled(enabled,fadeSeconds);
+	}
+
 	setRoomSend(id, value) {
 		const source = this.sources.get(id);
 		if (!source) return false;

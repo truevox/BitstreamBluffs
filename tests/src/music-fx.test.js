@@ -585,6 +585,34 @@ describe('Modular cheap Web Audio processors', () => {
 			for (const dispose of waitingDisposals)expect(dispose).toHaveBeenCalledTimes(1);
 		} finally {jest.useRealTimers();}
 	});
+	test('clean-menu output gate silences lingering convolution tails in the same 750ms',()=>{
+		jest.useFakeTimers();
+		try{
+			const ctx=fakeContext(),mix=new StemFXMixer(ctx,ctx.createGain());
+			const room=mix.space;
+			expect(room.wetEnabled).toBe(true);
+			expect(room.outputGate.gain.value).toBe(1);
+			expect(room.active.gain.connections).toContain(room.outputGate);
+			expect(mix.setRoomWetEnabled('false',.75)).toBe(false);
+			expect(mix.setRoomWetEnabled(false,.75)).toBe(true);
+			expect(room.outputGate.gain.value).toBe(0);
+			expect(room.wetEnabled).toBe(false);
+			expect(mix.setRoomWetEnabled(false,.75)).toBe(false);
+			// Rapid resume reverses only the room master gate, without
+			// reallocating convolvers or re-enabling old source sends.
+			ctx.currentTime+=.11;
+			const previousPaths=room.paths.size;
+			expect(mix.setRoomWetEnabled(true,.75)).toBe(true);
+			expect(room.outputGate.gain.value).toBe(1);
+			expect(room.paths.size).toBe(previousPaths);
+			expect(mix.setRoomWetEnabled(true,.75)).toBe(false);
+			expect(mix.setRoomWetEnabled(false,NaN)).toBe(true);
+			expect(room.outputGate.gain.value).toBe(0);
+			const gate=room.outputGate;
+			mix.destroy();
+			expect(gate.connections).toHaveLength(0);
+		}finally{jest.useRealTimers();}
+	});
 	test('source-level gain, ducking, independent send, biome and chain replacement', () => {
 		jest.useFakeTimers();
 		try {

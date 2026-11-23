@@ -99,7 +99,7 @@ describe('continuous soundtrack and saved shuffle',()=>{
 			.map(s=>[s,{}])]);
 		d._timbreSignatures=new Map();
 		d.mixer={setGain:jest.fn(),setEffectParam:jest.fn(),replaceEffects:jest.fn(),
-			setRoomSend:jest.fn(),selectBiome:jest.fn()};
+			setRoomSend:jest.fn(),setRoomWetEnabled:jest.fn(),selectBiome:jest.fn()};
 		d.adaptive={setAirborne:jest.fn(),setBiome:jest.fn(),setEnabled:jest.fn(),
 			setSpeed:jest.fn()};
 		d.setMenuMode(true);
@@ -112,6 +112,7 @@ describe('continuous soundtrack and saved shuffle',()=>{
 			expect(d.mixer.replaceEffects).toHaveBeenCalledWith(source,[],.75);
 		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('drums',0);
 		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('voice:crystal-cavern',0);
+		expect(d.mixer.setRoomWetEnabled).toHaveBeenCalledWith(false,.75);
 		expect(d._timbreSignatures.get('voice:debutmont')).toBe('[]');
 		expect(d.clockStart).toBe(41.25);
 		expect(d.trackIndex).toBe(2);
@@ -133,6 +134,7 @@ describe('continuous soundtrack and saved shuffle',()=>{
 			expect(call?.[1].length).toBeGreaterThan(0);
 		}
 		expect(d.adaptive.setEnabled).toHaveBeenLastCalledWith(true);
+		expect(d.mixer.setRoomWetEnabled).toHaveBeenLastCalledWith(true,.75);
 		expect(d.clockStart).toBe(41.25);
 		expect(d.trackIndex).toBe(2);
 	});

@@ -58,6 +58,7 @@ try{
 					.filter(([name])=>name.startsWith('voice:')&&d.gains.has(name))
 					.every(([,src])=>src.chain?.stages?.length===0),
 				vocalsSendZero:!!mixer.sources.get('vocals'),
+				roomWetEnabled:mixer.space.wetEnabled,
 				calls:calls.slice()
 			};
 			calls.length=0;
@@ -68,6 +69,7 @@ try{
 				trackIndex:d.trackIndex,trackId:d.track?.id,
 				processed:dryNames.every(id=>
 					mixer.sources.get(id)?.chain?.stages?.some(s=>s.type==='snowpack')),
+				roomWetEnabled:mixer.space.wetEnabled,
 				calls:calls.slice(),retiring:mixer.retiringEffects.size
 			};
 			return {before,menu,run};
@@ -80,6 +82,7 @@ try{
 	assert.equal(result.menu.menuMode,true);
 	assert(result.menu.clean,'Menu still has instrumental gameplay processors');
 	assert(result.menu.voiceClean,'Menu still has one or more melodic-lead processors');
+	assert.equal(result.menu.roomWetEnabled,false,'Shared reverb remains enabled in clean menu');
 	assert.equal(result.menu.calls.length>=5,true);
 	for(const call of result.menu.calls){
 		assert.deepEqual(call.effects,[],'Menu retained a source effect on '+call.id);
@@ -88,6 +91,7 @@ try{
 	assert.equal(result.run.mode,'run');
 	assert.equal(result.run.musicBiome,'debutmont');
 	assert.equal(result.run.menuMode,false);
+	assert.equal(result.run.roomWetEnabled,true,'Shared reverb not restored on gameplay return');
 	assert(result.run.processed,'Resume did not reinstate Debutmont snowpack source processing');
 	for(const call of result.run.calls){
 		assert.equal(call.fade,.75,'Returning to run fade wrong on '+call.id);
@@ -96,6 +100,55 @@ try{
 		assert.equal(result.menu[key],result.before[key],key+' changed entering clean menu');
 		assert.equal(result.run[key],result.before[key],key+' changed resuming gameplay');
 	}
+	// Real Web Audio renders the shared reverb gate, not merely a mocked
+	// API call: verify its 750ms output transition in both directions.
+	await page.waitForFunction(()=>{
+		const a=window.__bbGame.scene.getScene('RunScene').registry.get('audioSynth');
+		return a?._stemMusic?.mixer?.space?.outputGate?.gain?.value>.98;
+	},{timeout:3000});
+	const room=await page.evaluate(async()=>{
+		const a=window.__bbGame.scene.getScene('RunScene').registry.get('audioSynth');
+		const director=a._stemMusic,m=director.mixer,gate=m.space.outputGate.gain;
+		const initial={enabled:m.space.wetEnabled,gain:gate.value,
+			clockStart:director.clockStart,trackIndex:director.trackIndex};
+		a._enterMenuMusic();
+		await new Promise(resolve=>setTimeout(resolve,850));
+		const clean={enabled:m.space.wetEnabled,gain:gate.value,
+			clockStart:director.clockStart,trackIndex:director.trackIndex};
+		a._enterRunMusic('menu-crossfade-test');
+		await new Promise(resolve=>setTimeout(resolve,850));
+		const live={enabled:m.space.wetEnabled,gain:gate.value,
+			clockStart:director.clockStart,trackIndex:director.trackIndex};
+		// Six reversals faster than 750ms must not leak room effect tails
+		// or strand old graph chains. Last requested state wins.
+		for(let i=0;i<6;i++){
+			if(i%2===0)a._enterMenuMusic();
+			else a._enterRunMusic('menu-crossfade-test');
+			await new Promise(resolve=>setTimeout(resolve,45));
+		}
+		await new Promise(resolve=>setTimeout(resolve,880));
+		const settled={enabled:m.space.wetEnabled,gain:gate.value,
+			clockStart:director.clockStart,trackIndex:director.trackIndex,
+			retiring:m.retiringEffects.size,roomPaths:m.space.paths.size};
+		return {initial,clean,live,settled};
+	});
+	assert(room.initial.enabled&&room.initial.gain>.98);
+	assert.equal(room.clean.enabled,false);
+	assert(room.clean.gain<.02,'Shared convolution output did not fully fade dry in menu');
+	assert.equal(room.live.enabled,true);
+	assert(room.live.gain>.98,'Shared convolution output did not reappear within 750ms');
+	assert.equal(room.settled.enabled,true);
+	assert(room.settled.gain>.98,'Rapid pause/unpause did not settle to the LAST gameplay state');
+	assert.equal(room.settled.retiring,0,'Rapid menu toggles left retired audio effect graphs');
+	assert(room.settled.roomPaths<=3,'Convolution room graph grew unbounded');
+	for(const field of ['clockStart','trackIndex']){
+		for(const stage of ['clean','live','settled'])
+			assert.equal(room[stage][field],room.initial[field],
+				'Rapid clean menu transition changed original source '+field);
+	}
+	console.log('CLEAN_MENU_750MS_SHARED_CONVOLUTION_GATE_RAPID_REVERSAL_PASS',
+		JSON.stringify(room));
+
 	await page.waitForFunction(()=>{
 		const d=window.__bbGame.scene.getScene('RunScene')
 			.registry.get('audioSynth')?._stemMusic;

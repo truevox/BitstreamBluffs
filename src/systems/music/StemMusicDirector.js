@@ -231,6 +231,9 @@ export class StemMusicDirector {
 		// a deliberate three-quarter-second crossfade without seeking,
 		// restarting, or changing the original source clock.
 		this._applyMusicTimbres(true, .75);
+		// The shared convolution tail is not controlled by per-source
+		// DSP replacement. Make it follow the same 750ms clean mix gate.
+		this.mixer?.setRoomWetEnabled?.(!next,.75);
 	}
 
 	/** The real physical BSOD proximity drives only accompaniment corruption.
