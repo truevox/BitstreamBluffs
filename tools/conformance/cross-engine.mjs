@@ -6,7 +6,7 @@
  *   ... cross-engine.mjs matrix --resume    # continue an interrupted matrix: finished sessions are read from the journal
  *   node tools/conformance/cross-engine.mjs scout [fixtureId]                                             # explore autopilot outcomes
  *
- * Env: CE_FIXTURE_SET=historical|sim6 (default historical),
+ * Env: CE_FIXTURE_SET=historical|sim6|sim7 (default historical),
  *      CE_TAPE_DIR (required NEW absolute output for record; optional replay input for matrix/fresh/positions),
  *      ENGINES (comma list; default all), HZ (default 30,60,120,144), SESSIONS (fresh browser contexts per engine/cadence, default 2),
  *      FIXTURES (comma ids), OUT (results json), RASTER=1 (really rasterise WebGL frames; default skips only the GPU draw call).
@@ -21,7 +21,7 @@ import os from 'node:os';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FIXTURES, FIXTURES_SIM6 } from './cross-engine-fixtures.mjs';
+import { FIXTURES, FIXTURES_SIM6, FIXTURES_SIM7 } from './cross-engine-fixtures.mjs';
 import { currentBuildIdentity, checkBuildIdentity } from '../ruleset/lib.mjs';
 import { selectTapeDirectory, prepareRecordingDirectory } from './cross-engine-paths.mjs';
 
@@ -35,11 +35,11 @@ const cmd = process.argv[2];
 const TAPE_DIR = selectTapeDirectory({ mode: cmd, explicit: process.env.CE_TAPE_DIR, historical: historicalTapeDir });
 const OUT = process.env.OUT || path.join(here, '..', '..', 'docs', 'determinism', 'results', 'cross-engine-results.json');
 const fixtureSet = process.env.CE_FIXTURE_SET || 'historical';
-if (!['historical', 'sim6'].includes(fixtureSet)) throw new Error('CE_FIXTURE_SET must be historical or sim6');
-if (fixtureSet === 'sim6' && !process.env.CE_TAPE_DIR) {
-  throw new Error('CE_FIXTURE_SET=sim6 requires an explicit CE_TAPE_DIR (never borrow historical tapes)');
+if (!['historical', 'sim6', 'sim7'].includes(fixtureSet)) throw new Error('CE_FIXTURE_SET must be historical, sim6 or sim7');
+if (fixtureSet !== 'historical' && !process.env.CE_TAPE_DIR) {
+  throw new Error(`CE_FIXTURE_SET=${fixtureSet} requires an explicit CE_TAPE_DIR (never borrow historical tapes)`);
 }
-const fixtureDefinitions = fixtureSet === 'sim6' ? FIXTURES_SIM6 : FIXTURES;
+const fixtureDefinitions = fixtureSet === 'sim6' ? FIXTURES_SIM6 : fixtureSet === 'sim7' ? FIXTURES_SIM7 : FIXTURES;
 const fixtureFilter = process.env.FIXTURES ? process.env.FIXTURES.split(',') : null;
 const fixtures = fixtureDefinitions.filter((f) => !fixtureFilter || fixtureFilter.includes(f.id));
 // The game derives the Daily rule for ordinary seeds from the wall-clock DATE (RunScene: getDailyInfo()), and the tape header does not pin it, so the same
@@ -112,26 +112,28 @@ function validatedSourceProvenance() {
     sourceTripwireId: record.sourceTripwireId };
 }
 
-async function verifySim6FixtureSet() {
-  if (fixtureSet !== 'sim6' || cmd === 'record' || cmd === 'scout') return;
+async function verifyVersionedFixtureSet() {
+  if (fixtureSet === 'historical' || cmd === 'record' || cmd === 'scout') return;
+  const revision = Number(fixtureSet.slice(3));
+  const label = fixtureSet.toUpperCase();
   let meta;
   try { meta = JSON.parse(await readFile(path.join(TAPE_DIR, 'record-meta.json'), 'utf8')); }
-  catch { throw new Error('SIM6 tape input needs source-stamped record-meta.json, not historical tapes'); }
+  catch { throw new Error(`${label} tape input needs source-stamped record-meta.json, not historical tapes`); }
   if (meta.format !== 'bb-cross-engine-record-meta' || meta.formatVersion !== 2 ||
-      meta.fixtureSet !== 'sim6' || meta.simRevision !== 6) {
-    throw new Error('SIM6 tape input metadata is missing or not a revision-6 recording');
+      meta.fixtureSet !== fixtureSet || meta.simRevision !== revision) {
+    throw new Error(`${label} tape input metadata is missing or not a revision-${revision} recording`);
   }
   const { record } = currentBuildIdentity(repositoryRoot);
-  if (meta.gameVersion !== record.gameVersion || meta.rulesetId !== record.physicsIdentity.rulesetId ||
-      meta.buildId !== record.buildId) {
-    throw new Error('SIM6 tape metadata identifies a DIFFERENT game build; do not treat as current QA evidence');
+  if (record.physicsIdentity.simRevision !== revision || meta.gameVersion !== record.gameVersion ||
+      meta.rulesetId !== record.physicsIdentity.rulesetId || meta.buildId !== record.buildId) {
+    throw new Error(`${label} tape metadata identifies a DIFFERENT game build; do not treat as current QA evidence`);
   }
   for (const fixture of fixtures) {
     const source = meta.fixtures?.find((f) => f.id === fixture.id);
-    if (!source?.tapeSha256) throw new Error(`SIM6 tape lacks source metadata for ${fixture.id}`);
+    if (!source?.tapeSha256) throw new Error(`${label} tape lacks source metadata for ${fixture.id}`);
     const bytes = await readFile(tapePath(fixture));
     if (createHash('sha256').update(bytes).digest('hex') !== source.tapeSha256) {
-      throw new Error(`SIM6 tape bytes mismatch source metadata for ${fixture.id}`);
+      throw new Error(`${label} tape bytes mismatch source metadata for ${fixture.id}`);
     }
   }
 }
@@ -196,6 +198,9 @@ function roll(d) { let h = 0x811c9dc5; for (const r of d) for (const v of r) { h
 // ---------------------------------------------------------------- record
 async function record() {
   const source = validatedSourceProvenance();
+  if (fixtureSet !== 'historical' && source.simRevision !== Number(fixtureSet.slice(3))) {
+    throw new Error(`${fixtureSet.toUpperCase()} recording requires its exact SIM_REVISION and build identity`);
+  }
   const localIndex = await readFile(path.join(repositoryRoot, 'dist', 'index.html'));
   const servedIndex = Buffer.from(await (await fetch(url)).text());
   if (!servedIndex.equals(localIndex)) throw new Error('record GAME_URL is not serving this checkout\'s production dist/index.html');
@@ -211,6 +216,16 @@ async function record() {
       const rec = await play(page, { seed: f.seed, hz: 120, style: f.style, params: f.params, maxTicks: f.maxTicks, kodiaks: !!f.kodiaks, rngSeed: f.rngSeed || 1 });
       await ctx.close();
       if (!rec.tape) throw new Error(`${f.id}: no tape produced`);
+      if (fixtureSet === 'sim7' && f.id.startsWith('airbrake-')) {
+        const stats = rec.outcome?.stats;
+        if (!stats || stats.airBrakeTicks < 35 || stats.airTicks < 100) {
+          throw new Error(`${f.id}: no meaningful ACTUAL airborne AirBrake ticks; do not certify unexercised input`);
+        }
+        if (f.id === 'airbrake-canopy-overlap' &&
+            (stats.chuteTicks < 35 || stats.airBrakeCanopyOverlapTicks < 25)) {
+          throw new Error(`${f.id}: no real simultaneous canopy+AirBrake activation; recording is not coverage`);
+        }
+      }
       // Re-verify in a FRESH browser context (new page, empty IndexedDB, run #1 of that session), live vs replay.
       const v = await freshPage(browser);
       const rep = await play(v.page, { seed: f.seed, hz: 120, tape: rec.tape, level: levelOf(f) });
@@ -517,7 +532,7 @@ async function positions() {
   console.log('WROTE', OUTP);
 }
 
-await verifySim6FixtureSet();
+await verifyVersionedFixtureSet();
 if (cmd === 'record') await record();
 else if (cmd === 'matrix') await matrix();
 else if (cmd === 'scout') await scout();
