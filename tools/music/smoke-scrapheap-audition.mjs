@@ -28,8 +28,13 @@ try {
 	await page.click('#solo');
 	assert.equal(await page.$eval('#solo', e=>e.getAttribute('aria-pressed')),'true');
 	assert.equal(await page.$eval('#splock-value', e=>e.textContent),'160%');
+	assert.equal(await page.$eval('#suction-value', e=>e.textContent),'180%');
+	await page.$eval('#suction',e=>{e.value='240';e.dispatchEvent(new Event('input',{bubbles:true}));});
+	assert.equal(await page.$eval('#suction-value', e=>e.textContent),'240%');
+	assert.equal(await page.$eval('#splock-value', e=>e.textContent),'160%');
 	await page.click('#suction-hit');
 	assert.match(await page.$eval('#status', e=>e.textContent),/SLLLORP/);
+	await page.$eval('#suction',e=>{e.value='180';e.dispatchEvent(new Event('input',{bubbles:true}));});
 	await page.click('#takeoff');
 	assert.match(await page.$eval('#status', e=>e.textContent),/SLLLORP/);
 	assert.equal(await page.$eval('#hard', e=>e.disabled),false);

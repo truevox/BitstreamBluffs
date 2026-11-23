@@ -165,6 +165,8 @@ function allocateEffect(ctx, raw) {
 			// Owner-approved extra weight on the physical impact only; contact-bed
 			// loudness and the original drum recording remain unchanged.
 			let splock = clamp(raw.splock, 0, 1.6, 1.6);
+			// Takeoff volume is independent of the already-owner-approved landing.
+			let suction = clamp(raw.suction, 0, 2.4, 1.8);
 			let burstEnd = -Infinity;
 			// Stationary and airborne have genuinely zero metallic contact;
 			// a fast ground run makes the inharmonic layer audible but bounded.
@@ -213,18 +215,28 @@ function allocateEffect(ctx, raw) {
 			// Shorter, lighter suction on takeoff: rubbery adhesion pulls,
 			// stretches and releases. This is entirely separate from the
 			// owner-approved chunky SPLORP/PLOCK on landing.
-			const suctionLength = Math.ceil(ctx.sampleRate * .24);
+			const suctionLength = Math.ceil(ctx.sampleRate * .34);
 			const suctionBuffer = ctx.createBuffer(1, suctionLength, ctx.sampleRate);
 			const suctionSamples = suctionBuffer.getChannelData(0);
+			let suctionSeed = 0x14DDB337, wetNoise = 0;
 			for (let i = 0; i < suctionLength; i++) {
 				const t = i / ctx.sampleRate;
-				const stretch = Math.min(1, t / .048) * Math.exp(-t * 15);
-				const phase = 2 * Math.PI * (76*t + 560*t*t - 410*t*t*t);
-				const wobbly = .62*Math.sin(phase) + .21*Math.sin(phase*1.73);
-				const snapT = t - .106;
-				const plip = snapT >= 0 ? .31*Math.sin(2*Math.PI*260*snapT)
-					* Math.exp(-snapT*70) : 0;
-				suctionSamples[i] = Math.tanh((wobbly*stretch + plip)*.75);
+				// A long audible rubber stretch rising through vocal midrange,
+				// with filtered wet suction, a tacky release and a little pop.
+				// Deliberately mid-forward so the 5-stem music won't bury it.
+				const stretch = Math.min(1, t / .028) * Math.exp(-t * 8.5);
+				const phase = 2 * Math.PI * (145*t + 870*t*t - 195*t*t*t);
+				const wobbly = .72*Math.sin(phase) + .32*Math.sin(phase*1.67);
+				suctionSeed = (Math.imul(suctionSeed,1664525) + 1013904223) >>> 0;
+				wetNoise = wetNoise*.75 + (suctionSeed/2147483648-1)*.25;
+				const wet = wetNoise * .38 * stretch;
+				const snapT = t - .135;
+				const plip = snapT >= 0 ? .39*Math.sin(2*Math.PI*325*snapT)
+					* Math.exp(-snapT*63) : 0;
+				const secondT = t - .202;
+				const bubble = secondT >= 0 ? .21*Math.sin(2*Math.PI*450*secondT)
+					* Math.exp(-secondT*78) : 0;
+				suctionSamples[i] = Math.tanh((wobbly*stretch + wet + plip + bubble)*.90);
 			}
 			const activeStrikes = new Set();
 			const playPhysical = (buffer, gainValue, at) => {
@@ -253,7 +265,7 @@ function allocateEffect(ctx, raw) {
 			const strikeOnce = (strength, at) =>
 				playPhysical(strike, (.25 + strength * .80) * splock, at);
 			const takeoffOnce = (strength, at) =>
-				playPhysical(suctionBuffer, (.12 + strength * .23) * splock, at);
+				playPhysical(suctionBuffer, (.28 + strength * .34) * suction, at);
 			disposers.push(() => {
 				for (const entry of activeStrikes) {
 					try { entry.source.stop(); } catch {}
@@ -263,6 +275,10 @@ function allocateEffect(ctx, raw) {
 
 			refs.splock = { set: value => {
 				splock = clamp(value, 0, 1.6, 1.6);
+				return true;
+			} };
+			refs.suction = { set: value => {
+				suction = clamp(value, 0, 2.4, 1.8);
 				return true;
 			} };
 			refs.takeoff = { set: (value, at) => {

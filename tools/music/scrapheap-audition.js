@@ -11,6 +11,11 @@ const say = message => { $('status').textContent = message; };
 const effect = () => chain?.find('scrapheap');
 const speed = () => Number($('speed').value);
 const splock = () => Number($('splock').value)/100;
+const suction = () => Number($('suction').value)/100;
+const setSuction = () => {
+	$('suction-value').textContent = Math.round(suction()*100)+'%';
+	if (ctx) effect()?.set('suction',suction(),ctx.currentTime);
+};
 const setSplock = () => {
 	$('splock-value').textContent = Math.round(splock()*100)+'%';
 	if (ctx) effect()?.set('splock', splock(), ctx.currentTime);
@@ -96,6 +101,7 @@ async function play() {
 	airborne = false;
 	setContact();
 	setSplock();
+	setSuction();
 	const when=ctx.currentTime+.10;
 	for (const role of STEMS) {
 		const source=ctx.createBufferSource();
@@ -121,6 +127,7 @@ async function play() {
 $('load').addEventListener('click', loadSample);
 $('play').addEventListener('click', play);
 $('splock').addEventListener('input', setSplock);
+$('suction').addEventListener('input', setSuction);
 $('speed').addEventListener('input', () => {
 	$('speed-value').textContent = speed()+' px/s';
 	setContact();
