@@ -4,6 +4,7 @@
   'use strict';
   const STORAGE='bsb-audio-review-2026-11-23-v1';
   const labs=[
+    ['vertigo','Vertigo Vents'],
     ['jellyfish','Sky Jellyfish Mountain'],
     ['steampunk','Steampunk Slopes'],
     ['crystal','Crystal Cavern'],
@@ -66,7 +67,7 @@
     try{localStorage.setItem(STORAGE,JSON.stringify(state));}catch{}
     $('review-export').value=report();
     $('review-status').textContent='Saved locally in this browser · '+labs.filter(([id])=>
-      state[id].verdict!=='untried'||state[id].note.trim()).length+' of 8 notes started';
+      state[id].verdict!=='untried'||state[id].note.trim()).length+' of '+labs.length+' notes started';
   }
   $('copy-review').addEventListener('click',async()=>{
     const content=report(),out=$('review-export');
@@ -80,7 +81,7 @@
     }
   });
   $('clear-review').addEventListener('click',()=>{
-    if(!confirm('Clear all eight locally saved sound-lab notes?'))return;
+    if(!confirm('Clear all nine locally saved sound-lab notes?'))return;
     for(const [id] of labs){
       state[id]={verdict:'untried',note:''};
       $('review-verdict-'+id).value='untried';
