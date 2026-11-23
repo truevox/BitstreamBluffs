@@ -33,3 +33,28 @@ export function layoutMarkerLabels(best, death) {
     death: { x, y: base - DEATH_LABEL_RISE, originX: 1 },
   };
 }
+
+
+/**
+ * #253: read a visual-only marker's ground height ONLY after its chunk has
+ * already physically joined the authoritative terrain mesh. A marker may be
+ * 2600px ahead of the rider, outside the normal simulation streaming window.
+ * An unconditional TerrainGenerator.heightAt(marker.x) there invokes _chunkAt,
+ * which mutates activeList/_pendingAdded and contaminates later session replays.
+ *
+ * Return NaN (markers already defer display on non-finite y) until joined.
+ * This is a guard, not a new terrain generator or a fallback extrapolation.
+ * The height function is NEVER called for absent/unjoined chunks.
+ *
+ * @param {number} x marker world coordinate
+ * @param {Map<number,{startX:number,endX:number}>} joined actual mesh.chunks
+ * @param {(x:number)=>number} heightAt exact registered terrain height function
+ */
+export function joinedMarkerHeight(x, joined, heightAt) {
+  if (!Number.isFinite(x) || !joined || typeof joined.values !== 'function' || typeof heightAt !== 'function') return NaN;
+  for (const chunk of joined.values()) {
+    if (chunk && Number.isFinite(chunk.startX) && Number.isFinite(chunk.endX)
+        && x >= chunk.startX && x <= chunk.endX) return heightAt(x);
+  }
+  return NaN;
+}

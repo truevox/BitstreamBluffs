@@ -3,12 +3,9 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 7,
-  "attestation": "sim-revision-bumped: #247 owner-approved AirBrake stronger speed loss and speed-paid short lift replacing continuous upforce; SIM7, old SIM6 immutable",
+  "attestation": "behavior-change-unreleased: #253 visually read BEST/DIED HERE height only for already joined physics chunks, preventing presentation prefetch from contaminating causal terrain streaming on repeated browser runs",
   "changedFiles": [
-    "src/constants.js",
-    "src/entities/Sled.js",
-    "src/systems/BsodAerodynamics.js",
-    "src/systems/PhysicsTuner.js"
+    "src/scenes/RunScene.js"
   ],
   "files": {
     "src/constants.js": "sha256:9e74e22c6d550471b98840ff394eeb782de40449df42066fa3aed8149150c66f",
@@ -17,7 +14,7 @@
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:4491b4a600c384e1b7302878103cfeb5e77af051a284e473043d6196ab1cfeae",
     "src/entities/TerrainMesh.js": "sha256:da3148ca8ba96289a17e5347017bc5bd5696d1635b8349298fcd102f3bff39a0",
-    "src/scenes/RunScene.js": "sha256:8a9f003a06b18c1876d5ccffa861e50d55edc247a7e32961f4f090bdc71ae377",
+    "src/scenes/RunScene.js": "sha256:4c2d0ad7b3da92aa58dbf285375f8c91f0112404fee3bb59ca47e6522a3d54d8",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:b36abf4f4bc449dbc72c19d6c809c4544fd02119c8437a47874d3c2c2d3a603e",

@@ -1,5 +1,5 @@
 /** Follow-up 1: BEST and DIED HERE labels never overprint, whatever the x gap or slope (pure, systems/MarkerLayout.js). */
-import { layoutMarkerLabels, NEAR_PX, BEST_LABEL_RISE, DEATH_LABEL_RISE } from '../../src/systems/MarkerLayout.js';
+import { layoutMarkerLabels, joinedMarkerHeight, NEAR_PX, BEST_LABEL_RISE, DEATH_LABEL_RISE } from '../../src/systems/MarkerLayout.js';
 
 const W = 170; // wider than any real label at 12px monospace ("DIED HERE 9999m" is ~110px)
 const H = 16;  // label height (12px font)
@@ -54,5 +54,44 @@ describe('layoutMarkerLabels', () => {
     expect(layoutMarkerLabels({ x: BX, y: 600 }, null)).toEqual({ best: { x: BX, y: 600 - BEST_LABEL_RISE, originX: 0.5 }, death: null });
     expect(layoutMarkerLabels(null, { x: BX, y: 600 })).toEqual({ best: null, death: { x: BX, y: 600 - DEATH_LABEL_RISE, originX: 0.5 } });
     expect(layoutMarkerLabels({ x: BX, y: 600 }, { x: BX, y: NaN }).death).toBe(null);
+  });
+});
+
+
+describe('#253 visual marker must not prefetch authoritative terrain', () => {
+  const joined = new Map([
+    [1, {startX: 0, endX: 1600}],
+    [2, {startX: 1600, endX: 3200}],
+  ]);
+  test('defers marker drawing until its terrain joins physics (without calling a mutating heightAt)', () => {
+    let calls=0;
+    const height = (x) => { calls++; return x/2; };
+    for (const x of [4500, 5600, 9000, -200, NaN, Infinity]) {
+      expect(joinedMarkerHeight(x, joined, height)).toBeNaN();
+    }
+    expect(calls).toBe(0); // no TerrainGenerator._chunkAt() read ahead
+    // Marker x is far ahead but within the BestMarker's 2600px show radius.
+    const markerX=4500, sledX=2000;
+    expect(markerX-sledX).toBeLessThan(2600);
+    expect(joinedMarkerHeight(markerX, joined, height)).toBeNaN();
+    expect(calls).toBe(0);
+    joined.set(3, {startX:3200,endX:5600});
+    expect(joinedMarkerHeight(markerX, joined, height)).toBe(2250);
+    expect(calls).toBe(1); // exact existing ground geometry, no fallback extrapolation
+  });
+  test('matches the registered terrain height exactly at joined coordinates, including edges', () => {
+    const heights=[];
+    const height=(x) => {heights.push(x); return Math.sin(x)*80+1000;};
+    for(const x of [0,150,1599,1600,2500,3199,3200]) {
+      expect(joinedMarkerHeight(x, joined, height)).toBe(height(x));
+    }
+    expect(heights).toHaveLength(14);
+    expect(joinedMarkerHeight(5600.001, joined, height)).toBeNaN();
+  });
+  test('missing and invalid mesh/height inputs fail closed rather than generating terrain', () => {
+    expect(joinedMarkerHeight(1200,null,()=>0)).toBeNaN();
+    expect(joinedMarkerHeight(1200,new Map(),()=>0)).toBeNaN();
+    expect(joinedMarkerHeight(1200,joined,undefined)).toBeNaN();
+    expect(joinedMarkerHeight(1200,new Map([[1,{startX:NaN,endX:Infinity}]]),()=>0)).toBeNaN();
   });
 });
