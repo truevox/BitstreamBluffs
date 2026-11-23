@@ -6,12 +6,6 @@ option inputs as `RunScene`, loading the five sets of checked-out JSON
 definitions that the game loads with Vite. It does not open a browser, run a
 sled, write a save, or change terrain.
 
-```sh
-node tools/sim/terrain-preflight.mjs --seed fair15 --mask 16 --from-chunk 22 --chunks 1
-node tools/sim/terrain-preflight.mjs --seed fair4 --mask 16 --from-chunk 65 --chunks 1
-node tools/sim/terrain-preflight.mjs --seed terrain-lint-417 --mask 16 --from-chunk 86 --chunks 1
-```
-
 The mask is an unsigned decimal 32-bit bitfield. The zero-based origin chunk
 range is `[fromChunk, fromChunk + chunkCount)`, defaulting to `[0, 80)`. A
 request can cover at most 256 origin chunks and cannot end above chunk index
@@ -42,7 +36,48 @@ definition, not a measurement of arbitrary terrain gaps. This is **not** a
 finding of unfairness or unreachability. Branch routing, stall traps, dynamic
 motion, actual physics rollouts and reproducible tapes are not implemented.
 
-Selected reproducible pairs from the current content:
+## Reproduce the examples
+
+Run the commands from the repository root at the indicated revision. Use a
+separate checkout or worktree if you have local changes. Check the report's
+`provenance.sha256` before comparing coordinates across revisions.
+
+### SIM6 reference snapshot
+
+At [`eb281d8`](https://github.com/truevox/BitstreamBluffs/commit/eb281d8ee34c51c16c10dbe7735c4bcbab5aaede),
+the input SHA-256 is
+`42e6713ae28ec721a8f9ca5faea630cbbdf7ff9fa2843ca7213b40fd757ceaf8`.
+
+```sh
+node tools/sim/terrain-preflight.mjs --seed fair15 --mask 16 --from-chunk 28 --chunks 1
+node tools/sim/terrain-preflight.mjs --seed fair171 --mask 16 --from-chunk 12 --chunks 1
+```
+
+Selected geometry findings:
+
+| Seed / mask | From → to | Spawn X → X | Separation / padded reference | Inside nominal distance |
+| --- | --- | --- | --- | --- |
+| `fair15` / 16 | Shatter Wall 28 → Packet Spike 29 | 57021 → 57548 | 527 / 1312 px | Yes |
+| `fair171` / 16 | Shatter Wall 12 → Glitch Chasm 13 | 27055 → 27704 | 649 / 1190 px | Yes |
+
+These are candidates for a live test, not evidence that a sled hits the
+Shatter Wall and reaches the next hazard while still blind.
+
+### Historical preflight examples
+
+At [`4be4700`](https://github.com/truevox/BitstreamBluffs/commit/4be4700ed5a7d2e91bb9959e4c2c187b0db82693),
+the input SHA-256 is
+`17d2a46cdf92d4ed20b4c1dfd4393d1cef76a440304505ee2c3801ebed6897e8`.
+These three origin windows return **zero blind spawns** at the SIM6
+reference snapshot above. A zero here only describes the requested window.
+
+```sh
+node tools/sim/terrain-preflight.mjs --seed fair15 --mask 16 --from-chunk 22 --chunks 1
+node tools/sim/terrain-preflight.mjs --seed fair4 --mask 16 --from-chunk 65 --chunks 1
+node tools/sim/terrain-preflight.mjs --seed terrain-lint-417 --mask 16 --from-chunk 86 --chunks 1
+```
+
+Selected historical findings:
 
 | Seed / mask | From → to | Spawn X → X | Separation / padded reference | Inside nominal distance |
 | --- | --- | --- | --- | --- |
