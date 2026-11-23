@@ -29,6 +29,7 @@
  *   --pursuitGapPx N / --pursuitSpeedPxS N / --pursuitAccelPxS2 N   local counterfactual ONLY
  *   --pursuitProfileLevel N   local, disposable progression-level simulation (1–50)
  *   --pursuitGapOffsetPx N / --pursuitAccelFactor N   preserve built-in level scaling
+ *   --pursuitUpgradeRanks canopy:12,bsodGrace:12   disposable, explicitly enabled upgraded loadout
  *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
  *   --rule ID             run under that DailyPatch rule's real modifiers (default: none/neutralised)
  *   --workers N           parallel pages (default 4)           --out FILE   write JSON
@@ -141,6 +142,19 @@ if ((args.pursuitGapPx != null && args.pursuitGapOffsetPx != null) || (args.purs
 }
 if (args.pursuitProfileLevel != null && (!Number.isInteger(args.pursuitProfileLevel) || args.pursuitProfileLevel < 1 || args.pursuitProfileLevel > 50)) {
   throw new RangeError('--pursuitProfileLevel must be an integer in [1,50]');
+}
+// Only the known upgrade catalogue can appear in synthetic scenarios.
+const allowedUpgradeIds = new Set(['speed','hop','flip','canopy','airbrake','divebomb','bsodGrace','magnetMagnitude','magnetMeasure','magnetMyriad']);
+let pursuitUpgradeRanks = null;
+if (args.pursuitUpgradeRanks != null) {
+  pursuitUpgradeRanks = {};
+  for (const part of String(args.pursuitUpgradeRanks).split(',')) {
+    const m = /^([A-Za-z]+):(\d+)$/.exec(part);
+    if (!m || !allowedUpgradeIds.has(m[1]) || Object.hasOwn(pursuitUpgradeRanks, m[1]) || Number(m[2]) < 1 || Number(m[2]) > 50) {
+      throw new RangeError('pursuitUpgradeRanks must be unique knownId:rank entries, 1–50');
+    }
+    pursuitUpgradeRanks[m[1]] = Number(m[2]);
+  }
 }
 const seeds = expandSeeds(String(args.seeds));
 if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
@@ -352,6 +366,7 @@ async function main() {
         traceEvery: args.traceEvery || (args.verify || job.profile ? 60 : 0), sub: args.sub || 0,
         pursuitSampleMs: args.pursuitSampleMs || 0,
         pursuitProfileLevel: args.pursuitProfileLevel || null,
+        pursuitUpgradeRanks,
         pursuitOverrides: Object.fromEntries(['pursuitGapPx','pursuitSpeedPxS','pursuitAccelPxS2','pursuitGapOffsetPx','pursuitAccelFactor'].filter(k => args[k] != null).map(k => [k, args[k]])),
         // Daily rule to measure under; 'none' (the default) neutralises modifiers for pacing runs.
         rule: args.rule ? String(args.rule) : 'none',

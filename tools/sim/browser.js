@@ -335,6 +335,18 @@
     if (store && Array.isArray(store.runs)) store.runs.length = 0;
     // Opt-in isolated progression-level scenario, created in the headless registry.
     // Do not modify the SaveStore profile or issue a persistent unlock.
+    if (o.pursuitUpgradeRanks != null) {
+      const allowed = new Set(['speed','hop','flip','canopy','airbrake','divebomb','bsodGrace','magnetMagnitude','magnetMeasure','magnetMyriad']);
+      if (typeof o.pursuitUpgradeRanks !== 'object' || Array.isArray(o.pursuitUpgradeRanks) ||
+          !Object.keys(o.pursuitUpgradeRanks).length ||
+          Object.entries(o.pursuitUpgradeRanks).some(([id, n]) => !allowed.has(id) || !Number.isInteger(n) || n < 1 || n > 50)) {
+        throw new RangeError('invalid disposable pursuit upgrade loadout');
+      }
+      const profile = game.registry.get(REG.PROFILE) || {};
+      game.registry.set(REG.PROFILE, {
+        ...profile, upgrades: { ...o.pursuitUpgradeRanks }, upgradesEnabled: true,
+      });
+    }
     if (o.pursuitProfileLevel != null) {
       if (!Number.isInteger(o.pursuitProfileLevel) || o.pursuitProfileLevel < 1 || o.pursuitProfileLevel > 50) {
         throw new RangeError('invalid pursuitProfileLevel');
@@ -421,7 +433,7 @@
 
     // ---- recorders
     const R = {
-      seed: o.seed, policy: policyName, params, pursuitProfileLevel: o.pursuitProfileLevel ?? null,
+      seed: o.seed, policy: policyName, params, pursuitProfileLevel: o.pursuitProfileLevel ?? null, pursuitUpgradeRanks: o.pursuitUpgradeRanks ?? null,
       endReason: null, distM: 0, simSec: 0, frames: 0,
       crash: null, negatedCrashes: [], airPhases: [], landings: [], respawns: [], nudges: [], hints: [], hazardHits: [],
       maxSpeed: 0, maxSpeedAtM: 0, minZoom: 99, minZoomAtM: 0, zoomAtMaxSpeed: 0,
@@ -608,6 +620,18 @@
     // ---- start: first headlessStep processes the queue, creates RunScene (RUN_START hook installs the stub)
     // Opt-in isolated progression-level scenario, created in the headless registry.
     // Do not modify the SaveStore profile or issue a persistent unlock.
+    if (o.pursuitUpgradeRanks != null) {
+      const allowed = new Set(['speed','hop','flip','canopy','airbrake','divebomb','bsodGrace','magnetMagnitude','magnetMeasure','magnetMyriad']);
+      if (typeof o.pursuitUpgradeRanks !== 'object' || Array.isArray(o.pursuitUpgradeRanks) ||
+          !Object.keys(o.pursuitUpgradeRanks).length ||
+          Object.entries(o.pursuitUpgradeRanks).some(([id, n]) => !allowed.has(id) || !Number.isInteger(n) || n < 1 || n > 50)) {
+        throw new RangeError('invalid disposable pursuit upgrade loadout');
+      }
+      const profile = game.registry.get(REG.PROFILE) || {};
+      game.registry.set(REG.PROFILE, {
+        ...profile, upgrades: { ...o.pursuitUpgradeRanks }, upgradesEnabled: true,
+      });
+    }
     if (o.pursuitProfileLevel != null) {
       if (!Number.isInteger(o.pursuitProfileLevel) || o.pursuitProfileLevel < 1 || o.pursuitProfileLevel > 50) {
         throw new RangeError('invalid pursuitProfileLevel');
