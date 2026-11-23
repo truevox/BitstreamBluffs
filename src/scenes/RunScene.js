@@ -1432,6 +1432,12 @@ export class RunScene extends Phaser.Scene {
           audio.setGeyserMotion({beforeCooldownMs:geyserCooldownBeforeMs,
             afterCooldownMs:sled.geyserCooldownMs || 0,
             launchAvailable:!!phys.geyserLaunch,vy:sled.vy});
+        // Read-only authoritative low-gravity + absolute terrain/rider
+        // geometry. Effects never feed back into simulation or song time.
+        if (audio.setSpaceMotion && this.terrain)
+          audio.setSpaceMotion({gravityPxS2:phys.gravityPxS2,
+            terrainY:this.terrain.heightAt(sled.x),
+            riderY:sled.y,vy:sled.vy,grounded:!!sled.grounded});
         // Read-only post-physics terrain/rider snapshot for Underwater sound.
         // Terrain Y (positive down), not rider altitude, owns depth memory.
         if (audio.setHydrostaticMotion && this.terrain)

@@ -44,6 +44,74 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(impactFromLanding({impactSpeedPxS:900,hard:true,quality:'good'})).toBeGreaterThan(.55);
 		expect(impactFromLanding({impactSpeedPxS:5000,hard:true})).toBe(1);
 	});
+	test('Space Mountain reads actual low gravity and terrain altitude without moving source song clock',()=>{
+		const d=director();d.biome='space-mountain';d.started=true;
+		d._pendingSpaceImpact=0;d._spaceLastField=NaN;d._spaceLastGravity=NaN;
+		const preset=orchestraPreset('space-mountain','drums');
+		expect(preset).toEqual([{type:'orbitfield',id:'orbitfield',spread:1.15,
+			drift:1,weightless:0,lowGravity:0,reentryLevel:1.25,ejectLevel:.8}]);
+		d._applyMusicTimbres();
+		for(const stem of ROLES)expect(d.mixer.replaceEffects).toHaveBeenCalledWith(
+			stem,orchestraPreset('space-mountain',stem),.18);
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setSpaceMotion({gravityPxS2:630,terrainY:600,riderY:600,vy:0,grounded:true})).toBe(true);
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			stem,'orbitfield','lowGravity',expect.closeTo(.3,4));
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			stem,'orbitfield','weightless',0);
+		const initial=d.mixer.setEffectParam.mock.calls.length;
+		expect(d.setSpaceMotion({gravityPxS2:630,terrainY:600,riderY:600,vy:0,grounded:true})).toBe(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledTimes(initial);
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('other','orbitfield','eject',.25);
+		expect(d.setSpaceMotion({gravityPxS2:630,terrainY:600,riderY:-100,vy:-450,grounded:false})).toBe(true);
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			stem,'orbitfield','weightless',expect.closeTo(.925,3));
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:900});
+		expect(d._pendingSpaceImpact).toBeGreaterThan(.5);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[2]==='reentry')).toBe(false);
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			'drums','orbitfield','reentry',expect.any(Number));
+		expect(d._pendingSpaceImpact).toBe(0);
+		expect(d.clockStart).toBe(23.5);
+		d.setBiome('debutmont');d.mixer.setEffectParam.mockClear();
+		expect(d.setSpaceMotion({gravityPxS2:630,terrainY:600,riderY:-100,vy:-450,grounded:false})).toBe(false);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='orbitfield')).toBe(false);
+	});
+	test('Space low-gravity input validation, menu and crash landing fail closed',()=>{
+		const d=director();d.biome='space-mountain';d.started=true;
+		d._pendingSpaceImpact=0;d._spaceLastField=NaN;d._spaceLastGravity=NaN;
+		const valid={gravityPxS2:630,terrainY:600,riderY:400,vy:-200,grounded:false};
+		for(const bad of [{...valid,grounded:'false'},{...valid,gravityPxS2:Infinity},
+			{...valid,riderY:NaN},{...valid,gravityPxS2:0}]){
+			expect(d.setSpaceMotion(bad)).toBe(false);
+		}
+		d.onLanding({quality:'crash',hard:true,impactSpeedPxS:1000});
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:Infinity});
+		expect(d._pendingSpaceImpact).toBe(0);
+		d.menuMode=true;d.mixer.setEffectParam.mockClear();
+		expect(d.setSpaceMotion(valid)).toBe(false);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:900});
+		expect(d._pendingSpaceImpact).toBe(0);
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='orbitfield')).toBe(false);
+		d.menuMode=false;d.transportPaused=true;d.airborne=false;
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:900});
+		d.setAirborne(true);
+		expect(d._pendingSpaceImpact).toBe(0);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[2]==='reentry'||c[2]==='eject')).toBe(false);
+		expect(d.setSpaceMotion(valid)).toBe(false);
+		const synth=Object.create(AudioSynth.prototype);
+		synth._musicMode='run';synth._paused=false;
+		synth._stemMusic={setSpaceMotion:jest.fn(()=>true)};
+		expect(synth.setSpaceMotion(valid)).toBe(true);
+		synth._paused=true;expect(synth.setSpaceMotion(valid)).toBe(false);
+		synth._musicMode='menu';synth._paused=false;expect(synth.setSpaceMotion(valid)).toBe(false);
+		expect(synth._stemMusic.setSpaceMotion).toHaveBeenCalledTimes(1);
+	});
+
 	test('Candy Cane original-stem sparkle follows actual speed while Sugar Rush physics is untouched',()=>{
 		const d=director();d.biome='candy-cane-canyon';d._pendingCandyImpact=0;
 		d._candyLastSpeed=NaN;d.speedPxS=0;

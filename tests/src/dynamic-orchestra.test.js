@@ -166,7 +166,7 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 		d.setAirborne(false);
 		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='impact')).toHaveLength(count);
 	});
-	test('landing event after grounded update applies pulse immediately; excludes wrong biomes/menu',()=> {
+	test('landing after grounded applies Snowpack pulse, Space reentry has its own pulse, menus stay silent',()=> {
 		const d=fakeDirector();
 		d.setAirborne(true); d.setAirborne(false);
 		d.mixer.setEffectParam.mockClear();
@@ -177,7 +177,9 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
 		d.biome='space-mountain';
 		d.onLanding({impactSpeedPxS:900,quality:'good',hard:true});
-		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','orbitfield',
+			'reentry',expect.any(Number));
+		d.mixer.setEffectParam.mockClear();
 		d.biome='debutmont';d.menuMode=true;
 		d.onLanding({impactSpeedPxS:900,quality:'good',hard:true});
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
