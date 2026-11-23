@@ -2,12 +2,13 @@ import { jest } from '@jest/globals';
 import { GhostLibrary } from '../../src/systems/ghost/GhostLibrary.js';
 import { GHOST_TAPE_FORMAT, GHOST_TAPE_VERSION, GHOST_PHYSICS_VERSION } from '../../src/systems/ghost/GhostTape.js';
 import { SIM_TICK_HZ } from '../../src/systems/SimClock.js';
+import { SIM_REVISION } from '../../src/systems/replay/ruleset.js';
 import { GHOST_COURSE_ROWS, readGhostCourseRows } from '../../src/ui/ghost-course-rows.js';
 
 const roles = ['best', 'latest', 'fav0', 'fav1', 'fav2'];
 const fixture = (id, distanceM, overrides = {}) => ({
   format: GHOST_TAPE_FORMAT, version: GHOST_TAPE_VERSION, physicsVersion: GHOST_PHYSICS_VERSION,
-  simTickHz: SIM_TICK_HZ, seed: 'S1', biomeMask: 3, runId: id, distanceM, trace: 'AAAAAAAAAAAAAAAA',
+  simTickHz: SIM_TICK_HZ, simRevision: SIM_REVISION, seed: 'S1', biomeMask: 3, runId: id, distanceM, trace: 'AAAAAAAAAAAAAAAA',
   endedAt: new Date(2026, 10, 21, 12).getTime(), ...overrides,
 });
 
@@ -76,6 +77,37 @@ describe('Game Over local ghost roles', () => {
     const rows = await readGhostCourseRows(library, current);
     expect(rows.map(({ info }) => info)).toEqual(['NO TRACE', 'NO TRACE', 'EMPTY', 'EMPTY', 'EMPTY']);
     expect(rows.every(({ shared }) => !shared)).toBe(true);
+  });
+
+  test('reports stale and unstamped favorites as incompatible with current-terrain display', async () => {
+    const library = new GhostLibrary();
+    const stale = fixture('stale', 5000, { simRevision: SIM_REVISION - 1 });
+    const legacy = fixture('legacy', 100, { simRevision: undefined });
+    const current = fixture('current', 50);
+    await library.saveRun(stale);
+    await library.setFavorite('S1', 3, 0, stale.runId);
+    await library.setFavorite('S1', 3, 2, stale.runId);
+    await library.saveRun(legacy);
+    await library.setFavorite('S1', 3, 1, legacy.runId);
+    await library.saveRun(current);
+
+    const rows = await readGhostCourseRows(library, current);
+    expect(rows.map(({ info, shared, saveLabel }) => [info, shared, saveLabel])).toEqual([
+      ['THIS RUN', true, null], ['THIS RUN', true, null],
+      ['INCOMPATIBLE', false, 'REPLACE'], ['INCOMPATIBLE', false, 'REPLACE'], ['INCOMPATIBLE', false, 'REPLACE'],
+    ]);
+    expect((await library.ghostsFor('S1', 3, {}, { simRevision: SIM_REVISION })).map(({ runId }) => runId))
+      .toEqual([current.runId]);
+    expect(await library.getTape(stale.runId)).toEqual(stale);
+    expect(await library.getTape(legacy.runId)).toEqual(legacy);
+
+    await library.setFavorite('S1', 3, 0, current.runId);
+    expect((await readGhostCourseRows(library, current))[2])
+      .toMatchObject({ info: 'THIS RUN', shared: true, saveLabel: 'CLEAR' });
+    await library.setFavorite('S1', 3, 0, null);
+    expect((await readGhostCourseRows(library, current))[2])
+      .toMatchObject({ info: 'EMPTY', shared: false, saveLabel: 'SAVE' });
+    expect(await library.getTape(stale.runId)).toEqual(stale); // FAV C still references it.
   });
 
   test.each([

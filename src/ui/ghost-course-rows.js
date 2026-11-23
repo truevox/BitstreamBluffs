@@ -1,5 +1,6 @@
 /** Read-only Game Over labels for the existing local ghost roles. */
 import { FAVORITE_SLOTS, tapeCompatible } from '../systems/ghost/GhostLibrary.js';
+import { SIM_REVISION } from '../systems/replay/ruleset.js';
 import { fmtInt } from './Format.js';
 
 export const GHOST_COURSE_ROWS = Object.freeze([
@@ -27,7 +28,9 @@ export async function readGhostCourseRows(library, current, settings = {}) {
     [id, await library.getTape(id)])));
   return GHOST_COURSE_ROWS.map(({ role, slot, globalKey }, i) => {
     const id = ids[i], tape = tapes.get(id);
-    const compatible = tapeCompatible(tape);
+    // Match RunScene's current-terrain display gate. Direct tape access and
+    // historical replay compatibility are independent of this label.
+    const compatible = tapeCompatible(tape) && tape.simRevision === SIM_REVISION;
     const hasTrace = compatible && tape.trace.length > 0;
     const currentRun = id !== null && id === current.runId;
     const shared = hasTrace && ids.some((other, j) => j !== i && id === other);
