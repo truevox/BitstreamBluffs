@@ -13,6 +13,7 @@ import { FIRST_SONG_ID, defaultSongSelection, sanitizeSongSelection, nextEnabled
 import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
 import { snowpackImpactFromLanding } from './SnowpackImpact.js';
 import { contactFromMotion, impactFromLanding } from './MusicPhysicsSignals.js';
+import { HydrostaticPressure } from './HydrostaticPressure.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
@@ -53,6 +54,9 @@ export class StemMusicDirector {
 		this.airborne = false;
 		this._pendingSnowImpact = 0;
 		this._pendingScrapImpact = 0;
+		this._pendingHydroImpact = 0;
+		this.hydrostatic = new HydrostaticPressure();
+		this._hydroLastSent = NaN;
 		this._scrapContactLast = NaN;
 		this._timer = null;
 		this._token = 0;
@@ -265,7 +269,16 @@ export class StemMusicDirector {
 	}
 
 	setBiome(id) {
-		this.biome = typeof id === 'string' && id ? id : HOME_BIOME;
+		const next = typeof id === 'string' && id ? id : HOME_BIOME;
+		// Reset ONLY on a confirmed biome boundary (or new run via HOME_BIOME).
+		// Re-applying the same biome does not erase the depth high-water mark.
+		if (next !== this.biome &&
+			(next === 'underwater-mountain' || this.biome === 'underwater-mountain')) {
+			this.hydrostatic?.reset();
+			this._hydroLastSent = NaN;
+			this._pendingHydroImpact = 0;
+		}
+		this.biome = next;
 		if (this.biome !== 'debumont') this._pendingSnowImpact = 0;
 		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
 		this._scrapContactLast = NaN;
@@ -309,6 +322,11 @@ export class StemMusicDirector {
 			if (impulse <= 0) return;
 			this._pendingScrapImpact = Math.max(this._pendingScrapImpact || 0, impulse);
 			if (!this.airborne) this._applyScrapImpact();
+		} else if (this.biome === 'underwater-mountain') {
+			const impulse = impactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingHydroImpact = Math.max(this._pendingHydroImpact || 0,impulse);
+			if (!this.airborne) this._applyHydroImpact();
 		}
 	}
 
@@ -336,6 +354,28 @@ export class StemMusicDirector {
 		this.mixer?.setEffectParam('drums', 'scrapheap', 'impact', impulse);
 	}
 
+	/** True terrain elevation and rider motion from the real sim, never fake depth. */
+	setHydrostaticMotion({terrainY,riderY,vy,grounded}={}) {
+		if (this.menuMode || this.biome !== 'underwater-mountain') return false;
+		if (!this.hydrostatic) this.hydrostatic = new HydrostaticPressure();
+		const state = this.hydrostatic.update({terrainY,riderY,vy,grounded});
+		if (!state.valid) return false;
+		if (!Number.isFinite(this._hydroLastSent) ||
+			Math.abs(state.audiblePressure01-this._hydroLastSent) >= .018) {
+			this._hydroLastSent=state.audiblePressure01;
+			for (const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'hydrostatic','pressure',state.audiblePressure01);
+		}
+		return true;
+	}
+
+	_applyHydroImpact() {
+		const impulse = this._pendingHydroImpact || 0;
+		this._pendingHydroImpact = 0;
+		if (impulse > 0 && !this.menuMode && this.biome === 'underwater-mountain')
+			this.mixer?.setEffectParam('drums','hydrostatic','impact',impulse);
+	}
+
 	setAirborne(airborne) {
 		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
@@ -358,7 +398,10 @@ export class StemMusicDirector {
 			if (!next) this._applySnowImpact();
 		}
 		this._applyScrapContact(true);
-		if (!next) this._applyScrapImpact();
+		if (!next) {
+			this._applyScrapImpact();
+			this._applyHydroImpact();
+		}
 		// New adaptive packs crossfade full original drums with an actual
 		// airborne kit. The legacy 0.58 airborne duck remains unchanged.
 		// Airborne ducking applies to the ORIGINAL stem regardless

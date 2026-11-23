@@ -1316,6 +1316,11 @@ export class RunScene extends Phaser.Scene {
         if (sled.pushPulse) audio.playSfx('push');
         if (audio.setSpeed) audio.setSpeed(sled.speed);
         if (audio.setAirborne) audio.setAirborne(!sled.grounded);
+        // Read-only post-physics terrain/rider snapshot for Underwater sound.
+        // Terrain Y (positive down), not rider altitude, owns depth memory.
+        if (audio.setHydrostaticMotion && this.terrain)
+          audio.setHydrostaticMotion({terrainY:this.terrain.heightAt(sled.x),
+            riderY:sled.y, vy:sled.vy, grounded:!!sled.grounded});
       } catch (e) { /* audio must never break the loop */ }
     }
     if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict

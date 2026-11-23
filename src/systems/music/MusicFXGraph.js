@@ -8,7 +8,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic',
 ]);
 
 function saturatorCurve(amount) {
@@ -347,6 +347,84 @@ function allocateEffect(ctx, raw) {
 				strikeOnce(impulse, at);
 				return true;
 			} };
+			break;
+		}
+		case 'hydrostatic': {
+			// Warm physical hydrostatic envelope over the ORIGINAL recording.
+			// Pressure is accumulated by HydrostaticPressure outside the FX graph;
+			// this graph owns only instantaneous audible presentation.
+			const dry = node(ctx.createGain()), wet = node(ctx.createGain());
+			const low = node(ctx.createBiquadFilter()), low2 = node(ctx.createBiquadFilter());
+			const warmth = node(ctx.createBiquadFilter());
+			for (const f of [low,low2]) { f.type='lowpass'; f.Q.value=.707; }
+			warmth.type='peaking'; warmth.frequency.value=320; warmth.Q.value=.8;
+			input.connect(dry); dry.connect(output);
+			input.connect(low); low.connect(low2); low2.connect(warmth);
+			warmth.connect(wet); wet.connect(output);
+			const sensitivity = clamp(raw.sensitivity, .3, 1, 1);
+			const apply = (p,at,immediate=false) => {
+				const pressure = clamp(p,0,1,0)*sensitivity;
+				const cutoff = 12000*Math.pow(.11,pressure);
+				const settings = [[dry.gain,1-pressure*.74],[wet.gain,pressure*.94],
+					[low.frequency,cutoff],[low2.frequency,cutoff*1.20],
+					[warmth.gain,pressure*3.5]];
+				for (const [param,value] of settings) {
+					if (immediate) param.value=value;
+					else numericParam(param,value,at,.09);
+				}
+			};
+			apply(clamp(raw.pressure,0,1,0),ctx.currentTime,true);
+			refs.pressure={set:(value,at)=>{
+				if (!Number.isFinite(value)) return false;
+				apply(value,at);
+				return true;
+			}};
+			// A restrained, unpitched physical pressure-wave with a few bubbles
+			// on authoritative landing ONLY. No invented beat or music notes.
+			const length=Math.ceil(ctx.sampleRate*.36);
+			const wave=ctx.createBuffer(1,length,ctx.sampleRate);
+			const data=wave.getChannelData(0);
+			let seed=0x735EA123;
+			for(let i=0;i<length;i++) {
+				const t=i/ctx.sampleRate;
+				seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+				const noise=seed/2147483648-1;
+				const thump=.46*Math.sin(2*Math.PI*(95*t-45*t*t))*Math.exp(-t*23);
+				let bubbles=0;
+				for (const lag of [.065,.145,.230]) {
+					const dt=t-lag;
+					if (dt<0) continue;
+					bubbles+=.24*Math.sin(2*Math.PI*(270*dt-400*dt*dt))
+						*Math.exp(-dt*45);
+				}
+				data[i]=Math.tanh((thump+noise*.09*Math.exp(-t*32)+bubbles)*.75);
+			}
+			const active=new Set();
+			refs.impact={set:(value,at)=>{
+				const strength=clamp(value,0,1,0);
+				if(strength<=0) return false;
+				if(active.size>=3) {
+					const previous=active.values().next().value;
+					try {previous.source.stop();}catch{}
+					previous.cleanup();
+				}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=wave;
+				gain.gain.value=(.08+.22*strength);
+				source.connect(gain);gain.connect(output);
+				const entry={source,cleanup(){
+					try{source.disconnect();}catch{}
+					try{gain.disconnect();}catch{}
+					active.delete(entry);
+				}};
+				active.add(entry);source.onended=()=>entry.cleanup();
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			}};
+			disposers.push(()=>{for(const entry of active){
+				try{entry.source.stop();}catch{}
+				entry.cleanup();
+			}});
 			break;
 		}
 		case 'snowpack': {

@@ -936,6 +936,12 @@ export class AudioSynth {
     this._stemMusic?.setAirborne(this._musicMode === 'menu' ? false : value);
   }
 
+  /** Read-only authoritative terrain/rider sample for hydrostatic musical physics. */
+  setHydrostaticMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return;
+    this._stemMusic?.setHydrostaticMotion?.(snapshot);
+  }
+
   // ----------------------------------------------------------------------------------------------------------- music
 
   /** Switch only the musical presentation; keep the same track and WebAudio clock. */
