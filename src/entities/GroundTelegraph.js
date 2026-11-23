@@ -1,11 +1,10 @@
 /**
  * OWNER: gameplay (readable-chaos pass). World-space drawing of the ground-hazard telegraph planned by
  * systems/HazardTelegraph.js (pattern: entities/AirTelegraph.js). One instance per run. For each mark:
- *  - hazard still off screen: a badge at the right screen edge, standing on the terrain line, with the hazard's glyph,
+ *  - hazard cue would be clipped: a badge at the right screen edge, standing on the terrain line, with the hazard's glyph,
  *    marching chevrons pointing at what is coming, a response cue above it (hop = up-chevrons, brace = bars) and a
  *    proximity bar that fills as the hazard closes in. Several off-screen hazards stack upward (nearest lowest).
- *  - hazard on screen: a faint vertical light column standing on the box with the same response cue on top, so the eye
- *    finds a 20 px sprite the moment it enters the view.
+ *  - hazard cue fits: a faint vertical light column standing on the box with the same response cue on top.
  * Colour is the response (mark.color): danger = hop, amber = brace, lime = hop NOW. Shape repeats it (colour-blind safe):
  * the hop cue is open up-chevrons, the hop-now cue a filled up-arrow, the brace cue two flat bars.
  * Dim (and silent, see TelegraphTracker): a hazard the sled is flying over (state 'clear') and a Gear Gate that will be
@@ -25,6 +24,25 @@ const STACK_STEP_PX = 31;
 const COLUMN_PX = 130;
 /** The response cue is drawn at this scale of its design size. */
 const CUE_SCALE = 0.75;
+const GO_CUE_HALF_PX = 14;
+const CUE_STROKE_PX = 3;
+
+/** Read the drawn polyline only. A camera-driven heightAt call could stream terrain ahead of the next sim tick. */
+function edgeTerrainY(chunks, x) {
+  for (const chunk of chunks || []) {
+    if (!(x >= chunk.startX && x <= chunk.endX)) continue;
+    const points = chunk.points;
+    if (!points || points.length < 2 || x < points[0].x || x > points[points.length - 1].x) return NaN;
+    let lo = 0, hi = points.length - 1;
+    while (hi - lo > 1) {
+      const mid = (hi + lo) >> 1;
+      if (points[mid].x <= x) lo = mid; else hi = mid;
+    }
+    const a = points[lo], b = points[hi];
+    return b.x > a.x ? a.y + (b.y - a.y) * (x - a.x) / (b.x - a.x) : NaN;
+  }
+  return NaN;
+}
 
 export class GroundTelegraph {
   /**
@@ -42,32 +60,44 @@ export class GroundTelegraph {
    * @param {import('../systems/HazardTelegraph.js').TelegraphMark[]} marks nearest first.
    * @param {{left:number,right:number,top:number,bottom:number}} view visible world rect.
    * @param {number} zoom camera zoom.
-   * @param {(x:number)=>number} heightAt terrain height.
+   * @param {import('../data/schemas.js').TerrainChunk[]} activeChunks already-streamed terrain, read only.
    * @returns {void}
    */
-  update(timeMs, marks, view, zoom, heightAt) {
+  update(timeMs, marks, view, zoom, activeChunks) {
     const g = this.gfx;
     if (!g) return;
     g.clear();
     if (!marks || !marks.length || !view) return;
     const k = 1 / (zoom || 1);
-    let slot = 0;
+    const cueK = k * CUE_SCALE;
+    // Allow the full largest pulse plus outline so the cue doesn't switch layouts every time it pulses.
+    const half = (GO_CUE_HALF_PX + CUE_STROKE_PX / 2) * cueK;
+    const height = (1.5 * GO_CUE_HALF_PX + CUE_STROKE_PX / 2) * cueK;
+    const badges = [];
     for (const m of marks) {
-      if (m.onScreen) this._column(g, timeMs, m, k, view);
-      else if (slot < EDGE_MAX_STACK) this._edge(g, timeMs, m, k, view, heightAt, slot++);
+      const h = m.ref;
+      const base = h.cy - h.h / 2 - 3 * k;
+      const top = Math.min(base - 30 * k, Math.max(base - COLUMN_PX * k, view.top + 30 * k));
+      const cue = top - 4 * k;
+      if (h.cx - half >= view.left && h.cx + half <= view.right &&
+          cue - height >= view.top && cue + CUE_STROKE_PX / 2 * cueK <= view.bottom) {
+        this._column(g, timeMs, m, k, base, top);
+      } else badges.push(m);
+    }
+    // Only the first badge has a response glyph. Don't let an earlier warning hide the nearest clipped hop-now cue.
+    const go = badges.findIndex((m) => m.state === 'go');
+    if (go > 0) badges.unshift(...badges.splice(go, 1));
+    for (let slot = 0; slot < Math.min(badges.length, EDGE_MAX_STACK); slot++) {
+      this._edge(g, timeMs, badges[slot], k, view, activeChunks, slot);
     }
   }
 
   /** Light column on an on-screen hazard. */
-  _column(g, t, m, k, view) {
-    const h = m.ref;
+  _column(g, t, m, k, y0, y1) {
     const col = this.palette[m.color];
     const go = m.state === 'go';
     const dim = m.clear || m.state === 'open' ? 0.3 : 1;
-    const x = h.cx;
-    const y0 = h.cy - h.h / 2 - 3 * k;
-    // the cue on top must stay on screen when the hazard stands high in the view
-    const y1 = Math.min(y0 - 30 * k, Math.max(y0 - COLUMN_PX * k, view.top + 30 * k));
+    const x = m.ref.cx;
     const pulse = 0.5 + 0.5 * Math.sin(t / (go ? 45 : 150 - 70 * m.urgency));
     // fades once the box is close enough to read on its own, unless it is time to hop
     const near = go ? 1 : 1 - 0.55 * Math.max(0, (m.urgency - 0.6) / 0.4);
@@ -79,11 +109,11 @@ export class GroundTelegraph {
   }
 
   /** Badge at the right screen edge for an off-screen hazard. */
-  _edge(g, t, m, k, view, heightAt, slot) {
+  _edge(g, t, m, k, view, activeChunks, slot) {
     const col = this.palette[m.color];
     const dim = m.clear || m.state === 'open' ? 0.3 : 1;
     const x = view.right - EDGE_INSET_PX * k;
-    let ground = heightAt(x);
+    let ground = edgeTerrainY(activeChunks, x);
     if (!Number.isFinite(ground)) ground = (view.top + view.bottom) / 2;
     // not under the HUD's bottom row (seed / daily rule, bottom right) when the terrain line is below the view
     ground = Math.min(Math.max(ground, view.top + 100 * k), view.bottom - 30 * k);
@@ -124,10 +154,10 @@ export class GroundTelegraph {
       return;
     }
     if (m.state === 'go') {
-      const s = (11 + 3 * (Math.floor(t / 60) % 2)) * k;
+      const s = (GO_CUE_HALF_PX - 3 + 3 * (Math.floor(t / 60) % 2)) * k;
       g.fillStyle(col, a);
       g.fillTriangle(x - s, y, x + s, y, x, y - 1.5 * s);
-      g.lineStyle(3 * k, this.palette.text, 0.9 * a);
+      g.lineStyle(CUE_STROKE_PX * k, this.palette.text, 0.9 * a);
       g.lineBetween(x - s, y, x, y - 1.5 * s);
       g.lineBetween(x + s, y, x, y - 1.5 * s);
       return;

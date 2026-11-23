@@ -251,15 +251,15 @@ function topHit(scene, px, py) {
 describe('GO-1 / U6a: a level-up that unlocks a biome names it', () => {
   // All 11 biomes ship, so "SIGNATURE LOCKED - COMING ONLINE" is false. Both reward paths are covered.
   test('the rewardsEarned path says the biome is online, by name', () => {
-    const line = GameOverScene.prototype._rewardsLine.call({}, { leveledTo: 2, rewardsEarned: [{ level: 2, biome: 'debumont' }] });
+    const line = GameOverScene.prototype._rewardsLine.call({}, { leveledTo: 2, rewardsEarned: [{ level: 2, biome: 'debutmont' }] });
     expect(line).not.toMatch(/LOCKED|COMING ONLINE/);
-    expect(line).toBe('SIGNATURE ONLINE: DEBUMONT');
+    expect(line).toBe('SIGNATURE ONLINE: DEBUTMONT');
   });
 
   test('the legacy rewards path says it too', () => {
-    const line = GameOverScene.prototype._rewardsLine.call({}, { leveledTo: 2, rewards: { title: 'X', biome: 'debumont' } });
+    const line = GameOverScene.prototype._rewardsLine.call({}, { leveledTo: 2, rewards: { title: 'X', biome: 'debutmont' } });
     expect(line).not.toMatch(/LOCKED|COMING ONLINE/);
-    expect(line).toContain('SIGNATURE ONLINE: DEBUMONT');
+    expect(line).toContain('SIGNATURE ONLINE: DEBUTMONT');
   });
 
   test('every biome level names its biome in full, alone, with its own cosmetic, or after a double level-up', () => {

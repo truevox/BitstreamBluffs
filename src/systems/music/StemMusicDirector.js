@@ -8,6 +8,7 @@ import { CORE_STEMS, normalizeCatalog, normalizePack, resolveMusicAsset } from '
 import { StemFXMixer } from './MusicFXGraph.js';
 import { AdaptiveBiomeRouter } from './AdaptiveBiomeRouter.js';
 import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
+import { canonicalBiomeId } from '../../data/biomeAliases.js';
 import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.js';
 import { FIRST_SONG_ID, defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices, shuffledSongRound } from './MusicPlaylist.js';
 import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
@@ -162,7 +163,7 @@ export class StemMusicDirector {
 		this._nextPromise = null;
 	}
 
-	/** Preserve the song clock while menus use unprocessed originals and Debumont lead. */
+	/** Preserve the song clock while menus use unprocessed originals and Debutmont lead. */
 	setMenuMode(on) {
 		const next = on === true;
 		if (this.menuMode === next) return;
@@ -206,13 +207,13 @@ export class StemMusicDirector {
 		if (lead) sourceNames.push(lead);
 		for (const name of sourceNames) {
 			if (!this.gains.has(name)) continue;
-			const effects = name===lead ? melodyPreset(this.menuMode ? 'debumont' : this.biome) :
+			const effects = name===lead ? melodyPreset(this.menuMode ? 'debutmont' : this.biome) :
 				this.menuMode ? [] : orchestraPreset(this.biome,name);
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
 				// A rider entering Debumont while airborne is above the powder already.
 				// Keep the cached signature based on GROUND effects so jumps don't rebuild FX graphs.
-				const initial = this.airborne && !this.menuMode && this.biome === 'debumont'
+				const initial = this.airborne && !this.menuMode && this.biome === 'debutmont'
 					? effects.map(e => e.type === 'snowpack' ? { ...e, depth: 0 } : e) : effects;
 				this.mixer.replaceEffects(name,initial,.18);
 				this._timbreSignatures.set(name,key);
@@ -258,8 +259,8 @@ export class StemMusicDirector {
 	}
 
 	setBiome(id) {
-		this.biome = typeof id === 'string' && id ? id : HOME_BIOME;
-		if (this.biome !== 'debumont') this._pendingSnowImpact = 0;
+		this.biome = typeof id === 'string' && id ? canonicalBiomeId(id) : HOME_BIOME;
+		if (this.biome !== 'debutmont') this._pendingSnowImpact = 0;
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
@@ -268,7 +269,7 @@ export class StemMusicDirector {
 	}
 
 	_activeVoiceFor(pack) {
-		const desired = voiceSourceForBiome(this.menuMode ? 'debumont' : this.biome);
+		const desired = voiceSourceForBiome(this.menuMode ? 'debutmont' : this.biome);
 		if (pack?.sourceNames?.includes(desired)) return desired;
 		// Until all mountain instruments are rendered, keep the home melody audible.
 		const home = voiceSourceForBiome(HOME_BIOME);
@@ -289,7 +290,7 @@ export class StemMusicDirector {
 
 	/** Landing pulses may arrive either side of the per-frame grounded update. */
 	onLanding(landing) {
-		if (this.menuMode || this.biome !== 'debumont') return;
+		if (this.menuMode || this.biome !== 'debutmont') return;
 		const impulse = snowpackImpactFromLanding(landing);
 		if (impulse <= 0) return;
 		this._pendingSnowImpact = Math.max(this._pendingSnowImpact || 0, impulse);
@@ -299,7 +300,7 @@ export class StemMusicDirector {
 	_applySnowImpact() {
 		const impulse = this._pendingSnowImpact || 0;
 		this._pendingSnowImpact = 0;
-		if (impulse <= 0 || this.menuMode || this.biome !== 'debumont') return;
+		if (impulse <= 0 || this.menuMode || this.biome !== 'debutmont') return;
 		for (const stem of ['bass','drums','guitar','piano','other'])
 			this.mixer?.setEffectParam(stem,'snowpack','impact',impulse);
 	}
@@ -310,9 +311,9 @@ export class StemMusicDirector {
 		this.airborne = next;
 		// As the rider clears the snow, the original instruments open up; landing
 		// restores Powdery without changing playback, beat timing or the music clock.
-		if (this.biome === 'debumont') {
+		if (this.biome === 'debutmont') {
 			for (const stem of ['bass','drums','guitar','piano','other']) {
-				const depth = next ? 0 : orchestraPreset('debumont',stem)[0].depth;
+				const depth = next ? 0 : orchestraPreset('debutmont',stem)[0].depth;
 				this.mixer?.setEffectParam(stem,'snowpack','depth',depth);
 			}
 			if (!next) this._applySnowImpact();

@@ -1,0 +1,19 @@
+{
+  "kind": "local-replay-crash-brief",
+  "reportVersion": 1,
+  "scope": "local unverified replay reproduction; not proof of the original crash",
+  "build": {
+    "sameBuildAsserted": true,
+    "independentlyVerified": false
+  },
+  "replay": {
+    "freshRuns": 2,
+    "checkpointsCheckedPerRun": 8,
+    "matchedStateAndFatalEvent": true,
+    "savedRunsOrTapes": false
+  },
+  "crash": {
+    "category": "hazard",
+    "hazardId": "packetSpike"
+  }
+}

@@ -1,5 +1,243 @@
 # Changelog
 
+## v2.19.21 — source-stamped SIM6 replay fixture isolation and browser QA (#236 / #240) (2026-11-22)
+
+- **Immutable historical evidence:** cross-engine Chromium recordings now require a clean committed source, an explicit new output directory outside all checked-in fixture trees, and exclusive-create writes. The game URL must serve the local production build index. Existing historical tapes and original recording metadata remain untouched.
+- **Explicit SIM_REVISION 6 fixture set:** select `CE_FIXTURE_SET=sim6` with a separate source-stamped tape directory. The original nine fixture definitions remain unchanged for historical replay; a revision-6-specific Kodiak seed reaches actual seeded packs instead of crashing before the first encounter. Matrix/fresh/positions refuse source-unverified or wrong-build SIM6 input rather than silently mixing it with older tapes.
+- **Diagnostic cross-engine evidence:** Chromium, Firefox and containerized Playwright WebKit 27.2 replay the new fixtures. Both the recording and the browser matrix carry exact source, ruleset, simulator and build provenance; regressions check tape byte hashes, recording safety and replay semantics. Playwright WebKit is **not** real Safari/iOS.
+- **Bounded scope:** QA fixture harness, immutable fixture data, tests, documentation and workflow only. No gameplay or physics change; SIM_REVISION 6 remains. Parent #236 closes only after final exact-head execution review; no leaderboard or ghost trust changes.
+
+## v2.19.20 — deterministic exact build identity and safe artifact verification (#238 / #239) (2026-11-22)
+
+- **Deterministic read-only build identity:** compose an exact `buildId` from game version, archived ruleset ID / simulation revision, bundled Matter version, declared savestate-layout schema, and the causal source-tripwire digest. The runtime can expose an envelope-shaped descriptor without writing save data or registering any restorable layout.
+- **Fail-closed identity verification:** `build-ruleset.mjs --identity` and `--check-identity` verify committed artifacts against current source. An alternate `--root` is restricted to an artifact overlay that shares this checkout's actual `src` and `node_modules`, preventing a cross-checkout false-positive from comparing one tree's artifacts using another tree's imported code and schema.
+- **Adversarial regression coverage:** exact-identity, envelope rejection, no-partial-identity and negative tests, including changed layout and alternate dependency trees, with independent review and deterministic reproducibility. Explicitly document the causal-source allowlist's limits.
+- **Actual CI gate:** add separate pull-request/main GitHub Actions checks for the source ruleset, exact build identity, full determinism suite, and production build; preserve the metadata-only Friday lifecycle workflow unchanged.
+- **Scope boundary:** No production savestate capture or restoration, persistence, ranking or gameplay/physics change. SIM_REVISION stays 6. Parent #119 remains open; only leaf #238 is completed here. Every production merge is a release.
+
+## v2.19.19 — compare redacted local crash briefs (#78 / #237) (2026-11-22)
+
+- **Compare two existing redacted developer crash briefs.** The local CLI validates the original v1 JSON and reports whether its allowlisted crash signatures match, differ, or are inconclusive because a hazard ID is missing. It never reads an input tape, launches a replay, authenticates either report, or shares player data. No gameplay, scoring, replay compatibility or production change.
+
+## v2.19.18 — Strict savestate V1 envelope foundation (Issue #230 / PR #227) (2026-11-22)
+
+- **Pure versioned input boundary:** add BB-CJSON V1 savestate envelope writer/inspector and deterministic registered-layout hash, requiring caller-provided exact build ID, game version, SIM_REVISION, ruleset ID, Matter version and savestate layout ID. Invalid, tampered, noncanonical, oversized, unsupported or wrong-build snapshots fail closed. The digest is error detection, **not** an authentication/leaderboard credential. Trusted section validators operate on a recursively frozen parsed envelope, preventing mutation after checksum admission.
+- **Independent safety validation:** adversarial tests cover roundtrip F64, missing/unknown fields, schema and revision/build conflicts, duplicate keys, malformed bytes, mutation by validators, and legacy-layout refusal. These are *format-admission tests only*, not a game restore. No production savestate layout is registered by default.
+- **Not a completed save/load feature:** No live Matter/RunScene snapshot capture or restore, persistence, single-use suspend consumption, UI, GhostRecorder tape continuity or ranking changes. **Parent #119 remains open** for these tasks; only Phase 3A child #230 is completed by this release. No physics/simulation revision bump (SIM_REVISION 6 remains authoritative).
+
+## v2.19.17 — Exploit Factory observed trick activity (Issue #214 leaf / PR #229) (2026-11-22)
+
+- **Developer-only evidence:** show per-policy observed trick occurrences, distinct trick names/counts, and missing-data coverage in the Exploit Factory report. Records without valid trick data remain **unknown**, never misreported as zero tricks; failed or unplanned policy arms are excluded from comparison and tables rather than silently treated as successes.
+- **CLI and test hardening:** make the report function independently importable without accidentally running its CLI; resolve the actual script path so symlinked invocations still work. Regression tests cover rejected-seed audit outputs, unknown/trick-free data, policy failures, exact output creation and symlink entrypoints.
+- **Scope limit:** This does **not** complete the full #214 24+-seed parachute/airbrake/flip comparative investigation, prove an exploit, change game physics, rebalance BSOD pursuit, or alter leaderboard and replay trust. The umbrella issue remains open for the actual paired-seed study. No simulation revision bump: this release modifies only developer diagnostics and tests.
+
+## v2.19.16 — developer historical replay airtime check (#131 / #228) (2026-11-22)
+
+- **Measure airtime from one opt-in historical QA tape.** The fixed synthetic recording plays only in its pinned original v2.16.0 runtime. Two local native replays confirm the saved checkpoints and the sampled grounded state; the tool reports aggregate airtime, not the tape or player data. No gameplay, scoring, replay compatibility or production change.
+
+## v2.19.15 — Arcade bridge dissolve, biome FX and pixel backdrops (#65 / #217) (2026-11-22)
+
+- **Cosmetic biome transition:** a readable neon-grid arcade bridge dissolves the outgoing biome to retro pixel geometry and reconstructs the incoming look as riding distance changes. The handoff is presentation-only: it never creates terrain, changes physics, draws authoritative random numbers or rebuilds colliders. Reduced-motion users retain the simple static transition.
+- **Visual differentiation:** Debutmont's blocky pixel snow and dithered sky, arcade CRT/wireframe art, and garbage biome glitch debris are drawn with SVG backdrops and deterministic cosmetic effects; music/biome sampling uses the existing game state without changing the seeded terrain route.
+- **Safety and tests:** cosmetic-separation and transition tests verify identical authoritative terrain, collider and sled outcomes regardless of visual layers. The same **SIM_REVISION 6** and content-addressed ruleset `sha256:03c7d7c9…` from v2.19.14 remain current; no new physics or gameplay revision.
+
+## v2.19.14 — Debutmont home, arcade bridges and revision-safe ghosts (#65 / #216) (2026-11-22)
+
+- **Debutmont becomes the base biome from the first run.** Unlocked biomes default to ON, but a player's explicit OFF remains authoritative. Arcade segments bridge other biomes with distance-driven lengths that increase from roughly one-sixth to one-quarter of a sector (at most 1.5x), without changing arcade physics. The existing seed/mask remains authoritative; this is **SIM_REVISION 6**, since terrain and biome-entry outcomes change.
+- **Owner-approved progression changes:** Level 2 needs 80 XP, Garbage Dump Glacier first unlocks at level 4, subsequent biome awards shift down one level through Vertigo Vents at level 27, and level 28 has no biome. Replaced the low-value 1,500 m Debutmont mission with "Grab 3 Maple Wax in a run" (tier 4), and added "Ride 3 arcade bridges" (tier 2) only after earning a second biome. Existing mission progress migrates safely.
+- **Display-safe historical ghosts:** new tapes carry the build's simulation revision; ghosts from missing/different revisions do **not** overlay changed terrain, avoiding floating/clipping old traces. Old tapes remain readable by the direct replay/manifest tools; `tapeCompatible` and old replay contracts are unchanged. A fresh current-revision run may replace a stale previous-revision Best even when its distance is shorter. Displaced legacy recordings remain available for historical replay. No scoring or physics changes from the display-only ghost guard.
+- **Conformance probe repair:** the biome-entry search scans the actual terrain in small distance increments instead of assuming every transition happens at a sector boundary. `LAST_RELEASED_SIM_REVISION` advances to 6 on this release. The older revision-4 and revision-5 ruleset archives are preserved.
+- **Known follow-up:** cross-engine and old deterministic replay fixture tapes must be rerecorded against revision 6 using the browser harness. Current canaries remain separately gated; this release does not claim historical tape compatibility with the new terrain.
+
+## v2.19.13 — Debutmont spelling and legacy alias (#65 / #199) (2026-11-22)
+
+- **The first biome is now spelled "Debutmont"** (Marvin confirmed the spelling; issue #65, part 1 of 3). The biome id, name, hazards (Groomer Cat), power-up (Maple Wax), mission (`t4-biome-debutmont`, "1500 m in Debutmont"), Sync Level reward, music voice (`voice:debutmont`), the per-pack `adaptive/debutmont/` OGG directories (git renames, bytes unchanged), tools, tests and docs all use the new spelling. No gameplay, terrain, unlock level or profile default changes.
+- **Legacy alias, nothing lost.** `src/data/biomeAliases.js` maps `debumont` to `debutmont`. Profile sanitize applies it to `biomeProgress`, `unlocked.biomes` and the active mission list and mission progress (both spellings merge; the larger progress count wins), and the music pack loader, voice lookup and adaptive router read a stale `debumont` key or path as `debutmont`, so older saves and music branches written before the rename keep working.
+- **Historical entries below keep the old spelling** where they describe releases that shipped under it.
+- Tests: `biome-debutmont-alias.test.js` covers the save migration, the music lookups and a guard that no tracked text file outside the alias layer and this changelog spells the old name.
+
+## v2.19.12 — portable deterministic math: same simulation in every browser (#121 / #209) (2026-11-22)
+
+- **The authoritative simulation no longer depends on the browser's math library.** Firefox and WebKit returned different last bits than Chromium for `hypot`, `exp`, `cos`, `atan2` and others, so the same inputs could drift apart and, on a knife-edge hazard contact, end differently (a Firefox run survived a hazard that Chromium crashed on). Every simulation file now takes `sin/cos/tan/asin/acos/atan/atan2/exp/expm1/log/log1p/log2/log10/pow/hypot/tanh/sinh/cosh/cbrt` from `src/systems/pmath.js`, a facade over the exactly pinned, Apache-2.0 `@stdlib/math-base-special-*` packages (pure IEEE arithmetic, identical bits in Chromium, Firefox and WebKit), and the nine trig/pow/acos functions inside Phaser's bundled Matter are replaced the same way (`src/systems/MatterPortable.js`, no fork; `phaser` is now pinned exactly to 3.90.0). Presentation code (backgrounds, audio, UI, particles) keeps the native `Math`, and a test fails if a new native call appears in a simulation file.
+- **Physics-breaking, release `SIM_REVISION` 5.** Results differ from the native math in the last bit for about 1% of `sin`/`cos` calls, so older tapes and the terrain digests pinned in three tests change (terrain geometry differs by at most 8.7e-11 px, no structural change). No new gameplay rules and no player-visible tuning change.
+- **Integration with the released ruleset history:** this release contains the canonical terrain colliders from v2.19.7 (`SIM_REVISION` 4, archived as `sha256:89e2cdab…`) and the stable-id hazard warning snapshot/restore from v2.19.11. Combining the portable-math source with those changes produces the new `SIM_REVISION` 5 ruleset identity; revision 4 is preserved unchanged for historical manifests, and the stable-id `TelegraphTracker` snapshot/restore (with its 480→1000 hazard-restore contract) is re-verified on the combined source rather than inherited from the earlier native-math run.
+
+- **Verified three-engine parity on the combined code:** Seven representative post-#224 replays were independently compared across Chromium, Firefox and Playwright WebKit with **7/7 identical causal results, outcomes and tick counts**, zero position or velocity difference, and zero replay desync. Playwright WebKit ran in an isolated browser container; real Safari/iOS and historical replay migrations are not claimed.
+- **Fail-closed developer evidence:** Replaced regex-only native-Math scanning with a parser and fixed allowlist of reviewed draw-only statements; pinned `@babel/parser` as a direct exact dev dependency. Portable-math experiment caches now bind to exact source, rule, pinned math library, fixture/tape, engine/version and fully verified served dist/ contents, reject short/forged digest payloads and mismatched cells, recheck the served build after each measurement, and distinguish partial two-engine results from three-engine certification. These QA/tooling changes do not alter runtime simulation.
+
+## v2.19.11 — saveable stable-id hazard warnings (#119 / #224) (2026-11-22)
+
+- **Stable per-spawn hazard identity:** Each live hazard receives a deterministic `chunk:spawn-ordinal` ID on its single production creation path. Hazard warning/cue/arrival bookkeeping now keys on the ID instead of WeakMap/WeakSet object identity, and exposes JSON-safe `snapshot()`/`restore()`. Rebuilt hazard objects recover warning timestamps without replaying announcements. A hazard without a stable ID fails explicitly rather than creating an untracked, silently unsaveable state. Restoring malformed, duplicate-ID or non-finite warning records rejects atomically without corrupting previously live tracker state.
+- **Canonical collider integration:** The diagnostic save/restore harness now supports the pool-free terrain representation released in v2.19.7. It reports a zero-length pool when the pool is absent and **rejects** legacy nonempty pool snapshots instead of fabricating old collision bodies. These are experimental tools, not a production save format or cross-release migration. The harness now also permits selecting a single exact browser case with `EXACT_ONLY=hazard:full`, avoiding unnecessary ablations.
+- **Verification scope:** The existing deterministic physics and replay ruleset remains **SIM_REVISION 4**; no intentional change to authoritative physics, scoring, tape encoding or play controls. The developer browser restore experiment on the combined canonical-collider and stable-ID source reproduced the hazard fixture exactly for 520 post-save ticks (480→1000) in Chromium. This proves one exact restore fixture, not complete or secure production savestates. #119 remains open.
+
+## v2.19.10 — measure actual World Dance visibility (#212 / #225) (2026-11-22)
+
+- **Developer regression diagnostic:** Added a source-bound measurement suite tracing synthetic instrument energy through `AudioSynth.getWorldDanceSample()`, unverified meter timing, `WorldDanceEnvelope`, `sunDanceGeometry()` and real `motifDecor()` displacement. It measures steady-state and transient behavior using uniform frame cadence, tests invalid/silent meter rejection and distinguishes observed pixels from theoretical maxima.
+- **Observed issue, not yet fixed:** Steady-state music-driven backdrop movement is sub-pixel for supported motifs and **zero** for motifs that do not consume horizon-dance signals. The fixture intentionally stubs live audio nodes and is not evidence of audible real-world audio or human-perceptible scenery animation. Actual stronger gameplay-visible World Dance requires separate approved production art/animation work; leave #212 open.
+- **No gameplay change:** This PR adds tests only, with no production source, shader, physics, score, replay or simulation revision changes. Previous 2.19.9 input fix and ruleset v4 remain intact.
+
+## v2.19.9 — preserve overlapping gamepad button aliases (#211 / #223) (2026-11-22)
+
+- **Gamepad alias correctness:** Holding a shoulder button and the corresponding right-stick direction now keeps its helicopter control engaged until *both* inputs are released, instead of the first release incorrectly cancelling the shared gamepad source. Aggregate pad state is written before per-binding action events, matching the keyboard event-observation contract. Controller-disconnect bookkeeping clears both per-binding and aggregated states.
+- **Tests and documentation:** Added revert-sensitive tests for overlapping bindings and for action listeners seeing the updated pad state, plus a control-accessibility matrix covering touch/keyboard/gamepad behavior and precise analog thresholds. The wider #211 controls-parity effort remains open; this release is the bounded alias fix, not full parity certification.
+- **Replay scope:** No authoritative physics, score formulas, recorded input/tape schema or simulation revision changed. The existing v2.19.7 SIM_REVISION 4 ruleset and the v2.19.8 developer replay comparison remain unchanged.
+
+## v2.19.8 — developer matched-build replay check (#129 / #226) (2026-11-22)
+
+- **Compare one matched normal-run fixture across the adjacent v2.19.6 and v2.19.7 builds.** Each build records and verifies only its own native tape. The local tool compares the same encoded neutral input and stock starting fields, then summarizes observed divergence and natural finish. No game, replay compatibility, ranking or scoring changes.
+
+## v2.19.7 — canonical terrain colliders, SIM_REVISION 4 (#119 / #222) (2026-11-22), SIM_REVISION 4 (#119) (2026-11-22)
+
+- **Terrain colliders no longer depend on what was streamed before them.** `TerrainMesh` used to recycle collider bodies from a pool, reshaping them with `Body.setVertices` + `Body.setPosition`. That left vertex bits that depended on the body's *previous* position. Now every segment collider is built fresh from the chunk's points, and the pool is removed.
+- **Physics identity:** this is an owner-approved break. `SIM_REVISION` moves 3 → 4, with an archived ruleset `sha256:89e2cdab…`. Tick outcomes change only where a recycled collider was touched. In a 2149-tick run, the sled ends 1.4e-5 px away, with the same crash tick and the same score. No visible terrain change: graphics are drawn from chunk points, not colliders.
+- **Memory:** removed colliders are now garbage-collected instead of held forever. After teleporting to x=107000, 6454 pooled bodies → 0, collider geometry 845 KB → 41 KB, and JS heap 70.4 → 56.1 MB.
+- **Canaries:** all 7 golden canaries PASS exactly against the new build, so none needs re-baselining.
+- **Coordination:** #121 (portable math, PR #209) must integrate after this release with SIM_REVISION 5+; never reuse this shipped revision 4 identity.
+
+- **Release integration:** Morgan’s separate developer-only stock neutral panel shipped first as v2.19.6. Its unchanged tooling and release notes are preserved here; the collider geometry/source ruleset remains identical to the reviewed #222 head.
+
+## v2.19.6 — developer stock hands-off panel (#220 / #77) (2026-11-22)
+
+- **Find reproducible 500 m hands-off candidates within a fixed local panel.** The tool checks 12 built-in courses in the pinned v2.18.1 Chromium preview. A candidate must reach the distance on a completed tick and then reproduce its natural finish, native checkpoints and cadence fingerprints in a fresh replay without saving. Short finishes and capped runs are reported separately. The tool does not verify newer builds or change gameplay, Daily selection, scores, or sharing.
+
+## v2.19.5 — developer reaction-seed sensitivity comparison (#218 / #126) (2026-11-22)
+
+- **Compare matched synthetic hop-noise runs across reaction seeds.** The local CLI accepts two to eight complete classic panels with the same settings and per-course ideal control evidence. It reports pass counts and the courses that flip, with source file hashes and a caller-asserted build pin. It does not expose raw trials, select a Daily, estimate human fairness, or change game behavior.
+
+- **Integration:** developer-only comparison tool was validated on current v2.19.4 release (SIM_REVISION 3); original Morgan implementation unchanged. No gameplay, published Daily selection, human-skill model or replay verifier modified.
+
+## v2.19.4 — cross-engine replay conformance matrix (#161 / #120) (2026-11-22)
+
+- **Developer-only conformance harness and evidence; no game, replay-format or gameplay changes.** `tools/conformance/cross-engine*.mjs` replays nine committed fixture tapes through the real built game on Chromium, Firefox and Playwright WebKit at 30/60/120/144 Hz stepping, compares diagnostic (non-authoritative) per-tick digests split into causal state and derived reads, reports the first divergent tick and subsystem, TapePlayer checkpoint desyncs and final outcomes, and isolates `Math.*` differences with a pure-JS counterfactual (evidence for #121). Results and reproduction are in `docs/determinism/cross-engine-matrix.md`. Playwright WebKit is not iPhone Safari; real Safari/iOS, ARM and hardware GPUs were not tested.
+
+- **Historical measurement, current diagnostic tools:** The 400 sequential and 45 fresh-context rows were collected against v2.18.1 (main `7d5780f`), before v2.19.0 Kodiak shoves, v2.19.1 causal isolation and v2.19.3 prior-run-state reset. They are retained as provenance and demonstrate the earlier cross-engine math differences; **they are not a new verification of v2.19.3**. The #219 session leak is now fixed, while exact portable math parity remains open under #121. No gameplay or trusted replay-verifier code changes.
+
+## v2.19.3 — every run starts from identical sim state (#120) (2026-11-22)
+
+<!-- friday-issue: 120 -->
+- **A run no longer depends on what ran before it in the same page session.** `RunScene` is one instance for the whole session and `create()` did not reset `_biomeSector`, `_lastBiome` (and the tutorial latches `_hopped`/`_pushed`). With a biome mask, tick 1 compares the sled's sector with `_biomeSector`: a fresh page saw a "change" and called `refreshPalette`, which previously (before #160) rebuilt colliders; a later run could skip its initial biome repaint and cue. The same tape ran differently by session position (found by the #120 matrix: `chunk-biome-boundaries` as run #4 after a terrain crash survived 815 m instead of crashing at 835 m). `create()` now resets these fields so every run starts like run #1. Tests: `tests/replay/sessionIsolation.test.js`; diagnostic browser probe `tools/determinism/session-isolation-probe.mjs`.
+- **Replay and the calendar date was already fixed on main** by the replay-manifest work (Replay Contract R-1: daily rule, Sync Level and Kodiak/magnet flags come from the tape header). No change here.
+
+- **Integration:** #140 (v2.19.1, SIM_REVISION 3) already removed biome repaint as a cause of physics divergence, so these create-time field resets now address previous-run **presentation/cue and state hygiene**, not a new physics fix. The released SIM_REVISION remains 3 and the source tripwire is attested as non-causal. Historical browser evidence is preserved as original; a fresh run on the current combined source is part of integration verification.
+
+## v2.19.2 — savestate feasibility study, Phase 1 research (#119 / #159) (2026-11-22)
+
+- **Research only: no savestates ship, and no gameplay, physics, replay format or `src/` change.** Adds `docs/determinism/savestate-feasibility.md`.
+  - It inventories the complete Matter and game state that a tick-boundary save/restore needs.
+  - It shows that restoring a GhostTape checkpoint diverges on the next tick.
+  - It shows that a full diagnostic snapshot, restored into a fresh scene and world in the built game, replays bit-identically. The fixtures are contact-heavy and hazard-heavy, and were compared over 500 and 520 ticks.
+  - It proposes a build-bound savestate contract with completeness checks, and gives a conditional GO for Phase 2.
+- **Experimental harnesses:**
+  - `tools/savestate-experiment/` (pure-Matter and Chromium experiments, with results).
+  - `tests/determinism/savestate-matter.test.js` (16 tests).
+  - Their digests are diagnostic and non-authoritative; Replay Contract #152 owns canonical fingerprints.
+
+- **Post-integration context:** #155 camera read was already fixed by v2.16.1 and #140 causal isolation merged in v2.19.1 (simulation revision 3, preserving Kodiak shove revision 2). Canonical collider construction and stable-key TelegraphTracker remain separate Phase 2 prerequisites. The old Chromium snapshot measurements are archived as research evidence, not retested on the new physics; no production savestate code ships.
+
+## v2.19.1 — simulation/presentation causal isolation (#160 / #140) (2026-11-22)
+
+- **Palette toggle mid-run no longer touches physics.** A colour-blind palette switch (Pause > Settings) repainted the terrain through `TerrainMesh.addChunk`, which removed and re-added every live collider: segments came back as other pooled bodies (new ids, new Matter world order), pad sensors were rebuilt and the contact pairs under the sled lost their warm-start impulses. In the built game a toggle at tick 300 forked the sled pose at tick 301. New `TerrainMesh.redrawChunk` repaints graphics only; `addChunk` builds the same bodies in the same order as before.
+- **A failing audio engine can no longer freeze the game.** `RunScene.renderFrame` read `audio.getWorldDanceSample()` unguarded; an exception escaped the frame and Phaser's RAF step never rescheduled, stopping the loop and the simulation. The read now goes through `WorldDance.readWorldDanceAudio`, which returns "no dance" on failure. Dance visuals with working audio are unchanged.
+- **Biome-sector entry no longer rebuilds terrain colliders; physics change for biome-mask runs (owner-approved, `SIM_REVISION` 3).** Entering or leaving a biome sector repainted the world through the same collider rebuild as the palette toggle, which reshuffled body ids/order and dropped the contact warm-start state (and bounce-pad cooldowns) under the sled at that tick. It was deterministic but a presentation path feeding physics; it now repaints with `TerrainMesh.redrawChunk`. Biome gameplay (zone mods, hazards, pickups) is chunk data read by the sim and is unchanged. Tick outcomes of runs that cross a biome boundary change, so `SIM_REVISION` is 3 (new archived ruleset for the combined Kodiak-shove and collider-isolation source); manifests from prior revisions 1 and 2 resolve to their archived rulesets and are refused as `historical-verifier-required` rather than diverging silently, and legacy ghost tapes get the contract's `inconclusive-legacy` outcome (`GHOST_PHYSICS_VERSION` stays 1 per Replay Contract v1 §7.2). Existing `hazard-transition` and `bump` canaries were checked on Team B’s earlier base; a new independent integration run is required with the newly released Kodiak shove rules; the other five canaries are mask 0 and never repaint mid-run, so no golden changes.
+- **Sim/presentation isolation tooling, diagnostic only.** `tools/conformance/causal-digest.mjs` (per-tick causal-state digest, non-authoritative; the contract's fingerprints are authoritative) and `tools/conformance/causal-isolation-probe.mjs` (built-game differential matrix: camera, Fx, render cadence, audio, viewport, HUD, settings). Manual, not a CI gate; `EXPECT_ISOLATION=1` fails on any causal or cue leak, page error, stall or short run. With #155 merged, the ground-telegraph camera read is gone and its detector is now a plain regression test.
+- **Verification.** Built-game differential matrix (5 fixtures, 91 cells, Chromium): for a fixed per-tick input tape, render cadence (30/60/120/144 Hz, jitter), camera zoom/scroll/shake, Fx, audio (muted, absent, no AudioContext, throwing), viewport/DPR/resize, HUD, pause and settings leave every authoritative subsystem bit-identical on every tick; positive controls are caught at the next tick. Details in `docs/determinism/causal-isolation.md`.
+
+- **Release lineage:** Team A shipped a different `SIM_REVISION` 2 as v2.19.0 (Kodiak shoves, ruleset `sha256:b5763476…`). This patch preserves that immutable archive and publishes the combined physics as **revision 3**, explicitly marking revision 3 as the last released revision. The unshipped v2.18.2 candidate ruleset is not represented as a second released revision 2.
+
+## v2.19.0 — race bears: playful Kodiak rivals (#47) (2026-11-22)
+
+- **Racing bears from Sync Level 6.** Three snow-racing rivals now come in packs of two or three on ordinary runs: a white polar **Kernel-Panic** that feints and then stops dead in your line, a brown grizzly **Brute-Force** that rears up and charges from behind, and a black **Black-Ice** that slides under your predicted landing. The first pack of a run is always two. They never appear on Dailies, Draft runs or the Gym.
+- **Same-type or mixed packs.** Settings has a new **KODIAK PACKS** switch: SAME TYPE (default) or MIXED. Both use the same schedule for a seed, so you can compare them on one course.
+- **Bears shove, they don't crash.** Contact pushes the sled back and up by a bounded amount, then the race goes on. Each bear shoves once per encounter, with a one-second pause between shoves. A shoved bear earns no pass bonus, and touching a bear never scores. A shoved sled can still lose the race through terrain, a chasm or the BSOD.
+- **Telegraphs and passes.** Each attack has a visible warning. Clearing a bear in the air scores as a bear hop; passing it on the ground scores as a clean pass.
+- **Replays and ghosts.** Kodiak runs are part of the replay, and they replay exactly at 30 and 120 Hz. Ghost tapes recorded before this release are not offered for Kodiak runs, since they predate the shove rule.
+- **Still being tuned.** Encounter spacing, pack sizes, telegraph timings and shove strength are playtest values, not final balance.
+
+## v2.18.1 — developer Run DNA preview in local inspector (#213 / #87) (2026-11-22)
+
+- **Local, unverified Run DNA artwork preview.** The developer Downhill Run Strip inspector can now display abstract artwork from the full decoded trace loaded through the existing local file chooser. It clears stale previews on another selection or error; earlier asynchronous reads cannot replace a newer choice. The preview uses an SVG blob as an image, never injected markup. Section zoom and existing SVG download remain unchanged. No player-facing feature, replay, scoreboard, network, or gameplay changes.
+
+## v2.18.0 — canopy, airbrake and flip exploit research policies (#214 / #215) (2026-11-22)
+
+- **Developer Exploit Factory can now actually test the playtested canopy + airbrake + flip combination.** Adds two deterministic scripted candidates: `canopyHop` (airbrake/canopy without intentional flips) and `canopyFlip` (flip first, canopy after steering release, airbrake on descent while maintaining forward motion), against unchanged hands-off and flip controls. Simulator pad now routes real held/pressed canopy and airbrake signals; the result records observed active control times rather than assuming a named policy acted.
+- **24-seed matched comparison and pursuer distance diagnostics.** The report tracks the active BSOD's smallest observed 60 Hz gap to the rider, actual airborne/trick activity, score, distance, terminal cause and timeout censoring. These are headless diagnostics, not a claim of infinite airtime, an anti-cheat proof, or an approved balance change. No authoritative gameplay, collision, replay format or music code changes.
+
+## v2.17.0 — local course ghost lineup (#178 / #81) (2026-11-22)
+
+- **Choose which ghosts appear on your next run.** Open Course Ghosts from Game Over with **G** or **Ghost Fav**. Set local Best and Latest visibility for that course, and pin, replace or clear Favorites A–C. Global Best and Latest settings still take precedence, and a tape shared by several roles draws only once. The lineup stays on this device; replay formats, scoring and online sharing are unchanged.
+
+## v2.16.4 — developer stock Packet Spike traversal check (#202 / #127) (2026-11-22)
+
+- **Pinned stock hazard traversal diagnostic.** A developer-only Chromium script probes one naturally generated Packet Spike across three normal-input cases (no hop, a timed hop, and a late hop), each repeated twice in fresh contexts, without injecting terrain or collision outcomes. It checks that the same hazard and early power-up are encountered, validates actual input, clearance and fatal/landing events, and refuses a mismatched compiled game. The fixture is pinned to one older compiled build; this is not a general fairness verdict, cross-version compatibility proof, or active gameplay change. No player data is transferred or retained.
+
+## v2.16.3 — Exploit Factory: complete adversarial policy evidence (#187 / #76) (2026-11-22)
+
+- **`--reuse` no longer accepts an incomplete run record just because the record's own `failures[]` is empty.**
+  Completeness is re-derived from the record's data by new pure `tools/exploits/lib/record-audit.cjs`: every arm the
+  record claims to have run must carry exactly the planned seed identities, once each. Four shapes re-reported as
+  complete measurements (exit 0, full metrics table, rendered verdicts) and now exit 2 with the arm named as
+  *unmeasured*: an arm missing entirely, every arm cut to half the planned seeds, a duplicated seed inside one arm,
+  and a seed nobody planned. A duplicated-seed arm previously surfaced as exit 1 with a **usage** banner.
+- **A record whose counts cannot be attributed is rejected outright**, not partially compared: a run attributed to no
+  arm, an unnamed or duplicated `policySpec`, a plan that lists one seed twice. The report prints the reasons under
+  `RECORD REJECTED — no comparison is offered`.
+- **The exit code and the report now come from the same audit** on both the fresh and `--reuse` paths, so the status
+  cannot disagree with what was printed. The runner also merges audit findings into `failures` before writing, so the
+  record on disk always agrees with itself.
+- **Older records keep their guarantees.** A record without `args.seedList` has its plan recovered from the numeric
+  `args.seeds` count (expanded exactly as the simulator expands it), or from a comma-list `args.seeds`. Only a record
+  with neither is rejected outright, because there is then no plan to verify the arms against.
+- **A reused record must now be self-sufficient beyond its run list.** It must name a `baseline` that actually has an
+  arm — otherwise there is nothing to pair a candidate against — and it must carry a recoverable seed plan
+  (`args.seedList`, a numeric `args.seeds` count, or a comma-list `args.seeds`). A record with neither is rejected
+  instead of being accepted on "the arms agree", which is exactly what a uniformly truncated record looks like. A
+  comma-list `args.seeds` is now treated as exact identities rather than as an unverifiable fallback.
+- `tools/exploits/repro-reuse-incomplete.mjs` reproduces the twelve defective shapes through the real CLI, with two
+  positive cases (a full record and a genuinely dominant one) so it fails if the guard ever decays into "always
+  refuse". Run against the previously reviewed head `645a5c6` it reports 11 of 12 accepted as clean; at this head, 0.
+- Harness tooling only: no gameplay, physics, balance or player-visible change. `tools/sim/**` untouched.
+
+
+## v2.16.2 — canonical replay development check (#205 / #129) (2026-11-22)
+
+- **Same-build replay check for developers.** The local tool records one synthetic stock run in a pinned Chromium build, verifies its native canonical evidence, and compares every completed tick across two fresh replays plus the separate fatal event. It does not compare historical builds or change gameplay, scoring, or the replay format.
+
+## v2.16.1 — keep ground hop cues visible (#208 / #155) (2026-11-21)
+
+- **Ground hop cues stay visible at the edge.** Fixed-tick warning and sound timing no longer reads the rendered camera. The renderer uses the current view: if the hop arrow is clipped, the edge badge carries the cue. The badge only reads already-streamed terrain. No physics, score, replay ruleset or Pulp camera change.
+
+
+## v2.16.0 — reconcile post-v2.15.3 merged capabilities and release policy (2026-11-21)
+
+This corrective release recognizes already-merged replay and developer tooling plus the project-wide rule that every `main` merge is a release. Previous merges (#163, #165, #166, #203, #164, #173, #175, #179, #182, #158, #204, #206) were not each versioned at merge time; this is a catch-up release, not a claim they were individually tagged. Experimental/offline-only tooling is not an activated production feature.
+
+- **Replay contract and canonical serialization (#163 / #152).** Versioned replay contract, canonical JSON/binary encoding, deterministic hashes and cross-implementation fixtures. No live physics change.
+- **Subsystem fingerprints (#165 / #118).** Read-only checkpoint hashes cover sled/contact, terrain, hazards, BSOD, timers, scoring, equipment and RNG, with first-divergence and field-level comparison. Fingerprints detect divergence but are not anti-cheat.
+- **Physics ruleset time capsules (#166 / #123), with compatibility repair (#203).** Content-addressed ruleset archives, source attestation and version-aware replay verification; uploaded code is not executed.
+- **Self-contained replay manifests and local evidence (#164 / #116).** Capture seed, biome mask, daily rule, level/loadout, active boosts, BSOD, RNG and ruleset; fail-closed validation and exportable local `.bbreplay` evidence. IndexedDB evidence is local, not permanent cloud storage; cross-browser parity is not yet established.
+- **Golden replay canaries (#158 / #117).** Seven recorded scenarios and offline/manual comparator tooling for first-divergence and handling diagnostics. This does not yet constitute an automatically enforced cross-browser CI quality gate.
+- **PWA offline-shell experiments (#175 / #172).** Integrity inventory, test-only service-worker implementation, opt-in original-music selection/prefetch planning. No production service-worker registration and no claim that the shipped game runs offline.
+- **Real-original-music offline bridge experiments (#179 / #172).** Verified original-Opus music groups and development/test routes, with incomplete offline groups refused rather than silently replaced. Not an activated production offline download feature.
+- **Source-preserving music-variant tooling (#182 / #172, #180).** Developer-only mono Lite/Full per-stem derivative generation and provenance checks. Original stereo recordings remain untouched; quality presets require listening approval and are not a shipped player preference.
+
+**Verification snapshot:** On `main` at `e181f9f` (before #158 merged), replay tests passed 741/741 across 20 suites, ruleset integrity check passed, and the full test suite reported 3,561 passing / 9 failing (seven suites), consistent in count with the previously documented baseline. On the integrated #158 tree, canary unit tests passed 32/32. This is not a full-suite green claim.
+
+- **Release-policy correction (#204, #206 and this release).** Reconciled the missing changelog entries and codified `main` as the release boundary. The two documentation PRs should have received patch bumps; their omission is acknowledged rather than rewriting historical merges.
+
+## v2.15.3 - PWA install metadata and original icons (#172) (2026-11-21)
+
+- **Installable shell metadata, not an offline game.** A first-party Web App Manifest and generated original Bitstream Bluffs icons (192px, 512px, maskable, Apple touch) add supported-browser home-screen installation metadata, landscape/standalone preference and theme colors. The main application boot, gameplay simulation, ghost/replay format and scoring are unchanged.
+- **Correct hosted manifest MIME type.** Netlify serves `/manifest.webmanifest` with `Content-Type: application/manifest+json` on a path-specific rule, without changing headers for game bundles, saves or audio. Tested on the real deploy preview; some browsers may still choose not to expose installation.
+- **Explicit limitation:** no production service worker, offline shell, automatic media download, cache migration or upgrade UI ships in this slice. Those remain unmerged experimental work behind issue #172; the game still needs network access and original stereo music masters are untouched.
+
+
+## v2.15.2 - fair input timestamps (#115) (2026-11-21)
+
+- **Keyboard and touch input reach the tick they happened in.** Each key event's and touch-button pointer event's `event.timeStamp` now picks the 120 Hz tick whose window contains it, instead of one poll per display frame being applied from the frame's first tick. On a steady frame cadence (30/60/120 Hz) the harness and the built game give the exact tick and identical tapes; at 30 Hz a press used to act up to 3 ticks (25 ms of game time) before the key went down, and a 20 ms tap was lost 36 % of the time. Taps of held controls (push, tuck, tilt, brake) shorter than a frame always count for at least one tick, a double tap inside one frame is two hops, and taps across a 144 Hz frame that runs no tick are no longer dropped. Multi-touch, pointercancel and lost pointer capture release on their own tick; a touch and a key holding the same button stay held until the last one lets go.
+- **The bound, honestly:** an input is never shown later than before (same rendered frame, measured per press at 30/60/120/144 Hz) and never rewrites a tick that already ran. It can still land up to about 1 tick early at rates that do not divide 120 (144 Hz, as before), and at any rate under real rAF jitter or Phaser delta smoothing: a key stamped after a frame's vsync time but delivered before its callback goes to that frame's last tick. How early is bounded by how late the frame's callback runs after its vsync time: in a heavily loaded headless browser (~15-20 fps, stalls up to 1 s) the real-rAF probe put 90 of 180 presses on their exact tick (main: 4 of 60) and 33 early, by up to 6 ticks once and otherwise at most 3 (main: 36 of 60 early, up to 6).
+- Gamepad is unchanged (no per-button event timestamps; still the frame's first tick), and an untimed gamepad change is never pushed behind a key or touch event on another button. Ghost tape format and versions unchanged; existing tapes replay identically. See `docs/issue-115-fair-input.md`.
+
 ## v2.15.1 - Sky Jellyfish felt spring rebound (2026-11-16)
 
 - **Sky Jellyfish springs now visibly rebound on scored landings.** The rebound returns a bounded share of impact speed, follows the ground normal, and preserves along-slope velocity (`BiomeEffects.springReboundVelocity`, `Sled.launchNormal`). A rebound under 120 px/s is treated as no rebound, so at the shipped 0.2 share only impacts of 600 px/s or more are felt (800 px/s returns 160 px/s); the floor is the measured point that keeps the bounce felt within the accepted ±15% mask-128 hop survival tolerance. Stabilizer Rails damp the share to 0.05, below the floor even at an 801 px/s impact. A zero, negative or non-finite rebound request leaves `Sled.launchNormal` and its contact/snap/chute state untouched. The normal projection is checked on uniform slopes; it makes no general irregular-terrain safety claim. Bounce pads retain their existing launch behaviour.

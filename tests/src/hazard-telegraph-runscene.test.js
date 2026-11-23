@@ -18,13 +18,13 @@ jest.unstable_mockModule('../../src/shaders/GlitchPipeline.js', () => ({ GlitchP
 
 const { RunScene } = await import('../../src/scenes/RunScene.js');
 const { GroundTelegraph, EDGE_INSET_PX, EDGE_MAX_STACK } = await import('../../src/entities/GroundTelegraph.js');
-const { TelegraphTracker, planTelegraph, GROUND_WARN } = await import('../../src/systems/HazardTelegraph.js');
+const { TelegraphTracker, planTelegraph, planTelegraphMarks, GROUND_WARN } = await import('../../src/systems/HazardTelegraph.js');
 const { emptyWards, addWard } = await import('../../src/systems/Wards.js');
 const { SFX, AudioSynth } = await import('../../src/systems/AudioSynth.js');
 const { loadContent } = await import('./_helpers.js');
 
 const DEFS = loadContent().hazards;
-const hz = (id, cx, extra = {}) => ({ def: DEFS[id], cx, cy: 300 - DEFS[id].size.h / 2, w: DEFS[id].size.w, h: DEFS[id].size.h, hit: false, ...extra });
+const hz = (id, cx, extra = {}) => ({ hid: `${id}@${cx}`, def: DEFS[id], cx, cy: 300 - DEFS[id].size.h / 2, w: DEFS[id].size.w, h: DEFS[id].size.h, hit: false, ...extra });
 const PAL = { danger: 0xff0000, amber: 0xffaa00, lime: 0x00ff00, bg: 0x000011, text: 0xffffff, cyan: 0x00ffff };
 
 function makeRun(hazards, sledOver = {}) {
@@ -47,18 +47,20 @@ describe('RunScene.updateGroundTelegraph', () => {
   test('announces a crash hazard once (groundWarn), stamps it, then cues the hop once when the window opens', () => {
     const h = hz('packetSpike', 1000 + 1250);
     const s = makeRun([h]);
+    Object.defineProperty(s, '_view', { get() { throw new Error('cue planning read the renderer'); } });
     s.updateGroundTelegraph(5000);
     expect(s.sfx).toEqual([['groundWarn', { brace: false }]]);
     expect(h.teleAtMs).toBe(5000);
     expect(s._teleMarks).toHaveLength(1);
-    expect(s._teleMarks[0]).toMatchObject({ ref: h, color: 'danger', onScreen: false });
+    expect(s._teleMarks[0]).toMatchObject({ ref: h, color: 'danger' });
+    expect(s._teleMarks[0]).not.toHaveProperty('onScreen');
     s.updateGroundTelegraph(5016);
     expect(s.sfx).toHaveLength(1);
     s.sled.x = h.cx - 650 * 0.37;
-    s._view.right = s.sled.x + 900;
     s.updateGroundTelegraph(6000);
     expect(s.sfx[1]).toEqual(['hopCue', undefined]);
-    expect(s._teleMarks[0]).toMatchObject({ state: 'go', color: 'lime', onScreen: true });
+    expect(s._teleMarks[0]).toMatchObject({ state: 'go', color: 'lime', arrivalMs: 6370 });
+    expect(s.teleTracker.lastArrivalMs(h)).toBe(6370);
     s.updateGroundTelegraph(6016);
     expect(s.sfx).toHaveLength(2);
     expect(h.teleAtMs).toBe(5000);
@@ -111,8 +113,8 @@ describe('RunScene.updateGroundTelegraph', () => {
     const h = hz('packetSpike', 2200);
     const s = makeRun([h]);
     Object.assign(s, {
-      shardField: null, airTelegraph: null, bestMarker: null, bestM: 0, newBestDone: true, biomeMask: 0, _biomeSector: 1,
-      score: { checkMilestones: () => [] }, terrain: { _sectorOf: () => 1 },
+      shardField: null, airTelegraph: null, bestMarker: null, bestM: 0, newBestDone: true, biomeMask: 0, _biomeId: null,
+      score: { checkMilestones: () => [] }, terrain: { _sectorOf: () => 1, biomeAtX: () => null },
       tutTimers: { stall: 0 }, tutDone: new Set(['hop', 'flip', 'push', 'tuck']), tutShown: new Set(), _steepMs: 0, _landings: 0, tuckShows: 9,
       hints: { update: () => [] }, lastBoost: null, _airTricks: 0,
     });
@@ -136,15 +138,15 @@ const xs = (calls) => calls.flatMap((c) => (c[0] === 'lineBetween' ? [c[1], c[3]
 
 describe('GroundTelegraph (drawing)', () => {
   const VIEW = { left: 900, right: 1900, top: 0, bottom: 540 };
-  const flat = () => 300;
-  const draw = (marks, zoom = 1, view = VIEW) => {
+  const flat = [{ startX: 0, endX: 2100, points: [{ x: 0, y: 300 }, { x: 2100, y: 300 }] }];
+  const draw = (marks, zoom = 1, view = VIEW, chunks = flat) => {
     const sc = fakeScene();
     const t = new GroundTelegraph(sc, PAL);
     sc.calls.length = 0;
-    t.update(1234, marks, view, zoom, flat);
+    t.update(1234, marks, view, zoom, chunks);
     return sc.calls;
   };
-  const plan = (list, x = 1000, speed = 650, right = VIEW.right) => planTelegraph(list, { x, vx: speed, speed, grounded: true, landX: null }, right);
+  const plan = (list, x = 1000, speed = 650) => planTelegraphMarks(list, { x, vx: speed, speed, grounded: true, landX: null });
 
   test('no marks: clears and draws nothing', () => {
     expect(draw([])).toEqual([['clear']]);
@@ -160,6 +162,16 @@ describe('GroundTelegraph (drawing)', () => {
     const ys = calls.flatMap((c) => (c[0] === 'lineBetween' ? [c[2], c[4]] : []));
     expect(Math.max(...ys)).toBeLessThanOrEqual(300 + 1);
     expect(Math.min(...ys)).toBeGreaterThan(300 - 120);
+  });
+  test('the badge interpolates read-only live points and falls back when the viewport extends beyond them', () => {
+    const x = VIEW.right - EDGE_INSET_PX;
+    const points = Object.freeze([Object.freeze({ x: x - 20, y: 260 }), Object.freeze({ x: x + 20, y: 280 })]);
+    const chunks = Object.freeze([Object.freeze({ startX: x - 20, endX: x + 20, points })]);
+    const marks = plan([hz('packetSpike', 2200)]);
+    const stemY = (...args) => draw(marks, ...args).find(([name]) => name === 'lineBetween')[2];
+    expect(stemY(1, VIEW, chunks)).toBe(270);
+    expect(stemY(1, { ...VIEW, right: 2000 }, chunks)).toBe(270);
+    expect(stemY(1, { ...VIEW, right: 2000, bottom: 600 }, [])).toBe(300);
   });
   test('a brace hazard draws in amber, a hop-window hazard in lime', () => {
     expect(colours(draw(plan([hz('overflowFirewall', 2200)]))).has(PAL.amber)).toBe(true);
@@ -178,6 +190,29 @@ describe('GroundTelegraph (drawing)', () => {
     expect(top).toBeLessThan(h.cy - h.h / 2 - 100);
     expect(Math.max(...xs(calls))).toBeLessThan(VIEW.right - EDGE_INSET_PX - 40);
   });
+  test('the same go mark switches across the current viewport, ignoring the legacy visibility hint', () => {
+    const h = hz('packetSpike', 1195, { w: 40 });
+    const mark = Object.freeze(planTelegraph([h], { x: 1000, vx: 650, speed: 650, grounded: true }, 1900)[0]);
+    expect(mark).toMatchObject({ state: 'go', onScreen: true });
+    const triangle = (view) => draw([mark], 1, view).find((c) => c[0] === 'fillTriangle');
+    expect(triangle(VIEW)[5]).toBe(h.cx); // roomy current viewport uses the column
+    for (const right of [1160, 1180, 1198]) { // fully outside, partial box, centre in but response clips
+      const view = { ...VIEW, right };
+      const points = triangle(view);
+      expect(points[5]).toBe(right - EDGE_INSET_PX);
+      expect(Math.max(...xs([points]))).toBeLessThan(right);
+    }
+    expect(triangle({ ...VIEW, top: 277 })[5]).toBe(VIEW.right - EDGE_INSET_PX); // response above the current view
+  });
+  test('a clipped go keeps the response slot even after ordinary edge warnings fill the stack', () => {
+    const h = (cx, id = 'overflowFirewall') => hz(id, cx);
+    const marks = plan([h(1100), h(1120), h(1140), h(1195, 'packetSpike')]);
+    expect(marks.map((m) => m.state)).toEqual(['warn', 'warn', 'warn', 'go']);
+    const view = { ...VIEW, right: 1080 };
+    const calls = draw(marks, 1, view);
+    expect(calls.find((c) => c[0] === 'fillTriangle')[5]).toBe(view.right - EDGE_INSET_PX);
+    expect(names(calls).filter((n) => n === 'strokeRect')).toHaveLength(EDGE_MAX_STACK);
+  });
   test('a hazard high in the view: the column is shortened so the cue on top stays on screen', () => {
     const h = hz('packetSpike', 1500, { cy: 90 });
     const calls = draw(plan([h]));
@@ -188,8 +223,8 @@ describe('GroundTelegraph (drawing)', () => {
   test('sizes are counter-scaled: at zoom 0.5 the edge marker is twice as large in world px (same on screen)', () => {
     const view2 = { left: 0, right: 1920, top: 0, bottom: 1080 };
     const span = (calls) => { const x = xs(calls); return Math.max(...x) - Math.min(...x); };
-    const a = span(draw(plan([hz('packetSpike', 2400)], 1000, 800, 1900)));
-    const b = span(draw(plan([hz('packetSpike', 2400)], 1000, 800, 1920), 0.5, view2));
+    const a = span(draw(plan([hz('packetSpike', 2400)], 1000, 800)));
+    const b = span(draw(plan([hz('packetSpike', 2400)], 1000, 800), 0.5, view2));
     expect(b / a).toBeCloseTo(2, 1);
   });
   test('edge markers stack upward and are capped at EDGE_MAX_STACK', () => {

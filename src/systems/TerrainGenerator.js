@@ -30,6 +30,8 @@
 import { Rng, xxHash32, hashInts } from './Rng.js';
 import { rollSweep } from './HazardMotion.js';
 import { TERRAIN } from '../constants.js';
+import pmath from './pmath.js';
+import { BASE_BIOME_ID } from '../data/biomeAliases.js';
 
 /** Horizontal distance between consecutive polyline points (px). */
 export const SPACING_PX = 16;
@@ -42,7 +44,7 @@ export const MAX_NOISE_UP_DEG = 26;
 export const MAX_TURN_DEG = 10;
 export const MAX_NOISE_TURN_DEG = 17;
 /** Every chunk descends at least this much overall (tan of angle). */
-const MIN_NET_TAN = Math.tan((9 * Math.PI) / 180);
+const MIN_NET_TAN = pmath.tan((9 * Math.PI) / 180);
 /** Hazard fairness: hazards keep this far from chunk ends / each other / the start of the run. */
 export const HAZARD_END_MARGIN_PX = 240;
 export const HAZARD_MIN_SPACING_PX = 480;
@@ -54,7 +56,7 @@ export const HAZARD_MIN_X_PX = 700;
  */
 export const RISE_LINE_DEG = 7;
 export const RISE_MAX_PX = 30;
-const RISE_LINE_TAN = Math.tan((RISE_LINE_DEG * Math.PI) / 180);
+const RISE_LINE_TAN = pmath.tan((RISE_LINE_DEG * Math.PI) / 180);
 /**
  * Crest rounding (fun pass): the slope angle may INCREASE (convex crest = ground falling away) by at most this per 16 px
  * segment on ordinary terrain, so a sled above ~450 px/s no longer micro-hops. Deliberate launch templates (SHARP_TAGS)
@@ -67,13 +69,37 @@ export const SHARP_TAGS = ['kicker', 'jump-lip', 'launch', 'big-air', 'drop', 's
 export const SECTOR_M = 500;
 
 /**
- * Sectors whose content is always base Bitstream, whatever the mask (spec W3: "Sectors 0 and 1 are always
- * base Bitstream. From sector 2, each sector is base or one enabled biome."). Sector numbers here are
- * 0-based (sector n starts at n * SECTOR_M); TerrainChunk.sector is the same value 1-based for display.
+ * Issue #65: Debutmont is the base biome. This is the id every "base" answer resolves to (sectors before
+ * BASE_SECTORS, mask 0, the base-weight draw). One constant, shared with the profile and defined in
+ * data/biomeAliases.js; re-exported here. Arcade (`null`) is no longer a base: it is only the bridge between two
+ * different biomes (see biomeAtPosition).
+ */
+export { BASE_BIOME_ID };
+
+/**
+ * Sectors whose content is always the home biome, whatever the mask (spec W3: "Sectors 0 and 1 are always
+ * base"; the base is now Debutmont, #65). Sector numbers here are 0-based (sector n starts at
+ * n * SECTOR_M); TerrainChunk.sector is the same value 1-based for display.
  */
 export const BASE_SECTORS = 2;
-/** Weight of a base-Bitstream sector against the enabled biomes, once biomes can appear. */
+/** Weight of a home-biome sector against the enabled biomes, once biomes can appear. */
 export const BIOME_BASE_WEIGHT = 2.2;
+/**
+ * Arcade bridges (#65): the first stretch of a sector whose biome differs from the previous sector's is arcade
+ * terrain. Length, as a fraction of SECTOR_M, is MIN_FRAC at the run start and rises linearly with the sector's
+ * start distance to MAX_FRAC at ARCADE_BRIDGE_RAMP_M, then stays there. Distance only: never progression, input or BSOD.
+ */
+export const ARCADE_BRIDGE_MIN_FRAC = 1 / 6;
+export const ARCADE_BRIDGE_MAX_FRAC = 1 / 4;
+export const ARCADE_BRIDGE_RAMP_M = 5000;
+/**
+ * Hard cap on a bridge, as a multiple of its target length (whole chunks make a bridge overshoot the target, and a
+ * long carve starting just inside the window used to stretch it to 300 m). A chunk that would carry the bridge past
+ * ARCADE_BRIDGE_CAP_MUL x target, measured from the bridge's own first chunk, takes the sector's biome instead.
+ */
+export const ARCADE_BRIDGE_CAP_MUL = 1.5;
+/** bridgeSpanAt never walks more chunks than this either way (a bridge is a handful; this only bounds a bug). */
+const BRIDGE_SCAN_MAX_CHUNKS = 64;
 /** Hazard gentleness: no hazards before HAZARD_SOFT_PX (80 m); only non-crash hazards before HAZARD_SAFE_PX (150 m). */
 export const HAZARD_SOFT_PX = 1600;
 export const HAZARD_SAFE_PX = 3000;
@@ -313,35 +339,102 @@ function vnoise(x, seed) {
  */
 
 /**
- * Which biome a sector is drawn as. Pure and seed-deterministic: the answer depends only on
- * (seed, sector, mask), never on call order or on how much terrain has been generated, so a chunk built
- * late by streaming is identical to one built early.
+ * Which biome a sector is drawn as, BEFORE arcade bridges (see biomeAtPosition). Pure and seed-deterministic: the
+ * answer depends only on (seed, sector, mask), never on call order or on how much terrain has been generated,
+ * so a chunk built late by streaming is identical to one built early.
  *
  * Draws from `Rng.fork('biome')`, an independent stream, so asking this question never advances the
- * terrain, hazard or shard streams. That is what lets `biomeMask = 0` stay byte-identical to the
- * pre-W3 generator (pinned by tests/src/terrain-golden-mask0.test.js).
+ * terrain, hazard or shard streams. Debutmont (BASE_BIOME_ID) is the base: it answers wherever the old model
+ * answered arcade (sectors before BASE_SECTORS, mask 0, no eligible defs, the base-weight draw). The home
+ * biome is left out of the eligible pool, so its mask bit is a no-op and it is never double-weighted. The draw
+ * count and order are the same as before, so a non-home pick for a given seed and mask is unchanged.
  *
  * @param {string|number} seed run seed.
  * @param {number} sector 0-based sector index.
  * @param {number} biomeMask bitfield of enabled biome bits.
  * @param {Array<{id:string,bit:number,weight?:number}>} [biomeDefs] content; defaults to none.
- * @returns {string|null} biome id, or null for base Bitstream.
+ * @returns {string} biome id (never null; the home biome is the base).
  */
 export function biomeForSector(seed, sector, biomeMask, biomeDefs) {
-  if (!(sector >= BASE_SECTORS)) return null;
+  if (!(sector >= BASE_SECTORS)) return BASE_BIOME_ID;
   const mask = biomeMask >>> 0;
-  if (!mask) return null;
+  if (!mask) return BASE_BIOME_ID;
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   // Eligible = the biome is in the mask AND we actually have its definition (a mask bit with no content
-  // would otherwise be a sector with no palette and no chunks).
-  const eligible = defs.filter((d) => d && d.bit && (mask & d.bit) !== 0);
-  if (!eligible.length) return null;
+  // would otherwise be a sector with no palette and no chunks). The home biome is the base, not a candidate.
+  const eligible = defs.filter((d) => d && d.bit && d.id !== BASE_BIOME_ID && (mask & d.bit) !== 0);
+  if (!eligible.length) return BASE_BIOME_ID;
   const rng = new Rng(xxHash32(`biome:${sector}`, new Rng(seed).baseSeed));
   const pick = rng.weighted(
     eligible.concat([{ id: null, weight: BIOME_BASE_WEIGHT }]),
     (d) => d.weight || 1,
   );
-  return pick && pick.id ? pick.id : null;
+  return pick && pick.id ? pick.id : BASE_BIOME_ID;
+}
+
+/**
+ * Length in metres of the arcade bridge that opens a sector starting at `startM`, before chunk snapping.
+ * Linear in the start distance from ARCADE_BRIDGE_MIN_FRAC to ARCADE_BRIDGE_MAX_FRAC of SECTOR_M over
+ * ARCADE_BRIDGE_RAMP_M, then capped (about 83 m at the start, 125 m from 5000 m).
+ * @param {number} startM distance of the sector's start, metres.
+ * @returns {number} metres.
+ */
+export function arcadeBridgeLengthM(startM) {
+  const t = clamp((Number(startM) || 0) / ARCADE_BRIDGE_RAMP_M, 0, 1);
+  return SECTOR_M * (ARCADE_BRIDGE_MIN_FRAC + (ARCADE_BRIDGE_MAX_FRAC - ARCADE_BRIDGE_MIN_FRAC) * t);
+}
+
+/**
+ * Whether the sector's biome differs from the previous sector's, i.e. whether the sector opens with an arcade
+ * bridge. Sector 0 (the run start) never does.
+ * @returns {boolean}
+ */
+export function sectorHasBridge(seed, sector, biomeMask, biomeDefs) {
+  return sector >= 1
+    && biomeForSector(seed, sector, biomeMask, biomeDefs) !== biomeForSector(seed, sector - 1, biomeMask, biomeDefs);
+}
+
+/**
+ * Longest a bridge opening a sector starting at `startM` may run, in metres: ARCADE_BRIDGE_CAP_MUL x its target
+ * length (about 125 m at the start, 187.5 m from 5000 m).
+ * @param {number} startM distance of the sector's start, metres.
+ * @returns {number} metres.
+ */
+export function arcadeBridgeCapM(startM) {
+  return ARCADE_BRIDGE_CAP_MUL * arcadeBridgeLengthM(startM);
+}
+
+/**
+ * The biome at a position: the sector's biome, except the first arcade-bridge length of a sector that changes
+ * biome, which is arcade (`null`). Pure in (seed, x, mask, defs): no RNG draws beyond biomeForSector's, no
+ * dependence on input, progression or BSOD, so every player sees the same course (leaderboards, Daily, ghosts).
+ *
+ * Chunk snapping: the generator assigns a chunk by its START x, so a bridge is a run of whole chunks. A plain
+ * position query (no `chunk`) answers the unsnapped window. A chunk-level query passes the chunk's facts:
+ *   - `first`: the first chunk that starts in a bridging sector is always arcade, so every biome change has at
+ *     least one chunk of bridge however long the chunk straddling the boundary was;
+ *   - otherwise a chunk is arcade when it starts inside the window AND ends within the cap of the bridge's own
+ *     start (`runStartM` = start of the sector's first chunk, `endM` = this chunk's end), so a long chunk starting
+ *     just inside the window can no longer stretch the bridge: the sector's biome takes it instead.
+ *
+ * @param {string|number} seed
+ * @param {number} xM position, metres (>= 0).
+ * @param {number} biomeMask
+ * @param {Array<{id:string,bit:number,weight?:number}>} [biomeDefs]
+ * @param {{first?:boolean, runStartM?:number, endM?:number}|boolean} [chunk] chunk-level facts (a bare `true`
+ *   means `{ first: true }`); omit for a plain position query.
+ * @returns {string|null} biome id, or null for an arcade bridge.
+ */
+export function biomeAtPosition(seed, xM, biomeMask, biomeDefs, chunk) {
+  const sector = Math.max(0, Math.floor(xM / SECTOR_M));
+  const biome = biomeForSector(seed, sector, biomeMask, biomeDefs);
+  if (sector < 1 || biomeForSector(seed, sector - 1, biomeMask, biomeDefs) === biome) return biome;
+  const startM = sector * SECTOR_M;
+  const c = chunk === true ? { first: true } : chunk || {};
+  if (c.first) return null;
+  if (xM - startM >= arcadeBridgeLengthM(startM)) return biome;
+  const fits = !Number.isFinite(c.endM) || c.endM <= (Number.isFinite(c.runStartM) ? c.runStartM : startM) + arcadeBridgeCapM(startM);
+  return fits ? null : biome;
 }
 
 export class TerrainGenerator {
@@ -493,7 +586,7 @@ export class TerrainGenerator {
    * @returns {number} y world px (down positive).
    */
   heightAt(x) {
-    if (x < 0) return Math.tan(this.bounds[0].startAngDeg * RAD) * x;
+    if (x < 0) return pmath.tan(this.bounds[0].startAngDeg * RAD) * x;
     const c = this._chunkAt(x);
     const p = c.points;
     const i = this._segIndex(c, x);
@@ -533,8 +626,8 @@ export class TerrainGenerator {
       if (!sw || !Number.isFinite(sw.amplitudePx) || !Number.isFinite(sw.periodPx) || sw.periodPx <= 0) continue;
       const taper = Math.min(Number.isFinite(sw.taperPx) && sw.taperPx > 0 ? sw.taperPx : 0, (z.x1 - z.x0) / 2);
       const t = Math.min(x - z.x0, z.x1 - x);
-      const w = taper > 0 && t < taper ? 0.5 - 0.5 * Math.cos((Math.PI * t) / taper) : 1;
-      sum += Math.sin(((x - z.x0) / sw.periodPx) * Math.PI * 2) * sw.amplitudePx * w;
+      const w = taper > 0 && t < taper ? 0.5 - 0.5 * pmath.cos((Math.PI * t) / taper) : 1;
+      sum += pmath.sin(((x - z.x0) / sw.periodPx) * Math.PI * 2) * sw.amplitudePx * w;
     }
     return sum;
   }
@@ -570,7 +663,7 @@ export class TerrainGenerator {
     const c = this._chunkAt(x);
     const p = c.points;
     const i = this._segIndex(c, x);
-    return Math.atan2(p[i + 1].y - p[i].y, p[i + 1].x - p[i].x) * DEG;
+    return pmath.atan2(p[i + 1].y - p[i].y, p[i + 1].x - p[i].x) * DEG;
   }
 
   /**
@@ -729,15 +822,93 @@ export class TerrainGenerator {
   }
 
   /**
-   * Biome of the 0-based sector a chunk starts in, or null. Chunks are shorter than a sector, so a
-   * chunk that starts in a biome sector belongs to it; a chunk straddling a boundary is assigned by
-   * its START, which keeps the assignment a pure function of the chunk's own start position.
+   * Biome of a chunk, or null for arcade (a bridge, or content-free). A chunk is assigned by its START, which
+   * keeps the assignment a pure function of the chunk's own start position (and of facts about its own sector's
+   * chunks, which are themselves a function of the seed): see biomeAtPosition for the bridge rule. A chunk starting
+   * inside a bridge window is built as arcade first (`_arcadeEndPx`) to learn whether it would overrun the cap.
+   * A biome id with no definition in `biomeDefs` is treated as arcade, so a generator built without biome
+   * content is unchanged.
    * @param {{startX:number}} b
+   * @param {number} index chunk index.
    * @returns {string|null}
    */
-  _biomeForChunk(b) {
-    if (!this.biomeMask || !this.biomeDefs.length) return null;
-    return biomeForSector(this.seed, this._sectorOf(b.startX) - 1, this.biomeMask, this.biomeDefs);
+  _biomeForChunk(b, index) {
+    if (!this.biomeDefs.length) return null;
+    const startM = b.startX / this.ppm;
+    const first = this._isBreather(index, b);
+    let id = biomeAtPosition(this.seed, startM, this.biomeMask, this.biomeDefs, first);
+    if (id === null && !first) {
+      // inside the window of a bridging sector: arcade only if this chunk keeps the bridge under its cap
+      let j = index;
+      while (j > 0 && !this._isBreather(j, this.bounds[j])) j--;
+      id = biomeAtPosition(this.seed, startM, this.biomeMask, this.biomeDefs, {
+        runStartM: this.bounds[j].startX / this.ppm, endM: this._arcadeEndPx(b, index) / this.ppm,
+      });
+    }
+    return id && this.biomeDefs.some((d) => d.id === id) ? id : null;
+  }
+
+  /**
+   * Where chunk `index` would end if it were built as arcade (no biome preference): the def pick and the length
+   * draw replayed on their own forks of the chunk's seed, exactly as `_build` makes them, so it is the real end
+   * of the chunk whenever the chunk does come out arcade. Scratch only: touches no generator state.
+   * @returns {number} world px.
+   */
+  _arcadeEndPx(b, index) {
+    const distM = b.startX / this.ppm;
+    const crng = new Rng(hashInts(this.seedState, index + 1));
+    const def = this._pickDef(index, b, distM, this.difficultyAt(distM), crng.fork('plan'), null);
+    const kind = def.kind === 'noise' || def.kind === 'bridge' ? def.kind : 'spline';
+    const shape = crng.fork('shape');
+    const n = this._segmentCount(def, kind, index, b, shape);
+    return b.startX + (def === JUMP_DEF ? this._jumpAngles(index, b, distM, shape).length : n) * SPACING_PX;
+  }
+
+  /**
+   * Segment count of a non-jump chunk of `def`: the length jitter is drawn from `shape` first (always, as it was
+   * before the bridge rule needed it separately), then the length follows from the def, the pack's growth and it.
+   */
+  _segmentCount(def, kind, index, b, shape) {
+    const scale = kind === 'spline' ? Math.min(1.6, 1 + 0.08 * b.packNo) : 1;
+    const jitterLen = index === 0 ? 1 : shape.range(0.8, 1.2);
+    if (kind === 'bridge') return Math.max(30, Math.round(def.lengthPx / SPACING_PX));
+    return Math.max(10, Math.round((def.lengthPx * scale * jitterLen) / SPACING_PX));
+  }
+
+  /**
+   * Biome at world x, as the chunk containing x is built (the same answer the terrain uses). Builds chunk
+   * bounds as needed, scratch only. Every consumer that colours or announces "the biome we are in" asks this.
+   * @param {number} x world px.
+   * @returns {string|null} biome id, or null for an arcade bridge.
+   */
+  biomeAtX(x) {
+    const i = this._indexForX(Math.max(0, x));
+    return this._biomeForChunk(this.bounds[i], i);
+  }
+
+  /**
+   * The arcade bridge that contains world x, as the generator built it (whole chunks: the same answer biomeAtX gives),
+   * or null when x is not on a bridge. Read-only and scratch only (builds chunk bounds as needed), so the presentation
+   * layer (#65 dissolve / reconstruct) can key a look to the sled's x without touching generation. `fromId` is the
+   * biome the bridge leaves and `toId` the one it enters (null only where no biome borders it).
+   * @param {number} x world px.
+   * @returns {{startX:number, endX:number, fromId:string|null, toId:string|null}|null}
+   */
+  bridgeSpanAt(x) {
+    if (!this.biomeDefs.length) return null;
+    const idAt = (i) => this._biomeForChunk(this._boundAt(i), i);
+    const at = this._indexForX(Math.max(0, x));
+    if (idAt(at) !== null) return null;
+    let a = at;
+    for (let guard = 0; a > 0 && guard < BRIDGE_SCAN_MAX_CHUNKS && idAt(a - 1) === null; guard++) a--;
+    let z = at;
+    for (let guard = 0; guard < BRIDGE_SCAN_MAX_CHUNKS && idAt(z + 1) === null; guard++) z++;
+    return {
+      startX: this._boundAt(a).startX,
+      endX: this._boundAt(z + 1).startX,
+      fromId: a > 0 ? idAt(a - 1) : null,
+      toId: idAt(z + 1),
+    };
   }
 
   /** The first chunk that starts inside a new sector is a calm "breather". */
@@ -788,7 +959,7 @@ export class TerrainGenerator {
     const crng = new Rng(hashInts(this.seedState, index + 1));
     const plan = crng.fork('plan');
     const shape = crng.fork('shape');
-    const biome = this._biomeForChunk(b);
+    const biome = this._biomeForChunk(b, index);
     const biomeDef = biome ? this.biomeDefs.find((d) => d.id === biome) : null;
     const def = this._pickDef(index, b, distM, diff, plan, biomeDef);
     const kind = def.kind === 'noise' || def.kind === 'bridge' ? def.kind : 'spline';
@@ -796,11 +967,7 @@ export class TerrainGenerator {
     const breather = this._isBreather(index, b);
     const sharp = isJump || (def.tags && def.tags.some((t) => SHARP_TAGS.includes(t)));
 
-    let scale = 1;
-    if (kind === 'spline') scale = Math.min(1.6, 1 + 0.08 * b.packNo);
-    const jitterLen = index === 0 ? 1 : shape.range(0.8, 1.2);
-    let n = Math.max(10, Math.round((def.lengthPx * scale * jitterLen) / SPACING_PX));
-    if (kind === 'bridge') n = Math.max(30, Math.round(def.lengthPx / SPACING_PX));
+    let n = this._segmentCount(def, kind, index, b, shape);
     this._ensureScratch(n + 2);
     let L = n * SPACING_PX;
     const raw = this._raw;
@@ -820,7 +987,7 @@ export class TerrainGenerator {
       this._ensureScratch(n + 2);
       const jy = this._ys;
       jy[0] = b.startY;
-      for (let i = 0; i < n; i++) jy[i + 1] = jy[i] + Math.tan(ja[i] * RAD) * SPACING_PX;
+      for (let i = 0; i < n; i++) jy[i + 1] = jy[i] + pmath.tan(ja[i] * RAD) * SPACING_PX;
       endAng = ja[n - 1];
       ys = jy;
     } else if (kind === 'noise') {
@@ -903,7 +1070,7 @@ export class TerrainGenerator {
     let landEnd = 0;
     for (const l of lips) {
       if (!l.pad) {
-        target.launches.push({ x: l.x, y: l.y, angleDeg: -Math.atan2(l.vy, l.vx) * DEG, airS: l.airS, landX: l.landX });
+        target.launches.push({ x: l.x, y: l.y, angleDeg: -pmath.atan2(l.vy, l.vx) * DEG, airS: l.airS, landX: l.landX });
       }
       landEnd = Math.max(landEnd, l.zoneEnd);
     }
@@ -980,9 +1147,9 @@ export class TerrainGenerator {
     move(beta, LIP_TURN_DEG, LIP_TURN_DEG); // sharp fall-away: ground drops clear of the trajectory at once
     // landing ramp long enough for the fastest plausible launch (1.2 x expected) to touch down on it
     const vmax = first ? 470 : Math.max(JUMP_LAUNCH_SPEED_PX_S * 1.25, vExp * 1.1);
-    const ca = Math.cos(alpha * RAD);
+    const ca = pmath.cos(alpha * RAD);
     const k = GRAV / (2 * vmax * vmax * ca * ca);
-    const xHit = (Math.tan(beta * RAD) + Math.tan(alpha * RAD)) / k;
+    const xHit = (pmath.tan(beta * RAD) + pmath.tan(alpha * RAD)) / k;
     hold(Math.min(first ? 560 : 1300, xHit * 0.9 + 64));
     move(9, 0, RUNOUT_TURN_DEG); // long smooth concave runout
     hold(JUMP_RUNOUT_PX);
@@ -1009,7 +1176,7 @@ export class TerrainGenerator {
   _findLips(pts, vExp, endX) {
     const lips = [];
     const n = pts.length;
-    const ang = (k) => Math.atan2(pts[k + 1].y - pts[k].y, pts[k + 1].x - pts[k].x) * DEG;
+    const ang = (k) => pmath.atan2(pts[k + 1].y - pts[k].y, pts[k + 1].x - pts[k].x) * DEG;
     let skipTo = -Infinity;
     for (let i = 3; i < n - 2; i++) {
       if (pts[i].x <= skipTo) continue;
@@ -1017,8 +1184,8 @@ export class TerrainGenerator {
       const a1 = (ang(i) + ang(i + 1)) / 2;
       if (a1 - a0 < 7) continue;
       const inc = ang(i - 1);
-      const vx = vExp * Math.cos(inc * RAD);
-      const vy = vExp * Math.sin(inc * RAD);
+      const vx = vExp * pmath.cos(inc * RAD);
+      const vy = vExp * pmath.sin(inc * RAD);
       const f = this._flight(pts, pts[i].x, pts[i].y, vx, vy);
       const air = f ? f.t : 1.6;
       if (air < LIP_MIN_AIR_S) continue;
@@ -1160,7 +1327,7 @@ export class TerrainGenerator {
     const seed = (shape.next() * 4294967296) >>> 0;
     const amp = nz.amplitudePx * Math.min(variance, 1.6);
     const octaves = clamp(Math.floor(nz.octaves || 2), 1, 5);
-    const mean = Math.tan(clamp(nz.meanSlopeDeg || 12, 4, 30) * RAD);
+    const mean = pmath.tan(clamp(nz.meanSlopeDeg || 12, 4, 30) * RAD);
     const fade = Math.min(160, L * 0.3);
     const raw = this._raw;
     for (let i = 0; i <= n; i++) {
@@ -1203,7 +1370,7 @@ export class TerrainGenerator {
     let min = v0;
     for (let i = 0; i < n; i++) {
       const dy = ys[i + 1] - ys[i];
-      const len = Math.hypot(SPACING_PX, dy);
+      const len = pmath.hypot(SPACING_PX, dy);
       const sin = dy / len;
       const dt = len / Math.max(v, 25);
       v += (585 * sin - 0.3 * v - 0.0004 * v * v) * dt;
@@ -1224,7 +1391,7 @@ export class TerrainGenerator {
     out[i0] = startY;
     if (segs <= 0) return prevAngDeg;
     const rawStart = (raw[i0 + 1] - raw[i0]) / SPACING_PX;
-    const delta = Math.tan(prevAngDeg * RAD) - rawStart;
+    const delta = pmath.tan(prevAngDeg * RAD) - rawStart;
     const B = Math.min(220, Lseg * 0.5);
     const net = raw[i1] - raw[i0];
     const need = Lseg * MIN_NET_TAN;
@@ -1244,7 +1411,7 @@ export class TerrainGenerator {
       for (let i = i0 + 1; i <= i1; i++) {
         const x = (i - i0) * SPACING_PX;
         const rel = raw[i] - raw[i0] + corr(x) + (lift * x) / Lseg;
-        let ang = Math.atan2(rel - lastRel, SPACING_PX) * DEG;
+        let ang = pmath.atan2(rel - lastRel, SPACING_PX) * DEG;
         lastRel = rel;
         if (ang > hi) ang = hi;
         else if (ang < lo) ang = lo;
@@ -1254,7 +1421,7 @@ export class TerrainGenerator {
         const down = first ? Math.min(limits.turn, MAX_TURN_DEG) : limits.turn;
         if (ang > prev + up) ang = prev + up;
         else if (ang < prev - down) ang = prev - down;
-        y += Math.tan(ang * RAD) * SPACING_PX;
+        y += pmath.tan(ang * RAD) * SPACING_PX;
         out[i] = y;
         prev = ang;
       }
@@ -1333,7 +1500,7 @@ export class TerrainGenerator {
         const def = rng.weighted(this.hazardList, (h) => ((h.minDistanceM || 0) <= dM && (crashOk || !h.onHit || h.onHit.effect !== 'crash') ? h.weight || 1 : 0));
         if (def) {
           const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
-          const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
+          const slope = pmath.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
           const w = (def.size && def.size.w) || 24;
           const flatEnough = slope > -12 && slope < 28 && this._flatAround(pts, i);
           const slowOk = !def.onHit || def.onHit.effect !== 'slow' || this._descentAhead(pts, i, chunk.endX);
@@ -1404,7 +1571,7 @@ export class TerrainGenerator {
 
   /** Launch-speed multiple whose arc bounds every no-hop flight (see AIR_SPEED_HI_MUL). */
   _airHiMul(lip, distM) {
-    return Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(distM) / Math.hypot(lip.vx, lip.vy));
+    return Math.max(AIR_SPEED_HI_MUL, expectedSpeedPxS(distM) / pmath.hypot(lip.vx, lip.vy));
   }
 
   /**
@@ -1534,7 +1701,7 @@ export class TerrainGenerator {
     }
     const pts = chunk.points;
     const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
-    const slope = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
+    const slope = pmath.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
     if (!(slope > -12 && slope < 28) || !this._flatAround(pts, i)) return null;
     if (def.onHit && def.onHit.effect === 'slow') {
       const f = Number.isFinite(def.onHit.speedFactor) ? def.onHit.speedFactor : 0.5;
@@ -1694,7 +1861,7 @@ export class TerrainGenerator {
       for (let t = 0.01; t < 2.4 && list.length < SHARD_GROUP[1]; t += 0.01) {
         const x = l.x + l.vx * t;
         const y = l.y + l.vy * t + 0.5 * GRAV * t * t;
-        acc += Math.hypot(x - px, y - py);
+        acc += pmath.hypot(x - px, y - py);
         px = x;
         py = y;
         if (x >= chunk.endX - 8) break;
@@ -1752,7 +1919,7 @@ export class TerrainGenerator {
           for (let k = 0; k < cnt && good; k++) {
             const x = Math.round(x0 + k * sp);
             const i = clamp(Math.floor((x - chunk.startX) / SPACING_PX), 0, pts.length - 2);
-            const a = Math.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
+            const a = pmath.atan2(pts[i + 1].y - pts[i].y, SPACING_PX) * DEG;
             const y = Math.round(this._yAtLocal(pts, x) - 14);
             if (a < 8 || a > 38 || chunk.gaps.some((q) => x > q.x0 - 20 && x < q.x1 + 20) || !ok(x, y)) good = false;
             g.push({ x, y });
@@ -1780,7 +1947,7 @@ export class TerrainGenerator {
     if (pts[i].x + SLOW_HAZARD_CLEAR_PX > endX) return false;
     const k1 = Math.min(pts.length - 2, i + Math.ceil(SLOW_HAZARD_CLEAR_PX / SPACING_PX));
     for (let k = i; k <= k1; k++) {
-      if (Math.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG < SLOW_HAZARD_MIN_DEG) return false;
+      if (pmath.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG < SLOW_HAZARD_MIN_DEG) return false;
     }
     return true;
   }
@@ -1791,7 +1958,7 @@ export class TerrainGenerator {
     let lo = Infinity;
     let hi = -Infinity;
     for (let k = a0; k <= a1; k++) {
-      const a = Math.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG;
+      const a = pmath.atan2(pts[k + 1].y - pts[k].y, SPACING_PX) * DEG;
       if (a < lo) lo = a;
       if (a > hi) hi = a;
     }

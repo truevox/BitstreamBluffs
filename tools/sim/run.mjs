@@ -23,7 +23,7 @@
  *   --flipTargetDeg N     flip: the ideal release is the first frame from which a release gives >= N deg of net rotation and a clean landing (default 340; 700 = double flip)
  *   --hopLeadMs N         hop: hop when the next ground crash hazard is N ms away (default 380)
  *   --seedPrefix P        with --seeds N: names become P-01..P-NN instead of sim-01.. (a second, independent seed set)
- *   --biomeMask M         W3: biome bitmask for the run (1 Debumont, 2 Garbage Dump Glacier, 4 Pyramid Peak,
+ *   --biomeMask M         W3: biome bitmask for the run (1 Debutmont, 2 Garbage Dump Glacier, 4 Pyramid Peak,
  *                         8 Underwater Mountain, 16 Crystal Cavern; combined by OR). Default 0 = base terrain.
  *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
  *   --rule ID             run under that DailyPatch rule's real modifiers (default: none/neutralised)
@@ -32,6 +32,7 @@
  *   --keepUi              leave UIScene running (slower)       --quiet      no per-run lines
  *   --noiseProfiles ideal,steady,distracted   isolated developer hop-noise panel (see docs/issue-126-human-noise-bots.md)
  *   --noiseSeed LABEL     salt for the independent reaction RNG (noise panels only)
+ *   --fatigue             opt-in simulated-time ramp (see docs/issue-126-optional-fatigue.md)
  *
  * Policies (details in browser.js): flip's "ideal" release = the first frame from which a release (a forward model of Sled's own air rules) gives
  * >= 340 deg of net rotation and a landing within --flipCleanDeg (default 28, the 'good' band) of the slope; releaseLateMs delays it (negative = earlier). Attempts for which the model
@@ -49,7 +50,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DailyPatch } from '../../src/systems/DailyPatch.js';
 import {
-  DEFAULT_NOISE_SEED, MAX_NOISE_SEC, MAX_NOISE_SEEDS, NOISE_PROFILES,
+  DEFAULT_NOISE_SEED, FATIGUE_RAMP, MAX_NOISE_SEC, MAX_NOISE_SEEDS, NOISE_PROFILES,
   noiseOutcome, summarizeNoise, verifyNoiseEvidence,
 } from './human-noise.js';
 
@@ -64,7 +65,7 @@ function parseArgs(argv) {
     const k = argv[i];
     if (!k.startsWith('--')) continue;
     const name = k.slice(2);
-    if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop'].includes(name)) { a[name] = true; continue; }
+    if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop', 'fatigue'].includes(name)) { a[name] = true; continue; }
     a[name] = argv[++i];
   }
   for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM']) if (a[n] != null) a[n] = Number(a[n]);
@@ -113,6 +114,12 @@ if (argv.includes('--noiseProfiles')) {
   }
   args.noiseSeed ??= DEFAULT_NOISE_SEED;
   if (!args.noiseSeed.trim() || args.noiseSeed.length > 64) throw new TypeError('Provide a nonempty noise seed label of up to 64 characters');
+}
+const fatigueFlag = argv.indexOf('--fatigue');
+if (argv.some((value) => value.startsWith('--fatigue=')) || (fatigueFlag !== -1 &&
+    (!noiseProfiles || args.fatigue !== true || argv.lastIndexOf('--fatigue') !== fatigueFlag ||
+      (argv[fatigueFlag + 1] != null && !argv[fatigueFlag + 1].startsWith('--'))))) {
+  throw new TypeError('Use the single --fatigue switch without a value and only with --noiseProfiles');
 }
 const seeds = expandSeeds(String(args.seeds));
 if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
@@ -286,9 +293,12 @@ async function runNoisePanel(browser, url, runJob) {
     noiseSeed: args.noiseSeed, seeds, policy: args.policy, passDistanceM: args.maxM, maxSec: args.maxSec,
     biomeMask: Number(args.biomeMask ?? 0) >>> 0, rule: args.rule || 'none', hopLeadMs: args.hopLeadMs ?? 380,
     profiles: Object.fromEntries(noiseProfiles.map((name) => [name, NOISE_PROFILES[name]])),
+    ...(args.fatigue ? { fatigue: FATIGUE_RAMP } : {}),
   };
-  console.log(`HUMAN-NOISE BOT PANEL, LOCAL QA ONLY: ${JSON.stringify({ settings, summary, verify })}`);
-  if (args.out) writeFileSync(args.out, JSON.stringify({ kind: 'local-tool-assisted-bot-panel', settings, summary, verify, results }, null, 1));
+  const kind = args.fatigue ? 'local-tool-assisted-fatigue-bot-panel' : 'local-tool-assisted-bot-panel';
+  const label = args.fatigue ? 'FATIGUE BOT PANEL' : 'HUMAN-NOISE BOT PANEL';
+  console.log(`${label}, LOCAL QA ONLY: ${JSON.stringify({ settings, summary, verify })}`);
+  if (args.out) writeFileSync(args.out, JSON.stringify({ kind, settings, summary, verify, results }, null, 1));
   if (verify === false) throw new Error('Noise input or result did not reproduce');
 }
 
@@ -322,6 +332,7 @@ async function main() {
         // Daily rule to measure under; 'none' (the default) neutralises modifiers for pacing runs.
         rule: args.rule ? String(args.rule) : 'none',
         ...(job.profile ? { noiseProfile: job.profile, noiseSeed: args.noiseSeed, noiseReplay: job.playback } : {}),
+        ...(args.fatigue ? { noiseFatigue: true } : {}),
       };
       if (args.policy === 'terrain') return page.evaluate((o) => window.__sim.genTerrain(o), opts);
       return page.evaluate((o) => window.__sim.run(o), opts);

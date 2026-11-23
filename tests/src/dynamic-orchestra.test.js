@@ -9,7 +9,7 @@ import { snowpackImpactFromLanding } from '../../src/systems/music/SnowpackImpac
 const home='voice:bitstream-bluffs';
 function fakeDirector() {
 	const d=Object.create(StemMusicDirector.prototype);
-	d.biome='debumont';
+	d.biome='debutmont';
 	d.gains=new Map(['bass','drums','guitar','piano','other',home].map(s=>[s,{}]));
 	d.pack={sourceNames:['vocals','drums','bass','guitar','piano','other',home]};
 	d.dynamicOrchestra=false;
@@ -40,9 +40,9 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 		const d=fakeDirector();
 		d._applyMusicTimbres();
 		const map=new Map(d.mixer.replaceEffects.mock.calls.map(x=>[x[0],x[1]]));
-		expect(map.get(home)).toEqual(melodyPreset('debumont'));
+		expect(map.get(home)).toEqual(melodyPreset('debutmont'));
 		for(const stem of ['bass','drums','guitar','piano','other']){
-			expect(map.get(stem)).toEqual(orchestraPreset('debumont',stem));
+			expect(map.get(stem)).toEqual(orchestraPreset('debutmont',stem));
 			expect(map.get(stem).length).toBeGreaterThan(0);
 			// NULL resets each input's standard biome space send. OFF must
 			// never force zero or bypass its source effects.
@@ -100,15 +100,15 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 	test('future physical note-replacements remain gated OFF, ON enables them',()=>{
 		const r=Object.create(AdaptiveBiomeRouter.prototype);
 		r.pack={adaptive:{featuredStem:'other',variants:{
-			featured:{debumont:['first.ogg']},bass:{},drums:{debumont:['drums.ogg']}}}};
-		r.biome='debumont';
+			featured:{debutmont:['first.ogg']},bass:{},drums:{debutmont:['drums.ogg']}}}};
+		r.biome='debutmont';
 		r.airborne=true;
 		r.enabled=false;
 		expect(r._variant('featured')).toBeNull();
 		expect(r._variant('drums')).toBeNull();
 		r.enabled=true;
-		expect(r._variant('featured')).toBe('debumont');
-		expect(r._variant('drums')).toBe('debumont');
+		expect(r._variant('featured')).toBe('debutmont');
+		expect(r._variant('drums')).toBe('debutmont');
 	});
 	test('Debumont powder lifts on jump and settles on landing without rebuilding FX',()=> {
 		const d=fakeDirector();
@@ -129,6 +129,16 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 				orchestraPreset('debumont',stem)[0].depth);
 		expect(d.mixer.replaceEffects).not.toHaveBeenCalled();
 		expect(d.clockStart).toBe(12.78);
+	});
+	test('canonical Debutmont aliases preserve Snowpack resonance and impact',()=> {
+		const d=fakeDirector();
+		d.biome='debutmont';
+		for (const stem of ['bass','drums','guitar','piano','other']) {
+			expect(orchestraPreset('debutmont',stem)[0].type).toBe('snowpack');
+			expect(orchestraPreset('debumont',stem)).toEqual(orchestraPreset('debutmont',stem));
+		}
+		d.setBiome('debumont');
+		expect(d.biome).toBe('debutmont');
 	});
 	test('physical snow pulses are finite, bounded and do not fabricate impacts',()=> {
 		expect(snowpackImpactFromLanding(null)).toBe(0);
@@ -168,7 +178,7 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 		d.biome='space-mountain';
 		d.onLanding({impactSpeedPxS:900,quality:'good',hard:true});
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
-		d.biome='debumont';d.menuMode=true;
+		d.biome='debutmont';d.menuMode=true;
 		d.onLanding({impactSpeedPxS:900,quality:'good',hard:true});
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
 	});
@@ -191,8 +201,8 @@ describe('Dynamic Orchestra gates only replacement recordings, not original-stem
 	});
 
 	test('source stem presets cannot address vocals or unknown busses',()=>{
-		expect(()=>orchestraPreset('debumont','vocals')).toThrow();
-		expect(orchestraPreset('debumont','bass').length).toBeGreaterThan(0);
+		expect(()=>orchestraPreset('debutmont','vocals')).toThrow();
+		expect(orchestraPreset('debutmont','bass').length).toBeGreaterThan(0);
 		expect(orchestraPreset('no-such-biome','guitar')).toEqual([]);
 	});
 });

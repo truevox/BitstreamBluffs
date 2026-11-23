@@ -14,6 +14,7 @@ import { createServices } from '../services.js';
 import { installFonts, FONT_KEY } from '../ui/PixelFont.js';
 import { installScanlineTexture } from '../ui/Scanlines.js';
 import { queueMenuArt } from '../ui/MenuArt.js';
+import { queueBackdropArt } from '../ui/BackdropArt.js';
 import { queueBillboardArt, prewarmBillboardArt } from '../entities/BillboardArt.js';
 
 export class PreloadScene extends Phaser.Scene {
@@ -27,6 +28,7 @@ export class PreloadScene extends Phaser.Scene {
       console.warn('[BitstreamBluffs] cosmetic art failed to load:', file && file.key);
     });
     queueMenuArt(this.load);
+    queueBackdropArt(this.load); // #65: Debutmont ridges / sky and the arcade bridge art (cosmetic, optional like the menu art)
     queueBillboardArt(this.load);
   }
 

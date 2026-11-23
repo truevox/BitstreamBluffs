@@ -1,0 +1,153 @@
+{
+ "node": "v22.23.5",
+ "N": 200000,
+ "accuracy": {
+  "sin": {
+   "samples": 200000,
+   "exact": 0.848895,
+   "le1": 1,
+   "le2": 1,
+   "maxUlp": 1
+  },
+  "cos": {
+   "samples": 200000,
+   "exact": 0.84115,
+   "le1": 1,
+   "le2": 1,
+   "maxUlp": 1
+  },
+  "tan": {
+   "samples": 200000,
+   "exact": 0.58429,
+   "le1": 0.98572,
+   "le2": 0.999985,
+   "maxUlp": 3
+  },
+  "atan": {
+   "samples": 200000,
+   "exact": 1,
+   "le1": 1,
+   "le2": 1,
+   "maxUlp": 0
+  },
+  "exp": {
+   "samples": 200000,
+   "exact": 1,
+   "le1": 1,
+   "le2": 1,
+   "maxUlp": 0
+  },
+  "expm1": {
+   "samples": 200000,
+   "exact": 0.752565,
+   "le1": 0.975805,
+   "le2": 0.998075,
+   "maxUlp": 4
+  },
+  "log": {
+   "samples": 200000,
+   "exact": 0.998735,
+   "le1": 1,
+   "le2": 1,
+   "maxUlp": 1
+  },
+  "log1p": {
+   "samples": 200000,
+   "exact": 0.89198,
+   "le1": 0.999985,
+   "le2": 1,
+   "maxUlp": 2
+  },
+  "tanh": {
+   "samples": 200000,
+   "exact": 0.825985,
+   "le1": 0.982545,
+   "le2": 0.998525,
+   "maxUlp": 5
+  },
+  "atan2": {
+   "samples": 200000,
+   "exact": 1,
+   "le1": 1,
+   "le2": 1,
+   "maxUlp": 0
+  },
+  "hypot": {
+   "samples": 200000,
+   "exact": 0.618175,
+   "le1": 0.993365,
+   "le2": 1,
+   "maxUlp": 2
+  },
+  "pow(x,0.45)": {
+   "samples": 200000,
+   "exact": 0.637505,
+   "le1": 0.97446,
+   "le2": 0.99996,
+   "maxUlp": 3
+  },
+  "pow(x,1.5)": {
+   "samples": 200000,
+   "exact": 0.308605,
+   "le1": 0.669165,
+   "le2": 0.882115,
+   "maxUlp": 8
+  },
+  "pow(x,3)": {
+   "samples": 200000,
+   "exact": 0.723875,
+   "le1": 0.999995,
+   "le2": 1,
+   "maxUlp": 2
+  },
+  "pow(0.5..2,y 0..20 non-int)": {
+   "samples": 200000,
+   "exact": 0.413355,
+   "le1": 0.75343,
+   "le2": 0.90286,
+   "maxUlp": 8
+  }
+ },
+ "speed": {
+  "sin": {
+   "nativeNs": 15.8,
+   "portableNs": 242.7
+  },
+  "cos": {
+   "nativeNs": 156.7,
+   "portableNs": 279.2
+  },
+  "tan": {
+   "nativeNs": 232.3,
+   "portableNs": 146.9
+  },
+  "atan": {
+   "nativeNs": 132.5,
+   "portableNs": 102.3
+  },
+  "atan2": {
+   "nativeNs": 158.7,
+   "portableNs": 194.9
+  },
+  "exp": {
+   "nativeNs": 160.6,
+   "portableNs": 122.4
+  },
+  "log": {
+   "nativeNs": 157.9,
+   "portableNs": 140.7
+  },
+  "tanh": {
+   "nativeNs": 107.1,
+   "portableNs": 210.3
+  },
+  "hypot": {
+   "nativeNs": 249.6,
+   "portableNs": 140.2
+  },
+  "pow": {
+   "nativeNs": 177.9,
+   "portableNs": 325.1
+  }
+ }
+}

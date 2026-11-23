@@ -1,0 +1,459 @@
+{
+ "stdlibDir": "STDLIB_DIR",
+ "packages": {
+  "@stdlib/math-base-special-acos": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-asin": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-atan": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-atan2": {
+   "version": "0.3.1",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-cbrt": {
+   "version": "0.2.3",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-cos": {
+   "version": "0.3.1",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-cosh": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-exp": {
+   "version": "0.2.5",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-expm1": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-hypot": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-ln": {
+   "version": "0.2.5",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-log10": {
+   "version": "0.3.1",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-log1p": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-log2": {
+   "version": "0.3.1",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-pow": {
+   "version": "0.3.1",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-sin": {
+   "version": "0.3.1",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-sinh": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-tan": {
+   "version": "0.3.1",
+   "license": "Apache-2.0"
+  },
+  "@stdlib/math-base-special-tanh": {
+   "version": "0.2.4",
+   "license": "Apache-2.0"
+  }
+ },
+ "bundle": {
+  "stdlibMinBytes": 85686,
+  "stdlibGzipBytes": 21585,
+  "pmathMinBytes": 6868,
+  "pmathGzipBytes": 3032
+ },
+ "golden": {
+  "node": {
+   "sin": "6e402d71",
+   "cos": "9cea6ba0",
+   "tan": "fddd8c5b",
+   "atan": "3c892d34",
+   "atan2": "1e296ebc",
+   "asin": "a5617ab1",
+   "acos": "451fa68f",
+   "exp": "b5ee486c",
+   "expm1": "112bbbf5",
+   "log": "8ea31ec8",
+   "log1p": "b83bd76c",
+   "pow": "4bb5727a",
+   "tanh": "b0bea8e1",
+   "sinh": "e4783a03",
+   "cosh": "c695a238",
+   "cbrt": "20c2377b",
+   "log2": "a814bc22",
+   "log10": "c3ff64b7",
+   "hypot": "b16ed1a0",
+   "special": "f65b499c"
+  },
+  "pmathNode": {
+   "sin": "6411b184",
+   "cos": "6a91ca36",
+   "tan": "9f1c5553",
+   "atan": "eb33bb80",
+   "atan2": "3f023161",
+   "asin": "8acb5860",
+   "acos": "6e0b74b8",
+   "exp": "b5ee486c",
+   "expm1": "036fa9a4",
+   "log": "23921e0f",
+   "log1p": "92466a71",
+   "pow": "6e078d5d",
+   "tanh": "0889c44f",
+   "sinh": "b327c1e3",
+   "cosh": "da91a380",
+   "cbrt": "32e09b1b",
+   "log2": "88e41acd",
+   "log10": "27b0492b",
+   "hypot": "f614356f",
+   "special": "15f727c8"
+  }
+ },
+ "accuracy": {
+  "sin": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsHostExact": 0.9913,
+   "stdlibVsPmathMaxUlp": 1,
+   "stdlibVsPmathExact": 0.8483
+  },
+  "cos": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsHostExact": 0.9903,
+   "stdlibVsPmathMaxUlp": 1,
+   "stdlibVsPmathExact": 0.8411
+  },
+  "sin(|x|<2e6)": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsHostExact": 0.9909,
+   "stdlibVsPmathMaxUlp": 973774001,
+   "stdlibVsPmathExact": 0.6943
+  },
+  "sin(|x|<1e9)": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsHostExact": 0.9905,
+   "stdlibVsPmathMaxUlp": 1580819033267,
+   "stdlibVsPmathExact": 0.0015
+  },
+  "tan": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsHostExact": 1,
+   "stdlibVsPmathMaxUlp": 3,
+   "stdlibVsPmathExact": 0.5852
+  },
+  "asin": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsHostExact": 0.9005,
+   "stdlibVsPmathMaxUlp": 2,
+   "stdlibVsPmathExact": 0.7171
+  },
+  "acos": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsHostExact": 0.801,
+   "stdlibVsPmathMaxUlp": 3,
+   "stdlibVsPmathExact": 0.6673
+  },
+  "atan": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsHostExact": 0.9721,
+   "stdlibVsPmathMaxUlp": 1,
+   "stdlibVsPmathExact": 0.9721
+  },
+  "exp": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsHostExact": 1,
+   "stdlibVsPmathMaxUlp": 0,
+   "stdlibVsPmathExact": 1
+  },
+  "expm1": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsHostExact": 1,
+   "stdlibVsPmathMaxUlp": 4,
+   "stdlibVsPmathExact": 0.7545
+  },
+  "log": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsHostExact": 1,
+   "stdlibVsPmathMaxUlp": 1,
+   "stdlibVsPmathExact": 0.9987
+  },
+  "log1p": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsHostExact": 1,
+   "stdlibVsPmathMaxUlp": 1,
+   "stdlibVsPmathExact": 0.8898
+  },
+  "log2": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsHostExact": 1,
+   "stdlibVsPmathMaxUlp": 1,
+   "stdlibVsPmathExact": 0.9788
+  },
+  "log10": {
+   "stdlibVsHostMaxUlp": 2,
+   "stdlibVsHostExact": 0.9572,
+   "stdlibVsPmathMaxUlp": 2,
+   "stdlibVsPmathExact": 0.8235
+  },
+  "tanh": {
+   "stdlibVsHostMaxUlp": 2,
+   "stdlibVsHostExact": 0.8813,
+   "stdlibVsPmathMaxUlp": 4,
+   "stdlibVsPmathExact": 0.8654
+  },
+  "sinh": {
+   "stdlibVsHostMaxUlp": 2,
+   "stdlibVsHostExact": 0.8861,
+   "stdlibVsPmathMaxUlp": 5,
+   "stdlibVsPmathExact": 0.8781
+  },
+  "cosh": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsHostExact": 0.9769,
+   "stdlibVsPmathMaxUlp": 1,
+   "stdlibVsPmathExact": 0.9768
+  },
+  "cbrt": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsHostExact": 1,
+   "stdlibVsPmathMaxUlp": 1,
+   "stdlibVsPmathExact": 0.8721
+  },
+  "atan2": {
+   "stdlibVsHostMaxUlp": 2,
+   "stdlibVsHostExact": 0.7507,
+   "stdlibVsPmathMaxUlp": 2,
+   "stdlibVsPmathExact": 0.7507
+  },
+  "hypot": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsHostExact": 1,
+   "stdlibVsPmathMaxUlp": 2,
+   "stdlibVsPmathExact": 0.6186
+  },
+  "pow(x,3)": {
+   "stdlibVsHostMaxUlp": 2,
+   "stdlibVsPmathMaxUlp": 0
+  },
+  "pow(x,0.32)": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsPmathMaxUlp": 3
+  },
+  "pow(x,0.45)": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsPmathMaxUlp": 3
+  },
+  "pow(x,7.3)": {
+   "stdlibVsHostMaxUlp": 1,
+   "stdlibVsPmathMaxUlp": 43
+  },
+  "pow(x,2)": {
+   "stdlibVsHostMaxUlp": 0,
+   "stdlibVsPmathMaxUlp": 0
+  }
+ },
+ "largeArgSin": {
+  "10000000": {
+   "host": 0.4205477931907825,
+   "stdlib": 0.4205477931907825,
+   "pmath": 0.42054779202831016
+  },
+  "1000000000": {
+   "host": 0.5458434494486996,
+   "stdlib": 0.5458434494486996,
+   "pmath": 0.5458434625587549
+  },
+  "1000000000000000": {
+   "host": 0.8582727931702359,
+   "stdlib": 0.8582727931702359,
+   "pmath": 0.850319789818452
+  },
+  "1e+22": {
+   "host": -0.8522008497671888,
+   "stdlib": -0.8522008497671888,
+   "pmath": 0
+  },
+  "1e+300": {
+   "host": -0.8178819121159085,
+   "stdlib": -0.8178819121159085,
+   "pmath": 0
+  }
+ },
+ "engines": {
+  "chromium": {
+   "stdlibGolden": {
+    "sin": "6e402d71",
+    "cos": "9cea6ba0",
+    "tan": "fddd8c5b",
+    "atan": "3c892d34",
+    "atan2": "1e296ebc",
+    "asin": "a5617ab1",
+    "acos": "451fa68f",
+    "exp": "b5ee486c",
+    "expm1": "112bbbf5",
+    "log": "8ea31ec8",
+    "log1p": "b83bd76c",
+    "pow": "4bb5727a",
+    "tanh": "b0bea8e1",
+    "sinh": "e4783a03",
+    "cosh": "c695a238",
+    "cbrt": "20c2377b",
+    "log2": "a814bc22",
+    "log10": "c3ff64b7",
+    "hypot": "b16ed1a0",
+    "special": "f65b499c"
+   },
+   "pmathGolden": {
+    "sin": "6411b184",
+    "cos": "6a91ca36",
+    "tan": "9f1c5553",
+    "atan": "eb33bb80",
+    "atan2": "3f023161",
+    "asin": "8acb5860",
+    "acos": "6e0b74b8",
+    "exp": "b5ee486c",
+    "expm1": "036fa9a4",
+    "log": "23921e0f",
+    "log1p": "92466a71",
+    "pow": "6e078d5d",
+    "tanh": "0889c44f",
+    "sinh": "b327c1e3",
+    "cosh": "da91a380",
+    "cbrt": "32e09b1b",
+    "log2": "88e41acd",
+    "log10": "27b0492b",
+    "hypot": "f614356f",
+    "special": "15f727c8"
+   },
+   "usPerTickMedian": {
+    "native": 3.84,
+    "pmath": 5.52,
+    "stdlib": 2.75
+   }
+  },
+  "firefox": {
+   "stdlibGolden": {
+    "sin": "6e402d71",
+    "cos": "9cea6ba0",
+    "tan": "fddd8c5b",
+    "atan": "3c892d34",
+    "atan2": "1e296ebc",
+    "asin": "a5617ab1",
+    "acos": "451fa68f",
+    "exp": "b5ee486c",
+    "expm1": "112bbbf5",
+    "log": "8ea31ec8",
+    "log1p": "b83bd76c",
+    "pow": "4bb5727a",
+    "tanh": "b0bea8e1",
+    "sinh": "e4783a03",
+    "cosh": "c695a238",
+    "cbrt": "20c2377b",
+    "log2": "a814bc22",
+    "log10": "c3ff64b7",
+    "hypot": "b16ed1a0",
+    "special": "f65b499c"
+   },
+   "pmathGolden": {
+    "sin": "6411b184",
+    "cos": "6a91ca36",
+    "tan": "9f1c5553",
+    "atan": "eb33bb80",
+    "atan2": "3f023161",
+    "asin": "8acb5860",
+    "acos": "6e0b74b8",
+    "exp": "b5ee486c",
+    "expm1": "036fa9a4",
+    "log": "23921e0f",
+    "log1p": "92466a71",
+    "pow": "6e078d5d",
+    "tanh": "0889c44f",
+    "sinh": "b327c1e3",
+    "cosh": "da91a380",
+    "cbrt": "32e09b1b",
+    "log2": "88e41acd",
+    "log10": "27b0492b",
+    "hypot": "f614356f",
+    "special": "15f727c8"
+   },
+   "usPerTickMedian": {
+    "native": 1.95,
+    "pmath": 4.4,
+    "stdlib": 4.15
+   }
+  },
+  "webkit": {
+   "stdlibGolden": {
+    "sin": "6e402d71",
+    "cos": "9cea6ba0",
+    "tan": "fddd8c5b",
+    "atan": "3c892d34",
+    "atan2": "1e296ebc",
+    "asin": "a5617ab1",
+    "acos": "451fa68f",
+    "exp": "b5ee486c",
+    "expm1": "112bbbf5",
+    "log": "8ea31ec8",
+    "log1p": "b83bd76c",
+    "pow": "4bb5727a",
+    "tanh": "b0bea8e1",
+    "sinh": "e4783a03",
+    "cosh": "c695a238",
+    "cbrt": "20c2377b",
+    "log2": "a814bc22",
+    "log10": "c3ff64b7",
+    "hypot": "b16ed1a0",
+    "special": "f65b499c"
+   },
+   "pmathGolden": {
+    "sin": "6411b184",
+    "cos": "6a91ca36",
+    "tan": "9f1c5553",
+    "atan": "eb33bb80",
+    "atan2": "3f023161",
+    "asin": "8acb5860",
+    "acos": "6e0b74b8",
+    "exp": "b5ee486c",
+    "expm1": "036fa9a4",
+    "log": "23921e0f",
+    "log1p": "92466a71",
+    "pow": "6e078d5d",
+    "tanh": "0889c44f",
+    "sinh": "b327c1e3",
+    "cosh": "da91a380",
+    "cbrt": "32e09b1b",
+    "log2": "88e41acd",
+    "log10": "27b0492b",
+    "hypot": "f614356f",
+    "special": "15f727c8"
+   },
+   "usPerTickMedian": {
+    "native": 1.3,
+    "pmath": 2.3,
+    "stdlib": 1.8
+   }
+  }
+ },
+ "goldenIdenticalAcrossEngines": true,
+ "pmathGoldenIdenticalAcrossEngines": true
+}

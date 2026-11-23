@@ -1,18 +1,18 @@
 {
-  "_doc": "Sync Level thresholds and rewards. Data-driven (W1). xpMin is the cumulative XP needed to REACH that level. Cap is the last entry. Biomes unlock in this order; W1 only lists them (W3/W6 make them playable).",
+  "_doc": "Sync Level thresholds and rewards. Data-driven (W1). xpMin is the cumulative XP needed to REACH that level. Cap is the last entry. Biomes unlock in this order; W1 only lists them (W3/W6 make them playable). Debutmont is the base biome (issue #65): granted at level 1, so it is unlocked from the first run.",
   "cap": 30,
   "levels": [
     {
       "level": 1,
       "xpMin": 0,
       "title": "Signal Virgin",
-      "biome": null,
+      "biome": "debutmont",
       "cosmetic": null,
       "boost": null
     },
     {
       "level": 2,
-      "xpMin": 100,
+      "xpMin": 80,
       "title": "Bit Runner",
       "biome": null,
       "cosmetic": "trail-cyan",
@@ -30,7 +30,7 @@
       "level": 4,
       "xpMin": 3750,
       "title": "Frame Pusher",
-      "biome": "debumont",
+      "biome": "garbage-dump-glacier",
       "cosmetic": null,
       "boost": null
     },
@@ -54,7 +54,7 @@
       "level": 7,
       "xpMin": 10525,
       "title": "Buffer Bandit",
-      "biome": "garbage-dump-glacier",
+      "biome": "pyramid-peak",
       "cosmetic": null,
       "boost": null
     },
@@ -78,7 +78,7 @@
       "level": 10,
       "xpMin": 20325,
       "title": "Sync Surfer",
-      "biome": "pyramid-peak",
+      "biome": "underwater-mountain",
       "cosmetic": null,
       "boost": null
     },
@@ -102,7 +102,7 @@
       "level": 13,
       "xpMin": 33000,
       "title": "Downlink Diver",
-      "biome": "underwater-mountain",
+      "biome": "crystal-cavern",
       "cosmetic": null,
       "boost": null
     },
@@ -126,7 +126,7 @@
       "level": 16,
       "xpMin": 48400,
       "title": "Wireless Wraith",
-      "biome": "crystal-cavern",
+      "biome": "space-mountain",
       "cosmetic": null,
       "boost": null
     },
@@ -150,7 +150,7 @@
       "level": 19,
       "xpMin": 66450,
       "title": "Terabit Titan",
-      "biome": "space-mountain",
+      "biome": "candy-cane-canyon",
       "cosmetic": null,
       "boost": null
     },
@@ -174,7 +174,7 @@
       "level": 22,
       "xpMin": 87100,
       "title": "Quantum Quill",
-      "biome": "candy-cane-canyon",
+      "biome": "sky-jellyfish-mountain",
       "cosmetic": null,
       "boost": null
     },
@@ -198,7 +198,7 @@
       "level": 25,
       "xpMin": 110275,
       "title": "Jellyfish Signal",
-      "biome": "sky-jellyfish-mountain",
+      "biome": "steampunk-slopes",
       "cosmetic": null,
       "boost": null
     },
@@ -206,7 +206,7 @@
       "level": 26,
       "xpMin": 118550,
       "title": "Steam Circuit",
-      "biome": "steampunk-slopes",
+      "biome": "micro-mountain",
       "cosmetic": "trail-amber",
       "boost": null
     },
@@ -214,7 +214,7 @@
       "level": 27,
       "xpMin": 127075,
       "title": "Micronaut",
-      "biome": "micro-mountain",
+      "biome": "vertigo-vents",
       "cosmetic": null,
       "boost": null
     },
@@ -222,7 +222,7 @@
       "level": 28,
       "xpMin": 135900,
       "title": "Vent Diver",
-      "biome": "vertigo-vents",
+      "biome": null,
       "cosmetic": null,
       "boost": null
     },
@@ -244,7 +244,7 @@
     }
   ],
   "biomeOrder": [
-    "debumont",
+    "debutmont",
     "garbage-dump-glacier",
     "pyramid-peak",
     "underwater-mountain",

@@ -15,7 +15,7 @@ const out = [];
 const line = (s) => out.push(s);
 
 const DEFS = [
-  { id: 'debumont', bit: 1, unlockLevel: 1 },
+  { id: 'debutmont', bit: 1, unlockLevel: 1 },
   { id: 'garbage-dump-glacier', bit: 2, unlockLevel: 4 },
   { id: 'pyramid-peak', bit: 4, unlockLevel: 7 },
   { id: 'underwater-mountain', bit: 8, unlockLevel: 13 },

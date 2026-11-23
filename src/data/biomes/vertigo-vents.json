@@ -2,7 +2,7 @@
   "id": "vertigo-vents",
   "bit": 1024,
   "name": "Vertigo Vents",
-  "unlockLevel": 28,
+  "unlockLevel": 27,
   "lore": "The mountain is breathing out. Do not argue with it.",
   "background": "vents",
   "mod": "geyserVent",

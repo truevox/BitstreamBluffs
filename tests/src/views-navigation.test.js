@@ -576,11 +576,11 @@ describe('F11: the Profile view draws locked biomes and keeps the toggles on the
     const t = titleHost({ [REG.PROFILE]: profile });
     const prof = openProfile(t);
     const all = texts(prof.panel);
-    expect(all).toContain('CANDY CANE CANYON'); // unlocks at 22
+    expect(all).toContain('SKY JELLYFISH MOUNTAIN'); // unlocks at 22
     expect(all).toContain('LVL 22');
-    expect(all).toContain('SIGNATURES UNLOCKED 6/11');
+    expect(all).toContain('SIGNATURES UNLOCKED 7/11');
     const m = prof.sigMenu;
-    expect(m.items.length).toBe(6);
+    expect(m.items.length).toBe(6); // seven unlocked, minus the base biome, which has no toggle
     for (const r of m.rows) {
       expect(m.x + r.label.x).toBeLessThan(prof.w);
       expect(m.y + r.label.y).toBeLessThan(prof.h - 34); // above the ACHIEVEMENTS n/29 line

@@ -2,7 +2,7 @@
   "id": "space-mountain",
   "bit": 32,
   "name": "Space Mountain",
-  "unlockLevel": 19,
+  "unlockLevel": 16,
   "lore": "The whole mountain is in freefall and so are you. Land late, land long.",
   "background": "stars",
   "mod": "lowGravity",

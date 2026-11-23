@@ -2,7 +2,7 @@
   "id": "candy-cane-canyon",
   "bit": 64,
   "name": "Candy Cane Canyon",
-  "unlockLevel": 22,
+  "unlockLevel": 19,
   "lore": "The stripes are pure sugar and they want you going faster than you can steer.",
   "background": "candy-stripes",
   "mod": "sugarRush",

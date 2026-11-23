@@ -129,7 +129,7 @@ describe('Twelve mountain identities', () => {
 		expect(a.getChannelData(0).slice(0,200)).toEqual(b.getChannelData(0).slice(0,200));
 		expect(createBiomeImpulse(ctx,'sky-jellyfish-mountain','mobile').length).toBeLessThanOrEqual(55200);
 		const bank = new ImpulseBank(ctx,2);
-		expect(bank.get('debumont')).toBe(bank.get('debumont'));
+		expect(bank.get('debutmont')).toBe(bank.get('debutmont'));
 		bank.get('crystal-cavern'); bank.get('pyramid-peak');
 		expect(bank.cache.size).toBe(2);
 	});

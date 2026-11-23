@@ -6,10 +6,13 @@
  * mask 0 no matter what the profile had enabled. She set a profile to Sync Level 30 with `biomeMask 31`,
  * pressed START RUN, and the registry mask was 0.
  *
+ * Issue #65 flips the default: unlocked biomes are ON unless the player explicitly turned them OFF
+ * (`biomeOff`), and the base biome (Debutmont) is the terrain of every run so its bit is never in the mask.
+ *
  * These tests pin the CALLER, the same way the D6 tests pin GameOverScene's call site rather than
  * re-testing SaveStore. The rule under test:
- *   explicit `maskOverride` (Daily) > `seed@mask` suffix > the profile's enabled-and-unlocked bits.
- * A locked biome's bit is never honoured, even if it is set in the profile.
+ *   explicit `maskOverride` (Daily) > `seed@mask` suffix > the profile's unlocked bits minus its OFF choices.
+ * A locked biome's bit is never honoured, whatever the profile carries.
  */
 import { jest } from '@jest/globals';
 jest.unstable_mockModule('phaser', () => ({ default: { Scene: class {}, GameObjects: new Proxy({}, { get: () => class {} }) } }));
@@ -18,7 +21,7 @@ const { TitleScene } = await import('../../src/scenes/TitleScene.js');
 const { REG, SCENES } = await import('../../src/constants.js');
 
 const DEFS = {
-  debumont: { id: 'debumont', bit: 1 },
+  debutmont: { id: 'debutmont', bit: 1 },
   glacier: { id: 'glacier', bit: 2 },
   pyramid: { id: 'pyramid', bit: 4 },
 };
@@ -39,25 +42,25 @@ function scene(o = {}) {
   return { ctx, values };
 }
 
-/** A profile at cap with every batch-1 bit enabled, i.e. the state CC Friday tested. */
+/** A profile at cap with every batch-1 biome unlocked and nothing switched OFF. */
 const capped = (over = {}) => ({
-  v: 1, biomeMask: 7, level: 30,
-  pendingBiomes: ['debumont', 'glacier', 'pyramid'],
+  v: 1, biomeOff: 0, level: 30,
+  pendingBiomes: ['debutmont', 'glacier', 'pyramid'],
   unlocked: { biomes: [], cosmetics: [], boosts: {} },
   ...over,
 });
 
 describe('START RUN / bare seed use the profile mask', () => {
-  test('a bare seed starts with the enabled unlocked bits, not 0', () => {
+  test('a bare seed starts with every unlocked biome ON by default (the base bit is left out)', () => {
     const { ctx, values } = scene({ profile: capped() });
     TitleScene.prototype.startRun.call(ctx, 'alpha');
-    expect(values.get(REG.BIOME_MASK)).toBe(7);
+    expect(values.get(REG.BIOME_MASK)).toBe(6);
     expect(values.get(REG.SEED)).toBe('alpha');
     expect(ctx.scene.start).toHaveBeenCalledWith(SCENES.RUN);
   });
 
-  test('a profile with nothing enabled runs at mask 0', () => {
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 0 }) });
+  test('a profile with every biome explicitly OFF runs at mask 0', () => {
+    const { ctx, values } = scene({ profile: capped({ biomeOff: 6 }) });
     TitleScene.prototype.startRun.call(ctx, 'alpha');
     expect(values.get(REG.BIOME_MASK)).toBe(0);
   });
@@ -69,17 +72,23 @@ describe('START RUN / bare seed use the profile mask', () => {
     expect(values.get(REG.BIOME_MASK)).toBe(0);
   });
 
-  test('a bit for a biome the profile has NOT unlocked is stripped', () => {
-    // The profile says 1|2|4 but only Debumont is unlocked (level 4). Honouring the glacier/pyramid
-    // bits would hand a low-level player terrain they never earned — the same rule toggleBiome enforces.
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7, pendingBiomes: ['debumont'] }) });
+  test('a biome the profile has NOT unlocked never starts ON, whatever the profile carries', () => {
+    // Only Debutmont is unlocked, so the glacier/pyramid bits must not appear, even next to a crafted
+    // legacy `biomeMask` of 7 or an OFF bit for a biome that is not unlocked. Same rule toggleBiome enforces.
+    const { ctx, values } = scene({ profile: capped({ biomeMask: 7, biomeOff: 4, pendingBiomes: ['debutmont'] }) });
     TitleScene.prototype.startRun.call(ctx, 'alpha');
-    expect(values.get(REG.BIOME_MASK)).toBe(1);
+    expect(values.get(REG.BIOME_MASK)).toBe(0);
+  });
+
+  test('a legacy biomeMask of 0 does not switch unlocked biomes off', () => {
+    const { ctx, values } = scene({ profile: capped({ biomeMask: 0 }) });
+    TitleScene.prototype.startRun.call(ctx, 'alpha');
+    expect(values.get(REG.BIOME_MASK)).toBe(6);
   });
 
   test('unlocked.biomes counts too, not just pendingBiomes', () => {
     const { ctx, values } = scene({
-      profile: capped({ biomeMask: 7, pendingBiomes: [], unlocked: { biomes: ['glacier'], cosmetics: [], boosts: {} } }),
+      profile: capped({ pendingBiomes: [], unlocked: { biomes: ['glacier'], cosmetics: [], boosts: {} } }),
     });
     TitleScene.prototype.startRun.call(ctx, 'alpha');
     expect(values.get(REG.BIOME_MASK)).toBe(2);
@@ -90,7 +99,7 @@ describe('an explicit mask wins over the profile', () => {
   test('the seed@mask suffix wins, so a shared seed reproduces exactly', () => {
     // This is what makes a share string shareable: the recipient must see the sender's world, not
     // their own unlocked set.
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7 }) });
+    const { ctx, values } = scene({ profile: capped() });
     TitleScene.prototype.startRun.call(ctx, 'alpha@2');
     expect(values.get(REG.SEED)).toBe('alpha');
     expect(values.get(REG.BIOME_MASK)).toBe(2);
@@ -99,7 +108,7 @@ describe('an explicit mask wins over the profile', () => {
   test('the suffix wins even when it is @0', () => {
     // `seed@0` is a deliberate request for base terrain, not an absent suffix. Treating 0 as "unset"
     // would make it impossible to share a clean-terrain run with a player who has biomes on.
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7 }) });
+    const { ctx, values } = scene({ profile: capped() });
     TitleScene.prototype.startRun.call(ctx, 'alpha@0');
     expect(values.get(REG.BIOME_MASK)).toBe(0);
   });
@@ -107,13 +116,13 @@ describe('an explicit mask wins over the profile', () => {
   test('a Daily override wins over both the suffix and the profile', () => {
     // D6: the Daily mask is derived from the date and is the same for every player. It must not be
     // overridden by local unlocks, or two players' Daily runs would be different worlds.
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7 }) });
+    const { ctx, values } = scene({ profile: capped() });
     TitleScene.prototype.startRun.call(ctx, 'alpha@2', 8);
     expect(values.get(REG.BIOME_MASK)).toBe(8);
   });
 
   test('a Daily mask 0 is honoured, not treated as absent', () => {
-    const { ctx, values } = scene({ profile: capped({ biomeMask: 7 }) });
+    const { ctx, values } = scene({ profile: capped() });
     TitleScene.prototype.startRun.call(ctx, 'daily-2026-11-13', 0);
     expect(values.get(REG.BIOME_MASK)).toBe(0);
   });

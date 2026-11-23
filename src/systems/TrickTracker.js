@@ -13,6 +13,7 @@
  */
 
 import { SCORING } from '../constants.js';
+import pmath from './pmath.js';
 
 /** Rotation counts as a full turn at 360 - tolerance degrees. */
 export const FLIP_TOLERANCE_DEG = 20;
@@ -317,7 +318,7 @@ export class TrickTracker {
     const pre = !crashFrame && Number.isFinite(state.impactVx) && Number.isFinite(state.impactVy);
     const vx = (pre ? state.impactVx : state.vx) || 0;
     const vy = (pre ? state.impactVy : state.vy) || 0;
-    const impact = Math.max(0, -vx * Math.sin(th) + vy * Math.cos(th));
+    const impact = Math.max(0, -vx * pmath.sin(th) + vy * pmath.cos(th));
     // residual visual coast / a key nudge is not an unfinished spin: needs a real spin attempt or the key still down
     // _heliMax is only updated in the airborne branch, so fold in the touchdown frame's own spin
     const spunDeg = Math.max(this._heliMax, Math.abs(this._heliNet), Math.abs(this._corkscrewNet));

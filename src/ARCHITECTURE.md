@@ -209,7 +209,7 @@ only gameplay emitter.
 | Event | Emitter | Listeners |
 |---|---|---|
 | `RUN_START` | RunScene | AudioSynth (switch music to biome-aware run DSP without restarting the current song), UIScene (reset HUD), GlitchPipeline |
-| `RUN_END` | RunScene | AudioSynth (neutral menu audio and Debumont lead; current song continues), UIScene |
+| `RUN_END` | RunScene | AudioSynth (neutral menu audio and Debutmont lead; current song continues), UIScene |
 | `RUN_ABORT` | PauseScene | AudioSynth (return to menu music without restarting) |
 | `CRASH`, `RESPAWN`, `LANDING`, `TRICK`, `HAZARD_HIT`, `POWERUP_COLLECTED`, `POWERUP_EXPIRED`, `EFFECT_END` | RunScene | AudioSynth (SFX), UIScene (popups/indicators) |
 | `COMBO_CHANGED`, `SCORE_CHANGED`, `DISTANCE_CHANGED` | RunScene (from ScoreManager results) | UIScene |
@@ -221,6 +221,9 @@ only gameplay emitter.
 | `INPUT_ACTION` | InputRouter | Title/Pause/GameOver scenes (menus), AudioSynth (unlock on first) |
 
 Gameplay input is **polled**: `inputRouter.poll()` once per frame in `RunScene.update` (it consumes one-shot edges).
+Since #115 the poll result also carries a non-enumerable `timeline` (timestamped hold changes since the last poll);
+`SimClock.padsFor(pad, ticks, { frameTime, timeline, normalize })` uses it to give each fixed tick the keyboard input
+whose `event.timeStamp` falls in that tick's window (see `docs/issue-115-fair-input.md`).
 Menu scenes use `INPUT_ACTION` (or Phaser keyboard, since menus are simple) - but menus must work with gamepad + touch
 too, so prefer `INPUT_ACTION`.
 
@@ -292,6 +295,11 @@ delta in ms. Conversions (helpers in `PhysicsTuner.js`, gameplay may fix them bu
 
 All additive; no existing signature or payload changed.
 
+* **VirtualPad** (#115, additive): `setButton(name, down, source, timeStamp?)` takes an optional event time on the
+  `performance.now()` clock; `poll()` snapshots carry a non-enumerable `timeline` `{ base, events, analog }`; exported
+  pure `deriveHeld(held, analog)` (implemented in the pure `systems/PadDerive.js`, with `eventTimeOnClock`).
+  `InputRouter.poll()` returns `timeline: null` while disabled. `TouchOverlay` passes pointer `timeStamp`s
+  (down / move / up / cancel / lostpointercapture) the same way keyboard does.
 * **VirtualPad**: `setTilt(value, source = 'gamepad')` has an optional 2nd arg (analog sources `'gamepad'` / `'device'`;
   largest magnitude wins; output is rescaled outside the 0.15 dead-zone). New: `releaseSource(source)`,
   `setOverlayContext(visible)`. New helper file `systems/TouchOverlay.js` (DOM only). The touch overlay is shown only
@@ -309,7 +317,7 @@ All additive; no existing signature or payload changed.
 * **AudioSynth** additive methods: `setSpeed(pxPerSec)` (music speed/intensity only; RunScene calls it every frame; BSOD event exclusively drives environmental wind),
   `setIntensity(0..1)`, and `startMenuMusic()` (called once by Title, requests immediate One More Run, browser user gesture permitting).
   The same playback clock runs through Title, gameplay, death, pause and menus; only mix/melody/biome DSP changes.
-  Menu uses unprocessed original accompaniment with Debumont melody and no speed/jump/BSOD DSP.
+  Menu uses unprocessed original accompaniment with Debutmont melody and no speed/jump/BSOD DSP.
   Settings `musicShuffle` persists through SaveStore; ON shuffles following enabled songs in non-repeating rounds,
   not the fresh-load One More Run opener. All songs OFF remains music silence.
   Music intensity also follows `DISTANCE_CHANGED` during runs only.
@@ -717,14 +725,56 @@ Biome rewards are playable from W3 for the batch-1 biomes (see the W3 addendum b
 ## Addendum: biomes (W3, terrain + meta; additive)
 
 Five batch-1 biomes, each a sector of ordinary terrain with one signature mechanic:
-Debumont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal Cavern.
+Debutmont, Garbage Dump Glacier, Pyramid Peak, Underwater Mountain and Crystal Cavern.
 
 **Selection is pure and cheap.** `biomeForSector(seed, sector, mask, defs)` answers from
 `(seed, sector, mask)` alone - never from how much terrain has been generated or in what order -
 so a chunk built late by streaming is identical to one built early. It draws from
 `Rng.fork('biome')`, an independent stream, so *asking* the question never advances the terrain,
-hazard or shard streams. Sectors 0-1 are always base Bitstream so every run opens the same way;
-from sector 2 a sector is base or one enabled biome, weighted 2.2:1 toward base.
+hazard or shard streams. Since #65 **Debutmont is the base biome** (`BASE_BIOME_ID`, one constant
+shared by terrain and profile, defined in `data/biomeAliases.js`): sectors 0-1, mask 0, a mask with no eligible biome and
+the base-weight draw (2.2:1) all answer Debutmont, never `null`. The home biome is left out of the eligible
+pool, so its mask bit is a no-op and it is never double-weighted. The draw count and order are unchanged,
+so every non-home pick for a seed and mask is what it was.
+
+**Arcade is the bridge between biomes (#65).** `biomeAtPosition(seed, xM, mask, defs)` is the biome at a position:
+the sector's biome, except the first `arcadeBridgeLengthM(sectorStart)` metres of a sector whose biome differs
+from the previous sector's, which are arcade (`null`). Length is 1/6 of `SECTOR_M` (~83 m) at the run start,
+rising linearly with the sector's start distance to 1/4 (125 m) at 5000 m, then capped
+(`ARCADE_BRIDGE_MIN_FRAC`, `ARCADE_BRIDGE_MAX_FRAC`, `ARCADE_BRIDGE_RAMP_M`). It depends on distance only, never on
+progression, input or BSOD, and draws nothing new, so the same seed and mask give everyone the same course
+(leaderboards, Daily, ghosts). **Chunk snapping and the cap:** the generator assigns a chunk by its start x, so a
+bridge is whole chunks: the first chunk of a changing sector (its breather) is always arcade, so every biome change
+has at least one bridge chunk, and a later chunk is arcade when it starts inside the window **and** ends within
+`ARCADE_BRIDGE_CAP_MUL` (1.5) x the target length of the bridge's own first chunk (~125 m at the start, 187.5 m
+from 5000 m). A chunk that would overrun the cap is built as the sector's biome instead (the generator replays the
+chunk's own def pick and length draw as arcade to ask: `_arcadeEndPx`), which ends the bridge. Measured over
+13648 bridges (400 seeds, 20 km, full mask): min 46 m, median 98 m, p95 131 m, max 187 m (before the cap: median 107 m, p95 258 m, max 320 m). The sector
+biome picks (`biome:${sector}`) are untouched by the cap. Bridge terrain is exactly the old
+arcade (null-biome) generation: no biome preference, zone or spawns; physics is unchanged. Every consumer asks
+the generator (`TerrainGenerator.biomeAtX(xPx)`, the chunk containing x) rather than computing a sector biome:
+`RunScene` palette, motif, `BIOME_ENTER` (fires on entering Debutmont at the start, each bridge as
+`{id:null, entering:false}`, and each biome after it) and `bsodAtmosphere`. `detectBiomeVisits` asks the same
+generator answer (`biomeAt: (x) => terrain.biomeAtX(x)`), so discovery and the drawn terrain agree at bridge edges. `tools/sim/biome-layout.mjs` prints the layout.
+Terrain for a given seed and mask changed, so `SIM_REVISION` is 5 (the ruleset time capsule, `src/systems/replay/ruleset.js`); `GHOST_PHYSICS_VERSION` stays 1 (Replay Contract v1 section 7.2: it is kept only for legacy tape mapping).
+
+**Bridge presentation (#65, cosmetic only).** `TerrainGenerator.bridgeSpanAt(xPx)` is a read-only scratch query for the bridge
+containing x (`{startX, endX, fromId, toId}`, or null). `systems/BiomeTransition.js` (pure: no time, state or RNG) turns the sled's x
+within that span into a look: over the first 25 % of the bridge the outgoing biome dissolves into a pixel-block veil (veil
+0 -> 1, an 8x8 Bayer ordered dither of 16 px blocks), the middle is pure arcade, over the last 25 % the incoming biome is revealed
+(veil 1 -> 0); the look (palette / motif / glitch set) only changes while the veil is full. Reduced motion (`ui/Motion.isReducedMotion`)
+is the hard cut: the veil is on for the whole bridge and the look is the generator's. `RunScene._updateLook` applies it;
+`BIOME_ENTER`, discovery, music and every gameplay consumer keep asking the generator. A look change inside a bridge calls
+`refreshPalette()`, which repaints the terrain graphics only (`TerrainMesh.redrawChunk`; since #140 no repaint touches a collider),
+so the dissolve cannot affect the simulation whatever the effects setting.
+`entities/BiomeFx.js` draws behind the play layer (one screen-space container at depth -99): Debutmont (dithered-sky and ridgeline SVGs,
+blocky pixel snow, an occasional scanline shimmer; `Background` skips its own sky bands and ridges via `setSkin('pixel')`), Garbage Dump
+Glacier (trash blocks and colour-channel-offset fragments), and the arcade bridge (veil blocks, dithered sky, sun, skyline, neon
+perspective grid, CRT scanlines). Typed-array pools, whole-pixel positions, no per-frame allocation; reduced motion stops the
+time-driven parts. Randomness is the cosmetic stream `cosmeticRandom('biomefx')`. The art is `public/assets/backdrop/*.svg`, generated by
+`tools/backdrop-art/generate-backdrop-art.mjs` (greyscale, pixel-aligned, tinted from the live palette like the menu art; loaded by
+`ui/BackdropArt.js`, optional). Tests: `biome-transition.test.js`, `biome-fx-cosmetic.test.js` (terrain digests and the repaint schedule
+identical with the effects on, off or absent). `tools/sim/shots.mjs bridge` takes the before/after shots.
 
 **A biome's chunk templates are a preference, not a filter.** If its templates are not eligible
 at that distance the sector still gets ordinary terrain, so a biome can never leave a hole in
@@ -766,7 +816,7 @@ Gate harness: `node tools/sim/shots.mjs progression <dir>` (`tools/sim/shots-pro
 
 ## Missions
 
-`Missions.js` implements deterministic mission selection and evaluation. It seeds draws from the profile mission counter, sorts eligible templates by ID, and filters biome- and rule-ineligible templates. Tier determines the reward multiplier AND gates offerability by Sync Level (D7): `missions.json` carries a `tierUnlock` map of tier → minimum Sync Level (tier 1 at level 1, tier 2 at 3, tier 3 at 6, tier 4 at 10), and `drawMissions` drops templates above the profile's unlocked tier before the seeded pick. Thresholds live in data so they can be tuned without a code change; tier 1 is always open. If the unlocked tiers cannot fill three slots, the draw widens only up to the highest tier at or below the profile's ceiling, never above it — D7's wording is "fall back to the highest unlocked tier, never an empty slot", so a thin pool may return fewer than three missions rather than leak a tier the player has not unlocked. Gating never re-rolls or drops a mission already in a slot: a profile that drew a tier-3 mission before this rule existed keeps it and keeps its progress, and only its refills are gated. `MissionsService` publishes active mission progress through `REG.MISSIONS` and sends live completion notifications; `ProgressionService` invokes its payout path only after a run has been credited, so replaying a credited run cannot pay a mission twice. Mission state and rewards persist in `bb.profile`. Title, Pause and Game Over render the published view; HUD notifications share the milestone strip.
+`Missions.js` implements deterministic mission selection and evaluation. It seeds draws from the profile mission counter, sorts eligible templates by ID, and filters biome- and rule-ineligible templates. Tier determines the reward multiplier AND gates offerability by Sync Level (D7): `missions.json` carries a `tierUnlock` map of tier → minimum Sync Level (tier 1 at level 1, tier 2 at 3, tier 3 at 6, tier 4 at 10), and `drawMissions` drops templates above the profile's unlocked tier before the seeded pick. Thresholds live in data so they can be tuned without a code change; tier 1 is always open. If the unlocked tiers cannot fill three slots, the draw widens only up to the highest tier at or below the profile's ceiling, never above it — D7's wording is "fall back to the highest unlocked tier, never an empty slot", so a thin pool may return fewer than three missions rather than leak a tier the player has not unlocked. Gating never re-rolls or drops a mission already in a slot: a profile that drew a tier-3 mission before this rule existed keeps it and keeps its progress, and only its refills are gated. `MissionsService` publishes active mission progress through `REG.MISSIONS` and sends live completion notifications; `ProgressionService` invokes its payout path only after a run has been credited, so replaying a credited run cannot pay a mission twice. A template with `needsBridges` (#65, "Ride 3 arcade bridges", metric `bridges`) is offered only when the profile has earned a biome besides the base one and has not switched every earned biome OFF (no bridge can exist otherwise). `MissionsService` counts it live from `BIOME_ENTER {id:null}` (RunScene's once-per-entry bridge announcement; the opening Debutmont enter has an id), resets it on `RUN_START`, and hands the total to the roll as `bridges` beside the RunRecord, which does not carry it (so no ledger hash changes). Likewise `pickups` (power-ups collected this run by id, counted from `POWERUP_COLLECTED`) feeds "Grab 3 Maple Wax in a run" (`t4-pickup-maple-wax`, metric `pickups`, `pickup: mapleWax`); it replaced the trivial "1500 m in Debutmont", and `ProfileStore` migrates an active old `t4-biome-debutmont` to it (`RETIRED_MISSIONS`). Meta only: nothing in the simulation reads either counter. Mission state and rewards persist in `bb.profile`. Title, Pause and Game Over render the published view; HUD notifications share the milestone strip.
 
 ## Addendum: shop autoprompt (W4.1, additive)
 
@@ -989,13 +1039,13 @@ Closing restores the footer text and depth. With the shop closed nothing changed
 
 ## Addendum: biome full treatment, B1 "Wards" (content + slot rule; additive)
 
-B1 ships the first biome content: one hazard and one power-up for each of Debumont, Garbage Dump Glacier, Underwater
+B1 ships the first biome content: one hazard and one power-up for each of Debutmont, Garbage Dump Glacier, Underwater
 Mountain and Candy Cane Canyon (spec §4). Mask 0 is byte-identical (golden `shape` / `full` / `complete` unchanged): every
 def below carries a `biome` field, so the B0 constructor filter keeps it out of the base lists.
 
 | Biome (bit) | Hazard (file) | Hazard effect | Power-up (file) | Power-up effect |
 |---|---|---|---|---|
-| Debumont (1) | `groomerCat` (`groomer-cat.json`), ground 24x20, shape `groomer`, amber | `slow` 0.7 x 900 ms | `mapleWax` (`maple-wax.json`), shape `maple` | `speedBoost` 1.2 x 2 s |
+| Debutmont (1) | `groomerCat` (`groomer-cat.json`), ground 24x20, shape `groomer`, amber | `slow` 0.7 x 900 ms | `mapleWax` (`maple-wax.json`), shape `maple` | `speedBoost` 1.2 x 2 s |
 | Garbage Dump Glacier (2) | `seagullDive` (`seagull-dive.json`), air 40x24 in jump arcs, shape `seagull`, `danger`, >= 1000 m | `crash` | `slickWaxSpray` (`slick-wax-spray.json`), shape `waxSpray` | `ward` mods `['stickyPatch']` 4 s + `speedFactor` 1.1 |
 | Underwater Mountain (8) | `seaweedTangle` (`seaweed-tangle.json`), ground 22x30, shape `seaweed`, lime | `slow` 0.6 x 1.2 s | `aquaLungBubble` (`aqua-lung-bubble.json`), shape `bubble` | `ward` mods `['slowMotion']` 4 s |
 | Candy Cane Canyon (64) | `chocolateRiver` (`chocolate-river.json`), ground strip 24x8, shape `chocoRiver`, amber | `slow` 0.5 x 1.5 s | `sweetToothCoating` (`sweet-tooth-coating.json`), shape `candyCoat` | `ward` effects `['slow']` 5 s (wards off the Chocolate River) |
@@ -1139,10 +1189,10 @@ outside this change's files. The fix is to use `DailyPatch.dailyRunLabel(seed, p
 Decision 3: "Biome discovery means actually encountering the biome; track unlocked, encountered, and completed separately."
 
 - **Unlocked** is unchanged: the Sync Level unlock (`ProfileStore.unlockedBiomeIds`, from `pendingBiomes`).
-- **Encountered:** the sled's x reached a sector `s` with `biomeForSector(seed, s, mask) === id`. The sector rule is the generator's own (`floor(x / ppm / SECTOR_M)`, the same as `_sectorOf` and BIOME_ENTER).
+- **Encountered:** the sled's x reached a stretch the generator answers with `id` (`terrain.biomeAtX`), i.e. past the arcade bridge that opens the biome's sector when the previous sector differs (#65). The sector rule is the generator's own (`floor(x / ppm / SECTOR_M)`, the same as `_sectorOf`). Debutmont is the base, so it is encountered from sector 0 at any mask (there is no mask-0 early return); arcade is never recorded.
 - **Completed:** the sled rode one of that biome's sectors from its start to its end (`SECTOR_M`, 500 m), and the run's crash is not inside that sector. Only the run-ending crash counts. A crash absorbed by a Hashed Backup, or an opening-grace recovery, does not void completion, because the run went on. Completed implies encountered.
 
-**Detection** is the pure `BiomeDiscovery.detectBiomeVisits({seed, biomeMask, biomeDefs, furthestX, crashX, pxPerMeter})`, which returns `{encountered, completed}` in canonical `BIOME_IDS` order.
+**Detection** is the pure `BiomeDiscovery.detectBiomeVisits({biomeAt, furthestX, crashX, pxPerMeter})` (`biomeAt` is the run's `terrain.biomeAtX`; each sector 0..furthest is probed once), which returns `{encountered, completed}` in canonical `BIOME_IDS` order.
 - The sled moves forward through sectors and a respawn never skips one, so every sector from 0 to `sectorOfX(furthestX)` was entered. Sector `s` was crossed to its end if and only if the furthest sector is past `s`.
 - `BIOME_IDS` is a static list, pinned by a test to `src/data/biomes` and to `levels.json` `biomeOrder`. The sanitizer must not depend on the level table it is handed: the fallback table's empty `biomeOrder` would erase every encounter on the next save.
 
@@ -1322,17 +1372,24 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
   * `hazardResponse(def)` -> `'hop'` (crash, or no `onHit`) | `'brace'` (any other effect) | `null` (air: not ours).
   * `warnDistancePx(speedPxS)` -> `clamp(speed x leadS, minPx, maxPx)`.
   * `inHopWindow(dx, vx)`: the oracle's rule, `hopLeadMs - hopWindowMs < dx / max(vx, 60) x 1000 <= hopLeadMs`.
-  * `planTelegraph(hazards, sled, viewRight, {isMuted}?)` -> `TelegraphMark[]`, nearest first, at most `maxMarks`:
-    `{ref, kind, state: 'warn'|'go'|'clear', color: 'danger'|'amber'|'lime', clear, dx, etaS, urgency, onScreen}`. Skips hit,
+  * `planTelegraphMarks(hazards, sled, {isMuted}?)` -> `TelegraphMark[]`, nearest first, at most `maxMarks`:
+    `{ref, kind, state: 'warn'|'go'|'clear', color: 'danger'|'amber'|'lime', clear, dx, etaS, urgency}`. Skips hit,
     passed, air and muted hazards. `go` (lime) only for a grounded sled inside the hop window. `clear` when airborne and
-    the ballistic touchdown (`sled.landX`) is more than `clearMarginPx` past the box.
+    the ballistic touchdown (`sled.landX`) is more than `clearMarginPx` past the box. The former explicit-right-edge
+    `planTelegraph` adapter still supplies an `onScreen` hint to historical diagnostics, but live code doesn't use it.
   * `TelegraphTracker.update(nowMs, marks)` -> events `{type: 'warn'|'go', kind, ref, sound}`: `warn` once per hazard at its
     first non-clear mark (`sound` false when another warn sounded under `warnGapMs` ago), `go` once when it first turns lime.
-    `firstWarnMs(ref)`.
-* **`entities/GroundTelegraph.js`** (drawing only; does not import Phaser): `update(timeMs, marks, view, zoom, heightAt)`,
-  `setPalette`, `destroy`. Off-screen mark: a badge at `view.right - EDGE_INSET_PX / zoom` on the terrain line (glyph by
+    `firstWarnMs(ref)`. State is plain data keyed by the stable hazard id `Hazard.hid` (`${chunk.index}:${spawn ordinal}`, set in
+    `RunScene.takeChunk`; a hazard without one throws), never by object identity: `snapshot()` / `restore(snap)` (JSON-safe,
+    versioned) and `forgetChunk(index)` (called from `dropChunk`). `RunScene.snapshotTelegraph()` / `restoreTelegraph(snap)` wrap them and
+    re-stamp `teleAtMs` on the rebuilt hazards (#119 Phase 2).
+* **`entities/GroundTelegraph.js`** (drawing only; does not import Phaser): `update(timeMs, marks, view, zoom, activeChunks)`,
+  `setPalette`, `destroy`. If the arrow footprint would clip in the current view, draw a badge at
+  `view.right - EDGE_INSET_PX / zoom` on the terrain line (glyph by
   `BiomeEffects.hazardDrawKind`, marching chevrons, proximity bar, response cue), stacked upward, at most `EDGE_MAX_STACK` (3).
-  On-screen mark: a light column on the box (shortened to stay inside the view) with the cue on top. Cue shapes repeat the
+  The stem reads already-streamed polyline points or falls back to mid-view, never asking the generator to stream from a camera position.
+  The nearest clipped hop-now cue gets the first (response-bearing) slot, even among earlier warnings.
+  Otherwise, draw a light column on the box (shortened to stay inside the view) with the cue on top. Cue shapes repeat the
   colour: open up-chevrons = hop, filled up-arrow = hop now, two bars = brace. Every size is game px (480 x 270) / zoom.
 * **`RunScene`**: `updateGroundTelegraph(now)` is called from `updateFun` (live frames only) right after the air telegraph:
   it plans the marks (muting warded hazards via `Wards.isWarded` by id and by effect; `landX` from `sled.airEtaMs`), plays
@@ -1356,7 +1413,7 @@ Drop 1. At chance 0.5 the boulder took mask 4 hop survival to 15/48 (-16.7 %), h
 * `inHopWindowMs(etaMs)`: the oracle's window in time. `gateVerdict(h, arrivalMs)` -> `'open'` when `isPassable` holds at
   `arrivalMs - gateMarginMs` and `gateNextChangeMs` there exceeds `2 x gateMarginMs`, else `'closed'`; `null` without the
   gate API (or when `gateNextChangeMs` returns null).
-* `planTelegraph(..., {isMuted, nowMs})`: marks gain `arrivalMs` (null without `nowMs`) and `gate`; `etaS` and the lime
+* `planTelegraphMarks(..., {isMuted, nowMs})`: marks gain `arrivalMs` (null without `nowMs`) and `gate`; `etaS` and the lime
   window come from `predictArrival`; `clear` compares `landX` with `cxAtArrival`; new state `'open'` (gate open at
   arrival: drawn dim with still chevrons, silent in `TelegraphTracker`, never lime). `RunScene.updateGroundTelegraph`
   passes `nowMs: runTimeMs` (the time base of `Hazard.stepMotion`).

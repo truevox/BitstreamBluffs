@@ -1,0 +1,37 @@
+{
+  "id": "long-airborne",
+  "description": "Long airborne run with airbrake / parachute / helicopter input: launch off the generated lip and stay up on the canopy while flying with the helicopter and air brake.",
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "startX": 17900,
+  "hz": 120,
+  "durationMs": 5600,
+  "input": {
+    "held": [
+      {
+        "key": "push",
+        "from": 0,
+        "to": 700
+      },
+      {
+        "key": "parachute",
+        "from": 2000,
+        "to": 3800
+      },
+      {
+        "key": "heli",
+        "value": 1,
+        "from": 2100,
+        "to": 2600
+      },
+      {
+        "key": "airBrake",
+        "from": 2800,
+        "to": 3300
+      }
+    ],
+    "edges": [],
+    "events": []
+  },
+  "notes": "VERIFIED 2026-11-21. Genuinely long airtime with canopy control off the real lip at x=18464: 2350 ms airborne, and three control tricks register from the tape's own input - parachute@276, helicopterCW@313, airBrake@366 - before a 'good' landing at tick 478 (air 2358 ms). No crash; score 774."
+}

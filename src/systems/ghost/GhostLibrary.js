@@ -11,6 +11,7 @@
  * Bazaar publishing (#58) will be a separate, explicit action.
  */
 import { GHOST_TAPE_FORMAT, GHOST_TAPE_VERSION, GHOST_PHYSICS_VERSION, courseKey } from './GhostTape.js';
+import { KODIAK_VERSION } from '../Kodiaks.js';
 import { SIM_TICK_HZ } from '../SimClock.js';
 
 export const GHOST_DB = 'bitstream-ghosts';
@@ -24,10 +25,11 @@ const req2p = (req) => new Promise((resolve, reject) => {
   req.onerror = () => reject(req.error || new Error('idb request failed'));
 });
 
-/** A tape this build can draw: right format, version, tick rate and physics. */
+/** A tape this build can draw: right format, version, tick rate and physics. A Kodiak run from another bear ruleset (contact crashed before v3) would not replay. */
 export function tapeCompatible(tape) {
   return Boolean(tape && tape.format === GHOST_TAPE_FORMAT && tape.version === GHOST_TAPE_VERSION &&
-    tape.simTickHz === SIM_TICK_HZ && tape.physicsVersion === GHOST_PHYSICS_VERSION && typeof tape.trace === 'string');
+    tape.simTickHz === SIM_TICK_HZ && tape.physicsVersion === GHOST_PHYSICS_VERSION && typeof tape.trace === 'string' &&
+    (tape.kodiaksOn !== true || tape.kodiakVersion === KODIAK_VERSION));
 }
 
 function emptyCourse(key, tape) {
@@ -97,12 +99,30 @@ export class GhostLibrary {
     course.favorites = [...course.favorites];
     const before = new Set(courseGhostRuns(course).map((g) => g.runId));
     course.latest = tape.runId;
-    if (tape.distanceM > course.bestDistanceM) { course.best = tape.runId; course.bestDistanceM = tape.distanceM; }
+    // Terrain/ruleset revisions are distinct courses for competitive Best
+    // purposes even when their seed and mask are identical. An old-terrain
+    // distance must not permanently outrank every fresh-terrain tape.
+    const oldBest = course.best ? await this.getTape(course.best) : null;
+    const staleBest = Number.isSafeInteger(tape.simRevision) && tape.simRevision > 0 &&
+      course.best && oldBest?.simRevision !== tape.simRevision;
+    if (staleBest || tape.distanceM > course.bestDistanceM) {
+      course.best = tape.runId;
+      course.bestDistanceM = tape.distanceM;
+    }
     course.lastPlayedAt = tape.endedAt || Date.now();
     await this._putTape(tape);
     await this._putCourse(course);
     const after = new Set(courseGhostRuns(course).map((g) => g.runId));
-    for (const runId of before) if (!after.has(runId)) await this._collect(runId);
+    for (const runId of before) {
+      if (after.has(runId)) continue;
+      // Preserve displaced legacy/other-revision tapes for explicit replay
+      // tools and later historical analysis, even though current gameplay
+      // no longer draws them. Normal same-revision role GC is unchanged.
+      const previous = await this.getTape(runId);
+      if (Number.isSafeInteger(tape.simRevision) && tape.simRevision > 0 &&
+          previous && previous.simRevision !== tape.simRevision) continue;
+      await this._collect(runId);
+    }
     return course;
   }
 
@@ -132,17 +152,25 @@ export class GhostLibrary {
   /**
    * Ghosts to draw on a course: deduped runs with their roles, filtered by `show`
    * (role -> boolean) and the course's own `show` switches; a run shows if any of its roles is shown.
-   * Compatible tapes only.
+   * Compatible tapes only. `simRevision` is a display-only current-terrain
+   * gate; leave `tapeCompatible` and direct getTape/manifest replay unchanged.
+   * When present, an invalid revision refuses all display candidates.
+   * Omitting the fourth argument preserves the legacy tool/library API.
    */
-  async ghostsFor(seed, biomeMask = 0, show = {}) {
+  async ghostsFor(seed, biomeMask = 0, show = {}, { simRevision } = {}) {
     const out = [];
+    if (simRevision !== undefined && (!Number.isSafeInteger(simRevision) || simRevision < 1)) return out;
     const course = this.course(seed, biomeMask);
     // A role shows when both the player's global switch (`show`) and the course's own switch allow it.
     const visible = (r) => show[r] !== false && course?.show?.[r] !== false;
     for (const g of courseGhostRuns(course)) {
       if (!g.roles.some(visible)) continue;
       const tape = await this.getTape(g.runId);
-      if (tapeCompatible(tape)) out.push({ ...g, tape });
+      // No silent legacy->current simulation identity inference. Old or
+      // unstamped trace poses can float/clip on the revised terrain.
+      if (tapeCompatible(tape) && (simRevision === undefined || tape.simRevision === simRevision)) {
+        out.push({ ...g, tape });
+      }
     }
     return out;
   }

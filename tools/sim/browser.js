@@ -45,13 +45,14 @@
   let mods = null;
   async function loadMods() {
     if (mods) return mods;
-    const [ev, con, tun] = await Promise.all([
+    const [ev, con, tun, combo] = await Promise.all([
       import('/src/events.js'), import('/src/constants.js'), import('/src/systems/PhysicsTuner.js'),
+      import('/tools/sim/canopy-combo.js'),
     ]);
     const dyn = await import('/src/systems/DailyPatch.js');
     mods = {
       EVT: ev.EVT, REG: con.REG, PPM: con.PIXELS_PER_METER, TUNING: tun.TUNING, airIdleSpin: tun.airIdleSpin,
-      DAILY_RULES: dyn.DailyPatch.RULES,
+      DAILY_RULES: dyn.DailyPatch.RULES, canopyBrakeDescent: combo.canopyBrakeDescent,
     };
     return mods;
   }
@@ -79,7 +80,7 @@
   }
 
   function makePolicies(M) {
-    const { TUNING, PPM, airIdleSpin } = M;
+    const { TUNING, PPM, airIdleSpin, canopyBrakeDescent } = M;
     let policies_hop = null;
     const policies = {
       /** No input at all. */
@@ -215,6 +216,18 @@
         };
       },
 
+      /** Controlled ablation: same hazard-aware hops, then airbrake and canopy during descent. */
+      canopyHop(p) {
+        const hops = policies.hop(p);
+        return (c) => canopyBrakeDescent(c.sled, hops(c));
+      },
+
+      /** Issue #214: a staged flip + canopy + airbrake script, not an optimized player. */
+      canopyFlip(p) {
+        const flips = policies.flip(p);
+        return (c) => canopyBrakeDescent(c.sled, flips(c));
+      },
+
       /**
        * Brake to a dead stop on gentle ground, release, watch the stall nudge. Records into c.probe.
        * --probeKind picks WHERE the stop happens: the brake is held to a dead stop only while the ground slope (deg, + = downhill) is inside the
@@ -287,13 +300,14 @@
     const policy = policies[policyName](params);
     const withNoise = o.noiseProfile !== undefined;
     const playback = withNoise && o.noiseReplay !== undefined;
+    const fatigue = withNoise && o.noiseFatigue === true;
     let ghost, noiseApi, planner, inputRecorder;
     if (withNoise) {
       if (policyName !== 'hop') throw new Error('Human-noise simulation only supports hop');
       [ghost, noiseApi] = await Promise.all([
         import('/src/systems/ghost/GhostTape.js'), import('/tools/sim/human-noise.js'),
       ]);
-      if (!playback) planner = noiseApi.makeHopNoise(o.noiseProfile, o.seed, o.noiseSeed);
+      if (!playback) planner = noiseApi.makeHopNoise(o.noiseProfile, o.seed, o.noiseSeed, { fatigue });
       inputRecorder = new ghost.GhostRecorder({
         seed: o.seed, biomeMask: o.biomeMask >>> 0, mode: 'normal',
         boosts: [], upgradeRanks: null, magnetsDrop: false, kodiaksOn: false, kodiakPackMode: 'same',
@@ -375,6 +389,8 @@
       maxSpeed: 0, maxSpeedAtM: 0, minZoom: 99, minZoomAtM: 0, zoomAtMaxSpeed: 0,
       bands: {}, generatedToM: 0, openingGraces: 0, trace: [],
       shards: 0, nearMisses: 0, score: 0, scoreAt: 0, tricks: {}, maxAirtimeMs: 0, bestCombo: 1,
+      inputActivity: { airborneFrames: 0, tiltFrames: 0, airBrakeHeldFrames: 0, airBrakeActiveFrames: 0, parachuteHeldFrames: 0, parachuteActiveFrames: 0, overlapHeldFrames: 0, overlapActiveFrames: 0 },
+      minBsodGapPx: null, finalBsodGapPx: null, bsodActiveFrames: 0,
     };
     let tMs = 0; // run clock as the harness sees it (frames * DT)
     let lastLanding = null;
@@ -382,6 +398,8 @@
     let lastAir = null; // last finished air phase
     let air = null;
     let prevGrounded = true;
+    let prevAirBrakeHeld = false;
+    let prevParachuteHeld = false;
     let lastHopFrame = -1e9;
     let prevGraces = 0;
     let prevNudging = false;
@@ -564,9 +582,15 @@
         if (out.tilt != null) np.tilt = out.tilt;
         if (out.brake) np.brake = true;
         if (out.tuck) np.tuck = true;
+        if (out.airBrake) np.airBrake = true;
+        if (out.parachute) np.parachute = true;
         if (!withNoise && out.hop) { np.hop = true; np.pressed.hop = true; lastHopFrame = frame; }
       }
       if (planner?.step(frame, !!out?.hop)) np.hop = np.pressed.hop = true;
+      np.pressed.airBrake = np.airBrake && !prevAirBrakeHeld;
+      np.pressed.parachute = np.parachute && !prevParachuteHeld;
+      prevAirBrakeHeld = np.airBrake;
+      prevParachuteHeld = np.parachute;
       curPad = np;
 
       game.headlessStep(tMs, DT);
@@ -577,11 +601,34 @@
       // ---- observe
       const s = scene.sled;
       const distM = distOf(s.x);
+      // This reads the authoritative pursuit snapshot AFTER the game tick; it
+      // never moves the BSOD or changes gameplay. At 60 Hz, this is a sampled
+      // minimum, not a guarantee about the unsampled 120 Hz substep.
+      const pursuit = scene.bsodState;
+      if (pursuit?.active && Number.isFinite(pursuit.gapPx)) {
+        R.bsodActiveFrames++;
+        R.finalBsodGapPx = pursuit.gapPx;
+        R.minBsodGapPx = R.minBsodGapPx === null ? pursuit.gapPx : Math.min(R.minBsodGapPx, pursuit.gapPx);
+      }
       if (s.speed > R.maxSpeed) { R.maxSpeed = s.speed; R.maxSpeedAtM = distM; R.zoomAtMaxSpeed = scene.cameras.main.zoom; }
       const z = scene.cameras.main.zoom;
       if (z < R.minZoom) { R.minZoom = z; R.minZoomAtM = distM; }
       scanChunks();
 
+      // Observed controls in real simulator steps. A policy name is not evidence
+      // that its canopy, brake or trick actually engaged. These are 60 Hz
+      // *frame samples*, not falsely precise 120 Hz substep durations.
+      if (!s.grounded) {
+        const a = R.inputActivity;
+        a.airborneFrames++;
+        if (np.tilt) a.tiltFrames++;
+        if (np.airBrake) a.airBrakeHeldFrames++;
+        if (s.airBrakeActive) a.airBrakeActiveFrames++;
+        if (np.parachute) a.parachuteHeldFrames++;
+        if (s.parachuteMs > 0) a.parachuteActiveFrames++;
+        if (np.airBrake && np.parachute) a.overlapHeldFrames++;
+        if (s.airBrakeActive && s.parachuteMs > 0) a.overlapActiveFrames++;
+      }
       const g = s.grounded;
       if (!g && prevGrounded) {
         air = { ang0: s.angleDeg, lastAng: s.angleDeg, startM: distM, speed0: s.speed, vy0: s.vy, airMs: 0, hop: frame - lastHopFrame <= 15, cls: classifyStart(s.x), startFrame: frame };
@@ -667,7 +714,7 @@
       }
       const body = scene.sled.body;
       R.humanNoise = {
-        profile: o.noiseProfile, version: noiseApi.HUMAN_NOISE_VERSION,
+        profile: o.noiseProfile, version: fatigue ? noiseApi.HUMAN_NOISE_FATIGUE_VERSION : noiseApi.HUMAN_NOISE_VERSION,
         frameHz: noiseApi.NOISE_FPS, stats: planner?.stats() ?? null,
         input: {
           format: inputRecorder.header.format, version: inputRecorder.header.version,

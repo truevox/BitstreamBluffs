@@ -20,6 +20,7 @@ import { VirtualPad, emptyPadState } from './VirtualPad.js';
 import { EVT } from '../events.js';
 import { getPaletteCss } from '../ui/Palette.js';
 import { layoutButton } from './ControlLayouts.js';
+import { eventTimeOnClock, perfNow } from './PadDerive.js';
 
 /** Keyboard bindings by KeyboardEvent.code: pad button name and INPUT_ACTION names. */
 const KEYMAP = {
@@ -90,12 +91,16 @@ export class InputRouter {
     this._activeKeyBindings = new Map();
     /** @type {Object<string,boolean>} previous gamepad binding states. */
     this.gpPrev = {};
+    /** @type {Object<string,boolean>} previous aggregate pad states (all aliases of a pad button). */
+    this.gpPadPrev = {};
     this.gpConnected = false;
     this._listeners = [];
     this._gameListeners = [];
     this._orientation = null;
     this._destroyed = false;
     this._tickBound = () => this._pollGamepads();
+    /** Clock that DOM event.timeStamp and Phaser's rAF time share (overridable in tests). */
+    this.now = perfNow;
     this._bind();
   }
 
@@ -151,6 +156,16 @@ export class InputRouter {
     return override === undefined ? old : { ...old, pad: override };
   }
 
+  /**
+   * event.timeStamp on the performance.now() clock, or null when it is not on that clock (legacy epoch
+   * timestamps, synthetic events, jsdom). A null time keeps the pre-#115 scheduling for that change.
+   * @param {Event} e
+   * @returns {number|null}
+   */
+  _eventTime(e) {
+    return eventTimeOnClock(e && e.timeStamp, this.now());
+  }
+
   _onKeyDown(e) {
     if (this._destroyed) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return; // keep browser shortcuts working
@@ -168,8 +183,9 @@ export class InputRouter {
     }
     this.keysDown.add(code);
     this._activeKeyBindings.set(code, b);
-    if (b.pad) this.pad.setButton(b.pad, true, 'keyboard');
-    if (b.confirm) this.pad.setButton('confirm', true, 'keyboard');
+    const t = this._eventTime(e);
+    if (b.pad) this.pad.setButton(b.pad, true, 'keyboard', t);
+    if (b.confirm) this.pad.setButton('confirm', true, 'keyboard', t);
     for (const a of b.actions) this._emit(a, true, 'keyboard');
     this._emit('anyKey', true, 'keyboard');
   }
@@ -182,12 +198,13 @@ export class InputRouter {
     if (!b || !this.keysDown.has(code)) return;
     this.keysDown.delete(code);
     this._activeKeyBindings.delete(code);
+    const t = this._eventTime(e);
     if (b.pad) {
       // another physical key may still hold the same pad button (e.g. both Shift keys)
       const still = [...this._activeKeyBindings.entries()].some(([k, other]) => this.keysDown.has(k) && other.pad === b.pad);
-      if (!still) this.pad.setButton(b.pad, false, 'keyboard');
+      if (!still) this.pad.setButton(b.pad, false, 'keyboard', t);
     }
-    if (b.confirm) this.pad.setButton('confirm', false, 'keyboard');
+    if (b.confirm) this.pad.setButton('confirm', false, 'keyboard', t);
     for (const a of b.actions) this._emit(a, false, 'keyboard');
   }
 
@@ -265,6 +282,7 @@ export class InputRouter {
   _onGamepadGone() {
     this.gpConnected = false;
     this.gpPrev = {};
+    this.gpPadPrev = {};
     this.pad.releaseSource('gamepad');
   }
 
@@ -279,15 +297,30 @@ export class InputRouter {
       return;
     }
     this.gpActive = true;
+    // Several physical inputs may bind the same pad button (LB/RSLeft -> heliLeft, RB/RSRight ->
+    // heliRight). Aggregate them BEFORE writing the pad so releasing one alias cannot cancel another
+    // that is still held; every aggregate still writes the single 'gamepad' source.
+    const padNext = {};
+    const pending = [];
     for (const b of GP_BINDINGS) {
       const down = !!b.test(g);
-      if (down === !!this.gpPrev[b.id]) continue;
+      const changed = down !== !!this.gpPrev[b.id];
       this.gpPrev[b.id] = down;
-      if (b.pad) this.pad.setButton(b.pad, down, 'gamepad');
-      if (b.confirm) this.pad.setButton('confirm', down, 'gamepad');
-      for (const a of b.actions) this._emit(a, down, 'gamepad');
-      if (down) this._emit('anyKey', true, 'gamepad');
+      const target = b.pad;
+      if (target) padNext[target] = !!padNext[target] || down;
+      if (b.confirm) padNext.confirm = !!padNext.confirm || down;
+      if (!changed) continue;
+      for (const a of b.actions) pending.push([a, down]);
+      if (down) pending.push(['anyKey', true]);
     }
+    // Pad writes are applied before emitting so action listeners observe the current pad state,
+    // matching the keyboard path.
+    for (const [name, down] of Object.entries(padNext)) {
+      if (down === !!this.gpPadPrev[name]) continue;
+      this.gpPadPrev[name] = down;
+      this.pad.setButton(name, down, 'gamepad');
+    }
+    for (const [a, d] of pending) this._emit(a, d, 'gamepad');
     this.pad.setTilt(ax(g, 0), 'gamepad');
   }
 
@@ -295,7 +328,9 @@ export class InputRouter {
 
   /**
    * Read the current normalized control state. Call at most once per frame per consumer scene
-   * (it consumes the one-shot `pressed` edges and polls gamepads).
+   * (it consumes the one-shot `pressed` edges and polls gamepads). The result carries a non-enumerable
+   * `timeline` of timestamped changes since the last poll (VirtualPad.poll; null while disabled) for
+   * SimClock.padsFor (issue #115).
    * @returns {import('./VirtualPad.js').VirtualPadState}
    */
   poll() {
@@ -304,6 +339,7 @@ export class InputRouter {
     if (!this.enabled) {
       const n = emptyPadState();
       n.lastSource = s.lastSource;
+      Object.defineProperty(n, 'timeline', { value: null, enumerable: false });
       return n;
     }
     return s;

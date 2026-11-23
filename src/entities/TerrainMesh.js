@@ -12,9 +12,10 @@
  */
 import Phaser from 'phaser';
 import { CAT } from './Sled.js';
+import pmath from '../systems/pmath.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
-const { Bodies, Body, Vertices } = Matter;
+const { Bodies, Vertices } = Matter;
 
 /** Vertical extrusion of each collider quad, px (perpendicular thickness >= 24 px up to 55 deg slopes). */
 export const COLLIDER_DEPTH = 64;
@@ -35,7 +36,6 @@ export class TerrainMesh {
     /** @type {Map<number, {gfx: Phaser.GameObjects.Graphics, bodies: any[], pads: any[], startX:number, endX:number}>} */
     this.chunks = new Map();
     this._gfxPool = [];
-    this._bodyPool = [];
     this.stats = { bodiesCreated: 0, gfxCreated: 0 };
   }
 
@@ -62,22 +62,20 @@ export class TerrainMesh {
     return g;
   }
 
+  /**
+   * A fresh static collider for one segment quad. Always built from scratch, never recycled (issue #119): reshaping a
+   * pooled body (Body.setVertices + Body.setPosition) left vertex bits that depended on the body's PREVIOUS position, so
+   * the same chunk could collide differently depending on what was streamed before it. A fresh body is a pure function
+   * of `verts`, which keeps terrain physics independent of history (savestates, seeks, verifiers that rebuild terrain).
+   */
   _takeBody(verts) {
     const centre = Vertices.centre(verts);
-    let b = this._bodyPool.pop();
-    if (!b) {
-      b = Bodies.fromVertices(centre.x, centre.y, [verts], {
-        isStatic: true,
-        label: 'terrain',
-        collisionFilter: { group: 0, category: CAT.TERRAIN, mask: CAT.SLED },
-      }, false);
-      this.stats.bodiesCreated++;
-    } else {
-      Body.setStatic(b, false);
-      Body.setVertices(b, verts);
-      Body.setPosition(b, centre);
-      Body.setStatic(b, true);
-    }
+    const b = Bodies.fromVertices(centre.x, centre.y, [verts], {
+      isStatic: true,
+      label: 'terrain',
+      collisionFilter: { group: 0, category: CAT.TERRAIN, mask: CAT.SLED },
+    }, false);
+    this.stats.bodiesCreated++;
     // Matter combines friction with min() but frictionStatic with max(): zero it here or the sled sticks to the ground.
     b.friction = 1;
     b.frictionStatic = 0;
@@ -97,25 +95,16 @@ export class TerrainMesh {
     if (!chunk || !chunk.points || chunk.points.length < 2) return;
     if (this.chunks.has(chunk.index)) this.removeChunk(chunk.index);
     const pts = chunk.points;
-    const pal = this.palette;
-    const gaps = chunk.gaps || [];
-    const zones = chunk.zones || [];
-    const isGap = (a, b) => gaps.some((g) => g.x0 <= a.x + 0.5 && g.x1 >= b.x - 0.5);
-    const zoneAt = (x) => {
-      for (const z of zones) if (x >= z.x0 && x <= z.x1) return z.modId;
-      return null;
-    };
+    const isGap = this._gapTest(chunk);
 
     const gfx = this._takeGfx();
     const rec = { gfx, bodies: [], pads: [], startX: chunk.startX, endX: chunk.endX };
 
-    // ---------- colliders + fill + edge, per solid segment ----------
-    const segs = [];
+    // ---------- colliders, per solid segment ----------
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i];
       const b = pts[i + 1];
       if (isGap(a, b)) continue;
-      segs.push(i);
       const verts = [
         { x: a.x, y: a.y },
         { x: b.x, y: b.y },
@@ -127,6 +116,63 @@ export class TerrainMesh {
       rec.bodies.push(body);
     }
 
+    // bounce pads: sensors
+    for (const pad of chunk.bouncePads || []) {
+      const w = Math.max(16, pad.width || 40);
+      const body = Bodies.rectangle(pad.x, pad.y - 6, w, 14, {
+        isStatic: true,
+        isSensor: true,
+        label: 'pad',
+        collisionFilter: { group: 0, category: CAT.SENSOR, mask: CAT.SLED },
+      });
+      body.bbPad = { x: pad.x, y: pad.y, width: w, boost: pad.boost || 500 };
+      this.world.add(body);
+      rec.pads.push(body);
+    }
+
+    this._drawChunk(gfx, chunk);
+    this.chunks.set(chunk.index, rec);
+  }
+
+  /**
+   * Repaint a live chunk with the current palette WITHOUT touching its colliders (issue #140). A palette or
+   * colour-blind toggle is presentation: removing and re-adding the static bodies would hand each segment a
+   * different pooled body (new ids, new world order) and drop Matter's cached contact pairs under the sled,
+   * which changes the physics of the next ticks. Returns false when the chunk is not live.
+   * @param {import('../data/schemas.js').TerrainChunk} chunk
+   * @returns {boolean}
+   */
+  redrawChunk(chunk) {
+    const rec = chunk && this.chunks.get(chunk.index);
+    if (!rec) return false;
+    rec.gfx.clear();
+    this._drawChunk(rec.gfx, chunk);
+    return true;
+  }
+
+  /** @param {import('../data/schemas.js').TerrainChunk} chunk @returns {(a:{x:number}, b:{x:number}) => boolean} */
+  _gapTest(chunk) {
+    const gaps = chunk.gaps || [];
+    return (a, b) => gaps.some((g) => g.x0 <= a.x + 0.5 && g.x1 >= b.x - 0.5);
+  }
+
+  /**
+   * Draw a chunk (fill, zone tints, contours, edge, markers, gaps, bounce-pad plates) into `gfx`. Graphics only.
+   * @param {Phaser.GameObjects.Graphics} gfx
+   * @param {import('../data/schemas.js').TerrainChunk} chunk
+   */
+  _drawChunk(gfx, chunk) {
+    const pts = chunk.points;
+    const pal = this.palette;
+    const gaps = chunk.gaps || [];
+    const zones = chunk.zones || [];
+    const isGap = this._gapTest(chunk);
+    const zoneAt = (x) => {
+      for (const z of zones) if (x >= z.x0 && x <= z.x1) return z.modId;
+      return null;
+    };
+    const segs = [];
+    for (let i = 0; i < pts.length - 1; i++) if (!isGap(pts[i], pts[i + 1])) segs.push(i);
     // dark body fill
     gfx.fillStyle(pal.bgAlt, 1);
     for (const i of segs) {
@@ -223,7 +269,7 @@ export class TerrainMesh {
       const b = pts.find((p) => Math.abs(p.x - gp.x1) < 0.6);
       if (!a || !b) continue;
       const col = this._colour('wirelessBridge');
-      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const len = pmath.hypot(b.x - a.x, b.y - a.y);
       const n = Math.max(2, Math.floor(len / 10));
       gfx.lineStyle(1.5, col, 0.55);
       for (let k = 0; k < n; k += 2) {
@@ -239,18 +285,9 @@ export class TerrainMesh {
       gfx.lineBetween(b.x + 8, b.y - 18, b.x, b.y - 10);
     }
 
-    // bounce pads: sensor + neon chevron plate
+    // bounce pads: neon chevron plate (the sensor body is built in addChunk)
     for (const pad of chunk.bouncePads || []) {
       const w = Math.max(16, pad.width || 40);
-      const body = Bodies.rectangle(pad.x, pad.y - 6, w, 14, {
-        isStatic: true,
-        isSensor: true,
-        label: 'pad',
-        collisionFilter: { group: 0, category: CAT.SENSOR, mask: CAT.SLED },
-      });
-      body.bbPad = { x: pad.x, y: pad.y, width: w, boost: pad.boost || 500 };
-      this.world.add(body);
-      rec.pads.push(body);
       const col = this._colour('wirelessBridge');
       gfx.fillStyle(col, 0.35);
       gfx.fillRect(pad.x - w / 2, pad.y - 5, w, 5);
@@ -262,8 +299,6 @@ export class TerrainMesh {
         gfx.strokePoints([{ x: cx - 4, y: pad.y - 8 }, { x: cx, y: pad.y - 13 }, { x: cx + 4, y: pad.y - 8 }], false, false);
       }
     }
-
-    this.chunks.set(chunk.index, rec);
   }
 
   _surfaceY(pts, x) {
@@ -289,15 +324,12 @@ export class TerrainMesh {
 
   /**
    * @param {number} chunkIndex
-   * @returns {void} returns graphics + bodies to the pool.
+   * @returns {void} returns graphics to the pool; colliders are discarded (never recycled, see _takeBody).
    */
   removeChunk(chunkIndex) {
     const rec = this.chunks.get(chunkIndex);
     if (!rec) return;
-    for (const b of rec.bodies) {
-      this.world.remove(b);
-      this._bodyPool.push(b);
-    }
+    for (const b of rec.bodies) this.world.remove(b);
     for (const p of rec.pads) this.world.remove(p);
     rec.gfx.clear();
     rec.gfx.setVisible(false).setActive(false);
@@ -310,6 +342,5 @@ export class TerrainMesh {
     for (const idx of [...this.chunks.keys()]) this.removeChunk(idx);
     for (const g of this._gfxPool) g.destroy();
     this._gfxPool.length = 0;
-    this._bodyPool.length = 0;
   }
 }

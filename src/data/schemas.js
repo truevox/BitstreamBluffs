@@ -144,7 +144,7 @@
  *
  * @typedef {Object} BiomeDef
  * @property {string} id            kebab-case, e.g. 'garbage-dump-glacier'.
- * @property {number} bit           power-of-two mask bit. This is the vocabulary of `profile.biomeMask`
+ * @property {number} bit           power-of-two mask bit. This is the vocabulary of `profile.biomeOff`
  *                                  and of the date-derived Daily mask, so it is assigned by CONTENT and
  *                                  must never be inferred from a position in `levels.json: biomeOrder`.
  * @property {string} name          player-facing name.

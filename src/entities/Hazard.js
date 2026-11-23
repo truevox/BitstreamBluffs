@@ -10,6 +10,7 @@ import Phaser from 'phaser';
 import { CAT } from './Sled.js';
 import { hazardColor, hazardDrawKind, gustImpulse } from '../systems/BiomeEffects.js';
 import { emptyRollState, rollStep, rollParams, rollPredictX, gateOpenAt, gateNextChangeMs } from '../systems/HazardMotion.js';
+import pmath from '../systems/pmath.js';
 
 const Matter = Phaser.Physics.Matter.Matter;
 const { Bodies, Body } = Matter;
@@ -17,7 +18,7 @@ const DEG = Math.PI / 180;
 
 /** Tiny deterministic hash -> [0,1). */
 function hash01(n) {
-  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  const s = pmath.sin(n * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
 }
 
@@ -112,11 +113,11 @@ export class Hazard {
   _boxAt(x, y, rot) {
     const air = this.def.placement === 'air';
     const h = this.h;
-    const cx = air ? x : x + Math.sin(rot) * (h / 2);
-    const cy = air ? y : y - Math.cos(rot) * (h / 2);
+    const cx = air ? x : x + pmath.sin(rot) * (h / 2);
+    const cy = air ? y : y - pmath.cos(rot) * (h / 2);
     const bh = this._crashy ? h * 0.8 : h;
-    const bcy = this._crashy && !air ? cy + (h - bh) / 2 * Math.cos(rot) : cy;
-    const bcx = this._crashy && !air ? cx - (h - bh) / 2 * Math.sin(rot) : cx;
+    const bcy = this._crashy && !air ? cy + (h - bh) / 2 * pmath.cos(rot) : cy;
+    const bcx = this._crashy && !air ? cx - (h - bh) / 2 * pmath.sin(rot) : cx;
     return { cx, cy, bcx, bcy };
   }
 
@@ -274,7 +275,7 @@ export class Hazard {
     ], false, false);
     // chromatic ghost
     g.lineStyle(1, pal.cyan, 0.6);
-    g.strokeRect(-w / 2 + 3 * Math.sin(t / 90), -h, w, h);
+    g.strokeRect(-w / 2 + 3 * pmath.sin(t / 90), -h, w, h);
   }
 
   // Overflow Firewall: wall of amber flame bars
@@ -327,8 +328,8 @@ export class Hazard {
   _drone(g, t, frame, col, pal) {
     const w = this.w;
     const h = this.h;
-    const bob = Math.sin(t / 260 + this.seed) * 2.5;
-    const pulse = 0.5 + 0.5 * Math.sin(t / (this.alert ? 90 : 190) + this.seed);
+    const bob = pmath.sin(t / 260 + this.seed) * 2.5;
+    const pulse = 0.5 + 0.5 * pmath.sin(t / (this.alert ? 90 : 190) + this.seed);
     const cy = -h / 2 + bob;
     // soft halo (additive-looking stacked discs) plus an alert ring that tightens
     g.fillStyle(col, 0.1 + 0.1 * pulse);
@@ -384,7 +385,7 @@ export class Hazard {
     // junk glyphs rising (deterministic from time)
     for (let i = 0; i < 9; i++) {
       const ph = ((t / 900 + i * 0.137 + hash01(this.seed + i)) % 1);
-      const gx = (hash01(i * 7.7 + this.seed) - 0.5) * (w - 4) + Math.sin(ph * 9 + i) * 3;
+      const gx = (hash01(i * 7.7 + this.seed) - 0.5) * (w - 4) + pmath.sin(ph * 9 + i) * 3;
       const gy = -baseH - ph * (h - baseH);
       const s = 1.5 + 2.5 * (1 - ph);
       g.fillStyle(i % 3 === 0 ? pal.cyan : col, 1 - ph * 0.8);
@@ -392,7 +393,7 @@ export class Hazard {
     }
   }
 
-  // B1 Debumont: Groomer Cat, a little tracked snow groomer facing the sled, its blade out front (left) and a puffing stack
+  // B1 Debutmont: Groomer Cat, a little tracked snow groomer facing the sled, its blade out front (left) and a puffing stack
   _groomer(g, t, frame, col, pal) {
     const w = this.w;
     const h = this.h;
@@ -407,7 +408,7 @@ export class Hazard {
       g.fillStyle(col, 0.8);
       g.fillCircle(wx, -trackH / 2, trackH * 0.32);
       g.fillStyle(pal.bg, 1);
-      g.fillCircle(wx + Math.cos(t / 120 + i) * 1.2, -trackH / 2 + Math.sin(t / 120 + i) * 1.2, 0.8);
+      g.fillCircle(wx + pmath.cos(t / 120 + i) * 1.2, -trackH / 2 + pmath.sin(t / 120 + i) * 1.2, 0.8);
     }
     // body and cab
     const bodyTop = -h * 0.62;
@@ -440,7 +441,7 @@ export class Hazard {
       const pts = [];
       for (let k = 0; k <= 6; k++) {
         const u = k / 6;
-        pts.push({ x: x0 + Math.sin(u * 3.2 + t / 380 + f * 1.7 + this.seed) * 3.2 * u, y: -u * tall });
+        pts.push({ x: x0 + pmath.sin(u * 3.2 + t / 380 + f * 1.7 + this.seed) * 3.2 * u, y: -u * tall });
       }
       g.lineStyle(2.5, col, 1);
       g.strokePoints(pts, false, false);
@@ -451,7 +452,7 @@ export class Hazard {
       }
     }
     g.fillStyle(pal.text, 0.7);
-    g.fillCircle(Math.sin(t / 500 + this.seed) * 3, -h * 0.55 - ((t / 40) % 10), 1); // a rising bubble
+    g.fillCircle(pmath.sin(t / 500 + this.seed) * 3, -h * 0.55 - ((t / 40) % 10), 1); // a rising bubble
   }
 
   // B1 Candy Cane Canyon: Chocolate River, a wide glossy strip flush with the ground, ripples flowing downhill (right)
@@ -488,7 +489,7 @@ export class Hazard {
   _shatterWall(g, t, frame, col, pal) {
     const w = this.w;
     const h = this.h;
-    const glint = 0.5 + 0.5 * Math.sin(t / 210 + this.seed);
+    const glint = 0.5 + 0.5 * pmath.sin(t / 210 + this.seed);
     g.fillStyle(col, 0.12 + 0.12 * glint);
     g.fillRect(-w / 2 - 3, -h - 3, w + 6, h + 3);
     // three tall facets leaning together
@@ -512,7 +513,7 @@ export class Hazard {
   _ashCloud(g, t, frame, col, pal) {
     const w = this.w;
     const h = this.h;
-    const drift = Math.sin(t / 400 + this.seed) * 2;
+    const drift = pmath.sin(t / 400 + this.seed) * 2;
     g.fillStyle(pal.bgAlt, 0.85);
     g.fillEllipse(-w * 0.22 + drift, -h * 0.45, w * 0.55, h * 0.7);
     g.fillEllipse(w * 0.2 - drift, -h * 0.5, w * 0.6, h * 0.8);
@@ -544,7 +545,7 @@ export class Hazard {
     g.lineStyle(1.5, pal.text, 0.75);
     for (let k = 0; k < 3; k++) {
       const u = a + k * 2.1;
-      g.lineBetween(Math.cos(u) * r * 0.15, cy + Math.sin(u) * r * 0.15, Math.cos(u + 0.3) * r * 0.8, cy + Math.sin(u + 0.3) * r * 0.8);
+      g.lineBetween(pmath.cos(u) * r * 0.15, cy + pmath.sin(u) * r * 0.15, pmath.cos(u + 0.3) * r * 0.8, cy + pmath.sin(u + 0.3) * r * 0.8);
     }
     // dust kicked up behind it while it rolls
     if (this.rolling) {
@@ -561,7 +562,7 @@ export class Hazard {
     const w = this.w;
     const h = this.h;
     const a = this.spin || 0;
-    const wob = this.rolling ? Math.sin(t / 70 + this.seed) * 1.2 : 0;
+    const wob = this.rolling ? pmath.sin(t / 70 + this.seed) * 1.2 : 0;
     g.fillStyle(pal.bgAlt, 0.9);
     g.fillEllipse(0, -h / 2, w + wob, h - wob);
     g.fillStyle(col, 0.35);
@@ -569,7 +570,7 @@ export class Hazard {
     g.lineStyle(2, col, 1);
     g.strokeEllipse(0, -h / 2, w + wob, h - wob);
     g.fillStyle(pal.text, 0.85);
-    g.fillCircle(Math.cos(a - 2.2) * w * 0.25, -h / 2 + Math.sin(a - 2.2) * h * 0.25, 2);
+    g.fillCircle(pmath.cos(a - 2.2) * w * 0.25, -h / 2 + pmath.sin(a - 2.2) * h * 0.25, 2);
   }
 
   /**
@@ -598,7 +599,7 @@ export class Hazard {
     g.fillStyle(col, 1);
     for (let k = 0; k < 6; k++) {
       const u = ang + (k * Math.PI) / 3;
-      g.fillCircle(Math.cos(u) * gr, gy + Math.sin(u) * gr, 1.6);
+      g.fillCircle(pmath.cos(u) * gr, gy + pmath.sin(u) * gr, 1.6);
     }
     g.lineStyle(1.5, col, 1);
     g.strokeCircle(0, gy, gr * 0.75);
@@ -609,8 +610,8 @@ export class Hazard {
   _seagull(g, t, frame, col, pal) {
     const w = this.w;
     const h = this.h;
-    const pulse = 0.5 + 0.5 * Math.sin(t / (this.alert ? 90 : 190) + this.seed);
-    const cy = -h / 2 + Math.sin(t / 240 + this.seed) * 2;
+    const pulse = 0.5 + 0.5 * pmath.sin(t / (this.alert ? 90 : 190) + this.seed);
+    const cy = -h / 2 + pmath.sin(t / 240 + this.seed) * 2;
     g.fillStyle(col, 0.1 + 0.1 * pulse);
     g.fillEllipse(0, cy, w + 18 + 6 * pulse, h + 14 + 4 * pulse);
     if (this.alert) {
@@ -643,7 +644,7 @@ export class Hazard {
   _meteor(g, t, frame, col, pal) {
     const w = this.w;
     const h = this.h;
-    const pulse = 0.5 + 0.5 * Math.sin(t / (this.alert ? 90 : 190) + this.seed);
+    const pulse = 0.5 + 0.5 * pmath.sin(t / (this.alert ? 90 : 190) + this.seed);
     const cy = -h / 2;
     g.fillStyle(col, 0.1 + 0.1 * pulse);
     g.fillEllipse(0, cy, w + 18 + 6 * pulse, h + 16 + 4 * pulse);
@@ -664,7 +665,7 @@ export class Hazard {
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
       const rr = r * (0.85 + 0.25 * hash01(this.seed * 3 + i));
-      pts.push({ x: -w * 0.08 + Math.cos(a) * rr, y: cy + h * 0.06 + Math.sin(a) * rr });
+      pts.push({ x: -w * 0.08 + pmath.cos(a) * rr, y: cy + h * 0.06 + pmath.sin(a) * rr });
     }
     g.fillStyle(col, 1);
     g.fillPoints(pts, true);
@@ -684,10 +685,10 @@ export class Hazard {
     const w = this.w;
     const h = this.h;
     const imp = gustImpulse(this.def.onHit && this.def.onHit.impulsePxS);
-    const m = Math.hypot(imp.dvx, imp.dvy) || 1;
+    const m = pmath.hypot(imp.dvx, imp.dvy) || 1;
     const ux = imp.dvx / m;
     const uy = imp.dvy / m;
-    const breathe = 0.5 + 0.5 * Math.sin(t / 300 + this.seed);
+    const breathe = 0.5 + 0.5 * pmath.sin(t / 300 + this.seed);
     g.fillStyle(col, 0.1 + 0.06 * breathe);
     g.fillEllipse(0, -h / 2, w + 6, h + 4);
     g.lineStyle(1, col, 0.45);
@@ -702,7 +703,7 @@ export class Hazard {
       const x0 = bx + ux * d;
       const y0 = by + uy * d;
       const len = 9 + 5 * u;
-      g.lineStyle(1.5, k % 2 ? pal.text : col, 0.8 * Math.sin(ph * Math.PI));
+      g.lineStyle(1.5, k % 2 ? pal.text : col, 0.8 * pmath.sin(ph * Math.PI));
       g.lineBetween(x0, y0, x0 + ux * len, y0 + uy * len);
     }
     // one arrowhead at the centre: the push direction

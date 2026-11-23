@@ -1,0 +1,546 @@
+{
+ "gitSha": "1e0e52469a7574893349b3f9afa8f0c90ccebe31",
+ "recordedAt": "2026-11-22T04:20:20.846Z",
+ "fixtures": [
+  {
+   "id": "cruise-baseline",
+   "preRuns": 0,
+   "covers": [
+    "baseline grounded + air"
+   ],
+   "outcome": {
+    "ticks": 2400,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 591,
+    "score": 876,
+    "x": 11874.715539007208,
+    "y": 4309.179112106649,
+    "stats": {
+     "contactTicks": 1412,
+     "maxPairs": 3,
+     "airTicks": 899,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2400,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "tapeInputs": 694,
+   "checkpoints": 20,
+   "endTick": 2400,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2401,
+     "distanceM": 591,
+     "score": 876
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     2400,
+     2401
+    ],
+    "desync": null,
+    "checked": 20
+   },
+   "levelSensitivity": null,
+   "pageErrors": []
+  },
+  {
+   "id": "fifth-run-in-session",
+   "preRuns": 4,
+   "covers": [
+    "recorded as the 5th run in one page session; re-verified in a fresh browser context"
+   ],
+   "outcome": {
+    "ticks": 1800,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 472,
+    "score": 717,
+    "x": 9492.119818147337,
+    "y": 3155.8405600747164,
+    "stats": {
+     "contactTicks": 1042,
+     "maxPairs": 3,
+     "airTicks": 725,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1800,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 5,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "tapeInputs": 521,
+   "checkpoints": 15,
+   "endTick": 1800,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 1801,
+     "distanceM": 472,
+     "score": 717
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     1800,
+     1801
+    ],
+    "desync": null,
+    "checked": 15
+   },
+   "levelSensitivity": null,
+   "pageErrors": []
+  },
+  {
+   "id": "collision-heavy",
+   "preRuns": 0,
+   "covers": [
+    "many contact pairs, hazards, hard landings"
+   ],
+   "outcome": {
+    "ticks": 1669,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 289,
+    "score": 399,
+    "x": 5834.460291407023,
+    "y": 2310.857072223444,
+    "stats": {
+     "contactTicks": 1223,
+     "maxPairs": 3,
+     "airTicks": 419,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1668,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 3,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "tapeInputs": 19,
+   "checkpoints": 13,
+   "endTick": 1668,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 1669,
+     "distanceM": 289,
+     "score": 399
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     1669,
+     1669
+    ],
+    "desync": null,
+    "checked": 13
+   },
+   "levelSensitivity": null,
+   "pageErrors": []
+  },
+  {
+   "id": "chunk-biome-boundaries",
+   "preRuns": 0,
+   "covers": [
+    "crosses procedural chunk borders and the 500 m sector boundary (biome sectors from sector 2)"
+   ],
+   "outcome": {
+    "ticks": 3431,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 835,
+    "score": 1175,
+    "x": 16750.500450043968,
+    "y": 5815.790910416067,
+    "stats": {
+     "contactTicks": 2191,
+     "maxPairs": 7,
+     "airTicks": 1170,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 3430,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 10,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 2047
+    }
+   },
+   "tapeInputs": 789,
+   "checkpoints": 28,
+   "endTick": 3430,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 3431,
+     "distanceM": 835,
+     "score": 1175
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     3431,
+     3431
+    ],
+    "desync": null,
+    "checked": 28
+   },
+   "levelSensitivity": null,
+   "pageErrors": []
+  },
+  {
+   "id": "bsod-pursuit-catch",
+   "preRuns": 0,
+   "covers": [
+    "BSOD pursuit; the rider brakes and spams manual reset (respawn) until the wall catches it (~100 s)"
+   ],
+   "outcome": {
+    "ticks": 12150,
+    "crashed": true,
+    "cause": "bsod",
+    "distanceM": 437,
+    "score": 0,
+    "x": 8748.234829728051,
+    "y": 3041.224223896719,
+    "stats": {
+     "contactTicks": 9798,
+     "maxPairs": 8,
+     "airTicks": 2346,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 12149,
+     "bsodCaught": true,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "tapeInputs": 2254,
+   "checkpoints": 101,
+   "endTick": 12149,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 12150,
+     "distanceM": 437,
+     "score": 0
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     12150,
+     12150
+    ],
+    "desync": null,
+    "checked": 101
+   },
+   "levelSensitivity": null,
+   "pageErrors": []
+  },
+  {
+   "id": "airborne-tricks",
+   "preRuns": 0,
+   "covers": [
+    "heli / corkscrew / divebomb tricks"
+   ],
+   "outcome": {
+    "ticks": 2224,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 513,
+    "score": 2428,
+    "x": 10323.184568997418,
+    "y": 3959.4610143827304,
+    "stats": {
+     "contactTicks": 866,
+     "maxPairs": 3,
+     "airTicks": 1294,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2223,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 1,
+     "tricks": {
+      "helicopterCW": 5,
+      "helicopterCCW": 2
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "tapeInputs": 576,
+   "checkpoints": 18,
+   "endTick": 2223,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2224,
+     "distanceM": 513,
+     "score": 2428
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     2224,
+     2224
+    ],
+    "desync": null,
+    "checked": 18
+   },
+   "levelSensitivity": null,
+   "pageErrors": []
+  },
+  {
+   "id": "parachute-airbrake",
+   "preRuns": 0,
+   "covers": [
+    "parachute deploy, air brake presses, ground brake"
+   ],
+   "outcome": {
+    "ticks": 2146,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 332,
+    "score": 790,
+    "x": 6707.891359180972,
+    "y": 2498.6672397200714,
+    "stats": {
+     "contactTicks": 559,
+     "maxPairs": 3,
+     "airTicks": 1570,
+     "chuteTicks": 309,
+     "airBrakeTicks": 717,
+     "bsodActiveTicks": 2145,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {
+      "parachute": 3,
+      "airBrake": 1
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "tapeInputs": 1055,
+   "checkpoints": 17,
+   "endTick": 2145,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2146,
+     "distanceM": 332,
+     "score": 790
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     2146,
+     2146
+    ],
+    "desync": null,
+    "checked": 17
+   },
+   "levelSensitivity": null,
+   "pageErrors": []
+  },
+  {
+   "id": "kodiaks-on",
+   "preRuns": 0,
+   "covers": [
+    "hostile Kodiak packs (Sync Level >= 6 at record time)"
+   ],
+   "outcome": {
+    "ticks": 2637,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 606,
+    "score": 991,
+    "x": 12174.654997585263,
+    "y": 4433.215652380765,
+    "stats": {
+     "contactTicks": 1503,
+     "maxPairs": 7,
+     "airTicks": 1070,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2636,
+     "bsodCaught": false,
+     "kodiakTicks": 586,
+     "maxChunk": 8,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": true,
+     "biomeMask": 0
+    }
+   },
+   "tapeInputs": 715,
+   "checkpoints": 21,
+   "endTick": 2636,
+   "recordLevel": 8,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2637,
+     "distanceM": 606,
+     "score": 991
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     2637,
+     2637
+    ],
+    "desync": null,
+    "checked": 21
+   },
+   "levelSensitivity": {
+    "recordedLevel": 8,
+    "replayLevel": 1,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2637,
+     "crashed": true,
+     "cause": "hazard",
+     "distanceM": 606,
+     "score": 991
+    }
+   },
+   "pageErrors": []
+  },
+  {
+   "id": "daily-practice-rule",
+   "preRuns": 0,
+   "covers": [
+    "Daily rule + biome mask derived from a past date seed (practice run; official Daily needs today's date)"
+   ],
+   "outcome": {
+    "ticks": 2400,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 724,
+    "score": 1399,
+    "x": 14528.470121555341,
+    "y": 5467.452240658642,
+    "stats": {
+     "contactTicks": 1333,
+     "maxPairs": 3,
+     "airTicks": 1038,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2400,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 7,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 16
+    }
+   },
+   "tapeInputs": 727,
+   "checkpoints": 20,
+   "endTick": 2400,
+   "recordLevel": 1,
+   "dateIndependence": {
+    "altDate": "2026-12-25",
+    "ok": true,
+    "first": null,
+    "desync": null,
+    "outcome": {
+     "ticks": 2401,
+     "distanceM": 724,
+     "score": 1399
+    }
+   },
+   "liveVsFreshContextReplay": {
+    "ok": true,
+    "first": null,
+    "lengths": [
+     2400,
+     2401
+    ],
+    "desync": null,
+    "checked": 20
+   },
+   "levelSensitivity": null,
+   "pageErrors": []
+  }
+ ]
+}

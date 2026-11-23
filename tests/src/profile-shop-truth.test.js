@@ -51,27 +51,29 @@ describe('SHOP-3: a way back to DEFAULT', () => {
 describe('F11: Profile lists locked biomes', () => {
   test('F11: with the production inputs a level-1 player can still see the locked biomes', () => {
     const texts = prodLayout(v1()).items.map((i) => i.text);
-    expect(texts).toContain('DEBUMONT');
+    expect(texts).toContain('DEBUTMONT');
   });
 
   test('F11: a locked biome shows its unlock level beside its name', () => {
-    const items = prodLayout(atLevel(5)).items; // Debumont (level 4) unlocked, Garbage Dump Glacier (7) not
+    const items = prodLayout(atLevel(3)).items; // Debutmont (the base biome) unlocked, Garbage Dump Glacier (4) not
     const lock = (id) => items.find((i) => i.key === `lock-${id}`);
-    expect(lock('garbage-dump-glacier').text).toBe('LVL 7');
-    expect(lock('vertigo-vents').text).toBe('LVL 28');
+    expect(lock('garbage-dump-glacier').text).toBe('LVL 4');
+    expect(lock('vertigo-vents').text).toBe('LVL 27');
     const name = items.find((i) => i.text === 'GARBAGE DUMP GLACIER');
     expect(lock('garbage-dump-glacier').x).toBeGreaterThan(name.x + name.w);
     expect(lock('garbage-dump-glacier').y).toBe(name.y);
-    // Unlocked: no lock tag and no plain name row - it is a toggle row in the menu below.
-    expect(lock('debumont')).toBeUndefined();
-    expect(items.some((i) => i.text === 'DEBUMONT')).toBe(false);
+    // The base biome has no lock tag. It cannot be turned off, so it has no toggle row either: it stays a
+    // plain (unlocked, amber) name row.
+    expect(lock('debutmont')).toBeUndefined();
+    expect(items.find((i) => i.text === 'DEBUTMONT')).toMatchObject({ color: 'amber', alpha: 1 });
   });
 
-  test('F11: at every level 1-30 each biome is listed once (name if locked, toggle if unlocked) and nothing overlaps', () => {
+  test('F11: at every level 1-30 each biome is listed once (name if locked or base, toggle if switchable) and nothing overlaps', () => {
     for (let level = 1; level <= 30; level++) {
       const p = atLevel(level);
       const L = prodLayout(p);
-      const unlocked = new Set(p.pendingBiomes);
+      // The base biome is unlocked but has no toggle (it cannot be turned off), so it keeps a name row.
+      const unlocked = new Set(p.pendingBiomes.filter((id) => id !== 'debutmont'));
       const named = L.items.filter((i) => /^sig-/.test(i.key) && i.key !== 'sig-head' && i.key !== 'sig-note').map((i) => i.text);
       expect({ level, named }).toEqual({ level, named: LEVELS.biomeOrder.filter((id) => !unlocked.has(id)).map(label) });
       expect({ level, toggles: L.toggleRowCount }).toEqual({ level, toggles: unlocked.size });
@@ -105,8 +107,9 @@ describe('F11: Profile labels say what they count', () => {
 
   test('F11: the biome header counts unlocked signatures and says so', () => {
     const head = (p) => prodLayout(p).items.find((i) => i.key === 'sig-head').text;
-    expect(head(v1())).toBe('SIGNATURES UNLOCKED 0/11');
-    expect(head(atLevel(5))).toBe('SIGNATURES UNLOCKED 1/11');
+    expect(head(v1())).toBe('SIGNATURES UNLOCKED 1/11'); // the base biome, from the first run
+    expect(head(atLevel(3))).toBe('SIGNATURES UNLOCKED 1/11');
+    expect(head(atLevel(5))).toBe('SIGNATURES UNLOCKED 2/11'); // + Garbage Dump Glacier (level 4)
     expect(head(v1({ xp: MAX_XP }))).toBe('SIGNATURES UNLOCKED 11/11');
   });
 });

@@ -1,0 +1,135 @@
+{
+ "reps": 31,
+ "expected": {
+  "sin": "6e402d71",
+  "cos": "9cea6ba0",
+  "tan": "fddd8c5b",
+  "atan": "3c892d34",
+  "atan2": "1e296ebc",
+  "asin": "a5617ab1",
+  "acos": "451fa68f",
+  "exp": "b5ee486c",
+  "expm1": "112bbbf5",
+  "log": "8ea31ec8",
+  "log1p": "b83bd76c",
+  "pow": "4bb5727a",
+  "tanh": "b0bea8e1",
+  "sinh": "e4783a03",
+  "cosh": "c695a238",
+  "cbrt": "20c2377b",
+  "log2": "a814bc22",
+  "log10": "c3ff64b7",
+  "hypot": "b16ed1a0",
+  "special": "f65b499c"
+ },
+ "engines": {
+  "chromium": {
+   "golden": {
+    "sin": "6e402d71",
+    "cos": "9cea6ba0",
+    "tan": "fddd8c5b",
+    "atan": "3c892d34",
+    "atan2": "1e296ebc",
+    "asin": "a5617ab1",
+    "acos": "451fa68f",
+    "exp": "b5ee486c",
+    "expm1": "112bbbf5",
+    "log": "8ea31ec8",
+    "log1p": "b83bd76c",
+    "pow": "4bb5727a",
+    "tanh": "b0bea8e1",
+    "sinh": "e4783a03",
+    "cosh": "c695a238",
+    "cbrt": "20c2377b",
+    "log2": "a814bc22",
+    "log10": "c3ff64b7",
+    "hypot": "b16ed1a0",
+    "special": "f65b499c"
+   },
+   "nativeUsPerTickMedian": 3.95,
+   "portableUsPerTickMedian": 2.8,
+   "deltaUsMedian": -1.15,
+   "nativeRange": [
+    3.87,
+    6.3
+   ],
+   "portableRange": [
+    2.77,
+    5.6
+   ],
+   "goldenMatchesCommitted": true
+  },
+  "firefox": {
+   "golden": {
+    "sin": "6e402d71",
+    "cos": "9cea6ba0",
+    "tan": "fddd8c5b",
+    "atan": "3c892d34",
+    "atan2": "1e296ebc",
+    "asin": "a5617ab1",
+    "acos": "451fa68f",
+    "exp": "b5ee486c",
+    "expm1": "112bbbf5",
+    "log": "8ea31ec8",
+    "log1p": "b83bd76c",
+    "pow": "4bb5727a",
+    "tanh": "b0bea8e1",
+    "sinh": "e4783a03",
+    "cosh": "c695a238",
+    "cbrt": "20c2377b",
+    "log2": "a814bc22",
+    "log10": "c3ff64b7",
+    "hypot": "b16ed1a0",
+    "special": "f65b499c"
+   },
+   "nativeUsPerTickMedian": 1.95,
+   "portableUsPerTickMedian": 4.2,
+   "deltaUsMedian": 2.25,
+   "nativeRange": [
+    1.9,
+    3.7
+   ],
+   "portableRange": [
+    4.1,
+    6.45
+   ],
+   "goldenMatchesCommitted": true
+  },
+  "webkit": {
+   "golden": {
+    "sin": "6e402d71",
+    "cos": "9cea6ba0",
+    "tan": "fddd8c5b",
+    "atan": "3c892d34",
+    "atan2": "1e296ebc",
+    "asin": "a5617ab1",
+    "acos": "451fa68f",
+    "exp": "b5ee486c",
+    "expm1": "112bbbf5",
+    "log": "8ea31ec8",
+    "log1p": "b83bd76c",
+    "pow": "4bb5727a",
+    "tanh": "b0bea8e1",
+    "sinh": "e4783a03",
+    "cosh": "c695a238",
+    "cbrt": "20c2377b",
+    "log2": "a814bc22",
+    "log10": "c3ff64b7",
+    "hypot": "b16ed1a0",
+    "special": "f65b499c"
+   },
+   "nativeUsPerTickMedian": 1.35,
+   "portableUsPerTickMedian": 1.65,
+   "deltaUsMedian": 0.3,
+   "nativeRange": [
+    1.3,
+    4.3
+   ],
+   "portableRange": [
+    1.6,
+    2.9
+   ],
+   "goldenMatchesCommitted": true
+  }
+ }
+}

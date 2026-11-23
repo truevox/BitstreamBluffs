@@ -1,0 +1,1363 @@
+{
+ "build": "portable-math (SIM_REVISION 5)",
+ "fixtures": [
+  {
+   "id": "cruise-baseline",
+   "recorded": {
+    "ticks": 2400,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 593,
+    "score": 878,
+    "x": 11919.086727236301,
+    "y": 4328.820260572334,
+    "stats": {
+     "contactTicks": 1419,
+     "maxPairs": 3,
+     "airTicks": 896,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2400,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 2401,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 594,
+    "score": 879,
+    "x": 11924.058922794207,
+    "y": 4331.021430243035,
+    "stats": {
+     "contactTicks": 1420,
+     "maxPairs": 3,
+     "airTicks": 896,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2401,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 2400,
+   "inputs": 695,
+   "checkpoints": 20
+  },
+  {
+   "id": "fifth-run-in-session",
+   "recorded": {
+    "ticks": 1800,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 472,
+    "score": 717,
+    "x": 9492.119396070024,
+    "y": 3155.839072791284,
+    "stats": {
+     "contactTicks": 1042,
+     "maxPairs": 3,
+     "airTicks": 725,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1800,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 5,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 1801,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 472,
+    "score": 717,
+    "x": 9497.990798299896,
+    "y": 3158.7270687807236,
+    "stats": {
+     "contactTicks": 1042,
+     "maxPairs": 3,
+     "airTicks": 726,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1801,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 5,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 1800,
+   "inputs": 521,
+   "checkpoints": 15
+  },
+  {
+   "id": "collision-heavy",
+   "recorded": {
+    "ticks": 1669,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 289,
+    "score": 399,
+    "x": 5834.4602914294,
+    "y": 2310.857072228933,
+    "stats": {
+     "contactTicks": 1223,
+     "maxPairs": 3,
+     "airTicks": 419,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1668,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 3,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 1669,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 289,
+    "score": 399,
+    "x": 5834.4602914294,
+    "y": 2310.857072228933,
+    "stats": {
+     "contactTicks": 1223,
+     "maxPairs": 3,
+     "airTicks": 419,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1668,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 3,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 1668,
+   "inputs": 19,
+   "checkpoints": 13
+  },
+  {
+   "id": "chunk-biome-boundaries",
+   "recorded": {
+    "ticks": 3410,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 834,
+    "score": 1174,
+    "x": 16745.832510096476,
+    "y": 5837.998620858555,
+    "stats": {
+     "contactTicks": 2171,
+     "maxPairs": 5,
+     "airTicks": 1165,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 3409,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 10,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 2047
+    }
+   },
+   "replay": {
+    "ticks": 3410,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 834,
+    "score": 1174,
+    "x": 16745.832510096476,
+    "y": 5837.998620858555,
+    "stats": {
+     "contactTicks": 2171,
+     "maxPairs": 5,
+     "airTicks": 1165,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 3409,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 10,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 2047
+    }
+   },
+   "desync": null,
+   "endTick": 3409,
+   "inputs": 761,
+   "checkpoints": 28
+  },
+  {
+   "id": "bsod-pursuit-catch",
+   "recorded": {
+    "ticks": 12150,
+    "crashed": true,
+    "cause": "bsod",
+    "distanceM": 437,
+    "score": 0,
+    "x": 8748.234829728173,
+    "y": 3041.2242238966805,
+    "stats": {
+     "contactTicks": 9795,
+     "maxPairs": 8,
+     "airTicks": 2346,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 12149,
+     "bsodCaught": true,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 12150,
+    "crashed": true,
+    "cause": "bsod",
+    "distanceM": 437,
+    "score": 0,
+    "x": 8748.234829728173,
+    "y": 3041.2242238966805,
+    "stats": {
+     "contactTicks": 9795,
+     "maxPairs": 8,
+     "airTicks": 2346,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 12149,
+     "bsodCaught": true,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 12149,
+   "inputs": 2254,
+   "checkpoints": 101
+  },
+  {
+   "id": "airborne-tricks",
+   "recorded": {
+    "ticks": 2224,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 513,
+    "score": 2428,
+    "x": 10322.902431659993,
+    "y": 3959.432407469666,
+    "stats": {
+     "contactTicks": 866,
+     "maxPairs": 3,
+     "airTicks": 1294,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2223,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 1,
+     "tricks": {
+      "helicopterCW": 5,
+      "helicopterCCW": 2
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 2224,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 513,
+    "score": 2428,
+    "x": 10322.902431659993,
+    "y": 3959.432407469666,
+    "stats": {
+     "contactTicks": 866,
+     "maxPairs": 3,
+     "airTicks": 1294,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2223,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 1,
+     "tricks": {
+      "helicopterCW": 5,
+      "helicopterCCW": 2
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 2223,
+   "inputs": 574,
+   "checkpoints": 18
+  },
+  {
+   "id": "parachute-airbrake",
+   "recorded": {
+    "ticks": 2146,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 332,
+    "score": 790,
+    "x": 6707.891359180972,
+    "y": 2498.6672397200714,
+    "stats": {
+     "contactTicks": 559,
+     "maxPairs": 3,
+     "airTicks": 1570,
+     "chuteTicks": 309,
+     "airBrakeTicks": 717,
+     "bsodActiveTicks": 2145,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {
+      "parachute": 3,
+      "airBrake": 1
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 2146,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 332,
+    "score": 790,
+    "x": 6707.891359180972,
+    "y": 2498.6672397200714,
+    "stats": {
+     "contactTicks": 559,
+     "maxPairs": 3,
+     "airTicks": 1570,
+     "chuteTicks": 309,
+     "airBrakeTicks": 717,
+     "bsodActiveTicks": 2145,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {
+      "parachute": 3,
+      "airBrake": 1
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 2145,
+   "inputs": 1055,
+   "checkpoints": 17
+  },
+  {
+   "id": "kodiaks-on",
+   "recorded": {
+    "ticks": 4800,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 1036,
+    "score": 1956,
+    "x": 20765.78126444781,
+    "y": 6812.521273127084,
+    "stats": {
+     "contactTicks": 2844,
+     "maxPairs": 7,
+     "airTicks": 1810,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 4800,
+     "bsodCaught": false,
+     "kodiakTicks": 1799,
+     "maxChunk": 12,
+     "maxSector": 2,
+     "tricks": {},
+     "kodiaksOn": true,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 4801,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 1036,
+    "score": 1956,
+    "x": 20770.816564093624,
+    "y": 6813.358580447049,
+    "stats": {
+     "contactTicks": 2844,
+     "maxPairs": 7,
+     "airTicks": 1810,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 4801,
+     "bsodCaught": false,
+     "kodiakTicks": 1799,
+     "maxChunk": 12,
+     "maxSector": 2,
+     "tricks": {},
+     "kodiaksOn": true,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 4800,
+   "inputs": 1375,
+   "checkpoints": 40
+  },
+  {
+   "id": "daily-practice-rule",
+   "recorded": {
+    "ticks": 2400,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 724,
+    "score": 1399,
+    "x": 14528.470456362165,
+    "y": 5467.452236312314,
+    "stats": {
+     "contactTicks": 1333,
+     "maxPairs": 3,
+     "airTicks": 1038,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2400,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 7,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 16
+    }
+   },
+   "replay": {
+    "ticks": 2401,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 724,
+    "score": 1399,
+    "x": 14535.395571674024,
+    "y": 5472.806717605184,
+    "stats": {
+     "contactTicks": 1334,
+     "maxPairs": 3,
+     "airTicks": 1038,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 2401,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 7,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 16
+    }
+   },
+   "desync": null,
+   "endTick": 2400,
+   "inputs": 727,
+   "checkpoints": 20
+  },
+  {
+   "id": "broad-cruise-a",
+   "recorded": {
+    "ticks": 3472,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 843,
+    "score": 1951,
+    "x": 16923.805407564378,
+    "y": 5866.080473998821,
+    "stats": {
+     "contactTicks": 2008,
+     "maxPairs": 7,
+     "airTicks": 1386,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 3471,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 9,
+     "maxSector": 1,
+     "tricks": {
+      "backflip": 1,
+      "frontflip": 1
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 3472,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 843,
+    "score": 1951,
+    "x": 16923.805407564378,
+    "y": 5866.080473998821,
+    "stats": {
+     "contactTicks": 2008,
+     "maxPairs": 7,
+     "airTicks": 1386,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 3471,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 9,
+     "maxSector": 1,
+     "tricks": {
+      "backflip": 1,
+      "frontflip": 1
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 3471,
+   "inputs": 732,
+   "checkpoints": 28
+  },
+  {
+   "id": "broad-cruise-b",
+   "recorded": {
+    "ticks": 1508,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 325,
+    "score": 405,
+    "x": 6561.293718896465,
+    "y": 2474.3763007057496,
+    "stats": {
+     "contactTicks": 983,
+     "maxPairs": 4,
+     "airTicks": 508,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1507,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 1508,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 325,
+    "score": 405,
+    "x": 6561.293718896465,
+    "y": 2474.3763007057496,
+    "stats": {
+     "contactTicks": 983,
+     "maxPairs": 4,
+     "airTicks": 508,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1507,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 1507,
+   "inputs": 356,
+   "checkpoints": 12
+  },
+  {
+   "id": "broad-cruise-c",
+   "recorded": {
+    "ticks": 1770,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 409,
+    "score": 529,
+    "x": 8242.426757721638,
+    "y": 2795.529893262236,
+    "stats": {
+     "contactTicks": 997,
+     "maxPairs": 7,
+     "airTicks": 741,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1769,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 1
+    }
+   },
+   "replay": {
+    "ticks": 1770,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 409,
+    "score": 529,
+    "x": 8242.426757721638,
+    "y": 2795.529893262236,
+    "stats": {
+     "contactTicks": 997,
+     "maxPairs": 7,
+     "airTicks": 741,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1769,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 4,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 1
+    }
+   },
+   "desync": null,
+   "endTick": 1769,
+   "inputs": 469,
+   "checkpoints": 14
+  },
+  {
+   "id": "broad-cruise-d",
+   "recorded": {
+    "ticks": 1755,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 401,
+    "score": 501,
+    "x": 8077.914265425554,
+    "y": 2754.7171834036726,
+    "stats": {
+     "contactTicks": 810,
+     "maxPairs": 3,
+     "airTicks": 930,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1754,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 5,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 2
+    }
+   },
+   "replay": {
+    "ticks": 1755,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 401,
+    "score": 501,
+    "x": 8077.914265425554,
+    "y": 2754.7171834036726,
+    "stats": {
+     "contactTicks": 810,
+     "maxPairs": 3,
+     "airTicks": 930,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1754,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 5,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 2
+    }
+   },
+   "desync": null,
+   "endTick": 1754,
+   "inputs": 640,
+   "checkpoints": 14
+  },
+  {
+   "id": "broad-cruise-e",
+   "recorded": {
+    "ticks": 874,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 170,
+    "score": 235,
+    "x": 3455.3977923134307,
+    "y": 1095.851117688776,
+    "stats": {
+     "contactTicks": 632,
+     "maxPairs": 3,
+     "airTicks": 237,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 873,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 2,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 64
+    }
+   },
+   "replay": {
+    "ticks": 874,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 170,
+    "score": 235,
+    "x": 3455.3977923134307,
+    "y": 1095.851117688776,
+    "stats": {
+     "contactTicks": 632,
+     "maxPairs": 3,
+     "airTicks": 237,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 873,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 2,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 64
+    }
+   },
+   "desync": null,
+   "endTick": 873,
+   "inputs": 162,
+   "checkpoints": 7
+  },
+  {
+   "id": "broad-allbiomes",
+   "recorded": {
+    "ticks": 6925,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 1850,
+    "score": 3280,
+    "x": 37060.2560101977,
+    "y": 13664.678058331463,
+    "stats": {
+     "contactTicks": 3061,
+     "maxPairs": 8,
+     "airTicks": 3597,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 6924,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 21,
+     "maxSector": 3,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 2047
+    }
+   },
+   "replay": {
+    "ticks": 6925,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 1850,
+    "score": 3280,
+    "x": 37060.2560101977,
+    "y": 13664.678058331463,
+    "stats": {
+     "contactTicks": 3061,
+     "maxPairs": 8,
+     "airTicks": 3597,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 6924,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 21,
+     "maxSector": 3,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 2047
+    }
+   },
+   "desync": null,
+   "endTick": 6924,
+   "inputs": 2837,
+   "checkpoints": 57
+  },
+  {
+   "id": "broad-reckless-a",
+   "recorded": {
+    "ticks": 1086,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 137,
+    "score": 202,
+    "x": 2748.0464463431845,
+    "y": 1034.9338075912992,
+    "stats": {
+     "contactTicks": 586,
+     "maxPairs": 6,
+     "airTicks": 502,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1085,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 2,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 1086,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 137,
+    "score": 202,
+    "x": 2748.0464463431845,
+    "y": 1034.9338075912992,
+    "stats": {
+     "contactTicks": 586,
+     "maxPairs": 6,
+     "airTicks": 502,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1085,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 2,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 1085,
+   "inputs": 20,
+   "checkpoints": 9
+  },
+  {
+   "id": "broad-reckless-b",
+   "recorded": {
+    "ticks": 1077,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 157,
+    "score": 157,
+    "x": 3195.4574524585264,
+    "y": 1096.175176538193,
+    "stats": {
+     "contactTicks": 737,
+     "maxPairs": 3,
+     "airTicks": 345,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1076,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 2,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 4
+    }
+   },
+   "replay": {
+    "ticks": 1077,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 157,
+    "score": 157,
+    "x": 3195.4574524585264,
+    "y": 1096.175176538193,
+    "stats": {
+     "contactTicks": 737,
+     "maxPairs": 3,
+     "airTicks": 345,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1076,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 2,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 4
+    }
+   },
+   "desync": null,
+   "endTick": 1076,
+   "inputs": 22,
+   "checkpoints": 8
+  },
+  {
+   "id": "broad-tricks-a",
+   "recorded": {
+    "ticks": 1861,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 394,
+    "score": 816,
+    "x": 7945.126551340867,
+    "y": 2805.0130191298267,
+    "stats": {
+     "contactTicks": 916,
+     "maxPairs": 4,
+     "airTicks": 931,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1860,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 0,
+     "tricks": {
+      "helicopterCW": 2
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 1861,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 394,
+    "score": 816,
+    "x": 7945.126551340867,
+    "y": 2805.0130191298267,
+    "stats": {
+     "contactTicks": 916,
+     "maxPairs": 4,
+     "airTicks": 931,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1860,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 0,
+     "tricks": {
+      "helicopterCW": 2
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 1860,
+   "inputs": 425,
+   "checkpoints": 15
+  },
+  {
+   "id": "broad-tricks-b",
+   "recorded": {
+    "ticks": 3008,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 655,
+    "score": 1425,
+    "x": 13148.913044445833,
+    "y": 4911.622551773986,
+    "stats": {
+     "contactTicks": 1657,
+     "maxPairs": 3,
+     "airTicks": 1293,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 3007,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 7,
+     "maxSector": 1,
+     "tricks": {
+      "helicopterCW": 3
+     },
+     "kodiaksOn": false,
+     "biomeMask": 8
+    }
+   },
+   "replay": {
+    "ticks": 3008,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 655,
+    "score": 1425,
+    "x": 13148.913044445833,
+    "y": 4911.622551773986,
+    "stats": {
+     "contactTicks": 1657,
+     "maxPairs": 3,
+     "airTicks": 1293,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 3007,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 7,
+     "maxSector": 1,
+     "tricks": {
+      "helicopterCW": 3
+     },
+     "kodiaksOn": false,
+     "biomeMask": 8
+    }
+   },
+   "desync": null,
+   "endTick": 3007,
+   "inputs": 555,
+   "checkpoints": 25
+  },
+  {
+   "id": "broad-chute-a",
+   "recorded": {
+    "ticks": 5000,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 794,
+    "score": 1566,
+    "x": 15935.71752819867,
+    "y": 5103.4763443119855,
+    "stats": {
+     "contactTicks": 1345,
+     "maxPairs": 4,
+     "airTicks": 3575,
+     "chuteTicks": 532,
+     "airBrakeTicks": 1646,
+     "bsodActiveTicks": 5000,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 9,
+     "maxSector": 1,
+     "tricks": {
+      "parachute": 5,
+      "airBrake": 3
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 5001,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 794,
+    "score": 1566,
+    "x": 15936.252419991853,
+    "y": 5104.623643576637,
+    "stats": {
+     "contactTicks": 1345,
+     "maxPairs": 4,
+     "airTicks": 3576,
+     "chuteTicks": 532,
+     "airBrakeTicks": 1647,
+     "bsodActiveTicks": 5001,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 9,
+     "maxSector": 1,
+     "tricks": {
+      "parachute": 5,
+      "airBrake": 3
+     },
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 5000,
+   "inputs": 2381,
+   "checkpoints": 41
+  },
+  {
+   "id": "broad-chute-b",
+   "recorded": {
+    "ticks": 4587,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 752,
+    "score": 1566,
+    "x": 15106.519758170545,
+    "y": 5649.694089098768,
+    "stats": {
+     "contactTicks": 1342,
+     "maxPairs": 3,
+     "airTicks": 3170,
+     "chuteTicks": 487,
+     "airBrakeTicks": 1462,
+     "bsodActiveTicks": 4586,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 8,
+     "maxSector": 1,
+     "tricks": {
+      "parachute": 4,
+      "airBrake": 2
+     },
+     "kodiaksOn": false,
+     "biomeMask": 16
+    }
+   },
+   "replay": {
+    "ticks": 4587,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 752,
+    "score": 1566,
+    "x": 15106.519758170545,
+    "y": 5649.694089098768,
+    "stats": {
+     "contactTicks": 1342,
+     "maxPairs": 3,
+     "airTicks": 3170,
+     "chuteTicks": 487,
+     "airBrakeTicks": 1462,
+     "bsodActiveTicks": 4586,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 8,
+     "maxSector": 1,
+     "tricks": {
+      "parachute": 4,
+      "airBrake": 2
+     },
+     "kodiaksOn": false,
+     "biomeMask": 16
+    }
+   },
+   "desync": null,
+   "endTick": 4586,
+   "inputs": 2119,
+   "checkpoints": 38
+  },
+  {
+   "id": "broad-bsod-a",
+   "recorded": {
+    "ticks": 9000,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 586,
+    "score": 26,
+    "x": 11706.883787779865,
+    "y": 4207.721534330018,
+    "stats": {
+     "contactTicks": 7447,
+     "maxPairs": 7,
+     "airTicks": 1557,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 9000,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 9001,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 586,
+    "score": 26,
+    "x": 11707.860561038384,
+    "y": 4207.742569067599,
+    "stats": {
+     "contactTicks": 7447,
+     "maxPairs": 7,
+     "airTicks": 1558,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 9001,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 1,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 9000,
+   "inputs": 1446,
+   "checkpoints": 75
+  },
+  {
+   "id": "broad-kodiaks-a",
+   "recorded": {
+    "ticks": 1759,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 401,
+    "score": 686,
+    "x": 8076.797969302438,
+    "y": 2717.0425290791004,
+    "stats": {
+     "contactTicks": 997,
+     "maxPairs": 3,
+     "airTicks": 720,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1758,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": true,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 1759,
+    "crashed": true,
+    "cause": "hazard",
+    "distanceM": 401,
+    "score": 686,
+    "x": 8076.797969302438,
+    "y": 2717.0425290791004,
+    "stats": {
+     "contactTicks": 997,
+     "maxPairs": 3,
+     "airTicks": 720,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 1758,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 6,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": true,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 1758,
+   "inputs": 600,
+   "checkpoints": 14
+  },
+  {
+   "id": "broad-daily",
+   "recorded": {
+    "ticks": 866,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 219,
+    "score": 239,
+    "x": 4444.387605766194,
+    "y": 1532.0061333119609,
+    "stats": {
+     "contactTicks": 630,
+     "maxPairs": 3,
+     "airTicks": 227,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 865,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 2,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "replay": {
+    "ticks": 866,
+    "crashed": true,
+    "cause": "terrain",
+    "distanceM": 219,
+    "score": 239,
+    "x": 4444.387605766194,
+    "y": 1532.0061333119609,
+    "stats": {
+     "contactTicks": 630,
+     "maxPairs": 3,
+     "airTicks": 227,
+     "chuteTicks": 0,
+     "airBrakeTicks": 0,
+     "bsodActiveTicks": 865,
+     "bsodCaught": false,
+     "kodiakTicks": 0,
+     "maxChunk": 2,
+     "maxSector": 0,
+     "tricks": {},
+     "kodiaksOn": false,
+     "biomeMask": 0
+    }
+   },
+   "desync": null,
+   "endTick": 865,
+   "inputs": 115,
+   "checkpoints": 7
+  }
+ ]
+}

@@ -7,7 +7,13 @@ import {
 } from '../../src/systems/TerrainGenerator.js';
 import { SLOW_HAZARD_MIN_DEG, SLOW_HAZARD_CLEAR_PX, RUNOUT_TURN_DEG } from '../../src/systems/TerrainGenerator.js';
 import { TERRAIN, PIXELS_PER_METER } from '../../src/constants.js';
-import { makeGen, loadContent, segAngle, inGap, rollSim, findLaunches } from './_helpers.js';
+import { makeGen as makeGenWithBiomes, loadContent, segAngle, inGap, rollSim, findLaunches } from './_helpers.js';
+
+// These tests pin the core terrain machinery (shape, spacing, hazard and launch frequencies, digests). Since #65 the
+// home biome (Debutmont) is the base, so a generator built WITH biome content flavours even mask-0 terrain. The core
+// rules here are asserted without biome content, as before; biome terrain has its own tests (biomes.test.js,
+// biome-bridges.test.js and the per-biome suites).
+const makeGen = (seed, overrides = {}) => makeGenWithBiomes(seed, { biomeDefs: [], ...overrides });
 
 const snap = (c) => JSON.parse(JSON.stringify(c));
 const isAirDef = (defs, h) => defs[h.defId].placement === 'air';
@@ -1339,11 +1345,13 @@ describe('longer difficulty ramp (tail past the old caps)', () => {
   });
 });
 
+// #121 (portable math): digests re-pinned once. Terrain generation now uses pmath (tan/atan2/hypot/cos), which differs from native V8 Math in the last bits
+// of about 10% of the numbers (max 8.7e-11 px, 6e-16 relative; zero structural differences over 20 seed/mask pairs x 300 chunks, tools/determinism/portable-math/terrain-delta.mjs).
 describe('late-game hazard fill (retry of rejected slots past HAZARD_RETRY_FROM_M)', () => {
   // md5 of every chunk starting before 2000 m, taken from the generator BEFORE the late-game fill was added
   const GOLDEN_BEFORE_2000M = {
-    alpha: '6e5c7443c540:20', beta: 'e4ed7b8fa11b:21', gamma: 'bed9bc0df84a:20',
-    'sim-01': '9212e9ac3899:22', 'sim-17': 'a1c2e22cb540:20', 'daily-2026-11-12': 'e833c066662d:20',
+    alpha: '6e5c7443c540:20', beta: '67e071ba3872:21', gamma: '9dd05cbe30d0:20',
+    'sim-01': '3923503d3d32:22', 'sim-17': '5b5cbfedf760:20', 'daily-2026-11-12': 'f14618ca0886:20',
   };
 
   test('chunks starting before HAZARD_RETRY_FROM_M (so the whole opening and early game) are bit-identical to before', () => {

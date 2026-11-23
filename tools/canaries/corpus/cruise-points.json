@@ -1,0 +1,37 @@
+{
+  "id": "cruise-points",
+  "description": "Plain cruise tape that accrues real trick / score points: ride the intro roller, launch off the generated lip, air-brake and front flip, and bank the score without crashing.",
+  "seed": "CANARY117",
+  "biomeMask": 0,
+  "startX": 0,
+  "hz": 60,
+  "durationMs": 9000,
+  "input": {
+    "held": [
+      {
+        "key": "push",
+        "from": 0,
+        "to": 1600
+      },
+      {
+        "key": "tuck",
+        "from": 2000,
+        "to": 3000
+      },
+      {
+        "key": "airBrake",
+        "from": 2400,
+        "to": 2800
+      },
+      {
+        "key": "tilt",
+        "value": 1,
+        "from": 2800,
+        "to": 3400
+      }
+    ],
+    "edges": [],
+    "events": []
+  },
+  "notes": "VERIFIED 2026-11-21 (re-verified after re-baseline). Accrues real trick points without crashing: airBrake@tick 318 and frontflip@tick 427 both register from the tape's own input. One long airborne episode crosses the lip at x=1024 (startTick 281, durationMs 2158.3, lands x=1873 at tick 540); the other two airborne episodes are the 208 ms start drop (ticks 1-26) and a 108 ms hop at tick 672, so only ONE episode is the lip jump. A highBandwidth zone runs x=2639..3229 (tick 708). Score rises 0 -> 481; no crash, distance 205 m, endTick 1080."
+}

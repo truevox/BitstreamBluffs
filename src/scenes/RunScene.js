@@ -27,7 +27,7 @@ import { EVT } from '../events.js';
 import { SaveStore, LEDGER_HASH_V, UPGRADE_LEDGER_HASH_V,DRAFT_LEDGER_HASH_V } from '../systems/SaveStore.js';
 import { upgradeLoadoutForRun, upgradeEffects, canopyBluffRecoveryMs } from '../systems/PermanentUpgrades.js';
 import {DRAFT_RULES_VERSION,DRAFT_BUDGET,validDraftRanks,draftActiveRanks} from '../systems/DailyDraft.js';
-import { TerrainGenerator, biomeForSector } from '../systems/TerrainGenerator.js';
+import { TerrainGenerator } from '../systems/TerrainGenerator.js';
 import { detectBiomeVisits } from '../systems/BiomeDiscovery.js';
 import { ScoreManager } from '../systems/ScoreManager.js';
 import { TrickTracker } from '../systems/TrickTracker.js';
@@ -45,8 +45,11 @@ import { GhostRider } from '../entities/GhostRider.js';
 import { BlackHole } from '../entities/BlackHole.js';
 import { isReducedMotion } from '../ui/Motion.js';
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
+import { resolveReplaySetup } from '../systems/replay/manifest.js';
+import { scheduleRunEvidence, RULESET_KEY } from '../systems/replay/evidenceCapture.js';
+import { SIM_REVISION } from '../systems/replay/ruleset.js';
 import { magnetStrength, pullStep, magnetSpawn, magnetHolePos, magnetsDropFor } from '../systems/ShardMagnet.js';
-import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, KODIAK_BY_ID, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
+import { kodiaksEnabledFor, kodiakEncounter, spawnKodiakPack, stepKodiakPack, kodiakBox, kodiakHits, kodiakKnockback, KODIAK_KNOCK, KODIAK_VERSION, KODIAK_DEFS } from '../systems/Kodiaks.js';
 import { KodiakRider } from '../entities/KodiakRider.js';
 import { emptyWards, addWard, tickWards, isWarded, wardMsLeft, wardSpeedMul } from '../systems/Wards.js';
 import {
@@ -62,7 +65,9 @@ import { Hazard } from '../entities/Hazard.js';
 import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
-import { WorldDanceEnvelope, worldDanceMotionAllowed } from '../systems/WorldDance.js';
+import { BiomeFx } from '../entities/BiomeFx.js';
+import { bridgeLook } from '../systems/BiomeTransition.js';
+import { WorldDanceEnvelope, worldDanceMotionAllowed, readWorldDanceAudio } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
 import { ShardField } from '../entities/Shard.js';
@@ -72,14 +77,16 @@ import { crashReport, crashBeat, deathMarkerX } from '../systems/CrashReport.js'
 import { layoutMarkerLabels } from '../systems/MarkerLayout.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
-import { planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
+import { planTelegraphMarks as planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
 import { speedZoom, ZOOM_FLOOR } from '../systems/CameraZoom.js';
 import { installTerrainContactFix } from '../systems/TerrainContact.js';
+import { installPortableMatter } from '../systems/MatterPortable.js';
 import { HintScheduler } from '../systems/HintScheduler.js';
 import { BsodPursuit, BSOD_DEFAULTS, emptyBsodState } from '../systems/BsodPursuit.js';
 import { bsodWindVisualStrength } from '../systems/BsodWindVisual.js';
 import { GYM_READY_MS, gymSetupForProfile, placeGymWall, GYM_MASTERY_CHAIN, advanceGymReadyMs, gymBeatSuggestion } from '../systems/BsodGym.js';
 import { BsodBluffTracker } from '../systems/BsodBluffTracker.js';
+import pmath from '../systems/pmath.js';
 
 const DEG = Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -158,6 +165,10 @@ export class RunScene extends Phaser.Scene {
     // stale `pressed.pause` paused the run on its first frame. Drop them before the run starts.
     try { if (this.inputRouter) this.inputRouter.poll(); } catch (e) { /* ignore */ }
     this.palette = getPalette(this.game);
+    // RunScene is one instance across runs and the palette above is the base one: forget the previous run's biome, or a
+    // retry that ends where it began (Debutmont) would skip its opening repaint, motif and BIOME_ENTER (#65).
+    this._biomeId = undefined;
+    this._lookId = undefined; // #65 presentation: the look follows the same reset
     // W4 cosmetics: resolved ONCE per run, from the profile, for the same reason the biome mask is: the
     // sled, the trail and the drawn colours must not disagree with each other mid-run.
     this.look = this._resolveLook();
@@ -166,6 +177,9 @@ export class RunScene extends Phaser.Scene {
     this._replayTape = reg.get(REG.GHOST_REPLAY) || null;
     if (this._replayTape) reg.remove(REG.GHOST_REPLAY);
     const replay = this._replayTape;
+    // Replay Contract R-1..R-4: a replay resolves daily rule, Sync Level and Kodiak/magnet flags from the recorded
+    // tape/manifest, never from the clock, the live profile or the live registry flags.
+    const rp = replay ? resolveReplaySetup(replay, { rules: DailyPatch.RULES }) : null;
     this.seed = replay ? String(replay.seed) : String(reg.get(REG.SEED) != null ? reg.get(REG.SEED) : 'default');
     // Named seeded streams for this run (issue #59). Rebuilt from the seed on every create.
     this.runRandom = runRandomStreams(this.seed);
@@ -186,21 +200,21 @@ export class RunScene extends Phaser.Scene {
     // The today check means a retry or a pause-restart after 00:00 UTC cannot back-fill yesterday.
     const seedDay = DailyPatch.dateKeyFromSeed(this.seed);
     const todayKey = DailyPatch.getDailyInfo().dateKey;
-    this.dailyOfficial = reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
+    this.dailyOfficial = !replay && reg.get(REG.DAILY_OFFICIAL) === true && seedDay !== null && seedDay === todayKey;
     // Separate ranked Daily lane. A typed seed, Gym or stale-date retry
     // can NEVER turn itself into an official competitive Draft.
     this.dailyMode=this.dailyOfficial&&reg.get(REG.DAILY_MODE)==='draft'?'draft':'classic';
     // daily rule (read ONCE per run). A run on a daily seed plays THAT date's rule (decision 2: a practice
     // run of a past date replays that date, FAIRNESS-2); every other run plays today's rule as before.
     const seedDayInfo = seedDay ? DailyPatch.infoForDateKey(seedDay) : null;
-    const daily = seedDayInfo ? { rule: seedDayInfo.rule } : DailyPatch.getDailyInfo();
+    const daily = rp ? { rule: rp.dailyRule } : seedDayInfo ? { rule: seedDayInfo.rule } : DailyPatch.getDailyInfo();
     this.dailyRuleId = (daily && daily.rule && daily.rule.id) || 'none';
     // W4 loadout: the boosts the player switched on, read from the profile. Absent profile or absent
     // boosts means a clean run, which is the default-off rule.
     // The owned set (`unlocked.boosts`, granted at Sync Level 8 / 15) gates them: a toggle switched on
     // before the boost is unlocked does nothing and does not mark the run modded (Boosts.boostEffects).
     const prof = this.registry.get(REG.PROFILE) || {};
-    this.bsodGym = reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
+    this.bsodGym = !replay && reg.get(REG.BSOD_GYM) === true && prof.bsodGym?.owned === true;
     this.loadout = { boosts: (prof && prof.boosts && typeof prof.boosts === 'object') ? { ...prof.boosts } : {} };
     const owned = prof && prof.unlocked && typeof prof.unlocked === 'object' ? prof.unlocked.boosts : null;
     this.unlockedBoosts = owned && typeof owned === 'object' ? { ...owned } : {};
@@ -224,16 +238,17 @@ export class RunScene extends Phaser.Scene {
     this.upgradeFx = this.upgradeRun.effects;
     // Shard Magnets drop from Sync Level 5, and on every Daily (equal pickups on an official board).
     // A ghost replay restores the recorded choice so the course matches.
-    this.magnetsDrop = replay && typeof replay.magnetsDrop === 'boolean' ? replay.magnetsDrop
+    this.magnetsDrop = rp ? rp.magnetsDrop
       : magnetsDropFor({ level: prof.level, daily: this.dailyOfficial === true || this.dailyMode === 'draft' });
     // Issue #47: hostile Kodiaks from the proposed Sync Level, never on Dailies or in the Gym (no event rule yet).
-    this.kodiaksOn = replay && typeof replay.kodiaksOn === 'boolean' ? replay.kodiaksOn
+    this.kodiaksOn = rp ? rp.kodiaksOn
       : kodiaksEnabledFor({ level: prof.level, daily: this.dailyOfficial === true || this.dailyMode === 'draft', gym: this.bsodGym === true });
     // Packs are one type ('same') or mixed; a Settings switch while Marvin playtests which is better.
-    this.kodiakPackMode = replay && typeof replay.kodiakPackMode === 'string' ? replay.kodiakPackMode
+    this.kodiakPackMode = rp ? rp.kodiakPackMode
       : this.settings?.kodiakPacks === 'mixed' ? 'mixed' : 'same';
     this.kodiaks = [];
     this.kodiakNext = 0;
+    this.kodiakShoveCdMs = 0; // immunity window after a bear shove (sim ms)
     // Player abilities and BSOD behavior are unchanged in the Gym. Only the
     // starting pose, pursuit gap/speed and post-catch retry are different.
     this.gymSetup = this.bsodGym ? gymSetupForProfile(prof) : null;
@@ -316,10 +331,17 @@ export class RunScene extends Phaser.Scene {
     world.engine.velocityIterations = 6;
     world.engine.gravity.y = PHYSICS.gravityPxS2 / 1000;
     installTerrainContactFix(Phaser.Physics.Matter.Matter);
+    installPortableMatter(Phaser.Physics.Matter.Matter); // #121: Matter's trig/pow/acos through pmath, before any body is built
 
     // visuals / entities
     this.cameras.main.setBackgroundColor(this.palette.bg);
     this.bg = new Background(this, this.palette);
+    // #65 presentation: the biome glitch sets and the arcade bridge look. Render-only (BiomeFx reads the camera and the
+    // run clock; nothing it does reaches terrain, physics, hazards or score).
+    this._veil = 0;
+    this._bridgeSpan = null;
+    this._lookScratch = { veil: 0, lookId: null, t: -1 }; // bridgeLook's result, reused every frame
+    this.biomeFx = new BiomeFx(this, this.palette, getPalette(this.game, null), this.bg);
     this.worldDance = new WorldDanceEnvelope();
     this.songBillboard = new SongBillboard(this);
     // Retain a live MediaQueryList so an OS reduced-motion change is seen
@@ -345,6 +367,16 @@ export class RunScene extends Phaser.Scene {
 
     // initial terrain buffer, then the sled on the surface
     this._chunkQueue = new Map(); // a retry re-enters create() on this instance: no stale queued chunks
+    // The scene instance outlives the run (scene.start re-enters create()). The biome announcement compares the sled's
+    // biome with the last one it saw (`_biomeId`, reset above, before the look reads it). Before #140 the palette
+    // repaint also rebuilt terrain colliders, so this affected physics by session position; since #140 it is a
+    // presentation/cue reset. Keep every run like run #1.
+    // Presentation state of the previous run (a stale boost hint at run start, a stale POWERUP_EXPIRED id):
+    this.lastBoost = null;
+    this.boostId = null;
+    // Defensive: update() rewrites these every frame, so today they carry nothing over.
+    this._hopped = false;
+    this._pushed = false;
     this.streamTerrain(0);
     const start = this.safeStartPosition();
     // spawn a few body-lengths in so the rear runner is over solid ground (terrain begins exactly at start.x)
@@ -356,7 +388,7 @@ export class RunScene extends Phaser.Scene {
     this.gymAttemptStartX = spawnX;
     this.gymStartX = spawnX;
     this.sled = new Sled(this, spawnX, spawnY - 14, this.palette, this.look);
-    this.sled.setPose(spawnX, spawnY - 15, spawnAng, 50 * Math.cos(spawnAng * DEG), 50 * Math.sin(spawnAng * DEG));
+    this.sled.setPose(spawnX, spawnY - 15, spawnAng, 50 * pmath.cos(spawnAng * DEG), 50 * pmath.sin(spawnAng * DEG));
     // W4 boosts. Applied at spawn from the loadout chosen before the run: the shield reuses the Hashed
     // Backup charge counter the pickup already feeds, and Head Start scales the launch velocity through
     // the same method the speed-boost pickup uses. No physics constant is touched.
@@ -390,7 +422,7 @@ export class RunScene extends Phaser.Scene {
     this.sled.parachuteFuelMs = this.sled.canopyFuelFullMs;
     this.bsod = new BsodPursuit({
       sledLeftEdgeX: sledLeftCollisionEdge(this.sled),
-      level: prof.level,
+      level: rp ? rp.syncLevel : prof.level,
       config: { ...BSOD_DEFAULTS,
         accelerationPxS2: BSOD_DEFAULTS.accelerationPxS2 * this.upgradeFx.bsodAccelerationMul },
     });
@@ -447,8 +479,10 @@ export class RunScene extends Phaser.Scene {
         this.finishGymReady();
       }
     };
-    this._onMusicTrackChange = (payload) => this.songBillboard?.showTrack(payload,
-      this.registry.get(REG.AUDIO));
+    // Audio is presentation: a failing engine must never break run start or the emitter (issue #140).
+    this._onMusicTrackChange = (payload) => {
+      try { this.songBillboard?.showTrack(payload, this.registry.get(REG.AUDIO)); } catch { /* no billboard */ }
+    };
     this.game.events.on(EVT.MUSIC_TRACK_CHANGED,this._onMusicTrackChange);
     this.game.events.on(EVT.SETTINGS_CHANGED, this._onSettings);
     this.game.events.on(EVT.GAME_RESUME, this._onResume);
@@ -460,9 +494,11 @@ export class RunScene extends Phaser.Scene {
     this.scene.launch(SCENES.UI);
     // A track may already be playing from the Title jukebox. Introduce it
     // once when entering the first run, never once per scene retry.
-    const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
-    if(playing?.state==='playing'&&playing.current)
-      this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    try {
+      const playing=this.registry.get(REG.AUDIO)?.jukeboxSnapshot?.();
+      if(playing?.state==='playing'&&playing.current)
+        this.songBillboard?.showTrack(playing.current,this.registry.get(REG.AUDIO));
+    } catch { /* a throwing audio engine must not stop the run from starting (issue #140) */ }
     this._initGhosts();
     this.game.events.emit(EVT.RUN_START, {
       runId: this.runId, seed: this.seed, dailyRuleId: this.dailyRuleId, startedAt: this.startedAt,
@@ -488,7 +524,12 @@ export class RunScene extends Phaser.Scene {
     if (!lib || this.bsodGym || replay) return;
     const st = this.settings || {};
     const show = { best: st.ghostBest !== false, latest: st.ghostLatest !== false, fav0: true, fav1: true, fav2: true };
-    lib.ghostsFor(this.seed, this.biomeMask, show).then((list) => {
+    // A missing/older simRevision is never a current-terrain display ghost.
+    // The source revision is available synchronously even if the validated
+    // runtime ruleset's asynchronous loader has not completed at run start.
+    const loadedRevision = this.registry.get(RULESET_KEY)?.doc?.simRevision;
+    const simRevision = loadedRevision === SIM_REVISION ? loadedRevision : SIM_REVISION;
+    lib.ghostsFor(this.seed, this.biomeMask, show, { simRevision }).then((list) => {
       if (token !== this._ghostToken || !this.sys?.isActive?.()) return;
       this.ghostRiders = list.map((g) => new GhostRider(this, g, this.palette));
     }).catch(() => { /* ghosts are cosmetic */ });
@@ -499,8 +540,17 @@ export class RunScene extends Phaser.Scene {
     const b = this.sled.body;
     return {
       seed: this.seed, biomeMask: this.biomeMask || 0,
+      // Use the registered, verified ruleset when present. A run can begin
+      // before the nonblocking ruleset-loader finishes; the same build's
+      // compile-time SIM_REVISION is the safe fallback, not legacy physicsVersion.
+      simRevision: this.registry.get(RULESET_KEY)?.doc?.simRevision === SIM_REVISION
+        ? this.registry.get(RULESET_KEY).doc.simRevision : SIM_REVISION,
       mode: this.bsodGym ? 'gym' : this.dailyMode === 'draft' ? 'daily-draft' : this.dailyOfficial ? 'daily' : 'normal',
       dailyRuleId: this.dailyRuleId || null,
+      dailyRuleSource: DailyPatch.dateKeyFromSeed(this.seed) ? 'seed-date' : 'clock-at-start',
+      syncLevel: Number.isFinite(this.registry.get(REG.PROFILE)?.level) ? Math.max(1, this.registry.get(REG.PROFILE).level) : 1,
+      bsod: { leftEdgeX: sledLeftCollisionEdge(this.sled),
+        initial: { wallX: this.bsod.wallX, wallSpeedPxS: this.bsod.wallSpeedPxS, accelerationPxS2: this.bsod.accelerationPxS2 } },
       controlLayout: this.settings?.controlLayout || 'tricksRight',
       boosts: [...(this.appliedBoosts || [])],
       upgradeRanks: this.upgradeRun?.enabled ? { ...this.upgradeRun.ranks } : null,
@@ -523,17 +573,21 @@ export class RunScene extends Phaser.Scene {
       this.registry.set(REG.LAST_GHOST_TAPE, tape);
       const pr = this.registry.get(REG.GHOSTS)?.saveRun(tape);
       if (pr && pr.catch) pr.catch(() => {});
+      // Replay evidence (#116): runs in a later task (never on this frame), never throws; failures are logged and left on the registry.
+      scheduleRunEvidence(tape, rec, { registry: this.registry, ruleset: this.registry.get(RULESET_KEY) });
     } catch (e) { /* a ghost must never break the end of a run */ }
   }
 
   /**
    * Issue #47: one Kodiak PACK at a time, on the seeded schedule (Kodiaks.kodiakEncounter). Runs inside the
-   * fixed tick; collision is a tick-exact box test per bear (no Matter body). A hit is a crash hazard, so
-   * shields, the respawn grace and Hashed Backup apply exactly as for any hazard; passing a bear scores.
+   * fixed tick; collision is a tick-exact box test per bear (no Matter body). Contact is never a crash: the bear
+   * shoves the sled back and up (Kodiaks.kodiakKnockback), once per bear, with a shared immunity window so a pack
+   * cannot chain shoves. A shoved bear earns no pass bonus; a clean pass scores.
    */
   updateKodiaks(dt) {
     if (!this.kodiaksOn || this.crashed || !this.sled) return;
     const sled = this.sled;
+    if (this.kodiakShoveCdMs > 0) this.kodiakShoveCdMs = Math.max(0, this.kodiakShoveCdMs - dt);
     if (!this.kodiaks.length) {
       const enc = kodiakEncounter(this.seed, this.kodiakNext, this.kodiakPackMode);
       if ((sled.x - this.startX) / PIXELS_PER_METER < enc.atM) return;
@@ -553,11 +607,15 @@ export class RunScene extends Phaser.Scene {
         this.playSfx('groundWarn', { brace: ev.telegraph === 'real' });
         this.emitIf(EVT.KODIAK, { type: 'telegraph', id: k.def.id, short: k.def.short, real: ev.telegraph === 'real' });
       }
-      if (!k.hit && !(sled.invulnerableMs > 0) && kodiakHits(kodiakBox(k.x, k.groundY), sledBox)) {
+      if (!k.hit && this.kodiakShoveCdMs <= 0 && !(sled.invulnerableMs > 0) && kodiakHits(kodiakBox(k.x, k.groundY), sledBox)) {
         k.hit = true;
-        if (!this.pendingCrash) this.pendingCrash = { cause: 'hazard', hazardId: k.def.id };
+        const shove = kodiakKnockback(k, sled);
+        this._addSledVelocity(shove.dvx, shove.dvy);
+        this.kodiakShoveCdMs = KODIAK_KNOCK.immunityMs;
         this.fx.sparks(k.x, k.groundY - 14, k.def.accent, 16, 220);
         this.shake(3);
+        this.playSfx('push');
+        this.emitIf(EVT.KODIAK, { type: 'shove', id: k.def.id, short: k.def.short, n: k.n, member: k.member, dvx: shove.dvx, dvy: shove.dvy });
       }
       // Passing a bear (it was ahead and now is behind) scores; clearing it in the air scores more.
       const ahead = sled.x > k.x;
@@ -599,6 +657,8 @@ export class RunScene extends Phaser.Scene {
     safe(this.trail);
     safe(this.fx);
     safe(this.bg);
+    safe(this.biomeFx);
+    this.biomeFx = null;
     safe(this.songBillboard);
     this.songBillboard=null;
     safe(this.blackHole);
@@ -639,8 +699,7 @@ export class RunScene extends Phaser.Scene {
   /** Active Space Mountain has no atmosphere, even though the BSOD still chases. */
   bsodAtmosphere() {
     if (!this.terrain || !this.sled || !this.biomeMask) return 1;
-    const sector = this.terrain._sectorOf(this.sled.x);
-    const biome = this._biomeDefForSector(sector);
+    const biome = this._biomeDefAt(this.sled.x);
     return biome && biome.id === 'space-mountain' ? 0 : 1;
   }
 
@@ -795,14 +854,50 @@ export class RunScene extends Phaser.Scene {
 
   /** Ask the generator to stream around x and mirror its adds/removals into mesh, hazards and power-ups. */
   /**
-   * The biome definition owning a sector, or null for base terrain / no mask. Pure w.r.t. game state.
-   * @param {number} sectorNow 1-based sector index as the HUD uses it
+   * The biome definition at world x, or null for an arcade bridge / no content. Asks the generator, so the
+   * palette, the BIOME_ENTER announcement and the terrain itself (arcade bridges included) cannot disagree.
+   * Pure w.r.t. game state.
+   * @param {number} x world px
    * @returns {Object|null}
    */
-  _biomeDefForSector(sectorNow) {
-    if (!this.biomeMask) return null;
-    const id = biomeForSector(this.seed, sectorNow - 1, this.biomeMask, Object.values(this.content.biomes || {}));
+  _biomeDefAt(x) {
+    return this._biomeDefById(this.terrain.biomeAtX(x));
+  }
+
+  _biomeDefById(id) {
     return id ? (this.content.biomes || {})[id] || null : null;
+  }
+
+  /**
+   * #65 presentation: the biome whose look (palette, motif, glitch set) the world wears. Equals the generator's biome
+   * except across an arcade bridge, where the outgoing look holds through the dissolve and the incoming look is on
+   * before the bridge ends (BiomeTransition.bridgeLook). Reduced motion is the hard cut: the generator's answer.
+   * @returns {string|null|undefined}
+   */
+  _lookBiomeId() {
+    return this._lookId !== undefined ? this._lookId : this._biomeId;
+  }
+
+  /**
+   * Recompute the look and the dissolve veil from the sled's x and repaint when the look changes. Presentation only:
+   * the generator's own biome (BIOME_ENTER, discovery, music) is untouched. A bridge's span is cached while the sled
+   * is inside it, so the generator is asked once per bridge, not once per frame.
+   * @param {string|null} biomeNow terrain.biomeAtX(sled.x)
+   * @param {boolean} paletteOwed the generator's biome changed and a repaint was owed (entering a biome, or leaving one)
+   */
+  _updateLook(biomeNow, paletteOwed) {
+    const x = this.sled.x;
+    let span = null;
+    if (biomeNow === null && this.terrain.bridgeSpanAt && this.terrain.biomeDefs && this.terrain.biomeDefs.length) {
+      span = this._bridgeSpan;
+      if (!span || x < span.startX || x >= span.endX) span = this._bridgeSpan = this.terrain.bridgeSpanAt(x);
+    } else this._bridgeSpan = null;
+    const look = bridgeLook(span, x, biomeNow, !isReducedMotion(this), this._lookScratch || (this._lookScratch = { veil: 0, lookId: null, t: -1 }));
+    this._veil = look.veil;
+    const lookChanged = look.lookId !== this._lookId;
+    const firstLook = this._lookId === undefined;
+    this._lookId = look.lookId;
+    if (paletteOwed || (lookChanged && (this._biomeDefById(look.lookId) || !firstLook))) this.refreshPalette();
   }
 
   streamTerrain(x) {
@@ -831,10 +926,13 @@ export class RunScene extends Phaser.Scene {
     if (!chunk || this.mesh.chunks.has(chunk.index)) return;
     this.mesh.addChunk(chunk);
     const hz = [];
-    for (const spawn of chunk.hazards || []) {
+    const spawns = chunk.hazards || [];
+    for (let hazardOrdinal = 0; hazardOrdinal < spawns.length; hazardOrdinal++) {
+      const spawn = spawns[hazardOrdinal];
       const def = this.content.hazards[spawn.defId];
       if (!def) continue;
       const h = new Hazard(this, def, spawn, this.palette);
+      h.hid = `${chunk.index}:${hazardOrdinal}`; // stable id (chunk + spawn ordinal): keys TelegraphTracker, serializable
       h.simStepped = true; // its motion (rolls, gates) moves the sensor body: advanced in simTick, not per frame
       if (def.placement === 'air') {
         // the launch lip this air hazard belongs to (nearest lip before it): the STAY LOW telegraph stands there
@@ -875,6 +973,7 @@ export class RunScene extends Phaser.Scene {
     const hz = this.hazards.get(idx);
     if (hz) hz.forEach((h) => h.destroy());
     this.hazards.delete(idx);
+    if (this.teleTracker) this.teleTracker.forgetChunk(idx);
     const pu = this.powerups.get(idx);
     if (pu) pu.forEach((p) => p.destroy());
     this.powerups.delete(idx);
@@ -1204,7 +1303,8 @@ export class RunScene extends Phaser.Scene {
       return;
     }
 
-    const polled = this.normalizePad(this.inputRouter ? this.inputRouter.poll() : null);
+    const rawPad = this.inputRouter ? this.inputRouter.poll() : null;
+    const polled = this.normalizePad(rawPad);
     if (polled.pressed.pause) {
       this.pauseRun();
       return;
@@ -1217,7 +1317,11 @@ export class RunScene extends Phaser.Scene {
     // A ghost tape under replay (REG.GHOST_REPLAY) replaces live input tick by tick.
     const pads = this.tapePlayer
       ? Array.from({ length: ticks }, (_, i) => this.tapePlayer.padAt(this.simClock.tick + 1 + i))
-      : this.simClock.padsFor(polled, ticks);
+      // Issue #115: timestamped key changes go to the tick whose window contains them (`time` is the
+      // rAF time, the same clock as KeyboardEvent.timeStamp); see SimClock.padsFor.
+      : this.simClock.padsFor(polled, ticks, {
+        frameTime: time, timeline: rawPad && rawPad.timeline, normalize: (raw) => this.normalizePad(raw),
+      });
     let pad = polled;
     for (const tickPad of pads) {
       pad = tickPad;
@@ -1351,7 +1455,7 @@ export class RunScene extends Phaser.Scene {
     this.updateZones(sled.x);
     this.sampleSafeGround(dt, fs);
 
-    // Issue #47: the Kodiak rival (if one is out) runs, telegraphs and may hit the sled this tick.
+    // Issue #47: the Kodiak rival (if one is out) runs, telegraphs and may shove the sled this tick.
     this.updateKodiaks(dt);
 
     // Collision with the deletion wall always wins if any other contact/landing happened during this frame.
@@ -1396,8 +1500,8 @@ export class RunScene extends Phaser.Scene {
       sled.render(dt);
       // trail anchored at the rear runner
       const a = sled.body.angle;
-      const c = Math.cos(a);
-      const s = Math.sin(a);
+      const c = pmath.cos(a);
+      const s = pmath.sin(a);
       this.trail.update(sled.x + c * -16 - s * 6, sled.y + s * -16 + c * 6, sled.speed);
     }
     // the crash beat (CrashReport.crashBeat): hit-stop, then 400 ms of FX at 0.25x; visual only, the run clock is stopped
@@ -1432,17 +1536,18 @@ export class RunScene extends Phaser.Scene {
       this.deathMarker.setPlacement(L.death);
     }
     this.drawStreaks(t);
-    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.heightFn);
+    if (this.groundTelegraph) this.groundTelegraph.update(t, this.crashed ? null : this._teleMarks, this._view, cam.zoom, this.terrain?.activeList);
     // Visual-only world dance: no music player/beat-grid mutation, and no
     // hidden synthetic tempo. With a muted/paused song or reduced motion the
     // backdrop returns immediately to its original neutral geometry.
     const danceAllowed=worldDanceMotionAllowed(this.settings,
       this._worldDanceMotionQuery?.matches===true);
     const audio=this.registry?.get?.(REG.AUDIO);
-    const sample=danceAllowed?audio?.getWorldDanceSample?.():null;
-    const meter=danceAllowed&&sample?audio?.getSyntheticMeterTiming?.():null;
+    // Never throws: a failing audio engine must not stop the frame (and with it Phaser's loop), issue #140.
+    const {sample,meter}=readWorldDanceAudio(audio,danceAllowed);
     const dance=this.worldDance?.update(sample,dt,meter)||0;
     this.bg.update(cam.scrollX, t, sled.speed,dance);
+    if (this.biomeFx) this.biomeFx.update(cam.scrollX, t, this._veil || 0, isReducedMotion(this));
     this.songBillboard?.update(dt,dance,!danceAllowed);
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
@@ -1872,21 +1977,27 @@ export class RunScene extends Phaser.Scene {
       this.fx.sparks(sled.x, sled.y - 6, this.palette.cyan, 14, 240, 40);
     }
     // W3: announce the biome we are in, when it changes. Driven by the sled's current position rather
-    // than by chunk callbacks so it cannot fire out of order or twice for one crossing.
-    const sectorNow = this.terrain._sectorOf(sled.x);
-    if (this._biomeSector !== sectorNow) {
-      this._biomeSector = sectorNow;
-      const biomeId = this.biomeMask ? biomeForSector(this.seed, sectorNow - 1, this.biomeMask, Object.values(this.content.biomes || {})) : null;
-      const def = biomeId ? (this.content.biomes || {})[biomeId] : null;
+    // than by chunk callbacks so it cannot fire out of order or twice for one crossing. #65: the biome is the
+    // generator's own answer at the sled's x, so an arcade bridge (null) is its own stretch: entering it and
+    // entering the next biome each fire once, and a run opens in the home biome.
+    const biomeNow = this.terrain.biomeAtX(this.sled.x);
+    const biomeChanged = this._biomeId !== biomeNow;
+    let def = null;
+    let first = false;
+    if (biomeChanged) {
+      first = this._biomeId === undefined;
+      this._biomeId = biomeNow;
+      def = this._biomeDefById(biomeNow);
+      const sectorNow = this.terrain._sectorOf(this.sled.x);
       if (def) this.emitIf(EVT.BIOME_ENTER, { id: def.id, name: def.name, sector: sectorNow, entering: true });
-      else if (this._lastBiome) this.emitIf(EVT.BIOME_ENTER, { id: null, name: 'Bitstream', sector: sectorNow, entering: false });
-      // The biome's palette only takes effect if something applies it. Repaint on entry AND on exit
-      // back to base terrain, or the tint would persist past the biome that owns it.
-      // Never at mask 0: no sector can carry a biome there, and refreshPalette rebuilds every collider,
-      // so a mask-0 run repaints only on a palette setting change, exactly as it did before W3.
-      if (this.biomeMask) this.refreshPalette();
-      this._lastBiome = Boolean(def);
+      else if (!first) this.emitIf(EVT.BIOME_ENTER, { id: null, name: 'Bitstream', sector: sectorNow, entering: false });
     }
+    // The biome's palette only takes effect if something applies it. Repaint on entry AND on exit
+    // back to arcade terrain, or the tint would persist past the biome that owns it. refreshPalette repaints graphics
+    // only (#140: colliders are never touched), so it runs when the generator's biome changed and a repaint was actually
+    // owed: a run with no biome content never repaints beyond a palette setting change. #65 presentation: the look
+    // (what the world is painted as) can change at other x than that (inside an arcade bridge) and repaints the same way.
+    this._updateLook(biomeNow, biomeChanged && (def !== null || !first));
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;
       this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });
@@ -1920,7 +2031,7 @@ export class RunScene extends Phaser.Scene {
 
   /**
    * Ground-hazard telegraph (systems/HazardTelegraph.js): plan this frame's marks (drawn by entities/GroundTelegraph.js in
-   * renderFrame) and play each hazard's warn / hop cue once. Reads state only; never touches physics, score or the record.
+   * renderFrame) and play each hazard's warn / hop cue once. The speed-based horizon never reads the camera.
    * @param {number} now run time (ms).
    */
   updateGroundTelegraph(now) {
@@ -1929,7 +2040,7 @@ export class RunScene extends Phaser.Scene {
     for (const list of this.hazards.values()) for (const h of list) live.push(h);
     const landX = !sled.grounded && Number.isFinite(sled.airEtaMs) ? sled.x + sled.vx * sled.airEtaMs / 1000 : null;
     const isMuted = (h) => isWarded(this.wards, { hazardId: h.def.id }) || isWarded(this.wards, { effect: h.def.onHit ? h.def.onHit.effect : 'crash' });
-    const marks = planTelegraph(live, { x: sled.x, vx: sled.vx, speed: sled.speed, grounded: sled.grounded, landX }, this._view ? this._view.right : sled.x + GAME_WIDTH, { isMuted, nowMs: now });
+    const marks = planTelegraph(live, { x: sled.x, vx: sled.vx, speed: sled.speed, grounded: sled.grounded, landX }, { isMuted, nowMs: now });
     for (const e of this.teleTracker.update(now, marks)) {
       if (e.type === 'warn') {
         e.ref.teleAtMs = now; // read by the measurement harness and the gate; nothing in the game depends on it
@@ -1937,6 +2048,22 @@ export class RunScene extends Phaser.Scene {
       } else this.playSfx('hopCue');
     }
     this._teleMarks = marks;
+  }
+
+  /** Savestate hook (#119): the telegraph tracker's plain-data state. */
+  snapshotTelegraph() { return this.teleTracker.snapshot(); }
+
+  /**
+   * Savestate hook (#119): restore the tracker, then re-stamp `teleAtMs` on the (freshly built) live hazards from it, so
+   * nothing re-warns and the crash-report/harness timestamp matches the uninterrupted run.
+   * @param {ReturnType<TelegraphTracker['snapshot']>} snap
+   */
+  restoreTelegraph(snap) {
+    this.teleTracker.restore(snap);
+    for (const list of this.hazards.values()) for (const h of list) {
+      const w = this.teleTracker.firstWarnMs(h);
+      if (w !== null) h.teleAtMs = w;
+    }
   }
 
   /** Distance (px) from x to the next generated launch lip ahead, or Infinity. */
@@ -2032,10 +2159,10 @@ export class RunScene extends Phaser.Scene {
       x = s.x; y = this.terrain.heightAt(s.x) - 16; ang = this.slopeAt(s.x);
       vx = s.vx; vy = 0;
     }
-    const sp = Math.hypot(vx, vy);
+    const sp = pmath.hypot(vx, vy);
     const keep = sp > 1 ? Math.min(1, 380 / sp) * speedKeep : 0;
-    const dirx = Math.cos(ang * DEG);
-    const diry = Math.sin(ang * DEG);
+    const dirx = pmath.cos(ang * DEG);
+    const diry = pmath.sin(ang * DEG);
     const along = Math.max(minAlong, sp * keep);
     s.setPose(x, y - 4, ang, dirx * along, diry * along);
     s.invulnerableMs = TUNING.invulnerableMs;
@@ -2085,7 +2212,7 @@ export class RunScene extends Phaser.Scene {
   resolveCrash(fs) {
     const c = this.pendingCrash;
     this.pendingCrash = null;
-    const speed = Math.hypot(fs.vx, fs.vy);
+    const speed = pmath.hypot(fs.vx, fs.vy);
     // The advancing deletion wall overrides even shield, respawn grace and opening grace.
     if (c.cause === 'bsod') { this.doCrash(c, fs, speed); return; }
     if (this.sled.invulnerableMs > 0 && c.cause !== 'chasm') return; // brief grace after a respawn / backup
@@ -2293,7 +2420,7 @@ export class RunScene extends Phaser.Scene {
     // Decision 3: which biomes this run entered / rode through (pure, BiomeDiscovery). Beside the record, never
     // in it, so the RunRecord and its ledger hash are unchanged. Furthest x = the ScoreManager's furthest metres.
     const biomeVisits = detectBiomeVisits({
-      seed: this.seed, biomeMask: this.biomeMask, biomeDefs: Object.values(this.content.biomes || {}),
+      biomeAt: (x) => this.terrain.biomeAtX(x),
       furthestX: Math.max(fs.x, this.startX + (snap.distanceM || 0) * PIXELS_PER_METER), crashX: fs.x, pxPerMeter: PIXELS_PER_METER,
     });
     this.game.events.emit(EVT.RUN_END, { record, biomeVisits });
@@ -2308,7 +2435,7 @@ export class RunScene extends Phaser.Scene {
     const hz = this.content && this.content.hazards;
     const h = this._crashHazard;
     const ent = c.cause === 'hazard' && h && h.def && h.def.id === c.hazardId ? h : null;
-    const def = ent ? ent.def : c.hazardId ? (hz && hz[c.hazardId]) || KODIAK_BY_ID[c.hazardId] || null : null;
+    const def = ent ? ent.def : c.hazardId ? (hz && hz[c.hazardId]) || null : null;
     const arrivalMs = ent && this.teleTracker ? this.teleTracker.lastArrivalMs(ent) : null;
     this.registry.set(REG.LAST_CRASH, crashReport({
       runId: this.runId, seed: this.seed, biomeMask: this.biomeMask, cause: c.cause, def, x: fs.x, startX: this.startX,
@@ -2349,6 +2476,7 @@ export class RunScene extends Phaser.Scene {
 
   onSettingsChanged(payload) {
     if (payload && payload.settings) this.settings = payload.settings;
+    // A palette toggle (Pause > Settings) is presentation: repaint only, never rebuild colliders (issue #140).
     if (payload && payload.key === 'palette' && this.sled) this.refreshPalette();
   }
 
@@ -2361,16 +2489,24 @@ export class RunScene extends Phaser.Scene {
     const reg = this.registry;
     const profile = reg.get(REG.PROFILE) || null;
     const settings = reg.get(REG.SETTINGS) || {};
-    const hex = getPaletteCss(this.game, this._biomeDefForSector(this._biomeSector));
+    const hex = getPaletteCss(this.game, this._biomeDefById(this._lookBiomeId()));
     return resolveCosmetics(profile, this.palette, hex, {
       colorblind: settings.palette === 'colorblind',
     });
   }
 
+  /**
+   * Repaint the world in the current palette (+ the active sector's biome tint). Graphics only: terrain chunks are
+   * repainted with TerrainMesh.redrawChunk and their colliders are never touched (issue #140). Used by the palette
+   * setting AND on entering / leaving a biome sector. A biome's gameplay (zone mods, hazards, pickups) is chunk data
+   * read by the sim (getZoneDefs, takeChunk); collider material is fixed (TerrainMesh._takeBody), so rebuilding the
+   * colliders here only reshuffled body ids/order and dropped contact warm-start state. Owner-approved physics change
+   * (SIM_REVISION 2).
+   */
   refreshPalette() {
     // W3: the active sector's biome tints the world. Passing the def (not just an id) keeps this a
     // pure function of current state, so a palette toggle mid-biome repaints to the right place.
-    const biomeDef = this._biomeDefForSector(this._biomeSector);
+    const biomeDef = this._biomeDefById(this._lookBiomeId());
     this.palette = getPalette(this.game, biomeDef);
     // W3: the biome's `background` motif, and back to the base backdrop when the sector has no biome.
     // setMotif(null) is the exit case: a motif must not outlive the sector that owns it.
@@ -2384,13 +2520,17 @@ export class RunScene extends Phaser.Scene {
     if (this.sled) this.sled.look = this.look;
     if (this.trail) { this.trail.setPalette(this.palette); this.trail.setStops(this.look && this.look.trail); }
     this.bg.setPalette(this.palette);
+    if (this.biomeFx) {
+      this.biomeFx.setPalettes(this.palette, getPalette(this.game, null));
+      this.biomeFx.setLook(biomeDef ? biomeDef.id : null);
+    }
     this.fx.palette = this.palette;
     if (this.airTelegraph) this.airTelegraph.setPalette(this.palette);
     if (this.groundTelegraph) this.groundTelegraph.setPalette(this.palette);
     this.mesh.setPalette(this.palette);
     for (const chunk of this.terrain.getActiveChunks()) {
       if (!this.mesh.chunks.has(chunk.index)) continue;
-      this.mesh.addChunk(chunk); // redraws (removes + re-adds)
+      this.mesh.redrawChunk(chunk); // graphics only; colliders stay
       const hz = this.hazards.get(chunk.index);
       if (hz) hz.forEach((h) => { h.palette = this.palette; h.color = hazardColor(h.def, this.palette); });
       const pu = this.powerups.get(chunk.index);
@@ -2423,6 +2563,7 @@ export class RunScene extends Phaser.Scene {
     const px = (GAME_WIDTH * (z - 1)) / (2 * z);
     const py = (GAME_HEIGHT * (z - 1)) / (2 * z);
     if (this.bg && this.bg.gfx) this.bg.gfx.setScale(k).setPosition(px, py);
+    if (this.biomeFx) this.biomeFx.applyZoomCompensation(k, px, py);
     if (this.flashRect) this.flashRect.setScale(k).setPosition(px, py);
     if (this.blindRect) this.blindRect.setScale(k).setPosition(px, py);
   }
@@ -2436,9 +2577,9 @@ export class RunScene extends Phaser.Scene {
       - 225 * smooth01((this.bsodState && this.bsodState.proximity01) || 0);
     const tx = s.x + look - GAME_WIDTH * 0.38;
     const ty = s.y - GAME_HEIGHT / 3 - clamp(s.vy * 0.05, -26, 34);
-    const kx = 1 - Math.exp((-TUNING.cameraLerpX * dt) / 1000);
+    const kx = 1 - pmath.exp((-TUNING.cameraLerpX * dt) / 1000);
     // follow faster the quicker the sled moves vertically (bounce pads / big drops must never push it off screen)
-    const ky = 1 - Math.exp((-(TUNING.cameraLerpY + clamp(Math.abs(s.vy) / 90, 0, 7)) * dt) / 1000);
+    const ky = 1 - pmath.exp((-(TUNING.cameraLerpY + clamp(Math.abs(s.vy) / 90, 0, 7)) * dt) / 1000);
     this._camX += (tx - this._camX) * kx;
     this._camY += (ty - this._camY) * ky;
     // hard guarantee: keep the rider inside the visible band
@@ -2451,7 +2592,7 @@ export class RunScene extends Phaser.Scene {
       // per-pixel RNG jitter, decaying
       ox = Math.round(((this.runRandom?.visualCamera || cosmeticRandom('visual/camera')).next() * 2 - 1) * this.shakeAmp);
       oy = Math.round(((this.runRandom?.visualCamera || cosmeticRandom('visual/camera')).next() * 2 - 1) * this.shakeAmp);
-      this.shakeAmp *= Math.exp(-dt / 140);
+      this.shakeAmp *= pmath.exp(-dt / 140);
     } else {
       this.shakeAmp = 0;
     }
@@ -2467,7 +2608,7 @@ export class RunScene extends Phaser.Scene {
     // speed zoom: 1.0 at rest -> zoomMin at zoomSpeedHi, smoothed, with a brief extra pull-out on boosts. Stepped to 0.005
     // so the vector terrain does not shimmer from continuous sub-pixel scale changes.
     const zt = speedZoom(s.speed);
-    this._zoom += (zt - this._zoom) * (1 - Math.exp((-TUNING.zoomLerp * dt) / 1000));
+    this._zoom += (zt - this._zoom) * (1 - pmath.exp((-TUNING.zoomLerp * dt) / 1000));
     this._zoomKick = Math.max(0, this._zoomKick - dt / 260 * 0.05);
     const crashZoom = this.crashed ? crashBeat(this.crashTimerMs, TUNING.hitStopCrashMs).zoomMul : 1; // crash beat zoom-in
     const z = Math.round(clamp((this._zoom - this._zoomKick) * crashZoom, ZOOM_FLOOR, 1.2) * 200) / 200;

@@ -14,6 +14,7 @@ import { PHYSICS, MAX_PHYSICS_STEP_MS } from '../constants.js';
 import { AIR_NEAR_MISS_BELOW_PX } from './TerrainGenerator.js';
 import { isWarded } from './Wards.js';
 import { glideDrag } from './BiomeEffects.js';
+import pmath from './pmath.js';
 
 /** Matter's internal base delta in ms (Body._baseDelta). */
 export const BASE_STEP_MS = 1000 / 60;
@@ -310,13 +311,13 @@ export function angAccelToStep(degS2, deltaMs) {
  * @returns {number} new angular velocity, rad/s.
  */
 export function airIdleSpin(w, angle, vx, vy, dt, t = TUNING, ctx = null) {
-  const target = ctx && ctx.slopeDeg != null ? (ctx.slopeDeg + t.airIdleLandOffsetDeg) * Math.PI / 180 : Math.atan2(vy, vx);
+  const target = ctx && ctx.slopeDeg != null ? (ctx.slopeDeg + t.airIdleLandOffsetDeg) * Math.PI / 180 : pmath.atan2(vy, vx);
   let err = target - angle;
-  err = Math.atan2(Math.sin(err), Math.cos(err));
+  err = pmath.atan2(pmath.sin(err), pmath.cos(err));
   const eta = ctx && ctx.etaMs != null ? ctx.etaMs : Infinity;
   const u = Math.min(t.airIdleUrgencyMax, Math.max(1, t.airIdleUrgencyRefMs / Math.max(eta, 1)));
   const spring = Math.max(-1.2, Math.min(1.2, err)) * t.airIdleLevelK * u * u * dt;
-  return (w + spring) * Math.exp(-t.airIdleSpinDamp * u * dt);
+  return (w + spring) * pmath.exp(-t.airIdleSpinDamp * u * dt);
 }
 
 /**
@@ -332,7 +333,7 @@ export function conveyorStep(i) {
   if (!i || !i.grounded || !(i.drivePxS2 > 0)) return { dvx: 0, dvy: 0 };
   const rad = ((i.slopeDeg || 0) * Math.PI) / 180;
   const drive = i.drivePxS2 * (i.direction === -1 ? -1 : 1) * ((i.stepMs || 0) / 1000);
-  return { dvx: Math.cos(rad) * drive, dvy: Math.sin(rad) * drive };
+  return { dvx: pmath.cos(rad) * drive, dvy: pmath.sin(rad) * drive };
 }
 
 /**
@@ -377,8 +378,8 @@ export function geyserStep(i, defaultCooldownMs = 900) {
  */
 export function stallNudgeStep(st, i, t = TUNING) {
   const rad = (i.slopeDeg * Math.PI) / 180;
-  const tx = Math.cos(rad);
-  const ty = Math.sin(rad);
+  const tx = pmath.cos(rad);
+  const ty = pmath.sin(rad);
   const vt = i.vx * tx + i.vy * ty; // signed speed along the slope (+ = downhill / forward)
   const eligible = i.grounded && !i.braking && Math.abs(i.slopeDeg) < t.stallNudgeMaxSlopeDeg;
   const crawl = eligible && vt < (st.nudging ? t.stallNudgeToPxS : t.stallNudgeBelowPxS);
@@ -483,7 +484,7 @@ export class PhysicsTuner {
       tiltSign = -1;
       jitter = t.scrambleTorqueJitterDegS2;
       const tm = (ctx.timeMs || 0) / 1000;
-      gravityMul *= 1 + t.scrambleGravityWobble * Math.sin(tm * 11) * Math.cos(tm * 4.3);
+      gravityMul *= 1 + t.scrambleGravityWobble * pmath.sin(tm * 11) * pmath.cos(tm * 4.3);
     }
 
     const resistBase = t.groundResist * frictionMul + (ctx.braking && !ctx.airborne ? t.brakeResist : 0);

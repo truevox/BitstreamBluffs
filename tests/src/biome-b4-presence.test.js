@@ -10,6 +10,11 @@ import { flightGravityMul } from '../../src/systems/TerrainGenerator.js';
 const c = loadContent();
 const SEEDS = ['pres1', 'pres2', 'pres3', 'pres4', 'pres5', 'pres6', 'pres7', 'pres8'];
 const ROB = Array.from({ length: 32 }, (_, k) => `rob${k + 1}`);
+// re-pinned for #65: Debutmont base + arcade bridges. Same re-assessment as biome-b1-presence.test.js: the generator's hazard
+// rates are unchanged (400 seeds, +/-0.02), the sample is ~25 % smaller because each biome sector opens with an arcade bridge,
+// so the band is asserted on BIG (150 seeds) and the per-seed 1-per-2-km rule on seeds with >= SHORT_KM of the biome.
+const BIG = Array.from({ length: 150 }, (_, k) => `big${k + 1}`);
+const SHORT_KM = 1;
 /** Air hazards are placed only in generated jumps (isJump). */
 const eligible = (ch) => ch.defId === 'gen-jump';
 
@@ -29,7 +34,7 @@ function presence(mask, biome, id, seeds) {
       if (here) n++;
       if (eligible(ch)) { elig++; if (here) has++; }
     }
-    perSeed.push({ seed, n, km: +km.toFixed(2), ok: n * 2 >= km });
+    perSeed.push({ seed, n, km: +km.toFixed(2), ok: km < SHORT_KM || n * 2 >= km });
   }
   const share = has / elig;
   console.log(`${id} (${seeds.length} seeds): ${has}/${elig} eligible = ${(100 * share).toFixed(1)} %; per seed ${perSeed.map((p) => `${p.n}/${p.km}km`).join(' ')}`);
@@ -43,32 +48,36 @@ describe('B4 presence: the biome hazard is felt in early terrain (chunks 0-44, s
   test.each([
     [32, 'space-mountain', 'meteor', 2, 6],
     [128, 'sky-jellyfish-mountain', 'gustFront', 2, 6],
-  ])('mask %p (%s): %s meets the 35-55 %% band (8 and 32 seeds); 1-per-2-km misses at most %p / 8 and %p / 32 seeds', (mask, biome, id, f8, f32) => {
+  ])('mask %p (%s): %s meets the 35-60 %% band (150 seeds); 1-per-2-km misses (seeds with >= 1 km of biome) at most %p / 8 and %p / 32 seeds', (mask, biome, id, f8, f32) => {
     const a = presence(mask, biome, id, SEEDS);
     expect(a.elig).toBeGreaterThanOrEqual(10);
-    expect(a.share).toBeGreaterThanOrEqual(0.35);
-    expect(a.share).toBeLessThanOrEqual(0.6);
     expect(a.fails).toBeLessThanOrEqual(f8);
     const b = presence(mask, biome, id, ROB);
-    expect(b.share).toBeGreaterThanOrEqual(0.35);
-    expect(b.share).toBeLessThanOrEqual(0.6);
-    expect(b.fails).toBeLessThanOrEqual(f32);
+    expect(b.fails).toBeLessThanOrEqual(f32); // 2 of ~22 seeds with >= 1 km of biome at #65 (an air hazard needs a generated jump)
+    const big = presence(mask, biome, id, BIG);
+    expect(big.share).toBeGreaterThanOrEqual(0.35);
+    expect(big.share).toBeLessThanOrEqual(0.6);
   });
 });
 
-describe('B4 presence: long range (4 seeds x 300 chunks), hazard floor and power-up band', () => {
+describe('B4 presence: long range (16 seeds x 300 chunks), hazard floor and power-up band', () => {
+  // re-pinned for #65: Debutmont base + arcade bridges. The sample grew from 4 seeds to 16 (the original four first): bridges
+  // took ~25 % of the biome chunks, and 4 seeds now read meteor 29.2 % / gustFront 28.9 % (below both old floors) while 60
+  // seeds read 34.1 / 33.7 % before #65 and 34.8 / 33.3 % after, i.e. the placement rate did not move. gustFront's old 0.35
+  // floor came from one lucky 4-seed sample (35.6 %); its rate was 33.7 % over 60 seeds even then, so its floor is 0.3 like meteor's.
+  const LONG = [...['b1-share-a', 'b1-share-b', 'b1-share-c', 'b1-share-d'], ...Array.from({ length: 12 }, (_, k) => `b4-share-${k + 1}`)];
   const ROWS = [
-    // measured 33.8 % at long range (26 / 77): Space's generated jumps past 2 km often carry a base air hazard already
+    // measured 33.5 % at long range (119 / 355): Space's generated jumps past 2 km often carry a base air hazard already
     // (one air box per jump), so the floor is 0.3 (B2's Vertigo row uses 0.25 for the same reason)
     [32, 'space-mountain', 'meteor', 'gravityStabilizer', 0.3, 0.25, 0.45],
-    [128, 'sky-jellyfish-mountain', 'gustFront', 'stabilizerRails', 0.35, 0.25, 0.45],
+    [128, 'sky-jellyfish-mountain', 'gustFront', 'stabilizerRails', 0.3, 0.25, 0.45],
   ];
   test.each(ROWS)('mask %p (%s): hazard %s, power-up %s, hazard share of eligible chunks >= %p, power-up share of biome chunks in [%p, %p]', (mask, biome, hz, pu, floor, lo, hi) => {
     let all = 0;
     let elig = 0;
     let h = 0;
     let p = 0;
-    for (const seed of ['b1-share-a', 'b1-share-b', 'b1-share-c', 'b1-share-d']) {
+    for (const seed of LONG) {
       const g = makeGen(seed, { biomeMask: mask });
       for (let i = 1; i < 300; i++) {
         const ch = g.getChunk(i);

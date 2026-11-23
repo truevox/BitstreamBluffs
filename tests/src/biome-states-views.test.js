@@ -249,22 +249,23 @@ describe('ACH-6: the real AchievementsView shows encountered / target', () => {
   });
 
   test('three encountered biomes read 3/5 and 3/11', () => {
-    const all = gridTexts({ ...defaultProfile(), ...prog(['debumont', 'pyramid-peak', 'vertigo-vents']) });
+    const all = gridTexts({ ...defaultProfile(), ...prog(['debutmont', 'pyramid-peak', 'vertigo-vents']) });
     expect(all).toEqual(expect.arrayContaining(['2/2', '3/5', '3/11']));
   });
 });
 
 describe('decision 3: ProfileView labels each unlocked biome with its state', () => {
   test('NEW / SEEN / DONE on the real toggle rows; locked names still drawn with LVL n', () => {
-    const p = atLevel(10, prog(['garbage-dump-glacier', 'pyramid-peak'], ['pyramid-peak']));
+    const p = atLevel(7, prog(['garbage-dump-glacier', 'pyramid-peak'], ['pyramid-peak']));
     const t = titleHost({ [REG.PROFILE]: p });
     const prof = openProfile(t);
     const labels = prof.sigMenu.items.map((i) => i.label);
-    expect(labels).toEqual(['DEBUMONT NEW', 'GARBAGE DUMP GLACIER SEEN', 'PYRAMID PEAK DONE']);
-    expect(prof.sigMenu.items.map((i) => i.color)).toEqual(['text', 'cyan', 'lime']);
+    // Debutmont is the base biome (issue #65): always on, so it has no toggle row.
+    expect(labels).toEqual(['GARBAGE DUMP GLACIER SEEN', 'PYRAMID PEAK DONE']);
+    expect(prof.sigMenu.items.map((i) => i.color)).toEqual(['cyan', 'lime']);
     const all = texts(prof.panel);
     expect(all).toContain('UNDERWATER MOUNTAIN');
-    expect(all).toContain('LVL 13');
+    expect(all).toContain('LVL 10');
     expect(all).toContain('BIOMES SEEN 2/11 DONE 1/11');
   });
 });

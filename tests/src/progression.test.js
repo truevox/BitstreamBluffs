@@ -162,8 +162,13 @@ describe('tuning targets (D-C: state the numbers)', () => {
     expect(TABLE.levels[1].xpMin).toBeGreaterThan(weakest);
   });
 
-  test('first biome unlock lands around 20 minutes of measured play', () => {
-    const firstBiome = TABLE.levels.find((l) => l.biome);
+  test('the base biome is granted at level 1; the first EARNED biome lands within 14-28 minutes of measured play', () => {
+    // Issue #65: Debutmont (the old level-4 reward) is now the base biome, granted at level 1. The first biome a
+    // player earns is Garbage Dump Glacier, which takes over the old level-4 slot and the original pacing band.
+    expect(TABLE.levels[0].biome).toBe('debutmont');
+    const firstBiome = TABLE.levels.find((l) => l.biome && l.level > 1);
+    expect(firstBiome.biome).toBe('garbage-dump-glacier');
+    expect(firstBiome.level).toBe(4);
     // Replay the measured runs until the first biome's threshold is crossed; count real seconds.
     let xp = 0;
     let ms = 0;
@@ -197,9 +202,10 @@ describe('rewardsForLevel', () => {
   test('returns title plus the biome/cosmetic/boost that level grants', () => {
     const l4 = rewardsForLevel(4, TABLE);
     expect(l4.title).toBe('Frame Pusher');
-    expect(l4.biome).toBe('debumont');
+    // Issue #65: level 4 grants the first earned biome (Debutmont, the old level-4 reward, is the base biome at level 1).
+    expect(l4.biome).toBe('garbage-dump-glacier');
     const l1 = rewardsForLevel(1, TABLE);
-    expect(l1.biome).toBe(null);
+    expect(l1.biome).toBe('debutmont');
   });
 
   test('clamps out-of-range levels instead of throwing', () => {
@@ -225,7 +231,8 @@ describe('defaultProfile', () => {
     // fresh profile and a reloaded one stay byte-identical; adding it lazily made the two disagree.
     expect(p.unlocked).toEqual({ biomes: [], cosmetics: [], titles: [], boosts: {}, musicVocals: false });
     expect(p.equipped).toEqual({ trail: 'default', glow: 'default', rider: 'default', theme: 'default', title: 'default' });
-    expect(p.biomeMask).toBe(0);
+    expect(p.biomeOff).toBe(0);
+    expect('biomeMask' in p).toBe(false); // the legacy opt-in mask is no longer part of the shape
     expect(p.missions).toEqual({ counter: 0, active: [], progress: {} });
     expect(p.achievements).toEqual({});
     expect(p.credited).toEqual([]);

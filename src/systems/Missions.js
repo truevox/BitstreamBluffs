@@ -16,7 +16,7 @@
  *   combo       the same run must contain every trick in `require`
  */
 import { Rng } from './Rng.js';
-import { earnedBiomeIds, unlockedBiomeIds } from './ProfileStore.js';
+import { earnedBiomeIds, unlockedBiomeIds, enabledBiomeMask, BASE_BIOME_ID } from './ProfileStore.js';
 
 /** How many missions are active at once (spec §5 W2). */
 export const SLOTS = 3;
@@ -33,6 +33,12 @@ const TIER_MULT = [0, 1, 1.6, 2.4, 3.5];
 /** RunRecord fields that can feed a singleRun/cumulative metric. */
 const RECORD_METRICS = new Set([
   'distanceM', 'score', 'shards', 'nearMisses', 'maxAirtimeMs', 'bestCombo', 'tricks',
+  // #65: arcade bridges the sled entered this run. Not stored in the RunRecord (and so not in any ledger hash):
+  // MissionsService counts BIOME_ENTER `{id:null}` events and hands the total to the roll beside the record.
+  'bridges',
+  // #65: power-ups collected this run, by power-up id (`{mapleWax: 2}`); a template names the one it wants in `pickup`.
+  // Same route as `bridges`: counted live from POWERUP_COLLECTED, never stored in the RunRecord.
+  'pickups',
 ]);
 
 /**
@@ -84,6 +90,11 @@ function runValue(t, ctx) {
   const metric = t && t.metric;
   if (!metric) return 0;
   if (metric === 'runs') return 1;
+  if (metric === 'pickups') {
+    const byId = (live && live.pickups) || record.pickups;
+    const n = byId && typeof byId === 'object' && typeof t.pickup === 'string' && Object.hasOwn(byId, t.pickup) ? byId[t.pickup] : 0;
+    return isNum(n) ? Math.max(0, n) : 0;
+  }
   // Live counters (mid-run toasts) win when present: they are strictly fresher than the record.
   if (live && isNum(live[metric])) return Math.max(0, live[metric]);
   if (isNum(record[metric])) return Math.max(0, record[metric]);
@@ -151,7 +162,7 @@ function comboRequirement(t) {
  */
 export function satisfies(t, ctx) {
   if (!t || typeof t !== 'object') return false;
-  // A biome mission ("1500 m in Debumont") is met only on a run that had that biome switched on. The mask
+  // A biome mission ("1500 m in Debutmont") is met only on a run that had that biome switched on. The mask
   // is the run's (record.biomeMask, or the live counters' copy mid-run); the bit is resolved exactly as the
   // draw gate resolves it, so a mission can never be offered under one rule and completed under another.
   if (t.biome) {
@@ -243,6 +254,14 @@ export function isOfferable(t, profile, ruleId, biomeDefs) {
   if (!t || typeof t !== 'object') return false;
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   if (Array.isArray(t.excludedRuleIds) && ruleId && t.excludedRuleIds.includes(ruleId)) return false;
+  if (t.needsBridges) {
+    // #65: a bridge only exists between two biomes, so the player needs an earned biome besides the base one, and
+    // not all of them switched OFF (the enabled mask has no bit for the base biome, so a zero mask means no bridges).
+    // With no table (a legacy caller) an OFF choice cannot be resolved, so the earned check alone decides.
+    const earned = (defs.length ? earnedBiomeIds(profile, defs) : unlockedBiomeIds(profile)).filter((id) => id !== BASE_BIOME_ID);
+    if (!earned.length) return false;
+    if (defs.length && enabledBiomeMask(profile, defs) === 0) return false;
+  }
   if (t.biome) {
     // Earned, not merely listed: `profile.unlocked.biomes` is part of the profile shape but nothing
     // populates it, so reading it alone made every biome mission unofferable to a real profile.
@@ -250,18 +269,18 @@ export function isOfferable(t, profile, ruleId, biomeDefs) {
     // behaviour; the run-start and draw paths always pass the table.
     const unlocked = defs.length ? earnedBiomeIds(profile, defs) : unlockedBiomeIds(profile);
     if (!unlocked.includes(t.biome)) return false;
-    // A disabled signature must not spawn missions for terrain the player will never see. The bit comes
-    // from the biome table, because `profile.biomeOrder` is never set - gating on it meant the mask was
-    // never consulted at all.
-    const mask = profile && isNum(profile.biomeMask) ? profile.biomeMask : 0;
-    if (!maskCoversBiome(mask, t.biome, defs)) return false;
+    // A disabled signature must not spawn missions for terrain the player will never see. Unlocked biomes
+    // default ON (issue #65), so what is OFF is the profile's explicit `biomeOff`; the enabled mask resolves
+    // that against the biome table. The base biome has no bit in it and is always eligible. With no table
+    // (a legacy caller) an OFF choice cannot be resolved to a biome, so the unlocked check above decides.
+    if (defs.length && !maskCoversBiome(enabledBiomeMask(profile, defs), t.biome, defs)) return false;
   }
   return true;
 }
 
 /**
- * Does a biome mask include this biome? Shared by the draw gate (the profile's mask) and the completion gate
- * (the run's mask) so the two can never drift.
+ * Does a biome mask include this biome? Shared by the draw gate (the profile's enabled mask) and the completion
+ * gate (the run's mask) so the two can never drift. The base biome is always covered.
  *
  * With no table to resolve the id against (a legacy caller), the only decidable case is "everything off",
  * so that fails closed and any non-zero mask passes; with a table, the biome's own bit must be set.
@@ -271,6 +290,9 @@ export function isOfferable(t, profile, ruleId, biomeDefs) {
  * @returns {boolean}
  */
 function maskCoversBiome(mask, biomeId, biomeDefs) {
+  // The base biome is the terrain of every run, whatever its mask (Daily, seed@mask, Gym), so a mission for
+  // it is always eligible and completable ("1500 m in Debutmont" must not depend on a no-op bit).
+  if (biomeId === BASE_BIOME_ID) return true;
   const m = isNum(mask) ? mask >>> 0 : 0;
   const defs = Array.isArray(biomeDefs) ? biomeDefs : [];
   const def = defs.find((d) => d && d.id === biomeId);

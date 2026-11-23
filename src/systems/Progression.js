@@ -12,9 +12,9 @@
  *   nearMisses  2 XP per near miss
  *   airtime     1 XP per full 2 s of the run's best single airtime
  * Pacing is anchored on MEASURED play, not on a hypothetical good run: an untrained player who only
- * steers (tools/sim/pacing.mjs --policy handsOff) earns ~38 XP per run, so Sync Level 2 is set at
- * 100 XP and lands on the third run — the "level 2 within the first 3 runs" target. The first biome
- * (level 4) is 3 750 XP and lands at 20.3 measured minutes. Both are asserted in
+ * steers (tools/sim/pacing.mjs --policy handsOff) earns ~33-44 XP per run (Debutmont base terrain, #65), so Sync Level 2
+ * is set at 80 XP and lands on the third run — the "level 2 within the first 3 runs" target. The first earned biome
+ * (Garbage Dump Glacier, level 4) is 3 750 XP, asserted to land within 14-28 measured minutes. Both are asserted in
  * tests/src/progression.test.js against a committed real-sim fixture (D-C numbers).
  *
  * The default profile shape is created ONCE by `defaultProfile()` with every field the later
@@ -23,9 +23,19 @@
 
 import { emptyUpgradeRanks } from "./PermanentUpgrades.js";
 import { DRAFT_RULES_VERSION } from './DailyDraft.js';
+import { BASE_BIOME_ID } from '../data/biomeAliases.js';
 
 /** Profile schema version, independent of STORAGE.saveVersion. */
 export const PROFILE_VERSION = 1;
+
+/**
+ * The base biome (issue #65): Debutmont is the normal run's terrain from the very first run. It is always
+ * unlocked and can never be switched off, so it has no toggle row and its mask bit is never part of a
+ * profile's enabled mask (the terrain generator treats the home bit as a no-op, and keeping it out keeps
+ * masks canonical so leaderboard cohorts do not split on a meaningless bit). Defined once in data/biomeAliases.js
+ * (shared with the terrain generator's BASE_BIOME_ID); re-exported here.
+ */
+export { BASE_BIOME_ID };
 
 /** XP weights. Kept here (not in JSON) because they are arithmetic, not content. */
 export const XP = Object.freeze({
@@ -42,7 +52,7 @@ const FALLBACK_TABLE = Object.freeze({
   cap: 3,
   levels: Object.freeze([
     Object.freeze({ level: 1, xpMin: 0, title: 'Signal Virgin', biome: null, cosmetic: null, boost: null }),
-    Object.freeze({ level: 2, xpMin: 100, title: 'Bit Runner', biome: null, cosmetic: 'trail-cyan', boost: null }),
+    Object.freeze({ level: 2, xpMin: 80, title: 'Bit Runner', biome: null, cosmetic: 'trail-cyan', boost: null }),
     Object.freeze({ level: 3, xpMin: 1200, title: 'Packet Jockey', biome: null, cosmetic: null, boost: null }),
   ]),
   biomeOrder: Object.freeze([]),
@@ -184,7 +194,10 @@ export function defaultProfile() {
     // reloaded one have the identical shape — a missing key would make the two disagree on first save.
     unlocked: { biomes: [], cosmetics: [], titles: [], boosts: {}, musicVocals: false },
     equipped: { trail: 'default', glow: 'default', rider: 'default', theme: 'default', title: 'default' },
-    biomeMask: 0,
+    // Issue #65: unlocked biomes default ON, so the profile stores only the player's explicit OFF choices (one
+    // bit per biome, the biome table's `bit`). The old opt-in `biomeMask` field is gone: it is no longer
+    // written and an old save's value is ignored, which migrates every existing profile to all-ON.
+    biomeOff: 0,
     // W4 loadout: which boosts are switched ON for the next run. Separate from `unlocked.boosts`, which
     // records what the player owns. Additive, default-off, and safe on an old save by omission - which is
     // why it needs no saveVersion bump.

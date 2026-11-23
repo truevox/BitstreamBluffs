@@ -218,9 +218,9 @@ describe('doCrash writes the crash report to the registry, never to the record',
   test('a hazard crash: named killer, distance, hop verdict from the telegraph arrival and the last hop, keyed to the run', () => {
     const values = baseValues();
     const s0 = runScene(values);
-    const h = { def: CONTENT.hazards.packetSpike, cx: s0.startX + 301 * PIXELS_PER_METER };
+    const h = { hid: '9:0', def: CONTENT.hazards.packetSpike, cx: s0.startX + 301 * PIXELS_PER_METER };
     const tracker = new TelegraphTracker();
-    tracker._arrival.set(h, 12000);
+    tracker._entry(h.hid).arrival = 12000;
     const { s, record } = crashRun(values, { cause: 'hazard', hazardId: 'packetSpike' }, s0.startX + 301.5 * PIXELS_PER_METER,
       { teleTracker: tracker, _crashHazard: h, _lastHopMs: 12000 - 130 + 210, runTimeMs: 12010 });
     const lc = values.get(REG.LAST_CRASH);
@@ -234,7 +234,7 @@ describe('doCrash writes the crash report to the registry, never to the record',
   });
   test('the record is the same shape as before (same keys as a terrain crash, which has no hazard)', () => {
     const a = crashRun(baseValues(), { cause: 'terrain' }, 5000).record;
-    const b = crashRun(baseValues(), { cause: 'hazard', hazardId: 'glitchChasm' }, 5000, { _crashHazard: { def: CONTENT.hazards.glitchChasm, cx: 5000 } }).record;
+    const b = crashRun(baseValues(), { cause: 'hazard', hazardId: 'glitchChasm' }, 5000, { _crashHazard: { hid: '9:1', def: CONTENT.hazards.glitchChasm, cx: 5000 } }).record;
     expect(Object.keys(b).sort()).toEqual(Object.keys(a).sort());
   });
   test('without a telegraph arrival the crash time stands in; without a hop it says NO HOP', () => {
@@ -244,9 +244,9 @@ describe('doCrash writes the crash report to the registry, never to the record',
   });
   test('a stale crash hazard (another id) is never used for the report', () => {
     const values = baseValues();
-    const stale = { def: CONTENT.hazards.packetSpike, cx: 100 };
+    const stale = { hid: '9:2', def: CONTENT.hazards.packetSpike, cx: 100 };
     const tracker = new TelegraphTracker();
-    tracker._arrival.set(stale, 1);
+    tracker._entry(stale.hid).arrival = 1;
     crashRun(values, { cause: 'hazard', hazardId: 'glitchChasm' }, 9000, { _crashHazard: stale, teleTracker: tracker, _lastHopMs: 3900, runTimeMs: 4000 });
     // window from the crash time (4000): open 3620, close 3870: the hop at 3900 is 0.03 s late
     expect(values.get(REG.LAST_CRASH).line).toMatch(/^GLITCH CHASM AT \d+ M - HOP WAS 0.03 S LATE$/);
@@ -310,7 +310,7 @@ describe('palette switch recolours hazards exactly like a fresh spawn', () => {
     const biomeHz = { def: { biome: 'space-mountain', onHit: { effect: 'crash' }, colorKey: 'amber' }, color: -1 };
     const baseHz = { def: { colorKey: 'magenta' }, color: -1 };
     s.terrain = { getActiveChunks: () => [{ index: 7 }] };
-    s.mesh = { chunks: new Map([[7, true]]), setPalette() {}, addChunk() {} };
+    s.mesh = { chunks: new Map([[7, true]]), setPalette() {}, addChunk() {}, redrawChunk() {} }; // #140: refreshPalette repaints via redrawChunk
     s.hazards = new Map([[7, [biomeHz, baseHz]]]);
     s.powerups = new Map();
     s.refreshPalette();
