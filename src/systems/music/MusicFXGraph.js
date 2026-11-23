@@ -9,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge', 'sugarfizz',
 ]);
 
 function saturatorCurve(amount) {
@@ -573,6 +573,123 @@ function allocateEffect(ctx, raw) {
 			}};
 			disposers.push(()=>{for(const entry of active){
 				try{entry.source.stop();}catch{}disposeTone(entry);
+			}});
+			break;
+		}
+		case 'sugarfizz': {
+			// Candy Cane Canyon: original recorded stems always remain at
+			// UNITY dry gain. Sugar Rush is the real SPEED/airborne mechanic.
+			// Add only source-excited bright/fizzy accents: no MIDI rewrite,
+			// no invented tempo grid and no new tuned melody.
+			const dry=node(ctx.createGain());dry.gain.value=1;
+			input.connect(dry);dry.connect(output);
+			const sweet=node(ctx.createBiquadFilter());sweet.type='bandpass';
+			sweet.frequency.value=3400;sweet.Q.value=.85;
+			const candyGain=node(ctx.createGain());
+			input.connect(sweet);sweet.connect(candyGain);candyGain.connect(output);
+			const brittle=node(ctx.createBiquadFilter());brittle.type='highpass';
+			brittle.frequency.value=5400;brittle.Q.value=.65;
+			const fizzGain=node(ctx.createGain());
+			input.connect(brittle);brittle.connect(fizzGain);fizzGain.connect(output);
+			const fizzOsc=node(ctx.createOscillator());fizzOsc.type='sine';fizzOsc.frequency.value=2;
+			const fizzyTrem=node(ctx.createGain());fizzyTrem.gain.value=.03;
+			fizzOsc.connect(fizzyTrem);fizzyTrem.connect(fizzGain.gain);
+			fizzOsc.start();lfos.push(fizzOsc);
+			let speed=clamp(raw.speed,0,1,0);
+			let airborne=raw.airborne===true;
+			let sweetness=clamp(raw.sweetness,0,2,1.25);
+			let fizz=clamp(raw.fizz,0,2,1.5);
+			let popLevel=clamp(raw.popLevel,0,2,1.3);
+			let wrapperLevel=clamp(raw.wrapperLevel,0,2,.9);
+			const apply=(at,immediate=false)=>{
+				// Low speed = lighter sugar coating. Fast actual sled =
+				// sweet sparkle, fizzy high frequencies and faster bubbles.
+				const envelope=.14+.77*speed;
+				for(const [target,value] of [
+					[candyGain.gain,sweetness*envelope],
+					[fizzGain.gain,fizz*(.045+.36*speed)*(airborne?.55:1)],
+					[fizzOsc.frequency,1.7+speed*11],
+					[fizzyTrem.gain,.02+.06*fizz*speed],
+					[sweet.frequency,2900+2200*speed],
+					[brittle.frequency,airborne?3900:5300]]){
+					if(immediate)target.value=value;
+					else numericParam(target,value,at,.10);
+				}
+			};
+			apply(ctx.currentTime,true);
+			const control=(key,low,hi,def,setValue)=>{
+				refs[key]={set:(v,at)=>{if(!Number.isFinite(v))return false;
+					setValue(clamp(v,low,hi,def));apply(at);return true;}};
+			};
+			control('speed',0,1,0,v=>speed=v);
+			control('sweetness',0,2,1.25,v=>sweetness=v);
+			control('fizz',0,2,1.5,v=>fizz=v);
+			refs.airborne={set:(v,at)=>{if(typeof v!=='boolean'&&v!==0&&v!==1)return false;
+				airborne=!!v;apply(at);return true;}};
+			refs.popLevel={set:v=>{if(!Number.isFinite(v))return false;
+				popLevel=clamp(v,0,2,1.3);return true;}};
+			refs.wrapperLevel={set:v=>{if(!Number.isFinite(v))return false;
+				wrapperLevel=clamp(v,0,2,.9);return true;}};
+			const makeEvent=kind=>{
+				const duration=kind==='pop'?.51:.24;
+				const frames=Math.ceil(ctx.sampleRate*duration);
+				const buffer=ctx.createBuffer(1,frames,ctx.sampleRate);
+				const data=buffer.getChannelData(0);
+				let seed=kind==='pop'?0x5A9A3253:0xE1A55AC9,smoothed=0;
+				for(let i=0;i<frames;i++){
+					const t=i/ctx.sampleRate;
+					seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+					const white=seed/2147483648-1;
+					smoothed=.9*smoothed+.1*white;
+					let value=0;
+					if(kind==='pop'){
+						// A handful of candy-crackle bursts, not a sampled beat,
+						// pitched musical sequence or sticky Garbage SPLORP.
+						const thunk=.26*Math.sin(2*Math.PI*(205*t-135*t*t))*Math.exp(-t*26);
+						let pops=0;
+						for(const [lag,weight] of [[0,1],[.048,.73],[.105,.51],[.183,.31],[.289,.18]]){
+							if(t<lag)continue;
+							const age=t-lag;
+							pops+=weight*(white*.65-smoothed*.18)*Math.exp(-age*90);
+						}
+						value=thunk+pops*.7;
+					}else{
+						// Short crinkle of brittle cellophane on *real* takeoff.
+						const sharp=(white-smoothed)*Math.exp(-t*30);
+						const tear=(Math.sin(2*Math.PI*(860*t-100*t*t)))*Math.exp(-t*39);
+						value=.63*sharp+.09*tear;
+					}
+					data[i]=Math.tanh(value*.86);
+				}
+				return buffer;
+			};
+			const pop=makeEvent('pop'),wrap=makeEvent('wrapper');
+			const voices=new Set();
+			const release=item=>{
+				if(!voices.delete(item))return;
+				try{item.source.disconnect();}catch{}
+				try{item.gain.disconnect();}catch{}
+			};
+			const trigger=(kind,value,at)=>{
+				if(!Number.isFinite(value)||value<=0)return false;
+				const weight=kind==='pop'?popLevel:wrapperLevel;
+				if(weight<=0)return false;
+				if(voices.size>=3){const old=voices.values().next().value;
+					try{old.source.stop();}catch{}release(old);}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=kind==='pop'?pop:wrap;
+				gain.gain.value=Math.min(1.4,(kind==='pop'?.68:.46)*weight*
+					(.3+.7*clamp(value,0,1,0)));
+				source.connect(gain);gain.connect(output);
+				const voice={source,gain};voices.add(voice);
+				source.onended=()=>release(voice);
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			};
+			refs.pop={set:(v,at)=>trigger('pop',v,at)};
+			refs.wrapper={set:(v,at)=>trigger('wrapper',v,at)};
+			disposers.push(()=>{for(const voice of [...voices]){
+				try{voice.source.stop();}catch{}release(voice);
 			}});
 			break;
 		}

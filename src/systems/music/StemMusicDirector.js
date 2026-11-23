@@ -66,7 +66,9 @@ export class StemMusicDirector {
 		this._pendingSteamImpact = 0;
 		this._pendingJellyImpact = 0;
 		this._pendingVentCrust = 0;
+		this._pendingCandyImpact = 0;
 		this._steamLastSent = NaN;
+		this._candyLastSpeed = NaN;
 		this.microBees = null;
 		this.hydrostatic = new HydrostaticPressure();
 		this._hydroLastSent = NaN;
@@ -199,6 +201,7 @@ export class StemMusicDirector {
 			this._pendingSteamImpact = 0;
 		this._pendingJellyImpact = 0;
 		this._pendingVentCrust = 0;
+		this._pendingCandyImpact = 0;
 			this._steamLastSent = NaN;
 			this.microBees?.dispose();
 			this.microBees=null;
@@ -250,11 +253,12 @@ export class StemMusicDirector {
 				const initial = this.airborne && !this.menuMode &&
 					(this.biome === 'debutmont' || this.biome === 'micro-mountain' ||
 					this.biome === 'crystal-cavern' || this.biome === 'steampunk-slopes' ||
-					this.biome === 'sky-jellyfish-mountain')
+					this.biome === 'sky-jellyfish-mountain' || this.biome === 'candy-cane-canyon')
 					? effects.map(e => e.type==='snowpack' ? {...e,depth:0} :
 						e.type==='microbox' || e.type==='crystallattice' ? {...e,openness:1} :
 						e.type==='steamworks' ? {...e,airborne:true} :
 						e.type==='jellybloom' ? {...e,airborne:true} :
+						e.type==='sugarfizz' ? {...e,airborne:true} :
 						e.id==='crystalPercussion' ? {...e,gain:.48} : e) : effects;
 				this.mixer.replaceEffects(name,initial,.18);
 				this._timbreSignatures.set(name,key);
@@ -267,6 +271,8 @@ export class StemMusicDirector {
 		this._applyScrapContact(true);
 		this._steamLastSent = NaN;
 		this._applySteamSpeed(true);
+		this._candyLastSpeed=NaN;
+		this._applyCandySpeed(true);
 	}
 
 	_nextEnabledIndex(previous = -1) {
@@ -322,6 +328,8 @@ export class StemMusicDirector {
 		if (this.biome !== 'steampunk-slopes') this._pendingSteamImpact=0;
 		if (this.biome !== 'sky-jellyfish-mountain') this._pendingJellyImpact=0;
 		if (this.biome !== 'vertigo-vents') this._pendingVentCrust=0;
+		if (this.biome !== 'candy-cane-canyon') this._pendingCandyImpact=0;
+		this._candyLastSpeed=NaN;
 		this._ventLastLift=NaN;
 		this._steamLastSent=NaN;
 		if(this.biome!=='steampunk-slopes')this._lastSteamMusicAccentMs=-Infinity;
@@ -392,6 +400,12 @@ export class StemMusicDirector {
 			if(impulse<=0)return;
 			this._pendingSteamImpact=Math.max(this._pendingSteamImpact||0,impulse);
 			if(!this.airborne)this._applySteamImpact();
+		} else if (this.biome === 'candy-cane-canyon') {
+			if(this.transportPaused)return;
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingCandyImpact=Math.max(this._pendingCandyImpact||0,impulse);
+			if(!this.airborne)this._applyCandyImpact();
 		} else if (this.biome === 'vertigo-vents') {
 			const impulse=impactFromLanding(landing);
 			if(impulse<=0)return;
@@ -434,6 +448,25 @@ export class StemMusicDirector {
 		this._pendingVentCrust=0;
 		if(impulse>0&&!this.menuMode&&this.biome==='vertigo-vents')
 			this.mixer?.setEffectParam('drums','ventforge','crustImpact',impulse);
+	}
+
+	/** Real original-stem Candy Cane sugar fizz follows actual rider speed.
+	 * Never synthesize a beat or modify Sugar Rush physics/steering.
+	 */
+	_applyCandySpeed(force=false){
+		if(this.menuMode||this.biome!=='candy-cane-canyon')return;
+		const speed=Math.min(1,Math.max(0,this.speedPxS/1800));
+		if(!force&&Number.isFinite(this._candyLastSpeed)&&
+			Math.abs(speed-this._candyLastSpeed)<.035)return;
+		this._candyLastSpeed=speed;
+		for(const stem of ['bass','drums','guitar','piano','other'])
+			this.mixer?.setEffectParam(stem,'sugarfizz','speed',speed);
+	}
+	_applyCandyImpact(){
+		const impulse=this._pendingCandyImpact||0;
+		this._pendingCandyImpact=0;
+		if(impulse>0&&!this.menuMode&&!this.transportPaused&&this.biome==='candy-cane-canyon')
+			this.mixer?.setEffectParam('drums','sugarfizz','pop',impulse);
 	}
 
 	/** Jelly elastic impacts only trigger for actual noncrash touchdown.
@@ -582,9 +615,15 @@ export class StemMusicDirector {
 		if(next&&!this.menuMode&&this.biome==='steampunk-slopes')
 			this.mixer?.setEffectParam('drums','steamworks','release',
 				Math.max(.18,clamp(this.speedPxS/1600,0,1)));
+		if(next&&!this.menuMode&&!this.transportPaused&&this.biome==='candy-cane-canyon')
+			this.mixer?.setEffectParam('other','sugarfizz','wrapper',
+				Math.max(.2,Math.min(1,this.speedPxS/1800)));
 		if(next&&!this.menuMode&&this.biome==='sky-jellyfish-mountain')
 			this.mixer?.setEffectParam('other','jellybloom','lift',.80);
 		this.airborne = next;
+		if(this.biome==='candy-cane-canyon'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'sugarfizz','airborne',next);
 		if(this.biome==='sky-jellyfish-mountain'&&!this.menuMode)
 			for(const stem of ['bass','drums','guitar','piano','other'])
 				this.mixer?.setEffectParam(stem,'jellybloom','airborne',next);
@@ -610,6 +649,7 @@ export class StemMusicDirector {
 			this._applySteamImpact();
 			this._applyJellyImpact();
 			this._applyVentCrust();
+			this._applyCandyImpact();
 		}
 		if(this.biome==='crystal-cavern'&&!this.menuMode){
 			for(const stem of ['bass','guitar','piano','other'])
@@ -641,6 +681,7 @@ export class StemMusicDirector {
 		this.speedPxS = Math.max(0, Number(speedPxS)||0);
 		this._applyScrapContact();
 		this._applySteamSpeed();
+		this._applyCandySpeed();
 		const speedGain = this.menuMode ? 1 : clamp(.2+this.speedPxS/850,.2,1.18);
 		this.mixer?.setGain('bass',speedGain,{motion:true,time:.16});
 		this.mixer?.setGain('adaptive:bass',speedGain,{motion:true,time:.16});

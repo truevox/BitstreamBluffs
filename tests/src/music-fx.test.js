@@ -70,6 +70,40 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(chains[0].find('effect7').refs.impulse).toBeDefined();
 		for(const chain of chains)chain.dispose();
 	});
+	test('Candy Cane source-fed sugar fizz tracks real speed and makes bounded physical Pop Rocks',()=>{
+		const ctx=fakeContext(),output=ctx.createGain();
+		const chain=buildMusicChain(ctx,[{type:'sugarfizz',id:'sugarfizz',
+			speed:0,airborne:false,sweetness:1.25,fizz:1.5,popLevel:1.3,wrapperLevel:.9}],output);
+		const fx=chain.find('sugarfizz');
+		expect(fx).toBeDefined();
+		for(const key of ['speed','airborne','sweetness','fizz','popLevel','wrapperLevel','pop','wrapper'])
+			expect(fx.refs[key]).toBeDefined();
+		expect(fx.set('speed',.83,ctx.currentTime)).toBe(true);
+		expect(fx.set('airborne',true,ctx.currentTime)).toBe(true);
+		expect(fx.set('airborne','true',ctx.currentTime)).toBe(false);
+		expect(fx.set('sweetness',1.65,ctx.currentTime)).toBe(true);
+		expect(fx.set('fizz',1.8,ctx.currentTime)).toBe(true);
+		expect(fx.set('fizz',NaN,ctx.currentTime)).toBe(false);
+		expect(fx.set('wrapperLevel',1.25,ctx.currentTime)).toBe(true);
+		expect(fx.set('popLevel',1.65,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(0); // no extra on-beat notes
+		expect(fx.set('pop',0,ctx.currentTime)).toBe(false);
+		expect(fx.set('wrapper',Infinity,ctx.currentTime)).toBe(false);
+		expect(fx.set('pop',.95,ctx.currentTime)).toBe(true);
+		expect(fx.set('wrapper',.85,ctx.currentTime)).toBe(true);
+		for(const source of ctx._bufferSources){
+			expect(source.started).toBe(true);
+			expect(source.buffer.getChannelData(0).every(Number.isFinite)).toBe(true);
+			expect(source.buffer.getChannelData(0).some(x=>Math.abs(x)>.05)).toBe(true);
+		}
+		for(let i=0;i<11;i++)fx.set('pop',1,ctx.currentTime+i*.012);
+		expect(ctx._bufferSources.filter(x=>!x.stopped).length).toBeLessThanOrEqual(3);
+		fx.set('popLevel',0,ctx.currentTime);
+		expect(fx.set('pop',1,ctx.currentTime)).toBe(false);
+		chain.dispose();
+		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
+	});
+
 	test('Vertigo Vents source-fed geothermal distortion and physical geyser samples are bounded',()=>{
 		const ctx=fakeContext();
 		const chain=buildMusicChain(ctx,[{type:'ventforge',id:'ventforge',
