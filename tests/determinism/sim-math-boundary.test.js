@@ -28,7 +28,7 @@ export const PRESENTATION_FILES = [
   'src/entities/GroundTelegraph.js', 'src/entities/KodiakRider.js', 'src/entities/LastDeathMarker.js', 'src/entities/PowerUp.js', 'src/entities/Shard.js',
   'src/entities/SongBillboard.js', 'src/scenes/GameOverScene.js', 'src/scenes/PauseScene.js', 'src/scenes/TitleScene.js', 'src/scenes/UIScene.js',
   'src/shaders/GlitchPipeline.js', 'src/systems/AudioSynth.js', 'src/systems/MicroBees.js', 'src/systems/WorldDance.js',
-  'src/systems/music/AdaptiveBiomeRouter.js', 'src/systems/music/BsodThreatProcessor.js', 'src/systems/music/ImpulseBank.js', 'src/systems/music/MusicFXGraph.js',
+  'src/systems/music/AdaptiveBiomeRouter.js', 'src/systems/music/BsodThreatProcessor.js', 'src/systems/music/CrystalChroma.js', 'src/systems/music/HydrostaticPressure.js', 'src/systems/music/ImpulseBank.js', 'src/systems/music/MusicFXGraph.js',
   'src/ui/Backdrop.js', 'src/ui/LeaderboardTable.js', 'src/ui/MenuList.js', 'src/ui/MenuTerrain.js', 'src/ui/Motion.js', 'src/ui/Panel.js',
 ];
 /** Files that must visibly use pmath (everything wired in #121). */
@@ -201,6 +201,17 @@ describe('the scanner itself: every bypass is caught, legitimate code passes', (
 });
 
 describe('every src file is on the allowlist, except explicit presentation files', () => {
+  test('new source-pitch and pressure DSP files are strictly audio-only, not causal tripwires', () => {
+    for (const f of ['src/systems/music/CrystalChroma.js', 'src/systems/music/HydrostaticPressure.js']) {
+      expect(PRESENTATION_FILES).toContain(f);
+      expect(tripwire.has(f)).toBe(false);
+      expect(read(f)).toMatch(/Math\.(?:pow|exp)\(/);
+    }
+    // The cause-effect boundary remains enforced: RunScene is a mixed
+    // presentation/physics file and cannot be exempted wholesale.
+    expect(PRESENTATION_FILES).not.toContain('src/scenes/RunScene.js');
+    expect(tripwire.has('src/scenes/RunScene.js')).toBe(true);
+  });
   const scanned = allSrc.filter((f) => !PRESENTATION_FILES.includes(f) || tripwire.has(f));
   test('the scan covers src/ minus the presentation list (and the list has no stale entries)', () => {
     for (const f of PRESENTATION_FILES) expect(allSrc).toContain(f);
