@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bitstream Bluffs • Micro Mountain Tiny Box & Giant Bees</title>
+<style>
+:root{font:16px system-ui,sans-serif;color-scheme:dark;background:#161325;color:#f9f7ff}
+body{margin:0;padding:20px;background:radial-gradient(ellipse at 70% 0,#392858,#161325 67%);min-height:100vh}
+main{max-width:880px;margin:auto}.tag{color:#efd18c;text-transform:uppercase;letter-spacing:.13em;font-size:.84rem;font-weight:700}
+h1{font-size:clamp(2rem,5vw,3rem)}p{line-height:1.6}.panel{border:1px solid #655585;border-radius:18px;padding:20px;background:#252037;box-shadow:0 20px 45px #100d1c80}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin:13px 0}button{font:inherit;border-radius:12px;background:#49375f;color:#fcf5ff;padding:12px 15px;border:1px solid #957cb1;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}button[aria-pressed=true]{background:#78603c;border-color:#ecd18d}button.primary{background:#6f4193}
+label{display:block;margin-top:17px;margin-bottom:7px;font-weight:700}input[type=range]{width:100%;accent-color:#f0c475}.small{font-size:.89rem;color:#c3b5d5}#status{min-height:2.6rem;color:#f8d997}
+.hive{height:95px;border:1px dashed #917eac;background:linear-gradient(90deg,#51385f2e,#86694320);border-radius:14px;position:relative;margin:14px 0;overflow:hidden}.bee{position:absolute;top:16px;font-size:34px;transform:translateX(-50%);transition:left .13s linear,opacity .13s}.bee-label{font-size:12px;text-align:center;color:#f5d18a}
+a{color:#f8d58f}
+</style>  <script type="module" crossorigin src="./assets/microbox-audition-6-GYY6-R.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/MusicFXGraph-BVVt84v-.js">
+  <link rel="modulepreload" crossorigin href="./assets/DynamicOrchestraPresets-CyxqgZej.js">
+  <link rel="modulepreload" crossorigin href="./assets/MicroBees-BxBrEeD8.js">
+</head><body><main>
+<div class="tag">Bitstream Bluffs / Physics-driven music</div><h1>🐝 Micro Mountain</h1>
+<p><strong>Your full original instrumental recording, squeezed inside a tiny box.</strong> Grounded = close, plastic, reflective; taking flight opens the room. Those enormous bees already in the Micro backdrop provide stereo wing buzz that follows their real existing screen positions.</p>
+<section class="panel">
+<div class="row"><button id="load" class="primary">🎵 Load original stems</button><button id="play" disabled>▶ Play</button><button id="dry" disabled aria-pressed="false">Compare dry</button></div>
+<label for="box">Miniature enclosure intensity: <output id="box-value">100%</output></label>
+<input id="box" type="range" min="40" max="180" step="5" value="100">
+<label for="open">Room openness: <output id="open-value">0% (closed)</output></label>
+<input id="open" type="range" min="0" max="100" step="5" value="0">
+<div class="row"><button id="takeoff" disabled>⬆️ Take off — open the box</button><button id="land" disabled>📦 Land — rattle the box</button><button id="impact" disabled>🪘 Test box shake</button></div>
+<label for="impact-weight">Box impact strength: <output id="impact-value">100%</output></label>
+<input id="impact-weight" type="range" min="0" max="200" step="10" value="100">
+<hr style="border-color:#50436b;margin-top:25px">
+<h2>🐝 Giant background bees • stereo flybys</h2>
+<p class="small">These aren't invented flybys. The readout below uses the exact same deterministic <code>beesAt(camera, time, seed)</code> function as the backdrop. Moving the virtual camera changes which real visual bees you hear. Changing rider screen position makes the stereo image respond.</p>
+<div id="hive" class="hive" aria-label="Positions of visible decorative bees"></div>
+<label for="camera">Backdrop camera position: <output id="camera-value">0 px</output></label>
+<input id="camera" type="range" min="0" max="28000" step="200" value="0">
+<label for="rider">Micro rider horizontal screen position: <output id="rider-value">50%</output></label>
+<input id="rider" type="range" min="0" max="100" step="5" value="50">
+<label for="bees">Bee buzz intensity: <output id="bees-value">100%</output></label>
+<input id="bees" type="range" min="0" max="200" step="10" value="100">
+<p id="bee-status" class="small" aria-live="polite">Bee positions appear when the sample starts.</p>
+<p id="status" role="status" aria-live="polite">Load the five original recorded stems.</p>
+</section>
+<p class="small">Uses existing separated instrument preview stems, without editing recordings or MIDI biome vocal leads. One short browser sample, not final game loudness certification. Implementation: <a href="https://github.com/truevox/BitstreamBluffs/issues/254">issue #254</a>, <a href="https://github.com/truevox/BitstreamBluffs/pull/255">draft code PR #255</a>.</p>
+</main></body></html>
