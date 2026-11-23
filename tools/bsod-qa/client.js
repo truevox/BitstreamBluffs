@@ -5,6 +5,7 @@ import { REG } from '../../src/constants.js';
 // Make module evaluation order explicit: the injected QA module can otherwise
 // execute before the separate <script type=module src=/src/main.js> completes.
 import { game } from '../../src/main.js';
+import { installSoftApproach } from './soft-approach.mjs';
 
 const qa = parseBsodQaQuery(location.search);
 if (qa) {
@@ -29,6 +30,7 @@ if (qa) {
     scene.bsod.wallX = edge - gap;
     scene.bsod.wallSpeedPxS = qa.initialSpeedPxS;
     scene.bsod.accelerationPxS2 *= qa.accelFactor;
+    if (qa.softFinish) installSoftApproach(scene.bsod, scene.sled);
     scene.bsodState = scene.bsod.state(edge, scene.sled.vx, 1);
     // Local QA is completely unranked: suppress run, ghost and progression
     // persistence. Keep the in-memory record for the Game Over screen.
@@ -39,7 +41,7 @@ if (qa) {
     game.events.removeAllListeners(EVT.RUN_END);
     window.__bsodQaEvidence = { preset: qa.name, seed: qa.seed, initialGapPx: gap,
       initialSpeedPxS: scene.bsod.wallSpeedPxS, effectiveAccelerationPxS2: scene.bsod.accelerationPxS2,
-      noSave: true };
+      softFinish: !!qa.softFinish, noSave: true };
   });
 
   const aside = document.createElement('aside');

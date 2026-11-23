@@ -2,6 +2,7 @@
 export const BSOD_QA_PRESETS = Object.freeze({
   moderate: Object.freeze({ label: 'MODERATE', gapOffsetPx: -3100, initialSpeedPxS: 250, accelFactor: 3 / 1.15, initialGapPx: 4500, accelerationPxS2: 3 }),
   buffered: Object.freeze({ label: 'BUFFERED STRONG', gapOffsetPx: -3100, initialSpeedPxS: 300, accelFactor: 4 / 1.15, initialGapPx: 4500, accelerationPxS2: 4 }),
+  soft: Object.freeze({ label: 'FAST APPROACH / SOFT FINISH', gapOffsetPx: -3100, initialSpeedPxS: 300, accelFactor: 4 / 1.15, initialGapPx: 4500, accelerationPxS2: 4, softFinish: true }),
 });
 export function parseBsodQaQuery(search) {
   const q = new URLSearchParams(typeof search === 'string' ? search : '');

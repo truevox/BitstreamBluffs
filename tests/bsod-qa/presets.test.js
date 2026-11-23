@@ -11,7 +11,7 @@ test('two presets keep the same gap and different chase pressure', () => {
   expect(m.initialGapPx).toBe(4500);
   expect(b.initialGapPx).toBe(4500);
   expect(m.accelerationPxS2).toBeLessThan(b.accelerationPxS2);
-  expect(Object.keys(BSOD_QA_PRESETS)).toEqual(['moderate','buffered']);
+  expect(Object.keys(BSOD_QA_PRESETS)).toEqual(['moderate','buffered','soft']);
 });
 test('malformed seed is replaced with a deterministic safe default', () => {
   expect(parseBsodQaQuery('?bsodQa=moderate&qaSeed=%2F..').seed).toBe('bsod-ab-01');

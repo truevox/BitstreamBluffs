@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 const base = process.env.BSOD_QA_URL || 'http://127.0.0.1:4173';
 const browser = await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try {
-  for (const [preset, speed, accel] of [['moderate',250,3],['buffered',300,4]]) {
+  for (const [preset, speed, accel] of [['moderate',250,3],['buffered',300,4],['soft',300,4]]) {
     const page = await browser.newPage();
     // Regression: recreate the user-reported race by putting the QA module
     // BEFORE the app script. The explicit ESM dependency must still boot it.
@@ -37,8 +37,9 @@ try {
       assert.equal(data.e.initialSpeedPxS,speed);
       assert.equal(Math.round(data.e.effectiveAccelerationPxS2*1000)/1000,accel);
       assert.equal(data.e.noSave,true);
+      assert.equal(data.e.softFinish,preset==='soft');
       assert.equal(data.storeIsWrapped,true);
-      assert(data.title.includes(preset==='buffered'?'BUFFERED STRONG':'MODERATE'));
+      assert(data.title.includes(preset==='soft'?'FAST APPROACH / SOFT FINISH':preset==='buffered'?'BUFFERED STRONG':'MODERATE'));
       assert.equal(await page.locator('#bsod-qa-boot-status').count(),1);
       console.log(`PASS ${preset}: same seed, authoritative 4500px gap, ${speed}px/s, ${accel}px/s², save isolation`);
     } finally { await page.close(); }
