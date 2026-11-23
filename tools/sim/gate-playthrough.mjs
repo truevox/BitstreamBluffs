@@ -3973,13 +3973,17 @@ async function main() {
                 const T0 = Math.ceil((clock + 60000) / 1000) * 1000;
                 run._resetBiomeEffects();
                 run.runTimeMs = T0; clock = T0; run.hitStopMs = 0; run.slowmoMs = 0; run.boostMs = 0; run.sled.boostMs = 0;
+                run.simClock.accMs = 0; // a new controlled trial starts on the same fixed-tick boundary
               };
               const slope = (x) => Math.atan2(T.heightAt(x + 10) - T.heightAt(x - 10), 20) * 180 / Math.PI;
               /**
                * One real landing: settle on the ground (no air or trick state carries over), then the same pose (h px above
                * x, along the slope, 380 / 150 px/s) and input (tilt held `k` frames); optional pickup taken right before.
                */
-              const landX = run.sled.x + 500;
+              // A fixed coordinate from the start seed, not whatever x the sled
+              // reaches during a variable 300ms real browser bootstrap. The
+              // latter made a strict landing-angle gate timing-dependent.
+              const landX = run.startX + 500;
               const landing = (h, td, k, p) => {
                 keepAlive(); hold = -1;
                 run.sled.setPose(landX - 300, T.heightAt(landX - 300) - 18, slope(landX), 300, 0);
@@ -3998,7 +4002,7 @@ async function main() {
               const stabilizeProbe = (p) => {
                 for (const td of [1, -1]) {
                   for (let h = 92; h <= 116; h += 4) {
-                    for (const k of [21, 22, 23]) {
+                    for (const k of [24, 25, 26, 27]) {
                       const a = landing(h, td, k, null);
                       if (a.crash === 'badLanding' && a.q === 'crash' && Math.abs(a.ang) > 78 && Math.abs(a.ang) <= 90) {
                         const again = landing(h, td, k, null);
@@ -4269,9 +4273,18 @@ async function main() {
           g.events.on('bb:landing', onLand);
           try {
             // the run's own bouncySpring zone and its own Stabilizer Rails
-            let zone = null;
-            for (let i = 0; i < 200 && !zone; i++) { const ch = T.getChunk(i); const z = ch.zones.find((q) => q.modId === 'bouncySpring'); if (z) zone = { ...z, chunk: i }; }
-            if (!zone) return { fatal: 'no bouncySpring zone in the first 200 chunks' };
+            // The FIRST spring (chunk 11) has a genuine Packet Spike 880px
+            // downstream; its bounce reaches it during the 120-frame sample.
+            // For a controlled A/B/C comparison use the SAME seeded world's
+            // spring at pinned chunk 29: it has a naturally clear 1600px
+            // runout and gives an actual >= 120px/s, non-pogo rebound. This is not a
+            // replacement simulator or a hazard mask: the actual terrain,
+            // colliders and hazards remain live during all three arms.
+            const SPRING_FIXTURE_CHUNK = 29;
+            const springChunk = T.getChunk(SPRING_FIXTURE_CHUNK);
+            const realZone = springChunk.zones.find((q) => q.modId === 'bouncySpring');
+            const zone = realZone ? { ...realZone, chunk: SPRING_FIXTURE_CHUNK } : null;
+            if (!zone) return { fatal: 'the real bouncySpring zone moved from pinned safe-runout chunk 29' };
             let rails = null;
             for (let i = 0; i < 200 && !rails; i++) { const ch = T.getChunk(i); const s = ch.powerups.find((q) => q.defId === 'stabilizerRails'); if (s) rails = { ch, sp: s }; }
             // the colliders of the zone have to exist before the sled is dropped into it
@@ -4279,7 +4292,17 @@ async function main() {
             if (rails && !run.mesh.chunks.has(rails.ch.index)) run.takeChunk(rails.ch);
             const pu = rails ? (run.powerups.get(rails.ch.index) || []).find((e) => e.def.id === 'stabilizerRails') : null;
             if (!pu) return { fatal: 'no stabilizerRails pickup in the first 200 chunks' };
-            const zx = Math.round((zone.x0 + zone.x1) / 2);
+            // Use the same real upstream zone entry for all three arms.
+            const zx = Math.round(zone.x0 + Math.min(96, (zone.x1 - zone.x0) / 4));
+            // Fail closed if generator edits move a live hazard into this probe.
+            // Unlike a crash-suppressing probe, we still run every real sensor.
+            const forwardHazards = [];
+            for (let j = SPRING_FIXTURE_CHUNK; j <= SPRING_FIXTURE_CHUNK + 2; j++) {
+              for (const h of T.getChunk(j).hazards) {
+                if (h.x > zx - 80 && h.x < zx + 1600) forwardHazards.push(`${h.defId}@${h.x}`);
+              }
+            }
+            if (forwardHazards.length) return { fatal: `the real spring runout is no longer hazard-clear: ${forwardHazards.join(',')}` };
             const H = 200; const VX = 200; const VY = 700;
             /**
              * One arm: the same pose, the same frames, from a clean state.
@@ -4290,6 +4313,7 @@ async function main() {
               const T0 = Math.ceil((clock + 60000) / 1000) * 1000;
               run._resetBiomeEffects();
               run.runTimeMs = T0; clock = T0; run.hitStopMs = 0; run.slowmoMs = 0; run.boostMs = 0; run.sled.boostMs = 0;
+              run.simClock.accMs = 0; // a new controlled trial starts on the same fixed-tick boundary
               run.sled.invulnerableMs = 0; run.pendingCrash = null; run.crashed = false;
               crashes.length = 0; lands.length = 0;
               const zoneDefs = run.getZoneDefs;
