@@ -8,7 +8,7 @@
  */
 import { createSign } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
-import { validateEvidence, assertPrHead, reviewEvent, checkConclusion, reviewBody, CHECK_NAME } from './logic.mjs';
+import { validateEvidence, assertPrHead, reviewEvent, checkConclusion, reviewBody, CHECK_NAME, installationPermissions } from './logic.mjs';
 
 const BASE = 'https://api.github.com';
 const repo = process.env.FRIDAY_REVIEW_REPO || 'truevox/BitstreamBluffs';
@@ -50,7 +50,7 @@ async function installationToken() {
 	if (!details.isFile() || (details.mode & 0o077)) throw new Error('App private key must be a regular owner-only file (mode 0600)');
 	const pem = await readFile(keyPath, 'utf8');
 	const token = await api(`/app/installations/${installationId}/access_tokens`, jwt(appId, pem), 'POST', {
-		repositories: ['BitstreamBluffs'], permissions: { contents: 'read', pull_requests: 'write', checks: 'write' },
+		repositories: ['BitstreamBluffs'], permissions: installationPermissions(),
 	});
 	if (!token.token) throw new Error('No App installation token returned');
 	return token.token;

@@ -1,3 +1,4 @@
+import * as reviewGate from '../../tools/review-gate/logic.mjs';
 import { CHECK_NAME, validateEvidence, assertPrHead, reviewEvent, checkConclusion, reviewBody } from '../../tools/review-gate/logic.mjs';
 const sha = 'a'.repeat(40);
 const good = () => ({pr:42, headSha:sha, verdict:'approve', reviewerAgent:'Astra Friday',
@@ -34,4 +35,9 @@ test('explicit holds and requested changes never produce passing check runs', ()
 	expect(checkConclusion('approve')).toBe('success');
 	expect(reviewBody(hold)).toContain('Exact PR head');
 	expect(CHECK_NAME).toBe('friday-independent-review');
+});
+
+test('review token requests only permissions granted to the installed app', () => {
+	expect(typeof reviewGate.installationPermissions).toBe('function');
+	expect(reviewGate.installationPermissions()).toEqual({ pull_requests: 'write', checks: 'write' });
 });

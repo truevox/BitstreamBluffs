@@ -1,16 +1,16 @@
 # Independent GitHub App review gate — staged rollout
 
-**Status: prepared, not active.** No app was created/installed, no keys or tokens are in Git, no branch rule was changed, and no existing PR is merge-blocked by this proposal.
+**Status: staged, not active.** Gal Friday Review is registered and installed on all current and future repositories owned by truevox at Marvin’s request. The app and a repository-scoped token have been authenticated successfully. No branch rule was changed and no PR is merge-blocked by this proposal. The reviewer credential and execution environment still need an independently enforced security boundary before use as a review gate.
 
 ## Why stay on GitHub for BsB?
 
 2026-11-23 live audit: `truevox/BitstreamBluffs` is public, has 43 open PRs and 141 open issues, and **main has no protection/ruleset**. Its Forgejo copy at `git.bearcave.win/truevox/BitstreamBluffs` is a GitHub→Forgejo *pull mirror* (8h interval) with PRs and Actions disabled. Making that the primary writable origin is a separate issue/PR/CI migration; don't silently turn off the running mirror or transfer canonical ownership. GitHub remains the source of truth until explicitly changed.
 
-## One-time owner action: create and install the reviewer GitHub App
+## App configuration and outstanding credential isolation
 
-1. Register a private GitHub App owned by `truevox` at `https://github.com/settings/apps/new`; suggested unique name **Gal Friday Review** (actual slug may differ).
-2. Repository permissions: **Metadata read**, **Contents read**, **Pull requests read/write**, **Checks read/write**. Nothing for Issues, Administration, Actions, or Workflows. **Do not grant Contents write** or access to other repositories. No webhook required for the initial manually invoked reviewer workflow (future trigger can use a validated webhook).
-3. Install it for **only** `truevox/BitstreamBluffs`. Record the App ID, installation ID, and actual slug; generate a private key. Provision that key *outside* the repository, readable only by the isolated reviewer service account, with `chmod 600`. Never paste the key into a PR, chat, GBrain knowledge page, or build log.
+1. The private **Gal Friday Review** app is registered under `truevox` and installed. A separate root-owned or otherwise genuinely isolated publisher environment is still required; a mode-0600 key under the same Unix user as coding agents is not an independence boundary.
+2. Repository permissions: **Metadata read**, **Pull requests read/write**, **Checks read/write**. No Contents, Issues, Administration, Actions, or Workflows access. The owner selected all current and future truevox repositories for the installation; this publisher requests an installation token scoped only to BitstreamBluffs. No webhook required for the initial manually invoked reviewer workflow (future trigger can use a validated webhook).
+3. The app is installed across truevox repositories by owner request. Record the App ID, installation ID, and actual slug; generate a private key. Provision that key *outside* the repository, readable only by the isolated reviewer service account, with `chmod 600`. Never paste the key into a PR, chat, GBrain knowledge page, or build log.
 4. Do not share reviewer-App installation tokens, key files, or service credentials with the coding agents. The independent reviewer must actually inspect the diff and evidence, not simply publish a second identity for the original author. Keep a separate runtime/security principal for the credential. **Run the publisher from a trusted, installed code copy pinned to a protected revision, never from the PR branch being reviewed** (or a PR-controlled package/dependency). Review evidence must originate from the independent reviewer process, not as an author-supplied unverified artifact.
 
 ## Review execution
@@ -42,7 +42,7 @@ The script requests a short-lived, single-repo App installation token, checks th
 
 ## Activate enforcement only after an end-to-end trial
 
-After App creation, integration tests, at least one **real review** and check, and a deliberate owner go-ahead:
+After isolation, integration tests, at least one **real review** and check, and verification that the owner’s requested activation remains safe:
 
 1. Open a harmless test PR, review it from the isolated App, verify `APPROVED` by the App and `friday-independent-review` **success** on its exact head. Request changes on another and verify a failure check. Push a new commit and verify the old green status does not satisfy it.
 2. Add a GitHub branch protection rule/ruleset for `main`, requiring PRs and the exact `friday-independent-review` check **from the expected GitHub App**, plus the desired existing CI gates. The App check is the enforcement contract even if its formal bot approval is shown as read-only and does not count toward GitHub's normal approval quota. Do not require an arbitrary count of formal approvals until verified with this App on the actual repository.

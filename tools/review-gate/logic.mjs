@@ -1,5 +1,8 @@
 /** Trust boundary for an independently authenticated GitHub App review. */
 export const CHECK_NAME = 'friday-independent-review';
+export function installationPermissions() {
+	return { pull_requests: 'write', checks: 'write' };
+}
 const SHA = /^[0-9a-f]{40}$/i;
 const VALID = new Set(['approve', 'changes_requested', 'hold']);
 
