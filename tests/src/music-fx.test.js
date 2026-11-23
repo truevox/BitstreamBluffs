@@ -52,15 +52,58 @@ describe('Modular cheap Web Audio processors', () => {
 		const ctx = fakeContext(), output = ctx.createGain();
 		const specs = MUSIC_PROCESSORS.map((type,i)=>({ id:'effect' + i, type,
 			frequency:950, rate:6, wet:0.16, mode:'bandpass' }));
-		const chain = buildMusicChain(ctx,specs,output);
-		expect(chain.stages).toHaveLength(MUSIC_PROCESSORS.length);
-		expect(chain.find('effect1').set('frequency',2500,ctx.currentTime)).toBe(true);
-		expect(chain.find('effect1').refs.frequency.target.value).toBe(2500);
+		// A *real source* is limited to at most 16 chained effects; as the
+		// registered processor catalog grows, test coverage in safe batches
+		// rather than weakening the chain safety limit for a catalog test.
+		const chains=[];
+		for(let i=0;i<specs.length;i+=16){
+			const part=specs.slice(i,i+16);
+			const chain=buildMusicChain(ctx,part,output);
+			expect(chain.stages).toHaveLength(part.length);
+			chains.push(chain);
+		}
+		expect(chains.flatMap(c=>c.stages)).toHaveLength(MUSIC_PROCESSORS.length);
+		expect(chains[0].find('effect1').set('frequency',2500,ctx.currentTime)).toBe(true);
+		expect(chains[0].find('effect1').refs.frequency.target.value).toBe(2500);
 		const buffer = ctx.createBuffer(2,500);
-		expect(chain.find('effect7').setImpulse(buffer)).toBeUndefined();
-		expect(chain.find('effect7').refs.impulse).toBeDefined();
-		chain.dispose();
+		expect(chains[0].find('effect7').setImpulse(buffer)).toBeUndefined();
+		expect(chains[0].find('effect7').refs.impulse).toBeDefined();
+		for(const chain of chains)chain.dispose();
 	});
+	test('Sky Jellyfish source-fed stereo bloom and elastic membrane reuse original stems',()=>{
+		const ctx=fakeContext(),target=ctx.createGain();
+		const chain=buildMusicChain(ctx,[{id:'jellybloom',type:'jellybloom',
+			airborne:false,buoyancy:1.35,spring:1.3,liftLevel:.95}],target);
+		const gel=chain.find('jellybloom');
+		expect(gel).toBeDefined();
+		for(const name of ['airborne','buoyancy','floatRate','spring','liftLevel','impact','lift'])
+			expect(gel.refs[name]).toBeDefined();
+		expect(gel.set('airborne',true,ctx.currentTime)).toBe(true);
+		expect(gel.set('airborne','true',ctx.currentTime)).toBe(false);
+		expect(gel.set('buoyancy',1.8,ctx.currentTime)).toBe(true);
+		expect(gel.set('buoyancy',NaN,ctx.currentTime)).toBe(false);
+		expect(gel.set('floatRate',1.6,ctx.currentTime)).toBe(true);
+		expect(gel.set('floatRate',Infinity,ctx.currentTime)).toBe(false);
+		expect(gel.set('spring',1.7,ctx.currentTime)).toBe(true);
+		expect(gel.set('liftLevel',1.45,ctx.currentTime)).toBe(true);
+		expect(gel.set('impact',0,ctx.currentTime)).toBe(false);
+		expect(gel.set('lift',Infinity,ctx.currentTime)).toBe(false);
+		expect(ctx._bufferSources).toHaveLength(0); // no continuous synthetic music
+		expect(gel.set('lift',.85,ctx.currentTime)).toBe(true);
+		expect(gel.set('impact',1,ctx.currentTime)).toBe(true);
+		for(const source of ctx._bufferSources){
+			expect(source.started).toBe(true);
+			expect(source.buffer.getChannelData(0).every(Number.isFinite)).toBe(true);
+			expect(source.buffer.getChannelData(0).some(x=>Math.abs(x)>.04)).toBe(true);
+		}
+		for(let i=0;i<9;i++)gel.set('impact',1,ctx.currentTime+i*.016);
+		expect(ctx._bufferSources.filter(x=>!x.stopped).length).toBeLessThanOrEqual(3);
+		gel.set('spring',0,ctx.currentTime);
+		expect(gel.set('impact',1,ctx.currentTime)).toBe(false);
+		chain.dispose();
+		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
+	});
+
 	test('Snowpack depth smoothly reshapes the original without altering transport', () => {
 		const ctx = fakeContext();
 		const chain = buildMusicChain(ctx, [{id:'snow',type:'snowpack',depth:0.95}], ctx.createGain());

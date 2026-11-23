@@ -64,6 +64,7 @@ export class StemMusicDirector {
 		this._pendingMicroImpact = 0;
 		this._pendingCrystalImpact = 0;
 		this._pendingSteamImpact = 0;
+		this._pendingJellyImpact = 0;
 		this._steamLastSent = NaN;
 		this.microBees = null;
 		this.hydrostatic = new HydrostaticPressure();
@@ -194,6 +195,7 @@ export class StemMusicDirector {
 			this._pendingMicroImpact = 0;
 			this._pendingCrystalImpact = 0;
 			this._pendingSteamImpact = 0;
+		this._pendingJellyImpact = 0;
 			this._steamLastSent = NaN;
 			this.microBees?.dispose();
 			this.microBees=null;
@@ -244,10 +246,12 @@ export class StemMusicDirector {
 				// Keep the cached signature based on GROUND effects so jumps don't rebuild FX graphs.
 				const initial = this.airborne && !this.menuMode &&
 					(this.biome === 'debutmont' || this.biome === 'micro-mountain' ||
-					this.biome === 'crystal-cavern' || this.biome === 'steampunk-slopes')
+					this.biome === 'crystal-cavern' || this.biome === 'steampunk-slopes' ||
+					this.biome === 'sky-jellyfish-mountain')
 					? effects.map(e => e.type==='snowpack' ? {...e,depth:0} :
 						e.type==='microbox' || e.type==='crystallattice' ? {...e,openness:1} :
 						e.type==='steamworks' ? {...e,airborne:true} :
+						e.type==='jellybloom' ? {...e,airborne:true} :
 						e.id==='crystalPercussion' ? {...e,gain:.48} : e) : effects;
 				this.mixer.replaceEffects(name,initial,.18);
 				this._timbreSignatures.set(name,key);
@@ -313,6 +317,7 @@ export class StemMusicDirector {
 		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
 		if (this.biome !== 'garbage-dump-glacier') this.scrapPitch?.resetTiming();
 		if (this.biome !== 'steampunk-slopes') this._pendingSteamImpact=0;
+		if (this.biome !== 'sky-jellyfish-mountain') this._pendingJellyImpact=0;
 		this._steamLastSent=NaN;
 		if(this.biome!=='steampunk-slopes')this._lastSteamMusicAccentMs=-Infinity;
 		if (this.biome !== 'micro-mountain') {
@@ -382,7 +387,21 @@ export class StemMusicDirector {
 			if(impulse<=0)return;
 			this._pendingSteamImpact=Math.max(this._pendingSteamImpact||0,impulse);
 			if(!this.airborne)this._applySteamImpact();
+		} else if (this.biome === 'sky-jellyfish-mountain') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingJellyImpact=Math.max(this._pendingJellyImpact||0,impulse);
+			if(!this.airborne)this._applyJellyImpact();
 		}
+	}
+
+	/** Jelly elastic impacts only trigger for actual noncrash touchdown.
+	 * Pending impact may arrive before the authoritative grounded edge. */
+	_applyJellyImpact(){
+		const impulse=this._pendingJellyImpact||0;
+		this._pendingJellyImpact=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='sky-jellyfish-mountain')
+			this.mixer?.setEffectParam('drums','jellybloom','impact',impulse);
 	}
 
 	/**
@@ -522,7 +541,12 @@ export class StemMusicDirector {
 		if(next&&!this.menuMode&&this.biome==='steampunk-slopes')
 			this.mixer?.setEffectParam('drums','steamworks','release',
 				Math.max(.18,clamp(this.speedPxS/1600,0,1)));
+		if(next&&!this.menuMode&&this.biome==='sky-jellyfish-mountain')
+			this.mixer?.setEffectParam('other','jellybloom','lift',.80);
 		this.airborne = next;
+		if(this.biome==='sky-jellyfish-mountain'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'jellybloom','airborne',next);
 		if(this.biome==='steampunk-slopes'&&!this.menuMode)
 			for(const stem of ['bass','drums','guitar','piano','other'])
 				this.mixer?.setEffectParam(stem,'steamworks','airborne',next);
@@ -543,6 +567,7 @@ export class StemMusicDirector {
 			this._applyMicroImpact();
 			this._applyCrystalImpact();
 			this._applySteamImpact();
+			this._applyJellyImpact();
 		}
 		if(this.biome==='crystal-cavern'&&!this.menuMode){
 			for(const stem of ['bass','guitar','piano','other'])
