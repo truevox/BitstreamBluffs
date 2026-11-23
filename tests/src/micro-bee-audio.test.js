@@ -22,12 +22,13 @@ describe('Micro Mountain actual visual-bee audio, no simulated new bees',()=>{
 		const bees=new MicroBeeAudio(ctx,target);
 		expect(osc).toHaveLength(2);
 		expect(osc.every(x=>x.started)).toBe(true);
+		expect(bees.intensity).toBe(1.5);
 		bees.setPositions([{id:0,x:100,alpha:1},{id:1,x:GAME_WIDTH-100,alpha:.75}],
 			{enabled:true,playerScreenX:GAME_WIDTH/2});
 		expect(bees.voices[0].pan.pan.value).toBeLessThan(-.2);
 		expect(bees.voices[1].pan.pan.value).toBeGreaterThan(.2);
 		expect(bees.voices[0].level.gain.value).toBeGreaterThan(0);
-		expect(bees.voices[0].level.gain.value).toBeLessThan(.02);
+		expect(bees.voices[0].level.gain.value).toBeLessThan(.03);
 		bees.setIntensity(2);
 		bees.setPositions([{id:0,x:GAME_WIDTH/2,alpha:1},{id:1,x:GAME_WIDTH/2,alpha:1}],
 			{enabled:true,playerScreenX:GAME_WIDTH/2});

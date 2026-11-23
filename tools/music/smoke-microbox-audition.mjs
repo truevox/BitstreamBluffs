@@ -17,6 +17,8 @@ try{
 	await page.waitForFunction(()=>document.getElementById('status').textContent.includes('Ready:'),{timeout:16000});
 	await page.click('#play');
 	assert.match(await page.$eval('#play',e=>e.textContent),/Stop/);
+	assert.equal(await page.$eval('#box-value',e=>e.textContent),'135%');
+	assert.equal(await page.$eval('#bees-value',e=>e.textContent),'150%');
 	await page.$eval('#box',e=>{e.value='160';e.dispatchEvent(new Event('input',{bubbles:true}));});
 	assert.equal(await page.$eval('#box-value',e=>e.textContent),'160%');
 	await page.click('#takeoff');

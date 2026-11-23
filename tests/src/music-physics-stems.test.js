@@ -107,7 +107,7 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		for(const stem of ROLES){
 			const fx=orchestraPreset('micro-mountain',stem);
 			expect(fx).toEqual([{type:'microbox',id:'microbox',openness:0,
-				boxiness:stem==='bass'?.65:1,impactWeight:1}]);
+				boxiness:1.35,impactWeight:1}]);
 		}
 	});
 	test('Micro Mountain opens box once per grounded→airborne edge and shakes box only on real landing',()=>{

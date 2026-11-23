@@ -40,7 +40,7 @@ export function orchestraPreset(biome, stem) {
 	if (biome === 'underwater-mountain') return [{type:'hydrostatic',id:'hydrostatic',
 		pressure:0,sensitivity:stem==='bass'?.68:1}];
 	if (biome === 'micro-mountain') return [{type:'microbox',id:'microbox',
-		openness:0,boxiness:stem==='bass'?.65:1,impactWeight:1}];
+		openness:0,boxiness:1.35,impactWeight:1}];
 	const edge = {
 		'debumont': 4200,'garbage-dump-glacier':6200,
 		'pyramid-peak': 5100,'underwater-mountain':1800,

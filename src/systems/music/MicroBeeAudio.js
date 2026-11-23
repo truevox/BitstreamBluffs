@@ -11,7 +11,7 @@ export class MicroBeeAudio {
 	constructor(ctx,target){
 		this.ctx=ctx;
 		this.voices=[];
-		this.intensity=1;
+		this.intensity=1.5;
 		// Native AudioParam objects are not guaranteed to be extensible.
 		// Store last scheduled values separately; no per-frame event growth.
 		this._lastTargets=new WeakMap();
@@ -34,7 +34,7 @@ export class MicroBeeAudio {
 		this.disposed=false;
 	}
 	setIntensity(value){
-		this.intensity=clamp(value,0,2,1);
+		this.intensity=clamp(value,0,2,1.5);
 	}
 	/** `bees` must be the `beesAt` readout used by the SAME video frame. */
 	setPositions(bees=[],{enabled=false,playerScreenX=GAME_WIDTH/2}={}){

@@ -365,7 +365,7 @@ function allocateEffect(ctx, raw) {
 				lop.connect(delay);delay.connect(tap);tap.connect(output);
 				taps.push({tap,level});
 			}
-			let boxiness=clamp(raw.boxiness,0,1.8,1.0);
+			let boxiness=clamp(raw.boxiness,0,1.8,1.35);
 			let openness=clamp(raw.openness,0,1,0);
 			let impactWeight=clamp(raw.impactWeight,0,2,1);
 			const apply=(at,immediate=false)=>{
@@ -388,7 +388,7 @@ function allocateEffect(ctx, raw) {
 			}};
 			refs.boxiness={set:(value,at)=>{
 				if(!Number.isFinite(value))return false;
-				boxiness=clamp(value,0,1.8,1);apply(at);return true;
+				boxiness=clamp(value,0,1.8,1.35);apply(at);return true;
 			}};
 			refs.impactWeight={set:value=>{
 				if(!Number.isFinite(value))return false;
