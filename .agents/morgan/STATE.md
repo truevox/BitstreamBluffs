@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 19:18 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
+Last verified: 2026-11-23 19:22 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -52,10 +52,15 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76 upstream work; Team A #152/#116/#118/#123; Team B
   #119/#140/#120/#115 and conditional #121. Reference as upstream, not
   assignments Morgan can take over. #155 fix already unblocked Team B #140.
-- #273 Seeking/Gal pilot: Luna's exact-head rerun passed its cutoff check but
-  had no terminal verdict at last review. Leave further review in that lane.
+- #273 Seeking/Gal pilot: Luna posted exact-head delta source approval at
+  `0fd1400` after the earlier retry timed out. It is still a draft and #130
+  remains open; leave release and broader work in their lane.
   #248 AirBrake remains Gal/Home-owned; latest feel freeze and fresh SIM7
   receipts are separate from historical SIM1–6. #266 preserves future
   version/identity seams, not a prerelease old-tape support requirement.
 - Main stays release-controlled. Keep synthetic developer evidence out of
   gameplay, saved formats, scoring and ranked eligibility unless authorized.
+
+Recovery: a history-free Morgan startup read this branch and caught the stale
+#273 note above. The root repository pointer is in draft #282, not yet on
+main. No unfinished bootstrap write is required to use this checkpoint.
