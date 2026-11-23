@@ -265,6 +265,7 @@ export class Sled {
       const kicked = airBrakeKickStep({ vx, vy,
         atmosphereDensity: atmosphere ? atmosphere.atmosphereDensity : 1,
         decelFraction: PHYSICS.airBrakeDecel,
+        liftBudgetFraction: TUNING.airBrakeLiftBudgetFraction,
         upwardRatio: TUNING.airBrakeKickUpRatio,
         maxUpPxS: TUNING.airBrakeKickUpCapPxS,
         liftMul: phys.airbrakeLiftMul || 1,

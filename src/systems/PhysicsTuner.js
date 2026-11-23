@@ -113,7 +113,8 @@ export const TUNING = Object.freeze({
   hopBufferMs: 110,
   /** Ground contact hysteresis (ms) before the sled counts as airborne. */
   groundedGraceMs: 45,
-  /** #247 owner retune: one vertical kick paid from one horizontal speed kick. No floating/drag/gravity change. */
+  /** #247 owner retune: increased decel cannot inflate the already-approved-feel upward kick. No float. */
+  airBrakeLiftBudgetFraction: 0.40, // fixed prior reference: only this much spent velocity pays for upward impulse
   airBrakeKickUpRatio: 1.5,
   airBrakeKickUpCapPxS: 420,
   /** Seconds-based helicopter spin rate of the visual (deg/s). */

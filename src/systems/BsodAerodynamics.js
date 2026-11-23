@@ -13,20 +13,30 @@ import pmath from './pmath.js';
  *
  * `maxUpPxS` caps extra upward energy but never slows an already fast ascent.
  * Lift scales with forward momentum actually paid; no free stationary launch.
+ * The lift budget is capped at the earlier 40% braking reference, even when
+ * the separate horizontal deceleration is increased. This preserves the same
+ * upward kick for identical incoming velocity, density and upgrade level.
  */
 export function airBrakeKickStep({ vx = 0, vy = 0, atmosphereDensity = 1,
-  decelFraction = .40, upwardRatio = 1.5, liftMul = 1, maxUpPxS = 420 } = {}) {
+  decelFraction = .60, liftBudgetFraction = .40, upwardRatio = 1.5,
+  liftMul = 1, maxUpPxS = 420 } = {}) {
   if (!Number.isFinite(vx) || !Number.isFinite(vy)) return { vx, vy, spentSpeedPxS: 0 };
   const density = Number.isFinite(atmosphereDensity) ? Math.max(0, Math.min(1, atmosphereDensity)) : 0;
   const fraction = Number.isFinite(decelFraction) ? Math.max(0, Math.min(.95, decelFraction)) * density : 0;
   if (!fraction) return { vx, vy, spentSpeedPxS: 0 };
   const afterVx = vx * (1 - fraction);
   const spentSpeedPxS = Math.max(0, Math.abs(vx) - Math.abs(afterVx));
+  // Use EXACTLY the former upward-impulse budget even when braking harder.
+  // This remains a subset of the momentum genuinely lost on this activation.
+  const budget = Number.isFinite(liftBudgetFraction)
+    ? Math.max(0, Math.min(.95, liftBudgetFraction)) * density : 0;
+  const liftFraction = Math.min(fraction, budget);
+  const liftSpendPxS = Math.max(0, Math.abs(vx) - Math.abs(vx * (1 - liftFraction)));
   // Prevent tiny-speed presses from resetting a fast downward plunge for free.
-  if (spentSpeedPxS < 25) return { vx: afterVx, vy, spentSpeedPxS };
+  if (liftSpendPxS < 25) return { vx: afterVx, vy, spentSpeedPxS };
   const mul = Number.isFinite(liftMul) ? Math.max(1, Math.min(1.6, liftMul)) : 1;
   const ratio = Number.isFinite(upwardRatio) ? Math.max(0, upwardRatio) : 0;
-  const up = spentSpeedPxS * ratio * mul;
+  const up = liftSpendPxS * ratio * mul;
   const limit = Number.isFinite(maxUpPxS) ? Math.max(0, maxUpPxS) : 0;
   // A visible upward kick even if already descending; no continuing force.
   // Never clip an already more-negative (faster upward) vertical velocity.

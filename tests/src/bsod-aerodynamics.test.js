@@ -32,9 +32,10 @@ describe('BSOD aerodynamics (pure)', () => {
   });
   test('one AirBrake activation is a pair of IMMEDIATE kicks, not a sustained wing', () => {
     const r=airBrakeKickStep({vx:530,vy:150,decelFraction:PHYSICS.airBrakeDecel,
+      liftBudgetFraction:TUNING.airBrakeLiftBudgetFraction,
       upwardRatio:TUNING.airBrakeKickUpRatio,maxUpPxS:TUNING.airBrakeKickUpCapPxS});
-    expect(r.vx).toBeCloseTo(318,10);
-    expect(r.spentSpeedPxS).toBeCloseTo(212,10);
+    expect(r.vx).toBeCloseTo(212,10);
+    expect(r.spentSpeedPxS).toBeCloseTo(318,10);
     expect(r.vy).toBeCloseTo(-318,10); // already descending before pressing: visible upward launch
     expect(aerodynamicStep({vx:r.vx,vy:r.vy,airBrake:true,stepMs:8})).toEqual({dvx:0,dvy:0});
   });
@@ -51,13 +52,15 @@ describe('BSOD aerodynamics (pure)', () => {
     expect(TUNING).not.toHaveProperty('airBrakeSpanMs');
     expect(TUNING).not.toHaveProperty('airBrakePaidLiftRatio');
     const r=airBrakeKickStep({vx:650,vy:-80,decelFraction:PHYSICS.airBrakeDecel,
+      liftBudgetFraction:TUNING.airBrakeLiftBudgetFraction,
       upwardRatio:TUNING.airBrakeKickUpRatio,maxUpPxS:TUNING.airBrakeKickUpCapPxS});
-    expect(r.vx).toBeCloseTo(390,10);
+    expect(r.vx).toBeCloseTo(260,10);
     expect(r.vy).toBeCloseTo(-420,10); // capped snap, then NORMAL GRAVITY
     expect(aerodynamicStep({vx:r.vx,vy:r.vy,airBrake:true,stepMs:1000})).toEqual({dvx:0,dvy:0});
   });
   test('one-shot kick independent of framerate and display step size', () => {
     const args={vx:530,vy:150,decelFraction:PHYSICS.airBrakeDecel,
+      liftBudgetFraction:TUNING.airBrakeLiftBudgetFraction,
       upwardRatio:TUNING.airBrakeKickUpRatio,maxUpPxS:TUNING.airBrakeKickUpCapPxS};
     const out=airBrakeKickStep(args);
     for(const hz of [30,60,120,144]){
@@ -66,6 +69,7 @@ describe('BSOD aerodynamics (pure)', () => {
   });
   test('upgraded AirBrake Lift strengthens the same single kick without free forward momentum', () => {
     const args={vx:600,vy:240,decelFraction:PHYSICS.airBrakeDecel,
+      liftBudgetFraction:TUNING.airBrakeLiftBudgetFraction,
       upwardRatio:TUNING.airBrakeKickUpRatio,maxUpPxS:TUNING.airBrakeKickUpCapPxS};
     const normal=airBrakeKickStep(args);
     const upgraded=airBrakeKickStep({...args,liftMul:1.3});
@@ -75,6 +79,7 @@ describe('BSOD aerodynamics (pure)', () => {
   });
   test('vacuum and nearly stopped riders get no free vertical kick', () => {
     const v={vx:530,vy:350,decelFraction:PHYSICS.airBrakeDecel,
+      liftBudgetFraction:TUNING.airBrakeLiftBudgetFraction,
       upwardRatio:TUNING.airBrakeKickUpRatio,maxUpPxS:TUNING.airBrakeKickUpCapPxS};
     expect(airBrakeKickStep({...v,atmosphereDensity:0})).toEqual({vx:530,vy:350,spentSpeedPxS:0});
     const stopped=airBrakeKickStep({...v,vx:20});
@@ -87,14 +92,43 @@ describe('BSOD aerodynamics (pure)', () => {
   });
   test('backward speed pays for the same two kicks without gaining absolute forward speed', () => {
     const r=airBrakeKickStep({vx:-600,vy:250,decelFraction:PHYSICS.airBrakeDecel});
-    expect(r.vx).toBeCloseTo(-360,10);
+    expect(r.vx).toBeCloseTo(-240,10);
     expect(r.vy).toBeLessThan(-300);
     expect(Math.abs(r.vx)).toBeLessThan(600);
   });
   test('already fast upward motion is not capped or slowed by AirBrake', () => {
     const r=airBrakeKickStep({vx:530,vy:-650,maxUpPxS:420});
     expect(r.vy).toBe(-650);
-    expect(r.vx).toBeCloseTo(318,10);
+    expect(r.vx).toBeCloseTo(212,10);
+  });
+  test('stronger decel preserves exact vertical output from previous 40% braking for different speeds, atmospheres and upgrades', () => {
+    expect(PHYSICS.airBrakeDecel).toBe(0.60);
+    expect(TUNING.airBrakeLiftBudgetFraction).toBe(0.40);
+    const oldFraction=0.40, newFraction=PHYSICS.airBrakeDecel;
+    for(const vx of [0, 20, 63, 110, 530.6930808429843, 900, -110, -900]){
+      for(const vy of [-700, -150, 0, 100, 350, 900]){
+        for(const density of [0, .1, .5, 1]){
+          for(const liftMul of [1, 1.15, 1.5]){
+            const args={vx,vy,atmosphereDensity:density,liftMul,
+              liftBudgetFraction:TUNING.airBrakeLiftBudgetFraction,
+              upwardRatio:TUNING.airBrakeKickUpRatio,maxUpPxS:TUNING.airBrakeKickUpCapPxS};
+            const before=airBrakeKickStep({...args,decelFraction:oldFraction});
+            const after=airBrakeKickStep({...args,decelFraction:newFraction});
+            expect(after.vy).toBe(before.vy);
+            expect(Math.abs(after.vx)).toBeLessThanOrEqual(Math.abs(before.vx));
+            expect(after.spentSpeedPxS).toBeGreaterThanOrEqual(before.spentSpeedPxS);
+          }
+        }
+      }
+    }
+  });
+  test('harder braking still does not create continuous lift when held', () => {
+    const p=airBrakeKickStep({vx:600,vy:120,decelFraction:PHYSICS.airBrakeDecel,
+      liftBudgetFraction:TUNING.airBrakeLiftBudgetFraction,
+      upwardRatio:TUNING.airBrakeKickUpRatio});
+    expect(p.vx).toBeCloseTo(240);
+    expect(p.vy).toBeCloseTo(-360);
+    expect(aerodynamicStep({vx:p.vx,vy:p.vy,airBrake:true,stepMs:100})).toEqual({dvx:0,dvy:0});
   });
   test('vacuum kills all aerodynamic force even during contact-danger', () => {
     expect(aerodynamicStep({vx:900,relativeAirX:1200,atmosphereDensity:0,parachute:true,airBrake:true})).toEqual({dvx:0,dvy:0});
