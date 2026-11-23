@@ -26,6 +26,8 @@
  *   --biomeMask M         W3: biome bitmask for the run (1 Debutmont, 2 Garbage Dump Glacier, 4 Pyramid Peak,
  *                         8 Underwater Mountain, 16 Crystal Cavern; combined by OR). Default 0 = base terrain.
  *   --pursuitSampleMs N   developer-only authoritative post-tick BSOD gap timeline every N ms (500–60000)
+ *   --pursuitStartGapPx N developer-only COUNTERFACTUAL initial BSOD wall gap; 50–20000px, not gameplay tuning
+ *   --pursuitStartSpeedPxS N developer-only COUNTERFACTUAL initial wall speed; 25–3000 px/s; requires start gap
  *   --sub N               record the last N physics sub-steps before a crash into crash.sub (debug)
  *   --rule ID             run under that DailyPatch rule's real modifiers (default: none/neutralised)
  *   --workers N           parallel pages (default 4)           --out FILE   write JSON
@@ -69,7 +71,7 @@ function parseArgs(argv) {
     if (['verify', 'keepUi', 'quiet', 'noReload', 'noHop', 'fatigue'].includes(name)) { a[name] = true; continue; }
     a[name] = argv[++i];
   }
-  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM', 'pursuitSampleMs']) if (a[n] != null) a[n] = Number(a[n]);
+  for (const n of ['maxM', 'maxSec', 'workers', 'releaseLateMs', 'flipCleanDeg', 'flipTargetDeg', 'hopLeadMs', 'traceEvery', 'sub', 'probeMinM', 'pursuitSampleMs', 'pursuitStartGapPx', 'pursuitStartSpeedPxS']) if (a[n] != null) a[n] = Number(a[n]);
   return a;
 }
 const argv = process.argv.slice(2);
@@ -125,6 +127,14 @@ if (argv.some((value) => value.startsWith('--fatigue=')) || (fatigueFlag !== -1 
 if (args.pursuitSampleMs != null && (!Number.isInteger(args.pursuitSampleMs) ||
     args.pursuitSampleMs < 500 || args.pursuitSampleMs > 60000)) {
   throw new RangeError('Developer-only --pursuitSampleMs must be an integer in [500,60000]');
+}
+if (args.pursuitStartGapPx != null && (!Number.isInteger(args.pursuitStartGapPx) ||
+    args.pursuitStartGapPx < 50 || args.pursuitStartGapPx > 20000)) {
+  throw new RangeError('Developer-only --pursuitStartGapPx must be an integer in [50,20000]');
+}
+if (args.pursuitStartSpeedPxS != null && (!Number.isInteger(args.pursuitStartSpeedPxS) ||
+    args.pursuitStartSpeedPxS < 25 || args.pursuitStartSpeedPxS > 3000 || args.pursuitStartGapPx == null)) {
+  throw new RangeError('Developer-only --pursuitStartSpeedPxS requires --pursuitStartGapPx and integer speed in [25,3000]');
 }
 const seeds = expandSeeds(String(args.seeds));
 if (args.seedPrefix) for (let i = 0; i < seeds.length; i++) seeds[i] = seeds[i].replace(/^sim-/, `${args.seedPrefix}-`);
@@ -335,6 +345,8 @@ async function main() {
         biomeMask: args.biomeMask != null ? Number(args.biomeMask) >>> 0 : 0,
         traceEvery: args.traceEvery || (args.verify || job.profile ? 60 : 0), sub: args.sub || 0,
         pursuitSampleMs: args.pursuitSampleMs || 0,
+        ...(args.pursuitStartGapPx != null ? { pursuitStartGapPx: args.pursuitStartGapPx } : {}),
+        ...(args.pursuitStartSpeedPxS != null ? { pursuitStartSpeedPxS: args.pursuitStartSpeedPxS } : {}),
         // Daily rule to measure under; 'none' (the default) neutralises modifiers for pacing runs.
         rule: args.rule ? String(args.rule) : 'none',
         ...(job.profile ? { noiseProfile: job.profile, noiseSeed: args.noiseSeed, noiseReplay: job.playback } : {}),

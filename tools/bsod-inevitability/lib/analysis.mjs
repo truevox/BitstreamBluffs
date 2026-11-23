@@ -87,11 +87,12 @@ export function analyzeRun(run, { sampleMs }) {
     airborneFraction: rounded(run.frames ? run.inputActivity.airborneFrames / run.frames : 0),
     activeBsodFrames: run.bsodActiveFrames,
     inputActivity: run.inputActivity,
+    ...(run.pursuitIntervention ? { pursuitIntervention: run.pursuitIntervention } : {}),
     gapSamples: samples,
   };
 }
 
-export function validateAndSummarize({ seedList, policies, byPolicy, sampleMs }) {
+export function validateAndSummarize({ seedList, policies, byPolicy, sampleMs, startGapPx = null, startSpeedPxS = null }) {
   if (!Array.isArray(seedList) || !seedList.length || seedList.some((s) => !s || typeof s !== 'string') ||
       new Set(seedList).size !== seedList.length) throw new Error('seed plan must have unique nonempty seed identities');
   if (!Array.isArray(policies) || !policies.length || new Set(policies).size !== policies.length) {
@@ -111,6 +112,20 @@ export function validateAndSummarize({ seedList, policies, byPolicy, sampleMs })
     if (record.args.pursuitSampleMs !== sampleMs) throw new Error(`${policy}: wrong pursuit sampling interval`);
     for (const run of record.results) {
       if (run.policy !== policy) throw new Error(`${policy}: wrong policy reported by authoritative simulator`);
+      const injection = run.pursuitIntervention;
+      if (startGapPx === null) {
+        if (injection) throw new Error(`${policy}: unexpected counterfactual pursuit intervention in stock result`);
+      } else if (!injection || injection.kind !== 'developer-counterfactual-initial-bsod-state' ||
+          injection.noCanonicalPlayerTape !== true || injection.requestedGapPx !== startGapPx ||
+          !validFinite(injection.observedGapPx) || Math.abs(injection.observedGapPx - startGapPx) > 0.001 ||
+          !validFinite(injection.priorGapPx) || !validFinite(injection.dangerRangePx) ||
+          injection.dangerRangePx <= 0 ||
+          !validFinite(injection.priorWallSpeedPxS) || !validFinite(injection.observedWallSpeedPxS) ||
+          (injection.requestedWallSpeedPxS ?? null) !== startSpeedPxS ||
+          (startSpeedPxS !== null && injection.observedWallSpeedPxS !== startSpeedPxS) ||
+          (startSpeedPxS === null && injection.observedWallSpeedPxS !== injection.priorWallSpeedPxS)) {
+        throw new Error(`${policy}: unverified near-threat wall-start intervention`);
+      }
       rows.push(analyzeRun(run, { sampleMs }));
     }
     const these = rows.filter((r) => r.policy === policy);
@@ -142,7 +157,10 @@ export function markdownReport(record) {
     `Source commit: \`${source.gitSha}\` (${source.workingTreeClean ? 'clean' : 'DIRTY/experimental'}).`,
     `SIM_REVISION ${source.simRevision}; ruleset \`${source.rulesetId}\`; build ID \`${source.buildId}\`.`,
     `Real authoritative headless Chromium/Phaser/Matter simulation, sampled post-tick at 60Hz; wall-gap timeline every ${config.sampleMs}ms.`,
-    `Seeds: ${config.seedList.join(', ')}. Horizon: ${config.maxSec}s or ${config.maxM}m, whichever is first.`, '',
+    `Seeds: ${config.seedList.join(', ')}. Horizon: ${config.maxSec}s or ${config.maxM}m, whichever is first.`,
+    ...(config.startGapPx == null ? [] : [
+      '', `**COUNTERFACTUAL intervention**: BSOD leading edge was translated at RunScene RUN_START to exactly ${config.startGapPx}px behind the real sled left edge${config.startSpeedPxS == null ? '' : `, and its initial speed set to ${config.startSpeedPxS}px/s`}. This is not default gameplay or an admissible player replay; no production physics constants were changed.`,
+    ]), '',
     '| Strategy | Seeds | BSOD catches | Other deaths | Cutoffs | Stalls | Median min gap (px) | Median final gap (px) | Median growth (px) | Median max air (s) | Growing gap cases |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
   ];
