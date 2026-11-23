@@ -57,7 +57,12 @@ going” means resume this queue, not take over other lanes or merge a draft.
    SHA-256 starts a1319ec7, separate QA starts dcabd1df, old normal
    starts 8d904f4c. Build ID alone does not distinguish these; require
    exact standard index/assets, no QA path, query or redirect. No changes
-   to original strip/SVG, #78 JSON or #278 head.
+   to original strip/SVG, #78 JSON or #278 head. Isolated prototype on
+   pinned eb281d8 now shows a separate fatal detail only for the verified
+   fixture. Chromium checked positive/cutoff UI and both byte-identical
+   SVG downloads. It rejects wrong tape/build/entry, changed stored pose
+   or tick, and copied receipts. Fixture-local only, not a public contract
+   or product rollout; wait for independent review before integrating.
 
 ## Active branches and ownership
 
