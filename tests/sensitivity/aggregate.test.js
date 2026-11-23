@@ -28,6 +28,9 @@ describe('classifyOutcome', () => {
   test('reaching the distance cap is CENSORED, not a survival and not a crash', () => {
     expect(classifyOutcome({ endReason: 'maxM', desync: null })).toBe('censored');
     expect(classifyOutcome({ endReason: 'timeout', desync: null })).toBe('censored');
+    expect(classifyOutcome({ endReason: 'replay-window', desync: null })).toBe('censored');
+    expect(classifyOutcome({ endReason: 'replay-window', desync: { tick: 100 } })).toBe('censored');
+    expect(classifyOutcome({ endReason: 'replay-window', desync: { tick: 100 } }, { integrityRequired: true })).toBe('excluded');
   });
 
   test('a stalled run is its own class', () => {
@@ -50,7 +53,7 @@ describe('classifyOutcome', () => {
   });
 
   test('every class returned is one of the declared outcomes', () => {
-    for (const endReason of ['crash:x', 'maxM', 'timeout', 'stalled', 'unknown']) {
+    for (const endReason of ['crash:x', 'maxM', 'timeout', 'replay-window', 'stalled', 'unknown']) {
       expect(OUTCOMES).toContain(classifyOutcome({ endReason, desync: null }));
     }
   });

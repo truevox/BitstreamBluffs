@@ -33,7 +33,8 @@
  *   --field NAME          one control from lib/perturb.mjs FIELDS          (default hopPress)
  *   --offsets LIST        fixed-tick offsets to measure, must include 0     (default -2,-1,0,1,2)
  *   --rule ID|none        daily rule for BOTH capture and replay           (default featherweight)
- *   --maxM N --maxSec N   replay caps; reaching one is CENSORED             (default 3000 / 90)
+ *   --maxM N --maxSec N   CAPTURE limits (not replay limits)                (default 3000 / 90)
+ *                         replay hard cap = captured tape horizon + 1200 fixed ticks (10s at 120Hz)
  *   --workers N           parallel pages                                    (default 2)
  *   --out FILE            machine record (raw rows + aggregate)
  *   --quiet               no per-run lines
@@ -213,8 +214,11 @@ export async function replayTapeInPage({ tape, maxTicks, dt }) {
     crashed: !!run.crashed,
     crashCause: cause,
     endTick: run.simClock.tick,
-    endReason: run.crashed ? `crash:${cause || 'unknown'}` : 'maxM',
+    // The replay loop is bounded by maxTicks, NOT by the capture's
+    // --maxM/--maxSec options. Do not falsely attest to reaching a distance cap.
+    endReason: run.crashed ? `crash:${cause || 'unknown'}` : 'replay-window',
     capHit,
+    replayMaxTicks: maxTicks,
     desync: run.tapePlayer.desync,
     checkpointsChecked: run.tapePlayer.checked,
     distanceM: Math.round(((run.sled.x - run.startX) / 20) * 1000) / 1000,
@@ -304,6 +308,7 @@ async function main() {
               divergedAtTick: r.desync ? r.desync.tick : null,
               crashCause: r.crashCause,
               endReason: r.endReason,
+              replayMaxTicks: r.replayMaxTicks,
               endTick: r.endTick,
               distanceM: r.distanceM,
               score: r.score,

@@ -47,7 +47,7 @@ identity were self-attested from environment variables and were inconsistent wit
 | `--field NAME` | one control from `lib/perturb.mjs` `FIELDS` | `hopPress` |
 | `--offsets LIST` | fixed-tick offsets; must contain `0` | `-2,-1,0,1,2` |
 | `--rule ID\|none` | daily rule for **both** capture and replay | `featherweight` |
-| `--maxM N` / `--maxSec N` | replay caps; reaching one is **censored** | `3000` / `90` |
+| `--maxM N` / `--maxSec N` | **capture** distance/time limits only; a capped capture without a finalized tape is **refused** | `3000` / `90` |
 | `--workers N` | parallel pages | `2` |
 | `--out FILE` | machine record (raw rows + aggregate) | — |
 
@@ -65,9 +65,12 @@ source; old-style `bsb-ruleset@...` values are invalid.
 
 ## How to read the numbers
 
-- **`censored` is not survival.** A run that reached the distance/time cap was still going when the window
-  ended. It is counted in the denominator, reported as its own class, and never called a survivor or an
-  unbounded run.
+- **`censored` is not survival.** The replay is bounded by **the captured tape's own horizon plus 1200
+  fixed ticks (10 seconds at 120Hz)**, *not* by `--maxM` or `--maxSec`. An arm that reaches this
+  replay window without crashing has `endReason: "replay-window"`, `replayMaxTicks`, and outcome
+  `censored`. It is kept in the denominator, never called a survivor or an unbounded run.
+  `--maxM`/`--maxSec` bound the initial capture; if that capture cannot finalize its tape, the seed
+  fails closed instead of being omitted or silently replaced by the previous seed's tape.
 - **Rates carry a Wilson 95% interval** and a `smallSample` flag. With a dozen seeds a rate of 1.0 is not
   "everything survives"; the lower bound says how little that sample supports.
 - **Pairs are on the same seed.** Seeds differ enormously in how far a run gets, so an unpaired comparison

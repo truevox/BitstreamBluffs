@@ -25,9 +25,10 @@ export const OUTCOMES = Object.freeze(['crash', 'stalled', 'censored', 'excluded
 /**
  * Classify one replay record.
  *
- * `censored` is a run that reached the distance or time cap without crashing. It is NOT a success: it means
- * the measurement window ended first. `stalled` is a run the harness gave up on because the sled stopped
- * making progress. `excluded` is a perturbation the tool refused to build (see `perturbTape`), and it is
+ * `censored` is a run whose finite measurement window ended without crashing. In this CLI,
+ * replay stops at the captured tape's horizon + 1200 fixed ticks, labeled `replay-window`;
+ * `--maxM`/`--maxSec` limit capture, not replay. It is NOT a success.
+ * `stalled` is a run the harness gave up on because the sled stopped making progress. `excluded` is a perturbation the tool refused to build (see `perturbTape`), and it is
  * carried in the row so the denominator is never quietly shrunk.
  *
  * CHECKPOINT DIVERGENCE (`desync`) is graded by arm, because it means opposite things on each one:
@@ -42,7 +43,7 @@ export const OUTCOMES = Object.freeze(['crash', 'stalled', 'censored', 'excluded
  */
 export function classifyOutcome({ endReason, desync }, { integrityRequired = false } = {}) {
   if (desync && integrityRequired) return 'excluded';
-  if (endReason === 'maxM' || endReason === 'timeout') return 'censored';
+  if (endReason === 'maxM' || endReason === 'timeout' || endReason === 'replay-window') return 'censored';
   if (endReason === 'stalled') return 'stalled';
   if (typeof endReason === 'string' && endReason.startsWith('crash:')) return 'crash';
   return 'excluded';
