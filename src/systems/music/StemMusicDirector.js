@@ -13,6 +13,10 @@ import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.j
 import { FIRST_SONG_ID, defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices, shuffledSongRound } from './MusicPlaylist.js';
 import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
 import { snowpackImpactFromLanding } from './SnowpackImpact.js';
+import { contactFromMotion, impactFromLanding } from './MusicPhysicsSignals.js';
+import { HydrostaticPressure } from './HydrostaticPressure.js';
+import { ScrapPitchCadence } from './ScrapPitchCadence.js';
+import { MicroBeeAudio } from './MicroBeeAudio.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
@@ -52,6 +56,15 @@ export class StemMusicDirector {
 		this.captionWords = [];
 		this.airborne = false;
 		this._pendingSnowImpact = 0;
+		this._pendingScrapImpact = 0;
+		this._pendingHydroImpact = 0;
+		this._pendingMicroImpact = 0;
+		this._pendingCrystalImpact = 0;
+		this.microBees = null;
+		this.hydrostatic = new HydrostaticPressure();
+		this._hydroLastSent = NaN;
+		this._scrapContactLast = NaN;
+		this.scrapPitch = new ScrapPitchCadence();
 		this._timer = null;
 		this._token = 0;
 		this._nextPromise = null;
@@ -91,6 +104,7 @@ export class StemMusicDirector {
 		const lowMemory = typeof navigator !== 'undefined' &&
 			Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
 		this.mixer = new StemFXMixer(ctx, this.bus, { roomQuality: lowMemory ? 'mobile' : 'standard' });
+		// Instantiate the two bee voices only if Micro has visible bees.
 		this.mixer.selectBiome(this.biome);
 		for (const name of CORE_STEMS) {
 			const g = this.mixer.addSource(name, { gain: name === 'vocals' && !this.vocals ? 0 : 1 });
@@ -168,7 +182,15 @@ export class StemMusicDirector {
 		const next = on === true;
 		if (this.menuMode === next) return;
 		this.menuMode = next;
-		if (next) this._pendingSnowImpact = 0;
+		if (next) {
+			this._pendingSnowImpact = 0;
+			this._pendingScrapImpact = 0;
+			this.scrapPitch?.resetTiming();
+			this._pendingMicroImpact = 0;
+		this._pendingCrystalImpact = 0;
+			this.microBees?.dispose();
+			this.microBees=null;
+		}
 		if (next) {
 			// Menus restore all three original accompaniments to clean DSP.
 			this.setBsodDanger(0);
@@ -213,8 +235,12 @@ export class StemMusicDirector {
 			if (force || this._timbreSignatures.get(name)!==key) {
 				// A rider entering Debumont while airborne is above the powder already.
 				// Keep the cached signature based on GROUND effects so jumps don't rebuild FX graphs.
-				const initial = this.airborne && !this.menuMode && this.biome === 'debutmont'
-					? effects.map(e => e.type === 'snowpack' ? { ...e, depth: 0 } : e) : effects;
+				const initial = this.airborne && !this.menuMode &&
+					(this.biome === 'debutmont' || this.biome === 'micro-mountain' ||
+					this.biome === 'crystal-cavern')
+					? effects.map(e => e.type==='snowpack' ? {...e,depth:0} :
+						e.type==='microbox' || e.type==='crystallattice' ? {...e,openness:1} :
+						e.id==='crystalPercussion' ? {...e,gain:.48} : e) : effects;
 				this.mixer.replaceEffects(name,initial,.18);
 				this._timbreSignatures.set(name,key);
 			}
@@ -223,6 +249,7 @@ export class StemMusicDirector {
 			// disable legitimate processing of the ORIGINAL recordings.
 			this.mixer.setRoomSend(name,this.menuMode ? 0 : null);
 		}
+		this._applyScrapContact(true);
 	}
 
 	_nextEnabledIndex(previous = -1) {
@@ -259,8 +286,29 @@ export class StemMusicDirector {
 	}
 
 	setBiome(id) {
-		this.biome = typeof id === 'string' && id ? canonicalBiomeId(id) : HOME_BIOME;
+		const next = typeof id === 'string' && id ? canonicalBiomeId(id) : HOME_BIOME;
+		// Reset only on confirmed boundaries; aliases resolve BEFORE comparing.
+		if (next !== this.biome &&
+			(next === 'underwater-mountain' || this.biome === 'underwater-mountain')) {
+			this.hydrostatic?.reset();
+			this._hydroLastSent = NaN;
+			this._pendingHydroImpact = 0;
+		}
+		if (next !== this.biome &&
+			(next === 'garbage-dump-glacier' || this.biome === 'garbage-dump-glacier'))
+			this.scrapPitch?.reset();
+		this.biome = next;
 		if (this.biome !== 'debutmont') this._pendingSnowImpact = 0;
+		if (this.biome !== 'crystal-cavern') this._pendingCrystalImpact = 0;
+		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
+		if (this.biome !== 'garbage-dump-glacier') this.scrapPitch?.resetTiming();
+		if (this.biome !== 'micro-mountain') {
+			this._pendingMicroImpact=0;
+			this.microBees?.dispose();
+			this.microBees=null;
+		}
+		this._scrapContactLast = NaN;
+		// Reapplying the same biome must NOT postpone the next musical clang.
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
@@ -290,11 +338,33 @@ export class StemMusicDirector {
 
 	/** Landing pulses may arrive either side of the per-frame grounded update. */
 	onLanding(landing) {
-		if (this.menuMode || this.biome !== 'debutmont') return;
-		const impulse = snowpackImpactFromLanding(landing);
-		if (impulse <= 0) return;
-		this._pendingSnowImpact = Math.max(this._pendingSnowImpact || 0, impulse);
-		if (!this.airborne) this._applySnowImpact();
+		if (this.menuMode) return;
+		if (this.biome === 'debutmont') {
+			const impulse = snowpackImpactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingSnowImpact = Math.max(this._pendingSnowImpact || 0, impulse);
+			if (!this.airborne) this._applySnowImpact();
+		} else if (this.biome === 'garbage-dump-glacier') {
+			const impulse = impactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingScrapImpact = Math.max(this._pendingScrapImpact || 0, impulse);
+			if (!this.airborne) this._applyScrapImpact();
+		} else if (this.biome === 'crystal-cavern') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingCrystalImpact=Math.max(this._pendingCrystalImpact||0,impulse);
+			if(!this.airborne)this._applyCrystalImpact();
+		} else if (this.biome === 'micro-mountain') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingMicroImpact=Math.max(this._pendingMicroImpact||0,impulse);
+			if(!this.airborne)this._applyMicroImpact();
+		} else if (this.biome === 'underwater-mountain') {
+			const impulse = impactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingHydroImpact = Math.max(this._pendingHydroImpact || 0,impulse);
+			if (!this.airborne) this._applyHydroImpact();
+		}
 	}
 
 	_applySnowImpact() {
@@ -305,9 +375,97 @@ export class StemMusicDirector {
 			this.mixer?.setEffectParam(stem,'snowpack','impact',impulse);
 	}
 
+	_applyScrapContact(force = false) {
+		if (this.biome !== 'garbage-dump-glacier' || this.menuMode) return;
+		const contact = contactFromMotion(this.speedPxS, !this.airborne);
+		if (!force && Number.isFinite(this._scrapContactLast) &&
+			Math.abs(contact - this._scrapContactLast) < .04) return;
+		this._scrapContactLast = contact;
+		this.mixer?.setEffectParam('drums', 'scrapheap', 'contact', contact);
+	}
+
+	/**
+	 * Seeded irregular source-consonant junk clangs. Called by the EXISTING
+	 * music pump; no new timer, guessed song key or off-grid scoring changes.
+	 * The bass analyser is only read at a due time, not each 75ms tick.
+	 */
+	_maybeScrapPitchClang(now){
+		if(!Number.isFinite(now)||!this.started||this.transportPaused||
+			this.menuMode||this.biome!=='garbage-dump-glacier'||this.airborne)
+			return false;
+		const contact=contactFromMotion(this.speedPxS,true);
+		if(contact<.16)return false;
+		const candidate=this.scrapPitch?.next(now,contact,
+			()=>this.mixer?.readEffect?.('bass','scrapPitchProbe','notes'));
+		if(!candidate)return false;
+		return this.mixer?.setEffectParam('drums','scrapheap','pitchedClang',candidate)===true;
+	}
+
+	_applyScrapImpact() {
+		const impulse = this._pendingScrapImpact || 0;
+		this._pendingScrapImpact = 0;
+		if (impulse <= 0 || this.menuMode || this.biome !== 'garbage-dump-glacier') return;
+		this.mixer?.setEffectParam('drums', 'scrapheap', 'impact', impulse);
+	}
+
+	/** True terrain elevation and rider motion from the real sim, never fake depth. */
+	setHydrostaticMotion({terrainY,riderY,vy,grounded}={}) {
+		if (this.menuMode || this.biome !== 'underwater-mountain') return false;
+		if (!this.hydrostatic) this.hydrostatic = new HydrostaticPressure();
+		const state = this.hydrostatic.update({terrainY,riderY,vy,grounded});
+		if (!state.valid) return false;
+		if (!Number.isFinite(this._hydroLastSent) ||
+			Math.abs(state.audiblePressure01-this._hydroLastSent) >= .018) {
+			this._hydroLastSent=state.audiblePressure01;
+			for (const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'hydrostatic','pressure',state.audiblePressure01);
+		}
+		return true;
+	}
+
+	_applyHydroImpact() {
+		const impulse = this._pendingHydroImpact || 0;
+		this._pendingHydroImpact = 0;
+		if (impulse > 0 && !this.menuMode && this.biome === 'underwater-mountain')
+			this.mixer?.setEffectParam('drums','hydrostatic','impact',impulse);
+	}
+
+	/** Actual existing Micro Mountain bee screen positions: no new bee RNG. */
+	setMicroBees(bees,playerScreenX){
+		if(this.menuMode||this.biome!=='micro-mountain'||!this.started){
+			this.microBees?.setPositions([],{enabled:false});
+			return false;
+		}
+		if(!this.microBees&&this.ctx&&this.bus&&Array.isArray(bees)&&bees.length)
+			this.microBees=new MicroBeeAudio(this.ctx,this.bus);
+		return this.microBees?.setPositions(bees,{enabled:true,playerScreenX})||false;
+	}
+
+	_applyCrystalImpact(){
+		const impulse=this._pendingCrystalImpact||0;
+		this._pendingCrystalImpact=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='crystal-cavern')
+			this.mixer?.setEffectParam('bass','crystallattice','impact',impulse);
+	}
+
+	_applyMicroImpact(){
+		const impulse=this._pendingMicroImpact||0;
+		this._pendingMicroImpact=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='micro-mountain')
+			this.mixer?.setEffectParam('drums','microbox','impact',impulse);
+	}
+
 	setAirborne(airborne) {
 		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
+		// Emit precisely once at the authoritative grounded→airborne edge.
+		// Ground speed is the real physical proxy; no invented dirt or MIDI notes.
+		// Suppress in menus and all non-Garbage biomes.
+		if (next && !this.menuMode && this.biome === 'garbage-dump-glacier') {
+			const speedContact = contactFromMotion(this.speedPxS, true);
+			this.mixer?.setEffectParam('drums','scrapheap','takeoff',
+				Math.max(.18,speedContact));
+		}
 		this.airborne = next;
 		// As the rider clears the snow, the original instruments open up; landing
 		// restores Powdery without changing playback, beat timing or the music clock.
@@ -318,6 +476,22 @@ export class StemMusicDirector {
 			}
 			if (!next) this._applySnowImpact();
 		}
+		this._applyScrapContact(true);
+		if(next&&this.biome==='garbage-dump-glacier')this.scrapPitch?.resetTiming();
+		if (!next) {
+			this._applyScrapImpact();
+			this._applyHydroImpact();
+			this._applyMicroImpact();
+			this._applyCrystalImpact();
+		}
+		if(this.biome==='crystal-cavern'&&!this.menuMode){
+			for(const stem of ['bass','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'crystallattice','openness',next?1:0);
+			this.mixer?.setEffectParam('drums','crystalPercussion','gain',next?.48:1);
+		}
+		if(this.biome==='micro-mountain'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'microbox','openness',next?1:0);
 		// New adaptive packs crossfade full original drums with an actual
 		// airborne kit. The legacy 0.58 airborne duck remains unchanged.
 		// Airborne ducking applies to the ORIGINAL stem regardless
@@ -338,6 +512,7 @@ export class StemMusicDirector {
 		const normalized = clamp((Number(speedPxS) || 0) / 1000, 0, 1);
 		this.mixer?.setEffectParam('other', 'speed-filter', 'frequency', 400 + normalized * 15000);
 		this.speedPxS = Math.max(0, Number(speedPxS)||0);
+		this._applyScrapContact();
 		const speedGain = this.menuMode ? 1 : clamp(.2+this.speedPxS/850,.2,1.18);
 		this.mixer?.setGain('bass',speedGain,{motion:true,time:.16});
 		this.mixer?.setGain('adaptive:bass',speedGain,{motion:true,time:.16});
@@ -635,6 +810,7 @@ export class StemMusicDirector {
 		if (!this.started || !this.pack || !this.ctx || this.ctx.state !== 'running' ||
 			this.clockStart === null) return;
 		const now = this.ctx.currentTime;
+		this._maybeScrapPitchClang(now);
 		const elapsed = now - this.clockStart;
 		const duration = this.pack.duration;
 		if (elapsed > duration - 15 && !this._nextPromise) {
@@ -804,6 +980,7 @@ export class StemMusicDirector {
 
 	stop() {
 		this.started = false;
+		this.microBees?.setPositions([],{enabled:false});
 		this.transportPaused=false;
 		this._resumeOffset=0;
 		this._resumeGateAt=null;
@@ -830,6 +1007,7 @@ export class StemMusicDirector {
 		this.disposed = true;
 		this.stop();
 		this.adaptive?.destroy();
+		this.microBees?.dispose();
 		this.mixer?.destroy();
 		if (this.bus) this.bus.disconnect();
 	}

@@ -39,6 +39,15 @@ export function orchestraPreset(biome, stem) {
 	// Bass retains some warmth; jumping temporarily removes this effect in the director.
 	if (biome === 'debutmont') return [{ type:'snowpack', id:'snowpack',
 		depth: stem === 'bass' ? .56 : .72 }];
+	if (biome === 'underwater-mountain') return [{type:'hydrostatic',id:'hydrostatic',
+		pressure:0,sensitivity:stem==='bass'?.68:1}];
+	if (biome === 'micro-mountain') return [{type:'microbox',id:'microbox',
+		openness:0,boxiness:1.35,impactWeight:1}];
+	if (biome === 'crystal-cavern' && ['bass','guitar','piano','other'].includes(stem))
+		return [{type:'crystallattice',id:'crystallattice',strength:1.5,openness:0,airBloom:1.6,
+			detectChroma:stem==='bass',bassFeed:stem==='bass'}];
+	if (biome === 'crystal-cavern' && stem==='drums')
+		return [{type:'gain',id:'crystalPercussion',gain:1}];
 	const edge = {
 		'debutmont': 4200,'garbage-dump-glacier':6200,
 		'pyramid-peak': 5100,'underwater-mountain':1800,
@@ -48,10 +57,18 @@ export function orchestraPreset(biome, stem) {
 		'vertigo-vents':3700,
 	}[biome] || 5000;
 	if (stem==='bass') {
-		return [filter('shaped-bass','lowpass',Math.min(3000,edge*.55)),
+		return [
+			// The original bass is analysed BEFORE its existing FX. The
+			// analyser is read only when an irregular on-pitch clang is due.
+			...(biome==='garbage-dump-glacier'?[{type:'scrapPitchProbe',id:'scrapPitchProbe'}]:[]),
+			filter('shaped-bass','lowpass',Math.min(3000,edge*.55)),
 			...(biome==='garbage-dump-glacier'||biome==='vertigo-vents'?[distortion(.18)]:[])];
 	}
 	if (stem==='drums') {
+		// Garbage retains a genuinely unfiltered original drum path; metal
+		// coloration happens only in Scrapheap's parallel resonant wet send.
+		if (biome==='garbage-dump-glacier')
+			return [{type:'scrapheap',id:'scrapheap',contact:0}];
 		return [filter('drum-color','lowpass',edge),
 			...(biome==='steampunk-slopes'||biome==='micro-mountain'?[tremolo(6,.17)]:[])];
 	}
