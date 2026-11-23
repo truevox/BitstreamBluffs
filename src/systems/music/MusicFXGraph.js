@@ -9,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom',
 ]);
 
 function saturatorCurve(amount) {
@@ -573,6 +573,124 @@ function allocateEffect(ctx, raw) {
 			}};
 			disposers.push(()=>{for(const entry of active){
 				try{entry.source.stop();}catch{}disposeTone(entry);
+			}});
+			break;
+		}
+		case 'jellybloom': {
+			// Sky Jellyfish Mountain: an elastic, diaphanous *source-fed*
+			// stereo chorus on the actual original recorded instrument.
+			// No new score, harmonic notes, tempo clock or extra melody.
+			const dry=node(ctx.createGain());dry.gain.value=1;
+			input.connect(dry);dry.connect(output);
+			const hip=node(ctx.createBiquadFilter());hip.type='highpass';hip.frequency.value=130;
+			const low=node(ctx.createBiquadFilter());low.type='lowpass';low.Q.value=.63;
+			input.connect(hip);hip.connect(low);
+			const taps=[],drifts=[];
+			let floatRate=clamp(raw.floatRate,.25,2.0,1);
+			for(let i=0;i<2;i++){
+				const delay=node(ctx.createDelay(.12));delay.delayTime.value=i? .047:.028;
+				const trem=node(ctx.createGain());
+				const pan=node(ctx.createStereoPanner());pan.pan.value=i?.58:-.58;
+				const drift=node(ctx.createOscillator());drift.type='sine';
+				drift.frequency.value=(i?.43:.33)*floatRate;
+				const modulation=node(ctx.createGain());modulation.gain.value=i?.005:.004;
+				drift.connect(modulation);modulation.connect(delay.delayTime);
+				drift.start();lfos.push(drift);drifts.push(drift);
+				low.connect(delay);delay.connect(trem);trem.connect(pan);pan.connect(output);
+				taps.push(trem);
+			}
+			let airborne=raw.airborne===true;
+			let buoyancy=clamp(raw.buoyancy,0,2,1.35);
+			let spring=clamp(raw.spring,0,2,1.3);
+			let liftLevel=clamp(raw.liftLevel,0,2,.95);
+			const apply=(at,immediate=false)=>{
+				const values=[[low.frequency,airborne?12500:4700],
+					...taps.map((tap,i)=>[tap.gain,
+						(airborne?.37:.19)*buoyancy*(i?.75:1)])];
+				for(const [target,value] of values){
+					if(immediate)target.value=value;
+					else numericParam(target,value,at,airborne?.14:.2);
+				}
+			};
+			apply(ctx.currentTime,true);
+			refs.airborne={set:(v,at)=>{
+				if(typeof v!=='boolean'&&v!==0&&v!==1)return false;
+				airborne=!!v;apply(at);return true;}};
+			refs.buoyancy={set:(v,at)=>{if(!Number.isFinite(v))return false;
+				buoyancy=clamp(v,0,2,1.35);apply(at);return true;}};
+			refs.floatRate={set:(v,at)=>{if(!Number.isFinite(v))return false;
+				floatRate=clamp(v,.25,2,1);
+				for(let i=0;i<drifts.length;i++)numericParam(drifts[i].frequency,(i?.43:.33)*floatRate,at,.1);
+				return true;}};
+			refs.spring={set:v=>{if(!Number.isFinite(v))return false;
+				spring=clamp(v,0,2,1.3);return true;}};
+			refs.liftLevel={set:v=>{if(!Number.isFinite(v))return false;
+				liftLevel=clamp(v,0,2,.95);return true;}};
+			// One deterministic elastic membrane and gentle jelly-gel lift
+			// waveform each, rendered once per graph. Physical event samples
+			// *may* sound with quiet stems; never fabricate musical rhythm.
+			const makeEvent=kind=>{
+				const duration=kind==='impact'?.77:.39;
+				const frames=Math.ceil(ctx.sampleRate*duration);
+				const buffer=ctx.createBuffer(1,frames,ctx.sampleRate);
+				const data=buffer.getChannelData(0);
+				let seed=kind==='impact'?0xB011C310:0xA11F5EA5,lowNoise=0;
+				for(let i=0;i<frames;i++){
+					const t=i/ctx.sampleRate;
+					seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+					const white=seed/2147483648-1;
+					lowNoise=.93*lowNoise+.07*white;
+					let value=0;
+					if(kind==='impact'){
+						// A downward-sliding elastic resonator with two increasingly
+						// quiet gelatin reverberations, *not* a scale/note line.
+						const membrane=Math.sin(2*Math.PI*(252*t-92*t*t))
+							+.26*Math.sin(2*Math.PI*(415*t-151*t*t));
+						const decay=Math.exp(-t*10.2);
+						let after=0;
+						for(const [delay,amplitude] of [[.14,.26],[.305,.1]]){
+							if(t<delay)continue;
+							const dt=t-delay;
+							after+=amplitude*Math.sin(2*Math.PI*(220*dt-64*dt*dt))*Math.exp(-dt*14);
+						}
+						value=(membrane*decay*.68+after+lowNoise*Math.exp(-t*37)*.17);
+					}else{
+						const rise=Math.min(1,t/.038),fade=Math.exp(-t*11);
+						const float=Math.sin(2*Math.PI*(165*t+215*t*t))*.18;
+						const wispy=(white-lowNoise)*.22+lowNoise*.36;
+						value=(float+wispy)*rise*fade;
+					}
+					data[i]=Math.tanh(value*.86);
+				}
+				return buffer;
+			};
+			const impactBuffer=makeEvent('impact');
+			const liftBuffer=makeEvent('lift');
+			const voices=new Set();
+			const releaseVoice=voice=>{if(!voices.delete(voice))return;
+				try{voice.source.disconnect();}catch{}
+				try{voice.level.disconnect();}catch{}
+			};
+			const fire=(kind,value,at)=>{
+				if(!Number.isFinite(value)||value<=0)return false;
+				const weight=kind==='impact'?spring:liftLevel;
+				if(weight<=0)return false;
+				if(voices.size>=3){const old=voices.values().next().value;
+					try{old.source.stop();}catch{}releaseVoice(old);}
+				const source=ctx.createBufferSource(),level=ctx.createGain();
+				source.buffer=kind==='impact'?impactBuffer:liftBuffer;
+				level.gain.value=Math.min(1.6,(kind==='impact'?.32:.22)*
+					(.25+.75*clamp(value,0,1,0))*weight);
+				source.connect(level);level.connect(output);
+				const voice={source,level};voices.add(voice);
+				source.onended=()=>releaseVoice(voice);
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			};
+			refs.impact={set:(v,at)=>fire('impact',v,at)};
+			refs.lift={set:(v,at)=>fire('lift',v,at)};
+			disposers.push(()=>{for(const voice of [...voices]){
+				try{voice.source.stop();}catch{}releaseVoice(voice);
 			}});
 			break;
 		}

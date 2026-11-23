@@ -11,7 +11,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: ['./index.html', './tools/music/snowpack-audition.html', './tools/music/scrapheap-audition.html', './tools/music/hydrostatic-audition.html', './tools/music/microbox-audition.html', './tools/music/crystallattice-audition.html', './tools/music/scrap-clangs-audition.html', './tools/music/steamworks-audition.html'], // Game + isolated biome DSP auditions
+      input: ['./index.html', './tools/music/snowpack-audition.html', './tools/music/scrapheap-audition.html', './tools/music/hydrostatic-audition.html', './tools/music/microbox-audition.html', './tools/music/crystallattice-audition.html', './tools/music/scrap-clangs-audition.html', './tools/music/steamworks-audition.html', './tools/music/jellybloom-audition.html'], // Game + isolated biome DSP auditions
     },
   },
   server: {

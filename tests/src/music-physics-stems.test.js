@@ -42,6 +42,50 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(impactFromLanding({impactSpeedPxS:900,hard:true,quality:'good'})).toBeGreaterThan(.55);
 		expect(impactFromLanding({impactSpeedPxS:5000,hard:true})).toBe(1);
 	});
+	test('Jellyfish authentic elastic bounce, flight bloom and source song clock preservation',()=>{
+		const d=director();d.biome='sky-jellyfish-mountain';d._pendingJellyImpact=0;
+		const preset=orchestraPreset('sky-jellyfish-mountain','drums');
+		expect(preset).toEqual([{type:'jellybloom',id:'jellybloom',
+			airborne:false,buoyancy:1.35,floatRate:1,spring:1.3,liftLevel:.95}]);
+		d._applyMusicTimbres();
+		for(const stem of ROLES)expect(d.mixer.replaceEffects).toHaveBeenCalledWith(
+			stem,orchestraPreset('sky-jellyfish-mountain',stem),.18);
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('other','jellybloom','lift',.80);
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'jellybloom','airborne',true);
+		const liftCount=d.mixer.setEffectParam.mock.calls.filter(call=>call[2]==='lift').length;
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(call=>call[2]==='lift')).toHaveLength(liftCount);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:840});
+		expect(d._pendingJellyImpact).toBeGreaterThan(.4);
+		expect(d.mixer.setEffectParam.mock.calls.some(call=>call[2]==='impact')).toBe(false);
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','jellybloom','impact',expect.any(Number));
+		expect(d._pendingJellyImpact).toBe(0);
+		expect(d.clockStart).toBe(23.5);
+		d.setBiome('debutmont');
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.some(call=>call[1]==='jellybloom')).toBe(false);
+	});
+	test('Jellyfish crash, invalid and menu landings are fail-closed; airborne entry begins blooming',()=>{
+		const d=director();d.biome='sky-jellyfish-mountain';d._pendingJellyImpact=0;
+		d.airborne=true;d._applyMusicTimbres();
+		for(const stem of ROLES){
+			const effect=d.mixer.replaceEffects.mock.calls.find(call=>call[0]===stem)?.[1]?.[0];
+			expect(effect).toMatchObject({type:'jellybloom',airborne:true});
+		}
+		d.onLanding({quality:'crash',hard:true,impactSpeedPxS:1000});
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:NaN});
+		expect(d._pendingJellyImpact).toBe(0);
+		d.menuMode=true;d.mixer.setEffectParam.mockClear();
+		d.setAirborne(false);d.setAirborne(true);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:950});
+		expect(d._pendingJellyImpact).toBe(0);
+		expect(d.mixer.setEffectParam.mock.calls.some(call=>call[1]==='jellybloom')).toBe(false);
+	});
+
 	test('Steampunk chug follows actual speed; one real takeoff vents, one landing clangs, no song rescore',()=>{
 		const d=director();d.biome='steampunk-slopes';d._pendingSteamImpact=0;d._steamLastSent=NaN;
 		const preset=orchestraPreset('steampunk-slopes','drums');
