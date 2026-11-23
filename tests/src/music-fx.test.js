@@ -177,7 +177,29 @@ describe('Modular cheap Web Audio processors', () => {
 		chain.dispose();
 		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
 	});
+	test('Microbox native DSP opens on flight and bounded plastic-box shake has real samples',()=>{
+		const ctx=fakeContext();
+		const fx=buildMusicChain(ctx,[{id:'micro',type:'microbox',openness:0}],ctx.createGain());
+		const box=fx.find('micro');
+		expect(box.refs.boxiness).toBeDefined();
+		expect(box.refs.openness).toBeDefined();
+		expect(box.refs.impact).toBeDefined();
+		expect(box.set('openness',1,ctx.currentTime)).toBe(true);
+		expect(box.set('openness',NaN,ctx.currentTime)).toBe(false);
+		expect(box.set('boxiness',1.5,ctx.currentTime)).toBe(true);
+		expect(box.set('impact',0,ctx.currentTime)).toBe(false);
+		expect(box.set('impact',.7,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(1);
+		const waveform=ctx._bufferSources[0].buffer.getChannelData(0);
+		expect(waveform.every(Number.isFinite)).toBe(true);
+		expect(waveform.some(x=>Math.abs(x)>.01)).toBe(true);
+		for(let i=0;i<8;i++)box.set('impact',1,ctx.currentTime+i*.013);
+		expect(ctx._bufferSources.filter(x=>!x.stopped).length).toBeLessThanOrEqual(3);
+		fx.dispose();
+		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
+	});
 	test('Hydrostatic native DSP has bounded pressure automation, real landing pulse and cleanup',()=>{
+
 		const ctx=fakeContext();
 		const fx=buildMusicChain(ctx,[{id:'h',type:'hydrostatic',pressure:0}],ctx.createGain());
 		const hydro=fx.find('h');

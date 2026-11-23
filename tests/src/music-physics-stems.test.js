@@ -103,7 +103,31 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='takeoff')).toHaveLength(0);
 		expect(d.clockStart).toBe(23.5);
 	});
+	test('Micro Mountain uses five original microbox processors, independently from MIDI voice',()=>{
+		for(const stem of ROLES){
+			const fx=orchestraPreset('micro-mountain',stem);
+			expect(fx).toEqual([{type:'microbox',id:'microbox',openness:0,
+				boxiness:1.35,impactWeight:1}]);
+		}
+	});
+	test('Micro Mountain opens box once per grounded→airborne edge and shakes box only on real landing',()=>{
+		const d=director();d.biome='micro-mountain';
+		d.setAirborne(true);
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'microbox','openness',1);
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='openness')).toHaveLength(0);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:600});
+		expect(d._pendingMicroImpact).toBeGreaterThan(0);
+		d.setAirborne(false);
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'microbox','openness',0);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','microbox','impact',expect.any(Number));
+		expect(d._pendingMicroImpact).toBe(0);
+		d.setBiome('debumont');
+		expect(d._pendingMicroImpact).toBe(0);
+	});
 	test('Hydrostatic original-stem preset exists only in Underwater, bass stays warm',()=>{
+
 		for(const stem of ROLES) {
 			const fx=orchestraPreset('underwater-mountain',stem);
 			expect(fx).toEqual([{type:'hydrostatic',id:'hydrostatic',pressure:0,

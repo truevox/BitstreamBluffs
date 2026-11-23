@@ -62,6 +62,7 @@ import { Hazard } from '../entities/Hazard.js';
 import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
+import { beesAt } from '../systems/MicroBees.js';
 import { WorldDanceEnvelope, worldDanceMotionAllowed } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
@@ -1448,6 +1449,13 @@ export class RunScene extends Phaser.Scene {
     const meter=danceAllowed&&sample?audio?.getSyntheticMeterTiming?.():null;
     const dance=this.worldDance?.update(sample,dt,meter)||0;
     this.bg.update(cam.scrollX, t, sled.speed,dance);
+    // Follow the real decorative bees, not an independent audio spawn table.
+    if(audio?.setMicroBees) {
+      const visible=this.bg.motif==='dew-drops'&&this.bg.bees===true&&!this.crashed;
+      const positions=visible?beesAt(cam.scrollX,t,this.bg.decorSeed):[];
+      const riderScreenX=GAME_WIDTH/2+(sled.x-(cam.scrollX+GAME_WIDTH/2))*cam.zoom;
+      audio.setMicroBees(positions,riderScreenX);
+    }
     this.songBillboard?.update(dt,dance,!danceAllowed);
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));
