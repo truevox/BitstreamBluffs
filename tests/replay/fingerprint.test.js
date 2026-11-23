@@ -82,10 +82,14 @@ describe('BSOD-only mutation with the REAL BsodPursuit', () => {
   }
 
   test('advancing BsodPursuit exactly as the spec vector does reproduces the committed bsod digest', () => {
-    const p = new BsodPursuit({ sledLeftEdgeX: 12.5, level: 1 });
+    // The committed 6.10 vector describes historical SIM6, not today's
+    // SIM7 owner-approved chase. Replay vectors MUST remain immutable.
+    const p = new BsodPursuit({ sledLeftEdgeX: 12.5, level: 1,
+      config: { initialGapPx: 7600, initialSpeedPxS: 115, accelerationPxS2: 1.15,
+        softFinishRangePx: 0, softFinishMaxReduction: 0 } });
     for (let i = 0; i < 120 * 2; i++) p.advance(1000 / 240);
     const bsod = bsodOf(p, new BsodBluffTracker());
-    // The vector state was produced by this same loop (120 ticks of 2 substeps): wallX -7471.925000000001.
+    // Historical vector after 120 ticks of 2 nominal substeps: -7471.925000000001.
     expect(f64Encode(bsod.wallX)).toBe(vectors.subsystems.bsod.state.wallX);
     expect(fingerprintSubsystem('bsod', bsod)).toBe(vectors.subsystems.bsod.digest);
   });

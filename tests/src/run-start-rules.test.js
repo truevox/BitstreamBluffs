@@ -12,6 +12,7 @@
  */
 import { jest } from '@jest/globals';
 import { loadContent } from './_helpers.js';
+import { BSOD_DEFAULTS } from '../../src/systems/BsodPursuit.js';
 
 // ---------------------------------------------------------------- inert fakes
 
@@ -381,7 +382,7 @@ describe('permanent upgrade loadout is snapshot at the start, forbidden in offic
     expect(phys.airbrakeLiftMul).toBeGreaterThan(1);
     expect(phys.divebombMul).toBeGreaterThan(1);
     expect(scene.sled.canopyFuelFullMs).toBeGreaterThan(880);
-    expect(scene.bsod.accelerationPxS2).toBeLessThan(1.15);
+    expect(scene.bsod.accelerationPxS2).toBeLessThan(BSOD_DEFAULTS.accelerationPxS2);
     const r = crash(scene);
     expect(r).toMatchObject({
       hashV: 3, modded: true, upgradeRanks: UPGRADED.upgrades,

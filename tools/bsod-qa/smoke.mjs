@@ -29,7 +29,7 @@ try {
       await page.waitForFunction(()=>document.getElementById('bsod-qa-boot-status')?.textContent?.includes('Active scene: TitleScene'),null,{timeout:15000});
       await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('discard-this-seed'));
       await page.waitForFunction(()=>window.__bsodQaEvidence?.preset,null,{timeout:30000});
-      const data=await page.evaluate(()=>({e:window.__bsodQaEvidence,seed:window.__bbGame.scene.getScene('RunScene').seed,storeIsWrapped:window.__bbGame.scene.getScene('RunScene').saveStore !== window.__bbGame.registry.get('saveStore'),title:document.getElementById('bsod-qa-toolbar').textContent}));
+      const data=await page.evaluate(()=>({e:window.__bsodQaEvidence,seed:window.__bbGame.scene.getScene('RunScene').seed,softReduction:window.__bbGame.scene.getScene('RunScene').bsod.config.softFinishMaxReduction,storeIsWrapped:window.__bbGame.scene.getScene('RunScene').saveStore !== window.__bbGame.registry.get('saveStore'),title:document.getElementById('bsod-qa-toolbar').textContent}));
       assert.deepEqual(errors,[]);
       assert.equal(data.seed,'bsod-ab-01');
       assert.equal(data.e.preset,preset);
@@ -38,11 +38,36 @@ try {
       assert.equal(Math.round(data.e.effectiveAccelerationPxS2*1000)/1000,accel);
       assert.equal(data.e.noSave,true);
       assert.equal(data.e.softFinish,preset==='soft');
+      assert.equal(data.softReduction, preset==='soft' ? 0.18 : 0);
       assert.equal(data.storeIsWrapped,true);
       assert(data.title.includes(preset==='soft'?'FAST APPROACH / SOFT FINISH':preset==='buffered'?'BUFFERED STRONG':'MODERATE'));
       assert.equal(await page.locator('#bsod-qa-boot-status').count(),1);
       console.log(`PASS ${preset}: same seed, authoritative 4500px gap, ${speed}px/s, ${accel}px/s², save isolation`);
     } finally { await page.close(); }
   }
+  // A regular run must use the new shipping chase, with no QA script at all.
+  const page=await browser.newPage();
+  const errors=[];
+  page.on('pageerror',e=>errors.push(String(e)));
+  try {
+    const response=await page.goto(`${base}/`);
+    assert.equal(response.status(),200);
+    await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:60000});
+    await page.evaluate(()=>window.__bbGame.scene.getScene('TitleScene').startRun('bsod-default-smoke'));
+    await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('RunScene'),null,{timeout:30000});
+    const run=await page.evaluate(()=>{
+      const scene=window.__bbGame.scene.getScene('RunScene');
+      return {gap:scene.bsodState.gapPx,speed:scene.bsod.wallSpeedPxS,accel:scene.bsod.accelerationPxS2,
+        soft:scene.bsod.config.softFinishMaxReduction,range:scene.bsod.config.softFinishRangePx,qa:!!document.getElementById('bsod-qa-toolbar')};
+    });
+    assert.deepEqual(errors,[]);
+    assert.equal(run.qa,false);
+    assert(Math.abs(run.gap-4500)<100, 'regular game starts at 4500px');
+    assert(Math.abs(run.speed-300)<5); // player physics may have advanced 1–2 frames
+    assert.equal(run.accel,4);
+    assert.equal(run.soft,0.18);
+    assert.equal(run.range,3000);
+    console.log('PASS ordinary gameplay: actual default 4500px / 300px/s / 4px/s², 18% soft finish, no QA');
+  } finally { await page.close(); }
 } finally { await browser.close(); }
-console.log('PLAYABLE QA CHROMIUM SMOKE PASSED');
+console.log('PLAYABLE QA AND SHIPPING-DEFAULT CHROMIUM SMOKE PASSED');

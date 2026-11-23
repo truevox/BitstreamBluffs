@@ -344,7 +344,7 @@ describe('Secret BSOD Gym discovery, shop and practice state',()=>{
   expect(scene.gymReadyMs).toBe(GYM_READY_MS);
   expect(scene.gymRetries).toBe(1);
   expect(scene.bsod.wallSpeedPxS).toBe(GYM_DEFAULT_SETUP.wallSpeedPxS);
-  expect(scene.bsod.accelerationPxS2).toBeCloseTo(1.15);
+  expect(scene.bsod.accelerationPxS2).toBeCloseTo(BSOD_DEFAULTS.accelerationPxS2);
   expect(scene.saveStore.saveRun).not.toHaveBeenCalled();
   expect(scene.registry.set).not.toHaveBeenCalled();
   expect(calls.map(([k])=>k)).toEqual([EVT.GYM_ATTEMPT_RESET, EVT.BSOD_STATE_CHANGED]);
