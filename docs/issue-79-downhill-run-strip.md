@@ -28,7 +28,9 @@ separately. The first recorded sample is at tick 4; v1 saves one pose every 4
 ticks at nominal 120 Hz. This does not identify the exact run start or crash.
 
 To bound large overviews, windows above 1,024 poses draw the endpoints and the
-recorded X/Y extrema of small consecutive buckets, in original order. The image
+recorded X/Y extrema of small consecutive buckets, in original order. The live
+preview also retains the selected pose so its ring always sits on the path.
+A static export does not include this selection-only vertex. The image
 says how many vertices it shows; zoom into at most 1,024 poses to see each
 recorded pose. There is no smoothing or extrapolation. The inspector accepts a
 UTF-8 JSON file up to 2 MiB with 2–32,768 complete v1 pose triples (Float32 X,
