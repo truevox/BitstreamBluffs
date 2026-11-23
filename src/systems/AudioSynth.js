@@ -947,6 +947,12 @@ export class AudioSynth {
     this._stemMusic?.setMicroBees?.(bees,playerScreenX);
   }
 
+  /** Verified physical thermal zone and actual gravity; one-way music only. */
+  setThermalMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setThermalMotion?.(snapshot) === true;
+  }
+
   /** Actual low-gravity and rider altitude for Space Mountain source field. */
   setSpaceMotion(snapshot) {
     if (this._musicMode !== 'run' || this._paused) return false;

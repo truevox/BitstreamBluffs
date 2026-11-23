@@ -1432,6 +1432,13 @@ export class RunScene extends Phaser.Scene {
           audio.setGeyserMotion({beforeCooldownMs:geyserCooldownBeforeMs,
             afterCooldownMs:sled.geyserCooldownMs || 0,
             launchAvailable:!!phys.geyserLaunch,vy:sled.vy});
+        // Real thermalUpdraft mod must be physically under the rider and
+        // unwarded; reduced gravity from parachutes alone is not a thermal.
+        // Cosmetic audio observation, never changes the physics snapshot.
+        if (audio.setThermalMotion)
+          audio.setThermalMotion({active:zoneDefs.some(def=>def?.id==='thermalUpdraft') &&
+            !isWarded(this.wards,{modId:'thermalUpdraft'}),
+            gravityPxS2:phys.gravityPxS2,vy:sled.vy,grounded:!!sled.grounded});
         // Read-only authoritative low-gravity + absolute terrain/rider
         // geometry. Effects never feed back into simulation or song time.
         if (audio.setSpaceMotion && this.terrain)

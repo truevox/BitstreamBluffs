@@ -9,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge', 'sugarfizz', 'orbitfield',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge', 'sugarfizz', 'orbitfield', 'sunstone',
 ]);
 
 function saturatorCurve(amount) {
@@ -573,6 +573,125 @@ function allocateEffect(ctx, raw) {
 			}};
 			disposers.push(()=>{for(const entry of active){
 				try{entry.source.stop();}catch{}disposeTone(entry);
+			}});
+			break;
+		}
+		case 'sunstone': {
+			// Pyramid Peak: real thermal zones loft the rider and the
+			// original instruments feed warm, airy sandstone resonators.
+			// Dry original waveform/notes/song clock always stay untouched.
+			const dry=node(ctx.createGain());dry.gain.value=1;
+			input.connect(dry);dry.connect(output);
+			const sandFilter=node(ctx.createBiquadFilter());sandFilter.type='highpass';
+			sandFilter.frequency.value=250;sandFilter.Q.value=.62;
+			input.connect(sandFilter);
+			const warm=node(ctx.createBiquadFilter());warm.type='bandpass';
+			warm.frequency.value=680;warm.Q.value=1.35;
+			const high=node(ctx.createBiquadFilter());high.type='bandpass';
+			high.frequency.value=1600;high.Q.value=1.8;
+			const warmDelay=node(ctx.createDelay(.5));warmDelay.delayTime.value=.063;
+			const highDelay=node(ctx.createDelay(.5));highDelay.delayTime.value=.113;
+			const warmth=node(ctx.createGain()),shine=node(ctx.createGain());
+			sandFilter.connect(warm);warm.connect(warmDelay);
+			warmDelay.connect(warmth);warmth.connect(output);
+			sandFilter.connect(high);high.connect(highDelay);
+			highDelay.connect(shine);shine.connect(output);
+			const breezeOsc=node(ctx.createOscillator());breezeOsc.type='sine';
+			breezeOsc.frequency.value=.72;breezeOsc.start();lfos.push(breezeOsc);
+			const flutter=node(ctx.createGain());flutter.gain.value=.015;
+			breezeOsc.connect(flutter);flutter.connect(shine.gain);
+			let loft=clamp(raw.loft,0,1,0);
+			let resonance=clamp(raw.resonance,0,2,1.25);
+			let drift=clamp(raw.drift,.25,2,1);
+			let gustLevel=clamp(raw.gustLevel,0,2,1.2);
+			let stoneLevel=clamp(raw.stoneLevel,0,2,1.15);
+			const apply=(at,instant=false)=>{
+				const levels=[[warmth.gain,resonance*(.07+.73*loft)],
+					[shine.gain,resonance*(.025+.48*loft)],
+					[warm.frequency,480+310*loft],
+					[high.frequency,1250+1100*loft],
+					[high.Q,1.3+1.0*loft],
+					[breezeOsc.frequency,.44+drift*.35],
+					[flutter.gain,.006+.065*loft],
+					[warmDelay.delayTime,.063+.026*loft],
+					[highDelay.delayTime,.113+.039*loft]];
+				for(const [param,v] of levels){
+					if(instant)param.value=v;
+					else numericParam(param,v,at,.08);
+				}
+			};
+			apply(ctx.currentTime,true);
+			const control=(key,min,max,fallback,setter)=>{
+				refs[key]={set:(v,at)=>{if(!Number.isFinite(v))return false;
+					setter(clamp(v,min,max,fallback));apply(at);return true;}};
+			};
+			control('loft',0,1,0,v=>loft=v);
+			control('resonance',0,2,1.25,v=>resonance=v);
+			control('drift',.25,2,1,v=>drift=v);
+			refs.gustLevel={set:v=>{if(!Number.isFinite(v))return false;
+				gustLevel=clamp(v,0,2,1.2);return true;}};
+			refs.stoneLevel={set:v=>{if(!Number.isFinite(v))return false;
+				stoneLevel=clamp(v,0,2,1.15);return true;}};
+			// Air moving through stepped sandstone, and a warm ceramic
+			// physical impact: deterministic original Foley, not melody.
+			const sample=kind=>{
+				const duration=kind==='gust'?.64:.47;
+				const buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*duration),ctx.sampleRate);
+				const data=buffer.getChannelData(0);
+				let seed=kind==='gust'?0x7E113D51:0xD35E471A,low=0;
+				for(let i=0;i<data.length;i++){
+					const t=i/ctx.sampleRate;
+					seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+					const white=seed/2147483648-1;
+					low=.94*low+.06*white;
+					let sound=0;
+					if(kind==='gust'){
+						const swell=(1-Math.exp(-t*27))*Math.exp(-t*5.4);
+						const wind=.5*(white*.6+low*1.5)*swell;
+						const hollow=.18*Math.sin(2*Math.PI*(310*t+180*t*t))*swell;
+						sound=wind+hollow;
+					}else{
+						const thud=.35*Math.sin(2*Math.PI*(220*t-96*t*t))*Math.exp(-t*21);
+						const stone=.30*Math.sin(2*Math.PI*563*t)*Math.exp(-t*15)
+							+.11*Math.sin(2*Math.PI*1174*t)*Math.exp(-t*25);
+						let grit=0;
+						for(const lag of [0,.038,.093,.156]){
+							if(t<lag)continue;
+							grit+=(white-low)*.18*Math.exp(-(t-lag)*95);
+						}
+						sound=thud+stone+grit;
+					}
+					data[i]=Math.tanh(sound*.89);
+				}
+				return buffer;
+			};
+			const gust=sample('gust'),stone=sample('stone');
+			const voices=new Set();
+			const release=v=>{
+				if(!voices.delete(v))return;
+				try{v.source.disconnect();}catch{}
+				try{v.gain.disconnect();}catch{}
+			};
+			const fire=(kind,strength,at)=>{
+				if(!Number.isFinite(strength)||strength<=0)return false;
+				const level=kind==='gust'?gustLevel:stoneLevel;
+				if(level<=0)return false;
+				if(voices.size>=3){const oldest=voices.values().next().value;
+					try{oldest.source.stop();}catch{}release(oldest);}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=kind==='gust'?gust:stone;
+				gain.gain.value=Math.min(1.4,(kind==='gust'?.43:.42)*level*
+					(.3+.7*clamp(strength,0,1,0)));
+				source.connect(gain);gain.connect(output);
+				const voice={source,gain};voices.add(voice);
+				source.onended=()=>release(voice);
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			};
+			refs.gust={set:(v,at)=>fire('gust',v,at)};
+			refs.stone={set:(v,at)=>fire('stone',v,at)};
+			disposers.push(()=>{for(const voice of [...voices]){
+				try{voice.source.stop();}catch{}release(voice);
 			}});
 			break;
 		}

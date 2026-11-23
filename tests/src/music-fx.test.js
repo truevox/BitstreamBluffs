@@ -70,6 +70,34 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(chains[0].find('effect7').refs.impulse).toBeDefined();
 		for(const chain of chains)chain.dispose();
 	});
+	test('Pyramid source-fed sandstone resonators and true thermal sound release bounded',()=>{
+		const ctx=fakeContext();
+		const chain=buildMusicChain(ctx,[{type:'sunstone',id:'sunstone',loft:0,
+			resonance:1.25,drift:1,gustLevel:1.2,stoneLevel:1.15}],ctx.createGain());
+		const fx=chain.find('sunstone');expect(fx).toBeDefined();
+		for(const key of ['loft','resonance','drift','gustLevel','stoneLevel','gust','stone'])
+			expect(fx.refs[key]).toBeDefined();
+		expect(fx.set('loft',.83,ctx.currentTime)).toBe(true);
+		expect(fx.set('resonance',1.7,ctx.currentTime)).toBe(true);
+		expect(fx.set('drift',1.8,ctx.currentTime)).toBe(true);
+		expect(fx.set('loft',Infinity,ctx.currentTime)).toBe(false);
+		expect(fx.set('gustLevel',1.6,ctx.currentTime)).toBe(true);
+		expect(fx.set('stoneLevel',1.6,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(0); // no continuous new song notes
+		expect(fx.set('gust',0,ctx.currentTime)).toBe(false);
+		expect(fx.set('stone',NaN,ctx.currentTime)).toBe(false);
+		expect(fx.set('gust',.8,ctx.currentTime)).toBe(true);
+		expect(fx.set('stone',.95,ctx.currentTime)).toBe(true);
+		for(const source of ctx._bufferSources){
+			expect(source.started).toBe(true);
+			expect(source.buffer.getChannelData(0).every(Number.isFinite)).toBe(true);
+			expect(source.buffer.getChannelData(0).some(x=>Math.abs(x)>.05)).toBe(true);
+		}
+		for(let i=0;i<9;i++)fx.set('stone',1,ctx.currentTime+i*.01);
+		expect(ctx._bufferSources.filter(x=>!x.stopped)).toHaveLength(3);
+		chain.dispose();expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
+	});
+
 	test('Space Mountain source-fed orbital fields and physical reentry samples cap and clean up',()=>{
 		const ctx=fakeContext(),target=ctx.createGain();
 		const chain=buildMusicChain(ctx,[{type:'orbitfield',id:'orbitfield',
