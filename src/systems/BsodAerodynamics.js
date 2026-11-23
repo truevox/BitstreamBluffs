@@ -4,6 +4,45 @@
  * efficiency, finite fuel, terrain and player choices determine escape viability.
  */
 import pmath from './pmath.js';
+
+/**
+ * #247 owner retune: AirBrake is exactly TWO IMMEDIATE impulses on first press
+ * each airtime: decelerate vx and kick vy upward. NO drag-over-time, gravity
+ * reduction, ongoing lift, or descent damp. The parachute is its own action.
+ * One use per actual touchdown, so tapping cannot create endless flight.
+ *
+ * `maxUpPxS` caps extra upward energy but never slows an already fast ascent.
+ * Lift scales with forward momentum actually paid; no free stationary launch.
+ * The lift budget is capped at the earlier 40% braking reference, even when
+ * the separate horizontal deceleration is increased. This preserves the same
+ * upward kick for identical incoming velocity, density and upgrade level.
+ */
+export function airBrakeKickStep({ vx = 0, vy = 0, atmosphereDensity = 1,
+  decelFraction = .60, liftBudgetFraction = .40, upwardRatio = 1.5,
+  liftMul = 1, maxUpPxS = 420 } = {}) {
+  if (!Number.isFinite(vx) || !Number.isFinite(vy)) return { vx, vy, spentSpeedPxS: 0 };
+  const density = Number.isFinite(atmosphereDensity) ? Math.max(0, Math.min(1, atmosphereDensity)) : 0;
+  const fraction = Number.isFinite(decelFraction) ? Math.max(0, Math.min(.95, decelFraction)) * density : 0;
+  if (!fraction) return { vx, vy, spentSpeedPxS: 0 };
+  const afterVx = vx * (1 - fraction);
+  const spentSpeedPxS = Math.max(0, Math.abs(vx) - Math.abs(afterVx));
+  // Use EXACTLY the former upward-impulse budget even when braking harder.
+  // This remains a subset of the momentum genuinely lost on this activation.
+  const budget = Number.isFinite(liftBudgetFraction)
+    ? Math.max(0, Math.min(.95, liftBudgetFraction)) * density : 0;
+  const liftFraction = Math.min(fraction, budget);
+  const liftSpendPxS = Math.max(0, Math.abs(vx) - Math.abs(vx * (1 - liftFraction)));
+  // Prevent tiny-speed presses from resetting a fast downward plunge for free.
+  if (liftSpendPxS < 25) return { vx: afterVx, vy, spentSpeedPxS };
+  const mul = Number.isFinite(liftMul) ? Math.max(1, Math.min(1.6, liftMul)) : 1;
+  const ratio = Number.isFinite(upwardRatio) ? Math.max(0, upwardRatio) : 0;
+  const up = liftSpendPxS * ratio * mul;
+  const limit = Number.isFinite(maxUpPxS) ? Math.max(0, maxUpPxS) : 0;
+  // A visible upward kick even if already descending; no continuing force.
+  // Never clip an already more-negative (faster upward) vertical velocity.
+  const targetVy = Math.max(-limit, Math.min(vy, 0) - up);
+  return { vx: afterVx, vy: Math.min(vy, targetVy), spentSpeedPxS };
+}
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /** Treat low-speed riders as a sail, fast riders as a glider. */
@@ -15,11 +54,11 @@ export function canopySailFactor(vx) {
 /** Proposed first-playtest aerodynamic forces (velocity change in px/s). */
 export function aerodynamicStep({
   vx = 0, vy = 0, relativeAirX = 0, atmosphereDensity = 1,
-  parachute = false, airBrake = false, airbrakeLiftMul = 1, proximity01 = 0, stepMs = 8,
+  parachute = false, proximity01 = 0, stepMs = 8,
 } = {}) {
   const dt = Number.isFinite(stepMs) ? clamp(stepMs, 0, 50) / 1000 : 0;
   const density = clamp(Number.isFinite(atmosphereDensity) ? atmosphereDensity : 0, 0, 1);
-  if (!dt || !density || (!parachute && !airBrake)) return { dvx: 0, dvy: 0 };
+  if (!dt || !density || !parachute) return { dvx: 0, dvy: 0 };
   const flow = Number.isFinite(relativeAirX) ? relativeAirX : 0;
   let dvx = 0, dvy = 0;
   if (parachute) {
@@ -33,17 +72,6 @@ export function aerodynamicStep({
       * pmath.tanh(flow / 420) * canopySailFactor(vx);
     dvx += sailAccel * density * dt;
     dvy -= (65 + 45 * pmath.tanh(Math.abs(flow) / 600)) * density * dt;
-  }
-  if (airBrake) {
-    // Braking buys altitude by converting available forward speed to lift.
-    // Cannot generate endless upward thrust while standing still.
-    const flowSpeed = Math.abs(Number(vx) || 0);
-    // The separate horizontal airbrake already removes substantial speed.
-    // Convert that spent momentum into meaningful, speed-dependent upward lift:
-    // above ~400px/s it can briefly overcome gravity; as the rider slows the
-    // lift collapses, preventing stationary hovering or free infinite flight.
-    const aero = 1250 * pmath.tanh(flowSpeed / 450) * density;
-    dvy -= aero * Math.max(1, Number.isFinite(airbrakeLiftMul) ? airbrakeLiftMul : 1) * dt;
   }
   return { dvx, dvy };
 }
