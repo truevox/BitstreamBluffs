@@ -39,6 +39,8 @@ export function orchestraPreset(biome, stem) {
 	// Bass retains some warmth; jumping temporarily removes this effect in the director.
 	if (biome === 'debutmont') return [{ type:'snowpack', id:'snowpack',
 		depth: stem === 'bass' ? .56 : .72 }];
+	if (biome === 'candy-cane-canyon') return [{type:'sugarfizz',id:'sugarfizz',
+		speed:0,airborne:false,sweetness:1.25,fizz:1.5,popLevel:1.3,wrapperLevel:.9}];
 	if (biome === 'vertigo-vents') return [{type:'ventforge',id:'ventforge',
 		rumble:1.25,shimmer:1.25,updraft:0,blast:1.3,crust:.8}];
 	if (biome === 'sky-jellyfish-mountain') return [{type:'jellybloom',id:'jellybloom',

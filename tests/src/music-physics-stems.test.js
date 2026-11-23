@@ -44,6 +44,62 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(impactFromLanding({impactSpeedPxS:900,hard:true,quality:'good'})).toBeGreaterThan(.55);
 		expect(impactFromLanding({impactSpeedPxS:5000,hard:true})).toBe(1);
 	});
+	test('Candy Cane original-stem sparkle follows actual speed while Sugar Rush physics is untouched',()=>{
+		const d=director();d.biome='candy-cane-canyon';d._pendingCandyImpact=0;
+		d._candyLastSpeed=NaN;d.speedPxS=0;
+		const preset=orchestraPreset('candy-cane-canyon','drums');
+		expect(preset).toEqual([{type:'sugarfizz',id:'sugarfizz',speed:0,
+			airborne:false,sweetness:1.25,fizz:1.5,popLevel:1.3,wrapperLevel:.9}]);
+		d._applyMusicTimbres();
+		for(const stem of ROLES)expect(d.mixer.replaceEffects).toHaveBeenCalledWith(
+			stem,orchestraPreset('candy-cane-canyon',stem),.18);
+		d.mixer.setEffectParam.mockClear();
+		d.setSpeed(1440); // true existing speed, NOT a fabricated musical metronome
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			stem,'sugarfizz','speed',expect.closeTo(.8,4));
+		const speedCount=d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='speed').length;
+		d.setSpeed(1450);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='speed')).toHaveLength(speedCount);
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('other','sugarfizz','wrapper',.8055555555555556);
+		for(const stem of ROLES)expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			stem,'sugarfizz','airborne',true);
+		const wrapperCount=d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='wrapper').length;
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='wrapper')).toHaveLength(wrapperCount);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:860});
+		expect(d._pendingCandyImpact).toBeGreaterThan(.4);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[2]==='pop')).toBe(false);
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith(
+			'drums','sugarfizz','pop',expect.any(Number));
+		expect(d._pendingCandyImpact).toBe(0);
+		expect(d.clockStart).toBe(23.5);
+		d.setBiome('debutmont');d.mixer.setEffectParam.mockClear();
+		d.setSpeed(1800);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='sugarfizz')).toBe(false);
+	});
+	test('Candy Cane menu, crash, invalid landing and already airborne entry are safe',()=>{
+		const d=director();d.biome='candy-cane-canyon';d._pendingCandyImpact=0;
+		d.airborne=true;d._applyMusicTimbres();
+		for(const stem of ROLES)expect(d.mixer.replaceEffects.mock.calls
+			.find(c=>c[0]===stem)?.[1]?.[0]).toMatchObject({type:'sugarfizz',airborne:true});
+		d.onLanding({quality:'crash',hard:true,impactSpeedPxS:1100});
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:NaN});
+		expect(d._pendingCandyImpact).toBe(0);
+		d.menuMode=true;d.mixer.setEffectParam.mockClear();
+		d.setAirborne(false);d.setAirborne(true);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:750});
+		expect(d._pendingCandyImpact).toBe(0);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[1]==='sugarfizz')).toBe(false);
+		d.menuMode=false;d.transportPaused=true;d.airborne=false;
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:900});
+		d.setAirborne(true);
+		expect(d._pendingCandyImpact).toBe(0);
+		expect(d.mixer.setEffectParam.mock.calls.some(c=>c[2]==='wrapper'||c[2]==='pop')).toBe(false);
+	});
+
 	test('Vertigo eruption only on actual same-physics-tick geyser cooldown increase, not a jump',()=>{
 		const d=director();d.biome='vertigo-vents';d.started=true;
 		d._pendingVentCrust=0;d._ventLastLift=NaN;
