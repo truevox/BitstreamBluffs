@@ -153,6 +153,9 @@ describe('build identity: deterministic exact composition', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-build-identity-'));
     try {
       const { record } = realParts();
+      // This is an artifact overlay, not an independently loaded code tree.
+      fs.symlinkSync(path.join(root, 'src'), path.join(dir, 'src'));
+      fs.symlinkSync(path.join(root, 'node_modules'), path.join(dir, 'node_modules'));
       fs.mkdirSync(path.join(dir, 'tools', 'ruleset', 'archive'), { recursive: true });
       fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ version: record.gameVersion }));
       fs.writeFileSync(path.join(dir, 'tools', 'ruleset', 'current.json'), JSON.stringify({
@@ -454,6 +457,48 @@ describe('build identity CLI: reporting and --check-identity', () => {
       const res = cli('--check-identity', '--root', dir);
       expect(res.status).toBe(1);
       expect(res.stderr).toMatch(/source tripwire: src\/constants\.js changed/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('--root refuses an independent layout declaration instead of certifying the invoker identity', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-build-identity-alternate-code-'));
+    try {
+      scaffold(dir);
+      // Reproduce the review failure: the alternate tree has its own source and
+      // a changed schema declaration, but the CLI still imports ours.
+      fs.rmSync(path.join(dir, 'src'));
+      fs.cpSync(path.join(root, 'src'), path.join(dir, 'src'), { recursive: true });
+      const layout = path.join(dir, 'src', 'systems', 'savestate', 'layoutDeclaration.js');
+      const original = fs.readFileSync(layout, 'utf8');
+      expect(original).toContain('SAVESTATE_LAYOUT_DECLARATION_VERSION = 1');
+      fs.writeFileSync(layout, original.replace('SAVESTATE_LAYOUT_DECLARATION_VERSION = 1',
+        'SAVESTATE_LAYOUT_DECLARATION_VERSION = 2'));
+
+      const reference = cli('--identity');
+      expect(reference.status).toBe(0);
+      for (const mode of ['--identity', '--check-identity']) {
+        const result = cli(mode, '--root', dir);
+        expect(result.status).toBe(1);
+        expect(result.stderr).toMatch(/--root must be an artifact overlay reusing this checkout's src/);
+        expect(result.stdout).not.toContain('build identity is provable and current');
+        expect(result.stdout).not.toContain(reference.stdout.split('\n')[0]);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('--root rejects a different dependency tree rather than silently loading local dependencies', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-build-identity-alternate-deps-'));
+    try {
+      scaffold(dir);
+      fs.rmSync(path.join(dir, 'node_modules'));
+      fs.mkdirSync(path.join(dir, 'node_modules'));
+      const result = cli('--check-identity', '--root', dir);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/--root must be an artifact overlay reusing this checkout's node_modules/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

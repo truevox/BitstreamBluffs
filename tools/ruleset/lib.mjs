@@ -238,11 +238,35 @@ export function readCurrentRuleset(root = repoRoot()) {
 }
 
 /**
+ * `--root` is a read-only ARTIFACT OVERLAY, not a second executable checkout.
+ * Imported ruleset constants, source registry, and savestate-layout declaration
+ * come from this running CLI's checkout. Verifying a different physical `src`
+ * tree would silently substitute the wrong declaration (and might certify a
+ * different build as identical). A distinct root is therefore allowed only
+ * when its `src` and `node_modules` resolve to the same directories as ours.
+ * This fail-closed boundary is deliberately stronger than comparing hashes of
+ * a hand-picked subset of imports, which could omit a new transitive module.
+ */
+export function assertArtifactOverlayRoot(root = repoRoot()) {
+  let sameRoot = false;
+  try { sameRoot = fs.realpathSync(root) === fs.realpathSync(repoRoot()); } catch { /* fail closed below */ }
+  if (sameRoot) return;
+  for (const directory of ['src', 'node_modules']) {
+    let same = false;
+    try {
+      same = fs.realpathSync(path.join(root, directory)) === fs.realpathSync(path.join(repoRoot(), directory));
+    } catch { /* missing path: not the same code/dependencies */ }
+    if (!same) throw new Error(`--root must be an artifact overlay reusing this checkout's ${directory}; independent source trees cannot be certified by this process`);
+  }
+}
+
+/**
  * Compose the build identity implied by the COMMITTED artifacts only. Read-only: never writes
- * `current.json` or the tripwire.
+ * `current.json` or the tripwire. An alternate root must share our source and dependencies.
  * @returns {{record:object, parts:object, built:{doc:object,rulesetId:string}}}
  */
 export function currentBuildIdentity(root = repoRoot()) {
+  assertArtifactOverlayRoot(root);
   const pkg = JSON.parse(readText(root, 'package.json'));
   const { doc, rulesetId } = readCurrentRuleset(root);
   const parts = {

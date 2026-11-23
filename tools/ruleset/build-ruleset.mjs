@@ -12,8 +12,9 @@
  *   node tools/ruleset/build-ruleset.mjs --attest "no-behavior-change: <why>"
  *   node tools/ruleset/build-ruleset.mjs --attest "sim-revision-bumped: <what>"
  *                                                        rewrite tools/ruleset/source-digest.json (the source tripwire)
- *   node tools/ruleset/build-ruleset.mjs --root <dir>    read artifacts from <dir> instead of this repository
- *                                                        (read-only modes only: --identity, --check-identity)
+ *   node tools/ruleset/build-ruleset.mjs --root <dir>    inspect an artifact overlay on this checkout's code and deps
+ *                                                        (read-only modes only: --identity, --check-identity;
+ *                                                         independent code trees fail closed)
  *
  * Reads files under the repo only. No network. Does not execute anything it reads.
  */
@@ -29,8 +30,10 @@ import {
 const args = process.argv.slice(2);
 const rootIx = args.indexOf('--root');
 const root = rootIx >= 0 ? path.resolve(args[rootIx + 1] || '') : repoRoot();
-if (rootIx >= 0 && (args.includes('--write') || args.indexOf('--attest') >= 0)) {
-  console.error('FAIL --root is read-only: --write and --attest always operate on this repository');
+if (rootIx >= 0 && (!args[rootIx + 1] || args[rootIx + 1].startsWith('--') ||
+    !(args.includes('--identity') || args.includes('--check-identity')) ||
+    args.includes('--write') || args.includes('--check') || args.indexOf('--attest') >= 0)) {
+  console.error('FAIL --root needs a directory and supports only --identity or --check-identity; no writes');
   process.exit(2);
 }
 
