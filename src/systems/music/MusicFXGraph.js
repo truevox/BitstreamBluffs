@@ -8,7 +8,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox',
 ]);
 
 function saturatorCurve(amount) {
@@ -347,6 +347,88 @@ function allocateEffect(ctx, raw) {
 				strikeOnce(impulse, at);
 				return true;
 			} };
+			break;
+		}
+		case 'microbox': {
+			// Five original instrument stems become an RC-diorama soundtrack:
+			// compact, band-limited resonant plastic enclosure on the ground;
+			// when the rider flies, the virtual lid opens and reflections decay.
+			const hip = node(ctx.createBiquadFilter()), lop = node(ctx.createBiquadFilter());
+			hip.type='highpass';hip.Q.value=.707;
+			lop.type='lowpass';lop.Q.value=.83;
+			const direct = node(ctx.createGain());
+			input.connect(hip);hip.connect(lop);lop.connect(direct);direct.connect(output);
+			const taps=[];
+			for (const [seconds,level] of [[.011,.58],[.026,.37]]) {
+				const delay=node(ctx.createDelay(.1));delay.delayTime.value=seconds;
+				const tap=node(ctx.createGain());
+				lop.connect(delay);delay.connect(tap);tap.connect(output);
+				taps.push({tap,level});
+			}
+			let boxiness=clamp(raw.boxiness,0,1.8,1.0);
+			let openness=clamp(raw.openness,0,1,0);
+			let impactWeight=clamp(raw.impactWeight,0,2,1);
+			const apply=(at,immediate=false)=>{
+				const closed=(1-openness)*boxiness;
+				const params=[
+					[hip.frequency,Math.max(75,90+320*closed)],
+					[lop.frequency,Math.min(18000,16000*Math.pow(.22,closed))],
+					[direct.gain,Math.min(2.3,1+.66*closed)],
+					...taps.map(({tap,level})=>[tap.gain,level*closed*.35]),
+				];
+				for(const [param,value] of params){
+					if(immediate)param.value=value;
+					else numericParam(param,value,at,.07);
+				}
+			};
+			apply(ctx.currentTime,true);
+			refs.openness={set:(value,at)=>{
+				if(!Number.isFinite(value))return false;
+				openness=clamp(value,0,1,0);apply(at);return true;
+			}};
+			refs.boxiness={set:(value,at)=>{
+				if(!Number.isFinite(value))return false;
+				boxiness=clamp(value,0,1.8,1);apply(at);return true;
+			}};
+			refs.impactWeight={set:value=>{
+				if(!Number.isFinite(value))return false;
+				impactWeight=clamp(value,0,2,1);return true;
+			}};
+			// Distinct deterministic plastic-box shake at physical landing.
+			// Not a new song note, and audible even between drum attacks.
+			const length=Math.ceil(ctx.sampleRate*.32);
+			const buffer=ctx.createBuffer(1,length,ctx.sampleRate);
+			const samples=buffer.getChannelData(0);
+			let seed=0xB0551234;
+			for(let i=0;i<length;i++){
+				const t=i/ctx.sampleRate;
+				seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+				const hiss=(seed/2147483648-1);
+				let clack=0;
+				for(const lag of [0,.046,.107,.185]){
+					const dt=t-lag;if(dt<0)continue;
+					clack+=(.32*Math.sin(2*Math.PI*(420*dt-210*dt*dt))+.15*hiss)
+						*Math.exp(-dt*68);
+				}
+				samples[i]=Math.tanh(clack*.84);
+			}
+			const active=new Set();
+			refs.impact={set:(value,at)=>{
+				const strength=clamp(value,0,1,0);
+				if(strength<=0)return false;
+				if(active.size>=3){const old=active.values().next().value;
+					try{old.source.stop();}catch{}old.cleanup();}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=buffer;gain.gain.value=Math.min(1.2,(.13+.24*strength)*impactWeight);
+				source.connect(gain);gain.connect(output);
+				const item={source,cleanup(){try{source.disconnect();}catch{}
+					try{gain.disconnect();}catch{}active.delete(item);}};
+				active.add(item);source.onended=()=>item.cleanup();
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));return true;
+			}};
+			disposers.push(()=>{for(const item of active){
+				try{item.source.stop();}catch{}item.cleanup();
+			}});
 			break;
 		}
 		case 'hydrostatic': {

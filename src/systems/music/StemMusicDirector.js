@@ -14,6 +14,7 @@ import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
 import { snowpackImpactFromLanding } from './SnowpackImpact.js';
 import { contactFromMotion, impactFromLanding } from './MusicPhysicsSignals.js';
 import { HydrostaticPressure } from './HydrostaticPressure.js';
+import { MicroBeeAudio } from './MicroBeeAudio.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
@@ -55,6 +56,8 @@ export class StemMusicDirector {
 		this._pendingSnowImpact = 0;
 		this._pendingScrapImpact = 0;
 		this._pendingHydroImpact = 0;
+		this._pendingMicroImpact = 0;
+		this.microBees = null;
 		this.hydrostatic = new HydrostaticPressure();
 		this._hydroLastSent = NaN;
 		this._scrapContactLast = NaN;
@@ -97,6 +100,7 @@ export class StemMusicDirector {
 		const lowMemory = typeof navigator !== 'undefined' &&
 			Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
 		this.mixer = new StemFXMixer(ctx, this.bus, { roomQuality: lowMemory ? 'mobile' : 'standard' });
+		// Instantiate the two bee voices only if Micro has visible bees.
 		this.mixer.selectBiome(this.biome);
 		for (const name of CORE_STEMS) {
 			const g = this.mixer.addSource(name, { gain: name === 'vocals' && !this.vocals ? 0 : 1 });
@@ -177,6 +181,9 @@ export class StemMusicDirector {
 		if (next) {
 			this._pendingSnowImpact = 0;
 			this._pendingScrapImpact = 0;
+			this._pendingMicroImpact = 0;
+			this.microBees?.dispose();
+			this.microBees=null;
 		}
 		if (next) {
 			// Menus restore all three original accompaniments to clean DSP.
@@ -222,8 +229,10 @@ export class StemMusicDirector {
 			if (force || this._timbreSignatures.get(name)!==key) {
 				// A rider entering Debumont while airborne is above the powder already.
 				// Keep the cached signature based on GROUND effects so jumps don't rebuild FX graphs.
-				const initial = this.airborne && !this.menuMode && this.biome === 'debumont'
-					? effects.map(e => e.type === 'snowpack' ? { ...e, depth: 0 } : e) : effects;
+				const initial = this.airborne && !this.menuMode &&
+					(this.biome === 'debumont' || this.biome==='micro-mountain')
+					? effects.map(e => e.type==='snowpack' ? {...e,depth:0} :
+						e.type==='microbox' ? {...e,openness:1} : e) : effects;
 				this.mixer.replaceEffects(name,initial,.18);
 				this._timbreSignatures.set(name,key);
 			}
@@ -281,6 +290,11 @@ export class StemMusicDirector {
 		this.biome = next;
 		if (this.biome !== 'debumont') this._pendingSnowImpact = 0;
 		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
+		if (this.biome !== 'micro-mountain') {
+			this._pendingMicroImpact=0;
+			this.microBees?.dispose();
+			this.microBees=null;
+		}
 		this._scrapContactLast = NaN;
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
@@ -322,6 +336,11 @@ export class StemMusicDirector {
 			if (impulse <= 0) return;
 			this._pendingScrapImpact = Math.max(this._pendingScrapImpact || 0, impulse);
 			if (!this.airborne) this._applyScrapImpact();
+		} else if (this.biome === 'micro-mountain') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingMicroImpact=Math.max(this._pendingMicroImpact||0,impulse);
+			if(!this.airborne)this._applyMicroImpact();
 		} else if (this.biome === 'underwater-mountain') {
 			const impulse = impactFromLanding(landing);
 			if (impulse <= 0) return;
@@ -376,6 +395,24 @@ export class StemMusicDirector {
 			this.mixer?.setEffectParam('drums','hydrostatic','impact',impulse);
 	}
 
+	/** Actual existing Micro Mountain bee screen positions: no new bee RNG. */
+	setMicroBees(bees,playerScreenX){
+		if(this.menuMode||this.biome!=='micro-mountain'||!this.started){
+			this.microBees?.setPositions([],{enabled:false});
+			return false;
+		}
+		if(!this.microBees&&this.ctx&&this.bus&&Array.isArray(bees)&&bees.length)
+			this.microBees=new MicroBeeAudio(this.ctx,this.bus);
+		return this.microBees?.setPositions(bees,{enabled:true,playerScreenX})||false;
+	}
+
+	_applyMicroImpact(){
+		const impulse=this._pendingMicroImpact||0;
+		this._pendingMicroImpact=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='micro-mountain')
+			this.mixer?.setEffectParam('drums','microbox','impact',impulse);
+	}
+
 	setAirborne(airborne) {
 		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
@@ -401,7 +438,11 @@ export class StemMusicDirector {
 		if (!next) {
 			this._applyScrapImpact();
 			this._applyHydroImpact();
+			this._applyMicroImpact();
 		}
+		if(this.biome==='micro-mountain'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'microbox','openness',next?1:0);
 		// New adaptive packs crossfade full original drums with an actual
 		// airborne kit. The legacy 0.58 airborne duck remains unchanged.
 		// Airborne ducking applies to the ORIGINAL stem regardless
@@ -889,6 +930,7 @@ export class StemMusicDirector {
 
 	stop() {
 		this.started = false;
+		this.microBees?.setPositions([],{enabled:false});
 		this.transportPaused=false;
 		this._resumeOffset=0;
 		this._resumeGateAt=null;
@@ -915,6 +957,7 @@ export class StemMusicDirector {
 		this.disposed = true;
 		this.stop();
 		this.adaptive?.destroy();
+		this.microBees?.dispose();
 		this.mixer?.destroy();
 		if (this.bus) this.bus.disconnect();
 	}

@@ -1423,6 +1423,8 @@ bees are ordinary bees, so next to the micro rider they are HUGE.
   backdrop is one Graphics at depth -100, below the terrain (5), hazards (8), pickups (9) and sled (20).
 * Zero gameplay effect: no generator, physics, presence or sim input; every digest is unchanged.
 
+**Micro Mountain musical physics experiment (draft issue #254):** `src/systems/music/MicroBeeAudio.js` uses the same exact `beesAt(cam.scrollX,runTimeMs,Background.decorSeed)` points **after backdrop update** to produce at most two quiet stereo wing buzz voices, panned relative to the real rider's screen X. It never spawns bees or changes their visual location, and fades when no bees are on screen or outside Micro. Native `microbox` DSP in `MusicFXGraph` colors the **original** five instrument stems with a tiny 11/26-ms enclosed room; actual airborne state opens the enclosure, and real noncrash landing gives a bounded 320-ms physical plastic shake on the drums. `AudioSynth.setMicroBees` is read-only, the song transport/beat/MIDI vocals/game physics unchanged, and bee oscillators allocate lazily and are disposed on confirmed biome exit, menu transition and final teardown. See `docs/music-review/20261122-micro-mountain-box-and-bees.md`. This is a draft sound candidate, not owner-approved production audio.
+
 **Neon Sled Drone (rider cosmetic).**
 * Catalogue: `{id:'rider-drone', slot:'rider', price:0, unlockLevel:1, value:'drone', grant:'biome',
   biome:'micro-mountain', unlockText:'COMPLETE MICRO MOUNTAIN'}`. The `grant`, `biome` and `unlockText` fields are
