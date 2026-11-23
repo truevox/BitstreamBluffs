@@ -12,6 +12,7 @@ import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.j
 import { FIRST_SONG_ID, defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices, shuffledSongRound } from './MusicPlaylist.js';
 import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
 import { snowpackImpactFromLanding } from './SnowpackImpact.js';
+import { contactFromMotion, impactFromLanding } from './MusicPhysicsSignals.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
@@ -51,6 +52,8 @@ export class StemMusicDirector {
 		this.captionWords = [];
 		this.airborne = false;
 		this._pendingSnowImpact = 0;
+		this._pendingScrapImpact = 0;
+		this._scrapContactLast = NaN;
 		this._timer = null;
 		this._token = 0;
 		this._nextPromise = null;
@@ -167,7 +170,10 @@ export class StemMusicDirector {
 		const next = on === true;
 		if (this.menuMode === next) return;
 		this.menuMode = next;
-		if (next) this._pendingSnowImpact = 0;
+		if (next) {
+			this._pendingSnowImpact = 0;
+			this._pendingScrapImpact = 0;
+		}
 		if (next) {
 			// Menus restore all three original accompaniments to clean DSP.
 			this.setBsodDanger(0);
@@ -222,6 +228,7 @@ export class StemMusicDirector {
 			// disable legitimate processing of the ORIGINAL recordings.
 			this.mixer.setRoomSend(name,this.menuMode ? 0 : null);
 		}
+		this._applyScrapContact(true);
 	}
 
 	_nextEnabledIndex(previous = -1) {
@@ -260,6 +267,8 @@ export class StemMusicDirector {
 	setBiome(id) {
 		this.biome = typeof id === 'string' && id ? id : HOME_BIOME;
 		if (this.biome !== 'debumont') this._pendingSnowImpact = 0;
+		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
+		this._scrapContactLast = NaN;
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
@@ -289,11 +298,18 @@ export class StemMusicDirector {
 
 	/** Landing pulses may arrive either side of the per-frame grounded update. */
 	onLanding(landing) {
-		if (this.menuMode || this.biome !== 'debumont') return;
-		const impulse = snowpackImpactFromLanding(landing);
-		if (impulse <= 0) return;
-		this._pendingSnowImpact = Math.max(this._pendingSnowImpact || 0, impulse);
-		if (!this.airborne) this._applySnowImpact();
+		if (this.menuMode) return;
+		if (this.biome === 'debumont') {
+			const impulse = snowpackImpactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingSnowImpact = Math.max(this._pendingSnowImpact || 0, impulse);
+			if (!this.airborne) this._applySnowImpact();
+		} else if (this.biome === 'garbage-dump-glacier') {
+			const impulse = impactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingScrapImpact = Math.max(this._pendingScrapImpact || 0, impulse);
+			if (!this.airborne) this._applyScrapImpact();
+		}
 	}
 
 	_applySnowImpact() {
@@ -304,9 +320,33 @@ export class StemMusicDirector {
 			this.mixer?.setEffectParam(stem,'snowpack','impact',impulse);
 	}
 
+	_applyScrapContact(force = false) {
+		if (this.biome !== 'garbage-dump-glacier' || this.menuMode) return;
+		const contact = contactFromMotion(this.speedPxS, !this.airborne);
+		if (!force && Number.isFinite(this._scrapContactLast) &&
+			Math.abs(contact - this._scrapContactLast) < .04) return;
+		this._scrapContactLast = contact;
+		this.mixer?.setEffectParam('drums', 'scrapheap', 'contact', contact);
+	}
+
+	_applyScrapImpact() {
+		const impulse = this._pendingScrapImpact || 0;
+		this._pendingScrapImpact = 0;
+		if (impulse <= 0 || this.menuMode || this.biome !== 'garbage-dump-glacier') return;
+		this.mixer?.setEffectParam('drums', 'scrapheap', 'impact', impulse);
+	}
+
 	setAirborne(airborne) {
 		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
+		// Emit precisely once at the authoritative grounded→airborne edge.
+		// Ground speed is the real physical proxy; no invented dirt or MIDI notes.
+		// Suppress in menus and all non-Garbage biomes.
+		if (next && !this.menuMode && this.biome === 'garbage-dump-glacier') {
+			const speedContact = contactFromMotion(this.speedPxS, true);
+			this.mixer?.setEffectParam('drums','scrapheap','takeoff',
+				Math.max(.18,speedContact));
+		}
 		this.airborne = next;
 		// As the rider clears the snow, the original instruments open up; landing
 		// restores Powdery without changing playback, beat timing or the music clock.
@@ -317,6 +357,8 @@ export class StemMusicDirector {
 			}
 			if (!next) this._applySnowImpact();
 		}
+		this._applyScrapContact(true);
+		if (!next) this._applyScrapImpact();
 		// New adaptive packs crossfade full original drums with an actual
 		// airborne kit. The legacy 0.58 airborne duck remains unchanged.
 		// Airborne ducking applies to the ORIGINAL stem regardless
@@ -337,6 +379,7 @@ export class StemMusicDirector {
 		const normalized = clamp((Number(speedPxS) || 0) / 1000, 0, 1);
 		this.mixer?.setEffectParam('other', 'speed-filter', 'frequency', 400 + normalized * 15000);
 		this.speedPxS = Math.max(0, Number(speedPxS)||0);
+		this._applyScrapContact();
 		const speedGain = this.menuMode ? 1 : clamp(.2+this.speedPxS/850,.2,1.18);
 		this.mixer?.setGain('bass',speedGain,{motion:true,time:.16});
 		this.mixer?.setGain('adaptive:bass',speedGain,{motion:true,time:.16});

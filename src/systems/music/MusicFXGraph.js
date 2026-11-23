@@ -8,7 +8,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap',
 ]);
 
 function saturatorCurve(amount) {
@@ -33,6 +33,7 @@ function allocateEffect(ctx, raw) {
 	}
 	const owned = [];
 	const lfos = [];
+	const disposers = [];
 	const refs = {};
 	const node = (n) => { owned.push(n); return n; };
 	const input = node(ctx.createGain());
@@ -129,6 +130,225 @@ function allocateEffect(ctx, raw) {
 			refs.impulse = { set: (buffer) => { conv.buffer = buffer || null; } };
 			break;
 		}
+		case 'scrapheap': {
+			// Inharmonic, source-excited junk-metal resonators on ORIGINAL drum audio.
+			// No independently timed notes or invented beat grid: the recording
+			// remains audible on the untouched dry path.
+			const dry = node(ctx.createGain()), wet = node(ctx.createGain());
+			const highpass = node(ctx.createBiquadFilter());
+			highpass.type = 'highpass'; highpass.frequency.value = 185;
+			const grit = node(ctx.createWaveShaper());
+			grit.curve = saturatorCurve(0.16);
+			grit.oversample = '2x';
+			dry.gain.value = 1;
+			input.connect(dry); dry.connect(output);
+			input.connect(highpass); highpass.connect(grit);
+			const pitches = [379, 743, 1327]; // intentionally inharmonic, not Crystal chords
+			const delays = [.017, .043, .071];
+			const weights = [1.14, .82, .64];
+			for (let i = 0; i < pitches.length; i++) {
+				const resonator = node(ctx.createBiquadFilter());
+				resonator.type = 'bandpass';
+				resonator.frequency.value = pitches[i];
+				resonator.Q.value = 5.2 + i * 1.5;
+				const shortEcho = node(ctx.createDelay(.2));
+				shortEcho.delayTime.value = delays[i];
+				const voice = node(ctx.createGain());
+				voice.gain.value = weights[i];
+				grit.connect(resonator);
+				resonator.connect(shortEcho);
+				shortEcho.connect(voice);
+				voice.connect(wet);
+			}
+			wet.connect(output);
+			let contact = clamp(raw.contact, 0, 1, 0);
+			// Owner-approved extra weight on the physical impact only; contact-bed
+			// loudness and the original drum recording remain unchanged.
+			let splock = clamp(raw.splock, 0, 1.6, 1.6);
+			// Takeoff volume is independent of the already-owner-approved landing.
+			let suction = clamp(raw.suction, 0, 2.4, .8);
+			let burstEnd = -Infinity;
+			// Stationary and airborne have genuinely zero metallic contact;
+			// a fast ground run makes the inharmonic layer audible but bounded.
+			const bed = () => contact * .80;
+			wet.gain.value = bed();
+
+			// A collision must sound like a collision EVEN BETWEEN drum hits.
+			// The previous version merely amplified resonances already being
+			// excited by the recording, which could be effectively silent.
+			// One deterministic struck-metal sample is generated per graph,
+			// then reused as a small, bounded, physical Foley one-shot.
+			const strikeLength = Math.ceil(ctx.sampleRate * .42);
+			const strike = ctx.createBuffer(1, strikeLength, ctx.sampleRate);
+			const samples = strike.getChannelData(0);
+			let seed = 0x5A17C0DE;
+			for (let i = 0; i < strikeLength; i++) {
+				const t = i / ctx.sampleRate;
+				seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+				const white = seed / 2147483648 - 1;
+				const noise = white * Math.exp(-t * 52);
+				const metal = .42 * Math.sin(2 * Math.PI * 379 * t) * Math.exp(-t * 12)
+					+ .34 * Math.sin(2 * Math.PI * 743 * t) * Math.exp(-t * 18)
+					+ .21 * Math.sin(2 * Math.PI * 1327 * t) * Math.exp(-t * 25)
+					+ .12 * Math.sin(2 * Math.PI * 1919 * t) * Math.exp(-t * 30);
+				// Thick, slightly descending hollow knock: the 'splock' under
+				// the metal. Small delayed clacks suggest loose scrap scattering.
+				const thunk = .35 * Math.sin(2 * Math.PI * (148 * t - 95 * t * t)) * Math.exp(-t * 31);
+				const hollow = .30 * Math.sin(2 * Math.PI * (235 * t - 160 * t * t)) * Math.exp(-t * 24);
+				// A sticky suction that gathers before it breaks free: fast upward
+				// formant-like pitch glide, a rounded lip-pop, then small wet bits.
+				// This is synthetic impact texture, NOT music or an extra song stem.
+				const sip = Math.sin(2 * Math.PI * (94 * t + 520 * t * t - 350 * t * t * t));
+				const sipEnvelope = Math.max(0, Math.min(1, t / .014)) * Math.exp(-t * 18);
+				const suction = .33 * sip * sipEnvelope;
+				const lip = .28 * Math.sin(2 * Math.PI * 173 * Math.max(0,t-.060))
+					* (t >= .060 ? Math.exp(-(t-.060)*61) : 0);
+				let debris = 0;
+				for (const lag of [.042, .097, .151]) {
+					if (t < lag) continue;
+					const since = t - lag;
+					debris += (.19 * white + .13 * Math.sin(2 * Math.PI * 870 * since))
+						* Math.exp(-since * 105) * (1 - lag * 2.5);
+				}
+				samples[i] = Math.tanh((noise * .50 + metal * .85 + thunk + hollow + suction + lip + debris) * .85);
+			}
+			// Audition two materially different procedural suction textures.
+			// The previous takeoff was mostly a pitched electronic glissando:
+			// louder, but not convincingly wet. Here *filtered aspirated noise*
+			// leads; tiny gurgles and a lip break are supporting details.
+			// Everything is deterministic, precomputed and voice-capped.
+			const suctionLength = Math.ceil(ctx.sampleRate * .43);
+			const suctionBuffers = [];
+			for (let style = 0; style < 2; style++) {
+				const buffer = ctx.createBuffer(1, suctionLength, ctx.sampleRate);
+				const data = buffer.getChannelData(0);
+				let seed = style === 0 ? 0x14DDB337 : 0x7B00B1E5;
+				let low = 0, mid = 0, sub = 0;
+				for (let i = 0; i < suctionLength; i++) {
+					const t = i / ctx.sampleRate;
+					seed = (Math.imul(seed,1664525) + 1013904223) >>> 0;
+					const white = seed / 2147483648 - 1;
+					const progress = Math.min(1,t/.32);
+					const opening = Math.min(1,t/.032);
+					const release = Math.max(0,Math.min(1,(.40-t)/.13));
+					const envelope = opening * release;
+					// Simulated pressure change: noisy seal → narrow resonant
+					// wet hiss → sudden break. Distinct cutoffs produce a
+					// genuine timbral sweep, not just a louder sine wave.
+					const base = style === 0 ? 300 : 165;
+					const target = style === 0 ? 2350 : 1100;
+					const cutoff = base + (target-base)*progress*progress;
+					const lpf = 1 - Math.exp(-2*Math.PI*cutoff/ctx.sampleRate);
+					const midf = 1 - Math.exp(-2*Math.PI*(cutoff*2.1)/ctx.sampleRate);
+					const subf = 1 - Math.exp(-2*Math.PI*125/ctx.sampleRate);
+					low += lpf*(white-low);
+					mid += midf*(white-mid);
+					sub += subf*(white-sub);
+					const squish = (mid-low*.92)*1.65 + (low-sub)*.42;
+					const flutter = style === 0 ?
+						(.85 + .15*Math.sin(2*Math.PI*32*t)) :
+						(.72 + .28*Math.sin(2*Math.PI*(19*t + 14*t*t)));
+					let gulp = 0;
+					if (style === 1) {
+						// Several falling sticky bubble voids, not one musical note.
+						for (const lag of [.070,.154,.235]) {
+							const dt = t-lag;
+							if (dt < 0) continue;
+							gulp += .28*Math.sin(2*Math.PI*(205*dt-590*dt*dt))
+								*Math.exp(-dt*39);
+						}
+					}
+					const sealT = t-(style === 0 ? .265 : .315);
+					// Rapid pressure release, with short low thop and moist tick.
+					const breakPop = sealT < 0 ? 0 :
+						(.42*Math.sin(2*Math.PI*(205*sealT-260*sealT*sealT))
+						+ .35*white)*Math.exp(-sealT*65);
+					const wet = squish*flutter*envelope*(style === 0 ? 1.15 : .98);
+					data[i] = Math.tanh((wet + gulp + breakPop)*1.5);
+				}
+				suctionBuffers.push(buffer);
+			}
+			let suctionStyle = clamp(raw.suctionStyle,0,1,0) >= .5 ? 1 : 0;
+			const activeStrikes = new Set();
+			const playPhysical = (buffer, gainValue, at) => {
+				if (activeStrikes.size >= 4) {
+					const oldest = activeStrikes.values().next().value;
+					try { oldest.source.stop(); } catch {}
+					oldest.cleanup();
+				}
+				const source = ctx.createBufferSource();
+				const gain = ctx.createGain();
+				source.buffer = buffer;
+				gain.gain.value = gainValue;
+				source.connect(gain); gain.connect(output);
+				const entry = {
+					source,
+					cleanup() {
+						try { source.disconnect(); } catch {}
+						try { gain.disconnect(); } catch {}
+						activeStrikes.delete(entry);
+					},
+				};
+				activeStrikes.add(entry);
+				source.onended = () => entry.cleanup();
+				source.start(Math.max(at, ctx.currentTime));
+			};
+			const strikeOnce = (strength, at) =>
+				playPhysical(strike, (.25 + strength * .80) * splock, at);
+			const takeoffOnce = (strength, at) =>
+				playPhysical(suctionBuffers[suctionStyle], (.28 + strength * .34) * suction * (suctionStyle === 0 ? .68 : 1), at);
+			disposers.push(() => {
+				for (const entry of activeStrikes) {
+					try { entry.source.stop(); } catch {}
+					entry.cleanup();
+				}
+			});
+
+			refs.splock = { set: value => {
+				splock = clamp(value, 0, 1.6, 1.6);
+				return true;
+			} };
+			refs.suction = { set: value => {
+				suction = clamp(value, 0, 2.4, .8);
+				return true;
+			} };
+			refs.suctionStyle = { set: value => {
+				if (!Number.isFinite(Number(value))) return false;
+				suctionStyle = clamp(value,0,1,0) >= .5 ? 1 : 0;
+				return true;
+			} };
+			refs.takeoff = { set: (value, at) => {
+				const release = clamp(value, 0, 1, 0);
+				if (release <= 0) return false;
+				takeoffOnce(release, at);
+				return true;
+			} };
+			refs.contact = { set: (value, at) => {
+				contact = clamp(value, 0, 1, 0);
+				// Takeoff silences contact immediately and cancels impact tails.
+				if (contact === 0) {
+					burstEnd = -Infinity;
+					numericParam(wet.gain, bed(), at, 0.035);
+				} else {
+					// Ground-speed updates adjust the recovery without an abrupt click.
+					const when = Math.max(at, burstEnd);
+					numericParam(wet.gain, bed(), when, 0.11);
+				}
+				return true;
+			} };
+			refs.impact = { set: (value, at) => {
+				const impulse = clamp(value, 0, 1, 0);
+				if (impulse <= 0) return false;
+				const peak = Math.min(1.65, bed() + .82 * impulse);
+				burstEnd = at + .13;
+				wet.gain.cancelScheduledValues(at);
+				wet.gain.setTargetAtTime(peak, at, .018);
+				wet.gain.setTargetAtTime(bed(), burstEnd, .22);
+				strikeOnce(impulse, at);
+				return true;
+			} };
+			break;
+		}
 		case 'snowpack': {
 			// Acoustic snow blanket: soften attacks, absorb highs, keep the low end.
 			// Original samples and their timing remain completely untouched.
@@ -207,6 +427,7 @@ function allocateEffect(ctx, raw) {
 		},
 		setImpulse(buffer) { return refs.impulse?.set(buffer); },
 		dispose() {
+			for (const stop of disposers) { try { stop(); } catch {} }
 			for (const osc of lfos) { try { osc.stop(); } catch {} }
 			for (const n of owned) { try { n.disconnect(); } catch {} }
 		},

@@ -67,6 +67,16 @@ describe('Bitstream Music Pack v1', () => {
 		expect(result.captions).toBe('captions/words.json');
 		expect(result.bpm).toBe(160);
 	});
+	test('source-bound physical DSP processors can be described safely by manifests', () => {
+		const original=pack();
+		original.effects={drums:[{id:'metal',type:'scrapheap',contact:.3}],
+			bass:[{id:'snow',type:'snowpack',depth:.6}]};
+		const result=normalizePack(original);
+		expect(result.effects.drums[0].type).toBe('scrapheap');
+		expect(result.effects.bass[0].type).toBe('snowpack');
+		original.effects.drums[0].type='arbitrary-script';
+		expect(()=>normalizePack(original)).toThrow(/Invalid music processor/);
+	});
 	test('data-driven non-vocal derived textures are valid and limited', () => {
 		const p = pack();
 		for (const seg of p.segments) seg.sources['pad:space'] = 'derived-pad.ogg';
