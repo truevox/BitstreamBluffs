@@ -339,6 +339,14 @@ export class StemMusicDirector {
 	setAirborne(airborne) {
 		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
+		// Emit precisely once at the authoritative grounded→airborne edge.
+		// Ground speed is the real physical proxy; no invented dirt or MIDI notes.
+		// Suppress in menus and all non-Garbage biomes.
+		if (next && !this.menuMode && this.biome === 'garbage-dump-glacier') {
+			const speedContact = contactFromMotion(this.speedPxS, true);
+			this.mixer?.setEffectParam('drums','scrapheap','takeoff',
+				Math.max(.18,speedContact));
+		}
 		this.airborne = next;
 		// As the rider clears the snow, the original instruments open up; landing
 		// restores Powdery without changing playback, beat timing or the music clock.

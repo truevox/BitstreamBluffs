@@ -164,7 +164,7 @@ function allocateEffect(ctx, raw) {
 			let contact = clamp(raw.contact, 0, 1, 0);
 			// Owner-approved extra weight on the physical impact only; contact-bed
 			// loudness and the original drum recording remain unchanged.
-			let splock = clamp(raw.splock, 0, 1.6, 1.2);
+			let splock = clamp(raw.splock, 0, 1.6, 1.6);
 			let burstEnd = -Infinity;
 			// Stationary and airborne have genuinely zero metallic contact;
 			// a fast ground run makes the inharmonic layer audible but bounded.
@@ -210,8 +210,24 @@ function allocateEffect(ctx, raw) {
 				}
 				samples[i] = Math.tanh((noise * .50 + metal * .85 + thunk + hollow + suction + lip + debris) * .85);
 			}
+			// Shorter, lighter suction on takeoff: rubbery adhesion pulls,
+			// stretches and releases. This is entirely separate from the
+			// owner-approved chunky SPLORP/PLOCK on landing.
+			const suctionLength = Math.ceil(ctx.sampleRate * .24);
+			const suctionBuffer = ctx.createBuffer(1, suctionLength, ctx.sampleRate);
+			const suctionSamples = suctionBuffer.getChannelData(0);
+			for (let i = 0; i < suctionLength; i++) {
+				const t = i / ctx.sampleRate;
+				const stretch = Math.min(1, t / .048) * Math.exp(-t * 15);
+				const phase = 2 * Math.PI * (76*t + 560*t*t - 410*t*t*t);
+				const wobbly = .62*Math.sin(phase) + .21*Math.sin(phase*1.73);
+				const snapT = t - .106;
+				const plip = snapT >= 0 ? .31*Math.sin(2*Math.PI*260*snapT)
+					* Math.exp(-snapT*70) : 0;
+				suctionSamples[i] = Math.tanh((wobbly*stretch + plip)*.75);
+			}
 			const activeStrikes = new Set();
-			const strikeOnce = (strength, at) => {
+			const playPhysical = (buffer, gainValue, at) => {
 				if (activeStrikes.size >= 4) {
 					const oldest = activeStrikes.values().next().value;
 					try { oldest.source.stop(); } catch {}
@@ -219,8 +235,8 @@ function allocateEffect(ctx, raw) {
 				}
 				const source = ctx.createBufferSource();
 				const gain = ctx.createGain();
-				source.buffer = strike;
-				gain.gain.value = (.25 + strength * .80) * splock;
+				source.buffer = buffer;
+				gain.gain.value = gainValue;
 				source.connect(gain); gain.connect(output);
 				const entry = {
 					source,
@@ -234,6 +250,10 @@ function allocateEffect(ctx, raw) {
 				source.onended = () => entry.cleanup();
 				source.start(Math.max(at, ctx.currentTime));
 			};
+			const strikeOnce = (strength, at) =>
+				playPhysical(strike, (.25 + strength * .80) * splock, at);
+			const takeoffOnce = (strength, at) =>
+				playPhysical(suctionBuffer, (.12 + strength * .23) * splock, at);
 			disposers.push(() => {
 				for (const entry of activeStrikes) {
 					try { entry.source.stop(); } catch {}
@@ -242,7 +262,13 @@ function allocateEffect(ctx, raw) {
 			});
 
 			refs.splock = { set: value => {
-				splock = clamp(value, 0, 1.6, 1.2);
+				splock = clamp(value, 0, 1.6, 1.6);
+				return true;
+			} };
+			refs.takeoff = { set: (value, at) => {
+				const release = clamp(value, 0, 1, 0);
+				if (release <= 0) return false;
+				takeoffOnce(release, at);
 				return true;
 			} };
 			refs.contact = { set: (value, at) => {

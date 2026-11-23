@@ -77,6 +77,29 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='impact')).toHaveLength(before);
 		expect(d.clockStart).toBe(23.5);
 	});
+	test('real grounded-to-airborne transition triggers one suction, scales with actual speed and never leaks to menus',()=>{
+		const d=director();d.speedPxS=650;
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','scrapheap','takeoff',.5);
+		const before=d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='takeoff').length;
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='takeoff')).toHaveLength(before);
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='takeoff')).toHaveLength(before);
+		d.setSpeed(0);
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','scrapheap','takeoff',.18);
+		d.setAirborne(false);
+		d.menuMode=true;
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='takeoff')).toHaveLength(0);
+		d.menuMode=false;
+		d.biome='debumont';
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='takeoff')).toHaveLength(0);
+		expect(d.clockStart).toBe(23.5);
+	});
 	test('post-grounded landing works, missing and wrong biome signals never leak',()=>{
 		const d=director();d.mixer.setEffectParam.mockClear();
 		d.onLanding({quality:'perfect',impactSpeedPxS:300,hard:false});

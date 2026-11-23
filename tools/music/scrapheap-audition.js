@@ -28,6 +28,7 @@ const controlState = () => {
 	$('soft').disabled = !playing || !airborne;
 	$('hard').disabled = !playing || !airborne;
 	$('splock-hit').disabled = !playing || bypassed;
+	$('suction-hit').disabled = !playing || bypassed;
 	$('play').textContent = playing ? '■ Stop' : '▶ Play';
 	$('bypass').textContent = bypassed ? 'Hear processed' : 'Compare dry';
 	$('bypass').setAttribute('aria-pressed',String(bypassed));
@@ -143,15 +144,24 @@ $('solo').addEventListener('click', () => {
 	say(drumOnly ? 'Only the original drums + metal layer: move speed and compare dry.' :
 		'Full instrumental mix restored, without restarting the song.');
 });
+const pullStrength = () => Math.max(.18, contactFromMotion(speed(),true));
 $('takeoff').addEventListener('click', () => {
-	if (!buffers || airborne) return;
+	if (!playing || airborne) return;
+	// Physical suction sounds only on the true ground→airborne edge.
+	// Matches StemMusicDirector's real-game signal policy.
+	effect()?.set('takeoff',pullStrength(),ctx.currentTime);
 	airborne=true;
 	setContact();
 	controlState();
-	say('Airborne: contact rattles rapidly disappear while the original instruments keep playing.');
+	say('SLLLORP! The garbage releases its grip, and ground rattles vanish in flight.');
+});
+$('suction-hit').addEventListener('click', () => {
+	if (!playing || bypassed || !ctx) return;
+	effect()?.set('takeoff', pullStrength(), ctx.currentTime);
+	say('SLLLORP! Brief sticky suction-release, no change to gameplay state.');
 });
 function land(strength) {
-	if (!buffers || !airborne) return;
+	if (!playing || !airborne) return;
 	airborne=false;
 	setContact();
 	effect()?.set('impact',strength,ctx.currentTime);

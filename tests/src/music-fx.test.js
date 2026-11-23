@@ -117,7 +117,7 @@ describe('Modular cheap Web Audio processors', () => {
 		const originalGain = ctx._bufferSources[0].connections[0].gain.value;
 		expect(scrap.set('splock',1.6,ctx.currentTime)).toBe(true);
 		expect(scrap.set('impact',.9,ctx.currentTime)).toBe(true);
-		expect(ctx._bufferSources[1].connections[0].gain.value).toBeCloseTo(originalGain*1.6/1.2);
+		expect(ctx._bufferSources[1].connections[0].gain.value).toBeCloseTo(originalGain);
 		expect(scrap.set('splock',0,ctx.currentTime)).toBe(true);
 		expect(scrap.set('impact',.9,ctx.currentTime)).toBe(true);
 		expect(ctx._bufferSources[2].connections[0].gain.value).toBe(0);
@@ -132,6 +132,30 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(ctx._bufferSources).toHaveLength(11);
 		chain.dispose();
 		expect(ctx._bufferSources.at(-1).stopped).toBe(true);
+	});
+	test('Scrapheap takeoff produces a source-independent, bounded adhesive release only when signaled', () => {
+		const ctx = fakeContext();
+		const chain = buildMusicChain(ctx,[{id:'scrap',type:'scrapheap',contact:0}],ctx.createGain());
+		const fx = chain.find('scrap');
+		expect(fx.refs.takeoff).toBeDefined();
+		expect(fx.set('takeoff',0,ctx.currentTime)).toBe(false);
+		expect(fx.set('takeoff',NaN,ctx.currentTime)).toBe(false);
+		expect(ctx._bufferSources).toHaveLength(0);
+		expect(fx.set('takeoff',.65,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(1);
+		const source=ctx._bufferSources[0];
+		expect(source.started).toBe(true);
+		expect(source.buffer.length).toBeGreaterThan(ctx.sampleRate*.18);
+		expect(source.buffer.length).toBeLessThan(ctx.sampleRate*.3);
+		const samples=source.buffer.getChannelData(0);
+		expect(samples.some(x=>Math.abs(x)>.01)).toBe(true);
+		expect(samples.every(Number.isFinite)).toBe(true);
+		expect(samples.every(x=>Math.abs(x)<=1)).toBe(true);
+		expect(fx.set('splock',1.6,ctx.currentTime)).toBe(true);
+		for(let i=0;i<8;i++) fx.set('takeoff',1,ctx.currentTime+i*.02);
+		expect(ctx._bufferSources.filter(x=>!x.stopped).length).toBeLessThanOrEqual(4);
+		chain.dispose();
+		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
 	});
 	test('rejects unknown processors and duplicate stable ids', () => {
 		const ctx = fakeContext();

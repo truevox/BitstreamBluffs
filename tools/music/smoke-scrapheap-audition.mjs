@@ -27,7 +27,11 @@ try {
 	assert.match(await page.$eval('#play', e=>e.textContent), /Stop/);
 	await page.click('#solo');
 	assert.equal(await page.$eval('#solo', e=>e.getAttribute('aria-pressed')),'true');
+	assert.equal(await page.$eval('#splock-value', e=>e.textContent),'160%');
+	await page.click('#suction-hit');
+	assert.match(await page.$eval('#status', e=>e.textContent),/SLLLORP/);
 	await page.click('#takeoff');
+	assert.match(await page.$eval('#status', e=>e.textContent),/SLLLORP/);
 	assert.equal(await page.$eval('#hard', e=>e.disabled),false);
 	await page.click('#hard');
 	assert.match(await page.$eval('#status', e=>e.textContent),/Hard landing/);
@@ -47,6 +51,7 @@ try {
 	await page.$eval('#takeoff', e => e.scrollIntoView({block:'center',behavior:'instant'}));
 	await new Promise(resolve=>setTimeout(resolve,150));
 	await page.click('#takeoff');
+	assert.match(await page.$eval('#status', e=>e.textContent),/SLLLORP/);
 	assert.equal(await page.$eval('#soft', e=>e.disabled),false);
 	await page.click('#soft');
 	assert.equal(await page.$eval('#soft', e=>e.disabled),true);
