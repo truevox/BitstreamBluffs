@@ -1,5 +1,14 @@
 # SIM_REVISION 7 conformance preflight — issue #249
 
+## CURRENT SOURCE RESET 2026-11-23 — owner demands two kicks, NO float
+
+**The previous experimental browser results on this page were all recorded BEFORE the owner rejected the first SIM7 held/speed-paid-lift physics.** Their exact source hashes, SHA-256 reports, and earlier findings are preserved as HISTORICAL evidence only. They **do not certify** the new owner-retuned AirBrake code.
+
+Current AIRBRAKE code lives on draft PR #248 exact `fed8552284297f67997e1358a64dbd71535d4cab`, new unpublished SIM7 ruleset `sha256:30774199ce6c8240e28ea4441bf520b3b2ee0f7f9191baef0c33f8e60f48875b`, build identity `sha256:8032f820a7ff33f4c4c412e1f3dc5ec4d79237622695dfbda72b5919a6263589`. It fires an **instantaneous horizontal deceleration and upward kick**, once per actually airborne interval, **no AirBrake gliding/float/gravity reduction**, existing parachute stays separate. Causal state `airBrakeKickUsed` is fingerprinted in new sled schema v3; historical v1/sled-v2 fixture remains untouched. Source-stamped new recordings and browser QA MUST be rerun; the numeric kick magnitude is still provisional until Marvin's new feel test. New results below this heading should carry their own exact commit and report hashes. Source branch is a stacked DRAFT, not a release.
+
+---
+
+
 **Status: EXPERIMENTAL / DRAFT, not frozen golden evidence.** SIM7 is the unmerged, owner-playtest-pending AirBrake balance candidate from [[GitHub PR #248](https://github.com/truevox/BitstreamBluffs/pull/248)]. This leaf is stacked on that PR, not on main. **Do NOT commit final fixture tapes or claim cross-engine parity until the owner has accepted the numeric feel settings and an exact clean source has been pinned and reviewed.**
 
 ## What is implemented for preliminary QA
