@@ -177,6 +177,44 @@ describe('Modular cheap Web Audio processors', () => {
 		chain.dispose();
 		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
 	});
+	test('Hydrostatic native DSP has bounded pressure automation, real landing pulse and cleanup',()=>{
+		const ctx=fakeContext();
+		const fx=buildMusicChain(ctx,[{id:'h',type:'hydrostatic',pressure:0}],ctx.createGain());
+		const hydro=fx.find('h');
+		expect(hydro.refs.pressure).toBeDefined();
+		expect(hydro.refs.impact).toBeDefined();
+		expect(hydro.refs.contrast).toBeDefined();
+		expect(hydro.refs.waveStrength).toBeDefined();
+		// Provisional owner-liked audition setting: 60% wave while pressure remains 190%.
+		expect(hydro.set('contrast',2.2,ctx.currentTime)).toBe(true);
+		expect(hydro.set('contrast',NaN,ctx.currentTime)).toBe(false);
+		expect(hydro.set('contrast',1.45,ctx.currentTime)).toBe(true);
+		expect(hydro.set('waveStrength',NaN,ctx.currentTime)).toBe(false);
+		expect(hydro.set('pressure',.75,ctx.currentTime)).toBe(true);
+		expect(hydro.set('pressure',NaN,ctx.currentTime)).toBe(false);
+		expect(hydro.set('impact',0,ctx.currentTime)).toBe(false);
+		expect(hydro.set('impact',NaN,ctx.currentTime)).toBe(false);
+		expect(hydro.set('impact',.8,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(1);
+		expect(ctx._bufferSources[0].connections[0].gain.value).toBeGreaterThan(.35);
+		expect(ctx._bufferSources[0].connections[0].gain.value).toBeLessThan(.5);
+		const waveform=ctx._bufferSources[0].buffer.getChannelData(0);
+		expect(waveform.every(Number.isFinite)).toBe(true);
+		expect(waveform.every(v=>Math.abs(v)<=1)).toBe(true);
+		expect(waveform.some(v=>Math.abs(v)>.01)).toBe(true);
+		expect(waveform.length).toBeGreaterThan(ctx.sampleRate*.5);
+		expect(hydro.set('waveStrength',0,ctx.currentTime)).toBe(true);
+		expect(hydro.set('impact',.8,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources.at(-1).connections[0].gain.value).toBe(0);
+		expect(hydro.set('waveStrength',2.4,ctx.currentTime)).toBe(true);
+		expect(hydro.set('impact',.8,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources.at(-1).connections[0].gain.value).toBeGreaterThan(1.5);
+		expect(ctx._bufferSources.at(-1).connections[0].gain.value).toBeLessThanOrEqual(1.9);
+		for(let i=0;i<8;i++)hydro.set('impact',1,ctx.currentTime+i*.015);
+		expect(ctx._bufferSources.filter(source=>!source.stopped).length).toBeLessThanOrEqual(3);
+		fx.dispose();
+		expect(ctx._bufferSources.every(source=>source.stopped)).toBe(true);
+	});
 	test('rejects unknown processors and duplicate stable ids', () => {
 		const ctx = fakeContext();
 		expect(() => buildMusicChain(ctx,[{type:'unsafeScript',id:'bad'}],ctx.createGain())).toThrow();

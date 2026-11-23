@@ -37,6 +37,8 @@ export function orchestraPreset(biome, stem) {
 	// Bass retains some warmth; jumping temporarily removes this effect in the director.
 	if (biome === 'debumont') return [{ type:'snowpack', id:'snowpack',
 		depth: stem === 'bass' ? .56 : .72 }];
+	if (biome === 'underwater-mountain') return [{type:'hydrostatic',id:'hydrostatic',
+		pressure:0,sensitivity:stem==='bass'?.68:1}];
 	const edge = {
 		'debumont': 4200,'garbage-dump-glacier':6200,
 		'pyramid-peak': 5100,'underwater-mountain':1800,

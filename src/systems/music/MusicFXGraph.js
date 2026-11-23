@@ -8,7 +8,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic',
 ]);
 
 function saturatorCurve(amount) {
@@ -347,6 +347,111 @@ function allocateEffect(ctx, raw) {
 				strikeOnce(impulse, at);
 				return true;
 			} };
+			break;
+		}
+		case 'hydrostatic': {
+			// Warm physical hydrostatic envelope over the ORIGINAL recording.
+			// Pressure is accumulated by HydrostaticPressure outside the FX graph;
+			// this graph owns only instantaneous audible presentation.
+			const dry = node(ctx.createGain()), wet = node(ctx.createGain());
+			const low = node(ctx.createBiquadFilter()), low2 = node(ctx.createBiquadFilter());
+			const warmth = node(ctx.createBiquadFilter());
+			for (const f of [low,low2]) { f.type='lowpass'; f.Q.value=.707; }
+			warmth.type='peaking'; warmth.frequency.value=320; warmth.Q.value=.8;
+			input.connect(dry); dry.connect(output);
+			input.connect(low); low.connect(low2); low2.connect(warmth);
+			warmth.connect(wet); wet.connect(output);
+			const sensitivity = clamp(raw.sensitivity, .3, 1, 1);
+			let contrast = clamp(raw.contrast, .6, 2.2, 1.9);
+			let waveStrength = clamp(raw.waveStrength, 0, 2.4, .6);
+			let currentPressure = clamp(raw.pressure, 0, 1, 0);
+			const apply = (p,at,immediate=false) => {
+				currentPressure = clamp(p,0,1,0);
+				const pressure = currentPressure*sensitivity;
+				// The former deep sound leaked 26% of the entire dry signal and
+				// reached only ~1.3kHz. More distinct enclosed/pressure character:
+				// deep: a filtered wet performance with tiny intelligibility anchor,
+				// rising: brisk, reversible brightening. Depth still remains monotonic
+				// in HydrostaticPressure; this slider adjusts timbre, NOT memory.
+				const cutoff = 14000*Math.pow(.06,Math.pow(pressure,.85)*(.65+.38*contrast));
+				const dryAnchor = Math.max(.035,1-pressure*(.84+.05*contrast));
+				const settings = [[dry.gain,dryAnchor],[wet.gain,pressure*(.92+.06*(contrast-1))],
+					[low.frequency,cutoff],[low2.frequency,cutoff*1.12],
+					[warmth.gain,pressure*(3.5+contrast)]];
+				for (const [param,value] of settings) {
+					if (immediate) param.value=value;
+					else numericParam(param,value,at,.065);
+				}
+			};
+			apply(currentPressure,ctx.currentTime,true);
+			refs.pressure={set:(value,at)=>{
+				if (!Number.isFinite(value)) return false;
+				apply(value,at);
+				return true;
+			}};
+			refs.contrast={set:(value,at)=>{
+				if (!Number.isFinite(value)) return false;
+				contrast=clamp(value,.6,2.2,1.9);
+				apply(currentPressure,at);
+				return true;
+			}};
+			refs.waveStrength={set:value=>{
+				if (!Number.isFinite(value)) return false;
+				waveStrength=clamp(value,0,2.4,.6);
+				return true;
+			}};
+			// Physically motivated pressure shock: low-mid water-hammer thump,
+			// a noisy accelerating rush, then five separating air bubbles.
+			// A deeper 95Hz-only tick was invisible under five original stems;
+			// the 140–500Hz body is audible on ordinary speakers, too.
+			// Deterministic, derived Foley; never an extra musical instrument.
+			const length=Math.ceil(ctx.sampleRate*.58);
+			const wave=ctx.createBuffer(1,length,ctx.sampleRate);
+			const data=wave.getChannelData(0);
+			let seed=0x735EA123,wetNoise=0;
+			for(let i=0;i<length;i++) {
+				const t=i/ctx.sampleRate;
+				seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+				const noise=seed/2147483648-1;
+				wetNoise=wetNoise*.78+noise*.22;
+				const thump=.74*Math.sin(2*Math.PI*(145*t-75*t*t))*Math.exp(-t*18);
+				const bloom=.46*Math.sin(2*Math.PI*(300*t-110*t*t))*Math.exp(-t*15);
+				const rush=(wetNoise*.44+noise*.13)*Math.exp(-t*12);
+				let bubbles=0;
+				for (const lag of [.067,.142,.224,.329,.427]) {
+					const dt=t-lag;
+					if (dt<0) continue;
+					bubbles+=.32*Math.sin(2*Math.PI*(490*dt-580*dt*dt))
+						*Math.exp(-dt*47);
+				}
+				data[i]=Math.tanh((thump+bloom+rush+bubbles)*.98);
+			}
+			const active=new Set();
+			refs.impact={set:(value,at)=>{
+				const strength=clamp(value,0,1,0);
+				if(strength<=0) return false;
+				if(active.size>=3) {
+					const previous=active.values().next().value;
+					try {previous.source.stop();}catch{}
+					previous.cleanup();
+				}
+				const source=ctx.createBufferSource(),gain=ctx.createGain();
+				source.buffer=wave;
+				gain.gain.value=Math.min(1.9,(.30+.52*strength)*waveStrength);
+				source.connect(gain);gain.connect(output);
+				const entry={source,cleanup(){
+					try{source.disconnect();}catch{}
+					try{gain.disconnect();}catch{}
+					active.delete(entry);
+				}};
+				active.add(entry);source.onended=()=>entry.cleanup();
+				source.start(Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime));
+				return true;
+			}};
+			disposers.push(()=>{for(const entry of active){
+				try{entry.source.stop();}catch{}
+				entry.cleanup();
+			}});
 			break;
 		}
 		case 'snowpack': {

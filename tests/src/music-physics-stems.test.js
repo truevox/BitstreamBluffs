@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 import { StemMusicDirector } from '../../src/systems/music/StemMusicDirector.js';
 import { contactFromMotion, impactFromLanding } from '../../src/systems/music/MusicPhysicsSignals.js';
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
+import { HydrostaticPressure } from '../../src/systems/music/HydrostaticPressure.js';
 
 const ROLES=['bass','drums','guitar','piano','other'];
 function director() {
@@ -10,13 +11,15 @@ function director() {
 	d.menuMode=false; d.airborne=false; d.speedPxS=400; d.clockStart=23.5;
 	d._timbreSignatures=new Map();
 	d._scrapContactLast=NaN;
-	d._pendingScrapImpact=0; d._pendingSnowImpact=0;
+	d._pendingScrapImpact=0; d._pendingSnowImpact=0; d._pendingHydroImpact=0;
+	d.hydrostatic=new HydrostaticPressure();d._hydroLastSent=NaN;
 	d.gains=new Map(ROLES.map(role=>[role,{}]));
 	d.mixer={
 		setEffectParam:jest.fn(()=>true),replaceEffects:jest.fn(()=>true),
-		setRoomSend:jest.fn(()=>true),setGain:jest.fn(()=>true)
+		setRoomSend:jest.fn(()=>true),setGain:jest.fn(()=>true),
+		selectBiome:jest.fn(()=>true)
 	};
-	d.adaptive={setSpeed:jest.fn(),setAirborne:jest.fn()};
+	d.adaptive={setSpeed:jest.fn(),setAirborne:jest.fn(),setBiome:jest.fn()};
 	d.started=false;
 	return d;
 }
@@ -99,6 +102,55 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		d.setAirborne(true);
 		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='takeoff')).toHaveLength(0);
 		expect(d.clockStart).toBe(23.5);
+	});
+	test('Hydrostatic original-stem preset exists only in Underwater, bass stays warm',()=>{
+		for(const stem of ROLES) {
+			const fx=orchestraPreset('underwater-mountain',stem);
+			expect(fx).toEqual([{type:'hydrostatic',id:'hydrostatic',pressure:0,
+				sensitivity:stem==='bass'?.68:1}]);
+		}
+		expect(orchestraPreset('garbage-dump-glacier','drums')[0].type).toBe('scrapheap');
+	});
+	test('Underwater depth accumulates only true terrain descent; jump relief and uphill never clear it',()=>{
+		const d=director();d.biome='underwater-mountain';d._applyMusicTimbres();
+		d.mixer.setEffectParam.mockClear();
+		d.setHydrostaticMotion({terrainY:400,riderY:400,vy:0,grounded:true});
+		const ground=d.setHydrostaticMotion({terrainY:990,riderY:990,vy:0,grounded:true});
+		expect(ground).toBe(true);
+		const saved=d.hydrostatic.storedPressure01;
+		expect(saved).toBeGreaterThan(.5);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','hydrostatic','pressure',expect.any(Number));
+		d.setHydrostaticMotion({terrainY:760,riderY:730,vy:-490,grounded:false});
+		expect(d.hydrostatic.storedPressure01).toBe(saved);
+		expect(d.hydrostatic.audiblePressure01).toBeLessThan(saved);
+		d.setHydrostaticMotion({terrainY:790,riderY:760,vy:440,grounded:false});
+		const duringFall=d.hydrostatic.audiblePressure01;
+		expect(duringFall).toBeGreaterThan(0);
+		d.setHydrostaticMotion({terrainY:790,riderY:790,vy:0,grounded:true});
+		expect(d.hydrostatic.audiblePressure01).toBe(saved);
+		const memory=d.hydrostatic.deepestTerrainDescentPx;
+		d.setBiome('underwater-mountain');
+		expect(d.hydrostatic.deepestTerrainDescentPx).toBe(memory);
+		d.setBiome('debumont');
+		expect(d.hydrostatic.storedPressure01).toBe(0);
+		d.setBiome('underwater-mountain');
+		d.setHydrostaticMotion({terrainY:1200,riderY:1200,vy:0,grounded:true});
+		expect(d.hydrostatic.deepestTerrainDescentPx).toBe(0);
+		d.biome='micro-mountain';d.mixer.setEffectParam.mockClear();
+		expect(d.setHydrostaticMotion({terrainY:3000,riderY:3000,grounded:true})).toBe(false);
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+	});
+	test('Underwater landing pressure wave follows a real event, not a fake beat',()=>{
+		const d=director();d.biome='underwater-mountain';d.airborne=true;
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:750});
+		expect(d._pendingHydroImpact).toBeGreaterThan(.1);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='impact')).toHaveLength(0);
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','hydrostatic','impact',expect.any(Number));
+		expect(d._pendingHydroImpact).toBe(0);
+		d.mixer.setEffectParam.mockClear();
+		d.onLanding({quality:'crash',impactSpeedPxS:950,hard:true});
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
 	});
 	test('post-grounded landing works, missing and wrong biome signals never leak',()=>{
 		const d=director();d.mixer.setEffectParam.mockClear();
