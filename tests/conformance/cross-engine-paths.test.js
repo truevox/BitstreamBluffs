@@ -79,3 +79,23 @@ test('real CLI record without CE_TAPE_DIR fails before browser launch and preser
   expect(fs.readFileSync(path.join(historical, 'record-meta.json'))).toEqual(beforeMeta);
   expect(fs.readFileSync(path.join(historical, 'chunk-biome-boundaries.tape.json'))).toEqual(beforeTape);
 });
+
+test('sim6 fixture selection refuses implicit historical input before any browser starts', () => {
+  const env = { ...process.env, CE_FIXTURE_SET: 'sim6' };
+  delete env.CE_TAPE_DIR;
+  const run = spawnSync(process.execPath, [path.join(root, 'tools/conformance/cross-engine.mjs'), 'fresh'],
+    { env, cwd: root, encoding: 'utf8', timeout: 7000 });
+  expect(run.status).not.toBe(0);
+  expect(run.stderr).toMatch(/CE_FIXTURE_SET=sim6 requires an explicit CE_TAPE_DIR/);
+  expect(run.stderr).not.toMatch(/browserType\.launch/);
+});
+
+test('sim6 explicitly pointed at historical tapes rejects missing v6 provenance before replay', () => {
+  const original = fs.readFileSync(path.join(historical, 'record-meta.json'));
+  const env = { ...process.env, CE_FIXTURE_SET: 'sim6', CE_TAPE_DIR: historical };
+  const run = spawnSync(process.execPath, [path.join(root, 'tools/conformance/cross-engine.mjs'), 'fresh'],
+    { env, cwd: root, encoding: 'utf8', timeout: 7000 });
+  expect(run.status).not.toBe(0);
+  expect(run.stderr).toMatch(/SIM6 tape input metadata is missing or not a revision-6 recording/);
+  expect(fs.readFileSync(path.join(historical, 'record-meta.json'))).toEqual(original);
+});

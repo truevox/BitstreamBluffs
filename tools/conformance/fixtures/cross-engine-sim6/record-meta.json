@@ -1,6 +1,25 @@
 {
- "gitSha": "d35019ceb411a38370ac101b139042bd40fb14f6",
- "recordedAt": "2026-11-23T02:17:29.878Z",
+ "format": "bb-cross-engine-record-meta",
+ "formatVersion": 2,
+ "gitSha": "35ad8ac36d4f05a5866a81bf305aee2d600544cc",
+ "gameVersion": "2.19.21",
+ "simRevision": 6,
+ "rulesetId": "sha256:03c7d7c987c2523ae61c1e4dc4c47699b21069d2355bdabdedcf3d0fb85bcb6b",
+ "buildId": "sha256:a3f069ee7d73e5229fdafd374b6ccc5e53d6342ff8255e66b152556c72a74d41",
+ "matterVersion": "0.20.0",
+ "savestateLayoutId": "sha256:640c7e418d962b488a7f227c9cd38341ca6fbba2e28bf74e88cdbe6725058d32",
+ "sourceTripwireId": "sha256:5ef5b08c6b35c0309aeca235a68cc7a7dcc6d28a322e500f8a98b48fcf0d6ff4",
+ "fixtureSet": "sim6",
+ "recordedAt": "2026-11-23T02:30:29.210Z",
+ "fixedPageClock": "2026-11-21T12:00:00Z",
+ "servedIndexSha256": "8d904f4c9d5babd3420e9bac36549eb908dcf759f695db2f25d3e2e8699b138e",
+ "browser": {
+  "engine": "chromium-headless-shell",
+  "version": "158.0.8127.18",
+  "node": "v22.22.3",
+  "os": "Linux 6.14.11-6-pve",
+  "arch": "x64"
+ },
  "fixtures": [
   {
    "id": "cruise-baseline",
@@ -58,7 +77,8 @@
     "checked": 20
    },
    "levelSensitivity": null,
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "941a4ad1d2ed1662017b858bca8ad6a77349a2f74cce23c9060dc3fd8e69c30f"
   },
   {
    "id": "fifth-run-in-session",
@@ -116,7 +136,8 @@
     "checked": 15
    },
    "levelSensitivity": null,
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "ebd29dd9aa9577e9d3306c54e5800f7cbc4dc208b7edc2a5798e3bd8bbb49d04"
   },
   {
    "id": "collision-heavy",
@@ -174,7 +195,8 @@
     "checked": 7
    },
    "levelSensitivity": null,
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "32500ed6028d0b5fa182b8ffe1b9b4a3a5ab5c01a9d0370648ec04787db1342d"
   },
   {
    "id": "chunk-biome-boundaries",
@@ -232,7 +254,8 @@
     "checked": 21
    },
    "levelSensitivity": null,
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "70928f343cb6d86e623f23a205c41df974421290e35aca1c9972aedbceb4e085"
   },
   {
    "id": "bsod-pursuit-catch",
@@ -290,7 +313,8 @@
     "checked": 100
    },
    "levelSensitivity": null,
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "8d3209650f678747ecd8d5f22cc8f94d7e82d70e8493ead4a090ba630e96e5fd"
   },
   {
    "id": "airborne-tricks",
@@ -351,7 +375,8 @@
     "checked": 12
    },
    "levelSensitivity": null,
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "d7146075e4a34150670f2870e5b19ff681233f5ca543bbab3a11cb44dba64282"
   },
   {
    "id": "parachute-airbrake",
@@ -412,41 +437,43 @@
     "checked": 30
    },
    "levelSensitivity": null,
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "888eb47d1b406e2eaa91e853f4ef80bbb5406511ed609c199f306f16a0e996c7"
   },
   {
    "id": "kodiaks-on",
    "preRuns": 0,
    "covers": [
-    "hostile Kodiak packs (Sync Level >= 6 at record time)"
+    "SIM_REVISION 6 actual Kodiak pack activity (>= 1,000 active-bear ticks)",
+    "at least one 450 m encounter, rider continues beyond 1,000 m"
    ],
    "outcome": {
-    "ticks": 2171,
-    "crashed": true,
-    "cause": "terrain",
-    "distanceM": 432,
-    "score": 532,
-    "x": 8707.095339582693,
-    "y": 2800.2039486080103,
+    "ticks": 4800,
+    "crashed": false,
+    "cause": null,
+    "distanceM": 1192,
+    "score": 2042,
+    "x": 23888.27886235907,
+    "y": 8251.057020462256,
     "stats": {
-     "contactTicks": 1486,
-     "maxPairs": 6,
-     "airTicks": 675,
+     "contactTicks": 2549,
+     "maxPairs": 3,
+     "airTicks": 2164,
      "chuteTicks": 0,
      "airBrakeTicks": 0,
-     "bsodActiveTicks": 2170,
+     "bsodActiveTicks": 4800,
      "bsodCaught": false,
-     "kodiakTicks": 0,
-     "maxChunk": 6,
-     "maxSector": 0,
+     "kodiakTicks": 1292,
+     "maxChunk": 12,
+     "maxSector": 2,
      "tricks": {},
      "kodiaksOn": true,
      "biomeMask": 0
     }
    },
-   "tapeInputs": 430,
-   "checkpoints": 18,
-   "endTick": 2170,
+   "tapeInputs": 1722,
+   "checkpoints": 40,
+   "endTick": 4800,
    "recordLevel": 8,
    "dateIndependence": {
     "altDate": "2026-12-25",
@@ -454,20 +481,20 @@
     "first": null,
     "desync": null,
     "outcome": {
-     "ticks": 2171,
-     "distanceM": 432,
-     "score": 532
+     "ticks": 4801,
+     "distanceM": 1192,
+     "score": 2042
     }
    },
    "liveVsFreshContextReplay": {
     "ok": true,
     "first": null,
     "lengths": [
-     2171,
-     2171
+     4800,
+     4801
     ],
     "desync": null,
-    "checked": 18
+    "checked": 40
    },
    "levelSensitivity": {
     "recordedLevel": 8,
@@ -475,14 +502,15 @@
     "first": null,
     "desync": null,
     "outcome": {
-     "ticks": 2171,
-     "crashed": true,
-     "cause": "terrain",
-     "distanceM": 432,
-     "score": 532
+     "ticks": 4801,
+     "crashed": false,
+     "cause": null,
+     "distanceM": 1192,
+     "score": 2042
     }
    },
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "aaf7ca66114c1e65ac712e98170eab092898f251bc64142451096f7b28cb3545"
   },
   {
    "id": "daily-practice-rule",
@@ -540,7 +568,8 @@
     "checked": 11
    },
    "levelSensitivity": null,
-   "pageErrors": []
+   "pageErrors": [],
+   "tapeSha256": "59e11df4737e763e55db8b53ab7e6ea98ffa93e929c693b27eb0ca028d2cb4ba"
   }
  ]
 }

@@ -21,12 +21,17 @@ const IDS = [
 
 test('the v6 fixture set is separately anchored to source, ruleset and exact build identity', () => {
   expect(provenance.format).toBe('bsb-cross-engine-replay-fixture-provenance-v1');
-  expect(provenance.sourceGitSha).toBe('d35019ceb411a38370ac101b139042bd40fb14f6');
+  expect(provenance.sourceGitSha).toBe('35ad8ac36d4f05a5866a81bf305aee2d600544cc');
   expect(metadata.gitSha).toBe(provenance.sourceGitSha);
-  expect(provenance.gameVersion).toBe('2.19.20');
+  expect(metadata.format).toBe('bb-cross-engine-record-meta');
+  expect(metadata.formatVersion).toBe(2);
+  expect(metadata.fixtureSet).toBe('sim6');
+  expect(metadata.buildId).toBe(provenance.buildId);
+  expect(metadata.rulesetId).toBe(provenance.rulesetId);
+  expect(provenance.gameVersion).toBe('2.19.21');
   expect(provenance.simRevision).toBe(6);
   expect(provenance.rulesetId).toBe('sha256:03c7d7c987c2523ae61c1e4dc4c47699b21069d2355bdabdedcf3d0fb85bcb6b');
-  expect(provenance.buildId).toBe('sha256:52339d69e85125cdc1bb3c690264a36351ce3fe362cee969f4a2eef1fe4736a7');
+  expect(provenance.buildId).toBe('sha256:a3f069ee7d73e5229fdafd374b6ccc5e53d6342ff8255e66b152556c72a74d41');
   expect(provenance.recordingHz).toBe(120);
   expect(provenance.recordingEngine).toBe('chromium-headless-shell');
   expect(provenance.fixtureIds).toEqual(IDS);
@@ -70,14 +75,15 @@ test('the older historical tapes remain separate evidence, not a rewritten v6 al
   expect(newer.simRevision).toBe(6);
   expect(old.endTick).not.toBe(newer.endTick);
   expect(old.distanceM).not.toBe(newer.distanceM);
-  expect(provenance.coverageCaveats).toEqual(expect.arrayContaining([expect.stringMatching(/Playwright WebKit is not Safari/i)]));
+  expect(provenance.coverageCaveats).toEqual(expect.arrayContaining([expect.stringMatching(/Playwright WebKit.*not Safari/i)]));
 });
 
-test('the Kodiak-enabled recording is explicitly not misrepresented as covering Kodiak contact', () => {
+test('the Kodiak v6 recording actually covers an active pack, without falsely claiming collision', () => {
   const fixture = metadata.fixtures.find((x) => x.id === 'kodiaks-on');
   expect(fixture.outcome.stats.kodiaksOn).toBe(true);
-  expect(fixture.outcome.stats.kodiakTicks).toBe(0);
-  expect(provenance.coverageCaveats).toEqual(expect.arrayContaining([expect.stringMatching(/kodiakTicks=0/)]));
+  expect(fixture.outcome.stats.kodiakTicks).toBeGreaterThan(1000);
+  expect(fixture.outcome.distanceM).toBeGreaterThan(1000);
+  expect(provenance.coverageCaveats).toEqual(expect.arrayContaining([expect.stringMatching(/presence, not necessarily a bear-sled collision/)]));
 });
 
 test('the sim6-only Kodiak route reaches real packs without changing ANY historical fixture definition', () => {
