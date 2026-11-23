@@ -103,6 +103,29 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[2]==='takeoff')).toHaveLength(0);
 		expect(d.clockStart).toBe(23.5);
 	});
+	test('Crystal grounded originals ring consonantly; flight opens lattice, drums duck, landing triggers only measured-piano response',()=>{
+		for(const stem of ['bass','guitar','piano','other'])
+			expect(orchestraPreset('crystal-cavern',stem)).toEqual([
+				{type:'crystallattice',id:'crystallattice',strength:1,openness:0,
+				 detectChroma:stem==='bass',bassFeed:stem==='bass'}]);
+		expect(orchestraPreset('crystal-cavern','drums')).toEqual([{type:'gain',id:'crystalPercussion',gain:1}]);
+		const d=director();d.biome='crystal-cavern';
+		d.setAirborne(true);
+		for(const stem of ['bass','guitar','piano','other'])
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'crystallattice','openness',1);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','crystalPercussion','gain',.48);
+		d.mixer.setEffectParam.mockClear();
+		d.setAirborne(true);
+		expect(d.mixer.setEffectParam.mock.calls.filter(c=>c[1]==='crystallattice')).toHaveLength(0);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:690});
+		expect(d._pendingCrystalImpact).toBeGreaterThan(0);
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','crystalPercussion','gain',1);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('bass','crystallattice','impact',expect.any(Number));
+		expect(d._pendingCrystalImpact).toBe(0);
+		d.setBiome('debumont');
+		expect(d._pendingCrystalImpact).toBe(0);
+	});
 	test('Micro Mountain uses five original microbox processors, independently from MIDI voice',()=>{
 		for(const stem of ROLES){
 			const fx=orchestraPreset('micro-mountain',stem);

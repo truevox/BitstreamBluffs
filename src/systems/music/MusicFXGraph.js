@@ -1,5 +1,6 @@
 import { BiomeSpaceBus } from './BiomeSpaceBus.js';
 import { BSOD_THREAT_STEMS, createBsodThreatProcessor } from './BsodThreatProcessor.js';
+import { CRYSTAL_MIDI_LOW, CRYSTAL_MIDI_HIGH, crystalHz, confidentCrystalNotes } from './CrystalChroma.js';
 /**
  * Low-cost WebAudio processors. Types are trusted code, specifications are validated data.
  * Each returned chain owns its oscillators/connections and can be disposed independently.
@@ -8,7 +9,7 @@ const clamp = (n, lo, hi, fallback = lo) =>
 	Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : fallback;
 
 export const MUSIC_PROCESSORS = Object.freeze([
-	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox',
+	'gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice',
 ]);
 
 function saturatorCurve(amount) {
@@ -347,6 +348,134 @@ function allocateEffect(ctx, raw) {
 				strikeOnce(impulse, at);
 				return true;
 			} };
+			break;
+		}
+		case 'crystallattice': {
+			// Consonant crystal modes are excited by ONLY the original source
+			// waveform; no fake note sequencer and no MIDI stem rewriting.
+			// Three harmonic instruments x 24 modes = bounded 72 biquads.
+			// Drums and bass are separate (no white-noise crystal chords).
+			const dry=node(ctx.createGain());dry.gain.value=1;
+			input.connect(dry);dry.connect(output);
+			const modal=node(ctx.createGain());
+			const bassFeed=raw.bassFeed===true;
+			// The actual Pope sample contains strong bass but virtually silent
+			// guitar/piano/other. Include source bass overtones explicitly;
+			// without that, this effect would be numerically inaudible.
+			// Keep a 100%-untouched dry bass and saturate ONLY its wet send.
+			let excitation=input;
+			if(bassFeed){
+				const pre=node(ctx.createGain());pre.gain.value=2.3;
+				const bright=node(ctx.createWaveShaper());
+				bright.curve=saturatorCurve(.14);bright.oversample='2x';
+				input.connect(pre);pre.connect(bright);excitation=bright;
+			}
+			const lo=bassFeed?48:CRYSTAL_MIDI_LOW;
+			const hi=bassFeed?71:CRYSTAL_MIDI_HIGH;
+			for(let midi=lo;midi<=hi;midi++){
+				const band=node(ctx.createBiquadFilter());band.type='bandpass';
+				band.frequency.value=crystalHz(midi);band.Q.value=bassFeed?12:23;
+				const trim=node(ctx.createGain());trim.gain.value=bassFeed?.45:.115;
+				excitation.connect(band);band.connect(trim);trim.connect(modal);
+			}
+			const delay=node(ctx.createDelay(.4));delay.delayTime.value=.116;
+			const damping=node(ctx.createBiquadFilter());
+			damping.type='lowpass';damping.frequency.value=4800;damping.Q.value=.65;
+			const feedback=node(ctx.createGain());feedback.gain.value=.69;
+			modal.connect(delay);delay.connect(damping);damping.connect(feedback);
+			feedback.connect(delay);
+			const modalMix=node(ctx.createGain());
+			modal.connect(modalMix);delay.connect(modalMix);
+			const bloom=node(ctx.createGain());bloom.gain.value=1;
+			modalMix.connect(bloom);
+			const wet=node(ctx.createGain());bloom.connect(wet);
+			// Limiter ONLY on newly generated crystal wash, never on the
+			// protected dry instrument path or song clock.
+			const wetLimiter=node(ctx.createDynamicsCompressor());
+			wetLimiter.threshold.value=-16;wetLimiter.knee.value=8;
+			wetLimiter.ratio.value=4;wetLimiter.attack.value=.008;
+			wetLimiter.release.value=.19;
+			wet.connect(wetLimiter);wetLimiter.connect(output);
+			let strength=clamp(raw.strength,0,2,1);
+			let openness=clamp(raw.openness,0,1,0);
+			const apply=(at,immediate=false)=>{
+				const level=(.55+.80*openness)*strength;
+				const pairs=[[wet.gain,level],[dry.gain,1-.075*openness]];
+				for(const [target,value] of pairs){
+					if(immediate)target.value=value;
+					else numericParam(target,value,at,.12);
+				}
+			};
+			apply(ctx.currentTime,true);
+			refs.openness={set:(value,at)=>{
+				if(!Number.isFinite(value))return false;
+				openness=clamp(value,0,1,0);apply(at);return true;
+			}};
+			refs.strength={set:(value,at)=>{
+				if(!Number.isFinite(value))return false;
+				strength=clamp(value,0,2,1);apply(at);return true;
+			}};
+			// Spectral monitoring only on the source bass stem. It is sampled
+			// during genuine landing events, not per frame. Without confident
+			// CURRENT source pitches, don't launch any pitched crystal tone.
+			let monitor=null, spectrum=null, lastNotes=[];
+			if(raw.detectChroma===true&&typeof ctx.createAnalyser==='function'){
+				monitor=node(ctx.createAnalyser());monitor.fftSize=4096;
+				monitor.smoothingTimeConstant=.52;
+				// Tiny nonzero monitor return prevents browsers from optimizing away
+				// the otherwise-silent analyser branch. -140dB is inaudible.
+				const silent=node(ctx.createGain());silent.gain.value=1e-7;
+				input.connect(monitor);monitor.connect(silent);silent.connect(output);
+				spectrum=new Float32Array(monitor.frequencyBinCount);
+			}
+			const scan=()=>{
+				if(!monitor||typeof monitor.getFloatFrequencyData!=='function'){
+					lastNotes=[];return lastNotes;
+				}
+				monitor.getFloatFrequencyData(spectrum);
+				lastNotes=confidentCrystalNotes(spectrum,{sampleRate:ctx.sampleRate,
+					fftSize:monitor.fftSize,maxNotes:2});
+				return lastNotes;
+			};
+			refs.chroma={read:()=>scan(),get last(){return lastNotes;}};
+			const active=new Set();
+			const disposeTone=(entry)=>{
+				try{entry.source.disconnect();}catch{}
+				try{entry.gain.disconnect();}catch{}
+				active.delete(entry);
+			};
+			refs.impact={set:(value,at)=>{
+				const impulse=clamp(value,0,1,0);
+				if(impulse<=0)return false;
+				const now=Math.max(ctx.currentTime,Number.isFinite(at)?at:ctx.currentTime);
+				// Always swell the source-fed modes at physical impact. If the
+				// source is silent this cannot manufacture a fake crystal chord.
+				bloom.gain.cancelScheduledValues(now);
+				bloom.gain.setTargetAtTime(1+impulse*.95,now,.02);
+				bloom.gain.setTargetAtTime(1,now+.13,.27);
+				const selected=scan();
+				for(let i=0;i<selected.length;i++){
+					if(active.size>=4){const old=active.values().next().value;
+						try{old.source.stop();}catch{}disposeTone(old);}
+					const source=ctx.createOscillator(),gain=ctx.createGain();
+					source.type='sine';source.frequency.value=selected[i].hz;
+					const offset=.055*i;
+					gain.gain.value=0;
+					gain.gain.setValueAtTime(0,now+offset);
+					gain.gain.setTargetAtTime((.022+.026*impulse)*Math.max(.2,selected[i].confidence),
+						now+offset,.018);
+					gain.gain.setTargetAtTime(0,now+offset+.13,.27);
+					source.connect(gain);gain.connect(output);
+					const entry={source,gain};active.add(entry);
+					source.onended=()=>disposeTone(entry);
+					source.start(now+offset);
+					source.stop(now+offset+1.4);
+				}
+				return true;
+			}};
+			disposers.push(()=>{for(const entry of active){
+				try{entry.source.stop();}catch{}disposeTone(entry);
+			}});
 			break;
 		}
 		case 'microbox': {
