@@ -947,6 +947,14 @@ export class AudioSynth {
     this._stemMusic?.setMicroBees?.(bees,playerScreenX);
   }
 
+  /** Read-only same-tick physics snapshots prove real geyser eruptions.
+   * A simple airborne edge is deliberately NOT a valid geyser trigger.
+   */
+  setGeyserMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setGeyserMotion?.(snapshot) === true;
+  }
+
   /** Read-only authoritative terrain/rider sample for hydrostatic musical physics. */
   setHydrostaticMotion(snapshot) {
     if (this._musicMode !== 'run' || this._paused) return;

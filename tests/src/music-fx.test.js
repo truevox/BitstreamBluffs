@@ -70,6 +70,36 @@ describe('Modular cheap Web Audio processors', () => {
 		expect(chains[0].find('effect7').refs.impulse).toBeDefined();
 		for(const chain of chains)chain.dispose();
 	});
+	test('Vertigo Vents source-fed geothermal distortion and physical geyser samples are bounded',()=>{
+		const ctx=fakeContext();
+		const chain=buildMusicChain(ctx,[{type:'ventforge',id:'ventforge',
+			rumble:1.25,shimmer:1.25,updraft:0,blast:1.3,crust:.8}],ctx.createGain());
+		const fx=chain.find('ventforge');
+		for(const key of ['rumble','shimmer','updraft','blast','crust','eruption','crustImpact'])
+			expect(fx.refs[key]).toBeDefined();
+		expect(fx.set('rumble',1.5,ctx.currentTime)).toBe(true);
+		expect(fx.set('updraft',.9,ctx.currentTime)).toBe(true);
+		expect(fx.set('updraft',NaN,ctx.currentTime)).toBe(false);
+		expect(fx.set('shimmer',1.8,ctx.currentTime)).toBe(true);
+		expect(fx.set('blast',0,ctx.currentTime)).toBe(true);
+		expect(fx.set('eruption',1,ctx.currentTime)).toBe(false);
+		expect(fx.set('blast',1.8,ctx.currentTime)).toBe(true);
+		expect(fx.set('crust',1.3,ctx.currentTime)).toBe(true);
+		expect(ctx._bufferSources).toHaveLength(0); // no invented sustained beat
+		expect(fx.set('eruption',Infinity,ctx.currentTime)).toBe(false);
+		expect(fx.set('eruption',.85,ctx.currentTime)).toBe(true);
+		expect(fx.set('crustImpact',.9,ctx.currentTime)).toBe(true);
+		for(const source of ctx._bufferSources){
+			expect(source.started).toBe(true);
+			expect(source.buffer.getChannelData(0).every(Number.isFinite)).toBe(true);
+			expect(source.buffer.getChannelData(0).some(x=>Math.abs(x)>.035)).toBe(true);
+		}
+		for(let i=0;i<11;i++)fx.set('eruption',1,ctx.currentTime+i*.012);
+		expect(ctx._bufferSources.filter(x=>!x.stopped).length).toBeLessThanOrEqual(3);
+		chain.dispose();
+		expect(ctx._bufferSources.every(x=>x.stopped)).toBe(true);
+	});
+
 	test('Sky Jellyfish source-fed stereo bloom and elastic membrane reuse original stems',()=>{
 		const ctx=fakeContext(),target=ctx.createGain();
 		const chain=buildMusicChain(ctx,[{id:'jellybloom',type:'jellybloom',

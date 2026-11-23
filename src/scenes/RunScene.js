@@ -1375,6 +1375,11 @@ export class RunScene extends Phaser.Scene {
     const phys = this.tuner.getEffective(this.physicsContext(pad, zoneDefs));
     this.currentPhys = phys;
 
+    // Audio-only observation: preserve the physical cooldown BEFORE this
+    // simulation tick. A real geyser increments it; normal jumps do not.
+    // Never write into the sled or feed this value back to physics.
+    const geyserCooldownBeforeMs = Number.isFinite(sled.geyserCooldownMs) ?
+      Math.max(0,sled.geyserCooldownMs) : 0;
     // sub-stepped physics; slow-mo scales the delta, never the 8 ms limit
     sled.dropAheadDeg = this.dropAhead(sled);
     this.airForecast(sled);
@@ -1421,6 +1426,12 @@ export class RunScene extends Phaser.Scene {
         if (sled.pushPulse) audio.playSfx('push');
         if (audio.setSpeed) audio.setSpeed(sled.speed);
         if (audio.setAirborne) audio.setAirborne(!sled.grounded);
+        // Compare authoritative same-tick cooldown before/after real geyserStep;
+        // visual/audio only, no sound-generated force or beat-based launch.
+        if (audio.setGeyserMotion)
+          audio.setGeyserMotion({beforeCooldownMs:geyserCooldownBeforeMs,
+            afterCooldownMs:sled.geyserCooldownMs || 0,
+            launchAvailable:!!phys.geyserLaunch,vy:sled.vy});
         // Read-only post-physics terrain/rider snapshot for Underwater sound.
         // Terrain Y (positive down), not rider altitude, owns depth memory.
         if (audio.setHydrostaticMotion && this.terrain)

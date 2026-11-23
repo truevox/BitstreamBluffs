@@ -4,6 +4,8 @@ import { contactFromMotion, impactFromLanding } from '../../src/systems/music/Mu
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
 import { HydrostaticPressure } from '../../src/systems/music/HydrostaticPressure.js';
 import {ScrapPitchCadence} from '../../src/systems/music/ScrapPitchCadence.js';
+import {geyserStep} from '../../src/systems/PhysicsTuner.js';
+import {AudioSynth} from '../../src/systems/AudioSynth.js';
 
 const ROLES=['bass','drums','guitar','piano','other'];
 function director() {
@@ -42,6 +44,101 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(impactFromLanding({impactSpeedPxS:900,hard:true,quality:'good'})).toBeGreaterThan(.55);
 		expect(impactFromLanding({impactSpeedPxS:5000,hard:true})).toBe(1);
 	});
+	test('Vertigo eruption only on actual same-physics-tick geyser cooldown increase, not a jump',()=>{
+		const d=director();d.biome='vertigo-vents';d.started=true;
+		d._pendingVentCrust=0;d._ventLastLift=NaN;
+		const preset=orchestraPreset('vertigo-vents','drums');
+		expect(preset).toEqual([{type:'ventforge',id:'ventforge',
+			rumble:1.25,shimmer:1.25,updraft:0,blast:1.3,crust:.8}]);
+		d._applyMusicTimbres();
+		for(const stem of ROLES)expect(d.mixer.replaceEffects).toHaveBeenCalledWith(
+			stem,orchestraPreset('vertigo-vents',stem),.18);
+		d.mixer.setEffectParam.mockClear();
+		// Ordinary player jump: negative actual velocity can color music but
+		// MUST NOT trigger an eruption when cooldown stays unchanged.
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:0,
+			launchAvailable:true,vy:-720})).toBe(false);
+		expect(d.mixer.setEffectParam.mock.calls.some(call=>call[2]==='eruption')).toBe(false);
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:892,
+			launchAvailable:true,vy:-1150})).toBe(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','ventforge','eruption',
+			expect.any(Number));
+		const count=d.mixer.setEffectParam.mock.calls.filter(call=>call[2]==='eruption').length;
+		expect(d.setGeyserMotion({beforeCooldownMs:892,afterCooldownMs:884,
+			launchAvailable:true,vy:-1050})).toBe(false);
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:897,
+			launchAvailable:false,vy:-1100})).toBe(false);
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:900,
+			launchAvailable:true,vy:Infinity})).toBe(false);
+		expect(d.mixer.setEffectParam.mock.calls.filter(call=>call[2]==='eruption')).toHaveLength(count);
+		// Legitimate landing pulse arrives before authoritative grounded.
+		d.airborne=true;
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:850});
+		expect(d._pendingVentCrust).toBeGreaterThan(0);
+		d.setAirborne(false);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','ventforge',
+			'crustImpact',expect.any(Number));
+		expect(d._pendingVentCrust).toBe(0);
+		expect(d.clockStart).toBe(23.5); // no song restart or beat change
+		d.setBiome('debutmont');
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:900,
+			launchAvailable:true,vy:-1000})).toBe(false);
+		expect(d.mixer.setEffectParam.mock.calls.some(call=>call[1]==='ventforge')).toBe(false);
+	});
+	test('Vertigo sound follows actual geyserStep launch cooldown, never an invented jump beat',()=>{
+		const vent={velocityPxS:620,cooldownMs:900};
+		const launched=geyserStep({grounded:true,launch:vent,cooldownLeftMs:0});
+		expect(launched.fire).toBe(true);
+		const d=director();d.biome='vertigo-vents';d.started=true;d._ventLastLift=NaN;
+		const actual={beforeCooldownMs:0,afterCooldownMs:launched.cooldownMs-8,
+			vy:launched.dvy,launchAvailable:true};
+		expect(d.setGeyserMotion(actual)).toBe(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','ventforge',
+			'eruption',expect.any(Number));
+		const cooldown=geyserStep({grounded:true,launch:vent,cooldownLeftMs:600});
+		expect(cooldown.fire).toBe(false);
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setGeyserMotion({beforeCooldownMs:600,afterCooldownMs:592,
+			vy:-450,launchAvailable:true})).toBe(false);
+		expect(d.mixer.setEffectParam.mock.calls.some(call=>call[2]==='eruption')).toBe(false);
+		const ordinaryHop=geyserStep({grounded:false,launch:vent,cooldownLeftMs:0});
+		expect(ordinaryHop.fire).toBe(false);
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:0,
+			vy:-620,launchAvailable:true})).toBe(false);
+		// The AudioSynth adapter refuses pause/menu instead of fabricating a geyser.
+		const synth=Object.create(AudioSynth.prototype);
+		synth._musicMode='run';synth._paused=false;
+		synth._stemMusic={setGeyserMotion:jest.fn(()=>true)};
+		expect(synth.setGeyserMotion(actual)).toBe(true);
+		expect(synth._stemMusic.setGeyserMotion).toHaveBeenCalledWith(actual);
+		synth._paused=true;
+		expect(synth.setGeyserMotion(actual)).toBe(false);
+		synth._musicMode='menu';synth._paused=false;
+		expect(synth.setGeyserMotion(actual)).toBe(false);
+		expect(synth._stemMusic.setGeyserMotion).toHaveBeenCalledTimes(1);
+	});
+
+	test('Vertigo menu, crash, disabled transport and invalid snapshots fail closed',()=>{
+		const d=director();d.biome='vertigo-vents';d.started=true;d._pendingVentCrust=0;
+		d.onLanding({quality:'crash',hard:true,impactSpeedPxS:1200});
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:NaN});
+		expect(d._pendingVentCrust).toBe(0);
+		d.menuMode=true;
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:900,
+			launchAvailable:true,vy:-1300})).toBe(false);
+		d.onLanding({quality:'good',hard:true,impactSpeedPxS:700});
+		expect(d._pendingVentCrust).toBe(0);
+		d.menuMode=false;d.transportPaused=true;
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:900,
+			launchAvailable:true,vy:-1300})).toBe(false);
+		d.transportPaused=false;d.started=false;
+		expect(d.setGeyserMotion({beforeCooldownMs:0,afterCooldownMs:900,
+			launchAvailable:true,vy:-1300})).toBe(false);
+		expect(d.mixer.setEffectParam.mock.calls.some(call=>call[2]==='eruption')).toBe(false);
+	});
+
 	test('Jellyfish authentic elastic bounce, flight bloom and source song clock preservation',()=>{
 		const d=director();d.biome='sky-jellyfish-mountain';d._pendingJellyImpact=0;
 		const preset=orchestraPreset('sky-jellyfish-mountain','drums');
