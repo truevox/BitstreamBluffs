@@ -37,9 +37,14 @@ try{
 		if(!d.started||!d.pack)throw Error('Original song was not loaded');
 		d.setBiome('crystal-cavern');
 		const dryNames=['drums','bass','guitar','piano','other'];
+		const guard=a.nodes?.peakGuard;
 		const before={
 			clockStart:d.clockStart,trackIndex:d.trackIndex,trackId:d.track?.id,
 			musicBiome:d.biome,mode:a._musicMode,
+			outputGuard:{present:!!guard,oversample:guard?.oversample,
+				curveLength:guard?.curve?.length,
+				maxSample:guard?.curve?.[guard.curve.length-1],
+				zero:guard?.curve?.[(guard.curve.length-1)/2]},
 			processed:dryNames.every(id=>mixer.sources.get(id)?.chain?.stages?.length>0)
 		};
 		const calls=[];
@@ -77,6 +82,11 @@ try{
 	});
 	assert.equal(result.before.mode,'run');
 	assert.equal(result.before.musicBiome,'crystal-cavern');
+	assert(result.before.outputGuard.present,'Actual final game compressor lacks output guard');
+	assert.equal(result.before.outputGuard.oversample,'2x');
+	assert.equal(result.before.outputGuard.curveLength,8193);
+	assert(result.before.outputGuard.maxSample<.965);
+	assert.equal(result.before.outputGuard.zero,0);
 	assert(result.before.processed,'No real original-stem gameplay processing found');
 	assert.equal(result.menu.mode,'menu');
 	assert.equal(result.menu.menuMode,true);

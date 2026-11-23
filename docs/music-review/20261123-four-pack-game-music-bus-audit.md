@@ -36,3 +36,8 @@ Build native draft with npm run build. This registers tools/music/final-game-mus
 This is a real *music-bus* graph test and a meaningful improvement on precompressor-only measurements. It is NOT an exact whole-game output capture. It excludes simultaneous gameplay SFX, BSOD wind/static, event-driven impact sounds, crash count-in, continuously automated gameplay gain and adaptive re-performance stems. Only 2.5 seconds of the opening 12-second original OGG segment were measured, not the full song. This is sample peak, not intersample true peak, full-game LUFS, speaker distortion or subjective masking. The physical source effect state is elevated where supported, but no synthetic gameplay event timing is added.
 
 Strong Garbage and Vertigo relative-to-dry precompressor levels remain human ear-review items in issue #289; do not auto-normalize or silently alter approved-feeling biome identities. Retain all original recordings and MIDI leads. No game DSP defaults changed. Human listening and independent engineering review must gate merges of draft game PR #280 and static preview PR #201.
+
+
+## Follow-up: whole 12-second segment exposed transient clipping
+
+This report records the ORIGINAL compressor-only 100-case short-window baseline. The later 12-second stress test found two One More Run max-volume-with-vocals mixes exceeding full scale (Garbage peak 1.439; Crystal 1.080) after the compressor; those spikes occurred outside the initial 2.5-second window. The draft OutputPeakGuard now contains both while preserving normal levels. See 20261123-post-compressor-original-audio-peak-guard.md and the four distinct before/after JSON reports for detailed provenance. Do not claim the original 100-case audit alone certifies full-song headroom.

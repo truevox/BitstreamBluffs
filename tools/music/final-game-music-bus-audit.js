@@ -7,16 +7,17 @@
 import {StemFXMixer} from '../../src/systems/music/MusicFXGraph.js';
 import {orchestraPreset,melodyPreset} from '../../src/systems/music/DynamicOrchestraPresets.js';
 import {BIOMES,load} from './cross-pack-original-stem-audit.js';
+import {createOutputPeakGuard} from '../../src/systems/music/OutputPeakGuard.js';
 
 const ROLES=['drums','bass','guitar','piano','other'];
-const START=.75,DURATION=2.5,RATE=48000;
+const START=.75,DEFAULT_DURATION=2.5,RATE=48000;
 const PRESETS=[
  {id:'default-instrumental',master:.8,music:.6,vocals:false},
  {id:'maximum-music-with-vocals',master:1,music:1,vocals:true}
 ];
-function metrics(buffer) {
+function metrics(buffer,duration=DEFAULT_DURATION) {
  let sum=0,peak=0,over=0,near=0,nonfinite=0;
- const from=Math.floor(RATE*START),count=Math.floor(RATE*DURATION);
+ const from=Math.floor(RATE*START),count=Math.floor(RATE*duration);
  for(let ch=0;ch<2;ch++){
   const array=buffer.getChannelData(ch);
   for(let i=from;i<from+count;i++){
@@ -31,12 +32,14 @@ function metrics(buffer) {
  return {rms:Math.sqrt(sum/(2*count)),samplePeak:peak,
   overUnitySamples:over,nearUnitySamples:near,nonfiniteSamples:nonfinite};
 }
-async function render(song,biome,preset,clean=false){
- const ctx=new OfflineAudioContext(2,Math.ceil((START+DURATION+.10)*RATE),RATE);
+async function render(song,biome,preset,clean=false,duration=DEFAULT_DURATION){
+ const ctx=new OfflineAudioContext(2,Math.ceil((START+duration+.10)*RATE),RATE);
  const comp=ctx.createDynamicsCompressor();
  comp.threshold.value=-10;comp.ratio.value=6;
  const master=ctx.createGain();master.gain.value=preset.master;
- master.connect(comp);comp.connect(ctx.destination);
+ master.connect(comp);
+ const guard=createOutputPeakGuard(ctx);
+ comp.connect(guard);guard.connect(ctx.destination);
  const musicBus=ctx.createGain();musicBus.gain.value=preset.music*.55;
  musicBus.connect(master);
  const musicFilter=ctx.createBiquadFilter();musicFilter.type='lowpass';
@@ -72,27 +75,30 @@ async function render(song,biome,preset,clean=false){
   }
  }
  const output=await ctx.startRendering();
- const stats=metrics(output);
+ const stats=metrics(output,duration);
  mixer.destroy();
  return stats;
 }
-async function audit(packs,biomes=BIOMES){
+async function audit(packs,biomes=BIOMES,duration=DEFAULT_DURATION,maxVocalsOnly=false){
+ if(!Number.isFinite(duration)||duration<=0||duration>12)throw Error("Invalid QA sample duration");
  const results=[];
  for(const pack of packs){
   const song=await load(pack);
   for(const biome of biomes){
-   for(const preset of PRESETS){
-    const stats=await render(song,biome,preset);
+   for(const preset of maxVocalsOnly?PRESETS.filter(p=>p.vocals):PRESETS){
+    const stats=await render(song,biome,preset,false,duration);
     results.push({pack,trackId:song.id,biome,scenario:preset.id,...stats});
    }
   }
-  const stats=await render(song,'debutmont',PRESETS[0],true);
-  results.push({pack,trackId:song.id,biome:'debutmont',scenario:'clean-menu-original',...stats});
+  if(!maxVocalsOnly){
+   const stats=await render(song,'debutmont',PRESETS[0],true,duration);
+   results.push({pack,trackId:song.id,biome:'debutmont',scenario:'clean-menu-original',...stats});
+  }
  }
  return {format:'bbs-original-ogg-game-music-bus-v1',
   source:'Original OGG first segment, 2.5s, each original biome voice lead',
-  sampleRate:RATE,
-  limitations:'Real StemFXMixer source, source FX, impulse room, music lowpass, default/master music volumes, and compressor (-10dB/6:1). Excludes gameplay SFX/wind/static, physical event transients, adaptive re-performances, full-song peak and inter-sample true peak.',
+  sampleRate:RATE,sampleSeconds:duration,maxVocalsOnly,
+  limitations:'Real StemFXMixer source, source FX, impulse room, music lowpass, default/master music volumes, compressor (-10dB/6:1) and post-compressor transparent output safety WaveShaper. Excludes gameplay SFX/wind/static, physical event transients, adaptive re-performances, full-song peak and inter-sample true peak.',
   scenarios:PRESETS,results};
 }
 window.__finalGameMusicBusQA=Object.freeze({audit});

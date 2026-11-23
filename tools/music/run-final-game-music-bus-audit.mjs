@@ -16,12 +16,14 @@ try{
  page.on('response',r=>{if(r.status()>=400)errors.push(String(r.status())+' '+r.url());});
  await page.goto(url,{waitUntil:'networkidle2',timeout:25000});
  await page.waitForFunction(()=>!!window.__finalGameMusicBusQA,{timeout:12000});
- const subset=process.env.MUSIC_BUS_FOCUS?
+ const fullSegment=process.env.MUSIC_BUS_FULL_SEGMENT==='1';
+ const subset=(fullSegment||process.env.MUSIC_BUS_FOCUS)?
   ['garbage-dump-glacier','vertigo-vents','crystal-cavern','bitstream-bluffs']:null;
+ const duration=fullSegment?12:2.5;
  const report=await page.evaluate(async args=>
-  await window.__finalGameMusicBusQA.audit(args.packs,args.subset||undefined),
-  {packs,subset});
- assert.equal(report.results.length,4*(subset?4:12)*2+4);
+  await window.__finalGameMusicBusQA.audit(args.packs,args.subset||undefined,args.duration,args.fullSegment),
+  {packs,subset,duration,fullSegment});
+ assert.equal(report.results.length,4*(subset?4:12)*(fullSegment?1:2)+(fullSegment?0:4));
  assert.deepEqual(errors,[]);
  assert(report.results.every(row=>row.nonfiniteSamples===0),
   'Non-finite game music bus output');
@@ -29,7 +31,7 @@ try{
   writeFileSync(process.env.MUSIC_BUS_REPORT,JSON.stringify(report,null,2)+'\n','utf8');
  const highest=[...report.results].sort((a,b)=>b.samplePeak-a.samplePeak);
  console.log('GAME_MUSIC_BUS_COMPRESSOR_REAL_OGG_REPORT',JSON.stringify({
-  cases:report.results.length,
+  cases:report.results.length,secondsPerRender:duration,
   highest:highest.slice(0,20),
   overUnity:report.results.filter(r=>r.overUnitySamples>0).length,
   nearUnity:report.results.filter(r=>r.nearUnitySamples>0).length
