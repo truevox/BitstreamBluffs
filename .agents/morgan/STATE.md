@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 20:49 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
+Last verified: 2026-11-23 21:47 UTC. Main: `eb281d8ee34c51c16c10dbe7735c4bcbab5aaede` (v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -35,6 +35,18 @@ going” means resume this queue, not take over other lanes or merge a draft.
    Reproduce via existing classic panel and two fresh
    `--policy terrain --seeds sim-01,sim-02,sim-03 --biomeMask 0 --maxM 500`
    invocations; do not use terrain with the trace-specific `--verify`.
+
+5. #79 annotation QA, not an inspector change: all nine committed SIM6
+   fixture bytes match metadata, but four nonfatal cutoffs have a crash
+   header. At exact main `eb281d8` with matching recorded build identity,
+   two native Chromium reproductions of collision-heavy match seven
+   checkpoints and the stored poses. Last pose tick 936; reproduced
+   terrain fatal tick 937 ~2.623 px away. Raw cruise-baseline fails strict
+   intake; a synthetic identity/time-only control passes intake and
+   repeats without a fatal event. Never annotate from the header, last
+   pose or redacted #78 brief. A local prototype must bind the exact tape
+   and supported build, check stored f32 poses against the replay, and
+   fail closed. The original strip/SVG, #78 JSON and #278 head are unchanged.
 
 ## Active branches and ownership
 
