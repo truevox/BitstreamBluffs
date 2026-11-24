@@ -230,3 +230,17 @@ test('active contact must reference the identical support vertex, not a differen
   expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/contact\/support mismatch/);
   expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
 });
+
+test('single-support active pair must preserve the unused contact slot used for the next swap',()=>{
+  const a=buildWorld(Matter);
+  for(let i=0;i<300&&!a.engine.pairs.list.some(p=>p.isActive&&p.contactCount===1);i++)Matter.Engine.update(a.engine,1000/240);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  const i=good.pairs.findIndex(p=>p.isActive&&p.contactCount===1);
+  expect(i).toBeGreaterThanOrEqual(0);
+  expect(kit.preflight(good)).toBe(true);
+  const bad=JSON.parse(JSON.stringify(good)),p=bad.pairs[i];
+  p.contacts[1][0]=p.col.supports[1]===null?[...p.col.supports[0]]:null;
+  const b=buildWorld(Matter),before=JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}));
+  expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/contact\/support mismatch/);
+  expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
+});

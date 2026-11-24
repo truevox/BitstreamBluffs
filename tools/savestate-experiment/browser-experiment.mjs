@@ -250,13 +250,24 @@ async function runCase(browser, fxName, level, skip = []) {
               const [key,index]=p.contacts[0][0],split=key.lastIndexOf('#');
               const count=s.matter.bodies[key.slice(0,split)].parts[Number(key.slice(split+1))].verts.length;
               p.contacts[0][0]=[key,(index+1)%count];},
+            unusedContactSupport:s=>{
+              // If this boundary has only two-support pairs, construct a
+              // valid one-support diagnostic shape first. Pair.update still
+              // assigns both slots; only the subsequent mismatch is invalid.
+              const p=s.matter.pairs.find(p=>p.isActive&&p.contactCount===1)||
+                s.matter.pairs.find(p=>p.isActive&&p.contactCount===2);
+              if(!p)throw new Error('fixture lacks active contact pair');
+              p.contactCount=1;p.col.supportCount=1;
+              window.__ssMatterKit.preflight(s.matter);
+              p.contacts[1][0]=p.col.supports[1]===null?[...p.col.supports[0]]:null;
+            },
           };
           const expected={
             missingBody:'body inventory',duplicateId:'duplicate/invalid part ID',
             badGeometry:'part geometry sled',extraOrder:'world/detector order',coercedOrder:'world/detector order',
             badPair:'pair/contact reference',reversePair:'pair/contact reference',sparseVelocity:'body state sled',orphan:'incomplete or orphaned state',
             statics:'module statics',staticType:'module statics',thirdContact:'pair/contact reference',
-            thirdSupport:'collision support reference',contactSlot:'pair/contact reference',contactActivity:'pair activity/contact count',contactSupport:'contact/support mismatch',
+            thirdSupport:'collision support reference',contactSlot:'pair/contact reference',contactActivity:'pair activity/contact count',contactSupport:'contact/support mismatch',unusedContactSupport:'contact/support mismatch',
           };
           return Object.entries(corruptions).map(([name,mutate])=>{
             const bad=JSON.parse(json);mutate(bad);
@@ -406,7 +417,7 @@ if (STRICT) {
     r.restoreError || r.harnessError || r.ticksCompared !== r.N-r.K ||
     r.firstDivergentTick !== null || r.firstSledDivergentTick !== null ||
     r.prefixControls?.length !== 5 || !r.prefixControls.every(c=>c.unchanged&&c.error?.startsWith('recorder prefix:')) ||
-    r.matterControls?.length !== 16 || !r.matterControls.every(c=>c.unchanged&&c.error?.startsWith('Matter preflight:')) ||
+    r.matterControls?.length !== 17 || !r.matterControls.every(c=>c.unchanged&&c.error?.startsWith('Matter preflight:')) ||
     !r.stagedControl?.discarded || !r.stagedControl.sourceUnchanged || !r.stagedControl.destinationUnchanged ||
     !r.recorderParity?.prefix || !r.recorderParity.finishedTape || r.recorderParity.endTick !== r.N ||
     r.pageErrors?.length !== 0 || r.audit?.length !== 0 || r.unclassified?.length !== 0 ||
