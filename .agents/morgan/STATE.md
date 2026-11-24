@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 16:51 UTC. Main `05a1bf1e4ba710be691610b4947d1e4a60dd2413` (#320), v2.20.2, SIM9 unchanged. Exact Pages push green; served bundle verification tracked below.
+Last verified: 2026-11-24 17:46 UTC. Main `05a1bf1e4ba710be691610b4947d1e4a60dd2413` (#320), v2.20.2 live at https://simulate.sledhead.ing/, SIM9 unchanged.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -20,21 +20,23 @@ means resume this queue, not take over another lane or merge a draft.
    No coefficient or runtime change. Exact lifecycle `45429825491` and
    identity `45429825825` green; only old-head review observed. Await fresh
    exact-head independent review; resolve real feedback only. No merge.
+   Independent exact test blob overlay on shipped v2.20.2 again passed
+   159/159 across the same five suites; #320 has no test-file overlap.
 2. Reconcile #168 against current issue states and release notes. All 17
    original open issues were rechecked after #318; no parent issue closed.
-   When #287 is waiting on Gal, advance a separately testable developer
-   slice without crossing the listed dependencies, starting with #79 local
-   annotation QA if current SIM9 source can reproduce its own native
-   positive and nonfatal negative. Historical SIM6 evidence cannot certify
-   current input. Preserve exact supported normal-entry/build gating, tape
-   binding, replay pose equality, fatal-event proof and unchanged SVG.
-   Source-verified recipe on #320: normal compiled entry, disposable
-   Chromium, opt-in `tools/conformance/cross-engine-page.js` `__ce.play`
-   at 120 Hz. Try CE120-BUMP3/reckless/hopEvery400/rngSeed9; use genuine
-   non-negated terrain fatal and an earlier cutoff with the same policy.
-   Replay fresh, check all checkpoints and f32 pose triplets at ticks
-   4, 8, …; fatal must be observed at endTick+1, not inferred from header.
-   This recipe is identified, not executed or evidence of current replay.
+   While #287 waits, continue bounded #79 replay annotation QA.
+   Exact public normal v2.20.2 entry and shipped SIM9 identity: four
+   fresh Chromium contexts, positive record+replay and cutoff record+replay.
+   Existing opt-in conformance helper, CE120-BUMP3/reckless/hopEvery400,
+   rngSeed9, 120 Hz. Natural matching non-negated terrain fatal tick937
+   (153m); all 7 checks and 234 f32 pose triplets match, last pose tick936
+   2.592px from fatal XY. Cutoff tick464 has a crash header but no fatal
+   on either capture or replay through 465 (3 checks, 116 f32 poses match).
+   Positive tape SHA-256 `fb1732519d3642b869a346a4d0360b0ddbaa9054d301cdc8452572d37db29b6f`;
+   cutoff `1d0b806d064d6c37119bba12884ca1dffa06d6dde3b4f6ae6c8f2bde6d06ddbe`.
+   Next exercise a local-only annotation/provenance prototype against
+   those cases and a mutated-pose/entry/receipt negative; keep original
+   SVG and runtime untouched. No UI validation or general support yet.
 3. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
    #84/#83 and broader #70/#71; #57/#60 gate #127 full branching;
    #75/#100/#74 need trusted restoration or equivalent causal replay
@@ -50,7 +52,11 @@ means resume this queue, not take over another lane or merge a draft.
   retries an uncommitted ID without duplicate scoring, and serializes
   initials updates. Game Over can label a score PENDING or SESSION ONLY.
   [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45437509543)
-  green; check served bundle before claiming live. Native abort/retry/reopen,
+  green. Served `main-CCdxY2p8.js` SHA-256
+  `d84ee27159617d6605c2a756700ed1ea55001937e10fde1b2da76a104009cedc`;
+  live source map SaveStore and GameOverScene blobs match exact Git main.
+  Public Chromium #79 proof exercised the normal deployed bundle with
+  fetched HTTPS bytes. Native abort/retry/reopen,
   request/quota/open failure reviewed in [#319](https://github.com/truevox/BitstreamBluffs/issues/319#issuecomment-7137786867).
   This does not atomically preserve run + proof, change ranking eligibility,
   or implement physics restore. #82/#244 remain open; #244 is Gal/Home's
@@ -116,17 +122,24 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76; Team A #152/#116/#118/#123; Team B #119/#140/#120/#115
   and conditional #121. #155 cue already unblocked #140/#160. #273 is
   the other lane (historical Luna source approval exact `0fd1400` only).
-- #306 music draft `8fbdc753ad6e1f15b4d47bf3ae76bc7a9efdd30b` must
-  restack on SIM9 and choose a later version: AirBrake used 2.20.0 and
-  #318 used 2.20.1. Exact three-way conflict in changelog, package, lock
-  and source digest; RunScene text auto-merges but integration unproven.
-  Old #311/#300/#306 scratch physics/audio isolation proof is historical.
-  #310 `8ed7d367` sampled 33 native opening segments, estimated worst
-  -0.362 dBTP per author; not calibrated mastering, full transitions,
-  overlap or rights. #312/#316 another lane: exact `a11b45c` direct
-  native 48 kHz transport before onset paused outgoing but resumed incoming
-  at offset zero. No-fade and after-onset controls did not. Real Phaser UI
-  and fixed-head recheck outstanding; no private media published.
+- Gal/Home audio lane: combined #322 draft `df11f055dabb700da58b5c7522c191658d0c281c`
+  on #320 proposes v2.21.0/SIM9 and restacks #306/#310/#316. #321 not
+  included. Corrective exact-head re-review covered fatal count-in,
+  Arcade corridor and audit port; CI green but not the Pause/Play case.
+  Native Chromium/actual Title jukebox clicks on exact compiled draft,
+  four public OGG songs and empty grids; a legacy settings payload
+  without the field inherits ON. After a test-only initial seek,
+  natural scheduler commits a 2.8s fade. Pause 460ms before incoming
+  onset stops 14 nodes (seven outgoing), saves incoming at zero instead
+  of outgoing ~211.72s; Play starts incoming at zero. Explicit OFF
+  retains outgoing ~212s; after-onset retains incoming +0.230s. Real game
+  Escape then PauseScene RESUME pointer also reproduced at 481ms before
+  onset (~211.70s outgoing → incoming zero); scratch suppressed run
+  physics during lead-up only. No page or HTTP errors in these arms. User
+  notified privately; no PR edits, merge, or private publication.
+  Recommend lane owner resolve before release and retest the exact fixed
+  head with the same pre/post/OFF controls. Historical #310 sampled peaks
+  are not calibrated mastering or private-media clearance.
 - Main release controlled under #207. #295/#307 advisory checks are not
   exact-head approval. #308/#309: initial PR titles and applicable commits
   `[skip netlify]`; default zero discretionary previews, at most 10 actual
