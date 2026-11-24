@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.19.23 — Morgan recovery, ghost labels and hop regression (#282, #290, #283) (2026-11-24)
+
+- **Recoverable agent work:** point Morgan to the separate `morgan/checkpoint` branch on a fresh session or handoff, requiring exact remote-tip reconciliation. Checkpoint is working context, not authorization, and stays out of feature branches. No gameplay or simulation logic changes.
+- **Ghost UI parity (#290):** stale and unversioned local tapes are correctly labeled INCOMPATIBLE rather than showing misleading distances or Shared Run; the original tapes remain stored and may be replaced/cleared. No change to replay acceptance or physics.
+- **Hop planner regression (#283):** new deterministic tests protect dispatch-frame intent coalescing across classic and fatigue scheduling; no runtime planner changes.
+- **Release scope:** repository instructions, ghost-panel read-only labels, and tests only. Preserve SIM_REVISION 8 and the current public soundtrack. New version/build identity is independently checked.
+
+
 ## v2.19.22 — protect replay terrain from visual marker prefetch (SIM_REVISION 8, #253) (2026-11-23)
 
 - **Real causal retry bug fixed:** BEST and DIED HERE gate labels sample only the already-joined Matter collision polyline without calling `TerrainGenerator.heightAt` at any time, even when the marker is inside streamed terrain. The new `joinedMarkerHeight` wrapper defers first marker placement until the exact ground chunk is joined; the marker still draws at its true collider-ground height after that; the generator lookup cache is never changed by marker rendering. No gameplay features, AirBrake tuning or owner-approved SIM7 BSOD chase physics are changed.
