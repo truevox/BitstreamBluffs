@@ -34,3 +34,15 @@ For earlier missed handoffs after the workflow is merged, use **Actions → Frid
 - Read-only live-API parsing checked PR #174 (request as an `issue_comment`, approval as a `COMMENTED` PR review), CC Friday's #163–#166 bracketed titles, Team B's #159–#162 Friday issue markers, Home Friday's #158 `Closes`, and both PWA #172 drafts. No labels were mutated during that read-only check.
 
 Both the event collector and its privileged writer must land together; the Action's behavior is **not live** until this reviewed PR lands on the default branch. Do not report it as installed merely because the tests pass.
+
+## Security remediation staged after independent audit (2026-11-23)
+
+The independent Deep Think adversarial review of #177 SHA `abc6f8ad` found five concrete security issues. This stacked branch addresses them **without activating** the privileged writer:
+
+1. **Untrusted ZIP extraction (HIGH):** The privileged router no longer invokes `actions/download-artifact` or extracts untrusted files into its workspace. It fetches a single compressed archive and validates exact ZIP entry count and path, local/central header agreement, streaming data-descriptor CRC/size, bounded archive/compressed/uncompressed byte counts, strict UTF-8, CRC32, and only a validated JSON pointer. Raw DEFLATE uses `maxOutputLength`. It fails closed on unknown ZIP layouts, oversized content and unknown binary response types. The event pointer has no executable code, and is read from a bounded step output, not filesystem.
+2. **HEAD race:** Before PR label writes and on each label operation, re-fetch the real PR to verify exact HEAD, draft status, parent issue, same-repo source and PR lifecycle state. Abort if changed. GitHub has no label CAS, so a push precisely after the final check remains a platform-level race; reconciliation on subsequent events must handle it.
+3. **Sibling reparenting:** Revalidate each sibling on every PR write, and re-read final sibling membership/HEADs before parent labels. Abort instead of applying a stale parent decision.
+4. **Untrusted comment amplification:** Filter public PR issue-comments by trusted author association and leading Friday review marker **before** allocating the unprivileged collector job. The privileged resolver independently revalidates actual repository write permission, source record and current full 40-hex SHA.
+5. **Raw HTML parsing:** Unclosed `<pre>`, `<code>`, `<script>`, `<style>` and `<textarea>` blocks consume the remaining text; fake `Refs`/`Closes` examples inside them cannot route or close parent issues.
+
+Adversarial negative tests cover compressed ZIP bombs, misleading size metadata, path traversal, invalid descriptors, malicious pointer shapes, HEAD-push and sibling-parent changes during reconciliation, late arriving siblings, and unclosed HTML directives. The new security boundary is **draft only** until an independent exact-head reviewer and live GitHub Action event test prove the trusted-main publisher works. No workflow is merged or enabled by this branch; the `truevox/skills` canonical template must be synced and reviewed separately before installation.

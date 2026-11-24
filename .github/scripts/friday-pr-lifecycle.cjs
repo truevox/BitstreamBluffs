@@ -10,11 +10,62 @@ const SHA = /^[0-9a-f]{40}$/i;
 const REVIEW_MESSAGE = /^\s*\[(GAL FRIDAY REVIEW (?:REQUEST|PASSED|CHANGES REQUESTED))\]/i;
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER','MEMBER','COLLABORATOR']);
 
+/** Mask only ACTUAL HTML raw-content blocks. An HTML-looking example inside
+ * fenced Markdown, an inline code span or an HTML comment is literal text:
+ * it must not swallow the real Refs/Closes declaration below that example.
+ * Keep every newline and mask with spaces to preserve directive boundaries. */
+function withoutRawHtml(body) {
+  let fence=null, inComment=false, inlineCode=null, rawTag=null;
+  const output=[];
+  for(const line of String(body||'').split(/\r?\n/)){
+    const delimiter=/^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if(fence){
+      if(delimiter&&delimiter[1][0]===fence.char&&delimiter[1].length>=fence.length&&/^\s*$/.test(delimiter[2]))fence=null;
+      output.push(line);continue;
+    }
+    if(!rawTag&&!inComment&&inlineCode===null&&delimiter){
+      fence={char:delimiter[1][0],length:delimiter[1].length};output.push(line);continue;
+    }
+    if(!rawTag&&!inComment&&inlineCode===null&&(/^(?: {4,}|\t)/.test(line)||/^\s*>/.test(line))){
+      output.push(line);continue;
+    }
+    let out='',i=0;
+    while(i<line.length){
+      if(rawTag){
+        const closing=new RegExp(`</${rawTag}\\s*>`,'i').exec(line.slice(i));
+        if(!closing){out+=' '.repeat(line.length-i);break;}
+        const size=closing.index+closing[0].length;
+        out+=' '.repeat(size);i+=size;rawTag=null;continue;
+      }
+      if(inComment){
+        const end=line.indexOf('-->',i);
+        if(end<0){out+=line.slice(i);break;}
+        out+=line.slice(i,end+3);i=end+3;inComment=false;continue;
+      }
+      if(line.startsWith('<!--',i)){inComment=true;out+='<!--';i+=4;continue;}
+      if(line[i]==='`'&&(i===0||line[i-1]!=='\\')){
+        let end=i+1;while(line[end]==='`')end++;
+        const count=end-i;
+        if(inlineCode===null)inlineCode=count;
+        else if(inlineCode===count)inlineCode=null;
+        out+=line.slice(i,end);i=end;continue;
+      }
+      if(inlineCode===null){
+        const opening=/^<(pre|code|script|style|textarea)\b[^>]*>/i.exec(line.slice(i));
+        if(opening){rawTag=opening[1].toLowerCase();out+=' [EXCLUDED_HTML] ';i+=opening[0].length;continue;}
+      }
+      out+=line[i++];
+    }
+    output.push(out);
+  }
+  return output.join('\n');
+}
+
 /** Extract only top-level issue directives: never read "Closes" examples from
  * code fences, HTML comments, indented code or raw HTML code/pre blocks. */
 function bodyDirectives(body) {
   const markers=[], refs=[];
-  const cleaned=String(body||'').replace(/<(pre|code|script)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, v=>' [EXCLUDED_HTML] '+'\n'.repeat((v.match(/\n/g)||[]).length)+' [EXCLUDED_HTML] ');
+  const cleaned=withoutRawHtml(body);
   let fence=null, inComment=false, inlineCode=null;
   for(let line of cleaned.split(/\r?\n/)){
     const delimiter=/^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
@@ -157,14 +208,37 @@ async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumb
   };
   await ensureLabels();
 
-  async function setState(number,item,desired){
+  // HEAD and parent can change while we are reading comments and sibling
+  // reviews. Check the real PR immediately before EVERY label API mutation.
+  // GitHub labels lack conditional ETags, so this minimizes rather than claims
+  // to eliminate a push racing precisely after the final check.
+  const identity=(p)=>({sha:p.head?.sha,draft:!!p.draft,state:p.state,
+    parent:getIssueReference(p),repo:p.head?.repo?.full_name});
+  const stable=(a,b)=>a.sha===b.sha&&a.draft===b.draft&&a.state===b.state&&
+    a.parent===b.parent&&a.repo===b.repo;
+  async function currentPR(number,expected){
+    const fresh=(await github.rest.pulls.get({owner,repo,pull_number:number})).data;
+    if(!stable(identity(fresh),expected)||expected.parent!==issueNumber||
+      expected.repo!==`${owner}/${repo}`){
+      throw Error(`PR #${number} changed HEAD/draft/parent before label write; abort and reconcile newer event`);
+    }
+    return fresh;
+  }
+  async function setState(number,item,desired,expected=null){
+    const isPR=!!item.head?.sha;
+    const original=expected || (isPR?identity(item):null);
+    if(isPR)item=await currentPR(number,original);
     const active=Object.values(STATES).filter(label=>hasLabel(item,label));
     const removals=active.filter(label=>label!==desired);
     for(const name of removals){
+      if(isPR)await currentPR(number,original);
       try{await github.rest.issues.removeLabel({owner,repo,issue_number:number,name});}
       catch(e){if(e.status!==404)throw e;}
     }
-    if(desired&&!active.includes(desired))await github.rest.issues.addLabels({owner,repo,issue_number:number,labels:[desired]});
+    if(desired&&!active.includes(desired)){
+      if(isPR)await currentPR(number,original);
+      await github.rest.issues.addLabels({owner,repo,issue_number:number,labels:[desired]});
+    }
   }
 
   const commentCache=new Map(),reviewCache=new Map(),fileCache=new Map(),starterCache=new Map();
@@ -234,9 +308,10 @@ async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumb
   const siblings=linked(open);
   const seen=new Map();
   for(const p of siblings){
+    const before=identity(p);
     const status=await reviewState(p);
-    seen.set(p.number,{status,sha:p.head.sha,draft:p.draft});
-    await setState(p.number,p,status);
+    seen.set(p.number,{status,sha:before.sha,draft:before.draft});
+    await setState(p.number,p,status,before);
   }
   const currentState=pr.state==='open'?await reviewState(pr):null;
   if(pr.state==='closed')await setState(pr.number,pr,pr.merged?STATES.done:null);
@@ -249,14 +324,25 @@ async function run({github,context,core,expectedKey=null,prNumber:resolvedPrNumb
   const latestOpen=await listOpen();
   const latestSiblings=linked(latestOpen);
   const states=[];
+  const finalIdentities=new Map();
   for(const p of latestSiblings){
     // A handoff or new commit may have arrived while we checked siblings.
     // Re-read actual comments/reviews for the final shared-issue decision.
+    const before=identity(p);
     commentCache.delete(p.number);reviewCache.delete(p.number);fileCache.delete(p.number);
     const status=await reviewState(p);
-    await setState(p.number,p,status);
+    await setState(p.number,p,status,before);
+    finalIdentities.set(p.number,before);
     states.push(status);
   }
+  // Parent-level state must use exactly the same sibling membership/HEADs
+  // evaluated above, not a stale parent issue held under another issue lock.
+  const beforeParent=linked(await listOpen());
+  if(beforeParent.length!==finalIdentities.size||
+    beforeParent.some(p=>!finalIdentities.has(p.number)||!stable(identity(p),finalIdentities.get(p.number)))){
+    throw Error('Sibling membership/HEAD changed before parent label update; abort to reconcile new state');
+  }
+  for(const [number,snapshot] of finalIdentities)await currentPR(number,snapshot);
   const targetIssueState=states.includes(STATES.review)?STATES.review
     : states.length?STATES.progress
     : pr.state==='closed'&&pr.merged?STATES.progress:STATES.todo;
