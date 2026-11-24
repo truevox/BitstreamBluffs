@@ -1413,6 +1413,7 @@ export class RunScene extends Phaser.Scene {
     // touchdown (or attach its points to a later unrelated landing).
     // Buffer actual contact snapshots before any later substep modifies pose.
     const substepTouchdowns=[];
+    const landingLedger = { entries: [], combo: null, airTricks: 0 };
     let stepElapsedMs=0, kickSinceTouchdown=false, bluffKickSample=null;
     stepWorld(
       this.matter.world,
@@ -1436,10 +1437,9 @@ export class RunScene extends Phaser.Scene {
       (stepMs) => {
         const actualTouchdown=!!sled.endStep(stepMs);
         stepElapsedMs+=stepMs;
-        // Flow is causal for banked points. Expire it at this physical
-        // substep before a possible landing refreshes the timer; helicopter
+        // Preserve Flow expiry before the matching landing in the ledger;
         // yaw was already advanced before Matter resolved the contact.
-        this.emitFlow(this.score.tick(stepMs));
+        landingLedger.entries.push({ stepMs });
         const paidKick=!!sled.airBrakeKickPulse;
         if (paidKick) kickSinceTouchdown=true;
         sled.airBrakeKickPulse=0; // retain actual event in local ordered tick evidence
@@ -1482,7 +1482,7 @@ export class RunScene extends Phaser.Scene {
             this.pendingCrash.cause==='hazard' &&
             (this.shieldCharges>0 || sled.invulnerableMs>0);
           if (!this.pendingCrash || absorbed)
-            this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs);
+            this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs, landingLedger);
         }
       },
     );
@@ -1493,8 +1493,8 @@ export class RunScene extends Phaser.Scene {
       this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
       this.publishBsodState(this.bsodState);
     }
-    // Flow has already advanced for each physical substep, before any
-    // touchdown banked points. Slow-mo and hit-stop use the same simDt.
+    // The ledger retains the exact substep Flow/landing chronology;
+    // only surviving ticks may commit the landing awards.
 
     // SFX with no event: push / hop (+ wind speed every frame)
     const audio = this.registry.get(REG.AUDIO);
@@ -1538,13 +1538,18 @@ export class RunScene extends Phaser.Scene {
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
     const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);
     fs.crashed = !!this.pendingCrash && !absorbed;
-    // All genuine touches have ALREADY settled in their physical substeps.
-    // No buffered replay may mutate the body AFTER a later Hop launches.
+    // All genuine touches already applied their physical consequences.
+    // Score/event publication remains staged until crash priority is known.
     const upd = this.tricks.update(fs) || {};
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, upd.airtimeMs || 0, sled.airtimeMs);
 
-    if (!this.pendingCrash || absorbed) this.handleTricksAndLanding(upd, fs);
-    else if (upd.landing && upd.landing.quality === 'crash') { /* already crashing */ }
+    // A fallback final-frame landing must be graded before committing any
+    // earlier touchdown rewards. It cannot outrank a terminal wall/hazard.
+    const finalLanding = (!this.pendingCrash || absorbed) ? this.gradeLanding(upd.landing) : null;
+    if (finalLanding?.quality === 'crash') {
+      this.pendingCrash = { cause: 'badLanding' };
+      landingLedger.entries.push({ crashLanding: finalLanding, fs });
+    }
 
     // zones, safe-ground samples
     this.updateZones(sled.x);
@@ -1555,6 +1560,10 @@ export class RunScene extends Phaser.Scene {
 
     // Collision with the deletion wall always wins if any other contact/landing happened during this frame.
     if (this.bsodCaught) this.pendingCrash = { cause: "bsod" };
+    const survivedLanding = !this.pendingCrash || (this.pendingCrash.cause === 'hazard' &&
+      (this.shieldCharges > 0 || sled.invulnerableMs > 0));
+    this.commitTouchdownLedger(landingLedger, survivedLanding);
+    if (survivedLanding) this.handleTricksAndLanding(upd, fs, { gradedLanding: finalLanding });
     // crash resolution (may be negated by Hashed Backup, except the BSOD)
     if (this.pendingCrash) this.resolveCrash(fs);
     // The replacement attempt remains frozen even for this crash frame.
@@ -1840,17 +1849,69 @@ export class RunScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ tricks / landings / score
 
-  /** Physical contact settlement, invoked in the Matter after-step hook.
-   * It is deliberately NOT replayed from the last frame: scoring effects
-   * (including wobble and spring rebound) are causal and must precede any
-   * controls step for a buffered relaunch. The final frame may subsequently
-   * update presentation/tricks, but has no unconsumed contact.
+  /** Grade once at the actual contact, before a later pickup can change tolerance. */
+  gradeLanding(landing) {
+    if (!landing) return null;
+    let l = resolveLanding(landing, this.stabilizeMs > 0 ? this.stabilizeDeg : 0, TUNING);
+    if (l.shortAirBrakeTouchdown && l.quality === 'perfect') l = { ...l, quality: 'good' };
+    return l;
+  }
+
+  /** Apply causal body changes at contact, but stage score/event publication.
+   * The preview only needs combo types and trick count (not points or Flow).
+   * Clock steps and real score operations are committed in their original order.
    */
-  settlePhysicalTouchdown(fs) {
-    const upd=this.tricks.update(fs)||{};
-    this.maxAirtimeMs=Math.max(this.maxAirtimeMs||0,upd.airtimeMs||0);
-    this.handleTricksAndLanding(upd,fs);
+  settlePhysicalTouchdown(fs, ledger = null) {
+    const upd = this.tricks.update(fs) || {};
+    this.maxAirtimeMs = Math.max(this.maxAirtimeMs || 0, upd.airtimeMs || 0);
+    if (!ledger) { this.handleTricksAndLanding(upd, fs); return upd; }
+    const l = this.gradeLanding(upd.landing);
+    if (l?.quality === 'crash') {
+      this.pendingCrash = { cause: 'badLanding' };
+      ledger.entries.push({ crashLanding: l, fs });
+      return upd;
+    }
+    if (!ledger.combo) {
+      ledger.combo = new Set(this.score.getSnapshot().comboTricks);
+      ledger.airTricks = this._airTricks;
+    }
+    for (const t of upd.tricks || []) {
+      ledger.combo.add(t.type);
+      ledger.airTricks += Math.max(1, t.count || 1);
+    }
+    let boostEvent;
+    if (l) {
+      const types = [...ledger.combo];
+      boostEvent = this.applyLandingPhysics(l, this.score.getMultiplier(types),
+        Math.max(ledger.airTricks, types.length), fs, false);
+      ledger.combo.clear();
+      ledger.airTricks = 0;
+    }
+    ledger.entries.push({ upd, fs, options: {
+      gradedLanding: l, physicalApplied: true, boostEvent,
+      zoneScoreMul: l ? this._zoneScoreMulAt(fs.x) : undefined,
+    } });
     return upd;
+  }
+
+  /** A terminal collision anywhere in the tick forfeits its staged rewards.
+   * Flow still advances, and older banked points and unrelated bonuses survive.
+   */
+  commitTouchdownLedger(ledger, survived) {
+    for (const entry of ledger.entries) {
+      if (entry.stepMs !== undefined) this.emitFlow(this.score.tick(entry.stepMs));
+      else if (survived && entry.upd) this.handleTricksAndLanding(entry.upd, entry.fs, entry.options);
+      else if (entry.crashLanding && this.pendingCrash?.cause === 'badLanding') {
+        this.emitCrashLanding(entry.crashLanding, entry.fs);
+      }
+    }
+  }
+
+  emitCrashLanding(l, fs) {
+    this.game.events.emit(EVT.LANDING, {
+      quality: 'crash', angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0,
+      airtimeMs: l.airtimeMs || 0, bonusPoints: 0, bankedPoints: 0, hard: true, x: fs.x, y: fs.y,
+    });
   }
 
   emitScore() {
@@ -1882,7 +1943,7 @@ export class RunScene extends Phaser.Scene {
     }
   }
 
-  handleTricksAndLanding(upd, fs) {
+  handleTricksAndLanding(upd, fs, options = {}) {
     for (const t of upd.tricks || []) {
       const r = this.score.addTrick(t);
       const n = Math.max(1, t.count || 1);
@@ -1895,30 +1956,20 @@ export class RunScene extends Phaser.Scene {
       this.emitCombo('trick');
       this.fx.sparks(fs.x, fs.y - 14, r.isNew ? this.palette.amber : this.palette.cyan, 8, 150, 60);
     }
-    let l = upd.landing;
+    const l = options.gradedLanding === undefined ? this.gradeLanding(upd.landing) : options.gradedLanding;
     if (!l) return;
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, l.airtimeMs || 0);
     const airTricks = this._airTricks;
     this._airTricks = 0;
-    // forgiveness: clearly-bad-but-not-head-first landings become a recoverable wobble instead of a crash; a B0
-    // stabilize power-up widens the tolerance by its landingToleranceDeg (BiomeEffects.resolveLanding)
-    l = resolveLanding(l, this.stabilizeMs > 0 ? this.stabilizeDeg : 0, TUNING);
-    // A stabilized micro-touch may be forgiven up to GOOD, but must NEVER
-    // become a fabricated perfect landing or perfect-bonus farm.
-    if (l.shortAirBrakeTouchdown && l.quality === 'perfect')
-      l = { ...l, quality:'good' };
     if (l.quality === 'crash') {
-      this.game.events.emit(EVT.LANDING, {
-        quality: 'crash', angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
-        bonusPoints: 0, bankedPoints: 0, hard: true, x: fs.x, y: fs.y,
-      });
+      this.emitCrashLanding(l, fs);
       this.pendingCrash = { cause: 'badLanding' };
       return;
     }
     const pre = this.score.getSnapshot();
     const mult = pre.multiplier || 1;
     const nTricks = Math.max(airTricks, (pre.comboTricks || []).length);
-    const r = this.score.onLanding(l, { zoneScoreMul: this._zoneScoreMulAt(fs.x) });
+    const r = this.score.onLanding(l, { zoneScoreMul: options.zoneScoreMul ?? this._zoneScoreMulAt(fs.x) });
     this.game.events.emit(EVT.LANDING, {
       quality: l.quality, angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
       bonusPoints: r.bonus, bankedPoints: r.banked, hard: !!l.hard, x: fs.x, y: fs.y,
@@ -1938,14 +1989,20 @@ export class RunScene extends Phaser.Scene {
       this.sled.squash = l.hard ? 1 : 0.6;
     } else if (imp > 250) this.sled.squash = 0.35;
     this._landings += 1;
+    if (options.physicalApplied) {
+      if (options.boostEvent) this.emitIf(EVT.LANDING_BOOST, options.boostEvent);
+    } else this.applyLandingPhysics(l, mult, nTricks, fs);
+  }
+
+  applyLandingPhysics(l, mult, nTricks, fs, publish = true) {
     if (l.shortAirBrakeTouchdown) {
-      // A micro-touch cannot manufacture extra speed or a spring rebound,
-      // BUT a sloppy landing still pays the ordinary wobble/velocity cost.
+      // Micro-touches cannot manufacture boost/rebound, but still pay wobble.
       if (l.quality === 'sloppy') this.sled.wobble(TUNING.sloppySpeedKeep);
-    } else {
-      this.applyLandingBoost(l, mult, nTricks, fs);
-      this.applySpringRebound(l, fs);
+      return;
     }
+    const event = this.applyLandingBoost(l, mult, nTricks, fs, publish);
+    this.applySpringRebound(l, fs);
+    return event;
   }
 
   /**
@@ -1965,7 +2022,7 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** Trick -> speed loop (TUNING.boost*): a clean landing after tricks gives a forward burst and a stretch of low drag. */
-  applyLandingBoost(l, mult, nTricks, fs) {
+  applyLandingBoost(l, mult, nTricks, fs, publish = true) {
     const sled = this.sled;
     if (l.quality === 'sloppy') {
       sled.wobble(TUNING.sloppySpeedKeep);
@@ -1983,7 +2040,8 @@ export class RunScene extends Phaser.Scene {
     sled.addForwardSpeed(amt);
     sled.boostMs = TUNING.boostDragMs;
     this.lastBoost = { amountPxS: Math.round(amt), t: this.runTimeMs };
-    this.emitIf(EVT.LANDING_BOOST, { amountPxS: Math.round(amt), quality: l.quality, comboMult: mult, tricks: nTricks });
+    const event = { amountPxS: Math.round(amt), quality: l.quality, comboMult: mult, tricks: nTricks };
+    if (publish) this.emitIf(EVT.LANDING_BOOST, event);
     const k = amt / TUNING.boostCapPxS;
     const sp = sled.speed || 1;
     const bx = fs.x - (sled.vx / sp) * 18;
@@ -1993,6 +2051,7 @@ export class RunScene extends Phaser.Scene {
     this.fx.sparks(bx, by, this.palette.amber, 6, 200, 10);
     this._zoomKick = Math.max(this._zoomKick, 0.025 + 0.04 * k);
     this.shake(1 + 1.5 * k);
+    return event;
   }
 
   // ------------------------------------------------------------------ fun-pass systems

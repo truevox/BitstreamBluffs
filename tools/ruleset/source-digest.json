@@ -3,10 +3,9 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "behavior-change-unreleased: observe actual paid AirBrake kick before final-substep bluff arming",
+  "attestation": "behavior-change-unreleased: stage contact score and Flow chronology until terminal outcome",
   "changedFiles": [
-    "src/scenes/RunScene.js",
-    "src/systems/BsodBluffTracker.js"
+    "src/scenes/RunScene.js"
   ],
   "files": {
     "src/constants.js": "sha256:19b22072736e5257d7c872cb68c96a79d3a7ff70a8cf7435938cf2066def6607",
@@ -15,7 +14,7 @@
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:3eb494523cb54e17c556530acbb7b16ed3a536cf207b4202a641e0bff3d19db2",
     "src/entities/TerrainMesh.js": "sha256:c1d23f82fbe130ff4ad8fa215a8434a36e12f9e621e37a42be64aa2bb2217b45",
-    "src/scenes/RunScene.js": "sha256:54b5dc430e97e45fea801ec38c6dd3efc709c7fe99e493703ee6d6b5084f8a19",
+    "src/scenes/RunScene.js": "sha256:e344ab5906385bc72665b3a58ddffac866f67069c9f68eef3bca995ed1a52967",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:5f24e720a35b949b68d8e14062d4abab397c2e094598542f9ecebfcbf3cf27c3",
@@ -33,7 +32,7 @@
     "src/systems/pmath-stdlib-lock.json": "sha256:78f7e9b94d1ecd8a5831b824e57d79a4e0099ac71eca42f6faacb71ba65a808b",
     "src/systems/pmath.js": "sha256:de4cf4c188f1b00c7c29ea4ac03e5934c88d8da8b6f7a9df96d761fd4e925dd3",
     "src/systems/RunRandom.js": "sha256:d2042cd6ad49f44708f2fcee50aeadcbe9323f8b217d8715aaf443344db2bd68",
-    "src/systems/ScoreManager.js": "sha256:4e165d2005eab146533a6954980614b603e9553366d5d9643faab39fc68fc93d",
+    "src/systems/ScoreManager.js": "sha256:08e7d7c84f19598600e916d6be8cde73037f1b15dbae0fef5417efdb0db45393",
     "src/systems/ShardMagnet.js": "sha256:f3e3ec4414933a523a6c8ab77b57d6bf69b0d6efa3827b066d95676afbdf2d4c",
     "src/systems/SimClock.js": "sha256:8881e9cd4d271ca9c991b1ca1cd66c683c36f9d41586b71da7d2086717db569e",
     "src/systems/TerrainContact.js": "sha256:65c28824f55b42e613945f51d351bfa92f5d20076d37e8034998a9cd2c464568",

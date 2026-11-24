@@ -363,8 +363,8 @@ export class ScoreManager {
   }
 
   /** @returns {number} current multiplier = 1 + 0.25 * unique flip / helicopter types (SCORING.comboStepTypes). */
-  getMultiplier() {
-    const steps = this.comboTricks.filter((t) => SCORING.comboStepTypes.includes(t)).length;
+  getMultiplier(trickTypes = this.comboTricks) {
+    const steps = trickTypes.filter((t) => SCORING.comboStepTypes.includes(t)).length;
     return SCORING.comboStart + SCORING.comboStep * steps;
   }
 

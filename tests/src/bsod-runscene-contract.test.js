@@ -224,7 +224,7 @@ test('SIM9 contact chronology advances yaw and expires Flow BEFORE physical land
   const control=source.indexOf('sled.applyControls(pad, phys, stepMs, air)');
   const yaw=source.indexOf('sled.stepHeli(stepMs)',control);
   const endStep=source.indexOf('const actualTouchdown=!!sled.endStep(stepMs)',yaw);
-  const flow=source.indexOf('this.emitFlow(this.score.tick(stepMs))',endStep);
+  const flow=source.indexOf('landingLedger.entries.push({ stepMs })',endStep);
   const settle=source.indexOf('this.settlePhysicalTouchdown(',flow);
   expect(control).toBeGreaterThan(0);
   expect(yaw).toBeGreaterThan(control);
@@ -239,9 +239,9 @@ test('RunScene orders physical Matter substep touchdown ledger before the final 
   const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
   expect(source).toMatch(/const actualTouchdown=!!sled\.endStep\(stepMs\)/);
   expect(source).toMatch(/if\s*\(actualTouchdown\)\s*\{[\s\S]*?substepTouchdowns\.push/);
-  expect(source).toContain('this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs)');
+  expect(source).toContain('this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs, landingLedger)');
   expect(source).toContain('fs.input.airBrakeKicked = airBrakeKickedThisTick');
-  expect(source).toMatch(/this\.handleTricksAndLanding\(upd,fs\)/);
+  expect(source).toContain('this.commitTouchdownLedger(landingLedger, survivedLanding)');
 });
 
 describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
@@ -467,7 +467,7 @@ test('physical buffered touchdown captures contact-position slope instead of sta
 test('substep Flow expires before landing settlement, and new airborne time starts after last physical contact',async()=>{
   const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
   const callback=source.indexOf('const actualTouchdown=!!sled.endStep(stepMs)');
-  const advance=source.indexOf('this.emitFlow(this.score.tick(stepMs));',callback);
+  const advance=source.indexOf('landingLedger.entries.push({ stepMs });',callback);
   const settle=source.indexOf('this.settlePhysicalTouchdown(',callback);
   expect(callback).toBeGreaterThan(0);
   expect(advance).toBeGreaterThan(callback);
@@ -507,4 +507,110 @@ test.each([[300,150],[240,190]])('paid kick at gap %i cannot borrow later approa
   scene.sled.x=1400;scene.runTimeMs=800;scene.bsodState.gapPx=900;
   scene.updateBsodBluff();
   expect(awards).toEqual([points]);
+});
+
+describe('tick-local landing settlement', () => {
+  test.each([false, true])('late crash priority / survivor=%s: body effects are immediate but rewards are conditional', async survived => {
+    const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+    const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+    const scene=Object.create(RunScene.prototype), events=[];
+    scene.game={events:{emit:(key,payload)=>events.push({key,payload})}};
+    scene.tricks=new TrickTracker();scene.score=new ScoreManager();
+    scene.score.trickPoints=500;scene.score.flow=2;scene.score.flowRemainingMs=4;
+    scene.score.addBonus(30,'shard');
+    scene.trickCounts={};scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
+    scene.stabilizeMs=0;scene.stabilizeDeg=0;scene.pendingCrash=null;
+    scene.palette={amber:1,cyan:2,lime:3};scene.fx={sparks(){},ring(){}};
+    scene.sled={x:1000,y:200,vx:200,vy:0,wobble:jest.fn()};
+    scene.emitCombo=()=>{};scene.emitFlow=()=>{};scene.emitScore=()=>{};
+    scene._zoneScoreMulAt=()=>1;
+    scene.applyLandingBoost=jest.fn();scene.applySpringRebound=jest.fn();
+    const fs={timeMs:10008,dtMs:8,grounded:true,crashed:false,angleDeg:45,
+      vx:200,vy:0,impactVx:200,impactVy:50,groundAngleDeg:0,x:1000,y:200,
+      input:{airBrake:true,airBrakeKicked:true,parachute:false,heli:0}};
+    const ledger={entries:[{stepMs:8}],combo:null,airTricks:0};
+    scene.settlePhysicalTouchdown(fs,ledger);
+    expect(scene.sled.wobble).toHaveBeenCalledTimes(1);
+    expect(scene.score.trickPoints).toBe(500);
+    expect(scene._landings).toBe(0);
+    expect(events).toHaveLength(0);
+    ledger.entries.push({stepMs:8});
+    if (!survived) scene.pendingCrash={cause:'bsod'};
+    scene.commitTouchdownLedger(ledger,survived);
+    expect(scene.score.bonusPoints).toBe(30);
+    expect(scene.score.flow).toBeLessThan(2);
+    expect(scene.sled.wobble).toHaveBeenCalledTimes(1);
+    expect(scene._landings).toBe(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(survived?1:0);
+    expect(scene.score.trickPoints>500).toBe(survived);
+  });
+});
+
+describe('real fixed-tick crash-priority routing', () => {
+  test.each(['wall', 'hazard', 'shielded', 'survive'])('first-substep paid landing, second-substep %s', async outcome => {
+    const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+    const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+    const {SIM_TICK_MS}=await import('../../src/systems/SimClock.js');
+    const scene=Object.create(RunScene.prototype), events=[];
+    let steps=0, wallSteps=0;
+    Object.assign(scene,{
+      runTimeMs:1000,resetCooldownMs:0,hazards:new Map(),scrambleMs:0,
+      slowmoMs:0,blinkMs:0,hitStopMs:0,stabilizeMs:0,stabilizeDeg:0,
+      pendingCrash:null,shieldCharges:outcome==='shielded'?1:0,bsodCaught:false,crashed:false,
+      score:new ScoreManager(),tricks:new TrickTracker(),trickCounts:{},_airTricks:0,
+      _landings:0,maxAirtimeMs:0,lastTotal:530,bestCombo:1,startX:0,
+      palette:{amber:1,cyan:2,lime:3},fx:{sparks(){},ring(){}},
+      game:{events:{emit:(key,payload)=>events.push({key,payload})}},
+      registry:{get:()=>null},terrain:{heightAt:()=>500},
+      tuner:{getEffective:()=>({})},matter:{world:{step:()=>{steps++;}}},
+      tickEffects(){},getZoneDefs:()=>[],slopeAt:()=>0,physicsContext:()=>({}),
+      dropAhead:()=>0,airForecast(){},flushDespawn(){},updateZones(){},sampleSafeGround(){},
+      updateKodiaks(){},updateBsodBluff(){},updateFun(){},streamTerrain(){},publishBsodState(){},
+      bsodAtmosphere:()=>1,glitch:{update:()=>({})},
+      processContacts(){
+        if(steps===2 && (outcome==='hazard'||outcome==='shielded'))
+          this.pendingCrash={cause:'hazard'};
+      },
+      resolveCrash:jest.fn(function(){
+        const fatal=outcome!=='shielded';
+        this.pendingCrash=null;
+        this.crashed=fatal;
+        if(fatal)this.score.onCrash();
+      }),
+    });
+    scene.score.trickPoints=500;
+    scene.score.addBonus(30,'shard');
+    scene.sled={
+      x:1000,y:200,vx:200,vy:0,speed:200,airtimeMs:8,grounded:false,
+      invulnerableMs:0,airBrakeKickPulse:0,stepHeli(){},wobble:jest.fn(),
+      applyControls(){
+        if(steps===0)this.airBrakeKickPulse=1;
+        else {
+          expect(this.wobble).toHaveBeenCalledTimes(1);
+          expect(scene.score.trickPoints).toBe(500);
+          expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(0);
+        }
+      },
+      endStep(){this.grounded=steps===1;return this.grounded;},
+      getFrameState(timeMs,dtMs){return {timeMs,dtMs,grounded:this.grounded,
+        crashed:false,angleDeg:45,groundAngleDeg:0,vx:200,vy:0,impactVx:200,impactVy:50,
+        x:this.x,y:this.y,input:{airBrake:true,heli:0}};}
+    };
+    scene.bsod={
+      advance(){wallSteps++;},
+      state(){return {active:true,gapPx:outcome==='wall'&&wallSteps===2?-1:400,
+        relativeAirX:100,atmosphereDensity:1};}
+    };
+    scene.simTick(SIM_TICK_MS,{pressed:{}});
+    const survived=outcome==='shielded'||outcome==='survive';
+    expect(steps).toBe(2);
+    expect(scene.sled.wobble).toHaveBeenCalledTimes(1);
+    expect(scene.score.trickPoints>500).toBe(survived);
+    expect(scene.score.bonusPoints).toBe(30);
+    expect(scene._landings).toBe(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(survived?1:0);
+    expect(scene.resolveCrash).toHaveBeenCalledTimes(outcome==='survive'?0:1);
+  });
 });
