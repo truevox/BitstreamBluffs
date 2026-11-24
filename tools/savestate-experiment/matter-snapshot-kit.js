@@ -339,7 +339,10 @@ export function createMatterSnapshotKit(Matter) {
       orphanPairs,
       gravity: { x: engine.gravity.x, y: engine.gravity.y, scale: engine.gravity.scale },
       timing: { timestamp: engine.timing.timestamp, timeScale: engine.timing.timeScale, lastDelta: engine.timing.lastDelta },
-      detectorOrder: (engine.detector.bodies || []).map((b) => keyOf(b)),
+      detectorOrder: (engine.detector.bodies || []).map(b => {
+        const k = keyOf(b);
+        return ix.byKey.get(k) === b ? k : null;
+      }),
       // Composite order: Engine iterates it, and Detector.setBodies copies it on every world change, so it breaks
       // bounds.min.x ties in the (stable) broadphase sort after the next add/remove.
       worldOrder: Composite.allBodies(engine.world).map((b) => keyOf(b)),

@@ -275,3 +275,20 @@ test('pending detector rebuild preserves raw resolvable order and modified flag'
   expect(restored.worldModified).toBe(true);
   expect(restored.detectorOrder).toEqual(good.detectorOrder);
 });
+
+test('pending detector rebuild must not alias a removed body to its same-key replacement',()=>{
+  const a=buildWorld(Matter);
+  Matter.Engine.update(a.engine,1000/240);
+  const old=a.engine.detector.bodies.find(b=>b.isStatic);
+  const key=a.keyOf(old);
+  const replacement=Matter.Bodies.rectangle(old.position.x,old.position.y,10,10,{isStatic:true,label:old.label});
+  Matter.Composite.remove(a.engine.world,old);
+  Matter.Composite.add(a.engine.world,replacement);
+  const keyOf=b=>b===replacement?key:a.keyOf(b);
+  const snap=kit.capture(a.engine,keyOf,{selectBody:()=>true});
+  expect(snap.worldModified).toBe(true);
+  expect(snap.worldOrder).toContain(key);
+  expect(snap.detectorOrder).toContain(null);
+  expect(snap.detectorOrder).not.toContain(key);
+  expect(kit.preflight(snap)).toBe(true);
+});
