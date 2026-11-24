@@ -1,6 +1,6 @@
 # Independent GitHub App review gate — staged rollout
 
-**Status: staged, not active.** Gal Friday Review is registered and installed on all current and future repositories owned by truevox at Marvin’s request. The app and a repository-scoped token have been authenticated successfully. No branch rule was changed and no PR is merge-blocked by this proposal. The reviewer credential and execution environment still need an independently enforced security boundary before use as a review gate.
+**Status: periodic reconciliation active; merge gate not active.** Gal Friday Review is registered and installed on all current and future repositories owned by truevox at Marvin’s request. A CT223 user timer checks open Bitstream Bluffs PRs approximately every five minutes. No branch rule was changed and no PR is merge-blocked by this proposal. The shared reviewer credential does not enforce independent authorship.
 
 ## Why stay on GitHub for BsB?
 
@@ -38,13 +38,13 @@ On the dedicated reviewer runtime, configure `FRIDAY_REVIEW_APP_ID`, `FRIDAY_REV
 node tools/review-gate/publish.mjs --evidence /private/review-42.json
 ```
 
-The script requests a short-lived, single-repo App installation token, checks the App identity, verifies the PR's **exact live head**, submits a formal review, verifies GitHub identified its author as the expected `slug[bot]` on the exact commit, rechecks the live head, then posts an App-owned `friday-independent-review` check run **on that same SHA**. A head change or bad credentials fail closed; a new push lacks the old SHA's passing check. The repo has no webhook/service trigger yet, so running the script is a separate deliberate act.
+The script requests a short-lived, single-repo App installation token, checks the App identity, verifies the PR's **exact live head**, submits a formal review, verifies GitHub identified its author as the expected `slug[bot]` on the exact commit, rechecks the live head, then posts an App-owned `friday-independent-review` check run **on that same SHA**. A head change or bad credentials fail closed; a new push lacks the old SHA's passing check. Publishing a review remains a separate deliberate act; the timer reconciles checks that already exist.
 
 ## Review-state reconciliation (staged)
 
 `node tools/review-gate/reconcile.mjs --dry-run 42` checks whether successful app-owned checks for PR 42 still point to the latest non-pending bot approval for its current head. It reports stale checks without changing GitHub. `--apply` marks those stale checks as failures. Both commands require the same environment variables and separately protected key as the publisher. They validate the App and installation identity and page through reviews and checks.
 
-This command is not an automatic service. It has not been tested against a live dismissed approval, nor provisioned in an isolated runtime. Even when periodically scheduled or triggered by an event, a delay or outage can leave a stale success temporarily green; enforcement requires a proven failure-closed architecture that handles missed events, outages, and the interval before reconciliation. Do not enable a required gate on the basis of this command alone.
+The `gal-friday-review-reconcile.timer` user unit on CT223 runs `--apply --all` approximately every five minutes using app credentials. It executes a copy pinned to commit `ea77693c5a6b5bb6a8998388d53dda4ad952aca7`; deployments must explicitly update that copy and unit. On test PR #307, GitHub confirmed an app approval, a successful check, dismissal, and the scheduled sweep changing the check to failure; a new commit had no inherited green check. The empty test PR was closed without merging. The timer operates as the shared `hermes` account, not an isolated reviewer. A delay or outage can leave a stale success temporarily green; do not make this check a required merge gate until missed events, outages, and the reconciliation interval are addressed.
 
 ## Activate enforcement only after an end-to-end trial
 
