@@ -160,13 +160,33 @@ async function run(p,{hz,markers,maxTicks=2400,raster=false,rasterLastFrames=0})
     }
   },{hz,markers,maxTicks,raster,rasterLastFrames});
 }
+const RUN_TIMEOUT_MS=Number(process.env.RUN_TIMEOUT_MS||45000);
+assert(Number.isInteger(RUN_TIMEOUT_MS)&&RUN_TIMEOUT_MS>0&&RUN_TIMEOUT_MS<=180000,
+  'RUN_TIMEOUT_MS must be an integer in (0,180000]');
+async function runBounded(session,options) {
+  // The underlying conformance bootRun polls with requestAnimationFrame. If
+  // that scene transition stalls there is otherwise NO rejection from evaluate.
+  // Closing the whole context interrupts Chromium's pending page.evaluate.
+  // Report exact cadence/policy and already observed browser page errors.
+  let timer;
+  const stop=new Promise((_,reject)=>{
+    timer=setTimeout(()=>{
+      void session.context.close().catch(()=>{});
+      reject(new Error(`SIM8 browser run timeout after ${RUN_TIMEOUT_MS}ms: `+
+        `cadence=${options.hz}Hz markers=${options.markers} raster=${!!options.raster}; `+
+        `page errors: ${session.errors.length?session.errors.join(' | '):'none reported'}`));
+    },RUN_TIMEOUT_MS);
+  });
+  try {return await Promise.race([run(session.p,options),stop]);}
+  finally {clearTimeout(timer);}
+}
 try {
   for(const hz of hzValues){
     const base=await page();const marker=await page();
     try {
-      const a=await run(base.p,{hz,markers:false});
-      const b=await run(marker.p,{hz,markers:true});
-      const c=await run(marker.p,{hz,markers:true});
+      const a=await runBounded(base,{hz,markers:false});
+      const b=await runBounded(marker,{hz,markers:true});
+      const c=await runBounded(marker,{hz,markers:true});
       const baseJs=await base.verifyActualLoadedScripts({expectRuntime:true});
       const markerJs=await marker.verifyActualLoadedScripts({expectRuntime:true});
       assert.deepEqual(baseJs,markerJs,'marker mode loads a different compiled JS graph');
@@ -202,8 +222,8 @@ try {
     const normal=await page(),marked=await page();
     try{
       const hz=120,maxTicks=Number(process.env.RASTER_TICKS||1600);
-      const a=await run(normal.p,{hz,markers:false,maxTicks,raster:true,rasterLastFrames:4});
-      const b=await run(marked.p,{hz,markers:true,maxTicks,raster:true,rasterLastFrames:4});
+      const a=await runBounded(normal,{hz,markers:false,maxTicks,raster:true,rasterLastFrames:4});
+      const b=await runBounded(marked,{hz,markers:true,maxTicks,raster:true,rasterLastFrames:4});
       const normalJs=await normal.verifyActualLoadedScripts({expectRuntime:true});
       const markedJs=await marked.verifyActualLoadedScripts({expectRuntime:true});
       assert.deepEqual(normalJs,markedJs,'raster mode loaded a different compiled JS graph');
