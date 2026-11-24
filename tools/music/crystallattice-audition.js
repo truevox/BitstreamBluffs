@@ -1,5 +1,7 @@
+import {attachAuditionExtra} from './AuditionExtra.js';
 import { buildMusicChain } from '../../src/systems/music/MusicFXGraph.js';
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
+let extraEnhancer=null;
 const $=id=>document.getElementById(id);
 const ROLES=['drums','bass','guitar','piano','other'];
 let ctx=null,buffers=null,master=null,dryGain=null,processedGain=null;
@@ -55,7 +57,7 @@ async function ready(){if(!ctx)ctx=new AudioContext({latencyHint:'interactive'})
 async function load(){
 	$('load').disabled=true;say('Loading the original five instrument stems…');
 	try{await ready();const decoded=await Promise.all(ROLES.map(async role=>{
-		const response=await fetch('/scrapheap-audition/'+role+'.mp3');
+		const response=await fetch('/audition-loops/pope-leo/'+role+'.ogg');
 		if(!response.ok)throw new Error('Missing original '+role+' stem');
 		return ctx.decodeAudioData(await response.arrayBuffer());
 	}));buffers=Object.fromEntries(ROLES.map((r,i)=>[r,decoded[i]]));
@@ -64,6 +66,7 @@ async function load(){
 	finally{$('load').disabled=false;controls();}
 }
 function stop(){
+	extraEnhancer?.dispose();extraEnhancer=null;
 	for(const source of sources){try{source.stop();}catch{}try{source.disconnect();}catch{}}
 	for(const chain of Object.values(chains))chain.dispose();
 	for(const node of [master,dryGain,processedGain])try{node?.disconnect();}catch{}
@@ -75,7 +78,7 @@ async function play(){
 	if(!buffers)return;
 	await ready();master=ctx.createGain();master.gain.value=.32;master.connect(ctx.destination);
 	dryGain=ctx.createGain();processedGain=ctx.createGain();dryGain.gain.value=0;processedGain.gain.value=1;
-	dryGain.connect(master);processedGain.connect(master);
+	dryGain.connect(master);processedGain.connect(master);extraEnhancer=attachAuditionExtra(ctx,processedGain,master);
 	for(const role of ROLES){
 		const chain=buildMusicChain(ctx,orchestraPreset('crystal-cavern',role),processedGain);
 		const source=ctx.createBufferSource(),gain=ctx.createGain();

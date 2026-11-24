@@ -1,8 +1,10 @@
+import {attachAuditionExtra} from './AuditionExtra.js';
 import { buildMusicChain } from '../../src/systems/music/MusicFXGraph.js';
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
 import { MicroBeeAudio } from '../../src/systems/music/MicroBeeAudio.js';
 import { beesAt } from '../../src/systems/MicroBees.js';
 import { GAME_WIDTH } from '../../src/constants.js';
+let extraEnhancer=null;
 const $=id=>document.getElementById(id);
 const ROLES=['drums','bass','guitar','piano','other'];
 let ctx=null,buffers=null,master=null,dryGain=null,processedGain=null;
@@ -49,7 +51,7 @@ async function audioReady(){if(!ctx)ctx=new AudioContext({latencyHint:'interacti
 async function load(){
 	$('load').disabled=true;announce('Loading the original five stems…');
 	try{await audioReady();const decoded=await Promise.all(ROLES.map(async role=>{
-		const res=await fetch('/scrapheap-audition/'+role+'.mp3');
+		const res=await fetch('/audition-loops/pope-leo/'+role+'.ogg');
 		if(!res.ok)throw new Error('Missing original stem: '+role);
 		return ctx.decodeAudioData(await res.arrayBuffer());
 	}));
@@ -59,6 +61,7 @@ async function load(){
 	finally{$('load').disabled=false;setControls();}
 }
 function stop(){
+	extraEnhancer?.dispose();extraEnhancer=null;
 	for(const source of sources){try{source.stop();}catch{}try{source.disconnect();}catch{}}
 	for(const chain of chains)chain.dispose();beeSound?.dispose();
 	for(const bus of [master,dryGain,processedGain])try{bus?.disconnect();}catch{}
@@ -71,7 +74,7 @@ async function play(){
 	await audioReady();master=ctx.createGain();master.gain.value=.32;master.connect(ctx.destination);
 	dryGain=ctx.createGain();processedGain=ctx.createGain();
 	dryGain.gain.value=0;processedGain.gain.value=1;
-	dryGain.connect(master);processedGain.connect(master);
+	dryGain.connect(master);processedGain.connect(master);extraEnhancer=attachAuditionExtra(ctx,processedGain,master);
 	for(const role of ROLES){
 		const chain=buildMusicChain(ctx,orchestraPreset('micro-mountain',role),processedGain);
 		const source=ctx.createBufferSource(),gain=ctx.createGain();

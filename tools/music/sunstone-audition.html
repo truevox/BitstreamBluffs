@@ -7,6 +7,7 @@
 <div class="row"><button id="load" class="primary">🎵 Load original OGG stems</button><button id="play" disabled>▶ Play</button><button id="dry" disabled aria-pressed="false">Compare dry</button><button id="solo" disabled aria-pressed="false">Solo drums</button></div>
 <p id="phase" class="phase">Grounded — the terraces are still</p>
 <label for="resonance">Warm sandstone resonators: <output id="resonance-value">125%</output></label><input id="resonance" type="range" min="0" max="200" value="125" step="5">
+<p class="help"><strong>New test:</strong> Sandstone resonance is now much more audible near the top of this existing slider. The existing 125% default sounds exactly as before. Above 125%, the original melody and instruments acquire a separate warm, stereo sandstone chamber response—even on the ground. No new note, thermal gust or stone-landing volume is added.</p>
 <label for="drift">Air through stone chambers: <output id="drift-value">100%</output></label><input id="drift" type="range" min="25" max="200" value="100" step="5">
 <div class="check"><input type="checkbox" id="zone" checked><label for="zone">Rider is inside a genuine, unwarded thermalUpdraft zone</label></div>
 <label for="gravity">Authoritative gravity: <output id="gravity-value">738 px/s²</output></label><input id="gravity" type="range" min="450" max="900" value="738" step="1">
@@ -17,6 +18,8 @@
 <div class="row"><button id="takeoff" disabled>☀️ Take off — ride thermal</button><button id="land" disabled>🏺 Land — ceramic strike</button></div>
 <div class="row"><button id="gust-test" disabled>Test thermal gust alone</button><button id="stone-test" disabled>Test sandstone impact alone</button></div>
 <div class="note"><strong>Try this:</strong> Load → Play → Take off while Thermal Zone is checked → Compare dry → restore Sunstone → uncheck Thermal Zone (the music calms) → check again (a fresh real zone entry). Land for the ceramic-sand impact. Try a jump with Thermal Zone unchecked to verify there is no false gust.</div>
+<label for="extra">✨ Extra biome bloom: <output id="extra-value">0%</output></label><input id="extra" type="range" min="0" max="200" value="0" step="5"><p class="help">0% = original audition sound. Raise this to add a spacious, filtered echo of this biome’s processed stems; the dry song and event effect settings stay unchanged.</p>
 <p id="status" role="status" aria-live="polite">Load the five original instrument stems to begin.</p></section>
 <p class="help">Experimental review only. The game uses its actual physics inputs; the standalone page merely demonstrates them. No source recording, separate MIDI lead, game physics, score, replay or song clock altered. Marvin's hearing remains the approval gate.</p>
-</main><script type="module" src="./sunstone-audition.js"></script></body></html>
+</main><script type="module" src="./sunstone-audition.js"></script><p style="margin:14px auto;max-width:900px;color:#bcebcf;font:600 14px system-ui,sans-serif">🎸 HIGH-ENERGY LOOP: curated steady-performance excerpt, smoothly crossfaded at its seam. The original full recordings are unchanged.</p>
+</body></html>

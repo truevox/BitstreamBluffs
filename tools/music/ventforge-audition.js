@@ -1,9 +1,13 @@
+import {attachAuditionExtra} from './AuditionExtra.js';
+import {attachAuditionCharacterEdge} from './AuditionCharacterEdge.js';
 import {buildMusicChain} from '../../src/systems/music/MusicFXGraph.js';
 import {orchestraPreset} from '../../src/systems/music/DynamicOrchestraPresets.js';
 
+let extraEnhancer=null;
+let tonalCharacter=null;
 const $=id=>document.getElementById(id);
 const ROLES=['drums','bass','guitar','piano','other'];
-const PACK='/music/packs/33_local-one-more-run-bitstream-bluffs/';
+const PACK='/audition-loops/one-more-run/';
 const roleGain=role=>role==='drums'?.9:role==='bass'?.75:.65;
 const number=id=>Number($(id).value);
 const say=message=>{$('status').textContent=message;};
@@ -82,7 +86,7 @@ async function load(){
 	try{
 		await ready();
 		const sound=await Promise.all(ROLES.map(async role=>{
-			const response=await fetch(PACK+'0000-'+role+'.ogg');
+			const response=await fetch(PACK+role+'.ogg');
 			if(!response.ok)throw Error(role+' OGG unavailable: HTTP '+response.status);
 			return ctx.decodeAudioData(await response.arrayBuffer());
 		}));
@@ -92,6 +96,8 @@ async function load(){
 	finally{$('load').disabled=false;controls();}
 }
 function stop(){
+	tonalCharacter?.dispose();tonalCharacter=null;
+	extraEnhancer?.dispose();extraEnhancer=null;
 	for(const {source,gain} of Object.values(streams)){
 		try{source.stop();}catch{}try{source.disconnect();}catch{}try{gain.disconnect();}catch{}
 	}
@@ -106,13 +112,14 @@ async function play(){
 	await ready();
 	master=ctx.createGain();master.gain.value=.26;master.connect(ctx.destination);
 	rawBus=ctx.createGain();fxBus=ctx.createGain();rawBus.gain.value=0;fxBus.gain.value=1;
-	rawBus.connect(master);fxBus.connect(master);
+	rawBus.connect(master);fxBus.connect(master);extraEnhancer=attachAuditionExtra(ctx,fxBus,master);
+	tonalCharacter=attachAuditionCharacterEdge(ctx,fxBus,$('heat-wah'),'heat');
 	const when=ctx.currentTime+.12;
 	for(const role of ROLES){
 		const chain=buildMusicChain(ctx,orchestraPreset('vertigo-vents',role),fxBus);
 		const source=ctx.createBufferSource(),gain=ctx.createGain();
 		source.buffer=buffers[role];source.loop=true;gain.gain.value=roleGain(role);
-		source.connect(gain);gain.connect(rawBus);gain.connect(chain.input);
+		source.connect(gain);gain.connect(rawBus);gain.connect(chain.input);gain.connect(tonalCharacter.input);
 		source.start(when);streams[role]={source,gain};chains[role]=chain;
 	}
 	playing=true;dry=solo=airborne=false;
@@ -142,4 +149,4 @@ $('settle').addEventListener('click',settle);
 window.addEventListener('pagehide',()=>{stop();ctx?.close();});
 controls();rumble();shimmer();blast();crust();rising();
 if(new URLSearchParams(location.search).get('qa')==='1')
-	window.__ventforgeQA=Object.freeze({buildMusicChain,orchestraPreset,getBuffers:()=>buffers});
+	window.__ventforgeQA=Object.freeze({buildMusicChain,orchestraPreset,attachAuditionCharacterEdge,getBuffers:()=>buffers});

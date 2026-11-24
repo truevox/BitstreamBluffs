@@ -1,6 +1,8 @@
+import {attachAuditionExtra} from './AuditionExtra.js';
 import { buildMusicChain } from '../../src/systems/music/MusicFXGraph.js';
 import { HydrostaticPressure } from '../../src/systems/music/HydrostaticPressure.js';
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
+let extraEnhancer=null;
 const $=id=>document.getElementById(id);
 const ROLES=['drums','bass','guitar','piano','other'];
 const controller=new HydrostaticPressure();
@@ -52,7 +54,7 @@ async function load(){
 	try {
 		await ready();
 		const data=await Promise.all(ROLES.map(async role=>{
-			const response=await fetch('/scrapheap-audition/'+role+'.mp3');
+			const response=await fetch('/audition-loops/pope-leo/'+role+'.ogg');
 			if(!response.ok)throw new Error(role+' missing ('+response.status+')');
 			return ctx.decodeAudioData(await response.arrayBuffer());
 		}));
@@ -62,6 +64,7 @@ async function load(){
 	finally {$('load').disabled=false;control();}
 }
 function stop(){
+	extraEnhancer?.dispose();extraEnhancer=null;
 	for(const source of sources){try{source.stop();}catch{}try{source.disconnect();}catch{}}
 	for(const chain of chains)chain.dispose();
 	for(const node of [master,rawGain,processedGain])try{node?.disconnect();}catch{}
@@ -73,7 +76,7 @@ async function play(){
 	if(!buffers)return;
 	await ready();master=ctx.createGain();master.gain.value=.32;master.connect(ctx.destination);
 	rawGain=ctx.createGain();processedGain=ctx.createGain();rawGain.gain.value=0;processedGain.gain.value=1;
-	rawGain.connect(master);processedGain.connect(master);
+	rawGain.connect(master);processedGain.connect(master);extraEnhancer=attachAuditionExtra(ctx,processedGain,master);
 	for(const role of ROLES){
 		const chain=buildMusicChain(ctx,orchestraPreset('underwater-mountain',role),processedGain);
 		const source=ctx.createBufferSource(),gain=ctx.createGain();

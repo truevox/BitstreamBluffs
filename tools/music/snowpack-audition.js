@@ -1,7 +1,8 @@
+import {attachAuditionExtra} from './AuditionExtra.js';
 import { buildMusicChain } from '../../src/systems/music/MusicFXGraph.js';
 
 const $ = id => document.getElementById(id);
-let ctx = null, chain = null, buffer = null, source = null, running = false, airborne = false;
+let ctx = null, chain = null, buffer = null, source = null, running = false, airborne = false, extraEnhancer = null;
 const status = message => { $('status').textContent = message; };
 const setDepth = (amount, updateSlider = true) => {
 	const depth = Math.max(0, Math.min(1, Number(amount) || 0));
@@ -22,7 +23,10 @@ const stop = () => {
 const ensureContext = async () => {
 	if (!ctx) {
 		ctx = new AudioContext();
-		chain = buildMusicChain(ctx, [{ type: 'snowpack', id: 'snow', depth: Number($('depth').value) }], ctx.destination);
+		const processed=ctx.createGain();
+		processed.connect(ctx.destination);
+		chain = buildMusicChain(ctx, [{ type: 'snowpack', id: 'snow', depth: Number($('depth').value) }], processed);
+		extraEnhancer=attachAuditionExtra(ctx,processed,ctx.destination);
 	}
 	await ctx.resume();
 };
@@ -46,7 +50,7 @@ $('file').addEventListener('change', async () => {
 $('demo').addEventListener('click', async () => {
 	status('Loading original instrument sample…');
 	try {
-		const response = await fetch('/snowpack-audition/pope-leo-original-instruments-20s.mp3');
+		const response = await fetch('/audition-loops/pope-leo/mix.ogg');
 		if (!response.ok) throw new Error('Sample unavailable');
 		await loadAudio(await response.arrayBuffer(), 'Pope Leo / original instrumental stems');
 	} catch (error) { status('Sample unavailable: ' + String(error.message || error)); }
@@ -84,5 +88,5 @@ $('hard').addEventListener('click', () => {
 	status('Hard landing: deeper snow burial pulse, then gradual resettling.');
 });
 window.addEventListener('pagehide', () => {
-	stop(); chain?.dispose(); ctx?.close();
+	stop(); extraEnhancer?.dispose(); chain?.dispose(); ctx?.close();
 });
