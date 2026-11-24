@@ -375,6 +375,9 @@ async function compareOriginalFatal(args={}){
 	}));
 	return {...positive.analysis,
 		control:{samplePeak:control.analysis.samplePeak,
+			sampleClips:control.analysis.sampleClips,
+			estimatedTrueClips4x:control.analysis.estimatedTrueClips4x,
+			nonfiniteSamples:control.analysis.nonfiniteSamples,
 			estimatedTruePeak4x:control.analysis.estimatedTruePeak4x,
 			estimatedTruePeakDbTp4x:control.analysis.estimatedTruePeakDbTp4x,
 			sourceHashes:control.analysis.sourceHashes,

@@ -30,8 +30,8 @@ const originalVocalFullSeven=[
 const full33=process.env.QA_FULL33==='1';
 const rejectedAttempts=[];
 const chosenFull33=full33?Array.from({length:33},(_,index)=>{
-	const established=originalVocalFullSeven.find(x=>x.index===index);
-	if(established)return established;
+	// ALL 33 indexes must use fresh quantum-v2 attempt records. The older
+	// seven prototype captures remain immutable historical evidence only.
 	const id=String(index).padStart(2,'0');
 	let selected=null;
 	for(let attempt=1;attempt<=3;attempt++){

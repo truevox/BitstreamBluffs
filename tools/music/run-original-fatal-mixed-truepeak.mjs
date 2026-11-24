@@ -6,6 +6,7 @@
  * never a fabricated MIDI beat or placeholder recording.
  */
 import assert from 'node:assert/strict';
+import {assertSafeFatalPair} from './fatal-qa-peak-gate.js';
 import {existsSync,writeFileSync} from 'node:fs';
 import {chromium} from 'playwright';
 const url=process.env.QA_URL||'http://127.0.0.1:8220';
@@ -83,6 +84,7 @@ try{
 					item.countIn.beatOnsets[i-1]-.5)<1e-9);
 			assert.deepEqual(item.control.sourceHashes,item.sourceHashes);
 			assert.equal(item.control.countIn,null);
+			assertSafeFatalPair(item); // both positive and no-count-in original-stereo controls
 			assert.equal(item.sampleClips,0,'Actual count-in composite samples clipped');
 			assert.equal(item.estimatedTrueClips4x,0,'Count-in 4x true peak overs');
 			assert.equal(item.nonfiniteSamples,0);

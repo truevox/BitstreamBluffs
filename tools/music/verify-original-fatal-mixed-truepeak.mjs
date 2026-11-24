@@ -5,6 +5,7 @@
  * Never manufactures source data or modifies a local master.
  */
 import assert from 'node:assert/strict';
+import {assertSafeFatalPair} from './fatal-qa-peak-gate.js';
 import {readFileSync,existsSync,writeFileSync} from 'node:fs';
 import {resolve,join,sep} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -66,6 +67,7 @@ for(let index=0;index<4;index++){
 		assert.equal(item.countInVsRealOriginalNoCountIn.length,4);
 		assert.equal(item.control.countIn,null);
 		assert.deepEqual(item.sourceHashes,item.control.sourceHashes);
+		assertSafeFatalPair(item);
 		assert.equal(item.sourceHashes.drums,item.originalDrumSha256);
 		assert.equal(item.nonfiniteSamples,0);
 		assert.equal(item.sampleClips,0);

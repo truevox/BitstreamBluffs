@@ -4,6 +4,7 @@
  * native fallback-drum preload. No source data enters Git or public server.
  */
 import assert from 'node:assert/strict';
+import {assertSafeFatalPair} from './fatal-qa-peak-gate.js';
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve,join,sep} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -45,6 +46,7 @@ for(let index=0;index<33;index++){
 	assert.equal(result.countInVsRealOriginalNoCountIn.length,4);
 	assert.equal(result.control.countIn,null);
 	assert.deepEqual(result.control.sourceHashes,result.sourceHashes);
+	assertSafeFatalPair(result);
 	assert.equal(result.sampleClips,0);
 	assert.equal(result.estimatedTrueClips4x,0);
 	assert.equal(result.nonfiniteSamples,0);
