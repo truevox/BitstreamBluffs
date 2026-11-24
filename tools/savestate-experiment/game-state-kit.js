@@ -311,6 +311,7 @@
       pool: poolState(run, ix.keyOf),
       config: opt.withConfig ? Object.fromEntries(CONFIG.filter((k) => k in run && k !== 'content' && k !== 'tuner').map((k) => [k, JSON.stringify(run[k])])) : undefined,
       classes, audit, skipped: skipped.length,
+      recorder: global.__ssCanonical ? global.__ssRecorderKit.captureRecorderPrefix(run) : undefined,
     };
     return out;
   }
@@ -336,6 +337,9 @@
     if (L < 0) throw new Error(`restore: unknown level ${level}`);
     if (!snap || snap.kind !== 'bb-runscene-diagnostic-snapshot' || snap.version !== 1) throw new Error('restore: bad snapshot kind/version');
     if (L > 0 && opt.strict !== false && snap.audit.length) throw new Error(`restore: snapshot is incomplete: ${snap.audit.join(' | ')}`);
+    // Validate the entire recorder section before touching the fresh world.
+    const preparedRecorder = global.__ssCanonical
+      ? global.__ssRecorderKit.prepareRecorderPrefix(run,snap.recorder,snap.ghost[0]) : null;
     const engine = run.matter.world.engine;
     const tickMs = run.simClock.tickMs;
     if (L === 0) {
@@ -396,6 +400,7 @@
     if (L >= 4 && !skip.has('pool')) restorePool(run, snap.pool, !skip.has('ids'));
     if (L >= 4 && !skip.has('ids')) Matter.Common._nextId = snap.matter.nextId;
     if (L >= 4 && !skip.has('camera')) restoreCamera(run, snap.camera);
+    if (preparedRecorder) global.__ssRecorderKit.applyRecorderPrefix(run,preparedRecorder);
     return { level, matter: mres, log: dcd.log };
   }
 

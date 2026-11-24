@@ -42,6 +42,8 @@ const EXACT_ONLY = process.env.EXACT_ONLY ? process.env.EXACT_ONLY.split(',') : 
 
 const matterKitSrc = readFileSync(path.join(here, 'matter-snapshot-kit.js'), 'utf8').replace(/^export /gm, '')
   + '\nwindow.__ssMatterKit = createMatterSnapshotKit(Phaser.Physics.Matter.Matter);\n';
+const recorderKitSrc = readFileSync(path.join(here, 'recorder-snapshot-kit.js'), 'utf8').replace(/^export /gm, '')
+  + '\nwindow.__ssRecorderKit = {captureRecorderPrefix,prepareRecorderPrefix,applyRecorderPrefix};\n';
 const gameKitSrc = readFileSync(path.join(here, 'game-state-kit.js'), 'utf8');
 
 // Tick-indexed tape (120 Hz ticks). Held ranges [from, to) and one-shot edges.
@@ -72,6 +74,7 @@ async function bootPage(browser, fx, tape) {
   await page.goto(URL_, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
   await page.addScriptTag({ content: matterKitSrc });
+  await page.addScriptTag({ content: recorderKitSrc });
   await page.addScriptTag({ content: gameKitSrc });
   await page.evaluate(strict => { window.__ssCanonical = strict; }, STRICT);
   await page.evaluate(async ({ fx, tape }) => {
@@ -143,7 +146,7 @@ async function runCase(browser, fxName, level, skip = []) {
   const B = await bootPage(browser, fx, tape);
   try {
     let fixtureStats = null;
-    let snapBytes = 0, restoreLog = [], classes = null, audit = [];
+    let snapBytes = 0, restoreLog = [], classes = null, audit = [], prefixControls = null;
     if (level !== 'control') {
       await A.page.evaluate((K) => window.__ss.step(K), fx.K);
       fixtureStats = await A.page.evaluate(() => {
@@ -158,6 +161,30 @@ async function runCase(browser, fxName, level, skip = []) {
       snapBytes = json.length;
       const parsed = JSON.parse(json);
       classes = parsed.classes; audit = parsed.audit;
+      if (STRICT) {
+        prefixControls = await B.page.evaluate(json => {
+          const run=window.__ss.run, kit=window.__ssGameKit, snap=JSON.parse(json);
+          const before=JSON.stringify(kit.digests(run));
+          const beforeRecorder=JSON.stringify(window.__ssRecorderKit.captureRecorderPrefix(run));
+          const results=[];
+          const corruptions={
+            missing:s=>delete s.recorder,
+            cursor:s=>{const d=JSON.parse(s.recorder.data);d.recorder._lastTick++;s.recorder.data=JSON.stringify(d);},
+            prefix:s=>{const d=JSON.parse(s.recorder.data);d.recorder.inputs.shift();s.recorder.data=JSON.stringify(d);},
+            fingerprint:s=>{const d=JSON.parse(s.recorder.data);d.recorder.fingerprints.pop();s.recorder.data=JSON.stringify(d);},
+          };
+          for(const [name,mutate] of Object.entries(corruptions)){
+            const bad=JSON.parse(json);mutate(bad);
+            let error=null;
+            try{kit.restore(run,bad,'full');}catch(e){error=String(e.message);}
+            const unchanged=before===JSON.stringify(kit.digests(run)) &&
+              beforeRecorder===JSON.stringify(window.__ssRecorderKit.captureRecorderPrefix(run));
+            results.push({name,error,unchanged});
+            if(!error?.startsWith('recorder prefix:')||!unchanged)throw new Error('negative control failed: '+name);
+          }
+          return results;
+        },json);
+      }
       const r = await B.page.evaluate(({ json, level, skip }) => {
         try { return { ok: true, ...window.__ssGameKit.restore(window.__ss.run, JSON.parse(json), level, { skip }) }; } catch (e) { return { ok: false, error: String(e.message || e) }; }
       }, { json, level, skip });
@@ -166,6 +193,9 @@ async function runCase(browser, fxName, level, skip = []) {
       if (STRICT) {
         const [atK, restoredK] = await Promise.all([A,B].map(P => P.page.evaluate(() => window.__ssGameKit.digests(window.__ss.run))));
         const atCapture = compareDigests(atK,restoredK);
+        const prefix = await Promise.all([A,B].map(P=>P.page.evaluate(()=>window.__ssRecorderKit.captureRecorderPrefix(window.__ss.run))));
+        if (JSON.stringify(prefix[0])!==JSON.stringify(prefix[1]))
+          return {fixture:fxName,level,skip:'-',restoreError:'recorder prefix mismatch at capture',snapBytes,audit,prefixControls};
         if (atK.__tick !== fx.K || restoredK.__tick !== fx.K || atCapture.diff.length)
           return {fixture:fxName,level,skip:'-',restoreError:'capture-tick mismatch: '+atCapture.diff.join(','),atCapture,snapBytes,audit};
       }
@@ -209,13 +239,26 @@ async function runCase(browser, fxName, level, skip = []) {
         if (crashA !== null && crashB !== null && t > Math.max(crashA, crashB) + 30) break outer;
       }
     }
+    let recorderParity = null;
+    if (STRICT) {
+      const receipts=await Promise.all([A,B].map(P=>P.page.evaluate(()=>{
+        const r=window.__ss.run, rec=r.ghostRecorder;
+        const prefix=window.__ssRecorderKit.captureRecorderPrefix(r);
+        const tape=rec.finish({runId:r.runId,distanceM:r.sled.x,score:r.score.getTotal(),endedAt:1});
+        return {prefix,tape};
+      })));
+      recorderParity={prefix:JSON.stringify(receipts[0].prefix)===JSON.stringify(receipts[1].prefix),
+        finishedTape:JSON.stringify(receipts[0].tape)===JSON.stringify(receipts[1].tape),
+        endTick:receipts[0].tape.endTick,inputRows:receipts[0].tape.inputs.length,
+        checkpoints:receipts[0].tape.checkpoints.length};
+    }
     const errors = [...A.errors, ...B.errors];
     return {
       fixture: fxName, level, skip: skip.join('+') || '-', K, N: fx.N, ticksCompared: ticks, snapBytes, fixtureStats,
       firstDivergentTick: first, ticksAfterRestore: first === null ? null : first - K, subsystemsAtFirst: firstDiff,
       firstSledDivergentTick: firstSled, firstLeaves, firstDivergenceBySubsystem: firstBy, maxSledPosErrPx: +maxPos.toFixed(4), endSledPosErrPx: +endPos.toFixed(4),
       crashTickA: crashA, crashTickB: crashB, restoreLog: restoreLog.slice(0, 12), restoreLogCount: restoreLog.length,
-      audit, classes: classes && Object.fromEntries(Object.entries(classes).map(([k, v]) => [k, v.length])), unclassified: classes?.unclassified, pageErrors: errors,
+      prefixControls, recorderParity, audit, classes: classes && Object.fromEntries(Object.entries(classes).map(([k, v]) => [k, v.length])), unclassified: classes?.unclassified, pageErrors: errors,
     };
   } finally {
     await A.ctx.close(); await B.ctx.close();
@@ -259,6 +302,8 @@ if (STRICT) {
   const failed = results.length !== 2 || results.some(r =>
     r.restoreError || r.harnessError || r.ticksCompared !== r.N-r.K ||
     r.firstDivergentTick !== null || r.firstSledDivergentTick !== null ||
+    r.prefixControls?.length !== 4 || !r.prefixControls.every(c=>c.unchanged&&c.error?.startsWith('recorder prefix:')) ||
+    !r.recorderParity?.prefix || !r.recorderParity.finishedTape || r.recorderParity.endTick !== r.N ||
     r.pageErrors?.length !== 0 || r.audit?.length !== 0 || r.unclassified?.length !== 0 ||
     (r.fixture === 'contact' ? !(r.fixtureStats?.activePairs > 0) : !(r.fixtureStats?.hazardsHit > 0)));
   console.log(failed ? 'FAIL_STRICT_DIAGNOSTIC_SUFFIX' : 'PASS_STRICT_DIAGNOSTIC_SUFFIX');
