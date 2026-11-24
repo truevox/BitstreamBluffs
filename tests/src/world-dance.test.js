@@ -202,3 +202,37 @@ test.each(['ridges','drift','terraces','currents','facets','stars','candy-stripe
  expect(max).toBeLessThanOrEqual(45);
  bg.update(400,1234,0,0);expect(outlines()).toEqual(still);
 });
+
+test('Steampunk keyed spokes visibly rock on a typical accent without moving their axles',()=>{
+ const motif='brass-pipes', d=biomeDanceStyle(motif,.26).decor;
+ const sample=dance=>motifDecor(motif,400,1234,0,{dance});
+ const keyed=items=>items.filter(p=>p.kind==='line'&&p.depth===-1&&p.width===3);
+ const still=keyed(sample(0)),moving=keyed(sample(d));
+ expect(still.length).toBeGreaterThan(0);
+ expect(moving).toHaveLength(still.length);
+ for(let i=0;i<still.length;i++){
+  const a=still[i].pts[1],b=moving[i].pts[1];
+  expect(Math.hypot(a.x-b.x,a.y-b.y)).toBeGreaterThan(9);
+ }
+ const axles=items=>items.filter(p=>p.kind==='circle'&&p.depth===-1);
+ expect(axles(sample(d))).toEqual(axles(sample(0)));
+ expect(keyed(sample(0))).toEqual(still);
+});
+
+test('Jellyfish bells individually lift and squash without borrowing horizon motion',()=>{
+ const motif='jellyfish', d=biomeDanceStyle(motif,.26).decor;
+ const bells=dance=>motifDecor(motif,400,1234,0,{dance}).filter(p=>p.kind==='poly'&&p.depth===-1);
+ const still=bells(0), moving=bells(d);
+ expect(still.length).toBeGreaterThan(1);
+ const lifts=[];
+ for(let i=0;i<still.length;i++){
+  const a=still[i].pts,b=moving[i].pts;
+  const lift=a[0].y-b[0].y;
+  lifts.push(lift);
+  expect(lift).toBeGreaterThan(11);
+  const width=pts=>Math.max(...pts.map(p=>p.x))-Math.min(...pts.map(p=>p.x));
+  expect(width(b)/width(a)).toBeGreaterThan(1.2);
+ }
+ expect(Math.max(...lifts)-Math.min(...lifts)).toBeGreaterThan(1);
+ expect(bells(0)).toEqual(still);
+});

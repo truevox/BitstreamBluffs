@@ -361,6 +361,12 @@ function ellipsePts(cx, cy, rx, ry, rot, n) {
  *   the perf comparison switch). Default on. Bee primitives carry `bee: id`.
  * @returns {ReadonlyArray<Object>} primitives in draw order
  */
+// Presentation-only audition tuning, in native pixels/radians.
+const DECOR_DANCE = Object.freeze({
+  gearRock: 1.4,
+  jellyLift: 42, jellySquash: 1.05, jellyTentacle: 0.24,
+});
+
 export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
   if (typeof motif !== 'string' || !DECOR_SEEDS[motif] || !MOTIFS.includes(motif)) return EMPTY_DECOR;
   const sx = Number.isFinite(scrollX) ? scrollX : 0;
@@ -455,8 +461,11 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     for (const j of lay.jellies) {
       const x = tileX(j.x0, sx, j.f);
       if (x === null) continue;
-      const pulse = 1 + 0.08 * Math.sin(t / 520 + j.ph) + 0.9 * dance;
-      const y = j.y + Math.sin(t / 1400 + j.ph) * 5 - 29 * dance;
+      // Phase-varied accent gains keep the school from moving as one rigid sprite.
+      const accent = dance * (0.83 + 0.17 * Math.sin(t / 230 + j.ph));
+      const pulse = 1 + 0.08 * Math.sin(t / 520 + j.ph) + DECOR_DANCE.jellySquash * accent;
+      const baseY = j.y + Math.sin(t / 1400 + j.ph) * 5;
+      const y = baseY - Math.min(DECOR_DANCE.jellyLift * accent, Math.max(0, baseY - j.s * 0.8 - 4));
       const rx = j.s * pulse;
       const ry = (j.s * 0.8) / pulse;
       const bell = [];
@@ -469,7 +478,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       out.push({ kind: 'poly', depth: -1, color: j.color, fillAlpha: 0.22, lineAlpha: 0.6, pts: bell });
       for (let k = 0; k < 4; k++) {
         const bx = x - rx * 0.6 + (k / 3) * rx * 1.2;
-        const len = j.s * 2.2;
+        const len = j.s * 2.2 * (1 - DECOR_DANCE.jellyTentacle * accent);
         const tend = [];
         for (let i = 0; i <= 5; i++) {
           const u = i / 5;
@@ -484,7 +493,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(gr.x0, sx, 0.06);
       if (x === null) continue;
       const teeth = Math.max(6, Math.round(gr.r / 2.4));
-      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * 1.25 * gr.dir;
+      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * DECOR_DANCE.gearRock * gr.dir;
       const pts = [];
       for (let i = 0; i < teeth; i++) {
         const a = rot + (i / teeth) * Math.PI * 2;
@@ -496,6 +505,14 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       }
       out.push({ kind: 'poly', depth: -1, color: 'amber', fillAlpha: 0.16, lineAlpha: 0.55, pts });
       out.push({ kind: 'circle', depth: -1, color: 'amber', fillAlpha: 0, lineAlpha: 0.55, x, y: gr.y, r: gr.r * 0.38 });
+      // An asymmetric reference spoke makes the actual rotation readable:
+      // identical teeth alone visually alias as the wheel rocks.
+      for (const [offset, width] of [[0, 3], [Math.PI * 0.7, 1], [Math.PI * 1.35, 1]]) {
+        const a = rot + offset;
+        out.push({ kind: 'line', depth: -1, color: 'amber', alpha: 0.72, width,
+          pts: [{ x: x + Math.cos(a) * gr.r * 0.38, y: gr.y + Math.sin(a) * gr.r * 0.38 },
+            { x: x + Math.cos(a) * gr.r * 0.91, y: gr.y + Math.sin(a) * gr.r * 0.91 }] });
+      }
     }
     // A brass pipe run in front of the far roofline: pipe, highlight, flanges, and some drop pipes.
     const L0 = def.layers[0];
