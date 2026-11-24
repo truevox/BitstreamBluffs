@@ -518,7 +518,13 @@ export class SaveStore {
           const d = req.result;
           if (!d.objectStoreNames.contains(STORAGE.runsStore)) d.createObjectStore(STORAGE.runsStore, { keyPath: 'id' });
         };
-        req.onsuccess = () => done(resolve, req.result);
+        req.onsuccess = () => {
+          if (settled) {
+            try { req.result.close(); } catch (_) { /* abandoned open */ }
+            return;
+          }
+          done(resolve, req.result);
+        };
         req.onerror = () => done(reject, req.error || new Error('idb open failed'));
         req.onblocked = () => done(reject, new Error('idb blocked'));
       });
@@ -881,7 +887,8 @@ export class SaveStore {
     const previous = this._runWrites.get(id) || Promise.resolve();
     this._runPersistence.set(id, 'pending');
     const write = previous.then(async () => {
-      if (retry && !this._db) await this.init();
+      if (this._initPromise) await this._initPromise;
+      else if (retry && !this._db) await this.init();
       const db = this._db;
       if (!db) return 'session-only';
       try {

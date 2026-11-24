@@ -491,6 +491,34 @@ describe('IndexedDB persistence (fake indexedDB)', () => {
     expect((await fresh()).runs).toEqual([expect.objectContaining({id:r.id,initials:'ABC'})]);
   });
 
+  test('new runs wait for a concurrent recovery open', async () => {
+    const idb = makeFakeIndexedDB();
+    globalThis.indexedDB = idb;
+    const s = await fresh(), r = makeRun(), next = makeRun();
+    const db = s._db, realTx = db.transaction;
+    db.transaction = () => { throw new Error('QuotaExceeded'); };
+    expect(await s.saveRun(r)).toBe('session-only');
+    db.transaction = realTx;
+    const retry = s.saveRun(r);
+    await Promise.resolve();
+    expect(s._initPromise).not.toBeNull();
+    expect(await Promise.all([retry, s.saveRun(next)])).toEqual(['committed','committed']);
+    expect((await fresh()).runs.map(x=>x.id).sort()).toEqual([r.id,next.id].sort());
+  });
+
+  test('late successful open after blocked rejection closes the abandoned connection', async () => {
+    const req = {}, close = jest.fn();
+    globalThis.indexedDB = {open:()=>req};
+    const s = new SaveStore(), pending = s.init();
+    req.onblocked();
+    await pending;
+    req.result = {close};
+    req.onsuccess();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(s.backend).toBe('memory');
+    expect(s._db).toBeNull();
+  });
+
   test('a failing write switches to memory-only and does not throw', async () => {
     const idb = makeFakeIndexedDB();
     globalThis.indexedDB = idb;
