@@ -17,6 +17,15 @@ function groupName(group,scope){return cachePrefix(scope)+group.id+'-'+group.ver
 function markerUrl(group,origin,scope){return new URL(scope+'.bitstream/r2-complete/'+encodeURIComponent(group.id)+'/'+group.version,origin).href;}
 async function verifiedResponse(cache,e,subtle){const r=await cache.match(e.url);if(!r?.ok||r.type==='opaque')return null;const b=await r.clone().arrayBuffer();return b.byteLength===e.bytes&&await digest(b,subtle)===e.sha256?r:null;}
 export async function catalogCacheGroup(entry,subtle){const entries=[entry];return {id:'release-catalog',version:(await digest(new TextEncoder().encode(JSON.stringify(entries)),subtle)).slice(0,20),entries};}
+/** Full readiness is verified, not inferred from an old completion marker. */
+export async function inspectR2Group(group,{storage,origin,scope,subtle}){
+  await groupCheck(group,subtle);const cache=await storage.open(groupName(group,scope));
+  const marker=await cache.match(markerUrl(group,origin,scope));let complete=false;
+  if(marker?.ok){try{const saved=await marker.json();complete=saved.id===group.id&&saved.version===group.version&&JSON.stringify(saved.entries)===JSON.stringify(group.entries);}catch{}}
+  let missingBytes=0,verifiedBytes=0;
+  for(const e of group.entries){if(await verifiedResponse(cache,e,subtle))verifiedBytes+=e.bytes;else missingBytes+=e.bytes;}
+  return {ready:complete&&missingBytes===0,missingBytes,verifiedBytes};
+}
 export async function downloadR2Group(group,{storage,origin,scope,subtle,fetcher,consent=false,signal,onProgress=()=>{},concurrency=4}){
   if(consent!==true)throw Error('Explicit download consent required');
   scopePath(scope);await groupCheck(group,subtle);

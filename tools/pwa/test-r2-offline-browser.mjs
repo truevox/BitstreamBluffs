@@ -16,6 +16,7 @@ const pack=inv.objects.find(x=>x.key===chosen.manifest);
 const bytes=pack.origin==='released-git'?execFileSync('git',['show',inv.publicBaseCommit+':public/music/'+pack.key],{cwd:root}):await readFile(resolve(source,inv.source,pack.key));
 const plan=planPublishedMusic(inv,catalog,{[chosen.id]:bytes},{selection:selected});
 const moduleUrl='data:text/javascript;base64,'+(await readFile(resolve(root,'tools/pwa/r2-cache.mjs'))).toString('base64');
+const controlsUrl='data:text/javascript;base64,'+Buffer.from((await readFile(resolve(root,'tools/pwa/r2-download-controls.mjs'),'utf8')).replace("'./r2-cache.mjs'",JSON.stringify(moduleUrl))).toString('base64');
 const base='/BitstreamBluffs/',scratch=await mkdtemp(resolve(root,'.pwa-r2-test-'));let browser,server;
 try{
  await build({root,base,build:{outDir:scratch,emptyOutDir:true}});await generateOfflineWorker(scratch,base);
@@ -27,7 +28,7 @@ try{
  await page.goto(origin+base,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:30000});
  await page.evaluate(async base=>{await navigator.serviceWorker.register(base+'sw.js',{scope:base,updateViaCache:'none'});await navigator.serviceWorker.ready;},base);
  await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:30000});
- const downloaded=await page.evaluate(async({moduleUrl,plan,base})=>{const m=await import(moduleUrl),opts={storage:caches,origin:location.origin,scope:base,subtle:crypto.subtle,consent:true,fetcher:fetch.bind(window),concurrency:6};const groups=[await m.catalogCacheGroup(plan.catalog,crypto.subtle),...plan.groups];const results=[];for(const g of groups)results.push(await m.downloadR2Group(g,opts));navigator.serviceWorker.controller.postMessage({type:'bb-r2-cache-updated'});return results;},{moduleUrl,plan,base});
+ const downloaded=await page.evaluate(async({controlsUrl,plan,base})=>{const {R2DownloadControls}=await import(controlsUrl),states=[];let calls=0;const c=new R2DownloadControls({plan,storage:caches,origin:location.origin,scope:base,subtle:crypto.subtle,fetcher:(...args)=>{calls++;return fetch(...args);},estimate:()=>navigator.storage.estimate(),onState:s=>states.push(s.status)});const before=await c.refresh();let rejected=false;try{await c.start();}catch{rejected=true;}if(!rejected||calls!==0||before.ready)throw Error('Unexpected implicit download');const result=await c.start({consent:true});if(!result.ready||result.completedBytes!==result.totalBytes)throw Error('Not verified after explicit download: '+JSON.stringify(result));const firstCalls=calls;const resumed=await c.start({consent:true});if(!resumed.ready||calls!==firstCalls)throw Error('Ready group downloaded again');navigator.serviceWorker.controller.postMessage({type:'bb-r2-cache-updated'});return {before,result,states,firstCalls,resumedWithoutTransfers:true};},{controlsUrl,plan,base});
  console.log('R2_DOWNLOAD',JSON.stringify({song:chosen.title,downloaded}));
  await context.setOffline(true);await page.close();const cold=await context.newPage();cold.on('pageerror',e=>errors.push(e.message));await cold.goto(origin+base,{waitUntil:'domcontentloaded'});
  await cold.waitForFunction(()=>window.__bbGame?.registry.get('audioSynth')?._stemMusic?.ready,null,{timeout:30000});
