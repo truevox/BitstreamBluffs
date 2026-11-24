@@ -27,13 +27,37 @@
 - Five-song private real-game smoke (four existing originals + new slot02) validated full game boot, all 33 setting keys, selector pages `[8,8,8,8,1]`, switch/toggle restoration, **actual new 249.77-second Opus source song playback**, 18 bus identities / 12 melody voices, 21 real decoded source OGG requests, **zero unexpected HTTP failures or page exceptions**. A known older `debumont` physical-path 404 is resolved by existing explicit legacy fallback and counted separately, not misrepresented as a missing playable file.
 - Focused Jest song-selection, jukebox continuity, shuffle, source beat release gates: **32/32 passed**. Vite build succeeded. Note these tests do NOT establish whether the automatically transcribed melodies sound right.
 
-## Explicit gates pending before release
+## Full-batch completion — source-verified private deliverable
 
-1. All remaining 28 new-song melody packs complete, independently pass exact-length validation and private source-stem QA.
-2. Full 33-song private game catalog / browser proof with all music assets, shuffle, song enabling/disabling, named song playback, no missing media (aside from supported legacy fallback), and uninterrupted transitions.
-3. Owner/independent listening of generated new melodies, especially voice octave errors, sustained vs repeated notes, rap/whisper/scream material, and missing/false melodic note hypotheses. Do not imply automatic YIN is artist-proven.
-4. Review true drum/bass beat-one, actual meter/downbeat offsets, half-/double-time, possible variable tempo and recurring sections. Machine-only 33 mapping does not authorize any production beat grids.
-5. Source licensing/publication and final mastering approval before releasing music to Netlify/public downloads. All 33 remain private meanwhile.
+The complete **29-new-song generator batch finished 28/28 parallel jobs successful, plus the separate pilot**, with no new-song failures. Independent verification from the *original* private FLAC source archive completed as follows:
+
+| Check | Independently verified result |
+|---|---:|
+| Brand-new songs with melodic voice packs | **29/29** |
+| Previously established, unmodified source-and-melody packs | **4** |
+| New automatic YIN-derived note candidates | **19,978** (*unverified*) |
+| New `voice:<biome>` melody Opus chunks | **6,564** |
+| Source FLAC originals SHA-256 verified | **174** |
+| New source+melody media references validated | **9,846** |
+| Early and late representative melody Opus files independently decoded for exact frames | **290** |
+| Final private game catalog songs | **33/33** |
+| Total final catalog original+melody audio chunks | **11,016** |
+| Missing media catalogs | **0** |
+| Beat-candidate songs source-verified | **33/33**, 66 source original drums/bass FLAC SHA-256s |
+
+The independent all-new-song validator on CT211 writes **`/root/bitstream-maxi/launch33-melody33-20261123-private/source-verified-all-29-summary.json`**, SHA-256 **`2d2eaf878f9e495e8647f7ed286d66603bb82da696464a0b44966720781f8b32`**. It explicitly states `releaseApproval: NONE`. The all-33 source-beat summary SHA-256 is **`0355ecdd85e08eb175f7cb20855c59e8ea4ac5483247e961b86741afb3b05155`**. **Do not copy these private detailed source/score audits or original audio assets into public Git.**
+
+The private full-game catalog lives under `/home/hermes/experiments/bitstream-melody33-private-20261123/game33-music-final/` on CT223 and is mounted into the **private Tailscale preview** at `http://100.115.120.66:8213/`; source audio is not embedded in the public repository. The beat-candidate human listening page is `http://100.115.120.66:8213/music-review/beat33/`.
+
+Three real Chromium game smoke trials on the **full 33-song catalog** succeeded for the pilot `ehy7VzQezYA`, the Factorio-themed final `cjphToi1DUo` and another new song `riwvGZ_dG30`. In all three: 33 selection keys, all five selector pages `[8,8,8,8,1]`, song toggle and restoration, 18 source roles including twelve distinct biome melody voices, and successful source Opus playback with positive live audio nodes. All had **zero unexpected HTTP errors and zero page errors**. A known older `debutmont` source filename fallback generates a test-observed 404 before the compatible original `debumont` path is loaded; this was not misclassified as a missing playable clip. These checks **do not** claim human audition or full-song transition testing on each of 33 tracks.
+
+## Remaining gates before any general music release
+
+1. Owner/independent **listening of the 29 newly generated source-melody transcriptions**, particularly voice octave errors, sustained vs repeated notes, rap/whisper/scream material, and missing or false melodic-note hypotheses. YIN output is not artist-proven MIDI.
+2. Broader real-game continuous playback: all 33 songs in sequence/shuffle, actual segment transitions, low-end platform behavior and full-song audio peak/loudness QA. Three named-song starts and completed music catalog validation are **not** continuous 33-song performance certification.
+3. Confirm actual beat-one, meter, downbeat phase, half-/double-time interpretation, tempo changes and sections from the original recordings. All 33 candidate maps exist, but **none** is certified for Gym/World Dance/game physics.
+4. Source media licensing/publication checks and final mastering approval before releasing any private copyrighted OGG/FLAC/WAV to public Netlify or a player download. Keep all new media private until authorized.
+
 
 ## Private beat-map listening lab (not an approval authority)
 
