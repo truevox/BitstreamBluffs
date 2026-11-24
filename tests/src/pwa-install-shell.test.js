@@ -16,13 +16,20 @@ function pngSize(path) {
 
 test('PWA metadata identifies exactly this game and stays on the current origin', () => {
   expect(manifest).toMatchObject({
-    name: 'Bitstream Bluffs', short_name: 'Bitstream', id: '/', start_url: '/', scope: '/',
+    name: 'Bitstream Bluffs', short_name: 'Bitstream', start_url: './', scope: './',
     display: 'standalone', orientation: 'landscape', background_color: '#05060f', theme_color: '#05060f',
     prefer_related_applications: false,
   });
   expect(manifest.description).toMatch(/arcade sledder/i);
-  for (const field of ['id', 'start_url', 'scope']) {
-    expect(new URL(manifest[field], 'https://bb.example').origin).toBe('https://bb.example');
+  // Without an explicit id, the install identity defaults to the resolved start URL.
+  expect(manifest.id).toBeUndefined();
+  for (const base of ['https://bb.example/', 'https://bb.example/BitstreamBluffs/']) {
+    for (const field of ['start_url', 'scope']) {
+      expect(new URL(manifest[field], base + 'manifest.webmanifest').href).toBe(base);
+    }
+    for (const icon of manifest.icons) {
+      expect(new URL(icon.src, base + 'manifest.webmanifest').href).toBe(base + icon.src);
+    }
   }
 });
 
@@ -34,7 +41,7 @@ test('192/512 icons, safe-mask icon and Apple icon are valid matching PNGs', () 
   ];
   expect(manifest.icons).toHaveLength(3);
   for (const [name, size, purpose] of expected) {
-    const icon = manifest.icons.find((entry) => entry.src === `/icons/${name}`);
+    const icon = manifest.icons.find((entry) => entry.src === `icons/${name}`);
     expect(icon).toMatchObject({ sizes: `${size}x${size}`, type: 'image/png', purpose });
     expect(pngSize(`public/icons/${name}`)).toEqual([size, size]);
   }
@@ -53,8 +60,8 @@ test('the HTML uses the manifest and theme tags without interfering with normal 
 
 test('every declared asset uses first-party paths and the source menu artwork exists', () => {
   for (const icon of manifest.icons) {
-    expect(icon.src).toMatch(/^\/icons\/[a-z0-9-]+\.png$/);
-    expect(existsSync(resolve(root, 'public' + icon.src))).toBe(true);
+    expect(icon.src).toMatch(/^icons\/[a-z0-9-]+\.png$/);
+    expect(existsSync(resolve(root, 'public/' + icon.src))).toBe(true);
   }
   for (const name of ['logo-bitstream-fill.svg', 'logo-bluffs-fill.svg', 'rider-body.svg', 'rider-helmet.svg', 'rider-sled.svg']) {
     expect(existsSync(resolve(root, 'public/assets/menu', name))).toBe(true);
