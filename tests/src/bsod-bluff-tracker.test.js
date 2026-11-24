@@ -2,7 +2,7 @@ import { BLUFF, BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
 
 const frame = (gapPx, overrides = {}) => ({
   active: true, gapPx, playerX: 500, nowMs: 0, grounded: false,
-  crashed: false, canopyDeployed: false, airbrakeDeployed: false,
+  crashed: false, canopyDeployed: false, airbrakeKicked: false,
   relativeAirX: 420, atmosphereDensity: 1, ...overrides,
 });
 
@@ -40,13 +40,23 @@ describe('Bitstream Bluffing — actual approach, canopy rescue, escape', () => 
   test('airbrake skill gains points; Surfing the Void chains without landing', () => {
     const t=new BsodBluffTracker();
     t.update(frame(1500,{playerX:1000,nowMs:0}));
-    t.update(frame(240,{playerX:1050,nowMs:100,canopyDeployed:true,airbrakeDeployed:true}));
+    t.update(frame(240,{playerX:1050,nowMs:100,canopyDeployed:true,airbrakeKicked:true}));
     const first=t.update(frame(900,{playerX:1350,nowMs:750}));
     expect(first).toMatchObject({points:BLUFF.basePoints+BLUFF.airbrakePoints, chain:1,surfing:false});
     t.update(frame(1000,{playerX:1380,nowMs:800}));
     t.update(frame(180,{playerX:1550,nowMs:1000,canopyDeployed:true}));
     const second=t.update(frame(880,{playerX:1800,nowMs:1600}));
     expect(second).toMatchObject({points:BLUFF.basePoints+BLUFF.chainPoints,chain:2,surfing:true});
+  });
+
+  test('a held or re-tapped AirBrake without a fresh paid physical kick receives NO bonus', () => {
+    const t=new BsodBluffTracker();
+    t.update(frame(1000,{playerX:1000,nowMs:0}));
+    // This deliberately supplies the OLD held-button field: tracker must
+    // ignore it because no new actual Sled kick happened near the wall.
+    t.update(frame(240,{playerX:1050,nowMs:100,canopyDeployed:true,airbrakeDeployed:true}));
+    const reward=t.update(frame(900,{playerX:1350,nowMs:750}));
+    expect(reward).toMatchObject({points:BLUFF.basePoints,chain:1,surfing:false});
   });
 
   test('touching down breaks the chain and cannot bank an armed bluff', () => {

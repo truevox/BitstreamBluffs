@@ -1,0 +1,36 @@
+{
+  "buildId": "sha256:a3f069ee7d73e5229fdafd374b6ccc5e53d6342ff8255e66b152556c72a74d41",
+  "engines": {
+    "chromium-headless-shell": "158.0.8127.18",
+    "firefox": "159.0",
+    "webkit": "27.2"
+  },
+  "fileSha256": {
+    "fresh-final-chromium-firefox.json": "efb291eaf65e1f9def1bdf1bcb386bda23d761c6c00d76d3adc3a43f011a3d44",
+    "fresh-final-webkit.json": "a57d3bd0dd691f743fc781dc0bcccb0c2532fc5389f617b263a38f71f5f75281",
+    "matrix-final-chromium-firefox.json": "71556457c743540e490856412b315fa1819a538d05ef2a0b67486fba276b7eaa",
+    "matrix-final-webkit.json": "cc2f8135bf866b3d03c8700f98a3f1149a89477b89ef3eb7ec2344ec10326d7d"
+  },
+  "format": "bsb-cross-engine-browser-evidence-v1",
+  "freshRows": 27,
+  "gameVersion": "2.19.21",
+  "matrixHz": [
+    30,
+    60,
+    120,
+    144
+  ],
+  "matrixRows": 128,
+  "matrixSessions": 2,
+  "matrixUniqueEngineRows": 96,
+  "notes": [
+    "Two separate runners each include 32 Chromium reference rows. Together 128 report rows cover 96 unique engine+cadence+session+run cells.",
+    "SIM6 Kodiak seed CE120-KODIAK-B demonstrates 1292 ticks of Kodiak-pack activity; not a measured bear-sled collision.",
+    "Playwright Linux WebKit is not Safari/iOS. Browser runs used a diagnostic harness with GPU raster drawing skipped, not user-facing playtests.",
+    "These JSON results were captured from the committed parent source SHA, before follow-up documentation/evidence-only changes."
+  ],
+  "playwrightVersion": "1.65.0",
+  "recordingSourceGitSha": "35ad8ac36d4f05a5866a81bf305aee2d600544cc",
+  "rulesetId": "sha256:03c7d7c987c2523ae61c1e4dc4c47699b21069d2355bdabdedcf3d0fb85bcb6b",
+  "simRevision": 6
+}

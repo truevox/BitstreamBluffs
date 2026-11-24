@@ -758,7 +758,7 @@ export class SoundLabView extends View {
     this.markerStatus='OPTIONAL MAXI PIANO A/B/C OPENS IN SEPARATE TAB';
     this._tick();
     if(typeof window!=='undefined'&&typeof window.open==='function'){
-      window.open('/music-review/piano-friendly/index.html',
+      window.open('music-review/piano-friendly/index.html',
         '_blank','noopener,noreferrer');
     }
   }

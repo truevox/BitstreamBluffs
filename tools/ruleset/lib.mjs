@@ -42,6 +42,7 @@ export const TRIPWIRE_FILES = Object.freeze([
   'src/systems/DailyPatch.js',
   'src/systems/HazardMotion.js',
   'src/systems/Kodiaks.js',
+  'src/systems/MarkerLayout.js', // #253 visual-origin helper can mutate causal terrain via heightAt; protect it
   'src/systems/MatterPortable.js',
   'src/systems/PermanentUpgrades.js',
   'src/systems/PhysicsTuner.js',

@@ -82,10 +82,14 @@ describe('BSOD-only mutation with the REAL BsodPursuit', () => {
   }
 
   test('advancing BsodPursuit exactly as the spec vector does reproduces the committed bsod digest', () => {
-    const p = new BsodPursuit({ sledLeftEdgeX: 12.5, level: 1 });
+    // The committed 6.10 vector describes historical SIM6, not today's
+    // SIM7 owner-approved chase. Replay vectors MUST remain immutable.
+    const p = new BsodPursuit({ sledLeftEdgeX: 12.5, level: 1,
+      config: { initialGapPx: 7600, initialSpeedPxS: 115, accelerationPxS2: 1.15,
+        softFinishRangePx: 0, softFinishMaxReduction: 0 } });
     for (let i = 0; i < 120 * 2; i++) p.advance(1000 / 240);
     const bsod = bsodOf(p, new BsodBluffTracker());
-    // The vector state was produced by this same loop (120 ticks of 2 substeps): wallX -7471.925000000001.
+    // Historical vector after 120 ticks of 2 nominal substeps: -7471.925000000001.
     expect(f64Encode(bsod.wallX)).toBe(vectors.subsystems.bsod.state.wallX);
     expect(fingerprintSubsystem('bsod', bsod)).toBe(vectors.subsystems.bsod.digest);
   });
@@ -151,7 +155,7 @@ describe('fingerprintState', () => {
   });
 
   test('every schema declares a positive integer schemaVersion (bumped only by a reviewed layout change)', () => {
-    const expected = { sled: 2, matter: 2, kodiak: 2 }; // v2: sled flags.shield removed; matter staticOrder.padLast added (#165 review); kodiak shoveCdMs (#47)
+    const expected = { sled: 3, matter: 2, kodiak: 2 }; // v3 SIM9: AirBrake one-shot and paid-lift ownership; historical v2 immutable
     for (const n of FP_SUBSYSTEMS) expect([n, FP_SCHEMAS[n].version]).toEqual([n, expected[n] || 1]);
   });
 });
@@ -197,8 +201,8 @@ describe('capture helpers', () => {
   });
 });
 
-describe('schema regression lock (tests/fixtures/replay/v1/fingerprint-schemas-v1.json)', () => {
-  const lock = loadFixture('fingerprint-schemas-v1.json');
+describe('current SIM9 schema regression lock', () => {
+  const lock = loadFixture('../sim9/fingerprint-schemas-sim9.json');
 
   test('production schemas, versions and order equal the committed lock', () => {
     expect(lock.order).toEqual([...FP_SUBSYSTEMS]);
@@ -213,5 +217,24 @@ describe('schema regression lock (tests/fixtures/replay/v1/fingerprint-schemas-v
     expect(f.subsystems).toEqual(lock.reference.subsystems);
     expect(f.combined).toBe(lock.reference.combined);
     expect(f.tick).toBe(lock.reference.tick);
+  });
+});
+
+
+describe('historical SIM6 schema lock stays immutable', () => {
+  const lock = loadFixture('fingerprint-schemas-v1.json');
+  test('v2 sled schema and old reference fingerprints are readable separately from SIM9 v3', () => {
+    expect(lock.schemas.sled.version).toBe(2);
+    expect(FP_SCHEMAS.sled.version).toBe(3);
+    const oldState = referenceState();
+    delete oldState.sled.flags.airBrakePressPending;
+    delete oldState.sled.flags.airBrakeKickUsed;
+    delete oldState.sled.flags.airBrakeLiftProtected;
+    delete oldState.sled.flags.airBrakeKickPulse;
+    delete oldState.sled.ctl.protectedHopExtraVyPxS;
+    const old = {};
+    for (const name of lock.order) old[name] = fingerprintOf(encodeSubsystemWith(lock.schemas[name], oldState[name]));
+    expect(old).toEqual(lock.reference.subsystems);
+    expect(combineFingerprints(oldState.tick, old, lock.order)).toBe(lock.reference.combined);
   });
 });

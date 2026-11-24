@@ -130,7 +130,7 @@ function captureSled(sled) {
     parts: b.parts.filter((p) => p.id !== b.id).map(partRecord),
     ctl: {
       msSinceContact: sled.msSinceContact, groundAngleDeg: sled.groundAngleDeg, airtimeMs: sled.airtimeMs,
-      hopBufferMs: sled.hopBufferMs, playerHopElapsedMs: sled._playerHopElapsedMs, pushCooldownMs: sled.pushCooldownMs,
+      hopBufferMs: sled.hopBufferMs, playerHopElapsedMs: sled._playerHopElapsedMs, protectedHopExtraVyPxS: sled._protectedHopExtraVyPxS || 0, pushCooldownMs: sled.pushCooldownMs,
       parachuteMs: sled.parachuteMs, parachuteFuelMs: sled.parachuteFuelMs, canopyFuelFullMs: opt(sled.canopyFuelFullMs),
       heliPhase: sled.heliPhase, heliVel: sled.heliVel, invulnerableMs: sled.invulnerableMs, boostMs: sled.boostMs,
       geyserCooldownMs: sled.geyserCooldownMs ?? 0, // the sim reads `(geyserCooldownMs || 0)`
@@ -142,7 +142,8 @@ function captureSled(sled) {
     },
     flags: {
       contactFlag: !!sled._contactFlag, playerHopActive: !!sled._playerHopActive, chuteUsed: !!sled.chuteUsed,
-      tucked: !!sled.tucked, airBrakeActive: !!sled.airBrakeActive, corkscrewActive: !!sled.corkscrewActive,
+      tucked: !!sled.tucked, airBrakeActive: !!sled.airBrakeActive, airBrakePressPending: !!sled.airBrakePressPending,
+      airBrakeKickUsed: !!sled.airBrakeKickUsed, airBrakeLiftProtected: !!sled.airBrakeLiftProtected, airBrakeKickPulse: !!sled.airBrakeKickPulse, corkscrewActive: !!sled.corkscrewActive,
       scrambled: !!sled.scrambled, nudging: !!sled._nudging, inWorld: !!sled.inWorld,
       destroyed: !!sled.destroyed,
     },

@@ -17,7 +17,7 @@ const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
 
 export class StemMusicDirector {
-	constructor(audio, catalogUrl = '/music/catalog.json') {
+	constructor(audio, catalogUrl = 'music/catalog.json') {
 		this.audio = audio;
 		this.catalogUrl = catalogUrl;
 		this.catalog = [];

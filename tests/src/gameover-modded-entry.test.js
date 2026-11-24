@@ -69,3 +69,25 @@ describe('GameOverScene saveEntry / skipEntry preserve modded board identity', (
     expect(over.modded).toBe(false);
   });
 });
+
+test('a session-only record is not presented as a durable leaderboard save', () => {
+  const {over,getTitle}=makeOver({id:'local',score:400}, {
+    getRunPersistence:()=> 'session-only',
+  });
+  over._showBoard('local',false);
+  expect(getTitle()).toBe('LEDGER // SESSION ONLY');
+});
+
+test('pending save status updates to the actual settled result, not a false success', async () => {
+  let settle;
+  const {over,getTitle}=makeOver({id:'local',score:400}, {
+    getRunPersistence:()=> 'pending',
+    whenRunSettled:()=>new Promise(resolve=>{settle=resolve;}),
+  });
+  over.entry=null;
+  over._showBoard('local',false);
+  expect(getTitle()).toBe('LEDGER // SAVING');
+  settle('session-only');
+  await Promise.resolve();
+  expect(getTitle()).toBe('LEDGER // SESSION ONLY');
+});

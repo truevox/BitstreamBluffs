@@ -66,6 +66,25 @@ describe('Downhill Run Strip', () => {
     expect(vertices(trace.render({ start: 3332, end: 3334 }))).toBe(3);
   });
 
+  test('keeps a non-extremal cursor on the overview line without changing the exported section', () => {
+    const rows = Array.from({ length: 1532 }, (_, i) => [i, 0, 0]);
+    // All four points below are in the first decimation bucket. Sample 4 is
+    // neither a bucket extreme nor collinear with the retained path.
+    for (const [index, y] of [[2, 60], [3, 40], [4, 40], [5, -60]]) rows[index][1] = y;
+    const trace = openDownhillRunTrace(tape(rows));
+    const withoutCursor = trace.render();
+    const preview = trace.render({ selected: 3 });
+    const [, x, y] = preview.match(/<circle cx="([\d.]+)" cy="([\d.]+)" r="13"/);
+    expect(path(preview)).toContain(` L${x} ${y} `);
+    expect(path(withoutCursor)).not.toContain(` L${x} ${y} `);
+    expect(path(preview).replace(` L${x} ${y}`, '')).toBe(path(withoutCursor));
+    expect(vertices(preview)).toBe(vertices(withoutCursor) + 1);
+    expect(vertices(preview)).toBeLessThanOrEqual(MAX_STRIP_POINTS);
+    expect(vertices(trace.render({ selected: 2 }))).toBe(vertices(withoutCursor));
+    expect(vertices(trace.render({ selected: 1531 }))).toBe(vertices(withoutCursor));
+    expect(trace.render()).toBe(withoutCursor);
+  });
+
   test.each([
     [[[4, 1, 0], [4, 5, 0]], 'M600 127 L600 345'],
     [[[1, 4, 0], [5, 4, 0]], 'M64 236 L1136 236'],

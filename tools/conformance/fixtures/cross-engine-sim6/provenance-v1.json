@@ -1,0 +1,117 @@
+{
+  "buildId": "sha256:a3f069ee7d73e5229fdafd374b6ccc5e53d6342ff8255e66b152556c72a74d41",
+  "buildOutputFileCount": 83,
+  "buildOutputManifestSha256": "2494e4e8f233ce969d5a655793a787a2c522d375305164e7aabc8cec1a28218b",
+  "buildOutputScope": "CT223 sparse worktree excludes media; this is NOT full production media parity",
+  "coverageCaveats": [
+    "Kodiak active-bear ticks prove pack presence, not necessarily a bear-sled collision",
+    "Playwright WebKit Linux is not Safari or iOS"
+  ],
+  "evidence": "revision-six diagnostic synthetic tapes; no leaderboard/player claim",
+  "fileSha256": {
+    "airborne-tricks.tape.json": "d7146075e4a34150670f2870e5b19ff681233f5ca543bbab3a11cb44dba64282",
+    "bsod-pursuit-catch.tape.json": "8d3209650f678747ecd8d5f22cc8f94d7e82d70e8493ead4a090ba630e96e5fd",
+    "chunk-biome-boundaries.tape.json": "70928f343cb6d86e623f23a205c41df974421290e35aca1c9972aedbceb4e085",
+    "collision-heavy.tape.json": "32500ed6028d0b5fa182b8ffe1b9b4a3a5ab5c01a9d0370648ec04787db1342d",
+    "cruise-baseline.tape.json": "941a4ad1d2ed1662017b858bca8ad6a77349a2f74cce23c9060dc3fd8e69c30f",
+    "daily-practice-rule.tape.json": "59e11df4737e763e55db8b53ab7e6ea98ffa93e929c693b27eb0ca028d2cb4ba",
+    "fifth-run-in-session.tape.json": "ebd29dd9aa9577e9d3306c54e5800f7cbc4dc208b7edc2a5798e3bd8bbb49d04",
+    "kodiaks-on.tape.json": "aaf7ca66114c1e65ac712e98170eab092898f251bc64142451096f7b28cb3545",
+    "parachute-airbrake.tape.json": "888eb47d1b406e2eaa91e853f4ef80bbb5406511ed609c199f306f16a0e996c7",
+    "record-meta.json": "af8db8fb87e81fe2f7278527730172d014acf297da3a73e3600296306fefe160"
+  },
+  "fixedPageClock": "2026-11-21T12:00:00Z",
+  "fixtureIds": [
+    "cruise-baseline",
+    "fifth-run-in-session",
+    "collision-heavy",
+    "chunk-biome-boundaries",
+    "bsod-pursuit-catch",
+    "airborne-tricks",
+    "parachute-airbrake",
+    "kodiaks-on",
+    "daily-practice-rule"
+  ],
+  "fixtureSet": "sim6",
+  "format": "bsb-cross-engine-replay-fixture-provenance-v1",
+  "gameVersion": "2.19.21",
+  "matterVersion": "0.20.0",
+  "nodeVersion": "v22.22.3",
+  "playwrightVersion": "1.65.0",
+  "recordedAt": "2026-11-23T02:30:29.210Z",
+  "recordingBrowserVersion": "158.0.8127.18",
+  "recordingChecks": {
+    "airborne-tricks": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 12
+    },
+    "bsod-pursuit-catch": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 100
+    },
+    "chunk-biome-boundaries": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 21
+    },
+    "collision-heavy": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 7
+    },
+    "cruise-baseline": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 20
+    },
+    "daily-practice-rule": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 11
+    },
+    "fifth-run-in-session": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 15
+    },
+    "kodiaks-on": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 40
+    },
+    "parachute-airbrake": {
+      "dateIndependencePassed": true,
+      "freshReplayDesync": null,
+      "freshReplayPassed": true,
+      "pageErrors": 0,
+      "recordedCheckpoints": 30
+    }
+  },
+  "recordingEngine": "chromium-headless-shell",
+  "recordingHarness": "tools/conformance/cross-engine.mjs",
+  "recordingHz": 120,
+  "rulesetId": "sha256:03c7d7c987c2523ae61c1e4dc4c47699b21069d2355bdabdedcf3d0fb85bcb6b",
+  "savestateLayoutId": "sha256:640c7e418d962b488a7f227c9cd38341ca6fbba2e28bf74e88cdbe6725058d32",
+  "servedIndexSha256": "8d904f4c9d5babd3420e9bac36549eb908dcf759f695db2f25d3e2e8699b138e",
+  "simRevision": 6,
+  "sourceGitSha": "35ad8ac36d4f05a5866a81bf305aee2d600544cc",
+  "sourceTripwireId": "sha256:5ef5b08c6b35c0309aeca235a68cc7a7dcc6d28a322e500f8a98b48fcf0d6ff4"
+}
