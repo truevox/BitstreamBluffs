@@ -10,9 +10,15 @@ try {
   page.on('pageerror', e => failures.push(String(e)));
   page.on('response', r => {
     const u = new URL(r.url());
-    if (u.origin !== base.origin) return;
+    // Phaser rasterizes SVG textures via local blob: URLs. They share the page's
+    // origin but are not HTTP assets or deployment paths.
+    if (!['http:', 'https:'].includes(u.protocol) || u.origin !== base.origin) return;
     requests.push(u.pathname);
     if (!u.pathname.startsWith(base.pathname) || r.status() >= 400) failures.push(`${r.status()} ${u.pathname}`);
+  });
+  page.on('requestfailed', r => {
+    const u = new URL(r.url());
+    if (['http:', 'https:'].includes(u.protocol) && u.origin === base.origin && r.failure()?.errorText !== 'net::ERR_ABORTED') failures.push(`${r.failure()?.errorText} ${u.href}`);
   });
   assert.equal((await page.goto(base.href)).status(), 200);
   await page.waitForFunction(() => window.__bbGame?.scene?.isActive('TitleScene'), null, {timeout: 60000});
