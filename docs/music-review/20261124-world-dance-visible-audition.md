@@ -90,3 +90,7 @@ V10 and V11: 96 matched actual game frame pairs with original One More Run, cont
 ## V12 individual tower EQ tuning
 
 Owner loved the skyline EQ and asked for stronger individual variation. Each of 20 tower slices now has its own bounded gain (0.46–1.25) and blend of adjacent actual bands, including extra treble sensitivity to compensate for the typically quieter upper band. No new sprites or audio nodes; wrap copies share the same response. Maximum scale remains 2.25x. This is a stylized three-band visualizer, not 20 independent FFT bands. Tests verify within-band variety, relative low/high response, wrap consistency, bounds and neutral restoration. 165/165 targeted tests passed; 96 matched real-render pairs with original One More Run, no page errors, at least ten distinct visible scales in a frame. Silent controlled audition; Chromebook frame rate remains unverified.
+
+## Final V12 visual acceptance
+
+2026-11-24: owner response to V12 audition: "LOVE IT! Looks great!" All current visual tuning accepted, including individual Arcade tower EQ responses. No further tuning requested. This is visual approval, not a waiver of independent review or Chromebook performance gate. Main has advanced to R2 soundtrack v2.21.1 plus billboard thumbnails; candidate version moved to v2.21.2 to avoid collision.
