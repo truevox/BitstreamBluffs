@@ -163,7 +163,7 @@ describe('tripwire attestation categories', () => {
   });
   test('behavior-change-unreleased: valid only while SIM_REVISION is above the last released revision', () => {
     const msg = 'behavior-change-unreleased: -0 tilt normalized (sign of zero only)';
-    expect(LAST_RELEASED_SIM_REVISION).toBe(7); // #128 owner-approved chase default releases SIM_REVISION 7
+    expect(LAST_RELEASED_SIM_REVISION).toBe(8); // #253 marker prefetch isolation releases SIM_REVISION 8
     expect(SIM_REVISION).toBe(LAST_RELEASED_SIM_REVISION); // revision 7 is now frozen; future causal changes must bump
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 0 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 2, prevSimRevision: 1, lastReleased: 1 })).toBeNull();
