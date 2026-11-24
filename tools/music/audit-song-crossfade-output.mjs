@@ -7,7 +7,7 @@ import {writeFileSync,existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {chromium} from 'playwright';
 import {measureFourTimesTruePeak} from './estimate-true-peak-4x.js';
-const url=process.env.GAME_URL||'http://127.0.0.1:18222/';
+const url=process.env.GAME_URL||'http://127.0.0.1:8220/';
 const index=Number(process.env.QA_INDEX);
 const out=process.env.REPORT_OUT;
 assert.ok(Number.isInteger(index)&&index>=0&&index<33);

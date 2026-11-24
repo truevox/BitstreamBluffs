@@ -294,6 +294,10 @@ export class StemMusicDirector {
 		// a deliberate three-quarter-second crossfade without seeking,
 		// restarting, or changing the original source clock.
 		this._applyMusicTimbres(true, .75);
+		// Returning from the clean menu creates new Arcade processors even
+		// when the song and world corridor have not changed. Replay the
+		// cached physical sample (or invalidate it if transport is paused).
+		if(!next)this._restoreArcadeBridgeAfterTrackReplace();
 		// The shared convolution tail is not controlled by per-source
 		// DSP replacement. Make it follow the same 750ms clean mix gate.
 		this.mixer?.setRoomWetEnabled?.(!next,.75);
@@ -618,7 +622,7 @@ export class StemMusicDirector {
 		this._ventLastLift=NaN;
 	}
 
-	/** New song effect chains create arcadeglue with default bridge=false.
+	/** Rebuilt effect chains create arcadeglue with default bridge=false.
 	 * Preserve the current world corridor state across song replacement; the
 	 * memoized previous bridge=true would otherwise suppress this update.
 	 * WebAudio presentation only; never writes to physics, replay or the clock.
@@ -1339,6 +1343,10 @@ export class StemMusicDirector {
 	_trySongCrossfade(now,elapsed,duration){
 		if(!this.crossfadeEnabled||this._loading||!this._nextPromise||!this._nextPrepared||
 			(this.dynamicOrchestra&&!this.menuMode)||duration<8||elapsed<duration-4.6)return;
+		// A natural early handoff must not cancel the outgoing crash's
+		// four original drum accents. Use the time-aware status, not the
+		// retained recovery record (which survives completion).
+		if(this.audio?.getFatalCountInStatus?.()?.active)return;
 		const nextIndex=this._nextIndex,prepared=this._nextPrepared;
 		if(this.catalog[nextIndex]?.id!==prepared.track.id||this.songEnabled[prepared.track.id]===false||
 			prepared.track.id===this.track.id)return;

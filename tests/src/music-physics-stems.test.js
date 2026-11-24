@@ -829,3 +829,26 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
 	});
 });
+
+test('same-song clean menu round trip restores the Arcade bridge on rebuilt chains',()=>{
+	const d=director();d.biome='bitstream-bluffs';d.started=true;d.transportPaused=false;
+	d._arcadeLastBridge=null;d._arcadeLastProgress=NaN;
+	d.track={id:'same'};d._token=17;
+	d.adaptive.setEnabled=jest.fn();
+	d.setBsodDanger=jest.fn();d.setAirborne=jest.fn();d.setCombo=jest.fn();d.setSpeed=jest.fn();
+	d._applyMusicTimbres(true);
+	d.setArcadeTransition({bridge:true,progress:.44});
+	d.setMenuMode(true);
+	for(const stem of ROLES)expect(d.mixer.replaceEffects).toHaveBeenCalledWith(stem,[],.75);
+	d.mixer.setEffectParam.mockClear();
+	d.setMenuMode(false);
+	for(const stem of ROLES){
+		expect(d.mixer.replaceEffects).toHaveBeenCalledWith(stem,expectedChain('bitstream-bluffs',stem),.75);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'arcadeglue','bridge',true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'arcadeglue','progress',.44);
+	}
+	d.mixer.setEffectParam.mockClear();
+	d.setArcadeTransition({bridge:true,progress:.44});
+	expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+	expect(d.track.id).toBe('same');expect(d._token).toBe(17);expect(d.clockStart).toBe(23.5);
+});

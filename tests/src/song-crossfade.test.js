@@ -144,3 +144,27 @@ test('fallback value respects pre-start, exact knots, completed ramp and no auto
 	retargetEnvelope(r,0,11,.003);
 	expect(param.setValueAtTime).toHaveBeenLastCalledWith(0,11);
 });
+
+test('near-end fatal count-in blocks early crossfade but completed recovery does not disable future handoffs',()=>{
+	const d=Object.create(StemMusicDirector.prototype);
+	const status=jest.fn(()=>({active:true,stage:'four-drum-count-in'}));
+	Object.assign(d,{audio:{getFatalCountInStatus:status},crossfadeEnabled:true,_loading:null,
+		_nextPromise:Promise.resolve(),_nextIndex:1,_token:5,track:{id:'a'},
+		catalog:[{id:'a'},{id:'b'}],songEnabled:{},clockStart:10,
+		pack:{sampleRate:1,segments:[{startFrame:0,frames:96},{startFrame:96,frames:4}]},
+		_nextPrepared:{track:{id:'b'},pack:{},buffers:new Map([['0/drums',{}]])},
+		_wantedNames:()=>['drums'],scheduled:new Set(['1/drums']),
+		_beginTrack:jest.fn(()=>Promise.resolve())});
+	d._trySongCrossfade(106.9,96.9,100);
+	expect(d._beginTrack).not.toHaveBeenCalled();
+	expect(d._token).toBe(5);expect(d.clockStart).toBe(10);
+	// Recovery ends after this song's eligible early window: do not
+	// invent a late overlap. The normal boundary remains authoritative.
+	status.mockReturnValue({active:false,stage:'full-band'});
+	d._trySongCrossfade(108,98,100);
+	expect(d._beginTrack).not.toHaveBeenCalled();
+	// The next ordinary eligible window works even with a retained record.
+	d.clockStart=110;
+	d._trySongCrossfade(206.9,96.9,100);
+	expect(d._beginTrack).toHaveBeenCalledWith(1,207.2,0,expect.objectContaining({end:210}));
+});
