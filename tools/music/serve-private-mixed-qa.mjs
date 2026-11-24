@@ -14,6 +14,7 @@ const host=assertPrivateAudioQaLoopbackHost(process.env.BSB291_HOST||'127.0.0.1'
 const port=Number(process.env.BSB291_PORT||8220);
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid private QA port');
 const media=resolve(root);
+const gridFile=process.env.BSB312_GRID_FILE ? resolve(process.env.BSB312_GRID_FILE) : null;
 const plugin={
 	name:'qa-private-original-media-overlay',enforce:'pre',
 	configureServer(vite){
@@ -21,7 +22,7 @@ const plugin={
 			let url;
 			try{url=decodeURIComponent((req.url||'').split('?')[0]);}
 			catch{res.writeHead(400);res.end();return}
-			if(!url.startsWith('/music/packs/')&&url!=='/music/catalog.json')return next();
+			if(!url.startsWith('/music/packs/')&&url!=='/music/catalog.json'&&url!=='/music/transition-grids.json')return next();
 			if(!isPrivateQaRequestHost(req.headers.host,host,port)){
 				res.writeHead(403);res.end();return;
 			}
@@ -32,8 +33,9 @@ const plugin={
 			if(pieces.some(x=>!/^[-_A-Za-z0-9.]+$/.test(x)||x==='.'||x==='..')){
 				res.writeHead(400);res.end();return;
 			}
-			const file=resolve(media,...pieces.slice(1));
-			if(!file.startsWith(media+sep)){res.writeHead(403);res.end();return}
+			const file=url==='/music/transition-grids.json'?gridFile:resolve(media,...pieces.slice(1));
+			if(!file){res.writeHead(404);res.end();return;}
+			if(file!==gridFile&&!file.startsWith(media+sep)){res.writeHead(403);res.end();return}
 			if(!/\.(ogg|json)$/.test(file)||!existsSync(file)||!statSync(file).isFile()){
 				res.writeHead(404);res.end();return;
 			}
