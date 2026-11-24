@@ -237,21 +237,34 @@ test('Jellyfish bells individually lift and squash without borrowing horizon mot
  expect(bells(0)).toEqual(still);
 });
 
-test('Candy canes independently curve and stretch with planted roots',()=>{
+test('Candy canes boing in both directions with fixed roots and constant stem length',()=>{
  const motif='candy-stripes', d=biomeDanceStyle(motif,.26).decor;
- const canes=dance=>motifDecor(motif,400,1234,0,{dance}).filter(p=>p.kind==='line'&&p.depth===0&&p.color==='text'&&p.width===3);
- const still=canes(0), moving=canes(d);
+ const canes=(dance,time)=>motifDecor(motif,400,time,0,{dance}).filter(p=>p.kind==='line'&&p.depth===0&&p.color==='text'&&p.width===3);
+ const still=canes(0,1234);
  expect(still.length).toBeGreaterThan(1);
- expect(moving).toHaveLength(still.length);
- for(let i=0;i<still.length;i++){
-  const a=still[i].pts,b=moving[i].pts;
-  expect(b).toHaveLength(a.length);
-  expect(b[0]).toEqual(a[0]);
-  expect(Math.abs(b.at(-1).x-a.at(-1).x)).toBeGreaterThan(19);
-  expect(a.at(-1).y-b.at(-1).y).toBeGreaterThan(4);
-  expect(Math.abs(b[1].x-a[1].x)).toBeLessThan(3);
+ const shifts=still.map(()=>[]);
+ const stemLength=pts=>pts.slice(0,-7).slice(1).reduce((sum,p,i)=>sum+Math.hypot(p.x-pts[i].x,p.y-pts[i].y),0);
+ for(let k=0;k<=24;k++){
+  const t=1234+k*Math.PI*2*165/24;
+  const moving=canes(d,t);
+  expect(moving).toHaveLength(still.length);
+  for(let i=0;i<still.length;i++){
+   const a=still[i].pts,b=moving[i].pts;
+   expect(b).toHaveLength(a.length);
+   expect(b[0]).toEqual(a[0]);
+   shifts[i].push(b.at(-8).x-a.at(-8).x);
+   expect(Math.abs(b[1].x-a[1].x)).toBeLessThan(2);
+   expect(stemLength(b)/stemLength(a)).toBeCloseTo(1,2);
+   // The curved stem bends down, never grows taller.
+   expect(b.at(-8).y).toBeGreaterThanOrEqual(a.at(-8).y-1e-8);
+   expect(Math.hypot(b.at(-1).x-b.at(-8).x,b.at(-1).y-b.at(-8).y)).toBeCloseTo(13,8);
+  }
+  expect(canes(0,t)).toEqual(still);
  }
- expect(canes(0)).toEqual(still);
+ for(const x of shifts){
+  expect(Math.max(...x)).toBeGreaterThan(15);
+  expect(Math.min(...x)).toBeLessThan(-15);
+ }
 });
 
 test('Candy lollipops independently hop, grow and spin without detaching from sticks',()=>{

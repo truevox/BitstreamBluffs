@@ -52,3 +52,11 @@ Candy canes bend with a rooted quadratic curve, reach up, and vary accent gain b
 Grass uses an envelope-gated travelling spatial wave with per-blade phase variation, larger height-scaled lateral sway and a quadratic bow. Roots stay anchored and attached dew moves with its parent blade; bee behavior and unrelated motifs are unchanged. This is phase variation, not a delayed audio envelope. Independent tests require opposing tip shifts beyond 15px in the typical accent fixture, vertical bow, >8px dew displacement, fixed roots, unchanged droplet radii, direction reversal over a half wave, and exact neutral geometry. 109/109 targeted background/dance/ruleset tests passed.
 
 96 matched actual game render pairs using original One More Run, native 480x270 per arm, peak visual envelope .783 over 4.94s audio, no page errors; silent ~5s Tailnet audition. Controlled production look on Debutmont terrain rather than natural traversal. Owner feedback, fresh accessibility browser checks, Chromebook performance and remaining motifs pending. No media committed.
+
+## Seventh audition: Candy Cane rebound
+
+Owner feedback: Candy canes looked like they were stretching; requested more back-and-forth boing. Steampunk, Sky Jellyfish and Micro Mountain look good to owner. Leave these three unchanged.
+
+Candy stem now bends along a constant-length circular arc, with a signed envelope-gated oscillation (165ms/radian, about 1.04s/cycle) and individual phase offsets. The hook follows the tangent at the tip as a rigid shape. No vertical stretch; the cane bows down as it bends. Lollipops unchanged. Tests sample 25 phases, require >15px tip displacement to both sides for each visible cane at .26 input, fixed roots, stable stem length and hook dimensions, no vertical elongation, neutral geometry with dance off. 109/109 targeted background/dance/ruleset tests passed.
+
+96 matched actual game render pairs, original One More Run, peak visual envelope .804, 6.94s audio span, no page errors. Controlled CCC look on Debutmont terrain, silent Tailnet audition. No media committed; remaining live accessibility and Chromebook checks pending. This oscillation is amplitude-gated by music rather than phase-locked to beat timing.

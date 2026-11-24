@@ -365,7 +365,7 @@ function ellipsePts(cx, cy, rx, ry, rot, n) {
 const DECOR_DANCE = Object.freeze({
   gearRock: 1.4,
   grassSwayBase: 25, grassSwayPerHeight: 0.48, grassBow: 0.19,
-  caneBend: 48, caneStretch: 12, popLift: 39, popSway: 17, popGrow: 0.35, popSpin: 1.8,
+  caneSwingAngle: 2.1, caneSwingMs: 165, popLift: 39, popSway: 17, popGrow: 0.35, popSpin: 1.8,
   jellyLift: 42, jellySquash: 1.05, jellyTentacle: 0.24,
 });
 
@@ -425,21 +425,29 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       if (x === null) continue;
       const yB = layerYAt(def.shape, L0, sx, x, horizonDance) + 2;
       const dir = c.flip ? -1 : 1;
-      const accent = dance * (0.87 + 0.13 * Math.sin(t / 220 + c.x0 * .03));
-      const stretch = DECOR_DANCE.caneStretch * accent;
-      const top = yB - c.h - stretch;
+      // A springy, alternating bend. Arc length stays constant, and the hook
+      // follows the tip tangent instead of stretching sideways with the stem.
+      const theta = dance * DECOR_DANCE.caneSwingAngle *
+        Math.sin(t / DECOR_DANCE.caneSwingMs + c.x0 * .019);
+      const centre = (u) => Math.abs(theta) < 1e-8
+        ? { x, y: yB - c.h * u }
+        : { x: x + c.h * (1 - Math.cos(theta * u)) / theta,
+            y: yB - c.h * Math.sin(theta * u) / theta };
+      const tip = centre(1);
+      const cs = Math.cos(theta), sn = Math.sin(theta);
+      const hook = (dx, dy) => ({
+        x: tip.x + dx * cs - dy * sn,
+        y: tip.y + dx * sn + dy * cs,
+      });
       const path = [];
-      const flex = accent * DECOR_DANCE.caneBend * dir;
-      // Root stays planted; upper stem curves rather than tilting as a rigid stick.
       for (let y = yB; y > yB - c.h; y -= 5) {
-        const u = (yB - y) / c.h;
-        path.push({ x: x + flex * u * u, y: y - stretch * u });
+        path.push(Math.abs(theta) < 1e-8 ? { x, y } : centre((yB - y) / c.h));
       }
       for (let i = 0; i <= 6; i++) {
         const a = Math.PI - (i / 6) * Math.PI;
-        path.push({ x: x + flex + dir * (6 + Math.cos(a) * 6), y: top - Math.sin(a) * 6 });
+        path.push(hook(dir * (6 + Math.cos(a) * 6), -Math.sin(a) * 6));
       }
-      path.push({ x: x + flex + dir * 12, y: top + 5 });
+      path.push(hook(dir * 12, 5));
       // One white stroke for the whole cane, then a red stripe on every other segment.
       out.push({ kind: 'line', depth: 0, color: 'text', alpha: 0.7, width: 3, pts: path });
       for (let i = 0; i < path.length - 1; i += 2) {
