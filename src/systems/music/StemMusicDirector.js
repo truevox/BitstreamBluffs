@@ -113,9 +113,21 @@ export class StemMusicDirector {
 	async _loadCatalog() {
 		for (const url of [this.catalogUrl, this.catalogFallback].filter(Boolean)) {
 			try {
-				const response = await fetch(url);
-				if (!response.ok) continue;
-				const parsed = normalizeCatalog(await response.json());
+				let raw;
+				if (url === REMOTE_CATALOG) {
+					const controller = new AbortController();
+					const timer = setTimeout(() => controller.abort(), 5000);
+					try {
+						const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+						if (!response.ok) continue;
+						raw = await response.json();
+					} finally { clearTimeout(timer); }
+				} else {
+					const response = await fetch(url);
+					if (!response.ok) continue;
+					raw = await response.json();
+				}
+				const parsed = normalizeCatalog(raw);
 				if (!parsed.tracks.length) continue;
 				this.catalogUrl = url;
 				this.catalog = parsed.tracks;
