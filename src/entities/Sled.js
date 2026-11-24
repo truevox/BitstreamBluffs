@@ -486,6 +486,11 @@ export class Sled {
     if (!this.inWorld) return;
     const v = Body.getVelocity(this.body);
     Body.setVelocity(this.body, { x: v.x * k, y: v.y * k });
+    // The variable-Hop release budget represents an actual share of upward
+    // velocity. Hazards and sloppy-land wobble scale the WHOLE velocity;
+    // preserving its unscaled old amount would erase purchased AirBrake lift
+    // on later Space release. Match the authoritative velocity change.
+    this._protectedHopExtraVyPxS = (this._protectedHopExtraVyPxS || 0) * k;
     this._sync();
   }
 

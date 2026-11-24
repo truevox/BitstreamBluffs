@@ -767,8 +767,20 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** A real close approach followed by a parachute escape; zero score for proximity alone. */
-  updateBsodBluff(airBrakeKicked = false) {
+  updateBsodBluff(airBrakeKicked = false, physicalTouchdowns = []) {
     if (!this.bsodBluffs || !this.sled || !this.bsodState) return;
+    // The scorer otherwise sees only the LAST substep of an 8ms frame.
+    // A real Matter touchdown followed by a buffered Hop in that frame
+    // separates TWO flights: the earlier one loses its canopy/AirBrake
+    // credit before the new one can arm. Grounded update does not award.
+    for (const contact of physicalTouchdowns) {
+      const d=contact.bsodState || this.bsodState;
+      this.bsodBluffs.update({
+        active: !!d.active, gapPx:d.gapPx,
+        playerX:contact.fs.x,nowMs:contact.fs.timeMs,
+        grounded:true,crashed:!!this.bsodCaught,
+      });
+    }
     const s = this.sled, danger = this.bsodState;
     const event = this.bsodBluffs.update({
       active: danger.active, gapPx: danger.gapPx, playerX: s.x, nowMs: this.runTimeMs,
@@ -1412,6 +1424,11 @@ export class RunScene extends Phaser.Scene {
           const atMs=this.runTimeMs-dt+
             (simDt>0 ? Math.min(1,stepElapsedMs/simDt)*dt : 0);
           const contactFs=sled.getFrameState(atMs,stepMs);
+          // Grade against the real CONTACT slope, not the ground angle
+          // sampled at the beginning of this potentially long fixed tick.
+          // Terrain progression is unchanged; this read uses the same
+          // existing slopeAt mechanism as the final-frame landing.
+          contactFs.groundAngleDeg=this.slopeAt(contactFs.x);
           contactFs.grounded=true;
           contactFs.input.airBrakeKicked=kickSinceTouchdown;
           substepTouchdowns.push({fs:contactFs,kicked:kickSinceTouchdown});
@@ -1423,6 +1440,7 @@ export class RunScene extends Phaser.Scene {
         if (this.bsod && !this.bsodCaught) {
           this.bsod.advance(stepMs, sledLeftCollisionEdge(sled));
           const s = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
+          if (actualTouchdown) substepTouchdowns[substepTouchdowns.length-1].bsodState=s;
           if (s.gapPx <= 0) {
             this.bsodCaught = true;
             this.pendingCrash = { cause: 'bsod' };
@@ -1500,7 +1518,12 @@ export class RunScene extends Phaser.Scene {
     if (this.bsodGym && this.gymReadyMs > 0) return 'hold';
 
     if (!this.crashed) {
-      this.updateBsodBluff(airBrakeKickedThisTick);
+      // A physical landing split the flight. Only a paid kick AFTER the
+      // last contact belongs to this relaunched encounter; never carry a
+      // tick-wide pre-touchdown brake bonus into the new flight.
+      this.updateBsodBluff(
+        substepTouchdowns.length ? kickSinceTouchdown : airBrakeKickedThisTick,
+        substepTouchdowns);
       // Gym may continue through the same terrain, but score/distance belongs
       // only to the current attempt. Never recredit earlier travel on a retry.
       const origin = this.bsodGym ? this.gymAttemptStartX : this.startX;
@@ -1894,9 +1917,11 @@ export class RunScene extends Phaser.Scene {
       this.sled.squash = l.hard ? 1 : 0.6;
     } else if (imp > 250) this.sled.squash = 0.35;
     this._landings += 1;
-    if (!l.shortAirBrakeTouchdown) {
-      // Touchdown-only physically paid AirBrake tricks must bank their score,
-      // not manufacture a second speed boost/spring bounce on a micro-bump.
+    if (l.shortAirBrakeTouchdown) {
+      // A micro-touch cannot manufacture extra speed or a spring rebound,
+      // BUT a sloppy landing still pays the ordinary wobble/velocity cost.
+      if (l.quality === 'sloppy') this.sled.wobble(TUNING.sloppySpeedKeep);
+    } else {
       this.applyLandingBoost(l, mult, nTricks, fs);
       this.applySpringRebound(l, fs);
     }

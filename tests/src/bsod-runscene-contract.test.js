@@ -375,3 +375,74 @@ describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
     expect(events.filter(x=>x.key===EVT.TRICK).map(x=>x.payload.airtimeMs)).toEqual([8,8,8]);
   });
 });
+
+test('real buffered touchdown resets prior BSOD canopy/paid brake credit before another airborne scoring frame',()=>{
+  const scene=Object.create(RunScene.prototype);
+  const awards=[];
+  scene.sled={x:1000,y:200,grounded:false,parachuteMs:300};
+  scene.bsodState={active:true,gapPx:1000,relativeAirX:420,atmosphereDensity:1};
+  scene.bsodBluffs=new BsodBluffTracker();
+  scene.runTimeMs=0;scene.crashed=false;scene.bsodCaught=false;
+  scene.bonus=(points)=>awards.push(points);
+  scene.game={events:{emit:jest.fn()}};
+  scene.updateBsodBluff();
+  scene.runTimeMs=100;
+  scene.bsodState.gapPx=200;
+  scene.updateBsodBluff(true);
+  expect(scene.bsodBluffs.armed).toBe(true);
+  expect(scene.bsodBluffs.usedCanopy).toBe(true);
+  expect(scene.bsodBluffs.usedAirbrake).toBe(true);
+  // A genuine Matter contact and buffered relaunch within one 8ms tick.
+  // A final airborne frame alone cannot represent that physical boundary.
+  scene.runTimeMs=116;
+  scene.bsodState.gapPx=850;
+  scene.sled.x=1400;
+  scene.updateBsodBluff(false,[{
+    fs:{x:1250,timeMs:112},
+    bsodState:{active:true,gapPx:250,relativeAirX:420,atmosphereDensity:1},
+  }]);
+  expect(awards).toEqual([]); // old canopy and old paid AirBrake cannot cross landing
+  expect(scene.bsodBluffs.armed).toBe(false);
+  expect(scene.bsodBluffs.usedCanopy).toBe(false);
+  expect(scene.bsodBluffs.usedAirbrake).toBe(false);
+  expect(scene.bsodBluffs.chain).toBe(0);
+  // New separate real close approach plus current canopy can earn only BASE.
+  scene.runTimeMs=200;scene.sled.x=1500;scene.bsodState.gapPx=200;
+  scene.updateBsodBluff(false);
+  scene.runTimeMs=820;scene.sled.x=1800;scene.bsodState.gapPx=900;
+  scene.updateBsodBluff(false);
+  expect(awards).toEqual([150]);
+});
+
+test('short AirBrake contact retains sloppy wobble penalty without adding a new boost or spring',async()=>{
+  const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+  const scene=Object.create(RunScene.prototype);
+  scene.game={events:{emit:jest.fn()}};
+  scene.score=new ScoreManager();
+  scene.trickCounts={};scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
+  scene.stabilizeMs=0;scene.stabilizeDeg=0;
+  scene.palette={amber:1,cyan:2,lime:3};
+  scene.fx={sparks:jest.fn(),ring:jest.fn()};
+  scene.sled={x:1000,y:200,vx:200,vy:0,wobble:jest.fn(),squash:0};
+  scene.emitCombo=()=>{};scene.emitFlow=()=>{};scene.emitScore=()=>{};
+  scene._zoneScoreMulAt=()=>1;
+  scene.applyLandingBoost=jest.fn();
+  scene.applySpringRebound=jest.fn();
+  const fs={timeMs:8,dtMs:8,grounded:true,crashed:false,angleDeg:0,
+    vx:200,vy:0,x:1000,y:200,groundAngleDeg:0};
+  scene.handleTricksAndLanding({tricks:[],landing:{
+    quality:'sloppy',shortAirBrakeTouchdown:true,angleDeg:30,
+    airtimeMs:8,rotationDeg:0,impactSpeedPxS:200,hard:false,
+  }},fs);
+  const {TUNING}=await import('../../src/systems/PhysicsTuner.js');
+  expect(scene.sled.wobble).toHaveBeenCalledWith(TUNING.sloppySpeedKeep);
+  expect(scene.applyLandingBoost).not.toHaveBeenCalled();
+  expect(scene.applySpringRebound).not.toHaveBeenCalled();
+  expect(scene._landings).toBe(1);
+});
+
+test('physical buffered touchdown captures contact-position slope instead of stale start-tick angle',()=>{
+  const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+  expect(source).toContain('contactFs.groundAngleDeg=this.slopeAt(contactFs.x)');
+  expect(source).toContain('substepTouchdowns.push({fs:contactFs,kicked:kickSinceTouchdown})');
+});

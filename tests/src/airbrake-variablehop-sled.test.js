@@ -231,3 +231,20 @@ test('endStep reports only genuine NEW Matter touchdown, not a continuous contac
   expect(s.airBrakeKickUsed).toBe(false);
   expect(s.endStep(8)).toBe(false);
 });
+
+test('slowdown scales protected Hop-only lift together with Matter velocity, so paid AirBrake lift survives Space release',()=>{
+  const s=makeSled(100,-360);
+  s.airBrakeLiftProtected=true;
+  s.airBrakeKickUsed=true;
+  s._playerHopActive=true;
+  s._playerHopElapsedMs=TUNING.hopMinimumHoldMs+1;
+  s._protectedHopExtraVyPxS=300;
+  s._sync=()=>{};
+  s.scaleVelocity(.5);
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-180,6);
+  expect(s._protectedHopExtraVyPxS).toBeCloseTo(150,6);
+  step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-30,6);
+  expect(s._protectedHopExtraVyPxS).toBe(0);
+  expect(s.airBrakeLiftProtected).toBe(true);
+});
