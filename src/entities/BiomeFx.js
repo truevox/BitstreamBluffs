@@ -38,6 +38,12 @@ const ARCADE_SUN_DANCE = Object.freeze({ squashX: .42, squashY: .28, bounce: 22 
 // Roof boundaries in the existing 120-cell skyline art (4 native px/cell).
 // Two tiled copies, with each building slice rooted at the same horizon.
 const ARCADE_TOWER_EDGES = Object.freeze([0,6,11,16,23,28,33,39,46,51,58,64,72,79,86,90,95,105,113,116,120]);
+// Hand-tuned gains and adjacent-band blends. Each roof has its own response,
+// not just one of three synchronized height groups. Both wrap copies share it.
+const ARCADE_TOWER_GAIN = Object.freeze([1.25,.55,1.1,.72,1.18,.48,.94,
+  .62,1.25,.5,1.08,.76,1.2,.52,.98,.58,1.25,.72,1.12,.46]);
+const ARCADE_TOWER_BLEND = Object.freeze([0,.32,.12,.48,.08,.4,.24,
+  .38,0,.46,.15,.3,.06,.42,.18,.36,0,.28,.12,.48]);
 const GRID_COLS = 9; // perspective lane lines each side of centre
 const GRID_ROWS = 9;
 const LANE_PX = 84; // lane spacing at the bottom of the screen
@@ -413,8 +419,14 @@ export class BiomeFx {
     for(let i=0;i<towers.length;i+=2){
       const j=i/2, band=Math.min(2,Math.floor(j*3/(towers.length/2)));
       const x=ARCADE_TOWER_EDGES[j]*4-shift;
-      const level=active?clamp01(bands[band]||0):0;
-      const sy=1+1.25*level;
+      const blend=ARCADE_TOWER_BLEND[j];
+      const neighbor=band===0?1:band===2?1:j%2===0?0:2;
+      // Treble is normally quieter in a full mix; give it a little more
+      // visual sensitivity, without exceeding the original maximum height.
+      const primary=active?clamp01((bands[band]||0)*(band===2?1.6:1)):0;
+      const secondary=active?clamp01((bands[neighbor]||0)*(neighbor===2?1.6:1)):0;
+      const level=primary*(1-blend)+secondary*blend;
+      const sy=1+ARCADE_TOWER_GAIN[j]*level;
       for(let copy=0;copy<2;copy++){
         const tower=towers[i+copy];
         const left=x+copy*BACKDROP_ART.arcadeSkyline.w;

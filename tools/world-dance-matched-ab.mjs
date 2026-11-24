@@ -91,7 +91,7 @@ try{
   assert.ok(frames.every(f=>f.onSun?.visible&&f.offSun?.visible&&f.onSun.alpha===f.offSun.alpha),'Arcade sun or veil mismatch');
   assert.ok(frames.some(f=>f.veil===1&&f.onSun.sx-f.offSun.sx>.2&&f.offSun.y-f.onSun.y>5),'No readable Arcade sun response');
   assert.ok(frames.every(f=>f.offTowers.every(s=>!s.visible&&s.sy===1)),'OFF retained EQ motion');
-  assert.ok(frames.some(f=>f.veil===1&&f.onTowers.some(s=>s.visible&&s.sy>1.4)&&new Set(f.onTowers.filter(s=>s.visible).map(s=>s.sy)).size>=3),'No distinct EQ response');
+  assert.ok(frames.some(f=>f.veil===1&&f.onTowers.some(s=>s.visible&&s.sy>1.4)&&new Set(f.onTowers.filter(s=>s.visible).map(s=>s.sy.toFixed(2))).size>=10),'No distinct EQ response');
   assert.ok(frames.every(f=>f.onTowers.every(s=>s.y===118&&(!s.visible||Math.abs(s.alpha-.55*Math.min(1,Math.max(0,(f.veil-.6)/.4)))<1e-8))),'EQ root or alpha changed');
   assert.ok(frames.some(f=>f.veil>.6&&f.veil<.8),'No partial veil coverage');
   assert.ok(frames.every(f=>Math.abs(f.onSun.alpha-.95*Math.min(1,Math.max(0,(f.veil-.6)/.4)))<1e-8),'Arcade veil opacity changed');
