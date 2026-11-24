@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.21.1 — 33-song soundtrack delivery (2026-11-24)
+
+- Load the full soundtrack from the versioned audio host, with the bundled four-song catalog as a fallback.
+
 ## v2.21.0 — original-stem soundtrack and crossfades (2026-11-24)
 
 - #306: integrate original-stem soundtrack processing for twelve biome identities, music library and explicit all-off silence, Arcade bridge and clean menu presentation. Optional audio failures cannot interrupt the simulation. Only installed music packs are selectable.

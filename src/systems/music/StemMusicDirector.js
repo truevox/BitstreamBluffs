@@ -21,13 +21,17 @@ import { MicroBeeAudio } from './MicroBeeAudio.js';
 
 import {normalizeTransitionGrids,planSongCrossfade,automateTransition,retargetEnvelope} from './SongCrossfade.js';
 
+const REMOTE_CATALOG = 'https://bsb-audio.bearcave.win/releases/20261124-69a6fb46/catalog.json';
+const LOCAL_CATALOG = 'music/catalog.json';
+
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
 
 export class StemMusicDirector {
-	constructor(audio, catalogUrl = 'music/catalog.json') {
+	constructor(audio, catalogUrl = REMOTE_CATALOG) {
 		this.audio = audio;
 		this.catalogUrl = catalogUrl;
+		this.catalogFallback = catalogUrl === REMOTE_CATALOG ? LOCAL_CATALOG : null;
 		this.catalog = [];
 		this.songEnabled = defaultSongSelection();
 		this.shuffleEnabled = false;
@@ -107,20 +111,22 @@ export class StemMusicDirector {
 	}
 
 	async _loadCatalog() {
-		try {
-			const response = await fetch(this.catalogUrl);
-			if (!response.ok) return false; // No music installed: existing synth stays in service.
-			const parsed = normalizeCatalog(await response.json());
-			this.catalog = parsed.tracks;
-			// A fresh game begins with One More Run, including with shuffle enabled.
-			const opening = this.catalog.findIndex(song => song.id === FIRST_SONG_ID);
-			if (opening >= 0) this.trackIndex = opening;
-			this.ready = this.catalog.length > 0;
-			if (this.ready && this.onReady && !this.disposed) this.onReady();
-			return this.ready;
-		} catch {
-			return false;
+		for (const url of [this.catalogUrl, this.catalogFallback].filter(Boolean)) {
+			try {
+				const response = await fetch(url);
+				if (!response.ok) continue;
+				const parsed = normalizeCatalog(await response.json());
+				if (!parsed.tracks.length) continue;
+				this.catalogUrl = url;
+				this.catalog = parsed.tracks;
+				const opening = this.catalog.findIndex(song => song.id === FIRST_SONG_ID);
+				if (opening >= 0) this.trackIndex = opening;
+				this.ready = true;
+				if (this.onReady && !this.disposed) this.onReady();
+				return true;
+			} catch { /* Try the bundled catalog if the remote catalog fails. */ }
 		}
+		return false;
 	}
 
 	attach(ctx, target) {
@@ -159,7 +165,7 @@ export class StemMusicDirector {
 		this.crossfadeEnabled=on===true;
 		if(this.crossfadeEnabled&&!this._gridRequest){
 			this._gridRequest=Promise.resolve().then(async()=>{
-				const url=new URL('transition-grids.json',new URL(this.catalogUrl,window.location.href));
+				const url=new URL('transition-grids.json',new URL(this.catalogFallback ? LOCAL_CATALOG : this.catalogUrl,window.location.href));
 				const response=await fetch(url);
 				if(response.ok)this.transitionGrids=normalizeTransitionGrids(await response.json());
 			}).catch(()=>{}); // absent private metadata: time-based blend
