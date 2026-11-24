@@ -322,7 +322,7 @@ export class Sled {
     // Normal divebomb drops without killing horizontal momentum. In zero-atmo
     // Space Mountain the small board thruster instead trades flight height/time
     // for modest forward purchase; no false atmospheric wind is generated.
-    if (!grounded && pad && pad.divebomb && !chute && !this.airBrakeActive) {
+    if (!grounded && pad && pad.divebomb && !chute && !airBrakeKickedThisStep) {
       const density = atmosphere ? atmosphere.atmosphereDensity : 1;
       if (density === 0) {
         const impulse = vacuumDivebombStep({

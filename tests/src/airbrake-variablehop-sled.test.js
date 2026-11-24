@@ -314,3 +314,25 @@ test('paid crest-adjacent AirBrake launch keeps its ascent through the next subs
   step(s,{airBrake:false,noAutoNudge:true,pressed:{}});
   expect(toPx(s.body.velocity.y)).toBeCloseTo(-80,6);
 });
+
+test('divebomb resumes after a paid AirBrake even if the button stays held',()=>{
+  const s=makeSled(530,150);
+  s._playerHopActive=false;
+  const held={airBrake:true,divebomb:true,noAutoNudge:true,pressed:{airBrake:true}};
+  step(s,held);
+  const initial=toPx(s.body.velocity.y);
+  expect(initial).toBeCloseTo(-318,6);
+  step(s,{...held,pressed:{}});
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(initial+TUNING.divebombDownPxS2*0.008,6);
+});
+test('an unpaid vacuum AirBrake does not disable the divebomb thruster',()=>{
+  const held=makeSled(530,150), control=makeSled(530,150);
+  held._playerHopActive=false;control._playerHopActive=false;
+  const pad={divebomb:true,noAutoNudge:true,pressed:{}};
+  const vacuum={atmosphereDensity:0,relativeAirX:0,proximity01:0};
+  held.applyControls({...pad,airBrake:true,pressed:{airBrake:true}},phys,8,vacuum);
+  control.applyControls(pad,phys,8,vacuum);
+  expect(held.airBrakeKickUsed).toBe(false);
+  expect(held.body.velocity).toEqual(control.body.velocity);
+  expect(toPx(held.body.velocity.x)).toBeGreaterThan(530);
+});

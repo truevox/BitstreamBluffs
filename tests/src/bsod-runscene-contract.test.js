@@ -625,3 +625,22 @@ describe('real fixed-tick crash-priority routing', () => {
     expect(scene.resolveCrash).toHaveBeenCalledTimes(outcome==='survive'?0:1);
   });
 });
+
+test('grace prevents death but forfeits a failed landing combo before the next flight',async()=>{
+  const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+  const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+  const r=Object.create(RunScene.prototype);
+  Object.assign(r,{pendingCrash:{cause:'badLanding'},sled:{invulnerableMs:500},
+    score:new ScoreManager(),tricks:new TrickTracker(),_airTricks:1,
+    emitFlow:jest.fn(),emitCombo:jest.fn(),emitScore:jest.fn(),doCrash:jest.fn()});
+  r.score.trickPoints=500;
+  r.score.addTrick({type:'airBrake',count:1,airtimeMs:50});
+  expect(r.score.getSnapshot().pendingPoints).toBeGreaterThan(0);
+  r.resolveCrash({vx:200,vy:10});
+  expect(r.doCrash).not.toHaveBeenCalled();
+  expect(r.pendingCrash).toBeNull();
+  expect(r._airTricks).toBe(0);
+  expect(r.score.getSnapshot().pendingPoints).toBe(0);
+  expect(r.score.onLanding({quality:'good'}).banked).toBe(0);
+  expect(r.score.trickPoints).toBe(500);
+});

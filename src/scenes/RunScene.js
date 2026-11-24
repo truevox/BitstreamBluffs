@@ -2405,7 +2405,18 @@ export class RunScene extends Phaser.Scene {
     const speed = pmath.hypot(fs.vx, fs.vy);
     // The advancing deletion wall overrides even shield, respawn grace and opening grace.
     if (c.cause === 'bsod') { this.doCrash(c, fs, speed); return; }
-    if (this.sled.invulnerableMs > 0 && c.cause !== 'chasm') return; // brief grace after a respawn / backup
+    if (this.sled.invulnerableMs > 0 && c.cause !== 'chasm') {
+      // Grace prevents death, not the failure of a completed bad landing.
+      // Its provisional combo belongs to the ended flight, never a later one.
+      if (c.cause === 'badLanding') {
+        this._airTricks = 0;
+        this.tricks.reset();
+        this.emitFlow(this.score.onCrash());
+        this.emitCombo('crash');
+        this.emitScore();
+      }
+      return;
+    }
     const distM = (fs.x - this.startX) / PIXELS_PER_METER;
     if (c.cause !== 'hazard' && c.cause !== 'chasm' && distM < TUNING.openingGraceM && this.openingGraces < TUNING.openingGraceMax) {
       // opening grace: recover instead of ending the run (no Hashed Backup charge used)
