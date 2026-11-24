@@ -1,7 +1,9 @@
+import {attachAuditionExtra} from './AuditionExtra.js';
 import { buildMusicChain } from '../../src/systems/music/MusicFXGraph.js';
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
 import { WorldDanceEnvelope } from '../../src/systems/WorldDance.js';
 
+let extraEnhancer=null;
 const $=id=>document.getElementById(id);
 const STEMS=['drums','bass','guitar','piano','other'];
 const SONG='/music/packs/33_local-one-more-run-bitstream-bluffs/';
@@ -140,6 +142,7 @@ async function load(){
 	finally{$('load').disabled=false;controls();}
 }
 function stop(){
+	extraEnhancer?.dispose();extraEnhancer=null;
 	for(const {source,gain} of Object.values(stems)){
 		try{source.stop();}catch{}try{source.disconnect();}catch{}try{gain.disconnect();}catch{}
 	}
@@ -158,7 +161,7 @@ async function play(){
 	master=ctx.createGain();master.gain.value=.27;master.connect(ctx.destination);
 	rawBus=ctx.createGain();fxBus=ctx.createGain();
 	rawBus.gain.value=0;fxBus.gain.value=1;
-	rawBus.connect(master);fxBus.connect(master);
+	rawBus.connect(master);fxBus.connect(master);extraEnhancer=attachAuditionExtra(ctx,fxBus,master);
 	monitor=ctx.createAnalyser();monitor.fftSize=1024;monitor.smoothingTimeConstant=.3;
 	spectrum=new Uint8Array(monitor.frequencyBinCount);
 	monitorSink=ctx.createGain();monitorSink.gain.value=1e-7;

@@ -1,6 +1,8 @@
+import {attachAuditionExtra} from './AuditionExtra.js';
 import {buildMusicChain} from '../../src/systems/music/MusicFXGraph.js';
 import {orchestraPreset} from '../../src/systems/music/DynamicOrchestraPresets.js';
 
+let extraEnhancer=null;
 const $=id=>document.getElementById(id);
 const ROLES=['drums','bass','guitar','piano','other'];
 const PACK='/music/packs/33_local-one-more-run-bitstream-bluffs/';
@@ -92,6 +94,7 @@ async function load(){
 	finally{$('load').disabled=false;controls();}
 }
 function stop(){
+	extraEnhancer?.dispose();extraEnhancer=null;
 	for(const {source,gain} of Object.values(streams)){
 		try{source.stop();}catch{}try{source.disconnect();}catch{}try{gain.disconnect();}catch{}
 	}
@@ -106,7 +109,7 @@ async function play(){
 	await ready();
 	master=ctx.createGain();master.gain.value=.26;master.connect(ctx.destination);
 	rawBus=ctx.createGain();fxBus=ctx.createGain();rawBus.gain.value=0;fxBus.gain.value=1;
-	rawBus.connect(master);fxBus.connect(master);
+	rawBus.connect(master);fxBus.connect(master);extraEnhancer=attachAuditionExtra(ctx,fxBus,master);
 	const when=ctx.currentTime+.12;
 	for(const role of ROLES){
 		const chain=buildMusicChain(ctx,orchestraPreset('vertigo-vents',role),fxBus);

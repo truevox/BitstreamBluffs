@@ -1,8 +1,10 @@
+import {attachAuditionExtra} from './AuditionExtra.js';
 import { buildMusicChain } from '../../src/systems/music/MusicFXGraph.js';
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
 import { contactFromMotion } from '../../src/systems/music/MusicPhysicsSignals.js';
 import { ScrapPitchCadence } from '../../src/systems/music/ScrapPitchCadence.js';
 
+let extraEnhancer=null;
 const $ = id => document.getElementById(id);
 const STEMS = ['drums','bass','guitar','piano','other'];
 let ctx = null, buffers = null, chain = null, master = null;
@@ -136,6 +138,7 @@ async function loadSample() {
 	}
 }
 function stop() {
+	extraEnhancer?.dispose();extraEnhancer=null;
 	for (const source of sources) {
 		try { source.stop(); } catch {}
 		try { source.disconnect(); } catch {}
@@ -169,7 +172,7 @@ async function play(offsetSeconds=0) {
 	rawGain.gain.value = bypassed ? 1 : 0;
 	processedGain.gain.value = bypassed ? 0 : 1;
 	rawGain.connect(master);
-	processedGain.connect(master);
+	processedGain.connect(master);extraEnhancer=attachAuditionExtra(ctx,processedGain,master);
 	chain = buildMusicChain(ctx,orchestraPreset('garbage-dump-glacier','drums'),processedGain);
 	bassChain=buildMusicChain(ctx,orchestraPreset('garbage-dump-glacier','bass'),processedGain);
 	clangClock.reset();clangCount=0;

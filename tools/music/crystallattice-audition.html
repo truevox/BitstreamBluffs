@@ -16,6 +16,7 @@
 <div class="row"><button id="scan" disabled>🎼 Check actual source pitches</button></div>
 <div class="note" id="chroma-result" aria-live="polite">Only actual current musical pitches can trigger pitched crystal notes. Weak or ambiguous chroma means NO invented chord; the existing source-fed crystal bank still rings.</div>
 <p class="small">This is a real musical-source experiment, not a key or beat-grid guess. Crystal resonance uses 24 chromatic physical modes across C4–B5 on the non-bass harmonic stems (with lower C3–B4 modes for bass); the landing analyser reads the actually audible bass signal. If it can't confidently find a pitch, it won't synthesize one.</p>
+<label for="extra">✨ Extra biome bloom: <output id="extra-value">0%</output></label><input id="extra" type="range" min="0" max="200" value="0" step="5"><p class="help">0% = original audition sound. Raise this to add a spacious, filtered echo of this biome’s processed stems; the dry song and event effect settings stay unchanged.</p>
 <p id="status" aria-live="polite" role="status">Load the original five instrument recordings to start.</p>
 </section>
 <p class="small">Original separated MP3 instrument previews are shared with our earlier auditions and are never overwritten. No changes to the stereo masters, separate MIDI biome leads, gameplay physics or music clock. Experimental draft, not final mix. <a href="https://github.com/truevox/BitstreamBluffs/issues/256">Crystal issue #256</a>.</p>
