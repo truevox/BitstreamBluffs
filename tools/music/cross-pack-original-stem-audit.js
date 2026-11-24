@@ -18,17 +18,19 @@ const sourceGain=role=>role==='drums'?.9:role==='bass'?.75:.65;
 const TEST_MASTER=.55,TEST_LEAD=.75;
 const SECONDS=2.5,SAMPLE_RATE=48000;
 
-export async function load(pack){
+export async function load(pack,segmentIndex=0,hashInputs=false){
+	if(!Number.isSafeInteger(segmentIndex)||segmentIndex<0)throw Error('Invalid test segment index');
 	if(!/^[a-zA-Z0-9_-]+$/.test(pack))throw Error('Invalid test pack id');
 	const manifestResponse=await fetch('/music/packs/'+pack+'/pack.json');
 	if(!manifestResponse.ok)throw Error('No original source pack '+pack);
 	const manifest=await manifestResponse.json();
-	const sourceTable=manifest.segments?.[0]?.sources;
-	if(!sourceTable)throw Error('Missing first segment sources '+pack);
+	const segment=manifest.segments?.[segmentIndex];
+	const sourceTable=segment?.sources;
+	if(!sourceTable)throw Error('Missing segment sources '+pack+'/'+segmentIndex);
 	const keys=new Set([...ROLES,'vocals',...BIOMES.map(b=>'voice:'+b)]);
 	const ctx=new AudioContext();
 	try{
-		const decoded=new Map();
+		const decoded=new Map(),sourceSha256={};
 		for(const key of keys){
 			const relative=sourceTable[key];
 			if(!relative)throw Error('Missing '+key+' in '+pack);
@@ -39,9 +41,15 @@ export async function load(pack){
 				relative.replace('adaptive/debutmont/','adaptive/debumont/'):relative;
 			const response=await fetch('/music/packs/'+pack+'/'+archivedPath);
 			if(!response.ok)throw Error('Missing original OGG '+pack+'/'+archivedPath+' HTTP '+response.status);
-			decoded.set(key,await ctx.decodeAudioData(await response.arrayBuffer()));
+			const bytes=await response.arrayBuffer();
+			if(hashInputs){
+				const digest=await crypto.subtle.digest('SHA-256',bytes);
+				sourceSha256[key]=[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
+			}
+			decoded.set(key,await ctx.decodeAudioData(bytes));
 		}
-		return {decoded,pack,id:manifest.id};
+		return {decoded,pack,id:manifest.id,segmentIndex,segmentCount:manifest.segments.length,
+			startFrame:segment.startFrame,frames:segment.frames,sourceSha256};
 	}finally{await ctx.close();}
 }
 function metrics(buffer){

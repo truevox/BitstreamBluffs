@@ -20,15 +20,18 @@ try{
  const subset=(fullSegment||process.env.MUSIC_BUS_FOCUS)?
   ['garbage-dump-glacier','vertigo-vents','crystal-cavern','bitstream-bluffs']:null;
  const duration=fullSegment?12:2.5;
- const report=await page.evaluate(async args=>
+ const segmentSpread=process.env.MUSIC_BUS_SEGMENT_SPREAD==='1';
+ const report=await page.evaluate(async args=>args.segmentSpread?
+  await window.__finalGameMusicBusQA.auditSegmentSpread(args.packs,{duration:args.duration}):
   await window.__finalGameMusicBusQA.audit(args.packs,args.subset||undefined,args.duration,args.fullSegment),
-  {packs,subset,duration,fullSegment});
- assert.equal(report.results.length,4*(subset?4:12)*(fullSegment?1:2)+(fullSegment?0:4));
+  {packs,subset,duration,fullSegment,segmentSpread});
+ assert.equal(report.results.length,segmentSpread?4*3*4:
+  4*(subset?4:12)*(fullSegment?1:2)+(fullSegment?0:4));
  assert.deepEqual(errors,[]);
  assert(report.results.every(row=>row.nonfiniteSamples===0),
   'Non-finite game music bus output');
  if(process.env.MUSIC_BUS_REPORT)
-  writeFileSync(process.env.MUSIC_BUS_REPORT,JSON.stringify(report,null,2)+'\n','utf8');
+  writeFileSync(process.env.MUSIC_BUS_REPORT,JSON.stringify(report,null,2)+'\n',{flag:'wx'});
  const highest=[...report.results].sort((a,b)=>b.samplePeak-a.samplePeak);
  console.log('GAME_MUSIC_BUS_COMPRESSOR_REAL_OGG_REPORT',JSON.stringify({
   cases:report.results.length,secondsPerRender:duration,
@@ -36,5 +39,7 @@ try{
   overUnity:report.results.filter(r=>r.overUnitySamples>0).length,
   nearUnity:report.results.filter(r=>r.nearUnitySamples>0).length
  }));
+ assert(report.results.every(row=>row.overUnitySamples===0),'Post-compressor output exceeded digital full scale');
+ assert(report.results.every(row=>row.nearUnitySamples===0),'Post-compressor output approached digital full scale');
  console.log('GAME_MUSIC_BUS_COMPRESSOR_ORIGINAL_OGG_RENDER_PASS');
 }finally{await browser.close();}
