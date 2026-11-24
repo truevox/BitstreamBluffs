@@ -26,15 +26,16 @@ try {
   await page.waitForFunction(() => window.__bbGame?.scene?.isActive('TitleScene'), null, {timeout: 60000});
   const readVersion = () => page.evaluate(() => {
     const label = window.__bbGame.scene.getScene('TitleScene').versionLabel;
-    return {text: label?.main?.text, visible: label?.visible, alpha: label?.alpha, x: label?.x, y: label?.y};
+    return {text: label?.main?.text, visible: label?.visible, alpha: label?.alpha, x: label?.x, y: label?.y, scale: label?.scaleX};
   });
   const version = await readVersion();
   assert.equal(version.text, `v${expectedVersion}`);
-  assert(version.visible && version.alpha === 1, 'startup version is fully visible');
+  assert(version.visible && version.alpha > 0 && version.alpha <= 0.7, 'startup version is subtle but visible');
+  assert.equal(version.scale, 1, 'startup version uses small native pixel text');
   assert(version.x < 20 && version.y < 20, 'version is in the top-left corner');
   await page.waitForTimeout(1000);
   const heldVersion = await readVersion();
-  assert(heldVersion.visible && heldVersion.alpha === 1, 'startup version holds before fade');
+  assert(heldVersion.visible && heldVersion.alpha === version.alpha, 'startup version holds before fade');
   await page.waitForFunction(() => {
     const label = window.__bbGame.scene.getScene('TitleScene').versionLabel;
     return label && !label.visible && label.alpha === 0;

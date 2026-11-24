@@ -62,6 +62,7 @@ const LOGO_DEPTH = 5;
 
 // The startup version belongs to the game instance, not every return to Title.
 const versionShown = new WeakSet();
+const VERSION_LABEL_ALPHA = 0.65;
 
 const HINT_TEXT = '↑↓ SELECT   ENTER / A CONFIRM   H / X HOW TO PLAY';
 
@@ -499,14 +500,14 @@ export class TitleScene extends Phaser.Scene {
       versionShown.add(this.game);
       const v = TITLE_BANDS.version;
       const label = this.versionLabel = new NeonText(this, theme, v.x, v.y, `v${packageInfo.version}`, {
-        color: 'text', outline: 'dark', scale: 2,
-      }).setDepth(LOGO_DEPTH).setAlpha(1);
+        color: 'text', outline: 'dark', scale: 1,
+      }).setDepth(LOGO_DEPTH).setAlpha(VERSION_LABEL_ALPHA);
       this.time.delayedCall(3000, () => {
         if (!label.scene) return;
         tweenProgress(this, {
           duration: isReducedMotion(this) ? 120 : 400,
           ease: Ease.outQuad,
-          onUpdate: (p) => { if (label.scene) label.setAlpha(1 - p); },
+          onUpdate: (p) => { if (label.scene) label.setAlpha(VERSION_LABEL_ALPHA * (1 - p)); },
           onComplete: () => { if (label.scene) label.setVisible(false); },
         });
       });
