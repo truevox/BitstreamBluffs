@@ -24,6 +24,10 @@ const expectedHtml=fs.readFileSync(path.join(root,'dist/index.html'),'utf8');
 const entryPath=/<script[^>]+src="(\/assets\/[^"]+\.js)"/.exec(expectedHtml)?.[1];
 assert(entryPath,'compiled game entry module not found');
 const expectedEntry=fs.readFileSync(path.join(root,'dist',entryPath.slice(1)));
+const expectedJsFiles=new Map(fs.readdirSync(path.join(root,'dist/assets'))
+  .filter(x=>x.endsWith('.js'))
+  .map(x=>['/assets/'+x,fs.readFileSync(path.join(root,'dist/assets',x))]));
+assert(expectedJsFiles.has(entryPath),'compiled entry not in expected JS assets');
 const url=process.env.GAME_URL || 'http://127.0.0.1:4198/';
 const hzValues=(process.env.HZ||'30,60,120,144').split(',').map(Number);
 assert(hzValues.every(v=>Number.isFinite(v)&&v>=30&&v<=240));
@@ -36,17 +40,45 @@ async function page() {
   const context=await browser.newContext({viewport:{width:960,height:540}});
   const p=await context.newPage();
   const errors=[];p.on('pageerror',e=>errors.push(String(e)));
+  // Observe Chromium's ACTUAL response bodies, including dynamically imported
+  // runtime ruleset chunks. A separate p.request.get() proves nothing about
+  // what the browser itself executed; this listener runs BEFORE navigation.
+  const observed=new Map();
+  const reads=[];
+  p.on('response',response=>{
+    const requested=new URL(response.url());
+    if(requested.origin!==new URL(url).origin ||
+        !requested.pathname.startsWith('/assets/') || !requested.pathname.endsWith('.js'))return;
+    reads.push((async()=>{
+      assert.equal(response.status(),200,`failed browser JS response ${requested.pathname}`);
+      const expected=expectedJsFiles.get(requested.pathname);
+      assert(expected,`browser requested unknown compiled JS asset: ${requested.pathname}`);
+      const actual=await response.body();
+      assert.deepEqual(actual,expected,`BROWSER EXECUTED DIFFERENT JS: ${requested.pathname}`);
+      const digest=createHash('sha256').update(actual).digest('hex');
+      const prior=observed.get(requested.pathname);
+      assert(!prior||prior===digest,`inconsistent browser JS content for ${requested.pathname}`);
+      observed.set(requested.pathname,digest);
+    })());
+  });
+  async function verifyActualLoadedScripts({expectRuntime=false}={}){
+    // page.on('response') captures the response used by Chromium, not a
+    // separately issued request. Repeat after play() to cover lazy imports.
+    await Promise.all(reads);
+    assert(observed.has(entryPath),'Chromium never fetched the expected game entry module');
+    if(expectRuntime)assert([...observed.keys()].some(x=>x.includes('runtimeRuleset-')),
+      'the dynamically imported runtime ruleset was not observed');
+    return Object.fromEntries([...observed].sort());
+  }
   await p.addInitScript(`(() => {const R=Date, base=R.parse('2026-11-21T12:00:00Z'), t0=R.now(); function D(...a){return a.length?new R(...a):new R(base+R.now()-t0)} D.prototype=R.prototype;D.now=()=>base+R.now()-t0;D.parse=R.parse;D.UTC=R.UTC;window.Date=D})()`);
   await p.addInitScript(() => { window.__ceMarkerCachePure=true; }); // read-only diagnostic, does not mask causal subsystems
   await p.addInitScript(source);
   const response=await p.goto(url,{waitUntil:'domcontentloaded'});
   assert.equal(response.status(),200);
   assert.equal(await response.text(),expectedHtml,'served game index does not match local built dist/index.html');
-  const servedEntry=await p.request.get(new URL(entryPath,url).href);
-  assert.equal(servedEntry.status(),200,'served compiled game bundle unavailable');
-  assert.deepEqual(await servedEntry.body(),expectedEntry,'served game JavaScript does not match freshly built source bundle');
   await p.waitForFunction(()=>window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive()&&window.__ce,null,{timeout:60000});
-  return {p,context,errors};
+  await verifyActualLoadedScripts();
+  return {p,context,errors,verifyActualLoadedScripts};
 }
 async function run(p,{hz,markers,maxTicks=2400,raster=false,rasterLastFrames=0}){
   return p.evaluate(async({hz,markers,maxTicks,raster,rasterLastFrames})=>{
@@ -135,6 +167,9 @@ try {
       const a=await run(base.p,{hz,markers:false});
       const b=await run(marker.p,{hz,markers:true});
       const c=await run(marker.p,{hz,markers:true});
+      const baseJs=await base.verifyActualLoadedScripts({expectRuntime:true});
+      const markerJs=await marker.verifyActualLoadedScripts({expectRuntime:true});
+      assert.deepEqual(baseJs,markerJs,'marker mode loads a different compiled JS graph');
       assert.deepEqual(base.errors,[]);
       assert.deepEqual(marker.errors,[]);
       assert(b.marker.shown.best?.joined&&b.marker.shown.best?.visible);
@@ -151,6 +186,7 @@ try {
         assert.deepEqual(item.raw,a.raw,`raw debug-state mismatch at ${hz}Hz`);
       }
       const record={hz,rows:3,causalSha:sha(a.digests),rawSha:sha(a.raw),outcome:a.outcome,
+        executedJs:baseJs,
         markerGeneratorReads:b.marker.generatorReads,markerCacheMutations:b.marker.cacheMutations,
         markerFirstShown:b.marker.shown,repeatMarkerFirstShown:c.marker.shown,
         deferred:{best:b.marker.deferredBest,death:b.marker.deferredDeath},errors:[]};
@@ -168,6 +204,9 @@ try {
       const hz=120,maxTicks=Number(process.env.RASTER_TICKS||1600);
       const a=await run(normal.p,{hz,markers:false,maxTicks,raster:true,rasterLastFrames:4});
       const b=await run(marked.p,{hz,markers:true,maxTicks,raster:true,rasterLastFrames:4});
+      const normalJs=await normal.verifyActualLoadedScripts({expectRuntime:true});
+      const markedJs=await marked.verifyActualLoadedScripts({expectRuntime:true});
+      assert.deepEqual(normalJs,markedJs,'raster mode loaded a different compiled JS graph');
       assert.deepEqual(normal.errors,[]);
       assert.deepEqual(marked.errors,[]);
       assert.deepEqual(a.outcome,b.outcome);
@@ -231,7 +270,7 @@ try {
         fs.writeFileSync(`${process.env.RASTER_OUT}-normal.png`,screenshotA,{flag:'wx'});
         fs.writeFileSync(`${process.env.RASTER_OUT}-markers.png`,screenshotB,{flag:'wx'});
       }
-      rasterEvidence={hz,maxTicks,markerOnscreen:b.marker.onscreen,
+      rasterEvidence={hz,maxTicks,executedJs:markedJs,markerOnscreen:b.marker.onscreen,
         capturedFrame:b.marker.capturedFrame,labelPixelProof,
         normalPngSha:createHash('sha256').update(screenshotA).digest('hex'),
         markerPngSha:createHash('sha256').update(screenshotB).digest('hex'),
