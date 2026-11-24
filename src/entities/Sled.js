@@ -286,7 +286,6 @@ export class Sled {
     // Neither holding nor re-tapping AirBrake buys extra lift until touchdown.
     let airBrakeKickedThisStep = false;
     if (this.airBrakeActive && !this.airBrakeKickUsed) {
-      this.airBrakeKickUsed = true;
       const kicked = airBrakeKickStep({ vx, vy,
         atmosphereDensity: atmosphere ? atmosphere.atmosphereDensity : 1,
         decelFraction: PHYSICS.airBrakeDecel,
@@ -310,6 +309,9 @@ export class Sled {
           ? Math.max(0, -vy) : 0;
       }
       if (kicked.spentSpeedPxS > 0) {
+        // A zero-atmosphere attempt costs nothing; preserve this flight's
+        // one shot until an actual horizontal speed payment occurs.
+        this.airBrakeKickUsed = true;
         this.airBrakeKickPulse = 1;
         airBrakeKickedThisStep = true;
       }

@@ -163,8 +163,8 @@ describe('tripwire attestation categories', () => {
   });
   test('behavior-change-unreleased: valid only while SIM_REVISION is above the last released revision', () => {
     const msg = 'behavior-change-unreleased: -0 tilt normalized (sign of zero only)';
-    expect(LAST_RELEASED_SIM_REVISION).toBe(9); // #247 approved one-shot AirBrake releases SIM_REVISION 9
-    expect(SIM_REVISION).toBe(LAST_RELEASED_SIM_REVISION); // SIM9 will be frozen by this release; future causal changes must bump
+    expect(LAST_RELEASED_SIM_REVISION).toBe(8); // SIM8 is merged; SIM9 AirBrake remains a draft candidate
+    expect(SIM_REVISION).toBe(LAST_RELEASED_SIM_REVISION + 1); // keep draft causal changes explicitly attested
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 0 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 2, prevSimRevision: 1, lastReleased: 1 })).toBeNull();
     expect(attestationProblem(msg, { simRevision: 1, prevSimRevision: 1, lastReleased: 1 })).toMatch(/only valid while/);

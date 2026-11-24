@@ -48,6 +48,22 @@ test('AirBrake pressed as variable hop is released gives both paid horizontal de
   expect(toPx(s.body.velocity.x)).toBeCloseTo(212,6);
 });
 
+test('vacuum AirBrake does not spend latch; atmospheric braking remains available in the same flight',()=>{
+  const s=makeSled(530,150);
+  s._playerHopActive=false;
+  s.applyControls({airBrake:true,noAutoNudge:true,pressed:{airBrake:true}},phys,8,
+    {atmosphereDensity:0,relativeAirX:0,proximity01:0});
+  expect(s.airBrakeKickUsed).toBe(false);
+  expect(s.airBrakeKickPulse||0).toBe(0);
+  expect(toPx(s.body.velocity.x)).toBeCloseTo(530,6);
+  step(s,{airBrake:false,noAutoNudge:true,pressed:{}});
+  expect(s.airBrakeKickUsed).toBe(false);
+  step(s,{airBrake:true,noAutoNudge:true,pressed:{airBrake:true}});
+  expect(s.airBrakeKickUsed).toBe(true);
+  expect(s.airBrakeKickPulse).toBe(1);
+  expect(toPx(s.body.velocity.x)).toBeLessThan(300);
+});
+
 test('separate next-tick coyote Hop cannot reactivate cutoff after already-paid AirBrake lift',()=>{
   const s=makeSled(530,150);
   s.msSinceContact=60; // airborne, after grounded grace but before coyote expires
