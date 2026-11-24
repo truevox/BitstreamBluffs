@@ -147,7 +147,7 @@ jest.unstable_mockModule('../../src/data/index.js', () => ({ content: {}, loadCo
 const { REG, GAME_WIDTH, GAME_HEIGHT } = await import('../../src/constants.js');
 const { Theme } = await import('../../src/ui/Theme.js');
 const Views = await import('../../src/ui/Views.js');
-const { ProfileView, AchievementsView, ShopView, LeaderboardView, TitlesView } = Views;
+const { ProfileView, AchievementsView, ShopView, LeaderboardView, TitlesView, SongLibraryView } = Views;
 const { MenuList } = await import('../../src/ui/MenuList.js');
 const { TitleScene } = await import('../../src/scenes/TitleScene.js');
 const { copyText } = await import('../../src/ui/Clipboard.js');
@@ -832,4 +832,29 @@ describe('SHOP-2: TITLES opens from Profile and buys / equips by keys', () => {
     expect(['default', 'ROOKIE', 'STATIC RIDER']).toContain(t.registry.get(REG.PROFILE).equipped.title);
     expect(v.menu.items.find((i) => i.id === 'title-omniscient').disabled).toBe(true);
   });
+});
+
+
+test('open Music Library refreshes the installed song roster on async catalog discovery and clamps its page',async()=>{
+  const {GAME_SONGS,installedSongChoices}=await import('../../src/systems/music/MusicPlaylist.js');
+  let catalog=null;
+  const v=Object.create(SongLibraryView.prototype);
+  v.scene={game:{registry:{get:()=>({_stemMusic:{catalog}})}}};
+  v._catalogSignature=v._catalogKey(catalog);
+  v.tracks=installedSongChoices(catalog);
+  v.page=0;v._build=jest.fn();
+  expect(v.tracks).toHaveLength(4);
+  expect(v._refreshCatalog()).toBe(false);
+  catalog=GAME_SONGS.map(song=>({id:song.id}));
+  expect(v._refreshCatalog()).toBe(true);
+  expect(v.tracks).toHaveLength(33);
+  expect(v._build).toHaveBeenCalledTimes(1);
+  expect(v._refreshCatalog()).toBe(false);
+  expect(v._build).toHaveBeenCalledTimes(1);
+  v.page=4;
+  catalog=GAME_SONGS.slice(0,4).map(song=>({id:song.id}));
+  expect(v._refreshCatalog()).toBe(true);
+  expect(v.page).toBe(0);
+  expect(v.tracks).toHaveLength(4);
+  expect(v._build).toHaveBeenCalledTimes(2);
 });

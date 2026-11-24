@@ -295,9 +295,29 @@ export class SongLibraryView extends View {
     super(scene,theme,{w:448,h:238,title:'MUSIC LIBRARY',
       color:'cyan',onClose:o.onClose,y:15,
       hints:[{keys:['↑','↓'],label:'SELECT'},{keys:['←','→'],label:'ON/OFF'}]});
-    this.tracks=installedSongChoices(scene.game.registry.get('audioSynth')?._stemMusic?.catalog);
+    const catalog=scene.game.registry.get('audioSynth')?._stemMusic?.catalog;
+    this._catalogSignature=this._catalogKey(catalog);
+    this.tracks=installedSongChoices(catalog);
     this.page=0;
     this._build();
+    // A private 33-song catalog may arrive while this view is already open.
+    // Do not freeze the four public fallback choices for the whole modal.
+    this._onCatalogFrame=()=>this._refreshCatalog();
+    scene.events?.on('update',this._onCatalogFrame);
+  }
+  _catalogKey(catalog){
+    return Array.isArray(catalog)
+      ? catalog.map(track=>track?.id||'').join('|') : 'unresolved';
+  }
+  _refreshCatalog(){
+    const catalog=this.scene.game.registry.get('audioSynth')?._stemMusic?.catalog;
+    const key=this._catalogKey(catalog);
+    if(key===this._catalogSignature)return false;
+    this._catalogSignature=key;
+    this.tracks=installedSongChoices(catalog);
+    this.page=Math.min(this.page,Math.max(0,songPageCount(this.tracks)-1));
+    this._build(); // refresh rows and page count; do not change song settings
+    return true;
   }
   _build(){
     const settings=()=>this.scene.game.registry.get(REG.SETTINGS)||{};
@@ -329,10 +349,16 @@ export class SongLibraryView extends View {
     this._build();
   }
   handleAction(action){
+    this._refreshCatalog(); // also refresh if this scene's update was paused
     if(action==='cancel'){this.close();return true;}
     return this.menu.handleAction(action);
   }
-  destroy(){this.menu?.destroy();this.menu=null;super.destroy();}
+  destroy(){
+    if(this._onCatalogFrame)this.scene.events?.off('update',this._onCatalogFrame);
+    this._onCatalogFrame=null;
+    this.menu?.destroy();this.menu=null;
+    super.destroy();
+  }
 }
 
 export class SoundManagerView extends View {

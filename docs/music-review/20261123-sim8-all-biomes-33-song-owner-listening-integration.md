@@ -66,3 +66,14 @@ A second static code review after the first three corrections found five additio
 - The beat verifier independently parses the FLAC STREAMINFO sample rate and count for both manifest-bound originals and caps candidate timestamps to the shorter recording plus one 48 kHz output frame of rounding. It no longer trusts the report's own claimed duration. Five synthetic provenance tests cover healthy 33-song manifests, forged source hashes/paths, overstated durations, and mismatched stem lengths.
 - The original vocal room-send remains unmodified in menus and is restored on re-entry to actual gameplay (no accidental replacement of vocal DSP chains).
 - This user-facing music capability prepares semantic minor release v2.20.0 (package and lockfile), with a dated numbered changelog entry. It is **not merged** until all source, browser, independent-review and owner/publication gates are addressed. If main advances before merge, re-evaluate the version and restack against the actual release base. [skip netlify] remains mandatory.
+
+
+## Fifth independent-review corrections (November 24, 2026)
+
+At exact prior commit fcd84920, independent review identified three still-actionable presentation issues:
+
+- A late failed private stem pack could initialize the procedural scheduler but leave its musicSrc bus muted. AudioSynth.musicProviderFailed now unmutes that bus explicitly (not the original or SFX buses) only when a selected installed song is still present and game audio is playing. Disabled public songs and manual menu jukebox mode remain silent. Tests exercise positive late failure and negative silence.
+- A clean menu removes all original vocal DSP chains and room sends. Gameplay must restore the exact current pack-defined effects.vocals, effects for the active voice, and roomSends after the same source returns; restoring only default room wetness is insufficient. This is source-native pack data, not synthesized replacement notes, and it does not restart the music transport.
+- A Music Library opened before async discovery can show the four public fallback choices indefinitely. Its open panel now watches the owning scene's update for a changed installed-catalog signature, rebuilds the actual track rows and page counts on discovery, clamps the selected page when the catalog shrinks, and detaches its listener on destruction. No toggle or stored preference changes on refresh.
+
+The three focused music/library suites pass 94/94 tests. The integration remains code-only and draft; release version v2.20.0 remains conditional on the actual merge base and owner publication gates.

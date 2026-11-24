@@ -1102,8 +1102,16 @@ export class AudioSynth {
   /** Failure of a pack load only falls back to procedural when some
    * songs remain selected, never in the all-off state. */
   musicProviderFailed() {
-    if (!this._musicWanted || !this._hasEnabledSongs(this.settings.musicEnabledSongs)) return;
-    if (this.ctx?.state === 'running' && !this._musicTimer) this._startScheduler();
+    if (!this._musicWanted || this._jukeboxMode ||
+        !this._hasEnabledSongs(this.settings.musicEnabledSongs)) return;
+    if (this.ctx?.state !== 'running' || !this.nodes?.musicSrc || this._musicTimer) return;
+    // An attempted stem launch deliberately muted procedural musicSrc.
+    // If that pack fails late, scheduling synth notes at gain=0 is SILENT.
+    // Restore only this fallback bus, not any original source / SFX bus.
+    const t = this.ctx.currentTime;
+    this.nodes.musicSrc.gain.cancelScheduledValues(t);
+    this.nodes.musicSrc.gain.setTargetAtTime(this._paused ? 0.45 : 1, t, 0.04);
+    this._startScheduler();
   }
 
   /** Full soundtrack and synth fallback are both muted if no tracks selected.

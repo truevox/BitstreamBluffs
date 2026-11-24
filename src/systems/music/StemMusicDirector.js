@@ -268,13 +268,23 @@ export class StemMusicDirector {
 			for (const name of this.gains.keys())
 				if (name.startsWith('voice:') || name === 'vocals')
 					sourceNames.push(name);
-		} else if (lead) sourceNames.push(lead);
+		} else {
+			if (lead) sourceNames.push(lead);
+			// Menus stripped every vocal/voice effects chain. Rehydrate the
+			// original pack-defined chains on the SAME song when returning to
+			// gameplay, not just the active melodic lead.
+			for (const name of this.gains.keys())
+				if ((name==='vocals' || name.startsWith('voice:')) &&
+					!sourceNames.includes(name)) sourceNames.push(name);
+		}
 		for (const name of sourceNames) {
 			if (!this.gains.has(name)) continue;
 			// In menus EVERY original source is raw, including the selected
 			// Debutmont melody lead. Gameplay alone gets DSP/biome FX.
+			const packSource=name==='vocals' || name.startsWith('voice:');
 			const effects = this.menuMode ? [] :
 				name===lead ? melodyPreset(this.biome) :
+				packSource ? (this.pack?.effects?.[name] || []) :
 				[...sourceOnlyExtras(this.biome,name), ...orchestraPreset(this.biome,name)];
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
@@ -296,13 +306,9 @@ export class StemMusicDirector {
 			// Restore each source's normal biome room send in either
 			// mode. Muting reverb when the toggle is OFF would wrongly
 			// disable legitimate processing of the ORIGINAL recordings.
-			this.mixer.setRoomSend(name,this.menuMode ? 0 : null);
+			this.mixer.setRoomSend(name,this.menuMode ? 0 :
+				packSource ? this.pack?.roomSends?.[name] : null);
 		}
-		// The menu explicitly dries the original vocal room send, even though
-		// vocals have no gameplay DSP chain. Restore their natural reverb when
-		// gameplay resumes without replacing/damaging the vocal effect graph.
-		if (!this.menuMode && this.gains.has('vocals'))
-			this.mixer.setRoomSend('vocals',null);
 		this._applyScrapContact(true);
 		this._steamLastSent = NaN;
 		this._applySteamSpeed(true);

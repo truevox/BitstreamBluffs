@@ -108,12 +108,31 @@ describe('33-song owner playlist — explicit all-off SILENCE', () => {
 		expect(a._arrangement(0)).toEqual(b._arrangement(0));
 		// Later catalog discovery recognizes the actual installed source.
 		a._stemMusic.catalog=GAME_SONGS;
-		a.musicProviderFailed(); // real source failed; scheduler must now be safe
+		const synthGain=a.nodes.musicSrc.gain;
+		a.musicProviderFailed(); // real source failed; scheduler must now be safe and audible
+		expect(synthGain.cancelScheduledValues).toHaveBeenCalledWith(15);
+		expect(synthGain.setTargetAtTime).toHaveBeenCalledWith(1,15,.04);
 		expect(a._startScheduler).toHaveBeenCalledTimes(1);
 		expect(()=>a._arrangement(1)).not.toThrow();
 		expect(a._step).toBe(0);
 	});
-	test('four-song saved all-off migration never enables newly added songs',()=>{
+	test('late pack failure never unmutes when all installed songs are disabled or manual jukebox is active',()=>{
+		const disabled=Object.fromEntries(GAME_SONGS.map(song=>[song.id,false]));
+		const a=Object.create(AudioSynth.prototype);
+		a.settings={musicEnabledSongs:disabled};
+		a._musicWanted=true;a._jukeboxMode=false;a._stemMusic={catalog:GAME_SONGS};
+		a._musicTimer=null;a.ctx={state:'running',currentTime:12};
+		a.nodes={musicSrc:{gain:{cancelScheduledValues:jest.fn(),setTargetAtTime:jest.fn()}}};
+		a._startScheduler=jest.fn();
+		a.musicProviderFailed();
+		expect(a.nodes.musicSrc.gain.setTargetAtTime).not.toHaveBeenCalled();
+		expect(a._startScheduler).not.toHaveBeenCalled();
+		a.settings.musicEnabledSongs=defaultSongSelection();
+		a._jukeboxMode=true;
+		a.musicProviderFailed();
+		expect(a.nodes.musicSrc.gain.setTargetAtTime).not.toHaveBeenCalled();
+	});
+		test('four-song saved all-off migration never enables newly added songs',()=>{
 		const legacyAllOff=Object.fromEntries(GAME_SONGS.slice(0,4).map(s=>[s.id,false]));
 		expect(hasEnabledSongs(legacyAllOff)).toBe(false);
 		expect(Object.values(sanitizeSongSelection(legacyAllOff)).every(v=>!v)).toBe(true);

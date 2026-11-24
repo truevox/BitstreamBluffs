@@ -117,17 +117,22 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		const source=readFileSync(new URL('../../src/systems/music/StemMusicDirector.js',import.meta.url),'utf8');
 		expect(source).toMatch(/this\._applyMusicTimbres\(true\);\s*this\._invalidateContinuousFxMemoAfterTrackReplace\(\);\s*this\._restoreArcadeBridgeAfterTrackReplace\(\)/);
 	});
-	test('original vocal room send resumes in-game after menu without replacing vocal effects',()=>{
+	test('original pack-specific vocal DSP and room send are restored after the clean menu without restarting music',()=>{
 		const d=director();
+		const vocalEffects=[{type:'gain',id:'original-vocal-color',gain:.8}];
+		d.pack={effects:{vocals:vocalEffects},roomSends:{vocals:.34}};
 		d.gains.set('vocals',{});
 		d.menuMode=true;
 		d._applyMusicTimbres();
+		expect(d.mixer.replaceEffects).toHaveBeenCalledWith('vocals',[],.18);
 		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('vocals',0);
-		d.mixer.setRoomSend.mockClear();
-		d.mixer.replaceEffects.mockClear();
+		d.mixer.setRoomSend.mockClear();d.mixer.replaceEffects.mockClear();
 		d.menuMode=false;
 		d._applyMusicTimbres();
-		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('vocals',null);
+		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('vocals',.34);
+		expect(d.mixer.replaceEffects).toHaveBeenCalledWith('vocals',vocalEffects,.18);
+		// A later static frame must not repeatedly replace the voice chain.
+		d.mixer.replaceEffects.mockClear();d._applyMusicTimbres();
 		expect(d.mixer.replaceEffects.mock.calls.some(([name])=>name==='vocals')).toBe(false);
 	});
 	test('song replacement invalidates continuous Space/Hydro/Thermal/Vent memo without retriggering one-shot gusts',()=>{
