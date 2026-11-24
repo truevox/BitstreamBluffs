@@ -58,18 +58,21 @@ test('separate next-tick coyote Hop cannot reactivate cutoff after already-paid 
   s.msSinceContact=68;
   step(s,{hop:true,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{hop:true}});
   expect(s.hopPulse).toBe(1);
-  expect(s._playerHopActive).toBe(false);
+  expect(s._playerHopActive).toBe(true); // extra Hop lift is independently releasable
+  expect(s._protectedHopExtraVyPxS).toBeGreaterThan(0);
   for(let i=0;i<25;i++){
     s.msSinceContact+=8;
     step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
   }
-  expect(toPx(s.body.velocity.y)).toBeLessThan(-100);
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(paidVy,6); // extra Hop removed, paid brake remains
+  expect(s._protectedHopExtraVyPxS).toBe(0);
   expect(s.airBrakeLiftProtected).toBe(true);
   // A physically registered landing is the only rearm/reset point.
   s._contactFlag=true;
   s._sync=()=>{};
   s.endStep(8);
   expect(s.airBrakeLiftProtected).toBe(false);
+  expect(s._protectedHopExtraVyPxS).toBe(0);
   expect(s.airBrakeKickUsed).toBe(false);
 });
 
@@ -91,7 +94,8 @@ test('simultaneous coyote Hop + AirBrake preserves the paid kick when Hop is lat
   expect(s.hopPulse).toBe(1);
   expect(toPx(s.body.velocity.x)).toBeLessThan(300);
   expect(toPx(s.body.velocity.y)).toBeLessThan(-100);
-  expect(s._playerHopActive).toBe(false);
+  expect(s._playerHopActive).toBe(true); // Hop's own added velocity may still be cut
+  expect(s._protectedHopExtraVyPxS).toBeGreaterThan(0);
   // Far beyond the minimum 150ms hold: the normal hop-release cutoff must
   // NOT zero the separate AirBrake climb. No second speed cut is permitted.
   const afterBrake=toPx(s.body.velocity.x);
@@ -99,6 +103,27 @@ test('simultaneous coyote Hop + AirBrake preserves the paid kick when Hop is lat
     s.msSinceContact+=8;
     step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
   }
-  expect(toPx(s.body.velocity.y)).toBeLessThan(-100);
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-318,6); // original brake lift, not extra coyote-hop lift
+  expect(s._protectedHopExtraVyPxS).toBe(0);
   expect(toPx(s.body.velocity.x)).toBeCloseTo(afterBrake,6);
+});
+
+
+test('low-speed paid brake -60, later Hop -360: release cuts Hop +300 but preserves brake -60',()=>{
+  const s=makeSled(100,0);
+  s.msSinceContact=60;
+  step(s,{hop:false,variableHop:true,airBrake:true,noAutoNudge:true,pressed:{airBrake:true}});
+  const paidVy=toPx(s.body.velocity.y);
+  expect(paidVy).toBeCloseTo(-60,6);
+  s.msSinceContact=68;
+  step(s,{hop:true,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{hop:true}});
+  const hoppedVy=toPx(s.body.velocity.y);
+  expect(hoppedVy).toBeCloseTo(-360,6);
+  expect(s._protectedHopExtraVyPxS).toBeCloseTo(300,6);
+  for(let i=0;i<25;i++){
+    s.msSinceContact+=8;
+    step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
+  }
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-60,6);
+  expect(s._protectedHopExtraVyPxS).toBe(0);
 });

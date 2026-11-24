@@ -35,6 +35,7 @@ try {
       sled._playerHopElapsedMs=170;
       sled.airBrakeKickUsed=false;
       sled.airBrakeLiftProtected=false;
+      sled._protectedHopExtraVyPxS=0;
       sled.airBrakeKickPulse=0;
       sled.hopBufferMs=0;
       sled.boostMs=0;
@@ -43,7 +44,8 @@ try {
     const actual=(label)=>{
       const v=B.getVelocity(sled.body);
       return {label,vx:toWorld(v.x),vy:toWorld(v.y),
-        latch:sled.airBrakeKickUsed,hopActive:sled._playerHopActive};
+        latch:sled.airBrakeKickUsed,hopActive:sled._playerHopActive,
+        protectedHopExtra:sled._protectedHopExtraVyPxS||0};
     };
     prepare(530,150);
     sled.applyControls(input,scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
@@ -81,6 +83,20 @@ try {
     }
     const separateRelease=actual('separate Hop released after 25 later frames');
 
+    prepare(100,0,60);
+    sled.applyControls(input,scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const lowBrake=actual('low-speed paid AirBrake -60');
+    sled.msSinceContact=68;
+    sled.applyControls({...input,airBrake:false,hop:true,pressed:{hop:true}},scene.currentPhys,8,
+      {atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const lowHop=actual('low-speed later coyote Hop adds ~300');
+    for(let i=0;i<25;i++){
+      sled.msSinceContact+=8;
+      sled.applyControls({...input,airBrake:false,hop:false,pressed:{}},scene.currentPhys,8,
+        {atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    }
+    const lowRelease=actual('shortened low-speed Hop preserves paid AirBrake');
+
     prepare(530,-150);
     sled.applyControls(input,scene.currentPhys,8,{atmosphereDensity:0,relativeAirX:0,proximity01:0});
     const vacuum=actual('vacuum: no paid vertical impulse');
@@ -95,14 +111,17 @@ try {
     const frame=sled.getFrameState(scene.runTimeMs+8,8);
     frame.input.airBrakeKicked=paidEvent;
     const paidTricks=tracker.update(frame).tricks.map(x=>x.type);
+    const landedTracker=new scene.tricks.constructor();
+    const landedFrame={...frame,grounded:true,input:{...frame.input,airBrakeKicked:true},crashed:false};
+    const landedTricks=landedTracker.update(landedFrame).tricks.map(x=>x.type);
     const heldTricks=[];
     for(let i=1;i<=40;i++){
       const nextFrame={...frame,timeMs:frame.timeMs+i*8,
         input:{...frame.input,airBrake:true,airBrakeKicked:false}};
       heldTricks.push(...tracker.update(nextFrame).tricks.map(x=>x.type));
     }
-    return {first,next,coyoteFirst,coyoteLater,separateBrake,separateHop,separateRelease,vacuum,
-      paidEvent,paidTricks,heldTricks};
+    return {first,next,coyoteFirst,coyoteLater,separateBrake,separateHop,separateRelease,
+      lowBrake,lowHop,lowRelease,vacuum,paidEvent,paidTricks,landedTricks,heldTricks};
   });
   assert.deepEqual(errors,[],'compiled browser has no fatal page errors');
   const {first,next,coyoteFirst,coyoteLater,separateBrake,separateHop,separateRelease,vacuum}=measurements;
@@ -113,15 +132,27 @@ try {
   assert(next.vy < -100,'later hop release must not cancel paid AirBrake lift');
   assert(Math.abs(next.vx-first.vx)<2,'no second held-AirBrake speed cut');
   assert.equal(coyoteFirst.latch,true);
-  assert.equal(coyoteFirst.hopActive,false,'coyote hop must not re-arm variable-hop cutoff on paid AirBrake lift');
+  assert.equal(coyoteFirst.hopActive,true,'Hop-added lift must remain separately releasable');
+  assert(coyoteFirst.protectedHopExtra>=0); // no extra if upgraded Hop target is below paid brake ascent
   assert(coyoteFirst.vx>150&&coyoteFirst.vx<300);
   assert(coyoteFirst.vy < -100,'simultaneous coyote Hop + brake preserves paid lift');
   assert(coyoteLater.vy < -100,'later Hop release must not cancel the original paid lift');
+  assert.equal(coyoteLater.protectedHopExtra,0);
+  assert.equal(coyoteLater.hopActive,false);
   assert(coyoteLater.vx > coyoteFirst.vx*0.75,'no second 60% speed penalty over 25 naturally dragged steps');
   assert(separateBrake.vy < -100);
-  assert.equal(separateHop.hopActive,false,'later coyote Hop cannot rearm the cutoff after a paid lift');
+  assert.equal(separateHop.hopActive,true,'later coyote Hop must retain its OWN variable-release cutoff');
+  assert(separateHop.protectedHopExtra>=0); // low-speed case below proves positive extra and proper cutoff
   assert(separateRelease.vy < -100,'later hop release cannot erase earlier AirBrake lift');
+  assert.equal(separateRelease.protectedHopExtra,0);
+  assert.equal(separateRelease.hopActive,false);
   assert(separateRelease.vx > separateBrake.vx*0.75,'no second 60% brake during later coyote Hop');
+  assert(measurements.lowBrake.vy< -20 && measurements.lowBrake.vy> -100,'low speed AirBrake buys about -60');
+  assert(measurements.lowHop.vy < measurements.lowBrake.vy-100,'later coyote Hop adds significant extra lift');
+  assert(measurements.lowRelease.vy < -20 && measurements.lowRelease.vy> -100,
+    'Hop release removes Hop-added velocity but preserves original AirBrake ascent');
+  assert.equal(measurements.lowRelease.protectedHopExtra,0);
+  assert.deepEqual(measurements.landedTricks,['airBrake'],'paid kick on touchdown counts immediately');
   assert.equal(measurements.paidEvent,true,'Sled must expose real paid kick');
   assert.deepEqual(measurements.paidTricks,['airBrake'],'one-shot tap must earn regular trick immediately');
   assert.deepEqual(measurements.heldTricks,[],'holding a spent AirBrake cannot earn another trick');

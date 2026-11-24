@@ -51,7 +51,7 @@ export const FP_SCHEMAS = Object.freeze({
       ['parts', list(rec(...PART_FIELDS))], // the 5 collision parts (the compound root, parts[0], is `body`)
       ['ctl', rec(
         ['msSinceContact', 'f64'], ['groundAngleDeg', 'f64'], ['airtimeMs', 'f64'], ['hopBufferMs', 'f64'],
-        ['playerHopElapsedMs', 'f64'], ['pushCooldownMs', 'f64'], ['parachuteMs', 'f64'], ['parachuteFuelMs', 'f64'],
+        ['playerHopElapsedMs', 'f64'], ['protectedHopExtraVyPxS', 'f64'], ['pushCooldownMs', 'f64'], ['parachuteMs', 'f64'], ['parachuteFuelMs', 'f64'],
         ['canopyFuelFullMs', opt('f64')], ['heliPhase', 'f64'], ['heliVel', 'f64'], ['invulnerableMs', 'f64'],
         ['boostMs', 'f64'], ['geyserCooldownMs', 'f64'], ['airEtaMs', 'f64'], ['airSlopeDeg', opt('f64')],
         ['dropAheadDeg', 'f64'], ['groundRunMs', 'f64'], ['sinceLaunchMs', 'f64'], ['landSettleMs', 'f64'],
@@ -227,7 +227,7 @@ export const FIELD_SOURCES = Object.freeze({
   Sled: Object.freeze({
     body: 'sled.body', // the compound root and its 5 parts (+ the Matter pair table in `matter`)
     msSinceContact: 'sled.ctl.msSinceContact', groundAngleDeg: 'sled.ctl.groundAngleDeg', airtimeMs: 'sled.ctl.airtimeMs',
-    hopBufferMs: 'sled.ctl.hopBufferMs', _playerHopElapsedMs: 'sled.ctl.playerHopElapsedMs',
+    hopBufferMs: 'sled.ctl.hopBufferMs', _playerHopElapsedMs: 'sled.ctl.playerHopElapsedMs', _protectedHopExtraVyPxS: 'sled.ctl.protectedHopExtraVyPxS',
     pushCooldownMs: 'sled.ctl.pushCooldownMs', parachuteMs: 'sled.ctl.parachuteMs',
     parachuteFuelMs: 'sled.ctl.parachuteFuelMs', canopyFuelFullMs: 'sled.ctl.canopyFuelFullMs',
     heliPhase: 'sled.ctl.heliPhase', heliVel: 'sled.ctl.heliVel', invulnerableMs: 'sled.ctl.invulnerableMs',

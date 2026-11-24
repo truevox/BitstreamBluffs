@@ -230,6 +230,7 @@ describe('historical SIM6 schema lock stays immutable', () => {
     delete oldState.sled.flags.airBrakeKickUsed;
     delete oldState.sled.flags.airBrakeLiftProtected;
     delete oldState.sled.flags.airBrakeKickPulse;
+    delete oldState.sled.ctl.protectedHopExtraVyPxS;
     const old = {};
     for (const name of lock.order) old[name] = fingerprintOf(encodeSubsystemWith(lock.schemas[name], oldState[name]));
     expect(old).toEqual(lock.reference.subsystems);

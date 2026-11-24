@@ -255,6 +255,16 @@ export class TrickTracker {
       }
       this._air = false;
     }
+    // A genuinely paid one-shot can occur on the final airborne physics
+    // substep but land before the post-physics frame is observed. Do not
+    // discard that trick as an ordinary short bump/grounded input; the
+    // physical kick happened and the player paid horizontal speed. Crashes
+    // were already rejected above.
+    if (!this._brakeDone && input.airBrakeKicked) {
+      this._brakeDone = true;
+      tricks.push({ type: 'airBrake', count: 1, rotationDeg: 0,
+        airtimeMs: Math.max(0, t - this._airStart) });
+    }
     this._prevAngle = angle;
     this._prevHeli = heli;
     this._havePrev = true;

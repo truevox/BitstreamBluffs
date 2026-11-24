@@ -252,6 +252,24 @@ describe('air brake and parachute', () => {
     expect(allTricks(out)).toEqual([]);
   });
 
+  test('a paid one-shot brake on the actual touchdown frame earns its trick even on a short bump',()=>{
+    const r=rig();
+    r.run(2,{grounded:true});
+    r.run(3,{}); // less than minAirtimeMs
+    const closing=r.frame({grounded:true,input:{airBrake:true,airBrakeKicked:true}});
+    expect(allTricks([closing]).map(t=>t.type)).toEqual(['airBrake']);
+    const held=r.run(40,{grounded:true,input:{airBrake:true,airBrakeKicked:false}});
+    expect(allTricks(held)).toEqual([]);
+  });
+
+  test('a crash frame never credits a paid AirBrake trick',()=>{
+    const r=rig();
+    r.run(2,{grounded:true});
+    r.run(6,{});
+    const out=r.frame({grounded:true,crashed:true,input:{airBrake:true,airBrakeKicked:true}});
+    expect(allTricks([out])).toEqual([]);
+  });
+
   test('parachute stall fires after PARACHUTE_MIN_MS once per jump', () => {
     const r = rig();
     r.run(2, { grounded: true });

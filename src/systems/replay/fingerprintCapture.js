@@ -130,7 +130,7 @@ function captureSled(sled) {
     parts: b.parts.filter((p) => p.id !== b.id).map(partRecord),
     ctl: {
       msSinceContact: sled.msSinceContact, groundAngleDeg: sled.groundAngleDeg, airtimeMs: sled.airtimeMs,
-      hopBufferMs: sled.hopBufferMs, playerHopElapsedMs: sled._playerHopElapsedMs, pushCooldownMs: sled.pushCooldownMs,
+      hopBufferMs: sled.hopBufferMs, playerHopElapsedMs: sled._playerHopElapsedMs, protectedHopExtraVyPxS: sled._protectedHopExtraVyPxS || 0, pushCooldownMs: sled.pushCooldownMs,
       parachuteMs: sled.parachuteMs, parachuteFuelMs: sled.parachuteFuelMs, canopyFuelFullMs: opt(sled.canopyFuelFullMs),
       heliPhase: sled.heliPhase, heliVel: sled.heliVel, invulnerableMs: sled.invulnerableMs, boostMs: sled.boostMs,
       geyserCooldownMs: sled.geyserCooldownMs ?? 0, // the sim reads `(geyserCooldownMs || 0)`

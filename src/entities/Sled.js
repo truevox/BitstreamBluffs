@@ -74,6 +74,7 @@ export class Sled {
     this.airBrakeActive = false;
     this.airBrakeKickUsed = false; // #247 one-shot per actual airborne interval; rearm on genuine touchdown
     this.airBrakeLiftProtected = false; // persists until real touchdown; later coyote Hop cannot erase purchased lift
+    this._protectedHopExtraVyPxS = 0; // separate later Hop lift that variable release MAY truncate
     this.airBrakeKickPulse = 0; // actual spent-speed event; RunScene consumes & clears this fixed tick
     this.heliInput = 0;
     this.corkscrewActive = false;
@@ -170,6 +171,7 @@ export class Sled {
     if (this._contactFlag) {
       this.airBrakeKickUsed = false; // actual Matter contact rearms, never a button release
       this.airBrakeLiftProtected = false; // only physical terrain contact can end protection
+      this._protectedHopExtraVyPxS = 0;
       if (this.msSinceContact >= TUNING.groundedGraceMs) {
         this.chuteUsed = false; // freshly landed
         this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
@@ -254,6 +256,7 @@ export class Sled {
       const f = Math.max(0, 1 - phys.quadDrag * boostK * speed * dt);
       vx *= f;
       vy *= f;
+      this._protectedHopExtraVyPxS = (this._protectedHopExtraVyPxS || 0) * f;
     }
     // runner resistance on the ground (lower inside High Bandwidth zones, much higher while braking)
     if (grounded && phys.groundResist) {
@@ -281,7 +284,8 @@ export class Sled {
       // a subsequent tick. When no lift was actually purchased (vacuum, very
       // slow rider, or already faster upward), retain normal hop semantics.
       if (kicked.vy < vy) {
-        this.airBrakeLiftProtected = true; // protects later separate coyote-hop substeps
+        this.airBrakeLiftProtected = true; // the *brake* lift is not part of the Hop-cutoff budget
+        this._protectedHopExtraVyPxS = 0; // a fresh paid kick supersedes any earlier Hop cutoff
         this._playerHopActive = false;
       }
       if (kicked.spentSpeedPxS > 0) this.airBrakeKickPulse = 1;
@@ -340,6 +344,7 @@ export class Sled {
 
     // hop / bump jump (Space) with coyote time and input buffer
     if (this.hopBufferMs > 0 && this.msSinceContact < TUNING.hopCoyoteMs) {
+      const beforeHopVy = vy;
       const vn = vx * nx + vy * ny;
       const want = TUNING.hopPxS * (phys.hopMul || 1);
       if (vn < want) {
@@ -350,19 +355,30 @@ export class Sled {
       this.msSinceContact = TUNING.groundedGraceMs + 1; // leave the ground immediately
       this.hopPulse = 1;
       this._sinceLaunchMs = 0;
-      // A coyote hop may fire AFTER the AirBrake within this exact substep.
-      // It must not re-arm the hold-release cutoff over the paid brake ascent.
-      this._playerHopActive = !!pad.variableHop && !this.airBrakeLiftProtected;
+      // Hop and AirBrake are INDEPENDENT vertical impulses. Even if the brake
+      // happened on a prior coyote substep, Space release can truncate just
+      // the upward velocity this NEW Hop added, never the paid AirBrake part.
+      this._protectedHopExtraVyPxS = this.airBrakeLiftProtected
+        ? Math.max(0, beforeHopVy - vy) : 0;
+      this._playerHopActive = !!pad.variableHop;
       this._playerHopElapsedMs = 0;
     }
     if (this._playerHopActive) {
       this._playerHopElapsedMs += stepMs;
       if (!pad.hop && this._playerHopElapsedMs >= TUNING.hopMinimumHoldMs) {
-        // Do not add upward height or alter horizontal momentum. Only player's own
-        // Space launch has this cutoff; geyser/spring/rebound impulses do not.
-        if (vy < 0) vy = 0;
+        // Cut only the extra launch velocity introduced by the player Hop.
+        // A previously paid AirBrake kick has its OWN protected ascent; never
+        // zero that separately bought vertical impulse. The stored extra is
+        // attenuated by the same quad drag as vy on subsequent physics steps.
+        if (this.airBrakeLiftProtected) {
+          vy += this._protectedHopExtraVyPxS || 0;
+        } else if (vy < 0) vy = 0;
+        this._protectedHopExtraVyPxS = 0;
         this._playerHopActive = false;
-      } else if (vy >= 0) this._playerHopActive = false;
+      } else if (vy >= 0) {
+        this._protectedHopExtraVyPxS = 0;
+        this._playerHopActive = false;
+      }
     }
 
     // ground snap / crest smoothing: kill the small upward drift off convex crests (see TUNING.snap*)
@@ -460,6 +476,7 @@ export class Sled {
     this.msSinceContact = TUNING.groundedGraceMs + 1;
     this._sinceLaunchMs = 0;
     this._playerHopActive = false;
+    this._protectedHopExtraVyPxS = 0; // other launch supersedes pending optional Hop hold
     this.chuteUsed = false;
     this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
     this._sync();
@@ -484,6 +501,7 @@ export class Sled {
     this.msSinceContact = TUNING.groundedGraceMs + 1;
     this._sinceLaunchMs = 0;
     this._playerHopActive = false;
+    this._protectedHopExtraVyPxS = 0; // other launch supersedes pending optional Hop hold
     this.chuteUsed = false;
     this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
     this._sync();
@@ -550,6 +568,14 @@ export class Sled {
     this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
     this.chuteUsed = false;
     this.airtimeMs = 0;
+    this.airBrakeActive = false;
+    this.airBrakeKickUsed = false; // respawn is a new flight/life
+    this.airBrakeLiftProtected = false;
+    this._protectedHopExtraVyPxS = 0;
+    this.airBrakeKickPulse = 0;
+    this._playerHopActive = false;
+    this._playerHopElapsedMs = 0;
+    this.hopBufferMs = 0;
     this._sync();
   }
 
