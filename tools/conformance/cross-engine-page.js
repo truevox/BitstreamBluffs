@@ -106,7 +106,12 @@
     const al = run.terrain.activeList || [];
     const lastChunk = al.length ? al[al.length - 1] : null;
     out[2] = hashNums([al.length, lastChunk ? lastChunk.endX : 0, lastChunk ? lastChunk.index : 0, hz, pu]);
-    out[9] = hashNums([run.terrain.heightAt(s.x), run.slopeAt(s.x)]);
+    // #253 opt-in probe: these DERIVED readouts use TerrainGenerator._chunkAt,
+    // which itself updates _lastChunk. Disable them in the marker-purity
+    // experiment so observation cannot erase a marker-caused cache change.
+    // Normal conformance tests preserve the historical default behavior.
+    out[9] = window.__ceMarkerCachePure === true ? 0
+      : hashNums([run.terrain.heightAt(s.x), run.slopeAt(s.x)]);
     const kd = [run.kodiakNext || 0, (run.kodiaks || []).length];
     for (const k of run.kodiaks || []) for (const v of Object.values(k)) if (typeof v === 'number' || typeof v === 'boolean') kd.push(v);
     out[3] = hashNums(kd);
@@ -197,7 +202,7 @@
     ensureHooks(run);
     S.hold = true;
     if (!S.rasterReal) S.rasterReal = g.renderer.render;
-    g.renderer.render = o.raster ? S.rasterReal : function () {};
+    g.renderer.render = o.raster && !o.rasterLastFrames ? S.rasterReal : function () {};
     g.loop.wake();
     const title = g.scene.getScene('TitleScene');
     // Return to a clean Title between runs of one session (the previous run's scenes are stopped).
@@ -329,6 +334,10 @@
     const cap = (endTick * 8.34) / dt + 600;
     while (!run.crashed && run.simClock.tick < endTick && frames < cap) {
       t += dt; frames++;
+      // #253 opt-in: rasterize only the last few simulation frames for a
+      // true label-on-canvas screenshot without 1600 costly headless GPU draws.
+      if(o.rasterLastFrames && run.simClock.tick >= endTick-o.rasterLastFrames)
+        g.renderer.render=S.rasterReal;
       g.step(t, dt);
     }
     S.hold = true;
