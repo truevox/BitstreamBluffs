@@ -489,3 +489,22 @@ test('substep Flow expires before landing settlement, and new airborne time star
   expect(end.landing?.shortAirBrakeTouchdown).toBe(true);
   expect(end.landing?.airtimeMs).toBe(119);
 });
+
+test.each([[300,150],[240,190]])('paid kick at gap %i cannot borrow later approach eligibility', (kickGap, points)=>{
+  const scene=Object.create(RunScene.prototype);
+  const awards=[];
+  scene.sled={x:1000,y:200,grounded:false,parachuteMs:300};
+  scene.bsodState={active:true,gapPx:1000,relativeAirX:420,atmosphereDensity:1};
+  scene.bsodBluffs=new BsodBluffTracker();
+  scene.runTimeMs=0;scene.crashed=false;scene.bsodCaught=false;
+  scene.bonus=(n)=>awards.push(n);
+  scene.game={events:{emit:jest.fn()}};
+  scene.updateBsodBluff();
+  scene.runTimeMs=108;
+  scene.bsodState.gapPx=200;
+  scene.updateBsodBluff(true,[],{active:true,gapPx:kickGap,playerX:1000,nowMs:100,
+    grounded:false,crashed:false,canopyDeployed:true,relativeAirX:420,atmosphereDensity:1});
+  scene.sled.x=1400;scene.runTimeMs=800;scene.bsodState.gapPx=900;
+  scene.updateBsodBluff();
+  expect(awards).toEqual([points]);
+});

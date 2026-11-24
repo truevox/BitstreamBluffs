@@ -40,6 +40,11 @@ export class BsodBluffTracker {
     this.lastAwardTimeMs = -Infinity;
   }
 
+  /** Record a paid kick at an already observed approach sample. */
+  recordPaidAirBrake() {
+    if (this.armed) this.usedAirbrake = true;
+  }
+
   /** @returns {{type:string, points:number, chain:number, surfing:boolean, closestGapPx:number}|null} */
   update({
     active, gapPx, playerX, nowMs, grounded, crashed, canopyDeployed,

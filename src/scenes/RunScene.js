@@ -767,7 +767,7 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** A real close approach followed by a parachute escape; zero score for proximity alone. */
-  updateBsodBluff(airBrakeKicked = false, physicalTouchdowns = []) {
+  updateBsodBluff(airBrakeKicked = false, physicalTouchdowns = [], kickSample = null) {
     if (!this.bsodBluffs || !this.sled || !this.bsodState) return;
     // The scorer otherwise sees only the LAST substep of an 8ms frame.
     // A real Matter touchdown followed by a buffered Hop in that frame
@@ -782,15 +782,27 @@ export class RunScene extends Phaser.Scene {
       });
     }
     const s = this.sled, danger = this.bsodState;
+    // Resolve the approach at the actual pre-controls kick position. An
+    // encounter that arms only at the end of this tick cannot claim this kick.
+    // Observe any already-completed escape BEFORE recording the new kick.
+    if (kickSample && airBrakeKicked && !this.bsodCaught && !this.crashed) {
+      const early = this.bsodBluffs.update({ ...kickSample, airbrakeKicked: false });
+      if (early) this.awardBsodBluff(early);
+      this.bsodBluffs.recordPaidAirBrake();
+    }
     const event = this.bsodBluffs.update({
       active: danger.active, gapPx: danger.gapPx, playerX: s.x, nowMs: this.runTimeMs,
       grounded: !!s.grounded, crashed: !!this.crashed || !!this.bsodCaught,
       canopyDeployed: (s.parachuteMs || 0) > 0,
-      airbrakeKicked: !!airBrakeKicked, // actual physical one-shot, not a held button
+      airbrakeKicked: !!airBrakeKicked && !kickSample, // sampled callers only; real controls supply kickSample
       relativeAirX: danger.relativeAirX,
       atmosphereDensity: danger.atmosphereDensity,
     });
-    if (!event) return;
+    if (event) this.awardBsodBluff(event);
+  }
+
+  awardBsodBluff(event) {
+    const s = this.sled;
     // Existing near-miss accounting feeds scoring, missions, achievements and run records.
     this.nearMissCount = (this.nearMissCount || 0) + 1;
     this.bonus(event.points, 'nearMiss');
@@ -1401,13 +1413,22 @@ export class RunScene extends Phaser.Scene {
     // touchdown (or attach its points to a later unrelated landing).
     // Buffer actual contact snapshots before any later substep modifies pose.
     const substepTouchdowns=[];
-    let stepElapsedMs=0, kickSinceTouchdown=false;
+    let stepElapsedMs=0, kickSinceTouchdown=false, bluffKickSample=null;
     stepWorld(
       this.matter.world,
       simDt,
       (stepMs) => {
         const air = this.bsod ? this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere()) : null;
+        // The kick is applied before Matter or the wall advances.
+        const kickSample = air && {
+          active: air.active, gapPx: air.gapPx, playerX: sled.x,
+          nowMs: this.runTimeMs - dt + (simDt > 0 ? stepElapsedMs / simDt * dt : 0),
+          grounded: !!sled.grounded, crashed: !!this.pendingCrash || !!this.bsodCaught,
+          canopyDeployed: (sled.parachuteMs || 0) > 0,
+          relativeAirX: air.relativeAirX, atmosphereDensity: air.atmosphereDensity,
+        };
         sled.applyControls(pad, phys, stepMs, air);
+        if (sled.airBrakeKickPulse) bluffKickSample = kickSample;
         // Integrate visual helicopter yaw over the upcoming physical
         // interval, BEFORE Matter can register a touchdown at its end.
         sled.stepHeli(stepMs);
@@ -1437,6 +1458,7 @@ export class RunScene extends Phaser.Scene {
           contactFs.input.airBrakeKicked=kickSinceTouchdown;
           substepTouchdowns.push({fs:contactFs,kicked:kickSinceTouchdown});
           kickSinceTouchdown=false;
+          bluffKickSample=null;
         }
         this.processContacts();
         // The BSOD advances with the SAME capped physics substeps as the sled. A fast wall cannot
@@ -1544,7 +1566,7 @@ export class RunScene extends Phaser.Scene {
       // tick-wide pre-touchdown brake bonus into the new flight.
       this.updateBsodBluff(
         substepTouchdowns.length ? kickSinceTouchdown : airBrakeKickedThisTick,
-        substepTouchdowns);
+        substepTouchdowns, bluffKickSample);
       // Gym may continue through the same terrain, but score/distance belongs
       // only to the current attempt. Never recredit earlier travel on a retry.
       const origin = this.bsodGym ? this.gymAttemptStartX : this.startX;

@@ -3,9 +3,10 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "behavior-change-unreleased: retain current-flight yaw classification on short paid AirBrake touchdowns",
+  "attestation": "behavior-change-unreleased: observe actual paid AirBrake kick before final-substep bluff arming",
   "changedFiles": [
-    "src/systems/TrickTracker.js"
+    "src/scenes/RunScene.js",
+    "src/systems/BsodBluffTracker.js"
   ],
   "files": {
     "src/constants.js": "sha256:19b22072736e5257d7c872cb68c96a79d3a7ff70a8cf7435938cf2066def6607",
@@ -14,11 +15,11 @@
     "src/entities/Shard.js": "sha256:c0ab9d0682e3a65d004a160ae7d2a0294decd47cc06b9782d2c681a50a27c7e7",
     "src/entities/Sled.js": "sha256:3eb494523cb54e17c556530acbb7b16ed3a536cf207b4202a641e0bff3d19db2",
     "src/entities/TerrainMesh.js": "sha256:c1d23f82fbe130ff4ad8fa215a8434a36e12f9e621e37a42be64aa2bb2217b45",
-    "src/scenes/RunScene.js": "sha256:146f4daa4f2371770e2ab65badaf3c91b77479edb4899e849aa8dd9f5afed276",
+    "src/scenes/RunScene.js": "sha256:54b5dc430e97e45fea801ec38c6dd3efc709c7fe99e493703ee6d6b5084f8a19",
     "src/systems/BiomeEffects.js": "sha256:92e923a3e4321560aacc7ddbb89316fbfdb95768bad3e8a7b4f676160172b556",
     "src/systems/Boosts.js": "sha256:28a4d7472c123d39475ed8782d77240c1f754c89193628e5d8f57d3b983e67c0",
     "src/systems/BsodAerodynamics.js": "sha256:5f24e720a35b949b68d8e14062d4abab397c2e094598542f9ecebfcbf3cf27c3",
-    "src/systems/BsodBluffTracker.js": "sha256:79446f1c0fcfb616b391a40e9b38236b38edc04ecf9f26e25a8f29c0e1731db3",
+    "src/systems/BsodBluffTracker.js": "sha256:5864ba78934609faea37fa8193161edb25ccd05e39b3c1ba7a985c0a67c2638f",
     "src/systems/BsodPursuit.js": "sha256:1ad4778ed093566562f3132e170cc9e16ef720899236848f7911e2d916af13ee",
     "src/systems/DailyDraft.js": "sha256:01f594995d8d100e290f51b91e7fd49b768a1f943b60bf8493f6e05efcd6e207",
     "src/systems/DailyPatch.js": "sha256:220a6e1f227988bcb8ea87bc0ce683d6b5a034c1beb14dd8f8f26a268d3a1e1c",
