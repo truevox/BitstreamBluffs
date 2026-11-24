@@ -24,6 +24,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { decodePad } from '../../src/systems/ghost/GhostTape.js';
+import { decodeRecorderPrefix } from './recorder-snapshot-kit.js';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,11 +41,13 @@ const STRICT = argv.includes('--strict-suffix');
 const repeatFlag=argv.indexOf('--repeat-ticks');
 const BOUNDARY=argv.includes('--repeat-boundaries');
 const MOVING=argv.includes('--repeat-moving');
-const NATURAL=argv.includes('--natural-run'), PROBE=argv.includes('--natural-probe');
+const TERMINAL=argv.includes('--natural-terminal');
+const NATURAL=argv.includes('--natural-run')||TERMINAL, PROBE=argv.includes('--natural-probe');
+const NATURAL_START=TERMINAL?960:0;
 const naturalLimitFlag=argv.indexOf('--natural-limit');
 const NATURAL_LIMIT=naturalLimitFlag===-1?4800:Number(argv[naturalLimitFlag+1]);
-if((NATURAL||PROBE)&&(!STRICT||NATURAL&&PROBE||MOVING||BOUNDARY||repeatFlag!==-1||
-  !Number.isSafeInteger(NATURAL_LIMIT)||NATURAL_LIMIT<1||NATURAL_LIMIT>12000))
+if((NATURAL||PROBE)&&(!STRICT||NATURAL&&PROBE||TERMINAL&&argv.includes('--natural-run')||MOVING||BOUNDARY||repeatFlag!==-1||
+  !Number.isSafeInteger(NATURAL_LIMIT)||NATURAL_LIMIT<=NATURAL_START||NATURAL_LIMIT>12000))
   throw new Error('natural mode requires strict, exclusive mode and a limit 1..12000');
 if(naturalLimitFlag!==-1&&!NATURAL&&!PROBE)throw new Error('--natural-limit requires natural mode');
 if(MOVING&&(!STRICT||BOUNDARY||repeatFlag!==-1))throw new Error('--repeat-moving requires --strict-suffix and no other repeat mode');
@@ -570,6 +573,7 @@ async function runNatural(browser){
   const tape={held:[],edges:[]};
   const source=await bootPage(browser,fx,tape);
   let current=source,candidate=null,cycles=[],tick=0,phase='initial';
+  const mode=PROBE?'probe':TERMINAL?'terminal-window':'full-run';
   const measure=P=>P.page.evaluate(()=>{
     const ss=window.__ss,r=ss.run;
     if(r.crashed){
@@ -592,7 +596,7 @@ async function runNatural(browser){
       m.fatal[0].tick!==m.tick||m.record.cause!=='crash'||m.tape.endTick!==m.tick-1||
       m.tape.runId!==m.record.id||m.tape.score!==m.record.score||m.tape.distanceM!==m.record.distanceM||
       m.droppedMs!==0)throw Error('native terminal record/tape incomplete');
-    const {recorder:r,runId,startedAt}=JSON.parse(m.prefix.data);
+    const {recorder:r,runId,startedAt}=decodeRecorderPrefix(m.prefix);
     const inputCursor=r.inputs.reduce((sum,row)=>sum+row[0],0);
     const trace=Buffer.from(new Float32Array(r.trace).buffer).toString('base64');
     if(r.lastTick!==m.tick-1||r.fingerprintErrorCount||r.fingerprintErrors.length||
@@ -632,7 +636,19 @@ async function runNatural(browser){
       }
       return {fixture:'natural',level:'probe',seed:fx.seed,coverageError:true,tick:NATURAL_LIMIT,pageErrors:source.errors};
     }
-    for(tick=0;tick<NATURAL_LIMIT;tick++){
+    if(NATURAL_START){
+      phase='terminal window warmup';
+      const warmed=await source.page.evaluate(n=>{
+        const ss=window.__ss;
+        for(let i=0;i<n&&!ss.run.crashed;i++){
+          const before=ss.run.simClock.tick;ss.step(1);
+          if(ss.run.simClock.tick!==before+1)throw Error('noncontiguous warmup tick '+before);
+        }
+        return {tick:ss.run.simClock.tick,crashed:ss.run.crashed};
+      },NATURAL_START);
+      if(warmed.tick!==NATURAL_START||warmed.crashed)throw Error('terminal window warmup did not reach live boundary');
+    }
+    for(tick=NATURAL_START;tick<NATURAL_LIMIT;tick++){
       phase='before capture';
       const a=await measure(source),b=current===source?a:await measure(current);
       const d=diff(a,b,tick);if(d.length)throw Error(d.join(','));
@@ -654,11 +670,11 @@ async function runNatural(browser){
       if(current!==source)await current.ctx.close();
       current=candidate;candidate=null;
       if(x.terminal){phase='terminal validation';validateTerminal(x);validateTerminal(y);
-        return {fixture:'natural',level:'full-run',seed:fx.seed,cycles,terminal:x,pageErrors:[]};}
-      if(tick%10===0){console.log('NATURAL_PROGRESS',tick+1);save({fixture:'natural',level:'full-run',seed:fx.seed,cycles,incomplete:true});}
+        return {fixture:'natural',level:mode,startTick:NATURAL_START,seed:fx.seed,cycles,terminal:x,pageErrors:[]};}
+      if(tick%10===0){console.log('NATURAL_PROGRESS',tick+1);save({fixture:'natural',level:mode,startTick:NATURAL_START,seed:fx.seed,cycles,incomplete:true});}
     }
-    return {fixture:'natural',level:'full-run',seed:fx.seed,cycles,coverageError:true,phase:'tick limit reached without crash'};
-  }catch(e){return {fixture:'natural',level:PROBE?'probe':'full-run',seed:fx.seed,cycles,firstDivergentTick:tick,phase,restoreError:String(e.message||e),pageErrors:[...source.errors,...(candidate?.errors||[]),...current.errors]};}
+    return {fixture:'natural',level:mode,startTick:NATURAL_START,seed:fx.seed,cycles,coverageError:true,phase:'tick limit reached without crash'};
+  }catch(e){return {fixture:'natural',level:mode,startTick:NATURAL_START,seed:fx.seed,cycles,firstDivergentTick:tick,phase,restoreError:String(e.message||e),pageErrors:[...source.errors,...(candidate?.errors||[]),...current.errors]};}
   finally{if(candidate)await candidate.ctx.close();if(current!==source)await current.ctx.close();await source.ctx.close();}
 }
 
@@ -673,7 +689,7 @@ if (!STRICT && jsonOut && existsSync(jsonOut)) {
 const done = new Set(results.map(caseKey));
 const plan = [];
 for (const fx of NATURAL||PROBE?['natural']:MOVING?['moving']:['contact', 'hazard']) {
-  if (STRICT) { plan.push([fx,NATURAL?'full-run':PROBE?'probe':REPEAT?'repeat':'full']); continue; }
+  if (STRICT) { plan.push([fx,TERMINAL?'terminal-window':NATURAL?'full-run':PROBE?'probe':REPEAT?'repeat':'full']); continue; }
   plan.push([fx, 'control'], [fx, 'ghost'], [fx, 'game'], [fx, 'kinematic'], [fx, 'contacts'], [fx, 'full']);
   for (const s of ['camera', 'ids', 'runRandom', 'impulses', 'staleSupport', 'timing', 'positionImpulse', 'rawGeometry']) plan.push([fx, 'full', [s]]);
   if (fx === 'hazard') for (const s of ['kodiaks', 'bsod', 'hazardHit', 'pool', 'telegraph']) plan.push([fx, 'full', [s]]);
@@ -697,8 +713,8 @@ if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
 
 if(NATURAL||PROBE){
   const r=results[0],failed=results.length!==1||r.harnessError||r.restoreError||r.coverageError||!r.terminal||r.pageErrors?.length!==0||
-    (NATURAL&&(r.cycles?.length!==r.terminal.tick||!r.cycles.every((c,i)=>c.captureTick===i&&c.nextTick===i+1&&c.recaptured===(i>0)&&c.terminal===(i===r.cycles.length-1)&&(c.terminal||c.canonical))));
-  console.log(failed?'FAIL_NATURAL_RUN':PROBE?'PASS_NATURAL_REFERENCE_ONLY':'PASS_NATURAL_FULL_RUN');
+    (NATURAL&&(r.startTick!==NATURAL_START||r.cycles?.length!==r.terminal.tick-NATURAL_START||!r.cycles.every((c,i)=>c.captureTick===NATURAL_START+i&&c.nextTick===NATURAL_START+i+1&&c.recaptured===(i>0)&&c.terminal===(i===r.cycles.length-1)&&(c.terminal||c.canonical))));
+  console.log(failed?'FAIL_NATURAL_RUN':PROBE?'PASS_NATURAL_REFERENCE_ONLY':TERMINAL?'PASS_NATURAL_TERMINAL_WINDOW':'PASS_NATURAL_FULL_RUN');
   if(failed)process.exitCode=1;
 } else if (REPEAT) {
   const failed=results.length!==(MOVING?1:2)||results.some(r=>r.harnessError||r.restoreError||

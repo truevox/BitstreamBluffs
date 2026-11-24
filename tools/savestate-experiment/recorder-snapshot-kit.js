@@ -29,6 +29,13 @@ function decode(bytes) {
   return JSON.parse(bytes, (_k,v) => sameKeys(v,['__bbDiagnosticNegativeZero']) &&
     v.__bbDiagnosticNegativeZero === true ? -0 : v);
 }
+export function decodeRecorderPrefix(section) {
+  if (!sameKeys(section,['kind','version','data','integrity']) || section.kind !== 'bb-diagnostic-recorder-prefix' || section.version !== 2)
+    fail('missing or invalid section');
+  if (typeof section.data !== 'string' || section.data.length > 8*1024*1024 || seal(section.data) !== section.integrity)
+    fail('integrity mismatch');
+  return decode(section.data);
+}
 function withoutStart(header) {
   const {startedAt,...rest}=header;
   return rest;
@@ -46,8 +53,7 @@ export function prepareRecorderPrefix(run, section, tick) {
     fail('fresh recorder missing or changed');
   if (run.simClock.tick !== 0 || run.ghostRecorder.lastTick !== 0 || run.ghostRecorder.inputs.length)
     fail('target is not fresh');
-  if (typeof section.data !== 'string' || section.data.length > 8*1024*1024 || seal(section.data) !== section.integrity) fail('integrity mismatch');
-  const decoded=decode(section.data);
+  const decoded=decodeRecorderPrefix(section);
   if (!sameKeys(decoded,['runId','startedAt','recorder'])) fail('metadata shape');
   const {recorder:r,runId,startedAt}=decoded;
   if (typeof runId !== 'string' || !runId || !uint(startedAt) || !sameKeys(r,FIELDS) ||

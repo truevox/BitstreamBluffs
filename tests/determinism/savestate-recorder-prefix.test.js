@@ -1,7 +1,7 @@
 import {digestOfBytes} from '../../src/systems/replay/canonicalSha256.js';
 import {utf8Encode} from '../../src/systems/replay/canonicalJson.js';
 import { GhostRecorder } from '../../src/systems/ghost/GhostTape.js';
-import {captureRecorderPrefix,prepareRecorderPrefix,applyRecorderPrefix} from '../../tools/savestate-experiment/recorder-snapshot-kit.js';
+import {captureRecorderPrefix,prepareRecorderPrefix,applyRecorderPrefix,decodeRecorderPrefix} from '../../tools/savestate-experiment/recorder-snapshot-kit.js';
 
 function fresh(startedAt=1) {
   return {runId:'fixture-'+startedAt,startedAt,simClock:{tick:0},ghostRecorder:new GhostRecorder({seed:'test',startedAt})};
@@ -69,4 +69,11 @@ test('zero tick restores a genuinely empty native recorder and rejects nonempty 
   bad.recorder.inputs.push([1,0,0]);
   const data=JSON.stringify(bad);
   expect(()=>prepareRecorderPrefix(fresh(3),{...snapshot,data,integrity:digestOfBytes(utf8Encode(data))},0)).toThrow(/zero-tick history/);
+});
+
+test('terminal history reader verifies integrity and preserves signed-zero trace samples',()=>{
+  const a=prefix(),snap=captureRecorderPrefix(a),decoded=decodeRecorderPrefix(snap);
+  expect(Object.is(decoded.recorder.trace[1],-0)).toBe(true);
+  expect(decodeRecorderPrefix(snap).recorder.lastTick).toBe(8);
+  expect(()=>decodeRecorderPrefix({...snap,data:snap.data+' '})).toThrow(/integrity mismatch/);
 });
