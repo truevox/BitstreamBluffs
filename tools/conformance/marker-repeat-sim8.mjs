@@ -12,8 +12,16 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {chromium} from 'playwright';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+// Compile from THIS exact clean checkout. A stale dist from another HEAD must
+// never acquire the current source identity just by matching the served HTML.
+const sourceStatus=execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim();
+assert.equal(sourceStatus,'','source worktree must be clean for stamped acceptance');
+execFileSync('npm',['run','build'],{cwd:root,timeout:120000,stdio:'pipe'});
 const source=fs.readFileSync(path.join(root,'tools/conformance/cross-engine-page.js'),'utf8');
 const expectedHtml=fs.readFileSync(path.join(root,'dist/index.html'),'utf8');
+const entryPath=/<script[^>]+src="(\/assets\/[^"]+\.js)"/.exec(expectedHtml)?.[1];
+assert(entryPath,'compiled game entry module not found');
+const expectedEntry=fs.readFileSync(path.join(root,'dist',entryPath.slice(1)));
 const url=process.env.GAME_URL || 'http://127.0.0.1:4198/';
 const hzValues=(process.env.HZ||'30,60,120,144').split(',').map(Number);
 assert(hzValues.every(v=>Number.isFinite(v)&&v>=30&&v<=240));
@@ -32,6 +40,9 @@ async function page() {
   const response=await p.goto(url,{waitUntil:'domcontentloaded'});
   assert.equal(response.status(),200);
   assert.equal(await response.text(),expectedHtml,'served game index does not match local built dist/index.html');
+  const servedEntry=await p.request.get(new URL(entryPath,url).href);
+  assert.equal(servedEntry.status(),200,'served compiled game bundle unavailable');
+  assert.deepEqual(await servedEntry.body(),expectedEntry,'served game JavaScript does not match freshly built source bundle');
   await p.waitForFunction(()=>window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive()&&window.__ce,null,{timeout:60000});
   return {p,context,errors};
 }
@@ -98,8 +109,17 @@ async function run(p,{hz,markers,maxTicks=2400,raster=false,rasterLastFrames=0})
     };
     try{
       const out=await window.__ce.play({seed,hz,style:'cruise',params:{},maxTicks,kodiaks:false,raster,rasterLastFrames});
+      const capturedFrame={};
+      if(raster){
+        const v=run.cameras.main.worldView;
+        for(const [label,key] of [['best','bestMarker'],['death','deathMarker']]){
+          const m=run[key],rect=m?.label?.getBounds?.();
+          capturedFrame[label]=!!(m?.label?.visible&&rect && rect.right>v.x&&rect.x<v.right&&
+            rect.bottom>v.y&&rect.y<v.bottom);
+        }
+      }
       return {outcome:out.outcome,digests:out.digests,raw:out.raw,
-        marker:{shown,onscreen,deferredBest,deferredDeath,unjoined,markerUpdates,generatorReads,cacheMutations}};
+        marker:{shown,onscreen,capturedFrame,deferredBest,deferredDeath,unjoined,markerUpdates,generatorReads,cacheMutations}};
     }finally{
       run.renderFrame=real;
       for(const [m,update] of originalUpdates)m.update=update;
@@ -154,6 +174,8 @@ try {
       assert.equal(b.marker.cacheMutations,0);
       assert(b.marker.shown.best?.visible&&b.marker.shown.death?.visible,'both labels must be visible game objects');
       assert(b.marker.onscreen.best&&b.marker.onscreen.death,'both labels must intersect camera during genuine rendered frames');
+      assert(b.marker.capturedFrame.best&&b.marker.capturedFrame.death,
+        'both label text bounds must intersect camera ON THE FRAME BEING CAPTURED');
       const screenshotA=await normal.p.screenshot(),screenshotB=await marked.p.screenshot();
       assert.notEqual(createHash('sha256').update(screenshotA).digest('hex'),
         createHash('sha256').update(screenshotB).digest('hex'),'actual raster buffers must differ with both markers');
@@ -162,6 +184,7 @@ try {
         fs.writeFileSync(`${process.env.RASTER_OUT}-markers.png`,screenshotB,{flag:'wx'});
       }
       rasterEvidence={hz,maxTicks,markerOnscreen:b.marker.onscreen,
+        capturedFrame:b.marker.capturedFrame,
         normalPngSha:createHash('sha256').update(screenshotA).digest('hex'),
         markerPngSha:createHash('sha256').update(screenshotB).digest('hex'),
         markerGeneratorReads:b.marker.generatorReads,markerCacheMutations:b.marker.cacheMutations};
@@ -169,6 +192,7 @@ try {
     }finally{await normal.context.close();await marked.context.close();}
   }
 
-  if(process.env.OUT)fs.writeFileSync(process.env.OUT,JSON.stringify({identity,url,distIndexSha:sha(expectedHtml),readOnlyDerivedProbe:true,results,rasterEvidence},null,2)+'\n',{flag:'wx'});
+  if(process.env.OUT)fs.writeFileSync(process.env.OUT,JSON.stringify({identity,url,distIndexSha:sha(expectedHtml),distEntrySha:createHash('sha256').update(expectedEntry).digest('hex'),
+    freshlyBuilt:true,readOnlyDerivedProbe:true,results,rasterEvidence},null,2)+'\n',{flag:'wx'});
   console.log(`PASS #253 all ${results.length*3} real Chromium render/cadence/run-position cells; no marker-dependent causal state`);
 }finally{await browser.close();}
