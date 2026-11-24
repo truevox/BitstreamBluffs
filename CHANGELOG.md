@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.20.2 — save integrity (2026-11-24)
+
+- #319: distinguish committed IndexedDB runs from session-only fallback; retry failed saves without duplicate scores, serialize initials updates, and close abandoned connections. Game Over reports pending or session-only saves honestly.
+- Add disposable native Chromium persistence fault-injection QA. No simulation, scoring, or ledger-format changes.
+
 ## v2.20.1 — developer diagnostics and local replay artwork (2026-11-24)
 
 - #269: opt-in local Run DNA orientation study; existing V1 output stays unchanged and artwork is explicitly unverified.
