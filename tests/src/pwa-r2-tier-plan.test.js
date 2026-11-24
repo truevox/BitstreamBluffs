@@ -1,0 +1,10 @@
+import {planR2Tiers} from '../../tools/pwa/r2-tier-plan.mjs';
+import {RELEASE_CATALOG} from '../../tools/pwa/r2-release-plan.mjs';
+const base=new URL('.',RELEASE_CATALOG).href;
+const hash='a'.repeat(64),vhash='b'.repeat(64);
+const original={format:'bb-published-music-plan-v1',groups:['required','bonus'].map((priority,i)=>({id:'song:'+i,priority,entries:[{url:base+'packs/a/'+i+'.ogg',bytes:100,sha256:hash},{url:base+'packs/a/pack.json',bytes:10,sha256:hash}]}))};
+const variant=quality=>({quality,entries:[0,1].map(i=>({quality,originalReleaseUrl:base+'packs/a/'+i+'.ogg',url:'/music/packs/a/'+i+'.ogg',variantUrl:'/music-variants/'+quality+'/packs/a/'+i+'.ogg',sourceSha256:hash,sourceBytes:100,sha256:vhash,bytes:quality==='lite'?20:60,channels:1,sampleRate:48000,sourceFrames:576000,frames:576000}))});
+const both={lite:variant('lite'),full:variant('full')};
+test('High obtains required Lite before Full, before optional prefetch; no claimed published derivative URLs',()=>{const p=planR2Tiers(original,both,'high');expect(p.downloads.map(g=>g.priority+':'+g.quality)).toEqual(['required:lite','required:full','bonus:lite','bonus:full']);expect(p.publicationReady).toBe(false);expect(p.groups[0].entries[0].objectKey).toBe('music-variants/lite/packs/a/0.ogg');expect(p.groups[0].entries[0].url).toBeUndefined();});
+test('Space Saver requires only Lite; No Music creates no plan or transfers',()=>{expect(planR2Tiers(original,{lite:both.lite},'space-saver').downloads.map(g=>g.quality)).toEqual(['lite','lite']);expect(planR2Tiers(original,{},'no-music').downloads).toEqual([]);});
+test('rejects wrong source digest, wrong decoded frame count, and incomplete derivatives',()=>{for(const bad of [{sourceSha256:'c'.repeat(64)},{frames:1},{channels:2},{sourceBytes:99}]){const lite=variant('lite');Object.assign(lite.entries[0],bad);expect(()=>planR2Tiers(original,{...both,lite},'high')).toThrow();}const lite=variant('lite');lite.entries.pop();expect(()=>planR2Tiers(original,{...both,lite},'high')).toThrow(/Missing or mismatched/);});
