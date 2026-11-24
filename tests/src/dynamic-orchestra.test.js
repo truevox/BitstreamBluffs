@@ -27,9 +27,9 @@ function fakeDirector() {
 	return d;
 }
 describe('Dynamic Orchestra gates only replacement recordings, not original-stem DSP',()=>{
-	test('defaults OFF and survives strict settings sanitation',()=>{
+	test('retired gameplay preference always sanitizes OFF',()=>{
 		expect(defaultSettings().dynamicOrchestra).toBe(false);
-		expect(sanitizeSettings({dynamicOrchestra:true}).dynamicOrchestra).toBe(true);
+		expect(sanitizeSettings({dynamicOrchestra:true}).dynamicOrchestra).toBe(false);
 		expect(sanitizeSettings({dynamicOrchestra:false}).dynamicOrchestra).toBe(false);
 		expect(sanitizeSettings({dynamicOrchestra:'true'}).dynamicOrchestra).toBe(false);
 	});

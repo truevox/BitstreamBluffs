@@ -389,11 +389,6 @@ export class SoundManagerView extends View {
           {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>settings().musicCrossfade!==false,
         set:v=>updateSetting(game,'musicCrossfade',v)},
-      {kind:'choice',label:'DYNAMIC ORCHESTRA',badge:'PRE-ALPHA',
-        badgeColor:'magenta',options:[
-          {value:false,label:'OFF'},{value:true,label:'ON'}],
-        get:()=>settings().dynamicOrchestra===true,
-        set:v=>updateSetting(game,'dynamicOrchestra',v)},
       ...(unlocked ? [
         {kind:'choice',label:'ORIGINAL VOCALS',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
@@ -424,7 +419,7 @@ export class SoundManagerView extends View {
     if(!this._revealed){this._revealed=true;staggerMenuRows(this.scene,this.menu);}
     if(!this.note){
       this.note=new NeonText(this.scene,this.theme,12,this.h-39,
-        'DYNAMIC ORCHESTRA OFF = SOURCE STEMS + ALL GAME DSP',{
+        'ORIGINAL STEMS + BIOME MELODY + ALL GAME DSP',{
           color:'text',outline:'none',
         });
       this.note.setAlpha(.6);
