@@ -216,6 +216,7 @@ export const TITLE_CARD_INNER_W = TITLE_CARD.w - TITLE_CARD.pad * 2;
 export const TITLE_BANDS = Object.freeze({
   // Both chrome words, plus 3 px either side for the wave and the glitch slices' sideways kick.
   logo: Object.freeze({ x: 110, y: 2, w: 260, h: 92 }),
+  version: Object.freeze({ x: 8, y: 6, w: 96, h: 18 }),
   tagline: Object.freeze({ x: 160, y: 96, w: 150, h: 8 }),
   jukebox: Object.freeze({ x: 372, y: 6, w: 102, h: 30 }),
   menu: Object.freeze({ x: 8, y: 154, w: 208, h: 100 }),
