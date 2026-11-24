@@ -1,0 +1,35 @@
+# Dependencies
+/node_modules
+
+# Parcel cache and build artifacts
+/.parcel-cache
+/dist
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sim sweep raw output (per-rule run dumps); the summary is committed as evidence
+/tools/sim/.reach/*.json
+!/tools/sim/.reach/reachability.json
+
+# OS generated files
+.DS_Store
+Thumbs.db
+config.txt
+.config/config.txt
+
+# Unrelated files
+/public/docs/Slides/
+# Coverage output and sim scratch
+/coverage
+/tools/sim/.pacing
+/tools/sim/__pycache__
+
+# Issue #117 canary working output (regenerable by feel-diff; golden/ + corpus/ + expected/ stay committed)
+/tools/canaries/out/
+
+# Exploit Factory generated output (reproducible; do not commit raw runs)
+/tools/exploits/out/

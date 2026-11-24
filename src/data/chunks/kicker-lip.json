@@ -1,0 +1,40 @@
+{
+  "id": "kicker-lip",
+  "kind": "spline",
+  "weight": 2,
+  "minDistanceM": 40,
+  "lengthPx": 1000,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.3,
+      "y": 43
+    },
+    {
+      "x": 0.58,
+      "y": 93
+    },
+    {
+      "x": 0.74,
+      "y": 72
+    },
+    {
+      "x": 0.86,
+      "y": 58
+    },
+    {
+      "x": 1,
+      "y": 140
+    }
+  ],
+  "tags": [
+    "kicker",
+    "jump-lip"
+  ],
+  "modIds": [
+    "highBandwidth"
+  ]
+}

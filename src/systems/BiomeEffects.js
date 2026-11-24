@@ -1,0 +1,329 @@
+/**
+ * OWNER: gameplay engineer. Phaser-free and pure (no Math.random, no Date): unit-tested in tests/src/biome-effects.test.js.
+ *
+ * The math of the biome full-treatment effects (B0, spec §5 / §6 "test seam for the sled"). RunScene, PhysicsTuner,
+ * Hazard and PowerUp only CALL these, so every number a biome hazard or power-up can put on the sled is unit-tested here,
+ * and the built-game gate (tools/sim/gate-playthrough.mjs) proves the calls are wired.
+ *
+ * Hazard onHit effects added: `blind` {durationMs?, visibility?} (a dimming overlay, never below 35 % visibility) and
+ * `gust` {impulsePxS:[x,y]} (one velocity kick, at most 180 px/s). Power-up kinds added: `ward` (Wards.js), `glide`
+ * {frictionMul, durationMs} and `stabilize` {landingToleranceDeg, bounceMul?, durationMs}.
+ */
+import { PHYSICS } from '../constants.js';
+import { classifyLanding } from './TrickTracker.js';
+import { TUNING } from './PhysicsTuner.js';
+import pmath from './pmath.js';
+
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+// ------------------------------------------------------------------------------------------------ gust
+
+/** Spec §4: a gust impulse is at most 180 px/s. */
+export const GUST_MAX_PX_S = 180;
+
+/**
+ * One bounded velocity kick from a `gust` hazard. The vector keeps its direction and is scaled down to GUST_MAX_PX_S when
+ * longer. World axes, px/s, y down (negative y = up).
+ * @param {[number, number]} impulsePxS
+ * @returns {{dvx:number, dvy:number}}
+ */
+export function gustImpulse(impulsePxS) {
+  if (!Array.isArray(impulsePxS)) return { dvx: 0, dvy: 0 };
+  const x = Number.isFinite(impulsePxS[0]) ? impulsePxS[0] : 0;
+  const y = Number.isFinite(impulsePxS[1]) ? impulsePxS[1] : 0;
+  const m = pmath.hypot(x, y);
+  const k = m > GUST_MAX_PX_S ? GUST_MAX_PX_S / m : 1;
+  return { dvx: x * k, dvy: y * k };
+}
+
+// ------------------------------------------------------------------------------------------------ blind
+
+/** Spec §4: `blind` never fully hides the terrain line: at least 35 % visibility. */
+export const BLIND_MIN_VISIBILITY = 0.35;
+/** Duration of a `blind` hit whose def gives none (spec §4 table: 1.2 s). */
+export const BLIND_DEFAULT_MS = 1200;
+/** Visibility of a `blind` hit whose def gives none. */
+export const BLIND_DEFAULT_VISIBILITY = 0.4;
+/** Fade-in and fade-out of the dimming overlay (ms). */
+export const BLIND_FADE_IN_MS = 90;
+export const BLIND_FADE_OUT_MS = 300;
+
+/** Visibility of a blind hit, clamped to [BLIND_MIN_VISIBILITY, 1]. @param {number} v @returns {number} */
+export function blindVisibility(v) {
+  return clamp(Number.isFinite(v) ? v : BLIND_DEFAULT_VISIBILITY, BLIND_MIN_VISIBILITY, 1);
+}
+
+/**
+ * Alpha of the dimming overlay with `msLeft` of a `totalMs` blind left. A pure function of time (never of the seed or a
+ * random number): a short fade in, full dim, then a fade out. Always within [0, 1 - BLIND_MIN_VISIBILITY].
+ * @param {number} msLeft
+ * @param {number} totalMs
+ * @param {number} visibility raw def value (clamped here).
+ * @returns {number}
+ */
+export function blindOverlayAlpha(msLeft, totalMs, visibility) {
+  if (!(msLeft > 0)) return 0;
+  const full = 1 - blindVisibility(visibility);
+  const elapsed = Math.max(0, (Number.isFinite(totalMs) ? totalMs : 0) - msLeft);
+  const k = Math.min(1, elapsed / BLIND_FADE_IN_MS, msLeft / BLIND_FADE_OUT_MS);
+  return clamp(full * Math.max(0, k), 0, 1 - BLIND_MIN_VISIBILITY);
+}
+
+// ------------------------------------------------------------------------------------------------ glide / stabilize
+
+/** Floor of a glide's friction multiplier (a glide lowers friction; it never removes it). */
+export const GLIDE_MIN_FRICTION_MUL = 0.2;
+/** Default glide multiplier (spec §4 table: ground friction x0.7). */
+export const GLIDE_DEFAULT_FRICTION_MUL = 0.7;
+
+/** A glide's ground-friction multiplier, clamped to [GLIDE_MIN_FRICTION_MUL, 1]. @param {number} m @returns {number} */
+export function glideFrictionMul(m) {
+  return clamp(Number.isFinite(m) ? m : GLIDE_DEFAULT_FRICTION_MUL, GLIDE_MIN_FRICTION_MUL, 1);
+}
+
+/**
+ * B3: the ground-friction multiplier with a glide applied: `frictionMul` x glideFrictionMul(glideMul). PhysicsTuner calls
+ * this (it scales groundResist and groundFriction). No glide (glideMul missing, <= 0 or 1) leaves frictionMul unchanged.
+ * @param {number} frictionMul the multiplier before the glide (daily rule x zones)
+ * @param {number} [glideMul] the active glide's frictionMul (TunerContext.glideFrictionMul)
+ * @returns {number}
+ */
+export function glideFriction(frictionMul, glideMul) {
+  if (!(glideMul > 0)) return frictionMul;
+  return frictionMul * glideFrictionMul(glideMul);
+}
+
+/**
+ * B3 tuning ("make the glides felt"): how far into the glide range a glide multiplier is, 0 (no glide: m >= 1, missing
+ * or <= 0) .. 1 (the floor GLIDE_MIN_FRICTION_MUL). @param {number} [glideMul] @returns {number}
+ */
+export function glideStrength(glideMul) {
+  if (!(glideMul > 0) || glideMul >= 1) return 0;
+  return (1 - glideFrictionMul(glideMul)) / (1 - GLIDE_MIN_FRICTION_MUL);
+}
+
+/**
+ * B3 tuning: the whole drag change of a glide, one pure function of its frictionMul (PhysicsTuner calls it). Ground
+ * friction alone is only ~a quarter of the sled's drag at cruise speed (groundResist ~48 px/s^2 vs frictionAir ~65 and
+ * quadDrag ~69 at 480 px/s), so a friction-only glide measured ~+10 px/s: not felt. A glide of strength s
+ * (glideStrength) also lifts speedMul by `t.glideSpeedLift * s` (frictionAir / speedMul: the Packet Burst path) and cuts
+ * quadDrag by `t.glideQuadCut * s`. No glide is exactly {frictionMul, speedMul: 1, quadMul: 1}.
+ * @param {number} frictionMul the multiplier before the glide (daily rule x zones)
+ * @param {number} [glideMul] the active glide's frictionMul (TunerContext.glideFrictionMul)
+ * @param {{glideSpeedLift:number, glideQuadCut:number}} [t] TUNING
+ * @returns {{frictionMul:number, speedMul:number, quadMul:number}}
+ */
+export function glideDrag(frictionMul, glideMul, t = TUNING) {
+  const s = glideStrength(glideMul);
+  if (s === 0) return { frictionMul: glideFriction(frictionMul, glideMul), speedMul: 1, quadMul: 1 };
+  return {
+    frictionMul: glideFriction(frictionMul, glideMul),
+    speedMul: 1 + clamp(t.glideSpeedLift, 0, 1) * s,
+    quadMul: 1 - clamp(t.glideQuadCut, 0, 0.9) * s,
+  };
+}
+
+/** Largest landing tolerance a stabilize may add (deg). */
+export const STABILIZE_MAX_DEG = 30;
+
+/** Extra landing tolerance of a stabilize, clamped to [0, STABILIZE_MAX_DEG]. @param {number} d @returns {number} */
+export function stabilizeToleranceDeg(d) {
+  return clamp(Number.isFinite(d) ? d : 0, 0, STABILIZE_MAX_DEG);
+}
+
+/** A stabilize's optional bounce multiplier (1 when absent), clamped to [0.1, 1]. @param {number} m @returns {number} */
+export function stabilizeBounceMul(m) {
+  return clamp(Number.isFinite(m) ? m : 1, 0.1, 1);
+}
+
+// ------------------------------------------------------------------------------------------------ spring rebound
+
+/**
+ * A spring rebound slower than this is no rebound: it is what ends the chain of touchdowns (px/s). 120 px/s is the
+ * floor that keeps the bounce visibly felt on the real sled within the accepted ±15% mask-128 hop survival tolerance;
+ * below it a touchdown reads as ordinary ground (500 px/s at the shipped 0.2 share is 100 px/s and does not rebound).
+ */
+export const SPRING_REBOUND_MIN_PX_S = 120;
+/** A spring rebound never exceeds this (px/s, about 32 px of rise at 900 px/s^2): a bounce, never a launch. */
+export const SPRING_REBOUND_MAX_PX_S = 240;
+/** Largest share of the impact speed a rebound may return: always less than it got, so the chain decays. */
+export const SPRING_REBOUND_MAX_SHARE = 0.6;
+
+/**
+ * Sky Jellyfish's felt bounce: the upward speed (px/s, positive = up) a scored landing gets back inside a zone that
+ * carries `physics.landingRebound` (combined by PhysicsTuner.getEffective, Rails already applied). The share is clamped
+ * to [0, SPRING_REBOUND_MAX_SHARE], the result to SPRING_REBOUND_MAX_PX_S, and a result under SPRING_REBOUND_MIN_PX_S is
+ * 0, so on flat ground a chain of touchdowns (each landing at about the speed the last rebound left at) always stops.
+ * @param {number} impactSpeedPxS speed into the ground at touchdown (TrickTracker LandingResult.impactSpeedPxS).
+ * @param {number} share effective landingRebound.
+ * @returns {number}
+ */
+export function springRebound(impactSpeedPxS, share) {
+  if (!Number.isFinite(impactSpeedPxS) || impactSpeedPxS <= 0 || !Number.isFinite(share) || share <= 0) return 0;
+  const v = impactSpeedPxS * clamp(share, 0, SPRING_REBOUND_MAX_SHARE);
+  if (v < SPRING_REBOUND_MIN_PX_S) return 0;
+  return Math.min(v, SPRING_REBOUND_MAX_PX_S);
+}
+
+/**
+ * Slope-normal spring rebound: keep the velocity along the slope and raise the velocity away from it to at least
+ * `upPxS`. `groundAngleDeg` is the terrain slope (clockwise positive = descending right, as SledFrameState defines it),
+ * so the outward normal is `(sin a, -cos a)` and the tangent `(cos a, sin a)`. The outward normal becomes
+ * `max(existing outward, upPxS)`: a touchdown never converts forward/tangential speed into extra bounce energy, which
+ * a global vertical `launchUp` did on descents. A non-positive `upPxS` leaves the velocity unchanged, and bad input is
+ * treated as zero rather than producing NaN. Values are world px/s, y down.
+ * @param {number} vx world px/s.
+ * @param {number} vy world px/s.
+ * @param {number} groundAngleDeg slope under the sled (deg).
+ * @param {number} upPxS desired outward normal speed (px/s, positive = away from the ground).
+ * @returns {{vx:number, vy:number}}
+ */
+export function springReboundVelocity(vx, vy, groundAngleDeg, upPxS) {
+  const x = Number.isFinite(vx) ? vx : 0;
+  const y = Number.isFinite(vy) ? vy : 0;
+  const want = Number.isFinite(upPxS) && upPxS > 0 ? upPxS : 0;
+  if (want === 0) return { vx: x, vy: y };
+  const a = ((Number.isFinite(groundAngleDeg) ? groundAngleDeg : 0) * Math.PI) / 180;
+  const cos = pmath.cos(a);
+  const sin = pmath.sin(a);
+  const along = x * cos + y * sin;
+  const outward = x * sin - y * cos;
+  const n = Math.max(outward, want);
+  return { vx: cos * along + sin * n, vy: sin * along - cos * n };
+}
+
+const RANK = { crash: 0, sloppy: 1, good: 2, perfect: 3 };
+
+/**
+ * Final grade of a landing, as RunScene uses it. With `toleranceDeg` 0 this is exactly the original forgiveness rule
+ * (a crash grade up to TUNING.forgiveAngleDeg and under TUNING.forgiveImpactPxS becomes a sloppy wobble). A stabilize adds
+ * `toleranceDeg`: the landing is re-graded with its angle reduced by the tolerance (TrickTracker's own classifyLanding,
+ * never worse than the original grade) and the forgiveness angle grows by the same amount. Impact limits never move.
+ * @param {{quality:string, angleDeg?:number, impactSpeedPxS?:number}} landing
+ * @param {number} toleranceDeg
+ * @param {{forgiveAngleDeg:number, forgiveImpactPxS:number}} [t] defaults to PhysicsTuner TUNING.
+ * @returns {Object} the landing (same object when nothing changed, else a copy with a new quality).
+ */
+export function resolveLanding(landing, toleranceDeg, t = TUNING) {
+  let l = landing;
+  const tol = stabilizeToleranceDeg(toleranceDeg);
+  const angle = Math.abs(l.angleDeg || 0);
+  const impact = l.impactSpeedPxS || 0;
+  if (tol > 0) {
+    const q = classifyLanding(Math.max(0, angle - tol), impact, false).quality;
+    if (RANK[q] > (RANK[l.quality] == null ? 3 : RANK[l.quality])) l = { ...l, quality: q };
+  }
+  if (l.quality === 'crash' && angle <= t.forgiveAngleDeg + tol && impact < t.forgiveImpactPxS) l = { ...l, quality: 'sloppy' };
+  return l;
+}
+
+// ------------------------------------------------------------------------------------------------ durations
+
+/**
+ * How long a hazard effect lasts (ms), as RunScene applies it and HAZARD_HIT reports it. Base effects are unchanged
+ * (crash 0, slow def or 1500, scramble def or PHYSICS.scrambleDurationMs); gust is an instant kick (0); blind defaults to
+ * BLIND_DEFAULT_MS.
+ * @param {{effect?:string, durationMs?:number}} onHit
+ * @returns {number}
+ */
+export function hazardEffectDurationMs(onHit) {
+  const e = onHit || {};
+  const kind = e.effect || 'crash';
+  if (kind === 'crash' || kind === 'gust') return 0;
+  if (e.durationMs != null) return e.durationMs;
+  if (kind === 'scramble') return PHYSICS.scrambleDurationMs;
+  if (kind === 'blind') return BLIND_DEFAULT_MS;
+  return 1500;
+}
+
+/** Defaults for the timed power-up kinds B0 adds (spec §4 table). */
+export const TIMED_POWERUP_DEFAULT_MS = Object.freeze({ glide: 4000, stabilize: 5000 });
+
+/** Duration of a glide / stabilize pickup (ms). @param {{kind:string, durationMs?:number}} effect @returns {number} */
+export function timedPowerupMs(effect) {
+  const e = effect || {};
+  if (Number.isFinite(e.durationMs) && e.durationMs > 0) return e.durationMs;
+  return TIMED_POWERUP_DEFAULT_MS[e.kind] || 3000;
+}
+
+// ------------------------------------------------------------------------------------------------ drawing choices
+
+/**
+ * Palette key a hazard is drawn in. Spec §4: `danger` is the colour of every BIOME crash hazard, whatever its JSON says.
+ * Base defs keep their own colorKey (glitchChasm is a magenta crash hazard and stays so).
+ * @param {{biome?:string, onHit?:{effect?:string}, colorKey?:string}} def
+ * @returns {string}
+ */
+export function hazardColorKey(def) {
+  const crash = !def.onHit || !def.onHit.effect || def.onHit.effect === 'crash';
+  if (def.biome && crash) return 'danger';
+  return def.colorKey || 'danger';
+}
+
+/**
+ * The palette colour a hazard is drawn in: `hazardColorKey`, falling back to `danger`. The single resolution used by
+ * Hazard's constructor (fresh spawn) AND RunScene's palette switch, so a switch never recolours a hazard differently.
+ * @param {{biome?:string, onHit?:{effect?:string}, colorKey?:string}} def
+ * @param {Object<string,number>} palette
+ * @returns {number}
+ */
+export function hazardColor(def, palette) {
+  const c = palette[hazardColorKey(def)];
+  return c != null ? c : palette.danger;
+}
+
+/** Hazard shapeKeys with their own drawing routine in entities/Hazard.js (B1 adds groomer, seagull, seaweed, chocoRiver; B2 shatterWall, ashCloud; B3 boulder, dewDrop, gearGate; B4 meteor, gustFront). */
+export const HAZARD_SHAPES = Object.freeze(['chasm', 'firewall', 'spike', 'vent', 'drone', 'groomer', 'seagull', 'seaweed', 'chocoRiver', 'shatterWall', 'ashCloud', 'boulder', 'dewDrop', 'gearGate', 'meteor', 'gustFront']);
+/** Power-up shapeKeys with their own glyph in entities/PowerUp.js (B1 adds maple, waxSpray, bubble, candyCoat; B2 goggles, heatShield; B3 skis, jellyWax, treads; B4 gravStabilizer, stabRails). */
+export const POWERUP_SHAPES = Object.freeze(['clock', 'burst', 'shield', 'maple', 'waxSpray', 'bubble', 'candyCoat', 'goggles', 'heatShield', 'skis', 'jellyWax', 'treads', 'gravStabilizer', 'stabRails', 'blackHole']);
+
+/** Drawing routine for a hazard: its shapeKey when Hazard.js knows it, else 'generic' (a visible filled box). */
+export function hazardDrawKind(def) {
+  return HAZARD_SHAPES.includes(def && def.shapeKey) ? def.shapeKey : 'generic';
+}
+
+/** Glyph for a power-up: its shapeKey when PowerUp.js knows it, else 'generic' (a visible diamond). */
+export function powerupDrawKind(def) {
+  return POWERUP_SHAPES.includes(def && def.shapeKey) ? def.shapeKey : 'generic';
+}
+
+// ------------------------------------------------------------------------------------------------ shield sources (B2)
+
+/**
+ * B2: Vertigo Vents' Heat Shield is the existing `shield` kind (spec §4), so it feeds RunScene's one `shieldCharges` pool.
+ * The HUD keeps a chip per pickup id, so RunScene also remembers which pickup each charge came from, one entry per charge,
+ * and reports the spent charge's id. A charge with no tracked source (the W4 shield boost, granted at spawn) is the base
+ * Hashed Backup's, exactly as before B2.
+ */
+export const SHIELD_DEFAULT_SOURCE = 'hashedBackup';
+
+/** Add `charges` (at least 1) entries for pickup `id`. Does not mutate. @param {string[]|undefined} sources @returns {string[]} */
+export function addShieldSource(sources, id, charges) {
+  const n = Math.max(1, Number.isFinite(charges) ? Math.floor(charges) : 1);
+  const out = Array.isArray(sources) ? sources.slice() : [];
+  for (let i = 0; i < n; i++) out.push(String(id));
+  return out;
+}
+
+/**
+ * Spend one charge: the most recent source goes first. Does not mutate.
+ * @param {string[]|undefined} sources
+ * @returns {{sources:string[], id:string}} the remaining sources and the id whose charge was spent.
+ */
+export function spendShieldSource(sources) {
+  const list = Array.isArray(sources) ? sources : [];
+  if (!list.length) return { sources: [], id: SHIELD_DEFAULT_SOURCE };
+  return { sources: list.slice(0, -1), id: list[list.length - 1] };
+}
+
+/**
+ * Charges a pickup's chip shows. A biome shield (any id but SHIELD_DEFAULT_SOURCE) shows only its own tracked charges.
+ * The Hashed Backup shows the pool minus the charges other tracked pickups own, so untracked charges (the W4 Error
+ * Correction boost) stay on its chip and a lone Hashed Backup shows the whole pool, as before B2.
+ * @param {string[]|undefined} sources @param {string} id @param {number} pool @returns {number}
+ */
+export function shieldChargesFor(sources, id, pool) {
+  const list = Array.isArray(sources) ? sources : [];
+  if (id !== SHIELD_DEFAULT_SOURCE) return Math.min(pool || 0, list.filter((s) => s === id).length);
+  return Math.max(0, (pool || 0) - list.filter((s) => s !== id).length);
+}

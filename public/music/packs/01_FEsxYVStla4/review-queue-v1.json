@@ -1,0 +1,43 @@
+{
+  "format": "bitstream-music-review-queue-v1",
+  "songId": "FEsxYVStla4",
+  "status": "machine-ranked-disagreement-not-human-verified",
+  "baselineScoreHash": "dced84f31e200d9bb1d4a3e23c474f9d441692bf44a141fb93f1d015a27c732b",
+  "experimentalScoreHash": "a87dde0ccd906fa2bfa97b07874261c6aa7cb4e529412f6815e0477fdab25995",
+  "selectionMethod": "machine ranking of pitch/class disagreements within 50ms, NOT correctness",
+  "excerpts": [
+    {
+      "id": "other-7680000",
+      "role": "other",
+      "startFrame": 7680000,
+      "endFrame": 8064000,
+      "priorityOrder": 3,
+      "releaseCount": 300,
+      "candidateCount": 98,
+      "samePitchWithin50ms": 52,
+      "disagreementProxy": 73.5
+    },
+    {
+      "id": "guitar-9216000",
+      "role": "guitar",
+      "startFrame": 9216000,
+      "endFrame": 9600000,
+      "priorityOrder": 6,
+      "releaseCount": 242,
+      "candidateCount": 100,
+      "samePitchWithin50ms": 41,
+      "disagreementProxy": 65.0
+    },
+    {
+      "id": "drums-9600000",
+      "role": "drums",
+      "startFrame": 9600000,
+      "endFrame": 9984000,
+      "priorityOrder": 11,
+      "releaseCount": 94,
+      "candidateCount": 145,
+      "samePitchWithin50ms": 56,
+      "disagreementProxy": 55.562
+    }
+  ]
+}

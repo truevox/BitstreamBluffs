@@ -1,0 +1,335 @@
+/**
+ * OWNER: UI engineer.
+ * Phaser-free layout for the profile UI: the TitleScene level badge and the whole contents of the
+ * PROFILE view. `Views.js` and `TitleScene.js` only draw what this returns, so positions, text,
+ * palette keys and alphas can be unit-tested (overlap + contrast) in Jest without booting Phaser.
+ *
+ * Every box is in panel-local / screen-local game pixels (480x270 virtual canvas, 5x7 font: 7 cap
+ * rows + 1 descender row). `x`/`y` are the TOP-LEFT corner, `w`/`h` the measured extent, so a
+ * renderer can draw with `anchor: 'left'` at (x, y) and a test can intersect the boxes directly.
+ */
+import { measureText } from './PixelFont.js';
+import { loadLevelTable, levelForXp, BASE_BIOME_ID } from '../systems/Progression.js';
+import { fmtInt, fmtSec, fmtClock, idToLabel } from './Format.js';
+import { equippedTitle } from '../systems/Cosmetics.js';
+import { sanitizeBiomeProgress, BIOME_IDS } from '../systems/BiomeDiscovery.js';
+import { TITLE_CARD } from './MissionsLayout.js';
+
+/**
+ * Decision 3: the tag an UNLOCKED biome's toggle row carries. It replaces the unlock level on that row (the
+ * level is already reached, so it told the player nothing). NEW = unlocked, never entered; SEEN = a run
+ * entered one of its sectors; DONE = a run rode one of its sectors to the end. Locked biomes keep "LVL n".
+ */
+export const BIOME_STATE_TAGS = Object.freeze({ unlocked: 'NEW', encountered: 'SEEN', completed: 'DONE' });
+const STATE_COLORS = Object.freeze({ unlocked: 'text', encountered: 'cyan', completed: 'lime' });
+
+/**
+ * Label and colour of one unlocked biome's toggle row. The widest (SKY JELLYFISH MOUNTAIN SEEN/DONE) is
+ * 148 px, inside the ~150 px a two-column toggle band leaves before the ON/OFF value (unit-tested).
+ * @param {{name:string, state:string}} row a ProfileStore.biomeToggleRows row
+ * @returns {{text:string, color:string}}
+ */
+export function toggleLabel(row) {
+  const r = row && typeof row === 'object' ? row : {};
+  const state = BIOME_STATE_TAGS[r.state] ? r.state : 'unlocked';
+  return { text: `${String(r.name || r.id || '').toUpperCase()} ${BIOME_STATE_TAGS[state]}`, color: STATE_COLORS[state] };
+}
+
+/**
+ * PROFILE view panel size. Taller than the leaderboard because it carries 10 stats and 11 signatures.
+ *
+ * 240, not 224: with all five W3 signatures unlocked the toggle menu runs to local y 205, and the BACK
+ * button sits at `h - 22`. At h=224 that is y 202, so the fifth ON/OFF row drew underneath the button.
+ * 240 puts the button at 218 and leaves the menu clear by 13px. It still fits the 270px canvas at y=22
+ * (bottom 262). The panel's own `items` were always well clear; it was the toggle band, which is
+ * returned separately and so is not covered by `overlappingPairs(items)`, that overflowed.
+ */
+export const PROFILE_PANEL = Object.freeze({ w: 416, h: 240 });
+
+/**
+ * Screen position of the Title level badge: the top of the right-hand cabinet card (MissionsLayout.TITLE_CARD),
+ * its player section, above BEST and the Daily Patch. Overlap with the logo and the card's other lines is
+ * asserted in tests/src/profilelayout.test.js and tests/src/missionslayout.test.js.
+ */
+export const TITLE_BADGE = Object.freeze({
+  x: TITLE_CARD.x + TITLE_CARD.pad,
+  y: TITLE_CARD.y + TITLE_CARD.sections.level,
+  lineH: TITLE_CARD.sections.title - TITLE_CARD.sections.level,
+  /** The badge text column's width: the card's inner width. */
+  w: TITLE_CARD.w - TITLE_CARD.pad * 2,
+});
+
+const GLYPH_H = 8; // 7 cap rows + the descender row: a conservative box for overlap tests
+const PAD = 12;
+const RIGHT = PROFILE_PANEL.w - PAD;
+
+/** @returns {string} 'H:MM:SS' over an hour, else 'M:SS'. Lifetime totals get large, so plain m:ss is not enough. */
+export function fmtPlaytime(ms) {
+  const total = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+  if (total < 3600) return fmtClock(total * 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  return `${h}:${String(m).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** 'garbage-dump-glacier' -> 'GARBAGE DUMP GLACIER'. Biome ids are kebab-case, ids elsewhere are camelCase. */
+function label(id) {
+  return idToLabel(String(id || '').replace(/[-_]+/g, ' '));
+}
+
+/**
+ * Build one text box. Right-aligned text still records its true left edge so overlap tests are exact.
+ * @param {string} key
+ * @param {string} text
+ * @param {number} x left edge (left/center) or right edge (right-aligned)
+ * @param {number} y top edge
+ * @param {string} color palette key
+ * @param {{align?:'left'|'right', alpha?:number, outline?:'dark'|'glow'|'none'}} [o]
+ */
+function box(key, text, x, y, color, o = {}) {
+  const t = String(text === undefined || text === null ? '' : text);
+  const align = o.align || 'left';
+  const w = measureText(t);
+  return {
+    key,
+    text: t,
+    x: align === 'right' ? x - w : x,
+    y,
+    w,
+    h: GLYPH_H,
+    align,
+    color,
+    alpha: o.alpha === undefined ? 1 : o.alpha,
+    outline: o.outline || 'none',
+  };
+}
+
+/**
+ * Lifetime stat rows, in reading order. Device-best values come straight from the profile the
+ * progression service publishes — this file never re-derives a best from the stored run list.
+ * @param {Object} life profile.lifetime
+ * @returns {[string,string][]}
+ */
+export function statRows(life) {
+  const l = life && typeof life === 'object' ? life : {};
+  const tricks = l.tricks && typeof l.tricks === 'object' ? l.tricks : {};
+  const trickTotal = Object.values(tricks).reduce((a, b) => a + (Number(b) || 0), 0);
+  return [
+    ['RUNS', fmtInt(l.runs)],
+    ['TOTAL DISTANCE', `${fmtInt(l.distanceM)} M`],
+    ['PLAY TIME', fmtPlaytime(l.playMs)],
+    ['BEST SCORE', fmtInt(l.bestScore)],
+    ['BEST DISTANCE', `${fmtInt(l.bestDistanceM)} M`],
+    ['BEST COMBO', `x${(Number(l.bestCombo) || 0).toFixed(2)}`],
+    ['BEST AIR', `${fmtSec(l.maxAirtimeMs)} S`],
+    // RUN SHARDS, not DATA SHARDS: lifetime.shards counts shards earned by runs only (mission shards and
+    // spending never touch it), so it is neither the spendable balance nor all shards ever earned. The
+    // spendable figure is the bank, drawn on the LIFETIME header row.
+    ['RUN SHARDS', fmtInt(l.shards)],
+    ['NEAR MISSES', fmtInt(l.nearMisses)],
+    ['TRICKS', fmtInt(trickTotal)],
+  ];
+}
+
+/**
+ * Layout of the PROFILE view. Defensive: a missing/partial profile renders as a level 1 pilot with
+ * zeroes rather than throwing, because a view can be opened before the first run ever credits.
+ * @param {{profile?:Object, levels?:*}} o `levels` is the parsed levels.json (content.progression)
+ * @returns {{w:number,h:number,items:Object[],bar:{x:number,y:number,w:number,h:number,ratio:number,color:string}}}
+ */
+export function profileLayout(o = {}) {
+  const table = loadLevelTable(o.levels);
+  const p = o.profile && typeof o.profile === 'object' ? o.profile : {};
+  const life = p.lifetime && typeof p.lifetime === 'object' ? p.lifetime : {};
+  const xp = Number(p.xp) || 0;
+  // Derive the level from XP (the same rule ProfileStore applies on every load), so a stale or
+  // hand-edited `level` field can never make the badge disagree with the XP figure beside it.
+  const level = levelForXp(xp, table);
+  const entry = table.levels.find((e) => e.level === level) || { xpMin: 0, title: '' };
+  const next = table.levels.find((e) => e.level === level + 1) || null;
+  const span = next ? next.xpMin - entry.xpMin : 0;
+  const ratio = next && span > 0 ? Math.min(1, Math.max(0, (xp - entry.xpMin) / span)) : 1;
+
+  const items = [];
+  // Sync Level row: level + the title earned at that level.
+  items.push(box('level', `SYNC LEVEL ${level}`, PAD, 24, 'lime'));
+  // SHOP-2: an equipped title replaces the level title; DEFAULT shows the level title.
+  items.push(box('title', equippedTitle(p) || String(entry.title || '').toUpperCase(), RIGHT, 24, 'text', { align: 'right', alpha: 0.85 }));
+  // XP row: figure, Resonance bar, and what is left to the next level.
+  items.push(box('xp', `XP ${fmtInt(xp)}`, PAD, 36, 'amber'));
+  const bar = { x: 96, y: 36, w: 190, h: 7, ratio, color: ratio >= 1 ? 'amber' : 'lime' };
+  if (next) items.push(box('tonext', `${fmtInt(Math.max(0, next.xpMin - xp))} TO L${level + 1}`, RIGHT, 36, 'text', { align: 'right', alpha: 0.85 }));
+  else items.push(box('tonext', 'MAX SYNC', RIGHT, 36, 'amber', { align: 'right' }));
+
+  // Lifetime block: two columns of five, so ten numbers fit without shrinking the font.
+  items.push(box('lifetime-head', 'LIFETIME', PAD, 54, 'amber'));
+  // The spendable balance is the shard figure a player acts on, so it is the primary one on this screen.
+  items.push(box('bank', `BANK ${fmtInt(Math.max(0, Number(p.bank) || 0))}`, RIGHT, 54, 'amber', { align: 'right' }));
+  const rows = statRows(life);
+  rows.forEach(([k, v], i) => {
+    const col = i < 5 ? 0 : 1;
+    const labelX = col === 0 ? PAD : 208;
+    const valueRight = col === 0 ? 186 : RIGHT;
+    const y = 66 + (i % 5) * 12;
+    items.push(box(`stat-k${i}`, k, labelX, y, 'text', { alpha: 0.7 }));
+    items.push(box(`stat-v${i}`, v, valueRight, y, 'cyan', { align: 'right' }));
+  });
+
+  // Biomes: W3 ships the first five signatures, so the W1 "SIGNATURE LOCKED - COMING ONLINE" note is
+  // no longer true for them. It now states how many reached biomes have a playable signature vs how
+  // many are still pending W6, which stays honest as W6 adds the rest.
+  // Hyphen, not an em dash: the 5x7 font has no U+2014 and would draw '?'. 
+  const order = Array.isArray(table.biomeOrder) ? table.biomeOrder : [];
+  // The base biome is unlocked from the first run (issue #65), whatever the profile's list says.
+  const reached = new Set([BASE_BIOME_ID, ...(Array.isArray(p.pendingBiomes) ? p.pendingBiomes : [])]);
+  const reachedCount = order.filter((id) => reached.has(id)).length;
+  const sigIds = new Set(Array.isArray(o.playableBiomeIds) ? o.playableBiomeIds : []);
+  const sigCount = order.filter((id) => reached.has(id) && sigIds.has(id)).length;
+  // The base biome is online but has no ON/OFF toggle (it cannot be turned off), so it is a plain name row.
+  const isToggle = (id) => id !== BASE_BIOME_ID && reached.has(id) && sigIds.has(id);
+  const toggleCount = order.filter(isToggle).length;
+  // SIGNATURES UNLOCKED, not BIOMES REACHED: the count is biomes unlocked by Sync Level (pendingBiomes),
+  // which a player has with zero runs played, so "reached" claimed something that never happened.
+  items.push(box('sig-head', `SIGNATURES UNLOCKED ${reachedCount}/${order.length}`, PAD, 132, 'magenta'));
+  const note = sigIds.size === 0
+    ? 'SIGNATURE LOCKED - COMING ONLINE'
+    : `${sigCount} SIGNATURE${sigCount === 1 ? '' : 'S'} ONLINE`;
+  items.push(box('sig-note', note, RIGHT, 132, 'text', { align: 'right', alpha: 0.7 }));
+  // Signature names sit ABOVE the toggle menu, not behind it. Luna's round-2 finding: the menu was
+  // drawn at y=150 in Views.js while the names ran from y=146, so the ON/OFF rows covered the names.
+  // The geometry lives here now so overlap stays unit-tested instead of depending on two files agreeing.
+  // Name pitch is 10, not 11: the shipped table has ELEVEN biomes (4 rows) and the toggle menu has to
+  // fit under them inside a 224px panel. At pitch 11 with an 11px menu the deepest row ran to y=242.
+    // NAME_TOP must clear the header row (y=132 + GLYPH_H 8) — starting at 138 overlapped it. Pitch 9 is
+  // the tightest that satisfies the GLYPH_H+1 rule in MissionsLayout, and it is what lets four name rows
+  // plus five toggle rows fit in a 224px panel.
+  const NAME_TOP = 141;
+  const NAME_PITCH = 9;
+  // Every signature WITHOUT a toggle row gets a plain name row: a toggle exists only for a biome that is
+  // both unlocked and playable. An unlocked biome already appears in the toggle menu below, labelled with
+  // its unlock level, so listing it twice was pure duplication. This used to list only the not-playable
+  // ones, and production passes every shipped id as playable, so LOCKED biomes vanished from the screen
+  // (audit F11): a new player could not see what was coming.
+  // Two columns (x 12 and 208, the LIFETIME columns), not three: a locked name carries a "LVL n" tag, and
+  // "SKY JELLYFISH MOUNTAIN LVL 25" does not fit a 134px third of the panel.
+  const NAME_COLS = 2;
+  const NAME_COL_X = [PAD, 208];
+  const levelOf = (id) => {
+    const e = table.levels.find((l) => l.biome === id);
+    return e ? e.level : null;
+  };
+  const prog = sanitizeBiomeProgress(p.biomeProgress);
+  const namedOnly = order.filter((id) => !isToggle(id));
+  namedOnly.forEach((id, i) => {
+    const x = NAME_COL_X[i % NAME_COLS];
+    const y = NAME_TOP + Math.floor(i / NAME_COLS) * NAME_PITCH;
+    const has = reached.has(id);
+    // 0.55 alpha keeps even the unreached names above the 4.5:1 contrast floor in both palettes.
+    const name = box(`sig-${id}`, label(id), x, y, has ? 'amber' : 'text', { alpha: has ? 1 : 0.55 });
+    items.push(name);
+    // A locked signature says when it unlocks, in the shop's own "LVL n" wording.
+    const lv = levelOf(id);
+    let right = name;
+    if (!has && lv) {
+      right = box(`lock-${id}`, `LVL ${lv}`, name.x + name.w + 6, y, 'text', { alpha: 0.55 });
+      items.push(right);
+    }
+    // Decision 3: a biome can be entered before it is unlocked (a Daily plays the date's mask), so a plain
+    // name row also says SEEN / DONE when that happened. Its own box: the name and LVL texts stay exact.
+    const st = prog.completed.includes(id) ? 'completed' : prog.encountered.includes(id) ? 'encountered' : null;
+    if (st) items.push(box(`state-${id}`, BIOME_STATE_TAGS[st], right.x + right.w + 6, y, STATE_COLORS[st]));
+  });
+
+  // The toggle menu's band: below the last name row, sized so the deepest row still clears the panel
+  // floor. Five signatures is the worst case; a sixth would push past h, which is why the height is
+  // computed from `order` rather than hardcoded.
+  const nameRows = Math.max(1, Math.ceil(namedOnly.length / NAME_COLS));
+  const lastNameBottom = namedOnly.length
+    ? NAME_TOP + (nameRows - 1) * NAME_PITCH + GLYPH_H
+    : NAME_TOP - NAME_PITCH + GLYPH_H; // no plain rows: sit directly under the header
+  // W6: eleven signatures cannot stack in one column. At 9px pitch, 11 rows from y 142 reach 241 while
+  // BACK starts at 218, so the last three would be covered by a button the player cannot see through —
+  // the exact defect W3's audit already caught once. Split into two columns instead of shrinking the pitch:
+  // 6 rows per column at 9px is 54px, clearing BACK by 22px, and the font stays legible.
+  // Balanced columns (ceil(n/2) rows each, at most 6) rather than always filling 6 before wrapping: now that
+  // locked names are listed above the menu, 6-7 unlocked signatures under two name rows would otherwise
+  // reach the ACHIEVEMENTS line at y 206. Balanced, names plus toggles never exceed six rows in total.
+  const TOGGLE_MAX_ROWS = 6;
+  const TOGGLE_COLS = order.length > TOGGLE_MAX_ROWS ? 2 : 1;
+  const TOGGLE_ROWS_PER_COL = Math.max(1, Math.min(TOGGLE_MAX_ROWS, Math.ceil(toggleCount / TOGGLE_COLS)));
+  const toggleMenu = {
+    x: PAD + 2,
+    y: lastNameBottom + 2,
+    w: PROFILE_PANEL.w - (PAD * 2) - 4,
+    // 9 not 11: the rows must clear the panel floor beneath the signature names. GLYPH_H is 8, so
+    // 9 still leaves a clear row gap.
+    rowH: 9,
+    columns: TOGGLE_COLS,
+    rowsPerColumn: TOGGLE_ROWS_PER_COL,
+  };
+
+  // Two buttons want the strip beside BACK, and both belong on this screen:
+  //   * W5's ACHIEVEMENTS entry — the spec puts the grid in Profile, and Title has no seventh row;
+  //   * W4's SHARD SHOP — Title's band fits six 2x rows (y92..196, daily strip at 202) and the shop was
+  //     the seventh, the overflow CC Friday caught with SETTINGS.
+  // BACK is right-aligned at x w-76, so both fit left of it: 96 + 8 + 96 = 200px, well inside 416.
+  const achUnlocked = Object.keys(p.achievements && typeof p.achievements === 'object' ? p.achievements : {}).length;
+  const achTotal = Number(o.achievementTotal) > 0 ? Number(o.achievementTotal) : 0;
+  items.push(box('ach-summary',
+    achTotal ? `ACHIEVEMENTS ${achUnlocked}/${achTotal}` : `ACHIEVEMENTS ${achUnlocked}`,
+    PAD, PROFILE_PANEL.h - 34, 'amber', { alpha: 0.9 }));
+  // Decision 3: how many biomes this pilot has actually entered and ridden through, on the same line as the
+  // achievements count (right-aligned; the toggle band always ends above this line).
+  const biomeTotal = order.length || BIOME_IDS.length;
+  items.push(box('biome-progress', `BIOMES SEEN ${prog.encountered.length}/${biomeTotal} DONE ${prog.completed.length}/${biomeTotal}`,
+    RIGHT, PROFILE_PANEL.h - 34, 'cyan', { align: 'right', alpha: 0.9 }));
+  const BTN_Y = PROFILE_PANEL.h - 22;
+  const achButton = { x: PAD, y: BTN_Y, w: 96, h: 16 };
+  const shopButton = { x: PAD + 96 + 8, y: BTN_Y, w: 96, h: 16 };
+  // SHOP-2: TITLES opens the title picker. Third in the strip (x 220..316), still clear of BACK at x 340.
+  const titlesButton = { x: PAD + (96 + 8) * 2, y: BTN_Y, w: 96, h: 16 };
+
+  // Physical rows the menu occupies: with two columns that is the taller column, not the row count, which
+  // is what the overlap test has to measure.
+  const togglePhysicalRows = toggleCount ? TOGGLE_ROWS_PER_COL : 0;
+  return {
+    w: PROFILE_PANEL.w, h: PROFILE_PANEL.h, items, bar, toggleMenu,
+    toggleRowCount: toggleCount, togglePhysicalRows, achButton, achUnlocked, achTotal, shopButton, titlesButton,
+  };
+}
+
+/**
+ * Title-screen level badge. Two short lines in the top-left corner, left of the logo: the subtitle
+ * sits at y 76-83 and the menu panel starts at y 92, so a centred badge there would collide with both.
+ * `outline: 'dark'` because the badge sits on the animated backdrop, not on a flat panel.
+ * @param {{profile?:Object, levels?:*}} o
+ * @returns {{level:number, items:Object[]}|null} null = nothing to draw (no profile yet)
+ */
+export function titleBadgeLayout(o = {}) {
+  const p = o.profile;
+  if (!p || typeof p !== 'object') return null;
+  const table = loadLevelTable(o.levels);
+  const level = levelForXp(Number(p.xp) || 0, table);
+  const entry = table.levels.find((e) => e.level === level) || { title: '' };
+  const items = [
+    box('badge-level', `SYNC LEVEL ${level}`, TITLE_BADGE.x, TITLE_BADGE.y, 'lime', { outline: 'dark' }),
+    // SHOP-2: the equipped title, else the level title.
+    box('badge-title', equippedTitle(p) || String(entry.title || '').toUpperCase(), TITLE_BADGE.x, TITLE_BADGE.y + TITLE_BADGE.lineH, 'text', { outline: 'dark', alpha: 0.85 }),
+  ];
+  return { level, items };
+}
+
+/** @param {Object[]} items @returns {Object[]} every overlapping pair, for tests and HUD probes. */
+export function overlappingPairs(items) {
+  const hits = [];
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const p = items[i];
+      const q = items[j];
+      const ix = Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x);
+      const iy = Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y);
+      if (ix > 1 && iy > 1) hits.push([p.key, q.key]);
+    }
+  }
+  return hits;
+}

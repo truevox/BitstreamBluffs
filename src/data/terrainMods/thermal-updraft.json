@@ -1,0 +1,1 @@
+{ "id": "thermalUpdraft", "colorKey": "amber", "physics": { "gravityMul": 0.82 }, "weight": 3, "minDistanceM": 140, "lengthPx": [400, 850] }

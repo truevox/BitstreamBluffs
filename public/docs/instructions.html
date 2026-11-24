@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitstream Bluffs - Instructions</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #000022;
+            color: #00ffff;
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        .star {
+            position: fixed;
+            border-radius: 50%;
+            opacity: 0.8;
+            animation: twinkle 3s infinite alternate;
+            z-index: -1;
+        }
+        
+        @keyframes twinkle {
+            0% { opacity: 0.4; }
+            100% { opacity: 0.8; }
+        }
+
+        /* Ensure fade-out always wins */
+        .back-to-game.fade-out {
+            opacity: 0 !important;
+            pointer-events: none;
+            transition: opacity 0.6s !important;
+        }
+        
+        /* Retro scan lines */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.05),
+                rgba(0, 0, 0, 0.05) 1px,
+                transparent 1px,
+                transparent 4px
+            );
+            pointer-events: none; /* Allow clicking through the scan lines */
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1, h2, h3 {
+            font-family: 'Press Start 2P', cursive;
+            color: #ff00ff;
+            text-shadow: 2px 2px 0px #000;
+            margin-top: 40px;
+        }
+        
+        h1 {
+            font-size: 32px;
+        }
+        
+        h2 {
+            font-size: 24px;
+        }
+        
+        h3 {
+            font-size: 20px;
+        }
+        
+        p {
+            margin: 20px 0;
+            font-size: 20px;
+        }
+        
+        .key {
+            display: inline-block;
+            background-color: #333355;
+            border: 2px solid #00ffff;
+            border-radius: 5px;
+            padding: 2px 8px;
+            margin: 0 5px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #ffffff;
+        }
+        
+        .box {
+            background-color: #000033;
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        
+        .glow {
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0ff, 0 0 20px #0ff;
+            }
+            to {
+                text-shadow: 0 0 10px #fff, 0 0 15px #0ff, 0 0 20px #0ff, 0 0 25px #0ff;
+            }
+        }
+        
+        .button {
+            display: inline-block;
+            background-color: #000022;
+            border: 3px solid #00ffff;
+            border-radius: 8px;
+            padding: 10px 20px;
+            margin: 20px 0;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            color: #00ffff;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .button:hover {
+            background-color: #00ffff;
+            color: #000022;
+            transform: scale(1.05);
+        }
+        
+        .tricks {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin: 30px 0;
+        }
+        
+        .trick-card {
+            width: 45%;
+            background-color: #000033;
+            border: 2px solid #ff00ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .back-link {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #00ffff;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            color: #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="glow">BITSTREAM BLUFFS</h1>
+        <p>Welcome to the digital slopes! Navigate the procedurally generated terrain, perform tricks, and challenge your friends with the same seed.</p>
+        
+        <div class="box">
+            <h2>OBJECTIVE</h2>
+            <p>Ride down the procedurally generated mountain while performing tricks to score points. Avoid obstacles and find the optimal path to maximize your score!</p>
+        </div>
+        
+        <h2>CONTROLS</h2>
+        <div class="box">
+            <h3>Tricks Right (default)</h3>
+            <p><span class="key">↑</span> Frontflip · <span class="key">↓</span> Backflip · <span class="key">→</span> Helicopter · <span class="key">←</span> Corkscrew</p>
+            <p><span class="key">W</span> Parachute · <span class="key">A</span> Airbrake (ground brake) · <span class="key">S</span> Divebomb · <span class="key">D</span> Tuck</p>
+            <p><span class="key">SPACE</span> Hop; release early for a shorter ascent.</p>
+            <h3>Other layouts</h3>
+            <p>Settings → Controls can swap the arrow and WASD clusters (Tricks Left) or select the original Classic layout.</p>
+            <p>On a gamepad or touch screen, consult the on-screen control display.</p>
+        </div>
+
+        <h2>RIDING</h2>
+        <div class="box">
+            <p>Use terrain and well-timed jumps to build speed. Landing angle matters; tuck to stay fast, or deploy the sail when airborne.</p>
+            <p><strong>Stuck in a valley?</strong> Hop and hold the parachute to catch the wind and regain forward momentum. It does not require a trick combo.</p>
+            <p>Wind noise reflects air moving <em>relative to you</em>, not just the sled's speed. Keep an eye on the helmet pom-pom if you cannot hear it.</p>
+            <p>Space Mountain has almost no atmosphere: the sail and ordinary wind do not work there, but low gravity gives you more time to maneuver.</p>
+        </div>
+
+        <h2>SEEDS</h2>
+        <div class="box">
+            <p>Each game is generated using a unique seed. Share your seed with friends to challenge them on the exact same terrain!</p>
+            <p>You can copy, paste, or manually edit the seed on the start screen.</p>
+        </div>
+
+        <!-- 🔽 START: AVALANCHE WARNING SECTION 🔽 -->
+        <h2>AVALANCHE WARNING</h2>
+        <div class="box">
+          <p><strong>⚠️ WARNING: THE BIT STREAM APPROACHES</strong></p>
+          <p>Somewhere behind you—beneath the snow, beneath the code—a force is unraveling the mountain.</p>
+          <p>No one knows exactly what it is.</p>
+          <p>Some riders call it <em>The Bitrot Blizzard</em>—an endless, unraveling corruption gnawing at the terrain.<br>
+             Others call it <em>The Bit Stream Of Death</em> (BSOD)—a cold, calculating wave of deleted possibilities.<br>
+             And some, with a look in their eyes like they've seen too much, just call it <em>The Snow Crash</em>.</p>
+          <p>❄️ It does not slow.<br>
+             🧠 It does not forget.<br>
+             💾 It does not <em>crash</em>.</p>
+          <p>It <strong>terminates</strong>.</p>
+          <p>If it catches you, your run ends in corruption—erased from memory, dumped to void.</p>
+          <p><strong>🛷 How to survive?</strong><br>
+             - Keep moving.<br>
+             - Ride like the fate of your file system depends on it.<br>
+             - Do your tricks, but <em>don’t linger</em>.<br>
+             - Whatever you do, <strong>don’t stop to look back</strong>.</p>
+          <p>The BSOD compresses the atmosphere ahead into a tailwind. The faster you move with that air, the quieter it can become—even if the wall is close.</p>
+        </div>
+        <!-- 🔼 END: AVALANCHE WARNING SECTION 🔼 -->
+
+        <!-- 🔽 START: TERRAIN COLORS SECTION 🔽 -->
+        <h2>TERRAIN COLORS</h2>
+        <div class="box">
+          <p>The slopes of Bitstream Bluffs are streaked with <strong>neon colors</strong>—each with unique effects on your ride:</p>
+          <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+            <li><span style="color: #00ffff; font-weight: bold;">Blue</span>: <strong>Extra Points!</strong> — Riding over blue terrain gives you a score bonus. Chase these streaks for high scores.</li>
+            <li><span style="color: #00ff88; font-weight: bold;">Green</span>: <strong>Speed Boost!</strong> — Green terrain has <em>less friction</em>. You'll accelerate faster and maintain more speed. Great for big jumps and outrunning danger.</li>
+            <li><span style="color: #ff00ff; font-weight: bold;">Magenta</span>: <strong>Slows You Down!</strong> — Magenta terrain has <em>more friction</em>. It can sap your momentum, so watch out when speed matters.</li>
+          </ul>
+          <p>Mastering when and how to use each terrain type is key to survival and high scores.</p>
+        </div>
+        <!-- 🔼 END: TERRAIN COLORS SECTION 🔼 -->
+
+        <h2>TIPS</h2>
+        <div class="box">
+            <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <li>Build momentum before attempting jumps</li>
+                <li>Land on downward slopes to maintain speed</li>
+                <li>Chain tricks together for combo multipliers</li>
+                <li>Use the seed system to practice difficult sections</li>
+                <li>Try to find secret paths and shortcuts in the terrain</li>
+            </ul>
+        </div>
+        
+        <a href="../index.html" class="button" onclick="returnToGame(event)">RETURN TO GAME</a>
+    </div>
+    
+    <a href="../index.html" class="back-link" onclick="returnToGame(event)">← BACK TO GAME</a>
+    
+    <script>
+        // Preload fonts to avoid FOUC (Flash of Unstyled Content)
+        document.fonts.ready.then(() => {
+            document.body.style.opacity = 1;
+        });
+        
+        // Create starfield background with actual stars
+        document.addEventListener('DOMContentLoaded', () => {
+            const colors = ['#ff00ff', '#00ffff', '#ffff00']; // Magenta, Cyan, Yellow
+            const starCount = 70; // Create 70 stars (a bit more muted than the start screen's 100)
+            
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.classList.add('star');
+                
+                // Random position
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                star.style.left = `${x}%`;
+                star.style.top = `${y}%`;
+                
+                // Random size (smaller than start screen for muted effect)
+                const size = 1 + Math.random() * 2;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                
+                // Random color
+                const colorIndex = Math.floor(Math.random() * colors.length);
+                star.style.backgroundColor = colors[colorIndex];
+                
+                // Random animation delay for twinkling effect
+                star.style.animationDelay = `${Math.random() * 3}s`;
+                
+                // Add to document
+                document.body.appendChild(star);
+            }
+        });
+    </script>
+<script>
+  // Allows both RETURN TO GAME and ← BACK TO GAME to close the window if possible, or fallback to redirect
+  function returnToGame(e) {
+    if (e) e.preventDefault();
+    // Try to close the window (works if opened via script)
+    window.close();
+    // If window.close() fails (not opened by script), fallback to redirect
+    window.location.href = '/index.html';
+  }
+
+  console.log('Instructions script loaded');
+  
+  // Find the BACK TO GAME element by its text content
+  function findBackToGameElement() {
+    // Method 1: Try to find by text content
+    const allElements = document.querySelectorAll('*');
+    for (const el of allElements) {
+      if (el.textContent && el.textContent.trim() === 'BACK TO GAME' || 
+          el.textContent && el.textContent.trim() === '← BACK TO GAME') {
+        console.log('Found BACK TO GAME by text!', el);
+        return el;
+      }
+    }
+    console.log('Could not find BACK TO GAME element');
+    return null;
+  }
+  
+  function atPageBottom() {
+    const scrollY = window.scrollY || window.pageYOffset;
+    const viewportHeight = window.innerHeight;
+    const pageHeight = document.documentElement.scrollHeight;
+    const buffer = 50; // Larger buffer for earlier fade
+    const atBottom = (scrollY + viewportHeight) >= (pageHeight - buffer);
+    return atBottom;
+  }
+  
+  function updateBackButtonVisibility() {
+    const backButton = findBackToGameElement();
+    
+    if (!backButton) {
+      console.log('Back button not found, cannot update visibility');
+      return;
+    }
+    
+    if (atPageBottom()) {
+      // Apply fade styles directly
+      backButton.style.opacity = '0';
+      backButton.style.pointerEvents = 'none';
+      console.log('Fade-out applied to:', backButton);
+    } else {
+      backButton.style.opacity = '1';
+      backButton.style.pointerEvents = 'auto';
+      console.log('Fade-in applied to:', backButton);
+    }
+  }
+  
+  // Run when page is loaded
+  window.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded - searching for BACK TO GAME element');
+    
+    const backButton = findBackToGameElement();
+    if (backButton) {
+      // Add transition for smooth fade
+      backButton.style.transition = 'opacity 0.6s ease';
+      console.log('Added transition to back button');
+    }
+    
+    // Initial check
+    updateBackButtonVisibility();
+    
+    // Event listeners
+    window.addEventListener('scroll', updateBackButtonVisibility);
+    window.addEventListener('resize', updateBackButtonVisibility);
+  });
+</script>
+
+</body>
+</html>

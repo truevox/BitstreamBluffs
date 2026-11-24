@@ -1,0 +1,289 @@
+/**
+ * W3 — the biome mask in saved data (D6: seed-best and daily-best compare only within the same mask).
+ *
+ * The rules that matter here are about old data, not new data: a record written before this campaign
+ * has no `biomeMask`, must still load, must keep its ledger hash, and must count as mask 0. Anything
+ * that reinterprets an existing run would silently rewrite somebody's leaderboard.
+ */
+import { SaveStore, sanitizeRun, parseSeedMask } from '../../src/systems/SaveStore.js';
+import { DailyPatch } from '../../src/systems/DailyPatch.js';
+import { toggleBiome, biomeToggleRows } from '../../src/systems/ProfileStore.js';
+import { STORAGE } from '../../src/constants.js';
+import { readDir } from './_helpers.js';
+const BIOME_DEFS = readDir('biomes');
+
+// Fixed id: the ledger hash covers id, so a fixture whose id varies with its fields would make the
+// "mask does not enter the hash" assertion below pass or fail for the wrong reason.
+const run = (over = {}) => ({
+  version: 1, id: 'r-fixed', seed: 'alpha',
+  dailyRuleId: '', startedAt: 1, endedAt: 2, durationMs: 1000, score: 100, distanceM: 10,
+  trickPoints: 0, tricks: {}, bestCombo: 1, maxAirtimeMs: 0, cause: 'crash', ledgerHash: 'abcd1234',
+  ...over,
+});
+
+describe('biomeMask in run records', () => {
+  test('a record from before this campaign has no mask and is unchanged by sanitising', () => {
+    const old = run();
+    expect('biomeMask' in old).toBe(false);
+    const out = sanitizeRun(old);
+    // Absent, not zero: writing 0 into every historical run would rewrite stored data for no reason.
+    expect('biomeMask' in out).toBe(false);
+    expect(out.ledgerHash).toBe('abcd1234');
+    expect(out.version).toBe(STORAGE.saveVersion);
+  });
+
+  test('a mask survives sanitising and is coerced to a non-negative integer', () => {
+    expect(sanitizeRun(run({ biomeMask: 21 })).biomeMask).toBe(21);
+    expect(sanitizeRun(run({ biomeMask: 0 })).biomeMask).toBe(0);
+    expect(sanitizeRun(run({ biomeMask: 5.9 })).biomeMask).toBe(5);
+    for (const bad of [-1, NaN, Infinity, '7', null]) {
+      expect({ bad, has: 'biomeMask' in sanitizeRun(run({ biomeMask: bad })) })
+        .toMatchObject({ bad, has: false });
+    }
+  });
+
+  test('the mask does NOT enter the ledger hash and saveVersion is not bumped', () => {
+    // Both are hard constraints of the campaign: existing saved runs must stay valid, and a version
+    // bump would force a migration on every device.
+    expect(STORAGE.saveVersion).toBe(1);
+    const a = run();
+    const b = run({ biomeMask: 16 });
+    expect(SaveStore.computeLedgerHash(b)).toBe(SaveStore.computeLedgerHash(a));
+  });
+});
+
+describe('mask-scoped seed and daily stats', () => {
+  const store = (runs) => {
+    const s = new SaveStore({ storage: null }); // memory fallback: no localStorage in Jest
+    s.runs = runs;
+    return s;
+  };
+
+  test('seed stats separate masks, and old records count as mask 0', () => {
+    const s = store([
+      run({ id: 'old', seed: 'alpha', score: 500, distanceM: 50 }), // pre-W3: no field
+      run({ id: 'm0', seed: 'alpha', score: 100, distanceM: 10, biomeMask: 0 }),
+      run({ id: 'm1', seed: 'alpha', score: 900, distanceM: 90, biomeMask: 1 }),
+    ]);
+    expect(s.getSeedStats('alpha', { biomeMask: 0 })).toMatchObject({ attempts: 2, bestScore: 500 });
+    expect(s.getSeedStats('alpha', { biomeMask: 1 })).toMatchObject({ attempts: 1, bestScore: 900 });
+    expect(s.getSeedStats('alpha', { biomeMask: 2 })).toBeNull();
+  });
+
+  test('omitting the mask keeps the pre-W3 behaviour of comparing every run', () => {
+    // The leaderboard and the legacy tests call this without a mask; that must not silently start
+    // ignoring runs.
+    const s = store([
+      run({ id: 'old', seed: 'alpha', score: 500, distanceM: 50 }),
+      run({ id: 'm1', seed: 'alpha', score: 900, distanceM: 90, biomeMask: 1 }),
+    ]);
+    expect(s.getSeedStats('alpha')).toMatchObject({ attempts: 2, bestScore: 900, bestDistanceM: 90 });
+  });
+
+  test('daily stats count only official Daily runs on the date\'s mask (decisions 1/2)', () => {
+    // Replaces the old "scoped by the daily seed, which already fixes the mask" test. That rule let a
+    // typed `daily-<date>@mask` run, or one replayed from SHARE SEED at another mask, become TODAY'S BEST
+    // (audit F1). Marvin's decisions: Daily bests are scoped by gameplay mask, and only a run started from
+    // the DAILY RUN item is official. A legacy record (no hashV) counts only on the date's mask and rule,
+    // so a pre-W3 record with no mask field no longer counts on a day whose derived mask is non-zero.
+    let when = null;
+    for (let i = 0; i < 30 && !when; i++) {
+      const d = new Date(Date.UTC(2026, 10, 13 + i, 12));
+      if (DailyPatch.biomeMaskForDate(d) !== 0) when = d;
+    }
+    expect(when).not.toBeNull();
+    const dateKey = when.toISOString().slice(0, 10);
+    const info = DailyPatch.infoForDateKey(dateKey);
+    const s = store([
+      // A record written before this campaign existed: no biomeMask field at all (mask 0 != the date's).
+      run({ id: 'd-old', seed: `daily-${dateKey}`, score: 900, distanceM: 90, dailyRuleId: info.rule.id }),
+      // A typed run at another mask: practice, not the Daily.
+      run({ id: 'd-new', seed: `daily-${dateKey}`, score: 300, distanceM: 30, biomeMask: 3, dailyRuleId: info.rule.id }),
+      // A legacy record on the date's own mask and rule: kept (real Daily history).
+      run({ id: 'd-legacy', seed: `daily-${dateKey}`, score: 200, distanceM: 20, biomeMask: info.biomeMask, dailyRuleId: info.rule.id }),
+      // A new official run from the DAILY RUN item.
+      run({ id: 'd-off', seed: `daily-${dateKey}`, score: 250, distanceM: 25, biomeMask: info.biomeMask, dailyRuleId: info.rule.id, hashV: 2, dailyOfficial: true }),
+      run({ id: 'd-other', seed: 'daily-1999-01-01', score: 9999 }),
+    ]);
+    expect(s.getDailyStats(when)).toMatchObject({ attempts: 2, bestScore: 250, dateKey });
+  });
+});
+
+describe('daily mask derivation (D6)', () => {
+  test('is a pure function of the date: same day, same mask, every caller', () => {
+    const d = new Date('2026-11-13T00:00:01Z');
+    expect(DailyPatch.biomeMaskForDate(d)).toBe(DailyPatch.biomeMaskForDate(new Date(d.getTime())));
+    // Accepts epoch ms as well as a Date.
+    expect(DailyPatch.biomeMaskForDate(d.getTime())).toBe(DailyPatch.biomeMaskForDate(d));
+  });
+
+  test('is independent of unlocks — a locked biome can appear as a preview', () => {
+    // Nothing about the player is an input. This is the whole of D6's "same for every player".
+    const masks = new Set();
+    for (let i = 0; i < 9; i++) masks.add(DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 9, 1 + i))));
+    expect([...masks].sort((a, b) => a - b)).toEqual([0, 1, 2, 4, 8, 16]);
+  });
+
+  // Before the decision-5 cutover (2026-11-17); the 15-day rotation after it is pinned in daily-w6-rotation.test.js.
+  test('mostly mask 0, and cycles rather than drifting', () => {
+    const masks = [];
+    for (let i = 0; i < 9; i++) masks.push(DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 9, 1 + i))));
+    expect(masks.filter((m) => m === 0).length).toBe(4);
+    // 9-day cycle: the mask repeats exactly 9 days later, so there is no drift.
+    for (let i = 0; i < 9; i++) {
+      const a = DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 9, 1 + i)));
+      const b = DailyPatch.biomeMaskForDate(new Date(Date.UTC(2026, 9, 10 + i)));
+      expect({ i, b }).toMatchObject({ i, b: a });
+    }
+  });
+
+  test('an invalid input falls back instead of throwing', () => {
+    expect(Number.isFinite(DailyPatch.biomeMaskForDate(new Date('nope')))).toBe(true);
+    expect(Number.isFinite(DailyPatch.biomeMaskForDate(undefined))).toBe(true);
+  });
+});
+
+describe('seed@mask entry (W3)', () => {
+  const DEFS = [{ bit: 1 }, { bit: 2 }, { bit: 4 }, { bit: 8 }, { bit: 16 }];
+
+  test('a bare seed is mask 0 and is used verbatim', () => {
+    // Every seed string that existed before W3 must keep meaning exactly what it meant.
+    for (const seed of ['alpha', 'bitstream-bluffs', '2026-11-13', 'with space', 'UPPER']) {
+      expect(parseSeedMask(seed, DEFS)).toEqual({ seed, biomeMask: 0, hadSuffix: false });
+    }
+  });
+
+  test('a numeric suffix selects a mask', () => {
+    expect(parseSeedMask('alpha@1', DEFS)).toEqual({ seed: 'alpha', biomeMask: 1, hadSuffix: true });
+    expect(parseSeedMask('alpha@21', DEFS)).toEqual({ seed: 'alpha', biomeMask: 21, hadSuffix: true });
+    expect(parseSeedMask('  alpha@16  ', DEFS)).toEqual({ seed: 'alpha', biomeMask: 16, hadSuffix: true });
+  });
+
+  test('unknown bits are dropped, because a mask bit with no biome is unplayable terrain', () => {
+    // 999 has bits outside the five batch-1 biomes (bits 0-4); only 1|2|4 survive.
+    expect(parseSeedMask('alpha@999', DEFS)).toEqual({ seed: 'alpha', biomeMask: 7, hadSuffix: true });
+  });
+
+  test('anything that is not a clean suffix is treated as a seed, not rejected', () => {
+    // A seed is arbitrary player text; silently refusing it would lose the run they asked for.
+    for (const raw of ['alpha@', '@5', 'a@b', 'alpha@x', 'alpha @ 5', '']) {
+      expect({ raw, out: parseSeedMask(raw, DEFS).biomeMask }).toMatchObject({ raw, out: 0 });
+    }
+  });
+
+  test('empty input does not throw', () => {
+    expect(parseSeedMask(undefined, DEFS)).toEqual({ seed: '', biomeMask: 0, hadSuffix: false });
+    expect(parseSeedMask(null, DEFS)).toEqual({ seed: '', biomeMask: 0, hadSuffix: false });
+    expect(parseSeedMask(42, DEFS)).toEqual({ seed: '', biomeMask: 0, hadSuffix: false });
+  });
+});
+
+describe('profile biome toggles (W3, default ON since issue #65)', () => {
+  const DEFS = [
+    { id: 'debutmont', bit: 1, name: 'Debutmont', unlockLevel: 1 },
+    { id: 'garbage-dump-glacier', bit: 2, name: 'Garbage Dump Glacier', unlockLevel: 7 },
+    { id: 'pyramid-peak', bit: 4, name: 'Pyramid Peak', unlockLevel: 10 },
+  ];
+  const prof = (over = {}) => ({
+    v: 1, xp: 0, level: 7, bank: 0, biomeOff: 0,
+    pendingBiomes: ['debutmont', 'garbage-dump-glacier'],
+    unlocked: { biomes: [], cosmetics: [], boosts: {} },
+    ...over,
+  });
+
+  test('toggles an unlocked biome OFF and back ON through biomeOff', () => {
+    const a = toggleBiome(prof(), 'garbage-dump-glacier', DEFS);
+    expect(a.biomeOff).toBe(2);
+    expect(toggleBiome(a, 'garbage-dump-glacier', DEFS).biomeOff).toBe(0);
+  });
+
+  test('refuses a biome the player has not unlocked', () => {
+    // A toggle that honoured a locked bit would hand a low-level profile terrain it never earned.
+    const p = prof();
+    expect(toggleBiome(p, 'pyramid-peak', DEFS)).toBe(p);
+    expect(toggleBiome(p, 'pyramid-peak', DEFS).biomeOff).toBe(0);
+  });
+
+  test('refuses the base biome: Debutmont cannot be turned off', () => {
+    const p = prof();
+    expect(toggleBiome(p, 'debutmont', DEFS)).toBe(p);
+  });
+
+  test('is pure and never mutates the profile it was given', () => {
+    const p = prof();
+    const before = JSON.stringify(p);
+    toggleBiome(p, 'garbage-dump-glacier', DEFS);
+    expect(JSON.stringify(p)).toBe(before);
+  });
+
+  test('an unknown id is a no-op, not a throw', () => {
+    const p = prof();
+    for (const bad of ['nope', '', null, undefined, 42]) {
+      expect(toggleBiome(p, bad, DEFS)).toBe(p);
+    }
+  });
+
+  test('toggling one biome leaves the others alone', () => {
+    // Pyramid Peak unlocked and already explicitly OFF (bit 4).
+    const p = prof({ biomeOff: 4, pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak'] });
+    // Turning the glacier OFF adds bit 2 and leaves Pyramid Peak's OFF bit alone.
+    expect(toggleBiome(p, 'garbage-dump-glacier', DEFS).biomeOff).toBe(6);
+    // Turning Pyramid Peak back ON clears only its own bit.
+    expect(toggleBiome(p, 'pyramid-peak', DEFS).biomeOff).toBe(0);
+  });
+
+  test('rows list every switchable biome in unlock order with its state, and omit the base biome', () => {
+    const rows = biomeToggleRows(
+      prof({ biomeOff: 4, pendingBiomes: ['debutmont', 'garbage-dump-glacier', 'pyramid-peak'] }),
+      DEFS.slice().reverse(), // input order must not leak into display order
+    );
+    expect(rows.map((r) => r.id)).toEqual(['garbage-dump-glacier', 'pyramid-peak']);
+    expect(rows[0]).toMatchObject({ unlocked: true, enabled: true });
+    expect(rows[1]).toMatchObject({ unlocked: true, enabled: false });
+  });
+
+  test('a locked biome never shows as enabled, even if its bit is set', () => {
+    // Defence in depth: a locked biome is never "on", whatever the profile carries.
+    const rows = biomeToggleRows(prof({ biomeOff: 0, level: 1, pendingBiomes: ['debutmont'] }), DEFS);
+    expect(rows.find((r) => r.id === 'pyramid-peak')).toMatchObject({ unlocked: false, enabled: false });
+  });
+});
+
+describe('D6 at the Game Over call site', () => {
+  // The rule is already tested on SaveStore. What can silently break is the CALLER: GameOverScene must
+  // pass the scope, or a mask-31 run is judged against mask-0 runs and reports a SEED BEST it never
+  // set. This pins the scene's side of the contract rather than re-testing the store.
+  const store = (runs) => {
+    const s = new SaveStore({ storage: null });
+    s.runs = runs;
+    return s;
+  };
+
+  test('a mask-31 run sees no best from a mask-0 run on the same seed', () => {
+    const s = store([
+      run({ id: 'm0', seed: 'letterkenny', score: 5000, biomeMask: 0 }),
+    ]);
+    // What the scene asks for when the run being shown is mask 31:
+    expect(s.getSeedStats('letterkenny', { biomeMask: 31 })).toBeNull();
+    // And what it used to ask for (no scope), which would wrongly report 5000 as the bar to beat:
+    expect(s.getSeedStats('letterkenny').bestScore).toBe(5000);
+  });
+
+  test('a pre-W3 run with no field is mask 0, so it still supplies a best for mask-0 play', () => {
+    const s = store([run({ id: 'old', seed: 'letterkenny', score: 4200 })]);
+    expect(s.getSeedStats('letterkenny', { biomeMask: 0 }).bestScore).toBe(4200);
+    expect(s.getSeedStats('letterkenny', { biomeMask: 1 })).toBeNull();
+  });
+
+  test('the shareable seed carries the mask suffix only when the mask is not 0', () => {
+    // Same rule GameOverScene applies to the SHARE SEED line: mask 0 stays suffix-free so every
+    // existing seed string is unchanged; a non-zero mask round-trips through the entry parser.
+    const shown = (rec) => (Number(rec.biomeMask) || 0 ? `${rec.seed}@${Number(rec.biomeMask)}` : String(rec.seed));
+    expect(shown({ seed: 'letterkenny' })).toBe('letterkenny');
+    expect(shown({ seed: 'letterkenny', biomeMask: 0 })).toBe('letterkenny');
+    const withMask = shown({ seed: 'letterkenny', biomeMask: 31 });
+    expect(withMask).toBe('letterkenny@31');
+    // And it parses back to the same seed + mask, which is what makes it shareable.
+    expect(parseSeedMask(withMask, BIOME_DEFS)).toEqual({ seed: 'letterkenny', biomeMask: 31, hadSuffix: true });
+  });
+});

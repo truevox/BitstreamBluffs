@@ -1,0 +1,14 @@
+{
+  "id": "bouncySpring",
+  "colorKey": "lime",
+  "physics": {
+    "bounceMul": 1.9,
+    "landingRebound": 0.2
+  },
+  "weight": 3,
+  "minDistanceM": 150,
+  "lengthPx": [
+    360,
+    780
+  ]
+}

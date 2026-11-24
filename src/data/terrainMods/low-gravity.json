@@ -1,0 +1,13 @@
+{
+  "id": "lowGravity",
+  "colorKey": "cyan",
+  "physics": {
+    "gravityMul": 0.7
+  },
+  "weight": 3,
+  "minDistanceM": 160,
+  "lengthPx": [
+    420,
+    900
+  ]
+}

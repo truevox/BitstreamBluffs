@@ -1,0 +1,3 @@
+{ "id": "clockPulse", "shapeKey": "clock", "radius": 10,
+  "effect": { "kind": "slowmo", "durationMs": 1000, "timeScale": 0.5 },
+  "spawn": { "baseChance": 0.25, "distanceDecayM": 1500 }, "colorKey": "cyan" }

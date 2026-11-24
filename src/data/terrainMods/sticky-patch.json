@@ -1,0 +1,1 @@
+{ "id": "stickyPatch", "colorKey": "lime", "physics": { "frictionMul": 1.45 }, "weight": 3, "minDistanceM": 120, "lengthPx": [360, 780] }

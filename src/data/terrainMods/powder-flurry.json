@@ -1,0 +1,1 @@
+{ "id": "powderFlurry", "colorKey": "cyan", "physics": { "frictionMul": 1.18, "bounceMul": 1.12 }, "weight": 3, "minDistanceM": 120, "lengthPx": [420, 900] }

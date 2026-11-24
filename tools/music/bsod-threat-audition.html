@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bitstream Bluffs — BSOD Sound-Design Audition</title>
+<style>
+:root{color-scheme:dark;font:16px system-ui,sans-serif;background:#111923;color:#e9edf4}
+body{margin:0 auto;max-width:820px;padding:28px 18px;line-height:1.45}
+h1{font-size:1.65rem;line-height:1.25;margin:0 0 10px}
+h2{font-size:1.08rem;margin-top:22px}
+p,small{color:#b6c4d5}.panel{background:#202d3d;border:1px solid #394d62;border-radius:13px;padding:18px;margin:16px 0}
+label{display:block;margin:10px 0 5px;font-weight:600}select,input,button{font:inherit}
+select{width:100%;background:#121e29;color:inherit;padding:11px;border:1px solid #516579;border-radius:8px}
+button{border:1px solid #627f99;border-radius:9px;background:#2a4055;color:#fff;padding:12px 20px;cursor:pointer;margin:7px 8px 0 0}
+button.primary{background:#29665c;border-color:#62a998}button:disabled{opacity:.48;cursor:not-allowed}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+input[type=range]{width:100%;accent-color:#8fd5c6}strong.out{color:#91ddd2}
+#status{font-variant-numeric:tabular-nums;color:#a9efbf;min-height:1.5em}
+.warning{border-left:4px solid #caa66f;padding-left:13px}
+.pill{display:inline-block;border:1px solid #70849a;padding:2px 8px;border-radius:999px;font-size:.78rem;color:#b9d9eb}
+</style></head><body>
+<header><span class="pill">Private sound-design sandbox • not deployed</span>
+<h1>🌪️ BSOD Music Corruption — A/B Audition</h1>
+<p>Hear real shipped stem recordings through the exact calibrated <strong>guitar, piano and Other</strong> threat processor. Change the BSOD danger live while a short passage loops.</p></header>
+<div class="panel">
+<label for="song">Song</label><select id="song"></select>
+<label for="passage">Passage from that song</label><select id="passage"></select>
+<label for="melody">Melody arrangement</label><select id="melody"><option value="voice:crystal-cavern">Run — Crystal Cavern</option><option value="voice:debutmont">Menu — Debutmont</option></select>
+<label for="danger">Real BSOD proximity (music-only): <strong id="danger-value" class="out">0%</strong></label>
+<input type="range" id="danger" min="0" max="100" step="1" value="0">
+<div class="controls">
+<button id="play" class="primary" type="button">Play passage</button>
+<button id="clean" type="button">A: Clean</button>
+<button id="threat" type="button">B: Near BSOD</button>
+<button id="stop" type="button">Stop</button>
+</div><p id="status" role="status">Select a song and press Play. Browser audio begins after your click.</p>
+</div>
+<p class="warning"><strong>Scope:</strong> This is a <strong>sound-design audition</strong>, not the game’s timing/transcription validator. It uses actual shipped Ogg stems and the same BSOD threat processor, but a simplified loop mix (not the full gameplay EQ, atmosphere, adaptive orchestration, SFX, or six-stem master graph). A good sound here must still pass real-engine testing and human listening.</p>
+<p>Nothing here saves settings, spends shards, changes game files, or touches Control Friday’s playtesting build. Keep your volume reasonable before pressing Play.</p>
+<script type="module">
+import {createBsodThreatProcessor} from '/src/systems/music/BsodThreatProcessor.js';
+const byId=id=>document.getElementById(id);
+const song=byId('song'),passage=byId('passage'),melody=byId('melody'),
+ danger=byId('danger'),dangerText=byId('danger-value'),status=byId('status');
+const play=byId('play'),stop=byId('stop');
+let ctx=null,master=null,token=0,running=[],processors=[],pack=null,base=null;
+const setStatus=s=>{status.textContent=s};
+const catalogUrl=new URL('/public/music/catalog.json',location.href);
+const response=await fetch(catalogUrl);
+if(!response.ok)throw Error('Music catalog unavailable');
+const catalog=await response.json();
+const order=[...catalog.tracks].sort((a,b)=>Number(b.id==='local-one-more-run-bitstream-bluffs')-Number(a.id==='local-one-more-run-bitstream-bluffs'));
+for(const item of order) song.add(new Option(item.title,item.id));
+function resetAudio(){
+	token++;
+	for(const node of running){try{node.stop()}catch{}try{node.disconnect()}catch{}}
+	running=[];
+	for(const proc of processors)proc.destroy();
+	processors=[];
+}
+function applyThreat(){
+	const amount=Number(danger.value)/100;
+	dangerText.textContent=Math.round(amount*100)+'%';
+	for(const proc of processors)proc.setDanger(amount);
+}
+async function loadTrack(){
+	resetAudio();
+	const item=catalog.tracks.find(x=>x.id===song.value);
+	const url=new URL(item.manifest,catalogUrl);
+	const res=await fetch(url);
+	if(!res.ok)throw Error('Music pack manifest unavailable');
+	pack=await res.json();base=url;
+	passage.replaceChildren();
+	for(const i of [0,Math.floor(pack.segments.length/2),pack.segments.length-2]){
+		if(i<0||[...passage.options].some(o=>o.value===String(i)))continue;
+		const time=pack.segments[i].startFrame/pack.sampleRate;
+		passage.add(new Option((time<15?'Opening':i>pack.segments.length-4?'Late':'Middle')+
+			' — '+Math.round(time)+'s',String(i)));
+	}
+	setStatus('Loaded song choices. Press Play to audition.');
+}
+async function playPassage(){
+	resetAudio();
+	const myToken=token;
+	play.disabled=true;
+	setStatus('Decoding original source stems…');
+	try{
+		ctx ||= new AudioContext();
+		await ctx.resume();
+		if(!master){
+			master=ctx.createGain();master.gain.value=.19;
+			const comp=ctx.createDynamicsCompressor();
+			comp.threshold.value=-10;comp.ratio.value=6;
+			master.connect(comp);comp.connect(ctx.destination);
+		}
+		const chosen=pack.segments[Number(passage.value)];
+		const names=['drums','bass','guitar','piano','other',melody.value];
+		const tracks=await Promise.all(names.map(async name=>{
+			const rel=chosen.sources[name];
+			if(!rel)throw Error('Missing '+name+' in source pack');
+			const r=await fetch(new URL(rel,base));if(!r.ok)throw Error('Missing asset '+rel);
+			return {name,buffer:await ctx.decodeAudioData(await r.arrayBuffer())};
+		}));
+		if(myToken!==token)return;
+		const at=ctx.currentTime+.08;
+		for(const {name,buffer} of tracks){
+			const source=ctx.createBufferSource();source.buffer=buffer;source.loop=true;
+			if(['guitar','piano','other'].includes(name)){
+				const effect=createBsodThreatProcessor(ctx,master);
+				processors.push(effect);source.connect(effect.input);
+			}else source.connect(master);
+			source.start(at);running.push(source);
+		}
+		applyThreat();
+		setStatus('Playing '+names.length+' original stems — switch A/B or move danger slider.');
+	}catch(e){resetAudio();setStatus('Could not play: '+e.message);console.error(e)}
+	finally{play.disabled=false}
+}
+song.addEventListener('change',()=>loadTrack().catch(e=>setStatus(e.message)));
+passage.addEventListener('change',()=>{resetAudio();setStatus('Press Play to load this passage.')});
+melody.addEventListener('change',()=>{resetAudio();setStatus('Press Play to load this melody.')});
+danger.addEventListener('input',applyThreat);
+byId('clean').addEventListener('click',()=>{danger.value='0';applyThreat()});
+byId('threat').addEventListener('click',()=>{danger.value='97';applyThreat()});
+play.addEventListener('click',()=>playPassage());
+stop.addEventListener('click',()=>{resetAudio();setStatus('Stopped.')});
+loadTrack().catch(e=>setStatus(e.message));
+</script></body></html>

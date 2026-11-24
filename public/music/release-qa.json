@@ -1,0 +1,41 @@
+{
+  "format": "bitstream-opus-frame-exact-gate-v1",
+  "passed": true,
+  "rate": 48000,
+  "channels": 2,
+  "expectedOgg": 4745,
+  "originalSha256Unchanged": 455,
+  "decodedFramesExact": 4745,
+  "counts": {
+    "original": 455,
+    "reperformed": 4290
+  },
+  "songs": [
+    {
+      "id": "FEsxYVStla4",
+      "durationSeconds": 214.97597916666666,
+      "segments": 18,
+      "decodedClips": 1314
+    },
+    {
+      "id": "local-one-more-run-bitstream-bluffs",
+      "durationSeconds": 174.6,
+      "segments": 15,
+      "decodedClips": 1095
+    },
+    {
+      "id": "WRBGQUqD54U",
+      "durationSeconds": 198.5493125,
+      "segments": 17,
+      "decodedClips": 1241
+    },
+    {
+      "id": "FYImnz5-hXs",
+      "durationSeconds": 172.90666666666667,
+      "segments": 15,
+      "decodedClips": 1095
+    }
+  ],
+  "fix": "independent Opus encoding per 12s integer-sample segment",
+  "notes": "No content transcription improvements claimed. This is an audio packaging repair."
+}

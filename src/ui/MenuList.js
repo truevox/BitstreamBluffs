@@ -1,0 +1,390 @@
+/**
+ * OWNER: UI engineer.
+ * Vertical menu list usable with keyboard, gamepad (via MenuInput actions), mouse and touch.
+ * Item kinds:
+ *   action : { label, onSelect }
+ *   choice : { label, options:[{value,label}], get(), set(v) }   left/right cycles, click cycles forward
+ *   slider : { label, get() -> 0..1, set(v), step? }              left/right adjusts, click/drag on the bar sets
+ *   static : { label }                                            drawn but never focusable or clickable
+ * Optional per item: sub (dim secondary text), color (palette key), disabled,
+ *   badge (noninteractive in-row warning), badgeColor (palette key),
+ *   subColor / subAlpha (palette key and alpha of the `sub` text; default text at 0.6),
+ *   tint (palette key the label always wears when enabled; default only the selected row is coloured),
+ *   heading (on a 'static' row: draw it as a bright section heading in `color` instead of a dim line).
+ *
+ * Selection look (synthwave pass): `g` paints the static state exactly where the selected row IS (a faint
+ * wash over the selected cell, badges, sliders); it is what layout tests measure, so its first fillRect is
+ * always the selected cell. On top of that, `cursorG` paints the animated cursor: a gradient bar with a
+ * chevron that GLIDES from the previous row to the new one (eased, frame-rate independent), pulses gently,
+ * runs a light sweep every few seconds and flashes on confirm. Reduce motion: the cursor snaps and holds
+ * still. The cursor is paint only: hit zones, column layout and every input path are unchanged.
+ */
+import Phaser from 'phaser';
+import { NeonText } from './Neon.js';
+import { measureText } from './PixelFont.js';
+import { uiSfx } from './Sound.js';
+import { approach, isReducedMotion, onTick } from './Motion.js';
+
+const SLIDER_W = 70;
+
+export class MenuList extends Phaser.GameObjects.Container {
+  /**
+   * @param {Phaser.Scene} scene
+   * @param {import('./Theme.js').Theme} theme
+   * @param {{x:number,y:number,w:number,rowH?:number,items:object[],color?:string,align?:'left'|'center',scale?:number,
+   *          parent?:Phaser.GameObjects.Container, onBack?:function():void,
+   *          columns?:number, rowsPerColumn?:number}} o
+   *
+   * `columns` > 1 lays the SAME list out column-major: item i fills column floor(i / rowsPerColumn),
+   * row i % rowsPerColumn. Column-major rather than row-major so up/down keep walking down a column and
+   * only wrap into the next one at the bottom; row-major would make `down` jump sideways. Default 1
+   * leaves every existing menu pixel-identical.
+   */
+  constructor(scene, theme, o) {
+    super(scene, o.x, o.y);
+    this.theme = theme;
+    this.w = o.w;
+    this.rowH = o.rowH || 16;
+    this.items = o.items;
+    this.colorKey = o.color || 'cyan';
+    this.align = o.align || 'left';
+    this.scale1 = o.scale || 1;
+    // W6: the biome toggle list outgrew one column (11 signatures), so the list can split. Geometry is
+    // computed once here and every row reads it, so a row can never disagree with its own hit zone.
+    this.columns = Math.max(1, Math.floor(o.columns || 1));
+    this.rowsPerColumn = Math.max(1, Math.floor(o.rowsPerColumn || this.items.length || 1));
+    this.colW = this.w / this.columns;
+    this.selected = this.items.findIndex((i) => !i.disabled);
+    if (this.selected < 0) this.selected = 0;
+    this.dragging = -1;
+    this.g = new Phaser.GameObjects.Graphics(scene);
+    this.add(this.g);
+    // Under the labels, over the wash: the animated cursor (see the header).
+    this.cursorG = new Phaser.GameObjects.Graphics(scene);
+    this.add(this.cursorG);
+    /** @type {{x:number,y:number}|null} where the cursor bar is drawn now (null = snap on next paint) */
+    this.glide = null;
+    this.confirmFlash = 0;
+    this.rows = this.items.map((item, i) => this._buildRow(scene, item, i));
+    scene.add.existing(this);
+    if (o.parent) o.parent.add(this);
+    this._unbind = theme.bind(() => this.refresh());
+    this._stopTick = onTick(scene, (time, delta) => this._tick(time, delta));
+  }
+
+  /** Column-major cell for item i: which column, and which row inside it. */
+  _cell(i) {
+    return { col: Math.floor(i / this.rowsPerColumn), rowInCol: i % this.rowsPerColumn };
+  }
+
+  _buildRow(scene, item, i) {
+    const { col, rowInCol } = this._cell(i);
+    const x0 = col * this.colW;
+    const y = rowInCol * this.rowH;
+    const cy = y + this.rowH / 2;
+    const center = this.align === 'center';
+    const label = new NeonText(scene, this.theme, x0 + (center ? this.colW / 2 : 14), cy, item.label, {
+      color: item.color || 'text', scale: this.scale1, anchor: center ? 'center' : 'left', vAnchor: 0.5,
+    });
+    this.add(label);
+    const row = { label, value: null, sub: null, zone: null, badge: null, badgeBox: null };
+    if (item.badge) {
+      const text = String(item.badge).toUpperCase();
+      const badgeX = x0 + 14 + measureText(item.label) * this.scale1 + 7;
+      const badgeW = measureText(text) * this.scale1 + 10;
+      if (badgeX + badgeW > x0 + this.colW - 62) {
+        throw new Error('Menu warning badge would overlap the choice value: ' + item.label);
+      }
+      row.badgeBox = { x: badgeX, y: y + 2, w: badgeW, h: this.rowH - 4 };
+      row.badge = new NeonText(scene, this.theme, badgeX + 5, cy, text, {
+        color: item.badgeColor || 'magenta', scale: this.scale1,
+        anchor: 'left', vAnchor: .5,
+      });
+      this.add(row.badge);
+    }
+    if (item.kind === 'choice' || item.kind === 'slider') {
+      row.value = new NeonText(scene, this.theme, x0 + this.colW - 8, cy, '', { color: this.colorKey, anchor: 'right', vAnchor: 0.5 });
+      this.add(row.value);
+    }
+    if (item.sub) {
+      row.sub = new NeonText(scene, this.theme, x0 + this.colW - 8, cy, item.sub, {
+        color: 'text', anchor: 'right', vAnchor: 0.5, outline: 'none',
+      });
+      row.sub.setAlpha(0.6);
+      this.add(row.sub);
+    }
+    // W6's column geometry AND W5's static rows: the zone is sized to the COLUMN, and a static row gets no
+    // zone at all. Both matter — a full-width zone under a two-column list would let a click in the left
+    // column select a row in the right one.
+    const zone = new Phaser.GameObjects.Zone(scene, x0, y, this.colW, this.rowH).setOrigin(0, 0);
+    // 'static' rows are headings and summary lines: they are drawn by the same list so they share its
+    // geometry, but they must never take focus or swallow a click meant for the row beneath.
+    if (item.kind === 'static') {
+      row.zone = null;
+      return row;
+    }
+    zone.setInteractive({ useHandCursor: !item.disabled });
+    this.add(zone);
+    zone.on('pointerover', () => {
+      if (!item.disabled) this.setSelected(i, true);
+    });
+    zone.on('pointerdown', (p, lx) => this._onPointerDown(i, lx));
+    zone.on('pointermove', (p, lx) => {
+      if (this.dragging === i && p.isDown) this._setSliderFromX(i, lx);
+    });
+    zone.on('pointerup', () => { this.dragging = -1; });
+    zone.on('pointerupoutside', () => { this.dragging = -1; });
+    row.zone = zone;
+    return row;
+  }
+
+  _sliderRange() {
+    return { x0: this.w - 8 - SLIDER_W - 26, x1: this.w - 8 - 26 };
+  }
+
+  _onPointerDown(i, lx) {
+    const item = this.items[i];
+    if (item.disabled) return;
+    this.setSelected(i, true);
+    if (item.kind === 'slider') {
+      this.dragging = i;
+      this._setSliderFromX(i, lx);
+    } else if (item.kind === 'choice') {
+      this._adjust(i, lx < this.w * 0.6 && lx < this.w - 90 ? -1 : 1);
+    } else {
+      this.activate(i);
+    }
+  }
+
+  _setSliderFromX(i, lx) {
+    const { x0, x1 } = this._sliderRange();
+    const v = Math.min(1, Math.max(0, (lx - x0) / (x1 - x0)));
+    const item = this.items[i];
+    const step = item.step || 0.1;
+    const snapped = Math.round(v / step) * step;
+    if (Math.abs(snapped - item.get()) > 1e-6) {
+      item.set(Math.min(1, Math.max(0, snapped)));
+      uiSfx(this.scene, 'uiMove');
+      this.refresh();
+    }
+  }
+
+  /** @param {number} i @param {boolean} [silent] @returns {void} */
+  setSelected(i, silent) {
+    if (i === this.selected) return;
+    this.selected = i;
+    if (!silent) uiSfx(this.scene, 'uiMove');
+    else uiSfx(this.scene, 'uiMove', { volume: 0.5 });
+    this.refresh();
+  }
+
+  _move(dir) {
+    const n = this.items.length;
+    let i = this.selected;
+    for (let k = 0; k < n; k++) {
+      i = (i + dir + n) % n;
+      if (!this.items[i].disabled) break;
+    }
+    this.setSelected(i);
+  }
+
+  _adjust(i, dir) {
+    const item = this.items[i];
+    if (item.kind === 'choice') {
+      const cur = item.options.findIndex((o) => o.value === item.get());
+      const next = item.options[(cur + dir + item.options.length) % item.options.length];
+      item.set(next.value);
+      uiSfx(this.scene, 'uiSelect');
+    } else if (item.kind === 'slider') {
+      const step = item.step || 0.1;
+      const v = Math.min(1, Math.max(0, Math.round((item.get() + dir * step) / step) * step));
+      item.set(v);
+      uiSfx(this.scene, 'uiMove', { pitch: 0.8 + v * 0.6 });
+    }
+    this.refresh();
+  }
+
+  /** @param {number} [i] @returns {void} */
+  activate(i = this.selected) {
+    const item = this.items[i];
+    if (!item || item.disabled) return;
+    if (item.kind === 'choice') this._adjust(i, 1);
+    else if (item.kind === 'slider') this._adjust(i, 1);
+    else if (item.onSelect) {
+      uiSfx(this.scene, 'uiSelect');
+      this.confirmFlash = 1;
+      this._paintCursor();
+      item.onSelect();
+    }
+  }
+
+  /**
+   * @param {string} action MenuInput action
+   * @returns {boolean} true if consumed
+   */
+  handleAction(action) {
+    switch (action) {
+      case 'up': this._move(-1); return true;
+      case 'down': this._move(1); return true;
+      case 'left':
+      case 'right': {
+        const k = this.items[this.selected].kind;
+        if (k !== 'choice' && k !== 'slider') return false;
+        this._adjust(this.selected, action === 'left' ? -1 : 1);
+        return true;
+      }
+      case 'confirm': this.activate(); return true;
+      default: return false;
+    }
+  }
+
+  /** Repaint highlight + values. @returns {void} */
+  refresh() {
+    const pal = this.theme.pal;
+    const g = this.g;
+    g.clear();
+    this.items.forEach((item, i) => {
+      const row = this.rows[i];
+      const sel = i === this.selected && !item.disabled;
+      const c = pal[item.color || this.colorKey];
+      if (row.badgeBox) {
+        const box = row.badgeBox;
+        const badgeColor = pal[item.badgeColor || 'magenta'];
+        g.fillStyle(badgeColor, sel ? .24 : .14);
+        g.fillRoundedRect(box.x, box.y, box.w, box.h, 2);
+        g.lineStyle(1, badgeColor, sel ? 1 : .7);
+        g.strokeRoundedRect(box.x+.5, box.y+.5, box.w-1, box.h-1, 2);
+        row.badge.setColorKey(item.badgeColor || 'magenta');
+        row.badge.setAlpha(item.disabled ? .35 : 1);
+      }
+      // Same cell as the row's own label and zone: in a multi-column list item i is NOT at i * rowH, and
+      // painting it there put the highlight below the list, in the wrong column.
+      const { col, rowInCol } = this._cell(i);
+      const x0 = col * this.colW;
+      const y = rowInCol * this.rowH;
+      if (sel) {
+        // the settled highlight; the bright edge and chevron belong to the gliding cursor (cursorG)
+        g.fillStyle(c, 0.1);
+        g.fillRect(x0, y, this.colW, this.rowH - 1);
+      }
+      if (item.kind === 'static' && item.heading) {
+        row.label.setColorKey(item.color || 'text');
+        row.label.setAlpha(1);
+      } else {
+        row.label.setColorKey(item.disabled ? 'text' : sel ? (item.color || 'text') : (item.tint || 'text'));
+        row.label.setAlpha(item.disabled ? 0.35 : sel ? 1 : 0.85);
+      }
+      if (item.kind === 'choice') {
+        const opt = item.options.find((o) => o.value === item.get()) || item.options[0];
+        row.value.setText(sel ? `← ${opt.label} →` : opt.label);
+        row.value.setColorKey(item.color || this.colorKey);
+      } else if (item.kind === 'slider') {
+        const v = item.get();
+        const { x0, x1 } = this._sliderRange();
+        const cy = y + this.rowH / 2;
+        g.fillStyle(pal.bgAlt, 1);
+        g.fillRect(x0, cy - 2, x1 - x0, 5);
+        g.fillStyle(c, sel ? 0.5 : 0.3);
+        g.fillRect(x0, cy - 2, x1 - x0, 1);
+        g.fillRect(x0, cy + 2, x1 - x0, 1);
+        g.fillStyle(c, 1);
+        g.fillRect(x0, cy - 1, Math.round((x1 - x0) * v), 3);
+        g.fillStyle(pal.text, 1);
+        g.fillRect(x0 + Math.round((x1 - x0) * v) - 1, cy - 4, 2, 9);
+        row.value.setText(`${Math.round(v * 100)}%`);
+        row.value.setColorKey(item.color || this.colorKey);
+      }
+      if (row.sub) {
+        row.sub.setColorKey(item.subColor || 'text');
+        if (item.subAlpha !== undefined) row.sub.setAlpha(item.subAlpha);
+      }
+    });
+    this._paintCursor();
+  }
+
+  /** Top-left of the selected cell, or null when nothing selectable is selected. */
+  _targetCell() {
+    const item = this.items[this.selected];
+    if (!item || item.disabled || item.kind === 'static') return null;
+    const { col, rowInCol } = this._cell(this.selected);
+    return { x: col * this.colW, y: rowInCol * this.rowH };
+  }
+
+  _tick(time, delta) {
+    if (!this.scene || !this.visible) return;
+    const target = this._targetCell();
+    if (target && this.glide && !isReducedMotion(this.scene)) {
+      // eased glide toward the selected cell; ~40 ms half-life feels instant to the hand but reads as motion
+      const k = approach(delta, 40);
+      this.glide.x += (target.x - this.glide.x) * k;
+      this.glide.y += (target.y - this.glide.y) * k;
+      if (Math.abs(target.x - this.glide.x) < 0.3 && Math.abs(target.y - this.glide.y) < 0.3) this.glide = { ...target };
+    }
+    if (this.confirmFlash > 0) this.confirmFlash = Math.max(0, this.confirmFlash - (delta || 16) / 220);
+    this._paintCursor(time);
+  }
+
+  /** @param {number} [time] scene time, for the pulse and the sweep */
+  _paintCursor(time) {
+    const f = this.cursorG;
+    if (!f || !this.scene) return;
+    f.clear();
+    const target = this._targetCell();
+    if (!target) return;
+    const reduced = isReducedMotion(this.scene);
+    if (!this.glide || reduced) this.glide = { ...target };
+    const t = time === undefined ? ((this.scene.time && this.scene.time.now) || 0) : time;
+    const pal = this.theme.pal;
+    const item = this.items[this.selected];
+    const c = pal[item.color || this.colorKey];
+    const x = Math.round(this.glide.x);
+    const y = Math.round(this.glide.y);
+    const w = this.colW;
+    const h = this.rowH - 1;
+    const pulse = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(t / 340);
+    // gradient bar: strong at the left edge, fading to nothing at the right
+    const steps = 8;
+    const sw = Math.ceil(w / steps);
+    for (let i = 0; i < steps; i++) {
+      f.fillStyle(c, (0.22 + 0.08 * pulse) * (1 - i / steps));
+      f.fillRect(x + i * sw, y, Math.min(sw, w - i * sw), h);
+    }
+    // hairlines top and bottom over the bright half
+    f.fillStyle(c, 0.3 + 0.25 * pulse);
+    f.fillRect(x, y, Math.round(w * 0.55), 1);
+    f.fillRect(x, y + h - 1, Math.round(w * 0.55), 1);
+    // light sweep: a narrow bright band crossing the bar every 2.8 s
+    if (!reduced) {
+      const sx = ((t % 2800) / 1100) * (w + 24) - 24;
+      if (sx < w) {
+        f.fillStyle(pal.text, 0.12);
+        f.fillRect(Math.max(x, x + Math.round(sx)), y + 1, Math.max(0, Math.min(8, w - Math.round(sx))), h - 2);
+      }
+    }
+    if (this.confirmFlash > 0) {
+      f.fillStyle(pal.text, 0.4 * this.confirmFlash);
+      f.fillRect(x, y, w, h);
+    }
+    // the bright left edge, then the chevron (bobbing a pixel toward the label)
+    f.fillStyle(c, 1);
+    f.fillRect(x, y, 2, h);
+    const row = this.rows[this.selected];
+    const bob = reduced ? 0 : (Math.sin(t / 220) > 0 ? 1 : 0);
+    const cx = this.align === 'center' && row && row.label
+      ? Math.round(x + w / 2 - row.label.textWidth / 2 - 9) + bob
+      : x + 5 + bob;
+    const cy = y + Math.floor(h / 2);
+    f.fillStyle(pal.text, 0.95);
+    f.fillRect(cx, cy - 2, 1, 5);
+    f.fillRect(cx + 1, cy - 1, 1, 3);
+    f.fillRect(cx + 2, cy, 1, 1);
+  }
+
+  destroy(fromScene) {
+    if (this._stopTick) this._stopTick();
+    this._stopTick = null;
+    if (this._unbind) this._unbind();
+    this._unbind = null;
+    super.destroy(fromScene);
+  }
+}

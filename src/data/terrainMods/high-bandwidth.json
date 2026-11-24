@@ -1,0 +1,1 @@
+{ "id": "highBandwidth", "colorKey": "cyan", "physics": { "frictionMul": 0.25 }, "weight": 3, "minDistanceM": 100, "lengthPx": [400, 900] }

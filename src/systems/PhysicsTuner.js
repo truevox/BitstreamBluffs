@@ -1,0 +1,538 @@
+/**
+ * OWNER: gameplay engineer. Phaser-free (keep it so: it is unit-testable).
+ * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
+ *
+ * Single source of the EFFECTIVE physics constants for a frame: base PHYSICS (doc 4.2) x tuck x terrain-mod zones
+ * x daily rule x timed effects. Also holds the doc-units -> Matter-units conversion helpers (ARCHITECTURE.md section 7)
+ * and every gameplay "feel" tunable (TUNING) so nothing else hard-codes numbers.
+ *
+ * MATTER 0.20 NOTE (bundled with Phaser 3.90): Body.setVelocity / getVelocity and angular velocity are NORMALISED to
+ * a 1000/60 ms base step, not to the actual sub-step. So "px/s -> Matter" is `pxPerSecToStep(v, BASE_STEP_MS)`. The
+ * helpers still accept a delta so they stay correct if that ever changes.
+ */
+import { PHYSICS, MAX_PHYSICS_STEP_MS } from '../constants.js';
+import { AIR_NEAR_MISS_BELOW_PX } from './TerrainGenerator.js';
+import { isWarded } from './Wards.js';
+import { glideDrag } from './BiomeEffects.js';
+import pmath from './pmath.js';
+
+/** Matter's internal base delta in ms (Body._baseDelta). */
+export const BASE_STEP_MS = 1000 / 60;
+
+/**
+ * Gameplay feel tunables that the design doc does not pin down. Everything is in doc units (px, s, deg).
+ * Tweak here only.
+ */
+export const TUNING = Object.freeze({
+  /**
+   * Matter sliding friction of the sled. MUST stay 0: Matter 0.20's friction solver jams a body on slopes below ~15 deg
+   * for ANY friction >= 0.0005 (verified). All runner drag is applied manually via groundResist / brakeResist instead.
+   */
+  groundFriction: 0,
+  /** Matter static friction of the sled (0 for the same reason). */
+  groundFrictionStatic: 0,
+  /**
+   * Extra manual runner resistance on the ground, 1/s (exponential speed decay). Scaled by frictionMul.
+   * Was 0.04. The seam "ghost" contacts (terrainSnapNormals) used to bleed ~30 % of the cruise speed (grounded speed was a flat
+   * ~480 px/s on 0-24 degree slopes); with them gone the sled ran ~31 % faster (average 465 -> 607 px/s) and every jump launched
+   * ~25 % faster. 0.10 gives back some of that (average ~581 px/s, +25 % vs the old game) while keeping the jump airtimes at or above
+   * the old ones (chunk-0 jump 706 ms vs 689, later jumps ~1000 ms vs 840). 0.17 = +17 % pace but a 600 ms first jump; 0.25 = +9 % pace
+   * but jumps 17 % shorter than before and 6 % under 400 ms.
+   */
+  groundResist: 0.10,
+  /**
+   * Multiplier on the doc drag (PHYSICS.dragUntucked 0.015) when written to Matter frictionAir. Matter 0.20 applies
+   * frictionAir per 16.7 ms base step (= 0.9/s for the literal 0.015), which capped speed at ~120-250 px/s and stalled
+   * the sled in every dip (QA: hands-off run covered ~110 m in 20 s). 0.15 (= 0.14/s) keeps the doc ratios (tuck halves
+   * drag, boosts divide it) and, with groundResist 0.04 and quadDrag below, gives a 350-500 px/s cruise on ordinary
+   * 8-12 degree terrain and ~600+ on steep drops (was 0.3). Set to 1 for the literal doc value.
+   */
+  dragFeelMul: 0.15,
+  /**
+   * Multiplier on air tilt authority (on top of PHYSICS.airControlFactor 0.7 and the doc's 420 deg/s^2): 5 = 1470 deg/s^2 in the air.
+   * Was 3.6 (1060). A flip must be HELD for ~0.65 s before the sled has turned far enough to be finished by the levelling spring
+   * (airIdleLevelK), and generated jumps give ~1.0 s of air, so the slack between the earliest good release and touchdown (which is the
+   * whole release window, see airIdleLevelK) was only ~250 ms; 5 buys back ~100 ms of it. With maxAngularVelDegS 900 the rotation
+   * of a held flip is about the same as before: ~600 deg in 1.0 s, ~960 deg in 1.4 s (measured in the sim: 627 deg at 1054 ms, 944 at 1394 ms).
+   */
+  airTiltFeelMul: 5,
+  /** Ground friction multiplier and extra manual decay while braking (S). */
+  brakeFrictionMul: 1,
+  brakeResist: 2.2,
+  /** Aerial angular damping while braking (S in air), 1/s. */
+  airBrakeAngularDamp: 5,
+  /** Quadratic drag (1/px) giving a soft terminal velocity on very steep slopes (about +0.15/s at 500 px/s; was 0.00009). */
+  quadDrag: 0.0003,
+  /**
+   * Runner contact normals (TerrainContact.js). Matter's SAT picks the minimum-overlap axis, which at the 16 px quad seams is
+   * often a wall axis or one of the 24-gon runner's own 15 degree face axes instead of the ground's normal ("ghost" normals).
+   * With this on, every runner/terrain contact uses the quad's top-face normal. This was the root cause of the post-landing
+   * spin / terrain crashes after good landings (and a hidden speed-dependent drag of ~30 % on cruise speed).
+   * Contacts where the runner is deeper than terrainSnapMaxDepthPx below the quad's top plane (real walls: gap edges) are left alone.
+   */
+  terrainSnapNormals: true,
+  terrainSnapMaxDepthPx: 10,
+  /**
+   * Landing settle: for landSettleMs after a touchdown (contact after >= groundedGraceMs of air) the post-solve angular velocity is
+   * capped at landSpinMaxDegS. A rigid sled that lands on one runner first gets +/-400..700 deg/s from the contact solver and rocks
+   * onto the other runner; with 8 ms sub-steps and zero friction nothing damps that, so a good landing bounced into a flip.
+   * 0 disables. Ground lean (A/D) accelerates only ~210 deg/s^2, so normal riding never reaches the cap.
+   */
+  landSpinMaxDegS: 200,
+  landSettleMs: 150,
+  /** Ground lean torque multiplier (relative to maxTiltTorque). */
+  groundTiltMul: 0.5,
+  /**
+   * Angular velocity cap, deg/s (1100 before). Reached after ~0.6 s of held tilt. With the old weak levelling every 100 ms of late
+   * release added ~100 deg of spin the player could not time; 900 keeps a double flip possible in ~1.4 s of air (see airTiltFeelMul).
+   */
+  maxAngularVelDegS: 900,
+  /** Held airborne flips approach a stable, controllable rate instead of accelerating forever. */
+  flipTargetDegS: 680,
+  flipAccelDegS2: 1300,
+  hopMinimumHoldMs: 150, // candidate minimum variable-hop ascent
+  divebombDownPxS2: 1400, // atmospheric downward push, no horizontal penalty
+  /** Push kick: surface speed set by W when stalled (px/s), and re-trigger delay. */
+  pushKickPxS: 90,
+  /**
+   * Stall safety net (stallNudgeStep, called from Sled.applyControls): forward speed ALONG THE SLOPE below stallNudgeBelowPxS (so
+   * stopped or rolling backwards) for stallNudgeAfterMs on slopes < stallNudgeMaxSlopeDeg with no brake -> auto-push forward at
+   * stallNudgeAccelPxS2 (net of gravity on an up-slope) until the speed passes stallNudgeToPxS (a little above the 120 px/s "moving
+   * again" mark so the sled does not hover just under it). 240 (was 160) turns a sled that rolled back at 50 px/s on a 12 deg ramp
+   * round and up to 120 within ~1.5 s of letting go of the brake.
+   */
+  stallNudgeBelowPxS: 40,
+  stallNudgeAfterMs: 600,
+  stallNudgeMaxSlopeDeg: 16,
+  stallNudgeToPxS: 130,
+  stallNudgeAccelPxS2: 240,
+  pushCooldownMs: 280,
+  /** Hop: speed along the surface normal (px/s; was 300, raised so an average hop is ~0.8 s of air) and coyote/buffer windows. */
+  hopPxS: 360,
+  hopCoyoteMs: 90,
+  hopBufferMs: 110,
+  /** Ground contact hysteresis (ms) before the sled counts as airborne. */
+  groundedGraceMs: 45,
+  /** #247 owner retune: increased decel cannot inflate the already-approved-feel upward kick. No float. */
+  airBrakeLiftBudgetFraction: 0.40, // fixed prior reference: only this much spent velocity pays for upward impulse
+  airBrakeKickUpRatio: 1.5,
+  airBrakeKickUpCapPxS: 420,
+  /** Seconds-based helicopter spin rate of the visual (deg/s). */
+  heliSpinDegS: 760,
+  /** Hazard / power-up defaults. */
+  scrambleGravityWobble: 0.45,
+  scrambleTorqueJitterDegS2: 380,
+  /** Invulnerability after Hashed Backup saves you or after a respawn (ms). */
+  invulnerableMs: 900,
+  /** Opening grace: non-hazard crashes before this distance (m) become recovers, at most openingGraceMax per run. */
+  openingGraceM: 150,
+  openingGraceMax: 3,
+  /** A body falling this far below the interpolated ground line has fallen into a gap/void: crash. */
+  voidDepthPx: 320,
+  /** Camera. */
+  cameraLerpX: 5.5,
+  cameraLerpY: 3.2,
+  lookAheadSec: 0.4,
+  lookAheadMaxPx: 170,
+  /** Speed-zoom: 1.0 below zoomSpeedLo px/s, zoomMin at zoomSpeedHi px/s and above; zoomLerp = 1/s smoothing. */
+  zoomMin: 0.82,
+  zoomSpeedLo: 150,
+  zoomSpeedHi: 600,
+  zoomLerp: 2.2,
+  /** Speed streaks start at streakSpeedLo px/s and reach full strength at streakSpeedHi. */
+  streakSpeedLo: 420,
+  streakSpeedHi: 700,
+  /** Hit-stop (ms of frozen physics) on perfect/hard landings and on a crash. */
+  hitStopLandingMs: 45,
+  hitStopCrashMs: 70,
+  /** Trick -> speed loop. Boost = base x comboMult x (1 + trickCountBonus x (tricks-1)); perfect x perfectMul; capped. */
+  boostBasePxS: 60,
+  boostTrickCountBonus: 0.2,
+  boostPerfectMul: 1.5,
+  boostCapPxS: 260,
+  boostPerfectNoTrickPxS: 30,
+  /** After a boost the drag (air, ground resist, quadratic) is multiplied by boostDragMul for boostDragMs. */
+  boostDragMs: 1200,
+  boostDragMul: 0.3,
+  /** A sloppy landing keeps this fraction of the speed. */
+  sloppySpeedKeep: 0.92,
+  /** Forgiveness: TrickTracker 'crash' landings up to this angle (deg) / impact (px/s) become a sloppy wobble instead. */
+  forgiveAngleDeg: 78,
+  forgiveImpactPxS: 1700,
+  /**
+   * Ground snap (crest smoothing): a sled that was grounded >= snapMinGroundMs, did not hop/launch in the last snapQuietMs,
+   * left the ground < snapWindowMs ago, rises from the surface slower than snapMaxVnPxS and has ground that falls away by
+   * less than snapMaxDropDeg (over the look-ahead) gets its surface-normal speed clamped to snapKeepVnPxS plus snapDownPxS/s
+   * of downforce. Real kickers (drop > snapMaxDropDeg, or vn above the cap) are untouched.
+   */
+  /**
+   * Hands-off air rotation (no tilt held), see airIdleSpin(): `airIdleLevelK` (1/s^2) springs the nose toward the landing attitude by
+   * the SHORTEST way (error clamped to +-1.2 rad), `airIdleSpinDamp` (1/s) damps the spin. They were 8 and 3, which left a released flip
+   * spinning at 600-1000 deg/s for ~1 s with a spring far too weak to stop it; at 80 and 12 the spin is gone within ~0.3 s and an
+   * UNHURRIED release (>= ~450 ms of air left) lands level from any attitude. Holding tilt is untouched (the spring only acts with no
+   * input) and still crashes. Stronger constant values (120 / 18) look like a snap and measured no better; what the window still lacked
+   * was authority when little air is left, see airIdleUrgencyRefMs.
+   *
+   * What the window really is: a flip let go after about 0.42 s of held tilt (about a third of a turn, plus ~50 deg of coast) is carried round
+   * to one full turn, and one let go before that unwinds to a plain landing; the tipping point between the two is 180 deg from level,
+   * where the spring flips direction. A release up to ~0.85 s of hold (about 470 deg of rotation) still finishes ONE flip, later ones go on
+   * to a second turn (a double on long air). Before the urgency scaling the sled needed ~0.45 s to come back from the tipping point, so
+   * anything released with less than that left (about 100 ms either side of the tipping point, and every release 200 ms or more after
+   * the earliest good one) landed on its side. With it, a release at any rotation lands on the runners if >= ~250 ms of air is left.
+   */
+  airIdleSpinDamp: 12,
+  airIdleLevelK: 80,
+  /**
+   * Where the hands-off sled settles: this many degrees nose-down of the ground slope at the predicted touchdown (Sled.airSlopeDeg, from
+   * RunScene.airForecast). 15 is what the old "aim at the velocity heading" rule produced on generated landings (median 16, p10-p90
+   * 12-19 deg), so an unattended landing stays a "good" one (PERFECT_ANGLE_DEG 12 .. GOOD 28) and a PERFECT one still has to be earned
+   * with tilt: aiming at the slope itself made ~100 % of hands-off landings perfect, +25 % speed and a failing hop policy (measured).
+   */
+  airIdleLandOffsetDeg: 15,
+  /**
+   * Levelling urgency: with `eta` ms of air left (Sled.airEtaMs) the spring is multiplied by u^2 and the spin damping by u, where
+   * u = clamp(airIdleUrgencyRefMs / eta, 1, airIdleUrgencyMax) (the same damping ratio, a faster settle). 400 ms and 3 => unchanged above 400 ms
+   * of air, 4x spring at 200 ms, 9x (the cap) from 133 ms. That is enough to turn a release from the tipping point with 250 ms left into a
+   * landing, and still not enough (wMax limits the turn to ~45 deg per 50 ms) to rescue one let go inverted with <~100 ms left.
+   */
+  airIdleUrgencyRefMs: 400,
+  airIdleUrgencyMax: 3,
+  snapMinGroundMs: 100,
+  snapQuietMs: 350,
+  snapWindowMs: 160,
+  snapMaxVnPxS: 130,
+  snapKeepVnPxS: 0,
+  snapMaxDropDeg: 11,
+  snapMinSpeedPxS: 250,
+  /** Near miss: crash hazard passed within this many px above / below its centre line (plus half its height). */
+  nearMissAbovePx: 80,
+  nearMissBelowPx: 30,
+  /** Air hazards are passed underneath: an airborne sled crossing the box x within this far below its bottom pays (generator constant). */
+  airNearMissBelowPx: AIR_NEAR_MISS_BELOW_PX,
+  /** Air hazard warning (alert pulse, sound and the STAY LOW marker over the lip) once the box is this close ahead; the lip is ~400 px before it. */
+  airWarnAheadPx: 900,
+  tuckHintSlopeDeg: 12, // a steep grounded descent shows the tuck hint ...
+  tuckHintMs: 800, // ... after this long on it
+  tuckHintShowMs: 2500, // minimum time on screen once shown (then it hides when the steep stretch ends)
+  tuckHintWaitMs: 8000, // a hint waiting for another hint to clear is dropped after this long
+  tuckHintMaxShows: 2, // shown this many times (across runs) without the player tucking -> done for good
+  nearMissPoints: 25,
+  nearMissSlowMs: 80,
+  shardRadiusPx: 18,
+  shardChainMs: 1500,
+  shardPointsPerChain: 5,
+  shardPointsCap: 50,
+  milestoneEveryM: 500,
+  /**
+   * B3 tuning, glide power-ups (BiomeEffects.glideDrag): at full glide strength (frictionMul at the 0.2 floor) speedMul is
+   * lifted by glideSpeedLift (frictionAir / speedMul) and quadDrag cut by glideQuadCut, both scaled by the strength.
+   */
+  glideSpeedLift: 0.35,
+  glideQuadCut: 0.35,
+  /** Screen shake amplitudes (px). */
+  shakeHardLanding: 3,
+  shakeCrash: 7,
+});
+
+/**
+ * @typedef {Object} TunerContext
+ * @property {boolean} tucked
+ * @property {import('../data/schemas.js').TerrainModDef[]} zones  mods the sled is currently inside.
+ * @property {import('./DailyPatch.js').DailyModifiers} [daily]
+ * @property {boolean} [scrambled]  garbage-data vent active (controls/gravity perturbed).
+ * @property {boolean} [slowed]     overflow firewall active.
+ * @property {number} [speedBoost]  packet burst multiplier (1 = none).
+ * @property {number} [slowFactor]  overflow firewall speed multiplier while slowed (default PHYSICS.slowFactor).
+ * @property {number} [timeMs]      run time, used for the scramble wobble.
+ * @property {boolean} [parachute]  parachute stall active (gravity x0.5, steering locked).
+ * @property {boolean} [airBrake]   air brake held while airborne.
+ * @property {boolean} [airborne]
+ * @property {boolean} [braking]    S held.
+ * @property {import('./Wards.js').WardState} [wards]  B0: active wards; a zone whose mod id is warded is skipped.
+ * @property {number} [glideFrictionMul]   B0 `glide` power-up: multiplier on ground friction (groundResist), 1 = none.
+ * @property {number} [stabilizeBounceMul] B0 `stabilize` power-up: multiplier on bounce, 1 = none.
+ */
+
+/**
+ * @typedef {Object} EffectivePhysics
+ * @property {number} gravityPxS2        px/s^2 (down).
+ * @property {number} frictionAir        Matter frictionAir (see ARCHITECTURE.md 7).
+ * @property {number} groundFriction     Matter friction for terrain contact.
+ * @property {number} tiltTorqueDegS2    deg/s^2 at full input on ground.
+ * @property {number} airControl         multiplier on tilt torque while airborne.
+ * @property {number} bounceMul
+ * @property {number} speedMul           overall speed multiplier for boosts/slows (applied as drag scaling).
+ * @property {number} [steerMul]         0 = steering locked (parachute), 1 normal, tucked daily rule may reduce.
+ * @property {number} [tiltSign]         -1 when scrambled (inverted controls).
+ * @property {number} [groundResist]     manual runner resistance 1/s.
+ * @property {number} [quadDrag]
+ * @property {number} [pushForceMul]
+ * @property {number} [beltDrivePxS2]  horizontal drive from conveyor-belt zones (px/s^2), always >= 0.
+ * @property {number} [beltDirection]  +1 the belt carries you forward, -1 it fights you.
+ * @property {number} [scrambleJitterDegS2] random torque amplitude while scrambled.
+ * @property {number} [restitution]
+ * @property {number} [landingRebound] share of the touchdown speed a scored landing gets back as an upward rebound (0 =
+ *   none; zone `physics.landingRebound`, larger share wins, times stabilizeBounceMul^2; BiomeEffects.springRebound).
+ */
+
+/** px/s -> Matter per-step velocity for a step of deltaMs. @param {number} pxPerS @param {number} deltaMs @returns {number} */
+export function pxPerSecToStep(pxPerS, deltaMs) {
+  return (pxPerS * deltaMs) / 1000;
+}
+
+/** Inverse of pxPerSecToStep. @param {number} pxPerStep @param {number} deltaMs @returns {number} px/s */
+export function stepToPxPerSec(pxPerStep, deltaMs) {
+  return (pxPerStep * 1000) / deltaMs;
+}
+
+/** Gravity in px/s^2 -> Phaser Matter `world.gravity.y` (scale left at the default 0.001). @param {number} g @returns {number} */
+export function gravityToMatter(g) {
+  return g / 1000;
+}
+
+/** deg/s^2 angular acceleration -> change in Matter angularVelocity (rad/step) for one step. @param {number} degS2 @param {number} deltaMs @returns {number} */
+export function angAccelToStep(degS2, deltaMs) {
+  const dt = deltaMs / 1000;
+  return (degS2 * Math.PI) / 180 * dt * dt;
+}
+
+/**
+ * Hands-off air rotation, one step (pure; Sled.applyControls uses it when airborne with no tilt input): a spring toward the
+ * landing attitude by the SHORTEST way (error clamped to +-1.2 rad) plus exponential spin damping. See TUNING.airIdleLevelK / airIdleSpinDamp.
+ * With `ctx` (what RunScene.airForecast gives Sled: ballistic ms to touchdown and ground slope there) the attitude is slope + airIdleLandOffsetDeg
+ * and the spring/damping scale with urgency (TUNING.airIdleUrgencyRefMs); without it the target is the velocity heading and nothing is scaled.
+ * @param {number} w angular velocity, rad/s (clockwise positive, like the body angle).
+ * @param {number} angle body angle, rad (any multiple of a turn).
+ * @param {number} vx velocity px/s.
+ * @param {number} vy velocity px/s (down positive).
+ * @param {number} dt seconds.
+ * @param {typeof TUNING} [t]
+ * @param {{etaMs?:number, slopeDeg?:number|null}|null} [ctx] landing forecast (etaMs Infinity / slopeDeg null = unknown).
+ * @returns {number} new angular velocity, rad/s.
+ */
+export function airIdleSpin(w, angle, vx, vy, dt, t = TUNING, ctx = null) {
+  const target = ctx && ctx.slopeDeg != null ? (ctx.slopeDeg + t.airIdleLandOffsetDeg) * Math.PI / 180 : pmath.atan2(vy, vx);
+  let err = target - angle;
+  err = pmath.atan2(pmath.sin(err), pmath.cos(err));
+  const eta = ctx && ctx.etaMs != null ? ctx.etaMs : Infinity;
+  const u = Math.min(t.airIdleUrgencyMax, Math.max(1, t.airIdleUrgencyRefMs / Math.max(eta, 1)));
+  const spring = Math.max(-1.2, Math.min(1.2, err)) * t.airIdleLevelK * u * u * dt;
+  return (w + spring) * pmath.exp(-t.airIdleSpinDamp * u * dt);
+}
+
+/**
+ * Conveyor belt, one physics step (pure; Sled.applyControls feeds it and applies the result).
+ * A belt carries the sled along the surface tangent while it is grounded, with no player input — that is
+ * the whole mechanic. `drivePxS2` is always a positive magnitude and `direction` carries the sign, so a
+ * caller cannot add a negative magnitude by mistake, and `direction: -1` is a belt fighting the player.
+ * Returns a velocity delta in px/s to add this step; zero when airborne or when no belt is under the sled.
+ * @param {{grounded:boolean, drivePxS2:number, direction:number, slopeDeg:number, stepMs:number}} i
+ * @returns {{dvx:number, dvy:number}}
+ */
+export function conveyorStep(i) {
+  if (!i || !i.grounded || !(i.drivePxS2 > 0)) return { dvx: 0, dvy: 0 };
+  const rad = ((i.slopeDeg || 0) * Math.PI) / 180;
+  const drive = i.drivePxS2 * (i.direction === -1 ? -1 : 1) * ((i.stepMs || 0) / 1000);
+  return { dvx: pmath.cos(rad) * drive, dvy: pmath.sin(rad) * drive };
+}
+
+/**
+ * Geyser vent, one physics step (W6, Vertigo Vents; pure — Sled.applyControls supplies it and applies the result).
+ *
+ * The spec's W6 table says "Geysers that launch you", and `geyser-vent.json` has carried
+ * `launch: { velocityPxS, cooldownMs }` since the biome shipped — but nothing ever read the field, so the
+ * mechanic did not exist while its data and schema looked present. This is the same failure shape as the
+ * conveyor belt's unused `direction`; both are why "the data is there" is never evidence that a mechanic works.
+ *
+ * A vent fires only from the ground, and only when its cooldown has expired — without that, a vent under the
+ * sled would kick on every physics step and hold the sled in the air forever.
+ *
+ * @param {{grounded:boolean, launch?:{velocityPxS?:number, cooldownMs?:number}, cooldownLeftMs?:number}} i
+ * @param {number} [defaultCooldownMs] used when the vent's data omits a usable cooldown.
+ * @returns {{fire:boolean, dvy:number, cooldownMs:number}} upward velocity change (px/s, negative = up).
+ */
+export function geyserStep(i, defaultCooldownMs = 900) {
+  const inert = { fire: false, dvy: 0, cooldownMs: 0 };
+  if (!i || !i.grounded) return inert;
+  const l = i.launch;
+  if (!l || typeof l !== 'object') return inert;
+  const v = l.velocityPxS;
+  if (!Number.isFinite(v) || v <= 0) return inert;
+  if ((i.cooldownLeftMs || 0) > 0) return inert;
+  const cd = Number.isFinite(l.cooldownMs) && l.cooldownMs > 0 ? l.cooldownMs : defaultCooldownMs;
+  return { fire: true, dvy: -v, cooldownMs: cd };
+}
+
+/**
+ * Stall safety net, one physics step (pure; Sled.applyControls feeds it and applies the result).
+ * A sled that is stopped or rolling BACKWARDS (speed along the slope tangent below `stallNudgeBelowPxS`) on non-steep ground with no
+ * brake for `stallNudgeAfterMs` gets a gentle push along the tangent up to `stallNudgeToPxS`. The test is the signed tangential speed,
+ * not the speed magnitude: a sled sliding backwards down a gentle up-slope at 50 px/s has |v| > 40 but is exactly the case the net is for.
+ * On an up-slope the push also cancels the gravity component along the slope, so it is a net 160 px/s^2 on any slope (on a 12 deg
+ * up-slope gravity alone is ~190 px/s^2, more than the raw push). Once started it continues until the target speed is reached.
+ * Never acts while braking, airborne, on steep ground, or while the sled is moving forward at or above the threshold.
+ * @param {{crawlMs:number, nudging:boolean}} st state from the previous step.
+ * @param {{grounded:boolean, braking:boolean, slopeDeg:number, vx:number, vy:number, stepMs:number, gravityPxS2:number}} i velocity px/s, slope deg (+ = downhill).
+ * @param {typeof TUNING} [t]
+ * @returns {{crawlMs:number, nudging:boolean, dvx:number, dvy:number}} velocity change (px/s) to add this step.
+ */
+export function stallNudgeStep(st, i, t = TUNING) {
+  const rad = (i.slopeDeg * Math.PI) / 180;
+  const tx = pmath.cos(rad);
+  const ty = pmath.sin(rad);
+  const vt = i.vx * tx + i.vy * ty; // signed speed along the slope (+ = downhill / forward)
+  const eligible = i.grounded && !i.braking && Math.abs(i.slopeDeg) < t.stallNudgeMaxSlopeDeg;
+  const crawl = eligible && vt < (st.nudging ? t.stallNudgeToPxS : t.stallNudgeBelowPxS);
+  const crawlMs = crawl ? st.crawlMs + i.stepMs : 0;
+  const nudging = crawl && crawlMs > t.stallNudgeAfterMs;
+  let dv = 0;
+  if (nudging) {
+    const dt = i.stepMs / 1000;
+    dv = Math.min(t.stallNudgeAccelPxS2 * dt, t.stallNudgeToPxS - vt);
+    // cancel the pull of gravity along an up-slope (ty < 0) so the push is a net acceleration
+    dv += Math.max(0, -ty) * i.gravityPxS2 * dt;
+  }
+  return { crawlMs, nudging, dvx: tx * dv, dvy: ty * dv };
+}
+
+export class PhysicsTuner {
+  /** @param {Partial<typeof PHYSICS>} [overrides] dev-time overrides of base values. */
+  constructor(overrides = {}) {
+    this.base = { ...PHYSICS, ...overrides };
+    this.tuning = TUNING;
+  }
+
+  /**
+   * @param {TunerContext} ctx
+   * @returns {EffectivePhysics}
+   */
+  getEffective(ctx) {
+    const b = this.base;
+    const t = this.tuning;
+    const daily = ctx.daily || {};
+    const zones = ctx.zones || [];
+
+    let gravityMul = daily.gravityMul || 1;
+    let frictionMul = daily.frictionMul || 1;
+    let bounceMul = 1;
+    // W6: the surface-feel multipliers a zone can carry. Kept separate from the three base ones so the
+    // existing mods read exactly as before; each defaults to 1 and multiplies, so two overlapping zones
+    // compound rather than one silently winning.
+    let zoneSpeedMul = 1;
+    let zoneSteerMul = 1;
+    let zonePushMul = 1;
+    // W6 conveyor: a belt drives the sled itself, so its force must not be folded into a multiplier on
+    // the player's push key (which only fires on flat ground while W is held — a belt that needs you to
+    // push is not a belt). The magnitude accumulates and the sign is carried separately in
+    // beltDirection, so a consumer cannot add a negative magnitude by mistake.
+    let beltDrive = 0;
+    let beltDirection = 1;
+    // W6 geysers: the vent's launch data, resolved here so the consumer does not walk the zone list again.
+    // `launch` lives on the MOD DEF (geyser-vent.json), not on zone.physics, so it is read from the def.
+    let geyserLaunch = null;
+    // Sky Jellyfish felt bounce: the share of the touchdown speed a landing gets back (BiomeEffects.springRebound).
+    // Overlapping zones take the larger share, never a compounded one (a bounce, not a launch).
+    let landingRebound = 0;
+    for (const z of zones) {
+      // B0 ward: a warded mod is skipped entirely, as if the sled were not in that zone (Wards.js).
+      if (ctx.wards && z && isWarded(ctx.wards, { modId: z.id })) continue;
+      const p = (z && z.physics) || {};
+      if (p.gravityMul) gravityMul *= p.gravityMul;
+      if (p.frictionMul) frictionMul *= p.frictionMul;
+      if (p.bounceMul) bounceMul *= p.bounceMul;
+      if (p.speedMul) zoneSpeedMul *= p.speedMul;
+      if (p.steerMul) zoneSteerMul *= p.steerMul;
+      if (p.pushForceMul) zonePushMul *= p.pushForceMul;
+      if (p.landingRebound > landingRebound) landingRebound = p.landingRebound;
+      if (p.beltDrivePxS2 > 0) {
+        beltDrive += p.beltDrivePxS2;
+        // Last zone wins the sign. Two belts facing opposite ways is a data situation the shipped table
+        // does not produce; picking the nearer (last) zone keeps the behaviour deterministic.
+        beltDirection = (z && z.direction) === -1 || (z && z.physics && z.physics.direction) === -1 ? -1 : 1;
+      }
+      if (z && z.launch && typeof z.launch === 'object') geyserLaunch = z.launch;
+    }
+
+    // B0 glide / stabilize power-ups (values already clamped by BiomeEffects at pickup).
+    const glide = glideDrag(frictionMul, ctx.glideFrictionMul, t); // B3: the pure glide math (BiomeEffects)
+    frictionMul = glide.frictionMul;
+    if (ctx.stabilizeBounceMul > 0) bounceMul *= ctx.stabilizeBounceMul;
+    // the Rails damp the rebound as they damp restitution: by bounceMul squared (a bounce's energy)
+    if (ctx.stabilizeBounceMul > 0) landingRebound *= ctx.stabilizeBounceMul * ctx.stabilizeBounceMul;
+
+    let speedMul = (ctx.speedBoost || 1) * zoneSpeedMul * glide.speedMul * (ctx.upgradeEffects?.speedMul || 1);
+    if (ctx.slowed) speedMul *= ctx.slowFactor || b.slowFactor;
+    let dragMul = 1;
+    let steerMul = 1;
+    if (ctx.tucked) {
+      gravityMul *= b.tuckGravityMul;
+      dragMul *= b.tuckDragMul;
+      speedMul *= daily.tuckSpeedMul || 1;
+      steerMul *= daily.tuckSteerMul == null ? 1 : daily.tuckSteerMul;
+    }
+    const airDensity = Number.isFinite(ctx.atmosphereDensity) ? Math.max(0, Math.min(1, ctx.atmosphereDensity)) : 1;
+    if (ctx.parachute && airDensity > 0) {
+      gravityMul *= 1 - (1 - b.parachuteGravityMul) * airDensity;
+      steerMul = 0;
+    }
+
+    let tiltSign = 1;
+    let jitter = 0;
+    if (ctx.scrambled) {
+      tiltSign = -1;
+      jitter = t.scrambleTorqueJitterDegS2;
+      const tm = (ctx.timeMs || 0) / 1000;
+      gravityMul *= 1 + t.scrambleGravityWobble * pmath.sin(tm * 11) * pmath.cos(tm * 4.3);
+    }
+
+    const resistBase = t.groundResist * frictionMul + (ctx.braking && !ctx.airborne ? t.brakeResist : 0);
+    const frictionBrake = ctx.braking && !ctx.airborne ? t.brakeFrictionMul : 1;
+
+    return {
+      gravityPxS2: b.gravityPxS2 * gravityMul,
+      // Linear drag falls as speedMul rises, so terminal speed scales ~ speedMul (packet burst +30 %, firewall -50 %).
+      frictionAir: (b.dragUntucked * t.dragFeelMul * dragMul) / Math.max(0.2, speedMul),
+      groundFriction: t.groundFriction * frictionMul * frictionBrake,
+      tiltTorqueDegS2: b.maxTiltTorqueDegS2,
+      airControl: b.airControlFactor * t.airTiltFeelMul * (daily.airControlMul || 1) * zoneSteerMul,
+      bounceMul,
+      speedMul,
+      hopMul: ctx.upgradeEffects?.hopMul || 1,
+      flipMul: ctx.upgradeEffects?.flipMul || 1,
+      airbrakeLiftMul: ctx.upgradeEffects?.airbrakeLiftMul || 1,
+      divebombMul: ctx.upgradeEffects?.divebombMul || 1,
+      steerMul,
+      tiltSign,
+      groundResist: resistBase,
+      quadDrag: t.quadDrag * glide.quadMul,
+      pushForceMul: (daily.pushForceMul || 1) * zonePushMul,
+      beltDrivePxS2: beltDrive,
+      beltDirection,
+      geyserLaunch,
+      scrambleJitterDegS2: jitter,
+      restitution: Math.min(0.9, 0.02 * bounceMul * bounceMul),
+      landingRebound,
+    };
+  }
+}
+
+/**
+ * Advance a Phaser Matter world by `deltaMs` in sub-steps no larger than MAX_PHYSICS_STEP_MS.
+ * Requires `matterWorld.autoUpdate === false` (set in the Matter config). Call once per frame from RunScene.update.
+ * @param {Phaser.Physics.Matter.World} matterWorld
+ * @param {number} deltaMs frame delta (clamp upstream to <= 50).
+ * @param {(stepMs:number)=>void} [beforeStep] hook to apply forces/torques for each sub-step.
+ * @param {(stepMs:number)=>void} [afterStep] optional hook after each sub-step (collision events have fired).
+ * @returns {number} number of sub-steps run.
+ */
+export function stepWorld(matterWorld, deltaMs, beforeStep, afterStep) {
+  if (!(deltaMs > 0)) return 0;
+  const n = Math.max(1, Math.ceil(deltaMs / MAX_PHYSICS_STEP_MS));
+  const step = deltaMs / n;
+  for (let i = 0; i < n; i++) {
+    if (beforeStep) beforeStep(step);
+    matterWorld.step(step);
+    if (afterStep) afterStep(step);
+  }
+  return n;
+}

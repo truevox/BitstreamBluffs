@@ -1,0 +1,3 @@
+{ "id": "ashCloud", "biome": "vertigo-vents", "shapeKey": "ashCloud", "size": { "w": 56, "h": 34 },
+  "onHit": { "effect": "blind", "durationMs": 1200, "visibility": 0.4 }, "spawn": { "baseChance": 0.75 },
+  "weight": 1, "minDistanceM": 0, "placement": "air", "colorKey": "amber" }

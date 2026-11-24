@@ -1,0 +1,236 @@
+{
+  "v": 1,
+  "note": "W4 cosmetic catalogue MIRROR. The source of truth is COSMETIC_ITEMS in src/systems/Cosmetics.js (audit F4b); tests/src/cosmetics-complete.test.js fails if this file and that constant ever disagree in any field. kind equals slot. price 0 = never bought: a level reward (unlockLevel = the level that grants it), an achievement grant (grant: achievement), or a biome grant (grant: biome, owned by completing `biome`; unlockText is the shop's locked text). Prices are in Data Shards.",
+  "items": [
+    {
+      "id": "trail-hue-aurora",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Aurora Trail",
+      "price": 0,
+      "unlockLevel": 3,
+      "value": "aurora"
+    },
+    {
+      "id": "trail-hue-ember",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Ember Trail",
+      "price": 120,
+      "unlockLevel": 1,
+      "value": "ember"
+    },
+    {
+      "id": "trail-hue-tidal",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Tidal Trail",
+      "price": 200,
+      "unlockLevel": 5,
+      "value": "tidal"
+    },
+    {
+      "id": "sled-glow-warm",
+      "kind": "glow",
+      "slot": "glow",
+      "name": "Warm Glow",
+      "price": 90,
+      "unlockLevel": 1,
+      "value": "warm"
+    },
+    {
+      "id": "sled-glow-cold",
+      "kind": "glow",
+      "slot": "glow",
+      "name": "Cold Glow",
+      "price": 150,
+      "unlockLevel": 4,
+      "value": "cold"
+    },
+    {
+      "id": "rider-hue-mint",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Mint Rider",
+      "price": 100,
+      "unlockLevel": 1,
+      "value": "mint"
+    },
+    {
+      "id": "rider-hue-plum",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Plum Rider",
+      "price": 180,
+      "unlockLevel": 6,
+      "value": "plum"
+    },
+    {
+      "id": "theme-mono",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Mono Theme",
+      "price": 250,
+      "unlockLevel": 1,
+      "value": "mono"
+    },
+    {
+      "id": "theme-sunset",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Sunset Theme",
+      "price": 300,
+      "unlockLevel": 8,
+      "value": "sunset"
+    },
+    {
+      "id": "trail-cyan",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Cyan Trail",
+      "price": 0,
+      "unlockLevel": 2,
+      "value": "cyan"
+    },
+    {
+      "id": "glow-lime",
+      "kind": "glow",
+      "slot": "glow",
+      "name": "Lime Glow",
+      "price": 0,
+      "unlockLevel": 5,
+      "value": "lime"
+    },
+    {
+      "id": "rider-amber",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Amber Rider",
+      "price": 0,
+      "unlockLevel": 9,
+      "value": "amber"
+    },
+    {
+      "id": "theme-magenta",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Magenta Theme",
+      "price": 0,
+      "unlockLevel": 12,
+      "value": "magenta"
+    },
+    {
+      "id": "trail-magenta",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Magenta Trail",
+      "price": 0,
+      "unlockLevel": 15,
+      "value": "magenta"
+    },
+    {
+      "id": "glow-cyan",
+      "kind": "glow",
+      "slot": "glow",
+      "name": "Ice Cyan Glow",
+      "price": 0,
+      "unlockLevel": 18,
+      "value": "cyan"
+    },
+    {
+      "id": "rider-lime",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Lime Rider",
+      "price": 0,
+      "unlockLevel": 20,
+      "value": "lime"
+    },
+    {
+      "id": "theme-amber",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Amber Theme",
+      "price": 0,
+      "unlockLevel": 23,
+      "value": "amber"
+    },
+    {
+      "id": "trail-amber",
+      "kind": "trail",
+      "slot": "trail",
+      "name": "Amber Trail",
+      "price": 0,
+      "unlockLevel": 26,
+      "value": "amber"
+    },
+    {
+      "id": "glow-magenta",
+      "kind": "glow",
+      "slot": "glow",
+      "name": "Magenta Glow",
+      "price": 0,
+      "unlockLevel": 29,
+      "value": "magenta"
+    },
+    {
+      "id": "theme-legend",
+      "kind": "theme",
+      "slot": "theme",
+      "name": "Legend Theme",
+      "price": 0,
+      "unlockLevel": 30,
+      "value": "legend"
+    },
+    {
+      "id": "title-rookie",
+      "kind": "title",
+      "slot": "title",
+      "name": "Rookie",
+      "price": 0,
+      "unlockLevel": 1,
+      "value": "ROOKIE"
+    },
+    {
+      "id": "title-static",
+      "kind": "title",
+      "slot": "title",
+      "name": "Static Rider",
+      "price": 220,
+      "unlockLevel": 1,
+      "value": "STATIC RIDER"
+    },
+    {
+      "id": "title-cartographer",
+      "kind": "title",
+      "slot": "title",
+      "name": "Cartographer",
+      "price": 0,
+      "unlockLevel": 1,
+      "value": "CARTOGRAPHER",
+      "grant": "achievement"
+    },
+    {
+      "id": "title-omniscient",
+      "kind": "title",
+      "slot": "title",
+      "name": "Omniscient",
+      "price": 0,
+      "unlockLevel": 1,
+      "value": "OMNISCIENT",
+      "grant": "achievement"
+    },
+    {
+      "id": "rider-drone",
+      "kind": "rider",
+      "slot": "rider",
+      "name": "Neon Sled Drone",
+      "price": 0,
+      "unlockLevel": 1,
+      "value": "drone",
+      "grant": "biome",
+      "biome": "micro-mountain",
+      "unlockText": "COMPLETE MICRO MOUNTAIN"
+    }
+  ]
+}

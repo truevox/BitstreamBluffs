@@ -1,0 +1,109 @@
+{
+  "format": "bitstream-music-review-queue-v1",
+  "songId": "local-one-more-run-bitstream-bluffs",
+  "status": "machine-ranked-disagreement-not-human-verified",
+  "baselineScoreHash": "de3cb9b095e183c9996b1edec22bc870f3d2bdbf3502c67615f9a687aa32529c",
+  "experimentalScoreHash": "4b8e9b42230e532539e096e4b0855f0a914fea792f477681ca97ab5c3fa2275a",
+  "selectionMethod": "machine ranking of pitch/class disagreements within 50ms, NOT correctness",
+  "excerpts": [
+    {
+      "id": "piano-2688000",
+      "role": "piano",
+      "startFrame": 2688000,
+      "endFrame": 3072000,
+      "priorityOrder": 1,
+      "releaseCount": 266,
+      "candidateCount": 118,
+      "samePitchWithin50ms": 65,
+      "disagreementProxy": 79.375
+    },
+    {
+      "id": "drums-3840000",
+      "role": "drums",
+      "startFrame": 3840000,
+      "endFrame": 4224000,
+      "priorityOrder": 5,
+      "releaseCount": 118,
+      "candidateCount": 180,
+      "samePitchWithin50ms": 74,
+      "disagreementProxy": 65.625
+    },
+    {
+      "id": "other-6912000",
+      "role": "other",
+      "startFrame": 6912000,
+      "endFrame": 7296000,
+      "priorityOrder": 8,
+      "releaseCount": 208,
+      "candidateCount": 101,
+      "samePitchWithin50ms": 35,
+      "disagreementProxy": 59.75
+    },
+    {
+      "id": "piano-2304000",
+      "role": "piano",
+      "startFrame": 2304000,
+      "endFrame": 2688000,
+      "priorityOrder": 13,
+      "releaseCount": 184,
+      "candidateCount": 88,
+      "samePitchWithin50ms": 30,
+      "disagreementProxy": 66.25
+    },
+    {
+      "id": "piano-6528000",
+      "role": "piano",
+      "startFrame": 6528000,
+      "endFrame": 6912000,
+      "priorityOrder": 14,
+      "releaseCount": 218,
+      "candidateCount": 88,
+      "samePitchWithin50ms": 50,
+      "disagreementProxy": 64.375
+    },
+    {
+      "id": "piano-4992000",
+      "role": "piano",
+      "startFrame": 4992000,
+      "endFrame": 5376000,
+      "priorityOrder": 15,
+      "releaseCount": 214,
+      "candidateCount": 96,
+      "samePitchWithin50ms": 54,
+      "disagreementProxy": 63.125
+    },
+    {
+      "id": "drums-5376000",
+      "role": "drums",
+      "startFrame": 5376000,
+      "endFrame": 5760000,
+      "priorityOrder": 17,
+      "releaseCount": 117,
+      "candidateCount": 175,
+      "samePitchWithin50ms": 74,
+      "disagreementProxy": 63.0
+    },
+    {
+      "id": "drums-4992000",
+      "role": "drums",
+      "startFrame": 4992000,
+      "endFrame": 5376000,
+      "priorityOrder": 18,
+      "releaseCount": 114,
+      "candidateCount": 173,
+      "samePitchWithin50ms": 73,
+      "disagreementProxy": 61.688
+    },
+    {
+      "id": "other-2688000",
+      "role": "other",
+      "startFrame": 2688000,
+      "endFrame": 3072000,
+      "priorityOrder": 20,
+      "releaseCount": 248,
+      "candidateCount": 111,
+      "samePitchWithin50ms": 64,
+      "disagreementProxy": 57.75
+    }
+  ]
+}

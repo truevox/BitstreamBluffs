@@ -1,0 +1,28 @@
+{
+  "format": "bitstream-music-catalog-v1",
+  "tracks": [
+    {
+      "id": "FEsxYVStla4",
+      "title": "Pope Leo Wants the AI Root Password",
+      "youtubeId": "FEsxYVStla4",
+      "manifest": "packs/01_FEsxYVStla4/pack.json"
+    },
+    {
+      "id": "local-one-more-run-bitstream-bluffs",
+      "title": "One More Run (The Ballad of Bitstream Bluffs)",
+      "manifest": "packs/33_local-one-more-run-bitstream-bluffs/pack.json"
+    },
+    {
+      "id": "WRBGQUqD54U",
+      "title": "Every Hacker (Runs Out of Code) - Part 2 of 2",
+      "youtubeId": "WRBGQUqD54U",
+      "manifest": "packs/03_WRBGQUqD54U/pack.json"
+    },
+    {
+      "id": "FYImnz5-hXs",
+      "title": "Varmont Is Saved",
+      "youtubeId": "FYImnz5-hXs",
+      "manifest": "packs/31_FYImnz5-hXs/pack.json"
+    }
+  ]
+}

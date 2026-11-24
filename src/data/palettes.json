@@ -1,0 +1,10 @@
+{
+  "default": {
+    "bg": "#05060f", "bgAlt": "#0c1024", "cyan": "#00f0ff", "magenta": "#ff2bd6",
+    "lime": "#9dff3a", "amber": "#ffb000", "text": "#d8f6ff", "danger": "#ff3b3b"
+  },
+  "colorblind": {
+    "bg": "#05060f", "bgAlt": "#0c1024", "cyan": "#56b4e9", "magenta": "#cc79a7",
+    "lime": "#f0e442", "amber": "#e69f00", "text": "#f2f2f2", "danger": "#d55e00"
+  }
+}

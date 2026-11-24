@@ -1,0 +1,247 @@
+/**
+ * OWNER: core-logic engineer. NO Phaser imports.
+ * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
+ *
+ * Daily patch rule (design doc section 6.2, stretch): one movement rule per UTC day, applies to EVERY run
+ * that day; the rule id is stored on every RunRecord. The rule changes at 00:00 UTC: index = whole days since the
+ * Unix epoch (UTC) modulo RULES.length, so every device agrees without any network.
+ */
+
+/**
+ * Modifier keys PhysicsTuner understands. All are multipliers (default 1) applied to the base PHYSICS values.
+ * @typedef {Object} DailyModifiers
+ * @property {number} [tuckSpeedMul]      extra speed while tucked (e.g. 1.5 = +50%).
+ * @property {number} [tuckSteerMul]      steering authority while tucked (e.g. 0.5 = -50%).
+ * @property {number} [gravityMul]
+ * @property {number} [frictionMul]
+ * @property {number} [airControlMul]
+ * @property {number} [pushForceMul]
+ */
+
+/**
+ * @typedef {Object} DailyRule
+ * @property {string} id            stable id, e.g. 'tuckBoost'.
+ * @property {string} name          display name.
+ * @property {string} description   one line for the UI.
+ * @property {DailyModifiers} modifiers
+ */
+
+/**
+ * @typedef {Object} DailyInfo
+ * @property {string} dateKey  'YYYY-MM-DD' (UTC).
+ * @property {DailyRule} rule
+ * @property {string} seed     the daily seed string, `daily-${dateKey}`.
+ */
+
+const DAY_MS = 86400000;
+/** infoForDateKey memo (pure answers, bounded). */
+const INFO_CACHE = new Map();
+const INFO_CACHE_MAX = 4096;
+
+export class DailyPatch {
+  /** All rules, order is stable (index = days since epoch % length). Append only: reordering changes history. @type {DailyRule[]} */
+  static RULES = [
+    {
+      id: 'tuckBoost',
+      name: 'Tuck Boost',
+      description: 'Tuck grants +50% speed, but steering -50%.',
+      modifiers: { tuckSpeedMul: 1.5, tuckSteerMul: 0.5 },
+    },
+    {
+      id: 'heavyPackets',
+      name: 'Heavy Packets',
+      description: 'Gravity +25%: faster descents, shorter airtime.',
+      modifiers: { gravityMul: 1.25 },
+    },
+    {
+      id: 'featherweight',
+      name: 'Featherweight',
+      description: 'Gravity -20%: floaty jumps, but the sled pushes harder to stay on the ground.',
+      modifiers: { gravityMul: 0.8, airControlMul: 0.9 },
+    },
+    {
+      id: 'slickLines',
+      name: 'Slick Lines',
+      description: 'Friction -40% everywhere: fast and hard to stop.',
+      modifiers: { frictionMul: 0.6 },
+    },
+    {
+      id: 'stickyBits',
+      name: 'Sticky Bits',
+      description: 'Friction +50% but pushing off is twice as strong.',
+      modifiers: { frictionMul: 1.5, pushForceMul: 2 },
+    },
+    {
+      id: 'airDancer',
+      name: 'Air Dancer',
+      description: 'Air control +50% for easier tricks, tuck steering -25%.',
+      modifiers: { airControlMul: 1.5, tuckSteerMul: 0.75 },
+    },
+    {
+      id: 'stiffNeck',
+      name: 'Stiff Neck',
+      description: 'Air control -40%: tricks take commitment.',
+      modifiers: { airControlMul: 0.6 },
+    },
+    {
+      id: 'turboTuck',
+      name: 'Turbo Tuck',
+      description: 'Tuck grants +30% speed and friction -20%, but gravity +10%.',
+      modifiers: { tuckSpeedMul: 1.3, frictionMul: 0.8, gravityMul: 1.1 },
+    },
+  ];
+
+  /**
+   * @param {Date} [date=new Date()] interpreted in UTC. An invalid Date falls back to "now".
+   * @returns {DailyInfo}
+   */
+  static getDailyInfo(date = new Date()) {
+    const d = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+    const dateKey = d.toISOString().slice(0, 10);
+    const dayNumber = Math.floor(d.getTime() / DAY_MS);
+    const n = DailyPatch.RULES.length;
+    const rule = DailyPatch.RULES[((dayNumber % n) + n) % n];
+    return { dateKey, rule, seed: `daily-${dateKey}` };
+  }
+
+  /**
+   * The daily run's biome mask (W3, D6). Derived from the UTC date key ALONE, by a pure function, so every
+   * player runs the same mask on the same day regardless of what they have unlocked - that is the point
+   * of D6: a locked biome may appear as a preview. Widening it with unlocks would make the daily
+   * leaderboard compare different terrain for different players.
+   *
+   * Before CUTOVER_DATE_KEY the cycle is 9 days, indexed by the epoch day: 4 clear days (mask 0, the terrain
+   * everyone knows) and one day for each batch-1 signature biome. Every past date keeps exactly that mask, so
+   * past Daily records and practice replays of past dates stay valid.
+   *
+   * From CUTOVER_DATE_KEY (decision 5, Marvin 2026-11-16) the cycle is 15 days, indexed from the cutover
+   * day: all 11 biomes once plus 4 clear days. The six W6 biomes premiere first, each followed by a clear day
+   * until the last pair, then the batch-1 biomes.
+   * @param {Date|number} [when=new Date()]
+   * @returns {number} biome mask.
+   */
+  static biomeMaskForDate(when = new Date()) {
+    const d = when instanceof Date ? when : new Date(typeof when === 'number' ? when : Date.now());
+    const t = Number.isNaN(d.getTime()) ? Date.now() : d.getTime();
+    const dayNumber = Math.floor(t / DAY_MS);
+    const cutoverDay = Math.floor(Date.parse(`${DailyPatch.CUTOVER_DATE_KEY}T00:00:00Z`) / DAY_MS);
+    if (dayNumber < cutoverDay) {
+      const CYCLE_V1 = [0, 0, 0, 0, 1, 2, 4, 8, 16];
+      return CYCLE_V1[((dayNumber % CYCLE_V1.length) + CYCLE_V1.length) % CYCLE_V1.length];
+    }
+    const CYCLE_V2 = [32, 0, 64, 0, 128, 0, 256, 0, 512, 1024, 1, 2, 4, 8, 16];
+    return CYCLE_V2[(dayNumber - cutoverDay) % CYCLE_V2.length];
+  }
+
+  /** First UTC date of the 15-day, all-biome Daily rotation (decision 5). Dates before it keep the 9-day cycle. */
+  static get CUTOVER_DATE_KEY() { return '2026-11-17'; }
+
+  /**
+   * @param {string} id
+   * @returns {DailyRule|null}
+   */
+  static getRuleById(id) {
+    return DailyPatch.RULES.find((r) => r.id === id) || null;
+  }
+
+  /**
+   * Milliseconds until the next 00:00 UTC rule change (additive helper for a countdown on the title screen).
+   * @param {Date} [date=new Date()]
+   * @returns {number}
+   */
+  static msUntilNextRule(date = new Date()) {
+    const t = date instanceof Date && !Number.isNaN(date.getTime()) ? date.getTime() : Date.now();
+    return DAY_MS - (((t % DAY_MS) + DAY_MS) % DAY_MS);
+  }
+
+  /**
+   * Additive helper: parse the UTC date key out of a daily seed.
+   * @param {string} seed
+   * @returns {string|null} 'YYYY-MM-DD' for a seed of the form `daily-YYYY-MM-DD`, else null.
+   */
+  static dateKeyFromSeed(seed) {
+    const m = typeof seed === 'string' ? /^daily-(\d{4}-\d{2}-\d{2})$/.exec(seed) : null;
+    if (!m) return null;
+    const t = Date.parse(`${m[1]}T00:00:00.000Z`);
+    return Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== m[1] ? null : m[1];
+  }
+
+  /**
+   * Additive helper (decisions 1/2): everything a given UTC date's Daily was, from its date key alone.
+   * A practice run of a past date replays THAT date's rule and mask; the official surfaces use the same
+   * answer to check a record really was played on the date's mask and rule. Pure.
+   * @param {string} dateKey 'YYYY-MM-DD'
+   * @returns {{dateKey:string, seed:string, rule:DailyRule, biomeMask:number}|null} null for a malformed key.
+   */
+  static infoForDateKey(dateKey) {
+    if (typeof dateKey !== 'string') return null;
+    // Memoised: the Daily surfaces ask once per stored run, and a device can hold thousands. The answer is
+    // a pure function of the key, so the cache can never go stale; it is bounded and returns frozen objects.
+    const hit = INFO_CACHE.get(dateKey);
+    if (hit !== undefined) return hit;
+    const k = DailyPatch.dateKeyFromSeed(`daily-${dateKey}`);
+    let out = null;
+    if (k) {
+      // Noon UTC: well inside the day whatever the rounding, so the rule and the mask are that day's.
+      const noon = new Date(Date.parse(`${k}T12:00:00.000Z`));
+      const info = DailyPatch.getDailyInfo(noon);
+      out = Object.freeze({ dateKey: k, seed: info.seed, rule: info.rule, biomeMask: DailyPatch.biomeMaskForDate(noon) });
+    }
+    if (INFO_CACHE.size >= INFO_CACHE_MAX) INFO_CACHE.clear();
+    INFO_CACHE.set(dateKey, out);
+    return out;
+  }
+
+  /**
+   * Additive helper (decision 2): the label a run on this seed wears on the HUD and on Game Over.
+   * An official Daily (started from the DAILY RUN menu item) is 'DAILY RUN'; any other run on a
+   * `daily-YYYY-MM-DD` seed is a practice run, 'DAILY PRACTICE YYYY-MM-DD'; every other seed has none.
+   * @param {string} seed @param {boolean} official
+   * @returns {string}
+   */
+  static dailyRunLabel(seed, official) {
+    const k = DailyPatch.dateKeyFromSeed(seed);
+    if (!k) return '';
+    return official === true ? 'DAILY RUN' : `DAILY PRACTICE ${k}`;
+  }
+
+  /**
+   * Additive helper (decision 2, HUD): the in-run rule-line prefix. 'DAILY RUN' only for the official Daily,
+   * 'DAILY PRACTICE <date>' for any other daily-YYYY-MM-DD seed, 'DAILY RULE' for every other seed.
+   * @param {string|null|undefined} seed
+   * @param {boolean|undefined} official
+   * @returns {string}
+   */
+  static hudRuleLabel(seed, official) {
+    return DailyPatch.dailyRunLabel(seed, official) || 'DAILY RULE';
+  }
+
+  /**
+   * Additive helper (decision 2, HUD): the rule a run on this seed plays, the same answer RunScene gives.
+   * A daily-YYYY-MM-DD seed plays that date's rule; every other seed plays today's. Pure for a given `now`.
+   * @param {string|null|undefined} seed
+   * @param {Date} [now]
+   * @returns {string} rule id, or '' if none
+   */
+  static ruleIdForSeed(seed, now) {
+    const k = DailyPatch.dateKeyFromSeed(seed);
+    const info = k ? DailyPatch.infoForDateKey(k) : DailyPatch.getDailyInfo(now);
+    return (info && info.rule && info.rule.id) || '';
+  }
+
+  /**
+   * Additive helper: format a millisecond duration for the "NEXT PATCH IN" countdown, e.g. '3H 12M'.
+   * Under one hour it reads '12M'; under one minute '<1M'. Rounds minutes up so the display never shows 0 early.
+   * Non-finite or non-positive input gives '0M'.
+   * @param {number} ms
+   * @returns {string}
+   */
+  static formatCountdown(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return '0M';
+    const totalMin = Math.ceil(ms / 60000);
+    if (ms < 60000) return '<1M';
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `${h}H ${m}M` : `${m}M`;
+  }
+}

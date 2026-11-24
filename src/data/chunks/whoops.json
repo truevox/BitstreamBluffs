@@ -1,0 +1,52 @@
+{
+  "id": "whoops",
+  "kind": "spline",
+  "weight": 2,
+  "minDistanceM": 100,
+  "lengthPx": 1300,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.12,
+      "y": 37
+    },
+    {
+      "x": 0.25,
+      "y": 6
+    },
+    {
+      "x": 0.38,
+      "y": 50
+    },
+    {
+      "x": 0.5,
+      "y": 19
+    },
+    {
+      "x": 0.62,
+      "y": 62
+    },
+    {
+      "x": 0.75,
+      "y": 31
+    },
+    {
+      "x": 0.88,
+      "y": 74
+    },
+    {
+      "x": 1,
+      "y": 93
+    }
+  ],
+  "tags": [
+    "bumps",
+    "trick-practice"
+  ],
+  "modIds": [
+    "compression"
+  ]
+}

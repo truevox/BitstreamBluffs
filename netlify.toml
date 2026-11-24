@@ -1,0 +1,21 @@
+[build]
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PUPPETEER_SKIP_DOWNLOAD = "1"
+
+[[plugins]]
+  package = "netlify-plugin-cache"
+
+  [plugins.inputs]
+  paths = ["node_modules", "package-lock.json"]
+
+# Netlify's default static-asset MIME lookup serves `.webmanifest` as
+# application/octet-stream on previews. Explicitly advertise the registered
+# Web App Manifest media type for standards-compliant PWA installation.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"

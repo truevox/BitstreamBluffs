@@ -1,0 +1,835 @@
+/**
+ * Modal views: navigation, focus and teardown (post-sprint audit fixes U1, U2, U3, UI-1, UI-2, U7a,
+ * SHOP-3, F3 - the view half).
+ *
+ * Harness: a small but real fake of the Phaser surface the UI widgets touch. Every object has a working
+ * destroy() (so leaked panels are observable), Zones keep their pointer handlers (so the pointer path can
+ * be fired exactly as the built-game gate does) and Graphics record their fillRect calls (so painted
+ * highlights can be measured). Scenes are stubs built on the real scene prototypes.
+ *
+ * Harness and the first red tests come from the UI audit branch (audit/ui at e0ae90f).
+ */
+import { jest } from '@jest/globals';
+import fs from 'fs';
+import path from 'path';
+
+// ------------------------------------------------------------------ fake Phaser
+
+class Emitter {
+  constructor() { this._ev = new Map(); }
+  on(e, fn, ctx) { if (!this._ev.has(e)) this._ev.set(e, []); this._ev.get(e).push({ fn, ctx, once: false }); return this; }
+  once(e, fn, ctx) { if (!this._ev.has(e)) this._ev.set(e, []); this._ev.get(e).push({ fn, ctx, once: true }); return this; }
+  off(e, fn) {
+    const l = this._ev.get(e);
+    if (!l) return this;
+    if (!fn) { this._ev.delete(e); return this; }
+    this._ev.set(e, l.filter((x) => x.fn !== fn));
+    return this;
+  }
+  emit(e, ...a) {
+    const l = this._ev.get(e);
+    if (!l || !l.length) return false;
+    for (const x of [...l]) {
+      if (x.once) this.off(e, x.fn);
+      x.fn.apply(x.ctx, a);
+    }
+    return true;
+  }
+  listenerCount(e) { return (this._ev.get(e) || []).length; }
+  totalListeners() { let n = 0; for (const l of this._ev.values()) n += l.length; return n; }
+  removeAllListeners() { this._ev.clear(); return this; }
+}
+
+class GO extends Emitter {
+  constructor(scene, x = 0, y = 0) {
+    super();
+    this.scene = scene;
+    this.x = x; this.y = y;
+    this.visible = true; this.alpha = 1; this.scaleX = 1; this.scaleY = 1; this.depth = 0;
+    this.originX = 0; this.originY = 0;
+    this.list = [];
+    this.destroyed = false;
+    this.parentContainer = null;
+    this.input = null;
+    this.width = 0; this.height = 0;
+  }
+  add(c) {
+    for (const o of [].concat(c)) {
+      if (!o) continue;
+      if (o.parentContainer && o.parentContainer !== this) o.parentContainer.remove(o);
+      this.list.push(o);
+      o.parentContainer = this;
+      if (this.scene && this.scene.__top) this.scene.__top.delete(o);
+    }
+    return this;
+  }
+  remove(c) { for (const o of [].concat(c)) { this.list = this.list.filter((x) => x !== o); if (o) o.parentContainer = null; } return this; }
+  setDepth(d) { this.depth = d; return this; }
+  setPosition(x, y) { this.x = x; if (y !== undefined) this.y = y; return this; }
+  setX(x) { this.x = x; return this; }
+  setY(y) { this.y = y; return this; }
+  setVisible(v) { this.visible = v; return this; }
+  setAlpha(a) { this.alpha = a; return this; }
+  setScale(sx, sy) { this.scaleX = sx; this.scaleY = sy === undefined ? sx : sy; return this; }
+  setOrigin(ox, oy) { this.originX = ox; this.originY = oy === undefined ? ox : oy; return this; }
+  setInteractive() { this.input = { enabled: true }; return this; }
+  disableInteractive() { if (this.input) this.input.enabled = false; return this; }
+  removeInteractive() { this.input = null; return this; }
+  setSize(w, h) { this.width = w; this.height = h; return this; }
+  setTint() { return this; }
+  clearTint() { return this; }
+  setBlendMode() { return this; }
+  setScrollFactor() { return this; }
+  setMask() { return this; }
+  setAngle() { return this; }
+  setRotation() { return this; }
+  setCenterAlign() { return this; }
+  setLeftAlign() { return this; }
+  setRightAlign() { return this; }
+  setLetterSpacing() { return this; }
+  setFontSize() { return this; }
+  setDropShadow() { return this; }
+  setFillStyle() { return this; }
+  setStrokeStyle() { return this; }
+  bringToTop() { return this; }
+  getBounds() { return { x: this.x, y: this.y, width: this.width, height: this.height }; }
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    for (const c of [...this.list]) if (c && c.destroy) c.destroy();
+    this.list = [];
+    if (this.parentContainer) this.parentContainer.remove(this);
+    if (this.scene && this.scene.__top) this.scene.__top.delete(this);
+    this.emit('destroy');
+    this.scene = undefined;
+  }
+}
+
+class BitmapText extends GO {
+  constructor(scene, x, y, font, text) { super(scene, x, y); this.text = String(text === undefined ? '' : text); }
+  setText(t) { this.text = String(t); return this; }
+}
+class Zone extends GO {
+  constructor(scene, x, y, w, h) { super(scene, x, y); this.width = w; this.height = h; }
+}
+class Rect extends GO {
+  constructor(scene, x, y, w, h) { super(scene, x, y); this.width = w; this.height = h; }
+}
+/** Graphics: records every drawing call; unknown drawing methods are recorded too. */
+class Graphics extends GO {
+  constructor(scene) {
+    super(scene, 0, 0);
+    this.ops = [];
+    return new Proxy(this, {
+      get(t, k, r) {
+        if (typeof k !== 'string' || k in t || k === 'then') return Reflect.get(t, k, r);
+        return (...a) => { t.ops.push([k, ...a]); return r; };
+      },
+    });
+  }
+  clear() { this.ops = []; return this; }
+  fillStyle(...a) { this.ops.push(['fillStyle', ...a]); return this; }
+  fillRect(...a) { this.ops.push(['fillRect', ...a]); return this; }
+  lineStyle(...a) { this.ops.push(['lineStyle', ...a]); return this; }
+  strokeRect(...a) { this.ops.push(['strokeRect', ...a]); return this; }
+}
+
+const FakePhaser = {
+  Scene: class {},
+  GameObjects: { Container: GO, Graphics, BitmapText, Zone, Image: GO, Rectangle: Rect, Text: BitmapText },
+  Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown', DESTROY: 'destroy' } },
+  Math: { Between: (a) => a, Clamp: (v, a, b) => Math.min(b, Math.max(a, v)) },
+};
+
+jest.unstable_mockModule('phaser', () => ({ default: FakePhaser }));
+jest.unstable_mockModule('../../src/data/index.js', () => ({ content: {}, loadContent: () => ({}) }));
+
+const { REG, GAME_WIDTH, GAME_HEIGHT } = await import('../../src/constants.js');
+const { Theme } = await import('../../src/ui/Theme.js');
+const Views = await import('../../src/ui/Views.js');
+const { ProfileView, AchievementsView, ShopView, LeaderboardView, TitlesView } = Views;
+const { MenuList } = await import('../../src/ui/MenuList.js');
+const { TitleScene } = await import('../../src/scenes/TitleScene.js');
+const { copyText } = await import('../../src/ui/Clipboard.js');
+const { measureText } = await import('../../src/ui/PixelFont.js');
+const { DailyPatch } = await import('../../src/systems/DailyPatch.js');
+const { defaultProfile } = await import('../../src/systems/Progression.js');
+const { loadContent } = await import('./_helpers.js');
+
+const LEVELS = JSON.parse(fs.readFileSync(path.resolve('src/data/progression/levels.json'), 'utf8'));
+const PALETTES = JSON.parse(fs.readFileSync(path.resolve('src/data/palettes.json'), 'utf8'));
+const CONTENT = { ...loadContent(), progression: LEVELS, palettes: PALETTES.palettes || PALETTES };
+
+// ------------------------------------------------------------------ scene stubs
+
+function makeScene(proto, values = {}) {
+  const reg = new Map();
+  reg.set(REG.CONTENT, CONTENT);
+  for (const [k, v] of Object.entries(values)) reg.set(k, v);
+  const registry = { get: (k) => reg.get(k), set: (k, v) => { reg.set(k, v); }, values: reg };
+  const game = { registry, events: new Emitter(), canvas: null, config: {} };
+  const s = proto ? Object.create(proto) : {};
+  const timers = [];
+  const tweens = [];
+  Object.assign(s, {
+    game,
+    registry,
+    __top: new Set(),
+    events: new Emitter(),
+    input: Object.assign(new Emitter(), { keyboard: new Emitter() }),
+    sys: { settings: { data: {} }, game },
+    textures: { exists: () => true, createCanvas: () => ({ context: {}, refresh() {} }) },
+    cameras: { main: { setBackgroundColor() { return this; }, fadeIn() { return this; }, fadeOut() { return this; }, once() { return this; } } },
+    scene: { start: jest.fn(), stop: jest.fn(), resume: jest.fn(), launch: jest.fn(), get: () => null },
+    time: {
+      delayedCall: (ms, fn) => { const t = { ms, fn, removed: false, paused: false, remove() { this.removed = true; return this; } }; timers.push(t); return t; },
+      addEvent: (cfg) => { const t = { cfg, removed: false, remove() { this.removed = true; return this; } }; timers.push(t); return t; },
+    },
+    tweens: {
+      add: (cfg) => { const t = { cfg, removed: false, remove() { this.removed = true; return this; }, stop() { return this; } }; tweens.push(t); return t; },
+      addCounter: (cfg) => { const t = { cfg, removed: false, remove() { this.removed = true; return this; }, stop() { return this; } }; tweens.push(t); return t; },
+      killTweensOf: () => {},
+      pauseAll: () => {},
+      resumeAll: () => {},
+    },
+    add: {
+      existing: (o) => { if (!o.parentContainer) s.__top.add(o); return o; },
+      graphics: () => { const g = new Graphics(s); s.__top.add(g); return g; },
+      rectangle: (x, y, w, h) => { const r = new Rect(s, x, y, w, h); s.__top.add(r); return r; },
+      image: (x, y) => { const r = new GO(s, x, y); s.__top.add(r); return r; },
+      container: (x, y) => { const r = new GO(s, x, y); s.__top.add(r); return r; },
+    },
+  });
+  s.__timers = timers;
+  s.__tweens = tweens;
+  return s;
+}
+
+/** A Title scene stub with the real menu (so PROFILE / LEADERBOARD open exactly as in the game). */
+function titleHost(values = {}) {
+  const t = makeScene(TitleScene.prototype, { [REG.PROFILE]: defaultProfile(), ...values });
+  t.starting = false;
+  t.view = null;
+  t.dim = null;
+  t.theme = new Theme(t);
+  t.daily = DailyPatch.getDailyInfo();
+  t._buildMenu();
+  return t;
+}
+const item = (t, label) => t.menu.items.find((i) => String(i.label).toUpperCase() === label);
+const openProfile = (t) => { item(t, 'PROFILE').onSelect(); return t.view; };
+
+/** Every BitmapText string under a game object. */
+function texts(obj, out = []) {
+  if (!obj) return out;
+  if (typeof obj.text === 'string' && obj.text) out.push(obj.text);
+  for (const c of obj.list || []) texts(c, out);
+  return out;
+}
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+const richProfile = () => ({ ...defaultProfile(), level: 3, xp: 0, bank: 500 });
+
+
+test('sanity: game sizes the tests assume', () => {
+  expect([GAME_WIDTH, GAME_HEIGHT]).toEqual([480, 270]);
+});
+
+// ================================================================== U7a: Clipboard
+
+describe('Clipboard.copyText', () => {
+  test('U7a: copyText leaves no hidden textarea in the DOM when execCommand throws', async () => {
+    const orig = document.execCommand;
+    document.execCommand = () => { throw new Error('denied'); };
+    try {
+      const before = document.querySelectorAll('textarea').length;
+      const ok = await copyText('seed@31');
+      expect(ok).toBe(false);
+      expect(document.querySelectorAll('textarea').length).toBe(before);
+    } finally {
+      document.execCommand = orig;
+      for (const ta of document.querySelectorAll('textarea')) ta.remove();
+    }
+  });
+});
+
+// ================================================================== UI-2: MenuList columns
+
+describe('UI-2: MenuList highlights the selected row in its own column', () => {
+  test('UI-2: with columns:2 the highlight for item 7 is drawn at column 2, row 1', () => {
+    const s = makeScene(null);
+    const theme = new Theme(s);
+    const items = Array.from({ length: 11 }, (_, i) => ({
+      kind: 'choice', label: `B${i}`, options: [{ value: false, label: 'OFF' }, { value: true, label: 'ON' }], get: () => false, set: () => {},
+    }));
+    const m = new MenuList(s, theme, { x: 0, y: 0, w: 388, rowH: 9, items, columns: 2, rowsPerColumn: 6 });
+    m.setSelected(7, true);
+    // The first fillRect after the highlight colour is the 16% wash over the selected row.
+    const rects = m.g.ops.filter((o) => o[0] === 'fillRect');
+    const wash = rects[0];
+    expect(wash).toBeTruthy();
+    const [, x, y, w] = wash;
+    expect({ x, y, w }).toEqual({ x: 194, y: 9, w: 194 });
+  });
+});
+
+describe('MenuList single column stays pixel-identical', () => {
+  test('UI-2 control: a one-column list highlights row i at y = i * rowH across the full width', () => {
+    const s = makeScene(null);
+    const theme = new Theme(s);
+    const items = Array.from({ length: 4 }, (_, i) => ({ kind: 'action', label: `A${i}`, onSelect: () => {} }));
+    const m = new MenuList(s, theme, { x: 0, y: 0, w: 200, rowH: 16, items });
+    m.setSelected(3, true);
+    const [, x, y, w] = m.g.ops.filter((o) => o[0] === 'fillRect')[0];
+    expect({ x, y, w }).toEqual({ x: 0, y: 48, w: 200 });
+  });
+});
+
+// ================================================================== U1: Profile -> Achievements -> back
+
+describe('U1: Profile -> ACHIEVEMENTS -> BACK', () => {
+  test('harness control: the first Profile view reaches SHARD SHOP by keyboard (control)', () => {
+    const t = titleHost();
+    expect(openProfile(t)).toBeInstanceOf(ProfileView);
+    t._onAction('down'); // lands focus on SHARD SHOP (no unlocked biomes = no toggle rows)
+    t._onAction('confirm');
+    expect(t.view).toBeInstanceOf(ShopView);
+  });
+
+  test('U1: backing out of ACHIEVEMENTS destroys the Achievements panel', () => {
+    const t = titleHost();
+    const prof = openProfile(t);
+    prof.achButton.zone.emit('pointerdown'); // the pointer path, exactly as the gate and the live check did
+    const ach = t.view;
+    expect(ach).toBeInstanceOf(AchievementsView);
+    const achPanel = ach.panel;
+    t._onAction('cancel'); // grid -> profile
+    expect(t.view).toBeInstanceOf(ProfileView);
+    t._onAction('cancel'); // profile -> title
+    expect(t.view).toBeNull();
+    // Correct: nothing of the grid survives.
+    expect(achPanel.destroyed).toBe(true);
+    expect(ach.alive).toBe(false);
+  });
+
+  test('U1b: the Profile view rebuilt after ACHIEVEMENTS still opens SHARD SHOP', () => {
+    const t = titleHost();
+    openProfile(t).achButton.zone.emit('pointerdown');
+    t._onAction('cancel'); // back to the rebuilt profile
+    expect(t.view).toBeInstanceOf(ProfileView);
+    t._onAction('down');
+    t._onAction('confirm');
+    expect(t.view).toBeInstanceOf(ShopView);
+  });
+});
+
+describe('U2: ACHIEVEMENTS is reachable without a pointer', () => {
+  test('U2: some keyboard/pad sequence on PROFILE opens the achievements grid', () => {
+    const tried = [];
+    let opened = false;
+    for (const dir of ['down', 'up', 'left', 'right']) {
+      for (let n = 0; n <= 6 && !opened; n += 1) {
+        const t = titleHost();
+        openProfile(t);
+        t._onAction('down'); // land focus
+        for (let i = 0; i < n; i += 1) t._onAction(dir);
+        // Confirm only while still on the profile: confirm on BACK closes it, which is not a find.
+        if (t.view instanceof ProfileView) t._onAction('confirm');
+        tried.push(`${dir}x${n}->${t.view ? t.view.constructor.name : 'null'}`);
+        if (t.view instanceof AchievementsView) opened = true;
+      }
+    }
+    expect({ opened, tried }).toEqual(expect.objectContaining({ opened: true }));
+  });
+
+  test('U2: ACHIEVEMENTS sits before SHARD SHOP in the focus order, gets a focus ring, and confirm opens the grid', () => {
+    const t = titleHost();
+    const prof = openProfile(t);
+    t._onAction('down'); // land: SHARD SHOP (no toggle rows on a fresh profile)
+    t._onAction('up'); // ACHIEVEMENTS, which is left of SHARD SHOP on screen
+    expect(prof._focusTargets()[prof.focusIdx]).toEqual({ kind: 'ach' });
+    const ring = prof.shopFocus.ops.find((o) => o[0] === 'strokeRect');
+    expect(ring).toBeTruthy();
+    expect(ring[1]).toBeCloseTo(prof.achButton.x - 1.5);
+    t._onAction('confirm');
+    expect(t.view).toBeInstanceOf(AchievementsView);
+  });
+});
+
+// ================================================================== U3: leaderboard tabs
+
+describe('U3: leaderboard tabs and empty state', () => {
+  const store = () => ({ getLeaderboard: async () => [], getModdedLeaderboard: async () => [] });
+
+  test('U3: a keyboard/pad action switches the leaderboard to the MODDED board', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    expect(view).toBeInstanceOf(LeaderboardView);
+    const flipped = [];
+    for (const a of ['left', 'right', 'up', 'down', 'confirm', 'alt', 'shop']) {
+      if (t.view !== view) break;
+      t._onAction(a);
+      if (view.showingModded) flipped.push(a);
+    }
+    expect(flipped.length).toBeGreaterThan(0);
+  });
+
+  test('U3b: an empty MODDED board says why it is empty', async () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    view._toggleBoard(); // the gate's own route (gate-playthrough.mjs ~:1203)
+    await flush();
+    expect(view.emptyText).toBe('NO MODDED RUNS RECORDED YET'); // the view computed it...
+    expect(texts(view.panel)).toContain(view.emptyText); // ...and puts it on screen
+  });
+
+  test('U3: right shows MODDED, left shows CLEAN, N / pad X (alt) toggles', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    t._onAction('right');
+    expect(view.showingModded).toBe(true);
+    t._onAction('right'); // directional, so a held key does not flicker between boards
+    expect(view.showingModded).toBe(true);
+    t._onAction('left');
+    expect(view.showingModded).toBe(false);
+    t._onAction('alt');
+    expect(view.showingModded).toBe(true);
+    t._onAction('alt');
+    expect(view.showingModded).toBe(false);
+    expect(t.view).toBe(view);
+  });
+
+  test('U3: the tab button is a focus target: it holds focus first, confirm switches, down moves to BACK', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    const ring = () => view.focusG.ops.find((o) => o[0] === 'strokeRect');
+    expect(ring()[1]).toBeCloseTo(view.tabBtn.x - 1.5); // painted from the start
+    t._onAction('confirm');
+    expect(view.showingModded).toBe(true);
+    expect(view.tabBtn.label.main.text).toBe('CLEAN');
+    t._onAction('down');
+    expect(ring()[1]).toBeCloseTo(view.back.x - 1.5);
+    t._onAction('confirm');
+    expect(t.view).toBeNull();
+  });
+
+  test('U3: an on-screen hint names the switch keys and stays clear of the buttons', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    // The hint is a keycap row (ViewChrome.Keycaps, in the title-tab line): its `summary` is the plain-text
+    // reading of the row, and `totalW` its drawn width, so the same contract is checked on the new widget.
+    const hint = view.panel.list.find((o) => typeof o.summary === 'string' && /SWITCH BOARD/.test(o.summary));
+    expect(hint).toBeTruthy();
+    expect(hint.summary).toMatch(/←/);
+    expect(hint.summary).toMatch(/\bN\b/);
+    expect(hint.summary).toMatch(/PAD X/);
+    const box = { x: hint.x, y: hint.y, w: hint.totalW, h: 11 };
+    expect(box.x).toBeGreaterThanOrEqual(4);
+    expect(box.x + box.w).toBeLessThanOrEqual(view.w - 4);
+    for (const b of [view.tabBtn, view.back]) {
+      const hit = box.x < b.x + b.w && b.x < box.x + box.w && box.y < b.y + b.h && b.y < box.y + box.h;
+      expect(hit).toBe(false);
+    }
+    // The panel still fits the 480x270 canvas.
+    expect(view.panel.y + view.h).toBeLessThanOrEqual(GAME_HEIGHT);
+  });
+
+  test('U3b: the empty CLEAN board names its board, and only one empty message is drawn', async () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    await flush();
+    const all = texts(view.panel);
+    expect(all).toContain('NO CLEAN RUNS RECORDED YET');
+    expect(all).not.toContain('NO ENTRIES YET');
+    view._toggleBoard();
+    await flush();
+    expect(texts(view.panel)).not.toContain('NO CLEAN RUNS RECORDED YET');
+  });
+
+  test('U3c: a slow CLEAN result that lands after switching to MODDED does not overwrite the MODDED board', async () => {
+    let releaseClean;
+    const slow = {
+      getLeaderboard: () => new Promise((r) => { releaseClean = () => r([{ id: 'c1', initials: 'CLN', score: 5, distanceM: 1 }]); }),
+      getModdedLeaderboard: async () => [{ id: 'm1', initials: 'MOD', score: 9, distanceM: 2 }],
+    };
+    const t = titleHost({ [REG.SAVE_STORE]: slow });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    t._onAction('right'); // MODDED requested while CLEAN is still in flight
+    await flush();
+    releaseClean();
+    await flush();
+    const all = texts(view.panel);
+    expect(all).toContain('MOD');
+    expect(all).not.toContain('CLN');
+  });
+});
+
+describe('UI-1: the leaderboard footer fits at 480x270', () => {
+  const store = () => ({ getLeaderboard: async () => [], getModdedLeaderboard: async () => [] });
+  const full = () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      id: `r${i}`, initials: 'WWW', score: 9999999 - i, distanceM: 99999, seed: 'WWWWWWWWWWWWWWWW', dailyRuleId: 'none',
+    }));
+    return { getLeaderboard: async () => rows, getModdedLeaderboard: async () => rows };
+  };
+  const panelTexts = (view) => view.panel.list.filter((o) => o.main && typeof o.main.text === 'string' && o.main.text)
+    .map((o) => ({ text: o.main.text, x: o.x, y: o.y, w: measureText(o.main.text), h: 8 }));
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  test('UI-1: the leaderboard footer line is not drawn under the MODDED button at 480x270', () => {
+    const t = titleHost({ [REG.SAVE_STORE]: store() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    const footer = view.panel.list.find((o) => o.main && /ONE LEDGER PER DEVICE/.test(o.main.text));
+    expect(footer).toBeTruthy();
+    const right = footer.x + measureText(footer.main.text);
+    // The tab button and BACK share the footer's row (button y h-24..h-8, text y h-18..h-10).
+    expect(right).toBeLessThanOrEqual(view.tabBtn.x - 2);
+  });
+
+  test('UI-1: with a full ten-row board no footer text touches a button, another footer text or the table', async () => {
+    const t = titleHost({ [REG.SAVE_STORE]: full() });
+    item(t, 'LEADERBOARD').onSelect();
+    const view = t.view;
+    await flush();
+    // Footer texts only: everything drawn into the panel below the table's top (the frame title sits above).
+    const boxes = panelTexts(view).filter((b) => b.y > view.table.y);
+    // The rule-flag explanation survives the split; it is still on screen somewhere.
+    expect(boxes.some((b) => /MAGENTA RULE FLAG = DAILY PATCH ACTIVE/.test(b.text))).toBe(true);
+    const tableBottom = view.table.y + 14 + 9 * view.table.rowH + 8;
+    for (const b of boxes) {
+      expect({ text: b.text, inside: b.x >= 4 && b.x + b.w <= view.w - 4 }).toEqual({ text: b.text, inside: true });
+      expect({ text: b.text, belowTable: b.y >= tableBottom + 1 }).toEqual({ text: b.text, belowTable: true });
+      for (const btn of [view.tabBtn, view.back]) {
+        expect({ text: b.text, hitsButton: hit(b, btn) }).toEqual({ text: b.text, hitsButton: false });
+      }
+    }
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        expect({ pair: [boxes[i].text, boxes[j].text], overlap: hit(boxes[i], boxes[j]) })
+          .toEqual({ pair: [boxes[i].text, boxes[j].text], overlap: false });
+      }
+    }
+  });
+});
+
+// ================================================================== SHOP-3: back to DEFAULT
+
+/** A ShopView on a bare scene stub, the way the Title and Game Over hosts open it. */
+function shopHost(profile) {
+  const s = makeScene(null, { [REG.PROFILE]: profile });
+  const theme = new Theme(s);
+  return { s, view: new ShopView(s, theme, { onClose: () => {} }) };
+}
+const focusItem = (view, pred) => {
+  const idx = view.menu.items.findIndex(pred);
+  expect(idx).toBeGreaterThanOrEqual(0);
+  view.menu.setSelected(idx, true);
+  return idx;
+};
+
+describe('SHOP-3: the shop offers a way back to DEFAULT', () => {
+  const equippedEmber = () => ({
+    ...defaultProfile(), bank: 0,
+    unlocked: { biomes: [], cosmetics: ['trail-hue-ember'], titles: [], boosts: {} },
+    equipped: { ...defaultProfile().equipped, trail: 'ember' },
+  });
+
+  test('SHOP-3: the equipped row takes focus and confirm returns the slot to DEFAULT; confirm again re-equips', () => {
+    const { s, view } = shopHost(equippedEmber());
+    focusItem(view, (i) => i.id === 'trail-hue-ember');
+    view.handleAction('confirm');
+    expect(s.registry.get(REG.PROFILE).equipped.trail).toBe('default');
+    expect(texts(view.panel).some((x) => /TRAIL DEFAULT/.test(x))).toBe(true);
+    // The row is still there, now offering EQUIP, and focus stayed on it.
+    const again = view.menu.items[view.menu.selected];
+    expect(again.id).toBe('trail-hue-ember');
+    expect(again.sub).toBe('EQUIP');
+    view.handleAction('confirm');
+    expect(s.registry.get(REG.PROFILE).equipped.trail).toBe('ember');
+  });
+
+  test('SHOP-3: keyboard focus can reach the equipped row (it is no longer skipped)', () => {
+    const { view } = shopHost(equippedEmber());
+    const seen = new Set();
+    for (let i = 0; i < view.menu.items.length + 2; i++) {
+      seen.add(view.menu.items[view.menu.selected].id);
+      view.handleAction('down');
+    }
+    expect(seen.has('trail-hue-ember')).toBe(true);
+  });
+});
+
+// ================================================================== F11: Profile view draws locked biomes
+
+describe('F11: the Profile view draws locked biomes and keeps the toggles on the panel', () => {
+  test('F11: at Sync Level 20 the locked names and their LVL tags are drawn, and every toggle row is inside the panel', () => {
+    const xp = LEVELS.levels.find((l) => l.level === 20).xpMin;
+    const profile = { ...defaultProfile(), xp, level: 20, pendingBiomes: LEVELS.levels.filter((l) => l.biome && l.level <= 20).map((l) => l.biome) };
+    const t = titleHost({ [REG.PROFILE]: profile });
+    const prof = openProfile(t);
+    const all = texts(prof.panel);
+    expect(all).toContain('SKY JELLYFISH MOUNTAIN'); // unlocks at 22
+    expect(all).toContain('LVL 22');
+    expect(all).toContain('SIGNATURES UNLOCKED 7/11');
+    const m = prof.sigMenu;
+    expect(m.items.length).toBe(6); // seven unlocked, minus the base biome, which has no toggle
+    for (const r of m.rows) {
+      expect(m.x + r.label.x).toBeLessThan(prof.w);
+      expect(m.y + r.label.y).toBeLessThan(prof.h - 34); // above the ACHIEVEMENTS n/29 line
+    }
+  });
+});
+
+// ================================================================== F3: shop boost gate (view half)
+
+describe('F3: ShopView does not let a locked boost be switched on', () => {
+  test('F3: on a level-1 profile no key or pointer path turns Head Start or Error Correction on', () => {
+    const { s, view } = shopHost({ ...defaultProfile(), bank: 0 });
+    const boostIdx = view.menu.items.map((it, i) => (it.boostId ? i : -1)).filter((i) => i >= 0);
+    expect(boostIdx.length).toBe(2);
+    for (const i of boostIdx) {
+      expect(view.menu.items[i].disabled).toBe(true);
+      expect(view.menu.items[i].sub).toMatch(/^LVL \d+$/);
+    }
+    // Keys: walk the whole list with every action at every stop.
+    for (let n = 0; n < view.menu.items.length + 2; n++) {
+      expect(boostIdx).not.toContain(view.menu.selected);
+      for (const a of ['left', 'right', 'confirm']) {
+        const cur = view.menu.items[view.menu.selected];
+        if (cur && cur.boostId) view.handleAction(a);
+      }
+      view.handleAction('down');
+    }
+    // Pointer: click each boost row's zone.
+    for (const i of boostIdx) {
+      const z = view.menu.rows[i].zone;
+      if (z) { z.emit('pointerover'); z.emit('pointerdown', {}, 10); z.emit('pointerdown', {}, 380); }
+    }
+    const b = s.registry.get(REG.PROFILE).boosts;
+    expect(b.headStart).toBe(false);
+    expect(b.errorCorrection).toBe(false);
+  });
+
+  test('F3 control: once unlocked.boosts.headStart is granted the toggle works', () => {
+    const p = { ...defaultProfile(), xp: LEVELS.levels.find((l) => l.level === 8).xpMin, level: 8, unlocked: { ...defaultProfile().unlocked, boosts: { headStart: 1 } } };
+    const { s, view } = shopHost(p);
+    focusItem(view, (it) => it.boostId === 'headStart');
+    view.handleAction('right');
+    expect(s.registry.get(REG.PROFILE).boosts.headStart).toBe(true);
+  });
+});
+
+// ================================================================== F4 fit: the shop pages by slot
+
+describe('F4 fit: ShopView pages by slot, by key, pad and pointer', () => {
+  const ids = (view) => view.menu.items.filter((i) => i.id && !i.boostId).map((i) => i.id);
+  const pageRowIdx = (view) => view.menu.items.findIndex((i) => i.rowKind === 'page');
+  const lvl30 = () => ({
+    ...defaultProfile(), xp: LEVELS.levels[LEVELS.levels.length - 1].xpMin + 1, level: 30, bank: 0,
+    unlocked: { ...defaultProfile().unlocked, boosts: { headStart: 8, errorCorrection: 15 } },
+  });
+
+  test('the shop opens on TRAIL with focus on the page row', () => {
+    const { view } = shopHost(richProfile());
+    expect(view.menu.selected).toBe(pageRowIdx(view));
+    expect(ids(view).every((id) => id.startsWith('trail-'))).toBe(true);
+  });
+
+  test('right / left on the page row turn the page and wrap; focus stays on the page row', () => {
+    const { view } = shopHost(richProfile());
+    view.handleAction('right');
+    expect(ids(view).length).toBeGreaterThan(0);
+    expect(ids(view).every((id) => /glow/.test(id))).toBe(true);
+    expect(view.menu.selected).toBe(pageRowIdx(view));
+    view.handleAction('left');
+    view.handleAction('left');
+    expect(ids(view).every((id) => id.startsWith('theme-'))).toBe(true);
+    expect(texts(view.panel).some((x) => /4\/4/.test(x))).toBe(true);
+  });
+
+  test('left / right on an item row also page (the slot is the page), confirm on the page row turns it forward', () => {
+    const { view } = shopHost(richProfile());
+    focusItem(view, (i) => i.id === 'trail-hue-ember');
+    view.handleAction('right');
+    expect(ids(view).every((id) => /glow/.test(id))).toBe(true);
+    focusItem(view, (i) => i.rowKind === 'page');
+    view.handleAction('confirm');
+    expect(ids(view).every((id) => /rider/.test(id))).toBe(true);
+  });
+
+  test('a pointer click on the page row turns the page', () => {
+    const { view } = shopHost(richProfile());
+    const z = view.menu.rows[pageRowIdx(view)].zone;
+    z.emit('pointerdown', {}, 10);
+    expect(ids(view).every((id) => /glow/.test(id))).toBe(true);
+  });
+
+  test('left / right on an unlocked boost row toggle the boost and do not turn the page', () => {
+    const { s, view } = shopHost(lvl30());
+    const before = ids(view);
+    focusItem(view, (i) => i.boostId === 'headStart');
+    view.handleAction('right');
+    expect(s.registry.get(REG.PROFILE).boosts.headStart).toBe(true);
+    expect(ids(view)).toEqual(before);
+  });
+
+  test('buying works from any page, and the bank line refreshes', () => {
+    const { s, view } = shopHost(richProfile());
+    view._choose('rider-hue-mint'); // the built-game gate calls exactly this from the first page
+    const p = s.registry.get(REG.PROFILE);
+    expect(p.bank).toBe(400);
+    expect(p.equipped.rider).toBe('mint');
+    expect(texts(view.panel)).toContain('BANK 400');
+  });
+
+  test('SHOP-3 holds on a later page: confirm on EQUIPPED returns the slot to DEFAULT', () => {
+    const p = { ...richProfile(), unlocked: { ...defaultProfile().unlocked, cosmetics: ['rider-hue-mint'] }, equipped: { ...defaultProfile().equipped, rider: 'mint' } };
+    const { s, view } = shopHost(p);
+    view.handleAction('right');
+    view.handleAction('right');
+    focusItem(view, (i) => i.id === 'rider-hue-mint');
+    expect(view.menu.items[view.menu.selected].sub).toBe('EQUIPPED');
+    view.handleAction('confirm');
+    expect(s.registry.get(REG.PROFILE).equipped.rider).toBe('default');
+    expect(ids(view).every((id) => /rider/.test(id))).toBe(true); // the page did not jump back
+  });
+
+  test('every page reaches every one of its rows by up/down', () => {
+    const { view } = shopHost(lvl30());
+    for (let page = 0; page < 4; page++) {
+      const want = new Set(view.menu.items.map((it, i) => (it.disabled ? -1 : i)).filter((i) => i >= 0));
+      const seen = new Set();
+      for (let n = 0; n < view.menu.items.length * 2; n++) { seen.add(view.menu.selected); view.handleAction('down'); }
+      expect([...want].filter((i) => !seen.has(i))).toEqual([]);
+      focusItem(view, (i) => i.rowKind === 'page');
+      view.handleAction('right');
+    }
+  });
+});
+
+// ================================================================== SHOP-5: the equipped theme reaches the UI
+
+describe('SHOP-5: Theme applies the equipped UI theme', () => {
+  const hex = (n) => `#${n.toString(16).padStart(6, '0')}`;
+  const base = PALETTES.default;
+
+  test('a scene Theme reads the equipped theme: accents change, danger does not', () => {
+    const s = makeScene(null, { [REG.PROFILE]: { ...defaultProfile(), equipped: { ...defaultProfile().equipped, theme: 'sunset' } } });
+    const th = new Theme(s);
+    expect(hex(th.pal.cyan)).not.toBe(base.cyan);
+    expect(th.css.cyan).toBe(hex(th.pal.cyan));
+    expect(hex(th.pal.danger)).toBe(base.danger);
+    expect(th.color('danger')).toBe(parseInt(base.danger.slice(1), 16));
+  });
+
+  test('no theme equipped: the Theme is the plain palette', () => {
+    const th = new Theme(makeScene(null, { [REG.PROFILE]: defaultProfile() }));
+    expect(th.css).toEqual(base);
+  });
+
+  test('colourblind keeps priority over an equipped theme', () => {
+    const s = makeScene(null, {
+      [REG.PROFILE]: { ...defaultProfile(), equipped: { ...defaultProfile().equipped, theme: 'legend' } },
+      [REG.SETTINGS]: { palette: 'colorblind' },
+    });
+    expect(new Theme(s).css).toEqual(PALETTES.colorblind);
+  });
+
+  test('equipping a theme in the shop repaints the open screen live; unequipping restores it', () => {
+    const lvl30 = { ...defaultProfile(), xp: LEVELS.levels[LEVELS.levels.length - 1].xpMin + 1, level: 30, bank: 0 };
+    const { s, view } = shopHost(lvl30);
+    const before = view.theme.pal.cyan;
+    view._choose('theme-legend');
+    expect(s.registry.get(REG.PROFILE).equipped.theme).toBe('legend');
+    expect(view.theme.pal.cyan).not.toBe(before);
+    view._choose('theme-legend'); // confirm on EQUIPPED -> DEFAULT (SHOP-3)
+    expect(view.theme.pal.cyan).toBe(before);
+  });
+});
+
+// ================================================================== SHOP-2: titles, by keyboard / pad
+
+describe('SHOP-2: TITLES opens from Profile and buys / equips by keys', () => {
+  const lvl3 = (bank = 500, extra = {}) => ({ ...defaultProfile(), xp: LEVELS.levels.find((l) => l.level === 3).xpMin, level: 3, bank, ...extra });
+  const toTarget = (prof, kind) => {
+    for (let n = 0; n < 40 && (prof._focusTargets()[prof.focusIdx] || {}).kind !== kind; n++) prof.handleAction('down');
+    return (prof._focusTargets()[prof.focusIdx] || {}).kind === kind;
+  };
+
+  test('first focus on Profile still lands on SHARD SHOP when there are no toggle rows', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3() });
+    const prof = openProfile(t);
+    prof.handleAction('down'); // the first action only places focus
+    expect(prof._focusTargets()[prof.focusIdx].kind).toBe('buy');
+  });
+
+  test('down reaches TITLES, confirm opens the TITLES view, Static Rider buys and equips by keys', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3() });
+    const prof = openProfile(t);
+    expect(toTarget(prof, 'titles')).toBe(true);
+    prof.handleAction('confirm');
+    const v = t.view;
+    expect(v).toBeInstanceOf(TitlesView);
+    for (let n = 0; n < 20 && v.menu.items[v.menu.selected].id !== 'title-static'; n++) v.handleAction('down');
+    expect(v.menu.items[v.menu.selected].id).toBe('title-static');
+    v.handleAction('confirm');
+    const p = t.registry.get(REG.PROFILE);
+    expect(p.bank).toBe(280);
+    expect(p.equipped.title).toBe('STATIC RIDER');
+    expect(texts(v.panel)).toContain('BANK 280');
+    expect(v.menu.items[v.menu.selected].sub).toBe('EQUIPPED');
+  });
+
+  test('BACK from TITLES returns to Profile, which shows the equipped title; confirm on EQUIPPED restores the level title', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3(0, { unlocked: { ...defaultProfile().unlocked, titles: ['CARTOGRAPHER'] } }) });
+    const prof = openProfile(t);
+    prof.titlesButton.zone.emit('pointerdown');
+    let v = t.view;
+    for (let n = 0; n < 20 && v.menu.items[v.menu.selected].id !== 'title-cartographer'; n++) v.handleAction('down');
+    v.handleAction('confirm');
+    v.handleAction('cancel');
+    expect(t.view).toBeInstanceOf(ProfileView);
+    expect(texts(t.view.panel)).toContain('CARTOGRAPHER');
+    expect(v.panel).toBe(null); // the TITLES view is destroyed, not pinned over the menu
+    expect(v.alive).toBe(false);
+    t.view.titlesButton.zone.emit('pointerdown');
+    v = t.view;
+    for (let n = 0; n < 20 && v.menu.items[v.menu.selected].id !== 'title-cartographer'; n++) v.handleAction('down');
+    v.handleAction('confirm'); // EQUIPPED -> DEFAULT
+    expect(t.registry.get(REG.PROFILE).equipped.title).toBe('default');
+    v.handleAction('cancel');
+    expect(texts(t.view.panel)).toContain(LEVELS.levels[2].title.toUpperCase());
+  });
+
+  test('the Title badge redraws with the equipped title when Profile closes', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3() });
+    t._buildLevelBadge();
+    const badge = () => t.levelBadge.map((b) => texts(b)[0]); // NeonText draws shadow + fill: read one
+    expect(badge()).toContain(LEVELS.levels[2].title.toUpperCase());
+    const prof = openProfile(t);
+    prof.titlesButton.zone.emit('pointerdown');
+    t.view._choose('title-static');
+    t.view.handleAction('cancel'); // back to Profile
+    t.view.handleAction('cancel'); // back to Title
+    expect(t.view).toBe(null);
+    expect(badge()).toContain('STATIC RIDER');
+    expect(badge()).not.toContain(LEVELS.levels[2].title.toUpperCase());
+  });
+
+  test('a locked achievement title cannot be equipped by any key', () => {
+    const t = titleHost({ [REG.PROFILE]: lvl3(99999) });
+    openProfile(t).titlesButton.zone.emit('pointerdown');
+    const v = t.view;
+    for (let n = 0; n < 20; n++) { v.handleAction('confirm'); v.handleAction('down'); }
+    expect(['default', 'ROOKIE', 'STATIC RIDER']).toContain(t.registry.get(REG.PROFILE).equipped.title);
+    expect(v.menu.items.find((i) => i.id === 'title-omniscient').disabled).toBe(true);
+  });
+});

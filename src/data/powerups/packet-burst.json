@@ -1,0 +1,3 @@
+{ "id": "packetBurst", "shapeKey": "burst", "radius": 10,
+  "effect": { "kind": "speedBoost", "durationMs": 3000, "speedFactor": 1.3 },
+  "spawn": { "baseChance": 0.3, "distanceDecayM": 1500 }, "colorKey": "lime" }

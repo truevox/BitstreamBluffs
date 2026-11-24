@@ -1,0 +1,3 @@
+{ "id": "chocolateRiver", "biome": "candy-cane-canyon", "shapeKey": "chocoRiver", "size": { "w": 24, "h": 8 },
+  "onHit": { "effect": "slow", "durationMs": 1000, "speedFactor": 0.6 }, "spawn": { "baseChance": 0.5 },
+  "weight": 1, "minDistanceM": 0, "placement": "ground", "colorKey": "amber" }

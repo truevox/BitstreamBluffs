@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural Music Maker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tonal/4.10.0/tonal.min.js" onerror="window.TonalLoadFailed = true;"></script> 
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #282c34; /* Dark background for the page */
+            color: #abb2bf; /* Light text color */
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #61afef; /* Blueish accent for main title */
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .music-makers-container {
+            display: grid;
+            /* Responsive grid: 1 column on small screens, auto-fit for larger */
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            width: 100%;
+            max-width: 1600px; /* Max width for very large screens */
+        }
+
+        .music-piece {
+            background-color: #323842; /* Slightly lighter card background */
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); /* Subtle shadow for depth */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .music-piece-header {
+            display: flex;
+            align-items: center; /* Align emoji and text vertically */
+            margin-bottom: 15px;
+        }
+
+        .music-piece-header .emoji {
+            font-size: 3em; /* Large emoji */
+            margin-right: 15px;
+            line-height: 1; /* Ensure emoji aligns well */
+        }
+
+        .music-piece-header .title-desc h2 {
+            margin: 0 0 5px 0;
+            color: #e5c07b; /* Yellowish accent for piece title */
+            font-size: 1.5em;
+        }
+
+        .music-piece-header .title-desc p {
+            margin: 0;
+            font-size: 0.9em;
+            color: #98c379; /* Greenish accent for description */
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* Two columns for controls */
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-group label {
+            font-size: 0.85em;
+            margin-bottom: 5px;
+            color: #c678dd; /* Purplish accent for labels */
+        }
+
+        .control-group input[type="number"],
+        .control-group input[type="text"],
+        .control-group select {
+            padding: 10px; /* Increased padding for better touch targets */
+            border-radius: 5px;
+            border: 1px solid #4f5663; /* Subtle border */
+            background-color: #2c313a; /* Darker input background */
+            color: #abb2bf; /* Light text in inputs */
+            font-size: 0.9em;
+            box-sizing: border-box; /* Ensure padding doesn't break layout */
+        }
+
+        .control-group input.out-of-range {
+            background-color: #e5c07b; /* Yellowish highlight */
+            color: #282c34; /* Dark text on highlight */
+            border-color: #d19a66; /* Darker yellow border */
+        }
+        
+        .note-durations {
+            grid-column: span 2; /* Make note durations span both columns */
+        }
+
+        .note-durations fieldset {
+            border: 1px solid #4f5663;
+            border-radius: 5px;
+            padding: 10px 15px; /* More padding in fieldset */
+        }
+        .note-durations legend {
+            font-size: 0.85em;
+            color: #c678dd; /* Purplish accent */
+            padding: 0 5px;
+            font-weight: bold;
+        }
+
+        .note-durations .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 15px; /* Spacing between checkboxes */
+            padding-top: 5px;
+        }
+        .note-durations .checkbox-group label {
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            color: #abb2bf; /* Standard text color for checkbox labels */
+            cursor: pointer;
+        }
+        .note-durations .checkbox-group input[type="checkbox"] {
+            margin-right: 8px; /* Space between checkbox and its label text */
+            transform: scale(1.1); /* Slightly larger checkboxes */
+        }
+
+        .play-button {
+            grid-column: span 2; /* Button spans both columns */
+            padding: 12px;
+            font-size: 1.1em;
+            font-weight: bold;
+            background-color: #61afef; /* Blueish accent */
+            color: #282c34; /* Dark text on button */
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            margin-top: 15px; /* Space above button */
+        }
+
+        .play-button:hover {
+            background-color: #5297d6; /* Darker blue on hover */
+        }
+        .play-button:active {
+            transform: scale(0.98); /* Slight shrink on click */
+        }
+        .play-button.playing {
+            background-color: #e06c75; /* Reddish when playing */
+        }
+        .play-button.playing:hover {
+            background-color: #c95f69; /* Darker red on hover */
+        }
+
+        /* Message for user interaction needed for audio */
+        #audioContextMessage {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #e5c07b;
+            color: #282c34;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-weight: bold;
+        }
+
+         #tonalJsError {
+            display: none; /* Hidden by default */
+            color:red;
+            text-align:center;
+            width:100%;
+            background-color: #443030;
+            padding: 10px;
+            border: 1px solid red;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+    </style>
+</head>
+<body>
+    <h1>🎛️🎶 Synthetic Music Lab 🎶🎛️</h1>
+    <div id="tonalJsError">Error: Essential music library (Tonal.js) failed to load. Please check your internet connection or try refreshing the page. The application cannot start.</div>
+    <div id="audioContextMessage">Click anywhere or a "Play" button to enable audio.</div>
+    <div class="music-makers-container" id="musicMakersContainer">
+        <!-- Music pieces will be injected here by JavaScript -->
+    </div>
+
+    <script>
+        // Declare Tonal components globally, to be assigned after Tonal.js loads.
+        let Note, Scale, Chord, ChordType, Interval, RomanNumeral;
+
+        // Data defining each music style, its properties, and generation hints
+        const musicStylesData = [
+            {
+                id: 'major_pentatonic',
+                name: 'Major Pentatonic',
+                emoji: '🎉',
+                description: 'Cheerful, poppy. Good for menu themes, happy shops, jingles.',
+                chordProgressionRoman: ['I', 'V', 'vi', 'IV'], // Standard pop progression
+                tempoRange: [90, 130], // BPM range
+                defaultTimeSignature: '4/4',
+                scaleType: 'major pentatonic', // Tonal.js scale name
+                leadTips: 'Short repeating motifs. Avoid chromatics. Use 1–2–3–5–6 scale degrees.',
+                bassTips: 'Root–5th groove, I–vi–IV–V walkups.',
+                drumTips: 'Straight 8th beat. Kick/snare/hat on 2 & 4.',
+            },
+            {
+                id: 'minor_pentatonic',
+                name: 'Minor Pentatonic',
+                emoji: '🌄',
+                description: 'Reflective, grounded. Forest zone, bittersweet memory.',
+                chordProgressionRoman: ['i', 'bVII', 'bVI', 'IV'], // Common minor progression
+                tempoRange: [70, 110],
+                defaultTimeSignature: '4/4',
+                scaleType: 'minor pentatonic',
+                leadTips: 'Slides & bends. Emotive phrasing. Sustain tones, use space.',
+                bassTips: 'Pedal root or minimal melodic walk. Play the silence.',
+                drumTips: 'Sparse but solid kick/snare. Light fills.',
+            },
+            {
+                id: 'blues_pentatonic',
+                name: 'Blues Pentatonic',
+                emoji: '😤',
+                description: 'Gritty, soulful. Character jam, chill-out lounge.',
+                // Standard 12-bar blues progression
+                chordProgressionRoman: ['I7', 'I7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'V7', 'IV7', 'I7', 'V7'],
+                tempoRange: [60, 100],
+                defaultTimeSignature: '4/4',
+                isSwing: true, // Indicates a swing feel for rhythm generation
+                scaleTypeForBlues: 'minor pentatonic', // Base scale for blues
+                blueNoteInterval: 'd5', // Diminished 5th from root, the "blue note"
+                leadTips: 'Slide into notes. Use ♭5 ("blue" note) for tension. Call & response.',
+                bassTips: 'Walking bass is 🔑. Use chromatics between root/chord tones.',
+                drumTips: 'Swing shuffle groove. Emphasize triplets. Snare on 2/4.',
+            },
+            {
+                id: 'dorian_mode',
+                name: 'Dorian Mode',
+                emoji: '🕶️',
+                description: 'Funky, hopeful. Town loop, snow lodge groove.',
+                chordProgressionRoman: ['i7', 'IV7', 'i7', 'IV7'], // Classic Dorian vamp
+                tempoRange: [90, 115],
+                defaultTimeSignature: '4/4',
+                scaleType: 'dorian',
+                leadTips: 'Funk riffs! Syncopate. Emphasize 6th scale degree.',
+                bassTips: 'Octave stabs, slap bass, i–IV grooves.',
+                drumTips: 'Ghost notes on snare. Syncopated kick/snare.',
+            },
+            {
+                id: 'mixolydian_mode',
+                name: 'Mixolydian Mode',
+                emoji: '💪',
+                description: 'Anthemic, rebellious. Hero rides in, cutscene anthem.',
+                chordProgressionRoman: ['I', 'bVII', 'IV', 'I'], // Common rock/anthemic progression
+                tempoRange: [100, 140],
+                defaultTimeSignature: '4/4',
+                scaleType: 'mixolydian',
+                leadTips: 'Big, open phrases. Think: heroic melodies. 5–6–1 movement.',
+                bassTips: 'Pedal root or power-rock grooves. Push into bVII on bars 2–3.',
+                drumTips: 'Classic rock beat, ride cymbal, toms.',
+            },
+            {
+                id: 'insen_scale',
+                name: 'Insen (Japanese)',
+                emoji: '🧘',
+                description: 'Calm, cinematic. Lore zone, pause screen.',
+                chordProgressionRoman: ['i', 'bIImaj7', 'v(dim)'], // Drone-like, sparse changes
+                tempoRange: [50, 70],
+                defaultTimeSignature: '3/4', // Often in 3/4 or free time
+                scaleType: 'insen', // Tonal.js supports 'insen'
+                leadTips: 'Sparse melodies. Let tones hang. Avoid busy playing.',
+                bassTips: 'Use drones (C for C Insen), slow octave jumps.',
+                drumTips: 'Simple taiko beat or soft brush. Few hits.',
+            },
+            {
+                id: 'celtic_minor',
+                name: 'Celtic Minor (Aeolian)',
+                emoji: '🍀',
+                description: 'Lively, folk. Rural intro, ancestral dream.',
+                chordProgressionRoman: ['i', 'bVII', 'bVI', 'i'], // Common folk minor
+                tempoRange: [80, 120],
+                defaultTimeSignature: '6/8', // Characteristic jig/reel time
+                scaleType: 'aeolian', // Natural minor, common in Celtic music
+                leadTips: 'Triplet-based reels. Up-down motion. Modal ornamentation optional.',
+                bassTips: 'Triplet root–5–oct–5 pulse. 1-2-3-1-2-3.',
+                drumTips: 'Bodhrán feel: kick-snare-like split on 6/8 rhythm.',
+            }
+        ];
+
+        // Available note durations for user selection
+        const noteDurationsOptions = [
+            { label: '16th', value: '16n' },
+            { label: '8th', value: '8n' },
+            { label: 'Triplet (8th)', value: '8t' }, // "Third" interpreted as 8th triplet
+            { label: 'Quarter', value: '4n' },
+            { label: 'Half', value: '2n' },
+            { label: 'Whole', value: '1n' }
+        ];
+        
+        // Default root notes to pick from randomly
+        const defaultRootNotes = ['C4', 'G3', 'F3', 'A3', 'D4', 'E3', 'B3'];
+        let currentPlayingPieceId = null; // Tracks which piece is currently playing
+        let synths = {}; // Holds Tone.js synth objects (lead, bass, drums)
+        let parts = {}; // Holds Tone.js Part objects for scheduling sequences
+
+        // --- Utility Functions ---
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function getRandomElement(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+        
+        // Function to show a message if audio context needs user interaction
+        function showAudioContextMessage() {
+            const msgEl = document.getElementById('audioContextMessage');
+            if (Tone.context.state !== 'running' && msgEl) {
+                msgEl.style.display = 'block';
+                // One-time listener to hide message on any click
+                const hideMsg = () => {
+                    if (msgEl) msgEl.style.display = 'none';
+                    document.body.removeEventListener('click', hideMsg, true);
+                };
+                document.body.addEventListener('click', hideMsg, true);
+            }
+        }
+
+
+        // --- Music Generation Logic ---
+
+        /**
+         * Generates an array of notes belonging to a specific scale.
+         * @param {string} rootNoteWithOctave - e.g., "C4"
+         * @param {string} scaleTypeName - Tonal.js scale name (e.g., "major pentatonic")
+         * @param {number} numOctaves - How many octaves of the scale to generate
+         * @returns {string[]} Array of note names (e.g., ["C4", "D4", ...])
+         */
+        function getScaleNotes(rootNoteWithOctave, scaleTypeName, numOctaves = 3) {
+            const root = Note.pitchClass(rootNoteWithOctave);
+            const octave = Note.octave(rootNoteWithOctave) || 4;
+            try {
+                const scaleNotesWithoutOctave = Scale.get(`${root} ${scaleTypeName}`).notes;
+                if (!scaleNotesWithoutOctave || scaleNotesWithoutOctave.length === 0) {
+                    console.warn(`Scale not found or empty for ${root} ${scaleTypeName}. Defaulting to C Major Pentatonic.`);
+                    return Scale.get('C major pentatonic').notes.map(n => `${n}${octave}`);
+                }
+                let notes = [];
+                // Generate notes for the specified number of octaves around the root octave
+                for (let i = -Math.floor(numOctaves/2) +1; i < Math.ceil(numOctaves/2) +1; i++) {
+                    notes = notes.concat(scaleNotesWithoutOctave.map(n => `${n}${octave + i}`));
+                }
+                return notes.map(Note.simplify); // Simplifies notes like "B#3" to "C4"
+            } catch (e) {
+                console.error(`Error getting scale notes for ${rootNoteWithOctave} ${scaleTypeName}:`, e);
+                return Scale.get('C major pentatonic').notes.map(n => `${n}4`); // Fallback
+            }
+        }
+        
+        /**
+         * Generates a sequence of notes for the lead melody.
+         * @param {object} pieceData - The data object for the current music style.
+         * @param {object} settings - User-configured settings (bpm, rootNote, etc.).
+         * @param {string[]} availableScaleNotes - Notes available from the current scale.
+         * @param {string} totalDuration - Total duration of the loop (e.g., "4m").
+         * @returns {object[]} Array of note events for Tone.Part.
+         */
+        function generateLeadSequence(pieceData, settings, availableScaleNotes, totalDuration) {
+            const sequence = [];
+            let currentTime = 0; // In seconds
+            const loopDurationSecs = Tone.Time(totalDuration).toSeconds();
+            const baseOctave = Note.octave(settings.rootNote) || 4;
+
+            // Filter scale notes to a typical lead register (e.g., root octave and one above/below)
+            let leadScaleNotes = availableScaleNotes.filter(n => {
+                const oct = Note.octave(n);
+                return oct >= baseOctave -1 && oct <= baseOctave + 1;
+            }).sort(Note.ascending); // Sort notes by pitch
+            
+            if (leadScaleNotes.length === 0) { // Fallback if filter is too restrictive
+                leadScaleNotes = availableScaleNotes.sort(Note.ascending);
+                 if (leadScaleNotes.length === 0) return [{time: 0, note: settings.rootNote, duration: '1n'}]; // Ultimate fallback
+            }
+
+            while (currentTime < loopDurationSecs) {
+                const durationValue = getRandomElement(settings.noteDurations);
+                const note = getRandomElement(leadScaleNotes);
+                const noteDurationSecs = Tone.Time(durationValue).toSeconds();
+
+                // Ensure note doesn't exceed loop boundary
+                if (currentTime + noteDurationSecs <= loopDurationSecs + 0.01) { // Add small tolerance
+                    sequence.push({ time: currentTime, note: note, duration: durationValue });
+                } else {
+                     // If the note would exceed, try a shorter one or fill with rest (implicit)
+                    const remainingTime = loopDurationSecs - currentTime;
+                    // Find a duration that fits, or just end the sequence
+                    const fittingDuration = settings.noteDurations.find(d => Tone.Time(d).toSeconds() <= remainingTime) || '16n';
+                    if (remainingTime > Tone.Time('16n').toSeconds()){ // Add if there's some meaningful time left
+                        sequence.push({ time: currentTime, note: note, duration: fittingDuration});
+                    }
+                }
+                currentTime += noteDurationSecs;
+            }
+            return sequence;
+        }
+
+        /**
+         * Gets the notes of a chord based on a Roman numeral and root note.
+         * @param {string} rootNoteWithOctave - e.g., "C4"
+         * @param {string} scaleTypeName - Tonal.js scale name.
+         * @param {string} romanNumeralStr - e.g., "I", "V7", "bVImaj7".
+         * @returns {string[]} Array of note names in the chord.
+         */
+        function getChordNotes(rootNoteWithOctave, scaleTypeName, romanNumeralStr) {
+            const rootPc = Note.pitchClass(rootNoteWithOctave); // e.g. "C" from "C4"
+            const octave = Note.octave(rootNoteWithOctave) || 4; // e.g. 4 from "C4"
+            
+            try {
+                // Tonal.RomanNumeral.get() parses the Roman numeral string.
+                // e.g., "V7" in C major -> G dominant 7th chord.
+                // Tonal.Scale.degrees() can create a function to map degrees to notes in the scale.
+                const scaleDegreeFn = Scale.degrees(`${rootPc} ${scaleTypeName}`);
+                const rn = RomanNumeral.get(romanNumeralStr); // Parses "vi", "V7", "bIImaj" etc.
+
+                // Determine the root of the chord based on the Roman numeral and scale.
+                // rn.degree is 1-indexed.
+                let chordRootPc = scaleDegreeFn(rn.major ? rn.degree : rn.degree); // Get pitch class of chord root
+
+                // Adjust chord root pitch class based on accidentals in Roman numeral (e.g., bVII)
+                if (rn.acc === 'b') chordRootPc = Note.transpose(chordRootPc, Interval.fromSemitones(-1));
+                if (rn.acc === '#') chordRootPc = Note.transpose(chordRootPc, Interval.fromSemitones(1));
+                
+                // Determine chord type (e.g., "M", "m7", "dim")
+                let chordType = rn.chordType || (rn.major ? "M" : "m"); // Default to major/minor triad
+
+                // Construct the chord using Tonal.Chord.getChord()
+                // The octave for the bass note is typically lower.
+                const chord = Chord.getChord(chordType, `${chordRootPc}${octave - 1}`); 
+
+                return chord.notes.length > 0 ? chord.notes : [`${chordRootPc}${octave - 1}`]; // Fallback to root
+            } catch (e) {
+                console.warn("Error parsing Roman Numeral or getting chord:", romanNumeralStr, "in", scaleTypeName, "Root:", rootNoteWithOctave, e);
+                return [`${rootPc}${octave - 1}`]; // Fallback to the scale's root note
+            }
+        }
+
+        /**
+         * Generates a sequence for the bass line.
+         * @param {object} pieceData - The data object for the current music style.
+         * @param {object} settings - User-configured settings.
+         * @param {string} totalDuration - Total duration of the loop.
+         * @returns {object[]} Array of note events for Tone.Part.
+         */
+        function generateBassSequence(pieceData, settings, totalDuration) {
+            const sequence = [];
+            let currentTime = 0; // In seconds
+            const loopDurationSecs = Tone.Time(totalDuration).toSeconds();
+            const measureDurationSecs = Tone.Time(`${settings.timeSignature.split('/')[0]}n`).toSeconds() * (4 / parseInt(settings.timeSignature.split('/')[1])); // Duration of one measure
+            
+            const chordsRoman = pieceData.chordProgressionRoman;
+            let chordIndex = 0;
+
+            while (currentTime < loopDurationSecs) {
+                const currentChordRoman = chordsRoman[chordIndex % chordsRoman.length];
+                const chordTones = getChordNotes(settings.rootNote, pieceData.scaleType, currentChordRoman);
+                const bassNote = chordTones[0]; // Simplest: play root of the chord
+
+                // Bass plays on the downbeat of each chord change, holding for the chord's duration (here, one measure)
+                const noteDuration = measureDurationSecs;
+                if (currentTime + noteDuration <= loopDurationSecs + 0.01) {
+                    sequence.push({ time: currentTime, note: bassNote, duration: Tone.Time(noteDuration).toNotation() });
+                } else {
+                    const remainingTime = loopDurationSecs - currentTime;
+                    if (remainingTime > 0.05) { // Add if there's some meaningful time left
+                         sequence.push({ time: currentTime, note: bassNote, duration: Tone.Time(remainingTime).toNotation() });
+                    }
+                }
+                currentTime += measureDurationSecs;
+                chordIndex++;
+            }
+            return sequence;
+        }
+
+        /**
+         * Generates a sequence for the drum beat.
+         * @param {object} pieceData - The data object for the current music style.
+         * @param {object} settings - User-configured settings.
+         * @param {string} totalDuration - Total duration of the loop.
+         * @returns {object[]} Array of drum hit events for Tone.Part.
+         */
+        function generateDrumSequence(pieceData, settings, totalDuration) {
+            const sequence = [];
+            let currentTime = 0; // In seconds
+            const loopDurationSecs = Tone.Time(totalDuration).toSeconds();
+            const tsParts = settings.timeSignature.split('/'); // e.g. ["4", "4"]
+            const beatsPerMeasure = parseInt(tsParts[0]); // e.g. 4
+            // const beatUnit = parseInt(tsParts[1]); // e.g. 4 (quarter note)
+
+            const eighthNoteSecs = Tone.Time('8n').toSeconds();
+            const measureDurationSecs = beatsPerMeasure * Tone.Time(`${tsParts[1]}n`).toSeconds();
+
+
+            // Define drum patterns per measure (subdivided into 8th notes)
+            let kickPattern = [], snarePattern = [], hihatPattern = [];
+
+            if (settings.timeSignature === '4/4') {
+                // Standard rock/pop beat
+                kickPattern  = [1,0,0,0, 1,0,0,0]; // Kick on 1 and 3 (represented as 8th note slots)
+                snarePattern = [0,0,1,0, 0,0,1,0]; // Snare on 2 and 4
+                hihatPattern = [1,1,1,1, 1,1,1,1]; // Continuous 8th note hi-hats
+            } else if (settings.timeSignature === '3/4') {
+                // Waltz-like beat
+                kickPattern  = [1,0,0, 0,0,0]; // Kick on 1
+                snarePattern = [0,1,0, 0,1,0]; // Snare on 2 and 3 (or just 2)
+                hihatPattern = [1,1,1, 1,1,1]; // Continuous 8th note hi-hats
+            } else if (settings.timeSignature === '6/8') {
+                // Jig/reel feel (two main beats, each a dotted quarter)
+                kickPattern  = [1,0,0, 1,0,0]; // Kick on beat 1 and 4 (of 6 eighths)
+                snarePattern = [0,0,0, 0,1,0]; // Snare often on beat 4 or an upbeat like 5
+                hihatPattern = [1,1,1, 1,1,1]; // Continuous 8th note hi-hats
+            }
+
+            while (currentTime < loopDurationSecs) {
+                const currentMeasureStartTime = currentTime;
+                for (let i = 0; i < hihatPattern.length; i++) { // Iterate through 8th note slots in the measure
+                    const timeInLoop = currentMeasureStartTime + i * eighthNoteSecs;
+                    if (timeInLoop >= loopDurationSecs) break;
+
+                    if (kickPattern[i % kickPattern.length]) sequence.push({ time: timeInLoop, voice: 'kick', duration: '8n' });
+                    if (snarePattern[i % snarePattern.length]) sequence.push({ time: timeInLoop, voice: 'snare', duration: '8n' });
+                    if (hihatPattern[i % hihatPattern.length]) sequence.push({ time: timeInLoop, voice: 'hihat', duration: '16n' }); // Hi-hats often faster
+                }
+                currentTime += measureDurationSecs;
+            }
+            return sequence;
+        }
+
+
+        // --- Tone.js Synths and Playback Setup ---
+        /**
+         * Initializes or re-initializes the synthesizers for lead, bass, and drums.
+         */
+        function setupSynths() {
+            // Dispose existing synths to prevent memory leaks or sound artifacts
+            Object.values(synths).forEach(synth => synth.dispose());
+
+            synths.lead = new Tone.PolySynth(Tone.FMSynth, {
+                harmonicity: 1.5,
+                modulationIndex: 7,
+                envelope: { attack: 0.01, decay: 0.4, sustain: 0.1, release: 0.6 },
+                volume: -12 // Quieter lead to balance
+            }).toDestination();
+
+            synths.bass = new Tone.MonoSynth({
+                oscillator: { type: 'fatsawtooth' }, // Fuller bass sound
+                envelope: { attack: 0.03, decay: 0.3, sustain: 0.3, release: 0.7 },
+                filterEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.2, baseFrequency: 150, octaves: 3 },
+                volume: -8 // Slightly louder bass
+            }).toDestination();
+            
+            synths.kick = new Tone.MembraneSynth({ // Good for kick drums
+                pitchDecay: 0.04, octaves: 8, oscillator: {type: "sine"},
+                envelope: {attack: 0.001, decay: 0.3, sustain: 0.01, release: 1.2, attackCurve: "exponential"},
+                volume: -2 // Prominent kick
+            }).toDestination();
+
+            synths.snare = new Tone.NoiseSynth({ // Noise for snare
+                noise: { type: 'white', playbackRate: 1.5 }, // Brighter snare
+                envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.15 },
+                 volume: -10
+            }).toDestination();
+            
+            synths.hihat = new Tone.NoiseSynth({ // Noise for hi-hat
+                noise: {type: "pink", playbackRate: 2}, // Higher pitched hi-hat
+                envelope: {attack: 0.001, decay: 0.04, sustain: 0, release: 0.06},
+                volume: -20 // Quieter hi-hats
+            }).toDestination();
+        }
+
+        /**
+         * Starts playing the music for a given piece.
+         * @param {string} pieceId - The ID of the music style to play.
+         */
+        async function playMusic(pieceId) {
+            const pieceData = musicStylesData.find(p => p.id === pieceId);
+            const settings = getPieceSettings(pieceId);
+
+            if (!pieceData || !settings) {
+                console.error("Piece data or settings not found for", pieceId);
+                return;
+            }
+
+            // Ensure Tone.js audio context is started (requires user interaction)
+            if (Tone.context.state !== 'running') {
+                await Tone.start();
+                console.log("AudioContext started.");
+                const audioMsgEl = document.getElementById('audioContextMessage');
+                if (audioMsgEl) audioMsgEl.style.display = 'none';
+            }
+
+            // Stop any currently playing music from another piece
+            if (currentPlayingPieceId && currentPlayingPieceId !== pieceId) {
+                const oldButton = document.querySelector(`.play-button[data-piece-id="${currentPlayingPieceId}"]`);
+                stopMusic(currentPlayingPieceId, oldButton);
+            }
+            
+            Tone.Transport.cancel(); // Clear any previously scheduled Tone.Transport events
+            // Dispose previous parts
+            Object.values(parts).forEach(part => part.dispose());
+            parts = {};
+
+            setupSynths(); // Initialize or re-initialize synths
+
+            Tone.Transport.bpm.value = settings.bpm;
+            Tone.Transport.timeSignature = settings.timeSignature.split('/').map(Number);
+            
+            // Apply swing if specified for the style
+            if(pieceData.isSwing) {
+                Tone.Transport.swing = 0.5; // Standard swing amount
+                Tone.Transport.swingSubdivision = '8n'; // Swing applies to 8th notes
+            } else {
+                Tone.Transport.swing = 0; // No swing
+            }
+
+            // Generate scale notes, including blue note for blues styles
+            let currentScaleNotes = getScaleNotes(settings.rootNote, pieceData.scaleTypeForBlues || pieceData.scaleType);
+            if (pieceData.id === 'blues_pentatonic' && pieceData.blueNoteInterval) {
+                const rootPc = Note.pitchClass(settings.rootNote);
+                for (let oct = Note.octave(settings.rootNote) -1; oct <= Note.octave(settings.rootNote) +1; oct++) {
+                    currentScaleNotes.push(Note.simplify(Note.transpose(`${rootPc}${oct}`, pieceData.blueNoteInterval)));
+                }
+                currentScaleNotes = [...new Set(currentScaleNotes)]; // Remove duplicates
+            }
+
+            const loopDuration = '4m'; // Define a loop duration (e.g., 4 measures)
+
+            // Generate sequences for lead, bass, and drums
+            const leadSequence = generateLeadSequence(pieceData, settings, currentScaleNotes, loopDuration);
+            parts.lead = new Tone.Part((time, value) => {
+                synths.lead.triggerAttackRelease(value.note, value.duration, time);
+            }, leadSequence).start(0); // Start at the beginning of the transport
+            parts.lead.loop = true; // Loop the part
+            parts.lead.loopEnd = loopDuration; // Set loop duration
+
+            const bassSequence = generateBassSequence(pieceData, settings, loopDuration);
+            parts.bass = new Tone.Part((time, value) => {
+                synths.bass.triggerAttackRelease(value.note, value.duration, time);
+            }, bassSequence).start(0);
+            parts.bass.loop = true;
+            parts.bass.loopEnd = loopDuration;
+
+            const drumSequence = generateDrumSequence(pieceData, settings, loopDuration);
+            parts.drums = new Tone.Part((time, value) => {
+                // Trigger corresponding drum synth based on 'voice' property
+                if (value.voice === 'kick') synths.kick.triggerAttackRelease("C1", value.duration, time); // Note for kick is arbitrary
+                else if (value.voice === 'snare') synths.snare.triggerAttackRelease(value.duration, time);
+                else if (value.voice === 'hihat') synths.hihat.triggerAttackRelease(value.duration, time);
+            }, drumSequence).start(0);
+            parts.drums.loop = true;
+            parts.drums.loopEnd = loopDuration;
+            
+            Tone.Transport.start(); // Start the Tone.js transport
+            currentPlayingPieceId = pieceId; // Set the currently playing piece
+        }
+
+        /**
+         * Stops the currently playing music.
+         * @param {string} pieceId - The ID of the piece to stop.
+         * @param {HTMLElement} buttonElement - The play/stop button associated with the piece.
+         */
+        function stopMusic(pieceId, buttonElement) {
+            Tone.Transport.stop(); // Stop the transport
+            // Release any hanging notes from synths
+            if (synths.lead) synths.lead.releaseAll(); 
+            if (synths.bass) synths.bass.releaseAll();
+            // Kick, snare, hihat are typically short, but good practice:
+            if (synths.kick) synths.kick.releaseAll();
+            if (synths.snare) synths.snare.releaseAll();
+            if (synths.hihat) synths.hihat.releaseAll();
+
+
+            if (buttonElement) { // Update button text and style
+                 buttonElement.textContent = '▶️ Play';
+                 buttonElement.classList.remove('playing');
+            }
+            if (currentPlayingPieceId === pieceId) { // Clear current playing piece ID if it was this one
+                currentPlayingPieceId = null;
+            }
+        }
+
+        /**
+         * Retrieves the current settings for a music piece from its UI controls.
+         * @param {string} pieceId - The ID of the music piece.
+         * @returns {object|null} An object with settings (bpm, timeSignature, etc.), or null if not found.
+         */
+        function getPieceSettings(pieceId) {
+            const pieceElement = document.getElementById(`piece-${pieceId}`);
+            if (!pieceElement) return null;
+
+            const bpm = parseFloat(pieceElement.querySelector('.bpm-input').value);
+            const timeSignature = pieceElement.querySelector('.time-signature-select').value;
+            const rootNote = pieceElement.querySelector('.root-note-input').value;
+            const noteDurations = Array.from(pieceElement.querySelectorAll('.note-duration-checkbox:checked'))
+                                       .map(cb => cb.value);
+            // Ensure at least one note duration is selected, default to '4n' if not
+            if (noteDurations.length === 0) {
+                noteDurations.push('4n');
+                // Optionally, check the '4n' checkbox visually
+                const fallbackCheckbox = pieceElement.querySelector('.note-duration-checkbox[value="4n"]');
+                if (fallbackCheckbox) fallbackCheckbox.checked = true;
+            }
+            return { bpm, timeSignature, rootNote, noteDurations };
+        }
+
+        /**
+         * Creates the HTML card for a single music piece.
+         * @param {object} pieceData - The data object for the music style.
+         * @returns {HTMLElement} The created card element.
+         */
+        function createMusicPieceCard(pieceData) {
+            const card = document.createElement('div');
+            card.className = 'music-piece';
+            card.id = `piece-${pieceData.id}`;
+
+            // Header with emoji, title, and description
+            const header = document.createElement('div');
+            header.className = 'music-piece-header';
+            header.innerHTML = `
+                <span class="emoji">${pieceData.emoji}</span>
+                <div class="title-desc">
+                    <h2>${pieceData.name}</h2>
+                    <p>${pieceData.description}</p>
+                </div>
+            `;
+            card.appendChild(header);
+
+            const controlsContainer = document.createElement('div');
+            controlsContainer.className = 'controls';
+
+            // BPM Control
+            const bpmGroup = document.createElement('div');
+            bpmGroup.className = 'control-group';
+            const bpmLabel = document.createElement('label');
+            bpmLabel.setAttribute('for', `bpm-${pieceData.id}`);
+            bpmLabel.textContent = `BPM (Range: ${pieceData.tempoRange[0]}-${pieceData.tempoRange[1]})`;
+            const bpmInput = document.createElement('input');
+            bpmInput.type = 'number';
+            bpmInput.id = `bpm-${pieceData.id}`;
+            bpmInput.className = 'bpm-input';
+            bpmInput.value = getRandomInt(pieceData.tempoRange[0], pieceData.tempoRange[1]);
+            bpmInput.min = 30; bpmInput.max = 300; // Absolute min/max for input field
+            bpmInput.addEventListener('input', () => {
+                const val = parseFloat(bpmInput.value);
+                // Highlight if outside the style's "sane" range
+                if (val < pieceData.tempoRange[0] || val > pieceData.tempoRange[1]) {
+                    bpmInput.classList.add('out-of-range');
+                } else {
+                    bpmInput.classList.remove('out-of-range');
+                }
+                // If this piece is currently playing, update BPM live
+                if (currentPlayingPieceId === pieceData.id && Tone.Transport.state === "started") {
+                    Tone.Transport.bpm.value = val;
+                }
+            });
+            bpmGroup.appendChild(bpmLabel);
+            bpmGroup.appendChild(bpmInput);
+            controlsContainer.appendChild(bpmGroup);
+
+            // Time Signature Control
+            const tsGroup = document.createElement('div');
+            tsGroup.className = 'control-group';
+            const tsLabel = document.createElement('label');
+            tsLabel.setAttribute('for', `ts-${pieceData.id}`);
+            tsLabel.textContent = 'Time Signature';
+            const tsSelect = document.createElement('select');
+            tsSelect.id = `ts-${pieceData.id}`;
+            tsSelect.className = 'time-signature-select';
+            const commonTimeSignatures = ['4/4', '3/4', '6/8', '2/4', '5/4', '7/8'];
+            if (!commonTimeSignatures.includes(pieceData.defaultTimeSignature)) {
+                commonTimeSignatures.unshift(pieceData.defaultTimeSignature); // Ensure default is an option
+            }
+            commonTimeSignatures.forEach(ts => {
+                const option = document.createElement('option');
+                option.value = ts;
+                option.textContent = ts;
+                if (ts === pieceData.defaultTimeSignature) {
+                    option.selected = true;
+                }
+                tsSelect.appendChild(option);
+            });
+            tsSelect.addEventListener('change', () => {
+                 // If playing, changing time signature requires re-sequencing, so stop and restart.
+                 if (currentPlayingPieceId === pieceData.id && Tone.Transport.state === "started") {
+                    const playButton = card.querySelector('.play-button');
+                    stopMusic(pieceData.id, playButton);
+                    // Optionally, auto-play again, or let user re-click
+                 }
+            });
+            tsGroup.appendChild(tsLabel);
+            tsGroup.appendChild(tsSelect);
+            controlsContainer.appendChild(tsGroup);
+
+            // Root Note Control
+            const rootNoteGroup = document.createElement('div');
+            rootNoteGroup.className = 'control-group';
+            const rootNoteLabel = document.createElement('label');
+            rootNoteLabel.setAttribute('for', `root-${pieceData.id}`);
+            rootNoteLabel.textContent = 'Root Note (e.g., C4, A#3)';
+            const rootNoteInput = document.createElement('input');
+            rootNoteInput.type = 'text';
+            rootNoteInput.id = `root-${pieceData.id}`;
+            rootNoteInput.className = 'root-note-input';
+            rootNoteInput.value = getRandomElement(defaultRootNotes);
+            rootNoteInput.placeholder = "e.g. C4";
+            rootNoteInput.addEventListener('input', () => {
+                // Basic validation for note format (Letter, optional Accidental, Octave number)
+                if (!/^[A-Ga-g][#b]?\d$/.test(rootNoteInput.value.trim())) {
+                    rootNoteInput.classList.add('out-of-range'); // Use same style for invalid format
+                } else {
+                    rootNoteInput.classList.remove('out-of-range');
+                }
+                 // If playing, changing root note requires re-sequencing.
+                 if (currentPlayingPieceId === pieceData.id && Tone.Transport.state === "started") {
+                    const playButton = card.querySelector('.play-button');
+                    stopMusic(pieceData.id, playButton);
+                 }
+            });
+            rootNoteGroup.appendChild(rootNoteLabel);
+            rootNoteGroup.appendChild(rootNoteInput);
+            controlsContainer.appendChild(rootNoteGroup);
+
+            // Note Durations Control (for Lead part)
+            const noteDurationsGroup = document.createElement('div');
+            noteDurationsGroup.className = 'control-group note-durations';
+            const fieldset = document.createElement('fieldset');
+            const legend = document.createElement('legend');
+            legend.textContent = 'Permitted Note Durations (Lead)';
+            fieldset.appendChild(legend);
+            const checkboxesDiv = document.createElement('div');
+            checkboxesDiv.className = 'checkbox-group';
+            
+            // Sane default checked note durations
+            const defaultCheckedDurations = ['8n', '4n', '2n']; 
+
+            noteDurationsOptions.forEach(opt => {
+                const cbLabel = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'note-duration-checkbox';
+                checkbox.value = opt.value;
+                checkbox.id = `dur-${opt.value}-${pieceData.id}`; // Unique ID for label association
+                if (defaultCheckedDurations.includes(opt.value)) {
+                    checkbox.checked = true;
+                }
+                cbLabel.htmlFor = checkbox.id; // Associate label with checkbox
+                cbLabel.appendChild(checkbox);
+                cbLabel.appendChild(document.createTextNode(` ${opt.label}`));
+                checkboxesDiv.appendChild(cbLabel);
+
+                checkbox.addEventListener('change', () => {
+                    // If playing, changing durations requires re-sequencing.
+                    if (currentPlayingPieceId === pieceData.id && Tone.Transport.state === "started") {
+                        const playButton = card.querySelector('.play-button');
+                        stopMusic(pieceData.id, playButton);
+                    }
+                });
+            });
+            fieldset.appendChild(checkboxesDiv);
+            noteDurationsGroup.appendChild(fieldset);
+            controlsContainer.appendChild(noteDurationsGroup);
+            
+            card.appendChild(controlsContainer);
+
+            // Play/Stop Button
+            const playButton = document.createElement('button');
+            playButton.className = 'play-button';
+            playButton.textContent = '▶️ Play';
+            playButton.dataset.pieceId = pieceData.id; // Store piece ID for reference
+            playButton.addEventListener('click', async () => {
+                // Check if audio context is running, prompt if not
+                if (Tone.context.state !== 'running') {
+                    await Tone.start(); // Attempt to start audio context
+                     console.log("AudioContext started on button click.");
+                     const audioMsgEl = document.getElementById('audioContextMessage');
+                     if (audioMsgEl) audioMsgEl.style.display = 'none';
+                }
+
+                if (playButton.classList.contains('playing')) { // If already playing, stop it
+                    stopMusic(pieceData.id, playButton);
+                } else { // If not playing, start it
+                    // Stop any other piece that might be playing
+                    const allPlayButtons = document.querySelectorAll('.play-button.playing');
+                    allPlayButtons.forEach(btn => {
+                        if(btn !== playButton) { // Don't stop self if it was just clicked to play
+                           stopMusic(btn.dataset.pieceId, btn);
+                        }
+                    });
+
+                    playMusic(pieceData.id); // Play this piece
+                    playButton.textContent = '⏹️ Stop';
+                    playButton.classList.add('playing');
+                }
+            });
+            card.appendChild(playButton);
+
+            return card;
+        }
+        
+        function displayTonalError() {
+            console.error("FATAL: Tonal.js library not loaded or Tonal global is not defined/complete.");
+            const errorDiv = document.getElementById('tonalJsError');
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+            }
+            const container = document.getElementById('musicMakersContainer');
+            if (container) {
+                container.innerHTML = ''; // Clear the container as app can't run
+            }
+            const audioMsgEl = document.getElementById('audioContextMessage');
+            if (audioMsgEl) audioMsgEl.style.display = 'none';
+        }
+
+        function initializeApp() {
+            // If Tonal is defined, proceed with destructuring assignment into the global `let` variables
+            ({ Note, Scale, Chord, ChordType, Interval, RomanNumeral } = Tonal);
+
+            const container = document.getElementById('musicMakersContainer');
+            if (!container) { 
+                console.error("Music makers container not found post Tonal check!");
+                return;
+            }
+            // Create and append a card for each music style defined in musicStylesData
+            musicStylesData.forEach(pieceData => {
+                const card = createMusicPieceCard(pieceData);
+                container.appendChild(card);
+            });
+
+            // Show initial message if audio context needs interaction
+            showAudioContextMessage();
+        }
+
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // If Tonal.js failed to load, show the error message immediately
+            if (window.TonalLoadFailed) {
+                const errorDiv = document.getElementById('tonalJsError');
+                if (errorDiv) errorDiv.style.display = 'block';
+                // Do not proceed with further initialization
+                return;
+            }
+            let attempts = 0;
+            const maxAttempts = 100; // Try for 10 seconds (100 * 100ms)
+            const intervalTime = 100; // Check every 100ms
+
+            const checkTonalInterval = setInterval(() => {
+                attempts++;
+                if (typeof Tonal !== 'undefined' && Tonal && typeof Tonal.Note !== 'undefined') {
+                    clearInterval(checkTonalInterval);
+                    console.log("Tonal.js loaded successfully after " + attempts * intervalTime + "ms.");
+                    initializeApp();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkTonalInterval);
+                    console.error("Tonal.js did not load after " + (maxAttempts * intervalTime / 1000) + " seconds.");
+                    displayTonalError();
+                }
+            }, intervalTime);
+        });
+
+    </script>
+</body>
+</html>

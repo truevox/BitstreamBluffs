@@ -1,0 +1,27 @@
+{
+  "id": "speed-chute",
+  "kind": "spline",
+  "weight": 1,
+  "minDistanceM": 250,
+  "lengthPx": 1600,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.5,
+      "y": 186
+    },
+    {
+      "x": 1,
+      "y": 384
+    }
+  ],
+  "tags": [
+    "fast"
+  ],
+  "modIds": [
+    "highBandwidth"
+  ]
+}

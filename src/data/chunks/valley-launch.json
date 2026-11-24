@@ -1,0 +1,41 @@
+{
+  "id": "valley-launch",
+  "kind": "spline",
+  "weight": 1.5,
+  "minDistanceM": 140,
+  "lengthPx": 1500,
+  "controlPoints": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 0.25,
+      "y": 100
+    },
+    {
+      "x": 0.5,
+      "y": 150
+    },
+    {
+      "x": 0.72,
+      "y": 105
+    },
+    {
+      "x": 0.86,
+      "y": 90
+    },
+    {
+      "x": 1,
+      "y": 190
+    }
+  ],
+  "tags": [
+    "valley",
+    "launch"
+  ],
+  "modIds": [
+    "highBandwidth",
+    "compression"
+  ]
+}
