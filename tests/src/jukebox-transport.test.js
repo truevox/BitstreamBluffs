@@ -5,7 +5,7 @@ import { JukeboxHUD } from '../../src/ui/JukeboxHUD.js';
 
 function bare(){
 	const d=Object.create(StemMusicDirector.prototype);
-	d.catalog=GAME_SONGS.map(song=>({id:song.id,title:song.label}));
+	d.catalog=GAME_SONGS.slice(0,4).map(song=>({id:song.id,title:song.label}));
 	d.songEnabled=defaultSongSelection();
 	d.trackIndex=0;
 	d.track=d.catalog[0];

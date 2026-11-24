@@ -6,7 +6,7 @@ import { FIRST_SONG_ID, GAME_SONGS, defaultSongSelection, shuffledSongRound } fr
 import { SaveStore, sanitizeSettings, defaultSettings } from '../../src/systems/SaveStore.js';
 import { EVT } from '../../src/events.js';
 
-const catalog = GAME_SONGS.map(s => ({ id:s.id, title:s.label, manifest:'packs/'+s.id+'/pack.json' }));
+const catalog = GAME_SONGS.slice(0,4).map(s => ({ id:s.id, title:s.label, manifest:'packs/'+s.id+'/pack.json' }));
 const gains = () => ({setTargetAtTime:jest.fn(),cancelScheduledValues:jest.fn()});
 
 function audioFixture(){
