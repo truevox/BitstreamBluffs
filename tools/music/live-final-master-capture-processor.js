@@ -19,7 +19,7 @@ class BsbLiveFinalMasterTap extends AudioWorkletProcessor {
 			if(data?.type==='stop') {
 				this.flush();
 				this.active=false;
-				this.port.postMessage({type:'stopped',sampleRate});
+				this.port.postMessage({type:'stopped',sampleRate,quantumValidationVersion:2});
 			}
 		};
 	}

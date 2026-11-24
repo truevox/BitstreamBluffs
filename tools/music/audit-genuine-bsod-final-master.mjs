@@ -128,7 +128,10 @@ try{
 			const msg=e.data;
 			if(msg?.type==='pcm')chunks.push(msg);
 			if(msg?.type==='discontinuity')state.discontinuities.push(msg);
-			if(msg?.type==='stopped')state.stopped=true;
+			if(msg?.type==='stopped') {
+				state.stopped=true;
+				state.quantumValidationVersion=msg.quantumValidationVersion;
+			}
 		};
 		window.__bbLiveFinalAudit={tap,silent,state};
 		return {songId:d.pack.id,trackId:d.track.id,
@@ -256,6 +259,8 @@ try{
 		while(!installed.state.stopped&&Date.now()<until)
 			await new Promise(resolve=>setTimeout(resolve,30));
 		if(!installed.state.stopped)throw Error('Worklet did not finish capture');
+		if(installed.state.quantumValidationVersion!==2)
+			throw Error('Unversioned worklet continuity protocol');
 		if(installed.state.discontinuities.length)
 			throw Error('INVALID_INSTRUMENT_CAPTURE: render quantum chronology '+
 				JSON.stringify(installed.state.discontinuities));
@@ -329,7 +334,9 @@ try{
 			songId:d.pack.id,sourceId:d.track.id,clockStart:d.clockStart,
 			sampleRate,originalMediaRoles:d.pack.sourceNames.length,
 			tapAt:installed.state.installedAt,firstFrame,
-			chunks:chunks.length,frames,gaps:0,duration:frames/sampleRate,
+			chunks:chunks.length,frames,gaps:0,
+			captureContinuityVersion:installed.state.quantumValidationVersion,
+			duration:frames/sampleRate,
 			discardedStartupChunks:tailIndex,discardedStartupGapDetails:gapDetails,
 			clockOfFirstFrame:origin,clockOfLastFrame:priorEnd/sampleRate,
 			realOriginalDrumWindows:clockWindows(

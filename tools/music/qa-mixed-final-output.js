@@ -45,7 +45,9 @@ async function decodeOriginals(pack,segmentIndex,biome){
 	const segment=manifest.segments?.[segmentIndex];
 	if(!segment||!segment.sources)throw Error('No actual original source segment');
 	const roles=[...ALL_ROLES,'voice:'+biome];
-	const ctx=new AudioContext();
+	// Decode original OGGs at the SAME 48kHz as the native offline
+	// render; device-default 44.1kHz would silently double-resample.
+	const ctx=new OfflineAudioContext(2,1,RATE);
 	const sources=new Map(),hashes={};
 	try{
 		for(const role of roles){
@@ -58,7 +60,7 @@ async function decodeOriginals(pack,segmentIndex,biome){
 			hashes[role]=[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
 			sources.set(role,await ctx.decodeAudioData(bytes));
 		}
-	}finally{await ctx.close()}
+	}finally{ /* OfflineAudioContext has no close(); it never starts. */ }
 	return {manifest,segment,segmentIndex,biome,sources,hashes,
 		originalSourceVerified:true,roles};
 }
@@ -67,7 +69,15 @@ function actualAudioSynthGraph(ctx){
 	// master -> production compressor -> production OutputPeakGuard -> output.
 	const a=Object.create(AudioSynth.prototype);
 	a.ctx=ctx;
-	a._stemMusic={attach(){},mixer:null};
+	a._stemMusic={attach(){},mixer:null,menuMode:false,
+		setBsodDanger(proximity01){
+			// Match production StemMusicDirector.setBsodDanger: near-wall
+			// accompaniment threat FX, not just AudioSynth wind.
+			const danger=Number.isFinite(proximity01)?Math.max(0,Math.min(1,proximity01)):0;
+			for(const role of ['guitar','piano','other'])
+				this.mixer?.setThreatLevel?.(role,danger);
+		}
+	};
 	a.settings={masterVolume:1,musicVolume:1,sfxVolume:1,
 		windVolume:1,windEnabled:true,musicVocals:true};
 	a._lastSfx={};a._musicMode='run';a._paused=false;
@@ -254,9 +264,8 @@ async function renderOriginalFatal({pack,segmentIndex=0,biome='garbage-dump-glac
 		const digest=await crypto.subtle.digest('SHA-256',bytes);
 		extraDrumHashes[index]=[...new Uint8Array(digest)]
 			.map(v=>v.toString(16).padStart(2,'0')).join('');
-		const decoder=new AudioContext();
-		try{cache.set(index+'/drums',await decoder.decodeAudioData(bytes))}
-		finally{await decoder.close()}
+		const decoder=new OfflineAudioContext(2,1,RATE);
+		cache.set(index+'/drums',await decoder.decodeAudioData(bytes));
 		return cache.get(index+'/drums');
 	};
 	const d={

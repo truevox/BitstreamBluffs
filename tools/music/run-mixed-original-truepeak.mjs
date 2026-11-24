@@ -104,13 +104,16 @@ try{
 		samplePeak:worst.samplePeak,estimatedTruePeak4x:worst.estimatedTruePeak4x,
 		estimatedTruePeakDbTp4x:worst.estimatedTruePeakDbTp4x};
 	report.summary={songs:new Set(mixed.map(x=>x.trackId)).size,mixedCases:mixed.length,
-		allCases:results.length,overUnityMixedSamples:mixed.reduce((a,x)=>a+x.sampleClips,0),
+		allCases:results.length,
+		overUnityAllSamples:results.reduce((a,x)=>a+x.sampleClips,0),
+		overUnityAllTruePeak4xFrames:results.reduce((a,x)=>a+x.estimatedTrueClips4x,0),
+		overUnityMixedSamples:mixed.reduce((a,x)=>a+x.sampleClips,0),
 		overUnityMixedTruePeak4xFrames:mixed.reduce((a,x)=>a+x.estimatedTrueClips4x,0),
 		totalHashedSourceInputs:results.reduce((a,x)=>a+Object.keys(x.sourceHashes).length,0),
 		pageErrors:errors.length,httpErrors:httpErrors.length};
 	report.status=errors.length||httpErrors.length?'INVALID_BROWSER_OR_HTTP_ERRORS':
-		report.summary.overUnityMixedSamples?'FAILED_SAMPLE_PEAK':
-		report.summary.overUnityMixedTruePeak4xFrames?'FAILED_ESTIMATED_4X_TRUE_PEAK':
+		report.summary.overUnityAllSamples?'FAILED_SAMPLE_PEAK':
+		report.summary.overUnityAllTruePeak4xFrames?'FAILED_ESTIMATED_4X_TRUE_PEAK':
 		'PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE';
 	report.browserErrors=errors;report.httpErrors=httpErrors;
 	if(report.status!=='PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE')process.exitCode=1;

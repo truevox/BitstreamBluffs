@@ -125,6 +125,8 @@ for(const {index,file,vocals} of sequence){
 	assert.equal(live.sourceId,actual.id);
 	assert.equal(live.clockStart,crash.before.clockStart);
 	assert.equal(live.gaps,0);
+	assert.equal(live.captureContinuityVersion,2,
+		'Historic chunk-only PCM evidence is not quantum-validated; recapture required');
 	assert.ok(live.chunks>=50);
 	assert.ok(live.duration>3.0);
 	assert.equal(live.sampleRate,r.pre.audioSampleRate);

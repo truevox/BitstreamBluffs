@@ -12,8 +12,15 @@ export function classifyLiveFailure(error,metrics){
   return 'FAIL_OR_INCOMPLETE';
 }
 
+export function hasUnexpectedHttpFailures(report){
+  return (report?.unexpectedHttp||[]).some(({status,url})=>
+    !(status===404 && /\/music\/packs\/[^/]+\/adaptive\/debutmont\//.test(url||'')));
+}
+
 export function isRetryableInstrumentFailure(report){
   return report?.status==='INVALID_INSTRUMENT_CAPTURE' &&
+    Array.isArray(report.errors) && report.errors.length===0 &&
+    !hasUnexpectedHttpFailures(report) &&
     !report.liveFinalMaster?.finalMasterMetrics &&
     typeof report.error==='string' &&
     classifyLiveFailure(report.error,null)==='INVALID_INSTRUMENT_CAPTURE';

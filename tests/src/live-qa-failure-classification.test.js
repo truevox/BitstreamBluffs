@@ -13,11 +13,13 @@ test('estimated intersample overs and nonfinite results are nonretryable',()=>{
   ])expect(classifyLiveFailure('bad output',metrics)).toBe('VALID_CAPTURE_AUDIO_LIMIT_FAILURE');
 });
 test('explicit instrument continuity failure alone is retryable',()=>{
-  expect(isRetryableInstrumentFailure({status:'INVALID_INSTRUMENT_CAPTURE',error:'Missing live PCM near crash'})).toBe(true);
+  expect(isRetryableInstrumentFailure({status:'INVALID_INSTRUMENT_CAPTURE',error:'Missing live PCM near crash',errors:[],unexpectedHttp:[]})).toBe(true);
 });
 test('ambiguous legacy failures and misclassified reports fail closed',()=>{
   for(const report of [
-    {status:'FAIL_OR_INCOMPLETE',error:'Missing live PCM near crash'},
+    {status:'FAIL_OR_INCOMPLETE',error:'Missing live PCM near crash',errors:[]},
+    {status:'INVALID_INSTRUMENT_CAPTURE',error:'Missing live PCM',errors:['Page crashed']},
+    {status:'INVALID_INSTRUMENT_CAPTURE',error:'Missing live PCM',errors:[],unexpectedHttp:[{status:500,url:'https://bad.test/music'}]},
     {status:'INVALID_INSTRUMENT_CAPTURE',error:'real output clipping measured'},
     {status:'INVALID_INSTRUMENT_CAPTURE',error:'Missing live PCM',liveFinalMaster:{finalMasterMetrics:{sampleClips:2}}},
     {status:'VALID_CAPTURE_AUDIO_LIMIT_FAILURE',error:'Missing live PCM'},
