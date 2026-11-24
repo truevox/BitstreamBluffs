@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 15:49 UTC. Main `0229045d1c51a8351df7d0119f407562ccba407f` (#318), SIM9 sealed, v2.20.1 live at https://simulate.sledhead.ing/.
+Last verified: 2026-11-24 16:51 UTC. Main `05a1bf1e4ba710be691610b4947d1e4a60dd2413` (#320), v2.20.2, SIM9 unchanged. Exact Pages push green; served bundle verification tracked below.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -17,8 +17,9 @@ means resume this queue, not take over another lane or merge a draft.
    air earns none, one paid pulse awards 40, held/duplicate earn nothing.
    Test isolates immediate credit, matched 89/95 combined utility, pending
    vs. banked, short/no-bonus settlement, canopy, combo and earned Flow.
-   No coefficient or runtime change. Next inspect exact-head checks and
-   independent review; resolve real feedback only. This is not merge-ready.
+   No coefficient or runtime change. Exact lifecycle `45429825491` and
+   identity `45429825825` green; only old-head review observed. Await fresh
+   exact-head independent review; resolve real feedback only. No merge.
 2. Reconcile #168 against current issue states and release notes. All 17
    original open issues were rechecked after #318; no parent issue closed.
    When #287 is waiting on Gal, advance a separately testable developer
@@ -27,6 +28,13 @@ means resume this queue, not take over another lane or merge a draft.
    positive and nonfatal negative. Historical SIM6 evidence cannot certify
    current input. Preserve exact supported normal-entry/build gating, tape
    binding, replay pose equality, fatal-event proof and unchanged SVG.
+   Source-verified recipe on #320: normal compiled entry, disposable
+   Chromium, opt-in `tools/conformance/cross-engine-page.js` `__ce.play`
+   at 120 Hz. Try CE120-BUMP3/reckless/hopEvery400/rngSeed9; use genuine
+   non-negated terrain fatal and an earlier cutoff with the same policy.
+   Replay fresh, check all checkpoints and f32 pose triplets at ticks
+   4, 8, …; fatal must be observed at endTick+1, not inferred from header.
+   This recipe is identified, not executed or evidence of current replay.
 3. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
    #84/#83 and broader #70/#71; #57/#60 gate #127 full branching;
    #75/#100/#74 need trusted restoration or equivalent causal replay
@@ -36,6 +44,18 @@ means resume this queue, not take over another lane or merge a draft.
    delivered cue fix but do not claim full Pulp or take over Team B.
 
 ## Changes landed and published
+
+- #320 v2.20.2 closed #319, the storage durability gap Morgan diagnosed.
+  SaveStore distinguishes transaction commitment from session-only fallback,
+  retries an uncommitted ID without duplicate scoring, and serializes
+  initials updates. Game Over can label a score PENDING or SESSION ONLY.
+  [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45437509543)
+  green; check served bundle before claiming live. Native abort/retry/reopen,
+  request/quota/open failure reviewed in [#319](https://github.com/truevox/BitstreamBluffs/issues/319#issuecomment-7137786867).
+  This does not atomically preserve run + proof, change ranking eligibility,
+  or implement physics restore. #82/#244 remain open; #244 is Gal/Home's
+  protected replay evidence archive. #242 diagnostic baseline does not
+  establish fresh-world restore; #75/#100/#74 remain gated.
 
 - #300 merged `9e0258076eab0e8edd8aa1d551090efb3d5a32e3` as v2.20.0/SIM9:
   owner-approved paid one-shot 60% horizontal loss, same upward pop.
@@ -86,10 +106,9 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   checks; last pose tick936, verified terrain fatal tick937 ~2.623px away.
   Header-only cruise false fatal and changed stored pose were rejected.
   Actual matching normal entry matters even when a QA build shares identity.
-- #82 real native put then abort: the legacy memory fallback still
-  returned a row, but restart recovered only a positively completed
-  transaction. Require atomic run + provenance completion and reopen proof
-  before calling a row durable. Scratch only, no production/ranking change.
+- #82 historical native put→abort established the scope for shipped #320.
+  Broader phase still needs atomic run + provenance completion and reopen
+  proof for a durable cohort. Do not count memory-only scores as durable.
 - #85 private scripted recapture candidate, not player footage: SIM6
   `22b6ade` reached 180s cutoff under stock level 1 neutral canopyHop
   on two seeds; SIM7 `d3e80fa` actual BSOD at 84.42/80.62s.
