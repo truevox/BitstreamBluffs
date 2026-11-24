@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
-const url=process.env.GAME_URL||'http://100.115.120.66:8187/';
+const url=process.env.GAME_URL||'http://127.0.0.1:8228/';
 const browser=await chromium.launch({
 	headless:true,args:['--no-sandbox','--use-gl=angle',
 		'--use-angle=swiftshader','--enable-webgl','--ignore-gpu-blocklist'],
@@ -16,7 +16,6 @@ page.on('response',resp=>{
 	if(resp.status()>=400)badResources.push([resp.status(),resp.url()]);
 	if(resp.url().endsWith('.ogg'))audioResponses.push(resp.status());
 });
-const assertReasonable=(value)=>assert.ok(value,message+': '+value);
 try {
 	await page.goto(url,{waitUntil:'domcontentloaded',timeout:25000});
 	await page.waitForFunction(()=>{
@@ -32,11 +31,14 @@ try {
 		const game=window.__bbGame;
 		const title=game.scene.getScene('TitleScene');
 		title.menu.items.find(i=>i.label==='SETTINGS').onSelect();
-		const view=title.view;
+		title.view.menu.items.find(i=>i.label==='MANAGE SOUND').onSelect();
+		const sound=title.view.soundView;
+		sound.menu.items.find(i=>i.label.startsWith('SELECT TRACKS')).onSelect();
+		const view=sound.libraryView;
 		return {
 			songs:game.registry.get('audioSynth')._stemMusic.catalog.map(t=>t.title),
-			items:view.menu.items.filter(t=>t.label.startsWith('▶')).map(t=>t.label),
-			geometry:{panelY:view.panel.y,h:view.h,lastRow:22+(view.menu.items.length-1)*16+16,
+			items:view.menu.items.filter(t=>t.kind==='choice').map(t=>t.label),
+			geometry:{panelY:view.panel.y,h:view.h,lastRow:33+view.menu.items.length*16,
 				backY:view.h-22},
 		};
 	});
@@ -55,8 +57,12 @@ try {
 	});
 	await page.waitForFunction(()=>{
 		const audio=window.__bbGame.registry.get('audioSynth');
-		return audio?._stemMusic?.pack&&audio._stemMusic.activeNodes.size>0;
+		return window.__bbGame.scene.getScene('RunScene')?.sys?.isActive()&&
+			window.__bbGame.scene.getScene('UIScene')?.sys?.isActive()&&
+			audio?._stemMusic?.pack&&audio._stemMusic.activeNodes.size>0;
 	},null,{timeout:35000});
+	await page.evaluate(()=>{if(!window.__bbGame.registry.get('audioSynth').jukeboxStep(1))throw Error('Track change failed');});
+	await page.waitForFunction(()=>{const g=window.__bbGame,d=g.registry.get('audioSynth')._stemMusic;return !d._loading&&d.activeNodes.size>=6&&g.scene.getScene('RunScene').songBillboard?.active&&g.scene.getScene('RunScene').songBillboard.trackId===d.track?.id;},null,{timeout:35000});
 	const playing=await page.evaluate(()=>{
 		const g=window.__bbGame;
 		const audio=g.registry.get('audioSynth');
@@ -69,17 +75,21 @@ try {
 			activeStemNodes:audio._stemMusic.activeNodes.size,
 			musicEvents:window.__musicEvents,
 			hudActive:ui.sys.isActive(),
-			hudStripText:ui.stripT?.main?.text,
+			billboardActive:g.scene.getScene('RunScene').songBillboard?.active,
+			billboardTitle:g.scene.getScene('RunScene').songBillboard?.titleFull,
+			billboardId:g.scene.getScene('RunScene').songBillboard?.trackId,
 			volume:audio.settings.musicVolume,
 		};
 	});
 	assert.ok(playing.musicEvents?.length>=1,'No Now Playing event');
 	assert.ok(playing.hudActive,'HUD not active');
-	assert.ok(String(playing.hudStripText).includes('NOW PLAYING'),
-		'Now Playing toast missing: '+playing.hudStripText);
+	assert.equal(playing.billboardActive,true,'Now Playing billboard missing');
+	assert.equal(playing.billboardId,playing.id);
+	assert.equal(playing.billboardTitle,playing.track.toUpperCase().trim());
+	assert.ok(playing.musicEvents.some(e=>e.id===playing.id),'No actual current-song change event');
 	assert.ok(playing.activeStemNodes>=1,'No sample playback');
 	assert.ok(playing.duration>150,'Not full-length music');
-	console.log('LIVE_SIX_STEM_MUSIC_AND_TOAST_PASS',playing);
+	console.log('LIVE_SIX_STEM_MUSIC_AND_BILLBOARD_PASS',playing);
 	// Disable EVERY song live and verify no procedural fallback or stem
 	// playback even though the game itself remains alive.
 	const quiet=await page.evaluate(()=>{

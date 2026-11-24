@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 
-const url=process.env.GAME_URL||'http://100.115.120.66:8195/';
+const url=process.env.GAME_URL||'http://127.0.0.1:8228/';
 const browser=await chromium.launch({headless:true,args:[
 	'--no-sandbox','--use-gl=angle','--use-angle=swiftshader',
 	'--enable-webgl','--ignore-gpu-blocklist']});
@@ -24,9 +24,9 @@ try{
 			current:j.audio.jukeboxSnapshot().current?.title};
 	});
 	assert.equal(title.exists,true);
-	assert.equal(title.buttons[0],'PREV');
-	assert.ok(['PLAY','PAUSE'].includes(title.buttons[1]));
-	assert.deepEqual(title.buttons.slice(2),['NEXT','LIST']);
+	assert.equal(title.buttons[0],'<<');
+	assert.ok(['▶','II'].includes(title.buttons[1]));
+	assert.deepEqual(title.buttons.slice(2),['>>','▼']);
 	assert.ok(title.queueNext.startsWith('NEXT:'));
 	console.log('TITLE_JUKEBOX_VISIBLE_LAST_NOW_NEXT_QUEUE_PASS',title);
 	// The catalog loads asynchronously. Do not press a legitimately
@@ -39,7 +39,7 @@ try{
 	// The soundtrack starts on load; only press PLAY if the browser deferred it.
 	await page.evaluate(()=>{
 		const audio=window.__bbGame.registry.get('audioSynth');
-		if (!audio._stemMusic.started && !audio._stemMusic.transportPaused)
+		if (!['playing','loading'].includes(audio.jukeboxSnapshot().state) && !audio._stemMusic.transportPaused)
 			audio.jukeboxPlay();
 	});
 	await page.waitForFunction(()=>{
@@ -116,7 +116,7 @@ try{
 	const off=await page.evaluate(()=>{
 		const a=window.__bbGame.registry.get('audioSynth');
 		return {state:a.jukeboxSnapshot().state,active:a._stemMusic.activeNodes.size,
-			enabled:Object.values(a._stemMusic.songEnabled)};
+			enabled:a._stemMusic.catalog.map(t=>a._stemMusic.songEnabled[t.id])};
 	});
 	console.log('ALL_SONGS_OFF_STATE',off);
 	assert.ok(off.enabled.every(x=>x===false));
