@@ -31,11 +31,11 @@ function options(argv) {
   };
   const seedList = /^\d+$/.test(vals.seeds)
     ? Array.from({ length: integer('seeds', 1, 96) }, (_, i) => `sim-${String(i + 1).padStart(2, '0')}`)
-    : vals.seeds.split(',').map((s) => s.trim()).filter(Boolean);
-  if (!seedList.length || seedList.length > 96 || new Set(seedList).size !== seedList.length || seedList.some((s) => s.length > 64)) {
+    : vals.seeds.split(',').map((s) => s.trim());
+  if (!seedList.length || seedList.length > 96 || new Set(seedList).size !== seedList.length || seedList.some((s) => !s || s.length > 64)) {
     throw new Error('seed list must contain 1–96 unique, nonempty seeds');
   }
-  const policies = vals.policies.split(',').map((s) => s.trim()).filter(Boolean);
+  const policies = vals.policies.split(',').map((s) => s.trim());
   if (!policies.length || new Set(policies).size !== policies.length || policies.some((p) => !ALL_POLICIES.includes(p))) {
     throw new Error(`policies must be unique from ${ALL_POLICIES.join(', ')}`);
   }

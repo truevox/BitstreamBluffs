@@ -11,7 +11,7 @@ const SHA = 'a'.repeat(40);
 const ID = `sha256:${'a'.repeat(64)}`;
 const BASE = Object.freeze({
   gitSha: SHA, workingTreeClean: true, workingTreeSha256: ID,
-  simRevision: 6, rulesetId: ID, buildId: ID,
+  simRevision: 7, rulesetId: ID, buildId: ID,
   rulesetArtifactSha256: ID, packageVersion: '2.19.21',
 });
 
@@ -22,7 +22,7 @@ describe('#128 real checkout source integrity', () => {
       gitSha: expect.stringMatching(/^[0-9a-f]{40}$/),
       workingTreeClean: expect.any(Boolean),
       workingTreeSha256: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
-      simRevision: 6,
+      simRevision: 7,
       rulesetId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       buildId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       rulesetArtifactSha256: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -37,7 +37,7 @@ describe('#128 real checkout source integrity', () => {
     ['gitSha', 'b'.repeat(40)],
     ['workingTreeClean', false],
     ['workingTreeSha256', `sha256:${'b'.repeat(64)}`],
-    ['simRevision', 7],
+    ['simRevision', 8],
     ['rulesetId', `sha256:${'b'.repeat(64)}`],
     ['buildId', `sha256:${'b'.repeat(64)}`],
     ['rulesetArtifactSha256', `sha256:${'b'.repeat(64)}`],
