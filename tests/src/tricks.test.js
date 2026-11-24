@@ -116,6 +116,24 @@ describe('TrickTracker basics', () => {
   });
 });
 
+test('touchdown-only paid AirBrake cannot inherit prior-flight helicopter penalty',()=>{
+  const r=rig();
+  r.frame({grounded:true});
+  // Prior flight had an unfinished 180-degree helicopter. The new paid
+  // kick and contact both occur between ordinary tracker samples.
+  r.tracker._air=false;
+  r.tracker._heliHeld=true;
+  r.tracker._heliMax=180;
+  r.tracker._heliNet=180;
+  r.tracker._corkscrewNet=180;
+  const next=r.frame({grounded:true,input:{airBrake:true,airBrakeKicked:true},
+    state:{heliDeg:180,midSpin:180,impactVx:200,impactVy:40}});
+  expect(next.tricks.map(x=>x.type)).toEqual(['airBrake']);
+  expect(next.landing).toMatchObject({quality:'good',shortAirBrakeTouchdown:true,midSpin:false});
+  expect(r.tracker._heliHeld).toBe(false);
+  expect(r.tracker._heliMax).toBe(0);
+});
+
 describe('flips', () => {
   const spin = (dir, turns, opts = {}) => {
     const r = rig();

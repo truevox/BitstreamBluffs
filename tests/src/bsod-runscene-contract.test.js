@@ -219,6 +219,22 @@ describe('Bitstream Bluffing RunScene integration', () => {
   });
 });
 
+test('SIM9 contact chronology advances yaw and expires Flow BEFORE physical landing settlement',()=>{
+  const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+  const control=source.indexOf('sled.applyControls(pad, phys, stepMs, air)');
+  const yaw=source.indexOf('sled.stepHeli(stepMs)',control);
+  const endStep=source.indexOf('const actualTouchdown=!!sled.endStep(stepMs)',yaw);
+  const flow=source.indexOf('this.emitFlow(this.score.tick(stepMs))',endStep);
+  const settle=source.indexOf('this.settlePhysicalTouchdown(',flow);
+  expect(control).toBeGreaterThan(0);
+  expect(yaw).toBeGreaterThan(control);
+  expect(endStep).toBeGreaterThan(yaw);
+  expect(flow).toBeGreaterThan(endStep);
+  expect(settle).toBeGreaterThan(flow);
+  expect(source).not.toContain('this.score.tick(simDt)');
+  expect(source).not.toContain('sled.stepHeli(dt)');
+});
+
 test('RunScene orders physical Matter substep touchdown ledger before the final presentation state',()=>{
   const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
   expect(source).toMatch(/const actualTouchdown=!!sled\.endStep\(stepMs\)/);

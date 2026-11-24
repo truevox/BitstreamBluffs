@@ -1408,10 +1408,17 @@ export class RunScene extends Phaser.Scene {
       (stepMs) => {
         const air = this.bsod ? this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere()) : null;
         sled.applyControls(pad, phys, stepMs, air);
+        // Integrate visual helicopter yaw over the upcoming physical
+        // interval, BEFORE Matter can register a touchdown at its end.
+        sled.stepHeli(stepMs);
       },
       (stepMs) => {
         const actualTouchdown=!!sled.endStep(stepMs);
         stepElapsedMs+=stepMs;
+        // Flow is causal for banked points. Expire it at this physical
+        // substep before a possible landing refreshes the timer; helicopter
+        // yaw was already advanced before Matter resolved the contact.
+        this.emitFlow(this.score.tick(stepMs));
         const paidKick=!!sled.airBrakeKickPulse;
         if (paidKick) kickSinceTouchdown=true;
         sled.airBrakeKickPulse=0; // retain actual event in local ordered tick evidence
@@ -1464,8 +1471,8 @@ export class RunScene extends Phaser.Scene {
       this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
       this.publishBsodState(this.bsodState);
     }
-    // flow timeout runs on the same scaled run clock as physics (slow-mo stretches it, pause / hit-stop freeze it)
-    this.emitFlow(this.score.tick(simDt));
+    // Flow has already advanced for each physical substep, before any
+    // touchdown banked points. Slow-mo and hit-stop use the same simDt.
 
     // SFX with no event: push / hop (+ wind speed every frame)
     const audio = this.registry.get(REG.AUDIO);
@@ -1496,8 +1503,8 @@ export class RunScene extends Phaser.Scene {
       }
     }
 
-    // trick tracking (always fed; flagged crashed on the frame a crash is detected)
-    sled.stepHeli(dt);
+    // Trick yaw was advanced through each physical substep, including
+    // any touchdown, rather than applying an extra full-tick rotation here.
     const fs = sled.getFrameState(this.runTimeMs, dt);
     fs.input.airBrakeKicked = airBrakeKickedThisTick; // earlier kicks were settled at real contacts
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase

@@ -751,7 +751,7 @@ Owner: core-logic engineer. All additive except the two rule changes marked RULE
 
 ## Integration: flow, spin cut, named combos, air drone, chase UI (integration engineer; additive)
 
-* **Flow wiring** (`RunScene`): `score.tick(simDt)` every frame right after `stepWorld`, with `simDt` = the scaled sim delta (slow-mo stretches the
+* **Flow wiring** (`RunScene`): SIM9 ticks `score.tick(stepMs)` within each capped Matter physics substep, BEFORE settling its actual touchdown, so a just-expired multiplier cannot be refreshed and banked retroactively; the substep deltas sum to `simDt` = the scaled sim delta (slow-mo stretches the
   timeout, pause and hit-stop freeze it; never wall clock). `RunScene.emitFlow(fc)` turns any FlowChange (tick, `onLanding`, `onCrash`,
   `penalizeReset`) into `FLOW_LOST` (lost) or `FLOW_CHANGED` (changed). A shield-absorbed HAZARD hit calls `onShieldHit(false)` (flow halved, pending combo kept, no COMBO_CHANGED); a shield-absorbed body / landing / void crash
   respawns the sled and calls `onShieldHit(true)` (combo dropped, `COMBO_CHANGED reason 'crash'`). `HUD_SPEED_EVENT` (~10 Hz) now also carries `flow` and `flowFrac` so the HUD meter resyncs

@@ -3,7 +3,7 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * Detects flips / helicopter spins / air-brake / parachute from per-frame sled state.
- * RunScene calls update() once per fixed simulation tick (after physics) with a SledFrameState.
+ * RunScene calls update() on physical touchdowns and at the fixed tick end with a SledFrameState.
  *
  * Model: an "air phase" starts on the first frame with grounded=false and ends on the first grounded frame.
  * Rotation deltas (from the unwrapped angleDeg) are accumulated into two buckets per frame: tilt (A/D driven) and
@@ -278,6 +278,16 @@ export class TrickTracker {
         airtimeMs:airBrakeTouchdownMs });
     }
     if (!landing && (input.airBrakeKicked || pendingShortBrake)) {
+        if (!this._air) {
+          // A paid kick and real touchdown can fit between tracker samples.
+          // This is a NEW flight; no prior helicopter/corkscrew attempt may
+          // downgrade its landing or contaminate its rotation totals.
+          this._heliHeld=false;
+          this._heliMax=0;
+          this._tiltNet=0;
+          this._heliNet=0;
+          this._corkscrewNet=0;
+        }
         const measured=this._makeLanding(state,angle,t,false);
         // Very short touches can bank their earned AirBrake trick, but may not
         // invent a perfect-landing bonus or an additional trick-speed launch.
