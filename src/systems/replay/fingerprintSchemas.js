@@ -386,6 +386,7 @@ export const NON_CAUSAL = Object.freeze({
     gfx: PRESENTATION, bodies: 'collider bodies: positions and detector order are matter.staticOrder',
     pads: 'pad sensor bodies: positions and cooldown are matter.staticOrder (padLast)',
     startX: DERIVED_STATIC, endX: DERIVED_STATIC,
+    points: DERIVED_STATIC + ' (read-only joined source geometry used by existing terrain colliders and visual markers; authoritative points are fingerprinted in terrain)',
   }),
   ShardField: Object.freeze({ scene: 'back-reference to the scene', palette: PRESENTATION, gfx: PRESENTATION }),
   Shard: Object.freeze({ pulled: PRESENTATION + ' (draw flag set by pull())' }),

@@ -36,25 +36,37 @@ export function layoutMarkerLabels(best, death) {
 
 
 /**
- * #253: read a visual-only marker's ground height ONLY after its chunk has
- * already physically joined the authoritative terrain mesh. A marker may be
- * 2600px ahead of the rider, outside the normal simulation streaming window.
- * An unconditional TerrainGenerator.heightAt(marker.x) there invokes _chunkAt,
- * which mutates activeList/_pendingAdded and contaminates later session replays.
+ * #253: marker rendering must NEVER read the mutable terrain generator.
+ * The physically joined Matter mesh retains the exact polyline it built
+ * collision bodies from; sample that existing geometry with the identical
+ * TerrainGenerator.heightAt segment formula, but without invoking _chunkAt,
+ * changing _lastChunk, generating future chunks, or queuing terrain.
  *
- * Return NaN (markers already defer display on non-finite y) until joined.
- * This is a guard, not a new terrain generator or a fallback extrapolation.
- * The height function is NEVER called for absent/unjoined chunks.
+ * At a shared boundary either joined neighbor has the same endpoint height.
+ * Iterate the mesh's insertion order consistently and never request a chunk.
+ * Return NaN until physically joined; the normal marker update defers drawing.
  *
  * @param {number} x marker world coordinate
- * @param {Map<number,{startX:number,endX:number}>} joined actual mesh.chunks
- * @param {(x:number)=>number} heightAt exact registered terrain height function
+ * @param {Map<number,{startX:number,endX:number,points:{x:number,y:number}[]}>} joined
+ *   actual Matter TerrainMesh.chunks, not speculative TerrainGenerator.activeList
+ * @returns {number} unchanged geometry height, or NaN when unjoined/invalid
  */
-export function joinedMarkerHeight(x, joined, heightAt) {
-  if (!Number.isFinite(x) || !joined || typeof joined.values !== 'function' || typeof heightAt !== 'function') return NaN;
+export function joinedMarkerHeight(x, joined) {
+  if (!Number.isFinite(x) || !joined || typeof joined.values !== 'function') return NaN;
   for (const chunk of joined.values()) {
-    if (chunk && Number.isFinite(chunk.startX) && Number.isFinite(chunk.endX)
-        && x >= chunk.startX && x <= chunk.endX) return heightAt(x);
+    if (!chunk || !Number.isFinite(chunk.startX) || !Number.isFinite(chunk.endX) ||
+        x < chunk.startX || x > chunk.endX) continue;
+    const p = chunk.points;
+    if (!Array.isArray(p) || p.length < 2) continue;
+    const sp = p[1].x - p[0].x;
+    if (!(sp > 0) || !Number.isFinite(sp)) continue;
+    // Mirror TerrainGenerator._segIndex and heightAt: this is a read-only
+    // interpolation over joined collider points, not a generator lookup.
+    const i = Math.max(0, Math.min(p.length - 2, Math.floor((x - chunk.startX) / sp)));
+    const a = p[i], b = p[i+1];
+    if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(b.x) ||
+        !Number.isFinite(a.y) || !Number.isFinite(b.y) || !(b.x > a.x)) return NaN;
+    return a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x);
   }
   return NaN;
 }

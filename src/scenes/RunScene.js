@@ -352,7 +352,7 @@ export class RunScene extends Phaser.Scene {
     this.mesh = new TerrainMesh(this, this.palette, this.content.terrainMods);
     // #253: BEST/DIED HERE are presentation. Their lookahead height reads must
     // never pre-generate terrain beyond the chunks already joined in Matter.
-    this.markerHeightFn = (x) => joinedMarkerHeight(x, this.mesh.chunks, this.heightFn);
+    this.markerHeightFn = (x) => joinedMarkerHeight(x, this.mesh.chunks);
     this.fx = new Fx(this, this.palette);
     this.trail = new TrailParticles(this, this.palette, this.look && this.look.trail);
     this.shardField = new ShardField(this, this.palette);
