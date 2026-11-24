@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 09:44 UTC. Main: `e3fdd814fbc4903ec33853976c1203cb72452ab6` (#308 docs only); shipped game remains SIM8 v2.19.22 at `2dcd07fa`.
+Last verified: 2026-11-24 10:49 UTC. Main: `e3fdd814fbc4903ec33853976c1203cb72452ab6` (#308 docs only); shipped game remains SIM8 v2.19.22 at `2dcd07fa`.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -87,7 +87,16 @@ going” means resume this queue, not take over other lanes or merge a draft.
    retry behaved correctly. This is SIM7 scratch evidence, not a merged
    head. Repeat on the actual integration base after any release change.
    Friend exchange still requires #58.
-   #82 storage lifecycle needs separately scoped save-system review;
+   #82 needs separately scoped save-system review. Exact main `e3fdd81`:
+   two identical disposable Chromium runs observed a native put success
+   followed by transaction abort. saveRun resolved and kept the row in
+   memory; duplicate ID opened no write even after diagnostic re-init.
+   After full browser restart, the completed control survived and the
+   aborted row did not. Fresh-store same-ID save was durable. The separate
+   synthetic two-store check again rolled both rows back together, unlike
+   split storage. Require a completed atomic run + provenance commit and
+   verify on reopen before counting a durable cohort; preserve legacy
+   memory fallback. No production storage or ranking change.
    #85 has a private 9-second scripted recapture candidate, not archival
    footage or gallery approval. Exact #272 SIM6 `22b6ade` and #297 SIM7
    `d3e80fa`, stock level 1, neutral modifiers, `canopyHop`: fresh paired
