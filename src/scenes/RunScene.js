@@ -1827,8 +1827,12 @@ export class RunScene extends Phaser.Scene {
       this.sled.squash = l.hard ? 1 : 0.6;
     } else if (imp > 250) this.sled.squash = 0.35;
     this._landings += 1;
-    this.applyLandingBoost(l, mult, nTricks, fs);
-    this.applySpringRebound(l, fs);
+    if (!l.shortAirBrakeTouchdown) {
+      // Touchdown-only physically paid AirBrake tricks must bank their score,
+      // not manufacture a second speed boost/spring bounce on a micro-bump.
+      this.applyLandingBoost(l, mult, nTricks, fs);
+      this.applySpringRebound(l, fs);
+    }
   }
 
   /**

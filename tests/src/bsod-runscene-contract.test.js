@@ -217,3 +217,52 @@ describe('Bitstream Bluffing RunScene integration', () => {
     expect(scene.bsodBluffs.chain).toBe(0);
   });
 });
+
+describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
+  test('two true kick pulses after two missed short flights bank immediately, do not inflate airtime or leak provisional points',async()=>{
+    const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+    const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+    const scene=Object.create(RunScene.prototype);
+    const events=[];
+    scene.game={events:{emit:(key,payload)=>events.push({key,payload})}};
+    scene.tricks=new TrickTracker();
+    scene.score=new ScoreManager();
+    scene.trickCounts={};
+    scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
+    scene.stabilizeMs=0;scene.stabilizeDeg=0;scene.pendingCrash=null;
+    scene.palette={amber:1,cyan:2,lime:3};
+    scene.fx={sparks(){},ring(){}};
+    scene.sled={x:1000,y:200,vx:200,vy:0};
+    scene.emitCombo=()=>{};
+    scene.emitFlow=()=>{};
+    scene.emitScore=()=>{};
+    scene._zoneScoreMulAt=()=>1;
+    scene.applyLandingBoost=jest.fn();
+    scene.applySpringRebound=jest.fn();
+    const frame=(timeMs)=>({
+      timeMs,dtMs:8,grounded:true,crashed:false,angleDeg:0,
+      vx:200,vy:0,impactVx:200,impactVy:50,
+      groundAngleDeg:0,x:1000,y:200,
+      input:{airBrake:true,airBrakeKicked:true,parachute:false,heli:0},
+    });
+    for(const t of [10000,20000]){
+      const fs=frame(t);
+      const upd=scene.tricks.update(fs);
+      expect(upd.tricks).toHaveLength(1);
+      expect(upd.tricks[0]).toMatchObject({type:'airBrake',airtimeMs:8});
+      expect(upd.landing).toMatchObject({quality:'good',airtimeMs:8,shortAirBrakeTouchdown:true});
+      const prior=scene.score.trickPoints;
+      scene.handleTricksAndLanding(upd,fs);
+      expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+      expect(scene.score.trickPoints).toBeGreaterThan(prior);
+      expect(scene._airTricks).toBe(0);
+    }
+    expect(scene._landings).toBe(2);
+    expect(scene.trickCounts.airBrake).toBe(2);
+    expect(scene.applyLandingBoost).not.toHaveBeenCalled();
+    expect(scene.applySpringRebound).not.toHaveBeenCalled();
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(2);
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(2);
+    expect(events.filter(x=>x.key===EVT.TRICK).map(x=>x.payload.airtimeMs)).toEqual([8,8]);
+  });
+});

@@ -378,7 +378,10 @@ export class Sled {
         // zero that separately bought vertical impulse. The stored extra is
         // attenuated by the same quad drag as vy on subsequent physics steps.
         if (this.airBrakeLiftProtected) {
-          vy += this._protectedHopExtraVyPxS || 0;
+          // Gravity may have already spent part of the original Hop ascent.
+          // Shortening a jump must never create an instant downward shove:
+          // remove no more than the upward velocity still present NOW.
+          vy = Math.min(0, vy + (this._protectedHopExtraVyPxS || 0));
         } else if (vy < 0) vy = 0;
         this._protectedHopExtraVyPxS = 0;
         this._playerHopActive = false;

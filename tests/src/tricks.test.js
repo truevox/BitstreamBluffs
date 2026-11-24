@@ -272,6 +272,17 @@ describe('air brake and parachute', () => {
     expect(allTricks([merelyHeld])).toEqual([]);
   });
 
+  test('paid AirBrake on a tracked but sub-minimum-airtime touchdown settles immediately with bounded airtime',()=>{
+    const r=rig();
+    r.frame({grounded:true});
+    r.frame({grounded:false});
+    const touchdown=r.frame({grounded:true,input:{airBrake:true,airBrakeKicked:true}});
+    expect(allTricks([touchdown]).map(t=>t.type)).toEqual(['airBrake']);
+    expect(touchdown.landing).toMatchObject({quality:'good',shortAirBrakeTouchdown:true});
+    expect(touchdown.tricks[0].airtimeMs).toBe(2*DT);
+    expect(touchdown.landing.airtimeMs).toBe(2*DT);
+  });
+
   test('a crash frame never credits a paid AirBrake trick',()=>{
     const r=rig();
     r.run(2,{grounded:true});

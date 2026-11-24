@@ -237,6 +237,7 @@ export class TrickTracker {
     }
 
     // grounded
+    const trackedAirMs=this._air?Math.max(0,t-this._airStart):Math.max(0,dt);
     let landing = null;
     let rot = 0;
     if (this._air) {
@@ -255,11 +256,11 @@ export class TrickTracker {
       }
       this._air = false;
     }
-    // A genuinely paid one-shot can occur on the final airborne physics
-    // substep but land before the post-physics frame is observed. Do not
-    // discard that trick as an ordinary short bump/grounded input; the
-    // physical kick happened and the player paid horizontal speed. Crashes
-    // were already rejected above.
+    // A genuinely paid one-shot can land before the post-physics tracker
+    // observes an airborne frame, or after a flight shorter than minAirtime.
+    // Credit and SETTLE the physically paid trick on this actual touchdown;
+    // otherwise ScoreManager.pending would leak into an unrelated later jump.
+    // Do not inherit the previous flight's _airStart, multiplier or airtime.
     if (input.airBrakeKicked) {
       // A real Matter touchdown can rearm Sled between two TrickTracker
       // samples. Consecutive very short hops may therefore BOTH produce
@@ -267,8 +268,18 @@ export class TrickTracker {
       // sample to reset _brakeDone. Trust each actual one-shot physics event,
       // not stale presentation-phase state. Held input has no pulse.
       this._brakeDone = true;
-      tricks.push({ type: 'airBrake', count: 1, rotationDeg: 0,
-        airtimeMs: Math.max(0, t - this._airStart) });
+      const airtimeMs=landing ? landing.airtimeMs
+        : Math.min(this.minAirtimeMs,trackedAirMs);
+      tricks.push({ type: 'airBrake', count: 1, rotationDeg: 0, airtimeMs });
+      if (!landing) {
+        const measured=this._makeLanding(state,angle,t,false);
+        // Very short touches can bank their earned AirBrake trick, but may not
+        // invent a perfect-landing bonus or an additional trick-speed launch.
+        // Ordinary sloppy/crash safety classification still applies.
+        landing={...measured, airtimeMs, rotationDeg:0,
+          midSpin:false, shortAirBrakeTouchdown:true,
+          quality:measured.quality==='perfect'?'good':measured.quality};
+      }
     }
     this._prevAngle = angle;
     this._prevHeli = heli;

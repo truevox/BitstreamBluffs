@@ -170,3 +170,21 @@ test('holding an already-spent AirBrake cannot suppress ordinary crest smoothing
   expect(toPx(held.body.velocity.y)).toBeCloseTo(toPx(released.body.velocity.y),6);
   expect(toPx(held.body.velocity.x)).toBeCloseTo(toPx(released.body.velocity.x),6);
 });
+
+test('Hop release never creates a sudden downward shove after gravity has already spent most of Hop ascent',()=>{
+  const s=makeSled(530,0);
+  s.msSinceContact=60;
+  s._playerHopActive=false;
+  step(s,{hop:true,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{hop:true}});
+  s.msSinceContact=68;
+  step(s,{hop:true,variableHop:true,airBrake:true,noAutoNudge:true,pressed:{airBrake:true}});
+  expect(s._protectedHopExtraVyPxS).toBeGreaterThan(300);
+  // Real Matter gravity advances BETWEEN the separate fixed input ticks;
+  // before release, the remaining rising speed can be < stored Hop budget.
+  s.body.velocity.y=toMatter(-140);
+  s._playerHopElapsedMs=TUNING.hopMinimumHoldMs+2;
+  step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
+  expect(toPx(s.body.velocity.y)).toBe(0);
+  expect(s._protectedHopExtraVyPxS).toBe(0);
+  expect(s._playerHopActive).toBe(false);
+});
