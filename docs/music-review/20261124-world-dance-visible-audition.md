@@ -46,3 +46,9 @@ Owner feedback on V4: "Hehehe, I love it! The jellyfish look so happy jumping ar
 Candy canes bend with a rooted quadratic curve, reach up, and vary accent gain by item. Lollipops hop and sway while growing and spinning, with stems remaining attached. Same neutral geometry and no changes to physics, audio timing or other motifs. Independent motif tests require >19px hook displacement and >4px stretch, >15px lollipop lift, >13% growth, perceptible spiral rotation and planted roots at .26 input without horizon movement. 108/108 targeted background/dance/ruleset tests passed.
 
 96 matched rendered pairs, original One More Run, 480x270 per arm, peak visual envelope .863 over 5.34s audio, no page errors; silent ~5.33s Tailnet audition at 18 fps. Controlled production-look selection on Debutmont terrain, not natural traversal; owner visual feedback, fresh live accessibility check and Chromebook performance still pending. No media committed.
+
+## Sixth audition: Micro Mountain
+
+Grass uses an envelope-gated travelling spatial wave with per-blade phase variation, larger height-scaled lateral sway and a quadratic bow. Roots stay anchored and attached dew moves with its parent blade; bee behavior and unrelated motifs are unchanged. This is phase variation, not a delayed audio envelope. Independent tests require opposing tip shifts beyond 15px in the typical accent fixture, vertical bow, >8px dew displacement, fixed roots, unchanged droplet radii, direction reversal over a half wave, and exact neutral geometry. 109/109 targeted background/dance/ruleset tests passed.
+
+96 matched actual game render pairs using original One More Run, native 480x270 per arm, peak visual envelope .783 over 4.94s audio, no page errors; silent ~5s Tailnet audition. Controlled production look on Debutmont terrain rather than natural traversal. Owner feedback, fresh accessibility browser checks, Chromebook performance and remaining motifs pending. No media committed.

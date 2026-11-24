@@ -273,3 +273,32 @@ test('Candy lollipops independently hop, grow and spin without detaching from st
  }
  expect(sample(0)).toEqual(still);
 });
+
+test('Micro Mountain grass waves bend rooted blades and carry attached dew independently of hills',()=>{
+ const motif='dew-drops', d=biomeDanceStyle(motif,.26).decor;
+ const sample=(dance,time=1234)=>motifDecor(motif,400,time,0,{dance,bees:false});
+ const blades=items=>items.filter(p=>p.kind==='poly'&&p.color==='lime');
+ const dew=items=>items.filter(p=>p.kind==='circle'&&p.color==='cyan');
+ const still=sample(0), moving=sample(d);
+ const a=blades(still),b=blades(moving);
+ expect(a.length).toBeGreaterThan(3);
+ expect(b).toHaveLength(a.length);
+ const dx=[];
+ for(let i=0;i<a.length;i++){
+  const x=a[i].pts,y=b[i].pts;
+  expect(y[0]).toEqual(x[0]);
+  expect(y.at(-1)).toEqual(x.at(-1));
+  dx.push(y[5].x-x[5].x);
+  expect(y[5].y-x[5].y).toBeGreaterThan(2);
+ }
+ expect(Math.max(...dx)).toBeGreaterThan(15);
+ expect(Math.min(...dx)).toBeLessThan(-15);
+ const drops=dew(still), shifted=dew(moving);
+ expect(drops.length).toBeGreaterThan(1);
+ expect(shifted).toHaveLength(drops.length);
+ expect(Math.max(...drops.map((p,i)=>Math.hypot(p.x-shifted[i].x,p.y-shifted[i].y)))).toBeGreaterThan(8);
+ for(let i=0;i<drops.length;i++)expect(shifted[i].r).toBe(drops[i].r);
+ const later=blades(sample(d,1234+Math.PI*330)),laterStill=blades(sample(0,1234+Math.PI*330));
+ for(let i=0;i<a.length;i++)expect(later[i].pts[5].x-laterStill[i].pts[5].x).toBeCloseTo(-dx[i],6);
+ expect(sample(0)).toEqual(still);
+});

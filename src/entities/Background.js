@@ -364,6 +364,7 @@ function ellipsePts(cx, cy, rx, ry, rot, n) {
 // Presentation-only audition tuning, in native pixels/radians.
 const DECOR_DANCE = Object.freeze({
   gearRock: 1.4,
+  grassSwayBase: 25, grassSwayPerHeight: 0.48, grassBow: 0.19,
   caneBend: 48, caneStretch: 12, popLift: 39, popSway: 17, popGrow: 0.35, popSpin: 1.8,
   jellyLift: 42, jellySquash: 1.05, jellyTentacle: 0.24,
 });
@@ -549,10 +550,14 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(b.x0, sx, L.factor);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L, sx, x, horizonDance) + 3;
-      const beatSway = dance * (26 + b.h * 0.32) * Math.sin(b.ph);
+      // Neighbouring blades share a travelling wave, with a local phase offset.
+      // The envelope gates the entire movement, so OFF is exactly neutral.
+      const wave = Math.sin(t / 330 - b.x0 / 105 + b.ph * .22);
+      const beatSway = dance * (DECOR_DANCE.grassSwayBase + b.h * DECOR_DANCE.grassSwayPerHeight) * wave;
+      const bow = dance * DECOR_DANCE.grassBow * b.h * (0.65 + 0.35 * Math.abs(wave));
       const centre = (u) => ({
         x: x + (b.lean + beatSway) * u * u,
-        y: yB - b.h * u,
+        y: yB - b.h * u + bow * u * u,
       });
       const left = [];
       const right = [];
