@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 17:46 UTC. Main `05a1bf1e4ba710be691610b4947d1e4a60dd2413` (#320), v2.20.2 live at https://simulate.sledhead.ing/, SIM9 unchanged.
+Last verified: 2026-11-24 18:12 UTC. Main `05a1bf1e4ba710be691610b4947d1e4a60dd2413` (#320), v2.20.2 live at https://simulate.sledhead.ing/, SIM9 unchanged.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -22,8 +22,8 @@ means resume this queue, not take over another lane or merge a draft.
    exact-head independent review; resolve real feedback only. No merge.
    Independent exact test blob overlay on shipped v2.20.2 again passed
    159/159 across the same five suites; #320 has no test-file overlap.
-2. Reconcile #168 against current issue states and release notes. All 17
-   original open issues were rechecked after #318; no parent issue closed.
+2. #168 and all 17 original open issues were rechecked on v2.20.2;
+   none closed. Keep checking source for actual dependency movement.
    While #287 waits, continue bounded #79 replay annotation QA.
    Exact public normal v2.20.2 entry and shipped SIM9 identity: four
    fresh Chromium contexts, positive record+replay and cutoff record+replay.
@@ -34,9 +34,18 @@ means resume this queue, not take over another lane or merge a draft.
    on either capture or replay through 465 (3 checks, 116 f32 poses match).
    Positive tape SHA-256 `fb1732519d3642b869a346a4d0360b0ddbaa9054d301cdc8452572d37db29b6f`;
    cutoff `1d0b806d064d6c37119bba12884ca1dffa06d6dde3b4f6ae6c8f2bde6d06ddbe`.
-   Next exercise a local-only annotation/provenance prototype against
-   those cases and a mutated-pose/entry/receipt negative; keep original
-   SVG and runtime untouched. No UI validation or general support yet.
+   Scratch-only UI A/B now shows separate terrain detail at tick937,
+   X3121.909/Y1054.085, only for the independently replayed exact tape.
+   +8px first-pose mutation still passes all 7 causal checkpoints and hits
+   the same fatal, but fails exact Float32 comparison and receives no note.
+   Header-only cutoff, copied receipt, wrong entry URL/index/module,
+   clearing and delayed file hash after replacement all fail closed.
+   Byte-identical strip preview, SVG download and Run DNA art for each
+   accepted input; local inspector had zero outbound requests or errors.
+   This is a scripted fixture-only QA bridge, not provenance for player
+   files, an importable receipt, or product code. If review-ready proof
+   is needed, package a pinned developer-QA recipe without runtime claims;
+   otherwise move to the next unblocked slice rather than repeating this.
 3. Keep upstream lanes tracked. #58 gates #81 friend exchange; #60 gates
    #84/#83 and broader #70/#71; #57/#60 gate #127 full branching;
    #75/#100/#74 need trusted restoration or equivalent causal replay
