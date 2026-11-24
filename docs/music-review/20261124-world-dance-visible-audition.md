@@ -94,3 +94,7 @@ Owner loved the skyline EQ and asked for stronger individual variation. Each of 
 ## Final V12 visual acceptance
 
 2026-11-24: owner response to V12 audition: "LOVE IT! Looks great!" All current visual tuning accepted, including individual Arcade tower EQ responses. No further tuning requested. This is visual approval, not a waiver of independent review or Chromebook performance gate. Main has advanced to R2 soundtrack v2.21.1 plus billboard thumbnails; candidate version moved to v2.21.2 to avoid collision.
+
+## v2.21.2 integration gate
+
+Candidate 25254189 against main 29587b64: 173/173 focused tests (including the R2 catalog and cosmetic noninterference), production build and identity check passed. GitHub identity/build/lifecycle green, deploy skipped. Production Chromium real original-OGG reactivity and mute/reduced-motion/OFF passed. Settings smoke initially rejected 16 rows vs an obsolete 14-row expectation, identical settings UI to main; corrected the assertion to require one World Dance and one Reduce Motion control, retain panel bounds validation, and test actual persistence. Corrected test passed: panel y18/h244, 16 rows, choices survive reload. Independent OpenCode review attempt timed out at 75 seconds without findings or verdict; Codex review remains rate-limited. No independent approval claimed. Physical Chromebook performance and natural traversal are still outstanding.
