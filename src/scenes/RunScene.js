@@ -1590,13 +1590,17 @@ export class RunScene extends Phaser.Scene {
     this.bg.update(cam.scrollX, t, sled.speed,dance);
     // The existing decorative bees OWN their positions. Sound follows
     // them only when they are actually on screen in Micro Mountain.
-    if (audio?.setMicroBees) {
-      const visible = this.bg.motif === 'dew-drops' && this.bg.bees === true && !this.crashed;
-      const positions = visible ? beesAt(cam.scrollX, t, this.bg.decorSeed) : [];
-      const riderScreenX = GAME_WIDTH / 2 +
-        (sled.x - (cam.scrollX + GAME_WIDTH / 2)) * cam.zoom;
-      audio.setMicroBees(positions, riderScreenX);
-    }
+    // Optional WebAudio can fail while instantiating bee voices. It must NOT
+    // prevent the next physics/frame update or the rest of the UI from drawing.
+    try {
+      if (audio?.setMicroBees) {
+        const visible = this.bg.motif === 'dew-drops' && this.bg.bees === true && !this.crashed;
+        const positions = visible ? beesAt(cam.scrollX, t, this.bg.decorSeed) : [];
+        const riderScreenX = GAME_WIDTH / 2 +
+          (sled.x - (cam.scrollX + GAME_WIDTH / 2)) * cam.zoom;
+        audio.setMicroBees(positions, riderScreenX);
+      }
+    } catch { /* presentation-only audio must never stop Phaser's frame loop */ }
     if (this.biomeFx) this.biomeFx.update(cam.scrollX, t, this._veil || 0, isReducedMotion(this));
     this.songBillboard?.update(dt,dance,!danceAllowed);
     this.drawBsodCues();
@@ -2051,11 +2055,15 @@ export class RunScene extends Phaser.Scene {
     // The real terrain generator, not the visual dissolve or a guessed
     // timer, owns Arcade corridor position; music only reads its progress.
     if (biomeNow === null || biomeNow === 'bitstream-bluffs') {
-      const span = biomeNow === null ? this._bridgeSpan : null;
-      this.registry?.get?.(REG.AUDIO)?.setArcadeTransition?.({
-        bridge: !!span,
-        progress: span ? Math.max(0, Math.min(1, bridgeProgress(span, sled.x))) : 0,
-      });
+      // The bridge corridor and terrain decisions are authoritative. Optional
+      // WebAudio/FX-param failures must not break this gameplay transition.
+      try {
+        const span = biomeNow === null ? this._bridgeSpan : null;
+        this.registry?.get?.(REG.AUDIO)?.setArcadeTransition?.({
+          bridge: !!span,
+          progress: span ? Math.max(0, Math.min(1, bridgeProgress(span, sled.x))) : 0,
+        });
+      } catch { /* a broken audio graph cannot interrupt terrain/simulation */ }
     }
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;

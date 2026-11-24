@@ -32,6 +32,13 @@ def verify(master,results):
 		assert 60<=report['sourceSeconds']<=600
 		paths=report['sourceStemPaths']
 		assert set(paths)=={'drums','bass'}
+		# The report cannot choose its own matching source files. Match BOTH
+		# expected track/role paths from the independent master manifest first,
+		# including the special grouped-six final slot. Otherwise a report can
+		# reference another song's sources and still self-verify its hashes.
+		manifest_stems=track['grouped_6s']['stemFiles'] if int(track['slot'])==33 else track['stem_files']
+		expected={key:str(manifest_stems[key]) for key in ('drums','bass')}
+		assert paths==expected,f'Incorrect master source-path binding {name}: {paths!r} != {expected!r}'
 		for key,relative in paths.items():
 			p=(master/relative).resolve()
 			assert master.resolve() in p.parents

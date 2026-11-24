@@ -533,6 +533,22 @@ export class StemMusicDirector {
 		return true;
 	}
 
+	/** Brand-new effect nodes start with default continuous controls. The
+	 * rider/biome may not have changed, so memoized identical values could
+	 * suppress ALL later writes. Force the next genuine physical observations
+	 * to restore those continuous params. Preserve one-shot impact/lift/event
+	 * latches and HydrostaticPressure's stored depth: NO fabricated impulses.
+	 * Candy/Steam/Scrap speed/contact are already explicitly replayed by
+	 * _applyMusicTimbres(true), so keep their sent caches in sync.
+	 */
+	_invalidateContinuousFxMemoAfterTrackReplace(){
+		this._spaceLastField=NaN;
+		this._spaceLastGravity=NaN;
+		this._thermalLastLoft=NaN;
+		this._hydroLastSent=NaN;
+		this._ventLastLift=NaN;
+	}
+
 	/** New song effect chains create arcadeglue with default bridge=false.
 	 * Preserve the current world corridor state across song replacement; the
 	 * memoized previous bridge=true would otherwise suppress this update.
@@ -1092,6 +1108,7 @@ export class StemMusicDirector {
 			this._refreshVoices();
 			this._timbreSignatures.clear();
 			this._applyMusicTimbres(true);
+			this._invalidateContinuousFxMemoAfterTrackReplace();
 			this._restoreArcadeBridgeAfterTrackReplace();
 			if (info.pack.captions) this._loadCaptions(info, token);
 			this._nextPromise = null;

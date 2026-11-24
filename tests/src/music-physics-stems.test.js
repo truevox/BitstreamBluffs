@@ -115,7 +115,39 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		expect(d.setArcadeTransition({bridge:true,progress:.44})).toBe(true);
 		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','arcadeglue','bridge',true);
 		const source=readFileSync(new URL('../../src/systems/music/StemMusicDirector.js',import.meta.url),'utf8');
-		expect(source).toMatch(/this\._applyMusicTimbres\(true\);\s*this\._restoreArcadeBridgeAfterTrackReplace\(\)/);
+		expect(source).toMatch(/this\._applyMusicTimbres\(true\);\s*this\._invalidateContinuousFxMemoAfterTrackReplace\(\);\s*this\._restoreArcadeBridgeAfterTrackReplace\(\)/);
+	});
+	test('song replacement invalidates continuous Space/Hydro/Thermal/Vent memo without retriggering one-shot gusts',()=>{
+		const d=director();d.biome='space-mountain';d.started=true;
+		d._spaceLastField=.81;d._spaceLastGravity=.4;
+		d._hydroLastSent=.6;d._thermalLastLoft=.7;d._ventLastLift=.5;
+		d._thermalWasActive=true; // a continuous thermal must not refire a gust
+		d._invalidateContinuousFxMemoAfterTrackReplace();
+		for(const key of ['_spaceLastField','_spaceLastGravity','_hydroLastSent','_thermalLastLoft','_ventLastLift'])
+			expect(Number.isNaN(d[key])).toBe(true);
+		expect(d._thermalWasActive).toBe(true);
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setSpaceMotion({gravityPxS2:700,terrainY:1800,riderY:1400,vy:-100,grounded:false})).toBe(true);
+		for(const stem of ROLES){
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'orbitfield','lowGravity',expect.any(Number));
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'orbitfield','weightless',expect.any(Number));
+		}
+		const source=readFileSync(new URL('../../src/systems/music/StemMusicDirector.js',import.meta.url),'utf8');
+		expect(source).toMatch(/this\._applyMusicTimbres\(true\);\s*this\._invalidateContinuousFxMemoAfterTrackReplace\(\)/);
+		expect(source).not.toMatch(/_invalidateContinuousFxMemoAfterTrackReplace\(\)[\s\S]{0,280}this\._thermalWasActive\s*=\s*false/);
+	});
+	test('Micro bees and Arcade music audio failures are individually isolated from RunScene loop',()=>{
+		const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+		const bee=source.indexOf('audio.setMicroBees(positions, riderScreenX)');
+		const arcade=source.indexOf('setArcadeTransition?.({');
+		expect(bee).toBeGreaterThan(0);expect(arcade).toBeGreaterThan(0);
+		const beeStart=source.lastIndexOf('try {',bee),beeEnd=source.indexOf('} catch',bee);
+		const arcadeStart=source.lastIndexOf('try {',arcade),arcadeEnd=source.indexOf('} catch',arcade);
+		expect(beeStart).toBeGreaterThan(0);expect(beeEnd).toBeGreaterThan(bee);
+		expect(arcadeStart).toBeGreaterThan(0);expect(arcadeEnd).toBeGreaterThan(arcade);
+		// A future callback which escapes the try boundary will fail this source contract.
+		expect(source.slice(beeStart,beeEnd)).toContain('audio.setMicroBees(positions, riderScreenX)');
+		expect(source.slice(arcadeStart,arcadeEnd)).toContain('setArcadeTransition?.({');
 	});
 	test('RunScene music observations use joined collider geometry, never the mutable terrain generator',()=>{
 		const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');

@@ -87,6 +87,7 @@ export class AudioSynth {
     this._jukeboxMode = false;
     this._musicMode = 'run';
     this._autoStartAttempted = false;
+    this._menuAutoplayPending = false; // private-only selection while catalog is unresolved
     this._intensity = 0;
     this._distIntensity = 0;
     this._speedIntensity = 0;
@@ -110,11 +111,7 @@ export class AudioSynth {
     this._domListeners = [];
     this._destroyed = false;
     this._stemMusic = new StemMusicDirector(this);
-    this._stemMusic.onReady = () => {
-      if (this._musicWanted && this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
-        this._activateStemMusic();
-      }
-    };
+    this._stemMusic.onReady = () => this._onStemCatalogReady();
     this._stemMusic.onTrackStarted = (track) => {
       const current=this._fatalCountIn?.active;
       if(current && (current.trackId!==track.id ||
@@ -138,6 +135,24 @@ export class AudioSynth {
    */
   _hasEnabledSongs(selection = this.settings?.musicEnabledSongs) {
     return hasEnabledSongs(selection, installedSongChoices(this._stemMusic?.catalog));
+  }
+
+  /** A private-only selected track may not be discoverable when Title first
+   * calls startMenuMusic(). Preserve that *one* autoplay request until the
+   * installed catalog arrives, without inventing an uninstalled source or
+   * resuming a jukebox the user explicitly stopped/paused.
+   */
+  _onStemCatalogReady() {
+    const pending = !!this._menuAutoplayPending;
+    this._menuAutoplayPending = false;
+    if (pending && this._musicMode === 'menu' && !this._musicWanted &&
+        !this._stemMusic?.transportPaused &&
+        this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+      this.jukeboxPlay();
+      return;
+    }
+    if (this._musicWanted && this._hasEnabledSongs(this.settings?.musicEnabledSongs))
+      this._activateStemMusic();
   }
 
   // -------------------------------------------------------------------------------------------------------- wiring
@@ -1031,11 +1046,19 @@ export class AudioSynth {
     this._enterMenuMusic();
     if (this._autoStartAttempted) return;
     this._autoStartAttempted = true;
+    if (!this._stemMusic?.ready &&
+        !this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
+      // All public first-four off may still mean a selected private source;
+      // don't permanently discard initial menu autoplay before discovery.
+      this._menuAutoplayPending = true;
+      return;
+    }
     if (this._hasEnabledSongs(this.settings.musicEnabledSongs)) this.jukeboxPlay();
   }
 
   /** Run transitions change timbre and effects but never restart a playing song. */
   _enterRunMusic(seed) {
+    this._menuAutoplayPending = false; // a late catalog fetch cannot restart Title music in-game
     this._musicMode = 'run';
     this._jukeboxMode = false;
     // #65: choose actual Debutmont WHILE still using the clean menu
@@ -1131,6 +1154,7 @@ export class AudioSynth {
   }
 
   jukeboxPlay() {
+    this._menuAutoplayPending = false; // manual play overrides delayed menu autoplay
     try {
       if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
       this._vinylJukeboxIntent();
@@ -1145,6 +1169,7 @@ export class AudioSynth {
   }
 
   jukeboxPause() {
+    this._menuAutoplayPending = false; // intentional manual pause cancels pending autoplay
     this._vinylJukeboxIntent();
     const ok=this._stemMusic?.transportPause()||false;
     if(ok){
@@ -1156,6 +1181,7 @@ export class AudioSynth {
   }
 
   jukeboxStep(direction) {
+    this._menuAutoplayPending = false; // next/previous is explicit manual intent
     try {
       if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
       this._vinylJukeboxIntent();
@@ -1355,6 +1381,7 @@ export class AudioSynth {
 
   /** @returns {void} */
   stopMusic() {
+    this._menuAutoplayPending = false;
     try {
       this._cancelFatalCountIn();
       this._cancelVinylTransition();

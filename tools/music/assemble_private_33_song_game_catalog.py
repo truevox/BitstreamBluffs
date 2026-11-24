@@ -24,6 +24,16 @@ OLD_IDS={'FEsxYVStla4','WRBGQUqD54U','FYImnz5-hXs','local-one-more-run-bitstream
 def safe_string(v):
 	return isinstance(v,str) and v and all(c.isalnum() or c in '_-' for c in v)
 
+def validate_partial_track_ids(ids):
+	'''A private partial preview must include all FOUR authentic originals AND new media.'''
+	installed=set(ids)
+	missing=OLD_IDS-installed
+	novel=installed-OLD_IDS
+	if missing or not novel:
+		raise ValueError('Partial preview requires all four original packs and at least one new song: '
+			+f'missing originals={sorted(missing)}, new songs={len(novel)}')
+	return True
+
 def install(a):
 	roster=json.loads(a.roster.read_text())['tracks']
 	assert len(roster)==33 and len({t['id'] for t in roster})==33
@@ -88,9 +98,12 @@ def install(a):
 	if not a.partial and len(catalog['tracks'])!=33:
 		shutil.rmtree(stage)
 		raise ValueError('Expected 33 complete song packs')
-	if a.partial and len(catalog['tracks'])<5:
-		shutil.rmtree(stage)
-		raise ValueError('Partial preview must contain the four old songs and one new song')
+	if a.partial:
+		try:
+			validate_partial_track_ids(track['id'] for track in catalog['tracks'])
+		except ValueError:
+			shutil.rmtree(stage)
+			raise
 	(stage/'catalog.json').write_text(json.dumps(catalog,indent=2)+'\n')
 	(stage/'PRIVATE-README.txt').write_text(
 		'PRIVATE TAILSCALE ONLY. Original six stems + source-vocal-derived experimental melody for 33 tracks.\n'

@@ -97,6 +97,66 @@ describe('33-song owner playlist — explicit all-off SILENCE', () => {
 		expect(director.stop).toHaveBeenCalledTimes(1);
 		expect(director.started).toBe(false);
 	});
+	test('private-only menu selection waits for catalog readiness, then honors delayed initial autoplay',()=>{
+		const audio=Object.create(AudioSynth.prototype);
+		const selection=defaultSongSelection();
+		for(const song of GAME_SONGS.slice(0,4))selection[song.id]=false;
+		audio.settings={musicEnabledSongs:selection};
+		audio._stemMusic={catalog:[],ready:false,transportPaused:false};
+		audio._autoStartAttempted=false;audio._musicWanted=false;audio._menuAutoplayPending=false;
+		audio._enterMenuMusic=jest.fn(()=>{audio._musicMode='menu';});
+		audio._activateStemMusic=jest.fn(()=>true);
+		audio.jukeboxPlay=jest.fn(()=>{audio._musicWanted=true;return true;});
+		audio.startMenuMusic();
+		expect(audio._autoStartAttempted).toBe(true);
+		expect(audio._menuAutoplayPending).toBe(true);
+		expect(audio.jukeboxPlay).not.toHaveBeenCalled();
+		audio._stemMusic.catalog=catalog;
+		audio._stemMusic.ready=true;
+		audio._onStemCatalogReady();
+		expect(audio.jukeboxPlay).toHaveBeenCalledTimes(1);
+		expect(audio._menuAutoplayPending).toBe(false);
+		// The same ready notification cannot replay an earlier pending intent.
+		audio._onStemCatalogReady();
+		expect(audio.jukeboxPlay).toHaveBeenCalledTimes(1);
+	});
+	test('menu autoplay pending intent is canceled by user pause or game start',()=>{
+		const audio=Object.create(AudioSynth.prototype);
+		const selection=defaultSongSelection();
+		for(const song of GAME_SONGS.slice(0,4))selection[song.id]=false;
+		audio.settings={musicEnabledSongs:selection};
+		audio._stemMusic={catalog:[],ready:false,transportPaused:false,
+			transportPause:jest.fn(()=>false),setBiome:jest.fn(),setMenuMode:jest.fn()};
+		audio._autoStartAttempted=false;audio._musicWanted=false;
+		audio._enterMenuMusic=jest.fn(()=>{audio._musicMode='menu';});
+		audio._vinylJukeboxIntent=jest.fn();audio._activateStemMusic=jest.fn();
+		audio.jukeboxPlay=jest.fn();
+		audio.startMenuMusic();
+		expect(audio._menuAutoplayPending).toBe(true);
+		audio.jukeboxPause();
+		expect(audio._menuAutoplayPending).toBe(false);
+		audio._stemMusic.catalog=catalog;audio._stemMusic.ready=true;
+		audio._onStemCatalogReady();
+		expect(audio.jukeboxPlay).not.toHaveBeenCalled();
+		audio._menuAutoplayPending=true;
+		audio._onBsodState=jest.fn();audio._setPaused=jest.fn();
+		audio.startMusic=jest.fn();
+		audio._enterRunMusic('seed');
+		expect(audio._menuAutoplayPending).toBe(false);
+		audio._onStemCatalogReady();
+		expect(audio.jukeboxPlay).not.toHaveBeenCalled();
+	});
+	test('public original-four menu fallback is still requested when catalog fetch has not completed',()=>{
+		const audio=Object.create(AudioSynth.prototype);
+		audio.settings={musicEnabledSongs:defaultSongSelection()};
+		audio._stemMusic={catalog:[],ready:false};
+		audio._autoStartAttempted=false;
+		audio._enterMenuMusic=jest.fn(()=>{audio._musicMode='menu';});
+		audio.jukeboxPlay=jest.fn();
+		audio.startMenuMusic();
+		expect(audio.jukeboxPlay).toHaveBeenCalledTimes(1);
+		expect(audio._menuAutoplayPending).not.toBe(true);
+	});
 	test('AudioSynth.startMusic NEVER starts synth or stems in all-off mode', () => {
 		const player=Object.create(AudioSynth.prototype);
 		const disabled=Object.fromEntries(GAME_SONGS.map(s=>[s.id,false]));
