@@ -5,6 +5,7 @@
  * The separately synthesized biome-specific lead stays active in both modes.
  */
 import { BIOME_IDS, HOME_BIOME } from './BiomeVoices.js';
+import { canonicalBiomeId } from '../../data/biomeAliases.js';
 
 const filter = (id, mode, frequency, Q = 0.7) => ({ type:'filter', id, mode, frequency, Q });
 const distortion = amount => ({ type:'distortion', id:'color', amount });
@@ -12,7 +13,7 @@ const tremolo = (rate, depth) => ({ type:'tremolo', id:'motion', rate, depth });
 const delay = (time, wet) => ({ type:'delay', id:'echo', time, wet, feedback:0.15 });
 
 export function melodyPreset(biome) {
-	switch (biome) {
+	switch (canonicalBiomeId(biome)) {
 		case 'debutmont': return [filter('warm','lowpass',3200),tremolo(3.6,.12)];
 		case 'garbage-dump-glacier': return [distortion(.31),filter('edge','highpass',420),tremolo(11,.24)];
 		case 'pyramid-peak': return [distortion(.12),filter('brass','lowpass',4100,1.1)];
@@ -24,15 +25,74 @@ export function melodyPreset(biome) {
 		case 'steampunk-slopes': return [distortion(.17),tremolo(8.5,.23)];
 		case 'micro-mountain': return [filter('tiny','highpass',1000),tremolo(10.5,.18)];
 		case 'vertigo-vents': return [distortion(.44),filter('volcanic','lowpass',2900)];
-		case HOME_BIOME: return [filter('arcade','lowpass',7000)];
+		case HOME_BIOME: return [filter('arcade','lowpass',7000),tremolo(5.6,.11)];
 		default: return [filter('arcade','lowpass',7000)];
 	}
 }
 
+/**
+ * Experimental *original-source-only* layers from the owner's second listening
+ * round. Keep these BEFORE every event-capable biome DSP stage: a valid jump,
+ * landing, rock crack or geyser must not enter a long delay or distorted wah.
+ * These are private trial settings, NOT public mastered or artist-approved audio.
+ */
+export function sourceOnlyExtras(biome, stem) {
+	if (!['bass','drums','guitar','piano','other'].includes(stem)) return [];
+	switch (canonicalBiomeId(biome)) {
+		case 'candy-cane-canyon':
+			return [{type:'characteredge',id:'candy-character',kind:'candy',intensity:1.6},
+				{type:'biomebloom',id:'candy-bloom',intensity:1.75}];
+		case 'vertigo-vents':
+			return [{type:'characteredge',id:'heat-wah',kind:'heat',intensity:1.05},
+				{type:'biomebloom',id:'vent-bloom',intensity:1.85}];
+		case HOME_BIOME:
+			return [{type:'biomebloom',id:'arcade-bloom',intensity:1.9}];
+		case 'space-mountain':
+			return [{type:'spatialreach',id:'long-orbit',kind:'space',intensity:1.5},
+				{type:'biomebloom',id:'space-bloom',intensity:1.5}];
+		case 'sky-jellyfish-mountain':
+			return [{type:'spatialreach',id:'tentacle-trail',kind:'jelly',intensity:1.5}];
+		case 'pyramid-peak':
+			// Sandstone's owner-heard 125% baseline remains unchanged.
+			// 200% extra only affects the experimental stereo chamber.
+			return [{type:'spatialreach',id:'stone-chamber',kind:'stone',intensity:2}];
+		default: return [];
+	}
+}
+
 export function orchestraPreset(biome, stem) {
+	biome=canonicalBiomeId(biome); // archived home-biome aliases remain safely accepted
 	if (!['bass','drums','guitar','piano','other'].includes(stem))
 		throw new Error('Cannot apply orchestra effects to an unknown stem');
 	if (!BIOME_IDS.includes(biome)) return [];
+	// Powdery snow muffles the original performance without changing its notes or timing.
+	// Bass retains some warmth; jumping temporarily removes this effect in the director.
+	if (biome === HOME_BIOME) return [{type:'arcadeglue',id:'arcadeglue',
+		bridge:false,progress:0,intensity:2,chop:2}];
+	if (biome === 'debutmont') return [{ type:'snowpack', id:'snowpack',
+		depth: stem === 'bass' ? .56 : .72 }];
+	if (biome === 'pyramid-peak') return [{type:'sunstone',id:'sunstone',
+		loft:0,resonance:1.25,drift:1,gustLevel:1.2,stoneLevel:1.15}];
+	if (biome === 'space-mountain') return [{type:'orbitfield',id:'orbitfield',
+		spread:1.5,drift:2,weightless:0,lowGravity:0,reentryLevel:1.5,ejectLevel:1.7}];
+	if (biome === 'candy-cane-canyon') return [{type:'sugarfizz',id:'sugarfizz',
+		speed:0,airborne:false,sweetness:2,fizz:2,popLevel:2,wrapperLevel:2}];
+	if (biome === 'vertigo-vents') return [{type:'ventforge',id:'ventforge',
+		rumble:2,shimmer:1.9,updraft:0,blast:2,crust:1.9}];
+	if (biome === 'sky-jellyfish-mountain') return [{type:'jellybloom',id:'jellybloom',
+		airborne:false,buoyancy:1.35,floatRate:1,spring:1.30,liftLevel:.95}];
+	if (biome === 'steampunk-slopes') return [{type:'steamworks',id:'steamworks',
+		weight:stem==='drums'?1:stem==='bass'?.85:.48,
+		speed:0,airborne:false,intensity:1.9,steam:1.5,impactWeight:1.35,accentWeight:1.55}];
+	if (biome === 'underwater-mountain') return [{type:'hydrostatic',id:'hydrostatic',
+		pressure:0,sensitivity:stem==='bass'?.68:1}];
+	if (biome === 'micro-mountain') return [{type:'microbox',id:'microbox',
+		openness:0,boxiness:1.35,impactWeight:1}];
+	if (biome === 'crystal-cavern' && ['bass','guitar','piano','other'].includes(stem))
+		return [{type:'crystallattice',id:'crystallattice',strength:1.5,openness:0,airBloom:1.6,
+			detectChroma:stem==='bass',bassFeed:stem==='bass'}];
+	if (biome === 'crystal-cavern' && stem==='drums')
+		return [{type:'gain',id:'crystalPercussion',gain:1}];
 	const edge = {
 		'debutmont': 4200,'garbage-dump-glacier':6200,
 		'pyramid-peak': 5100,'underwater-mountain':1800,
@@ -42,10 +102,18 @@ export function orchestraPreset(biome, stem) {
 		'vertigo-vents':3700,
 	}[biome] || 5000;
 	if (stem==='bass') {
-		return [filter('shaped-bass','lowpass',Math.min(3000,edge*.55)),
+		return [
+			// The original bass is analysed BEFORE its existing FX. The
+			// analyser is read only when an irregular on-pitch clang is due.
+			...(biome==='garbage-dump-glacier'?[{type:'scrapPitchProbe',id:'scrapPitchProbe'}]:[]),
+			filter('shaped-bass','lowpass',Math.min(3000,edge*.55)),
 			...(biome==='garbage-dump-glacier'||biome==='vertigo-vents'?[distortion(.18)]:[])];
 	}
 	if (stem==='drums') {
+		// Garbage retains a genuinely unfiltered original drum path; metal
+		// coloration happens only in Scrapheap's parallel resonant wet send.
+		if (biome==='garbage-dump-glacier')
+			return [{type:'scrapheap',id:'scrapheap',contact:0,clangLevel:1.7,splock:1.6,suction:.8}];
 		return [filter('drum-color','lowpass',edge),
 			...(biome==='steampunk-slopes'||biome==='micro-mountain'?[tremolo(6,.17)]:[])];
 	}

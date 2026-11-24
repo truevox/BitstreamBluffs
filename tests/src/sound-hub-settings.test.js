@@ -89,3 +89,14 @@ describe('Sound hub: original vocals entitlement and dedicated wind mixer settin
 		expect(store.profile.unlocked.musicVocals).toBe(false);
 	});
 });
+
+describe('owner-approved crossfade default',()=>{
+	test('new and pre-crossfade settings enable crossfade; explicit OFF survives',()=>{
+		expect(defaultSettings().musicCrossfade).toBe(true);
+		expect(sanitizeSettings({musicVolume:.5}).musicCrossfade).toBe(true);
+		expect(sanitizeSettings({musicCrossfade:false}).musicCrossfade).toBe(false);
+		expect(sanitizeSettings({musicCrossfade:true}).musicCrossfade).toBe(true);
+		for(const value of [null,0,'false',{},undefined])
+			expect(sanitizeSettings({musicCrossfade:value}).musicCrossfade).toBe(true);
+	});
+});

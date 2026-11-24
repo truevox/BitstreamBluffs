@@ -1,13 +1,13 @@
 /** Validated, versioned music-pack data. No Phaser, DOM or I/O. */
 import { BIOME_IDS, HOME_BIOME } from './BiomeVoices.js';
-import { canonicalBiomeId, canonicalLegacyId } from '../../data/biomeAliases.js';
+import { canonicalBiomeId, canonicalLegacyId, BASE_BIOME_ID, LEGACY_BIOME_ALIASES } from '../../data/biomeAliases.js';
 export const CORE_STEMS = Object.freeze(['vocals', 'drums', 'bass', 'guitar', 'piano', 'other']);
 const validId = (s) => typeof s === 'string' && /^[a-zA-Z0-9:_-]{1,100}$/.test(s);
 const safePath = (s) => typeof s === 'string' && s.length < 300 &&
   !s.startsWith('/') && !s.includes('..') && !s.includes('\\') &&
   /^[a-zA-Z0-9_.\/-]+$/.test(s);
 const whole = (v) => Number.isSafeInteger(v) && v >= 0;
-const effectTypes = new Set(['gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser']);
+const effectTypes = new Set(['gain', 'filter', 'pan', 'distortion', 'delay', 'tremolo', 'ring', 'convolution', 'analyser', 'snowpack', 'scrapheap', 'hydrostatic', 'microbox', 'crystallattice', 'scrapPitchProbe', 'steamworks', 'jellybloom', 'ventforge', 'sugarfizz', 'orbitfield', 'sunstone', 'arcadeglue', 'biomebloom', 'characteredge', 'spatialreach']);
 
 /**
  * An object's entries with legacy biome ids (issue #65) read as canonical. A map carrying BOTH spellings of one key
@@ -220,4 +220,41 @@ export function normalizePack(raw) {
 export function resolveMusicAsset(baseUrl, safeRelativePath) {
 	if (!safePath(safeRelativePath)) throw new Error('Unsafe music asset path');
 	return new URL(safeRelativePath, baseUrl).href;
+}
+
+/**
+ * Only the canonical 2026-11-23 base-biome folder has an older physical
+ * spelling in some archived music packs. Existing manifests normalize the
+ * *logical* keys to `debutmont`, while the original OGG recordings remain
+ * stored under the historic one-letter-shorter name. Try canonical first, then the archived
+ * path on 404. Do not mutate/duplicate source media or rewrite other biomes.
+ */
+export function legacyDebutmontAssetPath(path) {
+	if (!safePath(path)) throw new Error('Unsafe music asset path');
+	const canonical='adaptive/'+BASE_BIOME_ID+'/';
+	if (!path.startsWith(canonical)) return null;
+	// The central alias table is the ONLY source of the archived typo.
+	const legacy=Object.keys(LEGACY_BIOME_ALIASES)
+		.find(alias=>LEGACY_BIOME_ALIASES[alias]===BASE_BIOME_ID);
+	if (!legacy) return null;
+	return 'adaptive/'+legacy+'/'+path.slice(canonical.length);
+}
+
+/**
+ * Optional `preferLegacy` avoids repeated 404s once a pack has proved it
+ * stores original home-biome recordings at the archived physical path. A mixed pack
+ * still works: a 404 on either spelling tries the other. Never retry an
+ * auth, server, timeout or decode error as though it were an old filename.
+ */
+export async function fetchMusicAssetResponse(baseUrl, path, {
+	fetcher=fetch, preferLegacy=false,
+}={}) {
+	const legacy=legacyDebutmontAssetPath(path);
+	const paths=legacy ? (preferLegacy?[legacy,path]:[path,legacy]) : [path];
+	for (const [index,candidate] of paths.entries()) {
+		const response=await fetcher(resolveMusicAsset(baseUrl,candidate));
+		if (response.ok || response.status!==404 || index===paths.length-1)
+			return {response,usedLegacy:response.ok && !!legacy && candidate===legacy};
+	}
+	throw new Error('Unreachable audio asset fallback');
 }

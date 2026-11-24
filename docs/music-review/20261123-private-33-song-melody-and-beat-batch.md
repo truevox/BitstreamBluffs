@@ -1,0 +1,36 @@
+# Bitstream Bluffs — private 33-song melody-only expansion and source beat research
+
+**Owner request November 23, 2026:** Retain original six separated stems, do **not** replace drums/bass/guitar/piano/other with synthesized MIDI orchestra tracks, generate new full-length **biome melody voices** for all 33 songs and add all 33 to the game. Concurrently, map *candidate* source rhythm / beats for all 33 originals. Source recordings must remain unchanged; user listening/approved Pyramid lead must not be overwritten.
+
+## Method recovered from prior sessions and source code
+
+- CT211 canonical read-only source bank: `/root/bitstream-maxi/launch33/`, 33 manifest tracks, 32 Demucs six-stem songs + *One More Run* with original 11 stems and a previously reviewed grouped-six derivative. **Do not copy or alter originals**.
+- Original four native gameplay tracks (Pope Leo, One More Run, Every Hacker, Varmont) already have their own approved/pending-review melodies. Preserve their source packs and melody voices byte-for-byte. Only 29 additional songs require first-generation leads.
+- Use original separated **vocals** for YIN extraction (16kHz source audio / 10ms hop, note stability+silence filtering). Source-derived MIDI-like note events are an **unverified approximation**, not a trusted sheet-music score or artist MIDI; we do **not** use MIDI-generated backing stems. The renderer reuses the model-free, existing character instruments from `render_full_dynamic_orchestra_v1.py` / `render_biome_orchestras_v2.py` for eleven nonhome identities and the separately rendered home melody.
+- Produce exactly the original six stems plus **12 distinct `voice:<biome>` melody buses** at 48kHz stereo; 12-second source-aligned Opus segments, each encoded with its own independent encoder and checked by full decoded frame count. Prevent partial publication by staging each song and promoting only after exact-frame checks. Existing four OGG original+voice archives are reused, not regenerated.
+- CT211 melody output, PRIVATE ONLY: `/root/bitstream-maxi/launch33-melody33-20261123-private`. Source compilation/runner under `/root/bitstream-maxi/melody33-tools-20261123/`. Per-song audit JSON contains source vocal SHA-256, note events, extraction algorithm and provisional label; **not** published in game source.
+- Source-drum/bass beat candidates use *different input tracks* from the melody model: real original FLACs. Two librosa beat tracking tempo priors 105/165 BPM; 18s local rhythmic autocorrelation every 6s; full-track source-frame 48k positions; four competing hypothetical 4-beat meter offsets per candidate, never one assumed true downbeat. Every source FLAC's SHA-256 is recorded and independently verified by `verify_33_original_beats.py`. **No asserted real tempo, quarter-note beat 1, meter, half-time section or drift; separate synthetic Gym beat API remains unchanged.** This honors the failed-closed real-source research already in DRAFT PR #53. Album-wide beat candidates must **never** flow into `RELEASE_BEAT_GRIDS`, game physics, Gym, World Dance, or master recordings without explicit verification.
+- Private beat output: `/root/bitstream-maxi/launch33-beat-candidates-20261123-private`, with 33 separate immutable candidate reports, SHA-bound independent `source-verified-summary.json` and 66 verified original source FLACs. **Nine of 33 songs exhibit >15 BPM divergence between differing estimator start-priors**, often half/double-time ambiguity. This is a warning, not an artist-measured tempo discrepancy.
+
+## Game integration
+
+- The entire 33-song roster is represented by `FullSongRoster.js`; the old four song IDs/order are unchanged as the first four settings keys. The remaining 29 follow master slot sequence. On first install, all songs with actual media are enabled; saved legacy **all-four-off** selection migrates to 33-off rather than unexpectedly starting new tracks.
+- Menu height cannot fit 33 toggles. The `MANAGE SOUND` panel now offers **SELECT TRACKS (33)** and a five-page, eight-toggle-per-page browser for keyboard, touch and gamepad. No new large spritesheets or media artwork are required to test the gameplay integration.
+- `BeatGridCatalog.js` now lists all 33 as **UNVERIFIED**, not as certified source-downbeats.
+- `assemble_private_33_song_game_catalog.py` assembles a private runtime catalog using symlinks to existing four full source/voice packs and new model-free 29, with complete 18-role/segment/clock validation. It only emits into a new PRIVATE game site media tree, refuses overwrites and disallows release with missing songs unless explicit `--partial` engineering smoke.
+- No private OGG/WAV/FLAC or source-vocal-derived score JSON is checked into Git or shipped to public Netlify. The game code/roster and private deployment are independent: without installed media, the runtime retains the normal safe fallback.
+
+## Verification already performed
+
+- Remote CT211 slot02, *TRUNCATE TABLE: THE NINE-MILLION-ROW PURGE*: 687 provisional melody notes, 21 sample-exact segments, all 12 biomes / 252 synthesized melody OGGs, plus 126 original-core OGGs. Full source-derived song duration **249.77 seconds**, promoted atomically after exact decoded-PCM frame checks.
+- Entire 33-song drum/bass beat batch completed successfully; independent source validation **33/33**, **66 original drum/bass SHA-256 matches**, all candidate timestamps monotonically increasing and inside original song boundaries; nine source songs have 15+ BPM disagreement between tempo priors. No musical downbeat approved.
+- Five-song private real-game smoke (four existing originals + new slot02) validated full game boot, all 33 setting keys, selector pages `[8,8,8,8,1]`, switch/toggle restoration, **actual new 249.77-second Opus source song playback**, 18 bus identities / 12 melody voices, 21 real decoded source OGG requests, **zero unexpected HTTP failures or page exceptions**. A known older legacy home-biome physical-path 404 is resolved by existing explicit legacy fallback and counted separately, not misrepresented as a missing playable file.
+- Focused Jest song-selection, jukebox continuity, shuffle, source beat release gates: **32/32 passed**. Vite build succeeded. Note these tests do NOT establish whether the automatically transcribed melodies sound right.
+
+## Explicit gates pending before release
+
+1. All remaining 28 new-song melody packs complete, independently pass exact-length validation and private source-stem QA.
+2. Full 33-song private game catalog / browser proof with all music assets, shuffle, song enabling/disabling, named song playback, no missing media (aside from supported legacy fallback), and uninterrupted transitions.
+3. Owner/independent listening of generated new melodies, especially voice octave errors, sustained vs repeated notes, rap/whisper/scream material, and missing/false melodic note hypotheses. Do not imply automatic YIN is artist-proven.
+4. Review true drum/bass beat-one, actual meter/downbeat offsets, half-/double-time, possible variable tempo and recurring sections. Machine-only 33 mapping does not authorize any production beat grids.
+5. Source licensing/publication and final mastering approval before releasing music to Netlify/public downloads. All 33 remain private meanwhile.
