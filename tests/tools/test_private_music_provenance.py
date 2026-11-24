@@ -17,6 +17,14 @@ assemble_module=load_script('assemble_private_33_song_game_catalog','assemble_pr
 def sha(data):
 	return hashlib.sha256(data).hexdigest()
 
+def mock_flac_streaminfo(seconds=120,rate=48000,unique=b''):
+	'''Synthetic metadata-only FLAC header for unit tests (not audio output).'''
+	samples=int(seconds*rate)
+	packed=(rate<<44)|(1<<41)|(15<<36)|samples
+	streaminfo=bytes([16,0,16,0])+bytes(6)+packed.to_bytes(8,'big')+bytes(16)
+	assert len(streaminfo)==34
+	return b'fLaC'+bytes([0x80,0,0,34])+streaminfo+unique
+
 class SourceBindingTests(unittest.TestCase):
 	def create_fixture(self,root):
 		master=root/'master';results=root/'results'
@@ -30,7 +38,7 @@ class SourceBindingTests(unittest.TestCase):
 				name=f'sources/{slot:02d}/{role}.flac'
 				target=master/name
 				target.parent.mkdir(parents=True,exist_ok=True)
-				data=f'unique private mock {id} {role}'.encode()
+				data=mock_flac_streaminfo(unique=f'unique private mock {id} {role}'.encode())
 				target.write_bytes(data)
 				files[role]=name
 				hashes[role]=sha(data)
@@ -82,6 +90,40 @@ class SourceBindingTests(unittest.TestCase):
 			}
 			target.write_text(json.dumps(report))
 			with self.assertRaisesRegex(AssertionError,'Incorrect master source-path binding'):
+				verify_module.verify(master,results)
+
+	def test_beat_beyond_verified_duration_is_rejected_even_with_inflated_report_duration(self):
+		with tempfile.TemporaryDirectory() as tmp:
+			master,results=self.create_fixture(Path(tmp))
+			target=results/'01_song01.json'
+			report=json.loads(target.read_text())
+			report['sourceSeconds']=121
+			for q in report['candidateBeatPaths']:
+				q['beatsSourceFrames48k'][-1]=120*48000+1
+			target.write_text(json.dumps(report))
+			with self.assertRaisesRegex(AssertionError,'(Claimed source duration|Beat frame)'):
+				verify_module.verify(master,results)
+			# Even a truthful reportSeconds cannot permit a beat beyond the
+			# independently verified shortest original recording.
+			report['sourceSeconds']=120
+			target.write_text(json.dumps(report))
+			with self.assertRaisesRegex(AssertionError,'Beat frame outside verified'):
+				verify_module.verify(master,results)
+
+	def test_shorter_bass_recording_caps_the_common_beat_grid(self):
+		with tempfile.TemporaryDirectory() as tmp:
+			master,results=self.create_fixture(Path(tmp))
+			bass=master/'sources/01/bass.flac'
+			data=mock_flac_streaminfo(110,unique=b'shorter bass')
+			bass.write_bytes(data)
+			target=results/'01_song01.json'
+			report=json.loads(target.read_text())
+			report['sourceStemSha256']['bass']=sha(data)
+			report['sourceSeconds']=110
+			for q in report['candidateBeatPaths']:
+				q['beatsSourceFrames48k'][-1]=111*48000
+			target.write_text(json.dumps(report))
+			with self.assertRaisesRegex(AssertionError,'Beat frame outside verified'):
 				verify_module.verify(master,results)
 
 	def test_private_partial_preview_requires_four_old_and_one_new(self):

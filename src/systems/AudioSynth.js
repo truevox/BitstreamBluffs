@@ -242,7 +242,13 @@ export class AudioSynth {
 
   _onLanding(p) {
     if (!p || p.quality === 'crash') return;
-    if (this._musicMode === 'run') this._stemMusic?.onLanding?.(p);
+    // LANDING is a synchronous gameplay event, fired before scoring boosts
+    // and spring rebound. WebAudio/FX cannot be allowed to cancel that
+    // authoritative game logic; still play ordinary landing SFX afterward.
+    if (this._musicMode === 'run') {
+      try { this._stemMusic?.onLanding?.(p); }
+      catch { /* optional musical-physics effects must never stop Matter */ }
+    }
     if (p.quality === 'perfect') this.playSfx('landPerfect');
     else if (p.hard) this.playSfx('landHard');
     else this.playSfx('land', { pitch: p.quality === 'sloppy' ? 0.8 : 1 });
@@ -1112,13 +1118,9 @@ export class AudioSynth {
       this._musicSeed = String(seed == null ? '' : seed);
       this._musicWanted = true;
       this._arrCache.clear();
-      if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
-        this._stemMusic?.stop();
-        if (this._musicTimer) clearInterval(this._musicTimer);
-        this._musicTimer = null;
-        if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
-        return;
-      }
+      // Arrange the fallback deterministically even if the catalog has not
+      // arrived yet. A late pack failure can start the procedural scheduler;
+      // it must never inherit undefined RNG, progression or step state.
       const base = new Rng(this._musicSeed).fork('music');
       this._baseBpm = 118 + base.int(0, 14);
       const order = [0, 1, 2, 3];
@@ -1128,9 +1130,18 @@ export class AudioSynth {
       }
       this._progOrder = order;
       this._baseRng = base;
+      this._step = 0;
+      this._nextTime = null;
       this._distIntensity = 0;
       this._speedIntensity = 0;
       this._updateIntensity();
+      if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
+        this._stemMusic?.stop();
+        if (this._musicTimer) clearInterval(this._musicTimer);
+        this._musicTimer = null;
+        if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
+        return;
+      }
       if (!this._ensureCtx()) return;
       if (this._activateStemMusic()) return;
       const t = this.ctx.currentTime;

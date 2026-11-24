@@ -117,6 +117,19 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		const source=readFileSync(new URL('../../src/systems/music/StemMusicDirector.js',import.meta.url),'utf8');
 		expect(source).toMatch(/this\._applyMusicTimbres\(true\);\s*this\._invalidateContinuousFxMemoAfterTrackReplace\(\);\s*this\._restoreArcadeBridgeAfterTrackReplace\(\)/);
 	});
+	test('original vocal room send resumes in-game after menu without replacing vocal effects',()=>{
+		const d=director();
+		d.gains.set('vocals',{});
+		d.menuMode=true;
+		d._applyMusicTimbres();
+		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('vocals',0);
+		d.mixer.setRoomSend.mockClear();
+		d.mixer.replaceEffects.mockClear();
+		d.menuMode=false;
+		d._applyMusicTimbres();
+		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('vocals',null);
+		expect(d.mixer.replaceEffects.mock.calls.some(([name])=>name==='vocals')).toBe(false);
+	});
 	test('song replacement invalidates continuous Space/Hydro/Thermal/Vent memo without retriggering one-shot gusts',()=>{
 		const d=director();d.biome='space-mountain';d.started=true;
 		d._spaceLastField=.81;d._spaceLastGravity=.4;

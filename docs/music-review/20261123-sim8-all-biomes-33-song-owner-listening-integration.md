@@ -57,3 +57,12 @@ A second static code review after the first three corrections found five additio
 - **Partial PRIVATE preview validity:** a private partial-catalog staging promotion requires ALL four original source packs and at least one additional new song, not merely five arbitrary songs. Synthetic standalone Python regression controls verify both provenance guards without ever reading or exporting actual audio.
 
 **Status distinction:** source/physics isolation and four-song public fallback are production-code review gates; private pitch interpretation, all 33 original rhythm candidates, full-song quality, intersample mastering, and publication rights are NOT certified by these smoke tests and remain separate owner/listening gates. No private audio or provisional musical note/beat transcripts have been staged to GitHub.
+
+
+## Final integration-review corrections and release preparation (November 24, 2026)
+
+- A throwing `StemMusicDirector.onLanding` is now caught inside `AudioSynth._onLanding`, so `EVT.LANDING` does not abort subsequent scoring/boost/spring logic and the ordinary SFX listener still executes.
+- A run with only private tracks selected initializes its seeded procedural fallback's RNG, chord order, step and intensity before a catalog read can return early. A later selected pack failure can start fallback safely; public four-song all-off still stays silent.
+- The beat verifier independently parses the FLAC STREAMINFO sample rate and count for both manifest-bound originals and caps candidate timestamps to the shorter recording plus one 48 kHz output frame of rounding. It no longer trusts the report's own claimed duration. Five synthetic provenance tests cover healthy 33-song manifests, forged source hashes/paths, overstated durations, and mismatched stem lengths.
+- The original vocal room-send remains unmodified in menus and is restored on re-entry to actual gameplay (no accidental replacement of vocal DSP chains).
+- This user-facing music capability prepares semantic minor release v2.20.0 (package and lockfile), with a dated numbered changelog entry. It is **not merged** until all source, browser, independent-review and owner/publication gates are addressed. If main advances before merge, re-evaluate the version and restack against the actual release base. [skip netlify] remains mandatory.

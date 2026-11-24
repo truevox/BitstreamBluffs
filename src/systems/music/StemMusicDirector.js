@@ -298,6 +298,11 @@ export class StemMusicDirector {
 			// disable legitimate processing of the ORIGINAL recordings.
 			this.mixer.setRoomSend(name,this.menuMode ? 0 : null);
 		}
+		// The menu explicitly dries the original vocal room send, even though
+		// vocals have no gameplay DSP chain. Restore their natural reverb when
+		// gameplay resumes without replacing/damaging the vocal effect graph.
+		if (!this.menuMode && this.gains.has('vocals'))
+			this.mixer.setRoomSend('vocals',null);
 		this._applyScrapContact(true);
 		this._steamLastSent = NaN;
 		this._applySteamSpeed(true);

@@ -80,6 +80,39 @@ describe('33-song owner playlist — explicit all-off SILENCE', () => {
 		audio._stemMusic.catalog=privateCatalog;
 		expect(audio._hasEnabledSongs(selection)).toBe(true);
 	});
+	test('private-only run initializes seeded procedural fallback before the catalog loads',()=>{
+		const selection=defaultSongSelection();
+		for(const item of GAME_SONGS.slice(0,4))selection[item.id]=false;
+		const fake=()=>{
+			const a=Object.create(AudioSynth.prototype);
+			a.settings={musicEnabledSongs:selection};
+			a._arrCache=new Map();a._stemMusic={catalog:GAME_SONGS.slice(0,4),
+				stop:jest.fn(),ready:false,started:false};
+			a._musicTimer=null;a._musicWanted=false;a._updateIntensity=jest.fn();
+			a._ensureCtx=jest.fn(()=>true);
+			a._activateStemMusic=jest.fn(()=>false);
+			a._startScheduler=jest.fn();
+			a.ctx={state:'running',currentTime:15};
+			a.nodes={musicSrc:{gain:{cancelScheduledValues:jest.fn(),setTargetAtTime:jest.fn()}}};
+			return a;
+		};
+		const a=fake(),b=fake();
+		a.startMusic('private-only-run');
+		b.startMusic('private-only-run');
+		expect(a._musicWanted).toBe(true);
+		expect(a._startScheduler).not.toHaveBeenCalled(); // still silent
+		expect(a._ensureCtx).not.toHaveBeenCalled();
+		expect(a._step).toBe(0);
+		expect(a._progOrder).toHaveLength(4);
+		expect(a._baseRng).toBeDefined();
+		expect(a._arrangement(0)).toEqual(b._arrangement(0));
+		// Later catalog discovery recognizes the actual installed source.
+		a._stemMusic.catalog=GAME_SONGS;
+		a.musicProviderFailed(); // real source failed; scheduler must now be safe
+		expect(a._startScheduler).toHaveBeenCalledTimes(1);
+		expect(()=>a._arrangement(1)).not.toThrow();
+		expect(a._step).toBe(0);
+	});
 	test('four-song saved all-off migration never enables newly added songs',()=>{
 		const legacyAllOff=Object.fromEntries(GAME_SONGS.slice(0,4).map(s=>[s.id,false]));
 		expect(hasEnabledSongs(legacyAllOff)).toBe(false);
