@@ -244,3 +244,19 @@ test('single-support active pair must preserve the unused contact slot used for 
   expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/contact\/support mismatch/);
   expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
 });
+
+test('retained inactive pairs must preserve both old contact references for warm start',()=>{
+  const a=buildWorld(Matter);
+  for(let i=0;i<300&&!a.engine.pairs.list.some(p=>p.isActive&&p.contactCount>0);i++)Matter.Engine.update(a.engine,1000/240);
+  const pair=a.engine.pairs.list.find(p=>p.isActive&&p.contactCount>0);
+  expect(pair).toBeDefined();
+  Matter.Pair.setActive(pair,false,a.engine.timing.timestamp);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  const i=good.pairs.findIndex(p=>!p.isActive&&p.col.supportCount>0);
+  expect(i).toBeGreaterThanOrEqual(0);
+  expect(kit.preflight(good)).toBe(true);
+  const bad=JSON.parse(JSON.stringify(good));bad.pairs[i].contacts[0][0]=null;
+  const b=buildWorld(Matter),before=JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}));
+  expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/contact\/support mismatch/);
+  expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
+});

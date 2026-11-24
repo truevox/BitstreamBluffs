@@ -164,8 +164,9 @@ export function preflightMatterSnapshot(snap, Matter) {
         !c.supports.every((r,i)=>vertex(r,i<c.supportCount,p)))fail('collision support reference');
     if (p.isActive ? p.contactCount!==c.supportCount : p.contactCount!==0) fail('pair activity/contact count');
     // Pair.update compares BOTH stored contacts when deciding whether to
-    // swap warm-start impulses, even when only one support is active.
-    if(p.isActive)for(let i=0;i<2;i++){
+    // swap warm-start impulses, even with one support or a retained
+    // inactive sleeping pair.
+    for(let i=0;i<2;i++){
       const a=p.contacts[i][0],b=c.supports[i];
       if(a===null||b===null ? a!==b : a[0]!==b[0]||a[1]!==b[1])
         fail('contact/support mismatch');
