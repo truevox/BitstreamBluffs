@@ -45,11 +45,12 @@ async function page() {
   // what the browser itself executed; this listener runs BEFORE navigation.
   const observed=new Map();
   const reads=[];
+  let responseReadError=null;
   p.on('response',response=>{
     const requested=new URL(response.url());
     if(requested.origin!==new URL(url).origin ||
         !requested.pathname.startsWith('/assets/') || !requested.pathname.endsWith('.js'))return;
-    reads.push((async()=>{
+    const read=(async()=>{
       assert.equal(response.status(),200,`failed browser JS response ${requested.pathname}`);
       const expected=expectedJsFiles.get(requested.pathname);
       assert(expected,`browser requested unknown compiled JS asset: ${requested.pathname}`);
@@ -59,12 +60,17 @@ async function page() {
       const prior=observed.get(requested.pathname);
       assert(!prior||prior===digest,`inconsistent browser JS content for ${requested.pathname}`);
       observed.set(requested.pathname,digest);
-    })());
+    })();
+    // A timed-out run closes its browser context while network responses may
+    // still be pending. Attach rejection handling NOW, not later at the gate,
+    // so context teardown never triggers an unhandled Node.js rejection.
+    reads.push(read.catch(error=>{responseReadError ||= error;}));
   });
   async function verifyActualLoadedScripts({expectRuntime=false}={}){
     // page.on('response') captures the response used by Chromium, not a
     // separately issued request. Repeat after play() to cover lazy imports.
     await Promise.all(reads);
+    if(responseReadError)throw responseReadError;
     assert(observed.has(entryPath),'Chromium never fetched the expected game entry module');
     if(expectRuntime)assert([...observed.keys()].some(x=>x.includes('runtimeRuleset-')),
       'the dynamically imported runtime ruleset was not observed');
