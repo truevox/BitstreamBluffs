@@ -74,7 +74,7 @@ import { ShardField } from '../entities/Shard.js';
 import { BestMarker } from '../entities/BestMarker.js';
 import { LastDeathMarker } from '../entities/LastDeathMarker.js';
 import { crashReport, crashBeat, deathMarkerX } from '../systems/CrashReport.js';
-import { layoutMarkerLabels } from '../systems/MarkerLayout.js';
+import { layoutMarkerLabels, joinedMarkerHeight } from '../systems/MarkerLayout.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
 import { planTelegraphMarks as planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
@@ -350,6 +350,9 @@ export class RunScene extends Phaser.Scene {
       ?matchMedia('(prefers-reduced-motion: reduce)'):null; }
     catch { this._worldDanceMotionQuery=null; }
     this.mesh = new TerrainMesh(this, this.palette, this.content.terrainMods);
+    // #253: BEST/DIED HERE are presentation. Their lookahead height reads must
+    // never pre-generate terrain beyond the chunks already joined in Matter.
+    this.markerHeightFn = (x) => joinedMarkerHeight(x, this.mesh.chunks);
     this.fx = new Fx(this, this.palette);
     this.trail = new TrailParticles(this, this.palette, this.look && this.look.trail);
     this.shardField = new ShardField(this, this.palette);
@@ -1393,7 +1396,7 @@ export class RunScene extends Phaser.Scene {
         // The BSOD advances with the SAME capped physics substeps as the sled. A fast wall cannot
         // jump over the rider between render frames. Do not depend on audio or animation timers.
         if (this.bsod && !this.bsodCaught) {
-          this.bsod.advance(stepMs);
+          this.bsod.advance(stepMs, sledLeftCollisionEdge(sled));
           const s = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
           if (s.gapPx <= 0) {
             this.bsodCaught = true;
@@ -1526,8 +1529,8 @@ export class RunScene extends Phaser.Scene {
       if (!this.blackHole) this.blackHole = new BlackHole(this, this.palette);
       this.blackHole.update(t, magnetHolePos(sled.x, sled.y), magnetStrength(this.magnetEff, this.upgradeFx?.magnetMul), this.magnetMs, isReducedMotion(this));
     } else this.blackHole?.update(t, null, null, 0);
-    if (this.bestMarker) this.bestMarker.update(t, sled.x, this.heightFn);
-    if (this.deathMarker) this.deathMarker.update(t, sled.x, this.heightFn);
+    if (this.bestMarker) this.bestMarker.update(t, sled.x, this.markerHeightFn);
+    if (this.deathMarker) this.deathMarker.update(t, sled.x, this.markerHeightFn);
     if (this.bestMarker && this.deathMarker) {
       // BEST and DIED HERE are often at the same x: lay their labels out together so they never overprint
       const known = (m) => (m.y != null ? { x: m.x, y: m.y } : null);

@@ -302,9 +302,9 @@ describe('layout is deterministic', () => {
 });
 
 describe('replay identity', () => {
-  test('v2.19.14 releases the revised terrain as SIM_REVISION 6, freezing it for future causal changes', () => {
-    expect(SIM_REVISION).toBe(6);
-    expect(LAST_RELEASED_SIM_REVISION).toBe(SIM_REVISION);
+  test('SIM_REVISION 8 preserves SIM7 chase and isolates marker prefetch from causal terrain', () => {
+    expect(SIM_REVISION).toBe(8);
+    expect(LAST_RELEASED_SIM_REVISION).toBe(SIM_REVISION); // SIM8 release freeze
   });
   test('GHOST_PHYSICS_VERSION stays 1: it only maps legacy tapes (Replay Contract v1 section 7.2)', () => {
     expect(GHOST_PHYSICS_VERSION).toBe(1);

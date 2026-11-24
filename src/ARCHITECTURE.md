@@ -8,6 +8,33 @@ methods) are fine. Everything is plain JS ES modules + JSDoc; Phaser 3.90, Matte
 
 The legacy implementation in `js/` is untouched and unrelated; do not import from it.
 
+## 2026-11-23 SIM8 replay-determinism correction — BEST / DIED HERE marker reads
+
+The #253 visual marker bug produced extra authoritative terrain chunks on repeated
+runs because `BestMarker` and `LastDeathMarker` queried `TerrainGenerator.heightAt`
+for positions up to 2600px ahead of the sled. That accessor may generate and
+queue chunks, depending on the prior run's visible markers. The canonical
+`joinedMarkerHeight(x, mesh.chunks, heightAt)` guard now returns `NaN` until
+that x is actually joined to the real Matter terrain mesh. Both presentation
+markers defer placement, then display at the exact live terrain height. No
+extra chunk generation may occur merely to render these markers; do not mask
+causal terrain state or disable the markers. The old AirBrake tuning branch
+(#248) is still independent and not merged by this correction.
+
+This source change is **SIM_REVISION 8** because SIM7 had already shipped on
+`main`, including the owner-approved Fast Approach / Soft Finish chase. The
+SIM7 archive remains immutable; no historical SIM1–SIM7 playback support is
+required before first public player release, but versioned replay interfaces
+remain supported architecturally. #253 final review still requires independent
+source review and real repeat-session/visual marker confirmation for this
+exact main-based commit, not inherited approval from #248.
+
+## CURRENT 2026-11-23 OWNER DECISION — production BSOD Fast Approach / Soft Finish
+
+Owner explicitly approved **Fast Approach / Soft Finish as the normal game default**, not merely a trial. `BSOD_DEFAULTS` starts the authoritative deletion wall 4500px behind the sled collision edge, with 300px/s nominal starting speed and 4px/s² acceleration. Within the final 3000px, a smoothstep curve reduces its **actual collision-edge motion**, down to 82% of the current nominal speed at contact. This is not an animation-only delay, catch countdown, player-speed response or rubber-banding. Sync Level head start/acceleration attenuation and purchased BSOD grace continue to apply. This is an owner-approved causal change: SIM_REVISION **7**, new content-addressed ruleset, old SIM6 replay fixtures retained as historical evidence.
+
+`BsodPursuit.wallSpeedPxS` remains the deterministic, fingerprinted **nominal** accelerating velocity; `state(sledLeftEdgeX, ...)` publishes the **actual eased** velocity to wind, warnings and time-to-impact. `RunScene` passes the real Matter left collision edge to `advance(stepMs, sledLeftEdgeX)` on every capped physics substep, so the edge that hits the rider is the edge that visually approaches. The normal production implementation is in `BsodPursuit` and MUST NOT be replaced by a QA monkeypatch. The opt-in `bsod-qa.html` retains moderate and buffered-strong comparison variants with the ending ease disabled; `soft` corresponds to the production behavior. The BSOD Gym uses the identical normal chase after its explicitly selected initial conditions.
+
 ## CURRENT 2026-11-18 OWNER CONTRACT — faithful BSOD Gym and nested 5x Gym-only Easter egg
 
 ## CURRENT 2026-11-18 OWNER CONTRACT — faithful BSOD Gym and nested 5x Gym-only Easter egg

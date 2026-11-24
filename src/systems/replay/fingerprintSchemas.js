@@ -386,6 +386,7 @@ export const NON_CAUSAL = Object.freeze({
     gfx: PRESENTATION, bodies: 'collider bodies: positions and detector order are matter.staticOrder',
     pads: 'pad sensor bodies: positions and cooldown are matter.staticOrder (padLast)',
     startX: DERIVED_STATIC, endX: DERIVED_STATIC,
+    points: DERIVED_STATIC + ' (read-only joined source geometry used by existing terrain colliders and visual markers; authoritative points are fingerprinted in terrain)',
   }),
   ShardField: Object.freeze({ scene: 'back-reference to the scene', palette: PRESENTATION, gfx: PRESENTATION }),
   Shard: Object.freeze({ pulled: PRESENTATION + ' (draw flag set by pull())' }),
@@ -442,6 +443,7 @@ export const NON_CAUSAL = Object.freeze({
     _ghostToken: PRESENTATION, ghostRecorder: 'the recorder itself', tapePlayer: 'replay input source (inputs are the tape)',
     _replayTape: RUN_CONSTANT, _manualPauseSeq: PRESENTATION, _manualPausePending: PRESENTATION,
     _bsodObserverErrorLogged: PRESENTATION, _view: PRESENTATION, heightFn: 'closure over terrain',
+    markerHeightFn: 'presentation-only closure: joinedMarkerHeight uses existing Matter mesh coverage, avoiding speculative TerrainGenerator.heightAt() writes',
     // run constants (manifest territory)
     seed: RUN_CONSTANT, runId: 'identity string; excluded from manifests (privacy, section 1.3)', startedAt: 'wall clock; excluded',
     dailyOfficial: RUN_CONSTANT, dailyMode: RUN_CONSTANT, dailyRuleId: RUN_CONSTANT, dailyMods: RUN_CONSTANT,

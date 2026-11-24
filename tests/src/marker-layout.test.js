@@ -1,5 +1,5 @@
 /** Follow-up 1: BEST and DIED HERE labels never overprint, whatever the x gap or slope (pure, systems/MarkerLayout.js). */
-import { layoutMarkerLabels, NEAR_PX, BEST_LABEL_RISE, DEATH_LABEL_RISE } from '../../src/systems/MarkerLayout.js';
+import { layoutMarkerLabels, joinedMarkerHeight, NEAR_PX, BEST_LABEL_RISE, DEATH_LABEL_RISE } from '../../src/systems/MarkerLayout.js';
 
 const W = 170; // wider than any real label at 12px monospace ("DIED HERE 9999m" is ~110px)
 const H = 16;  // label height (12px font)
@@ -54,5 +54,68 @@ describe('layoutMarkerLabels', () => {
     expect(layoutMarkerLabels({ x: BX, y: 600 }, null)).toEqual({ best: { x: BX, y: 600 - BEST_LABEL_RISE, originX: 0.5 }, death: null });
     expect(layoutMarkerLabels(null, { x: BX, y: 600 })).toEqual({ best: null, death: { x: BX, y: 600 - DEATH_LABEL_RISE, originX: 0.5 } });
     expect(layoutMarkerLabels({ x: BX, y: 600 }, { x: BX, y: NaN }).death).toBe(null);
+  });
+});
+
+
+describe('#253 marker heights are read-only and require physically joined terrain', () => {
+  const chunk = (startX, ys) => ({
+    startX, endX: startX + 1600,
+    points: ys.map((y, i) => ({x: startX + i * 800, y})),
+  });
+  const joined = () => new Map([
+    [0, chunk(0, [300, 500, 700])],
+    [1, chunk(1600, [700, 800, 900])],
+  ]);
+
+  test('out-of-window markers never prequeue or query another terrain accessor', () => {
+    const mesh = joined();
+    for (const x of [4500, 5600, 9000, -200, NaN, Infinity]) {
+      expect(joinedMarkerHeight(x, mesh)).toBeNaN();
+    }
+    // Even when inside the marker lookahead radius, the marker is deferred.
+    const markerX=4500, sledX=2000;
+    expect(markerX-sledX).toBeLessThan(2600);
+    expect(joinedMarkerHeight(markerX,mesh)).toBeNaN();
+    mesh.set(2, chunk(3200,[900,1100,1300]));
+    expect(joinedMarkerHeight(markerX,mesh)).toBeCloseTo(1225);
+  });
+
+  test('exact joined polyline interpolation (including both sides of chunk seam)', () => {
+    const mesh=joined();
+    const samples = new Map([
+      [0,300],[400,400],[800,500],[1200,600],[1599,699.75],
+      [1600,700],[1600.001,700.000125],[2000,750],[2400,800],[3199,899.875],[3200,900],
+    ]);
+    for(const [x,y] of samples) expect(joinedMarkerHeight(x,mesh)).toBeCloseTo(y,7);
+    // Both neighboring joined chunks interpolate the same shared endpoint.
+    const reversed=new Map([...mesh].reverse());
+    expect(joinedMarkerHeight(1600,reversed)).toBe(joinedMarkerHeight(1600,mesh));
+    expect(joinedMarkerHeight(1600.001,reversed)).toBe(joinedMarkerHeight(1600.001,mesh));
+  });
+
+  test('marker lookups cannot mutate a generator chunk cache even at the seam', () => {
+    const mesh=joined();
+    // Deliberately model a generator whose cached-chunk choice would change a
+    // subsequent slope calculation; this function accepts ONLY mesh geometry.
+    const generator={_lastChunk:{index:777,startX:0,endX:1600},_pendingAdded:[],
+      heightAt:()=>{throw Error('unwanted mutation path: TerrainGenerator.heightAt');}};
+    const saved=generator._lastChunk;
+    for(let i=0;i<15;i++) for(const x of [1599.99,1600,1600.01]) {
+      expect(Number.isFinite(joinedMarkerHeight(x,mesh))).toBe(true);
+      expect(generator._lastChunk).toBe(saved);
+    }
+    expect(generator._pendingAdded).toHaveLength(0);
+  });
+
+  test('only physically joined valid chunks can yield a height; malformed inputs fail closed', () => {
+    const mesh=joined();
+    expect(joinedMarkerHeight(1200,null)).toBeNaN();
+    expect(joinedMarkerHeight(1200,new Map())).toBeNaN();
+    expect(joinedMarkerHeight(1200,new Map([[1,{startX:0,endX:1600}]]))).toBeNaN();
+    expect(joinedMarkerHeight(1200,new Map([[1,{startX:0,endX:1600,points:[{x:0,y:0}]}]]))).toBeNaN();
+    expect(joinedMarkerHeight(1200,new Map([[1,{startX:NaN,endX:Infinity,points:[{x:0,y:0},{x:1,y:1}]}]]))).toBeNaN();
+    mesh.delete(0);
+    expect(joinedMarkerHeight(800,mesh)).toBeNaN();
   });
 });
