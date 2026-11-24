@@ -424,17 +424,21 @@ describe('U4b: clicks inside the open Game Over shop never reach the buttons und
     const g = gameOverHost();
     g._openShop();
     const panel = g.shopView.panel;
-    const pr = { x: panel.x, y: panel.y, w: panel.w, h: panel.h };
+    const pr = { x: panel.x, y: panel.y, w: panel.frameWidth, h: panel.h };
+    expect(Number.isFinite(pr.w) && pr.w > 0).toBe(true);
     const leaks = [];
+    let sampledInsidePanel = 0;
     for (const b of g.buttons) {
       for (let x = b.x + 2; x < b.x + b.w - 2; x += 8) {
         for (let y = b.y + 2; y < b.y + b.h - 2; y += 4) {
           if (x < pr.x || x >= pr.x + pr.w || y < pr.y || y >= pr.y + pr.h) continue; // outside the panel
+          sampledInsidePanel++;
           const hit = topHit(g, x, y);
           if (hit && hit === b.zone) leaks.push(`${b.label.main.text}@${x},${y}`);
         }
       }
     }
+    expect(sampledInsidePanel).toBeGreaterThan(0); // prevent vacuous success if panel dimensions regress
     expect(leaks).toEqual([]);
   });
 

@@ -7,7 +7,7 @@
  * pixelArt and costs nothing), an angled title tab, and corner brackets that breathe outwards by a pixel.
  *
  * Geometry contract (layout code and tests rely on it): the container's (x, y) is the panel's top-left, the
- * body is exactly w x h, the title text sits at (8, 4) and content starts below y 16. The glow strokes paint
+ * body is exactly frameWidth x h, the title text sits at (8, 4) and content starts below y 16. The glow strokes paint
  * up to 2 px OUTSIDE the box; nothing else does.
  */
 import Phaser from 'phaser';
