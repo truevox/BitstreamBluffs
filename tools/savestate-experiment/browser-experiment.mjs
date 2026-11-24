@@ -24,6 +24,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { decodePad } from '../../src/systems/ghost/GhostTape.js';
+import { decodeRecorderPrefix } from './recorder-snapshot-kit.js';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +41,15 @@ const STRICT = argv.includes('--strict-suffix');
 const repeatFlag=argv.indexOf('--repeat-ticks');
 const BOUNDARY=argv.includes('--repeat-boundaries');
 const MOVING=argv.includes('--repeat-moving');
+const TERMINAL=argv.includes('--natural-terminal');
+const NATURAL=argv.includes('--natural-run')||TERMINAL, PROBE=argv.includes('--natural-probe');
+const NATURAL_START=TERMINAL?936:0;
+const naturalLimitFlag=argv.indexOf('--natural-limit');
+const NATURAL_LIMIT=naturalLimitFlag===-1?4800:Number(argv[naturalLimitFlag+1]);
+if((NATURAL||PROBE)&&(!STRICT||NATURAL&&PROBE||TERMINAL&&argv.includes('--natural-run')||MOVING||BOUNDARY||repeatFlag!==-1||
+  !Number.isSafeInteger(NATURAL_LIMIT)||NATURAL_LIMIT<=NATURAL_START||NATURAL_LIMIT>12000))
+  throw new Error('natural mode requires strict, exclusive mode and a limit '+(NATURAL_START+1)+'..12000');
+if(naturalLimitFlag!==-1&&!NATURAL&&!PROBE)throw new Error('--natural-limit requires natural mode');
 if(MOVING&&(!STRICT||BOUNDARY||repeatFlag!==-1))throw new Error('--repeat-moving requires --strict-suffix and no other repeat mode');
 const REPEAT=repeatFlag===-1?(BOUNDARY?14:MOVING?6:0):Number(argv[repeatFlag+1]);
 if(BOUNDARY&&(!STRICT||repeatFlag!==-1))throw new Error('--repeat-boundaries requires --strict-suffix and cannot combine with --repeat-ticks');
@@ -92,6 +102,7 @@ async function bootPage(browser, fx, tape) {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
   const page = await ctx.newPage();
   const errors = [];
+  if(fx.natural)await page.clock.setFixedTime(new Date('2026-01-05T12:00:00Z'));
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(URL_, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
@@ -105,9 +116,23 @@ async function bootPage(browser, fx, tape) {
     const realUpdate = run.update;
     let hold = true;
     run.update = function (t, d) { if (!hold) return realUpdate.call(this, t, d); };
-    g.scene.getScene('TitleScene').startRun(fx.seed);
-    await new Promise((res) => { const w = () => (run.sys.isActive() && run.sled ? res() : requestAnimationFrame(w)); w(); });
-    g.loop.sleep();
+    if(fx.natural){
+      // Canonical A/A harness uses a synchronous tick-zero boot; avoid
+      // title transition timers tied to the fixed wall-clock test date.
+      g.loop.sleep();
+      g.scene.getScene('TitleScene').startRun(fx.seed);
+      g.scene.stop('TitleScene');g.scene.start('RunScene');
+      g.headlessStep(0,0);
+      if(!run.sys.isActive()||!run.sled)throw Error('natural tick-zero scene failed to boot');
+    }else{
+      g.scene.getScene('TitleScene').startRun(fx.seed);
+      await new Promise((res,reject) => {
+        const deadline=performance.now()+15000;
+        const w=()=>run.sys.isActive()&&run.sled?res():performance.now()>deadline?reject(Error('RunScene boot timeout')):requestAnimationFrame(w);
+        w();
+      });
+      g.loop.sleep();
+    }
     if (fx.scramble) run.scrambleMs = 1e9;
     if (fx.kodiaks) run.kodiaksOn = true;
     if (fx.shields) run.shieldCharges = fx.shields; // hazard hits are absorbed (and scored as hits), so the run survives
@@ -134,7 +159,16 @@ async function bootPage(browser, fx, tape) {
       for (const e of tape.edges) if (tick === e.at) { pad.pressed[e.key] = true; pad[e.key] = true; }
       return pad;
     };
-    window.__ss = { g, run, t: 0, step(n) { for (let i = 0; i < n; i++) { this.t += 1000 / 120; g.step(this.t, 1000 / 120); } return run.simClock.tick; } };
+    if(fx.natural){
+      if(run.simClock.tick!==0||!run.ghostRecorder||run.tapePlayer||run.bsodGym||run.dailyOfficial||
+        run.appliedBoosts.length||run.upgradeRun.enabled||run.magnetsDrop||run.kodiaksOn)
+        throw new Error('not a stock tick-zero normal run');
+    }
+    window.__ss = { g, run, recorder:run.ghostRecorder, fatal:[], t: 0, step(n) { for (let i = 0; i < n; i++) { this.t += 1000 / 120; (fx.natural?g.headlessStep:g.step).call(g,this.t,1000/120); } return run.simClock.tick; } };
+    if(fx.natural)g.events.on('bb:crash',e=>{
+      if(e.fatal===true&&e.negated===false&&e.runId===run.runId)
+        window.__ss.fatal.push({tick:run.simClock.tick,cause:e.cause,hazardId:e.hazardId??null,x:e.x,y:e.y,speed:e.speedPxS});
+    });
     hold = false;
   }, { fx, tape });
   return { ctx, page, errors };
@@ -336,9 +370,9 @@ async function runCase(browser, fxName, level, skip = []) {
         finally{await C.ctx.close();}
         const after=await Promise.all([A,B].map(measured));
         stagedControl={error:rejection.error,discarded:rejection.discarded===true,
-          sourceUnchanged:before[0]===after[0],destinationUnchanged:before[1]===after[1]};
+          sourceUnchanged:before[0]===after[0],destinationUnchanged:before[1]===after[1],pageErrors:C.errors};
         if(rejection.ok||stagedControl.error!=='Matter preflight: rebuilt geometry count sled'||
-            !stagedControl.discarded||!stagedControl.sourceUnchanged||!stagedControl.destinationUnchanged)
+            !stagedControl.discarded||!stagedControl.sourceUnchanged||!stagedControl.destinationUnchanged||stagedControl.pageErrors.length)
           throw new Error('staged late failure control failed: '+JSON.stringify(stagedControl));
       }
       const r = await restoreCandidate(B,json,level,skip);
@@ -403,7 +437,14 @@ async function runCase(browser, fxName, level, skip = []) {
         const tape=rec.finish({runId:r.runId,distanceM:r.sled.x,score:r.score.getTotal(),endedAt:1});
         return {prefix,tape};
       })));
-      recorderParity={prefix:JSON.stringify(receipts[0].prefix)===JSON.stringify(receipts[1].prefix),
+      const D=await bootPage(browser,fx,tape);
+      let finalValidation;
+      try{finalValidation=await D.page.evaluate(({prefix,tick})=>{
+        window.__ssRecorderKit.prepareRecorderPrefix(window.__ss.run,prefix,tick);return true;
+      },{prefix:receipts[0].prefix,tick:fx.N});}
+      finally{await D.ctx.close();}
+      if(D.errors.length)throw new Error('final validation page errors: '+JSON.stringify(D.errors));
+      recorderParity={finalValidation,prefix:JSON.stringify(receipts[0].prefix)===JSON.stringify(receipts[1].prefix),
         finishedTape:JSON.stringify(receipts[0].tape)===JSON.stringify(receipts[1].tape),
         endTick:receipts[0].tape.endTick,inputRows:receipts[0].tape.inputs.length,
         checkpoints:receipts[0].tape.checkpoints.length};
@@ -525,6 +566,118 @@ async function runRepeatedCase(browser,fxName) {
   }
 }
 
+// A stock run: no forced poses, boosts, shields, scramble, or hazard injection.
+// Fixed wall time only makes native record identity/timestamps comparable.
+async function runNatural(browser){
+  const fx={seed:'sim-05@0',natural:true};
+  const tape={held:[],edges:[]};
+  const source=await bootPage(browser,fx,tape);
+  let current=source,candidate=null,cycles=[],tick=0,phase='initial';
+  const mode=PROBE?'probe':TERMINAL?'terminal-window':'full-run';
+  const measure=P=>P.page.evaluate(()=>{
+    const ss=window.__ss,r=ss.run;
+    if(r.crashed){
+      const record=ss.g.registry.get('lastRecord'),tape=ss.g.registry.get('lastGhostTape');
+      const crash=ss.g.registry.get('lastCrash');
+      const prefix=window.__ssRecorderKit.captureRecorderPrefix({runId:r.runId,startedAt:r.startedAt,ghostRecorder:ss.recorder});
+      const observer={fingerprints:[],fingerprintErrors:[],fingerprintErrorCount:0};
+      ss.recorder._fingerprint.call(observer,r.simClock.tick,r);
+      if(observer.fingerprintErrorCount||observer.fingerprints.length!==1||
+        observer.fingerprints[0].tick!==r.simClock.tick||Object.keys(observer.fingerprints[0].subsystems).length!==13)
+        throw Error('terminal canonical fingerprint failed: '+JSON.stringify(observer.fingerprintErrors));
+      return {terminal:true,tick:r.simClock.tick,record,tape,crash,fatal:ss.fatal,prefix,
+        fingerprint:observer.fingerprints[0],droppedMs:r.simClock.droppedMs};
+    }
+    const cap=window.__ssGameKit.capture(r,{withConfig:true,withRecorder:true});
+    return {terminal:false,tick:r.simClock.tick,digests:window.__ssGameKit.digests(r,cap),prefix:cap.recorder};
+  });
+  const validateTerminal=m=>{
+    if(!m.terminal||!m.record||!m.tape||!m.crash||m.fatal.length!==1||
+      m.fatal[0].tick!==m.tick||m.record.cause!=='crash'||m.tape.endTick!==m.tick-1||
+      m.tape.runId!==m.record.id||m.tape.score!==m.record.score||m.tape.distanceM!==m.record.distanceM||
+      m.droppedMs!==0)throw Error('native terminal record/tape incomplete');
+    const {recorder:r,runId,startedAt}=decodeRecorderPrefix(m.prefix);
+    const inputCursor=r.inputs.reduce((sum,row)=>sum+row[0],0);
+    const trace=Buffer.from(new Float32Array(r.trace).buffer).toString('base64');
+    if(r.lastTick!==m.tick-1||r.fingerprintErrorCount||r.fingerprintErrors.length||
+      r.trace.length!==Math.floor(r.lastTick/4)*3||r.checkpoints.length!==Math.floor(r.lastTick/120)||
+      r.fingerprints.length!==r.checkpoints.length||r.inputs[0]?.[0]!==1||
+      r._lastTick!==inputCursor||inputCursor>m.tick||runId!==m.tape.runId||startedAt!==m.tape.startedAt||
+      JSON.stringify(r.inputs)!==JSON.stringify(m.tape.inputs)||
+      JSON.stringify(r.checkpoints)!==JSON.stringify(m.tape.checkpoints)||trace!==m.tape.trace||
+      !r.fingerprints.every((f,i)=>f.tick===(i+1)*120&&Object.keys(f.subsystems).length===13))
+      throw Error('native terminal history incomplete');
+  };
+  const diff=(a,b,k)=>{
+    if(a.tick!==k||b.tick!==k||a.terminal!==b.terminal)return ['expected tick/terminal'];
+    if(a.terminal)return JSON.stringify(a)===JSON.stringify(b)?[]:['native terminal record/tape/crash'];
+    const out=compareDigests(a.digests,b.digests).diff;
+    if(JSON.stringify(a.prefix)!==JSON.stringify(b.prefix))out.push('recorder.prefix');
+    return out;
+  };
+  const save=(result)=>{if(jsonOut)writeFileSync(jsonOut,JSON.stringify([result],null,1));};
+  try{
+    const initial=await measure(source);
+    if(initial.tick!==0||initial.terminal)throw Error('source did not start at zero');
+    if(PROBE){
+      for(let start=0;start<NATURAL_LIMIT;start+=60){
+        const state=await source.page.evaluate(n=>{
+          const ss=window.__ss;
+          for(let i=0;i<n&&!ss.run.crashed;i++){
+            const before=ss.run.simClock.tick;ss.step(1);
+            if(ss.run.simClock.tick!==before+1)throw Error('noncontiguous reference tick '+before);
+          }
+          return {tick:ss.run.simClock.tick,crashed:ss.run.crashed};
+        },Math.min(60,NATURAL_LIMIT-start));
+        tick=state.tick;
+        if(state.crashed){const terminal=await measure(source);validateTerminal(terminal);
+          return {fixture:'natural',level:'probe',seed:fx.seed,terminal,pageErrors:source.errors};}
+        console.log('NATURAL_REFERENCE_PROGRESS',tick);
+      }
+      return {fixture:'natural',level:'probe',seed:fx.seed,coverageError:true,tick:NATURAL_LIMIT,pageErrors:source.errors};
+    }
+    if(NATURAL_START){
+      phase='terminal window warmup';
+      const warmed=await source.page.evaluate(n=>{
+        const ss=window.__ss;
+        for(let i=0;i<n&&!ss.run.crashed;i++){
+          const before=ss.run.simClock.tick;ss.step(1);
+          if(ss.run.simClock.tick!==before+1)throw Error('noncontiguous warmup tick '+before);
+        }
+        return {tick:ss.run.simClock.tick,crashed:ss.run.crashed};
+      },NATURAL_START);
+      if(warmed.tick!==NATURAL_START||warmed.crashed)throw Error('terminal window warmup did not reach live boundary');
+    }
+    for(tick=NATURAL_START;tick<NATURAL_LIMIT;tick++){
+      phase='before capture';
+      const a=await measure(source),b=current===source?a:await measure(current);
+      const d=diff(a,b,tick);if(d.length)throw Error(d.join(','));
+      phase='capture';
+      const bytes=await current.page.evaluate(()=>JSON.stringify(window.__ssGameKit.capture(window.__ss.run,{withConfig:true,withRecorder:true})));
+      phase='fresh restore';
+      candidate=await bootPage(browser,fx,tape);
+      const restored=await restoreCandidate(candidate,bytes,'full',[]);
+      if(!restored.ok)throw Error(restored.error);
+      phase='at restore';
+      const at=diff(a,await measure(candidate),tick);if(at.length)throw Error(at.join(','));
+      phase='next tick';
+      await Promise.all([source,candidate].map(P=>P.page.evaluate(()=>window.__ss.step(1))));
+      const [x,y]=await Promise.all([source,candidate].map(measure));
+      const after=diff(x,y,tick+1);if(after.length)throw Error(after.join(','));
+      if(source.errors.length||candidate.errors.length||current.errors.length)throw Error('page errors: '+JSON.stringify([...source.errors,...candidate.errors,...current.errors]));
+      cycles.push({captureTick:tick,nextTick:tick+1,bytes:Buffer.byteLength(bytes),recaptured:current!==source,
+        canonical:x.digests?.['canonical.combined']??null,terminal:x.terminal});
+      if(current!==source)await current.ctx.close();
+      current=candidate;candidate=null;
+      if(x.terminal){phase='terminal validation';validateTerminal(x);validateTerminal(y);
+        return {fixture:'natural',level:mode,startTick:NATURAL_START,seed:fx.seed,cycles,terminal:x,pageErrors:[]};}
+      if(tick%10===0){console.log('NATURAL_PROGRESS',tick+1);save({fixture:'natural',level:mode,startTick:NATURAL_START,seed:fx.seed,cycles,incomplete:true});}
+    }
+    return {fixture:'natural',level:mode,startTick:NATURAL_START,seed:fx.seed,cycles,coverageError:true,phase:'tick limit reached without crash'};
+  }catch(e){return {fixture:'natural',level:mode,startTick:NATURAL_START,seed:fx.seed,cycles,firstDivergentTick:tick,phase,restoreError:String(e.message||e),pageErrors:[...source.errors,...(candidate?.errors||[]),...current.errors]};}
+  finally{if(candidate)await candidate.ctx.close();if(current!==source)await current.ctx.close();await source.ctx.close();}
+}
+
 const browser = await chromium.launch({ headless: true, executablePath: EXE, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
 // Resumable: every finished case is written to the results file as it completes; a rerun with the same file skips
 // cases already present (harness errors are retried).
@@ -535,8 +688,8 @@ if (!STRICT && jsonOut && existsSync(jsonOut)) {
 }
 const done = new Set(results.map(caseKey));
 const plan = [];
-for (const fx of MOVING?['moving']:['contact', 'hazard']) {
-  if (STRICT) { plan.push([fx,REPEAT?'repeat':'full']); continue; }
+for (const fx of NATURAL||PROBE?['natural']:MOVING?['moving']:['contact', 'hazard']) {
+  if (STRICT) { plan.push([fx,TERMINAL?'terminal-window':NATURAL?'full-run':PROBE?'probe':REPEAT?'repeat':'full']); continue; }
   plan.push([fx, 'control'], [fx, 'ghost'], [fx, 'game'], [fx, 'kinematic'], [fx, 'contacts'], [fx, 'full']);
   for (const s of ['camera', 'ids', 'runRandom', 'impulses', 'staleSupport', 'timing', 'positionImpulse', 'rawGeometry']) plan.push([fx, 'full', [s]]);
   if (fx === 'hazard') for (const s of ['kodiaks', 'bsod', 'hazardHit', 'pool', 'telegraph']) plan.push([fx, 'full', [s]]);
@@ -549,7 +702,7 @@ try {
     if (done.has(key)) { console.log(`${key.padEnd(30)} (cached in ${jsonOut})`); continue; }
     const t0 = Date.now();
     let r;
-    try { r = REPEAT?await runRepeatedCase(browser,fx):await runCase(browser, fx, level, skip || []); } catch (e) { r = { fixture: fx, level, skip: (skip || []).join('+') || '-', harnessError: String(e.message || e).slice(0, 300) }; }
+    try { r = NATURAL||PROBE?await runNatural(browser):REPEAT?await runRepeatedCase(browser,fx):await runCase(browser, fx, level, skip || []); } catch (e) { r = { fixture: fx, level, skip: (skip || []).join('+') || '-', harnessError: String(e.message || e).slice(0, 300) }; }
     r.wallMs = Date.now() - t0;
     results.push(r);
     if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
@@ -558,7 +711,12 @@ try {
 } finally { await browser.close(); }
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
 
-if (REPEAT) {
+if(NATURAL||PROBE){
+  const r=results[0],failed=results.length!==1||r.harnessError||r.restoreError||r.coverageError||!r.terminal||r.pageErrors?.length!==0||
+    (NATURAL&&(r.startTick!==NATURAL_START||r.cycles?.length!==r.terminal.tick-NATURAL_START||!r.cycles.every((c,i)=>c.captureTick===NATURAL_START+i&&c.nextTick===NATURAL_START+i+1&&c.recaptured===(i>0)&&c.terminal===(i===r.cycles.length-1)&&(c.terminal||c.canonical))));
+  console.log(failed?'FAIL_NATURAL_RUN':PROBE?'PASS_NATURAL_REFERENCE_ONLY':TERMINAL?'PASS_NATURAL_TERMINAL_WINDOW':'PASS_NATURAL_FULL_RUN');
+  if(failed)process.exitCode=1;
+} else if (REPEAT) {
   const failed=results.length!==(MOVING?1:2)||results.some(r=>r.harnessError||r.restoreError||
     r.firstDivergentTick!==null||r.coverageError||!r.finalValidation?.ok||r.pageErrors?.length!==0||r.cycles?.length!==REPEAT||
     r.fixtureStats?.tick!==r.K||r.fixtureStats.crashed||
@@ -575,7 +733,7 @@ if (REPEAT) {
     r.prefixControls?.length !== 5 || !r.prefixControls.every(c=>c.unchanged&&c.error?.startsWith('recorder prefix:')) ||
     r.matterControls?.length !== 18 || !r.matterControls.every(c=>c.unchanged&&c.error?.startsWith('Matter preflight:')) ||
     !r.stagedControl?.discarded || !r.stagedControl.sourceUnchanged || !r.stagedControl.destinationUnchanged ||
-    !r.recorderParity?.prefix || !r.recorderParity.finishedTape || r.recorderParity.endTick !== r.N ||
+    !r.recorderParity?.finalValidation || !r.recorderParity.prefix || !r.recorderParity.finishedTape || r.recorderParity.endTick !== r.N ||
     r.pageErrors?.length !== 0 || r.audit?.length !== 0 || r.unclassified?.length !== 0 ||
     (r.fixture === 'contact' ? !(r.fixtureStats?.activePairs > 0) : !(r.fixtureStats?.hazardsHit > 0)));
   console.log(failed ? 'FAIL_STRICT_DIAGNOSTIC_SUFFIX' : 'PASS_STRICT_DIAGNOSTIC_SUFFIX');

@@ -1,0 +1,108 @@
+[
+ {
+  "fixture": "natural",
+  "level": "full-run",
+  "seed": "sim-05@0",
+  "cycles": [
+   {
+    "captureTick": 0,
+    "nextTick": 1,
+    "bytes": 142956,
+    "recaptured": false,
+    "canonical": "xxh32x2:c3f579f75b38ad3e",
+    "terminal": false
+   },
+   {
+    "captureTick": 1,
+    "nextTick": 2,
+    "bytes": 146425,
+    "recaptured": true,
+    "canonical": "xxh32x2:fa882f9dea94392d",
+    "terminal": false
+   },
+   {
+    "captureTick": 2,
+    "nextTick": 3,
+    "bytes": 146507,
+    "recaptured": true,
+    "canonical": "xxh32x2:5ac1500302f7acf7",
+    "terminal": false
+   },
+   {
+    "captureTick": 3,
+    "nextTick": 4,
+    "bytes": 146443,
+    "recaptured": true,
+    "canonical": "xxh32x2:0348f5f4436b2526",
+    "terminal": false
+   },
+   {
+    "captureTick": 4,
+    "nextTick": 5,
+    "bytes": 146554,
+    "recaptured": true,
+    "canonical": "xxh32x2:50f55f10ffca17e8",
+    "terminal": false
+   },
+   {
+    "captureTick": 5,
+    "nextTick": 6,
+    "bytes": 146554,
+    "recaptured": true,
+    "canonical": "xxh32x2:b025d329ade47c73",
+    "terminal": false
+   },
+   {
+    "captureTick": 6,
+    "nextTick": 7,
+    "bytes": 146538,
+    "recaptured": true,
+    "canonical": "xxh32x2:08d0be55c43511f9",
+    "terminal": false
+   },
+   {
+    "captureTick": 7,
+    "nextTick": 8,
+    "bytes": 146545,
+    "recaptured": true,
+    "canonical": "xxh32x2:22134f7f45a3a9ff",
+    "terminal": false
+   },
+   {
+    "captureTick": 8,
+    "nextTick": 9,
+    "bytes": 147333,
+    "recaptured": true,
+    "canonical": "xxh32x2:985c5be778b6af75",
+    "terminal": false
+   },
+   {
+    "captureTick": 9,
+    "nextTick": 10,
+    "bytes": 147228,
+    "recaptured": true,
+    "canonical": "xxh32x2:cd05a42c2c94e527",
+    "terminal": false
+   },
+   {
+    "captureTick": 10,
+    "nextTick": 11,
+    "bytes": 147311,
+    "recaptured": true,
+    "canonical": "xxh32x2:0351dc476cedbace",
+    "terminal": false
+   },
+   {
+    "captureTick": 11,
+    "nextTick": 12,
+    "bytes": 147317,
+    "recaptured": true,
+    "canonical": "xxh32x2:68d579282a0c0e36",
+    "terminal": false
+   }
+  ],
+  "coverageError": true,
+  "phase": "tick limit reached without crash",
+  "wallMs": 10235
+ }
+]

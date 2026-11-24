@@ -1,7 +1,7 @@
 import {digestOfBytes} from '../../src/systems/replay/canonicalSha256.js';
 import {utf8Encode} from '../../src/systems/replay/canonicalJson.js';
 import { GhostRecorder } from '../../src/systems/ghost/GhostTape.js';
-import {captureRecorderPrefix,prepareRecorderPrefix,applyRecorderPrefix} from '../../tools/savestate-experiment/recorder-snapshot-kit.js';
+import {captureRecorderPrefix,prepareRecorderPrefix,applyRecorderPrefix,decodeRecorderPrefix} from '../../tools/savestate-experiment/recorder-snapshot-kit.js';
 
 function fresh(startedAt=1) {
   return {runId:'fixture-'+startedAt,startedAt,simClock:{tick:0},ghostRecorder:new GhostRecorder({seed:'test',startedAt})};
@@ -58,4 +58,22 @@ test('interior repeated edge removal with an unchanged final cursor fails the ca
   const before=captureRecorderPrefix(b);
   expect(()=>prepareRecorderPrefix(b,{...s,data:JSON.stringify(d)},8)).toThrow(/integrity mismatch/);
   expect(captureRecorderPrefix(b)).toEqual(before);
+});
+
+test('zero tick restores a genuinely empty native recorder and rejects nonempty history',()=>{
+  const a=fresh(1),b=fresh(2);
+  const snapshot=captureRecorderPrefix(a);
+  applyRecorderPrefix(b,prepareRecorderPrefix(b,snapshot,0));
+  expect(captureRecorderPrefix(b)).toEqual(snapshot);
+  const bad=JSON.parse(snapshot.data);
+  bad.recorder.inputs.push([1,0,0]);
+  const data=JSON.stringify(bad);
+  expect(()=>prepareRecorderPrefix(fresh(3),{...snapshot,data,integrity:digestOfBytes(utf8Encode(data))},0)).toThrow(/zero-tick history/);
+});
+
+test('terminal history reader verifies integrity and preserves signed-zero trace samples',()=>{
+  const a=prefix(),snap=captureRecorderPrefix(a),decoded=decodeRecorderPrefix(snap);
+  expect(Object.is(decoded.recorder.trace[1],-0)).toBe(true);
+  expect(decodeRecorderPrefix(snap).recorder.lastTick).toBe(8);
+  expect(()=>decodeRecorderPrefix({...snap,data:snap.data+' '})).toThrow(/integrity mismatch/);
 });
