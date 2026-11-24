@@ -3,9 +3,9 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 8,
-  "attestation": "sim-revision-bumped: #253 marker render height read no longer prequeues causal terrain chunks; SIM8 after released SIM7, preserving the already approved chase",
+  "attestation": "no-behavior-change: add new causal MarkerLayout helper to source tripwire after independent review; the SIM8 behavior bump was already attested in preceding commit",
   "changedFiles": [
-    "src/scenes/RunScene.js"
+    "src/systems/MarkerLayout.js"
   ],
   "files": {
     "src/constants.js": "sha256:21fe3491017fa3f6fa55c25c5d3d3cca22fa3f1ce15a22c611113b173dc0a8e5",
@@ -24,6 +24,7 @@
     "src/systems/DailyPatch.js": "sha256:220a6e1f227988bcb8ea87bc0ce683d6b5a034c1beb14dd8f8f26a268d3a1e1c",
     "src/systems/HazardMotion.js": "sha256:448d21f50a945d2130f61637b448ad2b4e6ec24186454ed205a218a82cb9ad71",
     "src/systems/Kodiaks.js": "sha256:fa7cce50cea0eeaa8c5ae4b4950aa9a5c2f599d9829937ccb887a2aa3618f134",
+    "src/systems/MarkerLayout.js": "sha256:ed16528cee90d1a65c7917f094eddc52f994c34e11200717932cc7e7074a3ee3",
     "src/systems/MatterPortable.js": "sha256:65a6659eaa3f1116b054fc646ea40870a5f68d9eaf2ce814afadeb57fb73f555",
     "src/systems/PermanentUpgrades.js": "sha256:c51661c29ee2b887f11234bebbd25fd34b1501c48b84a060cc3e6dccf2e05cd7",
     "src/systems/PhysicsTuner.js": "sha256:85e8a6d01f75c80730d75abc112aa3da28a7454b77cf802e7eed0f073492d6f3",
