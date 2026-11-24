@@ -36,6 +36,10 @@ const EXE = process.env.CHROMIUM_PATH;
 const argv = process.argv.slice(2);
 const QUICK = argv.includes('--quick');
 const STRICT = argv.includes('--strict-suffix');
+const repeatFlag=argv.indexOf('--repeat-ticks');
+const REPEAT=repeatFlag===-1?0:Number(argv[repeatFlag+1]);
+if(repeatFlag!==-1&&(!STRICT||!Number.isSafeInteger(REPEAT)||REPEAT<1||REPEAT>120))
+  throw new Error('--repeat-ticks requires --strict-suffix and an integer from 1 to 120');
 const jsonOut = argv.includes('--json') ? argv[argv.indexOf('--json') + 1] : null;
 if (STRICT && (!jsonOut || existsSync(jsonOut) || process.env.ONLY || process.env.EXACT_ONLY)) throw new Error('--strict-suffix requires a new --json file and no case filters');
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
@@ -368,6 +372,57 @@ async function runCase(browser, fxName, level, skip = []) {
   }
 }
 
+// At each boundary, recapture the previously restored candidate, transfer it
+// into a completely fresh context, compare it with the uninterrupted source,
+// then advance BOTH exactly one tick. This is intentionally expensive and
+// bounded: the count refers to contiguous restore cycles, not sampled ticks.
+async function runRepeatedCase(browser,fxName) {
+  const fx=FIXTURES[fxName], tape=TAPES[fxName];
+  const source=await bootPage(browser,fx,tape);
+  let current=source, candidate=null;
+  const cycles=[];
+  const measure=P=>P.page.evaluate(()=>{
+    const r=window.__ss.run;
+    return {digests:window.__ssGameKit.digests(r),
+      prefix:window.__ssRecorderKit.captureRecorderPrefix(r)};
+  });
+  const same=(a,b,tick)=>{
+    const c=compareDigests(a.digests,b.digests);
+    if(a.digests.__tick!==tick||b.digests.__tick!==tick)c.diff.push('direct.expectedTick');
+    if(JSON.stringify(a.prefix)!==JSON.stringify(b.prefix))c.diff.push('recorder.prefix');
+    return c.diff;
+  };
+  try {
+    await source.page.evaluate(k=>window.__ss.step(k),fx.K);
+    for(let k=fx.K;k<fx.K+REPEAT;k++){
+      const [a,b]=await Promise.all([source,current].map(measure));
+      const before=same(a,b,k);
+      if(before.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k,phase:'before capture',diff:before};
+      const bytes=await current.page.evaluate(()=>JSON.stringify(window.__ssGameKit.capture(window.__ss.run,{withConfig:true,withRecorder:true})));
+      candidate=await bootPage(browser,fx,tape);
+      const r=await restoreCandidate(candidate,bytes,'full',[]);
+      if(!r.ok)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k,phase:'restore',restoreError:r.error,discarded:r.discarded};
+      const atRestore=same(a,await measure(candidate),k);
+      if(atRestore.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k,phase:'after restore',diff:atRestore};
+      await Promise.all([source,candidate].map(P=>P.page.evaluate(()=>window.__ss.step(1))));
+      const [nextA,nextB]=await Promise.all([source,candidate].map(measure));
+      const after=same(nextA,nextB,k+1);
+      if(after.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k+1,phase:'next tick',diff:after};
+      if(source.errors.length||candidate.errors.length||current.errors.length)
+        throw new Error('page errors during repeat: '+JSON.stringify([...source.errors,...candidate.errors,...current.errors]));
+      cycles.push({captureTick:k,nextTick:k+1,bytes:Buffer.byteLength(bytes),canonical:nextA.digests['canonical.combined'],recaptured:current!==source});
+      if(current!==source)await current.ctx.close();
+      current=candidate;candidate=null;
+    }
+    return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:null,
+      pageErrors:[...source.errors,...current.errors]};
+  } finally {
+    if(candidate)await candidate.ctx.close();
+    if(current!==source)await current.ctx.close();
+    await source.ctx.close();
+  }
+}
+
 const browser = await chromium.launch({ headless: true, executablePath: EXE, args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
 // Resumable: every finished case is written to the results file as it completes; a rerun with the same file skips
 // cases already present (harness errors are retried).
@@ -379,7 +434,7 @@ if (jsonOut && existsSync(jsonOut)) {
 const done = new Set(results.map(caseKey));
 const plan = [];
 for (const fx of ['contact', 'hazard']) {
-  if (STRICT) { plan.push([fx,'full']); continue; }
+  if (STRICT) { plan.push([fx,REPEAT?'repeat':'full']); continue; }
   plan.push([fx, 'control'], [fx, 'ghost'], [fx, 'game'], [fx, 'kinematic'], [fx, 'contacts'], [fx, 'full']);
   for (const s of ['camera', 'ids', 'runRandom', 'impulses', 'staleSupport', 'timing', 'positionImpulse', 'rawGeometry']) plan.push([fx, 'full', [s]]);
   if (fx === 'hazard') for (const s of ['kodiaks', 'bsod', 'hazardHit', 'pool', 'telegraph']) plan.push([fx, 'full', [s]]);
@@ -392,7 +447,7 @@ try {
     if (done.has(key)) { console.log(`${key.padEnd(30)} (cached in ${jsonOut})`); continue; }
     const t0 = Date.now();
     let r;
-    try { r = await runCase(browser, fx, level, skip || []); } catch (e) { r = { fixture: fx, level, skip: (skip || []).join('+') || '-', harnessError: String(e.message || e).slice(0, 300) }; }
+    try { r = REPEAT?await runRepeatedCase(browser,fx):await runCase(browser, fx, level, skip || []); } catch (e) { r = { fixture: fx, level, skip: (skip || []).join('+') || '-', harnessError: String(e.message || e).slice(0, 300) }; }
     r.wallMs = Date.now() - t0;
     results.push(r);
     if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
@@ -401,7 +456,13 @@ try {
 } finally { await browser.close(); }
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
 
-if (STRICT) {
+if (REPEAT) {
+  const failed=results.length!==2||results.some(r=>r.harnessError||r.restoreError||
+    r.firstDivergentTick!==null||r.pageErrors?.length!==0||r.cycles?.length!==REPEAT||
+    !r.cycles.every((c,i)=>c.captureTick===r.K+i&&c.nextTick===r.K+i+1&&c.recaptured===(i>0)&&c.canonical));
+  console.log(failed?'FAIL_REPEATED_RESTORE':'PASS_REPEATED_RESTORE');
+  if(failed)process.exitCode=1;
+} else if (STRICT) {
   const failed = results.length !== 2 || results.some(r =>
     r.restoreError || r.harnessError || r.ticksCompared !== r.N-r.K ||
     r.firstDivergentTick !== null || r.firstSledDivergentTick !== null ||
