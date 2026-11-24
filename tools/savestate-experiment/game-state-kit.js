@@ -464,7 +464,10 @@
     out['matter.pairs'] = fnv(JSON.stringify(m.pairs));
     out['matter.ids'] = fnv(sorted(m.ids) + m.nextId);
     out['matter.timing'] = fnv(JSON.stringify(m.timing));
-    if (global.__ssCanonical) out['matter.gravity'] = fnv(JSON.stringify(m.gravity));
+    if (global.__ssCanonical) {
+      out['matter.gravity'] = fnv(JSON.stringify(m.gravity));
+      out['matter.statics'] = fnv(canon(m.statics));
+    }
     out['camera(#155)'] = fnv(JSON.stringify(cap.camera));
     out['pool'] = fnv(JSON.stringify(cap.pool));
     // Use the actual compiled game's recorder fingerprint method, with a

@@ -163,6 +163,7 @@ export function preflightMatterSnapshot(snap, Matter) {
         !uint(c.supportCount)||c.supportCount>2||!dense(c.supports)||c.supports.length!==2||
         !c.supports.every((r,i)=>vertex(r,i<c.supportCount,p)))fail('collision support reference');
     if (p.isActive ? p.contactCount!==c.supportCount : p.contactCount!==0) fail('pair activity/contact count');
+    for(let i=0;i<p.contactCount;i++){const a=p.contacts[i][0],b=c.supports[i];if(a[0]!==b[0]||a[1]!==b[1])fail('contact/support mismatch');}
   }
   return true;
 }

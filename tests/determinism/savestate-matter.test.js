@@ -216,3 +216,17 @@ test('pair activity and contact count must agree before full restore',()=>{
     expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
   }
 });
+
+test('active contact must reference the identical support vertex, not a different vertex on its endpoint',()=>{
+  const a=buildWorld(Matter);
+  for(let i=0;i<300&&!a.engine.pairs.list.some(p=>p.isActive&&p.contactCount>0);i++)Matter.Engine.update(a.engine,1000/240);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  const bad=JSON.parse(JSON.stringify(good)),p=bad.pairs.find(p=>p.isActive&&p.contactCount>0);
+  expect(p).toBeDefined();
+  const [key,index]=p.contacts[0][0],split=key.lastIndexOf('#');
+  const count=bad.bodies[key.slice(0,split)].parts[Number(key.slice(split+1))].verts.length;
+  p.contacts[0][0]=[key,(index+1)%count];
+  const b=buildWorld(Matter),before=JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}));
+  expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/contact\/support mismatch/);
+  expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
+});
