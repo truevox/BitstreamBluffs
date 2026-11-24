@@ -13,6 +13,14 @@ export class BiomeSpaceBus {
 		this.wet = wet;
 		this.bank = new ImpulseBank(ctx, 3);
 		this.input = ctx.createGain();
+		// One global post-reverb gate. Per-source sends are lowered in
+		// menus too, but already-excited room impulse tails can survive
+		// those sends. Fade this output as well so the actual menu mix
+		// becomes truly dry after the same 750ms transition.
+		this.outputGate = ctx.createGain();
+		this.outputGate.gain.value = 1;
+		this.outputGate.connect(destination);
+		this.wetEnabled = true;
 		this.active = null;
 		this.paths = new Set();
 		this.timers = new Set();
@@ -30,7 +38,7 @@ export class BiomeSpaceBus {
 		gain.gain.value = 0;
 		this.input.connect(convolver);
 		convolver.connect(gain);
-		gain.connect(this.destination);
+		gain.connect(this.outputGate);
 		const route = { id: next, convolver, gain };
 		this.paths.add(route);
 		const start = c.currentTime, seconds = Math.min(2, Math.max(0.01, fade));
@@ -61,6 +69,27 @@ export class BiomeSpaceBus {
 		return true;
 	}
 
+	/** No room-convolution tail may spill into clean menu playback.
+	 * Hold the exact in-flight gain on rapid reversals before scheduling
+	 * the next bounded fade. A single gate applies to old AND new rooms.
+	 */
+	setWetEnabled(enabled, fadeSeconds = .75) {
+		if (typeof enabled !== 'boolean' || this.wetEnabled === enabled)
+			return false;
+		this.wetEnabled = enabled;
+		const t = this.ctx.currentTime;
+		const param = this.outputGate.gain;
+		if (typeof param.cancelAndHoldAtTime === 'function')
+			param.cancelAndHoldAtTime(t);
+		else {
+			param.cancelScheduledValues(t);
+			param.setValueAtTime(param.value,t);
+		}
+		param.linearRampToValueAtTime(enabled ? 1 : 0,
+			t + Math.max(.02,Math.min(2,Number.isFinite(fadeSeconds)?fadeSeconds:.75)));
+		return true;
+	}
+
 	destroy() {
 		for (const t of this.timers) clearTimeout(t);
 		this.timers.clear();
@@ -69,6 +98,7 @@ export class BiomeSpaceBus {
 		}
 		this.paths.clear();
 		this.input.disconnect();
+		this.outputGate.disconnect();
 		this.bank.clear();
 	}
 }

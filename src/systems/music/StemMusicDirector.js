@@ -4,14 +4,20 @@
  * Derived source keys (for example "voice:bitstream-bluffs") are allowed in packs.
  * Optional 'voice:<biome>' sources are mixed in dynamically when a pack provides them.
  */
-import { CORE_STEMS, normalizeCatalog, normalizePack, resolveMusicAsset } from './MusicPack.js';
+import { CORE_STEMS, normalizeCatalog, normalizePack, resolveMusicAsset, fetchMusicAssetResponse } from './MusicPack.js';
 import { StemFXMixer } from './MusicFXGraph.js';
 import { AdaptiveBiomeRouter } from './AdaptiveBiomeRouter.js';
 import { voiceSourceForBiome, HOME_BIOME } from './BiomeVoices.js';
 import { canonicalBiomeId } from '../../data/biomeAliases.js';
 import { captionAt, nextBeatTime, normalizeCaptions } from './CaptionSequencer.js';
 import { FIRST_SONG_ID, defaultSongSelection, sanitizeSongSelection, nextEnabledSongIndex, enabledSongIndices, shuffledSongRound } from './MusicPlaylist.js';
-import { melodyPreset, orchestraPreset } from './DynamicOrchestraPresets.js';
+import { melodyPreset, orchestraPreset, sourceOnlyExtras } from './DynamicOrchestraPresets.js';
+import { snowpackImpactFromLanding } from './SnowpackImpact.js';
+import { contactFromMotion, impactFromLanding } from './MusicPhysicsSignals.js';
+import { HydrostaticPressure } from './HydrostaticPressure.js';
+import { ScrapPitchCadence } from './ScrapPitchCadence.js';
+import { createVerifiedScrapCowbell } from './ScrapCowbell.js';
+import { MicroBeeAudio } from './MicroBeeAudio.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
@@ -43,13 +49,42 @@ export class StemMusicDirector {
 		this._effectSignatures = new Map();
 		this.activeNodes = new Set();
 		this.cache = new Map();
+		// Archived home-biome folder may still use its legacy spelling in
+		// original archived music packs even though the logical ID is canonical.
+		this._legacyDebutmontPacks = new Set();
 		this.scheduled = new Set();
 		this.inflight = new Map();
 		this.biome = HOME_BIOME;
+		this._arcadeLastBridge=null;
+		this._arcadeLastProgress=NaN;
 		this.vocals = false;
 		this.musicCaptions = false;
 		this.captionWords = [];
 		this.airborne = false;
+		this._pendingSnowImpact = 0;
+		this._pendingScrapImpact = 0;
+		this._pendingHydroImpact = 0;
+		this._pendingMicroImpact = 0;
+		this._pendingCrystalImpact = 0;
+		this._pendingSteamImpact = 0;
+		this._pendingJellyImpact = 0;
+		this._pendingVentCrust = 0;
+		this._pendingCandyImpact = 0;
+		this._pendingSpaceImpact = 0;
+		this._pendingPyramidImpact = 0;
+		this._steamLastSent = NaN;
+		this._candyLastSpeed = NaN;
+		this._spaceLastField = NaN;
+		this._spaceLastGravity = NaN;
+		this._thermalLastLoft = NaN;
+		this._thermalWasActive = false;
+		this.microBees = null;
+		this.hydrostatic = new HydrostaticPressure();
+		this._hydroLastSent = NaN;
+		this._ventLastLift=NaN;
+		this._scrapContactLast = NaN;
+		this.scrapPitch = new ScrapPitchCadence();
+		this.scrapCowbell = null;
 		this._timer = null;
 		this._token = 0;
 		this._nextPromise = null;
@@ -89,6 +124,7 @@ export class StemMusicDirector {
 		const lowMemory = typeof navigator !== 'undefined' &&
 			Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
 		this.mixer = new StemFXMixer(ctx, this.bus, { roomQuality: lowMemory ? 'mobile' : 'standard' });
+		// Instantiate the two bee voices only if Micro has visible bees.
 		this.mixer.selectBiome(this.biome);
 		for (const name of CORE_STEMS) {
 			const g = this.mixer.addSource(name, { gain: name === 'vocals' && !this.vocals ? 0 : 1 });
@@ -167,6 +203,25 @@ export class StemMusicDirector {
 		if (this.menuMode === next) return;
 		this.menuMode = next;
 		if (next) {
+			// Clean menus never contain the source-pitched junkyard Foley.
+			this.scrapCowbell?.dispose();
+			this.scrapCowbell=null;
+			this._pendingSnowImpact = 0;
+			this._pendingScrapImpact = 0;
+			this.scrapPitch?.resetTiming();
+			this._pendingMicroImpact = 0;
+			this._pendingCrystalImpact = 0;
+			this._pendingSteamImpact = 0;
+		this._pendingJellyImpact = 0;
+		this._pendingVentCrust = 0;
+		this._pendingCandyImpact = 0;
+		this._pendingSpaceImpact = 0;
+		this._pendingPyramidImpact = 0;
+			this._steamLastSent = NaN;
+			this.microBees?.dispose();
+			this.microBees=null;
+		}
+		if (next) {
 			// Menus restore all three original accompaniments to clean DSP.
 			this.setBsodDanger(0);
 			this.setAirborne(false);
@@ -177,7 +232,13 @@ export class StemMusicDirector {
 		this.mixer?.selectBiome(next ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(next ? HOME_BIOME : this.biome);
 		this.adaptive?.setEnabled(this.dynamicOrchestra && !next);
-		this._applyMusicTimbres(true);
+		// Menu↔run is a musical mix change, not a biome jump: give it
+		// a deliberate three-quarter-second crossfade without seeking,
+		// restarting, or changing the original source clock.
+		this._applyMusicTimbres(true, .75);
+		// The shared convolution tail is not controlled by per-source
+		// DSP replacement. Make it follow the same 750ms clean mix gate.
+		this.mixer?.setRoomWetEnabled?.(!next,.75);
 	}
 
 	/** The real physical BSOD proximity drives only accompaniment corruption.
@@ -197,25 +258,62 @@ export class StemMusicDirector {
 	 * an original instrumental source with its re-performed alternative.
 	 * The separately synthesized biome melody stays active in BOTH modes.
 	 */
-	_applyMusicTimbres(force=false) {
+	_applyMusicTimbres(force=false, fadeSeconds=.18) {
 		if (!this.mixer || !this.gains) return;
 		const lead = this._activeVoiceFor(this.pack);
 		const sourceNames = ['bass','drums','guitar','piano','other'];
-		if (lead) sourceNames.push(lead);
+		if (this.menuMode) {
+			// Don't leave dormant melodic leads or a vocal room-send wet
+			// behind in Title, Game Over or the pause-screen jukebox.
+			for (const name of this.gains.keys())
+				if (name.startsWith('voice:') || name === 'vocals')
+					sourceNames.push(name);
+		} else {
+			if (lead) sourceNames.push(lead);
+			// Menus stripped every vocal/voice effects chain. Rehydrate the
+			// original pack-defined chains on the SAME song when returning to
+			// gameplay, not just the active melodic lead.
+			for (const name of this.gains.keys())
+				if ((name==='vocals' || name.startsWith('voice:')) &&
+					!sourceNames.includes(name)) sourceNames.push(name);
+		}
 		for (const name of sourceNames) {
 			if (!this.gains.has(name)) continue;
-			const effects = name===lead ? melodyPreset(this.menuMode ? 'debutmont' : this.biome) :
-				this.menuMode ? [] : orchestraPreset(this.biome,name);
+			// In menus EVERY original source is raw, including the selected
+			// Debutmont melody lead. Gameplay alone gets DSP/biome FX.
+			const packSource=name==='vocals' || name.startsWith('voice:');
+			const effects = this.menuMode ? [] :
+				name===lead ? melodyPreset(this.biome) :
+				packSource ? (this.pack?.effects?.[name] || []) :
+				[...sourceOnlyExtras(this.biome,name), ...orchestraPreset(this.biome,name)];
 			const key = JSON.stringify(effects);
 			if (force || this._timbreSignatures.get(name)!==key) {
-				this.mixer.replaceEffects(name,effects,.18);
+				// A rider entering the home biome while airborne is above the powder already.
+				// Keep the cached signature based on GROUND effects so jumps don't rebuild FX graphs.
+				const initial = this.airborne && !this.menuMode &&
+					(this.biome === 'debutmont' || this.biome === 'micro-mountain' ||
+					this.biome === 'crystal-cavern' || this.biome === 'steampunk-slopes' ||
+					this.biome === 'sky-jellyfish-mountain' || this.biome === 'candy-cane-canyon')
+					? effects.map(e => e.type==='snowpack' ? {...e,depth:0} :
+						e.type==='microbox' || e.type==='crystallattice' ? {...e,openness:1} :
+						e.type==='steamworks' ? {...e,airborne:true} :
+						e.type==='jellybloom' ? {...e,airborne:true} :
+						e.type==='sugarfizz' ? {...e,airborne:true} :
+						e.id==='crystalPercussion' ? {...e,gain:.48} : e) : effects;
+				this.mixer.replaceEffects(name,initial,fadeSeconds);
 				this._timbreSignatures.set(name,key);
 			}
 			// Restore each source's normal biome room send in either
 			// mode. Muting reverb when the toggle is OFF would wrongly
 			// disable legitimate processing of the ORIGINAL recordings.
-			this.mixer.setRoomSend(name,this.menuMode ? 0 : null);
+			this.mixer.setRoomSend(name,this.menuMode ? 0 :
+				packSource ? this.pack?.roomSends?.[name] : null);
 		}
+		this._applyScrapContact(true);
+		this._steamLastSent = NaN;
+		this._applySteamSpeed(true);
+		this._candyLastSpeed=NaN;
+		this._applyCandySpeed(true);
 	}
 
 	_nextEnabledIndex(previous = -1) {
@@ -252,7 +350,51 @@ export class StemMusicDirector {
 	}
 
 	setBiome(id) {
-		this.biome = typeof id === 'string' && id ? canonicalBiomeId(id) : HOME_BIOME;
+		const next = typeof id === 'string' && id ? canonicalBiomeId(id) : HOME_BIOME;
+		const previous=this.biome;
+		// Reset only on confirmed boundaries; aliases resolve BEFORE comparing.
+		if (next !== this.biome &&
+			(next === 'underwater-mountain' || this.biome === 'underwater-mountain')) {
+			this.hydrostatic?.reset();
+			this._hydroLastSent = NaN;
+			this._pendingHydroImpact = 0;
+		}
+		if (next !== this.biome &&
+			(next === 'garbage-dump-glacier' || this.biome === 'garbage-dump-glacier'))
+			this.scrapPitch?.reset();
+		this.biome = next;
+		if(previous!==next){this._arcadeLastBridge=null;this._arcadeLastProgress=NaN;}
+		if (this.biome !== 'debutmont') this._pendingSnowImpact = 0;
+		if (this.biome !== 'crystal-cavern') this._pendingCrystalImpact = 0;
+		if (this.biome !== 'garbage-dump-glacier') this._pendingScrapImpact = 0;
+		if (this.biome !== 'garbage-dump-glacier') {
+			this.scrapPitch?.resetTiming();
+			this.scrapCowbell?.dispose();
+			this.scrapCowbell=null;
+		}
+		if (this.biome !== 'steampunk-slopes') this._pendingSteamImpact=0;
+		if (this.biome !== 'sky-jellyfish-mountain') this._pendingJellyImpact=0;
+		if (this.biome !== 'vertigo-vents') this._pendingVentCrust=0;
+		if (this.biome !== 'candy-cane-canyon') this._pendingCandyImpact=0;
+		if (this.biome !== 'space-mountain') this._pendingSpaceImpact=0;
+		if (this.biome !== 'pyramid-peak') this._pendingPyramidImpact=0;
+		if(previous!==next){
+			this._thermalLastLoft=NaN;
+			this._thermalWasActive=false;
+		}
+		this._spaceLastField=NaN;
+		this._spaceLastGravity=NaN;
+		this._candyLastSpeed=NaN;
+		this._ventLastLift=NaN;
+		this._steamLastSent=NaN;
+		if(this.biome!=='steampunk-slopes')this._lastSteamMusicAccentMs=-Infinity;
+		if (this.biome !== 'micro-mountain') {
+			this._pendingMicroImpact=0;
+			this.microBees?.dispose();
+			this.microBees=null;
+		}
+		this._scrapContactLast = NaN;
+		// Reapplying the same biome must NOT postpone the next musical clang.
 		this._refreshVoices();
 		this.mixer?.selectBiome(this.menuMode ? HOME_BIOME : this.biome);
 		this.adaptive?.setBiome(this.menuMode ? HOME_BIOME : this.biome);
@@ -280,10 +422,460 @@ export class StemMusicDirector {
 		}
 	}
 
+	/** Landing pulses may arrive either side of the per-frame grounded update. */
+	onLanding(landing) {
+		if (this.menuMode) return;
+		if (this.biome === 'debutmont') {
+			const impulse = snowpackImpactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingSnowImpact = Math.max(this._pendingSnowImpact || 0, impulse);
+			if (!this.airborne) this._applySnowImpact();
+		} else if (this.biome === 'garbage-dump-glacier') {
+			const impulse = impactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingScrapImpact = Math.max(this._pendingScrapImpact || 0, impulse);
+			if (!this.airborne) this._applyScrapImpact();
+		} else if (this.biome === 'crystal-cavern') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingCrystalImpact=Math.max(this._pendingCrystalImpact||0,impulse);
+			if(!this.airborne)this._applyCrystalImpact();
+		} else if (this.biome === 'micro-mountain') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingMicroImpact=Math.max(this._pendingMicroImpact||0,impulse);
+			if(!this.airborne)this._applyMicroImpact();
+		} else if (this.biome === 'underwater-mountain') {
+			const impulse = impactFromLanding(landing);
+			if (impulse <= 0) return;
+			this._pendingHydroImpact = Math.max(this._pendingHydroImpact || 0,impulse);
+			if (!this.airborne) this._applyHydroImpact();
+		} else if (this.biome === 'steampunk-slopes') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingSteamImpact=Math.max(this._pendingSteamImpact||0,impulse);
+			if(!this.airborne)this._applySteamImpact();
+		} else if (this.biome === 'pyramid-peak') {
+			if(this.transportPaused)return;
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingPyramidImpact=Math.max(this._pendingPyramidImpact||0,impulse);
+			if(!this.airborne)this._applyPyramidImpact();
+		} else if (this.biome === 'space-mountain') {
+			if(this.transportPaused)return;
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingSpaceImpact=Math.max(this._pendingSpaceImpact||0,impulse);
+			if(!this.airborne)this._applySpaceImpact();
+		} else if (this.biome === 'candy-cane-canyon') {
+			if(this.transportPaused)return;
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingCandyImpact=Math.max(this._pendingCandyImpact||0,impulse);
+			if(!this.airborne)this._applyCandyImpact();
+		} else if (this.biome === 'vertigo-vents') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingVentCrust=Math.max(this._pendingVentCrust||0,impulse);
+			if(!this.airborne)this._applyVentCrust();
+		} else if (this.biome === 'sky-jellyfish-mountain') {
+			const impulse=impactFromLanding(landing);
+			if(impulse<=0)return;
+			this._pendingJellyImpact=Math.max(this._pendingJellyImpact||0,impulse);
+			if(!this.airborne)this._applyJellyImpact();
+		}
+	}
+
+	/** Read actual physics cooldown before and after SAME SIM TICK.
+	 * The geyser engine sets this cooldown only when the vent really fires.
+	 * Airborne alone is never sufficient to create an eruption.
+	 * The values are read-only after authoritative stepWorld, not inferred
+	 * from the synthetic beat or a timer.
+	 */
+	setGeyserMotion(snapshot){
+		if(!this.started||this.menuMode||this.transportPaused||this.biome!=='vertigo-vents'||
+			!snapshot||typeof snapshot!=='object')return false;
+		const {beforeCooldownMs:before,afterCooldownMs:after,vy,launchAvailable}=snapshot;
+		if(!Number.isFinite(before)||!Number.isFinite(after)||before<0||after<0||
+			!Number.isFinite(vy)||typeof launchAvailable!=='boolean')return false;
+		const rise=Math.max(0,Math.min(1,-vy/1600));
+		if(!Number.isFinite(this._ventLastLift)||
+			Math.abs(rise-this._ventLastLift)>.035){
+			this._ventLastLift=rise;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'ventforge','updraft',rise);
+		}
+		const fired=launchAvailable&&after>before+80&&after>200;
+		if(fired)this.mixer?.setEffectParam('drums','ventforge','eruption',
+			Math.max(.55,rise));
+		return fired;
+	}
+	_applyVentCrust(){
+		const impulse=this._pendingVentCrust||0;
+		this._pendingVentCrust=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='vertigo-vents')
+			this.mixer?.setEffectParam('drums','ventforge','crustImpact',impulse);
+	}
+
+	/** Arcade is both a standalone soundscape and the true transition
+	 * corridor between biome identities. The generator alone chooses
+	 * whether this is a bridge; its x geometry drives the exact phase.
+	 * No source restart, no beat inference, no gameplay writeback.
+	 */
+	setArcadeTransition({bridge,progress}={}){
+		if(!this.started||this.menuMode||this.transportPaused||
+			this.biome!==HOME_BIOME||typeof bridge!=='boolean'||
+			!Number.isFinite(progress)||progress<0||progress>1)return false;
+		const changed=this._arcadeLastBridge!==bridge;
+		const progressChanged=changed||!Number.isFinite(this._arcadeLastProgress)||
+			(progress!==this._arcadeLastProgress && (
+			Math.abs(progress-this._arcadeLastProgress)>=.018||
+			progress===0||progress===1));
+		if(changed){
+			this._arcadeLastBridge=bridge;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'arcadeglue','bridge',bridge);
+		}
+		if(progressChanged){
+			this._arcadeLastProgress=progress;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'arcadeglue','progress',progress);
+		}
+		return true;
+	}
+
+	/** Brand-new effect nodes start with default continuous controls. The
+	 * rider/biome may not have changed, so memoized identical values could
+	 * suppress ALL later writes. Force the next genuine physical observations
+	 * to restore those continuous params. Preserve one-shot impact/lift/event
+	 * latches and HydrostaticPressure's stored depth: NO fabricated impulses.
+	 * Candy/Steam/Scrap speed/contact are already explicitly replayed by
+	 * _applyMusicTimbres(true), so keep their sent caches in sync.
+	 */
+	_invalidateContinuousFxMemoAfterTrackReplace(){
+		this._spaceLastField=NaN;
+		this._spaceLastGravity=NaN;
+		this._thermalLastLoft=NaN;
+		this._hydroLastSent=NaN;
+		this._ventLastLift=NaN;
+	}
+
+	/** New song effect chains create arcadeglue with default bridge=false.
+	 * Preserve the current world corridor state across song replacement; the
+	 * memoized previous bridge=true would otherwise suppress this update.
+	 * WebAudio presentation only; never writes to physics, replay or the clock.
+	 */
+	_restoreArcadeBridgeAfterTrackReplace(){
+		const bridge=this._arcadeLastBridge;
+		const progress=this._arcadeLastProgress;
+		if(typeof bridge!=='boolean'||!Number.isFinite(progress))return false;
+		this._arcadeLastBridge=null;
+		this._arcadeLastProgress=NaN;
+		return this.setArcadeTransition({bridge,progress});
+	}
+
+	/** A genuine, unwarded thermalUpdraft zone plus EffectivePhysics
+	 * reduced gravity creates source-fed sandstone resonance. The zone
+	 * is confirmed in RunScene from actual physicsContext zoneDefs:
+	 * parachuting outside a thermal is NOT a thermal musical event.
+	 */
+	setThermalMotion({active,gravityPxS2,vy,grounded}={}){
+		if(!this.started||this.menuMode||this.transportPaused||
+			this.biome!=='pyramid-peak'||typeof active!=='boolean'||
+			typeof grounded!=='boolean'||
+			![gravityPxS2,vy].every(Number.isFinite)||gravityPxS2<=0)return false;
+		const thermal=active&&!grounded&&gravityPxS2<900;
+		const reduction=Math.max(0,Math.min(1,(900-gravityPxS2)/350));
+		const rising=Math.max(0,Math.min(1,-vy/1100));
+		const loft=thermal?Math.max(0,Math.min(1,.16+.60*reduction+.24*rising)):0;
+		if(!Number.isFinite(this._thermalLastLoft)||
+			Math.abs(loft-this._thermalLastLoft)>.025){
+			this._thermalLastLoft=loft;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'sunstone','loft',loft);
+		}
+		if(thermal&&!this._thermalWasActive)
+			this.mixer?.setEffectParam('other','sunstone','gust',
+				Math.max(.45,loft));
+		this._thermalWasActive=thermal;
+		return thermal;
+	}
+	_applyPyramidImpact(){
+		const impulse=this._pendingPyramidImpact||0;
+		this._pendingPyramidImpact=0;
+		if(impulse>0&&!this.menuMode&&!this.transportPaused&&this.biome==='pyramid-peak')
+			this.mixer?.setEffectParam('drums','sunstone','stone',impulse);
+	}
+
+	/** Read-only actual physics and rider/ground geometry for Space Mountain.
+	 * Low-gravity 0.7x zone is real in EffectivePhysics; grounded height is
+	 * exactly zero, and airborne altitude comes from actual terrain/sled y.
+	 */
+	setSpaceMotion({gravityPxS2,terrainY,riderY,vy,grounded}={}){
+		if(!this.started||this.menuMode||this.transportPaused||
+			this.biome!=='space-mountain'||typeof grounded!=='boolean'||
+			![gravityPxS2,terrainY,riderY,vy].every(Number.isFinite)||
+			gravityPxS2<=0)return false;
+		const altitude=grounded?0:Math.max(0,terrainY-riderY);
+		const distance=Math.max(0,Math.min(1,altitude/700));
+		const gravity=Math.max(0,Math.min(1,(900-gravityPxS2)/900));
+		// No guessed jump clock. Actual distance and gravity shape only the
+		// long source-fed field. Grounded must never make false altitude.
+		const openness=grounded?0:Math.max(0,Math.min(1,
+			distance*.82+gravity*.35));
+		if(!Number.isFinite(this._spaceLastField)||
+			Math.abs(openness-this._spaceLastField)>.025){
+			this._spaceLastField=openness;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'orbitfield','weightless',openness);
+		}
+		if(!Number.isFinite(this._spaceLastGravity)||
+			Math.abs(gravity-this._spaceLastGravity)>.025){
+			this._spaceLastGravity=gravity;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'orbitfield','lowGravity',gravity);
+		}
+		return true;
+	}
+	_applySpaceImpact(){
+		const impulse=this._pendingSpaceImpact||0;
+		this._pendingSpaceImpact=0;
+		if(impulse>0&&!this.menuMode&&!this.transportPaused&&this.biome==='space-mountain')
+			this.mixer?.setEffectParam('drums','orbitfield','reentry',impulse);
+	}
+
+	/** Real original-stem Candy Cane sugar fizz follows actual rider speed.
+	 * Never synthesize a beat or modify Sugar Rush physics/steering.
+	 */
+	_applyCandySpeed(force=false){
+		if(this.menuMode||this.biome!=='candy-cane-canyon')return;
+		const speed=Math.min(1,Math.max(0,this.speedPxS/1800));
+		if(!force&&Number.isFinite(this._candyLastSpeed)&&
+			Math.abs(speed-this._candyLastSpeed)<.035)return;
+		this._candyLastSpeed=speed;
+		for(const stem of ['bass','drums','guitar','piano','other'])
+			this.mixer?.setEffectParam(stem,'sugarfizz','speed',speed);
+	}
+	_applyCandyImpact(){
+		const impulse=this._pendingCandyImpact||0;
+		this._pendingCandyImpact=0;
+		if(impulse>0&&!this.menuMode&&!this.transportPaused&&this.biome==='candy-cane-canyon')
+			this.mixer?.setEffectParam('drums','sugarfizz','pop',impulse);
+	}
+
+	/** Jelly elastic impacts only trigger for actual noncrash touchdown.
+	 * Pending impact may arrive before the authoritative grounded edge. */
+	_applyJellyImpact(){
+		const impulse=this._pendingJellyImpact||0;
+		this._pendingJellyImpact=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='sky-jellyfish-mountain')
+			this.mixer?.setEffectParam('drums','jellybloom','impact',impulse);
+	}
+
+	/**
+	 * A real original-mix transient detected by the WorldDance presentation
+	 * envelope may make the same decorative gear audibly tick. This NEVER
+	 * consumes the synthetic/unverified meter and never authorizes gameplay.
+	 * Only the live audio engine's own revision-matched sample qualifies.
+	 */
+	onSteampunkMusicAccent(sample){
+		if(!this.started||this.transportPaused||this.menuMode||this.airborne||
+			this.biome!=='steampunk-slopes'||!sample||
+			!Number.isFinite(sample.timeMs)||
+			!Number.isFinite(sample.bass)||!Number.isFinite(sample.mid)||
+			!this.track||sample.revision!==String(this._token)+':'+this.track.id+':'+this.clockStart||
+			sample.timeMs-this._lastSteamMusicAccentMs<165)return false;
+		this._lastSteamMusicAccentMs=sample.timeMs;
+		const strength=Math.max(.18,Math.min(1,.76*sample.bass+.24*sample.mid));
+		return this.mixer?.setEffectParam('drums','steamworks','musicAccent',strength)===true;
+	}
+
+	_applySteamSpeed(force=false){
+		if(this.menuMode||this.biome!=='steampunk-slopes')return;
+		const speed=clamp(this.speedPxS/1600,0,1);
+		if(!force&&Number.isFinite(this._steamLastSent)&&
+			Math.abs(speed-this._steamLastSent)<.025)return;
+		this._steamLastSent=speed;
+		for(const stem of ['bass','drums','guitar','piano','other'])
+			this.mixer?.setEffectParam(stem,'steamworks','speed',speed);
+	}
+
+	_applySteamImpact(){
+		const impulse=this._pendingSteamImpact||0;
+		this._pendingSteamImpact=0;
+		if(impulse<=0||this.menuMode||this.biome!=='steampunk-slopes')return;
+		this.mixer?.setEffectParam('drums','steamworks','impact',impulse);
+	}
+
+	_applySnowImpact() {
+		const impulse = this._pendingSnowImpact || 0;
+		this._pendingSnowImpact = 0;
+		if (impulse <= 0 || this.menuMode || this.biome !== 'debutmont') return;
+		for (const stem of ['bass','drums','guitar','piano','other'])
+			this.mixer?.setEffectParam(stem,'snowpack','impact',impulse);
+	}
+
+	_applyScrapContact(force = false) {
+		if (this.biome !== 'garbage-dump-glacier' || this.menuMode) return;
+		const contact = contactFromMotion(this.speedPxS, !this.airborne);
+		if (!force && Number.isFinite(this._scrapContactLast) &&
+			Math.abs(contact - this._scrapContactLast) < .04) return;
+		this._scrapContactLast = contact;
+		this.mixer?.setEffectParam('drums', 'scrapheap', 'contact', contact);
+	}
+
+	/**
+	 * Seeded irregular source-consonant junk clangs. Called by the EXISTING
+	 * music pump; no new timer, guessed song key or off-grid scoring changes.
+	 * The bass analyser is only read at a due time, not each 75ms tick.
+	 */
+	_maybeScrapPitchClang(now){
+		if(!Number.isFinite(now)||!this.started||this.transportPaused||
+			this.menuMode||this.biome!=='garbage-dump-glacier'||this.airborne)
+			return false;
+		const contact=contactFromMotion(this.speedPxS,true);
+		if(contact<.16)return false;
+		const candidate=this.scrapPitch?.next(now,contact,
+			()=>this.mixer?.readEffect?.('bass','scrapPitchProbe','notes'),1.8);
+		if(!candidate)return false;
+		const played=this.mixer?.setEffectParam('drums','scrapheap','pitchedClang',candidate)===true;
+		if(!played)return false;
+		// Exact same verified source pitch/time: no independent ringtone
+		// scheduling, no extra music-note discovery, max three cowbells.
+		if(!this.scrapCowbell && this.ctx && this.bus)
+			this.scrapCowbell=createVerifiedScrapCowbell(this.ctx,this.bus,{level:2});
+		this.scrapCowbell?.play(candidate,now);
+		return true;
+	}
+
+	_applyScrapImpact() {
+		const impulse = this._pendingScrapImpact || 0;
+		this._pendingScrapImpact = 0;
+		if (impulse <= 0 || this.menuMode || this.biome !== 'garbage-dump-glacier') return;
+		this.mixer?.setEffectParam('drums', 'scrapheap', 'impact', impulse);
+	}
+
+	/** True terrain elevation and rider motion from the real sim, never fake depth. */
+	setHydrostaticMotion({terrainY,riderY,vy,grounded}={}) {
+		if (this.menuMode || this.biome !== 'underwater-mountain') return false;
+		if (!this.hydrostatic) this.hydrostatic = new HydrostaticPressure();
+		const state = this.hydrostatic.update({terrainY,riderY,vy,grounded});
+		if (!state.valid) return false;
+		if (!Number.isFinite(this._hydroLastSent) ||
+			Math.abs(state.audiblePressure01-this._hydroLastSent) >= .018) {
+			this._hydroLastSent=state.audiblePressure01;
+			for (const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'hydrostatic','pressure',state.audiblePressure01);
+		}
+		return true;
+	}
+
+	_applyHydroImpact() {
+		const impulse = this._pendingHydroImpact || 0;
+		this._pendingHydroImpact = 0;
+		if (impulse > 0 && !this.menuMode && this.biome === 'underwater-mountain')
+			this.mixer?.setEffectParam('drums','hydrostatic','impact',impulse);
+	}
+
+	/** Actual existing Micro Mountain bee screen positions: no new bee RNG. */
+	setMicroBees(bees,playerScreenX){
+		if(this.menuMode||this.biome!=='micro-mountain'||!this.started){
+			this.microBees?.setPositions([],{enabled:false});
+			return false;
+		}
+		if(!this.microBees&&this.ctx&&this.bus&&Array.isArray(bees)&&bees.length)
+			this.microBees=new MicroBeeAudio(this.ctx,this.bus);
+		return this.microBees?.setPositions(bees,{enabled:true,playerScreenX})||false;
+	}
+
+	_applyCrystalImpact(){
+		const impulse=this._pendingCrystalImpact||0;
+		this._pendingCrystalImpact=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='crystal-cavern')
+			this.mixer?.setEffectParam('bass','crystallattice','impact',impulse);
+	}
+
+	_applyMicroImpact(){
+		const impulse=this._pendingMicroImpact||0;
+		this._pendingMicroImpact=0;
+		if(impulse>0&&!this.menuMode&&this.biome==='micro-mountain')
+			this.mixer?.setEffectParam('drums','microbox','impact',impulse);
+	}
+
 	setAirborne(airborne) {
 		const next = !this.menuMode && !!airborne;
 		if (next === this.airborne) return;
+		// Emit precisely once at the authoritative grounded→airborne edge.
+		// Ground speed is the real physical proxy; no invented dirt or MIDI notes.
+		// Suppress in menus and all non-Garbage biomes.
+		if (next && !this.menuMode && this.biome === 'garbage-dump-glacier') {
+			const speedContact = contactFromMotion(this.speedPxS, true);
+			this.mixer?.setEffectParam('drums','scrapheap','takeoff',
+				Math.max(.18,speedContact));
+		}
+		if(next&&!this.menuMode&&this.biome==='steampunk-slopes')
+			this.mixer?.setEffectParam('drums','steamworks','release',
+				Math.max(.18,clamp(this.speedPxS/1600,0,1)));
+		if(next&&!this.menuMode&&!this.transportPaused&&this.biome==='space-mountain')
+			this.mixer?.setEffectParam('other','orbitfield','eject',
+				Math.max(.25,Math.min(1,this.speedPxS/1800)));
+		if(next&&!this.menuMode&&!this.transportPaused&&this.biome==='candy-cane-canyon')
+			this.mixer?.setEffectParam('other','sugarfizz','wrapper',
+				Math.max(.2,Math.min(1,this.speedPxS/1800)));
+		if(next&&!this.menuMode&&this.biome==='sky-jellyfish-mountain')
+			this.mixer?.setEffectParam('other','jellybloom','lift',.80);
 		this.airborne = next;
+		if(this.biome==='pyramid-peak'&&!this.menuMode&&!next){
+			this._thermalLastLoft=0;
+			this._thermalWasActive=false;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'sunstone','loft',0);
+		}
+		if(this.biome==='space-mountain'&&!this.menuMode&&!next){
+			this._spaceLastField=0;
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'orbitfield','weightless',0);
+		}
+		if(this.biome==='candy-cane-canyon'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'sugarfizz','airborne',next);
+		if(this.biome==='sky-jellyfish-mountain'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'jellybloom','airborne',next);
+		if(this.biome==='steampunk-slopes'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'steamworks','airborne',next);
+		// As the rider clears the snow, the original instruments open up; landing
+		// restores Powdery without changing playback, beat timing or the music clock.
+		if (this.biome === 'debutmont') {
+			for (const stem of ['bass','drums','guitar','piano','other']) {
+				const depth = next ? 0 : orchestraPreset('debutmont',stem)[0].depth;
+				this.mixer?.setEffectParam(stem,'snowpack','depth',depth);
+			}
+			if (!next) this._applySnowImpact();
+		}
+		this._applyScrapContact(true);
+		if(next&&this.biome==='garbage-dump-glacier')this.scrapPitch?.resetTiming();
+		if (!next) {
+			this._applyScrapImpact();
+			this._applyHydroImpact();
+			this._applyMicroImpact();
+			this._applyCrystalImpact();
+			this._applySteamImpact();
+			this._applyJellyImpact();
+			this._applyVentCrust();
+			this._applyCandyImpact();
+			this._applySpaceImpact();
+			this._applyPyramidImpact();
+		}
+		if(this.biome==='crystal-cavern'&&!this.menuMode){
+			for(const stem of ['bass','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'crystallattice','openness',next?1:0);
+			this.mixer?.setEffectParam('drums','crystalPercussion','gain',next?.48:1);
+		}
+		if(this.biome==='micro-mountain'&&!this.menuMode)
+			for(const stem of ['bass','drums','guitar','piano','other'])
+				this.mixer?.setEffectParam(stem,'microbox','openness',next?1:0);
 		// New adaptive packs crossfade full original drums with an actual
 		// airborne kit. The legacy 0.58 airborne duck remains unchanged.
 		// Airborne ducking applies to the ORIGINAL stem regardless
@@ -304,6 +896,9 @@ export class StemMusicDirector {
 		const normalized = clamp((Number(speedPxS) || 0) / 1000, 0, 1);
 		this.mixer?.setEffectParam('other', 'speed-filter', 'frequency', 400 + normalized * 15000);
 		this.speedPxS = Math.max(0, Number(speedPxS)||0);
+		this._applyScrapContact();
+		this._applySteamSpeed();
+		this._applyCandySpeed();
 		const speedGain = this.menuMode ? 1 : clamp(.2+this.speedPxS/850,.2,1.18);
 		this.mixer?.setGain('bass',speedGain,{motion:true,time:.16});
 		this.mixer?.setGain('adaptive:bass',speedGain,{motion:true,time:.16});
@@ -376,6 +971,15 @@ export class StemMusicDirector {
 		if (!this._timer) this._timer = setInterval(() => { this._pump(); }, 75);
 	}
 
+	async _fetchOriginalMusicResponse(packBase,relative){
+		const key=String(packBase);
+		const {response,usedLegacy}=await fetchMusicAssetResponse(packBase,relative,{
+			preferLegacy:this._legacyDebutmontPacks?.has(key)===true,
+		});
+		if(usedLegacy)this._legacyDebutmontPacks?.add(key);
+		return response;
+	}
+
 	async _getTrack(index) {
 		const track = this.catalog[index % this.catalog.length];
 		const catalogBase = new URL(this.catalogUrl, window.location.href);
@@ -392,7 +996,7 @@ export class StemMusicDirector {
 		const buffers = new Map();
 		await Promise.all(this._wantedNames(info.pack).map(async (name) => {
 			const relative = info.pack.segments[0].sources[name];
-			const response = await fetch(resolveMusicAsset(info.base, relative));
+			const response = await this._fetchOriginalMusicResponse(info.base,relative);
 			if (!response.ok) throw new Error('Missing first segment: ' + name);
 			const buffer = await this.ctx.decodeAudioData(await response.arrayBuffer());
 			buffers.set('0/' + name, buffer);
@@ -408,7 +1012,7 @@ export class StemMusicDirector {
 		if (this.cache.has(key)) return this.cache.get(key);
 		if (this.inflight.has(key)) return this.inflight.get(key);
 		const promise = (async () => {
-			const response = await fetch(resolveMusicAsset(info.base, relative));
+			const response = await this._fetchOriginalMusicResponse(info.base,relative);
 			if (!response.ok) throw new Error('Missing stem ' + sourceName + ' in ' + info.track.id);
 			const compressed = await response.arrayBuffer();
 			const buffer = await this.ctx.decodeAudioData(compressed);
@@ -442,7 +1046,7 @@ export class StemMusicDirector {
 		if (this.cache.has(key)) return this.cache.get(key);
 		if (this.inflight.has(key)) return this.inflight.get(key);
 		const promise = (async () => {
-			const response = await fetch(resolveMusicAsset(this.packBase, path));
+			const response = await this._fetchOriginalMusicResponse(this.packBase,path);
 			if (!response.ok) throw new Error('Missing optional adaptive source');
 			const buffer = await this.ctx.decodeAudioData(await response.arrayBuffer());
 			if (token === this._token && !this.disposed) this.cache.set(key, buffer);
@@ -515,6 +1119,8 @@ export class StemMusicDirector {
 			this._refreshVoices();
 			this._timbreSignatures.clear();
 			this._applyMusicTimbres(true);
+			this._invalidateContinuousFxMemoAfterTrackReplace();
+			this._restoreArcadeBridgeAfterTrackReplace();
 			if (info.pack.captions) this._loadCaptions(info, token);
 			this._nextPromise = null;
 			this._nextIndex = null;
@@ -601,6 +1207,7 @@ export class StemMusicDirector {
 		if (!this.started || !this.pack || !this.ctx || this.ctx.state !== 'running' ||
 			this.clockStart === null) return;
 		const now = this.ctx.currentTime;
+		this._maybeScrapPitchClang(now);
 		const elapsed = now - this.clockStart;
 		const duration = this.pack.duration;
 		if (elapsed > duration - 15 && !this._nextPromise) {
@@ -769,7 +1376,10 @@ export class StemMusicDirector {
 	}
 
 	stop() {
+		this.scrapCowbell?.dispose();
+		this.scrapCowbell=null;
 		this.started = false;
+		this.microBees?.setPositions([],{enabled:false});
 		this.transportPaused=false;
 		this._resumeOffset=0;
 		this._resumeGateAt=null;
@@ -796,6 +1406,7 @@ export class StemMusicDirector {
 		this.disposed = true;
 		this.stop();
 		this.adaptive?.destroy();
+		this.microBees?.dispose();
 		this.mixer?.destroy();
 		if (this.bus) this.bus.disconnect();
 	}

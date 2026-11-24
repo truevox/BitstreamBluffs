@@ -16,7 +16,7 @@
  *
  * Signal graph:
  *   music voices -> musicSrc -> musicFilter -> duck -> musicBus -+
- *   sfx voices  -----------------------------------> sfxBus ----+-> mix -> dry --------+-> gate -> master -> comp -> out
+ *   sfx voices  -----------------------------------> sfxBus ----+-> mix -> dry --------+-> gate -> master -> comp -> peakGuard -> out
  *   wind noise ------------------------------------> windGain --+      -> crusher -> wet +
  *   static noise -> staticGain ---------------------------------------------------------> master
  * The "glitch bus" is the dry/wet crusher + gate + static section: bit-crush (staircase WaveShaper), stutter
@@ -29,11 +29,12 @@ import { Rng } from './Rng.js';
 import { StemMusicDirector } from './music/StemMusicDirector.js';
 import { TurntableScratch } from './music/TurntableScratch.js';
 import { FatalCrashCountIn } from './music/FatalCrashCountIn.js';
-import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
+import { hasEnabledSongs, installedSongChoices, sanitizeSongSelection } from './music/MusicPlaylist.js';
 import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
 import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
 import { syntheticMeterAt } from './music/SyntheticMeterTiming.js';
 import { cosmeticRandom } from './CosmeticRandom.js';
+import { createOutputPeakGuard } from './music/OutputPeakGuard.js';
 
 /** SFX names playSfx() must support (callers outside the engineer's files may use these). */
 export const SFX = Object.freeze([
@@ -86,6 +87,7 @@ export class AudioSynth {
     this._jukeboxMode = false;
     this._musicMode = 'run';
     this._autoStartAttempted = false;
+    this._menuAutoplayPending = false; // private-only selection while catalog is unresolved
     this._intensity = 0;
     this._distIntensity = 0;
     this._speedIntensity = 0;
@@ -109,11 +111,7 @@ export class AudioSynth {
     this._domListeners = [];
     this._destroyed = false;
     this._stemMusic = new StemMusicDirector(this);
-    this._stemMusic.onReady = () => {
-      if (this._musicWanted && hasEnabledSongs(this.settings.musicEnabledSongs)) {
-        this._activateStemMusic();
-      }
-    };
+    this._stemMusic.onReady = () => this._onStemCatalogReady();
     this._stemMusic.onTrackStarted = (track) => {
       const current=this._fatalCountIn?.active;
       if(current && (current.trackId!==track.id ||
@@ -129,6 +127,32 @@ export class AudioSynth {
       this.game?.events?.emit(EVT.MUSIC_TRACK_CHANGED, { id: track.id, title: track.title });
     };
     this._bind();
+  }
+
+  /** Scope selection to the installed catalog rather than 33 defaults.
+   * When catalog discovery has not completed yet, only the public first four
+   * may trigger any procedural fallback, never uninstalled private tracks.
+   */
+  _hasEnabledSongs(selection = this.settings?.musicEnabledSongs) {
+    return hasEnabledSongs(selection, installedSongChoices(this._stemMusic?.catalog));
+  }
+
+  /** A private-only selected track may not be discoverable when Title first
+   * calls startMenuMusic(). Preserve that *one* autoplay request until the
+   * installed catalog arrives, without inventing an uninstalled source or
+   * resuming a jukebox the user explicitly stopped/paused.
+   */
+  _onStemCatalogReady() {
+    const pending = !!this._menuAutoplayPending;
+    this._menuAutoplayPending = false;
+    if (pending && this._musicMode === 'menu' && !this._musicWanted &&
+        !this._stemMusic?.transportPaused &&
+        this._hasEnabledSongs(this.settings?.musicEnabledSongs)) {
+      this.jukeboxPlay();
+      return;
+    }
+    if (this._musicWanted && this._hasEnabledSongs(this.settings?.musicEnabledSongs))
+      this._activateStemMusic();
   }
 
   // -------------------------------------------------------------------------------------------------------- wiring
@@ -218,6 +242,13 @@ export class AudioSynth {
 
   _onLanding(p) {
     if (!p || p.quality === 'crash') return;
+    // LANDING is a synchronous gameplay event, fired before scoring boosts
+    // and spring rebound. WebAudio/FX cannot be allowed to cancel that
+    // authoritative game logic; still play ordinary landing SFX afterward.
+    if (this._musicMode === 'run') {
+      try { this._stemMusic?.onLanding?.(p); }
+      catch { /* optional musical-physics effects must never stop Matter */ }
+    }
     if (p.quality === 'perfect') this.playSfx('landPerfect');
     else if (p.hard) this.playSfx('landHard');
     else this.playSfx('land', { pitch: p.quality === 'sloppy' ? 0.8 : 1 });
@@ -260,7 +291,12 @@ export class AudioSynth {
     n.comp.threshold.value = -10;
     n.comp.ratio.value = 6;
     n.master.connect(n.comp);
-    n.comp.connect(c.destination);
+    // Compressor can still overshoot 0 dBFS on short mixed transients.
+    // This post-compressor soft ceiling stays linear below 0.86 and
+    // protects the entire output, including SFX and wind/static.
+    n.peakGuard = createOutputPeakGuard(c);
+    n.comp.connect(n.peakGuard);
+    n.peakGuard.connect(c.destination);
     n.gate = g(1);
     n.gate.connect(n.master);
     n.mix = g(1);
@@ -367,7 +403,7 @@ export class AudioSynth {
       }
       this._domListeners = this._domListeners.filter((d) => d[1] === 'visibilitychange');
     }
-    if (this._musicWanted && hasEnabledSongs(this.settings.musicEnabledSongs)) {
+    if (this._musicWanted && this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
       if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode)
         this._startScheduler();
     }
@@ -611,7 +647,7 @@ export class AudioSynth {
   applySettings(settings) {
     try {
       if (settings) {
-        const hadMusic = hasEnabledSongs(this.settings?.musicEnabledSongs);
+        const hadMusic = this._hasEnabledSongs(this.settings?.musicEnabledSongs);
         this.settings = {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
@@ -631,11 +667,11 @@ export class AudioSynth {
         // Re-enabling music from the all-off state should not require
         // pressing PLAY a second time during an auto-started menu session.
         if (this._autoStartAttempted && this._musicMode === 'menu' &&
-            !hadMusic && hasEnabledSongs(this.settings.musicEnabledSongs) &&
+            !hadMusic && this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
             !this._stemMusic?.transportPaused) this.jukeboxPlay();
         // The owner-defined all-off state is TRUE SILENCE, including
         // muting the procedural synth. SFX uses a separate bus.
-        if (!hasEnabledSongs(this.settings.musicEnabledSongs)) {
+        if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
           if (this._musicTimer) clearInterval(this._musicTimer);
           this._musicTimer = null;
           this._stemMusic?.stop();
@@ -683,6 +719,8 @@ export class AudioSynth {
 
   _setPaused(paused) {
     this._paused = paused;
+    // Pauses may stop frame updates instantly: proactively silence bee Foley.
+    if (paused) try { this._stemMusic?.setMicroBees?.([],0); } catch {}
     try {
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
@@ -715,7 +753,7 @@ export class AudioSynth {
     return !!(this.ctx && this.ctx.state === 'running' && this.nodes &&
       !this.unavailable && !this._destroyed &&
       s?.masterVolume > 0 && s?.musicVolume > 0 &&
-      hasEnabledSongs(s?.musicEnabledSongs));
+      this._hasEnabledSongs(s?.musicEnabledSongs));
   }
 
   /** Jukebox intent is authoritative over automatic song restoration. */
@@ -757,7 +795,7 @@ export class AudioSynth {
     }
     if (!d?.transportPaused || d.started || d._token !== snap.token ||
         d.trackIndex !== snap.trackIndex || d._resumeOffset !== snap.offset ||
-        !hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+        !this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
     // No vinyl on run-end or run-abort; restore the SAME source once.
     this._musicWanted = true;
     try { if (!d.transportPlay()) this._musicWanted = false; }
@@ -813,7 +851,7 @@ export class AudioSynth {
     this._vinylResume = null;
     this._vinylResumeTimer = null;
     const snap = pending.snapshot;
-    if (!hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+    if (!this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
     if (!snap.procedural && (!d?.transportPaused || d.started ||
         d._token !== snap.token || d.trackIndex !== snap.trackIndex ||
         d._resumeOffset !== snap.offset)) return;
@@ -846,7 +884,7 @@ export class AudioSynth {
       this._setPaused(false);
       if (!session?.shouldResume || session.manualOverride) return;
       const d = this._stemMusic;
-      if (!hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+      if (!this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
       if (!session.procedural && (!d?.transportPaused || d.started ||
           d._token !== session.token || d.trackIndex !== session.trackIndex ||
           d._resumeOffset !== session.offset)) return;
@@ -935,6 +973,49 @@ export class AudioSynth {
     this._stemMusic?.setAirborne(this._musicMode === 'menu' ? false : value);
   }
 
+  /** Read-only screen positions from the existing Micro Mountain bee backdrop. */
+  setMicroBees(bees,playerScreenX) {
+    if (this._musicMode !== 'run' || this._paused) {
+      this._stemMusic?.setMicroBees?.([],0);
+      return;
+    }
+    this._stemMusic?.setMicroBees?.(bees,playerScreenX);
+  }
+
+  /** True arcade bridge geometry, read-only from terrain; standalone
+   * Arcade uses this exact same native original-source processor.
+   */
+  setArcadeTransition(sample) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setArcadeTransition?.(sample) === true;
+  }
+
+  /** Verified physical thermal zone and actual gravity; one-way music only. */
+  setThermalMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setThermalMotion?.(snapshot) === true;
+  }
+
+  /** Actual low-gravity and rider altitude for Space Mountain source field. */
+  setSpaceMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setSpaceMotion?.(snapshot) === true;
+  }
+
+  /** Read-only same-tick physics snapshots prove real geyser eruptions.
+   * A simple airborne edge is deliberately NOT a valid geyser trigger.
+   */
+  setGeyserMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setGeyserMotion?.(snapshot) === true;
+  }
+
+  /** Read-only authoritative terrain/rider sample for hydrostatic musical physics. */
+  setHydrostaticMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return;
+    this._stemMusic?.setHydrostaticMotion?.(snapshot);
+  }
+
   // ----------------------------------------------------------------------------------------------------------- music
 
   /** Switch only the musical presentation; keep the same track and WebAudio clock. */
@@ -957,7 +1038,9 @@ export class AudioSynth {
         ]) {
           if (!node?.gain) continue;
           node.gain.cancelScheduledValues(t);
-          node.gain.setTargetAtTime(gain, t, 0.025);
+          // ~95% settled at 0.6s, virtually complete by 0.75s,
+          // matching the native original-stem menu transition.
+          node.gain.setTargetAtTime(gain, t, 0.20);
         }
       }
     } catch { /* headless audio and unsupported nodes remain harmless */ }
@@ -969,15 +1052,27 @@ export class AudioSynth {
     this._enterMenuMusic();
     if (this._autoStartAttempted) return;
     this._autoStartAttempted = true;
-    if (hasEnabledSongs(this.settings.musicEnabledSongs)) this.jukeboxPlay();
+    if (!this._stemMusic?.ready &&
+        !this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
+      // All public first-four off may still mean a selected private source;
+      // don't permanently discard initial menu autoplay before discovery.
+      this._menuAutoplayPending = true;
+      return;
+    }
+    if (this._hasEnabledSongs(this.settings.musicEnabledSongs)) this.jukeboxPlay();
   }
 
   /** Run transitions change timbre and effects but never restart a playing song. */
   _enterRunMusic(seed) {
+    this._menuAutoplayPending = false; // a late catalog fetch cannot restart Title music in-game
     this._musicMode = 'run';
     this._jukeboxMode = false;
+    // #65: choose actual Debutmont WHILE still using the clean menu
+    // arrangement; only then crossfade into its gameplay processing.
+    // Reversing this order would replace the 750ms menu fade with the
+    // ordinary 180ms biome fade, as caught by real Chromium Web Audio.
+    this._stemMusic?.setBiome('debutmont');
     this._stemMusic?.setMenuMode(false);
-    this._stemMusic?.setBiome('bitstream-bluffs');
     this._onBsodState(null);
     this._setPaused(false);
     // Respect an explicit manual pause in the jukebox.
@@ -990,7 +1085,7 @@ export class AudioSynth {
   /** Start selected six-stem soundtrack; fall back to procedural only
    * when a song IS selected but its pack cannot be loaded. */
   _activateStemMusic() {
-    if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+    if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
     if (this._paused && this._vinylPauseSession &&
         !this._vinylPauseSession.manualOverride) return false;
     const player = this._stemMusic;
@@ -1007,8 +1102,16 @@ export class AudioSynth {
   /** Failure of a pack load only falls back to procedural when some
    * songs remain selected, never in the all-off state. */
   musicProviderFailed() {
-    if (!this._musicWanted || !hasEnabledSongs(this.settings.musicEnabledSongs)) return;
-    if (this.ctx?.state === 'running' && !this._musicTimer) this._startScheduler();
+    if (!this._musicWanted || this._jukeboxMode ||
+        !this._hasEnabledSongs(this.settings.musicEnabledSongs)) return;
+    if (this.ctx?.state !== 'running' || !this.nodes?.musicSrc || this._musicTimer) return;
+    // An attempted stem launch deliberately muted procedural musicSrc.
+    // If that pack fails late, scheduling synth notes at gain=0 is SILENT.
+    // Restore only this fallback bus, not any original source / SFX bus.
+    const t = this.ctx.currentTime;
+    this.nodes.musicSrc.gain.cancelScheduledValues(t);
+    this.nodes.musicSrc.gain.setTargetAtTime(this._paused ? 0.45 : 1, t, 0.04);
+    this._startScheduler();
   }
 
   /** Full soundtrack and synth fallback are both muted if no tracks selected.
@@ -1023,13 +1126,9 @@ export class AudioSynth {
       this._musicSeed = String(seed == null ? '' : seed);
       this._musicWanted = true;
       this._arrCache.clear();
-      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) {
-        this._stemMusic?.stop();
-        if (this._musicTimer) clearInterval(this._musicTimer);
-        this._musicTimer = null;
-        if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
-        return;
-      }
+      // Arrange the fallback deterministically even if the catalog has not
+      // arrived yet. A late pack failure can start the procedural scheduler;
+      // it must never inherit undefined RNG, progression or step state.
       const base = new Rng(this._musicSeed).fork('music');
       this._baseBpm = 118 + base.int(0, 14);
       const order = [0, 1, 2, 3];
@@ -1039,9 +1138,18 @@ export class AudioSynth {
       }
       this._progOrder = order;
       this._baseRng = base;
+      this._step = 0;
+      this._nextTime = null;
       this._distIntensity = 0;
       this._speedIntensity = 0;
       this._updateIntensity();
+      if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
+        this._stemMusic?.stop();
+        if (this._musicTimer) clearInterval(this._musicTimer);
+        this._musicTimer = null;
+        if (this.nodes) this.nodes.musicSrc.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
+        return;
+      }
       if (!this._ensureCtx()) return;
       if (this._activateStemMusic()) return;
       const t = this.ctx.currentTime;
@@ -1065,8 +1173,9 @@ export class AudioSynth {
   }
 
   jukeboxPlay() {
+    this._menuAutoplayPending = false; // manual play overrides delayed menu autoplay
     try {
-      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       this._jukeboxMode = true;
@@ -1079,6 +1188,7 @@ export class AudioSynth {
   }
 
   jukeboxPause() {
+    this._menuAutoplayPending = false; // intentional manual pause cancels pending autoplay
     this._vinylJukeboxIntent();
     const ok=this._stemMusic?.transportPause()||false;
     if(ok){
@@ -1090,8 +1200,9 @@ export class AudioSynth {
   }
 
   jukeboxStep(direction) {
+    this._menuAutoplayPending = false; // next/previous is explicit manual intent
     try {
-      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       const wasPaused=this._stemMusic.transportPaused;
@@ -1168,6 +1279,20 @@ export class AudioSynth {
     }catch{return null;}
   }
 
+  /**
+   * Audio-only cosmetic gear tick on a real WorldDance detected recording
+   * transient. The caller passes the EXACT current read-only source sample.
+   * Synthetic meter events are never passed into this method.
+   */
+  onSteampunkRecordedAccent(sample){
+    try{
+      if(this._destroyed||this._musicMode!=='run'||this._paused||
+        !this._musicWanted||!this._vinylAudible()||
+        !sample||sample!==this._worldDanceSample)return false;
+      return this._stemMusic?.onSteampunkMusicAccent?.(sample)===true;
+    }catch{return false;}
+  }
+
   /** Read-only, deliberately UNVERIFIED 0.5s / 4/4 meter for cosmetics.
    * Unlike getBeatTiming(), this is NOT sound-analyzed and CANNOT release
    * Gym, time tricks, change physics, certify downbeats or alter playback.
@@ -1188,7 +1313,7 @@ export class AudioSynth {
         d.songEnabled?.[d.track.id]===false||
         this.settings?.musicEnabledSongs?.[d.track.id]===false||
         !this.settings?.masterVolume||!this.settings?.musicVolume||
-        !hasEnabledSongs(this.settings?.musicEnabledSongs)||
+        !this._hasEnabledSongs(this.settings?.musicEnabledSongs)||
         !c||c.state!=='running'||!Number.isFinite(c.currentTime)||
         this._vinylPauseSession||this._vinylResume||
         this.getFatalCountInStatus().active)return null;
@@ -1222,7 +1347,7 @@ export class AudioSynth {
       if(this.getFatalCountInStatus().active)
         return fallback('fatal-recovery-grid-unverified');
       if(!(this.settings?.masterVolume>0&&this.settings?.musicVolume>0)||
-        !hasEnabledSongs(this.settings?.musicEnabledSongs))
+        !this._hasEnabledSongs(this.settings?.musicEnabledSongs))
         return fallback('music-muted-or-disabled');
       if(!d.pack||!d.track||d.pack.id!==d.track.id||
         d.clockStart===null||d._loading||d.activeNodes?.size<1||
@@ -1260,7 +1385,7 @@ export class AudioSynth {
       if(!c||c.state!=='running'||this.unavailable||this._paused||
         !this._musicWanted||!d?.started||d.transportPaused||
         !this.settings?.masterVolume||!this.settings?.musicVolume||
-        !hasEnabledSongs(this.settings?.musicEnabledSongs)||
+        !this._hasEnabledSongs(this.settings?.musicEnabledSongs)||
         !d.track||!d.pack||d.pack.id!==d.track.id||d._loading||
         d.activeNodes?.size<1||d.songEnabled?.[d.track.id]===false)return false;
       const revision=String(d._token)+':'+d.track.id+':'+d.clockStart;
@@ -1275,6 +1400,7 @@ export class AudioSynth {
 
   /** @returns {void} */
   stopMusic() {
+    this._menuAutoplayPending = false;
     try {
       this._cancelFatalCountIn();
       this._cancelVinylTransition();
@@ -1309,7 +1435,7 @@ export class AudioSynth {
 
   _tickMusic() {
     if (!this._ready() || !this._musicWanted ||
-      !hasEnabledSongs(this.settings.musicEnabledSongs) || this._stemMusic?.started) return;
+      !this._hasEnabledSongs(this.settings.musicEnabledSongs) || this._stemMusic?.started) return;
     const c = this.ctx;
     if (this._nextTime < c.currentTime - 0.1) this._nextTime = c.currentTime + 0.05; // fell behind (tab throttled)
     while (this._nextTime < c.currentTime + 0.22) {

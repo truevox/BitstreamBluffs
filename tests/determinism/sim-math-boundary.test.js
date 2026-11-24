@@ -29,6 +29,9 @@ export const PRESENTATION_FILES = [
   'src/entities/SongBillboard.js', 'src/scenes/GameOverScene.js', 'src/scenes/PauseScene.js', 'src/scenes/TitleScene.js', 'src/scenes/UIScene.js',
   'src/shaders/GlitchPipeline.js', 'src/systems/AudioSynth.js', 'src/systems/MicroBees.js', 'src/systems/WorldDance.js',
   'src/systems/music/AdaptiveBiomeRouter.js', 'src/systems/music/BsodThreatProcessor.js', 'src/systems/music/ImpulseBank.js', 'src/systems/music/MusicFXGraph.js',
+  // Original-stem notes, pressure ambience and event-gated cowbell are
+  // ONLY Web Audio presentation. They never feed physics or recorded pads.
+  'src/systems/music/CrystalChroma.js', 'src/systems/music/HydrostaticPressure.js', 'src/systems/music/ScrapCowbell.js',
   'src/ui/Backdrop.js', 'src/ui/LeaderboardTable.js', 'src/ui/MenuList.js', 'src/ui/MenuTerrain.js', 'src/ui/Motion.js', 'src/ui/Panel.js',
 ];
 /** Files that must visibly use pmath (everything wired in #121). */
