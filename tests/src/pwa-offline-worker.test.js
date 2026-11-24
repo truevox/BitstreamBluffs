@@ -77,6 +77,8 @@ test('subpath inventory is scope-bound and rejects cross-scope HTML entries',asy
 test('local candidate mono router is explicitly opt-in and generated scripts parse',()=>{
   const inv={base:'/BitstreamBluffs/',version:'a'.repeat(20),entries:[]};
   const normal=renderOfflineWorker(inv),pilot=renderOfflineWorker(inv,{monoDev:true});
-  expect(normal).not.toContain('monoDevResponse');expect(pilot).toContain('monoDevResponse');
+  expect(normal).not.toContain('monoDevResponse');
+  const cacheName=s=>s.match(/const CACHE_NAME = "([^"]+)"/)[1];
+  expect(cacheName(normal)).not.toBe(cacheName(pilot));expect(pilot).toContain('monoDevResponse');
   expect(()=>new Function(normal)).not.toThrow();expect(()=>new Function(pilot)).not.toThrow();
 });

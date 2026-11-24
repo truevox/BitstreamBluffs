@@ -72,11 +72,11 @@ export async function createOfflineInventory(distDir, base = '/') {
 
 export function renderOfflineWorker(inventory, {monoDev=false} = {}) {
   const base = checkedBase(inventory.base);
-  const cacheName = CACHE_PREFIX + inventory.version;
+  const cacheToken = '__BB_SHELL_CACHE_ID__';
   const paths = inventory.entries.map(x => [x.path, x.sha256]);
-  return `/* Bitstream Bluffs #172: deterministic offline experiment. Deploy only when deliberately registered. */\n` +
+  const script = `/* Bitstream Bluffs #172: deterministic offline experiment. Deploy only when deliberately registered. */\n` +
 `'use strict';\n` +
-`const CACHE_NAME = ${JSON.stringify(cacheName)};\n` +
+`const CACHE_NAME = ${JSON.stringify(cacheToken)};\n` +
 `const CACHE_PREFIX = ${JSON.stringify(CACHE_PREFIX)};\n` +
 `const EXPECTED = new Map(${JSON.stringify(paths)});\n` +
 `const BASE = ${JSON.stringify(base)};\n` +
@@ -137,6 +137,9 @@ renderR2RouteWorker() +
 `    return new Response('Offline files unavailable: reconnect to repair.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });\n` +
 `  })());\n` +
 `});\n`;
+  // Bind cache identity to exact worker behavior as well as the shell assets.
+  const version = sha256(Buffer.from(JSON.stringify([inventory.version,script]))).slice(0,20);
+  return script.replace(cacheToken,CACHE_PREFIX+version);
 }
 
 export async function generateOfflineWorker(distDir, base = '/', options = {}) {
