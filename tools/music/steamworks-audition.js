@@ -6,7 +6,7 @@ import { WorldDanceEnvelope } from '../../src/systems/WorldDance.js';
 let extraEnhancer=null;
 const $=id=>document.getElementById(id);
 const STEMS=['drums','bass','guitar','piano','other'];
-const SONG='/music/packs/33_local-one-more-run-bitstream-bluffs/';
+const SONG='/audition-loops/one-more-run/';
 const gainFor=role=>role==='drums'?.9:role==='bass'?.75:.65;
 const val=id=>Number($(id).value);
 const percent=id=>val(id)+'%';
@@ -132,7 +132,7 @@ async function load(){
 	try{
 		await ready();
 		const decoded=await Promise.all(STEMS.map(async role=>{
-			const response=await fetch(SONG+'0000-'+role+'.ogg');
+			const response=await fetch(SONG+role+'.ogg');
 			if(!response.ok)throw Error(role+' original source unavailable (HTTP '+response.status+')');
 			return ctx.decodeAudioData(await response.arrayBuffer());
 		}));

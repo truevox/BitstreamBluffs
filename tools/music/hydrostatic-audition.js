@@ -54,7 +54,7 @@ async function load(){
 	try {
 		await ready();
 		const data=await Promise.all(ROLES.map(async role=>{
-			const response=await fetch('/scrapheap-audition/'+role+'.mp3');
+			const response=await fetch('/audition-loops/pope-leo/'+role+'.ogg');
 			if(!response.ok)throw new Error(role+' missing ('+response.status+')');
 			return ctx.decodeAudioData(await response.arrayBuffer());
 		}));

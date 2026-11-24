@@ -59,7 +59,7 @@ async function loadSample() {
 	try {
 		await readyAudio();
 		const decoded = await Promise.all(STEMS.map(async role => {
-			const response = await fetch('/scrapheap-audition/' + role + '.mp3');
+			const response = await fetch('/audition-loops/pope-leo/' + role + '.ogg');
 			if (!response.ok) throw new Error(role + ' stem is missing');
 			return ctx.decodeAudioData(await response.arrayBuffer());
 		}));

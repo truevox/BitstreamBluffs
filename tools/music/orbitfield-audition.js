@@ -5,7 +5,7 @@ import {orchestraPreset} from '../../src/systems/music/DynamicOrchestraPresets.j
 let extraEnhancer=null;
 const $=id=>document.getElementById(id);
 const ROLES=['drums','bass','guitar','piano','other'];
-const PACK='/music/packs/33_local-one-more-run-bitstream-bluffs/';
+const PACK='/audition-loops/one-more-run/';
 const roleGain=role=>role==='drums'?.9:role==='bass'?.75:.65;
 const value=id=>Number($(id).value);
 const say=message=>{$('status').textContent=message;};
@@ -87,7 +87,7 @@ async function load(){
 	try{
 		await ready();
 		const audio=await Promise.all(ROLES.map(async role=>{
-			const response=await fetch(PACK+'0000-'+role+'.ogg');
+			const response=await fetch(PACK+role+'.ogg');
 			if(!response.ok)throw Error(role+' original OGG unavailable: HTTP '+response.status);
 			return ctx.decodeAudioData(await response.arrayBuffer());
 		}));

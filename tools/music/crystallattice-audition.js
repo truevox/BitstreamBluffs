@@ -57,7 +57,7 @@ async function ready(){if(!ctx)ctx=new AudioContext({latencyHint:'interactive'})
 async function load(){
 	$('load').disabled=true;say('Loading the original five instrument stems…');
 	try{await ready();const decoded=await Promise.all(ROLES.map(async role=>{
-		const response=await fetch('/scrapheap-audition/'+role+'.mp3');
+		const response=await fetch('/audition-loops/pope-leo/'+role+'.ogg');
 		if(!response.ok)throw new Error('Missing original '+role+' stem');
 		return ctx.decodeAudioData(await response.arrayBuffer());
 	}));buffers=Object.fromEntries(ROLES.map((r,i)=>[r,decoded[i]]));

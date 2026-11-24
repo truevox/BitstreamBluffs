@@ -50,7 +50,7 @@ $('file').addEventListener('change', async () => {
 $('demo').addEventListener('click', async () => {
 	status('Loading original instrument sample…');
 	try {
-		const response = await fetch('/snowpack-audition/pope-leo-original-instruments-20s.mp3');
+		const response = await fetch('/audition-loops/pope-leo/mix.ogg');
 		if (!response.ok) throw new Error('Sample unavailable');
 		await loadAudio(await response.arrayBuffer(), 'Pope Leo / original instrumental stems');
 	} catch (error) { status('Sample unavailable: ' + String(error.message || error)); }
