@@ -16,6 +16,8 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 // never acquire the current source identity just by matching the served HTML.
 const sourceStatus=execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim();
 assert.equal(sourceStatus,'','source worktree must be clean for stamped acceptance');
+const testedHead=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
+assert(/^[a-f0-9]{40}$/.test(testedHead),'cannot attest exact commit SHA');
 execFileSync('npm',['run','build'],{cwd:root,timeout:120000,stdio:'pipe'});
 const source=fs.readFileSync(path.join(root,'tools/conformance/cross-engine-page.js'),'utf8');
 const expectedHtml=fs.readFileSync(path.join(root,'dist/index.html'),'utf8');
@@ -176,6 +178,52 @@ try {
       assert(b.marker.onscreen.best&&b.marker.onscreen.death,'both labels must intersect camera during genuine rendered frames');
       assert(b.marker.capturedFrame.best&&b.marker.capturedFrame.death,
         'both label text bounds must intersect camera ON THE FRAME BEING CAPTURED');
+      // Pixel proof of EACH label, not merely the gate poles. Hide only one
+      // Phaser text object at a time, re-render the SAME camera with zero
+      // simulation delta, and compare a tightly clipped text region. The
+      // marker pole and all other scenery remain unchanged; the tick must not
+      // advance. This catches visible-but-not-painted labels.
+      const clipRegions=await marked.p.evaluate(()=>{
+        const g=window.__bbGame,run=g.scene.getScene('RunScene');
+        const view=run.cameras.main.worldView;
+        const canvasRect=g.canvas.getBoundingClientRect();
+        const scaleX=canvasRect.width/view.width,scaleY=canvasRect.height/view.height;
+        const regions={};
+        for(const [label,key] of [['best','bestMarker'],['death','deathMarker']]){
+          const m=run[key],r=m.label.getBounds();
+          const x=Math.max(0,Math.floor(canvasRect.x+(r.x-view.x)*scaleX-2));
+          const y=Math.max(0,Math.floor(canvasRect.y+(r.y-view.y)*scaleY-2));
+          const right=Math.min(window.innerWidth,Math.ceil(canvasRect.x+(r.right-view.x)*scaleX+2));
+          const bottom=Math.min(window.innerHeight,Math.ceil(canvasRect.y+(r.bottom-view.y)*scaleY+2));
+          if(!(right>x+6&&bottom>y+6))throw Error(`${label} has no screen-space text region`);
+          regions[label]={x,y,width:right-x,height:bottom-y};
+        }
+        return regions;
+      });
+      const labelPixelProof={};
+      const renderWithoutSim=async(label,visible)=>marked.p.evaluate(({label,visible})=>{
+        const g=window.__bbGame,run=g.scene.getScene('RunScene');
+        const before=run.simClock.tick;
+        run[label==='best'?'bestMarker':'deathMarker'].label.setVisible(visible);
+        g.step(g.loop.now,0);
+        if(run.simClock.tick!==before)throw Error('Visibility-only raster test advanced simulation');
+      },{label,visible});
+      for(const label of ['best','death']){
+        const clip=clipRegions[label];
+        const visiblePixels=await marked.p.screenshot({clip});
+        await renderWithoutSim(label,false);
+        const hiddenPixels=await marked.p.screenshot({clip});
+        assert(!visiblePixels.equals(hiddenPixels),`${label} text pixels did not change when only that label was hidden`);
+        await renderWithoutSim(label,true);
+        const restoredPixels=await marked.p.screenshot({clip});
+        assert(visiblePixels.equals(restoredPixels),`${label} pixel crop not restored after zero-tick rerender`);
+        const bytesSha=(buf)=>createHash('sha256').update(buf).digest('hex');
+        labelPixelProof[label]={clip,visibleSha:bytesSha(visiblePixels),hiddenSha:bytesSha(hiddenPixels),restored:true};
+        if(process.env.RASTER_OUT){
+          fs.writeFileSync(`${process.env.RASTER_OUT}-${label}-visible.png`,visiblePixels,{flag:'wx'});
+          fs.writeFileSync(`${process.env.RASTER_OUT}-${label}-hidden.png`,hiddenPixels,{flag:'wx'});
+        }
+      }
       const screenshotA=await normal.p.screenshot(),screenshotB=await marked.p.screenshot();
       assert.notEqual(createHash('sha256').update(screenshotA).digest('hex'),
         createHash('sha256').update(screenshotB).digest('hex'),'actual raster buffers must differ with both markers');
@@ -184,7 +232,7 @@ try {
         fs.writeFileSync(`${process.env.RASTER_OUT}-markers.png`,screenshotB,{flag:'wx'});
       }
       rasterEvidence={hz,maxTicks,markerOnscreen:b.marker.onscreen,
-        capturedFrame:b.marker.capturedFrame,
+        capturedFrame:b.marker.capturedFrame,labelPixelProof,
         normalPngSha:createHash('sha256').update(screenshotA).digest('hex'),
         markerPngSha:createHash('sha256').update(screenshotB).digest('hex'),
         markerGeneratorReads:b.marker.generatorReads,markerCacheMutations:b.marker.cacheMutations};
@@ -192,7 +240,7 @@ try {
     }finally{await normal.context.close();await marked.context.close();}
   }
 
-  if(process.env.OUT)fs.writeFileSync(process.env.OUT,JSON.stringify({identity,url,distIndexSha:sha(expectedHtml),distEntrySha:createHash('sha256').update(expectedEntry).digest('hex'),
+  if(process.env.OUT)fs.writeFileSync(process.env.OUT,JSON.stringify({testedHead,identity,url,distIndexSha:sha(expectedHtml),distEntrySha:createHash('sha256').update(expectedEntry).digest('hex'),
     freshlyBuilt:true,readOnlyDerivedProbe:true,results,rasterEvidence},null,2)+'\n',{flag:'wx'});
   console.log(`PASS #253 all ${results.length*3} real Chromium render/cadence/run-position cells; no marker-dependent causal state`);
 }finally{await browser.close();}
