@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 01:41 UTC. Main: `b569fa70815b15fdd1f7720ee3ae7b87aa31ccea` (SIM7, package/lock/changelog v2.19.21).
+Last verified: 2026-11-24 01:47 UTC. Main: `b569fa70815b15fdd1f7720ee3ae7b87aa31ccea` (SIM7, package/lock/changelog v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -168,11 +168,11 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   #248 is historical preview only: its older draft SIM7 is not shipped
   SIM7. Owner approved the tested 60% one-shot AirBrake slowdown and
   unchanged upward kick; no new feel decision. Gal/Home own #299 SIM8
-  marker isolation at `5ed2d1ab8c9d9c0cfa57b7a8b3ee87638999fffc` and
+  marker isolation at `ea5348e537cf12d764ae05ea2d584ff29c5a1002` and
   #300 SIM9 AirBrake at `23b21e5d4eb9c23c068566904a2de7a7e1dddcf0`.
-  #300 is 2 ahead/1 behind #299 at fork 2286f88. The missing commit is
-  harness-only (served bundle/clean source/captured marker frames), not
-  missing marker physics. Both drafts need exact-head independent review.
+  #300 is 2 ahead/2 behind #299 at fork 2286f88. Both missing commits
+  touch only the marker-repeat harness (served bundle/clean source and
+  captured-frame checks), not marker physics. Both drafts need exact-head independent review.
   Reconcile and rerun #300 on the actual post-#299 base; earlier browser
   evidence does not establish exact combined release acceptance. Preserve
   #266's future version/identity seams, not a prerelease old-tape mandate.
