@@ -236,3 +236,40 @@ test('Jellyfish bells individually lift and squash without borrowing horizon mot
  expect(Math.max(...lifts)-Math.min(...lifts)).toBeGreaterThan(1);
  expect(bells(0)).toEqual(still);
 });
+
+test('Candy canes independently curve and stretch with planted roots',()=>{
+ const motif='candy-stripes', d=biomeDanceStyle(motif,.26).decor;
+ const canes=dance=>motifDecor(motif,400,1234,0,{dance}).filter(p=>p.kind==='line'&&p.depth===0&&p.color==='text'&&p.width===3);
+ const still=canes(0), moving=canes(d);
+ expect(still.length).toBeGreaterThan(1);
+ expect(moving).toHaveLength(still.length);
+ for(let i=0;i<still.length;i++){
+  const a=still[i].pts,b=moving[i].pts;
+  expect(b).toHaveLength(a.length);
+  expect(b[0]).toEqual(a[0]);
+  expect(Math.abs(b.at(-1).x-a.at(-1).x)).toBeGreaterThan(19);
+  expect(a.at(-1).y-b.at(-1).y).toBeGreaterThan(4);
+  expect(Math.abs(b[1].x-a[1].x)).toBeLessThan(3);
+ }
+ expect(canes(0)).toEqual(still);
+});
+
+test('Candy lollipops independently hop, grow and spin without detaching from sticks',()=>{
+ const motif='candy-stripes', d=biomeDanceStyle(motif,.26).decor;
+ const sample=dance=>motifDecor(motif,400,1234,0,{dance});
+ const pops=items=>items.filter(p=>p.kind==='circle'&&p.depth===1);
+ const stems=items=>items.filter(p=>p.kind==='line'&&p.depth===1&&p.width===2);
+ const spirals=items=>items.filter(p=>p.kind==='line'&&p.depth===1&&p.width===1);
+ const still=sample(0), moving=sample(d), a=pops(still),b=pops(moving);
+ expect(a.length).toBeGreaterThan(1);
+ for(let i=0;i<a.length;i++){
+  expect(a[i].y-b[i].y).toBeGreaterThan(15);
+  expect(b[i].r/a[i].r).toBeGreaterThan(1.13);
+  expect(stems(moving)[i].pts[0]).toEqual(stems(still)[i].pts[0]);
+  expect(stems(moving)[i].pts[1]).toEqual({x:b[i].x,y:b[i].y+b[i].r});
+  const angle=(p,c)=>Math.atan2(p.y-c.y,p.x-c.x);
+  const delta=angle(spirals(moving)[i].pts[1],b[i])-angle(spirals(still)[i].pts[1],a[i]);
+  expect(Math.abs(Math.sin(delta/2))).toBeGreaterThan(.3);
+ }
+ expect(sample(0)).toEqual(still);
+});

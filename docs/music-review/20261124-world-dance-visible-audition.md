@@ -38,3 +38,11 @@ Owner reported V2 was visible, but requested even more movement. V3 expands anch
 The first two motif-specific candidates add a permanent asymmetric reference spoke to each gear (otherwise periodic teeth obscure rotation), a bounded 1.4 radian rock, stronger jellyfish lift and squash, accent-linked tentacle contraction, and phase-varied accent gains. Phase variation is not a true delayed envelope. No physics, audio or meter change. Independent tests measure keyed spoke endpoints with fixed axles and individual bell lift/width without horizon movement; 106/106 focused background, World Dance and ruleset tests passed.
 
 The matched capture runner accepts AUDITION_BIOME for controlled production-look selection on the real Debutmont run. This is not natural traversal of the named sectors. Actual public One More Run, 96 matched 480x270 frame pairs per motif, no page errors: Steampunk peak visual envelope .879 over 6.15s audio; Jellyfish peak .695 over 4.73s. Silent owner audition only; no audio or media publication. The rest of the motifs, normal gameplay traversal, fresh accessibility browser checks and Chromebook performance remain pending. Final amplitude and art changes remain subject to owner approval.
+
+## Fifth audition: Candy Cane Canyon
+
+Owner feedback on V4: "Hehehe, I love it! The jellyfish look so happy jumping around! On to CCC!" This is favorable V4 audition feedback and permission to continue, not blanket merge approval.
+
+Candy canes bend with a rooted quadratic curve, reach up, and vary accent gain by item. Lollipops hop and sway while growing and spinning, with stems remaining attached. Same neutral geometry and no changes to physics, audio timing or other motifs. Independent motif tests require >19px hook displacement and >4px stretch, >15px lollipop lift, >13% growth, perceptible spiral rotation and planted roots at .26 input without horizon movement. 108/108 targeted background/dance/ruleset tests passed.
+
+96 matched rendered pairs, original One More Run, 480x270 per arm, peak visual envelope .863 over 5.34s audio, no page errors; silent ~5.33s Tailnet audition at 18 fps. Controlled production-look selection on Debutmont terrain, not natural traversal; owner visual feedback, fresh live accessibility check and Chromebook performance still pending. No media committed.

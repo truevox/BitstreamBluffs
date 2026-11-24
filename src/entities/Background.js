@@ -364,6 +364,7 @@ function ellipsePts(cx, cy, rx, ry, rot, n) {
 // Presentation-only audition tuning, in native pixels/radians.
 const DECOR_DANCE = Object.freeze({
   gearRock: 1.4,
+  caneBend: 48, caneStretch: 12, popLift: 39, popSway: 17, popGrow: 0.35, popSpin: 1.8,
   jellyLift: 42, jellySquash: 1.05, jellyTentacle: 0.24,
 });
 
@@ -422,12 +423,17 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(c.x0, sx, L0.factor);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L0, sx, x, horizonDance) + 2;
-      const top = yB - c.h;
       const dir = c.flip ? -1 : 1;
+      const accent = dance * (0.87 + 0.13 * Math.sin(t / 220 + c.x0 * .03));
+      const stretch = DECOR_DANCE.caneStretch * accent;
+      const top = yB - c.h - stretch;
       const path = [];
-      const flex = dance * 36 * dir;
-      for (let y = yB; y > top; y -= 5)
-        path.push({ x: x + flex * ((yB - y) / c.h), y });
+      const flex = accent * DECOR_DANCE.caneBend * dir;
+      // Root stays planted; upper stem curves rather than tilting as a rigid stick.
+      for (let y = yB; y > yB - c.h; y -= 5) {
+        const u = (yB - y) / c.h;
+        path.push({ x: x + flex * u * u, y: y - stretch * u });
+      }
       for (let i = 0; i <= 6; i++) {
         const a = Math.PI - (i / 6) * Math.PI;
         path.push({ x: x + flex + dir * (6 + Math.cos(a) * 6), y: top - Math.sin(a) * 6 });
@@ -445,15 +451,20 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(lp.x0, sx, L1.factor);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L1, sx, x, horizonDance) + 2;
-      const cy = yB - lp.stick - lp.r - dance * 32;
-      out.push({ kind: 'line', depth: 1, color: 'text', alpha: 0.55, width: 2, pts: [{ x, y: yB }, { x, y: cy + lp.r }] });
-      out.push({ kind: 'circle', depth: 1, color: lp.color, fillAlpha: 0.32, lineAlpha: 0.75, x, y: cy, r: lp.r });
+      const accent = dance * (0.85 + 0.15 * Math.sin(t / 240 + lp.ph));
+      const sway = DECOR_DANCE.popSway * accent * Math.sin(lp.ph);
+      const cx = x + sway;
+      const cy = yB - lp.stick - lp.r - accent * DECOR_DANCE.popLift;
+      const radius = lp.r * (1 + DECOR_DANCE.popGrow * accent);
+      const stem = [{ x, y: yB }, { x: cx, y: cy + radius }];
+      out.push({ kind: 'line', depth: 1, color: 'text', alpha: 0.55, width: 2, pts: stem });
+      out.push({ kind: 'circle', depth: 1, color: lp.color, fillAlpha: 0.32, lineAlpha: 0.75, x: cx, y: cy, r: radius });
       const spiral = [];
-      const spin = t * 0.001 + lp.ph;
+      const spin = t * 0.001 + lp.ph + accent * DECOR_DANCE.popSpin;
       for (let i = 0; i <= 16; i++) {
         const a = spin + (i / 16) * Math.PI * 3.5;
-        const rr = (i / 16) * lp.r * 0.85;
-        spiral.push({ x: x + Math.cos(a) * rr, y: cy + Math.sin(a) * rr });
+        const rr = (i / 16) * radius * 0.85;
+        spiral.push({ x: cx + Math.cos(a) * rr, y: cy + Math.sin(a) * rr });
       }
       out.push({ kind: 'line', depth: 1, color: 'text', alpha: 0.6, width: 1, pts: spiral });
     }
