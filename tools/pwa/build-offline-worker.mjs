@@ -4,6 +4,7 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderMusicRouteWorker } from './music-route-worker.mjs';
+import { renderR2RouteWorker } from './r2-cache.mjs';
 
 export const CACHE_PREFIX = 'bitstream-shell-v1-';
 export const MAX_PRECACHE_BYTES = 8 * 1024 * 1024;
@@ -80,6 +81,7 @@ export function renderOfflineWorker(inventory) {
 `const BASE = ${JSON.stringify(base)};\n` +
 `const ROOT = BASE + 'index.html';\n` +
 (base === '/' ? renderMusicRouteWorker() : '') +
+renderR2RouteWorker() +
 `function hex(bytes) { return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join(''); }\n` +
 `self.addEventListener('install', event => {\n` +
 `  event.waitUntil((async () => {\n` +
@@ -107,6 +109,9 @@ export function renderOfflineWorker(inventory) {
 `  const request = event.request;\n` +
 `  if (request.method !== 'GET') return;\n` +
 `  const url = new URL(request.url);\n` +
+`  if (request.mode === 'cors' && releaseUrl(url.href) && !request.headers.has('Range')) {\n` +
+`    event.respondWith((async()=>{const stored=await cachedR2(url.href);if(stored)return stored;try{return await fetch(request);}catch{return new Response('Original music download required when online.',{status:503});}})());return;\n` +
+`  }\n` +
 `  if (url.origin !== self.location.origin || !url.pathname.startsWith(BASE)) return;\n` +
 `  const path = url.pathname === BASE ? ROOT : url.pathname;\n` +
 `  if (BASE === '/' && path.startsWith('/music/packs/')) {\n` +

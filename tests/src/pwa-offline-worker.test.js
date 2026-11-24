@@ -67,6 +67,7 @@ test('subpath inventory is scope-bound and rejects cross-scope HTML entries',asy
   expect(inv.base).toBe('/BitstreamBluffs/');
   expect(inv.entries.every(e=>e.path.startsWith(inv.base))).toBe(true);
   const worker=renderOfflineWorker(inv);
+  expect(()=>new Function(worker)).not.toThrow();
   expect(worker).toContain('Offline worker scope mismatch');
   expect(worker).toContain('const BASE = "/BitstreamBluffs/"');
   expect(worker).not.toContain('function completeMusicGroup');

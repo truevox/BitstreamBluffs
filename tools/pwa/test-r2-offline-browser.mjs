@@ -1,0 +1,41 @@
+/** Explicit developer smoke: one selected song from the already published R2 release. */
+import {readFile,mkdtemp,rm} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {build,preview} from 'vite';
+import {chromium} from 'playwright';
+import {planPublishedMusic} from './r2-release-plan.mjs';
+import {generateOfflineWorker} from './build-offline-worker.mjs';
+const root=fileURLToPath(new URL('../../',import.meta.url)),source=process.env.BSB_PUBLICATION_ROOT;
+if(!source)throw Error('Set BSB_PUBLICATION_ROOT to the verified release source');
+const inv=JSON.parse(await readFile(resolve(source,'publication-330-inventory.json'))),catalog=await readFile(resolve(source,'publication-330-catalog.json'));
+const tracks=JSON.parse(catalog).tracks,chosen=tracks.find(t=>t.title.includes('One More Run'))||tracks[0];
+const selected=Object.fromEntries(tracks.map(t=>[t.id,t.id===chosen.id]));
+const pack=inv.objects.find(x=>x.key===chosen.manifest);
+const bytes=pack.origin==='released-git'?execFileSync('git',['show',inv.publicBaseCommit+':public/music/'+pack.key],{cwd:root}):await readFile(resolve(source,inv.source,pack.key));
+const plan=planPublishedMusic(inv,catalog,{[chosen.id]:bytes},{selection:selected});
+const moduleUrl='data:text/javascript;base64,'+(await readFile(resolve(root,'tools/pwa/r2-cache.mjs'))).toString('base64');
+const base='/BitstreamBluffs/',scratch=await mkdtemp(resolve(root,'.pwa-r2-test-'));let browser,server;
+try{
+ await build({root,base,build:{outDir:scratch,emptyOutDir:true}});await generateOfflineWorker(scratch,base);
+ server=await preview({root,base,build:{outDir:scratch},preview:{host:'127.0.0.1',port:0,strictPort:true}});
+ const origin='http://127.0.0.1:'+server.httpServer.address().port;
+ browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const context=await browser.newContext({serviceWorkers:'allow',viewport:{width:1000,height:540}});
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(origin+base,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__bbGame?.scene?.isActive('TitleScene'),null,{timeout:30000});
+ await page.evaluate(async base=>{await navigator.serviceWorker.register(base+'sw.js',{scope:base,updateViaCache:'none'});await navigator.serviceWorker.ready;},base);
+ await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>!!navigator.serviceWorker.controller,null,{timeout:30000});
+ const downloaded=await page.evaluate(async({moduleUrl,plan,base})=>{const m=await import(moduleUrl),opts={storage:caches,origin:location.origin,scope:base,subtle:crypto.subtle,consent:true,fetcher:fetch.bind(window),concurrency:6};const groups=[await m.catalogCacheGroup(plan.catalog,crypto.subtle),...plan.groups];const results=[];for(const g of groups)results.push(await m.downloadR2Group(g,opts));navigator.serviceWorker.controller.postMessage({type:'bb-r2-cache-updated'});return results;},{moduleUrl,plan,base});
+ console.log('R2_DOWNLOAD',JSON.stringify({song:chosen.title,downloaded}));
+ await context.setOffline(true);await page.close();const cold=await context.newPage();cold.on('pageerror',e=>errors.push(e.message));await cold.goto(origin+base,{waitUntil:'domcontentloaded'});
+ await cold.waitForFunction(()=>window.__bbGame?.registry.get('audioSynth')?._stemMusic?.ready,null,{timeout:30000});
+ await cold.evaluate(selection=>{const a=window.__bbGame.registry.get('audioSynth');a.applySettings({...a.settings,musicEnabledSongs:selection,dynamicOrchestra:false});a.jukeboxPlay();},selected);
+ await cold.waitForFunction(id=>{const p=window.__bbGame.registry.get('audioSynth')?._stemMusic;return p?.track?.id===id&&p?.clockStart!==null&&p?.cache?.size>=7;},chosen.id,{timeout:30000});
+ const observed=await cold.evaluate(()=>{const a=window.__bbGame.registry.get('audioSynth'),p=a._stemMusic;return {catalog:p.catalog.length,track:p.track.id,buffers:p.cache.size,state:p.transportSnapshot().state,ctx:a.ctx.state,procedural:!!a._musicTimer};});
+ if(observed.catalog!==33||observed.track!==chosen.id||observed.state!=='playing'||observed.ctx!=='running'||observed.procedural||errors.length)throw Error(JSON.stringify({observed,errors}));
+ const eviction=await cold.evaluate(async({g,base})=>{const name='bb-r2-recordings-v1-'+encodeURIComponent(base)+'-'+g.id+'-'+g.version;const c=await caches.open(name);await c.delete(g.entries[0].url);const r=await fetch(g.entries[1].url);return r.status;},{g:plan.groups[0],base});
+ if(eviction!==503)throw Error('Missing group member did not revoke offline readiness: '+eviction);
+ console.log('PASS_R2_OFFLINE_MUSIC',JSON.stringify({observed,eviction,errors}));
+}finally{if(browser)await browser.close();if(server)await new Promise((res,rej)=>server.httpServer.close(e=>e?rej(e):res()));await rm(scratch,{recursive:true,force:true});}
