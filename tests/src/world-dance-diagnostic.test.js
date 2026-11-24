@@ -85,12 +85,12 @@ const meter = (revision, beatIndex, measureIndex = 0, overrides = {}) => ({
 
 /**
  * Sun geometry from the real `sunDanceGeometry()`. These are RADIUS deltas:
- * the drawn sun's width/height changes by twice each delta (+4.8p/-3.6p px at
- * radius 40 mean a +9.6p/-7.2p px full width/height change). Do not read a
+ * the drawn sun's width/height changes by twice each delta (+8p/-6p px at
+ * radius 40 mean a +16p/-12p px full width/height change). Do not read a
  * radius delta as a diameter change.
  */
 function sunPixels(strength) {
-  const sun = sunDanceGeometry(strength, 40);
+  const sun = sunDanceGeometry(biomeDanceStyle('ridges',strength).sun, 40);
   return {
     strength,
     widthRadiusDeltaPx: sun.widthRadius - 40,
@@ -106,8 +106,8 @@ function sunPixels(strength) {
  * Background.js:777-779). Return the observed max |Δy| across every primitive's
  * `pts[].y` and `y`.
  *
- * The theoretical ceiling is 1.7 × horizonDance (|sin| ≤ 1), which for these
- * motifs stays at or below 1.19 × strength; `sin` attenuates the observed value
+ * The theoretical ceiling is 8 × horizonDance (|sin| ≤ 1), which for these
+ * motifs stays at or below 8 × horizonDance; `sin` attenuates the observed value
  * below that, so assertions use a loose bound and never an exact float.
  * Motif dependence is real: stars, jellyfish and brass-pipes never feed
  * `horizonDanceOffset()` into a primitive and measure exactly 0.
@@ -241,21 +241,21 @@ describe('World Dance diagnostic: producer, unverified meter, envelope and pixel
     }
 
     const settledPixels = sunPixels(settled);
-    // Radius deltas from the real sunDanceGeometry(): +4.8p / -3.6p px at r=40.
-    expect(settledPixels.widthRadiusDeltaPx).toBeCloseTo(4.8 * settled, 10);
-    expect(settledPixels.heightRadiusDeltaPx).toBeCloseTo(-3.6 * settled, 10);
+    // Radius deltas from the real sunDanceGeometry(): +8p / -6p px at r=40.
+    expect(settledPixels.widthRadiusDeltaPx).toBeCloseTo(8 * biomeDanceStyle('ridges',settled).sun, 10);
+    expect(settledPixels.heightRadiusDeltaPx).toBeCloseTo(-6 * biomeDanceStyle('ridges',settled).sun, 10);
 
     // Measured decor displacement at this settled strength (not a formula).
     const motifs = ['candy-stripes', 'stars', 'vents', 'dew-drops', 'jellyfish', 'brass-pipes'];
     const decor = motifs.map(m => measureDecorDisplacement(m, settled));
     const byMotif = Object.fromEntries(decor.map(d => [d.motif, d]));
     for (const d of decor) {
-      // Theoretical ceiling: |1.7·horizonDance·sin(...)| ≤ 1.7·horizonDance,
-      // and horizonDance ≤ 0.7·strength, hence ≤ 1.19·strength. Loose, never exact.
-      expect(d.maxAbsDeltaY).toBeLessThanOrEqual(1.19 * settled);
+      // Theoretical ceiling: |8·horizonDance·sin(...)| ≤ 8·horizonDance,
+      // Per-motif amplified horizon strength remains bounded. Loose, never exact.
+      expect(d.maxAbsDeltaY).toBeLessThanOrEqual(8 * d.horizonDance);
     }
     // These motifs do route horizonDance into decor roots: real, non-zero motion.
-    expect(byMotif['candy-stripes'].maxAbsDeltaY).toBeGreaterThan(0.5 * 1.7 * byMotif['candy-stripes'].horizonDance);
+    expect(byMotif['candy-stripes'].maxAbsDeltaY).toBeGreaterThan(0.5 * 8 * byMotif['candy-stripes'].horizonDance);
     expect(byMotif.vents.maxAbsDeltaY).toBeGreaterThan(0);
     expect(byMotif['dew-drops'].maxAbsDeltaY).toBeGreaterThan(0);
     // These never feed horizonDanceOffset() into a primitive: exactly zero,
@@ -268,7 +268,7 @@ describe('World Dance diagnostic: producer, unverified meter, envelope and pixel
       settledStrength: settled,
       sun: settledPixels,
       decorDisplacementsPx: decor,
-      theoreticalCeilingPx: 1.19 * settled,
+      theoreticalCeilingPx: 8 * biomeDanceStyle('ridges',settled).horizon,
     });
   });
 
@@ -297,8 +297,8 @@ describe('World Dance diagnostic: producer, unverified meter, envelope and pixel
     const transientPixels = sunPixels(onsetPeak);
     // Sun deltas are radius deltas; a rendered sun's full width/height changes
     // by twice these values (+9.6p / -7.2p px full extent at r=40).
-    expect(transientPixels.widthRadiusDeltaPx).toBeCloseTo(4.8 * onsetPeak, 10);
-    expect(transientPixels.heightRadiusDeltaPx).toBeCloseTo(-3.6 * onsetPeak, 10);
+    expect(transientPixels.widthRadiusDeltaPx).toBeCloseTo(8 * biomeDanceStyle('ridges',onsetPeak).sun, 10);
+    expect(transientPixels.heightRadiusDeltaPx).toBeCloseTo(-6 * biomeDanceStyle('ridges',onsetPeak).sun, 10);
 
     console.log('World Dance transient onset peak vs settled level (measured)', {
       onsetPeakStrength: onsetPeak,
@@ -310,6 +310,6 @@ describe('World Dance diagnostic: producer, unverified meter, envelope and pixel
 
 // The meter is an arbitrary 0.5 s source-zero-origin 4/4 clock, explicitly unverified; source-verified analysis is #50.
 // Sun numbers are radius deltas from the real sunDanceGeometry(); decor numbers are MEASURED max |Δy| from the real
-// motifDecor() at a fixed frame, not the 1.7·dance·sin formula. 1.19 × strength is only a theoretical ceiling.
+// motifDecor() at a fixed frame, not the 8·dance·sin formula. 8 × horizonDance is only a theoretical ceiling.
 // TODO(live verification): a real browser run with real audio is required to establish actual live sample cadence and
 // rendered scenery. These displacements are measured here; visibility to a player is an owner judgment.

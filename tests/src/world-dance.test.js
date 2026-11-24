@@ -1,4 +1,4 @@
-import {WorldDanceEnvelope,worldDanceMotionAllowed,sunDanceGeometry,biomeDanceStyle}
+import {WorldDanceEnvelope,worldDanceMotionAllowed,sunDanceGeometry,biomeDanceStyle,visibleDanceStrength}
  from '../../src/systems/WorldDance.js';
 import {Background,motifDecor} from '../../src/entities/Background.js';
 import {AudioSynth} from '../../src/systems/AudioSynth.js';
@@ -81,8 +81,8 @@ test('biomes get different bounded personalities with no fake colour or geometry
 test('sun squash is bounded and neutral at zero/invalid input',()=>{
  expect(sunDanceGeometry(0)).toEqual({widthRadius:40,heightRadius:40});
  const kick=sunDanceGeometry(1);
- expect(kick.widthRadius).toBeCloseTo(44.8);
- expect(kick.heightRadius).toBeCloseTo(36.4);
+ expect(kick.widthRadius).toBeCloseTo(48);
+ expect(kick.heightRadius).toBeCloseTo(34);
  expect(sunDanceGeometry(1000)).toEqual(kick);
  expect(sunDanceGeometry(NaN)).toEqual(sunDanceGeometry(0));
 });
@@ -97,8 +97,8 @@ test('the actual procedural sun is ellipse-shaped on musical hit and original ci
  bg.update(10,500,200,1);
  const moving=calls.find(x=>x[0]==='strokeEllipse');
  expect(moving).toBeDefined();
- expect(moving[3]).toBeCloseTo(89.6,2);
- expect(moving[4]).toBeCloseTo(72.8,2);
+ expect(moving[3]).toBeCloseTo(96,2);
+ expect(moving[4]).toBeCloseTo(68,2);
  expect(calls.some(x=>x[0]==='strokeCircle'&&x[3]===40)).toBe(false);
 });
 
@@ -138,4 +138,29 @@ test('AudioSynth exposes only real, currently playing, non-muted soundtrack anal
  expect(s.getWorldDanceSample()).toBeNull();
  s.getFatalCountInStatus=()=>({active:false});s._stemMusic.transportPaused=true;
  expect(s.getWorldDanceSample()).toBeNull();
+});
+
+test('audition transfer lifts small accents smoothly without changing the detector or exceeding unity',()=>{
+ expect(visibleDanceStrength(0)).toBe(0);
+ expect(visibleDanceStrength(NaN)).toBe(0);
+ expect(visibleDanceStrength(1)).toBe(1);
+ expect(visibleDanceStrength(.04)).toBeGreaterThan(.14);
+ expect(visibleDanceStrength(.11)).toBeGreaterThan(visibleDanceStrength(.04)*2);
+ for(let i=1;i<=100;i++)expect(visibleDanceStrength(i/100)).toBeGreaterThan(visibleDanceStrength((i-1)/100));
+});
+test.each(['stars','candy-stripes','jellyfish','brass-pipes','dew-drops','vents'])('%s receives a distinct visible decor response at realistic accent strength',motif=>{
+ const style=biomeDanceStyle(motif,.26);
+ const before=motifDecor(motif,400,1234,0,{bees:false});
+ const after=motifDecor(motif,400,1234,0,{bees:false,dance:style.decor,horizonDance:style.horizon});
+ expect(after).toHaveLength(before.length);
+ let max=0;
+ for(let i=0;i<before.length;i++){
+  for(const key of ['x','y','r'])if(Number.isFinite(before[i][key]))max=Math.max(max,Math.abs(after[i][key]-before[i][key]));
+  for(let j=0;j<(before[i].pts||[]).length;j++){
+   max=Math.max(max,Math.hypot(after[i].pts[j].x-before[i].pts[j].x,after[i].pts[j].y-before[i].pts[j].y));
+  }
+ }
+ expect(max).toBeGreaterThan(1);
+ expect(max).toBeLessThan(25);
+ expect(motifDecor(motif,400,1234,0,{bees:false,dance:0,horizonDance:0})).toEqual(before);
 });

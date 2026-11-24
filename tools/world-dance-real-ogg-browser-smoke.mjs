@@ -16,6 +16,8 @@ const snap=()=>page.evaluate(()=>{
   intensity:r?.worldDance?.intensity||0,strength:r?.worldDance?.strength||0,
   drewEllipse:r?.bg?.__danceProbe?.ellipse||0,
   lastEllipse:r?.bg?.__danceProbe?.lastEllipse||null,
+  pixelSun:r?.bg?.__danceProbe?.pixelSun||null,skin:r?.bg?.skin,
+  nearRidgeY:r?.biomeFx?.ridgeNear?.y,farRidgeY:r?.biomeFx?.ridgeFar?.y,
   runActive:r?.sys?.isActive(),musicStarted:d?.started,stemNodes:d?.activeNodes?.size,
   trackId:d?.track?.id,musicTimeMs:(a?.ctx?.currentTime||0)*1000,
   sceneMotion:r?.settings?.reduceMotion};
@@ -30,7 +32,7 @@ try{
  },null,{timeout:30000});
  await page.evaluate(()=>{
   const g=window.__bbGame,a=g.registry.get('audioSynth'),d=a._stemMusic;
-  if(!d.started&&!d.transportPaused){
+  if(!['playing','loading'].includes(a.jukeboxSnapshot().state)&&!d.started&&!d.transportPaused){
    const btn=g.scene.getScene('TitleScene').jukebox?.buttons?.[1]?.zone;
    if(!btn)throw Error('Missing jukebox play button');
    btn.emit('pointerdown');
@@ -46,7 +48,11 @@ try{
  const initial=await snap();assert.equal(initial.runActive,true);assert.ok(initial.trackId);
  await page.evaluate(()=>{
   const b=window.__bbGame.scene.getScene('RunScene').bg,g=b.gfx;
-  b.__danceProbe={ellipse:0,lastEllipse:null,circle:0};
+  b.__danceProbe={ellipse:0,lastEllipse:null,circle:0,pixelSun:null};
+  const update=b.update,fill=g.fillRect.bind(g);
+  let measuring=false,stripes=[];
+  g.fillRect=(...args)=>{if(measuring&&stripes.length<9&&args[2]>=24&&args[2]<=100&&args[3]>0&&args[3]<=12)stripes.push(args);return fill(...args);};
+  b.update=function(...args){stripes=[];measuring=this.skin==='pixel';try{return update.apply(this,args);}finally{measuring=false;if(stripes.length===9)b.__danceProbe.pixelSun={width:Math.max(...stripes.map(s=>s[2])),height:stripes.at(-1)[1]+stripes.at(-1)[3]-stripes[0][1]};}};
   const ellipse=g.strokeEllipse.bind(g),circle=g.strokeCircle.bind(g);
   g.strokeEllipse=(...args)=>{
    b.__danceProbe.ellipse++;b.__danceProbe.lastEllipse=args;
@@ -73,7 +79,11 @@ try{
  assert.ok(valid.length>65,'Music sampler did not receive a sustained real OGG track');
  assert.ok(bassRange[1]>bassRange[0]||midRange[1]>midRange[0],'Analyser signal did not vary');
  assert.ok(peak>0.04,'World never responded to real music accents');
- assert.ok(valid.at(-1)?.drewEllipse>20,'Real rendered graphics never squashed the sun');
+ const pixel=valid.filter(s=>s.skin==='pixel'&&s.pixelSun);
+ const ridge=valid.filter(s=>Number.isFinite(s.nearRidgeY));
+ console.log('ACTUAL_RENDER_GEOMETRY',JSON.stringify({pixelWidths:[...new Set(pixel.map(s=>s.pixelSun.width))],pixelHeights:[...new Set(pixel.map(s=>s.pixelSun.height))],nearRidgeYs:[...new Set(ridge.map(s=>s.nearRidgeY))],ellipses:valid.at(-1)?.drewEllipse}));
+ assert.ok(valid.at(-1)?.drewEllipse>20||new Set(pixel.map(s=>s.pixelSun.width)).size>=2||new Set(pixel.map(s=>s.pixelSun.height)).size>=2,'No actual sun geometry response');
+ if(pixel.length>20)assert.ok(new Set(ridge.map(s=>s.nearRidgeY)).size>=2,'Pixel ridge never moved');
  assert.ok(maxIntensity>minIntensity+.02,'World intensity did not follow the recording');
  await page.evaluate(()=>{
   const a=window.__bbGame.registry.get('audioSynth');

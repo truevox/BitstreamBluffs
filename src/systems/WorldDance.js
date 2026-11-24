@@ -49,18 +49,26 @@ export function readWorldDanceAudio(audio, allowed) {
  * These are cosmetic multipliers; the intensity never leaks to physics.
  */
 const DANCE_MOTIF_STYLES=Object.freeze({
-    ridges:[1,0.7,0], drift:[0.8,0.55,0], terraces:[0.6,0.4,0],
-    currents:[0.6,0.75,0], facets:[0.65,0.35,0],
-    stars:[0.6,0.2,0.25],
+    ridges:[1,0.7,0], drift:[0.8,0.55,0], terraces:[0.8,0.6,0],
+    currents:[0.85,0.75,0], facets:[0.85,0.55,0],
+    stars:[0.8,0.35,0.65],
     'candy-stripes':[1,0.55,1],
-    jellyfish:[0.65,0.35,0.85],
-    'brass-pipes':[0.55,0.15,0.42],
+    jellyfish:[0.85,0.5,0.85],
+    'brass-pipes':[0.8,0.35,0.75],
     'dew-drops':[0.85,0.32,1],
     vents:[0.7,0.4,0.45],
 });
 
-export function biomeDanceStyle(motif, strength) {
+/** Audition-only visual transfer curve: lift small real accents without
+ * clipping strong accents together. Neutral and maximum remain unchanged.
+ * The detector and its audio-facing onset timestamps are untouched. */
+export function visibleDanceStrength(strength) {
   const p=clamp01(strength);
+  return 4*p/(1+3*p);
+}
+
+export function biomeDanceStyle(motif, strength) {
+  const p=visibleDanceStrength(strength);
   const [sun,horizon,decor]=DANCE_MOTIF_STYLES[motif]||DANCE_MOTIF_STYLES.ridges;
   return {sun:clamp01(p*sun),horizon:clamp01(p*horizon),decor:clamp01(p*decor)};
 }
@@ -68,7 +76,7 @@ export function biomeDanceStyle(motif, strength) {
 export function sunDanceGeometry(pulse, radius = 40) {
   const p=clamp01(pulse);
   const r=Number.isFinite(radius)&&radius>0 ? radius : 40;
-  return {widthRadius:r*(1+0.12*p),heightRadius:r*(1-0.09*p)};
+  return {widthRadius:r*(1+0.20*p),heightRadius:r*(1-0.15*p)};
 }
 
 export class WorldDanceEnvelope {
