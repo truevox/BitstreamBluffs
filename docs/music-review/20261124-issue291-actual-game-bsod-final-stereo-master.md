@@ -1,3 +1,5 @@
+**INDEPENDENT REVIEW UPDATE, November 24, 2026:** Older live PCM readings were collected before strict per-render-quantum validation, and earlier offline runs used simplified vocal FX/room sends. These figures are historic/provisional, NOT current calibrated mastering clearance. See docs/music-review/20261124-pr310-independent-review-corrections.md for the fail-closed updates and remaining measurement uncertainty.
+
 # #291 — actual real-physics BSOD collision, final master PCM after peak guard
 
 Status as of 2026-11-24: source-backed engineering QA, **not mastered/cleared for launch**. No game source audio, master gain, FX, collision physics, replay data or original-beat authority is modified. This is an additive, code-only test suite stacked on #306 through draft #310.

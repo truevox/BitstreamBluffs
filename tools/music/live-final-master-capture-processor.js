@@ -13,7 +13,7 @@ class BsbLiveFinalMasterTap extends AudioWorkletProcessor {
 		this.left = new Float32Array(1024);
 		this.right = new Float32Array(1024);
 		this.firstFrame = 0;
-		this.expectedFrame = null;
+		this.nextQuantumFrame = null;
 		this.active = true;
 		this.port.onmessage = ({data})=>{
 			if(data?.type==='stop') {
@@ -37,24 +37,28 @@ class BsbLiveFinalMasterTap extends AudioWorkletProcessor {
 		// This node is deliberately side-chained through a gain of zero;
 		// its output is always silent and cannot amplify the soundtrack.
 		const input=inputs[0];
-		if(this.active&&input?.[0]){
-			// Validate every render quantum BEFORE buffering: a missing or
-			// duplicated 128-frame block inside a 1024-frame chunk must not
-			// be hidden by chunk timestamps or compensating discontinuities.
-			if(this.expectedFrame!==null&&currentFrame!==this.expectedFrame){
-				this.port.postMessage({type:'discontinuity',actual:currentFrame,
-					expected:this.expectedFrame,delta:currentFrame-this.expectedFrame});
+		if(this.active){
+			const quantumFrames=input?.[0]?.length??outputs[0]?.[0]?.length??128;
+			if(!input?.[0]||!Number.isSafeInteger(currentFrame)||
+				!Number.isSafeInteger(quantumFrames)||quantumFrames<1||
+				(this.nextQuantumFrame!==null&&currentFrame!==this.nextQuantumFrame)){
+				this.flush();
+				this.port.postMessage({type:'discontinuity',
+					expected:this.nextQuantumFrame,
+					actual:currentFrame,
+					delta:this.nextQuantumFrame===null?null:currentFrame-this.nextQuantumFrame,
+					quantumFrames,
+					reason:!input?.[0]?'missing-input':'render-quantum-discontinuity'});
 				this.active=false;
-			}
-			if(this.active)this.expectedFrame=currentFrame+input[0].length;
-		}
-		if(this.active&&input?.[0]){
-			for(let i=0;i<input[0].length;i++){
+			}else{
+				this.nextQuantumFrame=currentFrame+quantumFrames;
+				for(let i=0;i<quantumFrames;i++){
 				if(this.frames===0)this.firstFrame=currentFrame+i;
 				this.left[this.frames]=input[0][i];
 				this.right[this.frames]=input[1]?.[i]??input[0][i];
 				this.frames++;
 				if(this.frames===this.left.length)this.flush();
+				}
 			}
 		}
 		for(const output of outputs){

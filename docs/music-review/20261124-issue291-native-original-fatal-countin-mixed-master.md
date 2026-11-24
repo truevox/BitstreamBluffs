@@ -1,3 +1,5 @@
+**INDEPENDENT REVIEW UPDATE, November 24, 2026:** Older live PCM readings were collected before strict per-render-quantum validation, and earlier offline runs used simplified vocal FX/room sends. These figures are historic/provisional, NOT current calibrated mastering clearance. See docs/music-review/20261124-pr310-independent-review-corrections.md for the fail-closed updates and remaining measurement uncertainty.
+
 # Issue #291 — Real original-drum fatal count-in + native mixed Web Audio output
 
 **2026-11-24. Code-only pre-release QA; no production audio, game physics, beat-grid or source OGG changes.**

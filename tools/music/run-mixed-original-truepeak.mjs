@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import {existsSync,writeFileSync} from 'node:fs';
 import {chromium} from 'playwright';
-const base=process.env.QA_URL||'http://127.0.0.1:8220';
+import {auditVerdictExitCode} from './audit-verdict-exit.js';
+const base=(process.env.QA_URL||'http://127.0.0.1:8220').replace(/\/+$/,'');
 const dest=process.env.REPORT_OUT;
 if(!dest||existsSync(dest))throw Error('Unique REPORT_OUT required; no existing evidence overwrite');
 const allScenarios=process.env.QA_EXTENDED==='1'?
@@ -43,8 +44,7 @@ const report={format:'bitstream-sim8-original-mixed-output-4x-estimate-v1',
 	]};
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle',
 	'--use-angle=swiftshader','--enable-webgl','--ignore-gpu-blocklist',
-	'--autoplay-policy=no-user-gesture-required',
-	'--unsafely-treat-insecure-origin-as-secure='+base]});
+	'--autoplay-policy=no-user-gesture-required']});
 try{
 	const page=await browser.newPage({viewport:{width:900,height:600}});
 	page.on('pageerror',e=>errors.push(String(e)));
@@ -116,7 +116,7 @@ try{
 		report.summary.overUnityAllTruePeak4xFrames?'FAILED_ESTIMATED_4X_TRUE_PEAK':
 		'PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE';
 	report.browserErrors=errors;report.httpErrors=httpErrors;
-	if(report.status!=='PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE')process.exitCode=1;
+	process.exitCode=auditVerdictExitCode(report.status);
 	console.log('MIXED_OUTPUT_AUDIT',report.status,JSON.stringify(report.summary),
 		'max_dBTP',report.highestMixed.estimatedTruePeakDbTp4x.toFixed(2));
 }catch(error){

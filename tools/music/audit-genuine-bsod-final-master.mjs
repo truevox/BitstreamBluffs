@@ -14,7 +14,6 @@
 import assert from 'node:assert/strict';
 import {existsSync,writeFileSync} from 'node:fs';
 import {chromium} from 'playwright';
-import {classifyLiveFailure} from './classify-live-qa-failure.js';
 const base=process.env.GAME_URL||'http://127.0.0.1:8221/';
 const output=process.env.REPORT_OUT;
 const songIndex=Number(process.env.QA_SONG_INDEX||0);
@@ -30,6 +29,8 @@ const report={
 		'BSOD collision itself is accelerated by QA positioning/speed of the real wall before calling real physics headlessStep; not organically played or recorded player input',
 		'Captures limited seconds of one original track, not full 33-song continuous audio or each biome',
 		'4x Hann-windowed-sinc intersample estimate is NOT a calibrated mastering BS.1770 meter',
+		'AudioWorklet validates EVERY render quantum; quantum skip/repeat/compensation is INVALID_INSTRUMENT_CAPTURE and cannot be counted as passing PCM',
+		'Non-silent master audio during four original drum source onsets does not establish that those drums were independently audible above wind and other program audio; only scheduled source identity is verified',
 		'AudioWorklet is a read-only sidechain with silent output to destination; live AudioContext device/platform timing affects observed signal',
 		'No private PCM or source media is stored in this public code repository; report includes only analysis metrics and event identities',
 	]
@@ -122,13 +123,13 @@ try{
 		a.nodes.peakGuard.connect(tap);
 		tap.connect(silent);silent.connect(c.destination);
 		const chunks=[];
-		const state={chunks,discontinuities:[],stopped:false,sampleRate:c.sampleRate,
-			installedAt:c.currentTime};
+		const state={chunks,stopped:false,chronologyErrors:[],
+			sampleRate:c.sampleRate,installedAt:c.currentTime};
 		tap.port.onmessage=e=>{
 			const msg=e.data;
 			if(msg?.type==='pcm')chunks.push(msg);
-			if(msg?.type==='discontinuity')state.discontinuities.push(msg);
-			if(msg?.type==='stopped') {
+			if(msg?.type==='discontinuity')state.chronologyErrors.push(msg);
+			if(msg?.type==='stopped'){
 				state.stopped=true;
 				state.quantumValidationVersion=msg.quantumValidationVersion;
 			}
@@ -258,16 +259,16 @@ try{
 		const until=Date.now()+1700;
 		while(!installed.state.stopped&&Date.now()<until)
 			await new Promise(resolve=>setTimeout(resolve,30));
-		if(!installed.state.stopped)throw Error('Worklet did not finish capture');
+		if(!installed.state.stopped)throw Error('INSTRUMENT_CAPTURE: Worklet did not finish capture');
 		if(installed.state.quantumValidationVersion!==2)
-			throw Error('Unversioned worklet continuity protocol');
-		if(installed.state.discontinuities.length)
-			throw Error('INVALID_INSTRUMENT_CAPTURE: render quantum chronology '+
-				JSON.stringify(installed.state.discontinuities));
+			throw Error('INSTRUMENT_CAPTURE: Missing quantum-v2 validation proof');
 		installed.tap.disconnect();installed.silent.disconnect();
 		a.nodes.peakGuard.disconnect(installed.tap);
+		if(installed.state.chronologyErrors.length)
+			throw Error('INSTRUMENT_CAPTURE: per-quantum chronology '+JSON.stringify(
+				installed.state.chronologyErrors.slice(0,3)));
 		const allChunks=installed.state.chunks;
-		if(allChunks.length<50)throw Error('No genuine final PCM chunks from actual game');
+		if(allChunks.length<50)throw Error('INSTRUMENT_CAPTURE: No genuine final PCM chunks from actual game');
 		const sampleRate=installed.state.sampleRate;
 		// Chromium may activate the diagnostic sidechain in two phases.
 		// The first small PCM quantum can precede a short worklet startup
@@ -283,28 +284,28 @@ try{
 					delta:curr.frame-expected,at:curr.frame/sampleRate};
 				gapDetails.push(detail);
 				if(i>2 || detail.at>=collision.after.audioCurrentTime-.15)
-					throw Error('Missing live PCM at/near real crash: '+JSON.stringify(detail));
+					throw Error('INSTRUMENT_CAPTURE: Missing live PCM at/near real crash: '+JSON.stringify(detail));
 				tailIndex=i;
 			}
 		}
 		const chunks=allChunks.slice(tailIndex);
 		const firstFrame=chunks[0].frame;
 		const gapToCrash=collision.after.audioCurrentTime-firstFrame/sampleRate;
-		if(gapToCrash<.14)throw Error('No 140ms pre-crash CONTIGUOUS live output: '+gapToCrash);
+		if(gapToCrash<.14)throw Error('INSTRUMENT_CAPTURE: No 140ms pre-crash CONTIGUOUS live output: '+gapToCrash);
 		const frames=chunks.reduce((sum,chunk)=>sum+chunk.frames,0);
-		if(frames<sampleRate*2)throw Error('Captured fewer than 2 seconds of final game output');
+		if(frames<sampleRate*2)throw Error('INSTRUMENT_CAPTURE: Captured fewer than 2 seconds of final game output');
 		const left=new Float32Array(frames),right=new Float32Array(frames);
 		let off=0,priorEnd=firstFrame;
 		for(const chunk of chunks){
 			if(chunk.frame!==priorEnd)
-				throw Error('Unrecoverable gap inside final crash output: '+JSON.stringify({
+				throw Error('INSTRUMENT_CAPTURE: Unrecoverable gap inside final crash output: '+JSON.stringify({
 					actual:chunk.frame,expected:priorEnd}));
-			if(chunk.sampleRate!==sampleRate)throw Error('Variable audio sample rate');
+			if(chunk.sampleRate!==sampleRate)throw Error('INSTRUMENT_CAPTURE: Variable audio sample rate');
 			left.set(chunk.left,off);right.set(chunk.right,off);
 			off+=chunk.frames;priorEnd=chunk.frame+chunk.frames;
 		}
 		if(priorEnd/sampleRate<collision.countIn.bandAt+.15)
-			throw Error('Capture ended before authentic original band recovery');
+			throw Error('INSTRUMENT_CAPTURE: Capture ended before authentic original band recovery');
 		const {measureFourTimesTruePeak}=await import('/tools/music/estimate-true-peak-4x.js');
 		const pcm={sampleRate,numberOfChannels:2,length:frames,
 			getChannelData:channel=>channel===0?left:right};
@@ -318,7 +319,7 @@ try{
 			for(const [name,at] of Object.entries(crashTimes)){
 				const begin=Math.round((at+.012-origin)*sampleRate);
 				const end=Math.round((at+.115-origin)*sampleRate);
-				if(begin<0||end>frames)throw Error('Real original drum window outside live PCM');
+				if(begin<0||end>frames)throw Error('INSTRUMENT_CAPTURE: Real original drum window outside live PCM');
 				let sum=0,peak=0;
 				for(let i=begin;i<end;i++){
 					const l=left[i],r=right[i];sum+=l*l+r*r;
@@ -334,15 +335,19 @@ try{
 			songId:d.pack.id,sourceId:d.track.id,clockStart:d.clockStart,
 			sampleRate,originalMediaRoles:d.pack.sourceNames.length,
 			tapAt:installed.state.installedAt,firstFrame,
-			chunks:chunks.length,frames,gaps:0,
+			chunks:chunks.length,frames,gaps:0,duration:frames/sampleRate,
 			captureContinuityVersion:installed.state.quantumValidationVersion,
-			duration:frames/sampleRate,
+			captureQuantumIntegrity:{checkedEveryQuantum:true,
+				chronologyErrors:installed.state.chronologyErrors.length,
+				nextQuantumVerified:true},
 			discardedStartupChunks:tailIndex,discardedStartupGapDetails:gapDetails,
 			clockOfFirstFrame:origin,clockOfLastFrame:priorEnd/sampleRate,
-			realOriginalDrumWindows:clockWindows(
+			countInMasterWindows:clockWindows(
 				Object.fromEntries(plan.beatOnsets.map((t,i)=>['drum'+(i+1),t]))),
 			finalMasterMetrics:result,
 			eventLog:window.__bbFinalAuditEvents,
+			originalDrumSourceScheduled:true,
+			isolatedOriginalDrumAudibilityVerified:false,
 		};
 	},crash);
 	// Persist valid observed PCM metrics before validating any audio limit.
@@ -354,12 +359,14 @@ try{
 	assert.equal(measured.sourceId,pre.trackId);
 	assert.equal(measured.clockStart,pre.clockStart);
 	assert.ok(measured.chunks>=50);
-	assert.equal(measured.finalMasterMetrics.nonfiniteSamples,0);
-	assert.equal(measured.finalMasterMetrics.sampleClips,0);
-	assert.equal(measured.finalMasterMetrics.estimatedTrueClips4x,0);
-	assert.ok(measured.finalMasterMetrics.estimatedTruePeak4x<1);
+	// Preserve COMPLETE measured audio-limit failures in report JSON;
+	// do not mislabel them as missing measurement or retry them away.
+	const metered=measured.finalMasterMetrics;
+	const audioLimitFailed=metered.sampleClips>0||
+		metered.estimatedTrueClips4x>0||metered.nonfiniteSamples>0||
+		metered.samplePeak>=1||metered.estimatedTruePeak4x>=1;
 	for(const i of [1,2,3,4]){
-		const hit=measured.realOriginalDrumWindows['drum'+i];
+		const hit=measured.countInMasterWindows['drum'+i];
 		assert.ok(hit.samplesPerChannel>1000&&hit.rms>.0002);
 	}
 	const unexpected=httpErrors.filter(({status,url})=>
@@ -374,18 +381,29 @@ try{
 	report.errors=errors;
 	report.unexpectedHttp=unexpected;
 	report.mediaRequests=mediaRequests.length;
-	report.status='PASS_ACTUAL_PHYSICS_BSOD_FULL_OUTPUT_4X_ESTIMATE_NOT_MASTERED';
-	console.log('REAL_PHYSICS_BSOD_LIVE_FINAL_OUTPUT_PASS',JSON.stringify({
+	report.status=audioLimitFailed?'VALID_CAPTURE_AUDIO_LIMIT_FAILURE':
+		'PASS_ACTUAL_PHYSICS_BSOD_FULL_OUTPUT_4X_ESTIMATE_NOT_MASTERED';
+	if(audioLimitFailed)process.exitCode=2;
+	console.log(audioLimitFailed?'REAL_PHYSICS_BSOD_VALID_AUDIO_LIMIT_FAILURE':
+		'REAL_PHYSICS_BSOD_LIVE_FINAL_OUTPUT_PASS',JSON.stringify({
 		songId:measured.songId,duration:measured.duration.toFixed(3),
-		scheduledOriginalDrumHits:4,
+		scheduledOriginalDrumSourceHits:4,
 		samplePeak:measured.finalMasterMetrics.samplePeak,
 		estimatedTruePeak4x:measured.finalMasterMetrics.estimatedTruePeak4x,
 		estimatedDbTp:measured.finalMasterMetrics.estimatedTruePeakDbTp4x,
-		sampleClips:0,truePeakEstimatedOvers:0,
+		sampleClips:metered.sampleClips,truePeakEstimatedOvers:metered.estimatedTrueClips4x,
 		peakGuard:'production',readOnlyTap:'AudioWorklet',httpErrors:0
 	}));
 }catch(error){
-	report.status=classifyLiveFailure(error,report.liveFinalMaster?.finalMasterMetrics);
+	const meter=report.liveFinalMaster?.finalMasterMetrics;
+	const hadAudioLimit=!!meter && (
+		meter.sampleClips>0||meter.estimatedTrueClips4x>0||
+		meter.nonfiniteSamples>0||meter.samplePeak>=1||
+		meter.estimatedTruePeak4x>=1
+	);
+	report.status=hadAudioLimit?'VALID_CAPTURE_AUDIO_LIMIT_FAILURE':
+		String(error).includes('INSTRUMENT_CAPTURE:')?
+			'INVALID_INSTRUMENT_CAPTURE':'INVALID_QA_OR_SOURCE';
 	report.error=String(error);
 	report.errors=errors;
 	report.unexpectedHttp=httpErrors;

@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve,join,sep} from 'node:path';
 import {createHash} from 'node:crypto';
-import {isRetryableInstrumentFailure} from './classify-live-qa-failure.js';
+import {classifyLiveCaptureAttempt,assertNoNonretryableAudioFailure,
+	PASS_CAPTURE,INVALID_CAPTURE} from './live-capture-review-policy.js';
 const mediaRoot=process.env.BSB291_PRIVATE_AUDIO_ROOT;
 const reportRoot=process.env.REPORT_ROOT;
 const output=process.env.REPORT_OUT;
@@ -28,6 +29,7 @@ const originalVocalFullSeven=[
 	})),
 ];
 const full33=process.env.QA_FULL33==='1';
+const strictReview=process.env.QA_REVIEW_STRICT==='1';
 const rejectedAttempts=[];
 const chosenFull33=full33?Array.from({length:33},(_,index)=>{
 	// ALL 33 indexes must use fresh quantum-v2 attempt records. The older
@@ -35,23 +37,24 @@ const chosenFull33=full33?Array.from({length:33},(_,index)=>{
 	const id=String(index).padStart(2,'0');
 	let selected=null;
 	for(let attempt=1;attempt<=3;attempt++){
-		const filename='issue291-real-bsod-live-full33-index-'+id+
-			'-attempt-'+attempt+'-20261124.json';
+		const filename=strictReview?
+			'issue291-review-corrected-live-index-'+id+'-attempt-'+attempt+'-20261124.json':
+			'issue291-real-bsod-live-full33-index-'+id+'-attempt-'+attempt+'-20261124.json';
 		const path=join(reports,filename);
 		if(!existsSync(path))continue;
 		const bytes=readFileSync(path);
 		const item=JSON.parse(bytes);
-		if(item.status==='PASS_ACTUAL_PHYSICS_BSOD_FULL_OUTPUT_4X_ESTIMATE_NOT_MASTERED'){
+		// Critically inspect EVERY attempt, even AFTER finding a PASS.
+		// Any complete capture with an audio-limit failure aborts the
+		// whole source audit; retries are only for instrument invalidity.
+		const result=assertNoNonretryableAudioFailure(item);
+		if(result===PASS_CAPTURE){
 			if(selected)throw Error('Multiple ambiguous passing live captures of original '+id);
 			selected={index,file:filename,vocals:true};
-		}else{
-			// A valid clip, an ambiguous legacy failure, or an unclassified
-			// error is NEVER retryable: it must fail the entire aggregate.
-			assert.ok(isRetryableInstrumentFailure(item),
-				'Non-retryable or ambiguous source/audio failure in '+filename);
+		}else if(result===INVALID_CAPTURE){
 			rejectedAttempts.push({index,attempt,filename,sha256:sha(bytes),
-				reason:String(item.error).slice(0,240)});
-		}
+				status:result,reason:String(item.error).slice(0,240)});
+		}else throw Error('Invalid unrecognized capture type '+filename);
 	}
 	assert.ok(selected,'Missing valid source-verified game collision for song '+id);
 	return selected;
@@ -66,7 +69,8 @@ for(const {index,file,vocals} of sequence){
 	assert.ok(existsSync(src),'Original live physics audit report missing '+src);
 	const bytes=readFileSync(src);
 	const r=JSON.parse(bytes);
-	assert.equal(r.status,'PASS_ACTUAL_PHYSICS_BSOD_FULL_OUTPUT_4X_ESTIMATE_NOT_MASTERED');
+	assert.equal(classifyLiveCaptureAttempt(r),PASS_CAPTURE,
+		'No validated per-render-quantum chronology or measured audio limit failure');
 	assert.equal(r.songIndex,index);
 	assert.equal(r.testOriginalVocalsUnlockedInDisposableBrowser,vocals,
 		'Audio was not recorded with requested genuine vocal unlock');
@@ -126,7 +130,10 @@ for(const {index,file,vocals} of sequence){
 	assert.equal(live.clockStart,crash.before.clockStart);
 	assert.equal(live.gaps,0);
 	assert.equal(live.captureContinuityVersion,2,
-		'Historic chunk-only PCM evidence is not quantum-validated; recapture required');
+		'Missing historical quantum-v2 proof: recapture required');
+	assert.deepEqual(live.captureQuantumIntegrity,{
+		checkedEveryQuantum:true,chronologyErrors:0,nextQuantumVerified:true
+	});
 	assert.ok(live.chunks>=50);
 	assert.ok(live.duration>3.0);
 	assert.equal(live.sampleRate,r.pre.audioSampleRate);
@@ -140,6 +147,8 @@ for(const {index,file,vocals} of sequence){
 		assert.ok(gap.index<=2&&gap.at<crash.after.audioCurrentTime-.15,
 			'Unacceptable late post-guard PCM gap');
 	}
+	assert.equal(live.originalDrumSourceScheduled,true);
+	assert.equal(live.isolatedOriginalDrumAudibilityVerified,false);
 	const meter=live.finalMasterMetrics;
 	assert.equal(meter.nonfiniteSamples,0);
 	assert.equal(meter.sampleClips,0);
@@ -150,7 +159,7 @@ for(const {index,file,vocals} of sequence){
 	assert.equal(meter.sampleRate,live.sampleRate);
 	assert.equal(meter.channels,2);
 	for(let i=1;i<=4;i++){
-		const hit=live.realOriginalDrumWindows['drum'+i];
+		const hit=live.countInMasterWindows['drum'+i];
 		assert.ok(hit&&hit.rms>.0002&&hit.samplesPerChannel>1000,
 			'No real original recorded drum output at actual crash beat '+i);
 	}
@@ -171,7 +180,7 @@ const summary={
 	distinctOriginalSongIds:new Set(checked.map(x=>x.trackId)).size,
 	vocalsUnlockedCases:checked.filter(x=>x.vocals).length,
 	vocalsLockedControlCases:checked.filter(x=>!x.vocals).length,
-	scheduledOriginalRecordedDrumOnsets:checked.length*4,
+	originalRecordedDrumSourcesScheduled:checked.length*4,
 	independentlyVerifiedDrumOggSources:sourceFiles.size,
 	noPostStartupPcmGaps:true,
 	sampleClips:0,estimated4xOvers:0,nonfiniteSamples:0,
@@ -193,7 +202,8 @@ const aggregate={
 		'Each case uses one 33-song original first segment, naturally starting in Debutmont. If QA_FULL33=1, exactly one first segment per song; not a coverage claim for full-length tracks or all 12 game biomes.',
 		'The four recorded original drum excerpts use the production count-in synthetic-unverified grid; original beats have NOT been certified.',
 		'Browser audio context playback at native device sample rate (usually 44.1 kHz); 4x sinc estimate is not an independent mastering reference.',
-		'Some captures may fail closed due Worklet PCM discontinuities, retained as separately hashed rejected reports; only truly contiguous pre-crash through recovery windows are counted.',
+		'Every 128-frame quantum is individually chronologically checked; any discontinuity fails capture. Only invalid diagnostic captures may be retried; a valid measured clipping case permanently fails the aggregate.',
+		'Four drum sounds are verified as source-original and scheduled; non-silent master windows DO NOT isolate the drum from wind/crash/room and must not be called verified drum audibility.',
 		'Do not change approved sound mixes, release music, merge a draft PR or close issue #291 solely because these samples pass.',
 	],
 };

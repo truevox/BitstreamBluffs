@@ -97,6 +97,9 @@ function setOriginalSourceMix(ctx,a,originals,{biome,mode}){
 	if(mode==='music-only')mixer.setRoomWetEnabled(true);
 	for(const role of originals.roles){
 		const source=originals.sources.get(role);
+		// Match StemMusicDirector._applyMusicTimbres: lyrics retain the
+		// pack-authored FX; both vocals and selected melody retain their
+		// original pack-defined room sends.
 		const effects=mode==='dry-originals'?[]:
 			role==='vocals'?(originals.manifest.effects?.[role]||[]):
 			role.startsWith('voice:')?melodyPreset(biome):
@@ -139,6 +142,7 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 	const programs=scenario==='music-only'?[]:timeline.map(item=>({
 		item,
 		promise:ctx.suspend(item.at).then(async()=>{
+			try{
 			if(item.action==='bsod-wind'){
 				a._onBsodState({active:true,relativeAirX:1800,
 					atmosphereDensity:1,proximity01:.98,timeToImpactMs:250});
@@ -150,14 +154,14 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 				a.playSfx('crash');
 			}else a.playSfx(item.action);
 			sent.push({at:item.at,action:item.action,ctxTime:ctx.currentTime});
-			await ctx.resume();
+			}finally{await ctx.resume()}
 		}),
 	}));
-	const rendering=ctx.startRendering();
-	// An event handler can reject while OfflineAudioContext is suspended;
-	// awaiting rendering first would hang forever on that error.
-	const pcm=await Promise.race([rendering,
-		Promise.all(programs.map(x=>x.promise)).then(()=>rendering)]);
+	const [pcm,eventResults]=await Promise.all([
+		ctx.startRendering(),Promise.allSettled(programs.map(x=>x.promise))
+	]);
+	const rejected=eventResults.find(x=>x.status==='rejected');
+	if(rejected)throw rejected.reason;
 	const window=measureFourTimesTruePeak(pcm,{
 		startFrame:Math.floor(.20*RATE),
 		endFrame:Math.floor(3.85*RATE),
@@ -167,6 +171,7 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 		sourceFrameStart:original.segment.startFrame,biome,scenario,
 		sourceHashes:original.hashes,sourceRoles:original.roles,
 		originalSourceCount:installedAudioSources,
+		originalVocalFxAndRoomSendsFromPack:true,
 		productionGraph:{
 			AudioSynthBuildGraph:a.nodes.master instanceof GainNode,
 			productionSfx:a.nodes.sfxBus instanceof GainNode,
@@ -235,7 +240,7 @@ function momentEnergy(pcm,start,end){
 	return {rms:Math.sqrt(sum/(2*(last-from))),samplePeak:peak};
 }
 async function renderOriginalFatal({pack,segmentIndex=0,biome='garbage-dump-glacier',
-	includeCountIn=true,internalPcm=false}={}){
+	includeCountIn=true,internalPcm=false,simulateMissingOriginalDrumForTest=false}={}){
 	if(typeof includeCountIn!=='boolean')throw Error('Invalid count-in condition');
 	const original=await decodeOriginals(pack,segmentIndex,biome);
 	const ctx=new OfflineAudioContext(2,Math.round(FATAL_RATE_SECONDS*RATE),RATE);
@@ -277,6 +282,7 @@ async function renderOriginalFatal({pack,segmentIndex=0,biome='garbage-dump-glac
 	};
 	let selected=null,program=null;
 	const events=FATAL_EVENTS.map(item=>ctx.suspend(item.at).then(async()=>{
+		try{
 		switch(item.action){
 			case 'bsod-wind':
 				a._onBsodState({active:true,relativeAirX:1800,
@@ -288,6 +294,8 @@ async function renderOriginalFatal({pack,segmentIndex=0,biome='garbage-dump-glac
 				// The exact original MIDI-like 0.5s plan is synthetic,
 				// unverified, but every *sound* comes from source OGG.
 				if(includeCountIn){
+					if(simulateMissingOriginalDrumForTest)
+						throw Error('QA_TEST_ONLY_MISSING_ORIGINAL_DRUM_ATTACK');
 					if(!findOriginalDrumAccent(d))
 						await countIn.prepare(d);
 					selected=findOriginalDrumAccent(d);
@@ -308,12 +316,16 @@ async function renderOriginalFatal({pack,segmentIndex=0,biome='garbage-dump-glac
 			case 'hard-landing':a._onLanding({quality:'sloppy',hard:true});break;
 			default:throw Error('Unexpected fatal sound event');
 		}
-		await ctx.resume();
+		}finally{
+			// Do not strand the offline renderer on missing source audio.
+			await ctx.resume();
+		}
 	}));
-	const rendering=ctx.startRendering();
-	// Propagate missing real-drum or event-scheduling failures immediately,
-	// even when their suspend handler never reached ctx.resume().
-	const pcm=await Promise.race([rendering,Promise.all(events).then(()=>rendering)]);
+	const [pcm,eventResults]=await Promise.all([
+		ctx.startRendering(),Promise.allSettled(events)
+	]);
+	const rejected=eventResults.find(x=>x.status==='rejected');
+	if(rejected)throw rejected.reason;
 	if(includeCountIn&&!program)throw Error('Missing source drum count-in evidence');
 	const measured=measureFourTimesTruePeak(pcm,{
 		startFrame:Math.floor(.18*RATE),endFrame:Math.floor(5.40*RATE)});
@@ -330,6 +342,7 @@ async function renderOriginalFatal({pack,segmentIndex=0,biome='garbage-dump-glac
 		extraOriginalDrumHashes:extraDrumHashes,
 		includeCountIn,qaCosmeticSeed:QA_COSMETIC_SEED,
 		audioSource:'original decoded OGG drums, real FatalCrashCountIn.start native class',
+		originalVocalFxAndRoomSendsFromPack:true,
 		offlineSchedulingStateFacade:true,
 		countIn:program?{
 			sourceSegment:program.sourceSegment,sourceOffset:program.sourceOffset,
