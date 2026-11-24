@@ -270,6 +270,12 @@ export class Sled {
         maxUpPxS: TUNING.airBrakeKickUpCapPxS,
         liftMul: phys.airbrakeLiftMul || 1,
       });
+      // Variable-hop release only truncates the original Space launch.
+      // A paid AirBrake impulse is a NEW airborne kick, like a spring rebound;
+      // it must not be zeroed by the hop-release cutoff later this tick or in
+      // a subsequent tick. When no lift was actually purchased (vacuum, very
+      // slow rider, or already faster upward), retain normal hop semantics.
+      if (kicked.vy < vy) this._playerHopActive = false;
       vx = kicked.vx;
       vy = kicked.vy;
     }
