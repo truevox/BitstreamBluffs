@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import { jest } from '@jest/globals';
 import { BsodPursuit } from '../../src/systems/BsodPursuit.js';
 import { BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
@@ -218,7 +219,89 @@ describe('Bitstream Bluffing RunScene integration', () => {
   });
 });
 
+test('RunScene orders physical Matter substep touchdown ledger before the final presentation state',()=>{
+  const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+  expect(source).toMatch(/const actualTouchdown=!!sled\.endStep\(stepMs\)/);
+  expect(source).toMatch(/if\s*\(actualTouchdown\)\s*\{[\s\S]*?substepTouchdowns\.push/);
+  expect(source).toMatch(/fs\.input\.airBrakeKicked=this\.replayMidtickTouchdowns\(/);
+  expect(source).toMatch(/this\.handleTricksAndLanding\(upd,fs\)/);
+});
+
 describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
+  test('ordered Matter substep touchdown banks a paid brake even when buffered Hop ends the fixed tick airborne',async()=>{
+    const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+    const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+    const scene=Object.create(RunScene.prototype);
+    const events=[];
+    scene.game={events:{emit:(key,payload)=>events.push({key,payload})}};
+    scene.tricks=new TrickTracker();scene.score=new ScoreManager();
+    scene.trickCounts={};scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
+    scene.stabilizeMs=1000;scene.stabilizeDeg=45;scene.pendingCrash=null;
+    scene.palette={amber:1,cyan:2,lime:3};
+    scene.fx={sparks(){},ring(){}};
+    scene.sled={x:1000,y:200,vx:200,vy:0};
+    scene.emitCombo=()=>{};scene.emitFlow=()=>{};scene.emitScore=()=>{};
+    scene._zoneScoreMulAt=()=>1;
+    scene.applyLandingBoost=jest.fn();scene.applySpringRebound=jest.fn();
+    const frame=(timeMs,grounded,kicked)=>({
+      timeMs,dtMs:8,grounded,crashed:false,angleDeg:0,
+      vx:200,vy:0,impactVx:200,impactVy:50,groundAngleDeg:0,x:1000,y:200,
+      input:{airBrake:true,airBrakeKicked:kicked,parachute:false,heli:0},
+    });
+    // First substep: kick then a genuine new touchdown. Second substep:
+    // buffered Hop relaunches, so the fixed-tick final frame is airborne.
+    const touchdown=frame(10008,true,true);
+    expect(scene.replayMidtickTouchdowns([{fs:touchdown,kicked:true}],false,false,true)).toBe(false);
+    expect(scene._landings).toBe(1);
+    expect(scene.trickCounts.airBrake).toBe(1);
+    expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+    const banked=scene.score.trickPoints;
+    expect(banked).toBeGreaterThan(0);
+    const end=frame(10016,false,false);
+    const update=scene.tricks.update(end);
+    scene.handleTricksAndLanding(update,end);
+    expect(update.tricks).toEqual([]);
+    expect(scene._landings).toBe(1);
+    expect(scene.score.trickPoints).toBe(banked);
+
+    // A kick had instead happened on the previous fixed tick, with points
+    // pending; new intermediate touchdown has NO new kick. It must STILL
+    // settle the already-earned trick before a new buffered Hop relaunch.
+    const prior=frame(10024,false,true);
+    const paid=scene.tricks.update(prior);
+    scene.handleTricksAndLanding(paid,prior);
+    expect(paid.tricks).toMatchObject([{type:'airBrake'}]);
+    expect(scene.score.getSnapshot().pendingPoints).toBeGreaterThan(0);
+    expect(scene.replayMidtickTouchdowns(
+      [{fs:frame(10032,true,false),kicked:false}],false,false,false)).toBe(false);
+    expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+    expect(scene._landings).toBe(2);
+    expect(scene.trickCounts.airBrake).toBe(2);
+    const final=scene.tricks.update(frame(10040,false,false));
+    scene.handleTricksAndLanding(final,frame(10040,false,false));
+    expect(final.tricks).toEqual([]);
+    expect(scene._landings).toBe(2);
+
+    // If the final frame is itself grounded, do not replay its contact:
+    // normal post-physics scoring must handle it once.
+    expect(scene.replayMidtickTouchdowns(
+      [{fs:frame(10048,true,true),kicked:true}],true,false,true)).toBe(true);
+    expect(scene._landings).toBe(2);
+    const last=frame(10048,true,true);
+    const lastUpdate=scene.tricks.update(last);
+    scene.handleTricksAndLanding(lastUpdate,last);
+    expect(scene._landings).toBe(3);
+    expect(scene.trickCounts.airBrake).toBe(3);
+    expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(3);
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(3);
+    const landings=events.filter(x=>x.key===EVT.LANDING);
+    expect(landings.map(e=>e.payload.quality)).toEqual(['good','good','good']);
+    expect(events.filter(x=>x.key===EVT.LANDING).every(x=>x.payload.quality==='good')).toBe(true);
+    expect(scene.applyLandingBoost).not.toHaveBeenCalled();
+    expect(scene.applySpringRebound).not.toHaveBeenCalled();
+  });
+
   test('two true kick pulses after two missed short flights bank immediately, do not inflate airtime or leak provisional points',async()=>{
     const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
     const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
@@ -229,7 +312,7 @@ describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
     scene.score=new ScoreManager();
     scene.trickCounts={};
     scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
-    scene.stabilizeMs=0;scene.stabilizeDeg=0;scene.pendingCrash=null;
+    scene.stabilizeMs=1000;scene.stabilizeDeg=45;scene.pendingCrash=null;
     scene.palette={amber:1,cyan:2,lime:3};
     scene.fx={sparks(){},ring(){}};
     scene.sled={x:1000,y:200,vx:200,vy:0};
@@ -285,6 +368,9 @@ describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
     expect(scene.applyLandingBoost).not.toHaveBeenCalled();
     expect(scene.applySpringRebound).not.toHaveBeenCalled();
     expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(3);
+    expect(events.filter(x=>x.key===EVT.LANDING).every(x=>
+      x.payload.quality==='good' && x.payload.bonusPoints===0)).toBe(true);
+
     expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(3);
     expect(events.filter(x=>x.key===EVT.TRICK).map(x=>x.payload.airtimeMs)).toEqual([8,8,8]);
   });

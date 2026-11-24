@@ -1383,6 +1383,13 @@ export class RunScene extends Phaser.Scene {
     let simDt = dt * (this.slowmoMs > 0 ? this.slowmoScale : 1);
     if (this.blinkMs > 0) { this.blinkMs -= dt; simDt *= 0.35; }
     if (this.hitStopMs > 0) { this.hitStopMs -= dt; simDt = 0; }
+    // A real contact can occur in one Matter substep and a buffered coyote
+    // Hop relaunch in the NEXT substep of this same fixed tick. The final
+    // sled frame would be airborne and otherwise lose the paid AirBrake
+    // touchdown (or attach its points to a later unrelated landing).
+    // Buffer actual contact snapshots before any later substep modifies pose.
+    const substepTouchdowns=[];
+    let stepElapsedMs=0, anyAirBrakeKick=false, kickSinceTouchdown=false;
     stepWorld(
       this.matter.world,
       simDt,
@@ -1391,7 +1398,25 @@ export class RunScene extends Phaser.Scene {
         sled.applyControls(pad, phys, stepMs, air);
       },
       (stepMs) => {
-        sled.endStep(stepMs);
+        const actualTouchdown=!!sled.endStep(stepMs);
+        stepElapsedMs+=stepMs;
+        const paidKick=!!sled.airBrakeKickPulse;
+        if (paidKick) {
+          anyAirBrakeKick=true;
+          kickSinceTouchdown=true;
+        }
+        sled.airBrakeKickPulse=0; // retain actual event in local ordered tick evidence
+        if (actualTouchdown) {
+          // Map the physical substep to the corresponding fixed run-clock
+          // timestamp; slow-mo changes the physics delta, not the run clock.
+          const atMs=this.runTimeMs-dt+
+            (simDt>0 ? Math.min(1,stepElapsedMs/simDt)*dt : 0);
+          const contactFs=sled.getFrameState(atMs,stepMs);
+          contactFs.grounded=true;
+          contactFs.input.airBrakeKicked=kickSinceTouchdown;
+          substepTouchdowns.push({fs:contactFs,kicked:kickSinceTouchdown});
+          kickSinceTouchdown=false;
+        }
         this.processContacts();
         // The BSOD advances with the SAME capped physics substeps as the sled. A fast wall cannot
         // jump over the rider between render frames. Do not depend on audio or animation timers.
@@ -1428,8 +1453,8 @@ export class RunScene extends Phaser.Scene {
     if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict
     this._hopped = !!sled.hopPulse;
     this._pushed = !!sled.pushPulse;
-    const airBrakeKickedThisTick = !!sled.airBrakeKickPulse;
-    sled.airBrakeKickPulse = 0; // consumed for bluff scoring; always zero at replay checkpoint
+    const airBrakeKickedThisTick = anyAirBrakeKick;
+    sled.airBrakeKickPulse = 0; // consumed per substep; always zero at replay checkpoint
     sled.hopPulse = 0;
     sled.pushPulse = 0;
 
@@ -1451,6 +1476,9 @@ export class RunScene extends Phaser.Scene {
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
     const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);
     fs.crashed = !!this.pendingCrash && !absorbed;
+    if (!this.pendingCrash || absorbed)
+      fs.input.airBrakeKicked=this.replayMidtickTouchdowns(
+        substepTouchdowns,sled.grounded,kickSinceTouchdown,anyAirBrakeKick);
     const upd = this.tricks.update(fs) || {};
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, upd.airtimeMs || 0, sled.airtimeMs);
 
@@ -1746,6 +1774,41 @@ export class RunScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ tricks / landings / score
 
+  /**
+   * Restore causal ordering for actual Matter touchdowns that happen BEFORE
+   * a later relaunch in the SAME fixed simulation tick. Without this narrow
+   * replay the one post-physics frame is airborne, and a paid brake trick
+   * from the preceding flight can remain unbanked or receive duplicate
+   * airborne credit. A final grounded frame still processes its own latest
+   * touchdown via the normal single-frame path.
+   *
+   * @param {{fs:object,kicked:boolean}[]} contacts ordered new-contact frames
+   * @param {boolean} finalGrounded
+   * @param {boolean} kickAfterLastTouch
+   * @param {boolean} anyKick
+   * @returns {boolean} whether the final frame has an unconsumed new kick
+   */
+  replayMidtickTouchdowns(contacts,finalGrounded,kickAfterLastTouch,anyKick) {
+    if (!contacts.length) return anyKick;
+    // Avoid replaying unrelated normal jumps. Only an actual paid brake kick
+    // in this tick or an unsettled AirBrake trick from the preceding tick
+    // authorizes the extra touchdown sample. _brakeDone alone may be stale
+    // after a previous settled flight, so require pending air trick points.
+    const priorBrakePending=!!this.tricks?._brakeDone && this._airTricks>0;
+    if (!contacts.some(c=>c.kicked) && !priorBrakePending) return anyKick;
+    const count=finalGrounded?contacts.length-1:contacts.length;
+    if (!(count>0)) return anyKick;
+    for(let i=0;i<count;i++){
+      const fs=contacts[i].fs;
+      const upd=this.tricks.update(fs)||{};
+      this.maxAirtimeMs=Math.max(this.maxAirtimeMs||0,upd.airtimeMs||0);
+      this.handleTricksAndLanding(upd,fs);
+    }
+    return finalGrounded
+      ? !!(contacts[contacts.length-1]?.kicked || kickAfterLastTouch)
+      : !!kickAfterLastTouch;
+  }
+
   emitScore() {
     const total = this.score.getTotal();
     const delta = total - this.lastTotal;
@@ -1796,6 +1859,10 @@ export class RunScene extends Phaser.Scene {
     // forgiveness: clearly-bad-but-not-head-first landings become a recoverable wobble instead of a crash; a B0
     // stabilize power-up widens the tolerance by its landingToleranceDeg (BiomeEffects.resolveLanding)
     l = resolveLanding(l, this.stabilizeMs > 0 ? this.stabilizeDeg : 0, TUNING);
+    // A stabilized micro-touch may be forgiven up to GOOD, but must NEVER
+    // become a fabricated perfect landing or perfect-bonus farm.
+    if (l.shortAirBrakeTouchdown && l.quality === 'perfect')
+      l = { ...l, quality:'good' };
     if (l.quality === 'crash') {
       this.game.events.emit(EVT.LANDING, {
         quality: 'crash', angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,

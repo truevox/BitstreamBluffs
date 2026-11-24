@@ -205,3 +205,29 @@ test('protected Hop release AFTER its apex does not pause or reverse existing de
   expect(s._protectedHopExtraVyPxS).toBe(0);
   expect(s._playerHopActive).toBe(false);
 });
+
+test('removable Hop-added ascent uses the same Matter per-substep frictionAir damping',()=>{
+  const s=makeSled(530,-100);
+  s.airBrakeLiftProtected=true;
+  s._protectedHopExtraVyPxS=300;
+  s._contactFlag=false;
+  s.body.frictionAir=0.12;
+  s._sync=()=>{};
+  s.endStep(8);
+  const expected=300*(1-0.12*8/(1000/60));
+  expect(s._protectedHopExtraVyPxS).toBeCloseTo(expected,9);
+  s.endStep(8);
+  expect(s._protectedHopExtraVyPxS).toBeCloseTo(expected*(1-0.12*8/(1000/60)),9);
+});
+
+
+test('endStep reports only genuine NEW Matter touchdown, not a continuous contact or an airborne step',()=>{
+  const s=makeSled();
+  s._sync=()=>{};
+  s.msSinceContact=200;s._contactFlag=true;
+  expect(s.endStep(8)).toBe(true);
+  s._contactFlag=true;
+  expect(s.endStep(8)).toBe(false);
+  expect(s.airBrakeKickUsed).toBe(false);
+  expect(s.endStep(8)).toBe(false);
+});

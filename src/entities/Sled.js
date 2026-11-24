@@ -165,9 +165,11 @@ export class Sled {
   /**
    * Call once after every physics sub-step (collision events have fired by then).
    * @param {number} stepMs
-   * @returns {void}
+   * @returns {boolean} true only on a new actual terrain touchdown
    */
   endStep(stepMs) {
+    const actualNewTouchdown=!!this._contactFlag &&
+      this.msSinceContact >= TUNING.groundedGraceMs;
     if (this._contactFlag) {
       this.airBrakeKickUsed = false; // actual Matter contact rearms, never a button release
       this.airBrakeLiftProtected = false; // only physical terrain contact can end protection
@@ -184,6 +186,16 @@ export class Sled {
       this.msSinceContact += stepMs;
     }
     this._contactFlag = false;
+    // Matter applies linear air friction DURING each physics substep, after
+    // our input-level quadratic drag. The removable player-Hop velocity must
+    // receive the SAME damping or release will subtract more ascent than is
+    // physically still present and consume paid AirBrake lift.
+    if (this._protectedHopExtraVyPxS > 0) {
+      const frictionAir=Number.isFinite(this.body?.frictionAir)
+        ? this.body.frictionAir : 0;
+      this._protectedHopExtraVyPxS *= Math.max(0,
+        1 - frictionAir * stepMs / BASE_STEP_MS);
+    }
     this._groundRunMs = this.msSinceContact < 1 ? this._groundRunMs + stepMs : (this.msSinceContact > TUNING.snapWindowMs ? 0 : this._groundRunMs);
     this.airtimeMs = this.grounded ? 0 : this.airtimeMs + stepMs;
     if (this._landSettleMs > 0 && TUNING.landSpinMaxDegS > 0) {
@@ -193,6 +205,7 @@ export class Sled {
       if (Math.abs(w) > wMax) Body.setAngularVelocity(this.body, Math.sign(w) * wMax);
     }
     this._sync();
+    return actualNewTouchdown;
   }
 
   /**
