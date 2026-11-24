@@ -83,3 +83,7 @@ The repeat gate now passes the final prefix through the same strict restore-admi
 ### Moving-hazard pilot (stacked diagnostic)
 
 A generated rolling boulder in b3pyramid5@4 is approached using a synthetic initial sled pose, not manually advanced or assigned a roll offset. Six consecutive restore cycles at K30–35 preserve all canonical and diagnostic states and recorder prefixes. The same live hazard ID 13:1 retains its actual activation time and exact roll offset/body position at restore and after each next tick; its offset increases from 6.705337063656785 to 8.360868011437026 px. 6/6 passed, zero page errors; no crash or ranked-replay claim. Receipt: results/sim9-05a1bf1e-repeat-moving.json. Tested on 8071a538 base; final recorder-validation and inactive-pair corrections remain to be integrated and retested. Reproduce after building local game: GAME_URL=http://127.0.0.1:43251/ node tools/savestate-experiment/browser-experiment.mjs --quick --strict-suffix --repeat-moving --json /tmp/new-moving-receipt.json.
+
+### Integrated moving-hazard gate
+
+Run `npm run gate:heavy -- --repeat-moving` from the checkout. Fresh local build at b63fa6fd, including final prefix validation and retained inactive pair consistency, passed six consecutive moving-boulder restore cycles with identical activation, stable ID, offset and body position at restore and after each next tick; final recorder admission passed. Receipt: results/sim9-05a1bf1e-repeat-moving-integrated.json. Synthetic fixture only; no production or competitive admission claim.
