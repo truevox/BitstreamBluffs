@@ -277,6 +277,12 @@ async function runCase(browser, fxName, level, skip = []) {
               const [key,index]=p.contacts[0][0],split=key.lastIndexOf('#');
               const count=s.matter.bodies[key.slice(0,split)].parts[Number(key.slice(split+1))].verts.length;
               p.contacts[0][0]=[key,(index+1)%count];},
+            inactiveContactSupport:s=>{
+              const p=s.matter.pairs.find(p=>p.isActive&&p.contactCount>0);
+              p.isActive=false;p.contactCount=0;
+              window.__ssMatterKit.preflight(s.matter);
+              p.contacts[0][0]=null;
+            },
             unusedContactSupport:s=>{
               // If this boundary has only two-support pairs, construct a
               // valid one-support diagnostic shape first. Pair.update still
@@ -294,7 +300,7 @@ async function runCase(browser, fxName, level, skip = []) {
             badGeometry:'part geometry sled',extraOrder:'world/detector order',coercedOrder:'world/detector order',
             badPair:'pair/contact reference',reversePair:'pair/contact reference',sparseVelocity:'body state sled',orphan:'incomplete or orphaned state',
             statics:'module statics',staticType:'module statics',thirdContact:'pair/contact reference',
-            thirdSupport:'collision support reference',contactSlot:'pair/contact reference',contactActivity:'pair activity/contact count',contactSupport:'contact/support mismatch',unusedContactSupport:'contact/support mismatch',
+            thirdSupport:'collision support reference',contactSlot:'pair/contact reference',contactActivity:'pair activity/contact count',contactSupport:'contact/support mismatch',unusedContactSupport:'contact/support mismatch',inactiveContactSupport:'contact/support mismatch',
           };
           return Object.entries(corruptions).map(([name,mutate])=>{
             const bad=JSON.parse(json);mutate(bad);
@@ -365,7 +371,9 @@ async function runCase(browser, fxName, level, skip = []) {
           const [ca, cb] = (await Promise.all([A.page.evaluate(cap, t), B.page.evaluate(cap, t)])).map((j) => JSON.parse(j));
           firstLeaves = [];
           for (const k of c.diff) {
-            if(k.startsWith('canonical.')||k.startsWith('direct.')||k==='telegraph'){firstLeaves.push(k+': '+JSON.stringify(da[k])+' != '+JSON.stringify(db[k]));continue;}
+            if(k.startsWith('canonical.')||k.startsWith('direct.')||k==='telegraph'){
+              const field=k.startsWith('direct.')?'__'+k.slice(7):k;
+              firstLeaves.push(k+': '+JSON.stringify(da[field])+' != '+JSON.stringify(db[field]));continue;}
             if (k === 'matter.worldOrder' || k === 'matter.detectorOrder') { const f = k.slice(7); const i = ca.matter[f].findIndex((x, j) => x !== cb.matter[f][j]); firstLeaves.push(`${k}[${i}]: A=${ca.matter[f][i]} B=${cb.matter[f][i]} (len ${ca.matter[f].length}/${cb.matter[f].length})`); }
             else if (k.startsWith('matter.')) leafDiff(ca.matter[k.slice(7)], cb.matter[k.slice(7)], k, firstLeaves, firstLeaves.length + 6);
             else if (k === 'pool') leafDiff(ca.pool, cb.pool, 'pool', firstLeaves, firstLeaves.length + 6);
@@ -479,13 +487,29 @@ async function runRepeatedCase(browser,fxName) {
       if(current!==source)await current.ctx.close();
       current=candidate;candidate=null;
     }
+    // Matching invalid histories are not a pass. Use the exact restore
+    // admission validator on the final prefix in a fresh destination.
+    const final=await measure(current);
+    candidate=await bootPage(browser,fx,tape);
+    const finalValidation=await candidate.page.evaluate(({prefix,tick})=>{
+      try{window.__ssRecorderKit.prepareRecorderPrefix(window.__ss.run,prefix,tick);return {ok:true};}
+      catch(e){return {ok:false,error:String(e.message||e)};}
+    },{prefix:final.prefix,tick:fx.K+REPEAT});
+    if(candidate.errors.length)throw new Error('page errors during final validation: '+JSON.stringify(candidate.errors));
+    await candidate.ctx.close();candidate=null;
+    if(!finalValidation.ok)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,
+      firstDivergentTick:fx.K+REPEAT,phase:'final recorder validation',restoreError:finalValidation.error};
     const boundaryWitness=boundary?{
       edge:boundary.edge,checkpoint:boundary.checkpoint,
       inputRecorded:cycles.some(c=>c.nextTick===boundary.edge&&c.newInputRows===1&&c.recordedHopEdge),
       checkpointRecorded:cycles.some(c=>c.nextTick===boundary.checkpoint&&c.newCheckpoints===1&&c.newFingerprints===1),
       recapturedAfterCheckpoint:cycles.some(c=>c.captureTick===boundary.checkpoint&&c.recaptured)
     }:null;
-    return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,boundaryWitness,firstDivergentTick:null,
+    const missingWitness=boundary?Object.entries(boundaryWitness).filter(([_k,v])=>v===false).map(([k])=>k):[];
+    if(missingWitness.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,boundaryWitness,
+      firstDivergentTick:null,phase:'boundary coverage',diff:missingWitness.map(k=>k+' (hop '+boundary.edge+', checkpoint '+boundary.checkpoint+')'),
+      coverageError:true,finalValidation,pageErrors:[...source.errors,...current.errors]};
+    return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,boundaryWitness,finalValidation,firstDivergentTick:null,
       pageErrors:[...source.errors,...current.errors]};
   } finally {
     if(candidate)await candidate.ctx.close();
@@ -529,7 +553,7 @@ if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
 
 if (REPEAT) {
   const failed=results.length!==(MOVING?1:2)||results.some(r=>r.harnessError||r.restoreError||
-    r.firstDivergentTick!==null||r.pageErrors?.length!==0||r.cycles?.length!==REPEAT||
+    r.firstDivergentTick!==null||r.coverageError||!r.finalValidation?.ok||r.pageErrors?.length!==0||r.cycles?.length!==REPEAT||
     r.fixtureStats?.tick!==r.K||r.fixtureStats.crashed||
     (r.fixture==='contact'?!(r.fixtureStats.activePairs>0):r.fixture==='moving'?!(r.fixtureStats.movingHazards>0):!(r.fixtureStats.hazardsHit>0))||
     (MOVING&&!r.cycles.every(c=>c.movingBefore?.id&&c.movingAfter?.id===c.movingBefore.id&&c.movingBefore.offset!==c.movingAfter.offset&&c.movingBefore.x!==c.movingAfter.x))||
@@ -542,7 +566,7 @@ if (REPEAT) {
     r.restoreError || r.harnessError || r.ticksCompared !== r.N-r.K ||
     r.firstDivergentTick !== null || r.firstSledDivergentTick !== null ||
     r.prefixControls?.length !== 5 || !r.prefixControls.every(c=>c.unchanged&&c.error?.startsWith('recorder prefix:')) ||
-    r.matterControls?.length !== 17 || !r.matterControls.every(c=>c.unchanged&&c.error?.startsWith('Matter preflight:')) ||
+    r.matterControls?.length !== 18 || !r.matterControls.every(c=>c.unchanged&&c.error?.startsWith('Matter preflight:')) ||
     !r.stagedControl?.discarded || !r.stagedControl.sourceUnchanged || !r.stagedControl.destinationUnchanged ||
     !r.recorderParity?.prefix || !r.recorderParity.finishedTape || r.recorderParity.endTick !== r.N ||
     r.pageErrors?.length !== 0 || r.audit?.length !== 0 || r.unclassified?.length !== 0 ||

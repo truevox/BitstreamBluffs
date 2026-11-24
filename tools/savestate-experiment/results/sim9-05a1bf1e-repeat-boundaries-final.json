@@ -1,0 +1,386 @@
+[
+ {
+  "fixture": "contact",
+  "level": "repeat",
+  "K": 707,
+  "N": 721,
+  "cycles": [
+   {
+    "captureTick": 707,
+    "nextTick": 708,
+    "bytes": 268301,
+    "canonical": "xxh32x2:f443c2fcce453d61",
+    "recaptured": false,
+    "newInputRows": 1,
+    "recordedHopEdge": true,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 708,
+    "nextTick": 709,
+    "bytes": 267042,
+    "canonical": "xxh32x2:86f3ad2b16af72d6",
+    "recaptured": true,
+    "newInputRows": 1,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 709,
+    "nextTick": 710,
+    "bytes": 266990,
+    "canonical": "xxh32x2:ffcc2eef34718dfb",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 710,
+    "nextTick": 711,
+    "bytes": 266987,
+    "canonical": "xxh32x2:6f1ad8dd85641222",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 711,
+    "nextTick": 712,
+    "bytes": 266986,
+    "canonical": "xxh32x2:023b2451e12b0296",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 712,
+    "nextTick": 713,
+    "bytes": 267107,
+    "canonical": "xxh32x2:d403c7518feee60f",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 713,
+    "nextTick": 714,
+    "bytes": 267115,
+    "canonical": "xxh32x2:c854aef90bd95e87",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 714,
+    "nextTick": 715,
+    "bytes": 267103,
+    "canonical": "xxh32x2:143ca8880b1a7940",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 715,
+    "nextTick": 716,
+    "bytes": 267092,
+    "canonical": "xxh32x2:0e7cc4ecd98fc608",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 716,
+    "nextTick": 717,
+    "bytes": 267133,
+    "canonical": "xxh32x2:615c99715fe5b19b",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 717,
+    "nextTick": 718,
+    "bytes": 267178,
+    "canonical": "xxh32x2:a4380ba55a3c2e58",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 718,
+    "nextTick": 719,
+    "bytes": 267145,
+    "canonical": "xxh32x2:c66c4b5a56d6907c",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 719,
+    "nextTick": 720,
+    "bytes": 267168,
+    "canonical": "xxh32x2:eea436972af7a733",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 1,
+    "newFingerprints": 1
+   },
+   {
+    "captureTick": 720,
+    "nextTick": 721,
+    "bytes": 267933,
+    "canonical": "xxh32x2:5e593f3db2305dea",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   }
+  ],
+  "fixtureStats": {
+   "tick": 707,
+   "sledX": 1858.8128632356127,
+   "hazards": 2,
+   "movingHazards": 0,
+   "hazardsHit": 0,
+   "kodiaksOut": 0,
+   "kodiakNext": 0,
+   "pairs": 2,
+   "activePairs": 2,
+   "worldBodies": 264,
+   "pool": 0,
+   "chunks": 2,
+   "score": 165,
+   "crashed": false,
+   "nextId": 276
+  },
+  "boundaryWitness": {
+   "edge": 708,
+   "checkpoint": 720,
+   "inputRecorded": true,
+   "checkpointRecorded": true,
+   "recapturedAfterCheckpoint": true
+  },
+  "finalValidation": {
+   "ok": true
+  },
+  "firstDivergentTick": null,
+  "pageErrors": [],
+  "wallMs": 68885
+ },
+ {
+  "fixture": "hazard",
+  "level": "repeat",
+  "K": 479,
+  "N": 493,
+  "cycles": [
+   {
+    "captureTick": 479,
+    "nextTick": 480,
+    "bytes": 383368,
+    "canonical": "xxh32x2:fbabf857fb35dec0",
+    "recaptured": false,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 1,
+    "newFingerprints": 1
+   },
+   {
+    "captureTick": 480,
+    "nextTick": 481,
+    "bytes": 383986,
+    "canonical": "xxh32x2:575bbe31d715f3c4",
+    "recaptured": true,
+    "newInputRows": 1,
+    "recordedHopEdge": true,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 481,
+    "nextTick": 482,
+    "bytes": 383385,
+    "canonical": "xxh32x2:37e693695b1f44d8",
+    "recaptured": true,
+    "newInputRows": 1,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 482,
+    "nextTick": 483,
+    "bytes": 383419,
+    "canonical": "xxh32x2:382fe905d80de055",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 483,
+    "nextTick": 484,
+    "bytes": 383399,
+    "canonical": "xxh32x2:689ef4c41d9ce647",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 484,
+    "nextTick": 485,
+    "bytes": 383460,
+    "canonical": "xxh32x2:a75b62e64bc1039a",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 485,
+    "nextTick": 486,
+    "bytes": 383449,
+    "canonical": "xxh32x2:1b58695bb6234f46",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 486,
+    "nextTick": 487,
+    "bytes": 383471,
+    "canonical": "xxh32x2:ac5590fc8df5e131",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 487,
+    "nextTick": 488,
+    "bytes": 383473,
+    "canonical": "xxh32x2:9bb73b23cbc62dce",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 488,
+    "nextTick": 489,
+    "bytes": 383526,
+    "canonical": "xxh32x2:2e74485297b6de82",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 489,
+    "nextTick": 490,
+    "bytes": 383492,
+    "canonical": "xxh32x2:60b1e87a81314ec3",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 490,
+    "nextTick": 491,
+    "bytes": 383506,
+    "canonical": "xxh32x2:9bee70071c3b9bcf",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 491,
+    "nextTick": 492,
+    "bytes": 383558,
+    "canonical": "xxh32x2:12a69ba21554ffcb",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 492,
+    "nextTick": 493,
+    "bytes": 383606,
+    "canonical": "xxh32x2:c9c39a62341ad001",
+    "recaptured": true,
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   }
+  ],
+  "fixtureStats": {
+   "tick": 479,
+   "sledX": 108384.56679718409,
+   "hazards": 6,
+   "movingHazards": 0,
+   "hazardsHit": 2,
+   "kodiaksOut": 2,
+   "kodiakNext": 1,
+   "pairs": 1,
+   "activePairs": 1,
+   "worldBodies": 304,
+   "pool": 0,
+   "chunks": 3,
+   "score": 10937,
+   "crashed": false,
+   "nextId": 7004
+  },
+  "boundaryWitness": {
+   "edge": 481,
+   "checkpoint": 480,
+   "inputRecorded": true,
+   "checkpointRecorded": true,
+   "recapturedAfterCheckpoint": true
+  },
+  "finalValidation": {
+   "ok": true
+  },
+  "firstDivergentTick": null,
+  "pageErrors": [],
+  "wallMs": 94471
+ }
+]

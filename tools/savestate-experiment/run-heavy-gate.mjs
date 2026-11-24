@@ -15,8 +15,9 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const args = process.argv.slice(2);
 const repeatArg=args[0]==='--repeat-ticks'&&args.length===2&&/^[1-9][0-9]*$/.test(args[1])&&Number(args[1])<=120;
 const boundaryArg=args.length===1&&args[0]==='--repeat-boundaries';
-if (!(args.length===0||(args.length===1&&args[0]==='--full')||repeatArg||boundaryArg)) {
-  console.error('Usage: npm run gate:heavy -- [--full | --repeat-ticks 1..120 | --repeat-boundaries]');
+const movingArg=args.length===1&&args[0]==='--repeat-moving';
+if (!(args.length===0||(args.length===1&&args[0]==='--full')||repeatArg||boundaryArg||movingArg)) {
+  console.error('Usage: npm run gate:heavy -- [--full | --repeat-ticks 1..120 | --repeat-boundaries | --repeat-moving]');
   process.exit(2);
 }
 const full = args[0] === '--full';
@@ -40,7 +41,7 @@ try {
   const result=await new Promise((resolve,reject)=>{
     const child=spawn(process.execPath,[
     'tools/savestate-experiment/browser-experiment.mjs','--strict-suffix',
-    ...(!full?['--quick']:[]),...(repeatArg||boundaryArg?args:[]),'--json',output
+    ...(!full?['--quick']:[]),...(repeatArg||boundaryArg||movingArg?args:[]),'--json',output
   ],{cwd:root,env:{...env,GAME_URL:'http://127.0.0.1:'+address.port+'/'},
     stdio:'inherit'});
     const timer=setTimeout(()=>child.kill('SIGTERM'),repeatArg?Math.max(300000,Number(args[1])*30000):boundaryArg?480000:300000);
