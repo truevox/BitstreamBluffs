@@ -1,3 +1,5 @@
+import {digestOfBytes} from '../../src/systems/replay/canonicalSha256.js';
+import {utf8Encode} from '../../src/systems/replay/canonicalJson.js';
 import { GhostRecorder } from '../../src/systems/ghost/GhostTape.js';
 import {captureRecorderPrefix,prepareRecorderPrefix,applyRecorderPrefix} from '../../tools/savestate-experiment/recorder-snapshot-kit.js';
 
@@ -32,7 +34,11 @@ test.each([
   ['invalid row',s=>{const d=JSON.parse(s.data);d.recorder.inputs[0][1]=0xffffffff;return {...s,data:JSON.stringify(d)};}],
 ])('rejects %s without modifying fresh recorder',(_label,mutate)=>{
   const a=prefix(),b=fresh(2),before=captureRecorderPrefix(b);
-  expect(()=>prepareRecorderPrefix(b,mutate(captureRecorderPrefix(a)),8)).toThrow(/recorder prefix/);
+  const bad=mutate(captureRecorderPrefix(a));
+  // Re-seal these shape/cursor negatives to exercise structural validation
+  // independently of the accidental-corruption checksum.
+  if(bad)bad.integrity=digestOfBytes(utf8Encode(bad.data));
+  expect(()=>prepareRecorderPrefix(b,bad,8)).toThrow(/recorder prefix/);
   expect(captureRecorderPrefix(b)).toEqual(before);
 });
 test('unclassified recorder field and nonfresh destination fail closed',()=>{
@@ -41,4 +47,15 @@ test('unclassified recorder field and nonfresh destination fail closed',()=>{
   expect(()=>prepareRecorderPrefix(b,captureRecorderPrefix(a),8)).toThrow(/not fresh/);
   a.ghostRecorder.newField=true;
   expect(()=>captureRecorderPrefix(a)).toThrow(/unclassified/);
+});
+
+test('interior repeated edge removal with an unchanged final cursor fails the captured integrity check',()=>{
+  const a=prefix(),b=fresh(2),s=captureRecorderPrefix(a),d=JSON.parse(s.data);
+  expect(d.recorder.inputs[1][1]).toBe(d.recorder.inputs[2][1]);
+  d.recorder.inputs[2][0]+=d.recorder.inputs[1][0];
+  d.recorder.inputs.splice(1,1);
+  expect(d.recorder.inputs.reduce((n,row)=>n+row[0],0)).toBe(d.recorder._lastTick);
+  const before=captureRecorderPrefix(b);
+  expect(()=>prepareRecorderPrefix(b,{...s,data:JSON.stringify(d)},8)).toThrow(/integrity mismatch/);
+  expect(captureRecorderPrefix(b)).toEqual(before);
 });

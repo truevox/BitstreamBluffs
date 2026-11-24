@@ -311,7 +311,7 @@
       pool: poolState(run, ix.keyOf),
       config: opt.withConfig ? Object.fromEntries(CONFIG.filter((k) => k in run && k !== 'content' && k !== 'tuner').map((k) => [k, JSON.stringify(run[k])])) : undefined,
       classes, audit, skipped: skipped.length,
-      recorder: global.__ssCanonical ? global.__ssRecorderKit.captureRecorderPrefix(run) : undefined,
+      recorder: opt.withRecorder ? global.__ssRecorderKit.captureRecorderPrefix(run) : undefined,
     };
     return out;
   }

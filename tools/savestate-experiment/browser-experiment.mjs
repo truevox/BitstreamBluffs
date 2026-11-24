@@ -21,6 +21,8 @@
  *            moving hazards), Kodiaks forced on (two packs spawn), 99 shield charges so hits are absorbed, not fatal.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { build } from 'esbuild';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,8 +44,10 @@ const EXACT_ONLY = process.env.EXACT_ONLY ? process.env.EXACT_ONLY.split(',') : 
 
 const matterKitSrc = readFileSync(path.join(here, 'matter-snapshot-kit.js'), 'utf8').replace(/^export /gm, '')
   + '\nwindow.__ssMatterKit = createMatterSnapshotKit(Phaser.Physics.Matter.Matter);\n';
-const recorderKitSrc = readFileSync(path.join(here, 'recorder-snapshot-kit.js'), 'utf8').replace(/^export /gm, '')
-  + '\nwindow.__ssRecorderKit = {captureRecorderPrefix,prepareRecorderPrefix,applyRecorderPrefix};\n';
+// Bundle the existing pure SHA-256 implementation with the diagnostic codec,
+// rather than maintaining an independent browser checksum implementation.
+const recorderKitSrc = (await build({entryPoints:[path.join(here,'recorder-snapshot-kit.js')],
+  bundle:true,write:false,format:'iife',globalName:'__ssRecorderKit',platform:'browser'})).outputFiles[0].text;
 const gameKitSrc = readFileSync(path.join(here, 'game-state-kit.js'), 'utf8');
 
 // Tick-indexed tape (120 Hz ticks). Held ranges [from, to) and one-shot edges.
@@ -157,33 +161,47 @@ async function runCase(browser, fxName, level, skip = []) {
           pairs: e.pairs.list.length, activePairs: e.pairs.list.filter((p) => p.isActive && !p.isSensor).length, worldBodies: e.world.bodies.length, pool: run.mesh._bodyPool?.length ?? 0,
           chunks: run.mesh.chunks.size, score: run.score.getTotal(), crashed: run.crashed, nextId: Phaser.Physics.Matter.Matter.Common._nextId };
       });
-      const json = await A.page.evaluate(() => JSON.stringify(window.__ssGameKit.capture(window.__ss.run, { withConfig: true })));
+      const json = await A.page.evaluate(() => JSON.stringify(window.__ssGameKit.capture(window.__ss.run, { withConfig: true, withRecorder: window.__ssCanonical })));
       snapBytes = json.length;
       const parsed = JSON.parse(json);
       classes = parsed.classes; audit = parsed.audit;
       if (STRICT) {
-        prefixControls = await B.page.evaluate(json => {
-          const run=window.__ss.run, kit=window.__ssGameKit, snap=JSON.parse(json);
+        // Construct and independently seal the structural negative controls
+        // in Node, so even an insecure HTTP game origin works.
+        const corruptions={
+          missing:s=>delete s.recorder,
+          cursor:s=>{const d=JSON.parse(s.recorder.data);d.recorder._lastTick++;s.recorder.data=JSON.stringify(d);},
+          prefix:s=>{const d=JSON.parse(s.recorder.data);d.recorder.inputs.shift();s.recorder.data=JSON.stringify(d);},
+          interior:s=>{const d=JSON.parse(s.recorder.data),rows=d.recorder.inputs;
+            if(rows.length<3)throw new Error('fixture lacks interior input row');
+            rows[2][0]+=rows[1][0];rows.splice(1,1);s.recorder.data=JSON.stringify(d);},
+          fingerprint:s=>{const d=JSON.parse(s.recorder.data);d.recorder.fingerprints.pop();s.recorder.data=JSON.stringify(d);},
+        };
+        const expectedErrors={
+          missing:'missing or invalid section',cursor:'input cursor mismatch',
+          prefix:'input cursor mismatch',interior:'integrity mismatch',fingerprint:'trace/checkpoint coverage',
+        };
+        const cases=Object.entries(corruptions).map(([name,mutate])=>{
+          const bad=JSON.parse(json);mutate(bad);
+          if(name!=='missing'&&name!=='interior')
+            bad.recorder.integrity='sha256:'+createHash('sha256').update(bad.recorder.data,'utf8').digest('hex');
+          return {name,bad,expectedError:'recorder prefix: '+expectedErrors[name]};
+        });
+        prefixControls = await B.page.evaluate(cases => {
+          const run=window.__ss.run, kit=window.__ssGameKit;
           const before=JSON.stringify(kit.digests(run));
           const beforeRecorder=JSON.stringify(window.__ssRecorderKit.captureRecorderPrefix(run));
           const results=[];
-          const corruptions={
-            missing:s=>delete s.recorder,
-            cursor:s=>{const d=JSON.parse(s.recorder.data);d.recorder._lastTick++;s.recorder.data=JSON.stringify(d);},
-            prefix:s=>{const d=JSON.parse(s.recorder.data);d.recorder.inputs.shift();s.recorder.data=JSON.stringify(d);},
-            fingerprint:s=>{const d=JSON.parse(s.recorder.data);d.recorder.fingerprints.pop();s.recorder.data=JSON.stringify(d);},
-          };
-          for(const [name,mutate] of Object.entries(corruptions)){
-            const bad=JSON.parse(json);mutate(bad);
+          for(const {name,bad,expectedError} of cases){
             let error=null;
             try{kit.restore(run,bad,'full');}catch(e){error=String(e.message);}
             const unchanged=before===JSON.stringify(kit.digests(run)) &&
               beforeRecorder===JSON.stringify(window.__ssRecorderKit.captureRecorderPrefix(run));
             results.push({name,error,unchanged});
-            if(!error?.startsWith('recorder prefix:')||!unchanged)throw new Error('negative control failed: '+name);
+            if(error!==expectedError||!unchanged)throw new Error('negative control failed: '+name+': '+error);
           }
           return results;
-        },json);
+        },cases);
       }
       const r = await B.page.evaluate(({ json, level, skip }) => {
         try { return { ok: true, ...window.__ssGameKit.restore(window.__ss.run, JSON.parse(json), level, { skip }) }; } catch (e) { return { ok: false, error: String(e.message || e) }; }
@@ -302,7 +320,7 @@ if (STRICT) {
   const failed = results.length !== 2 || results.some(r =>
     r.restoreError || r.harnessError || r.ticksCompared !== r.N-r.K ||
     r.firstDivergentTick !== null || r.firstSledDivergentTick !== null ||
-    r.prefixControls?.length !== 4 || !r.prefixControls.every(c=>c.unchanged&&c.error?.startsWith('recorder prefix:')) ||
+    r.prefixControls?.length !== 5 || !r.prefixControls.every(c=>c.unchanged&&c.error?.startsWith('recorder prefix:')) ||
     !r.recorderParity?.prefix || !r.recorderParity.finishedTape || r.recorderParity.endTick !== r.N ||
     r.pageErrors?.length !== 0 || r.audit?.length !== 0 || r.unclassified?.length !== 0 ||
     (r.fixture === 'contact' ? !(r.fixtureStats?.activePairs > 0) : !(r.fixtureStats?.hazardsHit > 0)));

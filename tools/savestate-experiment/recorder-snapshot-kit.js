@@ -1,5 +1,8 @@
 // Diagnostic-only GhostRecorder prefix codec. No production restore registration,
 // no untrusted file admission, and no claim that a synthetic fixture is ranked.
+import {digestOfBytes} from '../../src/systems/replay/canonicalSha256.js';
+import {utf8Encode} from '../../src/systems/replay/canonicalJson.js';
+const seal = data => digestOfBytes(utf8Encode(data));
 const FIELDS = ['header','inputs','checkpoints','trace','fingerprints','fingerprintErrorCount',
   'fingerprintErrors','_last','_lastTick','lastTick'];
 const CHANNELS = ['clock','rng','sled','matter','terrain','hazards','pickups','effects','bsod','kodiak','score','tricks','recovery'];
@@ -34,15 +37,16 @@ export function captureRecorderPrefix(run) {
   const rec = run.ghostRecorder;
   if (!sameKeys(rec,FIELDS)) fail('unclassified recorder fields');
   const data = encode({runId:run.runId,startedAt:run.startedAt,recorder:Object.fromEntries(FIELDS.map(k=>[k,rec[k]]))});
-  return {kind:'bb-diagnostic-recorder-prefix',version:1,data};
+  return {kind:'bb-diagnostic-recorder-prefix',version:2,data,integrity:seal(data)};
 }
 export function prepareRecorderPrefix(run, section, tick) {
-  if (!sameKeys(section,['kind','version','data']) || section.kind !== 'bb-diagnostic-recorder-prefix' || section.version !== 1)
+  if (!sameKeys(section,['kind','version','data','integrity']) || section.kind !== 'bb-diagnostic-recorder-prefix' || section.version !== 2)
     fail('missing or invalid section');
   if (!sameKeys(run.ghostRecorder,FIELDS) || typeof run.ghostRecorder.finish !== 'function')
     fail('fresh recorder missing or changed');
   if (run.simClock.tick !== 0 || run.ghostRecorder.lastTick !== 0 || run.ghostRecorder.inputs.length)
     fail('target is not fresh');
+  if (typeof section.data !== 'string' || section.data.length > 8*1024*1024 || seal(section.data) !== section.integrity) fail('integrity mismatch');
   const decoded=decode(section.data);
   if (!sameKeys(decoded,['runId','startedAt','recorder'])) fail('metadata shape');
   const {recorder:r,runId,startedAt}=decoded;
