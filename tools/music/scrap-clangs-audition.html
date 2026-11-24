@@ -67,11 +67,12 @@ footer{font-size:.86rem;color:#acb8ce;line-height:1.5}
 <hr style="border-color:#536477;margin-top:28px">
 <h2>🔔 New: irregular, on-pitch junk-metal clangs</h2>
 <p class="hint">Clangs happen only while moving on the ground and when the live bass analyser supports a confident current frequency. The timing varies irregularly, but the note comes from the recording. Silence = no manufactured clang.</p>
-<label for="clang-level">Pitched clang volume: <output id="clang-level-value">100%</output></label>
-<input id="clang-level" type="range" min="0" max="200" step="10" value="100">
-<label for="clang-density">Clang occurrence rate: <output id="clang-density-value">100%</output></label>
-<input id="clang-density" type="range" min="50" max="200" step="10" value="100">
-<div class="row"><button id="auto-clangs" disabled aria-pressed="true">Auto clangs: ON</button><button id="scan-pitch" disabled>🎼 Check live pitch</button><button id="pitch-hit" disabled>🔔 Test next verified-pitch clang</button></div>
+<label for="clang-level">Pitched clang volume: <output id="clang-level-value">200%</output></label>
+<input id="clang-level" type="range" min="0" max="200" step="10" value="200">
+<label for="clang-density">Clang occurrence rate: <output id="clang-density-value">200%</output></label>
+<input id="clang-density" type="range" min="50" max="200" step="10" value="200">
+<label for="cowbell">🔔 MOAR COWBELL — extra on-pitch metallic body: <output id="cowbell-value">175%</output></label><input id="cowbell" type="range" min="0" max="200" step="5" value="175"><p class="hint">New warm, ringing cowbell partials follow ONLY successfully detected original-bass notes. 0% removes the new cowbell without removing existing clangs. The old SPLORP, suction, landing sounds and original musical notes stay untouched. At 200% this gets hilariously metallic.</p>
+<div class="row"><button id="auto-clangs" disabled aria-pressed="true">Auto clangs: ON</button><button id="scan-pitch" disabled>🎼 Check live pitch</button><button id="pitch-hit" disabled>🔔 Test next verified-pitch clang + cowbell</button></div>
 <p id="pitch-status" class="hint" aria-live="polite">The bass spectrum is measured only when a new clang is due or you press Test; weak evidence means no pitched sound.</p>
 <p class="hint">A seed controls irregular time gaps, not musical pitch. Compared with Crystal's sustained glass-like notes, Garbage clangs have an on-pitch fundamental surrounded by gritty, inharmonic junk-metal overtones. Try the difference by playing the original recordings; your original preferred SPLORP 160% and takeoff A/80% remain separate.</p>
 <label for="extra">✨ Extra biome bloom: <output id="extra-value">0%</output></label><input id="extra" type="range" min="0" max="200" value="0" step="5"><p class="help">0% = original audition sound. Raise this to add a spacious, filtered echo of this biome’s processed stems; the dry song and event effect settings stay unchanged.</p>
