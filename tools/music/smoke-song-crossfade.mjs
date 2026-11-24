@@ -1,7 +1,7 @@
 /** Private original-media real game crossfade smoke, not mastering/listening approval. */
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-const url=process.env.GAME_URL||'http://127.0.0.1:18222/';
+const url=process.env.GAME_URL||'http://127.0.0.1:8220/';
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--ignore-gpu-blocklist']});
 try{
 	const page=await browser.newPage({viewport:{width:1080,height:720}});

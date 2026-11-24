@@ -45,3 +45,55 @@ test('explicit OFF prevents automatic transition without changing physics or tra
 	expect(d.crossfadeEnabled).toBe(false);
 	expect(d._beginTrack).not.toHaveBeenCalled();
 });
+
+import {GAME_SONGS,defaultSongSelection} from '../../src/systems/music/MusicPlaylist.js';
+function overlapFixture(){
+	const [a,b]=GAME_SONGS.map(s=>({id:s.id}));
+	const d=Object.create(StemMusicDirector.prototype);
+	const node=()=>({stop:jest.fn(),disconnect:jest.fn()});
+	const param=()=>({cancelScheduledValues:jest.fn(),cancelAndHoldAtTime:jest.fn(),setTargetAtTime:jest.fn()});
+	const old=node(),incoming=node(),oldGain=param(),newGain=param();
+	Object.assign(d,{ctx:{currentTime:11,state:'running'},bus:{gain:param()},started:true,ready:true,
+		track:b,trackIndex:1,catalog:[a,b],songEnabled:defaultSongSelection(),clockStart:10,
+		pack:{id:b.id,duration:100},_token:8,_incomingFade:{token:8,start:10,end:13},
+		activeNodes:new Set([old,incoming]),_sourceEnvelopes:new Map([
+			[old,{songId:a.id,token:7,gain:{gain:oldGain,disconnect:jest.fn()},role:'drums',end:13}],
+			[incoming,{songId:b.id,token:8,gain:{gain:newGain,disconnect:jest.fn()},role:'drums',end:20}]]),
+		cache:new Map(),scheduled:new Set(),inflight:new Map(),_pump:jest.fn(),_syncAdaptiveUserLevels:jest.fn(),
+		start:jest.fn(()=>true)});
+	return {d,a,b,old,incoming,oldGain,newGain};
+}
+test('disabling outgoing mid-overlap retires only its nodes, completes incoming gain without a restart',()=>{
+	const {d,a,b,old,incoming,oldGain,newGain}=overlapFixture();
+	d.setSongSelection({...d.songEnabled,[a.id]:false});
+	expect(oldGain.cancelAndHoldAtTime).toHaveBeenCalledWith(11);
+	expect(oldGain.setTargetAtTime).toHaveBeenCalledWith(0,11,.003);
+	expect(old.stop).toHaveBeenCalledWith(11.015);
+	expect(incoming.stop).not.toHaveBeenCalled();
+	expect(newGain.setTargetAtTime).toHaveBeenCalledWith(1,11,.015);
+	expect(d.activeNodes.has(old)).toBe(false);
+	expect(d._sourceEnvelopes.has(old)).toBe(false);
+	expect(d.track.id).toBe(b.id);expect(d.clockStart).toBe(10);expect(d._token).toBe(8);
+	expect(d.start).not.toHaveBeenCalled();expect(d._incomingFade).toBeNull();
+	// Toggling back does not resurrect the already retired outgoing nodes.
+	d.setSongSelection({...d.songEnabled,[a.id]:true});
+	expect(old.stop).toHaveBeenCalledTimes(1);
+	expect(d.start).not.toHaveBeenCalled();
+});
+test.each(['pause','seek'])('%s after outgoing mute does not extend its stop or retain old ownership',kind=>{
+	const {d,a,old,incoming}=overlapFixture();
+	d.setSongSelection({...d.songEnabled,[a.id]:false});
+	if(kind==='pause')expect(d.transportPause()).toBe(true);
+	else expect(d.seekTo(5)).toBe(true);
+	expect(old.stop).toHaveBeenCalledTimes(1);
+	expect(incoming.stop).toHaveBeenCalledTimes(1);
+	expect(d.activeNodes.size).toBe(0);expect(d._sourceEnvelopes.size).toBe(0);
+	expect(d._incomingFade).toBeNull();
+});
+test('all songs disabled during overlap retires both and stops transport',()=>{
+	const {d,old,incoming}=overlapFixture();
+	d.setSongSelection(Object.fromEntries(GAME_SONGS.map(s=>[s.id,false])));
+	expect(old.stop).toHaveBeenCalledTimes(1);expect(incoming.stop).toHaveBeenCalledTimes(1);
+	expect(d.started).toBe(false);expect(d._sourceEnvelopes.size).toBe(0);
+	expect(d.start).not.toHaveBeenCalled();
+});

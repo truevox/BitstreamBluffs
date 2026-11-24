@@ -185,6 +185,7 @@ export class StemMusicDirector {
 			return;
 		}
 		if (!this.started) return;
+		this._silenceDisabledSources();
 		const next = nextEnabledSongIndex(this.catalog, this.songEnabled, -1);
 		if (next < 0) {
 			// Crucially NO procedural fallback: the owner's all-off setting
@@ -195,6 +196,48 @@ export class StemMusicDirector {
 		if (!this.track || this.songEnabled[this.track.id] === false) {
 			this.stop();
 			this.start();
+		}
+	}
+
+	/** Overlap sources retain their own song identity, independently of the
+	 * transport's incoming track. Cut only disabled recordings, without moving
+	 * the incoming clock. Keep a short click-suppressing release when possible;
+	 * remove the source from transport bookkeeping so later pause/seek/selection
+	 * cannot extend its scheduled stop or automate its old envelope again.
+	 */
+	_silenceDisabledSources() {
+		const now=this.ctx?.currentTime??0;
+		let cutOutgoing=false;
+		for(const [src,record] of this._sourceEnvelopes??[]){
+			if(this.songEnabled[record.songId]!==false)continue;
+			if(record.songId!==this.track?.id)cutOutgoing=true;
+			const param=record.gain.gain;
+			try {
+				if(typeof param.cancelAndHoldAtTime==='function')param.cancelAndHoldAtTime(now);
+				else param.cancelScheduledValues(now);
+				param.setTargetAtTime(0,now,.003);
+				src.stop(now+.015);
+			} catch {
+				// If automation/stop is unavailable, disconnect immediately.
+				try {src.disconnect();} catch {}
+				try {record.gain.disconnect();} catch {}
+			}
+			this.activeNodes.delete(src);
+			this._sourceEnvelopes.delete(src);
+		}
+		// If the old track was muted early, do not leave the new rhythm or
+		// vocals waiting for a handoff that no longer exists. Preserve its
+		// exact source clock and lift only its independent envelopes.
+		if(cutOutgoing&&this._incomingFade?.token===this._token&&
+			this.songEnabled[this.track?.id]!==false){
+			this._incomingFade=null;
+			for(const record of this._sourceEnvelopes.values()){
+				if(record.token!==this._token||record.songId!==this.track?.id)continue;
+				const param=record.gain.gain;
+				if(typeof param.cancelAndHoldAtTime==='function')param.cancelAndHoldAtTime(now);
+				else param.cancelScheduledValues(now);
+				param.setTargetAtTime(1,now,.015);
+			}
 		}
 	}
 
@@ -1227,7 +1270,7 @@ export class StemMusicDirector {
 			const fade=this._incomingFade;
 			if(fade?.token===this._token&&firstAllowed<fade.end)
 				automateTransition(envelope.gain,name,'in',fade.start,fade.end,firstAllowed);
-			this._sourceEnvelopes.set(src,{gain:envelope,role:name,token:this._token,
+			this._sourceEnvelopes.set(src,{gain:envelope,role:name,token:this._token,songId:this.track?.id??this.pack.id,
 				end:firstAllowed+Math.max(0.001,Math.min(duration-late,buffer.duration-late))});
 		}else src.connect(dest);
 		this.activeNodes.add(src);
@@ -1432,6 +1475,7 @@ export class StemMusicDirector {
 			try {src.stop(t+.014);} catch {}
 		}
 		this.activeNodes.clear();
+		this._sourceEnvelopes?.clear();
 		this._incomingFade=null;
 		this.scheduled.clear();
 		this.inflight.clear();
@@ -1478,6 +1522,7 @@ export class StemMusicDirector {
 		if (this.bus && this.ctx) this.bus.gain.setTargetAtTime(0, now, 0.01);
 		for (const src of this.activeNodes) { try { src.stop(now + 0.04); } catch {} }
 		this.activeNodes.clear();
+		this._sourceEnvelopes?.clear();
 	}
 
 	destroy() {
