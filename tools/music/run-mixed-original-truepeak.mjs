@@ -114,7 +114,9 @@ try{
 	report.status=errors.length||httpErrors.length?'INVALID_BROWSER_OR_HTTP_ERRORS':
 		report.summary.overUnityAllSamples?'FAILED_SAMPLE_PEAK':
 		report.summary.overUnityAllTruePeak4xFrames?'FAILED_ESTIMATED_4X_TRUE_PEAK':
-		'PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE';
+        results.some(x=>!Number.isFinite(x.samplePeak)||x.samplePeak>=1)?'FAILED_SAMPLE_PEAK':
+        results.some(x=>!Number.isFinite(x.estimatedTruePeak4x)||x.estimatedTruePeak4x>=1)?'FAILED_ESTIMATED_4X_TRUE_PEAK':
+        'PASS_SAMPLED_MIXED_OUTPUT_4X_ESTIMATE';
 	report.browserErrors=errors;report.httpErrors=httpErrors;
 	process.exitCode=auditVerdictExitCode(report.status);
 	console.log('MIXED_OUTPUT_AUDIT',report.status,JSON.stringify(report.summary),

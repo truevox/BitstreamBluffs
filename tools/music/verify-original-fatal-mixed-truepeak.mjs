@@ -68,6 +68,8 @@ for(let index=0;index<4;index++){
 		assert.equal(item.control.countIn,null);
 		assert.deepEqual(item.sourceHashes,item.control.sourceHashes);
 		assertSafeFatalPair(item);
+		assert.equal(item.originalVocalFxAndRoomSendsFromPack,true,
+			'Old simplified-vocal mix cannot be accepted as approved-game peak evidence');
 		assert.equal(item.sourceHashes.drums,item.originalDrumSha256);
 		assert.equal(item.nonfiniteSamples,0);
 		assert.equal(item.sampleClips,0);

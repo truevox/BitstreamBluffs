@@ -27,8 +27,17 @@ export function classifyLiveCaptureAttempt(report) {
 	if(report.status===AUDIO_LIMIT_FAILURE) return AUDIO_LIMIT_FAILURE;
 	if(report.status===PASS_CAPTURE)
 		return complete?PASS_CAPTURE:'INVALID_QA_OR_SOURCE';
-	if(report.status===INVALID_CAPTURE&&!meter)
-		return INVALID_CAPTURE;
+	if(report.status===INVALID_CAPTURE&&!meter){
+        // A quantum capture fault is retryable ONLY if it was the sole
+        // failure; real page/source loading failures may not disappear
+        // behind a cleaner second recording.
+        const unexpected=(report.unexpectedHttp||[]).filter(({status,url})=>
+            !(status===404&&/\/music\/packs\/[^/]+\/adaptive\/debutmont\//.test(url||'')));
+        if(!Array.isArray(report.errors)||report.errors.length||unexpected.length||
+            !/INSTRUMENT_CAPTURE|quantum gap|Missing live PCM|Unrecoverable gap|Worklet did not finish capture/i.test(String(report.error)))
+            return 'INVALID_QA_OR_SOURCE';
+        return INVALID_CAPTURE;
+    }
 	// Any unclassified/incomplete report or legacy "FAIL_OR_INCOMPLETE"
 	// requires a human diagnosis and cannot be silently retried as QA.
 	return 'INVALID_QA_OR_SOURCE';

@@ -47,6 +47,8 @@ for(let index=0;index<33;index++){
 	assert.equal(result.control.countIn,null);
 	assert.deepEqual(result.control.sourceHashes,result.sourceHashes);
 	assertSafeFatalPair(result);
+		assert.equal(result.originalVocalFxAndRoomSendsFromPack,true,
+			'Old simplified-vocal mix cannot be accepted as approved-game peak evidence');
 	assert.equal(result.sampleClips,0);
 	assert.equal(result.estimatedTrueClips4x,0);
 	assert.equal(result.nonfiniteSamples,0);

@@ -51,6 +51,8 @@ for(let i=0;i<4;i++){
 		assert.equal(scenario.test.qaCosmeticSeed,0x2912026);
 		assert.equal(scenario.test.events.length,6);
 		assert.equal(scenario.productionGraph.productionPeakGuard,true);
+		assert.equal(scenario.originalVocalFxAndRoomSendsFromPack,true,
+			'Historic pre-correction offline mix cannot be accepted');
 		assertMixedQaMetrics(scenario);
 		assert.ok(scenario.estimatedTruePeak4x>=scenario.samplePeak-1e-7);
 		// Independent READ of the canonical, unchanged original OGG
@@ -119,6 +121,8 @@ if(overlapFile){
 			'hazardScramble','static-glitch','fatal-crash-sfx']);
 		assert.equal(v.originalSourceCount,7);
 		assert.equal(v.test.qaCosmeticSeed,0x2912026);
+		assert.equal(v.originalVocalFxAndRoomSendsFromPack,true,
+			'Historic overlap mix lacks pack vocal FX and room sends');
 		const song=songs.find(x=>x.id===v.trackId);
 		assert.ok(song&&!checkUnique.has(song.id));
 		checkUnique.add(song.id);

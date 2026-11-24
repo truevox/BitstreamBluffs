@@ -31,7 +31,7 @@ describe('#310 strict captured-audio review policy',()=>{
 	});
 	test('explicit instrument failure without actual measured PCM is retryable',()=>{
 		expect(classifyLiveCaptureAttempt({status:INVALID_CAPTURE,
-			error:'INSTRUMENT_CAPTURE: quantum gap'})).toBe(INVALID_CAPTURE);
+			error:'INSTRUMENT_CAPTURE: quantum gap',errors:[],unexpectedHttp:[]})).toBe(INVALID_CAPTURE);
 	});
 	test.each(['FAIL_OR_INCOMPLETE','INVALID_QA_OR_SOURCE','bogus',PASS_CAPTURE])(
 		'legacy or unsupported report without verified quantum chronology fails closed: %s',status=>{
@@ -46,4 +46,14 @@ describe('#310 strict captured-audio review policy',()=>{
 		const x=report(INVALID_CAPTURE,{estimatedTruePeak4x:1.2});
 		expect(classifyLiveCaptureAttempt(x)).toBe(AUDIO_LIMIT_FAILURE);
 	});
+});
+
+test('never discard an instrument gap when the same run had browser or source errors',()=>{
+  const base={status:INVALID_CAPTURE,error:'INSTRUMENT_CAPTURE: quantum gap',errors:[],unexpectedHttp:[]};
+  for(const extra of [
+    {errors:['TypeError: crashed in game']},
+    {unexpectedHttp:[{status:500,url:'http://127.0.0.1/music/packs/a/drums.ogg'}]},
+    {error:'Unexplained source replacement'},
+  ])expect(classifyLiveCaptureAttempt({...base,...extra})).toBe('INVALID_QA_OR_SOURCE');
+  expect(classifyLiveCaptureAttempt({...base,unexpectedHttp:[{status:404,url:'http://127.0.0.1/music/packs/a/adaptive/debutmont/missing.ogg'}]})).toBe(INVALID_CAPTURE);
 });

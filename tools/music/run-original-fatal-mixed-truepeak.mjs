@@ -85,6 +85,8 @@ try{
 			assert.deepEqual(item.control.sourceHashes,item.sourceHashes);
 			assert.equal(item.control.countIn,null);
 			assertSafeFatalPair(item); // both positive and no-count-in original-stereo controls
+			assert.equal(item.originalVocalFxAndRoomSendsFromPack,true,
+			'Old simplified-vocal mix cannot be accepted as approved-game peak evidence');
 			assert.equal(item.sampleClips,0,'Actual count-in composite samples clipped');
 			assert.equal(item.estimatedTrueClips4x,0,'Count-in 4x true peak overs');
 			assert.equal(item.nonfiniteSamples,0);
