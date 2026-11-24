@@ -67,7 +67,9 @@ import * as matterPortableNs from '../MatterPortable.js';
 // 7: #128 (owner-approved 2026-11-23): buffered-strong opening with physical
 //    soft finish replaces the default BSOD chase; nominal wall speed stays
 //    fingerprinted, and the actual wall slows smoothly in the final 3000px.
-export const SIM_REVISION = 7;
+// 8: #253 marker rendering no longer prequeues unjoined terrain chunks on retries;
+//    this changes canonical causal terrain state despite being a visual-origin bug.
+export const SIM_REVISION = 8;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above
@@ -75,7 +77,8 @@ export const SIM_REVISION = 7;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-export const LAST_RELEASED_SIM_REVISION = 7;
+// Freeze the reviewed SIM8 rule for this release commit; main stays SIM7 until merge.
+export const LAST_RELEASED_SIM_REVISION = 8;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;

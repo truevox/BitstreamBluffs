@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.22 — protect replay terrain from visual marker prefetch (SIM_REVISION 8, #253) (2026-11-23)
+
+- **Real causal retry bug fixed:** BEST and DIED HERE gate labels sample only the already-joined Matter collision polyline without calling `TerrainGenerator.heightAt` at any time, even when the marker is inside streamed terrain. The new `joinedMarkerHeight` wrapper defers first marker placement until the exact ground chunk is joined; the marker still draws at its true collider-ground height after that; the generator lookup cache is never changed by marker rendering. No gameplay features, AirBrake tuning or owner-approved SIM7 BSOD chase physics are changed.
+- **SIM_REVISION 8:** Generated/queued terrain state can now differ from SIM7 on a retry with prior markers. The previous SIM7 ruleset is preserved as an immutable archive; source tripwire now explicitly covers `src/systems/MarkerLayout.js` so future edits to its guard cannot evade source-integrity checks. Version-aware replay interfaces remain; prelaunch old-tape runtime support is not required by #266.
+- **Review evidence boundary:** source tests and real browser marker-enabled repeat/session conformance are distinct gates. Prior 36/36 cross-engine runs on old unmerged AirBrake code are historical evidence, not proof on this exact main-based SIM8 build. Independent review requested changes on the initial draft to add source coverage and release metadata; this release incorporates both.
+
 ## v2.19.21 — source-stamped SIM6 replay fixture isolation and browser QA (#236 / #240) (2026-11-22)
 
 - **Immutable historical evidence:** cross-engine Chromium recordings now require a clean committed source, an explicit new output directory outside all checked-in fixture trees, and exclusive-create writes. The game URL must serve the local production build index. Existing historical tapes and original recording metadata remain untouched.
