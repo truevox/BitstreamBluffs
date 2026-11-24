@@ -533,6 +533,20 @@ export class StemMusicDirector {
 		return true;
 	}
 
+	/** New song effect chains create arcadeglue with default bridge=false.
+	 * Preserve the current world corridor state across song replacement; the
+	 * memoized previous bridge=true would otherwise suppress this update.
+	 * WebAudio presentation only; never writes to physics, replay or the clock.
+	 */
+	_restoreArcadeBridgeAfterTrackReplace(){
+		const bridge=this._arcadeLastBridge;
+		const progress=this._arcadeLastProgress;
+		if(typeof bridge!=='boolean'||!Number.isFinite(progress))return false;
+		this._arcadeLastBridge=null;
+		this._arcadeLastProgress=NaN;
+		return this.setArcadeTransition({bridge,progress});
+	}
+
 	/** A genuine, unwarded thermalUpdraft zone plus EffectivePhysics
 	 * reduced gravity creates source-fed sandstone resonance. The zone
 	 * is confirmed in RunScene from actual physicsContext zoneDefs:
@@ -1078,6 +1092,7 @@ export class StemMusicDirector {
 			this._refreshVoices();
 			this._timbreSignatures.clear();
 			this._applyMusicTimbres(true);
+			this._restoreArcadeBridgeAfterTrackReplace();
 			if (info.pack.captions) this._loadCaptions(info, token);
 			this._nextPromise = null;
 			this._nextIndex = null;

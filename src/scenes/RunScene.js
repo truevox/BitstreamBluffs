@@ -1441,15 +1441,20 @@ export class RunScene extends Phaser.Scene {
             !isWarded(this.wards, { modId: 'thermalUpdraft' }),
           gravityPxS2: phys.gravityPxS2, vy: sled.vy, grounded: !!sled.grounded,
         });
-        if (this.terrain) {
-          const terrainY = this.terrain.heightAt(sled.x);
-          audio.setSpaceMotion?.({
-            gravityPxS2: phys.gravityPxS2,
-            terrainY, riderY: sled.y, vy: sled.vy, grounded: !!sled.grounded,
-          });
-          audio.setHydrostaticMotion?.({
-            terrainY, riderY: sled.y, vy: sled.vy, grounded: !!sled.grounded,
-          });
+        // #306 / SIM8: audio must sample the already-JOINED collision mesh,
+        // never TerrainGenerator.heightAt() (whose _chunkAt mutates caches
+        // and can queue new terrain). No joined sample => no new audio input.
+        if (this.mesh?.chunks) {
+          const terrainY = joinedMarkerHeight(sled.x, this.mesh.chunks);
+          if (Number.isFinite(terrainY)) {
+            audio.setSpaceMotion?.({
+              gravityPxS2: phys.gravityPxS2,
+              terrainY, riderY: sled.y, vy: sled.vy, grounded: !!sled.grounded,
+            });
+            audio.setHydrostaticMotion?.({
+              terrainY, riderY: sled.y, vy: sled.vy, grounded: !!sled.grounded,
+            });
+          }
         }
       } catch (e) { /* audio must never break the loop */ }
     }

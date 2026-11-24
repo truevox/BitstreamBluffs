@@ -14,7 +14,7 @@
 
 ## Game signal ownership
 
-- RunScene sends only read-only snapshots from current terrain generation, existing sampled background-bee positions, WorldDance original-source envelopes, pre/post-same-step geyser cooldown and player motion. No new physics RNG, collider, score, replay pad, authoritative meter, or hazard motion comes from any audio callback.
+- RunScene sends only read-only snapshots from the already-joined Matter collision mesh (never TerrainGenerator.heightAt), existing sampled background-bee positions, WorldDance original-source envelopes, pre/post-same-step geyser cooldown and player motion. No new physics RNG, collider, score, replay pad, authoritative meter, or hazard motion comes from any audio callback.
 - StemMusicDirector owns source effects and physical landing/takeoff triggers. Gameplay-facing stage ordering is **source-only character/echo/bloom first, then existing event-capable physical biome processor**.
 - Menus preserve original untouched sources and the chosen song/clock, fading changes over 750ms. The final AudioSynth compressor feeds OutputPeakGuard (sampled soft ceiling 0.965). This is **not** certified oversampled true-peak mastering and must not be described as such.
 - A normal playable 33-song private runtime mounts the original OGG packs from a separate owner-authorized private archive. None of the copyrighted OGG/FLAC/WAV/MP3 media or private note transcripts is included in this code PR.
@@ -38,3 +38,10 @@ Build a full Vite game using this branch. At deployment only, mount the external
 ## Remaining gates
 
 The preliminary 29 YIN-generated melody transcriptions need human listening for incorrect pitches/octaves and rhythm. All original drum/bass beat maps remain explicitly **unverified**; none is authorized to change timing, Gym, World Dance or physics. Real full-length 33-song continuous/transition QA, musical A/B approval, low-power device CPU, final musical balance with gameplay wind/SFX, oversampled true peaks, public media rights, source licensing and independent code review are outstanding. Do not publish original or derived media publicly or merge a draft PR as a final mastered release.
+
+## Independent integration-review hardening (November 23, 2026)
+
+- The SIM8 causal isolation reviewer found `TerrainGenerator.heightAt(sled.x)` inside an audio-only branch. That method can change `_lastChunk` and queue terrain, so the branch now samples existing physically joined `TerrainMesh.chunks` with `joinedMarkerHeight()`. Audio input is skipped until a finite joined geometry sample exists. The authoritative gameplay void check later in the tick retains its generator read and is NOT altered by the audio correction.
+- The installed-catalog selector governs ALL AudioSynth music and procedural fallback checks. A public four-song installation with all four visible tracks OFF stays silent even if the 29 not-installed private song booleans are ON in settings; an actual private 33-song installation retains those selections.
+- On an original-track change during an active Arcade bridge, newly built `arcadeglue` effect chains immediately receive the cached bridge and progress parameters. If audio is paused, the cache is invalidated for the next authoritative transition update; no synthetic timing is fabricated.
+- Regression tests prove these corrected contracts, including no mutable generator height reads in the audio observation block. All source OGGs remain private. Full-song pitch/beat certification, listening, rights and mastering remain separate owner gates.

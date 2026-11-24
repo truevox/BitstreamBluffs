@@ -59,6 +59,13 @@ export function shuffledSongRound(catalog, selection, currentIndex, random=()=>c
 	return choices;
 }
 
-export function hasEnabledSongs(selection) {
-	return GAME_SONGS.some(song => sanitizeSongSelection(selection)[song.id]);
+/** True only if at least one SELECTED song is actually installed/playable.
+ * With no explicit catalog, preserve the full-roster query contract.
+ * Public AudioSynth callers pass installedSongChoices(catalog), so 29
+ * private-only defaults cannot turn a four-song all-off game audible.
+ */
+export function hasEnabledSongs(selection, playableSongs = GAME_SONGS) {
+	if (!Array.isArray(playableSongs) || !playableSongs.length) return false;
+	const selected = sanitizeSongSelection(selection);
+	return playableSongs.some(song => song?.id && selected[song.id] === true);
 }

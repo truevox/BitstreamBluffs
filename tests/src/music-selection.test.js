@@ -57,6 +57,29 @@ describe('33-song owner playlist — explicit all-off SILENCE', () => {
 		expect(nextEnabledSongIndex(catalog,allOff)).toBe(-1);
 		expect(nextEnabledSongIndex(catalog,allOff,2)).toBe(-1);
 	});
+	test('public all-off remains SILENT even when hidden private-song flags are enabled',()=>{
+		const visible=GAME_SONGS.slice(0,4).map(song=>({id:song.id}));
+		const selection=defaultSongSelection();
+		for(const song of visible)selection[song.id]=false;
+		expect(hasEnabledSongs(selection)).toBe(true); // hidden private choices are enabled
+		expect(hasEnabledSongs(selection,visible)).toBe(false); // NONE are actually installed
+		const privateCatalog=GAME_SONGS.map(song=>({id:song.id}));
+		expect(hasEnabledSongs(selection,privateCatalog)).toBe(true);
+		const audio=Object.create(AudioSynth.prototype);
+		audio.settings={musicEnabledSongs:selection};
+		audio._stemMusic={catalog:visible,stop:jest.fn()};
+		audio._musicTimer=null;audio._arrCache=new Map();audio._musicWanted=false;
+		audio._ensureCtx=jest.fn(()=>{throw Error('all visible songs OFF must never allocate audio');});
+		audio._startScheduler=jest.fn();audio.nodes=null;
+		expect(audio._hasEnabledSongs(selection)).toBe(false);
+		audio.startMusic('public-all-off');
+		expect(audio._stemMusic.stop).toHaveBeenCalledTimes(1);
+		expect(audio._ensureCtx).not.toHaveBeenCalled();
+		expect(audio._startScheduler).not.toHaveBeenCalled();
+		// As soon as the private catalog is legitimately installed, those choices work.
+		audio._stemMusic.catalog=privateCatalog;
+		expect(audio._hasEnabledSongs(selection)).toBe(true);
+	});
 	test('four-song saved all-off migration never enables newly added songs',()=>{
 		const legacyAllOff=Object.fromEntries(GAME_SONGS.slice(0,4).map(s=>[s.id,false]));
 		expect(hasEnabledSongs(legacyAllOff)).toBe(false);

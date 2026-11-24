@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { LEGACY_BIOME_ALIASES } from '../../src/data/biomeAliases.js';
 const LEGACY_HOME_BIOME = Object.keys(LEGACY_BIOME_ALIASES)[0];
 import { jest } from '@jest/globals';
@@ -90,6 +91,42 @@ describe('Original-stem physics signals are read-only and source-grounded',()=>{
 		d.setBiome('debutmont');d.mixer.setEffectParam.mockClear();
 		expect(d.setArcadeTransition({bridge:true,progress:.5})).toBe(false);
 		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+	});
+	test('song replacement rehydrates the current bridge state in new Arcade glue processors',()=>{
+		const d=director();d.biome='bitstream-bluffs';d.started=true;d.transportPaused=false;
+		d._arcadeLastBridge=null;d._arcadeLastProgress=NaN;
+		expect(d.setArcadeTransition({bridge:true,progress:.44})).toBe(true);
+		d._applyMusicTimbres(true); // actual new WebAudio effect instances start bridge=false
+		d.mixer.setEffectParam.mockClear();
+		expect(d._restoreArcadeBridgeAfterTrackReplace()).toBe(true);
+		for(const stem of ROLES){
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'arcadeglue','bridge',true);
+			expect(d.mixer.setEffectParam).toHaveBeenCalledWith(stem,'arcadeglue','progress',.44);
+		}
+		d.mixer.setEffectParam.mockClear();
+		expect(d.setArcadeTransition({bridge:true,progress:.44})).toBe(true);
+		expect(d.mixer.setEffectParam).not.toHaveBeenCalled();
+		// With transport paused the cache must still invalidate for the next
+		// authentic world update rather than erroneously claiming restoration.
+		d.transportPaused=true;
+		expect(d._restoreArcadeBridgeAfterTrackReplace()).toBe(false);
+		expect(d._arcadeLastBridge).toBe(null);
+		d.transportPaused=false;
+		expect(d.setArcadeTransition({bridge:true,progress:.44})).toBe(true);
+		expect(d.mixer.setEffectParam).toHaveBeenCalledWith('drums','arcadeglue','bridge',true);
+		const source=readFileSync(new URL('../../src/systems/music/StemMusicDirector.js',import.meta.url),'utf8');
+		expect(source).toMatch(/this\._applyMusicTimbres\(true\);\s*this\._restoreArcadeBridgeAfterTrackReplace\(\)/);
+	});
+	test('RunScene music observations use joined collider geometry, never the mutable terrain generator',()=>{
+		const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+		const start=source.indexOf('audio.setGeyserMotion?.');
+		const end=source.indexOf('} catch (e) { /* audio must never break the loop */ }',start);
+		expect(start).toBeGreaterThan(0);
+		expect(end).toBeGreaterThan(start);
+		const audioOnly=source.slice(start,end);
+		expect(audioOnly).toContain('joinedMarkerHeight(sled.x, this.mesh.chunks)');
+		expect(audioOnly).toContain('Number.isFinite(terrainY)');
+		expect(audioOnly).not.toMatch(/this\.terrain\.heightAt\s*\(/);
 	});
 	test('Arcade rejects invalid, menu/paused and future-standalone malformed bridge data',()=>{
 		const d=director();d.biome='bitstream-bluffs';d.started=true;

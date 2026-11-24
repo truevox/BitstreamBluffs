@@ -29,7 +29,7 @@ import { Rng } from './Rng.js';
 import { StemMusicDirector } from './music/StemMusicDirector.js';
 import { TurntableScratch } from './music/TurntableScratch.js';
 import { FatalCrashCountIn } from './music/FatalCrashCountIn.js';
-import { hasEnabledSongs, sanitizeSongSelection } from './music/MusicPlaylist.js';
+import { hasEnabledSongs, installedSongChoices, sanitizeSongSelection } from './music/MusicPlaylist.js';
 import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
 import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
 import { syntheticMeterAt } from './music/SyntheticMeterTiming.js';
@@ -111,7 +111,7 @@ export class AudioSynth {
     this._destroyed = false;
     this._stemMusic = new StemMusicDirector(this);
     this._stemMusic.onReady = () => {
-      if (this._musicWanted && hasEnabledSongs(this.settings.musicEnabledSongs)) {
+      if (this._musicWanted && this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
         this._activateStemMusic();
       }
     };
@@ -130,6 +130,14 @@ export class AudioSynth {
       this.game?.events?.emit(EVT.MUSIC_TRACK_CHANGED, { id: track.id, title: track.title });
     };
     this._bind();
+  }
+
+  /** Scope selection to the installed catalog rather than 33 defaults.
+   * When catalog discovery has not completed yet, only the public first four
+   * may trigger any procedural fallback, never uninstalled private tracks.
+   */
+  _hasEnabledSongs(selection = this.settings?.musicEnabledSongs) {
+    return hasEnabledSongs(selection, installedSongChoices(this._stemMusic?.catalog));
   }
 
   // -------------------------------------------------------------------------------------------------------- wiring
@@ -374,7 +382,7 @@ export class AudioSynth {
       }
       this._domListeners = this._domListeners.filter((d) => d[1] === 'visibilitychange');
     }
-    if (this._musicWanted && hasEnabledSongs(this.settings.musicEnabledSongs)) {
+    if (this._musicWanted && this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
       if (!this._activateStemMusic() && !this._musicTimer && !this._jukeboxMode)
         this._startScheduler();
     }
@@ -618,7 +626,7 @@ export class AudioSynth {
   applySettings(settings) {
     try {
       if (settings) {
-        const hadMusic = hasEnabledSongs(this.settings?.musicEnabledSongs);
+        const hadMusic = this._hasEnabledSongs(this.settings?.musicEnabledSongs);
         this.settings = {
           masterVolume: clamp01(Number(settings.masterVolume)),
           musicVolume: clamp01(Number(settings.musicVolume)),
@@ -638,11 +646,11 @@ export class AudioSynth {
         // Re-enabling music from the all-off state should not require
         // pressing PLAY a second time during an auto-started menu session.
         if (this._autoStartAttempted && this._musicMode === 'menu' &&
-            !hadMusic && hasEnabledSongs(this.settings.musicEnabledSongs) &&
+            !hadMusic && this._hasEnabledSongs(this.settings.musicEnabledSongs) &&
             !this._stemMusic?.transportPaused) this.jukeboxPlay();
         // The owner-defined all-off state is TRUE SILENCE, including
         // muting the procedural synth. SFX uses a separate bus.
-        if (!hasEnabledSongs(this.settings.musicEnabledSongs)) {
+        if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
           if (this._musicTimer) clearInterval(this._musicTimer);
           this._musicTimer = null;
           this._stemMusic?.stop();
@@ -724,7 +732,7 @@ export class AudioSynth {
     return !!(this.ctx && this.ctx.state === 'running' && this.nodes &&
       !this.unavailable && !this._destroyed &&
       s?.masterVolume > 0 && s?.musicVolume > 0 &&
-      hasEnabledSongs(s?.musicEnabledSongs));
+      this._hasEnabledSongs(s?.musicEnabledSongs));
   }
 
   /** Jukebox intent is authoritative over automatic song restoration. */
@@ -766,7 +774,7 @@ export class AudioSynth {
     }
     if (!d?.transportPaused || d.started || d._token !== snap.token ||
         d.trackIndex !== snap.trackIndex || d._resumeOffset !== snap.offset ||
-        !hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+        !this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
     // No vinyl on run-end or run-abort; restore the SAME source once.
     this._musicWanted = true;
     try { if (!d.transportPlay()) this._musicWanted = false; }
@@ -822,7 +830,7 @@ export class AudioSynth {
     this._vinylResume = null;
     this._vinylResumeTimer = null;
     const snap = pending.snapshot;
-    if (!hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+    if (!this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
     if (!snap.procedural && (!d?.transportPaused || d.started ||
         d._token !== snap.token || d.trackIndex !== snap.trackIndex ||
         d._resumeOffset !== snap.offset)) return;
@@ -855,7 +863,7 @@ export class AudioSynth {
       this._setPaused(false);
       if (!session?.shouldResume || session.manualOverride) return;
       const d = this._stemMusic;
-      if (!hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
+      if (!this._hasEnabledSongs(this.settings?.musicEnabledSongs)) return;
       if (!session.procedural && (!d?.transportPaused || d.started ||
           d._token !== session.token || d.trackIndex !== session.trackIndex ||
           d._resumeOffset !== session.offset)) return;
@@ -1023,7 +1031,7 @@ export class AudioSynth {
     this._enterMenuMusic();
     if (this._autoStartAttempted) return;
     this._autoStartAttempted = true;
-    if (hasEnabledSongs(this.settings.musicEnabledSongs)) this.jukeboxPlay();
+    if (this._hasEnabledSongs(this.settings.musicEnabledSongs)) this.jukeboxPlay();
   }
 
   /** Run transitions change timbre and effects but never restart a playing song. */
@@ -1048,7 +1056,7 @@ export class AudioSynth {
   /** Start selected six-stem soundtrack; fall back to procedural only
    * when a song IS selected but its pack cannot be loaded. */
   _activateStemMusic() {
-    if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+    if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
     if (this._paused && this._vinylPauseSession &&
         !this._vinylPauseSession.manualOverride) return false;
     const player = this._stemMusic;
@@ -1065,7 +1073,7 @@ export class AudioSynth {
   /** Failure of a pack load only falls back to procedural when some
    * songs remain selected, never in the all-off state. */
   musicProviderFailed() {
-    if (!this._musicWanted || !hasEnabledSongs(this.settings.musicEnabledSongs)) return;
+    if (!this._musicWanted || !this._hasEnabledSongs(this.settings.musicEnabledSongs)) return;
     if (this.ctx?.state === 'running' && !this._musicTimer) this._startScheduler();
   }
 
@@ -1081,7 +1089,7 @@ export class AudioSynth {
       this._musicSeed = String(seed == null ? '' : seed);
       this._musicWanted = true;
       this._arrCache.clear();
-      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) {
+      if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) {
         this._stemMusic?.stop();
         if (this._musicTimer) clearInterval(this._musicTimer);
         this._musicTimer = null;
@@ -1124,7 +1132,7 @@ export class AudioSynth {
 
   jukeboxPlay() {
     try {
-      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       this._jukeboxMode = true;
@@ -1149,7 +1157,7 @@ export class AudioSynth {
 
   jukeboxStep(direction) {
     try {
-      if (!hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
+      if (!this._hasEnabledSongs(this.settings.musicEnabledSongs)) return false;
       this._vinylJukeboxIntent();
       if (!this._ensureCtx()) return false;
       const wasPaused=this._stemMusic.transportPaused;
@@ -1260,7 +1268,7 @@ export class AudioSynth {
         d.songEnabled?.[d.track.id]===false||
         this.settings?.musicEnabledSongs?.[d.track.id]===false||
         !this.settings?.masterVolume||!this.settings?.musicVolume||
-        !hasEnabledSongs(this.settings?.musicEnabledSongs)||
+        !this._hasEnabledSongs(this.settings?.musicEnabledSongs)||
         !c||c.state!=='running'||!Number.isFinite(c.currentTime)||
         this._vinylPauseSession||this._vinylResume||
         this.getFatalCountInStatus().active)return null;
@@ -1294,7 +1302,7 @@ export class AudioSynth {
       if(this.getFatalCountInStatus().active)
         return fallback('fatal-recovery-grid-unverified');
       if(!(this.settings?.masterVolume>0&&this.settings?.musicVolume>0)||
-        !hasEnabledSongs(this.settings?.musicEnabledSongs))
+        !this._hasEnabledSongs(this.settings?.musicEnabledSongs))
         return fallback('music-muted-or-disabled');
       if(!d.pack||!d.track||d.pack.id!==d.track.id||
         d.clockStart===null||d._loading||d.activeNodes?.size<1||
@@ -1332,7 +1340,7 @@ export class AudioSynth {
       if(!c||c.state!=='running'||this.unavailable||this._paused||
         !this._musicWanted||!d?.started||d.transportPaused||
         !this.settings?.masterVolume||!this.settings?.musicVolume||
-        !hasEnabledSongs(this.settings?.musicEnabledSongs)||
+        !this._hasEnabledSongs(this.settings?.musicEnabledSongs)||
         !d.track||!d.pack||d.pack.id!==d.track.id||d._loading||
         d.activeNodes?.size<1||d.songEnabled?.[d.track.id]===false)return false;
       const revision=String(d._token)+':'+d.track.id+':'+d.clockStart;
@@ -1381,7 +1389,7 @@ export class AudioSynth {
 
   _tickMusic() {
     if (!this._ready() || !this._musicWanted ||
-      !hasEnabledSongs(this.settings.musicEnabledSongs) || this._stemMusic?.started) return;
+      !this._hasEnabledSongs(this.settings.musicEnabledSongs) || this._stemMusic?.started) return;
     const c = this.ctx;
     if (this._nextTime < c.currentTime - 0.1) this._nextTime = c.currentTime + 0.05; // fell behind (tab throttled)
     while (this._nextTime < c.currentTime + 0.22) {
