@@ -11,20 +11,28 @@ export function classifyLiveCaptureAttempt(report) {
 	if(!report||typeof report!=='object')return 'INVALID_QA_OR_SOURCE';
 	const live=report.liveFinalMaster;
 	const meter=live?.finalMasterMetrics;
-	const complete=!!meter && live?.gaps===0 &&
-		live?.captureQuantumIntegrity?.checkedEveryQuantum===true &&
-		live?.captureQuantumIntegrity?.chronologyErrors===0 &&
-		live?.captureQuantumIntegrity?.nextQuantumVerified===true &&
-		Number.isFinite(meter.samplePeak)&&Number.isFinite(meter.estimatedTruePeak4x)&&
+	const metricValid=!!meter&&Number.isFinite(meter.samplePeak)&&
+		Number.isFinite(meter.estimatedTruePeak4x)&&
 		Number.isSafeInteger(meter.sampleClips)&&
 		Number.isSafeInteger(meter.estimatedTrueClips4x)&&
 		Number.isSafeInteger(meter.nonfiniteSamples);
-	// Detect even a mislabeled failing report which contains a valid
-	// above-unity reading; never retry over physical audio failure.
-	if(complete&&(meter.sampleClips>0||meter.estimatedTrueClips4x>0||
+	// CRITICAL: Do NOT require quantum-v3 arm proof before classifying
+	// an actual measured clip as permanently non-retryable. A historic
+	// v2 capture with a measured clip is STILL an audio-limit failure.
+	if(metricValid&&(meter.sampleClips>0||meter.estimatedTrueClips4x>0||
 		meter.nonfiniteSamples>0||meter.samplePeak>=1||meter.estimatedTruePeak4x>=1))
 		return AUDIO_LIMIT_FAILURE;
 	if(report.status===AUDIO_LIMIT_FAILURE) return AUDIO_LIMIT_FAILURE;
+	const complete=metricValid&&live.gaps===0&&
+		live.captureContinuityVersion===3&&
+		Number.isSafeInteger(live.captureArmFrame)&&live.captureArmFrame>=0&&
+		live.firstFrame===live.captureArmFrame&&
+		Number.isSafeInteger(live.startupWarmupGapsExcludedBeforeArm)&&
+		live.startupWarmupGapsExcludedBeforeArm>=0&&
+		live.discardedStartupChunks===0&&
+		live.captureQuantumIntegrity?.checkedEveryQuantum===true&&
+		live.captureQuantumIntegrity?.chronologyErrors===0&&
+		live.captureQuantumIntegrity?.nextQuantumVerified===true;
 	if(report.status===PASS_CAPTURE)
 		return complete?PASS_CAPTURE:'INVALID_QA_OR_SOURCE';
 	if(report.status===INVALID_CAPTURE&&!meter){

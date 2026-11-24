@@ -29,7 +29,7 @@ const report={
 		'BSOD collision itself is accelerated by QA positioning/speed of the real wall before calling real physics headlessStep; not organically played or recorded player input',
 		'Captures limited seconds of one original track, not full 33-song continuous audio or each biome',
 		'4x Hann-windowed-sinc intersample estimate is NOT a calibrated mastering BS.1770 meter',
-		'AudioWorklet validates EVERY render quantum; quantum skip/repeat/compensation is INVALID_INSTRUMENT_CAPTURE and cannot be counted as passing PCM',
+		'Quantum-v3 begins recording only AFTER a 450ms strictly contiguous warmup; startup worklet activation gaps are excluded BEFORE arming, while EVERY post-arm quantum must remain continuous, without filling or overlooking gaps',
 		'Non-silent master audio during four original drum source onsets does not establish that those drums were independently audible above wind and other program audio; only scheduled source identity is verified',
 		'AudioWorklet is a read-only sidechain with silent output to destination; live AudioContext device/platform timing affects observed signal',
 		'No private PCM or source media is stored in this public code repository; report includes only analysis metrics and event identities',
@@ -119,18 +119,24 @@ try{
 		await c.audioWorklet.addModule('/tools/music/live-final-master-capture-processor.js');
 		const tap=new AudioWorkletNode(c,'bsb-live-final-master-tap',{
 			numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],
-			channelCount:2,channelCountMode:'explicit'
+			channelCount:2,channelCountMode:'explicit',
+			processorOptions:{stableWarmupFrames:Math.round(c.sampleRate*.45)}
 		});
 		const silent=c.createGain();silent.gain.value=0;
 		a.nodes.peakGuard.connect(tap);
 		tap.connect(silent);silent.connect(c.destination);
 		const chunks=[];
 		const state={chunks,stopped:false,chronologyErrors:[],
+			armed:false,armFrame:null,warmupGaps:null,
 			sampleRate:c.sampleRate,installedAt:c.currentTime};
 		tap.port.onmessage=e=>{
 			const msg=e.data;
 			if(msg?.type==='pcm')chunks.push(msg);
 			if(msg?.type==='discontinuity')state.chronologyErrors.push(msg);
+			if(msg?.type==='armed'){
+				state.armed=true;state.armFrame=msg.armFrame;
+				state.warmupGaps=msg.warmupGaps;
+			}
 			if(msg?.type==='stopped'){
 				state.stopped=true;
 				state.quantumValidationVersion=msg.quantumValidationVersion;
@@ -160,7 +166,47 @@ try{
 	assert.equal(pre.testUserGains.vocals,testUnlockVocals,
 		'Original vocals did not honor the disposable QA profile toggle');
 	console.log('REAL_GAME_POST_GUARD_TAP',JSON.stringify(pre));
-	await page.waitForTimeout(230); // establish pre-crash live PCM
+	// Start the physics collision ONLY once the AUDIO CLOCK has truly
+	// advanced at least 300ms beyond the first qualified armed frame.
+	// Playwright timers alone are not tied to the WebAudio render clock.
+	try{
+		await page.waitForFunction(()=>{
+			const state=window.__bbLiveFinalAudit?.state;
+			const ctx=window.__bbGame?.registry.get('audioSynth')?.ctx;
+			return !!ctx&&state?.armed===true&&
+				ctx.currentTime>=state.armFrame/ctx.sampleRate+.30&&
+				state.chunks.length>=8&&!state.chronologyErrors.length;
+		},null,{timeout:18000});
+	}catch(error){
+		// Lack of a 450ms uninterrupted STARTUP window is a diagnostic
+		// arm failure, NOT a measured audio peak or original source
+		// problem. But refuse this explanation if the game or media
+		// source simultaneously failed.
+		const state=await page.evaluate(()=>{
+			const x=window.__bbLiveFinalAudit?.state;
+			const a=window.__bbGame?.registry.get('audioSynth');
+			return {armed:x?.armed,armFrame:x?.armFrame,
+				warmupGaps:x?.warmupGaps,quantumErrors:x?.chronologyErrors?.length,
+				chunks:x?.chunks?.length,audioState:a?.ctx?.state,
+				songStarted:a?._stemMusic?.started,musicError:a?._stemMusic?.lastError};
+		});
+		const badHttp=httpErrors.filter(({status,url})=>!
+			(status===404&&/\/music\/packs\/[^/]+\/adaptive\/debutmont\//.test(url)));
+		if(errors.length||badHttp.length||!state.songStarted||state.musicError)
+			throw Error('QA_OR_SOURCE: Cannot arm due concurrent game/media failure: '+
+				JSON.stringify({errors,badHttp,state}));
+		throw Error('INSTRUMENT_CAPTURE: Qualified startup arm unavailable: '+
+			JSON.stringify(state)+'; original '+String(error).slice(0,100));
+	}
+	const captureReady=await page.evaluate(()=>{
+		const state=window.__bbLiveFinalAudit.state;
+		const ctx=window.__bbGame.registry.get('audioSynth').ctx;
+		return {armFrame:state.armFrame,armTime:state.armFrame/ctx.sampleRate,
+			currentTime:ctx.currentTime,
+			preCrashSeconds:ctx.currentTime-state.armFrame/ctx.sampleRate,
+			bufferedChunks:state.chunks.length,warmupGaps:state.warmupGaps};
+	});
+	console.log('QUALIFIED_V3_PRECRASH_SAMPLE_CLOCK',JSON.stringify(captureReady));
 	const crash=await page.evaluate(()=>{
 		const g=window.__bbGame,r=g.scene.getScene('RunScene'),
 			a=g.registry.get('audioSynth'),d=a._stemMusic;
@@ -270,8 +316,10 @@ try{
 		while(!installed.state.stopped&&Date.now()<until)
 			await new Promise(resolve=>setTimeout(resolve,30));
 		if(!installed.state.stopped)throw Error('INSTRUMENT_CAPTURE: Worklet did not finish capture');
-		if(installed.state.quantumValidationVersion!==2)
-			throw Error('INSTRUMENT_CAPTURE: Missing quantum-v2 validation proof');
+		if(installed.state.quantumValidationVersion!==3||
+			!installed.state.armed||
+			!Number.isSafeInteger(installed.state.armFrame))
+			throw Error('INSTRUMENT_CAPTURE: Missing qualified quantum-v3 arm proof');
 		installed.tap.disconnect();installed.silent.disconnect();
 		a.nodes.peakGuard.disconnect(installed.tap);
 		if(installed.state.chronologyErrors.length)
@@ -280,26 +328,22 @@ try{
 		const allChunks=installed.state.chunks;
 		if(allChunks.length<50)throw Error('INSTRUMENT_CAPTURE: No genuine final PCM chunks from actual game');
 		const sampleRate=installed.state.sampleRate;
-		// Chromium may activate the diagnostic sidechain in two phases.
-		// The first small PCM quantum can precede a short worklet startup
-		// gap. Only discard that initial tap warmup, NEVER a gap during
-		// the real collision/count-in/recovery window.
+		// Startup samples are never recorded before arming. Any missing
+		// sample AFTER the qualified arm is non-retryable within this
+		// instrument capture; no gap healing or post-hoc exclusion.
 		const gapDetails=[];
-		let tailIndex=0;
+		const tailIndex=0;
 		for(let i=1;i<allChunks.length;i++){
 			const prev=allChunks[i-1],curr=allChunks[i];
 			const expected=prev.frame+prev.frames;
-			if(curr.frame!==expected){
-				const detail={index:i,actual:curr.frame,expected,
-					delta:curr.frame-expected,at:curr.frame/sampleRate};
-				gapDetails.push(detail);
-				if(i>2 || detail.at>=collision.after.audioCurrentTime-.15)
-					throw Error('INSTRUMENT_CAPTURE: Missing live PCM at/near real crash: '+JSON.stringify(detail));
-				tailIndex=i;
-			}
+			if(curr.frame!==expected)
+				throw Error('INSTRUMENT_CAPTURE: Armed PCM discontinuity '+JSON.stringify({
+					index:i,actual:curr.frame,expected,delta:curr.frame-expected}));
 		}
-		const chunks=allChunks.slice(tailIndex);
+		const chunks=allChunks;
 		const firstFrame=chunks[0].frame;
+		if(firstFrame!==installed.state.armFrame)
+			throw Error('INSTRUMENT_CAPTURE: First sample not the qualified arm frame');
 		const gapToCrash=collision.after.audioCurrentTime-firstFrame/sampleRate;
 		if(gapToCrash<.14)throw Error('INSTRUMENT_CAPTURE: No 140ms pre-crash CONTIGUOUS live output: '+gapToCrash);
 		const frames=chunks.reduce((sum,chunk)=>sum+chunk.frames,0);
@@ -347,6 +391,8 @@ try{
 			tapAt:installed.state.installedAt,firstFrame,
 			chunks:chunks.length,frames,gaps:0,duration:frames/sampleRate,
 			captureContinuityVersion:installed.state.quantumValidationVersion,
+			captureArmFrame:installed.state.armFrame,
+			startupWarmupGapsExcludedBeforeArm:installed.state.warmupGaps,
 			captureQuantumIntegrity:{checkedEveryQuantum:true,
 				chronologyErrors:installed.state.chronologyErrors.length,
 				nextQuantumVerified:true},

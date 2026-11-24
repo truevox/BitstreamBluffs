@@ -1,3 +1,5 @@
+**CURRENT 2026-11-24 QUANTUM-V3 FOLLOW-UP (SUPERSEDES THE OLD LIVE CAPTURE BLOCKER BELOW):** A NEW separate v3b 33-song live-physics final-output capture matrix passed independent original-source SHA-256 and strictly armed, per-render-quantum PCM validation, with 0 clips/estimated overs and worst estimated -0.404 dBTP. Five instrument-invalid attempts were preserved and inspected. Older v2 and prior unclassified v3 reports remain historical/untrusted, not counted. Details and private audit digest: docs/music-review/20261124-issue291-quantum-v3-armed-live-final-master.md. This is still NOT calibrated mastering, full-song playback, release approval or source publication.
+
 # PR #310 — Independent review corrections, November 24, 2026
 
 This is a code-only QA infrastructure update stacked on draft PR #306. It changes no private original OGG/FLAC files, approved mix, production physics, replay rules or actual user profile. Netlify must remain skipped.

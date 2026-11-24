@@ -2,7 +2,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {resolve} from 'node:path';
 
-function liveCapture(){
+function liveCapture(processorOptions){
 	const messages=[],ports=[];
 	let TestClass;
 	class AudioWorkletProcessor {
@@ -21,7 +21,7 @@ function liveCapture(){
 		}};
 	const source=readFileSync(resolve('tools/music/live-final-master-capture-processor.js'),'utf8');
 	runInNewContext(source,scope);
-	const tap=new TestClass();
+	const tap=new TestClass({processorOptions});
 	const process=(frame,frames=128)=>{
 		scope.currentFrame=frame;
 		const input=[Float32Array.from({length:frames},()=>.125),
@@ -74,6 +74,42 @@ describe('live final-output AudioWorklet quantum integrity',()=>{
 		a.tap.process([[]],[[new Float32Array(128),new Float32Array(128)]]);
 		expect(a.getErrors()).toHaveLength(1);
 		expect(a.getErrors()[0].reason).toBe('missing-input');
+	});
+	test('v3 warmup startup gap is excluded before arming; strict measurement then stays contiguous',()=>{
+		const a=liveCapture({stableWarmupFrames:384});
+		a.process(0);a.process(384); // 128->384 startup dropout, NOT captured
+		a.process(512);a.process(640);a.process(768);
+		const arm=a.messages.find(m=>m.type==='armed');
+		expect(arm).toMatchObject({armFrame:896,warmupGaps:1});
+		expect(a.messages.filter(m=>m.type==='pcm')).toHaveLength(0);
+		a.process(896);a.process(1024);
+		a.port.onmessage({data:{type:'stop'}});
+		const pcm=a.messages.find(m=>m.type==='pcm');
+		expect(pcm).toMatchObject({frame:896,frames:256});
+		expect(a.getErrors()).toHaveLength(0);
+		expect(a.messages.at(-1)).toMatchObject({
+			type:'stopped',quantumValidationVersion:3,
+			armed:true,armFrame:896,warmupGaps:1
+		});
+	});
+	test('v3 post-arming gap aborts even if startup had a harmless excluded gap',()=>{
+		const a=liveCapture({stableWarmupFrames:256});
+		a.process(0);a.process(256); // startup gap resets warmup
+		a.process(384);a.process(512); // arm after 512, at 640
+		expect(a.messages.find(m=>m.type==='armed').armFrame).toBe(640);
+		a.process(640);
+		a.process(896); // expected 768, fatal after armed
+		expect(a.getErrors()).toHaveLength(1);
+		expect(a.getErrors()[0]).toMatchObject({expected:768,actual:896});
+		expect(a.tap.active).toBe(false);
+	});
+	test('v3 stop before qualified arm never asserts the recording was valid',()=>{
+		const a=liveCapture({stableWarmupFrames:1024});
+		a.process(0);
+		a.port.onmessage({data:{type:'stop'}});
+		expect(a.messages.at(-1)).toMatchObject({
+			type:'stopped',quantumValidationVersion:3,armed:false,armFrame:null
+		});
 	});
 	test('stop flushes a partial chunk with an exact audio sample timestamp',()=>{
 		const a=liveCapture();

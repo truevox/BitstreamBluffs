@@ -33,13 +33,14 @@ const full33=process.env.QA_FULL33==='1';
 const strictReview=process.env.QA_REVIEW_STRICT==='1';
 const rejectedAttempts=[];
 const chosenFull33=full33?Array.from({length:33},(_,index)=>{
-	// ALL 33 indexes must use fresh quantum-v2 attempt records. The older
-	// seven prototype captures remain immutable historical evidence only.
+	// ALL 33 indexes must use new quantum-v3 ARMED capture reports.
+	// v2 and the earlier chunk-only captures remain immutable historical
+	// evidence and must NEVER be grandfathered into this aggregate.
 	const id=String(index).padStart(2,'0');
 	let selected=null;
 	for(let attempt=1;attempt<=3;attempt++){
 		const filename=strictReview?
-			'issue291-review-corrected-live-index-'+id+'-attempt-'+attempt+'-20261124.json':
+			'issue291-qualified-v3b-live-index-'+id+'-attempt'+attempt+'-20261124.json':
 			'issue291-real-bsod-live-full33-index-'+id+'-attempt-'+attempt+'-20261124.json';
 		const path=join(reports,filename);
 		if(!existsSync(path))continue;
@@ -132,8 +133,14 @@ for(const {index,file,vocals} of sequence){
 	assert.equal(live.sourceId,actual.id);
 	assert.equal(live.clockStart,crash.before.clockStart);
 	assert.equal(live.gaps,0);
-	assert.equal(live.captureContinuityVersion,2,
-		'Missing historical quantum-v2 proof: recapture required');
+	assert.equal(live.captureContinuityVersion,3,
+		'Missing quantum-v3 qualified arm proof: recapture required');
+	assert.equal(live.captureArmFrame,live.firstFrame,
+		'Recording must begin EXACTLY at its qualified sample-clock arm');
+	assert.ok(Number.isSafeInteger(live.startupWarmupGapsExcludedBeforeArm)&&
+		live.startupWarmupGapsExcludedBeforeArm>=0);
+	assert.equal(live.discardedStartupChunks,0,
+		'No recorded sample may be discarded after qualified arm');
 	assert.deepEqual(live.captureQuantumIntegrity,{
 		checkedEveryQuantum:true,chronologyErrors:0,nextQuantumVerified:true
 	});
@@ -171,7 +178,8 @@ for(const {index,file,vocals} of sequence){
 		sampleRate:live.sampleRate,liveOutputSeconds:live.duration,
 		outputPeak4x:meter.estimatedTruePeak4x,
 		dbTp4x:meter.estimatedTruePeakDbTp4x,
-		startupGapFrames:(live.discardedStartupGapDetails||[]).reduce((a,x)=>a+x.delta,0),
+		startupWarmupGapsExcludedBeforeArm:live.startupWarmupGapsExcludedBeforeArm,
+		captureContinuityVersion:live.captureContinuityVersion,
 		scheduledDrumHits:4,originalDrumSourceSha256:fileBytes.sha256,
 	});
 	reportEvidence.push({file,sha256:sha(bytes)});
@@ -195,7 +203,7 @@ summary.rejectedCaptureAttempts=rejectedAttempts.length;
 const aggregate={
 	format:full33?'bitstream-genuine-physics-bsod-live-output-all33-first-original-source-4x-audit-v1':
 		'bitstream-genuine-physics-bsod-live-output-original-ogg-4x-audit-v1',
-	status:full33?'PASS_33_GENUINE_PHYSICS_BSOD_FINAL_MASTER_SAMPLED_NOT_MASTERED':
+	status:full33?'PASS_33_QUANTUM_V3_ARMED_GENUINE_PHYSICS_BSOD_FINAL_MASTER_SAMPLED_NOT_MASTERED':
 		'PASS_REAL_GAME_BSOD_FINAL_MASTER_SAMPLE_NOT_RELEASE_CERTIFIED',
 	summary,checked,reportEvidence,rejectedAttempts,
 	notes:[
@@ -205,7 +213,7 @@ const aggregate={
 		'Each case uses one 33-song original first segment, naturally starting in Debutmont. If QA_FULL33=1, exactly one first segment per song; not a coverage claim for full-length tracks or all 12 game biomes.',
 		'The four recorded original drum excerpts use the production count-in synthetic-unverified grid; original beats have NOT been certified.',
 		'Browser audio context playback at native device sample rate (usually 44.1 kHz); 4x sinc estimate is not an independent mastering reference.',
-		'Every 128-frame quantum is individually chronologically checked; any discontinuity fails capture. Only invalid diagnostic captures may be retried; a valid measured clipping case permanently fails the aggregate.',
+		'Fresh v3b 33-song matrix after fixing diagnostic arm error classification: no historical v2/v3 failed or unclassified reports are reused. Each capture first qualifies a consecutive 450ms startup period, then arms exactly at the first recorded sample. ONLY PRE-ARM activation gaps are excluded; EVERY sample after arming must be contiguous, including pre-impact and recovery. Valid measured clipping permanently fails the aggregate; only instrument-invalid captures are retryable.',
 		'Four drum sounds are verified as source-original and scheduled; non-silent master windows DO NOT isolate the drum from wind/crash/room and must not be called verified drum audibility.',
 		'Do not change approved sound mixes, release music, merge a draft PR or close issue #291 solely because these samples pass.',
 	],

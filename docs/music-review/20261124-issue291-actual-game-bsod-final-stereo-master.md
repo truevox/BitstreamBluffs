@@ -1,3 +1,5 @@
+**CURRENT 2026-11-24 QUANTUM-V3 FOLLOW-UP (SUPERSEDES THE OLD LIVE CAPTURE BLOCKER BELOW):** A NEW separate v3b 33-song live-physics final-output capture matrix passed independent original-source SHA-256 and strictly armed, per-render-quantum PCM validation, with 0 clips/estimated overs and worst estimated -0.404 dBTP. Five instrument-invalid attempts were preserved and inspected. Older v2 and prior unclassified v3 reports remain historical/untrusted, not counted. Details and private audit digest: docs/music-review/20261124-issue291-quantum-v3-armed-live-final-master.md. This is still NOT calibrated mastering, full-song playback, release approval or source publication.
+
 **INDEPENDENT REVIEW UPDATE, November 24, 2026:** Older live PCM readings were collected before strict per-render-quantum validation, and earlier offline runs used simplified vocal FX/room sends. These figures are historic/provisional, NOT current calibrated mastering clearance. See docs/music-review/20261124-pr310-independent-review-corrections.md for the fail-closed updates and remaining measurement uncertainty.
 
 # #291 — actual real-physics BSOD collision, final master PCM after peak guard

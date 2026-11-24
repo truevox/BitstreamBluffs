@@ -4,7 +4,10 @@ import {
 } from '../../tools/music/live-capture-review-policy.js';
 function report(status=PASS_CAPTURE,patch={}){
 	return {status,liveFinalMaster:{
-		gaps:0,captureQuantumIntegrity:{checkedEveryQuantum:true,
+		gaps:0,captureContinuityVersion:3,captureArmFrame:4096,
+		firstFrame:4096,startupWarmupGapsExcludedBeforeArm:1,
+		discardedStartupChunks:0,
+		captureQuantumIntegrity:{checkedEveryQuantum:true,
 			chronologyErrors:0,nextQuantumVerified:true},
 		finalMasterMetrics:{samplePeak:.94,estimatedTruePeak4x:.95,
 			sampleClips:0,estimatedTrueClips4x:0,nonfiniteSamples:0,...patch},
@@ -38,6 +41,24 @@ describe('#310 strict captured-audio review policy',()=>{
 			expect(classifyLiveCaptureAttempt({status})).toBe('INVALID_QA_OR_SOURCE');
 		}
 	);
+	test('a historic v2 clean report does NOT count as a v3 validated PASS',()=>{
+		const x=report();x.liveFinalMaster.captureContinuityVersion=2;
+		expect(classifyLiveCaptureAttempt(x)).toBe('INVALID_QA_OR_SOURCE');
+	});
+	test('a historic v2 report with actual measured clipping STILL permanently fails',()=>{
+		const x=report('FAIL_OR_INCOMPLETE',{sampleClips:1});
+		x.liveFinalMaster.captureContinuityVersion=2;
+		expect(classifyLiveCaptureAttempt(x)).toBe(AUDIO_LIMIT_FAILURE);
+		expect(()=>assertNoNonretryableAudioFailure(x)).toThrow(/DO NOT RETRY/);
+	});
+	test('arming proof must match the very first captured audio sample',()=>{
+		const x=report();x.liveFinalMaster.firstFrame+=128;
+		expect(classifyLiveCaptureAttempt(x)).toBe('INVALID_QA_OR_SOURCE');
+	});
+	test('discarding even a single post-arm PCM chunk invalidates evidence',()=>{
+		const x=report();x.liveFinalMaster.discardedStartupChunks=1;
+		expect(classifyLiveCaptureAttempt(x)).toBe('INVALID_QA_OR_SOURCE');
+	});
 	test('pass without per-quantum evidence is rejected',()=>{
 		const x=report();delete x.liveFinalMaster.captureQuantumIntegrity;
 		expect(classifyLiveCaptureAttempt(x)).toBe('INVALID_QA_OR_SOURCE');
