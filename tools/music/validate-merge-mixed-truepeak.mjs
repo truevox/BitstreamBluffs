@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {existsSync,readFileSync,writeFileSync,statSync} from 'node:fs';
 import {join,resolve,sep} from 'node:path';
 import {createHash} from 'node:crypto';
+import {assertMixedQaMetrics} from './assert-mixed-qa-metrics.js';
 const root=process.env.BSB291_PRIVATE_AUDIO_ROOT;
 const output=process.env.REPORT_OUT;
 if(!root||!output||existsSync(output))throw Error('Private source root and unique REPORT_OUT required');
@@ -50,7 +51,7 @@ for(let i=0;i<4;i++){
 		assert.equal(scenario.test.qaCosmeticSeed,0x2912026);
 		assert.equal(scenario.test.events.length,6);
 		assert.equal(scenario.productionGraph.productionPeakGuard,true);
-		assert.equal(scenario.nonfiniteSamples,0);
+		assertMixedQaMetrics(scenario);
 		assert.ok(scenario.estimatedTruePeak4x>=scenario.samplePeak-1e-7);
 		// Independent READ of the canonical, unchanged original OGG
 		// source files; not the QA renderer's hash calculation.
@@ -132,7 +133,7 @@ if(overlapFile){
 			assert.equal(fingerprinted.get(file),expected);
 		}
 		assert.equal(Object.keys(v.sourceHashes).length,7);
-		assert.equal(v.nonfiniteSamples,0);
+		assertMixedQaMetrics(v);
 	}
 	overlapSummary={
 		cases:4,originalSourceInputs:28,

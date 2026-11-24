@@ -43,6 +43,8 @@ const browser=await chromium.launch({headless:true,args:[
 const errors=[],httpErrors=[],mediaRequests=[];
 try{
 	const page=await browser.newPage({viewport:{width:1280,height:800}});
+	// Install read-only provenance before game initialization/OGG decoding.
+	await page.addInitScript({path:new URL('./observe-original-ogg-fetch.js',import.meta.url).pathname});
 	page.on('pageerror',e=>errors.push(String(e)));
 	page.on('response',res=>{
 		if(res.status()>=400)httpErrors.push({status:res.status(),url:res.url()});
@@ -227,14 +229,22 @@ try{
 		const rel=manifest.segments?.[info.segment]?.sources?.drums;
 		if(!rel)throw Error('Actual count-in original drum is absent');
 		const srcUrl=new URL(rel,url);
-		const res=await fetch(srcUrl);
-		if(!res.ok)throw Error('Actual original drum source HTTP '+res.status);
-		const bytes=await res.arrayBuffer();
-		const digest=await crypto.subtle.digest('SHA-256',bytes);
-		const sha=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
+        const fetched=window.__bbOriginalOggFetchProof;
+        if(!fetched||fetched.protocol!=='game-original-response-clone-v2')
+            throw Error('Missing pre-game original-response provenance hook');
+        await Promise.all(fetched.pending);
+        const observed=fetched.records.get(srcUrl.pathname);
+        if(!observed)throw Error('No original game-decoding fetch for drum '+srcUrl.pathname);
+        // All four fatal count-in nodes must use the same actual cached
+        // AudioBuffer obtained from the production game's source fetch.
+        const cached=d.cache?.get(info.segment+'/drums');
+        const playing=window.__bbGame.registry.get('audioSynth')._fatalCountIn?.sources;
+        if(!cached||playing?.length!==4||!playing.every(src=>src.buffer===cached))
+            throw Error('Fatal source buffers do not match game decoded original drum cache');
 		return {trackId:track.id,manifest:track.manifest,
-			sourceSegment:info.segment,relativeOggPath:rel,originalOggSha256:sha,
-			originalOggBytes:bytes.byteLength,sourceSampleRate:manifest.sampleRate};
+			sourceSegment:info.segment,relativeOggPath:rel,
+            originalOggSha256:observed.sha256,originalOggBytes:observed.bytes,
+            sourceFetchProvenance:fetched.protocol,sourceSampleRate:manifest.sampleRate};
 	},{trackId:crash.after.trackId,segment:crash.countIn.sourceSegment});
 	assert.equal(originalDrum.trackId,pre.trackId);
 	assert.equal(originalDrum.sourceSegment,crash.countIn.sourceSegment);

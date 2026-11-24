@@ -12,6 +12,7 @@ import {resolve,join,sep} from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyLiveCaptureAttempt,assertNoNonretryableAudioFailure,
 	PASS_CAPTURE,INVALID_CAPTURE} from './live-capture-review-policy.js';
+import {selectEightLiveReports} from './select-eight-live-reports.js';
 const mediaRoot=process.env.BSB291_PRIVATE_AUDIO_ROOT;
 const reportRoot=process.env.REPORT_ROOT;
 const output=process.env.REPORT_OUT;
@@ -59,10 +60,10 @@ const chosenFull33=full33?Array.from({length:33},(_,index)=>{
 	assert.ok(selected,'Missing valid source-verified game collision for song '+id);
 	return selected;
 }):null;
-const sequence=full33?chosenFull33:[
+const sequence=full33?chosenFull33:selectEightLiveReports([
 	...originalVocalFullSeven,
 	{index:0,file:'issue291-real-physics-final-master-index0-vocals-off-v4-20261124.json',vocals:false}
-];
+],process.env.QA_EIGHT_REPORT_FILES);
 const checked=[],sourceFiles=new Map(),reportEvidence=[];
 for(const {index,file,vocals} of sequence){
 	const src=join(reports,file);
@@ -108,6 +109,8 @@ for(const {index,file,vocals} of sequence){
 	assert.equal(drum.trackId,actual.id);
 	assert.equal(drum.manifest,actual.manifest);
 	assert.equal(drum.sourceSegment,crash.countIn.sourceSegment);
+	assert.equal(drum.sourceFetchProvenance,'game-original-response-clone-v2',
+		'Source hash must be from the actual game decoder fetch response');
 	assert.match(drum.originalOggSha256,/^[a-f0-9]{64}$/);
 	const packPath=resolve(source,actual.manifest.replace(/\/pack\.json$/,''));
 	const manifest=JSON.parse(readFileSync(join(packPath,'pack.json'),'utf8'));
