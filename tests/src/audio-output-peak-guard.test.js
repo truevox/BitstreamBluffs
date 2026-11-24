@@ -5,6 +5,12 @@ import {
 } from '../../src/systems/music/OutputPeakGuard.js';
 
 describe('final original-music/SFX output soft peak backstop',()=>{
+	test('candidate has additional transient margin, without changing normal-level gain',()=>{
+		expect(PEAK_GUARD_KNEE).toBe(.78);
+		expect(PEAK_GUARD_CEILING).toBe(.88);
+		expect(peakGuardTransfer(.75)).toBe(.75);
+		expect(peakGuardTransfer(1)).toBeLessThan(.88);
+	});
 	test('the entire normal music band is EXACTLY transparent, including sign',()=>{
 		for(const value of [0,-0,1e-8,-1e-8,.125,-.125,.33,-.33,
 			.5,-.5,.75,-.75,PEAK_GUARD_KNEE,-PEAK_GUARD_KNEE])

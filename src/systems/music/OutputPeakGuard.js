@@ -5,11 +5,11 @@
  * original-stem + source-FX transient. Not a brickwall true-peak limiter:
  * no lookahead, oversampling/transient handling is browser dependent.
  *
- * Below 0.86, transfer function is exactly linear; it does not
+ * Below 0.78, transfer function is exactly linear; it does not
  * automatically normalize strong but owner-liked biome mix identities.
  */
-export const PEAK_GUARD_KNEE = 0.86;
-export const PEAK_GUARD_CEILING = 0.965;
+export const PEAK_GUARD_KNEE = 0.78;
+export const PEAK_GUARD_CEILING = 0.88;
 export const PEAK_GUARD_POINTS = 8193;
 const span = PEAK_GUARD_CEILING - PEAK_GUARD_KNEE;
 export function peakGuardTransfer(value) {

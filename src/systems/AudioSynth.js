@@ -292,7 +292,7 @@ export class AudioSynth {
     n.comp.ratio.value = 6;
     n.master.connect(n.comp);
     // Compressor can still overshoot 0 dBFS on short mixed transients.
-    // This post-compressor soft ceiling stays linear below 0.86 and
+    // This post-compressor soft ceiling stays linear below 0.78 and
     // protects the entire output, including SFX and wind/static.
     n.peakGuard = createOutputPeakGuard(c);
     n.comp.connect(n.peakGuard);
