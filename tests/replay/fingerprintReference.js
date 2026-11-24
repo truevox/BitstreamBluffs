@@ -17,13 +17,13 @@ export function referenceState() {
       body: body(),
       parts: [part(0), part(1), part(2), part(3), part(4)],
       ctl: {
-        msSinceContact: 0, groundAngleDeg: 12.5, airtimeMs: 0, hopBufferMs: 0, playerHopElapsedMs: 0, pushCooldownMs: 0,
+        msSinceContact: 0, groundAngleDeg: 12.5, airtimeMs: 0, hopBufferMs: 0, playerHopElapsedMs: 0, protectedHopExtraVyPxS: 0, pushCooldownMs: 0,
         parachuteMs: 0, parachuteFuelMs: 2500, canopyFuelFullMs: 2500, heliPhase: 0, heliVel: 0, invulnerableMs: 0, boostMs: 0,
         geyserCooldownMs: 0, airEtaMs: Infinity, airSlopeDeg: null, dropAheadDeg: 90, groundRunMs: 800, sinceLaunchMs: 999,
         landSettleMs: 0, crawlMs: 0, lastTilt: 0, preVx: 7.4, preVy: 1.2, touchdownVx: null, touchdownVy: null, heliInput: 0,
       },
       flags: {
-        contactFlag: false, playerHopActive: false, chuteUsed: false, tucked: false, airBrakeActive: false,
+        contactFlag: false, playerHopActive: false, chuteUsed: false, tucked: false, airBrakeActive: false, airBrakePressPending: false, airBrakeKickUsed: false, airBrakeLiftProtected: false, airBrakeKickPulse: false,
         corkscrewActive: false, scrambled: false, nudging: false, inWorld: true, destroyed: false,
       },
       lastPad: { bits: 5, tilt127: 0 },

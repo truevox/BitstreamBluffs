@@ -155,7 +155,7 @@ describe('fingerprintState', () => {
   });
 
   test('every schema declares a positive integer schemaVersion (bumped only by a reviewed layout change)', () => {
-    const expected = { sled: 2, matter: 2, kodiak: 2 }; // v2: sled flags.shield removed; matter staticOrder.padLast added (#165 review); kodiak shoveCdMs (#47)
+    const expected = { sled: 3, matter: 2, kodiak: 2 }; // v3 SIM9: AirBrake one-shot and paid-lift ownership; historical v2 immutable
     for (const n of FP_SUBSYSTEMS) expect([n, FP_SCHEMAS[n].version]).toEqual([n, expected[n] || 1]);
   });
 });
@@ -201,8 +201,8 @@ describe('capture helpers', () => {
   });
 });
 
-describe('schema regression lock (tests/fixtures/replay/v1/fingerprint-schemas-v1.json)', () => {
-  const lock = loadFixture('fingerprint-schemas-v1.json');
+describe('current SIM9 schema regression lock', () => {
+  const lock = loadFixture('../sim9/fingerprint-schemas-sim9.json');
 
   test('production schemas, versions and order equal the committed lock', () => {
     expect(lock.order).toEqual([...FP_SUBSYSTEMS]);
@@ -217,5 +217,24 @@ describe('schema regression lock (tests/fixtures/replay/v1/fingerprint-schemas-v
     expect(f.subsystems).toEqual(lock.reference.subsystems);
     expect(f.combined).toBe(lock.reference.combined);
     expect(f.tick).toBe(lock.reference.tick);
+  });
+});
+
+
+describe('historical SIM6 schema lock stays immutable', () => {
+  const lock = loadFixture('fingerprint-schemas-v1.json');
+  test('v2 sled schema and old reference fingerprints are readable separately from SIM9 v3', () => {
+    expect(lock.schemas.sled.version).toBe(2);
+    expect(FP_SCHEMAS.sled.version).toBe(3);
+    const oldState = referenceState();
+    delete oldState.sled.flags.airBrakePressPending;
+    delete oldState.sled.flags.airBrakeKickUsed;
+    delete oldState.sled.flags.airBrakeLiftProtected;
+    delete oldState.sled.flags.airBrakeKickPulse;
+    delete oldState.sled.ctl.protectedHopExtraVyPxS;
+    const old = {};
+    for (const name of lock.order) old[name] = fingerprintOf(encodeSubsystemWith(lock.schemas[name], oldState[name]));
+    expect(old).toEqual(lock.reference.subsystems);
+    expect(combineFingerprints(oldState.tick, old, lock.order)).toBe(lock.reference.combined);
   });
 });

@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import { jest } from '@jest/globals';
 import { BsodPursuit } from '../../src/systems/BsodPursuit.js';
 import { BsodBluffTracker } from '../../src/systems/BsodBluffTracker.js';
@@ -163,7 +164,7 @@ describe('Bitstream Bluffing RunScene integration', () => {
     scene.sled.parachuteMs=360;
     scene.sled.airBrakeActive=true;
     scene.runTimeMs=100;
-    scene.updateBsodBluff();
+    scene.updateBsodBluff(true); // an actual one-shot physical kick on this approach
     scene.sled.x=1300;
     scene.bsodState.gapPx=860;
     scene.runTimeMs=900;
@@ -176,6 +177,25 @@ describe('Bitstream Bluffing RunScene integration', () => {
     });
     scene.updateBsodBluff();
     expect(bonuses).toHaveLength(1);
+  });
+
+  test('holding spent AirBrake during BSOD approach cannot fraudulently earn the one-shot bonus', () => {
+    const scene=Object.create(RunScene.prototype);
+    const emitted=[],bonuses=[];
+    scene.sled={x:1000,y:200,grounded:false,parachuteMs:0,airBrakeActive:true,airBrakeKickUsed:true};
+    scene.bsodState={active:true,gapPx:1000,relativeAirX:440,atmosphereDensity:1};
+    scene.bsodBluffs=new BsodBluffTracker();
+    scene.game={events:{emit:(event,payload)=>emitted.push([event,payload])}};
+    scene.bonus=(points,kind)=>{bonuses.push([points,kind]);return true;};
+    scene.nearMissCount=0;scene.crashed=false;scene.bsodCaught=false;
+    scene.runTimeMs=0;scene.updateBsodBluff();
+    scene.bsodState.gapPx=200;
+    scene.sled.parachuteMs=360;
+    scene.runTimeMs=100;scene.updateBsodBluff(false);
+    scene.sled.x=1300;scene.bsodState.gapPx=860;
+    scene.runTimeMs=900;scene.updateBsodBluff(false);
+    expect(bonuses).toEqual([[150,'nearMiss']]);
+    expect(emitted.some(([event])=>event===EVT.BSOD_BLUFF)).toBe(true);
   });
 
   test('terminal collision never awards a last-frame BSOD bluff', () => {
@@ -197,4 +217,435 @@ describe('Bitstream Bluffing RunScene integration', () => {
     expect(scene.bonus).not.toHaveBeenCalled();
     expect(scene.bsodBluffs.chain).toBe(0);
   });
+});
+
+test('SIM9 contact chronology advances yaw and expires Flow BEFORE physical landing settlement',()=>{
+  const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+  const control=source.indexOf('sled.applyControls(pad, phys, stepMs, air)');
+  const yaw=source.indexOf('sled.stepHeli(stepMs)',control);
+  const endStep=source.indexOf('const actualTouchdown=!!sled.endStep(stepMs)',yaw);
+  const flow=source.indexOf('landingLedger.entries.push({ stepMs })',endStep);
+  const settle=source.indexOf('this.settlePhysicalTouchdown(',flow);
+  expect(control).toBeGreaterThan(0);
+  expect(yaw).toBeGreaterThan(control);
+  expect(endStep).toBeGreaterThan(yaw);
+  expect(flow).toBeGreaterThan(endStep);
+  expect(settle).toBeGreaterThan(flow);
+  expect(source).not.toContain('this.score.tick(simDt)');
+  expect(source).not.toContain('sled.stepHeli(dt)');
+});
+
+test('RunScene orders physical Matter substep touchdown ledger before the final presentation state',()=>{
+  const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+  expect(source).toMatch(/const actualTouchdown=!!sled\.endStep\(stepMs\)/);
+  expect(source).toMatch(/if\s*\(actualTouchdown\)\s*\{[\s\S]*?substepTouchdowns\.push/);
+  expect(source).toContain('this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs, landingLedger)');
+  expect(source).toContain('fs.input.airBrakeKicked = airBrakeKickedThisTick');
+  expect(source).toContain('this.commitTouchdownLedger(landingLedger, survivedLanding)');
+});
+
+describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
+  test('ordered Matter substep touchdown banks a paid brake even when buffered Hop ends the fixed tick airborne',async()=>{
+    const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+    const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+    const scene=Object.create(RunScene.prototype);
+    const events=[];
+    scene.game={events:{emit:(key,payload)=>events.push({key,payload})}};
+    scene.tricks=new TrickTracker();scene.score=new ScoreManager();
+    scene.trickCounts={};scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
+    scene.stabilizeMs=1000;scene.stabilizeDeg=45;scene.pendingCrash=null;
+    scene.palette={amber:1,cyan:2,lime:3};
+    scene.fx={sparks(){},ring(){}};
+    scene.sled={x:1000,y:200,vx:200,vy:0};
+    scene.emitCombo=()=>{};scene.emitFlow=()=>{};scene.emitScore=()=>{};
+    scene._zoneScoreMulAt=()=>1;
+    scene.applyLandingBoost=jest.fn();scene.applySpringRebound=jest.fn();
+    const frame=(timeMs,grounded,kicked)=>({
+      timeMs,dtMs:8,grounded,crashed:false,angleDeg:0,
+      vx:200,vy:0,impactVx:200,impactVy:50,groundAngleDeg:0,x:1000,y:200,
+      input:{airBrake:true,airBrakeKicked:kicked,parachute:false,heli:0},
+    });
+    // First substep: kick then a genuine new touchdown. Second substep:
+    // buffered Hop relaunches, so the fixed-tick final frame is airborne.
+    const touchdown=frame(10008,true,true);
+    scene.settlePhysicalTouchdown(touchdown);
+    expect(scene._landings).toBe(1);
+    expect(scene.trickCounts.airBrake).toBe(1);
+    expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+    const banked=scene.score.trickPoints;
+    expect(banked).toBeGreaterThan(0);
+    const end=frame(10016,false,false);
+    const update=scene.tricks.update(end);
+    scene.handleTricksAndLanding(update,end);
+    expect(update.tricks).toEqual([]);
+    expect(scene._landings).toBe(1);
+    expect(scene.score.trickPoints).toBe(banked);
+
+    // A kick had instead happened on the previous fixed tick, with points
+    // pending; new intermediate touchdown has NO new kick. It must STILL
+    // settle the already-earned trick before a new buffered Hop relaunch.
+    const prior=frame(10024,false,true);
+    const paid=scene.tricks.update(prior);
+    scene.handleTricksAndLanding(paid,prior);
+    expect(paid.tricks).toMatchObject([{type:'airBrake'}]);
+    expect(scene.score.getSnapshot().pendingPoints).toBeGreaterThan(0);
+    scene.settlePhysicalTouchdown(frame(10032,true,false));
+    expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+    expect(scene._landings).toBe(2);
+    expect(scene.trickCounts.airBrake).toBe(2);
+    const final=scene.tricks.update(frame(10040,false,false));
+    scene.handleTricksAndLanding(final,frame(10040,false,false));
+    expect(final.tricks).toEqual([]);
+    expect(scene._landings).toBe(2);
+
+    // A final-substep contact also settles immediately; the later
+    // post-physics presentation frame must not create a duplicate.
+    const last=frame(10048,true,true);
+    scene.settlePhysicalTouchdown(last);
+    expect(scene._landings).toBe(3);
+    const post={...last,input:{...last.input,airBrakeKicked:false}};
+    const lastUpdate=scene.tricks.update(post);
+    scene.handleTricksAndLanding(lastUpdate,post);
+    expect(lastUpdate.tricks).toEqual([]);
+    expect(scene._landings).toBe(3);
+    expect(scene.trickCounts.airBrake).toBe(3);
+    expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(3);
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(3);
+    const landings=events.filter(x=>x.key===EVT.LANDING);
+    expect(landings.map(e=>e.payload.quality)).toEqual(['good','good','good']);
+    expect(events.filter(x=>x.key===EVT.LANDING).every(x=>x.payload.quality==='good')).toBe(true);
+    expect(scene.applyLandingBoost).not.toHaveBeenCalled();
+    expect(scene.applySpringRebound).not.toHaveBeenCalled();
+  });
+
+  test('two true kick pulses after two missed short flights bank immediately, do not inflate airtime or leak provisional points',async()=>{
+    const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+    const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+    const scene=Object.create(RunScene.prototype);
+    const events=[];
+    scene.game={events:{emit:(key,payload)=>events.push({key,payload})}};
+    scene.tricks=new TrickTracker();
+    scene.score=new ScoreManager();
+    scene.trickCounts={};
+    scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
+    scene.stabilizeMs=1000;scene.stabilizeDeg=45;scene.pendingCrash=null;
+    scene.palette={amber:1,cyan:2,lime:3};
+    scene.fx={sparks(){},ring(){}};
+    scene.sled={x:1000,y:200,vx:200,vy:0};
+    scene.emitCombo=()=>{};
+    scene.emitFlow=()=>{};
+    scene.emitScore=()=>{};
+    scene._zoneScoreMulAt=()=>1;
+    scene.applyLandingBoost=jest.fn();
+    scene.applySpringRebound=jest.fn();
+    const frame=(timeMs)=>({
+      timeMs,dtMs:8,grounded:true,crashed:false,angleDeg:0,
+      vx:200,vy:0,impactVx:200,impactVy:50,
+      groundAngleDeg:0,x:1000,y:200,
+      input:{airBrake:true,airBrakeKicked:true,parachute:false,heli:0},
+    });
+    for(const t of [10000,20000]){
+      const fs=frame(t);
+      const upd=scene.tricks.update(fs);
+      expect(upd.tricks).toHaveLength(1);
+      expect(upd.tricks[0]).toMatchObject({type:'airBrake',airtimeMs:8});
+      expect(upd.landing).toMatchObject({quality:'good',airtimeMs:8,shortAirBrakeTouchdown:true});
+      const prior=scene.score.trickPoints;
+      scene.handleTricksAndLanding(upd,fs);
+      expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+      expect(scene.score.trickPoints).toBeGreaterThan(prior);
+      expect(scene._airTricks).toBe(0);
+    }
+    // Different timing: one genuinely paid kick during an airborne sample,
+    // followed by landing 8ms later with NO new kick pulse. The pending
+    // AirBrake trick must settle on THIS short landing, not leak to a later one.
+    const airborne={...frame(30008),grounded:false};
+    const paid=scene.tricks.update(airborne);
+    expect(paid.tricks).toMatchObject([{type:'airBrake',airtimeMs:8}]);
+    expect(paid.landing).toBe(null);
+    scene.handleTricksAndLanding(paid,airborne);
+    expect(scene.score.getSnapshot().pendingPoints).toBeGreaterThan(0);
+    const landingFrame={...frame(30016),input:{
+      airBrake:true,airBrakeKicked:false,parachute:false,heli:0,
+    }};
+    const settled=scene.tricks.update(landingFrame);
+    expect(settled.tricks).toEqual([]); // no duplicate trick on landing
+    expect(settled.landing).toMatchObject({
+      quality:'good',shortAirBrakeTouchdown:true,airtimeMs:16,
+    });
+    const priorThird=scene.score.trickPoints;
+    scene.handleTricksAndLanding(settled,landingFrame);
+    expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+    expect(scene.score.trickPoints).toBeGreaterThan(priorThird);
+    expect(scene._airTricks).toBe(0);
+
+    expect(scene._landings).toBe(3);
+    expect(scene.trickCounts.airBrake).toBe(3);
+    expect(scene.applyLandingBoost).not.toHaveBeenCalled();
+    expect(scene.applySpringRebound).not.toHaveBeenCalled();
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(3);
+    expect(events.filter(x=>x.key===EVT.LANDING).every(x=>
+      x.payload.quality==='good' && x.payload.bonusPoints===0)).toBe(true);
+
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(3);
+    expect(events.filter(x=>x.key===EVT.TRICK).map(x=>x.payload.airtimeMs)).toEqual([8,8,8]);
+  });
+});
+
+test('real buffered touchdown resets prior BSOD canopy/paid brake credit before another airborne scoring frame',()=>{
+  const scene=Object.create(RunScene.prototype);
+  const awards=[];
+  scene.sled={x:1000,y:200,grounded:false,parachuteMs:300};
+  scene.bsodState={active:true,gapPx:1000,relativeAirX:420,atmosphereDensity:1};
+  scene.bsodBluffs=new BsodBluffTracker();
+  scene.runTimeMs=0;scene.crashed=false;scene.bsodCaught=false;
+  scene.bonus=(points)=>awards.push(points);
+  scene.game={events:{emit:jest.fn()}};
+  scene.updateBsodBluff();
+  scene.runTimeMs=100;
+  scene.bsodState.gapPx=200;
+  scene.updateBsodBluff(true);
+  expect(scene.bsodBluffs.armed).toBe(true);
+  expect(scene.bsodBluffs.usedCanopy).toBe(true);
+  expect(scene.bsodBluffs.usedAirbrake).toBe(true);
+  // A genuine Matter contact and buffered relaunch within one 8ms tick.
+  // A final airborne frame alone cannot represent that physical boundary.
+  scene.runTimeMs=116;
+  scene.bsodState.gapPx=850;
+  scene.sled.x=1400;
+  scene.updateBsodBluff(false,[{
+    fs:{x:1250,timeMs:112},
+    bsodState:{active:true,gapPx:250,relativeAirX:420,atmosphereDensity:1},
+  }]);
+  expect(awards).toEqual([]); // old canopy and old paid AirBrake cannot cross landing
+  expect(scene.bsodBluffs.armed).toBe(false);
+  expect(scene.bsodBluffs.usedCanopy).toBe(false);
+  expect(scene.bsodBluffs.usedAirbrake).toBe(false);
+  expect(scene.bsodBluffs.chain).toBe(0);
+  // New separate real close approach plus current canopy can earn only BASE.
+  scene.runTimeMs=200;scene.sled.x=1500;scene.bsodState.gapPx=200;
+  scene.updateBsodBluff(false);
+  scene.runTimeMs=820;scene.sled.x=1800;scene.bsodState.gapPx=900;
+  scene.updateBsodBluff(false);
+  expect(awards).toEqual([150]);
+});
+
+test('short AirBrake contact retains sloppy wobble penalty without adding a new boost or spring',async()=>{
+  const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+  const scene=Object.create(RunScene.prototype);
+  scene.game={events:{emit:jest.fn()}};
+  scene.score=new ScoreManager();
+  scene.trickCounts={};scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
+  scene.stabilizeMs=0;scene.stabilizeDeg=0;
+  scene.palette={amber:1,cyan:2,lime:3};
+  scene.fx={sparks:jest.fn(),ring:jest.fn()};
+  scene.sled={x:1000,y:200,vx:200,vy:0,wobble:jest.fn(),squash:0};
+  scene.emitCombo=()=>{};scene.emitFlow=()=>{};scene.emitScore=()=>{};
+  scene._zoneScoreMulAt=()=>1;
+  scene.applyLandingBoost=jest.fn();
+  scene.applySpringRebound=jest.fn();
+  const fs={timeMs:8,dtMs:8,grounded:true,crashed:false,angleDeg:0,
+    vx:200,vy:0,x:1000,y:200,groundAngleDeg:0};
+  scene.handleTricksAndLanding({tricks:[],landing:{
+    quality:'sloppy',shortAirBrakeTouchdown:true,angleDeg:30,
+    airtimeMs:8,rotationDeg:0,impactSpeedPxS:200,hard:false,
+  }},fs);
+  const {TUNING}=await import('../../src/systems/PhysicsTuner.js');
+  expect(scene.sled.wobble).toHaveBeenCalledWith(TUNING.sloppySpeedKeep);
+  expect(scene.applyLandingBoost).not.toHaveBeenCalled();
+  expect(scene.applySpringRebound).not.toHaveBeenCalled();
+  expect(scene._landings).toBe(1);
+});
+
+test('physical buffered touchdown captures contact-position slope instead of stale start-tick angle',()=>{
+  const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+  expect(source).toContain('contactFs.groundAngleDeg=this.slopeAt(contactFs.x)');
+  expect(source).toContain('substepTouchdowns.push({fs:contactFs,kicked:kickSinceTouchdown})');
+});
+
+test('substep Flow expires before landing settlement, and new airborne time starts after last physical contact',async()=>{
+  const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+  const callback=source.indexOf('const actualTouchdown=!!sled.endStep(stepMs)');
+  const advance=source.indexOf('landingLedger.entries.push({ stepMs });',callback);
+  const settle=source.indexOf('this.settlePhysicalTouchdown(',callback);
+  expect(callback).toBeGreaterThan(0);
+  expect(advance).toBeGreaterThan(callback);
+  expect(settle).toBeGreaterThan(advance);
+  expect(source).not.toContain('this.emitFlow(this.score.tick(simDt))');
+  expect(source).toContain('fs.dtMs=Math.max(0,this.runTimeMs-lastContactMs)');
+  const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+  const tracker=new TrickTracker();
+  tracker.update({timeMs:100,dtMs:8,grounded:true,angleDeg:0,input:{}});
+  // Physics touchdown occurred at t=106 inside the same fixed input tick.
+  // The final t=108 airborne frame can only inherit the post-touchdown 2ms,
+  // NOT the whole 8ms. A 119ms later contact must stay under 120ms.
+  tracker.update({timeMs:108,dtMs:2,grounded:false,angleDeg:0,input:{}});
+  expect(tracker._airStart).toBe(106);
+  const end=tracker.update({timeMs:225,dtMs:8,grounded:true,angleDeg:0,
+    input:{airBrakeKicked:true},impactVx:200,impactVy:80,
+    groundAngleDeg:0});
+  expect(end.tricks.map(t=>t.type)).toEqual(['airBrake']);
+  expect(end.landing?.shortAirBrakeTouchdown).toBe(true);
+  expect(end.landing?.airtimeMs).toBe(119);
+});
+
+test.each([[300,150],[240,190]])('paid kick at gap %i cannot borrow later approach eligibility', (kickGap, points)=>{
+  const scene=Object.create(RunScene.prototype);
+  const awards=[];
+  scene.sled={x:1000,y:200,grounded:false,parachuteMs:300};
+  scene.bsodState={active:true,gapPx:1000,relativeAirX:420,atmosphereDensity:1};
+  scene.bsodBluffs=new BsodBluffTracker();
+  scene.runTimeMs=0;scene.crashed=false;scene.bsodCaught=false;
+  scene.bonus=(n)=>awards.push(n);
+  scene.game={events:{emit:jest.fn()}};
+  scene.updateBsodBluff();
+  scene.runTimeMs=108;
+  scene.bsodState.gapPx=200;
+  scene.updateBsodBluff(true,[],{active:true,gapPx:kickGap,playerX:1000,nowMs:100,
+    grounded:false,crashed:false,canopyDeployed:true,relativeAirX:420,atmosphereDensity:1});
+  scene.sled.x=1400;scene.runTimeMs=800;scene.bsodState.gapPx=900;
+  scene.updateBsodBluff();
+  expect(awards).toEqual([points]);
+});
+
+describe('tick-local landing settlement', () => {
+  test.each([false, true])('late crash priority / survivor=%s: body effects are immediate but rewards are conditional', async survived => {
+    const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+    const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+    const scene=Object.create(RunScene.prototype), events=[];
+    scene.game={events:{emit:(key,payload)=>events.push({key,payload})}};
+    scene.tricks=new TrickTracker();scene.score=new ScoreManager();
+    scene.score.trickPoints=500;scene.score.flow=2;scene.score.flowRemainingMs=4;
+    scene.score.addBonus(30,'shard');
+    scene.trickCounts={};scene._airTricks=0;scene._landings=0;scene.maxAirtimeMs=0;
+    scene.stabilizeMs=0;scene.stabilizeDeg=0;scene.pendingCrash=null;
+    scene.palette={amber:1,cyan:2,lime:3};scene.fx={sparks(){},ring(){}};
+    scene.sled={x:1000,y:200,vx:200,vy:0,wobble:jest.fn()};
+    scene.emitCombo=()=>{};scene.emitFlow=()=>{};scene.emitScore=()=>{};
+    scene._zoneScoreMulAt=()=>1;
+    scene.applyLandingBoost=jest.fn();scene.applySpringRebound=jest.fn();
+    const fs={timeMs:10008,dtMs:8,grounded:true,crashed:false,angleDeg:45,
+      vx:200,vy:0,impactVx:200,impactVy:50,groundAngleDeg:0,x:1000,y:200,
+      input:{airBrake:true,airBrakeKicked:true,parachute:false,heli:0}};
+    const ledger={entries:[{stepMs:8}],combo:null,airTricks:0};
+    scene.settlePhysicalTouchdown(fs,ledger);
+    expect(scene.sled.wobble).toHaveBeenCalledTimes(1);
+    expect(scene.score.trickPoints).toBe(500);
+    expect(scene._landings).toBe(0);
+    expect(events).toHaveLength(0);
+    ledger.entries.push({stepMs:8});
+    if (!survived) scene.pendingCrash={cause:'bsod'};
+    scene.commitTouchdownLedger(ledger,survived);
+    expect(scene.score.bonusPoints).toBe(30);
+    expect(scene.score.flow).toBeLessThan(2);
+    expect(scene.sled.wobble).toHaveBeenCalledTimes(1);
+    expect(scene._landings).toBe(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(survived?1:0);
+    expect(scene.score.trickPoints>500).toBe(survived);
+  });
+});
+
+describe('real fixed-tick crash-priority routing', () => {
+  test.each(['wall', 'hazard', 'shielded', 'survive', 'bad-then-hazard', 'bad-alone', 'shielded-kick', 'frozen-tap'])('first-substep paid landing, second-substep %s', async outcome => {
+    const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+    const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+    const {SIM_TICK_MS}=await import('../../src/systems/SimClock.js');
+    const scene=Object.create(RunScene.prototype), events=[];
+    let steps=0, wallSteps=0;
+    Object.assign(scene,{
+      runTimeMs:1000,resetCooldownMs:0,hazards:new Map(),scrambleMs:0,
+      slowmoMs:0,blinkMs:0,hitStopMs:outcome==='frozen-tap'?45:0,stabilizeMs:0,stabilizeDeg:0,
+      pendingCrash:null,shieldCharges:outcome.startsWith('shielded')?1:0,bsodCaught:false,crashed:false,
+      score:new ScoreManager(),tricks:new TrickTracker(),trickCounts:{},_airTricks:0,
+      _landings:0,maxAirtimeMs:0,lastTotal:530,bestCombo:1,startX:0,
+      palette:{amber:1,cyan:2,lime:3},fx:{sparks(){},ring(){}},
+      game:{events:{emit:(key,payload)=>events.push({key,payload})}},
+      registry:{get:()=>null},terrain:{heightAt:()=>500},
+      tuner:{getEffective:()=>({})},matter:{world:{step:()=>{steps++;}}},
+      tickEffects(){},getZoneDefs:()=>[],slopeAt:()=>0,physicsContext:()=>({}),
+      dropAhead:()=>0,airForecast(){},flushDespawn(){},updateZones(){},sampleSafeGround(){},
+      updateKodiaks(){},updateBsodBluff:jest.fn(),updateFun(){},streamTerrain(){},publishBsodState(){},
+      bsodAtmosphere:()=>1,glitch:{update:()=>({})},
+      processContacts(){
+        if(((steps===2 && ['hazard','shielded','bad-then-hazard'].includes(outcome)) ||
+          (steps===1 && outcome==='shielded-kick')) && !this.pendingCrash)
+          this.pendingCrash={cause:'hazard'};
+      },
+      resolveCrash:jest.fn(function(){
+        const fatal=!outcome.startsWith('shielded');
+        if(outcome==='bad-then-hazard')expect(this.pendingCrash?.cause).toBe('hazard');
+        if(outcome==='bad-alone')expect(this.pendingCrash?.cause).toBe('badLanding');
+        this.pendingCrash=null;
+        this.crashed=fatal;
+        if(fatal)this.score.onCrash();
+      }),
+    });
+    scene.score.trickPoints=500;
+    scene.score.addBonus(30,'shard');
+    scene.sled={
+      x:1000,y:200,vx:200,vy:0,speed:200,airtimeMs:8,grounded:false,
+      invulnerableMs:0,airBrakeKickPulse:0,stepHeli(){},wobble:jest.fn(),
+      applyControls(){
+        if(outcome==='shielded-kick'){if(steps===1)this.airBrakeKickPulse=1;return;}
+        if(steps===0)this.airBrakeKickPulse=1;
+        else {
+          expect(this.wobble).toHaveBeenCalledTimes(outcome.startsWith('bad-')?0:1);
+          expect(scene.pendingCrash).toBeNull();
+          expect(scene.score.trickPoints).toBe(500);
+          expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(0);
+        }
+      },
+      endStep(){this.grounded=steps===1 && outcome!=='shielded-kick';return this.grounded;},
+      getFrameState(timeMs,dtMs){return {timeMs,dtMs,grounded:this.grounded,
+        crashed:false,angleDeg:outcome.startsWith('bad-')?180:45,groundAngleDeg:0,vx:200,vy:0,impactVx:200,impactVy:50,
+        x:this.x,y:this.y,input:{airBrake:true,heli:0}};}
+    };
+    scene.bsod={
+      advance(){wallSteps++;},
+      state(){return {active:true,gapPx:outcome==='wall'&&wallSteps===2?-1:400,
+        relativeAirX:100,atmosphereDensity:1};}
+    };
+    scene.simTick(SIM_TICK_MS,{pressed:outcome==='frozen-tap'?{airBrake:true}:{}});
+    if(outcome==='frozen-tap'){
+      expect(steps).toBe(0);
+      expect(scene.sled.airBrakePressPending).toBe(true);
+      return;
+    }
+    if(outcome==='shielded-kick'){
+      expect(scene.updateBsodBluff).toHaveBeenCalledWith(true,[],expect.objectContaining({crashed:false,grounded:false}));
+      expect(scene.trickCounts.airBrake).toBe(1);
+      expect(scene.score.trickPoints).toBe(500);
+      return;
+    }
+    const survived=outcome==='shielded'||outcome==='survive';
+    expect(steps).toBe(2);
+    expect(scene.sled.wobble).toHaveBeenCalledTimes(outcome.startsWith('bad-')?0:1);
+    expect(scene.score.trickPoints>500).toBe(survived);
+    expect(scene.score.bonusPoints).toBe(30);
+    expect(scene._landings).toBe(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(survived||outcome==='bad-alone'?1:0);
+    expect(scene.resolveCrash).toHaveBeenCalledTimes(outcome==='survive'?0:1);
+  });
+});
+
+test('grace prevents death but forfeits a failed landing combo before the next flight',async()=>{
+  const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
+  const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+  const r=Object.create(RunScene.prototype);
+  Object.assign(r,{pendingCrash:{cause:'badLanding'},sled:{invulnerableMs:500},
+    score:new ScoreManager(),tricks:new TrickTracker(),_airTricks:1,
+    emitFlow:jest.fn(),emitCombo:jest.fn(),emitScore:jest.fn(),doCrash:jest.fn()});
+  r.score.trickPoints=500;
+  r.score.addTrick({type:'airBrake',count:1,airtimeMs:50});
+  expect(r.score.getSnapshot().pendingPoints).toBeGreaterThan(0);
+  r.resolveCrash({vx:200,vy:10});
+  expect(r.doCrash).not.toHaveBeenCalled();
+  expect(r.pendingCrash).toBeNull();
+  expect(r._airTricks).toBe(0);
+  expect(r.score.getSnapshot().pendingPoints).toBe(0);
+  expect(r.score.onLanding({quality:'good'}).banked).toBe(0);
+  expect(r.score.trickPoints).toBe(500);
 });

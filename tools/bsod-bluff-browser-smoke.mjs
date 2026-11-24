@@ -31,18 +31,47 @@ try {
       r.sled.x=1050;
       r.runTimeMs=150;
       r.bsodState={...r.bsodState,gapPx:190};
-      r.updateBsodBluff();
+      // An actual one-shot physical brake kick (verified separately by the
+      // compiled Sled regression), NOT just an airBrakeActive held button.
+      r.updateBsodBluff(true);
       r.sled.x=1400;
       r.runTimeMs=910;
       r.bsodState={...r.bsodState,gapPx:860};
       r.updateBsodBluff();
       r.updateBsodBluff(); // no repeated scoring at same gap
+      const rewardedScoreDelta=r.score.getTotal()-beforeScore;
+      const rewardedMissDelta=r.nearMissCount-beforeMisses;
+      const rewardedEvents=events.slice();
+      const pomAnchor=r.sled.windPomAnchor,pomHidden=r.sled.hidden;
+
+      // Second encounter in an isolated fresh tracker: button is held, but the
+      // one-shot latch has ALREADY been spent, so no physical kick occurred.
+      // This must still award the base 150 points but NOT the 40-point bonus.
+      r.bsodBluffs=new r.bsodBluffs.constructor();
+      events.length=0;
+      const heldScoreBefore=r.score.getTotal(),heldMissesBefore=r.nearMissCount;
+      r.sled.x=1000;
+      r.sled.airBrakeActive=true;
+      r.runTimeMs=1;
+      r.bsodState={...r.bsodState,gapPx:1300};
+      r.updateBsodBluff(false);
+      r.sled.x=1050;
+      r.runTimeMs=150;
+      r.bsodState={...r.bsodState,gapPx:190};
+      r.updateBsodBluff(false);
+      r.sled.x=1400;
+      r.runTimeMs=910;
+      r.bsodState={...r.bsodState,gapPx:860};
+      r.updateBsodBluff(false);
       return {
-        scoreDelta:r.score.getTotal()-beforeScore,
-        nearMissDelta:r.nearMissCount-beforeMisses,
-        events,
-        pomAnchor:r.sled.windPomAnchor,
-        pomHidden:r.sled.hidden,
+        scoreDelta:rewardedScoreDelta,
+        nearMissDelta:rewardedMissDelta,
+        events:rewardedEvents,
+        heldOnlyScoreDelta:r.score.getTotal()-heldScoreBefore,
+        heldOnlyNearMissDelta:r.nearMissCount-heldMissesBefore,
+        heldOnlyEvents:events.slice(),
+        pomAnchor,
+        pomHidden,
       };
     } finally {
       Object.assign(r.sled,{x:old.x,msSinceContact:old.msSinceContact,parachuteMs:old.parachuteMs,airBrakeActive:old.airBrakeActive});
@@ -52,6 +81,10 @@ try {
   });
   assert.equal(result.scoreDelta,190);
   assert.equal(result.nearMissDelta,1);
+  assert.equal(result.heldOnlyScoreDelta,150,'spent AirBrake held button must not buy extra points');
+  assert.equal(result.heldOnlyNearMissDelta,1);
+  assert.deepEqual(result.heldOnlyEvents.map(x=>x.kind),['nearMiss','bsodBluff']);
+  assert.equal(result.heldOnlyEvents[0].points,150);
   assert.deepEqual(result.events.map(x=>x.kind),['nearMiss','bsodBluff']);
   assert.equal(result.events[0].hazardType,'bsod');
   assert.equal(result.events[0].chain,1);
