@@ -130,7 +130,7 @@ export function preflightMatterSnapshot(snap, Matter) {
       snap.worldOrder.length!==roots.length || !unique(snap.worldOrder) || !snap.worldOrder.every(k=>typeof k==='string'&&Object.hasOwn(snap.ids,k)) ||
       !dense(snap.detectorOrder) ||
       (snap.worldModified
-        ? !snap.detectorOrder.every(k=>k===null||typeof k==='string')
+        ? !snap.detectorOrder.every(k=>k===null||typeof k==='string')||!unique(snap.detectorOrder.filter(k=>k!==null))
         : !unique(snap.detectorOrder)||snap.detectorOrder.length!==roots.length||!snap.detectorOrder.every(k=>typeof k==='string'&&Object.hasOwn(snap.ids,k)))) fail('world/detector order');
   if (!exact(snap.gravity,['x','y','scale']) || !Object.values(snap.gravity).every(finite) ||
       !exact(snap.timing,['timestamp','timeScale','lastDelta']) || !Object.values(snap.timing).every(finite)) fail('gravity/timing');

@@ -16,8 +16,9 @@ const args = process.argv.slice(2);
 const repeatArg=args[0]==='--repeat-ticks'&&args.length===2&&/^[1-9][0-9]*$/.test(args[1])&&Number(args[1])<=120;
 const boundaryArg=args.length===1&&args[0]==='--repeat-boundaries';
 const movingArg=args.length===1&&args[0]==='--repeat-moving';
-if (!(args.length===0||(args.length===1&&args[0]==='--full')||repeatArg||boundaryArg||movingArg)) {
-  console.error('Usage: npm run gate:heavy -- [--full | --repeat-ticks 1..120 | --repeat-boundaries | --repeat-moving]');
+const naturalArg=['--natural-run','--natural-probe'].includes(args[0])&&(args.length===1||(args.length===3&&args[1]==='--natural-limit'&&/^[1-9][0-9]*$/.test(args[2])&&Number(args[2])<=12000));
+if (!(args.length===0||(args.length===1&&args[0]==='--full')||repeatArg||boundaryArg||movingArg||naturalArg)) {
+  console.error('Usage: npm run gate:heavy -- [--full | --repeat-ticks 1..120 | --repeat-boundaries | --repeat-moving | --natural-run [--natural-limit N] | --natural-probe [--natural-limit N]]');
   process.exit(2);
 }
 const full = args[0] === '--full';
@@ -41,10 +42,10 @@ try {
   const result=await new Promise((resolve,reject)=>{
     const child=spawn(process.execPath,[
     'tools/savestate-experiment/browser-experiment.mjs','--strict-suffix',
-    ...(!full?['--quick']:[]),...(repeatArg||boundaryArg||movingArg?args:[]),'--json',output
+    ...(!full?['--quick']:[]),...(repeatArg||boundaryArg||movingArg||naturalArg?args:[]),'--json',output
   ],{cwd:root,env:{...env,GAME_URL:'http://127.0.0.1:'+address.port+'/'},
     stdio:'inherit'});
-    const timer=setTimeout(()=>child.kill('SIGTERM'),repeatArg?Math.max(300000,Number(args[1])*30000):boundaryArg?480000:300000);
+    const timer=setTimeout(()=>child.kill('SIGTERM'),naturalArg?Math.max(300000,(Number(args[2])||4800)*12000):repeatArg?Math.max(300000,Number(args[1])*30000):boundaryArg?480000:300000);
     child.once('error',e=>{clearTimeout(timer);reject(e);});
     child.once('exit',(code,signal)=>{clearTimeout(timer);resolve({code,signal});});
   });

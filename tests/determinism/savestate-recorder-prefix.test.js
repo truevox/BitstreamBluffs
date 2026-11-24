@@ -59,3 +59,14 @@ test('interior repeated edge removal with an unchanged final cursor fails the ca
   expect(()=>prepareRecorderPrefix(b,{...s,data:JSON.stringify(d)},8)).toThrow(/integrity mismatch/);
   expect(captureRecorderPrefix(b)).toEqual(before);
 });
+
+test('zero tick restores a genuinely empty native recorder and rejects nonempty history',()=>{
+  const a=fresh(1),b=fresh(2);
+  const snapshot=captureRecorderPrefix(a);
+  applyRecorderPrefix(b,prepareRecorderPrefix(b,snapshot,0));
+  expect(captureRecorderPrefix(b)).toEqual(snapshot);
+  const bad=JSON.parse(snapshot.data);
+  bad.recorder.inputs.push([1,0,0]);
+  const data=JSON.stringify(bad);
+  expect(()=>prepareRecorderPrefix(fresh(3),{...snapshot,data,integrity:digestOfBytes(utf8Encode(data))},0)).toThrow(/zero-tick history/);
+});

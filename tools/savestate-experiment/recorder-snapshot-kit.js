@@ -54,10 +54,15 @@ export function prepareRecorderPrefix(run, section, tick) {
       !sameKeys(r.header,Object.keys(run.ghostRecorder.header)) ||
       r.header.startedAt !== startedAt || encode(withoutStart(r.header)) !== encode(withoutStart(run.ghostRecorder.header)))
     fail('header/identity mismatch');
-  if (!uint(tick) || tick === 0 || r.lastTick !== tick || !Array.isArray(r.inputs) || !r.inputs.length ||
+  if (!uint(tick) || r.lastTick !== tick || !Array.isArray(r.inputs) || (tick>0&&!r.inputs.length) ||
       !Array.isArray(r.trace) || !Array.isArray(r.checkpoints) || !Array.isArray(r.fingerprints) ||
       !Array.isArray(r.fingerprintErrors) || r.fingerprintErrorCount !== 0 || r.fingerprintErrors.length)
     fail('incomplete history');
+  if(tick===0){
+    if(r.inputs.length||r._last!==null||r._lastTick!==0||r.trace.length||r.checkpoints.length||r.fingerprints.length)
+      fail('nonempty zero-tick history');
+    return decoded;
+  }
   let sum=0;
   for (const row of r.inputs) {
     if (!Array.isArray(row) || row.length !== 3 || !uint(row[0]) || row[0] === 0 || !pad(row[1],row[2])) fail('invalid input row');

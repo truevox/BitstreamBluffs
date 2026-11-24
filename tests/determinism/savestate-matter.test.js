@@ -292,3 +292,12 @@ test('pending detector rebuild must not alias a removed body to its same-key rep
   expect(snap.detectorOrder).not.toContain(key);
   expect(kit.preflight(snap)).toBe(true);
 });
+
+test('pending detector rebuild rejects duplicate live body references',()=>{
+  const a=buildWorld(Matter);
+  Matter.Engine.update(a.engine,1000/240);
+  const s=kit.capture(a.engine,a.keyOf,{selectBody:()=>true});
+  s.worldModified=true;
+  s.detectorOrder.push(s.detectorOrder[0]);
+  expect(()=>kit.preflight(s)).toThrow(/world\/detector order/);
+});
