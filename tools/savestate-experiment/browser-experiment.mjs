@@ -450,13 +450,29 @@ async function runRepeatedCase(browser,fxName) {
       if(current!==source)await current.ctx.close();
       current=candidate;candidate=null;
     }
+    // Matching invalid histories are not a pass. Use the exact restore
+    // admission validator on the final prefix in a fresh destination.
+    const final=await measure(current);
+    candidate=await bootPage(browser,fx,tape);
+    const finalValidation=await candidate.page.evaluate(({prefix,tick})=>{
+      try{window.__ssRecorderKit.prepareRecorderPrefix(window.__ss.run,prefix,tick);return {ok:true};}
+      catch(e){return {ok:false,error:String(e.message||e)};}
+    },{prefix:final.prefix,tick:fx.K+REPEAT});
+    if(candidate.errors.length)throw new Error('page errors during final validation: '+JSON.stringify(candidate.errors));
+    await candidate.ctx.close();candidate=null;
+    if(!finalValidation.ok)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,
+      firstDivergentTick:fx.K+REPEAT,phase:'final recorder validation',restoreError:finalValidation.error};
     const boundaryWitness=boundary?{
       edge:boundary.edge,checkpoint:boundary.checkpoint,
       inputRecorded:cycles.some(c=>c.nextTick===boundary.edge&&c.newInputRows===1&&c.recordedHopEdge),
       checkpointRecorded:cycles.some(c=>c.nextTick===boundary.checkpoint&&c.newCheckpoints===1&&c.newFingerprints===1),
       recapturedAfterCheckpoint:cycles.some(c=>c.captureTick===boundary.checkpoint&&c.recaptured)
     }:null;
-    return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,boundaryWitness,firstDivergentTick:null,
+    const missingWitness=boundary?Object.entries(boundaryWitness).filter(([_k,v])=>v===false).map(([k])=>k):[];
+    if(missingWitness.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,boundaryWitness,
+      firstDivergentTick:null,phase:'boundary coverage',diff:missingWitness.map(k=>k+' (hop '+boundary.edge+', checkpoint '+boundary.checkpoint+')'),
+      coverageError:true,finalValidation,pageErrors:[...source.errors,...current.errors]};
+    return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,boundaryWitness,finalValidation,firstDivergentTick:null,
       pageErrors:[...source.errors,...current.errors]};
   } finally {
     if(candidate)await candidate.ctx.close();
@@ -500,7 +516,7 @@ if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
 
 if (REPEAT) {
   const failed=results.length!==2||results.some(r=>r.harnessError||r.restoreError||
-    r.firstDivergentTick!==null||r.pageErrors?.length!==0||r.cycles?.length!==REPEAT||
+    r.firstDivergentTick!==null||r.coverageError||!r.finalValidation?.ok||r.pageErrors?.length!==0||r.cycles?.length!==REPEAT||
     r.fixtureStats?.tick!==r.K||r.fixtureStats.crashed||
     (r.fixture==='contact'?!(r.fixtureStats.activePairs>0):!(r.fixtureStats.hazardsHit>0))||
     (BOUNDARY&&(!r.boundaryWitness?.inputRecorded||!r.boundaryWitness.checkpointRecorded||!r.boundaryWitness.recapturedAfterCheckpoint))||
