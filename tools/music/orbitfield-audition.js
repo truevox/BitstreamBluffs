@@ -1,8 +1,10 @@
 import {attachAuditionExtra} from './AuditionExtra.js';
+import {attachAuditionSpatialReach} from './AuditionSpatialReach.js';
 import {buildMusicChain} from '../../src/systems/music/MusicFXGraph.js';
 import {orchestraPreset} from '../../src/systems/music/DynamicOrchestraPresets.js';
 
 let extraEnhancer=null;
+let spatialReach=null;
 const $=id=>document.getElementById(id);
 const ROLES=['drums','bass','guitar','piano','other'];
 const PACK='/audition-loops/one-more-run/';
@@ -97,6 +99,7 @@ async function load(){
 	finally{$('load').disabled=false;controls();}
 }
 function stop(){
+	spatialReach?.dispose();spatialReach=null;
 	extraEnhancer?.dispose();extraEnhancer=null;
 	for(const {source,gain} of Object.values(sources)){
 		try{source.stop();}catch{}try{source.disconnect();}catch{}try{gain.disconnect();}catch{}
@@ -113,12 +116,13 @@ async function play(){
 	master=ctx.createGain();master.gain.value=.24;master.connect(ctx.destination);
 	rawBus=ctx.createGain();fxBus=ctx.createGain();rawBus.gain.value=0;fxBus.gain.value=1;
 	rawBus.connect(master);fxBus.connect(master);extraEnhancer=attachAuditionExtra(ctx,fxBus,master);
+	spatialReach=attachAuditionSpatialReach(ctx,fxBus,$('echo-tail'),'space');
 	const when=ctx.currentTime+.12;
 	for(const role of ROLES){
 		const chain=buildMusicChain(ctx,orchestraPreset('space-mountain',role),fxBus);
 		const source=ctx.createBufferSource(),gain=ctx.createGain();
 		source.buffer=buffers[role];source.loop=true;gain.gain.value=roleGain(role);
-		source.connect(gain);gain.connect(rawBus);gain.connect(chain.input);
+		source.connect(gain);gain.connect(rawBus);gain.connect(chain.input);gain.connect(spatialReach.input);
 		source.start(when);sources[role]={source,gain};chains[role]=chain;
 	}
 	playing=true;dry=solo=airborne=false;spread();drift();shock();airlock();altitude();controls();
@@ -147,4 +151,4 @@ $('dry').addEventListener('click',()=>{
 window.addEventListener('pagehide',()=>{stop();ctx?.close();});
 controls();spread();drift();shock();airlock();altitude();
 if(new URLSearchParams(location.search).get('qa')==='1')
-	window.__orbitfieldQA=Object.freeze({buildMusicChain,orchestraPreset,getBuffers:()=>buffers});
+	window.__orbitfieldQA=Object.freeze({buildMusicChain,orchestraPreset,attachAuditionSpatialReach,getBuffers:()=>buffers});
