@@ -1506,6 +1506,12 @@ export class RunScene extends Phaser.Scene {
     // Trick yaw was advanced through each physical substep, including
     // any touchdown, rather than applying an extra full-tick rotation here.
     const fs = sled.getFrameState(this.runTimeMs, dt);
+    if (substepTouchdowns.length) {
+      // This is a NEW flight after a genuine physical contact. Count only
+      // the interval since the most recent touchdown, never pre-contact time.
+      const lastContactMs=substepTouchdowns[substepTouchdowns.length-1].fs.timeMs;
+      fs.dtMs=Math.max(0,this.runTimeMs-lastContactMs);
+    }
     fs.input.airBrakeKicked = airBrakeKickedThisTick; // earlier kicks were settled at real contacts
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
     const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);

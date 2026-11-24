@@ -463,3 +463,29 @@ test('physical buffered touchdown captures contact-position slope instead of sta
   expect(source).toContain('contactFs.groundAngleDeg=this.slopeAt(contactFs.x)');
   expect(source).toContain('substepTouchdowns.push({fs:contactFs,kicked:kickSinceTouchdown})');
 });
+
+test('substep Flow expires before landing settlement, and new airborne time starts after last physical contact',async()=>{
+  const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
+  const callback=source.indexOf('const actualTouchdown=!!sled.endStep(stepMs)');
+  const advance=source.indexOf('this.emitFlow(this.score.tick(stepMs));',callback);
+  const settle=source.indexOf('this.settlePhysicalTouchdown(',callback);
+  expect(callback).toBeGreaterThan(0);
+  expect(advance).toBeGreaterThan(callback);
+  expect(settle).toBeGreaterThan(advance);
+  expect(source).not.toContain('this.emitFlow(this.score.tick(simDt))');
+  expect(source).toContain('fs.dtMs=Math.max(0,this.runTimeMs-lastContactMs)');
+  const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
+  const tracker=new TrickTracker();
+  tracker.update({timeMs:100,dtMs:8,grounded:true,angleDeg:0,input:{}});
+  // Physics touchdown occurred at t=106 inside the same fixed input tick.
+  // The final t=108 airborne frame can only inherit the post-touchdown 2ms,
+  // NOT the whole 8ms. A 119ms later contact must stay under 120ms.
+  tracker.update({timeMs:108,dtMs:2,grounded:false,angleDeg:0,input:{}});
+  expect(tracker._airStart).toBe(106);
+  const end=tracker.update({timeMs:225,dtMs:8,grounded:true,angleDeg:0,
+    input:{airBrakeKicked:true},impactVx:200,impactVy:80,
+    groundAngleDeg:0});
+  expect(end.tricks.map(t=>t.type)).toEqual(['airBrake']);
+  expect(end.landing?.shortAirBrakeTouchdown).toBe(true);
+  expect(end.landing?.airtimeMs).toBe(119);
+});

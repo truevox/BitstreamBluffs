@@ -281,3 +281,21 @@ test('edge-only AirBrake tap pays one kick even if released before held-input sa
   expect(toPx(s.body.velocity.y)).toBeCloseTo(-318,6);
   expect(s.airBrakeActive).toBe(false); // not a fake held brake effect
 });
+
+test('an unpaid AirBrake press in vacuum does NOT spend the one-use latch; atmospheric speed payment later does',()=>{
+  const s=makeSled(530,150);
+  const vacuum={hop:false,variableHop:true,airBrake:true,noAutoNudge:true,
+    pressed:{airBrake:true}};
+  s.applyControls(vacuum,phys,8,{atmosphereDensity:0,relativeAirX:0,proximity01:0});
+  expect(s.airBrakeKickUsed).toBe(false);
+  expect(s.airBrakeKickPulse).not.toBe(1);
+  expect(s.airBrakeLiftProtected).toBe(false);
+  const unpaidVx=toPx(s.body.velocity.x);
+  expect(unpaidVx).toBeCloseTo(530,6);
+  const paid={...vacuum,pressed:{airBrake:true}}; // new tick/new press
+  s.applyControls(paid,phys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
+  expect(s.airBrakeKickUsed).toBe(true);
+  expect(s.airBrakeKickPulse).toBe(1);
+  expect(toPx(s.body.velocity.x)).toBeCloseTo(unpaidVx*.4,6);
+  expect(toPx(s.body.velocity.y)).toBeLessThan(-100);
+});

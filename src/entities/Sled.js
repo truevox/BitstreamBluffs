@@ -299,24 +299,21 @@ export class Sled {
       // it must not be zeroed by the hop-release cutoff later this tick or in
       // a subsequent tick. When no lift was actually purchased (vacuum, very
       // slow rider, or already faster upward), retain normal hop semantics.
-      if (kicked.vy < vy) {
-        this.airBrakeLiftProtected = true;
-        // If Space Hop came FIRST, its current upward velocity remains
-        // eligible for variable-release cutoff. Only the ADDITIONAL AirBrake
-        // ascent is protected. Capture the pre-brake upward Hop budget; if
-        // AirBrake came first, a later Hop records its own increment below.
-        this._protectedHopExtraVyPxS = this._playerHopActive
-          ? Math.max(0, -vy) : 0;
-      }
       if (kicked.spentSpeedPxS > 0) {
-        // A zero-atmosphere attempt costs nothing; preserve this flight's
-        // one shot until an actual horizontal speed payment occurs.
+        // Vacuum and other no-payment attempts cannot consume the flight's
+        // ONLY AirBrake. Spend the latch, event and any purchased lift as ONE
+        // transaction. A later physical paid press in atmosphere may retry.
         this.airBrakeKickUsed = true;
+        if (kicked.vy < vy) {
+          this.airBrakeLiftProtected = true;
+          this._protectedHopExtraVyPxS = this._playerHopActive
+            ? Math.max(0, -vy) : 0;
+        }
         this.airBrakeKickPulse = 1;
         airBrakeKickedThisStep = true;
+        vx = kicked.vx;
+        vy = kicked.vy;
       }
-      vx = kicked.vx;
-      vy = kicked.vy;
     }
     // parachute stall: float
     if (chute && vy > 0 && (!atmosphere || atmosphere.atmosphereDensity > 0)) vy *= pmath.exp(-1.6 * dt * (atmosphere ? atmosphere.atmosphereDensity : 1));

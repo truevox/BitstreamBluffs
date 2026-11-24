@@ -138,6 +138,11 @@ try {
     prepare(530,-150);
     sled.applyControls(input,scene.currentPhys,8,{atmosphereDensity:0,relativeAirX:0,proximity01:0});
     const vacuum=actual('vacuum: no paid vertical impulse');
+    const unpaidVacuumPulse=!!sled.airBrakeKickPulse;
+    sled.applyControls({...input,pressed:{airBrake:true}},scene.currentPhys,8,
+      {atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const vacuumReentry=actual('later real atmospheric press spends previously unpaid kick');
+    const paidReentryPulse=!!sled.airBrakeKickPulse;
 
     // Actual bundled TrickTracker on the actual Sled frame: a one-tick paid
     // AirBrake tap MUST credit one trick immediately; holding the spent key
@@ -161,7 +166,8 @@ try {
     }
     return {first,next,coyoteFirst,coyoteLater,separateBrake,separateHop,separateRelease,
       lowBrake,lowHop,lowRelease,hopBefore,hopThenBrake,hopThenBrakeReleased,
-      spentBrakeCrest,vacuum,edgeTap,edgeRepeat,firstPulse,repeatPulse,
+      spentBrakeCrest,vacuum,vacuumReentry,unpaidVacuumPulse,paidReentryPulse,
+      edgeTap,edgeRepeat,firstPulse,repeatPulse,
       paidEvent,paidTricks,landedTricks,secondTouchdown,heldTricks};
   });
   assert.deepEqual(errors,[],'compiled browser has no fatal page errors');
@@ -214,6 +220,11 @@ try {
   assert.deepEqual(measurements.heldTricks,[],'holding a spent AirBrake cannot earn another trick');
   assert.equal(vacuum.hopActive,false,'without paid lift, variable-hop cutoff still applies');
   assert(Math.abs(vacuum.vy)<1,'vacuum cannot gain an AirBrake upward impulse');
+  assert.equal(vacuum.latch,false,'no-payment vacuum cannot consume the one-use brake');
+  assert.equal(measurements.unpaidVacuumPulse,false,'unpaid vacuum never emits scoring pulse');
+  assert.equal(measurements.vacuumReentry.latch,true,'atmospheric speed payment finally consumes the latch');
+  assert.equal(measurements.paidReentryPulse,true,'real atmospheric retry emits exactly one kick');
+  assert(measurements.vacuumReentry.vy < -100,'real atmospheric retry earns real lift');
   console.log(JSON.stringify(measurements,null,2));
   console.log('PASS compiled Chromium: paid AirBrake ascent survives normal and coyote-hop release; vacuum stays lift-free');
 }finally {await browser.close();}
