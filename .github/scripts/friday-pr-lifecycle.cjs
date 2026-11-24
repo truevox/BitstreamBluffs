@@ -10,11 +10,62 @@ const SHA = /^[0-9a-f]{40}$/i;
 const REVIEW_MESSAGE = /^\s*\[(GAL FRIDAY REVIEW (?:REQUEST|PASSED|CHANGES REQUESTED))\]/i;
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER','MEMBER','COLLABORATOR']);
 
+/** Mask only ACTUAL HTML raw-content blocks. An HTML-looking example inside
+ * fenced Markdown, an inline code span or an HTML comment is literal text:
+ * it must not swallow the real Refs/Closes declaration below that example.
+ * Keep every newline and mask with spaces to preserve directive boundaries. */
+function withoutRawHtml(body) {
+  let fence=null, inComment=false, inlineCode=null, rawTag=null;
+  const output=[];
+  for(const line of String(body||'').split(/\r?\n/)){
+    const delimiter=/^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if(fence){
+      if(delimiter&&delimiter[1][0]===fence.char&&delimiter[1].length>=fence.length&&/^\s*$/.test(delimiter[2]))fence=null;
+      output.push(line);continue;
+    }
+    if(!rawTag&&!inComment&&inlineCode===null&&delimiter){
+      fence={char:delimiter[1][0],length:delimiter[1].length};output.push(line);continue;
+    }
+    if(!rawTag&&!inComment&&inlineCode===null&&(/^(?: {4,}|\t)/.test(line)||/^\s*>/.test(line))){
+      output.push(line);continue;
+    }
+    let out='',i=0;
+    while(i<line.length){
+      if(rawTag){
+        const closing=new RegExp(`</${rawTag}\\s*>`,'i').exec(line.slice(i));
+        if(!closing){out+=' '.repeat(line.length-i);break;}
+        const size=closing.index+closing[0].length;
+        out+=' '.repeat(size);i+=size;rawTag=null;continue;
+      }
+      if(inComment){
+        const end=line.indexOf('-->',i);
+        if(end<0){out+=line.slice(i);break;}
+        out+=line.slice(i,end+3);i=end+3;inComment=false;continue;
+      }
+      if(line.startsWith('<!--',i)){inComment=true;out+='<!--';i+=4;continue;}
+      if(line[i]==='`'&&(i===0||line[i-1]!=='\\')){
+        let end=i+1;while(line[end]==='`')end++;
+        const count=end-i;
+        if(inlineCode===null)inlineCode=count;
+        else if(inlineCode===count)inlineCode=null;
+        out+=line.slice(i,end);i=end;continue;
+      }
+      if(inlineCode===null){
+        const opening=/^<(pre|code|script|style|textarea)\b[^>]*>/i.exec(line.slice(i));
+        if(opening){rawTag=opening[1].toLowerCase();out+=' [EXCLUDED_HTML] ';i+=opening[0].length;continue;}
+      }
+      out+=line[i++];
+    }
+    output.push(out);
+  }
+  return output.join('\n');
+}
+
 /** Extract only top-level issue directives: never read "Closes" examples from
  * code fences, HTML comments, indented code or raw HTML code/pre blocks. */
 function bodyDirectives(body) {
   const markers=[], refs=[];
-  const cleaned=String(body||'').replace(/<(pre|code|script|style|textarea)\b[^>]*>(?:[\s\S]*?<\/\1\s*>|[\s\S]*$)/gi, v=>' [EXCLUDED_HTML] '+'\n'.repeat((v.match(/\n/g)||[]).length)+' [EXCLUDED_HTML] ');
+  const cleaned=withoutRawHtml(body);
   let fence=null, inComment=false, inlineCode=null;
   for(let line of cleaned.split(/\r?\n/)){
     const delimiter=/^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);

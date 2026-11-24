@@ -57,7 +57,7 @@ test('unprivileged source has no label writes or checkout; privileged writer sta
   expect(signal).toMatch(/permissions:\s+contents: read/);
   expect(signal).not.toContain('issues: write');
   expect(signal).toContain('github.event.comment.author_association');
-  expect(signal).toContain('startsWith(github.event.comment.body');
+  expect(signal).not.toContain('startsWith(github.event.comment.body'); // preserve leading-whitespace review requests
   expect(signal).not.toContain('actions/checkout');
   expect(privileged).toContain('workflow_run:');
   expect(privileged).not.toContain('pull_request_target:');

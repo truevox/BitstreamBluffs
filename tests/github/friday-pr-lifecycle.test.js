@@ -93,6 +93,19 @@ describe('Friday issue linking and exact-head review parsing',()=>{
     expect(explicitlyCloses(fake,79)).toBe(false);
     expect(explicitlyCloses(fake,80)).toBe(false);
   }
+  // Do not mistake literal raw-HTML examples inside Markdown code blocks,
+  // inline spans or HTML comments for real unclosed raw blocks.
+  for(const example of [
+    '```html\n<pre>\nCloses #79\n```\nRefs #80',
+    '~~~html\n<script>\nCloses #79\n~~~\nRefs #80',
+    '`<pre>`\nRefs #80',
+    '<!--\n<pre>\n-->\nRefs #80',
+    '> <pre>\nRefs #80',
+  ]){
+    const x=pr(501,80,{body:example,title:'no issue'});
+    expect(getIssueReference(x)).toBe(80);
+    expect(explicitlyCloses(x,79)).toBe(false);
+  }
   const hiddenMachineMarker=pr(500,80,{body:'`example\n<!-- friday-issue: 79 -->\nnot real`\nRefs #80',title:'no issue'});
   expect(getIssueReference(hiddenMachineMarker)).toBe(80);
   const pureExample=pr(500,80,{body:'```md\n<!-- friday-issue: 79 -->\nRefs #79\n```',title:'no issue'});
