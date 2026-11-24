@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.20.3 — Heavy Mode developer diagnostics (2026-11-24)
+
+- Add isolated fresh-build savestate capture/restore verification, strict Matter and recorder preflight, and repeated reload probes across input/checkpoint boundaries and a generated moving hazard.
+- Developer-only tools and evidence: no player savestate UI, storage, ranking or physics changes. SIM9 unchanged; #119 and #242 remain open.
+
 ## v2.20.2 — save integrity (2026-11-24)
 
 - #319: distinguish committed IndexedDB runs from session-only fallback; retry failed saves without duplicate scores, serialize initials updates, and close abandoned connections. Game Over reports pending or session-only saves honestly.
