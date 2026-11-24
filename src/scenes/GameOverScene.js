@@ -1063,7 +1063,7 @@ export class GameOverScene extends Phaser.Scene {
     this._at(delay, () => {
       if (!panel.scene) return;
       if (this._skipping) { panel.setAlpha(1).setScale(1, 1); return; }
-      const t = transitionIn(this, panel, { w: panel.w, h: panel.h, color: this.theme.color(color), duration: 240 });
+      const t = transitionIn(this, panel, { w: panel.frameWidth, h: panel.h, color: this.theme.color(color), duration: 240 });
       if (t) (this._rt = this._rt || []).push(t);
     });
   }
@@ -1087,7 +1087,7 @@ export class GameOverScene extends Phaser.Scene {
     const panels = [this.left, this.right];
     if (this.reduced) {
       for (const o of quiet) { o.setAlpha(0); this._fadeIn(o, motionMs(200, true), 0); }
-      for (const pn of panels) transitionIn(this, pn, { w: pn.w, h: pn.h, duration: 120 });
+      for (const pn of panels) transitionIn(this, pn, { w: pn.frameWidth, h: pn.h, duration: 120 });
       this.revealDone = true;
       return;
     }
@@ -1252,17 +1252,17 @@ export class GameOverScene extends Phaser.Scene {
         if (!g.scene) return;
         g.clear();
         const k = reduced ? 1 - raw : (0.5 + 0.5 * Math.sin(raw * Math.PI * 6 - Math.PI / 2)) * (1 - raw * 0.6);
-        glowRectPx(g, panel.x, panel.y, panel.w, panel.h, color, 1 + 5 * k);
+        glowRectPx(g, panel.x, panel.y, panel.frameWidth, panel.h, color, 1 + 5 * k);
         g.lineStyle(1, color, 0.5 * k);
-        g.strokeRect(panel.x - 0.5, panel.y - 0.5, panel.w + 1, panel.h + 1);
+        g.strokeRect(panel.x - 0.5, panel.y - 0.5, panel.frameWidth + 1, panel.h + 1);
       },
       onComplete: () => { if (g.scene) g.destroy(); },
     });
     if (reduced) return;
-    if (kind === 'rank') this._sparkBurst(panel.x + panel.w / 2, panel.y + 70, 34);
+    if (kind === 'rank') this._sparkBurst(panel.x + panel.frameWidth / 2, panel.y + 70, 34);
     else {
       this._sparkBurst(panel.x + 56, panel.y + 52, 26);
-      this._sparkBurst(panel.x + panel.w - 30, panel.y + 24, 18);
+      this._sparkBurst(panel.x + panel.frameWidth - 30, panel.y + 24, 18);
     }
   }
 
