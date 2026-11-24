@@ -34,3 +34,9 @@
 3. Owner/independent listening of generated new melodies, especially voice octave errors, sustained vs repeated notes, rap/whisper/scream material, and missing/false melodic note hypotheses. Do not imply automatic YIN is artist-proven.
 4. Review true drum/bass beat-one, actual meter/downbeat offsets, half-/double-time, possible variable tempo and recurring sections. Machine-only 33 mapping does not authorize any production beat grids.
 5. Source licensing/publication and final mastering approval before releasing music to Netlify/public downloads. All 33 remain private meanwhile.
+
+## Private beat-map listening lab (not an approval authority)
+
+A source-identity-bound static page at `public/music-review/beat33/` reads the installed private `/music/catalog.json`, the genuine six OGG stem clips for a chosen original source section, and matching `data/<slot>_<id>.json` private machine-beat reports. It offers **two alternate pulse tempo priors** and **four possible 4-pulse bar-accent offsets**, plays non-authoritative synthetic click sounds on the original six stems, and exports source-specific human observation notes locally without changing game timing or settings. It never calls the `RELEASE_BEAT_GRIDS` production gate. The private data files must be provisioned by the owner-authorized archive at runtime, not committed to public code. The page refuses a mismatched candidate report song identity.
+
+Five-song private Chromium proof: the page loaded a real original six-stem source excerpt plus candidate clicks; selected beat prior and accent; exported JSON; zero unexpected HTTP/page errors. Deliberately replacing the source report's `trackId` with an unrelated ID caused the page to **reject the source**. Browser test: `tools/music/smoke-beat33-source-review.mjs`.

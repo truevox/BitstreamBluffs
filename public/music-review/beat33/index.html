@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bitstream Bluffs — Original Song Beat Candidates (33-song Review)</title>
+<style>
+:root{font:16px system-ui,sans-serif;background:#101222;color:#f1eff8}*{box-sizing:border-box}body{margin:0;max-width:1000px;padding:22px 25px 60px}h1{font-size:clamp(24px,4vw,33px);margin:5px 0}h2{margin:10px 0}p{line-height:1.55;color:#d3d4e6}strong{color:#fff}label{display:block;margin:12px 0 6px;font-weight:650}select,input,textarea,button{font:inherit;background:#252944;color:#f6f4ff;border:1px solid #646a96;border-radius:8px;padding:9px}select{width:100%;max-width:900px}input[type=range]{width:100%;padding:0}textarea{width:100%;height:100px;resize:vertical}button{cursor:pointer;background:#3c4574}button:hover{background:#586399}button:disabled{opacity:.5;cursor:wait}main{display:grid;grid-template-columns:1fr 1fr;gap:24px}main>section{min-width:0}.warning{border:1px solid #8979a5;background:#1e2039;padding:12px;border-radius:10px}.status{min-height:34px;color:#aaf1ce}.sub{font-size:13px;color:#bbc6d9}.buttons{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}.metrics div{background:#202640;border-radius:6px;padding:9px}.metrics span{display:block;font-size:13px;color:#bbc7d8}a{color:#cfd0ff}@media(max-width:720px){main{grid-template-columns:1fr}body{padding:16px}}</style>
+</head><body><h1>🥁 The 33-Song Beat Lab</h1>
+<p class="warning"><strong>UNVERIFIED SOURCE RHYTHM — NOT A GAME BEAT GRID.</strong> These are automated beat and meter hypotheses made from each original song's drum/bass recordings. Beats may land on subdivisions, half-time, pickups, or the wrong beat of the measure. No source recording or game rule is changed here.</p>
+<main><section><h2>Original music</h2>
+<label for="song">Song</label><select id="song"></select>
+<label for="segment">Original source section: <output id="section-title">—</output></label><input type="range" min="0" max="0" step="1" id="segment" value="0">
+<label for="prior">Machine tempo candidate</label><select id="prior"><option value="0">Hypothesis A (start-prior 105 BPM)</option><option value="1">Hypothesis B (start-prior 165 BPM)</option></select>
+<label for="accent">Accent hypothetical meter position</label><select id="accent"><option value="none">No accent: hear every click equally</option><option value="0">First 4-pulse offset</option><option value="1">Second 4-pulse offset</option><option value="2">Third 4-pulse offset</option><option value="3">Fourth 4-pulse offset</option></select>
+<div class="buttons"><button id="play">▶ Play original stems + candidate clicks</button><button id="stop">■ Stop</button></div>
+<div class="status" id="status" role="status">Choose a song and source section.</div>
+<p class="sub">Playback combines the six ORIGINAL stems (not MIDI re-orchestration). The clicks are synthetic and are for hearing/ranking hypotheses only. This source section ends naturally at its boundary.</p>
+</section><section><h2>What the machine observed</h2>
+<div id="metrics" class="metrics"></div>
+<label for="notes">Your observations — not an automatic approval</label><textarea id="notes" placeholder="Which pulses feel right? Is this a half-time passage? Is the accent shifted? Timestamp any important phrase changes."></textarea>
+<div class="buttons"><button id="export">Export ALL listening observations (JSON)</button></div>
+<p class="sub">Notes are saved in this browser only, not uploaded. Export them whenever you're ready. None of these observations automatically change game beat authority.</p>
+</section></main>
+<script type="module" src="./review.js"></script>
+</body></html>
