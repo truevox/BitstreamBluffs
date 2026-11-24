@@ -395,8 +395,12 @@ async function runCase(browser, fxName, level, skip = []) {
 // then advance BOTH exactly one tick. This is intentionally expensive and
 // bounded: the count refers to contiguous restore cycles, not sampled ticks.
 async function runRepeatedCase(browser,fxName) {
-  const boundary=BOUNDARY?({contact:{K:707,edge:708,checkpoint:720},hazard:{K:829,edge:830,checkpoint:840}})[fxName]:null;
-  const fx={...FIXTURES[fxName],...(boundary?{K:boundary.K}:{})}, tape=TAPES[fxName];
+  const boundary=BOUNDARY?({contact:{K:707,edge:708,checkpoint:720},hazard:{K:479,edge:481,checkpoint:480}})[fxName]:null;
+  const fx={...FIXTURES[fxName],...(boundary?{K:boundary.K}:{})};
+  // Earlier hazard window preserves live hit state; add one explicit
+  // synthetic input edge immediately after the recorder checkpoint.
+  const baseTape=TAPES[fxName];
+  const tape=boundary&&fxName==='hazard'?{...baseTape,edges:[...baseTape.edges,{key:'hop',at:boundary.edge}]}:baseTape;
   const source=await bootPage(browser,fx,tape);
   let current=source, candidate=null;
   const cycles=[];
