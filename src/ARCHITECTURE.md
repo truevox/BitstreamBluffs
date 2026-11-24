@@ -8,6 +8,30 @@ methods) are fine. Everything is plain JS ES modules + JSDoc; Phaser 3.90, Matte
 
 The legacy implementation in `js/` is untouched and unrelated; do not import from it.
 
+## 2026-11-23 owner-approved production AirBrake — SIM9 release plan
+
+**Marvin explicitly ratified the tested 60% AirBrake horizontal speed loss** with
+its existing upward kick unchanged: “I absolutely authorize that. It was a
+huge improvement over the original.” This supersedes the earlier experimental
+numeric-feel gate in #247 / PR #248. Unlike a parachute, the AirBrake gives
+exactly one immediate deceleration kick and one upward impulse per true airtime,
+rearming only after physical ground contact. There is NO continuing AirBrake
+lift, gravity reduction or descent damping. The vertical kick uses the original
+40% paid-speed budget at a 1.5 factor with an upward cap, even as horizontal
+braking increases to 60%; extra braking is NOT exchanged for extra altitude.
+Existing parachute and BSOD-driven wind remain unchanged. The default 4500px,
+300px/s, 4px/s², final 3000px / 18% BSOD chase approved in SIM7 also remains.
+
+This change builds on the independent marker-prefetch SIM8 correction, so the
+approved AirBrake lands as **SIM_REVISION 9**, not the historical conflicting
+SIM7 number in old draft #248. The one-shot `airBrakeKickUsed` flag is causal
+and belongs in sled fingerprint schema v3. Keep old SIM6/SIM7/SIM8 ruleset
+archives immutable and preserve version-aware interfaces for the eventual public
+release without pretending any pre-release old-player tapes exist. Source review,
+real browser physics/replay tests and correct ruleset identity are required
+before merging; this section records OWNER APPROVAL of behavior, not code
+review approval or deployed status. Linked [[projects/truevox-bitstreambluffs/controls-tricks-and-upgrades]].
+
 ## 2026-11-23 SIM8 replay-determinism correction — BEST / DIED HERE marker reads
 
 The #253 visual marker bug produced extra authoritative terrain chunks on repeated

@@ -69,7 +69,9 @@ import * as matterPortableNs from '../MatterPortable.js';
 //    fingerprinted, and the actual wall slows smoothly in the final 3000px.
 // 8: #253 marker rendering no longer prequeues unjoined terrain chunks on retries;
 //    this changes canonical causal terrain state despite being a visual-origin bug.
-export const SIM_REVISION = 8;
+// 9: #247 owner-approved 60% one-shot AirBrake with fixed former upward kick;
+//    remove held AirBrake float, and fingerprint one-per-flight activation state.
+export const SIM_REVISION = 9;
 
 /**
  * `SIM_REVISION` of the last ruleset RELEASED on main. While the current SIM_REVISION is above
@@ -77,8 +79,7 @@ export const SIM_REVISION = 8;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-// Freeze the reviewed SIM8 rule for this release commit; main stays SIM7 until merge.
-export const LAST_RELEASED_SIM_REVISION = 8;
+export const LAST_RELEASED_SIM_REVISION = 9;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;
