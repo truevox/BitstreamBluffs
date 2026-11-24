@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 03:54 UTC. Main: `e3fdd814fbc4903ec33853976c1203cb72452ab6` (#308 docs only); shipped game remains SIM8 v2.19.22 at `2dcd07fa`.
+Last verified: 2026-11-24 09:44 UTC. Main: `e3fdd814fbc4903ec33853976c1203cb72452ab6` (#308 docs only); shipped game remains SIM8 v2.19.22 at `2dcd07fa`.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -88,7 +88,16 @@ going” means resume this queue, not take over other lanes or merge a draft.
    head. Repeat on the actual integration base after any release change.
    Friend exchange still requires #58.
    #82 storage lifecycle needs separately scoped save-system review;
-   #85 still needs authentic footage; #84/#83 and product #70/#71 need #60;
+   #85 has a private 9-second scripted recapture candidate, not archival
+   footage or gallery approval. Exact #272 SIM6 `22b6ade` and #297 SIM7
+   `d3e80fa`, stock level 1, neutral modifiers, `canopyHop`: fresh paired
+   Chromium runs for sim-01 and sim-02 exactly repeated. SIM6 reached
+   180.02s cutoffs at 3,574.3/3,720.4m; SIM7 actual BSOD at
+   84.42/80.62s and 1,596.2/1,542.3m. Capture uses sim-01, matched
+   78.42–84.42s; render-only sampling preserved stock run records
+   (excluding wall clock). No build deployed, official scores, replay
+   migration or gallery code. Original archival footage remains unverified.
+   #84/#83 and product #70/#71 need #60;
    #75/#100/#74 need trusted restore or equivalent causal replay prefix.
    #243 remains a starter, not a restore. Do not take over #155 full Pulp
    or change #157 scoring coefficients.
@@ -150,7 +159,7 @@ prototype is not pushed and must not be mistaken for a PR.
 
 | Phase / issues | Progress or blocker |
 |---|---|
-| 1: #132, #82, #87, #79, #126, #85 | #132 done via #167; #82 calculations shipped #169, durable provenance / screen work gated; #87 #170/#213 and #79 #174 shipped bounded slices, active drafts above; #126 #171/#189/#218 shipped synthetic tools; #85 still needs authentic footage. |
+| 1: #132, #82, #87, #79, #126, #85 | #132 done via #167; #82 calculations shipped #169, durable provenance / screen work gated; #87 #170/#213 and #79 #174 shipped bounded slices, active drafts above; #126 #171/#189/#218 shipped synthetic tools; #85 has a provenance-pinned scripted recapture candidate; original footage and gallery decision remain open. |
 | 2: #131, #129, #127, #84, #83, #81, #78, #77, #75, #71, #70 | Shipped slices: #131 #184/#228; #129 #205/#226; #127 #183/#202 (also draft #286); #81 #178 (also draft #290); #78 #190/#237; #77 #186/#220; #71 #197; #70 #181 (also draft #288). #84/#83 need #60 and scoped identity; #75 needs trusted restoration/testable replay prefix, not a pose trace. Remaining rank, identity, sharing and product gates in #168 still apply. |
 | 3: #157, #155, #100, #74 | #157 #195 and draft #287 baseline only; no scoring change. #155 #196/#208 cue fix shipped; #140 Team B #160 merged and closed; full Pulp not complete. #100/#74 await trusted restoration or equivalent causal evidence; #224 is a narrow milestone. |
 
