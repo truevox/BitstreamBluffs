@@ -364,6 +364,7 @@ function ellipsePts(cx, cy, rx, ry, rot, n) {
 // Presentation-only audition tuning, in native pixels/radians.
 const DECOR_DANCE = Object.freeze({
   gearRock: 1.4,
+  ventLift: 56, ventExpansion: 1.45, ventMouth: 7,
   grassSwayBase: 25, grassSwayPerHeight: 0.48, grassBow: 0.19,
   caneSwingAngle: 2.1, caneSwingMs: 165, popLift: 39, popSway: 17, popGrow: 0.35, popSpin: 1.8,
   jellyLift: 42, jellySquash: 1.05, jellyTentacle: 0.24,
@@ -605,15 +606,18 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
         const cx = (c + 0.5) * CONE_W - s71 - off;
         if (cx < -60 || cx > W + 60) continue;
         const top = layerYAt(def.shape, L, sx, cx, horizonDance) + 1;
-        out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 + dance * 7 });
+        out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 + dance * DECOR_DANCE.ventMouth });
         const cell = hash01(c, 4242);
+        // Steam expands as a column on accents, then contracts with the
+        // envelope. Keep young puffs near the mouth; older puffs billow.
+        const breath = dance * (0.85 + 0.15 * Math.sin(t / 320 + cell * Math.PI * 2));
         for (let k = 0; k < 6; k++) {
           const age = (((t / 3800 + k / 6 + cell) % 1) + 1) % 1;
           out.push({
             kind: 'circle', depth: li, color: 'text', fillAlpha: 0.3 * (1 - age), lineAlpha: 0,
             x: cx + age * 14 * lay.wind + Math.sin(age * 5 + lay.ph + c) * 3,
-            y: top - 4 - age * (plumeH + 43 * dance),
-            r: (2.5 + age * 8) * (li === 0 ? 1 : 0.8) * (1 + .45 * dance),
+            y: top - 4 - age * (plumeH + DECOR_DANCE.ventLift * breath),
+            r: (2.5 + age * 8) * (li === 0 ? 1 : 0.8) * (1 + DECOR_DANCE.ventExpansion * breath * (0.45 + 0.55 * age)),
           });
         }
       }

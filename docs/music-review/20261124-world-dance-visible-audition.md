@@ -60,3 +60,11 @@ Owner feedback: Candy canes looked like they were stretching; requested more bac
 Candy stem now bends along a constant-length circular arc, with a signed envelope-gated oscillation (165ms/radian, about 1.04s/cycle) and individual phase offsets. The hook follows the tangent at the tip as a rigid shape. No vertical stretch; the cane bows down as it bends. Lollipops unchanged. Tests sample 25 phases, require >15px tip displacement to both sides for each visible cane at .26 input, fixed roots, stable stem length and hook dimensions, no vertical elongation, neutral geometry with dance off. 109/109 targeted background/dance/ruleset tests passed.
 
 96 matched actual game render pairs, original One More Run, peak visual envelope .804, 6.94s audio span, no page errors. Controlled CCC look on Debutmont terrain, silent Tailnet audition. No media committed; remaining live accessibility and Chromebook checks pending. This oscillation is amplitude-gated by music rather than phase-locked to beat timing.
+
+## Eighth audition: Vertigo Vents
+
+Owner feedback: "Candy cane looks NICE and boingier. Keep going." Record positive V7 audition feedback; leave the four accepted motifs unchanged.
+
+Vertigo decorative steam now visibly breathes via height and radial expansion, with larger billowing older puffs and slight local phase variation. No lateral displacement, brightness change, actual hazard geometry or audio timing changes. Independent geometry test at .26 input requires >50% peak puff radius growth and >20px peak lift with fixed vent mouths, alpha and neutral OFF geometry. 110/110 targeted background/dance/ruleset tests passed.
+
+96 matched actual game render pairs, original One More Run, peak visual envelope .832, 5.10s audio span, no page errors. Controlled Vertigo look on Debutmont terrain, silent Tailnet audition. No media committed; natural traversal, accessibility browser refresh and Chromebook performance remain pending.

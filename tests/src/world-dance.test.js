@@ -315,3 +315,30 @@ test('Micro Mountain grass waves bend rooted blades and carry attached dew indep
  for(let i=0;i<a.length;i++)expect(later[i].pts[5].x-laterStill[i].pts[5].x).toBeCloseTo(-dx[i],6);
  expect(sample(0)).toEqual(still);
 });
+
+test('Vertigo steam breathes in width and height independently of the terrain',()=>{
+ const motif='vents', d=biomeDanceStyle(motif,.26).decor;
+ const sample=dance=>motifDecor(motif,400,1234,0,{dance});
+ const still=sample(0), moving=sample(d);
+ expect(moving).toHaveLength(still.length);
+ let plumeCount=0, maxGrowth=0, maxLift=0;
+ for(let i=0;i<still.length;i++){
+  const a=still[i],b=moving[i];
+  expect(b.x).toBe(a.x);
+  expect(b.fillAlpha).toBe(a.fillAlpha);
+  if(a.color==='amber'){
+   expect(b.y).toBe(a.y);
+   expect(b.r).toBeGreaterThan(a.r);
+  }else{
+   plumeCount++;
+   expect(b.r).toBeGreaterThan(a.r*1.2);
+   expect(b.y).toBeLessThanOrEqual(a.y);
+   maxGrowth=Math.max(maxGrowth,b.r/a.r);
+   maxLift=Math.max(maxLift,a.y-b.y);
+  }
+ }
+ expect(plumeCount).toBeGreaterThan(6);
+ expect(maxGrowth).toBeGreaterThan(1.5);
+ expect(maxLift).toBeGreaterThan(20);
+ expect(sample(0)).toEqual(still);
+});
