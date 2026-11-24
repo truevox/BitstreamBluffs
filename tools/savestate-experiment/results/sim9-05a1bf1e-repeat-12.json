@@ -1,0 +1,192 @@
+[
+ {
+  "fixture": "contact",
+  "level": "repeat",
+  "K": 600,
+  "N": 612,
+  "cycles": [
+   {
+    "captureTick": 600,
+    "nextTick": 601,
+    "bytes": 264979,
+    "canonical": "xxh32x2:8522770366123084",
+    "recaptured": false
+   },
+   {
+    "captureTick": 601,
+    "nextTick": 602,
+    "bytes": 265605,
+    "canonical": "xxh32x2:1a15b0c893b3b9d9",
+    "recaptured": true
+   },
+   {
+    "captureTick": 602,
+    "nextTick": 603,
+    "bytes": 264968,
+    "canonical": "xxh32x2:43941b81a4662155",
+    "recaptured": true
+   },
+   {
+    "captureTick": 603,
+    "nextTick": 604,
+    "bytes": 265607,
+    "canonical": "xxh32x2:dadf26d2e2e30bed",
+    "recaptured": true
+   },
+   {
+    "captureTick": 604,
+    "nextTick": 605,
+    "bytes": 265025,
+    "canonical": "xxh32x2:66813b65c48519bc",
+    "recaptured": true
+   },
+   {
+    "captureTick": 605,
+    "nextTick": 606,
+    "bytes": 265034,
+    "canonical": "xxh32x2:1176649288bbb2b9",
+    "recaptured": true
+   },
+   {
+    "captureTick": 606,
+    "nextTick": 607,
+    "bytes": 265044,
+    "canonical": "xxh32x2:361078b38935b8d7",
+    "recaptured": true
+   },
+   {
+    "captureTick": 607,
+    "nextTick": 608,
+    "bytes": 265037,
+    "canonical": "xxh32x2:a957cc83d6cc3cf1",
+    "recaptured": true
+   },
+   {
+    "captureTick": 608,
+    "nextTick": 609,
+    "bytes": 265093,
+    "canonical": "xxh32x2:fb9a3a011537dfe7",
+    "recaptured": true
+   },
+   {
+    "captureTick": 609,
+    "nextTick": 610,
+    "bytes": 265084,
+    "canonical": "xxh32x2:ae5fa96819b372c3",
+    "recaptured": true
+   },
+   {
+    "captureTick": 610,
+    "nextTick": 611,
+    "bytes": 265105,
+    "canonical": "xxh32x2:012f983f3248e6a0",
+    "recaptured": true
+   },
+   {
+    "captureTick": 611,
+    "nextTick": 612,
+    "bytes": 265095,
+    "canonical": "xxh32x2:545669c2183b13a3",
+    "recaptured": true
+   }
+  ],
+  "firstDivergentTick": null,
+  "pageErrors": [],
+  "wallMs": 45062
+ },
+ {
+  "fixture": "hazard",
+  "level": "repeat",
+  "K": 480,
+  "N": 492,
+  "cycles": [
+   {
+    "captureTick": 480,
+    "nextTick": 481,
+    "bytes": 384026,
+    "canonical": "xxh32x2:e2cf5896fbe2b26f",
+    "recaptured": false
+   },
+   {
+    "captureTick": 481,
+    "nextTick": 482,
+    "bytes": 384654,
+    "canonical": "xxh32x2:b8cbd30f3a9d81ba",
+    "recaptured": true
+   },
+   {
+    "captureTick": 482,
+    "nextTick": 483,
+    "bytes": 384047,
+    "canonical": "xxh32x2:36d5185bd92a51c9",
+    "recaptured": true
+   },
+   {
+    "captureTick": 483,
+    "nextTick": 484,
+    "bytes": 384041,
+    "canonical": "xxh32x2:06428c9dc4ffa82c",
+    "recaptured": true
+   },
+   {
+    "captureTick": 484,
+    "nextTick": 485,
+    "bytes": 384091,
+    "canonical": "xxh32x2:049aaf9a85a2db59",
+    "recaptured": true
+   },
+   {
+    "captureTick": 485,
+    "nextTick": 486,
+    "bytes": 384755,
+    "canonical": "xxh32x2:2dbdc4372a250292",
+    "recaptured": true
+   },
+   {
+    "captureTick": 486,
+    "nextTick": 487,
+    "bytes": 384795,
+    "canonical": "xxh32x2:3bfee42940bcbdaf",
+    "recaptured": true
+   },
+   {
+    "captureTick": 487,
+    "nextTick": 488,
+    "bytes": 384785,
+    "canonical": "xxh32x2:8e51d1b469366adf",
+    "recaptured": true
+   },
+   {
+    "captureTick": 488,
+    "nextTick": 489,
+    "bytes": 384806,
+    "canonical": "xxh32x2:e8c94fae8f2523c9",
+    "recaptured": true
+   },
+   {
+    "captureTick": 489,
+    "nextTick": 490,
+    "bytes": 384809,
+    "canonical": "xxh32x2:ebbe49f23322d327",
+    "recaptured": true
+   },
+   {
+    "captureTick": 490,
+    "nextTick": 491,
+    "bytes": 384819,
+    "canonical": "xxh32x2:a22664c92d19ca7a",
+    "recaptured": true
+   },
+   {
+    "captureTick": 491,
+    "nextTick": 492,
+    "bytes": 384838,
+    "canonical": "xxh32x2:64a3c97503133eff",
+    "recaptured": true
+   }
+  ],
+  "firstDivergentTick": null,
+  "pageErrors": [],
+  "wallMs": 54674
+ }
+]
