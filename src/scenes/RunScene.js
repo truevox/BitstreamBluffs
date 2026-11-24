@@ -1718,7 +1718,7 @@ export class RunScene extends Phaser.Scene {
         audio.setMicroBees(positions, riderScreenX);
       }
     } catch { /* presentation-only audio must never stop Phaser's frame loop */ }
-    if (this.biomeFx) this.biomeFx.update(cam.scrollX, t, this._veil || 0, isReducedMotion(this));
+    if (this.biomeFx) this.biomeFx.update(cam.scrollX, t, this._veil || 0, isReducedMotion(this), this.worldDance?.skylineBands);
     this.songBillboard?.update(dt,dance,!danceAllowed);
     this.drawBsodCues();
     if (this.flashRect.alpha > 0) this.flashRect.setAlpha(Math.max(0, this.flashRect.alpha - dt / 350));

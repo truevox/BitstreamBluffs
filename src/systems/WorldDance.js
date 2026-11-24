@@ -81,9 +81,10 @@ export function sunDanceGeometry(pulse, radius = 40) {
 }
 
 export class WorldDanceEnvelope {
-  constructor(){this.reset();}
+  constructor(){this.skylineBands=new Float32Array(3);this.reset();}
 
   reset(){
+    this.skylineBands.fill(0);
     this.visualStrength=0;
     this.visualHoldMs=0;
     this.pulse=0;
@@ -124,6 +125,15 @@ export class WorldDanceEnvelope {
     // exactly as before. This separate peak follower drives scenery only.
     // reset() clears both on silence, invalid input, revision or seek.
     if(this.lastSampleMs===null)return raw;
+    // Three existing analyser bands, independently smoothed for Arcade.
+    // Do not feed these back into the onset detector or music transport.
+    for(let i=0;i<3;i++){
+      const level=i===0?sample.bass:i===1?sample.mid:sample.treble;
+      const target=clamp01((clamp01(level)-.10)/.72);
+      const old=this.skylineBands[i];
+      const delta=Number.isFinite(dtMs)?Math.max(0,Math.min(100,dtMs)):16.7;
+      this.skylineBands[i]=old+(target-old)*(1-Math.exp(-delta/(target>old?65:150)));
+    }
     const dt=Number.isFinite(dtMs)?Math.max(0,Math.min(100,dtMs)):16.7;
     if(raw>this.visualStrength){
       // Fast attack: retain most of a short accent even at low frame rates.

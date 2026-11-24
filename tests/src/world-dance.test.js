@@ -122,7 +122,7 @@ test('AudioSynth exposes only real, currently playing, non-muted soundtrack anal
  s._musicWanted=true;s.settings={masterVolume:1,musicVolume:1};
  s._vinylAudible=()=>true;s.getFatalCountInStatus=()=>({active:false});
  const first=s.getWorldDanceSample();
- expect(first).toMatchObject({bass:.42,mid:.22,timeMs:3000});
+ expect(first).toMatchObject({bass:.42,mid:.22,treble:.88,timeMs:3000});
  expect(polls).toBe(1);
  s.ctx.currentTime=3.02;
  expect(s.getWorldDanceSample()).toBe(first);
@@ -365,4 +365,45 @@ test('Arcade sun hops and squashes without moving its horizontal centre or chang
   fx.bg.danceStrength=0;fx.update(0,1234,veil,false);
   expect(sprite).toEqual(still);
  }
+});
+
+test('Arcade EQ follows independent actual bands and clears on missing sample, silence and transport changes',()=>{
+ const w=new WorldDanceEnvelope();
+ const sample=(timeMs,bass,mid,treble,revision='a')=>({timeMs,bass,mid,treble,revision});
+ for(let i=0;i<8;i++)w.update(sample(i*50,.85,.5,.15),50);
+ expect(w.skylineBands[0]).toBeGreaterThan(.9);
+ expect(w.skylineBands[1]).toBeGreaterThan(.5);
+ expect(w.skylineBands[2]).toBeLessThan(.1);
+ for(let i=8;i<16;i++)w.update(sample(i*50,.15,.5,.85),50);
+ expect(w.skylineBands[2]).toBeGreaterThan(.9);
+ expect(w.skylineBands[0]).toBeLessThan(.15);
+ w.update(null,16);
+ expect([...w.skylineBands]).toEqual([0,0,0]);
+ w.update(sample(0,.8,.8,.8,'b'),50);
+ w.update(sample(50,0,0,0,'c'),50);
+ expect([...w.skylineBands]).toEqual([0,0,0]);
+});
+
+test('Arcade EQ building slices wrap, stay grounded, track bands, fade and restore original art',async()=>{
+ const {BiomeFx}=await import('../../src/entities/BiomeFx.js');
+ const sprite=()=>({y:118,setVisible(v){this.visible=v;return this;},setAlpha(v){this.alpha=v;return this;},setScale(x,y){this.scaleX=x;this.scaleY=y;return this;}});
+ const fx=Object.create(BiomeFx.prototype);
+ fx.arcSkyline=sprite();fx.arcTowers=Array.from({length:40},sprite);
+ fx._drawArcadeSkyline(1000,.55,[.8,.4,0]);
+ expect(fx.arcSkyline.visible).toBe(false);
+ expect(fx.arcTowers[0].x).toBe(-50);
+ expect(fx.arcTowers[1].x).toBe(430);
+ expect(fx.arcTowers[0].scaleY).toBeCloseTo(2);
+ expect(fx.arcTowers[16].scaleY).toBeCloseTo(1.5);
+ expect(fx.arcTowers[38].scaleY).toBe(1);
+ expect(fx.arcTowers.every(s=>s.y===118&&s.alpha===.55)).toBe(true);
+ expect(fx.arcTowers.filter(s=>s.visible).length).toBeLessThanOrEqual(21);
+ expect(fx.arcTowers[0].visible).toBe(false);
+ expect(fx.arcTowers[1].visible).toBe(true);
+ fx._drawArcadeSkyline(1000,.2,[.8,.4,0]);
+ expect(fx.arcTowers.every(s=>s.alpha===.2)).toBe(true);
+ fx._drawArcadeSkyline(1000,.55,null);
+ expect(fx.arcSkyline.visible).toBe(true);
+ expect(fx.arcSkyline.tilePositionX).toBe(50);
+ expect(fx.arcTowers.every(s=>!s.visible&&s.scaleY===1)).toBe(true);
 });

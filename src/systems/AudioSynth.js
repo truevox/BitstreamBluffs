@@ -1276,7 +1276,7 @@ export class AudioSynth {
         now-this._worldDanceSample.timeMs<40)return this._worldDanceSample;
       const e=d.mixer.energy();
       if(!Number.isFinite(e?.bass)||!Number.isFinite(e?.mid))return null;
-      return (this._worldDanceSample={revision,timeMs:now,bass:e.bass,mid:e.mid});
+      return (this._worldDanceSample={revision,timeMs:now,bass:e.bass,mid:e.mid,treble:Number.isFinite(e.treble)?e.treble:0});
     }catch{return null;}
   }
 

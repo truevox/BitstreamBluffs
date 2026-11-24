@@ -32,9 +32,10 @@ try{
   g.loop.stop();
   if(biome==='arcade'){
    // Force only the presentation veil; terrain and music remain untouched.
+   if(r.biomeFx.arcSkyline?.frame?.name!=='__BASE')throw Error('Original full skyline tile not selected');
    const update=r.biomeFx.update;
-   r.biomeFx.update=function(x,t,veil,reduced){
-    return update.call(this,x,t,this.auditionVeil??1,reduced);
+   r.biomeFx.update=function(x,t,veil,reduced,bands){
+    return update.call(this,x,t,this.auditionVeil??1,reduced,bands);
    };
   }else if(biome){
    // Select the actual production look without changing terrain or physics.
@@ -57,6 +58,8 @@ try{
    const sample=a.getWorldDanceSample(),meter=a.getSyntheticMeterTiming();
    const sun=()=>{const s=r.biomeFx.arcSun;return s?{x:s.x,y:s.y,sx:s.scaleX,sy:s.scaleY,alpha:s.alpha,visible:s.visible}:null;};
    const onSun=arcade?sun():null;
+   const towers=()=>r.biomeFx.arcTowers.map(s=>({sy:s.scaleY,visible:s.visible,alpha:s.alpha,y:s.y}));
+   const onTowers=arcade?towers():null;
    const before={x:r.sled.x,y:r.sled.y,runTime:r.runTimeMs,clock:d.clockStart,token:d._token,zoom:cam.zoom,scroll:cam.scrollX,track:d.track.id,skin:r.bg.skin,motif:r.bg.motif,nearY:r.biomeFx.ridgeNear?.y};
    const pairCanvas=document.createElement('canvas');pairCanvas.width=canvas.width*2;pairCanvas.height=canvas.height;
    const c=pairCanvas.getContext('2d');
@@ -66,10 +69,11 @@ try{
    r.bg.update(cam.scrollX,t,speed,0);r.biomeFx.update(cam.scrollX,t,veil,false);
    render();c.drawImage(canvas,0,0);
    const offSun=arcade?sun():null;
-   r.bg.update(cam.scrollX,t,speed,p);r.biomeFx.update(cam.scrollX,t,veil,false);
+   const offTowers=arcade?towers():null;
+   r.bg.update(cam.scrollX,t,speed,p);r.biomeFx.update(cam.scrollX,t,veil,false,r.worldDance.skylineBands);
    // Next Game.step draws the restored ON geometry; avoid a redundant third render.
    const after={x:r.sled.x,y:r.sled.y,runTime:r.runTimeMs,clock:d.clockStart,token:d._token,zoom:cam.zoom,scroll:cam.scrollX,track:d.track.id,skin:r.bg.skin,motif:r.bg.motif,nearY:r.biomeFx.ridgeNear?.y};
-   return {veil,onSun,offSun,png:pairCanvas.toDataURL('image/png').split(',')[1],before,after,p,sample,meter,audioTime:d.ctx.currentTime,width:canvas.width,height:canvas.height};
+   return {veil,onSun,offSun,onTowers,offTowers,png:pairCanvas.toDataURL('image/png').split(',')[1],before,after,p,sample,meter,audioTime:d.ctx.currentTime,width:canvas.width,height:canvas.height};
   },{i,arcade:auditionBiome==='arcade'});
   if(!pair)break;
   assert.deepEqual(pair.before,pair.after,'Paired presentation draw changed matched world or transport');
@@ -86,6 +90,9 @@ try{
  else if(auditionBiome==='arcade'){
   assert.ok(frames.every(f=>f.onSun?.visible&&f.offSun?.visible&&f.onSun.alpha===f.offSun.alpha),'Arcade sun or veil mismatch');
   assert.ok(frames.some(f=>f.veil===1&&f.onSun.sx-f.offSun.sx>.2&&f.offSun.y-f.onSun.y>5),'No readable Arcade sun response');
+  assert.ok(frames.every(f=>f.offTowers.every(s=>!s.visible&&s.sy===1)),'OFF retained EQ motion');
+  assert.ok(frames.some(f=>f.veil===1&&f.onTowers.some(s=>s.visible&&s.sy>1.4)&&new Set(f.onTowers.filter(s=>s.visible).map(s=>s.sy)).size>=3),'No distinct EQ response');
+  assert.ok(frames.every(f=>f.onTowers.every(s=>s.y===118&&(!s.visible||Math.abs(s.alpha-.55*Math.min(1,Math.max(0,(f.veil-.6)/.4)))<1e-8))),'EQ root or alpha changed');
   assert.ok(frames.some(f=>f.veil>.6&&f.veil<.8),'No partial veil coverage');
   assert.ok(frames.every(f=>Math.abs(f.onSun.alpha-.95*Math.min(1,Math.max(0,(f.veil-.6)/.4)))<1e-8),'Arcade veil opacity changed');
  }

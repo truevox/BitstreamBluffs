@@ -3,6 +3,7 @@
 ## v2.21.1 — readable World Dance (2026-11-24)
 
 - #212: owner-accepted scenery auditions for Steampunk, Sky Jellyfish, Candy Cane Canyon, Micro Mountain, Vertigo Vents and Arcade. Stronger visual-only accents, individual motif motion and accessible neutral settings.
+- #331: Arcade skyline tower groups rise to actual smoothed bass, midrange and treble readings; original artwork restored with World Dance OFF or reduced motion.
 - Preserve original audio transport, meter, physics and SIM9. Controlled motif auditions and live accessibility checks passed; natural traversal and Chromebook performance remain follow-up QA.
 
 ## v2.21.0 — original-stem soundtrack and crossfades (2026-11-24)

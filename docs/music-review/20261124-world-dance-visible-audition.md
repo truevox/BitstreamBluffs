@@ -80,3 +80,9 @@ Arcade sun now has a bounded vertical hop (22px maximum centre lift) combined wi
 ## Owner acceptance and integration
 
 Owner accepted Arcade V9 as good enough for now and raised possible dancing buildings as a future idea, not a requirement for this release. All six individual audition candidates are accepted for current visual tuning. Preserve existing building art for this release. Natural traversal and Chromebook performance remain separate evidence gaps.
+
+## Arcade skyline EQ follow-up (#331)
+
+Owner subsequently explicitly asked to try buildings as a graphic EQ and include it if the implementation is lightweight. Existing 480px skyline art is sliced into 20 tower groups sharing one texture, with two wrap copies but only the visible screen of sprites rendered. No extra audio nodes/assets; reuse existing real bass/mid/treble analyser readings with independent 65ms attack / 150ms release. Skyline remains rooted at horizon, tint/fade/parallax preserved, sun unchanged. Original tile used when OFF/neutral; explicit __BASE frame prevents Phaser's firstFrame change from corrupting later runs. No synthetic spectrum or physics change. 165/165 targeted tests passed including new band separation, reset, fade, wrap and geometry tests.
+
+V10 and V11: 96 matched actual game frame pairs with original One More Run, controlled full/partial Arcade veil on Debutmont terrain; no page errors. V11 optimized visible copies and idle updates, measured audio span 9.60s (V10 13.52s, V9 3.69s; capture timing is confounded by host load and capture overhead and is NOT a validated frame-rate benchmark). Chromebook performance is still unverified; treat the EQ as an audition candidate, not a cleared performance gate. Independent exact-head review and owner visual feedback pending. Do not conflate three broad frequency bands with a high-resolution spectrum display. No media committed.
