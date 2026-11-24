@@ -1,5 +1,5 @@
 /** Musical transition only. Provisional grids never become physics/Gym authority. */
-import {sin,cos} from '../pmath.js';
+import {sin,cos,exp} from '../pmath.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function normalizeTransitionGrids(raw){
 	const result=new Map();
@@ -40,13 +40,59 @@ export function transitionGain(role,direction,progress){
 	// Equal-power melodic blend (master peak guard remains downstream).
 	return direction==='out'?cos(p*Math.PI/2):sin(p*Math.PI/2);
 }
+/** Return the actual scheduled piecewise-linear envelope, not an ideal
+ * continuous sine/cosine approximation. Late-started sources have their own
+ * ramp knots. Every newly created envelope starts at native unity gain.
+ */
 export function automateTransition(param,role,direction,start,end,notBefore=start){
 	const at=Math.max(start,notBefore);
-	if(at>=end){param.setValueAtTime(direction==='in'?1:0,at);return;}
-	const steps=32,span=end-start;
-	param.setValueAtTime(transitionGain(role,direction,(at-start)/span),at);
-	for(let i=1;i<=steps;i++){
-		const t=at+(end-at)*i/steps;
-		param.linearRampToValueAtTime(transitionGain(role,direction,(t-start)/span),t);
+	const points=[];
+	const add=(time,value,first)=>{
+		if(first)param.setValueAtTime(value,time);
+		else param.linearRampToValueAtTime(value,time);
+		points.push({time,value});
+	};
+	if(at>=end)add(at,direction==='in'?1:0,true);
+	else{
+		const steps=32,span=end-start;
+		add(at,transitionGain(role,direction,(at-start)/span),true);
+		for(let i=1;i<=steps;i++){
+			const t=at+(end-at)*i/steps;
+			add(t,transitionGain(role,direction,(t-start)/span),false);
+		}
 	}
+	return {kind:'linear',points};
+}
+
+/** Evaluate precisely the automation we scheduled. AudioParam.value is not
+ * a reliable snapshot of an in-flight ramp on older implementations. */
+export function envelopeValueAt(automation,now){
+	if(!automation)return 1;
+	if(automation.kind==='target'){
+		const {at,from,to,tau}=automation;
+		return now<=at?from:to+(from-to)*exp(-(now-at)/tau);
+	}
+	const points=automation.points;
+	if(now<points[0].time)return 1;
+	for(let i=1;i<points.length;i++){
+		const a=points[i-1],b=points[i];
+		if(now<b.time)return a.value+(b.value-a.value)*(now-a.time)/(b.time-a.time);
+	}
+	return points[points.length-1].value;
+}
+
+/** Retarget an independently owned source, including the Safari/older-browser
+ * fallback. Explicitly anchor the instantaneous gain after cancel, then
+ * remember the exponential release so a rapid second toggle is continuous.
+ */
+export function retargetEnvelope(record,to,now,tau){
+	const param=record.gain.gain;
+	const from=envelopeValueAt(record.automation,now);
+	if(typeof param.cancelAndHoldAtTime==='function')param.cancelAndHoldAtTime(now);
+	else{
+		param.cancelScheduledValues(now);
+		param.setValueAtTime(from,now);
+	}
+	param.setTargetAtTime(to,now,tau);
+	record.automation={kind:'target',at:now,from,to,tau};
 }

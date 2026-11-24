@@ -1,5 +1,5 @@
 import {jest} from '@jest/globals';
-import {normalizeTransitionGrids,planSongCrossfade,transitionGain,automateTransition} from '../../src/systems/music/SongCrossfade.js';
+import {normalizeTransitionGrids,planSongCrossfade,transitionGain,automateTransition,envelopeValueAt,retargetEnvelope} from '../../src/systems/music/SongCrossfade.js';
 import {StemMusicDirector} from '../../src/systems/music/StemMusicDirector.js';
 
 test('normal and quiet tails choose different bounded durations; valid bar alignment never seeks incoming audio',()=>{
@@ -96,4 +96,51 @@ test('all songs disabled during overlap retires both and stops transport',()=>{
 	expect(old.stop).toHaveBeenCalledTimes(1);expect(incoming.stop).toHaveBeenCalledTimes(1);
 	expect(d.started).toBe(false);expect(d._sourceEnvelopes.size).toBe(0);
 	expect(d.start).not.toHaveBeenCalled();
+});
+
+test('fallback anchors exact scheduled linear gain on both sides, even with stale AudioParam.value',()=>{
+	const {d,a,old,incoming,oldGain,newGain}=overlapFixture();
+	d.ctx.currentTime=11.137;
+	for(const [node,param,dir,first] of [[old,oldGain,'out',10],[incoming,newGain,'in',10.31]]){
+		delete param.cancelAndHoldAtTime;
+		Object.assign(param,{value:1,setValueAtTime:jest.fn(),linearRampToValueAtTime:jest.fn()});
+		const record=d._sourceEnvelopes.get(node);
+		record.role='guitar';
+		record.automation=automateTransition(param,record.role,dir,10,13,first);
+		const actual=record.automation.points;
+		const next=actual.findIndex(p=>p.time>d.ctx.currentTime);
+		const [lo,hi]=[actual[next-1],actual[next]];
+		record.expected=lo.value+(hi.value-lo.value)*(d.ctx.currentTime-lo.time)/(hi.time-lo.time);
+		expect(record.expected).not.toBe(1);
+		expect(record.expected).not.toBeCloseTo(transitionGain('guitar',dir,(d.ctx.currentTime-10)/3),6);
+	}
+	const oldExpected=d._sourceEnvelopes.get(old).expected,newExpected=d._sourceEnvelopes.get(incoming).expected;
+	d.setSongSelection({...d.songEnabled,[a.id]:false});
+	for(const [param,expected,to,tau] of [[oldGain,oldExpected,0,.003],[newGain,newExpected,1,.015]]){
+		expect(param.cancelScheduledValues).toHaveBeenCalledWith(11.137);
+		expect(param.setValueAtTime).toHaveBeenLastCalledWith(expected,11.137);
+		expect(param.setTargetAtTime).toHaveBeenLastCalledWith(to,11.137,tau);
+		expect(param.cancelScheduledValues.mock.invocationCallOrder[0]).toBeLessThan(param.setValueAtTime.mock.invocationCallOrder.at(-1));
+		expect(param.setValueAtTime.mock.invocationCallOrder.at(-1)).toBeLessThan(param.setTargetAtTime.mock.invocationCallOrder.at(-1));
+	}
+	expect(d.clockStart).toBe(10);expect(d._token).toBe(8);
+	// Rapidly disabling the incoming song must anchor the ongoing exponential
+	// lift, not the old linear plan or a stale intrinsic AudioParam value.
+	d.ctx.currentTime+=.0075;
+	const now=d.ctx.currentTime;
+	d.setSongSelection({...d.songEnabled,[d.track.id]:false});
+	expect(newGain.setValueAtTime.mock.lastCall[0]).toBeCloseTo(1+(newExpected-1)*Math.exp(-.5),12);
+	expect(newGain.setValueAtTime.mock.lastCall[1]).toBe(now);
+});
+test('fallback value respects pre-start, exact knots, completed ramp and no automation',()=>{
+	const param={setValueAtTime:jest.fn(),linearRampToValueAtTime:jest.fn(),cancelScheduledValues:jest.fn(),setTargetAtTime:jest.fn(),value:.01};
+	const a=automateTransition(param,'bass','in',10,14,11);
+	expect(envelopeValueAt(null,9)).toBe(1);
+	expect(envelopeValueAt(a,10.9)).toBe(1);
+	expect(envelopeValueAt(a,11)).toBe(0);
+	expect(envelopeValueAt(a,14)).toBe(1);
+	expect(envelopeValueAt(a,15)).toBe(1);
+	const r={gain:{gain:param},automation:a};
+	retargetEnvelope(r,0,11,.003);
+	expect(param.setValueAtTime).toHaveBeenLastCalledWith(0,11);
 });

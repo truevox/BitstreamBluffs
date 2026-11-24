@@ -19,7 +19,7 @@ import { ScrapPitchCadence } from './ScrapPitchCadence.js';
 import { createVerifiedScrapCowbell } from './ScrapCowbell.js';
 import { MicroBeeAudio } from './MicroBeeAudio.js';
 
-import {normalizeTransitionGrids,planSongCrossfade,automateTransition} from './SongCrossfade.js';
+import {normalizeTransitionGrids,planSongCrossfade,automateTransition,retargetEnvelope} from './SongCrossfade.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
@@ -211,11 +211,8 @@ export class StemMusicDirector {
 		for(const [src,record] of this._sourceEnvelopes??[]){
 			if(this.songEnabled[record.songId]!==false)continue;
 			if(record.songId!==this.track?.id)cutOutgoing=true;
-			const param=record.gain.gain;
 			try {
-				if(typeof param.cancelAndHoldAtTime==='function')param.cancelAndHoldAtTime(now);
-				else param.cancelScheduledValues(now);
-				param.setTargetAtTime(0,now,.003);
+				retargetEnvelope(record,0,now,.003);
 				src.stop(now+.015);
 			} catch {
 				// If automation/stop is unavailable, disconnect immediately.
@@ -233,10 +230,7 @@ export class StemMusicDirector {
 			this._incomingFade=null;
 			for(const record of this._sourceEnvelopes.values()){
 				if(record.token!==this._token||record.songId!==this.track?.id)continue;
-				const param=record.gain.gain;
-				if(typeof param.cancelAndHoldAtTime==='function')param.cancelAndHoldAtTime(now);
-				else param.cancelScheduledValues(now);
-				param.setTargetAtTime(1,now,.015);
+				retargetEnvelope(record,1,now,.015);
 			}
 		}
 	}
@@ -1204,7 +1198,7 @@ export class StemMusicDirector {
 				this._incomingFade={start:firstSourceTime,end:transition.end,token};
 				for(const record of this._sourceEnvelopes.values()){
 					if(record.token===transition.oldToken&&record.end>firstSourceTime){
-						automateTransition(record.gain.gain,record.role,'out',firstSourceTime,transition.end);
+						record.automation=automateTransition(record.gain.gain,record.role,'out',firstSourceTime,transition.end);
 					}
 				}
 				this.lastCrossfade={from:transition.from,to:info.track.id,start:firstSourceTime,
@@ -1268,9 +1262,9 @@ export class StemMusicDirector {
 		if(envelope){
 			src.connect(envelope);envelope.connect(dest);
 			const fade=this._incomingFade;
-			if(fade?.token===this._token&&firstAllowed<fade.end)
-				automateTransition(envelope.gain,name,'in',fade.start,fade.end,firstAllowed);
-			this._sourceEnvelopes.set(src,{gain:envelope,role:name,token:this._token,songId:this.track?.id??this.pack.id,
+			const automation=fade?.token===this._token&&firstAllowed<fade.end?
+				automateTransition(envelope.gain,name,'in',fade.start,fade.end,firstAllowed):null;
+			this._sourceEnvelopes.set(src,{gain:envelope,role:name,token:this._token,songId:this.track?.id??this.pack.id,automation,
 				end:firstAllowed+Math.max(0.001,Math.min(duration-late,buffer.duration-late))});
 		}else src.connect(dest);
 		this.activeNodes.add(src);
