@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 03:03 UTC. Main: `2dcd07fa08e2f98304bd2e7e9a5ecdd20fb879eb` (SIM8, v2.19.22).
+Last verified: 2026-11-24 03:54 UTC. Main: `e3fdd814fbc4903ec33853976c1203cb72452ab6` (#308 docs only); shipped game remains SIM8 v2.19.22 at `2dcd07fa`.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -12,17 +12,27 @@ going” means resume this queue, not take over other lanes or merge a draft.
    Eight (#278/#281/#282/#283/#286/#287/#288/#290) have new COMMENTED
    source reviews with no blocking findings, no inline threads, and no
    APPROVED review. #269 lacks a GitHub review; separate exact source QA
-   found no blocker on landed SIM7. All nine exact heads show successful
-   Netlify, lifecycle and build-identity checks. Fix actual feedback
+   found no blocker on landed SIM7. The prior nine exact heads had successful
+   lifecycle/build-identity checks and historical previews. Fix actual feedback
    first; these are not approval. No merge of drafts.
    For later integration, prioritize the verified user-facing #290 fix
-   when the required review and release slot are clear. Obey the
-   numbered release rule (#207). #299 landed SIM8 at 2dcd07fa and used
+   when the required review and release slot are clear. #282 is again a
+   clean docs-only draft against current main; its prior comment is on the
+   old head. Obey the numbered release rule (#207). #299 landed SIM8 at 2dcd07fa and used
    v2.19.22; public normal entry JS byte-matches the exact build. v2.19.23
    is proposed by #300: leave both release ordering and next Morgan slot
    with the release owner. SIM7's #294 BSOD changes are in source history,
    not a separate changelog entry. Exact build ID now 7641c907…; preserve
    old receipts as historical and recapture exact evidence on each release.
+   #308 adds the owner’s spend and prelaunch policy. Put `[skip netlify]`
+   in every initial PR title; prefer local tests and GitHub Actions. Default
+   zero discretionary previews; at most 10 actual preview builds across
+   agents per Eastern date, only for owner testing, logged first in the
+   ledger and #309. Owner-requested exceptions are separate. Production
+   deployments are separately coordinated; a skipped PR is not a skipped
+   merge deploy. #308’s actual commit skipped production. Preserve replay
+   versioning; no old-tape migration or compatibility gate before public
+   launch and at least 10 real players. #290 is current UI parity only.
    Gal Friday Review App worked on the empty #307 fixture, but its polling
    check is advisory and #295 is still draft. Treat only a fresh independent
    exact-head judgment as real approval; #290 has COMMENTED only.
@@ -129,7 +139,7 @@ going” means resume this queue, not take over other lanes or merge a draft.
 | #127 / #286 | `morgan/issue-127-pin-preflight-examples` @ `7452a8a38f907aeb40c03912a12b9c014ddb2fe7` | Draft, docs only; historical/SIM6 inputs pinned; two repeated native timing arms on exact fair1153 entities; no fairness verdict. |
 | #157 / #287 | `morgan/issue-157-utility-score-baseline` @ `a7e795f30a1889d5fa057f6e078c86184c96fe90` | Draft, test only; separates utility points, combo, flow and landing components; 111 tests and two reversion-verified negative controls. |
 | #70 / #288 | `morgan/issue-70-classic-panel-diagnostic` @ `1bb776d021ad00162774e5f1ca0baf6a3f52313b` | Draft, offline diagnostic; classic output unchanged, verified fatigue fails closed with actionable message. 38 tests, 18 exact native-browser repeats and replays. |
-| Bootstrap / #282 | Exact PR head `25333e9350d97f4f48563404d10273595e81c64f` | Draft recovery pointer only, not part of the 21 issues. |
+| Bootstrap / #282 | Exact PR head `cc200434c7625497cbf1153528c6320492f44c70` | Draft recovery pointer only, not part of the 21 issues. |
 | #81 / #290 | `morgan/issue-81-ghost-row-revision` @ `bd43a5adecee4dc9e60f377b9a9735d0e373ce5b` | Draft, UI compatibility parity only; built Chromium Game Over A/B, 24 Jest tests, ruleset/identity checks. |
 
 All required work can be reconstructed from remote refs; no disposable worktree
@@ -167,11 +177,24 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   remains open; leave release and broader work in their lane.
   #248 is historical preview only. Owner approved the tested 60% AirBrake
   kick and unchanged upward impulse. #299 SIM8 landed as 2dcd07fa. Gal/Home's
-  #300 now targets main directly, latest draft `10df014dabd4790e0a3a9249a8f60d5663c4caaf`
-  (SIM9, proposed v2.19.23); hosted CI/preview green is not exact-head
-  independent approval. Pin published browser receipts to their tested heads.
-  #287 test-only baseline applies on exact SIM8 with 111/111. On exact
-  #300, two held-input expectations fail as designed: SIM9 credits the
+  #300 now targets main directly, latest draft `a990a5c39d673fc22e1234ba74b3c83bddf33039`
+  (SIM9, proposed v2.19.23), with ordered midtick kick/touchdown settlement.
+  #306 integrated music draft `6a7a6c026274379c144e28260f8fc0379f029bd6` shares
+  RunScene.js and the source-digest manifest. The second branch must
+  preserve both runtime paths, regenerate the attestation against landed
+  main, and retest normal browser entry for same-tick paid kick/touchdown
+  and isolated, cache-pure music observations. Both are drafts with no
+  formal reviews; GitHub checks are not approval. Pin receipts to exact
+  tested heads. Local exact-head composition: RunScene merged cleanly;
+  regenerated manifest resolved the only conflict. 351 focused tests,
+  ruleset/identity and normal Vite build pass. The fixed 440-tick Chromium
+  path is byte-identical with and without 440 injected audio callback
+  failures, including one paid kick at tick 37 and actual landing at 104.
+  No page or outbound errors. Same-tick relaunch covered by focused tests,
+  not by that browser path. No published branch or preview.
+  #287 passes 111/111 on landed SIM8. Two held-input expectations fail
+  both on earlier #300 `10df014` and on this exact newer composition:
+  SIM9 credits the
   actual paid kick instead of held AirBrake. Hold or coordinate the release
   order; replace held positives with paid pulse and spent/held negatives
   after SIM9, preserving separate parachute and score/flow assertions.
