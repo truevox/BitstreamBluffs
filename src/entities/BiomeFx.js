@@ -34,6 +34,7 @@ const DEBRIS_BAND_H = GAME_HEIGHT * 0.8;
 
 /** Where the arcade horizon sits on screen (y). */
 const HORIZON_Y = 118;
+const ARCADE_SUN_DANCE = Object.freeze({ squashX: .42, squashY: .28, bounce: 22 });
 const GRID_COLS = 9; // perspective lane lines each side of centre
 const GRID_ROWS = 9;
 const LANE_PX = 84; // lane spacing at the bottom of the screen
@@ -380,10 +381,13 @@ export class BiomeFx {
     if (this.arcSun) {
       this.arcSun.setAlpha(0.95 * a1);
       // Preserve the original centre with the artwork's top-left origin.
-      const sx=1+.48*dance, sy=1-.36*dance;
+      // A squash-and-hop rather than just resizing. Keep the horizontal
+      // centre fixed and let the veil continue to own opacity.
+      const sx=1+ARCADE_SUN_DANCE.squashX*dance;
+      const sy=1-ARCADE_SUN_DANCE.squashY*dance;
       this.arcSun.setScale(sx,sy);
       this.arcSun.x=300-BACKDROP_ART.arcadeSun.w*(sx-1)/2;
-      this.arcSun.y=HORIZON_Y-BACKDROP_ART.arcadeSun.h-BACKDROP_ART.arcadeSun.h*(sy-1)/2;
+      this.arcSun.y=HORIZON_Y-BACKDROP_ART.arcadeSun.h-BACKDROP_ART.arcadeSun.h*(sy-1)/2-ARCADE_SUN_DANCE.bounce*dance;
     }
     if (this.arcSkyline) {
       this.arcSkyline.setAlpha(0.55 * a1);

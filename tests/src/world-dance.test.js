@@ -342,3 +342,27 @@ test('Vertigo steam breathes in width and height independently of the terrain',(
  expect(maxLift).toBeGreaterThan(20);
  expect(sample(0)).toEqual(still);
 });
+
+test('Arcade sun hops and squashes without moving its horizontal centre or changing veil opacity',async()=>{
+ const {BiomeFx}=await import('../../src/entities/BiomeFx.js');
+ const sprite={setAlpha(v){this.alpha=v;},setScale(x,y){this.scaleX=x;this.scaleY=y;}};
+ const fx=Object.create(BiomeFx.prototype);
+ Object.assign(fx,{arcSun:sprite,arc:{},gridG:{clear(){}},_drawVeilBlocks(){},_veilDrawn:-1,
+  bg:{danceStrength:.26},root:{visible:true},_applyVisibility(){},debut:false,gdg:false});
+ for(const veil of [.75,1]){
+  // Cached grid isolates actual sprite transforms from unrelated draw calls.
+  fx._gridKey=Math.round((veil-.6)/.4*100)+1;
+  fx.bg.danceStrength=0;fx.update(0,1234,veil,false);
+  const still={...sprite};
+  fx.bg.danceStrength=.26;fx.update(0,1234,veil,false);
+  expect(sprite.scaleX).toBeGreaterThan(1.2);
+  expect(sprite.scaleY).toBeLessThan(.85);
+  expect(still.y-sprite.y).toBeGreaterThan(5);
+  expect(sprite.x+56*sprite.scaleX).toBeCloseTo(still.x+56,8);
+  expect(sprite.alpha).toBe(still.alpha);
+  fx.update(0,1234,veil,true);
+  expect(sprite).toEqual(still);
+  fx.bg.danceStrength=0;fx.update(0,1234,veil,false);
+  expect(sprite).toEqual(still);
+ }
+});

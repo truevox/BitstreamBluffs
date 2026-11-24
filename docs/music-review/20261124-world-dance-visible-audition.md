@@ -68,3 +68,11 @@ Owner feedback: "Candy cane looks NICE and boingier. Keep going." Record positiv
 Vertigo decorative steam now visibly breathes via height and radial expansion, with larger billowing older puffs and slight local phase variation. No lateral displacement, brightness change, actual hazard geometry or audio timing changes. Independent geometry test at .26 input requires >50% peak puff radius growth and >20px peak lift with fixed vent mouths, alpha and neutral OFF geometry. 110/110 targeted background/dance/ruleset tests passed.
 
 96 matched actual game render pairs, original One More Run, peak visual envelope .832, 5.10s audio span, no page errors. Controlled Vertigo look on Debutmont terrain, silent Tailnet audition. No media committed; natural traversal, accessibility browser refresh and Chromebook performance remain pending.
+
+## Ninth audition: Arcade bridge
+
+Owner approved V8 Vertigo Vents. The five previously accepted motifs remain unchanged.
+
+Arcade sun now has a bounded vertical hop (22px maximum centre lift) combined with broad horizontal squash and vertical compression. Its horizontal centre, palette and transition-controlled opacity remain independent of dance. The bridge grid and veil logic are untouched. Added actual sprite-transform tests at partial and full veil, including reduced motion and zero-envelope reset. 136/136 focused background, dance, transition and ruleset tests passed.
+
+96 matched real game frame pairs over original One More Run, with the presentation-only Arcade veil forced to full coverage then swept through partial coverage (not natural sector traversal). Peak envelope .724, maximum measured sun centre lift 20.09px, identical opacity in both arms, no page errors. Fresh live original-OGG browser smoke passed music reactivity, mute, OS reduced motion, explicit reduced-motion overrides and World Dance OFF. Private silent audition only; no media committed. Natural traversal and Chromebook performance still pending.
