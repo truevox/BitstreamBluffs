@@ -189,12 +189,13 @@ test('inactive dead contact/support references survive repeated capture and rest
   const p=good.pairs.find(p=>p.contactCount>0&&p.col.supportCount>0);
   expect(p).toBeDefined();
   p.contactCount=1;p.col.supportCount=1;
-  p.contacts[1][0]=['<dead>',0];p.col.supports[1]=['<dead>',0];
+  p.contacts[1][0]=['<dead>',-1];p.col.supports[1]=['<dead>',-1];
   expect(kit.preflight(good)).toBe(true);
   const b=buildWorld(Matter);
   kit.restore(b.engine,good,b.keyOf,'full',{completePreflight:true});
   const second=JSON.parse(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true})));
   expect(second.pairs.find(q=>q.a===p.a&&q.b===p.b).contacts[1][0]).toEqual(['<dead>',-1]);
+  expect(second.pairs).toEqual(good.pairs);
   expect(kit.preflight(second)).toBe(true);
   const c=buildWorld(Matter);
   expect(()=>kit.restore(c.engine,second,c.keyOf,'full',{completePreflight:true})).not.toThrow();
@@ -259,4 +260,18 @@ test('retained inactive pairs must preserve both old contact references for warm
   const b=buildWorld(Matter),before=JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}));
   expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/contact\/support mismatch/);
   expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
+});
+
+test('pending detector rebuild preserves raw resolvable order and modified flag',()=>{
+  const a=buildWorld(Matter);
+  Matter.Engine.update(a.engine,1000/240);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  good.worldModified=true;
+  good.detectorOrder=good.detectorOrder.slice(1).reverse();
+  expect(kit.preflight(good)).toBe(true);
+  const b=buildWorld(Matter);
+  kit.restore(b.engine,good,b.keyOf,'full',{completePreflight:true});
+  const restored=kit.capture(b.engine,b.keyOf,{selectBody:()=>true});
+  expect(restored.worldModified).toBe(true);
+  expect(restored.detectorOrder).toEqual(good.detectorOrder);
 });

@@ -46,7 +46,14 @@ if(BOUNDARY&&(!STRICT||repeatFlag!==-1))throw new Error('--repeat-boundaries req
 if(repeatFlag!==-1&&(!STRICT||!Number.isSafeInteger(REPEAT)||REPEAT<1||REPEAT>120))
   throw new Error('--repeat-ticks requires --strict-suffix and an integer from 1 to 120');
 const jsonOut = argv.includes('--json') ? argv[argv.indexOf('--json') + 1] : null;
-if (STRICT && (!jsonOut || existsSync(jsonOut) || process.env.ONLY || process.env.EXACT_ONLY)) throw new Error('--strict-suffix requires a new --json file and no case filters');
+if (STRICT) {
+  if(!jsonOut||process.env.ONLY||process.env.EXACT_ONLY)
+    throw new Error('--strict-suffix requires a new --json file and no case filters');
+  // Exclusive creation before any await; a competing run cannot claim this
+  // receipt. Strict mode never reads a previous result, even after launch.
+  try{writeFileSync(jsonOut,'[]',{flag:'wx'});}
+  catch(e){if(e.code==='EEXIST')throw new Error('--strict-suffix requires a new --json file and no case filters');throw e;}
+}
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 // For a single expensive browser case, use exact selection instead of matching every ablation.
 const EXACT_ONLY = process.env.EXACT_ONLY ? process.env.EXACT_ONLY.split(',') : null;
@@ -523,7 +530,7 @@ const browser = await chromium.launch({ headless: true, executablePath: EXE, arg
 // cases already present (harness errors are retried).
 const caseKey = (r) => `${r.fixture}:${r.level}${r.skip && r.skip !== '-' ? `-${r.skip}` : ''}`;
 let results = [];
-if (jsonOut && existsSync(jsonOut)) {
+if (!STRICT && jsonOut && existsSync(jsonOut)) {
   try { results = JSON.parse(readFileSync(jsonOut, 'utf8')).filter((r) => !r.harnessError); } catch { results = []; }
 }
 const done = new Set(results.map(caseKey));

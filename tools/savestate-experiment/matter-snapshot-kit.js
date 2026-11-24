@@ -140,7 +140,7 @@ export function preflightMatterSnapshot(snap, Matter) {
   const vertex = (r,active,pair) => {
     if (r===null) return !active;
     if (!dense(r)||r.length!==2) return false;
-    if (r[0]==='<dead>') return !active&&(r[1]===-1||uint(r[1]));
+    if (r[0]==='<dead>') return !active&&r[1]===-1;
     if (!uint(r[1])) return false;
     return parts.has(r[0]) && r[1]<parts.get(r[0]) && (!active||r[0]===pair.a||r[0]===pair.b);
   };
@@ -259,7 +259,7 @@ export function createMatterSnapshotKit(Matter) {
     // A stale slot (beyond contactCount / supportCount) may still point at a vertex of a body that has since left the
     // world. It is only ever compared by identity against current supports of THIS pair's parts, so it can never
     // match again: record it as a distinct dead reference.
-    if (pk == null) return ['<dead>', v.index];
+    if (pk == null) return ['<dead>', -1];
     return [pk, v.index];
   }
   const DEAD = { x: NaN, y: NaN, index: -1, body: null };
@@ -447,9 +447,9 @@ export function createMatterSnapshotKit(Matter) {
       engine.timing.lastDelta = snap.timing.lastDelta;
       // Detector: bodies array is sorted in place by bounds.min.x every step (stable sort), so the previous
       // order breaks ties. Rebuild it in the snapshot's order and clear isModified so Engine.update keeps it.
-      if (!skip.has("detectorOrder") && !snap.worldModified && snap.detectorOrder.length) {
-        engine.detector.bodies = snap.detectorOrder.map((k) => ix.byKey.get(k)).filter(Boolean);
-        Composite.setModified(engine.world, false, false, true);
+      if (!skip.has("detectorOrder") && snap.detectorOrder.every(k=>ix.byKey.has(k))) {
+        engine.detector.bodies = snap.detectorOrder.map(k=>ix.byKey.get(k));
+        Composite.setModified(engine.world, snap.worldModified, true, true);
       } else {
         Composite.setModified(engine.world, true, true, false);
       }

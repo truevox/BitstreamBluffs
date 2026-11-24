@@ -340,7 +340,14 @@
     // Validate the entire recorder section before touching the fresh world.
     const preparedRecorder = global.__ssCanonical
       ? global.__ssRecorderKit.prepareRecorderPrefix(run,snap.recorder,snap.ghost[0]) : null;
-    if (global.__ssCanonical) MKit().preflight(snap.matter);
+    if (global.__ssCanonical) {
+      MKit().preflight(snap.matter);
+      // The shipped canonical fingerprint observes the RAW detector list,
+      // including stale removed bodies. We cannot reconstruct those from the
+      // live body inventory. Reject that boundary rather than weaken parity.
+      if(snap.matter.worldModified&&snap.matter.detectorOrder.some(k=>!Object.hasOwn(snap.matter.ids,k)))
+        throw new Error('Matter preflight: unsupported removed-body detector history');
+    }
     const engine = run.matter.world.engine;
     const tickMs = run.simClock.tickMs;
     if (L === 0) {
@@ -460,7 +467,7 @@
     const sorted = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]]));
     out['matter.bodies'] = fnv(sorted(m.bodies));
     out['matter.worldOrder'] = fnv(JSON.stringify(m.worldOrder));
-    out['matter.detectorOrder'] = fnv(JSON.stringify(m.detectorOrder));
+    out['matter.detectorOrder'] = fnv(JSON.stringify([m.worldModified,global.__ssCanonical||!m.worldModified?m.detectorOrder:m.worldOrder]));
     out['matter.pairs'] = fnv(JSON.stringify(m.pairs));
     out['matter.ids'] = fnv(sorted(m.ids) + m.nextId);
     out['matter.timing'] = fnv(JSON.stringify(m.timing));

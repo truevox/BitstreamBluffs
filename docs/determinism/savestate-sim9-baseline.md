@@ -87,3 +87,7 @@ A generated rolling boulder in b3pyramid5@4 is approached using a synthetic init
 ### Integrated moving-hazard gate
 
 Run `npm run gate:heavy -- --repeat-moving` from the checkout. Fresh local build at b63fa6fd, including final prefix validation and retained inactive pair consistency, passed six consecutive moving-boulder restore cycles with identical activation, stable ID, offset and body position at restore and after each next tick; final recorder admission passed. Receipt: results/sim9-05a1bf1e-repeat-moving-integrated.json. Synthetic fixture only; no production or competitive admission claim.
+
+### Release-candidate review corrections
+
+Strict receipt files are exclusively reserved before asynchronous setup and never read through the resumable experiment path. Dead inactive vertex slots have one canonical sentinel encoding, preserving pair equality after capture/restore. Pending detector rebuilds preserve the raw order when every detector entry resolves to a live body; strict comparison includes both the raw order and worldModified flag. Removed-body detector history is explicitly unsupported in the strict game gate, because the shipped canonical fingerprint sees raw detector bodies and the diagnostic snapshot cannot reconstruct a removed body. Non-strict Matter experiments may still test effective rebuild behavior. 64/64 focused tests; production SIM9 and source unchanged. No claim of universal capture-boundary support.
