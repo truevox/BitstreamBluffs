@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 11:53 UTC. Main: `e3fdd814fbc4903ec33853976c1203cb72452ab6` (#308 docs only); shipped game remains SIM8 v2.19.22 at `2dcd07fa`.
+Last verified: 2026-11-24 12:51 UTC. Main: `398c8b6ae1248642478c913ce218cac9a65dbe48` (#311 portable Pages hosting). SIM8 v2.19.22 remains live on GitHub Pages at #311 and Netlify at `2dcd07fa`.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -19,7 +19,12 @@ going” means resume this queue, not take over other lanes or merge a draft.
    when the required review and release slot are clear. #282 is again a
    clean docs-only draft against current main; its prior comment is on the
    old head. Obey the numbered release rule (#207). #299 landed SIM8 at 2dcd07fa and used
-   v2.19.22; public normal entry JS byte-matches the exact build. v2.19.23
+   v2.19.22. #311 kept version/identity, skipped Netlify, and deployed Pages
+   via Actions run 45395454827. Public GitHub Pages HTML/main JS byte-match
+   the exact local subpath build; actual Chromium title/run, manifest/icons,
+   four public tracks, 44 same-origin responses, zero errors. Netlify still
+   serves the earlier root build. Distinct origins keep separate browser
+   scores, preferences and ghosts; do not imply automatic migration. v2.19.23
    is proposed by #300: leave both release ordering and next Morgan slot
    with the release owner. SIM7's #294 BSOD changes are in source history,
    not a separate changelog entry. Exact build ID now 7641c907…; preserve
@@ -66,8 +71,18 @@ going” means resume this queue, not take over other lanes or merge a draft.
    This proves timing, not causation/unfairness. #286 includes exact
    stock commands. Preserve separate historical #202; no new speculative
    tuning. Full branch/route model remains gated on #57/#60.
-3. #81/#290 fresh same-origin persistent Chromium A/B passed with exact
-   landed SIM8 2dcd07fa and unchanged bd43a5a. A genuine natural 185 m
+3. #81/#290 exact unchanged bd43a5a composes onto #311 main 398c8b6.
+   Built both unpatched/patched Pages subpaths, 49 focused tests and
+   identity passed. Fresh persisted Chromium root-to-subpath test on
+   the SAME origin retained the identical two natural 185 m SIM7 test tapes
+   across separate profiles, and each new session saved a 28 m SIM8 run.
+   Only the patch labels three stale/unstamped slots INCOMPATIBLE and
+   removes their false Shared Run; same-origin replace, clear, Escape and
+   retry passed, drawing one current rider. A second origin in the same
+   profile did not see the first origin's stored course. This is local
+   integration proof, not a deployment or a new approval; #290 stays draft.
+   Earlier same-origin persistent Chromium A/B passed on landed SIM8
+   2dcd07fa and unchanged bd43a5a. A genuine natural 185 m
    SIM7 b569fa7 tape persisted; a controlled shorter 28 m SIM8 run became
    Best/Latest. Old/unstamped still read, only current rendered; the patch
    removed false Shared Run and labelled old rows INCOMPATIBLE. Real
@@ -158,7 +173,7 @@ going” means resume this queue, not take over other lanes or merge a draft.
 | #157 / #287 | `morgan/issue-157-utility-score-baseline` @ `a7e795f30a1889d5fa057f6e078c86184c96fe90` | Draft, test only; separates utility points, combo, flow and landing components; 111 tests and two reversion-verified negative controls. |
 | #70 / #288 | `morgan/issue-70-classic-panel-diagnostic` @ `1bb776d021ad00162774e5f1ca0baf6a3f52313b` | Draft, offline diagnostic; classic output unchanged, verified fatigue fails closed with actionable message. 38 tests, 18 exact native-browser repeats and replays. |
 | Bootstrap / #282 | Exact PR head `cc200434c7625497cbf1153528c6320492f44c70` | Draft recovery pointer only, not part of the 21 issues. |
-| #81 / #290 | `morgan/issue-81-ghost-row-revision` @ `bd43a5adecee4dc9e60f377b9a9735d0e373ce5b` | Draft, UI compatibility parity only; built Chromium Game Over A/B, 24 Jest tests, ruleset/identity checks. |
+| #81 / #290 | `morgan/issue-81-ghost-row-revision` @ `bd43a5adecee4dc9e60f377b9a9735d0e373ce5b` | Draft, local UI parity only; #311 exact Pages-subpath persistent Chromium A/B, 49 tests, identity. Not deployed. |
 
 All required work can be reconstructed from remote refs; no disposable worktree
 or local patch is required for the drafts. Local-only #82 browser
@@ -200,8 +215,9 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   per-touchdown bluff credit, protected Hop-lift scaling, and sloppy landing
   recovery. #306 integrated music draft
   `8fbdc753ad6e1f15b4d47bf3ae76bc7a9efdd30b` proposes v2.20.0.
-  Both await independent exact-head review. RunScene merged cleanly in
-  local composition on main, but the source-digest, changelog, package and
+  Both await independent exact-head review. #311 additionally touches
+  StemMusicDirector.js and Views.js; previous local composition was on
+  e3fdd81, not the new hosting base. It merged RunScene cleanly, but the source-digest, changelog, package and
   lock conflict. Re-attest on the actual release base; coordinate version
   and preserve both runtime routes. Scratch resolution only: 188 focused
   tests, ruleset/identity and production build passed. Real normal-entry
