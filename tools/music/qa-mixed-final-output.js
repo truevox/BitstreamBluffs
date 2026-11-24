@@ -13,6 +13,7 @@ import {orchestraPreset,melodyPreset,sourceOnlyExtras}
 import {fetchMusicAssetResponse}
 	from '../../src/systems/music/MusicPack.js';
 import {measureFourTimesTruePeak} from './estimate-true-peak-4x.js';
+import {FatalCrashCountIn,findOriginalDrumAccent,planFatalCountIn} from '../../src/systems/music/FatalCrashCountIn.js';
 
 const RATE=48000,RENDER_SECONDS=4.1,START=.16;
 const QA_COSMETIC_SEED=0x2912026;
@@ -172,4 +173,198 @@ async function render({pack,segmentIndex=0,biome,scenario='mixed-game-stress',
 		...window,sourceFingerprintInputs:Object.keys(original.hashes).length,
 	};
 }
-window.__mixedFinalAudioQA=Object.freeze({render,measureFourTimesTruePeak,EVENTS,FXS});
+
+/**
+ * Dedicated native crash count-in master-output stress:
+ * instantiate the genuine FatalCrashCountIn class with genuine original
+ * recorded drum buffer, original stem recovery gates, native vinyl scratch,
+ * and native AudioSynth SFX/wind/static. No surrogate drum taps.
+ *
+ * OfflineAudioContext.suspend() holds the graph at the exact stress-time.
+ * Production FatalCrashCountIn.start() correctly requires a running LIVE
+ * AudioContext. For scheduling ONLY, a QA facade reports 'running' while
+ * forwarding all native WebAudio constructors/methods to the suspended
+ * real OfflineAudioContext. This never changes the production class;
+ * audio is actually produced by the genuine nodes upon ctx.resume().
+ */
+function offlineSchedulingFacade(ctx){
+	return new Proxy(ctx,{
+		get(target,key){
+			if(key==='state')return 'running'; // offline scheduling moment
+			const value=Reflect.get(target,key,target);
+			return typeof value==='function'?value.bind(target):value;
+		}
+	});
+}
+const FATAL_RATE_SECONDS=5.55;
+const FATAL_AT=.72;
+const FATAL_EVENTS=Object.freeze([
+	{at:.28,action:'bsod-wind'},
+	{at:.47,action:'hop'},
+	{at:FATAL_AT,action:'crash-and-source-countin'},
+	{at:1.20,action:'static-glitch'},
+	{at:2.40,action:'hazardScramble'},
+	{at:3.38,action:'hard-landing'},
+]);
+function momentEnergy(pcm,start,end){
+	const from=Math.max(0,Math.round(start*pcm.sampleRate));
+	const last=Math.min(pcm.length,Math.round(end*pcm.sampleRate));
+	if(last<=from)throw Error('Invalid original drum hit measure');
+	let sum=0,peak=0;
+	for(let c=0;c<2;c++){
+		const data=pcm.getChannelData(c);
+		for(let i=from;i<last;i++){
+			const n=data[i];sum+=n*n;peak=Math.max(peak,Math.abs(n));
+		}
+	}
+	return {rms:Math.sqrt(sum/(2*(last-from))),samplePeak:peak};
+}
+async function renderOriginalFatal({pack,segmentIndex=0,biome='garbage-dump-glacier',
+	includeCountIn=true,internalPcm=false}={}){
+	if(typeof includeCountIn!=='boolean')throw Error('Invalid count-in condition');
+	const original=await decodeOriginals(pack,segmentIndex,biome);
+	const ctx=new OfflineAudioContext(2,Math.round(FATAL_RATE_SECONDS*RATE),RATE);
+	seedCosmeticRandom(QA_COSMETIC_SEED);
+	const a=actualAudioSynthGraph(ctx);
+	const mixer=setOriginalSourceMix(ctx,a,original,{biome,mode:'mixed-game-stress'});
+	const facade=offlineSchedulingFacade(ctx);
+	const countIn=new FatalCrashCountIn(facade,mixer,a._vinylScratch);
+	const drum=original.sources.get('drums');
+	const cache=new Map([[segmentIndex+'/drums',drum]]);
+	const extraDrumHashes={};
+	const packBase=new URL('/music/packs/'+pack+'/',location.origin).href;
+	// Native FatalCrashCountIn.prepare() can warm an audible original
+	// drum segment 1..3 when an original song begins nearly drumless.
+	// Implement its source fetch adapter using ONLY the original pack
+	// manifest and exact original OGG bytes, never synthetic accents.
+	const fetchOriginalDrum=async(info,index,role,token)=>{
+		if(token!==1||role!=='drums'||!Number.isInteger(index)||
+			index<0||index>=original.manifest.segments.length)
+			throw Error('Invalid native original drum warmup');
+		const ref=original.manifest.segments[index].sources.drums;
+		if(!ref)throw Error('Missing original OGG drum segment');
+		const {response}=await fetchMusicAssetResponse(packBase,ref);
+		if(!response.ok)throw Error('Cannot decode original fallback drums');
+		const bytes=await response.arrayBuffer();
+		const digest=await crypto.subtle.digest('SHA-256',bytes);
+		extraDrumHashes[index]=[...new Uint8Array(digest)]
+			.map(v=>v.toString(16).padStart(2,'0')).join('');
+		const decoder=new AudioContext();
+		try{cache.set(index+'/drums',await decoder.decodeAudioData(bytes))}
+		finally{await decoder.close()}
+		return cache.get(index+'/drums');
+	};
+	const d={
+		ctx:facade,pack:original.manifest,track:{id:original.manifest.id},
+		cache,packBase,clockStart:START-original.segment.startFrame/RATE,
+		started:true,transportPaused:false,
+		activeNodes:{size:7},mixer,_loading:false,_token:1,
+		_fetchSource:fetchOriginalDrum,
+	};
+	let selected=null,program=null;
+	const events=FATAL_EVENTS.map(item=>ctx.suspend(item.at).then(async()=>{
+		switch(item.action){
+			case 'bsod-wind':
+				a._onBsodState({active:true,relativeAirX:1800,
+					atmosphereDensity:1,proximity01:.98,timeToImpactMs:250});
+				break;
+			case 'hop':a.playSfx('hop');break;
+			case 'crash-and-source-countin':
+				a.playSfx('crash');
+				// The exact original MIDI-like 0.5s plan is synthetic,
+				// unverified, but every *sound* comes from source OGG.
+				if(includeCountIn){
+					if(!findOriginalDrumAccent(d))
+						await countIn.prepare(d);
+					selected=findOriginalDrumAccent(d);
+					if(!selected)throw Error('Original recorded drums lack a usable attack, including native original-pack warmup');
+					program=countIn.start(d,{
+						timingKind:'synthetic-unverified',runId:'qa-real-original-drum'
+					});
+					if(!program||program.scheduledDrumAccents!==4||
+						program.drumSource!=='original-decoded-ogg-drums')
+						throw Error('Native real-source fatal count-in did not schedule all four hits');
+					if(countIn.sources.length!==4||
+						countIn.sources.some(src=>src.buffer!==selected.buffer))
+						throw Error('Count-in tried a surrogate source instead of original OGG');
+				}
+				break;
+			case 'static-glitch':a.glitch('static',950,.92);break;
+			case 'hazardScramble':a.playSfx('hazardScramble');break;
+			case 'hard-landing':a._onLanding({quality:'sloppy',hard:true});break;
+			default:throw Error('Unexpected fatal sound event');
+		}
+		await ctx.resume();
+	}));
+	const pcm=await ctx.startRendering();
+	await Promise.all(events);
+	if(includeCountIn&&!program)throw Error('Missing source drum count-in evidence');
+	const measured=measureFourTimesTruePeak(pcm,{
+		startFrame:Math.floor(.18*RATE),endFrame:Math.floor(5.40*RATE)});
+	const plan=program||planFatalCountIn(FATAL_AT);
+	if(!plan||plan.beatOnsets?.length!==4)throw Error('Invalid independent source-count-in timing plan');
+	const hitWindows=plan.beatOnsets.map(at=>momentEnergy(pcm,at+.012,at+.12));
+	const silenceWindow=momentEnergy(pcm,plan.silenceStart+.1,plan.drumsStart-.1);
+	const fullBandWindow=momentEnergy(pcm,plan.bandAt+.2,plan.bandAt+.4);
+	const analysis={
+		trackId:original.manifest.id,pack,biome,sourceSegment:segmentIndex,
+		sourceFrameStart:original.segment.startFrame,sourceHashes:original.hashes,
+		originalSourceCount:original.roles.length,
+		originalDrumSha256:original.hashes.drums,
+		extraOriginalDrumHashes:extraDrumHashes,
+		includeCountIn,qaCosmeticSeed:QA_COSMETIC_SEED,
+		audioSource:'original decoded OGG drums, real FatalCrashCountIn.start native class',
+		offlineSchedulingStateFacade:true,
+		countIn:program?{
+			sourceSegment:program.sourceSegment,sourceOffset:program.sourceOffset,
+			drumSource:program.drumSource,scheduledDrumAccents:program.scheduledDrumAccents,
+			verified:program.verified,timingKind:program.timingKind,
+			beatOnsets:program.beatOnsets,silenceStart:program.silenceStart,
+			drumsStart:program.drumsStart,bandAt:program.bandAt,
+			originalDrumOnsetScore:selected.onsetScore,
+			originalDrumExcerptSeconds:selected.excerptSeconds,
+			originalDrumSourceSha256:selected.segmentIndex===segmentIndex?
+				original.hashes.drums:extraDrumHashes[selected.segmentIndex],
+		}:null,
+		hitWindows,silenceWindow,fullBandWindow,
+		peakGate:a.nodes.peakGuard instanceof WaveShaperNode,
+		events:FATAL_EVENTS.map(e=>({at:e.at,action:e.action})),
+		...measured
+	};
+	countIn.destroy();mixer.destroy();a._vinylScratch?.destroy();
+	return internalPcm?{analysis,pcm}:analysis;
+}
+function pcmWindowDifferenceRms(a,b,start,end){
+	const from=Math.floor(start*a.sampleRate),to=Math.floor(end*a.sampleRate);
+	if(a.sampleRate!==b.sampleRate||a.length!==b.length||
+		from<0||to>a.length||to<=from)throw Error('Mismatched native comparison PCM');
+	let squares=0;
+	for(let ch=0;ch<2;ch++){
+		const left=a.getChannelData(ch),right=b.getChannelData(ch);
+		for(let i=from;i<to;i++)squares+=(left[i]-right[i])**2;
+	}
+	return Math.sqrt(squares/(2*(to-from)));
+}
+async function compareOriginalFatal(args={}){
+	const positive=await renderOriginalFatal({...args,includeCountIn:true,internalPcm:true});
+	const control=await renderOriginalFatal({...args,includeCountIn:false,internalPcm:true});
+	if(positive.analysis.trackId!==control.analysis.trackId||
+		positive.analysis.sourceSegment!==control.analysis.sourceSegment)
+		throw Error('Mismatched source identity in original-drum control');
+	const plan=positive.analysis.countIn;
+	const windows=plan.beatOnsets.map((time,i)=>({
+		beat:i+1,at:time,positiveRms:positive.analysis.hitWindows[i].rms,
+		controlRms:control.analysis.hitWindows[i].rms,
+		pcmDifferenceRms:pcmWindowDifferenceRms(positive.pcm,control.pcm,time+.012,time+.12),
+	}));
+	return {...positive.analysis,
+		control:{samplePeak:control.analysis.samplePeak,
+			estimatedTruePeak4x:control.analysis.estimatedTruePeak4x,
+			estimatedTruePeakDbTp4x:control.analysis.estimatedTruePeakDbTp4x,
+			sourceHashes:control.analysis.sourceHashes,
+			countIn:control.analysis.countIn,
+			hitWindows:control.analysis.hitWindows},
+		countInVsRealOriginalNoCountIn:windows};
+}
+window.__mixedFinalAudioQA=Object.freeze({
+	render,renderOriginalFatal,compareOriginalFatal,measureFourTimesTruePeak,EVENTS,FXS,FATAL_EVENTS});
