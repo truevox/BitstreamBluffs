@@ -5,8 +5,9 @@ import {execFileSync,spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {planPublishedMusic,RELEASE_CATALOG} from './r2-release-plan.mjs';
 import {encodeMonoVariants} from './mono-stem-variants.mjs';
-const [sourceArg,outArg,trackArg]=process.argv.slice(2);
-if(!sourceArg||!outArg)throw Error('Usage: node tools/pwa/build-r2-mono-pilot.mjs VERIFIED_PUBLICATION NEW_OUTPUT_DIR [TRACK_ID]');
+const [sourceArg,outArg,trackArg,coverage]=process.argv.slice(2);
+if(coverage!==undefined&&coverage!=='--all-recordings')throw Error('Invalid coverage option');
+if(!sourceArg||!outArg)throw Error('Usage: node tools/pwa/build-r2-mono-pilot.mjs VERIFIED_PUBLICATION NEW_OUTPUT_DIR [TRACK_ID] [--all-recordings]');
 const source=resolve(sourceArg),out=resolve(outArg);
 if(out===source||out.startsWith(source+sep)||source.startsWith(out+sep))throw Error('Output and originals must be disjoint');
 const inv=JSON.parse(await readFile(resolve(source,'publication-330-inventory.json'))),catalog=await readFile(resolve(source,'publication-330-catalog.json'));
@@ -16,7 +17,9 @@ const byKey=new Map(inv.objects.map(x=>[x.key,x])),sha=b=>createHash('sha256').u
 async function sourceBytes(key){const e=byKey.get(key);if(!e)throw Error('Unpublished source: '+key);const b=e.origin==='released-git'?execFileSync('git',['show',inv.publicBaseCommit+':public/music/'+key],{maxBuffer:20*1024*1024}):await readFile(resolve(source,inv.source,key));if(b.length!==e.size||sha(b)!==e.sha256)throw Error('Source differs from publication: '+key);return b;}
 const pack=await sourceBytes(chosen.manifest),selection=Object.fromEntries(tracks.map(t=>[t.id,t.id===chosen.id]));
 const plan=planPublishedMusic(inv,catalog,{[chosen.id]:pack},{selection});
-const entries=[...new Map(plan.groups.flatMap(g=>g.entries).filter(e=>e.url.endsWith('.ogg')).map(e=>[e.url,e])).values()];
+const packPrefix=chosen.manifest.slice(0,chosen.manifest.lastIndexOf('/')+1);
+const entries=coverage==='--all-recordings'?inv.objects.filter(e=>e.key.startsWith(packPrefix)&&e.key.endsWith('.ogg')).map(e=>({url:new URL(e.key,RELEASE_CATALOG).href,bytes:e.size,sha256:e.sha256})):[...new Map(plan.groups.flatMap(g=>g.entries).filter(e=>e.url.endsWith('.ogg')).map(e=>[e.url,e])).values()];
+if(!entries.length||entries.some(e=>!e.url.startsWith(new URL(packPrefix,RELEASE_CATALOG).href)))throw Error('Missing or escaped published pack recordings');
 await mkdir(out,{recursive:false});const stage=await mkdtemp(resolve(out,'source-stage-'));
 const urls=entries.map(e=>'/music/'+e.url.slice(new URL('.',RELEASE_CATALOG).href.length));
 const publicationByLogical=new Map(entries.map((e,i)=>[urls[i],e]));
@@ -24,7 +27,7 @@ const frames=file=>new Promise((ok,fail)=>{const p=spawn('ffmpeg',['-v','error',
 try{
  for(const url of urls){const file=resolve(stage,url.slice(1));await mkdir(dirname(file),{recursive:true});await writeFile(file,await sourceBytes(url.slice('/music/'.length)),{flag:'wx'});}
  const originals={};for(const url of urls)originals[url]=await frames(resolve(stage,url.slice(1)));
- const result={format:'bb-r2-mono-pilot-v1',release:RELEASE_CATALOG,song:chosen.id,sourceCount:urls.length,sourceBytes:entries.reduce((n,e)=>n+e.bytes,0),qualities:{}};
+ const result={format:'bb-r2-mono-pilot-v1',release:RELEASE_CATALOG,song:chosen.id,coverage:coverage==='--all-recordings'?'all-recordings':'menu-required',sourceCount:urls.length,sourceBytes:entries.reduce((n,e)=>n+e.bytes,0),qualities:{}};
  // Derivative tree is a sibling of the transient source stage, never inside it.
  for(const quality of ['lite','full']){
   const dest=resolve(out,'derivatives');const manifest=await encodeMonoVariants({urls,quality,sourceRoot:stage,outputRoot:dest,onProgress:({index,total})=>{if(index%20===0||index===total)console.log('ENCODE',quality,index,total);}});
