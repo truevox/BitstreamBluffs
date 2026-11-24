@@ -32,7 +32,11 @@ const originalVocalFullSeven=[
 const full33=process.env.QA_FULL33==='1';
 const strictReview=process.env.QA_REVIEW_STRICT==='1';
 const rejectedAttempts=[];
-const chosenFull33=full33?Array.from({length:33},(_,index)=>{
+const partial=process.env.QA_V4_PREFIX_COUNT;
+if(partial!==undefined&&(!full33||!strictReview||!/^([1-9]|[12][0-9]|3[0-2])$/.test(partial)))
+	throw Error('QA_V4_PREFIX_COUNT requires strict v4 mode and a prefix count 1..32');
+const targetCount=partial===undefined?33:Number(partial);
+const chosenFull33=full33?Array.from({length:targetCount},(_,index)=>{
 	// ALL 33 indexes must use fresh quantum-v4 terminal-verified reports.
 	// v2 and the earlier chunk-only captures remain immutable historical
 	// evidence and must NEVER be grandfathered into this aggregate.
@@ -176,7 +180,7 @@ for(const {index,file,vocals} of sequence){
 	for(let i=1;i<=4;i++){
 		const hit=live.countInMasterWindows['drum'+i];
 		assert.ok(hit&&hit.rms>.0002&&hit.samplesPerChannel>1000,
-			'No real original recorded drum output at actual crash beat '+i);
+			'No non-silent master window at scheduled crash beat '+i);
 	}
 	checked.push({
 		songIndex:index,trackId:actual.id,vocals,
@@ -189,7 +193,7 @@ for(const {index,file,vocals} of sequence){
 	});
 	reportEvidence.push({file,sha256:sha(bytes)});
 }
-assert.equal(checked.length,full33?33:8);
+assert.equal(checked.length,full33?targetCount:8);
 const worst=checked.reduce((a,b)=>a.outputPeak4x>=b.outputPeak4x?a:b);
 const summary={
 	liveGameRealPhysicsCases:checked.length,
@@ -206,19 +210,20 @@ const summary={
 };
 summary.rejectedCaptureAttempts=rejectedAttempts.length;
 const aggregate={
-	format:full33?'bitstream-genuine-physics-bsod-live-output-all33-first-original-source-4x-audit-v1':
+	format:full33?'bitstream-genuine-physics-bsod-live-output-v4-first-original-source-4x-audit-v2':
 		'bitstream-genuine-physics-bsod-live-output-original-ogg-4x-audit-v1',
-	status:full33?'PASS_33_QUANTUM_V3_ARMED_GENUINE_PHYSICS_BSOD_FINAL_MASTER_SAMPLED_NOT_MASTERED':
+	status:full33?(targetCount===33?'PASS_33_QUANTUM_V4_GENUINE_PHYSICS_BSOD_FINAL_MASTER_SAMPLED_NOT_MASTERED':
+		'PASS_PARTIAL_QUANTUM_V4_GENUINE_PHYSICS_BSOD_FINAL_MASTER_SAMPLED_NOT_MASTERED'):
 		'PASS_REAL_GAME_BSOD_FINAL_MASTER_SAMPLE_NOT_RELEASE_CERTIFIED',
 	summary,checked,reportEvidence,rejectedAttempts,
 	notes:[
 		'This is an actual physics-resolved BSOD collision after QA accelerates and positions the authoritative real wall. It is not a natural player/replay trajectory.',
 		'True final PCM captured read-only after game production OutputPeakGuard by silent-output AudioWorklet. Startup diagnostic gaps discarded only before collision; every counted crash interval is contiguous.',
 		'Original drum source OGG is SHA-256 verified and four hits are scheduled; non-silent full-master windows alone do NOT prove each isolated drum was audible over wind/crash tails.',
-		'Each case uses one 33-song original first segment, naturally starting in Debutmont. If QA_FULL33=1, exactly one first segment per song; not a coverage claim for full-length tracks or all 12 game biomes.',
+		'Each case uses one 33-song original first segment, naturally starting in Debutmont. Strict v4 mode covers the exact configured prefix (all 33 by default); not a coverage claim for full-length tracks or all 12 game biomes.',
 		'The four recorded original drum excerpts use the production count-in synthetic-unverified grid; original beats have NOT been certified.',
 		'Browser audio context playback at native device sample rate (usually 44.1 kHz); 4x sinc estimate is not an independent mastering reference.',
-		'Fresh v3b 33-song matrix after fixing diagnostic arm error classification: no historical v2/v3 failed or unclassified reports are reused. Each capture first qualifies a consecutive 450ms startup period, then arms exactly at the first recorded sample. ONLY PRE-ARM activation gaps are excluded; EVERY sample after arming must be contiguous, including pre-impact and recovery. Valid measured clipping permanently fails the aggregate; only instrument-invalid captures are retryable.',
+		'Fresh v4 captures only: no historical v2/v3 clean reports are accepted. Each capture first qualifies a consecutive 450ms startup period, then arms exactly at the first recorded sample. ONLY PRE-ARM activation gaps are excluded; EVERY sample after arming must be contiguous, including pre-impact, recovery and the terminal verified quantum. Every captured native sample is metered. Valid measured clipping permanently fails the aggregate; only instrument-invalid captures are retryable.',
 		'Four drum sounds are verified as source-original and scheduled; non-silent master windows DO NOT isolate the drum from wind/crash/room and must not be called verified drum audibility.',
 		'Do not change approved sound mixes, release music, merge a draft PR or close issue #291 solely because these samples pass.',
 	],
