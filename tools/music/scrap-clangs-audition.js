@@ -1,10 +1,11 @@
 import {attachAuditionExtra} from './AuditionExtra.js';
+import {attachAuditionCowbell} from './AuditionCowbell.js';
 import { buildMusicChain } from '../../src/systems/music/MusicFXGraph.js';
 import { orchestraPreset } from '../../src/systems/music/DynamicOrchestraPresets.js';
 import { contactFromMotion } from '../../src/systems/music/MusicPhysicsSignals.js';
 import { ScrapPitchCadence } from '../../src/systems/music/ScrapPitchCadence.js';
 
-let extraEnhancer=null;
+let extraEnhancer=null,cowbellAccent=null;
 const $ = id => document.getElementById(id);
 const STEMS = ['drums','bass','guitar','piano','other'];
 let ctx = null, buffers = null, chain = null, master = null;
@@ -36,11 +37,11 @@ function notes(){
 }
 function fireVerifiedClang(candidate){
 	if(!ctx||!playing||airborne||bypassed||speed()<280)return false;
-	const played=effect()?.set('pitchedClang',{
-		midi:candidate.midi,hz:candidate.hz,confidence:candidate.confidence,
-		strength:Math.max(.3,contactFromMotion(speed(),true))},ctx.currentTime);
-	if(played){clangCount++;
-		say('KLANG! On-pitch fundamental at '+Math.round(candidate.hz)+'Hz, dirty junk-metal overtones.');}
+	const verified={midi:candidate.midi,hz:candidate.hz,confidence:candidate.confidence,
+		strength:Math.max(.3,contactFromMotion(speed(),true))};
+	const played=effect()?.set('pitchedClang',verified,ctx.currentTime);
+	if(played){const bell=cowbellAccent?.play(verified)===true;clangCount++;
+		say('KLANG! '+(bell?'Extra cowbell + ':'')+'on-pitch fundamental at '+Math.round(candidate.hz)+'Hz, dirty junk-metal overtones.');}
 	return played===true;
 }
 function pitchHit(){
@@ -69,8 +70,9 @@ function automaticClangs(){
 	if(!clangAuto){clangClock.resetTiming();return;}
 	const candidate=clangClock.next(ctx.currentTime,contactFromMotion(speed(),true),notes,clangDensity());
 	if(candidate&&effect()?.set('pitchedClang',candidate,ctx.currentTime)){
+		const bell=cowbellAccent?.play(candidate)===true;
 		clangCount++;
-		say('Random KLANG #'+clangCount+': '+Math.round(candidate.hz)+'Hz, chosen from live bass spectrum.');
+		say('Random KLANG #'+clangCount+(bell?' + cowbell':'')+': '+Math.round(candidate.hz)+'Hz, chosen from live bass spectrum.');
 	}
 }
 const setSuctionTexture = () => {
@@ -138,6 +140,7 @@ async function loadSample() {
 	}
 }
 function stop() {
+	cowbellAccent?.dispose();cowbellAccent=null;
 	extraEnhancer?.dispose();extraEnhancer=null;
 	for (const source of sources) {
 		try { source.stop(); } catch {}
@@ -173,6 +176,7 @@ async function play(offsetSeconds=0) {
 	processedGain.gain.value = bypassed ? 0 : 1;
 	rawGain.connect(master);
 	processedGain.connect(master);extraEnhancer=attachAuditionExtra(ctx,processedGain,master);
+	cowbellAccent=attachAuditionCowbell(ctx,processedGain,$('cowbell'));
 	chain = buildMusicChain(ctx,orchestraPreset('garbage-dump-glacier','drums'),processedGain);
 	bassChain=buildMusicChain(ctx,orchestraPreset('garbage-dump-glacier','bass'),processedGain);
 	clangClock.reset();clangCount=0;
@@ -285,3 +289,6 @@ window.addEventListener('pagehide',()=>{
 controlState();
 
 setClangLevel();setClangDensity();
+
+if(new URLSearchParams(location.search).get('qa')==='1')
+	window.__scrapClangQA=Object.freeze({attachAuditionCowbell,getBuffers:()=>buffers});
