@@ -2,10 +2,10 @@
 // Invoke only from a trusted, separately controlled publisher runtime.
 import { createSign } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
-import { reconcilePullRequest, installationPermissions, assertInstallationIdentity } from './logic.mjs';
+import { reconcilePullRequest, reconcileAllPullRequests, installationPermissions, assertInstallationIdentity } from './logic.mjs';
 
 const [mode, arg, ...extra] = process.argv.slice(2);
-if (!['--dry-run', '--apply'].includes(mode) || !/^\d+$/.test(arg || '') || extra.length) throw new Error('Usage: reconcile.mjs --dry-run|--apply PR_NUMBER');
+if (!['--dry-run', '--apply'].includes(mode) || !(arg === '--all' || /^\d+$/.test(arg || '')) || extra.length) throw new Error('Usage: reconcile.mjs --dry-run|--apply PR_NUMBER|--all');
 const appId = process.env.FRIDAY_REVIEW_APP_ID;
 const installationId = process.env.FRIDAY_REVIEW_INSTALLATION_ID;
 const slug = process.env.FRIDAY_REVIEW_APP_SLUG;
@@ -40,5 +40,12 @@ const api = async (path, method = 'GET', data) => {
 	}
 	return request(path, scoped.token, method, data);
 };
-const invalidated = await reconcilePullRequest({ number: Number(arg), bot: `${slug}[bot]`, appId: Number(appId), api });
-console.log(`${mode === '--dry-run' ? 'Would invalidate' : 'Invalidated'} ${invalidated.length} stale check(s) on PR #${arg}`);
+const reconcile = ({ number }) => reconcilePullRequest({ number, bot: `${slug}[bot]`, appId: Number(appId), api });
+if (arg === '--all') {
+	const result = await reconcileAllPullRequests({ api, reconcile });
+	console.log(JSON.stringify(result));
+	if (result.failures.length) process.exitCode = 1;
+} else {
+	const invalidated = await reconcile({ number: Number(arg) });
+	console.log(`${mode === '--dry-run' ? 'Would invalidate' : 'Invalidated'} ${invalidated.length} stale check(s) on PR #${arg}`);
+}

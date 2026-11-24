@@ -123,3 +123,23 @@ export function assertInstallationIdentity(installation, appId, slug) {
 		throw new Error('Unexpected GitHub App installation identity or owner');
 	return true;
 }
+
+export async function reconcileAllPullRequests({ api, reconcile }) {
+	if (typeof api !== 'function' || typeof reconcile !== 'function') throw new Error('Invalid sweep callbacks');
+	const prs = [];
+	let complete = false;
+	for (let page = 1; page <= 100; page++) {
+		const batch = await api(`/repos/truevox/BitstreamBluffs/pulls?state=open&per_page=100&page=${page}`);
+		if (!Array.isArray(batch) || batch.some(pr => !Number.isInteger(pr.number) || pr.number < 1)) throw new Error('Invalid PR list');
+		prs.push(...batch);
+		if (batch.length < 100) { complete = true; break; }
+	}
+	if (!complete) throw new Error('PR pagination limit reached');
+	let invalidated = 0;
+	const failures = [];
+	for (const { number } of prs) {
+		try { invalidated += (await reconcile({ number })).length; }
+		catch (error) { failures.push({ number, message: String(error.message).slice(0, 300) }); }
+	}
+	return { scanned: prs.length, invalidated, failures };
+}

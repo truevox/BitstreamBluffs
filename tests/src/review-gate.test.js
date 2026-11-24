@@ -105,3 +105,20 @@ test('reconciliation preserves a valid current approval and reports update failu
 	expect(calls).toBe(0);
 	await expect(reviewGate.reconcileChecks({ pr: pr(), reviews: [{ ...review, state: 'DISMISSED' }], checks: [check], bot, appId: 123, invalidate })).rejects.toThrow('GitHub unavailable');
 });
+
+test('sweep reconciles every open PR and surfaces partial failures', async () => {
+	expect(typeof reviewGate.reconcileAllPullRequests).toBe('function');
+	const seen = [];
+	const api = async path => {
+		if (path.includes('/pulls?')) return [{ number: 10 }, { number: 11 }];
+		throw new Error('Unexpected API path');
+	};
+	const reconcile = async ({ number }) => {
+		seen.push(number);
+		if (number === 10) throw new Error('bad PR');
+		return [55];
+	};
+	const outcome = await reviewGate.reconcileAllPullRequests({ api, reconcile });
+	expect(seen).toEqual([10, 11]);
+	expect(outcome).toEqual({ scanned: 2, invalidated: 1, failures: [{ number: 10, message: 'bad PR' }] });
+});
