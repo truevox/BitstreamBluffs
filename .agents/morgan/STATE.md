@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 20:37 UTC. Main `29587b64fc86ba70ec647e31c4c73a3ec4c02976` (#334), v2.21.1 source, SIM9. #333 merged R2 soundtrack catalog and fallback as `d9d41c7`; #334 adds billboard thumbnails. Live deployment not rechecked for this checkpoint.
+Last verified: 2026-11-24 20:50 UTC. Main `29587b64fc86ba70ec647e31c4c73a3ec4c02976` (#334), v2.21.1 live, SIM9. #333 merged R2 soundtrack catalog and fallback as `d9d41c7`; #334 adds billboard thumbnails. Exact #334 Pages push `45480500227` green; public `main-BcKROgaR.js` SHA-256 `dd09ab01d587f6ca35c600dbabb659291ffde1f42551887c3392f9a45ed17334`, runtime version v2.21.1. Live catalog contains 33 tracks with CORS; no new pause or every-track test by Morgan.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -18,6 +18,10 @@ means resume this queue, not take over another lane or merge a draft.
   focused tests passed. Chromium WebGL: 20 shared frames, 40 per-run
   sprites, 20–21 visible, correct wrap/fade/OFF/exit over four restarts;
   old sprites destroyed, texture reused. Exact-head GitHub CI green.
+  Follow-up exact `e4241167ff276e39a09a66dbb16c8b1b6fca023a` fixes P2:
+  original scroll 8270→8271 now moves the visible tip from x13.925 to
+  x13.855, without cutoff; 125 focused tests and exact-head CI green.
+  Conservative per-motif margins preserve tile phase. User informed.
   Real Chromebook performance remains open. No PR write or merge.
 
 1. **#157 / #287**: current draft `morgan/issue-157-utility-score-baseline` @
