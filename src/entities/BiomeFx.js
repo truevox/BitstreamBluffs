@@ -21,6 +21,7 @@ import { VEIL_CELL_PX, veilCovers, hash01 } from '../systems/BiomeTransition.js'
 import { cosmeticRandom } from '../systems/CosmeticRandom.js';
 import { mixColor } from '../ui/MenuArt.js';
 import { BACKDROP_ART, hasBackdropArt } from '../ui/BackdropArt.js';
+import { visibleDanceStrength } from '../systems/WorldDance.js';
 
 const ADD = 1; // Phaser.BlendModes.ADD
 const DEPTH = -99;
@@ -33,6 +34,16 @@ const DEBRIS_BAND_H = GAME_HEIGHT * 0.8;
 
 /** Where the arcade horizon sits on screen (y). */
 const HORIZON_Y = 118;
+const ARCADE_SUN_DANCE = Object.freeze({ squashX: .42, squashY: .28, bounce: 22 });
+// Roof boundaries in the existing 120-cell skyline art (4 native px/cell).
+// Two tiled copies, with each building slice rooted at the same horizon.
+const ARCADE_TOWER_EDGES = Object.freeze([0,6,11,16,23,28,33,39,46,51,58,64,72,79,86,90,95,105,113,116,120]);
+// Hand-tuned gains and adjacent-band blends. Each roof has its own response,
+// not just one of three synchronized height groups. Both wrap copies share it.
+const ARCADE_TOWER_GAIN = Object.freeze([1.25,.55,1.1,.72,1.18,.48,.94,
+  .62,1.25,.5,1.08,.76,1.2,.52,.98,.58,1.25,.72,1.12,.46]);
+const ARCADE_TOWER_BLEND = Object.freeze([0,.32,.12,.48,.08,.4,.24,
+  .38,0,.46,.15,.3,.06,.42,.18,.36,0,.28,.12,.48]);
 const GRID_COLS = 9; // perspective lane lines each side of centre
 const GRID_ROWS = 9;
 const LANE_PX = 84; // lane spacing at the bottom of the screen
@@ -72,8 +83,9 @@ export class BiomeFx {
     this.root = add.container(0, 0).setScrollFactor(0).setDepth(DEPTH);
     const img = (name, x, y) => (hasBackdropArt(scene, name)
       ? add.image(x, y, BACKDROP_ART[name].key).setOrigin(0, 0).setScrollFactor(0) : null);
+    // Pin the full texture: registering EQ slices changes Phaser's default frame.
     const tile = (name, x, y, w, h) => (hasBackdropArt(scene, name)
-      ? add.tileSprite(x, y, w, h, BACKDROP_ART[name].key).setOrigin(0, 0).setScrollFactor(0) : null);
+      ? add.tileSprite(x, y, w, h, BACKDROP_ART[name].key, '__BASE').setOrigin(0, 0).setScrollFactor(0) : null);
 
     // Debutmont
     this.debutSky = img('debutmontSky', 0, 8);
@@ -88,16 +100,38 @@ export class BiomeFx {
     this.arcSky = img('arcadeSky', 0, HORIZON_Y - BACKDROP_ART.arcadeSky.h);
     this.arcSun = img('arcadeSun', 300, HORIZON_Y - BACKDROP_ART.arcadeSun.h);
     this.arcSkyline = tile('arcadeSkyline', 0, HORIZON_Y - BACKDROP_ART.arcadeSkyline.h, GAME_WIDTH, BACKDROP_ART.arcadeSkyline.h);
+    this.arcTowers = this._buildArcadeTowers();
     this.gridG = add.graphics().setScrollFactor(0);
     this.crt = this._crtImage();
     const kids = [this.debutSky, this.ridgeFar, this.ridgeNear, this.snowG, this.debrisG, this.debrisAdd, this.veilG,
-      this.arcSky, this.arcSun, this.arcSkyline, this.gridG, this.crt];
+      this.arcSky, this.arcSun, this.arcSkyline, ...this.arcTowers, this.gridG, this.crt];
     this.root.add(kids.filter(Boolean));
     this.root.setVisible(false);
 
     this._buildPools();
     this.setPalettes(palette, arcadePalette);
     this._applyVisibility(0);
+  }
+
+  // Split the existing texture rather than introducing replacement buildings.
+  // Frames are shared across runs; sprites are allocated only at scene setup.
+  _buildArcadeTowers() {
+    if (!this.arcSkyline) return [];
+    const a = BACKDROP_ART.arcadeSkyline;
+    const texture = this.scene.textures?.get(a.key);
+    if (!texture?.add || !texture?.has) return [];
+    const towers = [];
+    for (let i=0;i<ARCADE_TOWER_EDGES.length-1;i++) {
+      const x=ARCADE_TOWER_EDGES[i]*4, w=ARCADE_TOWER_EDGES[i+1]*4-x;
+      const frame='arcade-eq-'+i;
+      if (!texture.has(frame)) texture.add(frame,0,x,0,w,a.h);
+      for(let copy=0;copy<2;copy++){
+        const sprite=this.scene.add.image(x+copy*a.w,HORIZON_Y,a.key,frame)
+          .setOrigin(0,1).setScrollFactor(0).setVisible(false);
+        towers.push(sprite);
+      }
+    }
+    return towers;
   }
 
   // ------------------------------------------------------------------ setup
@@ -176,6 +210,7 @@ export class BiomeFx {
     if (this.arcSky) this.arcSky.setTint(a.magenta).setAlpha(0);
     if (this.arcSun) this.arcSun.setTint(a.magenta).setAlpha(0);
     if (this.arcSkyline) this.arcSkyline.setTint(a.cyan).setAlpha(0);
+    for(const tower of this.arcTowers||[]) tower.setTint(a.cyan).setAlpha(0);
     // deep blue / near black checker for the veil blocks, derived from the palette so colour-blind mode applies
     this.veilA = a.bg;
     this.veilB = mixColor(a.bgAlt, a.cyan, 0.1);
@@ -221,6 +256,10 @@ export class BiomeFx {
     if (this.arcSky) this.arcSky.setVisible(arc);
     if (this.arcSun) this.arcSun.setVisible(arc);
     if (this.arcSkyline) this.arcSkyline.setVisible(arc);
+    if(!arc&&this._arcTowersActive){
+      for(const tower of this.arcTowers||[])tower.setVisible(false).setScale(1,1);
+      this._arcTowersActive=false;
+    }
     if (this.crt) this.crt.setVisible(arc);
     this.root.setVisible(this.debut || this.gdg || arc);
   }
@@ -234,23 +273,34 @@ export class BiomeFx {
    * @param {boolean} reduced reduced motion: art stays, time-driven motion stops
    * @returns {void}
    */
-  update(scrollX, timeMs, veil, reduced) {
+  update(scrollX, timeMs, veil, reduced, skylineBands = null) {
     this.veil = veil;
     this._applyVisibility(veil);
     if (!this.root.visible) return;
     const t = reduced ? 0 : timeMs;
-    if (this.debut && veil < 1) this._drawDebutmont(scrollX, t, timeMs, reduced);
-    if (this.gdg && veil < 1 && !reduced) this._drawDebris(scrollX, t);
+    const dance = reduced ? 0 : visibleDanceStrength(this.bg?.danceStrength);
+    if (this.debut && veil < 1) this._drawDebutmont(scrollX, t, timeMs, reduced, dance);
+    if (this.gdg && veil < 1 && !reduced) this._drawDebris(scrollX, t, dance);
     else if (this.gdg) { this.debrisG.clear(); this.debrisAdd.clear(); }
-    if (veil > 0) this._drawArcade(scrollX, veil);
+    if (veil > 0) this._drawArcade(scrollX, veil, dance, reduced ? null : skylineBands);
   }
 
   // ------------------------------------------------------------------ Debutmont
 
-  _drawDebutmont(scrollX, t, runMs, reduced) {
+  _drawDebutmont(scrollX, t, runMs, reduced, dance = 0) {
     const p = this.palette;
-    if (this.ridgeFar) this.ridgeFar.tilePositionX = Math.round(scrollX * 0.1);
-    if (this.ridgeNear) this.ridgeNear.tilePositionX = Math.round(scrollX * 0.22);
+    if (this.ridgeFar) {
+      const lift=Math.round(22*dance);
+      this.ridgeFar.tilePositionX=Math.round(scrollX*.1-12*dance);
+      this.ridgeFar.y=54-lift;
+      this.ridgeFar.scaleY=1+lift/BACKDROP_ART.debutmontRidgeFar.h;
+    }
+    if (this.ridgeNear) {
+      const lift=Math.round(36*dance);
+      this.ridgeNear.tilePositionX=Math.round(scrollX*.22+20*dance);
+      this.ridgeNear.y=100-lift;
+      this.ridgeNear.scaleY=1+lift/BACKDROP_ART.debutmontRidgeNear.h;
+    }
     // ---- blocky pixel snow: whole-pixel squares, a slight stepped horizontal jitter, no round flakes
     const g = this.snowG;
     g.clear();
@@ -258,8 +308,8 @@ export class BiomeFx {
     for (let i = 0; i < SNOW_COUNT; i++) {
       const s = this.snowS[i];
       const jit = reduced ? 0 : Math.floor(hash01(jstep + i * 131, this._seed) * 3) - 1;
-      const x = ((wrap(this.snowX[i] - scrollX * this.snowZ[i] - t * 0.0045 * s + jit, GAME_WIDTH)) >> 1) << 1;
-      const y = ((wrap(this.snowY[i] + (t * this.snowV[i]) / 1000, GAME_HEIGHT)) >> 1) << 1;
+      const x = ((wrap(this.snowX[i] - scrollX * this.snowZ[i] - t * 0.0045 * s + jit + dance * (i % 2 ? 24 : -24), GAME_WIDTH)) >> 1) << 1;
+      const y = ((wrap(this.snowY[i] + (t * this.snowV[i]) / 1000 - dance * (12 + 3*s), GAME_HEIGHT)) >> 1) << 1;
       g.fillStyle(i % 6 === 0 ? p.cyan : p.text, s === 4 ? 0.85 : s === 3 ? 0.7 : 0.55);
       g.fillRect(x, y, s, s);
     }
@@ -285,7 +335,7 @@ export class BiomeFx {
 
   // ------------------------------------------------------------------ Garbage Dump Glacier
 
-  _drawDebris(scrollX, t) {
+  _drawDebris(scrollX, t, dance = 0) {
     const p = this.palette;
     const g = this.debrisG;
     const ga = this.debrisAdd;
@@ -295,7 +345,7 @@ export class BiomeFx {
     for (let i = 0; i < DEBRIS_TRASH + DEBRIS_FRAG; i++) {
       const k = this.dK[i];
       let x = wrap(this.dX[i] + (t * this.dVx[i]) / 1000 - scrollX * this.dZ[i], GAME_WIDTH);
-      const y = ((wrap(this.dY[i] + (t * this.dVy[i]) / 1000, DEBRIS_BAND_H)) >> 1) << 1;
+      const y = ((wrap(this.dY[i] + (t * this.dVy[i]) / 1000 - dance * (i % 2 ? 32 : 20), DEBRIS_BAND_H)) >> 1) << 1;
       if (k < 3) {
         // blocky trash: 2-6 px rectangles in the glacier's greens, low alpha, behind the play layer
         g.fillStyle(k === 0 ? p.lime : k === 1 ? p.amber : p.text, 0.62);
@@ -353,7 +403,45 @@ export class BiomeFx {
     for (let y = 0; y <= GAME_HEIGHT; y += VEIL_CELL_PX) g.lineBetween(0, y, GAME_WIDTH, y);
   }
 
-  _drawArcade(scrollX, veil) {
+  _drawArcadeSkyline(scrollX, alpha, bands) {
+    if(!this.arcSkyline)return;
+    const offset=Math.round(scrollX*.05);
+    const towers=this.arcTowers||[];
+    const active=towers.length>0&&alpha>0&&bands&&
+      (bands[0]>0.005||bands[1]>0.005||bands[2]>0.005);
+    this.arcSkyline.setAlpha(alpha).setVisible(!active);
+    this.arcSkyline.tilePositionX=offset;
+    // No per-building updates outside the active EQ. Keep off-screen copies
+    // hidden, so only one screen of towers participates in rendering.
+    if(!active&&!this._arcTowersActive)return;
+    this._arcTowersActive=!!active;
+    const shift=wrap(offset,BACKDROP_ART.arcadeSkyline.w);
+    for(let i=0;i<towers.length;i+=2){
+      const j=i/2, band=Math.min(2,Math.floor(j*3/(towers.length/2)));
+      const x=ARCADE_TOWER_EDGES[j]*4-shift;
+      const blend=ARCADE_TOWER_BLEND[j];
+      const neighbor=band===0?1:band===2?1:j%2===0?0:2;
+      // Treble is normally quieter in a full mix; give it a little more
+      // visual sensitivity, without exceeding the original maximum height.
+      const primary=active?clamp01((bands[band]||0)*(band===2?1.6:1)):0;
+      const secondary=active?clamp01((bands[neighbor]||0)*(neighbor===2?1.6:1)):0;
+      const level=primary*(1-blend)+secondary*blend;
+      const sy=1+ARCADE_TOWER_GAIN[j]*level;
+      for(let copy=0;copy<2;copy++){
+        const tower=towers[i+copy];
+        const left=x+copy*BACKDROP_ART.arcadeSkyline.w;
+        const w=(ARCADE_TOWER_EDGES[j+1]-ARCADE_TOWER_EDGES[j])*4;
+        const visible=!!active&&left+w>0&&left<GAME_WIDTH;
+        tower.setVisible(visible);
+        if(active){
+          tower.x=left;
+          tower.setScale(1,sy).setAlpha(alpha);
+        }else tower.setScale(1,1);
+      }
+    }
+  }
+
+  _drawArcade(scrollX, veil, dance = 0, skylineBands = null) {
     const a = this.arc;
     // The block layer depends only on the veil level (and the palette), so it is drawn when the level changes and
     // left alone otherwise: the whole pure-arcade stretch of a bridge costs no redraw.
@@ -365,11 +453,18 @@ export class BiomeFx {
     // ---- the arcade scene fades in over the last stretch of the dissolve (under near-full coverage, so no pop)
     const a1 = clamp01((veil - 0.6) / 0.4);
     if (this.arcSky) this.arcSky.setAlpha(0.45 * a1);
-    if (this.arcSun) this.arcSun.setAlpha(0.95 * a1);
-    if (this.arcSkyline) {
-      this.arcSkyline.setAlpha(0.55 * a1);
-      this.arcSkyline.tilePositionX = Math.round(scrollX * 0.05);
+    if (this.arcSun) {
+      this.arcSun.setAlpha(0.95 * a1);
+      // Preserve the original centre with the artwork's top-left origin.
+      // A squash-and-hop rather than just resizing. Keep the horizontal
+      // centre fixed and let the veil continue to own opacity.
+      const sx=1+ARCADE_SUN_DANCE.squashX*dance;
+      const sy=1-ARCADE_SUN_DANCE.squashY*dance;
+      this.arcSun.setScale(sx,sy);
+      this.arcSun.x=300-BACKDROP_ART.arcadeSun.w*(sx-1)/2;
+      this.arcSun.y=HORIZON_Y-BACKDROP_ART.arcadeSun.h-BACKDROP_ART.arcadeSun.h*(sy-1)/2-ARCADE_SUN_DANCE.bounce*dance;
     }
+    this._drawArcadeSkyline(scrollX,0.55*a1,skylineBands);
     if (this.crt) this.crt.setAlpha(veil);
     const gg = this.gridG;
     if (veil < 0.5) { if (this._gridKey !== 0) { gg.clear(); this._gridKey = 0; } return; }

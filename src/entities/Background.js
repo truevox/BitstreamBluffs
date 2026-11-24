@@ -214,7 +214,7 @@ export function motifProfile(shape, wx, seed) {
 function horizonDanceOffset(scrollX, screenX, layer, dance = 0) {
   if (!(dance > 0)) return 0;
   const wx = screenX + scrollX * layer.factor;
-  return 1.7 * dance * Math.sin(wx * 0.02 + layer.seed);
+  return dance * (-12 + 33 * Math.sin(wx * 0.02 + layer.seed));
 }
 
 /** Screen y of the background silhouette; decor roots track its tiny sway. */
@@ -265,8 +265,14 @@ function mulberry32(a) {
 
 /** Horizontal tile the decor items repeat over; wider than the screen so nothing pops at the seams. */
 const DECOR_TILE = 960;
-/** Items are emitted only while their anchor is within this many px of the screen. */
+/** Original tile phase and default anchor cull. Never change the phase when extending the cull. */
 const DECOR_MARGIN = 40;
+// Conservative full-animation horizontal extents, including stroke:
+// planet: 15*1.9*1.9 < 55; cane: 44px arc + 13px hook + stroke;
+// grass: 18px lean + 25 + 100*.48 sway + 12px width + stroke.
+// Keep the wider margin even while neutral, so an accent cannot change
+// which tile copy is selected near the edge. The tile has ample space.
+const DECOR_CULL = Object.freeze({ planet: 60, cane: 64, blade: 112, vent: 60 });
 /** Per-motif base seed for the decor layout (any fixed odd number; changing one re-lays that motif). */
 const DECOR_SEEDS = {
   stars: 0x5ca7, 'candy-stripes': 0xc4d1, jellyfish: 0x1e11, 'brass-pipes': 0xb4a5, 'dew-drops': 0xde3d, vents: 0x7e57,
@@ -274,11 +280,14 @@ const DECOR_SEEDS = {
 const EMPTY_DECOR = Object.freeze([]);
 
 /** Screen x of an item anchored at tile x `x0` scrolling at `factor`, or null if it is off screen. */
-function tileX(x0, scrollX, factor) {
+function tileX(x0, scrollX, factor, margin = DECOR_MARGIN) {
   let x = (x0 - scrollX * factor) % DECOR_TILE;
   if (x < 0) x += DECOR_TILE;
   x -= DECOR_MARGIN;
-  return x > GAME_WIDTH + DECOR_MARGIN ? null : x;
+  // The original anchor phase is unchanged. Recover the previous tile
+  // copy on the left when its animated geometry can still be on screen.
+  if (x >= DECOR_TILE - margin) x -= DECOR_TILE;
+  return x < -margin || x > GAME_WIDTH + margin ? null : x;
 }
 
 /**
@@ -361,6 +370,15 @@ function ellipsePts(cx, cy, rx, ry, rot, n) {
  *   the perf comparison switch). Default on. Bee primitives carry `bee: id`.
  * @returns {ReadonlyArray<Object>} primitives in draw order
  */
+// Presentation-only audition tuning, in native pixels/radians.
+const DECOR_DANCE = Object.freeze({
+  gearRock: 1.4,
+  ventLift: 56, ventExpansion: 1.45, ventMouth: 7,
+  grassSwayBase: 25, grassSwayPerHeight: 0.48, grassBow: 0.19,
+  caneSwingAngle: 2.1, caneSwingMs: 165, popLift: 39, popSway: 17, popGrow: 0.35, popSpin: 1.8,
+  jellyLift: 42, jellySquash: 1.05, jellyTentacle: 0.24,
+});
+
 export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
   if (typeof motif !== 'string' || !DECOR_SEEDS[motif] || !MOTIFS.includes(motif)) return EMPTY_DECOR;
   const sx = Number.isFinite(scrollX) ? scrollX : 0;
@@ -387,11 +405,12 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       }
     }
     const pl = lay.planet;
-    const px = tileX(pl.x0, sx, 0.012);
+    const px = tileX(pl.x0, sx, 0.012, DECOR_CULL.planet);
     if (px !== null) {
-      const r = pl.r * (1 + 0.04 * dance);
-      out.push({ kind: 'circle', depth: -1, color: 'lime', fillAlpha: 0.2, lineAlpha: 0.6, x: px, y: pl.y, r });
-      out.push({ kind: 'poly', depth: -1, color: 'amber', fillAlpha: 0, lineAlpha: 0.65, pts: ellipsePts(px, pl.y, r * 1.9, r * 0.42, pl.tilt, 20) });
+      const r = pl.r * (1 + 0.9 * dance);
+      const py=pl.y-28*dance;
+      out.push({ kind: 'circle', depth: -1, color: 'lime', fillAlpha: 0.2, lineAlpha: 0.6, x: px, y: py, r });
+      out.push({ kind: 'poly', depth: -1, color: 'amber', fillAlpha: 0, lineAlpha: 0.65, pts: ellipsePts(px, py, r * 1.9, r * 0.42, pl.tilt, 20) });
     }
   } else if (motif === 'candy-stripes') {
     // Candy-cane sky: slanted alternating bands across the upper sky, scrolling slowly.
@@ -412,20 +431,33 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     // Candy canes standing on the far ridge: a striped stick and hook, drawn as alternating segments.
     const L0 = def.layers[0];
     for (const c of lay.canes) {
-      const x = tileX(c.x0, sx, L0.factor);
+      const x = tileX(c.x0, sx, L0.factor, DECOR_CULL.cane);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L0, sx, x, horizonDance) + 2;
-      const top = yB - c.h;
       const dir = c.flip ? -1 : 1;
+      // A springy, alternating bend. Arc length stays constant, and the hook
+      // follows the tip tangent instead of stretching sideways with the stem.
+      const theta = dance * DECOR_DANCE.caneSwingAngle *
+        Math.sin(t / DECOR_DANCE.caneSwingMs + c.x0 * .019);
+      const centre = (u) => Math.abs(theta) < 1e-8
+        ? { x, y: yB - c.h * u }
+        : { x: x + c.h * (1 - Math.cos(theta * u)) / theta,
+            y: yB - c.h * Math.sin(theta * u) / theta };
+      const tip = centre(1);
+      const cs = Math.cos(theta), sn = Math.sin(theta);
+      const hook = (dx, dy) => ({
+        x: tip.x + dx * cs - dy * sn,
+        y: tip.y + dx * sn + dy * cs,
+      });
       const path = [];
-      const flex = dance * 3 * dir;
-      for (let y = yB; y > top; y -= 5)
-        path.push({ x: x + flex * ((yB - y) / c.h), y });
+      for (let y = yB; y > yB - c.h; y -= 5) {
+        path.push(Math.abs(theta) < 1e-8 ? { x, y } : centre((yB - y) / c.h));
+      }
       for (let i = 0; i <= 6; i++) {
         const a = Math.PI - (i / 6) * Math.PI;
-        path.push({ x: x + flex + dir * (6 + Math.cos(a) * 6), y: top - Math.sin(a) * 6 });
+        path.push(hook(dir * (6 + Math.cos(a) * 6), -Math.sin(a) * 6));
       }
-      path.push({ x: x + flex + dir * 12, y: top + 5 });
+      path.push(hook(dir * 12, 5));
       // One white stroke for the whole cane, then a red stripe on every other segment.
       out.push({ kind: 'line', depth: 0, color: 'text', alpha: 0.7, width: 3, pts: path });
       for (let i = 0; i < path.length - 1; i += 2) {
@@ -438,15 +470,20 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(lp.x0, sx, L1.factor);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L1, sx, x, horizonDance) + 2;
-      const cy = yB - lp.stick - lp.r - dance * 2.5;
-      out.push({ kind: 'line', depth: 1, color: 'text', alpha: 0.55, width: 2, pts: [{ x, y: yB }, { x, y: cy + lp.r }] });
-      out.push({ kind: 'circle', depth: 1, color: lp.color, fillAlpha: 0.32, lineAlpha: 0.75, x, y: cy, r: lp.r });
+      const accent = dance * (0.85 + 0.15 * Math.sin(t / 240 + lp.ph));
+      const sway = DECOR_DANCE.popSway * accent * Math.sin(lp.ph);
+      const cx = x + sway;
+      const cy = yB - lp.stick - lp.r - accent * DECOR_DANCE.popLift;
+      const radius = lp.r * (1 + DECOR_DANCE.popGrow * accent);
+      const stem = [{ x, y: yB }, { x: cx, y: cy + radius }];
+      out.push({ kind: 'line', depth: 1, color: 'text', alpha: 0.55, width: 2, pts: stem });
+      out.push({ kind: 'circle', depth: 1, color: lp.color, fillAlpha: 0.32, lineAlpha: 0.75, x: cx, y: cy, r: radius });
       const spiral = [];
-      const spin = t * 0.001 + lp.ph;
+      const spin = t * 0.001 + lp.ph + accent * DECOR_DANCE.popSpin;
       for (let i = 0; i <= 16; i++) {
         const a = spin + (i / 16) * Math.PI * 3.5;
-        const rr = (i / 16) * lp.r * 0.85;
-        spiral.push({ x: x + Math.cos(a) * rr, y: cy + Math.sin(a) * rr });
+        const rr = (i / 16) * radius * 0.85;
+        spiral.push({ x: cx + Math.cos(a) * rr, y: cy + Math.sin(a) * rr });
       }
       out.push({ kind: 'line', depth: 1, color: 'text', alpha: 0.6, width: 1, pts: spiral });
     }
@@ -454,8 +491,11 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     for (const j of lay.jellies) {
       const x = tileX(j.x0, sx, j.f);
       if (x === null) continue;
-      const pulse = 1 + 0.08 * Math.sin(t / 520 + j.ph) + 0.09 * dance;
-      const y = j.y + Math.sin(t / 1400 + j.ph) * 5;
+      // Phase-varied accent gains keep the school from moving as one rigid sprite.
+      const accent = dance * (0.83 + 0.17 * Math.sin(t / 230 + j.ph));
+      const pulse = 1 + 0.08 * Math.sin(t / 520 + j.ph) + DECOR_DANCE.jellySquash * accent;
+      const baseY = j.y + Math.sin(t / 1400 + j.ph) * 5;
+      const y = baseY - Math.min(DECOR_DANCE.jellyLift * accent, Math.max(0, baseY - j.s * 0.8 - 4));
       const rx = j.s * pulse;
       const ry = (j.s * 0.8) / pulse;
       const bell = [];
@@ -468,7 +508,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       out.push({ kind: 'poly', depth: -1, color: j.color, fillAlpha: 0.22, lineAlpha: 0.6, pts: bell });
       for (let k = 0; k < 4; k++) {
         const bx = x - rx * 0.6 + (k / 3) * rx * 1.2;
-        const len = j.s * 2.2;
+        const len = j.s * 2.2 * (1 - DECOR_DANCE.jellyTentacle * accent);
         const tend = [];
         for (let i = 0; i <= 5; i++) {
           const u = i / 5;
@@ -483,7 +523,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(gr.x0, sx, 0.06);
       if (x === null) continue;
       const teeth = Math.max(6, Math.round(gr.r / 2.4));
-      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * 0.055 * gr.dir;
+      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * DECOR_DANCE.gearRock * gr.dir;
       const pts = [];
       for (let i = 0; i < teeth; i++) {
         const a = rot + (i / teeth) * Math.PI * 2;
@@ -495,6 +535,14 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       }
       out.push({ kind: 'poly', depth: -1, color: 'amber', fillAlpha: 0.16, lineAlpha: 0.55, pts });
       out.push({ kind: 'circle', depth: -1, color: 'amber', fillAlpha: 0, lineAlpha: 0.55, x, y: gr.y, r: gr.r * 0.38 });
+      // An asymmetric reference spoke makes the actual rotation readable:
+      // identical teeth alone visually alias as the wheel rocks.
+      for (const [offset, width] of [[0, 3], [Math.PI * 0.7, 1], [Math.PI * 1.35, 1]]) {
+        const a = rot + offset;
+        out.push({ kind: 'line', depth: -1, color: 'amber', alpha: 0.72, width,
+          pts: [{ x: x + Math.cos(a) * gr.r * 0.38, y: gr.y + Math.sin(a) * gr.r * 0.38 },
+            { x: x + Math.cos(a) * gr.r * 0.91, y: gr.y + Math.sin(a) * gr.r * 0.91 }] });
+      }
     }
     // A brass pipe run in front of the far roofline: pipe, highlight, flanges, and some drop pipes.
     const L0 = def.layers[0];
@@ -517,13 +565,17 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
   } else if (motif === 'dew-drops') {
     for (const b of lay.blades) {
       const L = def.layers[b.layer];
-      const x = tileX(b.x0, sx, L.factor);
+      const x = tileX(b.x0, sx, L.factor, DECOR_CULL.blade);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L, sx, x, horizonDance) + 3;
-      const beatSway = dance * (3 + b.h * 0.045) * Math.sin(b.ph);
+      // Neighbouring blades share a travelling wave, with a local phase offset.
+      // The envelope gates the entire movement, so OFF is exactly neutral.
+      const wave = Math.sin(t / 330 - b.x0 / 105 + b.ph * .22);
+      const beatSway = dance * (DECOR_DANCE.grassSwayBase + b.h * DECOR_DANCE.grassSwayPerHeight) * wave;
+      const bow = dance * DECOR_DANCE.grassBow * b.h * (0.65 + 0.35 * Math.abs(wave));
       const centre = (u) => ({
         x: x + (b.lean + beatSway) * u * u,
-        y: yB - b.h * u,
+        y: yB - b.h * u + bow * u * u,
       });
       const left = [];
       const right = [];
@@ -555,23 +607,26 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     def.layers.forEach((L, li) => {
       const s71 = L.seed * 71;
       const off = sx * L.factor;
-      const c0 = Math.floor((off - DECOR_MARGIN + s71) / CONE_W);
-      const c1 = Math.floor((off + W + DECOR_MARGIN + s71) / CONE_W);
+      const c0 = Math.floor((off - DECOR_CULL.vent + s71) / CONE_W);
+      const c1 = Math.floor((off + W + DECOR_CULL.vent + s71) / CONE_W);
       const plumeH = li === 0 ? 58 : 44;
       for (let c = c0; c <= c1; c++) {
         if (hash01(c, L.seed * 1000 + 17) < 0.25) continue;
         const cx = (c + 0.5) * CONE_W - s71 - off;
-        if (cx < -60 || cx > W + 60) continue;
+        if (cx < -DECOR_CULL.vent || cx > W + DECOR_CULL.vent) continue;
         const top = layerYAt(def.shape, L, sx, cx, horizonDance) + 1;
-        out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 + dance * 0.7 });
+        out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 + dance * DECOR_DANCE.ventMouth });
         const cell = hash01(c, 4242);
+        // Steam expands as a column on accents, then contracts with the
+        // envelope. Keep young puffs near the mouth; older puffs billow.
+        const breath = dance * (0.85 + 0.15 * Math.sin(t / 320 + cell * Math.PI * 2));
         for (let k = 0; k < 6; k++) {
           const age = (((t / 3800 + k / 6 + cell) % 1) + 1) % 1;
           out.push({
             kind: 'circle', depth: li, color: 'text', fillAlpha: 0.3 * (1 - age), lineAlpha: 0,
             x: cx + age * 14 * lay.wind + Math.sin(age * 5 + lay.ph + c) * 3,
-            y: top - 4 - age * plumeH,
-            r: (2.5 + age * 8) * (li === 0 ? 1 : 0.8),
+            y: top - 4 - age * (plumeH + DECOR_DANCE.ventLift * breath),
+            r: (2.5 + age * 8) * (li === 0 ? 1 : 0.8) * (1 + DECOR_DANCE.ventExpansion * breath * (0.45 + 0.55 * age)),
           });
         }
       }
@@ -592,6 +647,7 @@ export class Background {
     this.skin = null; // #65: 'pixel' = BiomeFx draws the sky and ridgelines (Debutmont's SVG art); null = drawn here
     this.decorSeed = 0; // layout seed for motifDecor; fixed so a biome's backdrop looks the same every run
     this.bees = true; // Micro glow-up: draw the dew-drops bees (false = the perf comparison baseline)
+    this.danceStrength = 0; // frame-local presentation input for BiomeFx
     this.beeCount = 0; // bees drawn in the last frame (the built-game gate reads it)
     this.gfx = scene.add.graphics().setScrollFactor(0).setDepth(-100);
     const rnd = mulberry32(0xb175);
@@ -742,7 +798,8 @@ export class Background {
   update(scrollX, timeMs, speedPxS = 0, danceStrength = 0) {
     const g = this.gfx;
     const p = this.palette;
-    const dance = biomeDanceStyle(this.motif,danceStrength);
+    this.danceStrength = Number.isFinite(danceStrength) ? Math.max(0,Math.min(1,danceStrength)) : 0;
+    const dance = biomeDanceStyle(this.motif,this.danceStrength);
     g.clear();
     // sky gradient (banded)
     const pixel = this.skin === 'pixel';
