@@ -1412,6 +1412,10 @@ export class RunScene extends Phaser.Scene {
       (stepMs) => {
         const actualTouchdown=!!sled.endStep(stepMs);
         stepElapsedMs+=stepMs;
+        // Flow is a CAUSAL score multiplier. It must age THROUGH each real
+        // physics substep BEFORE contact points are banked, never after the
+        // whole frame when a new landing has already refreshed its timer.
+        this.emitFlow(this.score.tick(stepMs));
         const paidKick=!!sled.airBrakeKickPulse;
         if (paidKick) kickSinceTouchdown=true;
         sled.airBrakeKickPulse=0; // retain actual event in local ordered tick evidence
@@ -1464,8 +1468,10 @@ export class RunScene extends Phaser.Scene {
       this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
       this.publishBsodState(this.bsodState);
     }
-    // flow timeout runs on the same scaled run clock as physics (slow-mo stretches it, pause / hit-stop freeze it)
-    this.emitFlow(this.score.tick(simDt));
+    // Flow already advanced once per actual physics substep before contact
+    // settlement. Do not double-charge the newly refreshed landing timer.
+    // At zero sim time (hit stop), preserve the historical zero-time check.
+    if (!(simDt>0)) this.emitFlow(this.score.tick(0));
 
     // SFX with no event: push / hop (+ wind speed every frame)
     const audio = this.registry.get(REG.AUDIO);
@@ -1499,6 +1505,13 @@ export class RunScene extends Phaser.Scene {
     // trick tracking (always fed; flagged crashed on the frame a crash is detected)
     sled.stepHeli(dt);
     const fs = sled.getFrameState(this.runTimeMs, dt);
+    if (substepTouchdowns.length) {
+      // A buffered new flight begins AFTER its latest real contact, not at
+      // the beginning of this fixed tick. Otherwise a sub-120ms flight can
+      // accidentally inherit pre-landing time and earn a fake bonus.
+      const lastContactMs=substepTouchdowns[substepTouchdowns.length-1].fs.timeMs;
+      fs.dtMs=Math.max(0,this.runTimeMs-lastContactMs);
+    }
     fs.input.airBrakeKicked = airBrakeKickedThisTick; // earlier kicks were settled at real contacts
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
     const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);
