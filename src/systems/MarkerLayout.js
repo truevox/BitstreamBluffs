@@ -45,6 +45,7 @@ export function layoutMarkerLabels(best, death) {
  * At a shared boundary either joined neighbor has the same endpoint height.
  * Iterate the mesh's insertion order consistently and never request a chunk.
  * Return NaN until physically joined; the normal marker update defers drawing.
+ * SIM8 release contract: rendering must not touch generator caches or queues.
  *
  * @param {number} x marker world coordinate
  * @param {Map<number,{startX:number,endX:number,points:{x:number,y:number}[]}>} joined

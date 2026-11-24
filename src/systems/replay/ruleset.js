@@ -77,8 +77,8 @@ export const SIM_REVISION = 8;
  * accepts a `behavior-change-unreleased:` attestation. Set this to SIM_REVISION in the PR that releases a ruleset: from
  * then on a behavior change needs a real SIM_REVISION bump. Not part of the ruleset document or the id.
  */
-// SIM8 is still unmerged on this causal-correction commit; main released SIM7.
-export const LAST_RELEASED_SIM_REVISION = 7;
+// Freeze the reviewed SIM8 rule for this release commit; main stays SIM7 until merge.
+export const LAST_RELEASED_SIM_REVISION = 8;
 
 export const RULESET_FORMAT = 'bb-ruleset';
 export const RULESET_FORMAT_VERSION = 1;
