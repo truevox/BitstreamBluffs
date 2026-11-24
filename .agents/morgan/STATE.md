@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 10:49 UTC. Main: `e3fdd814fbc4903ec33853976c1203cb72452ab6` (#308 docs only); shipped game remains SIM8 v2.19.22 at `2dcd07fa`.
+Last verified: 2026-11-24 11:53 UTC. Main: `e3fdd814fbc4903ec33853976c1203cb72452ab6` (#308 docs only); shipped game remains SIM8 v2.19.22 at `2dcd07fa`.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -195,21 +195,32 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   remains open; leave release and broader work in their lane.
   #248 is historical preview only. Owner approved the tested 60% AirBrake
   kick and unchanged upward impulse. #299 SIM8 landed as 2dcd07fa. Gal/Home's
-  #300 now targets main directly, latest draft `a990a5c39d673fc22e1234ba74b3c83bddf33039`
-  (SIM9, proposed v2.19.23), with ordered midtick kick/touchdown settlement.
-  #306 integrated music draft `6a7a6c026274379c144e28260f8fc0379f029bd6` shares
-  RunScene.js and the source-digest manifest. The second branch must
-  preserve both runtime paths, regenerate the attestation against landed
-  main, and retest normal browser entry for same-tick paid kick/touchdown
-  and isolated, cache-pure music observations. Both are drafts with no
-  formal reviews; GitHub checks are not approval. Pin receipts to exact
-  tested heads. Local exact-head composition: RunScene merged cleanly;
-  regenerated manifest resolved the only conflict. 351 focused tests,
-  ruleset/identity and normal Vite build pass. The fixed 440-tick Chromium
-  path is byte-identical with and without 440 injected audio callback
-  failures, including one paid kick at tick 37 and actual landing at 104.
-  No page or outbound errors. Same-tick relaunch covered by focused tests,
-  not by that browser path. No published branch or preview.
+  #300 latest draft `f7931826232c61b6b6c6d757c4428339a5e51682`
+  (SIM9, proposed v2.19.23) refines actual contact slope, ordered
+  per-touchdown bluff credit, protected Hop-lift scaling, and sloppy landing
+  recovery. #306 integrated music draft
+  `8fbdc753ad6e1f15b4d47bf3ae76bc7a9efdd30b` proposes v2.20.0.
+  Both await independent exact-head review. RunScene merged cleanly in
+  local composition on main, but the source-digest, changelog, package and
+  lock conflict. Re-attest on the actual release base; coordinate version
+  and preserve both runtime routes. Scratch resolution only: 188 focused
+  tests, ruleset/identity and production build passed. Real normal-entry
+  Chromium: matched 440-tick physical path, paid kick 37, actual landing
+  104, despite 440 motion callback exceptions and a separate landing
+  callback exception at 104. Ordinary landing SFX and the later gameplay
+  listener still fired. No outbound or page errors; no live release.
+  Same-tick buffered relaunch remains unit-test evidence.
+  #310 QA draft `992eb3f4c1c32d24dc7eba525e86bf7e661938bf` is stacked on
+  that #306 head and adds scripted original-drum fatal-count-in tests.
+  Earlier 52-case estimate (-0.364 dBTP worst) is on a previous base.
+  Independent FFmpeg true-peak passed official EBU 3341 vectors 15–23
+  but both 4x meters underread a separate 19.2kHz synthetic control by
+  about 0.43 dB; 16x diagnostic recovered its known peak. No evidence
+  of actual game overs. Next in the existing #291 lane: same-host,
+  float-PCM remeasurement on exact source of worst/overlap/fatal cases and
+  full transition tails; keep bytes private and gains unchanged. The
+  private original-source run is still pending. No approval, publishing,
+  or mastered/beat-grid claim from a sampled stress check.
   #287 passes 111/111 on landed SIM8. Two held-input expectations fail
   both on earlier #300 `10df014` and on this exact newer composition:
   SIM9 credits the
