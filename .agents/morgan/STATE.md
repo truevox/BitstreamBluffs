@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 00:50 UTC. Main: `b569fa70815b15fdd1f7720ee3ae7b87aa31ccea` (SIM7, package/lock/changelog v2.19.21).
+Last verified: 2026-11-24 01:41 UTC. Main: `b569fa70815b15fdd1f7720ee3ae7b87aa31ccea` (SIM7, package/lock/changelog v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -24,7 +24,8 @@ going” means resume this queue, not take over other lanes or merge a draft.
    and every non-QA emitted asset; only the opt-in QA HTML, bundle and
    map changed. No new browser session. Have the release owner
    reconcile the numbering and confirm the next slot before any Morgan
-   merge; do not claim #248's previously proposed v2.19.22. #295 is still
+   merge; #299/#300 propose v2.19.22/.23, not owner-confirmed slots.
+   #295 is still
    a draft: no required independent Gal check or branch protection enabled.
    A pure package-number change keeps SIM7 physics but changes exact build
    ID (v2.19.21 ed6fb259…, hypothetical v2.19.22 997b60ea…). Exact-build
@@ -69,6 +70,12 @@ going” means resume this queue, not take over other lanes or merge a draft.
    draws. 24 focused tests, ruleset/identity and builds pass, no outbound
    or page errors. This is the local UI/upgrade fix, not old replay or
    sharing support. Previous #248-draft A/B remains separate evidence.
+   Exact #302 draft 4ca840e plus the #290 delta composes without conflict:
+   60 focused tests, normal build/identity and same-origin Chromium A/B.
+   Both variants kept the 416×236 Shop frame stable; interior click/G
+   stayed in Shop, Escape closed it, then Ghost labels and replace/clear/
+   retry behaved correctly. This is SIM7 scratch evidence, not a merged
+   head. Repeat on the actual integration base after any release change.
    Friend exchange still requires #58.
    #82 storage lifecycle needs separately scoped save-system review;
    #85 still needs authentic footage; #84/#83 and product #70/#71 need #60;
@@ -158,14 +165,17 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - #273 Seeking/Gal pilot: Luna posted exact-head delta source approval at
   `0fd1400` after the earlier retry timed out. It is still a draft and #130
   remains open; leave release and broader work in their lane.
-  #248 AirBrake remains Gal/Home-owned and draft at 4e0cff1, a different
-  SIM7 ruleset (13141411...) from landed #294 (f6efe964...). Its same
-  revision is indistinguishable to cosmetic ghost admission if tapes are
-  placed in one store; synthetic control reproduced this, not player data.
-  Normal separate preview origins do not share IndexedDB. Rebase causal
-  AirBrake on current main and apply the post-release revision bump rule
-  (or clearly preserve it as draft evidence). #266 preserves future
-  version/identity seams, not a prerelease old-tape support requirement.
+  #248 is historical preview only: its older draft SIM7 is not shipped
+  SIM7. Owner approved the tested 60% one-shot AirBrake slowdown and
+  unchanged upward kick; no new feel decision. Gal/Home own #299 SIM8
+  marker isolation at `5ed2d1ab8c9d9c0cfa57b7a8b3ee87638999fffc` and
+  #300 SIM9 AirBrake at `23b21e5d4eb9c23c068566904a2de7a7e1dddcf0`.
+  #300 is 2 ahead/1 behind #299 at fork 2286f88. The missing commit is
+  harness-only (served bundle/clean source/captured marker frames), not
+  missing marker physics. Both drafts need exact-head independent review.
+  Reconcile and rerun #300 on the actual post-#299 base; earlier browser
+  evidence does not establish exact combined release acceptance. Preserve
+  #266's future version/identity seams, not a prerelease old-tape mandate.
 - Main stays release-controlled. Keep synthetic developer evidence out of
   gameplay, saved formats, scoring and ranked eligibility unless authorized.
 
