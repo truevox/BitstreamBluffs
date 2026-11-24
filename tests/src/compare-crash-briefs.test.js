@@ -104,3 +104,36 @@ test('CLI requires two explicit bounded regular files and never echoes paths', (
     expectFailure(run(...args), 'Expected unchanged #190 v1 crash-brief JSON.');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+
+test('opt-in match requirement exposes different exit codes without altering the JSON or diagnostics', () => {
+  const cli = fileURLToPath(new URL('../../tools/sim/compare-crash-briefs.mjs', import.meta.url));
+  const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', timeout: 5000 });
+  const dir = mkdtempSync(join(tmpdir(), 'bb-crash-match-'));
+  const omitted = join(dir, 'private-observed.json');
+  try {
+    writeFileSync(omitted, generated('hazard', undefined));
+    for (const [observed, reference, expected] of [
+      [fixture('packet-spike'), fixture('packet-spike'), 0],
+      [fixture('terrain'), fixture('packet-spike'), 2],
+      [omitted, fixture('packet-spike'), 3],
+      [fixture('packet-spike'), omitted, 3],
+    ]) {
+      const args = ['--observed', observed, '--reference', reference];
+      const normal = run(...args), gated = run('--require-match', ...args);
+      expect(normal).toMatchObject({ status: 0, stderr: '' });
+      expect(gated).toMatchObject({ status: expected, stdout: normal.stdout, stderr: '' });
+      expect(gated.stdout).not.toContain(dir);
+    }
+    const args = ['--observed', omitted, '--reference', fixture('packet-spike')];
+    expect(run('--require-match', '--require-match', ...args)).toMatchObject({
+      status: 1, stdout: '', stderr: expect.stringContaining('Usage:'),
+    });
+    writeFileSync(omitted, 'not a brief');
+    const invalid = run('--require-match', ...args);
+    expect(invalid).toMatchObject({ status: 1, stdout: '', stderr: expect.stringContaining('Expected unchanged') });
+    expect(invalid.stderr).not.toContain(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

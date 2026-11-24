@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.20.1 — developer diagnostics and local replay artwork (2026-11-24)
+
+- #269: opt-in local Run DNA orientation study; existing V1 output stays unchanged and artwork is explicitly unverified.
+- #278: preserve the selected pose in the decimated developer strip preview.
+- #281: opt-in comparison exit statuses for crash-brief scripts.
+- #286: document source-pinned historical terrain/blind timing examples, not a current fairness verdict.
+- #288: explain the classic-only Daily shortlist input contract; do not admit fatigue reports.
+- No gameplay, scoring, soundtrack, replay admission or simulation changes. SIM9 remains sealed.
+
 ## v2.20.0 — owner-approved 60% one-shot AirBrake (SIM_REVISION 9, #247) (2026-11-24)
 
 - **Marvin's direct approval after playtest:** the sharper AirBrake was a huge improvement; the tested **60% instantaneous airborne horizontal speed reduction** with the **same vertical pop** is the approved production behavior, not a provisional feel experiment. Original direct owner affirmation: “I absolutely authorize that. It was a huge improvement over the original.”

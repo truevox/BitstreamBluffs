@@ -6,6 +6,9 @@ export const MAX_ART_SVG_BYTES = 8_192;
 const POSE_WIDTH = 3;
 const ART_POINTS = 64;
 const GRID = 4;
+const ORIENTATION_SLOTS = 16;
+const FULL_TURN = 2 * Math.PI;
+const ORIENTATION_COLORS = ['#384158', '#6883a6', '#78e5e8', '#ff9ccf'];
 const MAX_COMPONENT_MAGNITUDE = 1e9;
 
 function boundsOf(poses) {
@@ -55,15 +58,36 @@ function composePath(poses) {
   return { path, first: points[0], last: points.at(-1) };
 }
 
-/**
- * @param {Float32Array} poses Decoded GhostTape v1 x/y/angle triples.
- * @returns {string} Standalone ASCII SVG. No tape header or user strings accepted.
- */
-export function renderRunTraceArt(poses) {
+// Take the strongest *observed* shortest-arc delta in each fixed relative
+// band. Missing samples and full turns between samples cannot be inferred.
+function composeOrientationAccents(poses) {
+  const pairCount = poses.length / POSE_WIDTH - 1;
+  const peaks = new Uint8Array(ORIENTATION_SLOTS);
+  for (let i = 0; i < pairCount; i++) {
+    const slot = Math.floor((i + 0.5) * ORIENTATION_SLOTS / pairCount);
+    const a = poses[i * POSE_WIDTH + 2], b = poses[(i + 1) * POSE_WIDTH + 2];
+    const arc = Math.abs(b - a) % FULL_TURN;
+    const delta = Math.min(arc, FULL_TURN - arc);
+    const tier = delta >= 0.35 ? 3 : delta >= 0.12 ? 2 : delta >= 0.035 ? 1 : 0;
+    peaks[slot] = Math.max(peaks[slot], tier);
+  }
+  const marks = Array.from(peaks, (tier, i) =>
+    `<circle cx="${135 + 46 * i}" cy="499" r="${2 + tier}" fill="${ORIENTATION_COLORS[tier]}"/>`
+  ).join('');
+  return `<g aria-label="Coarse sampled sled orientation changes">${marks}</g>`;
+}
+
+function composeSvg(poses, orientationStudy) {
   const { path, first, last } = composePath(poses);
+  const studyName = orientationStudy ? 'SLED ORIENTATION STUDY / ART V2' : `SLED PATH STUDY / ART V${RUN_TRACE_ART_VERSION}`;
+  const stamp = orientationStudy ? 'V2 STUDY' : `V${RUN_TRACE_ART_VERSION}`;
+  const description = orientationStudy
+    ? 'An abstract neon path with coarse recorded orientation-change accents. It is local artwork, not a verified result.'
+    : 'An abstract neon motif from a recorded sled path. It is local artwork, not a verified result.';
+  const accents = orientationStudy ? composeOrientationAccents(poses) : '';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="620" viewBox="0 0 960 620" role="img" aria-labelledby="art-title art-desc">
 <title id="art-title">Bitstream Bluffs Run DNA: Local / Unverified</title>
-<desc id="art-desc">An abstract neon motif from a recorded sled path. It is local artwork, not a verified result.</desc>
+<desc id="art-desc">${description}</desc>
 <defs>
   <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
     <stop stop-color="#141a37"/><stop offset="0.55" stop-color="#100d29"/><stop offset="1" stop-color="#290d2b"/>
@@ -83,7 +107,7 @@ export function renderRunTraceArt(poses) {
   <circle cx="73" cy="64" r="5" fill="#64faff"/>
   <text x="89" y="69" fill="#bdcdf5" font-size="15" font-weight="700" letter-spacing="3">BITSTREAM BLUFFS</text>
   <text x="66" y="143" fill="#f3f2ff" font-size="71" font-weight="800" letter-spacing="-2">RUN DNA</text>
-  <text x="72" y="170" fill="#96a5d1" font-size="13" font-weight="600" letter-spacing="3">SLED PATH STUDY / ART V${RUN_TRACE_ART_VERSION}</text>
+  <text x="72" y="170" fill="#96a5d1" font-size="13" font-weight="600" letter-spacing="3">${studyName}</text>
   <rect x="668" y="49" width="228" height="38" rx="19" fill="#261637" stroke="#f290cd"/>
   <circle cx="688" cy="68" r="4" fill="#ff7bc7"/>
   <text x="703" y="74" fill="#ffd1ee" font-size="15" font-weight="750" letter-spacing="1.3">LOCAL / UNVERIFIED</text>
@@ -96,12 +120,28 @@ export function renderRunTraceArt(poses) {
   <path d="${path}" fill="none" stroke="url(#ion)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="${first[0]}" cy="${first[1]}" r="6" fill="#141932" stroke="#64faff" stroke-width="2"/>
   <circle cx="${last[0]}" cy="${last[1]}" r="5" fill="#ff7bc7" stroke="#ffd1ee" stroke-width="2"/>
-  <path d="M104 499H856" stroke="url(#ion)" stroke-opacity=".38"/>
+  <path d="M104 499H856" stroke="url(#ion)" stroke-opacity=".38"/>${accents}
   <text x="65" y="571" fill="#bdc7e7" font-size="13" font-weight="700" letter-spacing="2">RECORDED PATH / ARTWORK ONLY</text>
-  <text x="894" y="571" text-anchor="end" fill="#a4adcc" font-size="13" font-weight="600" letter-spacing="2">V${RUN_TRACE_ART_VERSION} / NO ATTESTATION</text>
+  <text x="894" y="571" text-anchor="end" fill="#a4adcc" font-size="13" font-weight="600" letter-spacing="2">${stamp} / NO ATTESTATION</text>
 </g>
 </svg>
 `;
   if (svg.length > MAX_ART_SVG_BYTES) throw new RangeError('Trace artwork exceeded its byte limit');
   return svg;
+}
+
+/**
+ * @param {Float32Array} poses Decoded GhostTape v1 x/y/angle triples.
+ * @returns {string} Standalone ASCII Art V1 SVG; no header or user strings.
+ */
+export function renderRunTraceArt(poses) {
+  return composeSvg(poses, false);
+}
+
+/**
+ * @param {Float32Array} poses Decoded GhostTape v1 x/y/angle triples.
+ * @returns {string} Opt-in local Art V2 study; not a trick or timing analysis.
+ */
+export function renderRunTraceOrientationStudy(poses) {
+  return composeSvg(poses, true);
 }
