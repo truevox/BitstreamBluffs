@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bitstream Bluffs — Stem Processing Listening Tour</title><style>
-:root{font:16px system-ui,sans-serif;color:#f0edf9;background:#111220}*{box-sizing:border-box}body{margin:0}header{padding:20px 24px;background:#22243b;border-bottom:1px solid #53537d}h1{margin:0 0 7px;font-size:clamp(23px,4vw,34px)}p{margin:5px 0;line-height:1.5;color:#cbc9db}main{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 130px)}nav{padding:12px;background:#1b1d30;display:flex;flex-direction:column;gap:6px;overflow:auto}button{cursor:pointer;border-radius:9px;text-align:left;padding:11px;background:#30314e;border:1px solid #515578;color:#f0eefa;font-size:14px}button:hover,button[aria-current=true]{background:#494071;border-color:#c5a3ff}button small{display:block;color:#cbc5e0;margin-top:3px}article{min-width:0}iframe{border:0;width:100%;height:calc(100vh - 130px);background:#101529}.note{font-size:12px}.topline{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap}.external{color:#e6c7ff}@media(max-width:720px){main{grid-template-columns:1fr}nav{flex-direction:row;overflow:auto;max-width:100vw;padding:8px}nav button{min-width:160px}iframe{height:75vh}}
-</style></head><body><header><div class="topline"><div><h1>🎧 Stem-FX Listening Tour — Extra Edition</h1><p>13 processed-stem audition labs, now using stronger, seamless-looped original stem passages. Each Extra slider starts at 0%. Turn it up to hear more spacious, filtered echoes of that biome's actual processing.</p></div><a class="external" id="direct" target="_blank" rel="noopener">Open current lab in a new tab ↗</a></div><p class="note">0% preserves the previous lab's sound; neither original recordings nor released game DSP are altered. Load → Play → turn up Extra → Compare dry. Switching labs stops the previous audition.</p></header><main><nav id="nav" aria-label="Biome audition choices"></nav><article><iframe id="lab" title="Selected biome audition" allow="autoplay"></iframe></article></main><script>
+:root{font:16px system-ui,sans-serif;color:#f0edf9;background:#111220}*{box-sizing:border-box}body{margin:0}header{padding:20px 24px;background:#22243b;border-bottom:1px solid #53537d}h1{margin:0 0 7px;font-size:clamp(23px,4vw,34px)}p{margin:5px 0;line-height:1.5;color:#cbc9db}main{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 130px)}nav{padding:12px;background:#1b1d30;display:flex;flex-direction:column;gap:6px;overflow:auto}button{cursor:pointer;border-radius:9px;text-align:left;padding:11px;background:#30314e;border:1px solid #515578;color:#f0eefa;font-size:14px}button:hover,button[aria-current=true]{background:#494071;border-color:#c5a3ff}button small{display:block;color:#cbc5e0;margin-top:3px}article{min-width:0}iframe{border:0;width:100%;height:calc(100vh - 130px);background:#101529}.note{font-size:12px}.topline{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap}.external{color:#e6c7ff}details.review{margin:12px 22px;padding:11px 15px;background:#30314e;border:1px solid #65648f;border-radius:10px}details.review summary{cursor:pointer;font-weight:700}details.review textarea{display:block;width:100%;min-height:88px;resize:vertical;margin:10px 0;color:#f7f4fd;background:#18192b;border:1px solid #8889aa;border-radius:8px;padding:10px;font:inherit}details.review button{font-weight:600;margin:5px 0}#save-status{font-size:13px;color:#a9f0d8;margin-left:12px}@media(max-width:720px){main{grid-template-columns:1fr}nav{flex-direction:row;overflow:auto;max-width:100vw;padding:8px}nav button{min-width:160px}iframe{height:75vh}}
+</style></head><body><header><div class="topline"><div><h1>🎧 Stem-FX Listening Tour — Extra Edition</h1><p>13 processed-stem audition labs, now using stronger, seamless-looped original stem passages. Each Extra slider starts at 0%. Turn it up to hear more spacious, filtered echoes of that biome's actual processing.</p></div><a class="external" id="direct" target="_blank" rel="noopener">Open current lab in a new tab ↗</a></div><p class="note">0% preserves the previous lab's sound; neither original recordings nor released game DSP are altered. Load → Play → turn up Extra → Compare dry. Switching labs stops the previous audition.</p></header><details class="review"><summary>📝 Listening notes for this biome <span id="save-status">Locally remembered</span></summary><p>Move sliders and switch biomes freely; their positions and your notes are saved in this browser. Playback itself does not resume automatically.</p><label id="notes-label" for="biome-notes">Crystal Cavern notes</label><textarea id="biome-notes" aria-labelledby="notes-label" placeholder="What works? What needs more or less?" spellcheck="true"></textarea><button id="export-review" type="button">Download all biome settings + notes (JSON)</button></details><main><nav id="nav" aria-label="Biome audition choices"></nav><article><iframe id="lab" title="Selected biome audition" allow="autoplay"></iframe></article></main><script>
 const labs=[
 ['crystallattice','💎 Crystal Cavern','Sympathetic resonance and crystal cascades'],
 ['jellybloom','🪼 Sky Jellyfish','Floating membrane and tentacle drift'],
@@ -15,5 +15,67 @@ const labs=[
 ['scrapheap','🛠️ Garbage Dump Glacier','Scrapyard processing'],
 ['scrap-clangs','🔔 Scrap Clangs','In-pitch metallic variations'],
 ['arcadeglue','🎮 Arcade','Transition glue and standalone biome']
-];const nav=document.querySelector('#nav'),frame=document.querySelector('#lab'),direct=document.querySelector('#direct');function select(id){if(!labs.some(x=>x[0]===id))id=labs[0][0];const path='/tools/music/'+id+'-audition.html';frame.src=path;direct.href=path;for(const button of nav.children)button.setAttribute('aria-current',String(button.dataset.id===id));history.replaceState(null,'','#'+id)}for(const [id,title,detail] of labs){const b=document.createElement('button');b.dataset.id=id;b.innerHTML='<strong>'+title+'</strong><small>'+detail+'</small>';b.onclick=()=>select(id);nav.appendChild(b)}select(decodeURIComponent(location.hash.slice(1)));window.addEventListener('hashchange',()=>select(location.hash.slice(1)));
+];
+const nav=document.querySelector('#nav'),frame=document.querySelector('#lab'),
+      direct=document.querySelector('#direct'),notes=document.querySelector('#biome-notes'),
+      notesLabel=document.querySelector('#notes-label'),saved=document.querySelector('#save-status');
+const KEY='bsb-stemfx-review-v1';
+const savedData=(()=>{try{const x=JSON.parse(localStorage.getItem(KEY)||'{}');return x&&typeof x==='object'?x:{}}catch{return {}}})();
+let current=null;
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(savedData));saved.textContent='Saved in this browser'}
+    catch{saved.textContent='Storage unavailable — export notes instead'}}
+function entry(id){return savedData[id]??(savedData[id]={settings:{},notes:''})}
+function controls(doc){return [...doc.querySelectorAll('input[id][type="range"],select[id]')].filter(x=>!x.disabled)}
+function capture(){
+ if(!current)return;
+ const doc=frame.contentDocument;
+ if(!doc)return;
+ const e=entry(current);
+ for(const node of controls(doc))e.settings[node.id]=node.value;
+ persist();
+}
+function restore(){
+ if(!current)return;
+ const doc=frame.contentDocument;
+ if(!doc)return;
+ const e=entry(current);
+ for(const node of controls(doc)){
+    if(!Object.hasOwn(e.settings,node.id))continue;
+    node.value=e.settings[node.id];
+    node.dispatchEvent(new Event('input',{bubbles:true}));
+    if(node.tagName==='SELECT')node.dispatchEvent(new Event('change',{bubbles:true}));
+ }
+ doc.addEventListener('input',capture,{passive:true});
+ doc.addEventListener('change',capture,{passive:true});
+}
+frame.addEventListener('load',restore);
+notes.addEventListener('input',()=>{if(!current)return;entry(current).notes=notes.value;persist()});
+function select(id){
+ if(!labs.some(x=>x[0]===id))id=labs[0][0];
+ if(current===id)return;
+ capture();current=id;
+ const path='/tools/music/'+id+'-audition.html';
+ frame.src=path;direct.href=path;
+ for(const button of nav.querySelectorAll('button[data-id]'))
+    button.setAttribute('aria-current',String(button.dataset.id===id));
+ notesLabel.textContent=(labs.find(x=>x[0]===id)?.[1]||id)+' notes';
+ notes.value=entry(id).notes||'';
+ history.replaceState(null,'','#'+id);
+}
+for(const [id,title,detail] of labs){
+ const b=document.createElement('button');b.dataset.id=id;
+ b.innerHTML='<strong>'+title+'</strong><small>'+detail+'</small>';
+ b.onclick=()=>select(id);nav.appendChild(b);
+}
+document.querySelector('#export-review').addEventListener('click',()=>{
+ capture();
+ const data={format:'bitstream-bluffs-listening-notes-v1',exportedAt:new Date().toISOString(),
+    labNames:Object.fromEntries(labs.map(x=>[x[0],x[1]])),reviews:savedData};
+ const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'}));
+ const a=document.createElement('a');a.href=url;a.download='bitstream-stemfx-listening-notes.json';
+ a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+window.addEventListener('pagehide',capture);
+window.addEventListener('hashchange',()=>select(decodeURIComponent(location.hash.slice(1))));
+select(decodeURIComponent(location.hash.slice(1)));
 </script></body></html>
