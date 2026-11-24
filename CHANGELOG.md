@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.19.24 — visible in-game release version (2026-11-24)
+
+- Display the bundled package version in the upper-left of the title screen, with an automated browser assertion. No simulation, replay, scoring, or soundtrack changes. SIM8 remains the current ruleset.
+
 ## v2.19.23 — Morgan recovery, ghost labels and hop regression (#282, #290, #283) (2026-11-24)
 
 - **Recoverable agent work:** point Morgan to the separate `morgan/checkpoint` branch on a fresh session or handoff, requiring exact remote-tip reconciliation. Checkpoint is working context, not authorization, and stays out of feature branches. No gameplay or simulation logic changes.
