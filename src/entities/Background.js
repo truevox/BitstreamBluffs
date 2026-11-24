@@ -214,7 +214,7 @@ export function motifProfile(shape, wx, seed) {
 function horizonDanceOffset(scrollX, screenX, layer, dance = 0) {
   if (!(dance > 0)) return 0;
   const wx = screenX + scrollX * layer.factor;
-  return 8 * dance * Math.sin(wx * 0.02 + layer.seed);
+  return dance * (-8 + 22 * Math.sin(wx * 0.02 + layer.seed));
 }
 
 /** Screen y of the background silhouette; decor roots track its tiny sway. */
@@ -389,9 +389,10 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     const pl = lay.planet;
     const px = tileX(pl.x0, sx, 0.012);
     if (px !== null) {
-      const r = pl.r * (1 + 0.22 * dance);
-      out.push({ kind: 'circle', depth: -1, color: 'lime', fillAlpha: 0.2, lineAlpha: 0.6, x: px, y: pl.y, r });
-      out.push({ kind: 'poly', depth: -1, color: 'amber', fillAlpha: 0, lineAlpha: 0.65, pts: ellipsePts(px, pl.y, r * 1.9, r * 0.42, pl.tilt, 20) });
+      const r = pl.r * (1 + 0.45 * dance);
+      const py=pl.y-18*dance;
+      out.push({ kind: 'circle', depth: -1, color: 'lime', fillAlpha: 0.2, lineAlpha: 0.6, x: px, y: py, r });
+      out.push({ kind: 'poly', depth: -1, color: 'amber', fillAlpha: 0, lineAlpha: 0.65, pts: ellipsePts(px, py, r * 1.9, r * 0.42, pl.tilt, 20) });
     }
   } else if (motif === 'candy-stripes') {
     // Candy-cane sky: slanted alternating bands across the upper sky, scrolling slowly.
@@ -418,7 +419,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const top = yB - c.h;
       const dir = c.flip ? -1 : 1;
       const path = [];
-      const flex = dance * 12 * dir;
+      const flex = dance * 25 * dir;
       for (let y = yB; y > top; y -= 5)
         path.push({ x: x + flex * ((yB - y) / c.h), y });
       for (let i = 0; i <= 6; i++) {
@@ -438,7 +439,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(lp.x0, sx, L1.factor);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L1, sx, x, horizonDance) + 2;
-      const cy = yB - lp.stick - lp.r - dance * 9;
+      const cy = yB - lp.stick - lp.r - dance * 22;
       out.push({ kind: 'line', depth: 1, color: 'text', alpha: 0.55, width: 2, pts: [{ x, y: yB }, { x, y: cy + lp.r }] });
       out.push({ kind: 'circle', depth: 1, color: lp.color, fillAlpha: 0.32, lineAlpha: 0.75, x, y: cy, r: lp.r });
       const spiral = [];
@@ -454,8 +455,8 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
     for (const j of lay.jellies) {
       const x = tileX(j.x0, sx, j.f);
       if (x === null) continue;
-      const pulse = 1 + 0.08 * Math.sin(t / 520 + j.ph) + 0.32 * dance;
-      const y = j.y + Math.sin(t / 1400 + j.ph) * 5 - 7 * dance;
+      const pulse = 1 + 0.08 * Math.sin(t / 520 + j.ph) + 0.65 * dance;
+      const y = j.y + Math.sin(t / 1400 + j.ph) * 5 - 19 * dance;
       const rx = j.s * pulse;
       const ry = (j.s * 0.8) / pulse;
       const bell = [];
@@ -483,7 +484,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(gr.x0, sx, 0.06);
       if (x === null) continue;
       const teeth = Math.max(6, Math.round(gr.r / 2.4));
-      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * 0.26 * gr.dir;
+      const rot = gr.ph + gr.dir * t * (0.012 / gr.r) + dance * 0.85 * gr.dir;
       const pts = [];
       for (let i = 0; i < teeth; i++) {
         const a = rot + (i / teeth) * Math.PI * 2;
@@ -520,7 +521,7 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
       const x = tileX(b.x0, sx, L.factor);
       if (x === null) continue;
       const yB = layerYAt(def.shape, L, sx, x, horizonDance) + 3;
-      const beatSway = dance * (8 + b.h * 0.12) * Math.sin(b.ph);
+      const beatSway = dance * (18 + b.h * 0.24) * Math.sin(b.ph);
       const centre = (u) => ({
         x: x + (b.lean + beatSway) * u * u,
         y: yB - b.h * u,
@@ -563,15 +564,15 @@ export function motifDecor(motif, scrollX, timeMs = 0, seed = 0, o = {}) {
         const cx = (c + 0.5) * CONE_W - s71 - off;
         if (cx < -60 || cx > W + 60) continue;
         const top = layerYAt(def.shape, L, sx, cx, horizonDance) + 1;
-        out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 + dance * 2.5 });
+        out.push({ kind: 'circle', depth: li, color: 'amber', fillAlpha: 0.35, lineAlpha: 0, x: cx, y: top, r: 4 + dance * 5 });
         const cell = hash01(c, 4242);
         for (let k = 0; k < 6; k++) {
           const age = (((t / 3800 + k / 6 + cell) % 1) + 1) % 1;
           out.push({
             kind: 'circle', depth: li, color: 'text', fillAlpha: 0.3 * (1 - age), lineAlpha: 0,
             x: cx + age * 14 * lay.wind + Math.sin(age * 5 + lay.ph + c) * 3,
-            y: top - 4 - age * (plumeH + 12 * dance),
-            r: (2.5 + age * 8) * (li === 0 ? 1 : 0.8) * (1 + .16 * dance),
+            y: top - 4 - age * (plumeH + 30 * dance),
+            r: (2.5 + age * 8) * (li === 0 ? 1 : 0.8) * (1 + .32 * dance),
           });
         }
       }

@@ -1704,7 +1704,7 @@ export class RunScene extends Phaser.Scene {
     if (sample && this.worldDance?.lastAccentMs === sample.timeMs) {
       try { audio?.onSteampunkRecordedAccent?.(sample); } catch {}
     }
-    this.bg.update(cam.scrollX, t, sled.speed,dance);
+    this.bg.update(cam.scrollX, t, sled.speed,this.worldDance?.visualStrength||0);
     // The existing decorative bees OWN their positions. Sound follows
     // them only when they are actually on screen in Micro Mountain.
     // Optional WebAudio can fail while instantiating bee voices. It must NOT

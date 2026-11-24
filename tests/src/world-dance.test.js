@@ -81,8 +81,8 @@ test('biomes get different bounded personalities with no fake colour or geometry
 test('sun squash is bounded and neutral at zero/invalid input',()=>{
  expect(sunDanceGeometry(0)).toEqual({widthRadius:40,heightRadius:40});
  const kick=sunDanceGeometry(1);
- expect(kick.widthRadius).toBeCloseTo(48);
- expect(kick.heightRadius).toBeCloseTo(34);
+ expect(kick.widthRadius).toBeCloseTo(52.8);
+ expect(kick.heightRadius).toBeCloseTo(30.4);
  expect(sunDanceGeometry(1000)).toEqual(kick);
  expect(sunDanceGeometry(NaN)).toEqual(sunDanceGeometry(0));
 });
@@ -97,8 +97,8 @@ test('the actual procedural sun is ellipse-shaped on musical hit and original ci
  bg.update(10,500,200,1);
  const moving=calls.find(x=>x[0]==='strokeEllipse');
  expect(moving).toBeDefined();
- expect(moving[3]).toBeCloseTo(96,2);
- expect(moving[4]).toBeCloseTo(68,2);
+ expect(moving[3]).toBeCloseTo(105.6,2);
+ expect(moving[4]).toBeCloseTo(60.8,2);
  expect(calls.some(x=>x[0]==='strokeCircle'&&x[3]===40)).toBe(false);
 });
 
@@ -160,7 +160,45 @@ test.each(['stars','candy-stripes','jellyfish','brass-pipes','dew-drops','vents'
    max=Math.max(max,Math.hypot(after[i].pts[j].x-before[i].pts[j].x,after[i].pts[j].y-before[i].pts[j].y));
   }
  }
- expect(max).toBeGreaterThan(1);
- expect(max).toBeLessThan(25);
+ expect(max).toBeGreaterThan(6);
+ expect(max).toBeLessThan(45);
  expect(motifDecor(motif,400,1234,0,{bees:false,dance:0,horizonDance:0})).toEqual(before);
+});
+
+test('scenery retains a readable accent independently of audio onset decay and resets immediately',()=>{
+ const w=new WorldDanceEnvelope();
+ w.update(audio(0,.1),40);
+ const raw=w.update(audio(40,.9,.6),40);
+ expect(w.visualStrength).toBeGreaterThan(raw*.6);
+ const peak=w.visualStrength;
+ w.update(audio(80,.9,.6),40);
+ w.update(audio(120,.9,.6),40);
+ expect(w.visualStrength).toBeGreaterThanOrEqual(peak);
+ for(let t=160;t<=400;t+=40)w.update(audio(t,.9,.6),40);
+ expect(w.visualStrength).toBeGreaterThan(w.strength);
+ expect(w.update(null,16)).toBe(0);expect(w.visualStrength).toBe(0);
+ w.update(audio(440,.1),40);w.update(audio(480,.9),40);
+ expect(w.visualStrength).toBeGreaterThan(0);
+ w.update(audio(520,.9,.1,'new'),40);expect(w.visualStrength).toBe(0);
+});
+
+test.each(['ridges','drift','terraces','currents','facets','stars','candy-stripes','jellyfish','brass-pipes','dew-drops','vents'])('%s actual ridge outlines have readable motion on a typical accent',motif=>{
+ const {scene,calls}=gfxScene();
+ const bg=new Background(scene,green);bg.setMotif(motif);
+ const outlines=()=>{
+  const out=calls.filter(c=>c[0]==='strokePoints').map(c=>c[1]);
+  calls.length=0;
+  return out.filter(p=>p.length>=60&&p[0].x===0);
+ };
+ bg.update(400,1234,0,0);const still=outlines();
+ bg.update(400,1234,0,.26);const moving=outlines();
+ expect(still.length).toBeGreaterThanOrEqual(2);
+ expect(moving).toHaveLength(still.length);
+ let max=0;
+ for(let i=0;i<still.length;i++)
+  for(let j=0;j<still[i].length;j++)
+   max=Math.max(max,Math.abs(still[i][j].y-moving[i][j].y));
+ expect(max).toBeGreaterThan(6);
+ expect(max).toBeLessThanOrEqual(30);
+ bg.update(400,1234,0,0);expect(outlines()).toEqual(still);
 });

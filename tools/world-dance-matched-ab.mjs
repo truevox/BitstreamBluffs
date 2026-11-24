@@ -34,7 +34,7 @@ try{
    const renderer=g.renderer,canvas=g.canvas;
    g.step(performance.now(),1000/24);
    if(!r.sys.isActive()||r.crashed)return null;
-   const p=r.worldDance.strength,cam=r.cameras.main,t=r.runTimeMs,speed=r.sled.speed,veil=r._veil||0;
+   const p=r.worldDance.visualStrength,cam=r.cameras.main,t=r.runTimeMs,speed=r.sled.speed,veil=r._veil||0;
    const sample=a.getWorldDanceSample(),meter=a.getSyntheticMeterTiming();
    const before={x:r.sled.x,y:r.sled.y,runTime:r.runTimeMs,clock:d.clockStart,token:d._token,zoom:cam.zoom,scroll:cam.scrollX,track:d.track.id,skin:r.bg.skin,nearY:r.biomeFx.ridgeNear?.y};
    const pairCanvas=document.createElement('canvas');pairCanvas.width=canvas.width*2;pairCanvas.height=canvas.height;
@@ -60,7 +60,7 @@ try{
  assert.ok(frames.length>=24,'Not enough live matched pairs');
  assert.ok(frames.filter(f=>f.sample).length>=24,'Original analyzer unavailable');
  assert.ok(frames.some(f=>f.p>.1),'No measurable dance');
- assert.ok(frames.some(f=>f.before.nearY<100),'No animated pixel ridge');
+ assert.ok(frames.some(f=>f.before.nearY<=88),'Near ridge never reaches readable displacement');
  assert.deepEqual(errors,[]);
  const report={format:'world-dance-matched-pairs-v1',mode:'controlled stepped live gameplay, same-frame redraw, silent',frames};
  writeFileSync(join(out,'report.json'),JSON.stringify(report,null,2),{flag:'wx'});

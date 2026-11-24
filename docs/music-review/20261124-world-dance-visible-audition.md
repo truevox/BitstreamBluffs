@@ -18,3 +18,11 @@ Reproduce with complete public music assets (see #323), loopback game URL and a 
 ```sh
 GAME_URL=http://127.0.0.1:8220/ REPORT_OUT=/tmp/world-dance-paired-new node tools/world-dance-matched-ab.mjs
 ```
+
+## Second audition: owner rejected first amplitude
+
+Owner feedback: "The gif is fine as long as the movement is enough to see. Right now it really isn't." Follow-up: "Do it. Every dance needs to be 'readable'." This authorizes a much stronger candidate, not final visual approval.
+
+The separate scenery peak follower attacks with a 32ms exponential time constant (~74ms to 90%), holds 105ms, then releases with a 145ms time constant (~334ms to 10%). It resets immediately on the same unavailable/disabled/seek/revision conditions as the original detector. The detector's strength, onset timestamps, synthetic meter and billboard response are unchanged. Scenery transfer is 5p/(1+4p). Near/far Debutmont ridges rise at most 20/12 native pixels and stretch vertically around their original lower edge, not merely translate. Procedural horizons deform up to 30px before motif scaling; stronger individual planet, cane, lollipop, jellyfish, gear, grass, vent, snow, debris and Arcade-sun movement. All six decorated motifs and all eleven procedural horizon motifs exceed 6px displacement at fixture strength .26; zero restores their exact old geometry. This is a quantitative gate, not proof of owner-perceived readability.
+
+Actual original public One More Run: 96 matched rendered pairs, near ridge 5–19px rise, median 13px (v1 median 3, max 6). All pairs nonblank and distinct; median 16,403.5 changed screen pixels (previous 8,842.5). New GIF ~14.1s, 6.8 unique frame pairs/sec under software rendering; encoded at 15fps without claiming interpolated frames as observations. Live independent browser smoke confirmed 19px maximum rise, 80–96px stripe width, 61–76px height, and neutral mute/OS reduced motion/explicit OFF. No audio or GIF committed. Temporary Tailnet-only static preview serves only silent imagery. 100/100 focused tests pass. One renderFrame call changes causal-source tripwire, attested presentation-only; SIM9 ruleset unchanged. Remaining: subjective approval, live biome-wide audition and Chromebook performance.
