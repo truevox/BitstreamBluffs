@@ -64,7 +64,8 @@ const DANCE_MOTIF_STYLES=Object.freeze({
  * The detector and its audio-facing onset timestamps are untouched. */
 export function visibleDanceStrength(strength) {
   const p=clamp01(strength);
-  return 5*p/(1+4*p);
+  // Give strong accents more contrast against the troughs.
+  return 4*p/(1+3*p);
 }
 
 export function biomeDanceStyle(motif, strength) {
@@ -76,7 +77,7 @@ export function biomeDanceStyle(motif, strength) {
 export function sunDanceGeometry(pulse, radius = 40) {
   const p=clamp01(pulse);
   const r=Number.isFinite(radius)&&radius>0 ? radius : 40;
-  return {widthRadius:r*(1+0.32*p),heightRadius:r*(1-0.24*p)};
+  return {widthRadius:r*(1+0.48*p),heightRadius:r*(1-0.36*p)};
 }
 
 export class WorldDanceEnvelope {

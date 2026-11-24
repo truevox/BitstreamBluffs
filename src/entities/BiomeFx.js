@@ -251,8 +251,18 @@ export class BiomeFx {
 
   _drawDebutmont(scrollX, t, runMs, reduced, dance = 0) {
     const p = this.palette;
-    if (this.ridgeFar) { this.ridgeFar.tilePositionX = Math.round(scrollX * 0.1); const lift=Math.round(12*dance); this.ridgeFar.y=54-lift; this.ridgeFar.scaleY=1+lift/BACKDROP_ART.debutmontRidgeFar.h; }
-    if (this.ridgeNear) { this.ridgeNear.tilePositionX = Math.round(scrollX * 0.22); const lift=Math.round(20*dance); this.ridgeNear.y=100-lift; this.ridgeNear.scaleY=1+lift/BACKDROP_ART.debutmontRidgeNear.h; }
+    if (this.ridgeFar) {
+      const lift=Math.round(22*dance);
+      this.ridgeFar.tilePositionX=Math.round(scrollX*.1-12*dance);
+      this.ridgeFar.y=54-lift;
+      this.ridgeFar.scaleY=1+lift/BACKDROP_ART.debutmontRidgeFar.h;
+    }
+    if (this.ridgeNear) {
+      const lift=Math.round(36*dance);
+      this.ridgeNear.tilePositionX=Math.round(scrollX*.22+20*dance);
+      this.ridgeNear.y=100-lift;
+      this.ridgeNear.scaleY=1+lift/BACKDROP_ART.debutmontRidgeNear.h;
+    }
     // ---- blocky pixel snow: whole-pixel squares, a slight stepped horizontal jitter, no round flakes
     const g = this.snowG;
     g.clear();
@@ -260,8 +270,8 @@ export class BiomeFx {
     for (let i = 0; i < SNOW_COUNT; i++) {
       const s = this.snowS[i];
       const jit = reduced ? 0 : Math.floor(hash01(jstep + i * 131, this._seed) * 3) - 1;
-      const x = ((wrap(this.snowX[i] - scrollX * this.snowZ[i] - t * 0.0045 * s + jit + dance * (i % 2 ? 15 : -15), GAME_WIDTH)) >> 1) << 1;
-      const y = ((wrap(this.snowY[i] + (t * this.snowV[i]) / 1000 - dance * (9 + 2*s), GAME_HEIGHT)) >> 1) << 1;
+      const x = ((wrap(this.snowX[i] - scrollX * this.snowZ[i] - t * 0.0045 * s + jit + dance * (i % 2 ? 24 : -24), GAME_WIDTH)) >> 1) << 1;
+      const y = ((wrap(this.snowY[i] + (t * this.snowV[i]) / 1000 - dance * (12 + 3*s), GAME_HEIGHT)) >> 1) << 1;
       g.fillStyle(i % 6 === 0 ? p.cyan : p.text, s === 4 ? 0.85 : s === 3 ? 0.7 : 0.55);
       g.fillRect(x, y, s, s);
     }
@@ -297,7 +307,7 @@ export class BiomeFx {
     for (let i = 0; i < DEBRIS_TRASH + DEBRIS_FRAG; i++) {
       const k = this.dK[i];
       let x = wrap(this.dX[i] + (t * this.dVx[i]) / 1000 - scrollX * this.dZ[i], GAME_WIDTH);
-      const y = ((wrap(this.dY[i] + (t * this.dVy[i]) / 1000 - dance * (i % 2 ? 20 : 12), DEBRIS_BAND_H)) >> 1) << 1;
+      const y = ((wrap(this.dY[i] + (t * this.dVy[i]) / 1000 - dance * (i % 2 ? 32 : 20), DEBRIS_BAND_H)) >> 1) << 1;
       if (k < 3) {
         // blocky trash: 2-6 px rectangles in the glacier's greens, low alpha, behind the play layer
         g.fillStyle(k === 0 ? p.lime : k === 1 ? p.amber : p.text, 0.62);
@@ -370,7 +380,7 @@ export class BiomeFx {
     if (this.arcSun) {
       this.arcSun.setAlpha(0.95 * a1);
       // Preserve the original centre with the artwork's top-left origin.
-      const sx=1+.32*dance, sy=1-.24*dance;
+      const sx=1+.48*dance, sy=1-.36*dance;
       this.arcSun.setScale(sx,sy);
       this.arcSun.x=300-BACKDROP_ART.arcadeSun.w*(sx-1)/2;
       this.arcSun.y=HORIZON_Y-BACKDROP_ART.arcadeSun.h-BACKDROP_ART.arcadeSun.h*(sy-1)/2;

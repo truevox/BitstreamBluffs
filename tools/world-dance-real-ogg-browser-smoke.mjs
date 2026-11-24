@@ -51,7 +51,7 @@ try{
   b.__danceProbe={ellipse:0,lastEllipse:null,circle:0,pixelSun:null};
   const update=b.update,fill=g.fillRect.bind(g);
   let measuring=false,stripes=[];
-  g.fillRect=(...args)=>{if(measuring&&stripes.length<9&&args[2]>=24&&args[2]<=100&&args[3]>0&&args[3]<=12)stripes.push(args);return fill(...args);};
+  g.fillRect=(...args)=>{if(measuring&&stripes.length<9&&args[2]>=24&&args[2]<=120&&args[3]>0&&args[3]<=12)stripes.push(args);return fill(...args);};
   b.update=function(...args){stripes=[];measuring=this.skin==='pixel';try{return update.apply(this,args);}finally{measuring=false;if(stripes.length===9)b.__danceProbe.pixelSun={width:Math.max(...stripes.map(s=>s[2])),height:stripes.at(-1)[1]+stripes.at(-1)[3]-stripes[0][1]};}};
   const ellipse=g.strokeEllipse.bind(g),circle=g.strokeCircle.bind(g);
   g.strokeEllipse=(...args)=>{

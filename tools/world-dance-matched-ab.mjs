@@ -45,7 +45,7 @@ try{
    r.bg.update(cam.scrollX,t,speed,0);r.biomeFx.update(cam.scrollX,t,veil,false);
    render();c.drawImage(canvas,0,0);
    r.bg.update(cam.scrollX,t,speed,p);r.biomeFx.update(cam.scrollX,t,veil,false);
-   render();
+   // Next Game.step draws the restored ON geometry; avoid a redundant third render.
    const after={x:r.sled.x,y:r.sled.y,runTime:r.runTimeMs,clock:d.clockStart,token:d._token,zoom:cam.zoom,scroll:cam.scrollX,track:d.track.id,skin:r.bg.skin,nearY:r.biomeFx.ridgeNear?.y};
    return {png:pairCanvas.toDataURL('image/png').split(',')[1],before,after,p,sample,meter,audioTime:d.ctx.currentTime,width:canvas.width,height:canvas.height};
   });
@@ -55,12 +55,12 @@ try{
   const filename=String(i).padStart(3,'0')+'.png';
   writeFileSync(join(out,filename),Buffer.from(png,'base64'),{flag:'wx'});
   frames.push({filename,wallMs:Date.now()-started,...meta});
-  await page.waitForTimeout(20);
+  // Yield naturally across evaluate calls; avoid an extra capture-rate cap.
  }
  assert.ok(frames.length>=24,'Not enough live matched pairs');
  assert.ok(frames.filter(f=>f.sample).length>=24,'Original analyzer unavailable');
  assert.ok(frames.some(f=>f.p>.1),'No measurable dance');
- assert.ok(frames.some(f=>f.before.nearY<=88),'Near ridge never reaches readable displacement');
+ assert.ok(frames.some(f=>f.before.nearY<=72),'Near ridge never reaches readable displacement');
  assert.deepEqual(errors,[]);
  const report={format:'world-dance-matched-pairs-v1',mode:'controlled stepped live gameplay, same-frame redraw, silent',frames};
  writeFileSync(join(out,'report.json'),JSON.stringify(report,null,2),{flag:'wx'});
