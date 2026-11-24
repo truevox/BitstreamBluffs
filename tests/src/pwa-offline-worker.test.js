@@ -58,3 +58,17 @@ test('enforces a capped budget and avoids silently caching user/third party URLs
   await expect(createOfflineInventory(tmp)).rejects.toThrow(/exceeds its 8 MiB/);
   expect(shouldPrecache('https://other.example/assets/logo.png')).toBe(false);
 });
+
+test('subpath inventory is scope-bound and rejects cross-scope HTML entries',async()=>{
+  prepare();
+  await expect(createOfflineInventory(tmp,'/BitstreamBluffs/')).rejects.toThrow(/uncached entry/);
+  put('index.html','<script type="module" src="/BitstreamBluffs/assets/index-ABC.js"></script>');
+  const inv=await createOfflineInventory(tmp,'/BitstreamBluffs/');
+  expect(inv.base).toBe('/BitstreamBluffs/');
+  expect(inv.entries.every(e=>e.path.startsWith(inv.base))).toBe(true);
+  const worker=renderOfflineWorker(inv);
+  expect(worker).toContain('Offline worker scope mismatch');
+  expect(worker).toContain('const BASE = "/BitstreamBluffs/"');
+  expect(worker).not.toContain('function completeMusicGroup');
+  for(const base of ['//other.example/','/foo/../','foo/','/foo'])await expect(createOfflineInventory(tmp,base)).rejects.toThrow(/deployment base/);
+});

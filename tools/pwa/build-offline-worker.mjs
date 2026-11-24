@@ -35,7 +35,13 @@ async function listFiles(dir, prefix = '') {
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
-export async function createOfflineInventory(distDir) {
+function checkedBase(base) {
+  if(typeof base!=='string'||!/^\/(?:[a-zA-Z0-9_-]+\/)*$/.test(base))throw new TypeError('Expected absolute deployment base ending in /');
+  return base;
+}
+
+export async function createOfflineInventory(distDir, base = '/') {
+  checkedBase(base);
   const all = await listFiles(distDir);
   const selected = all.filter(shouldPrecache).sort();
   for (const name of EXPLICIT) {
@@ -45,8 +51,10 @@ export async function createOfflineInventory(distDir) {
     throw new Error('Offline shell needs at least one Vite entry bundle');
   }
   const html = await readFile(resolve(distDir, 'index.html'), 'utf8');
-  for (const match of html.matchAll(/(?:src|href)="(\/assets\/[^"?#]+\.(?:js|css))"/g)) {
-    if (!selected.includes(match[1].slice(1))) throw new Error(`HTML references uncached entry: ${match[1]}`);
+  for (const match of html.matchAll(/(?:src|href)="([^"?#]+\.(?:js|css))"/g)) {
+    const url=new URL(match[1], 'https://offline.invalid'+base);
+    if(url.origin!=='https://offline.invalid'||!url.pathname.startsWith(base)||!selected.includes(url.pathname.slice(base.length)))
+      throw new Error(`HTML references uncached entry: ${match[1]}`);
   }
   const entries = [];
   let total = 0;
@@ -54,13 +62,14 @@ export async function createOfflineInventory(distDir) {
     const buf = await readFile(resolve(distDir, name));
     total += buf.length;
     if (total > MAX_PRECACHE_BYTES) throw new RangeError('Offline shell exceeds its 8 MiB cap; optional assets must not be cached');
-    entries.push({ path: `/${name}`, sha256: sha256(buf), bytes: buf.length });
+    entries.push({ path: `${base}${name}`, sha256: sha256(buf), bytes: buf.length });
   }
   const version = sha256(Buffer.from(JSON.stringify(entries))).slice(0, 20);
-  return { version, totalBytes: total, entries };
+  return { version, base, totalBytes: total, entries };
 }
 
 export function renderOfflineWorker(inventory) {
+  const base = checkedBase(inventory.base);
   const cacheName = CACHE_PREFIX + inventory.version;
   const paths = inventory.entries.map(x => [x.path, x.sha256]);
   return `/* Bitstream Bluffs #172: deterministic offline experiment. Deploy only when deliberately registered. */\n` +
@@ -68,11 +77,13 @@ export function renderOfflineWorker(inventory) {
 `const CACHE_NAME = ${JSON.stringify(cacheName)};\n` +
 `const CACHE_PREFIX = ${JSON.stringify(CACHE_PREFIX)};\n` +
 `const EXPECTED = new Map(${JSON.stringify(paths)});\n` +
-`const ROOT = '/index.html';\n` +
-renderMusicRouteWorker() +
+`const BASE = ${JSON.stringify(base)};\n` +
+`const ROOT = BASE + 'index.html';\n` +
+(base === '/' ? renderMusicRouteWorker() : '') +
 `function hex(bytes) { return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join(''); }\n` +
 `self.addEventListener('install', event => {\n` +
 `  event.waitUntil((async () => {\n` +
+`    if(new URL(self.registration.scope).pathname!==BASE) throw new Error('Offline worker scope mismatch');\n` +
 `    const cache = await caches.open(CACHE_NAME);\n` +
 `    try {\n` +
 `      for (const [path, expected] of EXPECTED) {\n` +
@@ -96,9 +107,9 @@ renderMusicRouteWorker() +
 `  const request = event.request;\n` +
 `  if (request.method !== 'GET') return;\n` +
 `  const url = new URL(request.url);\n` +
-`  if (url.origin !== self.location.origin) return;\n` +
-`  const path = url.pathname === '/' ? ROOT : url.pathname;\n` +
-`  if (path.startsWith('/music/packs/')) {\n` +
+`  if (url.origin !== self.location.origin || !url.pathname.startsWith(BASE)) return;\n` +
+`  const path = url.pathname === BASE ? ROOT : url.pathname;\n` +
+`  if (BASE === '/' && path.startsWith('/music/packs/')) {\n` +
 `    event.respondWith((async()=> {\n` +
 `      const stored=await realMusicFromCache(path);\n` +
 `      if(stored)return stored;\n` +
@@ -119,8 +130,8 @@ renderMusicRouteWorker() +
 `});\n`;
 }
 
-export async function generateOfflineWorker(distDir) {
-  const inventory = await createOfflineInventory(distDir);
+export async function generateOfflineWorker(distDir, base = '/') {
+  const inventory = await createOfflineInventory(distDir, base);
   const output = renderOfflineWorker(inventory);
   await writeFile(resolve(distDir, 'sw.js'), output);
   return inventory;
@@ -129,6 +140,6 @@ export async function generateOfflineWorker(distDir) {
 const isEntry = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isEntry) {
   const dir = process.argv[2] ? resolve(process.argv[2]) : resolve(dirname(fileURLToPath(import.meta.url)), '../../dist');
-  const inv = await generateOfflineWorker(dir);
+  const inv = await generateOfflineWorker(dir, process.argv[3] || '/');
   console.log(JSON.stringify({ path: resolve(dir, 'sw.js'), ...inv }, null, 2));
 }
