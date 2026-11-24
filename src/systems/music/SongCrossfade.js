@@ -1,4 +1,5 @@
 /** Musical transition only. Provisional grids never become physics/Gym authority. */
+import {sin,cos} from '../pmath.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function normalizeTransitionGrids(raw){
 	const result=new Map();
@@ -37,7 +38,7 @@ export function transitionGain(role,direction,progress){
 		return direction==='out'?1-x:x;
 	}
 	// Equal-power melodic blend (master peak guard remains downstream).
-	return direction==='out'?Math.cos(p*Math.PI/2):Math.sin(p*Math.PI/2);
+	return direction==='out'?cos(p*Math.PI/2):sin(p*Math.PI/2);
 }
 export function automateTransition(param,role,direction,start,end,notBefore=start){
 	const at=Math.max(start,notBefore);
