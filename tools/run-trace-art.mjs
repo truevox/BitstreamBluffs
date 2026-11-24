@@ -2,7 +2,7 @@
 import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { GHOST_TAPE_FORMAT, decodeTrace } from '../src/systems/ghost/GhostTape.js';
-import { MAX_ART_POSES, renderRunTraceArt } from '../src/systems/run-trace-art.js';
+import { MAX_ART_POSES, renderRunTraceArt, renderRunTraceOrientationStudy } from '../src/systems/run-trace-art.js';
 
 const MAX_TAPE_BYTES = 2 * 1024 * 1024;
 const TRACE_TAPE_VERSION = 1;
@@ -53,14 +53,21 @@ function decodeV1(tape) {
   return poses;
 }
 
-async function main([path, ...rest]) {
-  if (rest.length === 0 && (path === '--help' || path === '-h')) {
+async function main([first, ...rest]) {
+  if (rest.length === 0 && (first === '--help' || first === '-h')) {
     process.stdout.write('Usage: node tools/run-trace-art.mjs /path/to/ghost-tape.json > run-dna.svg\n');
+    process.stdout.write('Opt-in orientation study: node tools/run-trace-art.mjs --art-v2 /path/to/ghost-tape.json > run-dna-v2.svg\n');
     return;
   }
-  if (!path || rest.length) throw new TypeError('Provide exactly one local GhostTape v1 JSON file');
-  const poses = decodeV1(await readLocalTape(path));
-  process.stdout.write(renderRunTraceArt(poses));
+  const orientationStudy = first === '--art-v2';
+  const paths = orientationStudy ? rest : [first, ...rest];
+  if (paths.length !== 1 || !paths[0] ||
+      (orientationStudy && paths[0].startsWith('-'))) {
+    throw new TypeError('Provide exactly one local GhostTape v1 JSON file');
+  }
+  const poses = decodeV1(await readLocalTape(paths[0]));
+  const render = orientationStudy ? renderRunTraceOrientationStudy : renderRunTraceArt;
+  process.stdout.write(render(poses));
 }
 
 main(process.argv.slice(2)).catch((error) => {

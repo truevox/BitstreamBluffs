@@ -45,13 +45,13 @@ export const FP_SCHEMAS = Object.freeze({
   rng: { version: 1, schema: rec(['version', 'u32'], ['physicsScramble', 'u32']) },
 
   sled: {
-    version: 2, // v2: `flags.shield` removed (render-time mirror of effects.shieldCharges; cadence-dependent)
+    version: 3, // v3: one-shot AirBrake state is causal and must be replay-fingerprinted
     schema: rec(
       ['body', rec(...BODY_FIELDS)],
       ['parts', list(rec(...PART_FIELDS))], // the 5 collision parts (the compound root, parts[0], is `body`)
       ['ctl', rec(
         ['msSinceContact', 'f64'], ['groundAngleDeg', 'f64'], ['airtimeMs', 'f64'], ['hopBufferMs', 'f64'],
-        ['playerHopElapsedMs', 'f64'], ['pushCooldownMs', 'f64'], ['parachuteMs', 'f64'], ['parachuteFuelMs', 'f64'],
+        ['playerHopElapsedMs', 'f64'], ['protectedHopExtraVyPxS', 'f64'], ['pushCooldownMs', 'f64'], ['parachuteMs', 'f64'], ['parachuteFuelMs', 'f64'],
         ['canopyFuelFullMs', opt('f64')], ['heliPhase', 'f64'], ['heliVel', 'f64'], ['invulnerableMs', 'f64'],
         ['boostMs', 'f64'], ['geyserCooldownMs', 'f64'], ['airEtaMs', 'f64'], ['airSlopeDeg', opt('f64')],
         ['dropAheadDeg', 'f64'], ['groundRunMs', 'f64'], ['sinceLaunchMs', 'f64'], ['landSettleMs', 'f64'],
@@ -60,7 +60,7 @@ export const FP_SCHEMAS = Object.freeze({
       )],
       ['flags', rec(
         ['contactFlag', 'bool'], ['playerHopActive', 'bool'], ['chuteUsed', 'bool'], ['tucked', 'bool'],
-        ['airBrakeActive', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
+        ['airBrakeActive', 'bool'], ['airBrakePressPending', 'bool'], ['airBrakeKickUsed', 'bool'], ['airBrakeLiftProtected', 'bool'], ['airBrakeKickPulse', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
         ['nudging', 'bool'], ['inWorld', 'bool'], ['destroyed', 'bool'],
       )],
       // Bit identity of the last pad. The sim only uses `pad !== _lastPad` (object identity; each tick gets a fresh pad), so this
@@ -227,7 +227,7 @@ export const FIELD_SOURCES = Object.freeze({
   Sled: Object.freeze({
     body: 'sled.body', // the compound root and its 5 parts (+ the Matter pair table in `matter`)
     msSinceContact: 'sled.ctl.msSinceContact', groundAngleDeg: 'sled.ctl.groundAngleDeg', airtimeMs: 'sled.ctl.airtimeMs',
-    hopBufferMs: 'sled.ctl.hopBufferMs', _playerHopElapsedMs: 'sled.ctl.playerHopElapsedMs',
+    hopBufferMs: 'sled.ctl.hopBufferMs', _playerHopElapsedMs: 'sled.ctl.playerHopElapsedMs', _protectedHopExtraVyPxS: 'sled.ctl.protectedHopExtraVyPxS',
     pushCooldownMs: 'sled.ctl.pushCooldownMs', parachuteMs: 'sled.ctl.parachuteMs',
     parachuteFuelMs: 'sled.ctl.parachuteFuelMs', canopyFuelFullMs: 'sled.ctl.canopyFuelFullMs',
     heliPhase: 'sled.ctl.heliPhase', heliVel: 'sled.ctl.heliVel', invulnerableMs: 'sled.ctl.invulnerableMs',
@@ -237,7 +237,7 @@ export const FIELD_SOURCES = Object.freeze({
     _lastTilt: 'sled.ctl.lastTilt', _preVx: 'sled.ctl.preVx', _preVy: 'sled.ctl.preVy',
     touchdownVx: 'sled.ctl.touchdownVx', touchdownVy: 'sled.ctl.touchdownVy', heliInput: 'sled.ctl.heliInput',
     _contactFlag: 'sled.flags.contactFlag', _playerHopActive: 'sled.flags.playerHopActive', chuteUsed: 'sled.flags.chuteUsed',
-    tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive', corkscrewActive: 'sled.flags.corkscrewActive',
+    tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive', airBrakePressPending: 'sled.flags.airBrakePressPending', airBrakeKickUsed: 'sled.flags.airBrakeKickUsed', airBrakeLiftProtected: 'sled.flags.airBrakeLiftProtected', airBrakeKickPulse: 'sled.flags.airBrakeKickPulse', corkscrewActive: 'sled.flags.corkscrewActive',
     scrambled: 'sled.flags.scrambled', _nudging: 'sled.flags.nudging',
     inWorld: 'sled.flags.inWorld', destroyed: 'sled.flags.destroyed', _lastPad: 'sled.lastPad',
   }),
@@ -386,6 +386,7 @@ export const NON_CAUSAL = Object.freeze({
     gfx: PRESENTATION, bodies: 'collider bodies: positions and detector order are matter.staticOrder',
     pads: 'pad sensor bodies: positions and cooldown are matter.staticOrder (padLast)',
     startX: DERIVED_STATIC, endX: DERIVED_STATIC,
+    points: DERIVED_STATIC + ' (read-only joined source geometry used by existing terrain colliders and visual markers; authoritative points are fingerprinted in terrain)',
   }),
   ShardField: Object.freeze({ scene: 'back-reference to the scene', palette: PRESENTATION, gfx: PRESENTATION }),
   Shard: Object.freeze({ pulled: PRESENTATION + ' (draw flag set by pull())' }),
@@ -442,6 +443,7 @@ export const NON_CAUSAL = Object.freeze({
     _ghostToken: PRESENTATION, ghostRecorder: 'the recorder itself', tapePlayer: 'replay input source (inputs are the tape)',
     _replayTape: RUN_CONSTANT, _manualPauseSeq: PRESENTATION, _manualPausePending: PRESENTATION,
     _bsodObserverErrorLogged: PRESENTATION, _view: PRESENTATION, heightFn: 'closure over terrain',
+    markerHeightFn: 'presentation-only closure: joinedMarkerHeight uses existing Matter mesh coverage, avoiding speculative TerrainGenerator.heightAt() writes',
     // run constants (manifest territory)
     seed: RUN_CONSTANT, runId: 'identity string; excluded from manifests (privacy, section 1.3)', startedAt: 'wall clock; excluded',
     dailyOfficial: RUN_CONSTANT, dailyMode: RUN_CONSTANT, dailyRuleId: RUN_CONSTANT, dailyMods: RUN_CONSTANT,

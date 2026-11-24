@@ -33,7 +33,7 @@ export class TerrainMesh {
     this.world = scene.matter.world;
     this.palette = palette;
     this.modDefs = modDefs || {};
-    /** @type {Map<number, {gfx: Phaser.GameObjects.Graphics, bodies: any[], pads: any[], startX:number, endX:number}>} */
+    /** @type {Map<number, {gfx: Phaser.GameObjects.Graphics, bodies: any[], pads: any[], startX:number, endX:number, points:{x:number,y:number}[]}>} */
     this.chunks = new Map();
     this._gfxPool = [];
     this.stats = { bodiesCreated: 0, gfxCreated: 0 };
@@ -98,7 +98,9 @@ export class TerrainMesh {
     const isGap = this._gapTest(chunk);
 
     const gfx = this._takeGfx();
-    const rec = { gfx, bodies: [], pads: [], startX: chunk.startX, endX: chunk.endX };
+    // Marker labels must sample the exact already-joined collider polyline
+    // WITHOUT querying TerrainGenerator (its heightAt/_chunkAt mutate a cache).
+    const rec = { gfx, bodies: [], pads: [], startX: chunk.startX, endX: chunk.endX, points: chunk.points };
 
     // ---------- colliders, per solid segment ----------
     for (let i = 0; i < pts.length - 1; i++) {

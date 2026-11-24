@@ -20,8 +20,11 @@ changing or backing out of the panel never starts a run.
   compatible tape: it draws only once if any of its roles can show, and
   turning one role off will not hide a tape still selected through another.
 
-The panel uses the existing format/physics/tick compatibility checks and
-flags empty traces. It does not decode or validate the pose data. These are
+The panel uses the existing format/physics/tick checks and the same current
+simulation-revision check as the in-run ghost display. A tape with a different
+or missing revision shows **Incompatible** and won't draw on the current
+terrain. It remains in its slot until replaced or cleared. The panel flags
+empty traces but does not decode or validate the pose data. These are
 local cosmetic traces, not proof of identical rules or loadout, competitive
 parity, or human play. There are no friends, uploads, imports, score/standings changes, replay
 changes, or new settings or storage contracts in this slice.

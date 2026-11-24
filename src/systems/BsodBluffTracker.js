@@ -6,6 +6,8 @@
  * A close approach must be observed while airborne, while the wall closes the gap.
  * A successful escape must be airborne, use the parachute in positive BSOD tailwind,
  * and create real collision-edge separation before scoring.
+ * The optional AirBrake bonus requires an actual Sled one-shot paid-velocity
+ * event while armed, never a held/repeated button after its latch is spent.
  */
 const finite = (n) => Number.isFinite(n);
 export const BLUFF = Object.freeze({
@@ -38,10 +40,15 @@ export class BsodBluffTracker {
     this.lastAwardTimeMs = -Infinity;
   }
 
+  /** Record a paid kick at an already observed approach sample. */
+  recordPaidAirBrake() {
+    if (this.armed) this.usedAirbrake = true;
+  }
+
   /** @returns {{type:string, points:number, chain:number, surfing:boolean, closestGapPx:number}|null} */
   update({
     active, gapPx, playerX, nowMs, grounded, crashed, canopyDeployed,
-    airbrakeDeployed, relativeAirX, atmosphereDensity,
+    airbrakeKicked, relativeAirX, atmosphereDensity,
   } = {}) {
     // Never count a terminal collision or a stale/inactive state as a near miss.
     if (!active || crashed || !finite(gapPx) || gapPx <= 0) {
@@ -73,7 +80,7 @@ export class BsodBluffTracker {
       this.closestGapPx = Math.min(this.closestGapPx, gapPx);
       const wind = atmosphereDensity > 0 && relativeAirX >= cfg.minTailwindPxS;
       if (canopyDeployed && wind) this.usedCanopy = true;
-      if (airbrakeDeployed) this.usedAirbrake = true;
+      if (airbrakeKicked) this.usedAirbrake = true;
 
       // A genuine escape must leave the hazard band *alive*, not simply oscillate
       // around the arm threshold while accumulating per-frame points.

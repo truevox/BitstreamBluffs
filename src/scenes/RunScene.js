@@ -74,7 +74,7 @@ import { ShardField } from '../entities/Shard.js';
 import { BestMarker } from '../entities/BestMarker.js';
 import { LastDeathMarker } from '../entities/LastDeathMarker.js';
 import { crashReport, crashBeat, deathMarkerX } from '../systems/CrashReport.js';
-import { layoutMarkerLabels } from '../systems/MarkerLayout.js';
+import { layoutMarkerLabels, joinedMarkerHeight } from '../systems/MarkerLayout.js';
 import { AirTelegraph } from '../entities/AirTelegraph.js';
 import { GroundTelegraph } from '../entities/GroundTelegraph.js';
 import { planTelegraphMarks as planTelegraph, TelegraphTracker } from '../systems/HazardTelegraph.js';
@@ -350,6 +350,9 @@ export class RunScene extends Phaser.Scene {
       ?matchMedia('(prefers-reduced-motion: reduce)'):null; }
     catch { this._worldDanceMotionQuery=null; }
     this.mesh = new TerrainMesh(this, this.palette, this.content.terrainMods);
+    // #253: BEST/DIED HERE are presentation. Their lookahead height reads must
+    // never pre-generate terrain beyond the chunks already joined in Matter.
+    this.markerHeightFn = (x) => joinedMarkerHeight(x, this.mesh.chunks);
     this.fx = new Fx(this, this.palette);
     this.trail = new TrailParticles(this, this.palette, this.look && this.look.trail);
     this.shardField = new ShardField(this, this.palette);
@@ -764,18 +767,42 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** A real close approach followed by a parachute escape; zero score for proximity alone. */
-  updateBsodBluff() {
+  updateBsodBluff(airBrakeKicked = false, physicalTouchdowns = [], kickSample = null) {
     if (!this.bsodBluffs || !this.sled || !this.bsodState) return;
+    // The scorer otherwise sees only the LAST substep of an 8ms frame.
+    // A real Matter touchdown followed by a buffered Hop in that frame
+    // separates TWO flights: the earlier one loses its canopy/AirBrake
+    // credit before the new one can arm. Grounded update does not award.
+    for (const contact of physicalTouchdowns) {
+      const d=contact.bsodState || this.bsodState;
+      this.bsodBluffs.update({
+        active: !!d.active, gapPx:d.gapPx,
+        playerX:contact.fs.x,nowMs:contact.fs.timeMs,
+        grounded:true,crashed:!!this.bsodCaught,
+      });
+    }
     const s = this.sled, danger = this.bsodState;
+    // Resolve the approach at the actual pre-controls kick position. An
+    // encounter that arms only at the end of this tick cannot claim this kick.
+    // Observe any already-completed escape BEFORE recording the new kick.
+    if (kickSample && airBrakeKicked && !this.bsodCaught && !this.crashed) {
+      const early = this.bsodBluffs.update({ ...kickSample, airbrakeKicked: false });
+      if (early) this.awardBsodBluff(early);
+      this.bsodBluffs.recordPaidAirBrake();
+    }
     const event = this.bsodBluffs.update({
       active: danger.active, gapPx: danger.gapPx, playerX: s.x, nowMs: this.runTimeMs,
       grounded: !!s.grounded, crashed: !!this.crashed || !!this.bsodCaught,
       canopyDeployed: (s.parachuteMs || 0) > 0,
-      airbrakeDeployed: !!s.airBrakeActive,
+      airbrakeKicked: !!airBrakeKicked && !kickSample, // sampled callers only; real controls supply kickSample
       relativeAirX: danger.relativeAirX,
       atmosphereDensity: danger.atmosphereDensity,
     });
-    if (!event) return;
+    if (event) this.awardBsodBluff(event);
+  }
+
+  awardBsodBluff(event) {
+    const s = this.sled;
     // Existing near-miss accounting feeds scoring, missions, achievements and run records.
     this.nearMissCount = (this.nearMissCount || 0) + 1;
     this.bonus(event.points, 'nearMiss');
@@ -1380,25 +1407,88 @@ export class RunScene extends Phaser.Scene {
     let simDt = dt * (this.slowmoMs > 0 ? this.slowmoScale : 1);
     if (this.blinkMs > 0) { this.blinkMs -= dt; simDt *= 0.35; }
     if (this.hitStopMs > 0) { this.hitStopMs -= dt; simDt = 0; }
+    // A fixed input tick can run while physics is frozen. Preserve only
+    // a valid unspent airborne press until the next actual controls step.
+    // The tape retains the original edge; this causal latch is fingerprinted.
+    if (simDt === 0 && pad.pressed.airBrake && !sled.grounded && !sled.airBrakeKickUsed)
+      sled.airBrakePressPending = true;
+    // A real contact can occur in one Matter substep and a buffered coyote
+    // Hop relaunch in the NEXT substep of this same fixed tick. The final
+    // sled frame would be airborne and otherwise lose the paid AirBrake
+    // touchdown (or attach its points to a later unrelated landing).
+    // Buffer actual contact snapshots before any later substep modifies pose.
+    const substepTouchdowns=[];
+    const landingLedger = { entries: [], combo: null, airTricks: 0 };
+    let stepElapsedMs=0, kickSinceTouchdown=false, bluffKickSample=null;
     stepWorld(
       this.matter.world,
       simDt,
       (stepMs) => {
         const air = this.bsod ? this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere()) : null;
+        // The kick is applied before Matter or the wall advances.
+        const kickSample = air && {
+          active: air.active, gapPx: air.gapPx, playerX: sled.x,
+          nowMs: this.runTimeMs - dt + (simDt > 0 ? stepElapsedMs / simDt * dt : 0),
+          grounded: !!sled.grounded, crashed: !!this.bsodCaught || (!!this.pendingCrash &&
+            !(this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0))),
+          canopyDeployed: (sled.parachuteMs || 0) > 0,
+          relativeAirX: air.relativeAirX, atmosphereDensity: air.atmosphereDensity,
+        };
         sled.applyControls(pad, phys, stepMs, air);
+        if (sled.airBrakeKickPulse) bluffKickSample = kickSample;
+        // Integrate visual helicopter yaw over the upcoming physical
+        // interval, BEFORE Matter can register a touchdown at its end.
+        sled.stepHeli(stepMs);
       },
       (stepMs) => {
-        sled.endStep(stepMs);
+        const actualTouchdown=!!sled.endStep(stepMs);
+        stepElapsedMs+=stepMs;
+        // Preserve Flow expiry before the matching landing in the ledger;
+        // yaw was already advanced before Matter resolved the contact.
+        landingLedger.entries.push({ stepMs });
+        const paidKick=!!sled.airBrakeKickPulse;
+        if (paidKick) kickSinceTouchdown=true;
+        sled.airBrakeKickPulse=0; // retain actual event in local ordered tick evidence
+        if (actualTouchdown) {
+          // Map the physical substep to the corresponding fixed run-clock
+          // timestamp; slow-mo changes the physics delta, not the run clock.
+          const atMs=this.runTimeMs-dt+
+            (simDt>0 ? Math.min(1,stepElapsedMs/simDt)*dt : 0);
+          const contactFs=sled.getFrameState(atMs,stepMs);
+          // Grade against the real CONTACT slope, not the ground angle
+          // sampled at the beginning of this potentially long fixed tick.
+          // Terrain progression is unchanged; this read uses the same
+          // existing slopeAt mechanism as the final-frame landing.
+          contactFs.groundAngleDeg=this.slopeAt(contactFs.x);
+          contactFs.grounded=true;
+          contactFs.input.airBrakeKicked=kickSinceTouchdown;
+          substepTouchdowns.push({fs:contactFs,kicked:kickSinceTouchdown});
+          kickSinceTouchdown=false;
+          bluffKickSample=null;
+        }
         this.processContacts();
         // The BSOD advances with the SAME capped physics substeps as the sled. A fast wall cannot
         // jump over the rider between render frames. Do not depend on audio or animation timers.
         if (this.bsod && !this.bsodCaught) {
-          this.bsod.advance(stepMs);
+          this.bsod.advance(stepMs, sledLeftCollisionEdge(sled));
           const s = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
+          if (actualTouchdown) substepTouchdowns[substepTouchdowns.length-1].bsodState=s;
           if (s.gapPx <= 0) {
             this.bsodCaught = true;
             this.pendingCrash = { cause: 'bsod' };
           }
+        }
+        if (actualTouchdown) {
+          // The contact has been resolved by Matter and sensor handlers,
+          // and we know whether a terminal hazard/BSOD took priority.
+          // Settle a REAL landing now, BEFORE the next physics substep:
+          // wobble/boost/spring rebound must act on THIS flight's body,
+          // not on a buffered new Hop that launches in the next substep.
+          const absorbed=!!this.pendingCrash &&
+            this.pendingCrash.cause==='hazard' &&
+            (this.shieldCharges>0 || sled.invulnerableMs>0);
+          if ((!this.pendingCrash || absorbed) && !landingLedger.badLanding)
+            this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs, landingLedger);
         }
       },
     );
@@ -1409,8 +1499,8 @@ export class RunScene extends Phaser.Scene {
       this.bsodState = this.bsod.state(sledLeftCollisionEdge(sled), sled.vx, this.bsodAtmosphere());
       this.publishBsodState(this.bsodState);
     }
-    // flow timeout runs on the same scaled run clock as physics (slow-mo stretches it, pause / hit-stop freeze it)
-    this.emitFlow(this.score.tick(simDt));
+    // The ledger retains the exact substep Flow/landing chronology;
+    // only surviving ticks may commit the landing awards.
 
     // SFX with no event: push / hop (+ wind speed every frame)
     const audio = this.registry.get(REG.AUDIO);
@@ -1425,6 +1515,8 @@ export class RunScene extends Phaser.Scene {
     if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict
     this._hopped = !!sled.hopPulse;
     this._pushed = !!sled.pushPulse;
+    const airBrakeKickedThisTick = kickSinceTouchdown; // only the current flight
+    sled.airBrakeKickPulse = 0; // consumed per substep; always zero at replay checkpoint
     sled.hopPulse = 0;
     sled.pushPulse = 0;
 
@@ -1439,17 +1531,36 @@ export class RunScene extends Phaser.Scene {
       }
     }
 
-    // trick tracking (always fed; flagged crashed on the frame a crash is detected)
-    sled.stepHeli(dt);
+    // Trick yaw was advanced through each physical substep, including
+    // any touchdown, rather than applying an extra full-tick rotation here.
     const fs = sled.getFrameState(this.runTimeMs, dt);
+    if (substepTouchdowns.length) {
+      // This is a NEW flight after a genuine physical contact. Count only
+      // the interval since the most recent touchdown, never pre-contact time.
+      const lastContactMs=substepTouchdowns[substepTouchdowns.length-1].fs.timeMs;
+      fs.dtMs=Math.max(0,this.runTimeMs-lastContactMs);
+    }
+    fs.input.airBrakeKicked = airBrakeKickedThisTick; // earlier kicks were settled at real contacts
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
     const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);
     fs.crashed = !!this.pendingCrash && !absorbed;
+    // All genuine touches already applied their physical consequences.
+    // Score/event publication remains staged until crash priority is known.
     const upd = this.tricks.update(fs) || {};
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, upd.airtimeMs || 0, sled.airtimeMs);
 
-    if (!this.pendingCrash || absorbed) this.handleTricksAndLanding(upd, fs);
-    else if (upd.landing && upd.landing.quality === 'crash') { /* already crashing */ }
+    // A fallback final-frame landing must be graded before committing any
+    // earlier touchdown rewards. It cannot outrank a terminal wall/hazard.
+    const finalLanding = (!this.pendingCrash || absorbed) ? this.gradeLanding(upd.landing) : null;
+    if (finalLanding?.quality === 'crash') {
+      landingLedger.badLanding = true;
+      landingLedger.entries.push({ crashLanding: finalLanding, fs });
+    }
+    // Sensor/void causes have priority over provisional contact grading.
+    // A shield-absorbed hazard plus a bad landing still requires a backup
+    // respawn, as in the prior final-frame landing path.
+    if (landingLedger.badLanding && (!this.pendingCrash || absorbed))
+      this.pendingCrash = { cause: 'badLanding' };
 
     // zones, safe-ground samples
     this.updateZones(sled.x);
@@ -1460,13 +1571,22 @@ export class RunScene extends Phaser.Scene {
 
     // Collision with the deletion wall always wins if any other contact/landing happened during this frame.
     if (this.bsodCaught) this.pendingCrash = { cause: "bsod" };
+    const survivedLanding = !this.pendingCrash || (this.pendingCrash.cause === 'hazard' &&
+      (this.shieldCharges > 0 || sled.invulnerableMs > 0));
+    this.commitTouchdownLedger(landingLedger, survivedLanding);
+    if (survivedLanding) this.handleTricksAndLanding(upd, fs, { gradedLanding: finalLanding });
     // crash resolution (may be negated by Hashed Backup, except the BSOD)
     if (this.pendingCrash) this.resolveCrash(fs);
     // The replacement attempt remains frozen even for this crash frame.
     if (this.bsodGym && this.gymReadyMs > 0) return 'hold';
 
     if (!this.crashed) {
-      this.updateBsodBluff();
+      // A physical landing split the flight. Only a paid kick AFTER the
+      // last contact belongs to this relaunched encounter; never carry a
+      // tick-wide pre-touchdown brake bonus into the new flight.
+      this.updateBsodBluff(
+        substepTouchdowns.length ? kickSinceTouchdown : airBrakeKickedThisTick,
+        substepTouchdowns, bluffKickSample);
       // Gym may continue through the same terrain, but score/distance belongs
       // only to the current attempt. Never recredit earlier travel on a retry.
       const origin = this.bsodGym ? this.gymAttemptStartX : this.startX;
@@ -1526,8 +1646,8 @@ export class RunScene extends Phaser.Scene {
       if (!this.blackHole) this.blackHole = new BlackHole(this, this.palette);
       this.blackHole.update(t, magnetHolePos(sled.x, sled.y), magnetStrength(this.magnetEff, this.upgradeFx?.magnetMul), this.magnetMs, isReducedMotion(this));
     } else this.blackHole?.update(t, null, null, 0);
-    if (this.bestMarker) this.bestMarker.update(t, sled.x, this.heightFn);
-    if (this.deathMarker) this.deathMarker.update(t, sled.x, this.heightFn);
+    if (this.bestMarker) this.bestMarker.update(t, sled.x, this.markerHeightFn);
+    if (this.deathMarker) this.deathMarker.update(t, sled.x, this.markerHeightFn);
     if (this.bestMarker && this.deathMarker) {
       // BEST and DIED HERE are often at the same x: lay their labels out together so they never overprint
       const known = (m) => (m.y != null ? { x: m.x, y: m.y } : null);
@@ -1740,6 +1860,73 @@ export class RunScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ tricks / landings / score
 
+  /** Grade once at the actual contact, before a later pickup can change tolerance. */
+  gradeLanding(landing) {
+    if (!landing) return null;
+    let l = resolveLanding(landing, this.stabilizeMs > 0 ? this.stabilizeDeg : 0, TUNING);
+    if (l.shortAirBrakeTouchdown && l.quality === 'perfect') l = { ...l, quality: 'good' };
+    return l;
+  }
+
+  /** Apply causal body changes at contact, but stage score/event publication.
+   * The preview only needs combo types and trick count (not points or Flow).
+   * Clock steps and real score operations are committed in their original order.
+   */
+  settlePhysicalTouchdown(fs, ledger = null) {
+    const upd = this.tricks.update(fs) || {};
+    this.maxAirtimeMs = Math.max(this.maxAirtimeMs || 0, upd.airtimeMs || 0);
+    if (!ledger) { this.handleTricksAndLanding(upd, fs); return upd; }
+    const l = this.gradeLanding(upd.landing);
+    if (l?.quality === 'crash') {
+      // Do not occupy pendingCrash: subsequent sensor hits must be able
+      // to report their true cause (especially a fatal hazard).
+      ledger.badLanding = true;
+      ledger.entries.push({ crashLanding: l, fs });
+      return upd;
+    }
+    if (!ledger.combo) {
+      ledger.combo = new Set(this.score.getSnapshot().comboTricks);
+      ledger.airTricks = this._airTricks;
+    }
+    for (const t of upd.tricks || []) {
+      ledger.combo.add(t.type);
+      ledger.airTricks += Math.max(1, t.count || 1);
+    }
+    let boostEvent;
+    if (l) {
+      const types = [...ledger.combo];
+      boostEvent = this.applyLandingPhysics(l, this.score.getMultiplier(types),
+        Math.max(ledger.airTricks, types.length), fs, false);
+      ledger.combo.clear();
+      ledger.airTricks = 0;
+    }
+    ledger.entries.push({ upd, fs, options: {
+      gradedLanding: l, physicalApplied: true, boostEvent,
+      zoneScoreMul: l ? this._zoneScoreMulAt(fs.x) : undefined,
+    } });
+    return upd;
+  }
+
+  /** A terminal collision anywhere in the tick forfeits its staged rewards.
+   * Flow still advances, and older banked points and unrelated bonuses survive.
+   */
+  commitTouchdownLedger(ledger, survived) {
+    for (const entry of ledger.entries) {
+      if (entry.stepMs !== undefined) this.emitFlow(this.score.tick(entry.stepMs));
+      else if (survived && entry.upd) this.handleTricksAndLanding(entry.upd, entry.fs, entry.options);
+      else if (entry.crashLanding && this.pendingCrash?.cause === 'badLanding') {
+        this.emitCrashLanding(entry.crashLanding, entry.fs);
+      }
+    }
+  }
+
+  emitCrashLanding(l, fs) {
+    this.game.events.emit(EVT.LANDING, {
+      quality: 'crash', angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0,
+      airtimeMs: l.airtimeMs || 0, bonusPoints: 0, bankedPoints: 0, hard: true, x: fs.x, y: fs.y,
+    });
+  }
+
   emitScore() {
     const total = this.score.getTotal();
     const delta = total - this.lastTotal;
@@ -1769,7 +1956,7 @@ export class RunScene extends Phaser.Scene {
     }
   }
 
-  handleTricksAndLanding(upd, fs) {
+  handleTricksAndLanding(upd, fs, options = {}) {
     for (const t of upd.tricks || []) {
       const r = this.score.addTrick(t);
       const n = Math.max(1, t.count || 1);
@@ -1782,26 +1969,20 @@ export class RunScene extends Phaser.Scene {
       this.emitCombo('trick');
       this.fx.sparks(fs.x, fs.y - 14, r.isNew ? this.palette.amber : this.palette.cyan, 8, 150, 60);
     }
-    let l = upd.landing;
+    const l = options.gradedLanding === undefined ? this.gradeLanding(upd.landing) : options.gradedLanding;
     if (!l) return;
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, l.airtimeMs || 0);
     const airTricks = this._airTricks;
     this._airTricks = 0;
-    // forgiveness: clearly-bad-but-not-head-first landings become a recoverable wobble instead of a crash; a B0
-    // stabilize power-up widens the tolerance by its landingToleranceDeg (BiomeEffects.resolveLanding)
-    l = resolveLanding(l, this.stabilizeMs > 0 ? this.stabilizeDeg : 0, TUNING);
     if (l.quality === 'crash') {
-      this.game.events.emit(EVT.LANDING, {
-        quality: 'crash', angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
-        bonusPoints: 0, bankedPoints: 0, hard: true, x: fs.x, y: fs.y,
-      });
+      this.emitCrashLanding(l, fs);
       this.pendingCrash = { cause: 'badLanding' };
       return;
     }
     const pre = this.score.getSnapshot();
     const mult = pre.multiplier || 1;
     const nTricks = Math.max(airTricks, (pre.comboTricks || []).length);
-    const r = this.score.onLanding(l, { zoneScoreMul: this._zoneScoreMulAt(fs.x) });
+    const r = this.score.onLanding(l, { zoneScoreMul: options.zoneScoreMul ?? this._zoneScoreMulAt(fs.x) });
     this.game.events.emit(EVT.LANDING, {
       quality: l.quality, angleDeg: l.angleDeg || 0, impactSpeedPxS: l.impactSpeedPxS || 0, airtimeMs: l.airtimeMs || 0,
       bonusPoints: r.bonus, bankedPoints: r.banked, hard: !!l.hard, x: fs.x, y: fs.y,
@@ -1821,8 +2002,20 @@ export class RunScene extends Phaser.Scene {
       this.sled.squash = l.hard ? 1 : 0.6;
     } else if (imp > 250) this.sled.squash = 0.35;
     this._landings += 1;
-    this.applyLandingBoost(l, mult, nTricks, fs);
+    if (options.physicalApplied) {
+      if (options.boostEvent) this.emitIf(EVT.LANDING_BOOST, options.boostEvent);
+    } else this.applyLandingPhysics(l, mult, nTricks, fs);
+  }
+
+  applyLandingPhysics(l, mult, nTricks, fs, publish = true) {
+    if (l.shortAirBrakeTouchdown) {
+      // Micro-touches cannot manufacture boost/rebound, but still pay wobble.
+      if (l.quality === 'sloppy') this.sled.wobble(TUNING.sloppySpeedKeep);
+      return;
+    }
+    const event = this.applyLandingBoost(l, mult, nTricks, fs, publish);
     this.applySpringRebound(l, fs);
+    return event;
   }
 
   /**
@@ -1842,7 +2035,7 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** Trick -> speed loop (TUNING.boost*): a clean landing after tricks gives a forward burst and a stretch of low drag. */
-  applyLandingBoost(l, mult, nTricks, fs) {
+  applyLandingBoost(l, mult, nTricks, fs, publish = true) {
     const sled = this.sled;
     if (l.quality === 'sloppy') {
       sled.wobble(TUNING.sloppySpeedKeep);
@@ -1860,7 +2053,8 @@ export class RunScene extends Phaser.Scene {
     sled.addForwardSpeed(amt);
     sled.boostMs = TUNING.boostDragMs;
     this.lastBoost = { amountPxS: Math.round(amt), t: this.runTimeMs };
-    this.emitIf(EVT.LANDING_BOOST, { amountPxS: Math.round(amt), quality: l.quality, comboMult: mult, tricks: nTricks });
+    const event = { amountPxS: Math.round(amt), quality: l.quality, comboMult: mult, tricks: nTricks };
+    if (publish) this.emitIf(EVT.LANDING_BOOST, event);
     const k = amt / TUNING.boostCapPxS;
     const sp = sled.speed || 1;
     const bx = fs.x - (sled.vx / sp) * 18;
@@ -1870,6 +2064,7 @@ export class RunScene extends Phaser.Scene {
     this.fx.sparks(bx, by, this.palette.amber, 6, 200, 10);
     this._zoomKick = Math.max(this._zoomKick, 0.025 + 0.04 * k);
     this.shake(1 + 1.5 * k);
+    return event;
   }
 
   // ------------------------------------------------------------------ fun-pass systems
@@ -2215,7 +2410,18 @@ export class RunScene extends Phaser.Scene {
     const speed = pmath.hypot(fs.vx, fs.vy);
     // The advancing deletion wall overrides even shield, respawn grace and opening grace.
     if (c.cause === 'bsod') { this.doCrash(c, fs, speed); return; }
-    if (this.sled.invulnerableMs > 0 && c.cause !== 'chasm') return; // brief grace after a respawn / backup
+    if (this.sled.invulnerableMs > 0 && c.cause !== 'chasm') {
+      // Grace prevents death, not the failure of a completed bad landing.
+      // Its provisional combo belongs to the ended flight, never a later one.
+      if (c.cause === 'badLanding') {
+        this._airTricks = 0;
+        this.tricks.reset();
+        this.emitFlow(this.score.onCrash());
+        this.emitCombo('crash');
+        this.emitScore();
+      }
+      return;
+    }
     const distM = (fs.x - this.startX) / PIXELS_PER_METER;
     if (c.cause !== 'hazard' && c.cause !== 'chasm' && distM < TUNING.openingGraceM && this.openingGraces < TUNING.openingGraceMax) {
       // opening grace: recover instead of ending the run (no Hashed Backup charge used)

@@ -9,9 +9,11 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const positive = (v, fallback) => Number.isFinite(v) && v > 0 ? v : fallback;
 
 export const BSOD_DEFAULTS = Object.freeze({
-  initialGapPx: 7600,
-  initialSpeedPxS: 115,
-  accelerationPxS2: 1.15,
+  initialGapPx: 4500,
+  initialSpeedPxS: 300,
+  accelerationPxS2: 4,
+  softFinishRangePx: 3000,
+  softFinishMaxReduction: 0.18,
   dangerRangePx: 3400,
   compressionPxS: 600, // denser near-wall compressed tailwind: an actual last-second sail catch
 });
@@ -27,6 +29,20 @@ export const emptyBsodState = () => ({
   timeToImpactMs: null,
   atmosphereDensity: 0,
 });
+
+/** Smooth reduction of the wall's *physical* movement in its final 3000px.
+ * Independent of player velocity: no speed matching, teleports or catch timer.
+ * The authoritative wallSpeedPxS member remains the nominal accelerating
+ * velocity for replay fingerprints; state() exposes its actual softened speed.
+ */
+export function softApproachFactor(gapPx, config = BSOD_DEFAULTS) {
+  const range = Number(config.softFinishRangePx);
+  const reduction = Number(config.softFinishMaxReduction);
+  if (!Number.isFinite(gapPx) || !Number.isFinite(range) || range <= 0 ||
+      !Number.isFinite(reduction) || reduction <= 0) return 1;
+  const t = clamp01((range - gapPx) / range);
+  return 1 - clamp01(reduction) * t * t * (3 - 2 * t);
+}
 
 /** The physical world wind (when density > 0) is always faster than the moving wall. */
 export function compressedTailwind(wallSpeedPxS, gapPx, config = BSOD_DEFAULTS) {
@@ -75,16 +91,23 @@ export class BsodPursuit {
     this.active = true;
   }
 
-  advance(stepMs) {
+  advance(stepMs, sledLeftEdgeX) {
     if (!this.active || !Number.isFinite(stepMs) || stepMs <= 0) return;
     const dt = stepMs / 1000;
-    this.wallX += this.wallSpeedPxS * dt + 0.5 * this.accelerationPxS2 * dt * dt;
+    // Treat wallSpeedPxS as the nominal unsoftened physical rate. It is already
+    // causal/fingerprinted and is the only velocity state required. Apply the
+    // same factor to actual wall displacement as to the published snapshot.
+    // No sled edge supplied (pure historical/vector probes): advance nominally.
+    const factor = Number.isFinite(sledLeftEdgeX)
+      ? softApproachFactor(sledLeftEdgeX - this.wallX, this.config) : 1;
+    this.wallX += (this.wallSpeedPxS + 0.5 * this.accelerationPxS2 * dt) * dt * factor;
     this.wallSpeedPxS += this.accelerationPxS2 * dt;
   }
 
   state(sledLeftEdgeX, sledVelocityXPxS, atmosphereDensity = 1) {
+    const actualSpeed = this.wallSpeedPxS * softApproachFactor(sledLeftEdgeX - this.wallX, this.config);
     return bsodSnapshot({
-      active: this.active, wallX: this.wallX, wallSpeedPxS: this.wallSpeedPxS,
+      active: this.active, wallX: this.wallX, wallSpeedPxS: actualSpeed,
       sledLeftEdgeX, sledVelocityXPxS, atmosphereDensity,
       dangerRangePx: this.config.dangerRangePx,
       compressionPxS: this.config.compressionPxS,

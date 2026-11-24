@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url';
 // Vite configuration for Bitstream Bluffs Phaser project
 // See common-issues.md and llm-notes.md for any Vite/Phaser integration gotchas.
 import { defineConfig } from 'vite';
@@ -11,7 +12,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: './index.html', // Main HTML moved to public/
+      input: { game: fileURLToPath(new URL('./index.html', import.meta.url)), bsodQa: fileURLToPath(new URL('./bsod-qa.html', import.meta.url)) }, // Main HTML moved to public/
     },
   },
   server: {

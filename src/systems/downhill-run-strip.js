@@ -33,10 +33,11 @@ function readPoses(tape) {
   return poses;
 }
 
-function boundsAndIndices(poses, start, end) {
+function boundsAndIndices(poses, start, end, selected) {
   const size = end - start + 1;
   const exact = size <= MAX_STRIP_POINTS;
-  const bucketCount = exact ? size : Math.floor((MAX_STRIP_POINTS - 2) / 4);
+  // Bound the overview even with both endpoints and one non-extremal cursor pose.
+  const bucketCount = exact ? size : Math.floor((MAX_STRIP_POINTS - 3) / 4);
   const indices = exact ? [] : [start];
   const bounds = [Infinity, Infinity, -Infinity, -Infinity];
   for (let bucket = 0; bucket < bucketCount; bucket++) {
@@ -50,7 +51,8 @@ function boundsAndIndices(poses, start, end) {
       if (x > poses[POSE_WIDTH * extremes[2]]) extremes[2] = i;
       if (y > poses[POSE_WIDTH * extremes[3] + 1]) extremes[3] = i;
     }
-    // Keep extrema in trace order, not X order: a sled can backtrack.
+    if (!exact && selected !== null && selected >= a && selected < b) extremes.push(selected);
+    // Keep extrema and the selected pose in trace order, not X order: a sled can backtrack.
     for (const i of new Set(extremes.sort((left, right) => left - right))) indices.push(i);
   }
   if (!exact) indices.push(end);
@@ -79,7 +81,7 @@ function createProjection(poses, [minX, minY, maxX, maxY]) {
 }
 
 function svgFor(poses, count, start, end, selected) {
-  const { bounds, indices } = boundsAndIndices(poses, start, end);
+  const { bounds, indices } = boundsAndIndices(poses, start, end, selected);
   const point = createProjection(poses, bounds);
   const path = indices.map((i, near) => `${near ? 'L' : 'M'}${point(i).join(' ')}`).join(' ');
   const [startX, startY] = point(start), [endX, endY] = point(end);
