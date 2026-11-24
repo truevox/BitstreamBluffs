@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 14:51 UTC. Main `1123cbbca8f68d8ef623c652c75ccc2a5f518936` (#314), SIM8 v2.19.24 live on `simulate.sledhead.ing`. GitHub Pages' old URL redirects there; Netlify still serves v2.19.22 `2dcd07fa`.
+Last verified: 2026-11-24 15:04 UTC. Main `1123cbbca8f68d8ef623c652c75ccc2a5f518936` (#314), SIM8 v2.19.24 live on `simulate.sledhead.ing`. GitHub Pages' old URL redirects there; Netlify still serves v2.19.22 `2dcd07fa`.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -34,29 +34,23 @@ going” means resume this queue, not take over other lanes or merge a draft.
    Gal Friday Review App worked on the empty #307 fixture, but its polling
    check is advisory and #295 is still draft. Treat only a fresh independent
    exact-head judgment as real approval, not an advisory check.
-   Main #292 added a Vite entry for opt-in BSOD QA without changing the version. No #292
-   file overlaps the nine drafts. Applying #278's exact source delta to
-   570fc88 passed 30 focused tests and same-path 4,844-file build parity.
-   This is integration QA, not a new draft head or review verdict.
-   On 570fc88, exact #281/#282/#283/#286/#287/#290 deltas also apply
-   together in scratch: 229 focused tests across 11 suites, ruleset and
-   identity checks, and production build pass. #290 repeats real Chromium
-   Game Over A/B with no errors/outbound requests. #269 exact delta reapplies on
-   landed SIM7 5a7e3be: 42 tests and all 4,846 production files unchanged.
-   A genuine SIM7 QA tape from two identical native 185 m runs and nine
-   historical fixtures retain V1 bytes; opt-in V2 CLI/Chromium SVG bytes
-   match across all ten. No errors or outbound requests; not replay/score
-   verification or an independent Gal approval. #288 passes 47 tests, plus
-   18 fresh current-source browser repeat/playbacks; classic output stays
-   byte-identical, fatigue fails closed with the corrected diagnostic.
-   Main then added #293, opt-in BSOD QA files only (no overlap). Exact
-   combined #290 and #293 focused checks pass 13 tests; the heavier browser
-   and artifact results above remain pinned to 570fc88. No draft heads
-   changed. Recheck the actual current base on any release candidate. #288 on exact
-   landed SIM7 main plus its unchanged patch passes 47 focused tests and
-   18/18 fresh Chromium repeat/playbacks: same classic output, verified
-   fatigue fails closed with no output and better diagnostics. This does
-   not imply SIM6 tape playback compatibility.
+   #269 and #278 exact deltas revalidated on shipped v2.19.24
+   `1123cbb`. #269 42 focused tests/identity; base and candidate all
+   4,848 root-build files byte-identical, normal-entry JS matches live.
+   Two fresh Chromium profiles saved the same natural SIM8 185m crash
+   tape (end tick 975, 243 poses). V1 bytes unchanged for that plus nine
+   historical fixtures; explicit V2 Node/Chromium bytes match all ten,
+   no outbound or page errors. New evidence in [#269 review handoff](https://github.com/truevox/BitstreamBluffs/pull/269#issuecomment-7135411114);
+   head unchanged and no independent approval. #278 33 focused tests,
+   identity, root/subpath 4,848-file parity and real cursor A/B;
+   32,768-pose input stays within 1,023 preview vertices/~30 KB; boundaries
+   1,024/1,025 verified. Nine historical fixtures keep static SVG and V1
+   Art bytes. Neither proof is historical input playback or scoring.
+   #288 on landed SIM7 with unchanged patch: 47 focused tests and 18/18
+   native browser repeat/playbacks; classic unchanged, fatigue fails
+   closed with no output and clarified diagnostic. Recheck exact release
+   base later; historical #292/#293 are opt-in BSOD QA entries.
+
 2. #127 fair1153 (mask 16) on exact SIM6: Shatter Wall `17:2` x37680 →
    Packet Spike `18:0` x38301, 621 px. Fresh native 320 ms policy hits
    tick 9073 with 8.33 ms blind fade left; 300 ms policy hits same sensor
