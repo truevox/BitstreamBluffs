@@ -1,0 +1,181 @@
+[
+ {
+  "fixture": "moving",
+  "level": "repeat",
+  "K": 30,
+  "N": 36,
+  "cycles": [
+   {
+    "captureTick": 30,
+    "nextTick": 31,
+    "bytes": 386990,
+    "canonical": "xxh32x2:c0612f45bcf5fbb9",
+    "recaptured": false,
+    "movingBefore": {
+     "id": "13:1",
+     "offset": 6.705337063656785,
+     "activeAt": 8.333333333333334,
+     "x": 23921.66478626654,
+     "y": 8219.428357460529
+    },
+    "movingAfter": {
+     "id": "13:1",
+     "offset": 7.006121925959252,
+     "activeAt": 8.333333333333334,
+     "x": 23921.965571128843,
+     "y": 8219.426971415593
+    },
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 31,
+    "nextTick": 32,
+    "bytes": 387641,
+    "canonical": "xxh32x2:ba1ccaa9dcc98969",
+    "recaptured": true,
+    "movingBefore": {
+     "id": "13:1",
+     "offset": 7.006121925959252,
+     "activeAt": 8.333333333333334,
+     "x": 23921.965571128843,
+     "y": 8219.426971415593
+    },
+    "movingAfter": {
+     "id": "13:1",
+     "offset": 7.298573454928387,
+     "activeAt": 8.333333333333334,
+     "x": 23922.258022657814,
+     "y": 8219.425623771442
+    },
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 32,
+    "nextTick": 33,
+    "bytes": 387747,
+    "canonical": "xxh32x2:bab4a69d9debf116",
+    "recaptured": true,
+    "movingBefore": {
+     "id": "13:1",
+     "offset": 7.298573454928387,
+     "activeAt": 8.333333333333334,
+     "x": 23922.258022657814,
+     "y": 8219.425623771442
+    },
+    "movingAfter": {
+     "id": "13:1",
+     "offset": 7.561858317230854,
+     "activeAt": 8.333333333333334,
+     "x": 23922.521307520114,
+     "y": 8219.424410530035
+    },
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 33,
+    "nextTick": 34,
+    "bytes": 387698,
+    "canonical": "xxh32x2:5a62ed4decb427b1",
+    "recaptured": true,
+    "movingBefore": {
+     "id": "13:1",
+     "offset": 7.561858317230854,
+     "activeAt": 8.333333333333334,
+     "x": 23922.521307520114,
+     "y": 8219.424410530035
+    },
+    "movingAfter": {
+     "id": "13:1",
+     "offset": 7.827534678103693,
+     "activeAt": 8.333333333333334,
+     "x": 23922.78698388099,
+     "y": 8219.423186268376
+    },
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 34,
+    "nextTick": 35,
+    "bytes": 388393,
+    "canonical": "xxh32x2:b2b37e4ae31b6e2e",
+    "recaptured": true,
+    "movingBefore": {
+     "id": "13:1",
+     "offset": 7.827534678103693,
+     "activeAt": 8.333333333333334,
+     "x": 23922.78698388099,
+     "y": 8219.423186268376
+    },
+    "movingAfter": {
+     "id": "13:1",
+     "offset": 8.09420134477036,
+     "activeAt": 8.333333333333334,
+     "x": 23923.053650547656,
+     "y": 8219.421957443295
+    },
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   },
+   {
+    "captureTick": 35,
+    "nextTick": 36,
+    "bytes": 387739,
+    "canonical": "xxh32x2:b5013c2eb92a3a80",
+    "recaptured": true,
+    "movingBefore": {
+     "id": "13:1",
+     "offset": 8.09420134477036,
+     "activeAt": 8.333333333333334,
+     "x": 23923.053650547656,
+     "y": 8219.421957443295
+    },
+    "movingAfter": {
+     "id": "13:1",
+     "offset": 8.360868011437026,
+     "activeAt": 8.333333333333334,
+     "x": 23923.320317214322,
+     "y": 8219.420728618215
+    },
+    "newInputRows": 0,
+    "recordedHopEdge": false,
+    "newCheckpoints": 0,
+    "newFingerprints": 0
+   }
+  ],
+  "fixtureStats": {
+   "tick": 30,
+   "sledX": 23740.062958975195,
+   "hazards": 2,
+   "movingHazards": 1,
+   "hazardsHit": 0,
+   "kodiaksOut": 0,
+   "kodiakNext": 0,
+   "pairs": 0,
+   "activePairs": 0,
+   "worldBodies": 357,
+   "pool": 0,
+   "chunks": 3,
+   "score": 1484,
+   "crashed": false,
+   "nextId": 1728
+  },
+  "boundaryWitness": null,
+  "firstDivergentTick": null,
+  "pageErrors": [],
+  "wallMs": 27185
+ }
+]

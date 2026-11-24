@@ -8,6 +8,11 @@
 - Code-only release: keep the four existing public packs; private original/derived audio and estimated timing metadata remain unpublished. Experimental tighter guard (#321) is separate.
 - Preserve current main's SIM9 AirBrake, crash-priority scoring and persistence durability. Audio consumes read-only joined terrain and physics observations; no new simulation revision or old-tape compatibility promise.
 
+## v2.20.3 — Heavy Mode developer diagnostics (2026-11-24)
+
+- Add isolated fresh-build savestate capture/restore verification, strict Matter and recorder preflight, and repeated reload probes across input/checkpoint boundaries and a generated moving hazard.
+- Developer-only tools and evidence: no player savestate UI, storage, ranking or physics changes. SIM9 unchanged; #119 and #242 remain open.
+
 ## v2.20.2 — save integrity (2026-11-24)
 
 - #319: distinguish committed IndexedDB runs from session-only fallback; retry failed saves without duplicate scores, serialize initials updates, and close abandoned connections. Game Over reports pending or session-only saves honestly.

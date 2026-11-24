@@ -28,7 +28,7 @@
 
 const LEVELS = ['pose', 'kinematic', 'contacts', 'full'];
 const SNAPSHOT_KIND = 'bb-matter-diagnostic-snapshot';
-const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_VERSION = 2;
 
 const ROOT_SCALARS = ['angle', 'anglePrev', 'angularVelocity', 'angularSpeed', 'speed', 'motion', 'sleepCounter',
   'isSleeping', 'deltaTime', 'torque', 'totalContacts', 'timeScale'];
@@ -75,6 +75,105 @@ function unknownKeys(obj, allowed) {
 
 function vec(v) { return v ? [v.x, v.y] : null; }
 function setVec(t, a) { if (t && a) { t.x = a[0]; t.y = a[1]; } }
+
+/**
+ * Explicit diagnostic Matter V2 schema preflight. Validates the complete
+ * body/part identity graph and raw geometry before reconstruction. Not a
+ * production admission parser: no support for orphan pairs, constraints,
+ * nested composites, or arbitrary third-party extensions.
+ */
+export function preflightMatterSnapshot(snap, Matter) {
+  const fail = reason => { throw new Error('Matter preflight: '+reason); };
+  const record = v => v !== null && typeof v === 'object' && !Array.isArray(v) &&
+    (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null);
+  const exact = (v, keys) => record(v) && Object.keys(v).length === keys.length &&
+    keys.every(k => Object.hasOwn(v,k));
+  const finite = v => typeof v === 'number' && Number.isFinite(v);
+  const uint = v => Number.isSafeInteger(v) && v >= 0 && !Object.is(v,-0);
+  const dense = v => {
+    if (!Array.isArray(v) || Object.keys(v).length !== v.length) return false;
+    for (let i=0;i<v.length;i++) if (!Object.hasOwn(v,i)) return false;
+    return true;
+  };
+  const vec = (v,n) => dense(v) && v.length === n && v.every(finite);
+  const unique = a => new Set(a).size === a.length;
+  const keys = ['kind','version','matterVersion','diagnosticOnly','bodies','ids','nextId',
+    'pairs','orphanPairs','gravity','timing','detectorOrder','worldOrder','worldModified','audit','statics'];
+  if (!exact(snap,keys) || snap.kind !== SNAPSHOT_KIND || snap.version !== SNAPSHOT_VERSION ||
+      snap.matterVersion !== Matter.version || snap.diagnosticOnly !== true) fail('snapshot identity/shape');
+  if (!dense(snap.audit) || snap.audit.length || !dense(snap.orphanPairs) ||
+      snap.orphanPairs.length) fail('incomplete or orphaned state');
+  if (!record(snap.bodies) || !record(snap.ids) || !Object.keys(snap.ids).length ||
+      !exact(snap.bodies,Object.keys(snap.ids)) || !uint(snap.nextId)) fail('body inventory');
+  const ids = new Set(), parts = new Map(), partIdsByKey = new Map(), roots=Object.keys(snap.ids);
+  for (const key of roots) {
+    if (!key || key.includes('#') || ['__proto__','constructor','prototype'].includes(key)) fail('body key');
+    const body=snap.bodies[key], partIds=snap.ids[key];
+    if (!exact(body,['s','v','ci','parts']) || !exact(body.s,ROOT_SCALARS) ||
+        !exact(body.v,ROOT_VECTORS) || !ROOT_SCALARS.every(k=>k==='isSleeping'?typeof body.s[k]==='boolean':finite(body.s[k])) ||
+        !ROOT_VECTORS.every(k=>vec(body.v[k],2)) || !vec(body.ci,3) ||
+        !dense(body.parts) || !dense(partIds) || !partIds.length ||
+        body.parts.length!==partIds.length) fail('body state '+key);
+    for (let i=0;i<partIds.length;i++) {
+      const id=partIds[i], p=body.parts[i];
+      if (!uint(id) || id>=snap.nextId || ids.has(id)) fail('duplicate/invalid part ID');
+      ids.add(id);
+      if (!exact(p,['pos','ang','verts','axes','bounds']) || !vec(p.pos,2) || !finite(p.ang) ||
+          !dense(p.verts) || p.verts.length<3 || !p.verts.every(v=>vec(v,2)) ||
+          !dense(p.axes) || !p.axes.length || !p.axes.every(v=>vec(v,2)) ||
+          !vec(p.bounds,4) || p.bounds[0]>p.bounds[2] || p.bounds[1]>p.bounds[3]) fail('part geometry '+key);
+      parts.set(key+'#'+i,p.verts.length);
+      partIdsByKey.set(key+'#'+i,id);
+    }
+  }
+  if (typeof snap.worldModified !== 'boolean' || !dense(snap.worldOrder) ||
+      snap.worldOrder.length!==roots.length || !unique(snap.worldOrder) || !snap.worldOrder.every(k=>typeof k==='string'&&Object.hasOwn(snap.ids,k)) ||
+      !dense(snap.detectorOrder) ||
+      (snap.worldModified
+        ? !snap.detectorOrder.every(k=>k===null||typeof k==='string')
+        : !unique(snap.detectorOrder)||snap.detectorOrder.length!==roots.length||!snap.detectorOrder.every(k=>typeof k==='string'&&Object.hasOwn(snap.ids,k)))) fail('world/detector order');
+  if (!exact(snap.gravity,['x','y','scale']) || !Object.values(snap.gravity).every(finite) ||
+      !exact(snap.timing,['timestamp','timeScale','lastDelta']) || !Object.values(snap.timing).every(finite)) fail('gravity/timing');
+  if ( !exact(snap.statics,Object.keys(MODULE_STATICS).filter(k=>Matter[k])) ||
+      !Object.entries(snap.statics).every(([k,v])=>exact(v,MODULE_STATICS[k])&&Object.entries(v).every(([field,x])=>k==='Body'&&field==='_timeCorrection'?typeof x==='boolean':finite(x))))
+    fail('module statics');
+  const vertex = (r,active,pair) => {
+    if (r===null) return !active;
+    if (!dense(r)||r.length!==2) return false;
+    if (r[0]==='<dead>') return !active&&r[1]===-1;
+    if (!uint(r[1])) return false;
+    return parts.has(r[0]) && r[1]<parts.get(r[0]) && (!active||r[0]===pair.a||r[0]===pair.b);
+  };
+  if (!dense(snap.pairs)) fail('pair list');
+  const pairKeys=new Set();
+  const numbers=['separation','timeCreated','timeUpdated','inverseMass','friction','frictionStatic','restitution','slop'];
+  for (const p of snap.pairs) {
+    if (!exact(p,['a','b','ca','cb','contacts','contactCount','isActive','isSensor','col',...numbers]) ||
+        ![p.a,p.b,p.ca,p.cb].every(k=>parts.has(k)) || partIdsByKey.get(p.a)>=partIdsByKey.get(p.b) || p.ca!==p.a || p.cb!==p.b ||
+        !numbers.every(k=>finite(p[k])) || typeof p.isActive!=='boolean' || typeof p.isSensor!=='boolean' ||
+        !uint(p.contactCount)||!dense(p.contacts)||p.contacts.length!==2||p.contactCount>2||
+        !p.contacts.every((c,i)=>dense(c)&&c.length===3&&vertex(c[0],i<p.contactCount,p)&&finite(c[1])&&finite(c[2])))
+      fail('pair/contact reference');
+    const key=[p.a,p.b].sort().join('|');
+    if(pairKeys.has(key))fail('duplicate pair');
+    pairKeys.add(key);
+    const c=p.col;
+    if(!exact(c,['collided','depth','normal','tangent','penetration','supportCount','supports'])||
+        typeof c.collided!=='boolean'||!finite(c.depth)||!vec(c.normal,2)||!vec(c.tangent,2)||!vec(c.penetration,2)||
+        !uint(c.supportCount)||c.supportCount>2||!dense(c.supports)||c.supports.length!==2||
+        !c.supports.every((r,i)=>vertex(r,i<c.supportCount,p)))fail('collision support reference');
+    if (p.isActive ? p.contactCount!==c.supportCount : p.contactCount!==0) fail('pair activity/contact count');
+    // Pair.update compares BOTH stored contacts when deciding whether to
+    // swap warm-start impulses, even with one support or a retained
+    // inactive sleeping pair.
+    for(let i=0;i<2;i++){
+      const a=p.contacts[i][0],b=c.supports[i];
+      if(a===null||b===null ? a!==b : a[0]!==b[0]||a[1]!==b[1])
+        fail('contact/support mismatch');
+    }
+  }
+  return true;
+}
 
 export function createMatterSnapshotKit(Matter) {
   const { Body, Composite, Common, Pair, Collision } = Matter;
@@ -160,7 +259,7 @@ export function createMatterSnapshotKit(Matter) {
     // A stale slot (beyond contactCount / supportCount) may still point at a vertex of a body that has since left the
     // world. It is only ever compared by identity against current supports of THIS pair's parts, so it can never
     // match again: record it as a distinct dead reference.
-    if (pk == null) return ['<dead>', v.index];
+    if (pk == null) return ['<dead>', -1];
     return [pk, v.index];
   }
   const DEAD = { x: NaN, y: NaN, index: -1, body: null };
@@ -183,6 +282,8 @@ export function createMatterSnapshotKit(Matter) {
     const bodies = {};
     const ids = {};
     const audit = [];
+    if (Composite.allConstraints(engine.world).length) audit.push('unsupported Matter constraints');
+    if (engine.world.composites.length) audit.push('unsupported nested Matter composites');
     for (const [k, b] of ix.byKey) {
       ids[k] = b.parts.map((p) => p.id);
       if (!select(b)) continue;
@@ -236,8 +337,12 @@ export function createMatterSnapshotKit(Matter) {
       nextId: Common._nextId,
       pairs,
       orphanPairs,
+      gravity: { x: engine.gravity.x, y: engine.gravity.y, scale: engine.gravity.scale },
       timing: { timestamp: engine.timing.timestamp, timeScale: engine.timing.timeScale, lastDelta: engine.timing.lastDelta },
-      detectorOrder: (engine.detector.bodies || []).map((b) => keyOf(b)),
+      detectorOrder: (engine.detector.bodies || []).map(b => {
+        const k = keyOf(b);
+        return ix.byKey.get(k) === b ? k : null;
+      }),
       // Composite order: Engine iterates it, and Detector.setBodies copies it on every world change, so it breaks
       // bounds.min.x ties in the (stable) broadphase sort after the next add/remove.
       worldOrder: Composite.allBodies(engine.world).map((b) => keyOf(b)),
@@ -255,12 +360,14 @@ export function createMatterSnapshotKit(Matter) {
    */
   function restore(engine, snap, keyOf, level, opt = {}) {
     const strict = opt.strict !== false;
+    if (opt.completePreflight) preflightMatterSnapshot(snap,Matter);
     // Ablations (experiment only): leave one item out to measure what it contributes.
     const skip = new Set(opt.skip || []);
     const L = LEVELS.indexOf(level);
     if (L < 0) throw new Error(`restore: unknown level ${level}`);
     if (!snap || snap.kind !== SNAPSHOT_KIND) throw new Error('restore: not a diagnostic Matter snapshot');
     if (snap.version !== SNAPSHOT_VERSION) throw new Error(`restore: snapshot version ${snap.version} != ${SNAPSHOT_VERSION}`);
+    if (!snap.gravity || Object.keys(snap.gravity).length !== 3 || !['x','y','scale'].every(k => Number.isFinite(snap.gravity[k]))) throw new Error('restore: missing or invalid gravity');
     if (snap.matterVersion !== Matter.version) throw new Error(`restore: Matter ${snap.matterVersion} != ${Matter.version}`);
     if (strict && snap.audit && snap.audit.length) throw new Error(`restore: snapshot audit found uncaptured Matter state: ${snap.audit.join('; ')}`);
     let ix = indexWorld(engine, keyOf);
@@ -272,6 +379,20 @@ export function createMatterSnapshotKit(Matter) {
       if (missing.length || extra.length) throw new Error(`restore: world body set differs (missing ${missing.slice(0, 5)}, extra ${extra.slice(0, 5)})`);
     }
 
+    if (opt.completePreflight) {
+      if (!strict || L !== 3 || skip.size) throw new Error('Matter preflight: full strict restore required');
+      if (Composite.allConstraints(engine.world).length || engine.world.composites.length)
+        throw new Error('Matter preflight: unsupported destination constraints/composites');
+      // Compare the entire reconstructed topology BEFORE assigning IDs or
+      // writing any body fields. Counts are not derivable from a key alone.
+      for (const [k,o] of Object.entries(snap.bodies)) {
+        const b=ix.byKey.get(k);
+        if (!b || b.parts.length!==o.parts.length ||
+            o.parts.some((p,i)=>p.verts.length!==b.parts[i].vertices.length ||
+              p.axes.length!==b.parts[i].axes.length))
+          throw new Error('Matter preflight: rebuilt geometry count '+k);
+      }
+    }
     if (L >= 3) {
       // ids first: pair table keys and collision.bodyA/bodyB ordering are derived from them.
       for (const [k, partIds] of Object.entries(snap.ids)) {
@@ -324,13 +445,14 @@ export function createMatterSnapshotKit(Matter) {
       if (!skip.has("timing")) engine.timing.timestamp = snap.timing.timestamp;
       // module statics (Common._seed drives Common.random; group/category counters feed future bodies)
       for (const [mod, vals] of Object.entries(snap.statics || {})) if (Matter[mod]) Object.assign(Matter[mod], vals);
+      Object.assign(engine.gravity, snap.gravity);
       engine.timing.timeScale = snap.timing.timeScale;
       engine.timing.lastDelta = snap.timing.lastDelta;
       // Detector: bodies array is sorted in place by bounds.min.x every step (stable sort), so the previous
       // order breaks ties. Rebuild it in the snapshot's order and clear isModified so Engine.update keeps it.
-      if (!skip.has("detectorOrder") && !snap.worldModified && snap.detectorOrder.length) {
-        engine.detector.bodies = snap.detectorOrder.map((k) => ix.byKey.get(k)).filter(Boolean);
-        Composite.setModified(engine.world, false, false, true);
+      if (!skip.has("detectorOrder") && snap.detectorOrder.every(k=>ix.byKey.has(k))) {
+        engine.detector.bodies = snap.detectorOrder.map(k=>ix.byKey.get(k));
+        Composite.setModified(engine.world, snap.worldModified, true, true);
       } else {
         Composite.setModified(engine.world, true, true, false);
       }
@@ -350,5 +472,5 @@ export function createMatterSnapshotKit(Matter) {
     return out;
   }
 
-  return { LEVELS, capture, restore, digest, auditBody, captureBodyRaw: captureBody, restoreBodyRawInto: (b, o) => restoreBodyRaw(b, o), SNAPSHOT_KIND, SNAPSHOT_VERSION };
+  return { LEVELS, capture, restore, digest, auditBody, preflight: snap=>preflightMatterSnapshot(snap,Matter), captureBodyRaw: captureBody, restoreBodyRawInto: (b, o) => restoreBodyRaw(b, o), SNAPSHOT_KIND, SNAPSHOT_VERSION };
 }

@@ -46,7 +46,10 @@
   // look/palette are re-resolved when the biome sector changes (RunScene ~L2383): derived presentation, not CONFIG.
   const PRESENTATION = ['look', 'palette', 'bg', 'worldDance', 'songBillboard', 'mesh', 'fx', 'trail', 'airTelegraph', 'groundTelegraph',
     'streaks', 'flashRect', 'blindRect', 'bsodEdge', 'windPom', 'startGate', 'bestMarker', 'deathMarker', 'ghostRiders',
-    'kodiakRider', 'blackHole', '_worldDanceMotionQuery', '_frameDt', 'heightFn', 'shake'];
+    'kodiakRider', 'blackHole', '_worldDanceMotionQuery', '_frameDt', 'heightFn', 'shake',
+    // SIM9: bridge look/veil and cached span are visual; marker height reads joined mesh,
+    // not speculative terrain. Matches the shipped RunScene fingerprint exclusions.
+    '_lookId', '_veil', '_bridgeSpan', '_lookScratch', 'biomeFx', 'markerHeightFn'];
   // INFRA: Phaser scene systems, handlers, services.
   const INFRA = ['add', 'anims', 'cache', 'cameras', 'children', 'data', 'events', 'game', 'input', 'lights', 'load',
     'make', 'matter', 'plugins', 'registry', 'renderer', 'scale', 'scene', 'sound', 'sys', 'textures', 'time', 'tweens',
@@ -308,6 +311,7 @@
       pool: poolState(run, ix.keyOf),
       config: opt.withConfig ? Object.fromEntries(CONFIG.filter((k) => k in run && k !== 'content' && k !== 'tuner').map((k) => [k, JSON.stringify(run[k])])) : undefined,
       classes, audit, skipped: skipped.length,
+      recorder: opt.withRecorder ? global.__ssRecorderKit.captureRecorderPrefix(run) : undefined,
     };
     return out;
   }
@@ -333,6 +337,17 @@
     if (L < 0) throw new Error(`restore: unknown level ${level}`);
     if (!snap || snap.kind !== 'bb-runscene-diagnostic-snapshot' || snap.version !== 1) throw new Error('restore: bad snapshot kind/version');
     if (L > 0 && opt.strict !== false && snap.audit.length) throw new Error(`restore: snapshot is incomplete: ${snap.audit.join(' | ')}`);
+    // Validate the entire recorder section before touching the fresh world.
+    const preparedRecorder = global.__ssCanonical
+      ? global.__ssRecorderKit.prepareRecorderPrefix(run,snap.recorder,snap.ghost[0]) : null;
+    if (global.__ssCanonical) {
+      MKit().preflight(snap.matter);
+      // The shipped canonical fingerprint observes the RAW detector list,
+      // including stale removed bodies. We cannot reconstruct those from the
+      // live body inventory. Reject that boundary rather than weaken parity.
+      if(snap.matter.worldModified&&snap.matter.detectorOrder.some(k=>!Object.hasOwn(snap.matter.ids,k)))
+        throw new Error('Matter preflight: unsupported removed-body detector history');
+    }
     const engine = run.matter.world.engine;
     const tickMs = run.simClock.tickMs;
     if (L === 0) {
@@ -388,11 +403,12 @@
     // Pool bodies are outside the world; the Matter kit's strict body-set check covers world bodies only.
     const worldKeys = (k) => !String(k).startsWith('pool:');
     const msnapW = { ...msnap, ids: Object.fromEntries(Object.entries(msnap.ids).filter(([k]) => worldKeys(k))), bodies: Object.fromEntries(Object.entries(msnap.bodies).filter(([k]) => worldKeys(k))) };
-    const mres = MKit().restore(engine, msnapW, ix.keyOf, mlevel, { skip: [...skip] });
+    const mres = MKit().restore(engine, msnapW, ix.keyOf, mlevel, { skip: [...skip], completePreflight: !!global.__ssCanonical });
     run.sled._sync();
     if (L >= 4 && !skip.has('pool')) restorePool(run, snap.pool, !skip.has('ids'));
     if (L >= 4 && !skip.has('ids')) Matter.Common._nextId = snap.matter.nextId;
     if (L >= 4 && !skip.has('camera')) restoreCamera(run, snap.camera);
+    if (preparedRecorder) global.__ssRecorderKit.applyRecorderPrefix(run,preparedRecorder);
     return { level, matter: mres, log: dcd.log };
   }
 
@@ -451,12 +467,32 @@
     const sorted = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]]));
     out['matter.bodies'] = fnv(sorted(m.bodies));
     out['matter.worldOrder'] = fnv(JSON.stringify(m.worldOrder));
-    out['matter.detectorOrder'] = fnv(JSON.stringify(m.detectorOrder));
+    out['matter.detectorOrder'] = fnv(JSON.stringify([m.worldModified,global.__ssCanonical||!m.worldModified?m.detectorOrder:m.worldOrder]));
     out['matter.pairs'] = fnv(JSON.stringify(m.pairs));
     out['matter.ids'] = fnv(sorted(m.ids) + m.nextId);
     out['matter.timing'] = fnv(JSON.stringify(m.timing));
+    if (global.__ssCanonical) {
+      out['matter.gravity'] = fnv(JSON.stringify(m.gravity));
+      out['matter.statics'] = fnv(canon(m.statics));
+    }
     out['camera(#155)'] = fnv(JSON.stringify(cap.camera));
     out['pool'] = fnv(JSON.stringify(cap.pool));
+    // Use the actual compiled game's recorder fingerprint method, with a
+    // throwaway receiver: no mutation of the live recorder or its history.
+    if (global.__ssCanonical) {
+      if (cap.audit.length) throw new Error('incomplete diagnostic capture: '+cap.audit.join(' | '));
+      const recorder = run.ghostRecorder;
+      if (typeof recorder?._fingerprint !== 'function') throw new Error('compiled canonical fingerprint unavailable');
+      const receipt = { fingerprints: [], fingerprintErrorCount: 0, fingerprintErrors: [] };
+      recorder._fingerprint.call(receipt, run.simClock.tick, run);
+      const fp = receipt.fingerprints[0];
+      if (receipt.fingerprintErrorCount || receipt.fingerprints.length !== 1 ||
+          fp.tick !== run.simClock.tick || !fp.combined || Object.keys(fp.subsystems).length !== 13)
+        throw new Error('canonical fingerprint failed: '+JSON.stringify(receipt.fingerprintErrors));
+      out['canonical.combined'] = fp.combined;
+      for (const [key, value] of Object.entries(fp.subsystems)) out['canonical.'+key] = value;
+      out['telegraph'] = fnv(canon(cap.telegraph));
+    }
     const b = run.sled.body;
     out.__sled = [b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y, b.angularVelocity];
     out.__score = run.score.getTotal();
