@@ -768,7 +768,8 @@ export class GameOverScene extends Phaser.Scene {
     if (this.saved) return true;
     const store = this.registry.get(REG.SAVE_STORE);
     try {
-      await store.setInitials(this.rec.id, initials);
+      const status = await store.setInitials(this.rec.id, initials);
+      if (status === undefined && store.getRunPersistence?.(this.rec.id) === 'unknown') return false;
       this.saved = true;
       this.rec.initials = initials;
       updateSetting(this.game, 'lastInitials', initials);
@@ -823,7 +824,22 @@ export class GameOverScene extends Phaser.Scene {
       : modded
         ? (highlightId ? 'MODDED // YOU ARE ON THE BOARD' : 'MODDED // TOP 10')
         : (highlightId ? 'LEDGER // YOU ARE ON THE BOARD' : 'LEDGER // TOP 10');
-    this.right.setTitle(title);
+    const store = this.registry?.get(REG.SAVE_STORE);
+    const runId = this.rec?.id;
+    const prefix = this.rec?.dailyMode === 'draft' ? 'DAILY DRAFT' : modded ? 'MODDED' : 'LEDGER';
+    const persistence = store?.getRunPersistence?.(runId);
+    const display = status => status === 'session-only' ? prefix + ' // SESSION ONLY'
+      : status === 'pending' ? prefix + ' // SAVING' : title;
+    this.right.setTitle(display(persistence));
+    if (persistence === 'pending') {
+      const token = {};
+      this._boardPersistenceToken = token;
+      store.whenRunSettled(runId).then(status => {
+        if (this.alive && !this.leaving && !this.entry &&
+            this.rec?.id === runId && this._boardPersistenceToken === token)
+          this.right.setTitle(display(status));
+      });
+    } else this._boardPersistenceToken = null;
     this.modded = modded === true;
   }
 
