@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-23 23:55 UTC. Main: `5a7e3bec8b87f447aa5b61c27fc368622b7fa956` (SIM7, package/lock/changelog v2.19.21).
+Last verified: 2026-11-24 00:50 UTC. Main: `b569fa70815b15fdd1f7720ee3ae7b87aa31ccea` (SIM7, package/lock/changelog v2.19.21).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -19,10 +19,17 @@ going” means resume this queue, not take over other lanes or merge a draft.
    when the required review and release slot are clear. Obey the
    numbered release rule (#207). Main #294 shipped SIM7 Fast Approach /
    Soft Finish without updating the package, lock or changelog. The public
-   normal entry bundle matches #294 byte-for-byte. Have the release owner
+   normal entry bundle matches #294 byte-for-byte. Main #296 rebuilt
+   with 4,843/4,846 files identical to #294, including the normal index
+   and every non-QA emitted asset; only the opt-in QA HTML, bundle and
+   map changed. No new browser session. Have the release owner
    reconcile the numbering and confirm the next slot before any Morgan
    merge; do not claim #248's previously proposed v2.19.22. #295 is still
    a draft: no required independent Gal check or branch protection enabled.
+   A pure package-number change keeps SIM7 physics but changes exact build
+   ID (v2.19.21 ed6fb259…, hypothetical v2.19.22 997b60ea…). Exact-build
+   admission correctly rejects the old stamp. Keep historical receipts
+   pinned; recapture release-facing exact evidence on the actual commit.
    Main #292 added a Vite entry for opt-in BSOD QA without changing the version. No #292
    file overlaps the nine drafts. Applying #278's exact source delta to
    570fc88 passed 30 focused tests and same-path 4,844-file build parity.
@@ -91,9 +98,9 @@ going” means resume this queue, not take over other lanes or merge a draft.
    emits no report after the fatal-event check. Never annotate from the header, last
    pose or redacted #78 brief. A local prototype must bind the exact tape
    and supported build, check stored f32 poses against the replay, and
-   fail closed. Repeated both cases on current main's exact normal browser
-   entry (after #292): same tick outcomes, all stored poses match, and
-   public #78 cutoffs still produce no output. Current normal served index
+   fail closed. Repeated both cases on historical SIM6 570fc88's exact
+   normal browser entry (after #292): same tick outcomes, all stored poses match, and
+   public #78 cutoffs still produce no output. In that SIM6 check, normal served index
    SHA-256 starts a1319ec7, separate QA starts dcabd1df, old normal
    starts 8d904f4c. Build ID alone does not distinguish these; require
    exact standard index/assets, no QA path, query or redirect. No changes
