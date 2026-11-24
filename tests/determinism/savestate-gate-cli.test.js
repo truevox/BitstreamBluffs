@@ -47,3 +47,10 @@ test('natural full-run mode cannot run without strict mode or with a repeat mode
     expect(r.stderr).toContain('natural mode requires strict');
   }
 });
+
+test('terminal window rejects an invalid bound before starting the build',()=>{
+  const r=spawnSync(process.execPath,['tools/savestate-experiment/run-heavy-gate.mjs','--natural-terminal','--natural-limit','960'],{encoding:'utf8',timeout:5000});
+  expect(r.status).toBe(2);
+  expect(r.stderr).toContain('terminal window: 961..12000');
+  expect(r.stdout).not.toContain('building for production');
+});

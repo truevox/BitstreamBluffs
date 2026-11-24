@@ -48,7 +48,7 @@ const naturalLimitFlag=argv.indexOf('--natural-limit');
 const NATURAL_LIMIT=naturalLimitFlag===-1?4800:Number(argv[naturalLimitFlag+1]);
 if((NATURAL||PROBE)&&(!STRICT||NATURAL&&PROBE||TERMINAL&&argv.includes('--natural-run')||MOVING||BOUNDARY||repeatFlag!==-1||
   !Number.isSafeInteger(NATURAL_LIMIT)||NATURAL_LIMIT<=NATURAL_START||NATURAL_LIMIT>12000))
-  throw new Error('natural mode requires strict, exclusive mode and a limit 1..12000');
+  throw new Error('natural mode requires strict, exclusive mode and a limit '+(NATURAL_START+1)+'..12000');
 if(naturalLimitFlag!==-1&&!NATURAL&&!PROBE)throw new Error('--natural-limit requires natural mode');
 if(MOVING&&(!STRICT||BOUNDARY||repeatFlag!==-1))throw new Error('--repeat-moving requires --strict-suffix and no other repeat mode');
 const REPEAT=repeatFlag===-1?(BOUNDARY?14:MOVING?6:0):Number(argv[repeatFlag+1]);
