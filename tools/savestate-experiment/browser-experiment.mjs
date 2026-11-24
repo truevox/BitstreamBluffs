@@ -23,6 +23,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
+import { decodePad } from '../../src/systems/ghost/GhostTape.js';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,7 +38,9 @@ const argv = process.argv.slice(2);
 const QUICK = argv.includes('--quick');
 const STRICT = argv.includes('--strict-suffix');
 const repeatFlag=argv.indexOf('--repeat-ticks');
-const REPEAT=repeatFlag===-1?0:Number(argv[repeatFlag+1]);
+const BOUNDARY=argv.includes('--repeat-boundaries');
+const REPEAT=repeatFlag===-1?(BOUNDARY?14:0):Number(argv[repeatFlag+1]);
+if(BOUNDARY&&(!STRICT||repeatFlag!==-1))throw new Error('--repeat-boundaries requires --strict-suffix and cannot combine with --repeat-ticks');
 if(repeatFlag!==-1&&(!STRICT||!Number.isSafeInteger(REPEAT)||REPEAT<1||REPEAT>120))
   throw new Error('--repeat-ticks requires --strict-suffix and an integer from 1 to 120');
 const jsonOut = argv.includes('--json') ? argv[argv.indexOf('--json') + 1] : null;
@@ -165,6 +168,17 @@ async function restoreCandidate(candidate,json,level,skip) {
   }
 }
 
+async function fixtureStatsOf(P) {
+  return P.page.evaluate(() => {
+        const run = window.__ss.run; let hz = 0, moving = 0, hit = 0;
+        for (const l of run.hazards.values()) for (const h of l) { hz++; if (h.motion) moving++; if (h.hit) hit++; }
+        const e = run.matter.world.engine;
+        return { tick: run.simClock.tick, sledX: run.sled.x, hazards: hz, movingHazards: moving, hazardsHit: hit, kodiaksOut: run.kodiaks.length, kodiakNext: run.kodiakNext,
+          pairs: e.pairs.list.length, activePairs: e.pairs.list.filter((p) => p.isActive && !p.isSensor).length, worldBodies: e.world.bodies.length, pool: run.mesh._bodyPool?.length ?? 0,
+          chunks: run.mesh.chunks.size, score: run.score.getTotal(), crashed: run.crashed, nextId: Phaser.Physics.Matter.Matter.Common._nextId };
+      });
+}
+
 async function runCase(browser, fxName, level, skip = []) {
   const fx = FIXTURES[fxName];
   const tape = TAPES[fxName];
@@ -175,14 +189,7 @@ async function runCase(browser, fxName, level, skip = []) {
     let snapBytes = 0, restoreLog = [], classes = null, audit = [], prefixControls = null, matterControls = null, stagedControl = null;
     if (level !== 'control') {
       await A.page.evaluate((K) => window.__ss.step(K), fx.K);
-      fixtureStats = await A.page.evaluate(() => {
-        const run = window.__ss.run; let hz = 0, moving = 0, hit = 0;
-        for (const l of run.hazards.values()) for (const h of l) { hz++; if (h.motion) moving++; if (h.hit) hit++; }
-        const e = run.matter.world.engine;
-        return { tick: run.simClock.tick, sledX: run.sled.x, hazards: hz, movingHazards: moving, hazardsHit: hit, kodiaksOut: run.kodiaks.length, kodiakNext: run.kodiakNext,
-          pairs: e.pairs.list.length, activePairs: e.pairs.list.filter((p) => p.isActive && !p.isSensor).length, worldBodies: e.world.bodies.length, pool: run.mesh._bodyPool?.length ?? 0,
-          chunks: run.mesh.chunks.size, score: run.score.getTotal(), crashed: run.crashed, nextId: Phaser.Physics.Matter.Matter.Common._nextId };
-      });
+      fixtureStats = await fixtureStatsOf(A);
       const json = await A.page.evaluate(() => JSON.stringify(window.__ssGameKit.capture(window.__ss.run, { withConfig: true, withRecorder: window.__ssCanonical })));
       snapBytes = json.length;
       const parsed = JSON.parse(json);
@@ -377,10 +384,12 @@ async function runCase(browser, fxName, level, skip = []) {
 // then advance BOTH exactly one tick. This is intentionally expensive and
 // bounded: the count refers to contiguous restore cycles, not sampled ticks.
 async function runRepeatedCase(browser,fxName) {
-  const fx=FIXTURES[fxName], tape=TAPES[fxName];
+  const boundary=BOUNDARY?({contact:{K:707,edge:708,checkpoint:720},hazard:{K:829,edge:830,checkpoint:840}})[fxName]:null;
+  const fx={...FIXTURES[fxName],...(boundary?{K:boundary.K}:{})}, tape=TAPES[fxName];
   const source=await bootPage(browser,fx,tape);
   let current=source, candidate=null;
   const cycles=[];
+  let fixtureStats=null;
   const measure=P=>P.page.evaluate(()=>{
     const r=window.__ss.run;
     return {digests:window.__ssGameKit.digests(r),
@@ -394,8 +403,13 @@ async function runRepeatedCase(browser,fxName) {
   };
   try {
     await source.page.evaluate(k=>window.__ss.step(k),fx.K);
+    fixtureStats=await fixtureStatsOf(source);
+    if(fixtureStats.tick!==fx.K||fixtureStats.crashed||
+      (fxName==='contact' ? !(fixtureStats.activePairs>0) : !(fixtureStats.hazardsHit>0)))
+      return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,
+        firstDivergentTick:fx.K,phase:'fixture coverage',diff:['required contact/hazard evidence absent']};
     for(let k=fx.K;k<fx.K+REPEAT;k++){
-      const [a,b]=await Promise.all([source,current].map(measure));
+      const [a,b]=current===source?await measure(source).then(a=>[a,a]):await Promise.all([source,current].map(measure));
       const before=same(a,b,k);
       if(before.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k,phase:'before capture',diff:before};
       const bytes=await current.page.evaluate(()=>JSON.stringify(window.__ssGameKit.capture(window.__ss.run,{withConfig:true,withRecorder:true})));
@@ -410,11 +424,24 @@ async function runRepeatedCase(browser,fxName) {
       if(after.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k+1,phase:'next tick',diff:after};
       if(source.errors.length||candidate.errors.length||current.errors.length)
         throw new Error('page errors during repeat: '+JSON.stringify([...source.errors,...candidate.errors,...current.errors]));
-      cycles.push({captureTick:k,nextTick:k+1,bytes:Buffer.byteLength(bytes),canonical:nextA.digests['canonical.combined'],recaptured:current!==source});
+      const beforeRec=JSON.parse(a.prefix.data).recorder,afterRec=JSON.parse(nextA.prefix.data).recorder;
+      const appended=afterRec.inputs.length===beforeRec.inputs.length+1?afterRec.inputs.at(-1):null;
+      const recordedHopEdge=!!appended&&afterRec._lastTick===k+1&&decodePad(appended[1],appended[2]).pressed.hop===true;
+      cycles.push({captureTick:k,nextTick:k+1,bytes:Buffer.byteLength(bytes),
+        canonical:nextA.digests['canonical.combined'],recaptured:current!==source,
+        newInputRows:afterRec.inputs.length-beforeRec.inputs.length,recordedHopEdge,
+        newCheckpoints:afterRec.checkpoints.length-beforeRec.checkpoints.length,
+        newFingerprints:afterRec.fingerprints.length-beforeRec.fingerprints.length});
       if(current!==source)await current.ctx.close();
       current=candidate;candidate=null;
     }
-    return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:null,
+    const boundaryWitness=boundary?{
+      edge:boundary.edge,checkpoint:boundary.checkpoint,
+      inputRecorded:cycles.some(c=>c.nextTick===boundary.edge&&c.newInputRows===1&&c.recordedHopEdge),
+      checkpointRecorded:cycles.some(c=>c.nextTick===boundary.checkpoint&&c.newCheckpoints===1&&c.newFingerprints===1),
+      recapturedAfterCheckpoint:cycles.some(c=>c.captureTick===boundary.checkpoint&&c.recaptured)
+    }:null;
+    return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,boundaryWitness,firstDivergentTick:null,
       pageErrors:[...source.errors,...current.errors]};
   } finally {
     if(candidate)await candidate.ctx.close();
@@ -451,7 +478,7 @@ try {
     r.wallMs = Date.now() - t0;
     results.push(r);
     if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
-    console.log(`${key.padEnd(30)} firstDiv=${String(r.firstDivergentTick).padEnd(5)} (+${r.ticksAfterRestore ?? '-'}) sledDiv=${String(r.firstSledDivergentTick).padEnd(5)} maxPos=${r.maxSledPosErrPx ?? '-'} end=${r.endSledPosErrPx ?? '-'} crash=${r.crashTickA}/${r.crashTickB} ticks=${r.ticksCompared ?? '-'} at=${JSON.stringify(r.subsystemsAtFirst || r.restoreError || r.harnessError || null)}`);
+    console.log(`${key.padEnd(30)} firstDiv=${String(r.firstDivergentTick).padEnd(5)} (+${r.ticksAfterRestore ?? '-'}) sledDiv=${String(r.firstSledDivergentTick).padEnd(5)} maxPos=${r.maxSledPosErrPx ?? '-'} end=${r.endSledPosErrPx ?? '-'} crash=${r.crashTickA}/${r.crashTickB} ticks=${r.ticksCompared ?? '-'} at=${JSON.stringify(r.subsystemsAtFirst || (r.phase?{phase:r.phase,diff:r.diff,restoreError:r.restoreError}:null) || r.restoreError || r.harnessError || null)}`);
   }
 } finally { await browser.close(); }
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
@@ -459,6 +486,9 @@ if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
 if (REPEAT) {
   const failed=results.length!==2||results.some(r=>r.harnessError||r.restoreError||
     r.firstDivergentTick!==null||r.pageErrors?.length!==0||r.cycles?.length!==REPEAT||
+    r.fixtureStats?.tick!==r.K||r.fixtureStats.crashed||
+    (r.fixture==='contact'?!(r.fixtureStats.activePairs>0):!(r.fixtureStats.hazardsHit>0))||
+    (BOUNDARY&&(!r.boundaryWitness?.inputRecorded||!r.boundaryWitness.checkpointRecorded||!r.boundaryWitness.recapturedAfterCheckpoint))||
     !r.cycles.every((c,i)=>c.captureTick===r.K+i&&c.nextTick===r.K+i+1&&c.recaptured===(i>0)&&c.canonical));
   console.log(failed?'FAIL_REPEATED_RESTORE':'PASS_REPEATED_RESTORE');
   if(failed)process.exitCode=1;
