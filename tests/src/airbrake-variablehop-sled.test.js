@@ -248,3 +248,20 @@ test('slowdown scales protected Hop-only lift together with Matter velocity, so 
   expect(s._protectedHopExtraVyPxS).toBe(0);
   expect(s.airBrakeLiftProtected).toBe(true);
 });
+
+test('edge-only AirBrake tap pays one kick even if released before held-input sampling, not once per substep',()=>{
+  const s=makeSled(530,150);
+  const tap={hop:false,variableHop:true,airBrake:false,noAutoNudge:true,
+    pressed:{airBrake:true}};
+  step(s,tap);
+  expect(s.airBrakeKickUsed).toBe(true);
+  expect(s.airBrakeKickPulse).toBe(1);
+  expect(toPx(s.body.velocity.x)).toBeCloseTo(212,6);
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-318,6);
+  s.airBrakeKickPulse=0; // as the RunScene after-step consumer does
+  step(s,tap); // same VirtualPad object, distinct Matter physics substep
+  expect(s.airBrakeKickPulse).toBe(0);
+  expect(toPx(s.body.velocity.x)).toBeCloseTo(212,6);
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-318,6);
+  expect(s.airBrakeActive).toBe(false); // not a fake held brake effect
+});

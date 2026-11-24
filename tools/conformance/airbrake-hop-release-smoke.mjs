@@ -122,6 +122,19 @@ try {
       scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
     const spentBrakeCrest=actual('spent AirBrake held during crest smoothing');
 
+    // A very quick key tap released before the next held-input sample is
+    // still a genuine edge-only press. Reusing the same VirtualPad object
+    // for the next physics substep may never pay the kick a second time.
+    prepare(530,150);
+    const edgeOnly={...input,airBrake:false,pressed:{airBrake:true}};
+    sled.applyControls(edgeOnly,scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const edgeTap=actual('edge-only short AirBrake press, held state false');
+    const firstPulse=!!sled.airBrakeKickPulse;
+    sled.airBrakeKickPulse=0;
+    sled.applyControls(edgeOnly,scene.currentPhys,8,{atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const edgeRepeat=actual('same pad substep must not repeat quick tap');
+    const repeatPulse=!!sled.airBrakeKickPulse;
+
     prepare(530,-150);
     sled.applyControls(input,scene.currentPhys,8,{atmosphereDensity:0,relativeAirX:0,proximity01:0});
     const vacuum=actual('vacuum: no paid vertical impulse');
@@ -148,7 +161,8 @@ try {
     }
     return {first,next,coyoteFirst,coyoteLater,separateBrake,separateHop,separateRelease,
       lowBrake,lowHop,lowRelease,hopBefore,hopThenBrake,hopThenBrakeReleased,
-      spentBrakeCrest,vacuum,paidEvent,paidTricks,landedTricks,secondTouchdown,heldTricks};
+      spentBrakeCrest,vacuum,edgeTap,edgeRepeat,firstPulse,repeatPulse,
+      paidEvent,paidTricks,landedTricks,secondTouchdown,heldTricks};
   });
   assert.deepEqual(errors,[],'compiled browser has no fatal page errors');
   const {first,next,coyoteFirst,coyoteLater,separateBrake,separateHop,separateRelease,vacuum}=measurements;
@@ -190,7 +204,12 @@ try {
   assert.equal(measurements.hopThenBrakeReleased.protectedHopExtra,0);
   assert(Math.abs(measurements.spentBrakeCrest.vy)<1,'held spent AirBrake may not bypass crest snap');
 
-  assert.equal(measurements.paidEvent,true,'Sled must expose real paid kick');
+  assert.equal(measurements.firstPulse,true,'edge-only tap must expose a physically paid kick');
+  assert.equal(measurements.repeatPulse,false,'same-pad second substep cannot replay edge-only kick');
+  assert(measurements.edgeTap.vx>150&&measurements.edgeTap.vx<300);
+  assert(measurements.edgeTap.vy< -100);
+  assert(Math.abs(measurements.edgeRepeat.vx-measurements.edgeTap.vx)<2,'edge-only brake cannot repeat');
+    assert.equal(measurements.paidEvent,true,'Sled must expose real paid kick');
   assert.deepEqual(measurements.paidTricks,['airBrake'],'one-shot tap must earn regular trick immediately');
   assert.deepEqual(measurements.heldTricks,[],'holding a spent AirBrake cannot earn another trick');
   assert.equal(vacuum.hopActive,false,'without paid lift, variable-hop cutoff still applies');

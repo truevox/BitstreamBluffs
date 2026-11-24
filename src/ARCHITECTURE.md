@@ -30,9 +30,11 @@ that fires AFTER AirBrake is likewise releasable: `_protectedHopExtraVyPxS` reco
 ONLY the extra vertical velocity the Hop added atop the paid brake kick and
 truncates that increment on release (including quad-drag attenuation), never
 the brake. Both are SIM9 causal state fingerprinted in sled schema v3
-alongside `airBrakeKickUsed`. The full physical one-shot immediately earns the regular
-AirBrake trick on its one-tick `airBrakeKickPulse`, not after 250ms holding
-an already-spent key. A physically paid kick on the same tick as touchdown
+alongside `airBrakeKickUsed`. The full physical one-shot accepts either an airborne held brake or a
+first-substep `pressed.airBrake` edge that was released before the next fixed
+input sample. The press edge cannot repeat on later substeps, and earns the
+regular AirBrake trick on its one-tick `airBrakeKickPulse`, not after 250ms
+holding an already-spent key. A physically paid kick on the same tick as touchdown
 still receives its trick credit; two consecutive short real flights must not
 lose a later kick because the UI tracker failed to observe an airborne frame.
 Any touchdown-only paid kick under the ordinary minimum airtime is settled
@@ -40,9 +42,12 @@ immediately through the real RunScene / ScoreManager landing path with its
 actual bounded tick airtime. This applies both to a kick on the touchdown tick
 and to an airborne kick on an EARLIER tick in a short flight: the later touchdown
 banks already-pending points without issuing a duplicate trick event. Within
-each fixed simulation tick, `RunScene.simTick` buffers genuine Matter
-`Sled.endStep` touchdown frames in SUBSTEP ORDER and settles them before a
-later buffered Hop can relaunch in that same tick. Intermediate contact
+each fixed simulation tick, `RunScene.simTick` captures genuine Matter
+`Sled.endStep` touchdown frames in SUBSTEP ORDER, then settles their
+TrickTracker/ScoreManager landing physics IN THE SAME Matter after-step callback,
+before the next buffered Hop can relaunch. Applying spring and wobble after
+all substeps would incorrectly mutate the new flight, so deferred contact
+replay is expressly forbidden. Intermediate contact
 frames use the real slope at their recorded contact position, NOT the slope
 from the start of the fixed tick. The real BSOD Bluff tracker also receives
 each physical touchdown in substep order before any final airborne update,

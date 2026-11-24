@@ -1401,7 +1401,7 @@ export class RunScene extends Phaser.Scene {
     // touchdown (or attach its points to a later unrelated landing).
     // Buffer actual contact snapshots before any later substep modifies pose.
     const substepTouchdowns=[];
-    let stepElapsedMs=0, anyAirBrakeKick=false, kickSinceTouchdown=false;
+    let stepElapsedMs=0, kickSinceTouchdown=false;
     stepWorld(
       this.matter.world,
       simDt,
@@ -1413,10 +1413,7 @@ export class RunScene extends Phaser.Scene {
         const actualTouchdown=!!sled.endStep(stepMs);
         stepElapsedMs+=stepMs;
         const paidKick=!!sled.airBrakeKickPulse;
-        if (paidKick) {
-          anyAirBrakeKick=true;
-          kickSinceTouchdown=true;
-        }
+        if (paidKick) kickSinceTouchdown=true;
         sled.airBrakeKickPulse=0; // retain actual event in local ordered tick evidence
         if (actualTouchdown) {
           // Map the physical substep to the corresponding fixed run-clock
@@ -1446,6 +1443,18 @@ export class RunScene extends Phaser.Scene {
             this.pendingCrash = { cause: 'bsod' };
           }
         }
+        if (actualTouchdown) {
+          // The contact has been resolved by Matter and sensor handlers,
+          // and we know whether a terminal hazard/BSOD took priority.
+          // Settle a REAL landing now, BEFORE the next physics substep:
+          // wobble/boost/spring rebound must act on THIS flight's body,
+          // not on a buffered new Hop that launches in the next substep.
+          const absorbed=!!this.pendingCrash &&
+            this.pendingCrash.cause==='hazard' &&
+            (this.shieldCharges>0 || sled.invulnerableMs>0);
+          if (!this.pendingCrash || absorbed)
+            this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs);
+        }
       },
     );
     this.flushDespawn();
@@ -1471,7 +1480,7 @@ export class RunScene extends Phaser.Scene {
     if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict
     this._hopped = !!sled.hopPulse;
     this._pushed = !!sled.pushPulse;
-    const airBrakeKickedThisTick = anyAirBrakeKick;
+    const airBrakeKickedThisTick = kickSinceTouchdown; // only the current flight
     sled.airBrakeKickPulse = 0; // consumed per substep; always zero at replay checkpoint
     sled.hopPulse = 0;
     sled.pushPulse = 0;
@@ -1490,13 +1499,12 @@ export class RunScene extends Phaser.Scene {
     // trick tracking (always fed; flagged crashed on the frame a crash is detected)
     sled.stepHeli(dt);
     const fs = sled.getFrameState(this.runTimeMs, dt);
-    fs.input.airBrakeKicked = airBrakeKickedThisTick; // actual one-shot AirBrake trick; never held-state credit
+    fs.input.airBrakeKicked = airBrakeKickedThisTick; // earlier kicks were settled at real contacts
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
     const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);
     fs.crashed = !!this.pendingCrash && !absorbed;
-    if (!this.pendingCrash || absorbed)
-      fs.input.airBrakeKicked=this.replayMidtickTouchdowns(
-        substepTouchdowns,sled.grounded,kickSinceTouchdown,anyAirBrakeKick);
+    // All genuine touches have ALREADY settled in their physical substeps.
+    // No buffered replay may mutate the body AFTER a later Hop launches.
     const upd = this.tricks.update(fs) || {};
     this.maxAirtimeMs = Math.max(this.maxAirtimeMs, upd.airtimeMs || 0, sled.airtimeMs);
 
@@ -1797,39 +1805,17 @@ export class RunScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ tricks / landings / score
 
-  /**
-   * Restore causal ordering for actual Matter touchdowns that happen BEFORE
-   * a later relaunch in the SAME fixed simulation tick. Without this narrow
-   * replay the one post-physics frame is airborne, and a paid brake trick
-   * from the preceding flight can remain unbanked or receive duplicate
-   * airborne credit. A final grounded frame still processes its own latest
-   * touchdown via the normal single-frame path.
-   *
-   * @param {{fs:object,kicked:boolean}[]} contacts ordered new-contact frames
-   * @param {boolean} finalGrounded
-   * @param {boolean} kickAfterLastTouch
-   * @param {boolean} anyKick
-   * @returns {boolean} whether the final frame has an unconsumed new kick
+  /** Physical contact settlement, invoked in the Matter after-step hook.
+   * It is deliberately NOT replayed from the last frame: scoring effects
+   * (including wobble and spring rebound) are causal and must precede any
+   * controls step for a buffered relaunch. The final frame may subsequently
+   * update presentation/tricks, but has no unconsumed contact.
    */
-  replayMidtickTouchdowns(contacts,finalGrounded,kickAfterLastTouch,anyKick) {
-    if (!contacts.length) return anyKick;
-    // Avoid replaying unrelated normal jumps. Only an actual paid brake kick
-    // in this tick or an unsettled AirBrake trick from the preceding tick
-    // authorizes the extra touchdown sample. _brakeDone alone may be stale
-    // after a previous settled flight, so require pending air trick points.
-    const priorBrakePending=!!this.tricks?._brakeDone && this._airTricks>0;
-    if (!contacts.some(c=>c.kicked) && !priorBrakePending) return anyKick;
-    const count=finalGrounded?contacts.length-1:contacts.length;
-    if (!(count>0)) return anyKick;
-    for(let i=0;i<count;i++){
-      const fs=contacts[i].fs;
-      const upd=this.tricks.update(fs)||{};
-      this.maxAirtimeMs=Math.max(this.maxAirtimeMs||0,upd.airtimeMs||0);
-      this.handleTricksAndLanding(upd,fs);
-    }
-    return finalGrounded
-      ? !!(contacts[contacts.length-1]?.kicked || kickAfterLastTouch)
-      : !!kickAfterLastTouch;
+  settlePhysicalTouchdown(fs) {
+    const upd=this.tricks.update(fs)||{};
+    this.maxAirtimeMs=Math.max(this.maxAirtimeMs||0,upd.airtimeMs||0);
+    this.handleTricksAndLanding(upd,fs);
+    return upd;
   }
 
   emitScore() {

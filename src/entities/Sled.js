@@ -241,7 +241,11 @@ export class Sled {
     const chute = fuel.deployed;
     this.parachuteMs = chute ? Math.max(0.001, this.parachuteFuelMs) : 0;
     if (chute) this.chuteUsed = true;
-    this.airBrakeActive = !!(pad && pad.airBrake) && !grounded;
+    // Fixed-tick input preserves a short press edge even if the key was
+    // released before the tick sampled the held state. A paid one-shot
+    // needs that first-substep edge; later substeps cannot replay it.
+    this.airBrakeActive = !grounded &&
+      (!!(pad && pad.airBrake) || (firstOfFrame && !!pressed.airBrake));
     this.corkscrewActive = !!(pad && pad.corkscrew) && !grounded;
     this.tucked = !!(pad && pad.tuck);
 

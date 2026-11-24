@@ -223,7 +223,8 @@ test('RunScene orders physical Matter substep touchdown ledger before the final 
   const source=readFileSync(new URL('../../src/scenes/RunScene.js',import.meta.url),'utf8');
   expect(source).toMatch(/const actualTouchdown=!!sled\.endStep\(stepMs\)/);
   expect(source).toMatch(/if\s*\(actualTouchdown\)\s*\{[\s\S]*?substepTouchdowns\.push/);
-  expect(source).toMatch(/fs\.input\.airBrakeKicked=this\.replayMidtickTouchdowns\(/);
+  expect(source).toContain('this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs)');
+  expect(source).toContain('fs.input.airBrakeKicked = airBrakeKickedThisTick');
   expect(source).toMatch(/this\.handleTricksAndLanding\(upd,fs\)/);
 });
 
@@ -251,7 +252,7 @@ describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
     // First substep: kick then a genuine new touchdown. Second substep:
     // buffered Hop relaunches, so the fixed-tick final frame is airborne.
     const touchdown=frame(10008,true,true);
-    expect(scene.replayMidtickTouchdowns([{fs:touchdown,kicked:true}],false,false,true)).toBe(false);
+    scene.settlePhysicalTouchdown(touchdown);
     expect(scene._landings).toBe(1);
     expect(scene.trickCounts.airBrake).toBe(1);
     expect(scene.score.getSnapshot().pendingPoints).toBe(0);
@@ -272,8 +273,7 @@ describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
     scene.handleTricksAndLanding(paid,prior);
     expect(paid.tricks).toMatchObject([{type:'airBrake'}]);
     expect(scene.score.getSnapshot().pendingPoints).toBeGreaterThan(0);
-    expect(scene.replayMidtickTouchdowns(
-      [{fs:frame(10032,true,false),kicked:false}],false,false,false)).toBe(false);
+    scene.settlePhysicalTouchdown(frame(10032,true,false));
     expect(scene.score.getSnapshot().pendingPoints).toBe(0);
     expect(scene._landings).toBe(2);
     expect(scene.trickCounts.airBrake).toBe(2);
@@ -282,14 +282,15 @@ describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
     expect(final.tricks).toEqual([]);
     expect(scene._landings).toBe(2);
 
-    // If the final frame is itself grounded, do not replay its contact:
-    // normal post-physics scoring must handle it once.
-    expect(scene.replayMidtickTouchdowns(
-      [{fs:frame(10048,true,true),kicked:true}],true,false,true)).toBe(true);
-    expect(scene._landings).toBe(2);
+    // A final-substep contact also settles immediately; the later
+    // post-physics presentation frame must not create a duplicate.
     const last=frame(10048,true,true);
-    const lastUpdate=scene.tricks.update(last);
-    scene.handleTricksAndLanding(lastUpdate,last);
+    scene.settlePhysicalTouchdown(last);
+    expect(scene._landings).toBe(3);
+    const post={...last,input:{...last.input,airBrakeKicked:false}};
+    const lastUpdate=scene.tricks.update(post);
+    scene.handleTricksAndLanding(lastUpdate,post);
+    expect(lastUpdate.tricks).toEqual([]);
     expect(scene._landings).toBe(3);
     expect(scene.trickCounts.airBrake).toBe(3);
     expect(scene.score.getSnapshot().pendingPoints).toBe(0);
