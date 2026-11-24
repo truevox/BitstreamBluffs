@@ -65,8 +65,9 @@ import { Hazard } from '../entities/Hazard.js';
 import { PowerUp } from '../entities/PowerUp.js';
 import { TrailParticles } from '../entities/TrailParticles.js';
 import { Background } from '../entities/Background.js';
+import { beesAt } from '../systems/MicroBees.js';
 import { BiomeFx } from '../entities/BiomeFx.js';
-import { bridgeLook } from '../systems/BiomeTransition.js';
+import { bridgeLook, bridgeProgress } from '../systems/BiomeTransition.js';
 import { WorldDanceEnvelope, worldDanceMotionAllowed, readWorldDanceAudio } from '../systems/WorldDance.js';
 import { SongBillboard } from '../entities/SongBillboard.js';
 import { Fx } from '../entities/Fx.js';
@@ -1376,6 +1377,10 @@ export class RunScene extends Phaser.Scene {
     sled.scrambled = this.scrambleMs > 0 && !isWarded(this.wards, { effect: 'scramble' });
     const phys = this.tuner.getEffective(this.physicsContext(pad, zoneDefs));
     this.currentPhys = phys;
+    // Read-only same-tick geyser cooldown witness for music: an ordinary
+    // jump cannot count as a geyser, and audio never feeds back into physics.
+    const geyserCooldownBeforeMs = Number.isFinite(sled.geyserCooldownMs)
+      ? Math.max(0, sled.geyserCooldownMs) : 0;
 
     // sub-stepped physics; slow-mo scales the delta, never the 8 ms limit
     sled.dropAheadDeg = this.dropAhead(sled);
@@ -1423,6 +1428,29 @@ export class RunScene extends Phaser.Scene {
         if (sled.pushPulse) audio.playSfx('push');
         if (audio.setSpeed) audio.setSpeed(sled.speed);
         if (audio.setAirborne) audio.setAirborne(!sled.grounded);
+        // Music consumes authentic physical observations ONLY. No changes
+        // to controls, replay frames, causal RNG, force or recorded beats.
+        audio.setGeyserMotion?.({
+          beforeCooldownMs: geyserCooldownBeforeMs,
+          afterCooldownMs: sled.geyserCooldownMs || 0,
+          launchAvailable: !!phys.geyserLaunch,
+          vy: sled.vy,
+        });
+        audio.setThermalMotion?.({
+          active: zoneDefs.some(def => def?.id === 'thermalUpdraft') &&
+            !isWarded(this.wards, { modId: 'thermalUpdraft' }),
+          gravityPxS2: phys.gravityPxS2, vy: sled.vy, grounded: !!sled.grounded,
+        });
+        if (this.terrain) {
+          const terrainY = this.terrain.heightAt(sled.x);
+          audio.setSpaceMotion?.({
+            gravityPxS2: phys.gravityPxS2,
+            terrainY, riderY: sled.y, vy: sled.vy, grounded: !!sled.grounded,
+          });
+          audio.setHydrostaticMotion?.({
+            terrainY, riderY: sled.y, vy: sled.vy, grounded: !!sled.grounded,
+          });
+        }
       } catch (e) { /* audio must never break the loop */ }
     }
     if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict
@@ -1549,7 +1577,21 @@ export class RunScene extends Phaser.Scene {
     // Never throws: a failing audio engine must not stop the frame (and with it Phaser's loop), issue #140.
     const {sample,meter}=readWorldDanceAudio(audio,danceAllowed);
     const dance=this.worldDance?.update(sample,dt,meter)||0;
+    // Reuse an actual original-mix onset from WorldDance; never fabricate
+    // a musical beat or let the cosmetic gear pulse change the run.
+    if (sample && this.worldDance?.lastAccentMs === sample.timeMs) {
+      try { audio?.onSteampunkRecordedAccent?.(sample); } catch {}
+    }
     this.bg.update(cam.scrollX, t, sled.speed,dance);
+    // The existing decorative bees OWN their positions. Sound follows
+    // them only when they are actually on screen in Micro Mountain.
+    if (audio?.setMicroBees) {
+      const visible = this.bg.motif === 'dew-drops' && this.bg.bees === true && !this.crashed;
+      const positions = visible ? beesAt(cam.scrollX, t, this.bg.decorSeed) : [];
+      const riderScreenX = GAME_WIDTH / 2 +
+        (sled.x - (cam.scrollX + GAME_WIDTH / 2)) * cam.zoom;
+      audio.setMicroBees(positions, riderScreenX);
+    }
     if (this.biomeFx) this.biomeFx.update(cam.scrollX, t, this._veil || 0, isReducedMotion(this));
     this.songBillboard?.update(dt,dance,!danceAllowed);
     this.drawBsodCues();
@@ -2001,6 +2043,15 @@ export class RunScene extends Phaser.Scene {
     // owed: a run with no biome content never repaints beyond a palette setting change. #65 presentation: the look
     // (what the world is painted as) can change at other x than that (inside an arcade bridge) and repaints the same way.
     this._updateLook(biomeNow, biomeChanged && (def !== null || !first));
+    // The real terrain generator, not the visual dissolve or a guessed
+    // timer, owns Arcade corridor position; music only reads its progress.
+    if (biomeNow === null || biomeNow === 'bitstream-bluffs') {
+      const span = biomeNow === null ? this._bridgeSpan : null;
+      this.registry?.get?.(REG.AUDIO)?.setArcadeTransition?.({
+        bridge: !!span,
+        progress: span ? Math.max(0, Math.min(1, bridgeProgress(span, sled.x))) : 0,
+      });
+    }
     if (this.bestM > 0 && !this.newBestDone && metres > this.bestM) {
       this.newBestDone = true;
       this.emitIf(EVT.NEW_BEST, { distanceM: Math.floor(metres), previousBestM: this.bestM });

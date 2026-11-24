@@ -103,7 +103,9 @@ describe('continuous soundtrack and saved shuffle',()=>{
 			setSpeed:jest.fn()};
 		d.setMenuMode(true);
 		expect(d._activeVoiceFor(d.pack)).toBe('voice:debutmont');
-		expect(d.mixer.replaceEffects).toHaveBeenCalledWith('bass',[],0.18);
+		// This is deliberately the same 750ms window as the clean-menu
+		// transition, not the old abrupt 180ms biome graph switch.
+		expect(d.mixer.replaceEffects).toHaveBeenCalledWith('bass',[],0.75);
 		expect(d.mixer.setRoomSend).toHaveBeenCalledWith('drums',0);
 		expect(d.adaptive.setEnabled).toHaveBeenCalledWith(false);
 		expect(d.mixer.setGain).toHaveBeenCalledWith('bass',1,

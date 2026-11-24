@@ -16,7 +16,7 @@
  *
  * Signal graph:
  *   music voices -> musicSrc -> musicFilter -> duck -> musicBus -+
- *   sfx voices  -----------------------------------> sfxBus ----+-> mix -> dry --------+-> gate -> master -> comp -> out
+ *   sfx voices  -----------------------------------> sfxBus ----+-> mix -> dry --------+-> gate -> master -> comp -> peakGuard -> out
  *   wind noise ------------------------------------> windGain --+      -> crusher -> wet +
  *   static noise -> staticGain ---------------------------------------------------------> master
  * The "glitch bus" is the dry/wet crusher + gate + static section: bit-crush (staircase WaveShaper), stutter
@@ -34,6 +34,7 @@ import { validateBeatGrid, nextVerifiedPulse } from './music/BeatGridTiming.js';
 import { RELEASE_BEAT_GRIDS } from './music/BeatGridCatalog.js';
 import { syntheticMeterAt } from './music/SyntheticMeterTiming.js';
 import { cosmeticRandom } from './CosmeticRandom.js';
+import { createOutputPeakGuard } from './music/OutputPeakGuard.js';
 
 /** SFX names playSfx() must support (callers outside the engineer's files may use these). */
 export const SFX = Object.freeze([
@@ -218,6 +219,7 @@ export class AudioSynth {
 
   _onLanding(p) {
     if (!p || p.quality === 'crash') return;
+    if (this._musicMode === 'run') this._stemMusic?.onLanding?.(p);
     if (p.quality === 'perfect') this.playSfx('landPerfect');
     else if (p.hard) this.playSfx('landHard');
     else this.playSfx('land', { pitch: p.quality === 'sloppy' ? 0.8 : 1 });
@@ -260,7 +262,12 @@ export class AudioSynth {
     n.comp.threshold.value = -10;
     n.comp.ratio.value = 6;
     n.master.connect(n.comp);
-    n.comp.connect(c.destination);
+    // Compressor can still overshoot 0 dBFS on short mixed transients.
+    // This post-compressor soft ceiling stays linear below 0.86 and
+    // protects the entire output, including SFX and wind/static.
+    n.peakGuard = createOutputPeakGuard(c);
+    n.comp.connect(n.peakGuard);
+    n.peakGuard.connect(c.destination);
     n.gate = g(1);
     n.gate.connect(n.master);
     n.mix = g(1);
@@ -683,6 +690,8 @@ export class AudioSynth {
 
   _setPaused(paused) {
     this._paused = paused;
+    // Pauses may stop frame updates instantly: proactively silence bee Foley.
+    if (paused) try { this._stemMusic?.setMicroBees?.([],0); } catch {}
     try {
       if (!this.nodes) return;
       const t = this.ctx.currentTime;
@@ -935,6 +944,49 @@ export class AudioSynth {
     this._stemMusic?.setAirborne(this._musicMode === 'menu' ? false : value);
   }
 
+  /** Read-only screen positions from the existing Micro Mountain bee backdrop. */
+  setMicroBees(bees,playerScreenX) {
+    if (this._musicMode !== 'run' || this._paused) {
+      this._stemMusic?.setMicroBees?.([],0);
+      return;
+    }
+    this._stemMusic?.setMicroBees?.(bees,playerScreenX);
+  }
+
+  /** True arcade bridge geometry, read-only from terrain; standalone
+   * Arcade uses this exact same native original-source processor.
+   */
+  setArcadeTransition(sample) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setArcadeTransition?.(sample) === true;
+  }
+
+  /** Verified physical thermal zone and actual gravity; one-way music only. */
+  setThermalMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setThermalMotion?.(snapshot) === true;
+  }
+
+  /** Actual low-gravity and rider altitude for Space Mountain source field. */
+  setSpaceMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setSpaceMotion?.(snapshot) === true;
+  }
+
+  /** Read-only same-tick physics snapshots prove real geyser eruptions.
+   * A simple airborne edge is deliberately NOT a valid geyser trigger.
+   */
+  setGeyserMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return false;
+    return this._stemMusic?.setGeyserMotion?.(snapshot) === true;
+  }
+
+  /** Read-only authoritative terrain/rider sample for hydrostatic musical physics. */
+  setHydrostaticMotion(snapshot) {
+    if (this._musicMode !== 'run' || this._paused) return;
+    this._stemMusic?.setHydrostaticMotion?.(snapshot);
+  }
+
   // ----------------------------------------------------------------------------------------------------------- music
 
   /** Switch only the musical presentation; keep the same track and WebAudio clock. */
@@ -957,7 +1009,9 @@ export class AudioSynth {
         ]) {
           if (!node?.gain) continue;
           node.gain.cancelScheduledValues(t);
-          node.gain.setTargetAtTime(gain, t, 0.025);
+          // ~95% settled at 0.6s, virtually complete by 0.75s,
+          // matching the native original-stem menu transition.
+          node.gain.setTargetAtTime(gain, t, 0.20);
         }
       }
     } catch { /* headless audio and unsupported nodes remain harmless */ }
@@ -976,8 +1030,12 @@ export class AudioSynth {
   _enterRunMusic(seed) {
     this._musicMode = 'run';
     this._jukeboxMode = false;
+    // #65: choose actual Debutmont WHILE still using the clean menu
+    // arrangement; only then crossfade into its gameplay processing.
+    // Reversing this order would replace the 750ms menu fade with the
+    // ordinary 180ms biome fade, as caught by real Chromium Web Audio.
+    this._stemMusic?.setBiome('debutmont');
     this._stemMusic?.setMenuMode(false);
-    this._stemMusic?.setBiome('bitstream-bluffs');
     this._onBsodState(null);
     this._setPaused(false);
     // Respect an explicit manual pause in the jukebox.
@@ -1166,6 +1224,20 @@ export class AudioSynth {
       if(!Number.isFinite(e?.bass)||!Number.isFinite(e?.mid))return null;
       return (this._worldDanceSample={revision,timeMs:now,bass:e.bass,mid:e.mid});
     }catch{return null;}
+  }
+
+  /**
+   * Audio-only cosmetic gear tick on a real WorldDance detected recording
+   * transient. The caller passes the EXACT current read-only source sample.
+   * Synthetic meter events are never passed into this method.
+   */
+  onSteampunkRecordedAccent(sample){
+    try{
+      if(this._destroyed||this._musicMode!=='run'||this._paused||
+        !this._musicWanted||!this._vinylAudible()||
+        !sample||sample!==this._worldDanceSample)return false;
+      return this._stemMusic?.onSteampunkMusicAccent?.(sample)===true;
+    }catch{return false;}
   }
 
   /** Read-only, deliberately UNVERIFIED 0.5s / 4/4 meter for cosmetics.
