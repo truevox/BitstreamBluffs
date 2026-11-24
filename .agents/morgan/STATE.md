@@ -1,11 +1,24 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 18:46 UTC. Main `69a6fb4674335d2496a801ddd7dcaabcb0a4a8bd` (#328), v2.21.0 live at https://simulate.sledhead.ing/, SIM9 unchanged.
+Last verified: 2026-11-24 20:37 UTC. Main `29587b64fc86ba70ec647e31c4c73a3ec4c02976` (#334), v2.21.1 source, SIM9. #333 merged R2 soundtrack catalog and fallback as `d9d41c7`; #334 adds billboard thumbnails. Live deployment not rechecked for this checkpoint.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
 
 ## Next actions
+
+- **Requested #325 review completed:** open non-draft v2.21.2 head
+  `b4b52e1d6040f3b9ac998536f70362848b80d7dc` on main `29587b64`.
+  Final delta from locally built `8c5b81a` is only docs and a QA tool.
+  P2: strong sways exceed the 40px decor cull margin. At Micro Mountain
+  seed 0, t=0, strength .8, scroll 8270→8271 drops a still-visible grass
+  tip extending ~14px inside the left edge; main keeps the tip outside.
+  Planet rings can cross the same margin. Recommend bounds-aware culling
+  and a boundary regression test. Production build, identity and 123
+  focused tests passed. Chromium WebGL: 20 shared frames, 40 per-run
+  sprites, 20–21 visible, correct wrap/fade/OFF/exit over four restarts;
+  old sprites destroyed, texture reused. Exact-head GitHub CI green.
+  Real Chromebook performance remains open. No PR write or merge.
 
 1. **#157 / #287**: current draft `morgan/issue-157-utility-score-baseline` @
    `eace461ce67d113215ee5d6f3e24346704461e36`, based on exact v2.20.1.
@@ -148,8 +161,9 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
   onset with seven outgoing nodes, Play starts incoming at zero. Explicit
   OFF held the outgoing track ~211.96s and resumed ~212.29s. No page or
   HTTP errors. Old draft controls also cover after-onset and real Run
-  Escape/PauseScene resume. User informed that v2.21.0 is live and
-  Music Library → Song Crossfade → OFF is the verified workaround.
+  Escape/PauseScene resume. User informed at v2.21.0 that
+  Music Library → Song Crossfade → OFF was the verified workaround.
+  That receipt was for v2.21.0; do not claim it reverified on v2.21.1.
   Review covered other audio cases, not this one. #321 distinct; no
   media clearance implied. Watch for an owner fix and retest exact
   merged served head. No lane takeover, source edits, or external post.
