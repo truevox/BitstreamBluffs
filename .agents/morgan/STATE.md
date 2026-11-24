@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 01:47 UTC. Main: `b569fa70815b15fdd1f7720ee3ae7b87aa31ccea` (SIM7, package/lock/changelog v2.19.21).
+Last verified: 2026-11-24 03:03 UTC. Main: `2dcd07fa08e2f98304bd2e7e9a5ecdd20fb879eb` (SIM8, v2.19.22).
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 21-issue portfolio one independently testable Morgan slice at a time. “Keep
 going” means resume this queue, not take over other lanes or merge a draft.
@@ -17,20 +17,15 @@ going” means resume this queue, not take over other lanes or merge a draft.
    first; these are not approval. No merge of drafts.
    For later integration, prioritize the verified user-facing #290 fix
    when the required review and release slot are clear. Obey the
-   numbered release rule (#207). Main #294 shipped SIM7 Fast Approach /
-   Soft Finish without updating the package, lock or changelog. The public
-   normal entry bundle matches #294 byte-for-byte. Main #296 rebuilt
-   with 4,843/4,846 files identical to #294, including the normal index
-   and every non-QA emitted asset; only the opt-in QA HTML, bundle and
-   map changed. No new browser session. Have the release owner
-   reconcile the numbering and confirm the next slot before any Morgan
-   merge; #299/#300 propose v2.19.22/.23, not owner-confirmed slots.
-   #295 is still
-   a draft: no required independent Gal check or branch protection enabled.
-   A pure package-number change keeps SIM7 physics but changes exact build
-   ID (v2.19.21 ed6fb259…, hypothetical v2.19.22 997b60ea…). Exact-build
-   admission correctly rejects the old stamp. Keep historical receipts
-   pinned; recapture release-facing exact evidence on the actual commit.
+   numbered release rule (#207). #299 landed SIM8 at 2dcd07fa and used
+   v2.19.22; public normal entry JS byte-matches the exact build. v2.19.23
+   is proposed by #300: leave both release ordering and next Morgan slot
+   with the release owner. SIM7's #294 BSOD changes are in source history,
+   not a separate changelog entry. Exact build ID now 7641c907…; preserve
+   old receipts as historical and recapture exact evidence on each release.
+   Gal Friday Review App worked on the empty #307 fixture, but its polling
+   check is advisory and #295 is still draft. Treat only a fresh independent
+   exact-head judgment as real approval; #290 has COMMENTED only.
    Main #292 added a Vite entry for opt-in BSOD QA without changing the version. No #292
    file overlaps the nine drafts. Applying #278's exact source delta to
    570fc88 passed 30 focused tests and same-path 4,844-file build parity.
@@ -49,7 +44,7 @@ going” means resume this queue, not take over other lanes or merge a draft.
    Main then added #293, opt-in BSOD QA files only (no overlap). Exact
    combined #290 and #293 focused checks pass 13 tests; the heavier browser
    and artifact results above remain pinned to 570fc88. No draft heads
-   changed. Recheck #294 base on any release candidate. #288 on exact
+   changed. Recheck the actual current base on any release candidate. #288 on exact
    landed SIM7 main plus its unchanged patch passes 47 focused tests and
    18/18 fresh Chromium repeat/playbacks: same classic output, verified
    fatigue fails closed with no output and better diagnostics. This does
@@ -61,8 +56,13 @@ going” means resume this queue, not take over other lanes or merge a draft.
    This proves timing, not causation/unfairness. #286 includes exact
    stock commands. Preserve separate historical #202; no new speculative
    tuning. Full branch/route model remains gated on #57/#60.
-3. #81/#290 same-origin on-disk Chromium A/B passed on exact landed
-   SIM7 main 5a7e3be with and without exact #290 bd43a5a. Genuine SIM6
+3. #81/#290 fresh same-origin persistent Chromium A/B passed with exact
+   landed SIM8 2dcd07fa and unchanged bd43a5a. A genuine natural 185 m
+   SIM7 b569fa7 tape persisted; a controlled shorter 28 m SIM8 run became
+   Best/Latest. Old/unstamped still read, only current rendered; the patch
+   removed false Shared Run and labelled old rows INCOMPATIBLE. Real
+   replace/clear/escape/retry, 27 focused tests and build identity passed.
+   Prior on-disk Chromium A/B also passed on exact landed SIM7 main 5a7e3be with and without exact #290 bd43a5a. Genuine SIM6
    b848b03 sim-02 tape (185 m) stayed readable across a fresh process and
    unrendered; a controlled shorter SIM7 run (28 m) became Best/Latest.
    Baseline shows stale distances/false Shared Run, patch says
@@ -165,17 +165,17 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - #273 Seeking/Gal pilot: Luna posted exact-head delta source approval at
   `0fd1400` after the earlier retry timed out. It is still a draft and #130
   remains open; leave release and broader work in their lane.
-  #248 is historical preview only: its older draft SIM7 is not shipped
-  SIM7. Owner approved the tested 60% one-shot AirBrake slowdown and
-  unchanged upward kick; no new feel decision. Gal/Home own #299 SIM8
-  marker isolation at `ea5348e537cf12d764ae05ea2d584ff29c5a1002` and
-  #300 SIM9 AirBrake at `23b21e5d4eb9c23c068566904a2de7a7e1dddcf0`.
-  #300 is 2 ahead/2 behind #299 at fork 2286f88. Both missing commits
-  touch only the marker-repeat harness (served bundle/clean source and
-  captured-frame checks), not marker physics. Both drafts need exact-head independent review.
-  Reconcile and rerun #300 on the actual post-#299 base; earlier browser
-  evidence does not establish exact combined release acceptance. Preserve
-  #266's future version/identity seams, not a prerelease old-tape mandate.
+  #248 is historical preview only. Owner approved the tested 60% AirBrake
+  kick and unchanged upward impulse. #299 SIM8 landed as 2dcd07fa. Gal/Home's
+  #300 now targets main directly, latest draft `10df014dabd4790e0a3a9249a8f60d5663c4caaf`
+  (SIM9, proposed v2.19.23); hosted CI/preview green is not exact-head
+  independent approval. Pin published browser receipts to their tested heads.
+  #287 test-only baseline applies on exact SIM8 with 111/111. On exact
+  #300, two held-input expectations fail as designed: SIM9 credits the
+  actual paid kick instead of held AirBrake. Hold or coordinate the release
+  order; replace held positives with paid pulse and spent/held negatives
+  after SIM9, preserving separate parachute and score/flow assertions.
+  No scoring coefficient changes. #266 is future identity, not old-tape mandate.
 - Main stays release-controlled. Keep synthetic developer evidence out of
   gameplay, saved formats, scoring and ranked eligibility unless authorized.
 
