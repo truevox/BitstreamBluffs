@@ -143,6 +143,24 @@ function compareDigests(a, b) {
   return { diff, sledExact, posErr: Math.hypot(sa[0] - sb[0], sa[1] - sb[1]), scoreErr: Math.abs(a.__score - b.__score) };
 }
 
+// Only the disposable, isolated candidate is reconstructed. The caller
+// must not publish or step it unless restoration succeeds. Failed candidates
+// are closed, including when the page evaluation itself throws.
+async function restoreCandidate(candidate,json,level,skip) {
+  try {
+    const result=await candidate.page.evaluate(({json,level,skip})=>{
+      try{return {ok:true,...window.__ssGameKit.restore(window.__ss.run,JSON.parse(json),level,{skip})};}
+      catch(e){return {ok:false,error:String(e.message||e)};}
+    },{json,level,skip});
+    if(result.ok)return result;
+    await candidate.ctx.close();
+    return {...result,discarded:candidate.page.isClosed()};
+  } catch(e) {
+    await candidate.ctx.close();
+    throw e;
+  }
+}
+
 async function runCase(browser, fxName, level, skip = []) {
   const fx = FIXTURES[fxName];
   const tape = TAPES[fxName];
@@ -150,7 +168,7 @@ async function runCase(browser, fxName, level, skip = []) {
   const B = await bootPage(browser, fx, tape);
   try {
     let fixtureStats = null;
-    let snapBytes = 0, restoreLog = [], classes = null, audit = [], prefixControls = null;
+    let snapBytes = 0, restoreLog = [], classes = null, audit = [], prefixControls = null, matterControls = null, stagedControl = null;
     if (level !== 'control') {
       await A.page.evaluate((K) => window.__ss.step(K), fx.K);
       fixtureStats = await A.page.evaluate(() => {
@@ -202,10 +220,73 @@ async function runCase(browser, fxName, level, skip = []) {
           }
           return results;
         },cases);
+        matterControls = await B.page.evaluate(json=>{
+          const run=window.__ss.run,kit=window.__ssGameKit;
+          const before=JSON.stringify(kit.digests(run));
+          const beforeRecorder=JSON.stringify(window.__ssRecorderKit.captureRecorderPrefix(run));
+          const corruptions={
+            missingBody:s=>delete s.matter.bodies.sled,
+            duplicateId:s=>s.matter.ids.sled[1]=s.matter.ids.sled[0],
+            badGeometry:s=>s.matter.bodies.sled.parts[0].verts[0]=[null,0],
+            extraOrder:s=>s.matter.worldOrder.push('sled'),
+            coercedOrder:s=>s.matter.worldOrder[0]=[s.matter.worldOrder[0]],
+            badPair:s=>s.matter.pairs[0].a='missing#0',
+            reversePair:s=>{const p=s.matter.pairs[0];[p.a,p.b]=[p.b,p.a];[p.ca,p.cb]=[p.cb,p.ca];},
+            sparseVelocity:s=>delete s.matter.bodies.sled.v.velocity[0],
+            orphan:s=>s.matter.orphanPairs.push({labels:['a','b']}),
+            statics:s=>s.matter.statics={},
+            staticType:s=>s.matter.statics.Common._baseDelta=false,
+            thirdContact:s=>{
+              const p=s.matter.pairs.find(p=>p.contactCount>0);
+              p.contacts[0][0]=[Object.keys(s.matter.bodies).map(k=>k+'#0').find(k=>k!==p.a&&k!==p.b),0];
+            },
+            thirdSupport:s=>{
+              const p=s.matter.pairs.find(p=>p.col.supportCount>0);
+              p.col.supports[0]=[Object.keys(s.matter.bodies).map(k=>k+'#0').find(k=>k!==p.a&&k!==p.b),0];
+            },
+            contactSlot:s=>{s.matter.pairs[0].contactCount=1;s.matter.pairs[0].contacts.pop();},
+            contactActivity:s=>s.matter.pairs.find(p=>p.isActive&&p.contactCount>0).contactCount=0,
+          };
+          const expected={
+            missingBody:'body inventory',duplicateId:'duplicate/invalid part ID',
+            badGeometry:'part geometry sled',extraOrder:'world/detector order',coercedOrder:'world/detector order',
+            badPair:'pair/contact reference',reversePair:'pair/contact reference',sparseVelocity:'body state sled',orphan:'incomplete or orphaned state',
+            statics:'module statics',staticType:'module statics',thirdContact:'pair/contact reference',
+            thirdSupport:'collision support reference',contactSlot:'pair/contact reference',contactActivity:'pair activity/contact count',
+          };
+          return Object.entries(corruptions).map(([name,mutate])=>{
+            const bad=JSON.parse(json);mutate(bad);
+            let error=null;
+            try{kit.restore(run,bad,'full');}catch(e){error=String(e.message);}
+            const unchanged=before===JSON.stringify(kit.digests(run))&&
+              beforeRecorder===JSON.stringify(window.__ssRecorderKit.captureRecorderPrefix(run));
+            if(error!=='Matter preflight: '+expected[name]||!unchanged)
+              throw new Error('Matter negative control failed: '+name+': '+error);
+            return {name,error,unchanged};
+          });
+        },json);
+        // A finite extra axis passes shape preflight but fails after chunk
+        // reconstruction. Exercise that late failure in a THIRD context;
+        // B remains held at tick zero, A remains the uninterrupted source.
+        const measured=P=>P.page.evaluate(()=>JSON.stringify({
+          state:window.__ssGameKit.digests(window.__ss.run),
+          recorder:window.__ssRecorderKit.captureRecorderPrefix(window.__ss.run)
+        }));
+        const before=await Promise.all([A,B].map(measured));
+        const bad=JSON.parse(json);
+        bad.matter.bodies.sled.parts[0].axes.push([1,0]);
+        const C=await bootPage(browser,fx,tape);
+        let rejection;
+        try{rejection=await restoreCandidate(C,JSON.stringify(bad),'full',[]);}
+        finally{await C.ctx.close();}
+        const after=await Promise.all([A,B].map(measured));
+        stagedControl={error:rejection.error,discarded:rejection.discarded===true,
+          sourceUnchanged:before[0]===after[0],destinationUnchanged:before[1]===after[1]};
+        if(rejection.ok||stagedControl.error!=='Matter preflight: rebuilt geometry count sled'||
+            !stagedControl.discarded||!stagedControl.sourceUnchanged||!stagedControl.destinationUnchanged)
+          throw new Error('staged late failure control failed: '+JSON.stringify(stagedControl));
       }
-      const r = await B.page.evaluate(({ json, level, skip }) => {
-        try { return { ok: true, ...window.__ssGameKit.restore(window.__ss.run, JSON.parse(json), level, { skip }) }; } catch (e) { return { ok: false, error: String(e.message || e) }; }
-      }, { json, level, skip });
+      const r = await restoreCandidate(B,json,level,skip);
       if (!r.ok) return { fixture: fxName, level, skip: skip.join('+') || '-', restoreError: r.error, snapBytes, audit };
       restoreLog = r.log || [];
       if (STRICT) {
@@ -276,7 +357,7 @@ async function runCase(browser, fxName, level, skip = []) {
       firstDivergentTick: first, ticksAfterRestore: first === null ? null : first - K, subsystemsAtFirst: firstDiff,
       firstSledDivergentTick: firstSled, firstLeaves, firstDivergenceBySubsystem: firstBy, maxSledPosErrPx: +maxPos.toFixed(4), endSledPosErrPx: +endPos.toFixed(4),
       crashTickA: crashA, crashTickB: crashB, restoreLog: restoreLog.slice(0, 12), restoreLogCount: restoreLog.length,
-      prefixControls, recorderParity, audit, classes: classes && Object.fromEntries(Object.entries(classes).map(([k, v]) => [k, v.length])), unclassified: classes?.unclassified, pageErrors: errors,
+      prefixControls, matterControls, stagedControl, recorderParity, audit, classes: classes && Object.fromEntries(Object.entries(classes).map(([k, v]) => [k, v.length])), unclassified: classes?.unclassified, pageErrors: errors,
     };
   } finally {
     await A.ctx.close(); await B.ctx.close();
@@ -321,6 +402,8 @@ if (STRICT) {
     r.restoreError || r.harnessError || r.ticksCompared !== r.N-r.K ||
     r.firstDivergentTick !== null || r.firstSledDivergentTick !== null ||
     r.prefixControls?.length !== 5 || !r.prefixControls.every(c=>c.unchanged&&c.error?.startsWith('recorder prefix:')) ||
+    r.matterControls?.length !== 15 || !r.matterControls.every(c=>c.unchanged&&c.error?.startsWith('Matter preflight:')) ||
+    !r.stagedControl?.discarded || !r.stagedControl.sourceUnchanged || !r.stagedControl.destinationUnchanged ||
     !r.recorderParity?.prefix || !r.recorderParity.finishedTape || r.recorderParity.endTick !== r.N ||
     r.pageErrors?.length !== 0 || r.audit?.length !== 0 || r.unclassified?.length !== 0 ||
     (r.fixture === 'contact' ? !(r.fixtureStats?.activePairs > 0) : !(r.fixtureStats?.hazardsHit > 0)));

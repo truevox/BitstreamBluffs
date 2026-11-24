@@ -82,3 +82,137 @@ test('diagnostic snapshot V2 captures changed gravity and rejects absent or nonf
   kit.restore(b.engine,snap,b.keyOf,'full');
   expect(b.engine.gravity).toEqual(snap.gravity);
 });
+
+test('explicit full Matter preflight rejects malformed identity and geometry before modifying destination',()=>{
+  const a=buildWorld(Matter);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  const b=buildWorld(Matter);
+  const before=JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}));
+  for(const mutate of [
+    s=>delete s.bodies.sled,
+    s=>s.ids.sled[1]=s.ids.sled[0],
+    s=>s.bodies.sled.parts[0].verts[0]=[null,0],
+    s=>s.worldOrder.push('sled'),
+    s=>s.gravity.extra=0,
+    s=>s.statics={},
+    s=>s.statics.Common._baseDelta=false,
+    s=>s.statics.Body._timeCorrection=1,
+    s=>s.bodies.sled.parts[0].axes.push([1,0]),
+    s=>s.bodies.sled.parts[0].verts.push([1,0]),
+    s=>{s.bodies.sled.parts.push(s.bodies.sled.parts[0]);s.ids.sled.push(s.nextId++);},
+    s=>s.pairs.push({a:'missing'}),
+    s=>s.orphanPairs.push({labels:['a','b']}),
+  ]){
+    const bad=JSON.parse(JSON.stringify(good));mutate(bad);
+    expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/Matter preflight/);
+    expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
+  }
+  expect(()=>kit.restore(b.engine,good,b.keyOf,'full',{completePreflight:true})).not.toThrow();
+});
+test('unsupported constraints are audited rather than silently omitted',()=>{
+  const a=buildWorld(Matter);
+  Matter.Composite.add(a.engine.world,Matter.Constraint.create({bodyA:a.sled,pointB:{x:0,y:0}}));
+  const snap=kit.capture(a.engine,a.keyOf,{selectBody:()=>true});
+  expect(snap.audit).toContain('unsupported Matter constraints');
+});
+
+test('modified world permits stale detector entries only when the order will be rebuilt',()=>{
+  const a=buildWorld(Matter);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  good.worldModified=true;
+  good.detectorOrder=[null,null,'stale:removed'];
+  expect(kit.preflight(good)).toBe(true);
+  good.worldModified=false;
+  expect(()=>kit.preflight(good)).toThrow(/world\/detector order/);
+});
+test('full preflight requires both contact slots even for a one-contact pair',()=>{
+  const a=buildWorld(Matter);
+  for(let i=0;i<300&&!a.engine.pairs.list.length;i++) Matter.Engine.update(a.engine,1000/240);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  expect(good.pairs.length).toBeGreaterThan(0);
+  expect(kit.preflight(good)).toBe(true);
+  const bad=JSON.parse(JSON.stringify(good));
+  bad.pairs[0].contactCount=1;
+  bad.pairs[0].contacts.pop();
+  expect(()=>kit.preflight(bad)).toThrow(/pair\/contact reference/);
+});
+
+test('active contacts and collision supports must belong to the actual pair endpoints',()=>{
+  const a=buildWorld(Matter);
+  for(let i=0;i<300&&!a.engine.pairs.list.some(p=>p.contactCount>0);i++)Matter.Engine.update(a.engine,1000/240);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  expect(kit.preflight(good)).toBe(true);
+  const idx=good.pairs.findIndex(p=>p.contactCount>0&&p.col.supportCount>0);
+  expect(idx).toBeGreaterThanOrEqual(0);
+  const p=good.pairs[idx];
+  const other=Object.keys(good.bodies).map(k=>k+'#0').find(k=>k!==p.a&&k!==p.b);
+  for(const mutate of [p=>p.contacts[0][0]=[other,0],p=>p.col.supports[0]=[other,0]]){
+    const bad=JSON.parse(JSON.stringify(good));mutate(bad.pairs[idx]);
+    expect(()=>kit.preflight(bad)).toThrow(/reference/);
+  }
+});
+
+test('complete preflight rejects sparse physics arrays and reversed saved pair IDs without mutation',()=>{
+  const a=buildWorld(Matter);
+  for(let i=0;i<300&&!a.engine.pairs.list.some(p=>p.contactCount>0);i++)Matter.Engine.update(a.engine,1000/240);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  expect(kit.preflight(good)).toBe(true);
+  const b=buildWorld(Matter), before=JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}));
+  for(const mutate of [
+    s=>delete s.bodies.sled.v.velocity[0],
+    s=>delete s.bodies.sled.parts[0].verts[0],
+    s=>delete s.pairs[0].contacts[1],
+    s=>delete s.pairs[0],
+    s=>{const p=s.pairs[0];[p.a,p.b]=[p.b,p.a];[p.ca,p.cb]=[p.cb,p.ca];},
+  ]){
+    const bad=JSON.parse(JSON.stringify(good));mutate(bad);
+    expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/Matter preflight/);
+    expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
+  }
+});
+
+test('order entries must be actual strings, not coercible array keys',()=>{
+  const a=buildWorld(Matter);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  for(const field of ['worldOrder','detectorOrder']){
+    const bad=JSON.parse(JSON.stringify(good));
+    bad.worldModified=false;
+    bad.detectorOrder=[...bad.worldOrder];
+    bad[field][0]=[bad[field][0]];
+    expect(()=>kit.preflight(bad)).toThrow(/world\/detector order/);
+  }
+});
+test('inactive dead contact/support references survive repeated capture and restore',()=>{
+  const a=buildWorld(Matter);
+  for(let i=0;i<300&&!a.engine.pairs.list.some(p=>p.contactCount>0);i++)Matter.Engine.update(a.engine,1000/240);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  const p=good.pairs.find(p=>p.contactCount>0&&p.col.supportCount>0);
+  expect(p).toBeDefined();
+  p.contactCount=1;p.col.supportCount=1;
+  p.contacts[1][0]=['<dead>',0];p.col.supports[1]=['<dead>',0];
+  expect(kit.preflight(good)).toBe(true);
+  const b=buildWorld(Matter);
+  kit.restore(b.engine,good,b.keyOf,'full',{completePreflight:true});
+  const second=JSON.parse(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true})));
+  expect(second.pairs.find(q=>q.a===p.a&&q.b===p.b).contacts[1][0]).toEqual(['<dead>',-1]);
+  expect(kit.preflight(second)).toBe(true);
+  const c=buildWorld(Matter);
+  expect(()=>kit.restore(c.engine,second,c.keyOf,'full',{completePreflight:true})).not.toThrow();
+  p.contacts[0][0]=['<dead>',-1];
+  expect(()=>kit.preflight(good)).toThrow(/pair\/contact reference/);
+});
+
+test('pair activity and contact count must agree before full restore',()=>{
+  const a=buildWorld(Matter);
+  for(let i=0;i<300&&!a.engine.pairs.list.some(p=>p.isActive&&p.contactCount>0);i++)Matter.Engine.update(a.engine,1000/240);
+  const good=JSON.parse(JSON.stringify(kit.capture(a.engine,a.keyOf,{selectBody:()=>true})));
+  const i=good.pairs.findIndex(p=>p.isActive&&p.contactCount>0);
+  expect(i).toBeGreaterThanOrEqual(0);
+  expect(kit.preflight(good)).toBe(true);
+  const b=buildWorld(Matter),before=JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}));
+  for(const mutate of [p=>p.contactCount=0,p=>p.isActive=false]){
+    const bad=JSON.parse(JSON.stringify(good));mutate(bad.pairs[i]);
+    expect(()=>kit.restore(b.engine,bad,b.keyOf,'full',{completePreflight:true})).toThrow(/pair activity\/contact count/);
+    expect(JSON.stringify(kit.capture(b.engine,b.keyOf,{selectBody:()=>true}))).toBe(before);
+  }
+});

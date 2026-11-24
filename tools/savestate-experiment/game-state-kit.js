@@ -340,6 +340,7 @@
     // Validate the entire recorder section before touching the fresh world.
     const preparedRecorder = global.__ssCanonical
       ? global.__ssRecorderKit.prepareRecorderPrefix(run,snap.recorder,snap.ghost[0]) : null;
+    if (global.__ssCanonical) MKit().preflight(snap.matter);
     const engine = run.matter.world.engine;
     const tickMs = run.simClock.tickMs;
     if (L === 0) {
@@ -395,7 +396,7 @@
     // Pool bodies are outside the world; the Matter kit's strict body-set check covers world bodies only.
     const worldKeys = (k) => !String(k).startsWith('pool:');
     const msnapW = { ...msnap, ids: Object.fromEntries(Object.entries(msnap.ids).filter(([k]) => worldKeys(k))), bodies: Object.fromEntries(Object.entries(msnap.bodies).filter(([k]) => worldKeys(k))) };
-    const mres = MKit().restore(engine, msnapW, ix.keyOf, mlevel, { skip: [...skip] });
+    const mres = MKit().restore(engine, msnapW, ix.keyOf, mlevel, { skip: [...skip], completePreflight: !!global.__ssCanonical });
     run.sled._sync();
     if (L >= 4 && !skip.has('pool')) restorePool(run, snap.pool, !skip.has('ids'));
     if (L >= 4 && !skip.has('ids')) Matter.Common._nextId = snap.matter.nextId;
