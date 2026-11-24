@@ -3,10 +3,16 @@
   "formatVersion": 1,
   "note": "Not part of rulesetId. A diff here means causal source changed: attest it did not change behavior, or bump SIM_REVISION.",
   "simRevision": 9,
-  "attestation": "behavior-change-unreleased: preserve hazard priority and paid ascent and shielded bluff samples",
+  "attestation": "sim-revision-bumped: v2.20.0 releases SIM9 one-shot AirBrake and fixed-tick scoring corrections relative to released SIM8",
   "changedFiles": [
+    "src/constants.js",
     "src/entities/Sled.js",
-    "src/scenes/RunScene.js"
+    "src/scenes/RunScene.js",
+    "src/systems/BsodAerodynamics.js",
+    "src/systems/BsodBluffTracker.js",
+    "src/systems/PhysicsTuner.js",
+    "src/systems/ScoreManager.js",
+    "src/systems/TrickTracker.js"
   ],
   "files": {
     "src/constants.js": "sha256:19b22072736e5257d7c872cb68c96a79d3a7ff70a8cf7435938cf2066def6607",

@@ -304,7 +304,7 @@ describe('layout is deterministic', () => {
 describe('replay identity', () => {
   test('SIM_REVISION 9 preserves SIM7 chase and SIM8 marker correction, adds approved one-shot AirBrake', () => {
     expect(SIM_REVISION).toBe(9);
-    expect(LAST_RELEASED_SIM_REVISION).toBe(SIM_REVISION - 1);
+    expect(LAST_RELEASED_SIM_REVISION).toBe(SIM_REVISION);
   });
   test('GHOST_PHYSICS_VERSION stays 1: it only maps legacy tapes (Replay Contract v1 section 7.2)', () => {
     expect(GHOST_PHYSICS_VERSION).toBe(1);
