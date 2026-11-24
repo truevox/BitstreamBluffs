@@ -1,11 +1,12 @@
 import { cosmeticRandom } from '../CosmeticRandom.js';
-/** Four-song owner-selected rotation: One More Run first per fresh load, then sequential/shuffled. All disabled = SILENCE. */
-export const GAME_SONGS = Object.freeze([
-	{ id: 'FEsxYVStla4', label: 'POPE LEO' },
-	{ id: 'local-one-more-run-bitstream-bluffs', label: 'ONE MORE RUN' },
-	{ id: 'WRBGQUqD54U', label: 'RUNS OUT OF CODE' },
-	{ id: 'FYImnz5-hXs', label: 'VARMONT IS SAVED' },
-]);
+import { SONG_ROSTER } from './FullSongRoster.js';
+/** Full 33-song catalog; preserving original first-four order in settings. */
+export const GAME_SONGS = SONG_ROSTER;
+export const SONGS_PER_PAGE = 8;
+export const songPageCount = () => Math.ceil(GAME_SONGS.length/SONGS_PER_PAGE);
+export const songsForPage = (page) => GAME_SONGS.slice(
+	Math.max(0,Math.min(songPageCount()-1,Math.floor(Number(page)||0)))*SONGS_PER_PAGE,
+	(Math.max(0,Math.min(songPageCount()-1,Math.floor(Number(page)||0)))+1)*SONGS_PER_PAGE);
 export const FIRST_SONG_ID = 'local-one-more-run-bitstream-bluffs';
 export const defaultSongSelection = () => Object.fromEntries(GAME_SONGS.map(song => [song.id, true]));
 export function sanitizeSongSelection(input) {
@@ -14,6 +15,13 @@ export function sanitizeSongSelection(input) {
 	for (const song of GAME_SONGS) {
 		if (typeof input[song.id] === 'boolean') defaults[song.id] = input[song.id];
 	}
+	// Preserve a user's explicit 'ALL OFF' state created under the four-song
+	// version. Otherwise 29 newly enabled songs would start without permission.
+	const legacy=GAME_SONGS.slice(0,4);
+	const savedLegacyAllOff=legacy.every(song=>input[song.id]===false);
+	const hasNewBoolean=GAME_SONGS.slice(4).some(song=>typeof input[song.id]==='boolean');
+	if(savedLegacyAllOff&&!hasNewBoolean)
+		for(const song of GAME_SONGS.slice(4))defaults[song.id]=false;
 	return defaults;
 }
 export function enabledSongIndices(catalog, selection) {

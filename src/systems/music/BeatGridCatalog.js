@@ -5,12 +5,8 @@
  * Later verified entries must carry SHA-256 of the ORIGINAL source performance.
  */
 import {BEAT_GRID_FORMAT} from './BeatGridTiming.js';
-const ids=[
-	'local-one-more-run-bitstream-bluffs',
-	'WRBGQUqD54U',
-	'FYImnz5-hXs',
-	'FEsxYVStla4',
-];
+import { GAME_SONGS } from './MusicPlaylist.js';
+const ids=GAME_SONGS.map(song=>song.id);
 export const RELEASE_BEAT_GRIDS=Object.freeze(Object.fromEntries(ids.map(id=>[id,
 	Object.freeze({format:BEAT_GRID_FORMAT,trackId:id,status:'unverified',
 		review:Object.freeze({humanSpotCheck:'pending',independentCheck:'pending'}),
