@@ -49,18 +49,27 @@ export function readWorldDanceAudio(audio, allowed) {
  * These are cosmetic multipliers; the intensity never leaks to physics.
  */
 const DANCE_MOTIF_STYLES=Object.freeze({
-    ridges:[1,0.7,0], drift:[0.8,0.55,0], terraces:[0.6,0.4,0],
-    currents:[0.6,0.75,0], facets:[0.65,0.35,0],
-    stars:[0.6,0.2,0.25],
+    ridges:[1,0.7,0], drift:[0.8,0.55,0], terraces:[0.8,0.6,0],
+    currents:[0.85,0.75,0], facets:[0.85,0.55,0],
+    stars:[0.9,0.65,0.75],
     'candy-stripes':[1,0.55,1],
-    jellyfish:[0.65,0.35,0.85],
-    'brass-pipes':[0.55,0.15,0.42],
-    'dew-drops':[0.85,0.32,1],
-    vents:[0.7,0.4,0.45],
+    jellyfish:[0.85,0.5,0.85],
+    'brass-pipes':[0.9,0.65,0.85],
+    'dew-drops':[0.85,0.65,1],
+    vents:[0.85,0.75,0.9],
 });
 
-export function biomeDanceStyle(motif, strength) {
+/** Audition-only visual transfer curve: lift small real accents without
+ * clipping strong accents together. Neutral and maximum remain unchanged.
+ * The detector and its audio-facing onset timestamps are untouched. */
+export function visibleDanceStrength(strength) {
   const p=clamp01(strength);
+  // Give strong accents more contrast against the troughs.
+  return 4*p/(1+3*p);
+}
+
+export function biomeDanceStyle(motif, strength) {
+  const p=visibleDanceStrength(strength);
   const [sun,horizon,decor]=DANCE_MOTIF_STYLES[motif]||DANCE_MOTIF_STYLES.ridges;
   return {sun:clamp01(p*sun),horizon:clamp01(p*horizon),decor:clamp01(p*decor)};
 }
@@ -68,13 +77,16 @@ export function biomeDanceStyle(motif, strength) {
 export function sunDanceGeometry(pulse, radius = 40) {
   const p=clamp01(pulse);
   const r=Number.isFinite(radius)&&radius>0 ? radius : 40;
-  return {widthRadius:r*(1+0.12*p),heightRadius:r*(1-0.09*p)};
+  return {widthRadius:r*(1+0.48*p),heightRadius:r*(1-0.36*p)};
 }
 
 export class WorldDanceEnvelope {
-  constructor(){this.reset();}
+  constructor(){this.skylineBands=new Float32Array(3);this.reset();}
 
   reset(){
+    this.skylineBands.fill(0);
+    this.visualStrength=0;
+    this.visualHoldMs=0;
     this.pulse=0;
     this.meterPulse=0;
     this.mixLevel=0;
@@ -108,6 +120,35 @@ export class WorldDanceEnvelope {
    * @param {number} dtMs render delta, clamped so background tabs don't pop
    */
   update(sample,dtMs,meter=null){
+    const raw=this._updateDetector(sample,dtMs,meter);
+    // The audio-facing onset detector and its returned strength remain
+    // exactly as before. This separate peak follower drives scenery only.
+    // reset() clears both on silence, invalid input, revision or seek.
+    if(this.lastSampleMs===null)return raw;
+    // Three existing analyser bands, independently smoothed for Arcade.
+    // Do not feed these back into the onset detector or music transport.
+    for(let i=0;i<3;i++){
+      const level=i===0?sample.bass:i===1?sample.mid:sample.treble;
+      const target=clamp01((clamp01(level)-.10)/.72);
+      const old=this.skylineBands[i];
+      const delta=Number.isFinite(dtMs)?Math.max(0,Math.min(100,dtMs)):16.7;
+      this.skylineBands[i]=old+(target-old)*(1-Math.exp(-delta/(target>old?65:150)));
+    }
+    const dt=Number.isFinite(dtMs)?Math.max(0,Math.min(100,dtMs)):16.7;
+    if(raw>this.visualStrength){
+      // Fast attack: retain most of a short accent even at low frame rates.
+      this.visualStrength+=(raw-this.visualStrength)*(1-Math.exp(-dt/32));
+      this.visualHoldMs=105;
+    }else{
+      const held=Math.min(dt,this.visualHoldMs);
+      this.visualHoldMs-=held;
+      this.visualStrength=raw+(this.visualStrength-raw)*Math.exp(-(dt-held)/145);
+      if(raw===0&&this.visualStrength<.001)this.visualStrength=0;
+    }
+    return raw;
+  }
+
+  _updateDetector(sample,dtMs,meter=null){
     if(!sample||!Number.isFinite(sample.timeMs)||
       typeof sample.revision!=='string'||
       !Number.isFinite(sample.bass)||!Number.isFinite(sample.mid))return this.reset();

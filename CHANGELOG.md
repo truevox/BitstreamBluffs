@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.21.2 — readable World Dance (2026-11-24)
+
+- #212: owner-approved scenery motion across the six auditioned biome motifs. Stronger visual-only accents, individual motif motion and accessible neutral settings.
+- #331: owner-approved Arcade skyline EQ, with 20 individually weighted tower responses to three actual smoothed audio bands. Original skyline restored with World Dance OFF or reduced motion.
+- Preserve the released R2 soundtrack, billboard thumbnails, audio transport, meter, physics and SIM9. Natural traversal and Chromebook performance verification remain open.
+
+## v2.21.1 — 33-song soundtrack delivery (2026-11-24)
+
+- Load the full soundtrack from the versioned audio host, with the bundled four-song catalog as a fallback.
+
 ## v2.21.0 — original-stem soundtrack and crossfades (2026-11-24)
 
 - #306: integrate original-stem soundtrack processing for twelve biome identities, music library and explicit all-off silence, Arcade bridge and clean menu presentation. Optional audio failures cannot interrupt the simulation. Only installed music packs are selectable.

@@ -38,7 +38,10 @@ async function change(label,next){
 try{
  await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
  const panel=await open();
- assert.equal(panel.labels.length,14);
+ // Other settings can be added independently of World Dance. Validate the
+ // relevant controls and the panel bounds (in open()), not a stale row count.
+ for(const label of ['WORLD DANCE','REDUCE MOTION'])
+  assert.equal(panel.labels.filter(x=>x===label).length,1);
  const dance=await change('WORLD DANCE',false);
  assert.equal(dance.value,false);
  assert.equal(dance.setting.worldDance,false);
@@ -58,5 +61,5 @@ try{
  assert.equal(restored.worldDance,true);
  assert.equal(restored.reduceMotion,'off');
  assert.deepEqual(errors,[]);
- console.log('WORLD_DANCE_SETTINGS_PERSISTENT_MENU_14_ROWS_PASS',JSON.stringify({panel,saved:{worldDance:saved.worldDance,reduceMotion:saved.reduceMotion},restored:{worldDance:restored.worldDance,reduceMotion:restored.reduceMotion}}));
+ console.log('WORLD_DANCE_SETTINGS_PERSISTENT_MENU_PASS',JSON.stringify({panel,saved:{worldDance:saved.worldDance,reduceMotion:saved.reduceMotion},restored:{worldDance:restored.worldDance,reduceMotion:restored.reduceMotion}}));
 }finally{await browser.close();}
