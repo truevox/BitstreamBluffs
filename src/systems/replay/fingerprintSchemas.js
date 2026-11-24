@@ -60,7 +60,7 @@ export const FP_SCHEMAS = Object.freeze({
       )],
       ['flags', rec(
         ['contactFlag', 'bool'], ['playerHopActive', 'bool'], ['chuteUsed', 'bool'], ['tucked', 'bool'],
-        ['airBrakeActive', 'bool'], ['airBrakeKickUsed', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
+        ['airBrakeActive', 'bool'], ['airBrakeKickUsed', 'bool'], ['airBrakeLiftProtected', 'bool'], ['airBrakeKickPulse', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
         ['nudging', 'bool'], ['inWorld', 'bool'], ['destroyed', 'bool'],
       )],
       // Bit identity of the last pad. The sim only uses `pad !== _lastPad` (object identity; each tick gets a fresh pad), so this
@@ -237,7 +237,7 @@ export const FIELD_SOURCES = Object.freeze({
     _lastTilt: 'sled.ctl.lastTilt', _preVx: 'sled.ctl.preVx', _preVy: 'sled.ctl.preVy',
     touchdownVx: 'sled.ctl.touchdownVx', touchdownVy: 'sled.ctl.touchdownVy', heliInput: 'sled.ctl.heliInput',
     _contactFlag: 'sled.flags.contactFlag', _playerHopActive: 'sled.flags.playerHopActive', chuteUsed: 'sled.flags.chuteUsed',
-    tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive', airBrakeKickUsed: 'sled.flags.airBrakeKickUsed', corkscrewActive: 'sled.flags.corkscrewActive',
+    tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive', airBrakeKickUsed: 'sled.flags.airBrakeKickUsed', airBrakeLiftProtected: 'sled.flags.airBrakeLiftProtected', airBrakeKickPulse: 'sled.flags.airBrakeKickPulse', corkscrewActive: 'sled.flags.corkscrewActive',
     scrambled: 'sled.flags.scrambled', _nudging: 'sled.flags.nudging',
     inWorld: 'sled.flags.inWorld', destroyed: 'sled.flags.destroyed', _lastPad: 'sled.lastPad',
   }),
@@ -335,7 +335,6 @@ export const NON_CAUSAL = Object.freeze({
     squash: PRESENTATION + ' (landing squash)', hidden: PRESENTATION + ' (set with inWorld=false by vanish())',
     hopPulse: 'cleared by RunScene.simTick before afterTick, so always 0 at a checkpoint; read only for SFX/hints',
     pushPulse: 'cleared by RunScene.simTick before afterTick, so always 0 at a checkpoint; read only for SFX/hints',
-    airBrakeKickPulse: 'one-tick physical kick event consumed by RunScene BSOD scoring then cleared before afterTick; any durable result appears in BsodBluffTracker and score snapshots',
     random: 'the run RunRandom streams (shared with RunScene); physicsScramble state is the `rng` subsystem, visual streams are presentation',
     off: 'centre-of-mass offset from the spawn origin: immutable geometry fixed by _buildBody (ruleset/SIM_REVISION territory, section 7)',
     _time: 'render-only clock: sums stepMs but is read only by _draw (invulnerability flicker, shield pulse, tether wobble)',

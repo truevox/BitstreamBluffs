@@ -23,7 +23,7 @@ function makeSled(vx=530, vy=150){
     _sinceLaunchMs:200,_lastPad:null,_time:0,
     hopBufferMs:0,pushCooldownMs:0,geyserCooldownMs:0,invulnerableMs:0,
     parachuteFuelMs:880,canopyFuelFullMs:880,boostMs:0,
-    airBrakeActive:false,airBrakeKickUsed:false,
+    airBrakeActive:false,airBrakeKickUsed:false,airBrakeLiftProtected:false,
     _playerHopActive:true,_playerHopElapsedMs:TUNING.hopMinimumHoldMs+10,
     _crawlMs:0,_nudging:false,airEtaMs:Infinity,airSlopeDeg:null,
   });
@@ -46,6 +46,31 @@ test('AirBrake pressed as variable hop is released gives both paid horizontal de
   step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
   expect(toPx(s.body.velocity.y)).toBeCloseTo(-318,6);
   expect(toPx(s.body.velocity.x)).toBeCloseTo(212,6);
+});
+
+test('separate next-tick coyote Hop cannot reactivate cutoff after already-paid AirBrake lift',()=>{
+  const s=makeSled(530,150);
+  s.msSinceContact=60; // airborne, after grounded grace but before coyote expires
+  step(s,{hop:false,variableHop:true,airBrake:true,noAutoNudge:true,pressed:{airBrake:true}});
+  const paidVy=toPx(s.body.velocity.y);
+  expect(paidVy).toBeLessThan(-100);
+  expect(s.airBrakeLiftProtected).toBe(true);
+  s.msSinceContact=68;
+  step(s,{hop:true,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{hop:true}});
+  expect(s.hopPulse).toBe(1);
+  expect(s._playerHopActive).toBe(false);
+  for(let i=0;i<25;i++){
+    s.msSinceContact+=8;
+    step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
+  }
+  expect(toPx(s.body.velocity.y)).toBeLessThan(-100);
+  expect(s.airBrakeLiftProtected).toBe(true);
+  // A physically registered landing is the only rearm/reset point.
+  s._contactFlag=true;
+  s._sync=()=>{};
+  s.endStep(8);
+  expect(s.airBrakeLiftProtected).toBe(false);
+  expect(s.airBrakeKickUsed).toBe(false);
 });
 
 test('AirBrake without any vertical kick does not disable legitimate hop-release cutoff',()=>{

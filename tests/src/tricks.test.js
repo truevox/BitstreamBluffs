@@ -233,20 +233,22 @@ describe('helicopter spins', () => {
 });
 
 describe('air brake and parachute', () => {
-  test('air brake needs to be held; fires once per jump', () => {
-    const r = rig();
-    r.run(2, { grounded: true });
-    expect(allTricks(r.run(Math.floor(AIR_BRAKE_MIN_MS / DT) - 2, { input: { airBrake: true } }))).toEqual([]);
-    const out = r.run(60, { input: { airBrake: true } });
-    const tricks = allTricks(out);
-    expect(tricks).toHaveLength(1);
-    expect(tricks[0]).toMatchObject({ type: 'airBrake', count: 1 });
+  test('a physically paid one-shot AirBrake tap earns immediate trick credit once per jump', () => {
+    const r=rig();
+    r.run(2,{grounded:true});
+    const fired=r.frame({input:{airBrake:true,airBrakeKicked:true}});
+    expect(allTricks([fired]).map(t=>t.type)).toEqual(['airBrake']);
+    expect(allTricks(r.run(60,{input:{airBrake:true,airBrakeKicked:false}}))).toEqual([]);
+    expect(allTricks(r.run(60,{input:{airBrake:false,airBrakeKicked:true}}))).toEqual([]);
+    r.run(2,{grounded:true});
+    expect(allTricks([r.frame({input:{airBrake:true,airBrakeKicked:true}})]).map(t=>t.type)).toEqual(['airBrake']);
   });
 
-  test('tapping air brake briefly does not count', () => {
-    const r = rig();
-    r.run(2, { grounded: true });
-    const out = [...r.run(5, { input: { airBrake: true } }), ...r.run(40, {})];
+  test('holding a previously spent AirBrake without a fresh kick earns NO trick', () => {
+    const r=rig();
+    r.run(2,{grounded:true});
+    const out=[...r.run(Math.ceil(AIR_BRAKE_MIN_MS/DT)+60,{input:{airBrake:true,airBrakeKicked:false}}),
+      ...r.run(20,{input:{airBrake:false}})];
     expect(allTricks(out)).toEqual([]);
   });
 
@@ -260,9 +262,9 @@ describe('air brake and parachute', () => {
   test('air brake held on the ground does nothing; second jump can trigger again', () => {
     const r = rig();
     expect(allTricks(r.run(60, { grounded: true, input: { airBrake: true } }))).toEqual([]);
-    const a = allTricks(r.run(40, { input: { airBrake: true } }));
+    const a = allTricks([r.frame({input:{airBrake:true,airBrakeKicked:true}})]);
     r.frame({ grounded: true });
-    const b = allTricks(r.run(40, { input: { airBrake: true } }));
+    const b = allTricks([r.frame({input:{airBrake:true,airBrakeKicked:true}})]);
     expect(a).toHaveLength(1);
     expect(b).toHaveLength(1);
   });
@@ -270,8 +272,9 @@ describe('air brake and parachute', () => {
   test('brake and parachute together give both tricks', () => {
     const r = rig();
     r.run(2, { grounded: true });
-    const out = r.run(60, { input: { airBrake: true, parachute: true } });
-    expect(allTricks(out).map((t) => t.type).sort()).toEqual(['airBrake', 'parachute']);
+    const out = [r.frame({input:{airBrake:true,airBrakeKicked:true,parachute:true}}),
+      ...r.run(60,{input:{airBrake:true,parachute:true}})];
+    expect(allTricks(out).map(t=>t.type).sort()).toEqual(['airBrake','parachute']);
   });
 });
 

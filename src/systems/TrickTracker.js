@@ -3,7 +3,7 @@
  * Public signatures are a contract - do not change without updating src/ARCHITECTURE.md.
  *
  * Detects flips / helicopter spins / air-brake / parachute from per-frame sled state.
- * RunScene calls update() once per rendered frame (after physics) with a SledFrameState.
+ * RunScene calls update() once per fixed simulation tick (after physics) with a SledFrameState.
  *
  * Model: an "air phase" starts on the first frame with grounded=false and ends on the first grounded frame.
  * Rotation deltas (from the unwrapped angleDeg) are accumulated into two buckets per frame: tilt (A/D driven) and
@@ -17,7 +17,7 @@ import pmath from './pmath.js';
 
 /** Rotation counts as a full turn at 360 - tolerance degrees. */
 export const FLIP_TOLERANCE_DEG = 20;
-/** Air brake / parachute must be held this long in the air to register as a trick. */
+/** Historical AirBrake held-time threshold retained for telemetry; SIM9 trick credit uses a physical one-shot. */
 export const AIR_BRAKE_MIN_MS = 250;
 export const PARACHUTE_MIN_MS = 300;
 /** Landing alignment thresholds (|sled angle - ground slope| in degrees). */
@@ -54,7 +54,7 @@ export const DEFAULT_MIN_AIRTIME_MS = 120;
  * @property {boolean} grounded     sled has wheel/runner contact with terrain this frame.
  * @property {number} groundAngleDeg  slope of terrain under/near sled in degrees (clockwise positive = descending right);
  *                                  used for landing alignment. Use last known value while airborne.
- * @property {{heli:-1|0|1, airBrake:boolean, parachute:boolean, corkscrew?:boolean}} input  heli: -1 = CCW (left arrow), +1 = CW (right arrow).
+ * @property {{heli:-1|0|1, airBrake:boolean, airBrakeKicked?:boolean, parachute:boolean, corkscrew?:boolean}} input  heli: -1 = CCW (left arrow), +1 = CW (right arrow).
  * @property {number} [heliDeg]     OPTIONAL continuous (unwrapped) helicopter spin phase of the sled drawing, clockwise positive.
  *                                  The helicopter spin is a visual rotation about the sled's vertical axis (the physics body does
  *                                  not rotate), so when this is provided helicopter turns are counted from it, whatever the
@@ -219,7 +219,10 @@ export class TrickTracker {
 
       if (input.airBrake) this._brakeMs += dt;
       if (input.parachute) this._chuteMs += dt;
-      if (!this._brakeDone && this._brakeMs >= AIR_BRAKE_MIN_MS) {
+      // SIM9: a tap immediately performs the entire physical AirBrake. Count
+      // the actual paid-velocity kick, not 250ms of holding an already-spent
+      // button; _brakeDone prevents duplicate trick credit this airtime.
+      if (!this._brakeDone && input.airBrakeKicked) {
         this._brakeDone = true;
         tricks.push({ type: 'airBrake', count: 1, rotationDeg: 0, airtimeMs: airtime });
       }

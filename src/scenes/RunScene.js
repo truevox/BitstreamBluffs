@@ -1447,6 +1447,7 @@ export class RunScene extends Phaser.Scene {
     // trick tracking (always fed; flagged crashed on the frame a crash is detected)
     sled.stepHeli(dt);
     const fs = sled.getFrameState(this.runTimeMs, dt);
+    fs.input.airBrakeKicked = airBrakeKickedThisTick; // actual one-shot AirBrake trick; never held-state credit
     // a hazard hit that a shield charge (or post-respawn grace) will absorb leaves the sled flying: keep its air phase
     const absorbed = !!this.pendingCrash && this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0);
     fs.crashed = !!this.pendingCrash && !absorbed;

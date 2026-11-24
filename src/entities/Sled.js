@@ -73,6 +73,7 @@ export class Sled {
     this.tucked = false;
     this.airBrakeActive = false;
     this.airBrakeKickUsed = false; // #247 one-shot per actual airborne interval; rearm on genuine touchdown
+    this.airBrakeLiftProtected = false; // persists until real touchdown; later coyote Hop cannot erase purchased lift
     this.airBrakeKickPulse = 0; // actual spent-speed event; RunScene consumes & clears this fixed tick
     this.heliInput = 0;
     this.corkscrewActive = false;
@@ -168,6 +169,7 @@ export class Sled {
   endStep(stepMs) {
     if (this._contactFlag) {
       this.airBrakeKickUsed = false; // actual Matter contact rearms, never a button release
+      this.airBrakeLiftProtected = false; // only physical terrain contact can end protection
       if (this.msSinceContact >= TUNING.groundedGraceMs) {
         this.chuteUsed = false; // freshly landed
         this.parachuteFuelMs = (this.canopyFuelFullMs || PHYSICS.parachuteDurationMs);
@@ -261,7 +263,6 @@ export class Sled {
     }
     // Only the player's actual original hop launch may be shortened by
     // variable-hop release; never truncate a separately paid AirBrake impulse.
-    let airBrakePaidLiftThisStep = false;
     // Two instantaneous AirBrake kicks; neither holding nor re-tapping buys
     // extra lift until actual terrain contact. Normal gravity acts thereafter.
     if (this.airBrakeActive && !this.airBrakeKickUsed) {
@@ -280,7 +281,7 @@ export class Sled {
       // a subsequent tick. When no lift was actually purchased (vacuum, very
       // slow rider, or already faster upward), retain normal hop semantics.
       if (kicked.vy < vy) {
-        airBrakePaidLiftThisStep = true;
+        this.airBrakeLiftProtected = true; // protects later separate coyote-hop substeps
         this._playerHopActive = false;
       }
       if (kicked.spentSpeedPxS > 0) this.airBrakeKickPulse = 1;
@@ -351,7 +352,7 @@ export class Sled {
       this._sinceLaunchMs = 0;
       // A coyote hop may fire AFTER the AirBrake within this exact substep.
       // It must not re-arm the hold-release cutoff over the paid brake ascent.
-      this._playerHopActive = !!pad.variableHop && !airBrakePaidLiftThisStep;
+      this._playerHopActive = !!pad.variableHop && !this.airBrakeLiftProtected;
       this._playerHopElapsedMs = 0;
     }
     if (this._playerHopActive) {

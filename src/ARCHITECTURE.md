@@ -20,8 +20,17 @@ lift, gravity reduction or descent damping. The vertical kick uses the original
 40% paid-speed budget at a 1.5 factor with an upward cap, even as horizontal
 braking increases to 60%; extra braking is NOT exchanged for extra altitude.
 Existing parachute and BSOD-driven wind remain unchanged. Variable-hop
-release truncates only its own original jump; if a coyote-hop triggers after
-AirBrake in the same substep, it cannot erase the paid separate AirBrake ascent.
+release truncates only its own original jump; if a coyote-hop triggers in
+the same substep OR in a later substep during the 90ms coyote window, it
+cannot erase the separately paid AirBrake ascent. `airBrakeLiftProtected`
+tracks that ownership across ticks until a real terrain collision; it is
+SIM9 causal state, fingerprinted alongside `airBrakeKickUsed` in the sled
+schema (v3). The full physical one-shot immediately earns the regular
+AirBrake trick on its one-tick `airBrakeKickPulse`, not after 250ms holding
+an already-spent key. This single-tick event is consumed before the replay
+checkpoint but is STILL listed as causal (and fingerprinted in sled schema v3):
+it can affect TrickTracker, BSOD bluff scoring and later progression. Do not
+misclassify it as non-causal merely because the checkpoint normally sees zero.
 During a near-wall Bitstream Bluff, the extra 40-point AirBrake bonus is earned
 only by a NEW physically spent-speed kick while the approach is armed, never by
 holding or tapping AirBrake after its one-use latch is spent. Sled emits a

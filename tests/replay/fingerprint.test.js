@@ -155,7 +155,7 @@ describe('fingerprintState', () => {
   });
 
   test('every schema declares a positive integer schemaVersion (bumped only by a reviewed layout change)', () => {
-    const expected = { sled: 3, matter: 2, kodiak: 2 }; // v3: AirBrake one-shot causal state; historical v2 archive remains immutable
+    const expected = { sled: 3, matter: 2, kodiak: 2 }; // v3 SIM9: AirBrake one-shot and paid-lift ownership; historical v2 immutable
     for (const n of FP_SUBSYSTEMS) expect([n, FP_SCHEMAS[n].version]).toEqual([n, expected[n] || 1]);
   });
 });
@@ -228,6 +228,8 @@ describe('historical SIM6 schema lock stays immutable', () => {
     expect(FP_SCHEMAS.sled.version).toBe(3);
     const oldState = referenceState();
     delete oldState.sled.flags.airBrakeKickUsed;
+    delete oldState.sled.flags.airBrakeLiftProtected;
+    delete oldState.sled.flags.airBrakeKickPulse;
     const old = {};
     for (const name of lock.order) old[name] = fingerprintOf(encodeSubsystemWith(lock.schemas[name], oldState[name]));
     expect(old).toEqual(lock.reference.subsystems);
