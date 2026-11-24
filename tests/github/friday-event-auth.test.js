@@ -15,9 +15,8 @@ const signal=(kind='REQUEST',value=sha)=>`[GAL FRIDAY REVIEW ${kind}] exact HEAD
 
 async function resolve(pointer, {runEvent=pointer.event_name,comment=null,review=null,permission='write',associated=[174]}={}) {
   const outputs={};
-  const env={DIRECT_PR_NUMBER:''};
+  const env={DIRECT_PR_NUMBER:'',EVENT_POINTER_JSON:JSON.stringify(pointer)};
   const fakeRequire=(name)=>{
-    if(name==='node:fs')return {readFileSync:()=>JSON.stringify(pointer)};
     if(name==='fs')return {existsSync:()=>true};
     if(name==='./.github/scripts/friday-pr-lifecycle.cjs')return helper;
     throw new Error('Unexpected require: '+name);

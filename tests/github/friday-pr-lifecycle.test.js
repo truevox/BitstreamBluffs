@@ -14,11 +14,11 @@ function comment(id,body,{association='OWNER',login='truevox',at}={}){
 }
 const msg=(kind,sha=sha1)=>`[GAL FRIDAY REVIEW ${kind}] — independent exact HEAD \`${sha}\`; evidence verified`;
 function api(initial,mode={}){
- const data={prs:new Map(initial.prs.map(p=>[p.number,clone(p)])),issues:new Map(initial.issues.map(i=>[i.number,{...i,labels:[...(i.labels||[])]}])),comments:clone(initial.comments||{}),reviews:clone(initial.reviews||{}),writes:[],listCalls:0,perms:mode.perms||{truevox:'admin'},files:initial.files||{}};
+ const data={prs:new Map(initial.prs.map(p=>[p.number,clone(p)])),issues:new Map(initial.issues.map(i=>[i.number,{...i,labels:[...(i.labels||[])]}])),comments:clone(initial.comments||{}),reviews:clone(initial.reviews||{}),writes:[],listCalls:0,prGetCalls:0,perms:mode.perms||{truevox:'admin'},files:initial.files||{}};
  function target(n){return data.prs.get(n)||data.issues.get(n);}
  const gh={rest:{
   pulls:{
-   get:async({pull_number})=>({data:data.prs.get(pull_number)}),
+   get:async({pull_number})=>{data.prGetCalls++;mode.onPRGet?.({call:data.prGetCalls,number:pull_number,data});return {data:data.prs.get(pull_number)};},
    list:async()=>{data.listCalls++;mode.onListOpen?.({call:data.listCalls,data});return {data:[...data.prs.values()].filter(p=>p.state==='open')};},
    listFiles:async({pull_number})=>({data:data.files[pull_number]||[]}),
    listReviews:async({pull_number})=>({data:data.reviews[pull_number]||[]}),
@@ -36,7 +36,7 @@ function api(initial,mode={}){
   },
   repos:{
    get:async()=>({data:{default_branch:'main'}}),
-   getCollaboratorPermissionLevel:async({username})=>({data:{permission:data.perms[username]||'read'}}),
+   getCollaboratorPermissionLevel:async({username})=>{mode.onPermissionCheck?.({username,data});return {data:{permission:data.perms[username]||'read'}};},
   }
  }};
  gh.paginate=async(fn,args)=>(await fn(args)).data;
@@ -84,6 +84,14 @@ describe('Friday issue linking and exact-head review parsing',()=>{
     expect(getIssueReference(x)).toBe(80);
     expect(explicitlyCloses(x,79)).toBe(false);
     expect(explicitlyCloses(x,80)).toBe(false);
+  }
+  // An unclosed raw HTML region consumes the rest of the Markdown document;
+  // neither an internal Closes nor a later Refs can act as a parent directive.
+  for(const tag of ['pre','code','script','style','textarea']){
+    const fake=pr(501,80,{body:`<${tag}>\nCloses #79\nRefs #80`,title:'no issue'});
+    expect(getIssueReference(fake)).toBe(null);
+    expect(explicitlyCloses(fake,79)).toBe(false);
+    expect(explicitlyCloses(fake,80)).toBe(false);
   }
   const hiddenMachineMarker=pr(500,80,{body:'`example\n<!-- friday-issue: 79 -->\nnot real`\nRefs #80',title:'no issue'});
   expect(getIssueReference(hiddenMachineMarker)).toBe(80);
@@ -304,5 +312,33 @@ describe('GitHub-native issue and PR label reconciliation',()=>{
   const x=api({prs:[p],issues:[{number:79,state:'open'}],comments:{174:[c]}});
   await x.fire('workflow_dispatch',{inputs:{pr_number:'174'}});
   expect(labels(x.data.issues.get(79))).toEqual(['friday:in-review']);
+ });
+});
+
+
+describe('adversarial source races — never write a stale exact-head or stale parent',()=>{
+ test('late push during comment permission verification aborts before old-SHA label write',async()=>{
+   const p=pr(174,79),c=comment(1,msg('REQUEST'));
+   const x=api({prs:[p],issues:[{number:79,state:'open'}],comments:{174:[c]}},{
+     onPRGet:({call,data})=>{if(call===2)data.prs.get(174).head.sha=sha2;},
+   });
+   await expect(x.fire('issue_comment',notify(174,c))).rejects.toThrow(/changed HEAD\/draft\/parent/);
+   expect(x.data.writes.filter(w=>['add','remove'].includes(w[0]))).toHaveLength(0);
+ });
+ test('sibling relinks to another parent during evaluation: abort rather than mutate wrong parent',async()=>{
+   const p1=pr(174,79),p2=pr(175,79),c=comment(1,msg('REQUEST'));
+   const x=api({prs:[p1,p2],issues:[{number:79,state:'open'},{number:80,state:'open'}],comments:{174:[c]}},{
+     onPRGet:({call,data})=>{if(call===2)data.prs.get(175).body='Refs #80';},
+   });
+   await expect(x.fire('issue_comment',notify(174,c))).rejects.toThrow(/changed HEAD\/draft\/parent/);
+   expect(x.data.writes.some(w=>['add','remove'].includes(w[0])&&w[1]===79)).toBe(false);
+ });
+ test('new sibling appears after review scan but before parent write: abort stale parent labeling',async()=>{
+   const p1=pr(174,79),c=comment(1,msg('REQUEST'));
+   const x=api({prs:[p1],issues:[{number:79,state:'open'}],comments:{174:[c]}},{
+     onListOpen:({call,data})=>{if(call===3)data.prs.set(175,pr(175,79,{draft:true}));},
+   });
+   await expect(x.fire('issue_comment',notify(174,c))).rejects.toThrow(/Sibling membership\/HEAD changed/);
+   expect(x.data.writes.some(w=>['add','remove'].includes(w[0])&&w[1]===79)).toBe(false);
  });
 });

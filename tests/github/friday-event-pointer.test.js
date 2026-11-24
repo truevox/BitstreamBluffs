@@ -56,12 +56,16 @@ test('unprivileged source has no label writes or checkout; privileged writer sta
   expect(signal).toMatch(/name: Friday PR lifecycle signal/);
   expect(signal).toMatch(/permissions:\s+contents: read/);
   expect(signal).not.toContain('issues: write');
+  expect(signal).toContain('github.event.comment.author_association');
+  expect(signal).toContain('startsWith(github.event.comment.body');
   expect(signal).not.toContain('actions/checkout');
   expect(privileged).toContain('workflow_run:');
   expect(privileged).not.toContain('pull_request_target:');
   expect(privileged).toMatch(/workflow_run:\s+workflows: \[Friday PR lifecycle signal\]/);
   expect(privileged).toContain('size_in_bytes>4096');
-  expect(privileged).toContain('actions/download-artifact@v4');
+  expect(privileged).toContain('readPointerArchive(buffer)');
+  expect(privileged).not.toContain('uses: actions/download-artifact@v4');
+  expect(privileged).toContain('github.rest.actions.downloadArtifact');
   expect(privileged).toContain('github.event.repository.default_branch');
   expect(privileged).toContain('queue: max');
 });

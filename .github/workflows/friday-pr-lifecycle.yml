@@ -35,7 +35,8 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - name: Verify untrusted artifact size before download
+      - name: Read bounded untrusted ZIP without extracting files
+        id: pointer
         if: github.event_name == 'workflow_run'
         uses: actions/github-script@v7
         with:
@@ -44,20 +45,24 @@ jobs:
             const run_id=context.payload.workflow_run.id;
             const items=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,{owner,repo,run_id,per_page:100});
             const matches=items.filter(x=>x.name==='friday-event-pointer'&&!x.expired);
-            if(matches.length!==1||matches[0].size_in_bytes>4096)core.setFailed('Expected one small review-event pointer artifact');
-      - name: Download untrusted pointer only
-        if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: friday-event-pointer
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: .friday-signal
+            if(matches.length!==1||matches[0].size_in_bytes<52||matches[0].size_in_bytes>4096)
+              throw Error('Expected exactly one bounded review-event pointer ZIP');
+            // Download only a bounded compressed archive; NEVER run download-artifact,
+            // unzip or extract anything into the privileged runner's workspace.
+            const result=await github.rest.actions.downloadArtifact({owner,repo,artifact_id:matches[0].id,archive_format:'zip'});
+            const data=result.data;
+            const buffer=Buffer.isBuffer(data)?data:data instanceof ArrayBuffer?Buffer.from(data):
+              ArrayBuffer.isView(data)?Buffer.from(data.buffer,data.byteOffset,data.byteLength):null;
+            if(!buffer||buffer.length!==matches[0].size_in_bytes||buffer.length>4096)
+              throw Error('Artifact download size mismatch or unsupported binary API response');
+            const pointer=require('./.github/scripts/friday-event-zip.cjs').readPointerArchive(buffer);
+            core.setOutput('pointer',JSON.stringify(pointer));
       - name: Resolve stable parent issue for serialized label writes
         id: resolve
         uses: actions/github-script@v7
         env:
           DIRECT_PR_NUMBER: ${{ inputs.pr_number }}
+          EVENT_POINTER_JSON: ${{ steps.pointer.outputs.pointer }}
         with:
           script: |
             const {owner,repo}=context.repo;
@@ -65,10 +70,8 @@ jobs:
             if(context.eventName==='workflow_dispatch'){
               pointer={pr_number:Number(process.env.DIRECT_PR_NUMBER),event_name:'workflow_dispatch'};
             }else{
-              const fs=require('node:fs');
-              const file='.friday-signal/friday-event-pointer.json';
-              const raw=fs.readFileSync(file,'utf8');
-              if(raw.length>1024)throw Error('Oversized event pointer');
+              const raw=process.env.EVENT_POINTER_JSON||'';
+              if(Buffer.byteLength(raw,'utf8')>1024||!raw)throw Error('Invalid bounded event pointer');
               pointer=JSON.parse(raw);
             }
             const kinds=['pull_request','issue_comment','pull_request_review','workflow_dispatch'];
