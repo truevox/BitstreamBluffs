@@ -7,7 +7,7 @@
 import Phaser from 'phaser';
 import { REG, GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
 import { updateSetting } from '../services.js';
-import { GAME_SONGS } from '../systems/music/MusicPlaylist.js';
+import { GAME_SONGS, SONGS_PER_PAGE, songPageCount, songsForPage, installedSongChoices } from '../systems/music/MusicPlaylist.js';
 import { Panel } from './Panel.js';
 import { NeonText, glowRectPx, strokeRectPx } from './Neon.js';
 import { Keycaps, SectionHeader, paintRule, paintGlowBar, paintFocusRing, paintStateChip, paintPattern,
@@ -286,12 +286,88 @@ export class SettingsView extends View {
 /** One level deeper than ordinary Settings. The live game music engine is
  * shared by the playlist, laboratory and game - never use a separate player.
  */
+/** Paged source-song selector: 33 tracks cannot fit a single 238px panel.
+ * Eight toggle rows/page, keyboard/gamepad/touch accessible. No implicit
+ * playback or setting changes when merely opening/turning a page.
+ */
+export class SongLibraryView extends View {
+  constructor(scene,theme,o){
+    super(scene,theme,{w:448,h:238,title:'MUSIC LIBRARY',
+      color:'cyan',onClose:o.onClose,y:15,
+      hints:[{keys:['↑','↓'],label:'SELECT'},{keys:['←','→'],label:'ON/OFF'}]});
+    const catalog=scene.game.registry.get('audioSynth')?._stemMusic?.catalog;
+    this._catalogSignature=this._catalogKey(catalog);
+    this.tracks=installedSongChoices(catalog);
+    this.page=0;
+    this._build();
+    // A private 33-song catalog may arrive while this view is already open.
+    // Do not freeze the four public fallback choices for the whole modal.
+    this._onCatalogFrame=()=>this._refreshCatalog();
+    scene.events?.on('update',this._onCatalogFrame);
+  }
+  _catalogKey(catalog){
+    return Array.isArray(catalog)
+      ? catalog.map(track=>track?.id||'').join('|') : 'unresolved';
+  }
+  _refreshCatalog(){
+    const catalog=this.scene.game.registry.get('audioSynth')?._stemMusic?.catalog;
+    const key=this._catalogKey(catalog);
+    if(key===this._catalogSignature)return false;
+    this._catalogSignature=key;
+    this.tracks=installedSongChoices(catalog);
+    this.page=Math.min(this.page,Math.max(0,songPageCount(this.tracks)-1));
+    this._build(); // refresh rows and page count; do not change song settings
+    return true;
+  }
+  _build(){
+    const settings=()=>this.scene.game.registry.get(REG.SETTINGS)||{};
+    const count=songPageCount(this.tracks);
+    const current=songsForPage(this.page,this.tracks);
+    const start=this.page*SONGS_PER_PAGE;
+    const items=[...current.map((song,i)=>({
+      kind:'choice',label:String(start+i+1).padStart(2,'0')+' '+ellipsize(song.label.toUpperCase(),285),
+      options:[{value:true,label:'ON'},{value:false,label:'OFF'}],
+      get:()=>settings().musicEnabledSongs?.[song.id]!==false,
+      set:value=>updateSetting(this.scene.game,'musicEnabledSongs',{
+        ...(settings().musicEnabledSongs||{}),[song.id]:value,
+      }),
+    })),
+    {kind:'action',label:'PREVIOUS PAGE',color:'cyan',onSelect:()=>this._changePage(-1)},
+    {kind:'action',label:'NEXT PAGE',color:'cyan',onSelect:()=>this._changePage(1)}];
+    if(!this.pageText){
+      this.pageText=new NeonText(this.scene,this.theme,12,21,'',{color:'amber',outline:'none'});
+      this.panel.add(this.pageText);
+    }
+    this.pageText.setText('TRACKS '+(start+1)+'-'+(start+current.length)+' OF '+this.tracks.length+
+      '   PAGE '+(this.page+1)+'/'+count);
+    this.menu?.destroy();
+    this.menu=new MenuList(this.scene,this.theme,{x:8,y:33,w:432,
+      rowH:16,items,parent:this.panel,color:'lime'});
+  }
+  _changePage(delta){
+    this.page=(this.page+delta+songPageCount(this.tracks))%songPageCount(this.tracks);
+    this._build();
+  }
+  handleAction(action){
+    this._refreshCatalog(); // also refresh if this scene's update was paused
+    if(action==='cancel'){this.close();return true;}
+    return this.menu.handleAction(action);
+  }
+  destroy(){
+    if(this._onCatalogFrame)this.scene.events?.off('update',this._onCatalogFrame);
+    this._onCatalogFrame=null;
+    this.menu?.destroy();this.menu=null;
+    super.destroy();
+  }
+}
+
 export class SoundManagerView extends View {
   constructor(scene,theme,o){
     super(scene,theme,{w:448,h:238,title:'MANAGE SOUND',
       color:'cyan',onClose:o.onClose,y:15,
       hints:[{keys:['↑','↓'],label:'SELECT'},{keys:['←','→'],label:'CHANGE'}]});
     this.labView=null;
+    this.libraryView=null;
     this._build();
   }
   _profile(){return this.scene.registry.get(REG.PROGRESSION)?.store?.profile||
@@ -303,18 +379,16 @@ export class SoundManagerView extends View {
     const unlocked=this._unlocked();
     const bank=Number(this._profile().bank)||0;
     const menuItems=[
-      ...GAME_SONGS.map((song,index)=>({
-        kind:'choice',label:'TRACK '+(index+1)+'  '+ellipsize(song.label.toUpperCase(),190),
-        options:[{value:true,label:'ON'},{value:false,label:'OFF'}],
-        get:()=>settings().musicEnabledSongs?.[song.id]!==false,
-        set:v=>updateSetting(game,'musicEnabledSongs',{
-          ...(settings().musicEnabledSongs||{}),[song.id]:v,
-        }),
-      })),
+      {kind:'action',label:'SELECT TRACKS ('+installedSongChoices(game.registry.get('audioSynth')?._stemMusic?.catalog).length+')',color:'cyan',
+        sub:'ON / OFF PER SONG',onSelect:()=>this._openLibrary()},
       {kind:'choice',label:'SHUFFLE SONGS',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
         get:()=>settings().musicShuffle===true,
         set:v=>updateSetting(game,'musicShuffle',v)},
+      {kind:'choice',label:'SONG CROSSFADE',options:[
+          {value:false,label:'OFF'},{value:true,label:'ON'}],
+        get:()=>settings().musicCrossfade!==false,
+        set:v=>updateSetting(game,'musicCrossfade',v)},
       {kind:'choice',label:'DYNAMIC ORCHESTRA',badge:'PRE-ALPHA',
         badgeColor:'magenta',options:[
           {value:false,label:'OFF'},{value:true,label:'ON'}],
@@ -356,6 +430,18 @@ export class SoundManagerView extends View {
       this.note.setAlpha(.6);
       this.panel.add(this.note);
     }
+  }
+  _openLibrary(){
+    if(this.libraryView)return;
+    this.panel.setVisible(false);
+    this.libraryView=new SongLibraryView(this.scene,this.theme,{
+      onClose:()=>{
+        this.libraryView?.destroy();
+        this.libraryView=null;
+        this.panel.setVisible(true);
+        this._build();
+      },
+    });
   }
   _changeVocals(enabled){
     updateSetting(this.scene.game,'musicVocals',enabled===true);
@@ -399,11 +485,13 @@ export class SoundManagerView extends View {
     });
   }
   handleAction(action){
+    if(this.libraryView)return this.libraryView.handleAction(action);
     if(this.labView)return this.labView.handleAction(action);
     if(action==='cancel'){this.close();return true;}
     return this.menu.handleAction(action);
   }
   destroy(){
+    this.libraryView?.destroy();this.libraryView=null;
     this.labView?.destroy();this.labView=null;
     super.destroy();
   }

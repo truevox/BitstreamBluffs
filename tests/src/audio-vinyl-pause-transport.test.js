@@ -2,9 +2,10 @@ import {jest} from '@jest/globals';
 import {EventEmitter} from 'events';
 import {AudioSynth} from '../../src/systems/AudioSynth.js';
 import {EVT} from '../../src/events.js';
-import {defaultSongSelection} from '../../src/systems/music/MusicPlaylist.js';
+import {defaultSongSelection,FIRST_SONG_ID,GAME_SONGS} from '../../src/systems/music/MusicPlaylist.js';
 import {VINYL_SCRATCH_SECONDS} from '../../src/systems/music/TurntableScratch.js';
 
+const OTHER_SONG_ID=GAME_SONGS.find(song=>song.id!==FIRST_SONG_ID).id;
 const fakeParam=()=>({setTargetAtTime:jest.fn(),cancelScheduledValues:jest.fn()});
 function setup() {
   const events=new EventEmitter();
@@ -19,8 +20,8 @@ function setup() {
   a.settings={masterVolume:.8,musicVolume:.6,sfxVolume:.8,
     musicEnabledSongs:defaultSongSelection(),windEnabled:true,windVolume:1};
   const d={started:true,ready:true,disposed:false,transportPaused:false,
-    pack:{duration:180,id:'one-more-run'},track:{id:'one-more-run'},
-    catalog:[{id:'one-more-run'},{id:'other-track'}],
+    pack:{duration:180,id:FIRST_SONG_ID},track:{id:FIRST_SONG_ID},
+    catalog:[{id:FIRST_SONG_ID},{id:OTHER_SONG_ID}],
     ctx,clockStart:20,activeNodes:new Set([{}]),trackIndex:0,
     _resumeOffset:0,_token:8,_loading:null,stop:jest.fn(),
     transportPause:jest.fn(function(){
@@ -241,7 +242,7 @@ describe('user vinyl pause/resume owns only ONE preserved stem transport',()=>{
     events.emit(EVT.GAME_RESUME,{});
     jest.advanceTimersByTime(1000);
     expect(d.transportPlay).not.toHaveBeenCalled();
-    expect(d.track.id).toBe('other-track');
+    expect(d.track.id).toBe(OTHER_SONG_ID);
     expect(d._resumeOffset).toBe(0);
     a.destroy();
   });

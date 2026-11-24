@@ -384,6 +384,7 @@ export const NON_CAUSAL_MODULES = Object.freeze([
   { file: 'src/systems/MicroBees.js', reason: 'decor particles: presentation' },
   { file: 'src/systems/SaveStore.js', reason: 'local ledger and sharecode formats (V1-V4 hashes are not simulation; never rehashed)' },
   { file: 'src/systems/music/MusicPlaylist.js', reason: 'audio playlist: presentation' },
+  { file: 'src/systems/music/FullSongRoster.js', reason: 'recorded music source catalog titles and IDs; audio presentation only, never terrain, scoring, physics, RNG, input bits or replay outcomes' },
 ]);
 
 /**
