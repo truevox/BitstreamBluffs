@@ -283,6 +283,19 @@ describe('air brake and parachute', () => {
     expect(touchdown.landing.airtimeMs).toBe(2*DT);
   });
 
+  test('a physically paid airborne AirBrake on one tick settles the later short landing without repeating the trick',()=>{
+    const r=rig();
+    r.frame({grounded:true});
+    const kick=r.frame({grounded:false,input:{airBrake:true,airBrakeKicked:true}});
+    expect(kick.tricks.map(t=>t.type)).toEqual(['airBrake']);
+    expect(kick.landing).toBe(null);
+    const touchdown=r.frame({grounded:true,input:{airBrake:true,airBrakeKicked:false}});
+    expect(touchdown.tricks).toEqual([]);
+    expect(touchdown.landing).toMatchObject({
+      quality:'good',shortAirBrakeTouchdown:true,airtimeMs:2*DT,
+    });
+  });
+
   test('a crash frame never credits a paid AirBrake trick',()=>{
     const r=rig();
     r.run(2,{grounded:true});

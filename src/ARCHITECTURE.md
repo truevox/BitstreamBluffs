@@ -37,11 +37,15 @@ still receives its trick credit; two consecutive short real flights must not
 lose a later kick because the UI tracker failed to observe an airborne frame.
 Any touchdown-only paid kick under the ordinary minimum airtime is settled
 immediately through the real RunScene / ScoreManager landing path with its
-actual bounded tick airtime. It cannot carry unbanked points into an unrelated
+actual bounded tick airtime. This applies both to a kick on the touchdown tick
+and to an airborne kick on an EARLIER tick in a short flight: the later touchdown
+banks already-pending points without issuing a duplicate trick event. It cannot
+carry unbanked points into an unrelated
 flight, receive a fake perfect-landing bonus or manufacture a new speed/spring
 boost on a tiny bump. Hop release removes at most the remaining upward
 velocity, so gravity already spent on the ascent cannot turn a shortened Hop
-into an instant downward impulse.
+into an instant downward impulse. If the sled is already descending, a late
+Hop release leaves its positive downward velocity completely unchanged.
 The AirBrake held-input state also does NOT block the normal crest snap after
 its one-shot impulse has been used; only the actual kick tick gets an exemption.
 This single-tick event is consumed before the replay

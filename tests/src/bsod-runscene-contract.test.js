@@ -257,12 +257,35 @@ describe('#247 touchdown-only paid AirBrake scoring settlement',()=>{
       expect(scene.score.trickPoints).toBeGreaterThan(prior);
       expect(scene._airTricks).toBe(0);
     }
-    expect(scene._landings).toBe(2);
-    expect(scene.trickCounts.airBrake).toBe(2);
+    // Different timing: one genuinely paid kick during an airborne sample,
+    // followed by landing 8ms later with NO new kick pulse. The pending
+    // AirBrake trick must settle on THIS short landing, not leak to a later one.
+    const airborne={...frame(30008),grounded:false};
+    const paid=scene.tricks.update(airborne);
+    expect(paid.tricks).toMatchObject([{type:'airBrake',airtimeMs:8}]);
+    expect(paid.landing).toBe(null);
+    scene.handleTricksAndLanding(paid,airborne);
+    expect(scene.score.getSnapshot().pendingPoints).toBeGreaterThan(0);
+    const landingFrame={...frame(30016),input:{
+      airBrake:true,airBrakeKicked:false,parachute:false,heli:0,
+    }};
+    const settled=scene.tricks.update(landingFrame);
+    expect(settled.tricks).toEqual([]); // no duplicate trick on landing
+    expect(settled.landing).toMatchObject({
+      quality:'good',shortAirBrakeTouchdown:true,airtimeMs:16,
+    });
+    const priorThird=scene.score.trickPoints;
+    scene.handleTricksAndLanding(settled,landingFrame);
+    expect(scene.score.getSnapshot().pendingPoints).toBe(0);
+    expect(scene.score.trickPoints).toBeGreaterThan(priorThird);
+    expect(scene._airTricks).toBe(0);
+
+    expect(scene._landings).toBe(3);
+    expect(scene.trickCounts.airBrake).toBe(3);
     expect(scene.applyLandingBoost).not.toHaveBeenCalled();
     expect(scene.applySpringRebound).not.toHaveBeenCalled();
-    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(2);
-    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(2);
-    expect(events.filter(x=>x.key===EVT.TRICK).map(x=>x.payload.airtimeMs)).toEqual([8,8]);
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(3);
+    expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(3);
+    expect(events.filter(x=>x.key===EVT.TRICK).map(x=>x.payload.airtimeMs)).toEqual([8,8,8]);
   });
 });

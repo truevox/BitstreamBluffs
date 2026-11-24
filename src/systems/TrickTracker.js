@@ -238,6 +238,12 @@ export class TrickTracker {
 
     // grounded
     const trackedAirMs=this._air?Math.max(0,t-this._airStart):Math.max(0,dt);
+    // A physical one-shot kick could already have earned a trick on an earlier
+    // airborne tick. If touchdown happens before the normal min-air threshold,
+    // we MUST bank that pending trick even though this particular frame has
+    // no new kick pulse. This is a landing settlement, not duplicate credit.
+    const pendingShortBrake=this._air && this._brakeDone &&
+      trackedAirMs < this.minAirtimeMs;
     let landing = null;
     let rot = 0;
     if (this._air) {
@@ -261,25 +267,24 @@ export class TrickTracker {
     // Credit and SETTLE the physically paid trick on this actual touchdown;
     // otherwise ScoreManager.pending would leak into an unrelated later jump.
     // Do not inherit the previous flight's _airStart, multiplier or airtime.
+    const airBrakeTouchdownMs=landing ? landing.airtimeMs
+      : Math.min(this.minAirtimeMs,trackedAirMs);
     if (input.airBrakeKicked) {
-      // A real Matter touchdown can rearm Sled between two TrickTracker
-      // samples. Consecutive very short hops may therefore BOTH produce
-      // valid paid pulses while the tracker never observes an airborne
-      // sample to reset _brakeDone. Trust each actual one-shot physics event,
-      // not stale presentation-phase state. Held input has no pulse.
+      // Sled re-arms on real Matter contact, not UI samples; two consecutive
+      // short touchdown-only pulses can both be valid without an intervening
+      // rendered airborne frame. A held key without a pulse earns nothing.
       this._brakeDone = true;
-      const airtimeMs=landing ? landing.airtimeMs
-        : Math.min(this.minAirtimeMs,trackedAirMs);
-      tricks.push({ type: 'airBrake', count: 1, rotationDeg: 0, airtimeMs });
-      if (!landing) {
+      tricks.push({ type:'airBrake',count:1,rotationDeg:0,
+        airtimeMs:airBrakeTouchdownMs });
+    }
+    if (!landing && (input.airBrakeKicked || pendingShortBrake)) {
         const measured=this._makeLanding(state,angle,t,false);
         // Very short touches can bank their earned AirBrake trick, but may not
         // invent a perfect-landing bonus or an additional trick-speed launch.
         // Ordinary sloppy/crash safety classification still applies.
-        landing={...measured, airtimeMs, rotationDeg:0,
+        landing={...measured, airtimeMs:airBrakeTouchdownMs, rotationDeg:0,
           midSpin:false, shortAirBrakeTouchdown:true,
           quality:measured.quality==='perfect'?'good':measured.quality};
-      }
     }
     this._prevAngle = angle;
     this._prevHeli = heli;

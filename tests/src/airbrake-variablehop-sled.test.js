@@ -188,3 +188,20 @@ test('Hop release never creates a sudden downward shove after gravity has alread
   expect(s._protectedHopExtraVyPxS).toBe(0);
   expect(s._playerHopActive).toBe(false);
 });
+
+
+test('protected Hop release AFTER its apex does not pause or reverse existing descent',()=>{
+  const s=makeSled(530,0);
+  s.msSinceContact=60;
+  s._playerHopActive=false;
+  step(s,{hop:true,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{hop:true}});
+  s.msSinceContact=68;
+  step(s,{hop:true,variableHop:true,airBrake:true,noAutoNudge:true,pressed:{airBrake:true}});
+  expect(s._protectedHopExtraVyPxS).toBeGreaterThan(300);
+  s.body.velocity.y=toMatter(45); // real gravity has already crossed apex
+  s._playerHopElapsedMs=TUNING.hopMinimumHoldMs+2;
+  step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(45,6);
+  expect(s._protectedHopExtraVyPxS).toBe(0);
+  expect(s._playerHopActive).toBe(false);
+});

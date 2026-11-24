@@ -381,7 +381,9 @@ export class Sled {
           // Gravity may have already spent part of the original Hop ascent.
           // Shortening a jump must never create an instant downward shove:
           // remove no more than the upward velocity still present NOW.
-          vy = Math.min(0, vy + (this._protectedHopExtraVyPxS || 0));
+          if (vy < 0) vy = Math.min(0, vy + (this._protectedHopExtraVyPxS || 0));
+          // When gravity has ALREADY crossed the apex, Hop release does not
+          // change positive downward velocity or artificially pause the fall.
         } else if (vy < 0) vy = 0;
         this._protectedHopExtraVyPxS = 0;
         this._playerHopActive = false;
