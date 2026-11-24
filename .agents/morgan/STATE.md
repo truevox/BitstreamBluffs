@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 21:44 UTC. Main `044ebd4b68b4c80134cde5ec35f661b471a2e0b0` (#332), v2.21.2 live, SIM9. Exact Pages pushes `45486506744` (#325) and `45489983749` (#332) green. Public `main-h41TAaSg.js` SHA-256 `49d8dfbf2a56727b258b130c4948bbfe43de72b4b6a01c0e54a73bcba5afe359`; served source map matches exact main Background, BiomeFx and StemMusicDirector. #333/#334 shipped the 33-song catalog, local fallback and billboard thumbnails in v2.21.1; no new pause verification.
+Last verified: 2026-11-24 22:38 UTC. Main `044ebd4b68b4c80134cde5ec35f661b471a2e0b0` (#332), v2.21.2 live, SIM9. Exact Pages pushes `45486506744` (#325) and `45489983749` (#332) green. Public `main-h41TAaSg.js` SHA-256 `49d8dfbf2a56727b258b130c4948bbfe43de72b4b6a01c0e54a73bcba5afe359`; served source map matches exact main Background, BiomeFx and StemMusicDirector. #333/#334 shipped the 33-song catalog, local fallback and billboard thumbnails in v2.21.1; no new pause verification.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -41,9 +41,21 @@ means resume this queue, not take over another lane or merge a draft.
    exact-head independent review; resolve real feedback only. No merge.
    Independent exact test blob overlay on shipped v2.20.2 again passed
    159/159 across the same five suites; #320 has no test-file overlap.
-2. #168 and all 17 original open issues were rechecked on v2.20.2;
+2. #168 and all 17 original open issues were rechecked on v2.21.2;
    none closed. Keep checking source for actual dependency movement.
-   While #287 waits, continue bounded #79 replay annotation QA.
+   [#338](https://github.com/truevox/BitstreamBluffs/pull/338) / #78 is now
+   an open two-file developer-only draft at `fbc787a939446ac67ea4b7b25c12b35faf9b2836`,
+   branch `morgan/issue-78-crash-brief-chain-smoke`, based on `044ebd4b`.
+   Normal production asset matches v2.21.2. Two fresh strict playbacks
+   of natural terrain fatal tick937 checked 7/7 checkpoints; a complete
+   shaped nonfatal cutoff is refused with exit 1 and empty stdout.
+   Unchanged comparator returned 0 vs itself and 2 vs historical Packet
+   Spike brief. 102 focused tests, identity and closed-loop browser smoke
+   passed. A longer experimental hazard playback hit the existing 60s
+   wall limit and is not in the draft. No raw tapes, profile data, game
+   behavior, deployment, or issue closure. Await exact-head review;
+   lifecycle `45502797485`, identity `45502797488` started. No merge.
+   #79 replay annotation QA (independent prior slice):
    Exact public normal v2.20.2 entry and shipped SIM9 identity: four
    fresh Chromium contexts, positive record+replay and cutoff record+replay.
    Existing opt-in conformance helper, CE120-BUMP3/reckless/hopEvery400,
