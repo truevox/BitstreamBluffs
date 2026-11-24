@@ -8,8 +8,8 @@ import tempfile
 
 AUDIO = {".ogg", ".mp3", ".wav", ".flac", ".m4a", ".opus", ".aac",
          ".aiff", ".aif", ".wma", ".mid", ".midi"}
-MAX_BYTES = 80_000_000
-MAX_FILES = 4000
+MAX_BYTES = 8_000_000
+MAX_ENTRIES = 850
 TARGET = "refs/heads/gemini"
 URL = "https://github.com/truevox/BitstreamBluffs"
 MARKER = "Code-only Gemini snapshot of "
@@ -20,6 +20,22 @@ def git(*args, env=None, data=None):
 def remote_tip(ref):
     lines = git("ls-remote", "origin", ref).decode().splitlines()
     return lines[0].split()[0] if lines else ""
+
+def keep_path(raw):
+    """Prefer live game source, design docs, core tests and music/ruleset tools."""
+    p = PurePosixPath(os.fsdecode(raw))
+    name = str(p)
+    if p.suffix.lower() in AUDIO:
+        return False
+    if name.startswith("src/"):
+        return True
+    if name.startswith(("tests/src/", "tools/music/", "tools/ruleset/", "tools/gemini/")):
+        return p.suffix.lower() in {".js", ".mjs", ".cjs", ".py", ".json", ".md", ".ts", ".html", ".css", ".sh"}
+    if name.startswith("docs/"):
+        return p.suffix.lower() == ".md"
+    if name.startswith("public/"):
+        return p.suffix.lower() in {".json", ".webmanifest", ".html", ".js", ".css"} and not (name.startswith("public/music/packs/") and p.name.startswith("performance"))
+    return name in {"README.md", "AGENTS.md", "CHANGELOG.md", "package.json", "index.html", "vite.config.js", "vitest.config.js", "jest.setup.js", "server.js", "netlify.toml", "common-issues.md", "llm-notes.md", ".gitignore", ".gitattributes", "bsod-qa.html"} or name.startswith(".github/workflows/")
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -43,8 +59,10 @@ def main():
         idx("read-tree", source)
         paths = idx("ls-files", "-z").split(b"\0")[:-1]
         omitted = sorted(p for p in paths if PurePosixPath(os.fsdecode(p)).suffix.lower() in AUDIO)
-        if omitted:
-            idx("update-index", "--force-remove", "-z", "--stdin", data=b"\0".join(omitted)+b"\0")
+        excluded = sorted(p for p in paths if not keep_path(p))
+        other = sorted(set(excluded) - set(omitted))
+        if excluded:
+            idx("update-index", "--force-remove", "-z", "--stdin", data=b"\0".join(excluded)+b"\0")
 
         def put(path, content):
             sha = idx("hash-object", "-w", "--stdin", data=content.encode("utf-8")).decode().strip()
@@ -59,7 +77,11 @@ Source revision: [`{source}`]({URL}/commit/{source}).
 
 ## Music assets
 
-{len(omitted):,} audio binaries are intentionally omitted. All original assets remain in the canonical repository. Catalogs, pack manifests, timing/stem metadata, music code, tests and documentation remain here. [STRIPPED_AUDIO_INDEX.txt](STRIPPED_AUDIO_INDEX.txt) lists every omitted repository-relative path.
+{len(omitted):,} audio binaries are intentionally omitted. All original assets remain in the canonical repository. The catalog and pack manifests remain here, but large generated performance timelines are omitted. [STRIPPED_AUDIO_INDEX.txt](STRIPPED_AUDIO_INDEX.txt) lists every omitted audio path.
+
+## Scope
+
+This smaller projection is intended to test Gemini's actual file-content access, not just repository import acceptance. It retains the complete live `src/` tree (except audio), Markdown design/engineering docs, `tests/src/`, music/ruleset tooling, pack manifests and essential root configuration. Legacy code, other tests/tools, lockfile, binary art and generated reports are available from the pinned canonical source. [OMITTED_FILES.txt](OMITTED_FILES.txt) indexes the {len(other):,} non-audio exclusions. Never infer that omitted files are absent in main.
 
 - [Music directory at the source revision]({URL}/tree/{source}/public/music)
 - [Music packs and recordings at the source revision]({URL}/tree/{source}/public/music/packs)
@@ -79,24 +101,26 @@ For deployed media, omit the leading `public/` and use https://simulate.sledhead
 
 Gemini imports a point-in-time snapshot; re-import this branch to see later main changes.
 """
-        pointer = "\n> **Code-only snapshot:** Audio recordings are intentionally excluded. See [GEMINI.md](GEMINI.md) and [STRIPPED_AUDIO_INDEX.txt](STRIPPED_AUDIO_INDEX.txt) for source revision, original assets and retrieval instructions. Not a deployment or development target.\n"
+        pointer = "\n> **Code-only snapshot:** Audio, large performance data and ancillary files are intentionally excluded. See [GEMINI.md](GEMINI.md), [STRIPPED_AUDIO_INDEX.txt](STRIPPED_AUDIO_INDEX.txt) and [OMITTED_FILES.txt](OMITTED_FILES.txt) for source revision, original assets and retrieval instructions. Not a deployment or development target.\n"
         for path in ("README.md", "AGENTS.md"):
             first, sep, rest = git("show", source + ":" + path).decode().partition("\n")
             put(path, first + sep + pointer + rest)
         put("GEMINI.md", doc)
         put("STRIPPED_AUDIO_INDEX.txt", "".join(os.fsdecode(p)+"\n" for p in omitted))
+        put("OMITTED_FILES.txt", "".join(os.fsdecode(p)+"\n" for p in other))
         tree = idx("write-tree").decode().strip()
         entries = idx("ls-tree", "-r", "-l", "-z", tree).split(b"\0")[:-1]
         actual = {e.split(b"\t", 1)[1] for e in entries}
-        expected = set(paths) - set(omitted) | {b"GEMINI.md", b"STRIPPED_AUDIO_INDEX.txt"}
+        expected = set(paths) - set(excluded) | {b"GEMINI.md", b"STRIPPED_AUDIO_INDEX.txt", b"OMITTED_FILES.txt"}
         if actual != expected:
             raise SystemExit("Snapshot path mismatch")
         total = sum(int(e.split(b"\t", 1)[0].split()[-1]) for e in entries)
-        if len(entries) > MAX_FILES or total > MAX_BYTES:
-            raise SystemExit(f"Snapshot exceeds budget: {len(entries)} files, {total} bytes")
+        count = len(idx("ls-tree", "-r", "-t", "-z", tree).split(b"\0")) - 1
+        if count > MAX_ENTRIES or total > MAX_BYTES:
+            raise SystemExit(f"Snapshot exceeds budget: {count} tree entries, {total} bytes")
         if any(PurePosixPath(os.fsdecode(p)).suffix.lower() in AUDIO for p in actual):
             raise SystemExit("Audio leaked into snapshot")
-        print(f"Source {source}; tree {tree}; {len(entries)} files, {total} bytes; {len(omitted)} audio files omitted", flush=True)
+        print(f"Source {source}; tree {tree}; {len(entries)} files, {count} tree entries, {total} bytes; {len(omitted)} audio and {len(other)} other files omitted", flush=True)
         if not args.publish:
             return
         if previous and git("rev-parse", previous+"^{tree}").decode().strip() == tree:
