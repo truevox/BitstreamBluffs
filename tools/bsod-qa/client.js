@@ -21,6 +21,7 @@ if (qa) {
   };
   installTitleOverride();
 
+  let progressionListenerDetached = false;
   game.events.on(EVT.RUN_START, () => {
     const scene = game.scene.getScene('RunScene');
     if (!scene?.bsod || !scene?.bsodState) throw new Error('QA expected authoritative pursuer');
@@ -39,8 +40,23 @@ if (qa) {
     if (scene.saveStore) scene.saveStore = { ...scene.saveStore, saveRun: () => Promise.resolve() };
     scene._saveGhostTape = () => {};
     game.registry.set(REG.LAST_AWARDS, null); // Do not display awards left over from an earlier run.
-    // The progression service awards XP on RUN_END; no QA run may award it.
-    game.events.removeAllListeners(EVT.RUN_END);
+    // QA runs must not award XP/shards/missions. Remove ONLY the progression
+    // service's own crediting callback; RUN_END is also how InputRouter,
+    // AudioSynth and UIScene reset real input/audio/HUD state after a crash.
+    // This QA page runs in its own browser document; normal game listeners
+    // are untouched, and an ordinary run in another page still credits XP.
+    const progression = game.registry.get(REG.PROGRESSION);
+    if (!progression || typeof progression._onRunEnd !== 'function') {
+      throw new Error('QA cannot safely isolate progression crediting');
+    }
+    if (!progressionListenerDetached) {
+      if (!game.events.listeners(EVT.RUN_END).includes(progression._onRunEnd)) {
+        throw new Error('QA progression crediting listener not found');
+      }
+      game.events.off(EVT.RUN_END, progression._onRunEnd);
+      progressionListenerDetached = true;
+    }
+    progression.lastAwards = null;
     window.__bsodQaEvidence = { preset: qa.name, seed: qa.seed, initialGapPx: gap,
       initialSpeedPxS: scene.bsod.wallSpeedPxS, effectiveAccelerationPxS2: scene.bsod.accelerationPxS2,
       softFinish: !!qa.softFinish, noSave: true };

@@ -9,3 +9,13 @@ The original local-only developer server remains on the research branch, but thi
 ## Fast Approach / Soft Finish (experimental third candidate)
 
 This is now the production default. The original moderate and buffered QA comparators disable the final easing. The soft preset uses the same core `BsodPursuit` as ordinary gameplay. Keeps buffered strong's opening gap, starting wall speed and acceleration. During the final 3000px of closing distance, a smoothstep envelope reduces the **actual moving wall speed** from 100% to 82% of its nominal accelerating speed at contact. The displayed speed and collision edge use that reduced value. The wall does not key off the player's velocity or teleport to catch them. The first two original A/B presets are unchanged.
+
+### Post-crash acceptance (review blocker from #285)
+
+On a local built site (`npm run build && npm run preview -- --host 127.0.0.1 --port 4183`), run:
+
+```sh
+node tools/bsod-qa/post-crash-smoke.mjs
+```
+
+This real Chromium regression runs **all three** presets through the real `RunScene.doCrash` → `RUN_END` → `GameOverScene` transition. It requires the non-credit listeners to survive, InputRouter to release run controls, AudioSynth to enter menu mode, and XP/shards/lifetime runs, SaveStore records, and ghost evidence to remain unchanged. A QA page detaches only `ProgressionService._onRunEnd`; never call `removeAllListeners(EVT.RUN_END)`, since that silently disables unrelated lifecycle consumers. The normal game is unaffected.
