@@ -7,11 +7,12 @@ import {resolve,join} from 'node:path';
 const [file,archive=process.env.MUSIC_PACK_ARCHIVE||'/home/hermes/.local/share/bitstream-static-music-v1/packs']=process.argv.slice(2);
 assert.ok(file,'Usage: node tools/music/verify-original-segment-spread-report.mjs report.json [private pack archive]');
 const report=JSON.parse(readFileSync(file,'utf8'));
-assert.equal(report.format,'bbs-original-ogg-game-music-bus-segment-spread-v1');
+const allSegments=report.format==='bbs-original-ogg-game-music-bus-all-segments-v1';
+assert.ok(allSegments||report.format==='bbs-original-ogg-game-music-bus-segment-spread-v1');
 assert.equal(report.sampleRate,48000);
 assert.equal(report.sampleSeconds,2.5);
-assert.equal(report.segments.length,12);
-assert.equal(report.results.length,48);
+assert.ok(report.segments.length>0);
+assert.equal(report.results.length,report.segments.length*4);
 const folder=resolve(archive);
 const packs=new Map();
 for(const segment of report.segments){
@@ -34,11 +35,11 @@ for(const segment of report.segments){
  }
  assert.equal(Object.keys(segment.sourceSha256).length,18);
 }
-assert.equal(packs.size,4);
+assert.ok(packs.size>=1&&packs.size<=4);
 for(const [pack,indices] of packs){
- assert.equal(indices.length,3);
  const count=JSON.parse(readFileSync(join(folder,pack,'pack.json'),'utf8')).segments.length;
- assert.deepEqual(indices,[0,Math.floor((count-1)/2),count-1]);
+ assert.deepEqual(indices,allSegments?Array.from({length:count},(_,i)=>i):
+  [0,Math.floor((count-1)/2),count-1]);
 }
 for(const row of report.results){
  assert.ok(packs.get(row.pack)?.includes(row.segmentIndex));

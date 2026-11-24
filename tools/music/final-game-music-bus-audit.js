@@ -105,14 +105,15 @@ async function audit(packs,biomes=BIOMES,duration=DEFAULT_DURATION,maxVocalsOnly
  * This supplements the opening-only 100-case audit; it does not falsely claim
  * full-song continuous playback, physical SFX/wind or certified true peak.
  */
-async function auditSegmentSpread(packs,{duration=2.5,biomes=[
+async function auditSegmentSpread(packs,{duration=2.5,allSegments=false,biomes=[
  'garbage-dump-glacier','vertigo-vents','crystal-cavern','bitstream-bluffs'] }={}){
  if(!Number.isFinite(duration)||duration<=0||duration>5)throw Error('Invalid duration');
  if(!Array.isArray(biomes)||biomes.some(b=>!BIOMES.includes(b)))throw Error('Invalid biomes');
  const results=[],segments=[];
  for(const pack of packs){
   const songZero=await load(pack,0,true);
-  const indices=[...new Set([0,Math.floor((songZero.segmentCount-1)/2),songZero.segmentCount-1])];
+  const indices=allSegments?Array.from({length:songZero.segmentCount},(_,i)=>i):
+   [...new Set([0,Math.floor((songZero.segmentCount-1)/2),songZero.segmentCount-1])];
   for(const index of indices){
    const song=index===0?songZero:await load(pack,index,true);
    if(song.frames/RATE<duration+.1)throw Error('Too short segment '+pack+'/'+index);
@@ -125,10 +126,13 @@ async function auditSegmentSpread(packs,{duration=2.5,biomes=[
    }
   }
  }
- return {format:'bbs-original-ogg-game-music-bus-segment-spread-v1',
-  source:'Original OGG beginning/middle/end source segments; 2.5s each, max vocals',
+ return {format:allSegments?'bbs-original-ogg-game-music-bus-all-segments-v1':
+   'bbs-original-ogg-game-music-bus-segment-spread-v1',
+  source:allSegments?'All original OGG song segments, 2.5s each, max vocals':
+   'Original OGG beginning/middle/end source segments, 2.5s each, max vocals',
   sampleRate:RATE,sampleSeconds:duration,segments,
-  limitations:'Only three chosen segments per song and four risk-focused biomes. Real StemFXMixer, convolution, master/compressor and post-compressor guard are modeled. Excludes gameplay SFX, wind, static, physical event transients, full-song continuity and certified intersample true peak.',
+  limitations:allSegments?'Every source segment sampled only for its first 2.5 seconds, four high-risk biomes; MUSIC bus only, no SFX/wind, full-song continuity or certified true peak.':
+   'Only three chosen segments per song and four risk-focused biomes. Real StemFXMixer, convolution, master/compressor and post-compressor guard are modeled. Excludes gameplay SFX, wind, static, physical event transients, full-song continuity and certified intersample true peak.',
   results};
 }
 window.__finalGameMusicBusQA=Object.freeze({audit,auditSegmentSpread});

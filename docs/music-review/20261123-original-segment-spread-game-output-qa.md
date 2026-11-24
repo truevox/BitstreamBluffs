@@ -40,3 +40,36 @@ The CLI refuses to overwrite prior reports and fails if any output is nonfinite,
 ## Still outstanding for #291 — do NOT close
 
 This is **not a full-song continuous render**: it samples the first 2.5s of three selected segments, not every second or every intervening OGG segment; the exact rendered graph is MUSIC bus without real player SFX, wind/static, collisions, fatal count-in, pause and device resampling. These are raw sample peaks, not a certified oversampled true-peak measurement, integrated loudness or a phone/Chromebook CPU test. Owner's listening A/B of actual game output (not just the standalone single-song FX labs), independent code review and eventual full final-output device QA remain separate requirements. Preserve previous failed controls, source archive and ear decisions.
+
+## Follow-on: ALL 65 original OGG segments — completed
+
+Expanded the opt-in audit from the twelve selected source segments to **every available original segment of all four source packs**. The full 260-case measurement is the additional checked-in artifact `20261123-all-segments-original-game-output-qa.json`, SHA-256 **`9910114bbdd3a7eb2bbe91a89cdab538451e08eafda0e62db0c3471851525a1b`**. Each original segment is evaluated at 0.75–3.25 seconds after its own musical entry, with original source vocals, separate biome lead, the real game MUSIC-bus/routing/room/master/compressor and final protective guard, at the maximum user volume settings.
+
+| Original song pack | Segments | Rendered cases | Highest observed sample peak | Worst biome |
+|---|---:|---:|---:|---|
+| Pope Leo `01_FEsxYVStla4` | 18 | 72 | 0.936171 | Crystal Cavern |
+| Every Hacker `03_WRBGQUqD54U` | 17 | 68 | 0.937371 | Crystal Cavern |
+| Varmont Is Saved `31_FYImnz5-hXs` | 15 | 60 | 0.930220 | Crystal Cavern |
+| One More Run `33_local-one-more-run-bitstream-bluffs` | 15 | 60 | 0.947184 | Garbage Dump Glacier |
+| **TOTAL** | **65** | **260** | **0.947184** | |
+
+**ALL 260 outputs passed:** 0 samples above full scale, 0 near-unity ≥0.98, and 0 nonfinite. Independent verification matched **1,170 original source-file SHA-256s** against the immutable original archive and confirmed every source segment position and output metric.
+
+### Why the full run was split per pack
+
+A single long Chromium render hit Puppeteer's **180-second DevTools protocol timeout** midway through all 65 segments, without saving a complete JSON report. It was an automation transport timeout, **not a measured audio overload**. The repeatable replacement accepts `MUSIC_BUS_PACK` together with `MUSIC_BUS_ALL_SEGMENTS=1`; each song runs in a fresh browser/process, writes an exclusive immutable per-pack report, and is validated independently. The `merge-original-segment-spread-reports.mjs` utility combines four validated reports without overwriting older evidence. This avoids sacrificing work on longer multi-song audits and preserves exact constituent SHA-256 provenance. The standalone runner now has an explicit 300-second protocol timeout, but per-pack bounded execution is still the recommended path.
+
+For each allowed song pack ID, run (substitute a unique output path and localhost-served game build):
+
+```sh
+MUSIC_BUS_ALL_SEGMENTS=1 MUSIC_BUS_PACK=01_FEsxYVStla4 \
+  MUSIC_BUS_URL=http://127.0.0.1:19029/tools/music/final-game-music-bus-audit.html \
+  MUSIC_BUS_REPORT=/tmp/bsb291-pope-immutable.json \
+  node tools/music/run-final-game-music-bus-audit.mjs
+node tools/music/verify-original-segment-spread-report.mjs \
+  /tmp/bsb291-pope-immutable.json /path/to/private/original/packs
+```
+
+Run the other three packs with their own output names and combine with the merge helper. For verification, the checked-in aggregated JSON has SHA-256 `9910114bbdd3a7eb2bbe91a89cdab538451e08eafda0e62db0c3471851525a1b` and embeds only pack IDs, source fingerprints and numerical measurements—not original music bytes.
+
+**Important remaining limits:** The all-segment sweep samples 2.5 seconds of *each* original source segment, not every sample across the complete multi-minute songs or boundaries between segments. It uses the actual music bus but **does not add concurrent real game SFX, BSOD wind, impact/collision, glitch/static or fatal count-in**; those are next #291 test axes. The final transfer function's own 2× oversampling does **not** certify intersample true-peak; there is no low-end hardware/phone/Chromebook performance or owner listening sign-off yet. These remain release blockers. Neither this result nor the prior tests authorizes an automatic audio release or a change to the user's musical preferences.
