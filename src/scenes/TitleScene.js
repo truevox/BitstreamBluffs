@@ -60,6 +60,9 @@ const BLEND_ADD = 1;
 /** Logo depth: above the backdrop and the panels' glow, below views and the dim. */
 const LOGO_DEPTH = 5;
 
+// The startup version belongs to the game instance, not every return to Title.
+const versionShown = new WeakSet();
+
 const HINT_TEXT = '↑↓ SELECT   ENTER / A CONFIRM   H / X HOW TO PLAY';
 
 export class TitleScene extends Phaser.Scene {
@@ -489,12 +492,25 @@ export class TitleScene extends Phaser.Scene {
       color: 'text', anchor: 'center', vAnchor: 0.5, outline: 'dark',
     });
     this.hint.setAlpha(0.72);
-    // A release label from the actual bundled package, not a second version constant.
-    const v = TITLE_BANDS.version;
-    this.versionLabel = new NeonText(this, theme, v.x, v.y, `v${packageInfo.version}`, {
-      color: 'text', outline: 'dark',
-    });
-    this.versionLabel.setAlpha(0.85);
+    // Show the actual bundled version once per game load; never revive it
+    // on attract-mode wake or a later return to the title screen.
+    this.versionLabel = null;
+    if (!versionShown.has(this.game)) {
+      versionShown.add(this.game);
+      const v = TITLE_BANDS.version;
+      const label = this.versionLabel = new NeonText(this, theme, v.x, v.y, `v${packageInfo.version}`, {
+        color: 'text', outline: 'dark', scale: 2,
+      }).setDepth(LOGO_DEPTH).setAlpha(1);
+      this.time.delayedCall(3000, () => {
+        if (!label.scene) return;
+        tweenProgress(this, {
+          duration: isReducedMotion(this) ? 120 : 400,
+          ease: Ease.outQuad,
+          onUpdate: (p) => { if (label.scene) label.setAlpha(1 - p); },
+          onComplete: () => { if (label.scene) label.setVisible(false); },
+        });
+      });
+    }
     const h = TITLE_BANDS.help;
     // The touch / mouse route to HOW TO PLAY (keyboard: H; pad: X / Y or SELECT).
     this.helpButton = new Button(this, theme, { x: h.x, y: h.y, w: h.w, h: h.h, label: '? HOW TO PLAY', color: 'amber', onClick: () => this._openHelp(true) });
@@ -600,7 +616,7 @@ export class TitleScene extends Phaser.Scene {
 
   /** The things attract mode dims. */
   _attractTargets() {
-    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.sub, this.versionLabel].filter((o) => o && o.scene);
+    return [this.menuPanel, this.cardPanel, this.jukebox && this.jukebox.panel, this.hint, this.helpButton, this.sub].filter((o) => o && o.scene);
   }
 
   _enterAttract() {
@@ -791,5 +807,5 @@ function launchFx(scene, ms) {
   };
   slide(scene.menuPanel, -240);
   slide(scene.cardPanel, 180);
-  for (const o of [scene.hint, scene.helpButton, scene.jukebox && scene.jukebox.panel, scene.sub, scene.versionLabel]) slide(o, 0);
+  for (const o of [scene.hint, scene.helpButton, scene.jukebox && scene.jukebox.panel, scene.sub]) slide(o, 0);
 }

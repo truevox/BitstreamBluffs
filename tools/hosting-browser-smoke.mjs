@@ -24,9 +24,22 @@ try {
   });
   assert.equal((await page.goto(base.href)).status(), 200);
   await page.waitForFunction(() => window.__bbGame?.scene?.isActive('TitleScene'), null, {timeout: 60000});
-  const version = await page.evaluate(() => { const label = window.__bbGame.scene.getScene('TitleScene').versionLabel; return {text: label?.main?.text, visible: label?.visible, alpha: label?.alpha}; });
+  const readVersion = () => page.evaluate(() => {
+    const label = window.__bbGame.scene.getScene('TitleScene').versionLabel;
+    return {text: label?.main?.text, visible: label?.visible, alpha: label?.alpha, x: label?.x, y: label?.y};
+  });
+  const version = await readVersion();
   assert.equal(version.text, `v${expectedVersion}`);
-  assert(version.visible && version.alpha > 0, 'actual title-screen release label is visible');
+  assert(version.visible && version.alpha === 1, 'startup version is fully visible');
+  assert(version.x < 20 && version.y < 20, 'version is in the top-left corner');
+  await page.waitForTimeout(1000);
+  const heldVersion = await readVersion();
+  assert(heldVersion.visible && heldVersion.alpha === 1, 'startup version holds before fade');
+  await page.waitForFunction(() => {
+    const label = window.__bbGame.scene.getScene('TitleScene').versionLabel;
+    return label && !label.visible && label.alpha === 0;
+  }, null, {timeout: 12000});
+  assert.equal((await readVersion()).text, `v${expectedVersion}`);
   await page.waitForFunction(() => window.__bbGame?.registry?.get('audioSynth')?._stemMusic?.ready, null, {timeout: 30000});
   assert(requests.includes(base.pathname + 'music/catalog.json'), 'actual game loaded music catalog');
   const assets = await page.evaluate(async () => {
