@@ -548,7 +548,7 @@ describe('tick-local landing settlement', () => {
 });
 
 describe('real fixed-tick crash-priority routing', () => {
-  test.each(['wall', 'hazard', 'shielded', 'survive', 'bad-then-hazard', 'bad-alone', 'shielded-kick'])('first-substep paid landing, second-substep %s', async outcome => {
+  test.each(['wall', 'hazard', 'shielded', 'survive', 'bad-then-hazard', 'bad-alone', 'shielded-kick', 'frozen-tap'])('first-substep paid landing, second-substep %s', async outcome => {
     const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
     const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
     const {SIM_TICK_MS}=await import('../../src/systems/SimClock.js');
@@ -556,7 +556,7 @@ describe('real fixed-tick crash-priority routing', () => {
     let steps=0, wallSteps=0;
     Object.assign(scene,{
       runTimeMs:1000,resetCooldownMs:0,hazards:new Map(),scrambleMs:0,
-      slowmoMs:0,blinkMs:0,hitStopMs:0,stabilizeMs:0,stabilizeDeg:0,
+      slowmoMs:0,blinkMs:0,hitStopMs:outcome==='frozen-tap'?45:0,stabilizeMs:0,stabilizeDeg:0,
       pendingCrash:null,shieldCharges:outcome.startsWith('shielded')?1:0,bsodCaught:false,crashed:false,
       score:new ScoreManager(),tricks:new TrickTracker(),trickCounts:{},_airTricks:0,
       _landings:0,maxAirtimeMs:0,lastTotal:530,bestCombo:1,startX:0,
@@ -607,7 +607,12 @@ describe('real fixed-tick crash-priority routing', () => {
       state(){return {active:true,gapPx:outcome==='wall'&&wallSteps===2?-1:400,
         relativeAirX:100,atmosphereDensity:1};}
     };
-    scene.simTick(SIM_TICK_MS,{pressed:{}});
+    scene.simTick(SIM_TICK_MS,{pressed:outcome==='frozen-tap'?{airBrake:true}:{}});
+    if(outcome==='frozen-tap'){
+      expect(steps).toBe(0);
+      expect(scene.sled.airBrakePressPending).toBe(true);
+      return;
+    }
     if(outcome==='shielded-kick'){
       expect(scene.updateBsodBluff).toHaveBeenCalledWith(true,[],expect.objectContaining({crashed:false,grounded:false}));
       expect(scene.trickCounts.airBrake).toBe(1);

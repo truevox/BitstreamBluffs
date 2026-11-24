@@ -72,6 +72,7 @@ export class Sled {
     this.chuteUsed = false;
     this.tucked = false;
     this.airBrakeActive = false;
+    this.airBrakePressPending = false; // one press retained across physics hit-stop
     this.airBrakeKickUsed = false; // #247 one-shot per actual airborne interval; rearm on genuine touchdown
     this.airBrakeLiftProtected = false; // persists until real touchdown; later coyote Hop cannot erase purchased lift
     this._protectedHopExtraVyPxS = 0; // separate later Hop lift that variable release MAY truncate
@@ -171,6 +172,7 @@ export class Sled {
     const actualNewTouchdown=!!this._contactFlag &&
       this.msSinceContact >= TUNING.groundedGraceMs;
     if (this._contactFlag) {
+      this.airBrakePressPending = false;
       this.airBrakeKickUsed = false; // actual Matter contact rearms, never a button release
       this.airBrakeLiftProtected = false; // only physical terrain contact can end protection
       this._protectedHopExtraVyPxS = 0;
@@ -244,8 +246,10 @@ export class Sled {
     // Fixed-tick input preserves a short press edge even if the key was
     // released before the tick sampled the held state. A paid one-shot
     // needs that first-substep edge; later substeps cannot replay it.
+    const bufferedAirBrake = firstOfFrame && !!this.airBrakePressPending;
+    if (firstOfFrame) this.airBrakePressPending = false;
     this.airBrakeActive = !grounded &&
-      (!!(pad && pad.airBrake) || (firstOfFrame && !!pressed.airBrake));
+      (!!(pad && pad.airBrake) || (firstOfFrame && !!pressed.airBrake) || bufferedAirBrake);
     this.corkscrewActive = !!(pad && pad.corkscrew) && !grounded;
     this.tucked = !!(pad && pad.tuck);
 
@@ -604,6 +608,7 @@ export class Sled {
     this.chuteUsed = false;
     this.airtimeMs = 0;
     this.airBrakeActive = false;
+    this.airBrakePressPending = false;
     this.airBrakeKickUsed = false; // respawn is a new flight/life
     this.airBrakeLiftProtected = false;
     this._protectedHopExtraVyPxS = 0;

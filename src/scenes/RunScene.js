@@ -1407,6 +1407,11 @@ export class RunScene extends Phaser.Scene {
     let simDt = dt * (this.slowmoMs > 0 ? this.slowmoScale : 1);
     if (this.blinkMs > 0) { this.blinkMs -= dt; simDt *= 0.35; }
     if (this.hitStopMs > 0) { this.hitStopMs -= dt; simDt = 0; }
+    // A fixed input tick can run while physics is frozen. Preserve only
+    // a valid unspent airborne press until the next actual controls step.
+    // The tape retains the original edge; this causal latch is fingerprinted.
+    if (simDt === 0 && pad.pressed.airBrake && !sled.grounded && !sled.airBrakeKickUsed)
+      sled.airBrakePressPending = true;
     // A real contact can occur in one Matter substep and a buffered coyote
     // Hop relaunch in the NEXT substep of this same fixed tick. The final
     // sled frame would be airborne and otherwise lose the paid AirBrake

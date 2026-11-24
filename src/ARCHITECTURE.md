@@ -32,7 +32,9 @@ truncates that increment on release (including quad-drag attenuation), never
 the brake. Both are SIM9 causal state fingerprinted in sled schema v3
 alongside `airBrakeKickUsed`. The full physical one-shot accepts either an airborne held brake or a
 first-substep `pressed.airBrake` edge that was released before the next fixed
-input sample. The press edge cannot repeat on later substeps, and earns the
+input sample. A valid airborne press during physics hit-stop is retained by the
+causal, fingerprinted Sled.airBrakePressPending latch and consumed on the next
+controls step; contact and respawn clear it. The press edge cannot repeat on later substeps, and earns the
 regular AirBrake trick on its one-tick `airBrakeKickPulse`, not after 250ms
 holding an already-spent key. A physically paid kick on the same tick as touchdown
 still receives its trick credit; two consecutive short real flights must not

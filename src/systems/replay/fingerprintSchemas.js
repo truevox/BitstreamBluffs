@@ -60,7 +60,7 @@ export const FP_SCHEMAS = Object.freeze({
       )],
       ['flags', rec(
         ['contactFlag', 'bool'], ['playerHopActive', 'bool'], ['chuteUsed', 'bool'], ['tucked', 'bool'],
-        ['airBrakeActive', 'bool'], ['airBrakeKickUsed', 'bool'], ['airBrakeLiftProtected', 'bool'], ['airBrakeKickPulse', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
+        ['airBrakeActive', 'bool'], ['airBrakePressPending', 'bool'], ['airBrakeKickUsed', 'bool'], ['airBrakeLiftProtected', 'bool'], ['airBrakeKickPulse', 'bool'], ['corkscrewActive', 'bool'], ['scrambled', 'bool'],
         ['nudging', 'bool'], ['inWorld', 'bool'], ['destroyed', 'bool'],
       )],
       // Bit identity of the last pad. The sim only uses `pad !== _lastPad` (object identity; each tick gets a fresh pad), so this
@@ -237,7 +237,7 @@ export const FIELD_SOURCES = Object.freeze({
     _lastTilt: 'sled.ctl.lastTilt', _preVx: 'sled.ctl.preVx', _preVy: 'sled.ctl.preVy',
     touchdownVx: 'sled.ctl.touchdownVx', touchdownVy: 'sled.ctl.touchdownVy', heliInput: 'sled.ctl.heliInput',
     _contactFlag: 'sled.flags.contactFlag', _playerHopActive: 'sled.flags.playerHopActive', chuteUsed: 'sled.flags.chuteUsed',
-    tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive', airBrakeKickUsed: 'sled.flags.airBrakeKickUsed', airBrakeLiftProtected: 'sled.flags.airBrakeLiftProtected', airBrakeKickPulse: 'sled.flags.airBrakeKickPulse', corkscrewActive: 'sled.flags.corkscrewActive',
+    tucked: 'sled.flags.tucked', airBrakeActive: 'sled.flags.airBrakeActive', airBrakePressPending: 'sled.flags.airBrakePressPending', airBrakeKickUsed: 'sled.flags.airBrakeKickUsed', airBrakeLiftProtected: 'sled.flags.airBrakeLiftProtected', airBrakeKickPulse: 'sled.flags.airBrakeKickPulse', corkscrewActive: 'sled.flags.corkscrewActive',
     scrambled: 'sled.flags.scrambled', _nudging: 'sled.flags.nudging',
     inWorld: 'sled.flags.inWorld', destroyed: 'sled.flags.destroyed', _lastPad: 'sled.lastPad',
   }),

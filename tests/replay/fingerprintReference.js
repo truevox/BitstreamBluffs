@@ -23,7 +23,7 @@ export function referenceState() {
         landSettleMs: 0, crawlMs: 0, lastTilt: 0, preVx: 7.4, preVy: 1.2, touchdownVx: null, touchdownVy: null, heliInput: 0,
       },
       flags: {
-        contactFlag: false, playerHopActive: false, chuteUsed: false, tucked: false, airBrakeActive: false, airBrakeKickUsed: false, airBrakeLiftProtected: false, airBrakeKickPulse: false,
+        contactFlag: false, playerHopActive: false, chuteUsed: false, tucked: false, airBrakeActive: false, airBrakePressPending: false, airBrakeKickUsed: false, airBrakeLiftProtected: false, airBrakeKickPulse: false,
         corkscrewActive: false, scrambled: false, nudging: false, inWorld: true, destroyed: false,
       },
       lastPad: { bits: 5, tilt127: 0 },

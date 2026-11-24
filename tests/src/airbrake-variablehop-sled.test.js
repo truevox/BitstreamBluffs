@@ -336,3 +336,16 @@ test('an unpaid vacuum AirBrake does not disable the divebomb thruster',()=>{
   expect(held.body.velocity).toEqual(control.body.velocity);
   expect(toPx(held.body.velocity.x)).toBeGreaterThan(530);
 });
+
+test('a hit-stop buffered tap is consumed once by the next physical step after release',()=>{
+  const s=makeSled(530,150);
+  s._playerHopActive=false;
+  s.airBrakePressPending=true;
+  const released={airBrake:false,noAutoNudge:true,pressed:{}};
+  step(s,released);
+  expect(s.airBrakePressPending).toBe(false);
+  expect(s.airBrakeKickUsed).toBe(true);
+  expect(toPx(s.body.velocity.x)).toBeCloseTo(212,6);
+  step(s,released);
+  expect(toPx(s.body.velocity.x)).toBeCloseTo(212,6);
+});

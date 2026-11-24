@@ -142,7 +142,7 @@ function captureSled(sled) {
     },
     flags: {
       contactFlag: !!sled._contactFlag, playerHopActive: !!sled._playerHopActive, chuteUsed: !!sled.chuteUsed,
-      tucked: !!sled.tucked, airBrakeActive: !!sled.airBrakeActive,
+      tucked: !!sled.tucked, airBrakeActive: !!sled.airBrakeActive, airBrakePressPending: !!sled.airBrakePressPending,
       airBrakeKickUsed: !!sled.airBrakeKickUsed, airBrakeLiftProtected: !!sled.airBrakeLiftProtected, airBrakeKickPulse: !!sled.airBrakeKickPulse, corkscrewActive: !!sled.corkscrewActive,
       scrambled: !!sled.scrambled, nudging: !!sled._nudging, inWorld: !!sled.inWorld,
       destroyed: !!sled.destroyed,

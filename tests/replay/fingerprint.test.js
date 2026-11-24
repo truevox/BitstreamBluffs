@@ -227,6 +227,7 @@ describe('historical SIM6 schema lock stays immutable', () => {
     expect(lock.schemas.sled.version).toBe(2);
     expect(FP_SCHEMAS.sled.version).toBe(3);
     const oldState = referenceState();
+    delete oldState.sled.flags.airBrakePressPending;
     delete oldState.sled.flags.airBrakeKickUsed;
     delete oldState.sled.flags.airBrakeLiftProtected;
     delete oldState.sled.flags.airBrakeKickPulse;
