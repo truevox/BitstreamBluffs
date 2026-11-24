@@ -30,7 +30,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
 const URL_ = process.env.GAME_URL || 'http://localhost:8414/';
-const EXE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium_headless_shell';
+const EXE = process.env.CHROMIUM_PATH;
 const argv = process.argv.slice(2);
 const QUICK = argv.includes('--quick');
 const jsonOut = argv.includes('--json') ? argv[argv.indexOf('--json') + 1] : null;
