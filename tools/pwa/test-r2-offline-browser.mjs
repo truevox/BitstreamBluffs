@@ -35,7 +35,8 @@ try{
  await cold.waitForFunction(id=>{const p=window.__bbGame.registry.get('audioSynth')?._stemMusic;return p?.track?.id===id&&p?.clockStart!==null&&p?.cache?.size>=7;},chosen.id,{timeout:30000});
  const observed=await cold.evaluate(()=>{const a=window.__bbGame.registry.get('audioSynth'),p=a._stemMusic;return {catalog:p.catalog.length,track:p.track.id,buffers:p.cache.size,state:p.transportSnapshot().state,ctx:a.ctx.state,procedural:!!a._musicTimer};});
  if(observed.catalog!==33||observed.track!==chosen.id||observed.state!=='playing'||observed.ctx!=='running'||observed.procedural||errors.length)throw Error(JSON.stringify({observed,errors}));
- const eviction=await cold.evaluate(async({g,base})=>{const name='bb-r2-recordings-v1-'+encodeURIComponent(base)+'-'+g.id+'-'+g.version;const c=await caches.open(name);await c.delete(g.entries[0].url);const r=await fetch(g.entries[1].url);return r.status;},{g:plan.groups[0],base});
+ console.log('R2_OFFLINE_PLAYBACK',JSON.stringify({observed,errors}));
+ const eviction=await cold.evaluate(async({g,base})=>{const name='bb-r2-recordings-v1-'+encodeURIComponent(base)+'-'+g.id+'-'+g.version;const c=await caches.open(name);await c.delete(g.entries[0].url);const r=await fetch(g.entries[1].url,{cache:'no-store'});return r.status;},{g:plan.groups[0],base});
  if(eviction!==503)throw Error('Missing group member did not revoke offline readiness: '+eviction);
  console.log('PASS_R2_OFFLINE_MUSIC',JSON.stringify({observed,eviction,errors}));
 }finally{if(browser)await browser.close();if(server)await new Promise((res,rej)=>server.httpServer.close(e=>e?rej(e):res()));await rm(scratch,{recursive:true,force:true});}
