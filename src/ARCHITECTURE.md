@@ -494,7 +494,15 @@ All additive; no public signature changed.
   sanitised on save/load/import (unknown keys dropped). Sharecode = `BB1:` + base64(UTF-8 JSON `{app,v,runs}`), importer
   also accepts bare base64 / raw JSON, skips runs whose `ledgerHash` does not match their contents (per hash version; an
   empty hash is rejected since decision 6), and never throws.
-  `setInitials` throws `RangeError` for < 3 chars (after trim) and clamps to 12; unknown run ids are ignored.
+  `saveRun` returns committed/session-only/invalid; committed IDs deduplicate, while uncommitted IDs
+  retry the original record rather than replacing it. `getRunPersistence(id)` distinguishes pending,
+  committed, session-only and unknown; `whenRunSettled(id)` waits for the latest queued revision.
+  Only IDB transaction completion marks a write committed. In-memory fallback remains playable and
+  Game Over labels session-only results. Persistence status is local runtime metadata, not ledger
+  provenance, a hash field, or ranking proof. Same-ID writes are serialized, including initials.
+  `setInitials` throws `RangeError` for < 3 chars (after trim) and clamps to 12; unknown run ids are ignored,
+  known rows return committed/session-only. Native fault injection uses a disposable loopback Chromium
+  profile: `node tools/qa/save-persistence-browser.mjs http://127.0.0.1:43237/` against a local Vite server.
 * **DailyPatch**: 8 rules; index = whole UTC days since epoch modulo `RULES.length`. Added `msUntilNextRule(date)`.
 * **Rng**: `fork(label)` derives from the *initial* seed (independent of how much the parent has been consumed). New
   export `hashInts(a, b)`. Real xxHash32 (reference vectors tested).

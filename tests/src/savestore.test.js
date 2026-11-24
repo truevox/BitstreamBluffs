@@ -464,13 +464,40 @@ describe('IndexedDB persistence (fake indexedDB)', () => {
     expect(s.backend).toBe('memory');
   });
 
+  test('a failed ID can retry the original memory record without duplicate accounting', async () => {
+    const idb = makeFakeIndexedDB();
+    globalThis.indexedDB = idb;
+    const s = await fresh(), r = makeRun();
+    const db = s._db, realTx = db.transaction;
+    db.transaction = () => { throw new Error('QuotaExceeded'); };
+    expect(await s.saveRun(r)).toBe('session-only');
+    expect(s.getRunPersistence(r.id)).toBe('session-only');
+    db.transaction = realTx;
+    expect(await s.saveRun({...r, score:99999})).toBe('committed');
+    expect(s.getRunPersistence(r.id)).toBe('committed');
+    expect(s.runs).toHaveLength(1);
+    expect((await fresh()).runs[0].score).toBe(r.score);
+    expect(await s.saveRun(r)).toBe('committed');
+  });
+
+  test('concurrent duplicate and initials writes serialize; latest revision commits', async () => {
+    globalThis.indexedDB = makeFakeIndexedDB();
+    const s = await fresh(), r = makeRun();
+    const a = s.saveRun(r), b = s.saveRun(r);
+    const c = s.setInitials(r.id, 'ABC');
+    expect(s.getRunPersistence(r.id)).toBe('pending');
+    expect(await Promise.all([a,b,c])).toEqual(['committed','committed','committed']);
+    expect(await s.whenRunSettled(r.id)).toBe('committed');
+    expect((await fresh()).runs).toEqual([expect.objectContaining({id:r.id,initials:'ABC'})]);
+  });
+
   test('a failing write switches to memory-only and does not throw', async () => {
     const idb = makeFakeIndexedDB();
     globalThis.indexedDB = idb;
     const s = new SaveStore();
     await s.init();
     s._db.transaction = () => { throw new Error('QuotaExceeded'); };
-    await expect(s.saveRun(makeRun())).resolves.toBeUndefined();
+    await expect(s.saveRun(makeRun())).resolves.toBe('session-only');
     expect(s.backend).toBe('memory');
     expect(s.runs).toHaveLength(1);
   });

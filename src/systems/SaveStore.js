@@ -7,7 +7,7 @@
  *
  * Design notes:
  *  - `this.runs` is the in-memory mirror and is always the source of truth for reads; IndexedDB is write-through
- *    persistence. Any IndexedDB failure silently switches the store to memory-only for the rest of the session.
+ *    persistence. A failed write retains the session row but never marks it committed; retry is explicit.
  *  - Everything read from storage or a sharecode is sanitised (known keys only, types checked, numbers clamped),
  *    so older/newer versions or hand-edited data can never break the game.
  */
@@ -474,6 +474,9 @@ export class SaveStore {
     this.backend = 'memory';
     this._db = null;
     this._memSettings = null;
+    this._runPersistence = new Map();
+    this._runWrites = new Map();
+    this._initPromise = null;
   }
 
   /**
@@ -482,6 +485,14 @@ export class SaveStore {
    * @returns {Promise<void>}
    */
   async init() {
+    if (this._db) return;
+    if (!this._initPromise) {
+      this._initPromise = this._open().finally(() => { this._initPromise = null; });
+    }
+    await this._initPromise;
+  }
+
+  async _open() {
     try {
       const idb = globalThis.indexedDB;
       if (!idb) return;
@@ -517,7 +528,14 @@ export class SaveStore {
       this.backend = 'idb';
       for (const raw of all || []) {
         const rec = sanitizeRun(raw);
-        if (rec && !this.runs.some((r) => r.id === rec.id)) this.runs.push(rec);
+        if (!rec) continue;
+        const existing = this.runs.find((r) => r.id === rec.id);
+        if (!existing) {
+          this.runs.push(rec);
+          this._runPersistence.set(rec.id, 'committed');
+        } else if (!this._runWrites.has(rec.id) && JSON.stringify(existing) === JSON.stringify(rec)) {
+          this._runPersistence.set(rec.id, 'committed');
+        }
       }
     } catch (e) {
       this._db = null;
@@ -553,18 +571,24 @@ export class SaveStore {
   }
 
   /**
-   * Store a finished run (no initials yet). Idempotent by record.id (a second call with the same id is ignored).
-   * Invalid records (no id) are ignored.
+   * Store a finished run. Committed duplicate IDs are idempotent; an uncommitted
+   * duplicate retries the original session record, never substitutes new contents.
    * @param {RunRecord} record
-   * @returns {Promise<void>}
+   * @returns {Promise<'committed'|'session-only'|'invalid'>}
    */
   async saveRun(record) {
     const rec = sanitizeRun(record);
-    if (!rec || this.runs.some((r) => r.id === rec.id)) return;
+    if (!rec) return 'invalid';
+    const existing = this.runs.find((r) => r.id === rec.id);
+    if (existing) {
+      if (this._runWrites.has(rec.id)) return this._runWrites.get(rec.id);
+      if (this.getRunPersistence(rec.id) === 'committed') return 'committed';
+      return this._persist(existing, true);
+    }
     // A run saved here was played on this device: the `imported` marker is only ever set by import.
     delete rec.imported;
     this.runs.push(rec);
-    await this._persist(rec);
+    return this._persist(rec);
   }
 
   /**
@@ -572,7 +596,7 @@ export class SaveStore {
    * (min 3, max 12). Throws RangeError for < 3 chars. Unknown run ids are ignored.
    * @param {string} runId
    * @param {string} initials
-   * @returns {Promise<void>}
+   * @returns {Promise<'committed'|'session-only'|undefined>}
    */
   async setInitials(runId, initials) {
     const ini = normalizeInitials(initials);
@@ -580,7 +604,7 @@ export class SaveStore {
     const rec = this.runs.find((r) => r.id === runId);
     if (!rec) return;
     rec.initials = ini;
-    await this._persist(rec);
+    return this._persist(rec, true);
   }
 
   /**
@@ -840,15 +864,56 @@ export class SaveStore {
     return idx.map(([r]) => r);
   }
 
-  async _persist(rec) {
-    if (!this._db) return;
-    try {
-      const tx = this._db.transaction(STORAGE.runsStore, 'readwrite');
-      tx.objectStore(STORAGE.runsStore).put({ ...rec, tricks: { ...rec.tricks } });
-      await txDone(tx);
-    } catch (e) {
-      this._db = null;
-      this.backend = 'memory';
-    }
+  /** Status of the latest in-memory revision; never part of a ledger hash. */
+  getRunPersistence(id) {
+    return this._runPersistence.get(id) || 'unknown';
+  }
+
+  /** Await the latest write, including an initials update queued during an earlier save. */
+  async whenRunSettled(id) {
+    while (this._runWrites.has(id)) await this._runWrites.get(id);
+    return this.getRunPersistence(id);
+  }
+
+  _persist(rec, retry = false) {
+    const id = rec.id;
+    const snapshot = { ...rec, tricks: { ...rec.tricks } };
+    const previous = this._runWrites.get(id) || Promise.resolve();
+    this._runPersistence.set(id, 'pending');
+    const write = previous.then(async () => {
+      if (retry && !this._db) await this.init();
+      const db = this._db;
+      if (!db) return 'session-only';
+      try {
+        const tx = db.transaction(STORAGE.runsStore, 'readwrite');
+        const done = txDone(tx);
+        // Attach handlers before initiating the request. Abort and drain if
+        // put throws synchronously; request success alone is not a commit.
+        try {
+          tx.objectStore(STORAGE.runsStore).put(snapshot);
+        } catch (error) {
+          done.catch(() => {});
+          try { tx.abort(); } catch (_) { /* transaction already inactive */ }
+          throw error;
+        }
+        await done;
+        return 'committed';
+      } catch (error) {
+        if (this._db === db) {
+          this._db = null;
+          this.backend = 'memory';
+          try { db.close?.(); } catch (_) { /* preserve memory fallback */ }
+        }
+        return 'session-only';
+      }
+    }).then(status => {
+      if (this._runWrites.get(id) === write) {
+        this._runWrites.delete(id);
+        this._runPersistence.set(id, status);
+      }
+      return status;
+    });
+    this._runWrites.set(id, write);
+    return write;
   }
 }
