@@ -73,3 +73,10 @@ test('subpath inventory is scope-bound and rejects cross-scope HTML entries',asy
   expect(worker).not.toContain('function completeMusicGroup');
   for(const base of ['//other.example/','/foo/../','foo/','/foo'])await expect(createOfflineInventory(tmp,base)).rejects.toThrow(/deployment base/);
 });
+
+test('local candidate mono router is explicitly opt-in and generated scripts parse',()=>{
+  const inv={base:'/BitstreamBluffs/',version:'a'.repeat(20),entries:[]};
+  const normal=renderOfflineWorker(inv),pilot=renderOfflineWorker(inv,{monoDev:true});
+  expect(normal).not.toContain('monoDevResponse');expect(pilot).toContain('monoDevResponse');
+  expect(()=>new Function(normal)).not.toThrow();expect(()=>new Function(pilot)).not.toThrow();
+});

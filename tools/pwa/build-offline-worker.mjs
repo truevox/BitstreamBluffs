@@ -5,6 +5,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderMusicRouteWorker } from './music-route-worker.mjs';
 import { renderR2RouteWorker } from './r2-cache.mjs';
+import { renderMonoDevRouter } from './r2-mono-dev-cache.mjs';
 
 export const CACHE_PREFIX = 'bitstream-shell-v1-';
 export const MAX_PRECACHE_BYTES = 8 * 1024 * 1024;
@@ -69,7 +70,7 @@ export async function createOfflineInventory(distDir, base = '/') {
   return { version, base, totalBytes: total, entries };
 }
 
-export function renderOfflineWorker(inventory) {
+export function renderOfflineWorker(inventory, {monoDev=false} = {}) {
   const base = checkedBase(inventory.base);
   const cacheName = CACHE_PREFIX + inventory.version;
   const paths = inventory.entries.map(x => [x.path, x.sha256]);
@@ -82,6 +83,7 @@ export function renderOfflineWorker(inventory) {
 `const ROOT = BASE + 'index.html';\n` +
 (base === '/' ? renderMusicRouteWorker() : '') +
 renderR2RouteWorker() +
+(monoDev ? renderMonoDevRouter() : '') +
 `function hex(bytes) { return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join(''); }\n` +
 `self.addEventListener('install', event => {\n` +
 `  event.waitUntil((async () => {\n` +
@@ -110,7 +112,9 @@ renderR2RouteWorker() +
 `  if (request.method !== 'GET') return;\n` +
 `  const url = new URL(request.url);\n` +
 `  if (request.mode === 'cors' && releaseUrl(url.href) && !request.headers.has('Range')) {\n` +
-`    event.respondWith((async()=>{const stored=await cachedR2(url.href);if(stored)return stored;try{return await fetch(request);}catch{return new Response('Original music download required when online.',{status:503});}})());return;\n` +
+`    event.respondWith((async()=>{` +
+(monoDev ? `if(url.pathname.endsWith('.ogg')){const candidate=await monoDevResponse(url.href);if(candidate!==undefined)return candidate;}` : '') +
+`const stored=await cachedR2(url.href);if(stored)return stored;try{return await fetch(request);}catch{return new Response('Original music download required when online.',{status:503});}})());return;\n` +
 `  }\n` +
 `  if (url.origin !== self.location.origin || !url.pathname.startsWith(BASE)) return;\n` +
 `  const path = url.pathname === BASE ? ROOT : url.pathname;\n` +
@@ -135,9 +139,9 @@ renderR2RouteWorker() +
 `});\n`;
 }
 
-export async function generateOfflineWorker(distDir, base = '/') {
+export async function generateOfflineWorker(distDir, base = '/', options = {}) {
   const inventory = await createOfflineInventory(distDir, base);
-  const output = renderOfflineWorker(inventory);
+  const output = renderOfflineWorker(inventory, options);
   await writeFile(resolve(distDir, 'sw.js'), output);
   return inventory;
 }
