@@ -1,6 +1,6 @@
 # Morgan — Bitstream Bluffs working checkpoint
 
-Last verified: 2026-11-24 18:12 UTC. Main `05a1bf1e4ba710be691610b4947d1e4a60dd2413` (#320), v2.20.2 live at https://simulate.sledhead.ing/, SIM9 unchanged.
+Last verified: 2026-11-24 18:46 UTC. Main `69a6fb4674335d2496a801ddd7dcaabcb0a4a8bd` (#328), v2.21.0 live at https://simulate.sledhead.ing/, SIM9 unchanged.
 Goal: advance the handed [#168](https://github.com/truevox/BitstreamBluffs/issues/168)
 portfolio one independently testable Morgan slice at a time. “Keep going”
 means resume this queue, not take over another lane or merge a draft.
@@ -55,6 +55,11 @@ means resume this queue, not take over another lane or merge a draft.
    delivered cue fix but do not claim full Pulp or take over Team B.
 
 ## Changes landed and published
+
+- #327 merged `b67f944` as v2.20.3 Heavy Mode developer diagnostics,
+  also preserved in #328. Covers strict preflight and bounded fresh
+  reload probes; not trusted production restore, player save/load, or
+  competition admission. #119/#242 and dependent slices remain gated.
 
 - #320 v2.20.2 closed #319, the storage durability gap Morgan diagnosed.
   SaveStore distinguishes transaction commitment from session-only fallback,
@@ -131,24 +136,23 @@ Closed after bounded work: #132, #77, #129 and #131. Explicit PR directions: #16
 - Home: #117/#68/#76; Team A #152/#116/#118/#123; Team B #119/#140/#120/#115
   and conditional #121. #155 cue already unblocked #140/#160. #273 is
   the other lane (historical Luna source approval exact `0fd1400` only).
-- Gal/Home audio lane: combined #322 draft `df11f055dabb700da58b5c7522c191658d0c281c`
-  on #320 proposes v2.21.0/SIM9 and restacks #306/#310/#316. #321 not
-  included. Corrective exact-head re-review covered fatal count-in,
-  Arcade corridor and audit port; CI green but not the Pause/Play case.
-  Native Chromium/actual Title jukebox clicks on exact compiled draft,
-  four public OGG songs and empty grids; a legacy settings payload
-  without the field inherits ON. After a test-only initial seek,
-  natural scheduler commits a 2.8s fade. Pause 460ms before incoming
-  onset stops 14 nodes (seven outgoing), saves incoming at zero instead
-  of outgoing ~211.72s; Play starts incoming at zero. Explicit OFF
-  retains outgoing ~212s; after-onset retains incoming +0.230s. Real game
-  Escape then PauseScene RESUME pointer also reproduced at 481ms before
-  onset (~211.70s outgoing → incoming zero); scratch suppressed run
-  physics during lead-up only. No page or HTTP errors in these arms. User
-  notified privately; no PR edits, merge, or private publication.
-  Recommend lane owner resolve before release and retest the exact fixed
-  head with the same pre/post/OFF controls. Historical #310 sampled peaks
-  are not calibrated mastering or private-media clearance.
+- Gal/Home audio lane: #328 merged the #322 music code as v2.21.0,
+  main `69a6fb4674335d2496a801ddd7dcaabcb0a4a8bd`; #322 closed superseded.
+  [Exact Pages push](https://github.com/truevox/BitstreamBluffs/actions/runs/45461734705)
+  green. Public `main-CuoBeFkp.js` SHA-256
+  `d19109f634429c8e1a529b725efc1d5e059d19d34270f6ca255a3c1becd87a11`
+  exactly matches the previously tested draft build. Public source-map
+  SaveStore/StemMusicDirector/SongCrossfade blobs match merged Git.
+  Fresh Chromium on fetched public bytes and four real public OGG packs
+  reproduced via actual Title buttons: default ON, pause 420ms before
+  onset with seven outgoing nodes, Play starts incoming at zero. Explicit
+  OFF held the outgoing track ~211.96s and resumed ~212.29s. No page or
+  HTTP errors. Old draft controls also cover after-onset and real Run
+  Escape/PauseScene resume. User informed that v2.21.0 is live and
+  Music Library → Song Crossfade → OFF is the verified workaround.
+  Review covered other audio cases, not this one. #321 distinct; no
+  media clearance implied. Watch for an owner fix and retest exact
+  merged served head. No lane takeover, source edits, or external post.
 - Main release controlled under #207. #295/#307 advisory checks are not
   exact-head approval. #308/#309: initial PR titles and applicable commits
   `[skip netlify]`; default zero discretionary previews, at most 10 actual
