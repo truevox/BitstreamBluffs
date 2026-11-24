@@ -39,7 +39,9 @@ const QUICK = argv.includes('--quick');
 const STRICT = argv.includes('--strict-suffix');
 const repeatFlag=argv.indexOf('--repeat-ticks');
 const BOUNDARY=argv.includes('--repeat-boundaries');
-const REPEAT=repeatFlag===-1?(BOUNDARY?14:0):Number(argv[repeatFlag+1]);
+const MOVING=argv.includes('--repeat-moving');
+if(MOVING&&(!STRICT||BOUNDARY||repeatFlag!==-1))throw new Error('--repeat-moving requires --strict-suffix and no other repeat mode');
+const REPEAT=repeatFlag===-1?(BOUNDARY?14:MOVING?6:0):Number(argv[repeatFlag+1]);
 if(BOUNDARY&&(!STRICT||repeatFlag!==-1))throw new Error('--repeat-boundaries requires --strict-suffix and cannot combine with --repeat-ticks');
 if(repeatFlag!==-1&&(!STRICT||!Number.isSafeInteger(REPEAT)||REPEAT<1||REPEAT>120))
   throw new Error('--repeat-ticks requires --strict-suffix and an integer from 1 to 120');
@@ -59,6 +61,7 @@ const gameKitSrc = readFileSync(path.join(here, 'game-state-kit.js'), 'utf8');
 
 // Tick-indexed tape (120 Hz ticks). Held ranges [from, to) and one-shot edges.
 const TAPES = {
+  moving: {held: [],edges: []},
   contact: {
     held: [
       { key: 'push', from: 0, to: 216 }, { key: 'heli', value: 1, from: 324, to: 348 }, { key: 'tilt', value: -1, from: 360, to: 444 },
@@ -73,6 +76,7 @@ const TAPES = {
   },
 };
 const FIXTURES = {
+  moving: {seed:'b3pyramid5@4',movingId:'rollingBoulder',shields:99,K:30,N:36},
   contact: { seed: 'SAVE119', scramble: true, startX: null, kodiaks: false, K: 600, N: QUICK ? 900 : 1100 },
   hazard: { seed: 'SAVE119H@2047', scramble: false, startX: 107000, kodiaks: true, shields: 99, K: 480, N: QUICK ? 760 : 1000 },
 };
@@ -100,6 +104,18 @@ async function bootPage(browser, fx, tape) {
     if (fx.scramble) run.scrambleMs = 1e9;
     if (fx.kodiaks) run.kodiaksOn = true;
     if (fx.shields) run.shieldCharges = fx.shields; // hazard hits are absorbed (and scored as hits), so the run survives
+    if(fx.movingId){
+      let spawn=null;
+      for(let i=0;i<200&&!spawn;i++){
+        const ch=run.terrain.getChunk(i);
+        spawn=ch.hazards.find(s=>s.defId===fx.movingId);
+      }
+      if(!spawn)throw new Error('no generated rolling hazard');
+      const x=spawn.x-250;
+      run.streamTerrain(x);
+      run.sled.setPose(x,run.terrain.heightAt(x)-15,run.slopeAt(x),320,0);
+      if(run.snapCamera)run.snapCamera();
+    }
     if (fx.startX != null) {
       run.streamTerrain(fx.startX);
       run.sled.setPose(fx.startX, run.terrain.heightAt(fx.startX) - 15, run.slopeAt(fx.startX), 420, 0);
@@ -405,6 +421,11 @@ async function runRepeatedCase(browser,fxName) {
   let current=source, candidate=null;
   const cycles=[];
   let fixtureStats=null;
+  const movingState=P=>P.page.evaluate(()=>{
+    const run=window.__ss.run;
+    const h=[...run.hazards.values()].flat().find(h=>h.def.id==='rollingBoulder'&&h.rolling&&!h.destroyed);
+    return h?{id:h.hid,offset:h.roll.offsetPx,activeAt:h.roll.activeAtMs,x:h.body.position.x,y:h.body.position.y}:null;
+  });
   const measure=P=>P.page.evaluate(()=>{
     const r=window.__ss.run;
     return {digests:window.__ssGameKit.digests(r),
@@ -420,22 +441,29 @@ async function runRepeatedCase(browser,fxName) {
     await source.page.evaluate(k=>window.__ss.step(k),fx.K);
     fixtureStats=await fixtureStatsOf(source);
     if(fixtureStats.tick!==fx.K||fixtureStats.crashed||
-      (fxName==='contact' ? !(fixtureStats.activePairs>0) : !(fixtureStats.hazardsHit>0)))
+      (fxName==='contact' ? !(fixtureStats.activePairs>0) : fxName==='moving'?!(fixtureStats.movingHazards>0):!(fixtureStats.hazardsHit>0)))
       return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,
         firstDivergentTick:fx.K,phase:'fixture coverage',diff:['required contact/hazard evidence absent']};
     for(let k=fx.K;k<fx.K+REPEAT;k++){
       const [a,b]=current===source?await measure(source).then(a=>[a,a]):await Promise.all([source,current].map(measure));
       const before=same(a,b,k);
       if(before.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k,phase:'before capture',diff:before};
+      const movingBefore=MOVING?await movingState(source):null;
+      if(MOVING&&(!movingBefore?.id||!Number.isFinite(movingBefore.offset)||movingBefore.offset===0))
+        return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,fixtureStats,firstDivergentTick:k,phase:'moving coverage',diff:['no live activated moving hazard']};
       const bytes=await current.page.evaluate(()=>JSON.stringify(window.__ssGameKit.capture(window.__ss.run,{withConfig:true,withRecorder:true})));
       candidate=await bootPage(browser,fx,tape);
       const r=await restoreCandidate(candidate,bytes,'full',[]);
       if(!r.ok)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k,phase:'restore',restoreError:r.error,discarded:r.discarded};
       const atRestore=same(a,await measure(candidate),k);
+      if(MOVING&&JSON.stringify(movingBefore)!==JSON.stringify(await movingState(candidate)))atRestore.push('direct.movingHazard');
       if(atRestore.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k,phase:'after restore',diff:atRestore};
       await Promise.all([source,candidate].map(P=>P.page.evaluate(()=>window.__ss.step(1))));
       const [nextA,nextB]=await Promise.all([source,candidate].map(measure));
       const after=same(nextA,nextB,k+1);
+      const movingAfter=MOVING?await movingState(source):null;
+      if(MOVING&&(!movingAfter||movingAfter.id!==movingBefore.id||movingAfter.offset===movingBefore.offset||
+        movingAfter.x===movingBefore.x||JSON.stringify(movingAfter)!==JSON.stringify(await movingState(candidate))))after.push('direct.movingHazard');
       if(after.length)return {fixture:fxName,level:'repeat',K:fx.K,N:fx.K+REPEAT,cycles,firstDivergentTick:k+1,phase:'next tick',diff:after};
       if(source.errors.length||candidate.errors.length||current.errors.length)
         throw new Error('page errors during repeat: '+JSON.stringify([...source.errors,...candidate.errors,...current.errors]));
@@ -444,6 +472,7 @@ async function runRepeatedCase(browser,fxName) {
       const recordedHopEdge=!!appended&&afterRec._lastTick===k+1&&decodePad(appended[1],appended[2]).pressed.hop===true;
       cycles.push({captureTick:k,nextTick:k+1,bytes:Buffer.byteLength(bytes),
         canonical:nextA.digests['canonical.combined'],recaptured:current!==source,
+        ...(MOVING?{movingBefore,movingAfter}:{}),
         newInputRows:afterRec.inputs.length-beforeRec.inputs.length,recordedHopEdge,
         newCheckpoints:afterRec.checkpoints.length-beforeRec.checkpoints.length,
         newFingerprints:afterRec.fingerprints.length-beforeRec.fingerprints.length});
@@ -475,7 +504,7 @@ if (jsonOut && existsSync(jsonOut)) {
 }
 const done = new Set(results.map(caseKey));
 const plan = [];
-for (const fx of ['contact', 'hazard']) {
+for (const fx of MOVING?['moving']:['contact', 'hazard']) {
   if (STRICT) { plan.push([fx,REPEAT?'repeat':'full']); continue; }
   plan.push([fx, 'control'], [fx, 'ghost'], [fx, 'game'], [fx, 'kinematic'], [fx, 'contacts'], [fx, 'full']);
   for (const s of ['camera', 'ids', 'runRandom', 'impulses', 'staleSupport', 'timing', 'positionImpulse', 'rawGeometry']) plan.push([fx, 'full', [s]]);
@@ -499,10 +528,11 @@ try {
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
 
 if (REPEAT) {
-  const failed=results.length!==2||results.some(r=>r.harnessError||r.restoreError||
+  const failed=results.length!==(MOVING?1:2)||results.some(r=>r.harnessError||r.restoreError||
     r.firstDivergentTick!==null||r.pageErrors?.length!==0||r.cycles?.length!==REPEAT||
     r.fixtureStats?.tick!==r.K||r.fixtureStats.crashed||
-    (r.fixture==='contact'?!(r.fixtureStats.activePairs>0):!(r.fixtureStats.hazardsHit>0))||
+    (r.fixture==='contact'?!(r.fixtureStats.activePairs>0):r.fixture==='moving'?!(r.fixtureStats.movingHazards>0):!(r.fixtureStats.hazardsHit>0))||
+    (MOVING&&!r.cycles.every(c=>c.movingBefore?.id&&c.movingAfter?.id===c.movingBefore.id&&c.movingBefore.offset!==c.movingAfter.offset&&c.movingBefore.x!==c.movingAfter.x))||
     (BOUNDARY&&(!r.boundaryWitness?.inputRecorded||!r.boundaryWitness.checkpointRecorded||!r.boundaryWitness.recapturedAfterCheckpoint))||
     !r.cycles.every((c,i)=>c.captureTick===r.K+i&&c.nextTick===r.K+i+1&&c.recaptured===(i>0)&&c.canonical));
   console.log(failed?'FAIL_REPEATED_RESTORE':'PASS_REPEATED_RESTORE');
