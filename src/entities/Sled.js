@@ -306,6 +306,8 @@ export class Sled {
         this.airBrakeKickUsed = true;
         if (kicked.vy < vy) {
           this.airBrakeLiftProtected = true;
+          // A real purchased ascent is a launch, not incidental crest drift.
+          this._sinceLaunchMs = 0;
           this._protectedHopExtraVyPxS = this._playerHopActive
             ? Math.max(0, -vy) : 0;
         }

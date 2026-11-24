@@ -299,3 +299,18 @@ test('an unpaid AirBrake press in vacuum does NOT spend the one-use latch; atmos
   expect(toPx(s.body.velocity.x)).toBeCloseTo(unpaidVx*.4,6);
   expect(toPx(s.body.velocity.y)).toBeLessThan(-100);
 });
+
+test('paid crest-adjacent AirBrake launch keeps its ascent through the next substep',()=>{
+  const s=makeSled(800,0);
+  s.msSinceContact=60;s._sinceLaunchMs=500;s._groundRunMs=200;s.dropAheadDeg=0;
+  s._playerHopActive=false;
+  step(s,{airBrake:true,noAutoNudge:true,pressed:{airBrake:true}});
+  expect(s.airBrakeKickUsed).toBe(true);
+  expect(s._sinceLaunchMs).toBe(0);
+  // Gravity has reduced the ascent to the snap window, while still within
+  // the recent-contact window. The purchased launch must remain exempt.
+  s.body.velocity.y=toMatter(-80);
+  s.msSinceContact=68;
+  step(s,{airBrake:false,noAutoNudge:true,pressed:{}});
+  expect(toPx(s.body.velocity.y)).toBeCloseTo(-80,6);
+});

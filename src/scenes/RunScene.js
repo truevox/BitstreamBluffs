@@ -1424,7 +1424,8 @@ export class RunScene extends Phaser.Scene {
         const kickSample = air && {
           active: air.active, gapPx: air.gapPx, playerX: sled.x,
           nowMs: this.runTimeMs - dt + (simDt > 0 ? stepElapsedMs / simDt * dt : 0),
-          grounded: !!sled.grounded, crashed: !!this.pendingCrash || !!this.bsodCaught,
+          grounded: !!sled.grounded, crashed: !!this.bsodCaught || (!!this.pendingCrash &&
+            !(this.pendingCrash.cause === 'hazard' && (this.shieldCharges > 0 || sled.invulnerableMs > 0))),
           canopyDeployed: (sled.parachuteMs || 0) > 0,
           relativeAirX: air.relativeAirX, atmosphereDensity: air.atmosphereDensity,
         };
@@ -1481,7 +1482,7 @@ export class RunScene extends Phaser.Scene {
           const absorbed=!!this.pendingCrash &&
             this.pendingCrash.cause==='hazard' &&
             (this.shieldCharges>0 || sled.invulnerableMs>0);
-          if (!this.pendingCrash || absorbed)
+          if ((!this.pendingCrash || absorbed) && !landingLedger.badLanding)
             this.settlePhysicalTouchdown(substepTouchdowns[substepTouchdowns.length-1].fs, landingLedger);
         }
       },
@@ -1547,9 +1548,14 @@ export class RunScene extends Phaser.Scene {
     // earlier touchdown rewards. It cannot outrank a terminal wall/hazard.
     const finalLanding = (!this.pendingCrash || absorbed) ? this.gradeLanding(upd.landing) : null;
     if (finalLanding?.quality === 'crash') {
-      this.pendingCrash = { cause: 'badLanding' };
+      landingLedger.badLanding = true;
       landingLedger.entries.push({ crashLanding: finalLanding, fs });
     }
+    // Sensor/void causes have priority over provisional contact grading.
+    // A shield-absorbed hazard plus a bad landing still requires a backup
+    // respawn, as in the prior final-frame landing path.
+    if (landingLedger.badLanding && (!this.pendingCrash || absorbed))
+      this.pendingCrash = { cause: 'badLanding' };
 
     // zones, safe-ground samples
     this.updateZones(sled.x);
@@ -1867,7 +1873,9 @@ export class RunScene extends Phaser.Scene {
     if (!ledger) { this.handleTricksAndLanding(upd, fs); return upd; }
     const l = this.gradeLanding(upd.landing);
     if (l?.quality === 'crash') {
-      this.pendingCrash = { cause: 'badLanding' };
+      // Do not occupy pendingCrash: subsequent sensor hits must be able
+      // to report their true cause (especially a fatal hazard).
+      ledger.badLanding = true;
       ledger.entries.push({ crashLanding: l, fs });
       return upd;
     }

@@ -548,7 +548,7 @@ describe('tick-local landing settlement', () => {
 });
 
 describe('real fixed-tick crash-priority routing', () => {
-  test.each(['wall', 'hazard', 'shielded', 'survive'])('first-substep paid landing, second-substep %s', async outcome => {
+  test.each(['wall', 'hazard', 'shielded', 'survive', 'bad-then-hazard', 'bad-alone', 'shielded-kick'])('first-substep paid landing, second-substep %s', async outcome => {
     const {TrickTracker}=await import('../../src/systems/TrickTracker.js');
     const {ScoreManager}=await import('../../src/systems/ScoreManager.js');
     const {SIM_TICK_MS}=await import('../../src/systems/SimClock.js');
@@ -557,7 +557,7 @@ describe('real fixed-tick crash-priority routing', () => {
     Object.assign(scene,{
       runTimeMs:1000,resetCooldownMs:0,hazards:new Map(),scrambleMs:0,
       slowmoMs:0,blinkMs:0,hitStopMs:0,stabilizeMs:0,stabilizeDeg:0,
-      pendingCrash:null,shieldCharges:outcome==='shielded'?1:0,bsodCaught:false,crashed:false,
+      pendingCrash:null,shieldCharges:outcome.startsWith('shielded')?1:0,bsodCaught:false,crashed:false,
       score:new ScoreManager(),tricks:new TrickTracker(),trickCounts:{},_airTricks:0,
       _landings:0,maxAirtimeMs:0,lastTotal:530,bestCombo:1,startX:0,
       palette:{amber:1,cyan:2,lime:3},fx:{sparks(){},ring(){}},
@@ -566,14 +566,17 @@ describe('real fixed-tick crash-priority routing', () => {
       tuner:{getEffective:()=>({})},matter:{world:{step:()=>{steps++;}}},
       tickEffects(){},getZoneDefs:()=>[],slopeAt:()=>0,physicsContext:()=>({}),
       dropAhead:()=>0,airForecast(){},flushDespawn(){},updateZones(){},sampleSafeGround(){},
-      updateKodiaks(){},updateBsodBluff(){},updateFun(){},streamTerrain(){},publishBsodState(){},
+      updateKodiaks(){},updateBsodBluff:jest.fn(),updateFun(){},streamTerrain(){},publishBsodState(){},
       bsodAtmosphere:()=>1,glitch:{update:()=>({})},
       processContacts(){
-        if(steps===2 && (outcome==='hazard'||outcome==='shielded'))
+        if(((steps===2 && ['hazard','shielded','bad-then-hazard'].includes(outcome)) ||
+          (steps===1 && outcome==='shielded-kick')) && !this.pendingCrash)
           this.pendingCrash={cause:'hazard'};
       },
       resolveCrash:jest.fn(function(){
-        const fatal=outcome!=='shielded';
+        const fatal=!outcome.startsWith('shielded');
+        if(outcome==='bad-then-hazard')expect(this.pendingCrash?.cause).toBe('hazard');
+        if(outcome==='bad-alone')expect(this.pendingCrash?.cause).toBe('badLanding');
         this.pendingCrash=null;
         this.crashed=fatal;
         if(fatal)this.score.onCrash();
@@ -585,16 +588,18 @@ describe('real fixed-tick crash-priority routing', () => {
       x:1000,y:200,vx:200,vy:0,speed:200,airtimeMs:8,grounded:false,
       invulnerableMs:0,airBrakeKickPulse:0,stepHeli(){},wobble:jest.fn(),
       applyControls(){
+        if(outcome==='shielded-kick'){if(steps===1)this.airBrakeKickPulse=1;return;}
         if(steps===0)this.airBrakeKickPulse=1;
         else {
-          expect(this.wobble).toHaveBeenCalledTimes(1);
+          expect(this.wobble).toHaveBeenCalledTimes(outcome.startsWith('bad-')?0:1);
+          expect(scene.pendingCrash).toBeNull();
           expect(scene.score.trickPoints).toBe(500);
           expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(0);
         }
       },
-      endStep(){this.grounded=steps===1;return this.grounded;},
+      endStep(){this.grounded=steps===1 && outcome!=='shielded-kick';return this.grounded;},
       getFrameState(timeMs,dtMs){return {timeMs,dtMs,grounded:this.grounded,
-        crashed:false,angleDeg:45,groundAngleDeg:0,vx:200,vy:0,impactVx:200,impactVy:50,
+        crashed:false,angleDeg:outcome.startsWith('bad-')?180:45,groundAngleDeg:0,vx:200,vy:0,impactVx:200,impactVy:50,
         x:this.x,y:this.y,input:{airBrake:true,heli:0}};}
     };
     scene.bsod={
@@ -603,14 +608,20 @@ describe('real fixed-tick crash-priority routing', () => {
         relativeAirX:100,atmosphereDensity:1};}
     };
     scene.simTick(SIM_TICK_MS,{pressed:{}});
+    if(outcome==='shielded-kick'){
+      expect(scene.updateBsodBluff).toHaveBeenCalledWith(true,[],expect.objectContaining({crashed:false,grounded:false}));
+      expect(scene.trickCounts.airBrake).toBe(1);
+      expect(scene.score.trickPoints).toBe(500);
+      return;
+    }
     const survived=outcome==='shielded'||outcome==='survive';
     expect(steps).toBe(2);
-    expect(scene.sled.wobble).toHaveBeenCalledTimes(1);
+    expect(scene.sled.wobble).toHaveBeenCalledTimes(outcome.startsWith('bad-')?0:1);
     expect(scene.score.trickPoints>500).toBe(survived);
     expect(scene.score.bonusPoints).toBe(30);
     expect(scene._landings).toBe(survived?1:0);
     expect(events.filter(x=>x.key===EVT.TRICK)).toHaveLength(survived?1:0);
-    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(survived?1:0);
+    expect(events.filter(x=>x.key===EVT.LANDING)).toHaveLength(survived||outcome==='bad-alone'?1:0);
     expect(scene.resolveCrash).toHaveBeenCalledTimes(outcome==='survive'?0:1);
   });
 });
