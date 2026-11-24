@@ -163,7 +163,7 @@ describe('Bitstream Bluffing RunScene integration', () => {
     scene.sled.parachuteMs=360;
     scene.sled.airBrakeActive=true;
     scene.runTimeMs=100;
-    scene.updateBsodBluff();
+    scene.updateBsodBluff(true); // an actual one-shot physical kick on this approach
     scene.sled.x=1300;
     scene.bsodState.gapPx=860;
     scene.runTimeMs=900;
@@ -176,6 +176,25 @@ describe('Bitstream Bluffing RunScene integration', () => {
     });
     scene.updateBsodBluff();
     expect(bonuses).toHaveLength(1);
+  });
+
+  test('holding spent AirBrake during BSOD approach cannot fraudulently earn the one-shot bonus', () => {
+    const scene=Object.create(RunScene.prototype);
+    const emitted=[],bonuses=[];
+    scene.sled={x:1000,y:200,grounded:false,parachuteMs:0,airBrakeActive:true,airBrakeKickUsed:true};
+    scene.bsodState={active:true,gapPx:1000,relativeAirX:440,atmosphereDensity:1};
+    scene.bsodBluffs=new BsodBluffTracker();
+    scene.game={events:{emit:(event,payload)=>emitted.push([event,payload])}};
+    scene.bonus=(points,kind)=>{bonuses.push([points,kind]);return true;};
+    scene.nearMissCount=0;scene.crashed=false;scene.bsodCaught=false;
+    scene.runTimeMs=0;scene.updateBsodBluff();
+    scene.bsodState.gapPx=200;
+    scene.sled.parachuteMs=360;
+    scene.runTimeMs=100;scene.updateBsodBluff(false);
+    scene.sled.x=1300;scene.bsodState.gapPx=860;
+    scene.runTimeMs=900;scene.updateBsodBluff(false);
+    expect(bonuses).toEqual([[150,'nearMiss']]);
+    expect(emitted.some(([event])=>event===EVT.BSOD_BLUFF)).toBe(true);
   });
 
   test('terminal collision never awards a last-frame BSOD bluff', () => {

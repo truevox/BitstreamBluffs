@@ -767,14 +767,14 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** A real close approach followed by a parachute escape; zero score for proximity alone. */
-  updateBsodBluff() {
+  updateBsodBluff(airBrakeKicked = false) {
     if (!this.bsodBluffs || !this.sled || !this.bsodState) return;
     const s = this.sled, danger = this.bsodState;
     const event = this.bsodBluffs.update({
       active: danger.active, gapPx: danger.gapPx, playerX: s.x, nowMs: this.runTimeMs,
       grounded: !!s.grounded, crashed: !!this.crashed || !!this.bsodCaught,
       canopyDeployed: (s.parachuteMs || 0) > 0,
-      airbrakeDeployed: !!s.airBrakeActive,
+      airbrakeKicked: !!airBrakeKicked, // actual physical one-shot, not a held button
       relativeAirX: danger.relativeAirX,
       atmosphereDensity: danger.atmosphereDensity,
     });
@@ -1428,6 +1428,8 @@ export class RunScene extends Phaser.Scene {
     if (sled.hopPulse) this._lastHopMs = this.runTimeMs; // crash report: the hop verdict
     this._hopped = !!sled.hopPulse;
     this._pushed = !!sled.pushPulse;
+    const airBrakeKickedThisTick = !!sled.airBrakeKickPulse;
+    sled.airBrakeKickPulse = 0; // consumed for bluff scoring; always zero at replay checkpoint
     sled.hopPulse = 0;
     sled.pushPulse = 0;
 
@@ -1469,7 +1471,7 @@ export class RunScene extends Phaser.Scene {
     if (this.bsodGym && this.gymReadyMs > 0) return 'hold';
 
     if (!this.crashed) {
-      this.updateBsodBluff();
+      this.updateBsodBluff(airBrakeKickedThisTick);
       // Gym may continue through the same terrain, but score/distance belongs
       // only to the current attempt. Never recredit earlier travel on a retry.
       const origin = this.bsodGym ? this.gymAttemptStartX : this.startX;

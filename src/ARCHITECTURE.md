@@ -19,8 +19,18 @@ rearming only after physical ground contact. There is NO continuing AirBrake
 lift, gravity reduction or descent damping. The vertical kick uses the original
 40% paid-speed budget at a 1.5 factor with an upward cap, even as horizontal
 braking increases to 60%; extra braking is NOT exchanged for extra altitude.
-Existing parachute and BSOD-driven wind remain unchanged. The default 4500px,
-300px/s, 4px/s², final 3000px / 18% BSOD chase approved in SIM7 also remains.
+Existing parachute and BSOD-driven wind remain unchanged. Variable-hop
+release truncates only its own original jump; if a coyote-hop triggers after
+AirBrake in the same substep, it cannot erase the paid separate AirBrake ascent.
+During a near-wall Bitstream Bluff, the extra 40-point AirBrake bonus is earned
+only by a NEW physically spent-speed kick while the approach is armed, never by
+holding or tapping AirBrake after its one-use latch is spent. Sled emits a
+one-tick `airBrakeKickPulse` consumed and cleared in `RunScene.simTick` before
+the replay checkpoint; durable bluff/score state is fingerprinted. The reduced-
+order BSOD escape-envelope diagnostic uses the same one-shot `airBrakeKickStep`
+and normal gravity, not obsolete continuous 800ms drag/gravity relief. The
+simulation's approved default 4500px, 300px/s, 4px/s², and final 3000px / 18%
+BSOD chase from SIM7 remains unchanged.
 
 This change builds on the independent marker-prefetch SIM8 correction, so the
 approved AirBrake lands as **SIM_REVISION 9**, not the historical conflicting
@@ -38,7 +48,7 @@ The #253 visual marker bug produced extra authoritative terrain chunks on repeat
 runs because `BestMarker` and `LastDeathMarker` queried `TerrainGenerator.heightAt`
 for positions up to 2600px ahead of the sled. That accessor may generate and
 queue chunks, depending on the prior run's visible markers. The canonical
-`joinedMarkerHeight(x, mesh.chunks, heightAt)` guard now returns `NaN` until
+`joinedMarkerHeight(x, mesh.chunks)` read-only geometry interpolation now returns `NaN` until
 that x is actually joined to the real Matter terrain mesh. Both presentation
 markers defer placement, then display at the exact live terrain height. No
 extra chunk generation may occur merely to render these markers; do not mask

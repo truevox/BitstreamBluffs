@@ -25,9 +25,9 @@ try {
     const baseMatterStep=1000/60;
     const toMatter=x=>x*baseMatterStep/1000;
     const toWorld=x=>x*1000/baseMatterStep;
-    const prepare=(vx,vy)=>{
+    const prepare=(vx,vy,msSinceContact=200)=>{
       B.setVelocity(sled.body,{x:toMatter(vx),y:toMatter(vy)});
-      sled.msSinceContact=200;
+      sled.msSinceContact=msSinceContact;
       sled._groundRunMs=0;
       sled._sinceLaunchMs=200;
       sled.dropAheadDeg=90;
@@ -49,21 +49,38 @@ try {
     sled.applyControls({...input,airBrake:false,pressed:{}},scene.currentPhys,8,
       {atmosphereDensity:1,relativeAirX:0,proximity01:0});
     const next=actual('following release frame');
+    prepare(530,150,60); // inside 90ms coyote window, but already airborne
+    const hopAndBrake={...input,hop:true,pressed:{hop:true,airBrake:true}};
+    sled.applyControls(hopAndBrake,scene.currentPhys,8,
+      {atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    const coyoteFirst=actual('coyote Hop + AirBrake same physics substep');
+    for(let i=0;i<25;i++){
+      sled.msSinceContact+=8;
+      sled.applyControls({...hopAndBrake,hop:false,airBrake:false,pressed:{}},scene.currentPhys,8,
+        {atmosphereDensity:1,relativeAirX:0,proximity01:0});
+    }
+    const coyoteLater=actual('coyote Hop released after minimum hold time');
     prepare(530,-150);
     sled.applyControls(input,scene.currentPhys,8,{atmosphereDensity:0,relativeAirX:0,proximity01:0});
     const vacuum=actual('vacuum: no paid vertical impulse');
-    return {first,next,vacuum};
+    return {first,next,coyoteFirst,coyoteLater,vacuum};
   });
   assert.deepEqual(errors,[],'compiled browser has no fatal page errors');
-  const {first,next,vacuum}=measurements;
+  const {first,next,coyoteFirst,coyoteLater,vacuum}=measurements;
   assert.equal(first.latch,true);
   assert.equal(first.hopActive,false);
   assert(first.vx>150&&first.vx<300,'60% brake must cost real horizontal speed');
   assert(first.vy < -100,'AirBrake must deliver a real vertical launch');
   assert(next.vy < -100,'later hop release must not cancel paid AirBrake lift');
   assert(Math.abs(next.vx-first.vx)<2,'no second held-AirBrake speed cut');
+  assert.equal(coyoteFirst.latch,true);
+  assert.equal(coyoteFirst.hopActive,false,'coyote hop must not re-arm variable-hop cutoff on paid AirBrake lift');
+  assert(coyoteFirst.vx>150&&coyoteFirst.vx<300);
+  assert(coyoteFirst.vy < -100,'simultaneous coyote Hop + brake preserves paid lift');
+  assert(coyoteLater.vy < -100,'later Hop release must not cancel the original paid lift');
+  assert(coyoteLater.vx > coyoteFirst.vx*0.75,'no second 60% speed penalty over 25 naturally dragged steps');
   assert.equal(vacuum.hopActive,false,'without paid lift, variable-hop cutoff still applies');
   assert(Math.abs(vacuum.vy)<1,'vacuum cannot gain an AirBrake upward impulse');
   console.log(JSON.stringify(measurements,null,2));
-  console.log('PASS compiled Chromium: paid AirBrake ascent survives hop-release; vacuum stays lift-free');
+  console.log('PASS compiled Chromium: paid AirBrake ascent survives normal and coyote-hop release; vacuum stays lift-free');
 }finally {await browser.close();}

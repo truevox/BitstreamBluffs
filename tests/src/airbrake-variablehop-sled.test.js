@@ -55,3 +55,25 @@ test('AirBrake without any vertical kick does not disable legitimate hop-release
   expect(s._playerHopActive).toBe(false); // original hop cutoff runs and ends launch
   expect(toPx(s.body.velocity.y)).toBe(0);
 });
+
+
+test('simultaneous coyote Hop + AirBrake preserves the paid kick when Hop is later released',()=>{
+  const s=makeSled(530,150);
+  s.msSinceContact=60; // airborne, but within 90ms coyote launch window
+  step(s,{hop:true,variableHop:true,airBrake:true,noAutoNudge:true,
+    pressed:{hop:true,airBrake:true}});
+  expect(s.airBrakeKickUsed).toBe(true);
+  expect(s.hopPulse).toBe(1);
+  expect(toPx(s.body.velocity.x)).toBeLessThan(300);
+  expect(toPx(s.body.velocity.y)).toBeLessThan(-100);
+  expect(s._playerHopActive).toBe(false);
+  // Far beyond the minimum 150ms hold: the normal hop-release cutoff must
+  // NOT zero the separate AirBrake climb. No second speed cut is permitted.
+  const afterBrake=toPx(s.body.velocity.x);
+  for(let i=0;i<25;i++){
+    s.msSinceContact+=8;
+    step(s,{hop:false,variableHop:true,airBrake:false,noAutoNudge:true,pressed:{}});
+  }
+  expect(toPx(s.body.velocity.y)).toBeLessThan(-100);
+  expect(toPx(s.body.velocity.x)).toBeCloseTo(afterBrake,6);
+});

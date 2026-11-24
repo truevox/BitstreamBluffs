@@ -335,6 +335,7 @@ export const NON_CAUSAL = Object.freeze({
     squash: PRESENTATION + ' (landing squash)', hidden: PRESENTATION + ' (set with inWorld=false by vanish())',
     hopPulse: 'cleared by RunScene.simTick before afterTick, so always 0 at a checkpoint; read only for SFX/hints',
     pushPulse: 'cleared by RunScene.simTick before afterTick, so always 0 at a checkpoint; read only for SFX/hints',
+    airBrakeKickPulse: 'one-tick physical kick event consumed by RunScene BSOD scoring then cleared before afterTick; any durable result appears in BsodBluffTracker and score snapshots',
     random: 'the run RunRandom streams (shared with RunScene); physicsScramble state is the `rng` subsystem, visual streams are presentation',
     off: 'centre-of-mass offset from the spawn origin: immutable geometry fixed by _buildBody (ruleset/SIM_REVISION territory, section 7)',
     _time: 'render-only clock: sums stepMs but is read only by _draw (invulnerability flicker, shield pulse, tether wobble)',

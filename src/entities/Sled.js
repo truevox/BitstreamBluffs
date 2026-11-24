@@ -73,6 +73,7 @@ export class Sled {
     this.tucked = false;
     this.airBrakeActive = false;
     this.airBrakeKickUsed = false; // #247 one-shot per actual airborne interval; rearm on genuine touchdown
+    this.airBrakeKickPulse = 0; // actual spent-speed event; RunScene consumes & clears this fixed tick
     this.heliInput = 0;
     this.corkscrewActive = false;
     this.heliPhase = 0; // degrees, visual only
@@ -258,6 +259,9 @@ export class Sled {
       vx *= f;
       vy *= f;
     }
+    // Only the player's actual original hop launch may be shortened by
+    // variable-hop release; never truncate a separately paid AirBrake impulse.
+    let airBrakePaidLiftThisStep = false;
     // Two instantaneous AirBrake kicks; neither holding nor re-tapping buys
     // extra lift until actual terrain contact. Normal gravity acts thereafter.
     if (this.airBrakeActive && !this.airBrakeKickUsed) {
@@ -275,7 +279,11 @@ export class Sled {
       // it must not be zeroed by the hop-release cutoff later this tick or in
       // a subsequent tick. When no lift was actually purchased (vacuum, very
       // slow rider, or already faster upward), retain normal hop semantics.
-      if (kicked.vy < vy) this._playerHopActive = false;
+      if (kicked.vy < vy) {
+        airBrakePaidLiftThisStep = true;
+        this._playerHopActive = false;
+      }
+      if (kicked.spentSpeedPxS > 0) this.airBrakeKickPulse = 1;
       vx = kicked.vx;
       vy = kicked.vy;
     }
@@ -341,7 +349,9 @@ export class Sled {
       this.msSinceContact = TUNING.groundedGraceMs + 1; // leave the ground immediately
       this.hopPulse = 1;
       this._sinceLaunchMs = 0;
-      this._playerHopActive = !!pad.variableHop;
+      // A coyote hop may fire AFTER the AirBrake within this exact substep.
+      // It must not re-arm the hold-release cutoff over the paid brake ascent.
+      this._playerHopActive = !!pad.variableHop && !airBrakePaidLiftThisStep;
       this._playerHopElapsedMs = 0;
     }
     if (this._playerHopActive) {

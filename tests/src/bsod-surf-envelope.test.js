@@ -9,25 +9,28 @@ const lateRanks=(rank)=>Object.fromEntries(
 
 describe('BSOD near-miss physical envelope (optimistic model, not a gameplay-completion claim)',()=>{
   test('old requirement was inaccessible; revised first-pass pressure wave permits an early skilled save',()=>{
-    const low=scenario({wallSpeed:300,closing:30});
+    const low=scenario({wallSpeed:300,closing:90});
     expect(low.scored).toBe(1);
     expect(low.minGap).toBeLessThan(280);
     expect(low.finalGap).toBeGreaterThan(500);
     expect(low.flightMs).toBeLessThan(2000);
   });
   test('survival does not automatically scale to the wall: high speed needs upgraded flight or timing',()=>{
-    const noUpgrade=scenario({wallSpeed:900,closing:30});
-    const upgraded=scenario({wallSpeed:900,closing:30,ranks:lateRanks(10)});
+    const noUpgrade=scenario({wallSpeed:900,closing:200});
+    const upgraded=scenario({wallSpeed:900,closing:200,ranks:lateRanks(10)});
     expect(noUpgrade.scored).toBe(1);
     expect(upgraded.scored).toBe(1);
     expect(upgraded.finalGap).toBeGreaterThan(noUpgrade.finalGap);
     expect(upgraded.flightMs).toBeGreaterThan(noUpgrade.flightMs);
   });
   test('well-timed airbrake earns the skill bonus while spending forward momentum',()=>{
-    const plain=scenario({wallSpeed:600,closing:30});
-    const braked=scenario({wallSpeed:600,closing:30,brakeBeforeMs:160});
+    const plain=scenario({wallSpeed:600,closing:150});
+    const braked=scenario({wallSpeed:600,closing:150,brakeBeforeMs:160});
     expect(plain.scored).toBe(1);
     expect(braked.scored).toBe(1);
+    expect(plain.brakeKicks).toBe(0);
+    expect(braked.brakeKicks).toBe(1); // exactly one AirBrake speed-payment event
+    expect(braked.brakeSpentSpeedPxS).toBeCloseTo(270,0); // 60% of the actual 450 px/s approach speed
     expect(braked.points).toBe(190);
     expect(braked.points-plain.points).toBe(40);
     expect(braked.flightMs).toBeGreaterThan(plain.flightMs);
