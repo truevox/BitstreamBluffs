@@ -19,6 +19,8 @@ import { ScrapPitchCadence } from './ScrapPitchCadence.js';
 import { createVerifiedScrapCowbell } from './ScrapCowbell.js';
 import { MicroBeeAudio } from './MicroBeeAudio.js';
 
+import {normalizeTransitionGrids,planSongCrossfade,automateTransition,retargetEnvelope} from './SongCrossfade.js';
+
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const sleepSafe = (promise) => Promise.resolve(promise).catch(() => null);
 
@@ -48,6 +50,10 @@ export class StemMusicDirector {
 		this._stemUserLevels = new Map(CORE_STEMS.map(name => [name, 1]));
 		this._effectSignatures = new Map();
 		this.activeNodes = new Set();
+		this._sourceEnvelopes=new Map();
+		this.crossfadeEnabled=true;
+		this.transitionGrids=new Map();
+		this._incomingFade=null;
 		this.cache = new Map();
 		// Archived home-biome folder may still use its legacy spelling in
 		// original archived music packs even though the logical ID is canonical.
@@ -88,6 +94,7 @@ export class StemMusicDirector {
 		this._timer = null;
 		this._token = 0;
 		this._nextPromise = null;
+		this._nextPrepared=null;
 		this._nextIndex = null;
 		this._loading = null;
 		this.transportPaused = false;
@@ -144,7 +151,19 @@ export class StemMusicDirector {
 		this.setVocals(settings.musicVocals === true);
 		this.setSongSelection(settings.musicEnabledSongs);
 		this.setShuffle(settings.musicShuffle === true);
+		this.setCrossfade(settings.musicCrossfade !== false);
 		this.setDynamicOrchestra(settings.dynamicOrchestra === true);
+	}
+
+	setCrossfade(on) {
+		this.crossfadeEnabled=on===true;
+		if(this.crossfadeEnabled&&!this._gridRequest){
+			this._gridRequest=Promise.resolve().then(async()=>{
+				const url=new URL('transition-grids.json',new URL(this.catalogUrl,window.location.href));
+				const response=await fetch(url);
+				if(response.ok)this.transitionGrids=normalizeTransitionGrids(await response.json());
+			}).catch(()=>{}); // absent private metadata: time-based blend
+		}
 	}
 
 	setSongSelection(selection) {
@@ -155,6 +174,7 @@ export class StemMusicDirector {
 		this._shuffleRemaining = [];
 		this._nextIndex = null;
 		this._nextPromise = null;
+		this._nextPrepared=null;
 		if (this.transportPaused) {
 			const next = nextEnabledSongIndex(this.catalog, this.songEnabled, -1);
 			if(next<0){this.stop();return;}
@@ -165,6 +185,7 @@ export class StemMusicDirector {
 			return;
 		}
 		if (!this.started) return;
+		this._silenceDisabledSources();
 		const next = nextEnabledSongIndex(this.catalog, this.songEnabled, -1);
 		if (next < 0) {
 			// Crucially NO procedural fallback: the owner's all-off setting
@@ -175,6 +196,42 @@ export class StemMusicDirector {
 		if (!this.track || this.songEnabled[this.track.id] === false) {
 			this.stop();
 			this.start();
+		}
+	}
+
+	/** Overlap sources retain their own song identity, independently of the
+	 * transport's incoming track. Cut only disabled recordings, without moving
+	 * the incoming clock. Keep a short click-suppressing release when possible;
+	 * remove the source from transport bookkeeping so later pause/seek/selection
+	 * cannot extend its scheduled stop or automate its old envelope again.
+	 */
+	_silenceDisabledSources() {
+		const now=this.ctx?.currentTime??0;
+		let cutOutgoing=false;
+		for(const [src,record] of this._sourceEnvelopes??[]){
+			if(this.songEnabled[record.songId]!==false)continue;
+			if(record.songId!==this.track?.id)cutOutgoing=true;
+			try {
+				retargetEnvelope(record,0,now,.003);
+				src.stop(now+.015);
+			} catch {
+				// If automation/stop is unavailable, disconnect immediately.
+				try {src.disconnect();} catch {}
+				try {record.gain.disconnect();} catch {}
+			}
+			this.activeNodes.delete(src);
+			this._sourceEnvelopes.delete(src);
+		}
+		// If the old track was muted early, do not leave the new rhythm or
+		// vocals waiting for a handoff that no longer exists. Preserve its
+		// exact source clock and lift only its independent envelopes.
+		if(cutOutgoing&&this._incomingFade?.token===this._token&&
+			this.songEnabled[this.track?.id]!==false){
+			this._incomingFade=null;
+			for(const record of this._sourceEnvelopes.values()){
+				if(record.token!==this._token||record.songId!==this.track?.id)continue;
+				retargetEnvelope(record,1,now,.015);
+			}
 		}
 	}
 
@@ -195,6 +252,7 @@ export class StemMusicDirector {
 		this._shuffleRemaining = [];
 		this._nextIndex = null;
 		this._nextPromise = null;
+		this._nextPrepared=null;
 	}
 
 	/** Preserve the song clock while menus use unprocessed originals and Debutmont lead. */
@@ -1057,19 +1115,20 @@ export class StemMusicDirector {
 		finally { if (this.inflight.get(key) === promise) this.inflight.delete(key); }
 	}
 
-	async _beginTrack(index, desiredAt, offsetSeconds=0) {
+	async _beginTrack(index, desiredAt, offsetSeconds=0, transition=null) {
 		if (index < 0 || !this.catalog[index] ||
 			this.songEnabled[this.catalog[index].id] === false) {
 			if (this._nextEnabledIndex(-1) < 0) this.stop();
 			return;
 		}
 		const token = ++this._token;
+		this._incomingFade=null;
 		this.cache.clear();
 		this.inflight.clear();
 		this.scheduled.clear();
 		try {
-			const info = this._nextIndex === index && this._nextPromise
-				? await this._nextPromise : await this._getTrack(index);
+			const info = transition?.prepared || (this._nextIndex === index && this._nextPromise
+				? await this._nextPromise : await this._getTrack(index));
 			if (token !== this._token || this.disposed) return;
 			if (!info) throw new Error('Next track could not be prepared');
 			if (this.songEnabled[info.track.id] === false) {
@@ -1123,6 +1182,7 @@ export class StemMusicDirector {
 			this._restoreArcadeBridgeAfterTrackReplace();
 			if (info.pack.captions) this._loadCaptions(info, token);
 			this._nextPromise = null;
+			this._nextPrepared=null;
 			this._nextIndex = null;
 			if (info.buffers) {
 				for (const [key, buffer] of info.buffers) this.cache.set(key, buffer);
@@ -1134,6 +1194,16 @@ export class StemMusicDirector {
 				Math.max(0,this.pack.duration-.1));
 			const firstSourceTime=Math.max(this.ctx.currentTime+.12,desiredAt||0);
 			this.clockStart=firstSourceTime-actualResumeOffset;
+			if(transition&&transition.end-firstSourceTime>=1){
+				this._incomingFade={start:firstSourceTime,end:transition.end,token};
+				for(const record of this._sourceEnvelopes.values()){
+					if(record.token===transition.oldToken&&record.end>firstSourceTime){
+						record.automation=automateTransition(record.gain.gain,record.role,'out',firstSourceTime,transition.end);
+					}
+				}
+				this.lastCrossfade={from:transition.from,to:info.track.id,start:firstSourceTime,
+					end:transition.end,beatAligned:transition.beatAligned&&Math.abs(firstSourceTime-desiredAt)<.025};
+			}
 			// For normal track-start this is a no-op. For a manual pause resume,
 			// offsets MUST begin on this first sound frame, never 100ms before it
 			// just because buffers were fetched early in the WebAudio scheduler.
@@ -1186,11 +1256,22 @@ export class StemMusicDirector {
 		if (!dest) return;
 		const src = this.ctx.createBufferSource();
 		src.buffer = buffer;
-		src.connect(dest);
+		// A per-source envelope keeps the existing shared biome FX, master
+		// guard and room graph intact, while old and new recordings overlap.
+		const envelope=this._sourceEnvelopes&&this.ctx.createGain?.();
+		if(envelope){
+			src.connect(envelope);envelope.connect(dest);
+			const fade=this._incomingFade;
+			const automation=fade?.token===this._token&&firstAllowed<fade.end?
+				automateTransition(envelope.gain,name,'in',fade.start,fade.end,firstAllowed):null;
+			this._sourceEnvelopes.set(src,{gain:envelope,role:name,token:this._token,songId:this.track?.id??this.pack.id,automation,
+				end:firstAllowed+Math.max(0.001,Math.min(duration-late,buffer.duration-late))});
+		}else src.connect(dest);
 		this.activeNodes.add(src);
 		src.onended = () => {
 			this.activeNodes.delete(src);
-			try { src.disconnect(); } catch {}
+			this._sourceEnvelopes?.delete(src);
+			try { src.disconnect(); envelope?.disconnect(); } catch {}
 		};
 		try {
 			src.start(firstAllowed, late,
@@ -1198,7 +1279,8 @@ export class StemMusicDirector {
 			this.scheduled.add(key);
 		} catch (e) {
 			this.activeNodes.delete(src);
-			try { src.disconnect(); } catch {}
+			this._sourceEnvelopes?.delete(src);
+			try { src.disconnect(); envelope?.disconnect(); } catch {}
 			this.lastError = 'Schedule failed: ' + String(e);
 		}
 	}
@@ -1212,8 +1294,12 @@ export class StemMusicDirector {
 		const duration = this.pack.duration;
 		if (elapsed > duration - 15 && !this._nextPromise) {
 			this._nextIndex = this._nextEnabledIndex(this.trackIndex);
-			if (this._nextIndex >= 0)
-				this._nextPromise = this._preloadTrack(this._nextIndex).catch(() => null);
+			if (this._nextIndex >= 0){
+				const pending=this._preloadTrack(this._nextIndex).catch(() => null);
+				this._nextPromise=pending;
+				this._nextPrepared=null;
+				pending.then(info=>{if(this._nextPromise===pending)this._nextPrepared=info;});
+			}
 		}
 		if (elapsed >= duration - 0.5) {
 			if (!this._loading) {
@@ -1247,6 +1333,31 @@ export class StemMusicDirector {
 				else sleepSafe(this._fetchSource(info, i, name, token));
 			}
 		}
+		this._trySongCrossfade(now,elapsed,duration);
+	}
+
+	_trySongCrossfade(now,elapsed,duration){
+		if(!this.crossfadeEnabled||this._loading||!this._nextPromise||!this._nextPrepared||
+			(this.dynamicOrchestra&&!this.menuMode)||duration<8||elapsed<duration-4.6)return;
+		const nextIndex=this._nextIndex,prepared=this._nextPrepared;
+		if(this.catalog[nextIndex]?.id!==prepared.track.id||this.songEnabled[prepared.track.id]===false||
+			prepared.track.id===this.track.id)return;
+		const wanted=this._wantedNames(this.pack);
+		if(!this._wantedNames(prepared.pack).every(name=>prepared.buffers.has('0/'+name)))return;
+		const incomingGrid=this.transitionGrids?.get(prepared.track.id);
+		const plan=planSongCrossfade(duration,this.transitionGrids?.get(this.track.id),
+			incomingGrid&&Math.abs(incomingGrid.duration-prepared.pack.duration)<.25?incomingGrid:null);
+		const end=this.clockStart+duration,start=this.clockStart+plan.start;
+		if(now<start-.50||now>start-.16)return;
+		// Don't commit until every outgoing segment spanning the overlap has
+		// been scheduled and the incoming opening has fully decoded.
+		if(!this.pack.segments.every((seg,i)=>seg.startFrame/this.pack.sampleRate+
+			seg.frames/this.pack.sampleRate<=plan.start||
+			wanted.every(name=>this.scheduled.has(i+'/'+name))))return;
+		const transition={prepared,end,oldToken:this._token,from:this.track.id,beatAligned:plan.beatAligned};
+		const pending=this._beginTrack(nextIndex,start,0,transition);
+		this._loading=pending;
+		pending.finally(()=>{if(this._loading===pending)this._loading=null;});
 	}
 
 	/** One canonical transport for Title, Pause, and Game-Over. These
@@ -1358,9 +1469,12 @@ export class StemMusicDirector {
 			try {src.stop(t+.014);} catch {}
 		}
 		this.activeNodes.clear();
+		this._sourceEnvelopes?.clear();
+		this._incomingFade=null;
 		this.scheduled.clear();
 		this.inflight.clear();
-		this._nextPromise=null;
+		this._nextPromise = null;
+		this._nextPrepared=null;
 		this._nextIndex=null;
 		this.clockStart=t+.085-position;
 		this._resumeGateAt=null; // an explicit seek owns a separate transport generation
@@ -1379,6 +1493,7 @@ export class StemMusicDirector {
 		this.scrapCowbell?.dispose();
 		this.scrapCowbell=null;
 		this.started = false;
+		this._incomingFade=null;
 		this.microBees?.setPositions([],{enabled:false});
 		this.transportPaused=false;
 		this._resumeOffset=0;
@@ -1393,6 +1508,7 @@ export class StemMusicDirector {
 		this.cache.clear();
 		this.scheduled.clear();
 		this._nextPromise = null;
+		this._nextPrepared=null;
 		this._nextIndex = null;
 		this.captionWords = [];
 		// Stop queued sources, not just the timer: otherwise a rapid restart resurrects old audio.
@@ -1400,6 +1516,7 @@ export class StemMusicDirector {
 		if (this.bus && this.ctx) this.bus.gain.setTargetAtTime(0, now, 0.01);
 		for (const src of this.activeNodes) { try { src.stop(now + 0.04); } catch {} }
 		this.activeNodes.clear();
+		this._sourceEnvelopes?.clear();
 	}
 
 	destroy() {

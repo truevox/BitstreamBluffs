@@ -662,6 +662,7 @@ export class AudioSynth {
           musicCaptions: settings.musicCaptions === true,
           dynamicOrchestra: settings.dynamicOrchestra === true,
           musicShuffle: settings.musicShuffle === true,
+          musicCrossfade: settings.musicCrossfade !== false,
         };
         this._stemMusic?.applySettings(this.settings);
         // Re-enabling music from the all-off state should not require
