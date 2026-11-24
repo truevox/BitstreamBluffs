@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { spawnSync } from 'node:child_process';
+import { Rng } from '../../src/systems/Rng.js';
 import {
   DEFAULT_NOISE_SEED, FATIGUE_RAMP, NOISE_PROFILES, fatigueAtFrame, makeHopNoise, noiseOutcome, summarizeNoise, verifyNoiseEvidence,
 } from '../../tools/sim/human-noise.js';
@@ -82,6 +83,33 @@ function planned(profile, course, intentFrames, fatigue) {
   }
   return { frames, ...planner.stats() };
 }
+
+test.each([false, true])('coalesces an intent on the pending dispatch frame with fatigue=%s', (fatigue) => {
+  const firstIntent = FATIGUE_RAMP.startFrame - 1;
+  const [dispatch] = planned('steady', 'sim-01', [firstIntent], fatigue).frames;
+  expect(dispatch).toBeGreaterThan(FATIGUE_RAMP.startFrame);
+  const intents = [firstIntent, 420, 600, 720, 1080, 1600];
+  const chance = jest.spyOn(Rng.prototype, 'chance');
+  const delay = jest.spyOn(Rng.prototype, 'int');
+  try {
+    const control = planned('steady', 'sim-01', intents, fatigue);
+    const chanceCalls = chance.mock.calls.slice(), delayCalls = delay.mock.calls.slice();
+    expect(chanceCalls.length).toBe(intents.length);
+    expect(delayCalls.length).toBeGreaterThan(1);
+    expect(control.frames).toContain(dispatch);
+    expect(control.frames.at(-1)).toBeGreaterThan(dispatch);
+    chance.mockClear();
+    delay.mockClear();
+
+    const paired = planned('steady', 'sim-01', [firstIntent, dispatch, ...intents.slice(1)], fatigue);
+    expect(paired).toEqual({ ...control, intents: control.intents + 1, coalesced: control.coalesced + 1 });
+    expect(chance.mock.calls).toEqual(chanceCalls);
+    expect(delay.mock.calls).toEqual(delayCalls);
+  } finally {
+    chance.mockRestore();
+    delay.mockRestore();
+  }
+});
 
 test('early and already planned presses stay identical, and the ideal control stays unchanged at all phases', () => {
   const base = planned('steady', 'sim-01', [359], false);

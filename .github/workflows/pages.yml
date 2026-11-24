@@ -1,0 +1,80 @@
+name: Deploy GitHub Pages
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pages.yml'
+      - 'tools/hosting-browser-smoke.mjs'
+      - 'src/**'
+      - 'public/**'
+      - '*.html'
+      - 'vite.config.js'
+      - 'package*.json'
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: read
+concurrency:
+  group: pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/configure-pages@v5
+        id: pages
+        if: github.event_name != 'pull_request'
+      - name: Select base path
+        id: base
+        env:
+          EVENT: ${{ github.event_name }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PAGES_BASE: ${{ steps.pages.outputs.base_path }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then PAGES_BASE="/$REPO_NAME"; fi
+          echo "path=${PAGES_BASE%/}/" >> "$GITHUB_OUTPUT"
+      - run: npm ci --no-audit --no-fund
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - run: npm test -- --runInBand tests/src/pwa-install-shell.test.js tests/src/music-pack.test.js tests/src/continuous-soundtrack-menu-shuffle.test.js
+      - name: Build for Pages base path
+        env:
+          BASE: ${{ steps.base.outputs.path }}
+        run: npm run build -- --base "$BASE"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke test production game
+        env:
+          BASE: ${{ steps.base.outputs.path }}
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort --base "$BASE" > /tmp/pages-preview.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:4173$BASE" >/dev/null && break; sleep 1; done
+          node tools/hosting-browser-smoke.mjs "http://127.0.0.1:4173$BASE"
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: dist
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
