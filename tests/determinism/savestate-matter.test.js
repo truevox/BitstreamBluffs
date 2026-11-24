@@ -3,7 +3,7 @@
  * Uses the Matter build the game ships (Phaser 3.90 / Matter 0.20.0) and the game's installTerrainContactFix.
  * Digests are diagnostic only; #152 owns canonical hashes. See docs/determinism/savestate-feasibility.md.
  */
-import { loadDeps, runCase, incompleteChecks, staticGeometryDiff } from '../../tools/savestate-experiment/matter-node-experiment.mjs';
+import { loadDeps, runCase, incompleteChecks, staticGeometryDiff, buildWorld } from '../../tools/savestate-experiment/matter-node-experiment.mjs';
 
 let Matter;
 let kit;
@@ -65,4 +65,20 @@ describe('savestate feasibility: pure Matter round trip (contact-heavy fixture)'
     }
     expect(Object.keys(out.liveAudit)).toEqual(['rootBody', 'pair', 'collision', 'contact', 'engine', 'timing', 'detector', 'resolverStatic']);
   });
+});
+
+test('diagnostic snapshot V2 captures changed gravity and rejects absent or nonfinite gravity before restore', () => {
+  const a = buildWorld(Matter);
+  Object.assign(a.engine.gravity, { x: 0.125, y: 0.67, scale: 0.002 });
+  const snap = JSON.parse(JSON.stringify(kit.capture(a.engine, a.keyOf, {selectBody:()=>true})));
+  expect(snap.gravity).toEqual({ x: 0.125, y: 0.67, scale: 0.002 });
+  for (const bad of [undefined, {x:0,y:null,scale:.001}, {x:0,y:1,scale:.001,extra:0}]) {
+    const b = buildWorld(Matter);
+    const before = {...b.engine.gravity};
+    expect(()=>kit.restore(b.engine,{...snap,gravity:bad},b.keyOf,'full')).toThrow(/gravity/);
+    expect(b.engine.gravity).toEqual(before);
+  }
+  const b = buildWorld(Matter);
+  kit.restore(b.engine,snap,b.keyOf,'full');
+  expect(b.engine.gravity).toEqual(snap.gravity);
 });

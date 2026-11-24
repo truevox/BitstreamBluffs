@@ -28,7 +28,7 @@
 
 const LEVELS = ['pose', 'kinematic', 'contacts', 'full'];
 const SNAPSHOT_KIND = 'bb-matter-diagnostic-snapshot';
-const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_VERSION = 2;
 
 const ROOT_SCALARS = ['angle', 'anglePrev', 'angularVelocity', 'angularSpeed', 'speed', 'motion', 'sleepCounter',
   'isSleeping', 'deltaTime', 'torque', 'totalContacts', 'timeScale'];
@@ -236,6 +236,7 @@ export function createMatterSnapshotKit(Matter) {
       nextId: Common._nextId,
       pairs,
       orphanPairs,
+      gravity: { x: engine.gravity.x, y: engine.gravity.y, scale: engine.gravity.scale },
       timing: { timestamp: engine.timing.timestamp, timeScale: engine.timing.timeScale, lastDelta: engine.timing.lastDelta },
       detectorOrder: (engine.detector.bodies || []).map((b) => keyOf(b)),
       // Composite order: Engine iterates it, and Detector.setBodies copies it on every world change, so it breaks
@@ -261,6 +262,7 @@ export function createMatterSnapshotKit(Matter) {
     if (L < 0) throw new Error(`restore: unknown level ${level}`);
     if (!snap || snap.kind !== SNAPSHOT_KIND) throw new Error('restore: not a diagnostic Matter snapshot');
     if (snap.version !== SNAPSHOT_VERSION) throw new Error(`restore: snapshot version ${snap.version} != ${SNAPSHOT_VERSION}`);
+    if (!snap.gravity || Object.keys(snap.gravity).length !== 3 || !['x','y','scale'].every(k => Number.isFinite(snap.gravity[k]))) throw new Error('restore: missing or invalid gravity');
     if (snap.matterVersion !== Matter.version) throw new Error(`restore: Matter ${snap.matterVersion} != ${Matter.version}`);
     if (strict && snap.audit && snap.audit.length) throw new Error(`restore: snapshot audit found uncaptured Matter state: ${snap.audit.join('; ')}`);
     let ix = indexWorld(engine, keyOf);
@@ -324,6 +326,7 @@ export function createMatterSnapshotKit(Matter) {
       if (!skip.has("timing")) engine.timing.timestamp = snap.timing.timestamp;
       // module statics (Common._seed drives Common.random; group/category counters feed future bodies)
       for (const [mod, vals] of Object.entries(snap.statics || {})) if (Matter[mod]) Object.assign(Matter[mod], vals);
+      Object.assign(engine.gravity, snap.gravity);
       engine.timing.timeScale = snap.timing.timeScale;
       engine.timing.lastDelta = snap.timing.lastDelta;
       // Detector: bodies array is sorted in place by bounds.min.x every step (stable sort), so the previous

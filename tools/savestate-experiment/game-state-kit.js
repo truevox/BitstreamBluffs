@@ -458,8 +458,25 @@
     out['matter.pairs'] = fnv(JSON.stringify(m.pairs));
     out['matter.ids'] = fnv(sorted(m.ids) + m.nextId);
     out['matter.timing'] = fnv(JSON.stringify(m.timing));
+    if (global.__ssCanonical) out['matter.gravity'] = fnv(JSON.stringify(m.gravity));
     out['camera(#155)'] = fnv(JSON.stringify(cap.camera));
     out['pool'] = fnv(JSON.stringify(cap.pool));
+    // Use the actual compiled game's recorder fingerprint method, with a
+    // throwaway receiver: no mutation of the live recorder or its history.
+    if (global.__ssCanonical) {
+      if (cap.audit.length) throw new Error('incomplete diagnostic capture: '+cap.audit.join(' | '));
+      const recorder = run.ghostRecorder;
+      if (typeof recorder?._fingerprint !== 'function') throw new Error('compiled canonical fingerprint unavailable');
+      const receipt = { fingerprints: [], fingerprintErrorCount: 0, fingerprintErrors: [] };
+      recorder._fingerprint.call(receipt, run.simClock.tick, run);
+      const fp = receipt.fingerprints[0];
+      if (receipt.fingerprintErrorCount || receipt.fingerprints.length !== 1 ||
+          fp.tick !== run.simClock.tick || !fp.combined || Object.keys(fp.subsystems).length !== 13)
+        throw new Error('canonical fingerprint failed: '+JSON.stringify(receipt.fingerprintErrors));
+      out['canonical.combined'] = fp.combined;
+      for (const [key, value] of Object.entries(fp.subsystems)) out['canonical.'+key] = value;
+      out['telegraph'] = fnv(canon(cap.telegraph));
+    }
     const b = run.sled.body;
     out.__sled = [b.position.x, b.position.y, b.angle, b.velocity.x, b.velocity.y, b.angularVelocity];
     out.__score = run.score.getTotal();

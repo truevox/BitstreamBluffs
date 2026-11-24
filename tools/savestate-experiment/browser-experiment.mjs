@@ -33,7 +33,9 @@ const URL_ = process.env.GAME_URL || 'http://localhost:8414/';
 const EXE = process.env.CHROMIUM_PATH;
 const argv = process.argv.slice(2);
 const QUICK = argv.includes('--quick');
+const STRICT = argv.includes('--strict-suffix');
 const jsonOut = argv.includes('--json') ? argv[argv.indexOf('--json') + 1] : null;
+if (STRICT && (!jsonOut || existsSync(jsonOut) || process.env.ONLY || process.env.EXACT_ONLY)) throw new Error('--strict-suffix requires a new --json file and no case filters');
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 // For a single expensive browser case, use exact selection instead of matching every ablation.
 const EXACT_ONLY = process.env.EXACT_ONLY ? process.env.EXACT_ONLY.split(',') : null;
@@ -71,6 +73,7 @@ async function bootPage(browser, fx, tape) {
   await page.waitForFunction(() => window.__bbGame?.scene?.getScene('TitleScene')?.sys?.isActive(), null, { timeout: 30000 });
   await page.addScriptTag({ content: matterKitSrc });
   await page.addScriptTag({ content: gameKitSrc });
+  await page.evaluate(strict => { window.__ssCanonical = strict; }, STRICT);
   await page.evaluate(async ({ fx, tape }) => {
     const g = window.__bbGame;
     const run = g.scene.getScene('RunScene');
@@ -124,6 +127,12 @@ function compareDigests(a, b) {
   for (const k of Object.keys(b)) if (!k.startsWith('__') && !(k in a)) diff.push(`${k}(only B)`);
   const sa = a.__sled, sb = b.__sled;
   const sledExact = sa.every((v, i) => Object.is(v, sb[i]));
+  if (STRICT) {
+    if (!sledExact) diff.push('direct.sled');
+    if (a.__tick !== b.__tick) diff.push('direct.tick');
+    if (!Object.is(a.__score,b.__score)) diff.push('direct.score');
+    if (a.__crashed !== b.__crashed) diff.push('direct.crashed');
+  }
   return { diff, sledExact, posErr: Math.hypot(sa[0] - sb[0], sa[1] - sb[1]), scoreErr: Math.abs(a.__score - b.__score) };
 }
 
@@ -154,6 +163,12 @@ async function runCase(browser, fxName, level, skip = []) {
       }, { json, level, skip });
       if (!r.ok) return { fixture: fxName, level, skip: skip.join('+') || '-', restoreError: r.error, snapBytes, audit };
       restoreLog = r.log || [];
+      if (STRICT) {
+        const [atK, restoredK] = await Promise.all([A,B].map(P => P.page.evaluate(() => window.__ssGameKit.digests(window.__ss.run))));
+        const atCapture = compareDigests(atK,restoredK);
+        if (atK.__tick !== fx.K || restoredK.__tick !== fx.K || atCapture.diff.length)
+          return {fixture:fxName,level,skip:'-',restoreError:'capture-tick mismatch: '+atCapture.diff.join(','),atCapture,snapBytes,audit};
+      }
     } else {
       // control: two uninterrupted runs, both played to K, then compared K+1..N (digest determinism baseline)
       await Promise.all([A, B].map((P) => P.page.evaluate((K) => window.__ss.step(K), fx.K)));
@@ -169,6 +184,7 @@ async function runCase(browser, fxName, level, skip = []) {
       for (let i = 0; i < n; i++) {
         const da = ba[i], db = bb[i], t = t0 + i;
         if (!da || !db) break outer;
+        if (STRICT && (da.__tick !== t || db.__tick !== t)) throw new Error('noncontiguous tick '+t+': '+da.__tick+'/'+db.__tick);
         ticks++;
         const c = compareDigests(da, db);
         for (const k of c.diff) if (!(k in firstBy)) firstBy[k] = t;
@@ -178,6 +194,7 @@ async function runCase(browser, fxName, level, skip = []) {
           const [ca, cb] = (await Promise.all([A.page.evaluate(cap, t), B.page.evaluate(cap, t)])).map((j) => JSON.parse(j));
           firstLeaves = [];
           for (const k of c.diff) {
+            if(k.startsWith('canonical.')||k.startsWith('direct.')||k==='telegraph'){firstLeaves.push(k+': '+JSON.stringify(da[k])+' != '+JSON.stringify(db[k]));continue;}
             if (k === 'matter.worldOrder' || k === 'matter.detectorOrder') { const f = k.slice(7); const i = ca.matter[f].findIndex((x, j) => x !== cb.matter[f][j]); firstLeaves.push(`${k}[${i}]: A=${ca.matter[f][i]} B=${cb.matter[f][i]} (len ${ca.matter[f].length}/${cb.matter[f].length})`); }
             else if (k.startsWith('matter.')) leafDiff(ca.matter[k.slice(7)], cb.matter[k.slice(7)], k, firstLeaves, firstLeaves.length + 6);
             else if (k === 'pool') leafDiff(ca.pool, cb.pool, 'pool', firstLeaves, firstLeaves.length + 6);
@@ -216,6 +233,7 @@ if (jsonOut && existsSync(jsonOut)) {
 const done = new Set(results.map(caseKey));
 const plan = [];
 for (const fx of ['contact', 'hazard']) {
+  if (STRICT) { plan.push([fx,'full']); continue; }
   plan.push([fx, 'control'], [fx, 'ghost'], [fx, 'game'], [fx, 'kinematic'], [fx, 'contacts'], [fx, 'full']);
   for (const s of ['camera', 'ids', 'runRandom', 'impulses', 'staleSupport', 'timing', 'positionImpulse', 'rawGeometry']) plan.push([fx, 'full', [s]]);
   if (fx === 'hazard') for (const s of ['kodiaks', 'bsod', 'hazardHit', 'pool', 'telegraph']) plan.push([fx, 'full', [s]]);
@@ -236,3 +254,13 @@ try {
   }
 } finally { await browser.close(); }
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(results, null, 1));
+
+if (STRICT) {
+  const failed = results.length !== 2 || results.some(r =>
+    r.restoreError || r.harnessError || r.ticksCompared !== r.N-r.K ||
+    r.firstDivergentTick !== null || r.firstSledDivergentTick !== null ||
+    r.pageErrors?.length !== 0 || r.audit?.length !== 0 || r.unclassified?.length !== 0 ||
+    (r.fixture === 'contact' ? !(r.fixtureStats?.activePairs > 0) : !(r.fixtureStats?.hazardsHit > 0)));
+  console.log(failed ? 'FAIL_STRICT_DIAGNOSTIC_SUFFIX' : 'PASS_STRICT_DIAGNOSTIC_SUFFIX');
+  if (failed) process.exitCode=1;
+}

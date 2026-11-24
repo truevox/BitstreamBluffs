@@ -1,0 +1,38 @@
+[
+ {
+  "fixture": "contact",
+  "level": "full",
+  "skip": "-",
+  "restoreError": "capture-tick mismatch: canonical.combined,canonical.matter",
+  "atCapture": {
+   "diff": [
+    "canonical.combined",
+    "canonical.matter"
+   ],
+   "sledExact": true,
+   "posErr": 0,
+   "scoreErr": 0
+  },
+  "snapBytes": 251535,
+  "audit": [],
+  "wallMs": 21690
+ },
+ {
+  "fixture": "hazard",
+  "level": "full",
+  "skip": "-",
+  "restoreError": "capture-tick mismatch: canonical.combined,canonical.matter",
+  "atCapture": {
+   "diff": [
+    "canonical.combined",
+    "canonical.matter"
+   ],
+   "sledExact": true,
+   "posErr": 0,
+   "scoreErr": 0
+  },
+  "snapBytes": 372976,
+  "audit": [],
+  "wallMs": 18786
+ }
+]
